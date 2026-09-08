@@ -1,13 +1,31 @@
 /* Registration form only: keep presence-hour buttons compact without changing readonly timelines or crew availability. */
+.availability-hour-grid.compact-hours {
+  grid-template-columns: repeat(auto-fit, minmax(78px, 96px));
+  justify-content: start;
+  gap: 6px;
+}
+
 .availability-hour-grid.compact-hours .hour-card {
-  min-height: 58px;
-  padding: 5px 4px;
+  min-height: 52px;
+  padding: 4px 3px;
 }
 
 .availability-hour-grid.compact-hours .hour-card-number {
-  font-size: 20px;
+  font-size: 18px;
 }
 
 .availability-hour-grid.compact-hours .hour-card-state {
-  margin-top: 2px;
+  margin-top: 1px;
+  font-size: 9px;
+}
+
+@media (max-width: 700px) {
+  .availability-hour-grid.compact-hours {
+    grid-template-columns: repeat(auto-fit, minmax(68px, 86px));
+    gap: 5px;
+  }
+
+  .availability-hour-grid.compact-hours .hour-card {
+    min-height: 50px;
+  }
 }
