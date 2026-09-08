@@ -1,0 +1,1113 @@
+
+
+/* =========================================================
+   VARIABLES
+========================================================= */
+
+:root {
+  --bg: #090a0b;
+  --panel: #111315;
+  --panel2: #17191c;
+  --panel3: #1d2023;
+  --border: #292d31;
+
+  --text: #f2f2f2;
+  --muted: #92979c;
+
+  --blue: #2589d8;
+  --green: #31b86b;
+  --yellow: #e4c341;
+  --red: #e34c4c;
+
+  --accent: #7ee38f;
+}
+
+
+/* =========================================================
+   BASE
+========================================================= */
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+button,
+input {
+  font-family: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+
+/* =========================================================
+   BARRE ARC / FMT
+========================================================= */
+
+.top-stripes {
+  height: 5px;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+}
+
+.top-stripes div:nth-child(1) {
+  background: var(--blue);
+}
+
+.top-stripes div:nth-child(2) {
+  background: var(--green);
+}
+
+.top-stripes div:nth-child(3) {
+  background: var(--yellow);
+}
+
+.top-stripes div:nth-child(4) {
+  background: var(--red);
+}
+
+
+/* =========================================================
+   HEADER
+========================================================= */
+
+header {
+  background: #0d0f10;
+  border-bottom: 1px solid var(--border);
+  padding: 18px 20px;
+}
+
+.header-inner {
+  max-width: 1100px;
+  margin: auto;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 15px;
+}
+
+.logo {
+  font-size: 22px;
+  font-weight: 900;
+  letter-spacing: 2px;
+}
+
+.logo span {
+  color: var(--green);
+}
+
+
+/* =========================================================
+   MAIN
+========================================================= */
+
+main {
+  max-width: 1100px;
+  margin: auto;
+  padding: 25px 18px 50px;
+}
+
+.page-title {
+  font-size: 28px;
+  font-weight: 900;
+  margin-bottom: 5px;
+}
+
+.page-subtitle {
+  color: var(--muted);
+  font-size: 13px;
+  margin-bottom: 25px;
+}
+
+
+/* =========================================================
+   BOUTONS GENERAUX
+========================================================= */
+
+.primary-button {
+  border: 0;
+  background: var(--green);
+  color: #07100a;
+
+  font-weight: 900;
+
+  padding: 11px 16px;
+
+  border-radius: 4px;
+}
+
+.primary-button:hover {
+  filter: brightness(1.08);
+}
+
+.secondary-button {
+  border: 1px solid var(--border);
+  background: var(--panel2);
+  color: var(--text);
+
+  font-weight: 800;
+
+  padding: 10px 15px;
+
+  border-radius: 4px;
+}
+
+.secondary-button:hover {
+  background: var(--panel3);
+}
+
+.back-button {
+  margin-bottom: 20px;
+}
+
+
+/* =========================================================
+   CARTES EVENEMENTS
+========================================================= */
+
+.event-list {
+  display: grid;
+  gap: 12px;
+}
+
+.event-agenda { display: grid; gap: 30px; }
+.event-period { min-width: 0; }
+.event-period-heading { display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px 14px; margin: 4px 0 14px; padding-bottom: 10px; border-bottom: 1px solid #344147; color: #eef5f3; font-size: 19px; line-height: 1.4; }
+.event-period-heading > span::first-letter { text-transform: uppercase; }
+.event-period-heading small { color: #aababb; font-size: 13px; font-weight: 500; }
+
+.event-card {
+  position: relative;
+
+  overflow: hidden;
+
+  background: var(--panel);
+
+  border: 1px solid var(--border);
+
+  border-radius: 7px;
+
+  padding: 17px 18px 17px 23px;
+
+  cursor: pointer;
+
+  transition: .15s;
+}
+
+.event-card:hover {
+  background: var(--panel2);
+
+  border-color: #3a4045;
+
+  transform: translateX(2px);
+}
+
+.event-card::before {
+  content: "";
+
+  position: absolute;
+
+  left: 0;
+  top: 0;
+  bottom: 0;
+
+  width: 5px;
+
+  background: var(--event-accent, var(--green));
+}
+
+.event-card.event-type-special { --event-accent: #e23a3a; }
+.event-card.event-type-lmu { --event-accent: #2bc56f; }
+.event-card.event-type-private { --event-accent: #4c98ef; }
+.event-card-body { display: block; min-width: 0; }
+.event-card-title-row { display: flex; align-items: center; flex-wrap: wrap; gap: 10px 18px; min-width: 0; }
+.event-card { min-height: 210px; padding-right: 350px; }
+.event-card .circuit-visual { position: absolute; top: 18px; right: 20px; width: 310px; height: 174px; }
+.event-card .circuit-visual img { width: 100%; height: 100%; object-fit: contain; }
+.event-card-title-row .event-name { margin: 0; }
+.event-card-title-row .event-info { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+.event-card-status { display: grid; gap: 4px; margin-top: 15px; }
+.event-card.archived { opacity: .58; filter: saturate(.55); }
+.event-card.archived:hover { opacity: .82; filter: saturate(.8); }
+.event-filter { display: inline-flex; gap: 5px; margin: 2px 0 16px; padding: 4px; border: 1px solid #303a3f; border-radius: 9px; background: #111719; }
+.event-filter-button { min-height: 36px; padding: 7px 13px; border: 1px solid transparent; border-radius: 6px; color: #aebcbe; background: transparent; font-size: 13px; font-weight: 800; }
+.event-filter-button[aria-pressed="true"] { color: #edfff3; border-color: #438768; background: #1c4032; }
+
+.event-name {
+  font-size: 17px;
+  font-weight: 900;
+
+  margin-bottom: 7px;
+}
+
+.event-info {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.event-countdown {
+  margin-top: 10px;
+
+  color: var(--green);
+
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.event-countdown.finished {
+  color: var(--muted);
+}
+
+
+/* =========================================================
+   FORMULAIRE CREATION
+========================================================= */
+
+.empty {
+  background: var(--panel);
+
+  border: 1px dashed var(--border);
+
+  padding: 30px;
+
+  text-align: center;
+
+  color: var(--muted);
+
+  border-radius: 6px;
+}
+
+.form-panel {
+  background: var(--panel);
+
+  border: 1px solid var(--border);
+
+  border-radius: 7px;
+
+  padding: 20px;
+}
+
+.form-group {
+  margin-bottom: 18px;
+}
+
+.form-label {
+  display: block;
+
+  color: var(--muted);
+
+  font-size: 11px;
+  font-weight: 900;
+
+  text-transform: uppercase;
+
+  margin-bottom: 8px;
+
+  letter-spacing: .5px;
+}
+
+input {
+  width: 100%;
+
+  background: var(--panel2);
+
+  border: 1px solid var(--border);
+
+  color: var(--text);
+
+  border-radius: 4px;
+
+  padding: 11px;
+
+  outline: none;
+}
+
+input:focus {
+  border-color: var(--green);
+}
+
+.departure-fields {
+  display: grid;
+  gap: 10px;
+}
+
+.departure-field {
+  display: grid;
+
+  grid-template-columns: 1fr 140px 40px;
+
+  gap: 8px;
+
+  align-items: center;
+}
+
+.remove-departure {
+  height: 38px;
+
+  border: 1px solid var(--border);
+
+  background: #211719;
+
+  color: var(--red);
+
+  border-radius: 4px;
+
+  font-weight: 900;
+}
+
+
+/* =========================================================
+   HEADER EVENEMENT
+========================================================= */
+
+.event-header {
+  margin-bottom: 22px;
+}
+.event-heading-line { display: flex; align-items: center; justify-content: space-between; gap: 18px; }
+
+.event-title {
+  font-size: 27px;
+  font-weight: 900;
+
+  margin-bottom: 5px;
+}
+
+.event-subtitle {
+  color: var(--muted);
+  font-size: 12px;
+}
+.event-subtitle .event-type-badge { margin-right: 9px; }
+
+
+/* =========================================================
+   NOM PILOTE
+========================================================= */
+
+.pilot-name-panel {
+  background: var(--panel);
+
+  border: 1px solid var(--border);
+
+  border-radius: 7px;
+
+  padding: 15px;
+
+  margin-bottom: 18px;
+}
+
+.pilot-name-panel input {
+  max-width: 450px;
+}
+
+
+/* =========================================================
+   DEPART
+========================================================= */
+
+.departures {
+  display: grid;
+  gap: 14px;
+}
+
+.departure {
+  overflow: hidden;
+
+  background: var(--panel);
+
+  border: 1px solid var(--border);
+
+  border-radius: 7px;
+
+  transition: .2s;
+}
+
+.departure.finished {
+  opacity: .62;
+
+  border-color: #222528;
+}
+
+.departure.finished:hover {
+  opacity: .82;
+}
+
+.departure-header {
+  display: flex;
+
+  justify-content: space-between;
+  align-items: center;
+
+  gap: 15px;
+
+  padding: 14px 16px;
+
+  background: var(--panel2);
+
+  border-bottom: 1px solid var(--border);
+}
+
+.departure.finished .departure-header {
+  background: #101214;
+
+  border-bottom: 0;
+}
+
+.departure-date {
+  font-size: 13px;
+
+  font-weight: 900;
+
+  text-transform: uppercase;
+}
+
+.departure-time {
+  margin-left: 7px;
+
+  color: var(--green);
+}
+
+.departure.finished .departure-time {
+  color: var(--muted);
+}
+
+.departure-countdown {
+  color: var(--muted);
+
+  font-size: 11px;
+
+  text-align: right;
+
+  white-space: nowrap;
+}
+
+.departure-countdown.upcoming {
+  color: var(--green);
+
+  font-weight: 800;
+}
+
+.departure-countdown.finished {
+  color: var(--muted);
+}
+
+.finished-label {
+  margin-left: auto;
+
+  margin-right: 10px;
+
+  color: var(--muted);
+
+  font-size: 10px;
+
+  font-weight: 900;
+
+  letter-spacing: 1px;
+}
+
+.departure-toggle {
+  border: 1px solid var(--border);
+
+  background: #1c1f22;
+
+  color: var(--muted);
+
+  padding: 6px 9px;
+
+  border-radius: 3px;
+
+  font-size: 10px;
+
+  font-weight: 900;
+}
+
+.departure-toggle:hover {
+  background: #25292c;
+
+  color: var(--text);
+}
+
+
+/* =========================================================
+   LISTE PILOTES
+========================================================= */
+
+.pilot-section {
+  padding: 12px;
+}
+
+.pilot-section-title {
+  color: var(--muted);
+
+  font-size: 10px;
+
+  font-weight: 900;
+
+  letter-spacing: 1px;
+
+  margin-bottom: 7px;
+}
+
+.pilot-list {
+  display: grid;
+
+  gap: 4px;
+}
+
+
+/* =========================================================
+   GROUPES CATEGORIES
+========================================================= */
+
+.category-group {
+  margin-bottom: 10px;
+}
+
+.category-group:last-child {
+  margin-bottom: 0;
+}
+
+.category-group-header {
+  display: flex;
+
+  align-items: center;
+
+  gap: 7px;
+
+  padding: 6px 7px;
+
+  margin-bottom: 4px;
+
+  background: #0e1011;
+
+  border-left: 3px solid var(--border);
+
+  font-size: 9px;
+
+  font-weight: 900;
+
+  letter-spacing: 1px;
+
+  color: var(--muted);
+}
+
+.category-group-header img {
+  width: 25px;
+  height: 17px;
+
+  object-fit: contain;
+}
+
+.category-group-header.hyper {
+  border-left-color: var(--blue);
+}
+
+.category-group-header.lmp2 {
+  border-left-color: var(--green);
+}
+
+.category-group-header.lmp3 {
+  border-left-color: var(--yellow);
+}
+
+.category-group-header.gt3 {
+  border-left-color: var(--red);
+}
+
+.category-count {
+  margin-left: auto;
+
+  color: #656a6f;
+
+  font-size: 8px;
+}
+
+
+/* =========================================================
+   LIGNE PILOTE
+========================================================= */
+
+.pilot-row {
+  display: grid;
+
+  grid-template-columns:
+    minmax(100px, 1fr)
+    30px
+    78px
+    30px;
+
+  align-items: center;
+
+  gap: 8px;
+
+  min-height: 34px;
+
+  padding: 5px 7px;
+
+  background: var(--panel2);
+
+  border: 1px solid rgba(255,255,255,.035);
+
+  border-radius: 4px;
+}
+
+.pilot-name {
+  font-size: 12px;
+
+  font-weight: 800;
+
+  overflow: hidden;
+
+  text-overflow: ellipsis;
+
+  white-space: nowrap;
+}
+
+
+/* Petit logo catégorie */
+
+.pilot-category-logo {
+  width: 30px;
+  height: 25px;
+
+  display: flex;
+
+  align-items: center;
+  justify-content: center;
+}
+
+.pilot-category-logo img {
+  max-width: 30px;
+  max-height: 22px;
+
+  object-fit: contain;
+}
+
+
+/* =========================================================
+   BARRE DISPONIBILITE PILOTE
+========================================================= */
+
+.availability-bar {
+  display: grid;
+
+  grid-template-columns:
+    repeat(3, 1fr);
+
+  gap: 2px;
+
+  height: 17px;
+}
+
+.availability-segment {
+  background: #292d31;
+
+  border-radius: 2px;
+}
+
+.availability-segment.beginning.active {
+  background: var(--green);
+}
+
+.availability-segment.middle.active {
+  background: var(--yellow);
+}
+
+.availability-segment.end.active {
+  background: var(--red);
+}
+
+.availability-whole {
+  grid-column: 1 / 4;
+
+  background: var(--green);
+
+  border-radius: 2px;
+}
+
+.availability-unavailable {
+  grid-column: 1 / 4;
+
+  background: #35383b;
+
+  border-radius: 2px;
+}
+
+
+/* =========================================================
+   EDIT
+========================================================= */
+
+.edit-button {
+  width: 28px;
+  height: 25px;
+
+  border: 1px solid var(--border);
+
+  border-radius: 3px;
+
+  background: #25282b;
+
+  color: var(--muted);
+
+  font-size: 11px;
+}
+
+.edit-button:hover {
+  color: var(--text);
+
+  background: #303438;
+}
+
+
+/* =========================================================
+   FORMULAIRE INSCRIPTION
+========================================================= */
+
+.form-section {
+  padding: 13px;
+
+  border-top: 1px solid var(--border);
+
+  background: #0f1112;
+}
+
+.form-section.editing {
+  border-top-color: var(--green);
+}
+
+.form-title {
+  font-size: 10px;
+
+  font-weight: 900;
+
+  margin-bottom: 8px;
+
+  text-transform: uppercase;
+
+  color: var(--muted);
+
+  letter-spacing: .7px;
+}
+
+
+/* =========================================================
+   NOUVELLE BARRE DE DISPONIBILITE
+========================================================= */
+
+.relay-container {
+  margin-bottom: 10px;
+}
+
+.relay-bar {
+  display: grid;
+
+  grid-template-columns:
+    repeat(3, 1fr);
+
+  gap: 3px;
+
+  background: #0a0c0d;
+
+  padding: 3px;
+
+  border: 1px solid var(--border);
+
+  border-radius: 6px;
+
+  height: 48px;
+}
+
+.relay-button {
+  border: 0;
+
+  background: #202427;
+
+  color: #777d82;
+
+  font-size: 9px;
+
+  font-weight: 900;
+
+  letter-spacing: .5px;
+
+  position: relative;
+
+  transition: .12s;
+}
+
+.relay-button:first-child {
+  border-radius: 4px 2px 2px 4px;
+}
+
+.relay-button:last-child {
+  border-radius: 2px 4px 4px 2px;
+}
+
+.relay-button:hover {
+  background: #292d31;
+
+  color: white;
+}
+
+.relay-button.active.beginning {
+  background: var(--green);
+
+  color: #07100a;
+}
+
+.relay-button.active.middle {
+  background: var(--yellow);
+
+  color: #151200;
+}
+
+.relay-button.active.end {
+  background: var(--red);
+
+  color: white;
+}
+
+
+/* =========================================================
+   OPTIONS SPECIALES
+========================================================= */
+
+.special-availability {
+  display: flex;
+
+  gap: 5px;
+
+  margin-bottom: 12px;
+}
+
+.special-button {
+  border: 1px solid var(--border);
+
+  background: var(--panel2);
+
+  color: var(--muted);
+
+  border-radius: 4px;
+
+  padding: 7px 11px;
+
+  font-size: 9px;
+
+  font-weight: 900;
+
+  flex: 1;
+}
+
+.special-button:hover {
+  background: var(--panel3);
+
+  color: var(--text);
+}
+
+.special-button.active.whole {
+  background: var(--green);
+
+  border-color: var(--green);
+
+  color: #07100a;
+}
+
+.special-button.active.unavailable {
+  background: #3b3e41;
+
+  border-color: #555a5e;
+
+  color: white;
+}
+
+
+/* =========================================================
+   CATEGORIES
+========================================================= */
+
+.category-area {
+  display: flex;
+
+  align-items: center;
+
+  justify-content: space-between;
+
+  gap: 12px;
+
+  padding-top: 4px;
+}
+
+.category-label {
+  color: var(--muted);
+
+  font-size: 9px;
+
+  font-weight: 900;
+
+  letter-spacing: .7px;
+
+  white-space: nowrap;
+}
+
+.categories {
+  display: flex;
+
+  justify-content: flex-end;
+
+  gap: 5px;
+
+  flex-wrap: wrap;
+}
+
+.category-button {
+  width: 82px;
+  height: 40px;
+
+  border: 1px solid var(--border);
+
+  background: var(--panel2);
+
+  color: var(--muted);
+
+  border-radius: 4px;
+
+  font-weight: 900;
+
+  font-size: 8px;
+
+  display: flex;
+
+  align-items: center;
+
+  justify-content: center;
+
+  gap: 4px;
+
+  transition: .12s;
+}
+
+.category-button img {
+  max-width: 42px;
+  max-height: 23px;
+
+  object-fit: contain;
+}
+
+.category-button:hover {
+  background: var(--panel3);
+
+  color: var(--text);
+}
+
+.category-button.active.hyper {
+  background: var(--blue);
+
+  border-color: var(--blue);
+
+  color: #071017;
+}
+
+.category-button.active.lmp2 {
+  background: var(--green);
+
+  border-color: var(--green);
+
+  color: #07100a;
+}
+
+.category-button.active.lmp3 {
+  background: var(--yellow);
+
+  border-color: var(--yellow);
+
+  color: #151200;
+}
+
+.category-button.active.gt3 {
+  background: var(--red);
+
+  border-color: var(--red);
+
+  color: white;
+}
+
+
+/* =========================================================
+   SAUVEGARDE
+========================================================= */
+
+.save-row {
+  margin-top: 12px;
+
+  display: flex;
+
+  justify-content: flex-end;
+}
+
+.save-button {
+  border: 0;
+
+  background: var(--accent);
+
+  color: #07100a;
+
+  font-size: 10px;
+
+  font-weight: 900;
+
+  padding: 9px 15px;
+
+  border-radius: 4px;
+}
+
+.save-button:hover {
+  filter: brightness(1.08);
+}
+
+
+/* =========================================================
+   HISTORIQUE
+========================================================= */
+
+.finished-history {
+  padding: 10px 12px;
+
+  border-top: 1px solid var(--border);
+
+  color: var(--muted);
+
+  font-size: 9px;
+
+  text-transform: uppercase;
+
+  letter-spacing: .6px;
+}
+
+
+/* =========================================================
+   LEGENDE
+========================================================= */
+
+.legend {
+  padding: 10px 12px;
+
+  border-top: 1px solid var(--border);
+
+  color: var(--muted);
+
+  font-size: 9px;
+}
+
+.legend span {
+  margin-right: 10px;
+}

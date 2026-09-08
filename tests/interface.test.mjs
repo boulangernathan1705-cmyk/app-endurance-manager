@@ -47,7 +47,10 @@ function interfaceHarness(role='pilot',duration=6) {
   const app={innerHTML:'',querySelector:()=>null,insertAdjacentHTML(){}};
   const document={getElementById:()=>app,addEventListener(){}};
   const context=vm.createContext({document,Intl,Date,URLSearchParams,structuredClone,setInterval(){},localStorage:{getItem:()=>''},console});
-  vm.runInContext(readFileSync(new URL('../app.js',import.meta.url),'utf8').replace(/start\(\);\s*$/,''),context);
+  const catalog=readFileSync(new URL('../shared/catalog.mjs',import.meta.url),'utf8').replace(/\bexport\s+/g,'');
+  const schedule=readFileSync(new URL('../front/schedule.mjs',import.meta.url),'utf8').replace(/\bexport\s+/g,'');
+  const source=readFileSync(new URL('../app.js',import.meta.url),'utf8').replace(/^import[^\n]+\n/gm,'').replace(/start\(\);\s*$/,'');
+  vm.runInContext(catalog+'\n'+schedule+'\n'+source,context);
   const departure={id:'first',date:'2090-01-01',time:'12:00',startsAt:Date.UTC(2090,0,1),availability:[{id:'reg',name:'<Pilot>',status:'whole',category:'Hypercar',car:'Ferrari 499P',cars:['Ferrari 499P'],carAny:false,version:1,mine:true,canEdit:true}],crews:[{id:'crew',name:'FMT <test>',car:'Ferrari 499P',category:'Hypercar',version:1,registrationIds:['reg']}]};
   const event={id:'event',name:'Test',circuit:'daytona',eventType:'special',durationHours:duration,categories:['Hypercar'],departures:[departure,{...departure,id:'second',time:'15:00',crews:[],availability:[]}]};
   vm.runInContext(`events=${JSON.stringify([event])};user={role:${JSON.stringify(role)}};currentEventId='event';`,context);

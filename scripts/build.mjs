@@ -6,6 +6,9 @@ await rm(out,{recursive:true,force:true});
 await mkdir(out,{recursive:true});
 for(const file of ['index.html','styles.css','app.js']) await copyFile(root+file,new URL(file,out));
 await cp(root+'images',new URL('images/',out),{recursive:true});
+await cp(root+'styles',new URL('styles/',out),{recursive:true});
+await cp(root+'front',new URL('front/',out),{recursive:true});
+await cp(root+'shared',new URL('shared/',out),{recursive:true});
 if(!process.argv.includes('--workers')){
   await copyFile(root+'server/worker.mjs',new URL('_worker.js',out));
   await writeFile(new URL('_routes.json',out),JSON.stringify({version:1,include:['/api/*'],exclude:[]},null,2)+'\n');

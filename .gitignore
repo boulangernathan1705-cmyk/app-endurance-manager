@@ -7,3 +7,5 @@ public/
 .dev.vars.*
 !.env.example
 *.sqlite
+.DS_Store
+npm-debug.log*

@@ -1,39 +1,5 @@
-const CATEGORIES = ['Hypercar','LMP2 ELMS','LMP2 WEC','LMP3','GT3','GTE'];
-const EVENT_TYPES = {special:{label:'Special event',css:'special'},lmu:{label:'Championnat LMU',css:'lmu'},private:{label:'Championnat privé',css:'private'}};
-const CIRCUITS = [
-  {id:'bahrain',name:'Bahrain International Circuit',file:'bahrain.png'},
-  {id:'barcelona',name:'Circuit de Barcelona-Catalunya',file:'barcelone.png'},
-  {id:'cota',name:'Circuit of the Americas',file:'cota.png'},
-  {id:'daytona',name:'Daytona International Speedway',file:'daytona.png'},
-  {id:'fuji',name:'Fuji Speedway',file:'fuji.png'},
-  {id:'imola',name:'Autodromo Enzo e Dino Ferrari (Imola)',file:'imola.png'},
-  {id:'interlagos',name:'Interlagos',file:'interlagos.png'},
-  {id:'laguna-seca',name:'WeatherTech Raceway Laguna Seca',file:'laguna_seca.png'},
-  {id:'le-mans',name:'Circuit de la Sarthe (Le Mans)',file:'le_mans.png'},
-  {id:'lusail',name:'Lusail International Circuit',file:'lusail_international.png'},
-  {id:'monza',name:'Autodromo Nazionale Monza',file:'monza.png'},
-  {id:'paul-ricard',name:'Circuit Paul Ricard',file:'paul_ricard_elms.png'},
-  {id:'portimao',name:'Algarve International Circuit (Portimão)',file:'algarve.png'},
-  {id:'sebring',name:'Sebring International Raceway',file:'sebring.png'},
-  {id:'silverstone',name:'Silverstone Circuit',file:'silverstone.png'},
-  {id:'spa',name:'Circuit de Spa-Francorchamps',file:'spa_francorchamps.png'}
-];
-const categories = {
-  Hypercar:{image:'HC.png',css:'hyper'},
-  'LMP2 ELMS':{image:'LMP2.png',css:'lmp2'},
-  'LMP2 WEC':{image:'LMP2.png',css:'lmp2'},
-  LMP3:{image:'P3.png',css:'lmp3'},
-  GT3:{image:'GT3.png',css:'gt3'},
-  GTE:{image:'GTE.png',css:'gte'}
-};
-const CARS = {
-  Hypercar: ['Alpine A424','Aston Martin Valkyrie AMR LMH','BMW M Hybrid V8','Cadillac V-Series.R','Ferrari 499P','Genesis GMR-001 LMDh','Glickenhaus SCG 007','Isotta Fraschini Tipo 6-C','Lamborghini SC63','Peugeot 9X8','Porsche 963','Toyota GR010 Hybrid','Vanwall Vandervell 680'],
-  'LMP2 ELMS': ['Oreca 07 Gibson ELMS'],
-  'LMP2 WEC': ['Oreca 07 Gibson'],
-  LMP3: ['Ligier JS P325','Ginetta G61-LT-P3','Duqueine D09','Adess AD25'],
-  GT3: ['Aston Martin Vantage AMR LMGT3','BMW M4 LMGT3','Chevrolet Corvette Z06 LMGT3.R','Ferrari 296 LMGT3','Ford Mustang LMGT3','Lamborghini Huracán LMGT3','Lexus RC F LMGT3','Mercedes-AMG LMGT3','McLaren 720S LMGT3','Porsche 911 GT3 R LMGT3'],
-  GTE: ['Aston Martin Vantage GTE','Chevrolet Corvette C8.R','Ferrari 488 GTE','Porsche 911 RSR-19']
-};
+import {CATEGORIES, EVENT_TYPES, CIRCUITS, categories, CARS} from './shared/catalog.mjs';
+import {countdown, dateLabel, groupEvents} from './front/schedule.mjs';
 const app = document.getElementById('app');
 const nav = document.getElementById('navigation');
 let events=[], user=null, discordReady=false, currentEventId=null, page='home', editingEvent=null;
@@ -104,50 +70,6 @@ function renderNav() {
     ${isAdmin()?button('members','Gestion des membres'):''}
     ${user?`<span class="account-name">${esc(user.name)} <small>${roleLabel(user.role)}</small></span>${button('logout','Déconnexion')}`:
       discordReady?'<a class="discord-button" href="/api/auth/discord">Se connecter avec Discord</a>':'<span class="account-name">Connexion Discord à configurer</span>'}`;
-}
-function countdown(timestamp) {
-  const seconds=Math.max(0,Math.floor((timestamp-Date.now())/1000));
-  if (!seconds) return 'Départ passé';
-  const days=Math.floor(seconds/86400),hours=Math.floor(seconds%86400/3600),minutes=Math.floor(seconds%3600/60);
-  return days?`${days}j ${hours}h ${minutes}m`:`${hours}h ${minutes}m ${seconds%60}s`;
-}
-function dateLabel(departure) { return new Intl.DateTimeFormat('fr-FR',{timeZone:'Europe/Paris',dateStyle:'full'}).format(new Date(departure.startsAt)); }
-function parisCalendar(timestamp) {
-  const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Paris',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date(timestamp));
-  const value=type=>Number(parts.find(part=>part.type===type).value);
-  return {year:value('year'),month:value('month'),day:Date.UTC(value('year'),value('month')-1,value('day'))};
-}
-function eventSchedule(event,now) {
-  const departures=[...event.departures].filter(d=>Number.isFinite(d.startsAt)).sort((a,b)=>a.startsAt-b.startsAt);
-  const duration=(event.durationHours||6)*3600000;
-  const next=departures.find(d=>d.startsAt>now);
-  const running=departures.find(d=>d.startsAt<=now&&d.startsAt+duration>now);
-  const end=departures.length?departures[departures.length-1].startsAt+duration:null;
-  return {event,next,running,end,archived:end!==null&&end<=now,timestamp:running?.startsAt??next?.startsAt??end};
-}
-function groupEvents(source,filter,now=Date.now()) {
-  const today=parisCalendar(now);
-  const monday=today.day-((new Date(today.day).getUTCDay()+6)%7)*86400000;
-  const monthLabel=timestamp=>new Intl.DateTimeFormat('fr-FR',{timeZone:'Europe/Paris',month:'long',...(parisCalendar(timestamp).year!==today.year?{year:'numeric'}:{})}).format(new Date(timestamp));
-  const items=source.map(event=>eventSchedule(event,now)).filter(item=>filter==='archived'?item.archived:!item.archived);
-  items.sort((a,b)=>filter==='archived'?b.end-a.end:Number(!!b.running)-Number(!!a.running)||(a.timestamp??Infinity)-(b.timestamp??Infinity)||a.event.name.localeCompare(b.event.name,'fr'));
-  const groups=new Map();
-  for(const item of items){
-    let key,label;
-    if(item.timestamp===null){key='undated';label='Dates à confirmer';}
-    else {
-      const date=parisCalendar(item.timestamp);
-      key=`${date.year}-${date.month}`;
-      if(filter==='archived')label=monthLabel(item.timestamp);
-      else if(item.running){key='running';label='En cours';}
-      else if(date.day<monday+7*86400000){key='this-week';label='Cette semaine';}
-      else if(date.day<monday+14*86400000){key='next-week';label='La semaine prochaine';}
-      else label=`${date.year===today.year&&date.month===today.month?'Plus tard en ':''}${monthLabel(item.timestamp)}`;
-    }
-    if(!groups.has(key))groups.set(key,{key,label,items:[]});
-    groups.get(key).items.push(item);
-  }
-  return [...groups.values()];
 }
 function renderEventCard({event,next,running,archived,end}) {
   return `<button class="event-card event-type-${event.eventType||'private'} ${archived?'archived':''}" data-action="open" data-id="${event.id}">
