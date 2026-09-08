@@ -16,13 +16,15 @@ jobs:
         with:
           node-version: 22
       - name: Apply changes
-        run: python3 scripts/refine-course-header.py
+        run: |
+          python3 scripts/refine-course-header.py
+          python3 scripts/update-course-header-test.py
       - name: Run checks
         run: npm run check
       - name: Commit changes
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add app.js styles/application.css index.html
+          git add app.js styles/application.css index.html tests/interface.test.mjs
           git commit -m "refine: compact event header and recap"
           git push
