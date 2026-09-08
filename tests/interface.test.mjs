@@ -56,9 +56,9 @@ function interfaceHarness(role='pilot',duration=6) {
   vm.runInContext(`events=${JSON.stringify([event])};user={role:${JSON.stringify(role)}};currentEventId='event';`,context);
   return {app,context,run:code=>vm.runInContext(code,context)};
 }
-test('course recap, foldable departures, read-only crews for pilots, escaped names',()=>{
+test('compact course header, foldable departures, read-only crews for pilots, escaped names',()=>{
   const h=interfaceHarness();h.run('renderEvent()');
-  assert(h.app.innerHTML.includes('RÉCAPITULATIF DE LA COURSE'));
+  assert(h.app.innerHTML.includes('event-header-stats'));
   assert(h.app.innerHTML.includes('Daytona International Speedway'));
   assert(h.app.innerHTML.includes('event-type-special'));
   assert(h.app.innerHTML.includes('crew-pilot-group crew-palette-0'));
@@ -68,7 +68,7 @@ test('course recap, foldable departures, read-only crews for pilots, escaped nam
   assert(h.app.innerHTML.includes('id="departure-first"'));assert(h.app.innerHTML.includes('id="departure-second"'));
   assert.equal((h.app.innerHTML.match(/class="departure-fold"/g)||[]).length,2);
   h.run("eventSection='crews';renderEvent()");
-  assert(h.app.innerHTML.includes('RÉCAPITULATIF DE LA COURSE'));
+  assert(h.app.innerHTML.includes('event-header-stats'));
   assert(!h.app.innerHTML.includes('data-section="crews"'));
   assert(!h.app.innerHTML.includes('data-action="new-crew"'));
   assert(!h.app.innerHTML.includes('data-action="add-crew-pilot"'));
