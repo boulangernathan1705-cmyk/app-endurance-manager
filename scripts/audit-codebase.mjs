@@ -54,8 +54,11 @@ for (const circuit of CIRCUITS) {
 
 const app = searchable.find(item => item.path === 'app.js')?.content || '';
 const worker = searchable.find(item => item.path === 'server/worker.mjs')?.content || '';
+const workerCore = searchable.find(item => item.path === 'server/core.mjs')?.content || '';
 if (!app.includes("from './shared/catalog.mjs'")) warnings.push('Le front n’utilise pas le catalogue partagé.');
-if (!worker.includes("from '../shared/catalog.mjs'")) warnings.push('Le Worker n’utilise pas le catalogue partagé.');
+if (!worker.includes("from '../shared/catalog.mjs'") && !workerCore.includes("from '../shared/catalog.mjs'")) {
+  warnings.push('Le serveur n’utilise pas le catalogue partagé.');
+}
 
 console.log('=== Audit App Endurance Manager ===');
 console.log(`Fichiers analysés : ${rows.length}`);
