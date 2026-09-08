@@ -657,3 +657,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   .my-entry-toggle { flex-basis:32px; width:32px; height:32px; }
   .my-entry-waiting-grid { grid-template-columns:1fr; }
 }
+
+
+/* Mes inscriptions: status-focused layout. */
+.my-entry-existing-crews-wrap { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border); }
+.my-entry-existing-crews-wrap h4 { margin: 0 0 9px; color: var(--muted); font-size: 12px; font-weight: 900; letter-spacing: .7px; }
