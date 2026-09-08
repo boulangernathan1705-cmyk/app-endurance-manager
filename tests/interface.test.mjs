@@ -63,6 +63,8 @@ test('course recap, foldable departures, read-only crews for pilots, escaped nam
   assert(h.app.innerHTML.includes('event-type-special'));
   assert(h.app.innerHTML.includes('crew-pilot-group crew-palette-0'));
   assert(h.app.innerHTML.includes('Ferrari 499P'));
+  assert(h.app.innerHTML.includes('01h'));
+  assert(!h.app.innerHTML.includes('class="pilot-car"'));
   assert(h.app.innerHTML.includes('id="departure-first"'));assert(h.app.innerHTML.includes('id="departure-second"'));
   assert.equal((h.app.innerHTML.match(/class="departure-fold"/g)||[]).length,2);
   h.run("eventSection='crews';renderEvent()");
