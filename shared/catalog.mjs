@@ -1,11 +1,4 @@
-import {readFile, writeFile, mkdir, rm} from 'node:fs/promises';
-import {fileURLToPath} from 'node:url';
-
-const root = fileURLToPath(new URL('../', import.meta.url));
-const read = path => readFile(root + path, 'utf8');
-const write = (path, content) => writeFile(root + path, content);
-
-const catalog = `export const CATEGORIES = ['Hypercar','LMP2 ELMS','LMP2 WEC','LMP3','GT3','GTE'];
+export const CATEGORIES = ['Hypercar','LMP2 ELMS','LMP2 WEC','LMP3','GT3','GTE'];
 
 export const EVENT_TYPES = {
   special:{label:'Special event',css:'special'},
@@ -52,40 +45,3 @@ export const CARS = {
   GT3: ['Aston Martin Vantage AMR LMGT3','BMW M4 LMGT3','Chevrolet Corvette Z06 LMGT3.R','Ferrari 296 LMGT3','Ford Mustang LMGT3','Lamborghini Huracán LMGT3','Lexus RC F LMGT3','Mercedes-AMG LMGT3','McLaren 720S LMGT3','Porsche 911 GT3 R LMGT3'],
   GTE: ['Aston Martin Vantage GTE','Chevrolet Corvette C8.R','Ferrari 488 GTE','Porsche 911 RSR-19']
 };
-`;
-
-await mkdir(root + 'shared', {recursive:true});
-await write('shared/catalog.mjs', catalog);
-
-let app = await read('app.js');
-const appMarker = "const app = document.getElementById('app');";
-const appIndex = app.indexOf(appMarker);
-if (appIndex < 0) throw new Error('app.js marker not found');
-app = `import {CATEGORIES, EVENT_TYPES, CIRCUITS, categories, CARS} from './shared/catalog.mjs';\n${app.slice(appIndex)}`;
-await write('app.js', app);
-
-let worker = await read('server/worker.mjs');
-const workerMarker = 'const LEGACY_CAR_ALIASES = new Map([';
-const workerIndex = worker.indexOf(workerMarker);
-if (workerIndex < 0) throw new Error('worker marker not found');
-worker = `import {CATEGORIES, EVENT_TYPE_IDS as EVENT_TYPES, CIRCUIT_IDS as CIRCUITS, CARS} from '../shared/catalog.mjs';\n${worker.slice(workerIndex)}`;
-await write('server/worker.mjs', worker);
-
-let build = await read('scripts/build.mjs');
-const imageCopy = "await cp(root+'images',new URL('images/',out),{recursive:true});";
-if (!build.includes(imageCopy)) throw new Error('build marker not found');
-build = build.replace(imageCopy, `${imageCopy}\nawait cp(root+'shared',new URL('shared/',out),{recursive:true});`);
-await write('scripts/build.mjs', build);
-
-let tests = await read('tests/interface.test.mjs');
-const oldHarness = "  vm.runInContext(readFileSync(new URL('../app.js',import.meta.url),'utf8').replace(/start\\(\\);\\s*$/,''),context);";
-if (!tests.includes(oldHarness)) throw new Error('interface harness marker not found');
-const newHarness = "  const catalog=readFileSync(new URL('../shared/catalog.mjs',import.meta.url),'utf8').replace(/\\bexport\\s+/g,'');\n  const source=readFileSync(new URL('../app.js',import.meta.url),'utf8').replace(/^import[^\\n]+\\n/,'').replace(/start\\(\\);\\s*$/,'');\n  vm.runInContext(catalog+'\\n'+source,context);";
-tests = tests.replace(oldHarness, newHarness);
-await write('tests/interface.test.mjs', tests);
-
-// This one-time migration removes itself and its workflow after producing the refactor commit.
-await rm(root + 'scripts/refactor-shared-catalog.mjs', {force:true});
-await rm(root + '.github/workflows/refactor-shared-catalog.yml', {force:true});
-
-console.log('Shared catalog refactor applied.');
