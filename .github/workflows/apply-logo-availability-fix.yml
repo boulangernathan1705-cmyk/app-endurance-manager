@@ -1,0 +1,131 @@
+name: Apply logo and crew availability fix
+on:
+  push:
+    branches: [fix/logo-and-crew-availability]
+    paths: ['.github/workflows/apply-logo-availability-fix.yml']
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/logo-and-crew-availability
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Apply changes
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          app = Path('app.js')
+          s = app.read_text()
+
+          old = """function pilotWishes(reg) {
+  return `<dl class=\"pilot-wishes\"><div><dt>Voiture(s) souhaitée(s)</dt><dd>${esc(registrationCarLabel(reg))}</dd></div><div><dt>Coéquipier souhaité</dt><dd>${esc(reg.preferredPilot || 'Aucune préférence renseignée')}</dd></div></dl>`;
+}
+function updateAssignmentPreview(select) {
+  const departure=events.find(e=>e.id===currentEventId)?.departures.find(d=>d.id===select.dataset.departure);
+  const reg=departure?.availability.find(r=>r.id===select.value);
+  const preview=document.getElementById(select.getAttribute('aria-controls'));
+  const removed=reg?departure.availability.filter(r=>r.id!==reg.id&&r.participantId&&r.participantId===reg.participantId):[];
+  if(preview) preview.innerHTML=reg?`<strong>${esc(reg.name)}</strong>${pilotWishes(reg)}<p class=\"assignment-effect\">Affectation en <strong>${esc(reg.category)}</strong>. ${removed.length?`Les autres inscriptions de ce pilote sur ce départ seront retirées : ${removed.map(r=>esc(r.category||'Indisponible')).join(', ')}.`:'Aucune autre inscription à retirer sur ce départ.'}</p>`:'Sélectionne un pilote pour voir ses souhaits avant de l’ajouter.';
+}
+"""
+          new = """function pilotAvailability(reg,departure,duration) {
+  if(!departure)return '';
+  const parts=new Set(String(reg.status||'').split(',').filter(x=>/^h\\d+$/.test(x)));
+  return `<div class=\"crew-pilot-availability\"><span class=\"crew-pilot-availability-label\">Disponibilité</span><div class=\"crew-pilot-hours duration-${duration}\">${Array.from({length:duration},(_,i)=>{const present=reg.status==='whole'||parts.has(`h${i+1}`);return `<span class=\"crew-pilot-hour ${phaseClass(i,duration)} ${present?'present':''}\" title=\"${raceHourLabel(departure,i)} · ${present?'Disponible':'Absent'}\">${raceHourLabel(departure,i)}</span>`;}).join('')}</div></div>`;
+}
+function pilotWishes(reg,departure=null,duration=0) {
+  return `<dl class=\"pilot-wishes\"><div><dt>Voiture(s) souhaitée(s)</dt><dd>${esc(registrationCarLabel(reg))}</dd></div><div><dt>Coéquipier souhaité</dt><dd>${esc(reg.preferredPilot || 'Aucune préférence renseignée')}</dd></div></dl>${departure&&duration?pilotAvailability(reg,departure,duration):''}`;
+}
+function updateAssignmentPreview(select) {
+  const event=events.find(e=>e.id===currentEventId);
+  const departure=event?.departures.find(d=>d.id===select.dataset.departure);
+  const reg=departure?.availability.find(r=>r.id===select.value);
+  const preview=document.getElementById(select.getAttribute('aria-controls'));
+  const removed=reg?departure.availability.filter(r=>r.id!==reg.id&&r.participantId&&r.participantId===reg.participantId):[];
+  if(preview) preview.innerHTML=reg?`<strong>${esc(reg.name)}</strong>${pilotWishes(reg,departure,event?.durationHours||6)}<p class=\"assignment-effect\">Affectation en <strong>${esc(reg.category)}</strong>. ${removed.length?`Les autres inscriptions de ce pilote sur ce départ seront retirées : ${removed.map(r=>esc(r.category||'Indisponible')).join(', ')}.`:'Aucune autre inscription à retirer sur ce départ.'}</p>`:'Sélectionne un pilote pour voir ses souhaits et ses disponibilités avant de l’ajouter.';
+}
+"""
+          if old not in s:
+              raise SystemExit('pilotWishes block not found')
+          s = s.replace(old,new,1)
+
+          old = """  const preferenceList=preferences.length?`<ul class=\"crew-preference-list\">${preferences.map(r=>`<li><strong>${esc(r.name)}</strong><span>${esc(registrationCarLabel(r))}</span></li>`).join('')}</ul>`:'<p class=\"muted\">Aucun pilote inscrit dans cette catégorie pour ce départ.</p>';
+"""
+          new = """  const preferenceList=preferences.length?`<ul class=\"crew-preference-list\">${preferences.map(r=>`<li class=\"crew-preference-item\"><strong>${esc(r.name)}</strong>${pilotWishes(r,departure,event.durationHours||6)}</li>`).join('')}</ul>`:'<p class=\"muted\">Aucun pilote inscrit dans cette catégorie pour ce départ.</p>';
+"""
+          if old not in s:
+              raise SystemExit('preferenceList block not found')
+          s = s.replace(old,new,1)
+
+          old = """${unassigned.map(r=>`<li><strong>${esc(r.name)}</strong> <span class=\"muted\">· ${esc(r.category)}</span>${pilotWishes(r)}</li>`).join('')||'<li>Tous les pilotes inscrits disponibles sont affectés.</li>'}"""
+          new = """${unassigned.map(r=>`<li><strong>${esc(r.name)}</strong> <span class=\"muted\">· ${esc(r.category)}</span>${pilotWishes(r,departure,duration)}</li>`).join('')||'<li>Tous les pilotes inscrits disponibles sont affectés.</li>'}"""
+          if old not in s:
+              raise SystemExit('unassigned pilotWishes call not found')
+          s = s.replace(old,new,1)
+          app.write_text(s)
+
+          brand = Path('styles/brand-theme.css')
+          css = brand.read_text()
+          css = css.replace(""".brand-mark {
+  width: 54px;
+  height: 54px;
+  flex: 0 0 54px;
+  border-radius: 50%;
+  object-fit: cover;
+  box-shadow: 0 0 0 1px #303735, 0 5px 18px rgba(0,0,0,.38);
+}
+""",""".brand-mark {
+  width: 92px;
+  height: 92px;
+  flex: 0 0 92px;
+  border-radius: 0;
+  object-fit: contain;
+  object-position: center;
+  box-shadow: none;
+}
+""",1)
+          css = css.replace(".brand-button.logo:hover .brand-mark { box-shadow: 0 0 0 1px #3f8f68, 0 5px 20px rgba(0,0,0,.42); }",".brand-button.logo:hover .brand-mark { filter: brightness(1.08); }",1)
+          css = css.replace("  .brand-mark { width: 44px; height: 44px; flex-basis: 44px; }","  .brand-mark { width: 72px; height: 72px; flex-basis: 72px; }",1)
+          brand.write_text(css)
+
+          application = Path('styles/application.css')
+          acss = application.read_text()
+          acss += """
+
+/* Pilot availability shown while composing crews. */
+.crew-preference-list { grid-template-columns: 1fr; gap: 10px; }
+.crew-preference-list .crew-preference-item { display: block; padding: 10px 12px; border: 1px solid #2f3b3e; border-radius: 8px; }
+.crew-preference-item > strong { display: block; margin-bottom: 7px; }
+.crew-pilot-availability { margin-top: 8px; }
+.crew-pilot-availability-label { display: block; margin-bottom: 5px; color: #aebcbe; font-size: 12px; font-weight: 800; }
+.crew-pilot-hours { display: grid; grid-template-columns: repeat(var(--duration, 6), minmax(26px,1fr)); gap: 3px; width: 100%; }
+.crew-pilot-hour { display: grid; place-items: center; min-height: 24px; padding: 2px; border: 1px solid #394548; border-radius: 4px; background: #20272a; color: #7e8b8e; font-size: 9px; font-weight: 800; }
+.crew-pilot-hour.present { border-color: color-mix(in srgb, var(--phase-color) 70%, #fff); background: var(--phase-color); color: #0b1711; }
+.assignment-wishes .crew-pilot-hours { margin-top: 6px; }
+.unassigned-pilots .pilot-wishes { margin-top: 6px; }
+@media (max-width: 640px) {
+  .crew-pilot-hours { grid-template-columns: repeat(min(var(--duration, 6), 12), minmax(0,1fr)); }
+  .crew-pilot-hour { min-height: 26px; font-size: 9px; }
+}
+"""
+          application.write_text(acss)
+
+          index=Path('index.html')
+          html=index.read_text().replace('/styles.css?v=13-brand','/styles.css?v=14-logo-availability').replace('/app.js?v=12-participants','/app.js?v=14-logo-availability')
+          index.write_text(html)
+          PY
+      - name: Run checks
+        run: npm run check
+      - name: Commit changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app.js styles/brand-theme.css styles/application.css index.html
+          git commit -m "fix: improve header logo and show crew availability"
+          git push
