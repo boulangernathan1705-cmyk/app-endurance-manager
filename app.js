@@ -179,15 +179,17 @@ function renderEvent(message='') {
   const totalPilots=pilotCount(event.departures.flatMap(d=>d.availability));
   const totalCrews=event.departures.reduce((sum,d)=>sum+(d.crews||[]).length,0);
   app.innerHTML=`${button('home','← Retour aux événements','','secondary-button back-button')}
-    <div class="event-header event-type-${event.eventType||'private'}"><div class="event-heading-line"><div><h1 class="event-title">${esc(event.name)}</h1><p class="event-subtitle">${eventTypeBadge(event.eventType)} · Course de ${event.durationHours||6} h · Horaires de Paris · ${event.departures.length} départ(s)</p></div>${circuitVisual(event.circuit)}</div>
-    <div class="event-category-badges">${event.categories.map(category=>eventBadge(category,eventCategoryCount(event,category))).join('')}</div></div>
+    <div class="event-header event-header-compact event-type-${event.eventType||'private'}">
+      <div class="event-heading-line"><div class="event-heading-copy"><h1 class="event-title">${esc(event.name)}</h1><p class="event-subtitle">${eventTypeBadge(event.eventType)} <span>· Horaires de Paris</span></p></div>${circuitVisual(event.circuit)}</div>
+      <div class="event-header-summary">
+        <div class="event-category-badges">${event.categories.map(category=>eventBadge(category,eventCategoryCount(event,category))).join('')}</div>
+        <div class="event-header-stats" aria-label="Récapitulatif de la course"><span><strong>${event.durationHours||6} h</strong><small>durée</small></span><span><strong>${event.departures.length}</strong><small>départ${event.departures.length>1?'s':''}</small></span><span><strong>${totalPilots}</strong><small>pilote${totalPilots>1?'s':''}</small></span><span><strong>${totalCrews}</strong><small>équipage${totalCrews>1?'s':''}</small></span></div>
+        <span class="event-header-countdown">${nextDeparture?.startsAt>Date.now()?`Prochain départ <strong data-countdown="${nextDeparture.startsAt}">${countdown(nextDeparture.startsAt)}</strong>`:'Tous les départs ont eu lieu'}</span>
+      </div>
+    </div>
     <div class="toolbar">${button('refresh','Actualiser')}${canManage()?button('edit-event','Modifier l’événement',`data-id="${event.id}"`):''}${isAdmin()?button('delete-event','Supprimer l’événement',`data-id="${event.id}"`,'danger-button'):''}</div>
     ${message?`<p class="creation-success" role="status">${esc(message)}</p>`:''}${errorBox()}
     ${canManage()?`<nav class="event-section-tabs" aria-label="Sections de l’événement">${button('event-section','Course',`data-section="race" aria-pressed="${eventSection==='race'}"`,'event-section-tab')}${button('event-section','Équipages',`data-section="crews" aria-pressed="${eventSection==='crews'}"`,'event-section-tab')}</nav>`:''}
-    <section class="race-recap" aria-label="Récapitulatif de la course">
-      <div class="recap-intro"><p class="recap-kicker">${eventSection==='crews'?'GESTION DES ÉQUIPAGES':'RÉCAPITULATIF DE LA COURSE'}</p><span class="recap-countdown">${nextDeparture?.startsAt>Date.now()?`Prochain départ <strong data-countdown="${nextDeparture.startsAt}">${countdown(nextDeparture.startsAt)}</strong>`:'Tous les départs ont eu lieu'}</span></div>
-      <div class="recap-stats"><div><strong>${event.durationHours||6} h</strong><span>durée</span></div><div><strong>${event.departures.length}</strong><span>départ${event.departures.length>1?'s':''}</span></div><div><strong>${totalPilots}</strong><span>pilote${totalPilots>1?'s':''}</span></div><div><strong>${totalCrews}</strong><span>équipage${totalCrews>1?'s':''}</span></div></div>
-    </section>
     ${eventSection==='crews'?renderCrewPage(event,nextDeparture):`<section class="departure-accordion" aria-label="Départs de la course">${event.departures.map((departure,index)=>renderDeparturePanel(event,departure,index,departure.id===nextDeparture?.id||departure.id===selectedDepartureId)).join('')}</section>`}`;
   showRecoveryLink();
 }
@@ -304,7 +306,7 @@ function renderMyEntries() {
     const mineTimeline=pilotAvailability(reg,departure,duration);
     const startState=departure.startsAt<=Date.now()?'Départ passé':countdown(departure.startsAt);
 
-    const crewBlock=crew?`<section class="my-entry-section my-entry-crew"><div class="my-entry-section-heading"><div><span class="my-entry-kicker">ÉQUIPAGE FAIT</span><h3>${esc(crew.name)}</h3></div><span class="my-entry-pill">${esc(crew.car||'Voiture à définir')}</span></div>
+    const crewBlock=crew?`<section class="my-entry-section my-entry-crew"><div class="my-entry-section-heading"><div><span class="my-entry-kicker">MON ÉQUIPAGE</span><h3>${esc(crew.name)}</h3></div><span class="my-entry-pill">${esc(crew.car||'Voiture à définir')}</span></div>
       <div class="my-entry-crew-roster">${crewRegs.map(p=>`<article class="my-entry-pilot ${p.id===reg.id?'is-me':''}"><div class="my-entry-pilot-head"><strong>${esc(p.name)}${p.id===reg.id?' · Moi':''}</strong><span>${esc(statusLabel(p.status))}</span></div>${pilotAvailability(p,departure,duration)}</article>`).join('')}</div>
       <div class="crew-availability-line duration-${duration}" aria-label="Couverture de mon équipage">${crewCounts.map((n,i)=>`<span class="crew-availability-hour ${phaseClass(i,duration)} ${n?'covered':'gap'}" title="${raceHourLabel(departure,i)} : ${n?`${n} pilote(s)`:'aucun pilote'}">${raceHourLabel(departure,i)}</span>`).join('')}</div>
       <p class="coverage-note">${crewCovered===duration?'Toutes les heures sont couvertes par ton équipage.':`${duration-crewCovered} heure(s) restent sans présence dans ton équipage.`}</p>

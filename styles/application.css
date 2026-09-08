@@ -662,3 +662,42 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 /* Mes inscriptions: status-focused layout. */
 .my-entry-existing-crews-wrap { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border); }
 .my-entry-existing-crews-wrap h4 { margin: 0 0 9px; color: var(--muted); font-size: 12px; font-weight: 900; letter-spacing: .7px; }
+
+
+/* Compact event header: title + recap in one block. */
+.event-header-compact { display:grid; gap:12px; padding:16px 18px; }
+.event-header-compact .event-heading-line { align-items:center; gap:16px; }
+.event-header-compact .event-heading-copy { min-width:0; }
+.event-header-compact .event-title { margin:0; font-size:clamp(24px,3vw,34px); line-height:1.05; }
+.event-header-compact .event-subtitle { display:flex; align-items:center; flex-wrap:wrap; gap:6px; margin:7px 0 0; font-size:13px; }
+.event-header-compact .circuit-visual img { width:120px; height:58px; }
+.event-header-summary { display:grid; grid-template-columns:minmax(0,1fr) auto auto; align-items:center; gap:12px; padding-top:10px; border-top:1px solid var(--border); }
+.event-header-summary .event-category-badges { margin-top:0; }
+.event-header-stats { display:flex; align-items:stretch; gap:6px; }
+.event-header-stats > span { display:grid; min-width:64px; padding:7px 9px; border:1px solid #334146; border-radius:8px; background:rgba(7,12,14,.34); text-align:center; }
+.event-header-stats strong { color:#f5fbf8; font-size:16px; line-height:1.05; }
+.event-header-stats small { margin-top:2px; color:#9eafb1; font-size:10px; }
+.event-header-countdown { min-width:138px; padding:7px 10px; border:1px solid #42535a; border-radius:8px; color:#aebcbe; font-size:11px; text-align:right; }
+.event-header-countdown strong { display:block; margin-top:2px; color:#f2f7f6; font-size:14px; }
+
+@media (max-width:700px) {
+  .event-header-compact { gap:9px; padding:11px 12px; }
+  .event-header-compact .event-heading-line { gap:8px; align-items:flex-start; }
+  .event-header-compact .event-title { font-size:22px; padding-left:9px; border-left-width:3px; }
+  .event-header-compact .event-subtitle { margin-top:5px; font-size:11px; }
+  .event-header-compact .event-subtitle > span { display:none; }
+  .event-header-compact .circuit-visual img { width:76px; height:38px; }
+  .event-header-summary { grid-template-columns:1fr; gap:8px; padding-top:8px; }
+  .event-header-summary .event-category-badges { gap:5px; flex-wrap:nowrap; overflow-x:auto; scrollbar-width:none; }
+  .event-header-summary .event-category-badges::-webkit-scrollbar { display:none; }
+  .event-header-summary .event-category-badge { flex:0 0 auto; min-width:0; padding:5px 7px; gap:5px; }
+  .event-header-summary .event-category-badge img { width:22px; height:22px; }
+  .event-header-summary .event-category-copy strong { font-size:11px; }
+  .event-header-summary .event-category-copy small { font-size:9px; }
+  .event-header-stats { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:4px; }
+  .event-header-stats > span { min-width:0; padding:6px 3px; }
+  .event-header-stats strong { font-size:14px; }
+  .event-header-stats small { font-size:9px; }
+  .event-header-countdown { min-width:0; width:100%; padding:6px 8px; font-size:10px; text-align:left; }
+  .event-header-countdown strong { display:inline; margin-left:5px; font-size:11px; }
+}
