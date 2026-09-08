@@ -1,0 +1,9 @@
+node_modules/
+public/
+.wrangler/
+.env
+.env.*
+.dev.vars
+.dev.vars.*
+!.env.example
+*.sqlite

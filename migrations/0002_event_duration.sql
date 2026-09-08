@@ -1,0 +1,1 @@
+ALTER TABLE events ADD COLUMN duration_hours INTEGER NOT NULL DEFAULT 3 CHECK(duration_hours BETWEEN 1 AND 24);
