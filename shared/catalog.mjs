@@ -19,14 +19,16 @@ export const CIRCUITS = [
   {id:'le-mans',name:'Circuit de la Sarthe (Le Mans)',file:'le_mans.png'},
   {id:'lusail',name:'Lusail International Circuit',file:'lusail_international.png'},
   {id:'monza',name:'Autodromo Nazionale Monza',file:'monza.png'},
-  {id:'nurburgring',name:'Nürburgring',file:'nurburgring.png'},
   {id:'paul-ricard',name:'Circuit Paul Ricard',file:'paul_ricard_elms.png'},
   {id:'portimao',name:'Algarve International Circuit (Portimão)',file:'algarve.png'},
   {id:'sebring',name:'Sebring International Raceway',file:'sebring.png'},
   {id:'silverstone',name:'Silverstone Circuit',file:'silverstone.png'},
   {id:'spa',name:'Circuit de Spa-Francorchamps',file:'spa_francorchamps.png'}
 ];
-export const CIRCUIT_IDS = CIRCUITS.map(circuit => circuit.id);
+
+// Kept for backward compatibility with events created through the older API.
+export const LEGACY_CIRCUIT_IDS = ['nurburgring'];
+export const CIRCUIT_IDS = [...CIRCUITS.map(circuit => circuit.id), ...LEGACY_CIRCUIT_IDS];
 
 export const categories = {
   Hypercar:{image:'HC.png',css:'hyper'},
