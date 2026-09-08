@@ -56,6 +56,9 @@ const app = searchable.find(item => item.path === 'app.js')?.content || '';
 const worker = searchable.find(item => item.path === 'server/worker.mjs')?.content || '';
 const workerCore = searchable.find(item => item.path === 'server/core.mjs')?.content || '';
 if (!app.includes("from './shared/catalog.mjs'")) warnings.push('Le front n’utilise pas le catalogue partagé.');
+if (!app.includes("from './front/schedule.mjs'")) warnings.push('Le front n’utilise pas le module de calendrier partagé.');
+const rootCss = searchable.find(item => item.path === 'styles.css')?.content || '';
+if (!rootCss.includes("/styles/foundation.css") || !rootCss.includes("/styles/application.css")) warnings.push('Les feuilles CSS modulaires ne sont pas chargées dans le bon point d’entrée.');
 if (!worker.includes("from '../shared/catalog.mjs'") && !workerCore.includes("from '../shared/catalog.mjs'")) {
   warnings.push('Le serveur n’utilise pas le catalogue partagé.');
 }
