@@ -1,0 +1,13 @@
+/* Registration form only: keep presence-hour buttons compact without changing readonly timelines or crew availability. */
+.availability-hour-grid.compact-hours .hour-card {
+  min-height: 58px;
+  padding: 5px 4px;
+}
+
+.availability-hour-grid.compact-hours .hour-card-number {
+  font-size: 20px;
+}
+
+.availability-hour-grid.compact-hours .hour-card-state {
+  margin-top: 2px;
+}

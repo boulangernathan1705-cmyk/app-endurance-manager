@@ -8,21 +8,21 @@
   }
 
   .event-header-compact .event-heading-line {
-    grid-template-columns: minmax(300px,.68fr) minmax(448px,1.32fr);
+    grid-template-columns: minmax(300px,.78fr) minmax(360px,1.22fr);
     gap: 18px;
   }
 
   .event-header-compact .circuit-visual {
-    height: 352px;
+    height: 282px;
     align-items: center;
     justify-content: center;
   }
 
   .event-header-compact .circuit-visual img {
     width: auto;
-    height: 336px;
-    max-width: 624px;
-    max-height: 336px;
+    height: 269px;
+    max-width: 499px;
+    max-height: 269px;
     object-fit: contain;
   }
 
