@@ -308,19 +308,22 @@ function renderMyEntries() {
       <p class="coverage-note">${crewCovered===duration?'Toutes les heures sont couvertes par ton équipage.':`${duration-crewCovered} heure(s) restent sans présence dans ton équipage.`}</p>
     </section>`:`<section class="my-entry-section my-entry-waiting"><span class="my-entry-kicker">ÉQUIPAGE</span><h3>${eventCrewCount?'En attente d’affectation':'Aucun équipage créé pour le moment'}</h3><p>${eventCrewCount?`${eventCrewCount} équipage${eventCrewCount>1?'s':''} existe${eventCrewCount>1?'nt':''} déjà sur ce départ, mais tu n’es pas encore affecté.`:'Ton inscription est bien enregistrée. Les organisateurs pourront former les équipages plus tard.'}</p></section>`;
 
-    const pilotsBlock=`<section class="my-entry-section"><div class="my-entry-section-heading"><div><span class="my-entry-kicker">PILOTES SUR MON DÉPART</span><h3>${pilotCount(allAvailable)} pilote(s) inscrit(s)</h3></div><span class="my-entry-pill">${sameCategory.length} en ${esc(reg.category)}</span></div>
-      <div class="my-entry-pilot-list">${sameCategory.map(p=>`<article class="my-entry-pilot ${p.id===reg.id?'is-me':''}"><div class="my-entry-pilot-head"><strong>${esc(p.name)}${p.id===reg.id?' · Moi':''}</strong><span>${esc(registrationCarLabel(p))}</span></div>${pilotAvailability(p,departure,duration)}</article>`).join('')}</div>
+    const otherPilots=sameCategory.filter(p=>!crewRegs.some(c=>c.id===p.id));
+    const pilotsBlock=`<section class="my-entry-section my-entry-pilots-summary"><div class="my-entry-section-heading"><div><span class="my-entry-kicker">PILOTES SUR MON DÉPART</span><h3>${pilotCount(allAvailable)} pilote(s) inscrit(s)</h3></div><span class="my-entry-pill">${sameCategory.length} en ${esc(reg.category)}</span></div>
+      <div class="my-entry-compact-pilots">${otherPilots.map(p=>`<span class="my-entry-compact-pilot ${p.id===reg.id?'is-me':''}"><strong>${esc(p.name)}${p.id===reg.id?' · Moi':''}</strong><small>${esc(registrationCarLabel(p))}</small></span>`).join('')||'<p class="muted">Aucun autre pilote de ta catégorie hors de ton équipage.</p>'}</div>
     </section>`;
 
-    return `<article class="my-entry-card event-type-${event.eventType||'private'}">
-      <header class="my-entry-header"><div class="my-entry-title"><span class="my-entry-kicker">${esc(dateLabel(departure))} · ${esc(departure.time)}</span><h2>${esc(event.name)}</h2><div class="my-entry-meta">${eventTypeBadge(event.eventType)} ${badge(reg.category)} <span>${esc(circuitLabel(event.circuit))}</span><span>· ${duration} h</span><span>· ${esc(startState)}</span></div></div>${circuitVisual(event.circuit,true)}</header>
-      <section class="my-entry-section my-entry-self"><div class="my-entry-section-heading"><div><span class="my-entry-kicker">MON INSCRIPTION</span><h3>${esc(reg.name)}</h3></div><span class="my-entry-pill">${esc(reg.category)}</span></div>
-        <div class="my-entry-preferences"><div><span>Voiture(s) souhaitée(s)</span><strong>${esc(registrationCarLabel(reg))}</strong></div><div><span>Coéquipier souhaité</span><strong>${esc(reg.preferredPilot||'Aucune préférence')}</strong></div></div>${mineTimeline}
-      </section>
-      ${crewBlock}
-      ${pilotsBlock}
-      <div class="my-entry-actions"><button type="button" class="primary-button" data-action="open" data-id="${event.id}" data-departure="${departure.id}" data-registration="${reg.id}">Voir l’événement complet</button></div>
-    </article>`;
+    return `<details class="my-entry-card my-entry-accordion event-type-${event.eventType||'private'}" open>
+      <summary class="my-entry-header"><div class="my-entry-title"><span class="my-entry-kicker">${esc(dateLabel(departure))} · ${esc(departure.time)}</span><h2>${esc(event.name)}</h2><div class="my-entry-meta">${eventTypeBadge(event.eventType)} ${badge(reg.category)} <span>${esc(circuitLabel(event.circuit))}</span><span>· ${duration} h</span><span>· ${esc(startState)}</span></div></div><div class="my-entry-summary-side">${circuitVisual(event.circuit,true)}<span class="my-entry-chevron" aria-hidden="true">⌄</span></div></summary>
+      <div class="my-entry-accordion-body">
+        <div class="my-entry-actions my-entry-actions-top"><button type="button" class="primary-button" data-action="open" data-id="${event.id}" data-departure="${departure.id}" data-registration="${reg.id}">Voir l’événement complet</button></div>
+        <section class="my-entry-section my-entry-self"><div class="my-entry-section-heading"><div><span class="my-entry-kicker">MON INSCRIPTION</span><h3>${esc(reg.name)}</h3></div><span class="my-entry-pill">${esc(reg.category)}</span></div>
+          <div class="my-entry-preferences"><div><span>Voiture(s) souhaitée(s)</span><strong>${esc(registrationCarLabel(reg))}</strong></div><div><span>Coéquipier souhaité</span><strong>${esc(reg.preferredPilot||'Aucune préférence')}</strong></div></div>${mineTimeline}
+        </section>
+        ${crewBlock}
+        ${pilotsBlock}
+      </div>
+    </details>`;
   }
 
   const section=(title,list)=>`<section class="my-entries-group"><div class="my-entries-group-heading"><h2>${title}</h2><span>${list.length} inscription${list.length>1?'s':''}</span></div>${list.length?`<div class="my-entry-dashboard">${list.map(entryCard).join('')}</div>`:'<p class="empty">Aucune inscription.</p>'}</section>`;
