@@ -299,6 +299,9 @@ function renderMyEntries() {
     const crewCounts=crew?Array.from({length:duration},(_,i)=>crewRegs.filter(r=>coversHour(r,i)).length):[];
     const crewCovered=crewCounts.filter(n=>n>0).length;
     const eventCrewCount=(departure.crews||[]).length;
+    const assignedIds=new Set((departure.crews||[]).flatMap(c=>c.registrationIds||[]));
+    const unassignedSameCategory=sameCategory.filter(p=>!assignedIds.has(p.id));
+    const existingCrews=(departure.crews||[]).filter(c=>c.category===reg.category);
     const mineTimeline=pilotAvailability(reg,departure,duration);
     const startState=departure.startsAt<=Date.now()?'Départ passé':countdown(departure.startsAt);
 
@@ -306,15 +309,19 @@ function renderMyEntries() {
       <div class="my-entry-crew-roster">${crewRegs.map(p=>`<article class="my-entry-pilot ${p.id===reg.id?'is-me':''}"><div class="my-entry-pilot-head"><strong>${esc(p.name)}${p.id===reg.id?' · Moi':''}</strong><span>${esc(statusLabel(p.status))}</span></div>${pilotAvailability(p,departure,duration)}</article>`).join('')}</div>
       <div class="crew-availability-line duration-${duration}" aria-label="Couverture de mon équipage">${crewCounts.map((n,i)=>`<span class="crew-availability-hour ${phaseClass(i,duration)} ${n?'covered':'gap'}" title="${raceHourLabel(departure,i)} : ${n?`${n} pilote(s)`:'aucun pilote'}">${raceHourLabel(departure,i)}</span>`).join('')}</div>
       <p class="coverage-note">${crewCovered===duration?'Toutes les heures sont couvertes par ton équipage.':`${duration-crewCovered} heure(s) restent sans présence dans ton équipage.`}</p>
-    </section>`:`<section class="my-entry-section my-entry-waiting"><span class="my-entry-kicker">ÉQUIPAGE</span><h3>${eventCrewCount?'En attente d’affectation':'Aucun équipage créé pour le moment'}</h3><p>${eventCrewCount?`${eventCrewCount} équipage${eventCrewCount>1?'s':''} existe${eventCrewCount>1?'nt':''} déjà sur ce départ, mais tu n’es pas encore affecté.`:'Ton inscription est bien enregistrée. Les organisateurs pourront former les équipages plus tard.'}</p></section>`;
+    </section>`:`<section class="my-entry-section my-entry-waiting"><span class="my-entry-kicker">ÉQUIPAGE</span><h3>${eventCrewCount?'En attente d’affectation':'Aucun équipage créé pour le moment'}</h3><p>${eventCrewCount?`${eventCrewCount} équipage${eventCrewCount>1?'s':''} existe${eventCrewCount>1?'nt':''} déjà sur ce départ, mais tu n’es pas encore affecté.`:'Ton inscription est bien enregistrée. Les organisateurs pourront former les équipages plus tard.'}</p>
+      <div class="my-entry-waiting-grid">
+        <div><h4>Pilotes sans équipage · ${esc(reg.category)}</h4><div class="my-entry-compact-pilots">${unassignedSameCategory.map(p=>`<span class="my-entry-compact-pilot ${p.id===reg.id?'is-me':''}"><strong>${esc(p.name)}${p.id===reg.id?' · Moi':''}</strong><small>${esc(registrationCarLabel(p))}${p.preferredPilot?` · souhaite ${esc(p.preferredPilot)}`:''}</small></span>`).join('')||'<p class="muted">Aucun pilote sans équipage dans ta catégorie.</p>'}</div></div>
+        <div><h4>Équipages existants · ${esc(reg.category)}</h4><div class="my-entry-existing-crews">${existingCrews.map(c=>{const names=(c.registrationIds||[]).map(id=>departure.availability.find(p=>p.id===id)?.name).filter(Boolean);return `<div class="my-entry-existing-crew"><strong>${esc(c.name)}</strong><span>${esc(c.car||'Voiture à définir')}</span><small>${names.length?esc(names.join(' · ')):'Aucun pilote affecté'}</small></div>`;}).join('')||'<p class="muted">Aucun équipage créé dans ta catégorie.</p>'}</div></div>
+      </div><p class="coverage-note">Ouvre l’événement complet pour consulter les disponibilités détaillées des autres pilotes et équipages.</p></section>`;
 
     const otherPilots=sameCategory.filter(p=>!crewRegs.some(c=>c.id===p.id));
     const pilotsBlock=`<section class="my-entry-section my-entry-pilots-summary"><div class="my-entry-section-heading"><div><span class="my-entry-kicker">PILOTES SUR MON DÉPART</span><h3>${pilotCount(allAvailable)} pilote(s) inscrit(s)</h3></div><span class="my-entry-pill">${sameCategory.length} en ${esc(reg.category)}</span></div>
       <div class="my-entry-compact-pilots">${otherPilots.map(p=>`<span class="my-entry-compact-pilot ${p.id===reg.id?'is-me':''}"><strong>${esc(p.name)}${p.id===reg.id?' · Moi':''}</strong><small>${esc(registrationCarLabel(p))}</small></span>`).join('')||'<p class="muted">Aucun autre pilote de ta catégorie hors de ton équipage.</p>'}</div>
     </section>`;
 
-    return `<details class="my-entry-card my-entry-accordion event-type-${event.eventType||'private'}" open>
-      <summary class="my-entry-header"><div class="my-entry-title"><span class="my-entry-kicker">${esc(dateLabel(departure))} · ${esc(departure.time)}</span><h2>${esc(event.name)}</h2><div class="my-entry-meta">${eventTypeBadge(event.eventType)} ${badge(reg.category)} <span>${esc(circuitLabel(event.circuit))}</span><span>· ${duration} h</span><span>· ${esc(startState)}</span></div></div><div class="my-entry-summary-side">${circuitVisual(event.circuit,true)}<span class="my-entry-chevron" aria-hidden="true">⌄</span></div></summary>
+    return `<details class="my-entry-card my-entry-accordion event-type-${event.eventType||'private'}">
+      <summary class="my-entry-header"><span class="my-entry-toggle" aria-hidden="true">+</span><div class="my-entry-title"><span class="my-entry-kicker">${esc(dateLabel(departure))} · ${esc(departure.time)}</span><h2>${esc(event.name)}</h2><div class="my-entry-meta">${eventTypeBadge(event.eventType)} ${badge(reg.category)} <span>${esc(circuitLabel(event.circuit))}</span><span>· ${duration} h</span><span>· ${esc(startState)}</span></div></div><div class="my-entry-summary-side">${circuitVisual(event.circuit,true)}</div></summary>
       <div class="my-entry-accordion-body">
         <div class="my-entry-actions my-entry-actions-top"><button type="button" class="primary-button" data-action="open" data-id="${event.id}" data-departure="${departure.id}" data-registration="${reg.id}">Voir l’événement complet</button></div>
         <section class="my-entry-section my-entry-self"><div class="my-entry-section-heading"><div><span class="my-entry-kicker">MON INSCRIPTION</span><h3>${esc(reg.name)}</h3></div><span class="my-entry-pill">${esc(reg.category)}</span></div>
