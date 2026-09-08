@@ -79,7 +79,7 @@ function renderEventCard({event,next,running,archived,end}) {
     ${circuitVisual(event.circuit,true)}
     <span class="event-category-badges">${event.categories.map(category=>eventBadge(category,eventCategoryCount(event,category))).join('')}</span>
     <span class="event-card-status">${running?'<span class="event-countdown event-countdown-primary running">COURSE EN COURS</span>':''}
-    <span class="event-countdown ${statusClass}" ${next&&!archived?`data-status-time="${next.startsAt}"`:''}>${next?`Prochain départ : ${esc(dateLabel(next))} à ${esc(next.time)} · <span data-countdown="${next.startsAt}">${countdown(next.startsAt)}</span>`:archived?`Terminé le ${esc(dateLabel({startsAt:end}))}`:running?'Le dernier est encore en course.':'Dates à confirmer'}</span></span></span>
+    <span class="event-countdown ${statusClass}" ${next&&!archived?`data-status-time="${next.startsAt}"`:''}>${next?`Prochain départ : ${esc(dateLabel(next))} à ${esc(next.time)} · <span data-countdown="${next.startsAt}">${countdown(next.startsAt)}</span>`:archived?`Terminé le ${esc(dateLabel({startsAt:end}))}`:running?'':'Dates à confirmer'}</span></span></span>
   </button>`;
 }
 function renderHome(message='') {
