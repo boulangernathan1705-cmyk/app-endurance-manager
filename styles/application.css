@@ -555,3 +555,20 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 @media (max-width: 760px) { .event-heading-line { align-items: flex-start; flex-direction: column; } .event-heading-line > .circuit-visual { flex-basis: auto; width: 100%; height: 190px; } .event-card { min-height: 0; padding-right: 14px; } .event-card .circuit-visual { position: static; width: 100%; height: 155px; margin: 14px 0 0; } .event-filter { display: flex; width: 100%; } .event-filter-button { flex: 1; padding-inline: 6px; } }
 @media (max-width: 640px) { .crew-preference-list { grid-template-columns: 1fr; } .event-heading-line > .circuit-visual { height: 160px; } .event-card .circuit-visual { height: 135px; } }
 
+
+
+/* Pilot availability shown while composing crews. */
+.crew-preference-list { grid-template-columns: 1fr; gap: 10px; }
+.crew-preference-list .crew-preference-item { display: block; padding: 10px 12px; border: 1px solid #2f3b3e; border-radius: 8px; }
+.crew-preference-item > strong { display: block; margin-bottom: 7px; }
+.crew-pilot-availability { margin-top: 8px; }
+.crew-pilot-availability-label { display: block; margin-bottom: 5px; color: #aebcbe; font-size: 12px; font-weight: 800; }
+.crew-pilot-hours { display: grid; grid-template-columns: repeat(var(--duration, 6), minmax(26px,1fr)); gap: 3px; width: 100%; }
+.crew-pilot-hour { display: grid; place-items: center; min-height: 24px; padding: 2px; border: 1px solid #394548; border-radius: 4px; background: #20272a; color: #7e8b8e; font-size: 9px; font-weight: 800; }
+.crew-pilot-hour.present { border-color: color-mix(in srgb, var(--phase-color) 70%, #fff); background: var(--phase-color); color: #0b1711; }
+.assignment-wishes .crew-pilot-hours { margin-top: 6px; }
+.unassigned-pilots .pilot-wishes { margin-top: 6px; }
+@media (max-width: 640px) {
+  .crew-pilot-hours { grid-template-columns: repeat(min(var(--duration, 6), 12), minmax(0,1fr)); }
+  .crew-pilot-hour { min-height: 26px; font-size: 9px; }
+}
