@@ -37,7 +37,7 @@ header {
 .brand-button.logo {
   display: inline-flex;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
   min-width: 0;
   padding: 0;
   border: 0;
@@ -45,20 +45,33 @@ header {
   color: var(--text);
   text-align: left;
 }
+.brand-mark-frame {
+  position: relative;
+  width: 112px;
+  height: 112px;
+  flex: 0 0 112px;
+  overflow: hidden;
+  border-radius: 50%;
+  background: #111415;
+}
 .brand-mark {
-  width: 92px;
-  height: 92px;
-  flex: 0 0 92px;
-  border-radius: 0;
-  object-fit: contain;
+  position: absolute;
+  width: 164%;
+  height: 164%;
+  max-width: none;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%,-50%);
+  object-fit: cover;
   object-position: center;
+  border-radius: 0;
   box-shadow: none;
 }
 .brand-copy {
   display: grid;
-  gap: 1px;
+  gap: 2px;
   line-height: 1;
-  font-size: 18px;
+  font-size: 20px;
   font-weight: 900;
   letter-spacing: 1.6px;
 }
@@ -86,10 +99,11 @@ header {
 @media (max-width: 700px) {
   header { padding: 12px; }
   .header-inner { gap: 10px; }
-  .brand-mark { width: 72px; height: 72px; flex-basis: 72px; }
-  .brand-copy { font-size: 14px; letter-spacing: 1.1px; }
+  .brand-mark-frame { width: 84px; height: 84px; flex-basis: 84px; }
+  .brand-copy { font-size: 15px; letter-spacing: 1.1px; }
 }
 
 @media (max-width: 460px) {
+  .brand-mark-frame { width: 76px; height: 76px; flex-basis: 76px; }
   .brand-copy { display: none; }
 }
