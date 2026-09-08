@@ -257,15 +257,25 @@ main {
 
 .event-countdown {
   margin-top: 10px;
-
   color: var(--green);
-
   font-size: 12px;
   font-weight: 800;
 }
 
-.event-countdown.finished {
-  color: var(--muted);
+.event-countdown.upcoming { color: var(--green); }
+.event-countdown.soon { color: #f0a23a; }
+.event-countdown.running { color: var(--red); }
+.event-countdown.finished { color: var(--muted); }
+.event-countdown-primary {
+  margin-top: 12px;
+  font-size: clamp(22px, 3vw, 32px);
+  line-height: 1;
+  font-weight: 950;
+  letter-spacing: .8px;
+}
+.event-countdown-primary.running {
+  color: var(--red);
+  text-shadow: 0 0 18px rgba(227,76,76,.18);
 }
 
 
