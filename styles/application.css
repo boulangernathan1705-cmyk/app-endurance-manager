@@ -638,3 +638,5 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   .my-entry-chevron { flex:0 0 34px; }
   .my-entry-compact-pilot { width:100%; justify-content:space-between; border-radius:8px; }
 }
+
+.my-entry-actions-top { padding: 14px 18px; border-bottom: 1px solid var(--border); background: rgba(255,255,255,.015); }
