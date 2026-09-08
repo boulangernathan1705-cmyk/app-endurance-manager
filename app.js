@@ -289,11 +289,47 @@ async function renderMembers() {
 function renderMyEntries() {
   page='my-entries';
   const entries=events.flatMap(event=>event.departures.flatMap(departure=>departure.availability.filter(r=>r.mine||r.managed).map(reg=>({event,departure,reg}))));
-  const section=(title,list)=>`<h2>${title}</h2>${list.length?`<div class="event-list">${list.map(({event,departure,reg})=>`<button class="event-card" data-action="open" data-id="${event.id}" data-departure="${departure.id}" data-registration="${reg.id}"><span class="event-name">${esc(event.name)} · ${esc(reg.name)}</span><span class="event-info">${esc(dateLabel(departure))} à ${departure.time} · ${esc(reg.category)} · ${esc(statusLabel(reg.status))}</span></button>`).join('')}</div>`:'<p class="empty">Aucune inscription.</p>'}`;
-  app.innerHTML=`${button('home','← Retour','','secondary-button back-button')}<h1 class="page-title">MES INSCRIPTIONS</h1>${errorBox()}
+
+  function entryCard({event,departure,reg}) {
+    const duration=event.durationHours||6;
+    const sameCategory=departure.availability.filter(r=>r.category===reg.category&&r.status!=='unavailable');
+    const allAvailable=departure.availability.filter(r=>r.status!=='unavailable');
+    const crew=(departure.crews||[]).find(c=>c.registrationIds.includes(reg.id));
+    const crewRegs=crew?crew.registrationIds.map(id=>departure.availability.find(r=>r.id===id)).filter(Boolean):[];
+    const crewCounts=crew?Array.from({length:duration},(_,i)=>crewRegs.filter(r=>coversHour(r,i)).length):[];
+    const crewCovered=crewCounts.filter(n=>n>0).length;
+    const eventCrewCount=(departure.crews||[]).length;
+    const mineTimeline=pilotAvailability(reg,departure,duration);
+    const startState=departure.startsAt<=Date.now()?'Départ passé':countdown(departure.startsAt);
+
+    const crewBlock=crew?`<section class="my-entry-section my-entry-crew"><div class="my-entry-section-heading"><div><span class="my-entry-kicker">MON ÉQUIPAGE</span><h3>${esc(crew.name)}</h3></div><span class="my-entry-pill">${esc(crew.car||'Voiture à définir')}</span></div>
+      <div class="my-entry-crew-roster">${crewRegs.map(p=>`<article class="my-entry-pilot ${p.id===reg.id?'is-me':''}"><div class="my-entry-pilot-head"><strong>${esc(p.name)}${p.id===reg.id?' · Moi':''}</strong><span>${esc(statusLabel(p.status))}</span></div>${pilotAvailability(p,departure,duration)}</article>`).join('')}</div>
+      <div class="crew-availability-line duration-${duration}" aria-label="Couverture de mon équipage">${crewCounts.map((n,i)=>`<span class="crew-availability-hour ${phaseClass(i,duration)} ${n?'covered':'gap'}" title="${raceHourLabel(departure,i)} : ${n?`${n} pilote(s)`:'aucun pilote'}">${raceHourLabel(departure,i)}</span>`).join('')}</div>
+      <p class="coverage-note">${crewCovered===duration?'Toutes les heures sont couvertes par ton équipage.':`${duration-crewCovered} heure(s) restent sans présence dans ton équipage.`}</p>
+    </section>`:`<section class="my-entry-section my-entry-waiting"><span class="my-entry-kicker">ÉQUIPAGE</span><h3>${eventCrewCount?'En attente d’affectation':'Aucun équipage créé pour le moment'}</h3><p>${eventCrewCount?`${eventCrewCount} équipage${eventCrewCount>1?'s':''} existe${eventCrewCount>1?'nt':''} déjà sur ce départ, mais tu n’es pas encore affecté.`:'Ton inscription est bien enregistrée. Les organisateurs pourront former les équipages plus tard.'}</p></section>`;
+
+    const pilotsBlock=`<section class="my-entry-section"><div class="my-entry-section-heading"><div><span class="my-entry-kicker">PILOTES SUR MON DÉPART</span><h3>${pilotCount(allAvailable)} pilote(s) inscrit(s)</h3></div><span class="my-entry-pill">${sameCategory.length} en ${esc(reg.category)}</span></div>
+      <div class="my-entry-pilot-list">${sameCategory.map(p=>`<article class="my-entry-pilot ${p.id===reg.id?'is-me':''}"><div class="my-entry-pilot-head"><strong>${esc(p.name)}${p.id===reg.id?' · Moi':''}</strong><span>${esc(registrationCarLabel(p))}</span></div>${pilotAvailability(p,departure,duration)}</article>`).join('')}</div>
+    </section>`;
+
+    return `<article class="my-entry-card event-type-${event.eventType||'private'}">
+      <header class="my-entry-header"><div class="my-entry-title"><span class="my-entry-kicker">${esc(dateLabel(departure))} · ${esc(departure.time)}</span><h2>${esc(event.name)}</h2><div class="my-entry-meta">${eventTypeBadge(event.eventType)} ${badge(reg.category)} <span>${esc(circuitLabel(event.circuit))}</span><span>· ${duration} h</span><span>· ${esc(startState)}</span></div></div>${circuitVisual(event.circuit,true)}</header>
+      <section class="my-entry-section my-entry-self"><div class="my-entry-section-heading"><div><span class="my-entry-kicker">MON INSCRIPTION</span><h3>${esc(reg.name)}</h3></div><span class="my-entry-pill">${esc(reg.category)}</span></div>
+        <div class="my-entry-preferences"><div><span>Voiture(s) souhaitée(s)</span><strong>${esc(registrationCarLabel(reg))}</strong></div><div><span>Coéquipier souhaité</span><strong>${esc(reg.preferredPilot||'Aucune préférence')}</strong></div></div>${mineTimeline}
+      </section>
+      ${crewBlock}
+      ${pilotsBlock}
+      <div class="my-entry-actions"><button type="button" class="primary-button" data-action="open" data-id="${event.id}" data-departure="${departure.id}" data-registration="${reg.id}">Voir l’événement complet</button></div>
+    </article>`;
+  }
+
+  const section=(title,list)=>`<section class="my-entries-group"><div class="my-entries-group-heading"><h2>${title}</h2><span>${list.length} inscription${list.length>1?'s':''}</span></div>${list.length?`<div class="my-entry-dashboard">${list.map(entryCard).join('')}</div>`:'<p class="empty">Aucune inscription.</p>'}</section>`;
+
+  app.innerHTML=`${button('home','← Retour','','secondary-button back-button')}<div class="my-entries-heading"><div><span class="creation-kicker">ESPACE PILOTE</span><h1 class="page-title">MES INSCRIPTIONS</h1><p>Retrouve ici tes courses, ton équipage et les pilotes inscrits sur le même départ.</p></div></div>${errorBox()}
     ${!user?'<p class="creation-help">Les inscriptions de cet appareil ou de ton lien personnel sont affichées ici.</p>':''}
     ${section('Mes inscriptions personnelles',entries.filter(x=>x.reg.mine))}${entries.some(x=>x.reg.managed)?section('Inscriptions que je gère',entries.filter(x=>x.reg.managed)):''}`;
 }
+
 async function submitRegistration(form) {
   const departureId=form.dataset.departure,event=events.find(e=>e.id===currentEventId),departure=event.departures.find(d=>d.id===departureId),state=draftFor(departure);
   state.name=form.elements.pilotName.value.trim();

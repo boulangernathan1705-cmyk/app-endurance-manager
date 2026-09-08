@@ -572,3 +572,48 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   .crew-pilot-hours { grid-template-columns: repeat(min(var(--duration, 6), 12), minmax(0,1fr)); }
   .crew-pilot-hour { min-height: 26px; font-size: 9px; }
 }
+
+
+/* My entries pilot dashboard. */
+.my-entries-heading { margin: 8px 0 22px; }
+.my-entries-heading .page-title { margin-bottom: 8px; }
+.my-entries-heading p { margin: 0; color: var(--muted); }
+.my-entries-group { margin-top: 24px; }
+.my-entries-group-heading { display:flex; align-items:end; justify-content:space-between; gap:16px; margin-bottom:12px; }
+.my-entries-group-heading h2 { margin:0; }
+.my-entries-group-heading span { color:var(--muted); font-size:13px; font-weight:800; }
+.my-entry-dashboard { display:grid; gap:18px; }
+.my-entry-card { overflow:hidden; border:1px solid var(--border); border-radius:14px; background:linear-gradient(180deg,var(--panel2),var(--panel)); box-shadow:0 12px 30px rgba(0,0,0,.18); }
+.my-entry-header { display:flex; align-items:stretch; justify-content:space-between; gap:18px; padding:18px; background:linear-gradient(180deg,rgba(255,255,255,.025),transparent); border-bottom:1px solid var(--border); }
+.my-entry-title { min-width:0; }
+.my-entry-title h2 { margin:4px 0 10px; font-size:clamp(22px,3vw,34px); }
+.my-entry-kicker { display:block; color:var(--accent); font-size:11px; font-weight:900; letter-spacing:1.3px; text-transform:uppercase; }
+.my-entry-meta { display:flex; align-items:center; flex-wrap:wrap; gap:8px; color:var(--muted); }
+.my-entry-header .circuit-visual { flex:0 0 220px; width:220px; height:120px; }
+.my-entry-section { padding:16px 18px; border-bottom:1px solid var(--border); }
+.my-entry-section-heading { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; margin-bottom:12px; }
+.my-entry-section h3 { margin:3px 0 0; font-size:20px; }
+.my-entry-pill { display:inline-flex; align-items:center; min-height:30px; padding:6px 10px; border:1px solid var(--border); border-radius:999px; background:var(--panel3); color:var(--text); font-size:12px; font-weight:800; }
+.my-entry-preferences { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; margin:12px 0; }
+.my-entry-preferences > div { padding:10px 12px; border:1px solid var(--border); border-radius:9px; background:rgba(255,255,255,.02); }
+.my-entry-preferences span { display:block; margin-bottom:4px; color:var(--muted); font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.6px; }
+.my-entry-preferences strong { font-size:14px; }
+.my-entry-crew { background:rgba(31,143,90,.045); }
+.my-entry-waiting { background:rgba(255,170,0,.035); }
+.my-entry-waiting p { margin:8px 0 0; color:var(--muted); }
+.my-entry-crew-roster,.my-entry-pilot-list { display:grid; gap:8px; margin:10px 0 12px; }
+.my-entry-pilot { padding:10px 12px; border:1px solid var(--border); border-radius:9px; background:rgba(255,255,255,.018); }
+.my-entry-pilot.is-me { border-color:rgba(53,185,120,.7); box-shadow:inset 3px 0 0 var(--accent); }
+.my-entry-pilot-head { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:6px; }
+.my-entry-pilot-head span { color:var(--muted); font-size:12px; text-align:right; }
+.my-entry-actions { display:flex; justify-content:flex-end; padding:14px 18px 18px; }
+.my-entry-actions .primary-button { min-width:190px; }
+@media (max-width:760px) {
+  .my-entry-header { flex-direction:column; }
+  .my-entry-header .circuit-visual { width:100%; height:150px; flex-basis:auto; }
+  .my-entry-preferences { grid-template-columns:1fr; }
+  .my-entry-section-heading,.my-entry-pilot-head { align-items:flex-start; flex-direction:column; }
+  .my-entry-pilot-head span { text-align:left; }
+  .my-entry-actions { justify-content:stretch; }
+  .my-entry-actions .primary-button { width:100%; }
+}
