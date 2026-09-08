@@ -39,6 +39,13 @@ if(!audit.includes(auditMarker)) throw new Error('Audit marker not found');
 audit=audit.replace(auditMarker,auditMarker+"\nif (!app.includes(\"from './front/schedule.mjs'\")) warnings.push('Le front n’utilise pas le module de calendrier partagé.');\nconst rootCss = searchable.find(item => item.path === 'styles.css')?.content || '';\nif (!rootCss.includes(\"/styles/foundation.css\") || !rootCss.includes(\"/styles/application.css\")) warnings.push('Les feuilles CSS modulaires ne sont pas chargées dans le bon point d’entrée.');");
 await writeFile('scripts/audit-codebase.mjs',audit);
 
+let interfaceTest=await readFile('tests/interface.test.mjs','utf8');
+const oldHarness="  const source=readFileSync(new URL('../app.js',import.meta.url),'utf8').replace(/^import[^\\n]+\\n/,'').replace(/start\\(\\);\\s*$/,'');\n  vm.runInContext(catalog+'\\n'+source,context);";
+const newHarness="  const schedule=readFileSync(new URL('../front/schedule.mjs',import.meta.url),'utf8').replace(/\\bexport\\s+/g,'');\n  const source=readFileSync(new URL('../app.js',import.meta.url),'utf8').replace(/^import[^\\n]+\\n/gm,'').replace(/start\\(\\);\\s*$/,'');\n  vm.runInContext(catalog+'\\n'+schedule+'\\n'+source,context);";
+if(!interfaceTest.includes(oldHarness)) throw new Error('Interface harness marker not found');
+interfaceTest=interfaceTest.replace(oldHarness,newHarness);
+await writeFile('tests/interface.test.mjs',interfaceTest);
+
 await rm('scripts/refactor-front-css.mjs',{force:true});
 await rm('.github/workflows/refactor-front-css.yml',{force:true});
 console.log('Front schedule helpers and CSS split completed.');
