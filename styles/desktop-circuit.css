@@ -1,0 +1,33 @@
+/* Desktop-only event circuit sizing.
+   Intentionally starts at 1000px so phone/tablet layouts remain unchanged. */
+@media (min-width: 1000px) {
+  .event-header-compact {
+    gap: 6px;
+    padding-top: 8px;
+    padding-bottom: 10px;
+  }
+
+  .event-header-compact .event-heading-line {
+    grid-template-columns: minmax(300px,.68fr) minmax(560px,1.32fr);
+    gap: 18px;
+  }
+
+  .event-header-compact .circuit-visual {
+    height: 440px;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .event-header-compact .circuit-visual img {
+    width: auto;
+    height: 420px;
+    max-width: 780px;
+    max-height: 420px;
+    object-fit: contain;
+  }
+
+  .event-header-summary {
+    margin-top: -4px;
+    padding-top: 7px;
+  }
+}
