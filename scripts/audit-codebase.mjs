@@ -1,10 +1,10 @@
-import {readdir, readFile, stat} from 'node:fs/promises';
+import {access, readdir, readFile, stat} from 'node:fs/promises';
 import {extname, relative, resolve} from 'node:path';
-import {fileURLToPath} from 'node:url';
+import {fileURLToPath, pathToFileURL} from 'node:url';
 
 const root = resolve(fileURLToPath(new URL('../', import.meta.url)));
 const ignored = new Set(['.git', 'node_modules', 'public']);
-const textExtensions = new Set(['.js', '.mjs', '.cjs', '.css', '.html', '.md', '.json', '.jsonc', '.sql']);
+const textExtensions = new Set(['.js', '.mjs', '.cjs', '.css', '.html', '.md', '.json', '.jsonc', '.sql', '.yml', '.yaml']);
 const assetExtensions = new Set(['.png', '.jpg', '.jpeg', '.webp', '.svg', '.gif']);
 const LARGE_FILE_BYTES = 40_000;
 
@@ -38,30 +38,26 @@ const unusedAssets = assets.filter(item => {
   return !allText.includes(relativeAsset) && !allText.includes(basename);
 });
 
-function extractArray(source, name) {
-  const match = source.match(new RegExp(`const\\s+${name}\\s*=\\s*\\[([^;]+?)\\];`, 's'));
-  if (!match) return null;
-  return [...match[1].matchAll(/['\"]([^'\"]+)['\"]/g)].map(item => item[1]);
+const warnings = [];
+const catalogPath = resolve(root, 'shared/catalog.mjs');
+const {CATEGORIES, EVENT_TYPES, CIRCUITS, CIRCUIT_IDS, categories, CARS} = await import(pathToFileURL(catalogPath).href + `?audit=${Date.now()}`);
+
+if (!CATEGORIES.length || new Set(CATEGORIES).size !== CATEGORIES.length) warnings.push('Le catalogue contient des catégories absentes ou dupliquées.');
+if (CATEGORIES.some(category => !categories[category] || !Array.isArray(CARS[category]))) warnings.push('Chaque catégorie doit avoir un style et une liste de voitures.');
+if (!Object.keys(EVENT_TYPES).length) warnings.push('Aucun type d’événement n’est défini.');
+if (new Set(CIRCUIT_IDS).size !== CIRCUIT_IDS.length) warnings.push('Les identifiants de circuits ne sont pas uniques.');
+
+for (const circuit of CIRCUITS) {
+  try { await access(resolve(root, 'images/circuits', circuit.file)); }
+  catch { warnings.push(`Image de circuit manquante : ${circuit.id} -> ${circuit.file}`); }
 }
 
 const app = searchable.find(item => item.path === 'app.js')?.content || '';
 const worker = searchable.find(item => item.path === 'server/worker.mjs')?.content || '';
-const appCategories = extractArray(app, 'CATEGORIES');
-const workerCategories = extractArray(worker, 'CATEGORIES');
-const appCircuitIds = [...app.matchAll(/\{id:['\"]([^'\"]+)['\"]/g)].map(item => item[1]);
-const workerCircuits = extractArray(worker, 'CIRCUITS');
+if (!app.includes("from './shared/catalog.mjs'")) warnings.push('Le front n’utilise pas le catalogue partagé.');
+if (!worker.includes("from '../shared/catalog.mjs'")) warnings.push('Le Worker n’utilise pas le catalogue partagé.');
 
-const warnings = [];
-if (appCategories && workerCategories && JSON.stringify(appCategories) !== JSON.stringify(workerCategories)) {
-  warnings.push('Les catégories front et Worker ne sont pas identiques.');
-}
-if (appCircuitIds.length && workerCircuits) {
-  const onlyFront = appCircuitIds.filter(value => !workerCircuits.includes(value));
-  const onlyWorker = workerCircuits.filter(value => !appCircuitIds.includes(value));
-  if (onlyFront.length || onlyWorker.length) warnings.push(`Circuits incohérents — front uniquement: ${onlyFront.join(', ') || 'aucun'} ; Worker uniquement: ${onlyWorker.join(', ') || 'aucun'}.`);
-}
-
-console.log('=== Audit FMT Endurance Manager ===');
+console.log('=== Audit App Endurance Manager ===');
 console.log(`Fichiers analysés : ${rows.length}`);
 console.log(`Fichiers texte >= ${Math.round(LARGE_FILE_BYTES/1000)} Ko : ${large.length}`);
 for (const item of large) console.log(`  - ${item.path}: ${(item.size/1024).toFixed(1)} KiB`);
@@ -71,7 +67,7 @@ if (warnings.length) {
   console.log('Incohérences détectées :');
   for (const warning of warnings) console.log(`  - ${warning}`);
 } else {
-  console.log('Aucune incohérence de catalogue détectée.');
+  console.log('Catalogue partagé et assets référencés : OK.');
 }
 
 if (process.argv.includes('--strict') && warnings.length) process.exitCode = 1;
