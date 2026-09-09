@@ -209,9 +209,10 @@ function sortAccordions() {
   app?.querySelectorAll('.category-group').forEach(group => {
     const accordions = Array.from(group.querySelectorAll(':scope > .crew-pilot-accordion'));
     if (accordions.length < 2) return;
-    accordions.sort((a, b) => Number(a.dataset.crewLocked === 'true') - Number(b.dataset.crewLocked === 'true'));
+    const desired = [...accordions].sort((a, b) => Number(a.dataset.crewLocked === 'true') - Number(b.dataset.crewLocked === 'true'));
+    if (desired.every((accordion, index) => accordion === accordions[index])) return;
     const firstPilot = group.querySelector(':scope > .pilot-row');
-    for (const accordion of accordions) group.insertBefore(accordion, firstPilot || null);
+    for (const accordion of desired) group.insertBefore(accordion, firstPilot || null);
   });
 }
 
@@ -236,6 +237,7 @@ function decorateCrewCards(events) {
     if (!found) return;
     const {event, departure, crew} = found;
     card.dataset.crewLocked = String(Boolean(crew.locked));
+    card.dataset.crewStatusDecorated = 'true';
     card.classList.toggle('is-complete', Boolean(crew.locked));
     card.classList.toggle('is-open', !crew.locked);
 
@@ -266,8 +268,10 @@ function decorateCrewCards(events) {
 
   app?.querySelectorAll('.crew-list').forEach(list => {
     const cards = Array.from(list.querySelectorAll(':scope > .crew-card'));
-    cards.sort((a, b) => Number(a.dataset.crewLocked === 'true') - Number(b.dataset.crewLocked === 'true'));
-    for (const card of cards) list.append(card);
+    if (cards.length < 2) return;
+    const desired = [...cards].sort((a, b) => Number(a.dataset.crewLocked === 'true') - Number(b.dataset.crewLocked === 'true'));
+    if (desired.every((card, index) => card === cards[index])) return;
+    for (const card of desired) list.append(card);
   });
 }
 
@@ -285,6 +289,53 @@ function scheduleRefresh(force = false) {
   clearTimeout(refreshTimer);
   refreshTimer = setTimeout(() => refreshCrewDecorations(force), 0);
 }
+
+function restoreScrollPosition(x, y) {
+  if (typeof window === 'undefined' || typeof window.scrollTo !== 'function') return;
+  const restore = () => window.scrollTo(x, y);
+  if (typeof requestAnimationFrame === 'function') {
+    requestAnimationFrame(() => {
+      restore();
+      requestAnimationFrame(restore);
+    });
+  } else {
+    setTimeout(restore, 0);
+  }
+}
+
+function refreshMainViewPreservingScroll() {
+  const refreshButton = app?.querySelector('[data-action="refresh"]');
+  if (!refreshButton) {
+    scheduleRefresh(true);
+    return;
+  }
+
+  const x = typeof window !== 'undefined' ? window.scrollX : 0;
+  const y = typeof window !== 'undefined' ? window.scrollY : 0;
+  let restored = false;
+  const observer = new MutationObserver(() => {
+    if (restored) return;
+    restored = true;
+    observer.disconnect();
+    restoreScrollPosition(x, y);
+  });
+  observer.observe(app, {childList: true});
+  refreshButton.click();
+  setTimeout(() => {
+    observer.disconnect();
+    if (!restored) restoreScrollPosition(x, y);
+  }, 2000);
+}
+
+// The main application rebuilds the event markup when an availability hour is toggled.
+// Remember the viewport before that rebuild so the pilot stays at the same place in the form.
+document.addEventListener('click', event => {
+  const availability = event.target.closest('[data-action="availability"]');
+  if (!availability || typeof window === 'undefined') return;
+  const x = window.scrollX;
+  const y = window.scrollY;
+  setTimeout(() => restoreScrollPosition(x, y), 0);
+}, true);
 
 document.addEventListener('click', async event => {
   const button = event.target.closest('[data-crew-lock-toggle]');
@@ -309,7 +360,11 @@ document.addEventListener('click', async event => {
     });
     const result = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(result.error || 'Impossible de modifier l’état de l’équipage.');
-    location.reload();
+
+    // Do not reload the document: the application starts on the home page after a reload.
+    // Ask the main application to refresh its data instead, which keeps the current event/tab.
+    crewEvents = null;
+    refreshMainViewPreservingScroll();
   } catch (error) {
     alert(error?.message || 'Impossible de modifier l’état de l’équipage.');
   } finally {
@@ -325,8 +380,15 @@ if (app) {
     for (const mutation of mutations) {
       for (const node of mutation.addedNodes) {
         if (!(node instanceof HTMLElement)) continue;
+
+        // Detect only fresh application markup before enhancing it. Reordering an already
+        // enhanced accordion/card must not trigger another fetch/decorate/sort cycle.
+        const freshAccordion = node.matches('.crew-pilot-group:not([data-crew-accordion="true"])') || Boolean(node.querySelector?.('.crew-pilot-group:not([data-crew-accordion="true"])'));
+        const freshCard = node.matches('.crew-card:not([data-crew-status-decorated="true"])') || Boolean(node.querySelector?.('.crew-card:not([data-crew-status-decorated="true"])'));
+        const freshStructure = node.matches('.departure-fold, .category-group, .crew-list');
+
         enhanceCrewAccordions(node);
-        if (node.matches('.departure-fold, .category-group, .crew-card, .crew-pilot-group') || node.querySelector?.('.crew-card, .crew-pilot-group')) meaningful = true;
+        if (freshAccordion || freshCard || freshStructure) meaningful = true;
       }
     }
     if (meaningful) scheduleRefresh(true);
