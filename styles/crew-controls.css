@@ -14,4 +14,22 @@
 .crew-candidate-info{min-width:0}
 .crew-candidate-info .ux-candidate-head{margin-bottom:5px}
 .crew-add-pilot-button{min-width:84px;flex:0 0 auto;text-align:center}
-@media(max-width:760px){.crew-state-control{align-items:flex-start;flex-direction:column}.crew-state-select-wrap,.crew-state-select{width:100%}.crew-candidate-action-card{grid-template-columns:1fr}.crew-add-pilot-button,.crew-member-action{width:100%}}
+
+/* Course et Équipages utilisent maintenant la même lecture compacte. */
+.crew-list{display:grid!important;grid-template-columns:1fr!important;gap:10px!important}
+.crew-management-accordion{padding:0!important;overflow:hidden;opacity:1!important}
+.crew-management-accordion>.crew-management-summary{margin:0}
+.crew-management-accordion.is-complete>.crew-management-summary{background:color-mix(in srgb,#7d8589 8%,#151c1f)}
+.crew-management-accordion[open]>.crew-management-summary .crew-compact-chevron{transform:rotate(90deg)}
+.crew-management-accordion-body{padding:12px 14px 14px;border-top:1px solid color-mix(in srgb,var(--crew-color) 22%,transparent)}
+.crew-management-accordion-body>.crew-card-header{align-items:flex-start;margin:0 0 12px;padding:0 0 12px;border-bottom:1px solid var(--border)}
+.crew-management-accordion-body>.crew-card-header>div{display:flex;align-items:center;flex-wrap:wrap;gap:8px 12px;min-width:0}
+.crew-management-accordion-body>.crew-card-header>div>.event-category-badge,
+.crew-management-accordion-body>.crew-card-header>div>h3,
+.crew-management-accordion-body>.crew-card-header>div>.crew-car{display:none!important}
+.crew-management-accordion-body .crew-state-control{margin:0}
+.crew-management-accordion-body .coverage-summary{margin-left:auto;align-self:center}
+.crew-management-accordion-body .crew-actions{margin-top:14px}
+.crew-management-accordion-body .crew-actions:empty{display:none}
+
+@media(max-width:760px){.crew-state-control{align-items:flex-start;flex-direction:column}.crew-state-select-wrap,.crew-state-select{width:100%}.crew-candidate-action-card{grid-template-columns:1fr}.crew-add-pilot-button,.crew-member-action{width:100%}.crew-management-accordion-body>.crew-card-header{gap:10px}.crew-management-accordion-body .coverage-summary{margin-left:0}}
