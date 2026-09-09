@@ -1,7 +1,7 @@
-/* Stable banner rendering.
-   Keep the complete artwork visible as a real image. The image is capped on ultrawide
-   displays so browser zoom never stretches it beyond its source resolution; only the
-   blurred backdrop fills the unused sides. */
+/* Final banner rendering.
+   Keep the complete 2048×512 artwork visible as a real image. On ultrawide displays
+   the sharp artwork is capped at its native 2048px width while a blurred copy fills
+   any unused sides. This preserves detail and avoids stretching when browser zoom changes. */
 
 header.site-hero {
   position: relative;
@@ -23,7 +23,7 @@ header.site-hero::before {
   z-index: 0;
   background:
     linear-gradient(180deg,rgba(5,8,10,.16),rgba(5,8,10,.38)),
-    url('/images/endurance-manager-banner.webp') center / cover no-repeat;
+    url('/images/endurance-manager-banner-final-hq.webp') center / cover no-repeat;
   filter: blur(18px) saturate(.92) brightness(.52);
   transform: scale(1.035);
   opacity: .92;
@@ -46,7 +46,7 @@ header.site-hero::after {
   z-index: 1;
   display: block;
   width: min(100%, 2048px);
-  aspect-ratio: 3 / 1;
+  aspect-ratio: 4 / 1;
   margin: 0 auto;
   background: #080b0d;
   box-shadow: 0 0 46px rgba(0,0,0,.4);
@@ -132,7 +132,7 @@ header.site-hero .brand-button.logo {
 
   .hero-picture {
     width: 100%;
-    aspect-ratio: 3 / 1;
+    aspect-ratio: 4 / 1;
     box-shadow: none;
   }
 

@@ -38,4 +38,4 @@ async function validateWebp(path,{minWidth=1,minHeight=1}={}){
   console.log(`Asset image OK: ${path} (${width}×${height}, ${(buffer.length/1024).toFixed(1)} KiB)`);
 }
 
-await validateWebp('images/endurance-manager-banner.webp',{minWidth:1900,minHeight:600});
+await validateWebp('images/endurance-manager-banner-final-hq.webp',{minWidth:2000,minHeight:500});
