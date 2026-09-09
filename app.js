@@ -71,7 +71,7 @@ async function load() {
   renderNav();
 }
 function renderNav() {
-  nav.innerHTML=`${button('home','Événements')}
+  nav.innerHTML=`${button('home','Événements')}${button('my-entries','Mes inscriptions')}
     ${isAdmin()?button('members','Gestion des membres'):''}
     ${user?`<span class="account-name">${esc(user.name)} <small>${roleLabel(user.role)}</small></span>${button('logout','Déconnexion')}`:
       discordReady?'<a class="discord-button" href="/api/auth/discord">Se connecter avec Discord</a>':'<span class="account-name">Connexion Discord à configurer</span>'}`;
@@ -92,9 +92,8 @@ function renderHome(message='') {
   const groups=groupEvents(events,eventFilter);
   app.innerHTML=`<h1 class="page-title">ÉVÉNEMENTS</h1>
     ${canManage()?`<div class="home-create-event">${button('create','Ajouter un évènement','','primary-button')}</div>`:''}
-    <p class="page-subtitle">Gestion des courses d’endurance · Horaires de Paris</p>
     ${message?`<p class="creation-success" role="status">${esc(message)}</p>`:''}${errorBox()}
-    <div class="toolbar home-toolbar">${button('refresh','Actualiser')}${button('my-entries','Mes inscriptions')}${!user?button('guest-link','Mon lien personnel'):''}</div>
+    ${!user?`<div class="toolbar home-toolbar">${button('guest-link','Mon lien personnel')}</div>`:''}
     <div class="event-filter" role="group" aria-label="Filtrer les événements">${button('event-filter','À venir',`data-filter="upcoming" aria-pressed="${eventFilter==='upcoming'}"`,'event-filter-button')}${button('event-filter','Archivés',`data-filter="archived" aria-pressed="${eventFilter==='archived'}"`,'event-filter-button')}</div>
     ${groups.length?`<div class="event-agenda">${groups.map(group=>`<section class="event-period" aria-labelledby="period-${group.key}"><h2 class="event-period-heading" id="period-${group.key}"><span>${esc(group.label)}</span><small>${group.items.length} événement${group.items.length>1?'s':''}</small></h2><div class="event-list">${group.items.map(renderEventCard).join('')}</div></section>`).join('')}</div>`:`<div class="empty">${eventFilter==='upcoming'?'Aucun événement à venir.':'Aucun événement archivé.'}</div>`}`;
   showRecoveryLink();
