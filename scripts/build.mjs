@@ -5,7 +5,7 @@ const root = fileURLToPath(new URL('../', import.meta.url));
 const out = new URL('../public/', import.meta.url);
 await rm(out,{recursive:true,force:true});
 await mkdir(out,{recursive:true});
-for(const file of ['index.html','styles.css','app.js']) await copyFile(root+file,new URL(file,out));
+for(const file of ['index.html','styles.css','app.js','crew-accordion.css','crew-accordion.js']) await copyFile(root+file,new URL(file,out));
 await cp(root+'images',new URL('images/',out),{recursive:true});
 await cp(root+'styles',new URL('styles/',out),{recursive:true});
 await cp(root+'front',new URL('front/',out),{recursive:true});
@@ -27,6 +27,10 @@ await writeFile(new URL('_headers',out),`/*
 /app.js
   Cache-Control: no-cache
 /styles.css
+  Cache-Control: no-cache
+/crew-accordion.js
+  Cache-Control: no-cache
+/crew-accordion.css
   Cache-Control: no-cache
 `);
 console.log(`Build ready: public/ (${process.argv.includes('--workers')?'Workers':'Pages'})`);
