@@ -1,8 +1,7 @@
 /* Stable, high-fidelity banner rendering.
-   The artwork is shown as a real image instead of a stretched CSS background.
-   On very wide screens the sharp banner keeps a capped native-sized width while
-   a blurred backdrop fills the unused sides. This keeps the full 3:1 artwork
-   visible and prevents browser zoom from constantly resizing the hero. */
+   The final 2048×512 artwork is shown as a real image, never as a stretched CSS background.
+   On ultrawide screens it keeps its full 4:1 composition at a capped 2048px width while
+   a blurred backdrop fills any unused sides. On phones the same artwork scales down cleanly. */
 
 header.site-hero {
   position: relative;
@@ -24,7 +23,7 @@ header.site-hero::before {
   z-index: 0;
   background:
     linear-gradient(180deg,rgba(5,8,10,.16),rgba(5,8,10,.38)),
-    url('/images/endurance-manager-banner.webp') center / cover no-repeat;
+    url('/images/endurance-manager-banner-final.webp') center / cover no-repeat;
   filter: blur(18px) saturate(.92) brightness(.52);
   transform: scale(1.035);
   opacity: .92;
@@ -47,7 +46,7 @@ header.site-hero::after {
   z-index: 1;
   display: block;
   width: min(100%, 2048px);
-  aspect-ratio: 2048 / 682;
+  aspect-ratio: 4 / 1;
   margin: 0 auto;
   background: #080b0d;
   box-shadow: 0 0 46px rgba(0,0,0,.4);
@@ -86,7 +85,6 @@ header.site-hero .brand-button.logo {
   pointer-events: auto;
 }
 
-/* The global navigation stays below the artwork. */
 .site-nav-shell {
   position: relative;
   z-index: 8;
@@ -106,8 +104,8 @@ header.site-hero .brand-button.logo {
   margin: 0;
 }
 
-/* Ultrawide/desktop: the sharp artwork stays at its reference width.
-   Only the soft backdrop expands, so zooming out no longer makes the banner huge. */
+/* Ultrawide/desktop: keep the sharp banner at its native reference width.
+   Browser zoom can reveal more backdrop but never stretches the artwork past 2048px. */
 @media (min-width: 2048px) {
   .hero-picture,
   header.site-hero .header-inner {
@@ -115,7 +113,6 @@ header.site-hero .brand-button.logo {
   }
 }
 
-/* Normal desktop/tablet: preserve the full 3:1 composition. */
 @media (max-width: 2047px) {
   .hero-picture,
   header.site-hero .header-inner {
@@ -123,7 +120,6 @@ header.site-hero .brand-button.logo {
   }
 }
 
-/* Phone: same artwork, fully visible, naturally compact because of the 3:1 ratio. */
 @media (max-width: 700px) {
   header.site-hero {
     min-height: 0;
@@ -138,7 +134,7 @@ header.site-hero .brand-button.logo {
 
   .hero-picture {
     width: 100%;
-    aspect-ratio: 2048 / 682;
+    aspect-ratio: 4 / 1;
     box-shadow: none;
   }
 
