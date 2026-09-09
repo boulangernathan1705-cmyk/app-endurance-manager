@@ -75,11 +75,40 @@
 .presence-segment:first-child { border-radius: 5px 0 0 5px; }
 .presence-track > .presence-segment:last-child { border-right: 0; border-radius: 0 5px 5px 0; }
 .presence-track > .presence-segment:only-child { border-radius: 5px; }
-.presence-track > .presence-segment.is-present { background: var(--phase-color); color: #101416; }
+.presence-track > .presence-segment.is-present { background: var(--pilot-timeline-color, #8fb6c9); color: #101416; }
 .presence-track > button.presence-segment { cursor: pointer; touch-action: manipulation; }
-.presence-track > button.presence-segment:hover { filter: brightness(1.15); }
+.presence-track > button.presence-segment:hover { filter: brightness(1.08); }
 .presence-track > button.presence-segment:focus-visible { position: relative; z-index: 1; outline: 2px solid #fff; outline-offset: 1px; }
 .presence-edges { display: flex; justify-content: space-between; gap: 8px; margin-top: 5px; font-size: 10px; font-weight: 900; letter-spacing: .5px; }
+
+/* Stable, muted pastel palette: one tone is assigned to each visible pilot. */
+.pilot-timeline-tone-0 { --pilot-timeline-color: #8fb6c9; }
+.pilot-timeline-tone-1 { --pilot-timeline-color: #aa9fc2; }
+.pilot-timeline-tone-2 { --pilot-timeline-color: #91bca8; }
+.pilot-timeline-tone-3 { --pilot-timeline-color: #c3a08d; }
+.pilot-timeline-tone-4 { --pilot-timeline-color: #bd98a5; }
+.pilot-timeline-tone-5 { --pilot-timeline-color: #a8b996; }
+.pilot-timeline-tone-6 { --pilot-timeline-color: #8fb8b6; }
+.pilot-timeline-tone-7 { --pilot-timeline-color: #99a7c7; }
+.pilot-timeline-tone-8 { --pilot-timeline-color: #c5b887; }
+.pilot-timeline-tone-9 { --pilot-timeline-color: #b397b4; }
+.pilot-timeline-tone-10 { --pilot-timeline-color: #c1a48c; }
+.pilot-timeline-tone-11 { --pilot-timeline-color: #94adc3; }
+
+/* Organizer crew coverage: 2+ pilots = green, 1 pilot = yellow, nobody = neutral. */
+.presence-timeline.is-coverage .presence-segment.coverage-two {
+  background: #8fbea0;
+  color: #142019;
+}
+.presence-timeline.is-coverage .presence-segment.coverage-one {
+  background: #cdbc78;
+  color: #211d10;
+}
+.presence-timeline.is-coverage .presence-segment.coverage-none {
+  background: transparent;
+  color: #899598;
+}
+
 @container presence (min-width: 400px) {
   .presence-time[class] { display: none; }
   .presence-time.ticks-6 { display: block; }
