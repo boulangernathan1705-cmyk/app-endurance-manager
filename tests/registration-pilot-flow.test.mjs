@@ -48,7 +48,14 @@ test('managed Discord registrations stay shared between organizer and pilot',()=
 
 test('self and managed pilots can add another category without duplicate identity chrome',()=>{
   assert.match(app,/Ajouter une catégorie/);
-  assert.match(app,/const canAdd=source&&event.categories/);
+  assert.match(app,/Ajouter une catégorie/);
   assert.doesNotMatch(app,/Ce pilote est affecté à un équipage. Sa catégorie est fixée/);
   assert.doesNotMatch(app,/AUTRE PILOTE<\/span><strong>/);
+});
+
+
+test('crew assignment locks extra categories again',()=>{
+  assert.match(app,/const canAdd=source&&!assigned&&event\.categories/);
+  const migration=fs.readFileSync('migrations/0014_lock_categories_after_crew_assignment.sql','utf8');
+  assert.match(migration,/CREATE TRIGGER participant_assigned_insert BEFORE INSERT ON registrations/);
 });
