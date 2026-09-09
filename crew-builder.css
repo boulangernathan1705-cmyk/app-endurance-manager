@@ -1,0 +1,184 @@
+.crew-section [data-action="new-crew"] { display: none !important; }
+
+.crew-builder-open { margin-left: 2px; }
+
+.crew-builder-panel {
+  margin: 18px 0 22px;
+  padding: 18px;
+  border: 1px solid #344147;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #171e21, #101416);
+  box-shadow: 0 14px 32px rgba(0,0,0,.22);
+}
+
+.crew-builder-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 18px;
+  margin-bottom: 16px;
+}
+
+.crew-builder-heading h2 { margin: 4px 0 6px; }
+.crew-builder-heading p { margin: 0; color: var(--muted); max-width: 760px; line-height: 1.5; }
+
+.crew-builder-form { display: grid; gap: 14px; }
+
+.crew-builder-card {
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: rgba(255,255,255,.018);
+}
+
+.crew-builder-card-title {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  margin-bottom: 14px;
+}
+
+.crew-builder-card-title > span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 32px;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--green);
+  border-radius: 50%;
+  color: var(--green);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.crew-builder-card-title h3 { margin: 0 0 4px; }
+.crew-builder-card-title p { margin: 0; color: var(--muted); font-size: 13px; }
+
+.crew-builder-fields {
+  display: grid;
+  grid-template-columns: repeat(2,minmax(0,1fr));
+  gap: 12px;
+}
+
+.crew-builder-fields label {
+  display: grid;
+  gap: 7px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.crew-builder-fields input,
+.crew-builder-fields select {
+  width: 100%;
+  min-width: 0;
+}
+
+.crew-builder-pilots {
+  display: grid;
+  grid-template-columns: repeat(2,minmax(0,1fr));
+  gap: 10px;
+}
+
+.crew-builder-pilot {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid #344147;
+  border-radius: 10px;
+  background: #101416;
+  cursor: pointer;
+  transition: border-color .16s ease, background .16s ease, box-shadow .16s ease;
+}
+
+.crew-builder-pilot:hover { border-color: #587269; }
+.crew-builder-pilot.is-selected {
+  border-color: var(--green);
+  background: rgba(36,132,79,.16);
+  box-shadow: inset 3px 0 0 var(--green);
+}
+
+.crew-builder-pilot-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.crew-builder-pilot-head input {
+  flex: 0 0 18px;
+  width: 18px;
+  height: 18px;
+  margin: 2px 0 0;
+  accent-color: var(--green);
+}
+
+.crew-builder-pilot-head > span { display: grid; gap: 2px; min-width: 0; }
+.crew-builder-pilot-head strong { color: var(--text); }
+.crew-builder-pilot-head small { color: var(--muted); overflow-wrap: anywhere; }
+.crew-builder-pilot-wish { color: var(--muted); font-size: 12px; }
+.crew-builder-pilot-wish strong { color: #dcefe5; }
+
+.crew-builder-warning {
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  border-left: 3px solid #d6a63b;
+  background: rgba(214,166,59,.08);
+  color: #d8c89f;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.crew-builder-empty { margin: 0; color: var(--muted); }
+
+.crew-builder-coverage-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.crew-builder-coverage-heading > div { display: grid; gap: 3px; }
+.crew-builder-step-label { color: var(--green); font-size: 10px; font-weight: 900; letter-spacing: 1px; }
+.crew-builder-coverage-heading strong { font-size: 18px; }
+.crew-builder-coverage-heading > span { color: var(--muted); font-size: 12px; font-weight: 800; }
+
+.crew-builder-coverage-message {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.crew-builder-coverage-message.needs-pilots { color: #9ce1b4; }
+
+.crew-builder-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
+}
+
+.crew-builder-submit-note {
+  margin-right: auto;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.crew-builder-error { margin: 0; }
+.crew-builder-result { margin: 8px 0 14px; }
+
+@media (max-width: 820px) {
+  .crew-builder-pilots { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 680px) {
+  .crew-builder-panel { padding: 14px; }
+  .crew-builder-heading { flex-direction: column; }
+  .crew-builder-heading > button { width: 100%; }
+  .crew-builder-fields { grid-template-columns: 1fr; }
+  .crew-builder-actions { flex-direction: column; align-items: stretch; }
+  .crew-builder-submit-note { margin-right: 0; }
+  .crew-builder-actions .primary-button { width: 100%; }
+  .crew-builder-coverage-heading { align-items: flex-start; flex-direction: column; }
+}
