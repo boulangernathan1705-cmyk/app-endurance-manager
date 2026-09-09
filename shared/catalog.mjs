@@ -34,9 +34,9 @@ export const categories = {
   Hypercar:{image:'HC.png',css:'hyper'},
   'LMP2 ELMS':{image:'LMP2.png',css:'lmp2'},
   'LMP2 WEC':{image:'LMP2.png',css:'lmp2'},
-  LMP3:{image:'P3.png',css:'lmp3'},
-  GT3:{image:'GT3.png',css:'gt3'},
-  GTE:{image:'GTE.png',css:'gte'}
+  LMP3:{image:'P3.webp',css:'lmp3'},
+  GT3:{image:'GT3.webp',css:'gt3'},
+  GTE:{image:'GTE.webp',css:'gte'}
 };
 
 export const CARS = {
