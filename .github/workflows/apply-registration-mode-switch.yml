@@ -4,6 +4,7 @@ on:
     branches: [fix/registration-mode-switch]
     paths:
       - scripts/apply-registration-mode-switch.mjs
+      - scripts/fix-registration-mode-details.mjs
       - .github/workflows/apply-registration-mode-switch.yml
 permissions:
   contents: write
@@ -19,10 +20,12 @@ jobs:
         with:
           node-version: 22
       - run: node scripts/apply-registration-mode-switch.mjs
+      - run: node scripts/fix-registration-mode-details.mjs
       - run: npm run check
       - name: Commit patch and remove temporary automation
         run: |
           rm scripts/apply-registration-mode-switch.mjs
+          rm scripts/fix-registration-mode-details.mjs
           rm .github/workflows/apply-registration-mode-switch.yml
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
