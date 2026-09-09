@@ -23,7 +23,7 @@ header.site-hero::before {
   z-index: 0;
   background:
     linear-gradient(180deg,rgba(5,8,10,.16),rgba(5,8,10,.38)),
-    url('/images/endurance-manager-banner-final.webp') center / cover no-repeat;
+    url('/images/endurance-manager-banner-final-v2.webp') center / cover no-repeat;
   filter: blur(18px) saturate(.92) brightness(.52);
   transform: scale(1.035);
   opacity: .92;
@@ -48,7 +48,9 @@ header.site-hero::after {
   width: min(100%, 2048px);
   aspect-ratio: 4 / 1;
   margin: 0 auto;
-  background: #080b0d;
+  background:
+    #080b0d
+    url('/images/endurance-manager-banner.webp') center / contain no-repeat;
   box-shadow: 0 0 46px rgba(0,0,0,.4);
 }
 
