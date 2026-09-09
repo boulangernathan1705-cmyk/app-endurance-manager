@@ -1,0 +1,31 @@
+name: Apply shared pilot category controls
+on:
+  push:
+    branches: [feature/shared-pilot-category-controls]
+    paths:
+      - scripts/apply-shared-pilot-category-controls.mjs
+      - .github/workflows/apply-shared-pilot-category-controls.yml
+permissions:
+  contents: write
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/shared-pilot-category-controls
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node scripts/apply-shared-pilot-category-controls.mjs
+      - run: npm run check
+      - name: Commit patch and remove temporary automation
+        run: |
+          rm scripts/apply-shared-pilot-category-controls.mjs
+          rm .github/workflows/apply-shared-pilot-category-controls.yml
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -A
+          git commit -m "feat: share pilot registration controls"
+          git push origin HEAD:feature/shared-pilot-category-controls
