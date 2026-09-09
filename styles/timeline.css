@@ -105,7 +105,7 @@
   color: #211d10;
 }
 .presence-timeline.is-coverage .presence-segment.coverage-none {
-  background: #262e32;
+  background: transparent;
   color: #899598;
 }
 
