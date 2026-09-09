@@ -1,0 +1,31 @@
+name: Apply registration mode switch
+on:
+  push:
+    branches: [fix/registration-mode-switch]
+    paths:
+      - scripts/apply-registration-mode-switch.mjs
+      - .github/workflows/apply-registration-mode-switch.yml
+permissions:
+  contents: write
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/registration-mode-switch
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node scripts/apply-registration-mode-switch.mjs
+      - run: npm run check
+      - name: Commit patch and remove temporary automation
+        run: |
+          rm scripts/apply-registration-mode-switch.mjs
+          rm .github/workflows/apply-registration-mode-switch.yml
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -A
+          git commit -m "fix: simplify registration mode selection"
+          git push origin HEAD:fix/registration-mode-switch
