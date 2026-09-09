@@ -26,7 +26,18 @@ async function listEvents(env, actor) {
   const memberships = (await env.DB.prepare('SELECT crew_id,registration_id FROM crew_members').all()).results;
   const grouped = new Map();
   for (const reg of registrations) { const key = `${reg.event_id}:${reg.departure_id}`; if (!grouped.has(key)) grouped.set(key, []); grouped.get(key).push(publicRegistration(reg, actor)); }
-  return rows.map(row => ({id:row.id, name:row.name, circuit:row.circuit||'', durationHours:Number(row.duration_hours)||3, eventType:row.event_type||'private', categories:JSON.parse(row.categories), version:row.version, departures:JSON.parse(row.departures).map(d => ({...d, availability:grouped.get(`${row.id}:${d.id}`) || [], crews:crews.filter(c=>c.event_id===row.id&&c.departure_id===d.id).map(c=>({id:c.id,name:c.name,category:c.category,car:c.car,version:c.version,registrationIds:memberships.filter(m=>m.crew_id===c.id).map(m=>m.registration_id)}))}))}));
+  const membersByCrew = new Map();
+  for (const member of memberships) {
+    if (!membersByCrew.has(member.crew_id)) membersByCrew.set(member.crew_id, []);
+    membersByCrew.get(member.crew_id).push(member.registration_id);
+  }
+  const crewsByDeparture = new Map();
+  for (const crew of crews) {
+    const key = `${crew.event_id}:${crew.departure_id}`;
+    if (!crewsByDeparture.has(key)) crewsByDeparture.set(key, []);
+    crewsByDeparture.get(key).push({id:crew.id,name:crew.name,category:crew.category,car:crew.car,version:crew.version,registrationIds:membersByCrew.get(crew.id) || []});
+  }
+  return rows.map(row => ({id:row.id, name:row.name, circuit:row.circuit||'', durationHours:Number(row.duration_hours)||3, eventType:row.event_type||'private', categories:JSON.parse(row.categories), version:row.version, departures:JSON.parse(row.departures).map(d => ({...d, availability:grouped.get(`${row.id}:${d.id}`) || [], crews:crewsByDeparture.get(`${row.id}:${d.id}`) || []}))}));
 }
 async function oauthStart(request, env) {
   requireDiscord(env); await rateLimit(request, env, 'oauth', 20); await cleanup(env);
@@ -172,12 +183,13 @@ async function api(request, env) {
       return json({ok:true});
     }
     const data = validateEvent(input, event), cats = JSON.stringify(data.categories), deps = JSON.stringify(data.departures);
-    // Keep booked departures and their categories valid, including concurrent registrations.
+    // Check inside the UPDATE so concurrent registrations cannot invalidate the new duration.
     const result = await env.DB.prepare(`UPDATE events SET name=?,duration_hours=?,event_type=?,circuit=?,categories=?,departures=?,version=version+1 WHERE id=? AND version=?
       AND NOT EXISTS (SELECT 1 FROM registrations r WHERE r.event_id=events.id AND
         (NOT EXISTS (SELECT 1 FROM json_each(?) d WHERE json_extract(d.value,'$.id')=r.departure_id)
-      OR (r.category!='' AND NOT EXISTS (SELECT 1 FROM json_each(?) c WHERE c.value=r.category))))`).bind(data.name, data.durationHours, data.eventType, data.circuit, cats, deps, event.id, input.version, deps, cats).run();
-    if (!result.meta.changes) fail(409, 'Modification impossible : événement modifié ailleurs, départ supprimé avec des inscrits, ou catégorie encore utilisée.');
+      OR (r.category!='' AND NOT EXISTS (SELECT 1 FROM json_each(?) c WHERE c.value=r.category))
+      OR EXISTS (SELECT 1 FROM json_each(?) h WHERE instr(',' || r.status || ',', ',' || h.value || ',') > 0)))`).bind(data.name, data.durationHours, data.eventType, data.circuit, cats, deps, event.id, input.version, deps, cats, JSON.stringify(Array.from({length:24-data.durationHours},(_,i)=>`h${data.durationHours+i+1}`))).run();
+    if (!result.meta.changes) fail(409, 'Modification impossible : événement modifié ailleurs, départ supprimé avec des inscrits, catégorie encore utilisée, ou disponibilités au-delà de la nouvelle durée. Ajuste les disponibilités concernées avant de raccourcir la course.');
     return json({ok:true});
   }
   const departureMatch = path.match(/^\/api\/events\/([a-f0-9-]{36})\/departures\/([a-f0-9-]{36})\/registrations$/);

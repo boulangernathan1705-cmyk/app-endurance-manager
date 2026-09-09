@@ -267,3 +267,25 @@ test('Paris timezone is stable across seasons and rejects ambiguous/nonexistent 
  }
  for(const date of ['2027-03-28','2027-10-31'])assert.equal((await h.req('/api/events','POST',{...eventInput,departures:[{date,time:'02:30'}]},'admin')).status,400);
 });
+test('shortening preserves bookings and crews, rejecting hours outside the new duration',async()=>{
+ const {req,login,DB}=harness();await login(ADMIN,'admin');
+ await req('/api/events','POST',{...eventInput,durationHours:24},'admin');
+ let event=(await req('/api/events')).data.events[0];
+ const base=`/api/events/${event.id}/departures/${event.departures[0].id}`;
+ const registration=await req(base+'/registrations','POST',{name:'Late pilot',category:'Hypercar',status:'h1,h24'},'admin');
+ const crew=await req(base+'/crews','POST',{name:'Team',category:'Hypercar'},'admin');
+ await req('/api/crews/'+crew.data.id+'/members','POST',{registrationId:registration.data.id,version:1},'admin');
+ const before=DB.db.prepare('SELECT * FROM registrations').all();
+ const rejected=await req('/api/events/'+event.id,'PATCH',{...event,durationHours:2},'admin');
+ assert.equal(rejected.status,409);assert.match(rejected.data.error,/disponibilités/);
+ assert.deepEqual(DB.db.prepare('SELECT * FROM registrations').all(),before);
+ assert.equal(DB.db.prepare('SELECT duration_hours FROM events').get().duration_hours,24);
+ assert.equal(DB.db.prepare('SELECT COUNT(*) n FROM crew_members').get().n,1);
+ assert.equal((await req('/api/registrations/'+registration.data.id,'PATCH',{name:'Late pilot',category:'Hypercar',status:'h1,h2',version:1},'admin')).status,200);
+ assert.equal((await req('/api/events/'+event.id,'PATCH',{...event,durationHours:2},'admin')).status,200);
+ event=(await req('/api/events','GET',null,'admin')).data.events[0];
+ assert.equal(event.durationHours,2);assert.equal(event.departures[0].availability[0].status,'h1,h2');
+ assert.deepEqual(event.departures[0].crews[0].registrationIds,[registration.data.id]);
+ assert.equal((await req('/api/events/'+event.id,'PATCH',{...event,durationHours:1},'admin')).status,409);
+ assert.equal((await req('/api/events/'+event.id,'PATCH',{...event,durationHours:24},'admin')).status,200);
+});

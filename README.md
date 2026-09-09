@@ -19,7 +19,7 @@ Les deux catégories LMP2 sont distinctes mais utilisent le même logo P2. GTE u
 
 Un pilote peut conserver une inscription par catégorie sur le même départ. Le bouton **Ajouter une catégorie** apparaît après la première inscription, y compris pour un organisateur qui inscrit son propre pseudo. Dès qu’un organisateur affecte une de ces inscriptions à un équipage, les autres catégories du même pilote sur ce départ sont automatiquement retirées.
 
-La page de création d’événement est organisée en trois étapes lisibles (informations générales, catégories, départs) et utilise les logos GT3 et GTE fournis dans `images/GT3.png` et `images/GTE.png`.
+La page de création d’événement est organisée en trois étapes lisibles (informations générales, catégories, départs) et utilise les logos GT3 et GTE fournis dans `images/GT3.webp` et `images/GTE.webp`.
 
 ## Configuration préparée pour votre Worker existant
 
