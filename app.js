@@ -137,7 +137,7 @@ function renderRegistrationForm(event,departure) {
   const selected=departure.availability.find(r=>r.id===state.id),same=departure.availability.filter(r=>state.participantId&&r.participantId===state.participantId);
   const assigned=(departure.crews||[]).some(c=>c.registrationIds.some(id=>same.some(r=>r.id===id)));
   const source=selected||same[0]||(!state.forOther?ownRegistrations(departure)[0]:null);
-  const canAdd=source&&!assigned&&event.categories.some(c=>!same.some(r=>r.category===c));
+  const canAdd=source&&event.categories.some(c=>!same.some(r=>r.category===c));
   const contextName=state.name||source?.name||(!state.forOther?user?.name:'')||'';
   const selfMode=!state.forOther&&state.mode!=='category';
   const otherMode=state.forOther&&state.mode!=='category';
@@ -145,27 +145,26 @@ function renderRegistrationForm(event,departure) {
   const linkedOther=state.forOther&&!!(state.participantUserId||state.discordLinked);
   const manualOther=state.forOther&&!linkedOther&&!categoryMode;
   const guestSelf=!state.forOther&&!user;
-  const addButtons=`${button('my-registration','Mon inscription',`data-departure="${departure.id}" aria-pressed="${selfMode}"`,`${selfMode?'primary-button':'secondary-button'} registration-nav-button`)}${canManage()?button('new-registration','Ajouter un pilote',`data-departure="${departure.id}" data-mode="pilot" aria-pressed="${otherMode}"`,`${otherMode?'primary-button':'secondary-button'} registration-nav-button`):''}${canAdd?button('new-registration',`+ Catégorie pour ${esc(source.name)}`,`data-departure="${departure.id}" data-mode="category" data-registration="${source.id}" aria-pressed="${categoryMode}"`,`${categoryMode?'primary-button':'secondary-button'} registration-nav-button category-add-button`):''}`;
+  const addButtons=`${button('my-registration','Mon inscription',`data-departure="${departure.id}" aria-pressed="${selfMode}"`,`${selfMode?'primary-button':'secondary-button'} registration-nav-button`)}${canManage()?button('new-registration','Ajouter un pilote',`data-departure="${departure.id}" data-mode="pilot" aria-pressed="${otherMode}"`,`${otherMode?'primary-button':'secondary-button'} registration-nav-button`):''}${canAdd?button('new-registration','Ajouter une catégorie',`data-departure="${departure.id}" data-mode="category" data-registration="${source.id}" aria-pressed="${categoryMode}"`,`${categoryMode?'primary-button':'secondary-button'} registration-nav-button category-add-button`):''}`;
   const formTitle=categoryMode?`Ajouter une catégorie · ${esc(contextName||'Pilote')}`:otherMode?`Inscription de ${esc(contextName||'autre pilote')}`:'Mon inscription';
   const contextBanner=categoryMode
     ? `<div class="registration-context-banner category"><span>AJOUT D’UNE CATÉGORIE</span><strong>${esc(contextName||'Pilote')}</strong></div>`
     : otherMode
-      ? `<div class="registration-context-banner other"><span>AUTRE PILOTE</span><strong>${esc(contextName||'À choisir')}</strong></div>`
+      ? `<div class="registration-context-banner other"><span>AUTRE PILOTE</span></div>`
       : `<div class="registration-context-banner self"><span>TON INSCRIPTION</span><strong>${esc(contextName||user?.name||'Mon inscription')}</strong></div>`;
   return `<form class="form-section registration-form" data-kind="registration" data-departure="${departure.id}">
     <h3 class="form-title">${formTitle}<span class="registration-form-actions">${addButtons}</span></h3>
     ${contextBanner}
     ${!state.id&&state.forOther&&canManage()?`<section class="managed-pilot-picker"><label class="form-label" for="participant-${departure.id}">Pilote</label><select id="participant-${departure.id}" name="participant" data-departure="${departure.id}"><option value="">Autre pilote</option>${participants.map(p=>`<option value="${esc(p.id)}" ${state.participantUserId===p.id?'selected':''}>${esc(p.name)}</option>`).join('')}</select></section>`:''}
-    ${assigned?'<p class="assignment-effect">Ce pilote est affecté à un équipage. Sa catégorie est fixée ; ses heures et ses préférences restent modifiables.</p>':''}
-    ${categoryMode?'':manualOther?`<label class="form-label" for="name-${departure.id}">Pseudo de l’autre pilote</label><input id="name-${departure.id}" name="pilotName" data-departure="${departure.id}" value="${esc(state.name)}" maxlength="30" required autocomplete="nickname">`:linkedOther?`<div class="selected-discord-pilot"><span>Pilote</span><strong>${esc(state.name)}</strong></div>`:guestSelf?`<label class="form-label" for="name-${departure.id}">Pseudo pilote</label><input id="name-${departure.id}" name="pilotName" data-departure="${departure.id}" value="${esc(state.name)}" maxlength="30" required autocomplete="nickname">`:''}
+    ${categoryMode?'':manualOther?`<label class="form-label" for="name-${departure.id}">Pseudo de l’autre pilote</label><input id="name-${departure.id}" name="pilotName" data-departure="${departure.id}" value="${esc(state.name)}" maxlength="30" required autocomplete="nickname">`:linkedOther?'':guestSelf?`<label class="form-label" for="name-${departure.id}">Pseudo pilote</label><input id="name-${departure.id}" name="pilotName" data-departure="${departure.id}" value="${esc(state.name)}" maxlength="30" required autocomplete="nickname">`:''}
     <label class="form-label" for="preference-${departure.id}">Pilote souhaité dans le même équipage <span class="muted">(facultatif)</span></label>
     <input id="preference-${departure.id}" name="preferredPilot" data-departure="${departure.id}" value="${esc(state.preferredPilot||'')}" maxlength="30" placeholder="Pseudo du pilote souhaité">
     <div class="registration-choices"><span class="form-label">Heures de présence (${duration} h)</span><p class="availability-hint">Clique sur les créneaux où tu es disponible.</p>${renderAvailabilityTimeline({departure,duration,status:state.status,interactive:true,label:'Heures de présence'})}<div class="special-availability">
       ${button('availability','TOUTE LA COURSE',`data-departure="${departure.id}" data-value="whole" aria-pressed="${state.status==='whole'}"`,`special-button whole ${state.status==='whole'?'active':''}`)}
-      ${button('availability','INDISPONIBLE',`data-departure="${departure.id}" data-value="unavailable" ${assigned?'disabled':''} aria-pressed="${state.status==='unavailable'}"`,`special-button unavailable ${state.status==='unavailable'?'active':''}`)}
+      ${button('availability','INDISPONIBLE',`data-departure="${departure.id}" data-value="unavailable" ${assigned&&state.id&&!categoryMode?'disabled':''} aria-pressed="${state.status==='unavailable'}"`,`special-button unavailable ${state.status==='unavailable'?'active':''}`)}
     </div></div>
     ${state.status==='unavailable'?'':`<div class="category-area"><span class="form-label">Catégorie</span><div class="categories">
-      ${event.categories.map(category=>button('category',`${logo(category)}<span>${esc(category)}</span>`,`data-departure="${departure.id}" data-value="${esc(category)}" ${(assigned&&category!==state.category)||same.some(r=>r.id!==state.id&&r.category===category)?'disabled':''} aria-pressed="${state.category===category}"`,`category-button ${categories[category]?.css||''} ${state.category===category?'active':''}`)).join('')}
+      ${event.categories.map(category=>button('category',`${logo(category)}<span>${esc(category)}</span>`,`data-departure="${departure.id}" data-value="${esc(category)}" ${((assigned&&state.id&&!categoryMode&&category!==state.category)||same.some(r=>r.id!==state.id&&r.category===category))?'disabled':''} aria-pressed="${state.category===category}"`,`category-button ${categories[category]?.css||''} ${state.category===category?'active':''}`)).join('')}
     </div>${state.category?carPreferenceChoices(state.category,state.cars,state.carAny):''}</div>`}
     <div class="save-row"><button type="submit" class="save-button">${state.id?'ENREGISTRER':'S’INSCRIRE'}</button>
       ${state.id?button('delete-registration','Se désinscrire',`data-id="${state.id}" data-departure="${departure.id}"`,'danger-button'):''}</div>
@@ -243,7 +242,7 @@ function renderCrews(event,departure) {
       const candidates=unassigned.filter(r=>r.category===crew.category);
       const covered=counts.filter(n=>n>0).length;
       return `<article class="crew-card crew-category-${categories[crew.category]?.css||''} ${crewColorClass(crew.id,crewIndex)}" data-crew="${crew.id}"><div class="crew-card-header"><div>${badge(crew.category)}<h3>${esc(crew.name)}</h3><p class="crew-car">${esc(crew.car||'Voiture à choisir')}</p></div><span class="coverage-summary">${regs.length} pilote(s) · ${covered}/${duration} h</span></div>
-        <ul class="crew-roster">${regs.map(r=>`<li><div><strong class="crew-pilot-name">${esc(r.name)}</strong><small>${esc(registrationCarLabel(r))} · ${esc(statusLabel(r.status))}${r.preferredPilot?` · souhaite ${esc(r.preferredPilot)}`:''}</small></div>${manage?button('remove-crew-pilot','Retirer',`data-id="${crew.id}" data-departure="${departure.id}" data-registration="${r.id}" aria-label="Retirer ${esc(r.name)} de cet équipage"`):''}</li>`).join('')||'<li>Aucun pilote affecté.</li>'}</ul>
+        <ul class="crew-roster">${regs.map(r=>`<li><div><strong class="crew-pilot-name">${esc(r.name)}</strong><small>${esc(registrationCarLabel(r))}${r.preferredPilot?` · souhaite ${esc(r.preferredPilot)}`:''}</small></div>${manage?button('remove-crew-pilot','Retirer',`data-id="${crew.id}" data-departure="${departure.id}" data-registration="${r.id}" aria-label="Retirer ${esc(r.name)} de cet équipage"`):''}</li>`).join('')||'<li>Aucun pilote affecté.</li>'}</ul>
         ${renderAvailabilityTimeline({departure,duration,counts,label:'Disponibilité de l’équipage'})}
         <p class="coverage-note">${covered===duration?'Toutes les heures sont couvertes.':`${duration-covered} heure(s) sans présence.`}</p>
         ${regs.some(r=>/beginning|middle|end/.test(r.status))?'<p class="coverage-note">Certaines disponibilités anciennes doivent être précisées heure par heure ; elles ne sont pas comptées dans la couverture.</p>':''}

@@ -35,5 +35,20 @@ test('Discord identities are read only while guests and external pilots keep a p
   assert.match(app,/discordLinked:!!reg\.discordLinked/);
   assert.match(app,/linkedOther/);
   assert.match(app,/guestSelf/);
-  assert.match(app,/selected-discord-pilot/);
+  assert.doesNotMatch(app,/selected-discord-pilot/);
+  assert.ok(app.includes("linkedOther?'':guestSelf?"));
+});
+
+
+test('managed Discord registrations stay shared between organizer and pilot',()=>{
+  assert.match(core,/reg.participant_user_id === actor.user.id/);
+  assert.match(core,/reg.owner_user_id === actor.user.id/);
+  assert.ok(worker.includes("canEdit:owned(reg, actor) || actor.user?.role === 'admin'"));
+});
+
+test('self and managed pilots can add another category without duplicate identity chrome',()=>{
+  assert.match(app,/Ajouter une catégorie/);
+  assert.match(app,/const canAdd=source&&event.categories/);
+  assert.doesNotMatch(app,/Ce pilote est affecté à un équipage. Sa catégorie est fixée/);
+  assert.doesNotMatch(app,/AUTRE PILOTE<\/span><strong>/);
 });
