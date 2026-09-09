@@ -14,6 +14,7 @@ test('every duration from 1 to 24 keeps all hourly intervals, final boundary and
       const selected = status==='whole' ? duration : new Set(status.split(',').filter(x=>/^h\d+$/.test(x))).size;
       assert.equal((html.match(/aria-pressed="true"/g)||[]).length,selected);
       assert(!html.includes('style='));
+      assert(!html.includes('phase-'));
     }
   }
 });
@@ -30,12 +31,18 @@ test('real interval labels handle half hours, midnight and both Paris clock chan
   const html=renderAvailabilityTimeline({departure:autumn,duration:2});
   assert(html.includes('UTC+2'));assert(html.includes('UTC+1'));
 });
-test('crew coverage is read-only and distinguishes covered hours from gaps', () => {
-  const html=renderAvailabilityTimeline({departure,duration:4,counts:[2,0,1,0],label:'Couverture'});
+test('crew coverage is read-only and distinguishes two pilots, one pilot and gaps', () => {
+  const html=renderAvailabilityTimeline({departure,duration:4,counts:[2,0,1,3],label:'Couverture'});
   assert(!html.includes('<button'));
-  assert.equal((html.match(/ is-present/g)||[]).length,2);
+  assert(html.includes('presence-timeline duration-4 is-coverage'));
+  assert.equal((html.match(/coverage-two/g)||[]).length,2);
+  assert.equal((html.match(/coverage-one/g)||[]).length,1);
+  assert.equal((html.match(/coverage-none/g)||[]).length,1);
+  assert.equal((html.match(/ is-present/g)||[]).length,3);
   assert(html.includes('2 pilote(s) disponible(s)'));
   assert(html.includes('0 pilote(s) disponible(s)'));
+  assert(html.includes('>2</span>'));
+  assert(html.includes('>1</span>'));
 });
 test('sparse labels retain endpoints without crowding the finish for odd durations', () => {
   for(let duration=1;duration<=24;duration++) for(const capacity of [4,6,10,16,24]) {
