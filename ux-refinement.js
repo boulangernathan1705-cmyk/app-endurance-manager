@@ -246,7 +246,7 @@ document.addEventListener('click', event => {
     }
     refineFoldState();
     refineRegistration(fold);
-    if (visibleRegistrations.has(departureId)) fold?.querySelector('.fold-registration')?.scrollIntoView({behavior:'smooth',block:'start'});
+    if (visibleRegistrations.has(departureId)) fold?.querySelector('.fold-toolbar')?.scrollIntoView({behavior:'smooth',block:'start'});
     return;
   }
 

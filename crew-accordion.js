@@ -139,18 +139,23 @@ function capacityMessage(event, departure, crew) {
   const coverage = coverageFor(event, departure, crew);
   if (crew.locked) return `Équipage complet et verrouillé par l’organisation. Couverture actuelle : ${coverage.covered}/${coverage.duration} h.`;
   if (coverage.missing > 0) return `Il reste de la place dans cet équipage : ${coverage.missing} h de course ${coverage.missing > 1 ? 'ne sont' : 'n’est'} pas encore couverte${coverage.missing > 1 ? 's' : ''}.`;
-  return 'Toutes les heures sont couvertes, mais l’équipage reste ouvert tant qu’un organisateur ne le verrouille pas.';
+  return '';
 }
 
 function ensureCapacityMessage(container, event, departure, crew, placement = 'prepend') {
   if (!container) return;
   let message = container.querySelector(':scope > .crew-capacity-message');
+  const text = capacityMessage(event, departure, crew);
+  if (!text) {
+    message?.remove();
+    return;
+  }
   if (!message) {
     message = document.createElement('p');
     message.className = 'crew-capacity-message';
     placement === 'prepend' ? container.prepend(message) : container.append(message);
   }
-  message.textContent = capacityMessage(event, departure, crew);
+  message.textContent = text;
   message.classList.toggle('is-open', !crew.locked);
   message.classList.toggle('is-complete', Boolean(crew.locked));
   message.classList.toggle('needs-pilots', !crew.locked && coverageFor(event, departure, crew).missing > 0);
@@ -331,7 +336,7 @@ function focusRegistrationEditor(departureId) {
     fold.open = true;
     const section = fold.querySelector('.fold-registration');
     if (!section) return;
-    section.scrollIntoView({behavior: 'smooth', block: 'start'});
+    (fold.querySelector('.fold-toolbar') || section).scrollIntoView({behavior: 'smooth', block: 'start'});
     const field = section.querySelector('input:not([type="checkbox"]):not([type="hidden"]), button[data-action="availability"], button[data-action="category"]');
     field?.focus({preventScroll: true});
   }, 0);
