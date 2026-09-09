@@ -1,7 +1,5 @@
-/* Stable, high-fidelity banner rendering.
-   The final 2048×512 artwork is shown as a real image, never as a stretched CSS background.
-   On ultrawide screens it keeps its full 4:1 composition at a capped 2048px width while
-   a blurred backdrop fills any unused sides. On phones the same artwork scales down cleanly. */
+/* Stable banner rendering with a known-good source asset.
+   Desktop/ultrawide keeps a compact 4:1 hero while phone preserves the full 3:1 artwork. */
 
 header.site-hero {
   position: relative;
@@ -23,7 +21,7 @@ header.site-hero::before {
   z-index: 0;
   background:
     linear-gradient(180deg,rgba(5,8,10,.16),rgba(5,8,10,.38)),
-    url('/images/endurance-manager-banner-final-v2.webp') center / cover no-repeat;
+    url('/images/endurance-manager-banner.webp') center / cover no-repeat;
   filter: blur(18px) saturate(.92) brightness(.52);
   transform: scale(1.035);
   opacity: .92;
@@ -48,9 +46,8 @@ header.site-hero::after {
   width: min(100%, 2048px);
   aspect-ratio: 4 / 1;
   margin: 0 auto;
-  background:
-    #080b0d
-    url('/images/endurance-manager-banner.webp') center / contain no-repeat;
+  overflow: hidden;
+  background: #080b0d;
   box-shadow: 0 0 46px rgba(0,0,0,.4);
 }
 
@@ -58,7 +55,7 @@ header.site-hero::after {
   display: block;
   width: 100%;
   height: 100%;
-  object-fit: contain;
+  object-fit: cover;
   object-position: center;
   image-rendering: auto;
 }
@@ -106,8 +103,7 @@ header.site-hero .brand-button.logo {
   margin: 0;
 }
 
-/* Ultrawide/desktop: keep the sharp banner at its native reference width.
-   Browser zoom can reveal more backdrop but never stretches the artwork past 2048px. */
+/* Ultrawide/desktop: the sharp image never stretches past 2048 CSS pixels. */
 @media (min-width: 2048px) {
   .hero-picture,
   header.site-hero .header-inner {
@@ -122,6 +118,7 @@ header.site-hero .brand-button.logo {
   }
 }
 
+/* Phone: show the source artwork in full instead of cropping it. */
 @media (max-width: 700px) {
   header.site-hero {
     min-height: 0;
@@ -136,8 +133,12 @@ header.site-hero .brand-button.logo {
 
   .hero-picture {
     width: 100%;
-    aspect-ratio: 4 / 1;
+    aspect-ratio: 3 / 1;
     box-shadow: none;
+  }
+
+  .hero-banner {
+    object-fit: contain;
   }
 
   header.site-hero .header-inner {
