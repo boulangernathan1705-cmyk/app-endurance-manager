@@ -17,7 +17,7 @@ function publicRegistration(reg, actor) {
   try { cars = JSON.parse(reg.car_preferences || '[]'); } catch {}
   if (!Array.isArray(cars) || !cars.length) cars = reg.car ? [reg.car] : [];
   cars = cars.map(car => LEGACY_CAR_ALIASES.get(car) || car);
-  return {id:reg.id, participantId:reg.participant_id, name:reg.participant_name||reg.name, category:reg.category, car:cars[0] || reg.car || '', cars, carAny:Boolean(reg.car_any), status:reg.status, preferredPilot:reg.preferred_pilot || '', version:reg.version, mine:personal(reg, actor), managed:owned(reg,actor)&&!personal(reg,actor), canEdit:owned(reg, actor) || actor.user?.role === 'admin'};
+  return {id:reg.id, participantId:reg.participant_id, name:reg.participant_name||reg.name, category:reg.category, car:cars[0] || reg.car || '', cars, carAny:Boolean(reg.car_any), status:reg.status, preferredPilot:reg.preferred_pilot || '', version:reg.version, discordLinked:Boolean(reg.participant_user_id), mine:personal(reg, actor), managed:owned(reg,actor)&&!personal(reg,actor), canEdit:owned(reg, actor) || actor.user?.role === 'admin'};
 }
 async function listEvents(env, actor) {
   const rows = (await env.DB.prepare('SELECT * FROM events ORDER BY created_at DESC, id DESC').all()).results;
