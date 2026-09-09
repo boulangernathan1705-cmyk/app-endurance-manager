@@ -1,5 +1,6 @@
 const app = document.getElementById('app');
 let controlsObserver;
+const managementAccordionStates = new Map();
 
 function removeUnavailableButtons(root = app) {
   root?.querySelectorAll?.('[data-action="availability"][data-value="unavailable"]').forEach(button => button.remove());
@@ -9,13 +10,34 @@ function crewStatusText(locked) {
   return locked ? 'Équipage complet' : 'Ouvert';
 }
 
+function crewStatusPillText(locked) {
+  return locked ? 'ÉQUIPAGE COMPLET' : 'ÉQUIPAGE OUVERT';
+}
+
 function crewLockIcon(locked) {
   return locked ? '🔒' : '🔓';
 }
 
+function normalizedName(value) {
+  return String(value || '').trim();
+}
+
+function compareNames(left, right) {
+  return normalizedName(left).localeCompare(normalizedName(right), 'fr', {sensitivity:'base', numeric:true});
+}
+
+function crewNameFromElement(element) {
+  return normalizedName(
+    element?.dataset?.crewTeam ||
+    element?.querySelector?.('.crew-compact-team strong')?.textContent ||
+    element?.querySelector?.('.crew-card-header h3')?.textContent ||
+    ''
+  );
+}
+
 function ensureCrewStatusControl(card) {
   if (!(card instanceof HTMLElement)) return;
-  const header = card.querySelector(':scope > .crew-card-header');
+  const header = card.querySelector('.crew-card-header');
   const copy = header?.querySelector(':scope > div');
   const crewId = card.dataset.crew;
   if (!header || !copy || !crewId || !card.querySelector('.crew-actions')) return;
@@ -50,6 +72,10 @@ function makeRemoveButtonRed(card) {
   });
 }
 
+function removeObsoleteCrewActions(card) {
+  card.querySelectorAll('[data-action="edit-crew"]').forEach(button => button.remove());
+}
+
 function removeCoveredMessage(card) {
   card.querySelectorAll('.coverage-note').forEach(note => {
     if (note.textContent.trim().startsWith('Toutes les heures sont couvertes.')) note.remove();
@@ -82,13 +108,133 @@ function transformCandidateButton(candidate) {
   candidate.replaceWith(article);
 }
 
+function createCompactSummary(card) {
+  const header = card.querySelector('.crew-card-header');
+  if (!header) return null;
+  const teamName = header.querySelector('h3')?.textContent?.trim() || 'Équipage';
+  const car = header.querySelector('.crew-car')?.textContent?.trim() || 'Voiture à choisir';
+  const pilots = [...card.querySelectorAll('.crew-roster .crew-pilot-name')].map(node => node.textContent.trim()).filter(Boolean);
+  const categoryLogo = header.querySelector('.event-category-badge .category-logo, .event-category-badge .category-text-logo');
+  const locked = card.dataset.crewLocked === 'true';
+
+  const summary = document.createElement('summary');
+  summary.className = 'crew-pilot-accordion-summary crew-management-summary';
+  summary.setAttribute('aria-label', `${teamName} · ${pilots.join(', ') || 'aucun pilote'} · ${car}`);
+
+  const category = document.createElement('span');
+  category.className = 'crew-compact-category';
+  category.setAttribute('aria-hidden', 'true');
+  if (categoryLogo) category.append(categoryLogo.cloneNode(true));
+  summary.append(category);
+
+  const team = document.createElement('span');
+  team.className = 'crew-compact-team';
+  const strong = document.createElement('strong');
+  strong.textContent = teamName;
+  team.append(strong);
+  summary.append(team);
+
+  const pilotLine = document.createElement('span');
+  pilotLine.className = 'crew-compact-pilots';
+  pilotLine.textContent = pilots.join(' · ') || 'Aucun pilote affecté';
+  summary.append(pilotLine);
+
+  const carLine = document.createElement('span');
+  carLine.className = 'crew-compact-car';
+  carLine.textContent = car;
+  summary.append(carLine);
+
+  const status = document.createElement('span');
+  status.className = `crew-compact-status ${locked ? 'is-complete' : 'is-open'}`;
+  status.textContent = crewStatusPillText(locked);
+  summary.append(status);
+
+  const chevron = document.createElement('span');
+  chevron.className = 'crew-compact-chevron';
+  chevron.setAttribute('aria-hidden', 'true');
+  chevron.textContent = '›';
+  summary.append(chevron);
+  return summary;
+}
+
+function transformManagementCard(card) {
+  if (!(card instanceof HTMLElement) || card.matches('details.crew-management-accordion')) return card;
+  const summary = createCompactSummary(card);
+  if (!summary) return card;
+
+  const details = document.createElement('details');
+  for (const attribute of [...card.attributes]) details.setAttribute(attribute.name, attribute.value);
+  details.classList.add('crew-management-accordion');
+  details.dataset.crewTeam = crewNameFromElement(card);
+  details.open = managementAccordionStates.get(details.dataset.crew) ?? false;
+
+  const body = document.createElement('div');
+  body.className = 'crew-management-accordion-body';
+  while (card.firstChild) body.append(card.firstChild);
+  details.append(summary, body);
+  card.replaceWith(details);
+  return details;
+}
+
+function refreshManagementSummary(card) {
+  if (!card?.matches?.('details.crew-management-accordion')) return;
+  const current = card.querySelector(':scope > .crew-management-summary');
+  const next = createCompactSummary(card);
+  if (!current || !next) return;
+  if (current.outerHTML !== next.outerHTML) current.replaceWith(next);
+  card.dataset.crewTeam = crewNameFromElement(card);
+}
+
+function applyAlphabeticalManagementOrder(root = app) {
+  root?.querySelectorAll?.('.crew-list').forEach(list => {
+    const cards = [...list.querySelectorAll(':scope > .crew-card[data-crew]')];
+    const sorted = [...cards].sort((a, b) => compareNames(crewNameFromElement(a), crewNameFromElement(b)));
+    sorted.forEach((card, index) => { card.style.order = String(index); });
+  });
+}
+
+function mergeCourseCrewBuckets(root = app) {
+  root?.querySelectorAll?.('.ux-course-overview').forEach(overview => {
+    const buckets = [...overview.querySelectorAll(':scope > .ux-crew-bucket:not(.ux-unavailable-bucket)')]
+      .filter(bucket => bucket.querySelector(':scope > summary span')?.textContent?.trim().startsWith('Équipages'));
+    if (!buckets.length) return;
+
+    const primary = buckets[0];
+    const primaryBody = primary.querySelector(':scope > .ux-crew-bucket-body');
+    if (!primaryBody) return;
+    const wasOpen = buckets.some(bucket => bucket.open);
+
+    for (const bucket of buckets.slice(1)) {
+      const body = bucket.querySelector(':scope > .ux-crew-bucket-body');
+      [...(body?.querySelectorAll(':scope > .crew-pilot-accordion') || [])].forEach(crew => primaryBody.append(crew));
+      bucket.remove();
+    }
+
+    const crews = [...primaryBody.querySelectorAll(':scope > .crew-pilot-accordion')]
+      .sort((a, b) => compareNames(crewNameFromElement(a), crewNameFromElement(b)));
+    crews.forEach(crew => primaryBody.append(crew));
+
+    const label = primary.querySelector(':scope > summary span');
+    const count = primary.querySelector(':scope > summary strong');
+    if (label) label.textContent = 'Équipages';
+    if (count) count.textContent = String(crews.length);
+    primary.dataset.uxBucketKey = `${primary.closest('.departure-fold')?.id || 'course'}:crews`;
+    primary.dataset.crewMerged = 'true';
+    primary.open = wasOpen || crews.some(crew => crew.dataset.crewMine === 'true');
+  });
+}
+
 function refineCrewCards(root = app) {
-  root?.querySelectorAll?.('.crew-card[data-crew]').forEach(card => {
-    ensureCrewStatusControl(card);
-    makeRemoveButtonRed(card);
-    removeCoveredMessage(card);
+  root?.querySelectorAll?.('.crew-card[data-crew]').forEach(originalCard => {
+    removeObsoleteCrewActions(originalCard);
+    ensureCrewStatusControl(originalCard);
+    makeRemoveButtonRed(originalCard);
+    removeCoveredMessage(originalCard);
+    const card = transformManagementCard(originalCard);
+    refreshManagementSummary(card);
   });
   root?.querySelectorAll?.('button.ux-crew-candidate[data-ux-add-crew-pilot]').forEach(transformCandidateButton);
+  applyAlphabeticalManagementOrder(root);
 }
 
 async function findCrew(crewId) {
@@ -175,6 +321,7 @@ function decorate(root = app) {
   controlsObserver?.disconnect();
   try {
     removeUnavailableButtons(root);
+    mergeCourseCrewBuckets(root);
     refineCrewCards(root);
   } finally {
     controlsObserver?.observe(app, {childList:true, subtree:true, attributes:true, attributeFilter:['data-crew-locked']});
@@ -186,6 +333,12 @@ document.addEventListener('change', event => {
   if (!select) return;
   updateCrewState(select);
 });
+
+document.addEventListener('toggle', event => {
+  const details = event.target.closest?.('details.crew-management-accordion');
+  if (!details || event.target !== details) return;
+  managementAccordionStates.set(details.dataset.crew, details.open);
+}, true);
 
 if (app) {
   controlsObserver = new MutationObserver(() => decorate());
