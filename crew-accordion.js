@@ -113,6 +113,7 @@ function statusLabel(locked) {
 }
 
 function ensureStatusPill(container, locked) {
+  if (!container) return null;
   let pill = container.querySelector(':scope > .crew-compact-status, :scope > .crew-card-status');
   if (!pill) {
     pill = document.createElement('span');
@@ -138,6 +139,7 @@ function capacityMessage(event, departure, crew) {
 }
 
 function ensureCapacityMessage(container, event, departure, crew, placement = 'prepend') {
+  if (!container) return;
   let message = container.querySelector(':scope > .crew-capacity-message');
   if (!message) {
     message = document.createElement('p');
@@ -275,6 +277,13 @@ function decorateCrewCards(events) {
   });
 }
 
+function decorateFromCache() {
+  if (!crewEvents) return false;
+  decorateAccordions(crewEvents);
+  decorateCrewCards(crewEvents);
+  return true;
+}
+
 async function refreshCrewDecorations(force = false) {
   try {
     const events = await loadCrewEvents(force);
@@ -303,6 +312,20 @@ function restoreScrollPosition(x, y) {
   }
 }
 
+function focusRegistrationEditor(departureId) {
+  if (!departureId) return;
+  setTimeout(() => {
+    const fold = document.getElementById(`departure-${departureId}`);
+    if (!fold) return;
+    fold.open = true;
+    const section = fold.querySelector('.fold-registration');
+    if (!section) return;
+    section.scrollIntoView({behavior: 'smooth', block: 'start'});
+    const field = section.querySelector('input:not([type="checkbox"]):not([type="hidden"]), button[data-action="availability"], button[data-action="category"]');
+    field?.focus({preventScroll: true});
+  }, 0);
+}
+
 function refreshMainViewPreservingScroll() {
   const refreshButton = app?.querySelector('[data-action="refresh"]');
   if (!refreshButton) {
@@ -327,9 +350,13 @@ function refreshMainViewPreservingScroll() {
   }, 2000);
 }
 
-// The main application rebuilds the event markup when an availability hour is toggled.
-// Remember the viewport before that rebuild so the pilot stays at the same place in the form.
+// L'application reconstruit la vue quand on édite une inscription. Le cache équipage
+// permet de redécorer et trier immédiatement dans le MutationObserver, avant le prochain
+// rendu navigateur, sans requête réseau intermédiaire ni déplacement visible des cartes.
 document.addEventListener('click', event => {
+  const edit = event.target.closest('[data-action="edit-registration"]');
+  if (edit) focusRegistrationEditor(edit.dataset.departure);
+
   const availability = event.target.closest('[data-action="availability"]');
   if (!availability || typeof window === 'undefined') return;
   const x = window.scrollX;
@@ -361,8 +388,6 @@ document.addEventListener('click', async event => {
     const result = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(result.error || 'Impossible de modifier l’état de l’équipage.');
 
-    // Do not reload the document: the application starts on the home page after a reload.
-    // Ask the main application to refresh its data instead, which keeps the current event/tab.
     crewEvents = null;
     refreshMainViewPreservingScroll();
   } catch (error) {
@@ -381,16 +406,20 @@ if (app) {
       for (const node of mutation.addedNodes) {
         if (!(node instanceof HTMLElement)) continue;
 
-        // Detect only fresh application markup before enhancing it. Reordering an already
-        // enhanced accordion/card must not trigger another fetch/decorate/sort cycle.
         const freshAccordion = node.matches('.crew-pilot-group:not([data-crew-accordion="true"])') || Boolean(node.querySelector?.('.crew-pilot-group:not([data-crew-accordion="true"])'));
         const freshCard = node.matches('.crew-card:not([data-crew-status-decorated="true"])') || Boolean(node.querySelector?.('.crew-card:not([data-crew-status-decorated="true"])'));
-        const freshStructure = node.matches('.departure-fold, .category-group, .crew-list');
+        const freshStructure = node.matches('.departure-fold, .category-group, .crew-list') || Boolean(node.querySelector?.('.departure-fold, .category-group, .crew-list'));
 
         enhanceCrewAccordions(node);
         if (freshAccordion || freshCard || freshStructure) meaningful = true;
       }
     }
-    if (meaningful) scheduleRefresh(true);
+
+    if (!meaningful) return;
+
+    // Très important : si les données sont déjà en cache, on applique le statut et le tri
+    // synchroniquement dans le callback MutationObserver. Cela évite le "tri après coup"
+    // visible quand on clique sur Modifier ou sur un créneau d'un pilote.
+    if (!decorateFromCache()) scheduleRefresh(false);
   }).observe(app, {childList: true, subtree: true});
 }
