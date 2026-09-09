@@ -1,0 +1,36 @@
+name: Install theme banner
+
+on:
+  push:
+    branches:
+      - theme/fmt-racing-banner
+    paths:
+      - '.github/workflows/install-theme-banner.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  install:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: theme/fmt-racing-banner
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Rebuild optimized WebP banner
+        run: node scripts/install-theme-banner.mjs
+      - name: Run quality checks
+        run: npm run check
+      - name: Commit banner and remove temporary staging files
+        run: |
+          rm -rf tmp/banner
+          rm scripts/install-theme-banner.mjs
+          rm .github/workflows/install-theme-banner.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "style: install FMT racing banner"
+          git push origin HEAD:theme/fmt-racing-banner
