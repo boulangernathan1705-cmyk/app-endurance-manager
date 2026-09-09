@@ -6,12 +6,20 @@
 <meta name="referrer" content="no-referrer">
 <title>ENDURANCE MANAGER</title>
 <link rel="icon" href="/images/endurance-manager-logo.webp" type="image/webp">
-<link rel="stylesheet" href="/styles.css?v=34-header-nav-refine">
+<link rel="preload" as="image" href="/images/endurance-manager-banner.webp" type="image/webp" fetchpriority="high">
+<link rel="stylesheet" href="/styles.css?v=35-native-banner-rendering">
 <script type="module" src="/app.js?v=27-header-nav-refine"></script>
 </head>
 <body>
 <div class="top-stripes" aria-hidden="true"><div></div><div></div><div></div><div></div></div>
-<header><div class="header-inner"><button class="brand-button logo" data-action="home" aria-label="Retour aux événements"><span class="brand-mark-frame" aria-hidden="true"><img class="brand-mark" src="/images/endurance-manager-logo.webp" alt=""></span><span class="brand-copy">ENDURANCE <span>MANAGER</span></span></button></div></header>
+<header class="site-hero">
+  <picture class="hero-picture" aria-hidden="true">
+    <img class="hero-banner" src="/images/endurance-manager-banner.webp" alt="" width="2048" height="682" fetchpriority="high" decoding="async" draggable="false">
+  </picture>
+  <div class="header-inner">
+    <button class="brand-button logo" data-action="home" aria-label="Retour aux événements"><span class="brand-mark-frame" aria-hidden="true"><img class="brand-mark" src="/images/endurance-manager-logo.webp" alt=""></span><span class="brand-copy">ENDURANCE <span>MANAGER</span></span></button>
+  </div>
+</header>
 <div class="site-nav-shell"><nav id="navigation" aria-label="Navigation principale"></nav></div>
 <main id="app"><p role="status">Chargement des événements…</p></main>
 <noscript>Active JavaScript pour consulter les événements et t’inscrire.</noscript>
