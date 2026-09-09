@@ -137,7 +137,7 @@ function renderRegistrationForm(event,departure) {
   const selected=departure.availability.find(r=>r.id===state.id),same=departure.availability.filter(r=>state.participantId&&r.participantId===state.participantId);
   const assigned=(departure.crews||[]).some(c=>c.registrationIds.some(id=>same.some(r=>r.id===id)));
   const source=selected||same[0]||(!state.forOther?ownRegistrations(departure)[0]:null);
-  const canAdd=source&&event.categories.some(c=>!same.some(r=>r.category===c));
+  const canAdd=source&&!assigned&&event.categories.some(c=>!same.some(r=>r.category===c));
   const contextName=state.name||source?.name||(!state.forOther?user?.name:'')||'';
   const selfMode=!state.forOther&&state.mode!=='category';
   const otherMode=state.forOther&&state.mode!=='category';
