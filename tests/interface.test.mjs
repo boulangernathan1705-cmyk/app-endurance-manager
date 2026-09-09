@@ -49,8 +49,9 @@ function interfaceHarness(role='pilot',duration=6) {
   const context=vm.createContext({document,Intl,Date,URLSearchParams,structuredClone,setInterval(){},localStorage:{getItem:()=>''},console});
   const catalog=readFileSync(new URL('../shared/catalog.mjs',import.meta.url),'utf8').replace(/\bexport\s+/g,'');
   const schedule=readFileSync(new URL('../front/schedule.mjs',import.meta.url),'utf8').replace(/\bexport\s+/g,'');
+  const timeline=readFileSync(new URL('../front/timeline.mjs',import.meta.url),'utf8').replace(/\bexport\s+/g,'');
   const source=readFileSync(new URL('../app.js',import.meta.url),'utf8').replace(/^import[^\n]+\n/gm,'').replace(/start\(\);\s*$/,'');
-  vm.runInContext(catalog+'\n'+schedule+'\n'+source,context);
+  vm.runInContext(catalog+'\n'+schedule+'\n'+timeline+'\n'+source,context);
   const departure={id:'first',date:'2090-01-01',time:'12:00',startsAt:Date.UTC(2090,0,1),availability:[{id:'reg',name:'<Pilot>',status:'whole',category:'Hypercar',car:'Ferrari 499P',cars:['Ferrari 499P'],carAny:false,version:1,mine:true,canEdit:true}],crews:[{id:'crew',name:'FMT <test>',car:'Ferrari 499P',category:'Hypercar',version:1,registrationIds:['reg']}]};
   const event={id:'event',name:'Test',circuit:'daytona',eventType:'special',durationHours:duration,categories:['Hypercar'],departures:[departure,{...departure,id:'second',time:'15:00',crews:[],availability:[]}]};
   vm.runInContext(`events=${JSON.stringify([event])};user={role:${JSON.stringify(role)}};currentEventId='event';`,context);
@@ -75,22 +76,36 @@ test('compact course header, foldable departures, read-only crews for pilots, es
   assert(h.app.innerHTML.includes('Mon inscription'));
   assert(h.app.innerHTML.includes('fold-registration'));
 });
-test('organizer crew controls and hourly palette scale to 1, 4, 6 and 24 hours',async()=>{
-  for(const duration of [1,4,6,24]) {
+test('organizer crew controls and hourly palette scale to short, odd and 24-hour races',async()=>{
+  for(const duration of [1,2,4,6,7,13,24]) {
     const h=interfaceHarness('organizer',duration);
     h.run("eventSection='crews';renderEvent()");
     assert(h.app.innerHTML.includes('data-action="new-crew"'));
     assert(h.app.innerHTML.includes('data-action="remove-crew-pilot"'));
-    assert.equal((h.app.innerHTML.match(/class="crew-availability-hour /g)||[]).length,duration);
+    assert.equal((h.app.innerHTML.match(/<span class="presence-segment /g)||[]).length,duration);
     assert(h.app.innerHTML.includes('phase-0'));if(duration>1)assert(h.app.innerHTML.includes('phase-23'));
     h.run("eventSection='race';renderEvent()");
-    assert(h.app.innerHTML.includes('availability-hour-grid compact-hours duration-'+duration));
+    assert(h.app.innerHTML.includes('presence-timeline duration-'+duration+' is-interactive'));
     assert(h.app.innerHTML.includes('name="carPreference"'));
     assert(h.app.innerHTML.includes('name="carAny"'));
     assert.equal((h.app.innerHTML.match(/data-action="availability"/g)||[]).length,2*(duration+2));
-    assert.equal((h.app.innerHTML.match(/hour-card phase-\d+ active/g)||[]).length,duration);
+    assert.equal((h.app.innerHTML.match(/<button[^>]+presence-segment phase-\d+ is-present/g)||[]).length,duration);
     await h.run("perform('availability',{dataset:{departure:'first',value:'h1'}})");
-    assert.equal((h.app.innerHTML.match(/hour-card phase-\d+ active/g)||[]).length,duration-1);
+    assert.equal((h.app.innerHTML.match(/<button[^>]+presence-segment phase-\d+ is-present/g)||[]).length,duration-1);
     assert(!h.app.innerHTML.includes('style="'));
   }
+});
+
+test('my entries and crew preferences share timelines while other crews stay summarized',()=>{
+  const h=interfaceHarness('organizer',24);
+  h.run('renderMyEntries()');
+  assert(h.app.innerHTML.includes('MON ÉQUIPAGE'));
+  assert.equal((h.app.innerHTML.match(/class="presence-timeline /g)||[]).length,2);
+  assert(!h.app.innerHTML.includes('my-entry-accordion event-type-special" open'));
+  h.run("events[0].departures[0].crews=[];renderMyEntries()");
+  assert(h.app.innerHTML.includes('PILOTE EN AFFECTATION'));
+  assert.equal((h.app.innerHTML.match(/class="presence-timeline /g)||[]).length,1);
+  const wishes=h.run('pilotWishes(events[0].departures[0].availability[0],events[0].departures[0],24)');
+  assert(wishes.includes('presence-timeline duration-24'));
+  assert.equal((wishes.match(/<span class="presence-segment /g)||[]).length,24);
 });

@@ -1,5 +1,6 @@
 import {CATEGORIES, EVENT_TYPES, CIRCUITS, categories, CARS} from './shared/catalog.mjs';
 import {countdown, dateLabel, groupEvents} from './front/schedule.mjs';
+import {renderAvailabilityTimeline} from './front/timeline.mjs';
 const app = document.getElementById('app');
 const nav = document.getElementById('navigation');
 let events=[], user=null, discordReady=false, currentEventId=null, page='home', editingEvent=null;
@@ -35,8 +36,7 @@ function carPreferenceChoices(category, selected=[], any=false) {
 function registrationCarLabel(reg) { return reg.carAny ? 'N’importe quelle voiture' : ((reg.cars?.length ? reg.cars.join(' · ') : reg.car) || 'Pas de préférence'); }
 function pilotAvailability(reg,departure,duration) {
   if(!departure)return '';
-  const parts=new Set(String(reg.status||'').split(',').filter(x=>/^h\d+$/.test(x)));
-  return `<div class="crew-pilot-availability"><span class="crew-pilot-availability-label">Disponibilité</span><div class="crew-pilot-hours duration-${duration}">${Array.from({length:duration},(_,i)=>{const present=reg.status==='whole'||parts.has(`h${i+1}`);return `<span class="crew-pilot-hour ${phaseClass(i,duration)} ${present?'present':''}" title="${raceHourLabel(departure,i)} · ${present?'Disponible':'Absent'}">${raceHourLabel(departure,i)}</span>`;}).join('')}</div></div>`;
+  return `<div class="crew-pilot-availability"><span class="crew-pilot-availability-label">Disponibilité</span>${renderAvailabilityTimeline({departure,duration,status:reg.status})}</div>`;
 }
 function pilotWishes(reg,departure=null,duration=0) {
   return `<dl class="pilot-wishes"><div><dt>Voiture(s) souhaitée(s)</dt><dd>${esc(registrationCarLabel(reg))}</dd></div><div><dt>Coéquipier souhaité</dt><dd>${esc(reg.preferredPilot || 'Aucune préférence renseignée')}</dd></div></dl>${departure&&duration?pilotAvailability(reg,departure,duration):''}`;
@@ -123,27 +123,17 @@ function registrationSlotLabel(status,departure,duration) {
   if(status==='whole')return 'Toute la course'; if(status==='unavailable')return 'Indisponible';
   return status.split(',').filter(x=>/^h\d+$/.test(x)).map(x=>`Heure ${x.slice(1)}`).join(' · ') || statusLabel(status);
 }
-function phaseColor(index,duration) {
-  const ratio=duration>1?index/(duration-1):0;
-  return `hsl(${Math.round(145-141*ratio)} 72% 48%)`;
-}
-function phaseClass(index,duration) { return `phase-${duration>1?Math.round(index*23/(duration-1)):0}`; }
-const raceTimeFormatter=new Intl.DateTimeFormat('fr-FR',{timeZone:'Europe/Paris',hour:'2-digit',minute:'2-digit',hour12:false});
-function raceHourLabel(departure,index) {
-  const label=raceTimeFormatter.format(new Date(departure.startsAt+index*3600000)).replace(':','h');
-  return label.endsWith('h00')?label.slice(0,-2):label;
-}
 function renderRegistration(reg,departure,duration,showCarPreference=true) {
   const locked=departure.startsAt<=Date.now();
-  const parts=new Set(reg.status.split(',').filter(x=>/^h\d+$/.test(x))),hours=Array.from({length:duration},(_,i)=>`h${i+1}`);
+  const parts=new Set(reg.status.split(',').filter(x=>/^h\d+$/.test(x)));
   const presentCount=reg.status==='whole'?duration:parts.size;
-  const timeline=`<div class="availability-readonly" aria-label="${esc(registrationSlotLabel(reg.status,departure,duration))}"><span class="timeline-edge">DÉPART</span><div class="availability-mini-grid duration-${duration}">${hours.map((hour,i)=>`<span class="availability-mini-hour ${phaseClass(i,duration)} ${reg.status==='whole'||parts.has(hour)?'present':''}" title="${raceHourLabel(departure,i)}">${raceHourLabel(departure,i)}</span>`).join('')}</div><span class="timeline-edge">ARRIVÉE</span></div>`;
+  const timeline=renderAvailabilityTimeline({departure,duration,status:reg.status,label:registrationSlotLabel(reg.status,departure,duration)});
   return `<div class="pilot-row"><div class="pilot-main"><span class="pilot-name">${esc(reg.name)}${reg.mine?' <small>(toi)</small>':reg.managed?' <small>(inscription gérée par toi)</small>':''}</span>
     <span class="pilot-category-logo">${reg.category?logo(reg.category):'—'}</span>${showCarPreference?`<span class="pilot-car">${esc(registrationCarLabel(reg))}</span>`:''}<span class="registration-status">${reg.status==='unavailable'?'Indisponible':`${presentCount} h disponible${presentCount>1?'s':''}`}</span>${reg.preferredPilot?`<span class="pilot-preference">Souhaite rouler avec : <strong>${esc(reg.preferredPilot)}</strong></span>`:''}</div>${timeline}
     ${reg.canEdit&&!locked?button('edit-registration','Modifier',`data-id="${reg.id}" data-departure="${departure.id}"`,'edit-button'):''}</div>`;
 }
 function renderRegistrationForm(event,departure) {
-  const state=draftFor(departure),duration=event.durationHours||6,parts=state.status==='whole'?Array.from({length:duration},(_,i)=>`h${i+1}`):state.status.split(',').filter(Boolean);
+  const state=draftFor(departure),duration=event.durationHours||6;
   const selected=departure.availability.find(r=>r.id===state.id),same=departure.availability.filter(r=>state.participantId&&r.participantId===state.participantId);
   const assigned=(departure.crews||[]).some(c=>c.registrationIds.some(id=>same.some(r=>r.id===id)));
   const source=selected||same[0]||(!state.forOther?ownRegistrations(departure)[0]:null);
@@ -159,7 +149,7 @@ function renderRegistrationForm(event,departure) {
     <input id="name-${departure.id}" name="pilotName" data-departure="${departure.id}" value="${esc(state.name)}" maxlength="30" required autocomplete="nickname" ${!state.id&&state.participantId?'readonly':''}>
     <label class="form-label" for="preference-${departure.id}">Pilote souhaité dans le même équipage <span class="muted">(facultatif)</span></label>
     <input id="preference-${departure.id}" name="preferredPilot" data-departure="${departure.id}" value="${esc(state.preferredPilot||'')}" maxlength="30" placeholder="Pseudo du pilote souhaité">
-    <div class="registration-choices"><span class="form-label">Heures de présence (${duration} h)</span><p class="availability-hint">Sélectionne les heures de présence. Les cases cochées indiquent les disponibilités ; la couleur suit la progression de la course.</p><div class="availability-hour-grid compact-hours duration-${duration}">${Array.from({length:duration},(_,index)=>{const part=`h${index+1}`,active=parts.includes(part);const hourLabel=raceHourLabel(departure,index);return button('availability',`<span class="hour-card-number">${hourLabel}</span><span class="hour-card-state">${active?'✓':''}</span>`,`data-departure="${departure.id}" data-value="${part}" aria-pressed="${active}" aria-label="${hourLabel} : ${active?'présent':'disponible ?'}" title="${hourLabel} · ${active?'Présent':'Disponible ?'}"`,`hour-card ${phaseClass(index,duration)} ${active?'active':''}`);}).join('')}</div><div class="special-availability">
+    <div class="registration-choices"><span class="form-label">Heures de présence (${duration} h)</span><p class="availability-hint">Clique sur les créneaux où tu es disponible.</p>${renderAvailabilityTimeline({departure,duration,status:state.status,interactive:true,label:'Heures de présence'})}<div class="special-availability">
       ${button('availability','TOUTE LA COURSE',`data-departure="${departure.id}" data-value="whole" aria-pressed="${state.status==='whole'}"`,`special-button whole ${state.status==='whole'?'active':''}`)}
       ${button('availability','INDISPONIBLE',`data-departure="${departure.id}" data-value="unavailable" ${assigned?'disabled':''} aria-pressed="${state.status==='unavailable'}"`,`special-button unavailable ${state.status==='unavailable'?'active':''}`)}
     </div></div>
@@ -243,7 +233,7 @@ function renderCrews(event,departure) {
       const covered=counts.filter(n=>n>0).length;
       return `<article class="crew-card crew-category-${categories[crew.category]?.css||''} ${crewColorClass(crew.id,crewIndex)}" data-crew="${crew.id}"><div class="crew-card-header"><div>${badge(crew.category)}<h3>${esc(crew.name)}</h3><p class="crew-car">${esc(crew.car||'Voiture à choisir')}</p></div><span class="coverage-summary">${regs.length} pilote(s) · ${covered}/${duration} h</span></div>
         <ul class="crew-roster">${regs.map(r=>`<li><div><strong class="crew-pilot-name">${esc(r.name)}</strong><small>${esc(registrationCarLabel(r))} · ${esc(statusLabel(r.status))}${r.preferredPilot?` · souhaite ${esc(r.preferredPilot)}`:''}</small></div>${manage?button('remove-crew-pilot','Retirer',`data-id="${crew.id}" data-departure="${departure.id}" data-registration="${r.id}" aria-label="Retirer ${esc(r.name)} de cet équipage"`):''}</li>`).join('')||'<li>Aucun pilote affecté.</li>'}</ul>
-        <div class="crew-availability-line duration-${duration}" aria-label="Disponibilité de l’équipage">${counts.map((n,i)=>`<span class="crew-availability-hour ${phaseClass(i,duration)} ${n?'covered':'gap'}" title="${raceHourLabel(departure,i)} : ${n?`${n} pilote(s)`:'aucun pilote'}">${raceHourLabel(departure,i)}</span>`).join('')}</div>
+        ${renderAvailabilityTimeline({departure,duration,counts,label:'Disponibilité de l’équipage'})}
         <p class="coverage-note">${covered===duration?'Toutes les heures sont couvertes.':`${duration-covered} heure(s) sans présence.`}</p>
         ${regs.some(r=>/beginning|middle|end/.test(r.status))?'<p class="coverage-note">Certaines disponibilités anciennes doivent être précisées heure par heure ; elles ne sont pas comptées dans la couverture.</p>':''}
         ${manage?`<div class="crew-assignment"><label for="assign-${crew.id}">Ajouter un pilote inscrit · ${esc(crew.category)}</label><div><select id="assign-${crew.id}" data-assignment-preview data-departure="${departure.id}" aria-controls="wishes-${crew.id}" ${!candidates.length?'disabled':''}><option value="">${candidates.length?'Choisir un pilote':'Aucun pilote à affecter dans cette catégorie'}</option>${candidates.map(r=>`<option value="${r.id}">${esc(r.name)}</option>`).join('')}</select>${button('add-crew-pilot','Ajouter',`data-id="${crew.id}" data-departure="${departure.id}" ${!candidates.length?'disabled':''}`)}</div>${candidates.length?`<section id="wishes-${crew.id}" class="assignment-wishes" aria-live="polite">Sélectionne un pilote pour voir ses souhaits avant de l’ajouter.</section>`:''}</div><div class="crew-actions">${button('edit-crew','Modifier',`data-id="${crew.id}" data-departure="${departure.id}"`)}${button('delete-crew','Supprimer',`data-id="${crew.id}" data-departure="${departure.id}"`,'danger-button')}</div>`:''}</article>`;
@@ -308,7 +298,7 @@ function renderMyEntries() {
 
     const crewBlock=crew?`<section class="my-entry-section my-entry-crew"><div class="my-entry-section-heading"><div><span class="my-entry-kicker">MON ÉQUIPAGE</span><h3>${esc(crew.name)}</h3></div><span class="my-entry-pill">${esc(crew.car||'Voiture à définir')}</span></div>
       <div class="my-entry-crew-roster">${crewRegs.map(p=>`<article class="my-entry-pilot ${p.id===reg.id?'is-me':''}"><div class="my-entry-pilot-head"><strong>${esc(p.name)}${p.id===reg.id?' · Moi':''}</strong><span>${esc(statusLabel(p.status))}</span></div>${pilotAvailability(p,departure,duration)}</article>`).join('')}</div>
-      <div class="crew-availability-line duration-${duration}" aria-label="Couverture de mon équipage">${crewCounts.map((n,i)=>`<span class="crew-availability-hour ${phaseClass(i,duration)} ${n?'covered':'gap'}" title="${raceHourLabel(departure,i)} : ${n?`${n} pilote(s)`:'aucun pilote'}">${raceHourLabel(departure,i)}</span>`).join('')}</div>
+      ${renderAvailabilityTimeline({departure,duration,counts:crewCounts,label:'Couverture de mon équipage'})}
       <p class="coverage-note">${crewCovered===duration?'Toutes les heures sont couvertes par ton équipage.':`${duration-crewCovered} heure(s) restent sans présence dans ton équipage.`}</p>
     </section>`:`<section class="my-entry-section my-entry-waiting"><div class="my-entry-section-heading"><div><span class="my-entry-kicker">PILOTE EN AFFECTATION</span><h3>${esc(reg.name)}</h3></div><span class="my-entry-pill">${esc(reg.category)}</span></div>
       <div class="my-entry-preferences"><div><span>Voiture(s) souhaitée(s)</span><strong>${esc(registrationCarLabel(reg))}</strong></div><div><span>Coéquipier souhaité</span><strong>${esc(reg.preferredPilot||'Aucune préférence')}</strong></div></div>${mineTimeline}
@@ -420,7 +410,9 @@ async function perform(action,target) {
       const departure=event.departures.find(d=>d.id===target.dataset.departure),state=draftFor(departure),value=target.dataset.value;
       if(['whole','unavailable'].includes(value))state.status=value;
       else{const duration=event.durationHours||6;const parts=new Set(state.status==='whole'?Array.from({length:duration},(_,i)=>`h${i+1}`):state.status.split(',').filter(part=>/^h\d+$/.test(part)));parts.has(value)?parts.delete(value):parts.add(value);state.status=parts.size===duration?'whole':Array.from(parts).sort((a,b)=>Number(a.slice(1))-Number(b.slice(1))).join(',');}
-      renderEvent();break;
+      renderEvent();
+      app.querySelector(`[data-action="availability"][data-departure="${departure.id}"][data-value="${value}"]`)?.focus({preventScroll:true});
+      break;
     }
     case 'my-registration':{selectedDepartureId=target.dataset.departure;delete drafts[selectedDepartureId];renderEvent();break;}
     case 'new-registration':{

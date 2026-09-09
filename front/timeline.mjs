@@ -1,0 +1,41 @@
+const timelineEscape = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const timelineTime = new Intl.DateTimeFormat('fr-FR', {timeZone:'Europe/Paris', hour:'2-digit', minute:'2-digit', hourCycle:'h23'});
+const timelineDate = new Intl.DateTimeFormat('fr-FR', {timeZone:'Europe/Paris', day:'2-digit', month:'2-digit', timeZoneName:'short'});
+
+export function raceHourLabel(departure, index) {
+  return timelineTime.format(new Date(departure.startsAt + index * 3600000)).replace(':00', 'h').replace(':', 'h');
+}
+
+// Label density follows the containing card, independently of viewport size.
+// Always leave at least one full step before the final label (odd durations too).
+export function timelineLabelVisible(index, duration, capacity) {
+  const step = Math.ceil(duration / capacity);
+  return index === 0 || index === duration || (index % step === 0 && duration - index >= step);
+}
+
+export function renderAvailabilityTimeline({departure, duration, status = '', counts = null, interactive = false, label = 'Disponibilité'}) {
+  const parts = new Set(status.split(','));
+  const hours = Array.from({length:duration + 1}, (_, i) => raceHourLabel(departure, i));
+  const boundaries = hours.map((hour, i) => {
+    const density = [4,6,10,16,24].filter(capacity => timelineLabelVisible(i, duration, capacity)).map(capacity => `ticks-${capacity}`).join(' ');
+    return `<span class="presence-boundary boundary-${i} ${i===duration?'is-finish':''}"><span class="presence-time ${density}">${hour}</span></span>`;
+  }).join('');
+  const segments = Array.from({length:duration}, (_, i) => {
+    const present = counts ? counts[i] > 0 : status === 'whole' || parts.has(`h${i+1}`);
+    const timestamp = departure.startsAt + i * 3600000;
+    const range = `${hours[i]} → ${hours[i+1]}`;
+    const detail = counts ? `${counts[i]} pilote(s) disponible(s)` : present ? 'Disponible' : 'Non sélectionné';
+    const description = timelineEscape(`${range} · ${timelineDate.format(new Date(timestamp))} · ${detail}`);
+    const phase = duration > 1 ? Math.round(i * 23 / (duration - 1)) : 0;
+    const attributes = `class="presence-segment phase-${phase}${present?' is-present':''}" title="${description}" aria-label="${description}"`;
+    const content = `<span aria-hidden="true">${present?'✓':'·'}</span>`;
+    return interactive
+      ? `<button type="button" ${attributes} data-action="availability" data-departure="${timelineEscape(departure.id)}" data-value="h${i+1}" aria-pressed="${present}">${content}</button>`
+      : `<span ${attributes} role="img">${content}</span>`;
+  }).join('');
+  return `<div class="presence-timeline duration-${duration}${interactive?' is-interactive':''}" role="group" aria-label="${timelineEscape(label)}">
+    <div class="presence-scale" aria-hidden="true">${boundaries}</div>
+    <div class="presence-track">${segments}</div>
+    <div class="presence-edges" aria-hidden="true"><span>DÉPART</span><span>ARRIVÉE</span></div>
+  </div>`;
+}
