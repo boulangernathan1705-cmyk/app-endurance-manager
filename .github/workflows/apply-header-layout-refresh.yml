@@ -19,8 +19,16 @@ jobs:
         run: node scripts/apply-header-layout-refresh.mjs
       - name: Improve banner quality for wide displays
         run: |
-          ffmpeg -y -i images/endurance-manager-banner.webp -vf "scale=4344:1448:flags=lanczos,unsharp=5:5:0.55:5:5:0" -frames:v 1 -c:v libwebp -quality 92 images/endurance-manager-banner-hq.webp
-          mv images/endurance-manager-banner-hq.webp images/endurance-manager-banner.webp
+          python -m pip install --quiet pillow
+          python - <<'PY'
+          from PIL import Image, ImageFilter
+          path='images/endurance-manager-banner.webp'
+          image=Image.open(path).convert('RGB')
+          image=image.resize((4344,1448),Image.Resampling.LANCZOS)
+          image=image.filter(ImageFilter.UnsharpMask(radius=1.0,percent=115,threshold=3))
+          image.save(path,'WEBP',quality=92,method=6)
+          print('banner',image.size)
+          PY
       - name: Run checks
         run: npm run check
       - name: Commit final changes and remove temporary automation
