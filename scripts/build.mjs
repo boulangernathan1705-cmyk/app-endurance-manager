@@ -1,3 +1,4 @@
+import './validate-image-assets.mjs';
 import {mkdir, copyFile, cp, writeFile, rm} from 'node:fs/promises';
 import {fileURLToPath} from 'node:url';
 const root = fileURLToPath(new URL('../', import.meta.url));
