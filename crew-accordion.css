@@ -1,0 +1,148 @@
+/* Compact crew presentation inside "Pilotes inscrits". */
+.crew-pilot-group.crew-pilot-accordion {
+  margin: 10px 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+.crew-pilot-accordion > summary {
+  list-style: none;
+}
+
+.crew-pilot-accordion > summary::-webkit-details-marker {
+  display: none;
+}
+
+.crew-pilot-accordion-summary {
+  display: grid;
+  grid-template-columns: 40px minmax(130px, .95fr) minmax(210px, 1.65fr) minmax(180px, 1.15fr) 18px;
+  align-items: center;
+  gap: 12px;
+  min-height: 54px;
+  padding: 9px 12px;
+  cursor: pointer;
+  background: color-mix(in srgb, var(--crew-color) 5%, #151c1f);
+  transition: background .15s ease;
+}
+
+.crew-pilot-accordion-summary:hover {
+  background: color-mix(in srgb, var(--crew-color) 12%, #151c1f);
+}
+
+.crew-pilot-accordion-summary:focus-visible {
+  outline: 2px solid var(--crew-color);
+  outline-offset: -2px;
+}
+
+.crew-compact-category {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  min-width: 40px;
+}
+
+.crew-compact-category .category-logo {
+  width: auto;
+  max-width: 36px;
+  height: auto;
+  max-height: 28px;
+  object-fit: contain;
+}
+
+.crew-compact-category .category-text-logo {
+  font-size: 9px;
+  font-weight: 900;
+}
+
+.crew-compact-team,
+.crew-compact-pilots,
+.crew-compact-car {
+  min-width: 0;
+}
+
+.crew-compact-team strong {
+  display: block;
+  overflow: hidden;
+  color: var(--crew-color);
+  font-size: 14px;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.crew-compact-pilots,
+.crew-compact-car {
+  overflow: hidden;
+  font-size: 12px;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.crew-compact-pilots {
+  color: #eef4f4;
+}
+
+.crew-compact-car {
+  color: #c4d0d0;
+  text-align: right;
+}
+
+.crew-compact-chevron {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--crew-color);
+  font-size: 20px;
+  line-height: 1;
+  transform: rotate(0deg);
+  transition: transform .18s ease;
+}
+
+.crew-pilot-accordion[open] .crew-compact-chevron {
+  transform: rotate(90deg);
+}
+
+.crew-pilot-accordion-body {
+  padding: 0 12px 10px;
+  border-top: 1px solid color-mix(in srgb, var(--crew-color) 22%, transparent);
+}
+
+.crew-pilot-accordion-body > .crew-pilot-group-header {
+  padding-top: 10px;
+}
+
+@media (max-width: 760px) {
+  .crew-pilot-accordion-summary {
+    grid-template-columns: 36px minmax(0, 1fr) 18px;
+    gap: 7px 10px;
+    padding: 9px 10px;
+  }
+
+  .crew-compact-category {
+    grid-row: 1 / span 2;
+    width: 36px;
+    min-width: 36px;
+  }
+
+  .crew-compact-team {
+    grid-column: 2;
+  }
+
+  .crew-compact-chevron {
+    grid-column: 3;
+    grid-row: 1;
+  }
+
+  .crew-compact-pilots {
+    grid-column: 2 / 4;
+    grid-row: 2;
+  }
+
+  .crew-compact-car {
+    grid-column: 2 / 4;
+    grid-row: 3;
+    text-align: left;
+  }
+}
