@@ -621,3 +621,33 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   .pilot-row > .edit-button,
   .departure-content .pilot-row > .edit-button { min-height: 44px; }
 }
+
+/* Each registered crew opens independently with native keyboard support. */
+.crew-pilot-group > .crew-pilot-summary {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) 32px minmax(0, 1.5fr) minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  min-height: 36px;
+  list-style: none;
+  cursor: pointer;
+  color: var(--crew-color);
+}
+.crew-pilot-summary::-webkit-details-marker { display: none; }
+.crew-pilot-summary:focus-visible { outline: 2px solid var(--crew-color); outline-offset: 4px; border-radius: 4px; }
+.crew-pilot-toggle::before { content: '+'; font-size: 22px; font-weight: 800; }
+.crew-pilot-group[open] > .crew-pilot-summary .crew-pilot-toggle::before { content: '−'; }
+.crew-summary-category img { display: block; width: 28px; height: 28px; object-fit: contain; }
+.crew-summary-name, .crew-summary-car { min-width: 0; overflow-wrap: anywhere; }
+.crew-summary-pilots { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: var(--text); }
+.crew-summary-car { color: #c4d0d0; text-align: right; font-size: 14px; }
+.crew-pilot-details { padding-top: 2px; }
+@media (max-width: 700px) {
+  .crew-pilot-group > .crew-pilot-summary {
+    grid-template-columns: 18px minmax(0, 1fr) 28px minmax(0, 1fr);
+    gap: 4px 8px;
+    min-height: 44px;
+  }
+  .crew-summary-car { grid-column: 4; grid-row: 1; }
+  .crew-summary-pilots { grid-column: 2 / -1; grid-row: 2; white-space: normal; overflow-wrap: anywhere; font-size: 14px; }
+}
