@@ -2,6 +2,8 @@ const app = document.getElementById('app');
 let crewEvents = null;
 let crewEventsPromise = null;
 let refreshTimer = null;
+const accordionStates = new Map();
+let accordionEventId = null;
 
 function pilotNameFromRow(row) {
   const name = row.querySelector('.pilot-name');
@@ -60,6 +62,7 @@ function coverageFor(event, departure, crew) {
 }
 
 async function loadCrewEvents(force = false) {
+  if (!force && app?.querySelector('[data-event-id]') && app.eventViewData) return app.eventViewData.events;
   if (!force && crewEvents) return crewEvents;
   if (!force && crewEventsPromise) return crewEventsPromise;
   crewEventsPromise = fetch('/api/events', {credentials: 'same-origin', cache: 'no-store'})
@@ -84,6 +87,7 @@ function findCrewById(events, crewId) {
 }
 
 function findCrewForAccordion(events, details) {
+  if (details.dataset.crewId) return findCrewById(events, details.dataset.crewId);
   const departureId = departureIdFrom(details);
   const category = details.dataset.crewCategory || '';
   const teamName = details.dataset.crewTeam || '';
@@ -166,6 +170,12 @@ function enhanceCrewGroup(group) {
 
   const details = document.createElement('details');
   details.className = `${group.className} crew-pilot-accordion`;
+  const eventId = app.querySelector('[data-event-id]')?.dataset.eventId;
+  if (eventId !== accordionEventId) { accordionStates.clear(); accordionEventId = eventId; }
+  details.dataset.crewId = group.dataset.crewId;
+  details.dataset.crewLocked = group.dataset.crewLocked;
+  details.dataset.crewMine = group.dataset.crewMine;
+  details.open = accordionStates.get(group.dataset.crewId) ?? (group.dataset.crewMine === 'true');
   details.dataset.crewAccordion = 'true';
   details.dataset.crewTeam = teamName;
   details.dataset.crewCar = car;
@@ -185,7 +195,7 @@ function enhanceCrewGroup(group) {
   addText(summary, 'crew-compact-team', teamName, true);
   addText(summary, 'crew-compact-pilots', pilotNames.join(' · ') || 'Aucun pilote affecté');
   addText(summary, 'crew-compact-car', car);
-  ensureStatusPill(summary, false);
+  ensureStatusPill(summary, group.dataset.crewLocked === 'true');
 
   const chevron = document.createElement('span');
   chevron.className = 'crew-compact-chevron';
@@ -278,9 +288,10 @@ function decorateCrewCards(events) {
 }
 
 function decorateFromCache() {
-  if (!crewEvents) return false;
-  decorateAccordions(crewEvents);
-  decorateCrewCards(crewEvents);
+  const events = app?.querySelector('[data-event-id]') && app.eventViewData ? app.eventViewData.events : crewEvents;
+  if (!events) return false;
+  decorateAccordions(events);
+  decorateCrewCards(events);
   return true;
 }
 
@@ -354,6 +365,14 @@ function refreshMainViewPreservingScroll() {
 // permet de redécorer et trier immédiatement dans le MutationObserver, avant le prochain
 // rendu navigateur, sans requête réseau intermédiaire ni déplacement visible des cartes.
 document.addEventListener('click', event => {
+  const summary = event.target.closest('.crew-pilot-accordion > summary');
+  if (summary) {
+    event.preventDefault();
+    const details = summary.parentElement;
+    details.open = !details.open;
+    accordionStates.set(details.dataset.crewId, details.open);
+    return;
+  }
   const edit = event.target.closest('[data-action="edit-registration"]');
   if (edit) focusRegistrationEditor(edit.dataset.departure);
 
@@ -399,8 +418,9 @@ document.addEventListener('click', async event => {
 
 if (app) {
   enhanceCrewAccordions();
-  scheduleRefresh(true);
+  decorateFromCache();
   new MutationObserver(mutations => {
+    if (!app.querySelector('[data-event-id]')) { accordionStates.clear(); accordionEventId = null; }
     let meaningful = false;
     for (const mutation of mutations) {
       for (const node of mutation.addedNodes) {
@@ -423,3 +443,4 @@ if (app) {
     if (!decorateFromCache()) scheduleRefresh(false);
   }).observe(app, {childList: true, subtree: true});
 }
+

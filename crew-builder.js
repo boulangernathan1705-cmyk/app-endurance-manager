@@ -26,6 +26,7 @@ async function api(path, method = 'GET', data) {
 }
 
 async function loadEvents(force = false) {
+  if (!force && app?.querySelector('[data-event-id]') && app.eventViewData) return app.eventViewData.events;
   if (!force && eventsCache) return eventsCache;
   const result = await api('/api/events');
   eventsCache = Array.isArray(result.events) ? result.events : [];
@@ -210,14 +211,15 @@ function decorateEventView() {
     button.type = 'button';
     button.className = 'primary-button crew-builder-open';
     button.dataset.crewBuilderOpen = 'true';
-    button.textContent = '+ Ajouter un équipage';
+    button.textContent = '+ Créer un équipage';
     editButton.insertAdjacentElement('afterend', button);
   }
   insertPendingMessage();
+  if (builderState && builderState.eventId !== editButton.dataset.id) closeBuilder();
   if (builderState?.eventId === editButton.dataset.id && !app.querySelector('[data-crew-builder-panel]')) {
     loadEvents().then(events => {
       const event = events.find(item => item.id === builderState?.eventId);
-      if (event) renderPanel(event);
+      if (event && currentEventId() === event.id && builderState?.eventId === event.id && !app.querySelector('[data-crew-builder-panel]')) renderPanel(event);
     }).catch(() => {});
   }
 }
@@ -357,5 +359,11 @@ document.addEventListener('submit', event => {
 
 if (app) {
   decorateEventView();
-  new MutationObserver(scheduleDecorate).observe(app,{childList:true,subtree:true});
+  const observer = new MutationObserver(() => {
+    observer.disconnect();
+    try { decorateEventView(); }
+    finally { observer.observe(app,{childList:true,subtree:true}); }
+  });
+  observer.observe(app,{childList:true,subtree:true});
 }
+

@@ -3,14 +3,18 @@ import {renderAvailabilityTimeline} from './front/timeline.mjs';
 const app = document.getElementById('app');
 let eventsCache = null;
 let activeEventId = '';
-let decorateTimer = null;
 const openFolds = new Set();
+const initializedFolds = new Set();
+const bucketStates = new Map();
 const visibleRegistrations = new Set();
 let lastError = '';
+let submittedDepartureId = '';
+let refinementObserver;
 
 const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
 
 async function loadEvents(force = false) {
+  if (!force && app?.querySelector('[data-event-id]') && app.eventViewData) return app.eventViewData.events;
   if (!force && eventsCache) return eventsCache;
   const response = await fetch('/api/events', {credentials:'same-origin', cache:'no-store'});
   if (!response.ok) throw new Error('Impossible de charger les données de l’événement.');
@@ -20,7 +24,7 @@ async function loadEvents(force = false) {
 }
 
 function currentEventId() {
-  return app?.querySelector('[data-action="edit-event"][data-id]')?.dataset.id || '';
+  return app?.querySelector('[data-event-id]')?.dataset.eventId || '';
 }
 
 function departureIdFromFold(fold) {
@@ -55,11 +59,12 @@ function consumeErrors() {
   showBlockingError(message);
 }
 
-function syncEventState() {
-  const eventId = currentEventId();
+function syncEventState(eventId = currentEventId()) {
   if (eventId === activeEventId) return eventId;
   activeEventId = eventId;
   openFolds.clear();
+  initializedFolds.clear();
+  bucketStates.clear();
   visibleRegistrations.clear();
   eventsCache = null;
   return eventId;
@@ -70,14 +75,8 @@ function activeSection() {
 }
 
 function refineBuilderVisibility() {
-  const crewsActive = activeSection() === 'crews';
-  app.querySelectorAll('[data-crew-builder-open]').forEach(button => {
-    const hidden = !crewsActive;
-    if (button.hidden !== hidden) button.hidden = hidden;
-  });
-  app.querySelectorAll('[data-crew-builder-panel]').forEach(panel => {
-    const hidden = !crewsActive;
-    if (panel.hidden !== hidden) panel.hidden = hidden;
+  app.querySelectorAll('[data-crew-builder-open], [data-crew-builder-panel]').forEach(element => {
+    if (element.hidden) element.hidden = false;
   });
   app.querySelectorAll('[data-action="new-crew"]').forEach(button => {
     if (!button.hidden) button.hidden = true;
@@ -86,13 +85,18 @@ function refineBuilderVisibility() {
 
 function refineFoldState() {
   app.querySelectorAll('.departure-fold[id]').forEach(fold => {
-    fold.open = openFolds.has(fold.id);
+    if (!initializedFolds.has(fold.id)) {
+      initializedFolds.add(fold.id);
+      if (fold.open || fold.querySelector('[data-crew-mine="true"]')) openFolds.add(fold.id);
+    }
+    const open = openFolds.has(fold.id);
+    if (fold.open !== open) fold.open = open;
   });
 }
 
 function ownRegistrationExists(fold) {
-  const save = fold.querySelector('.fold-registration .save-button');
-  return save?.textContent?.trim().toUpperCase() === 'ENREGISTRER';
+  const event = app.eventViewData?.events.find(item => item.id === currentEventId());
+  return Boolean(event?.departures.find(item => item.id === departureIdFromFold(fold))?.availability.some(registration => registration.mine));
 }
 
 function refineRegistration(fold) {
@@ -113,7 +117,8 @@ function refineRegistration(fold) {
   }
   const editing = visibleRegistrations.has(departureId);
   toggle.className = editing ? 'secondary-button ux-registration-toggle is-open' : 'primary-button ux-registration-toggle';
-  toggle.textContent = editing ? 'Fermer l’inscription' : (ownRegistrationExists(fold) ? 'Modifier mon inscription' : 'S’inscrire');
+  const label = editing ? 'Fermer l’inscription' : (ownRegistrationExists(fold) ? 'Modifier mon inscription' : 'S’inscrire');
+  if (toggle.textContent !== label) toggle.textContent = label;
   if (section.hidden === editing) section.hidden = !editing;
 }
 
@@ -122,6 +127,7 @@ function groupCoursePilots(fold) {
   const pilotSection = fold.querySelector('.pilot-section');
   if (!pilotSection || pilotSection.dataset.uxGrouped === 'true') return;
 
+  if (pilotSection.querySelector('.crew-pilot-group:not([data-crew-accordion="true"])')) return;
   const crewGroups = [...pilotSection.querySelectorAll('.category-group > .crew-pilot-accordion')];
   if (crewGroups.some(group => !group.dataset.crewLocked)) return;
 
@@ -133,8 +139,8 @@ function groupCoursePilots(fold) {
   const replacement = document.createElement('div');
   replacement.className = 'ux-course-overview';
   replacement.innerHTML = `<section class="ux-unassigned-section"><div class="ux-section-heading"><div><span class="creation-kicker">À AFFECTER</span><h3>Pilotes sans équipage</h3></div><span class="ux-count">${unassigned.length}</span></div><div class="ux-unassigned-grid" data-ux-unassigned></div></section>
-    <details class="ux-crew-bucket"><summary><span>Équipages incomplets</span><strong>${incomplete.length}</strong></summary><div class="ux-crew-bucket-body" data-ux-incomplete></div></details>
-    <details class="ux-crew-bucket"><summary><span>Équipages prêts à partir</span><strong>${ready.length}</strong></summary><div class="ux-crew-bucket-body" data-ux-ready></div></details>
+    <details class="ux-crew-bucket"><summary><span>Équipages ouverts</span><strong>${incomplete.length}</strong></summary><div class="ux-crew-bucket-body" data-ux-incomplete></div></details>
+    <details class="ux-crew-bucket"><summary><span>Équipages complets</span><strong>${ready.length}</strong></summary><div class="ux-crew-bucket-body" data-ux-ready></div></details>
     ${unavailable.length ? `<details class="ux-crew-bucket ux-unavailable-bucket"><summary><span>Pilotes indisponibles</span><strong>${unavailable.length}</strong></summary><div class="ux-crew-bucket-body" data-ux-unavailable></div></details>` : ''}`;
 
   const unassignedTarget = replacement.querySelector('[data-ux-unassigned]');
@@ -142,12 +148,16 @@ function groupCoursePilots(fold) {
   else unassignedTarget.innerHTML = '<p class="empty">Tous les pilotes disponibles sont déjà affectés à un équipage.</p>';
 
   const incompleteTarget = replacement.querySelector('[data-ux-incomplete]');
-  incomplete.length ? incomplete.forEach(group => incompleteTarget.append(group)) : incompleteTarget.innerHTML = '<p class="empty">Aucun équipage incomplet.</p>';
+  incomplete.length ? incomplete.forEach(group => incompleteTarget.append(group)) : incompleteTarget.innerHTML = '<p class="empty">Aucun équipage ouvert.</p>';
   const readyTarget = replacement.querySelector('[data-ux-ready]');
-  ready.length ? ready.forEach(group => readyTarget.append(group)) : readyTarget.innerHTML = '<p class="empty">Aucun équipage prêt à partir.</p>';
+  ready.length ? ready.forEach(group => readyTarget.append(group)) : readyTarget.innerHTML = '<p class="empty">Aucun équipage complet.</p>';
   const unavailableTarget = replacement.querySelector('[data-ux-unavailable]');
   unavailable.forEach(row => unavailableTarget?.append(row));
 
+  replacement.querySelectorAll('.ux-crew-bucket').forEach((bucket, index) => {
+    bucket.dataset.uxBucketKey = `${fold.id}:${index}`;
+    bucket.open = bucketStates.get(bucket.dataset.uxBucketKey) ?? Boolean(bucket.querySelector('[data-crew-mine="true"]'));
+  });
   pilotSection.replaceChildren(replacement);
   pilotSection.dataset.uxGrouped = 'true';
 }
@@ -179,7 +189,7 @@ function refineCrewCard(event, departure, crew, card) {
     assignment.insertAdjacentElement('afterend', grid);
   }
   const ids = [...select.options].map(option => option.value).filter(Boolean);
-  const signature = ids.join('|');
+  const signature = JSON.stringify([event.durationHours, departure.startsAt, ids.map(id => departure.availability.find(registration => registration.id === id))]);
   if (grid.dataset.signature === signature) return;
   grid.dataset.signature = signature;
   const registrations = ids.map(id => departure.availability.find(registration => registration.id === id)).filter(Boolean);
@@ -192,7 +202,7 @@ async function refineCrewPage() {
   if (!eventId) return;
   const events = await loadEvents().catch(() => []);
   const event = events.find(item => item.id === eventId);
-  if (!event) return;
+  if (!event || currentEventId() !== eventId || activeSection() !== 'crews') return;
   app.querySelectorAll('.crew-card[data-crew]').forEach(card => {
     const departureId = departureIdFromFold(card.closest('.departure-fold'));
     const departure = event.departures.find(item => item.id === departureId);
@@ -202,20 +212,19 @@ async function refineCrewPage() {
 }
 
 function decorate() {
-  clearTimeout(decorateTimer);
   syncEventState();
   consumeErrors();
+  if (app.eventViewData?.message === 'Inscription enregistrée.') {
+    if (submittedDepartureId) visibleRegistrations.delete(submittedDepartureId);
+    submittedDepartureId = '';
+    app.eventViewData.message = '';
+  }
   if (!currentEventId()) return;
   refineBuilderVisibility();
   refineFoldState();
   app.querySelectorAll('.departure-fold').forEach(fold => refineRegistration(fold));
   if (activeSection() === 'race') app.querySelectorAll('.departure-fold').forEach(groupCoursePilots);
   refineCrewPage();
-}
-
-function scheduleDecorate(delay = 15) {
-  clearTimeout(decorateTimer);
-  decorateTimer = setTimeout(decorate, delay);
 }
 
 document.addEventListener('click', event => {
@@ -254,25 +263,38 @@ document.addEventListener('click', event => {
     return;
   }
 
+  const bucketSummary = event.target.closest('.ux-crew-bucket > summary');
+  if (bucketSummary) {
+    event.preventDefault();
+    const bucket = bucketSummary.parentElement;
+    bucket.open = !bucket.open;
+    bucketStates.set(bucket.dataset.uxBucketKey, bucket.open);
+    return;
+  }
   const summary = event.target.closest('.departure-fold > summary');
   if (summary) {
     const fold = summary.parentElement;
-    setTimeout(() => {
-      fold.open ? openFolds.add(fold.id) : openFolds.delete(fold.id);
-    }, 0);
+    event.preventDefault();
+    fold.open = !fold.open;
+    initializedFolds.add(fold.id);
+    fold.open ? openFolds.add(fold.id) : openFolds.delete(fold.id);
+    return;
   }
 
   const action = event.target.closest('[data-action]');
   if (!action) return;
   if (action.dataset.action === 'open') {
+    syncEventState(action.dataset.id);
     openFolds.clear();
+    initializedFolds.clear();
+    bucketStates.clear();
     visibleRegistrations.clear();
     if (action.dataset.departure) {
       openFolds.add(`departure-${action.dataset.departure}`);
       if (action.dataset.registration) visibleRegistrations.add(action.dataset.departure);
     }
   }
-  if (action.dataset.action === 'event-section') openFolds.clear();
+
   if (['edit-registration','my-registration','new-registration'].includes(action.dataset.action) && action.dataset.departure) {
     visibleRegistrations.add(action.dataset.departure);
     openFolds.add(`departure-${action.dataset.departure}`);
@@ -281,18 +303,19 @@ document.addEventListener('click', event => {
 
 document.addEventListener('submit', event => {
   const form = event.target.closest('.registration-form');
-  if (!form) return;
-  const departureId = form.dataset.departure;
-  setTimeout(() => {
-    const success = [...app.querySelectorAll('.creation-success')].some(item => item.textContent.includes('Inscription enregistrée'));
-    if (success && departureId) {
-      visibleRegistrations.delete(departureId);
-      scheduleDecorate();
-    }
-  }, 500);
+  if (form) submittedDepartureId = form.dataset.departure;
 }, true);
 
+function runDecorate() {
+  refinementObserver?.disconnect();
+  try { decorate(); }
+  finally { refinementObserver?.observe(app, {childList:true, subtree:true, attributes:true, attributeFilter:['hidden','data-crew-locked']}); }
+}
+
 if (app) {
-  scheduleDecorate(0);
-  new MutationObserver(() => scheduleDecorate()).observe(app,{childList:true,subtree:true,attributes:true,attributeFilter:['hidden','aria-pressed','data-crew-locked']});
+  // Run before paint, and ignore our own mutations. Countdown text changes need no decoration.
+  refinementObserver = new MutationObserver(mutations => {
+    if (mutations.some(mutation => !mutation.target.closest?.('[data-countdown]'))) runDecorate();
+  });
+  runDecorate();
 }

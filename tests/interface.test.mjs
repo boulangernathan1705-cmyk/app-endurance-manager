@@ -109,3 +109,18 @@ test('my entries and crew preferences share timelines while other crews stay sum
   assert(wishes.includes('presence-timeline duration-24'));
   assert.equal((wishes.match(/<span class="presence-segment /g)||[]).length,24);
 });
+
+test('crew identity and ownership reach the course view for pilots, including empty crews',()=>{
+  for (const locked of [false,true]) {
+    const h=interfaceHarness('pilot');
+    h.run(`events[0].departures[0].crews[0].locked=${locked};renderEvent()`);
+    assert(h.app.innerHTML.includes('data-event-id="event"'));
+    assert(h.app.innerHTML.includes(`data-crew-id="crew" data-crew-locked="${locked}" data-crew-mine="true"`));
+    assert.equal(h.app.eventViewData.events[0].departures[0].crews[0].locked,locked);
+    h.run("events[0].departures[0].availability[0].mine=false;renderEvent()");
+    assert(h.app.innerHTML.includes('data-crew-mine="false"'));
+    h.run("events[0].departures[0].availability=[];events[0].departures[0].crews[0].registrationIds=[];renderEvent()");
+    assert(h.app.innerHTML.includes('data-crew-id="crew"'));
+    assert(h.app.innerHTML.includes('Aucun pilote affecté.'));
+  }
+});
