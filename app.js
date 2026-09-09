@@ -138,15 +138,22 @@ function renderRegistrationForm(event,departure) {
   const assigned=(departure.crews||[]).some(c=>c.registrationIds.some(id=>same.some(r=>r.id===id)));
   const source=selected||same[0]||(!state.forOther?ownRegistrations(departure)[0]:null);
   const canAdd=source&&!assigned&&event.categories.some(c=>!same.some(r=>r.category===c));
-  const addButtons=`${button('my-registration','Mon inscription',`data-departure="${departure.id}"`,'secondary-button add-pilot-button')}${canManage()?button('new-registration','+ Inscrire un pilote',`data-departure="${departure.id}" data-mode="pilot"`,'secondary-button add-pilot-button'):''}${canAdd?button('new-registration','+ Ajouter une catégorie',`data-departure="${departure.id}" data-mode="category" data-registration="${source.id}"`,'secondary-button add-pilot-button'):''}`;
-  const formTitle=state.id?`Modifier l’inscription de ${esc(state.name)}`:state.mode==='category'?'Ajouter une catégorie':state.forOther?'Inscrire un pilote':'Mon inscription';
+  const contextName=state.name||source?.name||(!state.forOther?user?.name:'')||'';
+  const addButtons=`${button('my-registration','Mon inscription',`data-departure="${departure.id}"`,'secondary-button registration-nav-button')}${canManage()?button('new-registration','+ Autre pilote',`data-departure="${departure.id}" data-mode="pilot"`,'primary-button registration-nav-button'):''}${canAdd?button('new-registration',`+ Catégorie pour ${esc(source.name)}`,`data-departure="${departure.id}" data-mode="category" data-registration="${source.id}"`,'secondary-button registration-nav-button category-add-button'):''}`;
+  const formTitle=state.id?`Modifier l’inscription de ${esc(state.name)}`:state.mode==='category'?`Ajouter une catégorie à ${esc(contextName||'ce pilote')}`:state.forOther?'Inscrire un autre pilote':'Mon inscription';
+  const contextBanner=state.mode==='category'
+    ? `<div class="registration-context-banner category"><span>AJOUT D’UNE CATÉGORIE</span><strong>${esc(contextName||'Pilote')}</strong><small>La nouvelle catégorie sera ajoutée à ce pilote, sans modifier ses autres inscriptions.</small></div>`
+    : state.forOther
+      ? `<div class="registration-context-banner other"><span>INSCRIPTION GÉRÉE</span><strong>${contextName?`Tu inscris ${esc(contextName)}`:'Tu inscris un autre pilote'}</strong><small>Cette inscription sera gérée par toi. Elle n’est pas ton inscription personnelle.</small></div>`
+      : `<div class="registration-context-banner self"><span>TON INSCRIPTION</span><strong>${esc(contextName||'Mon inscription')}</strong><small>Les informations ci-dessous concernent ton propre départ.</small></div>`;
   return `<form class="form-section registration-form" data-kind="registration" data-departure="${departure.id}">
     <h3 class="form-title">${formTitle}<span class="registration-form-actions">${addButtons}</span></h3>
-    ${selected&&!selected.mine?'<p class="creation-help">Tu gères cette inscription pour un autre pilote.</p>':''}
-    ${!state.id&&state.forOther&&canManage()?`<label class="form-label" for="participant-${departure.id}">Pilote déjà inscrit</label><select id="participant-${departure.id}" name="participant" data-departure="${departure.id}"><option value="">Créer une nouvelle fiche pilote</option>${participants.map(p=>`<option value="${esc(p.id)}" ${state.participantId===p.id?'selected':''}>${esc(p.name)}</option>`).join('')}</select><p class="creation-help">Choisis la fiche existante pour garder ensemble ses catégories, même si un autre organisateur l’a inscrit.</p>`:''}
+    ${contextBanner}
+    ${!state.id&&state.forOther&&canManage()?`<section class="managed-pilot-picker"><label class="form-label" for="participant-${departure.id}">Pilote avec compte Discord</label><select id="participant-${departure.id}" name="participant" data-departure="${departure.id}"><option value="">— Pilote sans compte Discord —</option>${participants.map(p=>`<option value="${esc(p.id)}" ${state.participantUserId===p.id?'selected':''}>${esc(p.name)}</option>`).join('')}</select><p>Seuls les pilotes qui se sont déjà connectés au site avec Discord sont proposés ici. Sinon, laisse « Pilote sans compte Discord » et saisis simplement son pseudo.</p></section>`:''}
     ${assigned?'<p class="assignment-effect">Ce pilote est affecté à un équipage. Sa catégorie est fixée ; ses heures et ses préférences restent modifiables.</p>':''}
     <label class="form-label" for="name-${departure.id}">Pseudo pilote</label>
-    <input id="name-${departure.id}" name="pilotName" data-departure="${departure.id}" value="${esc(state.name)}" maxlength="30" required autocomplete="nickname" ${!state.id&&state.participantId?'readonly':''}>
+    <input id="name-${departure.id}" name="pilotName" data-departure="${departure.id}" value="${esc(state.name)}" maxlength="30" required autocomplete="nickname" ${state.mode==='category'||state.participantUserId?'readonly':''}>
+    ${state.forOther?`<p class="managed-pilot-note ${state.participantUserId?'discord':'external'}">${state.participantUserId?'Compte Discord sélectionné : cette inscription apparaîtra aussi au pilote.':'Pilote sans compte : aucun compte utilisateur ne sera créé. Tu resteras responsable de cette inscription.'}</p>`:''}
     <label class="form-label" for="preference-${departure.id}">Pilote souhaité dans le même équipage <span class="muted">(facultatif)</span></label>
     <input id="preference-${departure.id}" name="preferredPilot" data-departure="${departure.id}" value="${esc(state.preferredPilot||'')}" maxlength="30" placeholder="Pseudo du pilote souhaité">
     <div class="registration-choices"><span class="form-label">Heures de présence (${duration} h)</span><p class="availability-hint">Clique sur les créneaux où tu es disponible.</p>${renderAvailabilityTimeline({departure,duration,status:state.status,interactive:true,label:'Heures de présence'})}<div class="special-availability">
@@ -336,7 +343,7 @@ async function submitRegistration(form) {
   state.cars=[...form.querySelectorAll('[name="carPreference"]:checked')].map(input=>input.value);
   state.carAny=!!form.elements.carAny?.checked;
   if(state.status!=='unavailable'&&!state.carAny&&!state.cars.length)throw Error('Choisis au moins une voiture, ou coche « Peu importe la voiture ».');
-  const payload={name:state.name,status:state.status,category:state.category,cars:state.cars,carAny:state.carAny,preferredPilot:state.preferredPilot||'',version:state.version,participantId:state.participantId,forOther:!!state.forOther};
+  const payload={name:state.name,status:state.status,category:state.category,cars:state.cars,carAny:state.carAny,preferredPilot:state.preferredPilot||'',version:state.version,participantId:state.participantId,participantUserId:state.participantUserId,forOther:!!state.forOther};
   const result=await api(state.id?`/api/registrations/${state.id}`:`/api/events/${event.id}/departures/${departure.id}/registrations`,state.id?'PATCH':'POST',payload);
   if(!state.forOther){pilotName=state.name;try{localStorage.setItem('fmt_pilot_name',pilotName);}catch{}}
   if(result.recoveryLink)recoveryLink=result.recoveryLink;
@@ -419,7 +426,7 @@ async function perform(action,target) {
       selectedDepartureId=target.dataset.departure;
       const departure=event.departures.find(d=>d.id===target.dataset.departure);
       const categoryMode=target.dataset.mode==='category',existing=departure.availability.find(r=>r.id===target.dataset.registration)||ownRegistrations(departure)[0];
-      drafts[departure.id]={...(categoryMode&&existing?registrationDraft(existing):{name:'',status:'',preferredPilot:'',forOther:canManage()}),category:'',cars:[],carAny:false,id:null,version:null,mode:categoryMode?'category':'pilot'};
+      drafts[departure.id]={...(categoryMode&&existing?registrationDraft(existing):{name:'',status:'',preferredPilot:'',forOther:canManage(),participantUserId:null}),category:'',cars:[],carAny:false,id:null,version:null,mode:categoryMode?'category':'pilot'};
       renderEvent();document.getElementById('name-'+departure.id)?.focus();break;
     }
     case 'category':{selectedDepartureId=target.dataset.departure;const state=draftFor(event.departures.find(d=>d.id===target.dataset.departure));state.category=target.dataset.value;state.cars=(state.cars||[]).filter(car=>CARS[state.category]?.includes(car));state.carAny=false;renderEvent();break;}
@@ -447,7 +454,7 @@ document.addEventListener('change',event=>{
   const field=event.target;
   if(field.name==='participant'){
     const draft=drafts[field.dataset.departure],participant=participants.find(p=>p.id===field.value);
-    if(draft){draft.participantId=participant?.id;draft.name=participant?.name||'';draft.category='';draft.cars=[];draft.carAny=false;renderEvent();}return;
+    if(draft){draft.participantUserId=participant?.id||null;draft.participantId=participant?.participantId||null;draft.name=participant?.name||'';draft.category='';draft.cars=[];draft.carAny=false;renderEvent();}return;
   }
   if(field.hasAttribute('data-assignment-preview')){updateAssignmentPreview(field);return;}
   const departureId=field.form?.dataset.departure;

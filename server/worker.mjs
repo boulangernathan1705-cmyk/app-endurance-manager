@@ -101,7 +101,9 @@ async function api(request, env) {
   if (path === '/api/events' && method === 'GET') return json({events:await listEvents(env, actor)});
   if (path === '/api/participants' && method === 'GET') {
     requireRole(actor.user);
-    return json({participants:(await env.DB.prepare('SELECT id,name FROM participants ORDER BY name,id').all()).results});
+    return json({participants:(await env.DB.prepare(`SELECT u.id,u.name,p.id AS participantId
+      FROM users u LEFT JOIN participants p ON p.user_id=u.id
+      ORDER BY lower(u.name),u.id`).all()).results});
   }
   const crewCreate = path.match(/^\/api\/events\/([a-f0-9-]{36})\/departures\/([a-f0-9-]{36})\/crews$/);
   const crewRoute = path.match(/^\/api\/crews\/([a-f0-9-]{36})(?:\/members(?:\/([a-f0-9-]{36}))?)?$/);

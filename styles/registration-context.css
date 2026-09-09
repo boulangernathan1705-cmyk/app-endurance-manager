@@ -1,0 +1,19 @@
+/* Registration identity/context: make it unmistakable who is being edited. */
+.registration-form-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:flex-end}
+.registration-nav-button{min-height:38px;padding:8px 13px;font-size:12px;font-weight:850}
+.category-add-button{border-color:rgba(53,185,120,.55);color:#dff8e9}
+.registration-context-banner{display:grid;gap:4px;margin:12px 0 16px;padding:12px 14px;border:1px solid var(--border);border-left-width:4px;border-radius:9px;background:var(--panel2)}
+.registration-context-banner span{font-size:10px;font-weight:950;letter-spacing:1.1px;color:var(--muted)}
+.registration-context-banner strong{font-size:17px;line-height:1.15}
+.registration-context-banner small{font-size:12px;line-height:1.4;color:var(--muted)}
+.registration-context-banner.self{border-left-color:var(--green)}
+.registration-context-banner.other{border-left-color:#e7a83c;background:linear-gradient(90deg,rgba(231,168,60,.10),var(--panel2) 38%)}
+.registration-context-banner.other span{color:#e7b55e}
+.registration-context-banner.category{border-left-color:#4aa3df;background:linear-gradient(90deg,rgba(74,163,223,.10),var(--panel2) 38%)}
+.registration-context-banner.category span{color:#79bde8}
+.managed-pilot-picker{display:grid;gap:7px;margin:8px 0 14px;padding:12px;border:1px solid var(--border);border-radius:9px;background:rgba(255,255,255,.02)}
+.managed-pilot-picker p,.managed-pilot-note{margin:0;color:var(--muted);font-size:12px;line-height:1.4}
+.managed-pilot-note{margin:-3px 0 13px;padding-left:10px;border-left:3px solid var(--border)}
+.managed-pilot-note.discord{border-left-color:var(--green);color:#bfe9cf}
+.managed-pilot-note.external{border-left-color:#e7a83c;color:#e8d4ae}
+@media(max-width:700px){.form-title{align-items:flex-start}.registration-form-actions{width:100%;justify-content:flex-start;margin-top:8px}.registration-nav-button{flex:1 1 auto}.registration-context-banner{margin-top:8px;padding:11px 12px}.registration-context-banner strong{font-size:15px}}

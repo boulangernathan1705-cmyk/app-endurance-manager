@@ -61,6 +61,15 @@ const registrationSelect = `SELECT r.*,p.user_id AS participant_user_id,p.guest_
  p.created_by AS participant_created_by,p.name AS participant_name FROM registrations r JOIN participants p ON p.id=r.participant_id`;
 async function registrationParticipant(env, actor, input, data) {
   const manager=!!actor.user && ['admin','organizer'].includes(actor.user.role);
+  if (input.participantUserId) {
+    if (!manager) fail(403,'Seuls les organisateurs peuvent inscrire un autre pilote.');
+    if (!/^\d{15,22}$/.test(input.participantUserId)) fail(400,'Compte Discord invalide.');
+    const discordUser=await env.DB.prepare('SELECT id,name FROM users WHERE id=?').bind(input.participantUserId).first();
+    if (!discordUser) fail(404,'Ce pilote Discord est introuvable. Actualise la page.');
+    await env.DB.prepare(`INSERT INTO participants(id,name,user_id,created_by,created_at) VALUES(?,?,?,?,?)
+      ON CONFLICT(user_id) WHERE user_id IS NOT NULL DO UPDATE SET name=excluded.name`).bind(id(),discordUser.name,discordUser.id,actor.user.id,now()).run();
+    return env.DB.prepare('SELECT * FROM participants WHERE user_id=?').bind(discordUser.id).first();
+  }
   if (input.participantId) {
     const participant=await env.DB.prepare('SELECT * FROM participants WHERE id=?').bind(input.participantId).first();
     if (!participant) fail(404,'Ce pilote est introuvable. Actualise la page.');
@@ -71,9 +80,12 @@ async function registrationParticipant(env, actor, input, data) {
   }
   if (input.forOther===true && !manager) fail(403,'Seuls les organisateurs peuvent inscrire un autre pilote.');
   if (input.forOther===true) {
-    // Reuse a known profile deliberately; a matching name never grants ownership.
-    const existing=await env.DB.prepare('SELECT id FROM participants WHERE lower(name)=lower(?) LIMIT 1').bind(data.name).first();
-    if (existing) fail(409,'Un pilote porte déjà ce pseudo. Choisis sa fiche dans « Pilote déjà inscrit ».');
+    // A manually entered name is an external pilot identity, never a site/Discord account.
+    // Reuse an existing external identity with the same pseudo to avoid duplicate profiles.
+    const existing=await env.DB.prepare(`SELECT * FROM participants
+      WHERE user_id IS NULL AND guest_hash IS NULL AND lower(name)=lower(?)
+      ORDER BY created_at,id LIMIT 1`).bind(data.name).first();
+    if (existing) return existing;
     const participant={id:id(),name:data.name,user_id:null,guest_hash:null,created_by:actor.user.id};
     await env.DB.prepare('INSERT INTO participants(id,name,created_by,created_at) VALUES(?,?,?,?)').bind(participant.id,participant.name,actor.user.id,now()).run();
     return participant;
