@@ -212,7 +212,7 @@ function renderCrewPage(event,nextDeparture) {
 }
 function renderPilots(event,departure) {
   return `<div class="pilot-section">
-    ${event.categories.map(category=>{const regs=departure.availability.filter(r=>r.category===category&&r.status!=='unavailable'),allCrews=departure.crews||[],crews=allCrews.filter(crew=>crew.category===category),assigned=new Set(crews.flatMap(crew=>crew.registrationIds)),unassigned=regs.filter(reg=>!assigned.has(reg.id));if(!regs.length)return '';return `<div class="category-group"><div class="category-group-header ${categories[category]?.css||''}">${logo(category)}<span>${esc(category)} · ${regs.length}</span></div>${crews.map(crew=>{const crewRegs=crew.registrationIds.map(id=>regs.find(reg=>reg.id===id)).filter(Boolean);return crewRegs.length?`<div class="crew-pilot-group ${crewColorClass(crew.id,allCrews.indexOf(crew))}"><div class="crew-pilot-group-header"><strong>${esc(crew.name)}</strong><span>${esc(crew.car||'Voiture à choisir')}</span></div>${crewRegs.map(reg=>renderRegistration(reg,departure,event.durationHours||6,false)).join('')}</div>`:'';}).join('')}${unassigned.map(reg=>renderRegistration(reg,departure,event.durationHours||6)).join('')}</div>`;}).join('')}
+    ${event.categories.map(category=>{const regs=departure.availability.filter(r=>r.category===category&&r.status!=='unavailable'),allCrews=departure.crews||[],crews=allCrews.filter(crew=>crew.category===category),assigned=new Set(crews.flatMap(crew=>crew.registrationIds)),unassigned=regs.filter(reg=>!assigned.has(reg.id));if(!regs.length)return '';return `<div class="category-group"><div class="category-group-header ${categories[category]?.css||''}">${logo(category)}<span>${esc(category)} · ${regs.length} pilote${regs.length>1?'s':''}</span></div>${crews.map(crew=>{const crewRegs=crew.registrationIds.map(id=>regs.find(reg=>reg.id===id)).filter(Boolean);return crewRegs.length?`<div class="crew-pilot-group ${crewColorClass(crew.id,allCrews.indexOf(crew))}"><div class="crew-pilot-group-header"><strong>${esc(crew.name)}</strong><span>${esc(crew.car||'Voiture à choisir')}</span></div>${crewRegs.map(reg=>renderRegistration(reg,departure,event.durationHours||6,false)).join('')}</div>`:'';}).join('')}${unassigned.map(reg=>renderRegistration(reg,departure,event.durationHours||6)).join('')}</div>`;}).join('')}
     ${departure.availability.filter(r=>r.status==='unavailable').map(reg=>renderRegistration(reg,departure,event.durationHours||6)).join('')}
     ${!departure.availability.length?'<p class="no-pilots">Aucun pilote inscrit sur ce départ.</p>':''}</div>`;
 }
@@ -253,7 +253,7 @@ function renderCrews(event,departure) {
 function departureFields(departure={}) {
   const fieldId=crypto.randomUUID();
   return `<div class="departure-field" data-id="${esc(departure.id||'')}"><div><label class="form-label" for="date-${fieldId}">Date</label><input id="date-${fieldId}" name="date" type="date" value="${esc(departure.date||'')}" required></div>
-    <div><label class="form-label" for="time-${fieldId}">Heure (Paris)</label><input id="time-${fieldId}" name="time" type="time" value="${esc(departure.time||'')}" required></div>
+    <div><label class="form-label" for="time-${fieldId}">Heure (Paris)</label><input id="time-${fieldId}" name="time" type="time" value="${esc(departure.time||'00:00')}" required></div>
     ${button('remove-departure','×','aria-label="Supprimer ce départ"','remove-departure')}</div>`;
 }
 function renderEventForm(event=null) {
