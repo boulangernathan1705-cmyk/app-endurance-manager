@@ -1,0 +1,31 @@
+name: Apply registration pilot flow
+on:
+  push:
+    branches: [feature/registration-pilot-flow]
+    paths:
+      - scripts/apply-registration-pilot-flow.mjs
+      - .github/workflows/apply-registration-pilot-flow.yml
+permissions:
+  contents: write
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/registration-pilot-flow
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node scripts/apply-registration-pilot-flow.mjs
+      - run: npm run check
+      - name: Commit patch and remove temporary automation
+        run: |
+          rm scripts/apply-registration-pilot-flow.mjs
+          rm .github/workflows/apply-registration-pilot-flow.yml
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -A
+          git commit -m "feat: clarify managed pilot registrations"
+          git push origin HEAD:feature/registration-pilot-flow
