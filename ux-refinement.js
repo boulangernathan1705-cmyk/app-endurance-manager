@@ -47,9 +47,7 @@ function showBlockingError(message) {
 }
 
 function consumeErrors() {
-  const boxes = [
-    ...app.querySelectorAll('#error:not([hidden]), [data-crew-builder-error]:not([hidden])')
-  ].filter(box => box.textContent.trim());
+  const boxes = [...app.querySelectorAll('#error:not([hidden]), [data-crew-builder-error]:not([hidden])')].filter(box => box.textContent.trim());
   const box = boxes.at(-1);
   if (!box) return;
   const message = box.textContent.trim();
@@ -74,10 +72,15 @@ function activeSection() {
 function refineBuilderVisibility() {
   const crewsActive = activeSection() === 'crews';
   app.querySelectorAll('[data-crew-builder-open]').forEach(button => {
-    button.hidden = !crewsActive;
+    const hidden = !crewsActive;
+    if (button.hidden !== hidden) button.hidden = hidden;
   });
   app.querySelectorAll('[data-crew-builder-panel]').forEach(panel => {
-    panel.hidden = !crewsActive;
+    const hidden = !crewsActive;
+    if (panel.hidden !== hidden) panel.hidden = hidden;
+  });
+  app.querySelectorAll('[data-action="new-crew"]').forEach(button => {
+    if (!button.hidden) button.hidden = true;
   });
 }
 
@@ -97,8 +100,7 @@ function refineRegistration(fold) {
   const departureId = departureIdFromFold(fold);
   const toolbar = fold.querySelector('.fold-toolbar');
   const section = fold.querySelector('.fold-registration');
-  const legacy = toolbar?.querySelector('[data-action="focus-registration"]');
-  legacy?.remove();
+  toolbar?.querySelector('[data-action="focus-registration"]')?.remove();
   if (!toolbar || !section) return;
 
   let toggle = toolbar.querySelector('[data-ux-registration-toggle]');
@@ -112,7 +114,7 @@ function refineRegistration(fold) {
   const editing = visibleRegistrations.has(departureId);
   toggle.className = editing ? 'secondary-button ux-registration-toggle is-open' : 'primary-button ux-registration-toggle';
   toggle.textContent = editing ? 'Fermer l’inscription' : (ownRegistrationExists(fold) ? 'Modifier mon inscription' : 'S’inscrire');
-  section.hidden = !editing;
+  if (section.hidden === editing) section.hidden = !editing;
 }
 
 function groupCoursePilots(fold) {
@@ -164,9 +166,10 @@ function refineCrewCard(event, departure, crew, card) {
   const add = assignment.querySelector('[data-action="add-crew-pilot"]');
   if (!select || !add) return;
   assignment.classList.add('ux-original-assignment');
-  select.hidden = true;
-  add.hidden = true;
-  assignment.querySelector('.assignment-wishes')?.setAttribute('hidden','');
+  if (!select.hidden) select.hidden = true;
+  if (!add.hidden) add.hidden = true;
+  const wishes = assignment.querySelector('.assignment-wishes');
+  if (wishes && !wishes.hidden) wishes.hidden = true;
 
   let grid = card.querySelector('[data-ux-candidate-grid]');
   if (!grid) {
@@ -176,6 +179,9 @@ function refineCrewCard(event, departure, crew, card) {
     assignment.insertAdjacentElement('afterend', grid);
   }
   const ids = [...select.options].map(option => option.value).filter(Boolean);
+  const signature = ids.join('|');
+  if (grid.dataset.signature === signature) return;
+  grid.dataset.signature = signature;
   const registrations = ids.map(id => departure.availability.find(registration => registration.id === id)).filter(Boolean);
   grid.innerHTML = `<div class="ux-candidate-title"><strong>Pilotes disponibles · ${esc(crew.category)}</strong><span>Clique sur un pilote pour l’ajouter</span></div><div class="ux-crew-candidate-grid">${registrations.length ? registrations.map(registration => candidateCard(event,departure,crew,registration)).join('') : '<p class="empty">Aucun pilote à affecter dans cette catégorie.</p>'}</div>`;
 }
@@ -266,9 +272,7 @@ document.addEventListener('click', event => {
       if (action.dataset.registration) visibleRegistrations.add(action.dataset.departure);
     }
   }
-  if (action.dataset.action === 'event-section') {
-    openFolds.clear();
-  }
+  if (action.dataset.action === 'event-section') openFolds.clear();
   if (['edit-registration','my-registration','new-registration'].includes(action.dataset.action) && action.dataset.departure) {
     visibleRegistrations.add(action.dataset.departure);
     openFolds.add(`departure-${action.dataset.departure}`);
