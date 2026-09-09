@@ -22,7 +22,7 @@ function publicRegistration(reg, actor) {
 async function listEvents(env, actor) {
   const rows = (await env.DB.prepare('SELECT * FROM events ORDER BY created_at DESC, id DESC').all()).results;
   const registrations = (await env.DB.prepare(registrationSelect+' ORDER BY r.created_at,r.id').all()).results;
-  const crews = (await env.DB.prepare('SELECT id,event_id,departure_id,name,category,car,version FROM crews ORDER BY created_at,id').all()).results;
+  const crews = (await env.DB.prepare('SELECT * FROM crews ORDER BY created_at,id').all()).results;
   const memberships = (await env.DB.prepare('SELECT crew_id,registration_id FROM crew_members').all()).results;
   const grouped = new Map();
   for (const reg of registrations) { const key = `${reg.event_id}:${reg.departure_id}`; if (!grouped.has(key)) grouped.set(key, []); grouped.get(key).push(publicRegistration(reg, actor)); }
@@ -35,7 +35,7 @@ async function listEvents(env, actor) {
   for (const crew of crews) {
     const key = `${crew.event_id}:${crew.departure_id}`;
     if (!crewsByDeparture.has(key)) crewsByDeparture.set(key, []);
-    crewsByDeparture.get(key).push({id:crew.id,name:crew.name,category:crew.category,car:crew.car,version:crew.version,registrationIds:membersByCrew.get(crew.id) || []});
+    crewsByDeparture.get(key).push({id:crew.id,name:crew.name,category:crew.category,car:crew.car,locked:Boolean(crew.locked),version:crew.version,registrationIds:membersByCrew.get(crew.id) || []});
   }
   return rows.map(row => ({id:row.id, name:row.name, circuit:row.circuit||'', durationHours:Number(row.duration_hours)||3, eventType:row.event_type||'private', categories:JSON.parse(row.categories), version:row.version, departures:JSON.parse(row.departures).map(d => ({...d, availability:grouped.get(`${row.id}:${d.id}`) || [], crews:crewsByDeparture.get(`${row.id}:${d.id}`) || []}))}));
 }
@@ -128,12 +128,12 @@ async function api(request, env) {
     if (departure.startsAt<=Date.now()) fail(409,'Ce départ est passé. Les équipages sont verrouillés.');
     if (crew && input.version!==crew.version) fail(409,'Cet équipage a changé. Actualise avant de réessayer.');
     const membership=crewRoute && path.includes('/members');
+    if (membership && crew.locked) fail(409,'Cet équipage est complet. Rouvre-le avant de modifier sa composition.');
     if (membership) {
       if (method==='POST' && !crewRoute[2]) {
         if (!/^[a-f0-9-]{36}$/.test(input.registrationId || '')) fail(400,'Sélectionne un pilote inscrit.');
         const selected=await env.DB.prepare('SELECT * FROM registrations WHERE id=?').bind(input.registrationId).first();
         if (!selected || selected.event_id!==crew.event_id || selected.departure_id!==crew.departure_id) fail(409,'Ce pilote n’est pas inscrit sur ce départ. Actualise la page.');
-        // Bump version and assign in one atomic batch; stale writes cannot assign anyone.
         const results=await env.DB.batch([
           env.DB.prepare('UPDATE crews SET version=version+1 WHERE id=? AND version=?').bind(crew.id,input.version),
           env.DB.prepare('INSERT INTO crew_members(registration_id,crew_id) SELECT ?,? WHERE changes()=1').bind(input.registrationId,crew.id),
@@ -156,6 +156,11 @@ async function api(request, env) {
       return json({ok:true});
     }
     if (crew && method!=='PATCH') fail(404,'Action introuvable.');
+    if (crew && method==='PATCH' && typeof input.locked==='boolean' && input.name===undefined && input.category===undefined && input.car===undefined) {
+      const result=await env.DB.prepare('UPDATE crews SET locked=?,version=version+1 WHERE id=? AND version=?').bind(input.locked?1:0,crew.id,input.version).run();
+      if (!result.meta.changes) fail(409,'Cet équipage a changé. Actualise la page.');
+      return json({ok:true,locked:input.locked});
+    }
     const name=text(input.name,60,'Nom de l’équipage');
     if (!JSON.parse(event.categories).includes(input.category)) fail(400,'Choisis une catégorie de cet événement.');
     const car=input.car==null || input.car==='' ? '' : text(input.car,100,'Voiture');
@@ -179,11 +184,10 @@ async function api(request, env) {
     if (input.version !== event.version) fail(409, 'Cet événement a changé. Actualise avant de réessayer.');
     if (method === 'DELETE') {
       const result = await env.DB.prepare('DELETE FROM events WHERE id=? AND version=?').bind(event.id, input.version).run();
-      if (!result.meta.changes) fail(409, 'Cet événement a changé. Actualise la page.');
+      if (!result.meta.changes) fail(409, 'Cet événement a changé. Actualise avant de réessayer.');
       return json({ok:true});
     }
     const data = validateEvent(input, event), cats = JSON.stringify(data.categories), deps = JSON.stringify(data.departures);
-    // Check inside the UPDATE so concurrent registrations cannot invalidate the new duration.
     const result = await env.DB.prepare(`UPDATE events SET name=?,duration_hours=?,event_type=?,circuit=?,categories=?,departures=?,version=version+1 WHERE id=? AND version=?
       AND NOT EXISTS (SELECT 1 FROM registrations r WHERE r.event_id=events.id AND
         (NOT EXISTS (SELECT 1 FROM json_each(?) d WHERE json_extract(d.value,'$.id')=r.departure_id)
@@ -202,11 +206,9 @@ async function api(request, env) {
     if (guestToken) { actor.guestToken=guestToken;actor.guestHash=await hash(guestToken); }
     const participant=await registrationParticipant(env,actor,input,data);
     const userId=participant.user_id;
-    // Managed profiles retain a non-public token to satisfy the legacy table check.
     const guestHash=userId?null:participant.guest_hash||await hash(token());
     const ownerUserId = actor.user?.id || null;
     const regId = id();
-    // An existing profile keeps its name when another organizer adds a category.
     if (input.participantId) { data.name=participant.name;data.nameKey=data.name.normalize('NFKC').toLocaleLowerCase('fr-FR'); }
     const result = await env.DB.prepare(`INSERT INTO registrations(id,event_id,departure_id,user_id,owner_user_id,guest_hash,name,name_key,category,car,car_preferences,car_any,status,preferred_pilot,created_at,participant_id)
       SELECT ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,? FROM events WHERE id=? AND version=?`).bind(regId,event.id,departure.id,userId,ownerUserId,guestHash,data.name,data.nameKey,data.category,data.car,JSON.stringify(data.cars),data.carAny?1:0,data.status,data.preferredPilot,now(),participant.id,event.id,event.version).run();
@@ -262,6 +264,7 @@ export default {
       if (message.includes('participant_already_assigned')) return json({error:'Ce pilote est déjà affecté à un équipage sur ce départ. Modifie son inscription existante, ou retire-le de l’équipage avant de changer de catégorie ou de le déclarer indisponible.'},409);
       if (message.includes('participant_required') || message.includes('participant_fixed')) return json({error:'Recharge le site pour retrouver la fiche du pilote.'},409);
       if (message.includes('no such table: participants') || message.includes('no such column: r.participant_id')) return json({error:'La mise à jour de la base attend la migration 0012_participants.sql.'},503);
+      if (message.includes('no such column: locked')) return json({error:'La mise à jour de la base attend la migration 0015_crew_lock.sql.'},503);
       if (message.includes('UNIQUE constraint failed: crew_members.')) return json({error:'Ce pilote appartient déjà à un équipage sur ce départ. Actualise la page.'},409);
       if (message.includes('crew_category_in_use')) return json({error:'Ce pilote est affecté à un équipage de cette catégorie. Retire d’abord son affectation pour changer de catégorie.'},409);
       if (message.includes('crew_event_in_use')) return json({error:'Un équipage utilise encore ce départ ou cette catégorie. Supprime ou modifie cet équipage avant de continuer.'},409);

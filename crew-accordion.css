@@ -15,14 +15,18 @@
 
 .crew-pilot-accordion-summary {
   display: grid;
-  grid-template-columns: 40px minmax(130px, .95fr) minmax(210px, 1.65fr) minmax(180px, 1.15fr) 18px;
+  grid-template-columns: 40px minmax(120px, .9fr) minmax(180px, 1.5fr) minmax(150px, 1.05fr) max-content 18px;
   align-items: center;
   gap: 12px;
   min-height: 54px;
   padding: 9px 12px;
   cursor: pointer;
   background: color-mix(in srgb, var(--crew-color) 5%, #151c1f);
-  transition: background .15s ease;
+  transition: background .15s ease, opacity .15s ease;
+}
+
+.crew-pilot-accordion.is-complete .crew-pilot-accordion-summary {
+  background: color-mix(in srgb, #7d8589 8%, #151c1f);
 }
 
 .crew-pilot-accordion-summary:hover {
@@ -89,6 +93,36 @@
   text-align: right;
 }
 
+.crew-compact-status,
+.crew-card-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 25px;
+  padding: 4px 8px;
+  border: 1px solid;
+  border-radius: 999px;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: .55px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.crew-compact-status.is-open,
+.crew-card-status.is-open {
+  color: #a9f3c2;
+  border-color: #3e9b63;
+  background: #173624;
+}
+
+.crew-compact-status.is-complete,
+.crew-card-status.is-complete {
+  color: #c1c7ca;
+  border-color: #586166;
+  background: #292e31;
+}
+
 .crew-compact-chevron {
   display: inline-flex;
   align-items: center;
@@ -113,14 +147,76 @@
   padding-top: 10px;
 }
 
+.crew-capacity-message {
+  margin: 10px 0 4px;
+  padding: 10px 12px;
+  border: 1px solid #384246;
+  border-left: 4px solid #68747a;
+  border-radius: 7px;
+  background: #171c1f;
+  color: #c5ced1;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.crew-capacity-message.is-open {
+  border-left-color: #43b96e;
+}
+
+.crew-capacity-message.needs-pilots {
+  border-color: #376e4b;
+  border-left-color: #5fd687;
+  background: #14251b;
+  color: #d7f4e0;
+}
+
+.crew-capacity-message.is-complete {
+  border-left-color: #7a8489;
+  color: #adb5b8;
+}
+
+.crew-card-header {
+  gap: 12px;
+}
+
+.crew-card-header .crew-card-status {
+  margin-left: auto;
+  align-self: flex-start;
+}
+
+.crew-card.is-complete {
+  opacity: .82;
+}
+
+.crew-card.is-complete .crew-assignment {
+  opacity: .58;
+}
+
+.crew-lock-button,
+.crew-unlock-button {
+  margin-right: auto;
+}
+
+@media (max-width: 900px) {
+  .crew-pilot-accordion-summary {
+    grid-template-columns: 40px minmax(120px, .95fr) minmax(160px, 1.25fr) max-content 18px;
+  }
+
+  .crew-compact-car {
+    display: none;
+  }
+}
+
 @media (max-width: 760px) {
   .crew-pilot-accordion-summary {
-    grid-template-columns: 36px minmax(0, 1fr) 18px;
-    gap: 7px 10px;
+    grid-template-columns: 36px minmax(0, 1fr) max-content 18px;
+    gap: 7px 9px;
     padding: 9px 10px;
   }
 
   .crew-compact-category {
+    grid-column: 1;
     grid-row: 1 / span 2;
     width: 36px;
     min-width: 36px;
@@ -128,21 +224,49 @@
 
   .crew-compact-team {
     grid-column: 2;
+    grid-row: 1;
   }
 
-  .crew-compact-chevron {
+  .crew-compact-status {
     grid-column: 3;
     grid-row: 1;
   }
 
+  .crew-compact-chevron {
+    grid-column: 4;
+    grid-row: 1;
+  }
+
   .crew-compact-pilots {
-    grid-column: 2 / 4;
+    grid-column: 2 / 5;
     grid-row: 2;
   }
 
   .crew-compact-car {
-    grid-column: 2 / 4;
+    display: block;
+    grid-column: 2 / 5;
     grid-row: 3;
     text-align: left;
+  }
+}
+
+@media (max-width: 520px) {
+  .crew-pilot-accordion-summary {
+    grid-template-columns: 34px minmax(0, 1fr) 18px;
+  }
+
+  .crew-compact-category {
+    width: 34px;
+    min-width: 34px;
+  }
+
+  .crew-compact-status {
+    grid-column: 2 / 4;
+    grid-row: 3;
+    justify-self: start;
+  }
+
+  .crew-compact-car {
+    grid-row: 4;
   }
 }
