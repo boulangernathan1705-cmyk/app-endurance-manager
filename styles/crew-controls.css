@@ -1,0 +1,17 @@
+.registration-form .special-availability{grid-template-columns:1fr!important}
+.crew-card-header>.crew-card-status[hidden],.crew-card [data-crew-lock-toggle][hidden]{display:none!important}
+.crew-state-control{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin:0 0 10px}
+.crew-state-label{display:inline-flex;align-items:center;gap:6px;color:#dce8e5;font-size:12px;font-weight:900;text-transform:uppercase;letter-spacing:.55px}
+.crew-state-lock{display:inline-grid;place-items:center;width:20px;height:20px;font-size:14px;line-height:1}
+.crew-state-select-wrap{position:relative;display:inline-flex;align-items:center}
+.crew-state-select{appearance:none;-webkit-appearance:none;min-height:34px;padding:7px 34px 7px 11px;border:1px solid #46565c;border-radius:7px;background:#111719;color:var(--text);font:inherit;font-size:12px;font-weight:850;cursor:pointer;outline:none}
+.crew-state-select:hover,.crew-state-select:focus{border-color:var(--green)}
+.crew-state-select:disabled{cursor:wait;opacity:.65}
+.crew-state-chevron{position:absolute;right:11px;top:50%;transform:translateY(-52%);pointer-events:none;color:#9feab0;font-size:15px;font-weight:900}
+.crew-member-action{min-width:84px;flex:0 0 auto;text-align:center}
+.crew-candidate-action-card{display:grid!important;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:14px;width:100%;padding:12px;border:1px solid var(--border);border-radius:10px;background:var(--panel2);color:var(--text);text-align:left;cursor:default;transform:none!important}
+.crew-candidate-action-card:hover{border-color:var(--border)!important;background:var(--panel2)!important;transform:none!important}
+.crew-candidate-info{min-width:0}
+.crew-candidate-info .ux-candidate-head{margin-bottom:5px}
+.crew-add-pilot-button{min-width:84px;flex:0 0 auto;text-align:center}
+@media(max-width:760px){.crew-state-control{align-items:flex-start;flex-direction:column}.crew-state-select-wrap,.crew-state-select{width:100%}.crew-candidate-action-card{grid-template-columns:1fr}.crew-add-pilot-button,.crew-member-action{width:100%}}
