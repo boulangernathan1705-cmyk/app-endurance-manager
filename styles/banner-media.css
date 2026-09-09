@@ -1,0 +1,171 @@
+/* Stable, high-fidelity banner rendering.
+   The artwork is shown as a real image instead of a stretched CSS background.
+   On very wide screens the sharp banner keeps a capped native-sized width while
+   a blurred backdrop fills the unused sides. This keeps the full 3:1 artwork
+   visible and prevents browser zoom from constantly resizing the hero. */
+
+header.site-hero {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-height: 0;
+  padding: 0;
+  overflow: hidden;
+  isolation: isolate;
+  background: #070a0c;
+  border-bottom: 1px solid rgba(91,210,215,.42);
+  box-shadow: 0 16px 42px rgba(0,0,0,.38), inset 0 -1px rgba(231,182,83,.16);
+}
+
+header.site-hero::before {
+  content: "";
+  position: absolute;
+  inset: -26px;
+  z-index: 0;
+  background:
+    linear-gradient(180deg,rgba(5,8,10,.16),rgba(5,8,10,.38)),
+    url('/images/endurance-manager-banner.webp') center / cover no-repeat;
+  filter: blur(18px) saturate(.92) brightness(.52);
+  transform: scale(1.035);
+  opacity: .92;
+  pointer-events: none;
+}
+
+header.site-hero::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 0;
+  z-index: 4;
+  height: 2px;
+  background: linear-gradient(90deg,var(--fmt-cyan),var(--fmt-red) 46%,var(--fmt-gold) 78%,transparent);
+  opacity: .9;
+  pointer-events: none;
+}
+
+.hero-picture {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: min(100%, 2048px);
+  aspect-ratio: 2048 / 682;
+  margin: 0 auto;
+  background: #080b0d;
+  box-shadow: 0 0 46px rgba(0,0,0,.4);
+}
+
+.hero-banner {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center;
+  image-rendering: auto;
+}
+
+header.site-hero .header-inner {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  width: min(100%, 2048px);
+  max-width: none;
+  min-height: 0;
+  margin: 0 auto;
+  pointer-events: none;
+}
+
+header.site-hero .brand-button.logo {
+  position: absolute;
+  inset: 0 auto 0 0;
+  display: block;
+  width: 35%;
+  height: 100%;
+  padding: 0;
+  opacity: 0;
+  border: 0;
+  background: transparent;
+  pointer-events: auto;
+}
+
+/* The global navigation stays below the artwork. */
+.site-nav-shell {
+  position: relative;
+  z-index: 8;
+  width: min(calc(100% - 44px),1180px);
+  height: 0;
+  margin: 0 auto;
+}
+
+.site-nav-shell #navigation {
+  position: absolute;
+  top: 22px;
+  right: 0;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 7px;
+  margin: 0;
+}
+
+/* Ultrawide/desktop: the sharp artwork stays at its reference width.
+   Only the soft backdrop expands, so zooming out no longer makes the banner huge. */
+@media (min-width: 2048px) {
+  .hero-picture,
+  header.site-hero .header-inner {
+    width: 2048px;
+  }
+}
+
+/* Normal desktop/tablet: preserve the full 3:1 composition. */
+@media (max-width: 2047px) {
+  .hero-picture,
+  header.site-hero .header-inner {
+    width: 100%;
+  }
+}
+
+/* Phone: same artwork, fully visible, naturally compact because of the 3:1 ratio. */
+@media (max-width: 700px) {
+  header.site-hero {
+    min-height: 0;
+    padding: 0;
+    background: #080b0d;
+  }
+
+  header.site-hero::before {
+    filter: blur(12px) saturate(.9) brightness(.46);
+    opacity: .72;
+  }
+
+  .hero-picture {
+    width: 100%;
+    aspect-ratio: 2048 / 682;
+    box-shadow: none;
+  }
+
+  header.site-hero .header-inner {
+    display: block;
+    width: 100%;
+    min-height: 0;
+  }
+
+  header.site-hero .brand-button.logo {
+    display: block;
+    width: 46%;
+  }
+
+  .site-nav-shell {
+    width: 100%;
+    height: auto;
+    margin: 0;
+    padding: 8px 10px 0;
+  }
+
+  .site-nav-shell #navigation {
+    position: static;
+    display: grid;
+    grid-template-columns: repeat(2,minmax(0,1fr));
+    gap: 6px;
+    width: 100%;
+    margin: 0;
+  }
+}
