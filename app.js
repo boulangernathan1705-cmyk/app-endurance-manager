@@ -169,6 +169,15 @@ function renderRegistrationForm(event,departure) {
       ${state.id?button('delete-registration','Se désinscrire',`data-id="${state.id}" data-departure="${departure.id}"`,'danger-button'):''}</div>
   </form>`;
 }
+function rerenderRegistrationSection(event,departure,focusSelector='') {
+  const fold=document.getElementById('departure-'+departure.id);
+  const section=fold?.querySelector('.fold-registration');
+  if(!section){renderEvent();return;}
+  const x=window.scrollX,y=window.scrollY;
+  section.innerHTML=`<h2>Mon inscription</h2>${renderRegistrationForm(event,departure)}`;
+  if(focusSelector)section.querySelector(focusSelector)?.focus({preventScroll:true});
+  window.scrollTo(x,y);
+}
 function renderEvent(message='') {
   page='event';
   const event=events.find(e=>e.id===currentEventId);
@@ -368,7 +377,6 @@ async function refreshAfterSave(message,firstId) {
     if(firstId)events.sort((a,b)=>a.id===firstId?-1:b.id===firstId?1:0);
     if(page==='event')renderEvent(message);else renderHome(message);
   } catch {
-    // The write already succeeded: do not offer the original submit again.
     app.innerHTML=`<p class="creation-success" role="status">${esc(message)}</p><p>La mise à jour de l’affichage a échoué.</p>${button('refresh','Recharger les données')}${errorBox()}`;
   }
 }
@@ -419,8 +427,7 @@ async function perform(action,target) {
       const departure=event.departures.find(d=>d.id===target.dataset.departure),state=draftFor(departure),value=target.dataset.value;
       if(['whole','unavailable'].includes(value))state.status=value;
       else{const duration=event.durationHours||6;const parts=new Set(state.status==='whole'?Array.from({length:duration},(_,i)=>`h${i+1}`):state.status.split(',').filter(part=>/^h\d+$/.test(part)));parts.has(value)?parts.delete(value):parts.add(value);state.status=parts.size===duration?'whole':Array.from(parts).sort((a,b)=>Number(a.slice(1))-Number(b.slice(1))).join(',');}
-      renderEvent();
-      app.querySelector(`[data-action="availability"][data-departure="${departure.id}"][data-value="${value}"]`)?.focus({preventScroll:true});
+      rerenderRegistrationSection(event,departure,`[data-action="availability"][data-departure="${departure.id}"][data-value="${value}"]`);
       break;
     }
     case 'my-registration':{selectedDepartureId=target.dataset.departure;delete drafts[selectedDepartureId];renderEvent();break;}
@@ -431,7 +438,13 @@ async function perform(action,target) {
       drafts[departure.id]={...(categoryMode&&existing?registrationDraft(existing):{name:'',status:'',preferredPilot:'',forOther:canManage(),participantUserId:null}),category:'',cars:[],carAny:false,id:null,version:null,mode:categoryMode?'category':'pilot'};
       renderEvent();document.getElementById('name-'+departure.id)?.focus();break;
     }
-    case 'category':{selectedDepartureId=target.dataset.departure;const state=draftFor(event.departures.find(d=>d.id===target.dataset.departure));state.category=target.dataset.value;state.cars=(state.cars||[]).filter(car=>CARS[state.category]?.includes(car));state.carAny=false;renderEvent();break;}
+    case 'category':{
+      selectedDepartureId=target.dataset.departure;
+      const departure=event.departures.find(d=>d.id===target.dataset.departure),state=draftFor(departure);
+      state.category=target.dataset.value;state.cars=(state.cars||[]).filter(car=>CARS[state.category]?.includes(car));state.carAny=false;
+      rerenderRegistrationSection(event,departure,`[data-action="category"][data-departure="${departure.id}"][data-value="${CSS.escape(target.dataset.value)}"]`);
+      break;
+    }
     case 'edit-registration':{
       selectedDepartureId=target.dataset.departure;
       const departure=event.departures.find(d=>d.id===target.dataset.departure),reg=departure.availability.find(r=>r.id===target.dataset.id);
