@@ -186,8 +186,9 @@ function renderEvent(message='') {
   const nextDeparture=event.departures.find(d=>d.startsAt>Date.now())||event.departures[0];
   const totalPilots=pilotCount(event.departures.flatMap(d=>d.availability));
   const totalCrews=event.departures.reduce((sum,d)=>sum+(d.crews||[]).length,0);
+  app.eventViewData={eventId:event.id,events,message};
   app.innerHTML=`${button('home','← Retour aux événements','','secondary-button back-button')}
-    <div class="event-header event-header-compact event-type-${event.eventType||'private'}">
+    <div class="event-header event-header-compact event-type-${event.eventType||'private'}" data-event-id="${event.id}">
       <div class="event-heading-line"><div class="event-heading-copy"><h1 class="event-title">${esc(event.name)}</h1><p class="event-subtitle">${eventTypeBadge(event.eventType)} <span>· Horaires de Paris</span></p></div>${circuitVisual(event.circuit)}</div>
       <div class="event-header-summary">
         <div class="event-category-badges">${event.categories.map(category=>eventBadge(category,eventCategoryCount(event,category))).join('')}</div>
@@ -220,7 +221,7 @@ function renderCrewPage(event,nextDeparture) {
 }
 function renderPilots(event,departure) {
   return `<div class="pilot-section">
-    ${event.categories.map(category=>{const regs=departure.availability.filter(r=>r.category===category&&r.status!=='unavailable'),allCrews=departure.crews||[],crews=allCrews.filter(crew=>crew.category===category),assigned=new Set(crews.flatMap(crew=>crew.registrationIds)),unassigned=regs.filter(reg=>!assigned.has(reg.id));if(!regs.length)return '';return `<div class="category-group"><div class="category-group-header ${categories[category]?.css||''}">${logo(category)}<span>${esc(category)} · ${regs.length} pilote${regs.length>1?'s':''}</span></div>${crews.map(crew=>{const crewRegs=crew.registrationIds.map(id=>regs.find(reg=>reg.id===id)).filter(Boolean);return crewRegs.length?`<div class="crew-pilot-group ${crewColorClass(crew.id,allCrews.indexOf(crew))}"><div class="crew-pilot-group-header"><strong>${esc(crew.name)}</strong><span>${esc(crew.car||'Voiture à choisir')}</span></div>${crewRegs.map(reg=>renderRegistration(reg,departure,event.durationHours||6,false)).join('')}</div>`:'';}).join('')}${unassigned.map(reg=>renderRegistration(reg,departure,event.durationHours||6)).join('')}</div>`;}).join('')}
+    ${event.categories.map(category=>{const regs=departure.availability.filter(r=>r.category===category&&r.status!=='unavailable'),allCrews=departure.crews||[],crews=allCrews.filter(crew=>crew.category===category),assigned=new Set(crews.flatMap(crew=>crew.registrationIds)),unassigned=regs.filter(reg=>!assigned.has(reg.id));if(!regs.length&&!crews.length)return '';return `<div class="category-group"><div class="category-group-header ${categories[category]?.css||''}">${logo(category)}<span>${esc(category)} · ${regs.length} pilote${regs.length>1?'s':''}</span></div>${crews.map(crew=>{const crewRegs=crew.registrationIds.map(id=>regs.find(reg=>reg.id===id)).filter(Boolean);return `<div class="crew-pilot-group ${crewColorClass(crew.id,allCrews.indexOf(crew))}" data-crew-id="${crew.id}" data-crew-locked="${Boolean(crew.locked)}" data-crew-mine="${crewRegs.some(reg=>reg.mine)}"><div class="crew-pilot-group-header"><strong>${esc(crew.name)}</strong><span>${esc(crew.car||'Voiture à choisir')}</span></div>${crewRegs.map(reg=>renderRegistration(reg,departure,event.durationHours||6,false)).join('')||'<p class="empty">Aucun pilote affecté.</p>'}</div>`;}).join('')}${unassigned.map(reg=>renderRegistration(reg,departure,event.durationHours||6)).join('')}</div>`;}).join('')}
     ${departure.availability.filter(r=>r.status==='unavailable').map(reg=>renderRegistration(reg,departure,event.durationHours||6)).join('')}
     ${!departure.availability.length?'<p class="no-pilots">Aucun pilote inscrit sur ce départ.</p>':''}</div>`;
 }
@@ -531,3 +532,4 @@ async function start(){
   }catch(error){app.innerHTML=`<h1 class="page-title">ENDURANCE MANAGER</h1>${errorBox()}${button('refresh','Réessayer')}`;showError(error);}
 }
 start();
+
