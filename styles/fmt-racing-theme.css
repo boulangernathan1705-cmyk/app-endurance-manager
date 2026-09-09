@@ -1,0 +1,319 @@
+/* FMT / Arc Raiders inspired visual pass.
+   Presentation only: no application behavior, data model or information architecture changes. */
+:root {
+  --bg: #07090a;
+  --panel: rgba(12,16,18,.94);
+  --panel2: rgba(18,25,28,.95);
+  --panel3: rgba(24,34,38,.96);
+  --border: #29454a;
+  --text: #f3ead8;
+  --muted: #91a4a7;
+  --blue: #52cfd4;
+  --green: #52cfd4;
+  --yellow: #e6b452;
+  --red: #e4483d;
+  --accent: #62dce0;
+  --fmt-cyan: #59d3d8;
+  --fmt-red: #e4483d;
+  --fmt-gold: #e7b653;
+  --fmt-cream: #f1e3c4;
+  --fmt-ink: #090c0e;
+}
+
+html { background: #07090a; }
+body {
+  position: relative;
+  min-height: 100vh;
+  isolation: isolate;
+  background:
+    radial-gradient(circle at 18% 4%, rgba(84,205,211,.08), transparent 25rem),
+    radial-gradient(circle at 82% 18%, rgba(228,72,61,.055), transparent 30rem),
+    linear-gradient(180deg,#080a0b 0%,#090c0e 42%,#07090a 100%);
+}
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(7,9,10,.58),rgba(7,9,10,.76)),
+    url('/images/fmt-tech-pattern.svg');
+  background-repeat: repeat, repeat;
+  background-size: auto, 720px 480px;
+  background-position: center, 40px 10px;
+  opacity: .42;
+}
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    repeating-linear-gradient(118deg,rgba(255,255,255,.012) 0 1px,transparent 1px 7px),
+    linear-gradient(90deg,transparent 0 8%,rgba(82,207,212,.025) 8.1%,transparent 8.2% 91%,rgba(228,72,61,.02) 91.1%,transparent 91.2%);
+}
+
+.top-stripes {
+  height: 5px;
+  grid-template-columns: 1.35fr .72fr .72fr .55fr;
+  background: #07090a;
+}
+.top-stripes div:nth-child(1) { display:block; background: linear-gradient(90deg,#3bbcc4,#78dce0); }
+.top-stripes div:nth-child(2) { display:block; background: linear-gradient(90deg,#d9433a,#f05b42); }
+.top-stripes div:nth-child(3) { display:block; background: linear-gradient(90deg,#dfa63e,#efca70); }
+.top-stripes div:nth-child(4) { display:block; background: #1c2427; }
+
+/* Banner header */
+header {
+  position: relative;
+  min-height: clamp(230px, 24vw, 340px);
+  padding: 16px 22px;
+  overflow: hidden;
+  background-color: #090c0e;
+  background-image:
+    linear-gradient(180deg,rgba(4,7,8,.04),rgba(4,7,8,.16)),
+    url('/images/endurance-manager-banner.webp');
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: cover;
+  border-bottom: 1px solid rgba(91,210,215,.42);
+  box-shadow: 0 16px 42px rgba(0,0,0,.38), inset 0 -1px rgba(231,182,83,.16);
+}
+header::after {
+  content:"";
+  position:absolute;
+  inset:auto 0 0;
+  height:2px;
+  background:linear-gradient(90deg,var(--fmt-cyan),var(--fmt-red) 46%,var(--fmt-gold) 78%,transparent);
+  opacity:.9;
+}
+.header-inner {
+  position: relative;
+  max-width: 1420px;
+  min-height: calc(clamp(230px, 24vw, 340px) - 32px);
+  align-items: flex-start;
+}
+.brand-button.logo {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: min(52%,760px);
+  height: 100%;
+  padding: 0;
+  opacity: 0;
+  border: 0;
+  background: transparent;
+}
+.brand-mark-frame,
+.brand-copy { display:none !important; }
+#navigation {
+  margin-left: auto;
+  padding: 8px;
+  border: 1px solid rgba(92,211,216,.26);
+  border-radius: 8px;
+  background: rgba(7,11,13,.70);
+  box-shadow: 0 8px 24px rgba(0,0,0,.24), inset 0 1px rgba(255,255,255,.035);
+  backdrop-filter: blur(9px);
+  -webkit-backdrop-filter: blur(9px);
+}
+#navigation .account-name { color: var(--fmt-cream); }
+#navigation .account-name small { color: #7fd9dc; }
+
+/* Core surfaces */
+main { position: relative; }
+.event-card,
+.form-panel,
+.form-section,
+.departure,
+.departure-fold,
+.event-header,
+.empty,
+.my-entry-card,
+.crew-card,
+.pilot-name-panel,
+.member-row,
+.recovery-panel {
+  background-color: rgba(12,17,19,.92);
+  border-color: rgba(73,118,123,.52);
+  box-shadow: 0 12px 30px rgba(0,0,0,.16), inset 0 1px rgba(255,255,255,.025);
+}
+.event-card:hover,
+.departure-fold[open],
+.my-entry-card[open] {
+  border-color: rgba(90,205,211,.62);
+  background-color: rgba(15,22,24,.96);
+}
+.event-card::after,
+.event-header::after,
+.form-panel::after {
+  pointer-events:none;
+}
+
+.page-title,
+.event-title,
+.form-title,
+.creation-intro h2,
+.creation-card h2,
+.my-entry-title h2 {
+  color: var(--fmt-cream);
+  text-shadow: 0 1px 16px rgba(232,181,82,.05);
+}
+.page-subtitle,
+.event-subtitle,
+.creation-help,
+.muted { color: var(--muted); }
+.creation-kicker,
+.my-entry-kicker { color: var(--fmt-gold); }
+
+/* Buttons and controls */
+.primary-button,
+.save-button {
+  border: 1px solid rgba(111,226,229,.32);
+  background: linear-gradient(180deg,#62dce0 0%,#31abb4 100%);
+  color: #061012;
+  box-shadow: inset 0 1px rgba(255,255,255,.26),0 5px 16px rgba(42,170,179,.12);
+}
+.primary-button:hover,
+.save-button:hover { filter: brightness(1.08) saturate(1.05); }
+.secondary-button,
+.edit-button,
+.event-section-tab,
+.event-filter-button {
+  border-color: rgba(71,111,116,.72);
+  background: linear-gradient(180deg,rgba(25,34,37,.96),rgba(15,21,23,.96));
+  color: #dce6e3;
+}
+.secondary-button:hover,
+.edit-button:hover,
+.event-section-tab:hover,
+.event-filter-button:hover { border-color: rgba(89,207,212,.62); background: #192528; }
+.event-section-tab[aria-pressed="true"],
+.event-filter-button[aria-pressed="true"],
+.registration-nav-button[aria-pressed="true"] {
+  border-color: rgba(91,213,218,.72);
+  background: linear-gradient(180deg,#1f5f64,#17484d);
+  color: #eaffff;
+  box-shadow: inset 0 1px rgba(255,255,255,.09),0 0 0 1px rgba(91,213,218,.08);
+}
+.danger-button { border-color: rgba(228,72,61,.62); background: linear-gradient(180deg,#51211f,#351716); color:#ffd8d2; }
+
+input,
+select,
+textarea {
+  background: rgba(15,22,24,.96);
+  border-color: rgba(66,103,108,.72);
+  color: var(--text);
+}
+input:focus,
+select:focus,
+textarea:focus { border-color: var(--fmt-cyan); box-shadow: 0 0 0 2px rgba(89,211,216,.09); }
+
+/* FMT accent treatments */
+.event-period-heading,
+.fold-section > h2,
+.crew-heading,
+.my-entries-group-heading {
+  border-color: rgba(76,129,134,.42);
+}
+.event-period-heading::after {
+  content:"";
+  flex: 1 1 80px;
+  height: 1px;
+  background: linear-gradient(90deg,rgba(89,211,216,.45),rgba(228,72,61,.22),transparent);
+}
+.event-card {
+  background-image: linear-gradient(118deg,rgba(89,211,216,.025),transparent 30%,rgba(228,72,61,.018));
+}
+.event-card::before { box-shadow: 0 0 15px rgba(89,211,216,.10); }
+.event-header-compact {
+  background-image: linear-gradient(120deg,rgba(89,211,216,.035),transparent 34%,rgba(231,182,83,.025));
+}
+.event-header-summary,
+.departure-fold > summary,
+.crew-card-header,
+.my-entry-header {
+  border-color: rgba(67,107,112,.48);
+}
+.category-group-header {
+  background: rgba(7,11,12,.78);
+  border-top: 1px solid rgba(255,255,255,.025);
+  border-bottom: 1px solid rgba(255,255,255,.025);
+}
+.pilot-row,
+.crew-roster li,
+.my-entry-pilot,
+.my-entry-compact-pilot {
+  background-color: rgba(18,25,28,.88);
+  border-color: rgba(255,255,255,.04);
+}
+
+/* Timelines keep their semantic heat progression but adopt the shell. */
+.presence-track {
+  border-color: #456066;
+  background: #172024;
+  box-shadow: inset 0 1px 5px rgba(0,0,0,.22);
+}
+.presence-track > .presence-segment {
+  border-right-color: #456066;
+  background: #172024;
+  color: #aebcbe;
+}
+.presence-boundary::after { background: #638087; }
+.presence-time { color: #cad6d4; }
+.special-availability { border-color: rgba(66,102,107,.48); }
+
+/* Small metallic details that echo the banner. */
+.event-type-badge,
+.my-entry-pill,
+.coverage-summary {
+  box-shadow: inset 0 1px rgba(255,255,255,.06);
+}
+.form-label { color: #a5b5b6; }
+.registration-context-banner.self { border-left-color: var(--fmt-cyan); }
+.registration-context-banner.other { border-left-color: var(--fmt-gold); }
+.registration-context-banner.category { border-left-color: var(--fmt-red); }
+
+@media (min-width: 1000px) {
+  main { max-width: 1180px; }
+}
+
+/* Mobile: keep the whole 3:1 artwork visible, then place navigation below it. */
+@media (max-width: 700px) {
+  header {
+    min-height: 0;
+    padding: calc(33.3125vw + 8px) 10px 10px;
+    background-size: 100% auto;
+    background-position: top center;
+    background-color: #080b0d;
+  }
+  .header-inner {
+    display: block;
+    min-height: 0;
+    width: 100%;
+  }
+  .brand-button.logo { display:none; }
+  #navigation {
+    display: grid;
+    grid-template-columns: repeat(2,minmax(0,1fr));
+    gap: 6px;
+    width: 100%;
+    margin: 0;
+    padding: 7px;
+    background: rgba(8,12,14,.93);
+  }
+  #navigation .account-name { grid-column: 1 / -1; }
+  main { padding-top: 18px; }
+  body::before { background-size: auto, 520px 347px; opacity:.34; }
+}
+
+@media (max-width: 460px) {
+  #navigation { gap: 5px; padding: 6px; }
+  body::before { background-size: auto, 440px 293px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .event-card,
+  .primary-button,
+  .secondary-button { transition: none !important; }
+}
