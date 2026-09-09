@@ -1,0 +1,25 @@
+name: Inspect banner asset
+on:
+  push:
+    branches:
+      - fix/banner-asset-and-build
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Inspect banner files
+        run: |
+          ls -lh images/endurance-manager-banner*.webp
+          file images/endurance-manager-banner-final.webp || true
+          xxd -l 32 images/endurance-manager-banner-final.webp || true
+      - name: Check source references
+        run: |
+          grep -R "endurance-manager-banner" -n index.html styles styles.css scripts || true
+      - name: Run quality checks
+        run: npm run check
