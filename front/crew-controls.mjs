@@ -145,14 +145,14 @@ async function updateCrewState(select) {
   const currentLocked = select.closest('.crew-card')?.dataset.crewLocked === 'true';
   if (requestedLocked === currentLocked) return;
 
-  const crew = await findCrew(crewId);
-  if (requestedLocked && !confirm(`Marquer « ${crew.name} » comme équipage complet et verrouiller sa composition ?`)) {
-    select.value = currentLocked ? 'locked' : 'open';
-    return;
-  }
-
   select.disabled = true;
   try {
+    const crew = await findCrew(crewId);
+    if (requestedLocked && !confirm(`Marquer « ${crew.name} » comme équipage complet et verrouiller sa composition ?`)) {
+      select.value = currentLocked ? 'locked' : 'open';
+      return;
+    }
+
     const response = await fetch(`/api/crews/${crew.id}`, {
       method:'PATCH',
       credentials:'same-origin',
