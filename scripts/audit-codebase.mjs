@@ -20,6 +20,17 @@ async function walk(dir) {
   return files;
 }
 
+async function readVp8Dimensions(file) {
+  const data = await readFile(file);
+  if (data.length < 32 || data.toString('ascii',0,4) !== 'RIFF' || data.toString('ascii',8,12) !== 'WEBP') return null;
+  const marker = data.indexOf(Buffer.from([0x9d,0x01,0x2a]));
+  if (marker < 0 || marker + 7 > data.length) return null;
+  return {
+    width: data.readUInt16LE(marker + 3) & 0x3fff,
+    height: data.readUInt16LE(marker + 5) & 0x3fff
+  };
+}
+
 const files = await walk(root);
 const rows = [];
 for (const file of files) {
@@ -50,6 +61,16 @@ if (new Set(CIRCUIT_IDS).size !== CIRCUIT_IDS.length) warnings.push('Les identif
 for (const circuit of CIRCUITS) {
   try { await access(resolve(root, 'images/circuits', circuit.file)); }
   catch { warnings.push(`Image de circuit manquante : ${circuit.id} -> ${circuit.file}`); }
+}
+
+const heroBannerPath = resolve(root, 'images/endurance-manager-banner.webp');
+try {
+  const dimensions = await readVp8Dimensions(heroBannerPath);
+  if (!dimensions || dimensions.width <= 0 || dimensions.height <= 0) {
+    warnings.push('La bannière principale WebP est invalide ou possède des dimensions nulles.');
+  }
+} catch {
+  warnings.push('La bannière principale est manquante ou illisible.');
 }
 
 const app = searchable.find(item => item.path === 'app.js')?.content || '';
