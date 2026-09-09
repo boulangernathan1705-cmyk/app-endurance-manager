@@ -17,9 +17,11 @@ jobs:
         run: |
           ls -lh images/endurance-manager-banner-final.webp images/endurance-manager-banner.webp
           file images/endurance-manager-banner-final.webp images/endurance-manager-banner.webp
+          xxd -l 96 images/endurance-manager-banner-final.webp
           python -m pip install --quiet pillow
           python - <<'PY'
           from PIL import Image
+          bad=False
           for path in ['images/endurance-manager-banner-final.webp','images/endurance-manager-banner.webp']:
               try:
                   im=Image.open(path)
@@ -28,7 +30,8 @@ jobs:
                   print(path, im.size, im.mode, im.format)
               except Exception as exc:
                   print(path, 'INVALID', repr(exc))
-                  raise
+                  bad=True
+          raise SystemExit(1 if bad else 0)
           PY
       - name: Build and verify public asset
         run: |
