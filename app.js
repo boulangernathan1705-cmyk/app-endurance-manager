@@ -189,7 +189,7 @@ function renderEvent(message='') {
   app.eventViewData={eventId:event.id,events,message};
   app.innerHTML=`${button('home','← Retour aux événements','','secondary-button back-button')}
     <div class="event-header event-header-compact event-type-${event.eventType||'private'}" data-event-id="${event.id}">
-      <div class="event-heading-line"><div class="event-heading-copy"><h1 class="event-title">${esc(event.name)}</h1><p class="event-subtitle">${eventTypeBadge(event.eventType)} <span>· Horaires de Paris</span></p></div>${circuitVisual(event.circuit)}</div>
+      <div class="event-heading-line"><div class="event-heading-copy"><h1 class="event-title">${esc(event.name)}</h1><p class="event-subtitle">${eventTypeBadge(event.eventType)}</p></div>${circuitVisual(event.circuit)}</div>
       <div class="event-header-summary">
         <div class="event-category-badges">${event.categories.map(category=>eventBadge(category,eventCategoryCount(event,category))).join('')}</div>
         <div class="event-header-stats" aria-label="Récapitulatif de la course"><span><strong>${event.durationHours||6} h</strong><small>durée</small></span><span><strong>${event.departures.length}</strong><small>départ${event.departures.length>1?'s':''}</small></span><span><strong>${totalPilots}</strong><small>pilote${totalPilots>1?'s':''}</small></span><span><strong>${totalCrews}</strong><small>équipage${totalCrews>1?'s':''}</small></span></div>
@@ -205,17 +205,17 @@ function renderEvent(message='') {
 function renderDeparturePanel(event,departure,index,open=false) {
   const locked=departure.startsAt<=Date.now(),crews=departure.crews||[],available=pilotCount(departure.availability);
   return `<details class="departure-fold" id="departure-${departure.id}" ${open?'open':''}>
-    <summary><span class="fold-index">${String(index+1).padStart(2,'0')}</span><span class="fold-date"><strong>${esc(dateLabel(departure))}</strong><span>${departure.time} · ${locked?'Départ passé':'Départ à venir'}</span></span><span class="fold-meta">${available} pilote${available>1?'s':''} · ${crews.length} équipage${crews.length>1?'s':''}</span><span class="fold-countdown" data-countdown="${departure.startsAt}">${countdown(departure.startsAt)}</span></summary>
+    <summary><span class="fold-index">${String(index+1).padStart(2,'0')}</span><span class="fold-date"><strong>${esc(dateLabel(departure))}</strong><span>${departure.time}${locked?' · Départ passé':''}</span></span><span class="fold-meta">${available} pilote${available>1?'s':''} · ${crews.length} équipage${crews.length>1?'s':''}</span><span class="fold-countdown" data-countdown="${departure.startsAt}">${countdown(departure.startsAt)}</span></summary>
     <div class="departure-fold-body"><div class="fold-toolbar"><span>${locked?'Les inscriptions sont verrouillées pour ce départ.':'Inscription et organisation du départ'}</span>${button('focus-registration','Aller à mon inscription',`data-departure="${departure.id}"`)}</div>
       ${locked?'<p class="finished-history">Les inscriptions sont verrouillées. Les pilotes et équipages restent consultables.</p>':''}
-      <section class="fold-section"><h2>Pilotes inscrits</h2>${renderPilots(event,departure)}</section>
       ${locked?'':`<section class="fold-section fold-registration"><h2>Mon inscription</h2>${renderRegistrationForm(event,departure)}</section>`}
+      <section class="fold-section"><h2>Pilotes inscrits</h2>${renderPilots(event,departure)}</section>
     </div>
   </details>`;
 }
 function renderCrewPage(event,nextDeparture) {
   return `<section class="departure-accordion crew-page-accordion" aria-label="Gestion des équipages">${event.departures.map((departure,index)=>`<details class="departure-fold" id="crew-departure-${departure.id}" ${departure.id===nextDeparture?.id||departure.id===selectedDepartureId?'open':''}>
-    <summary><span class="fold-index">${String(index+1).padStart(2,'0')}</span><span class="fold-date"><strong>${esc(dateLabel(departure))}</strong><span>${departure.time} · ${departure.startsAt<=Date.now()?'Départ passé':'Départ à venir'}</span></span><span class="fold-meta">${(departure.crews||[]).length} équipage${(departure.crews||[]).length>1?'s':''}</span><span class="fold-countdown" data-countdown="${departure.startsAt}">${countdown(departure.startsAt)}</span></summary>
+    <summary><span class="fold-index">${String(index+1).padStart(2,'0')}</span><span class="fold-date"><strong>${esc(dateLabel(departure))}</strong><span>${departure.time}${departure.startsAt<=Date.now()?' · Départ passé':''}</span></span><span class="fold-meta">${(departure.crews||[]).length} équipage${(departure.crews||[]).length>1?'s':''}</span><span class="fold-countdown" data-countdown="${departure.startsAt}">${countdown(departure.startsAt)}</span></summary>
     <div class="departure-fold-body"><section class="fold-section crew-only-section"><h2>Équipages du départ</h2>${renderCrews(event,departure)}</section></div>
   </details>`).join('')}</section>`;
 }
@@ -243,7 +243,7 @@ function renderCrews(event,departure) {
   const crews=departure.crews||[],manage=canManage()&&departure.startsAt>Date.now(),duration=event.durationHours||6;
   const assigned=new Set(crews.flatMap(c=>c.registrationIds));
   const unassigned=departure.availability.filter(r=>!assigned.has(r.id)&&r.status!=='unavailable');
-  return `<div class="crew-section"><div class="crew-heading"><div><h2>Équipages</h2><p>Composition définie par les organisateurs. Chaque équipage est identifié par son nom et sa couleur.</p></div>${manage&&!crewDraft?button('new-crew','+ Créer un équipage',`data-departure="${departure.id}"`,'primary-button'):''}</div>
+  return `<div class="crew-section"><div class="crew-heading"><div><h2>Équipages</h2></div>${manage&&!crewDraft?button('new-crew','+ Créer un équipage',`data-departure="${departure.id}"`,'primary-button'):''}</div>
     ${manage&&crewDraft?.departureId===departure.id?renderCrewForm(event):''}
     ${crews.length?`<div class="crew-list">${crews.map((crew,crewIndex)=>{
       const regs=crew.registrationIds.map(id=>departure.availability.find(r=>r.id===id)).filter(Boolean);

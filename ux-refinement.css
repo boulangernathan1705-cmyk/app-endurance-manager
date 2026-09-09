@@ -13,3 +13,9 @@
 .crew-roster{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px!important}.crew-roster>li{margin:0!important;border:1px solid var(--border);border-radius:9px;background:rgba(255,255,255,.018)}
 [data-crew-builder-open][hidden],[data-crew-builder-panel][hidden]{display:none!important}
 @media(max-width:760px){.ux-unassigned-grid,.ux-crew-candidate-grid,.crew-roster{grid-template-columns:1fr}.ux-candidate-title{align-items:flex-start;flex-direction:column}.ux-registration-toggle{width:100%;margin-left:0}.fold-toolbar{flex-wrap:wrap}}
+
+
+/* Keep pilot names, preferences and controls comfortably inside each roster card. */
+.crew-card .crew-roster > li { padding: 12px 14px; gap: 16px; }
+.crew-card .crew-roster > li > div { flex: 1; min-width: 0; }
+.crew-card .crew-roster > li > button { flex-shrink: 0; }

@@ -15,7 +15,7 @@ function refinementHarness() {
   });
   const toggle={};observed(toggle,'textContent','');
   const section={scrollIntoView(){}};observed(section,'hidden',false);
-  const toolbar={querySelector:selector=>selector.includes('data-ux-registration-toggle')?toggle:null};
+  const toolbar={scrollIntoView(){},querySelector:selector=>selector.includes('data-ux-registration-toggle')?toggle:null};
   const fold={id:'departure-first',open:true,querySelector:selector=>({'.fold-toolbar':toolbar,'.fold-registration':section}[selector]||null)};
   const button={hidden:true},panel={hidden:true},legacy={hidden:false};
   let folds=[fold];
