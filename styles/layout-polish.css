@@ -9,6 +9,31 @@
   display: none !important;
 }
 
+/* Le seul compte à rebours conservé est celui de l'en-tête de l'événement. */
+.departure-fold > summary > .fold-countdown,
+.race-recap .recap-countdown,
+.event-card .event-countdown:not(.running),
+.my-entry-meta > span:last-child {
+  display: none !important;
+}
+
+.event-heading-copy > .event-header-countdown {
+  display: block !important;
+  width: fit-content;
+  margin-top: 8px;
+  color: #b8c6c7;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.25;
+  text-align: left;
+}
+
+.event-heading-copy > .event-header-countdown strong {
+  color: #9beeb4;
+  font-size: 14px;
+  font-weight: 900;
+}
+
 /* Départs : même en-tête compact dans Course et Équipages. */
 .departure-fold > summary {
   grid-template-columns: 34px minmax(220px, 1fr) max-content 170px !important;
@@ -17,6 +42,10 @@
   padding: 10px 14px !important;
   column-gap: 14px !important;
   row-gap: 3px !important;
+}
+
+.crew-page-accordion .departure-fold > summary {
+  grid-template-columns: 34px minmax(220px, 1fr) max-content !important;
 }
 
 .departure-fold > summary > .fold-index {
@@ -53,10 +82,10 @@
 
 .departure-fold > summary > .fold-date .ux-departure-date {
   display: block;
-  margin-top: 4px;
-  color: #b4c2c4;
-  font-size: 13px;
-  font-weight: 600;
+  margin-top: 5px;
+  color: #c3cdcf;
+  font-size: 15px;
+  font-weight: 650;
   line-height: 1.2;
 }
 
@@ -68,36 +97,19 @@
   font-size: 13px !important;
 }
 
-.departure-fold > summary > .fold-countdown {
-  display: block !important;
-  grid-column: 4 !important;
-  grid-row: 1 !important;
-  width: 100%;
-  min-width: 0 !important;
-  text-align: center !important;
-  justify-self: stretch !important;
-  align-self: end !important;
-  font-size: 13px !important;
-}
-
 .departure-fold[id^="departure-"] > summary > .ux-summary-registration-toggle {
   grid-column: 4 !important;
-  grid-row: 2 !important;
-  width: 170px !important;
+  grid-row: 1 / span 2 !important;
+  width: 160px !important;
   max-width: 100%;
   min-width: 0 !important;
   min-height: 34px !important;
   margin: 0 !important;
   padding: 5px 10px !important;
   justify-self: end !important;
-  align-self: start !important;
+  align-self: center !important;
   font-size: 12px !important;
   white-space: nowrap;
-}
-
-.crew-page-accordion .departure-fold > summary > .fold-countdown {
-  grid-row: 1 / span 2 !important;
-  align-self: center !important;
 }
 
 /* Mon inscription : même largeur que les autres blocs du départ. */
@@ -172,11 +184,15 @@
 
 @media (max-width: 1100px) {
   .departure-fold > summary {
-    grid-template-columns: 34px minmax(190px, 1fr) max-content 160px !important;
+    grid-template-columns: 34px minmax(190px, 1fr) max-content 155px !important;
+  }
+
+  .crew-page-accordion .departure-fold > summary {
+    grid-template-columns: 34px minmax(190px, 1fr) max-content !important;
   }
 
   .departure-fold[id^="departure-"] > summary > .ux-summary-registration-toggle {
-    width: 160px !important;
+    width: 155px !important;
   }
 
   .ux-remaining-pilot-grid {
@@ -185,9 +201,10 @@
 }
 
 @media (max-width: 760px) {
-  .departure-fold > summary {
+  .departure-fold > summary,
+  .crew-page-accordion .departure-fold > summary {
     grid-template-columns: 30px minmax(0, 1fr) !important;
-    grid-template-rows: auto auto auto auto !important;
+    grid-template-rows: auto auto auto !important;
     gap: 5px 10px !important;
     min-height: 0 !important;
     padding: 10px 12px !important;
@@ -211,6 +228,10 @@
     font-size: 17px;
   }
 
+  .departure-fold > summary > .fold-date .ux-departure-date {
+    font-size: 14px;
+  }
+
   .departure-fold > summary > .fold-meta {
     grid-column: 2 !important;
     grid-row: 2 !important;
@@ -218,22 +239,21 @@
     font-size: 12px !important;
   }
 
-  .departure-fold > summary > .fold-countdown,
-  .crew-page-accordion .departure-fold > summary > .fold-countdown {
-    grid-column: 2 !important;
-    grid-row: 3 !important;
-    width: auto;
-    text-align: left !important;
-    justify-self: start !important;
-    align-self: start !important;
-  }
-
   .departure-fold[id^="departure-"] > summary > .ux-summary-registration-toggle {
     grid-column: 2 !important;
-    grid-row: 4 !important;
+    grid-row: 3 !important;
     width: auto !important;
     min-width: 140px !important;
     justify-self: start !important;
+  }
+
+  .event-heading-copy > .event-header-countdown {
+    margin-top: 6px;
+    font-size: 12px;
+  }
+
+  .event-heading-copy > .event-header-countdown strong {
+    font-size: 13px;
   }
 
   .ux-remaining-pilot-grid {
