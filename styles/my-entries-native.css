@@ -38,8 +38,8 @@
 }
 .native-my-entry-header {
   display: grid;
-  grid-template-columns: 36px minmax(0,1fr);
-  align-items: start;
+  grid-template-columns: 36px minmax(0,1fr) auto;
+  align-items: center;
   gap: 12px;
   min-height: 96px;
   padding: 14px 16px;
@@ -81,24 +81,41 @@
   color: #9eacad;
   font-size: 12px;
 }
+.native-my-entry-open-event {
+  align-self: center;
+  width: auto;
+  min-width: 166px;
+  padding-inline: 14px;
+  white-space: nowrap;
+}
 .native-my-entry-body {
   display: grid;
   gap: 10px;
   padding: 12px 14px 14px;
   border-top: 1px solid rgba(73,118,123,.34);
 }
-.native-my-entry-actions {
-  display: flex;
-  justify-content: flex-end;
-}
-.native-my-entry-actions .primary-button {
-  width: auto;
-  min-width: 170px;
-}
 .native-my-entries-loading {
   padding: 26px;
   color: var(--muted);
 }
+
+/* Le thème global stylise toutes les balises header comme la bannière du site.
+   Le header interne de Mon équipage doit rester un simple en-tête de carte. */
+.ux-my-own-crew > .ux-my-own-crew-head {
+  min-height: 0;
+  padding: 0;
+  overflow: visible;
+  background-color: transparent;
+  background-image: none;
+  background-position: initial;
+  background-size: auto;
+  border-bottom: 0;
+  box-shadow: none;
+}
+.ux-my-own-crew > .ux-my-own-crew-head::after {
+  content: none;
+}
+
 @media (max-width: 760px) {
   .native-my-entry-header {
     grid-template-columns: 32px minmax(0,1fr);
@@ -113,6 +130,12 @@
   }
   .native-my-entry-title h2 { font-size: 18px; }
   .native-my-entry-meta { font-size: 11px; }
+  .native-my-entry-open-event {
+    grid-column: 2;
+    justify-self: start;
+    min-width: 0;
+    width: auto;
+    margin-top: 4px;
+  }
   .native-my-entry-body { padding: 9px; }
-  .native-my-entry-actions .primary-button { width: 100%; min-width: 0; }
 }
