@@ -61,6 +61,13 @@ function decorateCoursePilots() {
     const edit = row.querySelector('.edit-button');
     if (edit) edit.classList.add('ux-pilot-edit');
   });
+
+  app?.querySelectorAll('.crew-pilot-accordion-body').forEach(body => {
+    const count = body.querySelectorAll(':scope > .pilot-row').length;
+    const visibleColumns = Math.max(1, Math.min(3, count));
+    const value = String(visibleColumns);
+    if (body.dataset.pilotColumns !== value) body.dataset.pilotColumns = value;
+  });
 }
 
 function applyVisualOrder(items, comparator) {
