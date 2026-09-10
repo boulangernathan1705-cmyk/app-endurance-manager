@@ -1,0 +1,1 @@
+Les cartes de circuits sont appliquées par `circuit-sources.mjs` directement sur l’attribut `src` des images afin d’être compatibles avec Safari/iOS. Les sources et licences sont listées dans `/circuit-credits.html`.
