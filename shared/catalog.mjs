@@ -7,40 +7,40 @@ const SHARED_EVENT_TYPES = {
 };
 
 const LMU_CIRCUITS = [
-  {id:'bahrain',name:'Bahrain International Circuit',file:'bahrain.png'},
-  {id:'barcelona',name:'Circuit de Barcelona-Catalunya',file:'barcelone.png'},
-  {id:'cota',name:'Circuit of the Americas',file:'cota.png'},
-  {id:'daytona',name:'Daytona International Speedway',file:'daytona.png'},
-  {id:'fuji',name:'Fuji Speedway',file:'fuji.png'},
-  {id:'imola',name:'Autodromo Enzo e Dino Ferrari (Imola)',file:'imola.png'},
-  {id:'interlagos',name:'Interlagos',file:'interlagos.png'},
-  {id:'laguna-seca',name:'WeatherTech Raceway Laguna Seca',file:'laguna_seca.png'},
-  {id:'le-mans',name:'Circuit de la Sarthe (Le Mans)',file:'le_mans.png'},
-  {id:'lusail',name:'Lusail International Circuit',file:'lusail_international.png'},
-  {id:'monza',name:'Autodromo Nazionale Monza',file:'monza.png'},
-  {id:'paul-ricard',name:'Circuit Paul Ricard',file:'paul_ricard_elms.png'},
-  {id:'portimao',name:'Algarve International Circuit (Portimão)',file:'algarve.png'},
-  {id:'sebring',name:'Sebring International Raceway',file:'sebring.png'},
-  {id:'silverstone',name:'Silverstone Circuit',file:'silverstone.png'},
-  {id:'spa',name:'Circuit de Spa-Francorchamps',file:'spa_francorchamps.png'}
+  {id:'bahrain',name:'Bahrain International Circuit',file:'track-placeholder.svg'},
+  {id:'barcelona',name:'Circuit de Barcelona-Catalunya',file:'track-placeholder.svg'},
+  {id:'cota',name:'Circuit of the Americas',file:'track-placeholder.svg'},
+  {id:'daytona',name:'Daytona International Speedway',file:'track-placeholder.svg'},
+  {id:'fuji',name:'Fuji Speedway',file:'track-placeholder.svg'},
+  {id:'imola',name:'Autodromo Enzo e Dino Ferrari (Imola)',file:'track-placeholder.svg'},
+  {id:'interlagos',name:'Interlagos',file:'track-placeholder.svg'},
+  {id:'laguna-seca',name:'WeatherTech Raceway Laguna Seca',file:'track-placeholder.svg'},
+  {id:'le-mans',name:'Circuit de la Sarthe (Le Mans)',file:'track-placeholder.svg'},
+  {id:'lusail',name:'Lusail International Circuit',file:'track-placeholder.svg'},
+  {id:'monza',name:'Autodromo Nazionale Monza',file:'track-placeholder.svg'},
+  {id:'paul-ricard',name:'Circuit Paul Ricard',file:'track-placeholder.svg'},
+  {id:'portimao',name:'Algarve International Circuit (Portimão)',file:'track-placeholder.svg'},
+  {id:'sebring',name:'Sebring International Raceway',file:'track-placeholder.svg'},
+  {id:'silverstone',name:'Silverstone Circuit',file:'track-placeholder.svg'},
+  {id:'spa',name:'Circuit de Spa-Francorchamps',file:'track-placeholder.svg'}
 ];
 
 const IRACING_CIRCUITS = [
   {id:'iracing-adelaide',name:'Adelaide Street Circuit',file:'track-placeholder.svg'},
-  {id:'iracing-portimao',name:'Algarve International Circuit (Portimão)',file:'algarve.png'},
+  {id:'iracing-portimao',name:'Algarve International Circuit (Portimão)',file:'track-placeholder.svg'},
   {id:'iracing-mexico',name:'Autódromo Hermanos Rodríguez',file:'track-placeholder.svg'},
-  {id:'iracing-interlagos',name:'Autódromo José Carlos Pace (Interlagos)',file:'interlagos.png'},
-  {id:'iracing-imola',name:'Autodromo Internazionale Enzo e Dino Ferrari',file:'imola.png'},
-  {id:'iracing-monza',name:'Autodromo Nazionale Monza',file:'monza.png'},
+  {id:'iracing-interlagos',name:'Autódromo José Carlos Pace (Interlagos)',file:'track-placeholder.svg'},
+  {id:'iracing-imola',name:'Autodromo Internazionale Enzo e Dino Ferrari',file:'track-placeholder.svg'},
+  {id:'iracing-monza',name:'Autodromo Nazionale Monza',file:'track-placeholder.svg'},
   {id:'iracing-mugello',name:'Autodromo Internazionale del Mugello',file:'track-placeholder.svg'},
-  {id:'iracing-barcelona',name:'Circuit de Barcelona-Catalunya',file:'barcelone.png'},
+  {id:'iracing-barcelona',name:'Circuit de Barcelona-Catalunya',file:'track-placeholder.svg'},
   {id:'iracing-magny-cours',name:'Circuit de Nevers Magny-Cours',file:'track-placeholder.svg'},
   {id:'iracing-misano',name:'Misano World Circuit Marco Simoncelli',file:'track-placeholder.svg'},
-  {id:'iracing-spa',name:'Circuit de Spa-Francorchamps',file:'spa_francorchamps.png'},
-  {id:'iracing-le-mans',name:'Circuit des 24 Heures du Mans',file:'le_mans.png'},
-  {id:'iracing-cota',name:'Circuit of the Americas',file:'cota.png'},
-  {id:'iracing-daytona',name:'Daytona International Speedway',file:'daytona.png'},
-  {id:'iracing-fuji',name:'Fuji International Speedway',file:'fuji.png'},
+  {id:'iracing-spa',name:'Circuit de Spa-Francorchamps',file:'track-placeholder.svg'},
+  {id:'iracing-le-mans',name:'Circuit des 24 Heures du Mans',file:'track-placeholder.svg'},
+  {id:'iracing-cota',name:'Circuit of the Americas',file:'track-placeholder.svg'},
+  {id:'iracing-daytona',name:'Daytona International Speedway',file:'track-placeholder.svg'},
+  {id:'iracing-fuji',name:'Fuji International Speedway',file:'track-placeholder.svg'},
   {id:'iracing-hockenheim',name:'HockenheimRing',file:'track-placeholder.svg'},
   {id:'iracing-indianapolis',name:'Indianapolis Motor Speedway',file:'track-placeholder.svg'},
   {id:'iracing-road-atlanta',name:'Michelin Raceway Road Atlanta',file:'track-placeholder.svg'},
@@ -49,14 +49,14 @@ const IRACING_CIRCUITS = [
   {id:'iracing-nordschleife',name:'Nürburgring Combined / Nordschleife',file:'track-placeholder.svg'},
   {id:'iracing-red-bull-ring',name:'Red Bull Ring',file:'track-placeholder.svg'},
   {id:'iracing-road-america',name:'Road America',file:'track-placeholder.svg'},
-  {id:'iracing-sebring',name:'Sebring International Raceway',file:'sebring.png'},
-  {id:'iracing-silverstone',name:'Silverstone Circuit',file:'silverstone.png'},
+  {id:'iracing-sebring',name:'Sebring International Raceway',file:'track-placeholder.svg'},
+  {id:'iracing-silverstone',name:'Silverstone Circuit',file:'track-placeholder.svg'},
   {id:'iracing-sonoma',name:'Sonoma Raceway',file:'track-placeholder.svg'},
   {id:'iracing-suzuka',name:'Suzuka International Racing Course',file:'track-placeholder.svg'},
   {id:'iracing-thruxton',name:'Thruxton Circuit',file:'track-placeholder.svg'},
   {id:'iracing-vir',name:'Virginia International Raceway',file:'track-placeholder.svg'},
   {id:'iracing-watkins-glen',name:'Watkins Glen International',file:'track-placeholder.svg'},
-  {id:'iracing-laguna-seca',name:'WeatherTech Raceway Laguna Seca',file:'laguna_seca.png'},
+  {id:'iracing-laguna-seca',name:'WeatherTech Raceway Laguna Seca',file:'track-placeholder.svg'},
   {id:'iracing-zandvoort',name:'Circuit Zandvoort',file:'track-placeholder.svg'},
   {id:'iracing-tbd',name:'Circuit à préciser',file:'track-placeholder.svg'}
 ];
@@ -116,49 +116,19 @@ const IRACING_CARS = {
 };
 
 export const GAME_CATALOGS = {
-  lmu:{
-    id:'lmu',
-    name:'Le Mans Ultimate',
-    shortName:'LMU',
-    eventTypes:SHARED_EVENT_TYPES,
-    circuits:LMU_CIRCUITS,
-    categories:LMU_CATEGORIES,
-    cars:LMU_CARS
-  },
-  iracing:{
-    id:'iracing',
-    name:'iRacing',
-    shortName:'iRacing',
-    eventTypes:{...SHARED_EVENT_TYPES,lmu:{label:'Championnat iRacing',css:'lmu'}},
-    circuits:IRACING_CIRCUITS,
-    categories:IRACING_CATEGORIES,
-    cars:IRACING_CARS
-  }
+  lmu:{id:'lmu',name:'Le Mans Ultimate',shortName:'LMU',eventTypes:SHARED_EVENT_TYPES,circuits:LMU_CIRCUITS,categories:LMU_CATEGORIES,cars:LMU_CARS},
+  iracing:{id:'iracing',name:'iRacing',shortName:'iRacing',eventTypes:{...SHARED_EVENT_TYPES,lmu:{label:'Championnat iRacing',css:'lmu'}},circuits:IRACING_CIRCUITS,categories:IRACING_CATEGORIES,cars:IRACING_CARS}
 };
 
-export function catalogForGame(game='lmu') {
-  return GAME_CATALOGS[GAME_IDS.includes(game) ? game : 'lmu'];
-}
-
-export function gameForEvent(event) {
-  return String(event?.circuit || '').startsWith('iracing-') ? 'iracing' : 'lmu';
-}
-
+export function catalogForGame(game='lmu') { return GAME_CATALOGS[GAME_IDS.includes(game) ? game : 'lmu']; }
+export function gameForEvent(event) { return String(event?.circuit || '').startsWith('iracing-') ? 'iracing' : 'lmu'; }
 export const LEGACY_CIRCUIT_IDS = ['nurburgring'];
 export const EVENT_TYPE_IDS = Object.keys(SHARED_EVENT_TYPES);
-
 const browserGame = GAME_IDS.includes(globalThis?.__ENDURANCE_GAME__) ? globalThis.__ENDURANCE_GAME__ : 'lmu';
 const browserCatalog = catalogForGame(browserGame);
 const serverCatalog = typeof document === 'undefined';
 const unique = values => [...new Set(values)];
-const mergeCars = () => {
-  const output = {};
-  for (const catalog of Object.values(GAME_CATALOGS)) {
-    for (const [category,list] of Object.entries(catalog.cars)) output[category] = unique([...(output[category] || []),...list]);
-  }
-  return output;
-};
-
+const mergeCars = () => { const output={}; for(const catalog of Object.values(GAME_CATALOGS)) for(const [category,list] of Object.entries(catalog.cars)) output[category]=unique([...(output[category]||[]),...list]); return output; };
 export const EVENT_TYPES = browserCatalog.eventTypes;
 export const CATEGORIES = serverCatalog ? unique(Object.values(GAME_CATALOGS).flatMap(catalog => Object.keys(catalog.categories))) : Object.keys(browserCatalog.categories);
 export const CIRCUITS = serverCatalog ? Object.values(GAME_CATALOGS).flatMap(catalog => catalog.circuits) : browserCatalog.circuits;
