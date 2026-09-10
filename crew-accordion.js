@@ -137,7 +137,7 @@ function ensureStatusPill(container, locked) {
 
 function capacityMessage(event, departure, crew) {
   const coverage = coverageFor(event, departure, crew);
-  if (crew.locked) return `Équipage complet et verrouillé par l’organisation. Couverture actuelle : ${coverage.covered}/${coverage.duration} h.`;
+  if (crew.locked) return 'Équipage verrouillé';
   if (coverage.missing > 0) return `Il reste de la place dans cet équipage : ${coverage.missing} h de course ${coverage.missing > 1 ? 'ne sont' : 'n’est'} pas encore couverte${coverage.missing > 1 ? 's' : ''}.`;
   return '';
 }
@@ -210,6 +210,7 @@ function enhanceCrewGroup(group) {
 
   const body = document.createElement('div');
   body.className = 'crew-pilot-accordion-body';
+  groupHeader.remove();
   while (group.firstChild) body.append(group.firstChild);
 
   details.append(summary, body);
@@ -448,4 +449,3 @@ if (app) {
     if (!decorateFromCache()) scheduleRefresh(false);
   }).observe(app, {childList: true, subtree: true});
 }
-
