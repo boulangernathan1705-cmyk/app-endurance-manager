@@ -21,9 +21,17 @@
 /* Course: les pilotes d’un équipage utilisent les mêmes cartes lisibles que les inscrits. */
 .crew-pilot-accordion-body {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: 10px;
   align-items: stretch;
+}
+
+.crew-pilot-accordion-body[data-pilot-columns="2"] {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.crew-pilot-accordion-body[data-pilot-columns="3"] {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .crew-pilot-accordion-body > .crew-capacity-message,
@@ -45,14 +53,16 @@
   width: 100%;
 }
 
-/* Le tri est calculé en JS mais appliqué par CSS order : aucun déplacement DOM. */
-.ux-crew-bucket-body > .crew-pilot-accordion,
-.crew-list > .crew-card {
-  order: var(--crew-visual-order, initial);
+@media (max-width: 900px) {
+  .crew-pilot-accordion-body[data-pilot-columns="3"] {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 760px) {
-  .crew-pilot-accordion-body {
+  .crew-pilot-accordion-body,
+  .crew-pilot-accordion-body[data-pilot-columns="2"],
+  .crew-pilot-accordion-body[data-pilot-columns="3"] {
     grid-template-columns: minmax(0, 1fr);
   }
 }
