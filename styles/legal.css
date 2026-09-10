@@ -1,6 +1,9 @@
 .site-footer {
   display: flex;
+  flex-wrap: wrap;
   justify-content: center;
+  align-items: center;
+  gap: 7px;
   padding: 18px 16px 26px;
   font-size: .82rem;
   opacity: .72;
