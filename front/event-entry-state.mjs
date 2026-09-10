@@ -1,7 +1,7 @@
 const app = document.getElementById('app');
 let desiredDepartureId = '';
-let firstFrame = 0;
-let secondFrame = 0;
+let normalizationRequested = false;
+let frame = 0;
 
 function departureIdFromFold(fold) {
   return fold?.id?.replace(/^crew-departure-/, '').replace(/^departure-/, '') || '';
@@ -18,10 +18,8 @@ function refineMyEntryLinks(root = app) {
   });
 }
 
-function applyDepartureState() {
-  firstFrame = 0;
-  secondFrame = 0;
-  if (!app?.querySelector('[data-event-id]')) return;
+function applyDepartureState(finalize = false) {
+  if (!normalizationRequested || !app?.querySelector('[data-event-id]')) return;
 
   app.querySelectorAll('.departure-fold[id]').forEach(fold => {
     const shouldOpen = Boolean(desiredDepartureId) && departureIdFromFold(fold) === desiredDepartureId;
@@ -29,19 +27,21 @@ function applyDepartureState() {
     const summary = fold.querySelector(':scope > summary');
     if (summary) summary.click();
   });
+
+  if (finalize) {
+    normalizationRequested = false;
+    frame = 0;
+  }
 }
 
 function scheduleDepartureState(departureId = '') {
   desiredDepartureId = departureId || '';
-  if (firstFrame) cancelAnimationFrame(firstFrame);
-  if (secondFrame) cancelAnimationFrame(secondFrame);
+  normalizationRequested = true;
+  if (frame) cancelAnimationFrame(frame);
 
-  // Wait until the core renderer and the UX refinement MutationObserver have both
-  // finished. We then toggle through the normal summary handler, so its internal
-  // open-state cache stays synchronized instead of reopening a fold later.
-  firstFrame = requestAnimationFrame(() => {
-    secondFrame = requestAnimationFrame(applyDepartureState);
-  });
+  // requestAnimationFrame runs after the renderer/MutationObservers and before paint.
+  // It is therefore late enough to beat automatic UX opening, without showing a flash.
+  frame = requestAnimationFrame(() => applyDepartureState(true));
 }
 
 document.addEventListener('click', event => {
@@ -69,11 +69,17 @@ document.addEventListener('click', event => {
 if (app) {
   refineMyEntryLinks();
   new MutationObserver(mutations => {
+    let eventViewChanged = false;
     for (const mutation of mutations) {
       for (const node of mutation.addedNodes) {
         if (!(node instanceof HTMLElement)) continue;
-        refineMyEntryLinks(node.matches?.('.my-entry-card') ? node : node);
+        refineMyEntryLinks(node);
+        if (node.matches?.('[data-event-id], .departure-fold') || node.querySelector?.('[data-event-id], .departure-fold')) eventViewChanged = true;
       }
     }
+
+    // This microtask normally closes the folds in the same rendering turn.
+    // The rAF scheduled above remains as a final pre-paint safety pass.
+    if (eventViewChanged && normalizationRequested) queueMicrotask(() => applyDepartureState(false));
   }).observe(app, {childList: true, subtree: true});
 }
