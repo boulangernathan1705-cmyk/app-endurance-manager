@@ -28,10 +28,8 @@ function logo(category) {
     : `<span class="category-text-logo" aria-hidden="true">${esc(category)}</span>`;
 }
 
-function activePilotCount(departure) {
-  return new Set((departure?.availability || [])
-    .filter(registration => registration.status !== 'unavailable')
-    .map(registration => registration.participantId || registration.id)).size;
+function accordionSummary(title, count) {
+  return `<summary class="ux-content-accordion-summary"><span class="ux-content-accordion-title">${esc(title)}</span><span class="ux-content-accordion-count">${count}</span><span class="ux-content-accordion-chevron" aria-hidden="true">›</span></summary>`;
 }
 
 function decorateEventHeaderCountdown() {
@@ -77,20 +75,43 @@ function decorateCoursePilotAccordions() {
   app.querySelectorAll('.departure-fold[id^="departure-"]').forEach(fold => {
     const departure = event.departures?.find(item => item.id === departureIdFromFold(fold));
     const pilotSection = fold.querySelector('.pilot-section');
-    if (!departure || !pilotSection || pilotSection.closest('.ux-course-pilots-accordion')) return;
+    if (!departure || !pilotSection || pilotSection.dataset.uxSplitAccordions === 'true') return;
 
     const section = pilotSection.closest('.fold-section');
     const heading = section?.querySelector(':scope > h2');
-    if (!section || !heading || heading.textContent.trim() !== 'Pilotes inscrits') return;
+    const overview = pilotSection.querySelector(':scope > .ux-course-overview');
+    if (!section || !heading || heading.textContent.trim() !== 'Pilotes inscrits' || !overview) return;
 
-    const details = document.createElement('details');
-    details.className = `${section.className} ux-course-pilots-accordion`;
-    details.open = true;
-    const summary = document.createElement('summary');
-    summary.className = 'ux-content-accordion-summary';
-    summary.innerHTML = `<span class="ux-content-accordion-title">Pilotes inscrits</span><span class="ux-content-accordion-count">${activePilotCount(departure)}</span><span class="ux-content-accordion-chevron" aria-hidden="true">›</span>`;
-    details.append(summary, pilotSection);
-    section.replaceWith(details);
+    const unassignedSection = overview.querySelector(':scope > .ux-unassigned-section');
+    const unavailableBucket = overview.querySelector(':scope > .ux-unavailable-bucket');
+    const crewBuckets = [...overview.querySelectorAll(':scope > .ux-crew-bucket:not(.ux-unavailable-bucket)')];
+    if (!unassignedSection) return;
+
+    const pilotCount = unassignedSection.querySelectorAll('.pilot-row').length;
+    const crewCount = (departure.crews || []).length;
+
+    const pilotsAccordion = document.createElement('details');
+    pilotsAccordion.className = 'ux-course-pilots-accordion';
+    pilotsAccordion.innerHTML = accordionSummary('Pilotes inscrits', pilotCount);
+    const pilotsBody = document.createElement('div');
+    pilotsBody.className = 'ux-course-pilots-body';
+    pilotsBody.append(unassignedSection);
+    if (unavailableBucket) pilotsBody.append(unavailableBucket);
+    pilotsAccordion.append(pilotsBody);
+
+    const crewsAccordion = document.createElement('details');
+    crewsAccordion.className = 'ux-course-crews-accordion';
+    crewsAccordion.innerHTML = accordionSummary('Équipages', crewCount);
+    const crewsBody = document.createElement('div');
+    crewsBody.className = 'ux-course-crews-body';
+    crewBuckets.forEach(bucket => crewsBody.append(bucket));
+    crewsAccordion.append(crewsBody);
+
+    heading.remove();
+    section.classList.add('ux-course-split-section');
+    overview.classList.add('ux-course-split-overview');
+    overview.replaceChildren(pilotsAccordion, crewsAccordion);
+    pilotSection.dataset.uxSplitAccordions = 'true';
   });
 }
 
@@ -134,7 +155,6 @@ function decorateRemainingPilots() {
     if (section && section.tagName !== 'DETAILS') {
       const replacement = document.createElement('details');
       replacement.className = section.className;
-      replacement.open = true;
       section.replaceWith(replacement);
       section = replacement;
     }
@@ -142,14 +162,13 @@ function decorateRemainingPilots() {
     if (!section) {
       section = document.createElement('details');
       section.className = 'ux-remaining-pilots-section';
-      section.open = true;
       crewSection.append(section);
     }
 
     if (section.dataset.signature === signature) return;
     const wasOpen = section.open;
     section.dataset.signature = signature;
-    section.innerHTML = `<summary class="ux-content-accordion-summary"><span class="ux-content-accordion-title">Pilotes restants à affecter</span><span class="ux-content-accordion-count">${remaining.length}</span><span class="ux-content-accordion-chevron" aria-hidden="true">›</span></summary><div class="ux-remaining-pilot-grid">${remaining.map(registration => remainingPilotCard(event, departure, registration)).join('')}</div>`;
+    section.innerHTML = `${accordionSummary('Pilotes restants à affecter', remaining.length)}<div class="ux-remaining-pilot-grid">${remaining.map(registration => remainingPilotCard(event, departure, registration)).join('')}</div>`;
     section.open = wasOpen;
   });
 }
