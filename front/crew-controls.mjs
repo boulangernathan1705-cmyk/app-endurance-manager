@@ -237,16 +237,25 @@ function refineCrewCards(root = app) {
   applyAlphabeticalManagementOrder(root);
 }
 
-async function findCrew(crewId) {
-  const response = await fetch('/api/events', {credentials:'same-origin', cache:'no-store'});
-  if (!response.ok) throw new Error('Impossible de charger l’équipage.');
-  const result = await response.json();
-  for (const event of result.events || []) {
+function crewFromEvents(events, crewId) {
+  for (const event of events || []) {
     for (const departure of event.departures || []) {
       const crew = (departure.crews || []).find(item => item.id === crewId);
       if (crew) return crew;
     }
   }
+  return null;
+}
+
+async function findCrew(crewId) {
+  const current = crewFromEvents(app?.eventViewData?.events, crewId);
+  if (current) return current;
+
+  const response = await fetch('/api/events', {credentials:'same-origin', cache:'no-store'});
+  if (!response.ok) throw new Error('Impossible de charger l’équipage.');
+  const result = await response.json();
+  const crew = crewFromEvents(result.events, crewId);
+  if (crew) return crew;
   throw new Error('Équipage introuvable. Actualise la page.');
 }
 
