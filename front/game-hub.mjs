@@ -71,8 +71,9 @@ function enduranceMarkup(item, game) {
 function gameCard(game, events) {
   const catalog = GAME_CATALOGS[game];
   const href = game === 'lmu' ? '/lmu/' : '/iracing/';
+  const badge = game === 'lmu' ? 'LMU' : 'iR';
   return `<article class="game-hub-card game-${game}">
-    <div class="game-hub-heading"><span class="game-hub-kicker">SIMULATEUR</span><h2>${esc(catalog.name)}</h2><p>${game === 'lmu' ? 'Hypercar, prototypes et GT de Le Mans Ultimate.' : 'GTP, LMP2, GT3, GT4 et TCR avec un catalogue de circuits étendu.'}</p></div>
+    <div class="game-hub-heading"><div class="game-title-line"><span class="game-badge" aria-hidden="true">${badge}</span><h2>${esc(catalog.name)}</h2></div><p>${game === 'lmu' ? 'Hypercar, prototypes et GT de Le Mans Ultimate.' : 'GTP, LMP2, GT3, GT4 et TCR avec un catalogue de circuits étendu.'}</p></div>
     <a class="game-hub-enter" href="${href}">Accéder à ${esc(catalog.shortName)} <span aria-hidden="true">→</span></a>
     ${enduranceMarkup(nextEndurance(events,game),game)}
   </article>`;

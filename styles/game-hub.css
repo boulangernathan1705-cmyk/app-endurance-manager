@@ -51,11 +51,32 @@
 }
 
 .game-hub-heading {
-  padding: 26px 26px 20px;
+  padding: 22px 26px 18px;
   border-top: 4px solid var(--game-accent);
 }
 
-.game-hub-kicker,
+.game-title-line {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.game-badge {
+  display: inline-grid;
+  place-items: center;
+  width: 46px;
+  height: 34px;
+  flex: 0 0 auto;
+  border: 1px solid color-mix(in srgb, var(--game-accent) 68%, var(--border));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--game-accent) 15%, var(--panel2));
+  color: var(--game-accent);
+  font-size: 14px;
+  font-weight: 950;
+  letter-spacing: -.03em;
+}
+
 .hub-next-label {
   display: block;
   color: var(--game-accent);
@@ -65,14 +86,15 @@
 }
 
 .game-hub-heading h2 {
-  margin: 7px 0 6px;
+  min-width: 0;
+  margin: 0;
   font-size: clamp(28px, 3vw, 40px);
   line-height: 1;
 }
 
 .game-hub-heading p {
   min-height: 2.8em;
-  margin: 0;
+  margin: 8px 0 0;
   color: var(--muted);
   line-height: 1.45;
 }
@@ -202,45 +224,147 @@
 
 @media (max-width: 800px) {
   .hub-main {
-    width: min(100% - 20px, 660px);
-    margin-top: 12px;
+    width: min(100% - 16px, 660px);
+    margin: 8px auto 44px;
   }
 
   .hub-intro {
-    margin-bottom: 10px;
+    margin-bottom: 7px;
   }
 
   .hub-intro h1 {
-    font-size: 22px;
+    font-size: 20px;
   }
 
   .game-hub-grid {
     grid-template-columns: 1fr;
+    gap: 12px;
   }
 
-  .game-hub-heading,
-  .hub-next-race,
-  .hub-empty {
-    padding-left: 18px;
-    padding-right: 18px;
+  .game-hub-card {
+    border-radius: 14px;
   }
 
-  .game-hub-enter {
-    margin-left: 18px;
-    margin-right: 18px;
+  .game-hub-heading {
+    padding: 12px 14px 8px;
+    border-top-width: 3px;
+  }
+
+  .game-title-line {
+    gap: 9px;
+  }
+
+  .game-badge {
+    width: 38px;
+    height: 28px;
+    border-radius: 7px;
+    font-size: 12px;
+  }
+
+  .game-hub-heading h2 {
+    font-size: 25px;
   }
 
   .game-hub-heading p {
-    min-height: 0;
+    display: none;
+  }
+
+  .game-hub-enter {
+    margin: 0 14px 10px;
+    padding: 9px 12px;
+    min-height: 38px;
+    border-radius: 8px;
+    font-size: 14px;
+  }
+
+  .hub-next-race,
+  .hub-empty {
+    padding: 11px 14px 13px;
+  }
+
+  .hub-next-label {
+    font-size: 9px;
+    letter-spacing: .11em;
+  }
+
+  .hub-next-race h3 {
+    margin: 3px 0 5px;
+    font-size: 18px;
+    line-height: 1.15;
+  }
+
+  .hub-race-meta {
+    gap: 1px;
+    margin-bottom: 9px;
+    line-height: 1.25;
+  }
+
+  .hub-race-meta strong {
+    font-size: 13px;
+  }
+
+  .hub-race-meta span {
+    font-size: 11px;
+  }
+
+  .hub-crews-heading {
+    gap: 4px;
+    margin-bottom: 5px;
+    font-size: 13px;
+  }
+
+  .hub-crews-heading span {
+    font-size: 11px;
+  }
+
+  .hub-crews {
+    gap: 4px;
   }
 
   .hub-crew {
     grid-template-columns: auto minmax(0, 1fr);
+    gap: 7px;
+    padding: 5px 8px;
+    border-radius: 7px;
+  }
+
+  .hub-crew-status {
+    font-size: 12px;
+  }
+
+  .hub-crew-main {
+    gap: 0;
+    line-height: 1.12;
+  }
+
+  .hub-crew-main strong {
+    font-size: 12px;
+  }
+
+  .hub-crew-main small,
+  .hub-crew-pilots {
+    font-size: 10px;
   }
 
   .hub-crew-pilots {
     grid-column: 2;
+    margin-top: -1px;
     text-align: left;
-    white-space: normal;
+    white-space: nowrap;
+  }
+
+  .hub-no-crews {
+    margin-top: 4px;
+    padding: 7px 8px;
+    font-size: 11px;
+  }
+
+  .hub-empty {
+    gap: 2px;
+    font-size: 13px;
+  }
+
+  .hub-empty span {
+    font-size: 11px;
   }
 }
