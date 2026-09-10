@@ -1,0 +1,177 @@
+/* Course : sous "Pilotes inscrits", afficher directement les cartes. */
+.ux-unassigned-section {
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+}
+
+.ux-unassigned-section > .ux-section-heading {
+  display: none !important;
+}
+
+/* Créneaux : regrouper proprement stats, compte à rebours et inscription. */
+.departure-fold[id^="departure-"] > summary {
+  grid-template-columns: 46px minmax(0, 1fr) max-content 210px 32px !important;
+  grid-template-rows: auto auto !important;
+  column-gap: 16px !important;
+  row-gap: 5px !important;
+}
+
+.departure-fold[id^="departure-"] > summary > .fold-index {
+  grid-column: 1 !important;
+  grid-row: 1 / span 2 !important;
+}
+
+.departure-fold[id^="departure-"] > summary > .fold-date {
+  grid-column: 2 !important;
+  grid-row: 1 / span 2 !important;
+}
+
+.departure-fold[id^="departure-"] > summary > .fold-meta {
+  grid-column: 3 !important;
+  grid-row: 1 / span 2 !important;
+  align-self: center;
+  justify-self: end;
+}
+
+.departure-fold[id^="departure-"] > summary > .fold-countdown {
+  display: block !important;
+  grid-column: 4 !important;
+  grid-row: 1 !important;
+  width: 100%;
+  min-width: 0 !important;
+  text-align: center !important;
+  justify-self: stretch !important;
+}
+
+.departure-fold[id^="departure-"] > summary > .ux-summary-registration-toggle {
+  grid-column: 4 !important;
+  grid-row: 2 !important;
+  width: 100%;
+  min-height: 36px !important;
+  margin: 0 !important;
+  padding: 6px 12px !important;
+  justify-self: stretch !important;
+  font-size: 12px !important;
+}
+
+.departure-fold[id^="departure-"] > summary::after {
+  grid-column: 5 !important;
+  grid-row: 1 / span 2 !important;
+  align-self: center !important;
+}
+
+/* Équipages : pilotes restants en cartes, tout en bas. */
+.ux-legacy-unassigned-hidden {
+  display: none !important;
+}
+
+.ux-remaining-pilots-section {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+}
+
+.ux-remaining-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.ux-remaining-heading h3 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.ux-remaining-heading > span {
+  display: grid;
+  place-items: center;
+  min-width: 34px;
+  height: 34px;
+  padding: 0 9px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--panel3);
+  font-weight: 900;
+}
+
+.ux-remaining-pilot-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.ux-remaining-pilot-card {
+  min-width: 0;
+  height: 100%;
+  margin: 0 !important;
+  padding: 12px !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 10px;
+  background: var(--panel2);
+}
+
+.ux-remaining-pilot-card .presence-timeline {
+  width: 100%;
+}
+
+@media (max-width: 1100px) {
+  .departure-fold[id^="departure-"] > summary {
+    grid-template-columns: 46px minmax(0, 1fr) max-content 190px 32px !important;
+  }
+
+  .ux-remaining-pilot-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .departure-fold[id^="departure-"] > summary {
+    grid-template-columns: 38px minmax(0, 1fr) 26px !important;
+    grid-template-rows: auto auto auto auto !important;
+    gap: 7px 10px !important;
+  }
+
+  .departure-fold[id^="departure-"] > summary > .fold-index {
+    grid-column: 1 !important;
+    grid-row: 1 / span 2 !important;
+  }
+
+  .departure-fold[id^="departure-"] > summary > .fold-date {
+    grid-column: 2 !important;
+    grid-row: 1 !important;
+  }
+
+  .departure-fold[id^="departure-"] > summary > .fold-meta {
+    grid-column: 2 !important;
+    grid-row: 2 !important;
+    justify-self: start;
+  }
+
+  .departure-fold[id^="departure-"] > summary > .fold-countdown {
+    grid-column: 2 !important;
+    grid-row: 3 !important;
+    width: auto;
+    text-align: left !important;
+    justify-self: start !important;
+  }
+
+  .departure-fold[id^="departure-"] > summary > .ux-summary-registration-toggle {
+    grid-column: 2 !important;
+    grid-row: 4 !important;
+    width: auto;
+    min-width: 150px;
+    justify-self: start !important;
+  }
+
+  .departure-fold[id^="departure-"] > summary::after {
+    grid-column: 3 !important;
+    grid-row: 1 / span 4 !important;
+  }
+
+  .ux-remaining-pilot-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
