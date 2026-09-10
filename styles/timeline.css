@@ -6,6 +6,32 @@
   margin-top: 8px;
   color: var(--muted);
 }
+
+.duration-1 { --duration: 1; }
+.duration-2 { --duration: 2; }
+.duration-3 { --duration: 3; }
+.duration-4 { --duration: 4; }
+.duration-5 { --duration: 5; }
+.duration-6 { --duration: 6; }
+.duration-7 { --duration: 7; }
+.duration-8 { --duration: 8; }
+.duration-9 { --duration: 9; }
+.duration-10 { --duration: 10; }
+.duration-11 { --duration: 11; }
+.duration-12 { --duration: 12; }
+.duration-13 { --duration: 13; }
+.duration-14 { --duration: 14; }
+.duration-15 { --duration: 15; }
+.duration-16 { --duration: 16; }
+.duration-17 { --duration: 17; }
+.duration-18 { --duration: 18; }
+.duration-19 { --duration: 19; }
+.duration-20 { --duration: 20; }
+.duration-21 { --duration: 21; }
+.duration-22 { --duration: 22; }
+.duration-23 { --duration: 23; }
+.duration-24 { --duration: 24; }
+
 .presence-scale {
   display: grid;
   grid-template-columns: repeat(var(--duration), minmax(0, 1fr));
