@@ -31,8 +31,8 @@ function demoEvents({mine=false, managed=false}={}) {
 const participants=[{id:'u1',name:'Nathan'},{id:'u2',name:'Josselin'},{id:'u3',name:'Rico'},{id:'u4',name:'Manu'}];
 const members=[{id:'1001',name:'Nathan',role:'admin'},{id:'1002',name:'Josselin',role:'organizer'},{id:'1003',name:'Rico',role:'pilot'}];
 const roleUser=role=>role==='guest'?null:{id:`user-${role}`,name:'Nathan',role};
-let completed=[];
-let skipped=[];
+const completed=[];
+const skipped=[];
 
 async function pageFor(browser, role='guest', opts={}, viewport={width:1440,height:1100}) {
   const context=await browser.newContext({viewport,deviceScaleFactor:1});
@@ -103,6 +103,16 @@ async function capture(page,name,containerSelector,targetSelector='',label='',si
   }catch(error){skipped.push(`${name}: ${error.message}`);console.warn('SKIPPED',name,error.message);}
 }
 
+async function safeClick(page,selector){
+  try{
+    const item=page.locator(selector).first();
+    if(!(await item.count())||!(await item.isVisible())) return false;
+    await item.click({timeout:3000});
+    await page.waitForTimeout(250);
+    return true;
+  }catch{return false;}
+}
+
 async function openEvent(page){
   await page.locator('.event-card').first().click();
   await page.waitForSelector('.departure-fold');
@@ -111,18 +121,31 @@ async function openEvent(page){
   await page.waitForTimeout(450);
 }
 
+async function openRegistration(page){
+  const form=page.locator('.registration-form').first();
+  if(await form.count()&&await form.isVisible()) return true;
+  const toggle=page.locator('.ux-summary-registration-toggle, [data-action="focus-registration"]').first();
+  if(await toggle.count()&&await toggle.isVisible()){
+    await toggle.click({timeout:3000});
+    await page.waitForTimeout(350);
+    return await form.count()&&await form.isVisible();
+  }
+  return false;
+}
+
 const browser=await chromium.launch({headless:true});
 try{
-  // PILOTE / VISITEUR
   {
     const {context,page}=await pageFor(browser,'guest');
     await capture(page,'pilot-events','.event-agenda','.event-card','Clique sur la course');
     await openEvent(page);
-    const fold=page.locator('.departure-fold').first(); await fold.evaluate(el=>{el.open=true;});
-    await capture(page,'pilot-register','.fold-registration','.registration-form','Remplis ton inscription');
+    const fold=page.locator('.departure-fold').first(); await fold.evaluate(el=>{el.open=true;}); await page.waitForTimeout(150);
+    await capture(page,'pilot-register','.departure-fold > summary','.ux-summary-registration-toggle, [data-action="focus-registration"]','Ouvre Mon inscription','left');
+    await openRegistration(page);
+    await capture(page,'pilot-form','.fold-registration','.registration-form','Ton inscription');
     await capture(page,'pilot-availability','.registration-choices','[data-action="availability"][data-value="whole"]','Toute la course');
     await capture(page,'pilot-category','.category-area','.category-button.gt3','Choisis ta catégorie');
-    await page.locator('.category-button.gt3').first().click(); await page.waitForTimeout(250);
+    await safeClick(page,'.category-button.gt3');
     await capture(page,'pilot-cars','.car-preference-panel','.car-any-option','Ou coche cette option','left');
     await capture(page,'pilot-teammate','.registration-form','input[name="preferredPilot"]','Coéquipier souhaité');
     await capture(page,'pilot-submit','.registration-form','.save-button','Valide ici','bottom');
@@ -130,7 +153,7 @@ try{
   }
   {
     const {context,page}=await pageFor(browser,'guest',{}, {width:700,height:950});
-    await capture(page,'pilot-connection','header, .site-nav-shell','.discord-button','Connexion Discord','left');
+    await capture(page,'pilot-connection','body','.discord-button','Connexion Discord','left');
     await context.close();
   }
   {
@@ -140,50 +163,51 @@ try{
     await capture(page,'pilot-edit','.pilot-section','.edit-button','Modifier');
     const crew=page.locator('details.crew-pilot-accordion').first();
     if(await crew.count()){await crew.evaluate(el=>{el.open=true;});await capture(page,'pilot-crew','details.crew-pilot-accordion','details.crew-pilot-accordion > summary','Ouvre ton équipage');}
-    await page.locator('[data-action="my-entries"]').first().click(); await page.waitForSelector('.my-entry-card');
-    await capture(page,'pilot-my-entries','.my-entry-card','.my-entry-header','Ton inscription');
+    if(await safeClick(page,'[data-action="my-entries"]')){
+      await capture(page,'pilot-my-entries','.my-entry-card','.my-entry-header','Ton inscription');
+    }
     await context.close();
   }
-
-  // ORGANISATEUR
   {
     const {context,page}=await pageFor(browser,'organizer',{mine:true,managed:true});
     await capture(page,'org-home-create','main','.home-create-event [data-action="create"]','Ajouter un évènement','left');
-    await page.locator('.home-create-event [data-action="create"]').click(); await page.waitForSelector('.event-creation');
-    await capture(page,'org-create-event','.event-creation','.creation-basics','Informations générales');
-    await page.locator('[data-action="home"]').first().click(); await page.locator('.event-card').first().click(); await page.waitForSelector('.departure-fold');
-    const raceFold=page.locator('.departure-fold').first(); await raceFold.evaluate(el=>{el.open=true;}); await page.waitForTimeout(300);
-    await capture(page,'org-edit-event','main > .toolbar','[data-action="edit-event"]','Modifier l’événement');
-    await capture(page,'org-departure','.departure-fold','.departure-fold > summary','Le départ à gérer');
-    await capture(page,'org-registration','.pilot-section','.pilot-row','Lis les inscriptions');
-    await capture(page,'org-add-pilot','.registration-form','[data-action="new-registration"][data-mode="pilot"]','Ajouter un pilote');
-    await page.locator('[data-action="event-section"][data-section="crews"]').click(); await page.waitForTimeout(500);
-    const crewFold=page.locator('.crew-page-accordion .departure-fold').first(); if(await crewFold.count()) await crewFold.evaluate(el=>{el.open=true;}); await page.waitForTimeout(400);
-    await capture(page,'org-crew-overview','.crew-section','.crew-list','Équipages du départ');
-    const mgmt=page.locator('details.crew-management-accordion').first();
-    if(await mgmt.count()){
-      await mgmt.evaluate(el=>{el.open=true;});await page.waitForTimeout(200);
-      await capture(page,'org-crew-status','details.crew-management-accordion','.crew-state-select','Ouvert / complet');
-      await capture(page,'org-assign-pilot','details.crew-management-accordion','.crew-assignment select, .crew-add-pilot-button','Affecter un pilote');
-      await capture(page,'org-coverage','details.crew-management-accordion','.presence-timeline','Couverture horaire');
-      await capture(page,'org-crew-actions','details.crew-management-accordion','.crew-actions','Actions équipage','bottom');
+    if(await safeClick(page,'.home-create-event [data-action="create"]')){
+      await capture(page,'org-create-event','.event-creation','.creation-basics','Informations générales');
     }
-    await capture(page,'org-unassigned','.ux-remaining-pilots-section','.ux-remaining-heading','Pilotes restants');
-    const newCrew=page.locator('[data-action="new-crew"]').first();
-    if(await newCrew.count()&&await newCrew.isVisible()){
-      await newCrew.click();await page.waitForSelector('.crew-form');
-      await capture(page,'org-create-crew','.crew-form','button[type="submit"]','Enregistrer l’équipage','bottom');
+    await safeClick(page,'[data-action="home"]');
+    if(await safeClick(page,'.event-card')){
+      const raceFold=page.locator('.departure-fold').first(); if(await raceFold.count()) await raceFold.evaluate(el=>{el.open=true;}); await page.waitForTimeout(300);
+      await capture(page,'org-edit-event','main > .toolbar','[data-action="edit-event"]','Modifier l’événement');
+      await capture(page,'org-departure','.departure-fold','.departure-fold > summary','Le départ à gérer');
+      await capture(page,'org-registration','.pilot-section','.pilot-row','Lis les inscriptions');
+      await openRegistration(page);
+      await capture(page,'org-add-pilot','.registration-form','[data-action="new-registration"][data-mode="pilot"]','Ajouter un pilote');
+      await capture(page,'org-multi-category','.registration-form','[data-action="new-registration"][data-mode="category"]','Ajouter une catégorie');
+      if(await safeClick(page,'[data-action="event-section"][data-section="crews"]')){
+        const crewFold=page.locator('.crew-page-accordion .departure-fold').first(); if(await crewFold.count()) await crewFold.evaluate(el=>{el.open=true;}); await page.waitForTimeout(400);
+        await capture(page,'org-crew-overview','.crew-section','.crew-list','Équipages du départ');
+        const mgmt=page.locator('details.crew-management-accordion').first();
+        if(await mgmt.count()){
+          await mgmt.evaluate(el=>{el.open=true;});await page.waitForTimeout(200);
+          await capture(page,'org-crew-status','details.crew-management-accordion','.crew-state-select','Ouvert / complet');
+          await capture(page,'org-assign-pilot','details.crew-management-accordion','.crew-assignment select, .crew-add-pilot-button','Affecter un pilote');
+          await capture(page,'org-coverage','details.crew-management-accordion','.presence-timeline','Couverture horaire');
+          await capture(page,'org-crew-actions','details.crew-management-accordion','.crew-actions','Actions équipage','bottom');
+        }
+        await capture(page,'org-unassigned','.ux-remaining-pilots-section','.ux-remaining-heading','Pilotes restants');
+        const newCrew=page.locator('[data-action="new-crew"]').first();
+        if(await newCrew.count()&&await newCrew.isVisible()){
+          await newCrew.click({timeout:3000});await page.waitForTimeout(250);
+          await capture(page,'org-create-crew','.crew-form','button[type="submit"]','Enregistrer l’équipage','bottom');
+        }
+      }
     }
-    await page.locator('[data-action="my-entries"]').first().click(); await page.waitForTimeout(300);
-    await capture(page,'org-managed-entry','main','.my-entries-group','Inscriptions gérées');
+    if(await safeClick(page,'[data-action="my-entries"]')) await capture(page,'org-managed-entry','main','.my-entries-group','Inscriptions gérées');
     await context.close();
   }
-
-  // ADMIN
   {
     const {context,page}=await pageFor(browser,'admin',{mine:true,managed:true});
-    await page.locator('[data-action="members"]').click();await page.waitForSelector('.member-list');
-    await capture(page,'admin-members','.member-list','.member-row select','Choisir le rôle','left');
+    if(await safeClick(page,'[data-action="members"]')) await capture(page,'admin-members','.member-list','.member-row select','Choisir le rôle','left');
     await context.close();
   }
 }finally{await browser.close();}
