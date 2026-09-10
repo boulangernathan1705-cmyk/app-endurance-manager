@@ -1,41 +1,363 @@
+/* Mes inscriptions : styles complets de la vue native. */
+.ux-managed-entry-name {
+  display: block;
+  margin-bottom: 2px;
+  color: #f4ead9;
+  font-size: 18px;
+  font-weight: 900;
+  line-height: 1.15;
+}
+
+.ux-my-entry-departure {
+  display: block;
+  color: #9beeb4;
+  font-size: 16px;
+  font-weight: 900;
+  line-height: 1.15;
+}
+
+.ux-my-entry-date {
+  display: block;
+  color: #c3cdcf;
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 1.2;
+}
+
+.ux-my-entry-content-accordion {
+  overflow: hidden;
+  border: 1px solid rgba(73,118,123,.5);
+  border-radius: 10px;
+  background: rgba(18,25,28,.88);
+}
+
+.ux-my-entry-accordion-summary {
+  display: grid;
+  grid-template-columns: minmax(0,1fr) auto 24px;
+  align-items: center;
+  gap: 10px;
+  min-height: 54px;
+  padding: 10px 14px;
+  list-style: none;
+  cursor: pointer;
+}
+
+.ux-my-entry-accordion-summary::-webkit-details-marker {
+  display: none;
+}
+
+.ux-my-entry-accordion-summary > span:first-child {
+  color: #f1e9da;
+  font-size: 19px;
+  font-weight: 900;
+  line-height: 1.2;
+}
+
+.ux-my-entry-accordion-summary > strong {
+  display: grid;
+  place-items: center;
+  min-width: 32px;
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid rgba(73,118,123,.65);
+  border-radius: 999px;
+  background: rgba(255,255,255,.025);
+  color: #f1e9da;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.ux-my-entry-chevron {
+  display: grid;
+  place-items: center;
+  color: #8ea0a3;
+  font-size: 25px;
+  line-height: 1;
+  transition: transform .15s ease;
+}
+
+.ux-my-entry-content-accordion[open] > .ux-my-entry-accordion-summary {
+  border-bottom: 1px solid rgba(73,118,123,.4);
+}
+
+.ux-my-entry-content-accordion[open] > .ux-my-entry-accordion-summary .ux-my-entry-chevron {
+  transform: rotate(90deg);
+}
+
+.ux-my-entry-content-body {
+  padding: 12px 14px 14px;
+}
+
+.ux-my-own-crew {
+  padding: 12px;
+  border: 1px solid color-mix(in srgb, var(--category-color, #52cfd4) 55%, rgba(73,118,123,.55));
+  border-left: 4px solid var(--category-color, #52cfd4);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--category-color, #52cfd4) 5%, rgba(13,19,21,.96));
+}
+
+.ux-my-own-crew-head,
+.ux-my-own-crew-identity,
+.ux-my-other-crews-heading,
+.ux-my-other-crew-main {
+  display: flex;
+  align-items: center;
+}
+
+.ux-my-own-crew-head {
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.ux-my-own-crew-identity {
+  min-width: 0;
+  gap: 10px;
+}
+
+.ux-my-own-crew-identity > .category-logo,
+.ux-my-other-crew-main > .category-logo {
+  width: 34px;
+  height: 34px;
+  object-fit: contain;
+  flex: 0 0 auto;
+}
+
+.ux-my-own-crew-identity > div,
+.ux-my-other-crew-main > div {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.ux-my-own-crew-identity strong {
+  color: #f4ead9;
+  font-size: 18px;
+  font-weight: 900;
+}
+
+.ux-my-own-crew-identity span,
+.ux-my-other-crew-main span {
+  min-width: 0;
+  color: #aebbbc;
+  overflow-wrap: anywhere;
+}
+
+.ux-my-crew-state {
+  flex: 0 0 auto;
+  padding: 5px 9px;
+  border: 1px solid rgba(141,157,160,.5);
+  border-radius: 999px;
+  color: #bfc9ca;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: .45px;
+  text-transform: uppercase;
+}
+
+.ux-my-pilot-grid {
+  display: grid;
+  gap: 10px;
+  width: 100%;
+}
+
+.ux-my-pilot-grid-1 { grid-template-columns: minmax(0,1fr); }
+.ux-my-pilot-grid-2 { grid-template-columns: repeat(2,minmax(0,1fr)); }
+.ux-my-pilot-grid-3 { grid-template-columns: repeat(3,minmax(0,1fr)); }
+
+.ux-my-entry-pilot-card {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: stretch !important;
+  gap: 7px !important;
+  min-width: 0;
+  height: 100%;
+  margin: 0 !important;
+  padding: 12px !important;
+  border: 1px solid rgba(73,118,123,.55) !important;
+  border-radius: 10px;
+  background: rgba(12,18,20,.82);
+}
+
+.ux-my-entry-pilot-card.is-own-pilot {
+  border-color: rgba(82,207,212,.8) !important;
+  background: rgba(82,207,212,.07);
+  box-shadow: inset 3px 0 0 var(--fmt-cyan, #52cfd4);
+}
+
+.ux-my-entry-pilot-card .pilot-main {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex-wrap: wrap;
+}
+
+.ux-my-entry-pilot-card .pilot-name {
+  color: #f4ead9;
+  font-weight: 900;
+}
+
+.ux-my-entry-pilot-card .pilot-category-logo .category-logo,
+.ux-my-entry-pilot-card .pilot-category-logo > img,
+.ux-my-entry-pilot-card .category-logo {
+  width: 31px;
+  height: 31px;
+  object-fit: contain;
+}
+
+.ux-my-entry-pilot-card .pilot-car {
+  min-width: 0;
+  color: #b7c3c4;
+  overflow-wrap: anywhere;
+}
+
+.ux-my-entry-pilot-card .presence-timeline {
+  width: 100%;
+  margin-top: auto;
+  padding-top: 5px;
+}
+
+.ux-my-awaiting-crew {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid rgba(231,182,83,.48);
+  border-left: 4px solid rgba(231,182,83,.8);
+  border-radius: 10px;
+  background: rgba(231,182,83,.035);
+}
+
+.ux-my-awaiting-copy {
+  display: grid;
+  gap: 2px;
+}
+
+.ux-my-awaiting-copy strong {
+  color: #f0d89b;
+  font-size: 15px;
+}
+
+.ux-my-awaiting-copy span {
+  color: #aeb9ba;
+  font-size: 12px;
+}
+
+.ux-my-other-crews {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(73,118,123,.34);
+}
+
+.ux-my-other-crews-heading {
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.ux-my-other-crews-heading strong {
+  color: #bdc8c9;
+  font-size: 12px;
+  letter-spacing: .5px;
+  text-transform: uppercase;
+}
+
+.ux-my-other-crews-heading span {
+  color: #8fa0a2;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.ux-my-other-crews-grid {
+  display: grid;
+  grid-template-columns: repeat(3,minmax(0,1fr));
+  gap: 7px;
+}
+
+.ux-my-other-crew {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  padding: 8px 9px;
+  border: 1px solid rgba(73,118,123,.38);
+  border-left: 3px solid var(--category-color, rgba(82,207,212,.55));
+  border-radius: 8px;
+  background: rgba(255,255,255,.012);
+  opacity: .82;
+}
+
+.ux-my-other-crew-main {
+  gap: 8px;
+  min-width: 0;
+}
+
+.ux-my-other-crew-main > .category-logo {
+  width: 25px;
+  height: 25px;
+}
+
+.ux-my-other-crew-main strong {
+  color: #d9e0df;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.ux-my-other-crew-main span,
+.ux-my-other-crew small {
+  color: #8f9d9f;
+  font-size: 10px;
+  line-height: 1.25;
+}
+
+.ux-my-other-crew small {
+  overflow-wrap: anywhere;
+}
+
 .native-my-entries-heading {
   margin-bottom: 18px;
 }
+
 .native-my-entries-heading p {
   margin: 4px 0 0;
   color: var(--muted);
 }
+
 .native-my-entries-group {
   display: grid;
   gap: 10px;
   margin-top: 18px;
 }
+
 .native-my-entries-group-heading {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
 }
+
 .native-my-entries-group-heading h2 {
   margin: 0;
   color: #f1e9da;
   font-size: 20px;
 }
+
 .native-my-entries-group-heading span {
   color: var(--muted);
   font-size: 12px;
   font-weight: 800;
 }
+
 .native-my-entry-list {
   display: grid;
   gap: 12px;
 }
+
 .native-my-entry-card {
   overflow: hidden;
   border: 1px solid rgba(73,118,123,.52);
   border-radius: 12px;
   background: rgba(12,18,20,.9);
 }
+
 .native-my-entry-header {
   display: grid;
   grid-template-columns: 36px minmax(0,1fr) auto;
@@ -46,7 +368,9 @@
   list-style: none;
   cursor: pointer;
 }
+
 .native-my-entry-header::-webkit-details-marker { display: none; }
+
 .native-my-entry-toggle {
   display: grid;
   place-items: center;
@@ -58,20 +382,24 @@
   font-size: 24px;
   line-height: 1;
 }
+
 .native-my-entry-card[open] > .native-my-entry-header .native-my-entry-toggle::before { content: '−'; }
 .native-my-entry-card[open] > .native-my-entry-header .native-my-entry-toggle { font-size: 0; }
 .native-my-entry-card[open] > .native-my-entry-header .native-my-entry-toggle::before { font-size: 24px; }
+
 .native-my-entry-title {
   display: grid;
   min-width: 0;
   gap: 3px;
 }
+
 .native-my-entry-title h2 {
   margin: 0;
   color: #f4ead9;
   font-size: 21px;
   line-height: 1.1;
 }
+
 .native-my-entry-meta {
   display: flex;
   align-items: center;
@@ -81,6 +409,7 @@
   color: #9eacad;
   font-size: 12px;
 }
+
 .native-my-entry-open-event {
   align-self: center;
   width: auto;
@@ -88,19 +417,20 @@
   padding-inline: 14px;
   white-space: nowrap;
 }
+
 .native-my-entry-body {
   display: grid;
   gap: 10px;
   padding: 12px 14px 14px;
   border-top: 1px solid rgba(73,118,123,.34);
 }
+
 .native-my-entries-loading {
   padding: 26px;
   color: var(--muted);
 }
 
-/* Le thème global stylise toutes les balises header comme la bannière du site.
-   Le header interne de Mon équipage doit rester un simple en-tête de carte. */
+/* Le thème global stylise toutes les balises header comme la bannière du site. */
 .ux-my-own-crew > .ux-my-own-crew-head {
   min-height: 0;
   padding: 0;
@@ -112,24 +442,60 @@
   border-bottom: 0;
   box-shadow: none;
 }
+
 .ux-my-own-crew > .ux-my-own-crew-head::after {
   content: none;
 }
 
+@media (max-width: 1100px) {
+  .ux-my-pilot-grid-3,
+  .ux-my-other-crews-grid {
+    grid-template-columns: repeat(2,minmax(0,1fr));
+  }
+}
+
 @media (max-width: 760px) {
+  .ux-managed-entry-name { font-size: 15px; }
+  .ux-my-entry-departure { font-size: 14px; }
+  .ux-my-entry-date { font-size: 11px; }
+
+  .ux-my-entry-accordion-summary {
+    min-height: 48px;
+    padding: 8px 10px;
+  }
+
+  .ux-my-entry-accordion-summary > span:first-child { font-size: 17px; }
+  .ux-my-entry-content-body { padding: 9px; }
+
+  .ux-my-own-crew-head {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .ux-my-pilot-grid-2,
+  .ux-my-pilot-grid-3,
+  .ux-my-other-crews-grid {
+    grid-template-columns: minmax(0,1fr);
+  }
+
+  .ux-my-own-crew-identity strong { font-size: 16px; }
+
   .native-my-entry-header {
     grid-template-columns: 32px minmax(0,1fr);
     gap: 9px;
     min-height: 82px;
     padding: 11px;
   }
+
   .native-my-entry-toggle {
     width: 30px;
     height: 30px;
     font-size: 21px;
   }
+
   .native-my-entry-title h2 { font-size: 18px; }
   .native-my-entry-meta { font-size: 11px; }
+
   .native-my-entry-open-event {
     grid-column: 2;
     justify-self: start;
@@ -137,5 +503,6 @@
     width: auto;
     margin-top: 4px;
   }
+
   .native-my-entry-body { padding: 9px; }
 }
