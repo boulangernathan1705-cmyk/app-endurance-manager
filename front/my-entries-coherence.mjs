@@ -39,12 +39,12 @@ function registrationCarLabel(registration) {
   return registration?.car || 'Pas de préférence';
 }
 
-function coversHour(registration, index) {
-  return registration?.status === 'whole' || String(registration?.status || '').split(',').includes(`h${index + 1}`);
-}
-
 function accordionSummary(title, count) {
   return `<summary class="ux-my-entry-accordion-summary"><span>${esc(title)}</span><strong>${count}</strong><span class="ux-my-entry-chevron" aria-hidden="true">›</span></summary>`;
+}
+
+function pilotGridClass(count) {
+  return `ux-my-pilot-grid ux-my-pilot-grid-${Math.max(1,Math.min(3,count || 1))}`;
 }
 
 function pilotCard(event, departure, registration, own = false) {
@@ -79,7 +79,6 @@ function compactCrew(departure, crew) {
 }
 
 function ownCrewBody(event, departure, registration, crew) {
-  const duration = event.durationHours || 6;
   const otherCrews = (departure.crews || []).filter(item => item.id !== crew?.id).sort(crewSort);
   let main;
 
@@ -87,31 +86,38 @@ function ownCrewBody(event, departure, registration, crew) {
     const members = (crew.registrationIds || [])
       .map(id => departure.availability.find(item => item.id === id))
       .filter(Boolean);
-    const counts = Array.from({length:duration}, (_,index) => members.filter(member => coversHour(member,index)).length);
-    const covered = counts.filter(count => count > 0).length;
     main = `<article class="ux-my-own-crew ${categories[crew.category]?.css || ''}">
       <header class="ux-my-own-crew-head">
         <div class="ux-my-own-crew-identity">${logo(crew.category)}<div><strong>${esc(crew.name)}</strong><span>${esc(crew.car || 'Voiture à définir')}</span></div></div>
         <span class="ux-my-crew-state">${crew.locked ? 'Équipage complet' : 'Équipage ouvert'}</span>
       </header>
-      <div class="ux-my-crew-pilot-grid">${members.map(member => pilotCard(event,departure,member,member.id === registration.id)).join('') || '<p class="empty">Aucun pilote affecté.</p>'}</div>
-      <div class="ux-my-crew-coverage">${renderAvailabilityTimeline({departure,duration,counts,label:'Couverture de mon équipage'})}</div>
-      <p class="coverage-note">${covered === duration ? 'Toutes les heures sont couvertes.' : `${duration-covered} heure(s) restent sans présence.`}</p>
+      <div class="${pilotGridClass(members.length)}">${members.map(member => pilotCard(event,departure,member,member.id === registration.id)).join('') || '<p class="empty">Aucun pilote affecté.</p>'}</div>
     </article>`;
   } else {
-    main = `<article class="ux-my-awaiting-crew"><div class="ux-my-awaiting-copy"><strong>En attente d’affectation</strong><span>Ton inscription n’est pas encore rattachée à un équipage.</span></div>${pilotCard(event,departure,registration,true)}</article>`;
+    main = `<article class="ux-my-awaiting-crew">
+      <div class="ux-my-awaiting-copy"><strong>En attente d’affectation</strong><span>Ton inscription n’est pas encore rattachée à un équipage.</span></div>
+      <div class="${pilotGridClass(1)}">${pilotCard(event,departure,registration,true)}</div>
+    </article>`;
   }
 
   const others = `<section class="ux-my-other-crews"><div class="ux-my-other-crews-heading"><strong>Autres équipages</strong><span>${otherCrews.length}</span></div>${otherCrews.length ? `<div class="ux-my-other-crews-grid">${otherCrews.map(item => compactCrew(departure,item)).join('')}</div>` : '<p class="muted">Aucun autre équipage sur ce départ.</p>'}</section>`;
   return main + others;
 }
 
-function registeredPilotsBody(event, departure) {
+function unassignedPilotsBody(event, departure, ownRegistrationId) {
   const assigned = new Set((departure.crews || []).flatMap(crew => crew.registrationIds || []));
-  const pilots = (departure.availability || []).filter(registration => registration.status !== 'unavailable' && !assigned.has(registration.id));
+  const pilots = (departure.availability || [])
+    .filter(registration => registration.status !== 'unavailable' && !assigned.has(registration.id))
+    .sort((a,b) => {
+      const categoryDelta = (categoryOrder.get(a.category) ?? 99) - (categoryOrder.get(b.category) ?? 99);
+      if (categoryDelta) return categoryDelta;
+      return String(a.name || '').localeCompare(String(b.name || ''), 'fr', {sensitivity:'base'});
+    });
   return {
     count: pilots.length,
-    html: pilots.length ? `<div class="ux-my-registered-pilot-grid">${pilots.map(registration => pilotCard(event,departure,registration)).join('')}</div>` : '<p class="empty">Tous les pilotes disponibles sont déjà affectés à un équipage.</p>'
+    html: pilots.length
+      ? `<div class="${pilotGridClass(pilots.length)}">${pilots.map(registration => pilotCard(event,departure,registration,registration.id === ownRegistrationId)).join('')}</div>`
+      : '<p class="empty">Tous les pilotes disponibles sont déjà affectés à un équipage.</p>'
   };
 }
 
@@ -125,13 +131,19 @@ function decorateHeader(card, event, departure, registration, managed) {
   const title = header?.querySelector('.my-entry-title');
   if (!header || !title) return;
 
-  const typeBadge = title.querySelector('.event-type-badge')?.outerHTML || '';
-  const categoryBadge = title.querySelector('.event-category-badge')?.outerHTML || '';
+  const oldMeta = title.querySelector('.my-entry-meta');
+  const typeBadge = oldMeta?.querySelector('.event-type-badge')?.outerHTML || '';
+  const categoryBadge = oldMeta?.querySelector('.event-category-badge')?.outerHTML || '';
+  const metaTexts = [...oldMeta?.querySelectorAll(':scope > span:not(.event-type-badge):not(.event-category-badge)') || []]
+    .map(node => node.textContent.trim())
+    .filter(Boolean);
+  const circuitText = metaTexts.find(text => !/^·?\s*\d+\s*h$/i.test(text) && !/^·/.test(text)) || '';
+
   title.innerHTML = `${managed ? `<strong class="ux-managed-entry-name">${esc(registration.name)}</strong>` : ''}
     <span class="ux-my-entry-departure">Départ ${esc(departure.time || '')}</span>
     <h2>${esc(event.name)}</h2>
     <span class="ux-my-entry-date">${esc(formatDate(departure))}</span>
-    <div class="my-entry-meta">${typeBadge}${categoryBadge}<span>${esc(event.circuit || '')}</span><span>${event.durationHours || 6} h</span></div>`;
+    <div class="my-entry-meta">${typeBadge}${categoryBadge}${circuitText ? `<span>${esc(circuitText)}</span>` : ''}<span>${event.durationHours || 6} h</span></div>`;
   card.classList.toggle('ux-managed-entry', managed);
 }
 
@@ -145,7 +157,7 @@ function decorateCard(card, events) {
 
   const managed = /Inscriptions que je gère/i.test(card.closest('.my-entries-group')?.querySelector('.my-entries-group-heading h2')?.textContent || '');
   const crew = (departure.crews || []).find(item => (item.registrationIds || []).includes(registration.id));
-  const pilots = registeredPilotsBody(event,departure);
+  const unassigned = unassignedPilotsBody(event,departure,registration.id);
   const signature = JSON.stringify([
     event.version,event.durationHours,departure.version,registration.id,registration.version,managed,
     (departure.crews || []).map(item => [item.id,item.version,item.locked,item.name,item.category,item.car,item.registrationIds]),
@@ -165,7 +177,7 @@ function decorateCard(card, events) {
 
   const pilotsDetails = document.createElement('details');
   pilotsDetails.className = 'ux-my-entry-content-accordion ux-my-entry-pilots-accordion';
-  pilotsDetails.innerHTML = `${accordionSummary('Pilotes inscrits', pilots.count)}<div class="ux-my-entry-content-body">${pilots.html}</div>`;
+  pilotsDetails.innerHTML = `${accordionSummary('Pilotes sans équipage', unassigned.count)}<div class="ux-my-entry-content-body">${unassigned.html}</div>`;
 
   body.replaceChildren();
   if (actions) body.append(actions);
