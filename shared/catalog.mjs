@@ -70,24 +70,22 @@ const LMU_CATEGORIES = {
   GTE:{image:'GTE.webp',css:'gte'}
 };
 
-const IRACING_BADGE = 'iracing-category.svg';
 const IRACING_CATEGORIES = {
-  GTP:{image:IRACING_BADGE,css:'hyper'},
-  HYP:{image:IRACING_BADGE,css:'hyper'},
-  'LMP2 P217':{image:IRACING_BADGE,css:'lmp2'},
-  'LMP3 P320':{image:IRACING_BADGE,css:'lmp3'},
-  GT3:{image:IRACING_BADGE,css:'gt3'},
-  'Porsche Cup':{image:IRACING_BADGE,css:'gt3'},
-  GT4:{image:IRACING_BADGE,css:'gt3'},
-  TCR:{image:IRACING_BADGE,css:'gt3'},
-  M2:{image:IRACING_BADGE,css:'gt3'},
-  'Historic LMP2':{image:IRACING_BADGE,css:'lmp2'},
-  GT1:{image:IRACING_BADGE,css:'gt3'},
-  GT2:{image:IRACING_BADGE,css:'gt3'},
-  'GTP Classic':{image:IRACING_BADGE,css:'hyper'},
-  'GTO Classic':{image:IRACING_BADGE,css:'gt3'},
-  Production:{image:IRACING_BADGE,css:'gt3'},
-  Supercars:{image:IRACING_BADGE,css:'gt3'}
+  GTP:{image:'iracing-gtp.svg',css:'hyper'},
+  'LMP2 P217':{image:'iracing-lmp2.svg',css:'lmp2'},
+  'LMP3 P320':{image:'iracing-lmp3.svg',css:'lmp3'},
+  GT3:{image:'iracing-gt3.svg',css:'gt3'},
+  'Porsche Cup':{image:'iracing-cup.svg',css:'gt3'},
+  GT4:{image:'iracing-gt4.svg',css:'gt3'},
+  TCR:{image:'iracing-tcr.svg',css:'gt3'},
+  M2:{image:'iracing-m2.svg',css:'gt3'},
+  'Historic LMP2':{image:'iracing-historic-lmp2.svg',css:'lmp2'},
+  GT1:{image:'iracing-gt1.svg',css:'gt3'},
+  GT2:{image:'iracing-gt2.svg',css:'gt3'},
+  'GTP Classic':{image:'iracing-gtp-classic.svg',css:'hyper'},
+  'GTO Classic':{image:'iracing-gto-classic.svg',css:'gt3'},
+  Production:{image:'iracing-production.svg',css:'gt3'},
+  Supercars:{image:'iracing-supercars.svg',css:'gt3'}
 };
 
 const LMU_CARS = {
@@ -100,8 +98,7 @@ const LMU_CARS = {
 };
 
 const IRACING_CARS = {
-  GTP: ['Acura ARX-06 GTP','BMW M Hybrid V8 (EVO)','Cadillac V-Series.R GTP','Ferrari 499P','Porsche 963 GTP'],
-  HYP: ['Aston Martin Valkyrie AMR-LMH'],
+  GTP: ['Acura ARX-06 GTP','Aston Martin Valkyrie AMR-LMH','BMW M Hybrid V8 (EVO)','Cadillac V-Series.R GTP','Ferrari 499P','Porsche 963 GTP'],
   'LMP2 P217': ['Dallara P217 LMP2'],
   'LMP3 P320': ['Ligier JS P320'],
   GT3: ['Acura NSX GT3 EVO 22','Aston Martin Vantage GT3 EVO','Audi R8 LMS EVO II GT3','BMW M4 GT3 EVO','Chevrolet Corvette Z06 GT3.R','Ferrari 296 GT3','Ford Mustang GT3','Lamborghini Huracán GT3 EVO','McLaren 720S GT3 EVO','Mercedes-AMG GT3 2020','Porsche 911 GT3 R (992)'],
