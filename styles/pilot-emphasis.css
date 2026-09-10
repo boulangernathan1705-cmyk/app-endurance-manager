@@ -1,0 +1,19 @@
+.pilot-section .pilot-row.ux-current-pilot {
+  background: linear-gradient(90deg, rgba(240, 170, 105, .14), rgba(240, 170, 105, .035));
+  border-color: rgba(240, 170, 105, .48);
+  border-radius: 10px;
+  box-shadow: inset 3px 0 0 rgba(240, 170, 105, .78);
+}
+
+.pilot-section .pilot-row .edit-button.ux-pilot-edit {
+  border-color: rgba(236, 188, 144, .58);
+  background: rgba(236, 188, 144, .16);
+  color: #f1d4b9;
+}
+
+.pilot-section .pilot-row .edit-button.ux-pilot-edit:hover,
+.pilot-section .pilot-row .edit-button.ux-pilot-edit:focus-visible {
+  border-color: rgba(236, 188, 144, .8);
+  background: rgba(236, 188, 144, .24);
+  color: #ffe7d1;
+}
