@@ -28,13 +28,11 @@ async function clickVisible(page,sel){const e=page.locator(sel).first();if(!(awa
 
 const browser=await chromium.launch({headless:true});let count=0;
 try{
- // Organisateur : création directe depuis le vrai bandeau
  {
   const {context,page}=await makePage(browser,'organizer',true);
   if(await clickVisible(page,'[data-crew-builder-open]')){if(await shot(page,'org-create-crew','.crew-builder-panel','[data-crew-builder-submit]','Créer l’équipage'))count++;}
   await context.close();
  }
- // Organisateur : vraie page Équipages
  {
   const {context,page}=await makePage(browser,'organizer',true);
   await clickVisible(page,'[data-action="event-section"][data-section="crews"]');
@@ -56,7 +54,6 @@ try{
   if(await shot(page,'org-unassigned','.ux-remaining-pilots-section','.ux-remaining-heading','Pilotes non affectés'))count++;
   await context.close();
  }
- // Pilote : vraie vue compacte des équipages dans Course
  {
   const {context,page}=await makePage(browser,'pilot',true);
   const fold=page.locator('#departure-dep-help').first();
@@ -64,9 +61,16 @@ try{
   const bucket=page.locator('.ux-crew-bucket').filter({has:page.locator('.crew-pilot-accordion')}).first();
   if(await bucket.count()){const bsum=bucket.locator(':scope > summary');if(await bsum.count()&&await bsum.isVisible()&&!await bucket.evaluate(el=>el.open))await bsum.click();await page.waitForTimeout(500);}
   if(await shot(page,'pilot-crew','.ux-course-overview','.crew-pilot-accordion-summary','Ouvre ton équipage'))count++;
-  const crew=page.locator('details.crew-pilot-accordion').first();if(await crew.count()){const csum=crew.locator(':scope > summary');if(await csum.count()&&await csum.isVisible()&&!await crew.evaluate(el=>el.open))await csum.click();await page.waitForTimeout(400);if(await shot(page,'pilot-crew-details','details.crew-pilot-accordion','.presence-timeline','Tes disponibilités'))count++;}
+  const crew=page.locator('details.crew-pilot-accordion').first();
+  if(await crew.count()){
+    const csum=crew.locator(':scope > summary');
+    if(await csum.count()&&await csum.isVisible()&&!await crew.evaluate(el=>el.open))await csum.click();
+    await crew.evaluate(el=>{el.open=true;});
+    await page.waitForTimeout(450);
+    if(await shot(page,'pilot-crew-details','details.crew-pilot-accordion','.crew-pilot-accordion-body','Détail de l’équipage'))count++;
+  }
   await context.close();
  }
 }finally{await browser.close();}
 console.log('DONE_CREW',count);
-if(count<5)throw new Error(`Seulement ${count} captures équipage générées.`);
+if(count<6)throw new Error(`Seulement ${count} captures équipage générées.`);
