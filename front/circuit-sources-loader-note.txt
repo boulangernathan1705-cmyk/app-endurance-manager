@@ -1,0 +1,1 @@
+Le chargement des cartes est géré par circuit-sources.mjs via l'attribut src des images afin d'assurer la compatibilité Safari/iOS.
