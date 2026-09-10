@@ -1,0 +1,40 @@
+name: Banner optimization preview
+
+on:
+  push:
+    branches: [refactor/cloudflare-delivery-optimization]
+    paths: ['.github/workflows/banner-optimization-preview.yml']
+
+permissions:
+  contents: read
+
+jobs:
+  optimize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install pillow
+      - name: Generate comparison variants
+        run: |
+          mkdir -p banner-preview
+          cp images/endurance-manager-banner.webp banner-preview/original.webp
+          python - <<'PY'
+          from pathlib import Path
+          from PIL import Image
+
+          source = Path('images/endurance-manager-banner.webp')
+          image = Image.open(source).convert('RGB')
+          print('dimensions=', image.size, 'original=', source.stat().st_size)
+          for quality in (76, 82, 88):
+              target = Path(f'banner-preview/banner-q{quality}.webp')
+              image.save(target, 'WEBP', quality=quality, method=6)
+              print(target.name, target.stat().st_size)
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: banner-preview
+          path: banner-preview/
+          compression-level: 0
