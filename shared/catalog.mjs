@@ -1,13 +1,12 @@
-export const CATEGORIES = ['Hypercar','LMP2 ELMS','LMP2 WEC','LMP3','GT3','GTE'];
+export const GAME_IDS = ['lmu','iracing'];
 
-export const EVENT_TYPES = {
+const SHARED_EVENT_TYPES = {
   special:{label:'Special event',css:'special'},
   lmu:{label:'Championnat LMU',css:'lmu'},
   private:{label:'Championnat privé',css:'private'}
 };
-export const EVENT_TYPE_IDS = Object.keys(EVENT_TYPES);
 
-export const CIRCUITS = [
+const LMU_CIRCUITS = [
   {id:'bahrain',name:'Bahrain International Circuit',file:'bahrain.png'},
   {id:'barcelona',name:'Circuit de Barcelona-Catalunya',file:'barcelone.png'},
   {id:'cota',name:'Circuit of the Americas',file:'cota.png'},
@@ -26,11 +25,40 @@ export const CIRCUITS = [
   {id:'spa',name:'Circuit de Spa-Francorchamps',file:'spa_francorchamps.png'}
 ];
 
-// Kept for backward compatibility with events created through the older API.
-export const LEGACY_CIRCUIT_IDS = ['nurburgring'];
-export const CIRCUIT_IDS = [...CIRCUITS.map(circuit => circuit.id), ...LEGACY_CIRCUIT_IDS];
+const IRACING_CIRCUITS = [
+  {id:'iracing-adelaide',name:'Adelaide Street Circuit',file:'track-placeholder.svg'},
+  {id:'iracing-portimao',name:'Algarve International Circuit (Portimão)',file:'algarve.png'},
+  {id:'iracing-mexico',name:'Autódromo Hermanos Rodríguez',file:'track-placeholder.svg'},
+  {id:'iracing-interlagos',name:'Autódromo José Carlos Pace (Interlagos)',file:'interlagos.png'},
+  {id:'iracing-imola',name:'Autodromo Internazionale Enzo e Dino Ferrari',file:'imola.png'},
+  {id:'iracing-monza',name:'Autodromo Nazionale Monza',file:'monza.png'},
+  {id:'iracing-mugello',name:'Autodromo Internazionale del Mugello',file:'track-placeholder.svg'},
+  {id:'iracing-barcelona',name:'Circuit de Barcelona-Catalunya',file:'barcelone.png'},
+  {id:'iracing-spa',name:'Circuit de Spa-Francorchamps',file:'spa_francorchamps.png'},
+  {id:'iracing-le-mans',name:'Circuit des 24 Heures du Mans',file:'le_mans.png'},
+  {id:'iracing-cota',name:'Circuit of the Americas',file:'cota.png'},
+  {id:'iracing-daytona',name:'Daytona International Speedway',file:'daytona.png'},
+  {id:'iracing-fuji',name:'Fuji International Speedway',file:'fuji.png'},
+  {id:'iracing-hockenheim',name:'HockenheimRing',file:'track-placeholder.svg'},
+  {id:'iracing-indianapolis',name:'Indianapolis Motor Speedway',file:'track-placeholder.svg'},
+  {id:'iracing-road-atlanta',name:'Michelin Raceway Road Atlanta',file:'track-placeholder.svg'},
+  {id:'iracing-bathurst',name:'Mount Panorama Circuit',file:'track-placeholder.svg'},
+  {id:'iracing-nurburgring-gp',name:'Nürburgring Grand-Prix-Strecke',file:'track-placeholder.svg'},
+  {id:'iracing-nordschleife',name:'Nürburgring Nordschleife',file:'track-placeholder.svg'},
+  {id:'iracing-red-bull-ring',name:'Red Bull Ring',file:'track-placeholder.svg'},
+  {id:'iracing-road-america',name:'Road America',file:'track-placeholder.svg'},
+  {id:'iracing-sebring',name:'Sebring International Raceway',file:'sebring.png'},
+  {id:'iracing-silverstone',name:'Silverstone Circuit',file:'silverstone.png'},
+  {id:'iracing-sonoma',name:'Sonoma Raceway',file:'track-placeholder.svg'},
+  {id:'iracing-suzuka',name:'Suzuka International Racing Course',file:'track-placeholder.svg'},
+  {id:'iracing-vir',name:'Virginia International Raceway',file:'track-placeholder.svg'},
+  {id:'iracing-watkins-glen',name:'Watkins Glen International',file:'track-placeholder.svg'},
+  {id:'iracing-laguna-seca',name:'WeatherTech Raceway Laguna Seca',file:'laguna_seca.png'},
+  {id:'iracing-zandvoort',name:'Circuit Zandvoort',file:'track-placeholder.svg'},
+  {id:'iracing-tbd',name:'Circuit à préciser',file:'track-placeholder.svg'}
+];
 
-export const categories = {
+const LMU_CATEGORIES = {
   Hypercar:{image:'HC.png',css:'hyper'},
   'LMP2 ELMS':{image:'LMP2.png',css:'lmp2'},
   'LMP2 WEC':{image:'LMP2.png',css:'lmp2'},
@@ -39,7 +67,15 @@ export const categories = {
   GTE:{image:'GTE.webp',css:'gte'}
 };
 
-export const CARS = {
+const IRACING_CATEGORIES = {
+  GTP:{image:'HC.png',css:'hyper'},
+  LMP2:{image:'LMP2.png',css:'lmp2'},
+  GT3:{image:'GT3.webp',css:'gt3'},
+  GT4:{image:'GT3.webp',css:'gt3'},
+  TCR:{image:'GT3.webp',css:'gt3'}
+};
+
+const LMU_CARS = {
   Hypercar: ['Alpine A424','Aston Martin Valkyrie AMR LMH','BMW M Hybrid V8','Cadillac V-Series.R','Ferrari 499P','Genesis GMR-001 LMDh','Glickenhaus SCG 007','Isotta Fraschini Tipo 6-C','Lamborghini SC63','Peugeot 9X8','Porsche 963','Toyota GR010 Hybrid','Vanwall Vandervell 680'],
   'LMP2 ELMS': ['Oreca 07 Gibson ELMS'],
   'LMP2 WEC': ['Oreca 07 Gibson'],
@@ -47,3 +83,62 @@ export const CARS = {
   GT3: ['Aston Martin Vantage AMR LMGT3','BMW M4 LMGT3','Chevrolet Corvette Z06 LMGT3.R','Ferrari 296 LMGT3','Ford Mustang LMGT3','Lamborghini Huracán LMGT3','Lexus RC F LMGT3','Mercedes-AMG LMGT3','McLaren 720S LMGT3','Porsche 911 GT3 R LMGT3'],
   GTE: ['Aston Martin Vantage GTE','Chevrolet Corvette C8.R','Ferrari 488 GTE','Porsche 911 RSR-19']
 };
+
+const IRACING_CARS = {
+  GTP: ['Acura ARX-06 GTP','BMW M Hybrid V8 Evo','Cadillac V-Series.R GTP','Ferrari 499P','Porsche 963 GTP'],
+  LMP2: ['Dallara P217 LMP2'],
+  GT3: ['Acura NSX GT3 EVO 22','Aston Martin Vantage GT3 EVO','Audi R8 LMS EVO II GT3','BMW M4 GT3 EVO','Chevrolet Corvette Z06 GT3.R','Ferrari 296 GT3','Ford Mustang GT3','Lamborghini Huracán GT3 EVO','McLaren 720S GT3 EVO','Mercedes-AMG GT3 2020','Porsche 911 GT3 R (992)'],
+  GT4: ['Aston Martin Vantage GT4','BMW M4 G82 GT4','Ford Mustang GT4','McLaren 570S GT4','Mercedes-AMG GT4','Porsche 718 Cayman GT4 Clubsport MR'],
+  TCR: ['Audi RS 3 LMS Gen2 TCR','Honda Civic Type R TCR','Hyundai Elantra N TCR','Hyundai Veloster N TCR']
+};
+
+export const GAME_CATALOGS = {
+  lmu:{
+    id:'lmu',
+    name:'Le Mans Ultimate',
+    shortName:'LMU',
+    eventTypes:SHARED_EVENT_TYPES,
+    circuits:LMU_CIRCUITS,
+    categories:LMU_CATEGORIES,
+    cars:LMU_CARS
+  },
+  iracing:{
+    id:'iracing',
+    name:'iRacing',
+    shortName:'iRacing',
+    eventTypes:{...SHARED_EVENT_TYPES,lmu:{label:'Championnat iRacing',css:'lmu'}},
+    circuits:IRACING_CIRCUITS,
+    categories:IRACING_CATEGORIES,
+    cars:IRACING_CARS
+  }
+};
+
+export function catalogForGame(game='lmu') {
+  return GAME_CATALOGS[GAME_IDS.includes(game) ? game : 'lmu'];
+}
+
+export function gameForEvent(event) {
+  return String(event?.circuit || '').startsWith('iracing-') ? 'iracing' : 'lmu';
+}
+
+export const LEGACY_CIRCUIT_IDS = ['nurburgring'];
+export const EVENT_TYPE_IDS = Object.keys(SHARED_EVENT_TYPES);
+
+const browserGame = GAME_IDS.includes(globalThis?.__ENDURANCE_GAME__) ? globalThis.__ENDURANCE_GAME__ : 'lmu';
+const browserCatalog = catalogForGame(browserGame);
+const serverCatalog = typeof document === 'undefined';
+const unique = values => [...new Set(values)];
+const mergeCars = () => {
+  const output = {};
+  for (const catalog of Object.values(GAME_CATALOGS)) {
+    for (const [category,list] of Object.entries(catalog.cars)) output[category] = unique([...(output[category] || []),...list]);
+  }
+  return output;
+};
+
+export const EVENT_TYPES = browserCatalog.eventTypes;
+export const CATEGORIES = serverCatalog ? unique(Object.values(GAME_CATALOGS).flatMap(catalog => Object.keys(catalog.categories))) : Object.keys(browserCatalog.categories);
+export const CIRCUITS = serverCatalog ? Object.values(GAME_CATALOGS).flatMap(catalog => catalog.circuits) : browserCatalog.circuits;
+export const CIRCUIT_IDS = unique([...CIRCUITS.map(circuit => circuit.id),...LEGACY_CIRCUIT_IDS]);
+export const categories = serverCatalog ? Object.assign({},...Object.values(GAME_CATALOGS).map(catalog => catalog.categories)) : browserCatalog.categories;
+export const CARS = serverCatalog ? mergeCars() : browserCatalog.cars;
