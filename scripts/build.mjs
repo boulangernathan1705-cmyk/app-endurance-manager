@@ -86,7 +86,7 @@ const gameHtml = productionHtml(sourceGame);
 await writeFile(new URL('lmu/index.html', out), gameHtml);
 await writeFile(new URL('iracing/index.html', out), gameHtml);
 
-for (const file of ['app.js', 'crew-accordion.js', 'crew-builder.js', 'ux-refinement.js', 'help.js', 'privacy.html', 'privacy.css', 'legal.html']) {
+for (const file of ['app.js', 'crew-accordion.js', 'crew-builder.js', 'ux-refinement.js', 'help.js', 'privacy.html', 'privacy.css', 'legal.html', 'circuit-credits.html']) {
   await copyFile(root + file, new URL(file, out));
 }
 await copyFile(root + 'help.css', new URL('help.css', out));
@@ -100,7 +100,7 @@ if (!workers) {
 }
 
 await writeFile(new URL('_headers', out), `/*
-  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' https://commons.wikimedia.org https://upload.wikimedia.org; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'
   X-Content-Type-Options: nosniff
   Referrer-Policy: no-referrer
   X-Frame-Options: DENY
