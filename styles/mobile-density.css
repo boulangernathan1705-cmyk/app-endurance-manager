@@ -1,0 +1,161 @@
+/* Second mobile pass based on real phone captures. Desktop remains untouched. */
+@media (max-width: 760px) {
+  /* Course: the compact summary already contains team/car/status. Do not repeat them when opened. */
+  .crew-pilot-accordion-body > .crew-pilot-group-header {
+    display: none !important;
+  }
+  .crew-pilot-accordion-body > .crew-capacity-message.is-complete {
+    display: none !important;
+  }
+  .crew-pilot-accordion-body {
+    padding-top: 8px !important;
+  }
+
+  /* Unassigned pilots: keep the edit action useful without making it dominate the card. */
+  .ux-unassigned-grid > .pilot-row,
+  .crew-pilot-accordion-body > .pilot-row {
+    position: relative;
+  }
+  .pilot-row > .edit-button {
+    width: auto !important;
+    min-width: 78px !important;
+    min-height: 34px !important;
+    height: 34px !important;
+    padding: 5px 10px !important;
+    font-size: 12px !important;
+    align-self: flex-end;
+  }
+
+  /* Management accordion: summary is the identity, body is only for actions/details. */
+  .crew-management-accordion-body > .crew-card-header {
+    padding: 9px 10px !important;
+    border-bottom: 1px solid rgba(70,108,113,.38);
+  }
+  .crew-management-accordion-body > .crew-card-header > div > .event-category-badge,
+  .crew-management-accordion-body > .crew-card-header > div > h3,
+  .crew-management-accordion-body > .crew-card-header > div > .crew-car {
+    display: none !important;
+  }
+  .crew-management-accordion-body > .crew-card-header > div {
+    width: 100%;
+  }
+  .crew-management-accordion-body .coverage-summary {
+    margin: 0 !important;
+    padding: 5px 8px !important;
+    font-size: 10px !important;
+  }
+
+  /* Open/complete selector becomes a compact toolbar instead of a full-width form block. */
+  .crew-management-accordion-body .crew-state-control {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    flex-wrap: nowrap !important;
+    gap: 10px !important;
+    margin: 0 !important;
+  }
+  .crew-management-accordion-body .crew-state-label {
+    flex: 0 0 auto;
+    font-size: 10px !important;
+  }
+  .crew-management-accordion-body .crew-state-select-wrap {
+    width: auto !important;
+    min-width: 138px;
+    margin-left: auto;
+  }
+  .crew-management-accordion-body .crew-state-select {
+    width: auto !important;
+    min-width: 138px;
+    min-height: 38px !important;
+    padding: 6px 30px 6px 10px !important;
+    font-size: 12px !important;
+  }
+
+  /* Roster: one compact row per pilot with a small destructive action at the right. */
+  .crew-management-accordion-body .crew-roster {
+    gap: 5px !important;
+    padding: 7px 0 !important;
+  }
+  .crew-management-accordion-body .crew-roster > li {
+    display: grid !important;
+    grid-template-columns: minmax(0,1fr) auto !important;
+    align-items: center !important;
+    gap: 8px !important;
+    min-height: 58px;
+    padding: 8px 9px !important;
+  }
+  .crew-management-accordion-body .crew-roster > li > div {
+    min-width: 0;
+  }
+  .crew-management-accordion-body .crew-roster .crew-pilot-name {
+    display: block;
+    overflow: hidden;
+    font-size: 13px !important;
+    line-height: 1.2;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .crew-management-accordion-body .crew-roster small {
+    display: block;
+    margin-top: 2px;
+    overflow: hidden;
+    font-size: 10.5px !important;
+    line-height: 1.25;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .crew-management-accordion-body .crew-roster > li > .crew-member-action {
+    width: auto !important;
+    min-width: 70px !important;
+    min-height: 34px !important;
+    padding: 5px 9px !important;
+    font-size: 11px !important;
+  }
+
+  /* Keep the crew body dense: timelines and candidates remain readable but don't add large blank zones. */
+  .crew-management-accordion-body .presence-timeline {
+    margin-top: 5px !important;
+  }
+  .crew-management-accordion-body .crew-candidate-action-card {
+    grid-template-columns: minmax(0,1fr) auto !important;
+    align-items: center !important;
+    gap: 8px !important;
+    padding: 8px 9px !important;
+  }
+  .crew-management-accordion-body .crew-add-pilot-button {
+    width: auto !important;
+    min-width: 70px !important;
+    min-height: 34px !important;
+    padding: 5px 9px !important;
+    font-size: 11px !important;
+  }
+
+  /* Slightly tighter compact crew cards visible before expansion. */
+  .crew-pilot-accordion-summary,
+  .crew-management-summary {
+    min-height: 58px !important;
+    padding: 8px 9px !important;
+  }
+  .crew-compact-team strong {
+    font-size: 13px !important;
+  }
+  .crew-compact-pilots,
+  .crew-compact-car {
+    font-size: 10px !important;
+  }
+}
+
+@media (max-width: 390px) {
+  .crew-management-accordion-body .crew-state-label > span:last-child {
+    display: none;
+  }
+  .crew-management-accordion-body .crew-state-select-wrap,
+  .crew-management-accordion-body .crew-state-select {
+    min-width: 126px;
+  }
+  .crew-management-accordion-body .crew-roster > li > .crew-member-action,
+  .crew-management-accordion-body .crew-add-pilot-button {
+    min-width: 64px !important;
+  }
+}
