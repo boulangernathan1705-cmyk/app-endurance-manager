@@ -368,3 +368,9 @@
     font-size: 11px;
   }
 }
+
+@media (max-width: 700px) {
+  header.site-hero {
+    padding: 0;
+  }
+}
