@@ -5,9 +5,8 @@ on:
     branches:
       - feature/help-real-screenshots
     paths:
-      - scripts/capture-help-screenshots.mjs
+      - scripts/capture-help-screenshots-v2.mjs
       - .github/workflows/help-screenshots.yml
-      - capture-help-screenshots.trigger
 
 permissions:
   contents: write
@@ -37,7 +36,7 @@ jobs:
         run: |
           python3 -m http.server 4173 -d public > /tmp/help-server.log 2>&1 &
           sleep 2
-          node scripts/capture-help-screenshots.mjs
+          node scripts/capture-help-screenshots-v2.mjs
 
       - name: Commit screenshots
         run: |
