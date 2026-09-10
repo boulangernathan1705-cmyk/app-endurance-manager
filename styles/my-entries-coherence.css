@@ -5,7 +5,7 @@
 
 .ux-managed-entry-name {
   display: block;
-  margin-bottom: 1px;
+  margin-bottom: 2px;
   color: #f4ead9;
   font-size: 18px;
   font-weight: 900;
@@ -43,6 +43,7 @@
   gap: 10px !important;
 }
 
+/* Les deux blocs reprennent les accordéons de Course. */
 .ux-my-entry-content-accordion {
   overflow: hidden;
   border: 1px solid rgba(73,118,123,.5);
@@ -107,6 +108,7 @@
   padding: 12px 14px 14px;
 }
 
+/* Mon équipage : en-tête compact puis uniquement des cartes pilotes identiques à Course. */
 .ux-my-own-crew {
   padding: 12px;
   border: 1px solid color-mix(in srgb, var(--category-color, #52cfd4) 55%, rgba(73,118,123,.55));
@@ -126,7 +128,7 @@
 .ux-my-own-crew-head {
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 10px;
+  margin-bottom: 12px;
 }
 
 .ux-my-own-crew-identity {
@@ -174,20 +176,28 @@
   text-transform: uppercase;
 }
 
-.ux-my-crew-pilot-grid,
-.ux-my-registered-pilot-grid {
+/* Grille identique pour coéquipiers et pilotes sans équipage. */
+.ux-my-pilot-grid {
   display: grid;
-  grid-template-columns: repeat(3,minmax(0,1fr));
   gap: 10px;
+  width: 100%;
 }
 
+.ux-my-pilot-grid-1 { grid-template-columns: minmax(0,1fr); }
+.ux-my-pilot-grid-2 { grid-template-columns: repeat(2,minmax(0,1fr)); }
+.ux-my-pilot-grid-3 { grid-template-columns: repeat(3,minmax(0,1fr)); }
+
 .ux-my-entry-pilot-card {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: stretch !important;
+  gap: 7px !important;
   min-width: 0;
   height: 100%;
   margin: 0 !important;
-  padding: 11px !important;
+  padding: 12px !important;
   border: 1px solid rgba(73,118,123,.55) !important;
-  border-radius: 9px;
+  border-radius: 10px;
   background: rgba(12,18,20,.82);
 }
 
@@ -197,27 +207,39 @@
   box-shadow: inset 3px 0 0 var(--fmt-cyan, #52cfd4);
 }
 
+.ux-my-entry-pilot-card .pilot-main {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex-wrap: wrap;
+}
+
 .ux-my-entry-pilot-card .pilot-name {
   color: #f4ead9;
   font-weight: 900;
 }
 
+.ux-my-entry-pilot-card .pilot-category-logo .category-logo,
+.ux-my-entry-pilot-card .pilot-category-logo > img,
+.ux-my-entry-pilot-card .category-logo {
+  width: 31px;
+  height: 31px;
+  object-fit: contain;
+}
+
+.ux-my-entry-pilot-card .pilot-car {
+  min-width: 0;
+  color: #b7c3c4;
+  overflow-wrap: anywhere;
+}
+
 .ux-my-entry-pilot-card .presence-timeline {
-  margin-top: 8px;
+  width: 100%;
+  margin-top: auto;
+  padding-top: 5px;
 }
 
-.ux-my-crew-coverage {
-  margin-top: 10px;
-  padding-top: 8px;
-  border-top: 1px solid rgba(73,118,123,.34);
-}
-
-.ux-my-own-crew .coverage-note {
-  margin: 7px 0 0;
-  color: #94a3a5;
-  font-size: 11px;
-}
-
+/* En attente d'équipage : même carte pilote, sans ancien résumé Heure 1/2/3. */
 .ux-my-awaiting-crew {
   display: grid;
   gap: 10px;
@@ -243,6 +265,7 @@
   font-size: 12px;
 }
 
+/* Autres équipages restent volontairement plus discrets. */
 .ux-my-other-crews {
   margin-top: 14px;
   padding-top: 12px;
@@ -314,8 +337,7 @@
 }
 
 @media (max-width: 1100px) {
-  .ux-my-crew-pilot-grid,
-  .ux-my-registered-pilot-grid,
+  .ux-my-pilot-grid-3,
   .ux-my-other-crews-grid {
     grid-template-columns: repeat(2,minmax(0,1fr));
   }
@@ -356,8 +378,8 @@
     flex-direction: column;
   }
 
-  .ux-my-crew-pilot-grid,
-  .ux-my-registered-pilot-grid,
+  .ux-my-pilot-grid-2,
+  .ux-my-pilot-grid-3,
   .ux-my-other-crews-grid {
     grid-template-columns: minmax(0,1fr);
   }
