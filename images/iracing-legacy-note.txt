@@ -1,1 +1,0 @@
-Les catégories iRacing utilisent désormais un badge SVG distinct par catégorie. Ce fichier peut être supprimé après validation si inutile.
