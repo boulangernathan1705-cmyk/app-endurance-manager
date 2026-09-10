@@ -28,6 +28,25 @@ function logo(category) {
     : `<span class="category-text-logo" aria-hidden="true">${esc(category)}</span>`;
 }
 
+function decorateEventHeaderCountdown() {
+  const header = app?.querySelector('.event-header[data-event-id]');
+  const timer = header?.querySelector('.event-header-countdown');
+  const copy = header?.querySelector('.event-heading-copy');
+  if (!timer || !copy) return;
+
+  const subtitle = copy.querySelector('.event-subtitle');
+  if (timer.parentElement !== copy) {
+    if (subtitle) subtitle.insertAdjacentElement('afterend', timer);
+    else copy.append(timer);
+  }
+
+  const value = timer.querySelector('[data-countdown]');
+  if (value && timer.dataset.uxHeaderCountdown !== 'true') {
+    timer.dataset.uxHeaderCountdown = 'true';
+    timer.replaceChildren(document.createTextNode('Prochain départ dans '), value);
+  }
+}
+
 function decorateDepartureHeaders() {
   app?.querySelectorAll('.departure-fold[id]').forEach(fold => {
     const summary = fold.querySelector(':scope > summary');
@@ -93,6 +112,7 @@ function decorateRemainingPilots() {
 }
 
 function decorate() {
+  decorateEventHeaderCountdown();
   decorateDepartureHeaders();
   decorateRemainingPilots();
 }
