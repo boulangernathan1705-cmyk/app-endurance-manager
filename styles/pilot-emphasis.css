@@ -17,3 +17,42 @@
   background: rgba(236, 188, 144, .24);
   color: #ffe7d1;
 }
+
+/* Course: les pilotes d’un équipage utilisent les mêmes cartes lisibles que les inscrits. */
+.crew-pilot-accordion-body {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 10px;
+  align-items: stretch;
+}
+
+.crew-pilot-accordion-body > .crew-capacity-message,
+.crew-pilot-accordion-body > .empty {
+  grid-column: 1 / -1;
+}
+
+.crew-pilot-accordion-body > .pilot-row {
+  min-width: 0;
+  height: 100%;
+  margin: 0 !important;
+  padding: 12px !important;
+  border: 1px solid color-mix(in srgb, var(--crew-color) 30%, var(--border)) !important;
+  border-radius: 10px;
+  background: var(--panel2);
+}
+
+.crew-pilot-accordion-body > .pilot-row .presence-timeline {
+  width: 100%;
+}
+
+/* Le tri est calculé en JS mais appliqué par CSS order : aucun déplacement DOM. */
+.ux-crew-bucket-body > .crew-pilot-accordion,
+.crew-list > .crew-card {
+  order: var(--crew-visual-order, initial);
+}
+
+@media (max-width: 760px) {
+  .crew-pilot-accordion-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
