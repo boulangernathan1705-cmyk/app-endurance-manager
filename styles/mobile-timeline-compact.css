@@ -1,39 +1,56 @@
-@media (max-width: 700px) {
-  /* Compact mobile timeline: keep the same information while using much less vertical space. */
-  .presence-timeline {
-    margin-top: 2px;
+@media (max-width: 760px) {
+  /* Final mobile timeline sizing. This file is intentionally loaded last in game.html. */
+  .ux-unassigned-grid > .pilot-row,
+  .crew-pilot-accordion-body > .pilot-row {
+    padding-top: 6px !important;
+    padding-bottom: 6px !important;
+    gap: 3px !important;
   }
 
-  .presence-scale,
+  .ux-unassigned-grid .presence-timeline,
+  .crew-pilot-accordion-body .presence-timeline,
+  .crew-management-accordion-body .presence-timeline,
+  :is(.pilot-row, .crew-card) .presence-timeline {
+    margin-top: 0 !important;
+  }
+
+  .ux-unassigned-grid .presence-scale,
+  .crew-pilot-accordion-body .presence-scale,
+  .crew-management-accordion-body .presence-scale,
   :is(.pilot-row, .crew-card) .presence-scale {
-    height: 17px;
+    height: 15px !important;
   }
 
   .presence-time {
-    top: 0;
-    font-size: 10px;
-    line-height: 12px;
+    top: 0 !important;
+    font-size: 9px !important;
+    line-height: 10px !important;
   }
 
   .presence-boundary::after {
-    height: 4px;
+    height: 3px !important;
   }
 
   .presence-track {
-    border-radius: 5px;
+    border-radius: 4px !important;
   }
 
-  .presence-track > .presence-segment,
+  .ux-unassigned-grid .presence-track > .presence-segment,
+  .crew-pilot-accordion-body .presence-track > .presence-segment,
+  .crew-management-accordion-body .presence-track > .presence-segment,
   :is(.pilot-row, .crew-card) .presence-track > .presence-segment {
-    height: 20px;
-    font-size: 10px;
+    height: 16px !important;
+    min-height: 16px !important;
+    font-size: 9px !important;
   }
 
-  .presence-edges,
+  .ux-unassigned-grid .presence-edges,
+  .crew-pilot-accordion-body .presence-edges,
+  .crew-management-accordion-body .presence-edges,
   :is(.pilot-row, .crew-card) .presence-edges {
-    margin-top: 2px;
-    font-size: 9px;
-    line-height: 1.05;
-    letter-spacing: .25px;
+    margin-top: 1px !important;
+    font-size: 8px !important;
+    line-height: 1 !important;
+    letter-spacing: .15px !important;
   }
 }
