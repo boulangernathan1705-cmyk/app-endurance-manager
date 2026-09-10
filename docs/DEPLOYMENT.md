@@ -16,7 +16,11 @@ Cloudflare Workers déploie le projet avec `npx wrangler deploy`. Le fichier `wr
 
 Le build rassemble les feuilles CSS utilisées par `index.html` dans un unique `public/app.css`. Les fichiers CSS restent modulaires dans le dépôt pour faciliter les modifications, mais ils ne sont pas publiés séparément dans le build de production.
 
+L’aide est volontairement exclue du CSS principal : `front/help-loader.mjs` charge `help.js` et `help.css` uniquement lorsque l’utilisateur clique sur **Aide**. Les captures de l’aide utilisent déjà `loading="lazy"` et ne sont téléchargées que lorsqu’elles deviennent nécessaires.
+
 Le fichier `_headers` généré ne surcharge que les en-têtes de sécurité des assets statiques. Le cache statique reste géré par le comportement natif de Cloudflare Workers Static Assets (validation par ETag), afin d’éviter les règles dupliquées dans le dépôt. Les réponses de l’API restent explicitement en `Cache-Control: no-store` dans `server/core.mjs`.
+
+La bannière principale est validée au build : elle doit garder une largeur minimale de 1900 px, une hauteur minimale de 512 px et rester sous 300 000 octets. Cette limite protège le temps de chargement du premier écran.
 
 ## D1
 
