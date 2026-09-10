@@ -7,6 +7,31 @@
     gap: 3px !important;
   }
 
+  /* Keep pilot actions and category marks secondary to the availability itself. */
+  .pilot-row > .edit-button,
+  .pilot-row > .edit-button.ux-pilot-edit {
+    width: auto !important;
+    min-width: 62px !important;
+    min-height: 28px !important;
+    height: 28px !important;
+    padding: 3px 7px !important;
+    font-size: 10px !important;
+    line-height: 1 !important;
+    border-radius: 5px !important;
+  }
+
+  .pilot-category-logo {
+    align-self: center !important;
+  }
+
+  .pilot-category-logo .category-logo {
+    width: 30px !important;
+    height: 30px !important;
+    max-width: 30px !important;
+    max-height: 30px !important;
+    object-fit: contain !important;
+  }
+
   .ux-unassigned-grid .presence-timeline,
   .crew-pilot-accordion-body .presence-timeline,
   .crew-management-accordion-body .presence-timeline,
