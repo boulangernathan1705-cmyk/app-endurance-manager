@@ -1,8 +1,17 @@
 const app = document.getElementById('app');
 
-function closeAutomaticallyOpenedDepartures() {
+function resetDepartureFoldsClosed() {
   if (!app) return;
-  app.querySelectorAll('.departure-fold[open] > summary').forEach(summary => summary.click());
+
+  app.querySelectorAll('.departure-fold').forEach(fold => {
+    const summary = fold.querySelector(':scope > summary');
+    if (!summary) return;
+
+    // Go through the existing summary handler so its internal open-state cache
+    // is cleared too. A closed fold needs two toggles: open/add, then close/remove.
+    if (!fold.open) summary.click();
+    summary.click();
+  });
 }
 
 document.addEventListener('click', event => {
@@ -14,7 +23,6 @@ document.addEventListener('click', event => {
   if (!openingEventFromAgenda && !switchingEventSection) return;
 
   // The core renderer runs synchronously later in the same click dispatch.
-  // Closing in the next microtask keeps the first departure closed before paint,
-  // while going through the existing summary handler so its open-state cache stays in sync.
-  queueMicrotask(closeAutomaticallyOpenedDepartures);
+  // Resetting in the next microtask keeps every departure closed before paint.
+  queueMicrotask(resetDepartureFoldsClosed);
 }, true);
