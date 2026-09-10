@@ -10,6 +10,9 @@ function apply(root = document) {
     image.style.setProperty('--circuit-scale', String(config.scale));
     image.style.setProperty('--circuit-x', `${config.x}%`);
     image.style.setProperty('--circuit-y', `${config.y}%`);
+    image.style.setProperty('--circuit-mobile-scale', String(config.mobileScale));
+    image.style.setProperty('--circuit-mobile-x', `${config.mobileX}%`);
+    image.style.setProperty('--circuit-mobile-y', `${config.mobileY}%`);
 
     const src = circuitMapSource(config.file);
     if (src && image.src !== src) image.src = src;
