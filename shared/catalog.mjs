@@ -69,7 +69,7 @@ const LMU_CATEGORIES = {
 
 const IRACING_CATEGORIES = {
   GTP:{image:'HC.png',css:'hyper'},
-  LMP2:{image:'LMP2.png',css:'lmp2'},
+  'LMP2 P217':{image:'LMP2.png',css:'lmp2'},
   GT3:{image:'GT3.webp',css:'gt3'},
   GT4:{image:'GT3.webp',css:'gt3'},
   TCR:{image:'GT3.webp',css:'gt3'}
@@ -86,10 +86,10 @@ const LMU_CARS = {
 
 const IRACING_CARS = {
   GTP: ['Acura ARX-06 GTP','BMW M Hybrid V8 Evo','Cadillac V-Series.R GTP','Ferrari 499P','Porsche 963 GTP'],
-  LMP2: ['Dallara P217 LMP2'],
+  'LMP2 P217': ['Dallara P217 LMP2'],
   GT3: ['Acura NSX GT3 EVO 22','Aston Martin Vantage GT3 EVO','Audi R8 LMS EVO II GT3','BMW M4 GT3 EVO','Chevrolet Corvette Z06 GT3.R','Ferrari 296 GT3','Ford Mustang GT3','Lamborghini Huracán GT3 EVO','McLaren 720S GT3 EVO','Mercedes-AMG GT3 2020','Porsche 911 GT3 R (992)'],
   GT4: ['Aston Martin Vantage GT4','BMW M4 G82 GT4','Ford Mustang GT4','McLaren 570S GT4','Mercedes-AMG GT4','Porsche 718 Cayman GT4 Clubsport MR'],
-  TCR: ['Audi RS 3 LMS Gen2 TCR','Honda Civic Type R TCR','Hyundai Elantra N TCR','Hyundai Veloster N TCR']
+  TCR: ['Audi RS3 LMS TCR','Honda Civic Type R TCR','Hyundai Elantra N TCR','Hyundai Veloster N TCR']
 };
 
 export const GAME_CATALOGS = {
