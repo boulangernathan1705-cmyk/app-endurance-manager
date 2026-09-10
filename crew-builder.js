@@ -17,7 +17,7 @@ async function api(path, method = 'GET', data) {
     method,
     credentials: 'same-origin',
     cache: 'no-store',
-    headers: method === 'GET' ? {} : {'Content-Type': 'application/json'},
+    headers: method === 'GET' ? {} : {'Content-Type':'application/json'},
     body: method === 'GET' ? undefined : JSON.stringify(data || {})
   });
   const result = await response.json().catch(() => ({}));
@@ -240,7 +240,7 @@ async function openBuilder() {
   const eventId = currentEventId();
   if (!eventId) return;
   try {
-    const events = await loadEvents(true);
+    const events = await loadEvents();
     const event = events.find(item => item.id === eventId);
     if (!event) throw new Error('Événement introuvable. Actualise la page.');
     const departure = defaultDeparture(event);
