@@ -1,11 +1,23 @@
 /* Desktop event shell alignment.
    The desktop page is 1420px wide with 18px inner padding on each side,
    so its visible content column is 1384px. Keep the floating navigation
-   on that exact same axis. */
+   and the event content on that exact same axis. */
 @media (min-width: 761px) {
   .site-nav-shell {
     width: min(calc(100% - 36px), 1384px);
     max-width: 1384px;
     margin-inline: auto;
+  }
+
+  /* The circuit card was centered inside the right half of the event header.
+     Push it to the same right-hand axis as the navigation/logout control. */
+  .event-header-compact .event-heading-line > .circuit-visual {
+    justify-self: stretch;
+    justify-content: flex-end;
+  }
+
+  .event-header-compact .event-heading-line > .circuit-visual img {
+    margin-left: auto;
+    margin-right: 0;
   }
 }
