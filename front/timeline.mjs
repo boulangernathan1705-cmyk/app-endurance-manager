@@ -19,7 +19,8 @@ export function renderAvailabilityTimeline({departure, duration, status = '', co
   const hours = Array.from({length:duration + 1}, (_, i) => raceHourLabel(departure, i));
   const boundaries = hours.map((hour, i) => {
     const density = [4,6,10,16,24].filter(capacity => timelineLabelVisible(i, duration, capacity)).map(capacity => `ticks-${capacity}`).join(' ');
-    return `<span class="presence-boundary boundary-${i} ${i===duration?'is-finish':''}"><span class="presence-time ${density}">${hour}</span></span>`;
+    const position = duration ? (i / duration) * 100 : 0;
+    return `<span class="presence-boundary boundary-${i} ${i===duration?'is-finish':''}" style="left:${position}%"><span class="presence-time ${density}">${hour}</span></span>`;
   }).join('');
   const segments = Array.from({length:duration}, (_, i) => {
     const count = isCoverage ? Math.max(0, Number(counts[i]) || 0) : null;
@@ -30,13 +31,13 @@ export function renderAvailabilityTimeline({departure, duration, status = '', co
     const description = timelineEscape(`${range} · ${timelineDate.format(new Date(timestamp))} · ${detail}`);
     const coverageClass = isCoverage ? (count >= 2 ? ' coverage-two' : count === 1 ? ' coverage-one' : ' coverage-none') : '';
     const attributes = `class="presence-segment${present?' is-present':''}${coverageClass}" title="${description}" aria-label="${description}"`;
-    const marker = isCoverage ? (count > 0 ? String(count) : '·') : (present ? '✓' : '·');
-    const content = `<span aria-hidden="true">${marker}</span>`;
+    const marker = isCoverage ? (count > 0 ? String(count) : '') : '';
+    const content = marker ? `<span aria-hidden="true">${marker}</span>` : '';
     return interactive
       ? `<button type="button" ${attributes} data-action="availability" data-departure="${timelineEscape(departure.id)}" data-value="h${i+1}" aria-pressed="${present}">${content}</button>`
       : `<span ${attributes} role="img">${content}</span>`;
   }).join('');
-  return `<div class="presence-timeline duration-${duration}${interactive?' is-interactive':''}${isCoverage?' is-coverage':''}" role="group" aria-label="${timelineEscape(label)}">
+  return `<div class="presence-timeline duration-${duration}${interactive?' is-interactive':''}${isCoverage?' is-coverage':''}" style="--duration:${duration}" role="group" aria-label="${timelineEscape(label)}">
     <div class="presence-scale" aria-hidden="true">${boundaries}</div>
     <div class="presence-track">${segments}</div>
     <div class="presence-edges" aria-hidden="true"><span>DÉPART</span><span>ARRIVÉE</span></div>
