@@ -34,6 +34,8 @@ const IRACING_CIRCUITS = [
   {id:'iracing-monza',name:'Autodromo Nazionale Monza',file:'monza.png'},
   {id:'iracing-mugello',name:'Autodromo Internazionale del Mugello',file:'track-placeholder.svg'},
   {id:'iracing-barcelona',name:'Circuit de Barcelona-Catalunya',file:'barcelone.png'},
+  {id:'iracing-magny-cours',name:'Circuit de Nevers Magny-Cours',file:'track-placeholder.svg'},
+  {id:'iracing-misano',name:'Misano World Circuit Marco Simoncelli',file:'track-placeholder.svg'},
   {id:'iracing-spa',name:'Circuit de Spa-Francorchamps',file:'spa_francorchamps.png'},
   {id:'iracing-le-mans',name:'Circuit des 24 Heures du Mans',file:'le_mans.png'},
   {id:'iracing-cota',name:'Circuit of the Americas',file:'cota.png'},
@@ -44,13 +46,14 @@ const IRACING_CIRCUITS = [
   {id:'iracing-road-atlanta',name:'Michelin Raceway Road Atlanta',file:'track-placeholder.svg'},
   {id:'iracing-bathurst',name:'Mount Panorama Circuit',file:'track-placeholder.svg'},
   {id:'iracing-nurburgring-gp',name:'Nürburgring Grand-Prix-Strecke',file:'track-placeholder.svg'},
-  {id:'iracing-nordschleife',name:'Nürburgring Nordschleife',file:'track-placeholder.svg'},
+  {id:'iracing-nordschleife',name:'Nürburgring Combined / Nordschleife',file:'track-placeholder.svg'},
   {id:'iracing-red-bull-ring',name:'Red Bull Ring',file:'track-placeholder.svg'},
   {id:'iracing-road-america',name:'Road America',file:'track-placeholder.svg'},
   {id:'iracing-sebring',name:'Sebring International Raceway',file:'sebring.png'},
   {id:'iracing-silverstone',name:'Silverstone Circuit',file:'silverstone.png'},
   {id:'iracing-sonoma',name:'Sonoma Raceway',file:'track-placeholder.svg'},
   {id:'iracing-suzuka',name:'Suzuka International Racing Course',file:'track-placeholder.svg'},
+  {id:'iracing-thruxton',name:'Thruxton Circuit',file:'track-placeholder.svg'},
   {id:'iracing-vir',name:'Virginia International Raceway',file:'track-placeholder.svg'},
   {id:'iracing-watkins-glen',name:'Watkins Glen International',file:'track-placeholder.svg'},
   {id:'iracing-laguna-seca',name:'WeatherTech Raceway Laguna Seca',file:'laguna_seca.png'},
@@ -67,12 +70,24 @@ const LMU_CATEGORIES = {
   GTE:{image:'GTE.webp',css:'gte'}
 };
 
+const IRACING_BADGE = 'iracing-category.svg';
 const IRACING_CATEGORIES = {
-  GTP:{image:'HC.png',css:'hyper'},
-  'LMP2 P217':{image:'LMP2.png',css:'lmp2'},
-  GT3:{image:'GT3.webp',css:'gt3'},
-  GT4:{image:'GT3.webp',css:'gt3'},
-  TCR:{image:'GT3.webp',css:'gt3'}
+  GTP:{image:IRACING_BADGE,css:'hyper'},
+  HYP:{image:IRACING_BADGE,css:'hyper'},
+  'LMP2 P217':{image:IRACING_BADGE,css:'lmp2'},
+  'LMP3 P320':{image:IRACING_BADGE,css:'lmp3'},
+  GT3:{image:IRACING_BADGE,css:'gt3'},
+  'Porsche Cup':{image:IRACING_BADGE,css:'gt3'},
+  GT4:{image:IRACING_BADGE,css:'gt3'},
+  TCR:{image:IRACING_BADGE,css:'gt3'},
+  M2:{image:IRACING_BADGE,css:'gt3'},
+  'Historic LMP2':{image:IRACING_BADGE,css:'lmp2'},
+  GT1:{image:IRACING_BADGE,css:'gt3'},
+  GT2:{image:IRACING_BADGE,css:'gt3'},
+  'GTP Classic':{image:IRACING_BADGE,css:'hyper'},
+  'GTO Classic':{image:IRACING_BADGE,css:'gt3'},
+  Production:{image:IRACING_BADGE,css:'gt3'},
+  Supercars:{image:IRACING_BADGE,css:'gt3'}
 };
 
 const LMU_CARS = {
@@ -85,11 +100,22 @@ const LMU_CARS = {
 };
 
 const IRACING_CARS = {
-  GTP: ['Acura ARX-06 GTP','BMW M Hybrid V8 Evo','Cadillac V-Series.R GTP','Ferrari 499P','Porsche 963 GTP'],
+  GTP: ['Acura ARX-06 GTP','BMW M Hybrid V8 (EVO)','Cadillac V-Series.R GTP','Ferrari 499P','Porsche 963 GTP'],
+  HYP: ['Aston Martin Valkyrie AMR-LMH'],
   'LMP2 P217': ['Dallara P217 LMP2'],
+  'LMP3 P320': ['Ligier JS P320'],
   GT3: ['Acura NSX GT3 EVO 22','Aston Martin Vantage GT3 EVO','Audi R8 LMS EVO II GT3','BMW M4 GT3 EVO','Chevrolet Corvette Z06 GT3.R','Ferrari 296 GT3','Ford Mustang GT3','Lamborghini Huracán GT3 EVO','McLaren 720S GT3 EVO','Mercedes-AMG GT3 2020','Porsche 911 GT3 R (992)'],
+  'Porsche Cup': ['Porsche 911 GT3 Cup (992)','Porsche 911 Cup (992.2)'],
   GT4: ['Aston Martin Vantage GT4','BMW M4 G82 GT4','Ford Mustang GT4','McLaren 570S GT4','Mercedes-AMG GT4','Porsche 718 Cayman GT4 Clubsport MR'],
-  TCR: ['Audi RS3 LMS TCR','Honda Civic Type R TCR','Hyundai Elantra N TCR','Hyundai Veloster N TCR']
+  TCR: ['Audi RS 3 LMS TCR','Audi RS3 LMS Gen2 TCR','Honda Civic Type R TCR','Hyundai Elantra N TCR','Hyundai Veloster N TCR'],
+  M2: ['BMW M2 CS Racing','BMW M2 Racing (G87)'],
+  'Historic LMP2': ['HPD ARX-01c'],
+  GT1: ['Aston Martin DBR9 GT1','Chevrolet Corvette C6.R GT1'],
+  GT2: ['Ford GT GT2'],
+  'GTP Classic': ['Nissan GTP ZX-T'],
+  'GTO Classic': ['Audi 90 GTO'],
+  Production: ['BMW M2 CS Racing','Global Mazda MX-5 Cup','Renault Clio R.S. V','Toyota GR86'],
+  Supercars: ['Supercars Chevrolet Camaro Gen 3','Supercars Ford Mustang Gen 3']
 };
 
 export const GAME_CATALOGS = {
