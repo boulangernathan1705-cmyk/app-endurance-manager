@@ -50,12 +50,21 @@ const unusedAssets = assets.filter(item => {
 
 const warnings = [];
 const catalogPath = resolve(root, 'shared/catalog.mjs');
-const {CATEGORIES, EVENT_TYPES, CIRCUITS, CIRCUIT_IDS, categories, CARS} = await import(pathToFileURL(catalogPath).href + `?audit=${Date.now()}`);
+const {CATEGORIES, EVENT_TYPES, CIRCUITS, CIRCUIT_IDS, categories, CARS, GAME_CATALOGS} = await import(pathToFileURL(catalogPath).href + `?audit=${Date.now()}`);
 
 if (!CATEGORIES.length || new Set(CATEGORIES).size !== CATEGORIES.length) warnings.push('Le catalogue contient des catégories absentes ou dupliquées.');
 if (CATEGORIES.some(category => !categories[category] || !Array.isArray(CARS[category]))) warnings.push('Chaque catégorie doit avoir un style et une liste de voitures.');
 if (!Object.keys(EVENT_TYPES).length) warnings.push('Aucun type d’événement n’est défini.');
 if (new Set(CIRCUIT_IDS).size !== CIRCUIT_IDS.length) warnings.push('Les identifiants de circuits ne sont pas uniques.');
+if (!GAME_CATALOGS?.lmu || !GAME_CATALOGS?.iracing) warnings.push('Les catalogues LMU et iRacing doivent tous les deux être définis.');
+
+for (const [game,catalog] of Object.entries(GAME_CATALOGS || {})) {
+  const gameCategories = Object.keys(catalog.categories || {});
+  if (!gameCategories.length) warnings.push(`Le catalogue ${game} ne contient aucune catégorie.`);
+  if (gameCategories.some(category => !Array.isArray(catalog.cars?.[category]))) warnings.push(`Chaque catégorie ${game} doit avoir une liste de voitures.`);
+  const ids = (catalog.circuits || []).map(circuit => circuit.id);
+  if (!ids.length || new Set(ids).size !== ids.length) warnings.push(`Les circuits ${game} sont absents ou dupliqués.`);
+}
 
 for (const circuit of CIRCUITS) {
   try { await access(resolve(root, 'images/circuits', circuit.file)); }
@@ -65,8 +74,12 @@ for (const circuit of CIRCUITS) {
 const app = searchable.find(item => item.path === 'app.js')?.content || '';
 const worker = searchable.find(item => item.path === 'server/worker.mjs')?.content || '';
 const workerCore = searchable.find(item => item.path === 'server/core.mjs')?.content || '';
+const gameTemplate = searchable.find(item => item.path === 'game.html')?.content || '';
+const hub = searchable.find(item => item.path === 'index.html')?.content || '';
 if (!app.includes("from './shared/catalog.mjs'")) warnings.push('Le front n’utilise pas le catalogue partagé.');
 if (!app.includes("from './front/schedule.mjs'")) warnings.push('Le front n’utilise pas le module de calendrier partagé.');
+if (!hub.includes('href="/lmu/"') || !hub.includes('href="/iracing/"')) warnings.push('Le portail doit proposer les espaces LMU et iRacing.');
+if (!gameTemplate.includes('/front/game-context.js') || !gameTemplate.includes('/app.js')) warnings.push('Le gabarit de jeu doit charger le contexte puis l’application partagée.');
 const rootCss = searchable.find(item => item.path === 'styles.css')?.content || '';
 if (!rootCss.includes("/styles/foundation.css") || !rootCss.includes("/styles/application.css")) warnings.push('Les feuilles CSS modulaires ne sont pas chargées dans le bon point d’entrée.');
 if (!worker.includes("from '../shared/catalog.mjs'") && !workerCore.includes("from '../shared/catalog.mjs'")) {
@@ -79,20 +92,27 @@ if (!/"minify"\s*:\s*true/.test(wrangler)) warnings.push('Wrangler doit minifier
 if (!wrangler.includes('"/api/*"')) warnings.push('Cloudflare doit exécuter le Worker en priorité uniquement sur les routes /api/*.');
 
 const publicDir = resolve(root, 'public');
-const publicIndex = await readable(resolve(publicDir, 'index.html'));
 const publicCss = await readable(resolve(publicDir, 'app.css'));
 const publicHeaders = await readable(resolve(publicDir, '_headers'));
-if (!publicIndex) {
-  warnings.push('Le build public/ est absent. Lance npm run build:workers avant l’audit strict.');
-} else {
-  const stylesheetLinks = publicIndex.match(/<link\b[^>]*\brel=["']stylesheet["'][^>]*>/gi) || [];
-  if (stylesheetLinks.length !== 1 || !stylesheetLinks[0].includes('/app.css')) warnings.push('Le build de production doit charger une seule feuille /app.css.');
-  if (!publicCss.trim()) warnings.push('Le bundle public/app.css est absent ou vide.');
-  if (/@import\s+url\(/i.test(publicCss)) warnings.push('public/app.css contient encore des imports CSS et déclenchera des requêtes supplémentaires.');
-  if (await exists(resolve(publicDir, 'styles'))) warnings.push('Le dossier CSS source ne doit pas être publié séparément dans public/.');
-  if (await exists(resolve(publicDir, 'styles.css'))) warnings.push('styles.css est une source de build et ne doit pas être publié séparément.');
-  if (/^\s*Cache-Control:/mi.test(publicHeaders)) warnings.push('Le cache statique doit rester géré par Workers Static Assets et ses ETag natifs.');
+const builtPages = [
+  ['accueil',resolve(publicDir,'index.html')],
+  ['LMU',resolve(publicDir,'lmu/index.html')],
+  ['iRacing',resolve(publicDir,'iracing/index.html')]
+];
+for (const [label,path] of builtPages) {
+  const page = await readable(path);
+  if (!page) {
+    warnings.push(`Le build ${label} est absent. Lance npm run build:workers avant l’audit strict.`);
+    continue;
+  }
+  const stylesheetLinks = page.match(/<link\b[^>]*\brel=["']stylesheet["'][^>]*>/gi) || [];
+  if (stylesheetLinks.length !== 1 || !stylesheetLinks[0].includes('/app.css')) warnings.push(`Le build ${label} doit charger une seule feuille /app.css.`);
 }
+if (!publicCss.trim()) warnings.push('Le bundle public/app.css est absent ou vide.');
+if (/@import\s+url\(/i.test(publicCss)) warnings.push('public/app.css contient encore des imports CSS et déclenchera des requêtes supplémentaires.');
+if (await exists(resolve(publicDir, 'styles'))) warnings.push('Le dossier CSS source ne doit pas être publié séparément dans public/.');
+if (await exists(resolve(publicDir, 'styles.css'))) warnings.push('styles.css est une source de build et ne doit pas être publié séparément.');
+if (/^\s*Cache-Control:/mi.test(publicHeaders)) warnings.push('Le cache statique doit rester géré par Workers Static Assets et ses ETag natifs.');
 
 console.log('=== Audit App Endurance Manager ===');
 console.log(`Fichiers analysés : ${rows.length}`);
@@ -104,7 +124,7 @@ if (warnings.length) {
   console.log('Incohérences détectées :');
   for (const warning of warnings) console.log(`  - ${warning}`);
 } else {
-  console.log('Catalogue, build Cloudflare et assets référencés : OK.');
+  console.log('Catalogues multi-jeux, build Cloudflare et assets référencés : OK.');
 }
 
 if (process.argv.includes('--strict') && warnings.length) process.exitCode = 1;

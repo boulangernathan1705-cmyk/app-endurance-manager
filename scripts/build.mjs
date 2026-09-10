@@ -47,31 +47,44 @@ async function inlineCss(path, stack = []) {
   return output;
 }
 
+function stylesheetPaths(source, sourceName) {
+  const tags = [...source.matchAll(new RegExp(stylesheetTagPattern.source, stylesheetTagPattern.flags))];
+  if (!tags.length) throw new Error(`Aucune feuille de style trouvée dans ${sourceName}.`);
+  return tags.map(({0: tag}) => {
+    const href = tag.match(/\bhref=["']([^"']+)["']/i)?.[1];
+    const path = localAssetPath(href);
+    if (!path) throw new Error(`Feuille de style non locale non prise en charge : ${href || tag}`);
+    return path;
+  });
+}
+
+function productionHtml(source) {
+  let firstStylesheet = true;
+  return source.replace(new RegExp(stylesheetTagPattern.source, stylesheetTagPattern.flags), () => {
+    if (!firstStylesheet) return '';
+    firstStylesheet = false;
+    return '<link rel="stylesheet" href="/app.css">';
+  });
+}
+
 await rm(out, {recursive: true, force: true});
 await mkdir(out, {recursive: true});
+await mkdir(new URL('lmu/', out), {recursive: true});
+await mkdir(new URL('iracing/', out), {recursive: true});
 
 const sourceIndex = await readFile(root + 'index.html', 'utf8');
-const stylesheetTags = [...sourceIndex.matchAll(new RegExp(stylesheetTagPattern.source, stylesheetTagPattern.flags))];
-if (!stylesheetTags.length) throw new Error('Aucune feuille de style trouvée dans index.html.');
-
-const stylesheetPaths = stylesheetTags.map(({0: tag}) => {
-  const href = tag.match(/\bhref=["']([^"']+)["']/i)?.[1];
-  const path = localAssetPath(href);
-  if (!path) throw new Error(`Feuille de style non locale non prise en charge : ${href || tag}`);
-  return path;
-});
+const sourceGame = await readFile(root + 'game.html', 'utf8');
+const paths = [...stylesheetPaths(sourceIndex,'index.html'),...stylesheetPaths(sourceGame,'game.html')];
+const uniqueStylesheetPaths = [...new Set(paths)];
 
 const cssParts = [];
-for (const path of stylesheetPaths) cssParts.push(`/* ${path} */\n${await inlineCss(path)}`);
+for (const path of uniqueStylesheetPaths) cssParts.push(`/* ${path} */\n${await inlineCss(path)}`);
 await writeFile(new URL('app.css', out), cssParts.join('\n\n') + '\n');
 
-let firstStylesheet = true;
-const productionIndex = sourceIndex.replace(new RegExp(stylesheetTagPattern.source, stylesheetTagPattern.flags), () => {
-  if (!firstStylesheet) return '';
-  firstStylesheet = false;
-  return '<link rel="stylesheet" href="/app.css">';
-});
-await writeFile(new URL('index.html', out), productionIndex);
+await writeFile(new URL('index.html', out), productionHtml(sourceIndex));
+const gameHtml = productionHtml(sourceGame);
+await writeFile(new URL('lmu/index.html', out), gameHtml);
+await writeFile(new URL('iracing/index.html', out), gameHtml);
 
 for (const file of ['app.js', 'crew-accordion.js', 'crew-builder.js', 'ux-refinement.js', 'help.js', 'privacy.html', 'privacy.css']) {
   await copyFile(root + file, new URL(file, out));
@@ -94,4 +107,4 @@ await writeFile(new URL('_headers', out), `/*
   Permissions-Policy: camera=(), microphone=(), geolocation=()
 `);
 
-console.log(`Build ready: public/ (${workers ? 'Workers' : 'Pages'}, ${stylesheetPaths.length} feuilles CSS -> app.css, aide chargée à la demande)`);
+console.log(`Build ready: public/ (${workers ? 'Workers' : 'Pages'}, accueil + LMU + iRacing, ${uniqueStylesheetPaths.length} feuilles CSS -> app.css, aide chargée à la demande)`);
