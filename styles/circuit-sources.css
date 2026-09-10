@@ -1,65 +1,126 @@
-/* Cartes de circuits libres chargées depuis Wikimedia Commons.
-   Le choix des sources et les réglages de cadrage sont gérés par
-   /front/circuit-sources.mjs. Sources et licences : /circuit-credits.html. */
+/* Système de rendu des cartes de circuits.
+   Les sources et presets sont centralisés dans /shared/circuit-maps.mjs.
+   Sources et licences : /circuit-credits.html. */
 
 .circuit-visual {
-  overflow: hidden;
+  position: relative;
+  overflow: hidden !important;
+  contain: paint;
+  isolation: isolate;
+  min-width: 0;
+  min-height: 0;
 }
 
 .circuit-visual img[data-circuit] {
+  position: absolute;
+  inset: 0;
   display: block;
+  width: 100% !important;
+  height: 100% !important;
+  max-width: 100% !important;
+  max-height: 100% !important;
+  margin: auto;
   object-fit: contain;
   object-position: center;
-  transform: translate(var(--circuit-x, 0), var(--circuit-y, 0)) scale(var(--circuit-scale, 1));
+  transform: translate(var(--circuit-x, 0),var(--circuit-y, 0)) scale(var(--circuit-scale, .9));
   transform-origin: center;
   filter: grayscale(1) invert(1) brightness(1.12) contrast(1.14);
+  pointer-events: none;
 }
 
-/* Les cartes de la liste d'événements partagent toutes la même fenêtre visuelle.
-   Les différences de viewBox des SVG sont compensées par les presets JS. */
-.event-card .circuit-visual {
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  width: 132px !important;
-  height: 106px !important;
-  flex: 0 0 132px !important;
-}
-
-.event-card .circuit-visual img[data-circuit] {
-  width: 118px !important;
-  height: 92px !important;
-  max-width: 118px !important;
-  max-height: 92px !important;
-}
-
-/* Le Mans est naturellement très vertical : on lui laisse un peu plus de hauteur
-   sans empiéter sur les badges de catégories. */
-.event-card .circuit-visual img[data-circuit-map="le-mans"] {
-  width: 88px !important;
-  height: 98px !important;
-  max-width: 88px !important;
-  max-height: 98px !important;
-}
-
-@media (min-width: 761px) {
-  .event-card.event-card-harmonized .circuit-visual {
-    width: 258px !important;
-    height: 146px !important;
-    flex-basis: 258px !important;
+/* Accueil mobile : la carte a sa propre colonne et ne peut plus recouvrir
+   les badges de catégories. La troisième ligne reste entièrement dédiée
+   aux catégories, quelle que soit la forme du SVG. */
+@media (max-width: 760px) {
+  .event-card.event-card-harmonized .event-card-body {
+    display: grid !important;
+    grid-template-columns: minmax(0,1fr) 104px;
+    grid-template-areas:
+      "title map"
+      "categories categories"
+      "status status";
+    column-gap: 10px;
+    row-gap: 10px;
+    align-items: start;
   }
 
-  .event-card.event-card-harmonized .circuit-visual img[data-circuit] {
-    width: 224px !important;
-    height: 126px !important;
-    max-width: 224px !important;
-    max-height: 126px !important;
+  .event-card.event-card-harmonized .event-card-title-row {
+    grid-area: title;
+    min-width: 0;
+  }
+
+  .event-card.event-card-harmonized .circuit-visual {
+    grid-area: map;
+    position: relative !important;
+    top: auto !important;
+    right: auto !important;
+    bottom: auto !important;
+    left: auto !important;
+    width: 104px !important;
+    height: 88px !important;
+    min-width: 104px !important;
+    max-width: 104px !important;
+    flex: 0 0 104px !important;
+    align-self: start;
+    justify-self: end;
+    transform: none !important;
+    z-index: 0;
+  }
+
+  .event-card.event-card-harmonized .event-category-badges {
+    grid-area: categories;
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    margin-top: 0 !important;
+  }
+
+  .event-card.event-card-harmonized .event-card-status {
+    grid-area: status;
+    position: relative;
+    z-index: 1;
+    width: 100%;
   }
 
   .event-card.event-card-harmonized .circuit-visual img[data-circuit-map="le-mans"] {
-    width: 112px !important;
+    --circuit-scale: .68 !important;
+  }
+
+  .event-card.event-card-harmonized .circuit-visual img[data-circuit-map="cota"] {
+    --circuit-scale: .76 !important;
+  }
+
+  .event-card.event-card-harmonized .circuit-visual img[data-circuit-map="monza"] {
+    --circuit-scale: .76 !important;
+  }
+
+  .event-card.event-card-harmonized .circuit-visual img[data-circuit-map="iracing-road-atlanta"] {
+    --circuit-scale: .72 !important;
+  }
+}
+
+/* Accueil desktop : on conserve la réserve d'espace existante à droite,
+   mais l'image reste strictement peinte à l'intérieur de sa fenêtre. */
+@media (min-width: 761px) {
+  .event-card.event-card-harmonized .circuit-visual {
+    position: absolute !important;
+    top: 50% !important;
+    right: 18px !important;
+    width: 248px !important;
     height: 136px !important;
-    max-width: 112px !important;
-    max-height: 136px !important;
+    transform: translateY(-50%) !important;
+  }
+}
+
+/* Vue détaillée : même principe, avec une fenêtre dédiée qui empêche
+   tout SVG de sortir du header quelle que soit sa viewBox. */
+.event-heading-line > .circuit-visual {
+  overflow: hidden !important;
+}
+
+@media (min-width: 1000px) {
+  .event-heading-line > .circuit-visual {
+    width: 430px !important;
+    height: 230px !important;
   }
 }
