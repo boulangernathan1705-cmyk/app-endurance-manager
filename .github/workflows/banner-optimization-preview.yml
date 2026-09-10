@@ -1,4 +1,4 @@
-name: Banner optimization preview
+name: Apply banner optimization
 
 on:
   push:
@@ -6,35 +6,39 @@ on:
     paths: ['.github/workflows/banner-optimization-preview.yml']
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   optimize:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: refactor/cloudflare-delivery-optimization
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
       - run: pip install pillow
-      - name: Generate comparison variants
+      - name: Recompress active banner
         run: |
-          mkdir -p banner-preview
-          cp images/endurance-manager-banner.webp banner-preview/original.webp
           python - <<'PY'
           from pathlib import Path
           from PIL import Image
 
           source = Path('images/endurance-manager-banner.webp')
+          before = source.stat().st_size
           image = Image.open(source).convert('RGB')
-          print('dimensions=', image.size, 'original=', source.stat().st_size)
-          for quality in (76, 82, 88):
-              target = Path(f'banner-preview/banner-q{quality}.webp')
-              image.save(target, 'WEBP', quality=quality, method=6)
-              print(target.name, target.stat().st_size)
+          if image.size != (2048, 512):
+              raise SystemExit(f'Unexpected banner dimensions: {image.size}')
+          image.save(source, 'WEBP', quality=82, method=6)
+          after = source.stat().st_size
+          print(f'banner: {before} -> {after} bytes ({100 * (1-after/before):.1f}% smaller)')
           PY
-      - uses: actions/upload-artifact@v4
-        with:
-          name: banner-preview
-          path: banner-preview/
-          compression-level: 0
+      - name: Commit optimized binary
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add images/endurance-manager-banner.webp
+          git diff --cached --quiet && exit 0
+          git commit -m "Optimise la bannière principale"
+          git push origin HEAD:refactor/cloudflare-delivery-optimization
