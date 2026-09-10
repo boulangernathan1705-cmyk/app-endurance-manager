@@ -28,18 +28,18 @@
   pointer-events: none;
 }
 
-/* Accueil mobile : la carte a sa propre colonne et ne peut plus recouvrir
-   les badges de catégories. La troisième ligne reste entièrement dédiée
-   aux catégories, quelle que soit la forme du SVG. */
+/* Accueil mobile : la carte a sa propre colonne, plus large qu'avant,
+   tout en restant totalement confinée. Les badges restent sur une ligne
+   séparée, donc un zoom important ne peut jamais les recouvrir. */
 @media (max-width: 760px) {
   .event-card.event-card-harmonized .event-card-body {
     display: grid !important;
-    grid-template-columns: minmax(0,1fr) 104px;
+    grid-template-columns: minmax(0,1fr) 122px;
     grid-template-areas:
       "title map"
       "categories categories"
       "status status";
-    column-gap: 10px;
+    column-gap: 8px;
     row-gap: 10px;
     align-items: start;
   }
@@ -56,15 +56,19 @@
     right: auto !important;
     bottom: auto !important;
     left: auto !important;
-    width: 104px !important;
-    height: 88px !important;
-    min-width: 104px !important;
-    max-width: 104px !important;
-    flex: 0 0 104px !important;
-    align-self: start;
+    width: 122px !important;
+    height: 104px !important;
+    min-width: 122px !important;
+    max-width: 122px !important;
+    flex: 0 0 122px !important;
+    align-self: center;
     justify-self: end;
     transform: none !important;
     z-index: 0;
+  }
+
+  .event-card.event-card-harmonized .circuit-visual img[data-circuit] {
+    transform: translate(var(--circuit-mobile-x, 0),var(--circuit-mobile-y, 0)) scale(var(--circuit-mobile-scale, 1.08)) !important;
   }
 
   .event-card.event-card-harmonized .event-category-badges {
@@ -80,22 +84,6 @@
     position: relative;
     z-index: 1;
     width: 100%;
-  }
-
-  .event-card.event-card-harmonized .circuit-visual img[data-circuit-map="le-mans"] {
-    --circuit-scale: .68 !important;
-  }
-
-  .event-card.event-card-harmonized .circuit-visual img[data-circuit-map="cota"] {
-    --circuit-scale: .76 !important;
-  }
-
-  .event-card.event-card-harmonized .circuit-visual img[data-circuit-map="monza"] {
-    --circuit-scale: .76 !important;
-  }
-
-  .event-card.event-card-harmonized .circuit-visual img[data-circuit-map="iracing-road-atlanta"] {
-    --circuit-scale: .72 !important;
   }
 }
 
