@@ -20,6 +20,16 @@ async function walk(dir) {
   return files;
 }
 
+async function readable(path) {
+  try { return await readFile(path, 'utf8'); }
+  catch { return ''; }
+}
+
+async function exists(path) {
+  try { await access(path); return true; }
+  catch { return false; }
+}
+
 const files = await walk(root);
 const rows = [];
 for (const file of files) {
@@ -63,6 +73,27 @@ if (!worker.includes("from '../shared/catalog.mjs'") && !workerCore.includes("fr
   warnings.push('Le serveur n’utilise pas le catalogue partagé.');
 }
 
+const wrangler = await readable(resolve(root, 'wrangler.jsonc'));
+if (/"binding"\s*:\s*"ASSETS"/.test(wrangler)) warnings.push('Le binding ASSETS est inutile tant que le Worker ne fait pas env.ASSETS.fetch().');
+if (!/"minify"\s*:\s*true/.test(wrangler)) warnings.push('Wrangler doit minifier le Worker avant déploiement.');
+if (!wrangler.includes('"/api/*"')) warnings.push('Cloudflare doit exécuter le Worker en priorité uniquement sur les routes /api/*.');
+
+const publicDir = resolve(root, 'public');
+const publicIndex = await readable(resolve(publicDir, 'index.html'));
+const publicCss = await readable(resolve(publicDir, 'app.css'));
+const publicHeaders = await readable(resolve(publicDir, '_headers'));
+if (!publicIndex) {
+  warnings.push('Le build public/ est absent. Lance npm run build:workers avant l’audit strict.');
+} else {
+  const stylesheetLinks = publicIndex.match(/<link\b[^>]*\brel=["']stylesheet["'][^>]*>/gi) || [];
+  if (stylesheetLinks.length !== 1 || !stylesheetLinks[0].includes('/app.css')) warnings.push('Le build de production doit charger une seule feuille /app.css.');
+  if (!publicCss.trim()) warnings.push('Le bundle public/app.css est absent ou vide.');
+  if (/@import\s+url\(/i.test(publicCss)) warnings.push('public/app.css contient encore des imports CSS et déclenchera des requêtes supplémentaires.');
+  if (await exists(resolve(publicDir, 'styles'))) warnings.push('Le dossier CSS source ne doit pas être publié séparément dans public/.');
+  if (await exists(resolve(publicDir, 'styles.css'))) warnings.push('styles.css est une source de build et ne doit pas être publié séparément.');
+  if (/^\s*Cache-Control:/mi.test(publicHeaders)) warnings.push('Le cache statique doit rester géré par Workers Static Assets et ses ETag natifs.');
+}
+
 console.log('=== Audit App Endurance Manager ===');
 console.log(`Fichiers analysés : ${rows.length}`);
 console.log(`Fichiers texte >= ${Math.round(LARGE_FILE_BYTES/1000)} Ko : ${large.length}`);
@@ -73,7 +104,7 @@ if (warnings.length) {
   console.log('Incohérences détectées :');
   for (const warning of warnings) console.log(`  - ${warning}`);
 } else {
-  console.log('Catalogue partagé et assets référencés : OK.');
+  console.log('Catalogue, build Cloudflare et assets référencés : OK.');
 }
 
 if (process.argv.includes('--strict') && warnings.length) process.exitCode = 1;
