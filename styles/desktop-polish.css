@@ -1,0 +1,194 @@
+/* Desktop polish layer. Mobile is handled separately by the dedicated mobile styles. */
+@media (min-width: 761px) {
+  :root {
+    --desktop-control-h: 38px;
+    --desktop-control-h-sm: 32px;
+    --desktop-gap: 10px;
+  }
+
+  /* Global button hierarchy */
+  button,
+  .primary-button,
+  .secondary-button,
+  .danger-button,
+  .edit-button,
+  .event-section-tab {
+    min-height: var(--desktop-control-h);
+    padding: 8px 13px;
+    line-height: 1.1;
+  }
+  .edit-button,
+  .crew-member-action,
+  .crew-add-pilot-button,
+  .crew-actions button,
+  .fold-toolbar button,
+  .toolbar button:not(.primary-button):not(.danger-button) {
+    min-height: var(--desktop-control-h-sm);
+    padding: 6px 11px;
+    font-size: 12px;
+  }
+
+  /* Page rhythm */
+  main { max-width: 1420px; }
+  .toolbar { gap: 8px; margin: 12px 0 16px; }
+  .toolbar > button,
+  .toolbar > a { width: auto; }
+  .page-title { margin-bottom: 14px; }
+
+  /* Tabs */
+  .event-section-tabs {
+    display: inline-grid;
+    grid-template-columns: repeat(2, minmax(130px, auto));
+    gap: 4px;
+    padding: 4px;
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    background: var(--panel2);
+  }
+  .event-section-tab {
+    min-width: 140px;
+    padding-inline: 18px;
+  }
+
+  /* Departure accordions */
+  .departure-accordion { gap: 12px; }
+  .departure-fold > summary {
+    min-height: 68px;
+    padding: 12px 16px;
+  }
+  .departure-fold-body { padding: 0 16px 16px; }
+  .fold-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 0;
+  }
+  .fold-toolbar button { width: auto; }
+  .fold-section {
+    padding: 16px;
+    border-radius: 10px;
+  }
+  .fold-section > h2 { margin-bottom: 12px; }
+
+  /* Registration */
+  .registration-form { max-width: 1120px; }
+  .registration-form .form-title {
+    align-items: center;
+    gap: 12px;
+  }
+  .registration-form-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .registration-form-actions button { width: auto; }
+  .registration-form input,
+  .registration-form select { min-height: 40px; }
+  .special-availability { max-width: 260px; }
+  .save-row {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+  .save-row button { width: auto; }
+
+  /* Course pilot cards */
+  .ux-course-overview { gap: 12px; }
+  .ux-unassigned-section { padding: 12px; }
+  .ux-unassigned-grid { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; }
+  .ux-unassigned-grid > .pilot-row { padding: 10px 12px; }
+  .pilot-row { gap: 6px; }
+  .pilot-main { gap: 7px 10px; }
+  .pilot-row > .edit-button {
+    width: auto;
+    min-width: 76px;
+    align-self: flex-end;
+  }
+
+  /* Compact crews share one consistent height in Course and Équipages. */
+  .crew-pilot-accordion-summary,
+  .crew-management-summary {
+    min-height: 50px;
+    padding: 8px 11px;
+    gap: 10px;
+  }
+  .crew-compact-team strong { font-size: 13.5px; }
+  .crew-compact-pilots,
+  .crew-compact-car { font-size: 11.5px; }
+  .crew-compact-status {
+    min-height: 23px;
+    padding: 3px 7px;
+    font-size: 8.5px;
+  }
+  .crew-pilot-accordion-body,
+  .crew-management-accordion-body { padding: 10px 12px 12px; }
+
+  /* Organizer crew controls */
+  .crew-management-accordion-body > .crew-card-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 10px;
+    padding-bottom: 10px;
+  }
+  .crew-management-accordion-body > .crew-card-header > div {
+    flex: 1;
+  }
+  .crew-state-control {
+    flex-wrap: nowrap;
+    margin: 0;
+  }
+  .crew-state-select { min-height: 34px; }
+  .coverage-summary {
+    white-space: nowrap;
+    font-size: 11px;
+  }
+  .crew-roster {
+    grid-template-columns: repeat(2,minmax(0,1fr)) !important;
+    gap: 7px !important;
+  }
+  .crew-card .crew-roster > li {
+    min-height: 54px;
+    padding: 9px 11px;
+    gap: 10px;
+  }
+  .crew-card .crew-roster > li > button {
+    width: auto;
+    min-width: 72px;
+  }
+  .crew-candidate-action-card {
+    min-height: 58px;
+    padding: 10px 11px;
+  }
+  .crew-add-pilot-button,
+  .crew-member-action { min-width: 76px; }
+  .crew-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 10px !important;
+  }
+  .crew-actions button { width: auto; }
+
+  /* Timelines stay readable without becoming visually dominant. */
+  .presence-timeline { margin-top: 7px; }
+  .presence-track > .presence-segment { height: 34px; }
+  .presence-scale { height: 23px; }
+
+  /* Forms and creation pages */
+  .creation-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+  .creation-actions button { width: auto; }
+  .event-category-option { min-height: 50px; }
+  .member-row { align-items: center; }
+}
+
+@media (min-width: 1180px) {
+  .ux-unassigned-grid { grid-template-columns: repeat(3,minmax(0,1fr)); }
+  .crew-roster { grid-template-columns: repeat(3,minmax(0,1fr)) !important; }
+}
