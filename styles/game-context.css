@@ -1,0 +1,42 @@
+.game-space-bar {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 8px 20px 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.game-space-bar a {
+  color: var(--text);
+  text-decoration: none;
+  font-weight: 800;
+}
+
+.game-space-bar a:hover,
+.game-space-bar a:focus-visible {
+  color: var(--accent);
+}
+
+.game-space-bar strong {
+  color: var(--accent);
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+html[data-game="iracing"] .game-space-bar strong {
+  color: var(--blue);
+}
+
+.circuit-visual:has(img[src$="/track-placeholder.svg"]) {
+  display: none;
+}
+
+@media (max-width: 700px) {
+  .game-space-bar {
+    padding: 7px 12px 0;
+  }
+}
