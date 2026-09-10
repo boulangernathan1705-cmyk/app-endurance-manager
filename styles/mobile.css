@@ -7,7 +7,7 @@
   button { min-height: var(--mobile-touch); }
 
   /* Header + navigation */
-  .site-hero { min-height: 0 !important; padding: 33.3125vw 0 0 !important; border-bottom: 0; background-size: 100% auto !important; background-position: top center !important; }
+  .site-hero { min-height: 0 !important; padding: 0 !important; border-bottom: 0; background-size: 100% auto !important; background-position: top center !important; }
   .site-hero .header-inner { display: none; }
   .site-nav-shell { position: sticky !important; top: 0; z-index: 80; width: 100% !important; height: auto !important; padding: 7px 8px !important; background: rgba(7,11,13,.96); border-bottom: 1px solid rgba(89,211,216,.24); box-shadow: 0 8px 24px rgba(0,0,0,.3); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
   .site-nav-shell #navigation { position: static !important; display: grid !important; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 6px !important; width: 100%; padding: 0 !important; border: 0 !important; background: transparent !important; box-shadow: none !important; }
