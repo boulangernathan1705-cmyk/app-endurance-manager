@@ -76,6 +76,7 @@ await writeFile(new URL('index.html', out), productionIndex);
 for (const file of ['app.js', 'crew-accordion.js', 'crew-builder.js', 'ux-refinement.js', 'help.js']) {
   await copyFile(root + file, new URL(file, out));
 }
+await copyFile(root + 'help.css', new URL('help.css', out));
 await cp(root + 'images', new URL('images/', out), {recursive: true});
 await cp(root + 'front', new URL('front/', out), {recursive: true});
 await cp(root + 'shared', new URL('shared/', out), {recursive: true});
@@ -93,4 +94,4 @@ await writeFile(new URL('_headers', out), `/*
   Permissions-Policy: camera=(), microphone=(), geolocation=()
 `);
 
-console.log(`Build ready: public/ (${workers ? 'Workers' : 'Pages'}, ${stylesheetPaths.length} feuilles CSS -> app.css)`);
+console.log(`Build ready: public/ (${workers ? 'Workers' : 'Pages'}, ${stylesheetPaths.length} feuilles CSS -> app.css, aide chargée à la demande)`);
