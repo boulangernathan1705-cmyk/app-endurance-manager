@@ -53,6 +53,69 @@
   width: 100%;
 }
 
+/* Course: le contrôle d'inscription reste accessible même quand le départ est fermé. */
+.departure-fold[id^="departure-"] > .departure-fold-body > .fold-toolbar {
+  display: none !important;
+}
+
+.departure-fold[id^="departure-"] > summary {
+  grid-template-columns: 46px minmax(0, 1fr) auto minmax(155px, max-content) 32px;
+  grid-template-rows: auto auto;
+}
+
+.departure-fold[id^="departure-"] > summary > .fold-index {
+  grid-column: 1;
+  grid-row: 1 / span 2;
+}
+
+.departure-fold[id^="departure-"] > summary > .fold-date {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+}
+
+.departure-fold[id^="departure-"] > summary > .fold-meta {
+  grid-column: 3;
+  grid-row: 1 / span 2;
+}
+
+.departure-fold[id^="departure-"] > summary > .fold-countdown {
+  grid-column: 4;
+  grid-row: 1;
+  justify-self: end;
+}
+
+.departure-fold[id^="departure-"] > summary > .ux-summary-registration-toggle {
+  grid-column: 4;
+  grid-row: 2;
+  justify-self: end;
+  min-height: 32px;
+  margin-top: 5px;
+  padding: 5px 11px;
+  font-size: 12px;
+  white-space: nowrap;
+  z-index: 1;
+}
+
+.departure-fold[id^="departure-"] > summary::after {
+  grid-column: 5;
+  grid-row: 1 / span 2;
+  align-self: center;
+}
+
+/* Équipages: pas de titre redondant sous le créneau. */
+.crew-only-section > h2 {
+  display: none !important;
+}
+
+/* Stabilise le survol des accordéons d'équipage. */
+.crew-pilot-accordion-summary {
+  transition: none !important;
+}
+
+.crew-pilot-accordion-summary:hover {
+  background: color-mix(in srgb, var(--crew-color) 12%, #151c1f) !important;
+}
+
 @media (max-width: 900px) {
   .crew-pilot-accordion-body[data-pilot-columns="3"] {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -64,5 +127,47 @@
   .crew-pilot-accordion-body[data-pilot-columns="2"],
   .crew-pilot-accordion-body[data-pilot-columns="3"] {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .departure-fold[id^="departure-"] > summary {
+    grid-template-columns: 38px minmax(0, 1fr) 26px;
+    grid-template-rows: auto auto auto auto;
+    gap: 7px 10px;
+  }
+
+  .departure-fold[id^="departure-"] > summary > .fold-index {
+    grid-column: 1;
+    grid-row: 1 / span 2;
+  }
+
+  .departure-fold[id^="departure-"] > summary > .fold-date {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .departure-fold[id^="departure-"] > summary > .fold-meta {
+    grid-column: 2;
+    grid-row: 2;
+  }
+
+  .departure-fold[id^="departure-"] > summary > .fold-countdown {
+    display: block;
+    grid-column: 2;
+    grid-row: 3;
+    justify-self: start;
+    min-width: 0;
+    text-align: left;
+  }
+
+  .departure-fold[id^="departure-"] > summary > .ux-summary-registration-toggle {
+    grid-column: 2;
+    grid-row: 4;
+    justify-self: start;
+    margin-top: 2px;
+  }
+
+  .departure-fold[id^="departure-"] > summary::after {
+    grid-column: 3;
+    grid-row: 1 / span 4;
   }
 }
