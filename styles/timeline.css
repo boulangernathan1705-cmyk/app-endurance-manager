@@ -76,6 +76,26 @@
 .presence-track > .presence-segment:last-child { border-right: 0; border-radius: 0 5px 5px 0; }
 .presence-track > .presence-segment:only-child { border-radius: 5px; }
 .presence-track > .presence-segment.is-present { background: var(--pilot-timeline-color, #8fb6c9); color: #101416; }
+
+/* Pilot availability is communicated by colour: no check/dot markers are needed. */
+.presence-timeline:not(.is-coverage) .presence-track > .presence-segment > span {
+  display: none;
+}
+
+/* Consecutive selected hours read as one continuous availability range. */
+.presence-timeline:not(.is-coverage) .presence-track > .presence-segment.is-present:has(+ .presence-segment.is-present) {
+  border-right-color: transparent;
+}
+.presence-timeline:not(.is-coverage) .presence-track > .presence-segment.is-present:first-child,
+.presence-timeline:not(.is-coverage) .presence-track > .presence-segment:not(.is-present) + .presence-segment.is-present {
+  border-top-left-radius: 5px;
+  border-bottom-left-radius: 5px;
+}
+.presence-timeline:not(.is-coverage) .presence-track > .presence-segment.is-present:not(:has(+ .presence-segment.is-present)) {
+  border-top-right-radius: 5px;
+  border-bottom-right-radius: 5px;
+}
+
 .presence-track > button.presence-segment { cursor: pointer; touch-action: manipulation; }
 .presence-track > button.presence-segment:hover { filter: brightness(1.08); }
 .presence-track > button.presence-segment:focus-visible { position: relative; z-index: 1; outline: 2px solid #fff; outline-offset: 1px; }
@@ -107,6 +127,9 @@
 .presence-timeline.is-coverage .presence-segment.coverage-none {
   background: transparent;
   color: #899598;
+}
+.presence-timeline.is-coverage .presence-segment.coverage-none > span {
+  visibility: hidden;
 }
 
 @container presence (min-width: 400px) {
