@@ -1,21 +1,14 @@
-Placez ici les plans des circuits utilisés par les événements.
+# Cartes de circuits
 
-Le site utilise actuellement ces fichiers principaux :
-- bahrain.png
-- barcelone.png
-- cota.png
-- daytona.png
-- fuji.png
-- imola.png
-- interlagos.png
-- laguna_seca.png
-- le_mans.png
-- lusail_international.png
-- monza.png
-- paul_ricard_elms.png
-- algarve.png
-- sebring.png
-- silverstone.png
-- spa_francorchamps.png
+Les anciens PNG de circuits repris de MySimRace ne sont plus utilisés par Endurance Manager et sont retirés du dépôt.
 
-Le site essaie également les mêmes noms directement dans `images/`, ainsi que les extensions JPG et WebP.
+Les cartes affichées pour les espaces LMU et iRacing sont chargées depuis **Wikimedia Commons** à partir des sources déclarées dans `styles/circuit-sources.css`.
+
+Les auteurs, fichiers sources et licences de réutilisation sont documentés sur la page publique `circuit-credits.html`.
+
+Le fichier local `track-placeholder.svg` est conservé uniquement comme pictogramme générique/fallback et pour « Circuit à préciser ».
+
+Lors de l’ajout d’un nouveau circuit :
+1. choisir une source dont la licence permet explicitement la réutilisation ;
+2. ajouter le mapping dans `styles/circuit-sources.css` ;
+3. documenter la source, l’auteur et la licence dans `circuit-credits.html`.
