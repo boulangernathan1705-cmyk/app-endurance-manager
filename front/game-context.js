@@ -11,12 +11,14 @@
   globalThis.fetch = async (input, init) => {
     const rawUrl = input instanceof Request ? input.url : String(input);
     const url = new URL(rawUrl, location.origin);
-    if (url.origin !== location.origin || url.pathname !== '/api/events') return nativeFetch(input, init);
+    const isCollection = url.origin === location.origin && url.pathname === '/api/events';
+    const isEventDetail = url.origin === location.origin && /^\/api\/events\/[a-f0-9-]{36}$/.test(url.pathname);
+    if (!isCollection && !isEventDetail) return nativeFetch(input, init);
 
     const method = methodOf(input, init);
-    let requestInput = input;
     let requestInit = init;
-    if (game === 'iracing' && method === 'POST' && typeof init?.body === 'string') {
+    const keepsGame = game === 'iracing' && ((isCollection && method === 'POST') || (isEventDetail && method === 'PATCH'));
+    if (keepsGame && typeof init?.body === 'string') {
       try {
         const payload = JSON.parse(init.body);
         if (!payload.circuit) payload.circuit = 'iracing-tbd';
@@ -24,8 +26,8 @@
       } catch {}
     }
 
-    const response = await nativeFetch(requestInput, requestInit);
-    if (method !== 'GET' || !response.ok) return response;
+    const response = await nativeFetch(input, requestInit);
+    if (!isCollection || method !== 'GET' || !response.ok) return response;
     const type = response.headers.get('Content-Type') || '';
     if (!type.includes('application/json')) return response;
 
