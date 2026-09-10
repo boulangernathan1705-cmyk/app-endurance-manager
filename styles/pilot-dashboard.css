@@ -1,0 +1,426 @@
+/* Pilot dashboard: Course-like hierarchy focused on the driver's own entry. */
+.my-entries-heading {
+  margin: 6px 0 18px;
+}
+
+.my-entries-heading .page-title {
+  margin: 3px 0 6px;
+}
+
+.my-entries-group {
+  margin-top: 20px;
+}
+
+.my-entries-group-heading {
+  align-items: center;
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(74,119,124,.38);
+}
+
+.my-entries-group-heading h2 {
+  font-size: 18px;
+}
+
+.my-entry-dashboard {
+  gap: 12px;
+}
+
+.my-entry-card {
+  border-radius: 12px;
+  border-color: rgba(73,118,123,.58);
+  background: rgba(12,17,19,.95);
+  box-shadow: 0 10px 26px rgba(0,0,0,.16);
+}
+
+.my-entry-header {
+  display: grid;
+  grid-template-columns: 42px minmax(0,1fr) minmax(170px,230px);
+  align-items: center;
+  gap: 12px;
+  min-height: 76px;
+  padding: 11px 14px;
+  border-bottom: 0;
+  background: linear-gradient(180deg,rgba(25,34,37,.96),rgba(15,21,23,.96));
+}
+
+.my-entry-accordion[open] > .my-entry-header {
+  border-bottom: 1px solid rgba(73,118,123,.5);
+  background: linear-gradient(180deg,rgba(29,42,45,.98),rgba(17,25,27,.98));
+}
+
+.my-entry-toggle {
+  width: 36px;
+  height: 36px;
+  flex-basis: 36px;
+  margin: 0;
+  border-radius: 9px;
+  border-color: rgba(82,207,212,.4);
+  background: #243337;
+  color: #dce9e8;
+  font-size: 0;
+  transform: none !important;
+}
+
+.my-entry-toggle::before {
+  content: '+';
+  font-size: 22px;
+  line-height: 1;
+}
+
+.my-entry-accordion[open] .my-entry-toggle::before {
+  content: '−';
+}
+
+.my-entry-title {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.my-entry-title h2 {
+  margin: 0;
+  font-size: 18px;
+  line-height: 1.15;
+}
+
+.my-entry-title .my-entry-kicker {
+  color: #a8b9bb;
+  font-size: 11px;
+  letter-spacing: .75px;
+}
+
+.my-entry-meta {
+  gap: 5px 7px;
+  margin-top: 2px;
+  font-size: 12px;
+}
+
+.my-entry-meta .event-type-badge {
+  padding: 3px 7px;
+  font-size: 9px;
+}
+
+.my-entry-meta .event-category-badge {
+  min-width: 0;
+  padding: 3px 7px;
+  gap: 5px;
+}
+
+.my-entry-meta .event-category-badge img {
+  width: 22px;
+  height: 22px;
+}
+
+.my-entry-summary-side {
+  width: 100%;
+  justify-content: flex-end;
+}
+
+.my-entry-summary-side .circuit-visual {
+  width: 100%;
+  height: 70px;
+  justify-content: flex-end;
+}
+
+.my-entry-summary-side .circuit-visual img {
+  width: min(100%,210px);
+  height: 70px;
+  margin-left: auto;
+  object-fit: contain;
+}
+
+.my-entry-accordion-body {
+  display: grid;
+  gap: 10px;
+  padding: 10px 14px 14px;
+  background: rgba(8,12,14,.45);
+}
+
+.my-entry-actions-top {
+  justify-content: flex-end;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.my-entry-actions-top .primary-button {
+  min-width: 0;
+}
+
+.my-entry-section {
+  padding: 14px;
+  border: 1px solid rgba(73,118,123,.5);
+  border-radius: 10px;
+  background: rgba(18,25,28,.88);
+}
+
+.my-entry-section-heading {
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.my-entry-section h3 {
+  margin: 2px 0 0;
+  font-size: 17px;
+}
+
+.my-entry-section .my-entry-kicker {
+  font-size: 10px;
+  letter-spacing: 1px;
+}
+
+.my-entry-pill {
+  min-height: 26px;
+  padding: 4px 8px;
+  font-size: 11px;
+}
+
+/* The driver's own information stays dominant; team-mates become compact context. */
+.my-entry-crew-roster {
+  display: grid;
+  grid-template-columns: repeat(2,minmax(0,1fr));
+  gap: 8px;
+  margin: 8px 0 10px;
+}
+
+.my-entry-pilot {
+  min-width: 0;
+  padding: 9px 10px;
+  border-radius: 8px;
+}
+
+.my-entry-pilot.is-me {
+  order: -1;
+  grid-column: 1 / -1;
+  border-color: rgba(82,207,212,.68);
+  background: rgba(82,207,212,.055);
+  box-shadow: inset 3px 0 0 var(--fmt-cyan, var(--accent));
+}
+
+.my-entry-pilot:not(.is-me) .crew-pilot-availability {
+  display: none;
+}
+
+.my-entry-pilot:not(.is-me) {
+  opacity: .84;
+}
+
+.my-entry-pilot-head {
+  margin-bottom: 4px;
+}
+
+.my-entry-pilot-head strong {
+  font-size: 13px;
+}
+
+.my-entry-pilot-head span {
+  font-size: 11px;
+}
+
+.my-entry-preferences {
+  gap: 8px;
+  margin: 8px 0 10px;
+}
+
+.my-entry-preferences > div {
+  padding: 9px 10px;
+  border-radius: 8px;
+}
+
+.my-entry-preferences strong {
+  font-size: 13px;
+}
+
+.my-entry-crew {
+  border-left: 3px solid rgba(82,207,212,.68);
+  background: rgba(82,207,212,.035);
+}
+
+.my-entry-waiting {
+  border-left: 3px solid rgba(231,182,83,.7);
+  background: rgba(231,182,83,.03);
+}
+
+.my-entry-pilots-summary {
+  background: rgba(255,255,255,.012);
+}
+
+.my-entry-compact-pilots {
+  display: grid;
+  grid-template-columns: repeat(2,minmax(0,1fr));
+  gap: 7px;
+}
+
+.my-entry-compact-pilot {
+  display: grid;
+  align-items: start;
+  gap: 2px;
+  width: auto;
+  min-height: 0;
+  padding: 8px 9px;
+  border-radius: 8px;
+}
+
+.my-entry-compact-pilot strong {
+  font-size: 12px;
+}
+
+.my-entry-compact-pilot small {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.my-entry-existing-crews-wrap {
+  margin-top: 12px;
+  padding-top: 10px;
+}
+
+.my-entry-existing-crews {
+  grid-template-columns: repeat(2,minmax(0,1fr));
+  gap: 7px;
+}
+
+.my-entry-existing-crew {
+  padding: 8px 9px;
+}
+
+.my-entry-section .coverage-note {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.my-entry-section .presence-timeline {
+  margin-top: 7px;
+}
+
+.my-entry-section .presence-scale {
+  height: 22px;
+}
+
+.my-entry-section .presence-track > .presence-segment {
+  height: 24px;
+}
+
+@media (max-width: 760px) {
+  .my-entries-heading {
+    margin-bottom: 14px;
+  }
+
+  .my-entries-group {
+    margin-top: 16px;
+  }
+
+  .my-entries-group-heading h2 {
+    font-size: 16px;
+  }
+
+  .my-entry-header {
+    grid-template-columns: 34px minmax(0,1fr) 92px;
+    align-items: center;
+    gap: 8px;
+    min-height: 68px;
+    padding: 9px 10px;
+  }
+
+  .my-entry-toggle {
+    width: 32px;
+    height: 32px;
+    flex-basis: 32px;
+  }
+
+  .my-entry-title h2 {
+    font-size: 16px;
+  }
+
+  .my-entry-title .my-entry-kicker {
+    font-size: 9px;
+  }
+
+  .my-entry-meta {
+    gap: 4px 5px;
+    font-size: 10px;
+  }
+
+  .my-entry-meta .event-type-badge {
+    display: none;
+  }
+
+  .my-entry-meta .event-category-badge {
+    padding: 2px 5px;
+    font-size: 10px;
+  }
+
+  .my-entry-meta .event-category-badge img {
+    width: 18px;
+    height: 18px;
+  }
+
+  .my-entry-summary-side {
+    width: 92px;
+  }
+
+  .my-entry-summary-side .circuit-visual,
+  .my-entry-summary-side .circuit-visual img {
+    width: 92px;
+    height: 52px;
+  }
+
+  .my-entry-accordion-body {
+    gap: 8px;
+    padding: 8px 9px 10px;
+  }
+
+  .my-entry-actions-top .primary-button {
+    width: 100%;
+  }
+
+  .my-entry-section {
+    padding: 10px;
+  }
+
+  .my-entry-section-heading {
+    align-items: flex-start;
+    flex-direction: row;
+    gap: 8px;
+  }
+
+  .my-entry-section h3 {
+    font-size: 15px;
+  }
+
+  .my-entry-crew-roster,
+  .my-entry-compact-pilots,
+  .my-entry-existing-crews {
+    grid-template-columns: 1fr;
+  }
+
+  .my-entry-pilot.is-me {
+    grid-column: auto;
+  }
+
+  .my-entry-preferences {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 430px) {
+  .my-entry-header {
+    grid-template-columns: 32px minmax(0,1fr) 72px;
+  }
+
+  .my-entry-summary-side {
+    width: 72px;
+  }
+
+  .my-entry-summary-side .circuit-visual,
+  .my-entry-summary-side .circuit-visual img {
+    width: 72px;
+    height: 44px;
+  }
+
+  .my-entry-meta > span:not(.event-category-badge) {
+    display: none;
+  }
+}
