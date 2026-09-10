@@ -9,32 +9,66 @@
   display: none !important;
 }
 
-/* Créneaux : regrouper proprement stats, compte à rebours et inscription. */
-.departure-fold[id^="departure-"] > summary {
-  grid-template-columns: 46px minmax(0, 1fr) max-content 210px 32px !important;
+/* Départs : même en-tête compact dans Course et Équipages. */
+.departure-fold > summary {
+  grid-template-columns: 34px minmax(220px, 1fr) max-content 170px !important;
   grid-template-rows: auto auto !important;
-  column-gap: 16px !important;
-  row-gap: 5px !important;
+  min-height: 70px !important;
+  padding: 10px 14px !important;
+  column-gap: 14px !important;
+  row-gap: 3px !important;
 }
 
-.departure-fold[id^="departure-"] > summary > .fold-index {
+.departure-fold > summary > .fold-index {
+  display: none !important;
+}
+
+.departure-fold > summary::after {
   grid-column: 1 !important;
   grid-row: 1 / span 2 !important;
+  align-self: start !important;
+  justify-self: start !important;
+  width: 30px !important;
+  height: 30px !important;
+  margin: 0 !important;
+  line-height: 27px !important;
 }
 
-.departure-fold[id^="departure-"] > summary > .fold-date {
+.departure-fold > summary > .fold-date {
   grid-column: 2 !important;
   grid-row: 1 / span 2 !important;
+  align-self: center !important;
+  min-width: 0;
 }
 
-.departure-fold[id^="departure-"] > summary > .fold-meta {
+.departure-fold > summary > .fold-date .ux-departure-title {
+  display: block;
+  margin: 0;
+  color: #9beeb4;
+  font-size: 19px;
+  font-weight: 900;
+  line-height: 1.15;
+  letter-spacing: .1px;
+}
+
+.departure-fold > summary > .fold-date .ux-departure-date {
+  display: block;
+  margin-top: 4px;
+  color: #b4c2c4;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.departure-fold > summary > .fold-meta {
   grid-column: 3 !important;
   grid-row: 1 / span 2 !important;
-  align-self: center;
-  justify-self: end;
+  align-self: center !important;
+  justify-self: end !important;
+  font-size: 13px !important;
 }
 
-.departure-fold[id^="departure-"] > summary > .fold-countdown {
+.departure-fold > summary > .fold-countdown {
   display: block !important;
   grid-column: 4 !important;
   grid-row: 1 !important;
@@ -42,23 +76,42 @@
   min-width: 0 !important;
   text-align: center !important;
   justify-self: stretch !important;
+  align-self: end !important;
+  font-size: 13px !important;
 }
 
 .departure-fold[id^="departure-"] > summary > .ux-summary-registration-toggle {
   grid-column: 4 !important;
   grid-row: 2 !important;
-  width: 100%;
-  min-height: 36px !important;
+  width: 170px !important;
+  max-width: 100%;
+  min-width: 0 !important;
+  min-height: 34px !important;
   margin: 0 !important;
-  padding: 6px 12px !important;
-  justify-self: stretch !important;
+  padding: 5px 10px !important;
+  justify-self: end !important;
+  align-self: start !important;
   font-size: 12px !important;
+  white-space: nowrap;
 }
 
-.departure-fold[id^="departure-"] > summary::after {
-  grid-column: 5 !important;
+.crew-page-accordion .departure-fold > summary > .fold-countdown {
   grid-row: 1 / span 2 !important;
   align-self: center !important;
+}
+
+/* Mon inscription : même largeur que les autres blocs du départ. */
+.departure-fold .fold-registration,
+.departure-fold .fold-registration .registration-form,
+.departure-fold .fold-registration .form-section {
+  width: 100% !important;
+  max-width: none !important;
+  box-sizing: border-box !important;
+}
+
+.departure-fold .fold-registration .registration-form {
+  margin-left: 0 !important;
+  margin-right: 0 !important;
 }
 
 /* Équipages : pilotes restants en cartes, tout en bas. */
@@ -118,8 +171,12 @@
 }
 
 @media (max-width: 1100px) {
-  .departure-fold[id^="departure-"] > summary {
-    grid-template-columns: 46px minmax(0, 1fr) max-content 190px 32px !important;
+  .departure-fold > summary {
+    grid-template-columns: 34px minmax(190px, 1fr) max-content 160px !important;
+  }
+
+  .departure-fold[id^="departure-"] > summary > .ux-summary-registration-toggle {
+    width: 160px !important;
   }
 
   .ux-remaining-pilot-grid {
@@ -128,47 +185,55 @@
 }
 
 @media (max-width: 760px) {
-  .departure-fold[id^="departure-"] > summary {
-    grid-template-columns: 38px minmax(0, 1fr) 26px !important;
+  .departure-fold > summary {
+    grid-template-columns: 30px minmax(0, 1fr) !important;
     grid-template-rows: auto auto auto auto !important;
-    gap: 7px 10px !important;
+    gap: 5px 10px !important;
+    min-height: 0 !important;
+    padding: 10px 12px !important;
   }
 
-  .departure-fold[id^="departure-"] > summary > .fold-index {
+  .departure-fold > summary::after {
     grid-column: 1 !important;
-    grid-row: 1 / span 2 !important;
+    grid-row: 1 !important;
+    width: 28px !important;
+    height: 28px !important;
+    line-height: 25px !important;
   }
 
-  .departure-fold[id^="departure-"] > summary > .fold-date {
+  .departure-fold > summary > .fold-date {
     grid-column: 2 !important;
     grid-row: 1 !important;
+    align-self: start !important;
   }
 
-  .departure-fold[id^="departure-"] > summary > .fold-meta {
+  .departure-fold > summary > .fold-date .ux-departure-title {
+    font-size: 17px;
+  }
+
+  .departure-fold > summary > .fold-meta {
     grid-column: 2 !important;
     grid-row: 2 !important;
-    justify-self: start;
+    justify-self: start !important;
+    font-size: 12px !important;
   }
 
-  .departure-fold[id^="departure-"] > summary > .fold-countdown {
+  .departure-fold > summary > .fold-countdown,
+  .crew-page-accordion .departure-fold > summary > .fold-countdown {
     grid-column: 2 !important;
     grid-row: 3 !important;
     width: auto;
     text-align: left !important;
     justify-self: start !important;
+    align-self: start !important;
   }
 
   .departure-fold[id^="departure-"] > summary > .ux-summary-registration-toggle {
     grid-column: 2 !important;
     grid-row: 4 !important;
-    width: auto;
-    min-width: 150px;
+    width: auto !important;
+    min-width: 140px !important;
     justify-self: start !important;
-  }
-
-  .departure-fold[id^="departure-"] > summary::after {
-    grid-column: 3 !important;
-    grid-row: 1 / span 4 !important;
   }
 
   .ux-remaining-pilot-grid {
