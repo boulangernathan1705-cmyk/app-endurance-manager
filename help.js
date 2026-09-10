@@ -112,42 +112,16 @@ function organizerHelp(role) {
   </section>`;
 }
 
-function renderHelp() {
+function backToHome() {
+  const home = nav?.querySelector('[data-action="home"]') || document.querySelector('[data-action="home"]');
+  home?.click();
+}
+
+export function renderHelp() {
   if (!app) return;
   const role = normalizedRole();
   app.innerHTML = role === 'organizer' || role === 'admin' ? organizerHelp(role) : pilotHelp(role);
   document.getElementById(HELP_BUTTON_ID)?.setAttribute('aria-current', 'page');
-  window.scrollTo({top: 0, behavior: 'smooth'});
-}
-
-function injectHelpButton() {
-  if (!nav || document.getElementById(HELP_BUTTON_ID)) return;
-  const button = document.createElement('button');
-  button.type = 'button';
-  button.id = HELP_BUTTON_ID;
-  button.className = 'secondary-button help-nav-button';
-  button.textContent = 'Aide';
-  button.addEventListener('click', renderHelp);
-
-  const logout = nav.querySelector('[data-action="logout"]');
-  const discord = nav.querySelector('.discord-button');
-  if (logout) nav.insertBefore(button, logout);
-  else if (discord) nav.insertBefore(button, discord);
-  else nav.append(button);
-}
-
-document.addEventListener('click', event => {
-  if (event.target.closest(`#${HELP_BUTTON_ID}`)) return;
-  if (event.target.closest('[data-action]')) document.getElementById(HELP_BUTTON_ID)?.removeAttribute('aria-current');
-});
-
-document.addEventListener('click', event => {
-  if (!event.target.closest('#help-back-button')) return;
-  const home = nav?.querySelector('[data-action="home"]') || document.querySelector('[data-action="home"]');
-  home?.click();
-});
-
-if (nav) {
-  new MutationObserver(injectHelpButton).observe(nav, {childList: true});
-  injectHelpButton();
+  document.getElementById('help-back-button')?.addEventListener('click', backToHome, {once:true});
+  window.scrollTo({top:0, behavior:'smooth'});
 }
