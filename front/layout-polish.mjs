@@ -28,6 +28,23 @@ function logo(category) {
     : `<span class="category-text-logo" aria-hidden="true">${esc(category)}</span>`;
 }
 
+function decorateDepartureHeaders() {
+  app?.querySelectorAll('.departure-fold[id]').forEach(fold => {
+    const summary = fold.querySelector(':scope > summary');
+    const dateBlock = summary?.querySelector(':scope > .fold-date');
+    if (!summary || !dateBlock || dateBlock.dataset.uxCompactDeparture === 'true') return;
+
+    const dateText = dateBlock.querySelector('strong')?.textContent.trim() || '';
+    const rawTime = dateBlock.querySelector('span')?.textContent.trim() || '';
+    const timeText = rawTime.split('·')[0].trim();
+    const past = /départ passé/i.test(rawTime);
+
+    dateBlock.dataset.uxCompactDeparture = 'true';
+    dateBlock.innerHTML = `<strong class="ux-departure-title">Départ ${esc(timeText)}</strong><span class="ux-departure-date">${esc(dateText)}${past ? ' · Départ passé' : ''}</span>`;
+    summary.classList.add('ux-compact-departure-summary');
+  });
+}
+
 function remainingPilotCard(event, departure, registration) {
   const preference = registration.preferredPilot
     ? `<span class="pilot-preference">Souhaite rouler avec : <strong>${esc(registration.preferredPilot)}</strong></span>`
@@ -76,6 +93,7 @@ function decorateRemainingPilots() {
 }
 
 function decorate() {
+  decorateDepartureHeaders();
   decorateRemainingPilots();
 }
 
