@@ -75,7 +75,7 @@ const IRACING_CATEGORIES = {
   GTP:{image:IRACING_BADGE,css:'hyper'},
   HYP:{image:IRACING_BADGE,css:'hyper'},
   'LMP2 P217':{image:IRACING_BADGE,css:'lmp2'},
-  LMP3:{image:IRACING_BADGE,css:'lmp3'},
+  'LMP3 P320':{image:IRACING_BADGE,css:'lmp3'},
   GT3:{image:IRACING_BADGE,css:'gt3'},
   'Porsche Cup':{image:IRACING_BADGE,css:'gt3'},
   GT4:{image:IRACING_BADGE,css:'gt3'},
@@ -100,10 +100,10 @@ const LMU_CARS = {
 };
 
 const IRACING_CARS = {
-  GTP: ['Acura ARX-06 GTP','BMW M Hybrid V8 Evo','Cadillac V-Series.R GTP','Ferrari 499P','Porsche 963 GTP'],
+  GTP: ['Acura ARX-06 GTP','BMW M Hybrid V8 (EVO)','Cadillac V-Series.R GTP','Ferrari 499P','Porsche 963 GTP'],
   HYP: ['Aston Martin Valkyrie AMR-LMH'],
   'LMP2 P217': ['Dallara P217 LMP2'],
-  LMP3: ['Ligier JS P320'],
+  'LMP3 P320': ['Ligier JS P320'],
   GT3: ['Acura NSX GT3 EVO 22','Aston Martin Vantage GT3 EVO','Audi R8 LMS EVO II GT3','BMW M4 GT3 EVO','Chevrolet Corvette Z06 GT3.R','Ferrari 296 GT3','Ford Mustang GT3','Lamborghini Huracán GT3 EVO','McLaren 720S GT3 EVO','Mercedes-AMG GT3 2020','Porsche 911 GT3 R (992)'],
   'Porsche Cup': ['Porsche 911 GT3 Cup (992)','Porsche 911 Cup (992.2)'],
   GT4: ['Aston Martin Vantage GT4','BMW M4 G82 GT4','Ford Mustang GT4','McLaren 570S GT4','Mercedes-AMG GT4','Porsche 718 Cayman GT4 Clubsport MR'],
