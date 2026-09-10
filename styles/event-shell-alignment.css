@@ -1,0 +1,11 @@
+/* Desktop event shell alignment.
+   The desktop page is 1420px wide with 18px inner padding on each side,
+   so its visible content column is 1384px. Keep the floating navigation
+   on that exact same axis. */
+@media (min-width: 761px) {
+  .site-nav-shell {
+    width: min(calc(100% - 36px), 1384px);
+    max-width: 1384px;
+    margin-inline: auto;
+  }
+}
