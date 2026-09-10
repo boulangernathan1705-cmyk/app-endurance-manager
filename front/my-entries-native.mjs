@@ -151,6 +151,7 @@ function entryCard({event, departure, registration, managed}) {
   const crew = (departure.crews || []).find(item => (item.registrationIds || []).map(String).includes(String(registration.id)));
   const unassigned = unassignedPilots(event, departure, registration.id);
   const memberCount = crew?.registrationIds?.length || 0;
+  const openAttributes = `data-action="open" data-id="${esc(event.id)}" data-departure="${esc(departure.id)}" data-registration="${esc(registration.id)}"`;
 
   return `<details class="native-my-entry-card event-type-${event.eventType || 'private'}">
     <summary class="native-my-entry-header">
@@ -162,9 +163,9 @@ function entryCard({event, departure, registration, managed}) {
         <span class="ux-my-entry-date">${esc(entryDate(departure))}</span>
         <div class="native-my-entry-meta">${eventTypeBadge(event.eventType)}${categoryBadge(registration.category)}<span>${esc(circuitLabel(event.circuit))}</span><span>${event.durationHours || 6} h</span></div>
       </div>
+      <button type="button" class="primary-button native-my-entry-open-event" ${openAttributes}>Voir l’événement complet</button>
     </summary>
     <div class="native-my-entry-body">
-      <div class="native-my-entry-actions"><button type="button" class="primary-button" data-action="open" data-id="${esc(event.id)}" data-departure="${esc(departure.id)}" data-registration="${esc(registration.id)}">Voir l’événement complet</button></div>
       <details class="ux-my-entry-content-accordion">
         ${accordionSummary('Mon équipage', memberCount)}
         <div class="ux-my-entry-content-body">${ownCrewContent(event, departure, registration, crew)}</div>
