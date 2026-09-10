@@ -6,6 +6,7 @@ on:
       - feature/help-real-screenshots
     paths:
       - scripts/capture-help-screenshots-v2.mjs
+      - scripts/capture-help-crews.mjs
       - .github/workflows/help-screenshots.yml
 
 permissions:
@@ -37,6 +38,7 @@ jobs:
           python3 -m http.server 4173 -d public > /tmp/help-server.log 2>&1 &
           sleep 2
           node scripts/capture-help-screenshots-v2.mjs
+          node scripts/capture-help-crews.mjs
 
       - name: Commit screenshots
         run: |
@@ -46,6 +48,6 @@ jobs:
           if git diff --cached --quiet; then
             echo "No screenshot changes"
           else
-            git commit -m "Ajoute les captures réelles de l’interface pour l’aide"
+            git commit -m "Complète les captures réelles de l’interface pour l’aide"
             git push origin HEAD:feature/help-real-screenshots
           fi
