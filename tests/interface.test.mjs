@@ -83,15 +83,16 @@ test('organizer crew controls and hourly palette scale to short, odd and 24-hour
     assert(h.app.innerHTML.includes('data-action="new-crew"'));
     assert(h.app.innerHTML.includes('data-action="remove-crew-pilot"'));
     assert.equal((h.app.innerHTML.match(/<span class="presence-segment /g)||[]).length,duration);
-    assert(h.app.innerHTML.includes('phase-0'));if(duration>1)assert(h.app.innerHTML.includes('phase-23'));
+    assert(h.app.innerHTML.includes('coverage-one'));
+    assert(!h.app.innerHTML.includes('phase-'));
     h.run("eventSection='race';renderEvent()");
     assert(h.app.innerHTML.includes('presence-timeline duration-'+duration+' is-interactive'));
     assert(h.app.innerHTML.includes('name="carPreference"'));
     assert(h.app.innerHTML.includes('name="carAny"'));
     assert.equal((h.app.innerHTML.match(/data-action="availability"/g)||[]).length,2*(duration+2));
-    assert.equal((h.app.innerHTML.match(/<button[^>]+presence-segment phase-\d+ is-present/g)||[]).length,duration);
+    assert.equal((h.app.innerHTML.match(/<button[^>]+class="presence-segment is-present"/g)||[]).length,duration);
     await h.run("perform('availability',{dataset:{departure:'first',value:'h1'}})");
-    assert.equal((h.app.innerHTML.match(/<button[^>]+presence-segment phase-\d+ is-present/g)||[]).length,duration-1);
+    assert.equal((h.app.innerHTML.match(/<button[^>]+class="presence-segment is-present"/g)||[]).length,duration-1);
     assert(!h.app.innerHTML.includes('style="'));
   }
 });
