@@ -48,12 +48,88 @@
   .crew-management-accordion-body .presence-scale { height:21px!important; }
   .crew-management-accordion-body .presence-track>.presence-segment { height:30px!important; min-height:30px!important; font-size:10px!important; }
   .crew-management-accordion-body .presence-edges { margin-top:3px!important; }
-  .crew-management-accordion-body .crew-candidate-action-card { min-height:48px; padding:7px 8px!important; }
-  .crew-management-accordion-body .crew-add-pilot-button { min-width:62px!important; min-height:32px!important; padding:4px 7px!important; font-size:10.5px!important; }
+
+  /* Candidate cards: real mobile layout instead of a desktop card squeezed into one column. */
+  .crew-management-accordion-body .crew-candidate-action-card {
+    position:relative;
+    display:block!important;
+    min-height:0!important;
+    padding:9px!important;
+  }
+  .crew-management-accordion-body .crew-candidate-info {
+    min-width:0;
+    padding-right:82px;
+  }
+  .crew-management-accordion-body .crew-candidate-info .ux-candidate-head {
+    display:block!important;
+    margin:0 0 3px!important;
+  }
+  .crew-management-accordion-body .crew-candidate-info .ux-candidate-head strong {
+    display:block;
+    overflow:hidden;
+    font-size:13px!important;
+    line-height:1.2;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+  }
+  .crew-management-accordion-body .crew-candidate-info>small {
+    display:block!important;
+    margin:2px 0 0!important;
+    color:var(--muted);
+    font-size:10px!important;
+    line-height:1.3;
+  }
+  .crew-management-accordion-body .crew-candidate-info .presence-timeline {
+    margin-top:6px!important;
+    padding-right:0;
+  }
+  .crew-management-accordion-body .crew-add-pilot-button {
+    position:absolute;
+    top:9px;
+    right:9px;
+    width:auto!important;
+    min-width:70px!important;
+    min-height:34px!important;
+    padding:5px 9px!important;
+    font-size:11px!important;
+  }
+  .crew-management-accordion-body .ux-candidate-title {
+    display:block!important;
+    margin:8px 0 6px!important;
+  }
+  .crew-management-accordion-body .ux-candidate-title strong {
+    display:block;
+    font-size:14px!important;
+  }
+  .crew-management-accordion-body .ux-candidate-title span {
+    display:block;
+    margin-top:2px;
+    font-size:10px!important;
+  }
+  .crew-management-accordion-body .ux-crew-candidate-grid { gap:6px!important; }
+
+  /* Delete is a secondary destructive action, not a full-width footer. */
+  .crew-management-accordion-body .crew-actions {
+    display:flex!important;
+    justify-content:flex-end!important;
+    gap:6px!important;
+    margin-top:7px!important;
+    padding-top:7px!important;
+    border-top:1px solid rgba(70,108,113,.32);
+  }
+  .crew-management-accordion-body .crew-actions .danger-button {
+    width:auto!important;
+    min-width:104px!important;
+    min-height:36px!important;
+    padding:6px 10px!important;
+    font-size:11px!important;
+  }
 
   .ux-registration-toggle { min-height:44px!important; padding-block:8px!important; font-size:13px!important; }
 }
 @media (max-width:390px) {
   .crew-compact-car { max-width:125px; }
-  .crew-management-accordion-body .crew-roster>li>.crew-member-action,.crew-management-accordion-body .crew-add-pilot-button { min-width:58px!important; }
+  .crew-management-accordion-body .crew-roster>li>.crew-member-action { min-width:58px!important; }
+  .crew-management-accordion-body .crew-candidate-info { padding-right:76px; }
+  .crew-management-accordion-body .crew-add-pilot-button { min-width:64px!important; }
 }
