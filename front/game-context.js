@@ -35,6 +35,7 @@
       const data = await response.clone().json();
       if (!Array.isArray(data.events)) return response;
       const headers = new Headers(response.headers);
+      headers.delete('content-length');
       return new Response(JSON.stringify({...data,events:data.events.filter(event => eventGame(event) === game)}), {
         status:response.status,
         statusText:response.statusText,
