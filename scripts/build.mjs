@@ -73,7 +73,7 @@ const productionIndex = sourceIndex.replace(new RegExp(stylesheetTagPattern.sour
 });
 await writeFile(new URL('index.html', out), productionIndex);
 
-for (const file of ['app.js', 'crew-accordion.js', 'crew-builder.js', 'ux-refinement.js', 'help.js']) {
+for (const file of ['app.js', 'crew-accordion.js', 'crew-builder.js', 'ux-refinement.js', 'help.js', 'privacy.html', 'privacy.css']) {
   await copyFile(root + file, new URL(file, out));
 }
 await copyFile(root + 'help.css', new URL('help.css', out));
