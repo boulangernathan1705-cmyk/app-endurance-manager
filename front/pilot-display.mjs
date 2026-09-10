@@ -70,6 +70,33 @@ function decorateCoursePilots() {
   });
 }
 
+function decorateDepartureHeaderControls() {
+  app?.querySelectorAll('.departure-fold[id^="departure-"]').forEach(fold => {
+    const summary = fold.querySelector(':scope > summary');
+    const toolbarToggle = fold.querySelector('.fold-toolbar [data-ux-registration-toggle]');
+    const section = fold.querySelector('.fold-registration');
+    let summaryToggle = summary?.querySelector(':scope > .ux-summary-registration-toggle');
+
+    if (!summary || !toolbarToggle || !section) {
+      summaryToggle?.remove();
+      return;
+    }
+
+    if (!summaryToggle) {
+      summaryToggle = document.createElement('button');
+      summaryToggle.type = 'button';
+      summaryToggle.className = 'ux-summary-registration-toggle';
+      summaryToggle.dataset.uxRegistrationToggle = 'true';
+      summaryToggle.dataset.departure = fold.id.replace(/^departure-/, '');
+      summary.append(summaryToggle);
+    }
+
+    const open = !section.hidden;
+    summaryToggle.className = `${open ? 'secondary-button' : 'primary-button'} ux-summary-registration-toggle${open ? ' is-open' : ''}`;
+    if (summaryToggle.textContent !== toolbarToggle.textContent) summaryToggle.textContent = toolbarToggle.textContent;
+  });
+}
+
 function applyVisualOrder(items, comparator) {
   const sorted = [...items].sort(comparator);
   sorted.forEach((item, index) => {
@@ -137,6 +164,7 @@ function decorateCrewDepartureCounts() {
 
 function decorate() {
   decorateCoursePilots();
+  decorateDepartureHeaderControls();
   sortCourseCrewsVisually();
   sortCrewManagementVisually();
   decorateCrewDepartureCounts();
@@ -155,3 +183,8 @@ if (app) {
   decorate();
   new MutationObserver(scheduleDecorate).observe(app, {childList:true, subtree:true});
 }
+
+document.addEventListener('click', event => {
+  if (!event.target.closest('.ux-summary-registration-toggle')) return;
+  queueMicrotask(decorateDepartureHeaderControls);
+});
