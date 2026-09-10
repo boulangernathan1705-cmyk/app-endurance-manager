@@ -4,35 +4,38 @@
 
 Nettoyer et stabiliser la base avant d'ajouter de nouvelles fonctions (équipes, événements solo, championnats, filtres, etc.), sans modifier le comportement utilisateur existant pendant la phase de refactorisation.
 
-## Constats initiaux
+## État après optimisation
 
-- `app.js` concentre l'essentiel de l'interface et de la logique front dans un seul fichier d'environ 59 Ko.
-- `styles.css` concentre l'ensemble des styles desktop/mobile dans un seul fichier d'environ 58 Ko.
-- `server/worker.mjs` regroupe routes, validation, authentification, accès D1 et logique métier dans un seul fichier d'environ 36 Ko.
-- Les catalogues catégories / voitures / circuits sont dupliqués entre le front et le Worker.
-- La liste des circuits n'est pas parfaitement synchronisée : le Worker accepte `nurburgring`, alors que l'interface ne le propose pas.
-- `public/` était versionné alors qu'il est entièrement régénéré par `scripts/build.mjs`.
-- Un fichier `download` à la racine contenait en réalité une ancienne liste de règles `.gitignore`.
-- Le schéma D1 a évolué progressivement jusqu'au modèle `participants`; les colonnes historiques des inscriptions doivent être conservées tant que la logique de propriété/compatibilité les utilise.
-- Les tests API et interface existants constituent une bonne base de non-régression.
-- Les protections serveur existantes (validation, rôles, cookies sécurisés, rate limiting, taille des payloads) doivent être conservées.
+- Le front reste découpé en modules sources lisibles, mais le build Workers rassemble toutes les feuilles CSS nécessaires au démarrage dans `public/app.css`.
+- L’aide n’est plus chargée au démarrage : `front/help-loader.mjs` charge `help.js` et `help.css` uniquement au premier clic sur **Aide**.
+- Les anciennes couches `front/my-entries-coherence.mjs`, `styles/my-entries-coherence.css` et `front/mobile-ui.mjs` ont été supprimées après vérification de leur obsolescence.
+- `front/layout-polish.mjs` ne contient plus l’ancienne implémentation de **Mes inscriptions** ; la vue native et ses styles sont désormais la source active.
+- `front/event-entry-state.mjs` ne surveille plus en continu tout le DOM : l’état des départs est normalisé directement à la suite des actions de navigation.
+- Le créateur d’équipage et le changement d’état Ouvert/Complet réutilisent les données événement déjà affichées avant de refaire une lecture `/api/events`.
+- La bannière principale 2048×512 a été recompressée de 1 292 670 à 214 564 octets, soit environ 83 % de réduction, sans changement de dimensions ni de cadrage.
+- Le validateur d’images refuse désormais une bannière principale supérieure à 300 000 octets afin d’éviter une régression de poids.
+- Le binding Cloudflare `ASSETS` inutilisé a été retiré et Wrangler minifie le Worker avant déploiement.
+- Les réponses API restent explicitement en `Cache-Control: no-store`; les assets statiques utilisent le comportement natif de Workers Static Assets et ses ETag.
+- La base D1 `fmt-endurance`, son binding `DB`, les migrations existantes et la logique d’authentification restent inchangés.
 
-## Plan de refactorisation
+## Contrôles automatiques
 
-1. Hygiène du dépôt et génération des artefacts.
-2. Audit automatisé + CI.
-3. Catalogue métier partagé et suppression des constantes dupliquées.
-4. Découpage du front par responsabilités (API, état, événements, inscriptions, équipages, membres, utilitaires).
-5. Découpage du Worker (auth, validation, repositories D1, services métier, routes).
-6. Nettoyage CSS et séparation base/layout/composants/responsive.
-7. Revue des migrations et index D1 sans suppression de données en production.
-8. Nettoyage des assets réellement inutilisés.
-9. Tests desktop/mobile et non-régression fonctionnelle.
-10. PR vers `main` uniquement quand tous les contrôles sont verts.
+`npm run check` exécute les tests, le build Workers et l’audit strict. L’audit vérifie notamment :
 
-## Règles de sécurité du chantier
+- l’utilisation du catalogue métier partagé par le front et le serveur ;
+- la cohérence des images de circuits ;
+- l’absence du binding Cloudflare `ASSETS` lorsqu’il n’est pas utilisé ;
+- la minification Wrangler ;
+- le routage prioritaire limité aux routes `/api/*` ;
+- la présence d’une unique feuille `public/app.css` dans le build ;
+- l’absence d’anciens imports CSS ou de règles de cache statique contradictoires.
 
-- Aucun changement direct sur `main`.
-- Pas de migration destructive pendant le refactor structurel.
-- Chaque étape doit préserver les endpoints et comportements existants sauf correction de bug explicitement documentée.
-- Les données D1 de production ne sont pas modifiées par ce dépôt de travail tant que Cloudflare reste connecté à l'ancien dépôt.
+## Règles pour les prochaines évolutions
+
+- Ne pas modifier directement `main` pour un chantier structurel important : travailler par branche et PR avec preview Cloudflare.
+- Ne pas ajouter une nouvelle feuille ou un nouveau module uniquement pour corriger une couche précédente si la logique peut être intégrée proprement à la source active.
+- Réutiliser `app.eventViewData` pour les données déjà présentes à l’écran avant d’ajouter un nouvel appel `/api/events`.
+- Réserver les `MutationObserver` aux transformations qui dépendent réellement de mutations DOM asynchrones ; privilégier les appels directs après les actions connues.
+- Charger à la demande les fonctions lourdes qui ne sont pas nécessaires au parcours principal.
+- Ne pas ajouter de migration destructive dans une passe de nettoyage structurel.
+- Conserver la validation serveur, les rôles, les cookies sécurisés, le rate limiting et les contrôles de version optimistes.
