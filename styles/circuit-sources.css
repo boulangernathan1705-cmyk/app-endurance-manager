@@ -1,8 +1,65 @@
 /* Cartes de circuits libres chargées depuis Wikimedia Commons.
-   Le choix des sources est géré par /front/circuit-sources.mjs pour être compatible
-   avec Safari/iOS, qui n'applique pas de façon fiable `content: url(...)` sur <img>.
-   Sources et licences : /circuit-credits.html. */
+   Le choix des sources et les réglages de cadrage sont gérés par
+   /front/circuit-sources.mjs. Sources et licences : /circuit-credits.html. */
+
+.circuit-visual {
+  overflow: hidden;
+}
 
 .circuit-visual img[data-circuit] {
-  filter: grayscale(1) invert(1) brightness(1.15) contrast(1.18);
+  display: block;
+  object-fit: contain;
+  object-position: center;
+  transform: translate(var(--circuit-x, 0), var(--circuit-y, 0)) scale(var(--circuit-scale, 1));
+  transform-origin: center;
+  filter: grayscale(1) invert(1) brightness(1.12) contrast(1.14);
+}
+
+/* Les cartes de la liste d'événements partagent toutes la même fenêtre visuelle.
+   Les différences de viewBox des SVG sont compensées par les presets JS. */
+.event-card .circuit-visual {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 132px !important;
+  height: 106px !important;
+  flex: 0 0 132px !important;
+}
+
+.event-card .circuit-visual img[data-circuit] {
+  width: 118px !important;
+  height: 92px !important;
+  max-width: 118px !important;
+  max-height: 92px !important;
+}
+
+/* Le Mans est naturellement très vertical : on lui laisse un peu plus de hauteur
+   sans empiéter sur les badges de catégories. */
+.event-card .circuit-visual img[data-circuit-map="le-mans"] {
+  width: 88px !important;
+  height: 98px !important;
+  max-width: 88px !important;
+  max-height: 98px !important;
+}
+
+@media (min-width: 761px) {
+  .event-card.event-card-harmonized .circuit-visual {
+    width: 258px !important;
+    height: 146px !important;
+    flex-basis: 258px !important;
+  }
+
+  .event-card.event-card-harmonized .circuit-visual img[data-circuit] {
+    width: 224px !important;
+    height: 126px !important;
+    max-width: 224px !important;
+    max-height: 126px !important;
+  }
+
+  .event-card.event-card-harmonized .circuit-visual img[data-circuit-map="le-mans"] {
+    width: 112px !important;
+    height: 136px !important;
+    max-width: 112px !important;
+    max-height: 136px !important;
+  }
 }
