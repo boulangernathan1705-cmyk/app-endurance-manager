@@ -1,0 +1,98 @@
+/* Harmonisation des cartes d'événements de la page d'accueil. */
+@media (min-width: 761px) {
+  .event-card.event-card-harmonized {
+    min-height: 178px !important;
+    padding: 17px 292px 17px 24px !important;
+  }
+
+  .event-card.event-card-harmonized .event-card-body {
+    display: grid !important;
+    grid-template-rows: auto 1fr auto;
+    align-content: stretch;
+    min-height: 142px;
+  }
+
+  .event-card.event-card-harmonized .event-card-title-row {
+    display: flex !important;
+    align-items: center !important;
+    flex-wrap: wrap;
+    gap: 10px 14px;
+    min-width: 0;
+  }
+
+  .event-card.event-card-harmonized .event-name {
+    margin: 0 !important;
+    color: #f4ead9;
+    font-size: 18px;
+    font-weight: 900;
+    line-height: 1.15;
+  }
+
+  .event-card.event-card-harmonized .event-info {
+    display: inline-flex !important;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px 10px;
+    min-width: 0;
+  }
+
+  .event-card.event-card-harmonized .event-home-schedule {
+    color: #aebbbc;
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 1.25;
+    white-space: normal;
+  }
+
+  .event-card.event-card-harmonized .event-category-badges {
+    align-self: end;
+    margin-top: 16px !important;
+    margin-bottom: 0 !important;
+    gap: 8px;
+  }
+
+  .event-card.event-card-harmonized .event-category-badge {
+    min-width: 132px;
+  }
+
+  .event-card.event-card-harmonized .circuit-visual {
+    position: absolute !important;
+    top: 50% !important;
+    right: 16px !important;
+    width: 258px !important;
+    height: 146px !important;
+    transform: translateY(-50%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .event-card.event-card-harmonized .circuit-visual img {
+    width: 100% !important;
+    height: 100% !important;
+    max-width: 100% !important;
+    max-height: 100% !important;
+    object-fit: contain;
+  }
+
+  .event-card.event-card-harmonized .event-card-status {
+    align-self: center;
+    margin-top: 6px;
+  }
+}
+
+@media (max-width: 760px) {
+  .event-card.event-card-harmonized .event-info {
+    display: flex !important;
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 5px;
+  }
+
+  .event-card.event-card-harmonized .event-home-schedule {
+    color: #aebbbc;
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1.3;
+  }
+}
