@@ -211,7 +211,7 @@ function decorateEventView() {
     button.type = 'button';
     button.className = 'primary-button crew-builder-open';
     button.dataset.crewBuilderOpen = 'true';
-    button.textContent = '+ Créer un équipage';
+    button.textContent = 'Créer un équipage';
     editButton.insertAdjacentElement('afterend', button);
   }
   insertPendingMessage();
@@ -366,4 +366,3 @@ if (app) {
   });
   observer.observe(app,{childList:true,subtree:true});
 }
-
