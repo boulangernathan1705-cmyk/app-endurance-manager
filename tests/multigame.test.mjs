@@ -29,11 +29,11 @@ test('le serveur accepte les données endurance iRacing du catalogue partagé', 
     durationHours:24,
     eventType:'special',
     circuit:'iracing-daytona',
-    categories:['GTP','LMP2','GT3'],
+    categories:['GTP','LMP2 P217','GT3'],
     departures:[{date:'2090-01-15',time:'14:00'}]
   });
   assert.equal(event.circuit,'iracing-daytona');
-  assert.deepEqual(event.categories,['GTP','LMP2','GT3']);
+  assert.deepEqual(event.categories,['GTP','LMP2 P217','GT3']);
   const registration = validateRegistration({
     name:'Pilote',
     category:'GTP',
