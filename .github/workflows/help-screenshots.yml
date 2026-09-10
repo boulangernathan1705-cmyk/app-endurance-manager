@@ -49,5 +49,6 @@ jobs:
             echo "No screenshot changes"
           else
             git commit -m "Complète les captures réelles de l’interface pour l’aide"
+            git pull --rebase origin feature/help-real-screenshots
             git push origin HEAD:feature/help-real-screenshots
           fi
