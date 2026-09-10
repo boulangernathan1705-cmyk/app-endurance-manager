@@ -1,43 +1,8 @@
-/* Cartes de circuits libres, affichées depuis Wikimedia Commons.
-   Sources et licences : /circuit-credits.html.
-   Les fichiers distants restent inchangés ; seul leur rendu est harmonisé. */
+/* Cartes de circuits libres chargées depuis Wikimedia Commons.
+   Le choix des sources est géré par /front/circuit-sources.mjs pour être compatible
+   avec Safari/iOS, qui n'applique pas de façon fiable `content: url(...)` sur <img>.
+   Sources et licences : /circuit-credits.html. */
 
 .circuit-visual img[data-circuit] {
   filter: grayscale(1) invert(1) brightness(1.15) contrast(1.18);
 }
-
-.circuit-visual img[data-circuit="bahrain"] { content:url("https://commons.wikimedia.org/wiki/Special:Redirect/file/Circuit%20Bahrain.svg"); }
-.circuit-visual img[data-circuit="barcelona"],.circuit-visual img[data-circuit="iracing-barcelona"] { content:url("https://commons.wikimedia.org/wiki/Special:Redirect/file/Circuit%20Catalunya.svg"); }
-.circuit-visual img[data-circuit="cota"],.circuit-visual img[data-circuit="iracing-cota"] { content:url("https://commons.wikimedia.org/wiki/Special:Redirect/file/F1%20circuits%202014-2018%20-%20Circuit%20of%20the%20Americas%20%28version%202%29.svg"); }
-.circuit-visual img[data-circuit="daytona"],.circuit-visual img[data-circuit="iracing-daytona"] { content:url("https://commons.wikimedia.org/wiki/Special:Redirect/file/Daytona%20International%20Speedway%20-%20Road%20Course.svg"); }
-.circuit-visual img[data-circuit="fuji"],.circuit-visual img[data-circuit="iracing-fuji"] { content:url("https://commons.wikimedia.org/wiki/Special:Redirect/file/Circuit%20Fuji.svg"); }
-.circuit-visual img[data-circuit="imola"],.circuit-visual img[data-circuit="iracing-imola"] { content:url("https://commons.wikimedia.org/wiki/Special:Redirect/file/Imola%202009.svg"); }
-.circuit-visual img[data-circuit="interlagos"],.circuit-visual img[data-circuit="iracing-interlagos"] { content:url("https://commons.wikimedia.org/wiki/Special:Redirect/file/Circuit%20Interlagos.svg"); }
-.circuit-visual img[data-circuit="laguna-seca"],.circuit-visual img[data-circuit="iracing-laguna-seca"] { content:url("https://commons.wikimedia.org/wiki/Special:Redirect/file/Laguna%20seca%20layout.svg"); }
-.circuit-visual img[data-circuit="le-mans"],.circuit-visual img[data-circuit="iracing-le-mans"] { content:url("https://commons.wikimedia.org/wiki/Special:Redirect/file/Circuit%20de%20la%20Sarthe%20track%20map.svg"); }
-.circuit-visual img[data-circuit="lusail"] { content:url("https://commons.wikimedia.org/wiki/Special:Redirect/file/Lusail%20International%20Circuit%202023.svg"); }
-.circuit-visual img[data-circuit="monza"],.circuit-visual img[data-circuit="iracing-monza"] { content:url("https://commons.wikimedia.org/wiki/Special:Redirect/file/Circuit%20Monza.svg"); }
-.circuit-visual img[data-circuit="paul-ricard"] { content:url("https://commons.wikimedia.org/wiki/Special:Redirect/file/Paul%20Ricard.svg"); }
-.circuit-visual img[data-circuit="portimao"],.circuit-visual img[data-circuit="iracing-portimao"] { content:url("https://commons.wikimedia.org/wiki/Special:Redirect/file/Aut%C3%B3dromo%20de%20Algarve.svg"); }
-.circuit-visual img[data-circuit="sebring"],.circuit-visual img[data-circuit="iracing-sebring"] { content:url("https://commons.wikimedia.org/wiki/Special:Redirect/file/Sebring%20International%20Raceway.svg"); }
-.circuit-visual img[data-circuit="silverstone"],.circuit-visual img[data-circuit="iracing-silverstone"] { content:url("https://commons.wikimedia.org/wiki/Special:Redirect/file/Circuit%20Silverstone.svg"); }
-.circuit-visual img[data-circuit="spa"],.circuit-visual img[data-circuit="iracing-spa"] { content:url("https://commons.wikimedia.org/wiki/Special:Redirect/file/Spa-Francorchamps%20of%20Belgium.svg"); }
-.circuit-visual img[data-circuit="iracing-adelaide"] { content:url("https://commons.wikimedia.org/wiki/Special:Redirect/file/Adelaide%20Street%20Circuit%20-%20short.svg"); }
-.circuit-visual img[data-circuit="iracing-mexico"] { content:url("https://commons.wikimedia.org/wiki/Special:Redirect/file/Aut%C3%B3dromo%20Hermanos%20Rodr%C3%ADguez%202015.svg"); }
-.circuit-visual img[data-circuit="iracing-mugello"] { content:url("https://commons.wikimedia.org/wiki/Special:Redirect/file/Mugello%20Racing%20Circuit%20track%20map.svg"); }
-.circuit-visual img[data-circuit="iracing-magny-cours"] { content:url("https://commons.wikimedia.org/wiki/Special:Redirect/file/Circuit%20de%20Nevers%20Magny-Cours.svg"); }
-.circuit-visual img[data-circuit="iracing-misano"] { content:url("https://commons.wikimedia.org/wiki/Special:Redirect/file/Misano%20World%20Circuit.svg"); }
-.circuit-visual img[data-circuit="iracing-hockenheim"] { content:url("https://commons.wikimedia.org/wiki/Special:Redirect/file/Circuit%20Hockenheimring.svg"); }
-.circuit-visual img[data-circuit="iracing-indianapolis"] { content:url("https://commons.wikimedia.org/wiki/Special:Redirect/file/Indianapolis%20Motor%20Speedway%20-%20road%20course.svg"); }
-.circuit-visual img[data-circuit="iracing-road-atlanta"] { content:url("https://commons.wikimedia.org/wiki/Special:Redirect/file/Road%20Atlanta%20track%20map.svg"); }
-.circuit-visual img[data-circuit="iracing-bathurst"] { content:url("https://commons.wikimedia.org/wiki/Special:Redirect/file/Mount%20Panorama%20street%20racing%20circuit%20in%20Australia.svg"); }
-.circuit-visual img[data-circuit="iracing-nurburgring-gp"] { content:url("https://commons.wikimedia.org/wiki/Special:Redirect/file/N%C3%BCrburgring%20-%20Grand-Prix-Strecke.svg"); }
-.circuit-visual img[data-circuit="iracing-nordschleife"] { content:url("https://commons.wikimedia.org/wiki/Special:Redirect/file/Circuit%20N%C3%BCrburgring-2002-24h.svg"); }
-.circuit-visual img[data-circuit="iracing-red-bull-ring"] { content:url("https://commons.wikimedia.org/wiki/Special:Redirect/file/Circuit%20Red%20Bull%20Ring.svg"); }
-.circuit-visual img[data-circuit="iracing-road-america"] { content:url("https://commons.wikimedia.org/wiki/Special:Redirect/file/Road%20America.svg"); }
-.circuit-visual img[data-circuit="iracing-sonoma"] { content:url("https://commons.wikimedia.org/wiki/Special:Redirect/file/Sonoma%20Raceway%202024.svg"); }
-.circuit-visual img[data-circuit="iracing-suzuka"] { content:url("https://commons.wikimedia.org/wiki/Special:Redirect/file/F1%20circuits%202014-2018%20-%20Suzuka%20Circuit%20%28version%202%29.svg"); }
-.circuit-visual img[data-circuit="iracing-thruxton"] { content:url("https://commons.wikimedia.org/wiki/Special:Redirect/file/Thuxton%20Motor%20Racing%20Circuit%20map.svg"); }
-.circuit-visual img[data-circuit="iracing-vir"] { content:url("https://commons.wikimedia.org/wiki/Special:Redirect/file/Virginia%20International%20Raceway%20-%20Full%20Course.svg"); }
-.circuit-visual img[data-circuit="iracing-watkins-glen"] { content:url("https://commons.wikimedia.org/wiki/Special:Redirect/file/Watkins%20Glen%20International%20Track%20Map.svg"); }
-.circuit-visual img[data-circuit="iracing-zandvoort"] { content:url("https://commons.wikimedia.org/wiki/Special:Redirect/file/Zandvoort.svg"); }
