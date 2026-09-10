@@ -31,11 +31,12 @@ function webpDimensions(buffer){
   throw new Error('dimensions WebP introuvables');
 }
 
-async function validateWebp(path,{minWidth=1,minHeight=1}={}){
+async function validateWebp(path,{minWidth=1,minHeight=1,maxBytes=Infinity}={}){
   const buffer=await readFile(root+path);
   const {width,height}=webpDimensions(buffer);
   if(width<minWidth||height<minHeight) throw new Error(`${path}: dimensions invalides ${width}×${height}`);
+  if(buffer.length>maxBytes) throw new Error(`${path}: asset trop lourd ${(buffer.length/1024).toFixed(1)} KiB (maximum ${(maxBytes/1024).toFixed(1)} KiB)`);
   console.log(`Asset image OK: ${path} (${width}×${height}, ${(buffer.length/1024).toFixed(1)} KiB)`);
 }
 
-await validateWebp('images/endurance-manager-banner.webp',{minWidth:1900,minHeight:512});
+await validateWebp('images/endurance-manager-banner.webp',{minWidth:1900,minHeight:512,maxBytes:300000});
