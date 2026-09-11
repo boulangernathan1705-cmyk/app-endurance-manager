@@ -75,11 +75,13 @@ await mkdir(new URL('iracing/', out), {recursive: true});
 const sourceIndex = await readFile(root + 'index.html', 'utf8');
 const sourceGame = await readFile(root + 'game.html', 'utf8');
 const sourceMembers = await readFile(root + 'members.html', 'utf8');
+const sourceDiagnostics = await readFile(root + 'diagnostics.html', 'utf8');
 const sourceHelp = await readFile(root + 'help.html', 'utf8');
 const paths = [
   ...stylesheetPaths(sourceIndex,'index.html'),
   ...stylesheetPaths(sourceGame,'game.html'),
   ...stylesheetPaths(sourceMembers,'members.html'),
+  ...stylesheetPaths(sourceDiagnostics,'diagnostics.html'),
   ...stylesheetPaths(sourceHelp,'help.html')
 ];
 const uniqueStylesheetPaths = [...new Set(paths)];
@@ -92,6 +94,7 @@ await writeFile(new URL('app.css', out), bundledCss);
 
 await writeFile(new URL('index.html', out), productionHtml(sourceIndex));
 await writeFile(new URL('members.html', out), productionHtml(sourceMembers));
+await writeFile(new URL('diagnostics.html', out), productionHtml(sourceDiagnostics));
 await writeFile(new URL('help.html', out), productionHtml(sourceHelp));
 const gameHtml = productionHtml(sourceGame);
 await writeFile(new URL('lmu/index.html', out), gameHtml);
@@ -107,7 +110,7 @@ await cp(root + 'shared', new URL('shared/', out), {recursive: true});
 
 if (!workers) {
   await copyFile(root + 'server/worker.mjs', new URL('_worker.js', out));
-  await writeFile(new URL('_routes.json', out), JSON.stringify({version: 1, include: ['/api/*'], exclude: []}, null, 2) + '\n');
+  await writeFile(new URL('_routes.json', out), JSON.stringify({version: 1, include: ['/api/*','/telemetry/*'], exclude: []}, null, 2) + '\n');
 }
 
 await writeFile(new URL('_headers', out), `/*
@@ -118,4 +121,4 @@ await writeFile(new URL('_headers', out), `/*
   Permissions-Policy: camera=(), microphone=(), geolocation=()
 `);
 
-console.log(`Build ready: public/ (${workers ? 'Workers' : 'Pages'}, accueil + LMU + iRacing + membres + aide, ${uniqueStylesheetPaths.length} feuilles CSS -> app.css)`);
+console.log(`Build ready: public/ (${workers ? 'Workers' : 'Pages'}, accueil + LMU + iRacing + membres + diagnostics + aide, ${uniqueStylesheetPaths.length} feuilles CSS -> app.css)`);
