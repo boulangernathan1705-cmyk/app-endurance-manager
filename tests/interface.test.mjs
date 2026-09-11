@@ -83,6 +83,22 @@ test('les actions inscription restent contenues et côte à côte dans le résum
   assert.match(css,/grid-row:3/);
 });
 
+test('le compte déconnecté garde Aide et Discord alignés horizontalement',()=>{
+  const account=read('front/account-menu.mjs');
+  const css=read('styles/account-menu.css');
+  const game=read('game.html');
+  assert.match(account,/account-disconnected-actions/);
+  assert.match(css,/\.account-disconnected-actions\s*\{[^}]*display:\s*flex/s);
+  assert.match(css,/\.account-disconnected-actions \.account-help-link\s*\{[^}]*width:\s*auto/s);
+  assert.match(css,/white-space:\s*nowrap/);
+  assert.match(game,/account-menu\.css\?v=3-disconnected-row/);
+});
+
+test('inscrire un autre pilote reste réservé à un compte connecté',()=>{
+  const eventView=read('front/app/event-view.mjs');
+  assert.match(eventView,/\$\{state\.user\?button\('new-registration','Inscrire un autre pilote'/);
+});
+
 test('Équipages produit directement la gestion finale',()=>{
   const crews=read('front/app/crews.mjs');
   const eventView=read('front/app/event-view.mjs');
