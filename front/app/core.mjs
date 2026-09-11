@@ -68,9 +68,10 @@ function diagnosticMessage(path,method,stage,extra='') {
 function reportClientError({kind='network',path='',method='',message='',detail=''}) {
   try {
     const payload=JSON.stringify({kind,page:location.pathname.slice(0,160),apiPath:String(path).slice(0,160),method:String(method).slice(0,12),message:String(message).slice(0,500),detail:String(detail).slice(0,1000),userAgent:navigator.userAgent.slice(0,500),viewport:`${innerWidth}x${innerHeight}`,online:navigator.onLine!==false});
+    // sendBeacon peut renvoyer true alors que l'envoi échoue ensuite. On lance donc
+    // aussi un fetch keepalive afin d'avoir une vraie deuxième chance de livraison.
     if (navigator.sendBeacon) {
-      const blob=new Blob([payload],{type:'text/plain;charset=UTF-8'});
-      if (navigator.sendBeacon('/telemetry/client-error',blob)) return;
+      try { navigator.sendBeacon('/telemetry/client-error',new Blob([payload],{type:'text/plain;charset=UTF-8'})); } catch {}
     }
     fetch('/telemetry/client-error',{method:'POST',credentials:'same-origin',cache:'no-store',keepalive:true,headers:{'Content-Type':'text/plain;charset=UTF-8'},body:payload}).catch(()=>{});
   } catch {}
