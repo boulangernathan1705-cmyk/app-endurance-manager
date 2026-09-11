@@ -13,6 +13,23 @@
   min-width: 0;
 }
 
+/* Les actions de compte sont désormais regroupées dans le menu Discord commun. */
+#navigation > .account-name,
+#navigation > [data-action="logout"],
+#navigation > [data-action="members"],
+#navigation > .discord-button,
+#navigation .help-nav-button {
+  display: none !important;
+}
+
+#navigation > .help-sim-stack {
+  display: contents !important;
+}
+
+#navigation .nav-game-switcher {
+  min-width: 0;
+}
+
 .account-menu {
   position: relative;
 }
@@ -210,5 +227,11 @@
   .account-discord-unavailable {
     min-height: 38px;
     font-size: 12px;
+  }
+
+  #navigation .nav-game-switcher {
+    order: 3 !important;
+    grid-column: 1 / -1;
+    width: 100%;
   }
 }
