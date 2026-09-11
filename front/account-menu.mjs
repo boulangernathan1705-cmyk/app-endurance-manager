@@ -4,6 +4,7 @@ const roleLabel = role => ({admin:'Administrateur',organizer:'Organisateur',pilo
 const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
 const isHub = location.pathname === '/' || location.pathname.endsWith('/index.html');
 const isMembers = location.pathname.endsWith('/members.html');
+const isHelp = location.pathname.endsWith('/help.html');
 
 function discordMark() {
   return `<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M19.5 5.3A16.3 16.3 0 0 0 15.4 4l-.5 1.1a14.6 14.6 0 0 0-5.8 0L8.6 4a16.1 16.1 0 0 0-4.1 1.3C1.9 9.2 1.2 13 1.6 16.8A16.8 16.8 0 0 0 6.7 19l1.2-1.7c-.7-.3-1.4-.7-2-1.2l.5-.4c3.8 1.8 7.8 1.8 11.6 0l.5.4c-.6.5-1.3.9-2 1.2l1.2 1.7a16.7 16.7 0 0 0 5.1-2.2c.5-4.4-.9-8.2-3.3-11.5ZM8.5 14.7c-1.2 0-2.1-1.1-2.1-2.4 0-1.4.9-2.4 2.1-2.4s2.1 1.1 2.1 2.4-.9 2.4-2.1 2.4Zm7 0c-1.2 0-2.1-1.1-2.1-2.4 0-1.4.9-2.4 2.1-2.4s2.1 1.1 2.1 2.4-.9 2.4-2.1 2.4Z"/></svg>`;
@@ -68,16 +69,17 @@ function closeMenu() {
 }
 
 function renderDisconnected(discordReady) {
-  root.innerHTML = discordReady
-    ? `<a class="account-discord-login" href="/api/auth/discord">${discordMark()}<span>Se connecter avec Discord</span></a>`
-    : `<span class="account-discord-unavailable">${discordMark()}<span>Connexion Discord indisponible</span></span>`;
+  root.innerHTML = `<div class="account-disconnected-actions">
+    <a class="account-menu-item account-help-link" href="/help.html">Aide</a>
+    ${discordReady
+      ? `<a class="account-discord-login" href="/api/auth/discord">${discordMark()}<span>Se connecter avec Discord</span></a>`
+      : `<span class="account-discord-unavailable">${discordMark()}<span>Connexion Discord indisponible</span></span>`}
+  </div>`;
 }
 
 function renderConnected(user) {
   const manage = user.role === 'admin' ? `<a class="account-menu-item" href="/members.html">Gestion des membres</a>` : '';
-  const help = (isHub || isMembers)
-    ? `<a class="account-menu-item" href="/lmu/#help">Aide</a>`
-    : `<button type="button" class="account-menu-item" data-account-help>Aide</button>`;
+  const help = `<a class="account-menu-item" href="/help.html"${isHelp ? ' aria-current="page"' : ''}>Aide</a>`;
 
   root.innerHTML = `<div class="account-menu">
     <button type="button" class="account-trigger" aria-haspopup="menu" aria-expanded="false">
@@ -108,24 +110,12 @@ async function loadSession() {
   }
 }
 
-function activateHashAction() {
-  if (isHub || isMembers || !location.hash) return;
+function activateLegacyHashAction() {
   if (location.hash === '#members') {
     location.replace('/members.html');
     return;
   }
-  const selector = location.hash === '#help' ? '#help-nav-button' : '';
-  if (!selector) return;
-  let attempts = 0;
-  const timer = setInterval(() => {
-    attempts += 1;
-    const target = document.querySelector(selector);
-    if (target) {
-      clearInterval(timer);
-      history.replaceState(null,'',location.pathname + location.search);
-      target.click();
-    } else if (attempts >= 50) clearInterval(timer);
-  }, 100);
+  if (location.hash === '#help') location.replace('/help.html');
 }
 
 root?.addEventListener('click', async event => {
@@ -139,17 +129,12 @@ root?.addEventListener('click', async event => {
     popover.hidden = !open;
     return;
   }
-  if (event.target.closest('[data-account-help]')) {
-    closeMenu();
-    document.getElementById('help-nav-button')?.click();
-    return;
-  }
   if (event.target.closest('[data-account-logout]')) {
     const button = event.target.closest('[data-account-logout]');
     button.disabled = true;
     try {
       await fetch('/api/auth/logout', {method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:'{}'});
-      location.assign(isHub || isMembers ? '/' : location.pathname);
+      location.assign(isHub || isMembers || isHelp ? '/' : location.pathname);
     } catch {
       button.disabled = false;
     }
@@ -166,4 +151,4 @@ document.addEventListener('keydown', event => {
 });
 
 void loadSession();
-activateHashAction();
+activateLegacyHashAction();
