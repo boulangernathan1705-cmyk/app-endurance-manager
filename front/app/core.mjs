@@ -16,7 +16,7 @@ export const state = {
 };
 try { state.pilotName = localStorage.getItem('fmt_pilot_name') || ''; } catch {}
 
-export const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[c]));
+export const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 export const canManage = () => ['admin','organizer'].includes(state.user?.role);
 export const isAdmin = () => state.user?.role === 'admin';
 
@@ -80,7 +80,6 @@ function xhrApi(path,method,data) {
   });
 }
 export async function api(path,method='GET',data) {
-  let lastError;
   for (let attempt=0;attempt<2;attempt++) {
     try {
       const response = await fetch(path,{method,credentials:'same-origin',cache:'no-store',headers:method==='GET'?{'Accept':'application/json'}:{'Accept':'application/json','Content-Type':'application/json'},body:method==='GET'?undefined:JSON.stringify(data||{})});
@@ -88,16 +87,11 @@ export async function api(path,method='GET',data) {
       if (!response.ok) throw Error(result.error || 'Cette action a échoué.');
       return result;
     } catch (error) {
-      lastError=error;
       if (!networkFailure(error)) throw error;
       if (attempt===0) await wait(250);
     }
   }
-  try { return await xhrApi(path,method,data); }
-  catch (xhrError) {
-    if (networkFailure(lastError)) throw Error('Connexion au service impossible avec ce navigateur. Recharge la page ou réessaie dans quelques secondes.');
-    throw xhrError;
-  }
+  return xhrApi(path,method,data);
 }
 export async function load() {
   const session = await api('/api/session');
