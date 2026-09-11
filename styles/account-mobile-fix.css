@@ -1,0 +1,43 @@
+@media (max-width: 760px) {
+  .site-nav-shell .account-bar {
+    width: auto !important;
+    margin: 5px 0 0 !important;
+    padding: 0 !important;
+    justify-content: flex-start !important;
+  }
+
+  .site-nav-shell .account-menu-root,
+  .site-nav-shell .account-menu {
+    width: auto !important;
+    max-width: calc(100vw - 24px);
+  }
+
+  .site-nav-shell .account-trigger {
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: 235px !important;
+    min-height: 38px !important;
+    padding: 4px 8px 4px 5px !important;
+    gap: 7px !important;
+  }
+
+  .site-nav-shell .account-avatar {
+    width: 28px !important;
+    height: 28px !important;
+    flex-basis: 28px !important;
+  }
+
+  .site-nav-shell .account-trigger-copy strong {
+    max-width: 155px !important;
+    font-size: 12px !important;
+  }
+
+  .site-nav-shell .account-trigger-copy small {
+    font-size: 9px !important;
+  }
+
+  .site-nav-shell .account-chevron {
+    margin-left: 1px !important;
+    font-size: 12px !important;
+  }
+}
