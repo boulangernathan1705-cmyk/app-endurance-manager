@@ -62,11 +62,23 @@ test('Course produit directement l’interface finale',()=>{
   assert.match(crews,/crew-pilot-accordion/);
 });
 
-test('les actions inscription restent contenues dans le résumé du départ',()=>{
+test('la page événement évite la navigation en double et garde les actions dans le bon ordre',()=>{
+  const eventView=read('front/app/event-view.mjs');
+  assert.doesNotMatch(eventView,/Retour aux événements/);
+  assert.match(eventView,/event-toolbar-main/);
+  const refresh=eventView.indexOf("button('refresh','Actualiser')");
+  const edit=eventView.indexOf("button('edit-event','Modifier l’événement'");
+  const remove=eventView.indexOf("button('delete-event','Supprimer l’événement'");
+  const crew=eventView.indexOf('Créer un équipage');
+  assert.ok(refresh>=0&&refresh<edit&&edit<remove&&remove<crew);
+});
+
+test('les actions inscription restent contenues et côte à côte dans le résumé du départ',()=>{
   const css=read('styles/registration-sharing.css');
   assert.match(css,/summary>.ux-summary-registration-actions/);
   assert.match(css,/grid-column:4/);
   assert.match(css,/grid-row:1 \/ span 2/);
+  assert.match(css,/grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
   assert.match(css,/grid-column:2 \/ -1/);
   assert.match(css,/grid-row:3/);
 });
@@ -89,6 +101,7 @@ test('le formulaire inscription est unique et compact',()=>{
   assert.match(registration,/TOUTE LA COURSE/);
   assert.doesNotMatch(registration,/button\('availability','INDISPONIBLE'/);
   assert.match(registration,/renderAvailabilityTimeline\(\{departure,duration,status:stateDraft\.status,interactive:true/);
+  assert.match(registration,/pilot-category-logo pilot-category-text/);
 });
 
 test('Mes inscriptions restaure les grilles de 1 à 3 colonnes et les visuels catégorie',()=>{
