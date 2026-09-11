@@ -86,7 +86,9 @@ const uniqueStylesheetPaths = [...new Set(paths)];
 
 const cssParts = [];
 for (const path of uniqueStylesheetPaths) cssParts.push(`/* ${path} */\n${await inlineCss(path)}`);
-await writeFile(new URL('app.css', out), cssParts.join('\n\n') + '\n');
+const bundledCss = cssParts.join('\n\n') + '\n';
+if (/^\s*@import\s+url\(/mi.test(bundledCss)) throw new Error('Le bundle CSS contient encore un @import après compilation.');
+await writeFile(new URL('app.css', out), bundledCss);
 
 await writeFile(new URL('index.html', out), productionHtml(sourceIndex));
 await writeFile(new URL('members.html', out), productionHtml(sourceMembers));
@@ -95,7 +97,7 @@ const gameHtml = productionHtml(sourceGame);
 await writeFile(new URL('lmu/index.html', out), gameHtml);
 await writeFile(new URL('iracing/index.html', out), gameHtml);
 
-for (const file of ['app.js', 'crew-accordion.js', 'crew-builder.js', 'ux-refinement.js', 'help.js', 'privacy.html', 'privacy.css', 'legal.html', 'circuit-credits.html']) {
+for (const file of ['app.js', 'crew-builder.js', 'help.js', 'privacy.html', 'privacy.css', 'legal.html', 'circuit-credits.html']) {
   await copyFile(root + file, new URL(file, out));
 }
 await copyFile(root + 'help.css', new URL('help.css', out));

@@ -1,51 +1,40 @@
-.registration-workspace-head{display:block;margin-bottom:12px}
+.registration-workspace-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
 .registration-workspace-head h2{margin:0}
-.registration-workspace-actions{display:none!important}
+.registration-close-button{flex:0 0 auto}
 .registration-origin-info{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border:1px solid #566267;border-radius:50%;color:#aebabe;font-size:10px;font-weight:900;line-height:1;cursor:help;vertical-align:middle;opacity:.72}
 .registration-origin-info:hover,.registration-origin-info:focus{opacity:1;border-color:var(--green);color:#dfffe7}
 .pilot-name .registration-origin-info{margin-left:3px}
-.fold-toolbar .ux-registration-other{white-space:nowrap}
 
-/* Desktop : identité du pilote compacte, sans :has(). */
+.ux-summary-registration-actions{display:flex;align-items:center;justify-content:flex-end;gap:8px;margin-left:auto;min-width:0}
+.ux-summary-registration-actions .ux-summary-registration-toggle,.ux-summary-registration-actions .ux-summary-registration-other{min-height:34px;padding:7px 11px;white-space:nowrap}
+
+.registration-identity-grid{display:grid;gap:14px;margin:8px 0 14px;align-items:end}
+.registration-identity-field{display:grid;gap:7px;min-width:0;margin:0}
+.registration-identity-field>.form-label{margin:0;align-self:end}
+.registration-identity-field input,.registration-identity-field select{width:100%;min-width:0;margin:0}
+.registration-identity-readonly strong{display:flex;align-items:center;min-height:42px;padding:9px 12px;border:1px solid var(--border);border-radius:8px;background:rgba(255,255,255,.025);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* Desktop : Pilote / Pseudo / Pilote souhaité restent sur une seule ligne. */
 @media(min-width:901px){
-  .registration-form{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));column-gap:14px;row-gap:0;align-items:start}
-  .registration-form>.form-title,
-  .registration-form>.registration-context-banner,
-  .registration-form>.registration-choices,
-  .registration-form>.category-area,
-  .registration-form>.save-row{grid-column:1/-1}
+  .registration-identity-grid.is-other{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .registration-identity-grid.is-self{grid-template-columns:repeat(auto-fit,minmax(240px,1fr))}
+}
 
-  .registration-form>.managed-pilot-picker{display:contents}
-  .registration-form>.managed-pilot-picker>.form-label{grid-column:1;grid-row:3;margin:0 0 7px;align-self:end}
-  .registration-form>.managed-pilot-picker>select{grid-column:1;grid-row:4;width:100%;margin:0 0 14px}
-
-  .registration-form>label[for^="name-"]{grid-column:2;grid-row:3;margin:0 0 7px;align-self:end}
-  .registration-form>input[name="pilotName"]{grid-column:2;grid-row:4;width:100%;margin:0 0 14px}
-
-  .registration-form>label[for^="preference-"]{grid-column:1/-1;margin:0 0 7px;align-self:end}
-  .registration-form>input[name="preferredPilot"]{grid-column:1/-1;width:100%;margin:0 0 14px}
-
-  /* Ajout d'un autre pilote : Pilote / Pseudo / Pilote souhaité sur la même ligne. */
-  .registration-form>.managed-pilot-picker~label[for^="preference-"]{grid-column:2/-1;grid-row:3}
-  .registration-form>.managed-pilot-picker~input[name="preferredPilot"]{grid-column:2/-1;grid-row:4}
-  .registration-form>input[name="pilotName"]~label[for^="preference-"]{grid-column:3;grid-row:3}
-  .registration-form>input[name="pilotName"]~input[name="preferredPilot"]{grid-column:3;grid-row:4}
-
-  /* Modification d'un pilote manuel déjà inscrit : nom + coéquipier sur la même ligne. */
-  .registration-form>.registration-context-banner.other~label[for^="name-"]{grid-column:1;grid-row:3}
-  .registration-form>.registration-context-banner.other~input[name="pilotName"]{grid-column:1;grid-row:4}
-  .registration-form>.registration-context-banner.other~input[name="pilotName"]~label[for^="preference-"]{grid-column:2/-1;grid-row:3}
-  .registration-form>.registration-context-banner.other~input[name="pilotName"]~input[name="preferredPilot"]{grid-column:2/-1;grid-row:4}
+@media(max-width:1100px) and (min-width:901px){
+  .ux-summary-registration-actions{gap:6px}
+  .ux-summary-registration-actions .ux-summary-registration-toggle,.ux-summary-registration-actions .ux-summary-registration-other{font-size:11px;padding-inline:9px}
 }
 
 @media(max-width:900px){
-  .registration-form{display:block}
-  .registration-form>.managed-pilot-picker{display:grid;gap:7px;margin:8px 0 14px;padding:12px;border:1px solid var(--border);border-radius:9px;background:rgba(255,255,255,.02)}
-  .registration-form>label[for^="name-"],.registration-form>label[for^="preference-"]{display:block;margin-top:10px}
-  .registration-form>input[name="pilotName"],.registration-form>input[name="preferredPilot"]{width:100%;margin-bottom:0}
+  .registration-workspace-head{align-items:flex-start}
+  .registration-identity-grid,.registration-identity-grid.is-other,.registration-identity-grid.is-self{grid-template-columns:1fr}
+  .ux-summary-registration-actions{flex:1 1 100%;justify-content:flex-start;margin-left:0;margin-top:8px}
+  .ux-summary-registration-actions .ux-summary-registration-toggle,.ux-summary-registration-actions .ux-summary-registration-other{flex:1 1 180px}
 }
 
-@media(max-width:760px){
-  .fold-toolbar .ux-registration-toggle,.fold-toolbar .ux-registration-other{flex:1 1 180px;width:auto;margin-left:0}
-  .fold-toolbar>span{flex:1 0 100%}
+@media(max-width:520px){
+  .registration-workspace-head{flex-direction:column}
+  .registration-close-button{width:100%}
+  .ux-summary-registration-actions{display:grid;grid-template-columns:1fr;width:100%}
+  .ux-summary-registration-actions .ux-summary-registration-toggle,.ux-summary-registration-actions .ux-summary-registration-other{width:100%}
 }

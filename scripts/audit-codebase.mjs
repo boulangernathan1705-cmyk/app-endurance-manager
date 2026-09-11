@@ -72,12 +72,14 @@ for (const circuit of CIRCUITS) {
 }
 
 const app = searchable.find(item => item.path === 'app.js')?.content || '';
+const appCore = searchable.find(item => item.path === 'front/app/core.mjs')?.content || '';
 const worker = searchable.find(item => item.path === 'server/worker.mjs')?.content || '';
 const workerCore = searchable.find(item => item.path === 'server/core.mjs')?.content || '';
 const gameTemplate = searchable.find(item => item.path === 'game.html')?.content || '';
 const hub = searchable.find(item => item.path === 'index.html')?.content || '';
-if (!app.includes("from './shared/catalog.mjs'")) warnings.push('Le front n’utilise pas le catalogue partagé.');
-if (!app.includes("from './front/schedule.mjs'")) warnings.push('Le front n’utilise pas le module de calendrier partagé.');
+if (!app.includes("./front/app/actions.mjs")) warnings.push('app.js doit rester le point d’entrée de la base front modulaire.');
+if (!appCore.includes("../../shared/catalog.mjs")) warnings.push('La base front commune n’utilise pas le catalogue partagé.');
+if (!appCore.includes("../schedule.mjs")) warnings.push('La base front commune n’utilise pas le module de calendrier partagé.');
 if (!hub.includes('href="/lmu/"') || !hub.includes('href="/iracing/"')) warnings.push('Le portail doit proposer les espaces LMU et iRacing.');
 if (!gameTemplate.includes('/front/game-context.js') || !gameTemplate.includes('/app.js')) warnings.push('Le gabarit de jeu doit charger le contexte puis l’application partagée.');
 const rootCss = searchable.find(item => item.path === 'styles.css')?.content || '';
@@ -109,7 +111,8 @@ for (const [label,path] of builtPages) {
   if (stylesheetLinks.length !== 1 || !stylesheetLinks[0].includes('/app.css')) warnings.push(`Le build ${label} doit charger une seule feuille /app.css.`);
 }
 if (!publicCss.trim()) warnings.push('Le bundle public/app.css est absent ou vide.');
-if (/@import\s+url\(/i.test(publicCss)) warnings.push('public/app.css contient encore des imports CSS et déclenchera des requêtes supplémentaires.');
+const residualImports = publicCss.split(/\r?\n/).filter(line => /^\s*@import\s+url\(/i.test(line));
+if (residualImports.length) warnings.push(`public/app.css contient encore de vrais imports CSS : ${residualImports.slice(0,5).join(' | ')}`);
 if (await exists(resolve(publicDir, 'styles'))) warnings.push('Le dossier CSS source ne doit pas être publié séparément dans public/.');
 if (await exists(resolve(publicDir, 'styles.css'))) warnings.push('styles.css est une source de build et ne doit pas être publié séparément.');
 if (/^\s*Cache-Control:/mi.test(publicHeaders)) warnings.push('Le cache statique doit rester géré par Workers Static Assets et ses ETag natifs.');
@@ -124,7 +127,7 @@ if (warnings.length) {
   console.log('Incohérences détectées :');
   for (const warning of warnings) console.log(`  - ${warning}`);
 } else {
-  console.log('Catalogues multi-jeux, build Cloudflare et assets référencés : OK.');
+  console.log('Catalogues multi-jeux, base front commune, build Cloudflare et assets référencés : OK.');
 }
 
 if (process.argv.includes('--strict') && warnings.length) process.exitCode = 1;

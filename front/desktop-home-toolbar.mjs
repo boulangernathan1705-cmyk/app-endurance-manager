@@ -23,10 +23,7 @@ if (shell && app && navigation) {
   shell.insertBefore(right, navigation);
 
   const accountBar = shell.querySelector(':scope > .account-bar');
-
-  function cloneControl(node) {
-    return node ? node.cloneNode(true) : null;
-  }
+  const cloneControl = node => node ? node.cloneNode(true) : null;
 
   function restoreMobileAccount() {
     if (accountBar && accountBar.parentElement !== shell) shell.append(accountBar);
@@ -70,8 +67,7 @@ if (shell && app && navigation) {
       if (homeClone) toolbar.append(homeClone);
     }
 
-    const switcher = navigation.querySelector('.nav-game-switcher');
-    const switcherClone = cloneControl(switcher);
+    const switcherClone = cloneControl(navigation.querySelector('.nav-game-switcher'));
     if (switcherClone) center.append(switcherClone);
 
     const entriesClone = cloneControl(navigation.querySelector('[data-action="my-entries"]'));
@@ -80,12 +76,8 @@ if (shell && app && navigation) {
     if (accountBar) right.append(accountBar);
   }
 
-  const appObserver = new MutationObserver(() => queueMicrotask(sync));
-  appObserver.observe(app, {childList:true, subtree:true, attributes:true, attributeFilter:['aria-pressed']});
-
-  const navObserver = new MutationObserver(() => queueMicrotask(sync));
-  navObserver.observe(navigation, {childList:true, subtree:true});
-
+  document.addEventListener('endurance:render', sync);
+  document.addEventListener('endurance:nav', sync);
   media.addEventListener?.('change', sync);
-  sync();
+  queueMicrotask(sync);
 }

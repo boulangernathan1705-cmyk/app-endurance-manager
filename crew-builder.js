@@ -7,7 +7,6 @@ let eventsCache = null;
 let builderState = null;
 let builderPanel = null;
 let pendingMessage = null;
-let observerTimer = null;
 let submitting = false;
 
 const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
@@ -34,7 +33,7 @@ async function loadEvents(force = false) {
 }
 
 function currentEventId() {
-  return app?.querySelector('[data-action="edit-event"][data-id]')?.dataset.id || '';
+  return app?.querySelector('[data-event-id]')?.dataset.eventId || '';
 }
 
 function futureDepartures(event) {
@@ -62,10 +61,11 @@ function coversHour(registration, index) {
   return registration?.status === 'whole' || String(registration?.status || '').split(',').includes(`h${index + 1}`);
 }
 
-function availableCandidates(event, departure, category) {
+function availableCandidates(event, departure, category, editingCrewId = null) {
   if (!departure) return [];
   const registrations = departure.availability || [];
-  const assignedRegistrationIds = new Set((departure.crews || []).flatMap(crew => crew.registrationIds || []));
+  const otherCrews = (departure.crews || []).filter(crew => crew.id !== editingCrewId);
+  const assignedRegistrationIds = new Set(otherCrews.flatMap(crew => crew.registrationIds || []));
   const assignedParticipants = new Set(
     registrations
       .filter(registration => assignedRegistrationIds.has(registration.id) && registration.participantId)
@@ -97,7 +97,7 @@ function coverageMarkup(event, departure) {
   const coverage = coverageData(event, departure, builderState?.registrationIds || []);
   const selectedCount = coverage.registrations.length;
   const message = !selectedCount
-    ? 'Aucun pilote sélectionné. L’équipage peut être créé vide et complété plus tard.'
+    ? 'Aucun pilote sélectionné. L’équipage peut rester vide et être complété plus tard.'
     : coverage.missing
       ? `${coverage.missing} h de course ${coverage.missing > 1 ? 'ne sont' : 'n’est'} pas encore couverte${coverage.missing > 1 ? 's' : ''}.`
       : 'Toutes les heures de course sont couvertes par la sélection actuelle.';
@@ -106,62 +106,67 @@ function coverageMarkup(event, departure) {
     <p class="crew-builder-coverage-message ${coverage.missing && selectedCount ? 'needs-pilots' : ''}">${esc(message)}</p>`;
 }
 
-function pilotCard(event, departure, registration) {
+function pilotCard(event, departure, registration, locked = false) {
   const checked = builderState.registrationIds.includes(registration.id);
-  return `<label class="crew-builder-pilot ${checked ? 'is-selected' : ''}">
-    <span class="crew-builder-pilot-head"><input type="checkbox" name="builderPilot" value="${registration.id}" ${checked ? 'checked' : ''}><span><strong>${esc(registration.name)}</strong><small>${esc(registrationCarLabel(registration))}</small></span></span>
+  return `<label class="crew-builder-pilot ${checked ? 'is-selected' : ''}${locked ? ' is-locked' : ''}">
+    <span class="crew-builder-pilot-head"><input type="checkbox" name="builderPilot" value="${registration.id}" ${checked ? 'checked' : ''} ${locked ? 'disabled' : ''}><span><strong>${esc(registration.name)}</strong><small>${esc(registrationCarLabel(registration))}</small></span></span>
     <span class="crew-builder-pilot-wish">Coéquipier souhaité : <strong>${esc(registration.preferredPilot || 'aucune préférence')}</strong></span>
     ${renderAvailabilityTimeline({departure,duration:event.durationHours || 6,status:registration.status,label:`Disponibilités de ${registration.name}`})}
   </label>`;
 }
 
+function submitLabel() {
+  const count = builderState?.registrationIds?.length || 0;
+  if (builderState?.mode === 'edit') return `Enregistrer l’équipage${count ? ` · ${count} pilote${count > 1 ? 's' : ''}` : ''}`;
+  return `Créer l’équipage${count ? ` avec ${count} pilote${count > 1 ? 's' : ''}` : ' sans pilote'}`;
+}
+
 function panelMarkup(event) {
-  const departures = futureDepartures(event);
+  const editMode = builderState.mode === 'edit';
+  const departures = editMode
+    ? futureDepartures(event).filter(item => item.id === builderState.departureId)
+    : futureDepartures(event);
   const departure = departures.find(item => item.id === builderState.departureId) || departures[0];
   if (!departure) return `<section class="crew-builder-panel"><div class="crew-builder-heading"><div><span class="creation-kicker">FORMATION D’ÉQUIPAGE</span><h2>Aucun départ disponible</h2></div><button type="button" class="secondary-button" data-crew-builder-cancel>Fermer</button></div><p class="creation-help">Tous les départs de cet événement sont déjà passés.</p></section>`;
   builderState.departureId = departure.id;
   if (!event.categories.includes(builderState.category)) builderState.category = event.categories[0] || '';
   if (!(CARS[builderState.category] || []).includes(builderState.car)) builderState.car = '';
-  const candidates = availableCandidates(event, departure, builderState.category);
-  builderState.registrationIds = builderState.registrationIds.filter(id => candidates.some(candidate => candidate.id === id));
-  const pilotCount = builderState.registrationIds.length;
+  const candidates = availableCandidates(event, departure, builderState.category, editMode ? builderState.crewId : null);
+  if (!builderState.locked) builderState.registrationIds = builderState.registrationIds.filter(id => candidates.some(candidate => candidate.id === id));
+  const title = editMode ? `Modifier « ${esc(builderState.name || 'Équipage')} »` : 'Créer un nouvel équipage';
+  const description = editMode
+    ? 'Le même éditeur sert à modifier le nom, la voiture et la composition de l’équipage.'
+    : 'Choisis le départ et la catégorie, puis compose immédiatement l’équipage avec les pilotes déjà inscrits.';
+  const lockedNote = builderState.locked ? '<p class="crew-builder-warning">Cet équipage est complet. Rouvre-le depuis l’onglet Équipages pour modifier sa catégorie ou sa composition.</p>' : '';
 
   return `<section class="crew-builder-panel" data-crew-builder-panel>
-    <div class="crew-builder-heading"><div><span class="creation-kicker">FORMATION D’ÉQUIPAGE</span><h2>Créer un nouvel équipage</h2><p>Choisis le départ et la catégorie, puis compose immédiatement l’équipage avec les pilotes déjà inscrits.</p></div><button type="button" class="secondary-button" data-crew-builder-cancel>Annuler</button></div>
+    <div class="crew-builder-heading"><div><span class="creation-kicker">FORMATION D’ÉQUIPAGE</span><h2>${title}</h2><p>${description}</p></div><button type="button" class="secondary-button" data-crew-builder-cancel>Annuler</button></div>
     <form class="crew-builder-form" data-crew-builder-form>
-      <section class="crew-builder-card"><div class="crew-builder-card-title"><span>01</span><div><h3>Course et équipage</h3><p>Le départ filtre automatiquement les pilotes disponibles.</p></div></div>
+      <section class="crew-builder-card"><div class="crew-builder-card-title"><span>01</span><div><h3>Course et équipage</h3><p>${editMode ? 'Le départ d’un équipage existant ne change pas.' : 'Le départ filtre automatiquement les pilotes disponibles.'}</p></div></div>
         <div class="crew-builder-fields">
-          <label>Départ<select name="builderDeparture">${departures.map(item => `<option value="${item.id}" ${item.id === departure.id ? 'selected' : ''}>${esc(dateLabel(item))} · ${esc(item.time)}</option>`).join('')}</select></label>
-          <label>Catégorie<select name="builderCategory">${event.categories.map(category => `<option value="${esc(category)}" ${category === builderState.category ? 'selected' : ''}>${esc(category)}</option>`).join('')}</select></label>
+          <label>Départ<select name="builderDeparture" ${editMode ? 'disabled' : ''}>${departures.map(item => `<option value="${item.id}" ${item.id === departure.id ? 'selected' : ''}>${esc(dateLabel(item))} · ${esc(item.time)}</option>`).join('')}</select></label>
+          <label>Catégorie<select name="builderCategory" ${builderState.locked ? 'disabled' : ''}>${event.categories.map(category => `<option value="${esc(category)}" ${category === builderState.category ? 'selected' : ''}>${esc(category)}</option>`).join('')}</select></label>
           <label>Nom de l’équipage<input name="builderName" maxlength="60" required value="${esc(builderState.name)}" placeholder="Ex. FMT Racing 1"></label>
           <label>Voiture<select name="builderCar"><option value="">Voiture à définir</option>${(CARS[builderState.category] || []).map(car => `<option value="${esc(car)}" ${car === builderState.car ? 'selected' : ''}>${esc(car)}</option>`).join('')}</select></label>
         </div>
       </section>
-      <section class="crew-builder-card"><div class="crew-builder-card-title"><span>02</span><div><h3>Pilotes</h3><p>Tu peux en sélectionner maintenant, ou créer l’équipage vide et revenir dessus plus tard.</p></div></div>
-        <div class="crew-builder-pilots">${candidates.length ? candidates.map(registration => pilotCard(event,departure,registration)).join('') : '<p class="crew-builder-empty">Aucun pilote non affecté dans cette catégorie pour ce départ.</p>'}</div>
-        <p class="crew-builder-warning">Lorsqu’un pilote est affecté à cet équipage, ses autres inscriptions sur ce même départ sont retirées, comme dans la page Équipages actuelle.</p>
+      <section class="crew-builder-card"><div class="crew-builder-card-title"><span>02</span><div><h3>Pilotes</h3><p>${editMode ? 'La sélection affichée correspond à la composition enregistrée.' : 'Tu peux en sélectionner maintenant, ou créer l’équipage vide et revenir dessus plus tard.'}</p></div></div>
+        ${lockedNote}
+        <div class="crew-builder-pilots">${candidates.length ? candidates.map(registration => pilotCard(event,departure,registration,builderState.locked)).join('') : '<p class="crew-builder-empty">Aucun pilote disponible dans cette catégorie pour ce départ.</p>'}</div>
+        ${!builderState.locked ? '<p class="crew-builder-warning">Lorsqu’un pilote est affecté à cet équipage, ses autres inscriptions sur ce même départ sont retirées.</p>' : ''}
       </section>
       <section class="crew-builder-card crew-builder-coverage" data-crew-builder-coverage>${coverageMarkup(event,departure)}</section>
-      <div class="crew-builder-actions"><span class="crew-builder-submit-note">Tu pourras modifier la composition plus tard depuis l’onglet Équipages.</span><button type="submit" class="primary-button" data-crew-builder-submit>Créer l’équipage${pilotCount ? ` avec ${pilotCount} pilote${pilotCount > 1 ? 's' : ''}` : ' sans pilote'}</button></div>
+      <div class="crew-builder-actions"><span class="crew-builder-submit-note">Les changements sont appliqués directement à cet équipage.</span><button type="submit" class="primary-button" data-crew-builder-submit>${submitLabel()}</button></div>
       <p class="creation-error crew-builder-error" data-crew-builder-error hidden></p>
     </form>
   </section>`;
 }
 
 function renderPanel(event, {scroll = false} = {}) {
-  const markup = panelMarkup(event);
-  if (builderPanel?.isConnected) {
-    const replacement = document.createElement('div');
-    replacement.innerHTML = markup;
-    const nextPanel = replacement.firstElementChild;
-    builderPanel.replaceWith(nextPanel);
-    builderPanel = nextPanel;
-  } else {
-    const toolbar = app?.querySelector('[data-action="edit-event"]')?.closest('.toolbar');
-    if (!toolbar) return;
-    toolbar.insertAdjacentHTML('afterend', markup);
-    builderPanel = toolbar.nextElementSibling;
-  }
+  const root = app?.querySelector('#crew-builder-root');
+  if (!root) return;
+  root.innerHTML = panelMarkup(event);
+  builderPanel = root.querySelector('[data-crew-builder-panel]');
   if (scroll) builderPanel?.scrollIntoView({behavior:'smooth',block:'start'});
 }
 
@@ -169,9 +174,8 @@ function updateCoverage(event) {
   const departure = event?.departures?.find(item => item.id === builderState?.departureId);
   const coverage = builderPanel?.querySelector('[data-crew-builder-coverage]');
   if (coverage && departure) coverage.innerHTML = coverageMarkup(event, departure);
-  const count = builderState?.registrationIds?.length || 0;
   const submit = builderPanel?.querySelector('[data-crew-builder-submit]');
-  if (submit) submit.textContent = `Créer l’équipage${count ? ` avec ${count} pilote${count > 1 ? 's' : ''}` : ' sans pilote'}`;
+  if (submit) submit.textContent = submitLabel();
 }
 
 function showBuilderError(message) {
@@ -183,75 +187,142 @@ function showBuilderError(message) {
 
 function closeBuilder() {
   builderState = null;
-  builderPanel?.remove();
+  const root = app?.querySelector('#crew-builder-root');
+  if (root) root.replaceChildren();
   builderPanel = null;
 }
 
 function insertPendingMessage() {
   if (!pendingMessage) return;
-  const toolbar = app?.querySelector('[data-action="edit-event"]')?.closest('.toolbar');
-  if (!toolbar || app.querySelector('[data-crew-builder-message]')) return;
+  const root = app?.querySelector('#crew-builder-root');
+  if (!root) return;
   const message = document.createElement('p');
   message.dataset.crewBuilderMessage = 'true';
   message.className = pendingMessage.error ? 'creation-error crew-builder-result' : 'creation-success crew-builder-result';
   message.textContent = pendingMessage.text;
-  toolbar.insertAdjacentElement('afterend', message);
+  root.replaceChildren(message);
   pendingMessage = null;
 }
 
 function decorateEventView() {
-  const editButton = app?.querySelector('[data-action="edit-event"][data-id]');
-  if (!editButton) {
+  const eventId = currentEventId();
+  if (!eventId) {
+    builderState = null;
+    builderPanel = null;
+    return;
+  }
+  insertPendingMessage();
+  if (builderState && builderState.eventId !== eventId) {
     closeBuilder();
     return;
   }
-  const toolbar = editButton.closest('.toolbar');
-  if (toolbar && !toolbar.querySelector('[data-crew-builder-open]')) {
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = 'primary-button crew-builder-open';
-    button.dataset.crewBuilderOpen = 'true';
-    button.textContent = 'Créer un équipage';
-    editButton.insertAdjacentElement('afterend', button);
-  }
-  insertPendingMessage();
-  if (builderState && builderState.eventId !== editButton.dataset.id) closeBuilder();
-  if (builderState?.eventId === editButton.dataset.id && !app.querySelector('[data-crew-builder-panel]')) {
+  if (builderState?.eventId === eventId && !app.querySelector('[data-crew-builder-panel]')) {
     loadEvents().then(events => {
       const event = events.find(item => item.id === builderState?.eventId);
-      if (event && currentEventId() === event.id && builderState?.eventId === event.id && !app.querySelector('[data-crew-builder-panel]')) renderPanel(event);
+      if (event && currentEventId() === event.id && builderState?.eventId === event.id) renderPanel(event);
     }).catch(() => {});
   }
-}
-
-function scheduleDecorate() {
-  clearTimeout(observerTimer);
-  observerTimer = setTimeout(decorateEventView, 0);
 }
 
 async function refreshMainView() {
   eventsCache = null;
   const refresh = app?.querySelector('[data-action="refresh"]');
   if (refresh) refresh.click();
-  else scheduleDecorate();
 }
 
-async function openBuilder() {
+async function openBuilder(crewId = null) {
   const eventId = currentEventId();
   if (!eventId) return;
   try {
     const events = await loadEvents();
     const event = events.find(item => item.id === eventId);
     if (!event) throw new Error('Événement introuvable. Actualise la page.');
-    const departure = defaultDeparture(event);
-    if (!departure) throw new Error('Tous les départs de cet événement sont déjà passés.');
-    builderState = {eventId, departureId:departure.id, category:event.categories[0] || '', car:'', name:'', registrationIds:[]};
+
+    if (crewId) {
+      let found = null;
+      for (const departure of event.departures || []) {
+        const crew = (departure.crews || []).find(item => item.id === crewId);
+        if (crew) { found = {departure,crew}; break; }
+      }
+      if (!found) throw new Error('Équipage introuvable. Actualise la page.');
+      if (found.departure.startsAt <= Date.now()) throw new Error('Ce départ est passé. L’équipage est verrouillé.');
+      builderState = {
+        mode:'edit', eventId, crewId:found.crew.id, version:found.crew.version,
+        departureId:found.departure.id, category:found.crew.category, car:found.crew.car || '',
+        name:found.crew.name, locked:!!found.crew.locked,
+        registrationIds:[...(found.crew.registrationIds || [])]
+      };
+    } else {
+      const departure = defaultDeparture(event);
+      if (!departure) throw new Error('Tous les départs de cet événement sont déjà passés.');
+      builderState = {mode:'create',eventId,departureId:departure.id,category:event.categories[0] || '',car:'',name:'',locked:false,registrationIds:[]};
+    }
+
     renderPanel(event,{scroll:true});
     builderPanel?.querySelector('[name="builderName"]')?.focus({preventScroll:true});
   } catch (error) {
-    pendingMessage = {error:true,text:error?.message || 'Impossible d’ouvrir la création d’équipage.'};
+    pendingMessage = {error:true,text:error?.message || 'Impossible d’ouvrir l’éditeur d’équipage.'};
     insertPendingMessage();
   }
+}
+
+async function createCrew() {
+  const result = await api(`/api/events/${builderState.eventId}/departures/${builderState.departureId}/crews`,'POST',{
+    name:builderState.name,
+    category:builderState.category,
+    car:builderState.car
+  });
+  const createdId = result.id;
+  let removedRegistrations = 0;
+  if (builderState.registrationIds.length) {
+    const events = await loadEvents(true);
+    const event = events.find(item => item.id === builderState.eventId);
+    const departure = event?.departures?.find(item => item.id === builderState.departureId);
+    const crew = departure?.crews?.find(item => item.id === createdId);
+    if (!crew) throw new Error('L’équipage a été créé mais doit être actualisé avant d’y affecter les pilotes.');
+    let version = crew.version;
+    for (const registrationId of builderState.registrationIds) {
+      const memberResult = await api(`/api/crews/${createdId}/members`,'POST',{registrationId,version});
+      removedRegistrations += Number(memberResult.removedRegistrations) || 0;
+      version += 1;
+    }
+  }
+  return {createdId,removedRegistrations};
+}
+
+async function editCrew() {
+  const events = await loadEvents(true);
+  const event = events.find(item => item.id === builderState.eventId);
+  const departure = event?.departures?.find(item => item.id === builderState.departureId);
+  const crew = departure?.crews?.find(item => item.id === builderState.crewId);
+  if (!crew) throw new Error('Équipage introuvable. Actualise la page.');
+
+  await api(`/api/crews/${crew.id}`,'PATCH',{
+    name:builderState.name,
+    category:builderState.category,
+    car:builderState.car,
+    version:crew.version
+  });
+
+  if (crew.locked) return {removedRegistrations:0};
+
+  let version = crew.version + 1;
+  const current = new Set(crew.registrationIds || []);
+  const wanted = new Set(builderState.registrationIds || []);
+  for (const registrationId of current) {
+    if (wanted.has(registrationId)) continue;
+    await api(`/api/crews/${crew.id}/members/${registrationId}`,'DELETE',{version});
+    version += 1;
+  }
+
+  let removedRegistrations = 0;
+  for (const registrationId of wanted) {
+    if (current.has(registrationId)) continue;
+    const memberResult = await api(`/api/crews/${crew.id}/members`,'POST',{registrationId,version});
+    removedRegistrations += Number(memberResult.removedRegistrations) || 0;
+    version += 1;
+  }
+  return {removedRegistrations};
 }
 
 async function submitBuilder(form) {
@@ -259,42 +330,18 @@ async function submitBuilder(form) {
   submitting = true;
   const submit = form.querySelector('[data-crew-builder-submit]');
   if (submit) submit.disabled = true;
-  let createdId = null;
+  const mode = builderState.mode;
   try {
     builderState.name = form.elements.builderName.value.trim();
     builderState.car = form.elements.builderCar.value;
     if (!builderState.name) throw new Error('Indique le nom de l’équipage.');
-    const createResult = await api(`/api/events/${builderState.eventId}/departures/${builderState.departureId}/crews`,'POST',{
-      name:builderState.name,
-      category:builderState.category,
-      car:builderState.car
-    });
-    createdId = createResult.id;
-    let removedRegistrations = 0;
-    if (builderState.registrationIds.length) {
-      const events = await loadEvents(true);
-      const event = events.find(item => item.id === builderState.eventId);
-      const departure = event?.departures?.find(item => item.id === builderState.departureId);
-      const crew = departure?.crews?.find(item => item.id === createdId);
-      if (!crew) throw new Error('L’équipage a été créé mais doit être actualisé avant d’y affecter les pilotes.');
-      let version = crew.version;
-      for (const registrationId of builderState.registrationIds) {
-        const result = await api(`/api/crews/${createdId}/members`,'POST',{registrationId,version});
-        removedRegistrations += Number(result.removedRegistrations) || 0;
-        version += 1;
-      }
-    }
-    pendingMessage = {error:false,text:`Équipage « ${builderState.name} » créé${builderState.registrationIds.length ? ` avec ${builderState.registrationIds.length} pilote${builderState.registrationIds.length > 1 ? 's' : ''}` : ' sans pilote'}.${removedRegistrations ? ` ${removedRegistrations} autre(s) inscription(s) du même départ ont été retirées.` : ''}`};
+    const result = mode === 'edit' ? await editCrew() : await createCrew();
+    const suffix = result.removedRegistrations ? ` ${result.removedRegistrations} autre(s) inscription(s) du même départ ont été retirées.` : '';
+    pendingMessage = {error:false,text:mode === 'edit' ? `Équipage « ${builderState.name} » mis à jour.${suffix}` : `Équipage « ${builderState.name} » créé.${suffix}`};
     closeBuilder();
     await refreshMainView();
   } catch (error) {
-    if (createdId) {
-      pendingMessage = {error:true,text:`L’équipage a bien été créé, mais tous les pilotes n’ont pas pu être affectés : ${error?.message || 'erreur inconnue'}. Termine la composition depuis l’onglet Équipages.`};
-      closeBuilder();
-      await refreshMainView();
-    } else {
-      showBuilderError(error?.message || 'Impossible de créer cet équipage.');
-    }
+    showBuilderError(error?.message || `Impossible de ${mode === 'edit' ? 'modifier' : 'créer'} cet équipage.`);
   } finally {
     submitting = false;
     if (submit?.isConnected) submit.disabled = false;
@@ -302,9 +349,17 @@ async function submitBuilder(form) {
 }
 
 document.addEventListener('click', event => {
-  if (event.target.closest('[data-crew-builder-open]')) {
+  const create = event.target.closest('[data-crew-builder-open]');
+  if (create) {
     event.preventDefault();
-    openBuilder();
+    void openBuilder();
+    return;
+  }
+  const edit = event.target.closest('[data-action="edit-crew"]');
+  if (edit) {
+    event.preventDefault();
+    event.stopPropagation();
+    void openBuilder(edit.dataset.id);
     return;
   }
   if (event.target.closest('[data-crew-builder-cancel]')) {
@@ -324,13 +379,13 @@ document.addEventListener('change', async event => {
   const events = await loadEvents().catch(() => []);
   const currentEvent = events.find(item => item.id === builderState.eventId);
   if (!currentEvent) return;
-  if (field.name === 'builderDeparture') {
+  if (field.name === 'builderDeparture' && builderState.mode !== 'edit') {
     builderState.departureId = field.value;
     builderState.registrationIds = [];
     renderPanel(currentEvent);
     return;
   }
-  if (field.name === 'builderCategory') {
+  if (field.name === 'builderCategory' && !builderState.locked) {
     builderState.category = field.value;
     builderState.car = '';
     builderState.registrationIds = [];
@@ -341,7 +396,7 @@ document.addEventListener('change', async event => {
     builderState.car = field.value;
     return;
   }
-  if (field.name === 'builderPilot') {
+  if (field.name === 'builderPilot' && !builderState.locked) {
     const ids = new Set(builderState.registrationIds);
     field.checked ? ids.add(field.value) : ids.delete(field.value);
     builderState.registrationIds = [...ids];
@@ -354,15 +409,8 @@ document.addEventListener('submit', event => {
   const form = event.target.closest('[data-crew-builder-form]');
   if (!form) return;
   event.preventDefault();
-  submitBuilder(form);
+  void submitBuilder(form);
 });
 
-if (app) {
-  decorateEventView();
-  const observer = new MutationObserver(() => {
-    observer.disconnect();
-    try { decorateEventView(); }
-    finally { observer.observe(app,{childList:true,subtree:true}); }
-  });
-  observer.observe(app,{childList:true,subtree:true});
-}
+document.addEventListener('endurance:render', decorateEventView);
+if (app) queueMicrotask(decorateEventView);
