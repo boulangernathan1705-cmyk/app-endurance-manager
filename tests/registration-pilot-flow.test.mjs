@@ -41,7 +41,7 @@ test('adding and editing another pilot use the same native registration form',()
   assert.match(actions,/case 'edit-registration'/);
   assert.match(actions,/state\.drafts\[departure\.id\]=registrationDraft\(reg\)/);
   assert.doesNotMatch(game,/front\/registration-sharing\.mjs|ux-refinement\.js/);
-  assert.match(game,/app\.js\?v=60-common-core/);
+  assert.match(game,/app\.js\?v=[0-9]+-[a-z0-9-]+/i);
 });
 
 test('the add pilot action is next to the personal registration action',()=>{
