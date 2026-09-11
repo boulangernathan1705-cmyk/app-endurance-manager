@@ -99,6 +99,18 @@ test('inscrire un autre pilote reste réservé à un compte connecté',()=>{
   assert.match(eventView,/\$\{state\.user\?button\('new-registration','Inscrire un autre pilote'/);
 });
 
+test('Ajouter une catégorie est placé à côté de Fermer dans l’en-tête inscription',()=>{
+  const registration=read('front/app/registration.mjs');
+  const css=read('styles/registration-sharing.css');
+  const game=read('game.html');
+  assert.match(registration,/function renderAddCategoryAction/);
+  assert.match(registration,/registration-workspace-actions/);
+  assert.match(registration,/Ajouter une catégorie/);
+  assert.match(registration,/stateDraft\.mode!=='category'/);
+  assert.match(css,/\.registration-workspace-actions\{[^}]*display:flex/s);
+  assert.match(game,/registration-sharing\.css\?v=7-category-action/);
+});
+
 test('Équipages produit directement la gestion finale',()=>{
   const crews=read('front/app/crews.mjs');
   const eventView=read('front/app/event-view.mjs');

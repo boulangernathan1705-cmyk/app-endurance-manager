@@ -1,6 +1,7 @@
 .registration-workspace-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
 .registration-workspace-head h2{margin:0}
-.registration-close-button{flex:0 0 auto}
+.registration-workspace-actions{display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-wrap:wrap}
+.registration-workspace-actions .category-add-button,.registration-close-button{flex:0 0 auto;margin:0!important}
 .registration-origin-info{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border:1px solid #566267;border-radius:50%;color:#aebabe;font-size:10px;font-weight:900;line-height:1;cursor:help;vertical-align:middle;opacity:.72}
 .registration-origin-info:hover,.registration-origin-info:focus{opacity:1;border-color:var(--green);color:#dfffe7}
 .pilot-name .registration-origin-info{margin-left:3px}
@@ -97,7 +98,8 @@
 
 @media(max-width:380px){
   .registration-workspace-head{flex-direction:column}
-  .registration-close-button{width:100%}
+  .registration-workspace-actions{width:100%;display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
+  .registration-workspace-actions .category-add-button,.registration-close-button{width:100%}
   .departure-fold[id^="departure-"]>summary>.ux-summary-registration-actions .ux-summary-registration-toggle,
   .departure-fold[id^="departure-"]>summary>.ux-summary-registration-actions .ux-summary-registration-other{font-size:9.5px;padding-inline:5px}
 }
