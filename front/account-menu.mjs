@@ -95,7 +95,7 @@ async function loadSession() {
 
 function activateHashAction() {
   if (isHub || !location.hash) return;
-  const selector = location.hash === '#members' ? '[data-action="members"]' : location.hash === '#help' ? '#help-nav-button' : '';
+  const selector = location.hash === '#members' ? '#navigation > [data-action="members"]' : location.hash === '#help' ? '#help-nav-button' : '';
   if (!selector) return;
   let attempts = 0;
   const timer = setInterval(() => {
@@ -105,7 +105,7 @@ function activateHashAction() {
       clearInterval(timer);
       history.replaceState(null,'',location.pathname + location.search);
       target.click();
-    } else if (attempts >= 30) clearInterval(timer);
+    } else if (attempts >= 50) clearInterval(timer);
   }, 100);
 }
 
