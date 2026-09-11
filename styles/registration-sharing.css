@@ -5,16 +5,27 @@
 .registration-origin-info:hover,.registration-origin-info:focus{opacity:1;border-color:var(--green);color:#dfffe7}
 .pilot-name .registration-origin-info{margin-left:3px}
 
-/* Les deux actions sont maintenant un seul bloc natif dans le summary du départ. */
+/* Les catégories textuelles ne doivent pas hériter de la largeur fixe prévue pour les logos. */
+.pilot-category-logo.pilot-category-text{width:auto;min-width:max-content;height:auto;justify-content:flex-start;flex:0 0 auto}
+.pilot-category-value{display:inline-block;white-space:nowrap;font-weight:800}
+.pilot-main .pilot-car{min-width:0;overflow-wrap:anywhere}
+
+/* Réserve une vraie colonne aux deux actions du départ. Ce sélecteur est volontairement
+   plus précis que l'ancien layout pour ne pas dépendre d'un bouton unique. */
+@media(min-width:901px){
+  .departure-fold[id^="departure-"]>summary{grid-template-columns:34px minmax(220px,1fr) max-content minmax(250px,292px)!important}
+}
+
+/* Les deux actions d'inscription restent côte à côte dans le résumé du départ. */
 .departure-fold[id^="departure-"]>summary>.ux-summary-registration-actions{
   grid-column:4;
   grid-row:1 / span 2;
   align-self:center;
   justify-self:end;
   display:grid;
-  grid-template-columns:minmax(0,1fr);
-  gap:6px;
-  width:170px;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:7px;
+  width:292px;
   max-width:100%;
   min-width:0;
   margin:0;
@@ -24,14 +35,27 @@
   width:100%;
   max-width:100%;
   min-width:0!important;
-  min-height:32px;
+  min-height:36px;
   margin:0!important;
-  padding:6px 9px;
-  font-size:11px;
+  padding:7px 9px;
+  border-radius:5px;
+  font-size:10.5px;
   line-height:1.15;
   white-space:normal;
   text-align:center;
 }
+.departure-fold[id^="departure-"]>summary>.ux-summary-registration-actions .ux-summary-registration-toggle{
+  border:1px solid #71e0e5;
+  background:linear-gradient(180deg,#68dce1,#3bbbc2);
+  color:#061416;
+}
+.departure-fold[id^="departure-"]>summary>.ux-summary-registration-actions .ux-summary-registration-other{
+  border:1px solid #4fb7bd;
+  background:linear-gradient(180deg,#2c666a,#214f53);
+  color:#e8fbfb;
+}
+.departure-fold[id^="departure-"]>summary>.ux-summary-registration-actions .ux-summary-registration-toggle:hover,
+.departure-fold[id^="departure-"]>summary>.ux-summary-registration-actions .ux-summary-registration-other:hover{filter:brightness(1.08)}
 
 .registration-identity-grid{display:grid;gap:14px;margin:8px 0 14px;align-items:end}
 .registration-identity-field{display:grid;gap:7px;min-width:0;margin:0}
@@ -46,9 +70,10 @@
 }
 
 @media(max-width:1100px) and (min-width:901px){
-  .departure-fold[id^="departure-"]>summary>.ux-summary-registration-actions{width:155px;gap:5px}
+  .departure-fold[id^="departure-"]>summary{grid-template-columns:34px minmax(190px,1fr) max-content minmax(230px,250px)!important}
+  .departure-fold[id^="departure-"]>summary>.ux-summary-registration-actions{width:250px;gap:5px}
   .departure-fold[id^="departure-"]>summary>.ux-summary-registration-actions .ux-summary-registration-toggle,
-  .departure-fold[id^="departure-"]>summary>.ux-summary-registration-actions .ux-summary-registration-other{font-size:10px;padding-inline:7px}
+  .departure-fold[id^="departure-"]>summary>.ux-summary-registration-actions .ux-summary-registration-other{font-size:9.5px;padding-inline:6px}
 }
 
 @media(max-width:900px){
@@ -66,12 +91,13 @@
   .departure-fold[id^="departure-"]>summary>.ux-summary-registration-actions .ux-summary-registration-toggle,
   .departure-fold[id^="departure-"]>summary>.ux-summary-registration-actions .ux-summary-registration-other{
     min-height:34px;
-    font-size:11px;
+    font-size:10.5px;
   }
 }
 
-@media(max-width:520px){
+@media(max-width:380px){
   .registration-workspace-head{flex-direction:column}
   .registration-close-button{width:100%}
-  .departure-fold[id^="departure-"]>summary>.ux-summary-registration-actions{grid-template-columns:1fr}
+  .departure-fold[id^="departure-"]>summary>.ux-summary-registration-actions .ux-summary-registration-toggle,
+  .departure-fold[id^="departure-"]>summary>.ux-summary-registration-actions .ux-summary-registration-other{font-size:9.5px;padding-inline:5px}
 }

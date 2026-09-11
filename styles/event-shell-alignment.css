@@ -21,3 +21,42 @@
     margin-right: 0;
   }
 }
+
+/* Les actions qui modifient l'événement restent groupées ; la création
+   d'équipage arrive ensuite comme action métier distincte. */
+.event-actions-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.event-toolbar-main {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.event-actions-toolbar > .crew-builder-open {
+  margin-left: 2px;
+}
+
+@media (max-width: 600px) {
+  .event-actions-toolbar,
+  .event-toolbar-main {
+    width: 100%;
+  }
+
+  .event-toolbar-main {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .event-toolbar-main > button,
+  .event-actions-toolbar > .crew-builder-open {
+    width: 100%;
+    min-width: 0;
+    margin-left: 0;
+  }
+}
