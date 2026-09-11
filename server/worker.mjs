@@ -48,15 +48,24 @@ function publicRegistration(reg, actor, userNames = new Map()) {
     addedByName:canSeeCreator ? (userNames.get(creatorId) || '') : ''
   };
 }
-async function listEvents(env, actor) {
-  const rows = (await env.DB.prepare('SELECT * FROM events ORDER BY created_at DESC, id DESC').all()).results;
-  const registrations = (await env.DB.prepare(registrationSelect+' ORDER BY r.created_at,r.id').all()).results;
-  const crews = (await env.DB.prepare('SELECT * FROM crews ORDER BY created_at,id').all()).results;
-  const memberships = (await env.DB.prepare('SELECT crew_id,registration_id FROM crew_members').all()).results;
-  const users = (await env.DB.prepare('SELECT id,name FROM users').all()).results;
+async function listEvents(env, actor, game='') {
+  const where=game==='iracing' ? " WHERE circuit LIKE 'iracing-%'" : game==='lmu' ? " WHERE circuit NOT LIKE 'iracing-%'" : '';
+  const rows = (await env.DB.prepare(`SELECT * FROM events${where} ORDER BY created_at DESC, id DESC`).all()).results;
+  if (!rows.length) return [];
+  const eventIds=rows.map(row=>row.id);
+  const marks=eventIds.map(()=>'?').join(',');
+  const registrations = (await env.DB.prepare(registrationSelect+` WHERE r.event_id IN (${marks}) ORDER BY r.created_at,r.id`).bind(...eventIds).all()).results;
+  const crews = (await env.DB.prepare(`SELECT * FROM crews WHERE event_id IN (${marks}) ORDER BY created_at,id`).bind(...eventIds).all()).results;
+  const memberships = (await env.DB.prepare(`SELECT cm.crew_id,cm.registration_id FROM crew_members cm JOIN crews c ON c.id=cm.crew_id WHERE c.event_id IN (${marks})`).bind(...eventIds).all()).results;
+  const relevantUserIds=[...new Set(registrations.flatMap(reg=>[reg.owner_user_id,reg.participant_user_id,reg.user_id]).filter(Boolean))];
+  let users=[];
+  if (relevantUserIds.length) {
+    const userMarks=relevantUserIds.map(()=>'?').join(',');
+    users=(await env.DB.prepare(`SELECT id,name FROM users WHERE id IN (${userMarks})`).bind(...relevantUserIds).all()).results;
+  }
   const userNames = new Map(users.map(item => [item.id,item.name]));
   const grouped = new Map();
-  for (const reg of registrations) { const key = `${reg.event_id}:${reg.departure_id}`; if (!grouped.has(key, [])) grouped.set(key, []); grouped.get(key).push(publicRegistration(reg, actor, userNames)); }
+  for (const reg of registrations) { const key = `${reg.event_id}:${reg.departure_id}`; if (!grouped.has(key)) grouped.set(key, []); grouped.get(key).push(publicRegistration(reg, actor, userNames)); }
   const membersByCrew = new Map();
   for (const member of memberships) {
     if (!membersByCrew.has(member.crew_id)) membersByCrew.set(member.crew_id, []);
@@ -146,7 +155,17 @@ async function api(request, env) {
     if (!actor.guestToken || !(await env.DB.prepare('SELECT id FROM registrations WHERE guest_hash=? LIMIT 1').bind(actor.guestHash).first())) fail(404, 'Aucune inscription invitée sur cet appareil.');
     return json({link:canonical + '/#access=' + actor.guestToken});
   }
-  if (path === '/api/events' && method === 'GET') return json({events:await listEvents(env, actor)});
+  if (path === '/api/events' && method === 'GET') {
+    const requestedGame=url.searchParams.get('game');
+    const game=requestedGame==='lmu'||requestedGame==='iracing'?requestedGame:'';
+    const events=await listEvents(env,actor,game);
+    const payload={events};
+    const response=json(payload);
+    response.headers.set('X-Endurance-Game',game||'all');
+    response.headers.set('X-Endurance-Events',String(events.length));
+    response.headers.set('X-Endurance-Approx-Bytes',String(new TextEncoder().encode(JSON.stringify(payload)).length));
+    return response;
+  }
   if (path === '/api/participants' && method === 'GET') {
     if (!actor.user) fail(401,'Connecte-toi avec Discord pour choisir un pilote.');
     return json({participants:(await env.DB.prepare(`SELECT u.id,u.name,p.id AS participantId
