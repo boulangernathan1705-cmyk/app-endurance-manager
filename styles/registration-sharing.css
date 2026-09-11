@@ -1,9 +1,45 @@
-.registration-workspace-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+.registration-workspace-head{display:block;margin-bottom:12px}
 .registration-workspace-head h2{margin:0}
-.registration-workspace-actions{display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-wrap:wrap;margin:0;padding:0}
-.registration-workspace-actions .registration-nav-button{min-width:150px}
+.registration-workspace-actions{display:none!important}
 .registration-origin-info{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border:1px solid #566267;border-radius:50%;color:#aebabe;font-size:10px;font-weight:900;line-height:1;cursor:help;vertical-align:middle;opacity:.72}
 .registration-origin-info:hover,.registration-origin-info:focus{opacity:1;border-color:var(--green);color:#dfffe7}
 .pilot-name .registration-origin-info{margin-left:3px}
-@media(max-width:760px){.registration-workspace-head{align-items:stretch;flex-direction:column}.registration-workspace-actions{display:grid;grid-template-columns:1fr 1fr;width:100%}.registration-workspace-actions .registration-nav-button{min-width:0;width:100%}}
-@media(max-width:480px){.registration-workspace-actions{grid-template-columns:1fr}}
+.fold-toolbar .ux-registration-other{white-space:nowrap}
+
+/* L’ajout d’un autre pilote garde les trois informations d’identité sur une seule ligne. */
+.registration-form:has(> .managed-pilot-picker){display:grid;grid-template-columns:repeat(3,minmax(0,1fr));column-gap:14px;align-items:start}
+.registration-form:has(> .managed-pilot-picker)>:is(.form-title,.registration-context-banner,.registration-choices,.category-area,.save-row){grid-column:1/-1}
+.registration-form:has(> .managed-pilot-picker)>.managed-pilot-picker{display:contents}
+.registration-form:has(> .managed-pilot-picker)>.managed-pilot-picker>.form-label{grid-column:1;grid-row:3;margin:0 0 7px;align-self:end}
+.registration-form:has(> .managed-pilot-picker)>.managed-pilot-picker>select{grid-column:1;grid-row:4;width:100%;margin:0 0 14px}
+.registration-form:has(> .managed-pilot-picker)>label[for^="name-"]{grid-column:2;grid-row:3;margin:0 0 7px;align-self:end}
+.registration-form:has(> .managed-pilot-picker)>input[name="pilotName"]{grid-column:2;grid-row:4;width:100%;margin:0 0 14px}
+.registration-form:has(> .managed-pilot-picker)>label[for^="preference-"]{grid-column:3;grid-row:3;margin:0 0 7px;align-self:end}
+.registration-form:has(> .managed-pilot-picker)>input[name="preferredPilot"]{grid-column:3;grid-row:4;width:100%;margin:0 0 14px}
+.registration-form:has(> .managed-pilot-picker):not(:has(> input[name="pilotName"])){grid-template-columns:repeat(2,minmax(0,1fr))}
+.registration-form:has(> .managed-pilot-picker):not(:has(> input[name="pilotName"]))>label[for^="preference-"]{grid-column:2}
+.registration-form:has(> .managed-pilot-picker):not(:has(> input[name="pilotName"]))>input[name="preferredPilot"]{grid-column:2}
+
+/* Même compacité lors de la modification d’un pilote manuel déjà inscrit. */
+.registration-form:has(> .registration-context-banner.other):not(:has(> .managed-pilot-picker)):has(> input[name="pilotName"]){display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:14px;align-items:start}
+.registration-form:has(> .registration-context-banner.other):not(:has(> .managed-pilot-picker)):has(> input[name="pilotName"])>:is(.form-title,.registration-context-banner,.registration-choices,.category-area,.save-row){grid-column:1/-1}
+.registration-form:has(> .registration-context-banner.other):not(:has(> .managed-pilot-picker)):has(> input[name="pilotName"])>label[for^="name-"]{grid-column:1;grid-row:3;margin:0 0 7px;align-self:end}
+.registration-form:has(> .registration-context-banner.other):not(:has(> .managed-pilot-picker)):has(> input[name="pilotName"])>input[name="pilotName"]{grid-column:1;grid-row:4;width:100%;margin:0 0 14px}
+.registration-form:has(> .registration-context-banner.other):not(:has(> .managed-pilot-picker)):has(> input[name="pilotName"])>label[for^="preference-"]{grid-column:2;grid-row:3;margin:0 0 7px;align-self:end}
+.registration-form:has(> .registration-context-banner.other):not(:has(> .managed-pilot-picker)):has(> input[name="pilotName"])>input[name="preferredPilot"]{grid-column:2;grid-row:4;width:100%;margin:0 0 14px}
+
+@media(max-width:900px){
+  .registration-form:has(> .managed-pilot-picker){grid-template-columns:repeat(2,minmax(0,1fr))}
+  .registration-form:has(> .managed-pilot-picker)>label[for^="preference-"]{grid-column:1;grid-row:5}
+  .registration-form:has(> .managed-pilot-picker)>input[name="preferredPilot"]{grid-column:1/-1;grid-row:6}
+  .registration-form:has(> .managed-pilot-picker):not(:has(> input[name="pilotName"]))>label[for^="preference-"]{grid-column:2;grid-row:3}
+  .registration-form:has(> .managed-pilot-picker):not(:has(> input[name="pilotName"]))>input[name="preferredPilot"]{grid-column:2;grid-row:4}
+}
+@media(max-width:760px){
+  .fold-toolbar .ux-registration-toggle,.fold-toolbar .ux-registration-other{flex:1 1 180px;width:auto;margin-left:0}
+  .fold-toolbar>span{flex:1 0 100%}
+  .registration-form:has(> .managed-pilot-picker),.registration-form:has(> .registration-context-banner.other):not(:has(> .managed-pilot-picker)):has(> input[name="pilotName"]){display:block}
+  .registration-form:has(> .managed-pilot-picker)>.managed-pilot-picker{display:grid;gap:7px;margin:8px 0 14px;padding:12px;border:1px solid var(--border);border-radius:9px;background:rgba(255,255,255,.02)}
+  .registration-form:has(> .managed-pilot-picker)>label[for^="name-"],.registration-form:has(> .managed-pilot-picker)>label[for^="preference-"],.registration-form:has(> .registration-context-banner.other)>label[for^="name-"],.registration-form:has(> .registration-context-banner.other)>label[for^="preference-"]{display:block;margin-top:10px}
+  .registration-form:has(> .managed-pilot-picker)>input[name="pilotName"],.registration-form:has(> .managed-pilot-picker)>input[name="preferredPilot"],.registration-form:has(> .registration-context-banner.other)>input[name="pilotName"],.registration-form:has(> .registration-context-banner.other)>input[name="preferredPilot"]{width:100%;margin-bottom:0}
+}

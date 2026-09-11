@@ -107,13 +107,32 @@ function refineRegistration(fold) {
   toolbar?.querySelector('[data-action="focus-registration"]')?.remove();
   if (!toolbar || !section) return;
 
+  const nativeOther = section.querySelector?.('.registration-workspace-actions [data-action="new-registration"][data-mode="pilot"]') || null;
+  let other = toolbar.querySelector('[data-ux-registration-other]');
+  if (nativeOther && !other) {
+    other = document.createElement('button');
+    other.type = 'button';
+    other.className = 'secondary-button ux-registration-other';
+    other.dataset.uxRegistrationOther = 'true';
+    other.dataset.action = 'new-registration';
+    other.dataset.departure = departureId;
+    other.dataset.mode = 'pilot';
+    other.textContent = 'Inscrire un autre pilote';
+    toolbar.append(other);
+  } else if (!nativeOther && other) {
+    other.remove();
+    other = null;
+  }
+
   let toggle = toolbar.querySelector('[data-ux-registration-toggle]');
   if (!toggle) {
     toggle = document.createElement('button');
     toggle.type = 'button';
     toggle.dataset.uxRegistrationToggle = 'true';
     toggle.dataset.departure = departureId;
-    toolbar.append(toggle);
+    toolbar.insertBefore(toggle, other || null);
+  } else if (other && toggle.nextElementSibling !== other) {
+    toolbar.insertBefore(toggle, other);
   }
   const editing = visibleRegistrations.has(departureId);
   toggle.className = editing ? 'secondary-button ux-registration-toggle is-open' : 'primary-button ux-registration-toggle';
