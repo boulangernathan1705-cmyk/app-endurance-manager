@@ -66,6 +66,8 @@ async function registrationParticipant(env, actor, input, data) {
     if (!/^\d{15,22}$/.test(input.participantUserId)) fail(400,'Compte Discord invalide.');
     const discordUser=await env.DB.prepare('SELECT id,name FROM users WHERE id=?').bind(input.participantUserId).first();
     if (!discordUser) fail(404,'Ce pilote Discord est introuvable. Actualise la page.');
+    data.name=discordUser.name;
+    data.nameKey=data.name.normalize('NFKC').toLocaleLowerCase('fr-FR');
     await env.DB.prepare(`INSERT INTO participants(id,name,user_id,created_by,created_at) VALUES(?,?,?,?,?)
       ON CONFLICT(user_id) WHERE user_id IS NOT NULL DO UPDATE SET name=excluded.name`).bind(id(),discordUser.name,discordUser.id,actor.user.id,now()).run();
     return env.DB.prepare('SELECT * FROM participants WHERE user_id=?').bind(discordUser.id).first();
@@ -82,6 +84,8 @@ async function registrationParticipant(env, actor, input, data) {
   if (input.forOther===true) {
     // A manually entered name is an external pilot identity, never a site/Discord account.
     // Reuse only identities created by the same account so two pilots cannot take over each other's external profile.
+    const linkedUser=await env.DB.prepare('SELECT id FROM users WHERE lower(name)=lower(?) LIMIT 1').bind(data.name).first();
+    if (linkedUser) fail(409,'Ce pseudo correspond à un pilote Discord. Sélectionne son compte dans la liste.');
     const existing=await env.DB.prepare(`SELECT * FROM participants
       WHERE user_id IS NULL AND guest_hash IS NULL AND created_by=? AND lower(name)=lower(?)
       ORDER BY created_at,id LIMIT 1`).bind(actor.user.id,data.name).first();
