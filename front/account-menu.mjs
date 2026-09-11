@@ -42,11 +42,11 @@ function renderDisconnected(discordReady) {
 function renderConnected(user) {
   const manage = user.role === 'admin'
     ? (isHub
-      ? `<a class="account-menu-item" href="/lmu/?members=1">Gestion des membres</a>`
+      ? `<a class="account-menu-item" href="/lmu/#members">Gestion des membres</a>`
       : `<button type="button" class="account-menu-item" data-action="members" data-account-close>Gestion des membres</button>`)
     : '';
   const help = isHub
-    ? `<a class="account-menu-item" href="/lmu/?help=1">Aide</a>`
+    ? `<a class="account-menu-item" href="/lmu/#help">Aide</a>`
     : `<button type="button" class="account-menu-item" data-account-help>Aide</button>`;
 
   root.innerHTML = `<div class="account-menu">
@@ -75,6 +75,22 @@ async function loadSession() {
   } catch {
     root.innerHTML = '<span class="account-discord-unavailable">Compte indisponible</span>';
   }
+}
+
+function activateHashAction() {
+  if (isHub || !location.hash) return;
+  const selector = location.hash === '#members' ? '[data-action="members"]' : location.hash === '#help' ? '#help-nav-button' : '';
+  if (!selector) return;
+  let attempts = 0;
+  const timer = setInterval(() => {
+    attempts += 1;
+    const target = document.querySelector(selector);
+    if (target) {
+      clearInterval(timer);
+      history.replaceState(null,'',location.pathname + location.search);
+      target.click();
+    } else if (attempts >= 30) clearInterval(timer);
+  }, 100);
 }
 
 root?.addEventListener('click', async event => {
@@ -119,3 +135,4 @@ document.addEventListener('keydown', event => {
 });
 
 void loadSession();
+activateHashAction();
