@@ -21,6 +21,13 @@
     gap: 7px !important;
   }
 
+  .site-nav-shell .account-popover {
+    left: 0 !important;
+    right: auto !important;
+    width: min(270px, calc(100vw - 24px));
+    max-width: calc(100vw - 24px);
+  }
+
   .site-nav-shell .account-avatar {
     width: 28px !important;
     height: 28px !important;
