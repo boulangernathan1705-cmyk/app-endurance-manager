@@ -9,6 +9,7 @@ const formatter = new Intl.DateTimeFormat('fr-FR', {
   year:'numeric'
 });
 
+const CREW_COLORS = ['#52d3d8','#f3b33d','#ec5b67','#75d66b','#8b7cf6','#e47adf','#58a6ff','#f28f45'];
 const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
 
 function displayTime(value) {
@@ -41,12 +42,14 @@ function nextEndurance(events, game, timestamp=Date.now()) {
   return candidates[0] || null;
 }
 
-function crewMarkup(crew, departure) {
+function crewMarkup(crew, departure, index=0) {
   const pilots = (crew.registrationIds || [])
     .map(id => (departure.availability || []).find(registration => registration.id === id)?.name)
     .filter(Boolean);
-  return `<li class="hub-crew ${crew.locked ? 'is-complete' : 'is-open'}">
-    <span class="hub-crew-status" aria-label="${crew.locked ? 'Équipage complet' : 'Équipage ouvert'}">${crew.locked ? '🔒' : '🔓'}</span>
+  const color = CREW_COLORS[index % CREW_COLORS.length];
+  const teamMark = `<span class="hub-crew-status" aria-hidden="true" style="display:grid;place-items:center;width:24px;height:24px;border:1px solid ${color};border-radius:7px;background:color-mix(in srgb, ${color} 14%, transparent);color:${color}"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="7" r="2.2"/><circle cx="6.8" cy="10" r="1.7"/><circle cx="17.2" cy="10" r="1.7"/><path d="M8.5 17.2c.4-2.7 1.6-4.2 3.5-4.2s3.1 1.5 3.5 4.2"/><path d="M3.8 17c.3-2.2 1.3-3.4 3-3.4.7 0 1.3.2 1.8.6"/><path d="M20.2 17c-.3-2.2-1.3-3.4-3-3.4-.7 0-1.3.2-1.8.6"/></svg></span>`;
+  return `<li class="hub-crew ${crew.locked ? 'is-complete' : 'is-open'}" style="--crew-accent:${color}">
+    ${teamMark}
     <span class="hub-crew-main"><strong>${esc(crew.name)}</strong><small>${esc(crew.category)}${crew.car ? ` · ${esc(crew.car)}` : ''}</small></span>
     <span class="hub-crew-pilots">${pilots.length ? esc(pilots.join(' · ')) : 'Aucun pilote affecté'}</span>
   </li>`;
@@ -64,7 +67,7 @@ function enduranceMarkup(item, game) {
     <h3>${esc(event.name)}</h3>
     <p class="hub-race-meta"><strong>${esc(formatter.format(new Date(Number(departure.startsAt))))} · ${esc(displayTime(departure.time))}</strong><span>${esc(circuit)} · ${Number(event.durationHours) || 6} h</span></p>
     <div class="hub-crews-heading"><strong>${crews.length} équipage${crews.length > 1 ? 's' : ''}</strong><span>${crews.length ? 'engagé'+(crews.length > 1 ? 's' : '') : 'formé'}</span></div>
-    ${crews.length ? `<ul class="hub-crews">${crews.map(crew => crewMarkup(crew,departure)).join('')}</ul>` : '<p class="hub-no-crews">Aucun équipage formé pour ce départ.</p>'}
+    ${crews.length ? `<ul class="hub-crews">${crews.map((crew,index) => crewMarkup(crew,departure,index)).join('')}</ul>` : '<p class="hub-no-crews">Aucun équipage formé pour ce départ.</p>'}
   </section>`;
 }
 
