@@ -1,0 +1,27 @@
+{
+  "name": "endurance-manager-prod",
+  "main": "server/worker.mjs",
+  "compatibility_date": "2026-09-07",
+  "keep_vars": true,
+  "minify": true,
+  "build": { "command": "npm run build:workers" },
+  "assets": {
+    "directory": "./public",
+    "html_handling": "auto-trailing-slash",
+    "run_worker_first": [
+      "/api/*",
+      "/telemetry/*"
+    ]
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "endurance-manager-prod",
+      "database_id": "bf277ee5-ddf5-48a9-a18d-0ba2b0f49120",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "vars": {
+    "APP_ORIGIN": "https://endurance-manager.app"
+  }
+}
