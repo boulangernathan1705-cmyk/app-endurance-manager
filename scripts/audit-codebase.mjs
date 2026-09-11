@@ -111,7 +111,8 @@ for (const [label,path] of builtPages) {
   if (stylesheetLinks.length !== 1 || !stylesheetLinks[0].includes('/app.css')) warnings.push(`Le build ${label} doit charger une seule feuille /app.css.`);
 }
 if (!publicCss.trim()) warnings.push('Le bundle public/app.css est absent ou vide.');
-if (/^\s*@import\s+url\(/mi.test(publicCss)) warnings.push('public/app.css contient encore de vrais imports CSS et déclenchera des requêtes supplémentaires.');
+const residualImports = publicCss.split(/\r?\n/).filter(line => /^\s*@import\s+url\(/i.test(line));
+if (residualImports.length) warnings.push(`public/app.css contient encore de vrais imports CSS : ${residualImports.slice(0,5).join(' | ')}`);
 if (await exists(resolve(publicDir, 'styles'))) warnings.push('Le dossier CSS source ne doit pas être publié séparément dans public/.');
 if (await exists(resolve(publicDir, 'styles.css'))) warnings.push('styles.css est une source de build et ne doit pas être publié séparément.');
 if (/^\s*Cache-Control:/mi.test(publicHeaders)) warnings.push('Le cache statique doit rester géré par Workers Static Assets et ses ETag natifs.');
