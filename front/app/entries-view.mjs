@@ -60,6 +60,13 @@ function summary(title,count) {
   return `<summary class="ux-my-entry-accordion-summary"><span>${esc(title)}</span><strong>${count}</strong><span class="ux-my-entry-chevron" aria-hidden="true">›</span></summary>`;
 }
 
+function contentAccordion(title,count,body,compact=false) {
+  return `<details class="ux-my-entry-content-accordion${compact?' is-compact':''}">
+    ${summary(title,count)}
+    <div class="ux-my-entry-content-body">${body}</div>
+  </details>`;
+}
+
 function compactCrew(departure,crew) {
   const names = (crew.registrationIds || [])
     .map(id => departure.availability.find(reg => String(reg.id) === String(id))?.name)
@@ -81,6 +88,25 @@ function card({event,departure,reg}) {
     : [];
   const otherCrews = (departure.crews||[]).filter(item => item.id !== crew?.id).sort(crewSort(event));
 
+  const ownCrewBody = crew?`<article class="ux-my-own-crew ${categories[crew.category]?.css||''}">
+    <div class="ux-my-own-crew-head">
+      <div class="ux-my-own-crew-identity">${logo(crew.category)}<div><strong>${esc(crew.name)}</strong><span>${esc(crew.car||'Voiture à définir')}</span></div></div>
+      <span class="ux-my-crew-state">${crew.locked?'Équipage complet':'Équipage ouvert'}</span>
+    </div>
+    <div class="${pilotGridClass(members.length)}">${members.map(pilot=>pilotCard(event,departure,pilot,String(pilot.id)===String(reg.id))).join('')}</div>
+  </article>`:`<article class="ux-my-awaiting-crew">
+    <div class="ux-my-awaiting-copy"><strong>En attente d’affectation</strong><span>Cette inscription n’est pas encore rattachée à un équipage.</span></div>
+    <div class="${pilotGridClass(1)}">${pilotCard(event,departure,reg,true)}</div>
+  </article>`;
+
+  const otherCrewsBody = otherCrews.length
+    ? `<div class="ux-my-other-crews-grid">${otherCrews.map(item=>compactCrew(departure,item)).join('')}</div>`
+    : '<p class="muted">Aucun autre équipage sur ce départ.</p>';
+
+  const unassignedBody = unassigned.length
+    ? `<div class="${pilotGridClass(unassigned.length)}">${unassigned.map(pilot=>pilotCard(event,departure,pilot,String(pilot.id)===String(reg.id))).join('')}</div>`
+    : '<p class="empty">Tous les pilotes disponibles sont déjà affectés.</p>';
+
   return `<details class="native-my-entry-card event-type-${event.eventType||'private'}">
     <summary class="native-my-entry-header">
       <span class="native-my-entry-toggle" aria-hidden="true">+</span>
@@ -94,31 +120,9 @@ function card({event,departure,reg}) {
       <button type="button" class="primary-button native-my-entry-open-event" data-action="open" data-id="${event.id}" data-departure="${departure.id}">Voir l’événement complet</button>
     </summary>
     <div class="native-my-entry-body">
-      <details class="ux-my-entry-content-accordion">
-        ${summary('Mon équipage',members.length)}
-        <div class="ux-my-entry-content-body">
-          ${crew?`<article class="ux-my-own-crew ${categories[crew.category]?.css||''}">
-            <div class="ux-my-own-crew-head">
-              <div class="ux-my-own-crew-identity">${logo(crew.category)}<div><strong>${esc(crew.name)}</strong><span>${esc(crew.car||'Voiture à définir')}</span></div></div>
-              <span class="ux-my-crew-state">${crew.locked?'Équipage complet':'Équipage ouvert'}</span>
-            </div>
-            <div class="${pilotGridClass(members.length)}">${members.map(pilot=>pilotCard(event,departure,pilot,String(pilot.id)===String(reg.id))).join('')}</div>
-          </article>`:`<article class="ux-my-awaiting-crew">
-            <div class="ux-my-awaiting-copy"><strong>En attente d’affectation</strong><span>Cette inscription n’est pas encore rattachée à un équipage.</span></div>
-            <div class="${pilotGridClass(1)}">${pilotCard(event,departure,reg,true)}</div>
-          </article>`}
-          <section class="ux-my-other-crews">
-            <div class="ux-my-other-crews-heading"><strong>Autres équipages</strong><span>${otherCrews.length}</span></div>
-            ${otherCrews.length?`<div class="ux-my-other-crews-grid">${otherCrews.map(item=>compactCrew(departure,item)).join('')}</div>`:'<p class="muted">Aucun autre équipage sur ce départ.</p>'}
-          </section>
-        </div>
-      </details>
-      <details class="ux-my-entry-content-accordion">
-        ${summary('Pilotes sans équipage',unassigned.length)}
-        <div class="ux-my-entry-content-body">
-          ${unassigned.length?`<div class="${pilotGridClass(unassigned.length)}">${unassigned.map(pilot=>pilotCard(event,departure,pilot,String(pilot.id)===String(reg.id))).join('')}</div>`:'<p class="empty">Tous les pilotes disponibles sont déjà affectés.</p>'}
-        </div>
-      </details>
+      ${contentAccordion('Mon équipage',members.length,ownCrewBody)}
+      ${contentAccordion('Autres équipages',otherCrews.length,otherCrewsBody,true)}
+      ${contentAccordion('Pilotes sans équipage',unassigned.length,unassignedBody,true)}
     </div>
   </details>`;
 }

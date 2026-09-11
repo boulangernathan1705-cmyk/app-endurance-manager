@@ -1,0 +1,47 @@
+/* Mes inscriptions : Mon équipage reste prioritaire, les deux sections secondaires sont plus compactes. */
+.ux-my-entry-content-accordion.is-compact {
+  border-radius: 8px;
+  background: rgba(15,22,24,.78);
+}
+
+.ux-my-entry-content-accordion.is-compact > .ux-my-entry-accordion-summary {
+  min-height: 38px;
+  padding: 5px 11px;
+  grid-template-columns: minmax(0,1fr) auto 20px;
+  gap: 8px;
+}
+
+.ux-my-entry-content-accordion.is-compact > .ux-my-entry-accordion-summary > span:first-child {
+  font-size: 14px;
+  letter-spacing: .1px;
+}
+
+.ux-my-entry-content-accordion.is-compact > .ux-my-entry-accordion-summary > strong {
+  min-width: 26px;
+  height: 26px;
+  padding: 0 6px;
+  font-size: 11px;
+}
+
+.ux-my-entry-content-accordion.is-compact > .ux-my-entry-accordion-summary .ux-my-entry-chevron {
+  font-size: 20px;
+}
+
+.ux-my-entry-content-accordion.is-compact > .ux-my-entry-content-body {
+  padding: 10px 12px 12px;
+}
+
+@media (max-width: 760px) {
+  .ux-my-entry-content-accordion.is-compact > .ux-my-entry-accordion-summary {
+    min-height: 36px;
+    padding: 5px 9px;
+  }
+
+  .ux-my-entry-content-accordion.is-compact > .ux-my-entry-accordion-summary > span:first-child {
+    font-size: 13px;
+  }
+
+  .ux-my-entry-content-accordion.is-compact > .ux-my-entry-content-body {
+    padding: 8px 9px 9px;
+  }
+}
