@@ -6,10 +6,11 @@
 .registration-origin-info:hover,.registration-origin-info:focus{opacity:1;border-color:var(--green);color:#dfffe7}
 .pilot-name .registration-origin-info{margin-left:3px}
 
-/* Les cartes pilotes retrouvent le vrai logo de catégorie sans recréer les chevauchements. */
-.pilot-main .pilot-category-logo{display:inline-flex;align-items:center;justify-content:center;flex:0 0 38px;width:38px;min-width:38px;min-height:30px}
-.pilot-main .pilot-category-logo .category-logo{display:block;width:auto;max-width:36px;height:auto;max-height:30px;object-fit:contain}
-.pilot-main .pilot-category-logo .category-text-logo{max-width:38px;padding:3px;font-size:8px;line-height:1;text-align:center}
+/* Les cartes pilotes utilisent un nom et un logo visuellement équilibrés. */
+.pilot-main>.pilot-name{font-size:15.5px;font-weight:900;line-height:1.1}
+.pilot-main .pilot-category-logo{display:inline-flex;align-items:center;justify-content:center;flex:0 0 32px;width:32px;min-width:32px;min-height:24px}
+.pilot-main .pilot-category-logo .category-logo{display:block;width:auto;max-width:30px;height:auto;max-height:24px;object-fit:contain}
+.pilot-main .pilot-category-logo .category-text-logo{max-width:32px;padding:2px;font-size:7.5px;line-height:1;text-align:center}
 .pilot-main .pilot-car{min-width:0;overflow-wrap:anywhere}
 
 /* Réserve une vraie colonne aux deux actions du départ. Ce sélecteur est volontairement
