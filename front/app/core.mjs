@@ -16,7 +16,7 @@ export const state = {
 };
 try { state.pilotName = localStorage.getItem('fmt_pilot_name') || ''; } catch {}
 
-export const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+export const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[c]));
 export const canManage = () => ['admin','organizer'].includes(state.user?.role);
 export const isAdmin = () => state.user?.role === 'admin';
 
@@ -55,14 +55,53 @@ export function pilotWishes(reg,departure=null,duration=0) { return `<dl class="
 export function crewColorClass(crewId,index=null) { if (index != null) return `crew-palette-${index%10}`; let hash=0; for (const char of String(crewId||'')) hash=(hash*31+char.charCodeAt(0))>>>0; return `crew-palette-${hash%10}`; }
 export function coversHour(reg,index) { return reg.status === 'whole' || String(reg.status||'').split(',').includes(`h${index+1}`); }
 
+const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+function networkFailure(error) {
+  return error instanceof TypeError || /networkerror|failed to fetch|load failed/i.test(String(error?.message || error || ''));
+}
+function xhrApi(path,method,data) {
+  return new Promise((resolve,reject) => {
+    const request = new XMLHttpRequest();
+    request.open(method,path,true);
+    request.withCredentials=true;
+    request.setRequestHeader('Accept','application/json');
+    if (method !== 'GET') request.setRequestHeader('Content-Type','application/json');
+    request.onload=()=>{
+      let result;
+      try { result=JSON.parse(request.responseText || '{}'); }
+      catch { reject(Error('Le service partagé a renvoyé une réponse illisible.')); return; }
+      if (request.status < 200 || request.status >= 300) { reject(Error(result.error || 'Cette action a échoué.')); return; }
+      resolve(result);
+    };
+    request.onerror=()=>reject(Error('Connexion au service impossible. Vérifie la connexion réseau puis réessaie.'));
+    request.ontimeout=()=>reject(Error('Le service met trop de temps à répondre. Réessaie dans un instant.'));
+    request.timeout=12000;
+    request.send(method==='GET'?null:JSON.stringify(data||{}));
+  });
+}
 export async function api(path,method='GET',data) {
-  const response = await fetch(path,{method,credentials:'same-origin',cache:'no-store',headers:method==='GET'?{}:{'Content-Type':'application/json'},body:method==='GET'?undefined:JSON.stringify(data||{})});
-  let result; try { result=await response.json(); } catch { throw Error('Le service partagé ne répond pas. Vérifie la configuration du site.'); }
-  if (!response.ok) throw Error(result.error || 'Cette action a échoué.');
-  return result;
+  let lastError;
+  for (let attempt=0;attempt<2;attempt++) {
+    try {
+      const response = await fetch(path,{method,credentials:'same-origin',cache:'no-store',headers:method==='GET'?{'Accept':'application/json'}:{'Accept':'application/json','Content-Type':'application/json'},body:method==='GET'?undefined:JSON.stringify(data||{})});
+      let result; try { result=await response.json(); } catch { throw Error('Le service partagé ne répond pas correctement.'); }
+      if (!response.ok) throw Error(result.error || 'Cette action a échoué.');
+      return result;
+    } catch (error) {
+      lastError=error;
+      if (!networkFailure(error)) throw error;
+      if (attempt===0) await wait(250);
+    }
+  }
+  try { return await xhrApi(path,method,data); }
+  catch (xhrError) {
+    if (networkFailure(lastError)) throw Error('Connexion au service impossible avec ce navigateur. Recharge la page ou réessaie dans quelques secondes.');
+    throw xhrError;
+  }
 }
 export async function load() {
-  const [session,result] = await Promise.all([api('/api/session'),api('/api/events')]);
+  const session = await api('/api/session');
+  const result = await api('/api/events');
   state.user=session.user;
   state.discordReady=session.discordReady;
   state.events=(Array.isArray(result.events)?result.events:[]).filter(event => gameForEvent(event) === activeGame);
