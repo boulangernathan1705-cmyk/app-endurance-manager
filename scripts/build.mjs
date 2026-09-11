@@ -75,10 +75,12 @@ await mkdir(new URL('iracing/', out), {recursive: true});
 const sourceIndex = await readFile(root + 'index.html', 'utf8');
 const sourceGame = await readFile(root + 'game.html', 'utf8');
 const sourceMembers = await readFile(root + 'members.html', 'utf8');
+const sourceHelp = await readFile(root + 'help.html', 'utf8');
 const paths = [
   ...stylesheetPaths(sourceIndex,'index.html'),
   ...stylesheetPaths(sourceGame,'game.html'),
-  ...stylesheetPaths(sourceMembers,'members.html')
+  ...stylesheetPaths(sourceMembers,'members.html'),
+  ...stylesheetPaths(sourceHelp,'help.html')
 ];
 const uniqueStylesheetPaths = [...new Set(paths)];
 
@@ -88,6 +90,7 @@ await writeFile(new URL('app.css', out), cssParts.join('\n\n') + '\n');
 
 await writeFile(new URL('index.html', out), productionHtml(sourceIndex));
 await writeFile(new URL('members.html', out), productionHtml(sourceMembers));
+await writeFile(new URL('help.html', out), productionHtml(sourceHelp));
 const gameHtml = productionHtml(sourceGame);
 await writeFile(new URL('lmu/index.html', out), gameHtml);
 await writeFile(new URL('iracing/index.html', out), gameHtml);
@@ -106,11 +109,11 @@ if (!workers) {
 }
 
 await writeFile(new URL('_headers', out), `/*
-  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' https://commons.wikimedia.org https://upload.wikimedia.org; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' https://commons.wikimedia.org https://upload.wikimedia.org https://cdn.discordapp.com; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'
   X-Content-Type-Options: nosniff
   Referrer-Policy: no-referrer
   X-Frame-Options: DENY
   Permissions-Policy: camera=(), microphone=(), geolocation=()
 `);
 
-console.log(`Build ready: public/ (${workers ? 'Workers' : 'Pages'}, accueil + LMU + iRacing + membres, ${uniqueStylesheetPaths.length} feuilles CSS -> app.css, aide chargée à la demande)`);
+console.log(`Build ready: public/ (${workers ? 'Workers' : 'Pages'}, accueil + LMU + iRacing + membres + aide, ${uniqueStylesheetPaths.length} feuilles CSS -> app.css)`);
