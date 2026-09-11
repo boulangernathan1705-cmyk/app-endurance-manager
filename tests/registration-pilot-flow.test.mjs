@@ -73,8 +73,10 @@ test('creator metadata is only exposed to creator participant or managers',()=>{
 });
 
 test('self and managed pilots can still add another category',()=>{
+  assert.match(registration,/function renderAddCategoryAction/);
   assert.match(registration,/Ajouter une catégorie/);
-  assert.match(registration,/const canAdd=source&&!assigned&&event\.categories/);
+  assert.match(registration,/const canAdd=!!source&&!assigned&&stateDraft\.mode!=='category'&&event\.categories/);
+  assert.match(registration,/registration-workspace-actions/);
   assert.match(registration,/category-add-button/);
 });
 
