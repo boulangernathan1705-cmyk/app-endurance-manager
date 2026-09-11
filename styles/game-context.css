@@ -99,17 +99,27 @@ html[data-game="iracing"] .nav-game-switcher-iracing {
   }
 
   #navigation > .help-sim-stack {
-    width: 100%;
-    min-width: 0;
+    display: contents;
   }
 
   .help-sim-stack > .help-nav-button {
+    width: 100%;
     min-height: 42px;
     padding: 8px 10px;
   }
 
+  #navigation > [data-action="logout"] {
+    order: 5;
+  }
+
+  .nav-game-switcher {
+    order: 6;
+    width: 100%;
+    align-self: stretch;
+  }
+
   .nav-game-switcher-button {
-    min-height: 34px;
+    min-height: 42px;
     padding: 5px 6px;
     border-radius: 7px;
     font-size: 11px;
