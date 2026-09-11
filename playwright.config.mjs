@@ -21,6 +21,6 @@ export default defineConfig({
     {name:'webkit-desktop', use:{...devices['Desktop Safari']}},
     {name:'android-chrome', use:{...devices['Pixel 7']}},
     {name:'iphone-safari', use:{...devices['iPhone 14']}},
-    {name:'firefox-mobile-viewport', use:{browserName:'firefox', viewport:{width:390,height:844}, isMobile:true, hasTouch:true}}
+    {name:'firefox-mobile-viewport', use:{browserName:'firefox', viewport:{width:390,height:844}}}
   ]
 });
