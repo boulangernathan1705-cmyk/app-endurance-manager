@@ -65,6 +65,16 @@ function onlineLabel() {
 function diagnosticMessage(path,method,stage,extra='') {
   return `Connexion au service impossible. Diagnostic : ${method} ${path} · ${stage} · navigateur en ligne : ${onlineLabel()}${extra ? ` · ${extra}` : ''}`;
 }
+function reportClientError({kind='network',path='',method='',message='',detail=''}) {
+  try {
+    const payload=JSON.stringify({kind,page:location.pathname.slice(0,160),apiPath:String(path).slice(0,160),method:String(method).slice(0,12),message:String(message).slice(0,500),detail:String(detail).slice(0,1000),userAgent:navigator.userAgent.slice(0,500),viewport:`${innerWidth}x${innerHeight}`,online:navigator.onLine!==false});
+    if (navigator.sendBeacon) {
+      const blob=new Blob([payload],{type:'text/plain;charset=UTF-8'});
+      if (navigator.sendBeacon('/telemetry/client-error',blob)) return;
+    }
+    fetch('/telemetry/client-error',{method:'POST',credentials:'same-origin',cache:'no-store',keepalive:true,headers:{'Content-Type':'text/plain;charset=UTF-8'},body:payload}).catch(()=>{});
+  } catch {}
+}
 function xhrApi(path,method,data) {
   return new Promise((resolve,reject) => {
     const request = new XMLHttpRequest();
@@ -75,12 +85,12 @@ function xhrApi(path,method,data) {
     request.onload=()=>{
       let result;
       try { result=JSON.parse(request.responseText || '{}'); }
-      catch { reject(Error(diagnosticMessage(path,method,'réponse XHR illisible',`statut ${request.status}`))); return; }
+      catch { const error=Error(diagnosticMessage(path,method,'réponse XHR illisible',`statut ${request.status}`)); reportClientError({path,method,message:error.message,detail:`xhr status ${request.status}`}); reject(error); return; }
       if (request.status < 200 || request.status >= 300) { reject(Error(result.error || `Cette action a échoué (${request.status}).`)); return; }
       resolve(result);
     };
-    request.onerror=()=>reject(Error(diagnosticMessage(path,method,'fetch ×2 + secours XHR en échec','statut XHR 0')));
-    request.ontimeout=()=>reject(Error(diagnosticMessage(path,method,'fetch ×2 + secours XHR expiré','délai 12 s')));
+    request.onerror=()=>{const error=Error(diagnosticMessage(path,method,'fetch ×2 + secours XHR en échec','statut XHR 0'));reportClientError({path,method,message:error.message,detail:'fetch x2 + xhr error status 0'});reject(error);};
+    request.ontimeout=()=>{const error=Error(diagnosticMessage(path,method,'fetch ×2 + secours XHR expiré','délai 12 s'));reportClientError({path,method,message:error.message,detail:'xhr timeout 12s'});reject(error);};
     request.timeout=12000;
     request.send(method==='GET'?null:JSON.stringify(data||{}));
   });
@@ -102,7 +112,9 @@ export async function api(path,method='GET',data) {
   try { return await xhrApi(path,method,data); }
   catch (error) {
     if (/Diagnostic :/.test(String(error?.message || ''))) throw error;
-    throw Error(diagnosticMessage(path,method,'secours XHR en échec',lastNetworkError ? `fetch : ${lastNetworkError}` : ''));
+    const wrapped=Error(diagnosticMessage(path,method,'secours XHR en échec',lastNetworkError ? `fetch : ${lastNetworkError}` : ''));
+    reportClientError({path,method,message:wrapped.message,detail:lastNetworkError});
+    throw wrapped;
   }
 }
 export async function load() {
@@ -123,3 +135,6 @@ export function showError(error) {
   overlay.innerHTML=`<section class="ux-error-dialog" role="alertdialog" aria-modal="true" aria-labelledby="ux-error-title" aria-describedby="ux-error-message"><span class="ux-error-icon" aria-hidden="true">!</span><h2 id="ux-error-title">Action impossible</h2><p id="ux-error-message">${esc(message)}</p><button type="button" class="primary-button" data-action="dismiss-error">OK, j’ai compris</button></section>`;
   document.body.append(overlay); overlay.querySelector('button')?.focus();
 }
+
+addEventListener('error',event=>{if(event.error||event.message)reportClientError({kind:'javascript',message:event.message||event.error?.message||'Erreur JavaScript',detail:event.error?.stack||`${event.filename||''}:${event.lineno||0}:${event.colno||0}`});});
+addEventListener('unhandledrejection',event=>{const reason=event.reason;reportClientError({kind:'promise',message:reason?.message||String(reason||'Promise rejetée'),detail:reason?.stack||''});});
