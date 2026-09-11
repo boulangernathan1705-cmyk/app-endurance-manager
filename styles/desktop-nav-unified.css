@@ -8,7 +8,7 @@
     width: min(1600px, calc(100% - 36px)) !important;
     max-width: none !important;
     min-height: 68px;
-    margin: 12px auto 22px !important;
+    margin: 12px auto 8px !important;
     padding: 10px 14px !important;
     display: grid !important;
     grid-template-columns: minmax(0,1fr) minmax(260px,320px) minmax(0,1fr) !important;
@@ -139,7 +139,11 @@
 
   .site-nav-shell.is-events-home + #app {
     margin-top:0 !important;
-    padding-top:24px !important;
+    padding-top:6px !important;
+  }
+
+  .site-nav-shell.is-events-home + #app > .event-agenda {
+    margin-top:0 !important;
   }
 }
 
