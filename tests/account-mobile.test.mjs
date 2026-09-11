@@ -11,5 +11,5 @@ test('le compte connecté reste compact sur mobile sans modifier le desktop', ()
   assert.match(css, /\.site-nav-shell \.account-trigger\s*\{[^}]*width:\s*auto\s*!important/s);
   assert.match(css, /max-width:\s*235px\s*!important/);
   assert.match(css, /\.site-nav-shell \.account-avatar\s*\{[^}]*width:\s*28px\s*!important/s);
-  assert.match(game, /account-mobile-fix\.css\?v=1-compact-account/);
+  assert.match(game, /account-mobile-fix\.css\?v=2-left-popover/);
 });
