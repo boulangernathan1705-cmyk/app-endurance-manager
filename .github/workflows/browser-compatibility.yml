@@ -3,7 +3,7 @@ name: Browser compatibility
 on:
   workflow_dispatch:
   push:
-    branches: [main]
+    branches: [main, dev]
   schedule:
     - cron: '17 5 * * *'
 
@@ -21,10 +21,21 @@ jobs:
           node-version: '22.13.0'
       - run: npm install --no-audit --no-fund
       - run: npx playwright install --with-deps chromium firefox webkit
-      - name: Wait for production deployment
+      - name: Select environment
+        shell: bash
         run: |
-          for i in {1..12}; do
-            if curl --fail --silent --show-error --max-time 10 https://app.endurance-manager.workers.dev/api/session >/dev/null; then
+          if [ "${GITHUB_REF_NAME}" = "main" ]; then
+            echo "COMPAT_BASE_URL=https://endurance-manager.app" >> "$GITHUB_ENV"
+            echo "ENV_LABEL=production" >> "$GITHUB_ENV"
+          else
+            echo "COMPAT_BASE_URL=https://app.endurance-manager.workers.dev" >> "$GITHUB_ENV"
+            echo "ENV_LABEL=development" >> "$GITHUB_ENV"
+          fi
+      - name: Wait for deployment
+        run: |
+          echo "Checking ${ENV_LABEL}: ${COMPAT_BASE_URL}"
+          for i in {1..18}; do
+            if curl --fail --silent --show-error --max-time 10 "${COMPAT_BASE_URL}/api/session" >/dev/null; then
               exit 0
             fi
             sleep 10
@@ -32,12 +43,12 @@ jobs:
           exit 1
       - run: npm run compat:test
         env:
-          COMPAT_BASE_URL: https://app.endurance-manager.workers.dev
+          COMPAT_BASE_URL: ${{ env.COMPAT_BASE_URL }}
       - name: Upload Playwright report on failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: browser-compatibility-report
+          name: browser-compatibility-report-${{ github.ref_name }}
           path: |
             playwright-report/
             test-results/
