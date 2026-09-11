@@ -1,7 +1,34 @@
-import {json, origin, fail} from './core.mjs';
+import {json, origin, fail, identity} from './core.mjs';
 
 const DAY=86400;
 const clean=(value,max)=>String(value??'').replace(/[\u0000-\u001f\u007f]/g,' ').slice(0,max);
+
+async function ensureClientErrorsTable(env) {
+  await env.DB.batch([
+    env.DB.prepare(`CREATE TABLE IF NOT EXISTS client_errors (
+      id TEXT PRIMARY KEY,
+      created_at INTEGER NOT NULL,
+      kind TEXT NOT NULL,
+      page TEXT NOT NULL DEFAULT '',
+      api_path TEXT NOT NULL DEFAULT '',
+      method TEXT NOT NULL DEFAULT '',
+      message TEXT NOT NULL DEFAULT '',
+      detail TEXT NOT NULL DEFAULT '',
+      user_agent TEXT NOT NULL DEFAULT '',
+      viewport TEXT NOT NULL DEFAULT '',
+      online INTEGER NOT NULL DEFAULT 1
+    )`),
+    env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_client_errors_created_at ON client_errors(created_at DESC)')
+  ]);
+}
+
+async function readClientErrors(env) {
+  await ensureClientErrorsTable(env);
+  const cutoff=Math.floor(Date.now()/1000)-14*DAY;
+  await env.DB.prepare('DELETE FROM client_errors WHERE created_at < ?').bind(cutoff).run();
+  return (await env.DB.prepare(`SELECT created_at,kind,page,api_path,method,message,detail,user_agent,viewport,online
+    FROM client_errors ORDER BY created_at DESC LIMIT 200`).all()).results;
+}
 
 export async function ingestClientError(request,env) {
   if (!env.DB) return new Response(null,{status:204});
@@ -18,6 +45,7 @@ export async function ingestClientError(request,env) {
   } catch { return new Response(null,{status:204}); }
   const createdAt=Math.floor(Date.now()/1000);
   try {
+    await ensureClientErrorsTable(env);
     await env.DB.batch([
       env.DB.prepare(`INSERT INTO client_errors(id,created_at,kind,page,api_path,method,message,detail,user_agent,viewport,online)
         VALUES(?,?,?,?,?,?,?,?,?,?,?)`).bind(
@@ -37,9 +65,16 @@ export async function clientErrorsApi(path,method,env,actor) {
   if (path!=='/api/client-errors') return null;
   if (method!=='GET') fail(405,'Méthode non autorisée.');
   if (!actor.user || !['admin','organizer'].includes(actor.user.role)) fail(403,'Accès réservé aux organisateurs et administrateurs.');
-  const cutoff=Math.floor(Date.now()/1000)-14*DAY;
-  await env.DB.prepare('DELETE FROM client_errors WHERE created_at < ?').bind(cutoff).run();
-  const rows=(await env.DB.prepare(`SELECT created_at,kind,page,api_path,method,message,detail,user_agent,viewport,online
-    FROM client_errors ORDER BY created_at DESC LIMIT 200`).all()).results;
-  return json({errors:rows});
+  return json({errors:await readClientErrors(env)});
+}
+
+export async function clientErrorsTelemetry(request,env) {
+  if (!env.DB) return json({error:'La base partagée n’est pas encore configurée.'},503);
+  if (request.method!=='GET') return json({error:'Méthode non autorisée.'},405);
+  const url=new URL(request.url);
+  const canonical=origin(env);
+  if (url.origin!==canonical) return json({error:'Utilise l’adresse principale du site pour cette action.'},403);
+  const actor=await identity(request,env);
+  if (!actor.user || !['admin','organizer'].includes(actor.user.role)) return json({error:'Accès réservé aux organisateurs et administrateurs.'},403);
+  return json({errors:await readClientErrors(env)});
 }
