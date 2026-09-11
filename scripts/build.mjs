@@ -7,7 +7,7 @@ const root = fileURLToPath(new URL('../', import.meta.url));
 const out = new URL('../public/', import.meta.url);
 const workers = process.argv.includes('--workers');
 const stylesheetTagPattern = /<link\b[^>]*\brel=["']stylesheet["'][^>]*>/gi;
-const cssImportPattern = /@import\s+url\(\s*(["']?)([^"')]+)\1\s*\)\s*;/gi;
+const cssImportPattern = /@import\s+url\(\s*(["']?)([^"')]+)\1\s*;/gi;
 const cssUrlPattern = /url\(\s*(["']?)([^"')]+)\1\s*\)/gi;
 
 function localAssetPath(href, fromPath = '') {
@@ -95,7 +95,7 @@ const gameHtml = productionHtml(sourceGame);
 await writeFile(new URL('lmu/index.html', out), gameHtml);
 await writeFile(new URL('iracing/index.html', out), gameHtml);
 
-for (const file of ['app.js', 'crew-accordion.js', 'crew-builder.js', 'ux-refinement.js', 'help.js', 'privacy.html', 'privacy.css', 'legal.html', 'circuit-credits.html']) {
+for (const file of ['app.js', 'crew-builder.js', 'help.js', 'privacy.html', 'privacy.css', 'legal.html', 'circuit-credits.html']) {
   await copyFile(root + file, new URL(file, out));
 }
 await copyFile(root + 'help.css', new URL('help.css', out));
