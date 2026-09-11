@@ -11,7 +11,7 @@
     margin: 12px auto 8px !important;
     padding: 10px 14px !important;
     display: grid !important;
-    grid-template-columns: minmax(0,1fr) minmax(260px,320px) minmax(0,1fr) !important;
+    grid-template-columns: minmax(0,1fr) minmax(360px,420px) minmax(0,1fr) !important;
     align-items: center !important;
     column-gap: 20px !important;
     border: 1px solid rgba(70,108,113,.5) !important;
@@ -78,21 +78,22 @@
 
   .desktop-nav-center .nav-game-switcher {
     display:grid;
-    grid-template-columns:repeat(2,minmax(120px,1fr));
+    grid-template-columns:repeat(2,minmax(165px,1fr));
     gap:10px;
     width:100%;
-    max-width:300px;
+    max-width:410px;
     margin:0;
     padding:0;
   }
 
   .desktop-nav-center .nav-game-switcher-button {
-    min-width:120px;
+    min-width:165px;
     min-height:46px;
-    padding:9px 18px;
+    padding:9px 16px;
     border-radius:10px;
     font-size:14px;
     letter-spacing:.01em;
+    white-space:nowrap;
   }
 
   .desktop-nav-right {
@@ -149,7 +150,7 @@
 
 @media (min-width: 761px) and (max-width: 1280px) {
   .site-nav-shell {
-    grid-template-columns:minmax(0,1fr) minmax(220px,260px) minmax(0,1fr) !important;
+    grid-template-columns:minmax(0,1fr) minmax(300px,340px) minmax(0,1fr) !important;
     column-gap:12px !important;
   }
 
@@ -157,6 +158,6 @@
   .desktop-home-toolbar { gap:6px; }
   .desktop-home-toolbar .home-create-event .primary-button { padding-inline:10px; }
   .desktop-nav-center .nav-game-switcher { gap:6px; }
-  .desktop-nav-center .nav-game-switcher-button { min-width:100px; padding-inline:10px; }
+  .desktop-nav-center .nav-game-switcher-button { min-width:140px; padding-inline:10px; font-size:13px; }
   .desktop-nav-right-controls > [data-action="my-entries"] { min-width:145px; padding-inline:12px !important; }
 }

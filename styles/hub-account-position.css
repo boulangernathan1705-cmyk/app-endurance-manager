@@ -1,0 +1,39 @@
+.hub-topbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 18px;
+  margin: 0 0 14px;
+}
+
+.hub-topbar .account-bar {
+  grid-column: 1;
+  justify-content: flex-start;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+}
+
+.hub-topbar .hub-intro {
+  grid-column: 2;
+  margin: 0;
+  text-align: center;
+}
+
+@media (max-width: 800px) {
+  .hub-topbar {
+    grid-template-columns: 1fr;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+
+  .hub-topbar .account-bar,
+  .hub-topbar .hub-intro {
+    grid-column: 1;
+    justify-self: start;
+  }
+
+  .hub-topbar .hub-intro {
+    text-align: left;
+  }
+}

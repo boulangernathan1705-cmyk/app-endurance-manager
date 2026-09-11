@@ -68,8 +68,8 @@ function createNavStack() {
   switcher.className = 'nav-game-switcher';
   switcher.setAttribute('aria-label', 'Changer de simulateur');
   switcher.innerHTML = `
-    <a class="nav-game-switcher-button nav-game-switcher-lmu" href="/lmu/" aria-label="Accueil Le Mans Ultimate">LMU</a>
-    <a class="nav-game-switcher-button nav-game-switcher-iracing" href="/iracing/" aria-label="Accueil iRacing">iR</a>`;
+    <a class="nav-game-switcher-button nav-game-switcher-lmu" href="/lmu/" aria-label="Accueil Le Mans Ultimate">Le Mans Ultimate</a>
+    <a class="nav-game-switcher-button nav-game-switcher-iracing" href="/iracing/" aria-label="Accueil iRacing">iRacing</a>`;
 
   stack.append(button, switcher);
   return stack;
