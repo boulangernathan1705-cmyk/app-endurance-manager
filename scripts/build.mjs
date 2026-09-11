@@ -7,7 +7,7 @@ const root = fileURLToPath(new URL('../', import.meta.url));
 const out = new URL('../public/', import.meta.url);
 const workers = process.argv.includes('--workers');
 const stylesheetTagPattern = /<link\b[^>]*\brel=["']stylesheet["'][^>]*>/gi;
-const cssImportPattern = /@import\s+url\(\s*(["']?)([^"')]+)\1\s*;/gi;
+const cssImportPattern = /@import\s+url\(\s*(["']?)([^"')]+)\1\s*\)\s*;/gi;
 const cssUrlPattern = /url\(\s*(["']?)([^"')]+)\1\s*\)/gi;
 
 function localAssetPath(href, fromPath = '') {
@@ -86,7 +86,9 @@ const uniqueStylesheetPaths = [...new Set(paths)];
 
 const cssParts = [];
 for (const path of uniqueStylesheetPaths) cssParts.push(`/* ${path} */\n${await inlineCss(path)}`);
-await writeFile(new URL('app.css', out), cssParts.join('\n\n') + '\n');
+const bundledCss = cssParts.join('\n\n') + '\n';
+if (/^\s*@import\s+url\(/mi.test(bundledCss)) throw new Error('Le bundle CSS contient encore un @import après compilation.');
+await writeFile(new URL('app.css', out), bundledCss);
 
 await writeFile(new URL('index.html', out), productionHtml(sourceIndex));
 await writeFile(new URL('members.html', out), productionHtml(sourceMembers));
