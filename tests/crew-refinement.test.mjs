@@ -17,9 +17,9 @@ test('Équipages rend directement les contrôles de gestion finaux', () => {
   const crews = read('front/app/crews.mjs');
   assert.match(crews, /crew-management-accordion/);
   assert.match(crews, /data-crew-state-select/);
-  assert.match(crews, /data-action=\\"edit-crew\\"/);
-  assert.match(crews, /data-action=\\"add-crew-pilot\\"/);
-  assert.match(crews, /data-action=\\"remove-crew-pilot\\"/);
+  assert.match(crews, /button\('edit-crew'/);
+  assert.match(crews, /button\('add-crew-pilot'/);
+  assert.match(crews, /button\('remove-crew-pilot'/);
 });
 
 test('création et modification utilisent le même éditeur équipage', () => {
