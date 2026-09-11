@@ -2,9 +2,9 @@ name: Quality checks
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, dev]
   push:
-    branches: [main, 'refactor/**']
+    branches: [main, dev, 'refactor/**', 'feature/**', 'fix/**']
 
 permissions:
   contents: read
