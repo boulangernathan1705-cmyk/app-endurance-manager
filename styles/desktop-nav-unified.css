@@ -4,18 +4,18 @@
     z-index: 80 !important;
     width: min(1540px, calc(100% - 36px)) !important;
     max-width: none !important;
-    margin: 12px auto 18px !important;
-    padding: 7px !important;
+    min-height: 66px;
+    margin: 12px auto 22px !important;
+    padding: 10px 12px !important;
     display: flex !important;
     align-items: center !important;
-    gap: 8px !important;
-    border: 1px solid rgba(70,108,113,.58) !important;
-    border-radius: 13px !important;
-    background: rgba(8,12,14,.9) !important;
-    box-shadow: 0 10px 28px rgba(0,0,0,.18) !important;
+    gap: 10px !important;
+    border: 1px solid rgba(70,108,113,.5) !important;
+    border-radius: 14px !important;
+    background: rgba(8,12,14,.94) !important;
+    box-shadow: 0 10px 28px rgba(0,0,0,.2) !important;
   }
 
-  /* La simu courante est déjà identifiable par LMU / iRacing actif. */
   .site-nav-shell .game-space-bar {
     display: none !important;
   }
@@ -25,7 +25,7 @@
     flex: 1 1 auto;
     display: none;
     align-items: center;
-    gap: 7px;
+    gap: 8px;
   }
 
   .site-nav-shell.is-events-home .desktop-home-toolbar {
@@ -51,8 +51,8 @@
   }
 
   .desktop-home-toolbar .home-create-event .primary-button {
-    min-height: 40px;
-    padding: 8px 13px;
+    min-height: 42px;
+    padding: 8px 15px;
     white-space: nowrap;
     font-size: 13px;
   }
@@ -60,15 +60,15 @@
   .desktop-home-toolbar .event-filter {
     display: flex;
     gap: 5px;
-    padding: 3px;
+    padding: 4px;
     border: 1px solid rgba(70,108,113,.5);
-    border-radius: 9px;
-    background: rgba(255,255,255,.015);
+    border-radius: 10px;
+    background: rgba(255,255,255,.018);
   }
 
   .desktop-home-toolbar .event-filter-button {
-    min-height: 32px;
-    padding: 5px 10px;
+    min-height: 34px;
+    padding: 6px 11px;
     font-size: 12px;
     white-space: nowrap;
   }
@@ -81,8 +81,8 @@
     margin: 0 !important;
     padding: 0 !important;
     display: flex !important;
-    align-items: stretch !important;
-    gap: 6px !important;
+    align-items: center !important;
+    gap: 8px !important;
     border: 0 !important;
     border-radius: 0 !important;
     background: transparent !important;
@@ -92,10 +92,10 @@
   .site-nav-shell #navigation > button,
   .site-nav-shell #navigation > a {
     width: auto !important;
-    min-width: 132px;
-    min-height: 42px;
+    min-width: 150px;
+    min-height: 44px;
     margin: 0 !important;
-    padding: 8px 14px !important;
+    padding: 9px 16px !important;
     white-space: nowrap;
   }
 
@@ -103,17 +103,31 @@
     display: none !important;
   }
 
+  .site-nav-shell #navigation > .help-sim-stack {
+    display: contents !important;
+  }
+
   .site-nav-shell #navigation .nav-game-switcher {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 2;
     display: grid;
-    grid-template-columns: repeat(2, 62px);
-    gap: 6px;
-    width: auto;
+    grid-template-columns: repeat(2, minmax(112px, 1fr));
+    gap: 8px;
+    width: 236px;
+    margin: 0;
+    padding: 0;
   }
 
   .site-nav-shell #navigation .nav-game-switcher-button {
-    min-width: 62px;
-    min-height: 42px;
-    padding: 6px 8px;
+    min-width: 112px;
+    min-height: 46px;
+    padding: 8px 16px;
+    border-radius: 10px;
+    font-size: 13px;
+    letter-spacing: .01em;
   }
 
   .site-nav-shell .account-bar {
@@ -138,24 +152,43 @@
     display: none !important;
   }
 
-  /* Le contenu doit commencer sous la barre et jamais remonter dedans. */
   .site-nav-shell.is-events-home + #app {
     margin-top: 0 !important;
-    padding-top: 20px !important;
+    padding-top: 24px !important;
+  }
+}
+
+@media (min-width: 1181px) {
+  .site-nav-shell.is-events-home .desktop-home-toolbar {
+    max-width: calc(50% - 138px);
+  }
+
+  .site-nav-shell #navigation {
+    margin-left: auto !important;
   }
 }
 
 @media (min-width: 761px) and (max-width: 1180px) {
   .site-nav-shell {
     flex-wrap: wrap !important;
+    padding: 10px !important;
   }
 
   .desktop-home-toolbar {
     flex: 1 1 100%;
+    justify-content: center;
   }
 
   .site-nav-shell #navigation {
     flex: 1 1 auto;
+    justify-content: flex-start;
+  }
+
+  .site-nav-shell #navigation .nav-game-switcher {
+    position: static;
+    transform: none;
+    width: 236px;
+    margin: 0 auto;
   }
 
   .site-nav-shell .account-bar {
