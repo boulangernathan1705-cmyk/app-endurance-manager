@@ -131,7 +131,7 @@ function editorMarkup(event, departure, state) {
     ${availabilityChoices(state, departure, duration)}
     <div class="category-area"><span class="form-label">Catégorie</span><div class="categories">${categoryButtons(event, state)}</div>${carChoices(state)}</div>
     <p class="creation-error" data-registration-editor-error role="alert" hidden></p>
-    <div class="save-row"><button type="submit" class="save-button">${state.mode === 'edit' ? 'ENREGISTRER LES MODIFICATIONS' : 'AJOUTER LE PILOTE'}</button></div>
+    <div class="save-row"><button type="submit" class="save-button">${state.mode === 'edit' ? 'ENREGISTRER LES MODIFICATIONS' : 'AJOUTER LE PILOTE'}</button>${state.mode === 'edit' ? '<button type="button" class="danger-button" data-registration-delete>Supprimer l’inscription</button>' : ''}</div>
   </form>`;
 }
 
@@ -271,6 +271,14 @@ function restoreAfterRefresh(departureId) {
   setTimeout(() => observer.disconnect(), 3000);
 }
 
+function showEditorError(form, error) {
+  const box = form?.querySelector('[data-registration-editor-error]');
+  if (!box) return;
+  box.textContent = error?.message || 'Cette action a échoué.';
+  box.hidden = false;
+  box.focus?.();
+}
+
 async function submitEditor(form) {
   const departureId = form.dataset.departure;
   const state = editorStates.get(departureId);
@@ -316,6 +324,16 @@ async function submitEditor(form) {
   }
 }
 
+async function deleteEditorRegistration(form) {
+  const departureId = form.dataset.departure;
+  const state = editorStates.get(departureId);
+  if (!state?.id || state.mode !== 'edit') return;
+  if (!confirm(`Supprimer l’inscription de « ${state.name} » ?`)) return;
+  await api(`/api/registrations/${state.id}`, 'DELETE', {version:state.version});
+  editorStates.delete(departureId);
+  restoreAfterRefresh(departureId);
+}
+
 document.addEventListener('click', event => {
   const edit = event.target.closest?.('[data-action="edit-registration"][data-id][data-departure]');
   if (edit && app?.contains(edit)) {
@@ -346,6 +364,15 @@ document.addEventListener('click', event => {
   if (close) {
     event.preventDefault();
     closeEditor(close.closest('[data-registration-sharing-editor]')?.dataset.departure || '');
+    return;
+  }
+
+  const remove = event.target.closest?.('[data-registration-delete]');
+  if (remove) {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    const form = remove.closest('[data-registration-sharing-editor]');
+    deleteEditorRegistration(form).catch(error => showEditorError(form, error));
     return;
   }
 
@@ -438,14 +465,7 @@ document.addEventListener('submit', event => {
   if (!form) return;
   event.preventDefault();
   event.stopImmediatePropagation();
-  submitEditor(form).catch(error => {
-    const box = form.querySelector('[data-registration-editor-error]');
-    if (box) {
-      box.textContent = error?.message || 'Cette action a échoué.';
-      box.hidden = false;
-      box.focus?.();
-    }
-  });
+  submitEditor(form).catch(error => showEditorError(form, error));
 }, true);
 
 async function start() {
