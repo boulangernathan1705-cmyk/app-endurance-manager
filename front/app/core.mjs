@@ -1,4 +1,4 @@
-import {CATEGORIES, EVENT_TYPES, CIRCUITS, categories, CARS} from '../../shared/catalog.mjs';
+import {CATEGORIES, EVENT_TYPES, CIRCUITS, categories, CARS, gameForEvent} from '../../shared/catalog.mjs';
 import {countdown, dateLabel, groupEvents} from '../schedule.mjs';
 import {renderAvailabilityTimeline} from '../timeline.mjs';
 import {circuitMapConfig, circuitMapSource} from '../../shared/circuit-maps.mjs';
@@ -7,6 +7,7 @@ export {CATEGORIES, EVENT_TYPES, CIRCUITS, categories, CARS, countdown, dateLabe
 
 export const app = document.getElementById('app');
 export const nav = document.getElementById('navigation');
+export const activeGame = globalThis.__ENDURANCE_GAME__ === 'iracing' ? 'iracing' : 'lmu';
 
 export const state = {
   events:[], user:null, discordReady:false, currentEventId:null, page:'home', editingEvent:null,
@@ -62,7 +63,9 @@ export async function api(path,method='GET',data) {
 }
 export async function load() {
   const [session,result] = await Promise.all([api('/api/session'),api('/api/events')]);
-  state.user=session.user; state.discordReady=session.discordReady; state.events=result.events;
+  state.user=session.user;
+  state.discordReady=session.discordReady;
+  state.events=(Array.isArray(result.events)?result.events:[]).filter(event => gameForEvent(event) === activeGame);
   state.participants=state.user ? (await api('/api/participants')).participants : [];
   if (state.user && !state.pilotName) state.pilotName=state.user.name.slice(0,30);
 }
