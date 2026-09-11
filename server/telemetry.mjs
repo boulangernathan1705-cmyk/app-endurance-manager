@@ -31,12 +31,19 @@ async function readClientErrors(env) {
 }
 
 export async function ingestClientError(request,env) {
-  if (!env.DB) return new Response(null,{status:204});
+  if (!env.DB) return request.method==='GET' ? json({error:'La base partagée n’est pas encore configurée.'},503) : new Response(null,{status:204});
   const url=new URL(request.url);
   const canonical=origin(env);
   const requestOrigin=request.headers.get('Origin');
-  if (url.origin!==canonical || (requestOrigin && requestOrigin!==canonical)) return new Response(null,{status:204});
+  if (url.origin!==canonical || (requestOrigin && requestOrigin!==canonical)) return request.method==='GET' ? json({error:'Utilise l’adresse principale du site pour cette action.'},403) : new Response(null,{status:204});
+
+  if (request.method==='GET') {
+    const actor=await identity(request,env);
+    if (!actor.user || !['admin','organizer'].includes(actor.user.role)) return json({error:'Accès réservé aux organisateurs et administrateurs.'},403);
+    return json({errors:await readClientErrors(env)});
+  }
   if (request.method!=='POST') return new Response(null,{status:405});
+
   let input;
   try {
     const raw=await request.text();
@@ -65,16 +72,5 @@ export async function clientErrorsApi(path,method,env,actor) {
   if (path!=='/api/client-errors') return null;
   if (method!=='GET') fail(405,'Méthode non autorisée.');
   if (!actor.user || !['admin','organizer'].includes(actor.user.role)) fail(403,'Accès réservé aux organisateurs et administrateurs.');
-  return json({errors:await readClientErrors(env)});
-}
-
-export async function clientErrorsTelemetry(request,env) {
-  if (!env.DB) return json({error:'La base partagée n’est pas encore configurée.'},503);
-  if (request.method!=='GET') return json({error:'Méthode non autorisée.'},405);
-  const url=new URL(request.url);
-  const canonical=origin(env);
-  if (url.origin!==canonical) return json({error:'Utilise l’adresse principale du site pour cette action.'},403);
-  const actor=await identity(request,env);
-  if (!actor.user || !['admin','organizer'].includes(actor.user.role)) return json({error:'Accès réservé aux organisateurs et administrateurs.'},403);
   return json({errors:await readClientErrors(env)});
 }
