@@ -1,0 +1,83 @@
+@media (min-width: 761px) {
+  .site-nav-shell {
+    width: min(1180px, calc(100% - 32px)) !important;
+    max-width: none !important;
+    margin: 0 auto !important;
+    padding: 10px 0 !important;
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) auto auto !important;
+    align-items: center !important;
+    gap: 10px !important;
+    border: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+
+  .site-nav-shell .game-space-bar {
+    grid-column: 1;
+    grid-row: 1;
+    min-width: 0;
+    max-width: none;
+    margin: 0;
+    padding: 0;
+    justify-content: flex-start;
+  }
+
+  .site-nav-shell #navigation {
+    grid-column: 2;
+    grid-row: 1;
+    position: static !important;
+    inset: auto !important;
+    width: auto !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 6px !important;
+    display: flex !important;
+    align-items: stretch !important;
+    gap: 6px !important;
+    border: 1px solid rgba(70,108,113,.58) !important;
+    border-radius: 12px !important;
+    background: rgba(8,12,14,.9) !important;
+    box-shadow: 0 10px 28px rgba(0,0,0,.18) !important;
+  }
+
+  .site-nav-shell #navigation > button,
+  .site-nav-shell #navigation > a {
+    width: auto !important;
+    min-width: 142px;
+    min-height: 42px;
+    margin: 0 !important;
+    padding: 8px 16px !important;
+    white-space: nowrap;
+  }
+
+  .site-nav-shell #navigation .nav-game-switcher {
+    display: grid;
+    grid-template-columns: repeat(2, 62px);
+    gap: 6px;
+    width: auto;
+  }
+
+  .site-nav-shell #navigation .nav-game-switcher-button {
+    min-width: 62px;
+    min-height: 42px;
+    padding: 6px 8px;
+  }
+
+  .site-nav-shell .account-bar {
+    grid-column: 3;
+    grid-row: 1;
+    max-width: none;
+    margin: 0;
+    padding: 0;
+    justify-content: flex-end;
+  }
+
+  body > .account-bar {
+    width: min(1320px, calc(100% - 32px));
+    max-width: none;
+    margin: 0 auto;
+    padding: 12px 0 0;
+    justify-content: flex-end;
+  }
+}
