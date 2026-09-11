@@ -13,6 +13,35 @@
   min-width: 0;
 }
 
+/* État déconnecté : Aide et connexion Discord restent sur une seule ligne. */
+.account-disconnected-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.account-disconnected-actions .account-help-link {
+  width: auto;
+  min-height: 40px;
+  flex: 0 0 auto;
+  padding: 7px 11px;
+  border: 1px solid rgba(88,113,118,.72);
+  border-radius: 11px;
+  background: rgba(12,18,21,.92);
+  color: #eef3f2;
+  box-shadow: 0 8px 22px rgba(0,0,0,.18);
+}
+
+.account-disconnected-actions .account-discord-login,
+.account-disconnected-actions .account-discord-unavailable {
+  flex: 0 1 auto;
+  min-width: 0;
+  white-space: nowrap;
+}
+
 /* Les actions de compte sont désormais regroupées dans le menu Discord commun. */
 #navigation > .account-name,
 #navigation > [data-action="logout"],
@@ -210,6 +239,13 @@
   background: rgba(255,255,255,.08);
 }
 
+@media (max-width: 1280px) and (min-width: 761px) {
+  .account-disconnected-actions { gap: 6px; }
+  .account-disconnected-actions .account-help-link { padding-inline: 9px; font-size: 12px; }
+  .account-disconnected-actions .account-discord-login,
+  .account-disconnected-actions .account-discord-unavailable { padding-inline: 9px; font-size: 12px; }
+}
+
 @media (max-width: 760px) {
   .account-bar {
     padding: 6px 8px 0;
@@ -223,8 +259,21 @@
     max-width: 145px;
   }
 
-  .account-discord-login,
-  .account-discord-unavailable {
+  .account-disconnected-actions {
+    width: 100%;
+    justify-content: stretch;
+    gap: 6px;
+  }
+
+  .account-disconnected-actions .account-help-link {
+    min-height: 38px;
+    padding-inline: 10px;
+  }
+
+  .account-disconnected-actions .account-discord-login,
+  .account-disconnected-actions .account-discord-unavailable {
+    flex: 1 1 auto;
+    justify-content: center;
     min-height: 38px;
     font-size: 12px;
   }
