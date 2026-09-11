@@ -2,7 +2,6 @@ const app = document.getElementById('app');
 const paletteSize = 12;
 const toneByPilot = new Map();
 const pilotByTone = new Map();
-let timelineObserver;
 
 function normalizePilotName(value) {
   return String(value || '').trim().toLocaleLowerCase('fr-FR');
@@ -50,10 +49,8 @@ function toneForPilot(name) {
 function registrationFormPilotName(form) {
   const banner = form.querySelector('.registration-context-banner strong');
   if (banner?.textContent.trim()) return banner.textContent.trim();
-
   const nameInput = form.querySelector('input[name="pilotName"]');
   if (nameInput?.value.trim()) return nameInput.value.trim();
-
   const participant = form.querySelector('select[name="participant"]');
   const selected = participant?.selectedOptions?.[0];
   if (selected?.value && selected.textContent.trim()) return selected.textContent.trim();
@@ -66,19 +63,16 @@ function pilotNameForTimeline(timeline) {
     const name = textOnly(row.querySelector('.pilot-name'));
     if (name) return name;
   }
-
-  const candidate = timeline.closest('.crew-candidate-action-card, .ux-crew-candidate');
+  const candidate = timeline.closest('.crew-candidate-action-card, .ux-crew-candidate, .crew-builder-pilot');
   if (candidate) {
     const name = candidate.querySelector('strong')?.textContent.trim();
     if (name) return name;
   }
-
   const namedItem = timeline.closest('.crew-preference-item, .unassigned-pilots li, .assignment-wishes');
   if (namedItem) {
     const name = namedItem.querySelector('strong')?.textContent.trim();
     if (name) return name;
   }
-
   const form = timeline.closest('.registration-form');
   if (form) return registrationFormPilotName(form);
   return '';
@@ -115,14 +109,5 @@ document.addEventListener('change', event => {
   if (event.target.matches?.('select[name="participant"]')) recolorRegistrationForm(event.target);
 });
 
-if (app) {
-  decorateTimelines();
-  timelineObserver = new MutationObserver(mutations => {
-    for (const mutation of mutations) {
-      for (const node of mutation.addedNodes) {
-        if (node instanceof HTMLElement) decorateTimelines(node);
-      }
-    }
-  });
-  timelineObserver.observe(app, {childList:true, subtree:true});
-}
+document.addEventListener('endurance:render', () => decorateTimelines());
+if (app) queueMicrotask(() => decorateTimelines());
