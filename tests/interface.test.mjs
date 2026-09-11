@@ -62,6 +62,15 @@ test('Course produit directement l’interface finale',()=>{
   assert.match(crews,/crew-pilot-accordion/);
 });
 
+test('les actions inscription restent contenues dans le résumé du départ',()=>{
+  const css=read('styles/registration-sharing.css');
+  assert.match(css,/summary>.ux-summary-registration-actions/);
+  assert.match(css,/grid-column:4/);
+  assert.match(css,/grid-row:1 \/ span 2/);
+  assert.match(css,/grid-column:2 \/ -1/);
+  assert.match(css,/grid-row:3/);
+});
+
 test('Équipages produit directement la gestion finale',()=>{
   const crews=read('front/app/crews.mjs');
   const eventView=read('front/app/event-view.mjs');
@@ -82,10 +91,15 @@ test('le formulaire inscription est unique et compact',()=>{
   assert.match(registration,/renderAvailabilityTimeline\(\{departure,duration,status:stateDraft\.status,interactive:true/);
 });
 
-test('Mes inscriptions est rendu par la base commune',()=>{
+test('Mes inscriptions restaure les grilles de 1 à 3 colonnes et les visuels catégorie',()=>{
   const entries=read('front/app/entries-view.mjs');
   assert.match(entries,/native-my-entry-card/);
   assert.match(entries,/Mes inscriptions personnelles/);
   assert.match(entries,/Inscriptions que je gère/);
   assert.match(entries,/Pilotes sans équipage/);
+  assert.match(entries,/function pilotGridClass\(count\)/);
+  assert.match(entries,/ux-my-pilot-grid-/);
+  assert.match(entries,/ux-my-other-crews-grid/);
+  assert.match(entries,/pilot-category-logo/);
+  assert.match(entries,/categories\[crew\.category\]\?\.css/);
 });

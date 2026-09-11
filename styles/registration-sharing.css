@@ -5,8 +5,33 @@
 .registration-origin-info:hover,.registration-origin-info:focus{opacity:1;border-color:var(--green);color:#dfffe7}
 .pilot-name .registration-origin-info{margin-left:3px}
 
-.ux-summary-registration-actions{display:flex;align-items:center;justify-content:flex-end;gap:8px;margin-left:auto;min-width:0}
-.ux-summary-registration-actions .ux-summary-registration-toggle,.ux-summary-registration-actions .ux-summary-registration-other{min-height:34px;padding:7px 11px;white-space:nowrap}
+/* Les deux actions sont maintenant un seul bloc natif dans le summary du départ. */
+.departure-fold[id^="departure-"]>summary>.ux-summary-registration-actions{
+  grid-column:4;
+  grid-row:1 / span 2;
+  align-self:center;
+  justify-self:end;
+  display:grid;
+  grid-template-columns:minmax(0,1fr);
+  gap:6px;
+  width:170px;
+  max-width:100%;
+  min-width:0;
+  margin:0;
+}
+.departure-fold[id^="departure-"]>summary>.ux-summary-registration-actions .ux-summary-registration-toggle,
+.departure-fold[id^="departure-"]>summary>.ux-summary-registration-actions .ux-summary-registration-other{
+  width:100%;
+  max-width:100%;
+  min-width:0!important;
+  min-height:32px;
+  margin:0!important;
+  padding:6px 9px;
+  font-size:11px;
+  line-height:1.15;
+  white-space:normal;
+  text-align:center;
+}
 
 .registration-identity-grid{display:grid;gap:14px;margin:8px 0 14px;align-items:end}
 .registration-identity-field{display:grid;gap:7px;min-width:0;margin:0}
@@ -21,20 +46,32 @@
 }
 
 @media(max-width:1100px) and (min-width:901px){
-  .ux-summary-registration-actions{gap:6px}
-  .ux-summary-registration-actions .ux-summary-registration-toggle,.ux-summary-registration-actions .ux-summary-registration-other{font-size:11px;padding-inline:9px}
+  .departure-fold[id^="departure-"]>summary>.ux-summary-registration-actions{width:155px;gap:5px}
+  .departure-fold[id^="departure-"]>summary>.ux-summary-registration-actions .ux-summary-registration-toggle,
+  .departure-fold[id^="departure-"]>summary>.ux-summary-registration-actions .ux-summary-registration-other{font-size:10px;padding-inline:7px}
 }
 
 @media(max-width:900px){
   .registration-workspace-head{align-items:flex-start}
   .registration-identity-grid,.registration-identity-grid.is-other,.registration-identity-grid.is-self{grid-template-columns:1fr}
-  .ux-summary-registration-actions{flex:1 1 100%;justify-content:flex-start;margin-left:0;margin-top:8px}
-  .ux-summary-registration-actions .ux-summary-registration-toggle,.ux-summary-registration-actions .ux-summary-registration-other{flex:1 1 180px}
+  .departure-fold[id^="departure-"]>summary>.ux-summary-registration-actions{
+    grid-column:2 / -1;
+    grid-row:3;
+    justify-self:stretch;
+    display:grid;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    width:100%;
+    margin-top:5px;
+  }
+  .departure-fold[id^="departure-"]>summary>.ux-summary-registration-actions .ux-summary-registration-toggle,
+  .departure-fold[id^="departure-"]>summary>.ux-summary-registration-actions .ux-summary-registration-other{
+    min-height:34px;
+    font-size:11px;
+  }
 }
 
 @media(max-width:520px){
   .registration-workspace-head{flex-direction:column}
   .registration-close-button{width:100%}
-  .ux-summary-registration-actions{display:grid;grid-template-columns:1fr;width:100%}
-  .ux-summary-registration-actions .ux-summary-registration-toggle,.ux-summary-registration-actions .ux-summary-registration-other{width:100%}
+  .departure-fold[id^="departure-"]>summary>.ux-summary-registration-actions{grid-template-columns:1fr}
 }
