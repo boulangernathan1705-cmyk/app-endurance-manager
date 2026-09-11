@@ -73,7 +73,7 @@ function makeRemoveButtonRed(card) {
 }
 
 function removeObsoleteCrewActions(card) {
-  card.querySelectorAll('[data-action="edit-crew"]').forEach(button => button.remove());
+  card.querySelectorAll('.crew-actions [data-action="edit-crew"]').forEach(button => button.remove());
 }
 
 function removeCoveredMessage(card) {
@@ -116,6 +116,8 @@ function createCompactSummary(card) {
   const pilots = [...card.querySelectorAll('.crew-roster .crew-pilot-name')].map(node => node.textContent.trim()).filter(Boolean);
   const categoryLogo = header.querySelector('.event-category-badge .category-logo, .event-category-badge .category-text-logo');
   const locked = card.dataset.crewLocked === 'true';
+  const crewId = card.dataset.crew || '';
+  const departureId = card.querySelector('[data-action="delete-crew"][data-departure], [data-action="add-crew-pilot"][data-departure], [data-action="remove-crew-pilot"][data-departure]')?.dataset.departure || '';
 
   const summary = document.createElement('summary');
   summary.className = 'crew-pilot-accordion-summary crew-management-summary';
@@ -141,7 +143,21 @@ function createCompactSummary(card) {
 
   const carLine = document.createElement('span');
   carLine.className = 'crew-compact-car';
-  carLine.textContent = car;
+  const carLabel = document.createElement('span');
+  carLabel.className = 'crew-compact-car-label';
+  carLabel.textContent = car;
+  carLine.append(carLabel);
+  if (crewId && departureId) {
+    const edit = document.createElement('button');
+    edit.type = 'button';
+    edit.className = 'secondary-button crew-summary-edit';
+    edit.dataset.action = 'edit-crew';
+    edit.dataset.id = crewId;
+    edit.dataset.departure = departureId;
+    edit.textContent = 'Modifier';
+    edit.setAttribute('aria-label', `Modifier l’équipage ${teamName}`);
+    carLine.append(edit);
+  }
   summary.append(carLine);
 
   const status = document.createElement('span');
