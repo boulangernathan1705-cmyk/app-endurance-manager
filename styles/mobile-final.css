@@ -45,17 +45,101 @@
   .crew-candidate-action-card .presence-edges { font-size: 8px !important; }
   .crew-candidate-action-card .crew-add-pilot-button { width: 100% !important; min-height: 34px !important; padding: 5px 6px !important; font-size: 12px !important; }
 
-  /* Remaining pilots also benefit from two columns without changing desktop. */
+  /* Pilot cards: keep two columns but let every useful field breathe and wrap. */
   .ux-remaining-pilot-grid,
-  .ux-unassigned-grid { display: grid !important; grid-template-columns: repeat(2,minmax(0,1fr)) !important; gap: 8px !important; }
+  .ux-unassigned-grid { display: grid !important; grid-template-columns: repeat(2,minmax(0,1fr)) !important; gap: 8px !important; align-items: stretch; }
+
   .ux-remaining-pilot-card,
-  .ux-unassigned-grid > .pilot-row { min-width: 0 !important; padding: 8px !important; }
+  .ux-unassigned-grid > .pilot-row {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    min-width: 0 !important;
+    height: 100%;
+    padding: 9px !important;
+    gap: 7px !important;
+  }
+
+  .ux-remaining-pilot-card .pilot-main,
+  .ux-unassigned-grid > .pilot-row .pilot-main {
+    display: grid !important;
+    grid-template-columns: minmax(0,1fr) 34px !important;
+    grid-auto-rows: auto;
+    align-items: start !important;
+    gap: 5px 7px !important;
+    width: 100%;
+    min-width: 0;
+  }
+
   .ux-remaining-pilot-card .pilot-name,
-  .ux-unassigned-grid > .pilot-row .pilot-name { font-size: 12.5px !important; }
+  .ux-unassigned-grid > .pilot-row .pilot-name {
+    grid-column: 1 !important;
+    grid-row: 1 !important;
+    min-width: 0;
+    max-width: none !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+    white-space: normal !important;
+    overflow-wrap: anywhere !important;
+    word-break: break-word;
+    font-size: 13px !important;
+    line-height: 1.18 !important;
+  }
+
+  .ux-remaining-pilot-card .pilot-category-logo,
+  .ux-unassigned-grid > .pilot-row .pilot-category-logo {
+    grid-column: 2 !important;
+    grid-row: 1 !important;
+    justify-self: end;
+    width: 34px !important;
+    max-width: 34px !important;
+  }
+
+  .ux-remaining-pilot-card .pilot-category-logo img,
+  .ux-unassigned-grid > .pilot-row .pilot-category-logo img {
+    width: 34px !important;
+    max-width: 34px !important;
+    height: auto !important;
+  }
+
   .ux-remaining-pilot-card .pilot-car,
   .ux-unassigned-grid > .pilot-row .pilot-car,
+  .ux-remaining-pilot-card .registration-status,
+  .ux-unassigned-grid > .pilot-row .registration-status,
   .ux-remaining-pilot-card .pilot-preference,
-  .ux-unassigned-grid > .pilot-row .pilot-preference { font-size: 9.5px !important; line-height: 1.25 !important; }
+  .ux-unassigned-grid > .pilot-row .pilot-preference {
+    grid-column: 1 / -1 !important;
+    min-width: 0;
+    max-width: none !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+    white-space: normal !important;
+    overflow-wrap: anywhere !important;
+    font-size: 10.5px !important;
+    line-height: 1.28 !important;
+  }
+
+  .ux-remaining-pilot-card .presence-timeline,
+  .ux-unassigned-grid > .pilot-row .presence-timeline {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin-top: auto !important;
+    overflow-x: auto !important;
+  }
+
+  .ux-remaining-pilot-card > .edit-button,
+  .ux-unassigned-grid > .pilot-row > .edit-button {
+    position: static !important;
+    order: 3;
+    align-self: stretch !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    min-height: 34px !important;
+    height: auto !important;
+    margin: 0 !important;
+    padding: 5px 7px !important;
+    font-size: 11px !important;
+  }
 
   /* Members page: remove duplicated mobile heading chrome and densify cards. */
   .members-topbar-inner { width: calc(100% - 20px) !important; grid-template-columns: 1fr !important; gap: 7px !important; padding: 8px 0 !important; }
@@ -88,7 +172,8 @@
   .ux-my-entry-content-accordion.is-secondary > .ux-my-entry-accordion-summary > strong { min-width: 26px !important; height: 26px !important; font-size: 10px !important; }
 }
 
-@media (max-width: 360px) {
+/* Only exceptionally narrow screens fall back to one card per row. */
+@media (max-width: 320px) {
   .ux-crew-candidate-grid,
   .ux-remaining-pilot-grid,
   .ux-unassigned-grid { grid-template-columns: 1fr !important; }
