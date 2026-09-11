@@ -1,0 +1,42 @@
+.crew-management-summary .crew-compact-car {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.crew-management-edit {
+  flex: 0 0 auto;
+  min-height: 28px;
+  padding: 5px 10px;
+  border: 1px solid color-mix(in srgb, var(--crew-color) 58%, #566267);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--crew-color) 10%, #151c1f);
+  color: #eef4f4;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 900;
+  line-height: 1;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.crew-management-edit:hover,
+.crew-management-edit:focus-visible {
+  border-color: var(--crew-color);
+  background: color-mix(in srgb, var(--crew-color) 18%, #151c1f);
+  outline: none;
+}
+
+@media (max-width: 760px) {
+  .crew-management-summary .crew-compact-car {
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .crew-management-edit {
+    min-height: 26px;
+    padding-inline: 8px;
+    font-size: 10px;
+  }
+}
