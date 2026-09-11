@@ -1,11 +1,11 @@
 @media (min-width: 761px) {
   .site-nav-shell {
-    width: min(1180px, calc(100% - 32px)) !important;
+    width: min(1600px, calc(100% - 24px)) !important;
     max-width: none !important;
     margin: 0 auto !important;
     padding: 10px 0 !important;
     display: grid !important;
-    grid-template-columns: minmax(0, 1fr) auto auto !important;
+    grid-template-columns: auto minmax(0, 1fr) auto auto !important;
     align-items: center !important;
     gap: 10px !important;
     border: 0 !important;
@@ -16,15 +16,72 @@
   .site-nav-shell .game-space-bar {
     grid-column: 1;
     grid-row: 1;
-    min-width: 0;
+    min-width: 150px;
     max-width: none;
     margin: 0;
     padding: 0;
     justify-content: flex-start;
   }
 
-  .site-nav-shell #navigation {
+  .site-nav-shell .game-space-bar strong {
+    font-size: 13px;
+    white-space: nowrap;
+  }
+
+  .desktop-home-toolbar {
     grid-column: 2;
+    grid-row: 1;
+    min-width: 0;
+    display: none;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .site-nav-shell.is-events-home .desktop-home-toolbar {
+    display: flex;
+  }
+
+  .desktop-home-title {
+    flex: 0 0 auto;
+    color: var(--text);
+    font-size: 16px;
+    letter-spacing: .04em;
+  }
+
+  .desktop-home-toolbar .home-create-event,
+  .desktop-home-toolbar .event-filter {
+    margin: 0 !important;
+  }
+
+  .desktop-home-toolbar .home-create-event {
+    display: contents;
+  }
+
+  .desktop-home-toolbar .home-create-event .primary-button {
+    min-height: 40px;
+    padding: 8px 13px;
+    white-space: nowrap;
+    font-size: 13px;
+  }
+
+  .desktop-home-toolbar .event-filter {
+    display: flex;
+    gap: 5px;
+    padding: 4px;
+    border: 1px solid rgba(70,108,113,.5);
+    border-radius: 9px;
+    background: rgba(8,12,14,.7);
+  }
+
+  .desktop-home-toolbar .event-filter-button {
+    min-height: 32px;
+    padding: 5px 10px;
+    font-size: 12px;
+    white-space: nowrap;
+  }
+
+  .site-nav-shell #navigation {
+    grid-column: 3;
     grid-row: 1;
     position: static !important;
     inset: auto !important;
@@ -44,11 +101,15 @@
   .site-nav-shell #navigation > button,
   .site-nav-shell #navigation > a {
     width: auto !important;
-    min-width: 142px;
+    min-width: 132px;
     min-height: 42px;
     margin: 0 !important;
-    padding: 8px 16px !important;
+    padding: 8px 14px !important;
     white-space: nowrap;
+  }
+
+  .site-nav-shell.is-events-home #navigation > [data-action="home"] {
+    display: none !important;
   }
 
   .site-nav-shell #navigation .nav-game-switcher {
@@ -65,7 +126,7 @@
   }
 
   .site-nav-shell .account-bar {
-    grid-column: 3;
+    grid-column: 4;
     grid-row: 1;
     max-width: none;
     margin: 0;
@@ -78,6 +139,31 @@
     max-width: none;
     margin: 0 auto;
     padding: 12px 0 0;
+    justify-content: flex-end;
+  }
+
+  .site-nav-shell.is-events-home + #app > .page-title,
+  .site-nav-shell.is-events-home + #app > .home-create-event,
+  .site-nav-shell.is-events-home + #app > .event-filter {
+    display: none !important;
+  }
+
+  .site-nav-shell.is-events-home + #app {
+    padding-top: 6px !important;
+  }
+}
+
+@media (min-width: 761px) and (max-width: 1180px) {
+  .site-nav-shell {
+    grid-template-columns: auto minmax(0,1fr) auto !important;
+  }
+
+  .site-nav-shell .game-space-bar { grid-column: 1; }
+  .desktop-home-toolbar { grid-column: 2; }
+  .site-nav-shell #navigation { grid-column: 3; }
+  .site-nav-shell .account-bar {
+    grid-column: 1 / -1;
+    grid-row: 2;
     justify-content: flex-end;
   }
 }

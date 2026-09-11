@@ -9,10 +9,10 @@
 <link rel="preload" as="image" href="/images/endurance-manager-banner.webp?v=39-optimized" type="image/webp" fetchpriority="high">
 <link rel="stylesheet" href="/styles.css?v=44-aligned-timelines">
 <link rel="stylesheet" href="/styles/game-hub.css?v=5-mobile-banner-top">
-<link rel="stylesheet" href="/styles/account-menu.css?v=1">
-<link rel="stylesheet" href="/styles/desktop-nav-unified.css?v=1">
+<link rel="stylesheet" href="/styles/account-menu.css?v=2-global-members">
+<link rel="stylesheet" href="/styles/desktop-nav-unified.css?v=2-home-toolbar">
 <link rel="stylesheet" href="/styles/legal.css?v=2">
-<script type="module" src="/front/account-menu.mjs?v=2-members-ready"></script>
+<script type="module" src="/front/account-menu.mjs?v=3-global-members"></script>
 <script type="module" src="/front/game-hub.mjs?v=4-colored-crews"></script>
 </head>
 <body>
@@ -25,9 +25,7 @@
 </header>
 <div class="account-bar"><div id="account-menu-root" class="account-menu-root" aria-live="polite"></div></div>
 <main class="hub-main">
-  <section class="hub-intro">
-    <h1>Choisis ton simulateur</h1>
-  </section>
+  <section class="hub-intro"><h1>Choisis ton simulateur</h1></section>
   <p id="hub-status" role="status" aria-live="polite"></p>
   <section id="game-grid" class="game-hub-grid" aria-label="Simulateurs disponibles">
     <article class="game-hub-card game-lmu"><div class="game-hub-heading"><div class="game-title-line"><span class="game-badge" aria-hidden="true">LMU</span><h2>Le Mans Ultimate</h2></div><p>Chargement de la prochaine endurance…</p></div><a class="game-hub-enter" href="/lmu/">Accéder à LMU <span aria-hidden="true">→</span></a></article>
