@@ -9,12 +9,12 @@ async function renderStandaloneHelp() {
   try {
     const response = await fetch('/api/session', {credentials:'same-origin', cache:'no-store'});
     const session = response.ok ? await response.json() : {user:null};
-    if (nav) {
+    if (nav && session.user) {
       const account = document.createElement('span');
       account.className = 'account-name';
-      account.textContent = session.user?.name || '';
+      account.textContent = session.user.name || '';
       const small = document.createElement('small');
-      small.textContent = session.user ? roleLabel(session.user.role) : '';
+      small.textContent = roleLabel(session.user.role);
       account.append(small);
       nav.append(account);
     }
