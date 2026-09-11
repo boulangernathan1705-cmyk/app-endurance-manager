@@ -1,0 +1,237 @@
+.account-bar {
+  position: relative;
+  z-index: 95;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 8px 20px 0;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.account-menu-root {
+  position: relative;
+  min-width: 0;
+}
+
+/* Les actions de compte sont désormais regroupées dans le menu Discord commun. */
+#navigation > .account-name,
+#navigation > [data-action="logout"],
+#navigation > [data-action="members"],
+#navigation > .discord-button,
+#navigation .help-nav-button {
+  display: none !important;
+}
+
+#navigation > .help-sim-stack {
+  display: contents !important;
+}
+
+#navigation .nav-game-switcher {
+  min-width: 0;
+}
+
+.account-menu {
+  position: relative;
+}
+
+.account-trigger,
+.account-discord-login,
+.account-discord-unavailable {
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  border: 1px solid rgba(88,113,118,.72);
+  border-radius: 11px;
+  background: rgba(12,18,21,.92);
+  color: #f4f7f6;
+  text-decoration: none;
+  box-shadow: 0 8px 22px rgba(0,0,0,.18);
+}
+
+.account-trigger,
+.account-discord-login {
+  cursor: pointer;
+}
+
+.account-trigger {
+  padding: 5px 10px 5px 6px;
+}
+
+.account-discord-login,
+.account-discord-unavailable {
+  padding: 7px 11px;
+  font-weight: 800;
+  font-size: 13px;
+}
+
+.account-discord-login {
+  color: #dfe6ff;
+  border-color: rgba(114,137,218,.8);
+  background: rgba(88,101,242,.14);
+}
+
+.account-discord-login svg,
+.account-discord-unavailable svg {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
+}
+
+.account-avatar {
+  width: 31px;
+  height: 31px;
+  border-radius: 50%;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  flex: 0 0 31px;
+  color: #fff;
+  background: #5865f2;
+  border: 1px solid rgba(255,255,255,.16);
+}
+
+.account-avatar img {
+  grid-area: 1 / 1;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.account-avatar svg {
+  grid-area: 1 / 1;
+  width: 18px;
+  height: 18px;
+  display: none;
+}
+
+.account-avatar.is-fallback svg {
+  display: block;
+}
+
+.account-trigger-copy {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+  text-align: left;
+}
+
+.account-trigger-copy strong,
+.account-popover-profile strong {
+  font-size: 13px;
+  line-height: 1.15;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.account-trigger-copy small,
+.account-popover-profile small {
+  color: #8fcfd2;
+  font-size: 10px;
+  line-height: 1.15;
+}
+
+.account-chevron {
+  margin-left: 3px;
+  color: #9fb0b1;
+  font-size: 14px;
+  transition: transform .16s ease;
+}
+
+.account-menu.is-open .account-chevron {
+  transform: rotate(180deg);
+}
+
+.account-popover {
+  position: absolute;
+  top: calc(100% + 7px);
+  right: 0;
+  width: min(270px, calc(100vw - 24px));
+  padding: 8px;
+  border: 1px solid rgba(82,116,121,.72);
+  border-radius: 12px;
+  background: rgba(7,12,15,.98);
+  box-shadow: 0 18px 42px rgba(0,0,0,.42);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+.account-popover-profile {
+  display: grid;
+  grid-template-columns: 36px minmax(0,1fr);
+  align-items: center;
+  gap: 9px;
+  padding: 5px 6px 9px;
+}
+
+.account-popover-profile .account-avatar {
+  width: 36px;
+  height: 36px;
+}
+
+.account-popover-profile > span:last-child {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.account-menu-item {
+  width: 100%;
+  min-height: 38px;
+  padding: 8px 10px;
+  display: flex;
+  align-items: center;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #eef3f2;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  text-decoration: none;
+  text-align: left;
+  cursor: pointer;
+}
+
+.account-menu-item:hover,
+.account-menu-item:focus-visible {
+  background: rgba(89,211,216,.09);
+}
+
+.account-menu-logout {
+  color: #ff7c83;
+}
+
+.account-menu-separator {
+  display: block;
+  height: 1px;
+  margin: 5px 4px;
+  background: rgba(255,255,255,.08);
+}
+
+@media (max-width: 760px) {
+  .account-bar {
+    padding: 6px 8px 0;
+  }
+
+  .account-trigger {
+    max-width: min(250px, calc(100vw - 16px));
+  }
+
+  .account-trigger-copy strong {
+    max-width: 145px;
+  }
+
+  .account-discord-login,
+  .account-discord-unavailable {
+    min-height: 38px;
+    font-size: 12px;
+  }
+
+  #navigation .nav-game-switcher {
+    order: 3 !important;
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+}
