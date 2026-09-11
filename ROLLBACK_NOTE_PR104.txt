@@ -1,1 +1,0 @@
-Rollback temporaire de la PR #104 pour restaurer immédiatement le site à l’état précédent stable.
