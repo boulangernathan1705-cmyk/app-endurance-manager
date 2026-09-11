@@ -42,11 +42,6 @@ function statusFromHours(hours, duration) {
   return [...hours].sort((a,b) => a-b).map(hour => `h${hour}`).join(',');
 }
 
-function carLabel(reg) {
-  if (reg.carAny) return 'Peu importe la voiture';
-  return reg.cars?.length ? reg.cars.join(' · ') : (reg.car || 'Pas de préférence');
-}
-
 function stateForAdd(event, departure) {
   return {
     mode:'add',
@@ -102,7 +97,7 @@ function availabilityChoices(state, departure, duration) {
   return `<div class="registration-sharing-availability"><span class="form-label">Heures de présence (${duration} h)</span><p class="availability-hint">Sélectionne les créneaux où le pilote sera disponible.</p>
     <div class="registration-sharing-hours">${Array.from({length:duration}, (_, index) => {
       const hour = index + 1;
-      return `<button type="button" class="registration-sharing-hour ${hours.has(hour) ? 'active' : ''}" data-registration-hour="${hour}" aria-pressed="${hours.has(hour)}"><span>H${hour}</span><small>${esc(departure.time || '')}</small></button>`;
+      return `<button type="button" class="registration-sharing-hour ${hours.has(hour) ? 'active' : ''}" data-registration-hour="${hour}" aria-pressed="${hours.has(hour)}"><span>H${hour}</span><small>Heure ${hour}</small></button>`;
     }).join('')}</div>
     <button type="button" class="special-button whole ${hours.size === duration ? 'active' : ''}" data-registration-whole aria-pressed="${hours.size === duration}">TOUTE LA COURSE</button>
   </div>`;
@@ -228,7 +223,7 @@ function decorateRegistrationSection(section) {
   if (oldActions) oldActions.hidden = true;
   toolbar.querySelector('[data-registration-add]')?.toggleAttribute('disabled', departure.startsAt <= Date.now());
 
-  if (editorStates.has(departureId)) renderEditor(departureId);
+  if (editorStates.has(departureId) && !section.querySelector(':scope > .registration-sharing-editor')) renderEditor(departureId);
 }
 
 function decorateOriginInfo(root = app) {
@@ -397,6 +392,14 @@ document.addEventListener('click', event => {
   }
 }, true);
 
+document.addEventListener('input', event => {
+  const form = event.target.closest?.('[data-registration-sharing-editor]');
+  const state = editorStates.get(form?.dataset.departure);
+  if (!form || !state) return;
+  if (event.target.name === 'sharingPilotName') state.name = event.target.value;
+  if (event.target.name === 'sharingPreferredPilot') state.preferredPilot = event.target.value;
+});
+
 document.addEventListener('change', event => {
   const person = event.target.closest?.('[data-registration-person]');
   if (person) {
@@ -407,6 +410,15 @@ document.addEventListener('change', event => {
     const participant = participants.find(item => item.id === person.value);
     state.name = participant?.name || '';
     renderEditor(form.dataset.departure);
+    return;
+  }
+
+  const car = event.target.closest?.('[data-registration-car]');
+  if (car) {
+    const form = car.closest('[data-registration-sharing-editor]');
+    const state = editorStates.get(form?.dataset.departure);
+    if (!state) return;
+    state.cars = [...form.querySelectorAll('[data-registration-car]:checked')].map(input => input.value);
     return;
   }
 
