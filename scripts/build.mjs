@@ -74,7 +74,12 @@ await mkdir(new URL('iracing/', out), {recursive: true});
 
 const sourceIndex = await readFile(root + 'index.html', 'utf8');
 const sourceGame = await readFile(root + 'game.html', 'utf8');
-const paths = [...stylesheetPaths(sourceIndex,'index.html'),...stylesheetPaths(sourceGame,'game.html')];
+const sourceMembers = await readFile(root + 'members.html', 'utf8');
+const paths = [
+  ...stylesheetPaths(sourceIndex,'index.html'),
+  ...stylesheetPaths(sourceGame,'game.html'),
+  ...stylesheetPaths(sourceMembers,'members.html')
+];
 const uniqueStylesheetPaths = [...new Set(paths)];
 
 const cssParts = [];
@@ -82,6 +87,7 @@ for (const path of uniqueStylesheetPaths) cssParts.push(`/* ${path} */\n${await 
 await writeFile(new URL('app.css', out), cssParts.join('\n\n') + '\n');
 
 await writeFile(new URL('index.html', out), productionHtml(sourceIndex));
+await writeFile(new URL('members.html', out), productionHtml(sourceMembers));
 const gameHtml = productionHtml(sourceGame);
 await writeFile(new URL('lmu/index.html', out), gameHtml);
 await writeFile(new URL('iracing/index.html', out), gameHtml);
@@ -107,4 +113,4 @@ await writeFile(new URL('_headers', out), `/*
   Permissions-Policy: camera=(), microphone=(), geolocation=()
 `);
 
-console.log(`Build ready: public/ (${workers ? 'Workers' : 'Pages'}, accueil + LMU + iRacing, ${uniqueStylesheetPaths.length} feuilles CSS -> app.css, aide chargée à la demande)`);
+console.log(`Build ready: public/ (${workers ? 'Workers' : 'Pages'}, accueil + LMU + iRacing + membres, ${uniqueStylesheetPaths.length} feuilles CSS -> app.css, aide chargée à la demande)`);

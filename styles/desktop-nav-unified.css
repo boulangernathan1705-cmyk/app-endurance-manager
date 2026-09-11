@@ -1,40 +1,31 @@
 @media (min-width: 761px) {
   .site-nav-shell {
-    width: min(1600px, calc(100% - 24px)) !important;
+    position: relative !important;
+    z-index: 80 !important;
+    width: min(1540px, calc(100% - 36px)) !important;
     max-width: none !important;
-    margin: 0 auto !important;
-    padding: 10px 0 !important;
-    display: grid !important;
-    grid-template-columns: auto minmax(0, 1fr) auto auto !important;
+    margin: 12px auto 18px !important;
+    padding: 7px !important;
+    display: flex !important;
     align-items: center !important;
-    gap: 10px !important;
-    border: 0 !important;
-    background: transparent !important;
-    box-shadow: none !important;
+    gap: 8px !important;
+    border: 1px solid rgba(70,108,113,.58) !important;
+    border-radius: 13px !important;
+    background: rgba(8,12,14,.9) !important;
+    box-shadow: 0 10px 28px rgba(0,0,0,.18) !important;
   }
 
+  /* La simu courante est déjà identifiable par LMU / iRacing actif. */
   .site-nav-shell .game-space-bar {
-    grid-column: 1;
-    grid-row: 1;
-    min-width: 150px;
-    max-width: none;
-    margin: 0;
-    padding: 0;
-    justify-content: flex-start;
-  }
-
-  .site-nav-shell .game-space-bar strong {
-    font-size: 13px;
-    white-space: nowrap;
+    display: none !important;
   }
 
   .desktop-home-toolbar {
-    grid-column: 2;
-    grid-row: 1;
     min-width: 0;
+    flex: 1 1 auto;
     display: none;
     align-items: center;
-    gap: 8px;
+    gap: 7px;
   }
 
   .site-nav-shell.is-events-home .desktop-home-toolbar {
@@ -44,8 +35,10 @@
   .desktop-home-title {
     flex: 0 0 auto;
     color: var(--text);
-    font-size: 16px;
-    letter-spacing: .04em;
+    font-size: 15px;
+    font-weight: 950;
+    letter-spacing: .045em;
+    white-space: nowrap;
   }
 
   .desktop-home-toolbar .home-create-event,
@@ -67,10 +60,10 @@
   .desktop-home-toolbar .event-filter {
     display: flex;
     gap: 5px;
-    padding: 4px;
+    padding: 3px;
     border: 1px solid rgba(70,108,113,.5);
     border-radius: 9px;
-    background: rgba(8,12,14,.7);
+    background: rgba(255,255,255,.015);
   }
 
   .desktop-home-toolbar .event-filter-button {
@@ -81,21 +74,19 @@
   }
 
   .site-nav-shell #navigation {
-    grid-column: 3;
-    grid-row: 1;
     position: static !important;
     inset: auto !important;
     width: auto !important;
     max-width: none !important;
     margin: 0 !important;
-    padding: 6px !important;
+    padding: 0 !important;
     display: flex !important;
     align-items: stretch !important;
     gap: 6px !important;
-    border: 1px solid rgba(70,108,113,.58) !important;
-    border-radius: 12px !important;
-    background: rgba(8,12,14,.9) !important;
-    box-shadow: 0 10px 28px rgba(0,0,0,.18) !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
   }
 
   .site-nav-shell #navigation > button,
@@ -126,8 +117,7 @@
   }
 
   .site-nav-shell .account-bar {
-    grid-column: 4;
-    grid-row: 1;
+    flex: 0 0 auto;
     max-width: none;
     margin: 0;
     padding: 0;
@@ -148,22 +138,27 @@
     display: none !important;
   }
 
+  /* Le contenu doit commencer sous la barre et jamais remonter dedans. */
   .site-nav-shell.is-events-home + #app {
-    padding-top: 6px !important;
+    margin-top: 0 !important;
+    padding-top: 20px !important;
   }
 }
 
 @media (min-width: 761px) and (max-width: 1180px) {
   .site-nav-shell {
-    grid-template-columns: auto minmax(0,1fr) auto !important;
+    flex-wrap: wrap !important;
   }
 
-  .site-nav-shell .game-space-bar { grid-column: 1; }
-  .desktop-home-toolbar { grid-column: 2; }
-  .site-nav-shell #navigation { grid-column: 3; }
+  .desktop-home-toolbar {
+    flex: 1 1 100%;
+  }
+
+  .site-nav-shell #navigation {
+    flex: 1 1 auto;
+  }
+
   .site-nav-shell .account-bar {
-    grid-column: 1 / -1;
-    grid-row: 2;
-    justify-content: flex-end;
+    margin-left: auto;
   }
 }
