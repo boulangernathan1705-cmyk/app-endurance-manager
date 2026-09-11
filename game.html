@@ -23,7 +23,7 @@
 <link rel="stylesheet" href="/styles/pilot-emphasis.css?v=4">
 <link rel="stylesheet" href="/styles/layout-polish.css?v=5">
 <link rel="stylesheet" href="/styles/home-event-card.css?v=1-balanced-card">
-<link rel="stylesheet" href="/styles/game-context.css?v=2-sim-switcher">
+<link rel="stylesheet" href="/styles/game-context.css?v=3-under-help">
 <link rel="stylesheet" href="/styles/legal.css?v=2">
 <link rel="stylesheet" href="/styles/circuit-sources.css?v=4-mobile-framing">
 <link rel="stylesheet" href="/styles/mobile-timeline-compact.css?v=3">
@@ -40,7 +40,7 @@
 <script type="module" src="/front/layout-polish.mjs?v=7-clean"></script>
 <script type="module" src="/front/my-entries-native.mjs?v=2-header-fix"></script>
 <script type="module" src="/front/home-event-card.mjs?v=1-balanced-card"></script>
-<script type="module" src="/front/help-loader.mjs?v=1"></script>
+<script type="module" src="/front/help-loader.mjs?v=2-sim-switcher"></script>
 </head>
 <body>
 <div class="top-stripes" aria-hidden="true"><div></div><div></div><div></div><div></div></div>
@@ -51,13 +51,7 @@
   <div class="header-inner"><a class="brand-button logo" href="/" aria-label="Retour à l’accueil Endurance Manager"><span class="brand-mark-frame" aria-hidden="true"><img class="brand-mark" src="/images/endurance-manager-logo.webp" alt=""></span><span class="brand-copy">ENDURANCE <span>MANAGER</span></span></a></div>
 </header>
 <div class="site-nav-shell">
-  <div class="game-space-bar">
-    <div class="game-switcher" aria-label="Changer de simulateur">
-      <a class="game-switcher-button game-switcher-lmu" href="/lmu/" aria-label="Accueil Le Mans Ultimate">LMU</a>
-      <a class="game-switcher-button game-switcher-iracing" href="/iracing/" aria-label="Accueil iRacing">iR</a>
-    </div>
-    <strong id="game-context-label"></strong>
-  </div>
+  <div class="game-space-bar"><strong id="game-context-label"></strong></div>
   <nav id="navigation" aria-label="Navigation principale"></nav>
 </div>
 <main id="app"><p role="status">Chargement des événements…</p></main>
