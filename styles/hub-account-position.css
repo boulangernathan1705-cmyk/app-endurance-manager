@@ -7,8 +7,8 @@
 }
 
 .hub-topbar .account-bar {
-  grid-column: 1;
-  justify-content: flex-start;
+  grid-column: 3;
+  justify-content: flex-end;
   max-width: none;
   margin: 0;
   padding: 0;
@@ -30,10 +30,14 @@
   .hub-topbar .account-bar,
   .hub-topbar .hub-intro {
     grid-column: 1;
-    justify-self: start;
+  }
+
+  .hub-topbar .account-bar {
+    justify-self: end;
   }
 
   .hub-topbar .hub-intro {
-    text-align: left;
+    justify-self: center;
+    text-align: center;
   }
 }
