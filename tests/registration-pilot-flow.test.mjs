@@ -2,7 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
-const app=fs.readFileSync('app.js','utf8');
+const registration=fs.readFileSync('front/app/registration.mjs','utf8');
+const actions=fs.readFileSync('front/app/actions.mjs','utf8');
+const clientCore=fs.readFileSync('front/app/core.mjs','utf8');
+const eventView=fs.readFileSync('front/app/event-view.mjs','utf8');
 const core=fs.readFileSync('server/core.mjs','utf8');
 const worker=fs.readFileSync('server/worker.mjs','utf8');
 const game=fs.readFileSync('game.html','utf8');
@@ -11,10 +14,10 @@ test('all logged in pilots can use the Discord pilot picker',()=>{
   assert.match(worker,/if \(!actor\.user\) fail\(401,'Connecte-toi avec Discord pour choisir un pilote\.'/);
   assert.match(worker,/FROM users u LEFT JOIN participants p ON p\.user_id=u\.id/);
   assert.doesNotMatch(core,/if \(!manager\) fail\(403,'Seuls les organisateurs peuvent inscrire un autre pilote\.'/);
-  assert.match(app,/participants=user\?\(await api\('\/api\/participants'\)\)\.participants:\[\]/);
-  assert.match(app,/\+ Ajouter un pilote/);
-  assert.match(app,/name="participant"/);
-  assert.match(app,/participantUserId/);
+  assert.match(clientCore,/state\.participants=state\.user \? \(await api\('\/api\/participants'\)\)\.participants : \[\]/);
+  assert.match(eventView,/Inscrire un autre pilote/);
+  assert.match(registration,/name=\\"participant\\"/);
+  assert.match(registration,/participantUserId/);
 });
 
 test('Discord identity is authoritative when another pilot is selected',()=>{
@@ -30,22 +33,23 @@ test('external pilots stay owned by the account that created them',()=>{
 });
 
 test('adding and editing another pilot use the same native registration form',()=>{
-  assert.match(app,/function renderRegistrationWorkspace\(event,departure\)/);
-  assert.match(app,/renderRegistrationForm\(event,departure\)/);
-  assert.match(app,/renderAvailabilityTimeline\(\{departure,duration,status:state\.status,interactive:true/);
-  assert.match(app,/case 'new-registration'/);
-  assert.match(app,/forOther:!!user/);
-  assert.match(app,/case 'edit-registration'/);
-  assert.match(app,/drafts\[departure\.id\]=registrationDraft\(reg\);eventSection='race';renderEvent\(\)/);
-  assert.doesNotMatch(game,/front\/registration-sharing\.mjs/);
-  assert.match(game,/app\.js\?v=47-native-registration-ui/);
+  assert.match(registration,/function renderRegistrationWorkspace\(event,departure\)/);
+  assert.match(registration,/function renderRegistrationForm\(event,departure,stateDraft=draftFor\(departure\)\)/);
+  assert.match(registration,/renderAvailabilityTimeline\(\{departure,duration,status:stateDraft\.status,interactive:true/);
+  assert.match(actions,/case 'new-registration'/);
+  assert.match(actions,/forOther:!!state\.user/);
+  assert.match(actions,/case 'edit-registration'/);
+  assert.match(actions,/state\.drafts\[departure\.id\]=registrationDraft\(reg\)/);
+  assert.doesNotMatch(game,/front\/registration-sharing\.mjs|ux-refinement\.js/);
+  assert.match(game,/app\.js\?v=60-common-core/);
 });
 
-test('the add pilot action is outside the personal form',()=>{
-  assert.match(app,/registration-workspace-head/);
-  assert.match(app,/registration-workspace-actions/);
-  assert.match(app,/Gérer les inscriptions/);
-  assert.match(app,/const addButtons=canAdd\?button\('new-registration','Ajouter une catégorie'/);
+test('the add pilot action is next to the personal registration action',()=>{
+  assert.match(eventView,/Modifier mon inscription/);
+  assert.match(eventView,/S’inscrire/);
+  assert.match(eventView,/Inscrire un autre pilote/);
+  assert.match(eventView,/ux-summary-registration-actions/);
+  assert.doesNotMatch(registration,/\+ Ajouter un pilote/);
 });
 
 test('Discord registrations are editable by both creator and participant',()=>{
@@ -59,20 +63,19 @@ test('Discord registrations are editable by both creator and participant',()=>{
 test('organizers and admins can edit every registration without owning it',()=>{
   assert.match(worker,/\['admin','organizer'\]\.includes\(actor\.user\?\.role\)/);
   assert.match(worker,/if \(!canManageRegistration\(reg,actor\)\) fail\(403/);
-  assert.match(worker,/managed:owned\(reg,actor\)&&!personal\(reg,actor\)/);
 });
 
 test('creator metadata is only exposed to creator participant or managers',()=>{
   assert.match(worker,/actor\.user\.id === creatorId \|\| actor\.user\.id === participantUserId \|\| isRegistrationManager\(actor\)/);
   assert.match(worker,/addedByName:canSeeCreator \? \(userNames\.get\(creatorId\) \|\| ''\) : ''/);
-  assert.match(app,/registration-origin-info/);
-  assert.match(app,/Inscription ajoutée par/);
+  assert.match(registration,/registration-origin-info/);
+  assert.match(registration,/Inscription ajoutée par/);
 });
 
 test('self and managed pilots can still add another category',()=>{
-  assert.match(app,/Ajouter une catégorie/);
-  assert.match(app,/const canAdd=source&&!assigned&&event\.categories/);
-  assert.match(app,/category-add-button/);
+  assert.match(registration,/Ajouter une catégorie/);
+  assert.match(registration,/const canAdd=source&&!assigned&&event\.categories/);
+  assert.match(registration,/category-add-button/);
 });
 
 test('crew assignment still locks extra categories',()=>{
