@@ -1,0 +1,46 @@
+name: Cleanup merged branches
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout full history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Delete old branches already merged
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin '+refs/heads/*:refs/remotes/origin/*' --prune
+
+          deleted=0
+          kept=0
+
+          while IFS= read -r ref; do
+            branch="${ref#origin/}"
+
+            case "$branch" in
+              main|dev|HEAD) continue ;;
+            esac
+
+            if git merge-base --is-ancestor "$ref" origin/main 2>/dev/null || \
+               git merge-base --is-ancestor "$ref" origin/dev 2>/dev/null; then
+              echo "Deleting merged branch: $branch"
+              git push origin --delete "$branch"
+              deleted=$((deleted + 1))
+            else
+              echo "Keeping unmerged branch: $branch"
+              kept=$((kept + 1))
+            fi
+          done < <(git for-each-ref --format='%(refname:short)' refs/remotes/origin/ | sort)
+
+          echo "Deleted: $deleted"
+          echo "Kept because not merged: $kept"
