@@ -36,7 +36,7 @@ test('la base commune rend les inscriptions sans interface parallèle', async ()
   assert.match(registration, /function renderRegistrationWorkspace\(event,departure\)/);
   assert.match(registration, /function renderRegistrationForm\(event,departure,stateDraft=draftFor\(departure\)\)/);
   assert.match(eventView, /Inscrire un autre pilote/);
-  assert.doesNotMatch(game, /registration-sharing|ux-refinement\.js|crew-accordion\.js|crew-controls\.mjs|layout-polish\.mjs|course-crew-flatten\.mjs|my-entries-native\.mjs/);
+  assert.doesNotMatch(game, /front\/registration-sharing\.mjs|ux-refinement\.js|crew-accordion\.js|front\/crew-controls\.mjs|front\/layout-polish\.mjs|front\/course-crew-flatten\.mjs|front\/my-entries-native\.mjs/);
 });
 
 test('les scripts actifs ne dépendent plus de MutationObserver ni d’un proxy global fetch', async () => {
