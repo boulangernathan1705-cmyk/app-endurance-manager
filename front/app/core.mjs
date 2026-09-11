@@ -59,6 +59,12 @@ const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
 function networkFailure(error) {
   return error instanceof TypeError || /networkerror|failed to fetch|load failed/i.test(String(error?.message || error || ''));
 }
+function onlineLabel() {
+  return typeof navigator === 'undefined' ? 'inconnu' : (navigator.onLine ? 'oui' : 'non');
+}
+function diagnosticMessage(path,method,stage,extra='') {
+  return `Connexion au service impossible. Diagnostic : ${method} ${path} · ${stage} · navigateur en ligne : ${onlineLabel()}${extra ? ` · ${extra}` : ''}`;
+}
 function xhrApi(path,method,data) {
   return new Promise((resolve,reject) => {
     const request = new XMLHttpRequest();
@@ -69,29 +75,35 @@ function xhrApi(path,method,data) {
     request.onload=()=>{
       let result;
       try { result=JSON.parse(request.responseText || '{}'); }
-      catch { reject(Error('Le service partagé a renvoyé une réponse illisible.')); return; }
-      if (request.status < 200 || request.status >= 300) { reject(Error(result.error || 'Cette action a échoué.')); return; }
+      catch { reject(Error(diagnosticMessage(path,method,'réponse XHR illisible',`statut ${request.status}`))); return; }
+      if (request.status < 200 || request.status >= 300) { reject(Error(result.error || `Cette action a échoué (${request.status}).`)); return; }
       resolve(result);
     };
-    request.onerror=()=>reject(Error('Connexion au service impossible. Vérifie la connexion réseau puis réessaie.'));
-    request.ontimeout=()=>reject(Error('Le service met trop de temps à répondre. Réessaie dans un instant.'));
+    request.onerror=()=>reject(Error(diagnosticMessage(path,method,'fetch ×2 + secours XHR en échec','statut XHR 0')));
+    request.ontimeout=()=>reject(Error(diagnosticMessage(path,method,'fetch ×2 + secours XHR expiré','délai 12 s')));
     request.timeout=12000;
     request.send(method==='GET'?null:JSON.stringify(data||{}));
   });
 }
 export async function api(path,method='GET',data) {
+  let lastNetworkError='';
   for (let attempt=0;attempt<2;attempt++) {
     try {
       const response = await fetch(path,{method,credentials:'same-origin',cache:'no-store',headers:method==='GET'?{'Accept':'application/json'}:{'Accept':'application/json','Content-Type':'application/json'},body:method==='GET'?undefined:JSON.stringify(data||{})});
-      let result; try { result=await response.json(); } catch { throw Error('Le service partagé ne répond pas correctement.'); }
-      if (!response.ok) throw Error(result.error || 'Cette action a échoué.');
+      let result; try { result=await response.json(); } catch { throw Error(`Le service partagé ne répond pas correctement (${method} ${path}, statut ${response.status}).`); }
+      if (!response.ok) throw Error(result.error || `Cette action a échoué (${response.status}).`);
       return result;
     } catch (error) {
       if (!networkFailure(error)) throw error;
+      lastNetworkError=String(error?.message || error || 'erreur réseau').slice(0,120);
       if (attempt===0) await wait(250);
     }
   }
-  return xhrApi(path,method,data);
+  try { return await xhrApi(path,method,data); }
+  catch (error) {
+    if (/Diagnostic :/.test(String(error?.message || ''))) throw error;
+    throw Error(diagnosticMessage(path,method,'secours XHR en échec',lastNetworkError ? `fetch : ${lastNetworkError}` : ''));
+  }
 }
 export async function load() {
   const session = await api('/api/session');
