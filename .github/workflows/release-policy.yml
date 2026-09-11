@@ -1,0 +1,23 @@
+name: Production release policy
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  release-policy:
+    name: Release must come from dev
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require dev as source branch
+        shell: bash
+        run: |
+          if [ "${{ github.head_ref }}" != "dev" ]; then
+            echo "Production releases must be merged from the dev branch."
+            echo "Open the pull request as: dev -> main."
+            exit 1
+          fi
+          echo "Valid production release: dev -> main"
