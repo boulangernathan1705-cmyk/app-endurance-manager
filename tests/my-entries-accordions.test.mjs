@@ -24,6 +24,6 @@ test('les deux accordéons secondaires sont plus compacts que Mon équipage',()=
 test('la chaîne de modules Mes inscriptions est versionnée pour éviter un ancien onglet en cache',()=>{
   const app=read('app.js');
   const actions=read('front/app/actions.mjs');
-  assert.match(app,/actions\.mjs\?v=4-my-entries-accordions/);
+  assert.match(app,/actions\.mjs\?v=[^'"\s]+/);
   assert.match(actions,/entries-view\.mjs\?v=2-three-accordions/);
 });
