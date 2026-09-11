@@ -12,15 +12,30 @@ function avatarUrl(user) {
   const direct = user?.avatarUrl || user?.avatar_url;
   if (typeof direct === 'string' && /^https?:\/\//.test(direct)) return direct;
   if (typeof user?.avatar === 'string' && /^https?:\/\//.test(user.avatar)) return user.avatar;
-  const id = user?.discordId || user?.discord_id;
+  const id = user?.discordId || user?.discord_id || user?.id;
   const hash = user?.discordAvatar || user?.discord_avatar || (typeof user?.avatar === 'string' && !user.avatar.includes('/') ? user.avatar : '');
-  return id && hash ? `https://cdn.discordapp.com/avatars/${encodeURIComponent(id)}/${encodeURIComponent(hash)}.png?size=128` : '';
+  if (id && hash) return `https://cdn.discordapp.com/avatars/${encodeURIComponent(id)}/${encodeURIComponent(hash)}.png?size=128`;
+  if (id && /^\d{15,22}$/.test(String(id))) {
+    try {
+      const index = Number((BigInt(id) >> 22n) % 6n);
+      return `https://cdn.discordapp.com/embed/avatars/${index}.png`;
+    } catch {}
+  }
+  return '';
 }
 
 function avatarMarkup(user) {
   const src = avatarUrl(user);
-  if (src) return `<span class="account-avatar"><img src="${esc(src)}" alt="" referrerpolicy="no-referrer" onerror="this.remove();this.parentElement.classList.add('is-fallback')">${discordMark()}</span>`;
+  if (src) return `<span class="account-avatar"><img src="${esc(src)}" alt="" referrerpolicy="no-referrer">${discordMark()}</span>`;
   return `<span class="account-avatar is-fallback">${discordMark()}</span>`;
+}
+
+function bindAvatarFallbacks() {
+  root?.querySelectorAll('.account-avatar img').forEach(image => image.addEventListener('error', () => {
+    const wrapper = image.parentElement;
+    image.remove();
+    wrapper?.classList.add('is-fallback');
+  }, {once:true}));
 }
 
 function closeMenu() {
@@ -62,6 +77,7 @@ function renderConnected(user) {
       <button type="button" class="account-menu-item account-menu-logout" data-account-logout>Déconnexion</button>
     </div>
   </div>`;
+  bindAvatarFallbacks();
 }
 
 async function loadSession() {
