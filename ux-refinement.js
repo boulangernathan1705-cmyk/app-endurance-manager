@@ -107,9 +107,9 @@ function refineRegistration(fold) {
   toolbar?.querySelector('[data-action="focus-registration"]')?.remove();
   if (!toolbar || !section) return;
 
-  const nativeOther = section.querySelector?.('.registration-workspace-actions [data-action="new-registration"][data-mode="pilot"]') || null;
+  const hasRegistrationWorkspace = Boolean(section.querySelector?.('.registration-workspace-head'));
   let other = toolbar.querySelector('[data-ux-registration-other]');
-  if (nativeOther && !other) {
+  if (hasRegistrationWorkspace && !other) {
     other = document.createElement('button');
     other.type = 'button';
     other.className = 'secondary-button ux-registration-other';
@@ -119,7 +119,7 @@ function refineRegistration(fold) {
     other.dataset.mode = 'pilot';
     other.textContent = 'Inscrire un autre pilote';
     toolbar.append(other);
-  } else if (!nativeOther && other) {
+  } else if (!hasRegistrationWorkspace && other) {
     other.remove();
     other = null;
   }
