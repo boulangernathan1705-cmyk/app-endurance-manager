@@ -3,6 +3,7 @@ import {
   setCookie, json, redirect, origin, requireDiscord, administrators, publicUser, requireRole, identity, owned, personal,
   registrationSelect, registrationParticipant, body, rateLimit, cleanup, text, validateEvent, validateRegistration
 } from './core.mjs';
+import {ingestClientError, clientErrorsApi} from './telemetry.mjs';
 async function eventById(env, eventId) {
   const row = await env.DB.prepare('SELECT * FROM events WHERE id=?').bind(eventId).first();
   if (!row) fail(404, 'Événement introuvable.'); return row;
@@ -126,6 +127,8 @@ async function api(request, env) {
   if (path === '/api/auth/discord' && method === 'GET') return oauthStart(request, env);
   if (path === '/api/auth/discord/callback' && method === 'GET') return oauthCallback(request, env);
   const actor = await identity(request, env);
+  const diagnostics = await clientErrorsApi(path,method,env,actor);
+  if (diagnostics) return diagnostics;
   if (path === '/api/session' && method === 'GET') return json({user:actor.user, discordReady:!!(env.DISCORD_CLIENT_ID && env.DISCORD_CLIENT_SECRET), adminConfigured:administrators(env).length > 0});
   if (path === '/api/auth/logout' && method === 'POST') {
     const raw = cookie(request, COOKIE_SESSION);
@@ -290,7 +293,12 @@ async function api(request, env) {
 }
 export default {
   async fetch(request, env) {
-    if (!new URL(request.url).pathname.startsWith('/api/')) return env.ASSETS.fetch(request);
+    const pathname=new URL(request.url).pathname;
+    if (pathname === '/telemetry/client-error') {
+      try { return await ingestClientError(request,env); }
+      catch { return new Response(null,{status:204}); }
+    }
+    if (!pathname.startsWith('/api/')) return env.ASSETS.fetch(request);
     try { return await api(request, env); }
     catch (error) {
       if (error instanceof HttpError) return json({error:error.message},error.status);
