@@ -63,6 +63,7 @@ async function oauthCallback(request, env) {
     const profile = await profileResponse.json();
     if (!/^\d{15,22}$/.test(profile.id)) throw Error('identity');
     const display = String(profile.global_name || profile.username || 'Pilote').slice(0, 80);
+    const avatarHash = typeof profile.avatar === 'string' && /^[A-Za-z0-9_]{1,128}$/.test(profile.avatar) ? profile.avatar : '';
     const session = token();
     const guestRaw = cookie(request, COOKIE_GUEST);
     const guestHash = /^[a-f0-9]{64}$/.test(guestRaw) ? await hash(guestRaw) : null;
@@ -75,7 +76,10 @@ async function oauthCallback(request, env) {
     ]);
     const old = cookie(request, COOKIE_SESSION);
     if (old) await env.DB.prepare('DELETE FROM sessions WHERE token_hash=?').bind(await hash(old)).run();
-    return redirect(origin(env) + '/', [clear, setCookie(COOKIE_SESSION, session, 7 * DAY)]);
+    const avatarCookie = avatarHash
+      ? `fmt_discord_avatar=${encodeURIComponent(`${profile.id}:${avatarHash}`)}; Path=/; Secure; SameSite=Lax; Max-Age=${7 * DAY}`
+      : 'fmt_discord_avatar=; Path=/; Secure; SameSite=Lax; Max-Age=0';
+    return redirect(origin(env) + '/', [clear, setCookie(COOKIE_SESSION, session, 7 * DAY), avatarCookie]);
   } catch {
     return redirect(origin(env) + '/?auth=error', [clear]);
   }
@@ -96,7 +100,7 @@ async function api(request, env) {
   if (path === '/api/auth/logout' && method === 'POST') {
     const raw = cookie(request, COOKIE_SESSION);
     if (raw) await env.DB.prepare('DELETE FROM sessions WHERE token_hash=?').bind(await hash(raw)).run();
-    return json({ok:true}, 200, [setCookie(COOKIE_SESSION, '', 0)]);
+    return json({ok:true}, 200, [setCookie(COOKIE_SESSION, '', 0), 'fmt_discord_avatar=; Path=/; Secure; SameSite=Lax; Max-Age=0']);
   }
   if (path === '/api/guest/recover' && method === 'POST') {
     const input = await body(request);
@@ -151,7 +155,7 @@ async function api(request, env) {
       return json({ok:true});
     }
     if (crew && method==='DELETE') {
-      const result=await env.DB.prepare('DELETE FROM crews WHERE id=? AND version=?').bind(crew.id,input.version).run();
+      const result = await env.DB.prepare('DELETE FROM crews WHERE id=? AND version=?').bind(crew.id,input.version).run();
       if (!result.meta.changes) fail(409,'Cet équipage a changé. Actualise la page.');
       return json({ok:true});
     }
