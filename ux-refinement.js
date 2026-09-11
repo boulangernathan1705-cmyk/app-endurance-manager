@@ -107,7 +107,7 @@ function refineRegistration(fold) {
   toolbar?.querySelector('[data-action="focus-registration"]')?.remove();
   if (!toolbar || !section) return;
 
-  const nativeOther = section.querySelector('.registration-workspace-actions [data-action="new-registration"][data-mode="pilot"]');
+  const nativeOther = section.querySelector?.('.registration-workspace-actions [data-action="new-registration"][data-mode="pilot"]') || null;
   let other = toolbar.querySelector('[data-ux-registration-other]');
   if (nativeOther && !other) {
     other = document.createElement('button');
