@@ -12,20 +12,50 @@ function departureById(event, departureId) {
   if (!departure) fail(404, 'Départ introuvable.');
   return departure;
 }
-function publicRegistration(reg, actor) {
+function isRegistrationManager(actor) {
+  return ['admin','organizer'].includes(actor.user?.role);
+}
+function canManageRegistration(reg, actor) {
+  return owned(reg, actor) || isRegistrationManager(actor);
+}
+function publicRegistration(reg, actor, userNames = new Map()) {
   let cars = [];
   try { cars = JSON.parse(reg.car_preferences || '[]'); } catch {}
   if (!Array.isArray(cars) || !cars.length) cars = reg.car ? [reg.car] : [];
   cars = cars.map(car => LEGACY_CAR_ALIASES.get(car) || car);
-  return {id:reg.id, participantId:reg.participant_id, name:reg.participant_name||reg.name, category:reg.category, car:cars[0] || reg.car || '', cars, carAny:Boolean(reg.car_any), status:reg.status, preferredPilot:reg.preferred_pilot || '', version:reg.version, discordLinked:Boolean(reg.participant_user_id), mine:personal(reg, actor), managed:owned(reg,actor)&&!personal(reg,actor), canEdit:owned(reg, actor) || actor.user?.role === 'admin'};
+  const participantUserId = reg.participant_user_id || reg.user_id || '';
+  const creatorId = reg.owner_user_id || '';
+  const createdForOther = Boolean(creatorId && creatorId !== participantUserId);
+  const canSeeCreator = createdForOther && Boolean(actor.user) && (
+    actor.user.id === creatorId || actor.user.id === participantUserId || isRegistrationManager(actor)
+  );
+  return {
+    id:reg.id,
+    participantId:reg.participant_id,
+    name:reg.participant_name||reg.name,
+    category:reg.category,
+    car:cars[0] || reg.car || '',
+    cars,
+    carAny:Boolean(reg.car_any),
+    status:reg.status,
+    preferredPilot:reg.preferred_pilot || '',
+    version:reg.version,
+    discordLinked:Boolean(reg.participant_user_id),
+    mine:personal(reg, actor),
+    managed:owned(reg,actor)&&!personal(reg,actor),
+    canEdit:canManageRegistration(reg, actor),
+    addedByName:canSeeCreator ? (userNames.get(creatorId) || '') : ''
+  };
 }
 async function listEvents(env, actor) {
   const rows = (await env.DB.prepare('SELECT * FROM events ORDER BY created_at DESC, id DESC').all()).results;
   const registrations = (await env.DB.prepare(registrationSelect+' ORDER BY r.created_at,r.id').all()).results;
   const crews = (await env.DB.prepare('SELECT * FROM crews ORDER BY created_at,id').all()).results;
   const memberships = (await env.DB.prepare('SELECT crew_id,registration_id FROM crew_members').all()).results;
+  const users = (await env.DB.prepare('SELECT id,name FROM users').all()).results;
+  const userNames = new Map(users.map(item => [item.id,item.name]));
   const grouped = new Map();
-  for (const reg of registrations) { const key = `${reg.event_id}:${reg.departure_id}`; if (!grouped.has(key)) grouped.set(key, []); grouped.get(key).push(publicRegistration(reg, actor)); }
+  for (const reg of registrations) { const key = `${reg.event_id}:${reg.departure_id}`; if (!grouped.has(key, [])) grouped.set(key, []); grouped.get(key).push(publicRegistration(reg, actor, userNames)); }
   const membersByCrew = new Map();
   for (const member of memberships) {
     if (!membersByCrew.has(member.crew_id)) membersByCrew.set(member.crew_id, []);
@@ -115,7 +145,7 @@ async function api(request, env) {
   }
   if (path === '/api/events' && method === 'GET') return json({events:await listEvents(env, actor)});
   if (path === '/api/participants' && method === 'GET') {
-    requireRole(actor.user);
+    if (!actor.user) fail(401,'Connecte-toi avec Discord pour choisir un pilote.');
     return json({participants:(await env.DB.prepare(`SELECT u.id,u.name,p.id AS participantId
       FROM users u LEFT JOIN participants p ON p.user_id=u.id
       ORDER BY lower(u.name),u.id`).all()).results});
@@ -223,7 +253,7 @@ async function api(request, env) {
   if (regMatch && ['PATCH','DELETE'].includes(method)) {
     const reg = await env.DB.prepare(registrationSelect+' WHERE r.id=?').bind(regMatch[1]).first();
     if (!reg) fail(404, 'Inscription introuvable.');
-    if (!owned(reg,actor) && actor.user?.role !== 'admin') fail(403, 'Cette inscription ne t’appartient pas. Utilise ton lien personnel ou ton compte Discord.');
+    if (!canManageRegistration(reg,actor)) fail(403, 'Tu n’as pas l’autorisation de modifier cette inscription.');
     const event = await eventById(env, reg.event_id), departure = departureById(event,reg.departure_id);
     if (departure.startsAt <= Date.now()) fail(409, 'Ce départ est passé. Les inscriptions sont verrouillées.');
     const input = await body(request);
