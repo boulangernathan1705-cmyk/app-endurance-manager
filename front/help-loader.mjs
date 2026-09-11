@@ -1,4 +1,5 @@
 const HELP_BUTTON_ID = 'help-nav-button';
+const NAV_STACK_ID = 'help-sim-stack';
 const nav = document.getElementById('navigation');
 let helpModulePromise = null;
 let helpStylesPromise = null;
@@ -51,8 +52,11 @@ async function openHelp(button) {
   }
 }
 
-function injectHelpButton() {
-  if (!nav || document.getElementById(HELP_BUTTON_ID)) return;
+function createNavStack() {
+  const stack = document.createElement('div');
+  stack.id = NAV_STACK_ID;
+  stack.className = 'help-sim-stack';
+
   const button = document.createElement('button');
   button.type = 'button';
   button.id = HELP_BUTTON_ID;
@@ -60,11 +64,25 @@ function injectHelpButton() {
   button.textContent = 'Aide';
   button.addEventListener('click', () => openHelp(button));
 
+  const switcher = document.createElement('div');
+  switcher.className = 'nav-game-switcher';
+  switcher.setAttribute('aria-label', 'Changer de simulateur');
+  switcher.innerHTML = `
+    <a class="nav-game-switcher-button nav-game-switcher-lmu" href="/lmu/" aria-label="Accueil Le Mans Ultimate">LMU</a>
+    <a class="nav-game-switcher-button nav-game-switcher-iracing" href="/iracing/" aria-label="Accueil iRacing">iR</a>`;
+
+  stack.append(button, switcher);
+  return stack;
+}
+
+function injectNavStack() {
+  if (!nav || document.getElementById(NAV_STACK_ID)) return;
+  const stack = createNavStack();
   const logout = nav.querySelector('[data-action="logout"]');
   const discord = nav.querySelector('.discord-button');
-  if (logout) nav.insertBefore(button, logout);
-  else if (discord) nav.insertBefore(button, discord);
-  else nav.append(button);
+  if (logout) nav.insertBefore(stack, logout);
+  else if (discord) nav.insertBefore(stack, discord);
+  else nav.append(stack);
 }
 
 document.addEventListener('click', event => {
@@ -73,6 +91,6 @@ document.addEventListener('click', event => {
 }, true);
 
 if (nav) {
-  new MutationObserver(injectHelpButton).observe(nav, {childList:true});
-  injectHelpButton();
+  new MutationObserver(injectNavStack).observe(nav, {childList:true});
+  injectNavStack();
 }
