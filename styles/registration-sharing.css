@@ -6,9 +6,10 @@
 .registration-origin-info:hover,.registration-origin-info:focus{opacity:1;border-color:var(--green);color:#dfffe7}
 .pilot-name .registration-origin-info{margin-left:3px}
 
-/* Les catégories textuelles ne doivent pas hériter de la largeur fixe prévue pour les logos. */
-.pilot-category-logo.pilot-category-text{width:auto;min-width:max-content;height:auto;justify-content:flex-start;flex:0 0 auto}
-.pilot-category-value{display:inline-block;white-space:nowrap;font-weight:800}
+/* Les cartes pilotes retrouvent le vrai logo de catégorie sans recréer les chevauchements. */
+.pilot-main .pilot-category-logo{display:inline-flex;align-items:center;justify-content:center;flex:0 0 38px;width:38px;min-width:38px;min-height:30px}
+.pilot-main .pilot-category-logo .category-logo{display:block;width:auto;max-width:36px;height:auto;max-height:30px;object-fit:contain}
+.pilot-main .pilot-category-logo .category-text-logo{max-width:38px;padding:3px;font-size:8px;line-height:1;text-align:center}
 .pilot-main .pilot-car{min-width:0;overflow-wrap:anywhere}
 
 /* Réserve une vraie colonne aux deux actions du départ. Ce sélecteur est volontairement

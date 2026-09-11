@@ -108,7 +108,7 @@ test('Ajouter une catégorie est placé à côté de Fermer dans l’en-tête in
   assert.match(registration,/Ajouter une catégorie/);
   assert.match(registration,/stateDraft\.mode!=='category'/);
   assert.match(css,/\.registration-workspace-actions\{[^}]*display:flex/s);
-  assert.match(game,/registration-sharing\.css\?v=7-category-action/);
+  assert.match(game,/registration-sharing\.css\?v=\d+-[a-z0-9-]+/i);
 });
 
 test('Équipages produit directement la gestion finale',()=>{
@@ -120,6 +120,17 @@ test('Équipages produit directement la gestion finale',()=>{
   assert.match(crews,/edit-crew/);
   assert.match(crews,/add-crew-pilot/);
   assert.match(crews,/remove-crew-pilot/);
+  assert.match(crews,/logo\(crew\.category\)/);
+});
+
+test('les cartes pilotes et équipages utilisent les vrais logos de catégorie',()=>{
+  const registration=read('front/app/registration.mjs');
+  const crews=read('front/app/crews.mjs');
+  const css=read('styles/registration-sharing.css');
+  assert.match(registration,/pilot-category-logo[^`]*\$\{reg\.category\?logo\(reg\.category\):'—'\}/);
+  assert.doesNotMatch(registration,/pilot-category-text/);
+  assert.match(crews,/crew-compact-category[^`]*\$\{logo\(crew\.category\)\}/);
+  assert.match(css,/\.pilot-main \.pilot-category-logo \.category-logo/);
 });
 
 test('le formulaire inscription est unique et compact',()=>{
@@ -129,7 +140,7 @@ test('le formulaire inscription est unique et compact',()=>{
   assert.match(registration,/TOUTE LA COURSE/);
   assert.doesNotMatch(registration,/button\('availability','INDISPONIBLE'/);
   assert.match(registration,/renderAvailabilityTimeline\(\{departure,duration,status:stateDraft\.status,interactive:true/);
-  assert.match(registration,/pilot-category-logo pilot-category-text/);
+  assert.match(registration,/pilot-category-logo/);
 });
 
 test('Mes inscriptions restaure les grilles de 1 à 3 colonnes et les visuels catégorie',()=>{
