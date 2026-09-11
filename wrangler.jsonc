@@ -9,7 +9,8 @@
     "directory": "./public",
     "html_handling": "auto-trailing-slash",
     "run_worker_first": [
-      "/api/*"
+      "/api/*",
+      "/telemetry/*"
     ]
   },
   "d1_databases": [
