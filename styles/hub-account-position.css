@@ -8,6 +8,8 @@
 
 .hub-topbar .account-bar {
   grid-column: 3;
+  grid-row: 1;
+  align-self: center;
   justify-content: flex-end;
   max-width: none;
   margin: 0;
@@ -16,6 +18,8 @@
 
 .hub-topbar .hub-intro {
   grid-column: 2;
+  grid-row: 1;
+  align-self: center;
   margin: 0;
   text-align: center;
 }
@@ -30,6 +34,7 @@
   .hub-topbar .account-bar,
   .hub-topbar .hub-intro {
     grid-column: 1;
+    grid-row: auto;
   }
 
   .hub-topbar .account-bar {
