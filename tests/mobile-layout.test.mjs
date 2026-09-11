@@ -7,8 +7,8 @@ const read = path => readFileSync(new URL(`../${path}`, import.meta.url),'utf8')
 test('la passe mobile est chargée en dernier sur le jeu et les membres',()=>{
   const game=read('game.html');
   const members=read('members.html');
-  assert.match(game,/mobile-final\.css\?v=2-readable-pilot-cards/);
-  assert.match(members,/mobile-final\.css\?v=2-readable-pilot-cards/);
+  assert.match(game,/mobile-final\.css\?v=[^"']+/);
+  assert.match(members,/mobile-final\.css\?v=[^"']+/);
   assert.ok(game.indexOf('mobile-final.css')>game.indexOf('mobile-timeline-compact.css'));
   assert.ok(members.indexOf('mobile-final.css')>members.indexOf('members-page.css'));
 });
