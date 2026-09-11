@@ -10,6 +10,12 @@
 .pilot-category-value{display:inline-block;white-space:nowrap;font-weight:800}
 .pilot-main .pilot-car{min-width:0;overflow-wrap:anywhere}
 
+/* Réserve une vraie colonne aux deux actions du départ. Ce sélecteur est volontairement
+   plus précis que l'ancien layout pour ne pas dépendre d'un bouton unique. */
+@media(min-width:901px){
+  .departure-fold[id^="departure-"]>summary{grid-template-columns:34px minmax(220px,1fr) max-content minmax(250px,292px)!important}
+}
+
 /* Les deux actions d'inscription restent côte à côte dans le résumé du départ. */
 .departure-fold[id^="departure-"]>summary>.ux-summary-registration-actions{
   grid-column:4;
@@ -64,6 +70,7 @@
 }
 
 @media(max-width:1100px) and (min-width:901px){
+  .departure-fold[id^="departure-"]>summary{grid-template-columns:34px minmax(190px,1fr) max-content minmax(230px,250px)!important}
   .departure-fold[id^="departure-"]>summary>.ux-summary-registration-actions{width:250px;gap:5px}
   .departure-fold[id^="departure-"]>summary>.ux-summary-registration-actions .ux-summary-registration-toggle,
   .departure-fold[id^="departure-"]>summary>.ux-summary-registration-actions .ux-summary-registration-other{font-size:9.5px;padding-inline:6px}
