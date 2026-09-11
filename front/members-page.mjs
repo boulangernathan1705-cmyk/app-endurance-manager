@@ -35,7 +35,7 @@ async function load() {
     if (!session.user || session.user.role !== 'admin') throw new Error('Accès réservé aux administrateurs.');
     const result = await api('/api/members');
     const members = Array.isArray(result.members) ? result.members : [];
-    app.innerHTML = `<section class="members-panel"><header class="members-heading"><div><span class="members-kicker">ENDURANCE MANAGER</span><h1>GESTION DES MEMBRES</h1><p>Cette page est commune à LMU et iRacing. Un pilote apparaît après sa première connexion Discord.</p></div><span class="members-count">${members.length} membre${members.length > 1 ? 's' : ''}</span></header><div class="members-list">${members.map(memberRow).join('')}</div><p id="members-status" class="members-status" role="status" aria-live="polite"></p></section>`;
+    app.innerHTML = `<section class="members-panel"><div class="members-heading"><div><span class="members-kicker">ENDURANCE MANAGER</span><h1>GESTION DES MEMBRES</h1><p>Cette page est commune à LMU et iRacing. Un pilote apparaît après sa première connexion Discord.</p></div><span class="members-count">${members.length} membre${members.length > 1 ? 's' : ''}</span></div><div class="members-list">${members.map(memberRow).join('')}</div><p id="members-status" class="members-status" role="status" aria-live="polite"></p></section>`;
   } catch (error) {
     renderError(error.message || String(error));
   }
