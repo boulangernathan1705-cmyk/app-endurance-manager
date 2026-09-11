@@ -2,7 +2,7 @@ import {app,state,api,load,showError,countdown,CARS} from './core.mjs';
 import {renderNav,renderHome} from './home-view.mjs';
 import {renderEvent} from './event-view.mjs';
 import {renderEventForm,departureFields,updateRemoveButtons} from './event-form.mjs';
-import {renderMyEntries} from './entries-view.mjs';
+import {renderMyEntries} from './entries-view.mjs?v=2-three-accordions';
 import {refresh,refreshAfterSave} from './refresh.mjs';
 import {draftFor,registrationDraft,ownRegistrations,rerenderRegistrationSection,submitRegistration} from './registration.mjs';
 import {updateCrewState} from './crews.mjs';
