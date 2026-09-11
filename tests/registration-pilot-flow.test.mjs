@@ -17,6 +17,12 @@ test('all logged in pilots can use the Discord pilot picker',()=>{
   assert.match(sharing,/participantUserId/);
 });
 
+test('Discord identity is authoritative when another pilot is selected',()=>{
+  assert.match(core,/data\.name=discordUser\.name/);
+  assert.match(core,/data\.nameKey=data\.name\.normalize/);
+  assert.match(core,/Ce pseudo correspond à un pilote Discord\. Sélectionne son compte dans la liste\./);
+});
+
 test('external pilots stay owned by the account that created them',()=>{
   assert.match(core,/user_id IS NULL AND guest_hash IS NULL AND created_by=\? AND lower\(name\)=lower\(\?\)/);
   assert.match(core,/\.bind\(actor\.user\.id,data\.name\)/);
@@ -33,6 +39,8 @@ test('adding and editing a pilot use the focused registration editor',()=>{
   assert.match(sharing,/stopImmediatePropagation\(\)/);
   assert.match(sharing,/Modifier l’inscription/);
   assert.match(sharing,/AJOUTER LE PILOTE/);
+  assert.match(sharing,/data-registration-delete/);
+  assert.match(sharing,/DELETE/);
 });
 
 test('Discord registrations are editable by both creator and participant',()=>{
