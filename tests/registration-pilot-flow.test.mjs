@@ -16,7 +16,7 @@ test('all logged in pilots can use the Discord pilot picker',()=>{
   assert.doesNotMatch(core,/if \(!manager\) fail\(403,'Seuls les organisateurs peuvent inscrire un autre pilote\.'/);
   assert.match(clientCore,/state\.participants=state\.user \? \(await api\('\/api\/participants'\)\)\.participants : \[\]/);
   assert.match(eventView,/Inscrire un autre pilote/);
-  assert.match(registration,/name=\\"participant\\"/);
+  assert.match(registration,/name="participant"/);
   assert.match(registration,/participantUserId/);
 });
 
