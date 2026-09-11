@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {readFile} from 'node:fs/promises';
+import {readFile, access} from 'node:fs/promises';
 
 const read = path => readFile(new URL(`../${path}`, import.meta.url), 'utf8');
 
@@ -24,10 +24,15 @@ test('le build produit les deux espaces simulateurs et Cloudflare conserve les U
   assert.match(helpLoader, /href="\/iracing\/"/);
 });
 
-test('la décoration des inscriptions coupe son observateur pendant ses propres mutations', async () => {
-  const source = await read('front/registration-sharing.mjs');
-  assert.match(source, /appObserver\?\.disconnect\(\)/);
-  assert.match(source, /title\.textContent !== 'Inscriptions'/);
-  assert.match(source, /title\.textContent !== 'Mon inscription'/);
-  assert.match(source, /if \(oldActions && !oldActions\.hidden\) oldActions\.hidden = true/);
+test('les inscriptions sont rendues nativement sans observateur DOM parallèle', async () => {
+  const [app, game] = await Promise.all([read('app.js'), read('game.html')]);
+  let sharingExists = true;
+  try { await access(new URL('../front/registration-sharing.mjs', import.meta.url)); }
+  catch { sharingExists = false; }
+
+  assert.equal(sharingExists, false);
+  assert.doesNotMatch(game, /front\/registration-sharing\.mjs/);
+  assert.match(app, /function renderRegistrationWorkspace\(event,departure\)/);
+  assert.match(app, /renderRegistrationForm\(event,departure\)/);
+  assert.doesNotMatch(app, /new MutationObserver/);
 });
