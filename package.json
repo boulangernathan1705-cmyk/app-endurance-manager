@@ -8,9 +8,13 @@
     "audit": "node scripts/audit-codebase.mjs",
     "audit:strict": "node scripts/audit-codebase.mjs --strict",
     "check": "npm test && npm run build:workers && npm run audit:strict",
+    "compat:test": "playwright test",
     "db:migrations:apply": "npx wrangler d1 migrations apply DB --remote",
     "deploy:workers": "npm run db:migrations:apply && npx wrangler deploy",
     "test": "node --test tests/*.test.mjs"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.55.0"
   },
   "engines": {
     "node": ">=22.13.0"
