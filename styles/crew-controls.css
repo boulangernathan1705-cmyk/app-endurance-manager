@@ -21,6 +21,9 @@
 .crew-management-accordion>.crew-management-summary{margin:0}
 .crew-management-accordion.is-complete>.crew-management-summary{background:color-mix(in srgb,#7d8589 8%,#151c1f)}
 .crew-management-accordion[open]>.crew-management-summary .crew-compact-chevron{transform:rotate(90deg)}
+.crew-management-summary .crew-compact-car{display:flex;align-items:center;justify-content:flex-end;gap:10px;min-width:0}
+.crew-management-summary .crew-compact-car-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.crew-summary-edit{flex:0 0 auto;min-height:28px;padding:5px 10px;border-radius:8px;font-size:11px;font-weight:900;line-height:1;white-space:nowrap}
 .crew-management-accordion-body{padding:12px 14px 14px;border-top:1px solid color-mix(in srgb,var(--crew-color) 22%,transparent)}
 .crew-management-accordion-body>.crew-card-header{align-items:flex-start;margin:0 0 12px;padding:0 0 12px;border-bottom:1px solid var(--border)}
 .crew-management-accordion-body>.crew-card-header>div{display:flex;align-items:center;flex-wrap:wrap;gap:8px 12px;min-width:0}
@@ -32,4 +35,4 @@
 .crew-management-accordion-body .crew-actions{margin-top:14px}
 .crew-management-accordion-body .crew-actions:empty{display:none}
 
-@media(max-width:760px){.crew-state-control{align-items:flex-start;flex-direction:column}.crew-state-select-wrap,.crew-state-select{width:100%}.crew-candidate-action-card{grid-template-columns:1fr}.crew-add-pilot-button,.crew-member-action{width:100%}.crew-management-accordion-body>.crew-card-header{gap:10px}.crew-management-accordion-body .coverage-summary{margin-left:0}}
+@media(max-width:760px){.crew-state-control{align-items:flex-start;flex-direction:column}.crew-state-select-wrap,.crew-state-select{width:100%}.crew-candidate-action-card{grid-template-columns:1fr}.crew-add-pilot-button,.crew-member-action{width:100%}.crew-management-summary .crew-compact-car{justify-content:space-between;gap:8px}.crew-summary-edit{min-height:26px;padding-inline:8px;font-size:10px}.crew-management-accordion-body>.crew-card-header{gap:10px}.crew-management-accordion-body .coverage-summary{margin-left:0}}
