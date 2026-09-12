@@ -113,17 +113,18 @@ test('Ajouter une catégorie est placé à côté de Fermer dans l’en-tête in
   assert.match(game,/registration-sharing\.css\?v=\d+-[a-z0-9-]+/i);
 });
 
-test('Équipages est intégré directement dans chaque départ sans onglet séparé',()=>{
+test('Équipages est intégré directement dans chaque départ avec actions pilote contextuelles',()=>{
   const crews=read('front/app/crews.mjs');
   const eventView=read('front/app/event-view.mjs');
   assert.doesNotMatch(eventView,/event-section','Équipages'/);
   assert.match(eventView,/renderPilots\(event,departure\)/);
-  assert.match(crews,/canManage\(\)\?managementCard/);
-  assert.match(crews,/crew-management-accordion/);
+  assert.match(eventView,/Créer mon équipage/);
+  assert.match(crews,/crew-unified-card/);
+  assert.match(crews,/crew\.canManage/);
   assert.match(crews,/data-crew-state-select/);
-  assert.match(crews,/edit-crew/);
-  assert.match(crews,/add-crew-pilot/);
-  assert.match(crews,/remove-crew-pilot/);
+  assert.match(crews,/join-crew/);
+  assert.match(crews,/leave-crew/);
+  assert.match(crews,/Gérer mon équipage/);
   assert.match(crews,/logo\(crew\.category\)/);
 });
 
