@@ -1,1 +1,1 @@
-import './front/app/actions.mjs?v=16-unified-participation';
+import './front/app/actions.mjs?v=17-unified-crew-management';
