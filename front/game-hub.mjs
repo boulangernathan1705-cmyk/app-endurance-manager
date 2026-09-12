@@ -22,10 +22,14 @@ function hasRegisteredPilot(departure) {
   return (departure?.availability || []).some(registration => registration.status !== 'unavailable');
 }
 
+function hasVisibleActivity(departure) {
+  return hasRegisteredPilot(departure) || (departure?.crews || []).length > 0;
+}
+
 function selectedDeparture(event, timestamp=Date.now()) {
   const duration = (Number(event.durationHours) || 6) * 3600000;
   const departures = [...(event.departures || [])]
-    .filter(item => Number.isFinite(Number(item.startsAt)) && hasRegisteredPilot(item))
+    .filter(item => Number.isFinite(Number(item.startsAt)) && hasVisibleActivity(item))
     .sort((a,b) => Number(a.startsAt) - Number(b.startsAt));
   return departures.find(item => Number(item.startsAt) <= timestamp && Number(item.startsAt) + duration > timestamp)
     || departures.find(item => Number(item.startsAt) > timestamp)
@@ -63,11 +67,11 @@ function crewMarkup(crew, departure, index=0) {
 }
 
 function enduranceMarkup(item, game) {
-  if (!item) return `<div class="hub-empty"><strong>Aucune endurance avec pilote inscrit</strong><span>Le prochain départ apparaîtra ici dès qu’un pilote sera inscrit.</span></div>`;
+  if (!item) return `<div class="hub-empty"><strong>Aucune endurance avec inscription ou équipage</strong><span>Le prochain départ apparaîtra ici dès qu’un pilote ou un équipage sera inscrit.</span></div>`;
   const {event,departure} = item;
   const catalog = GAME_CATALOGS[game];
   const circuit = catalog.circuits.find(item => item.id === event.circuit)?.name || 'Circuit à préciser';
-  const crews = (departure.crews || []).filter(crew => (crew.registrationIds || []).some(id => (departure.availability || []).some(reg => reg.id === id && reg.status !== 'unavailable')));
+  const crews = [...(departure.crews || [])];
   const running = Number(departure.startsAt) <= Date.now();
   return `<section class="hub-next-race" aria-label="Prochaine endurance ${esc(catalog.name)}">
     <span class="hub-next-label">${running ? 'COURSE EN COURS' : 'PROCHAINE ENDURANCE'}</span>
