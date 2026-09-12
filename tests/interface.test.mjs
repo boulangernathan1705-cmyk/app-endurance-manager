@@ -75,14 +75,15 @@ test('la page événement garde les actions événement séparées des actions �
   assert.doesNotMatch(eventView,/event-create-crew/);
 });
 
-test('les actions inscription restent contenues et côte à côte dans le résumé du départ',()=>{
-  const css=read('styles/registration-sharing.css');
-  assert.match(css,/summary>.ux-summary-registration-actions/);
-  assert.match(css,/grid-column:4/);
-  assert.match(css,/grid-row:1 \/ span 2/);
-  assert.match(css,/grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
-  assert.match(css,/grid-column:2 \/ -1/);
-  assert.match(css,/grid-row:3/);
+test('les actions principales du départ sont regroupées au même niveau',()=>{
+  const eventView=read('front/app/event-view.mjs');
+  const css=read('styles/event-shell-alignment.css');
+  assert.match(eventView,/departure-action-panel/);
+  assert.match(eventView,/departure-primary-actions/);
+  assert.match(eventView,/departure-self-registration/);
+  assert.match(eventView,/departure-create-crew/);
+  assert.match(css,/\.departure-primary-actions\s*\{[^}]*grid-template-columns:\s*repeat\(2,minmax\(0,1fr\)\)/s);
+  assert.match(css,/\.departure-primary-actions > button/);
 });
 
 test('le compte déconnecté garde Aide et Discord alignés horizontalement',()=>{
@@ -98,7 +99,7 @@ test('le compte déconnecté garde Aide et Discord alignés horizontalement',()=
 
 test('inscrire un autre pilote reste réservé à un compte connecté',()=>{
   const eventView=read('front/app/event-view.mjs');
-  assert.match(eventView,/\$\{state\.user\?button\('new-registration','Inscrire un autre pilote'/);
+  assert.match(eventView,/const other=state\.user\?button\('new-registration','Inscrire un autre pilote'/);
 });
 
 test('Ajouter une catégorie est placé à côté de Fermer dans l’en-tête inscription',()=>{
@@ -120,10 +121,11 @@ test('Équipages est intégré directement dans chaque départ avec actions pilo
   assert.match(eventView,/renderPilots\(event,departure\)/);
   assert.match(eventView,/Créer mon équipage/);
   assert.match(crews,/crew-unified-card/);
+  assert.match(crews,/crew-card-shell/);
   assert.match(crews,/crew\.canManage/);
   assert.match(crews,/data-crew-state-select/);
-  assert.match(crews,/join-crew/);
-  assert.match(crews,/leave-crew/);
+  assert.match(crews,/Rejoindre cet équipage/);
+  assert.match(crews,/Quitter l’équipage/);
   assert.match(crews,/Gérer mon équipage/);
   assert.match(crews,/logo\(crew\.category\)/);
 });
