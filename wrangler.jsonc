@@ -4,7 +4,7 @@
   "compatibility_date": "2026-09-07",
   "keep_vars": true,
   "minify": true,
-  "build": { "command": "npm run build:workers" },
+  "build": { "command": "npm run db:migrations:apply && npm run build:workers" },
   "assets": {
     "directory": "./public",
     "html_handling": "auto-trailing-slash",
