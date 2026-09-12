@@ -1,4 +1,4 @@
-import {app,state,api,load,showError,countdown,CARS} from './core.mjs?v=5-game-scoped-network';
+import {app,state,api,load,showError,countdown,CARS} from './core.mjs';
 import {renderNav,renderHome} from './home-view.mjs';
 import {renderEvent} from './event-view.mjs';
 import {renderEventForm,departureFields,updateRemoveButtons} from './event-form.mjs';
