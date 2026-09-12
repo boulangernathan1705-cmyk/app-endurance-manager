@@ -4,7 +4,7 @@ import {renderEvent} from './event-view.mjs';
 import {renderEventForm,departureFields,updateRemoveButtons} from './event-form.mjs';
 import {renderMyEntries} from './entries-view.mjs?v=2-three-accordions';
 import {refresh,refreshAfterSave} from './refresh.mjs';
-import {draftFor,registrationDraft,ownRegistrations,rerenderRegistrationSection,submitRegistration} from './registration.mjs';
+import {draftFor,registrationDraft,ownRegistrations,rerenderRegistrationSection,submitRegistration} from './registration.mjs?v=2-preserve-timeline-scroll';
 import {updateCrewState} from './crews.mjs';
 
 async function submitEvent(form){
