@@ -57,20 +57,22 @@ test('Course produit directement l’interface finale',()=>{
   assert.match(eventView,/departure-fold/);
   assert.match(eventView,/Modifier mon inscription/);
   assert.match(eventView,/Inscrire un autre pilote/);
+  assert.match(eventView,/departure-participation-section/);
   assert.match(crews,/ux-course-pilots-accordion/);
   assert.match(crews,/ux-course-crews-accordion/);
   assert.match(crews,/crew-pilot-accordion/);
 });
 
-test('la page événement évite la navigation en double et garde les actions dans le bon ordre',()=>{
+test('la page événement garde les actions événement séparées des actions équipage',()=>{
   const eventView=read('front/app/event-view.mjs');
   assert.doesNotMatch(eventView,/Retour aux événements/);
   assert.match(eventView,/event-toolbar-main/);
+  assert.match(eventView,/departure-create-crew/);
   const refresh=eventView.indexOf("button('refresh','Actualiser')");
   const edit=eventView.indexOf("button('edit-event','Modifier l’événement'");
   const remove=eventView.indexOf("button('delete-event','Supprimer l’événement'");
-  const crew=eventView.indexOf('Créer un équipage');
-  assert.ok(refresh>=0&&refresh<edit&&edit<remove&&remove<crew);
+  assert.ok(refresh>=0&&refresh<edit&&edit<remove);
+  assert.doesNotMatch(eventView,/event-create-crew/);
 });
 
 test('les actions inscription restent contenues et côte à côte dans le résumé du départ',()=>{
@@ -111,10 +113,12 @@ test('Ajouter une catégorie est placé à côté de Fermer dans l’en-tête in
   assert.match(game,/registration-sharing\.css\?v=\d+-[a-z0-9-]+/i);
 });
 
-test('Équipages produit directement la gestion finale',()=>{
+test('Équipages est intégré directement dans chaque départ sans onglet séparé',()=>{
   const crews=read('front/app/crews.mjs');
   const eventView=read('front/app/event-view.mjs');
-  assert.match(eventView,/event-section','Équipages'/);
+  assert.doesNotMatch(eventView,/event-section','Équipages'/);
+  assert.match(eventView,/renderPilots\(event,departure\)/);
+  assert.match(crews,/canManage\(\)\?managementCard/);
   assert.match(crews,/crew-management-accordion/);
   assert.match(crews,/data-crew-state-select/);
   assert.match(crews,/edit-crew/);
