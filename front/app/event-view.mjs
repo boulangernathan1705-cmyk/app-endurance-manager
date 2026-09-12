@@ -1,6 +1,6 @@
 import {app,state,esc,button,canManage,isAdmin,eventTypeBadge,eventBadge,eventCategoryCount,circuitVisual,pilotCount,dateLabel,countdown,notifyRender} from './core.mjs';
 import {ownRegistration,renderRegistrationWorkspace} from './registration.mjs';
-import {renderPilots} from './crews.mjs?v=4-crew-actions';
+import {renderPilots} from './crews.mjs?v=5-delete-crew';
 import {renderHome,showRecoveryLink} from './home-view.mjs';
 
 function canCreateCrewOnDeparture(departure){
