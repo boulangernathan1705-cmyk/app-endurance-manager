@@ -26,12 +26,26 @@
   border-top:1px solid rgba(255,255,255,.16);
 }
 .event-card.event-card-harmonized .event-category-crew {
-  overflow:hidden;
+  display:flex;
+  align-items:baseline;
+  justify-content:space-between;
+  gap:6px;
+  min-width:0;
   color:inherit;
   font-size:10px;
   font-weight:700;
   line-height:1.2;
+}
+.event-card.event-card-harmonized .event-category-crew span {
+  overflow:hidden;
+  min-width:0;
   text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.event-card.event-card-harmonized .event-category-crew b {
+  flex:0 0 auto;
+  font-size:10px;
+  font-weight:900;
   white-space:nowrap;
 }
 
