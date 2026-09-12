@@ -8,7 +8,6 @@
 
 .event-card.event-card-harmonized .event-home-crews {
   display: block;
-  margin-top: 12px;
   min-width: 0;
   text-align: left;
 }
@@ -54,6 +53,10 @@
     gap: 8px;
   }
 
+  .event-card.event-card-harmonized .event-home-crews {
+    margin-top: 12px;
+  }
+
   .event-card.event-card-harmonized .circuit-visual {
     position: absolute !important;
     top: 50% !important;
@@ -81,50 +84,71 @@
 
 @media (max-width: 760px) {
   .event-card.event-card-harmonized .event-card-body {
-    grid-template-columns: minmax(0, 1fr) !important;
-    grid-auto-flow: row !important;
-  }
-
-  .event-card.event-card-harmonized .event-card-title-row,
-  .event-card.event-card-harmonized .event-info,
-  .event-card.event-card-harmonized .event-category-badges,
-  .event-card.event-card-harmonized .event-home-crews,
-  .event-card.event-card-harmonized .event-card-status {
-    grid-column: 1 !important;
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) 96px !important;
+    grid-template-areas:
+      "title map"
+      "info map"
+      "categories categories"
+      "crews crews"
+      "status status" !important;
+    column-gap: 8px;
+    row-gap: 7px;
+    align-items: start;
     width: 100%;
     min-width: 0;
   }
 
   .event-card.event-card-harmonized .event-card-title-row {
-    order: 1;
+    grid-area: title;
     display: flex !important;
     align-items: baseline !important;
     flex-wrap: wrap;
-    gap: 5px 8px;
+    gap: 4px 8px;
+    min-width: 0;
+    padding-right: 0 !important;
   }
 
-  .event-card.event-card-harmonized .event-info {
-    order: 2;
-    display: flex !important;
-    align-items: flex-start;
-    margin-top: 6px;
-  }
-
-  .event-card.event-card-harmonized .event-category-badges {
-    order: 3;
-  }
-
-  .event-card.event-card-harmonized .event-home-crews {
-    order: 4;
-    margin-top: 10px;
-  }
-
-  .event-card.event-card-harmonized .event-card-status {
-    order: 5;
+  .event-card.event-card-harmonized .event-name {
+    margin: 0 !important;
+    line-height: 1.12;
   }
 
   .event-card.event-card-harmonized .event-compact-date {
     font-size: 11px;
+  }
+
+  .event-card.event-card-harmonized .event-info {
+    grid-area: info;
+    display: flex !important;
+    align-items: flex-start;
+    margin: 0;
+    min-width: 0;
+  }
+
+  .event-card.event-card-harmonized .event-category-badges {
+    grid-area: categories;
+    display: flex !important;
+    flex-wrap: wrap;
+    gap: 6px;
+    width: 100%;
+    min-width: 0;
+    margin: 1px 0 0 !important;
+    padding: 0;
+  }
+
+  .event-card.event-card-harmonized .event-home-crews {
+    grid-area: crews;
+    width: 100%;
+    min-width: 0;
+    margin: 2px 0 0;
+  }
+
+  .event-card.event-card-harmonized .event-card-status {
+    grid-area: status;
+    width: 100%;
+    min-width: 0;
+    margin-top: 0;
   }
 
   .event-card.event-card-harmonized .crew-summary-list,
