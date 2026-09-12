@@ -1,11 +1,11 @@
 import {app,state,api,load,showError,countdown,CARS} from './core.mjs';
 import {renderNav,renderHome} from './home-view.mjs?v=3-shared-crew-cards';
-import {renderEvent} from './event-view.mjs?v=2-unified-participation';
+import {renderEvent} from './event-view.mjs?v=3-unified-crew-management';
 import {renderEventForm,departureFields,updateRemoveButtons} from './event-form.mjs';
 import {renderMyEntries} from './entries-view.mjs?v=2-three-accordions';
 import {refresh,refreshAfterSave} from './refresh.mjs';
 import {draftFor,registrationDraft,ownRegistrations,rerenderRegistrationSection,submitRegistration} from './registration.mjs?v=2-preserve-timeline-scroll';
-import {updateCrewState} from './crews.mjs';
+import {updateCrewState} from './crews.mjs?v=2-unified-management';
 
 async function submitEvent(form){
   const data={name:form.elements.eventName.value.trim(),durationHours:Number(form.elements.eventDuration.value),eventType:form.elements.eventType.value,circuit:form.elements.eventCircuit.value,categories:[...form.querySelectorAll('[name="eventCategory"]:checked')].map(input=>input.value),departures:[...form.querySelectorAll('.departure-field')].map(row=>({id:row.dataset.id||undefined,date:row.querySelector('[name="date"]').value,time:row.querySelector('[name="time"]').value})),version:state.editingEvent?.version};
