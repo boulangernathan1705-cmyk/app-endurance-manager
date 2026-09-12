@@ -18,10 +18,14 @@ function displayTime(value) {
   return match[2] === '00' ? `${Number(match[1])}h` : `${Number(match[1])}h${match[2]}`;
 }
 
+function hasRegisteredPilot(departure) {
+  return (departure?.availability || []).some(registration => registration.status !== 'unavailable');
+}
+
 function selectedDeparture(event, timestamp=Date.now()) {
   const duration = (Number(event.durationHours) || 6) * 3600000;
   const departures = [...(event.departures || [])]
-    .filter(item => Number.isFinite(Number(item.startsAt)))
+    .filter(item => Number.isFinite(Number(item.startsAt)) && hasRegisteredPilot(item))
     .sort((a,b) => Number(a.startsAt) - Number(b.startsAt));
   return departures.find(item => Number(item.startsAt) <= timestamp && Number(item.startsAt) + duration > timestamp)
     || departures.find(item => Number(item.startsAt) > timestamp)
@@ -56,7 +60,7 @@ function crewMarkup(crew, departure, index=0) {
 }
 
 function enduranceMarkup(item, game) {
-  if (!item) return `<div class="hub-empty"><strong>Aucune endurance programmée</strong><span>Les prochains événements apparaîtront ici automatiquement.</span></div>`;
+  if (!item) return `<div class="hub-empty"><strong>Aucune endurance avec pilote inscrit</strong><span>Le prochain départ apparaîtra ici dès qu’un pilote sera inscrit.</span></div>`;
   const {event,departure} = item;
   const catalog = GAME_CATALOGS[game];
   const circuit = catalog.circuits.find(item => item.id === event.circuit)?.name || 'Circuit à préciser';
@@ -67,7 +71,7 @@ function enduranceMarkup(item, game) {
     <h3>${esc(event.name)}</h3>
     <p class="hub-race-meta"><strong>${esc(formatter.format(new Date(Number(departure.startsAt))))} · ${esc(displayTime(departure.time))}</strong><span>${esc(circuit)} · ${Number(event.durationHours) || 6} h</span></p>
     <div class="hub-crews-heading"><strong>${crews.length} équipage${crews.length > 1 ? 's' : ''}</strong><span>${crews.length ? 'engagé'+(crews.length > 1 ? 's' : '') : 'formé'}</span></div>
-    ${crews.length ? `<ul class="hub-crews">${crews.map((crew,index) => crewMarkup(crew,departure,index)).join('')}</ul>` : '<p class="hub-no-crews">Aucun équipage formé pour ce départ.</p>'}
+    ${crews.length ? `<ul class="hub-crews">${crews.map((crew,index) => crewMarkup(crew,departure,index)).join('')}</ul>` : '<p class="hub-no-crews">Des pilotes sont inscrits, mais aucun équipage n’est encore formé pour ce départ.</p>'}
   </section>`;
 }
 
