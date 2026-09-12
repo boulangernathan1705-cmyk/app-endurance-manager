@@ -1,10 +1,10 @@
 {
   "name": "endurance-manager-prod",
-  "main": "server/worker.mjs",
+  "main": "server/worker-with-migrations.mjs",
   "compatibility_date": "2026-09-07",
   "keep_vars": true,
   "minify": true,
-  "build": { "command": "npm run db:migrations:apply -- --config wrangler.prod.jsonc && npm run build:workers" },
+  "build": { "command": "npm run build:workers" },
   "assets": {
     "directory": "./public",
     "html_handling": "auto-trailing-slash",
