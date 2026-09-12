@@ -14,22 +14,22 @@ function registeredRaceStatus(event,now=Date.now()){
   const duration=(event.durationHours||6)*3600000;
   return {next:departures.find(d=>Number(d.startsAt)>now)||null,running:departures.find(d=>Number(d.startsAt)<=now&&Number(d.startsAt)+duration>now)||null};
 }
-function crewNames(event,category){
+function crewRows(event,category){
   const rows=[];
   for(const departure of [...(event.departures||[])].filter(d=>Number.isFinite(Number(d.startsAt))).sort((a,b)=>Number(a.startsAt)-Number(b.startsAt))){
     for(const crew of departure.crews||[]){
       const registrations=(crew.registrationIds||[]).map(id=>(departure.availability||[]).find(reg=>reg.id===id)).filter(reg=>reg&&reg.status!=='unavailable');
       const crewCategory=crew.category||registrations[0]?.category||'';
       if(!registrations.length||crewCategory!==category)continue;
-      rows.push({startsAt:Number(departure.startsAt),name:crew.name||'Équipage'});
+      rows.push({startsAt:Number(departure.startsAt),time:departure.time,name:crew.name||'Équipage'});
     }
   }
   const seen=new Set();
-  return rows.sort((a,b)=>a.startsAt-b.startsAt||String(a.name).localeCompare(String(b.name),'fr',{sensitivity:'base',numeric:true})).filter(row=>{const key=String(row.name).trim().toLocaleLowerCase('fr');if(seen.has(key))return false;seen.add(key);return true;}).map(row=>row.name);
+  return rows.sort((a,b)=>a.startsAt-b.startsAt||String(a.name).localeCompare(String(b.name),'fr',{sensitivity:'base',numeric:true})).filter(row=>{const key=`${row.startsAt}|${String(row.name).trim().toLocaleLowerCase('fr')}`;if(seen.has(key))return false;seen.add(key);return true;});
 }
 function categoryBadge(event,category){
-  const count=eventCategoryCount(event,category),crews=crewNames(event,category);
-  return `<span class="event-category-badge ${categories[category]?.css||''}">${logo(category)}<span class="event-category-copy"><span class="event-category-heading"><strong>${esc(category)}</strong><small>${count} inscrit${count>1?'s':''}</small></span>${crews.length?`<span class="event-category-crews">${crews.map(name=>`<span class="event-category-crew">${esc(name)}</span>`).join('')}</span>`:''}</span></span>`;
+  const count=eventCategoryCount(event,category),crews=crewRows(event,category);
+  return `<span class="event-category-badge ${categories[category]?.css||''}">${logo(category)}<span class="event-category-copy"><span class="event-category-heading"><strong>${esc(category)}</strong><small>${count} inscrit${count>1?'s':''}</small></span>${crews.length?`<span class="event-category-crews">${crews.map(row=>`<span class="event-category-crew"><span>${esc(row.name)}</span><b>${esc(displayTime(row.time))}</b></span>`).join('')}</span>`:''}</span></span>`;
 }
 
 export function renderNav(){nav.innerHTML=`${button('home','Événements')}${button('my-entries','Mes inscriptions')}<div class="nav-game-switcher" aria-label="Changer de simulateur"><a class="nav-game-switcher-button nav-game-switcher-lmu" href="/lmu/">Le Mans Ultimate</a><a class="nav-game-switcher-button nav-game-switcher-iracing" href="/iracing/">iRacing</a></div>`;notifyNav();}
