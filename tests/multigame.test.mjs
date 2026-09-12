@@ -58,10 +58,20 @@ test('le portail expose les deux espaces et le contexte charge avant l’applica
 test('le résumé d’accueil affiche chaque équipage créé même sans pilote affecté', () => {
   const hub = readFileSync(new URL('../front/game-hub.mjs',import.meta.url),'utf8');
   assert.match(hub,/function hasVisibleActivity\(departure\)/);
-  assert.match(hub,/hasRegisteredPilot\(departure\) \|\| \(departure\?\.crews \|\| \[\]\)\.length > 0/);
+  assert.match(hub,/activeRegistrations\(departure\)\.length > 0 \|\| \(departure\?\.crews \|\| \[\]\)\.length > 0/);
   assert.match(hub,/const crews = \[\.\.\.\(departure\.crews \|\| \[\]\)\]/);
-  assert.doesNotMatch(hub,/const crews = \(departure\.crews \|\| \[\]\)\.filter\(crew =>/);
   assert.match(hub,/Aucun pilote affecté/);
+});
+
+test('l’accueil suit le prochain événement jusqu’à sa fin et saute les départs vides si un départ actif existe', () => {
+  const hub = readFileSync(new URL('../front/game-hub.mjs',import.meta.url),'utf8');
+  assert.match(hub,/function eventBounds\(event\)/);
+  assert.match(hub,/return remaining\.find\(hasVisibleActivity\) \|\| remaining\[0\]/);
+  assert.match(hub,/item\.bounds && item\.bounds\.end > timestamp && item\.departure/);
+  assert.match(hub,/const aStarted = a\.bounds\.start <= timestamp/);
+  assert.match(hub,/Aucun participant/);
+  assert.match(hub,/Aucun équipage formé/);
+  assert.match(hub,/PROCHAIN DÉPART/);
 });
 
 test('les identifiants iRacing ne peuvent pas entrer en collision avec les circuits LMU', () => {
