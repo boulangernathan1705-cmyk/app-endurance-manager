@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<meta name="description" content="À propos d’Endurance Manager : fonctionnement, sécurité, authentification Discord OAuth et informations de confiance du service.">
+<title>À propos et sécurité — ENDURANCE MANAGER</title>
+<link rel="icon" href="/images/endurance-manager-logo.webp" type="image/webp">
+<link rel="stylesheet" href="/privacy.css?v=2-legal-hub">
+</head>
+<body>
+<header class="legal-header">
+  <a class="brand" href="/" aria-label="Retour à Endurance Manager">
+    <img src="/images/endurance-manager-logo.webp" alt="" width="48" height="48">
+    <span>ENDURANCE <strong>MANAGER</strong></span>
+  </a>
+</header>
+<main class="legal-page">
+  <a class="back-link" href="/">← Retour au site</a>
+  <h1>À propos et sécurité</h1>
+  <p class="updated">Dernière mise à jour : 12 septembre 2026</p>
+
+  <nav class="legal-summary" aria-label="Informations de confiance">
+    <a href="#service">Le service</a>
+    <a href="#connexion">Connexion Discord</a>
+    <a href="#security">Sécurité</a>
+    <a href="#contact">Contact</a>
+    <a href="/privacy.html">Confidentialité</a>
+  </nav>
+
+  <section id="service">
+    <h2>Un outil communautaire de simracing</h2>
+    <p><strong>Endurance Manager</strong> est une application web gratuite destinée à organiser des courses d’endurance simracing : événements, disponibilités des pilotes, inscriptions, équipages et rôles d’organisation.</p>
+    <p>Le service ne vend aucun produit, ne demande aucun paiement et ne propose aucun logiciel à télécharger. Il s’utilise directement dans le navigateur.</p>
+  </section>
+
+  <section id="connexion">
+    <h2>Connexion avec Discord OAuth</h2>
+    <p>La connexion utilise le système OAuth officiel de Discord. Endurance Manager demande uniquement l’autorisation <code>identify</code> afin de connaître l’identifiant Discord et le nom d’affichage nécessaires à l’authentification.</p>
+    <p><strong>Endurance Manager ne demande, ne reçoit et ne stocke jamais ton mot de passe Discord.</strong> La saisie des identifiants Discord a lieu sur la page d’autorisation officielle de Discord.</p>
+    <p>Le service ne demande pas l’accès aux messages Discord, aux conversations privées ni à l’adresse e-mail du compte.</p>
+  </section>
+
+  <section id="security">
+    <h2>Mesures de sécurité</h2>
+    <ul>
+      <li>site servi exclusivement en HTTPS ;</li>
+      <li>cookies sensibles configurés avec <code>HttpOnly</code>, <code>Secure</code> et <code>SameSite=Lax</code> ;</li>
+      <li>jetons de session stockés sous forme hachée côté serveur ;</li>
+      <li>contrôle d’origine sur les actions d’écriture et limitation de débit ;</li>
+      <li>validation serveur des données et requêtes SQL paramétrées ;</li>
+      <li>Content Security Policy restrictive et blocage de l’intégration du site dans des iframes ;</li>
+      <li>aucun JavaScript tiers chargé par les pages de l’application.</li>
+    </ul>
+    <p>Une politique de signalement technique est également publiée dans <a href="/.well-known/security.txt">security.txt</a>.</p>
+  </section>
+
+  <section id="contact">
+    <h2>Transparence et contact</h2>
+    <p>Endurance Manager est un projet communautaire indépendant. Les informations légales, la politique de confidentialité et les crédits des ressources utilisées sont publics.</p>
+    <p>Pour signaler un problème technique ou de sécurité, tu peux utiliser le <a href="https://github.com/boulangernathan1705-cmyk/app-endurance-manager/issues" rel="noopener noreferrer">suivi public des problèmes du projet sur GitHub</a>.</p>
+    <p>Pour les informations sur les responsables du site et l’hébergement, consulte les <a href="/legal.html">informations légales</a>.</p>
+  </section>
+</main>
+<footer class="legal-footer"><a href="/">Endurance Manager</a> · <a href="/legal.html">Informations légales</a> · <a href="/privacy.html">Confidentialité</a></footer>
+</body>
+</html>
