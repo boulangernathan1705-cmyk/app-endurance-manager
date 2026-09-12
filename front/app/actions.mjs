@@ -1,6 +1,6 @@
 import {app,state,api,load,showError,countdown,CARS} from './core.mjs';
 import {renderNav,renderHome} from './home-view.mjs?v=3-shared-crew-cards';
-import {renderEvent} from './event-view.mjs';
+import {renderEvent} from './event-view.mjs?v=2-unified-participation';
 import {renderEventForm,departureFields,updateRemoveButtons} from './event-form.mjs';
 import {renderMyEntries} from './entries-view.mjs?v=2-three-accordions';
 import {refresh,refreshAfterSave} from './refresh.mjs';
