@@ -1,173 +1,103 @@
-/* Harmonisation des cartes d'événements des accueils LMU et iRacing. */
+/* Layout des cartes d'événements sur les accueils LMU et iRacing. */
 .event-card.event-card-harmonized .event-compact-date {
-  color:#aebbbc;
-  font-size:12px;
-  font-weight:800;
-  white-space:nowrap;
+  color: #aebbbc;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
 }
 
 .event-card.event-card-harmonized .event-home-crews {
-  display:block;
-  margin-top:12px;
-  text-align:left;
+  display: block;
+  margin-top: 12px;
+  min-width: 0;
+  text-align: left;
 }
-.event-card.event-card-harmonized .event-home-crews-heading {
-  display:flex;
-  align-items:baseline;
-  gap:6px;
-  margin-bottom:7px;
-}
-.event-card.event-card-harmonized .event-home-crews-heading strong {
-  color:#f4ead9;
-  font-size:12px;
-  font-weight:900;
-}
-.event-card.event-card-harmonized .event-home-crews-heading small {
-  color:#9eadae;
-  font-size:11px;
-}
-.event-card.event-card-harmonized .event-home-crew-list {
-  display:grid;
-  gap:6px;
-}
-.event-card.event-card-harmonized .event-home-crew {
-  display:grid;
-  grid-template-columns:auto minmax(125px,.8fr) minmax(0,1.2fr);
-  align-items:center;
-  gap:9px;
-  min-width:0;
-  padding:8px 10px;
-  border:1px solid rgba(103,174,181,.32);
-  border-radius:8px;
-  background:rgba(11,27,30,.78);
-}
-.event-card.event-card-harmonized .event-home-crew-icon {
-  display:grid;
-  place-items:center;
-  width:24px;
-  height:24px;
-  border:1px solid var(--crew-color);
-  border-radius:7px;
-  color:var(--crew-color);
-}
-.event-card.event-card-harmonized .event-home-crew-main {
-  display:grid;
-  gap:2px;
-  min-width:0;
-}
-.event-card.event-card-harmonized .event-home-crew-name {
-  display:flex;
-  align-items:baseline;
-  gap:7px;
-  min-width:0;
-}
-.event-card.event-card-harmonized .event-home-crew-name strong {
-  overflow:hidden;
-  min-width:0;
-  font-size:12px;
-  text-overflow:ellipsis;
-  white-space:nowrap;
-}
-.event-card.event-card-harmonized .event-home-crew-name b {
-  flex:0 0 auto;
-  color:#f4ead9;
-  font-size:11px;
-  font-weight:900;
-  white-space:nowrap;
-}
-.event-card.event-card-harmonized .event-home-crew-main small,
-.event-card.event-card-harmonized .event-home-crew-pilots {
-  overflow:hidden;
-  color:#9eadae;
-  font-size:10px;
-  text-overflow:ellipsis;
-  white-space:nowrap;
-}
-.event-card.event-card-harmonized .event-home-crew-pilots {text-align:right;}
 
-@media (min-width:761px) {
+@media (min-width: 761px) {
   .event-card.event-card-harmonized {
-    min-height:178px !important;
-    padding:17px 292px 17px 24px !important;
+    min-height: 178px !important;
+    padding: 17px 292px 17px 24px !important;
   }
+
   .event-card.event-card-harmonized .event-card-body {
-    display:grid !important;
-    grid-template-rows:auto auto auto auto auto;
-    align-content:start;
-    min-height:142px;
+    display: grid !important;
+    grid-template-rows: auto auto auto auto auto;
+    align-content: start;
+    min-height: 142px;
   }
+
   .event-card.event-card-harmonized .event-card-title-row {
-    display:flex !important;
-    align-items:baseline !important;
-    flex-wrap:wrap;
-    gap:7px 10px;
-    min-width:0;
+    display: flex !important;
+    align-items: baseline !important;
+    flex-wrap: wrap;
+    gap: 7px 10px;
+    min-width: 0;
   }
+
   .event-card.event-card-harmonized .event-name {
-    margin:0 !important;
-    color:#f4ead9;
-    font-size:18px;
-    font-weight:900;
-    line-height:1.15;
+    margin: 0 !important;
+    color: #f4ead9;
+    font-size: 18px;
+    font-weight: 900;
+    line-height: 1.15;
   }
+
   .event-card.event-card-harmonized .event-info {
-    display:flex !important;
-    align-items:flex-start;
-    margin-top:7px;
+    display: flex !important;
+    align-items: flex-start;
+    margin-top: 7px;
   }
+
   .event-card.event-card-harmonized .event-category-badges {
-    margin-top:12px !important;
-    margin-bottom:0 !important;
-    gap:8px;
+    margin-top: 12px !important;
+    margin-bottom: 0 !important;
+    gap: 8px;
   }
+
   .event-card.event-card-harmonized .circuit-visual {
-    position:absolute !important;
-    top:50% !important;
-    right:16px !important;
-    width:258px !important;
-    height:146px !important;
-    transform:translateY(-50%);
-    display:flex;
-    align-items:center;
-    justify-content:center;
+    position: absolute !important;
+    top: 50% !important;
+    right: 16px !important;
+    width: 258px !important;
+    height: 146px !important;
+    transform: translateY(-50%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
+
   .event-card.event-card-harmonized .circuit-visual img {
-    width:100% !important;
-    height:100% !important;
-    max-width:100% !important;
-    max-height:100% !important;
-    object-fit:contain;
+    width: 100% !important;
+    height: 100% !important;
+    max-width: 100% !important;
+    max-height: 100% !important;
+    object-fit: contain;
   }
+
   .event-card.event-card-harmonized .event-card-status {
-    margin-top:8px;
+    margin-top: 8px;
   }
 }
 
-@media (max-width:760px) {
+@media (max-width: 760px) {
   .event-card.event-card-harmonized .event-card-title-row {
-    display:flex !important;
-    align-items:baseline !important;
-    flex-wrap:wrap;
-    gap:5px 8px;
+    display: flex !important;
+    align-items: baseline !important;
+    flex-wrap: wrap;
+    gap: 5px 8px;
   }
-  .event-card.event-card-harmonized .event-compact-date {font-size:11px;}
+
+  .event-card.event-card-harmonized .event-compact-date {
+    font-size: 11px;
+  }
+
   .event-card.event-card-harmonized .event-info {
-    display:flex !important;
-    align-items:flex-start;
-    margin-top:6px;
+    display: flex !important;
+    align-items: flex-start;
+    margin-top: 6px;
   }
-  .event-card.event-card-harmonized .event-home-crews {margin-top:10px;}
-  .event-card.event-card-harmonized .event-home-crew {
-    grid-template-columns:auto minmax(0,1fr);
-    gap:7px;
-    padding:6px 8px;
-  }
-  .event-card.event-card-harmonized .event-home-crew-icon {
-    width:22px;
-    height:22px;
-  }
-  .event-card.event-card-harmonized .event-home-crew-pilots {
-    grid-column:2;
-    text-align:left;
+
+  .event-card.event-card-harmonized .event-home-crews {
+    margin-top: 10px;
   }
 }
