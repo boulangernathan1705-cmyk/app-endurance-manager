@@ -4,31 +4,38 @@ import {readFileSync} from 'node:fs';
 
 const read = path => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 
-test('Course rend directement les accordéons équipages finaux', () => {
+test('Course rend directement les équipages et pilotes du départ', () => {
   const crews = read('front/app/crews.mjs');
   assert.match(crews, /crew-pilot-accordion-summary/);
+  assert.match(crews, /crew-unified-card/);
   assert.match(crews, /ÉQUIPAGE COMPLET/);
   assert.match(crews, /ÉQUIPAGE OUVERT/);
+  assert.match(crews, /Pilotes sans équipage/);
   assert.match(crews, /ux-course-crews-body/);
   assert.doesNotMatch(crews, /MutationObserver/);
 });
 
-test('Équipages rend directement les contrôles de gestion finaux', () => {
+test('un pilote peut rejoindre quitter et gérer son équipage depuis la vue course', () => {
   const crews = read('front/app/crews.mjs');
-  assert.match(crews, /crew-management-accordion/);
+  const actions = read('front/app/actions.mjs');
+  assert.match(crews, /button\('join-crew','Rejoindre cet équipage'/);
+  assert.match(crews, /button\('leave-crew','Quitter l’équipage'/);
+  assert.match(crews, /Gérer mon équipage/);
+  assert.match(crews, /crew\.canManage/);
   assert.match(crews, /data-crew-state-select/);
-  assert.match(crews, /button\('edit-crew'/);
-  assert.match(crews, /button\('add-crew-pilot'/);
-  assert.match(crews, /button\('remove-crew-pilot'/);
+  assert.match(actions, /case 'join-crew'/);
+  assert.match(actions, /case 'leave-crew'/);
 });
 
-test('création et modification utilisent le même éditeur équipage', () => {
+test('création et modification utilisent le même éditeur équipage contextualisé au départ', () => {
   const builder = read('crew-builder.js');
-  assert.match(builder, /async function openBuilder\(crewId = null\)/);
+  assert.match(builder, /async function openBuilder\(crewId = null, preferredDepartureId = ''\)/);
   assert.match(builder, /mode:'edit'/);
   assert.match(builder, /mode:'create'/);
-  assert.match(builder, /Modifier «/);
-  assert.match(builder, /Créer un nouvel équipage/);
+  assert.match(builder, /Créer mon équipage/);
+  assert.match(builder, /Responsable de l’équipage/);
+  assert.match(builder, /found\.crew\.canManage/);
+  assert.match(builder, /create\.dataset\.departure/);
   assert.match(builder, /\[data-action="edit-crew"\]/);
   assert.doesNotMatch(builder, /MutationObserver/);
 });
