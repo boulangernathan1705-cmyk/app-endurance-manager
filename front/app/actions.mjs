@@ -41,7 +41,7 @@ async function perform(action,target){
     case 'join-crew': {
       const departure=event?.departures.find(item=>item.id===target.dataset.departure);const crew=departure?.crews.find(item=>item.id===target.dataset.id);const reg=departure?.availability.find(item=>item.id===target.dataset.registration);
       if(!crew||!reg)throw Error('Équipage ou inscription introuvable. Actualise la page.');
-      const result=await api(`/api/crews/${crew.id}/members`,'POST',{registrationId:reg.id,version:crew.version});state.crewManagementOpen.add(crew.id);
+      const result=await api(`/api/crews/${crew.id}/members`,'POST',{registrationId:reg.id,version:crew.version,selfJoin:true});state.crewManagementOpen.add(crew.id);
       await refreshAfterSave(`Tu as rejoint « ${crew.name} ».${result.claimedOwnership?' Tu en es maintenant le responsable.':''}`);break;
     }
     case 'leave-crew': {
