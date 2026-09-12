@@ -82,7 +82,7 @@ test('les actions principales du départ sont regroupées au même niveau',()=>{
   assert.match(eventView,/departure-primary-actions/);
   assert.match(eventView,/departure-self-registration/);
   assert.match(eventView,/departure-create-crew/);
-  assert.match(css,/\.departure-primary-actions\s*\{[^}]*grid-template-columns:\s*repeat\(2,minmax\(0,1fr\)\)/s);
+  assert.match(css,/\.departure-primary-actions\s*\{[^}]*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/s);
   assert.match(css,/\.departure-primary-actions > button/);
 });
 
