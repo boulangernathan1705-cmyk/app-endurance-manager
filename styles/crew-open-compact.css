@@ -1,0 +1,140 @@
+/* Compact opened crew view. Loaded after event-polish.css. */
+.crew-unified-card[open] .crew-unified-body{
+  gap:6px!important;
+  padding:7px 9px 8px!important;
+}
+
+.crew-unified-card[open] .crew-inline-management,
+.crew-unified-card[open] .crew-inline-management.is-readonly{
+  display:flex!important;
+  align-items:center!important;
+  justify-content:flex-start!important;
+  flex-direction:row!important;
+  flex-wrap:wrap!important;
+  gap:5px 9px!important;
+  min-height:29px!important;
+  padding:0 0 3px!important;
+  border-bottom:0!important;
+}
+
+.crew-unified-card[open] .crew-state-control{
+  display:inline-flex!important;
+  align-items:center!important;
+  flex-direction:row!important;
+  flex-wrap:nowrap!important;
+  gap:4px!important;
+  width:auto!important;
+  margin:0!important;
+}
+
+.crew-unified-card[open] .crew-state-lock{
+  width:16px!important;
+  height:16px!important;
+  font-size:12px!important;
+  line-height:1!important;
+}
+
+.crew-unified-card[open] .crew-state-select-wrap{
+  display:inline-flex!important;
+  width:auto!important;
+  min-width:0!important;
+}
+
+.crew-unified-card[open] .crew-state-select{
+  width:auto!important;
+  min-width:82px!important;
+  min-height:28px!important;
+  padding:4px 25px 4px 9px!important;
+  border-radius:7px!important;
+  font-size:10.5px!important;
+  font-weight:900!important;
+  line-height:1!important;
+}
+
+.crew-unified-card[open] .crew-state-chevron{
+  right:8px!important;
+  font-size:12px!important;
+}
+
+.crew-unified-card[open] .crew-state-readonly{
+  display:inline-flex;
+  align-items:center;
+  min-height:26px;
+  padding:3px 9px;
+  border:1px solid #4b6569;
+  border-radius:999px;
+  background:#172124;
+  color:#dce8e5;
+  font-size:10.5px;
+  font-weight:900;
+}
+.crew-unified-card[open] .crew-state-readonly.is-open{
+  border-color:#2aa960;
+  background:rgba(27,112,65,.18);
+  color:#9cedb9;
+}
+.crew-unified-card[open] .crew-state-readonly.is-complete{
+  border-color:#718086;
+  color:#cbd5d5;
+}
+
+.crew-unified-card[open] .coverage-summary{
+  display:inline-flex!important;
+  align-items:center!important;
+  width:auto!important;
+  min-width:0!important;
+  min-height:0!important;
+  margin:0!important;
+  padding:0!important;
+  border:0!important;
+  border-radius:0!important;
+  background:transparent!important;
+  box-shadow:none!important;
+  color:#aebcbd!important;
+  font-size:10.5px!important;
+  font-weight:850!important;
+  line-height:1.2!important;
+  white-space:nowrap!important;
+}
+
+/* The coverage number already tells the story; no extra sentence is needed. */
+.crew-unified-card[open] .crew-capacity-message{display:none!important}
+
+.crew-unified-card[open] .crew-member-grid{
+  gap:6px!important;
+  margin-top:0!important;
+}
+.crew-unified-card[open] .crew-member-grid>.pilot-row{
+  padding:7px 8px!important;
+  border-radius:8px!important;
+}
+.crew-unified-card[open] .crew-member-grid>.pilot-row .crew-pilot-availability{
+  margin-top:5px!important;
+}
+.crew-unified-card[open]>.crew-pilot-accordion-summary{
+  border-bottom-color:color-mix(in srgb,var(--crew-color) 22%,transparent)!important;
+}
+
+@media(max-width:760px){
+  .crew-unified-card[open] .crew-unified-body{
+    gap:5px!important;
+    padding:6px 8px 7px!important;
+  }
+  .crew-unified-card[open] .crew-inline-management,
+  .crew-unified-card[open] .crew-inline-management.is-readonly{
+    gap:5px 8px!important;
+    min-height:28px!important;
+    padding-bottom:2px!important;
+  }
+  .crew-unified-card[open] .crew-state-select{
+    min-width:78px!important;
+    min-height:27px!important;
+    font-size:10px!important;
+  }
+  .crew-unified-card[open] .coverage-summary{
+    font-size:10px!important;
+  }
+  .crew-unified-card[open] .crew-member-grid>.pilot-row{
+    padding:6px 7px!important;
+  }
+}
