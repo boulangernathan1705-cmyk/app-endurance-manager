@@ -1,30 +1,42 @@
 .registration-form .special-availability{grid-template-columns:1fr!important}
 
-/* Unified crew cards: the event page is a participation view, not an organizer editor. */
+/* Compact crew cards: keep the old colored identity while exposing pilot actions. */
 .crew-card-shell{
   display:grid;
-  gap:8px;
+  gap:0;
   min-width:0;
-  margin:10px 0;
+  margin:9px 0;
+  overflow:hidden;
+  border:1px solid color-mix(in srgb,var(--crew-color) 72%,#3e4a4e);
+  border-radius:10px;
+  background:color-mix(in srgb,var(--crew-color) 4%,#101617);
+  box-shadow:0 0 0 1px color-mix(in srgb,var(--crew-color) 10%,transparent);
 }
+.crew-card-shell.is-complete{border-color:color-mix(in srgb,#7a8489 60%,#3e4a4e)}
 .crew-unified-card{
   width:100%;
   min-width:0;
   margin:0!important;
   padding:0!important;
   overflow:hidden;
-  border:1px solid color-mix(in srgb,var(--crew-color) 42%,var(--border));
-  border-radius:12px;
-  background:#101617;
+  border:0!important;
+  border-radius:0!important;
+  background:transparent!important;
 }
-.crew-unified-card>.crew-pilot-accordion-summary{margin:0;min-width:0}
-.crew-unified-card[open]>.crew-pilot-accordion-summary{border-bottom:1px solid color-mix(in srgb,var(--crew-color) 22%,transparent)}
+.crew-unified-card>.crew-pilot-accordion-summary{
+  margin:0;
+  min-width:0;
+  background:color-mix(in srgb,var(--crew-color) 8%,#151c1f);
+}
+.crew-unified-card>.crew-pilot-accordion-summary:hover{background:color-mix(in srgb,var(--crew-color) 13%,#151c1f)}
+.crew-unified-card[open]>.crew-pilot-accordion-summary{border-bottom:1px solid color-mix(in srgb,var(--crew-color) 26%,transparent)}
 .crew-unified-body{
   display:grid;
-  gap:12px;
+  gap:10px;
   min-width:0;
-  padding:12px 14px 14px!important;
+  padding:10px 12px 12px!important;
   overflow:hidden;
+  background:rgba(7,12,13,.35);
 }
 .crew-unified-body>*{min-width:0;max-width:100%}
 .crew-unified-body>.presence-timeline,
@@ -39,48 +51,48 @@
   display:flex;
   align-items:center;
   justify-content:space-between;
-  gap:10px 16px;
+  gap:8px 14px;
   min-width:0;
-  padding-bottom:10px;
+  padding-bottom:8px;
   border-bottom:1px solid var(--border);
 }
 .crew-inline-management.is-readonly{justify-content:flex-end}
-.crew-inline-management .coverage-summary{margin-left:auto;color:var(--muted);font-size:12px;font-weight:800;white-space:nowrap}
-.crew-state-control{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin:0}
-.crew-state-label{display:inline-flex;align-items:center;gap:6px;color:#dce8e5;font-size:12px;font-weight:900;text-transform:uppercase;letter-spacing:.55px}
-.crew-state-lock{display:inline-grid;place-items:center;width:20px;height:20px;font-size:14px;line-height:1}
+.crew-inline-management .coverage-summary{margin-left:auto;color:var(--muted);font-size:11px;font-weight:800;white-space:nowrap}
+.crew-state-control{display:flex;align-items:center;flex-wrap:wrap;gap:7px;margin:0}
+.crew-state-label{display:inline-flex;align-items:center;gap:5px;color:#dce8e5;font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.5px}
+.crew-state-lock{display:inline-grid;place-items:center;width:18px;height:18px;font-size:13px;line-height:1}
 .crew-state-select-wrap{position:relative;display:inline-flex;align-items:center;min-width:0}
-.crew-state-select{appearance:none;-webkit-appearance:none;min-height:36px;max-width:100%;padding:7px 34px 7px 11px;border:1px solid #46565c;border-radius:8px;background:#111719;color:var(--text);font:inherit;font-size:12px;font-weight:850;cursor:pointer;outline:none}
+.crew-state-select{appearance:none;-webkit-appearance:none;min-height:32px;max-width:100%;padding:5px 30px 5px 10px;border:1px solid #46565c;border-radius:7px;background:#111719;color:var(--text);font:inherit;font-size:11px;font-weight:850;cursor:pointer;outline:none}
 .crew-state-select:hover,.crew-state-select:focus{border-color:var(--green)}
 .crew-state-select:disabled{cursor:wait;opacity:.65}
-.crew-state-chevron{position:absolute;right:11px;top:50%;transform:translateY(-52%);pointer-events:none;color:#9feab0;font-size:15px;font-weight:900}
+.crew-state-chevron{position:absolute;right:10px;top:50%;transform:translateY(-52%);pointer-events:none;color:#9feab0;font-size:14px;font-weight:900}
 
 .crew-owner-badge{
   display:inline-flex;
   width:max-content;
-  margin-top:3px;
-  padding:2px 6px;
-  border:1px solid color-mix(in srgb,var(--crew-color) 55%,#5d6a6d);
+  margin-top:2px;
+  padding:2px 5px;
+  border:1px solid color-mix(in srgb,var(--crew-color) 62%,#5d6a6d);
   border-radius:999px;
   color:#dff9e7;
-  background:rgba(31,92,55,.22);
-  font-size:8px;
+  background:color-mix(in srgb,var(--crew-color) 15%,rgba(17,28,22,.55));
+  font-size:7.5px;
   font-weight:900;
-  letter-spacing:.5px;
-  line-height:1.2;
+  letter-spacing:.45px;
+  line-height:1.1;
 }
 .crew-member-grid{
   display:grid;
   grid-template-columns:repeat(3,minmax(0,1fr));
-  gap:10px;
+  gap:8px;
   min-width:0;
 }
 .crew-member-grid>.pilot-row{
   min-width:0;
   margin:0!important;
-  padding:11px!important;
+  padding:9px!important;
   border:1px solid var(--border);
-  border-radius:10px;
+  border-radius:8px;
   background:rgba(255,255,255,.018);
   overflow:hidden;
 }
@@ -88,61 +100,78 @@
 .crew-member-grid>.pilot-row .ux-pilot-edit{display:none!important}
 .crew-empty-roster{margin:0}
 
-/* Join / leave / manage stay visible even when the crew details are collapsed. */
+/* Actions stay visible, but compact like the former highlighted crew controls. */
 .crew-self-actions{
-  display:grid;
-  grid-template-columns:repeat(2,minmax(0,1fr));
-  gap:8px;
+  display:flex;
+  flex-wrap:wrap;
+  align-items:center;
+  gap:6px;
   width:100%;
   min-width:0;
+  padding:7px 9px 8px;
+  border-top:1px solid color-mix(in srgb,var(--crew-color) 22%,transparent);
+  background:color-mix(in srgb,var(--crew-color) 5%,#0f1516);
 }
 .crew-self-actions>button{
-  width:100%;
-  min-width:0;
-  min-height:40px;
+  width:auto!important;
+  min-width:0!important;
+  min-height:31px!important;
   margin:0!important;
-  padding:9px 12px;
-  font-weight:900;
-  white-space:normal;
+  padding:5px 10px!important;
+  border-radius:7px!important;
+  font-size:10.5px!important;
+  font-weight:900!important;
+  line-height:1.1!important;
+  white-space:nowrap!important;
+  box-shadow:none!important;
 }
-.crew-self-actions>button:only-child{grid-column:1 / -1}
-.crew-join-button{grid-column:1 / -1}
-.crew-self-actions .crew-join-button+.crew-manage-button{grid-column:auto}
-.crew-self-actions:has(.crew-join-button+.crew-manage-button) .crew-join-button{grid-column:auto}
-.crew-action-hint{margin:0;color:var(--muted);font-size:12px;line-height:1.45}
+.crew-self-actions .crew-join-button{
+  border-color:color-mix(in srgb,var(--crew-color) 72%,#55dce0)!important;
+  background:color-mix(in srgb,var(--crew-color) 30%,#2abdc5)!important;
+}
+.crew-self-actions .crew-manage-button,
+.crew-self-actions .crew-leave-button{
+  border-color:color-mix(in srgb,var(--crew-color) 55%,#56676d)!important;
+  background:color-mix(in srgb,var(--crew-color) 10%,#172124)!important;
+}
+.crew-self-actions .crew-delete-button{
+  margin-left:auto!important;
+  padding-inline:9px!important;
+}
+.crew-action-hint{margin:0;color:var(--muted);font-size:11px;line-height:1.4}
 
 /* Legacy management styles kept harmless for old cached markup. */
 .crew-card-header>.crew-card-status[hidden],.crew-card [data-crew-lock-toggle][hidden]{display:none!important}
 .crew-list{display:grid!important;grid-template-columns:1fr!important;gap:10px!important}
 .crew-management-accordion{padding:0!important;overflow:hidden;opacity:1!important}
-.crew-member-action{min-width:84px;flex:0 0 auto;text-align:center}
-.crew-candidate-action-card{display:grid!important;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:14px;width:100%;min-width:0;padding:12px;border:1px solid var(--border);border-radius:10px;background:var(--panel2);color:var(--text);text-align:left;cursor:default;transform:none!important}
+.crew-member-action{min-width:76px;flex:0 0 auto;text-align:center}
+.crew-candidate-action-card{display:grid!important;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:12px;width:100%;min-width:0;padding:10px;border:1px solid var(--border);border-radius:9px;background:var(--panel2);color:var(--text);text-align:left;cursor:default;transform:none!important}
 .crew-candidate-action-card:hover{border-color:var(--border)!important;background:var(--panel2)!important;transform:none!important}
-.crew-candidate-info{min-width:0}.crew-add-pilot-button{min-width:84px;flex:0 0 auto;text-align:center}
+.crew-candidate-info{min-width:0}.crew-add-pilot-button{min-width:76px;flex:0 0 auto;text-align:center}
 
 @media(max-width:980px){
   .crew-member-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
 
 @media(max-width:760px){
-  .crew-card-shell{margin:8px 0;gap:7px}
-  .crew-unified-card{border-radius:10px}
-  .crew-unified-body{gap:10px;padding:10px!important}
-  .crew-inline-management,.crew-inline-management.is-readonly{align-items:stretch;flex-direction:column;justify-content:flex-start}
+  .crew-card-shell{margin:8px 0}
+  .crew-unified-body{gap:9px;padding:9px!important}
+  .crew-inline-management,.crew-inline-management.is-readonly{align-items:flex-start;flex-direction:column;justify-content:flex-start}
   .crew-inline-management .coverage-summary{margin-left:0;white-space:normal}
-  .crew-state-control{align-items:stretch;flex-direction:column;width:100%}
-  .crew-state-select-wrap,.crew-state-select{width:100%}
-  .crew-member-grid{grid-template-columns:1fr;gap:8px}
-  .crew-self-actions{grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
-  .crew-self-actions>button{min-height:42px;font-size:11.5px;padding:8px}
+  .crew-state-control{align-items:center;flex-direction:row;width:auto}
+  .crew-state-select-wrap,.crew-state-select{width:auto}
+  .crew-member-grid{grid-template-columns:1fr;gap:7px}
+  .crew-self-actions{gap:5px;padding:6px 8px 7px}
+  .crew-self-actions>button{min-height:30px!important;padding:5px 9px!important;font-size:10px!important}
   .crew-capacity-message{margin:0}
   .crew-candidate-action-card{grid-template-columns:1fr}
   .crew-add-pilot-button,.crew-member-action{width:100%}
 }
 
 @media(max-width:420px){
-  .crew-unified-body{padding:9px!important}
-  .crew-self-actions{grid-template-columns:1fr}
-  .crew-self-actions>button,.crew-self-actions .crew-join-button,.crew-self-actions .crew-manage-button{grid-column:1!important}
-  .crew-owner-badge{font-size:7.5px}
+  .crew-unified-body{padding:8px!important}
+  .crew-self-actions{display:flex;flex-wrap:wrap}
+  .crew-self-actions>button{flex:0 0 auto;width:auto!important}
+  .crew-self-actions .crew-delete-button{margin-left:0!important}
+  .crew-owner-badge{font-size:7px}
 }
