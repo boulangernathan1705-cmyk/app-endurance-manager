@@ -7,20 +7,25 @@ function coverage(event,departure,regs){const duration=event.durationHours||6;co
 
 function stateControl(crew,departure){return `<div class="crew-state-control"><span class="crew-state-label"><span class="crew-state-lock" aria-hidden="true">${crew.locked?'🔒':'🔓'}</span><span>Équipage</span></span><label class="crew-state-select-wrap"><span class="sr-only">État de l’équipage</span><select class="crew-state-select" data-crew-state-select data-crew-id="${crew.id}" data-departure="${departure.id}" data-version="${crew.version}"><option value="open" ${crew.locked?'':'selected'}>Ouvert</option><option value="locked" ${crew.locked?'selected':''}>Équipage complet</option></select><span class="crew-state-chevron" aria-hidden="true">▾</span></label></div>`;}
 
-function crewActions(crew,departure,ownMember,joinRegistration){
+function crewActions(crew,departure,ownMember,joinRegistration,memberElsewhere){
   const actions=[];
-  if(joinRegistration&&!crew.locked)actions.push(button('join-crew','Rejoindre cet équipage',`data-id="${crew.id}" data-departure="${departure.id}" data-registration="${joinRegistration.id}" data-version="${crew.version}"`,'primary-button crew-join-button'));
+  if(!ownMember&&!memberElsewhere&&!crew.locked&&state.user){
+    const registration=joinRegistration?.id||'';
+    actions.push(button('join-crew','Rejoindre cet équipage',`data-id="${crew.id}" data-departure="${departure.id}" data-registration="${registration}" data-version="${crew.version}"`,'primary-button crew-join-button'));
+  }
   if(ownMember)actions.push(button('leave-crew','Quitter l’équipage',`data-id="${crew.id}" data-departure="${departure.id}" data-registration="${ownMember.id}" data-version="${crew.version}"`,'secondary-button crew-leave-button'));
   if(crew.canManage)actions.push(button('edit-crew',crew.ownedByMe?'Gérer mon équipage':'Gérer l’équipage',`data-id="${crew.id}" data-departure="${departure.id}"`,'secondary-button crew-manage-button'));
   return actions.length?`<div class="crew-self-actions">${actions.join('')}</div>`:'';
 }
 
-function crewCard(event,departure,crew,index,unassigned){
+function crewCard(event,departure,crew,index,unassigned,allCrews){
   const regs=(crew.registrationIds||[]).map(id=>departure.availability.find(reg=>reg.id===id)).filter(Boolean);
   const cov=coverage(event,departure,regs);
   const names=regs.map(reg=>reg.name).join(' · ')||'Aucun pilote affecté';
   const ownMember=regs.find(reg=>reg.mine)||null;
-  const joinRegistration=ownMember?null:unassigned.find(reg=>reg.mine&&reg.category===crew.category)||null;
+  const ownRegistrationIds=new Set((departure.availability||[]).filter(reg=>reg.mine).map(reg=>reg.id));
+  const memberElsewhere=allCrews.some(other=>other.id!==crew.id&&(other.registrationIds||[]).some(id=>ownRegistrationIds.has(id)));
+  const joinRegistration=ownMember||memberElsewhere?null:unassigned.find(reg=>reg.mine&&reg.category===crew.category)||null;
   const open=Boolean(ownMember||crew.ownedByMe||state.crewManagementOpen.has(crew.id));
   const capacity=crew.locked
     ? '<p class="crew-capacity-message is-complete">Composition verrouillée : l’équipage est marqué complet.</p>'
@@ -30,24 +35,26 @@ function crewCard(event,departure,crew,index,unassigned){
   const ownerBadge=crew.ownedByMe?'<span class="crew-owner-badge">RESPONSABLE</span>':'';
   const management=crew.canManage?`<div class="crew-inline-management">${stateControl(crew,departure)}<span class="coverage-summary">${regs.length} pilote${regs.length>1?'s':''} · ${cov.covered}/${cov.duration} h</span></div>`:`<div class="crew-inline-management is-readonly"><span class="coverage-summary">${regs.length} pilote${regs.length>1?'s':''} · ${cov.covered}/${cov.duration} h</span></div>`;
   const memberCards=regs.length?`<div class="crew-member-grid" data-pilot-columns="${Math.max(1,Math.min(3,regs.length))}">${regs.map(reg=>renderRegistration(reg,departure,event.durationHours||6,false)).join('')}</div>`:'<p class="empty crew-empty-roster">Aucun pilote n’a encore rejoint cet équipage.</p>';
-  return `<details class="crew-pilot-group crew-pilot-accordion crew-unified-card ${crewColorClass(crew.id,index)} ${crew.locked?'is-complete':'is-open'}" data-crew="${crew.id}" data-crew-id="${crew.id}" data-crew-locked="${Boolean(crew.locked)}" data-crew-mine="${Boolean(ownMember)}" data-crew-team="${esc(crew.name)}" ${open?'open':''}>
-    <summary class="crew-pilot-accordion-summary" aria-label="${esc(crew.name)} · ${esc(names)} · ${esc(crew.car||'Voiture à choisir')}">
-      <span class="crew-compact-category" aria-hidden="true">${logo(crew.category)}</span>
-      <span class="crew-compact-team"><strong>${esc(crew.name)}</strong>${ownerBadge}</span>
-      <span class="crew-compact-pilots">${esc(names)}</span>
-      <span class="crew-compact-car">${esc(crew.car||'Voiture à choisir')}</span>
-      ${statusPill(crew)}
-      <span class="crew-compact-chevron" aria-hidden="true">›</span>
-    </summary>
-    <div class="crew-pilot-accordion-body crew-unified-body">
-      ${management}
-      ${capacity}
-      ${memberCards}
-      ${renderAvailabilityTimeline({departure,duration:cov.duration,counts:cov.counts,label:'Disponibilité de l’équipage'})}
-      ${crewActions(crew,departure,ownMember,joinRegistration)}
-      ${!state.user&&joinRegistration===null?'<p class="crew-action-hint">Connecte-toi avec Discord et inscris-toi pour rejoindre un équipage.</p>':''}
-    </div>
-  </details>`;
+  const actions=crewActions(crew,departure,ownMember,joinRegistration,memberElsewhere);
+  return `<div class="crew-card-shell ${crewColorClass(crew.id,index)}">
+    <details class="crew-pilot-group crew-pilot-accordion crew-unified-card ${crew.locked?'is-complete':'is-open'}" data-crew="${crew.id}" data-crew-id="${crew.id}" data-crew-locked="${Boolean(crew.locked)}" data-crew-mine="${Boolean(ownMember)}" data-crew-team="${esc(crew.name)}" ${open?'open':''}>
+      <summary class="crew-pilot-accordion-summary" aria-label="${esc(crew.name)} · ${esc(names)} · ${esc(crew.car||'Voiture à choisir')}">
+        <span class="crew-compact-category" aria-hidden="true">${logo(crew.category)}</span>
+        <span class="crew-compact-team"><strong>${esc(crew.name)}</strong>${ownerBadge}</span>
+        <span class="crew-compact-pilots">${esc(names)}</span>
+        <span class="crew-compact-car">${esc(crew.car||'Voiture à choisir')}</span>
+        ${statusPill(crew)}
+        <span class="crew-compact-chevron" aria-hidden="true">›</span>
+      </summary>
+      <div class="crew-pilot-accordion-body crew-unified-body">
+        ${management}
+        ${capacity}
+        ${memberCards}
+        ${renderAvailabilityTimeline({departure,duration:cov.duration,counts:cov.counts,label:'Disponibilité de l’équipage'})}
+      </div>
+    </details>
+    ${actions}
+  </div>`;
 }
 
 export function renderPilots(event,departure){
@@ -55,7 +62,7 @@ export function renderPilots(event,departure){
   const assigned=new Set(crews.flatMap(crew=>crew.registrationIds||[]));
   const unassigned=(departure.availability||[]).filter(reg=>reg.status!=='unavailable'&&!assigned.has(reg.id)).sort((a,b)=>event.categories.indexOf(a.category)-event.categories.indexOf(b.category)||String(a.name).localeCompare(String(b.name),'fr',{sensitivity:'base'}));
   const unavailable=(departure.availability||[]).filter(reg=>reg.status==='unavailable');
-  const crewCards=crews.length?crews.map((crew,index)=>crewCard(event,departure,crew,index,unassigned)).join(''):'<p class="empty">Aucun équipage pour ce départ. Un pilote inscrit peut créer le premier.</p>';
+  const crewCards=crews.length?crews.map((crew,index)=>crewCard(event,departure,crew,index,unassigned,crews)).join(''):'<p class="empty">Aucun équipage pour ce départ.</p>';
   const pilots=unassigned.length?`<section class="ux-unassigned-section"><div class="ux-unassigned-grid">${unassigned.map(reg=>renderRegistration(reg,departure,event.durationHours||6)).join('')}</div></section>`:`<section class="ux-unassigned-section"><p class="empty">${departure.availability.length?'Tous les pilotes disponibles ont déjà un équipage.':'Aucun pilote inscrit sur ce départ.'}</p></section>`;
   const unavailableHtml=unavailable.length?`<details class="ux-crew-bucket ux-unavailable-bucket"><summary><span>Pilotes indisponibles</span><strong>${unavailable.length}</strong></summary><div class="ux-crew-bucket-body">${unavailable.map(reg=>renderRegistration(reg,departure,event.durationHours||6)).join('')}</div></details>`:'';
   return `<div class="pilot-section"><div class="ux-course-overview ux-course-split-overview">
