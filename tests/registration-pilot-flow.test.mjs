@@ -44,11 +44,14 @@ test('adding and editing another pilot use the same native registration form',()
   assert.match(game,/app\.js\?v=[0-9]+-[a-z0-9-]+/i);
 });
 
-test('the add pilot action is next to the personal registration action',()=>{
+test('personal registration and crew creation share the same departure action block',()=>{
   assert.match(eventView,/Modifier mon inscription/);
   assert.match(eventView,/S’inscrire/);
   assert.match(eventView,/Inscrire un autre pilote/);
-  assert.match(eventView,/ux-summary-registration-actions/);
+  assert.match(eventView,/departure-action-panel/);
+  assert.match(eventView,/departure-primary-actions/);
+  assert.match(eventView,/departure-self-registration/);
+  assert.match(eventView,/departure-create-crew/);
   assert.doesNotMatch(registration,/\+ Ajouter un pilote/);
 });
 
