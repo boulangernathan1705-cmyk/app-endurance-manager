@@ -1,1 +1,1 @@
-import './front/app/actions.mjs?v=11-compact-home-cards';
+import './front/app/actions.mjs?v=12-team-times';
