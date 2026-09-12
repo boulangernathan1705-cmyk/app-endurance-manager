@@ -1,4 +1,4 @@
-import {json, origin, fail, identity} from './core.mjs';
+import {json, origin, fail, identity, rateLimit} from './core.mjs';
 
 const DAY=86400;
 const clean=(value,max)=>String(value??'').replace(/[\u0000-\u001f\u007f]/g,' ').slice(0,max);
@@ -35,7 +35,7 @@ export async function ingestClientError(request,env) {
   const url=new URL(request.url);
   const canonical=origin(env);
   const requestOrigin=request.headers.get('Origin');
-  if (url.origin!==canonical || (requestOrigin && requestOrigin!==canonical)) return request.method==='GET' ? json({error:'Utilise l’adresse principale du site pour cette action.'},403) : new Response(null,{status:204});
+  if (url.origin!==canonical || requestOrigin!==canonical) return request.method==='GET' ? json({error:'Utilise l’adresse principale du site pour cette action.'},403) : new Response(null,{status:204});
 
   if (request.method==='GET') {
     const actor=await identity(request,env);
@@ -43,6 +43,8 @@ export async function ingestClientError(request,env) {
     return json({errors:await readClientErrors(env)});
   }
   if (request.method!=='POST') return new Response(null,{status:405});
+  if (!request.headers.get('Content-Type')?.toLowerCase().startsWith('text/plain')) return new Response(null,{status:415});
+  await rateLimit(request,env,'telemetry',30);
 
   let input;
   try {
