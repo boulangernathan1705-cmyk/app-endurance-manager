@@ -72,7 +72,16 @@ export function renderRegistrationWorkspace(event,departure) {
 export function rerenderRegistrationSection(event,departure,focusSelector='',fallback=()=>{}) {
   const section=document.getElementById('departure-'+departure.id)?.querySelector('.fold-registration');
   if(!section){fallback();return;}
-  const x=window.scrollX,y=window.scrollY; section.innerHTML=renderRegistrationWorkspace(event,departure); if(focusSelector)section.querySelector(focusSelector)?.focus({preventScroll:true}); window.scrollTo(x,y); notifyRender();
+  const x=window.scrollX,y=window.scrollY;
+  const timelineOffsets=[...section.querySelectorAll('.presence-timeline')].map(timeline=>timeline.scrollLeft);
+  section.innerHTML=renderRegistrationWorkspace(event,departure);
+  const restoreTimelineOffsets=()=>section.querySelectorAll('.presence-timeline').forEach((timeline,index)=>{const offset=timelineOffsets[index];if(Number.isFinite(offset))timeline.scrollLeft=offset;});
+  restoreTimelineOffsets();
+  if(focusSelector)section.querySelector(focusSelector)?.focus({preventScroll:true});
+  restoreTimelineOffsets();
+  window.scrollTo(x,y);
+  notifyRender();
+  requestAnimationFrame(restoreTimelineOffsets);
 }
 
 export async function submitRegistration(form,api) {
