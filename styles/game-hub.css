@@ -134,7 +134,7 @@
 .hub-race-meta {
   display: grid;
   gap: 4px;
-  margin: 0 0 20px;
+  margin: 0 0 14px;
 }
 
 .hub-race-meta span {
@@ -142,75 +142,94 @@
   font-size: 14px;
 }
 
-.hub-crews-heading {
-  display: flex;
-  align-items: baseline;
-  gap: 6px;
-  margin-bottom: 9px;
-}
-
-.hub-crews-heading span {
-  color: var(--muted);
-  font-size: 13px;
-}
-
-.hub-crews {
+.hub-category-grid {
   display: grid;
+  grid-template-columns: repeat(2,minmax(0,1fr));
   gap: 8px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
 }
 
-.hub-crew {
+.hub-category-card {
   display: grid;
-  grid-template-columns: auto minmax(130px, .8fr) minmax(0, 1.2fr);
-  align-items: center;
-  gap: 10px;
-  padding: 10px 12px;
+  grid-template-columns: auto minmax(0,1fr);
+  align-items: start;
+  gap: 9px;
+  min-width: 0;
+  padding: 9px 10px;
   border: 1px solid var(--border);
   border-radius: 9px;
   background: var(--panel2);
 }
 
-.hub-crew-status {
-  font-size: 14px;
+.hub-category-logo,
+.hub-category-text-logo {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
 }
 
-.hub-crew-main {
+.hub-category-logo {
+  object-fit: contain;
+}
+
+.hub-category-text-logo {
   display: grid;
-  gap: 2px;
+  place-items: center;
+  border: 1px solid currentColor;
+  border-radius: 6px;
+  font-size: 9px;
+  font-weight: 900;
+}
+
+.hub-category-copy {
+  display: grid;
+  gap: 4px;
   min-width: 0;
 }
 
-.hub-crew-main strong,
-.hub-crew-main small,
-.hub-crew-pilots {
+.hub-category-heading {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+
+.hub-category-heading strong {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.hub-crew-main small,
-.hub-crew-pilots {
+.hub-category-heading small {
+  flex: 0 0 auto;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 11px;
+  font-weight: 700;
 }
 
-.hub-crew-pilots {
-  text-align: right;
+.hub-category-crews {
+  display: grid;
+  gap: 2px;
+  padding-top: 4px;
+  border-top: 1px solid rgba(255,255,255,.12);
+}
+
+.hub-category-crews span {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hub-category-crews-empty span {
+  font-weight: 500;
+  opacity: .75;
 }
 
 .hub-no-crews,
 .hub-empty {
   color: var(--muted);
-}
-
-.hub-no-crews {
-  margin: 8px 0 0;
-  padding: 12px;
-  border: 1px dashed var(--border);
-  border-radius: 9px;
 }
 
 .hub-empty {
@@ -307,56 +326,39 @@
     font-size: 11px;
   }
 
-  .hub-crews-heading {
-    gap: 4px;
-    margin-bottom: 5px;
-    font-size: 13px;
+  .hub-category-grid {
+    grid-template-columns: repeat(2,minmax(0,1fr));
+    gap: 5px;
   }
 
-  .hub-crews-heading span {
-    font-size: 11px;
-  }
-
-  .hub-crews {
-    gap: 4px;
-  }
-
-  .hub-crew {
-    grid-template-columns: auto minmax(0, 1fr);
-    gap: 7px;
-    padding: 5px 8px;
+  .hub-category-card {
+    gap: 6px;
+    padding: 6px 7px;
     border-radius: 7px;
   }
 
-  .hub-crew-status {
+  .hub-category-logo,
+  .hub-category-text-logo {
+    width: 28px;
+    height: 28px;
+  }
+
+  .hub-category-heading {
+    gap: 4px;
+  }
+
+  .hub-category-heading strong {
     font-size: 12px;
   }
 
-  .hub-crew-main {
-    gap: 0;
-    line-height: 1.12;
-  }
-
-  .hub-crew-main strong {
-    font-size: 12px;
-  }
-
-  .hub-crew-main small,
-  .hub-crew-pilots {
+  .hub-category-heading small,
+  .hub-category-crews span {
     font-size: 10px;
   }
 
-  .hub-crew-pilots {
-    grid-column: 2;
-    margin-top: -1px;
-    text-align: left;
-    white-space: nowrap;
-  }
-
-  .hub-no-crews {
-    margin-top: 4px;
-    padding: 7px 8px;
-    font-size: 11px;
+  .hub-category-crews {
+    gap: 1px;
+    padding-top: 3px;
   }
 
   .hub-empty {
@@ -366,6 +368,12 @@
 
   .hub-empty span {
     font-size: 11px;
+  }
+}
+
+@media (max-width: 420px) {
+  .hub-category-grid {
+    grid-template-columns: 1fr;
   }
 }
 
