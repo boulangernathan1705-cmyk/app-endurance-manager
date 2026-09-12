@@ -71,6 +71,7 @@ await rm(out, {recursive: true, force: true});
 await mkdir(out, {recursive: true});
 await mkdir(new URL('lmu/', out), {recursive: true});
 await mkdir(new URL('iracing/', out), {recursive: true});
+await mkdir(new URL('.well-known/', out), {recursive: true});
 
 const sourceIndex = await readFile(root + 'index.html', 'utf8');
 const sourceGame = await readFile(root + 'game.html', 'utf8');
@@ -114,11 +115,50 @@ if (!workers) {
 }
 
 await writeFile(new URL('_headers', out), `/*
-  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' https://commons.wikimedia.org https://upload.wikimedia.org https://cdn.discordapp.com; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'
+  Content-Security-Policy: default-src 'self'; script-src 'self'; script-src-attr 'none'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://commons.wikimedia.org https://upload.wikimedia.org https://cdn.discordapp.com; connect-src 'self'; font-src 'self' data:; media-src 'none'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; frame-src 'none'; form-action 'self'; worker-src 'self'; manifest-src 'self'; upgrade-insecure-requests
+  Strict-Transport-Security: max-age=31536000; includeSubDomains
   X-Content-Type-Options: nosniff
   Referrer-Policy: no-referrer
   X-Frame-Options: DENY
-  Permissions-Policy: camera=(), microphone=(), geolocation=()
+  Permissions-Policy: accelerometer=(), camera=(), display-capture=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()
+  X-Permitted-Cross-Domain-Policies: none
+
+/members.html
+  X-Robots-Tag: noindex, nofollow
+
+/diagnostics.html
+  X-Robots-Tag: noindex, nofollow
+
+https://app.endurance-manager.workers.dev/*
+  X-Robots-Tag: noindex, nofollow
+`);
+
+await writeFile(new URL('robots.txt', out), `User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /telemetry/
+Disallow: /members.html
+Disallow: /diagnostics.html
+Sitemap: https://endurance-manager.app/sitemap.xml
+`);
+
+await writeFile(new URL('sitemap.xml', out), `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://endurance-manager.app/</loc></url>
+  <url><loc>https://endurance-manager.app/lmu/</loc></url>
+  <url><loc>https://endurance-manager.app/iracing/</loc></url>
+  <url><loc>https://endurance-manager.app/help.html</loc></url>
+  <url><loc>https://endurance-manager.app/legal.html</loc></url>
+  <url><loc>https://endurance-manager.app/privacy.html</loc></url>
+  <url><loc>https://endurance-manager.app/circuit-credits.html</loc></url>
+</urlset>
+`);
+
+await writeFile(new URL('.well-known/security.txt', out), `Contact: https://github.com/boulangernathan1705-cmyk/app-endurance-manager/issues
+Expires: 2027-09-01T00:00:00.000Z
+Preferred-Languages: fr, en
+Canonical: https://endurance-manager.app/.well-known/security.txt
+Policy: https://endurance-manager.app/privacy.html
 `);
 
 console.log(`Build ready: public/ (${workers ? 'Workers' : 'Pages'}, accueil + LMU + iRacing + membres + diagnostics + aide, ${uniqueStylesheetPaths.length} feuilles CSS -> app.css)`);
