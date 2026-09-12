@@ -69,12 +69,12 @@ function closeMenu() {
 }
 
 function renderDisconnected(discordReady) {
-  root.innerHTML = `<div class="account-disconnected-actions">
+  root.innerHTML = `<div class="account-disconnected-wrap"><div class="account-disconnected-actions">
     <a class="account-menu-item account-help-link" href="/help.html">Aide</a>
     ${discordReady
       ? `<a class="account-discord-login" href="/api/auth/discord">${discordMark()}<span>Se connecter avec Discord</span></a>`
       : `<span class="account-discord-unavailable">${discordMark()}<span>Connexion Discord indisponible</span></span>`}
-  </div>`;
+  </div>${discordReady?'<p class="account-oauth-trust">Connexion via Discord OAuth · aucun mot de passe transmis à Endurance Manager. <a href="/about.html#connexion">En savoir plus</a></p>':''}</div>`;
 }
 
 function renderConnected(user) {
