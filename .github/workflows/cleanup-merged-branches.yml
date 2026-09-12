@@ -1,4 +1,4 @@
-name: Cleanup old branches
+name: Cleanup merged branches
 
 on:
   workflow_dispatch:
@@ -15,7 +15,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Delete every branch except main and dev
+      - name: Delete old branches already merged
         shell: bash
         run: |
           set -euo pipefail
@@ -28,17 +28,19 @@ jobs:
             branch="${ref#origin/}"
 
             case "$branch" in
-              main|dev|HEAD)
-                echo "Keeping protected branch: $branch"
-                kept=$((kept + 1))
-                continue
-                ;;
+              main|dev|HEAD) continue ;;
             esac
 
-            echo "Deleting old branch: $branch"
-            git push origin --delete "$branch"
-            deleted=$((deleted + 1))
+            if git merge-base --is-ancestor "$ref" origin/main 2>/dev/null || \
+               git merge-base --is-ancestor "$ref" origin/dev 2>/dev/null; then
+              echo "Deleting merged branch: $branch"
+              git push origin --delete "$branch"
+              deleted=$((deleted + 1))
+            else
+              echo "Keeping unmerged branch: $branch"
+              kept=$((kept + 1))
+            fi
           done < <(git for-each-ref --format='%(refname:short)' refs/remotes/origin/ | sort)
 
           echo "Deleted: $deleted"
-          echo "Kept: $kept"
+          echo "Kept because not merged: $kept"
