@@ -18,10 +18,14 @@ function displayTime(value) {
   return match[2] === '00' ? `${Number(match[1])}h` : `${Number(match[1])}h${match[2]}`;
 }
 
+function hasRegisteredPilot(departure) {
+  return (departure?.availability || []).some(registration => registration.status !== 'unavailable');
+}
+
 function selectedDeparture(event, timestamp=Date.now()) {
   const duration = (Number(event.durationHours) || 6) * 3600000;
   const departures = [...(event.departures || [])]
-    .filter(item => Number.isFinite(Number(item.startsAt)))
+    .filter(item => Number.isFinite(Number(item.startsAt)) && hasRegisteredPilot(item))
     .sort((a,b) => Number(a.startsAt) - Number(b.startsAt));
   return departures.find(item => Number(item.startsAt) <= timestamp && Number(item.startsAt) + duration > timestamp)
     || departures.find(item => Number(item.startsAt) > timestamp)
@@ -42,32 +46,35 @@ function nextEndurance(events, game, timestamp=Date.now()) {
   return candidates[0] || null;
 }
 
+function crewIcon(color) {
+  return `<span class="crew-summary-icon" aria-hidden="true" style="--crew-color:${color}"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="7" r="2.2"/><circle cx="6.8" cy="10" r="1.7"/><circle cx="17.2" cy="10" r="1.7"/><path d="M8.5 17.2c.4-2.7 1.6-4.2 3.5-4.2s3.1 1.5 3.5 4.2"/><path d="M3.8 17c.3-2.2 1.3-3.4 3-3.4.7 0 1.3.2 1.8.6"/><path d="M20.2 17c-.3-2.2-1.3-3.4-3-3.4-.7 0-1.3.2-1.8.6"/></svg></span>`;
+}
+
 function crewMarkup(crew, departure, index=0) {
   const pilots = (crew.registrationIds || [])
     .map(id => (departure.availability || []).find(registration => registration.id === id)?.name)
     .filter(Boolean);
   const color = CREW_COLORS[index % CREW_COLORS.length];
-  const teamMark = `<span class="hub-crew-status" aria-hidden="true" style="display:grid;place-items:center;width:24px;height:24px;border:1px solid ${color};border-radius:7px;color:${color}"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="${color}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="7" r="2.2"/><circle cx="6.8" cy="10" r="1.7"/><circle cx="17.2" cy="10" r="1.7"/><path d="M8.5 17.2c.4-2.7 1.6-4.2 3.5-4.2s3.1 1.5 3.5 4.2"/><path d="M3.8 17c.3-2.2 1.3-3.4 3-3.4.7 0 1.3.2 1.8.6"/><path d="M20.2 17c-.3-2.2-1.3-3.4-3-3.4-.7 0-1.3.2-1.8.6"/></svg></span>`;
-  return `<li class="hub-crew ${crew.locked ? 'is-complete' : 'is-open'}">
-    ${teamMark}
-    <span class="hub-crew-main"><strong style="color:${color}">${esc(crew.name)}</strong><small>${esc(crew.category)}${crew.car ? ` · ${esc(crew.car)}` : ''}</small></span>
-    <span class="hub-crew-pilots">${pilots.length ? esc(pilots.join(' · ')) : 'Aucun pilote affecté'}</span>
-  </li>`;
+  return `<span class="crew-summary-card ${crew.locked ? 'is-complete' : 'is-open'}">
+    ${crewIcon(color)}
+    <span class="crew-summary-main"><span class="crew-summary-title"><strong style="color:${color}">${esc(crew.name || 'Équipage')}</strong></span><small>${esc(crew.category || '')}${crew.car ? ` · ${esc(crew.car)}` : ''}</small></span>
+    <span class="crew-summary-pilots">${pilots.length ? esc(pilots.join(' · ')) : 'Aucun pilote affecté'}</span>
+  </span>`;
 }
 
 function enduranceMarkup(item, game) {
-  if (!item) return `<div class="hub-empty"><strong>Aucune endurance programmée</strong><span>Les prochains événements apparaîtront ici automatiquement.</span></div>`;
+  if (!item) return `<div class="hub-empty"><strong>Aucune endurance avec pilote inscrit</strong><span>Le prochain départ apparaîtra ici dès qu’un pilote sera inscrit.</span></div>`;
   const {event,departure} = item;
   const catalog = GAME_CATALOGS[game];
   const circuit = catalog.circuits.find(item => item.id === event.circuit)?.name || 'Circuit à préciser';
-  const crews = departure.crews || [];
+  const crews = (departure.crews || []).filter(crew => (crew.registrationIds || []).some(id => (departure.availability || []).some(reg => reg.id === id && reg.status !== 'unavailable')));
   const running = Number(departure.startsAt) <= Date.now();
   return `<section class="hub-next-race" aria-label="Prochaine endurance ${esc(catalog.name)}">
     <span class="hub-next-label">${running ? 'COURSE EN COURS' : 'PROCHAINE ENDURANCE'}</span>
     <h3>${esc(event.name)}</h3>
     <p class="hub-race-meta"><strong>${esc(formatter.format(new Date(Number(departure.startsAt))))} · ${esc(displayTime(departure.time))}</strong><span>${esc(circuit)} · ${Number(event.durationHours) || 6} h</span></p>
-    <div class="hub-crews-heading"><strong>${crews.length} équipage${crews.length > 1 ? 's' : ''}</strong><span>${crews.length ? 'engagé'+(crews.length > 1 ? 's' : '') : 'formé'}</span></div>
-    ${crews.length ? `<ul class="hub-crews">${crews.map((crew,index) => crewMarkup(crew,departure,index)).join('')}</ul>` : '<p class="hub-no-crews">Aucun équipage formé pour ce départ.</p>'}
+    <span class="crew-summary-heading"><strong>${crews.length} équipage${crews.length > 1 ? 's' : ''}</strong><span>${crews.length ? 'engagé'+(crews.length > 1 ? 's' : '') : 'formé'}</span></span>
+    ${crews.length ? `<span class="crew-summary-list">${crews.map((crew,index) => crewMarkup(crew,departure,index)).join('')}</span>` : '<p class="hub-no-crews">Des pilotes sont inscrits, mais aucun équipage n’est encore formé pour ce départ.</p>'}
   </section>`;
 }
 

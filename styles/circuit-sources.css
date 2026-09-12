@@ -28,26 +28,9 @@
   pointer-events: none;
 }
 
-/* Accueil mobile : fenêtre un peu plus généreuse pour que les SVG gardent
-   une marge visible sans toucher au rendu desktop. */
+/* Les cartes d'événements gèrent leur propre grille dans home-event-card.css.
+   Ici on ne définit que la fenêtre du circuit. */
 @media (max-width: 760px) {
-  .event-card.event-card-harmonized .event-card-body {
-    display: grid !important;
-    grid-template-columns: minmax(0,1fr) 132px;
-    grid-template-areas:
-      "title map"
-      "categories categories"
-      "status status";
-    column-gap: 8px;
-    row-gap: 10px;
-    align-items: start;
-  }
-
-  .event-card.event-card-harmonized .event-card-title-row {
-    grid-area: title;
-    min-width: 0;
-  }
-
   .event-card.event-card-harmonized .circuit-visual {
     grid-area: map;
     position: relative !important;
@@ -55,12 +38,12 @@
     right: auto !important;
     bottom: auto !important;
     left: auto !important;
-    width: 132px !important;
-    height: 112px !important;
-    min-width: 132px !important;
-    max-width: 132px !important;
-    flex: 0 0 132px !important;
-    align-self: center;
+    width: 96px !important;
+    height: 82px !important;
+    min-width: 96px !important;
+    max-width: 96px !important;
+    flex: 0 0 96px !important;
+    align-self: start;
     justify-self: end;
     transform: none !important;
     z-index: 0;
@@ -68,21 +51,6 @@
 
   .event-card.event-card-harmonized .circuit-visual img[data-circuit] {
     transform: translate(var(--circuit-mobile-x, 0),var(--circuit-mobile-y, 0)) scale(var(--circuit-mobile-scale, 1.02)) !important;
-  }
-
-  .event-card.event-card-harmonized .event-category-badges {
-    grid-area: categories;
-    position: relative;
-    z-index: 1;
-    width: 100%;
-    margin-top: 0 !important;
-  }
-
-  .event-card.event-card-harmonized .event-card-status {
-    grid-area: status;
-    position: relative;
-    z-index: 1;
-    width: 100%;
   }
 }
 
