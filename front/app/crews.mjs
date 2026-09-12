@@ -60,7 +60,7 @@ function crewCard(event,departure,crew,index,unassigned,allCrews){
   </div>`;
 }
 
-export function renderPilots(event,departure){
+export function renderPilots(event,departure,options={}){
   const crews=[...(departure.crews||[])].sort((a,b)=>event.categories.indexOf(a.category)-event.categories.indexOf(b.category)||String(a.name).localeCompare(String(b.name),'fr',{sensitivity:'base',numeric:true}));
   const assigned=new Set(crews.flatMap(crew=>crew.registrationIds||[]));
   const unassigned=(departure.availability||[]).filter(reg=>reg.status!=='unavailable'&&!assigned.has(reg.id)).sort((a,b)=>event.categories.indexOf(a.category)-event.categories.indexOf(b.category)||String(a.name).localeCompare(String(b.name),'fr',{sensitivity:'base'}));
@@ -68,13 +68,14 @@ export function renderPilots(event,departure){
   const crewCards=crews.length?crews.map((crew,index)=>crewCard(event,departure,crew,index,unassigned,crews)).join(''):'<p class="empty">Aucun équipage pour ce départ.</p>';
   const pilots=unassigned.length?`<section class="ux-unassigned-section"><div class="ux-unassigned-grid">${unassigned.map(reg=>renderRegistration(reg,departure,event.durationHours||6)).join('')}</div></section>`:`<section class="ux-unassigned-section"><p class="empty">${departure.availability.length?'Tous les pilotes disponibles ont déjà un équipage.':'Aucun pilote inscrit sur ce départ.'}</p></section>`;
   const unavailableHtml=unavailable.length?`<details class="ux-crew-bucket ux-unavailable-bucket"><summary><span>Pilotes indisponibles</span><strong>${unavailable.length}</strong></summary><div class="ux-crew-bucket-body">${unavailable.map(reg=>renderRegistration(reg,departure,event.durationHours||6)).join('')}</div></details>`:'';
+  const createCrew=options.canCreateCrew?`<button type="button" class="secondary-button crew-builder-open crew-section-create" data-crew-builder-open data-departure="${departure.id}">${esc(options.createCrewLabel||'Créer un équipage')}</button>`:'';
   return `<div class="pilot-section"><div class="ux-course-overview ux-course-split-overview">
-    <details class="ux-course-crews-accordion" open>${contentSummary('Équipages',crews.length)}<div class="ux-course-crews-body">${crewCards}</div></details>
+    <section class="ux-course-crews-block"><div class="ux-course-crews-heading"><span class="ux-course-crews-title">Équipages <strong>${crews.length}</strong></span>${createCrew}</div><div class="ux-course-crews-body">${crewCards}</div></section>
     <details class="ux-course-pilots-accordion">${contentSummary('Pilotes sans équipage',pilotCount(unassigned))}<div class="ux-course-pilots-body">${pilots}${unavailableHtml}</div></details>
   </div></div>`;
 }
 
-export function renderCrews(event,departure){return renderPilots(event,departure);}
+export function renderCrews(event,departure,options={}){return renderPilots(event,departure,options);}
 
 export async function updateCrewState(select){
   const event=state.events.find(item=>item.id===state.currentEventId);const departure=event?.departures.find(item=>item.id===select.dataset.departure);const crew=departure?.crews.find(item=>item.id===select.dataset.crewId);if(!crew)throw Error('Équipage introuvable. Actualise la page.');if(!crew.canManage)throw Error('Tu n’as pas l’autorisation de modifier cet équipage.');const locked=select.value==='locked';if(locked===!!crew.locked)return;if(locked&&!confirm(`Marquer « ${crew.name} » comme équipage complet et verrouiller sa composition ?`)){select.value=crew.locked?'locked':'open';return;}select.disabled=true;try{await api(`/api/crews/${crew.id}`,'PATCH',{locked,version:crew.version});state.crewManagementOpen.add(crew.id);}finally{if(select.isConnected)select.disabled=false;}
