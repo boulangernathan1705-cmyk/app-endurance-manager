@@ -1,6 +1,6 @@
 import {app,state,esc,button,canManage,isAdmin,eventTypeBadge,eventBadge,eventCategoryCount,circuitVisual,pilotCount,dateLabel,countdown,notifyRender} from './core.mjs';
 import {ownRegistration,renderRegistrationWorkspace} from './registration.mjs';
-import {renderPilots} from './crews.mjs';
+import {renderPilots} from './crews.mjs?v=2-unified-management';
 import {renderHome,showRecoveryLink} from './home-view.mjs';
 
 export function renderDeparturePanel(event,departure,index,open=false){
