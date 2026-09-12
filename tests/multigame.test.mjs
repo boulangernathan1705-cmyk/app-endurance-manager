@@ -55,6 +55,42 @@ test('le portail expose les deux espaces et le contexte charge avant l’applica
   assert(build.includes("new URL('iracing/index.html', out)"));
 });
 
+test('le résumé d’accueil suit la chronologie course et charge LMU/iRacing séparément', () => {
+  const hub = readFileSync(new URL('../front/game-hub.mjs',import.meta.url),'utf8');
+  assert.match(hub,/import \{eventSchedule\} from '\.\/schedule\.mjs'/);
+  assert.match(hub,/eventSchedule\(event,timestamp\)/);
+  assert.match(hub,/Number\(!!b\.schedule\.running\)-Number\(!!a\.schedule\.running\)/);
+  assert.match(hub,/fetchGameEvents\('lmu'\)/);
+  assert.match(hub,/fetchGameEvents\('iracing'\)/);
+  assert.match(hub,/\/api\/events\?game=/);
+});
+
+test('l’accueil affiche jusqu’à trois départs et s’arrête au premier équipage', () => {
+  const hub = readFileSync(new URL('../front/game-hub.mjs',import.meta.url),'utf8');
+  assert.match(hub,/const MAX_HOME_ITEMS = 3/);
+  assert.match(hub,/function homeQueue\(events, game, timestamp=Date\.now\(\)\)/);
+  assert.match(hub,/const active=remaining\.filter\(hasVisibleActivity\)/);
+  assert.match(hub,/for \(const departure of active\)/);
+  assert.match(hub,/if \(hasCrew\(departure\) \|\| queue\.length >= MAX_HOME_ITEMS\) return queue/);
+  assert.match(hub,/queue\.slice\(0,MAX_HOME_ITEMS\)/);
+});
+
+test('un événement sans aucune inscription reste visible jusqu’à sa fin', () => {
+  const hub = readFileSync(new URL('../front/game-hub.mjs',import.meta.url),'utf8');
+  assert.match(hub,/if \(!active\.length\) \{/);
+  assert.match(hub,/queue\.push\(\{\.\.\.item,departure:remaining\[0\]\}\)/);
+  assert.match(hub,/Aucun participant/);
+});
+
+test('le résumé d’accueil affiche chaque équipage créé même sans pilote affecté', () => {
+  const hub = readFileSync(new URL('../front/game-hub.mjs',import.meta.url),'utf8');
+  assert.match(hub,/function hasVisibleActivity\(departure\)/);
+  assert.match(hub,/\(departure\?\.crews \|\| \[\]\)\.length > 0/);
+  assert.match(hub,/const crews = \[\.\.\.\(departure\.crews \|\| \[\]\)\]/);
+  assert.match(hub,/Aucun pilote affecté/);
+  assert.match(hub,/Aucun participant/);
+});
+
 test('les identifiants iRacing ne peuvent pas entrer en collision avec les circuits LMU', () => {
   const lmuIds = new Set(GAME_CATALOGS.lmu.circuits.map(item => item.id));
   for (const circuit of GAME_CATALOGS.iracing.circuits) {

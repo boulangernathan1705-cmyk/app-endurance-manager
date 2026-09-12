@@ -1,4 +1,5 @@
 import {GAME_CATALOGS, gameForEvent} from '../shared/catalog.mjs';
+import {eventSchedule} from './schedule.mjs';
 
 const grid = document.getElementById('game-grid');
 const formatter = new Intl.DateTimeFormat('fr-FR', {
@@ -10,6 +11,7 @@ const formatter = new Intl.DateTimeFormat('fr-FR', {
 });
 
 const CREW_COLORS = ['#52d3d8','#f3b33d','#ec5b67','#75d66b','#8b7cf6','#e47adf','#58a6ff','#f28f45'];
+const MAX_HOME_ITEMS = 3;
 const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
 
 function displayTime(value) {
@@ -18,32 +20,71 @@ function displayTime(value) {
   return match[2] === '00' ? `${Number(match[1])}h` : `${Number(match[1])}h${match[2]}`;
 }
 
-function hasRegisteredPilot(departure) {
-  return (departure?.availability || []).some(registration => registration.status !== 'unavailable');
+function activeRegistrations(departure) {
+  return (departure?.availability || []).filter(registration => registration.status !== 'unavailable');
 }
 
-function selectedDeparture(event, timestamp=Date.now()) {
+function activePilotCount(departure) {
+  return new Set(activeRegistrations(departure).map(registration => registration.participantId || registration.id)).size;
+}
+
+function hasVisibleActivity(departure) {
+  return activeRegistrations(departure).length > 0 || (departure?.crews || []).length > 0;
+}
+
+function hasCrew(departure) {
+  return (departure?.crews || []).length > 0;
+}
+
+function eventBounds(event) {
   const duration = (Number(event.durationHours) || 6) * 3600000;
-  const departures = [...(event.departures || [])]
-    .filter(item => Number.isFinite(Number(item.startsAt)) && hasRegisteredPilot(item))
-    .sort((a,b) => Number(a.startsAt) - Number(b.startsAt));
-  return departures.find(item => Number(item.startsAt) <= timestamp && Number(item.startsAt) + duration > timestamp)
-    || departures.find(item => Number(item.startsAt) > timestamp)
-    || null;
+  const starts = (event.departures || [])
+    .map(item => Number(item.startsAt))
+    .filter(Number.isFinite)
+    .sort((a,b) => a-b);
+  if (!starts.length) return null;
+  return {start:starts[0],end:starts[starts.length-1]+duration,duration};
 }
 
-function nextEndurance(events, game, timestamp=Date.now()) {
-  const candidates = events
+function remainingDepartures(event, timestamp=Date.now()) {
+  const bounds = eventBounds(event);
+  if (!bounds) return [];
+  return [...(event.departures || [])]
+    .filter(item => Number.isFinite(Number(item.startsAt)) && Number(item.startsAt) + bounds.duration > timestamp)
+    .sort((a,b) => Number(a.startsAt) - Number(b.startsAt));
+}
+
+function orderedEvents(events, game, timestamp=Date.now()) {
+  return events
     .filter(event => gameForEvent(event) === game)
-    .map(event => ({event,departure:selectedDeparture(event,timestamp)}))
-    .filter(item => item.departure)
-    .sort((a,b) => {
-      const aRunning = Number(a.departure.startsAt) <= timestamp;
-      const bRunning = Number(b.departure.startsAt) <= timestamp;
-      if (aRunning !== bRunning) return aRunning ? -1 : 1;
-      return Number(a.departure.startsAt) - Number(b.departure.startsAt);
-    });
-  return candidates[0] || null;
+    .map(event => ({event,schedule:eventSchedule(event,timestamp),bounds:eventBounds(event)}))
+    .filter(item => item.bounds && !item.schedule.archived && item.schedule.timestamp !== null)
+    .sort((a,b) => Number(!!b.schedule.running)-Number(!!a.schedule.running)
+      || (a.schedule.timestamp ?? Infinity)-(b.schedule.timestamp ?? Infinity)
+      || a.event.name.localeCompare(b.event.name,'fr'));
+}
+
+function homeQueue(events, game, timestamp=Date.now()) {
+  const queue=[];
+  for (const item of orderedEvents(events,game,timestamp)) {
+    const remaining=remainingDepartures(item.event,timestamp);
+    if (!remaining.length) continue;
+    const active=remaining.filter(hasVisibleActivity);
+
+    // An event with nobody registered must still remain visible until it is over.
+    if (!active.length) {
+      queue.push({...item,departure:remaining[0]});
+      break;
+    }
+
+    for (const departure of active) {
+      queue.push({...item,departure});
+      if (hasCrew(departure) || queue.length >= MAX_HOME_ITEMS) return queue;
+    }
+
+    if (queue.length >= MAX_HOME_ITEMS) return queue;
+  }
+  return queue.slice(0,MAX_HOME_ITEMS);
 }
 
 function crewIcon(color) {
@@ -62,20 +103,37 @@ function crewMarkup(crew, departure, index=0) {
   </span>`;
 }
 
+function participationMarkup(departure) {
+  const crews = [...(departure.crews || [])];
+  const pilotCount = activePilotCount(departure);
+  if (crews.length) {
+    return `<span class="crew-summary-heading"><strong>${crews.length} équipage${crews.length > 1 ? 's' : ''} engagé${crews.length > 1 ? 's' : ''}</strong><span>${pilotCount ? `${pilotCount} pilote${pilotCount > 1 ? 's' : ''} inscrit${pilotCount > 1 ? 's' : ''}` : 'Aucun pilote inscrit'}</span></span>
+      <span class="crew-summary-list">${crews.map((crew,index) => crewMarkup(crew,departure,index)).join('')}</span>`;
+  }
+  if (pilotCount) {
+    return `<span class="crew-summary-heading"><strong>${pilotCount} pilote${pilotCount > 1 ? 's' : ''} inscrit${pilotCount > 1 ? 's' : ''}</strong><span>Aucun équipage formé</span></span>`;
+  }
+  return '<span class="crew-summary-heading"><strong>Aucun participant</strong><span>Aucune inscription pour ce départ</span></span>';
+}
+
 function enduranceMarkup(item, game) {
-  if (!item) return `<div class="hub-empty"><strong>Aucune endurance avec pilote inscrit</strong><span>Le prochain départ apparaîtra ici dès qu’un pilote sera inscrit.</span></div>`;
-  const {event,departure} = item;
+  const {event,departure,bounds,schedule} = item;
   const catalog = GAME_CATALOGS[game];
   const circuit = catalog.circuits.find(item => item.id === event.circuit)?.name || 'Circuit à préciser';
-  const crews = (departure.crews || []).filter(crew => (crew.registrationIds || []).some(id => (departure.availability || []).some(reg => reg.id === id && reg.status !== 'unavailable')));
-  const running = Number(departure.startsAt) <= Date.now();
-  return `<section class="hub-next-race" aria-label="Prochaine endurance ${esc(catalog.name)}">
-    <span class="hub-next-label">${running ? 'COURSE EN COURS' : 'PROCHAINE ENDURANCE'}</span>
+  const departureRunning = Number(departure.startsAt) <= Date.now() && Number(departure.startsAt) + bounds.duration > Date.now();
+  const eventStarted = schedule?.event?.departures?.some(item => Number(item.startsAt) <= Date.now()) || bounds.start <= Date.now();
+  const label = departureRunning ? 'COURSE EN COURS' : eventStarted ? 'PROCHAIN DÉPART' : 'PROCHAINE ENDURANCE';
+  return `<section class="hub-next-race" aria-label="${esc(event.name)} · départ ${esc(displayTime(departure.time))}">
+    <span class="hub-next-label">${label}</span>
     <h3>${esc(event.name)}</h3>
     <p class="hub-race-meta"><strong>${esc(formatter.format(new Date(Number(departure.startsAt))))} · ${esc(displayTime(departure.time))}</strong><span>${esc(circuit)} · ${Number(event.durationHours) || 6} h</span></p>
-    <span class="crew-summary-heading"><strong>${crews.length} équipage${crews.length > 1 ? 's' : ''}</strong><span>${crews.length ? 'engagé'+(crews.length > 1 ? 's' : '') : 'formé'}</span></span>
-    ${crews.length ? `<span class="crew-summary-list">${crews.map((crew,index) => crewMarkup(crew,departure,index)).join('')}</span>` : '<p class="hub-no-crews">Des pilotes sont inscrits, mais aucun équipage n’est encore formé pour ce départ.</p>'}
+    ${participationMarkup(departure)}
   </section>`;
+}
+
+function enduranceQueueMarkup(items, game) {
+  if (!items.length) return `<div class="hub-empty"><strong>Aucune endurance à venir</strong><span>Le prochain événement apparaîtra ici dès qu’il sera créé.</span></div>`;
+  return `<div class="hub-race-queue">${items.map(item=>enduranceMarkup(item,game)).join('')}</div>`;
 }
 
 function gameCard(game, events) {
@@ -85,17 +143,21 @@ function gameCard(game, events) {
   return `<article class="game-hub-card game-${game}">
     <div class="game-hub-heading"><div class="game-title-line"><span class="game-badge" aria-hidden="true">${badge}</span><h2>${esc(catalog.name)}</h2></div><p>${game === 'lmu' ? 'Hypercar, prototypes et GT de Le Mans Ultimate.' : 'GTP, LMP2, GT3, GT4 et TCR avec un catalogue de circuits étendu.'}</p></div>
     <a class="game-hub-enter" href="${href}">Accéder à ${esc(catalog.shortName)} <span aria-hidden="true">→</span></a>
-    ${enduranceMarkup(nextEndurance(events,game),game)}
+    ${enduranceQueueMarkup(homeQueue(events,game),game)}
   </article>`;
+}
+
+async function fetchGameEvents(game) {
+  const response = await fetch(`/api/events?game=${encodeURIComponent(game)}`, {credentials:'same-origin',cache:'no-store'});
+  if (!response.ok) throw new Error(`events-${game}`);
+  const result = await response.json();
+  return Array.isArray(result.events) ? result.events : [];
 }
 
 async function load() {
   try {
-    const response = await fetch('/api/events', {credentials:'same-origin',cache:'no-store'});
-    if (!response.ok) throw new Error('events');
-    const result = await response.json();
-    const events = Array.isArray(result.events) ? result.events : [];
-    grid.innerHTML = gameCard('lmu',events) + gameCard('iracing',events);
+    const [lmuEvents,iracingEvents] = await Promise.all([fetchGameEvents('lmu'),fetchGameEvents('iracing')]);
+    grid.innerHTML = gameCard('lmu',lmuEvents) + gameCard('iracing',iracingEvents);
   } catch {
     grid.innerHTML = gameCard('lmu',[]) + gameCard('iracing',[]);
     const notice = document.getElementById('hub-status');
