@@ -1,5 +1,5 @@
 import {app,state,api,load,showError,countdown,CARS} from './core.mjs';
-import {renderNav,renderHome} from './home-view.mjs';
+import {renderNav,renderHome} from './home-view.mjs?v=2-home-crew-summary';
 import {renderEvent} from './event-view.mjs';
 import {renderEventForm,departureFields,updateRemoveButtons} from './event-form.mjs';
 import {renderMyEntries} from './entries-view.mjs?v=2-three-accordions';

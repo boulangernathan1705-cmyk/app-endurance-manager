@@ -1,1 +1,1 @@
-import './front/app/actions.mjs?v=8-single-shared-state';
+import './front/app/actions.mjs?v=9-home-crew-summary';
