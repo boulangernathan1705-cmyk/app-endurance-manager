@@ -3,9 +3,7 @@ name: Browser compatibility
 on:
   workflow_dispatch:
   push:
-    branches: [main, dev]
-  schedule:
-    - cron: '17 5 * * *'
+    branches: [dev]
 
 permissions:
   contents: read
@@ -14,6 +12,9 @@ jobs:
   browser-compatibility:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      COMPAT_BASE_URL: https://app.endurance-manager.workers.dev
+      ENV_LABEL: development
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -21,23 +22,11 @@ jobs:
           node-version: '22.13.0'
       - run: npm install --no-audit --no-fund
       - run: npx playwright install --with-deps chromium firefox webkit
-      - name: Select environment
-        shell: bash
-        run: |
-          if [ "${GITHUB_REF_NAME}" = "main" ]; then
-            echo "COMPAT_BASE_URL=https://endurance-manager.app" >> "$GITHUB_ENV"
-            echo "ENV_LABEL=production" >> "$GITHUB_ENV"
-          else
-            echo "COMPAT_BASE_URL=https://app.endurance-manager.workers.dev" >> "$GITHUB_ENV"
-            echo "ENV_LABEL=development" >> "$GITHUB_ENV"
-          fi
       - name: Wait for deployment
         run: |
           echo "Checking ${ENV_LABEL}: ${COMPAT_BASE_URL}"
           for i in {1..18}; do
             if curl --fail --silent --show-error --max-time 10 \
-              --user-agent 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/140 Safari/537.36' \
-              --header 'Accept: application/json,text/plain,*/*' \
               "${COMPAT_BASE_URL}/api/session" >/dev/null; then
               exit 0
             fi
