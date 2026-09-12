@@ -1,0 +1,131 @@
+.crew-summary-heading {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-bottom: 9px;
+}
+
+.crew-summary-heading span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.crew-summary-list {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.crew-summary-card {
+  display: grid;
+  grid-template-columns: auto minmax(130px, .8fr) minmax(0, 1.2fr);
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--panel2);
+}
+
+.crew-summary-icon {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--crew-color);
+  border-radius: 7px;
+  color: var(--crew-color);
+}
+
+.crew-summary-main {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.crew-summary-title {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  min-width: 0;
+}
+
+.crew-summary-title strong,
+.crew-summary-main small,
+.crew-summary-pilots {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.crew-summary-title strong {
+  min-width: 0;
+}
+
+.crew-summary-title b {
+  flex: 0 0 auto;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.crew-summary-main small,
+.crew-summary-pilots {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.crew-summary-pilots {
+  text-align: right;
+}
+
+@media (max-width: 800px) {
+  .crew-summary-heading {
+    gap: 4px;
+    margin-bottom: 5px;
+    font-size: 13px;
+  }
+
+  .crew-summary-heading span {
+    font-size: 11px;
+  }
+
+  .crew-summary-list {
+    gap: 4px;
+  }
+
+  .crew-summary-card {
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 7px;
+    padding: 5px 8px;
+    border-radius: 7px;
+  }
+
+  .crew-summary-icon {
+    width: 22px;
+    height: 22px;
+  }
+
+  .crew-summary-main {
+    gap: 0;
+    line-height: 1.12;
+  }
+
+  .crew-summary-title strong,
+  .crew-summary-title b {
+    font-size: 12px;
+  }
+
+  .crew-summary-main small,
+  .crew-summary-pilots {
+    font-size: 10px;
+  }
+
+  .crew-summary-pilots {
+    grid-column: 2;
+    margin-top: -1px;
+    text-align: left;
+  }
+}
