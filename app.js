@@ -1,1 +1,1 @@
-import './front/app/actions.mjs?v=7-game-scoped-network';
+import './front/app/actions.mjs?v=8-single-shared-state';
