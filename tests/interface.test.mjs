@@ -132,6 +132,17 @@ test('Équipages est intégré directement dans chaque départ avec actions pilo
   assert.match(crews,/logo\(crew\.category\)/);
 });
 
+test('l’aide décrit les droits pilote organisateur et administrateur actuels',()=>{
+  const help=read('help.js');
+  assert.match(help,/créer ton propre équipage après ton inscription/);
+  assert.match(help,/gérer l’équipage dont tu es responsable/);
+  assert.match(help,/créer et modifier les événements/);
+  assert.match(help,/créer et gérer tous les équipages/);
+  assert.match(help,/Tu ne peux pas[\s\S]*supprimer définitivement un événement/);
+  assert.match(help,/Supprimer définitivement un événement/);
+  assert.doesNotMatch(help,/Tu ne peux pas[\s\S]*composer ou modifier les équipages/);
+});
+
 test('les cartes pilotes et équipages utilisent les vrais logos de catégorie',()=>{
   const registration=read('front/app/registration.mjs');
   const crews=read('front/app/crews.mjs');
