@@ -101,7 +101,7 @@ const gameHtml = productionHtml(sourceGame);
 await writeFile(new URL('lmu/index.html', out), gameHtml);
 await writeFile(new URL('iracing/index.html', out), gameHtml);
 
-for (const file of ['app.js', 'crew-builder.js', 'help.js', 'privacy.html', 'privacy.css', 'legal.html', 'circuit-credits.html']) {
+for (const file of ['app.js', 'crew-builder.js', 'help.js', 'privacy.html', 'privacy.css', 'legal.html', 'about.html', 'circuit-credits.html']) {
   await copyFile(root + file, new URL(file, out));
 }
 await copyFile(root + 'help.css', new URL('help.css', out));
@@ -116,12 +116,15 @@ if (!workers) {
 
 await writeFile(new URL('_headers', out), `/*
   Content-Security-Policy: default-src 'self'; script-src 'self'; script-src-attr 'none'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://commons.wikimedia.org https://upload.wikimedia.org https://cdn.discordapp.com; connect-src 'self'; font-src 'self' data:; media-src 'none'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; frame-src 'none'; form-action 'self'; worker-src 'self'; manifest-src 'self'; upgrade-insecure-requests
-  Strict-Transport-Security: max-age=31536000; includeSubDomains
+  Strict-Transport-Security: max-age=63072000; includeSubDomains
   X-Content-Type-Options: nosniff
   Referrer-Policy: no-referrer
   X-Frame-Options: DENY
   Permissions-Policy: accelerometer=(), camera=(), display-capture=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()
   X-Permitted-Cross-Domain-Policies: none
+  Cross-Origin-Opener-Policy: same-origin
+  Cross-Origin-Resource-Policy: same-site
+  X-DNS-Prefetch-Control: off
 
 /members.html
   X-Robots-Tag: noindex, nofollow
@@ -148,6 +151,7 @@ await writeFile(new URL('sitemap.xml', out), `<?xml version="1.0" encoding="UTF-
   <url><loc>https://endurance-manager.app/lmu/</loc></url>
   <url><loc>https://endurance-manager.app/iracing/</loc></url>
   <url><loc>https://endurance-manager.app/help.html</loc></url>
+  <url><loc>https://endurance-manager.app/about.html</loc></url>
   <url><loc>https://endurance-manager.app/legal.html</loc></url>
   <url><loc>https://endurance-manager.app/privacy.html</loc></url>
   <url><loc>https://endurance-manager.app/circuit-credits.html</loc></url>
@@ -158,7 +162,7 @@ await writeFile(new URL('.well-known/security.txt', out), `Contact: https://gith
 Expires: 2027-09-01T00:00:00.000Z
 Preferred-Languages: fr, en
 Canonical: https://endurance-manager.app/.well-known/security.txt
-Policy: https://endurance-manager.app/privacy.html
+Policy: https://endurance-manager.app/about.html#security
 `);
 
-console.log(`Build ready: public/ (${workers ? 'Workers' : 'Pages'}, accueil + LMU + iRacing + membres + diagnostics + aide, ${uniqueStylesheetPaths.length} feuilles CSS -> app.css)`);
+console.log(`Build ready: public/ (${workers ? 'Workers' : 'Pages'}, accueil + LMU + iRacing + membres + diagnostics + aide + confiance, ${uniqueStylesheetPaths.length} feuilles CSS -> app.css)`);
