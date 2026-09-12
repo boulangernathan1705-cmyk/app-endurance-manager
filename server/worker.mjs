@@ -205,11 +205,14 @@ async function api(request, env) {
         const selected=await env.DB.prepare(registrationSelect+' WHERE r.id=?').bind(input.registrationId).first();
         if (!selected || selected.event_id!==crew.event_id || selected.departure_id!==crew.departure_id) fail(409,'Ce pilote n’est pas inscrit sur ce départ. Actualise la page.');
         if (selected.category!==crew.category || selected.status==='unavailable') fail(409,'Cette inscription ne correspond pas à la catégorie de l’équipage.');
-        const selfJoin=personal(selected,actor);
+        const selfJoin=input.selfJoin===true && personal(selected,actor);
         if (!canManageCrew(crew,actor) && !selfJoin) fail(403,'Tu peux uniquement rejoindre un équipage avec ta propre inscription.');
         const claimOwner=selfJoin && !crew.owner_user_id ? actor.user.id : null;
+        const crewUpdate=claimOwner
+          ? env.DB.prepare('UPDATE crews SET version=version+1,owner_user_id=COALESCE(owner_user_id,?) WHERE id=? AND version=?').bind(claimOwner,crew.id,input.version)
+          : env.DB.prepare('UPDATE crews SET version=version+1 WHERE id=? AND version=?').bind(crew.id,input.version);
         const results=await env.DB.batch([
-          env.DB.prepare('UPDATE crews SET version=version+1,owner_user_id=COALESCE(owner_user_id,?) WHERE id=? AND version=?').bind(claimOwner,crew.id,input.version),
+          crewUpdate,
           env.DB.prepare('INSERT INTO crew_members(registration_id,crew_id) SELECT ?,? WHERE changes()=1').bind(input.registrationId,crew.id),
           env.DB.prepare(`DELETE FROM registrations WHERE changes()=1 AND id!=? AND event_id=? AND departure_id=? AND participant_id=?`).bind(selected.id,selected.event_id,selected.departure_id,selected.participant_id)
         ]);
@@ -267,7 +270,7 @@ async function api(request, env) {
     const car=input.car==null || input.car==='' ? '' : text(input.car,100,'Voiture');
     const crewId=id();
     if (isRegistrationManager(actor)) {
-      const result=await env.DB.prepare('INSERT INTO crews(id,event_id,departure_id,name,category,car,owner_user_id,created_at) VALUES(?,?,?,?,?,?,NULL,?)').bind(crewId,event.id,departure.id,name,input.category,car,now()).run();
+      const result=await env.DB.prepare('INSERT INTO crews(id,event_id,departure_id,name,category,car,created_at) VALUES(?,?,?,?,?,?,?)').bind(crewId,event.id,departure.id,name,input.category,car,now()).run();
       if (!result.meta.changes) fail(409,'Impossible de créer cet équipage. Actualise avant de réessayer.');
       return json({id:crewId,joined:false},201);
     }
