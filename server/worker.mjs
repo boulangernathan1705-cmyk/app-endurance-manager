@@ -236,8 +236,11 @@ async function api(request, env) {
             ORDER BY r.created_at,r.id LIMIT 1`).bind(crew.id,selected.id).first();
           nextOwner=replacement?.user_id || null;
         }
+        const crewUpdate=Object.prototype.hasOwnProperty.call(crew,'owner_user_id')
+          ? env.DB.prepare('UPDATE crews SET version=version+1,locked=0,owner_user_id=? WHERE id=? AND version=?').bind(nextOwner,crew.id,input.version)
+          : env.DB.prepare('UPDATE crews SET version=version+1 WHERE id=? AND version=?').bind(crew.id,input.version);
         const results=await env.DB.batch([
-          env.DB.prepare('UPDATE crews SET version=version+1,locked=0,owner_user_id=? WHERE id=? AND version=?').bind(nextOwner,crew.id,input.version),
+          crewUpdate,
           env.DB.prepare('DELETE FROM crew_members WHERE crew_id=? AND registration_id=? AND changes()=1').bind(crew.id,selected.id)
         ]);
         if (!results[0].meta.changes) fail(409,'Cet équipage a changé. Actualise la page.');
