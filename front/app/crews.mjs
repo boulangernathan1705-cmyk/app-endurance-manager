@@ -11,12 +11,12 @@ function crewActions(crew,departure,ownMember,joinRegistration,memberElsewhere){
   const actions=[];
   if(!ownMember&&!memberElsewhere&&!crew.locked&&state.user){
     const registration=joinRegistration?.id||'';
-    actions.push(button('join-crew','Rejoindre cet équipage',`data-id="${crew.id}" data-departure="${departure.id}" data-registration="${registration}" data-version="${crew.version}"`,'primary-button crew-join-button'));
+    actions.push(button('join-crew','Rejoindre',`data-id="${crew.id}" data-departure="${departure.id}" data-registration="${registration}" data-version="${crew.version}" aria-label="Rejoindre l’équipage ${esc(crew.name)}"`,'primary-button crew-join-button'));
   }
-  if(ownMember)actions.push(button('leave-crew','Quitter l’équipage',`data-id="${crew.id}" data-departure="${departure.id}" data-registration="${ownMember.id}" data-version="${crew.version}"`,'secondary-button crew-leave-button'));
+  if(ownMember)actions.push(button('leave-crew','Quitter',`data-id="${crew.id}" data-departure="${departure.id}" data-registration="${ownMember.id}" data-version="${crew.version}" aria-label="Quitter l’équipage ${esc(crew.name)}"`,'secondary-button crew-leave-button'));
   if(crew.canManage){
-    actions.push(button('edit-crew',crew.ownedByMe?'Gérer mon équipage':'Gérer l’équipage',`data-id="${crew.id}" data-departure="${departure.id}"`,'secondary-button crew-manage-button'));
-    actions.push(button('delete-crew','Supprimer l’équipage',`data-id="${crew.id}" data-departure="${departure.id}" data-version="${crew.version}"`,'danger-button crew-delete-button'));
+    actions.push(button('edit-crew',crew.ownedByMe?'Gérer':'Modifier',`data-id="${crew.id}" data-departure="${departure.id}" aria-label="Gérer l’équipage ${esc(crew.name)}"`,'secondary-button crew-manage-button'));
+    actions.push(button('delete-crew','Supprimer',`data-id="${crew.id}" data-departure="${departure.id}" data-version="${crew.version}" aria-label="Supprimer l’équipage ${esc(crew.name)}"`,'danger-button crew-delete-button'));
   }
   return actions.length?`<div class="crew-self-actions">${actions.join('')}</div>`:'';
 }
@@ -29,7 +29,7 @@ function crewCard(event,departure,crew,index,unassigned,allCrews){
   const ownRegistrationIds=new Set((departure.availability||[]).filter(reg=>reg.mine).map(reg=>reg.id));
   const memberElsewhere=allCrews.some(other=>other.id!==crew.id&&(other.registrationIds||[]).some(id=>ownRegistrationIds.has(id)));
   const joinRegistration=ownMember||memberElsewhere?null:unassigned.find(reg=>reg.mine&&reg.category===crew.category)||null;
-  const open=Boolean(ownMember||crew.ownedByMe||state.crewManagementOpen.has(crew.id));
+  const open=state.crewManagementOpen.has(crew.id);
   const capacity=crew.locked
     ? '<p class="crew-capacity-message is-complete">Composition verrouillée : l’équipage est marqué complet.</p>'
     : cov.missing
@@ -39,7 +39,7 @@ function crewCard(event,departure,crew,index,unassigned,allCrews){
   const management=crew.canManage?`<div class="crew-inline-management">${stateControl(crew,departure)}<span class="coverage-summary">${regs.length} pilote${regs.length>1?'s':''} · ${cov.covered}/${cov.duration} h</span></div>`:`<div class="crew-inline-management is-readonly"><span class="coverage-summary">${regs.length} pilote${regs.length>1?'s':''} · ${cov.covered}/${cov.duration} h</span></div>`;
   const memberCards=regs.length?`<div class="crew-member-grid" data-pilot-columns="${Math.max(1,Math.min(3,regs.length))}">${regs.map(reg=>renderRegistration(reg,departure,event.durationHours||6,false)).join('')}</div>`:'<p class="empty crew-empty-roster">Aucun pilote n’a encore rejoint cet équipage.</p>';
   const actions=crewActions(crew,departure,ownMember,joinRegistration,memberElsewhere);
-  return `<div class="crew-card-shell ${crewColorClass(crew.id,index)}">
+  return `<div class="crew-card-shell ${crewColorClass(crew.id,index)} ${crew.locked?'is-complete':'is-open'}">
     <details class="crew-pilot-group crew-pilot-accordion crew-unified-card ${crew.locked?'is-complete':'is-open'}" data-crew="${crew.id}" data-crew-id="${crew.id}" data-crew-locked="${Boolean(crew.locked)}" data-crew-mine="${Boolean(ownMember)}" data-crew-team="${esc(crew.name)}" ${open?'open':''}>
       <summary class="crew-pilot-accordion-summary" aria-label="${esc(crew.name)} · ${esc(names)} · ${esc(crew.car||'Voiture à choisir')}">
         <span class="crew-compact-category" aria-hidden="true">${logo(crew.category)}</span>
