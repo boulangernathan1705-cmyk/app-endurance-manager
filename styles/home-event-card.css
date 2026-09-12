@@ -80,24 +80,56 @@
 }
 
 @media (max-width: 760px) {
+  .event-card.event-card-harmonized .event-card-body {
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-auto-flow: row !important;
+  }
+
+  .event-card.event-card-harmonized .event-card-title-row,
+  .event-card.event-card-harmonized .event-info,
+  .event-card.event-card-harmonized .event-category-badges,
+  .event-card.event-card-harmonized .event-home-crews,
+  .event-card.event-card-harmonized .event-card-status {
+    grid-column: 1 !important;
+    width: 100%;
+    min-width: 0;
+  }
+
   .event-card.event-card-harmonized .event-card-title-row {
+    order: 1;
     display: flex !important;
     align-items: baseline !important;
     flex-wrap: wrap;
     gap: 5px 8px;
   }
 
-  .event-card.event-card-harmonized .event-compact-date {
-    font-size: 11px;
-  }
-
   .event-card.event-card-harmonized .event-info {
+    order: 2;
     display: flex !important;
     align-items: flex-start;
     margin-top: 6px;
   }
 
+  .event-card.event-card-harmonized .event-category-badges {
+    order: 3;
+  }
+
   .event-card.event-card-harmonized .event-home-crews {
+    order: 4;
     margin-top: 10px;
+  }
+
+  .event-card.event-card-harmonized .event-card-status {
+    order: 5;
+  }
+
+  .event-card.event-card-harmonized .event-compact-date {
+    font-size: 11px;
+  }
+
+  .event-card.event-card-harmonized .crew-summary-list,
+  .event-card.event-card-harmonized .crew-summary-card {
+    width: 100%;
+    min-width: 0;
   }
 }
