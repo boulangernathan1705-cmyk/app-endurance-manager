@@ -1,4 +1,5 @@
 import {GAME_CATALOGS, gameForEvent} from '../shared/catalog.mjs';
+import {eventSchedule} from './schedule.mjs';
 
 const grid = document.getElementById('game-grid');
 const formatter = new Intl.DateTimeFormat('fr-FR', {
@@ -20,6 +21,10 @@ function displayTime(value) {
 
 function activeRegistrations(departure) {
   return (departure?.availability || []).filter(registration => registration.status !== 'unavailable');
+}
+
+function activePilotCount(departure) {
+  return new Set(activeRegistrations(departure).map(registration => registration.participantId || registration.id)).size;
 }
 
 function hasVisibleActivity(departure) {
@@ -49,15 +54,16 @@ function selectedDeparture(event, timestamp=Date.now()) {
 function nextEndurance(events, game, timestamp=Date.now()) {
   const candidates = events
     .filter(event => gameForEvent(event) === game)
-    .map(event => ({event,bounds:eventBounds(event),departure:selectedDeparture(event,timestamp)}))
-    .filter(item => item.bounds && item.bounds.end > timestamp && item.departure)
-    .sort((a,b) => {
-      const aStarted = a.bounds.start <= timestamp;
-      const bStarted = b.bounds.start <= timestamp;
-      if (aStarted !== bStarted) return aStarted ? -1 : 1;
-      return a.bounds.start - b.bounds.start;
-    });
-  return candidates[0] || null;
+    .map(event => ({event,schedule:eventSchedule(event,timestamp)}))
+    .filter(item => !item.schedule.archived && item.schedule.timestamp !== null)
+    .sort((a,b) => Number(!!b.schedule.running)-Number(!!a.schedule.running)
+      || (a.schedule.timestamp ?? Infinity)-(b.schedule.timestamp ?? Infinity)
+      || a.event.name.localeCompare(b.event.name,'fr'));
+  const selected = candidates[0];
+  if (!selected) return null;
+  const departure = selectedDeparture(selected.event,timestamp);
+  const bounds = eventBounds(selected.event);
+  return departure && bounds ? {event:selected.event,departure,bounds,schedule:selected.schedule} : null;
 }
 
 function crewIcon(color) {
@@ -77,9 +83,8 @@ function crewMarkup(crew, departure, index=0) {
 }
 
 function participationMarkup(departure) {
-  const registrations = activeRegistrations(departure);
   const crews = [...(departure.crews || [])];
-  const pilotCount = registrations.length;
+  const pilotCount = activePilotCount(departure);
   if (crews.length) {
     return `<span class="crew-summary-heading"><strong>${crews.length} équipage${crews.length > 1 ? 's' : ''} engagé${crews.length > 1 ? 's' : ''}</strong><span>${pilotCount ? `${pilotCount} pilote${pilotCount > 1 ? 's' : ''} inscrit${pilotCount > 1 ? 's' : ''}` : 'Aucun pilote inscrit'}</span></span>
       <span class="crew-summary-list">${crews.map((crew,index) => crewMarkup(crew,departure,index)).join('')}</span>`;
@@ -92,11 +97,11 @@ function participationMarkup(departure) {
 
 function enduranceMarkup(item, game) {
   if (!item) return `<div class="hub-empty"><strong>Aucune endurance à venir</strong><span>Le prochain événement apparaîtra ici dès qu’il sera créé.</span></div>`;
-  const {event,departure,bounds} = item;
+  const {event,departure,bounds,schedule} = item;
   const catalog = GAME_CATALOGS[game];
   const circuit = catalog.circuits.find(item => item.id === event.circuit)?.name || 'Circuit à préciser';
   const departureRunning = Number(departure.startsAt) <= Date.now() && Number(departure.startsAt) + bounds.duration > Date.now();
-  const eventStarted = bounds.start <= Date.now();
+  const eventStarted = schedule?.event?.departures?.some(item => Number(item.startsAt) <= Date.now()) || bounds.start <= Date.now();
   const label = departureRunning ? 'COURSE EN COURS' : eventStarted ? 'PROCHAIN DÉPART' : 'PROCHAINE ENDURANCE';
   return `<section class="hub-next-race" aria-label="Prochaine endurance ${esc(catalog.name)}">
     <span class="hub-next-label">${label}</span>
@@ -117,13 +122,17 @@ function gameCard(game, events) {
   </article>`;
 }
 
+async function fetchGameEvents(game) {
+  const response = await fetch(`/api/events?game=${encodeURIComponent(game)}`, {credentials:'same-origin',cache:'no-store'});
+  if (!response.ok) throw new Error(`events-${game}`);
+  const result = await response.json();
+  return Array.isArray(result.events) ? result.events : [];
+}
+
 async function load() {
   try {
-    const response = await fetch('/api/events', {credentials:'same-origin',cache:'no-store'});
-    if (!response.ok) throw new Error('events');
-    const result = await response.json();
-    const events = Array.isArray(result.events) ? result.events : [];
-    grid.innerHTML = gameCard('lmu',events) + gameCard('iracing',events);
+    const [lmuEvents,iracingEvents] = await Promise.all([fetchGameEvents('lmu'),fetchGameEvents('iracing')]);
+    grid.innerHTML = gameCard('lmu',lmuEvents) + gameCard('iracing',iracingEvents);
   } catch {
     grid.innerHTML = gameCard('lmu',[]) + gameCard('iracing',[]);
     const notice = document.getElementById('hub-status');
