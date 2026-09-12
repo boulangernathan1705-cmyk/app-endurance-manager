@@ -1,1 +1,1 @@
-import './front/app/actions.mjs?v=19-crew-actions';
+import './front/app/actions.mjs?v=20-delete-crew';
