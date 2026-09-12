@@ -5,7 +5,7 @@ function contentSummary(title,count){return `<summary class="ux-content-accordio
 function statusPill(crew){return `<span class="crew-compact-status ${crew.locked?'is-complete':'is-open'}">${crew.locked?'ÉQUIPAGE COMPLET':'ÉQUIPAGE OUVERT'}</span>`;}
 function coverage(event,departure,regs){const duration=event.durationHours||6;const counts=Array.from({length:duration},(_,i)=>regs.filter(reg=>coversHour(reg,i)).length);const covered=counts.filter(Boolean).length;return{duration,counts,covered,missing:Math.max(0,duration-covered)};}
 
-function stateControl(crew,departure){return `<div class="crew-state-control"><span class="crew-state-label"><span class="crew-state-lock" aria-hidden="true">${crew.locked?'🔒':'🔓'}</span><span>Équipage</span></span><label class="crew-state-select-wrap"><span class="sr-only">État de l’équipage</span><select class="crew-state-select" data-crew-state-select data-crew-id="${crew.id}" data-departure="${departure.id}" data-version="${crew.version}"><option value="open" ${crew.locked?'':'selected'}>Ouvert</option><option value="locked" ${crew.locked?'selected':''}>Équipage complet</option></select><span class="crew-state-chevron" aria-hidden="true">▾</span></label></div>`;}
+function stateControl(crew,departure){return `<div class="crew-state-control"><span class="crew-state-lock" aria-hidden="true">${crew.locked?'🔒':'🔓'}</span><label class="crew-state-select-wrap"><span class="sr-only">État de l’équipage</span><select class="crew-state-select" data-crew-state-select data-crew-id="${crew.id}" data-departure="${departure.id}" data-version="${crew.version}"><option value="open" ${crew.locked?'':'selected'}>Ouvert</option><option value="locked" ${crew.locked?'selected':''}>Complet</option></select><span class="crew-state-chevron" aria-hidden="true">▾</span></label></div>`;}
 
 function crewActions(crew,departure,ownMember,joinRegistration,memberElsewhere){
   const actions=[];
@@ -30,13 +30,11 @@ function crewCard(event,departure,crew,index,unassigned,allCrews){
   const memberElsewhere=allCrews.some(other=>other.id!==crew.id&&(other.registrationIds||[]).some(id=>ownRegistrationIds.has(id)));
   const joinRegistration=ownMember||memberElsewhere?null:unassigned.find(reg=>reg.mine&&reg.category===crew.category)||null;
   const open=state.crewManagementOpen.has(crew.id);
-  const capacity=crew.locked
-    ? '<p class="crew-capacity-message is-complete">Composition verrouillée : l’équipage est marqué complet.</p>'
-    : cov.missing
-      ? `<p class="crew-capacity-message is-open needs-pilots">${cov.missing} h de course ${cov.missing>1?'ne sont':'n’est'} pas encore couverte${cov.missing>1?'s':''}.</p>`
-      : '<p class="crew-capacity-message is-open">Toutes les heures de course sont couvertes.</p>';
   const ownerBadge=crew.ownedByMe?'<span class="crew-owner-badge">RESPONSABLE</span>':'';
-  const management=crew.canManage?`<div class="crew-inline-management">${stateControl(crew,departure)}<span class="coverage-summary">${regs.length} pilote${regs.length>1?'s':''} · ${cov.covered}/${cov.duration} h</span></div>`:`<div class="crew-inline-management is-readonly"><span class="coverage-summary">${regs.length} pilote${regs.length>1?'s':''} · ${cov.covered}/${cov.duration} h</span></div>`;
+  const countLabel=`${regs.length} pilote${regs.length>1?'s':''} · ${cov.covered}/${cov.duration} h`;
+  const management=crew.canManage
+    ? `<div class="crew-inline-management">${stateControl(crew,departure)}<span class="coverage-summary">${countLabel}</span></div>`
+    : `<div class="crew-inline-management is-readonly"><span class="crew-state-readonly ${crew.locked?'is-complete':'is-open'}">${crew.locked?'Complet':'Ouvert'}</span><span class="coverage-summary">${countLabel}</span></div>`;
   const memberCards=regs.length?`<div class="crew-member-grid" data-pilot-columns="${Math.max(1,Math.min(3,regs.length))}">${regs.map(reg=>renderRegistration(reg,departure,event.durationHours||6,false)).join('')}</div>`:'<p class="empty crew-empty-roster">Aucun pilote n’a encore rejoint cet équipage.</p>';
   const actions=crewActions(crew,departure,ownMember,joinRegistration,memberElsewhere);
   return `<div class="crew-card-shell ${crewColorClass(crew.id,index)} ${crew.locked?'is-complete':'is-open'}">
@@ -51,7 +49,6 @@ function crewCard(event,departure,crew,index,unassigned,allCrews){
       </summary>
       <div class="crew-pilot-accordion-body crew-unified-body">
         ${management}
-        ${capacity}
         ${memberCards}
         ${renderAvailabilityTimeline({departure,duration:cov.duration,counts:cov.counts,label:'Disponibilité de l’équipage'})}
       </div>
