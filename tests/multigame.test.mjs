@@ -55,23 +55,24 @@ test('le portail expose les deux espaces et le contexte charge avant l’applica
   assert(build.includes("new URL('iracing/index.html', out)"));
 });
 
+test('le résumé d’accueil suit exactement la chronologie utilisée par les pages de course', () => {
+  const hub = readFileSync(new URL('../front/game-hub.mjs',import.meta.url),'utf8');
+  assert.match(hub,/import \{eventSchedule\} from '\.\/schedule\.mjs'/);
+  assert.match(hub,/eventSchedule\(event,timestamp\)/);
+  assert.match(hub,/Number\(!!b\.schedule\.running\)-Number\(!!a\.schedule\.running\)/);
+  assert.match(hub,/remaining\.find\(hasVisibleActivity\) \|\| remaining\[0\]/);
+  assert.match(hub,/fetchGameEvents\('lmu'\)/);
+  assert.match(hub,/fetchGameEvents\('iracing'\)/);
+  assert.match(hub,/\/api\/events\?game=/);
+});
+
 test('le résumé d’accueil affiche chaque équipage créé même sans pilote affecté', () => {
   const hub = readFileSync(new URL('../front/game-hub.mjs',import.meta.url),'utf8');
   assert.match(hub,/function hasVisibleActivity\(departure\)/);
-  assert.match(hub,/activeRegistrations\(departure\)\.length > 0 \|\| \(departure\?\.crews \|\| \[\]\)\.length > 0/);
+  assert.match(hub,/\(departure\?\.crews \|\| \[\]\)\.length > 0/);
   assert.match(hub,/const crews = \[\.\.\.\(departure\.crews \|\| \[\]\)\]/);
   assert.match(hub,/Aucun pilote affecté/);
-});
-
-test('l’accueil suit le prochain événement jusqu’à sa fin et saute les départs vides si un départ actif existe', () => {
-  const hub = readFileSync(new URL('../front/game-hub.mjs',import.meta.url),'utf8');
-  assert.match(hub,/function eventBounds\(event\)/);
-  assert.match(hub,/return remaining\.find\(hasVisibleActivity\) \|\| remaining\[0\]/);
-  assert.match(hub,/item\.bounds && item\.bounds\.end > timestamp && item\.departure/);
-  assert.match(hub,/const aStarted = a\.bounds\.start <= timestamp/);
   assert.match(hub,/Aucun participant/);
-  assert.match(hub,/Aucun équipage formé/);
-  assert.match(hub,/PROCHAIN DÉPART/);
 });
 
 test('les identifiants iRacing ne peuvent pas entrer en collision avec les circuits LMU', () => {
