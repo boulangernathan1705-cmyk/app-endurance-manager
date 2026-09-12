@@ -13,6 +13,13 @@
   min-width: 0;
 }
 
+.account-disconnected-wrap {
+  display: grid;
+  justify-items: end;
+  gap: 4px;
+  min-width: 0;
+}
+
 /* État déconnecté : Aide et connexion Discord restent sur une seule ligne. */
 .account-disconnected-actions {
   display: flex;
@@ -21,6 +28,26 @@
   gap: 8px;
   min-width: 0;
   white-space: nowrap;
+}
+
+.account-oauth-trust {
+  margin: 0;
+  max-width: 390px;
+  color: #8fa2a5;
+  font-size: 9.5px;
+  line-height: 1.25;
+  text-align: right;
+  white-space: normal;
+}
+
+.account-oauth-trust a {
+  color: #9edce0;
+  text-decoration: none;
+}
+
+.account-oauth-trust a:hover,
+.account-oauth-trust a:focus-visible {
+  text-decoration: underline;
 }
 
 .account-disconnected-actions .account-help-link {
@@ -244,6 +271,7 @@
   .account-disconnected-actions .account-help-link { padding-inline: 9px; font-size: 12px; }
   .account-disconnected-actions .account-discord-login,
   .account-disconnected-actions .account-discord-unavailable { padding-inline: 9px; font-size: 12px; }
+  .account-oauth-trust { max-width: 340px; font-size: 9px; }
 }
 
 @media (max-width: 760px) {
@@ -259,10 +287,22 @@
     max-width: 145px;
   }
 
+  .account-disconnected-wrap {
+    width: 100%;
+    justify-items: stretch;
+  }
+
   .account-disconnected-actions {
     width: 100%;
     justify-content: stretch;
     gap: 6px;
+  }
+
+  .account-oauth-trust {
+    max-width: none;
+    padding-inline: 2px;
+    font-size: 8.5px;
+    text-align: center;
   }
 
   .account-disconnected-actions .account-help-link {
