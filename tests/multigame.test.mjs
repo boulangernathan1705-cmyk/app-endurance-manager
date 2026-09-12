@@ -55,6 +55,15 @@ test('le portail expose les deux espaces et le contexte charge avant l’applica
   assert(build.includes("new URL('iracing/index.html', out)"));
 });
 
+test('le résumé d’accueil affiche chaque équipage créé même sans pilote affecté', () => {
+  const hub = readFileSync(new URL('../front/game-hub.mjs',import.meta.url),'utf8');
+  assert.match(hub,/function hasVisibleActivity\(departure\)/);
+  assert.match(hub,/hasRegisteredPilot\(departure\) \|\| \(departure\?\.crews \|\| \[\]\)\.length > 0/);
+  assert.match(hub,/const crews = \[\.\.\.\(departure\.crews \|\| \[\]\)\]/);
+  assert.doesNotMatch(hub,/const crews = \(departure\.crews \|\| \[\]\)\.filter\(crew =>/);
+  assert.match(hub,/Aucun pilote affecté/);
+});
+
 test('les identifiants iRacing ne peuvent pas entrer en collision avec les circuits LMU', () => {
   const lmuIds = new Set(GAME_CATALOGS.lmu.circuits.map(item => item.id));
   for (const circuit of GAME_CATALOGS.iracing.circuits) {
