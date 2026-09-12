@@ -9,8 +9,6 @@
     margin-inline: auto;
   }
 
-  /* The circuit card was centered inside the right half of the event header.
-     Push it to the same right-hand axis as the navigation/logout control. */
   .event-header-compact .event-heading-line > .circuit-visual {
     justify-self: stretch;
     justify-content: flex-end;
@@ -22,8 +20,6 @@
   }
 }
 
-/* Les actions qui modifient l'événement restent groupées ; la création
-   d'équipage arrive ensuite comme action métier distincte. */
 .event-actions-toolbar {
   display: flex;
   align-items: center;
@@ -38,8 +34,52 @@
   gap: 8px;
 }
 
-.event-actions-toolbar > .crew-builder-open {
-  margin-left: 2px;
+.departure-participation-section {
+  display: grid;
+  gap: 12px;
+  padding-top: 2px;
+}
+
+/* All actions for a departure live in one place, immediately before crews. */
+.departure-action-panel {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 4px;
+}
+
+.departure-primary-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.departure-primary-actions > button,
+.departure-primary-actions > .crew-builder-open {
+  width: 100%;
+  min-width: 0;
+  min-height: 46px;
+  margin: 0 !important;
+  font-weight: 900;
+}
+
+.departure-primary-actions > :only-child {
+  grid-column: 1 / -1;
+}
+
+.departure-secondary-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.departure-secondary-actions > button {
+  min-height: 36px;
+  margin: 0 !important;
+  padding: 7px 12px;
+  font-size: 12px;
+}
+
+.departure-create-crew {
+  margin: 0 !important;
 }
 
 @media (max-width: 600px) {
@@ -53,10 +93,40 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .event-toolbar-main > button,
-  .event-actions-toolbar > .crew-builder-open {
+  .event-toolbar-main > button {
     width: 100%;
     min-width: 0;
     margin-left: 0;
+  }
+
+  .departure-action-panel {
+    gap: 7px;
+  }
+
+  .departure-primary-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .departure-primary-actions > button,
+  .departure-primary-actions > .crew-builder-open {
+    min-height: 44px;
+    padding: 9px 8px;
+    font-size: 12px;
+    line-height: 1.15;
+  }
+
+  .departure-secondary-actions {
+    justify-content: stretch;
+  }
+
+  .departure-secondary-actions > button {
+    width: 100%;
+  }
+}
+
+@media (max-width: 380px) {
+  .departure-primary-actions {
+    grid-template-columns: 1fr;
   }
 }

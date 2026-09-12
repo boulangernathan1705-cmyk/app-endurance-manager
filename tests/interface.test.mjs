@@ -57,30 +57,35 @@ test('Course produit directement l’interface finale',()=>{
   assert.match(eventView,/departure-fold/);
   assert.match(eventView,/Modifier mon inscription/);
   assert.match(eventView,/Inscrire un autre pilote/);
+  assert.match(eventView,/departure-participation-section/);
   assert.match(crews,/ux-course-pilots-accordion/);
-  assert.match(crews,/ux-course-crews-accordion/);
+  assert.match(crews,/ux-course-crews-block/);
   assert.match(crews,/crew-pilot-accordion/);
 });
 
-test('la page événement évite la navigation en double et garde les actions dans le bon ordre',()=>{
+test('la page événement garde les actions événement séparées des actions équipage',()=>{
   const eventView=read('front/app/event-view.mjs');
+  const crews=read('front/app/crews.mjs');
   assert.doesNotMatch(eventView,/Retour aux événements/);
   assert.match(eventView,/event-toolbar-main/);
+  assert.match(crews,/crew-section-create/);
   const refresh=eventView.indexOf("button('refresh','Actualiser')");
   const edit=eventView.indexOf("button('edit-event','Modifier l’événement'");
   const remove=eventView.indexOf("button('delete-event','Supprimer l’événement'");
-  const crew=eventView.indexOf('Créer un équipage');
-  assert.ok(refresh>=0&&refresh<edit&&edit<remove&&remove<crew);
+  assert.ok(refresh>=0&&refresh<edit&&edit<remove);
+  assert.doesNotMatch(eventView,/event-create-crew/);
 });
 
-test('les actions inscription restent contenues et côte à côte dans le résumé du départ',()=>{
-  const css=read('styles/registration-sharing.css');
-  assert.match(css,/summary>.ux-summary-registration-actions/);
-  assert.match(css,/grid-column:4/);
-  assert.match(css,/grid-row:1 \/ span 2/);
-  assert.match(css,/grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
-  assert.match(css,/grid-column:2 \/ -1/);
-  assert.match(css,/grid-row:3/);
+test('les actions du départ restent compactes et contextualisées',()=>{
+  const eventView=read('front/app/event-view.mjs');
+  const crews=read('front/app/crews.mjs');
+  const css=read('styles/event-polish.css');
+  assert.match(eventView,/ux-summary-registration-actions/);
+  assert.match(eventView,/ux-summary-registration-toggle/);
+  assert.match(eventView,/ux-summary-registration-other/);
+  assert.match(crews,/crew-section-create/);
+  assert.match(css,/\.ux-summary-registration-actions/);
+  assert.match(css,/\.crew-section-create/);
 });
 
 test('le compte déconnecté garde Aide et Discord alignés horizontalement',()=>{
@@ -96,7 +101,7 @@ test('le compte déconnecté garde Aide et Discord alignés horizontalement',()=
 
 test('inscrire un autre pilote reste réservé à un compte connecté',()=>{
   const eventView=read('front/app/event-view.mjs');
-  assert.match(eventView,/\$\{state\.user\?button\('new-registration','Inscrire un autre pilote'/);
+  assert.match(eventView,/state\.user\?button\('new-registration','Inscrire un autre pilote'/);
 });
 
 test('Ajouter une catégorie est placé à côté de Fermer dans l’en-tête inscription',()=>{
@@ -111,16 +116,31 @@ test('Ajouter une catégorie est placé à côté de Fermer dans l’en-tête in
   assert.match(game,/registration-sharing\.css\?v=\d+-[a-z0-9-]+/i);
 });
 
-test('Équipages produit directement la gestion finale',()=>{
+test('Équipages est intégré directement dans chaque départ avec actions pilote contextuelles',()=>{
   const crews=read('front/app/crews.mjs');
   const eventView=read('front/app/event-view.mjs');
-  assert.match(eventView,/event-section','Équipages'/);
-  assert.match(crews,/crew-management-accordion/);
+  assert.doesNotMatch(eventView,/event-section','Équipages'/);
+  assert.match(eventView,/renderPilots\(event,departure,\{/);
+  assert.match(eventView,/Créer mon équipage/);
+  assert.match(crews,/crew-unified-card/);
+  assert.match(crews,/crew-card-shell/);
+  assert.match(crews,/crew\.canManage/);
   assert.match(crews,/data-crew-state-select/);
-  assert.match(crews,/edit-crew/);
-  assert.match(crews,/add-crew-pilot/);
-  assert.match(crews,/remove-crew-pilot/);
+  assert.match(crews,/button\('join-crew','Rejoindre'/);
+  assert.match(crews,/button\('leave-crew','Quitter'/);
+  assert.match(crews,/crew\.ownedByMe\?'Gérer':'Modifier'/);
   assert.match(crews,/logo\(crew\.category\)/);
+});
+
+test('l’aide décrit les droits pilote organisateur et administrateur actuels',()=>{
+  const help=read('help.js');
+  assert.match(help,/créer ton propre équipage après ton inscription/);
+  assert.match(help,/gérer l’équipage dont tu es responsable/);
+  assert.match(help,/créer et modifier les événements/);
+  assert.match(help,/créer et gérer tous les équipages/);
+  assert.match(help,/Tu ne peux pas[\s\S]*supprimer définitivement un événement/);
+  assert.match(help,/Supprimer définitivement un événement/);
+  assert.doesNotMatch(help,/Tu ne peux pas[\s\S]*composer ou modifier les équipages/);
 });
 
 test('les cartes pilotes et équipages utilisent les vrais logos de catégorie',()=>{

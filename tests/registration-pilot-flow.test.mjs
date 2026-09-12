@@ -6,6 +6,7 @@ const registration=fs.readFileSync('front/app/registration.mjs','utf8');
 const actions=fs.readFileSync('front/app/actions.mjs','utf8');
 const clientCore=fs.readFileSync('front/app/core.mjs','utf8');
 const eventView=fs.readFileSync('front/app/event-view.mjs','utf8');
+const crews=fs.readFileSync('front/app/crews.mjs','utf8');
 const core=fs.readFileSync('server/core.mjs','utf8');
 const worker=fs.readFileSync('server/worker.mjs','utf8');
 const game=fs.readFileSync('game.html','utf8');
@@ -44,11 +45,14 @@ test('adding and editing another pilot use the same native registration form',()
   assert.match(game,/app\.js\?v=[0-9]+-[a-z0-9-]+/i);
 });
 
-test('the add pilot action is next to the personal registration action',()=>{
+test('personal registration and crew creation stay contextualized in the same departure',()=>{
   assert.match(eventView,/Modifier mon inscription/);
   assert.match(eventView,/S’inscrire/);
   assert.match(eventView,/Inscrire un autre pilote/);
   assert.match(eventView,/ux-summary-registration-actions/);
+  assert.match(eventView,/renderPilots\(event,departure,\{/);
+  assert.match(crews,/crew-section-create/);
+  assert.match(crews,/data-departure="\$\{departure\.id\}"/);
   assert.doesNotMatch(registration,/\+ Ajouter un pilote/);
 });
 

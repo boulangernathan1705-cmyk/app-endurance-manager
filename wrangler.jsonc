@@ -1,6 +1,6 @@
 {
   "name": "app",
-  "main": "server/worker.mjs",
+  "main": "server/worker-with-migrations.mjs",
   "compatibility_date": "2026-09-07",
   "keep_vars": true,
   "minify": true,

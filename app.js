@@ -1,1 +1,1 @@
-import './front/app/actions.mjs?v=15-preserve-timeline-scroll';
+import './front/app/actions.mjs?v=21-one-course-page';

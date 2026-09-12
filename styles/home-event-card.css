@@ -6,6 +6,12 @@
   white-space: nowrap;
 }
 
+/* Les catégories et leurs inscrits restent disponibles dans le détail de l'événement.
+   Sur la carte d'accueil, les compteurs pilotes/équipages suffisent et évitent une ligne redondante. */
+.event-card.event-card-harmonized .event-category-badges {
+  display: none !important;
+}
+
 .event-card.event-card-harmonized .event-home-crews {
   display: block;
   min-width: 0;
@@ -20,7 +26,7 @@
 
   .event-card.event-card-harmonized .event-card-body {
     display: grid !important;
-    grid-template-rows: auto auto auto auto auto;
+    grid-template-rows: auto auto auto auto;
     align-content: start;
     min-height: 142px;
   }
@@ -45,12 +51,6 @@
     display: flex !important;
     align-items: flex-start;
     margin-top: 7px;
-  }
-
-  .event-card.event-card-harmonized .event-category-badges {
-    margin-top: 12px !important;
-    margin-bottom: 0 !important;
-    gap: 8px;
   }
 
   .event-card.event-card-harmonized .event-home-crews {
@@ -89,7 +89,6 @@
     grid-template-areas:
       "title map"
       "info map"
-      "categories categories"
       "crews crews"
       "status status" !important;
     column-gap: 8px;
@@ -124,17 +123,6 @@
     align-items: flex-start;
     margin: 0;
     min-width: 0;
-  }
-
-  .event-card.event-card-harmonized .event-category-badges {
-    grid-area: categories;
-    display: flex !important;
-    flex-wrap: wrap;
-    gap: 6px;
-    width: 100%;
-    min-width: 0;
-    margin: 1px 0 0 !important;
-    padding: 0;
   }
 
   .event-card.event-card-harmonized .event-home-crews {

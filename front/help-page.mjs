@@ -32,7 +32,7 @@ async function renderStandaloneHelp() {
     location.assign('/');
   });
 
-  const module = await import('../help.js');
+  const module = await import('../help.js?v=2-pilot-crew-roles');
   module.renderHelp();
 }
 

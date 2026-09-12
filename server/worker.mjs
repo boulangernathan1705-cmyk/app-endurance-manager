@@ -19,6 +19,9 @@ function isRegistrationManager(actor) {
 function canManageRegistration(reg, actor) {
   return owned(reg, actor) || isRegistrationManager(actor);
 }
+function canManageCrew(crew, actor) {
+  return isRegistrationManager(actor) || Boolean(actor.user && crew?.owner_user_id === actor.user.id);
+}
 function publicRegistration(reg, actor, userNames = new Map()) {
   let cars = [];
   try { cars = JSON.parse(reg.car_preferences || '[]'); } catch {}
@@ -75,7 +78,18 @@ async function listEvents(env, actor, game='') {
   for (const crew of crews) {
     const key = `${crew.event_id}:${crew.departure_id}`;
     if (!crewsByDeparture.has(key)) crewsByDeparture.set(key, []);
-    crewsByDeparture.get(key).push({id:crew.id,name:crew.name,category:crew.category,car:crew.car,locked:Boolean(crew.locked),version:crew.version,registrationIds:membersByCrew.get(crew.id) || []});
+    crewsByDeparture.get(key).push({
+      id:crew.id,
+      name:crew.name,
+      category:crew.category,
+      car:crew.car,
+      locked:Boolean(crew.locked),
+      version:crew.version,
+      registrationIds:membersByCrew.get(crew.id) || [],
+      canManage:canManageCrew(crew,actor),
+      ownedByMe:Boolean(actor.user && crew.owner_user_id===actor.user.id),
+      hasOwner:Boolean(crew.owner_user_id)
+    });
   }
   return rows.map(row => ({id:row.id, name:row.name, circuit:row.circuit||'', durationHours:Number(row.duration_hours)||3, eventType:row.event_type||'private', categories:JSON.parse(row.categories), version:row.version, departures:JSON.parse(row.departures).map(d => ({...d, availability:grouped.get(`${row.id}:${d.id}`) || [], crews:crewsByDeparture.get(`${row.id}:${d.id}`) || []}))}));
 }
@@ -175,7 +189,7 @@ async function api(request, env) {
   const crewCreate = path.match(/^\/api\/events\/([a-f0-9-]{36})\/departures\/([a-f0-9-]{36})\/crews$/);
   const crewRoute = path.match(/^\/api\/crews\/([a-f0-9-]{36})(?:\/members(?:\/([a-f0-9-]{36}))?)?$/);
   if ((crewCreate && method==='POST') || (crewRoute && ['POST','PATCH','DELETE'].includes(method))) {
-    requireRole(actor.user);
+    if (!actor.user) fail(401,'Connecte-toi avec Discord pour gérer un équipage.');
     const input=await body(request);
     const crew=crewRoute ? await env.DB.prepare('SELECT * FROM crews WHERE id=?').bind(crewRoute[1]).first() : null;
     if (crewRoute && !crew) fail(404,'Équipage introuvable.');
@@ -184,48 +198,95 @@ async function api(request, env) {
     if (departure.startsAt<=Date.now()) fail(409,'Ce départ est passé. Les équipages sont verrouillés.');
     if (crew && input.version!==crew.version) fail(409,'Cet équipage a changé. Actualise avant de réessayer.');
     const membership=crewRoute && path.includes('/members');
-    if (membership && crew.locked) fail(409,'Cet équipage est complet. Rouvre-le avant de modifier sa composition.');
     if (membership) {
       if (method==='POST' && !crewRoute[2]) {
+        if (crew.locked) fail(409,'Cet équipage est complet. Son responsable doit le rouvrir avant de pouvoir le rejoindre.');
         if (!/^[a-f0-9-]{36}$/.test(input.registrationId || '')) fail(400,'Sélectionne un pilote inscrit.');
-        const selected=await env.DB.prepare('SELECT * FROM registrations WHERE id=?').bind(input.registrationId).first();
+        const selected=await env.DB.prepare(registrationSelect+' WHERE r.id=?').bind(input.registrationId).first();
         if (!selected || selected.event_id!==crew.event_id || selected.departure_id!==crew.departure_id) fail(409,'Ce pilote n’est pas inscrit sur ce départ. Actualise la page.');
+        if (selected.category!==crew.category || selected.status==='unavailable') fail(409,'Cette inscription ne correspond pas à la catégorie de l’équipage.');
+        const selfJoin=input.selfJoin===true && personal(selected,actor);
+        if (!canManageCrew(crew,actor) && !selfJoin) fail(403,'Tu peux uniquement rejoindre un équipage avec ta propre inscription.');
+        const claimOwner=selfJoin && !crew.owner_user_id ? actor.user.id : null;
+        const crewUpdate=claimOwner
+          ? env.DB.prepare('UPDATE crews SET version=version+1,owner_user_id=COALESCE(owner_user_id,?) WHERE id=? AND version=?').bind(claimOwner,crew.id,input.version)
+          : env.DB.prepare('UPDATE crews SET version=version+1 WHERE id=? AND version=?').bind(crew.id,input.version);
         const results=await env.DB.batch([
-          env.DB.prepare('UPDATE crews SET version=version+1 WHERE id=? AND version=?').bind(crew.id,input.version),
+          crewUpdate,
           env.DB.prepare('INSERT INTO crew_members(registration_id,crew_id) SELECT ?,? WHERE changes()=1').bind(input.registrationId,crew.id),
           env.DB.prepare(`DELETE FROM registrations WHERE changes()=1 AND id!=? AND event_id=? AND departure_id=? AND participant_id=?`).bind(selected.id,selected.event_id,selected.departure_id,selected.participant_id)
         ]);
         if (!results[0].meta.changes) fail(409,'Cet équipage a changé. Actualise la page.');
-        return json({ok:true,removedRegistrations:results[2].meta.changes});
-      } else if (method==='DELETE' && crewRoute[2]) {
+        return json({ok:true,removedRegistrations:results[2].meta.changes,claimedOwnership:Boolean(claimOwner)});
+      }
+      if (method==='DELETE' && crewRoute[2]) {
+        const selected=await env.DB.prepare(registrationSelect+' WHERE r.id=?').bind(crewRoute[2]).first();
+        if (!selected) fail(404,'Inscription introuvable.');
+        const member=await env.DB.prepare('SELECT registration_id FROM crew_members WHERE crew_id=? AND registration_id=?').bind(crew.id,selected.id).first();
+        if (!member) fail(409,'Ce pilote ne fait plus partie de cet équipage. Actualise la page.');
+        const selfLeave=personal(selected,actor);
+        if (!canManageCrew(crew,actor) && !selfLeave) fail(403,'Tu peux uniquement quitter toi-même un équipage.');
+        let nextOwner=crew.owner_user_id;
+        if (crew.owner_user_id && selected.participant_user_id===crew.owner_user_id) {
+          const replacement=await env.DB.prepare(`SELECT p.user_id
+            FROM crew_members cm
+            JOIN registrations r ON r.id=cm.registration_id
+            JOIN participants p ON p.id=r.participant_id
+            WHERE cm.crew_id=? AND cm.registration_id!=? AND p.user_id IS NOT NULL
+            ORDER BY r.created_at,r.id LIMIT 1`).bind(crew.id,selected.id).first();
+          nextOwner=replacement?.user_id || null;
+        }
+        const crewUpdate=Object.prototype.hasOwnProperty.call(crew,'owner_user_id')
+          ? env.DB.prepare('UPDATE crews SET version=version+1,locked=0,owner_user_id=? WHERE id=? AND version=?').bind(nextOwner,crew.id,input.version)
+          : env.DB.prepare('UPDATE crews SET version=version+1 WHERE id=? AND version=?').bind(crew.id,input.version);
         const results=await env.DB.batch([
-          env.DB.prepare('UPDATE crews SET version=version+1 WHERE id=? AND version=?').bind(crew.id,input.version),
-          env.DB.prepare('DELETE FROM crew_members WHERE crew_id=? AND registration_id=? AND changes()=1').bind(crew.id,crewRoute[2])
+          crewUpdate,
+          env.DB.prepare('DELETE FROM crew_members WHERE crew_id=? AND registration_id=? AND changes()=1').bind(crew.id,selected.id)
         ]);
         if (!results[0].meta.changes) fail(409,'Cet équipage a changé. Actualise la page.');
-      } else fail(404,'Action introuvable.');
-      return json({ok:true});
+        return json({ok:true,unlocked:Boolean(crew.locked)});
+      }
+      fail(404,'Action introuvable.');
     }
-    if (crew && method==='DELETE') {
-      const result = await env.DB.prepare('DELETE FROM crews WHERE id=? AND version=?').bind(crew.id,input.version).run();
-      if (!result.meta.changes) fail(409,'Cet équipage a changé. Actualise la page.');
-      return json({ok:true});
-    }
-    if (crew && method!=='PATCH') fail(404,'Action introuvable.');
-    if (crew && method==='PATCH' && typeof input.locked==='boolean' && input.name===undefined && input.category===undefined && input.car===undefined) {
-      const result=await env.DB.prepare('UPDATE crews SET locked=?,version=version+1 WHERE id=? AND version=?').bind(input.locked?1:0,crew.id,input.version).run();
-      if (!result.meta.changes) fail(409,'Cet équipage a changé. Actualise la page.');
-      return json({ok:true,locked:input.locked});
+    if (crew) {
+      if (!canManageCrew(crew,actor)) fail(403,'Seul le responsable de cet équipage ou un organisateur peut le modifier.');
+      if (method==='DELETE') {
+        const result = await env.DB.prepare('DELETE FROM crews WHERE id=? AND version=?').bind(crew.id,input.version).run();
+        if (!result.meta.changes) fail(409,'Cet équipage a changé. Actualise avant de réessayer.');
+        return json({ok:true});
+      }
+      if (method!=='PATCH') fail(404,'Action introuvable.');
+      if (typeof input.locked==='boolean' && input.name===undefined && input.category===undefined && input.car===undefined) {
+        const result=await env.DB.prepare('UPDATE crews SET locked=?,version=version+1 WHERE id=? AND version=?').bind(input.locked?1:0,crew.id,input.version).run();
+        if (!result.meta.changes) fail(409,'Cet équipage a changé. Actualise avant de réessayer.');
+        return json({ok:true,locked:input.locked});
+      }
+      const name=text(input.name,60,'Nom de l’équipage');
+      if (!JSON.parse(event.categories).includes(input.category)) fail(400,'Choisis une catégorie de cet événement.');
+      const car=input.car==null || input.car==='' ? '' : text(input.car,100,'Voiture');
+      const result=await env.DB.prepare('UPDATE crews SET name=?,category=?,car=?,version=version+1 WHERE id=? AND version=?').bind(name,input.category,car,crew.id,input.version).run();
+      if (!result.meta.changes) fail(409,'Cet équipage a changé. Actualise avant de réessayer.');
+      return json({id:crew.id});
     }
     const name=text(input.name,60,'Nom de l’équipage');
     if (!JSON.parse(event.categories).includes(input.category)) fail(400,'Choisis une catégorie de cet événement.');
     const car=input.car==null || input.car==='' ? '' : text(input.car,100,'Voiture');
-    const crewId=crew?.id || id();
-    const result=crew
-      ? await env.DB.prepare('UPDATE crews SET name=?,category=?,car=?,version=version+1 WHERE id=? AND version=?').bind(name,input.category,car,crewId,input.version).run()
-      : await env.DB.prepare('INSERT INTO crews(id,event_id,departure_id,name,category,car,created_at) VALUES(?,?,?,?,?,?,?)').bind(crewId,event.id,departure.id,name,input.category,car,now()).run();
-    if (!result.meta.changes) fail(409,'Cet équipage a changé. Actualise la page.');
-    return json({id:crewId},crew?200:201);
+    const crewId=id();
+    if (isRegistrationManager(actor)) {
+      const result=await env.DB.prepare('INSERT INTO crews(id,event_id,departure_id,name,category,car,created_at) VALUES(?,?,?,?,?,?,?)').bind(crewId,event.id,departure.id,name,input.category,car,now()).run();
+      if (!result.meta.changes) fail(409,'Impossible de créer cet équipage. Actualise avant de réessayer.');
+      return json({id:crewId,joined:false},201);
+    }
+    const ownRows=(await env.DB.prepare(registrationSelect+' WHERE r.event_id=? AND r.departure_id=? AND r.category=? AND r.status!=?').bind(event.id,departure.id,input.category,'unavailable').all()).results;
+    const selected=ownRows.find(reg=>personal(reg,actor));
+    if (!selected) fail(403,'Inscris-toi d’abord sur ce départ dans cette catégorie avant de créer ton équipage.');
+    const results=await env.DB.batch([
+      env.DB.prepare('INSERT INTO crews(id,event_id,departure_id,name,category,car,owner_user_id,created_at) VALUES(?,?,?,?,?,?,?,?)').bind(crewId,event.id,departure.id,name,input.category,car,actor.user.id,now()),
+      env.DB.prepare('INSERT INTO crew_members(registration_id,crew_id) SELECT ?,? WHERE changes()=1').bind(selected.id,crewId),
+      env.DB.prepare(`DELETE FROM registrations WHERE changes()=1 AND id!=? AND event_id=? AND departure_id=? AND participant_id=?`).bind(selected.id,selected.event_id,selected.departure_id,selected.participant_id)
+    ]);
+    if (!results[0].meta.changes) fail(409,'Impossible de créer cet équipage. Actualise avant de réessayer.');
+    return json({id:crewId,joined:true,removedRegistrations:results[2].meta.changes},201);
   }
   if (path === '/api/events' && method === 'POST') {
     requireRole(actor.user);
@@ -326,6 +387,7 @@ export default {
       if (message.includes('participant_required') || message.includes('participant_fixed')) return json({error:'Recharge le site pour retrouver la fiche du pilote.'},409);
       if (message.includes('no such table: participants') || message.includes('no such column: r.participant_id')) return json({error:'La mise à jour de la base attend la migration 0012_participants.sql.'},503);
       if (message.includes('no such column: locked')) return json({error:'La mise à jour de la base attend la migration 0015_crew_lock.sql.'},503);
+      if (message.includes('no such column: owner_user_id')) return json({error:'La mise à jour de la base attend la migration 0016_crew_ownership.sql.'},503);
       if (message.includes('UNIQUE constraint failed: crew_members.')) return json({error:'Ce pilote appartient déjà à un équipage sur ce départ. Actualise la page.'},409);
       if (message.includes('crew_category_in_use')) return json({error:'Ce pilote est affecté à un équipage de cette catégorie. Retire d’abord son affectation pour changer de catégorie.'},409);
       if (message.includes('crew_event_in_use')) return json({error:'Un équipage utilise encore ce départ ou cette catégorie. Supprime ou modifie cet équipage avant de continuer.'},409);
