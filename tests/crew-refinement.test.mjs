@@ -4,24 +4,27 @@ import {readFileSync} from 'node:fs';
 
 const read = path => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 
-test('Course rend directement les équipages et pilotes du départ', () => {
+test('Course rend directement les équipages et pilotes du départ sur une seule page', () => {
   const crews = read('front/app/crews.mjs');
+  const eventView = read('front/app/event-view.mjs');
   assert.match(crews, /crew-pilot-accordion-summary/);
   assert.match(crews, /crew-unified-card/);
   assert.match(crews, /ÉQUIPAGE COMPLET/);
   assert.match(crews, /ÉQUIPAGE OUVERT/);
   assert.match(crews, /Pilotes sans équipage/);
   assert.match(crews, /ux-course-crews-body/);
+  assert.match(eventView, /renderPilots\(event,departure/);
+  assert.doesNotMatch(eventView, /event-section-tabs/);
   assert.doesNotMatch(crews, /MutationObserver/);
 });
 
 test('un pilote peut rejoindre quitter gérer et supprimer son équipage depuis la vue course', () => {
   const crews = read('front/app/crews.mjs');
   const actions = read('front/app/actions.mjs');
-  assert.match(crews, /button\('join-crew','Rejoindre cet équipage'/);
-  assert.match(crews, /button\('leave-crew','Quitter l’équipage'/);
-  assert.match(crews, /button\('delete-crew','Supprimer l’équipage'/);
-  assert.match(crews, /Gérer mon équipage/);
+  assert.match(crews, /button\('join-crew','Rejoindre'/);
+  assert.match(crews, /button\('leave-crew','Quitter'/);
+  assert.match(crews, /button\('delete-crew','Supprimer'/);
+  assert.match(crews, /crew\.ownedByMe\?'Gérer':'Modifier'/);
   assert.match(crews, /crew\.canManage/);
   assert.match(crews, /data-crew-state-select/);
   assert.match(actions, /case 'join-crew'/);
@@ -31,6 +34,7 @@ test('un pilote peut rejoindre quitter gérer et supprimer son équipage depuis 
 
 test('création et modification utilisent le même éditeur équipage contextualisé au départ', () => {
   const builder = read('crew-builder.js');
+  const crews = read('front/app/crews.mjs');
   assert.match(builder, /async function openBuilder\(crewId = null, preferredDepartureId = ''\)/);
   assert.match(builder, /mode:'edit'/);
   assert.match(builder, /mode:'create'/);
@@ -39,6 +43,7 @@ test('création et modification utilisent le même éditeur équipage contextual
   assert.match(builder, /found\.crew\.canManage/);
   assert.match(builder, /create\.dataset\.departure/);
   assert.match(builder, /\[data-action="edit-crew"\]/);
+  assert.match(crews, /crew-section-create/);
   assert.doesNotMatch(builder, /MutationObserver/);
 });
 
