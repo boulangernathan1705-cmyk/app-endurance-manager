@@ -14,7 +14,10 @@ function crewActions(crew,departure,ownMember,joinRegistration,memberElsewhere){
     actions.push(button('join-crew','Rejoindre cet équipage',`data-id="${crew.id}" data-departure="${departure.id}" data-registration="${registration}" data-version="${crew.version}"`,'primary-button crew-join-button'));
   }
   if(ownMember)actions.push(button('leave-crew','Quitter l’équipage',`data-id="${crew.id}" data-departure="${departure.id}" data-registration="${ownMember.id}" data-version="${crew.version}"`,'secondary-button crew-leave-button'));
-  if(crew.canManage)actions.push(button('edit-crew',crew.ownedByMe?'Gérer mon équipage':'Gérer l’équipage',`data-id="${crew.id}" data-departure="${departure.id}"`,'secondary-button crew-manage-button'));
+  if(crew.canManage){
+    actions.push(button('edit-crew',crew.ownedByMe?'Gérer mon équipage':'Gérer l’équipage',`data-id="${crew.id}" data-departure="${departure.id}"`,'secondary-button crew-manage-button'));
+    actions.push(button('delete-crew','Supprimer l’équipage',`data-id="${crew.id}" data-departure="${departure.id}" data-version="${crew.version}"`,'danger-button crew-delete-button'));
+  }
   return actions.length?`<div class="crew-self-actions">${actions.join('')}</div>`:'';
 }
 
