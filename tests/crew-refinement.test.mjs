@@ -15,16 +15,18 @@ test('Course rend directement les équipages et pilotes du départ', () => {
   assert.doesNotMatch(crews, /MutationObserver/);
 });
 
-test('un pilote peut rejoindre quitter et gérer son équipage depuis la vue course', () => {
+test('un pilote peut rejoindre quitter gérer et supprimer son équipage depuis la vue course', () => {
   const crews = read('front/app/crews.mjs');
   const actions = read('front/app/actions.mjs');
   assert.match(crews, /button\('join-crew','Rejoindre cet équipage'/);
   assert.match(crews, /button\('leave-crew','Quitter l’équipage'/);
+  assert.match(crews, /button\('delete-crew','Supprimer l’équipage'/);
   assert.match(crews, /Gérer mon équipage/);
   assert.match(crews, /crew\.canManage/);
   assert.match(crews, /data-crew-state-select/);
   assert.match(actions, /case 'join-crew'/);
   assert.match(actions, /case 'leave-crew'/);
+  assert.match(actions, /case 'delete-crew'/);
 });
 
 test('création et modification utilisent le même éditeur équipage contextualisé au départ', () => {
@@ -38,6 +40,17 @@ test('création et modification utilisent le même éditeur équipage contextual
   assert.match(builder, /create\.dataset\.departure/);
   assert.match(builder, /\[data-action="edit-crew"\]/);
   assert.doesNotMatch(builder, /MutationObserver/);
+});
+
+test('le worker répare la migration de responsabilité équipage avant les appels API', () => {
+  const wrapper = read('server/worker-with-migrations.mjs');
+  const dev = read('wrangler.jsonc');
+  const prod = read('wrangler.prod.jsonc');
+  assert.match(wrapper, /PRAGMA table_info\(crews\)/);
+  assert.match(wrapper, /ALTER TABLE crews ADD COLUMN owner_user_id/);
+  assert.match(wrapper, /0016_crew_ownership\.sql/);
+  assert.match(dev, /server\/worker-with-migrations\.mjs/);
+  assert.match(prod, /server\/worker-with-migrations\.mjs/);
 });
 
 test('le rendu principal publie des événements explicites au lieu d’observer le DOM', () => {
