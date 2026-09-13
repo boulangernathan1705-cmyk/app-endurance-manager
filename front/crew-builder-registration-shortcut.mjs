@@ -9,10 +9,11 @@ let decorationTimer=0;
 function currentEvent(){return state.events.find(item=>item.id===state.currentEventId)||null;}
 function currentDeparture(){const event=currentEvent();return event?.departures.find(item=>item.id===modalState.departureId)||null;}
 function modalRoot(){return document.querySelector('[data-registration-modal]');}
+function builderAllowsPilotRegistration(){return activeBuilder.mode==='create'||activeBuilder.mode==='edit';}
 
 function decorateCrewBuilder(){
   const panel=document.querySelector('[data-crew-builder-panel]');
-  if(!panel||activeBuilder.mode!=='create'||!activeBuilder.departureId)return false;
+  if(!panel||!builderAllowsPilotRegistration()||!activeBuilder.departureId)return false;
   if(panel.querySelector('[data-crew-builder-register-pilot]'))return true;
   const cards=panel.querySelectorAll('.crew-builder-form > .crew-builder-card');
   const composition=cards[1];
@@ -36,7 +37,7 @@ function decorateCrewBuilder(){
 
 function decorateWhenReady(attempt=0){
   clearTimeout(decorationTimer);
-  if(decorateCrewBuilder()||activeBuilder.mode!=='create'||attempt>=40)return;
+  if(decorateCrewBuilder()||!builderAllowsPilotRegistration()||attempt>=40)return;
   decorationTimer=window.setTimeout(()=>decorateWhenReady(attempt+1),50);
 }
 
@@ -86,8 +87,9 @@ function openModal(trigger){
   const root=document.createElement('div');
   root.className='registration-modal-backdrop';
   root.dataset.registrationModal='true';
+  const contextHelp=activeBuilder.mode==='create'?'<p>Ajoute le pilote à ce départ sans quitter la création de l’équipage.</p>':'';
   root.innerHTML=`<section class="registration-modal-panel" role="dialog" aria-modal="true" aria-labelledby="registration-modal-title">
-    <div class="registration-modal-header"><div><span class="creation-kicker">INSCRIPTION PILOTE</span><h2 id="registration-modal-title">Inscrire un autre pilote</h2><p>Ajoute le pilote à ce départ sans quitter la création de l’équipage.</p></div><button type="button" class="secondary-button registration-modal-close" data-registration-modal-close aria-label="Fermer l’inscription">Fermer</button></div>
+    <div class="registration-modal-header"><div><span class="creation-kicker">INSCRIPTION PILOTE</span><h2 id="registration-modal-title">Inscrire un autre pilote</h2>${contextHelp}</div><button type="button" class="secondary-button registration-modal-close" data-registration-modal-close aria-label="Fermer l’inscription">Fermer</button></div>
     <div class="registration-modal-content" data-registration-modal-content></div>
     <p class="creation-error registration-modal-error" data-registration-modal-error hidden></p>
   </section>`;
@@ -173,6 +175,7 @@ document.addEventListener('click',event=>{
   const edit=event.target.closest?.('[data-action="edit-crew"]');
   if(edit){
     activeBuilder={mode:'edit',departureId:edit.dataset.departure||''};
+    decorateWhenReady();
     return;
   }
   if(event.target.closest?.('[data-crew-builder-cancel]')){
