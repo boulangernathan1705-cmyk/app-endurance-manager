@@ -56,10 +56,7 @@ function dayKey(day) {
   return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}-${String(date.getUTCDate()).padStart(2, '0')}`;
 }
 
-export function parisWeek(timestamp = Date.now()) {
-  const current = localDay(timestamp);
-  const weekday = new Date(current * DAY_MS).getUTCDay();
-  const monday = current - (weekday === 0 ? 6 : weekday - 1);
+function weekFromMonday(monday) {
   const sunday = monday + 6;
   return {
     key: dayKey(monday),
@@ -67,6 +64,17 @@ export function parisWeek(timestamp = Date.now()) {
     sunday,
     label: `semaine du ${startLabel.format(dayDate(monday))} au ${endLabel.format(dayDate(sunday))}`
   };
+}
+
+export function parisWeek(timestamp = Date.now()) {
+  const current = localDay(timestamp);
+  const weekday = new Date(current * DAY_MS).getUTCDay();
+  const monday = current - (weekday === 0 ? 6 : weekday - 1);
+  return weekFromMonday(monday);
+}
+
+export function nextParisWeek(timestamp = Date.now()) {
+  return weekFromMonday(parisWeek(timestamp).monday + 7);
 }
 
 export function isInParisWeek(timestamp, week) {
@@ -133,8 +141,8 @@ export function buildWeeklyDiscordPayload(snapshot, appUrl, updatedAt = Date.now
     return {
       content,
       embeds: [{
-        title: 'Aucune endurance LMU à venir cette semaine',
-        description: 'Aucun départ LMU à venir ou encore en cours cette semaine.',
+        title: 'Aucune endurance LMU programmée',
+        description: 'Aucun départ LMU à venir ou encore en cours sur la période affichée.',
         color: 0x6b7280,
         footer: {text: 'Endurance Manager • mise à jour automatique'},
         timestamp: new Date(updatedAt).toISOString()
