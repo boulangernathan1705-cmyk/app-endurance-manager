@@ -9,7 +9,7 @@ const workers = process.argv.includes('--workers');
 const stylesheetTagPattern = /<link\b[^>]*\brel=["']stylesheet["'][^>]*>/gi;
 const cssImportPattern = /@import\s+url\(\s*(["']?)([^"')]+)\1\s*\)\s*;/gi;
 const cssUrlPattern = /url\(\s*(["']?)([^"')]+)\1\s*\)/gi;
-const i18nScriptTag = '<script type="module" src="/front/i18n.mjs"></script>';
+const i18nScriptTag = '<script type="module" src="/front/i18n.mjs"></script>\n<script type="module" src="/front/i18n-content.mjs"></script>';
 
 function localAssetPath(href, fromPath = '') {
   const clean = String(href || '').trim();
@@ -60,7 +60,7 @@ function stylesheetPaths(source, sourceName) {
 }
 
 function injectI18n(source) {
-  if (source.includes('/front/i18n.mjs')) return source;
+  if (source.includes('/front/i18n.mjs') && source.includes('/front/i18n-content.mjs')) return source;
   if (!source.includes('</head>')) throw new Error('Document HTML sans balise </head> pour le sélecteur de langue.');
   return source.replace('</head>', `${i18nScriptTag}\n</head>`);
 }
