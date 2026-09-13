@@ -13,7 +13,7 @@ const formatter = new Intl.DateTimeFormat(localeTag(), {
 
 const CREW_COLORS = ['#52d3d8','#f3b33d','#ec5b67','#75d66b','#8b7cf6','#e47adf','#58a6ff','#f28f45'];
 const MAX_HOME_ITEMS = 3;
-const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
+const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[char]));
 
 function displayTime(value) {
   const match = String(value || '').match(/^(\d{1,2}):(\d{2})$/);
@@ -49,10 +49,8 @@ function eventBounds(event) {
 }
 
 function remainingDepartures(event, timestamp=Date.now()) {
-  const bounds = eventBounds(event);
-  if (!bounds) return [];
   return [...(event.departures || [])]
-    .filter(item => Number.isFinite(Number(item.startsAt)) && Number(item.startsAt) + bounds.duration > timestamp)
+    .filter(item => Number.isFinite(Number(item.startsAt)) && Number(item.startsAt) > timestamp)
     .sort((a,b) => Number(a.startsAt) - Number(b.startsAt));
 }
 
@@ -118,12 +116,11 @@ function participationMarkup(departure) {
 }
 
 function enduranceMarkup(item, game) {
-  const {event,departure,bounds,schedule} = item;
+  const {event,departure} = item;
   const catalog = GAME_CATALOGS[game];
   const circuit = catalog.circuits.find(item => item.id === event.circuit)?.name || 'Circuit à préciser';
-  const departureRunning = Number(departure.startsAt) <= Date.now() && Number(departure.startsAt) + bounds.duration > Date.now();
-  const eventStarted = schedule?.event?.departures?.some(item => Number(item.startsAt) <= Date.now()) || bounds.start <= Date.now();
-  const label = departureRunning ? 'COURSE EN COURS' : eventStarted ? 'PROCHAIN DÉPART' : 'PROCHAINE ENDURANCE';
+  const eventStarted = (event.departures || []).some(item => Number.isFinite(Number(item.startsAt)) && Number(item.startsAt) <= Date.now());
+  const label = eventStarted ? 'PROCHAIN DÉPART' : 'PROCHAINE ENDURANCE';
   return `<section class="hub-next-race" aria-label="${esc(event.name)} · départ ${esc(displayTime(departure.time))}">
     <span class="hub-next-label">${label}</span>
     <h3>${esc(event.name)}</h3>
