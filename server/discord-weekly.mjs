@@ -1,4 +1,4 @@
-import {buildWeeklyDiscordPayload, parisWeek} from './discord-weekly-format.mjs';
+import {buildWeeklyDiscordPayload, isInParisWeek, parisWeek} from './discord-weekly-format.mjs';
 
 const STATE_KEY = 'lmu-weekly-v1'; // Conservé pour réutiliser le message Discord existant.
 const LOCK_SECONDS = 90;
@@ -45,17 +45,38 @@ function flattenDepartures(events) {
   return departures;
 }
 
+function selectPlanningWeek(allDepartures, timestamp) {
+  const currentWeek = parisWeek(timestamp);
+  let week = currentWeek;
+  let futureDepartures = allDepartures.filter(item => item.startsAt > timestamp && isInParisWeek(item.startsAt, currentWeek));
+
+  if (!futureDepartures.length) {
+    const firstFuture = allDepartures.find(item => item.startsAt > timestamp);
+    if (firstFuture) {
+      week = parisWeek(firstFuture.startsAt);
+      futureDepartures = allDepartures.filter(item => item.startsAt > timestamp && isInParisWeek(item.startsAt, week));
+    }
+  }
+
+  return {week, futureDepartures};
+}
+
 export async function loadWeeklyDiscordSnapshot(env, timestamp) {
   const events = (await env.DB.prepare(`SELECT id,name,circuit,duration_hours,departures
     FROM events WHERE circuit NOT LIKE 'iracing-%' ORDER BY created_at,id`).all()).results || [];
   const allDepartures = flattenDepartures(events);
+  const currentWeek = parisWeek(timestamp);
   const currentCandidates = allDepartures.filter(item => item.startsAt <= timestamp && item.endsAt > timestamp);
-  const nextDeparture = allDepartures.find(item => item.startsAt > timestamp) || null;
-  const selected = [...currentCandidates];
-  if (nextDeparture) selected.push(nextDeparture);
+  const planning = selectPlanningWeek(allDepartures, timestamp);
+  const selected = [...currentCandidates, ...planning.futureDepartures];
 
   if (!selected.length) {
-    return {currentDepartures:[],nextDeparture:null,periodKey:parisWeek(timestamp).key};
+    return {
+      currentDepartures: [],
+      futureDepartures: [],
+      periodKey: currentWeek.key,
+      periodLabel: currentWeek.label
+    };
   }
 
   const selectedByKey = new Map(selected.map(item => [`${item.eventId}:${item.departureId}`, item]));
@@ -128,12 +149,15 @@ export async function loadWeeklyDiscordSnapshot(env, timestamp) {
     delete departure.registrations;
   }
 
-  const currentDepartures = currentCandidates.filter(item => item.pilotCount > 0);
-  const periodTimestamp = nextDeparture?.startsAt ?? currentDepartures[0]?.startsAt ?? timestamp;
+  const currentDepartures = currentCandidates
+    .map(item => ({...item, crews:item.crews.filter(crew => crew.pilots.length > 0)}))
+    .filter(item => item.crews.length > 0);
+
   return {
     currentDepartures,
-    nextDeparture,
-    periodKey:parisWeek(periodTimestamp).key
+    futureDepartures: planning.futureDepartures,
+    periodKey: planning.futureDepartures.length ? planning.week.key : currentWeek.key,
+    periodLabel: planning.futureDepartures.length ? planning.week.label : currentWeek.label
   };
 }
 
