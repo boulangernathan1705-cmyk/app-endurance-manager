@@ -211,8 +211,20 @@
   }
 
   .departure-fold[id^="departure-"] > summary > .ux-summary-registration-actions {
-    margin-top: 4px !important;
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
     gap: 5px !important;
+    width: 100% !important;
+    margin-top: 4px !important;
+  }
+
+  .departure-fold[id^="departure-"] > summary > .ux-summary-registration-actions > button {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding-inline: 3px !important;
+    font-size: 10px !important;
   }
 
   .ux-content-accordion-summary {
