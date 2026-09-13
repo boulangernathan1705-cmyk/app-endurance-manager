@@ -42,6 +42,23 @@ test('home loads without network error', async ({page}) => {
   expect(apiFailures).toEqual([]);
 });
 
+test('language switch changes to English and persists in the simulator space', async ({page}) => {
+  await openAndCheck(page, '/');
+  const toggle = page.locator('[data-language-toggle]');
+  await expect(toggle).toBeVisible();
+  await expect(toggle).toContainText('🇬🇧');
+  await toggle.click();
+  await page.waitForLoadState('networkidle');
+  await expect(page.locator('html')).toHaveAttribute('lang','en');
+  await expect(page.getByText('Choose your simulator',{exact:true})).toBeVisible();
+  await expect(page.locator('[data-language-toggle]')).toContainText('🇫🇷');
+  await openAndCheck(page, '/lmu/');
+  await expect(page.locator('html')).toHaveAttribute('lang','en');
+  await expect(page.getByRole('heading',{name:'EVENTS',exact:true})).toBeVisible();
+  await expect(page.locator('[data-language-toggle]')).toContainText('🇫🇷');
+  expect(apiFailures).toEqual([]);
+});
+
 test('LMU space opens from home', async ({page}) => {
   await openAndCheck(page, '/');
   const link = page.locator('a[href="/lmu/"]');
