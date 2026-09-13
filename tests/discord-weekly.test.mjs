@@ -6,6 +6,7 @@ import {
   isWeeklyDiscordMutation,
   parisWeek
 } from '../server/discord-weekly-format.mjs';
+import {syncWeeklyDiscord} from '../server/discord-weekly.mjs';
 
 const uuid = '11111111-1111-4111-8111-111111111111';
 const departureUuid = '22222222-2222-4222-8222-222222222222';
@@ -61,4 +62,8 @@ test('les mutations qui changent le résumé déclenchent une synchronisation', 
   assert.equal(isWeeklyDiscordMutation(request(`/api/crews/${uuid}/members/${departureUuid}`, 'DELETE')), true);
   assert.equal(isWeeklyDiscordMutation(request('/api/auth/logout')), false);
   assert.equal(isWeeklyDiscordMutation(request('/api/events', 'GET')), false);
+});
+
+test('la synchronisation reste inactive tant que le webhook secret n’est pas configuré', async () => {
+  assert.deepEqual(await syncWeeklyDiscord({}), {ok:false, skipped:'not-configured'});
 });
