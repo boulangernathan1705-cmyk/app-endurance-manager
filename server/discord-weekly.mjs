@@ -1,4 +1,4 @@
-import {buildWeeklyDiscordPayload, isDepartureRelevant, parisWeek} from './discord-weekly-format.mjs';
+import {buildWeeklyDiscordPayload, isDepartureRelevant, nextParisWeek, parisWeek} from './discord-weekly-format.mjs';
 
 const STATE_KEY = 'lmu-weekly-v1';
 const LOCK_SECONDS = 90;
@@ -16,10 +16,7 @@ async function hashSnapshot(snapshot) {
   return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
 }
 
-async function loadSnapshot(env, timestamp) {
-  const week = parisWeek(timestamp);
-  const events = (await env.DB.prepare(`SELECT id,name,circuit,duration_hours,departures
-    FROM events WHERE circuit NOT LIKE 'iracing-%' ORDER BY created_at,id`).all()).results || [];
+function departuresForWeek(events, week, timestamp) {
   const departures = [];
   for (const event of events) {
     const eventDepartures = parseJson(event.departures, []);
@@ -32,6 +29,25 @@ async function loadSnapshot(env, timestamp) {
     }
   }
   departures.sort((a,b) => a.startsAt-b.startsAt || a.eventName.localeCompare(b.eventName,'fr'));
+  return departures;
+}
+
+async function loadSnapshot(env, timestamp) {
+  const currentWeek = parisWeek(timestamp);
+  const events = (await env.DB.prepare(`SELECT id,name,circuit,duration_hours,departures
+    FROM events WHERE circuit NOT LIKE 'iracing-%' ORDER BY created_at,id`).all()).results || [];
+
+  let week = currentWeek;
+  let departures = departuresForWeek(events, week, timestamp);
+  if (!departures.length) {
+    const followingWeek = nextParisWeek(timestamp);
+    const followingDepartures = departuresForWeek(events, followingWeek, timestamp);
+    if (followingDepartures.length) {
+      week = followingWeek;
+      departures = followingDepartures;
+    }
+  }
+
   if (!departures.length) return {week,departures};
 
   const eventIds = [...new Set(departures.map(item => item.eventId))];
