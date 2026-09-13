@@ -133,7 +133,8 @@ test('Équipages est intégré directement dans chaque départ avec actions pilo
   assert.match(crews,/data-crew-state-select/);
   assert.match(crews,/button\('join-crew','Rejoindre'/);
   assert.match(crews,/button\('leave-crew','Quitter'/);
-  assert.match(crews,/crew\.ownedByMe\?'Gérer':'Modifier'/);
+  assert.match(crews,/button\('edit-crew','Gérer'/);
+  assert.doesNotMatch(crews,/crew\.ownedByMe\?'Gérer':'Modifier'/);
   assert.match(crews,/logo\(crew\.category\)/);
 });
 
