@@ -13,7 +13,7 @@ const formatter = new Intl.DateTimeFormat(localeTag(), {
 
 const CREW_COLORS = ['#52d3d8','#f3b33d','#ec5b67','#75d66b','#8b7cf6','#e47adf','#58a6ff','#f28f45'];
 const MAX_HOME_ITEMS = 3;
-const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[char]));
+const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
 
 function displayTime(value) {
   const match = String(value || '').match(/^(\d{1,2}):(\d{2})$/);
