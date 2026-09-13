@@ -1,5 +1,6 @@
 import worker from './worker.mjs';
 import {isWeeklyDiscordMutation} from './discord-weekly-format.mjs';
+import {ensureDiscordWeeklySchema} from './discord-weekly-schema.mjs';
 import {syncWeeklyDiscord} from './discord-weekly.mjs';
 
 let crewOwnershipReady = null;
@@ -46,9 +47,14 @@ async function ensureCrewOwnershipSchema(env) {
   return crewOwnershipReady;
 }
 
+async function runWeeklySync(env) {
+  await ensureDiscordWeeklySchema(env);
+  return syncWeeklyDiscord(env);
+}
+
 function queueWeeklySync(env, ctx) {
   if (!env?.DISCORD_WEEKLY_WEBHOOK_URL || !ctx?.waitUntil) return;
-  ctx.waitUntil(syncWeeklyDiscord(env).catch(error => {
+  ctx.waitUntil(runWeeklySync(env).catch(error => {
     console.error('Discord weekly sync failed', error instanceof Error ? error.message : 'unknown');
   }));
 }
@@ -65,7 +71,7 @@ export default {
 
   async scheduled(_controller, env, ctx) {
     if (!env?.DISCORD_WEEKLY_WEBHOOK_URL) return;
-    ctx.waitUntil(syncWeeklyDiscord(env).catch(error => {
+    ctx.waitUntil(runWeeklySync(env).catch(error => {
       console.error('Discord weekly scheduled sync failed', error instanceof Error ? error.message : 'unknown');
     }));
   }
