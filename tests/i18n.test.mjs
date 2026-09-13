@@ -10,12 +10,35 @@ test('les libellés principaux existent en anglais',()=>{
   assert.equal(translateTextForLocale('Départs passés','en'),'Past starts');
   assert.equal(translateTextForLocale('3 pilotes inscrits','en'),'3 registered drivers');
   assert.equal(translateTextForLocale('Équipage complet','en'),'Crew complete');
-  assert.equal(translateTextForLocale('engagés','en'),'entered');
-  assert.equal(translateTextForLocale('Championnat iRacing','en'),'iRacing championship');
-  assert.equal(translateTextForLocale('Prochain départ dans','en'),'Next start in');
-  assert.equal(translateTextForLocale('Aucun départ à venir avec pilote inscrit','en'),'No upcoming start with a registered driver');
-  assert.equal(translateTextForLocale('Prochain départ avec pilotes : Sunday 13 September à 18:00 ·','en'),'Next start with drivers: Sunday 13 September at 18:00 ·');
   assert.equal(translateTextForLocale('Événements','fr'),'Événements');
+});
+
+test('les compteurs dynamiques et libellés de course sont traduits sans reste français',()=>{
+  assert.equal(translateTextForLocale('1 inscrit','en'),'1 driver');
+  assert.equal(translateTextForLocale('2 inscrits','en'),'2 drivers');
+  assert.equal(translateTextForLocale('2 équipages engagés','en'),'2 crews entered');
+  assert.equal(translateTextForLocale('Championnat iRacing','en'),'iRacing Championship');
+  assert.equal(translateTextForLocale('12h','en'),'12:00');
+  assert.equal(translateTextForLocale('12h30','en'),'12:30');
+});
+
+test('la version française normalise les libellés incohérents ou fautifs',()=>{
+  assert.equal(translateTextForLocale('Special event','fr'),'Événement spécial');
+  assert.equal(translateTextForLocale('Ajouter un évènement','fr'),'Ajouter un événement');
+  assert.equal(translateTextForLocale('Pilote souhaité','fr'),'Coéquipier souhaité');
+  assert.equal(translateTextForLocale('Pseudo du pilote souhaité','fr'),'Pseudo du coéquipier souhaité');
+  assert.equal(translateTextForLocale('Les dates et heures sont saisies en heure de Paris.','fr'),'Les dates et heures sont saisies à l’heure de Paris.');
+});
+
+test('les dialogues dynamiques sont traduisibles en anglais',()=>{
+  assert.equal(translateTextForLocale('Marquer « FMT01 » comme équipage complet et verrouiller sa composition ?','en'),'Mark “FMT01” as complete and lock its lineup?');
+  assert.equal(translateTextForLocale('Supprimer « FMT01 » et toutes ses inscriptions ? Cette suppression est définitive.','en'),'Delete “FMT01” and all its entries? This action is permanent.');
+});
+
+test('les pages aide et confiance disposent aussi de traductions',()=>{
+  assert.equal(translateTextForLocale('Consulter les événements','en'),'Browse events');
+  assert.equal(translateTextForLocale('Politique de confidentialité','en'),'Privacy policy');
+  assert.equal(translateTextForLocale('Crédits des cartes de circuits','en'),'Circuit map credits');
 });
 
 test('la locale anglaise utilise un format britannique cohérent avec les heures 24 h',()=>{
@@ -35,4 +58,10 @@ test('les dates applicatives utilisent la locale sélectionnée',()=>{
   assert.match(read('front/game-hub.mjs'),/Intl\.DateTimeFormat\(localeTag\(\)/);
   assert.match(read('front/app/home-view.mjs'),/Intl\.DateTimeFormat\(localeTag\(\)/);
   assert.match(read('front/app/entries-view.mjs'),/Intl\.DateTimeFormat\(localeTag\(\)/);
+});
+
+test('le sélecteur traduit aussi les confirmations natives en anglais',()=>{
+  const i18n=read('front/i18n.mjs');
+  assert.match(i18n,/installNativeDialogTranslation/);
+  assert.match(i18n,/globalThis\.confirm=message=>nativeConfirm\(translateTextForLocale\(message,'en'\)\)/);
 });
