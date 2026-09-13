@@ -1,1 +1,1 @@
-import './front/app/actions.mjs?v=22-past-departures';
+import './front/app/actions.mjs?v=23-departure-crew-action';
