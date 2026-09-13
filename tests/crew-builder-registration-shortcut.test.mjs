@@ -18,6 +18,7 @@ test('la création d’équipage propose d’inscrire un pilote non encore inscr
   assert.match(script,/button\.dataset\.departure=activeBuilder\.departureId/);
   assert.match(script,/button\.textContent='Inscrire un autre pilote'/);
   assert.match(script,/activeBuilder\.mode!=='create'/);
+  assert.doesNotMatch(script,/MutationObserver/);
   assert.match(css,/\.crew-builder-register-pilot/);
   assert.match(html,/crew-builder-registration-shortcut\.mjs\?v=1/);
   assert.match(html,/crew-builder-registration-shortcut\.css\?v=1/);
