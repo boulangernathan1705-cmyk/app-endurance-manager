@@ -37,6 +37,7 @@ test('la vue événement garde les départs fermés par défaut et range les dé
   assert.match(view,/renderDeparturePanel\(event,departure,index,false,\{isPast:true\}\)/);
   assert.doesNotMatch(view,/departure\.id===next\?\.id\|\|/);
   assert.match(view,/next-departure-tag/);
-  assert.match(css,/\.past-departures-fold > summary[\s\S]*font-size:\s*11px/);
+  assert.match(css,/\.past-departures-fold > summary[\s\S]*font-size:\s*14px/);
+  assert.match(css,/@media \(max-width: 700px\)[\s\S]*\.past-departures-fold > summary[\s\S]*font-size:\s*13px/);
   assert.match(html,/past-departures\.css\?v=1/);
 });
