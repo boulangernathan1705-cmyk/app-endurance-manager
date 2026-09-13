@@ -42,7 +42,7 @@ test('home loads without network error', async ({page}) => {
   expect(apiFailures).toEqual([]);
 });
 
-test('language switch changes to English and persists in the simulator space', async ({page}) => {
+test('language switch changes to English, translates event counters and persists', async ({page}) => {
   await openAndCheck(page, '/');
   const toggle = page.locator('[data-language-toggle]');
   await expect(toggle).toBeVisible();
@@ -52,6 +52,20 @@ test('language switch changes to English and persists in the simulator space', a
   await expect(page.locator('html')).toHaveAttribute('lang','en');
   await expect(page.getByText('Choose your simulator',{exact:true})).toBeVisible();
   await expect(page.locator('[data-language-toggle]')).toContainText('🇫🇷');
+
+  await openAndCheck(page, '/iracing/');
+  await expect(page.locator('html')).toHaveAttribute('lang','en');
+  await expect(page.getByRole('heading',{name:'EVENTS',exact:true})).toBeVisible();
+  await expect(page.locator('[data-language-toggle]')).toContainText('🇫🇷');
+  const cards=page.locator('.event-card');
+  if(await cards.count()) {
+    const categoryCopy=(await cards.first().locator('.event-category-badges').allTextContents()).join(' ');
+    expect(categoryCopy).not.toMatch(/\binscrit(?:s)?\b/i);
+    expect(categoryCopy).not.toMatch(/\bpilote(?:s)?\b/i);
+    const cardText=await cards.first().innerText();
+    expect(cardText).not.toMatch(/\béquipage(?:s)?\s+engagé(?:s)?\b/i);
+  }
+
   await openAndCheck(page, '/lmu/');
   await expect(page.locator('html')).toHaveAttribute('lang','en');
   await expect(page.getByRole('heading',{name:'EVENTS',exact:true})).toBeVisible();
