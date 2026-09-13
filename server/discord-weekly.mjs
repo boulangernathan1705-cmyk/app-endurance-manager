@@ -1,4 +1,4 @@
-import {buildWeeklyDiscordPayload, isInParisWeek, parisWeek} from './discord-weekly-format.mjs';
+import {buildWeeklyDiscordPayload, isDepartureRelevant, nextParisWeek, parisWeek} from './discord-weekly-format.mjs';
 
 const STATE_KEY = 'lmu-weekly-v1';
 const LOCK_SECONDS = 90;
@@ -16,21 +16,38 @@ async function hashSnapshot(snapshot) {
   return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
 }
 
-async function loadSnapshot(env, timestamp) {
-  const week = parisWeek(timestamp);
-  const events = (await env.DB.prepare(`SELECT id,name,circuit,duration_hours,departures
-    FROM events WHERE circuit NOT LIKE 'iracing-%' ORDER BY created_at,id`).all()).results || [];
+function departuresForWeek(events, week, timestamp) {
   const departures = [];
   for (const event of events) {
     const eventDepartures = parseJson(event.departures, []);
     if (!Array.isArray(eventDepartures)) continue;
+    const durationHours = Number(event.duration_hours) || 0;
     for (const departure of eventDepartures) {
       const startsAt = Number(departure?.startsAt);
-      if (!departure?.id || !Number.isFinite(startsAt) || !isInParisWeek(startsAt, week)) continue;
-      departures.push({eventId:event.id,eventName:event.name,circuit:event.circuit || '',durationHours:Number(event.duration_hours) || 0,departureId:departure.id,startsAt,crews:[]});
+      if (!departure?.id || !Number.isFinite(startsAt) || !isDepartureRelevant(startsAt, durationHours, week, timestamp)) continue;
+      departures.push({eventId:event.id,eventName:event.name,circuit:event.circuit || '',durationHours,departureId:departure.id,startsAt,crews:[]});
     }
   }
   departures.sort((a,b) => a.startsAt-b.startsAt || a.eventName.localeCompare(b.eventName,'fr'));
+  return departures;
+}
+
+export async function loadWeeklyDiscordSnapshot(env, timestamp) {
+  const currentWeek = parisWeek(timestamp);
+  const events = (await env.DB.prepare(`SELECT id,name,circuit,duration_hours,departures
+    FROM events WHERE circuit NOT LIKE 'iracing-%' ORDER BY created_at,id`).all()).results || [];
+
+  let week = currentWeek;
+  let departures = departuresForWeek(events, week, timestamp);
+  if (!departures.length) {
+    const followingWeek = nextParisWeek(timestamp);
+    const followingDepartures = departuresForWeek(events, followingWeek, timestamp);
+    if (followingDepartures.length) {
+      week = followingWeek;
+      departures = followingDepartures;
+    }
+  }
+
   if (!departures.length) return {week,departures};
 
   const eventIds = [...new Set(departures.map(item => item.eventId))];
@@ -82,7 +99,7 @@ async function editMessage(base,messageId,payload) {
 }
 
 async function syncLocked(env,base,lockToken,timestamp) {
-  const snapshot = await loadSnapshot(env,timestamp);
+  const snapshot = await loadWeeklyDiscordSnapshot(env,timestamp);
   const contentHash = await hashSnapshot(snapshot);
   const state = await env.DB.prepare('SELECT message_id,content_hash FROM discord_weekly_state WHERE key=? AND lock_token=?').bind(STATE_KEY,lockToken).first();
   if (!state) throw new Error('État Discord hebdomadaire indisponible.');

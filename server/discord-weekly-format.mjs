@@ -1,6 +1,7 @@
 import {catalogForGame} from '../shared/catalog.mjs';
 
 const DAY_MS = 86_400_000;
+const HOUR_MS = 3_600_000;
 const TIME_ZONE = 'Europe/Paris';
 const catalog = catalogForGame('lmu');
 const circuitNames = new Map(catalog.circuits.map(circuit => [circuit.id, circuit.name]));
@@ -55,10 +56,7 @@ function dayKey(day) {
   return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}-${String(date.getUTCDate()).padStart(2, '0')}`;
 }
 
-export function parisWeek(timestamp = Date.now()) {
-  const current = localDay(timestamp);
-  const weekday = new Date(current * DAY_MS).getUTCDay();
-  const monday = current - (weekday === 0 ? 6 : weekday - 1);
+function weekFromMonday(monday) {
   const sunday = monday + 6;
   return {
     key: dayKey(monday),
@@ -68,9 +66,27 @@ export function parisWeek(timestamp = Date.now()) {
   };
 }
 
+export function parisWeek(timestamp = Date.now()) {
+  const current = localDay(timestamp);
+  const weekday = new Date(current * DAY_MS).getUTCDay();
+  const monday = current - (weekday === 0 ? 6 : weekday - 1);
+  return weekFromMonday(monday);
+}
+
+export function nextParisWeek(timestamp = Date.now()) {
+  return weekFromMonday(parisWeek(timestamp).monday + 7);
+}
+
 export function isInParisWeek(timestamp, week) {
   const day = localDay(timestamp);
   return day >= week.monday && day <= week.sunday;
+}
+
+export function isDepartureRelevant(startsAt, durationHours, week, now = Date.now()) {
+  if (!Number.isFinite(startsAt) || !isInParisWeek(startsAt, week)) return false;
+  const hours = Number(durationHours);
+  const endAt = startsAt + (Number.isFinite(hours) && hours > 0 ? hours * HOUR_MS : 0);
+  return startsAt >= now || endAt > now;
 }
 
 function clean(value) {
@@ -125,8 +141,8 @@ export function buildWeeklyDiscordPayload(snapshot, appUrl, updatedAt = Date.now
     return {
       content,
       embeds: [{
-        title: 'Aucune endurance LMU cette semaine',
-        description: 'Aucun départ LMU n’est programmé entre lundi et dimanche.',
+        title: 'Aucune endurance LMU programmée',
+        description: 'Aucun départ LMU à venir ou encore en cours sur la période affichée.',
         color: 0x6b7280,
         footer: {text: 'Endurance Manager • mise à jour automatique'},
         timestamp: new Date(updatedAt).toISOString()
