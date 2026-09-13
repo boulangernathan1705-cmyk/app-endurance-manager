@@ -15,7 +15,7 @@ function crewActions(crew,departure,ownMember,joinRegistration,memberElsewhere){
   }
   if(ownMember)actions.push(button('leave-crew','Quitter',`data-id="${crew.id}" data-departure="${departure.id}" data-registration="${ownMember.id}" data-version="${crew.version}" aria-label="Quitter l’équipage ${esc(crew.name)}"`,'secondary-button crew-leave-button'));
   if(crew.canManage){
-    actions.push(button('edit-crew',crew.ownedByMe?'Gérer':'Modifier',`data-id="${crew.id}" data-departure="${departure.id}" aria-label="Gérer l’équipage ${esc(crew.name)}"`,'secondary-button crew-manage-button'));
+    actions.push(button('edit-crew','Gérer',`data-id="${crew.id}" data-departure="${departure.id}" aria-label="Gérer l’équipage ${esc(crew.name)}"`,'secondary-button crew-manage-button'));
     actions.push(button('delete-crew','Supprimer',`data-id="${crew.id}" data-departure="${departure.id}" data-version="${crew.version}" aria-label="Supprimer l’équipage ${esc(crew.name)}"`,'danger-button crew-delete-button'));
   }
   return actions.length?`<div class="crew-self-actions">${actions.join('')}</div>`:'';
