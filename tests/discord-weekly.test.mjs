@@ -13,6 +13,9 @@ const uuid = '11111111-1111-4111-8111-111111111111';
 const departureUuid = '22222222-2222-4222-8222-222222222222';
 const futureEventUuid = '33333333-3333-4333-8333-333333333333';
 const futureDepartureUuid = '44444444-4444-4444-8444-444444444444';
+const secondDepartureUuid = '55555555-5555-4555-8555-555555555555';
+const registrationUuid = '66666666-6666-4666-8666-666666666666';
+const crewUuid = '77777777-7777-4777-8777-777777777777';
 
 function request(path, method='POST') {
   return new Request(`https://endurance-manager.app${path}`, {method});
@@ -31,13 +34,43 @@ function dbFixture({events=[], registrations=[], crews=[]}) {
   };
 }
 
-function event(id, name, circuit, durationHours, departureId, startsAt) {
+function event(id, name, circuit, durationHours, departures) {
   return {
     id,
     name,
     circuit,
     duration_hours:durationHours,
-    departures:JSON.stringify([{id:departureId,startsAt}])
+    departures:JSON.stringify(departures)
+  };
+}
+
+function singleDepartureEvent(id, name, circuit, durationHours, departureId, startsAt) {
+  return event(id,name,circuit,durationHours,[{id:departureId,startsAt}]);
+}
+
+function registration({eventId=uuid, departureId=departureUuid, name='Nathan'}={}) {
+  return {
+    id:registrationUuid,
+    event_id:eventId,
+    departure_id:departureId,
+    participant_id:`pilot-${name.toLowerCase()}`,
+    category:'Hypercar',
+    status:'all',
+    pilot_name:name
+  };
+}
+
+function crewRow({eventId=uuid, departureId=departureUuid, name='FMT #1', pilot='Nathan'}={}) {
+  return {
+    id:crewUuid,
+    event_id:eventId,
+    departure_id:departureId,
+    name,
+    category:'Hypercar',
+    car:'Toyota GR010 Hybrid',
+    locked:1,
+    registration_id:pilot ? registrationUuid : null,
+    pilot_name:pilot || null
   };
 }
 
@@ -51,103 +84,119 @@ test('la semaine utilitaire suit lundi-dimanche en heure de Paris', () => {
   assert.equal(isInParisWeek(Date.parse('2026-09-14T12:00:00Z'), parisWeek(sunday)), false);
 });
 
-test('une course en cours sans pilote inscrit n’est pas affichée', async () => {
-  const now = Date.parse('2026-09-12T14:00:00Z');
-  const currentStart = Date.parse('2026-09-12T13:00:00Z');
-  const futureStart = Date.parse('2026-09-19T13:00:00Z');
-  const events = [
-    event(uuid,'6h de COTA','cota',6,departureUuid,currentStart),
-    event(futureEventUuid,'6h suivante','spa',6,futureDepartureUuid,futureStart)
-  ];
+test('le récap garde tous les départs futurs de la semaine et retire ceux déjà passés', async () => {
+  const now = Date.parse('2026-09-18T10:00:00Z');
+  const events = [event(uuid,'4h SILVERSTONE','silverstone',4,[
+    {id:'10000000-0000-4000-8000-000000000001',startsAt:Date.parse('2026-09-18T08:00:00Z')},
+    {id:departureUuid,startsAt:Date.parse('2026-09-18T12:00:00Z')},
+    {id:secondDepartureUuid,startsAt:Date.parse('2026-09-18T16:00:00Z')},
+    {id:futureDepartureUuid,startsAt:Date.parse('2026-09-19T08:00:00Z')}
+  ])];
   const snapshot = await loadWeeklyDiscordSnapshot({DB:dbFixture({events})},now);
   assert.equal(snapshot.currentDepartures.length,0);
-  assert.equal(snapshot.nextDeparture.eventName,'6h suivante');
-});
-
-test('une course en cours apparaît dès qu’au moins un pilote est inscrit', async () => {
-  const now = Date.parse('2026-09-12T14:00:00Z');
-  const currentStart = Date.parse('2026-09-12T13:00:00Z');
-  const events = [event(uuid,'6h de COTA','cota',6,departureUuid,currentStart)];
-  const registrations = [{
-    id:'55555555-5555-4555-8555-555555555555',
-    event_id:uuid,
-    departure_id:departureUuid,
-    participant_id:'pilot-nathan',
-    category:'Hypercar',
-    status:'all',
-    pilot_name:'Nathan'
-  }];
-  const snapshot = await loadWeeklyDiscordSnapshot({DB:dbFixture({events,registrations})},now);
-  assert.equal(snapshot.currentDepartures.length,1);
-  assert.equal(snapshot.currentDepartures[0].pilotCount,1);
-  assert.deepEqual(snapshot.currentDepartures[0].unassignedPilots,['Nathan']);
-  assert.equal(snapshot.nextDeparture,null);
-});
-
-test('après la course, le récap choisit le prochain départ futur même la semaine suivante', async () => {
-  const now = Date.parse('2026-09-13T21:14:00Z'); // dimanche 23:14 à Paris
-  const events = [
-    event(uuid,'6h de COTA','cota',6,departureUuid,Date.parse('2026-09-12T13:00:00Z')),
-    event(futureEventUuid,'6h semaine suivante','spa',6,futureDepartureUuid,Date.parse('2026-09-19T13:00:00Z'))
-  ];
-  const snapshot = await loadWeeklyDiscordSnapshot({DB:dbFixture({events})},now);
-  assert.equal(snapshot.currentDepartures.length,0);
-  assert.equal(snapshot.nextDeparture.eventName,'6h semaine suivante');
+  assert.equal(snapshot.futureDepartures.length,3);
+  assert.deepEqual(snapshot.futureDepartures.map(item => item.departureId),[departureUuid,secondDepartureUuid,futureDepartureUuid]);
   assert.equal(snapshot.periodKey,'2026-09-14');
 });
 
-test('le message distingue clairement les pilotes sans afficher leur nombre total', () => {
-  const timestamp = Date.parse('2026-09-12T14:00:00Z');
+test('un départ déjà commencé sans équipage engagé disparaît même si un pilote était inscrit', async () => {
+  const now = Date.parse('2026-09-18T14:00:00Z');
+  const startsAt = Date.parse('2026-09-18T13:00:00Z');
+  const events = [singleDepartureEvent(uuid,'4h SILVERSTONE','silverstone',4,departureUuid,startsAt)];
+  const snapshot = await loadWeeklyDiscordSnapshot({DB:dbFixture({events,registrations:[registration()]})},now);
+  assert.equal(snapshot.currentDepartures.length,0);
+  assert.equal(snapshot.futureDepartures.length,0);
+});
+
+test('un départ déjà commencé avec un équipage engagé reste affiché comme course en cours', async () => {
+  const now = Date.parse('2026-09-18T14:00:00Z');
+  const startsAt = Date.parse('2026-09-18T13:00:00Z');
+  const events = [singleDepartureEvent(uuid,'4h SILVERSTONE','silverstone',4,departureUuid,startsAt)];
+  const snapshot = await loadWeeklyDiscordSnapshot({
+    DB:dbFixture({events,registrations:[registration()],crews:[crewRow()]})
+  },now);
+  assert.equal(snapshot.currentDepartures.length,1);
+  assert.equal(snapshot.currentDepartures[0].crews.length,1);
+  assert.deepEqual(snapshot.currentDepartures[0].crews[0].pilots,['Nathan']);
+  assert.equal(snapshot.futureDepartures.length,0);
+});
+
+test('quand la semaine est terminée le récap affiche tous les départs de la prochaine semaine disponible', async () => {
+  const now = Date.parse('2026-09-13T21:14:00Z'); // dimanche 23:14 à Paris
+  const events = [
+    singleDepartureEvent(uuid,'6h de COTA','cota',6,departureUuid,Date.parse('2026-09-12T13:00:00Z')),
+    event(futureEventUuid,'4h SILVERSTONE','silverstone',4,[
+      {id:futureDepartureUuid,startsAt:Date.parse('2026-09-18T10:00:00Z')},
+      {id:secondDepartureUuid,startsAt:Date.parse('2026-09-19T10:00:00Z')}
+    ])
+  ];
+  const snapshot = await loadWeeklyDiscordSnapshot({DB:dbFixture({events})},now);
+  assert.equal(snapshot.currentDepartures.length,0);
+  assert.equal(snapshot.futureDepartures.length,2);
+  assert.equal(snapshot.periodKey,'2026-09-14');
+  assert.match(snapshot.periodLabel,/14 septembre/);
+});
+
+test('le message affiche les horaires seuls tant qu’aucun équipage n’est inscrit puis détaille les équipages', () => {
+  const timestamp = Date.parse('2026-09-18T10:00:00Z');
   const current = {
     eventId:uuid,
     eventName:'8H Test en cours',
     circuit:'spa',
     durationHours:8,
     departureId:departureUuid,
-    startsAt:Date.parse('2026-09-12T13:00:00Z'),
-    pilotCount:2,
-    unassignedPilots:['Pilote libre'],
+    startsAt:Date.parse('2026-09-18T09:00:00Z'),
+    unassignedPilots:[],
     crews:[{
-      id:uuid,
+      id:crewUuid,
       name:'FMT #1',
       category:'Hypercar',
       car:'Toyota GR010 Hybrid',
       locked:true,
-      pilots:['Nathan','@everyone']
+      pilots:['Nathan']
     }]
   };
-  const next = {
+  const futureEmpty = {
     eventId:futureEventUuid,
-    eventName:'6H suivante',
-    circuit:'cota',
-    durationHours:6,
+    eventName:'4h SILVERSTONE',
+    circuit:'silverstone',
+    durationHours:4,
     departureId:futureDepartureUuid,
-    startsAt:Date.parse('2026-09-19T13:00:00Z'),
-    pilotCount:1,
+    startsAt:Date.parse('2026-09-18T12:00:00Z'),
     unassignedPilots:[],
+    crews:[]
+  };
+  const futureWithCrew = {
+    ...futureEmpty,
+    departureId:secondDepartureUuid,
+    startsAt:Date.parse('2026-09-18T16:00:00Z'),
     crews:[{
-      id:futureEventUuid,
-      name:'FMT #2',
-      category:'GT3',
-      car:'Ferrari 296 LMGT3',
+      id:'88888888-8888-4888-8888-888888888888',
+      name:'Mrt blé',
+      category:'LMP2 ELMS',
+      car:'Oreca 07 Gibson ELMS',
       locked:false,
-      pilots:['Josselin']
+      pilots:['Etienne_48']
     }]
   };
-  const payload = buildWeeklyDiscordPayload({currentDepartures:[current],nextDeparture:next},'https://endurance-manager.app/lmu/',timestamp);
+  const payload = buildWeeklyDiscordPayload({
+    currentDepartures:[current],
+    futureDepartures:[futureEmpty,futureWithCrew],
+    periodLabel:'semaine du 14 septembre au 20 septembre 2026'
+  },'https://endurance-manager.app/lmu/',timestamp);
+
   assert.deepEqual(payload.allowed_mentions,{parse:[]});
-  assert.match(payload.content,/Endurance Manager/);
+  assert.equal(payload.embeds.length,2);
   assert.match(payload.embeds[0].title,/Course en cours/);
-  assert.doesNotMatch(payload.embeds[0].description,/pilotes? inscrits?/i);
-  assert.match(payload.embeds[0].fields[0].name,/Complet/);
-  assert.match(payload.embeds[0].fields[0].value,/Toyota GR010 Hybrid/);
   assert.match(payload.embeds[0].fields[0].value,/👤 Nathan/);
-  assert.match(payload.embeds[0].fields[0].value,/👤 @everyone/);
-  assert.match(payload.embeds[0].fields[1].name,/^📋 Pilotes inscrits non affectés$/);
-  assert.match(payload.embeds[0].fields[1].value,/👤 Pilote libre/);
-  assert.match(payload.embeds[1].title,/Prochaine inscription/);
-  assert.match(payload.embeds[1].fields[0].value,/Ferrari 296 LMGT3/);
-  assert.match(payload.embeds[1].fields[0].value,/👤 Josselin/);
+  assert.match(payload.embeds[1].title,/Départs disponibles/);
+  assert.equal(payload.embeds[1].fields.length,2);
+  assert.match(payload.embeds[1].fields[0].name,/vendredi 18 septembre à 14:00/i);
+  assert.equal(payload.embeds[1].fields[0].value,'\u200b');
+  assert.match(payload.embeds[1].fields[1].name,/vendredi 18 septembre à 18:00/i);
+  assert.match(payload.embeds[1].fields[1].value,/Mrt blé/);
+  assert.match(payload.embeds[1].fields[1].value,/👤 Etienne_48/);
+  assert.doesNotMatch(payload.embeds[1].description,/pilotes? inscrits?/i);
 });
 
 test('les mutations qui changent le résumé déclenchent une synchronisation', () => {
