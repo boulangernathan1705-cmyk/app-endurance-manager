@@ -1,8 +1,9 @@
 import {GAME_CATALOGS, gameForEvent} from '../shared/catalog.mjs';
 import {eventSchedule} from './schedule.mjs';
+import {getLocale,localeTag} from './i18n.mjs';
 
 const grid = document.getElementById('game-grid');
-const formatter = new Intl.DateTimeFormat('fr-FR', {
+const formatter = new Intl.DateTimeFormat(localeTag(), {
   timeZone:'Europe/Paris',
   weekday:'short',
   day:'numeric',
@@ -17,6 +18,7 @@ const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp
 function displayTime(value) {
   const match = String(value || '').match(/^(\d{1,2}):(\d{2})$/);
   if (!match) return String(value || '').trim();
+  if (getLocale()==='en') return `${String(Number(match[1])).padStart(2,'0')}:${match[2]}`;
   return match[2] === '00' ? `${Number(match[1])}h` : `${Number(match[1])}h${match[2]}`;
 }
 
@@ -61,7 +63,7 @@ function orderedEvents(events, game, timestamp=Date.now()) {
     .filter(item => item.bounds && !item.schedule.archived && item.schedule.timestamp !== null)
     .sort((a,b) => Number(!!b.schedule.running)-Number(!!a.schedule.running)
       || (a.schedule.timestamp ?? Infinity)-(b.schedule.timestamp ?? Infinity)
-      || a.event.name.localeCompare(b.event.name,'fr'));
+      || a.event.name.localeCompare(b.event.name,getLocale()==='en'?'en':'fr'));
 }
 
 function homeQueue(events, game, timestamp=Date.now()) {
@@ -71,7 +73,6 @@ function homeQueue(events, game, timestamp=Date.now()) {
     if (!remaining.length) continue;
     const active=remaining.filter(hasVisibleActivity);
 
-    // An event with nobody registered must still remain visible until it is over.
     if (!active.length) {
       queue.push({...item,departure:remaining[0]});
       break;
