@@ -11,7 +11,7 @@ test('inscrire un autre pilote n’ouvre pas automatiquement la liste des pilote
 
   assert.match(behavior,/ux-summary-registration-other\[data-action="new-registration"\]/);
   assert.doesNotMatch(behavior,/\.focus\s*\(/);
-  assert.match(registration,/>Choisir un pilote<\/option>/);
-  assert.match(registration,/>Autre pilote<\/option>/);
+  assert.match(registration,/Choose a driver.*Choisir un pilote/);
+  assert.match(registration,/Other driver.*Autre pilote/);
   assert.match(html,/registration-select-behavior\.mjs\?v=1/);
 });
