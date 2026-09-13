@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {translateTextForLocale,localeTag} from '../front/i18n.mjs';
+import {translateExtendedTextForLocale} from '../front/i18n-content.mjs';
 
 const read=path=>readFileSync(new URL(`../${path}`,import.meta.url),'utf8');
 
@@ -35,10 +36,14 @@ test('les dialogues dynamiques sont traduisibles en anglais',()=>{
   assert.equal(translateTextForLocale('Supprimer « FMT01 » et toutes ses inscriptions ? Cette suppression est définitive.','en'),'Delete “FMT01” and all its entries? This action is permanent.');
 });
 
-test('les pages aide et confiance disposent aussi de traductions',()=>{
-  assert.equal(translateTextForLocale('Consulter les événements','en'),'Browse events');
-  assert.equal(translateTextForLocale('Politique de confidentialité','en'),'Privacy policy');
-  assert.equal(translateTextForLocale('Crédits des cartes de circuits','en'),'Circuit map credits');
+test('les écrans avancés et contenus longs ont une couverture anglaise',()=>{
+  assert.equal(translateExtendedTextForLocale('FORMATION D’ÉQUIPAGE','en'),'CREW SETUP');
+  assert.equal(translateExtendedTextForLocale('Aucun pilote sélectionné.','en'),'No driver selected.');
+  assert.equal(translateExtendedTextForLocale('2 h de course ne sont pas encore couvertes.','en'),'2 race hours still are not covered.');
+  assert.equal(translateExtendedTextForLocale('Consulter les événements','en'),'Browse events');
+  assert.equal(translateExtendedTextForLocale('Politique de confidentialité','en'),'Privacy policy');
+  assert.equal(translateExtendedTextForLocale('Crédits des cartes de circuits','en'),'Circuit map credits');
+  assert.equal(translateExtendedTextForLocale('Données traitées','en'),'Data processed');
 });
 
 test('la locale anglaise utilise un format britannique cohérent avec les heures 24 h',()=>{
@@ -46,9 +51,10 @@ test('la locale anglaise utilise un format britannique cohérent avec les heures
   assert.equal(localeTag('fr'),'fr-FR');
 });
 
-test('le build injecte le sélecteur de langue sur les pages publiques et applicatives',()=>{
+test('le build injecte les deux couches de traduction sur les pages publiques et applicatives',()=>{
   const build=read('scripts/build.mjs');
   assert.match(build,/front\/i18n\.mjs/);
+  assert.match(build,/front\/i18n-content\.mjs/);
   assert.match(build,/privacy\.html/);
   assert.match(build,/circuit-credits\.html/);
 });
