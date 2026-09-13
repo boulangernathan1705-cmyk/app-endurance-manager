@@ -193,16 +193,18 @@
   }
   .ux-summary-registration-actions{
     display:grid!important;
-    grid-template-columns:repeat(auto-fit,minmax(100px,1fr));
-    gap:7px!important;
+    grid-template-columns:repeat(3,minmax(0,1fr));
+    gap:6px!important;
     width:100%;
     margin:4px 0 0!important;
   }
   .ux-summary-registration-actions>button{
     width:100%!important;
-    min-height:38px!important;
-    padding:7px 7px!important;
-    font-size:10.5px!important;
+    min-width:0!important;
+    min-height:42px!important;
+    padding:6px 4px!important;
+    font-size:10px!important;
+    line-height:1.1!important;
     white-space:normal!important;
   }
   .departure-participation-section{
@@ -263,6 +265,7 @@
 }
 
 @media (max-width:380px){
-  .ux-summary-registration-actions{grid-template-columns:repeat(auto-fit,minmax(92px,1fr))}
+  .ux-summary-registration-actions{grid-template-columns:repeat(3,minmax(0,1fr));gap:5px!important}
+  .ux-summary-registration-actions>button{padding-inline:3px!important;font-size:9.5px!important}
   .crew-self-actions .crew-delete-button{margin-left:0!important}
 }
