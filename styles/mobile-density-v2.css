@@ -46,6 +46,19 @@
     margin: 3px 0 0 !important;
   }
 
+  /* Connected Discord account aligns to exactly one navigation column. */
+  .site-nav-shell .account-bar:has(.account-menu) {
+    width: calc((100% - 4px) / 2) !important;
+    max-width: none !important;
+  }
+
+  .site-nav-shell .account-bar:has(.account-menu) .account-menu-root,
+  .site-nav-shell .account-bar:has(.account-menu) .account-menu,
+  .site-nav-shell .account-bar:has(.account-menu) .account-trigger {
+    width: 100% !important;
+    max-width: none !important;
+  }
+
   .site-nav-shell .account-trigger {
     min-height: 34px !important;
     padding: 3px 7px 3px 4px !important;
