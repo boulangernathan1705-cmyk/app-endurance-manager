@@ -32,7 +32,7 @@ function departuresForWeek(events, week, timestamp) {
   return departures;
 }
 
-async function loadSnapshot(env, timestamp) {
+export async function loadWeeklyDiscordSnapshot(env, timestamp) {
   const currentWeek = parisWeek(timestamp);
   const events = (await env.DB.prepare(`SELECT id,name,circuit,duration_hours,departures
     FROM events WHERE circuit NOT LIKE 'iracing-%' ORDER BY created_at,id`).all()).results || [];
@@ -99,7 +99,7 @@ async function editMessage(base,messageId,payload) {
 }
 
 async function syncLocked(env,base,lockToken,timestamp) {
-  const snapshot = await loadSnapshot(env,timestamp);
+  const snapshot = await loadWeeklyDiscordSnapshot(env,timestamp);
   const contentHash = await hashSnapshot(snapshot);
   const state = await env.DB.prepare('SELECT message_id,content_hash FROM discord_weekly_state WHERE key=? AND lock_token=?').bind(STATE_KEY,lockToken).first();
   if (!state) throw new Error('État Discord hebdomadaire indisponible.');
