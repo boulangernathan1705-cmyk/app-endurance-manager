@@ -102,6 +102,13 @@ function pilotLines(pilots) {
   return pilots.map(name => `👤 ${clean(name)}`).join('\n');
 }
 
+function crewText(crew) {
+  const marker = markers.get(crew.category) || '⬜';
+  const status = crew.locked ? '🔒 Complet' : '🔓 Ouvert';
+  const pilots = crew.pilots.length ? pilotLines(crew.pilots) : 'Aucun pilote affecté';
+  return `${marker} ${clean(crew.name)} · ${clean(crew.category)} · ${status}\n${crew.car ? `🏎️ ${clean(crew.car)}` : '🏎️ Voiture à définir'}\n${pilots}`;
+}
+
 function crewField(crew) {
   const marker = markers.get(crew.category) || '⬜';
   const status = crew.locked ? '🔒 Complet' : '🔓 Ouvert';
@@ -122,9 +129,6 @@ function departureFields(departure) {
       inline: false
     });
   }
-  if (!departure.crews.length) {
-    fields.push({name: 'Équipages', value: 'Aucun équipage créé pour ce départ.', inline: false});
-  }
   if (departure.unassignedPilots?.length) {
     fields.push({
       name: '📋 Pilotes inscrits non affectés',
@@ -135,14 +139,12 @@ function departureFields(departure) {
   return fields.slice(0, 25);
 }
 
-function departureEmbed(departure, appUrl, mode, first, updatedAt) {
-  const current = mode === 'current';
+function currentDepartureEmbed(departure, appUrl, first, updatedAt) {
   const circuit = circuitNames.get(departure.circuit) || departure.circuit || 'Circuit à préciser';
-  const label = current ? '🔴 Course en cours' : '📝 Prochaine inscription';
   const embed = {
-    title: cut(`${label} — ${clean(departure.eventName)}`, 256),
+    title: cut(`🔴 Course en cours — ${clean(departure.eventName)}`, 256),
     description: cut(`📅 **${departureLabel.format(departure.startsAt)}**\n📍 ${clean(circuit)}\n⏱️ ${departure.durationHours || '?'} h`, 4096),
-    color: current ? 0xd71920 : 0x2563eb,
+    color: 0xd71920,
     fields: departureFields(departure)
   };
   if (appUrl) embed.url = appUrl;
@@ -153,17 +155,53 @@ function departureEmbed(departure, appUrl, mode, first, updatedAt) {
   return embed;
 }
 
+function futureDepartureValue(departure) {
+  const blocks = departure.crews.map(crewText);
+  if (departure.unassignedPilots?.length) {
+    blocks.push(`📋 Pilotes inscrits non affectés\n${pilotLines(departure.unassignedPilots)}`);
+  }
+  return cut(blocks.join('\n\n') || '\u200b', 1024);
+}
+
+function futureDepartureField(departure) {
+  return {
+    name: cut(`🕐 ${departureLabel.format(departure.startsAt)} — ${clean(departure.eventName)}`, 256),
+    value: futureDepartureValue(departure),
+    inline: false
+  };
+}
+
+function futureDepartureEmbeds(departures, periodLabel, appUrl, first, updatedAt) {
+  const embeds = [];
+  for (let offset = 0; offset < departures.length; offset += 25) {
+    const fields = departures.slice(offset, offset + 25).map(futureDepartureField);
+    const embed = {
+      title: cut(`📝 Départs disponibles — ${periodLabel || 'semaine à venir'}`, 256),
+      description: offset === 0 ? 'Tous les horaires encore disponibles pour les inscriptions.' : 'Suite des horaires disponibles.',
+      color: 0x2563eb,
+      fields
+    };
+    if (appUrl) embed.url = appUrl;
+    if (first && embeds.length === 0) {
+      embed.footer = {text: 'Endurance Manager • mise à jour automatique'};
+      embed.timestamp = new Date(updatedAt).toISOString();
+    }
+    embeds.push(embed);
+  }
+  return embeds;
+}
+
 export function buildWeeklyDiscordPayload(snapshot, appUrl, updatedAt = Date.now()) {
   const content = '🏁 **Endurance Manager — LMU**';
   const currentDepartures = Array.isArray(snapshot.currentDepartures) ? snapshot.currentDepartures : [];
-  const nextDeparture = snapshot.nextDeparture || null;
+  const futureDepartures = Array.isArray(snapshot.futureDepartures) ? snapshot.futureDepartures : [];
 
-  if (!currentDepartures.length && !nextDeparture) {
+  if (!currentDepartures.length && !futureDepartures.length) {
     return {
       content,
       embeds: [{
         title: 'Aucune endurance LMU à préparer',
-        description: 'Aucune course avec un pilote inscrit n’est en cours et aucun prochain départ LMU n’est programmé.',
+        description: 'Aucune course avec un équipage engagé n’est en cours et aucun prochain départ LMU n’est programmé.',
         color: 0x6b7280,
         footer: {text: 'Endurance Manager • mise à jour automatique'},
         timestamp: new Date(updatedAt).toISOString()
@@ -173,20 +211,21 @@ export function buildWeeklyDiscordPayload(snapshot, appUrl, updatedAt = Date.now
   }
 
   const embeds = [];
-  for (const departure of currentDepartures.slice(0, 7)) {
-    embeds.push(departureEmbed(departure, appUrl, 'current', embeds.length === 0, updatedAt));
+  for (const departure of currentDepartures) {
+    embeds.push(currentDepartureEmbed(departure, appUrl, embeds.length === 0, updatedAt));
   }
-  if (currentDepartures.length > 7) {
-    embeds.push({
-      title: 'Autres courses en cours',
-      description: cut(currentDepartures.slice(7).map(item => `• ${clean(item.eventName)}`).join('\n'), 4096),
-      color: 0xd71920
-    });
+
+  if (futureDepartures.length) {
+    embeds.push(...futureDepartureEmbeds(
+      futureDepartures,
+      snapshot.periodLabel,
+      appUrl,
+      embeds.length === 0,
+      updatedAt
+    ));
   }
-  if (nextDeparture) {
-    embeds.push(departureEmbed(nextDeparture, appUrl, 'next', embeds.length === 0, updatedAt));
-  }
-  return {content, embeds, allowed_mentions: {parse: []}};
+
+  return {content, embeds:embeds.slice(0, 10), allowed_mentions: {parse: []}};
 }
 
 export function isWeeklyDiscordMutation(request) {
