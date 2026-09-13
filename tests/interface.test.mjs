@@ -29,7 +29,7 @@ test('agenda sorts unsorted departures and groups upcoming races by Paris weeks 
   assert.deepEqual(Array.from(result[0].items,x=>x.event.name),['Soonest','Multiple']);
 });
 
-test('archive uses the end of the last race and sorts newest finishes first',()=>{
+test('archive uses the last departure start and sorts newest starts first',()=>{
   const h=scheduleHarness();
   const result=h.run(`(() => {
     const now=Date.parse('2026-09-07T12:00:00Z');
@@ -37,8 +37,8 @@ test('archive uses the end of the last race and sorts newest finishes first',()=
     const source=[race('Old','2026-09-02T00:00:00Z',6),race('Running','2026-09-07T00:00:00Z',24),race('Just finished','2026-09-07T06:00:00Z',6),{name:'Undated',departures:[]}];
     return {active:groupEvents(source,'upcoming',now),archive:groupEvents(source,'archived',now)};
   })()`);
-  assert.equal(result.active[0].label,'En cours');
-  assert.deepEqual(Array.from(result.archive[0].items,x=>x.event.name),['Just finished','Old']);
+  assert.equal(result.active[0].label,'Dates à confirmer');
+  assert.deepEqual(Array.from(result.archive[0].items,x=>x.event.name),['Just finished','Running','Old']);
 });
 
 test('agenda handles Paris midnight, Sunday to Monday, DST and new year',()=>{
