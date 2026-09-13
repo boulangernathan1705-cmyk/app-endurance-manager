@@ -42,21 +42,25 @@ test('home loads without network error', async ({page}) => {
   expect(apiFailures).toEqual([]);
 });
 
-test('language switch changes to English, translates event counters and persists', async ({page}) => {
+test('language switch shows the current language, translates event counters and persists', async ({page}) => {
   await openAndCheck(page, '/');
   const toggle = page.locator('[data-language-toggle]');
   await expect(toggle).toBeVisible();
-  await expect(toggle).toContainText('🇬🇧');
+  await expect(toggle).toContainText('🇫🇷');
+  await expect(toggle).toHaveAttribute('data-current-language','fr');
+  await expect(toggle).toHaveAttribute('data-language-placement','hub-topbar');
   await toggle.click();
   await page.waitForLoadState('networkidle');
   await expect(page.locator('html')).toHaveAttribute('lang','en');
   await expect(page.getByText('Choose your simulator',{exact:true})).toBeVisible();
-  await expect(page.locator('[data-language-toggle]')).toContainText('🇫🇷');
+  await expect(page.locator('[data-language-toggle]')).toContainText('🇬🇧');
+  await expect(page.locator('[data-language-toggle]')).toHaveAttribute('data-current-language','en');
 
   await openAndCheck(page, '/iracing/');
   await expect(page.locator('html')).toHaveAttribute('lang','en');
   await expect(page.getByRole('heading',{name:'EVENTS',exact:true})).toBeVisible();
-  await expect(page.locator('[data-language-toggle]')).toContainText('🇫🇷');
+  await expect(page.locator('[data-language-toggle]')).toContainText('🇬🇧');
+  await expect(page.locator('[data-language-toggle]')).toHaveAttribute('data-language-placement','game-space');
   const cards=page.locator('.event-card');
   if(await cards.count()) {
     const categoryCopy=(await cards.first().locator('.event-category-badges').allTextContents()).join(' ');
@@ -69,7 +73,8 @@ test('language switch changes to English, translates event counters and persists
   await openAndCheck(page, '/lmu/');
   await expect(page.locator('html')).toHaveAttribute('lang','en');
   await expect(page.getByRole('heading',{name:'EVENTS',exact:true})).toBeVisible();
-  await expect(page.locator('[data-language-toggle]')).toContainText('🇫🇷');
+  await expect(page.locator('[data-language-toggle]')).toContainText('🇬🇧');
+  await expect(page.locator('[data-language-toggle]')).toHaveAttribute('data-language-placement','game-space');
   expect(apiFailures).toEqual([]);
 });
 
