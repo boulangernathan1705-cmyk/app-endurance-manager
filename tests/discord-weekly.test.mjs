@@ -195,7 +195,7 @@ test('le message affiche les horaires seuls tant qu’aucun équipage n’est in
   assert.equal(payload.embeds[1].fields[0].value,'\u200b');
   assert.match(payload.embeds[1].fields[1].name,/vendredi 18 septembre à 18:00/i);
   assert.match(payload.embeds[1].fields[1].value,/Mrt blé/);
-  assert.match(payload.embeds[1].fields[1].value,/👤 Etienne_48/);
+  assert.match(payload.embeds[1].fields[1].value,/👤 Etienne\\_48/);
   assert.doesNotMatch(payload.embeds[1].description,/pilotes? inscrits?/i);
 });
 
