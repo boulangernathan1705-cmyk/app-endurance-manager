@@ -75,8 +75,9 @@ test('l’accueil affiche jusqu’à trois départs et s’arrête au premier é
   assert.match(hub,/queue\.slice\(0,MAX_HOME_ITEMS\)/);
 });
 
-test('un événement sans aucune inscription reste visible jusqu’à sa fin', () => {
+test('un événement sans inscription reste visible uniquement tant que son départ est futur', () => {
   const hub = readFileSync(new URL('../front/game-hub.mjs',import.meta.url),'utf8');
+  assert.match(hub,/Number\(item\.startsAt\) > timestamp/);
   assert.match(hub,/if \(!active\.length\) \{/);
   assert.match(hub,/queue\.push\(\{\.\.\.item,departure:remaining\[0\]\}\)/);
   assert.match(hub,/Aucun participant/);
