@@ -96,7 +96,7 @@ test('après la course, le récap choisit le prochain départ futur même la sem
   assert.equal(snapshot.periodKey,'2026-09-14');
 });
 
-test('le message distingue course en cours et prochaine inscription avec les équipages', () => {
+test('le message distingue clairement les pilotes sans afficher leur nombre total', () => {
   const timestamp = Date.parse('2026-09-12T14:00:00Z');
   const current = {
     eventId:uuid,
@@ -138,12 +138,16 @@ test('le message distingue course en cours et prochaine inscription avec les éq
   assert.deepEqual(payload.allowed_mentions,{parse:[]});
   assert.match(payload.content,/Endurance Manager/);
   assert.match(payload.embeds[0].title,/Course en cours/);
+  assert.doesNotMatch(payload.embeds[0].description,/pilotes? inscrits?/i);
   assert.match(payload.embeds[0].fields[0].name,/Complet/);
   assert.match(payload.embeds[0].fields[0].value,/Toyota GR010 Hybrid/);
-  assert.match(payload.embeds[0].fields[1].value,/Pilote libre/);
+  assert.match(payload.embeds[0].fields[0].value,/👤 Nathan/);
+  assert.match(payload.embeds[0].fields[0].value,/👤 @everyone/);
+  assert.match(payload.embeds[0].fields[1].name,/^📋 Pilotes inscrits non affectés$/);
+  assert.match(payload.embeds[0].fields[1].value,/👤 Pilote libre/);
   assert.match(payload.embeds[1].title,/Prochaine inscription/);
   assert.match(payload.embeds[1].fields[0].value,/Ferrari 296 LMGT3/);
-  assert.match(payload.embeds[1].fields[0].value,/Josselin/);
+  assert.match(payload.embeds[1].fields[0].value,/👤 Josselin/);
 });
 
 test('les mutations qui changent le résumé déclenchent une synchronisation', () => {
