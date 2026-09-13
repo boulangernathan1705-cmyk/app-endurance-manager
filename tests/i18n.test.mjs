@@ -36,14 +36,16 @@ test('les dialogues dynamiques sont traduisibles en anglais',()=>{
   assert.equal(translateTextForLocale('Supprimer « FMT01 » et toutes ses inscriptions ? Cette suppression est définitive.','en'),'Delete “FMT01” and all its entries? This action is permanent.');
 });
 
-test('les écrans avancés et contenus longs ont une couverture anglaise',()=>{
+test('les écrans avancés et contenus longs ont une couverture anglaise cohérente',()=>{
   assert.equal(translateExtendedTextForLocale('FORMATION D’ÉQUIPAGE','en'),'CREW SETUP');
   assert.equal(translateExtendedTextForLocale('Aucun pilote sélectionné.','en'),'No driver selected.');
-  assert.equal(translateExtendedTextForLocale('2 h de course ne sont pas encore couvertes.','en'),'2 race hours still are not covered.');
+  assert.equal(translateExtendedTextForLocale('2 h de course ne sont pas encore couvertes.','en'),'2 race hours are still not covered.');
+  assert.equal(translateExtendedTextForLocale('1 h de course n’est pas encore couverte.','en'),'1 race hour is still not covered.');
+  assert.equal(translateExtendedTextForLocale('Équipage « FMT01 » créé. 2 autre(s) inscription(s) du même départ ont été retirées.','en'),'Crew “FMT01” created. 2 other entries were removed from the same start.');
   assert.equal(translateExtendedTextForLocale('Consulter les événements','en'),'Browse events');
   assert.equal(translateExtendedTextForLocale('Politique de confidentialité','en'),'Privacy policy');
   assert.equal(translateExtendedTextForLocale('Crédits des cartes de circuits','en'),'Circuit map credits');
-  assert.equal(translateExtendedTextForLocale('Données traitées','en'),'Data processed');
+  assert.equal(translateExtendedTextForLocale('2. Données traitées','en'),'2. Data processed');
 });
 
 test('la locale anglaise utilise un format britannique cohérent avec les heures 24 h',()=>{
