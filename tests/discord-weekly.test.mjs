@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   buildWeeklyDiscordPayload,
+  isDepartureRelevant,
   isInParisWeek,
   isWeeklyDiscordMutation,
   parisWeek
@@ -22,6 +23,14 @@ test('la semaine Discord suit lundi-dimanche en heure de Paris', () => {
   assert.equal(parisWeek(mondayAfterMidnightParis).key, '2026-09-14');
   assert.equal(isInParisWeek(Date.parse('2026-09-12T12:00:00Z'), parisWeek(sunday)), true);
   assert.equal(isInParisWeek(Date.parse('2026-09-14T12:00:00Z'), parisWeek(sunday)), false);
+});
+
+test('une endurance terminée disparaît du récap même si elle appartient encore à la semaine', () => {
+  const startsAt = Date.parse('2026-09-12T13:00:00Z'); // samedi 15:00 à Paris
+  const week = parisWeek(Date.parse('2026-09-13T21:14:00Z'));
+  assert.equal(isDepartureRelevant(startsAt, 6, week, Date.parse('2026-09-12T18:59:00Z')), true);
+  assert.equal(isDepartureRelevant(startsAt, 6, week, Date.parse('2026-09-12T19:00:00Z')), false);
+  assert.equal(isDepartureRelevant(startsAt, 6, week, Date.parse('2026-09-13T21:14:00Z')), false);
 });
 
 test('le message Discord résume les équipages sans autoriser les mentions', () => {
