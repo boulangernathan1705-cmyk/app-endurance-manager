@@ -10,6 +10,11 @@ test('les libellés principaux existent en anglais',()=>{
   assert.equal(translateTextForLocale('Départs passés','en'),'Past starts');
   assert.equal(translateTextForLocale('3 pilotes inscrits','en'),'3 registered drivers');
   assert.equal(translateTextForLocale('Équipage complet','en'),'Crew complete');
+  assert.equal(translateTextForLocale('engagés','en'),'entered');
+  assert.equal(translateTextForLocale('Championnat iRacing','en'),'iRacing championship');
+  assert.equal(translateTextForLocale('Prochain départ dans','en'),'Next start in');
+  assert.equal(translateTextForLocale('Aucun départ à venir avec pilote inscrit','en'),'No upcoming start with a registered driver');
+  assert.equal(translateTextForLocale('Prochain départ avec pilotes : Sunday 13 September à 18:00 ·','en'),'Next start with drivers: Sunday 13 September at 18:00 ·');
   assert.equal(translateTextForLocale('Événements','fr'),'Événements');
 });
 
