@@ -14,7 +14,7 @@ test('la création d’équipage ouvre l’inscription pilote dans une fenêtre 
   const script=read('front/crew-builder-registration-shortcut.mjs');
   const css=read('styles/crew-builder-registration-shortcut.css');
   const html=read('game.html');
-  assert.match(script,/data\.crewBuilderRegisterPilot='true'/);
+  assert.match(script,/dataset\.crewBuilderRegisterPilot='true'/);
   assert.match(script,/registration-modal-backdrop/);
   assert.match(script,/renderRegistrationForm\(event,departure,draft\)/);
   assert.match(script,/submitRegistration\(form,api\)/);
