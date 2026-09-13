@@ -1,8 +1,9 @@
 import {GAME_CATALOGS, gameForEvent} from '../shared/catalog.mjs';
 import {eventSchedule} from './schedule.mjs';
+import {getLocale,localeTag} from './i18n.mjs';
 
 const grid = document.getElementById('game-grid');
-const formatter = new Intl.DateTimeFormat('fr-FR', {
+const formatter = new Intl.DateTimeFormat(localeTag(), {
   timeZone:'Europe/Paris',
   weekday:'short',
   day:'numeric',
@@ -17,6 +18,7 @@ const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp
 function displayTime(value) {
   const match = String(value || '').match(/^(\d{1,2}):(\d{2})$/);
   if (!match) return String(value || '').trim();
+  if (getLocale()==='en') return `${String(Number(match[1])).padStart(2,'0')}:${match[2]}`;
   return match[2] === '00' ? `${Number(match[1])}h` : `${Number(match[1])}h${match[2]}`;
 }
 
@@ -47,10 +49,8 @@ function eventBounds(event) {
 }
 
 function remainingDepartures(event, timestamp=Date.now()) {
-  const bounds = eventBounds(event);
-  if (!bounds) return [];
   return [...(event.departures || [])]
-    .filter(item => Number.isFinite(Number(item.startsAt)) && Number(item.startsAt) + bounds.duration > timestamp)
+    .filter(item => Number.isFinite(Number(item.startsAt)) && Number(item.startsAt) > timestamp)
     .sort((a,b) => Number(a.startsAt) - Number(b.startsAt));
 }
 
@@ -61,7 +61,7 @@ function orderedEvents(events, game, timestamp=Date.now()) {
     .filter(item => item.bounds && !item.schedule.archived && item.schedule.timestamp !== null)
     .sort((a,b) => Number(!!b.schedule.running)-Number(!!a.schedule.running)
       || (a.schedule.timestamp ?? Infinity)-(b.schedule.timestamp ?? Infinity)
-      || a.event.name.localeCompare(b.event.name,'fr'));
+      || a.event.name.localeCompare(b.event.name,getLocale()==='en'?'en':'fr'));
 }
 
 function homeQueue(events, game, timestamp=Date.now()) {
@@ -71,7 +71,6 @@ function homeQueue(events, game, timestamp=Date.now()) {
     if (!remaining.length) continue;
     const active=remaining.filter(hasVisibleActivity);
 
-    // An event with nobody registered must still remain visible until it is over.
     if (!active.length) {
       queue.push({...item,departure:remaining[0]});
       break;
@@ -117,12 +116,11 @@ function participationMarkup(departure) {
 }
 
 function enduranceMarkup(item, game) {
-  const {event,departure,bounds,schedule} = item;
+  const {event,departure} = item;
   const catalog = GAME_CATALOGS[game];
   const circuit = catalog.circuits.find(item => item.id === event.circuit)?.name || 'Circuit à préciser';
-  const departureRunning = Number(departure.startsAt) <= Date.now() && Number(departure.startsAt) + bounds.duration > Date.now();
-  const eventStarted = schedule?.event?.departures?.some(item => Number(item.startsAt) <= Date.now()) || bounds.start <= Date.now();
-  const label = departureRunning ? 'COURSE EN COURS' : eventStarted ? 'PROCHAIN DÉPART' : 'PROCHAINE ENDURANCE';
+  const eventStarted = (event.departures || []).some(item => Number.isFinite(Number(item.startsAt)) && Number(item.startsAt) <= Date.now());
+  const label = eventStarted ? 'PROCHAIN DÉPART' : 'PROCHAINE ENDURANCE';
   return `<section class="hub-next-race" aria-label="${esc(event.name)} · départ ${esc(displayTime(departure.time))}">
     <span class="hub-next-label">${label}</span>
     <h3>${esc(event.name)}</h3>

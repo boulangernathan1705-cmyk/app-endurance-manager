@@ -28,6 +28,13 @@ test('un départ déjà lancé ne crée plus de groupe événement En cours s’
   assert.equal(groups[0].items[0].next.id,'b');
 });
 
+test('la page d’accueil masque les équipages des départs déjà passés tant que l’événement reste à venir',()=>{
+  const home=read('front/app/home-view.mjs');
+  assert.match(home,/function crewRows\(event,\{includePast=false,now=Date\.now\(\)\}=\{\}\)/);
+  assert.match(home,/includePast\|\|Number\(d\.startsAt\)>now/);
+  assert.match(home,/crewSummary\(event,\{includePast:archived\}\)/);
+});
+
 test('la vue événement garde les départs fermés par défaut et range les départs passés en bas',()=>{
   const view=read('front/app/event-view.mjs');
   const css=read('styles/past-departures.css');

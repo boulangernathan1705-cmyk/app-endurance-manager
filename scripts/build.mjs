@@ -9,6 +9,7 @@ const workers = process.argv.includes('--workers');
 const stylesheetTagPattern = /<link\b[^>]*\brel=["']stylesheet["'][^>]*>/gi;
 const cssImportPattern = /@import\s+url\(\s*(["']?)([^"')]+)\1\s*\)\s*;/gi;
 const cssUrlPattern = /url\(\s*(["']?)([^"')]+)\1\s*\)/gi;
+const i18nScriptTag = '<script type="module" src="/front/i18n.mjs"></script>\n<script type="module" src="/front/i18n-content.mjs"></script>\n<script type="module" src="/front/language-toggle-layout.mjs"></script>';
 
 function localAssetPath(href, fromPath = '') {
   const clean = String(href || '').trim();
@@ -58,13 +59,20 @@ function stylesheetPaths(source, sourceName) {
   });
 }
 
+function injectI18n(source) {
+  if (source.includes('/front/i18n.mjs') && source.includes('/front/i18n-content.mjs') && source.includes('/front/language-toggle-layout.mjs')) return source;
+  if (!source.includes('</head>')) throw new Error('Document HTML sans balise </head> pour le sélecteur de langue.');
+  return source.replace('</head>', `${i18nScriptTag}\n</head>`);
+}
+
 function productionHtml(source) {
   let firstStylesheet = true;
-  return source.replace(new RegExp(stylesheetTagPattern.source, stylesheetTagPattern.flags), () => {
+  const bundled = source.replace(new RegExp(stylesheetTagPattern.source, stylesheetTagPattern.flags), () => {
     if (!firstStylesheet) return '';
     firstStylesheet = false;
     return '<link rel="stylesheet" href="/app.css">';
   });
+  return injectI18n(bundled);
 }
 
 await rm(out, {recursive: true, force: true});
@@ -101,7 +109,11 @@ const gameHtml = productionHtml(sourceGame);
 await writeFile(new URL('lmu/index.html', out), gameHtml);
 await writeFile(new URL('iracing/index.html', out), gameHtml);
 
-for (const file of ['app.js', 'crew-builder.js', 'help.js', 'privacy.html', 'privacy.css', 'legal.html', 'about.html', 'circuit-credits.html']) {
+for (const file of ['privacy.html', 'legal.html', 'about.html', 'circuit-credits.html']) {
+  const source = await readFile(root + file, 'utf8');
+  await writeFile(new URL(file, out), injectI18n(source));
+}
+for (const file of ['app.js', 'crew-builder.js', 'help.js', 'privacy.css']) {
   await copyFile(root + file, new URL(file, out));
 }
 await copyFile(root + 'help.css', new URL('help.css', out));
@@ -146,7 +158,7 @@ Sitemap: https://endurance-manager.app/sitemap.xml
 `);
 
 await writeFile(new URL('sitemap.xml', out), `<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+<urlset xmlns="https://www.sitemaps.org/schemas/sitemap/0.9">
   <url><loc>https://endurance-manager.app/</loc></url>
   <url><loc>https://endurance-manager.app/lmu/</loc></url>
   <url><loc>https://endurance-manager.app/iracing/</loc></url>

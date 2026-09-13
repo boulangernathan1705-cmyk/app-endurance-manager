@@ -50,8 +50,9 @@ test('personal registration and crew creation stay contextualized in the same de
   assert.match(eventView,/S’inscrire/);
   assert.match(eventView,/Inscrire un autre pilote/);
   assert.match(eventView,/ux-summary-registration-actions/);
-  assert.match(eventView,/renderPilots\(event,departure,\{/);
-  assert.match(crews,/crew-section-create/);
+  assert.match(eventView,/ux-summary-create-crew/);
+  assert.match(eventView,/data-crew-builder-open data-departure="\$\{departure\.id\}"/);
+  assert.match(eventView,/renderPilots\(event,departure\);/);
   assert.match(crews,/data-departure="\$\{departure\.id\}"/);
   assert.doesNotMatch(registration,/\+ Ajouter un pilote/);
 });

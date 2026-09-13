@@ -18,7 +18,8 @@ async function openAndCheck(page, path) {
   page.on('requestfailed', onRequestFailed);
   const response = await page.goto(path, {waitUntil:'networkidle'});
   expect(response, `No navigation response for ${path}`).not.toBeNull();
-  expect(response.ok(), `${path} returned ${response.status()}`).toBeTruthy();
+  const navigationStatus = response.status();
+  expect(response.ok() || navigationStatus === 304, `${path} returned ${navigationStatus}`).toBeTruthy();
   await expect(page.locator('body')).toBeVisible();
   await expect(page.locator('[data-ux-error-modal]')).toHaveCount(0);
   expect(failures, `API request failures while opening ${path}`).toEqual([]);
@@ -40,6 +41,57 @@ test('public API responds', async ({page}) => {
 test('home loads without network error', async ({page}) => {
   await openAndCheck(page, '/');
   expect(apiFailures).toEqual([]);
+});
+
+test('language switch shows the current language, translates event counters and persists', async ({page}) => {
+  await openAndCheck(page, '/');
+  const toggle = page.locator('[data-language-toggle]');
+  await expect(toggle).toBeVisible();
+  await expect(toggle).toContainText('🇫🇷');
+  await expect(toggle).toHaveAttribute('data-current-language','fr');
+  await expect(toggle).toHaveAttribute('data-language-placement','hub-topbar');
+  await toggle.click();
+  await page.waitForLoadState('networkidle');
+  await expect(page.locator('html')).toHaveAttribute('lang','en');
+  await expect(page.getByText('Choose your simulator',{exact:true})).toBeVisible();
+  await expect(page.locator('[data-language-toggle]')).toContainText('🇬🇧');
+  await expect(page.locator('[data-language-toggle]')).toHaveAttribute('data-current-language','en');
+
+  await openAndCheck(page, '/iracing/');
+  await expect(page.locator('html')).toHaveAttribute('lang','en');
+  await expect(page.getByRole('heading',{name:'EVENTS',exact:true})).toBeVisible();
+  await expect(page.locator('[data-language-toggle]')).toContainText('🇬🇧');
+  await expect(page.locator('[data-language-toggle]')).toHaveAttribute('data-language-placement','game-space');
+  const cards=page.locator('.event-card');
+  if(await cards.count()) {
+    const categoryCopy=(await cards.first().locator('.event-category-badges').allTextContents()).join(' ');
+    expect(categoryCopy).not.toMatch(/\binscrit(?:s)?\b/i);
+    expect(categoryCopy).not.toMatch(/\bpilote(?:s)?\b/i);
+    const cardText=await cards.first().innerText();
+    expect(cardText).not.toMatch(/\béquipage(?:s)?\s+engagé(?:s)?\b/i);
+  }
+
+  await openAndCheck(page, '/lmu/');
+  await expect(page.locator('html')).toHaveAttribute('lang','en');
+  await expect(page.getByRole('heading',{name:'EVENTS',exact:true})).toBeVisible();
+  await expect(page.locator('[data-language-toggle]')).toContainText('🇬🇧');
+  await expect(page.locator('[data-language-toggle]')).toHaveAttribute('data-language-placement','game-space');
+  expect(apiFailures).toEqual([]);
+});
+
+test('mobile interface stays compact without horizontal overflow across main pages', async ({page}) => {
+  await page.setViewportSize({width:390,height:844});
+  for (const path of ['/', '/lmu/', '/iracing/', '/members.html', '/help.html']) {
+    await openAndCheck(page, path);
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    expect(overflow, `${path} overflows horizontally`).toBeLessThanOrEqual(1);
+  }
+
+  await openAndCheck(page, '/lmu/');
+  const shell = await page.locator('.site-nav-shell').boundingBox();
+  expect(shell).not.toBeNull();
+  expect(shell.height).toBeLessThan(190);
+  await expect(page.locator('.page-title')).toBeVisible();
 });
 
 test('LMU space opens from home', async ({page}) => {

@@ -1,0 +1,142 @@
+.crew-builder-composition-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin: -2px 0 10px;
+}
+
+.crew-builder-register-pilot {
+  min-height: 38px;
+  padding: 7px 11px;
+}
+
+body.registration-modal-open {
+  overflow: hidden;
+}
+
+.registration-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1400;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: clamp(12px, 3vh, 28px) 12px;
+  overflow-y: auto;
+  background: rgba(3, 8, 11, .82);
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+}
+
+.registration-modal-panel {
+  width: min(860px, 100%);
+  max-height: calc(100dvh - clamp(24px, 6vh, 56px));
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid rgba(93, 142, 148, .72);
+  border-radius: 16px;
+  background: linear-gradient(180deg, #151d20, #0c1113);
+  box-shadow: 0 28px 70px rgba(0, 0, 0, .58);
+}
+
+.registration-modal-header {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 16px 18px 14px;
+  border-bottom: 1px solid rgba(86, 117, 122, .45);
+  background: rgba(12, 18, 21, .97);
+}
+
+.registration-modal-header > div {
+  min-width: 0;
+}
+
+.registration-modal-header h2 {
+  margin: 4px 0 5px;
+  font-size: 23px;
+  line-height: 1.1;
+}
+
+.registration-modal-header p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.registration-modal-close {
+  flex: 0 0 auto;
+  min-height: 40px;
+}
+
+.registration-modal-content {
+  min-height: 0;
+  padding: 16px 18px 18px;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.registration-modal-content .registration-form {
+  margin: 0;
+}
+
+.registration-modal-content .form-title {
+  display: none;
+}
+
+.registration-modal-error {
+  flex: 0 0 auto;
+  margin: 0 18px 16px;
+}
+
+@media (max-width: 680px) {
+  .crew-builder-composition-actions {
+    justify-content: stretch;
+  }
+
+  .crew-builder-register-pilot {
+    width: 100%;
+  }
+
+  .registration-modal-backdrop {
+    padding: 8px;
+  }
+
+  .registration-modal-panel {
+    width: 100%;
+    max-height: calc(100dvh - 16px);
+    border-radius: 13px;
+  }
+
+  .registration-modal-header {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    gap: 10px;
+    padding: 12px;
+  }
+
+  .registration-modal-header h2 {
+    font-size: 19px;
+  }
+
+  .registration-modal-header p {
+    font-size: 12px;
+  }
+
+  .registration-modal-close {
+    min-height: 38px;
+    padding: 6px 9px;
+  }
+
+  .registration-modal-content {
+    padding: 12px;
+  }
+
+  .registration-modal-error {
+    margin: 0 12px 12px;
+  }
+}

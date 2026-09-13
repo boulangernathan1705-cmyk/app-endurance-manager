@@ -8,8 +8,9 @@ const read = path => readFileSync(new URL(`../${path}`, import.meta.url),'utf8')
 function scheduleHarness() {
   const context=vm.createContext({Intl,Date,console,globalThis:{}});
   const catalog=read('shared/catalog.mjs').replace(/\bexport\s+/g,'');
-  const schedule=read('front/schedule.mjs').replace(/\bexport\s+/g,'');
-  vm.runInContext(catalog+'\n'+schedule,context);
+  const schedule=read('front/schedule.mjs').replace(/^import .*?;\s*/m,'').replace(/\bexport\s+/g,'');
+  const localeHelpers="const getLocale=()=> 'fr'; const localeTag=()=> 'fr-FR';";
+  vm.runInContext(catalog+'\n'+localeHelpers+'\n'+schedule,context);
   return {run:code=>vm.runInContext(code,context)};
 }
 
@@ -78,14 +79,14 @@ test('la page événement garde les actions événement séparées des actions �
 
 test('les actions du départ restent compactes et contextualisées',()=>{
   const eventView=read('front/app/event-view.mjs');
-  const crews=read('front/app/crews.mjs');
   const css=read('styles/event-polish.css');
   assert.match(eventView,/ux-summary-registration-actions/);
   assert.match(eventView,/ux-summary-registration-toggle/);
   assert.match(eventView,/ux-summary-registration-other/);
-  assert.match(crews,/crew-section-create/);
+  assert.match(eventView,/ux-summary-create-crew/);
+  assert.match(eventView,/data-crew-builder-open/);
   assert.match(css,/\.ux-summary-registration-actions/);
-  assert.match(css,/\.crew-section-create/);
+  assert.match(css,/\.ux-summary-create-crew/);
 });
 
 test('le compte déconnecté garde Aide et Discord alignés horizontalement et explicite OAuth',()=>{
@@ -123,8 +124,9 @@ test('Équipages est intégré directement dans chaque départ avec actions pilo
   const crews=read('front/app/crews.mjs');
   const eventView=read('front/app/event-view.mjs');
   assert.doesNotMatch(eventView,/event-section','Équipages'/);
-  assert.match(eventView,/renderPilots\(event,departure,\{/);
+  assert.match(eventView,/renderPilots\(event,departure\);/);
   assert.match(eventView,/Créer mon équipage/);
+  assert.match(eventView,/data-crew-builder-open/);
   assert.match(crews,/crew-unified-card/);
   assert.match(crews,/crew-card-shell/);
   assert.match(crews,/crew\.canManage/);

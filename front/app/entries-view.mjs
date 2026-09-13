@@ -11,8 +11,9 @@ import {
   logo,
   categories
 } from './core.mjs';
+import {getLocale,localeTag} from '../i18n.mjs';
 
-const dateFormat = new Intl.DateTimeFormat('fr-FR', {
+const dateFormat = new Intl.DateTimeFormat(localeTag(), {
   timeZone:'Europe/Paris',
   weekday:'long',
   day:'numeric',
@@ -31,13 +32,15 @@ function categoryIndex(event, category) {
 }
 
 function pilotSort(event) {
+  const locale=getLocale()==='en'?'en':'fr';
   return (a,b) => categoryIndex(event,a.category) - categoryIndex(event,b.category)
-    || String(a.name || '').localeCompare(String(b.name || ''),'fr',{sensitivity:'base'});
+    || String(a.name || '').localeCompare(String(b.name || ''),locale,{sensitivity:'base'});
 }
 
 function crewSort(event) {
+  const locale=getLocale()==='en'?'en':'fr';
   return (a,b) => categoryIndex(event,a.category) - categoryIndex(event,b.category)
-    || String(a.name || '').localeCompare(String(b.name || ''),'fr',{sensitivity:'base',numeric:true});
+    || String(a.name || '').localeCompare(String(b.name || ''),locale,{sensitivity:'base',numeric:true});
 }
 
 function pilotGridClass(count) {

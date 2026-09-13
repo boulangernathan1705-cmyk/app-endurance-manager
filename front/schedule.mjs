@@ -1,10 +1,13 @@
+import {getLocale,localeTag} from './i18n.mjs';
+
 export function countdown(timestamp) {
   const seconds=Math.max(0,Math.floor((timestamp-Date.now())/1000));
-  if (!seconds) return 'Départ passé';
+  const english=getLocale()==='en';
+  if (!seconds) return english?'Start passed':'Départ passé';
   const days=Math.floor(seconds/86400),hours=Math.floor(seconds%86400/3600),minutes=Math.floor(seconds%3600/60);
-  return days?`${days}j ${hours}h ${minutes}m`:`${hours}h ${minutes}m ${seconds%60}s`;
+  return days?`${days}${english?'d':'j'} ${hours}h ${minutes}m`:`${hours}h ${minutes}m ${seconds%60}s`;
 }
-export function dateLabel(departure) { return new Intl.DateTimeFormat('fr-FR',{timeZone:'Europe/Paris',dateStyle:'full'}).format(new Date(departure.startsAt)); }
+export function dateLabel(departure) { return new Intl.DateTimeFormat(localeTag(),{timeZone:'Europe/Paris',dateStyle:'full'}).format(new Date(departure.startsAt)); }
 export function parisCalendar(timestamp) {
   const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Paris',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date(timestamp));
   const value=type=>Number(parts.find(part=>part.type===type).value);
@@ -19,22 +22,23 @@ export function eventSchedule(event,now) {
   return {event,next,running,end:archiveAt,archiveAt,archived:archiveAt!==null&&archiveAt<=now,timestamp:next?.startsAt??archiveAt};
 }
 export function groupEvents(source,filter,now=Date.now()) {
+  const english=getLocale()==='en';
   const today=parisCalendar(now);
   const monday=today.day-((new Date(today.day).getUTCDay()+6)%7)*86400000;
-  const monthLabel=timestamp=>new Intl.DateTimeFormat('fr-FR',{timeZone:'Europe/Paris',month:'long',...(parisCalendar(timestamp).year!==today.year?{year:'numeric'}:{})}).format(new Date(timestamp));
+  const monthLabel=timestamp=>new Intl.DateTimeFormat(localeTag(),{timeZone:'Europe/Paris',month:'long',...(parisCalendar(timestamp).year!==today.year?{year:'numeric'}:{})}).format(new Date(timestamp));
   const items=source.map(event=>eventSchedule(event,now)).filter(item=>filter==='archived'?item.archived:!item.archived);
-  items.sort((a,b)=>filter==='archived'?b.archiveAt-a.archiveAt:(a.timestamp??Infinity)-(b.timestamp??Infinity)||a.event.name.localeCompare(b.event.name,'fr'));
+  items.sort((a,b)=>filter==='archived'?b.archiveAt-a.archiveAt:(a.timestamp??Infinity)-(b.timestamp??Infinity)||a.event.name.localeCompare(b.event.name,english?'en':'fr'));
   const groups=new Map();
   for(const item of items){
     let key,label;
-    if(item.timestamp===null){key='undated';label='Dates à confirmer';}
+    if(item.timestamp===null){key='undated';label=english?'Dates to be confirmed':'Dates à confirmer';}
     else {
       const date=parisCalendar(item.timestamp);
       key=`${date.year}-${date.month}`;
       if(filter==='archived')label=monthLabel(item.timestamp);
-      else if(date.day<monday+7*86400000){key='this-week';label='Cette semaine';}
-      else if(date.day<monday+14*86400000){key='next-week';label='La semaine prochaine';}
-      else label=`${date.year===today.year&&date.month===today.month?'Plus tard en ':''}${monthLabel(item.timestamp)}`;
+      else if(date.day<monday+7*86400000){key='this-week';label=english?'This week':'Cette semaine';}
+      else if(date.day<monday+14*86400000){key='next-week';label=english?'Next week':'La semaine prochaine';}
+      else label=english?`Later in ${monthLabel(item.timestamp)}`:`${date.year===today.year&&date.month===today.month?'Plus tard en ':''}${monthLabel(item.timestamp)}`;
     }
     if(!groups.has(key))groups.set(key,{key,label,items:[]});
     groups.get(key).items.push(item);
