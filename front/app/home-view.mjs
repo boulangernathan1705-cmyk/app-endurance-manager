@@ -1,6 +1,7 @@
 import {app,nav,state,esc,button,canManage,eventTypeBadge,eventBadge,eventCategoryCount,pilotCount,circuitVisual,dateLabel,countdown,groupEvents,notifyRender,notifyNav} from './core.mjs';
+import {getLocale,localeTag} from '../i18n.mjs';
 
-const compactDateFormatter=new Intl.DateTimeFormat('fr-FR',{timeZone:'Europe/Paris',day:'2-digit',month:'2-digit'});
+const compactDateFormatter=new Intl.DateTimeFormat(localeTag(),{timeZone:'Europe/Paris',day:'2-digit',month:'2-digit'});
 const CREW_COLORS=['#52d3d8','#f3b33d','#ec5b67','#75d66b','#8b7cf6','#e47adf','#58a6ff','#f28f45'];
 
 function compactDateRange(departures=[]){
@@ -9,7 +10,7 @@ function compactDateRange(departures=[]){
   const labels=[...new Set(dated.map(d=>compactDateFormatter.format(new Date(Number(d.startsAt)))))];
   return labels.length===1?labels[0]:`${labels[0]}–${labels.at(-1)}`;
 }
-function displayTime(value){const match=String(value||'').match(/^(\d{1,2}):(\d{2})$/);if(!match)return String(value||'').trim();return match[2]==='00'?`${Number(match[1])}h`:`${Number(match[1])}h${match[2]}`;}
+function displayTime(value){const match=String(value||'').match(/^(\d{1,2}):(\d{2})$/);if(!match)return String(value||'').trim();if(getLocale()==='en')return`${String(Number(match[1])).padStart(2,'0')}:${match[2]}`;return match[2]==='00'?`${Number(match[1])}h`:`${Number(match[1])}h${match[2]}`;}
 function hasRegisteredPilot(departure){return (departure?.availability||[]).some(reg=>reg.status!=='unavailable');}
 function registeredRaceStatus(event,now=Date.now()){
   const departures=[...(event.departures||[])].filter(d=>Number.isFinite(Number(d.startsAt))&&hasRegisteredPilot(d)).sort((a,b)=>Number(a.startsAt)-Number(b.startsAt));
@@ -33,7 +34,8 @@ function crewRows(event){
       });
     }
   }
-  return rows.sort((a,b)=>a.startsAt-b.startsAt||String(a.category).localeCompare(String(b.category),'fr')||String(a.name).localeCompare(String(b.name),'fr',{sensitivity:'base',numeric:true}));
+  const locale=getLocale()==='en'?'en':'fr';
+  return rows.sort((a,b)=>a.startsAt-b.startsAt||String(a.category).localeCompare(String(b.category),locale)||String(a.name).localeCompare(String(b.name),locale,{sensitivity:'base',numeric:true}));
 }
 function crewIcon(color){return `<span class="crew-summary-icon" aria-hidden="true" style="--crew-color:${color}"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="7" r="2.2"/><circle cx="6.8" cy="10" r="1.7"/><circle cx="17.2" cy="10" r="1.7"/><path d="M8.5 17.2c.4-2.7 1.6-4.2 3.5-4.2s3.1 1.5 3.5 4.2"/><path d="M3.8 17c.3-2.2 1.3-3.4 3-3.4.7 0 1.3.2 1.8.6"/><path d="M20.2 17c-.3-2.2-1.3-3.4-3-3.4-.7 0-1.3.2-1.8.6"/></svg></span>`;}
 function crewSummary(event){
