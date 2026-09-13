@@ -1,7 +1,8 @@
-import {buildWeeklyDiscordPayload, isDepartureRelevant, nextParisWeek, parisWeek} from './discord-weekly-format.mjs';
+import {buildWeeklyDiscordPayload, parisWeek} from './discord-weekly-format.mjs';
 
-const STATE_KEY = 'lmu-weekly-v1';
+const STATE_KEY = 'lmu-weekly-v1'; // Conservé pour réutiliser le message Discord existant.
 const LOCK_SECONDS = 90;
+const HOUR_MS = 3_600_000;
 
 function parseJson(value, fallback) {
   try { return JSON.parse(value); } catch { return fallback; }
@@ -16,7 +17,7 @@ async function hashSnapshot(snapshot) {
   return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
 }
 
-function departuresForWeek(events, week, timestamp) {
+function flattenDepartures(events) {
   const departures = [];
   for (const event of events) {
     const eventDepartures = parseJson(event.departures, []);
@@ -24,8 +25,20 @@ function departuresForWeek(events, week, timestamp) {
     const durationHours = Number(event.duration_hours) || 0;
     for (const departure of eventDepartures) {
       const startsAt = Number(departure?.startsAt);
-      if (!departure?.id || !Number.isFinite(startsAt) || !isDepartureRelevant(startsAt, durationHours, week, timestamp)) continue;
-      departures.push({eventId:event.id,eventName:event.name,circuit:event.circuit || '',durationHours,departureId:departure.id,startsAt,crews:[]});
+      if (!departure?.id || !Number.isFinite(startsAt)) continue;
+      departures.push({
+        eventId: event.id,
+        eventName: event.name,
+        circuit: event.circuit || '',
+        durationHours,
+        departureId: departure.id,
+        startsAt,
+        endsAt: startsAt + durationHours * HOUR_MS,
+        crews: [],
+        registrations: [],
+        pilotCount: 0,
+        unassignedPilots: []
+      });
     }
   }
   departures.sort((a,b) => a.startsAt-b.startsAt || a.eventName.localeCompare(b.eventName,'fr'));
@@ -33,26 +46,44 @@ function departuresForWeek(events, week, timestamp) {
 }
 
 export async function loadWeeklyDiscordSnapshot(env, timestamp) {
-  const currentWeek = parisWeek(timestamp);
   const events = (await env.DB.prepare(`SELECT id,name,circuit,duration_hours,departures
     FROM events WHERE circuit NOT LIKE 'iracing-%' ORDER BY created_at,id`).all()).results || [];
+  const allDepartures = flattenDepartures(events);
+  const currentCandidates = allDepartures.filter(item => item.startsAt <= timestamp && item.endsAt > timestamp);
+  const nextDeparture = allDepartures.find(item => item.startsAt > timestamp) || null;
+  const selected = [...currentCandidates];
+  if (nextDeparture) selected.push(nextDeparture);
 
-  let week = currentWeek;
-  let departures = departuresForWeek(events, week, timestamp);
-  if (!departures.length) {
-    const followingWeek = nextParisWeek(timestamp);
-    const followingDepartures = departuresForWeek(events, followingWeek, timestamp);
-    if (followingDepartures.length) {
-      week = followingWeek;
-      departures = followingDepartures;
-    }
+  if (!selected.length) {
+    return {currentDepartures:[],nextDeparture:null,periodKey:parisWeek(timestamp).key};
   }
 
-  if (!departures.length) return {week,departures};
-
-  const eventIds = [...new Set(departures.map(item => item.eventId))];
+  const selectedByKey = new Map(selected.map(item => [`${item.eventId}:${item.departureId}`, item]));
+  const eventIds = [...new Set(selected.map(item => item.eventId))];
   const marks = eventIds.map(() => '?').join(',');
-  const rows = (await env.DB.prepare(`SELECT c.id,c.event_id,c.departure_id,c.name,c.category,c.car,c.locked,c.created_at,
+
+  const registrationRows = (await env.DB.prepare(`SELECT r.id,r.event_id,r.departure_id,r.participant_id,r.category,r.status,
+      COALESCE(p.name,r.name) AS pilot_name
+    FROM registrations r
+    LEFT JOIN participants p ON p.id=r.participant_id
+    WHERE r.event_id IN (${marks}) AND COALESCE(r.status,'') <> 'unavailable'
+    ORDER BY r.created_at,r.id`).bind(...eventIds).all()).results || [];
+
+  const registrationsById = new Map();
+  for (const row of registrationRows) {
+    const departure = selectedByKey.get(`${row.event_id}:${row.departure_id}`);
+    if (!departure || !row.id || !row.pilot_name) continue;
+    const registration = {
+      id:String(row.id),
+      participantId:String(row.participant_id || row.id),
+      name:String(row.pilot_name),
+      category:row.category || ''
+    };
+    departure.registrations.push(registration);
+    registrationsById.set(registration.id, registration);
+  }
+
+  const crewRows = (await env.DB.prepare(`SELECT c.id,c.event_id,c.departure_id,c.name,c.category,c.car,c.locked,c.created_at,
       cm.registration_id,COALESCE(p.name,r.name) AS pilot_name,r.created_at AS registration_created_at
     FROM crews c
     LEFT JOIN crew_members cm ON cm.crew_id=c.id
@@ -60,21 +91,50 @@ export async function loadWeeklyDiscordSnapshot(env, timestamp) {
     LEFT JOIN participants p ON p.id=r.participant_id
     WHERE c.event_id IN (${marks})
     ORDER BY c.created_at,c.id,r.created_at,r.id`).bind(...eventIds).all()).results || [];
+
   const crews = new Map();
-  const byDeparture = new Map();
-  for (const row of rows) {
+  const assignedParticipantsByDeparture = new Map();
+  for (const row of crewRows) {
+    const key = `${row.event_id}:${row.departure_id}`;
+    const departure = selectedByKey.get(key);
+    if (!departure) continue;
     let crew = crews.get(row.id);
     if (!crew) {
       crew = {id:row.id,name:row.name,category:row.category,car:row.car || '',locked:Boolean(row.locked),pilots:[]};
       crews.set(row.id,crew);
-      const key = `${row.event_id}:${row.departure_id}`;
-      if (!byDeparture.has(key)) byDeparture.set(key,[]);
-      byDeparture.get(key).push(crew);
+      departure.crews.push(crew);
     }
-    if (row.registration_id && row.pilot_name) crew.pilots.push(String(row.pilot_name));
+    if (row.registration_id && row.pilot_name) {
+      crew.pilots.push(String(row.pilot_name));
+      const registration = registrationsById.get(String(row.registration_id));
+      if (registration) {
+        if (!assignedParticipantsByDeparture.has(key)) assignedParticipantsByDeparture.set(key,new Set());
+        assignedParticipantsByDeparture.get(key).add(registration.participantId);
+      }
+    }
   }
-  for (const departure of departures) departure.crews = byDeparture.get(`${departure.eventId}:${departure.departureId}`) || [];
-  return {week,departures};
+
+  for (const departure of selected) {
+    const key = `${departure.eventId}:${departure.departureId}`;
+    const uniquePilots = new Map();
+    for (const registration of departure.registrations) {
+      if (!uniquePilots.has(registration.participantId)) uniquePilots.set(registration.participantId, registration.name);
+    }
+    const assigned = assignedParticipantsByDeparture.get(key) || new Set();
+    departure.pilotCount = uniquePilots.size;
+    departure.unassignedPilots = [...uniquePilots.entries()]
+      .filter(([participantId]) => !assigned.has(participantId))
+      .map(([,name]) => name);
+    delete departure.registrations;
+  }
+
+  const currentDepartures = currentCandidates.filter(item => item.pilotCount > 0);
+  const periodTimestamp = nextDeparture?.startsAt ?? currentDepartures[0]?.startsAt ?? timestamp;
+  return {
+    currentDepartures,
+    nextDeparture,
+    periodKey:parisWeek(periodTimestamp).key
+  };
 }
 
 async function sendDiscord(url, method, payload) {
@@ -107,7 +167,7 @@ async function syncLocked(env,base,lockToken,timestamp) {
   const payload = buildWeeklyDiscordPayload(snapshot,appUrl(env),timestamp);
   const messageId = state.message_id ? await editMessage(base,state.message_id,payload) : await createMessage(base,payload);
   await env.DB.prepare('UPDATE discord_weekly_state SET message_id=?,content_hash=?,week_key=?,updated_at=? WHERE key=? AND lock_token=?')
-    .bind(messageId,contentHash,snapshot.week.key,Math.floor(Date.now()/1000),STATE_KEY,lockToken).run();
+    .bind(messageId,contentHash,snapshot.periodKey,Math.floor(Date.now()/1000),STATE_KEY,lockToken).run();
   return {ok:true,changed:true,messageId};
 }
 
