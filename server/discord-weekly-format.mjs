@@ -163,7 +163,7 @@ export function buildWeeklyDiscordPayload(snapshot, appUrl, updatedAt = Date.now
       content,
       embeds: [{
         title: 'Aucune endurance LMU à préparer',
-        description: 'Aucune course avec un pilote FMT inscrit n’est en cours et aucun prochain départ LMU n’est programmé.',
+        description: 'Aucune course avec un pilote inscrit n’est en cours et aucun prochain départ LMU n’est programmé.',
         color: 0x6b7280,
         footer: {text: 'Endurance Manager • mise à jour automatique'},
         timestamp: new Date(updatedAt).toISOString()
