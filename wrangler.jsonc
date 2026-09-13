@@ -5,6 +5,9 @@
   "keep_vars": true,
   "minify": true,
   "build": { "command": "npm run build:workers" },
+  "triggers": {
+    "crons": ["17 * * * *"]
+  },
   "assets": {
     "directory": "./public",
     "html_handling": "auto-trailing-slash",
