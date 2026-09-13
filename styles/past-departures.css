@@ -1,20 +1,20 @@
-/* Historique discret des départs déjà lancés dans un événement. */
+/* Historique secondaire des départs déjà lancés dans un événement. */
 .past-departures-fold {
-  margin-top: 2px;
-  border-top: 1px solid #2d383b;
+  margin-top: 4px;
+  border-top: 1px solid #354245;
 }
 
 .past-departures-fold > summary {
   display: flex;
   align-items: center;
-  gap: 7px;
-  min-height: 34px;
-  padding: 7px 4px 5px;
-  color: #879596;
+  gap: 9px;
+  min-height: 46px;
+  padding: 10px 6px 8px;
+  color: #aab8b9;
   cursor: pointer;
   list-style: none;
-  font-size: 11px;
-  font-weight: 800;
+  font-size: 14px;
+  font-weight: 900;
   letter-spacing: .2px;
 }
 
@@ -22,17 +22,17 @@
 .past-departures-fold > summary::before {
   content: '›';
   display: inline-block;
-  color: #718082;
-  font-size: 15px;
+  color: #869698;
+  font-size: 19px;
   line-height: 1;
   transform-origin: center;
   transition: transform .15s ease;
 }
 .past-departures-fold[open] > summary::before { transform: rotate(90deg); }
 .past-departures-fold > summary small {
-  color: #697779;
-  font-size: 10px;
-  font-weight: 700;
+  color: #839193;
+  font-size: 11.5px;
+  font-weight: 800;
 }
 
 .past-departures-list {
@@ -71,11 +71,11 @@
 
 @media (max-width: 700px) {
   .past-departures-fold > summary {
-    min-height: 30px;
-    padding: 6px 2px 4px;
-    font-size: 10px;
+    min-height: 42px;
+    padding: 9px 4px 7px;
+    font-size: 13px;
   }
-  .past-departures-fold > summary small { font-size: 9px; }
+  .past-departures-fold > summary small { font-size: 11px; }
   .past-departures-list { gap: 8px; padding-top: 5px; }
   .next-departure-tag { font-size: 8px; padding: 2px 5px; }
 }
