@@ -88,15 +88,18 @@ test('les actions du départ restent compactes et contextualisées',()=>{
   assert.match(css,/\.crew-section-create/);
 });
 
-test('le compte déconnecté garde Aide et Discord alignés horizontalement',()=>{
+test('le compte déconnecté garde Aide et Discord alignés horizontalement et explicite OAuth',()=>{
   const account=read('front/account-menu.mjs');
   const css=read('styles/account-menu.css');
   const game=read('game.html');
   assert.match(account,/account-disconnected-actions/);
+  assert.match(account,/account-oauth-trust/);
+  assert.match(account,/Discord OAuth/);
+  assert.match(account,/aucun mot de passe transmis à Endurance Manager/);
   assert.match(css,/\.account-disconnected-actions\s*\{[^}]*display:\s*flex/s);
   assert.match(css,/\.account-disconnected-actions \.account-help-link\s*\{[^}]*width:\s*auto/s);
   assert.match(css,/white-space:\s*nowrap/);
-  assert.match(game,/account-menu\.css\?v=3-disconnected-row/);
+  assert.match(game,/account-menu\.css\?v=4-oauth-trust/);
 });
 
 test('inscrire un autre pilote reste réservé à un compte connecté',()=>{
