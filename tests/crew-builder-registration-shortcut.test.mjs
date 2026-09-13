@@ -10,16 +10,21 @@ test('le compte Discord mobile occupe exactement une colonne de navigation',()=>
   assert.match(css,/\.site-nav-shell \.account-bar:has\(\.account-menu\) \.account-trigger[\s\S]*?width:\s*100%\s*!important/);
 });
 
-test('la création d’équipage propose d’inscrire un pilote non encore inscrit',()=>{
+test('la création d’équipage ouvre l’inscription pilote dans une fenêtre superposée',()=>{
   const script=read('front/crew-builder-registration-shortcut.mjs');
   const css=read('styles/crew-builder-registration-shortcut.css');
   const html=read('game.html');
-  assert.match(script,/button\.dataset\.action='new-registration'/);
-  assert.match(script,/button\.dataset\.departure=activeBuilder\.departureId/);
-  assert.match(script,/button\.textContent='Inscrire un autre pilote'/);
+  assert.match(script,/data\.crewBuilderRegisterPilot='true'/);
+  assert.match(script,/registration-modal-backdrop/);
+  assert.match(script,/renderRegistrationForm\(event,departure,draft\)/);
+  assert.match(script,/submitRegistration\(form,api\)/);
+  assert.match(script,/document\.body\.classList\.add\('registration-modal-open'\)/);
   assert.match(script,/activeBuilder\.mode!=='create'/);
   assert.doesNotMatch(script,/MutationObserver/);
-  assert.match(css,/\.crew-builder-register-pilot/);
-  assert.match(html,/crew-builder-registration-shortcut\.mjs\?v=1/);
-  assert.match(html,/crew-builder-registration-shortcut\.css\?v=1/);
+  assert.doesNotMatch(script,/dataset\.action='new-registration'/);
+  assert.match(css,/\.registration-modal-backdrop\s*\{[\s\S]*?position:\s*fixed/);
+  assert.match(css,/\.registration-modal-panel[\s\S]*?100dvh/);
+  assert.match(css,/body\.registration-modal-open/);
+  assert.match(html,/crew-builder-registration-shortcut\.mjs\?v=2-modal/);
+  assert.match(html,/crew-builder-registration-shortcut\.css\?v=2-modal/);
 });
