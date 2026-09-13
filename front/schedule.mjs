@@ -15,15 +15,15 @@ export function eventSchedule(event,now) {
   const duration=(event.durationHours||6)*3600000;
   const next=departures.find(d=>d.startsAt>now);
   const running=departures.find(d=>d.startsAt<=now&&d.startsAt+duration>now);
-  const end=departures.length?departures[departures.length-1].startsAt+duration:null;
-  return {event,next,running,end,archived:end!==null&&end<=now,timestamp:running?.startsAt??next?.startsAt??end};
+  const archiveAt=departures.length?departures[departures.length-1].startsAt:null;
+  return {event,next,running,end:archiveAt,archiveAt,archived:archiveAt!==null&&archiveAt<=now,timestamp:next?.startsAt??archiveAt};
 }
 export function groupEvents(source,filter,now=Date.now()) {
   const today=parisCalendar(now);
   const monday=today.day-((new Date(today.day).getUTCDay()+6)%7)*86400000;
   const monthLabel=timestamp=>new Intl.DateTimeFormat('fr-FR',{timeZone:'Europe/Paris',month:'long',...(parisCalendar(timestamp).year!==today.year?{year:'numeric'}:{})}).format(new Date(timestamp));
   const items=source.map(event=>eventSchedule(event,now)).filter(item=>filter==='archived'?item.archived:!item.archived);
-  items.sort((a,b)=>filter==='archived'?b.end-a.end:Number(!!b.running)-Number(!!a.running)||(a.timestamp??Infinity)-(b.timestamp??Infinity)||a.event.name.localeCompare(b.event.name,'fr'));
+  items.sort((a,b)=>filter==='archived'?b.archiveAt-a.archiveAt:(a.timestamp??Infinity)-(b.timestamp??Infinity)||a.event.name.localeCompare(b.event.name,'fr'));
   const groups=new Map();
   for(const item of items){
     let key,label;
@@ -32,7 +32,6 @@ export function groupEvents(source,filter,now=Date.now()) {
       const date=parisCalendar(item.timestamp);
       key=`${date.year}-${date.month}`;
       if(filter==='archived')label=monthLabel(item.timestamp);
-      else if(item.running){key='running';label='En cours';}
       else if(date.day<monday+7*86400000){key='this-week';label='Cette semaine';}
       else if(date.day<monday+14*86400000){key='next-week';label='La semaine prochaine';}
       else label=`${date.year===today.year&&date.month===today.month?'Plus tard en ':''}${monthLabel(item.timestamp)}`;

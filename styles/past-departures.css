@@ -1,0 +1,81 @@
+/* Historique discret des départs déjà lancés dans un événement. */
+.past-departures-fold {
+  margin-top: 2px;
+  border-top: 1px solid #2d383b;
+}
+
+.past-departures-fold > summary {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 34px;
+  padding: 7px 4px 5px;
+  color: #879596;
+  cursor: pointer;
+  list-style: none;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .2px;
+}
+
+.past-departures-fold > summary::-webkit-details-marker { display: none; }
+.past-departures-fold > summary::before {
+  content: '›';
+  display: inline-block;
+  color: #718082;
+  font-size: 15px;
+  line-height: 1;
+  transform-origin: center;
+  transition: transform .15s ease;
+}
+.past-departures-fold[open] > summary::before { transform: rotate(90deg); }
+.past-departures-fold > summary small {
+  color: #697779;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.past-departures-list {
+  display: grid;
+  gap: 10px;
+  padding-top: 7px;
+}
+
+.departure-fold.is-past {
+  border-color: #303b3f;
+  background: #101618;
+}
+.departure-fold.is-past > summary { opacity: .92; }
+
+.ux-departure-title-line {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+.next-departure-tag {
+  display: inline-flex;
+  align-items: center;
+  min-height: 18px;
+  padding: 2px 6px;
+  border: 1px solid #387958;
+  border-radius: 999px;
+  color: #9feab0;
+  background: rgba(45,124,80,.12);
+  font-size: 9px;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: .25px;
+  text-transform: uppercase;
+}
+
+@media (max-width: 700px) {
+  .past-departures-fold > summary {
+    min-height: 30px;
+    padding: 6px 2px 4px;
+    font-size: 10px;
+  }
+  .past-departures-fold > summary small { font-size: 9px; }
+  .past-departures-list { gap: 8px; padding-top: 5px; }
+  .next-departure-tag { font-size: 8px; padding: 2px 5px; }
+}

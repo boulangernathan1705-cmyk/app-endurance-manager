@@ -1,1 +1,1 @@
-import './front/app/actions.mjs?v=21-one-course-page';
+import './front/app/actions.mjs?v=22-past-departures';
