@@ -12,6 +12,20 @@
   display: none !important;
 }
 
+.event-card.event-card-harmonized .event-info {
+  flex-direction: column;
+  gap: 5px;
+}
+
+.event-card.event-card-harmonized .event-pilot-count {
+  display: block;
+  color: #b6c3c5;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.2;
+  text-align: left;
+}
+
 .event-card.event-card-harmonized .event-home-crews {
   display: block;
   min-width: 0;
