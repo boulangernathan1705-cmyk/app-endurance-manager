@@ -1,7 +1,7 @@
 export const GAME_IDS = ['lmu','iracing'];
 
 const SHARED_EVENT_TYPES = {
-  special:{label:'Special event',css:'special'},
+  special:{label:'Événement spécial',css:'special'},
   lmu:{label:'Championnat LMU',css:'lmu'},
   private:{label:'Championnat privé',css:'private'}
 };
