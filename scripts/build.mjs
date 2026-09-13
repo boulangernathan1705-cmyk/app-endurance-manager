@@ -158,7 +158,7 @@ Sitemap: https://endurance-manager.app/sitemap.xml
 `);
 
 await writeFile(new URL('sitemap.xml', out), `<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/sitemap/0.9">
+<urlset xmlns="https://www.sitemaps.org/schemas/sitemap/0.9">
   <url><loc>https://endurance-manager.app/</loc></url>
   <url><loc>https://endurance-manager.app/lmu/</loc></url>
   <url><loc>https://endurance-manager.app/iracing/</loc></url>
