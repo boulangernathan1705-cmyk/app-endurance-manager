@@ -23,8 +23,9 @@ test('un pilote peut rejoindre quitter gérer et supprimer son équipage depuis 
   const actions = read('front/app/actions.mjs');
   assert.match(crews, /button\('join-crew','Rejoindre'/);
   assert.match(crews, /button\('leave-crew','Quitter'/);
+  assert.match(crews, /button\('edit-crew','Gérer'/);
+  assert.doesNotMatch(crews, /crew\.ownedByMe\?'Gérer':'Modifier'/);
   assert.match(crews, /button\('delete-crew','Supprimer'/);
-  assert.match(crews, /crew\.ownedByMe\?'Gérer':'Modifier'/);
   assert.match(crews, /crew\.canManage/);
   assert.match(crews, /data-crew-state-select/);
   assert.match(actions, /case 'join-crew'/);
