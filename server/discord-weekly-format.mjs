@@ -98,13 +98,17 @@ function cut(value, length) {
   return text.length <= length ? text : `${text.slice(0, length - 1).trimEnd()}…`;
 }
 
+function pilotLines(pilots) {
+  return pilots.map(name => `👤 ${clean(name)}`).join('\n');
+}
+
 function crewField(crew) {
   const marker = markers.get(crew.category) || '⬜';
   const status = crew.locked ? '🔒 Complet' : '🔓 Ouvert';
-  const pilots = crew.pilots.length ? crew.pilots.map(clean).join(' • ') : 'Aucun pilote affecté';
+  const pilots = crew.pilots.length ? pilotLines(crew.pilots) : 'Aucun pilote affecté';
   return {
     name: cut(`${marker} ${clean(crew.name)} · ${clean(crew.category)} · ${status}`, 256),
-    value: cut(`${crew.car ? `🏎️ ${clean(crew.car)}` : '🏎️ Voiture à définir'}\n👥 ${pilots}`, 1024),
+    value: cut(`${crew.car ? `🏎️ ${clean(crew.car)}` : '🏎️ Voiture à définir'}\n${pilots}`, 1024),
     inline: false
   };
 }
@@ -123,8 +127,8 @@ function departureFields(departure) {
   }
   if (departure.unassignedPilots?.length) {
     fields.push({
-      name: '👤 Pilotes inscrits non affectés',
-      value: cut(departure.unassignedPilots.map(clean).join(' • '), 1024),
+      name: '📋 Pilotes inscrits non affectés',
+      value: cut(pilotLines(departure.unassignedPilots), 1024),
       inline: false
     });
   }
@@ -134,14 +138,10 @@ function departureFields(departure) {
 function departureEmbed(departure, appUrl, mode, first, updatedAt) {
   const current = mode === 'current';
   const circuit = circuitNames.get(departure.circuit) || departure.circuit || 'Circuit à préciser';
-  const pilotCount = Number(departure.pilotCount) || 0;
   const label = current ? '🔴 Course en cours' : '📝 Prochaine inscription';
-  const pilotLine = pilotCount
-    ? `👥 ${pilotCount} pilote${pilotCount > 1 ? 's' : ''} inscrit${pilotCount > 1 ? 's' : ''}`
-    : '👥 Aucun pilote inscrit pour le moment';
   const embed = {
     title: cut(`${label} — ${clean(departure.eventName)}`, 256),
-    description: cut(`📅 **${departureLabel.format(departure.startsAt)}**\n📍 ${clean(circuit)}\n⏱️ ${departure.durationHours || '?'} h\n${pilotLine}`, 4096),
+    description: cut(`📅 **${departureLabel.format(departure.startsAt)}**\n📍 ${clean(circuit)}\n⏱️ ${departure.durationHours || '?'} h`, 4096),
     color: current ? 0xd71920 : 0x2563eb,
     fields: departureFields(departure)
   };
