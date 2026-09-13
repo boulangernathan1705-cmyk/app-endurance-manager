@@ -8,8 +8,9 @@ const read = path => readFileSync(new URL(`../${path}`, import.meta.url),'utf8')
 function scheduleHarness() {
   const context=vm.createContext({Intl,Date,console,globalThis:{}});
   const catalog=read('shared/catalog.mjs').replace(/\bexport\s+/g,'');
-  const schedule=read('front/schedule.mjs').replace(/\bexport\s+/g,'');
-  vm.runInContext(catalog+'\n'+schedule,context);
+  const schedule=read('front/schedule.mjs').replace(/^import .*?;\s*/m,'').replace(/\bexport\s+/g,'');
+  const localeHelpers="const getLocale=()=> 'fr'; const localeTag=()=> 'fr-FR';";
+  vm.runInContext(catalog+'\n'+localeHelpers+'\n'+schedule,context);
   return {run:code=>vm.runInContext(code,context)};
 }
 
