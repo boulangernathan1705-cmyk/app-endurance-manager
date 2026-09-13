@@ -13,7 +13,7 @@
   color: #aab8b9;
   cursor: pointer;
   list-style: none;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 900;
   letter-spacing: .2px;
 }
@@ -47,35 +47,12 @@
 }
 .departure-fold.is-past > summary { opacity: .92; }
 
-.ux-departure-title-line {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  flex-wrap: wrap;
-}
-.next-departure-tag {
-  display: inline-flex;
-  align-items: center;
-  min-height: 18px;
-  padding: 2px 6px;
-  border: 1px solid #387958;
-  border-radius: 999px;
-  color: #9feab0;
-  background: rgba(45,124,80,.12);
-  font-size: 9px;
-  font-weight: 900;
-  line-height: 1;
-  letter-spacing: .25px;
-  text-transform: uppercase;
-}
-
 @media (max-width: 700px) {
   .past-departures-fold > summary {
     min-height: 42px;
     padding: 9px 4px 7px;
-    font-size: 13px;
+    font-size: 14px;
   }
   .past-departures-fold > summary small { font-size: 11px; }
   .past-departures-list { gap: 8px; padding-top: 5px; }
-  .next-departure-tag { font-size: 8px; padding: 2px 5px; }
 }
