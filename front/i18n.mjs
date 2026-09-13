@@ -1,6 +1,17 @@
 const STORAGE_KEY='endurance_manager_locale';
 const SUPPORTED=new Set(['fr','en']);
 
+const FR_NORMALIZE=new Map(Object.entries({
+  'Special event':'Événement spécial',
+  'Ajouter un évènement':'Ajouter un événement',
+  'Autre pilote · pseudo manuel':'Autre pilote · saisie manuelle',
+  'Pilote souhaité':'Coéquipier souhaité',
+  'Pseudo du pilote souhaité':'Pseudo du coéquipier souhaité',
+  'Les dates et heures sont saisies en heure de Paris.':'Les dates et heures sont saisies à l’heure de Paris.',
+  'Vue réelle du bouton Ajouter un évènement':'Vue réelle du bouton Ajouter un événement',
+  'Commence par « Ajouter un évènement ».':'Commence par « Ajouter un événement ».'
+}));
+
 const EN=new Map(Object.entries({
   'Accueil':'Home','Aide':'Help','Événements':'Events','ÉVÉNEMENTS':'EVENTS','Mes inscriptions':'My entries','MES INSCRIPTIONS':'MY ENTRIES',
   'Mon inscription':'My entry','Inscriptions':'Entries','Mes inscriptions personnelles':'My personal entries','Inscriptions que je gère':'Entries I manage',
@@ -8,14 +19,19 @@ const EN=new Map(Object.entries({
   'Erreurs techniques':'Technical errors','AIDE':'HELP','AIDE PILOTE':'DRIVER HELP','ESPACE PILOTE':'DRIVER AREA','Pilote':'Driver','Pilotes':'Drivers',
   'Organisateur':'Organizer','Administrateur':'Administrator','Administrateur principal':'Primary administrator','Déconnexion':'Log out',
   'Se connecter avec Discord':'Sign in with Discord','Connexion Discord indisponible':'Discord sign-in unavailable','Compte indisponible':'Account unavailable',
+  'Connexion via Discord OAuth · aucun mot de passe transmis à Endurance Manager.':'Sign in via Discord OAuth · no password is shared with Endurance Manager.',
+  'En savoir plus':'Learn more','Utilisation sans connexion':'Using without an account',
   'Choisis ton simulateur':'Choose your simulator','Simulateurs disponibles':'Available simulators','Chargement de la prochaine endurance…':'Loading the next endurance event…',
   'Accéder à LMU':'Open LMU','Accéder à iRacing':'Open iRacing','COURSE EN COURS':'RACE IN PROGRESS','PROCHAIN DÉPART':'NEXT START','PROCHAINE ENDURANCE':'NEXT ENDURANCE',
   'Aucune endurance à venir':'No upcoming endurance events','Le prochain événement apparaîtra ici dès qu’il sera créé.':'The next event will appear here as soon as it is created.',
+  'Hypercar, prototypes et GT de Le Mans Ultimate.':'Hypercars, prototypes and GT cars in Le Mans Ultimate.',
+  'GTP, LMP2, GT3, GT4 et TCR avec un catalogue de circuits étendu.':'GTP, LMP2, GT3, GT4 and TCR with an extensive track catalogue.',
+  'Le récapitulatif des prochaines endurances est momentanément indisponible. Les espaces restent accessibles.':'The upcoming endurance summary is temporarily unavailable. The simulator areas remain accessible.',
   'À venir':'Upcoming','Archivés':'Archived','Ajouter un évènement':'Add event','Ajouter un événement':'Add event','Mon lien personnel':'My personal link',
-  'Copier le lien':'Copy link','Masquer':'Hide','Filtrer les événements':'Filter events','Aucun événement à venir.':'No upcoming events.','Aucun événement archivé.':'No archived events.',
+  'Copier le lien':'Copy link','Lien copié':'Link copied','Masquer':'Hide','Filtrer les événements':'Filter events','Aucun événement à venir.':'No upcoming events.','Aucun événement archivé.':'No archived events.',
   'Cette semaine':'This week','La semaine prochaine':'Next week','Dates à confirmer':'Dates to be confirmed','Date à confirmer':'Date to be confirmed',
   'Départ passé':'Start passed','· Départ passé':'· Start passed','Départs passés':'Past starts','Tous les départs ont eu lieu':'All starts have taken place',
-  'Prochain départ dans':'Next start in','Aucun départ à venir avec pilote inscrit':'No upcoming start with a registered driver',
+  'Prochain départ dans':'Next start in','Aucun départ à venir avec pilote inscrit':'No upcoming start with registered drivers',
   'Actualiser':'Refresh','Modifier l’événement':'Edit event','Supprimer l’événement':'Delete event','Départs de la course':'Race starts',
   'durée':'duration','départ':'start','départs':'starts','pilote':'driver','pilotes':'drivers','équipage':'crew','équipages':'crews','Équipage':'Crew','Équipages':'Crews',
   'engagé':'entered','engagés':'entered','ÉQUIPAGE COMPLET':'CREW COMPLETE','ÉQUIPAGE OUVERT':'CREW OPEN','Équipage complet':'Crew complete','Équipage ouvert':'Crew open','Ouvert':'Open','Complet':'Complete',
@@ -24,43 +40,146 @@ const EN=new Map(Object.entries({
   'Aucun pilote inscrit sur ce départ.':'No driver registered for this start.','Disponibilité de l’équipage':'Crew availability','État de l’équipage':'Crew status',
   'Voiture à choisir':'Car to be chosen','Voiture à définir':'Car to be decided','En attente d’affectation':'Waiting for crew assignment','Aucune inscription.':'No entries.',
   'Aucun pilote n’a encore rejoint cet équipage.':'No driver has joined this crew yet.','Tous les pilotes disponibles ont déjà un équipage.':'All available drivers already have a crew.',
-  'Aucun autre équipage sur ce départ.':'No other crew on this start.','Tous les pilotes disponibles sont déjà affectés.':'All available drivers are already assigned.',
+  'Aucun autre équipage sur ce départ.':'No other crew for this start.','Tous les pilotes disponibles sont déjà affectés.':'All available drivers are already assigned.',
+  'Cette inscription n’est pas encore rattachée à un équipage.':'This entry is not assigned to a crew yet.',
   'Voir l’événement complet':'View full event','Mon équipage':'My crew','Autres équipages':'Other crews','S’inscrire':'Register','Modifier mon inscription':'Edit my entry',
   'Inscrire un autre pilote':'Register another driver','Ajouter une catégorie':'Add a category','TON INSCRIPTION':'YOUR ENTRY','AUTRE PILOTE':'OTHER DRIVER','AJOUT D’UNE CATÉGORIE':'ADD A CATEGORY','INSCRIPTION GÉRÉE':'MANAGED ENTRY',
+  'Les inscriptions sont verrouillées. Les équipages restent consultables ci-dessous.':'Entries are locked. Crews remain viewable below.',
+  'Cet événement n’est plus disponible.':'This event is no longer available.',
+  'Ton lien personnel pour retrouver et modifier tes inscriptions sans compte':'Your personal link to retrieve and edit your entries without an account',
+  'Conserve ce lien et garde-le privé.':'Keep this link private.',
   'Heures de présence':'Availability hours','TOUTE LA COURSE':'WHOLE RACE','Toute la course':'Whole race','Indisponible':'Unavailable','Début':'Start','Milieu':'Middle','Fin':'End',
-  'Clique sur les créneaux où tu es disponible.':'Select the time slots when you are available.','Autre pilote · pseudo manuel':'Other driver · manual name','Pseudo de l’autre pilote':'Other driver name',
+  'Clique sur les créneaux où tu es disponible.':'Select the time slots when you are available.','Autre pilote · pseudo manuel':'Other driver · manual name','Autre pilote · saisie manuelle':'Other driver · manual name','Pseudo de l’autre pilote':'Other driver name',
   'Catégorie':'Category','Voiture(s) souhaitée(s)':'Preferred car(s)','N’importe quelle voiture':'Any car','Pas de préférence':'No preference','Peu importe la voiture':'Any car',
-  'Pilote souhaité':'Preferred driver','(facultatif)':'(optional)','Pseudo du pilote souhaité':'Preferred driver name','Pseudo pilote':'Driver name','Pilote Discord':'Discord driver','Souhaite rouler avec :':'Wants to race with:',
+  'Pilote souhaité':'Preferred teammate','Coéquipier souhaité':'Preferred teammate','(facultatif)':'(optional)','Pseudo du pilote souhaité':'Preferred teammate name','Pseudo du coéquipier souhaité':'Preferred teammate name','Pseudo pilote':'Driver name','Pilote Discord':'Discord driver','Souhaite rouler avec :':'Wants to race with:',
+  'Aucune préférence renseignée':'No preference provided','ce pilote':'this driver',
+  'Choisis un ou plusieurs modèles, ou coche « Peu importe la voiture ». Ces souhaits aident les organisateurs à former les équipages.':'Choose one or more cars, or select “Any car”. These preferences help organizers form crews.',
   'ENREGISTRER':'SAVE','INSCRIRE LE PILOTE':'REGISTER DRIVER','S’INSCRIRE':'REGISTER','Supprimer l’inscription':'Delete entry','Se désinscrire':'Withdraw','Fermer':'Close',
-  'Disponibilité':'Availability','Informations générales':'General information','Nom de l’événement':'Event name','Durée de la course':'Race duration','Type d’événement':'Event type',
+  'Disponibilité':'Availability','Disponible':'Available','Non sélectionné':'Not selected','DÉPART':'START','ARRIVÉE':'FINISH',
+  'Informations générales':'General information','Nom de l’événement':'Event name','Durée de la course':'Race duration','Type d’événement':'Event type',
   'Circuit':'Circuit','Sélectionner un circuit':'Select a circuit','Catégories autorisées':'Allowed categories','Départs possibles':'Available starts','+ Ajouter un départ':'+ Add start',
-  'Supprimer ce départ':'Delete this start','Date':'Date','Heure (Paris)':'Time (Paris)','MODIFIER L’ÉVÉNEMENT':'EDIT EVENT','NOUVEL ÉVÉNEMENT':'NEW EVENT',
+  'Supprimer ce départ':'Delete this start','Date':'Date','Heure (Paris)':'Paris time','MODIFIER L’ÉVÉNEMENT':'EDIT EVENT','NOUVEL ÉVÉNEMENT':'NEW EVENT',
   'CONFIGURATION DE LA COURSE':'RACE SETUP','ÉDITION DE LA COURSE':'RACE EDITING','Mettre à jour la course':'Update the race','Préparer une nouvelle course':'Set up a new race',
   'Renseigne les informations essentielles, puis ajoute les départs et les catégories ouvertes aux pilotes.':'Enter the essential information, then add the starts and categories open to drivers.',
   'Le nom, le format et le circuit apparaîtront dans le récapitulatif.':'The name, format and circuit will appear in the summary.','Choisis une ou plusieurs catégories disponibles pour cette course.':'Choose one or more categories available for this race.',
-  'Les dates et heures sont saisies en heure de Paris.':'Dates and times are entered in Paris time.','Un départ avec des inscrits ne peut pas être supprimé, ni une catégorie encore utilisée.':'A start with registrations cannot be deleted, nor can a category that is still in use.',
+  'Les dates et heures sont saisies en heure de Paris.':'Dates and times use Paris time.','Les dates et heures sont saisies à l’heure de Paris.':'Dates and times use Paris time.',
+  'Un départ avec des inscrits ne peut pas être supprimé, ni une catégorie encore utilisée.':'A start with entries cannot be deleted, nor can a category that is still in use.',
   'ENREGISTRER LES MODIFICATIONS':'SAVE CHANGES','CRÉER L’ÉVÉNEMENT':'CREATE EVENT',
-  '← Retour':'← Back','← Retour aux événements':'← Back to events','Retour à l’accueil':'Back to home','Retour à l’accueil Endurance Manager':'Back to Endurance Manager home',
+  'Retrouve ici tes courses, ton équipage et les pilotes inscrits sur le même départ.':'Find your races, your crew and the drivers registered for the same start here.',
+  '← Retour':'← Back','← Retour aux événements':'← Back to events','Retour à l’accueil':'Back to home','Retour à l’accueil Endurance Manager':'Back to Endurance Manager home','Retour à Endurance Manager':'Back to Endurance Manager',
   '← Retour au site':'← Back to site','Chargement des événements…':'Loading events…','Chargement des membres…':'Loading members…','Chargement de l’aide…':'Loading help…',
   'Chargement des diagnostics…':'Loading diagnostics…','Navigation principale':'Main navigation','Navigation globale':'Global navigation','Changer de simulateur':'Change simulator',
-  'Circuit à préciser':'Circuit to be confirmed','Championnat LMU':'LMU championship','Championnat iRacing':'iRacing championship','Championnat privé':'Private championship','Accès impossible':'Access unavailable','Enregistrer':'Save',
-  'Cet événement n’est plus disponible.':'This event is no longer available.','Les inscriptions sont verrouillées. Les équipages restent consultables ci-dessous.':'Entries are locked. Crews remain available below.',
-  'Ton lien personnel pour retrouver et modifier tes inscriptions sans compte':'Your personal link to retrieve and edit your entries without an account','Conserve ce lien et garde-le privé.':'Keep this link private.',
-  'À propos & sécurité':'About & security','À propos et sécurité':'About & security','Informations légales':'Legal information','Confidentialité':'Privacy','Crédits des circuits':'Circuit credits',
+  'Circuit à préciser':'Circuit to be confirmed','Championnat LMU':'LMU Championship','Championnat iRacing':'iRacing Championship','Championnat privé':'Private Championship','Événement spécial':'Special Event','Special event':'Special Event',
+  'Accès impossible':'Access unavailable','Enregistrer':'Save',
+  'Cette page est commune à LMU et iRacing. Un pilote apparaît après sa première connexion Discord.':'This page is shared by LMU and iRacing. A driver appears after their first Discord sign-in.',
+  'Accès réservé aux administrateurs.':'Access is restricted to administrators.','Autorisations mises à jour.':'Permissions updated.','Cette action a échoué.':'This action failed.',
+  'Impossible de joindre le service de diagnostics. Recharge la page puis réessaie.':'Unable to reach the diagnostics service. Reload the page and try again.',
+  'Impossible de charger les diagnostics.':'Unable to load diagnostics.','Erreur sans message':'Error without a message','Erreurs techniques remontées automatiquement par les navigateurs. Conservation limitée à 14 jours.':'Technical errors reported automatically by browsers. Retained for 14 days.',
+  'Aucune erreur récente.':'No recent errors.',
+  'Action impossible':'Action unavailable','OK, j’ai compris':'OK, got it','Action impossible.':'Action unavailable.',
+  'Équipage introuvable. Actualise la page.':'Crew not found. Refresh the page.','Tu n’as pas l’autorisation de modifier cet équipage.':'You are not allowed to edit this crew.',
+  'Connecte-toi avec un compte autorisé.':'Sign in with an authorized account.','Connecte-toi avec Discord pour rejoindre un équipage.':'Sign in with Discord to join a crew.',
+  'Cet équipage n’existe plus.':'This crew no longer exists.','Tu n’as pas l’autorisation de modifier cette inscription.':'You are not allowed to edit this entry.','Inscription introuvable.':'Entry not found.',
+  'Cet équipage n’est plus disponible. Actualise la page.':'This crew is no longer available. Refresh the page.','Équipage ou inscription introuvable. Actualise la page.':'Crew or entry not found. Refresh the page.','Équipage introuvable.':'Crew not found.',
+  'Choisis un pilote.':'Choose a driver.','Maximum 30 départs par événement.':'Maximum 30 starts per event.','Copie le lien sélectionné avec Ctrl+C.':'Copy the selected link with Ctrl+C.',
+  'Sélectionne au moins une catégorie.':'Select at least one category.','Sélectionne le circuit de la course.':'Select the race circuit.','Événement modifié.':'Event updated.','Événement créé.':'Event created.','Événement supprimé.':'Event deleted.',
+  'Inscription supprimée.':'Entry deleted.','Équipages mis à jour.':'Crews updated.','Équipage mis à jour.':'Crew updated.','Inscription enregistrée.':'Entry saved.',
+  'Indique le pseudo du pilote.':'Enter the driver name.','Ton compte Discord ne contient pas de nom utilisable.':'Your Discord account does not contain a usable name.','Choisis ta disponibilité.':'Choose your availability.','Choisis ta catégorie.':'Choose your category.','Choisis au moins une voiture, ou coche « Peu importe la voiture ».':'Choose at least one car, or select “Any car”.',
+  'Tes inscriptions invitées sont accessibles sur cet appareil.':'Your guest entries are now available on this device.','La connexion Discord n’a pas abouti. Tu peux réessayer.':'Discord sign-in did not complete. You can try again.',
+  'À propos & sécurité':'About & security','À propos et sécurité':'About & security','Informations légales':'Legal information','Confidentialité':'Privacy','Crédits des circuits':'Circuit credits','Crédits des cartes de circuits':'Circuit map credits',
   'Le service':'The service','Connexion Discord':'Discord sign-in','Sécurité':'Security','Contact':'Contact','Un outil communautaire de simracing':'A community simracing tool',
   'Connexion avec Discord OAuth':'Sign in with Discord OAuth','Mesures de sécurité':'Security measures','Transparence et contact':'Transparency and contact',
   'Politique de confidentialité':'Privacy policy','Mentions légales':'Legal notice','Propriété intellectuelle':'Intellectual property','Marques et simulateurs':'Trademarks and simulators',
-  'Données personnelles':'Personal data','Utilisation du service':'Use of the service','Action impossible':'Action unavailable','OK, j’ai compris':'OK, got it',
-  'Aucun participant':'No participants','Aucune inscription pour ce départ':'No entry for this start','Aucun pilote inscrit':'No registered driver','Aucun équipage formé':'No crew formed'
+  'Données personnelles':'Personal data','Utilisation du service':'Use of the service','Domaine public / CC0':'Public domain / CC0','Creative Commons avec attribution':'Creative Commons with attribution','Utilisation dans Endurance Manager':'Use in Endurance Manager',
+  'Dernière mise à jour : 12 septembre 2026':'Last updated: 12 September 2026','Dernière mise à jour : 11 septembre 2026':'Last updated: 11 September 2026','Dernière mise à jour : 10 septembre 2026':'Last updated: 10 September 2026',
+  'source':'source','domaine public':'public domain','Licences :':'Licences:',
+  'Utilisation sans connexion':'Using without an account','Consulter les événements':'Browse events','Connexion et récupération de mes inscriptions':'Sign-in and entry recovery','S’inscrire à un départ':'Register for a start',
+  'Choisir ses disponibilités':'Choose your availability','Choisir sa catégorie':'Choose your category','Indiquer ses voitures préférées':'Choose your preferred cars','Choisir un coéquipier souhaité':'Choose a preferred teammate',
+  'Modifier ou supprimer son inscription':'Edit or delete your entry','Créer, rejoindre et gérer un équipage':'Create, join and manage a crew','Retrouver mes inscriptions':'Find my entries','Mes droits en tant que pilote':'My driver permissions','À quoi sert un organisateur ?':'What does an organizer do?',
+  'Comprendre le rôle organisateur':'Understand the organizer role','Créer un événement':'Create an event','Modifier un événement':'Edit an event','Gérer les différents départs':'Manage the different starts','Comprendre les inscriptions':'Understand entries','Inscriptions dans plusieurs catégories':'Entries in multiple categories',
+  'Créer ou superviser un équipage':'Create or supervise a crew','Affecter et déplacer les pilotes':'Assign and move drivers','Gérer les pilotes non affectés':'Manage unassigned drivers','Vérifier la couverture horaire':'Check time coverage','Équipage ouvert ou complet':'Open or complete crew','Modifier ou supprimer un équipage':'Edit or delete a crew','Modifier une inscription que je gère':'Edit an entry I manage','Mes droits en tant qu’organisateur':'My organizer permissions','Administration du site':'Site administration',
+  'AIDE ORGANISATEUR':'ORGANIZER HELP','AIDE ORGANISATEUR & ADMINISTRATION':'ORGANIZER & ADMIN HELP',
+  'Tout ce qu’il faut pour s’inscrire à une course, indiquer ses disponibilités et gérer son équipage.':'Everything you need to register for a race, set your availability and manage your crew.',
+  'Créer les courses, suivre les inscriptions et superviser les équipages.':'Create races, track entries and supervise crews.','Gérer les courses, les équipages et les droits d’Endurance Manager.':'Manage races, crews and Endurance Manager permissions.',
+  'Tu peux':'You can','Tu ne peux pas':'You cannot','Besoin d’aide ?':'Need help?','Conseil :':'Tip:','Important :':'Important:',
+  'Les pilotes compatibles peuvent encore le rejoindre.':'Compatible drivers can still join.','La composition est verrouillée.':'The crew is locked.'
+}));
+
+const HELP_TEXT=new Map(Object.entries({
+  'Tu es connecté avec Discord. Tes inscriptions personnelles sont rattachées à ton compte et peuvent être retrouvées depuis':'You are signed in with Discord. Your personal entries are linked to your account and can be found under',
+  'Tu peux utiliser Endurance Manager sans compte. Après une inscription, conserve ton':'You can use Endurance Manager without an account. After registering, keep your',
+  ': il permet de retrouver et modifier tes inscriptions sur un autre appareil. Garde ce lien privé.':': it lets you retrieve and edit your entries on another device. Keep this link private.',
+  'La création, la gestion et l’adhésion à un équipage nécessitent une connexion Discord afin de savoir qui en est responsable.':'Creating, managing and joining a crew requires Discord sign-in so the service can identify the crew owner.',
+  'La page':'The','affiche les courses à venir et les événements archivés. Ouvre une course pour voir son circuit, sa durée, ses catégories, ses différents départs, les pilotes inscrits et les équipages déjà constitués.':'page shows upcoming races and archived events. Open a race to see its circuit, duration, categories, starts, registered drivers and existing crews.',
+  'Ouvre le départ qui t’intéresse puis utilise':'Open the start you are interested in, then use','ou':'or','Renseigne ton pseudo, tes disponibilités, ta catégorie et tes préférences avant de valider.':'Enter your driver name, availability, category and preferences before submitting.',
+  'ne coche que les heures pendant lesquelles tu es réellement disponible pour rouler.':'only select the hours when you are actually available to drive.',
+  'La course est découpée heure par heure. Sélectionne chaque heure pendant laquelle tu peux participer. Si tu es disponible du départ jusqu’à l’arrivée, utilise':'The race is split into hourly slots. Select every hour when you can participate. If you are available from start to finish, use','pour sélectionner l’ensemble de la course d’un coup.':'to select the entire race at once.',
+  'Sélectionne la catégorie dans laquelle tu souhaites participer parmi celles ouvertes par les organisateurs : Hypercar, LMP2, LMP3, GT3, GTE, etc.':'Select the category you want to race in from those opened by the organizers: Hypercar, LMP2, LMP3, GT3, GTE, etc.',
+  'Lorsque plusieurs catégories sont possibles, tu peux proposer ta participation dans plusieurs catégories. Dès que tu rejoins un équipage, que tu crées le tien ou qu’un organisateur t’y affecte, la catégorie de cet équipage devient celle retenue pour ce départ.':'When several categories are available, you can enter more than one. As soon as you join a crew, create your own, or an organizer assigns you to one, that crew’s category becomes your category for this start.',
+  'Après avoir choisi une catégorie, sélectionne une ou plusieurs voitures que tu souhaites piloter, ou choisis':'After choosing a category, select one or more cars you would like to drive, or choose','Ces préférences sont visibles lors de la constitution des équipages et aident le responsable d’équipage ou les organisateurs à choisir la voiture.':'These preferences are visible while crews are being formed and help the crew owner or organizers choose the car.',
+  'Le champ':'The','est facultatif. Tu peux y indiquer le pseudo d’un pilote avec lequel tu aimerais rouler. Cette préférence reste visible pour faciliter la formation des équipages.':'field is optional. You can enter the name of a driver you would like to race with. This preference remains visible to help form crews.',
+  'Avant le départ, ouvre ton inscription pour mettre à jour tes heures ou tes préférences. Tu peux également te désinscrire tant que l’inscription n’est pas verrouillée.':'Before the start, open your entry to update your hours or preferences. You can also withdraw while the entry is still open.',
+  'Si tu es déjà affecté à un équipage, ta catégorie est fixée par cet équipage, mais tes disponibilités et préférences peuvent encore être mises à jour lorsque le départ est ouvert.':'If you are already assigned to a crew, your category is set by that crew, but you can still update your availability and preferences while the start remains open.',
+  'Les équipages sont affichés directement dans chaque départ de la course. Un équipage':'Crews are shown directly within each race start. An','peut encore accueillir des pilotes ; un équipage':'crew can still accept drivers; a','est verrouillé.':'crew is locked.',
+  'Après t’être inscrit dans une catégorie, tu peux rejoindre un équipage ouvert compatible ou utiliser':'After registering in a category, you can join a compatible open crew or use','Si tu crées l’équipage, tu en deviens le responsable et tu peux gérer son nom, sa voiture, son état et sa composition. Tu peux également quitter un équipage sans supprimer ton inscription à la course.':'If you create the crew, you become its owner and can manage its name, car, status and lineup. You can also leave a crew without deleting your race entry.',
+  'Le bouton':'The','regroupe les courses et les départs auxquels tu es inscrit. Clique sur une inscription pour revenir directement sur la course concernée.':'button groups the races and starts you are registered for. Select an entry to return directly to the relevant race.',
+  'Les organisateurs gardent la maîtrise des événements : ils créent et modifient les courses, suivent toutes les inscriptions et supervisent tous les équipages. Ils peuvent intervenir sur n’importe quel équipage, déplacer ou retirer des pilotes et corriger une composition si nécessaire.':'Organizers retain control of events: they create and edit races, track all entries and supervise every crew. They can step in on any crew, move or remove drivers and correct a lineup when necessary.',
+  'Les pilotes restent libres de former et gérer eux-mêmes leurs équipages ; l’organisateur sert surtout de superviseur et de recours.':'Drivers remain free to form and manage their own crews; the organizer mainly acts as supervisor and support.',
+  'Contacte un organisateur si tes disponibilités ont changé après verrouillage, si tu rencontres un problème avec ton inscription ou ton équipage, ou si une affectation semble incorrecte.':'Contact an organizer if your availability changes after locking, if you have a problem with your entry or crew, or if an assignment looks incorrect.',
+  'Un organisateur possède les droits d’un pilote et les outils nécessaires pour créer les événements, suivre toutes les inscriptions et superviser les équipages.':'An organizer has all driver permissions plus the tools needed to create events, track entries and supervise crews.',
+  'Les pilotes peuvent désormais créer, rejoindre et gérer leurs propres équipages. L’organisateur garde cependant un droit de gestion global afin de corriger une composition, aider un pilote ou finaliser l’organisation de la course.':'Drivers can create, join and manage their own crews. The organizer still has global management rights to correct a lineup, help a driver or finalize race organization.',
+  'Depuis la page Événements, utilise':'From the Events page, use','Renseigne le nom, la durée, le type d’événement et le circuit, puis choisis les catégories ouvertes et ajoute les différents départs possibles.':'Enter the name, duration, event type and circuit, then choose the available categories and add the possible starts.',
+  'La durée choisie détermine le nombre d’heures affichées dans les disponibilités des pilotes.':'The selected duration determines how many hours are shown in driver availability.',
+  'Dans une course, utilise':'Within a race, use','pour mettre à jour les informations, les catégories ou les départs. Certaines suppressions sont bloquées lorsqu’elles toucheraient des inscriptions déjà existantes.':'to update information, categories or starts. Some deletions are blocked when they would affect existing entries.',
+  'si tu modifies un horaire, pense à prévenir les pilotes concernés.':'if you change a start time, remember to inform the affected drivers.',
+  'Chaque départ possède ses propres inscriptions et ses propres équipages. Ouvre toujours le bon départ avant de travailler sur les pilotes ou la composition des équipes.':'Each start has its own entries and crews. Always open the correct start before working on drivers or crew lineups.',
+  'Chaque inscription contient le pseudo du pilote, ses heures de présence, sa catégorie, ses voitures souhaitées et éventuellement un coéquipier préféré. Ces informations servent de base aux pilotes responsables d’équipage comme aux organisateurs.':'Each entry contains the driver name, availability hours, category, preferred cars and optionally a preferred teammate. This information helps both crew owners and organizers.',
+  'Dans le départ, utilise':'Within the start, use','lorsqu’un membre t’a donné directement ses informations. Si son compte Discord existe déjà, sélectionne-le afin que l’inscription soit correctement rattachée à son identité.':'when a member has given you their information directly. If their Discord account already exists, select it so the entry is correctly linked to their identity.',
+  'Cette fonction est aussi disponible aux pilotes connectés ; l’organisateur garde en plus le droit de modifier toutes les inscriptions si une correction est nécessaire.':'This function is also available to signed-in drivers; organizers additionally retain the right to edit all entries when a correction is needed.',
+  'Un pilote peut proposer plusieurs catégories sur un même départ. Lorsqu’il rejoint, crée ou est affecté à un équipage, la catégorie de cet équipage devient la catégorie retenue et ses autres propositions pour ce départ sont retirées.':'A driver can enter several categories for the same start. When they join, create or are assigned to a crew, that crew’s category becomes the selected category and their other entries for that start are removed.',
+  'Dans chaque départ,':'For each start,','permet à l’organisateur de préparer un équipage même sans y être inscrit. Un pilote inscrit peut de son côté utiliser':'lets an organizer prepare a crew even without being entered in it. A registered driver can use','et en devient automatiquement responsable.':'and automatically becomes its owner.',
+  'L’organisateur peut toujours reprendre la main sur n’importe quel équipage si nécessaire.':'The organizer can always take over management of any crew if necessary.',
+  'Tu peux ajouter ou retirer les pilotes inscrits compatibles avec la catégorie de l’équipage, même si tu n’en es pas le responsable. Avant une intervention, vérifie leurs voitures souhaitées, leur éventuel coéquipier préféré et leurs heures de présence.':'You can add or remove registered drivers who match the crew category, even if you are not the crew owner. Before making a change, check their preferred cars, preferred teammate and availability.',
+  'Les pilotes peuvent aussi rejoindre eux-mêmes un équipage ouvert avec leur propre inscription.':'Drivers can also join an open crew themselves using their own entry.',
+  'Les pilotes encore disponibles restent visibles dans':'Drivers who are still available remain visible under','Utilise cette liste pour vérifier qu’aucun inscrit n’a été oublié et pour repérer les pilotes qui peuvent encore rejoindre ou créer un équipage.':'Use this list to make sure no registered driver has been forgotten and to identify drivers who can still join or create a crew.',
+  'Chaque équipage affiche la disponibilité de ses pilotes et une ligne de couverture de la course. Vérifie qu’il existe une présence suffisante sur toutes les périodes avant de considérer l’équipage comme terminé.':'Each crew shows driver availability and race coverage. Check that every period has sufficient coverage before considering the crew complete.',
+  'Le responsable de l’équipage peut changer cet état. L’organisateur peut également intervenir sur le statut de n’importe quel équipage.':'The crew owner can change this status. The organizer can also change the status of any crew.',
+  'Tu peux modifier ou supprimer n’importe quel équipage avant le départ. Retirer un pilote d’un équipage conserve son inscription : il redevient simplement disponible dans':'You can edit or delete any crew before the start. Removing a driver from a crew keeps their entry: they simply become available again under',
+  'Supprimer un équipage conserve également les inscriptions de ses pilotes. Le responsable d’un équipage dispose des mêmes actions de gestion sur son propre équipage.':'Deleting a crew also keeps its drivers’ entries. A crew owner has the same management actions for their own crew.',
+  'Une inscription créée par toi pour un autre pilote apparaît parmi les inscriptions que tu gères. Tu peux aussi modifier les inscriptions des autres pilotes en tant qu’organisateur, tant que le départ n’est pas verrouillé.':'An entry you create for another driver appears among the entries you manage. As an organizer, you can also edit other drivers’ entries while the start remains unlocked.',
+  'En tant qu’':'As an','tu disposes également des fonctions de gestion des membres et des actions réservées au rôle administrateur.':'you also have member-management functions and actions reserved for administrators.'
+}));
+
+const LEGAL_TEXT=new Map(Object.entries({
+  'Informations de confiance':'Trust information','Informations légales et confidentialité':'Legal and privacy information','Sommaire des informations légales':'Legal information contents',
+  'Endurance Manager est une application web gratuite destinée à organiser des courses d’endurance simracing : événements, disponibilités des pilotes, inscriptions, équipages et rôles d’organisation.':'Endurance Manager is a free web application for organizing sim-racing endurance events, driver availability, entries, crews and organizer roles.',
+  'Le service ne vend aucun produit, ne demande aucun paiement et ne propose aucun logiciel à télécharger. Il s’utilise directement dans le navigateur.':'The service sells no products, requires no payment and offers no software downloads. It runs directly in the browser.',
+  'La connexion utilise le système OAuth officiel de Discord. Endurance Manager demande uniquement l’autorisation':'Sign-in uses Discord’s official OAuth system. Endurance Manager requests only the',
+  'afin de connaître l’identifiant Discord et le nom d’affichage nécessaires à l’authentification.':'permission to obtain the Discord ID and display name required for authentication.',
+  'Endurance Manager ne demande, ne reçoit et ne stocke jamais ton mot de passe Discord.':'Endurance Manager never asks for, receives or stores your Discord password.',
+  'La saisie des identifiants Discord a lieu sur la page d’autorisation officielle de Discord.':'Discord credentials are entered only on Discord’s official authorization page.',
+  'Le service ne demande pas l’accès aux messages Discord, aux conversations privées ni à l’adresse e-mail du compte.':'The service does not request access to Discord messages, private conversations or the account email address.',
+  'site servi exclusivement en HTTPS ;':'site served exclusively over HTTPS;','cookies sensibles configurés avec':'sensitive cookies configured with','et':'and',
+  'jetons de session stockés sous forme hachée côté serveur ;':'session tokens stored as hashes on the server;','contrôle d’origine sur les actions d’écriture et limitation de débit ;':'origin checks on write actions and rate limiting;','validation serveur des données et requêtes SQL paramétrées ;':'server-side data validation and parameterized SQL queries;','Content Security Policy restrictive et blocage de l’intégration du site dans des iframes ;':'restrictive Content Security Policy and blocking of site embedding in iframes;','aucun JavaScript tiers chargé par les pages de l’application.':'no third-party JavaScript loaded by application pages.',
+  'Une politique de signalement technique est également publiée dans':'A technical vulnerability reporting policy is also published in',
+  'Endurance Manager est un projet communautaire indépendant. Les informations légales, la politique de confidentialité et les crédits des ressources utilisées sont publics.':'Endurance Manager is an independent community project. Legal information, the privacy policy and resource credits are public.',
+  'Pour signaler un problème technique ou de sécurité, tu peux utiliser le':'To report a technical or security issue, you can use the','suivi public des problèmes du projet sur GitHub':'project’s public issue tracker on GitHub',
+  'Pour les informations sur les responsables du site et l’hébergement, consulte les':'For information about the people responsible for the site and hosting, see the',
+  'Les cartes de circuits utilisées par Endurance Manager proviennent de':'The circuit maps used by Endurance Manager come from','Les fichiers ne sont pas revendiqués comme des créations d’Endurance Manager. Leur apparence est harmonisée à l’écran par des réglages de cadrage, de taille et de contraste propres à chaque circuit.':'The files are not claimed as Endurance Manager creations. Their on-screen appearance is harmonized using circuit-specific framing, size and contrast settings.',
+  'Les licences ci-dessous sont celles indiquées sur les fiches Wikimedia Commons au moment de leur sélection. Le lien « source » donne accès au fichier, à son auteur, à son historique et aux conditions complètes de réutilisation.':'The licences below are those listed on Wikimedia Commons when the files were selected. The “source” link provides access to the file, author, history and full reuse terms.',
+  'Une même carte peut être utilisée dans les espaces LMU et iRacing lorsqu’ils partagent le même circuit. « Circuit à préciser » utilise uniquement le pictogramme générique original d’Endurance Manager. Les cartes de circuits ne constituent pas des logos officiels des simulateurs, championnats ou circuits.':'The same map may be used in LMU and iRacing when they share the same circuit. “Circuit to be confirmed” uses only Endurance Manager’s original generic icon. Circuit maps are not official logos of simulators, championships or circuits.'
 }));
 
 const PATTERNS=[
+  [/^(\d+) inscrit(?:s)?$/u,([,n])=>`${n} driver${n==='1'?'':'s'}`],
   [/^(\d+) pilote(?:s)? inscrit(?:s)?$/u,([,n])=>`${n} registered driver${n==='1'?'':'s'}`],
   [/^(\d+) pilote(?:s)?$/u,([,n])=>`${n} driver${n==='1'?'':'s'}`],
+  [/^(\d+) équipage(?:s)? engagé(?:s)?$/u,([,n])=>`${n} crew${n==='1'?'':'s'} entered`],
   [/^(\d+) équipage(?:s)?$/u,([,n])=>`${n} crew${n==='1'?'':'s'}`],
   [/^(\d+) événement(?:s)?$/u,([,n])=>`${n} event${n==='1'?'':'s'}`],
   [/^(\d+) inscription(?:s)?$/u,([,n])=>`${n} entr${n==='1'?'y':'ies'}`],
   [/^(\d+) membre(?:s)?$/u,([,n])=>`${n} member${n==='1'?'':'s'}`],
+  [/^(\d+) erreur(?:s)?$/u,([,n])=>`${n} error${n==='1'?'':'s'}`],
   [/^(\d+) départ(?:s)?$/u,([,n])=>`${n} start${n==='1'?'':'s'}`],
   [/^(\d+) pilote(?:s)? · (\d+) équipage(?:s)?$/u,([,d,c])=>`${d} driver${d==='1'?'':'s'} · ${c} crew${c==='1'?'':'s'}`],
   [/^Départ (.+) · Départ passé$/u,([,v])=>`Start ${v} · Start passed`],
@@ -73,25 +192,44 @@ const PATTERNS=[
   [/^Inscription ajoutée par (.+)$/u,([,name])=>`Entry added by ${name}`],
   [/^Ajouter une catégorie · (.+)$/u,([,name])=>`Add a category · ${name}`],
   [/^Modifier l’inscription · (.+)$/u,([,name])=>`Edit entry · ${name}`],
-  [/^Prochain départ avec pilotes : (.+) à ([^·]+) ·$/u,([,date,time])=>`Next start with drivers: ${date} at ${time.trim()} ·`],
+  [/^Prochain départ avec pilotes : (.+) à ([^·]+) ·$/u,([,date,time])=>`Next start with registered drivers: ${date} at ${time.trim()} ·`],
   [/^Tous les départs ont eu lieu · (.+)$/u,([,date])=>`All starts have taken place · ${date}`],
-  [/^Plus tard en (.+)$/u,([,v])=>`Later in ${v}`]
+  [/^Plus tard en (.+)$/u,([,v])=>`Later in ${v}`],
+  [/^(\d{1,2})h(\d{2})?$/u,([,h,m])=>`${String(Number(h)).padStart(2,'0')}:${m||'00'}`],
+  [/^(\d+) pilote\(s\) disponible\(s\)$/u,([,n])=>`${n} available driver${n==='1'?'':'s'}`],
+  [/^Plan du (.+)$/u,([,name])=>`Map of ${name}`],
+  [/^(.+) · départ (.+)$/u,([,name,time])=>`${name} · start ${time}`],
+  [/^Rejoindre l’équipage (.+)$/u,([,name])=>`Join crew ${name}`],
+  [/^Quitter l’équipage (.+)$/u,([,name])=>`Leave crew ${name}`],
+  [/^Gérer l’équipage (.+)$/u,([,name])=>`Manage crew ${name}`],
+  [/^Supprimer l’équipage (.+)$/u,([,name])=>`Delete crew ${name}`],
+  [/^Marquer « (.+) » comme équipage complet et verrouiller sa composition \?$/u,([,name])=>`Mark “${name}” as complete and lock its lineup?`],
+  [/^Supprimer l’inscription de (.+) pour ce départ \?$/u,([,name])=>`Delete ${name}'s entry for this start?`],
+  [/^Quitter « (.+) » \? Ton inscription à la course sera conservée\.$/u,([,name])=>`Leave “${name}”? Your race entry will be kept.`],
+  [/^Supprimer « (.+) » \? Les inscriptions des pilotes seront conservées\.$/u,([,name])=>`Delete “${name}”? Driver entries will be kept.`],
+  [/^Supprimer « (.+) » et toutes ses inscriptions \? Cette suppression est définitive\.$/u,([,name])=>`Delete “${name}” and all its entries? This action is permanent.`],
+  [/^Tu as rejoint « (.+) »\.(?: Tu en es maintenant le responsable\.)?$/u,([,name])=>`You joined “${name}”.`],
+  [/^Tu as quitté « (.+) »\.$/u,([,name])=>`You left “${name}”.`],
+  [/^Inscription enregistrée · équipage « (.+) » rejoint\.$/u,([,name])=>`Entry saved · joined crew “${name}”.`],
+  [/^Ton inscription est bien enregistrée, mais tu n’as pas pu rejoindre l’équipage : (.+)$/u,([,message])=>`Your entry was saved, but you could not join the crew: ${message}`],
+  [/^Pilote affecté\. (\d+) autre\(s\) inscription\(s\) retirée\(s\) pour ce départ\.$/u,([,n])=>`Driver assigned. ${n} other entr${n==='1'?'y':'ies'} removed for this start.`],
+  [/^Cette action a échoué \((\d+)\)\.$/u,([,code])=>`This action failed (${code}).`],
+  [/^Page : (.+) · écran : (.+) · en ligne : (oui|non)$/u,([,page,viewport,online])=>`Page: ${page} · screen: ${viewport} · online: ${online==='oui'?'yes':'no'}`],
+  [/^Connexion au service impossible\. Diagnostic : (.+)$/u,([,detail])=>`Unable to connect to the service. Diagnostic: ${detail}`]
 ];
+
+const FR_PATTERNS=[[/^(\d+) pilote\(s\) disponible\(s\)$/u,([,n])=>`${n} pilote${n==='1'?'':'s'} disponible${n==='1'?'':'s'}`]];
 
 export function getLocale(){try{const value=globalThis.localStorage?.getItem(STORAGE_KEY);return SUPPORTED.has(value)?value:'fr';}catch{return'fr';}}
 export function setLocale(locale){const value=SUPPORTED.has(locale)?locale:'fr';try{globalThis.localStorage?.setItem(STORAGE_KEY,value);}catch{}return value;}
 export function localeTag(locale=getLocale()){return locale==='en'?'en-GB':'fr-FR';}
-export function translateTextForLocale(value,locale=getLocale()){
-  const source=String(value??'');if(locale!=='en'||!source.trim())return source;
-  const match=source.match(/^(\s*)([\s\S]*?)(\s*)$/u),leading=match?.[1]||'',core=match?.[2]||source,trailing=match?.[3]||'';
-  if(EN.has(core))return`${leading}${EN.get(core)}${trailing}`;
-  for(const[pattern,replacer]of PATTERNS){const found=core.match(pattern);if(found)return`${leading}${replacer(found)}${trailing}`;}
-  return source;
-}
-function translateTextNode(node){const parent=node.parentElement;if(!parent||parent.closest('[data-i18n-ignore],.account-name,script,style,code,pre,textarea'))return;const translated=translateTextForLocale(node.nodeValue,'en');if(translated!==node.nodeValue)node.nodeValue=translated;}
-function translateAttributes(element){if(!(element instanceof Element)||element.closest('[data-i18n-ignore]'))return;for(const name of['aria-label','title','placeholder','alt']){if(!element.hasAttribute(name))continue;const current=element.getAttribute(name),translated=translateTextForLocale(current,'en');if(translated!==current)element.setAttribute(name,translated);}}
-function translateTree(root){if(!root)return;if(root.nodeType===Node.TEXT_NODE){translateTextNode(root);return;}if(root.nodeType!==Node.ELEMENT_NODE&&root.nodeType!==Node.DOCUMENT_NODE)return;if(root.nodeType===Node.ELEMENT_NODE)translateAttributes(root);const walker=document.createTreeWalker(root,NodeFilter.SHOW_ELEMENT|NodeFilter.SHOW_TEXT);let node=walker.nextNode();while(node){if(node.nodeType===Node.TEXT_NODE)translateTextNode(node);else translateAttributes(node);node=walker.nextNode();}}
+function translateCore(core,locale){if(locale==='fr'){if(FR_NORMALIZE.has(core))return FR_NORMALIZE.get(core);for(const[pattern,replacer]of FR_PATTERNS){const found=core.match(pattern);if(found)return replacer(found);}return core;}if(EN.has(core))return EN.get(core);if(HELP_TEXT.has(core))return HELP_TEXT.get(core);if(LEGAL_TEXT.has(core))return LEGAL_TEXT.get(core);for(const[pattern,replacer]of PATTERNS){const found=core.match(pattern);if(found)return replacer(found);}return core;}
+export function translateTextForLocale(value,locale=getLocale()){const source=String(value??'');if(!source.trim())return source;const match=source.match(/^(\s*)([\s\S]*?)(\s*)$/u),leading=match?.[1]||'',core=match?.[2]||source,trailing=match?.[3]||'';const translated=translateCore(core,locale);return translated===core?source:`${leading}${translated}${trailing}`;}
+function translateTextNode(node,locale){const parent=node.parentElement;if(!parent||parent.closest('[data-i18n-ignore],.account-name,script,style,code,pre,textarea'))return;const translated=translateTextForLocale(node.nodeValue,locale);if(translated!==node.nodeValue)node.nodeValue=translated;}
+function translateAttributes(element,locale){if(!(element instanceof Element)||element.closest('[data-i18n-ignore]'))return;for(const name of['aria-label','title','placeholder','alt']){if(!element.hasAttribute(name))continue;const current=element.getAttribute(name),translated=translateTextForLocale(current,locale);if(translated!==current)element.setAttribute(name,translated);}}
+function translateTree(root,locale){if(!root)return;if(root.nodeType===Node.TEXT_NODE){translateTextNode(root,locale);return;}if(root.nodeType!==Node.ELEMENT_NODE&&root.nodeType!==Node.DOCUMENT_NODE)return;if(root.nodeType===Node.ELEMENT_NODE)translateAttributes(root,locale);const walker=document.createTreeWalker(root,NodeFilter.SHOW_ELEMENT|NodeFilter.SHOW_TEXT);let node=walker.nextNode();while(node){if(node.nodeType===Node.TEXT_NODE)translateTextNode(node,locale);else translateAttributes(node,locale);node=walker.nextNode();}}
 function installStyles(){if(document.getElementById('endurance-language-style'))return;const style=document.createElement('style');style.id='endurance-language-style';style.textContent='.language-toggle{position:relative;z-index:120;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;width:40px;height:40px;padding:0;border:1px solid rgba(88,113,118,.72);border-radius:11px;background:rgba(12,18,21,.92);color:#f4f7f6;box-shadow:0 8px 22px rgba(0,0,0,.18);font-size:20px;line-height:1;cursor:pointer}.language-toggle:hover,.language-toggle:focus-visible{border-color:rgba(113,211,216,.9);transform:translateY(-1px)}.account-bar>.language-toggle{margin-right:8px}.legal-header>.language-toggle{position:absolute;top:16px;right:16px}body>.language-toggle{position:fixed;top:12px;right:12px}@media(max-width:700px){.language-toggle{width:36px;height:36px;border-radius:10px;font-size:18px}.account-bar>.language-toggle{margin-right:6px}.legal-header>.language-toggle{top:18px;right:12px}}';document.head.append(style);}
 function mountToggle(locale){if(document.querySelector('[data-language-toggle]'))return;const button=document.createElement('button');button.type='button';button.className='language-toggle';button.dataset.languageToggle='true';button.dataset.i18nIgnore='true';button.textContent=locale==='en'?'🇫🇷':'🇬🇧';button.setAttribute('aria-label',locale==='en'?'Switch site to French':'Passer le site en anglais');button.title=locale==='en'?'Français':'English';button.addEventListener('click',()=>{setLocale(locale==='en'?'fr':'en');location.reload();});const accountBar=document.querySelector('.account-bar');if(accountBar)accountBar.prepend(button);else{const legalHeader=document.querySelector('.legal-header');if(legalHeader)legalHeader.append(button);else document.body.append(button);}}
-function initialiseBrowserI18n(){const locale=getLocale();document.documentElement.lang=locale;installStyles();mountToggle(locale);if(locale!=='en')return;document.title=translateTextForLocale(document.title,'en');translateTree(document.body);const observer=new MutationObserver(records=>{for(const record of records){if(record.type==='characterData')translateTextNode(record.target);else if(record.type==='attributes')translateAttributes(record.target);else for(const node of record.addedNodes)translateTree(node);}});observer.observe(document.body,{subtree:true,childList:true,characterData:true,attributes:true,attributeFilter:['aria-label','title','placeholder','alt']});}
+function installNativeDialogTranslation(locale){if(locale!=='en'||typeof globalThis.confirm!=='function'||globalThis.__enduranceTranslatedConfirm)return;const nativeConfirm=globalThis.confirm.bind(globalThis);globalThis.confirm=message=>nativeConfirm(translateTextForLocale(message,'en'));globalThis.__enduranceTranslatedConfirm=true;}
+function initialiseBrowserI18n(){const locale=getLocale();document.documentElement.lang=locale;installStyles();mountToggle(locale);installNativeDialogTranslation(locale);document.title=translateTextForLocale(document.title,locale);translateTree(document.body,locale);const observer=new MutationObserver(records=>{for(const record of records){if(record.type==='characterData')translateTextNode(record.target,locale);else if(record.type==='attributes')translateAttributes(record.target,locale);else for(const node of record.addedNodes)translateTree(node,locale);}});observer.observe(document.body,{subtree:true,childList:true,characterData:true,attributes:true,attributeFilter:['aria-label','title','placeholder','alt']});}
 if(typeof document!=='undefined'){if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',initialiseBrowserI18n,{once:true});else initialiseBrowserI18n();}
