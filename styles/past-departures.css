@@ -1,0 +1,58 @@
+/* Historique secondaire des départs déjà lancés dans un événement. */
+.past-departures-fold {
+  margin-top: 4px;
+  border-top: 1px solid #354245;
+}
+
+.past-departures-fold > summary {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 46px;
+  padding: 10px 6px 8px;
+  color: #aab8b9;
+  cursor: pointer;
+  list-style: none;
+  font-size: 15px;
+  font-weight: 900;
+  letter-spacing: .2px;
+}
+
+.past-departures-fold > summary::-webkit-details-marker { display: none; }
+.past-departures-fold > summary::before {
+  content: '›';
+  display: inline-block;
+  color: #869698;
+  font-size: 19px;
+  line-height: 1;
+  transform-origin: center;
+  transition: transform .15s ease;
+}
+.past-departures-fold[open] > summary::before { transform: rotate(90deg); }
+.past-departures-fold > summary small {
+  color: #839193;
+  font-size: 11.5px;
+  font-weight: 800;
+}
+
+.past-departures-list {
+  display: grid;
+  gap: 10px;
+  padding-top: 7px;
+}
+
+.departure-fold.is-past {
+  border-color: #303b3f;
+  background: #101618;
+}
+.departure-fold.is-past > summary { opacity: .92; }
+
+@media (max-width: 700px) {
+  .past-departures-fold > summary {
+    min-height: 42px;
+    padding: 9px 4px 7px;
+    font-size: 14px;
+  }
+  .past-departures-fold > summary small { font-size: 11px; }
+  .past-departures-list { gap: 8px; padding-top: 5px; }
+}
