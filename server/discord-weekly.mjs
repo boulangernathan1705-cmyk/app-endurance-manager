@@ -1,4 +1,4 @@
-import {buildWeeklyDiscordPayload, isInParisWeek, parisWeek} from './discord-weekly-format.mjs';
+import {buildWeeklyDiscordPayload, isDepartureRelevant, parisWeek} from './discord-weekly-format.mjs';
 
 const STATE_KEY = 'lmu-weekly-v1';
 const LOCK_SECONDS = 90;
@@ -24,10 +24,11 @@ async function loadSnapshot(env, timestamp) {
   for (const event of events) {
     const eventDepartures = parseJson(event.departures, []);
     if (!Array.isArray(eventDepartures)) continue;
+    const durationHours = Number(event.duration_hours) || 0;
     for (const departure of eventDepartures) {
       const startsAt = Number(departure?.startsAt);
-      if (!departure?.id || !Number.isFinite(startsAt) || !isInParisWeek(startsAt, week)) continue;
-      departures.push({eventId:event.id,eventName:event.name,circuit:event.circuit || '',durationHours:Number(event.duration_hours) || 0,departureId:departure.id,startsAt,crews:[]});
+      if (!departure?.id || !Number.isFinite(startsAt) || !isDepartureRelevant(startsAt, durationHours, week, timestamp)) continue;
+      departures.push({eventId:event.id,eventName:event.name,circuit:event.circuit || '',durationHours,departureId:departure.id,startsAt,crews:[]});
     }
   }
   departures.sort((a,b) => a.startsAt-b.startsAt || a.eventName.localeCompare(b.eventName,'fr'));
