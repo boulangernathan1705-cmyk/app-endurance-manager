@@ -78,6 +78,21 @@ test('language switch shows the current language, translates event counters and 
   expect(apiFailures).toEqual([]);
 });
 
+test('mobile interface stays compact without horizontal overflow across main pages', async ({page}) => {
+  await page.setViewportSize({width:390,height:844});
+  for (const path of ['/', '/lmu/', '/iracing/', '/members.html', '/help.html']) {
+    await openAndCheck(page, path);
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    expect(overflow, `${path} overflows horizontally`).toBeLessThanOrEqual(1);
+  }
+
+  await openAndCheck(page, '/lmu/');
+  const shell = await page.locator('.site-nav-shell').boundingBox();
+  expect(shell).not.toBeNull();
+  expect(shell.height).toBeLessThan(158);
+  await expect(page.locator('.page-title')).toBeVisible();
+});
+
 test('LMU space opens from home', async ({page}) => {
   await openAndCheck(page, '/');
   const link = page.locator('a[href="/lmu/"]');
