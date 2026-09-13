@@ -155,31 +155,88 @@ function currentDepartureEmbed(departure, appUrl, first, updatedAt) {
   return embed;
 }
 
-function futureDepartureValue(departure) {
+function eventTitleAndNote(eventName) {
+  const text = String(eventName ?? '').trim();
+  const match = text.match(/^(.*?)\s*\(([^)]*horaires?[^)]*)\)\s*$/i);
+  if (!match) return {title:clean(text),note:''};
+  const note = match[2].trim();
+  return {
+    title:clean(match[1]),
+    note:clean(note ? `${note.charAt(0).toUpperCase()}${note.slice(1)}` : '')
+  };
+}
+
+function compactDepartureLabel(timestamp) {
+  return departureLabel.format(timestamp).replace(' à ', ' — ');
+}
+
+function futureDepartureDetails(departure) {
   const blocks = departure.crews.map(crewText);
   if (departure.unassignedPilots?.length) {
     blocks.push(`📋 Pilotes inscrits non affectés\n${pilotLines(departure.unassignedPilots)}`);
   }
-  return cut(blocks.join('\n\n') || '\u200b', 1024);
+  return blocks.join('\n\n');
 }
 
-function futureDepartureField(departure) {
-  return {
-    name: cut(`🕐 ${departureLabel.format(departure.startsAt)} — ${clean(departure.eventName)}`, 256),
-    value: futureDepartureValue(departure),
-    inline: false
-  };
+function futureDepartureBlock(departure) {
+  const details = futureDepartureDetails(departure);
+  const heading = `🕐 **${clean(compactDepartureLabel(departure.startsAt))}**`;
+  return cut(details ? `${heading}\n${details}` : heading, 1024);
+}
+
+function groupFutureDepartures(departures) {
+  const groups = new Map();
+  for (const departure of departures) {
+    const key = departure.eventId || departure.eventName || 'event';
+    if (!groups.has(key)) groups.set(key,{eventName:departure.eventName,departures:[]});
+    groups.get(key).departures.push(departure);
+  }
+  return [...groups.values()];
+}
+
+function futureEventFields(departures) {
+  const fields = [];
+  for (const group of groupFutureDepartures(departures)) {
+    const {title,note} = eventTitleAndNote(group.eventName);
+    let firstChunk = true;
+    let chunk = note;
+
+    for (const departure of group.departures) {
+      const block = futureDepartureBlock(departure);
+      const candidate = chunk ? `${chunk}\n\n${block}` : block;
+      if (candidate.length > 1024 && chunk) {
+        fields.push({
+          name: cut(firstChunk ? `🏁 ${title}` : '↳ Suite',256),
+          value:cut(chunk,1024),
+          inline:false
+        });
+        firstChunk = false;
+        chunk = block;
+      } else {
+        chunk = candidate;
+      }
+    }
+
+    if (chunk) {
+      fields.push({
+        name: cut(firstChunk ? `🏁 ${title}` : '↳ Suite',256),
+        value:cut(chunk,1024),
+        inline:false
+      });
+    }
+  }
+  return fields;
 }
 
 function futureDepartureEmbeds(departures, periodLabel, appUrl, first, updatedAt) {
+  const allFields = futureEventFields(departures);
   const embeds = [];
-  for (let offset = 0; offset < departures.length; offset += 25) {
-    const fields = departures.slice(offset, offset + 25).map(futureDepartureField);
+  for (let offset = 0; offset < allFields.length; offset += 25) {
     const embed = {
       title: cut(`📝 Départs disponibles — ${periodLabel || 'semaine à venir'}`, 256),
       description: offset === 0 ? 'Tous les horaires encore disponibles pour les inscriptions.' : 'Suite des horaires disponibles.',
       color: 0x2563eb,
-      fields
+      fields:allFields.slice(offset,offset + 25)
     };
     if (appUrl) embed.url = appUrl;
     if (first && embeds.length === 0) {
