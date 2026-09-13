@@ -137,7 +137,7 @@ test('quand la semaine est terminée le récap affiche tous les départs de la p
   assert.match(snapshot.periodLabel,/14 septembre/);
 });
 
-test('le message affiche les horaires seuls tant qu’aucun équipage n’est inscrit puis détaille les équipages', () => {
+test('le message regroupe les horaires d’une même endurance avec une ligne d’écart et détaille les équipages', () => {
   const timestamp = Date.parse('2026-09-18T10:00:00Z');
   const current = {
     eventId:uuid,
@@ -158,7 +158,7 @@ test('le message affiche les horaires seuls tant qu’aucun équipage n’est in
   };
   const futureEmpty = {
     eventId:futureEventUuid,
-    eventName:'4h SILVERSTONE',
+    eventName:'4h SILVERSTONE (horaires non définis par LMU)',
     circuit:'silverstone',
     durationHours:4,
     departureId:futureDepartureUuid,
@@ -190,12 +190,16 @@ test('le message affiche les horaires seuls tant qu’aucun équipage n’est in
   assert.match(payload.embeds[0].title,/Course en cours/);
   assert.match(payload.embeds[0].fields[0].value,/👤 Nathan/);
   assert.match(payload.embeds[1].title,/Départs disponibles/);
-  assert.equal(payload.embeds[1].fields.length,2);
-  assert.match(payload.embeds[1].fields[0].name,/vendredi 18 septembre à 14:00/i);
-  assert.equal(payload.embeds[1].fields[0].value,'\u200b');
-  assert.match(payload.embeds[1].fields[1].name,/vendredi 18 septembre à 18:00/i);
-  assert.match(payload.embeds[1].fields[1].value,/Mrt blé/);
-  assert.match(payload.embeds[1].fields[1].value,/👤 Etienne\\_48/);
+  assert.equal(payload.embeds[1].fields.length,1);
+  assert.match(payload.embeds[1].fields[0].name,/🏁 4h SILVERSTONE/);
+  assert.doesNotMatch(payload.embeds[1].fields[0].name,/horaires non définis/i);
+  assert.match(payload.embeds[1].fields[0].value,/Horaires non définis par LMU/);
+  assert.match(payload.embeds[1].fields[0].value,/vendredi 18 septembre — 14:00/i);
+  assert.match(payload.embeds[1].fields[0].value,/vendredi 18 septembre — 18:00/i);
+  assert.match(payload.embeds[1].fields[0].value,/\n\n🕐/);
+  assert.match(payload.embeds[1].fields[0].value,/Mrt blé/);
+  assert.match(payload.embeds[1].fields[0].value,/👤 Etienne\\_48/);
+  assert.equal((JSON.stringify(payload.embeds[1]).match(/4h SILVERSTONE/g) || []).length,1);
   assert.doesNotMatch(payload.embeds[1].description,/pilotes? inscrits?/i);
 });
 
