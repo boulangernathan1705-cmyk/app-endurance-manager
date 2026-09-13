@@ -14,9 +14,9 @@ test('la création d’équipage propose d’inscrire un pilote non encore inscr
   const script=read('front/crew-builder-registration-shortcut.mjs');
   const css=read('styles/crew-builder-registration-shortcut.css');
   const html=read('game.html');
-  assert.match(script,/data\.action='new-registration'/);
-  assert.match(script,/data\.departure=activeBuilder\.departureId/);
-  assert.match(script,/textContent='Inscrire un autre pilote'/);
+  assert.match(script,/button\.dataset\.action='new-registration'/);
+  assert.match(script,/button\.dataset\.departure=activeBuilder\.departureId/);
+  assert.match(script,/button\.textContent='Inscrire un autre pilote'/);
   assert.match(script,/activeBuilder\.mode!=='create'/);
   assert.match(css,/\.crew-builder-register-pilot/);
   assert.match(html,/crew-builder-registration-shortcut\.mjs\?v=1/);
