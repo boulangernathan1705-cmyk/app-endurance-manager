@@ -1,6 +1,7 @@
 import {catalogForGame} from '../shared/catalog.mjs';
 
 const DAY_MS = 86_400_000;
+const HOUR_MS = 3_600_000;
 const TIME_ZONE = 'Europe/Paris';
 const catalog = catalogForGame('lmu');
 const circuitNames = new Map(catalog.circuits.map(circuit => [circuit.id, circuit.name]));
@@ -73,6 +74,13 @@ export function isInParisWeek(timestamp, week) {
   return day >= week.monday && day <= week.sunday;
 }
 
+export function isDepartureRelevant(startsAt, durationHours, week, now = Date.now()) {
+  if (!Number.isFinite(startsAt) || !isInParisWeek(startsAt, week)) return false;
+  const hours = Number(durationHours);
+  const endAt = startsAt + (Number.isFinite(hours) && hours > 0 ? hours * HOUR_MS : 0);
+  return startsAt >= now || endAt > now;
+}
+
 function clean(value) {
   return String(value ?? '').replace(/[\\`*_~|>]/g, '\\$&').trim();
 }
@@ -125,8 +133,8 @@ export function buildWeeklyDiscordPayload(snapshot, appUrl, updatedAt = Date.now
     return {
       content,
       embeds: [{
-        title: 'Aucune endurance LMU cette semaine',
-        description: 'Aucun départ LMU n’est programmé entre lundi et dimanche.',
+        title: 'Aucune endurance LMU à venir cette semaine',
+        description: 'Aucun départ LMU à venir ou encore en cours cette semaine.',
         color: 0x6b7280,
         footer: {text: 'Endurance Manager • mise à jour automatique'},
         timestamp: new Date(updatedAt).toISOString()
