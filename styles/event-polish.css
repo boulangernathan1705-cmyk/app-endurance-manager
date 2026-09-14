@@ -269,3 +269,36 @@
   .ux-summary-registration-actions>button{padding-inline:3px!important;font-size:9.5px!important}
   .crew-self-actions .crew-delete-button{margin-left:0!important}
 }
+
+/* Desktop departure summary: reserve separate columns for metadata and the three actions.
+   This overrides the older compact 170px action slot from layout-polish.css. */
+@media (min-width:761px){
+  .departure-fold[id^="departure-"]>summary{
+    grid-template-columns:34px minmax(220px,1fr) max-content minmax(420px,520px)!important;
+  }
+  .departure-fold[id^="departure-"]>summary>.fold-meta{
+    grid-column:3!important;
+    grid-row:1 / span 2!important;
+    justify-self:end!important;
+    padding-right:4px;
+    white-space:nowrap;
+  }
+  .departure-fold[id^="departure-"]>summary>.ux-summary-registration-actions{
+    grid-column:4!important;
+    grid-row:1 / span 2!important;
+    justify-self:end!important;
+    width:100%!important;
+    min-width:0!important;
+    max-width:520px!important;
+    margin:0!important;
+  }
+}
+
+@media (min-width:761px) and (max-width:1100px){
+  .departure-fold[id^="departure-"]>summary{
+    grid-template-columns:34px minmax(170px,1fr) max-content minmax(360px,440px)!important;
+  }
+  .departure-fold[id^="departure-"]>summary>.ux-summary-registration-actions{
+    max-width:440px!important;
+  }
+}
