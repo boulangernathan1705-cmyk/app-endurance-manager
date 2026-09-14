@@ -1,4 +1,4 @@
-import {app,state,esc,button,carPreferenceChoices,registrationCarLabel,renderAvailabilityTimeline,notifyRender,logo,categories} from './core.mjs';
+import {state,esc,button,carPreferenceChoices,registrationCarLabel,renderAvailabilityTimeline,notifyRender,logo,categories} from './core.mjs';
 import {getLocale} from '../i18n.mjs';
 
 export function ownRegistrations(departure) { return departure.availability.filter(reg => reg.mine); }

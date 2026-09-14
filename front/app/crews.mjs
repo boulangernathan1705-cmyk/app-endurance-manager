@@ -1,4 +1,4 @@
-import {state,esc,button,logo,registrationCarLabel,renderAvailabilityTimeline,crewColorClass,coversHour,pilotCount,api} from './core.mjs';
+import {state,esc,button,logo,renderAvailabilityTimeline,crewColorClass,coversHour,pilotCount,api} from './core.mjs';
 import {renderRegistration} from './registration.mjs';
 
 function contentSummary(title,count){return `<summary class="ux-content-accordion-summary"><span class="ux-content-accordion-title">${esc(title)}</span><span class="ux-content-accordion-count">${count}</span><span class="ux-content-accordion-chevron" aria-hidden="true">›</span></summary>`;}
@@ -71,8 +71,6 @@ export function renderPilots(event,departure,options={}){
     <details class="ux-course-pilots-accordion">${contentSummary('Pilotes sans équipage',pilotCount(unassigned))}<div class="ux-course-pilots-body">${pilots}${unavailableHtml}</div></details>
   </div></div>`;
 }
-
-export function renderCrews(event,departure,options={}){return renderPilots(event,departure,options);}
 
 export async function updateCrewState(select){
   const event=state.events.find(item=>item.id===state.currentEventId);const departure=event?.departures.find(item=>item.id===select.dataset.departure);const crew=departure?.crews.find(item=>item.id===select.dataset.crewId);if(!crew)throw Error('Équipage introuvable. Actualise la page.');if(!crew.canManage)throw Error('Tu n’as pas l’autorisation de modifier cet équipage.');const locked=select.value==='locked';if(locked===!!crew.locked)return;if(locked&&!confirm(`Marquer « ${crew.name} » comme équipage complet et verrouiller sa composition ?`)){select.value=crew.locked?'locked':'open';return;}select.disabled=true;try{await api(`/api/crews/${crew.id}`,'PATCH',{locked,version:crew.version});state.crewManagementOpen.add(crew.id);}finally{if(select.isConnected)select.disabled=false;}
