@@ -19,19 +19,22 @@
     margin-right: 0;
   }
 
-  /* Keep the three departure actions on one desktop row when crew creation is available. */
-  .departure-fold > summary > .ux-summary-registration-actions:has(> .ux-summary-create-crew) {
+  /* Explicit three-action state: no :has() dependency and no desktop wrapping. */
+  .departure-fold > summary > .ux-summary-registration-actions.is-three-actions {
     display: grid !important;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    width: clamp(300px, 36vw, 450px);
-    min-width: 300px;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 8px !important;
+    width: clamp(420px, 34vw, 520px) !important;
+    min-width: 420px !important;
+    max-width: 520px !important;
     flex-wrap: nowrap !important;
   }
 
-  .departure-fold > summary > .ux-summary-registration-actions:has(> .ux-summary-create-crew) > button {
+  .departure-fold > summary > .ux-summary-registration-actions.is-three-actions > button {
     width: 100% !important;
     min-width: 0 !important;
     max-width: none !important;
+    margin: 0 !important;
     white-space: normal !important;
   }
 }
