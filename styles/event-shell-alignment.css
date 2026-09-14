@@ -18,6 +18,22 @@
     margin-left: auto;
     margin-right: 0;
   }
+
+  /* Keep the three departure actions on one desktop row when crew creation is available. */
+  .departure-fold > summary > .ux-summary-registration-actions:has(> .ux-summary-create-crew) {
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    width: clamp(300px, 36vw, 450px);
+    min-width: 300px;
+    flex-wrap: nowrap !important;
+  }
+
+  .departure-fold > summary > .ux-summary-registration-actions:has(> .ux-summary-create-crew) > button {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    white-space: normal !important;
+  }
 }
 
 .event-actions-toolbar {
