@@ -19,8 +19,10 @@
     margin-right: 0;
   }
 
-  /* Explicit three-action state: no :has() dependency and no desktop wrapping. */
-  .departure-fold > summary > .ux-summary-registration-actions.is-three-actions {
+  /* Keep all three departure actions on one desktop row.
+     The :has() fallback also covers a browser still running the previous JS module. */
+  .departure-fold > summary > .ux-summary-registration-actions.is-three-actions,
+  .departure-fold > summary > .ux-summary-registration-actions:has(> .ux-summary-create-crew) {
     display: grid !important;
     grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
     gap: 8px !important;
@@ -30,7 +32,8 @@
     flex-wrap: nowrap !important;
   }
 
-  .departure-fold > summary > .ux-summary-registration-actions.is-three-actions > button {
+  .departure-fold > summary > .ux-summary-registration-actions.is-three-actions > button,
+  .departure-fold > summary > .ux-summary-registration-actions:has(> .ux-summary-create-crew) > button {
     width: 100% !important;
     min-width: 0 !important;
     max-width: none !important;
