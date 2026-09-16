@@ -225,6 +225,7 @@
     margin: 0 !important;
     padding-inline: 3px !important;
     font-size: 10px !important;
+    white-space: normal !important;
   }
 
   .ux-content-accordion-summary {
