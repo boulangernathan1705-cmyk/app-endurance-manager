@@ -1,11 +1,12 @@
 import {app,state,api,load,showError,countdown,CARS} from './core.mjs';
-import {renderNav,renderHome} from './home-view.mjs?v=4-organizations';
-import {renderEvent} from './event-view.mjs?v=10-organizations';
+import {renderNav,renderHome} from './home-view.mjs?v=5-multi-filter';
+import {renderEvent} from './event-view.mjs?v=11-multi-filter';
 import {renderEventForm,departureFields,updateRemoveButtons} from './event-form.mjs';
-import {renderMyEntries} from './entries-view.mjs?v=3-organizations';
+import {renderMyEntries} from './entries-view.mjs?v=4-audiences';
 import {refresh,refreshAfterSave} from './refresh.mjs';
-import {draftFor,registrationDraft,ownRegistrations,rerenderRegistrationSection,submitRegistration} from './registration.mjs?v=3-organizations';
-import {updateCrewState} from './crews.mjs?v=8-one-page-compact';
+import {draftFor,registrationDraft,ownRegistrations,rerenderRegistrationSection,submitRegistration} from './registration.mjs?v=4-audiences';
+import {updateCrewState} from './crews.mjs?v=9-audiences';
+import {GENERAL_AUDIENCE,defaultRegistrationAudienceIds,registrationAudienceIds} from './organization-context.mjs?v=2-multi-filter';
 
 async function submitEvent(form){
   const data={name:form.elements.eventName.value.trim(),durationHours:Number(form.elements.eventDuration.value),eventType:form.elements.eventType.value,circuit:form.elements.eventCircuit.value,categories:[...form.querySelectorAll('[name="eventCategory"]:checked')].map(input=>input.value),departures:[...form.querySelectorAll('.departure-field')].map(row=>({id:row.dataset.id||undefined,date:row.querySelector('[name="date"]').value,time:row.querySelector('[name="time"]').value})),version:state.editingEvent?.version};
@@ -17,13 +18,21 @@ async function submitEvent(form){
 
 function beginCrewJoin(event,departure,crew){
   if(!state.user)throw Error('Connecte-toi avec Discord pour rejoindre un équipage.');
-  const assigned=new Set((departure.crews||[]).flatMap(item=>item.registrationIds||[]));
-  const source=ownRegistrations(departure).find(reg=>reg.status!=='unavailable'&&!assigned.has(reg.id));
+  const crewAudience=crew.organizationId||GENERAL_AUDIENCE;
+  const own=ownRegistrations(departure).filter(reg=>reg.status!=='unavailable'&&!reg.engaged);
+  const matching=own.find(reg=>reg.category===crew.category);
+  const source=matching||own[0]||null;
   state.pendingCrewJoin={eventId:event.id,departureId:departure.id,crewId:crew.id};
   state.selectedDepartureId=departure.id;
-  state.drafts[departure.id]=source
-    ? {...registrationDraft(source),category:crew.category,cars:[],carAny:false,id:null,version:null,mode:'category',forOther:false}
-    : {name:state.user.name?.slice(0,30)||state.pilotName,status:'',preferredPilot:'',forOther:false,participantUserId:null,participantId:null,category:crew.category,cars:[],carAny:false,id:null,version:null,mode:'pilot'};
+  if(matching){
+    const draft=registrationDraft(matching);
+    draft.audienceIds=[...new Set([...registrationAudienceIds(matching),crewAudience])];
+    state.drafts[departure.id]=draft;
+  }else{
+    state.drafts[departure.id]=source
+      ? {...registrationDraft(source),category:crew.category,cars:[],carAny:false,id:null,version:null,mode:'category',forOther:false,audienceIds:[...new Set([...registrationAudienceIds(source),crewAudience])]}
+      : {name:state.user.name?.slice(0,30)||state.pilotName,status:'',preferredPilot:'',forOther:false,participantUserId:null,participantId:null,category:crew.category,cars:[],carAny:false,id:null,version:null,mode:'pilot',audienceIds:[crewAudience]};
+  }
   state.registrationOpen.add(departure.id);
   renderEvent();
   document.getElementById(`departure-${departure.id}`)?.scrollIntoView({block:'start',behavior:'smooth'});
@@ -63,7 +72,7 @@ async function perform(action,target){
     case 'close-registration': if(state.pendingCrewJoin?.departureId===target.dataset.departure)state.pendingCrewJoin=null;state.registrationOpen.delete(target.dataset.departure); renderEvent(); break;
     case 'new-registration': {
       state.pendingCrewJoin=null;state.selectedDepartureId=target.dataset.departure; const departure=event.departures.find(item=>item.id===target.dataset.departure); const categoryMode=target.dataset.mode==='category'; const existing=departure.availability.find(reg=>reg.id===target.dataset.registration)||ownRegistrations(departure)[0];
-      state.drafts[departure.id]={...(categoryMode&&existing?registrationDraft(existing):{name:'',status:'',preferredPilot:'',forOther:!!state.user,participantUserId:null}),category:'',cars:[],carAny:false,id:null,version:null,mode:categoryMode?'category':'pilot'}; state.registrationOpen.add(departure.id); renderEvent(); (document.querySelector(`[name="participant"][data-departure="${departure.id}"]`)||document.querySelector(`[name="pilotName"][data-departure="${departure.id}"]`))?.focus(); break;
+      state.drafts[departure.id]={...(categoryMode&&existing?registrationDraft(existing):{name:'',status:'',preferredPilot:'',forOther:!!state.user,participantUserId:null,audienceIds:defaultRegistrationAudienceIds(state)}),category:'',cars:[],carAny:false,id:null,version:null,mode:categoryMode?'category':'pilot'}; state.registrationOpen.add(departure.id); renderEvent(); (document.querySelector(`[name="participant"][data-departure="${departure.id}"]`)||document.querySelector(`[name="pilotName"][data-departure="${departure.id}"]`))?.focus(); break;
     }
     case 'edit-registration': { state.pendingCrewJoin=null; const departure=event.departures.find(item=>item.id===target.dataset.departure),reg=departure.availability.find(item=>item.id===target.dataset.id); if(!reg?.canEdit)throw Error('Tu n’as pas l’autorisation de modifier cette inscription.'); state.selectedDepartureId=departure.id; state.drafts[departure.id]=registrationDraft(reg); state.registrationOpen.add(departure.id); state.eventSection='race'; renderEvent(); break; }
     case 'availability': {
@@ -100,7 +109,7 @@ async function perform(action,target){
     case 'delete-event': if(!confirm(`Supprimer « ${event.name} » et toutes ses inscriptions ? Cette suppression est définitive.`))return;await api(`/api/events/${event.id}`,'DELETE',{version:event.version});state.page='home';await refreshAfterSave('Événement supprimé.');break;
     case 'my-entries': await load();renderNav();renderMyEntries();break;
     case 'guest-link': state.recoveryLink=(await api('/api/guest/link','POST')).link;state.page==='event'?renderEvent():renderHome();break;
-    case 'copy-link': try{await navigator.clipboard.writeText(state.recoveryLink);target.textContent='Lien copié';}catch{document.getElementById('personalLink')?.select();throw Error('Copie le lien sélectionné avec Ctrl+C.');}break;
+    case 'copy-link': try{await navigator.clipboard.writeText(state.recoveryLink);target.textContent='Lien copié';}catch{document.getElementById('personalLink')?.select();throw Error('Copie le lien sélectionné avec Ctrl+C.');break;}
     case 'hide-link': state.recoveryLink='';target.closest('.recovery-panel')?.remove();break;
   }
 }
