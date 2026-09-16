@@ -40,7 +40,8 @@ test('les fixtures de dev restent isolées et la nouvelle interface est versionn
   const html=read('game.html');
   const app=read('app.js');
   assert.match(seed,/https:\/\/app\.endurance-manager\.workers\.dev/);
-  assert.match(seed,/new URL\(request\.url\)\.origin!==DEV_ORIGIN/);
+  assert.match(seed,/const url=new URL\(request\.url\)/);
+  assert.match(seed,/if\(url\.origin!==DEV_ORIGIN\)return/);
   assert.match(seed,/name:'FMT'/);
   assert.match(seed,/name:'Endurance Community'/);
   assert.match(html,/paddock-network\.css\?v=1-event-first/);
