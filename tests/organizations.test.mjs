@@ -42,7 +42,7 @@ test('0019 convertit l’ancien contexte unique en audience sans dupliquer l’i
   db.exec("INSERT INTO registrations(id,event_id,departure_id,participant_id,created_at,organization_id) VALUES('r1','event','departure','pilot',123,'team-a')");
   db.exec(migration19);
   const registration=db.prepare("SELECT organization_id FROM registrations WHERE id='r1'").get();
-  const audiences=db.prepare("SELECT audience_key,organization_id FROM registration_audiences WHERE registration_id='r1'").all();
+  const audiences=db.prepare("SELECT audience_key,organization_id FROM registration_audiences WHERE registration_id='r1'").all().map(row=>({...row}));
   assert.equal(registration.organization_id,null);
   assert.deepEqual(audiences,[{audience_key:'team-a',organization_id:'team-a'}]);
 });
