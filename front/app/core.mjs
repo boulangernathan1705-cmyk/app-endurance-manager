@@ -2,7 +2,7 @@ import {CATEGORIES, EVENT_TYPES, CIRCUITS, categories, CARS, gameForEvent} from 
 import {countdown, dateLabel, groupEvents} from '../schedule.mjs';
 import {renderAvailabilityTimeline} from '../timeline.mjs';
 import {circuitMapConfig, circuitMapSource} from '../../shared/circuit-maps.mjs';
-import {defaultOrganizationId,hasOrganization} from './organization-context.mjs?v=1';
+import {normalizeAudienceFilter} from './organization-context.mjs?v=2-multi-filter';
 
 export {CATEGORIES, EVENT_TYPES, CIRCUITS, categories, CARS, countdown, dateLabel, groupEvents, renderAvailabilityTimeline};
 
@@ -14,7 +14,7 @@ export const state = {
   events:[], user:null, discordReady:false, currentEventId:null, page:'home', editingEvent:null,
   drafts:{}, recoveryLink:'', busy:false, participants:[], flash:'', eventFilter:'upcoming',
   selectedDepartureId:null, eventSection:'race', pilotName:'', registrationOpen:new Set(), crewManagementOpen:new Set(),
-  pendingCrewJoin:null, organizations:{team:null,communities:[],discoverableCommunities:[]}, selectedOrganizationId:null
+  pendingCrewJoin:null, organizations:{team:null,communities:[],discoverableCommunities:[]}, visibleAudienceIds:new Set(['general'])
 };
 try { state.pilotName = localStorage.getItem('fmt_pilot_name') || ''; } catch {}
 
@@ -134,11 +134,8 @@ export async function load() {
   state.discordReady=session.discordReady;
   state.organizations=session.organizations||{team:null,communities:[],discoverableCommunities:[]};
   let stored=null;
-  try{stored=localStorage.getItem('endurance_organization_context');}catch{}
-  if(stored==='general')state.selectedOrganizationId=null;
-  else if(stored&&hasOrganization(state.organizations,stored))state.selectedOrganizationId=stored;
-  else if(!hasOrganization(state.organizations,state.selectedOrganizationId))state.selectedOrganizationId=defaultOrganizationId(state.organizations);
-  else if(!stored&&state.selectedOrganizationId==null)state.selectedOrganizationId=defaultOrganizationId(state.organizations);
+  try{stored=JSON.parse(localStorage.getItem('endurance_audience_filter')||'null');}catch{}
+  state.visibleAudienceIds=normalizeAudienceFilter(state.organizations,stored||state.visibleAudienceIds);
   state.events=(Array.isArray(result.events)?result.events:[]).filter(event => gameForEvent(event) === activeGame);
   state.participants=state.user ? (await api('/api/participants')).participants : [];
   if (state.user && !state.pilotName) state.pilotName=state.user.name.slice(0,30);
