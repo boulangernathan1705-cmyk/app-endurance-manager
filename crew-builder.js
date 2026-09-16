@@ -1,6 +1,7 @@
 import {CARS} from './shared/catalog.mjs';
 import {dateLabel} from './front/schedule.mjs';
 import {renderAvailabilityTimeline} from './front/timeline.mjs';
+import {scopeDeparture,organizationChoices,organizationById,organizationShortLabel} from './front/app/organization-context.mjs?v=2-multi-filter';
 
 const app = document.getElementById('app');
 let eventsCache = null;
@@ -42,6 +43,10 @@ function currentEventId() {
   return app?.querySelector('[data-event-id]')?.dataset.eventId || '';
 }
 
+function currentOrganizationId() {
+  return app?.querySelector('[data-event-id]')?.dataset.crewDefaultOrganization || null;
+}
+
 function futureDepartures(event) {
   return (event?.departures || []).filter(departure => Number(departure.startsAt) > Date.now());
 }
@@ -55,6 +60,12 @@ function defaultDeparture(event, preferredId = '') {
   const future = futureDepartures(event);
   const visibleId = preferredId || currentOpenDepartureId();
   return future.find(departure => departure.id === visibleId) || future[0] || null;
+}
+
+function canOrganize(session,organizationId){
+  if(!organizationId)return ['admin','organizer'].includes(session?.user?.role);
+  const organization=organizationById(session?.organizations||{},organizationId);
+  return !!organization&&['owner','manager'].includes(organization.role);
 }
 
 function registrationCarLabel(registration) {
@@ -73,7 +84,7 @@ function assignedIds(departure, exceptCrewId = null) {
 
 function ownAvailableRegistrations(departure) {
   const assigned = assignedIds(departure);
-  return (departure?.availability || []).filter(registration => registration.mine && registration.status !== 'unavailable' && !assigned.has(registration.id));
+  return (departure?.availability || []).filter(registration => registration.mine && registration.status !== 'unavailable' && !assigned.has(registration.id) && !registration.engaged);
 }
 
 function availableCandidates(event, departure, category, editingCrewId = null) {
@@ -86,10 +97,12 @@ function availableCandidates(event, departure, category, editingCrewId = null) {
       .filter(registration => assignedRegistrationIds.has(registration.id) && registration.participantId)
       .map(registration => registration.participantId)
   );
+  const currentIds=new Set(builderState?.originalRegistrationIds||[]);
   const seen = new Set();
   return registrations.filter(registration => {
     if (registration.status === 'unavailable' || registration.category !== category) return false;
     if (assignedRegistrationIds.has(registration.id)) return false;
+    if (registration.engaged && !currentIds.has(registration.id)) return false;
     if (registration.participantId && assignedParticipants.has(registration.participantId)) return false;
     const key = registration.participantId || registration.id;
     if (seen.has(key)) return false;
@@ -144,12 +157,15 @@ function createCategories(event, departure) {
 
 function panelMarkup(event) {
   const editMode = builderState.mode === 'edit';
-  const departure = futureDepartures(event).find(item => item.id === builderState.departureId);
+  const rawDeparture = futureDepartures(event).find(item => item.id === builderState.departureId);
+  const departure = scopeDeparture(rawDeparture,builderState.organizationId);
   if (!departure) return `<section class="crew-builder-panel"><div class="crew-builder-heading"><div><span class="creation-kicker">FORMATION D’ÉQUIPAGE</span><h2>Aucun départ disponible</h2></div><button type="button" class="secondary-button" data-crew-builder-cancel>Fermer</button></div><p class="creation-help">Ce départ est déjà passé.</p></section>`;
   const categories = editMode ? event.categories : createCategories(event,departure);
   if (!categories.includes(builderState.category)) builderState.category = categories[0] || '';
   if (!(CARS[builderState.category] || []).includes(builderState.car)) builderState.car = '';
-  if (!builderState.category) return `<section class="crew-builder-panel"><div class="crew-builder-heading"><div><span class="creation-kicker">FORMATION D’ÉQUIPAGE</span><h2>Inscription nécessaire</h2><p>Inscris-toi d’abord sur ce départ pour pouvoir créer ton équipage.</p></div><button type="button" class="secondary-button" data-crew-builder-cancel>Fermer</button></div></section>`;
+  const choices=organizationChoices(builderState.organizations||{});
+  const organizationName=organizationShortLabel(builderState.organizations||{},builderState.organizationId);
+  if (!builderState.category) return `<section class="crew-builder-panel"><div class="crew-builder-heading"><div><span class="creation-kicker">FORMATION D’ÉQUIPAGE</span><h2>Disponibilité à partager</h2><p>Tu n’as pas de disponibilité utilisable dans <strong>${esc(organizationName)}</strong> pour ce départ. Choisis un autre espace ou ajoute cet espace à ton inscription.</p></div><button type="button" class="secondary-button" data-crew-builder-cancel>Fermer</button></div>${!editMode?`<label class="crew-builder-organization-quick">Créer l’équipage pour<select name="builderOrganization" data-crew-builder-organization>${choices.map(choice=>`<option value="${esc(choice.id)}" ${choice.id===(builderState.organizationId||'')?'selected':''}>${esc(choice.name)}</option>`).join('')}</select></label>`:''}</section>`;
   const candidates = availableCandidates(event, departure, builderState.category, editMode ? builderState.crewId : null);
   const ownerRegistration = !builderState.manager && !editMode ? candidates.find(reg => reg.mine) : null;
   if (ownerRegistration) builderState.ownerRegistrationId = ownerRegistration.id;
@@ -161,10 +177,8 @@ function panelMarkup(event) {
   const categoryDisabled = builderState.locked || memberCategoryLocked;
   const title = editMode ? `Gérer « ${esc(builderState.name || 'Équipage')} »` : builderState.manager ? 'Créer un nouvel équipage' : 'Créer mon équipage';
   const description = editMode
-    ? 'Modifie le nom, la voiture et la composition. Les organisateurs gardent toujours un droit de supervision.'
-    : builderState.manager
-      ? 'Crée l’équipage sur ce départ puis choisis les pilotes déjà inscrits.'
-      : 'Tu deviens responsable de l’équipage et tu y es ajouté automatiquement.';
+    ? `Cet équipage reste dans ${esc(organizationName)}. Modifie son nom, sa voiture et sa composition.`
+    : `Choisis l’espace auquel appartient l’équipage. Seuls les pilotes ayant partagé leur disponibilité avec ${esc(organizationName)} sont proposés.`;
   const lockedNote = builderState.locked ? '<p class="crew-builder-warning">Cet équipage est marqué complet. Rouvre-le depuis sa carte avant de modifier sa composition.</p>' : '';
   const categoryNote = memberCategoryLocked && !builderState.locked ? '<p class="crew-builder-help">Pour changer de catégorie, retire d’abord tous les pilotes de cet équipage.</p>' : '';
 
@@ -173,19 +187,20 @@ function panelMarkup(event) {
     <form class="crew-builder-form" data-crew-builder-form>
       <section class="crew-builder-card"><div class="crew-builder-card-title"><span>01</span><div><h3>Équipage</h3><p>${esc(dateLabel(departure))} · départ ${esc(departure.time)}</p></div></div>
         <div class="crew-builder-fields">
+          <label>Créer pour<select name="builderOrganization" ${editMode?'disabled':''}>${choices.map(choice=>`<option value="${esc(choice.id)}" ${choice.id===(builderState.organizationId||'')?'selected':''}>${esc(choice.name)}</option>`).join('')}</select></label>
           <label>Départ<input value="${esc(dateLabel(departure))} · ${esc(departure.time)}" disabled></label>
           <label>Catégorie<select name="builderCategory" ${categoryDisabled?'disabled':''}>${categories.map(category => `<option value="${esc(category)}" ${category === builderState.category ? 'selected' : ''}>${esc(category)}</option>`).join('')}</select></label>
           <label>Nom de l’équipage<input name="builderName" maxlength="60" required value="${esc(builderState.name)}" placeholder="Ex. FMT Racing 1"></label>
           <label>Voiture<select name="builderCar"><option value="">Voiture à définir</option>${(CARS[builderState.category] || []).map(car => `<option value="${esc(car)}" ${car === builderState.car ? 'selected' : ''}>${esc(car)}</option>`).join('')}</select></label>
         </div>${categoryNote}
       </section>
-      <section class="crew-builder-card"><div class="crew-builder-card-title"><span>02</span><div><h3>Composition</h3><p>${editMode?'Coche ou décoche les pilotes que tu veux dans cet équipage.':'Tu peux ajouter dès maintenant d’autres pilotes inscrits dans la même catégorie.'}</p></div></div>
+      <section class="crew-builder-card"><div class="crew-builder-card-title"><span>02</span><div><h3>Composition</h3><p>${editMode?'Coche ou décoche les pilotes que tu veux dans cet équipage.':'Ajoute les pilotes disponibles dans la même catégorie et qui ont partagé leur inscription avec cet espace.'}</p></div></div>
         ${lockedNote}
         <div class="crew-builder-pilots">${candidates.length ? candidates.map(registration => pilotCard(event,departure,registration,builderState.locked,registration.id===builderState.ownerRegistrationId)).join('') : '<p class="crew-builder-empty">Aucun pilote disponible dans cette catégorie pour ce départ.</p>'}</div>
-        ${!builderState.locked ? '<p class="crew-builder-warning">Un pilote ne peut appartenir qu’à un équipage sur un même départ. Son affectation remplace ses autres inscriptions de catégorie sur ce départ.</p>' : ''}
+        ${!builderState.locked ? '<p class="crew-builder-warning">Un pilote ne peut être affecté qu’à un seul équipage sur un même départ, même s’il partage sa disponibilité avec plusieurs groupes.</p>' : ''}
       </section>
       <section class="crew-builder-card crew-builder-coverage" data-crew-builder-coverage>${coverageMarkup(event,departure)}</section>
-      <div class="crew-builder-actions"><span class="crew-builder-submit-note">Les inscriptions des pilotes restent conservées lorsqu’ils quittent un équipage.</span><button type="submit" class="primary-button" data-crew-builder-submit>${submitLabel()}</button></div>
+      <div class="crew-builder-actions"><span class="crew-builder-submit-note">L’espace de l’équipage est fixé à sa création.</span><button type="submit" class="primary-button" data-crew-builder-submit>${submitLabel()}</button></div>
       <p class="creation-error crew-builder-error" data-crew-builder-error hidden></p>
     </form>
   </section>`;
@@ -200,7 +215,8 @@ function renderPanel(event, {scroll = false} = {}) {
 }
 
 function updateCoverage(event) {
-  const departure = event?.departures?.find(item => item.id === builderState?.departureId);
+  const rawDeparture = event?.departures?.find(item => item.id === builderState?.departureId);
+  const departure=scopeDeparture(rawDeparture,builderState?.organizationId);
   const coverage = builderPanel?.querySelector('[data-crew-builder-coverage]');
   if (coverage && departure) coverage.innerHTML = coverageMarkup(event, departure);
   const submit = builderPanel?.querySelector('[data-crew-builder-submit]');
@@ -259,6 +275,16 @@ async function refreshMainView() {
   if (refresh) refresh.click();
 }
 
+function viableCrewSpaces(event,rawDeparture,session,organizations){
+  return organizationChoices(organizations).map(choice=>{
+    const organizationId=choice.id||null;
+    const departure=scopeDeparture(rawDeparture,organizationId);
+    const manager=canOrganize(session,organizationId);
+    const own=ownAvailableRegistrations(departure);
+    return {organizationId,manager,own,viable:manager||own.length>0};
+  }).filter(item=>item.viable);
+}
+
 async function openBuilder(crewId = null, preferredDepartureId = '') {
   const eventId = currentEventId();
   if (!eventId) return;
@@ -267,7 +293,7 @@ async function openBuilder(crewId = null, preferredDepartureId = '') {
     const event = events.find(item => item.id === eventId);
     if (!event) throw new Error('Événement introuvable. Actualise la page.');
     if (!session.user) throw new Error('Connecte-toi avec Discord pour gérer un équipage.');
-    const manager=['admin','organizer'].includes(session.user.role);
+    const organizations=session.organizations||{team:null,communities:[],discoverableCommunities:[]};
 
     if (crewId) {
       let found = null;
@@ -278,20 +304,26 @@ async function openBuilder(crewId = null, preferredDepartureId = '') {
       if (!found) throw new Error('Équipage introuvable. Actualise la page.');
       if (!found.crew.canManage) throw new Error('Tu n’es pas responsable de cet équipage.');
       if (found.departure.startsAt <= Date.now()) throw new Error('Ce départ est passé. L’équipage est verrouillé.');
+      const organizationId=found.crew.organizationId||null;
       builderState = {
-        mode:'edit', eventId, manager, crewId:found.crew.id, version:found.crew.version,
+        mode:'edit', eventId, manager:canOrganize(session,organizationId), organizations, organizationId, crewId:found.crew.id, version:found.crew.version,
         departureId:found.departure.id, category:found.crew.category, car:found.crew.car || '',
         name:found.crew.name, locked:!!found.crew.locked, ownerRegistrationId:null,
         registrationIds:[...(found.crew.registrationIds || [])], originalRegistrationIds:[...(found.crew.registrationIds || [])]
       };
     } else {
-      const departure = defaultDeparture(event,preferredDepartureId);
-      if (!departure) throw new Error('Tous les départs de cet événement sont déjà passés.');
-      const own=ownAvailableRegistrations(departure);
-      if (!manager && !own.length) throw new Error('Inscris-toi d’abord sur ce départ avant de créer ton équipage.');
+      const rawDeparture = defaultDeparture(event,preferredDepartureId);
+      if (!rawDeparture) throw new Error('Tous les départs de cet événement sont déjà passés.');
+      const preferred=currentOrganizationId();
+      const spaces=viableCrewSpaces(event,rawDeparture,session,organizations);
+      if(!spaces.length)throw new Error('Inscris-toi et partage ta disponibilité avec un espace avant de créer un équipage.');
+      const selected=spaces.find(item=>(item.organizationId||'')===(preferred||''))||spaces[0];
+      const organizationId=selected.organizationId;
+      const manager=selected.manager;
+      const own=selected.own;
       const category=manager ? (event.categories[0] || '') : own[0].category;
       const ownerRegistrationId=manager ? null : own.find(reg=>reg.category===category)?.id || null;
-      builderState = {mode:'create',eventId,manager,departureId:departure.id,category,car:'',name:'',locked:false,ownerRegistrationId,registrationIds:ownerRegistrationId?[ownerRegistrationId]:[],originalRegistrationIds:[]};
+      builderState = {mode:'create',eventId,manager,organizations,organizationId,departureId:rawDeparture.id,category,car:'',name:'',locked:false,ownerRegistrationId,registrationIds:ownerRegistrationId?[ownerRegistrationId]:[],originalRegistrationIds:[]};
     }
 
     renderPanel(event,{scroll:true});
@@ -306,7 +338,8 @@ async function createCrew() {
   const result = await api(`/api/events/${builderState.eventId}/departures/${builderState.departureId}/crews`,'POST',{
     name:builderState.name,
     category:builderState.category,
-    car:builderState.car
+    car:builderState.car,
+    organizationId:builderState.organizationId||null
   });
   const createdId = result.id;
   let removedRegistrations = Number(result.removedRegistrations) || 0;
@@ -376,7 +409,7 @@ async function submitBuilder(form) {
     if (!builderState.name) throw new Error('Indique le nom de l’équipage.');
     const result = mode === 'edit' ? await editCrew() : await createCrew();
     const suffix = result.removedRegistrations ? ` ${result.removedRegistrations} autre(s) inscription(s) du même départ ont été retirées.` : '';
-    pendingMessage = {error:false,text:mode === 'edit' ? `Équipage « ${builderState.name} » mis à jour.${suffix}` : `Équipage « ${builderState.name} » créé.${suffix}`};
+    pendingMessage = {error:false,text:mode === 'edit' ? `Équipage « ${builderState.name} » mis à jour.${suffix}` : `Équipage « ${builderState.name} » créé dans ${organizationShortLabel(builderState.organizations,builderState.organizationId)}.${suffix}`};
     closeBuilder();
     await refreshMainView();
   } catch (error) {
@@ -414,14 +447,28 @@ document.addEventListener('input', event => {
 
 document.addEventListener('change', async event => {
   const field = event.target;
-  if (!builderState || !field.closest('[data-crew-builder-form]')) return;
+  if (!builderState || !(field.closest('[data-crew-builder-form]')||field.matches('[data-crew-builder-organization]'))) return;
   const events = await loadEvents().catch(() => []);
   const currentEvent = events.find(item => item.id === builderState.eventId);
   if (!currentEvent) return;
+  if (field.name === 'builderOrganization' && builderState.mode==='create') {
+    builderState.organizationId=field.value||null;
+    builderState.manager=canOrganize(sessionCache,builderState.organizationId);
+    builderState.car='';builderState.name=builderState.name||'';
+    const rawDeparture=currentEvent.departures.find(item=>item.id===builderState.departureId);
+    const departure=scopeDeparture(rawDeparture,builderState.organizationId);
+    const own=ownAvailableRegistrations(departure);
+    builderState.category=builderState.manager?(currentEvent.categories[0]||''):(own[0]?.category||'');
+    builderState.ownerRegistrationId=builderState.manager?null:(own[0]?.id||null);
+    builderState.registrationIds=builderState.ownerRegistrationId?[builderState.ownerRegistrationId]:[];
+    renderPanel(currentEvent);
+    return;
+  }
   if (field.name === 'builderCategory' && !builderState.locked) {
     builderState.category = field.value;
     builderState.car = '';
-    const departure=currentEvent.departures.find(item=>item.id===builderState.departureId);
+    const rawDeparture=currentEvent.departures.find(item=>item.id===builderState.departureId);
+    const departure=scopeDeparture(rawDeparture,builderState.organizationId);
     builderState.ownerRegistrationId=!builderState.manager&&builderState.mode==='create'?ownAvailableRegistrations(departure).find(reg=>reg.category===field.value)?.id||null:null;
     builderState.registrationIds=builderState.ownerRegistrationId?[builderState.ownerRegistrationId]:[];
     renderPanel(currentEvent);
