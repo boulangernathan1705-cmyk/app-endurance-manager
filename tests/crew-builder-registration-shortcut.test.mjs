@@ -21,11 +21,12 @@ test('la création et la gestion d’équipage ouvrent l’inscription pilote da
   assert.match(script,/document\.body\.classList\.add\('registration-modal-open'\)/);
   assert.match(script,/activeBuilder\.mode==='create'\|\|activeBuilder\.mode==='edit'/);
   assert.match(script,/if\(edit\)\{[\s\S]*?activeBuilder=\{mode:'edit',departureId:edit\.dataset\.departure\|\|''\};[\s\S]*?decorateWhenReady\(\)/);
+  assert.match(script,/audienceIds:\[builderAudience\(\)\]/);
   assert.doesNotMatch(script,/MutationObserver/);
   assert.doesNotMatch(script,/dataset\.action='new-registration'/);
   assert.match(css,/\.registration-modal-backdrop\s*\{[\s\S]*?position:\s*fixed/);
   assert.match(css,/\.registration-modal-panel[\s\S]*?100dvh/);
   assert.match(css,/body\.registration-modal-open/);
-  assert.match(html,/crew-builder-registration-shortcut\.mjs\?v=3-manage/);
+  assert.match(html,/crew-builder-registration-shortcut\.mjs\?v=4-audiences/);
   assert.match(html,/crew-builder-registration-shortcut\.css\?v=2-modal/);
 });
