@@ -125,7 +125,7 @@ test('Équipages est intégré directement dans chaque départ avec actions pilo
   const eventView=read('front/app/event-view.mjs');
   assert.doesNotMatch(eventView,/event-section','Équipages'/);
   assert.match(eventView,/renderPilots\(event,departure\);/);
-  assert.match(eventView,/Créer mon équipage/);
+  assert.match(eventView,/Créer un équipage/);
   assert.match(eventView,/data-crew-builder-open/);
   assert.match(crews,/crew-unified-card/);
   assert.match(crews,/crew-card-shell/);
