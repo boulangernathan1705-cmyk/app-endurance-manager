@@ -12,7 +12,7 @@ import {
   categories
 } from './core.mjs';
 import {getLocale,localeTag} from '../i18n.mjs';
-import {scopeDeparture,organizationShortLabel} from './organization-context.mjs?v=1';
+import {scopeDeparture,registrationAudienceIds,organizationAudienceLabels} from './organization-context.mjs?v=2-multi-filter';
 
 const dateFormat = new Intl.DateTimeFormat(localeTag(), {
   timeZone:'Europe/Paris',
@@ -81,18 +81,25 @@ function compactCrew(departure,crew) {
   </article>`;
 }
 
+function audienceMeta(reg){
+  const ids=registrationAudienceIds(reg);
+  const labels=organizationAudienceLabels(state.organizations,ids);
+  return {ids,labels};
+}
+
 function card({event,departure:rawDeparture,reg}) {
-  const departure=scopeDeparture(rawDeparture,reg.organizationId||null);
+  const audiences=audienceMeta(reg);
+  const departure=scopeDeparture(rawDeparture,new Set(audiences.ids));
   const crew = (departure.crews||[]).find(item => (item.registrationIds||[]).some(id => String(id) === String(reg.id)));
   const assigned = new Set((departure.crews||[]).flatMap(item => (item.registrationIds||[]).map(String)));
   const unassigned = (departure.availability||[])
-    .filter(pilot => pilot.status !== 'unavailable' && !assigned.has(String(pilot.id)))
+    .filter(pilot => pilot.status !== 'unavailable' && !assigned.has(String(pilot.id)) && !pilot.engaged)
     .sort(pilotSort(event));
   const members = crew
     ? (crew.registrationIds||[]).map(id => departure.availability.find(pilot => String(pilot.id) === String(id))).filter(Boolean)
     : [];
   const otherCrews = (departure.crews||[]).filter(item => item.id !== crew?.id).sort(crewSort(event));
-  const organizationLabel=organizationShortLabel(state.organizations,reg.organizationId||null);
+  const audienceBadges=audiences.labels.map(label=>`<span class="organization-entry-badge">${esc(label)}</span>`).join('');
 
   const ownCrewBody = crew?`<article class="ux-my-own-crew ${categories[crew.category]?.css||''}">
     <div class="ux-my-own-crew-head">
@@ -101,17 +108,17 @@ function card({event,departure:rawDeparture,reg}) {
     </div>
     <div class="${pilotGridClass(members.length)}">${members.map(pilot=>pilotCard(event,departure,pilot,String(pilot.id)===String(reg.id))).join('')}</div>
   </article>`:`<article class="ux-my-awaiting-crew">
-    <div class="ux-my-awaiting-copy"><strong>En attente d’affectation</strong><span>Cette inscription n’est pas encore rattachée à un équipage.</span></div>
+    <div class="ux-my-awaiting-copy"><strong>${reg.engaged?'Déjà engagé sur ce départ':'En attente d’affectation'}</strong><span>${reg.engaged?'Ton équipage appartient à un autre espace que ceux affichés ici.':'Cette inscription n’est pas encore rattachée à un équipage.'}</span></div>
     <div class="${pilotGridClass(1)}">${pilotCard(event,departure,reg,true)}</div>
   </article>`;
 
   const otherCrewsBody = otherCrews.length
     ? `<div class="ux-my-other-crews-grid">${otherCrews.map(item=>compactCrew(departure,item)).join('')}</div>`
-    : '<p class="muted">Aucun autre équipage sur ce départ.</p>';
+    : '<p class="muted">Aucun autre équipage dans les espaces de cette inscription.</p>';
 
   const unassignedBody = unassigned.length
     ? `<div class="${pilotGridClass(unassigned.length)}">${unassigned.map(pilot=>pilotCard(event,departure,pilot,String(pilot.id)===String(reg.id))).join('')}</div>`
-    : '<p class="empty">Tous les pilotes disponibles sont déjà affectés.</p>';
+    : '<p class="empty">Aucun autre pilote disponible sans équipage.</p>';
 
   return `<details class="native-my-entry-card event-type-${event.eventType||'private'}">
     <summary class="native-my-entry-header">
@@ -121,9 +128,9 @@ function card({event,departure:rawDeparture,reg}) {
         <span class="ux-my-entry-departure">Départ ${esc(departure.time||'')}</span>
         <h2>${esc(event.name)}</h2>
         <span class="ux-my-entry-date">${esc(entryDate(departure))}</span>
-        <div class="native-my-entry-meta"><span class="organization-entry-badge">${esc(organizationLabel)}</span>${eventTypeBadge(event.eventType)}${badge(reg.category)}<span>${esc(circuitLabel(event.circuit))}</span><span>${event.durationHours||6} h</span></div>
+        <div class="native-my-entry-meta">${audienceBadges}${eventTypeBadge(event.eventType)}${badge(reg.category)}<span>${esc(circuitLabel(event.circuit))}</span><span>${event.durationHours||6} h</span></div>
       </div>
-      <button type="button" class="primary-button native-my-entry-open-event" data-organization-entry-open data-id="${event.id}" data-departure="${departure.id}" data-organization="${esc(reg.organizationId||'')}">Voir l’événement complet</button>
+      <button type="button" class="primary-button native-my-entry-open-event" data-organization-entry-open data-id="${event.id}" data-departure="${departure.id}" data-audiences="${esc(audiences.ids.join(','))}">Voir l’événement complet</button>
     </summary>
     <div class="native-my-entry-body">
       ${contentAccordion('Mon équipage',members.length,ownCrewBody)}
@@ -142,7 +149,7 @@ export function renderMyEntries() {
     <div class="native-my-entries-group-heading"><h2>${title}</h2><span>${list.length} inscription${list.length>1?'s':''}</span></div>
     ${list.length?`<div class="native-my-entry-list">${list.map(card).join('')}</div>`:'<p class="empty">Aucune inscription.</p>'}
   </section>`;
-  app.innerHTML=`<div class="native-my-entries-heading"><span class="creation-kicker">ESPACE PILOTE</span><h1 class="page-title">MES INSCRIPTIONS</h1><p>Chaque inscription indique maintenant si tu roules en général, avec ta Team ou dans une communauté.</p></div>
+  app.innerHTML=`<div class="native-my-entries-heading"><span class="creation-kicker">ESPACE PILOTE</span><h1 class="page-title">MES INSCRIPTIONS</h1><p>Une inscription peut maintenant être partagée avec Général, ta Team et plusieurs communautés sans être dupliquée.</p></div>
     ${section('Mes inscriptions personnelles',entries.filter(item=>item.reg.mine))}
     ${entries.some(item=>item.reg.managed)?section('Inscriptions que je gère',entries.filter(item=>item.reg.managed)):''}`;
   notifyRender();
