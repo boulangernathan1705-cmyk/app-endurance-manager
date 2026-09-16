@@ -1,5 +1,6 @@
 import {state,esc,button,logo,renderAvailabilityTimeline,crewColorClass,coversHour,pilotCount,api} from './core.mjs';
-import {renderRegistration} from './registration.mjs';
+import {renderRegistration} from './registration.mjs?v=4-audiences';
+import {organizationShortLabel} from './organization-context.mjs?v=2-multi-filter';
 
 function contentSummary(title,count){return `<summary class="ux-content-accordion-summary"><span class="ux-content-accordion-title">${esc(title)}</span><span class="ux-content-accordion-count">${count}</span><span class="ux-content-accordion-chevron" aria-hidden="true">›</span></summary>`;}
 function statusPill(crew){return `<span class="crew-compact-status ${crew.locked?'is-complete':'is-open'}">${crew.locked?'ÉQUIPAGE COMPLET':'ÉQUIPAGE OUVERT'}</span>`;}
@@ -26,11 +27,13 @@ function crewCard(event,departure,crew,index,unassigned,allCrews){
   const cov=coverage(event,departure,regs);
   const names=regs.map(reg=>reg.name).join(' · ')||'Aucun pilote affecté';
   const ownMember=regs.find(reg=>reg.mine)||null;
-  const ownRegistrationIds=new Set((departure.availability||[]).filter(reg=>reg.mine).map(reg=>reg.id));
-  const memberElsewhere=allCrews.some(other=>other.id!==crew.id&&(other.registrationIds||[]).some(id=>ownRegistrationIds.has(id)));
+  const ownRegistrations=(departure.availability||[]).filter(reg=>reg.mine);
+  const ownRegistrationIds=new Set(ownRegistrations.map(reg=>reg.id));
+  const memberElsewhere=allCrews.some(other=>other.id!==crew.id&&(other.registrationIds||[]).some(id=>ownRegistrationIds.has(id)))||(!ownMember&&ownRegistrations.some(reg=>reg.engaged));
   const joinRegistration=ownMember||memberElsewhere?null:unassigned.find(reg=>reg.mine&&reg.category===crew.category)||null;
   const open=state.crewManagementOpen.has(crew.id);
   const ownerBadge=crew.ownedByMe?'<span class="crew-owner-badge">RESPONSABLE</span>':'';
+  const groupBadge=`<span class="crew-group-badge">${esc(organizationShortLabel(state.organizations,crew.organizationId||null))}</span>`;
   const countLabel=`${regs.length} pilote${regs.length>1?'s':''} · ${cov.covered}/${cov.duration} h`;
   const management=crew.canManage
     ? `<div class="crew-inline-management">${stateControl(crew,departure)}<span class="coverage-summary">${countLabel}</span></div>`
@@ -41,7 +44,7 @@ function crewCard(event,departure,crew,index,unassigned,allCrews){
     <details class="crew-pilot-group crew-pilot-accordion crew-unified-card ${crew.locked?'is-complete':'is-open'}" data-crew="${crew.id}" data-crew-id="${crew.id}" data-crew-locked="${Boolean(crew.locked)}" data-crew-mine="${Boolean(ownMember)}" data-crew-team="${esc(crew.name)}" ${open?'open':''}>
       <summary class="crew-pilot-accordion-summary" aria-label="${esc(crew.name)} · ${esc(names)} · ${esc(crew.car||'Voiture à choisir')}">
         <span class="crew-compact-category" aria-hidden="true">${logo(crew.category)}</span>
-        <span class="crew-compact-team"><strong>${esc(crew.name)}</strong>${ownerBadge}</span>
+        <span class="crew-compact-team"><strong>${esc(crew.name)}</strong><span class="crew-compact-team-badges">${ownerBadge}${groupBadge}</span></span>
         <span class="crew-compact-pilots">${esc(names)}</span>
         <span class="crew-compact-car">${esc(crew.car||'Voiture à choisir')}</span>
         ${statusPill(crew)}
@@ -60,10 +63,10 @@ function crewCard(event,departure,crew,index,unassigned,allCrews){
 export function renderPilots(event,departure,options={}){
   const crews=[...(departure.crews||[])].sort((a,b)=>event.categories.indexOf(a.category)-event.categories.indexOf(b.category)||String(a.name).localeCompare(String(b.name),'fr',{sensitivity:'base',numeric:true}));
   const assigned=new Set(crews.flatMap(crew=>crew.registrationIds||[]));
-  const unassigned=(departure.availability||[]).filter(reg=>reg.status!=='unavailable'&&!assigned.has(reg.id)).sort((a,b)=>event.categories.indexOf(a.category)-event.categories.indexOf(b.category)||String(a.name).localeCompare(String(b.name),'fr',{sensitivity:'base'}));
+  const unassigned=(departure.availability||[]).filter(reg=>reg.status!=='unavailable'&&!assigned.has(reg.id)&&!reg.engaged).sort((a,b)=>event.categories.indexOf(a.category)-event.categories.indexOf(b.category)||String(a.name).localeCompare(String(b.name),'fr',{sensitivity:'base'}));
   const unavailable=(departure.availability||[]).filter(reg=>reg.status==='unavailable');
   const crewCards=crews.length?crews.map((crew,index)=>crewCard(event,departure,crew,index,unassigned,crews)).join(''):'<p class="empty">Aucun équipage pour ce départ.</p>';
-  const pilots=unassigned.length?`<section class="ux-unassigned-section"><div class="ux-unassigned-grid">${unassigned.map(reg=>renderRegistration(reg,departure,event.durationHours||6)).join('')}</div></section>`:`<section class="ux-unassigned-section"><p class="empty">${departure.availability.length?'Tous les pilotes disponibles ont déjà un équipage.':'Aucun pilote inscrit sur ce départ.'}</p></section>`;
+  const pilots=unassigned.length?`<section class="ux-unassigned-section"><div class="ux-unassigned-grid">${unassigned.map(reg=>renderRegistration(reg,departure,event.durationHours||6)).join('')}</div></section>`:`<section class="ux-unassigned-section"><p class="empty">${departure.availability.length?'Aucun pilote disponible sans équipage dans cet affichage.':'Aucun pilote inscrit sur ce départ.'}</p></section>`;
   const unavailableHtml=unavailable.length?`<details class="ux-crew-bucket ux-unavailable-bucket"><summary><span>Pilotes indisponibles</span><strong>${unavailable.length}</strong></summary><div class="ux-crew-bucket-body">${unavailable.map(reg=>renderRegistration(reg,departure,event.durationHours||6)).join('')}</div></details>`:'';
   const createCrew=options.canCreateCrew?`<button type="button" class="secondary-button crew-builder-open crew-section-create" data-crew-builder-open data-departure="${departure.id}">${esc(options.createCrewLabel||'Créer un équipage')}</button>`:'';
   return `<div class="pilot-section"><div class="ux-course-overview ux-course-split-overview">
