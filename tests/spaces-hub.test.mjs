@@ -4,33 +4,33 @@ import {readFileSync} from 'node:fs';
 
 const read=path=>readFileSync(new URL(`../${path}`,import.meta.url),'utf8');
 
-test('la navigation expose Espaces et le hub affiche une arborescence',()=>{
+test('la navigation expose directement Teams et communautés',()=>{
   const home=read('front/app/home-view.mjs');
-  const spaces=read('front/app/organizations-view.mjs');
-  const css=read('styles/spaces-hub.css');
-  assert.match(home,/data-organizations-open>Espaces</);
-  assert.match(spaces,/space-tree/);
-  assert.match(spaces,/Endurance Manager/);
-  assert.match(spaces,/TEAM PRIVÉE/);
-  assert.match(spaces,/COMMUNAUTÉ OUVERTE/);
-  assert.match(css,/\.space-tree-children/);
-  assert.match(css,/\.space-tree-node/);
+  const groups=read('front/app/organizations-view.mjs');
+  assert.match(home,/data-organizations-open>Teams & communautés</);
+  assert.match(groups,/TEAMS & COMMUNAUTÉS/);
+  assert.match(groups,/MA TEAM/);
+  assert.match(groups,/MES COMMUNAUTÉS/);
+  assert.doesNotMatch(groups,/space-tree/);
+  assert.doesNotMatch(groups,/MES ESPACES/);
 });
 
-test('Découvrir sépare communautés ouvertes et Teams privées',()=>{
-  const spaces=read('front/app/organizations-view.mjs');
-  assert.match(spaces,/data-discovery-kind="community"/);
-  assert.match(spaces,/data-discovery-kind="team"/);
-  assert.match(spaces,/Les Teams sont fermées/);
-  assert.match(spaces,/data-organization-join/);
-  assert.match(spaces,/Créer une communauté/);
+test('les Teams restent privées et seules les communautés se découvrent',()=>{
+  const groups=read('front/app/organizations-view.mjs');
+  assert.match(groups,/Une Team est privée/);
+  assert.match(groups,/Créer ma Team/);
+  assert.match(groups,/REJOINDRE UNE COMMUNAUTÉ/);
+  assert.match(groups,/data-organization-join/);
+  assert.match(groups,/Créer une communauté/);
+  assert.doesNotMatch(groups,/data-discovery-kind/);
+  assert.doesNotMatch(groups,/Découvrir des espaces/);
 });
 
-test('un espace peut ouvrir directement ses endurances filtrées',()=>{
-  const spaces=read('front/app/organizations-view.mjs');
-  assert.match(spaces,/data-space-events/);
-  assert.match(spaces,/normalizeAudienceFilter\(state\.organizations,\[spaceEvents\.dataset\.spaceEvents\]\)/);
-  assert.match(spaces,/Voir les endurances/);
+test('une Team ou communauté peut ouvrir ses endurances filtrées',()=>{
+  const groups=read('front/app/organizations-view.mjs');
+  assert.match(groups,/data-space-events/);
+  assert.match(groups,/normalizeAudienceFilter\(state\.organizations,\[groupEvents\.dataset\.spaceEvents\]\)/);
+  assert.match(groups,/Voir les endurances/);
 });
 
 test('FMT et Endurance Community sont des fixtures réservées au dev',()=>{
@@ -45,8 +45,8 @@ test('FMT et Endurance Community sont des fixtures réservées au dev',()=>{
   assert.doesNotMatch(prod,/https:\/\/app\.endurance-manager\.workers\.dev/);
 });
 
-test('la page de jeu charge les styles et la version du hub Espaces',()=>{
+test('la page de jeu charge la version simplifiée Teams et Communautés',()=>{
   const game=read('game.html');
-  assert.match(game,/spaces-hub\.css\?v=1-tree-discovery/);
-  assert.match(game,/app\.js\?v=87-spaces-hub/);
+  assert.match(game,/spaces-hub\.css\?v=2-teams-communities-simple/);
+  assert.match(game,/app\.js\?v=88-teams-communities-simple/);
 });
