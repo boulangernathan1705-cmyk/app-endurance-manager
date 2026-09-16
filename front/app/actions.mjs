@@ -1,12 +1,12 @@
 import {app,state,api,load,showError,countdown,CARS} from './core.mjs';
-import {renderNav,renderHome} from './home-view.mjs?v=5-multi-filter';
-import {renderEvent} from './event-view.mjs?v=11-multi-filter';
+import {renderNav,renderHome} from './home-view.mjs?v=7-paddock-pulse';
+import {renderEvent} from './event-view.mjs?v=13-paddock-lens';
 import {renderEventForm,departureFields,updateRemoveButtons} from './event-form.mjs';
 import {renderMyEntries} from './entries-view.mjs?v=4-audiences';
-import {refresh,refreshAfterSave} from './refresh.mjs';
+import {refresh,refreshAfterSave} from './refresh.mjs?v=2-paddock-chain';
 import {draftFor,registrationDraft,ownRegistrations,rerenderRegistrationSection,submitRegistration} from './registration.mjs?v=4-audiences';
 import {updateCrewState} from './crews.mjs?v=9-audiences';
-import {GENERAL_AUDIENCE,defaultRegistrationAudienceIds,registrationAudienceIds} from './organization-context.mjs?v=2-multi-filter';
+import {GENERAL_AUDIENCE,defaultRegistrationAudienceIds,registrationAudienceIds} from './organization-context.mjs?v=4-paddock-network';
 
 async function submitEvent(form){
   const data={name:form.elements.eventName.value.trim(),durationHours:Number(form.elements.eventDuration.value),eventType:form.elements.eventType.value,circuit:form.elements.eventCircuit.value,categories:[...form.querySelectorAll('[name="eventCategory"]:checked')].map(input=>input.value),departures:[...form.querySelectorAll('.departure-field')].map(row=>({id:row.dataset.id||undefined,date:row.querySelector('[name="date"]').value,time:row.querySelector('[name="time"]').value})),version:state.editingEvent?.version};
