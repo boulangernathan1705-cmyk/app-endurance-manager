@@ -1,22 +1,22 @@
-# Déploiement Cloudflare
+# Déploiement production
 
-Le dépôt est `boulangernathan1705-cmyk/app-endurance-manager`. `dev` correspond au développement et `main` à la production ; la procédure de publication est décrite dans [DEPLOYMENT.md](../DEPLOYMENT.md).
+Le dépôt de production est `boulangernathan1705-cmyk/app-endurance-manager` et la branche de production est `main`.
 
 ## Cloudflare Workers
 
-`wrangler.jsonc` configure le Worker DEV `app` ; `wrangler.prod.jsonc` configure le Worker PROD `endurance-manager-prod`. Un déploiement Wrangler sans option `--config` utilise la configuration DEV, même depuis `main` :
+Cloudflare Workers déploie le projet avec `npx wrangler deploy`. Le fichier `wrangler.jsonc` est la source de vérité du déploiement :
 
-- `server/worker-with-migrations.mjs` est le point d’entrée : il délègue les requêtes à `server/worker.mjs`, assure la récupération du schéma de propriété des équipages et programme la synchronisation Discord ;
+- `server/worker.mjs` reste le Worker d’API ;
 - `npm run build:workers` génère les assets statiques dans `public/` ;
-- les routes `/api/*` et `/telemetry/*` passent d’abord par le Worker ;
+- seules les routes `/api/*` passent d’abord par le Worker ;
 - les assets statiques sont servis directement par Cloudflare ;
-- aucun binding `ASSETS` n’est déclaré ; les routes prioritaires configurées ne nécessitent pas le repli `env.ASSETS.fetch()` encore présent dans `server/worker.mjs` ;
+- aucun binding `ASSETS` n’est déclaré, car le Worker ne lit pas les fichiers statiques lui-même ;
 - `minify: true` laisse Wrangler minifier le Worker avant l’envoi ;
 - `keep_vars: true` conserve les variables et secrets déjà configurés côté Cloudflare.
 
-Le build rassemble les feuilles CSS utilisées par `index.html`, `game.html`, `members.html`, `diagnostics.html` et `help.html` dans `public/app.css`. Le gabarit `game.html` est publié sous `/lmu/` et `/iracing/`. Le dossier source `styles/` n’est pas publié séparément ; `help.css` et `privacy.css` sont également copiés par le build.
+Le build rassemble les feuilles CSS utilisées par `index.html` dans un unique `public/app.css`. Les fichiers CSS restent modulaires dans le dépôt pour faciliter les modifications, mais ils ne sont pas publiés séparément dans le build de production.
 
-L’aide est une page dédiée `help.html`. `front/help-page.mjs` lit la session puis importe `help.js` pour afficher l’aide du rôle correspondant. Les 26 captures sont référencées dynamiquement par `helpScreenshot()` et `helpScreenshots()` avec `loading="lazy"` ; elles ne sont pas des fichiers inutilisés.
+L’aide est volontairement exclue du CSS principal : `front/help-loader.mjs` charge `help.js` et `help.css` uniquement lorsque l’utilisateur clique sur **Aide**. Les captures de l’aide utilisent déjà `loading="lazy"` et ne sont téléchargées que lorsqu’elles deviennent nécessaires.
 
 Le fichier `_headers` généré ne surcharge que les en-têtes de sécurité des assets statiques. Le cache statique reste géré par le comportement natif de Cloudflare Workers Static Assets (validation par ETag), afin d’éviter les règles dupliquées dans le dépôt. Les réponses de l’API restent explicitement en `Cache-Control: no-store` dans `server/core.mjs`.
 
@@ -24,10 +24,10 @@ La bannière principale est validée au build : elle doit garder une largeur min
 
 ## D1
 
-DEV utilise la base `fmt-endurance` ; PROD utilise `endurance-manager-prod`. Les deux configurations utilisent le binding `DB`, avec des identifiants de base distincts.
+La base D1 existante `fmt-endurance` doit être conservée. Son binding est `DB`.
 
-Ne pas recréer les bases ni rejouer manuellement la migration initiale. `npm run deploy:workers` applique les migrations en attente et déploie uniquement DEV. Toute commande manuelle destinée à PROD doit sélectionner explicitement `wrangler.prod.jsonc`, pour les migrations comme pour le déploiement, après autorisation de publication.
+Ne pas recréer la base ni rejouer manuellement la migration initiale sur une base déjà en production. Pour un déploiement manuel qui comporte de nouvelles migrations, utiliser `npm run deploy:workers`, qui applique uniquement les migrations D1 en attente avant `wrangler deploy`.
 
 ## Variables et secrets
 
-`APP_ORIGIN` est versionnée dans chaque configuration Wrangler. Les identifiants Discord non secrets peuvent rester configurés côté Cloudflare grâce à `keep_vars: true`. `DISCORD_CLIENT_SECRET` et `DISCORD_WEEKLY_WEBHOOK_URL` doivent rester des secrets Cloudflare. Le récapitulatif Discord utilise un cron toutes les 15 minutes ; voir [DISCORD_WEEKLY.md](DISCORD_WEEKLY.md).
+`APP_ORIGIN` est versionnée dans `wrangler.jsonc`. Les identifiants Discord non secrets peuvent rester configurés côté Cloudflare grâce à `keep_vars: true`. `DISCORD_CLIENT_SECRET` doit rester un secret Cloudflare et ne jamais être ajouté au dépôt.

@@ -14,15 +14,13 @@ Les deux environnements utilisent des Workers et des bases D1 distincts.
 3. La production est publiée uniquement avec une Pull Request `dev -> main`.
 4. Les contrôles GitHub doivent être verts avant fusion.
 5. Après fusion, Cloudflare déploie `main` vers `endurance-manager.app`.
-6. Le workflow Browser compatibility est déclenché sur les pushes vers `dev`, ou manuellement, et cible le domaine DEV. Il ne contrôle pas automatiquement la production après fusion.
+6. Le workflow Browser compatibility contrôle ensuite le domaine correspondant à la branche.
 
 ## Configurations Cloudflare
 
 ### DEV
 
 Configuration : `wrangler.jsonc`
-
-`npm run deploy:workers` utilise cette configuration DEV, quelle que soit la branche courante.
 
 La base D1 DEV et `APP_ORIGIN=https://app.endurance-manager.workers.dev` sont isolés de la production.
 

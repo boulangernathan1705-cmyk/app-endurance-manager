@@ -1,15 +1,15 @@
 # Annonce Discord hebdomadaire LMU
 
-Endurance Manager peut maintenir un message Discord unique avec les courses LMU en cours ayant au moins un équipage engagé et tous les départs futurs de la semaine courante, du lundi au dimanche en heure de Paris. S’il ne reste aucun départ futur cette semaine, le planning passe à la prochaine semaine contenant un départ LMU.
+Endurance Manager peut maintenir un message Discord unique qui résume uniquement les départs LMU de la semaine courante, du lundi au dimanche en heure de Paris.
 
 ## Comportement
 
 - un seul message Discord est créé puis édité ;
-- les inscriptions et modifications d’équipage actualisent le message existant ; il est recréé si Discord indique qu’il a été supprimé (404) ;
+- aucune nouvelle publication n'est envoyée lors d'une inscription ou d'une modification d'équipage ;
 - le résumé affiche les événements LMU, leurs départs, les équipages, catégories, voitures, pilotes et l'état Ouvert/Complet ;
 - les noms présents dans le site ne peuvent pas déclencher de mention Discord (`allowed_mentions` est désactivé) ;
 - chaque écriture réussie concernant un événement, une inscription ou un équipage demande une synchronisation ;
-- un contrôle Cloudflare est également exécuté toutes les 15 minutes afin d’actualiser les courses en cours et le planning, même si personne n’utilise le site ;
+- un contrôle Cloudflare est également exécuté chaque heure afin de changer automatiquement de semaine, même si personne n'utilise le site ;
 - le contenu est haché avant envoi : si rien n'a changé, Discord n'est pas édité.
 
 ## Configuration Discord
@@ -34,4 +34,4 @@ La migration `0017_discord_weekly.sql` stocke uniquement l'identifiant du messag
 
 ## Mise à jour automatique
 
-Le Cron Trigger Cloudflare est configuré à `*/15 * * * *` dans les deux configurations Wrangler. Il recalcule le résumé et n’édite pas le message si l’empreinte des données est identique. L’heure affichée dans le pied du message correspond à sa dernière actualisation effective.
+Le Cron Trigger Cloudflare est configuré à `17 * * * *`. Il ne republie pas le message à chaque heure : il recalcule le résumé puis s'arrête immédiatement si son contenu est identique.
