@@ -21,7 +21,7 @@ test('la création d’équipage est regroupée avec les actions du départ',()=
   assert.match(eventCss,/summary>\.ux-summary-registration-actions\{[\s\S]*?grid-column:4!important/);
   assert.match(html,/event-polish\.css\?v=4-desktop-meta-action-columns/);
   assert.match(html,/event-shell-alignment\.css\?v=8-explicit-three-departure-actions/);
-  assert.match(html,/app\.js\?v=86-groups-filter/);
+  assert.match(html,/app\.js\?v=87-spaces-hub/);
   assert.match(app,/actions\.mjs\?v=26-audiences/);
 });
 
