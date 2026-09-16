@@ -130,7 +130,9 @@ export async function submitRegistration(form,api) {
   draft.audienceIds=state.user?[...form.querySelectorAll('[name="registrationAudience"]:checked')].map(input=>input.value):[GENERAL_AUDIENCE];
   if(!draft.audienceIds.length)throw Error('Choisis au moins un espace avec lequel partager cette inscription.');
   const payload={name:draft.name,status:draft.status,category:draft.category,cars:draft.cars,carAny:draft.carAny,preferredPilot:draft.preferredPilot||'',version:draft.version,participantId:draft.participantId,participantUserId:draft.participantUserId,forOther:!!draft.forOther,audienceIds:draft.audienceIds};
-  const result=await api(draft.id?`/api/registrations/${draft.id}`:`/api/events/${event.id}/departures/${departure.id}/registrations`,draft.id?'PATCH':'POST',payload);
+  const savedId=draft.id;
+  const result=await api(savedId?`/api/registrations/${savedId}`:`/api/events/${event.id}/departures/${departure.id}/registrations`,savedId?'PATCH':'POST',payload);
+  const registrationId=result.id||savedId;
   if(!draft.forOther){state.pilotName=draft.name;try{localStorage.setItem('fmt_pilot_name',state.pilotName);}catch{}}
-  if(result.recoveryLink)state.recoveryLink=result.recoveryLink; delete state.drafts[departureId]; state.registrationOpen.delete(departureId); return result;
+  if(result.recoveryLink)state.recoveryLink=result.recoveryLink; delete state.drafts[departureId]; state.registrationOpen.delete(departureId); return {...result,id:registrationId};
 }
