@@ -32,8 +32,10 @@ async function ensureOrganization(env,user,definition){
 }
 
 export async function ensureDevOrganizations(request,env){
-  if(env?.APP_ORIGIN!==DEV_ORIGIN||!env?.DB)return;
-  const pathname=new URL(request.url).pathname;
+  if(!env?.DB||env?.APP_ORIGIN!==DEV_ORIGIN)return;
+  const url=new URL(request.url);
+  if(url.origin!==DEV_ORIGIN)return;
+  const pathname=url.pathname;
   if(pathname!=='/api/session'&&!pathname.startsWith('/api/organizations'))return;
   const actor=await identity(request,env);
   if(!actor.user||!['admin','organizer'].includes(actor.user.role))return;
