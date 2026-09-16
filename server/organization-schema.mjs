@@ -29,10 +29,13 @@ export async function ensureOrganizationSchema(env){
       PRIMARY KEY(organization_id,user_id)
     )`).run();
     await env.DB.prepare('CREATE INDEX IF NOT EXISTS organization_members_user ON organization_members(user_id)').run();
+
+    // 0018 reste présent pour compatibilité avec les données déjà créées sur DEV.
     await addColumnIfMissing(env,'registrations','organization_id','ALTER TABLE registrations ADD COLUMN organization_id TEXT REFERENCES organizations(id) ON DELETE RESTRICT');
     await addColumnIfMissing(env,'crews','organization_id','ALTER TABLE crews ADD COLUMN organization_id TEXT REFERENCES organizations(id) ON DELETE RESTRICT');
     await env.DB.prepare('CREATE INDEX IF NOT EXISTS registrations_organization ON registrations(organization_id,event_id,departure_id)').run();
     await env.DB.prepare('CREATE INDEX IF NOT EXISTS crews_organization ON crews(organization_id,event_id,departure_id)').run();
+
     await env.DB.prepare(`CREATE TRIGGER IF NOT EXISTS organization_member_one_team BEFORE INSERT ON organization_members
       WHEN (SELECT type FROM organizations WHERE id=NEW.organization_id)='team'
       BEGIN
@@ -49,30 +52,59 @@ export async function ensureOrganizationSchema(env){
           WHERE om.user_id=NEW.user_id AND o.type='team' AND om.organization_id!=OLD.organization_id
         );
       END`).run();
-    await env.DB.prepare(`CREATE TRIGGER IF NOT EXISTS registration_one_organization BEFORE INSERT ON registrations
-      BEGIN
-        SELECT RAISE(ABORT,'participant_other_organization') WHERE EXISTS (
-          SELECT 1 FROM registrations r
-          WHERE r.participant_id=NEW.participant_id AND r.event_id=NEW.event_id AND r.departure_id=NEW.departure_id
-            AND COALESCE(r.organization_id,'')!=COALESCE(NEW.organization_id,'')
-        );
-      END`).run();
-    await env.DB.prepare(`CREATE TRIGGER IF NOT EXISTS registration_organization_fixed BEFORE UPDATE OF organization_id ON registrations
-      BEGIN
-        SELECT RAISE(ABORT,'organization_fixed') WHERE COALESCE(NEW.organization_id,'')!=COALESCE(OLD.organization_id,'');
-      END`).run();
     await env.DB.prepare(`CREATE TRIGGER IF NOT EXISTS crew_organization_fixed BEFORE UPDATE OF organization_id ON crews
       BEGIN
         SELECT RAISE(ABORT,'organization_fixed') WHERE COALESCE(NEW.organization_id,'')!=COALESCE(OLD.organization_id,'');
       END`).run();
-    await env.DB.prepare(`CREATE TRIGGER IF NOT EXISTS crew_member_same_organization BEFORE INSERT ON crew_members
+
+    // 0019 : une inscription unique peut être visible dans plusieurs groupes.
+    await env.DB.prepare(`CREATE TABLE IF NOT EXISTS registration_audiences (
+      registration_id TEXT NOT NULL REFERENCES registrations(id) ON DELETE CASCADE,
+      audience_key TEXT NOT NULL,
+      organization_id TEXT REFERENCES organizations(id) ON DELETE CASCADE,
+      created_at INTEGER NOT NULL,
+      PRIMARY KEY(registration_id,audience_key),
+      CHECK((audience_key='general' AND organization_id IS NULL) OR (audience_key!='general' AND organization_id=audience_key))
+    )`).run();
+    await env.DB.prepare('CREATE INDEX IF NOT EXISTS registration_audiences_organization ON registration_audiences(organization_id,registration_id)').run();
+
+    await env.DB.prepare('DROP TRIGGER IF EXISTS registration_one_organization').run();
+    await env.DB.prepare('DROP TRIGGER IF EXISTS registration_organization_fixed').run();
+    await env.DB.prepare('DROP TRIGGER IF EXISTS crew_member_same_organization').run();
+
+    // Chaque ancienne inscription garde son ancien espace comme première audience.
+    await env.DB.prepare(`INSERT OR IGNORE INTO registration_audiences(registration_id,audience_key,organization_id,created_at)
+      SELECT r.id,COALESCE(r.organization_id,'general'),r.organization_id,r.created_at
+      FROM registrations r
+      WHERE NOT EXISTS(SELECT 1 FROM registration_audiences a WHERE a.registration_id=r.id)`).run();
+    await env.DB.prepare('UPDATE registrations SET organization_id=NULL WHERE organization_id IS NOT NULL').run();
+
+    // Recrée les deux garde-fous pour être certain que le runtime et les migrations restent alignés.
+    await env.DB.prepare('DROP TRIGGER IF EXISTS crew_member_audience').run();
+    await env.DB.prepare(`CREATE TRIGGER crew_member_audience BEFORE INSERT ON crew_members
       BEGIN
-        SELECT RAISE(ABORT,'organization_mismatch') WHERE EXISTS (
-          SELECT 1 FROM crews c JOIN registrations r ON r.id=NEW.registration_id
-          WHERE c.id=NEW.crew_id AND COALESCE(c.organization_id,'')!=COALESCE(r.organization_id,'')
+        SELECT RAISE(ABORT,'crew_membership_audience') WHERE NOT EXISTS (
+          SELECT 1 FROM crews c JOIN registration_audiences a ON a.registration_id=NEW.registration_id
+          WHERE c.id=NEW.crew_id AND (
+            (c.organization_id IS NULL AND a.audience_key='general')
+            OR (c.organization_id IS NOT NULL AND a.organization_id=c.organization_id)
+          )
         );
       END`).run();
+    await env.DB.prepare('DROP TRIGGER IF EXISTS registration_audience_in_use').run();
+    await env.DB.prepare(`CREATE TRIGGER registration_audience_in_use BEFORE DELETE ON registration_audiences
+      BEGIN
+        SELECT RAISE(ABORT,'audience_in_use') WHERE EXISTS (
+          SELECT 1 FROM crew_members cm JOIN crews c ON c.id=cm.crew_id
+          WHERE cm.registration_id=OLD.registration_id AND (
+            (c.organization_id IS NULL AND OLD.audience_key='general')
+            OR (c.organization_id IS NOT NULL AND OLD.organization_id=c.organization_id)
+          )
+        );
+      END`).run();
+
     try{await env.DB.prepare("INSERT OR IGNORE INTO d1_migrations(name) VALUES('0018_organizations.sql')").run();}catch{}
+    try{await env.DB.prepare("INSERT OR IGNORE INTO d1_migrations(name) VALUES('0019_registration_audiences.sql')").run();}catch{}
   })().catch(error=>{organizationSchemaReady=null;throw error;});
   return organizationSchemaReady;
 }
