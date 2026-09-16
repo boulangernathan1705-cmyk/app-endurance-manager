@@ -1,0 +1,75 @@
+.organization-context{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:16px;
+  margin:12px 0 14px;
+  padding:11px 13px;
+  border:1px solid rgba(77,117,122,.72);
+  border-radius:10px;
+  background:linear-gradient(180deg,rgba(20,29,31,.96),rgba(14,21,23,.96));
+}
+.organization-context-copy{display:grid;gap:2px;min-width:0}
+.organization-context-copy>span,.organization-kind{color:#7f979a;font-size:9px;font-weight:900;letter-spacing:.11em}
+.organization-context-copy>strong{color:#f1e9da;font-size:14px}
+.organization-context-copy>small{color:#9eadaf;font-size:11px;line-height:1.3}
+.organization-context label{min-width:min(360px,42vw)}
+.organization-context select{width:100%;min-height:38px;margin:0}
+.organization-context.is-compact{margin-block:8px;padding-block:8px}
+
+.registration-organization-context{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  margin:0 0 10px;padding:8px 10px;border:1px solid rgba(68,116,122,.55);border-radius:8px;background:rgba(18,28,30,.74)
+}
+.registration-organization-context>span{color:#7f979a;font-size:9px;font-weight:900;letter-spacing:.1em}
+.registration-organization-context>strong{color:#cfe8e5;font-size:12px;text-align:right}
+.organization-entry-badge{display:inline-flex;align-items:center;min-height:24px;padding:3px 7px;border:1px solid rgba(70,113,118,.65);border-radius:999px;background:rgba(18,31,33,.72);color:#c6d8d6;font-size:10px;font-weight:900}
+
+.organizations-page{display:grid;gap:14px}
+.organizations-heading{display:flex;align-items:flex-end;justify-content:space-between;gap:14px}
+.organizations-heading .page-title{margin:2px 0 0}
+.organization-current-context{padding:7px 10px;border:1px solid var(--border);border-radius:999px;background:var(--panel2);color:#9aabad;font-size:11px}
+.organization-current-context strong{color:#e7efed}
+.organization-explainer{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.organization-explainer>div,.organization-card{border:1px solid var(--border);border-radius:11px;background:var(--panel2)}
+.organization-explainer>div{padding:12px}
+.organization-explainer strong{color:#f1e9da;font-size:13px}
+.organization-explainer p,.organization-card>p{margin:6px 0 0;color:#9eadaf;font-size:11.5px;line-height:1.45}
+.organization-card{padding:14px}
+.organization-card-team{border-left:4px solid rgba(94,188,193,.72)}
+.organization-card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:10px}
+.organization-card-head h2{margin:2px 0 0;color:#f1e9da;font-size:18px}
+.organization-card-head small{display:block;margin-top:4px;color:#91a3a5;font-size:11px}
+.organization-private-badge,.organization-owner-badge{display:inline-flex;align-items:center;min-height:26px;padding:4px 8px;border:1px solid rgba(75,116,121,.7);border-radius:999px;background:#152124;color:#b9c9c8;font-size:10px;font-weight:900}
+.organization-member-list,.organization-community-list{display:grid;gap:7px;margin-top:11px}
+.organization-member,.organization-community{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 10px;border:1px solid rgba(61,88,93,.75);border-radius:8px;background:rgba(12,19,21,.58)}
+.organization-member>span{display:grid;gap:2px}
+.organization-member strong,.organization-community h3{color:#e8efed;font-size:12.5px}
+.organization-member small,.organization-community small{color:#879a9d;font-size:10.5px}
+.organization-member button,.organization-community button{width:auto!important;min-height:31px!important;margin:0!important;padding:5px 9px!important;font-size:10.5px!important}
+.organization-community>div{min-width:0}
+.organization-community h3{margin:2px 0}
+.organization-community.is-open{border-style:dashed}
+.organization-inline-form{display:flex;align-items:flex-end;gap:8px;margin-top:12px}
+.organization-inline-form label{display:grid;gap:5px;flex:1;min-width:0;color:#aebcbd;font-size:11px;font-weight:800}
+.organization-inline-form input,.organization-inline-form select{width:100%;min-height:38px;margin:0}
+.organization-inline-form button{width:auto!important;min-height:38px!important;margin:0!important;white-space:nowrap}
+.organization-empty{margin:10px 0 0;color:#819395;font-size:11.5px}
+.organization-leave{margin-top:12px!important;width:auto!important}
+.crew-builder-organization-quick{display:grid;gap:6px;margin:12px 0 0;color:#b8c5c6;font-size:11px;font-weight:800}
+.crew-builder-organization-quick select{min-height:40px}
+
+@media(max-width:760px){
+  .organization-context{display:grid;gap:9px;margin:9px 0 11px;padding:10px}
+  .organization-context label{min-width:0;width:100%}
+  .organization-context-copy>small{font-size:10.5px}
+  .organizations-heading{display:grid;align-items:start}
+  .organization-current-context{width:fit-content}
+  .organization-explainer{grid-template-columns:1fr}
+  .organization-card{padding:12px}
+  .organization-card-head{align-items:center}
+  .organization-inline-form{display:grid;align-items:stretch}
+  .organization-inline-form button{width:100%!important}
+  .organization-member,.organization-community{align-items:flex-start}
+  .registration-organization-context{align-items:flex-start}
+}
