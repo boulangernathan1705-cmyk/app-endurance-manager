@@ -83,11 +83,13 @@ export async function loadWeeklyDiscordSnapshot(env, timestamp) {
   const eventIds = [...new Set(selected.map(item => item.eventId))];
   const marks = eventIds.map(() => '?').join(',');
 
+  // Le récap Discord historique reste le planning général du site. Les espaces privés
+  // Team/communauté ne doivent jamais être exposés dans ce webhook partagé.
   const registrationRows = (await env.DB.prepare(`SELECT r.id,r.event_id,r.departure_id,r.participant_id,r.category,r.status,
       COALESCE(p.name,r.name) AS pilot_name
     FROM registrations r
     LEFT JOIN participants p ON p.id=r.participant_id
-    WHERE r.event_id IN (${marks}) AND COALESCE(r.status,'') <> 'unavailable'
+    WHERE r.event_id IN (${marks}) AND r.organization_id IS NULL AND COALESCE(r.status,'') <> 'unavailable'
     ORDER BY r.created_at,r.id`).bind(...eventIds).all()).results || [];
 
   const registrationsById = new Map();
@@ -110,7 +112,7 @@ export async function loadWeeklyDiscordSnapshot(env, timestamp) {
     LEFT JOIN crew_members cm ON cm.crew_id=c.id
     LEFT JOIN registrations r ON r.id=cm.registration_id
     LEFT JOIN participants p ON p.id=r.participant_id
-    WHERE c.event_id IN (${marks})
+    WHERE c.event_id IN (${marks}) AND c.organization_id IS NULL
     ORDER BY c.created_at,c.id,r.created_at,r.id`).bind(...eventIds).all()).results || [];
 
   const crews = new Map();

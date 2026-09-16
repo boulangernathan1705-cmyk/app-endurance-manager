@@ -112,13 +112,16 @@
     min-width:0;
   }
 
-  .desktop-nav-right-controls > [data-action="my-entries"] {
-    min-width:170px;
+  .desktop-nav-right-controls > [data-action="my-entries"],
+  .desktop-nav-right-controls > [data-organizations-open] {
     min-height:44px;
     margin:0 !important;
-    padding:9px 16px !important;
+    padding:9px 13px !important;
     white-space:nowrap;
   }
+
+  .desktop-nav-right-controls > [data-action="my-entries"] { min-width:150px; }
+  .desktop-nav-right-controls > [data-organizations-open] { min-width:150px; }
 
   .desktop-nav-right .account-bar {
     flex:0 0 auto;
@@ -159,5 +162,7 @@
   .desktop-home-toolbar .home-create-event .primary-button { padding-inline:10px; }
   .desktop-nav-center .nav-game-switcher { gap:6px; }
   .desktop-nav-center .nav-game-switcher-button { min-width:140px; padding-inline:10px; font-size:13px; }
-  .desktop-nav-right-controls > [data-action="my-entries"] { min-width:145px; padding-inline:12px !important; }
+  .desktop-nav-right-controls { gap:6px; }
+  .desktop-nav-right-controls > [data-action="my-entries"],
+  .desktop-nav-right-controls > [data-organizations-open] { min-width:0; padding-inline:9px !important; font-size:11px; }
 }

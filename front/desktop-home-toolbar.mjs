@@ -70,6 +70,9 @@ if (shell && app && navigation) {
     const switcherClone = cloneControl(navigation.querySelector('.nav-game-switcher'));
     if (switcherClone) center.append(switcherClone);
 
+    const organizationsClone = cloneControl(navigation.querySelector('[data-organizations-open]'));
+    if (organizationsClone) rightControls.append(organizationsClone);
+
     const entriesClone = cloneControl(navigation.querySelector('[data-action="my-entries"]'));
     if (entriesClone) rightControls.append(entriesClone);
 

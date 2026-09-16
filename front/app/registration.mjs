@@ -1,7 +1,8 @@
 import {state,esc,button,carPreferenceChoices,registrationCarLabel,renderAvailabilityTimeline,notifyRender,logo,categories} from './core.mjs';
 import {getLocale} from '../i18n.mjs';
+import {sameOrganization,organizationById,organizationShortLabel} from './organization-context.mjs?v=1';
 
-export function ownRegistrations(departure) { return departure.availability.filter(reg => reg.mine); }
+export function ownRegistrations(departure) { return departure.availability.filter(reg => reg.mine&&sameOrganization(reg,state.selectedOrganizationId)); }
 export function ownRegistration(departure) { return ownRegistrations(departure)[0]; }
 export function registrationDraft(reg) {
   return {name:reg.name,category:reg.category,cars:reg.cars||[],carAny:!!reg.carAny,status:reg.status,preferredPilot:reg.preferredPilot||'',id:reg.id,version:reg.version,participantId:reg.participantId,participantUserId:reg.participantUserId||null,discordLinked:!!reg.discordLinked,mine:reg.mine,forOther:!reg.mine,manualOther:!reg.mine&&!reg.participantUserId&&!reg.discordLinked};
@@ -30,10 +31,12 @@ function identityFields(stateDraft,departure,categoryMode,manualOther,linkedOthe
   if(categoryMode)return '';
   const fields=[];
   if(!stateDraft.id&&stateDraft.forOther&&state.user){
-    const options=state.participants.filter(participant=>participant.id!==state.user?.id);
+    const organization=organizationById(state.organizations,state.selectedOrganizationId);
+    const allowed=organization?new Set((organization.members||[]).map(member=>member.id)):null;
+    const options=state.participants.filter(participant=>participant.id!==state.user?.id&&(!allowed||allowed.has(participant.id)));
     const english=getLocale()==='en';
     const manualSelected=manualOther&&!linkedOther;
-    fields.push(`<label class="registration-identity-field"><span class="form-label">Pilote</span><select name="participant" data-departure="${departure.id}" required><option value="" disabled ${!linkedOther&&!manualSelected?'selected':''}>${english?'Choose a driver':'Choisir un pilote'}</option>${options.map(participant=>`<option value="${esc(participant.id)}" ${stateDraft.participantUserId===participant.id?'selected':''}>${esc(participant.name)}</option>`).join('')}<option value="__manual__" ${manualSelected?'selected':''}>${english?'Other driver':'Autre pilote'}</option></select></label>`);
+    fields.push(`<label class="registration-identity-field"><span class="form-label">Pilote</span><select name="participant" data-departure="${departure.id}" required><option value="" disabled ${!linkedOther&&!manualSelected?'selected':''}>${english?'Choose a driver':'Choisir un pilote'}</option>${options.map(participant=>`<option value="${esc(participant.id)}" ${stateDraft.participantUserId===participant.id?'selected':''}>${esc(participant.name)}</option>`).join('')}${organization?'':`<option value="__manual__" ${manualSelected?'selected':''}>${english?'Other driver':'Autre pilote'}</option>`}</select></label>`);
   } else if(stateDraft.forOther&&linkedOther) fields.push(`<div class="registration-identity-field registration-identity-readonly"><span class="form-label">Pilote</span><strong>${esc(stateDraft.name||'Pilote Discord')}</strong></div>`);
   if(manualOther||guestSelf) fields.push(`<label class="registration-identity-field"><span class="form-label">${manualOther?'Pseudo de l’autre pilote':'Pseudo pilote'}</span><input name="pilotName" data-departure="${departure.id}" value="${esc(stateDraft.name)}" maxlength="30" required autocomplete="nickname"></label>`);
   fields.push(`<label class="registration-identity-field"><span class="form-label">Pilote souhaité <span class="muted">(facultatif)</span></span><input name="preferredPilot" data-departure="${departure.id}" value="${esc(stateDraft.preferredPilot||'')}" maxlength="30" placeholder="Pseudo du pilote souhaité"></label>`);
@@ -41,9 +44,10 @@ function identityFields(stateDraft,departure,categoryMode,manualOther,linkedOthe
 }
 
 function registrationContext(event,departure,stateDraft) {
-  const selected=departure.availability.find(reg=>reg.id===stateDraft.id);
-  const same=departure.availability.filter(reg=>stateDraft.participantId&&reg.participantId===stateDraft.participantId);
-  const assigned=(departure.crews||[]).some(crew=>crew.registrationIds.some(id=>same.some(reg=>reg.id===id)));
+  const scoped=(departure.availability||[]).filter(reg=>sameOrganization(reg,state.selectedOrganizationId));
+  const selected=scoped.find(reg=>reg.id===stateDraft.id);
+  const same=scoped.filter(reg=>stateDraft.participantId&&reg.participantId===stateDraft.participantId);
+  const assigned=(departure.crews||[]).filter(crew=>sameOrganization(crew,state.selectedOrganizationId)).some(crew=>crew.registrationIds.some(id=>same.some(reg=>reg.id===id)));
   const source=selected||same[0]||(!stateDraft.forOther?ownRegistrations(departure)[0]:null);
   const canAdd=!!source&&!assigned&&stateDraft.mode!=='category'&&event.categories.some(category=>!same.some(reg=>reg.category===category));
   return {selected,same,assigned,source,canAdd};
@@ -63,7 +67,8 @@ export function renderRegistrationForm(event,departure,stateDraft=draftFor(depar
   const manualOther=stateDraft.forOther&&!linkedOther&&!categoryMode&&!!stateDraft.manualOther; const guestSelf=!stateDraft.forOther&&!state.user;
   const title=categoryMode?`Ajouter une catégorie · ${esc(contextName||'Pilote')}`:otherMode?(stateDraft.id?`Modifier l’inscription · ${esc(contextName||'Pilote')}`:'Inscrire un autre pilote'):'Mon inscription';
   const banner=categoryMode?`<div class="registration-context-banner category"><span>AJOUT D’UNE CATÉGORIE</span><strong>${esc(contextName||'Pilote')}</strong></div>`:otherMode?`<div class="registration-context-banner other"><span>${stateDraft.id?'INSCRIPTION GÉRÉE':'AUTRE PILOTE'}</span>${contextName?`<strong>${esc(contextName)}</strong>`:''}</div>`:`<div class="registration-context-banner self"><span>TON INSCRIPTION</span><strong>${esc(contextName||state.user?.name||'Mon inscription')}</strong></div>`;
-  return `<form class="form-section registration-form" data-kind="registration" data-departure="${departure.id}"><h3 class="form-title">${title}</h3>${banner}${identityFields(stateDraft,departure,categoryMode,manualOther,linkedOther,guestSelf)}<div class="registration-choices"><span class="form-label">Heures de présence (${duration} h)</span><p class="availability-hint">Clique sur les créneaux où tu es disponible.</p>${renderAvailabilityTimeline({departure,duration,status:stateDraft.status,interactive:true,label:'Heures de présence'})}<div class="special-availability">${button('availability','TOUTE LA COURSE',`data-departure="${departure.id}" data-value="whole" aria-pressed="${stateDraft.status==='whole'}"`,`special-button whole ${stateDraft.status==='whole'?'active':''}`)}</div></div>${stateDraft.status==='unavailable'?'':`<div class="category-area"><span class="form-label">Catégorie</span><div class="categories">${event.categories.map(category=>button('category',`${logo(category)}<span>${esc(category)}</span>`,`data-departure="${departure.id}" data-value="${esc(category)}" ${((assigned&&stateDraft.id&&!categoryMode&&category!==stateDraft.category)||same.some(reg=>reg.id!==stateDraft.id&&reg.category===category))?'disabled':''} aria-pressed="${stateDraft.category===category}"`,`category-button ${categories[category]?.css||''} ${stateDraft.category===category?'active':''}`)).join('')}</div>${stateDraft.category?carPreferenceChoices(stateDraft.category,stateDraft.cars,stateDraft.carAny):''}</div>`}<div class="save-row"><button type="submit" class="save-button">${stateDraft.id?'ENREGISTRER':stateDraft.forOther?'INSCRIRE LE PILOTE':'S’INSCRIRE'}</button>${stateDraft.id?button('delete-registration',stateDraft.forOther?'Supprimer l’inscription':'Se désinscrire',`data-id="${stateDraft.id}" data-departure="${departure.id}"`,'danger-button'):''}</div></form>`;
+  const organizationBanner=`<div class="registration-organization-context"><span>ORGANISATION</span><strong>${esc(organizationShortLabel(state.organizations,state.selectedOrganizationId))}</strong></div>`;
+  return `<form class="form-section registration-form" data-kind="registration" data-departure="${departure.id}"><h3 class="form-title">${title}</h3>${organizationBanner}${banner}${identityFields(stateDraft,departure,categoryMode,manualOther,linkedOther,guestSelf)}<div class="registration-choices"><span class="form-label">Heures de présence (${duration} h)</span><p class="availability-hint">Clique sur les créneaux où tu es disponible.</p>${renderAvailabilityTimeline({departure,duration,status:stateDraft.status,interactive:true,label:'Heures de présence'})}<div class="special-availability">${button('availability','TOUTE LA COURSE',`data-departure="${departure.id}" data-value="whole" aria-pressed="${stateDraft.status==='whole'}"`,`special-button whole ${stateDraft.status==='whole'?'active':''}`)}</div></div>${stateDraft.status==='unavailable'?'':`<div class="category-area"><span class="form-label">Catégorie</span><div class="categories">${event.categories.map(category=>button('category',`${logo(category)}<span>${esc(category)}</span>`,`data-departure="${departure.id}" data-value="${esc(category)}" ${((assigned&&stateDraft.id&&!categoryMode&&category!==stateDraft.category)||same.some(reg=>reg.id!==stateDraft.id&&reg.category===category))?'disabled':''} aria-pressed="${stateDraft.category===category}"`,`category-button ${categories[category]?.css||''} ${stateDraft.category===category?'active':''}`)).join('')}</div>${stateDraft.category?carPreferenceChoices(stateDraft.category,stateDraft.cars,stateDraft.carAny):''}</div>`}<div class="save-row"><button type="submit" class="save-button">${stateDraft.id?'ENREGISTRER':stateDraft.forOther?'INSCRIRE LE PILOTE':'S’INSCRIRE'}</button>${stateDraft.id?button('delete-registration',stateDraft.forOther?'Supprimer l’inscription':'Se désinscrire',`data-id="${stateDraft.id}" data-departure="${departure.id}"`,'danger-button'):''}</div></form>`;
 }
 
 export function renderRegistrationWorkspace(event,departure) {
@@ -103,6 +108,7 @@ export async function submitRegistration(form,api) {
   draft.cars=[...form.querySelectorAll('[name="carPreference"]:checked')].map(input=>input.value); draft.carAny=!!form.elements.carAny?.checked;
   if(draft.status!=='unavailable'&&!draft.carAny&&!draft.cars.length)throw Error('Choisis au moins une voiture, ou coche « Peu importe la voiture ».');
   const payload={name:draft.name,status:draft.status,category:draft.category,cars:draft.cars,carAny:draft.carAny,preferredPilot:draft.preferredPilot||'',version:draft.version,participantId:draft.participantId,participantUserId:draft.participantUserId,forOther:!!draft.forOther};
+  if(!draft.id)payload.organizationId=state.selectedOrganizationId||null;
   const result=await api(draft.id?`/api/registrations/${draft.id}`:`/api/events/${event.id}/departures/${departure.id}/registrations`,draft.id?'PATCH':'POST',payload);
   if(!draft.forOther){state.pilotName=draft.name;try{localStorage.setItem('fmt_pilot_name',state.pilotName);}catch{}}
   if(result.recoveryLink)state.recoveryLink=result.recoveryLink; delete state.drafts[departureId]; state.registrationOpen.delete(departureId); return result;

@@ -1,10 +1,10 @@
 import {app,state,api,load,showError,countdown,CARS} from './core.mjs';
-import {renderNav,renderHome} from './home-view.mjs?v=3-shared-crew-cards';
-import {renderEvent} from './event-view.mjs?v=9-one-course-page';
+import {renderNav,renderHome} from './home-view.mjs?v=4-organizations';
+import {renderEvent} from './event-view.mjs?v=10-organizations';
 import {renderEventForm,departureFields,updateRemoveButtons} from './event-form.mjs';
-import {renderMyEntries} from './entries-view.mjs?v=2-three-accordions';
+import {renderMyEntries} from './entries-view.mjs?v=3-organizations';
 import {refresh,refreshAfterSave} from './refresh.mjs';
-import {draftFor,registrationDraft,ownRegistrations,rerenderRegistrationSection,submitRegistration} from './registration.mjs?v=2-preserve-timeline-scroll';
+import {draftFor,registrationDraft,ownRegistrations,rerenderRegistrationSection,submitRegistration} from './registration.mjs?v=3-organizations';
 import {updateCrewState} from './crews.mjs?v=8-one-page-compact';
 
 async function submitEvent(form){

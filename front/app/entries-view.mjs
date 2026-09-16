@@ -12,6 +12,7 @@ import {
   categories
 } from './core.mjs';
 import {getLocale,localeTag} from '../i18n.mjs';
+import {scopeDeparture,organizationShortLabel} from './organization-context.mjs?v=1';
 
 const dateFormat = new Intl.DateTimeFormat(localeTag(), {
   timeZone:'Europe/Paris',
@@ -80,7 +81,8 @@ function compactCrew(departure,crew) {
   </article>`;
 }
 
-function card({event,departure,reg}) {
+function card({event,departure:rawDeparture,reg}) {
+  const departure=scopeDeparture(rawDeparture,reg.organizationId||null);
   const crew = (departure.crews||[]).find(item => (item.registrationIds||[]).some(id => String(id) === String(reg.id)));
   const assigned = new Set((departure.crews||[]).flatMap(item => (item.registrationIds||[]).map(String)));
   const unassigned = (departure.availability||[])
@@ -90,6 +92,7 @@ function card({event,departure,reg}) {
     ? (crew.registrationIds||[]).map(id => departure.availability.find(pilot => String(pilot.id) === String(id))).filter(Boolean)
     : [];
   const otherCrews = (departure.crews||[]).filter(item => item.id !== crew?.id).sort(crewSort(event));
+  const organizationLabel=organizationShortLabel(state.organizations,reg.organizationId||null);
 
   const ownCrewBody = crew?`<article class="ux-my-own-crew ${categories[crew.category]?.css||''}">
     <div class="ux-my-own-crew-head">
@@ -118,9 +121,9 @@ function card({event,departure,reg}) {
         <span class="ux-my-entry-departure">Départ ${esc(departure.time||'')}</span>
         <h2>${esc(event.name)}</h2>
         <span class="ux-my-entry-date">${esc(entryDate(departure))}</span>
-        <div class="native-my-entry-meta">${eventTypeBadge(event.eventType)}${badge(reg.category)}<span>${esc(circuitLabel(event.circuit))}</span><span>${event.durationHours||6} h</span></div>
+        <div class="native-my-entry-meta"><span class="organization-entry-badge">${esc(organizationLabel)}</span>${eventTypeBadge(event.eventType)}${badge(reg.category)}<span>${esc(circuitLabel(event.circuit))}</span><span>${event.durationHours||6} h</span></div>
       </div>
-      <button type="button" class="primary-button native-my-entry-open-event" data-action="open" data-id="${event.id}" data-departure="${departure.id}">Voir l’événement complet</button>
+      <button type="button" class="primary-button native-my-entry-open-event" data-organization-entry-open data-id="${event.id}" data-departure="${departure.id}" data-organization="${esc(reg.organizationId||'')}">Voir l’événement complet</button>
     </summary>
     <div class="native-my-entry-body">
       ${contentAccordion('Mon équipage',members.length,ownCrewBody)}
@@ -139,7 +142,7 @@ export function renderMyEntries() {
     <div class="native-my-entries-group-heading"><h2>${title}</h2><span>${list.length} inscription${list.length>1?'s':''}</span></div>
     ${list.length?`<div class="native-my-entry-list">${list.map(card).join('')}</div>`:'<p class="empty">Aucune inscription.</p>'}
   </section>`;
-  app.innerHTML=`<div class="native-my-entries-heading"><span class="creation-kicker">ESPACE PILOTE</span><h1 class="page-title">MES INSCRIPTIONS</h1><p>Retrouve ici tes courses, ton équipage et les pilotes inscrits sur le même départ.</p></div>
+  app.innerHTML=`<div class="native-my-entries-heading"><span class="creation-kicker">ESPACE PILOTE</span><h1 class="page-title">MES INSCRIPTIONS</h1><p>Chaque inscription indique maintenant si tu roules en général, avec ta Team ou dans une communauté.</p></div>
     ${section('Mes inscriptions personnelles',entries.filter(item=>item.reg.mine))}
     ${entries.some(item=>item.reg.managed)?section('Inscriptions que je gère',entries.filter(item=>item.reg.managed)):''}`;
   notifyRender();
