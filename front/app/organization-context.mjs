@@ -1,22 +1,6 @@
-const esc=value=>String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
+const esc=value=>String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[char]));
 
-export function sameOrganization(item,organizationId){
-  return (item?.organizationId||null)===(organizationId||null);
-}
-
-export function scopeDeparture(departure,organizationId){
-  if(!departure)return departure;
-  return {
-    ...departure,
-    availability:(departure.availability||[]).filter(item=>sameOrganization(item,organizationId)),
-    crews:(departure.crews||[]).filter(item=>sameOrganization(item,organizationId))
-  };
-}
-
-export function scopeEvent(event,organizationId){
-  if(!event)return event;
-  return {...event,departures:(event.departures||[]).map(departure=>scopeDeparture(departure,organizationId))};
-}
+export const GENERAL_AUDIENCE='general';
 
 export function joinedOrganizations(organizations={}){
   const values=[];
@@ -26,13 +10,13 @@ export function joinedOrganizations(organizations={}){
 }
 
 export function organizationById(organizations,organizationId){
-  if(!organizationId)return null;
+  if(!organizationId||organizationId===GENERAL_AUDIENCE)return null;
   return joinedOrganizations(organizations).find(item=>item.id===organizationId)||null;
 }
 
 export function organizationLabel(organizations,organizationId){
   const organization=organizationById(organizations,organizationId);
-  if(!organization)return'Endurance Manager · général';
+  if(!organization)return'Endurance Manager · Général';
   return `${organization.type==='team'?'Team':'Communauté'} · ${organization.name}`;
 }
 
@@ -42,25 +26,107 @@ export function organizationShortLabel(organizations,organizationId){
   return `${organization.type==='team'?'🔒':'🌐'} ${organization.name}`;
 }
 
-export function organizationChoices(organizations={},{includeGeneral=true}={}){
-  const choices=[];
-  if(includeGeneral)choices.push({id:'',type:'general',name:'Endurance Manager · général'});
-  if(organizations.team)choices.push({id:organizations.team.id,type:'team',name:`🔒 ${organizations.team.name} · Ma Team`});
-  for(const community of organizations.communities||[])choices.push({id:community.id,type:'community',name:`🌐 ${community.name} · Communauté`});
+export function audienceChoices(organizations={}){
+  const choices=[{key:GENERAL_AUDIENCE,id:GENERAL_AUDIENCE,type:'general',name:'Général',label:'Général'}];
+  if(organizations.team)choices.push({key:organizations.team.id,id:organizations.team.id,type:'team',name:organizations.team.name,label:`🔒 ${organizations.team.name}`});
+  for(const community of organizations.communities||[])choices.push({key:community.id,id:community.id,type:'community',name:community.name,label:`🌐 ${community.name}`});
   return choices;
 }
 
-export function organizationContextMarkup(state,{compact=false}={}){
+// Le builder d'équipage garde une valeur vide pour le Général afin de rester compatible avec l'API crew existante.
+export function organizationChoices(organizations={},{includeGeneral=true}={}){
+  return audienceChoices(organizations).filter(choice=>includeGeneral||choice.type!=='general').map(choice=>({
+    id:choice.type==='general'?'':choice.id,
+    type:choice.type,
+    name:choice.type==='general'?'Endurance Manager · Général':`${choice.label} · ${choice.type==='team'?'Ma Team':'Communauté'}`
+  }));
+}
+
+export function allAudienceIds(organizations={}){
+  return new Set(audienceChoices(organizations).map(choice=>choice.key));
+}
+
+export function normalizeAudienceFilter(organizations={},value){
+  const valid=allAudienceIds(organizations);
+  const source=value instanceof Set?[...value]:Array.isArray(value)?value:typeof value==='string'?[value]:[];
+  const result=new Set(source.map(item=>item||GENERAL_AUDIENCE).filter(item=>valid.has(item)));
+  return result.size?result:valid;
+}
+
+export function registrationAudienceIds(registration){
+  if(Array.isArray(registration?.audienceIds)&&registration.audienceIds.length)return [...new Set(registration.audienceIds.map(value=>value||GENERAL_AUDIENCE))];
+  return [registration?.organizationId||GENERAL_AUDIENCE];
+}
+
+function filterSet(filter){
+  if(filter instanceof Set)return filter.size?filter:new Set([GENERAL_AUDIENCE]);
+  if(Array.isArray(filter))return new Set(filter.length?filter:[GENERAL_AUDIENCE]);
+  return new Set([filter||GENERAL_AUDIENCE]);
+}
+
+export function sameOrganization(item,organizationId){
+  const key=organizationId||GENERAL_AUDIENCE;
+  if(Array.isArray(item?.audienceIds))return item.audienceIds.includes(key);
+  return (item?.organizationId||GENERAL_AUDIENCE)===key;
+}
+
+export function scopeDeparture(departure,audiences){
+  if(!departure)return departure;
+  const visible=filterSet(audiences);
+  return {
+    ...departure,
+    availability:(departure.availability||[]).filter(reg=>registrationAudienceIds(reg).some(key=>visible.has(key))),
+    crews:(departure.crews||[]).filter(crew=>visible.has(crew.organizationId||GENERAL_AUDIENCE))
+  };
+}
+
+export function scopeEvent(event,audiences){
+  if(!event)return event;
+  return {...event,departures:(event.departures||[]).map(departure=>scopeDeparture(departure,audiences))};
+}
+
+export function organizationAudienceLabels(organizations={},ids=[]){
+  const wanted=new Set(ids);
+  return audienceChoices(organizations).filter(choice=>wanted.has(choice.key)).map(choice=>choice.label);
+}
+
+export function defaultRegistrationAudienceIds(state){
+  const selected=normalizeAudienceFilter(state?.organizations||{},state?.visibleAudienceIds);
+  return selected.size===1?[...selected]:[GENERAL_AUDIENCE];
+}
+
+export function defaultCrewOrganizationId(state){
+  const selected=normalizeAudienceFilter(state?.organizations||{},state?.visibleAudienceIds);
+  if(selected.size===1){const key=[...selected][0];return key===GENERAL_AUDIENCE?null:key;}
+  return state?.organizations?.team?.id||null;
+}
+
+function filterSummary(state,choices){
+  const selected=normalizeAudienceFilter(state.organizations,state.visibleAudienceIds);
+  if(selected.size===choices.length)return'Tout';
+  if(selected.size===1){const choice=choices.find(item=>selected.has(item.key));return choice?.label||'1 espace';}
+  return `${selected.size} espaces`;
+}
+
+export function organizationFilterMarkup(state){
   if(!state?.user)return'';
-  const choices=organizationChoices(state.organizations);
-  const selected=state.selectedOrganizationId||'';
-  return `<section class="organization-context ${compact?'is-compact':''}" aria-label="Organisation de la participation"><div class="organization-context-copy"><span>ORGANISATION</span><strong>${esc(organizationShortLabel(state.organizations,state.selectedOrganizationId))}</strong>${compact?'':'<small>Choisis avec quel groupe tu organises cette participation. L’événement officiel reste le même.</small>'}</div><label><span class="sr-only">Organisation</span><select name="organizationContext">${choices.map(choice=>`<option value="${esc(choice.id)}" ${choice.id===selected?'selected':''}>${esc(choice.name)}</option>`).join('')}</select></label></section>`;
-}
-
-export function defaultOrganizationId(organizations={}){
-  return organizations.team?.id||(organizations.communities||[])[0]?.id||null;
-}
-
-export function hasOrganization(organizations,id){
-  return !id||joinedOrganizations(organizations).some(item=>item.id===id);
+  const choices=audienceChoices(state.organizations);
+  const selected=normalizeAudienceFilter(state.organizations,state.visibleAudienceIds);
+  const team=state.organizations?.team;
+  const communities=state.organizations?.communities||[];
+  return `<details class="organization-filter" data-audience-filter-menu>
+    <summary><span class="organization-filter-title"><small>AFFICHAGE</small><strong>${esc(filterSummary(state,choices))}</strong></span><span class="organization-filter-chevron" aria-hidden="true">▾</span></summary>
+    <div class="organization-filter-panel">
+      <div class="organization-filter-copy"><strong>Afficher les participations de</strong><span>Ce filtre change seulement ce que tu vois. Il ne modifie aucune inscription.</span></div>
+      <div class="organization-filter-presets" role="group" aria-label="Filtres rapides">
+        <button type="button" class="secondary-button" data-audience-preset="all">Tout</button>
+        <button type="button" class="secondary-button" data-audience-preset="general">Général</button>
+        ${team?'<button type="button" class="secondary-button" data-audience-preset="team">Ma Team</button>':''}
+        ${communities.length?'<button type="button" class="secondary-button" data-audience-preset="communities">Communautés</button>':''}
+      </div>
+      <div class="organization-filter-options">
+        ${choices.map(choice=>`<label class="organization-filter-option ${choice.type}"><input type="checkbox" data-audience-filter value="${esc(choice.key)}" ${selected.has(choice.key)?'checked':''}><span><strong>${esc(choice.label)}</strong><small>${choice.type==='general'?'Espace commun Endurance Manager':choice.type==='team'?'Team privée':'Communauté rejointe'}</small></span></label>`).join('')}
+      </div>
+    </div>
+  </details>`;
 }
