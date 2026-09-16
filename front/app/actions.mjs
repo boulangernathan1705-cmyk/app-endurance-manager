@@ -109,7 +109,10 @@ async function perform(action,target){
     case 'delete-event': if(!confirm(`Supprimer « ${event.name} » et toutes ses inscriptions ? Cette suppression est définitive.`))return;await api(`/api/events/${event.id}`,'DELETE',{version:event.version});state.page='home';await refreshAfterSave('Événement supprimé.');break;
     case 'my-entries': await load();renderNav();renderMyEntries();break;
     case 'guest-link': state.recoveryLink=(await api('/api/guest/link','POST')).link;state.page==='event'?renderEvent():renderHome();break;
-    case 'copy-link': try{await navigator.clipboard.writeText(state.recoveryLink);target.textContent='Lien copié';}catch{document.getElementById('personalLink')?.select();throw Error('Copie le lien sélectionné avec Ctrl+C.');break;}
+    case 'copy-link':
+      try{await navigator.clipboard.writeText(state.recoveryLink);target.textContent='Lien copié';}
+      catch{document.getElementById('personalLink')?.select();throw Error('Copie le lien sélectionné avec Ctrl+C.');}
+      break;
     case 'hide-link': state.recoveryLink='';target.closest('.recovery-panel')?.remove();break;
   }
 }
