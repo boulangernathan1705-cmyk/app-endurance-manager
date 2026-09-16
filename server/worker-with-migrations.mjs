@@ -4,6 +4,7 @@ import {ensureDiscordWeeklySchema} from './discord-weekly-schema.mjs';
 import {syncWeeklyDiscord} from './discord-weekly.mjs';
 import {ensureOrganizationSchema} from './organization-schema.mjs';
 import {organizationAwareFetch} from './organizations.mjs';
+import {ensureDevTestSpaces} from './dev-test-spaces.mjs';
 
 let crewOwnershipReady = null;
 
@@ -66,6 +67,7 @@ export default {
     if (pathname.startsWith('/api/')) {
       await ensureCrewOwnershipSchema(env);
       await ensureOrganizationSchema(env);
+      await ensureDevTestSpaces(request,env);
     }
     const weeklyMutation = isWeeklyDiscordMutation(request);
     const response = pathname.startsWith('/api/')
