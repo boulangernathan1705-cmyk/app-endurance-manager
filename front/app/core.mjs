@@ -14,7 +14,7 @@ export const state = {
   events:[], user:null, discordReady:false, currentEventId:null, page:'home', editingEvent:null,
   drafts:{}, recoveryLink:'', busy:false, participants:[], flash:'', eventFilter:'upcoming',
   selectedDepartureId:null, eventSection:'race', pilotName:'', registrationOpen:new Set(), crewManagementOpen:new Set(),
-  pendingCrewJoin:null, currentOrganizationId:null, activeOrganizationId:null, organizations:{team:null,communities:[],discoverableCommunities:[],discordBotReady:false,discordBotInviteUrl:''}, visibleAudienceIds:new Set(['general'])
+  pendingCrewJoin:null, currentOrganizationId:null, activeOrganizationId:null, eventCreationOrganizationId:null, organizations:{team:null,communities:[],discoverableCommunities:[],discordBotReady:false,discordBotInviteUrl:''}, visibleAudienceIds:new Set(['general'])
 };
 try { state.pilotName = localStorage.getItem('fmt_pilot_name') || ''; } catch {}
 
