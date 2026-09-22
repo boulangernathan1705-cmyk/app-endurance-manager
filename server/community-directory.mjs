@@ -68,6 +68,14 @@ async function membersFor(env,ids){
   }
   return map;
 }
+async function memberCountsFor(env,ids){
+  const map=new Map();
+  if(!ids.length)return map;
+  const marks=ids.map(()=>'?').join(',');
+  const rows=(await env.DB.prepare('SELECT organization_id,COUNT(*) member_count FROM organization_members WHERE organization_id IN ('+marks+') GROUP BY organization_id').bind(...ids).all()).results||[];
+  for(const row of rows)map.set(row.organization_id,Number(row.member_count)||0);
+  return map;
+}
 async function activityFor(env,ids){
   const map=new Map();
   if(!ids.length)return map;
@@ -122,7 +130,13 @@ export async function organizationSummary(env,actor){
   const joined=actor.user?(await env.DB.prepare('SELECT o.*,m.role FROM organizations o JOIN organization_members m ON m.organization_id=o.id WHERE m.user_id=? ORDER BY o.type DESC,lower(o.name),o.id').bind(actor.user.id).all()).results||[]:[];
   const joinedIds=joined.map(item=>item.id);
   const managedIds=joined.filter(item=>['owner','manager'].includes(item.role)).map(item=>item.id);
-  const [memberMap,joinedActivity,requestMap]=await Promise.all([membersFor(env,joinedIds),activityFor(env,joinedIds),requestsFor(env,managedIds)]);
+  const team=joined.find(item=>item.type==='team');
+  const [teamMembers,memberCounts,joinedActivity,requestMap]=await Promise.all([
+    membersFor(env,team?[team.id]:[]),
+    memberCountsFor(env,joinedIds),
+    activityFor(env,joinedIds),
+    requestsFor(env,managedIds)
+  ]);
   let discoverable=[];
   if(actor.user){
     discoverable=(await env.DB.prepare('SELECT o.*,COUNT(om.user_id) member_count,EXISTS(SELECT 1 FROM organization_join_requests r WHERE r.organization_id=o.id AND r.user_id=?) join_pending FROM organizations o LEFT JOIN organization_members om ON om.organization_id=o.id WHERE o.type=\'community\' AND o.visibility=\'public\' AND NOT EXISTS(SELECT 1 FROM organization_members mine WHERE mine.organization_id=o.id AND mine.user_id=?) GROUP BY o.id ORDER BY lower(o.name),o.id').bind(actor.user.id,actor.user.id).all()).results||[];
@@ -131,11 +145,10 @@ export async function organizationSummary(env,actor){
   }
   const discoverActivity=await activityFor(env,discoverable.map(item=>item.id));
   const decorate=item=>{
-    const members=memberMap.get(item.id)||[];
     const manage=['owner','manager'].includes(item.role);
-    return present(item,{role:item.role,members,memberCount:members.length,eventIds:joinedActivity.get(item.id)||[],manage,joinRequests:requestMap.get(item.id)||[]});
+    const members=item.type==='team'?(teamMembers.get(item.id)||[]):[];
+    return present(item,{role:item.role,members,memberCount:memberCounts.get(item.id)||0,eventIds:joinedActivity.get(item.id)||[],manage,joinRequests:requestMap.get(item.id)||[]});
   };
-  const team=joined.find(item=>item.type==='team');
   return {
     team:team?decorate(team):null,
     communities:joined.filter(item=>item.type==='community').map(decorate),
@@ -257,6 +270,15 @@ export async function communityDirectoryApi(request,env,actor){
   }
 
   const members=path.match(/^\/api\/organizations\/([a-f0-9-]{36})\/members(?:\/(\d{15,22}))?$/);
+  if(members&&method==='GET'&&!members[2]){
+    const organization=await requireMember(env,actor,members[1]);
+    const limit=Math.min(100,Math.max(1,Number(url.searchParams.get('limit'))||50));
+    const offset=Math.max(0,Number(url.searchParams.get('offset'))||0);
+    const list=(await env.DB.prepare('SELECT om.user_id,om.role,u.name FROM organization_members om JOIN users u ON u.id=om.user_id WHERE om.organization_id=? ORDER BY CASE om.role WHEN \'owner\' THEN 0 WHEN \'manager\' THEN 1 ELSE 2 END,lower(u.name),u.id LIMIT ? OFFSET ?').bind(organization.id,limit,offset).all()).results||[];
+    const count=await env.DB.prepare('SELECT COUNT(*) total FROM organization_members WHERE organization_id=?').bind(organization.id).first();
+    const total=Number(count?.total)||0;
+    return json({members:list.map(row=>({id:row.user_id,name:row.name,role:row.role})),total,nextOffset:offset+list.length<total?offset+list.length:null});
+  }
   if(members&&method==='POST'&&!members[2]){
     await secureWrite(request,env);
     const organization=await requireMember(env,actor,members[1],{manage:true});
