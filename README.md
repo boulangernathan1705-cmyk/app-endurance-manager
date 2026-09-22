@@ -19,8 +19,12 @@ Les permissions sont toujours vérifiées côté serveur. Un pseudo seul ne donn
 - API sur Cloudflare Workers.
 - Base partagée Cloudflare D1 `fmt-endurance`.
 - Authentification Discord.
+- Communautés Endurance Manager facultatives, indépendantes des événements généraux.
+- Liaison Discord facultative par communauté pour vérifier l’appartenance à un serveur et, si configuré, un rôle d’éligibilité aux endurances.
 - Assets statiques servis par Cloudflare Workers Static Assets.
 - Catalogue catégories, voitures et circuits partagé entre le front et le serveur.
+
+Une endurance peut rester générale et n’appartenir à aucune communauté. Les communautés peuvent être ouvertes, sur demande, sur invitation ou vérifier l’appartenance à un serveur Discord. Les listes de membres des communautés sont chargées à la demande et paginées afin de rester adaptées aux grands serveurs.
 
 Les horaires sont interprétés en heure de Paris. Les inscriptions se verrouillent au départ. Un pilote peut proposer plusieurs catégories sur le même départ ; lorsqu’il est affecté à un équipage, la catégorie de cet équipage devient celle retenue.
 
@@ -46,6 +50,6 @@ npm run deploy:workers
 
 Cette commande applique les migrations D1 en attente puis déploie le Worker. La base D1 existante ne doit pas être recréée et les migrations déjà appliquées ne doivent pas être rejouées manuellement.
 
-Les variables Discord sont configurées dans Cloudflare. `DISCORD_CLIENT_SECRET` doit rester un secret Cloudflare et ne doit jamais être ajouté au dépôt.
+Les variables Discord sont configurées dans Cloudflare. `DISCORD_CLIENT_SECRET` et `DISCORD_BOT_TOKEN` doivent rester des secrets Cloudflare et ne doivent jamais être ajoutés au dépôt. Le bot est nécessaire uniquement pour les communautés qui activent la vérification d’un serveur ou d’un rôle Discord.
 
 Voir `docs/DEPLOYMENT.md` pour le déploiement Cloudflare et `docs/TECHNICAL_AUDIT.md` pour les règles de maintenance et d’optimisation.
