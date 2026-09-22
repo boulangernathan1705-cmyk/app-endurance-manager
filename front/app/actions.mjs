@@ -1,12 +1,13 @@
 import {app,state,api,load,showError,countdown,CARS} from './core.mjs';
-import {renderNav,renderHome} from './home-view.mjs?v=7-paddock-pulse';
+import {renderNav,renderHome} from './home-view.mjs?v=8-community-directory';
+import {renderCommunities} from './community-directory.mjs?v=1';
 import {renderEvent} from './event-view.mjs?v=13-paddock-lens';
 import {renderEventForm,departureFields,updateRemoveButtons} from './event-form.mjs';
 import {renderMyEntries} from './entries-view.mjs?v=4-audiences';
 import {refresh,refreshAfterSave} from './refresh.mjs?v=2-paddock-chain';
 import {draftFor,registrationDraft,ownRegistrations,rerenderRegistrationSection,submitRegistration} from './registration.mjs?v=4-audiences';
 import {updateCrewState} from './crews.mjs?v=9-audiences';
-import {GENERAL_AUDIENCE,defaultRegistrationAudienceIds,registrationAudienceIds} from './organization-context.mjs?v=4-paddock-network';
+import {GENERAL_AUDIENCE,defaultRegistrationAudienceIds,registrationAudienceIds} from './organization-context.mjs?v=5-community-directory';
 
 async function submitEvent(form){
   const data={name:form.elements.eventName.value.trim(),durationHours:Number(form.elements.eventDuration.value),eventType:form.elements.eventType.value,circuit:form.elements.eventCircuit.value,categories:[...form.querySelectorAll('[name="eventCategory"]:checked')].map(input=>input.value),departures:[...form.querySelectorAll('.departure-field')].map(row=>({id:row.dataset.id||undefined,date:row.querySelector('[name="date"]').value,time:row.querySelector('[name="time"]').value})),version:state.editingEvent?.version};
@@ -108,6 +109,7 @@ async function perform(action,target){
     case 'remove-departure': if(app.querySelectorAll('.departure-field').length>1)target.closest('.departure-field').remove();updateRemoveButtons();break;
     case 'delete-event': if(!confirm(`Supprimer « ${event.name} » et toutes ses inscriptions ? Cette suppression est définitive.`))return;await api(`/api/events/${event.id}`,'DELETE',{version:event.version});state.page='home';await refreshAfterSave('Événement supprimé.');break;
     case 'my-entries': await load();renderNav();renderMyEntries();break;
+    case 'communities': await load();renderNav();renderCommunities();break;
     case 'guest-link': state.recoveryLink=(await api('/api/guest/link','POST')).link;state.page==='event'?renderEvent():renderHome();break;
     case 'copy-link':
       try{await navigator.clipboard.writeText(state.recoveryLink);target.textContent='Lien copié';}
