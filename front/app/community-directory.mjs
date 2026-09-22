@@ -1,7 +1,7 @@
 import {app,state,api,load,showError,esc,dateLabel,notifyRender} from './core.mjs';
 import {renderEvent} from './event-view.mjs?v=14-community-directory';
 
-const ui={search:'',game:'all',creating:false,discord:new Map(),eligibility:new Map(),busy:false};
+const ui={search:'',game:'all',creating:false,discord:new Map(),eligibility:new Map(),members:new Map(),busy:false};
 const communities=()=>[...(state.organizations?.communities||[]),...(state.organizations?.discoverableCommunities||[])];
 const byId=id=>communities().find(item=>item.id===id)||null;
 const canManage=community=>['owner','manager'].includes(community?.role);
@@ -27,6 +27,24 @@ function filteredDiscoverable(){
   const q=ui.search.trim().toLocaleLowerCase('fr-FR');
   return source.filter(item=>(!q||`${item.name} ${item.description||''}`.toLocaleLowerCase('fr-FR').includes(q))&&(ui.game==='all'||(item.games||[]).includes(ui.game)));
 }
+async function loadCommunityMembers(id,{append=false}={}){
+  const current=ui.members.get(id);
+  const offset=append?(current?.nextOffset??0):0;
+  if(append&&current?.nextOffset==null)return;
+  const result=await api('/api/organizations/'+id+'/members?limit=50&offset='+offset);
+  ui.members.set(id,{
+    members:append?[...(current?.members||[]),...(result.members||[])]:result.members||[],
+    total:Number(result.total)||0,
+    nextOffset:result.nextOffset==null?null:Number(result.nextOffset)
+  });
+}
+async function openCommunity(id){
+  renderCommunities(id);
+  const community=byId(id);
+  if(!community?.role)return;
+  await loadCommunityMembers(id);
+  if(state.page==='communities'&&state.currentOrganizationId===id)renderCommunities(id);
+}
 function teamPanel(){
   if(!state.user)return'';
   const team=state.organizations?.team;
@@ -44,8 +62,12 @@ function directory(){
   return `<section class="community-directory-hero"><div><small>COMMUNAUTÉS</small><h1>Trouve ton paddock</h1><p>Rejoins une communauté pour retrouver ses pilotes et ses endurances. Une communauté peut vivre entièrement sur Endurance Manager ou utiliser Discord pour vérifier ses membres et ses rôles.</p></div>${state.user?createPanel():'<div class="community-login-note">Connecte-toi avec Discord pour rejoindre ou créer une communauté.</div>'}</section>${joined.length?`<section class="community-directory-section"><div class="community-section-heading"><div><small>MES COMMUNAUTÉS</small><h2>Mes espaces</h2></div><span>${joined.length}</span></div><div class="community-grid">${joined.map(communityCard).join('')}</div></section>`:''}${teamPanel()}<section class="community-directory-section"><div class="community-section-heading"><div><small>DÉCOUVRIR</small><h2>Communautés disponibles</h2><p>Explore les communautés publiques sans obligation de passer par Discord.</p></div></div><div class="community-discovery-tools"><label><span>Rechercher</span><input type="search" value="${esc(ui.search)}" data-community-filter="search" placeholder="Nom ou description"></label><label><span>Simulateur</span><select data-community-filter="game"><option value="all" ${ui.game==='all'?'selected':''}>Tous</option><option value="lmu" ${ui.game==='lmu'?'selected':''}>Le Mans Ultimate</option><option value="iracing" ${ui.game==='iracing'?'selected':''}>iRacing</option></select></label></div>${found.length?`<div class="community-grid">${found.map(communityCard).join('')}</div>`:'<div class="community-empty">Aucune communauté ne correspond à ces critères.</div>'}</section>`;
 }
 function memberList(community){
-  const manageable=canManage(community),members=community.members||[];
-  return `<div class="community-members">${members.length?members.map(member=>`<div class="community-member"><span class="community-member-avatar">${esc(initials(member.name))}</span><span><strong>${esc(member.name)}</strong><small>${esc(roleLabel(member.role))}</small></span>${manageable&&member.role!=='owner'&&member.id!==state.user?.id?`<button type="button" data-community-action="remove-member" data-id="${community.id}" data-user-id="${member.id}" data-user-name="${esc(member.name)}" aria-label="Retirer ${esc(member.name)}">×</button>`:''}</div>`).join(''):'<p>Aucun membre.</p>'}</div>`;
+  const manageable=canManage(community);
+  const paged=community.type==='community'?ui.members.get(community.id):null;
+  const members=paged?.members||community.members||[];
+  const total=paged?.total??Number(community.memberCount)||0;
+  const loading=community.type==='community'&&!paged&&Number(community.memberCount)>0;
+  return `<div class="community-members">${loading?'<p class="community-muted">Chargement des membres…</p>':members.length?members.map(member=>`<div class="community-member"><span class="community-member-avatar">${esc(initials(member.name))}</span><span><strong>${esc(member.name)}</strong><small>${esc(roleLabel(member.role))}</small></span>${manageable&&member.role!=='owner'&&member.id!==state.user?.id?`<button type="button" data-community-action="remove-member" data-id="${community.id}" data-user-id="${member.id}" data-user-name="${esc(member.name)}" aria-label="Retirer ${esc(member.name)}">×</button>`:''}</div>`).join(''):'<p>Aucun membre.</p>'}${paged?.nextOffset!=null?`<button type="button" class="secondary-button community-more-members" data-community-action="more-members" data-id="${community.id}">Afficher plus · ${members.length}/${total}</button>`:''}</div>`;
 }
 function requestList(community){
   if(!canManage(community)||!(community.joinRequests||[]).length)return'';
@@ -94,12 +116,13 @@ async function action(target){
   const type=target.dataset.communityAction,id=target.dataset.id;
   if(type==='back'){renderCommunities(null);return;}
   if(type==='toggle-create'){ui.creating=!ui.creating;renderCommunities(null);return;}
-  if(type==='open'){renderCommunities(id);return;}
-  if(type==='join'){await api('/api/organizations/'+id+'/join','POST');await reload(id);return;}
-  if(type==='leave'){if(!confirm('Quitter cette communauté ?'))return;await api('/api/organizations/'+id+'/members/me','DELETE');ui.eligibility.delete(id);await reload(null);return;}
+  if(type==='open'){await openCommunity(id);return;}
+  if(type==='join'){await api('/api/organizations/'+id+'/join','POST');await load();await openCommunity(id);return;}
+  if(type==='leave'){if(!confirm('Quitter cette communauté ?'))return;await api('/api/organizations/'+id+'/members/me','DELETE');ui.eligibility.delete(id);ui.members.delete(id);await reload(null);return;}
   if(type==='eligibility'){ui.eligibility.set(id,await api('/api/organizations/'+id+'/eligibility'));renderCommunities(id);return;}
-  if(type==='remove-member'){if(!confirm('Retirer '+(target.dataset.userName||'ce pilote')+' de la communauté ?'))return;await api('/api/organizations/'+id+'/members/'+target.dataset.userId,'DELETE');await reload(id);return;}
-  if(type==='request'){await api('/api/organizations/'+id+'/join-requests/'+target.dataset.userId,'POST',{action:target.dataset.decision});await reload(id);return;}
+  if(type==='remove-member'){if(!confirm('Retirer '+(target.dataset.userName||'ce pilote')+' de la communauté ?'))return;await api('/api/organizations/'+id+'/members/'+target.dataset.userId,'DELETE');await load();await loadCommunityMembers(id);renderCommunities(id);return;}
+  if(type==='request'){await api('/api/organizations/'+id+'/join-requests/'+target.dataset.userId,'POST',{action:target.dataset.decision});await load();await loadCommunityMembers(id);renderCommunities(id);return;}
+  if(type==='more-members'){await loadCommunityMembers(id,{append:true});renderCommunities(id);return;}
   if(type==='unlink-discord'){if(!confirm('Délier le serveur Discord de cette communauté ?'))return;await api('/api/organizations/'+id+'/discord','PATCH',{guildId:''});ui.discord.delete(id);await reload(id);return;}
   if(type==='event'){state.activeOrganizationId=id;state.visibleAudienceIds=new Set([id]);state.currentEventId=target.dataset.eventId;state.selectedDepartureId=target.dataset.departureId||null;state.registrationOpen.clear();state.drafts={};renderEvent();}
 }
