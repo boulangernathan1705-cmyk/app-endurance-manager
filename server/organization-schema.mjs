@@ -125,7 +125,12 @@ export async function ensureOrganizationSchema(env){
 
     try{await env.DB.prepare("INSERT OR IGNORE INTO d1_migrations(name) VALUES('0018_organizations.sql')").run();}catch{}
     try{await env.DB.prepare("INSERT OR IGNORE INTO d1_migrations(name) VALUES('0019_registration_audiences.sql')").run();}catch{}
+    // 0021 : rattachement facultatif d'un événement à une communauté.
+    await addColumnIfMissing(env,'events','organization_id','ALTER TABLE events ADD COLUMN organization_id TEXT REFERENCES organizations(id) ON DELETE RESTRICT');
+    await env.DB.prepare('CREATE INDEX IF NOT EXISTS events_organization ON events(organization_id,created_at DESC)').run();
+
     try{await env.DB.prepare("INSERT OR IGNORE INTO d1_migrations(name) VALUES('0020_community_directory.sql')").run();}catch{}
+    try{await env.DB.prepare("INSERT OR IGNORE INTO d1_migrations(name) VALUES('0021_event_communities.sql')").run();}catch{}
   })().catch(error=>{organizationSchemaReady=null;throw error;});
   return organizationSchemaReady;
 }
