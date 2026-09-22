@@ -1,13 +1,26 @@
 import {app,state,esc,button,canManage,isAdmin,eventTypeBadge,eventBadge,eventCategoryCount,circuitVisual,pilotCount,dateLabel,countdown,notifyRender} from './core.mjs';
 import {ownRegistration,renderRegistrationWorkspace} from './registration.mjs?v=4-audiences';
 import {renderPilots} from './crews.mjs?v=9-audiences';
-import {renderHome,showRecoveryLink} from './home-view.mjs?v=7-paddock-pulse';
-import {scopeEvent,defaultCrewOrganizationId,joinedOrganizations,allAudienceIds} from './organization-context.mjs?v=4-paddock-network';
+import {renderHome,showRecoveryLink} from './home-view.mjs?v=8-community-directory';
+import {scopeEvent,defaultCrewOrganizationId,joinedOrganizations,allAudienceIds} from './organization-context.mjs?v=5-community-directory';
 
-function managesAnyGroup(){return joinedOrganizations(state.organizations).some(organization=>['owner','manager'].includes(organization.role));}
+function managedCommunity(organizationId){
+  return joinedOrganizations(state.organizations).find(organization=>organization.id===organizationId&&organization.type==='community'&&['owner','manager'].includes(organization.role))||null;
+}
+function managesCurrentScope(){
+  if(state.visibleAudienceIds?.size!==1)return false;
+  const organizationId=[...state.visibleAudienceIds][0];
+  return Boolean(managedCommunity(organizationId));
+}
+function canEditEvent(event){
+  return canManage()||Boolean(event?.organizationId&&managedCommunity(event.organizationId));
+}
+function canDeleteEvent(event){
+  return isAdmin()||Boolean(event?.organizationId&&managedCommunity(event.organizationId));
+}
 function canCreateCrewOnDeparture(departure){
   if(!state.user||departure.startsAt<=Date.now())return false;
-  if(canManage()||managesAnyGroup())return true;
+  if(canManage()||managesCurrentScope())return true;
   return (departure.availability||[]).some(reg=>reg.mine&&reg.status!=='unavailable'&&!reg.engaged);
 }
 
@@ -37,7 +50,7 @@ function raceLensMarkup(rawEvent){
   const current=currentScopeKey();
   const groups=joinedOrganizations(state.organizations);
   const options=[{id:'all',label:'Tout le paddock'},{id:'general',label:'Général'},...groups.map(group=>({id:group.id,label:`${group.type==='team'?'◆':'○'} ${group.name}`}))];
-  return `<section class="race-lens" aria-label="Choisir le paddock affiché"><div class="race-lens-head"><div><span>VOIR CETTE COURSE POUR</span><small>Même endurance, différents groupes de pilotes. Change de vue sans quitter la course.</small></div><button type="button" class="secondary-button race-lens-network" data-network-open>Mon réseau</button></div><div class="race-lens-options">${options.map(option=>`<button type="button" class="race-lens-button" data-paddock-scope="${option.id}" aria-pressed="${current===option.id}"><span>${esc(option.label)}</span><b>${scopeCount(rawEvent,option.id)}</b></button>`).join('')}</div></section>`;
+  return `<section class="race-lens" aria-label="Choisir le paddock affiché"><div class="race-lens-head"><div><span>VOIR CETTE COURSE POUR</span><small>Même endurance, différents groupes de pilotes. Change de vue sans quitter la course.</small></div><button type="button" class="secondary-button race-lens-network" data-action="communities">Communautés</button></div><div class="race-lens-options">${options.map(option=>`<button type="button" class="race-lens-button" data-paddock-scope="${option.id}" aria-pressed="${current===option.id}"><span>${esc(option.label)}</span><b>${scopeCount(rawEvent,option.id)}</b></button>`).join('')}</div></section>`;
 }
 
 export function renderEvent(message=''){
@@ -47,12 +60,12 @@ export function renderEvent(message=''){
   const ordered=(event.departures||[]).map((departure,index)=>({departure,index,rawDeparture:rawById.get(departure.id)||departure})).sort((a,b)=>Number(a.departure.startsAt)-Number(b.departure.startsAt));
   const future=ordered.filter(item=>Number.isFinite(Number(item.departure.startsAt))&&Number(item.departure.startsAt)>now),past=ordered.filter(item=>Number.isFinite(Number(item.departure.startsAt))&&Number(item.departure.startsAt)<=now),undated=ordered.filter(item=>!Number.isFinite(Number(item.departure.startsAt)));
   const next=future[0]?.departure||null,totalPilots=pilotCount(event.departures.flatMap(d=>d.availability)),totalCrews=event.departures.reduce((sum,d)=>sum+(d.crews||[]).length,0);
-  const eventActions=`<span class="event-toolbar-main">${button('refresh','Actualiser')}${canManage()?button('edit-event','Modifier l’événement',`data-id="${event.id}"`):''}${isAdmin()?button('delete-event','Supprimer l’événement',`data-id="${event.id}"`,'danger-button'):''}</span>`;
+  const eventActions=`<span class="event-toolbar-main">${button('refresh','Actualiser')}${canEditEvent(rawEvent)?button('edit-event','Modifier l’événement',`data-id="${event.id}"`):''}${canDeleteEvent(rawEvent)?button('delete-event','Supprimer l’événement',`data-id="${event.id}"`,'danger-button'):''}</span>`;
   const visible=[...future,...undated];
   const upcoming=visible.map(({departure,index,rawDeparture})=>renderDeparturePanel(event,departure,index,departure.id===state.selectedDepartureId||state.registrationOpen.has(departure.id),{rawEvent,rawDeparture})).join('');
   const countdownCopy=next?`Prochain départ dans <strong data-countdown="${next.startsAt}">${countdown(next.startsAt)}</strong>`:undated.length?'Dates à confirmer':'Tous les départs ont eu lieu';
   const crewDefault=defaultCrewOrganizationId(state)||'';
   app.eventViewData={eventId:event.id,events:state.events,message};
-  app.innerHTML=`${raceLensMarkup(rawEvent)}<div class="event-header event-header-compact event-type-${event.eventType||'private'}" data-event-id="${event.id}" data-crew-default-organization="${esc(crewDefault)}"><div class="event-heading-line"><div class="event-heading-copy"><h1 class="event-title">${esc(event.name)}</h1><p class="event-subtitle">${eventTypeBadge(event.eventType)}</p><span class="event-header-countdown">${countdownCopy}</span></div>${circuitVisual(event.circuit)}</div><div class="event-header-summary"><div class="event-category-badges">${event.categories.map(category=>eventBadge(category,eventCategoryCount(event,category))).join('')}</div><div class="event-header-stats"><span><strong>${event.durationHours||6} h</strong><small>durée</small></span><span><strong>${event.departures.length}</strong><small>départ${event.departures.length>1?'s':''}</small></span><span><strong>${totalPilots}</strong><small>pilote${totalPilots>1?'s':''}</small></span><span><strong>${totalCrews}</strong><small>équipage${totalCrews>1?'s':''}</small></span></div></div></div><div class="toolbar event-actions-toolbar">${eventActions}</div><div id="crew-builder-root"></div>${message?`<p class="creation-success" role="status">${esc(message)}</p>`:''}<section class="departure-accordion" aria-label="Départs de la course">${upcoming}${renderPastDepartures(event,rawEvent,past)}</section>`;
+  app.innerHTML=`${raceLensMarkup(rawEvent)}<div class="event-header event-header-compact event-type-${event.eventType||'private'}" data-event-id="${event.id}" data-crew-default-organization="${esc(crewDefault)}"><div class="event-heading-line"><div class="event-heading-copy"><h1 class="event-title">${esc(event.name)}</h1><p class="event-subtitle">${eventTypeBadge(event.eventType)}${rawEvent.organizationId?`<span class="event-community-label">Communauté · ${esc(joinedOrganizations(state.organizations).find(item=>item.id===rawEvent.organizationId)?.name||state.organizations?.discoverableCommunities?.find(item=>item.id===rawEvent.organizationId)?.name||'Communauté')}</span>`:''}</p><span class="event-header-countdown">${countdownCopy}</span></div>${circuitVisual(event.circuit)}</div><div class="event-header-summary"><div class="event-category-badges">${event.categories.map(category=>eventBadge(category,eventCategoryCount(event,category))).join('')}</div><div class="event-header-stats"><span><strong>${event.durationHours||6} h</strong><small>durée</small></span><span><strong>${event.departures.length}</strong><small>départ${event.departures.length>1?'s':''}</small></span><span><strong>${totalPilots}</strong><small>pilote${totalPilots>1?'s':''}</small></span><span><strong>${totalCrews}</strong><small>équipage${totalCrews>1?'s':''}</small></span></div></div></div><div class="toolbar event-actions-toolbar">${eventActions}</div><div id="crew-builder-root"></div>${message?`<p class="creation-success" role="status">${esc(message)}</p>`:''}<section class="departure-accordion" aria-label="Départs de la course">${upcoming}${renderPastDepartures(event,rawEvent,past)}</section>`;
   showRecoveryLink();notifyRender();
 }
