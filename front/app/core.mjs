@@ -2,7 +2,7 @@ import {CATEGORIES, EVENT_TYPES, CIRCUITS, categories, CARS, gameForEvent} from 
 import {countdown, dateLabel, groupEvents} from '../schedule.mjs';
 import {renderAvailabilityTimeline} from '../timeline.mjs';
 import {circuitMapConfig, circuitMapSource} from '../../shared/circuit-maps.mjs';
-import {normalizeAudienceFilter} from './organization-context.mjs?v=2-multi-filter';
+import {normalizeAudienceFilter} from './organization-context.mjs?v=5-community-directory';
 
 export {CATEGORIES, EVENT_TYPES, CIRCUITS, categories, CARS, countdown, dateLabel, groupEvents, renderAvailabilityTimeline};
 
@@ -14,7 +14,7 @@ export const state = {
   events:[], user:null, discordReady:false, currentEventId:null, page:'home', editingEvent:null,
   drafts:{}, recoveryLink:'', busy:false, participants:[], flash:'', eventFilter:'upcoming',
   selectedDepartureId:null, eventSection:'race', pilotName:'', registrationOpen:new Set(), crewManagementOpen:new Set(),
-  pendingCrewJoin:null, organizations:{team:null,communities:[],discoverableCommunities:[]}, visibleAudienceIds:new Set(['general'])
+  pendingCrewJoin:null, currentOrganizationId:null, activeOrganizationId:null, organizations:{team:null,communities:[],discoverableCommunities:[],discordBotReady:false,discordBotInviteUrl:''}, visibleAudienceIds:new Set(['general'])
 };
 try { state.pilotName = localStorage.getItem('fmt_pilot_name') || ''; } catch {}
 
@@ -132,7 +132,7 @@ export async function load() {
   const result = await api(`/api/events?game=${encodeURIComponent(activeGame)}`);
   state.user=session.user;
   state.discordReady=session.discordReady;
-  state.organizations=session.organizations||{team:null,communities:[],discoverableCommunities:[]};
+  state.organizations=session.organizations||{team:null,communities:[],discoverableCommunities:[],discordBotReady:false,discordBotInviteUrl:''};
   let stored=null;
   try{stored=JSON.parse(localStorage.getItem('endurance_audience_filter')||'null');}catch{}
   state.visibleAudienceIds=normalizeAudienceFilter(state.organizations,stored||state.visibleAudienceIds);
