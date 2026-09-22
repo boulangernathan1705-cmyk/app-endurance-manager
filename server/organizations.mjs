@@ -176,6 +176,12 @@ async function route(request,env,ctx,next){
   const registrationIds=method==='POST'?eventDeparture(path,'registrations'):null;
   if(registrationIds){
     const input=await request.clone().json().catch(()=>null);if(!input)fail(400,'Formulaire invalide.');
+    const eventScope=await env.DB.prepare('SELECT organization_id FROM events WHERE id=?').bind(registrationIds.eventId).first();
+    if(eventScope?.organization_id){
+      const supplied=normalizeAudienceIds(input);
+      if(supplied.some(value=>value!==eventScope.organization_id)&&!(supplied.length===1&&supplied[0]===GENERAL))fail(409,'Cette endurance appartient à une communauté : l’inscription doit rester dans cet espace.');
+      input.audienceIds=[eventScope.organization_id];
+    }
     const participantUserId=await targetUserId(env,actor,input);
     const audienceIds=await validateAudiences(env,actor,input,{participantUserId});
     const response=await next(request,env,ctx);
@@ -194,9 +200,11 @@ async function route(request,env,ctx,next){
   if(registration&&method==='PATCH'){
     const input=await request.clone().json().catch(()=>null);if(!input)fail(400,'Formulaire invalide.');
     let audienceIds=null;
+    const row=await env.DB.prepare(registrationSelect+' JOIN events e ON e.id=r.event_id WHERE r.id=?').bind(registration[1]).first();
+    if(!row)fail(404,'Inscription introuvable.');
+    const eventScope=await env.DB.prepare('SELECT organization_id FROM events WHERE id=?').bind(row.event_id).first();
+    if(eventScope?.organization_id)input.audienceIds=[eventScope.organization_id];
     if(Array.isArray(input.audienceIds)){
-      const row=await env.DB.prepare(registrationSelect+' WHERE r.id=?').bind(registration[1]).first();
-      if(!row)fail(404,'Inscription introuvable.');
       audienceIds=await validateAudiences(env,actor,input,{participantUserId:row.participant_user_id||row.user_id||null});
       const required=await requiredCrewAudience(env,row.id);
       if(required&&!audienceIds.includes(required))fail(409,'Cette inscription est déjà affectée à un équipage dans cet espace. Retire-la d’abord de l’équipage.');
@@ -209,8 +217,11 @@ async function route(request,env,ctx,next){
   const crewIds=method==='POST'?eventDeparture(path,'crews'):null;
   if(crewIds){
     const input=await request.clone().json().catch(()=>null);if(!input)fail(400,'Formulaire invalide.');
-    const organizationId=orgId(input.organizationId);
-    if(input.organizationId&&(!organizationId||!UUID.test(organizationId)))fail(400,'Organisation invalide.');
+    const eventScope=await env.DB.prepare('SELECT organization_id FROM events WHERE id=?').bind(crewIds.eventId).first();
+    const requestedOrganizationId=orgId(input.organizationId);
+    if(input.organizationId&&(!requestedOrganizationId||!UUID.test(requestedOrganizationId)))fail(400,'Organisation invalide.');
+    if(eventScope?.organization_id&&requestedOrganizationId&&requestedOrganizationId!==eventScope.organization_id)fail(409,'Cet équipage doit rester dans la communauté de l’endurance.');
+    const organizationId=eventScope?.organization_id||requestedOrganizationId;
     if(organizationId)return createCrew(request,env,actor,crewIds,input,organizationId);
   }
 
