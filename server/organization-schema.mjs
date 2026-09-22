@@ -103,8 +103,29 @@ export async function ensureOrganizationSchema(env){
         );
       END`).run();
 
+    // 0020 : annuaire de communautés et liaison Discord optionnelle.
+    await addColumnIfMissing(env,'organizations','description',"ALTER TABLE organizations ADD COLUMN description TEXT NOT NULL DEFAULT ''");
+    await addColumnIfMissing(env,'organizations','language',"ALTER TABLE organizations ADD COLUMN language TEXT NOT NULL DEFAULT 'fr'");
+    await addColumnIfMissing(env,'organizations','games',"ALTER TABLE organizations ADD COLUMN games TEXT NOT NULL DEFAULT '[\"lmu\",\"iracing\"]'");
+    await addColumnIfMissing(env,'organizations','visibility',"ALTER TABLE organizations ADD COLUMN visibility TEXT NOT NULL DEFAULT 'public'");
+    await addColumnIfMissing(env,'organizations','join_mode',"ALTER TABLE organizations ADD COLUMN join_mode TEXT NOT NULL DEFAULT 'open'");
+    await addColumnIfMissing(env,'organizations','discord_guild_id','ALTER TABLE organizations ADD COLUMN discord_guild_id TEXT');
+    await addColumnIfMissing(env,'organizations','discord_guild_name','ALTER TABLE organizations ADD COLUMN discord_guild_name TEXT');
+    await addColumnIfMissing(env,'organizations','discord_role_id','ALTER TABLE organizations ADD COLUMN discord_role_id TEXT');
+    await addColumnIfMissing(env,'organizations','discord_role_name','ALTER TABLE organizations ADD COLUMN discord_role_name TEXT');
+    await addColumnIfMissing(env,'organizations','updated_at','ALTER TABLE organizations ADD COLUMN updated_at INTEGER NOT NULL DEFAULT 0');
+    await env.DB.prepare(`CREATE TABLE IF NOT EXISTS organization_join_requests (
+      organization_id TEXT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      created_at INTEGER NOT NULL,
+      PRIMARY KEY(organization_id,user_id)
+    )`).run();
+    await env.DB.prepare('CREATE INDEX IF NOT EXISTS organization_join_requests_user ON organization_join_requests(user_id,created_at)').run();
+    await env.DB.prepare('CREATE INDEX IF NOT EXISTS organizations_directory ON organizations(type,visibility,name_key)').run();
+
     try{await env.DB.prepare("INSERT OR IGNORE INTO d1_migrations(name) VALUES('0018_organizations.sql')").run();}catch{}
     try{await env.DB.prepare("INSERT OR IGNORE INTO d1_migrations(name) VALUES('0019_registration_audiences.sql')").run();}catch{}
+    try{await env.DB.prepare("INSERT OR IGNORE INTO d1_migrations(name) VALUES('0020_community_directory.sql')").run();}catch{}
   })().catch(error=>{organizationSchemaReady=null;throw error;});
   return organizationSchemaReady;
 }
