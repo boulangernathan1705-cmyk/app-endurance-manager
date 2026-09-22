@@ -39,6 +39,7 @@ function crewSummary(event,{includePast=false}={}){
 }
 
 function organizationActivity(event,organization){
+  if(event.organizationId===organization.id)return true;
   for(const departure of event.departures||[]){
     if((departure.availability||[]).some(reg=>registrationAudienceIds(reg).includes(organization.id)))return true;
     if((departure.crews||[]).some(crew=>crew.organizationId===organization.id))return true;
@@ -46,7 +47,13 @@ function organizationActivity(event,organization){
   return false;
 }
 function eventNetworkBadges(event){
-  const groups=joinedOrganizations(state.organizations).filter(group=>organizationActivity(event,group));
+  const joined=joinedOrganizations(state.organizations);
+  const known=[...joined,...(state.organizations?.discoverableCommunities||[])];
+  const groups=joined.filter(group=>organizationActivity(event,group));
+  if(event.organizationId&&!groups.some(group=>group.id===event.organizationId)){
+    const owner=known.find(group=>group.id===event.organizationId);
+    if(owner)groups.unshift(owner);
+  }
   if(!groups.length)return'';
   return `<span class="event-network-badges">${groups.map(group=>`<span class="event-network-badge">${group.type==='team'?'◆':'○'} ${esc(group.name)}</span>`).join('')}</span>`;
 }
