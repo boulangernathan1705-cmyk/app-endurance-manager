@@ -56,6 +56,20 @@ test('les communautés restent facultatives autour des événements existants',(
   assert.match(actions,/case 'home'/);
 });
 
+
+test('les grandes communautés ne chargent leurs membres qu’à l’ouverture',()=>{
+  const server=read('server/community-directory.mjs');
+  const front=read('front/app/community-directory.mjs');
+  assert.match(server,/memberCountsFor/);
+  assert.match(server,/membersFor\(env,team\?\[team\.id\]:\[\]\)/);
+  assert.match(server,/LIMIT \? OFFSET \?/);
+  assert.match(server,/Math\.min\(100/);
+  assert.match(front,/loadCommunityMembers/);
+  assert.match(front,/limit=50&offset=/);
+  assert.match(front,/more-members/);
+  assert.match(front,/Afficher plus/);
+});
+
 test('les assets de la nouvelle interface sont versionnés et les fixtures dev restent isolées',()=>{
   const seed=read('server/dev-seed-organizations.mjs');
   const html=read('game.html');
