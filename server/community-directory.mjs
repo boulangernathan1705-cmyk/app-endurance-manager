@@ -80,8 +80,8 @@ async function activityFor(env,ids){
   const map=new Map();
   if(!ids.length)return map;
   const marks=ids.map(()=>'?').join(',');
-  const sql='SELECT organization_id,event_id FROM (SELECT ra.organization_id organization_id,r.event_id event_id FROM registration_audiences ra JOIN registrations r ON r.id=ra.registration_id WHERE ra.organization_id IN ('+marks+') UNION SELECT c.organization_id organization_id,c.event_id event_id FROM crews c WHERE c.organization_id IN ('+marks+')) ORDER BY organization_id,event_id';
-  const rows=(await env.DB.prepare(sql).bind(...ids,...ids).all()).results||[];
+  const sql='SELECT organization_id,event_id FROM (SELECT organization_id,id event_id FROM events WHERE organization_id IN ('+marks+') UNION SELECT ra.organization_id organization_id,r.event_id event_id FROM registration_audiences ra JOIN registrations r ON r.id=ra.registration_id WHERE ra.organization_id IN ('+marks+') UNION SELECT c.organization_id organization_id,c.event_id event_id FROM crews c WHERE c.organization_id IN ('+marks+')) ORDER BY organization_id,event_id';
+  const rows=(await env.DB.prepare(sql).bind(...ids,...ids,...ids).all()).results||[];
   for(const row of rows){
     if(!map.has(row.organization_id))map.set(row.organization_id,[]);
     if(!map.get(row.organization_id).includes(row.event_id))map.get(row.organization_id).push(row.event_id);
