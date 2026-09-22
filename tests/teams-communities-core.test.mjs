@@ -1,51 +1,68 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-const read=path=>readFileSync(new URL(`../${path}`,import.meta.url),'utf8');
+const read=path=>readFileSync(new URL('../'+path,import.meta.url),'utf8');
 
-test('Teams et communautés restent un socle métier sans dupliquer les endurances',()=>{
-  const migration=read('migrations/0018_organizations.sql');
+test('les communautés étendent le socle métier sans dupliquer les endurances',()=>{
+  const organizations=read('migrations/0018_organizations.sql');
   const audiences=read('migrations/0019_registration_audiences.sql');
+  const directory=read('migrations/0020_community_directory.sql');
   const api=read('server/organizations.mjs');
-  assert.match(migration,/CREATE TABLE organizations/);
-  assert.match(migration,/CREATE TABLE organization_members/);
-  assert.match(migration,/ALTER TABLE crews ADD COLUMN organization_id/);
+  assert.match(organizations,/CREATE TABLE organizations/);
   assert.match(audiences,/CREATE TABLE registration_audiences/);
-  assert.match(audiences,/inscription reste unique/i);
-  assert.match(api,/organizationAwareFetch/);
+  assert.match(directory,/organization_join_requests/);
+  assert.match(directory,/discord_guild_id/);
+  assert.match(directory,/discord_role_id/);
+  assert.match(api,/communityDirectoryApi/);
   assert.match(api,/decorateEvents/);
+  assert.match(api,/requireOrganizationEligibility/);
 });
 
-test('le front est event-first et ne recrée plus un mini-site par groupe',()=>{
+test('une communauté fonctionne sans Discord et peut ajouter Discord comme règle facultative',()=>{
+  const directory=read('server/community-directory.mjs');
+  const discord=read('server/community-discord.mjs');
+  assert.match(directory,/Discord.*facultatif|discordBotReady/i);
+  assert.match(directory,/JOIN_MODES=new Set\(\['open','request','invite','discord'\]\)/);
+  assert.match(directory,/requireOrganizationEligibility/);
+  assert.match(discord,/DISCORD_BOT_TOKEN/);
+  assert.match(discord,/guilds\/.*members/);
+  assert.doesNotMatch(discord,/guilds\/.*members\?limit/);
+  assert.match(discord,/Gérer le serveur/);
+});
+
+test('le front possède un annuaire et une fiche communauté plutôt qu’un tiroir parallèle',()=>{
+  const directory=read('front/app/community-directory.mjs');
   const network=read('front/app/paddock-network.mjs');
   const home=read('front/app/home-view.mjs');
-  const event=read('front/app/event-view.mjs');
-  assert.match(network,/Mon réseau/);
-  assert.match(network,/network-drawer/);
-  assert.match(network,/Ma Team/);
-  assert.match(network,/Mes communautés/);
-  assert.doesNotMatch(network,/Vue d’ensemble/);
-  assert.doesNotMatch(network,/data-tab=/);
-  assert.match(home,/Ce qui mérite ton attention/);
-  assert.match(home,/SIGNAUX DU RÉSEAU/);
-  assert.match(home,/Tu es inscrit sans équipage/);
-  assert.match(event,/VOIR CETTE COURSE POUR/);
-  assert.match(event,/Tout le paddock/);
-  assert.match(event,/data-paddock-scope/);
-  assert.doesNotMatch(event,/Retour à/);
+  assert.match(directory,/Trouve ton paddock/);
+  assert.match(directory,/Communautés disponibles/);
+  assert.match(directory,/Discord est facultatif/);
+  assert.match(directory,/Administration de la communauté/);
+  assert.match(directory,/Rôle requis pour participer aux endurances/);
+  assert.match(home,/button\('communities','Communautés'\)/);
+  assert.match(home,/ACTIVITÉ DU PADDOCK/);
+  assert.doesNotMatch(network,/network-drawer/);
+  assert.doesNotMatch(network,/Mon réseau/);
+  assert.match(network,/scopeNetworkTo/);
 });
 
-test('les fixtures de dev restent isolées et la nouvelle interface est versionnée',()=>{
+test('les communautés restent facultatives autour des événements existants',()=>{
+  const context=read('front/app/organization-context.mjs');
+  const actions=read('front/app/actions.mjs');
+  assert.match(context,/GENERAL_AUDIENCE='general'/);
+  assert.match(context,/defaultRegistrationAudienceIds/);
+  assert.match(actions,/case 'communities'/);
+  assert.match(actions,/renderCommunities/);
+  assert.match(actions,/case 'home'/);
+});
+
+test('les assets de la nouvelle interface sont versionnés et les fixtures dev restent isolées',()=>{
   const seed=read('server/dev-seed-organizations.mjs');
   const html=read('game.html');
   const app=read('app.js');
   assert.match(seed,/https:\/\/app\.endurance-manager\.workers\.dev/);
-  assert.match(seed,/const url=new URL\(request\.url\)/);
   assert.match(seed,/if\(url\.origin!==DEV_ORIGIN\)return/);
-  assert.match(seed,/name:'FMT'/);
-  assert.match(seed,/name:'Endurance Community'/);
-  assert.match(html,/paddock-network\.css\?v=1-event-first/);
-  assert.match(html,/app\.js\?v=86-paddock-network/);
-  assert.match(app,/paddock-network\.mjs\?v=1-event-first/);
-  assert.doesNotMatch(app,/teams-communities\.mjs/);
+  assert.match(html,/community-directory\.css\?v=1/);
+  assert.match(html,/app\.js\?v=87-community-directory/);
+  assert.match(app,/paddock-network\.mjs\?v=2-community-directory/);
 });
