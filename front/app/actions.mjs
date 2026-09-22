@@ -10,9 +10,10 @@ import {updateCrewState} from './crews.mjs?v=9-audiences';
 import {GENERAL_AUDIENCE,defaultRegistrationAudienceIds,registrationAudienceIds} from './organization-context.mjs?v=5-community-directory';
 
 async function submitEvent(form){
-  const data={name:form.elements.eventName.value.trim(),durationHours:Number(form.elements.eventDuration.value),eventType:form.elements.eventType.value,circuit:form.elements.eventCircuit.value,categories:[...form.querySelectorAll('[name="eventCategory"]:checked')].map(input=>input.value),departures:[...form.querySelectorAll('.departure-field')].map(row=>({id:row.dataset.id||undefined,date:row.querySelector('[name="date"]').value,time:row.querySelector('[name="time"]').value})),version:state.editingEvent?.version};
+  const data={name:form.elements.eventName.value.trim(),durationHours:Number(form.elements.eventDuration.value),eventType:form.elements.eventType.value,circuit:form.elements.eventCircuit.value,organizationId:form.elements.eventOrganization?.value||null,categories:[...form.querySelectorAll('[name="eventCategory"]:checked')].map(input=>input.value),departures:[...form.querySelectorAll('.departure-field')].map(row=>({id:row.dataset.id||undefined,date:row.querySelector('[name="date"]').value,time:row.querySelector('[name="time"]').value})),version:state.editingEvent?.version};
   if(!data.categories.length)throw Error('Sélectionne au moins une catégorie.'); if(!data.circuit)throw Error('Sélectionne le circuit de la course.');
   const editing=!!state.editingEvent; const result=await api(editing?`/api/events/${state.editingEvent.id}`:'/api/events',editing?'PATCH':'POST',data);
+  state.eventCreationOrganizationId=null;
   if(editing){state.currentEventId=state.editingEvent.id;state.page='event';}else{state.page='home';state.currentEventId=null;}
   await refreshAfterSave(editing?'Événement modifié.':'Événement créé.',result.id);
 }
@@ -64,10 +65,10 @@ async function perform(action,target){
   const event=state.events.find(item=>item.id===state.currentEventId);
   switch(action){
     case 'dismiss-error': document.querySelector('[data-ux-error-modal]')?.remove(); break;
-    case 'home': renderHome(); break;
+    case 'home': state.eventCreationOrganizationId=null;renderHome(); break;
     case 'event-filter': state.eventFilter=target.dataset.filter||'upcoming'; renderHome(); break;
     case 'refresh': await refresh(); break;
-    case 'open': state.currentEventId=target.dataset.id; state.selectedDepartureId=target.dataset.departure||null; state.eventSection='race'; state.drafts={}; state.pendingCrewJoin=null; state.registrationOpen.clear(); renderEvent(); break;
+    case 'open': { const nextEvent=state.events.find(item=>item.id===target.dataset.id);state.currentEventId=target.dataset.id;state.selectedDepartureId=target.dataset.departure||null;state.eventSection='race';state.drafts={};state.pendingCrewJoin=null;state.registrationOpen.clear();if(nextEvent?.organizationId){state.activeOrganizationId=nextEvent.organizationId;state.visibleAudienceIds=new Set([nextEvent.organizationId]);}renderEvent();break; }
     case 'event-section': state.eventSection='race'; renderEvent(); break;
     case 'my-registration': { state.pendingCrewJoin=null; state.selectedDepartureId=target.dataset.departure; delete state.drafts[state.selectedDepartureId]; state.registrationOpen.add(state.selectedDepartureId); renderEvent(); break; }
     case 'close-registration': if(state.pendingCrewJoin?.departureId===target.dataset.departure)state.pendingCrewJoin=null;state.registrationOpen.delete(target.dataset.departure); renderEvent(); break;
@@ -103,11 +104,11 @@ async function perform(action,target){
       else {if(!confirm('Retirer ce pilote de l’équipage ? Son inscription sera conservée.'))return;await api(`/api/crews/${crew.id}/members/${target.dataset.registration}`,'DELETE',{version:crew.version});state.crewManagementOpen.add(crew.id);}
       await refreshAfterSave('Équipages mis à jour.'); break;
     }
-    case 'create': renderEventForm(); break;
-    case 'edit-event': renderEventForm(event); break;
+    case 'create': state.eventCreationOrganizationId=null;renderEventForm(); break;
+    case 'edit-event': state.eventCreationOrganizationId=event?.organizationId||null;renderEventForm(event); break;
     case 'add-departure': if(app.querySelectorAll('.departure-field').length>=30)throw Error('Maximum 30 départs par événement.');document.getElementById('departureFields').insertAdjacentHTML('beforeend',departureFields());updateRemoveButtons();break;
     case 'remove-departure': if(app.querySelectorAll('.departure-field').length>1)target.closest('.departure-field').remove();updateRemoveButtons();break;
-    case 'delete-event': if(!confirm(`Supprimer « ${event.name} » et toutes ses inscriptions ? Cette suppression est définitive.`))return;await api(`/api/events/${event.id}`,'DELETE',{version:event.version});state.page='home';await refreshAfterSave('Événement supprimé.');break;
+    case 'delete-event': if(!confirm(`Supprimer « ${event.name} » et toutes ses inscriptions ? Cette suppression est définitive.`))return;await api(`/api/events/${event.id}`,'DELETE',{version:event.version,organizationId:event.organizationId||null});state.page='home';state.eventCreationOrganizationId=null;await refreshAfterSave('Événement supprimé.');break;
     case 'my-entries': await load();renderNav();renderMyEntries();break;
     case 'communities': await load();renderNav();renderCommunities();break;
     case 'guest-link': state.recoveryLink=(await api('/api/guest/link','POST')).link;state.page==='event'?renderEvent():renderHome();break;
