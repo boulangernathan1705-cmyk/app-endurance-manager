@@ -94,6 +94,21 @@ test('mobile interface stays compact without horizontal overflow across main pag
   await expect(page.locator('.page-title')).toBeVisible();
 });
 
+test('community directory opens for a guest without requiring Discord membership', async ({page}) => {
+  await page.setViewportSize({width:390,height:844});
+  await openAndCheck(page, '/lmu/');
+  const communities = page.getByRole('button',{name:'Communautés',exact:true}).first();
+  await expect(communities).toBeVisible();
+  await communities.click();
+  await expect(page.getByRole('heading',{name:'Trouve ton paddock',exact:true})).toBeVisible();
+  await expect(page.getByRole('heading',{name:'Communautés disponibles',exact:true})).toBeVisible();
+  await expect(page.getByText('sans obligation de passer par Discord',{exact:false})).toBeVisible();
+  await expect(page.locator('[data-ux-error-modal]')).toHaveCount(0);
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  expect(overflow,'community directory overflows horizontally').toBeLessThanOrEqual(1);
+  expect(apiFailures).toEqual([]);
+});
+
 test('LMU space opens from home', async ({page}) => {
   await openAndCheck(page, '/');
   const link = page.locator('a[href="/lmu/"]');
