@@ -16,11 +16,32 @@ function departureById(event, departureId) {
 function isRegistrationManager(actor) {
   return ['admin','organizer'].includes(actor.user?.role);
 }
+async function managedOrganizationIds(env,actor){
+  if(!actor.user)return new Set();
+  const rows=(await env.DB.prepare("SELECT organization_id FROM organization_members WHERE user_id=? AND role IN ('owner','manager')").bind(actor.user.id).all()).results||[];
+  return new Set(rows.map(row=>row.organization_id));
+}
+async function requireCommunityManager(env,actor,organizationId){
+  if(!actor.user)fail(401,'Connecte-toi avec Discord.');
+  if(!/^[a-f0-9-]{36}$/.test(String(organizationId||'')))fail(400,'Communauté invalide.');
+  const row=await env.DB.prepare("SELECT o.id,o.type,m.role FROM organizations o JOIN organization_members m ON m.organization_id=o.id WHERE o.id=? AND m.user_id=?").bind(organizationId,actor.user.id).first();
+  if(!row||row.type!=='community'||!['owner','manager'].includes(row.role))fail(403,'Seul un organisateur de cette communauté peut gérer ses endurances.');
+  return row;
+}
+async function requireEventManager(env,actor,event,{deleting=false}={}){
+  if(event.organization_id){
+    if(actor.user?.role==='admin')return;
+    if(!deleting&&actor.user?.role==='organizer')return;
+    await requireCommunityManager(env,actor,event.organization_id);
+    return;
+  }
+  requireRole(actor.user,deleting);
+}
 function canManageRegistration(reg, actor) {
   return owned(reg, actor) || isRegistrationManager(actor);
 }
-function canManageCrew(crew, actor) {
-  return isRegistrationManager(actor) || Boolean(actor.user && crew?.owner_user_id === actor.user.id);
+function canManageCrew(crew, actor, managedOrganizations=new Set()) {
+  return isRegistrationManager(actor) || Boolean(actor.user && crew?.owner_user_id === actor.user.id) || Boolean(crew?.organization_id && managedOrganizations.has(crew.organization_id));
 }
 function publicRegistration(reg, actor, userNames = new Map()) {
   let cars = [];
@@ -52,8 +73,15 @@ function publicRegistration(reg, actor, userNames = new Map()) {
   };
 }
 async function listEvents(env, actor, game='') {
-  const where=game==='iracing' ? " WHERE circuit LIKE 'iracing-%'" : game==='lmu' ? " WHERE circuit NOT LIKE 'iracing-%'" : '';
-  const rows = (await env.DB.prepare(`SELECT * FROM events${where} ORDER BY created_at DESC, id DESC`).all()).results;
+  const clauses=[];
+  const params=[];
+  if(game==='iracing')clauses.push("e.circuit LIKE 'iracing-%'");
+  else if(game==='lmu')clauses.push("e.circuit NOT LIKE 'iracing-%'");
+  let visibility="(e.organization_id IS NULL OR o.visibility='public'";
+  if(actor.user){visibility+=" OR EXISTS(SELECT 1 FROM organization_members om WHERE om.organization_id=e.organization_id AND om.user_id=?)";params.push(actor.user.id);}
+  visibility+=')';
+  clauses.push(visibility);
+  const rows = (await env.DB.prepare(`SELECT e.* FROM events e LEFT JOIN organizations o ON o.id=e.organization_id WHERE ${clauses.join(' AND ')} ORDER BY e.created_at DESC,e.id DESC`).bind(...params).all()).results;
   if (!rows.length) return [];
   const eventIds=rows.map(row=>row.id);
   const marks=eventIds.map(()=>'?').join(',');
@@ -67,6 +95,7 @@ async function listEvents(env, actor, game='') {
     users=(await env.DB.prepare(`SELECT id,name FROM users WHERE id IN (${userMarks})`).bind(...relevantUserIds).all()).results;
   }
   const userNames = new Map(users.map(item => [item.id,item.name]));
+  const managedOrganizations=await managedOrganizationIds(env,actor);
   const grouped = new Map();
   for (const reg of registrations) { const key = `${reg.event_id}:${reg.departure_id}`; if (!grouped.has(key)) grouped.set(key, []); grouped.get(key).push(publicRegistration(reg, actor, userNames)); }
   const membersByCrew = new Map();
@@ -86,12 +115,12 @@ async function listEvents(env, actor, game='') {
       locked:Boolean(crew.locked),
       version:crew.version,
       registrationIds:membersByCrew.get(crew.id) || [],
-      canManage:canManageCrew(crew,actor),
+      canManage:canManageCrew(crew,actor,managedOrganizations),
       ownedByMe:Boolean(actor.user && crew.owner_user_id===actor.user.id),
       hasOwner:Boolean(crew.owner_user_id)
     });
   }
-  return rows.map(row => ({id:row.id, name:row.name, circuit:row.circuit||'', durationHours:Number(row.duration_hours)||3, eventType:row.event_type||'private', categories:JSON.parse(row.categories), version:row.version, departures:JSON.parse(row.departures).map(d => ({...d, availability:grouped.get(`${row.id}:${d.id}`) || [], crews:crewsByDeparture.get(`${row.id}:${d.id}`) || []}))}));
+  return rows.map(row => ({id:row.id, name:row.name, circuit:row.circuit||'', durationHours:Number(row.duration_hours)||3, eventType:row.event_type||'private', organizationId:row.organization_id||null, categories:JSON.parse(row.categories), version:row.version, departures:JSON.parse(row.departures).map(d => ({...d, availability:grouped.get(`${row.id}:${d.id}`) || [], crews:crewsByDeparture.get(`${row.id}:${d.id}`) || []}))}));
 }
 async function oauthStart(request, env) {
   requireDiscord(env); await rateLimit(request, env, 'oauth', 20); await cleanup(env);
@@ -190,6 +219,7 @@ async function api(request, env) {
   const crewRoute = path.match(/^\/api\/crews\/([a-f0-9-]{36})(?:\/members(?:\/([a-f0-9-]{36}))?)?$/);
   if ((crewCreate && method==='POST') || (crewRoute && ['POST','PATCH','DELETE'].includes(method))) {
     if (!actor.user) fail(401,'Connecte-toi avec Discord pour gérer un équipage.');
+    const managedOrganizations=await managedOrganizationIds(env,actor);
     const input=await body(request);
     const crew=crewRoute ? await env.DB.prepare('SELECT * FROM crews WHERE id=?').bind(crewRoute[1]).first() : null;
     if (crewRoute && !crew) fail(404,'Équipage introuvable.');
@@ -206,7 +236,7 @@ async function api(request, env) {
         if (!selected || selected.event_id!==crew.event_id || selected.departure_id!==crew.departure_id) fail(409,'Ce pilote n’est pas inscrit sur ce départ. Actualise la page.');
         if (selected.category!==crew.category || selected.status==='unavailable') fail(409,'Cette inscription ne correspond pas à la catégorie de l’équipage.');
         const selfJoin=input.selfJoin===true && personal(selected,actor);
-        if (!canManageCrew(crew,actor) && !selfJoin) fail(403,'Tu peux uniquement rejoindre un équipage avec ta propre inscription.');
+        if (!canManageCrew(crew,actor,managedOrganizations) && !selfJoin) fail(403,'Tu peux uniquement rejoindre un équipage avec ta propre inscription.');
         const claimOwner=selfJoin && !crew.owner_user_id ? actor.user.id : null;
         const crewUpdate=claimOwner
           ? env.DB.prepare('UPDATE crews SET version=version+1,owner_user_id=COALESCE(owner_user_id,?) WHERE id=? AND version=?').bind(claimOwner,crew.id,input.version)
@@ -225,7 +255,7 @@ async function api(request, env) {
         const member=await env.DB.prepare('SELECT registration_id FROM crew_members WHERE crew_id=? AND registration_id=?').bind(crew.id,selected.id).first();
         if (!member) fail(409,'Ce pilote ne fait plus partie de cet équipage. Actualise la page.');
         const selfLeave=personal(selected,actor);
-        if (!canManageCrew(crew,actor) && !selfLeave) fail(403,'Tu peux uniquement quitter toi-même un équipage.');
+        if (!canManageCrew(crew,actor,managedOrganizations) && !selfLeave) fail(403,'Tu peux uniquement quitter toi-même un équipage.');
         let nextOwner=crew.owner_user_id;
         if (crew.owner_user_id && selected.participant_user_id===crew.owner_user_id) {
           const replacement=await env.DB.prepare(`SELECT p.user_id
@@ -249,7 +279,7 @@ async function api(request, env) {
       fail(404,'Action introuvable.');
     }
     if (crew) {
-      if (!canManageCrew(crew,actor)) fail(403,'Seul le responsable de cet équipage ou un organisateur peut le modifier.');
+      if (!canManageCrew(crew,actor,managedOrganizations)) fail(403,'Seul le responsable de cet équipage ou un organisateur peut le modifier.');
       if (method==='DELETE') {
         const result = await env.DB.prepare('DELETE FROM crews WHERE id=? AND version=?').bind(crew.id,input.version).run();
         if (!result.meta.changes) fail(409,'Cet équipage a changé. Actualise avant de réessayer.');
@@ -289,15 +319,21 @@ async function api(request, env) {
     return json({id:crewId,joined:true,removedRegistrations:results[2].meta.changes},201);
   }
   if (path === '/api/events' && method === 'POST') {
-    requireRole(actor.user);
-    const data = validateEvent(await body(request)), eventId = id();
-    await env.DB.prepare('INSERT INTO events(id,name,duration_hours,event_type,circuit,categories,departures,created_by,created_at) VALUES(?,?,?,?,?,?,?,?,?)').bind(eventId, data.name, data.durationHours, data.eventType, data.circuit, JSON.stringify(data.categories), JSON.stringify(data.departures), actor.user.id, now()).run();
+    const input=await body(request);
+    const organizationId=String(input.organizationId||'').trim()||null;
+    if(organizationId)await requireCommunityManager(env,actor,organizationId);
+    else requireRole(actor.user);
+    const data = validateEvent(input), eventId = id();
+    await env.DB.prepare('INSERT INTO events(id,name,duration_hours,event_type,circuit,categories,departures,organization_id,created_by,created_at) VALUES(?,?,?,?,?,?,?,?,?,?)').bind(eventId, data.name, data.durationHours, data.eventType, data.circuit, JSON.stringify(data.categories), JSON.stringify(data.departures), organizationId, actor.user.id, now()).run();
     return json({id:eventId}, 201);
   }
   const eventMatch = path.match(/^\/api\/events\/([a-f0-9-]{36})$/);
   if (eventMatch && ['PATCH','DELETE'].includes(method)) {
-    requireRole(actor.user, method === 'DELETE');
-    const event = await eventById(env, eventMatch[1]), input = await body(request);
+    const event = await eventById(env, eventMatch[1]);
+    await requireEventManager(env,actor,event,{deleting:method==='DELETE'});
+    const input = await body(request);
+    const requestedOrganizationId=String(input.organizationId||'').trim()||null;
+    if(requestedOrganizationId!==(event.organization_id||null))fail(409,'L’espace d’une endurance ne peut pas être déplacé après sa création.');
     if (input.version !== event.version) fail(409, 'Cet événement a changé. Actualise avant de réessayer.');
     if (method === 'DELETE') {
       const result = await env.DB.prepare('DELETE FROM events WHERE id=? AND version=?').bind(event.id, input.version).run();
