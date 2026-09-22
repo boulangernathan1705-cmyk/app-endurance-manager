@@ -1,12 +1,12 @@
 import {
   HttpError,fail,json,origin,rateLimit,identity,id,now,text,registrationSelect,personal
 } from './core.mjs';
+import {communityDirectoryApi,membership,requireMember,organizationSummary,requireOrganizationEligibility} from './community-directory.mjs';
 
 const UUID=/^[a-f0-9-]{36}$/;
 const DISCORD_ID=/^\d{15,22}$/;
 const GENERAL='general';
 const orgId=value=>typeof value==='string'&&value?value:null;
-const nameKey=value=>String(value||'').normalize('NFKC').trim().toLocaleLowerCase('fr-FR');
 const audienceKey=organizationId=>organizationId||GENERAL;
 
 async function secureWrite(request,env){
@@ -14,127 +14,6 @@ async function secureWrite(request,env){
   if(url.origin!==canonical)fail(403,'Utilise l’adresse principale du site pour cette action.');
   if(request.headers.get('Origin')!==canonical)fail(403,'Origine de la requête refusée.');
   await rateLimit(request,env,'write',80);
-}
-
-async function membership(env,userId,organizationId){
-  if(!userId||!organizationId)return null;
-  return env.DB.prepare(`SELECT o.id,o.type,o.name,o.owner_user_id,m.role
-    FROM organizations o JOIN organization_members m ON m.organization_id=o.id
-    WHERE o.id=? AND m.user_id=?`).bind(organizationId,userId).first();
-}
-
-async function requireMember(env,actor,organizationId,{manage=false}={}){
-  if(!UUID.test(String(organizationId||'')))fail(400,'Organisation invalide.');
-  if(!actor.user)fail(401,'Connecte-toi avec Discord pour utiliser une Team ou une communauté.');
-  const member=await membership(env,actor.user.id,organizationId);
-  if(!member)fail(403,'Tu ne fais pas partie de cette Team ou communauté.');
-  if(manage&&!['owner','manager'].includes(member.role))fail(403,'Seul un responsable de cette organisation peut faire cette action.');
-  return member;
-}
-
-async function membersFor(env,organizationIds){
-  if(!organizationIds.length)return new Map();
-  const marks=organizationIds.map(()=>'?').join(',');
-  const rows=(await env.DB.prepare(`SELECT om.organization_id,om.user_id,om.role,u.name
-    FROM organization_members om JOIN users u ON u.id=om.user_id
-    WHERE om.organization_id IN (${marks})
-    ORDER BY CASE om.role WHEN 'owner' THEN 0 WHEN 'manager' THEN 1 ELSE 2 END,lower(u.name),u.id`).bind(...organizationIds).all()).results||[];
-  const map=new Map();
-  for(const row of rows){
-    if(!map.has(row.organization_id))map.set(row.organization_id,[]);
-    map.get(row.organization_id).push({id:row.user_id,name:row.name,role:row.role});
-  }
-  return map;
-}
-
-export async function organizationSummary(env,actor){
-  const empty={team:null,communities:[],discoverableCommunities:[]};
-  if(!actor.user)return empty;
-  const joined=(await env.DB.prepare(`SELECT o.id,o.type,o.name,o.owner_user_id,m.role
-    FROM organizations o JOIN organization_members m ON m.organization_id=o.id
-    WHERE m.user_id=? ORDER BY o.type DESC,lower(o.name),o.id`).bind(actor.user.id).all()).results||[];
-  const members=await membersFor(env,joined.map(item=>item.id));
-  const decorate=item=>({
-    id:item.id,type:item.type,name:item.name,role:item.role,ownerUserId:item.owner_user_id,
-    members:members.get(item.id)||[],memberCount:(members.get(item.id)||[]).length
-  });
-  const discoverable=(await env.DB.prepare(`SELECT o.id,o.name,o.owner_user_id,COUNT(om.user_id) AS member_count
-    FROM organizations o LEFT JOIN organization_members om ON om.organization_id=o.id
-    WHERE o.type='community' AND NOT EXISTS(
-      SELECT 1 FROM organization_members mine WHERE mine.organization_id=o.id AND mine.user_id=?
-    ) GROUP BY o.id,o.name,o.owner_user_id ORDER BY lower(o.name),o.id`).bind(actor.user.id).all()).results||[];
-  const team=joined.find(item=>item.type==='team');
-  return {
-    team:team?decorate(team):null,
-    communities:joined.filter(item=>item.type==='community').map(decorate),
-    discoverableCommunities:discoverable.map(item=>({id:item.id,type:'community',name:item.name,ownerUserId:item.owner_user_id,memberCount:Number(item.member_count)||0}))
-  };
-}
-
-async function organizationsApi(request,env,actor){
-  const {pathname:path}=new URL(request.url),method=request.method;
-  if(path==='/api/organizations'&&method==='GET'){
-    if(!actor.user)fail(401,'Connecte-toi avec Discord pour gérer tes groupes.');
-    return json(await organizationSummary(env,actor));
-  }
-  if(path==='/api/organizations'&&method==='POST'){
-    await secureWrite(request,env);
-    if(!actor.user)fail(401,'Connecte-toi avec Discord pour créer une Team ou une communauté.');
-    const input=await request.clone().json().catch(()=>null);
-    if(!input||!['team','community'].includes(input.type))fail(400,'Choisis Team ou communauté.');
-    const name=text(input.name,60,input.type==='team'?'Nom de la Team':'Nom de la communauté');
-    if(input.type==='team'){
-      const existing=await env.DB.prepare(`SELECT 1 FROM organization_members om JOIN organizations o ON o.id=om.organization_id
-        WHERE om.user_id=? AND o.type='team' LIMIT 1`).bind(actor.user.id).first();
-      if(existing)fail(409,'Tu fais déjà partie d’une Team. Un pilote ne peut avoir qu’une seule Team.');
-    }
-    const organizationId=id(),createdAt=now();
-    await env.DB.batch([
-      env.DB.prepare('INSERT INTO organizations(id,type,name,name_key,owner_user_id,created_at) VALUES(?,?,?,?,?,?)').bind(organizationId,input.type,name,nameKey(name),actor.user.id,createdAt),
-      env.DB.prepare("INSERT INTO organization_members(organization_id,user_id,role,created_at) VALUES(?,?,'owner',?)").bind(organizationId,actor.user.id,createdAt)
-    ]);
-    return json({id:organizationId},201);
-  }
-  const join=path.match(/^\/api\/organizations\/([a-f0-9-]{36})\/join$/);
-  if(join&&method==='POST'){
-    await secureWrite(request,env);
-    if(!actor.user)fail(401,'Connecte-toi avec Discord pour rejoindre une communauté.');
-    const organization=await env.DB.prepare('SELECT id,type FROM organizations WHERE id=?').bind(join[1]).first();
-    if(!organization)fail(404,'Communauté introuvable.');
-    if(organization.type!=='community')fail(403,'Une Team privée se rejoint uniquement sur invitation.');
-    await env.DB.prepare("INSERT OR IGNORE INTO organization_members(organization_id,user_id,role,created_at) VALUES(?,?,'member',?)").bind(organization.id,actor.user.id,now()).run();
-    return json({ok:true});
-  }
-  const leave=path.match(/^\/api\/organizations\/([a-f0-9-]{36})\/members\/me$/);
-  if(leave&&method==='DELETE'){
-    await secureWrite(request,env);
-    const member=await requireMember(env,actor,leave[1]);
-    if(member.role==='owner')fail(409,'Le créateur doit conserver l’organisation. Le transfert ou la suppression pourra être ajouté plus tard.');
-    await env.DB.prepare('DELETE FROM organization_members WHERE organization_id=? AND user_id=?').bind(leave[1],actor.user.id).run();
-    return json({ok:true});
-  }
-  const add=path.match(/^\/api\/organizations\/([a-f0-9-]{36})\/members$/);
-  if(add&&method==='POST'){
-    await secureWrite(request,env);
-    const member=await requireMember(env,actor,add[1],{manage:true});
-    if(member.type!=='team')fail(400,'Une communauté est ouverte : le pilote peut la rejoindre lui-même.');
-    const input=await request.clone().json().catch(()=>null),userId=String(input?.userId||'');
-    if(!DISCORD_ID.test(userId))fail(400,'Sélectionne un pilote Discord.');
-    if(!(await env.DB.prepare('SELECT 1 FROM users WHERE id=?').bind(userId).first()))fail(404,'Ce pilote doit d’abord s’être connecté à Endurance Manager.');
-    await env.DB.prepare("INSERT OR IGNORE INTO organization_members(organization_id,user_id,role,created_at) VALUES(?,?,'member',?)").bind(add[1],userId,now()).run();
-    return json({ok:true});
-  }
-  const remove=path.match(/^\/api\/organizations\/([a-f0-9-]{36})\/members\/(\d{15,22})$/);
-  if(remove&&method==='DELETE'){
-    await secureWrite(request,env);
-    await requireMember(env,actor,remove[1],{manage:true});
-    const target=await env.DB.prepare('SELECT role FROM organization_members WHERE organization_id=? AND user_id=?').bind(remove[1],remove[2]).first();
-    if(!target)fail(404,'Ce pilote ne fait plus partie de cette organisation.');
-    if(target.role==='owner')fail(409,'Le créateur de l’organisation ne peut pas être retiré.');
-    await env.DB.prepare('DELETE FROM organization_members WHERE organization_id=? AND user_id=?').bind(remove[1],remove[2]).run();
-    return json({ok:true});
-  }
-  return null;
 }
 
 function eventDeparture(path,suffix){
@@ -182,6 +61,7 @@ async function validateAudiences(env,actor,input,{participantUserId=null}={}){
     if(!(await membership(env,actor.user.id,organizationId)))fail(403,'Tu ne peux partager une inscription qu’avec tes propres groupes.');
     if(!participantUserId)fail(409,'Pour une Team ou une communauté, sélectionne un pilote membre connecté à Discord.');
     if(!(await membership(env,participantUserId,organizationId)))fail(409,'Ce pilote ne fait pas partie d’un des groupes sélectionnés.');
+    await requireOrganizationEligibility(env,participantUserId,organizationId);
   }
   return ids;
 }
@@ -290,7 +170,7 @@ async function route(request,env,ctx,next){
   const actor=needsActor?await identity(request,env):null;
 
   if(path.startsWith('/api/organizations')){
-    const response=await organizationsApi(request,env,actor);if(response)return response;
+    const response=await communityDirectoryApi(request,env,actor);if(response)return response;
   }
 
   const registrationIds=method==='POST'?eventDeparture(path,'registrations'):null;
@@ -345,9 +225,11 @@ async function route(request,env,ctx,next){
     const input=await request.clone().json().catch(()=>null);if(!input)fail(400,'Formulaire invalide.');
     if(!UUID.test(String(input.registrationId||'')))fail(400,'Sélectionne un pilote inscrit.');
     const row=await env.DB.prepare(`SELECT c.organization_id,
+      (SELECT p.user_id FROM registrations r JOIN participants p ON p.id=r.participant_id WHERE r.id=?) AS participant_user_id,
       EXISTS(SELECT 1 FROM registration_audiences a WHERE a.registration_id=? AND a.audience_key=COALESCE(c.organization_id,'general')) AS shared
-      FROM crews c WHERE c.id=?`).bind(input.registrationId,addCrewMember[1]).first();
+      FROM crews c WHERE c.id=?`).bind(input.registrationId,input.registrationId,addCrewMember[1]).first();
     if(row&&!Number(row.shared))fail(409,'Ce pilote n’a pas partagé sa disponibilité avec l’espace de cet équipage.');
+    if(row?.organization_id&&row.participant_user_id)await requireOrganizationEligibility(env,row.participant_user_id,row.organization_id);
   }
 
   let response=await next(request,env,ctx);
