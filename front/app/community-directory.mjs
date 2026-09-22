@@ -65,7 +65,7 @@ function memberList(community){
   const manageable=canManage(community);
   const paged=community.type==='community'?ui.members.get(community.id):null;
   const members=paged?.members||community.members||[];
-  const total=paged?.total??Number(community.memberCount)||0;
+  const total=paged?.total??(Number(community.memberCount)||0);
   const loading=community.type==='community'&&!paged&&Number(community.memberCount)>0;
   return `<div class="community-members">${loading?'<p class="community-muted">Chargement des membres…</p>':members.length?members.map(member=>`<div class="community-member"><span class="community-member-avatar">${esc(initials(member.name))}</span><span><strong>${esc(member.name)}</strong><small>${esc(roleLabel(member.role))}</small></span>${manageable&&member.role!=='owner'&&member.id!==state.user?.id?`<button type="button" data-community-action="remove-member" data-id="${community.id}" data-user-id="${member.id}" data-user-name="${esc(member.name)}" aria-label="Retirer ${esc(member.name)}">×</button>`:''}</div>`).join(''):'<p>Aucun membre.</p>'}${paged?.nextOffset!=null?`<button type="button" class="secondary-button community-more-members" data-community-action="more-members" data-id="${community.id}">Afficher plus · ${members.length}/${total}</button>`:''}</div>`;
 }
@@ -120,7 +120,7 @@ async function action(target){
   if(type==='join'){await api('/api/organizations/'+id+'/join','POST');await load();await openCommunity(id);return;}
   if(type==='leave'){if(!confirm('Quitter cette communauté ?'))return;await api('/api/organizations/'+id+'/members/me','DELETE');ui.eligibility.delete(id);ui.members.delete(id);await reload(null);return;}
   if(type==='eligibility'){ui.eligibility.set(id,await api('/api/organizations/'+id+'/eligibility'));renderCommunities(id);return;}
-  if(type==='remove-member'){if(!confirm('Retirer '+(target.dataset.userName||'ce pilote')+' de la communauté ?'))return;await api('/api/organizations/'+id+'/members/'+target.dataset.userId,'DELETE');await load();await loadCommunityMembers(id);renderCommunities(id);return;}
+  if(type==='remove-member'){if(!confirm('Retirer '+(target.dataset.userName||'ce pilote')+' de la communauté ?'))return;const organization=id===state.organizations?.team?.id?state.organizations.team:byId(id);await api('/api/organizations/'+id+'/members/'+target.dataset.userId,'DELETE');await load();if(organization?.type==='community')await loadCommunityMembers(id);renderCommunities(organization?.type==='community'?id:null);return;}
   if(type==='request'){await api('/api/organizations/'+id+'/join-requests/'+target.dataset.userId,'POST',{action:target.dataset.decision});await load();await loadCommunityMembers(id);renderCommunities(id);return;}
   if(type==='more-members'){await loadCommunityMembers(id,{append:true});renderCommunities(id);return;}
   if(type==='unlink-discord'){if(!confirm('Délier le serveur Discord de cette communauté ?'))return;await api('/api/organizations/'+id+'/discord','PATCH',{guildId:''});ui.discord.delete(id);await reload(id);return;}
