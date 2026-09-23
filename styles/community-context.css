@@ -1,4 +1,9 @@
-.game-space-bar { display:none !important; }
+.game-space-bar .game-space-title,
+.game-space-bar .game-space-spacer { display:none !important; }
+.game-space-bar {
+  justify-content:flex-start;
+  min-height:52px;
+}
 
 /* Contexte principal : la communauté est choisie avant le simulateur. */
 .nav-community-context {
