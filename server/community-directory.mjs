@@ -37,6 +37,22 @@ function language(value){
   if(!['fr','en'].includes(result))fail(400,'Langue invalide.');
   return result;
 }
+function imageUrl(value,label){
+  const raw=String(value||'').trim();
+  if(!raw)return'';
+  if(raw.length>500)fail(400,`${label} trop longue.`);
+  try{
+    const url=new URL(raw);
+    if(url.protocol!=='https:')throw Error();
+    return url.href;
+  }catch{fail(400,`${label} doit être une adresse HTTPS valide.`);}
+}
+function accentColor(value){
+  const raw=String(value||'').trim();
+  if(!raw)return'';
+  if(!/^#[0-9a-fA-F]{6}$/.test(raw))fail(400,'La couleur doit être au format #RRGGBB.');
+  return raw.toUpperCase();
+}
 async function secureWrite(request,env){
   const canonical=origin(env),url=new URL(request.url);
   if(url.origin!==canonical)fail(403,'Utilise l’adresse principale du site pour cette action.');
@@ -115,6 +131,16 @@ function present(row,extra={}){
     eventIds:extra.eventIds||[],
     joinRequests:extra.manage?(extra.joinRequests||[]):[],
     joinPending:Boolean(extra.joinPending),
+    branding:community?{
+      logoUrl:String(row.logo_url||row.discord_icon_url||''),
+      bannerUrl:String(row.banner_url||row.discord_banner_url||''),
+      accentColor:String(row.accent_color||row.discord_accent_color||''),
+      customLogoUrl:extra.manage?String(row.logo_url||''):'',
+      customBannerUrl:extra.manage?String(row.banner_url||''):'',
+      customAccentColor:extra.manage?String(row.accent_color||''):'',
+      discordLogoUrl:String(row.discord_icon_url||''),
+      discordBannerUrl:String(row.discord_banner_url||'')
+    }:{logoUrl:'',bannerUrl:'',accentColor:'',customLogoUrl:'',customBannerUrl:'',customAccentColor:'',discordLogoUrl:'',discordBannerUrl:''},
     discord:community?{
       linked:Boolean(row.discord_guild_id),
       guildId:extra.manage?String(row.discord_guild_id||''):'',
@@ -149,10 +175,14 @@ export async function organizationSummary(env,actor){
     const members=item.type==='team'?(teamMembers.get(item.id)||[]):[];
     return present(item,{role:item.role,members,memberCount:memberCounts.get(item.id)||0,eventIds:joinedActivity.get(item.id)||[],manage,joinRequests:requestMap.get(item.id)||[]});
   };
+  const preference=actor.user?await env.DB.prepare('SELECT preferred_community_id FROM users WHERE id=?').bind(actor.user.id).first():null;
+  const joinedCommunities=joined.filter(item=>item.type==='community').map(decorate);
+  const preferredCommunityId=joinedCommunities.some(item=>item.id===preference?.preferred_community_id)?preference.preferred_community_id:null;
   return {
     team:team?decorate(team):null,
-    communities:joined.filter(item=>item.type==='community').map(decorate),
+    communities:joinedCommunities,
     discoverableCommunities:discoverable.map(item=>present(item,{memberCount:Number(item.member_count)||0,eventIds:discoverActivity.get(item.id)||[],joinPending:Boolean(item.join_pending)})),
+    preferredCommunityId,
     discordBotReady:Boolean(env.DISCORD_BOT_TOKEN),
     discordBotInviteUrl:discordBotInviteUrl(env)
   };
