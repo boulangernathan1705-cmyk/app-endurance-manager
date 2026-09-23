@@ -1,7 +1,7 @@
 import {app,state,esc,button,canManage,isAdmin,eventTypeBadge,eventBadge,eventCategoryCount,circuitVisual,pilotCount,dateLabel,countdown,notifyRender} from './core.mjs';
-import {ownRegistration,renderRegistrationWorkspace} from './registration.mjs?v=5-community-context';
-import {renderPilots} from './crews.mjs?v=10-community-context';
-import {renderHome,showRecoveryLink} from './home-view.mjs?v=9-community-context';
+import {ownRegistration,renderRegistrationWorkspace} from './registration.mjs?v=6-community-branding';
+import {renderPilots} from './crews.mjs?v=11-community-branding';
+import {renderHome,showRecoveryLink} from './home-view.mjs?v=10-community-context';
 import {scopeEvent,defaultCrewOrganizationId,joinedOrganizations,communityById} from './organization-context.mjs?v=6-community-context';
 
 function managedCommunity(organizationId){
