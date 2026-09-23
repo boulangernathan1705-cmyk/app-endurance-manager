@@ -11,6 +11,6 @@ test('le bouton Inscrire un autre pilote du départ réutilise la fenêtre super
   assert.match(bridge,/\.ux-summary-registration-other\[data-action="new-registration"\]/);
   assert.match(bridge,/dataset\.crewBuilderRegisterPilot='true'/);
   const bridgePos=html.indexOf('/front/departure-registration-modal-bridge.mjs?v=1');
-  const modalHandlerPos=html.indexOf('/front/crew-builder-registration-shortcut.mjs?v=4-audiences');
+  const modalHandlerPos=html.indexOf('/front/crew-builder-registration-shortcut.mjs?v=5-explicit-general');
   assert.ok(bridgePos>=0&&modalHandlerPos>=0&&bridgePos<modalHandlerPos);
 });

@@ -25,5 +25,5 @@ test('la chaîne de modules Mes inscriptions est versionnée pour éviter un anc
   const app=read('app.js');
   const actions=read('front/app/actions.mjs');
   assert.match(app,/actions\.mjs\?v=[^'"\s]+/);
-  assert.match(actions,/entries-view\.mjs\?v=6-community-first-runtime/);
+  assert.match(actions,/entries-view\.mjs\?v=7-explicit-general/);
 });

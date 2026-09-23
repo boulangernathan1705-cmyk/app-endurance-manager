@@ -1,12 +1,12 @@
-import {app,state,api,load,showError,countdown,CARS} from './core.mjs?v=7-runtime';
-import {renderNav,renderHome} from './home-view.mjs?v=11-community-first-runtime';
-import {renderCommunities} from './community-directory.mjs?v=4-community-first-runtime';
-import {renderEvent} from './event-view.mjs?v=17-community-first-runtime';
-import {renderEventForm,departureFields,updateRemoveButtons} from './event-form.mjs';
-import {renderMyEntries} from './entries-view.mjs?v=6-community-first-runtime';
-import {refresh,refreshAfterSave} from './refresh.mjs?v=2-paddock-chain';
-import {draftFor,registrationDraft,ownRegistrations,rerenderRegistrationSection,submitRegistration} from './registration.mjs?v=4-audiences';
-import {updateCrewState} from './crews.mjs?v=9-audiences';
+import {app,state,api,load,showError,countdown,CARS} from './core.mjs?v=8-explicit-general';
+import {renderNav,renderHome} from './home-view.mjs?v=12-explicit-general';
+import {renderCommunities} from './community-directory.mjs?v=5-explicit-general';
+import {renderEvent} from './event-view.mjs?v=18-explicit-general';
+import {renderEventForm,departureFields,updateRemoveButtons} from './event-form.mjs?v=3-explicit-general';
+import {renderMyEntries} from './entries-view.mjs?v=7-explicit-general';
+import {refresh,refreshAfterSave} from './refresh.mjs?v=3-explicit-general';
+import {draftFor,registrationDraft,ownRegistrations,rerenderRegistrationSection,submitRegistration} from './registration.mjs?v=7-explicit-general';
+import {updateCrewState} from './crews.mjs?v=12-explicit-general';
 import {GENERAL_AUDIENCE,defaultRegistrationAudienceIds,registrationAudienceIds,communityById} from './organization-context.mjs?v=6-community-context';
 
 async function submitEvent(form){
@@ -123,7 +123,7 @@ async function perform(action,target){
       state.activeOrganizationId=state.activeCommunityId;
       state.visibleAudienceIds=new Set([state.activeCommunityId||GENERAL_AUDIENCE]);
       const url=new URL(location.href);
-      if(state.activeCommunityId)url.searchParams.set('community',state.activeCommunityId);else url.searchParams.delete('community');
+      url.searchParams.set('community',state.activeCommunityId||'general');
       url.searchParams.delete('auth');
       history.replaceState(null,'',url.pathname+(url.search||''));
       renderNav();renderHome();break;

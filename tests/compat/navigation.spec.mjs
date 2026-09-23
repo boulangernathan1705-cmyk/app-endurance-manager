@@ -87,9 +87,11 @@ test('language switch shows the current language, translates event counters and 
   await page.waitForLoadState('networkidle');
   await expect(page.locator('html')).toHaveAttribute('lang','en');
   await expect(page.getByText('Choose your community',{exact:true})).toBeVisible();
-  await expect(page.getByText('Choose your simulator',{exact:true})).toBeVisible();
+  await expect(page.getByText('Choose your simulator',{exact:true})).toBeHidden();
   await expect(page.locator('[data-language-toggle]')).toContainText('🇬🇧');
   await expect(page.locator('[data-language-toggle]')).toHaveAttribute('data-current-language','en');
+  await page.locator('[data-hub-community=""]').click();
+  await expect(page.getByText('Choose your simulator',{exact:true})).toBeVisible();
 
   await openAndCheck(page, '/iracing/');
   await expect(page.locator('html')).toHaveAttribute('lang','en');
@@ -148,22 +150,27 @@ test('community management stays secondary behind the active-space selector', as
   expect(apiFailures).toEqual([]);
 });
 
-test('community selection comes before simulator selection', async ({page}) => {
+test('community and simulator choices are separate successive screens', async ({page}) => {
   await mockGameApi(page);
   await openAndCheck(page, '/');
-  const order=await page.evaluate(()=>({
-    community:document.getElementById('community-picker')?.getBoundingClientRect().top ?? Infinity,
-    simulator:document.getElementById('game-grid')?.getBoundingClientRect().top ?? -Infinity
-  }));
-  expect(order.community).toBeLessThan(order.simulator);
+  await expect(page.locator('#community-stage')).toBeVisible();
+  await expect(page.locator('#simulator-stage')).toBeHidden();
+  await page.locator('[data-hub-community=""]').click();
+  await expect(page.locator('#community-stage')).toBeHidden();
+  await expect(page.locator('#simulator-stage')).toBeVisible();
+  await expect(page).toHaveURL(/community=general/);
+  await page.locator('[data-hub-back]').click();
+  await expect(page.locator('#community-stage')).toBeVisible();
+  await expect(page.locator('#simulator-stage')).toBeHidden();
 });
 
 test('LMU space opens from home', async ({page}) => {
   await mockGameApi(page);
   await openAndCheck(page, '/');
-  const link = page.locator('a[href="/lmu/"]');
+  await page.locator('[data-hub-community=""]').click();
+  const link = page.locator('[data-hub-game="lmu"]');
   await expect(link).toBeVisible();
-  await Promise.all([page.waitForURL('**/lmu/'), link.click()]);
+  await Promise.all([page.waitForURL('**/lmu/?**'), link.click()]);
   await page.waitForLoadState('networkidle');
   await expect(page.locator('[data-ux-error-modal]')).toHaveCount(0);
   expect(apiFailures).toEqual([]);
@@ -172,9 +179,10 @@ test('LMU space opens from home', async ({page}) => {
 test('iRacing space opens from home', async ({page}) => {
   await mockGameApi(page);
   await openAndCheck(page, '/');
-  const link = page.locator('a[href="/iracing/"]');
+  await page.locator('[data-hub-community=""]').click();
+  const link = page.locator('[data-hub-game="iracing"]');
   await expect(link).toBeVisible();
-  await Promise.all([page.waitForURL('**/iracing/'), link.click()]);
+  await Promise.all([page.waitForURL('**/iracing/?**'), link.click()]);
   await page.waitForLoadState('networkidle');
   await expect(page.locator('[data-ux-error-modal]')).toHaveCount(0);
   expect(apiFailures).toEqual([]);

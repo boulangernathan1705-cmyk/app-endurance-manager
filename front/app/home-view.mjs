@@ -1,4 +1,4 @@
-import {app,nav,state,esc,button,canManage,eventTypeBadge,eventBadge,eventCategoryCount,pilotCount,circuitVisual,dateLabel,countdown,groupEvents,notifyRender,notifyNav} from './core.mjs?v=7-runtime';
+import {app,nav,state,esc,button,canManage,eventTypeBadge,eventBadge,eventCategoryCount,pilotCount,circuitVisual,dateLabel,countdown,groupEvents,notifyRender,notifyNav} from './core.mjs?v=8-explicit-general';
 import {getLocale,localeTag} from '../i18n.mjs';
 import {communityById,registrationAudienceIds} from './organization-context.mjs?v=6-community-context';
 
@@ -37,7 +37,8 @@ function communityMark(community,css=''){
     : `<span class="community-context-mark is-fallback ${css}" aria-hidden="true">${esc(initials(community?.name||'Endurance Manager'))}</span>`;
 }
 function contextQuery(communityId=state.activeCommunityId){
-  return communityId?`?community=${encodeURIComponent(communityId)}`:'';
+  if(communityId)return`?community=${encodeURIComponent(communityId)}`;
+  return new URLSearchParams(location.search).get('community')==='general'?'?community=general':'';
 }
 function communityContextMarkup(){
   const active=activeCommunity();

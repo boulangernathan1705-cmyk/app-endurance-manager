@@ -34,6 +34,8 @@ test('une communauté fonctionne sans Discord et peut ajouter Discord comme règ
 });
 
 test('la communauté active est choisie avant le simulateur et l’annuaire devient secondaire',()=>{
+  const hub=read('front/game-hub.mjs');
+  const index=read('index.html');
   const home=read('front/app/home-view.mjs');
   const directory=read('front/app/community-directory.mjs');
   const context=read('front/app/organization-context.mjs');
@@ -46,6 +48,10 @@ test('la communauté active est choisie avant le simulateur et l’annuaire devi
   assert.doesNotMatch(directory,/Trouve ton paddock/);
   assert.match(context,/preferredCommunityId/);
   assert.match(context,/communityById/);
+  assert.match(index,/id="community-stage"/);
+  assert.match(index,/id="simulator-stage"[^>]+hidden/);
+  assert.match(hub,/showSimulatorStage/);
+  assert.match(hub,/communityId \|\| 'general'/);
 });
 
 test('les gérants peuvent personnaliser leur espace sans créer un moteur de thème parallèle',()=>{
@@ -96,6 +102,6 @@ test('les assets de la nouvelle interface sont versionnés et les fixtures dev r
   assert.match(seed,/if\(url\.origin!==DEV_ORIGIN\)return/);
   assert.match(html,/community-context\.css\?v=3-language-preserved/);
   assert.match(html,/community-directory\.css\?v=2-secondary/);
-  assert.match(html,/app\.js\?v=91-core-versioned/);
-  assert.match(app,/paddock-network\.mjs\?v=5-core-versioned/);
+  assert.match(html,/app\.js\?v=92-explicit-general/);
+  assert.match(app,/paddock-network\.mjs\?v=6-explicit-general/);
 });

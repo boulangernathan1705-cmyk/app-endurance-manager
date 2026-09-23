@@ -134,9 +134,10 @@ export async function load() {
   state.discordReady=session.discordReady;
   state.organizations=session.organizations||{team:null,communities:[],discoverableCommunities:[],preferredCommunityId:null,discordBotReady:false,discordBotInviteUrl:''};
   const requestedRaw=typeof location!=='undefined'?new URLSearchParams(location.search).get('community')||'':'';
+  const explicitGeneral=requestedRaw==='general';
   const requested=/^[a-f0-9-]{36}$/.test(requestedRaw)&&communityById(state.organizations,requestedRaw)?requestedRaw:null;
   state.requestedCommunityId=requested;
-  state.activeCommunityId=requested||preferredCommunityId(state.organizations);
+  state.activeCommunityId=explicitGeneral?null:(requested||preferredCommunityId(state.organizations));
   state.activeOrganizationId=state.activeCommunityId;
   state.visibleAudienceIds=new Set([state.activeCommunityId||'general']);
   state.events=(Array.isArray(result.events)?result.events:[]).filter(event => gameForEvent(event) === activeGame);

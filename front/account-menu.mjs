@@ -59,6 +59,7 @@ function communityBadge(){
 function communityFromSession(session){
   const all=[...(session?.organizations?.communities||[]),...(session?.organizations?.discoverableCommunities||[])];
   const requested=new URLSearchParams(location.search).get('community');
+  if(requested==='general')return null;
   if(requested){
     const found=all.find(item=>item.id===requested);
     if(found)return found;

@@ -4,7 +4,11 @@ import {getLocale,localeTag} from './i18n.mjs';
 
 const grid = document.getElementById('game-grid');
 const communityPicker = document.getElementById('community-picker');
-let selectedCommunityId = '';
+const communityStage = document.getElementById('community-stage');
+const simulatorStage = document.getElementById('simulator-stage');
+const selectedCommunity = document.getElementById('hub-selected-community');
+let selectedCommunityId = null;
+let selectionPushed = false;
 let sessionState = {organizations:{team:null,communities:[],discoverableCommunities:[],preferredCommunityId:null}};
 let cachedEvents = {lmu:[],iracing:[]};
 const formatter = new Intl.DateTimeFormat(localeTag(), {
@@ -141,11 +145,11 @@ function enduranceQueueMarkup(items, game) {
 function gameCard(game, events, communityId='') {
   const catalog = GAME_CATALOGS[game];
   const base = game === 'lmu' ? '/lmu/' : '/iracing/';
-  const params = new URLSearchParams({runtime:'92'}); if (communityId) params.set('community',communityId); const href = `${base}?${params.toString()}`;
+  const params = new URLSearchParams({runtime:'93',community:communityId || 'general'}); const href = `${base}?${params.toString()}`;
   const badge = game === 'lmu' ? 'LMU' : 'iR';
   return `<article class="game-hub-card game-${game}">
     <div class="game-hub-heading"><div class="game-title-line"><span class="game-badge" aria-hidden="true">${badge}</span><h2>${esc(catalog.name)}</h2></div><p>${game === 'lmu' ? 'Hypercar, prototypes et GT de Le Mans Ultimate.' : 'GTP, LMP2, GT3, GT4 et TCR avec un catalogue de circuits étendu.'}</p></div>
-    <a class="game-hub-enter" href="${href}">Accéder à ${esc(catalog.shortName)} <span aria-hidden="true">→</span></a>
+    <a class="game-hub-enter" data-hub-game="${game}" href="${href}">Accéder à ${esc(catalog.shortName)} <span aria-hidden="true">→</span></a>
     ${enduranceQueueMarkup(homeQueue(events,game),game)}
   </article>`;
 }
@@ -172,19 +176,19 @@ function scopedEvents(events, communityId) {
   return (events || []).filter(event => communityId ? event.organizationId === communityId : !event.organizationId);
 }
 
-function resolveCommunity(organizations={}) {
-  const requested=new URLSearchParams(location.search).get('community') || '';
+function requestedCommunity(organizations={}) {
+  const params=new URLSearchParams(location.search);
+  if(!params.has('community'))return null;
+  const requested=params.get('community') || '';
+  if(requested==='general')return '';
   const known=knownCommunities(organizations);
   if (requested && known.some(item=>item.id===requested)) return requested;
-  const preferred=organizations.preferredCommunityId;
-  if (preferred && (organizations.communities || []).some(item=>item.id===preferred)) return preferred;
-  const joined=organizations.communities || [];
-  return joined.length===1 ? joined[0].id : '';
+  return null;
 }
 
 function communityOption(community) {
   const id=community?.id || '';
-  const active=id===selectedCommunityId;
+  const active=selectedCommunityId!==null&&id===selectedCommunityId;
   const subtitle=community
     ? (community.id===sessionState.organizations?.preferredCommunityId ? 'Communauté par défaut' : (community.role ? 'Membre' : 'Communauté publique'))
     : 'Endurances indépendantes';
@@ -219,6 +223,38 @@ function renderGames() {
     + gameCard('iracing',scopedEvents(cachedEvents.iracing,selectedCommunityId),selectedCommunityId);
 }
 
+function selectedCommunityMarkup() {
+  const community=knownCommunities(sessionState.organizations || {}).find(item=>item.id===selectedCommunityId) || null;
+  return `${communityMark(community)}<span><small>ESPACE CHOISI</small><strong>${esc(community?.name || 'Endurance Manager')}</strong></span>`;
+}
+
+function showCommunityStage() {
+  communityStage.hidden=false;
+  simulatorStage.hidden=true;
+  document.title='ENDURANCE MANAGER';
+}
+
+function showSimulatorStage(communityId,{historyMode='none'}={}) {
+  selectedCommunityId=communityId;
+  renderCommunityPicker();
+  renderGames();
+  selectedCommunity.innerHTML=selectedCommunityMarkup();
+  communityStage.hidden=true;
+  simulatorStage.hidden=false;
+  document.title=`${selectedCommunityId ? knownCommunities(sessionState.organizations || {}).find(item=>item.id===selectedCommunityId)?.name || 'Communauté' : 'Endurance Manager'} · Simulateur`;
+  if(historyMode!=='none'){
+    const url=new URL(location.href);
+    url.searchParams.set('community',selectedCommunityId || 'general');
+    history[historyMode==='push'?'pushState':'replaceState'](null,'',url.pathname+url.search);
+  }
+}
+
+function syncStageFromUrl() {
+  const requested=requestedCommunity(sessionState.organizations || {});
+  if(requested===null){showCommunityStage();return;}
+  showSimulatorStage(requested);
+}
+
 async function fetchSession() {
   const response=await fetch('/api/session',{credentials:'same-origin',cache:'no-store',headers:{Accept:'application/json'}});
   if(!response.ok) throw new Error('session');
@@ -242,9 +278,8 @@ async function load() {
   if(sessionResult.status==='fulfilled') sessionState=sessionResult.value || sessionState;
   cachedEvents.lmu=lmuResult.status==='fulfilled'?lmuResult.value:[];
   cachedEvents.iracing=iracingResult.status==='fulfilled'?iracingResult.value:[];
-  selectedCommunityId=resolveCommunity(sessionState.organizations || {});
   renderCommunityPicker();
-  renderGames();
+  syncStageFromUrl();
   if(notice && (lmuResult.status==='rejected' || iracingResult.status==='rejected')) {
     notice.textContent='Le récapitulatif des prochaines endurances est momentanément indisponible. Les espaces restent accessibles.';
   }
@@ -253,13 +288,25 @@ async function load() {
 communityPicker?.addEventListener('click',event=>{
   const button=event.target.closest?.('[data-hub-community]');
   if(!button)return;
-  selectedCommunityId=String(button.dataset.hubCommunity || '');
-  const url=new URL(location.href);
-  if(selectedCommunityId)url.searchParams.set('community',selectedCommunityId);
-  else url.searchParams.delete('community');
+  selectionPushed=true;
+  showSimulatorStage(String(button.dataset.hubCommunity || ''),{historyMode:'push'});
+  scrollTo({top:0,behavior:'auto'});
+});
+
+document.querySelector('[data-hub-back]')?.addEventListener('click',()=>{
+  if(selectionPushed){history.back();return;}
+  const url=new URL(location.href);url.searchParams.delete('community');
   history.replaceState(null,'',url.pathname+(url.search||''));
+  selectedCommunityId=null;
   renderCommunityPicker();
-  renderGames();
+  showCommunityStage();
+});
+
+addEventListener('popstate',()=>{
+  selectionPushed=false;
+  selectedCommunityId=null;
+  renderCommunityPicker();
+  syncStageFromUrl();
 });
 
 void load();
