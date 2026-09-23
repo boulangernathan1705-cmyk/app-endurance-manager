@@ -3,7 +3,7 @@ import {renderNav,renderHome} from './home-view.mjs?v=9-community-context';
 import {renderCommunities} from './community-directory.mjs?v=2-secondary-community-management';
 import {renderEvent} from './event-view.mjs?v=15-community-context';
 import {renderEventForm,departureFields,updateRemoveButtons} from './event-form.mjs';
-import {renderMyEntries} from './entries-view.mjs?v=4-audiences';
+import {renderMyEntries} from './entries-view.mjs?v=5-community-context';
 import {refresh,refreshAfterSave} from './refresh.mjs?v=2-paddock-chain';
 import {draftFor,registrationDraft,ownRegistrations,rerenderRegistrationSection,submitRegistration} from './registration.mjs?v=4-audiences';
 import {updateCrewState} from './crews.mjs?v=9-audiences';
