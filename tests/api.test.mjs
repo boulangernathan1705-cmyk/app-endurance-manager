@@ -238,6 +238,21 @@ test('pilot, organizer and admin keep ownership after Discord logout and login',
    assert.equal((await req('/api/registrations/'+registration.data.id,'DELETE',{version:1},actor)).status,200);
  }
 });
+test('Discord login returns to the requested community context',async()=>{
+ const h=harness();
+ const community='123e4567-e89b-12d3-a456-426614174000';
+ const start=await h.req('/api/auth/discord?return='+encodeURIComponent('/lmu/?community='+community),'GET',null,'community-login');
+ assert.equal(start.status,302);
+ const authUrl=new URL(start.response.headers.get('Location'));
+ const realFetch=globalThis.fetch;
+ globalThis.fetch=async url=>new Response(JSON.stringify(String(url).endsWith('/token')?{access_token:'mock-community'}:{id:PILOT,username:'Community pilot'}),{headers:{'Content-Type':'application/json'}});
+ try{
+   const callback=await h.req('/api/auth/discord/callback?code=test&state='+authUrl.searchParams.get('state'),'GET',null,'community-login');
+   assert.equal(callback.status,302);
+   assert.equal(callback.response.headers.get('Location'),ROOT+'/lmu/?community='+community);
+ }finally{globalThis.fetch=realFetch;}
+});
+
 test('OAuth state is bound to browser, single-use, and profile cannot grant admin',async()=>{
  const h=harness();
  const state=await h.login(PILOT,'pilot');
