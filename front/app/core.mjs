@@ -2,7 +2,7 @@ import {CATEGORIES, EVENT_TYPES, CIRCUITS, categories, CARS, gameForEvent} from 
 import {countdown, dateLabel, groupEvents} from '../schedule.mjs';
 import {renderAvailabilityTimeline} from '../timeline.mjs';
 import {circuitMapConfig, circuitMapSource} from '../../shared/circuit-maps.mjs';
-import {normalizeAudienceFilter} from './organization-context.mjs?v=5-community-directory';
+import {preferredCommunityId,communityById} from './organization-context.mjs?v=6-community-context';
 
 export {CATEGORIES, EVENT_TYPES, CIRCUITS, categories, CARS, countdown, dateLabel, groupEvents, renderAvailabilityTimeline};
 
@@ -14,7 +14,7 @@ export const state = {
   events:[], user:null, discordReady:false, currentEventId:null, page:'home', editingEvent:null,
   drafts:{}, recoveryLink:'', busy:false, participants:[], flash:'', eventFilter:'upcoming',
   selectedDepartureId:null, eventSection:'race', pilotName:'', registrationOpen:new Set(), crewManagementOpen:new Set(),
-  pendingCrewJoin:null, currentOrganizationId:null, activeOrganizationId:null, eventCreationOrganizationId:null, organizations:{team:null,communities:[],discoverableCommunities:[],discordBotReady:false,discordBotInviteUrl:''}, visibleAudienceIds:new Set(['general'])
+  pendingCrewJoin:null, currentOrganizationId:null, activeOrganizationId:null, activeCommunityId:null, requestedCommunityId:null, eventCreationOrganizationId:null, organizations:{team:null,communities:[],discoverableCommunities:[],preferredCommunityId:null,discordBotReady:false,discordBotInviteUrl:''}, visibleAudienceIds:new Set(['general'])
 };
 try { state.pilotName = localStorage.getItem('fmt_pilot_name') || ''; } catch {}
 
@@ -132,10 +132,13 @@ export async function load() {
   const result = await api(`/api/events?game=${encodeURIComponent(activeGame)}`);
   state.user=session.user;
   state.discordReady=session.discordReady;
-  state.organizations=session.organizations||{team:null,communities:[],discoverableCommunities:[],discordBotReady:false,discordBotInviteUrl:''};
-  let stored=null;
-  try{stored=JSON.parse(localStorage.getItem('endurance_audience_filter')||'null');}catch{}
-  state.visibleAudienceIds=normalizeAudienceFilter(state.organizations,stored||state.visibleAudienceIds);
+  state.organizations=session.organizations||{team:null,communities:[],discoverableCommunities:[],preferredCommunityId:null,discordBotReady:false,discordBotInviteUrl:''};
+  const requestedRaw=typeof location!=='undefined'?new URLSearchParams(location.search).get('community')||'':'';
+  const requested=/^[a-f0-9-]{36}$/.test(requestedRaw)&&communityById(state.organizations,requestedRaw)?requestedRaw:null;
+  state.requestedCommunityId=requested;
+  state.activeCommunityId=requested||preferredCommunityId(state.organizations);
+  state.activeOrganizationId=state.activeCommunityId;
+  state.visibleAudienceIds=new Set([state.activeCommunityId||'general']);
   state.events=(Array.isArray(result.events)?result.events:[]).filter(event => gameForEvent(event) === activeGame);
   state.participants=state.user ? (await api('/api/participants')).participants : [];
   if (state.user && !state.pilotName) state.pilotName=state.user.name.slice(0,30);
