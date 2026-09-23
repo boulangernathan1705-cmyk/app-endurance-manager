@@ -428,7 +428,17 @@ export default {
       try { return await ingestClientError(request,env); }
       catch { return new Response(null,{status:204}); }
     }
-    if (!pathname.startsWith('/api/')) return env.ASSETS.fetch(request);
+    if (!pathname.startsWith('/api/')) {
+      const response=await env.ASSETS.fetch(request);
+      const canonical=origin(env);
+      if (!canonical.includes('.workers.dev')) return response;
+      const lower=pathname.toLowerCase();
+      if (!(request.method==='GET'||request.method==='HEAD') || !(pathname==='/'||lower.endsWith('/')||lower.endsWith('.html')||lower.endsWith('.js')||lower.endsWith('.mjs')||lower.endsWith('.css'))) return response;
+      const headers=new Headers(response.headers);
+      headers.set('Cache-Control','no-store, max-age=0');
+      headers.set('Pragma','no-cache');
+      return new Response(response.body,{status:response.status,statusText:response.statusText,headers});
+    }
     try { return await api(request, env); }
     catch (error) {
       if (error instanceof HttpError) return json({error:error.message},error.status);
