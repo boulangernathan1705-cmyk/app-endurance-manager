@@ -30,6 +30,9 @@ async function expectApiHealthy(page, path) {
 
 async function openAndCheck(page, path) {
   const failures = [];
+  const pageErrors = [];
+  const onPageError = error => pageErrors.push(String(error?.stack || error?.message || error));
+  page.on('pageerror', onPageError);
   const onRequestFailed = request => {
     const url = request.url();
     if (url.includes('/api/')) failures.push(`${request.method()} ${url}: ${request.failure()?.errorText || 'request failed'}`);
@@ -42,6 +45,8 @@ async function openAndCheck(page, path) {
   await expect(page.locator('body')).toBeVisible();
   await expect(page.locator('[data-ux-error-modal]')).toHaveCount(0);
   expect(failures, `API request failures while opening ${path}`).toEqual([]);
+  expect(pageErrors, `JavaScript errors while opening ${path}`).toEqual([]);
+  page.off('pageerror', onPageError);
   page.off('requestfailed', onRequestFailed);
 }
 
@@ -81,6 +86,7 @@ test('language switch shows the current language, translates event counters and 
   await toggle.click();
   await page.waitForLoadState('networkidle');
   await expect(page.locator('html')).toHaveAttribute('lang','en');
+  await expect(page.getByText('Choose your community',{exact:true})).toBeVisible();
   await expect(page.getByText('Choose your simulator',{exact:true})).toBeVisible();
   await expect(page.locator('[data-language-toggle]')).toContainText('🇬🇧');
   await expect(page.locator('[data-language-toggle]')).toHaveAttribute('data-current-language','en');
@@ -140,6 +146,16 @@ test('community management stays secondary behind the active-space selector', as
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(overflow,'community management overflows horizontally').toBeLessThanOrEqual(1);
   expect(apiFailures).toEqual([]);
+});
+
+test('community selection comes before simulator selection', async ({page}) => {
+  await mockGameApi(page);
+  await openAndCheck(page, '/');
+  const order=await page.evaluate(()=>({
+    community:document.getElementById('community-picker')?.getBoundingClientRect().top ?? Infinity,
+    simulator:document.getElementById('game-grid')?.getBoundingClientRect().top ?? -Infinity
+  }));
+  expect(order.community).toBeLessThan(order.simulator);
 });
 
 test('LMU space opens from home', async ({page}) => {
