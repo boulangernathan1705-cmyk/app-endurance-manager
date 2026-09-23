@@ -1,13 +1,13 @@
 import {app,state,api,load,showError,countdown,CARS} from './core.mjs';
-import {renderNav,renderHome} from './home-view.mjs?v=8-community-directory';
-import {renderCommunities} from './community-directory.mjs?v=1';
-import {renderEvent} from './event-view.mjs?v=13-paddock-lens';
+import {renderNav,renderHome} from './home-view.mjs?v=9-community-context';
+import {renderCommunities} from './community-directory.mjs?v=2-secondary-community-management';
+import {renderEvent} from './event-view.mjs?v=15-community-context';
 import {renderEventForm,departureFields,updateRemoveButtons} from './event-form.mjs';
 import {renderMyEntries} from './entries-view.mjs?v=4-audiences';
 import {refresh,refreshAfterSave} from './refresh.mjs?v=2-paddock-chain';
 import {draftFor,registrationDraft,ownRegistrations,rerenderRegistrationSection,submitRegistration} from './registration.mjs?v=4-audiences';
 import {updateCrewState} from './crews.mjs?v=9-audiences';
-import {GENERAL_AUDIENCE,defaultRegistrationAudienceIds,registrationAudienceIds} from './organization-context.mjs?v=5-community-directory';
+import {GENERAL_AUDIENCE,defaultRegistrationAudienceIds,registrationAudienceIds,communityById} from './organization-context.mjs?v=6-community-context';
 
 async function submitEvent(form){
   const data={name:form.elements.eventName.value.trim(),durationHours:Number(form.elements.eventDuration.value),eventType:form.elements.eventType.value,circuit:form.elements.eventCircuit.value,organizationId:form.elements.eventOrganization?.value||null,categories:[...form.querySelectorAll('[name="eventCategory"]:checked')].map(input=>input.value),departures:[...form.querySelectorAll('.departure-field')].map(row=>({id:row.dataset.id||undefined,date:row.querySelector('[name="date"]').value,time:row.querySelector('[name="time"]').value})),version:state.editingEvent?.version};
@@ -104,13 +104,34 @@ async function perform(action,target){
       else {if(!confirm('Retirer ce pilote de l’équipage ? Son inscription sera conservée.'))return;await api(`/api/crews/${crew.id}/members/${target.dataset.registration}`,'DELETE',{version:crew.version});state.crewManagementOpen.add(crew.id);}
       await refreshAfterSave('Équipages mis à jour.'); break;
     }
-    case 'create': state.eventCreationOrganizationId=null;renderEventForm(); break;
+    case 'create': state.eventCreationOrganizationId=state.activeCommunityId||null;renderEventForm(null,{organizationId:state.eventCreationOrganizationId}); break;
     case 'edit-event': state.eventCreationOrganizationId=event?.organizationId||null;renderEventForm(event); break;
     case 'add-departure': if(app.querySelectorAll('.departure-field').length>=30)throw Error('Maximum 30 départs par événement.');document.getElementById('departureFields').insertAdjacentHTML('beforeend',departureFields());updateRemoveButtons();break;
     case 'remove-departure': if(app.querySelectorAll('.departure-field').length>1)target.closest('.departure-field').remove();updateRemoveButtons();break;
     case 'delete-event': if(!confirm(`Supprimer « ${event.name} » et toutes ses inscriptions ? Cette suppression est définitive.`))return;await api(`/api/events/${event.id}`,'DELETE',{version:event.version,organizationId:event.organizationId||null});state.page='home';state.eventCreationOrganizationId=null;await refreshAfterSave('Événement supprimé.');break;
     case 'my-entries': await load();renderNav();renderMyEntries();break;
-    case 'communities': await load();renderNav();renderCommunities();break;
+    case 'community-switch': {
+      const communityId=String(target.dataset.communityId||'').trim();
+      const community=communityId?communityById(state.organizations,communityId):null;
+      if(communityId&&!community)throw Error('Cette communauté n’est plus disponible.');
+      if(communityId&&!community?.role){renderCommunities(communityId);break;}
+      if(state.user){
+        await api('/api/organizations/preferred','PATCH',{organizationId:communityId||null});
+        state.organizations.preferredCommunityId=communityId||null;
+      }
+      state.activeCommunityId=communityId||null;
+      state.activeOrganizationId=state.activeCommunityId;
+      state.visibleAudienceIds=new Set([state.activeCommunityId||GENERAL_AUDIENCE]);
+      const url=new URL(location.href);
+      if(state.activeCommunityId)url.searchParams.set('community',state.activeCommunityId);else url.searchParams.delete('community');
+      url.searchParams.delete('auth');
+      history.replaceState(null,'',url.pathname+(url.search||''));
+      renderNav();renderHome();break;
+    }
+    case 'communities': {
+      const focus=target.dataset.communityId||state.activeCommunityId||null;
+      await load();renderNav();renderCommunities(focus);break;
+    }
     case 'guest-link': state.recoveryLink=(await api('/api/guest/link','POST')).link;state.page==='event'?renderEvent():renderHome();break;
     case 'copy-link':
       try{await navigator.clipboard.writeText(state.recoveryLink);target.textContent='Lien copié';}
@@ -134,6 +155,14 @@ document.addEventListener('error',event=>{const image=event.target;if(image inst
 setInterval(()=>document.querySelectorAll('[data-countdown]').forEach(element=>{element.textContent=countdown(Number(element.dataset.countdown));}),1000);
 
 async function start(){
-  try{const token=new URLSearchParams(location.hash.slice(1)).get('access');if(token){history.replaceState(null,'',location.pathname+location.search);await api('/api/guest/recover','POST',{token});state.flash='Tes inscriptions invitées sont accessibles sur cet appareil.';}const authError=new URLSearchParams(location.search).get('auth');if(authError){history.replaceState(null,'',location.pathname);state.flash='La connexion Discord n’a pas abouti. Tu peux réessayer.';}await load();renderNav();renderHome(state.flash);}catch(error){app.innerHTML='<h1 class="page-title">ENDURANCE MANAGER</h1>';showError(error);}
+  try{
+    const token=new URLSearchParams(location.hash.slice(1)).get('access');
+    if(token){history.replaceState(null,'',location.pathname+location.search);await api('/api/guest/recover','POST',{token});state.flash='Tes inscriptions invitées sont accessibles sur cet appareil.';}
+    const authError=new URLSearchParams(location.search).get('auth');
+    if(authError){const url=new URL(location.href);url.searchParams.delete('auth');history.replaceState(null,'',url.pathname+(url.search||''));state.flash='La connexion Discord n’a pas abouti. Tu peux réessayer.';}
+    await load();renderNav();
+    const requested=state.requestedCommunityId?communityById(state.organizations,state.requestedCommunityId):null;
+    if(requested&&!requested.role)renderCommunities(requested.id);else renderHome(state.flash);
+  }catch(error){app.innerHTML='<h1 class="page-title">ENDURANCE MANAGER</h1>';showError(error);}
 }
 start();
