@@ -1,6 +1,7 @@
 import {test, expect} from '@playwright/test';
 
 const apiFailures = [];
+const remoteBaseURL = String(process.env.COMPAT_REMOTE_BASE_URL || '').replace(/\/$/, '');
 
 async function mockGameApi(page) {
   await page.route('**/api/**', async route => {
@@ -21,9 +22,9 @@ async function mockGameApi(page) {
   });
 }
 
-async function expectApiHealthy(page, path) {
-  const response = await page.request.get(path, {headers:{Accept:'application/json'}});
-  expect(response.ok(), `${path} returned ${response.status()}`).toBeTruthy();
+async function expectApiHealthy(page, target) {
+  const response = await page.request.get(target, {headers:{Accept:'application/json'}});
+  expect(response.ok(), `${target} returned ${response.status()}`).toBeTruthy();
   const type = response.headers()['content-type'] || '';
   expect(type).toContain('application/json');
 }
@@ -59,10 +60,11 @@ test.beforeEach(async ({page}) => {
 
 test('public endpoints are reachable; JSON is validated when Cloudflare does not challenge the runner', async ({page}) => {
   for(const path of ['/api/session','/api/events']){
-    const response=await page.request.get(path,{headers:{Accept:'application/json'}});
-    expect(response.ok(),`${path} returned ${response.status()}`).toBeTruthy();
+    const target=remoteBaseURL ? `${remoteBaseURL}${path}` : path;
+    const response=await page.request.get(target,{headers:{Accept:'application/json'}});
+    expect(response.ok(),`${target} returned ${response.status()}`).toBeTruthy();
     const type=response.headers()['content-type']||'';
-    if(type.includes('application/json'))await expectApiHealthy(page,path);
+    if(type.includes('application/json'))await expectApiHealthy(page,target);
     else {
       expect(type).toContain('text/html');
       test.info().annotations.push({type:'cloudflare',description:`${path} returned HTML to the GitHub runner; browser UI tests use mocked API responses.`});
@@ -71,6 +73,7 @@ test('public endpoints are reachable; JSON is validated when Cloudflare does not
 });
 
 test('home loads without network error', async ({page}) => {
+  await mockGameApi(page);
   await openAndCheck(page, '/');
   expect(apiFailures).toEqual([]);
 });
