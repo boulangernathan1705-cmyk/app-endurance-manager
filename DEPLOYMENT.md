@@ -33,3 +33,6 @@ La base D1 PROD est `endurance-manager-prod` et `APP_ORIGIN=https://endurance-ma
 ## Données
 
 Ne jamais copier automatiquement la base DEV vers PROD. Les migrations de schéma sont partagées dans `migrations/`, mais les données utilisateur restent propres à chaque environnement.
+
+
+Le workflow DEV applique les migrations D1 avant chaque déploiement et publie automatiquement la branche `dev` sur le Worker de développement.
