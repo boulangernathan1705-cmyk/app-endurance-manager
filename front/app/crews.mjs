@@ -1,6 +1,6 @@
 import {state,esc,button,logo,renderAvailabilityTimeline,crewColorClass,coversHour,pilotCount,api} from './core.mjs';
-import {renderRegistration} from './registration.mjs?v=4-audiences';
-import {organizationShortLabel} from './organization-context.mjs?v=2-multi-filter';
+import {renderRegistration} from './registration.mjs?v=5-community-context';
+import {organizationShortLabel} from './organization-context.mjs?v=6-community-context';
 
 function contentSummary(title,count){return `<summary class="ux-content-accordion-summary"><span class="ux-content-accordion-title">${esc(title)}</span><span class="ux-content-accordion-count">${count}</span><span class="ux-content-accordion-chevron" aria-hidden="true">›</span></summary>`;}
 function statusPill(crew){return `<span class="crew-compact-status ${crew.locked?'is-complete':'is-open'}">${crew.locked?'ÉQUIPAGE COMPLET':'ÉQUIPAGE OUVERT'}</span>`;}
@@ -33,7 +33,8 @@ function crewCard(event,departure,crew,index,unassigned,allCrews){
   const joinRegistration=ownMember||memberElsewhere?null:unassigned.find(reg=>reg.mine&&reg.category===crew.category)||null;
   const open=state.crewManagementOpen.has(crew.id);
   const ownerBadge=crew.ownedByMe?'<span class="crew-owner-badge">RESPONSABLE</span>':'';
-  const groupBadge=`<span class="crew-group-badge">${esc(organizationShortLabel(state.organizations,crew.organizationId||null))}</span>`;
+  const currentEvent=state.events.find(item=>item.id===state.currentEventId);
+  const groupBadge=currentEvent?.organizationId&&crew.organizationId===currentEvent.organizationId?'':`<span class="crew-group-badge">${esc(organizationShortLabel(state.organizations,crew.organizationId||null))}</span>`;
   const countLabel=`${regs.length} pilote${regs.length>1?'s':''} · ${cov.covered}/${cov.duration} h`;
   const management=crew.canManage
     ? `<div class="crew-inline-management">${stateControl(crew,departure)}<span class="coverage-summary">${countLabel}</span></div>`
