@@ -204,11 +204,13 @@ async function createOrganization(request,env,actor){
   const selectedMode=community?joinMode(input.joinMode):'invite';
   if(selectedMode==='discord')fail(409,'Crée d’abord la communauté, puis lie son serveur Discord.');
   const organizationId=id(),createdAt=now();
-  await env.DB.batch([
+  const statements=[
     env.DB.prepare('INSERT INTO organizations(id,type,name,name_key,owner_user_id,description,language,games,visibility,join_mode,updated_at,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)')
       .bind(organizationId,input.type,name,nameKey(name),actor.user.id,description,community?language(input.language):'fr',JSON.stringify(selectedGames),community?visibility(input.visibility):'private',selectedMode,createdAt,createdAt),
     env.DB.prepare('INSERT INTO organization_members(organization_id,user_id,role,created_at) VALUES(?,?,\'owner\',?)').bind(organizationId,actor.user.id,createdAt)
-  ]);
+  ];
+  if(community)statements.push(env.DB.prepare('UPDATE users SET preferred_community_id=COALESCE(preferred_community_id,?) WHERE id=?').bind(organizationId,actor.user.id));
+  await env.DB.batch(statements);
   return json({id:organizationId},201);
 }
 async function updateCommunity(request,env,actor,organizationId){
@@ -220,8 +222,8 @@ async function updateCommunity(request,env,actor,organizationId){
   const description=typeof input.description==='string'&&input.description.trim()?text(input.description,600,'Présentation'):'';
   const mode=joinMode(input.joinMode);
   if(mode==='discord'&&!member.discord_guild_id)fail(409,'Lie d’abord un serveur Discord.');
-  await env.DB.prepare('UPDATE organizations SET name=?,name_key=?,description=?,language=?,games=?,visibility=?,join_mode=?,updated_at=? WHERE id=?')
-    .bind(name,nameKey(name),description,language(input.language),JSON.stringify(games(input.games)),visibility(input.visibility),mode,now(),member.id).run();
+  await env.DB.prepare('UPDATE organizations SET name=?,name_key=?,description=?,language=?,games=?,visibility=?,join_mode=?,logo_url=?,banner_url=?,accent_color=?,updated_at=? WHERE id=?')
+    .bind(name,nameKey(name),description,language(input.language),JSON.stringify(games(input.games)),visibility(input.visibility),mode,imageUrl(input.logoUrl,'Logo'),imageUrl(input.bannerUrl,'Bannière'),accentColor(input.accentColor),now(),member.id).run();
   return json({ok:true});
 }
 async function joinCommunity(request,env,actor,organizationId){
@@ -239,7 +241,8 @@ async function joinCommunity(request,env,actor,organizationId){
   if(mode==='discord')await requireDiscordCommunityAccess(env,actor.user.id,organization,{joining:true});
   await env.DB.batch([
     env.DB.prepare('INSERT OR IGNORE INTO organization_members(organization_id,user_id,role,created_at) VALUES(?,?,\'member\',?)').bind(organization.id,actor.user.id,now()),
-    env.DB.prepare('DELETE FROM organization_join_requests WHERE organization_id=? AND user_id=?').bind(organization.id,actor.user.id)
+    env.DB.prepare('DELETE FROM organization_join_requests WHERE organization_id=? AND user_id=?').bind(organization.id,actor.user.id),
+    env.DB.prepare('UPDATE users SET preferred_community_id=COALESCE(preferred_community_id,?) WHERE id=?').bind(organization.id,actor.user.id)
   ]);
   return json({ok:true,joined:true});
 }
@@ -251,15 +254,15 @@ async function configureDiscord(request,env,actor,organizationId){
   const guildId=String(input.guildId||'').trim();
   if(!guildId){
     if(member.join_mode==='discord')fail(409,'Choisis d’abord un autre mode d’accès avant de délier Discord.');
-    await env.DB.prepare('UPDATE organizations SET discord_guild_id=NULL,discord_guild_name=NULL,discord_role_id=NULL,discord_role_name=NULL,updated_at=? WHERE id=?').bind(now(),member.id).run();
+    await env.DB.prepare("UPDATE organizations SET discord_guild_id=NULL,discord_guild_name=NULL,discord_role_id=NULL,discord_role_name=NULL,discord_icon_url='',discord_banner_url='',discord_accent_color='',updated_at=? WHERE id=?").bind(now(),member.id).run();
     return json({ok:true,cleared:true});
   }
   const guild=await inspectDiscordGuild(env,actor.user.id,guildId);
   const roleId=String(input.roleId||'').trim();
   const role=roleId?guild.roles.find(item=>item.id===roleId):null;
   if(roleId&&!role)fail(400,'Choisis un rôle présent sur ce serveur.');
-  await env.DB.prepare('UPDATE organizations SET discord_guild_id=?,discord_guild_name=?,discord_role_id=?,discord_role_name=?,updated_at=? WHERE id=?')
-    .bind(guild.id,guild.name,role?.id||null,role?.name||null,now(),member.id).run();
+  await env.DB.prepare('UPDATE organizations SET discord_guild_id=?,discord_guild_name=?,discord_role_id=?,discord_role_name=?,discord_icon_url=?,discord_banner_url=?,discord_accent_color=?,updated_at=? WHERE id=?')
+    .bind(guild.id,guild.name,role?.id||null,role?.name||null,guild.iconUrl||'',guild.bannerUrl||'',guild.accentColor||'',now(),member.id).run();
   return json({ok:true,guild,requiredRole:role||null});
 }
 async function decideRequest(request,env,actor,organizationId,userId){
