@@ -129,8 +129,18 @@ export async function ensureOrganizationSchema(env){
     await addColumnIfMissing(env,'events','organization_id','ALTER TABLE events ADD COLUMN organization_id TEXT REFERENCES organizations(id) ON DELETE RESTRICT');
     await env.DB.prepare('CREATE INDEX IF NOT EXISTS events_organization ON events(organization_id,created_at DESC)').run();
 
+    // 0022 : communauté par défaut et identité visuelle légère.
+    await addColumnIfMissing(env,'users','preferred_community_id','ALTER TABLE users ADD COLUMN preferred_community_id TEXT');
+    await addColumnIfMissing(env,'organizations','logo_url',"ALTER TABLE organizations ADD COLUMN logo_url TEXT NOT NULL DEFAULT ''");
+    await addColumnIfMissing(env,'organizations','banner_url',"ALTER TABLE organizations ADD COLUMN banner_url TEXT NOT NULL DEFAULT ''");
+    await addColumnIfMissing(env,'organizations','accent_color',"ALTER TABLE organizations ADD COLUMN accent_color TEXT NOT NULL DEFAULT ''");
+    await addColumnIfMissing(env,'organizations','discord_icon_url',"ALTER TABLE organizations ADD COLUMN discord_icon_url TEXT NOT NULL DEFAULT ''");
+    await addColumnIfMissing(env,'organizations','discord_banner_url',"ALTER TABLE organizations ADD COLUMN discord_banner_url TEXT NOT NULL DEFAULT ''");
+    await env.DB.prepare('CREATE INDEX IF NOT EXISTS users_preferred_community ON users(preferred_community_id)').run();
+
     try{await env.DB.prepare("INSERT OR IGNORE INTO d1_migrations(name) VALUES('0020_community_directory.sql')").run();}catch{}
     try{await env.DB.prepare("INSERT OR IGNORE INTO d1_migrations(name) VALUES('0021_event_communities.sql')").run();}catch{}
+    try{await env.DB.prepare("INSERT OR IGNORE INTO d1_migrations(name) VALUES('0022_community_branding.sql')").run();}catch{}
   })().catch(error=>{organizationSchemaReady=null;throw error;});
   return organizationSchemaReady;
 }
