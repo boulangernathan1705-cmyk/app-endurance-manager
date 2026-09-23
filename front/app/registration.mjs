@@ -1,4 +1,4 @@
-import {state,esc,button,carPreferenceChoices,registrationCarLabel,renderAvailabilityTimeline,notifyRender,logo,categories} from './core.mjs';
+import {state,esc,button,carPreferenceChoices,registrationCarLabel,renderAvailabilityTimeline,notifyRender,logo,categories} from './core.mjs?v=7-runtime';
 import {getLocale} from '../i18n.mjs';
 import {GENERAL_AUDIENCE,audienceChoices,defaultRegistrationAudienceIds,registrationAudienceIds,organizationAudienceLabels,communityById} from './organization-context.mjs?v=6-community-context';
 
