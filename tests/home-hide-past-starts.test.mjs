@@ -12,5 +12,5 @@ test('l’accueil principal n’affiche que les départs strictement futurs',()=
   assert.doesNotMatch(hub,/Number\(item\.startsAt\) \+ bounds\.duration > timestamp/);
   assert.doesNotMatch(hub,/departureRunning/);
   assert.match(hub,/const label = eventStarted \? 'PROCHAIN DÉPART' : 'PROCHAINE ENDURANCE'/);
-  assert.match(html,/game-hub\.mjs\?v=14-community-first/);
+  assert.match(html,/game-hub\.mjs\?v=15-runtime-link/);
 });
