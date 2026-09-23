@@ -326,6 +326,19 @@
   background: #0a1416;
 }
 .pilot-community-logo img { width:100%; height:100%; object-fit:cover; }
+.registration-community-context {
+  display:flex;
+  align-items:center;
+  gap:8px;
+  margin:8px 0 12px;
+  padding:9px 10px;
+  border:1px solid rgba(72,111,116,.6);
+  border-radius:9px;
+  background:rgba(8,16,18,.58);
+}
+.registration-community-context > span:last-child { display:grid; gap:1px; min-width:0; }
+.registration-community-context strong { color:#dfe8e5; font-size:10px; }
+.registration-community-context small { color:#7f9698; font-size:8.5px; line-height:1.35; }
 
 @media (min-width:761px) {
   .desktop-home-toolbar .nav-community-context { width:min(300px,35vw); flex:0 1 300px; }
