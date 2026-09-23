@@ -15,7 +15,8 @@ if (shell && app && navigation) {
     const isEventsHome = !!title && title.textContent.trim().toUpperCase() === 'ÉVÉNEMENTS' && !!filters;
     shell.classList.toggle('is-events-home', isEventsHome);toolbar.replaceChildren();center.replaceChildren();rightControls.replaceChildren();
     if (!media.matches) { restoreMobileAccount(); return; }
-    if (isEventsHome) {const label = document.createElement('strong');label.className = 'desktop-home-title';label.textContent = 'ÉVÉNEMENTS';toolbar.append(label);const createClone = cloneControl(create);if (createClone) { createClone.classList.add('desktop-home-create');toolbar.append(createClone); }const filterClone = cloneControl(filters);if (filterClone) { filterClone.classList.add('desktop-home-filter');toolbar.append(filterClone); }}
+    const communityClone=cloneControl(navigation.querySelector('.nav-community-context'));if(communityClone)toolbar.append(communityClone);
+    if (isEventsHome) {const createClone = cloneControl(create);if (createClone) { createClone.classList.add('desktop-home-create');toolbar.append(createClone); }}
     else {const homeClone = cloneControl(navigation.querySelector('[data-action="home"]'));if (homeClone) toolbar.append(homeClone);}
     const switcherClone = cloneControl(navigation.querySelector('.nav-game-switcher'));if (switcherClone) center.append(switcherClone);
     const entriesClone = cloneControl(navigation.querySelector('[data-action="my-entries"]'));if (entriesClone) rightControls.append(entriesClone);
