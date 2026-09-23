@@ -77,14 +77,6 @@
 #hub-status:empty { display: none; }
 
 
-.hub-step-label {
-  display: block;
-  margin-bottom: 5px;
-  color: var(--muted);
-  font-size: 10px;
-  font-weight: 900;
-  letter-spacing: .14em;
-}
 
 .hub-community-picker {
   display: grid;
