@@ -21,7 +21,7 @@ const EN=new Map(Object.entries({
   'Se connecter avec Discord':'Sign in with Discord','Connexion Discord indisponible':'Discord sign-in unavailable','Compte indisponible':'Account unavailable',
   'Connexion via Discord OAuth · aucun mot de passe transmis à Endurance Manager.':'Sign in via Discord OAuth · no password is shared with Endurance Manager.',
   'En savoir plus':'Learn more','Utilisation sans connexion':'Using without an account',
-  'Choisis ton simulateur':'Choose your simulator','Simulateurs disponibles':'Available simulators','Chargement de la prochaine endurance…':'Loading the next endurance event…',
+  'Choisis ta communauté':'Choose your community','Choisis ton simulateur':'Choose your simulator','1 · ESPACE':'1 · SPACE','2 · SIMULATEUR':'2 · SIMULATOR','Espaces disponibles':'Available spaces','Chargement de tes espaces…':'Loading your spaces…','Endurance Manager · Général':'Endurance Manager · General','Endurances indépendantes':'Independent endurance events','Communauté par défaut':'Default community','Communauté publique':'Public community','Membre':'Member','Gérer ou découvrir des communautés':'Manage or discover communities','Simulateurs disponibles':'Available simulators','Chargement de la prochaine endurance…':'Loading the next endurance event…',
   'Accéder à LMU':'Open LMU','Accéder à iRacing':'Open iRacing','COURSE EN COURS':'RACE IN PROGRESS','PROCHAIN DÉPART':'NEXT START','PROCHAINE ENDURANCE':'NEXT ENDURANCE',
   'Aucune endurance à venir':'No upcoming endurance events','Le prochain événement apparaîtra ici dès qu’il sera créé.':'The next event will appear here as soon as it is created.',
   'Hypercar, prototypes et GT de Le Mans Ultimate.':'Hypercars, prototypes and GT cars in Le Mans Ultimate.',
