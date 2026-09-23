@@ -23,6 +23,8 @@ function eventOrganizationField(event,selectedOrganizationId){
   }
 
   const communities=managedCommunities();
+  const selectedCommunity=knownCommunity(selectedOrganizationId);
+  if(selectedCommunity&&canManage()&&!communities.some(community=>community.id===selectedCommunity.id))communities.unshift(selectedCommunity);
   const options=[];
   if(canManage())options.push('<option value="">Endurance indépendante · Général</option>');
   options.push(...communities.map(community=>`<option value="${community.id}" ${community.id===selectedOrganizationId?'selected':''}>Communauté · ${esc(community.name)}</option>`));
