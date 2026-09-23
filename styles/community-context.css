@@ -1,3 +1,5 @@
+.game-space-bar { display:none !important; }
+
 /* Contexte principal : la communauté est choisie avant le simulateur. */
 .nav-community-context {
   position: relative;
