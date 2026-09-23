@@ -32,4 +32,6 @@ Ne pas recréer la base ni rejouer manuellement la migration initiale sur une ba
 
 `APP_ORIGIN` est versionnée dans `wrangler.jsonc`. Les identifiants Discord non secrets peuvent rester configurés côté Cloudflare grâce à `keep_vars: true`. `DISCORD_CLIENT_SECRET` et `DISCORD_BOT_TOKEN` doivent rester des secrets Cloudflare et ne jamais être ajoutés au dépôt.
 
-`DISCORD_BOT_TOKEN` est utilisé uniquement par l’intégration facultative des communautés Discord. Il permet au Worker de vérifier un membre précis avec son identifiant Discord et de contrôler ses rôles au moment utile ; Endurance Manager ne télécharge pas la liste complète des membres du serveur. Sans ce secret, les communautés purement Endurance Manager continuent de fonctionner, mais les règles d’accès Discord sont indisponibles.
+`DISCORD_BOT_TOKEN` est utilisé uniquement par l’intégration facultative des communautés Discord. Il permet au Worker de vérifier un membre précis avec son identifiant Discord, de contrôler ses rôles au moment utile et de lire les métadonnées publiques du serveur nécessaires aux visuels (nom, icône, bannière/couleur quand Discord les fournit). Endurance Manager ne télécharge pas la liste complète des membres du serveur. Sans ce secret, les communautés purement Endurance Manager continuent de fonctionner, mais les règles d’accès Discord et la reprise automatique de ces visuels sont indisponibles.
+
+Les logos et bannières personnalisés configurés manuellement sont stockés sous forme d’URL HTTPS dans D1 ; aucun fichier binaire n’est stocké dans D1.
