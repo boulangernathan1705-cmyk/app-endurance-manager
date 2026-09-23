@@ -17,33 +17,35 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
-      COMPAT_BASE_URL: https://app.endurance-manager.workers.dev
-      ENV_LABEL: development
+      COMPAT_BASE_URL: http://127.0.0.1:8788
+      COMPAT_REMOTE_BASE_URL: https://app.endurance-manager.workers.dev
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '22.13.0'
       - run: npm install --no-audit --no-fund
-      - run: npx playwright install --with-deps chromium firefox webkit
-      - name: Wait for deployment
+      - name: Build exact commit for browser tests
+        run: npm run build:workers
+      - name: Start local browser-test server
         run: |
-          echo "Checking ${ENV_LABEL}: ${COMPAT_BASE_URL}"
-          expected="$(sha256sum app.js | awk '{print $1}')"
-          for i in {1..12}; do
-            if curl --fail --silent --show-error --max-time 10 -A "Mozilla/5.0" "${COMPAT_BASE_URL}/app.js?ci=${GITHUB_SHA}" -o /tmp/deployed-app.js; then
-              actual="$(sha256sum /tmp/deployed-app.js | awk '{print $1}')"
-              if [ "$actual" = "$expected" ]; then
-                echo "Exact commit assets are deployed."
-                exit 0
-              fi
+          python3 -m http.server 8788 --bind 127.0.0.1 --directory public >/tmp/endurance-manager-compat.log 2>&1 &
+          echo $! >/tmp/endurance-manager-compat.pid
+          for i in {1..20}; do
+            if curl --fail --silent --show-error --max-time 2 "http://127.0.0.1:8788/" >/dev/null; then
+              echo "Local exact-commit build is ready."
+              exit 0
             fi
-            sleep 5
+            sleep 1
           done
-          echo "::warning::Unable to prove exact asset freshness from the GitHub runner; continuing with browser tests because Cloudflare may challenge curl."
-      - run: npm run compat:test
+          cat /tmp/endurance-manager-compat.log || true
+          exit 1
+      - run: npx playwright install --with-deps chromium firefox webkit
+      - name: Run compatibility tests against exact commit
+        run: npm run compat:test
         env:
           COMPAT_BASE_URL: ${{ env.COMPAT_BASE_URL }}
+          COMPAT_REMOTE_BASE_URL: ${{ env.COMPAT_REMOTE_BASE_URL }}
       - name: Upload Playwright report on failure
         if: failure()
         uses: actions/upload-artifact@v4
