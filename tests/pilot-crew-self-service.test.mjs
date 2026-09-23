@@ -13,7 +13,7 @@ const MIGRATIONS=[
   '0005_registration_preference.sql','0006_registration_car.sql','0007_registration_car_preferences.sql',
   '0008_event_circuit.sql','0009_registration_owner.sql','0011_multi_category_registrations.sql',
   '0012_participants.sql','0013_allow_assigned_category_interests.sql','0014_lock_categories_after_crew_assignment.sql',
-  '0015_crew_lock.sql','0016_crew_ownership.sql'
+  '0015_crew_lock.sql','0016_crew_ownership.sql','0018_organizations.sql','0020_community_directory.sql','0021_event_communities.sql'
 ];
 
 class D1 {
