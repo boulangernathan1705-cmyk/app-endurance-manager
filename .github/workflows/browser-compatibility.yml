@@ -29,13 +29,18 @@ jobs:
       - name: Wait for deployment
         run: |
           echo "Checking ${ENV_LABEL}: ${COMPAT_BASE_URL}"
-          for i in {1..18}; do
-            if curl --fail --silent --show-error --max-time 10 \
-              "${COMPAT_BASE_URL}/api/session" >/dev/null; then
-              exit 0
+          expected="$(sha256sum app.js | awk '{print $1}')"
+          for i in {1..30}; do
+            if curl --fail --silent --show-error --max-time 10 "${COMPAT_BASE_URL}/app.js" -o /tmp/deployed-app.js; then
+              actual="$(sha256sum /tmp/deployed-app.js | awk '{print $1}')"
+              if [ "$actual" = "$expected" ]; then
+                echo "Exact commit assets are deployed."
+                exit 0
+              fi
             fi
             sleep 10
           done
+          echo "The deployed app.js never matched this commit."
           exit 1
       - run: npm run compat:test
         env:
