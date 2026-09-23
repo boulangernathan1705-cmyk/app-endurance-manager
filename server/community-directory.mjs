@@ -276,7 +276,8 @@ async function decideRequest(request,env,actor,organizationId,userId){
     if(organization.join_mode==='discord')await requireDiscordCommunityAccess(env,userId,organization,{joining:true});
     await env.DB.batch([
       env.DB.prepare('INSERT OR IGNORE INTO organization_members(organization_id,user_id,role,created_at) VALUES(?,?,\'member\',?)').bind(organization.id,userId,now()),
-      env.DB.prepare('DELETE FROM organization_join_requests WHERE organization_id=? AND user_id=?').bind(organization.id,userId)
+      env.DB.prepare('DELETE FROM organization_join_requests WHERE organization_id=? AND user_id=?').bind(organization.id,userId),
+      env.DB.prepare('UPDATE users SET preferred_community_id=COALESCE(preferred_community_id,?) WHERE id=?').bind(organization.id,userId)
     ]);
   }else await env.DB.prepare('DELETE FROM organization_join_requests WHERE organization_id=? AND user_id=?').bind(organization.id,userId).run();
   return json({ok:true});
@@ -286,6 +287,18 @@ export async function communityDirectoryApi(request,env,actor){
   const url=new URL(request.url),path=url.pathname,method=request.method;
   if(path==='/api/organizations'&&method==='GET')return json(await organizationSummary(env,actor));
   if(path==='/api/organizations'&&method==='POST')return createOrganization(request,env,actor);
+  if(path==='/api/organizations/preferred'&&method==='PATCH'){
+    await secureWrite(request,env);
+    if(!actor.user)fail(401,'Connecte-toi avec Discord.');
+    const input=await request.clone().json().catch(()=>null);
+    const organizationId=String(input?.organizationId||'').trim();
+    if(organizationId){
+      const member=await membership(env,actor.user.id,orgId(organizationId));
+      if(!member||member.type!=='community')fail(403,'Choisis une communauté dont tu es membre.');
+      await env.DB.prepare('UPDATE users SET preferred_community_id=? WHERE id=?').bind(organizationId,actor.user.id).run();
+    }else await env.DB.prepare('UPDATE users SET preferred_community_id=NULL WHERE id=?').bind(actor.user.id).run();
+    return json({ok:true,preferredCommunityId:organizationId||null});
+  }
 
   const profile=path.match(/^\/api\/organizations\/([a-f0-9-]{36})$/);
   if(profile&&method==='PATCH')return updateCommunity(request,env,actor,profile[1]);
@@ -298,7 +311,10 @@ export async function communityDirectoryApi(request,env,actor){
     await secureWrite(request,env);
     const member=await requireMember(env,actor,leave[1]);
     if(member.role==='owner')fail(409,'Le créateur doit conserver l’organisation.');
-    await env.DB.prepare('DELETE FROM organization_members WHERE organization_id=? AND user_id=?').bind(member.id,actor.user.id).run();
+    await env.DB.batch([
+      env.DB.prepare('DELETE FROM organization_members WHERE organization_id=? AND user_id=?').bind(member.id,actor.user.id),
+      env.DB.prepare('UPDATE users SET preferred_community_id=NULL WHERE id=? AND preferred_community_id=?').bind(actor.user.id,member.id)
+    ]);
     return json({ok:true});
   }
 
@@ -321,7 +337,8 @@ export async function communityDirectoryApi(request,env,actor){
     if(organization.type==='community'&&organization.join_mode==='discord')await requireDiscordCommunityAccess(env,userId,organization,{joining:true});
     await env.DB.batch([
       env.DB.prepare('INSERT OR IGNORE INTO organization_members(organization_id,user_id,role,created_at) VALUES(?,?,\'member\',?)').bind(organization.id,userId,now()),
-      env.DB.prepare('DELETE FROM organization_join_requests WHERE organization_id=? AND user_id=?').bind(organization.id,userId)
+      env.DB.prepare('DELETE FROM organization_join_requests WHERE organization_id=? AND user_id=?').bind(organization.id,userId),
+      ...(organization.type==='community'?[env.DB.prepare('UPDATE users SET preferred_community_id=COALESCE(preferred_community_id,?) WHERE id=?').bind(organization.id,userId)]:[])
     ]);
     return json({ok:true});
   }
