@@ -1,5 +1,5 @@
 import {app,state,api,load,showError,esc,dateLabel,notifyRender,activeGame} from './core.mjs?v=8-explicit-general';
-import {renderEvent} from './event-view.mjs?v=18-explicit-general';
+import {renderEvent} from './event-view.mjs?v=19-event-syntax';
 import {renderEventForm} from './event-form.mjs?v=3-explicit-general';
 
 const ui={search:'',game:'all',creating:false,discord:new Map(),eligibility:new Map(),members:new Map(),busy:false};

@@ -1,5 +1,5 @@
 import {state} from './core.mjs?v=8-explicit-general';
-import {renderEvent} from './event-view.mjs?v=18-explicit-general';
+import {renderEvent} from './event-view.mjs?v=19-event-syntax';
 import {organizationById} from './organization-context.mjs?v=6-community-context';
 
 export function resetNetworkScope(){
