@@ -28,30 +28,6 @@ jobs:
       - name: Quality checks
         run: npm run check
 
-      - name: Reconcile legacy DEV migration history
-        run: |
-          npx wrangler d1 execute DB --remote --command "INSERT OR IGNORE INTO d1_migrations(name) VALUES
-            ('0001_initial.sql'),
-            ('0002_event_duration.sql'),
-            ('0003_event_type.sql'),
-            ('0004_crews.sql'),
-            ('0005_registration_preference.sql'),
-            ('0006_registration_car.sql'),
-            ('0007_registration_car_preferences.sql'),
-            ('0008_event_circuit.sql'),
-            ('0009_registration_owner.sql'),
-            ('0011_multi_category_registrations.sql'),
-            ('0012_participants.sql'),
-            ('0013_allow_assigned_category_interests.sql'),
-            ('0014_lock_categories_after_crew_assignment.sql'),
-            ('0015_crew_lock.sql'),
-            ('0016_client_errors.sql'),
-            ('0016_crew_ownership.sql'),
-            ('0017_discord_weekly.sql');"
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
-
       - name: Apply DEV D1 migrations
         run: npx wrangler d1 migrations apply DB --remote
         env:
