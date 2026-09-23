@@ -29,6 +29,17 @@ async function botRequest(env,path,{allowMissing=false}={}){
   return response.json();
 }
 
+function discordAsset(kind,guildId,hash,size){
+  if(!hash)return'';
+  const ext=String(hash).startsWith('a_')?'gif':'webp';
+  return `https://cdn.discordapp.com/${kind}/${encodeURIComponent(guildId)}/${encodeURIComponent(hash)}.${ext}?size=${size}`;
+}
+function discordAccent(value){
+  const number=Number(value);
+  if(!Number.isInteger(number)||number<0||number>0xffffff)return'';
+  return '#'+number.toString(16).padStart(6,'0');
+}
+
 function rolePermissions(member,roles,guildId){
   const roleIds=new Set([guildId,...(member?.roles||[])]);
   let permissions=0n;
@@ -60,6 +71,9 @@ export async function inspectDiscordGuild(env,userId,guildId){
   return {
     id:guild.id,
     name:String(guild.name||'Serveur Discord').slice(0,100),
+    iconUrl:discordAsset('icons',guild.id,guild.icon,256),
+    bannerUrl:discordAsset('banners',guild.id,guild.banner,1024),
+    accentColor:discordAccent(guild.accent_color),
     roles:(roles||[])
       .filter(role=>role.id!==guild.id&&!role.managed)
       .sort((a,b)=>(Number(b.position)||0)-(Number(a.position)||0))
