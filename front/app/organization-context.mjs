@@ -7,6 +7,29 @@ export function joinedOrganizations(organizations={}){
   return values;
 }
 
+export function knownCommunities(organizations={}){
+  const map=new Map();
+  for(const community of [...(organizations.communities||[]),...(organizations.discoverableCommunities||[])])map.set(community.id,community);
+  return [...map.values()];
+}
+
+export function communityById(organizations={},communityId){
+  if(!communityId)return null;
+  return knownCommunities(organizations).find(item=>item.id===communityId)||null;
+}
+
+export function preferredCommunityId(organizations={}){
+  const preferred=organizations.preferredCommunityId;
+  if(preferred&&(organizations.communities||[]).some(item=>item.id===preferred))return preferred;
+  const joined=organizations.communities||[];
+  return joined.length===1?joined[0].id:null;
+}
+
+export function communityBranding(organizations={},communityId){
+  const community=communityById(organizations,communityId);
+  return community?.branding||{logoUrl:'',bannerUrl:'',accentColor:''};
+}
+
 export function organizationById(organizations,organizationId){
   if(!organizationId||organizationId===GENERAL_AUDIENCE)return null;
   return joinedOrganizations(organizations).find(item=>item.id===organizationId)||null;
