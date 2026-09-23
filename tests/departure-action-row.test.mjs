@@ -27,5 +27,5 @@ test('la création d’équipage est regroupée avec les actions du départ',()=
   assert.match(html,/event-shell-alignment\.css\?v=8-explicit-three-departure-actions/);
   assert.match(html,/event-polish\.css\?v=4-desktop-meta-action-columns/);
   assert.match(html,/mobile-density-v2\.css\?v=3-three-departure-actions/);
-  assert.match(html,/app\.js\?v=90-community-first-runtime/);
+  assert.match(html,/app\.js\?v=91-core-versioned/);
 });
