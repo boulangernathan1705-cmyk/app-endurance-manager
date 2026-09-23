@@ -136,6 +136,7 @@ export async function ensureOrganizationSchema(env){
     await addColumnIfMissing(env,'organizations','accent_color',"ALTER TABLE organizations ADD COLUMN accent_color TEXT NOT NULL DEFAULT ''");
     await addColumnIfMissing(env,'organizations','discord_icon_url',"ALTER TABLE organizations ADD COLUMN discord_icon_url TEXT NOT NULL DEFAULT ''");
     await addColumnIfMissing(env,'organizations','discord_banner_url',"ALTER TABLE organizations ADD COLUMN discord_banner_url TEXT NOT NULL DEFAULT ''");
+    await addColumnIfMissing(env,'organizations','discord_accent_color',"ALTER TABLE organizations ADD COLUMN discord_accent_color TEXT NOT NULL DEFAULT ''");
     await env.DB.prepare('CREATE INDEX IF NOT EXISTS users_preferred_community ON users(preferred_community_id)').run();
 
     try{await env.DB.prepare("INSERT OR IGNORE INTO d1_migrations(name) VALUES('0020_community_directory.sql')").run();}catch{}
