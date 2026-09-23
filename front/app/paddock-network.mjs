@@ -1,4 +1,4 @@
-import {state} from './core.mjs';
+import {state} from './core.mjs?v=7-runtime';
 import {renderEvent} from './event-view.mjs?v=16-community-branding';
 import {organizationById} from './organization-context.mjs?v=6-community-context';
 
