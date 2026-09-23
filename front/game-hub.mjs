@@ -186,6 +186,13 @@ function requestedCommunity(organizations={}) {
   return null;
 }
 
+function defaultCommunityId(organizations={}) {
+  const joined=organizations.communities || [];
+  const preferred=organizations.preferredCommunityId;
+  if (preferred && joined.some(item=>item.id===preferred)) return preferred;
+  return joined.length===1 ? joined[0].id : null;
+}
+
 function communityOption(community) {
   const id=community?.id || '';
   const active=selectedCommunityId!==null&&id===selectedCommunityId;
@@ -225,7 +232,7 @@ function renderGames() {
 
 function selectedCommunityMarkup() {
   const community=knownCommunities(sessionState.organizations || {}).find(item=>item.id===selectedCommunityId) || null;
-  return `${communityMark(community)}<span><small>ESPACE CHOISI</small><strong>${esc(community?.name || 'Endurance Manager')}</strong></span>`;
+  return `${communityMark(community)}<span><strong>${esc(community?.name || 'Endurance Manager')}</strong></span>`;
 }
 
 function showCommunityStage() {
@@ -250,9 +257,12 @@ function showSimulatorStage(communityId,{historyMode='none'}={}) {
 }
 
 function syncStageFromUrl() {
-  const requested=requestedCommunity(sessionState.organizations || {});
-  if(requested===null){showCommunityStage();return;}
-  showSimulatorStage(requested);
+  const organizations=sessionState.organizations || {};
+  const requested=requestedCommunity(organizations);
+  if(requested!==null){showSimulatorStage(requested);return;}
+  const preferred=defaultCommunityId(organizations);
+  if(preferred){showSimulatorStage(preferred,{historyMode:'replace'});return;}
+  showCommunityStage();
 }
 
 async function fetchSession() {
