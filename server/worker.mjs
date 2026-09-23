@@ -334,8 +334,9 @@ async function api(request, env) {
   if (path === '/api/events' && method === 'POST') {
     const input=await body(request);
     const organizationId=String(input.organizationId||'').trim()||null;
-    if(organizationId)await requireCommunityManager(env,actor,organizationId);
-    else requireRole(actor.user);
+    if(organizationId){
+      if(actor.user?.role!=='admin')await requireCommunityManager(env,actor,organizationId);
+    }else requireRole(actor.user);
     const data = validateEvent(input), eventId = id();
     await env.DB.prepare('INSERT INTO events(id,name,duration_hours,event_type,circuit,categories,departures,organization_id,created_by,created_at) VALUES(?,?,?,?,?,?,?,?,?,?)').bind(eventId, data.name, data.durationHours, data.eventType, data.circuit, JSON.stringify(data.categories), JSON.stringify(data.departures), organizationId, actor.user.id, now()).run();
     return json({id:eventId}, 201);
