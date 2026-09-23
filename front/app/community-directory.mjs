@@ -107,7 +107,7 @@ function settings(community){
 }
 function detail(community){
   const brand=community.branding||{};
-  return `<button type="button" class="community-back" data-community-action="back">← Gestion des communautés</button><section class="community-profile-hero"${brandingStyle(community)}>${brand.bannerUrl?`<img class="community-profile-banner" src="${esc(brand.bannerUrl)}" alt="" referrerpolicy="no-referrer">`:''}<span class="community-profile-shade"></span>${mark(community,true)}<div class="community-profile-copy"><small>COMMUNAUTÉ</small><h1>${esc(community.name)}</h1><p>${esc(community.description||'Cette communauté n’a pas encore ajouté de présentation.')}</p>${tagRow(community)}</div><div class="community-profile-actions">${canManage(community)?`<button class="secondary-button" type="button" data-community-action="create-event" data-id="${community.id}">+ Créer une endurance</button>`:''}${joinAction(community)}</div></section>${eligibilityBlock(community)}<div class="community-detail-grid"><div>${eventList(community)}${requestList(community)}</div><aside><section class="community-detail-block"><div class="community-block-title"><small>MEMBRES</small><h2>${Number(community.memberCount)||0} membre${Number(community.memberCount)===1?'':'s'}</h2></div>${community.role?memberList(community):'<p class="community-muted">Les membres deviennent visibles après avoir rejoint la communauté.</p>'}</section>${settings(community)}</aside></div>`;
+  return `<button type="button" class="community-back" data-community-action="back">← Gestion des communautés</button><section class="community-profile-hero"${brandingStyle(community)}>${brand.bannerUrl?`<img class="community-profile-banner" src="${esc(brand.bannerUrl)}" alt="" referrerpolicy="no-referrer">`:''}<span class="community-profile-shade"></span>${mark(community,true)}<div class="community-profile-copy"><small>COMMUNAUTÉ</small><h1>${esc(community.name)}</h1><p>${esc(community.description||'Cette communauté n’a pas encore ajouté de présentation.')}</p>${tagRow(community)}</div><div class="community-profile-actions">${canManage(community)?`<button class="secondary-button" type="button" data-community-action="copy-link" data-id="${community.id}">Copier le lien d’accès</button><button class="secondary-button" type="button" data-community-action="create-event" data-id="${community.id}">+ Créer une endurance</button>`:''}${joinAction(community)}</div></section>${eligibilityBlock(community)}<div class="community-detail-grid"><div>${eventList(community)}${requestList(community)}</div><aside><section class="community-detail-block"><div class="community-block-title"><small>MEMBRES</small><h2>${Number(community.memberCount)||0} membre${Number(community.memberCount)===1?'':'s'}</h2></div>${community.role?memberList(community):'<p class="community-muted">Les membres deviennent visibles après avoir rejoint la communauté.</p>'}</section>${settings(community)}</aside></div>`;
 }
 
 export function renderCommunities(id=state.currentOrganizationId){
@@ -132,6 +132,13 @@ async function action(target){
   if(type==='open'){await openCommunity(id);return;}
   if(type==='join'){const result=await api('/api/organizations/'+id+'/join','POST');if(result.joined){if(state.user)await api('/api/organizations/preferred','PATCH',{organizationId:id});goToCommunity(id);return;}await reload(id);return;}
   if(type==='set-default'){await api('/api/organizations/preferred','PATCH',{organizationId:id});goToCommunity(id);return;}
+  if(type==='copy-link'){
+    const path=activeGame==='iracing'?'/iracing/':'/lmu/';
+    const share=location.origin+path+'?community='+encodeURIComponent(id);
+    try{await navigator.clipboard.writeText(share);target.textContent='Lien copié';}
+    catch{prompt('Copie ce lien pour inviter directement dans la communauté :',share);}
+    return;
+  }
   if(type==='leave'){if(!confirm('Quitter cette communauté ?'))return;await api('/api/organizations/'+id+'/members/me','DELETE');ui.eligibility.delete(id);ui.members.delete(id);await reload(null);return;}
   if(type==='eligibility'){ui.eligibility.set(id,await api('/api/organizations/'+id+'/eligibility'));renderCommunities(id);return;}
   if(type==='create-event'){state.eventCreationOrganizationId=id;renderEventForm(null,{organizationId:id});return;}
