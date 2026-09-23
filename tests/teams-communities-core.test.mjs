@@ -96,6 +96,6 @@ test('les assets de la nouvelle interface sont versionnés et les fixtures dev r
   assert.match(seed,/if\(url\.origin!==DEV_ORIGIN\)return/);
   assert.match(html,/community-context\.css\?v=3-language-preserved/);
   assert.match(html,/community-directory\.css\?v=2-secondary/);
-  assert.match(html,/app\.js\?v=89-community-branding/);
-  assert.match(app,/paddock-network\.mjs\?v=3-community-context/);
+  assert.match(html,/app\.js\?v=90-community-first-runtime/);
+  assert.match(app,/paddock-network\.mjs\?v=4-community-first-runtime/);
 });
