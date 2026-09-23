@@ -10,9 +10,9 @@ import {
   notifyRender,
   logo,
   categories
-} from './core.mjs?v=8-explicit-general';
+} from './core.mjs?v=10-community-only';
 import {getLocale,localeTag} from '../i18n.mjs';
-import {scopeDeparture,registrationAudienceIds,organizationAudienceLabels,communityById} from './organization-context.mjs?v=6-community-context';
+import {scopeDeparture,registrationAudienceIds,organizationAudienceLabels,communityById} from './organization-context.mjs?v=7-community-only';
 
 const dateFormat = new Intl.DateTimeFormat(localeTag(), {
   timeZone:'Europe/Paris',

@@ -2,7 +2,7 @@ import {CATEGORIES, EVENT_TYPES, CIRCUITS, categories, CARS, gameForEvent} from 
 import {countdown, dateLabel, groupEvents} from '../schedule.mjs';
 import {renderAvailabilityTimeline} from '../timeline.mjs';
 import {circuitMapConfig, circuitMapSource} from '../../shared/circuit-maps.mjs';
-import {preferredCommunityId,communityById} from './organization-context.mjs?v=6-community-context';
+import {preferredCommunityId,communityById} from './organization-context.mjs?v=7-community-only';
 
 export {CATEGORIES, EVENT_TYPES, CIRCUITS, categories, CARS, countdown, dateLabel, groupEvents, renderAvailabilityTimeline};
 
@@ -14,7 +14,7 @@ export const state = {
   events:[], user:null, discordReady:false, currentEventId:null, page:'home', editingEvent:null,
   drafts:{}, recoveryLink:'', busy:false, participants:[], flash:'', eventFilter:'upcoming',
   selectedDepartureId:null, eventSection:'race', pilotName:'', registrationOpen:new Set(), crewManagementOpen:new Set(),
-  pendingCrewJoin:null, currentOrganizationId:null, activeOrganizationId:null, activeCommunityId:null, requestedCommunityId:null, eventCreationOrganizationId:null, organizations:{team:null,communities:[],discoverableCommunities:[],preferredCommunityId:null,discordBotReady:false,discordBotInviteUrl:''}, visibleAudienceIds:new Set(['general'])
+  pendingCrewJoin:null, currentOrganizationId:null, activeOrganizationId:null, activeCommunityId:null, requestedCommunityId:null, eventCreationOrganizationId:null, organizations:{communities:[],discoverableCommunities:[],preferredCommunityId:null,discordBotReady:false,discordBotInviteUrl:''}, visibleAudienceIds:new Set(['general'])
 };
 try { state.pilotName = localStorage.getItem('fmt_pilot_name') || ''; } catch {}
 
@@ -128,11 +128,12 @@ export async function api(path,method='GET',data) {
   }
 }
 export async function load() {
-  const session = await api('/api/session');
+  const requestedCommunity=new URLSearchParams(location.search).get('community');
+  const session = await api(requestedCommunity?`/api/session?community=${encodeURIComponent(requestedCommunity)}`:'/api/session');
   const result = await api(`/api/events?game=${encodeURIComponent(activeGame)}`);
   state.user=session.user;
   state.discordReady=session.discordReady;
-  state.organizations=session.organizations||{team:null,communities:[],discoverableCommunities:[],preferredCommunityId:null,discordBotReady:false,discordBotInviteUrl:''};
+  state.organizations=session.organizations||{communities:[],discoverableCommunities:[],preferredCommunityId:null,discordBotReady:false,discordBotInviteUrl:''};
   const requestedRaw=typeof location!=='undefined'?new URLSearchParams(location.search).get('community')||'':'';
   const explicitGeneral=requestedRaw==='general';
   const requested=/^[a-f0-9-]{36}$/.test(requestedRaw)&&communityById(state.organizations,requestedRaw)?requestedRaw:null;

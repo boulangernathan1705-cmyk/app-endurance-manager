@@ -1,6 +1,6 @@
 import {buildWeeklyDiscordPayload, isInParisWeek, parisWeek} from './discord-weekly-format.mjs';
 
-const STATE_KEY = 'lmu-weekly-v1'; // Conservé pour réutiliser le message Discord existant.
+const LEGACY_STATE_KEY = 'lmu-weekly-v1'; // Conservé pour réutiliser le message Discord général existant.
 const LOCK_SECONDS = 90;
 const HOUR_MS = 3_600_000;
 
@@ -8,8 +8,12 @@ function parseJson(value, fallback) {
   try { return JSON.parse(value); } catch { return fallback; }
 }
 
-function appUrl(env) {
-  try { return `${new URL(env.APP_ORIGIN).origin}/lmu/`; } catch { return undefined; }
+function appUrl(env,{organizationId=null,game='lmu'}={}) {
+  try {
+    const url=new URL(game==='iracing'?'/iracing/':'/lmu/',new URL(env.APP_ORIGIN).origin);
+    if(organizationId)url.searchParams.set('community',organizationId);
+    return url.toString();
+  } catch { return undefined; }
 }
 
 async function hashSnapshot(snapshot) {
@@ -61,9 +65,11 @@ function selectPlanningWeek(allDepartures, timestamp) {
   return {week, futureDepartures};
 }
 
-export async function loadWeeklyDiscordSnapshot(env, timestamp) {
-  const events = (await env.DB.prepare(`SELECT id,name,circuit,duration_hours,departures
-    FROM events WHERE circuit NOT LIKE 'iracing-%' ORDER BY created_at,id`).all()).results || [];
+export async function loadWeeklyDiscordSnapshot(env, timestamp,{organizationId=null,game='lmu'}={}) {
+  const gameClause=game==='iracing'?"circuit LIKE 'iracing-%'":"circuit NOT LIKE 'iracing-%'";
+  const organizationClause=organizationId?'organization_id=?':'organization_id IS NULL';
+  const query=env.DB.prepare(`SELECT id,name,circuit,duration_hours,departures FROM events WHERE ${gameClause} AND ${organizationClause} ORDER BY created_at,id`);
+  const events = (organizationId?await query.bind(organizationId).all():await query.all()).results || [];
   const allDepartures = flattenDepartures(events);
   const currentWeek = parisWeek(timestamp);
   const currentCandidates = allDepartures.filter(item => item.startsAt <= timestamp && item.endsAt > timestamp);
@@ -182,46 +188,56 @@ async function editMessage(base,messageId,payload) {
   catch (error) { if (error?.status !== 404) throw error; return createMessage(base,payload); }
 }
 
-async function syncLocked(env,base,lockToken,timestamp) {
-  const snapshot = await loadWeeklyDiscordSnapshot(env,timestamp);
+async function syncLocked(env,target,lockToken,timestamp) {
+  const snapshot = await loadWeeklyDiscordSnapshot(env,timestamp,target);
   const contentHash = await hashSnapshot(snapshot);
-  const state = await env.DB.prepare('SELECT message_id,content_hash FROM discord_weekly_state WHERE key=? AND lock_token=?').bind(STATE_KEY,lockToken).first();
+  const state = await env.DB.prepare('SELECT message_id,content_hash FROM discord_weekly_state WHERE key=? AND lock_token=?').bind(target.key,lockToken).first();
   if (!state) throw new Error('État Discord hebdomadaire indisponible.');
   if (state.message_id && state.content_hash === contentHash) return {ok:true,changed:false};
-  const payload = buildWeeklyDiscordPayload(snapshot,appUrl(env),timestamp);
-  const messageId = state.message_id ? await editMessage(base,state.message_id,payload) : await createMessage(base,payload);
+  const payload = buildWeeklyDiscordPayload(snapshot,appUrl(env,target),timestamp);
+  const messageId = state.message_id ? await editMessage(target.base,state.message_id,payload) : await createMessage(target.base,payload);
   await env.DB.prepare('UPDATE discord_weekly_state SET message_id=?,content_hash=?,week_key=?,updated_at=? WHERE key=? AND lock_token=?')
-    .bind(messageId,contentHash,snapshot.periodKey,Math.floor(Date.now()/1000),STATE_KEY,lockToken).run();
+    .bind(messageId,contentHash,snapshot.periodKey,Math.floor(Date.now()/1000),target.key,lockToken).run();
   return {ok:true,changed:true,messageId};
 }
 
-export async function syncWeeklyDiscord(env,timestamp=Date.now()) {
-  const base = String(env?.DISCORD_WEEKLY_WEBHOOK_URL || '').trim();
-  if (!env?.DB || !base) return {ok:false,skipped:'not-configured'};
+async function syncTarget(env,target,timestamp){
   const now = Math.floor(Date.now()/1000);
   await env.DB.prepare(`INSERT OR IGNORE INTO discord_weekly_state
     (key,message_id,content_hash,week_key,updated_at,dirty,lock_token,lock_until) VALUES(?,?,?,?,?,?,?,?)`)
-    .bind(STATE_KEY,'','','',0,0,'',0).run();
-  await env.DB.prepare('UPDATE discord_weekly_state SET dirty=1 WHERE key=?').bind(STATE_KEY).run();
+    .bind(target.key,'','','',0,0,'',0).run();
+  await env.DB.prepare('UPDATE discord_weekly_state SET dirty=1 WHERE key=?').bind(target.key).run();
   const lockToken = crypto.randomUUID();
   const lock = await env.DB.prepare("UPDATE discord_weekly_state SET lock_token=?,lock_until=? WHERE key=? AND (lock_token='' OR lock_until<?)")
-    .bind(lockToken,now+LOCK_SECONDS,STATE_KEY,now).run();
+    .bind(lockToken,now+LOCK_SECONDS,target.key,now).run();
   if (!lock.meta.changes) return {ok:true,queued:true};
   let result={ok:true,changed:false};
   let rerun=false;
   try {
     for (let attempt=0; attempt<5; attempt+=1) {
-      await env.DB.prepare('UPDATE discord_weekly_state SET dirty=0 WHERE key=? AND lock_token=?').bind(STATE_KEY,lockToken).run();
-      result=await syncLocked(env,base,lockToken,timestamp);
-      const state=await env.DB.prepare('SELECT dirty FROM discord_weekly_state WHERE key=? AND lock_token=?').bind(STATE_KEY,lockToken).first();
+      await env.DB.prepare('UPDATE discord_weekly_state SET dirty=0 WHERE key=? AND lock_token=?').bind(target.key,lockToken).run();
+      result=await syncLocked(env,target,lockToken,timestamp);
+      const state=await env.DB.prepare('SELECT dirty FROM discord_weekly_state WHERE key=? AND lock_token=?').bind(target.key,lockToken).first();
       if (!state?.dirty) break;
       if (attempt===4) rerun=true;
     }
   } catch (error) {
-    await env.DB.prepare('UPDATE discord_weekly_state SET dirty=1 WHERE key=? AND lock_token=?').bind(STATE_KEY,lockToken).run().catch(()=>{});
+    await env.DB.prepare('UPDATE discord_weekly_state SET dirty=1 WHERE key=? AND lock_token=?').bind(target.key,lockToken).run().catch(()=>{});
     throw error;
   } finally {
-    await env.DB.prepare("UPDATE discord_weekly_state SET lock_token='',lock_until=0 WHERE key=? AND lock_token=?").bind(STATE_KEY,lockToken).run().catch(()=>{});
+    await env.DB.prepare("UPDATE discord_weekly_state SET lock_token='',lock_until=0 WHERE key=? AND lock_token=?").bind(target.key,lockToken).run().catch(()=>{});
   }
-  return rerun ? syncWeeklyDiscord(env,Date.now()) : result;
+  return rerun ? syncTarget(env,target,Date.now()) : result;
+}
+
+export async function syncWeeklyDiscord(env,timestamp=Date.now()) {
+  if(!env?.DB)return {ok:false,skipped:'not-configured'};
+  const communities=(await env.DB.prepare("SELECT id,discord_weekly_webhook_url,discord_weekly_game FROM organizations WHERE type='community' AND discord_weekly_webhook_url IS NOT NULL AND discord_weekly_webhook_url!='' ORDER BY id").all()).results||[];
+  const targets=communities.map(item=>({key:`community:${item.id}:${item.discord_weekly_game==='iracing'?'iracing':'lmu'}`,base:String(item.discord_weekly_webhook_url),organizationId:item.id,game:item.discord_weekly_game==='iracing'?'iracing':'lmu'}));
+  const legacy=String(env.DISCORD_WEEKLY_WEBHOOK_URL||'').trim();
+  if(legacy)targets.unshift({key:LEGACY_STATE_KEY,base:legacy,organizationId:null,game:'lmu'});
+  if(!targets.length)return {ok:false,skipped:'not-configured'};
+  const results=[];
+  for(const target of targets)results.push(await syncTarget(env,target,timestamp));
+  return {ok:true,targets:results};
 }

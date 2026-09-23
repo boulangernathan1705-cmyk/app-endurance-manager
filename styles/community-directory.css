@@ -203,7 +203,7 @@
   font-size:9px;
   font-weight:850
 }
-.community-discovery-tools input,.community-discovery-tools select,.community-form input,.community-form select,.community-form textarea,.community-discord-probe input,.community-discord-save select {
+.community-discovery-tools input,.community-discovery-tools select,.community-form input,.community-form select,.community-form textarea,.community-discord-probe input,.community-discord-save input:not([type="checkbox"]),.community-discord-save select {
   width:100%;
   min-height:41px;
   border:1px solid rgba(67,99,104,.75);
@@ -292,7 +292,7 @@
 }
 .community-profile-hero {
   display:grid;
-  grid-template-columns:auto minmax(0,1fr) auto;
+  grid-template-columns:auto minmax(0,1fr) auto auto;
   align-items:center;
   gap:18px;
   padding:22px;
@@ -431,6 +431,10 @@
   font-size:10px;
   cursor:pointer
 }
+.community-member .community-member-role {
+  color:#8fc9cb;
+  font-weight:800
+}
 .community-more-members {
   justify-self:start;
   width:auto!important;
@@ -510,6 +514,12 @@
   width:auto!important;
   margin:0!important
 }
+.community-discord-save .community-discord-toggle {
+  display:flex;
+  align-items:center;
+  gap:8px
+}
+.community-discord-toggle input { width:auto; min-height:0 }
 .community-discord-linked {
   display:flex;
   align-items:center;
@@ -532,27 +542,6 @@
   font-size:8.5px
 }
 
-.team-secondary {
-  border-style:dashed;
-  background:rgba(9,16,18,.72)
-}
-.community-team-create {
-  display:grid;
-  grid-template-columns:minmax(0,1fr) auto;
-  gap:8px
-}
-.community-team-create input,.community-team-create select {
-  min-height:40px;
-  border:1px solid rgba(67,99,104,.75);
-  border-radius:9px;
-  background:#081012;
-  color:#dbe5e3;
-  padding:8px 10px
-}
-.community-team-create button {
-  width:auto!important;
-  margin:0!important
-}
 @media(max-width:900px) {
   .community-grid {
     grid-template-columns:repeat(2,minmax(0,1fr))
@@ -572,12 +561,6 @@
 }
 
 @media(max-width:620px) {
-  .community-team-create {
-    grid-template-columns:1fr
-  }
-  .community-team-create button {
-    width:100%!important
-  }
   .community-page {
     gap:12px
   }

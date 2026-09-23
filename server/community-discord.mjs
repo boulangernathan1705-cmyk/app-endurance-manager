@@ -92,6 +92,15 @@ export async function discordEligibility(env,userId,organization){
   return {linked:true,available:true,member:true,eligible:hasRole,roleRequired:Boolean(roleId)};
 }
 
+export async function discordCommunityStatus(env,userId,organization){
+  const status=await discordEligibility(env,userId,organization);
+  if(!status.linked||!status.available||!status.member)return {...status,manager:false};
+  const managerRoleId=String(organization?.discord_manager_role_id||'').trim();
+  if(!managerRoleId)return {...status,manager:false};
+  const member=await botRequest(env,`/guilds/${validId(organization.discord_guild_id,'Serveur Discord')}/members/${validId(userId,'Compte Discord')}`,{allowMissing:true});
+  return {...status,manager:Boolean(member&&(member.roles||[]).includes(managerRoleId))};
+}
+
 export async function requireDiscordCommunityAccess(env,userId,organization,{joining=false}={}){
   const status=await discordEligibility(env,userId,organization);
   if(!status.linked)return status;

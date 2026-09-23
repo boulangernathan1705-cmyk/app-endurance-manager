@@ -1,8 +1,8 @@
-import {app,state,esc,button,canManage,isAdmin,eventTypeBadge,eventBadge,eventCategoryCount,circuitVisual,pilotCount,dateLabel,countdown,notifyRender} from './core.mjs?v=8-explicit-general';
-import {ownRegistration,renderRegistrationWorkspace} from './registration.mjs?v=7-explicit-general';
-import {renderPilots} from './crews.mjs?v=12-explicit-general';
-import {renderHome,showRecoveryLink} from './home-view.mjs?v=12-explicit-general';
-import {scopeEvent,defaultCrewOrganizationId,joinedOrganizations,communityById} from './organization-context.mjs?v=6-community-context';
+import {app,state,esc,button,canManage,isAdmin,eventTypeBadge,eventBadge,eventCategoryCount,circuitVisual,pilotCount,dateLabel,countdown,notifyRender} from './core.mjs?v=10-community-only';
+import {ownRegistration,renderRegistrationWorkspace} from './registration.mjs?v=9-community-only';
+import {renderPilots} from './crews.mjs?v=14-community-only';
+import {renderHome,showRecoveryLink} from './home-view.mjs?v=14-community-only';
+import {scopeEvent,defaultCrewOrganizationId,joinedOrganizations,communityById} from './organization-context.mjs?v=7-community-only';
 
 function managedCommunity(organizationId){
   return joinedOrganizations(state.organizations).find(organization=>organization.id===organizationId&&organization.type==='community'&&['owner','manager'].includes(organization.role))||null;
@@ -40,19 +40,6 @@ function renderPastDepartures(event,rawEvent,items){
   if(!items.length)return'';
   return `<details class="past-departures-fold"><summary><span>Départs passés</span><small>${items.length} départ${items.length>1?'s':''}</small></summary><div class="past-departures-list">${items.map(({departure,index,rawDeparture})=>renderDeparturePanel(event,departure,index,false,{isPast:true,rawEvent,rawDeparture})).join('')}</div></details>`;
 }
-function scopeCount(rawEvent,key){
-  const event=scopeEvent(rawEvent,new Set([key]));
-  return pilotCount((event.departures||[]).flatMap(departure=>departure.availability||[]));
-}
-function raceLensMarkup(rawEvent){
-  if(rawEvent.organizationId)return'';
-  const team=state.organizations?.team;
-  if(!team)return'';
-  const options=[{id:'general',label:'Général'},{id:team.id,label:`◆ ${team.name}`}];
-  const current=state.visibleAudienceIds?.size===1?[...state.visibleAudienceIds][0]:'general';
-  return `<section class="race-lens" aria-label="Choisir l’espace affiché"><div class="race-lens-head"><div><span>VOIR CETTE COURSE POUR</span><small>La Team privée reste un filtre secondaire des endurances indépendantes.</small></div></div><div class="race-lens-options">${options.map(option=>`<button type="button" class="race-lens-button" data-paddock-scope="${option.id}" aria-pressed="${current===option.id}"><span>${esc(option.label)}</span><b>${scopeCount(rawEvent,option.id)}</b></button>`).join('')}</div></section>`;
-}
-
 export function renderEvent(message=''){
   state.page='event';state.eventSection='race';const rawEvent=state.events.find(item=>item.id===state.currentEventId);if(!rawEvent){renderHome('Cet événement n’est plus disponible.');return;}const event=scopeEvent(rawEvent,state.visibleAudienceIds);
   const rawById=new Map((rawEvent.departures||[]).map(departure=>[departure.id,departure]));
@@ -66,6 +53,6 @@ export function renderEvent(message=''){
   const countdownCopy=next?`Prochain départ dans <strong data-countdown="${next.startsAt}">${countdown(next.startsAt)}</strong>`:undated.length?'Dates à confirmer':'Tous les départs ont eu lieu';
   const crewDefault=defaultCrewOrganizationId(state)||'';
   app.eventViewData={eventId:event.id,events:state.events,message};
-  app.innerHTML=`${raceLensMarkup(rawEvent)}<div class="event-header event-header-compact event-type-${event.eventType||'private'}" data-event-id="${event.id}" data-crew-default-organization="${esc(crewDefault)}"><div class="event-heading-line"><div class="event-heading-copy"><h1 class="event-title">${esc(event.name)}</h1><p class="event-subtitle">${eventTypeBadge(event.eventType)}${rawEvent.organizationId?`<span class="event-community-label">Communauté · ${esc(communityById(state.organizations,rawEvent.organizationId)?.name||'Communauté')}</span>`:''}</p><span class="event-header-countdown">${countdownCopy}</span></div>${circuitVisual(event.circuit)}</div><div class="event-header-summary"><div class="event-category-badges">${event.categories.map(category=>eventBadge(category,eventCategoryCount(event,category))).join('')}</div><div class="event-header-stats"><span><strong>${event.durationHours||6} h</strong><small>durée</small></span><span><strong>${event.departures.length}</strong><small>départ${event.departures.length>1?'s':''}</small></span><span><strong>${totalPilots}</strong><small>pilote${totalPilots>1?'s':''}</small></span><span><strong>${totalCrews}</strong><small>équipage${totalCrews>1?'s':''}</small></span></div></div></div><div class="toolbar event-actions-toolbar">${eventActions}</div><div id="crew-builder-root"></div>${message?`<p class="creation-success" role="status">${esc(message)}</p>`:''}<section class="departure-accordion" aria-label="Départs de la course">${upcoming}${renderPastDepartures(event,rawEvent,past)}</section>`;
+  app.innerHTML=`<div class="event-header event-header-compact event-type-${event.eventType||'private'}" data-event-id="${event.id}" data-crew-default-organization="${esc(crewDefault)}"><div class="event-heading-line"><div class="event-heading-copy"><h1 class="event-title">${esc(event.name)}</h1><p class="event-subtitle">${eventTypeBadge(event.eventType)}${rawEvent.organizationId?`<span class="event-community-label">Communauté · ${esc(communityById(state.organizations,rawEvent.organizationId)?.name||'Communauté')}</span>`:''}</p><span class="event-header-countdown">${countdownCopy}</span></div>${circuitVisual(event.circuit)}</div><div class="event-header-summary"><div class="event-category-badges">${event.categories.map(category=>eventBadge(category,eventCategoryCount(event,category))).join('')}</div><div class="event-header-stats"><span><strong>${event.durationHours||6} h</strong><small>durée</small></span><span><strong>${event.departures.length}</strong><small>départ${event.departures.length>1?'s':''}</small></span><span><strong>${totalPilots}</strong><small>pilote${totalPilots>1?'s':''}</small></span><span><strong>${totalCrews}</strong><small>équipage${totalCrews>1?'s':''}</small></span></div></div></div><div class="toolbar event-actions-toolbar">${eventActions}</div><div id="crew-builder-root"></div>${message?`<p class="creation-success" role="status">${esc(message)}</p>`:''}<section class="departure-accordion" aria-label="Départs de la course">${upcoming}${renderPastDepartures(event,rawEvent,past)}</section>`;
   showRecoveryLink();notifyRender();
 }

@@ -1,5 +1,5 @@
 import {state} from './app/core.mjs';
-import {renderEvent} from './app/event-view.mjs?v=9-one-course-page';
+import {renderEvent} from './app/event-view.mjs?v=21-community-only';
 
 // The "Register another driver" shortcut must open the registration form without
 // programmatically focusing the driver <select>. On mobile Safari, focusing a

@@ -3,13 +3,13 @@ import {test, expect} from '@playwright/test';
 const apiFailures = [];
 const remoteBaseURL = String(process.env.COMPAT_REMOTE_BASE_URL || '').replace(/\/$/, '');
 
-async function mockGameApi(page) {
+async function mockGameApi(page,{organizations={communities:[],discoverableCommunities:[],preferredCommunityId:null,discordBotReady:false,discordBotInviteUrl:''}}={}) {
   await page.route('**/api/**', async route => {
     const request=route.request();
     if(request.method()!=='GET'){await route.continue();return;}
     const path=new URL(request.url()).pathname;
     const payload=path==='/api/session'
-      ? {user:null,discordReady:true,adminConfigured:true,organizations:{team:null,communities:[],discoverableCommunities:[],preferredCommunityId:null,discordBotReady:false,discordBotInviteUrl:''}}
+      ? {user:null,discordReady:true,adminConfigured:true,organizations}
       : path==='/api/events'
         ? {events:[]}
         : path==='/api/participants'
@@ -165,6 +165,18 @@ test('community and simulator choices are separate successive screens', async ({
   await page.locator('[data-hub-back]').click();
   await expect(page.locator('#community-stage')).toBeVisible();
   await expect(page.locator('#simulator-stage')).toBeHidden();
+});
+
+test('a preferred community opens directly on its branded simulator choice', async ({page}) => {
+  const id='123e4567-e89b-12d3-a456-426614174000';
+  const community={id,name:'Les Tondeuz à gazon',role:'member',branding:{logoUrl:'',bannerUrl:'',accentColor:'#59D3D8'}};
+  await mockGameApi(page,{organizations:{communities:[community],discoverableCommunities:[],preferredCommunityId:id,discordBotReady:true,discordBotInviteUrl:''}});
+  await openAndCheck(page,'/');
+  await expect(page.locator('#community-stage')).toBeHidden();
+  await expect(page.locator('#simulator-stage')).toBeVisible();
+  await expect(page.locator('#hub-selected-community')).toContainText('Les Tondeuz à gazon');
+  await expect(page.locator('[data-hub-game="lmu"]')).toHaveAttribute('href',new RegExp(`community=${id}`));
+  await expect(page.locator('[data-hub-game="iracing"]')).toHaveAttribute('href',new RegExp(`community=${id}`));
 });
 
 test('LMU space opens from home', async ({page}) => {

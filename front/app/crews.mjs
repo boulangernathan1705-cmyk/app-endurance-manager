@@ -1,6 +1,6 @@
-import {state,esc,button,logo,renderAvailabilityTimeline,crewColorClass,coversHour,pilotCount,api} from './core.mjs?v=8-explicit-general';
-import {renderRegistration} from './registration.mjs?v=7-explicit-general';
-import {organizationShortLabel} from './organization-context.mjs?v=6-community-context';
+import {state,esc,button,logo,renderAvailabilityTimeline,crewColorClass,coversHour,pilotCount,api} from './core.mjs?v=10-community-only';
+import {renderRegistration} from './registration.mjs?v=9-community-only';
+import {organizationShortLabel} from './organization-context.mjs?v=7-community-only';
 
 function contentSummary(title,count){return `<summary class="ux-content-accordion-summary"><span class="ux-content-accordion-title">${esc(title)}</span><span class="ux-content-accordion-count">${count}</span><span class="ux-content-accordion-chevron" aria-hidden="true">›</span></summary>`;}
 function statusPill(crew){return `<span class="crew-compact-status ${crew.locked?'is-complete':'is-open'}">${crew.locked?'ÉQUIPAGE COMPLET':'ÉQUIPAGE OUVERT'}</span>`;}

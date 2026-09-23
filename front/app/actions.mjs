@@ -1,13 +1,13 @@
-import {app,state,api,load,showError,countdown,CARS} from './core.mjs?v=8-explicit-general';
-import {renderNav,renderHome} from './home-view.mjs?v=12-explicit-general';
-import {renderCommunities} from './community-directory.mjs?v=6-event-syntax';
-import {renderEvent} from './event-view.mjs?v=19-event-syntax';
-import {renderEventForm,departureFields,updateRemoveButtons} from './event-form.mjs?v=3-explicit-general';
-import {renderMyEntries} from './entries-view.mjs?v=7-explicit-general';
-import {refresh,refreshAfterSave} from './refresh.mjs?v=4-event-syntax';
-import {draftFor,registrationDraft,ownRegistrations,rerenderRegistrationSection,submitRegistration} from './registration.mjs?v=7-explicit-general';
-import {updateCrewState} from './crews.mjs?v=12-explicit-general';
-import {GENERAL_AUDIENCE,defaultRegistrationAudienceIds,registrationAudienceIds,communityById} from './organization-context.mjs?v=6-community-context';
+import {app,state,api,load,showError,countdown,CARS} from './core.mjs?v=10-community-only';
+import {renderNav,renderHome} from './home-view.mjs?v=14-community-only';
+import {renderCommunities} from './community-directory.mjs?v=9-community-only';
+import {renderEvent} from './event-view.mjs?v=21-community-only';
+import {renderEventForm,departureFields,updateRemoveButtons} from './event-form.mjs?v=5-community-only';
+import {renderMyEntries} from './entries-view.mjs?v=9-community-only';
+import {refresh,refreshAfterSave} from './refresh.mjs?v=6-community-only';
+import {draftFor,registrationDraft,ownRegistrations,rerenderRegistrationSection,submitRegistration} from './registration.mjs?v=9-community-only';
+import {updateCrewState} from './crews.mjs?v=14-community-only';
+import {GENERAL_AUDIENCE,defaultRegistrationAudienceIds,registrationAudienceIds,communityById} from './organization-context.mjs?v=7-community-only';
 
 async function submitEvent(form){
   const data={name:form.elements.eventName.value.trim(),durationHours:Number(form.elements.eventDuration.value),eventType:form.elements.eventType.value,circuit:form.elements.eventCircuit.value,organizationId:form.elements.eventOrganization?.value||null,categories:[...form.querySelectorAll('[name="eventCategory"]:checked')].map(input=>input.value),departures:[...form.querySelectorAll('.departure-field')].map(row=>({id:row.dataset.id||undefined,date:row.querySelector('[name="date"]').value,time:row.querySelector('[name="time"]').value})),version:state.editingEvent?.version};

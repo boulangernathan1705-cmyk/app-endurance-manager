@@ -9,7 +9,7 @@ const simulatorStage = document.getElementById('simulator-stage');
 const selectedCommunity = document.getElementById('hub-selected-community');
 let selectedCommunityId = null;
 let selectionPushed = false;
-let sessionState = {organizations:{team:null,communities:[],discoverableCommunities:[],preferredCommunityId:null}};
+let sessionState = {organizations:{communities:[],discoverableCommunities:[],preferredCommunityId:null}};
 let cachedEvents = {lmu:[],iracing:[]};
 const formatter = new Intl.DateTimeFormat(localeTag(), {
   timeZone:'Europe/Paris',
@@ -178,7 +178,13 @@ function scopedEvents(events, communityId) {
 
 function requestedCommunity(organizations={}) {
   const params=new URLSearchParams(location.search);
-  if(!params.has('community'))return null;
+  if(!params.has('community')){
+    const joined=organizations.communities||[];
+    const preferred=joined.find(item=>item.id===organizations.preferredCommunityId);
+    if(preferred)return preferred.id;
+    if(joined.length===1)return joined[0].id;
+    return null;
+  }
   const requested=params.get('community') || '';
   if(requested==='general')return '';
   const known=knownCommunities(organizations);
@@ -232,7 +238,8 @@ function renderGames() {
 
 function selectedCommunityMarkup() {
   const community=knownCommunities(sessionState.organizations || {}).find(item=>item.id===selectedCommunityId) || null;
-  return `${communityMark(community)}<span><strong>${esc(community?.name || 'Endurance Manager')}</strong></span>`;
+  const banner=community?.branding?.bannerUrl;
+  return `${banner?`<img class="hub-selected-banner" src="${esc(banner)}" alt="" referrerpolicy="no-referrer">`:''}<span class="hub-selected-shade" aria-hidden="true"></span><span class="hub-selected-brand">${communityMark(community)}<strong>${esc(community?.name || 'Endurance Manager')}</strong></span>`;
 }
 
 function showCommunityStage() {
@@ -245,6 +252,9 @@ function showSimulatorStage(communityId,{historyMode='none'}={}) {
   selectedCommunityId=communityId;
   renderCommunityPicker();
   renderGames();
+  const community=knownCommunities(sessionState.organizations || {}).find(item=>item.id===selectedCommunityId) || null;
+  selectedCommunity.classList.toggle('has-banner',Boolean(community?.branding?.bannerUrl));
+  selectedCommunity.style.setProperty('--community-accent',community?.branding?.accentColor||'var(--accent)');
   selectedCommunity.innerHTML=selectedCommunityMarkup();
   communityStage.hidden=true;
   simulatorStage.hidden=false;
@@ -266,7 +276,9 @@ function syncStageFromUrl() {
 }
 
 async function fetchSession() {
-  const response=await fetch('/api/session',{credentials:'same-origin',cache:'no-store',headers:{Accept:'application/json'}});
+  const params=new URLSearchParams(location.search),community=params.get('community');
+  const path=community?`/api/session?community=${encodeURIComponent(community)}`:'/api/session';
+  const response=await fetch(path,{credentials:'same-origin',cache:'no-store',headers:{Accept:'application/json'}});
   if(!response.ok) throw new Error('session');
   return response.json();
 }

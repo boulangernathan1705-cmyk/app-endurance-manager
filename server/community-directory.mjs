@@ -1,5 +1,5 @@
 import {fail,json,origin,rateLimit,id,now,text} from './core.mjs';
-import {discordBotInviteUrl,discordEligibility,inspectDiscordGuild,requireDiscordCommunityAccess} from './community-discord.mjs';
+import {discordBotInviteUrl,discordEligibility,discordCommunityStatus,inspectDiscordGuild,requireDiscordCommunityAccess} from './community-discord.mjs';
 
 const UUID=/^[a-f0-9-]{36}$/;
 const DISCORD_ID=/^\d{15,22}$/;
@@ -53,6 +53,16 @@ function accentColor(value){
   if(!/^#[0-9a-fA-F]{6}$/.test(raw))fail(400,'La couleur doit être au format #RRGGBB.');
   return raw.toUpperCase();
 }
+function discordWebhook(value){
+  const raw=String(value||'').trim();
+  if(!raw)return'';
+  if(raw.length>500)fail(400,'Adresse du webhook Discord trop longue.');
+  try{
+    const url=new URL(raw);
+    if(url.protocol!=='https:'||!['discord.com','discordapp.com'].includes(url.hostname)||!/^\/api\/webhooks\/\d{15,22}\/[A-Za-z0-9._-]+$/.test(url.pathname))throw Error();
+    return url.href;
+  }catch{fail(400,'Indique une adresse de webhook Discord valide.');}
+}
 async function secureWrite(request,env){
   const canonical=origin(env),url=new URL(request.url);
   if(url.origin!==canonical)fail(403,'Utilise l’adresse principale du site pour cette action.');
@@ -73,17 +83,6 @@ export async function requireMember(env,actor,organizationId,{manage=false}={}){
   return member;
 }
 
-async function membersFor(env,ids){
-  const map=new Map();
-  if(!ids.length)return map;
-  const marks=ids.map(()=>'?').join(',');
-  const rows=(await env.DB.prepare('SELECT om.organization_id,om.user_id,om.role,u.name FROM organization_members om JOIN users u ON u.id=om.user_id WHERE om.organization_id IN ('+marks+') ORDER BY CASE om.role WHEN \'owner\' THEN 0 WHEN \'manager\' THEN 1 ELSE 2 END,lower(u.name),u.id').bind(...ids).all()).results||[];
-  for(const row of rows){
-    if(!map.has(row.organization_id))map.set(row.organization_id,[]);
-    map.get(row.organization_id).push({id:row.user_id,name:row.name,role:row.role});
-  }
-  return map;
-}
 async function memberCountsFor(env,ids){
   const map=new Map();
   if(!ids.length)return map;
@@ -116,14 +115,13 @@ async function requestsFor(env,ids){
   return map;
 }
 function present(row,extra={}){
-  const community=row.type==='community';
   return {
-    id:row.id,type:row.type,name:row.name,
-    description:community?String(row.description||''):'',
-    language:community?String(row.language||'fr'):'fr',
-    games:community?parseGames(row.games):[],
-    visibility:community?String(row.visibility||'public'):'private',
-    joinMode:community?String(row.join_mode||'open'):'invite',
+    id:row.id,type:'community',name:row.name,
+    description:String(row.description||''),
+    language:String(row.language||'fr'),
+    games:parseGames(row.games),
+    visibility:String(row.visibility||'public'),
+    joinMode:String(row.join_mode||'open'),
     ownerUserId:row.owner_user_id,
     role:extra.role||null,
     memberCount:Number(extra.memberCount)||0,
@@ -131,7 +129,7 @@ function present(row,extra={}){
     eventIds:extra.eventIds||[],
     joinRequests:extra.manage?(extra.joinRequests||[]):[],
     joinPending:Boolean(extra.joinPending),
-    branding:community?{
+    branding:{
       logoUrl:String(row.logo_url||row.discord_icon_url||''),
       bannerUrl:String(row.banner_url||row.discord_banner_url||''),
       accentColor:String(row.accent_color||row.discord_accent_color||''),
@@ -140,25 +138,28 @@ function present(row,extra={}){
       customAccentColor:extra.manage?String(row.accent_color||''):'',
       discordLogoUrl:String(row.discord_icon_url||''),
       discordBannerUrl:String(row.discord_banner_url||'')
-    }:{logoUrl:'',bannerUrl:'',accentColor:'',customLogoUrl:'',customBannerUrl:'',customAccentColor:'',discordLogoUrl:'',discordBannerUrl:''},
-    discord:community?{
+    },
+    discord:{
       linked:Boolean(row.discord_guild_id),
       guildId:extra.manage?String(row.discord_guild_id||''):'',
       guildName:String(row.discord_guild_name||''),
       requiredRoleId:extra.manage?String(row.discord_role_id||''):'',
       requiredRoleName:String(row.discord_role_name||''),
+      managerRoleId:extra.manage?String(row.discord_manager_role_id||''):'',
+      managerRoleName:String(row.discord_manager_role_name||''),
+      syncEnabled:Boolean(row.discord_sync_enabled),
+      weeklyConfigured:Boolean(row.discord_weekly_webhook_url),
+      weeklyGame:String(row.discord_weekly_game||'lmu'),
       joinRequired:String(row.join_mode||'open')==='discord'
-    }:{linked:false,guildId:'',guildName:'',requiredRoleId:'',requiredRoleName:'',joinRequired:false}
+    }
   };
 }
 
 export async function organizationSummary(env,actor){
-  const joined=actor.user?(await env.DB.prepare('SELECT o.*,m.role FROM organizations o JOIN organization_members m ON m.organization_id=o.id WHERE m.user_id=? ORDER BY o.type DESC,lower(o.name),o.id').bind(actor.user.id).all()).results||[]:[];
+  const joined=actor.user?(await env.DB.prepare("SELECT o.*,m.role FROM organizations o JOIN organization_members m ON m.organization_id=o.id WHERE m.user_id=? AND o.type='community' ORDER BY lower(o.name),o.id").bind(actor.user.id).all()).results||[]:[];
   const joinedIds=joined.map(item=>item.id);
   const managedIds=joined.filter(item=>['owner','manager'].includes(item.role)).map(item=>item.id);
-  const team=joined.find(item=>item.type==='team');
-  const [teamMembers,memberCounts,joinedActivity,requestMap]=await Promise.all([
-    membersFor(env,team?[team.id]:[]),
+  const [memberCounts,joinedActivity,requestMap]=await Promise.all([
     memberCountsFor(env,joinedIds),
     activityFor(env,joinedIds),
     requestsFor(env,managedIds)
@@ -172,14 +173,12 @@ export async function organizationSummary(env,actor){
   const discoverActivity=await activityFor(env,discoverable.map(item=>item.id));
   const decorate=item=>{
     const manage=['owner','manager'].includes(item.role);
-    const members=item.type==='team'?(teamMembers.get(item.id)||[]):[];
-    return present(item,{role:item.role,members,memberCount:memberCounts.get(item.id)||0,eventIds:joinedActivity.get(item.id)||[],manage,joinRequests:requestMap.get(item.id)||[]});
+    return present(item,{role:item.role,memberCount:memberCounts.get(item.id)||0,eventIds:joinedActivity.get(item.id)||[],manage,joinRequests:requestMap.get(item.id)||[]});
   };
   const preference=actor.user?await env.DB.prepare('SELECT preferred_community_id FROM users WHERE id=?').bind(actor.user.id).first():null;
   const joinedCommunities=joined.filter(item=>item.type==='community').map(decorate);
   const preferredCommunityId=joinedCommunities.some(item=>item.id===preference?.preferred_community_id)?preference.preferred_community_id:null;
   return {
-    team:team?decorate(team):null,
     communities:joinedCommunities,
     discoverableCommunities:discoverable.map(item=>present(item,{memberCount:Number(item.member_count)||0,eventIds:discoverActivity.get(item.id)||[],joinPending:Boolean(item.join_pending)})),
     preferredCommunityId,
@@ -192,24 +191,19 @@ async function createOrganization(request,env,actor){
   await secureWrite(request,env);
   if(!actor.user)fail(401,'Connecte-toi avec Discord pour créer une organisation.');
   const input=await request.clone().json().catch(()=>null);
-  if(!input||!['team','community'].includes(input.type))fail(400,'Choisis Team ou communauté.');
-  const name=text(input.name,60,input.type==='team'?'Nom de la Team':'Nom de la communauté');
-  if(input.type==='team'){
-    const existing=await env.DB.prepare('SELECT 1 FROM organization_members om JOIN organizations o ON o.id=om.organization_id WHERE om.user_id=? AND o.type=\'team\' LIMIT 1').bind(actor.user.id).first();
-    if(existing)fail(409,'Tu fais déjà partie d’une Team.');
-  }
-  const community=input.type==='community';
-  const description=community&&typeof input.description==='string'&&input.description.trim()?text(input.description,600,'Présentation'):'';
-  const selectedGames=community?games(input.games):['lmu','iracing'];
-  const selectedMode=community?joinMode(input.joinMode):'invite';
+  if(!input||input.type!=='community')fail(400,'Seules les communautés peuvent être créées.');
+  const name=text(input.name,60,'Nom de la communauté');
+  const description=typeof input.description==='string'&&input.description.trim()?text(input.description,600,'Présentation'):'';
+  const selectedGames=games(input.games);
+  const selectedMode=joinMode(input.joinMode);
   if(selectedMode==='discord')fail(409,'Crée d’abord la communauté, puis lie son serveur Discord.');
   const organizationId=id(),createdAt=now();
   const statements=[
     env.DB.prepare('INSERT INTO organizations(id,type,name,name_key,owner_user_id,description,language,games,visibility,join_mode,updated_at,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)')
-      .bind(organizationId,input.type,name,nameKey(name),actor.user.id,description,community?language(input.language):'fr',JSON.stringify(selectedGames),community?visibility(input.visibility):'private',selectedMode,createdAt,createdAt),
-    env.DB.prepare('INSERT INTO organization_members(organization_id,user_id,role,created_at) VALUES(?,?,\'owner\',?)').bind(organizationId,actor.user.id,createdAt)
+      .bind(organizationId,'community',name,nameKey(name),actor.user.id,description,language(input.language),JSON.stringify(selectedGames),visibility(input.visibility),selectedMode,createdAt,createdAt),
+    env.DB.prepare('INSERT INTO organization_members(organization_id,user_id,role,created_at) VALUES(?,?,\'owner\',?)').bind(organizationId,actor.user.id,createdAt),
+    env.DB.prepare('UPDATE users SET preferred_community_id=COALESCE(preferred_community_id,?) WHERE id=?').bind(organizationId,actor.user.id)
   ];
-  if(community)statements.push(env.DB.prepare('UPDATE users SET preferred_community_id=COALESCE(preferred_community_id,?) WHERE id=?').bind(organizationId,actor.user.id));
   await env.DB.batch(statements);
   return json({id:organizationId},201);
 }
@@ -254,16 +248,45 @@ async function configureDiscord(request,env,actor,organizationId){
   const guildId=String(input.guildId||'').trim();
   if(!guildId){
     if(member.join_mode==='discord')fail(409,'Choisis d’abord un autre mode d’accès avant de délier Discord.');
-    await env.DB.prepare("UPDATE organizations SET discord_guild_id=NULL,discord_guild_name=NULL,discord_role_id=NULL,discord_role_name=NULL,discord_icon_url='',discord_banner_url='',discord_accent_color='',updated_at=? WHERE id=?").bind(now(),member.id).run();
+    await env.DB.prepare("UPDATE organizations SET discord_guild_id=NULL,discord_guild_name=NULL,discord_role_id=NULL,discord_role_name=NULL,discord_manager_role_id=NULL,discord_manager_role_name=NULL,discord_sync_enabled=0,discord_weekly_webhook_url=NULL,discord_icon_url='',discord_banner_url='',discord_accent_color='',updated_at=? WHERE id=?").bind(now(),member.id).run();
     return json({ok:true,cleared:true});
   }
   const guild=await inspectDiscordGuild(env,actor.user.id,guildId);
   const roleId=String(input.roleId||'').trim();
   const role=roleId?guild.roles.find(item=>item.id===roleId):null;
   if(roleId&&!role)fail(400,'Choisis un rôle présent sur ce serveur.');
-  await env.DB.prepare('UPDATE organizations SET discord_guild_id=?,discord_guild_name=?,discord_role_id=?,discord_role_name=?,discord_icon_url=?,discord_banner_url=?,discord_accent_color=?,updated_at=? WHERE id=?')
-    .bind(guild.id,guild.name,role?.id||null,role?.name||null,guild.iconUrl||'',guild.bannerUrl||'',guild.accentColor||'',now(),member.id).run();
-  return json({ok:true,guild,requiredRole:role||null});
+  const managerRoleId=String(input.managerRoleId||'').trim();
+  const managerRole=managerRoleId?guild.roles.find(item=>item.id===managerRoleId):null;
+  if(managerRoleId&&!managerRole)fail(400,'Choisis un rôle organisateur présent sur ce serveur.');
+  const weeklyGame=GAMES.has(String(input.weeklyGame||member.discord_weekly_game||'lmu'))?String(input.weeklyGame||member.discord_weekly_game||'lmu'):'lmu';
+  const webhook=input.weeklyWebhookUrl===undefined?String(member.discord_weekly_webhook_url||''):discordWebhook(input.weeklyWebhookUrl);
+  await env.DB.prepare('UPDATE organizations SET discord_guild_id=?,discord_guild_name=?,discord_role_id=?,discord_role_name=?,discord_manager_role_id=?,discord_manager_role_name=?,discord_sync_enabled=?,discord_weekly_webhook_url=?,discord_weekly_game=?,discord_icon_url=?,discord_banner_url=?,discord_accent_color=?,updated_at=? WHERE id=?')
+    .bind(guild.id,guild.name,role?.id||null,role?.name||null,managerRole?.id||null,managerRole?.name||null,input.syncEnabled?1:0,webhook||null,weeklyGame,guild.iconUrl||'',guild.bannerUrl||'',guild.accentColor||'',now(),member.id).run();
+  return json({ok:true,guild,requiredRole:role||null,managerRole:managerRole||null});
+}
+
+export async function syncDiscordCommunityUser(env,actor,organizationId){
+  if(!actor.user||!UUID.test(String(organizationId||'')))return null;
+  const organization=await env.DB.prepare("SELECT * FROM organizations WHERE id=? AND type='community'").bind(organizationId).first();
+  if(!organization||!organization.discord_guild_id||!Number(organization.discord_sync_enabled))return null;
+  const current=await env.DB.prepare('SELECT role FROM organization_members WHERE organization_id=? AND user_id=?').bind(organization.id,actor.user.id).first();
+  if(current?.role==='owner')return {member:true,role:'owner'};
+  const status=await discordCommunityStatus(env,actor.user.id,organization);
+  if(!status.available)return status;
+  if(!status.member){
+    if(current)await env.DB.batch([
+      env.DB.prepare('DELETE FROM organization_members WHERE organization_id=? AND user_id=?').bind(organization.id,actor.user.id),
+      env.DB.prepare('UPDATE users SET preferred_community_id=NULL WHERE id=? AND preferred_community_id=?').bind(actor.user.id,organization.id)
+    ]);
+    return status;
+  }
+  const role=status.manager?'manager':'member';
+  await env.DB.batch([
+    env.DB.prepare("INSERT INTO organization_members(organization_id,user_id,role,created_at) VALUES(?,?,?,?) ON CONFLICT(organization_id,user_id) DO UPDATE SET role=CASE WHEN organization_members.role='owner' THEN 'owner' ELSE excluded.role END").bind(organization.id,actor.user.id,role,now()),
+    env.DB.prepare('DELETE FROM organization_join_requests WHERE organization_id=? AND user_id=?').bind(organization.id,actor.user.id),
+    env.DB.prepare('UPDATE users SET preferred_community_id=COALESCE(preferred_community_id,?) WHERE id=?').bind(organization.id,actor.user.id)
+  ]);
+  return {...status,role};
 }
 async function decideRequest(request,env,actor,organizationId,userId){
   await secureWrite(request,env);
@@ -341,6 +364,18 @@ export async function communityDirectoryApi(request,env,actor){
       ...(organization.type==='community'?[env.DB.prepare('UPDATE users SET preferred_community_id=COALESCE(preferred_community_id,?) WHERE id=?').bind(organization.id,userId)]:[])
     ]);
     return json({ok:true});
+  }
+  if(members&&method==='PATCH'&&members[2]){
+    await secureWrite(request,env);
+    const organization=await requireMember(env,actor,members[1],{manage:true});
+    if(organization.role!=='owner')fail(403,'Seul le responsable peut nommer un organisateur.');
+    const input=await request.clone().json().catch(()=>null),role=String(input?.role||'');
+    if(!['member','manager'].includes(role))fail(400,'Rôle communautaire invalide.');
+    const target=await env.DB.prepare('SELECT role FROM organization_members WHERE organization_id=? AND user_id=?').bind(organization.id,members[2]).first();
+    if(!target)fail(404,'Ce pilote ne fait plus partie de cette organisation.');
+    if(target.role==='owner')fail(409,'Le rôle du responsable est protégé.');
+    await env.DB.prepare('UPDATE organization_members SET role=? WHERE organization_id=? AND user_id=?').bind(role,organization.id,members[2]).run();
+    return json({ok:true,role});
   }
   if(members&&method==='DELETE'&&members[2]){
     await secureWrite(request,env);

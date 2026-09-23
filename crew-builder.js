@@ -1,7 +1,7 @@
 import {CARS} from './shared/catalog.mjs';
 import {dateLabel} from './front/schedule.mjs';
 import {renderAvailabilityTimeline} from './front/timeline.mjs';
-import {scopeDeparture,organizationChoices,organizationById,organizationShortLabel} from './front/app/organization-context.mjs?v=2-multi-filter';
+import {scopeDeparture,organizationChoices,organizationById,organizationShortLabel} from './front/app/organization-context.mjs?v=7-community-only';
 
 const app = document.getElementById('app');
 let eventsCache = null;
@@ -293,7 +293,7 @@ async function openBuilder(crewId = null, preferredDepartureId = '') {
     const event = events.find(item => item.id === eventId);
     if (!event) throw new Error('Événement introuvable. Actualise la page.');
     if (!session.user) throw new Error('Connecte-toi avec Discord pour gérer un équipage.');
-    const organizations=session.organizations||{team:null,communities:[],discoverableCommunities:[]};
+    const organizations=session.organizations||{communities:[],discoverableCommunities:[]};
 
     if (crewId) {
       let found = null;

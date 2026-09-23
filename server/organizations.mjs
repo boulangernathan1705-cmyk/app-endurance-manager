@@ -1,7 +1,7 @@
 import {
   HttpError,fail,json,origin,rateLimit,identity,id,now,text,registrationSelect,personal
 } from './core.mjs';
-import {communityDirectoryApi,membership,requireMember,organizationSummary,requireOrganizationEligibility} from './community-directory.mjs';
+import {communityDirectoryApi,membership,requireMember,organizationSummary,requireOrganizationEligibility,syncDiscordCommunityUser} from './community-directory.mjs';
 
 const UUID=/^[a-f0-9-]{36}$/;
 const DISCORD_ID=/^\d{15,22}$/;
@@ -56,10 +56,10 @@ async function validateAudiences(env,actor,input,{participantUserId=null}={}){
   const ids=normalizeAudienceIds(input);
   const organizations=ids.filter(value=>value!==GENERAL);
   if(!organizations.length)return ids;
-  if(!actor.user)fail(401,'Connecte-toi avec Discord pour partager une inscription avec une Team ou une communauté.');
+  if(!actor.user)fail(401,'Connecte-toi avec Discord pour partager une inscription avec une communauté.');
   for(const organizationId of organizations){
     if(!(await membership(env,actor.user.id,organizationId)))fail(403,'Tu ne peux partager une inscription qu’avec tes propres groupes.');
-    if(!participantUserId)fail(409,'Pour une Team ou une communauté, sélectionne un pilote membre connecté à Discord.');
+    if(!participantUserId)fail(409,'Pour une communauté, sélectionne un pilote membre connecté à Discord.');
     if(!(await membership(env,participantUserId,organizationId)))fail(409,'Ce pilote ne fait pas partie d’un des groupes sélectionnés.');
     await requireOrganizationEligibility(env,participantUserId,organizationId);
   }
@@ -156,9 +156,13 @@ async function decorateEvents(response,env,actor){
   return new Response(JSON.stringify(data),{status:response.status,headers});
 }
 
-async function decorateSession(response,env,actor){
+async function decorateSession(request,response,env,actor){
   if(!response.ok)return response;
   const data=await response.clone().json().catch(()=>null);if(!data)return response;
+  const requestUrl=new URL(request.url),referer=request.headers.get('Referer');
+  let requestedCommunity=requestUrl.searchParams.get('community');
+  if(!requestedCommunity&&referer){try{requestedCommunity=new URL(referer).searchParams.get('community');}catch{}}
+  if(requestedCommunity)await syncDiscordCommunityUser(env,actor,requestedCommunity);
   data.organizations=await organizationSummary(env,actor);
   const headers=new Headers(response.headers);headers.delete('Content-Length');
   return new Response(JSON.stringify(data),{status:response.status,headers});
@@ -244,7 +248,7 @@ async function route(request,env,ctx,next){
   }
 
   let response=await next(request,env,ctx);
-  if(path==='/api/session'&&method==='GET')response=await decorateSession(response,env,actor);
+  if(path==='/api/session'&&method==='GET')response=await decorateSession(request,response,env,actor);
   if(path==='/api/events'&&method==='GET')response=await decorateEvents(response,env,actor);
   return response;
 }
@@ -254,7 +258,6 @@ export async function organizationAwareFetch(request,env,ctx,next){
   catch(error){
     if(error instanceof HttpError)return json({error:error.message},error.status);
     const message=String(error?.message||error);
-    if(message.includes('one_team_only'))return json({error:'Un pilote ne peut appartenir qu’à une seule Team.'},409);
     if(message.includes('crew_membership_audience'))return json({error:'Ce pilote doit partager sa disponibilité avec cet espace avant de rejoindre cet équipage.'},409);
     if(message.includes('audience_in_use'))return json({error:'Cette inscription est utilisée par un équipage dans cet espace. Retire-la d’abord de l’équipage.'},409);
     if(message.includes('organization_fixed'))return json({error:'L’organisation d’un équipage ne peut pas être changée après sa création.'},409);

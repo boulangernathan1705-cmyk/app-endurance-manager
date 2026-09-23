@@ -36,22 +36,6 @@ export async function ensureOrganizationSchema(env){
     await env.DB.prepare('CREATE INDEX IF NOT EXISTS registrations_organization ON registrations(organization_id,event_id,departure_id)').run();
     await env.DB.prepare('CREATE INDEX IF NOT EXISTS crews_organization ON crews(organization_id,event_id,departure_id)').run();
 
-    await env.DB.prepare(`CREATE TRIGGER IF NOT EXISTS organization_member_one_team BEFORE INSERT ON organization_members
-      WHEN (SELECT type FROM organizations WHERE id=NEW.organization_id)='team'
-      BEGIN
-        SELECT RAISE(ABORT,'one_team_only') WHERE EXISTS (
-          SELECT 1 FROM organization_members om JOIN organizations o ON o.id=om.organization_id
-          WHERE om.user_id=NEW.user_id AND o.type='team' AND om.organization_id!=NEW.organization_id
-        );
-      END`).run();
-    await env.DB.prepare(`CREATE TRIGGER IF NOT EXISTS organization_member_one_team_update BEFORE UPDATE OF organization_id,user_id ON organization_members
-      WHEN (SELECT type FROM organizations WHERE id=NEW.organization_id)='team'
-      BEGIN
-        SELECT RAISE(ABORT,'one_team_only') WHERE EXISTS (
-          SELECT 1 FROM organization_members om JOIN organizations o ON o.id=om.organization_id
-          WHERE om.user_id=NEW.user_id AND o.type='team' AND om.organization_id!=OLD.organization_id
-        );
-      END`).run();
     await env.DB.prepare(`CREATE TRIGGER IF NOT EXISTS crew_organization_fixed BEFORE UPDATE OF organization_id ON crews
       BEGIN
         SELECT RAISE(ABORT,'organization_fixed') WHERE COALESCE(NEW.organization_id,'')!=COALESCE(OLD.organization_id,'');
@@ -139,9 +123,29 @@ export async function ensureOrganizationSchema(env){
     await addColumnIfMissing(env,'organizations','discord_accent_color',"ALTER TABLE organizations ADD COLUMN discord_accent_color TEXT NOT NULL DEFAULT ''");
     await env.DB.prepare('CREATE INDEX IF NOT EXISTS users_preferred_community ON users(preferred_community_id)').run();
 
+    // 0023 : synchronisation des membres/rôles et annonce hebdomadaire par communauté.
+    await addColumnIfMissing(env,'organizations','discord_sync_enabled','ALTER TABLE organizations ADD COLUMN discord_sync_enabled INTEGER NOT NULL DEFAULT 0');
+    await addColumnIfMissing(env,'organizations','discord_manager_role_id','ALTER TABLE organizations ADD COLUMN discord_manager_role_id TEXT');
+    await addColumnIfMissing(env,'organizations','discord_manager_role_name','ALTER TABLE organizations ADD COLUMN discord_manager_role_name TEXT');
+    await addColumnIfMissing(env,'organizations','discord_weekly_webhook_url','ALTER TABLE organizations ADD COLUMN discord_weekly_webhook_url TEXT');
+    await addColumnIfMissing(env,'organizations','discord_weekly_game',"ALTER TABLE organizations ADD COLUMN discord_weekly_game TEXT NOT NULL DEFAULT 'lmu'");
+
+    // 0024 : une Team n'est plus un second type de groupe. Elle devient une communaute fermee.
+    await env.DB.prepare(`UPDATE organizations
+      SET name=name || ' · privé',name_key=name_key || ' · privé · ' || substr(id,1,8)
+      WHERE type='team' AND EXISTS (
+        SELECT 1 FROM organizations community
+        WHERE community.type='community' AND community.name_key=organizations.name_key
+      )`).run();
+    await env.DB.prepare("UPDATE organizations SET type='community',visibility='private',join_mode='invite',updated_at=? WHERE type='team'").bind(Date.now()).run();
+    await env.DB.prepare('DROP TRIGGER IF EXISTS organization_member_one_team').run();
+    await env.DB.prepare('DROP TRIGGER IF EXISTS organization_member_one_team_update').run();
+
     try{await env.DB.prepare("INSERT OR IGNORE INTO d1_migrations(name) VALUES('0020_community_directory.sql')").run();}catch{}
     try{await env.DB.prepare("INSERT OR IGNORE INTO d1_migrations(name) VALUES('0021_event_communities.sql')").run();}catch{}
     try{await env.DB.prepare("INSERT OR IGNORE INTO d1_migrations(name) VALUES('0022_community_branding.sql')").run();}catch{}
+    try{await env.DB.prepare("INSERT OR IGNORE INTO d1_migrations(name) VALUES('0023_community_discord_sync.sql')").run();}catch{}
+    try{await env.DB.prepare("INSERT OR IGNORE INTO d1_migrations(name) VALUES('0024_teams_to_private_communities.sql')").run();}catch{}
   })().catch(error=>{organizationSchemaReady=null;throw error;});
   return organizationSchemaReady;
 }

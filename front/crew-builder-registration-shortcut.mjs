@@ -1,5 +1,5 @@
 import {state,api,CARS} from './app/core.mjs';
-import {renderRegistrationForm,submitRegistration} from './app/registration.mjs?v=7-explicit-general';
+import {renderRegistrationForm,submitRegistration} from './app/registration.mjs?v=9-community-only';
 
 let activeBuilder={mode:'',departureId:''};
 let modalState={departureId:'',category:''};

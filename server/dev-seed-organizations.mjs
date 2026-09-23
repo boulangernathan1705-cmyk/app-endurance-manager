@@ -2,30 +2,24 @@ import {identity,now} from './core.mjs';
 
 const DEV_ORIGIN='https://app.endurance-manager.workers.dev';
 const DEV_ORGANIZATIONS=[
-  {id:'f0000000-0000-4000-8000-000000000001',type:'team',name:'FMT',nameKey:'fmt'},
-  {id:'c0000000-0000-4000-8000-000000000001',type:'community',name:'Endurance Community',nameKey:'endurance community'}
+  {id:'c0000000-0000-4000-8000-000000000001',name:'Les Tondeuz à gazon',nameKey:'les tondeuz à gazon'}
 ];
 
-async function hasTeam(env,userId){
-  return env.DB.prepare(`SELECT 1 FROM organization_members om
-    JOIN organizations o ON o.id=om.organization_id
-    WHERE om.user_id=? AND o.type='team' LIMIT 1`).bind(userId).first();
-}
-
 async function ensureOrganization(env,user,definition){
-  let organization=await env.DB.prepare('SELECT id,owner_user_id FROM organizations WHERE type=? AND name_key=? LIMIT 1')
-    .bind(definition.type,definition.nameKey).first();
+  let organization=await env.DB.prepare("SELECT id,owner_user_id FROM organizations WHERE id=? OR (type='community' AND name_key=?) ORDER BY CASE WHEN name_key=? THEN 0 ELSE 1 END LIMIT 1")
+    .bind(definition.id,definition.nameKey,definition.nameKey).first();
   const createdAt=now();
   if(!organization){
-    if(definition.type==='team'&&await hasTeam(env,user.id))return;
-    await env.DB.prepare('INSERT INTO organizations(id,type,name,name_key,owner_user_id,created_at) VALUES(?,?,?,?,?,?)')
-      .bind(definition.id,definition.type,definition.name,definition.nameKey,user.id,createdAt).run();
+    await env.DB.prepare("INSERT INTO organizations(id,type,name,name_key,owner_user_id,visibility,join_mode,created_at) VALUES(?,'community',?,?,?,'private','invite',?)")
+      .bind(definition.id,definition.name,definition.nameKey,user.id,createdAt).run();
     organization={id:definition.id,owner_user_id:user.id};
+  }else if(organization.id===definition.id){
+    await env.DB.prepare("UPDATE organizations SET type='community',name=?,name_key=?,visibility='private',join_mode='invite' WHERE id=?")
+      .bind(definition.name,definition.nameKey,definition.id).run();
   }
   const existing=await env.DB.prepare('SELECT role FROM organization_members WHERE organization_id=? AND user_id=?')
     .bind(organization.id,user.id).first();
   if(existing)return;
-  if(definition.type==='team'&&await hasTeam(env,user.id))return;
   const role=organization.owner_user_id===user.id?'owner':'member';
   await env.DB.prepare('INSERT OR IGNORE INTO organization_members(organization_id,user_id,role,created_at) VALUES(?,?,?,?)')
     .bind(organization.id,user.id,role,createdAt).run();

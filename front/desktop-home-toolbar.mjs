@@ -20,7 +20,6 @@ if (shell && app && navigation) {
     else {const homeClone = cloneControl(navigation.querySelector('[data-action="home"]'));if (homeClone) toolbar.append(homeClone);}
     const switcherClone = cloneControl(navigation.querySelector('.nav-game-switcher'));if (switcherClone) center.append(switcherClone);
     const entriesClone = cloneControl(navigation.querySelector('[data-action="my-entries"]'));if (entriesClone) rightControls.append(entriesClone);
-    const teamsClone = cloneControl(navigation.querySelector('[data-teams-nav]'));if (teamsClone) rightControls.append(teamsClone);
     if (accountBar) right.append(accountBar);
   }
   document.addEventListener('endurance:render', sync);document.addEventListener('endurance:nav', sync);media.addEventListener?.('change', sync);queueMicrotask(sync);

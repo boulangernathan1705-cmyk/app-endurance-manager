@@ -1,6 +1,6 @@
-import {state,esc,button,carPreferenceChoices,registrationCarLabel,renderAvailabilityTimeline,notifyRender,logo,categories} from './core.mjs?v=8-explicit-general';
+import {state,esc,button,carPreferenceChoices,registrationCarLabel,renderAvailabilityTimeline,notifyRender,logo,categories} from './core.mjs?v=10-community-only';
 import {getLocale} from '../i18n.mjs';
-import {GENERAL_AUDIENCE,audienceChoices,defaultRegistrationAudienceIds,registrationAudienceIds,organizationAudienceLabels,communityById} from './organization-context.mjs?v=6-community-context';
+import {GENERAL_AUDIENCE,audienceChoices,defaultRegistrationAudienceIds,registrationAudienceIds,organizationAudienceLabels,communityById} from './organization-context.mjs?v=7-community-only';
 
 export function ownRegistrations(departure) { return (departure?.availability||[]).filter(reg => reg.mine); }
 export function ownRegistration(departure) { return ownRegistrations(departure)[0]; }
@@ -61,7 +61,7 @@ function participantCanUseAudience(stateDraft,key){
   if(!stateDraft.forOther)return true;
   const targetId=stateDraft.participantUserId||null;
   if(!targetId)return false;
-  const organization=state.organizations.team?.id===key?state.organizations.team:(state.organizations.communities||[]).find(item=>item.id===key);
+  const organization=(state.organizations.communities||[]).find(item=>item.id===key);
   return !!organization?.members?.some(member=>member.id===targetId);
 }
 
@@ -73,7 +73,7 @@ function audienceSelector(event,stateDraft){
   }
   const selected=new Set(stateDraft.audienceIds?.length?stateDraft.audienceIds:[GENERAL_AUDIENCE]);
   const choices=audienceChoices(state.organizations);
-  return `<fieldset class="registration-audience-panel"><legend>Partager ma disponibilité avec</legend><p>Une seule inscription, visible dans les espaces que tu coches. Tu peux en sélectionner plusieurs.</p><div class="registration-audience-options">${choices.map(choice=>{const allowed=participantCanUseAudience(stateDraft,choice.key);const checked=selected.has(choice.key);return `<label class="registration-audience-option ${choice.type}${allowed?'':' is-disabled'}"><input type="checkbox" name="registrationAudience" value="${esc(choice.key)}" ${checked?'checked':''} ${allowed?'':'disabled'}><span><strong>${esc(choice.label)}</strong><small>${choice.type==='general'?'Visible dans l’espace commun':choice.type==='team'?'Visible par les membres de ta Team':'Visible par les membres de cette communauté'}</small></span></label>`;}).join('')}</div>${stateDraft.forOther&&!stateDraft.participantUserId?'<small class="registration-audience-help">Un pilote saisi manuellement peut uniquement être partagé dans Général. Pour une Team ou une communauté, sélectionne son compte Discord.</small>':''}</fieldset>`;
+  return `<fieldset class="registration-audience-panel"><legend>Partager ma disponibilité avec</legend><p>Une seule inscription, visible dans les espaces que tu coches. Tu peux en sélectionner plusieurs.</p><div class="registration-audience-options">${choices.map(choice=>{const allowed=participantCanUseAudience(stateDraft,choice.key);const checked=selected.has(choice.key);return `<label class="registration-audience-option ${choice.type}${allowed?'':' is-disabled'}"><input type="checkbox" name="registrationAudience" value="${esc(choice.key)}" ${checked?'checked':''} ${allowed?'':'disabled'}><span><strong>${esc(choice.label)}</strong><small>${choice.type==='general'?'Visible dans l’espace commun':'Visible par les membres de cette communauté'}</small></span></label>`;}).join('')}</div>${stateDraft.forOther&&!stateDraft.participantUserId?'<small class="registration-audience-help">Un pilote saisi manuellement peut uniquement être partagé dans Général. Pour une communauté, sélectionne son compte Discord.</small>':''}</fieldset>`;
 }
 
 function registrationContext(event,departure,stateDraft) {

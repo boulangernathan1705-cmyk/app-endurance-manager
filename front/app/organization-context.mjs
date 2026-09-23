@@ -1,10 +1,7 @@
 export const GENERAL_AUDIENCE='general';
 
 export function joinedOrganizations(organizations={}){
-  const values=[];
-  if(organizations.team)values.push(organizations.team);
-  values.push(...(organizations.communities||[]));
-  return values;
+  return [...(organizations.communities||[])];
 }
 
 export function knownCommunities(organizations={}){
@@ -38,12 +35,11 @@ export function organizationById(organizations,organizationId){
 export function organizationShortLabel(organizations,organizationId){
   const organization=organizationById(organizations,organizationId);
   if(!organization)return'Général';
-  return `${organization.type==='team'?'🔒':'🌐'} ${organization.name}`;
+  return `🌐 ${organization.name}`;
 }
 
 export function audienceChoices(organizations={}){
   const choices=[{key:GENERAL_AUDIENCE,id:GENERAL_AUDIENCE,type:'general',name:'Général',label:'Général'}];
-  if(organizations.team)choices.push({key:organizations.team.id,id:organizations.team.id,type:'team',name:organizations.team.name,label:`🔒 ${organizations.team.name}`});
   for(const community of organizations.communities||[])choices.push({key:community.id,id:community.id,type:'community',name:community.name,label:`🌐 ${community.name}`});
   return choices;
 }
@@ -52,7 +48,7 @@ export function organizationChoices(organizations={},{includeGeneral=true}={}){
   return audienceChoices(organizations).filter(choice=>includeGeneral||choice.type!=='general').map(choice=>({
     id:choice.type==='general'?'':choice.id,
     type:choice.type,
-    name:choice.type==='general'?'Endurance Manager · Général':`${choice.type==='team'?'Team':'Communauté'} · ${choice.name}`
+    name:choice.type==='general'?'Endurance Manager · Général':`Communauté · ${choice.name}`
   }));
 }
 

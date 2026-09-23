@@ -41,7 +41,7 @@ async function runWeeklySync(env) {
 }
 
 function queueWeeklySync(env, ctx) {
-  if (!env?.DISCORD_WEEKLY_WEBHOOK_URL || !ctx?.waitUntil) return;
+  if (!env?.DB || !ctx?.waitUntil) return;
   ctx.waitUntil(runWeeklySync(env).catch(error => {
     console.error('Discord weekly sync failed', error instanceof Error ? error.message : 'unknown');
   }));
@@ -64,7 +64,7 @@ export default {
   },
 
   async scheduled(_controller, env, ctx) {
-    if (!env?.DISCORD_WEEKLY_WEBHOOK_URL) return;
+    if (!env?.DB) return;
     ctx.waitUntil((async()=>{
       await ensureCrewOwnershipSchema(env);
       await ensureOrganizationSchema(env);
