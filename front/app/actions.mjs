@@ -1,9 +1,9 @@
 import {app,state,api,load,showError,countdown,CARS} from './core.mjs';
-import {renderNav,renderHome} from './home-view.mjs?v=10-community-context';
-import {renderCommunities} from './community-directory.mjs?v=3-community-branding';
-import {renderEvent} from './event-view.mjs?v=16-community-branding';
+import {renderNav,renderHome} from './home-view.mjs?v=11-community-first-runtime';
+import {renderCommunities} from './community-directory.mjs?v=4-community-first-runtime';
+import {renderEvent} from './event-view.mjs?v=17-community-first-runtime';
 import {renderEventForm,departureFields,updateRemoveButtons} from './event-form.mjs';
-import {renderMyEntries} from './entries-view.mjs?v=5-community-context';
+import {renderMyEntries} from './entries-view.mjs?v=6-community-first-runtime';
 import {refresh,refreshAfterSave} from './refresh.mjs?v=2-paddock-chain';
 import {draftFor,registrationDraft,ownRegistrations,rerenderRegistrationSection,submitRegistration} from './registration.mjs?v=4-audiences';
 import {updateCrewState} from './crews.mjs?v=9-audiences';
@@ -161,8 +161,14 @@ async function start(){
     const authError=new URLSearchParams(location.search).get('auth');
     if(authError){const url=new URL(location.href);url.searchParams.delete('auth');history.replaceState(null,'',url.pathname+(url.search||''));state.flash='La connexion Discord n’a pas abouti. Tu peux réessayer.';}
     await load();renderNav();
+    const params=new URLSearchParams(location.search);
     const requested=state.requestedCommunityId?communityById(state.organizations,state.requestedCommunityId):null;
-    if(requested&&!requested.role)renderCommunities(requested.id);else renderHome(state.flash);
+    if(params.get('communities')==='1'){
+      params.delete('communities');
+      history.replaceState(null,'',location.pathname+(params.toString()?`?${params.toString()}`:''));
+      renderCommunities(requested?.id||state.activeCommunityId||null);
+    }else if(requested&&!requested.role)renderCommunities(requested.id);
+    else renderHome(state.flash);
   }catch(error){app.innerHTML='<h1 class="page-title">ENDURANCE MANAGER</h1>';showError(error);}
 }
 start();
