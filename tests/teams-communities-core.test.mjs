@@ -7,55 +7,63 @@ test('les communautés étendent le socle métier sans dupliquer les endurances'
   const organizations=read('migrations/0018_organizations.sql');
   const audiences=read('migrations/0019_registration_audiences.sql');
   const directory=read('migrations/0020_community_directory.sql');
+  const eventScope=read('migrations/0021_event_communities.sql');
+  const branding=read('migrations/0022_community_branding.sql');
   const api=read('server/organizations.mjs');
   assert.match(organizations,/CREATE TABLE organizations/);
   assert.match(audiences,/CREATE TABLE registration_audiences/);
   assert.match(directory,/organization_join_requests/);
-  assert.match(directory,/discord_guild_id/);
-  assert.match(directory,/discord_role_id/);
+  assert.match(eventScope,/ALTER TABLE events ADD COLUMN organization_id/);
+  assert.match(branding,/preferred_community_id/);
+  assert.match(branding,/logo_url/);
+  assert.match(branding,/banner_url/);
   assert.match(api,/communityDirectoryApi/);
-  assert.match(api,/decorateEvents/);
   assert.match(api,/requireOrganizationEligibility/);
 });
 
 test('une communauté fonctionne sans Discord et peut ajouter Discord comme règle facultative',()=>{
   const directory=read('server/community-directory.mjs');
   const discord=read('server/community-discord.mjs');
-  assert.match(directory,/Discord.*facultatif|discordBotReady/i);
   assert.match(directory,/JOIN_MODES=new Set\(\['open','request','invite','discord'\]\)/);
   assert.match(directory,/requireOrganizationEligibility/);
   assert.match(discord,/DISCORD_BOT_TOKEN/);
   assert.match(discord,/guilds\/.*members/);
   assert.doesNotMatch(discord,/guilds\/.*members\?limit/);
-  assert.match(discord,/Gérer le serveur/);
+  assert.match(discord,/iconUrl:discordAsset/);
+  assert.match(discord,/bannerUrl:discordAsset/);
 });
 
-test('le front possède un annuaire et une fiche communauté plutôt qu’un tiroir parallèle',()=>{
-  const directory=read('front/app/community-directory.mjs');
-  const network=read('front/app/paddock-network.mjs');
+test('la communauté active est choisie avant le simulateur et l’annuaire devient secondaire',()=>{
   const home=read('front/app/home-view.mjs');
-  assert.match(directory,/Trouve ton paddock/);
-  assert.match(directory,/Communautés disponibles/);
-  assert.match(directory,/Discord est facultatif/);
-  assert.match(directory,/Administration de la communauté/);
-  assert.match(directory,/Rôle requis pour participer aux endurances/);
-  assert.match(home,/button\('communities','Communautés'\)/);
-  assert.match(home,/ACTIVITÉ DU PADDOCK/);
-  assert.doesNotMatch(network,/network-drawer/);
-  assert.doesNotMatch(network,/Mon réseau/);
-  assert.match(network,/scopeNetworkTo/);
-});
-
-test('les communautés restent facultatives autour des événements existants',()=>{
+  const directory=read('front/app/community-directory.mjs');
   const context=read('front/app/organization-context.mjs');
-  const actions=read('front/app/actions.mjs');
-  assert.match(context,/GENERAL_AUDIENCE='general'/);
-  assert.match(context,/defaultRegistrationAudienceIds/);
-  assert.match(actions,/case 'communities'/);
-  assert.match(actions,/renderCommunities/);
-  assert.match(actions,/case 'home'/);
+  assert.match(home,/nav-community-context/);
+  assert.match(home,/communityContextMarkup/);
+  assert.match(home,/contextEvents/);
+  assert.doesNotMatch(home,/button\('communities','Communautés'\)/);
+  assert.match(directory,/Ton espace actif se choisit depuis la barre principale/);
+  assert.match(directory,/Découvrir d’autres communautés/);
+  assert.doesNotMatch(directory,/Trouve ton paddock/);
+  assert.match(context,/preferredCommunityId/);
+  assert.match(context,/communityById/);
 });
 
+test('les gérants peuvent personnaliser leur espace sans créer un moteur de thème parallèle',()=>{
+  const directory=read('front/app/community-directory.mjs');
+  const css=read('styles/community-context.css');
+  const server=read('server/community-directory.mjs');
+  const account=read('front/account-menu.mjs');
+  const registration=read('front/app/registration.mjs');
+  assert.match(directory,/IDENTITÉ VISUELLE/);
+  assert.match(directory,/logoUrl/);
+  assert.match(directory,/bannerUrl/);
+  assert.match(directory,/accentColor/);
+  assert.match(server,/imageUrl\(input\.logoUrl/);
+  assert.match(server,/accentColor\(input\.accentColor/);
+  assert.match(css,/community-home-banner/);
+  assert.match(account,/account-community-badge/);
+  assert.match(registration,/pilot-community-logo/);
+});
 
 test('les grandes communautés ne chargent leurs membres qu’à l’ouverture',()=>{
   const server=read('server/community-directory.mjs');
@@ -67,7 +75,17 @@ test('les grandes communautés ne chargent leurs membres qu’à l’ouverture',
   assert.match(front,/loadCommunityMembers/);
   assert.match(front,/limit=50&offset=/);
   assert.match(front,/more-members/);
-  assert.match(front,/Afficher plus/);
+});
+
+test('les endurances et inscriptions restent enfermées dans leur communauté active',()=>{
+  const context=read('front/app/core.mjs');
+  const home=read('front/app/home-view.mjs');
+  const entries=read('front/app/entries-view.mjs');
+  const registration=read('front/app/registration.mjs');
+  assert.match(context,/activeCommunityId/);
+  assert.match(home,/event\.organizationId===communityId/);
+  assert.match(entries,/event\.organizationId===state\.activeCommunityId/);
+  assert.match(registration,/event\.organizationId\?\[event\.organizationId\]/);
 });
 
 test('les assets de la nouvelle interface sont versionnés et les fixtures dev restent isolées',()=>{
@@ -76,7 +94,8 @@ test('les assets de la nouvelle interface sont versionnés et les fixtures dev r
   const app=read('app.js');
   assert.match(seed,/https:\/\/app\.endurance-manager\.workers\.dev/);
   assert.match(seed,/if\(url\.origin!==DEV_ORIGIN\)return/);
-  assert.match(html,/community-directory\.css\?v=1/);
-  assert.match(html,/app\.js\?v=87-community-directory/);
-  assert.match(app,/paddock-network\.mjs\?v=2-community-directory/);
+  assert.match(html,/community-context\.css\?v=1/);
+  assert.match(html,/community-directory\.css\?v=2-secondary/);
+  assert.match(html,/app\.js\?v=88-community-context/);
+  assert.match(app,/paddock-network\.mjs\?v=3-community-context/);
 });
