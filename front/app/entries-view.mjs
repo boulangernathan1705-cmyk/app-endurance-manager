@@ -12,7 +12,7 @@ import {
   categories
 } from './core.mjs';
 import {getLocale,localeTag} from '../i18n.mjs';
-import {scopeDeparture,registrationAudienceIds,organizationAudienceLabels} from './organization-context.mjs?v=2-multi-filter';
+import {scopeDeparture,registrationAudienceIds,organizationAudienceLabels,communityById} from './organization-context.mjs?v=6-community-context';
 
 const dateFormat = new Intl.DateTimeFormat(localeTag(), {
   timeZone:'Europe/Paris',
@@ -48,10 +48,18 @@ function pilotGridClass(count) {
   return `ux-my-pilot-grid ux-my-pilot-grid-${Math.max(1,Math.min(3,count || 1))}`;
 }
 
+function eventCommunity(event){
+  return event?.organizationId?communityById(state.organizations,event.organizationId):null;
+}
+function communityPilotMark(event){
+  const community=eventCommunity(event),logoUrl=community?.branding?.logoUrl;
+  return logoUrl?`<span class="pilot-community-logo" title="${esc(community.name)}"><img src="${esc(logoUrl)}" alt="" loading="lazy" referrerpolicy="no-referrer"></span>`:'';
+}
+
 function pilotCard(event,departure,reg,highlighted=false) {
   return `<article class="pilot-row ux-my-entry-pilot-card${highlighted?' is-own-pilot':''}">
     <div class="pilot-main">
-      <span class="pilot-name">${esc(reg.name)}</span>
+      <span class="pilot-name">${communityPilotMark(event)}${esc(reg.name)}</span>
       <span class="pilot-category-logo">${logo(reg.category)}</span>
       <span class="pilot-car">${esc(registrationCarLabel(reg))}</span>
       ${reg.preferredPilot?`<span class="pilot-preference">Souhaite rouler avec : <strong>${esc(reg.preferredPilot)}</strong></span>`:''}
@@ -81,14 +89,14 @@ function compactCrew(departure,crew) {
   </article>`;
 }
 
-function audienceMeta(reg){
-  const ids=registrationAudienceIds(reg);
-  const labels=organizationAudienceLabels(state.organizations,ids);
+function audienceMeta(event,reg){
+  const ids=event.organizationId?[event.organizationId]:registrationAudienceIds(reg);
+  const labels=event.organizationId?[]:organizationAudienceLabels(state.organizations,ids);
   return {ids,labels};
 }
 
 function card({event,departure:rawDeparture,reg}) {
-  const audiences=audienceMeta(reg);
+  const audiences=audienceMeta(event,reg);
   const departure=scopeDeparture(rawDeparture,new Set(audiences.ids));
   const crew = (departure.crews||[]).find(item => (item.registrationIds||[]).some(id => String(id) === String(reg.id)));
   const assigned = new Set((departure.crews||[]).flatMap(item => (item.registrationIds||[]).map(String)));
@@ -142,14 +150,19 @@ function card({event,departure:rawDeparture,reg}) {
 
 export function renderMyEntries() {
   state.page='my-entries';
-  const entries=state.events.flatMap(event=>event.departures.flatMap(departure=>departure.availability
+  const community=communityById(state.organizations,state.activeCommunityId);
+  const events=(state.events||[]).filter(event=>state.activeCommunityId?event.organizationId===state.activeCommunityId:!event.organizationId);
+  const entries=events.flatMap(event=>event.departures.flatMap(departure=>departure.availability
     .filter(reg=>reg.mine||reg.managed)
     .map(reg=>({event,departure,reg}))));
   const section=(title,list)=>`<section class="native-my-entries-group">
     <div class="native-my-entries-group-heading"><h2>${title}</h2><span>${list.length} inscription${list.length>1?'s':''}</span></div>
     ${list.length?`<div class="native-my-entry-list">${list.map(card).join('')}</div>`:'<p class="empty">Aucune inscription.</p>'}
   </section>`;
-  app.innerHTML=`<div class="native-my-entries-heading"><span class="creation-kicker">ESPACE PILOTE</span><h1 class="page-title">MES INSCRIPTIONS</h1><p>Une inscription peut maintenant être partagée avec Général, ta Team et plusieurs communautés sans être dupliquée.</p></div>
+  const context=community
+    ? `Tes inscriptions dans <strong>${esc(community.name)}</strong> sur ce simulateur.`
+    : 'Tes inscriptions aux endurances indépendantes Endurance Manager.';
+  app.innerHTML=`<div class="native-my-entries-heading"><span class="creation-kicker">ESPACE PILOTE</span><h1 class="page-title">MES INSCRIPTIONS</h1><p>${context}</p></div>
     ${section('Mes inscriptions personnelles',entries.filter(item=>item.reg.mine))}
     ${entries.some(item=>item.reg.managed)?section('Inscriptions que je gère',entries.filter(item=>item.reg.managed)):''}`;
   notifyRender();
