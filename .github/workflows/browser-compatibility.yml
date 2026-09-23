@@ -5,6 +5,10 @@ on:
   push:
     branches: [dev]
 
+concurrency:
+  group: browser-compatibility-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
