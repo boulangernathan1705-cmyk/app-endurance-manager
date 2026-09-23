@@ -9,13 +9,13 @@
 <link rel="icon" href="/images/endurance-manager-logo.webp" type="image/webp">
 <link rel="preload" as="image" href="/images/endurance-manager-banner.webp?v=39-optimized" type="image/webp" fetchpriority="high">
 <link rel="stylesheet" href="/styles.css?v=45-shared-crew-cards">
-<link rel="stylesheet" href="/styles/game-hub.css?v=10-staged-navigation">
+<link rel="stylesheet" href="/styles/game-hub.css?v=11-clean-community-flow">
 <link rel="stylesheet" href="/styles/hub-account-position.css?v=3-same-row">
 <link rel="stylesheet" href="/styles/account-menu.css?v=4-oauth-trust">
 <link rel="stylesheet" href="/styles/desktop-nav-unified.css?v=2-home-toolbar">
 <link rel="stylesheet" href="/styles/legal.css?v=2">
 <script type="module" src="/front/account-menu.mjs?v=9-explicit-general"></script>
-<script type="module" src="/front/game-hub.mjs?v=16-staged-navigation"></script>
+<script type="module" src="/front/game-hub.mjs?v=17-default-community"></script>
 </head>
 <body>
 <div class="top-stripes" aria-hidden="true"><div></div><div></div><div></div><div></div></div>
@@ -30,7 +30,7 @@
     <div class="account-bar"><div id="account-menu-root" class="account-menu-root" aria-live="polite"></div></div>
   </div>
   <section id="community-stage" class="hub-stage" aria-labelledby="community-stage-title">
-    <section class="hub-intro"><span class="hub-step-label">1 · ESPACE</span><h1 id="community-stage-title">Choisis ta communauté</h1></section>
+    <section class="hub-intro"><h1 id="community-stage-title">Choisis ta communauté</h1></section>
     <section id="community-picker" class="hub-community-picker" aria-label="Espaces disponibles">
       <div class="hub-community-loading">Chargement de tes espaces…</div>
     </section>
@@ -38,7 +38,7 @@
   <section id="simulator-stage" class="hub-stage hub-simulator-stage" aria-labelledby="simulator-stage-title" hidden>
     <button type="button" class="hub-stage-back" data-hub-back>← Changer de communauté</button>
     <div id="hub-selected-community" class="hub-selected-community" aria-live="polite"></div>
-    <section class="hub-simulator-intro"><span class="hub-step-label">2 · SIMULATEUR</span><h2 id="simulator-stage-title">Choisis ton simulateur</h2></section>
+    <section class="hub-simulator-intro"><h2 id="simulator-stage-title">Choisis ton simulateur</h2></section>
     <p id="hub-status" role="status" aria-live="polite"></p>
     <section id="game-grid" class="game-hub-grid" aria-label="Simulateurs disponibles">
       <article class="game-hub-card game-lmu"><div class="game-hub-heading"><div class="game-title-line"><span class="game-badge" aria-hidden="true">LMU</span><h2>Le Mans Ultimate</h2></div><p>Chargement de la prochaine endurance…</p></div></article>
