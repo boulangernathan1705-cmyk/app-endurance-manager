@@ -1,4 +1,4 @@
-import {app,state,api,load,showError,esc,dateLabel,notifyRender,activeGame} from './core.mjs';
+import {app,state,api,load,showError,esc,dateLabel,notifyRender,activeGame} from './core.mjs?v=7-runtime';
 import {renderEvent} from './event-view.mjs?v=16-community-branding';
 import {renderEventForm} from './event-form.mjs?v=2-community-events';
 
