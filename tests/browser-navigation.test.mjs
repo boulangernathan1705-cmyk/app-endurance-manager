@@ -20,8 +20,9 @@ test('le build produit les deux espaces simulateurs et Cloudflare conserve les U
   assert.match(home, /href="\/iracing\/"/);
   assert.match(hub, /'\/lmu\/'/);
   assert.match(hub, /'\/iracing\/'/);
-  assert.match(homeView, /href="\/lmu\/"/);
-  assert.match(homeView, /href="\/iracing\/"/);
+  assert.match(homeView, /href="\/lmu\/\$\{query\}"/);
+  assert.match(homeView, /href="\/iracing\/\$\{query\}"/);
+  assert.match(homeView, /communityContextMarkup/);
 });
 
 test('la base commune rend les inscriptions sans interface parallèle', async () => {
