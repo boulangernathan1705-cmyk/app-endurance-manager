@@ -1,4 +1,4 @@
-import {state,load} from './core.mjs';
+import {state,load} from './core.mjs?v=7-runtime';
 import {renderNav,renderHome} from './home-view.mjs?v=7-paddock-pulse';
 import {renderEvent} from './event-view.mjs?v=13-paddock-lens';
 import {renderMyEntries} from './entries-view.mjs?v=4-audiences';
