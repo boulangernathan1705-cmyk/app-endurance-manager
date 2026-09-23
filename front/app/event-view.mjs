@@ -48,9 +48,9 @@ function raceLensMarkup(rawEvent){
   if(rawEvent.organizationId)return'';
   const team=state.organizations?.team;
   if(!team)return'';
-  const options=[{id:'general',label:'Général'},{id:team.id,label:\`◆ \${team.name}\`}];
+  const options=[{id:'general',label:'Général'},{id:team.id,label:`◆ ${team.name}`}];
   const current=state.visibleAudienceIds?.size===1?[...state.visibleAudienceIds][0]:'general';
-  return \`<section class="race-lens" aria-label="Choisir l’espace affiché"><div class="race-lens-head"><div><span>VOIR CETTE COURSE POUR</span><small>La Team privée reste un filtre secondaire des endurances indépendantes.</small></div></div><div class="race-lens-options">\${options.map(option=>\`<button type="button" class="race-lens-button" data-paddock-scope="\${option.id}" aria-pressed="\${current===option.id}"><span>\${esc(option.label)}</span><b>\${scopeCount(rawEvent,option.id)}</b></button>\`).join('')}</div></section>\`;
+  return `<section class="race-lens" aria-label="Choisir l’espace affiché"><div class="race-lens-head"><div><span>VOIR CETTE COURSE POUR</span><small>La Team privée reste un filtre secondaire des endurances indépendantes.</small></div></div><div class="race-lens-options">${options.map(option=>`<button type="button" class="race-lens-button" data-paddock-scope="${option.id}" aria-pressed="${current===option.id}"><span>${esc(option.label)}</span><b>${scopeCount(rawEvent,option.id)}</b></button>`).join('')}</div></section>`;
 }
 
 export function renderEvent(message=''){
