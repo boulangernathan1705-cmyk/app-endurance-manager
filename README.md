@@ -19,12 +19,14 @@ Les permissions sont toujours vérifiées côté serveur. Un pseudo seul ne donn
 - API sur Cloudflare Workers.
 - Base partagée Cloudflare D1 `fmt-endurance`.
 - Authentification Discord.
-- Communautés Endurance Manager facultatives, indépendantes des événements généraux.
+- Communautés Endurance Manager facultatives, utilisées comme contexte principal avant le choix LMU / iRacing.
+- Communauté par défaut par utilisateur et liens directs `?community=<id>` pour ouvrir immédiatement l’espace voulu.
+- Personnalisation légère par communauté : logo, bannière et couleur d’accent, avec reprise automatique des visuels Discord quand ils existent.
 - Liaison Discord facultative par communauté pour vérifier l’appartenance à un serveur et, si configuré, un rôle d’éligibilité aux endurances.
 - Assets statiques servis par Cloudflare Workers Static Assets.
 - Catalogue catégories, voitures et circuits partagé entre le front et le serveur.
 
-Une endurance peut rester générale et n’appartenir à aucune communauté. Les communautés peuvent être ouvertes, sur demande, sur invitation ou vérifier l’appartenance à un serveur Discord. Les listes de membres des communautés sont chargées à la demande et paginées afin de rester adaptées aux grands serveurs.
+Une endurance peut rester générale et n’appartenir à aucune communauté. Lorsqu’une communauté est active, le site affiche d’abord son identité et ses endurances, puis le simulateur choisi ; l’annuaire multi-communautés reste une fonction secondaire de gestion/découverte. Les communautés peuvent être ouvertes, sur demande, sur invitation ou vérifier l’appartenance à un serveur Discord. Les listes de membres sont chargées à la demande et paginées afin de rester adaptées aux grands serveurs.
 
 Les horaires sont interprétés en heure de Paris. Les inscriptions se verrouillent au départ. Un pilote peut proposer plusieurs catégories sur le même départ ; lorsqu’il est affecté à un équipage, la catégorie de cet équipage devient celle retenue.
 
