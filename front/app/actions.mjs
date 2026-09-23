@@ -1,4 +1,4 @@
-import {app,state,api,load,showError,countdown,CARS} from './core.mjs';
+import {app,state,api,load,showError,countdown,CARS} from './core.mjs?v=7-runtime';
 import {renderNav,renderHome} from './home-view.mjs?v=11-community-first-runtime';
 import {renderCommunities} from './community-directory.mjs?v=4-community-first-runtime';
 import {renderEvent} from './event-view.mjs?v=17-community-first-runtime';
