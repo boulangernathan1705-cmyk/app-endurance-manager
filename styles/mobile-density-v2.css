@@ -336,6 +336,12 @@
     z-index: 120 !important;
   }
 
+  /* The account row sits below the community selector. While its absolute
+     menu is open, it must not steal taps from the community dropdown. */
+  .site-nav-shell:has(#navigation > .nav-community-context[open]) > .account-bar {
+    pointer-events: none !important;
+  }
+
   #navigation > .nav-community-context > summary {
     min-height: 40px !important;
     padding: 3px 7px !important;
