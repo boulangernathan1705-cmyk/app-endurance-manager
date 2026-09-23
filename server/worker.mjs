@@ -4,6 +4,18 @@ import {
   registrationSelect, registrationParticipant, body, rateLimit, cleanup, text, validateEvent, validateRegistration
 } from './core.mjs';
 import {ingestClientError, clientErrorsApi} from './telemetry.mjs';
+const COOKIE_OAUTH_RETURN='__Host-em_oauth_return';
+function safeReturnPath(value){
+  const raw=String(value||'').trim();
+  if(!raw||raw.length>500||!raw.startsWith('/')||raw.startsWith('//'))return'/';
+  try{const parsed=new URL(raw,'https://endurance-manager.invalid');return parsed.origin==='https://endurance-manager.invalid'?parsed.pathname+parsed.search:'/';}catch{return'/';}
+}
+function returnCookiePath(request){
+  const raw=cookie(request,COOKIE_OAUTH_RETURN);if(!raw)return'/';
+  try{return safeReturnPath(decodeURIComponent(raw));}catch{return'/';}
+}
+function authErrorPath(path){const url=new URL(safeReturnPath(path),'https://endurance-manager.invalid');url.searchParams.set('auth','error');return url.pathname+url.search;}
+
 async function eventById(env, eventId) {
   const row = await env.DB.prepare('SELECT * FROM events WHERE id=?').bind(eventId).first();
   if (!row) fail(404, 'Événement introuvable.'); return row;
@@ -125,18 +137,19 @@ async function listEvents(env, actor, game='') {
 async function oauthStart(request, env) {
   requireDiscord(env); await rateLimit(request, env, 'oauth', 20); await cleanup(env);
   const state = token();
+  const returnPath=safeReturnPath(new URL(request.url).searchParams.get('return'));
   await env.DB.prepare('INSERT INTO oauth_states(state_hash,expires_at) VALUES(?,?)').bind(await hash(state), now() + 600).run();
   const auth = new URL('https://discord.com/oauth2/authorize');
   auth.search = new URLSearchParams({client_id:env.DISCORD_CLIENT_ID, response_type:'code', redirect_uri:origin(env) + '/api/auth/discord/callback', scope:'identify', state}).toString();
-  return redirect(auth.href, [setCookie(COOKIE_STATE, state, 600)]);
+  return redirect(auth.href, [setCookie(COOKIE_STATE, state, 600),setCookie(COOKIE_OAUTH_RETURN,encodeURIComponent(returnPath),600)]);
 }
 async function oauthCallback(request, env) {
   requireDiscord(env);
   const url = new URL(request.url), state = url.searchParams.get('state');
-  const clear = setCookie(COOKIE_STATE, '', 0);
-  if (!state || !/^[a-f0-9]{64}$/.test(state) || state !== cookie(request, COOKIE_STATE)) return redirect(origin(env) + '/?auth=error', [clear]);
+  const clear = setCookie(COOKIE_STATE, '', 0),clearReturn=setCookie(COOKIE_OAUTH_RETURN,'',0),returnPath=returnCookiePath(request);
+  if (!state || !/^[a-f0-9]{64}$/.test(state) || state !== cookie(request, COOKIE_STATE)) return redirect(origin(env) + authErrorPath(returnPath), [clear,clearReturn]);
   const row = await env.DB.prepare('DELETE FROM oauth_states WHERE state_hash=? AND expires_at>? RETURNING state_hash').bind(await hash(state), now()).first();
-  if (!row || !url.searchParams.get('code') || url.searchParams.has('error')) return redirect(origin(env) + '/?auth=error', [clear]);
+  if (!row || !url.searchParams.get('code') || url.searchParams.has('error')) return redirect(origin(env) + authErrorPath(returnPath), [clear,clearReturn]);
   try {
     const response = await fetch('https://discord.com/api/oauth2/token', {method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:new URLSearchParams({client_id:env.DISCORD_CLIENT_ID, client_secret:env.DISCORD_CLIENT_SECRET, grant_type:'authorization_code', code:url.searchParams.get('code'), redirect_uri:origin(env) + '/api/auth/discord/callback'}), signal:AbortSignal.timeout(10000)});
     if (!response.ok) throw Error('token');
@@ -162,9 +175,9 @@ async function oauthCallback(request, env) {
     const avatarCookie = avatarHash
       ? `fmt_discord_avatar=${encodeURIComponent(`${profile.id}:${avatarHash}`)}; Path=/; Secure; SameSite=Lax; Max-Age=${7 * DAY}`
       : 'fmt_discord_avatar=; Path=/; Secure; SameSite=Lax; Max-Age=0';
-    return redirect(origin(env) + '/', [clear, setCookie(COOKIE_SESSION, session, 7 * DAY), avatarCookie]);
+    return redirect(origin(env) + returnPath, [clear,clearReturn,setCookie(COOKIE_SESSION, session, 7 * DAY), avatarCookie]);
   } catch {
-    return redirect(origin(env) + '/?auth=error', [clear]);
+    return redirect(origin(env) + authErrorPath(returnPath), [clear,clearReturn]);
   }
 }
 async function api(request, env) {
