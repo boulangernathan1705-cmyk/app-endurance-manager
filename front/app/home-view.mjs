@@ -24,7 +24,8 @@ function contextEvents(){
 }
 function canManageContext(){
   const community=activeCommunity();
-  return canManage()||Boolean(community&&['owner','manager'].includes(community.role));
+  if(community)return state.user?.role==='admin'||['owner','manager'].includes(community.role);
+  return canManage();
 }
 function initials(name){
   return String(name||'EM').split(/\s+/).filter(Boolean).slice(0,2).map(part=>part[0]).join('').toUpperCase();
