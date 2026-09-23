@@ -94,18 +94,21 @@ test('mobile interface stays compact without horizontal overflow across main pag
   await expect(page.locator('.page-title')).toBeVisible();
 });
 
-test('community directory opens for a guest without requiring Discord membership', async ({page}) => {
+test('community management stays secondary behind the active-space selector', async ({page}) => {
   await page.setViewportSize({width:390,height:844});
   await openAndCheck(page, '/lmu/');
-  const communities = page.getByRole('button',{name:'Communautés',exact:true}).first();
-  await expect(communities).toBeVisible();
-  await communities.click();
-  await expect(page.getByRole('heading',{name:'Trouve ton paddock',exact:true})).toBeVisible();
-  await expect(page.getByRole('heading',{name:'Communautés disponibles',exact:true})).toBeVisible();
-  await expect(page.getByText('sans obligation de passer par Discord',{exact:false})).toBeVisible();
+  const context = page.locator('.nav-community-context').first();
+  await expect(context).toBeVisible();
+  await context.locator('summary').click();
+  const manage = context.getByRole('button',{name:'Gérer ou découvrir des communautés',exact:true});
+  await expect(manage).toBeVisible();
+  await manage.click();
+  await expect(page.getByRole('heading',{name:'Communautés',exact:true})).toBeVisible();
+  await expect(page.getByText('Ton espace actif se choisit depuis la barre principale',{exact:false})).toBeVisible();
+  await expect(page.getByText('Découvrir d’autres communautés',{exact:false})).toBeVisible();
   await expect(page.locator('[data-ux-error-modal]')).toHaveCount(0);
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
-  expect(overflow,'community directory overflows horizontally').toBeLessThanOrEqual(1);
+  expect(overflow,'community management overflows horizontally').toBeLessThanOrEqual(1);
   expect(apiFailures).toEqual([]);
 });
 
