@@ -3,6 +3,10 @@ import {eventSchedule} from './schedule.mjs';
 import {getLocale,localeTag} from './i18n.mjs';
 
 const grid = document.getElementById('game-grid');
+const communityPicker = document.getElementById('community-picker');
+let selectedCommunityId = '';
+let sessionState = {organizations:{team:null,communities:[],discoverableCommunities:[],preferredCommunityId:null}};
+let cachedEvents = {lmu:[],iracing:[]};
 const formatter = new Intl.DateTimeFormat(localeTag(), {
   timeZone:'Europe/Paris',
   weekday:'short',
@@ -134,15 +138,91 @@ function enduranceQueueMarkup(items, game) {
   return `<div class="hub-race-queue">${items.map(item=>enduranceMarkup(item,game)).join('')}</div>`;
 }
 
-function gameCard(game, events) {
+function gameCard(game, events, communityId='') {
   const catalog = GAME_CATALOGS[game];
-  const href = game === 'lmu' ? '/lmu/' : '/iracing/';
+  const base = game === 'lmu' ? '/lmu/' : '/iracing/';
+  const href = communityId ? `${base}?community=${encodeURIComponent(communityId)}` : base;
   const badge = game === 'lmu' ? 'LMU' : 'iR';
   return `<article class="game-hub-card game-${game}">
     <div class="game-hub-heading"><div class="game-title-line"><span class="game-badge" aria-hidden="true">${badge}</span><h2>${esc(catalog.name)}</h2></div><p>${game === 'lmu' ? 'Hypercar, prototypes et GT de Le Mans Ultimate.' : 'GTP, LMP2, GT3, GT4 et TCR avec un catalogue de circuits étendu.'}</p></div>
     <a class="game-hub-enter" href="${href}">Accéder à ${esc(catalog.shortName)} <span aria-hidden="true">→</span></a>
     ${enduranceQueueMarkup(homeQueue(events,game),game)}
   </article>`;
+}
+
+
+function knownCommunities(organizations={}) {
+  const map = new Map();
+  for (const community of [...(organizations.communities || []), ...(organizations.discoverableCommunities || [])]) map.set(community.id, community);
+  return [...map.values()];
+}
+
+function communityInitials(name) {
+  return String(name || 'EM').split(/\s+/).filter(Boolean).slice(0,2).map(part=>part[0]).join('').toUpperCase();
+}
+
+function communityMark(community) {
+  const logo=community?.branding?.logoUrl;
+  return logo
+    ? `<span class="hub-community-mark has-image"><img src="${esc(logo)}" alt="" referrerpolicy="no-referrer"></span>`
+    : `<span class="hub-community-mark" aria-hidden="true">${esc(community ? communityInitials(community.name) : 'EM')}</span>`;
+}
+
+function scopedEvents(events, communityId) {
+  return (events || []).filter(event => communityId ? event.organizationId === communityId : !event.organizationId);
+}
+
+function resolveCommunity(organizations={}) {
+  const requested=new URLSearchParams(location.search).get('community') || '';
+  const known=knownCommunities(organizations);
+  if (requested && known.some(item=>item.id===requested)) return requested;
+  const preferred=organizations.preferredCommunityId;
+  if (preferred && (organizations.communities || []).some(item=>item.id===preferred)) return preferred;
+  const joined=organizations.communities || [];
+  return joined.length===1 ? joined[0].id : '';
+}
+
+function communityOption(community) {
+  const id=community?.id || '';
+  const active=id===selectedCommunityId;
+  const subtitle=community
+    ? (community.id===sessionState.organizations?.preferredCommunityId ? 'Communauté par défaut' : (community.role ? 'Membre' : 'Communauté publique'))
+    : 'Endurances indépendantes';
+  return `<button type="button" class="hub-community-option ${active?'is-active':''}" data-hub-community="${esc(id)}" aria-pressed="${active}">
+    ${communityMark(community)}
+    <span><strong>${esc(community?.name || 'Endurance Manager')}</strong><small>${esc(subtitle)}</small></span>
+    <b aria-hidden="true">${active?'✓':'›'}</b>
+  </button>`;
+}
+
+function renderCommunityPicker() {
+  if (!communityPicker) return;
+  const organizations=sessionState.organizations || {};
+  const joined=[...(organizations.communities || [])];
+  const requested=new URLSearchParams(location.search).get('community') || '';
+  const requestedCommunity=knownCommunities(organizations).find(item=>item.id===requested) || null;
+  const choices=requestedCommunity && !joined.some(item=>item.id===requestedCommunity.id)
+    ? [requestedCommunity, ...joined]
+    : joined;
+  const params=new URLSearchParams();
+  params.set('communities','1');
+  if (selectedCommunityId) params.set('community',selectedCommunityId);
+  communityPicker.innerHTML=`<div class="hub-community-options">
+      ${communityOption(null)}
+      ${choices.map(communityOption).join('')}
+    </div>
+    <a class="hub-community-manage" href="/lmu/?${params.toString()}">Gérer ou découvrir des communautés</a>`;
+}
+
+function renderGames() {
+  grid.innerHTML = gameCard('lmu',scopedEvents(cachedEvents.lmu,selectedCommunityId),selectedCommunityId)
+    + gameCard('iracing',scopedEvents(cachedEvents.iracing,selectedCommunityId),selectedCommunityId);
+}
+
+async function fetchSession() {
+  const response=await fetch('/api/session',{credentials:'same-origin',cache:'no-store',headers:{Accept:'application/json'}});
+  if(!response.ok) throw new Error('session');
+  return response.json();
 }
 
 async function fetchGameEvents(game) {
@@ -153,14 +233,33 @@ async function fetchGameEvents(game) {
 }
 
 async function load() {
-  try {
-    const [lmuEvents,iracingEvents] = await Promise.all([fetchGameEvents('lmu'),fetchGameEvents('iracing')]);
-    grid.innerHTML = gameCard('lmu',lmuEvents) + gameCard('iracing',iracingEvents);
-  } catch {
-    grid.innerHTML = gameCard('lmu',[]) + gameCard('iracing',[]);
-    const notice = document.getElementById('hub-status');
-    if (notice) notice.textContent = 'Le récapitulatif des prochaines endurances est momentanément indisponible. Les espaces restent accessibles.';
+  const notice=document.getElementById('hub-status');
+  const [sessionResult,lmuResult,iracingResult]=await Promise.allSettled([
+    fetchSession(),
+    fetchGameEvents('lmu'),
+    fetchGameEvents('iracing')
+  ]);
+  if(sessionResult.status==='fulfilled') sessionState=sessionResult.value || sessionState;
+  cachedEvents.lmu=lmuResult.status==='fulfilled'?lmuResult.value:[];
+  cachedEvents.iracing=iracingResult.status==='fulfilled'?iracingResult.value:[];
+  selectedCommunityId=resolveCommunity(sessionState.organizations || {});
+  renderCommunityPicker();
+  renderGames();
+  if(notice && (lmuResult.status==='rejected' || iracingResult.status==='rejected')) {
+    notice.textContent='Le récapitulatif des prochaines endurances est momentanément indisponible. Les espaces restent accessibles.';
   }
 }
+
+communityPicker?.addEventListener('click',event=>{
+  const button=event.target.closest?.('[data-hub-community]');
+  if(!button)return;
+  selectedCommunityId=String(button.dataset.hubCommunity || '');
+  const url=new URL(location.href);
+  if(selectedCommunityId)url.searchParams.set('community',selectedCommunityId);
+  else url.searchParams.delete('community');
+  history.replaceState(null,'',url.pathname+(url.search||''));
+  renderCommunityPicker();
+  renderGames();
+});
 
 void load();
