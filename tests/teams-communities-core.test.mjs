@@ -103,7 +103,7 @@ test('les gérants peuvent personnaliser leur espace sans créer un moteur de th
   assert.match(directory,/Webhook du salon récapitulatif/);
   assert.match(directory,/community-setup-steps/);
   assert.match(directory,/Mode développeur/);
-  assert.match(directory,/Ouvre uniquement la partie que tu souhaites modifier/);
+  assert.match(directory,/Ouvre cette partie uniquement si tu veux utiliser d’autres visuels/);
   assert.match(directoryCss,/input:not\(\[type="checkbox"\]\)/);
   assert.match(directoryCss,/\.community-choice-group input/);
 });

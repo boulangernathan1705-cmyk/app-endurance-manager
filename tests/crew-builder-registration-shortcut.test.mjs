@@ -26,6 +26,6 @@ test('la création et la gestion d’équipage ouvrent l’inscription pilote da
   assert.match(css,/\.registration-modal-backdrop\s*\{[\s\S]*?position:\s*fixed/);
   assert.match(css,/\.registration-modal-panel[\s\S]*?100dvh/);
   assert.match(css,/body\.registration-modal-open/);
-  assert.match(html,/crew-builder-registration-shortcut\.mjs\?v=6-community-only/);
+  assert.match(html,/crew-builder-registration-shortcut\.mjs\?v=14-tondeuz-tool/);
   assert.match(html,/crew-builder-registration-shortcut\.css\?v=2-modal/);
 });

@@ -88,7 +88,7 @@ function openModal(trigger){
   const root=document.createElement('div');
   root.className='registration-modal-backdrop';
   root.dataset.registrationModal='true';
-  const contextHelp=activeBuilder.mode==='create'?'<p>Ajoute le pilote à ce départ sans quitter la création de l’équipage. L’inscription sera partagée avec l’espace choisi pour cet équipage.</p>':'';
+  const contextHelp=activeBuilder.mode==='create'?'<p>Ajoute le pilote à ce départ sans quitter la création de l’équipage.</p>':'';
   root.innerHTML=`<section class="registration-modal-panel" role="dialog" aria-modal="true" aria-labelledby="registration-modal-title">
     <div class="registration-modal-header"><div><span class="creation-kicker">INSCRIPTION PILOTE</span><h2 id="registration-modal-title">Inscrire un autre pilote</h2>${contextHelp}</div><button type="button" class="secondary-button registration-modal-close" data-registration-modal-close aria-label="Fermer l’inscription">Fermer</button></div>
     <div class="registration-modal-content" data-registration-modal-content></div>
