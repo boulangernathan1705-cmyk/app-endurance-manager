@@ -28,12 +28,19 @@ function canCreateCrewOnDeparture(event,departure){
   return (departure.availability||[]).some(reg=>reg.mine&&reg.status!=='unavailable'&&!reg.engaged);
 }
 
+function registrationLoginHref(event,departure){
+  const url=new URL(location.href);
+  url.searchParams.set('event',event.id);
+  url.searchParams.set('departure',departure.id);
+  return '/api/auth/discord?return='+encodeURIComponent(url.pathname+url.search);
+}
+
 export function renderDeparturePanel(event,departure,index,open=false,{isPast=false,rawEvent=event,rawDeparture=departure}={}){
   const locked=departure.startsAt<=Date.now(),crews=departure.crews||[],available=pilotCount(departure.availability),own=ownRegistration(rawDeparture),editorOpen=state.registrationOpen.has(departure.id),canCreateCrew=canCreateCrewOnDeparture(rawEvent,rawDeparture);
   const createCrewAction=canCreateCrew?`<button type="button" class="secondary-button ux-summary-create-crew" data-crew-builder-open data-departure="${departure.id}">Créer un équipage</button>`:'';
   const selfAction=state.user
     ? button('my-registration',own?'Modifier mon inscription':'S’inscrire',`data-departure="${departure.id}"`,'primary-button ux-summary-registration-toggle')
-    : `<a class="primary-button ux-summary-registration-toggle" href="/api/auth/discord?return=${encodeURIComponent(location.pathname+location.search)}">Se connecter pour s’inscrire</a>`;
+    : `<a class="primary-button ux-summary-registration-toggle" href="${esc(registrationLoginHref(event,departure))}">Se connecter pour s’inscrire</a>`;
   const actions=locked?'':`<span class="ux-summary-registration-actions${canCreateCrew?' is-three-actions':''}">${selfAction}${state.user?button('new-registration','Inscrire un autre pilote',`data-departure="${departure.id}" data-mode="pilot"`,'secondary-button ux-summary-registration-other'):''}${createCrewAction}</span>`;
   const participation=renderPilots(event,departure);
   return `<details class="departure-fold${isPast?' is-past':''}" id="departure-${departure.id}" ${open?'open':''}><summary><span class="fold-index">${String(index+1).padStart(2,'0')}</span><span class="fold-date"><strong class="ux-departure-title">Départ ${esc(departure.time)}</strong><span class="ux-departure-date">${esc(dateLabel(departure))}${locked?' · Départ passé':''}</span></span><span class="fold-meta">${available} pilote${available>1?'s':''} · ${crews.length} équipage${crews.length>1?'s':''}</span>${actions}</summary><div class="departure-fold-body">${locked?'<p class="finished-history">Les inscriptions sont verrouillées. Les équipages restent consultables ci-dessous.</p>':`<section class="fold-section fold-registration" ${editorOpen?'':'hidden'}>${renderRegistrationWorkspace(rawEvent,rawDeparture)}</section>`}<section class="fold-section departure-participation-section">${participation}</section></div></details>`;
