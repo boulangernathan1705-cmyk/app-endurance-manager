@@ -14,7 +14,7 @@ async function ensureOrganization(env,user,definition){
       .bind(definition.id,definition.name,definition.nameKey,user.id,createdAt).run();
     organization={id:definition.id,owner_user_id:user.id};
   }else if(organization.id===definition.id){
-    await env.DB.prepare("UPDATE organizations SET type='community',name=?,name_key=?,visibility='private',join_mode='invite' WHERE id=?")
+    await env.DB.prepare("UPDATE organizations SET type='community',name=?,name_key=? WHERE id=?")
       .bind(definition.name,definition.nameKey,definition.id).run();
   }
   const existing=await env.DB.prepare('SELECT role FROM organization_members WHERE organization_id=? AND user_id=?')
