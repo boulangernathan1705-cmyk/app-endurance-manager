@@ -675,37 +675,35 @@ body:has([data-crew-builder-overlay]) { overflow: hidden; }
   .registration-summary-row > strong { font-size: 14px; }
 }
 
-/* ---------- Équipage ouvert : reste dans sa tuile, barres fines ---------- */
-html[data-game] #app .crew-card-shell:has(> details[open]) { grid-column: auto !important; }
+/* ---------- Équipage ouvert : deux colonnes, heures lisibles ---------- */
+@media (min-width: 900px) {
+  html[data-game] #app .crew-card-shell:has(> details[open]) { grid-column: span 2 !important; }
+}
+@media (max-width: 899px) {
+  html[data-game] #app .crew-card-shell:has(> details[open]) { grid-column: 1 / -1 !important; }
+}
 html[data-game] #app .ux-course-crews-body:has(details[open]) { align-items: start !important; }
+/* Tuiles fermées : même hauteur (place pour trois pilotes), même quand une autre est ouverte. */
+html[data-game] #app .crew-tile-summary .crew-compact-pilots { min-height: calc(3 * 1.45em); }
 html[data-game] #app .crew-card-shell > details[open] .crew-tile-summary .crew-compact-pilots { display: none !important; }
-html[data-game] #app .crew-unified-body { display: flex !important; flex-direction: column; gap: 8px; padding: 2px 14px 10px !important; }
+
+html[data-game] #app .crew-unified-body { display: flex !important; flex-direction: column; gap: 6px; padding: 2px 16px 12px !important; }
 html[data-game] #app .crew-unified-body .crew-inline-management { display: flex !important; align-items: center; gap: 8px; padding: 4px 0 !important; font-size: 13px; }
+html[data-game] #app .crew-unified-body .crew-inline-management .coverage-summary { display: none !important; }
 html[data-game] #app .crew-unified-body .crew-state-select { min-height: 32px !important; padding: 0 26px 0 10px !important; font-size: 13px !important; }
 
-/* Une ligne par pilote : nom, puis une barre fine de ses heures. */
-html[data-game] #app .crew-unified-body .pilot-row {
-  display: grid !important;
-  gap: 4px !important;
-  padding: 6px 0 !important;
-  grid-template-columns: minmax(0, 1fr) !important;
-}
+/* Une ligne par pilote : nom, puis sa frise avec les heures. */
+html[data-game] #app .crew-unified-body .pilot-row { display: grid !important; gap: 4px !important; padding: 8px 0 !important; grid-template-columns: minmax(0, 1fr) !important; }
 html[data-game] #app .crew-unified-body .pilot-main { display: flex !important; align-items: center; gap: 6px; min-width: 0; }
 html[data-game] #app .crew-unified-body .pilot-name { font-size: 14.5px !important; color: #e6ecea !important; }
 html[data-game] #app .crew-unified-body .pilot-category-logo { display: none !important; }
-
-/* Frises compactes dans l'équipage : pas de graduation, pas de « Départ / Arrivée ». */
-html[data-game] #app .crew-unified-body .presence-timeline { margin: 0 !important; padding: 0 !important; min-width: 0 !important; overflow: visible !important; }
+html[data-game] #app .crew-unified-body .presence-timeline { margin: 0 !important; }
 html[data-game] #app .crew-unified-body .presence-edges { display: none !important; }
-html[data-game] #app .crew-unified-body .presence-scale { display: none !important; }
-html[data-game] #app .crew-unified-body .presence-track { height: 8px !important; min-height: 0 !important; border-radius: 4px !important; overflow: hidden; min-width: 0 !important; }
-html[data-game] #app .crew-unified-body .presence-segment { min-height: 0 !important; height: 8px !important; font-size: 0 !important; padding: 0 !important; }
-
-/* Couverture de l'équipage : une barre un peu plus haute, avec l'heure de début et de fin. */
-html[data-game] #app .crew-unified-body .presence-timeline.is-coverage { display: grid !important; gap: 3px; margin-top: 4px !important; }
+html[data-game] #app .crew-unified-body .presence-track { height: 14px !important; min-height: 0 !important; border-radius: 4px !important; }
+html[data-game] #app .crew-unified-body .presence-timeline:not(.is-coverage) .presence-segment { min-height: 0 !important; height: 14px !important; font-size: 0 !important; }
 html[data-game] #app .crew-unified-body .presence-timeline.is-coverage .presence-track,
-html[data-game] #app .crew-unified-body .presence-timeline.is-coverage .presence-segment { height: 12px !important; }
+html[data-game] #app .crew-unified-body .presence-timeline.is-coverage .presence-segment { height: 22px !important; min-height: 0 !important; font-size: 11px !important; }
+
 html[data-game] #app .crew-coverage-block { display: grid; gap: 4px; margin-top: 4px; padding-top: 8px; border-top: 1px solid var(--border, #292d31); }
 html[data-game] #app .crew-coverage-title { font-size: 12.5px; color: var(--muted, #92979c); }
-html[data-game] #app .crew-coverage-edges { display: flex; justify-content: space-between; font-size: 11.5px; color: var(--muted, #92979c); }
-html[data-game] #app .crew-unified-body .crew-inline-management .coverage-summary { display: none !important; }
+html[data-game] #app .crew-coverage-edges { display: none; }
