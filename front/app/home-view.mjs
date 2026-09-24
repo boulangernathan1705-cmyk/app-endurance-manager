@@ -1,6 +1,6 @@
-import {app,nav,state,esc,button,canManage,eventTypeBadge,eventBadge,eventCategoryCount,pilotCount,circuitVisual,dateLabel,countdown,groupEvents,notifyRender,notifyNav} from './core.mjs?v=12-site-tool';
+import {app,nav,state,esc,button,canManage,eventTypeBadge,eventBadge,eventCategoryCount,pilotCount,circuitVisual,dateLabel,countdown,groupEvents,notifyRender,notifyNav} from './core.mjs?v=13-tondeuz-tool';
 import {getLocale,localeTag} from '../i18n.mjs';
-import {communityById} from './organization-context.mjs?v=7-community-only';
+import {communityById} from './organization-context.mjs?v=13-tondeuz-tool';
 
 const compactDateFormatter=new Intl.DateTimeFormat(localeTag(),{timeZone:'Europe/Paris',day:'2-digit',month:'2-digit'});
 const CREW_COLORS=['#52d3d8','#f3b33d','#ec5b67','#75d66b','#8b7cf6','#e47adf','#58a6ff','#f28f45'];
