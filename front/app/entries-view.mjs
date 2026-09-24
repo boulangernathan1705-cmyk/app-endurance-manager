@@ -10,9 +10,9 @@ import {
   notifyRender,
   logo,
   categories
-} from './core.mjs?v=12-site-tool';
+} from './core.mjs?v=13-tondeuz-tool';
 import {getLocale,localeTag} from '../i18n.mjs';
-import {scopeDeparture,registrationAudienceIds,organizationAudienceLabels,communityById} from './organization-context.mjs?v=7-community-only';
+import {scopeDeparture,registrationAudienceIds,organizationAudienceLabels,communityById} from './organization-context.mjs?v=13-tondeuz-tool';
 
 const dateFormat = new Intl.DateTimeFormat(localeTag(), {
   timeZone:'Europe/Paris',
