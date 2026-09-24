@@ -1,13 +1,12 @@
 import {app,state,api,load,showError,countdown,CARS} from './core.mjs?v=12-site-tool';
 import {renderNav,renderHome} from './home-view.mjs?v=16-site-tool';
-import {renderCommunities} from './community-directory.mjs?v=13-site-tool';
 import {renderEvent} from './event-view.mjs?v=23-site-tool';
 import {renderEventForm,departureFields,updateRemoveButtons} from './event-form.mjs?v=6-site-tool';
 import {renderMyEntries} from './entries-view.mjs?v=10-site-tool';
 import {refresh,refreshAfterSave} from './refresh.mjs?v=7-site-tool';
 import {draftFor,registrationDraft,ownRegistrations,rerenderRegistrationSection,submitRegistration} from './registration.mjs?v=10-site-tool';
 import {updateCrewState} from './crews.mjs?v=16-site-tool';
-import {GENERAL_AUDIENCE,defaultRegistrationAudienceIds,registrationAudienceIds,communityById} from './organization-context.mjs?v=7-community-only';
+import {GENERAL_AUDIENCE,defaultRegistrationAudienceIds,registrationAudienceIds} from './organization-context.mjs?v=7-community-only';
 
 async function submitEvent(form){
   const data={name:form.elements.eventName.value.trim(),durationHours:Number(form.elements.eventDuration.value),eventType:form.elements.eventType.value,circuit:form.elements.eventCircuit.value,organizationId:form.elements.eventOrganization?.value||null,categories:[...form.querySelectorAll('[name="eventCategory"]:checked')].map(input=>input.value),departures:[...form.querySelectorAll('.departure-field')].map(row=>({id:row.dataset.id||undefined,date:row.querySelector('[name="date"]').value,time:row.querySelector('[name="time"]').value})),version:state.editingEvent?.version};
@@ -65,7 +64,12 @@ async function perform(action,target){
   const event=state.events.find(item=>item.id===state.currentEventId);
   switch(action){
     case 'dismiss-error': document.querySelector('[data-ux-error-modal]')?.remove(); break;
-    case 'home': state.eventCreationOrganizationId=null;renderHome(); break;
+    case 'home': {
+      state.eventCreationOrganizationId=null;
+      const url=new URL(location.href);url.searchParams.delete('event');url.searchParams.delete('departure');
+      history.replaceState(null,'',url.pathname+(url.search||''));
+      renderHome();break;
+    }
     case 'event-filter': state.eventFilter=target.dataset.filter||'upcoming'; renderHome(); break;
     case 'refresh': await refresh(); break;
     case 'open': { const nextEvent=state.events.find(item=>item.id===target.dataset.id);state.currentEventId=target.dataset.id;state.selectedDepartureId=target.dataset.departure||null;state.eventSection='race';state.drafts={};state.pendingCrewJoin=null;state.registrationOpen.clear();if(nextEvent?.organizationId){state.activeOrganizationId=nextEvent.organizationId;state.visibleAudienceIds=new Set([nextEvent.organizationId]);}renderEvent();break; }
@@ -110,28 +114,6 @@ async function perform(action,target){
     case 'remove-departure': if(app.querySelectorAll('.departure-field').length>1)target.closest('.departure-field').remove();updateRemoveButtons();break;
     case 'delete-event': if(!confirm(`Supprimer « ${event.name} » et toutes ses inscriptions ? Cette suppression est définitive.`))return;await api(`/api/events/${event.id}`,'DELETE',{version:event.version,organizationId:event.organizationId||null});state.page='home';state.eventCreationOrganizationId=null;await refreshAfterSave('Événement supprimé.');break;
     case 'my-entries': await load();renderNav();renderMyEntries();break;
-    case 'community-switch': {
-      const communityId=String(target.dataset.communityId||'').trim();
-      const community=communityId?communityById(state.organizations,communityId):null;
-      if(communityId&&!community)throw Error('Cette communauté n’est plus disponible.');
-      if(communityId&&!community?.role){renderCommunities(communityId);break;}
-      if(state.user){
-        await api('/api/organizations/preferred','PATCH',{organizationId:communityId||null});
-        state.organizations.preferredCommunityId=communityId||null;
-      }
-      state.activeCommunityId=communityId||null;
-      state.activeOrganizationId=state.activeCommunityId;
-      state.visibleAudienceIds=new Set([state.activeCommunityId||GENERAL_AUDIENCE]);
-      const url=new URL(location.href);
-      url.searchParams.set('community',state.activeCommunityId||'general');
-      url.searchParams.delete('auth');
-      history.replaceState(null,'',url.pathname+(url.search||''));
-      renderNav();renderHome();break;
-    }
-    case 'communities': {
-      const focus=target.dataset.communityId||state.activeCommunityId||null;
-      location.assign('/communities.html'+(focus?'?community='+encodeURIComponent(focus):''));break;
-    }
     case 'guest-link': state.recoveryLink=(await api('/api/guest/link','POST')).link;state.page==='event'?renderEvent():renderHome();break;
     case 'copy-link':
       try{await navigator.clipboard.writeText(state.recoveryLink);target.textContent='Lien copié';}
@@ -162,13 +144,13 @@ async function start(){
     if(authError){const url=new URL(location.href);url.searchParams.delete('auth');history.replaceState(null,'',url.pathname+(url.search||''));state.flash='La connexion Discord n’a pas abouti. Tu peux réessayer.';}
     await load();renderNav();
     const params=new URLSearchParams(location.search);
-    const requested=state.requestedCommunityId?communityById(state.organizations,state.requestedCommunityId):null;
-    if(params.get('communities')==='1'){
-      params.delete('communities');
-      history.replaceState(null,'',location.pathname+(params.toString()?`?${params.toString()}`:''));
-      renderCommunities(requested?.id||state.activeCommunityId||null);
-    }else if(requested&&!requested.role)renderCommunities(requested.id);
-    else renderHome(state.flash);
+    const eventId=params.get('event');
+    const directEvent=eventId?state.events.find(item=>item.id===eventId):null;
+    if(directEvent){
+      state.currentEventId=directEvent.id;
+      state.selectedDepartureId=params.get('departure')||null;
+      renderEvent(state.flash);
+    }else renderHome(state.flash);
   }catch(error){app.innerHTML='<h1 class="page-title">ENDURANCE MANAGER</h1>';showError(error);}
 }
 start();
