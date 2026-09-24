@@ -5,6 +5,8 @@ function contentSummary(title,count){return `<summary class="ux-content-accordio
 function statusPill(crew){return `<span class="crew-compact-status ${crew.locked?'is-complete':'is-open'}">${crew.locked?'Complet':'Places libres'}</span>`;}
 function coverage(event,departure,regs){const duration=event.durationHours||6;const counts=Array.from({length:duration},(_,i)=>regs.filter(reg=>coversHour(reg,i)).length);const covered=counts.filter(Boolean).length;return{duration,counts,covered,missing:Math.max(0,duration-covered)};}
 
+function endTime(departure,duration){const [hours,minutes]=String(departure.time||'0:00').split(':').map(Number);return `${String(((hours||0)+duration)%24).padStart(2,'0')}:${String(minutes||0).padStart(2,'0')}`;}
+
 function stateControl(crew,departure){return `<div class="crew-state-control"><span class="crew-state-lock" aria-hidden="true">${crew.locked?'🔒':'🔓'}</span><label class="crew-state-select-wrap"><span class="sr-only">État de l’équipage</span><select class="crew-state-select" data-crew-state-select data-crew-id="${crew.id}" data-departure="${departure.id}" data-version="${crew.version}"><option value="open" ${crew.locked?'':'selected'}>Ouvert</option><option value="locked" ${crew.locked?'selected':''}>Complet</option></select><span class="crew-state-chevron" aria-hidden="true">▾</span></label></div>`;}
 
 function crewActions(crew,departure,ownMember,joinRegistration,memberElsewhere){
@@ -48,7 +50,7 @@ function crewCard(event,departure,crew,index,unassigned,allCrews){
       <div class="crew-pilot-accordion-body crew-unified-body">
         ${management}
         ${memberCards}
-        ${renderAvailabilityTimeline({departure,duration:cov.duration,counts:cov.counts,label:'Disponibilité de l’équipage'})}
+        <div class="crew-coverage-block"><span class="crew-coverage-title">Couverture de l’équipage · ${cov.covered}/${cov.duration} h</span>${renderAvailabilityTimeline({departure,duration:cov.duration,counts:cov.counts,label:'Disponibilité de l’équipage'})}<span class="crew-coverage-edges"><span>${esc(departure.time||'')}</span><span>${esc(endTime(departure,cov.duration))}</span></span></div>
       </div>
     </details>
     ${actions}
