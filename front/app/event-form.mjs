@@ -57,7 +57,7 @@ export function renderEventForm(event=null,{organizationId=state.eventCreationOr
           <span class="creation-step">01</span>
           <div>
             <h2>Informations générales</h2>
-            <p>Le nom, l’espace, le format et le circuit apparaîtront dans le récapitulatif.</p>
+            <p>Le nom, le format et le circuit apparaîtront dans le récapitulatif.</p>
           </div>
         </div>
         <div class="creation-field-grid">
@@ -84,7 +84,7 @@ export function renderEventForm(event=null,{organizationId=state.eventCreationOr
         ${button('add-departure','+ Ajouter un départ','','secondary-button add-departure-button')}
       </fieldset>
 
-      ${event?'<p class="creation-help">L’espace d’une endurance reste fixe après sa création. Un départ avec des inscrits ne peut pas être supprimé, ni une catégorie encore utilisée.</p>':''}
+      ${event?'<p class="creation-help">Un départ avec des inscrits ne peut pas être supprimé, ni une catégorie encore utilisée.</p>':''}
       <div class="creation-actions"><button type="submit" class="primary-button">${event?'ENREGISTRER LES MODIFICATIONS':'CRÉER L’ÉVÉNEMENT'}</button></div>
     </form>`;
   updateRemoveButtons();
