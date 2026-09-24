@@ -36,10 +36,7 @@ function communityMark(community,css=''){
     ? `<span class="community-context-mark ${css}"><img src="${esc(logo)}" alt="" loading="lazy" referrerpolicy="no-referrer"></span>`
     : `<span class="community-context-mark is-fallback ${css}" aria-hidden="true">${esc(initials(community?.name||'Endurance Manager'))}</span>`;
 }
-function contextQuery(communityId=state.activeCommunityId){
-  if(communityId)return`?community=${encodeURIComponent(communityId)}`;
-  return new URLSearchParams(location.search).get('community')==='general'?'?community=general':'';
-}
+
 function communityContextMarkup(){
   const active=activeCommunity();
   const joined=state.organizations?.communities||[];
@@ -92,8 +89,7 @@ function crewSummary(event,{includePast=false}={}){
   return `<span class="event-home-crews"><span class="crew-summary-heading"><strong>${rows.length} équipage${rows.length>1?'s':''}</strong><span>engagé${rows.length>1?'s':''}</span></span><span class="crew-summary-list">${rows.map((row,index)=>{const color=CREW_COLORS[index%CREW_COLORS.length];return `<span class="crew-summary-card ${row.locked?'is-complete':'is-open'}">${crewIcon(color)}<span class="crew-summary-main"><span class="crew-summary-title"><strong style="color:${color}">${esc(row.name)}</strong><b>${esc(displayTime(row.time))}</b></span><small>${esc(row.category)}${row.car?` · ${esc(row.car)}`:''}</small></span><span class="crew-summary-pilots">${row.pilots.length?esc(row.pilots.join(' · ')):'Aucun pilote affecté'}</span></span>`;}).join('')}</span></span>`;
 }
 export function renderNav(){
-  const query=contextQuery();
-  nav.innerHTML=`${button('home','Événements')}${button('my-entries','Mes inscriptions')}<div class="nav-game-switcher" aria-label="Changer de simulateur"><a class="nav-game-switcher-button nav-game-switcher-lmu" href="/lmu/${query}">Le Mans Ultimate</a><a class="nav-game-switcher-button nav-game-switcher-iracing" href="/iracing/${query}">iRacing</a></div>`;
+  nav.innerHTML=`${button('home','Événements')}${button('my-entries','Mes inscriptions')}<div class="nav-game-switcher" aria-label="Changer de simulateur"><a class="nav-game-switcher-button nav-game-switcher-lmu" href="/lmu/">Le Mans Ultimate</a><a class="nav-game-switcher-button nav-game-switcher-iracing" href="/iracing/">iRacing</a></div>`;
   notifyNav();
 }
 
