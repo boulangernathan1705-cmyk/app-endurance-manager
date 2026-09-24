@@ -127,6 +127,8 @@ test('les communautés remplacent les anciennes Teams et chargent leurs membres 
   assert.match(front,/more-members/);
   assert.match(front,/refresh-members/);
   assert.doesNotMatch(front,/function eventList|ENDURANCES ·|Créer une endurance/);
+  assert.match(front,/function siteCommunity\(\)/);
+  assert.doesNotMatch(front,/Créer une communauté|Découvrir d’autres communautés|data-community-filter|toggle-create|data-community-action="join"|data-community-action="leave"/);
 });
 
 test('les courses Tondeuz et les anciennes courses générales restent visibles sans exposer les autres communautés',()=>{

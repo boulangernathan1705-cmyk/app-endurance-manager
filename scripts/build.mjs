@@ -108,7 +108,7 @@ await writeFile(new URL('help.html', out), productionHtml(sourceHelp));
 const gameHtml = productionHtml(sourceGame);
 // Reuse the shell and community editor, without simulator scripts or navigation.
 const communityHtml = gameHtml.replace(/<script\b[^>]*>[\s\S]*?<\/script>/g,'')
-  .replace('</head>','<script type="module" src="/front/community-settings-page.mjs?v=3-tondeuz-tool"></script>\n'+i18nScriptTag+'\n</head>')
+  .replace('</head>','<script type="module" src="/front/community-settings-page.mjs?v=4-tondeuz-tool"></script>\n'+i18nScriptTag+'\n</head>')
   .replace(/<div class="site-nav-shell">[\s\S]*?<main id="app">/, '<nav class="community-settings-nav" aria-label="Navigation principale"><a href="/">Accueil</a><a href="/communities.html" aria-current="page">Paramètres du site</a></nav><main id="app">')
   .replace('Chargement des événements…','Chargement des paramètres…');
 await writeFile(new URL('communities.html', out), communityHtml);
