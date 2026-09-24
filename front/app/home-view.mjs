@@ -37,29 +37,7 @@ function communityMark(community,css=''){
     : `<span class="community-context-mark is-fallback ${css}" aria-hidden="true">${esc(initials(community?.name||'Endurance Manager'))}</span>`;
 }
 
-function communityContextMarkup(){
-  const active=activeCommunity();
-  const joined=state.organizations?.communities||[];
-  const knownActive=active&&!joined.some(item=>item.id===active.id)?[active]:[];
-  const choices=[...knownActive,...joined];
-  return `<details class="nav-community-context" data-community-context>
-    <summary>
-      ${communityMark(active)}
-      <span class="community-context-copy"><small>${active?'COMMUNAUTÉ ACTIVE':'ESPACE'}</small><strong>${esc(active?.name||'Endurance Manager')}</strong></span>
-      <span class="community-context-chevron" aria-hidden="true">⌄</span>
-    </summary>
-    <div class="community-context-menu">
-      <button type="button" class="community-context-option ${active?'':'is-active'}" data-action="community-switch" data-community-id="">
-        <span class="community-context-mark is-fallback">EM</span><span><strong>Endurance Manager</strong><small>Endurances indépendantes</small></span>
-      </button>
-      ${choices.map(community=>`<button type="button" class="community-context-option ${community.id===active?.id?'is-active':''}" data-action="community-switch" data-community-id="${community.id}">
-        ${communityMark(community)}<span><strong>${esc(community.name)}</strong><small>${community.id===state.organizations?.preferredCommunityId?'Communauté par défaut':community.role?'Membre':'Découvrir'}</small></span>
-      </button>`).join('')}
-      <span class="community-context-separator" aria-hidden="true"></span>
-      <button type="button" class="community-context-manage" data-action="communities">Paramètres communautés</button>
-    </div>
-  </details>`;
-}
+
 function communityIdentity(){
   const community=activeCommunity();
   if(!community)return'';
