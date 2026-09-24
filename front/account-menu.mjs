@@ -118,7 +118,20 @@ function activateLegacyHashAction() {
   if (location.hash === '#help') location.replace('/help.html');
 }
 
+// Remember which race is open so Discord login can bring the pilot back to it.
+let currentView = null;
+document.addEventListener('endurance:render', event => { currentView = event.detail; });
+function loginReturnPath() {
+  const eventId = currentView?.page === 'event' ? String(currentView.eventId || '') : '';
+  return location.pathname + (/^[a-f0-9-]{36}$/.test(eventId) ? `#event=${eventId}` : '');
+}
+
 root?.addEventListener('click', async event => {
+  const login = event.target.closest('.account-discord-login');
+  if (login) {
+    login.href = `/api/auth/discord?return=${encodeURIComponent(loginReturnPath())}`;
+    return;
+  }
   const trigger = event.target.closest('.account-trigger');
   if (trigger) {
     const menu = trigger.closest('.account-menu');

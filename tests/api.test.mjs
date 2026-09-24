@@ -327,3 +327,22 @@ test('organizer-created crews stay ownerless across worker cold starts',async()=
  assert.equal(listed.hasOwner,false);assert.equal(listed.ownedByMe,false);assert.equal(listed.canManage,false);
  assert.equal(DB.db.prepare('SELECT owner_user_id o FROM crews WHERE id=?').get(crew.data.id).o,null);
 });
+test('Discord login returns to the same-site page and race it started from',async()=>{
+ const {req}=harness();
+ const eventId='12345678-1234-4123-8123-123456789abc';
+ async function loginFrom(returnValue,actor){
+  const start=await req('/api/auth/discord?return='+encodeURIComponent(returnValue),'GET',null,actor);assert.equal(start.status,302);
+  const state=new URL(start.response.headers.get('Location')).searchParams.get('state');
+  const realFetch=globalThis.fetch;
+  globalThis.fetch=async url=>new Response(JSON.stringify(String(url).endsWith('/token')?{access_token:'mock'}:{id:PILOT,username:'Pilote'}),{headers:{'Content-Type':'application/json'}});
+  try{
+   const callback=await req('/api/auth/discord/callback?code=test&state='+state,'GET',null,actor);
+   assert.match(callback.response.headers.getSetCookie().join('\n'),/__Host-fmt_return=; [^\n]*Max-Age=0/);
+   return callback.response.headers.get('Location');
+  }finally{globalThis.fetch=realFetch;}
+ }
+ assert.equal(await loginFrom('/lmu/#event='+eventId,'a'),ROOT+'/lmu/#event='+eventId);
+ assert.equal(await loginFrom('/iracing/','b'),ROOT+'/iracing/');
+ for(const [i,unsafe] of ['//evil.example/','https://evil.example/','/\\evil.example','/lmu/?next=//evil','/lmu/#event=<script>','javascript:alert(1)'].entries())
+  assert.equal(await loginFrom(unsafe,'c'+i),ROOT+'/',unsafe);
+});

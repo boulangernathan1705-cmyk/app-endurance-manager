@@ -5,6 +5,7 @@ const LEGACY_CAR_ALIASES = new Map([
 const COOKIE_SESSION = '__Host-fmt_session';
 const COOKIE_GUEST = '__Host-fmt_guest';
 const COOKIE_STATE = '__Host-fmt_oauth';
+const COOKIE_RETURN = '__Host-fmt_return';
 const DAY = 86400;
 class HttpError extends Error { constructor(status, message) { super(message); this.status = status; } }
 const fail = (status, message) => { throw new HttpError(status, message); };
@@ -125,6 +126,12 @@ async function cleanup(env) {
     env.DB.prepare('DELETE FROM rate_limits WHERE key IN (SELECT key FROM rate_limits WHERE expires_at<? LIMIT 500)').bind(timestamp)
   ]);
 }
+// Same-site page to reopen after Discord login: a plain path, optionally with the opened event.
+// Anything else (other hosts, protocol-relative URLs, query strings) falls back to the home page.
+function returnPath(value) {
+  const path = typeof value === 'string' ? value : '';
+  return path.length <= 200 && /^\/(?:[A-Za-z0-9._~-]+\/?)*(?:#event=[a-f0-9-]{36})?$/.test(path) ? path : '/';
+}
 function text(value, max, label) {
   if (typeof value !== 'string' || !value.trim() || value.trim().length > max) fail(400, `${label} : indique de 1 à ${max} caractères.`);
   return value.trim();
@@ -195,7 +202,7 @@ function validateRegistration(input, event) {
 }
 
 export {
-  LEGACY_CAR_ALIASES, COOKIE_SESSION, COOKIE_GUEST, COOKIE_STATE, DAY, HttpError, fail, now, id, token, hash, cookie,
+  LEGACY_CAR_ALIASES, COOKIE_SESSION, COOKIE_GUEST, COOKIE_STATE, COOKIE_RETURN, DAY, HttpError, fail, now, id, token, hash, cookie,
   setCookie, json, redirect, origin, requireDiscord, administrators, publicUser, requireRole, identity, owned, personal,
-  registrationSelect, registrationParticipant, body, rateLimit, cleanup, text, parisTimestamp, validateEvent, validateRegistration
+  registrationSelect, registrationParticipant, body, rateLimit, cleanup, returnPath, text, parisTimestamp, validateEvent, validateRegistration
 };

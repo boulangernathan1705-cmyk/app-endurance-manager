@@ -1,7 +1,7 @@
 import {
-  LEGACY_CAR_ALIASES, COOKIE_SESSION, COOKIE_GUEST, COOKIE_STATE, DAY, HttpError, fail, now, id, token, hash, cookie,
+  LEGACY_CAR_ALIASES, COOKIE_SESSION, COOKIE_GUEST, COOKIE_STATE, COOKIE_RETURN, DAY, HttpError, fail, now, id, token, hash, cookie,
   setCookie, json, redirect, origin, requireDiscord, administrators, publicUser, requireRole, identity, owned, personal,
-  registrationSelect, registrationParticipant, body, rateLimit, cleanup, text, validateEvent, validateRegistration
+  registrationSelect, registrationParticipant, body, rateLimit, cleanup, returnPath, text, validateEvent, validateRegistration
 } from './core.mjs';
 import {ingestClientError, clientErrorsApi} from './telemetry.mjs';
 async function eventById(env, eventId) {
@@ -94,15 +94,18 @@ async function oauthStart(request, env) {
   await env.DB.prepare('INSERT INTO oauth_states(state_hash,expires_at) VALUES(?,?)').bind(await hash(state), now() + 600).run();
   const auth = new URL('https://discord.com/oauth2/authorize');
   auth.search = new URLSearchParams({client_id:env.DISCORD_CLIENT_ID, response_type:'code', redirect_uri:origin(env) + '/api/auth/discord/callback', scope:'identify', state}).toString();
-  return redirect(auth.href, [setCookie(COOKIE_STATE, state, 600)]);
+  const back = returnPath(new URL(request.url).searchParams.get('return'));
+  return redirect(auth.href, [setCookie(COOKIE_STATE, state, 600), setCookie(COOKIE_RETURN, encodeURIComponent(back), 600)]);
 }
 async function oauthCallback(request, env) {
   requireDiscord(env);
   const url = new URL(request.url), state = url.searchParams.get('state');
-  const clear = setCookie(COOKIE_STATE, '', 0);
-  if (!state || !/^[a-f0-9]{64}$/.test(state) || state !== cookie(request, COOKIE_STATE)) return redirect(origin(env) + '/?auth=error', [clear]);
+  const clear = setCookie(COOKIE_STATE, '', 0), clearReturn = setCookie(COOKIE_RETURN, '', 0);
+  let back = '/';
+  try { back = returnPath(decodeURIComponent(cookie(request, COOKIE_RETURN))); } catch {}
+  if (!state || !/^[a-f0-9]{64}$/.test(state) || state !== cookie(request, COOKIE_STATE)) return redirect(origin(env) + '/?auth=error', [clear, clearReturn]);
   const row = await env.DB.prepare('DELETE FROM oauth_states WHERE state_hash=? AND expires_at>? RETURNING state_hash').bind(await hash(state), now()).first();
-  if (!row || !url.searchParams.get('code') || url.searchParams.has('error')) return redirect(origin(env) + '/?auth=error', [clear]);
+  if (!row || !url.searchParams.get('code') || url.searchParams.has('error')) return redirect(origin(env) + '/?auth=error', [clear, clearReturn]);
   try {
     const response = await fetch('https://discord.com/api/oauth2/token', {method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:new URLSearchParams({client_id:env.DISCORD_CLIENT_ID, client_secret:env.DISCORD_CLIENT_SECRET, grant_type:'authorization_code', code:url.searchParams.get('code'), redirect_uri:origin(env) + '/api/auth/discord/callback'}), signal:AbortSignal.timeout(10000)});
     if (!response.ok) throw Error('token');
@@ -128,9 +131,9 @@ async function oauthCallback(request, env) {
     const avatarCookie = avatarHash
       ? `fmt_discord_avatar=${encodeURIComponent(`${profile.id}:${avatarHash}`)}; Path=/; Secure; SameSite=Lax; Max-Age=${7 * DAY}`
       : 'fmt_discord_avatar=; Path=/; Secure; SameSite=Lax; Max-Age=0';
-    return redirect(origin(env) + '/', [clear, setCookie(COOKIE_SESSION, session, 7 * DAY), avatarCookie]);
+    return redirect(origin(env) + back, [clear, clearReturn, setCookie(COOKIE_SESSION, session, 7 * DAY), avatarCookie]);
   } catch {
-    return redirect(origin(env) + '/?auth=error', [clear]);
+    return redirect(origin(env) + '/?auth=error', [clear, clearReturn]);
   }
 }
 async function api(request, env) {

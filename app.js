@@ -1,5 +1,5 @@
 import {state} from './front/app/core.mjs';
 import {installCrewDepartureOpenState} from './front/crew-departure-open-state.mjs?v=1';
-import './front/app/actions.mjs?v=24-crew-departure-open-state';
+import './front/app/actions.mjs?v=25-login-return';
 
 installCrewDepartureOpenState(state);
