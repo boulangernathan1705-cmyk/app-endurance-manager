@@ -1,5 +1,5 @@
-import {state,api,CARS} from './app/core.mjs?v=12-site-tool';
-import {renderRegistrationForm,submitRegistration} from './app/registration.mjs?v=10-site-tool';
+import {state,api,CARS} from './app/core.mjs?v=13-tondeuz-tool';
+import {renderRegistrationForm,submitRegistration} from './app/registration.mjs?v=13-tondeuz-tool';
 
 let activeBuilder={mode:'',departureId:''};
 let modalState={departureId:'',category:''};
