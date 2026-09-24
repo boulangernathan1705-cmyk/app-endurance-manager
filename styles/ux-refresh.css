@@ -707,3 +707,83 @@ html[data-game] #app .crew-unified-body .presence-timeline.is-coverage .presence
 html[data-game] #app .crew-coverage-block { display: grid; gap: 4px; margin-top: 4px; padding-top: 8px; border-top: 1px solid var(--border, #292d31); }
 html[data-game] #app .crew-coverage-title { font-size: 12.5px; color: var(--muted, #92979c); }
 html[data-game] #app .crew-coverage-edges { display: none; }
+
+/* =====================================================================
+   Carte de course dans la liste : trois zones côte à côte
+   course (nom en valeur) | équipages | circuit
+   ===================================================================== */
+html[data-game] .event-card .event-card-layout {
+  display: grid !important;
+  grid-template-columns: minmax(240px, 30%) minmax(0, 1fr) 120px !important;
+  grid-template-areas: "main crews circuit" !important;
+  align-items: start !important;
+  gap: 18px 24px !important;
+  padding: 18px 20px !important;
+  min-height: 0 !important;
+}
+html[data-game] .event-card .event-card-main { grid-area: main; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; min-width: 0; }
+html[data-game] .event-card .event-card-crews { grid-area: crews; min-width: 0; display: block; }
+html[data-game] .event-card .event-card-layout > .circuit-visual {
+  grid-area: circuit;
+  position: static !important;
+  width: 120px !important;
+  height: 90px !important;
+  margin: 0 !important;
+  justify-self: end;
+  align-self: center;
+  opacity: .85;
+  transform: none !important;
+}
+html[data-game] .event-card .event-card-layout > .circuit-visual img { width: 100% !important; height: 100% !important; object-fit: contain !important; transform: none !important; }
+
+/* Le nom de la course en valeur. */
+html[data-game] .event-card .event-card-title-row { margin: 0 !important; }
+html[data-game] .event-card .event-name {
+  font-size: 26px !important;
+  line-height: 1.1 !important;
+  font-weight: 800 !important;
+  letter-spacing: .01em;
+  color: #f4f6f5 !important;
+}
+html[data-game] .event-card .event-compact-date { font-size: 15px !important; font-weight: 600 !important; color: #c7d0d4 !important; margin: 0 !important; }
+html[data-game] .event-card .event-info { display: flex !important; flex-direction: row !important; flex-wrap: wrap; align-items: center; gap: 6px 8px !important; margin: 0 !important; }
+html[data-game] .event-card .event-info .event-schedule-badge { margin-left: 0; }
+html[data-game] .event-card .event-pilot-count { color: var(--muted, #92979c) !important; font-size: 13px !important; }
+html[data-game] .event-card .event-card-main .event-category-badges { margin: 2px 0 0 !important; }
+
+/* Équipages : un petit titre, puis les tuiles. */
+html[data-game] .event-card .event-card-crews .event-home-crews { display: grid !important; gap: 8px !important; margin: 0 !important; padding: 0 !important; border: 0 !important; }
+html[data-game] .event-card .event-card-crews .crew-summary-heading { font-size: 13px !important; color: var(--muted, #92979c) !important; margin: 0 !important; }
+html[data-game] .event-card .event-card-crews .crew-summary-list { grid-template-columns: repeat(auto-fill, minmax(max(180px, calc((100% - 24px) / 3)), 1fr)) !important; }
+html[data-game] .event-card .event-card-no-crew {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 64px;
+  border: 1px dashed var(--border, #292d31);
+  border-radius: 10px;
+  color: var(--muted, #92979c);
+  font-size: 13.5px;
+}
+
+@media (max-width: 900px) {
+  html[data-game] .event-card .event-card-layout {
+    grid-template-columns: minmax(0, 1fr) 84px !important;
+    grid-template-areas: "main circuit" "crews crews" !important;
+    padding: 14px !important;
+    gap: 12px !important;
+  }
+  html[data-game] .event-card .event-card-layout > .circuit-visual { width: 84px !important; height: 64px !important; align-self: start; }
+  html[data-game] .event-card .event-name { font-size: 22px !important; }
+  html[data-game] .event-card .event-card-crews .crew-summary-list { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)) !important; }
+}
+/* L'ancienne carte réservait 292 px à droite pour le circuit : il fait maintenant partie de la grille. */
+html[data-game] .event-card.event-card-harmonized { padding: 0 !important; min-height: 0 !important; }
+html[data-game] .event-card .event-card-layout > .event-card-status { display: none !important; }
+html[data-game] .event-card .event-card-layout { grid-template-rows: auto !important; grid-auto-rows: 0 !important; }
+@media (max-width: 900px) { html[data-game] .event-card .event-card-layout { grid-template-rows: auto auto !important; } }
+@media (max-width: 600px) {
+  html[data-game] .event-card .event-card-crews .crew-summary-list { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 6px !important; }
+  html[data-game] .event-card .event-card-crews .crew-summary-card { padding: 8px 10px !important; }
+  html[data-game] .event-card .event-card-crews .crew-summary-title strong { font-size: 14px; }
+}
