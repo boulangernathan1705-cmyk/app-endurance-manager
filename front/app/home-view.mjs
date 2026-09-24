@@ -20,7 +20,7 @@ function registeredRaceStatus(event,now=Date.now()){
 function activeCommunity(){return communityById(state.organizations,state.activeCommunityId);}
 function contextEvents(){
   const communityId=state.activeCommunityId;
-  return (state.events||[]).filter(event=>communityId?event.organizationId===communityId:!event.organizationId);
+  return (state.events||[]).filter(event=>!event.organizationId||!communityId||event.organizationId===communityId);
 }
 function canManageContext(){
   const community=activeCommunity();
@@ -71,8 +71,8 @@ function communityIdentity(){
   return `<section class="community-home-identity"${style}>
     ${brand.bannerUrl?`<img class="community-home-banner" src="${esc(brand.bannerUrl)}" alt="" loading="eager" referrerpolicy="no-referrer">`:''}
     <span class="community-home-shade" aria-hidden="true"></span>
-    <div class="community-home-brand">${communityMark(community,'large')}<span><small>ESPACE COMMUNAUTAIRE</small><strong>${esc(community.name)}</strong><em>${Number(community.memberCount)||0} membre${Number(community.memberCount)===1?'':'s'}${community.discord?.linked?` · Discord lié`:''}</em></span></div>
-    ${['owner','manager'].includes(community.role)?`<button type="button" class="community-home-manage" data-action="communities" data-community-id="${community.id}">Personnaliser</button>`:''}
+    <div class="community-home-brand">${communityMark(community,'large')}<span><small>LES TONDEUZ À GAZON</small><strong>${esc(community.name)}</strong><em>${Number(community.memberCount)||0} membre${Number(community.memberCount)===1?'':'s'}${community.discord?.linked?` · Discord lié`:''}</em></span></div>
+    
   </section>`;
 }
 function crewRows(event,{includePast=false,now=Date.now()}={}){
@@ -93,10 +93,10 @@ function crewSummary(event,{includePast=false}={}){
 }
 export function renderNav(){
   const query=contextQuery();
-  nav.innerHTML=`${communityContextMarkup()}${button('home','Événements')}${button('my-entries','Mes inscriptions')}<div class="nav-game-switcher" aria-label="Changer de simulateur"><a class="nav-game-switcher-button nav-game-switcher-lmu" href="/lmu/${query}">Le Mans Ultimate</a><a class="nav-game-switcher-button nav-game-switcher-iracing" href="/iracing/${query}">iRacing</a></div>`;
+  nav.innerHTML=`${button('home','Événements')}${button('my-entries','Mes inscriptions')}<div class="nav-game-switcher" aria-label="Changer de simulateur"><a class="nav-game-switcher-button nav-game-switcher-lmu" href="/lmu/${query}">Le Mans Ultimate</a><a class="nav-game-switcher-button nav-game-switcher-iracing" href="/iracing/${query}">iRacing</a></div>`;
   notifyNav();
-  queueMicrotask(()=>document.dispatchEvent(new CustomEvent('endurance:community-context',{detail:{community:activeCommunity()}})));
 }
+
 export function showRecoveryLink(){if(!state.recoveryLink)return;app.insertAdjacentHTML('afterbegin',`<section class="recovery-panel"><label for="personalLink">Ton lien personnel pour retrouver et modifier tes inscriptions sans compte</label><input id="personalLink" readonly value="${esc(state.recoveryLink)}"><p>Conserve ce lien et garde-le privé.</p>${button('copy-link','Copier le lien')}${button('hide-link','Masquer')}</section>`);}
 function eventCard({event,next,archived,end}){
   const registered=registeredRaceStatus(event);const displayNext=registered.next;
@@ -111,6 +111,6 @@ export function renderHome(message=''){
   const groups=groupEvents(events,state.eventFilter);
   const community=activeCommunity();
   const createAllowed=canManageContext();
-  app.innerHTML=`${communityIdentity()}<h1 class="page-title">ÉVÉNEMENTS</h1>${createAllowed?`<div class="home-create-event">${button('create',community?'Ajouter une endurance':'Ajouter un évènement','','primary-button')}</div>`:''}${message?`<p class="creation-success" role="status">${esc(message)}</p>`:''}${!state.user?`<div class="toolbar home-toolbar">${button('guest-link','Mon lien personnel')}</div>`:''}<div class="event-filter" role="group" aria-label="Filtrer les événements">${button('event-filter','À venir',`data-filter="upcoming" aria-pressed="${state.eventFilter==='upcoming'}"`,'event-filter-button')}${button('event-filter','Archivés',`data-filter="archived" aria-pressed="${state.eventFilter==='archived'}"`,'event-filter-button')}</div>${groups.length?`<div class="event-agenda">${groups.map(group=>`<section class="event-period" aria-labelledby="period-${group.key}"><h2 class="event-period-heading" id="period-${group.key}"><span>${esc(group.label)}</span><small>${group.items.length} événement${group.items.length>1?'s':''}</small></h2><div class="event-list">${group.items.map(eventCard).join('')}</div></section>`).join('')}</div>`:`<div class="empty">${state.eventFilter==='upcoming'?(community?`Aucune endurance ${globalThis.__ENDURANCE_GAME__==='iracing'?'iRacing':'LMU'} à venir dans cette communauté.`:'Aucun événement indépendant à venir.'):'Aucun événement archivé.'}</div>`}`;
+  app.innerHTML=`${communityIdentity()}<h1 class="page-title">ÉVÉNEMENTS</h1>${createAllowed?`<div class="home-create-event">${button('create',community?'Ajouter une endurance':'Ajouter un évènement','','primary-button')}</div>`:''}${message?`<p class="creation-success" role="status">${esc(message)}</p>`:''}<div class="event-filter" role="group" aria-label="Filtrer les événements">${button('event-filter','À venir',`data-filter="upcoming" aria-pressed="${state.eventFilter==='upcoming'}"`,'event-filter-button')}${button('event-filter','Archivés',`data-filter="archived" aria-pressed="${state.eventFilter==='archived'}"`,'event-filter-button')}</div>${groups.length?`<div class="event-agenda">${groups.map(group=>`<section class="event-period" aria-labelledby="period-${group.key}"><h2 class="event-period-heading" id="period-${group.key}"><span>${esc(group.label)}</span><small>${group.items.length} événement${group.items.length>1?'s':''}</small></h2><div class="event-list">${group.items.map(eventCard).join('')}</div></section>`).join('')}</div>`:`<div class="empty">${state.eventFilter==='upcoming'?`Aucune endurance ${globalThis.__ENDURANCE_GAME__==='iracing'?'iRacing':'LMU'} à venir.`:'Aucun événement archivé.'}</div>`}`;
   showRecoveryLink();notifyRender();
 }
