@@ -3,7 +3,7 @@ import {app,state,api,load,showError,esc,notifyRender} from './core.mjs?v=11-com
 const ui={search:'',game:'all',creating:false,discord:new Map(),eligibility:new Map(),members:new Map(),memberLoading:new Set(),memberErrors:new Map(),busy:false};
 const communities=()=>[...(state.organizations?.communities||[]),...(state.organizations?.discoverableCommunities||[])];
 const byId=id=>communities().find(item=>item.id===id)||null;
-const canManage=community=>['owner','manager'].includes(community?.role);
+const canManage=community=>['admin','organizer'].includes(state.user?.role)||['owner','manager'].includes(community?.role);
 const initials=name=>String(name||'EM').split(/\s+/).filter(Boolean).slice(0,2).map(part=>part[0]).join('').toUpperCase();
 const accessLabel=mode=>({open:'Ouverte à tous',request:'Validation par un responsable',invite:'Nouvelles adhésions fermées',discord:'Membres Discord'}[mode]||'Ouverte à tous');
 const roleLabel=role=>({owner:'Responsable',manager:'Manager',member:'Membre'}[role]||'Membre');
@@ -21,8 +21,9 @@ function brandingStyle(community){
 }
 function tagRow(community){
   const discord=community.discord||{};
-  return `<div class="community-tags">${(community.games||[]).map(game=>`<span>${esc(gameLabel(game))}</span>`).join('')}<span>${community.language==='en'?'English':'Français'}</span><span>${esc(accessLabel(community.joinMode))}</span>${discord.linked?`<span>Discord · ${esc(discord.guildName||'lié')}</span>`:'<span>Endurance Manager</span>'}${discord.requiredRoleName?`<span>Rôle ${esc(discord.requiredRoleName)}</span>`:''}</div>`;
+  return `<div class="community-tags">${(community.games||[]).map(game=>`<span>${esc(gameLabel(game))}</span>`).join('')}<span>${community.language==='en'?'English':'Français'}</span>${discord.linked?`<span>Discord · ${esc(discord.guildName||'lié')}</span>`:'<span>Discord non lié</span>'}${discord.requiredRoleName?`<span>Participation · ${esc(discord.requiredRoleName)}</span>`:''}</div>`;
 }
+
 function communityCard(community){
   const joined=Boolean(community.role),preferred=community.id===state.organizations?.preferredCommunityId;
   return `<article class="community-card ${joined?'is-joined':''}"${brandingStyle(community)}><button type="button" class="community-card-main" data-community-action="open" data-id="${community.id}">${mark(community)}<span class="community-card-copy"><small>${preferred?'PAR DÉFAUT':joined?'MES COMMUNAUTÉS':'À DÉCOUVRIR'}</small><strong>${esc(community.name)}</strong><em>${Number(community.memberCount)||0} membre${Number(community.memberCount)===1?'':'s'}</em><p>${esc(community.description||'Communauté simracing endurance sur Endurance Manager.')}</p>${tagRow(community)}</span><b aria-hidden="true">›</b></button></article>`;
@@ -102,12 +103,13 @@ function discordSettings(community,probe){
 }
 function settings(community){
   if(!canManage(community))return'';
-  const probe=ui.discord.get(community.id),discord=community.discord||{},joinOptions=['open','request','invite',...(discord.linked?['discord']:[])];
-  return `<section class="community-settings" aria-labelledby="community-settings-title"><div class="community-settings-heading"><small>ADMINISTRATION</small><h2 id="community-settings-title">Paramètres</h2><p>Ouvre uniquement la partie que tu souhaites modifier.</p></div><div class="community-settings-body"><form data-community-form="settings" data-id="${community.id}" class="community-form community-settings-form"><details class="community-config-section"><summary><span><strong>Informations et accès</strong><small>Nom, présentation, simulateurs et visibilité</small></span></summary><div class="community-config-body"><label><span>Nom de la communauté</span><input name="name" maxlength="60" value="${esc(community.name)}" required></label><label class="community-form-wide"><span>Présentation</span><textarea name="description" maxlength="600" rows="3" placeholder="Présente la communauté en quelques lignes.">${esc(community.description||'')}</textarea></label><fieldset class="community-choice-group"><legend>Simulateurs utilisés</legend><label><input type="checkbox" name="games" value="lmu" ${(community.games||[]).includes('lmu')?'checked':''}><span>Le Mans Ultimate</span></label><label><input type="checkbox" name="games" value="iracing" ${(community.games||[]).includes('iracing')?'checked':''}><span>iRacing</span></label></fieldset><div class="community-settings-grid"><label><span>Langue principale</span><select name="language"><option value="fr" ${community.language==='fr'?'selected':''}>Français</option><option value="en" ${community.language==='en'?'selected':''}>English</option></select><small>Langue utilisée par la communauté.</small></label><label><span>Comment rejoindre ?</span><select name="joinMode">${joinOptions.map(mode=>`<option value="${mode}" ${community.joinMode===mode?'selected':''}>${esc(accessLabel(mode))}</option>`).join('')}</select><small>Ouverte : adhésion immédiate. Validation : un responsable accepte la demande. Fermée : aucune nouvelle adhésion.</small></label><label><span>Qui peut la découvrir ?</span><select name="visibility"><option value="public" ${community.visibility==='public'?'selected':''}>Tout le monde dans l’annuaire</option><option value="private" ${community.visibility==='private'?'selected':''}>Masquée dans l’annuaire</option></select><small>Masquer la communauté ne change pas ses règles d’adhésion.</small></label></div></div></details>${brandingSettings(community)}<div class="community-form-actions"><button class="primary-button" type="submit">Enregistrer</button></div></form>${discordSettings(community,probe)}</div></section>`;
+  const probe=ui.discord.get(community.id);
+  return `<section class="community-settings" aria-labelledby="community-settings-title"><div class="community-settings-heading"><small>ADMINISTRATION</small><h2 id="community-settings-title">Paramètres du site</h2><p>Les courses se gèrent dans LMU ou iRacing. Ici, tu règles uniquement l’identité du site et Discord.</p></div><div class="community-settings-body"><form data-community-form="settings" data-id="${community.id}" class="community-form community-settings-form"><details class="community-config-section"><summary><span><strong>Identité du site</strong><small>Nom, présentation, simulateurs et langue</small></span></summary><div class="community-config-body"><label><span>Nom du site</span><input name="name" maxlength="60" value="${esc(community.name)}" required></label><label class="community-form-wide"><span>Présentation</span><textarea name="description" maxlength="600" rows="3" placeholder="Présente les Tondeuz en quelques lignes.">${esc(community.description||'')}</textarea></label><fieldset class="community-choice-group"><legend>Simulateurs utilisés</legend><label><input type="checkbox" name="games" value="lmu" ${(community.games||[]).includes('lmu')?'checked':''}><span>Le Mans Ultimate</span></label><label><input type="checkbox" name="games" value="iracing" ${(community.games||[]).includes('iracing')?'checked':''}><span>iRacing</span></label></fieldset><label><span>Langue principale</span><select name="language"><option value="fr" ${community.language==='fr'?'selected':''}>Français</option><option value="en" ${community.language==='en'?'selected':''}>English</option></select></label></div></details>${brandingSettings(community)}<div class="community-form-actions"><button class="primary-button" type="submit">Enregistrer</button></div></form>${discordSettings(community,probe)}</div></section>`;
 }
+
 function detail(community){
   const brand=community.branding||{};
-  return `<button type="button" class="community-back" data-community-action="back">← Communautés</button><section class="community-profile-hero"${brandingStyle(community)}>${brand.bannerUrl?`<img class="community-profile-banner" src="${esc(brand.bannerUrl)}" alt="" referrerpolicy="no-referrer">`:''}<span class="community-profile-shade"></span>${mark(community,true)}<div class="community-profile-copy"><small>COMMUNAUTÉ</small><h1>${esc(community.name)}</h1><p>${esc(community.description||'Cette communauté n’a pas encore ajouté de présentation.')}</p>${tagRow(community)}</div><div class="community-profile-actions">${canManage(community)?`<button class="secondary-button" type="button" data-community-action="copy-link" data-id="${community.id}">Copier le lien de la page</button>`:''}${joinAction(community)}</div></section>${eligibilityBlock(community)}<div class="community-detail-grid"><aside>${requestList(community)}${membersSection(community)}</aside><div>${settings(community)}</div></div>`;
+  return `<section class="community-profile-hero"${brandingStyle(community)}>${brand.bannerUrl?`<img class="community-profile-banner" src="${esc(brand.bannerUrl)}" alt="" referrerpolicy="no-referrer">`:''}<span class="community-profile-shade"></span>${mark(community,true)}<div class="community-profile-copy"><small>SITE DES TONDEUZ</small><h1>${esc(community.name)}</h1><p>${esc(community.description||'Organisation des endurances des Tondeuz à gazon.')}</p>${tagRow(community)}</div></section><div class="community-detail-grid"><aside>${membersSection(community)}</aside><div>${settings(community)}</div></div>`;
 }
 
 export function renderCommunities(id=state.currentOrganizationId){
@@ -120,8 +122,20 @@ export function renderCommunities(id=state.currentOrganizationId){
 }
 async function reload(id=state.currentOrganizationId){await load();renderCommunities(id);}
 function formPayload(form){
-  return {name:form.elements.name.value.trim(),description:form.elements.description?.value.trim()||'',language:form.elements.language?.value||'fr',games:[...form.querySelectorAll('[name="games"]:checked')].map(input=>input.value),joinMode:form.elements.joinMode?.value||'open',visibility:form.elements.visibility?.value||'public',logoUrl:form.elements.logoUrl?.value.trim()||'',bannerUrl:form.elements.bannerUrl?.value.trim()||'',accentColor:form.elements.accentColor?.value.trim()||''};
+  const current=form.dataset.id?byId(form.dataset.id):null;
+  return {
+    name:form.elements.name.value.trim(),
+    description:form.elements.description?.value.trim()||'',
+    language:form.elements.language?.value||current?.language||'fr',
+    games:[...form.querySelectorAll('[name="games"]:checked')].map(input=>input.value),
+    joinMode:form.elements.joinMode?.value||current?.joinMode||'invite',
+    visibility:form.elements.visibility?.value||current?.visibility||'private',
+    logoUrl:form.elements.logoUrl?.value.trim()||'',
+    bannerUrl:form.elements.bannerUrl?.value.trim()||'',
+    accentColor:form.elements.accentColor?.value.trim()||''
+  };
 }
+
 function goToCommunity(id){
   const url=new URL(location.href);url.searchParams.set('community',id);url.searchParams.delete('auth');location.assign('/'+url.search);
 }
