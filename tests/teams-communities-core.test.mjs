@@ -150,8 +150,8 @@ test('les assets de la nouvelle interface sont versionnés et les fixtures dev r
   const app=read('app.js');
   assert.match(seed,/https:\/\/app\.endurance-manager\.workers\.dev/);
   assert.match(seed,/if\(url\.origin!==DEV_ORIGIN\)return/);
-  assert.match(html,/community-context\.css\?v=4-community-navigation/);
-  assert.match(html,/community-directory\.css\?v=7-community-navigation/);
-  assert.match(html,/app\.js\?v=99-community-navigation/);
-  assert.match(app,/paddock-network\.mjs\?v=9-community-only/);
+  assert.match(html,/community-context\.css\?v=5-site-tool/);
+  assert.match(html,/community-directory\.css\?v=8-site-tool/);
+  assert.match(html,/app\.js\?v=102-tondeuz-tool/);
+  assert.match(app,/paddock-network\.mjs\?v=13-tondeuz-tool/);
 });
