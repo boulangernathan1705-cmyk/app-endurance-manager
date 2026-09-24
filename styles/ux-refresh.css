@@ -642,3 +642,35 @@ html[data-game] .event-card .crew-summary-list {
 html[data-game] #app .crew-card-shell > details:not([open]) { display: flex !important; flex-direction: column; }
 html[data-game] #app .crew-card-shell > details:not([open]) > .crew-tile-summary { flex: 1; }
 html[data-game] #app .crew-tile-foot { margin-top: auto; }
+
+/* ---------- Fenêtres en étapes : équipage et événement ---------- */
+body:has([data-crew-builder-overlay]) { overflow: hidden; }
+.crew-builder-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(4, 8, 10, .72);
+}
+.crew-builder-overlay .crew-builder-panel { margin: 0 !important; max-width: 680px; }
+.crew-builder-step[hidden] { display: none !important; }
+.crew-builder-step { display: flex; flex-direction: column; gap: 12px; }
+.crew-builder-overlay .crew-builder-fields { display: grid; gap: 12px; grid-template-columns: minmax(0, 1fr); }
+.crew-builder-overlay .crew-builder-fields label { display: grid; gap: 6px; font-weight: 600; }
+.crew-builder-overlay .crew-builder-pilots { display: grid; gap: 8px; }
+@media (max-width: 760px) {
+  .crew-builder-overlay { align-items: flex-end; padding: 0; }
+  .crew-builder-overlay .crew-builder-panel { max-width: none; max-height: 92vh; border-radius: 18px 18px 0 0; padding: 14px 14px 0; }
+}
+
+.event-stepper .event-step[hidden] { display: none !important; }
+.event-stepper .registration-step-nav { margin: 8px 0 0; padding: 14px 0; background: var(--bg, #090a0b); }
+.event-stepper .registration-summary-row .category-logo { width: 26px; height: auto; vertical-align: middle; }
+.registration-summary-row > strong { display: flex !important; flex-wrap: wrap; gap: 4px 8px; overflow-wrap: anywhere; }
+@media (max-width: 760px) {
+  .registration-summary-row { grid-template-columns: 74px minmax(0, 1fr) auto; gap: 8px; padding: 8px 10px; }
+  .registration-summary-row > strong { font-size: 14px; }
+}

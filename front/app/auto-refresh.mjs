@@ -14,7 +14,7 @@ function pilotIsBusy(){
   const active=document.activeElement;
   if(active?.matches?.('input,select,textarea,[contenteditable="true"]'))return true;
   if(document.querySelector('[aria-modal="true"],dialog[open],[data-ux-error-modal]'))return true;
-  if(document.getElementById('crew-builder-root')?.childElementCount)return true;
+  if(document.querySelector('[data-crew-builder-panel]'))return true;
   return false;
 }
 
