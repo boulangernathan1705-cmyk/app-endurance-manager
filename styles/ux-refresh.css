@@ -625,3 +625,20 @@ html[data-game] #app .crew-self-actions > .danger-link { width: auto !important;
 /* Le départ est le seul cadre : la zone Équipages / pilotes n'en ajoute pas un second. */
 html[data-game] #app .departure-participation-section { border: 0 !important; background: none !important; box-shadow: none !important; padding: 8px 0 0 !important; }
 html[data-game] #app .crew-self-actions > .danger-link { margin-left: auto !important; }
+
+/* Tuiles d'équipage : 4 par ligne au maximum, toutes de la même hauteur (la tienne comprise). */
+html[data-game] #app .ux-course-crews-body {
+  grid-template-columns: repeat(auto-fill, minmax(max(240px, calc((100% - 30px) / 4)), 1fr)) !important;
+  align-items: stretch !important;
+}
+html[data-game] #app .crew-card-shell { grid-template-rows: 1fr auto; }
+html[data-game] #app .crew-card-shell > details { height: 100%; }
+html[data-game] #app .crew-card-shell.is-mine,
+html[data-game] .event-card .crew-summary-card.is-mine { outline: 2px solid rgba(255, 255, 255, .5) !important; outline-offset: -2px !important; }
+html[data-game] .event-card .crew-summary-list {
+  grid-template-columns: repeat(auto-fill, minmax(max(220px, calc((100% - 24px) / 4)), 1fr)) !important;
+  align-items: stretch !important;
+}
+html[data-game] #app .crew-card-shell > details:not([open]) { display: flex !important; flex-direction: column; }
+html[data-game] #app .crew-card-shell > details:not([open]) > .crew-tile-summary { flex: 1; }
+html[data-game] #app .crew-tile-foot { margin-top: auto; }
