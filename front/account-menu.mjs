@@ -5,6 +5,7 @@ const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp
 const isHub = location.pathname === '/' || location.pathname.endsWith('/index.html');
 const isMembers = location.pathname.endsWith('/members.html');
 const isHelp = location.pathname.endsWith('/help.html');
+const isSiteSettings = location.pathname.endsWith('/communities.html');
 let connectedUser=null;
 let activeCommunity=null;
 
@@ -97,19 +98,20 @@ function renderDisconnected(discordReady) {
 
 function renderConnected(user) {
   connectedUser=user;
+  const managesSite=['admin','organizer'].includes(user.role)||['owner','manager'].includes(activeCommunity?.role);
+  const settings=managesSite?`<a class="account-menu-item" href="/communities.html"${isSiteSettings?' aria-current="page"':''}>Paramètres du site</a>`:'';
   const manage = user.role === 'admin' ? `<a class="account-menu-item" href="/members.html">Gestion des membres</a>` : '';
   const help = `<a class="account-menu-item" href="/help.html"${isHelp ? ' aria-current="page"' : ''}>Aide</a>`;
 
   root.innerHTML = `<div class="account-menu">
     <button type="button" class="account-trigger" aria-haspopup="menu" aria-expanded="false">
       ${avatarMarkup(user)}
-      ${communityBadge()}
       <span class="account-trigger-copy"><strong>${esc(user.name)}</strong><small>${roleLabel(user.role)}</small></span>
       <span class="account-chevron" aria-hidden="true">⌄</span>
     </button>
     <div class="account-popover" role="menu" hidden>
       <div class="account-popover-profile">${avatarMarkup(user)}<span><strong>${esc(user.name)}</strong><small>${roleLabel(user.role)}</small></span></div>
-      ${help}${manage}
+      ${settings}${help}${manage}
       <span class="account-menu-separator" aria-hidden="true"></span>
       <button type="button" class="account-menu-item account-menu-logout" data-account-logout>Déconnexion</button>
     </div>
