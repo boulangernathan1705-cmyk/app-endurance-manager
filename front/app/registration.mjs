@@ -1,6 +1,6 @@
-import {state,esc,button,carPreferenceChoices,registrationCarLabel,renderAvailabilityTimeline,notifyRender,logo,categories} from './core.mjs?v=12-site-tool';
+import {state,esc,button,carPreferenceChoices,registrationCarLabel,renderAvailabilityTimeline,notifyRender,logo,categories} from './core.mjs?v=13-tondeuz-tool';
 import {getLocale} from '../i18n.mjs';
-import {GENERAL_AUDIENCE,audienceChoices,defaultRegistrationAudienceIds,registrationAudienceIds,organizationAudienceLabels,communityById} from './organization-context.mjs?v=7-community-only';
+import {GENERAL_AUDIENCE,audienceChoices,defaultRegistrationAudienceIds,registrationAudienceIds,organizationAudienceLabels,communityById} from './organization-context.mjs?v=13-tondeuz-tool';
 
 export function ownRegistrations(departure) { return (departure?.availability||[]).filter(reg => reg.mine); }
 export function ownRegistration(departure) { return ownRegistrations(departure)[0]; }
