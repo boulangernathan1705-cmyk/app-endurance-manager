@@ -1,6 +1,6 @@
 import {state,esc,button,carPreferenceChoices,registrationCarLabel,renderAvailabilityTimeline,notifyRender,logo,categories} from './core.mjs?v=13-tondeuz-tool';
 import {getLocale} from '../i18n.mjs';
-import {GENERAL_AUDIENCE,audienceChoices,defaultRegistrationAudienceIds,registrationAudienceIds,organizationAudienceLabels,communityById} from './organization-context.mjs?v=13-tondeuz-tool';
+import {GENERAL_AUDIENCE,defaultRegistrationAudienceIds,registrationAudienceIds,communityById} from './organization-context.mjs?v=13-tondeuz-tool';
 
 export function ownRegistrations(departure) { return (departure?.availability||[]).filter(reg => reg.mine); }
 export function ownRegistration(departure) { return ownRegistrations(departure)[0]; }
@@ -22,13 +22,20 @@ function slotLabel(status) { return status==='whole'?'Toute la course':status===
 
 function currentEventCommunity(){
   const event=state.events.find(item=>item.id===state.currentEventId);
-  return event?.organizationId?communityById(state.organizations,event.organizationId):null;
+  return communityById(state.organizations,event?.organizationId||state.activeCommunityId)||null;
 }
 function communityPilotLogo(){
   const community=currentEventCommunity(),logoUrl=community?.branding?.logoUrl;
   return logoUrl?`<span class="pilot-community-logo" title="${esc(community.name)}"><img src="${esc(logoUrl)}" alt="" loading="lazy" referrerpolicy="no-referrer"></span>`:'';
 }
 function audienceBadges(){return'';}
+
+export function renderRegistration(reg,departure,duration,showCarPreference=true) {
+  const locked=departure.startsAt<=Date.now();
+  const origin=reg.addedByName?` <span class="registration-origin-info" title="Inscription ajoutée par ${esc(reg.addedByName)}" aria-label="Inscription ajoutée par ${esc(reg.addedByName)}">ⓘ</span>`:'';
+  const timeline=renderAvailabilityTimeline({departure,duration,status:reg.status,label:slotLabel(reg.status)});
+  return `<div class="pilot-row${reg.mine?' ux-current-pilot':''}${reg.engaged?' is-engaged':''}"><div class="pilot-main"><span class="pilot-name">${communityPilotLogo()}${esc(reg.name)}${origin}</span><span class="pilot-category-logo" title="${esc(reg.category||'Catégorie')}" aria-label="${esc(reg.category||'Catégorie')}">${reg.category?logo(reg.category):'—'}</span>${showCarPreference?`<span class="pilot-car">${esc(registrationCarLabel(reg))}</span>`:''}${reg.status==='unavailable'?'<span class="registration-status">Indisponible</span>':''}${reg.engaged?'<span class="registration-engaged">Déjà engagé</span>':''}${audienceBadges(reg)}${reg.preferredPilot?`<span class="pilot-preference">Souhaite rouler avec : <strong>${esc(reg.preferredPilot)}</strong></span>`:''}</div>${timeline}${reg.canEdit&&!locked?button('edit-registration','Modifier',`data-id="${reg.id}" data-departure="${departure.id}"`,'edit-button ux-pilot-edit'):''}</div>`;
+}
 
 function identityFields(stateDraft,departure,categoryMode,manualOther,linkedOther,guestSelf) {
   if(categoryMode)return '';
@@ -44,14 +51,6 @@ function identityFields(stateDraft,departure,categoryMode,manualOther,linkedOthe
   return `<div class="registration-identity-grid ${stateDraft.forOther?'is-other':'is-self'}">${fields.join('')}</div>`;
 }
 
-function participantCanUseAudience(stateDraft,key){
-  if(key===GENERAL_AUDIENCE)return true;
-  if(!stateDraft.forOther)return true;
-  const targetId=stateDraft.participantUserId||null;
-  if(!targetId)return false;
-  const organization=(state.organizations.communities||[]).find(item=>item.id===key);
-  return !!organization?.members?.some(member=>member.id===targetId);
-}
 
 function audienceSelector(){return'';}
 
