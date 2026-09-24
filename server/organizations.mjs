@@ -194,6 +194,15 @@ async function route(request,env,ctx,next){
     const response=await communityDirectoryApi(request,env,actor);if(response)return response;
   }
 
+  if(path==='/api/events'&&method==='POST'){
+    if(!actor.user)fail(401,'Connecte-toi avec Discord.');
+    const site=await siteCommunity(env);
+    if(!site)fail(503,'Le site des Tondeuz n’est pas encore configuré.');
+    const input=await request.clone().json().catch(()=>null);if(!input)fail(400,'Formulaire invalide.');
+    input.organizationId=site.id;
+    request=new Request(request,{body:JSON.stringify(input)});
+  }
+
   const registrationIds=method==='POST'?eventDeparture(path,'registrations'):null;
   if(registrationIds){
     const input=await request.clone().json().catch(()=>null);if(!input)fail(400,'Formulaire invalide.');
