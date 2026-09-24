@@ -10,7 +10,7 @@ import {
   notifyRender,
   logo,
   categories
-} from './core.mjs?v=11-community-navigation';
+} from './core.mjs?v=12-site-tool';
 import {getLocale,localeTag} from '../i18n.mjs';
 import {scopeDeparture,registrationAudienceIds,organizationAudienceLabels,communityById} from './organization-context.mjs?v=7-community-only';
 
