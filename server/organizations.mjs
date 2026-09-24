@@ -3,6 +3,7 @@ import {
 } from './core.mjs';
 import {communityDirectoryApi,membership,requireMember,organizationSummary,requireOrganizationEligibility,syncDiscordCommunityUser} from './community-directory.mjs';
 import {siteCommunity} from './site-community.mjs';
+import {requireDiscordCommunityAccess} from './community-discord.mjs';
 
 const UUID=/^[a-f0-9-]{36}$/;
 const DISCORD_ID=/^\d{15,22}$/;
@@ -115,10 +116,27 @@ async function accessibleOrganizations(env,actor){
   return new Set(rows.map(row=>row.organization_id));
 }
 
+async function ensureSiteMember(env,actor,site){
+  if(!actor.user)fail(401,'Connecte-toi avec Discord pour participer.');
+  const current=await membership(env,actor.user.id,site.id);
+  if(current)return current;
+  if(site.discord_guild_id)await requireDiscordCommunityAccess(env,actor.user.id,site,{joining:true});
+  await env.DB.batch([
+    env.DB.prepare("INSERT OR IGNORE INTO organization_members(organization_id,user_id,role,created_at) VALUES(?,?,'member',?)").bind(site.id,actor.user.id,now()),
+    env.DB.prepare('UPDATE users SET preferred_community_id=? WHERE id=?').bind(site.id,actor.user.id)
+  ]);
+  return membership(env,actor.user.id,site.id);
+}
+
+
 async function decorateEvents(response,env,actor){
   if(!response.ok)return response;
   const data=await response.clone().json().catch(()=>null);
-  if(!data||!Array.isArray(data.events)||!data.events.length)return response;
+  if(!data||!Array.isArray(data.events))return response;
+  const site=await siteCommunity(env);
+  data.events=data.events.filter(event=>!event.organizationId||(site&&event.organizationId===site.id));
+  const headers=new Headers(response.headers);headers.set('Content-Type','application/json; charset=utf-8');headers.delete('Content-Length');
+  if(!data.events.length)return new Response(JSON.stringify(data),{status:response.status,headers});
   const eventIds=data.events.map(event=>event.id),marks=eventIds.map(()=>'?').join(',');
   const [registrationRows,audienceRows,crewRows,engagedRows,allowed]=await Promise.all([
     env.DB.prepare(`SELECT id,organization_id FROM registrations WHERE event_id IN (${marks})`).bind(...eventIds).all(),
@@ -130,6 +148,7 @@ async function decorateEvents(response,env,actor){
       WHERE c.event_id IN (${marks})`).bind(...eventIds).all(),
     accessibleOrganizations(env,actor)
   ]);
+  if(site)allowed.add(site.id);
   const directOrg=new Map((registrationRows.results||[]).map(row=>[row.id,row.organization_id||null]));
   const audiences=new Map();
   for(const row of audienceRows.results||[]){
@@ -153,7 +172,6 @@ async function decorateEvents(response,env,actor){
       });
     }
   }
-  const headers=new Headers(response.headers);headers.set('Content-Type','application/json; charset=utf-8');headers.delete('Content-Length');
   return new Response(JSON.stringify(data),{status:response.status,headers});
 }
 
@@ -183,6 +201,7 @@ async function route(request,env,ctx,next){
     const site=await siteCommunity(env);
     if(!site)fail(503,'Le site des Tondeuz n’est pas encore configuré.');
     await syncDiscordCommunityUser(env,actor,site.id);
+    await ensureSiteMember(env,actor,site);
     const eventScope=await env.DB.prepare('SELECT organization_id FROM events WHERE id=?').bind(registrationIds.eventId).first();
     if(eventScope?.organization_id&&eventScope.organization_id!==site.id)fail(404,'Événement introuvable.');
     input.audienceIds=[site.id];
