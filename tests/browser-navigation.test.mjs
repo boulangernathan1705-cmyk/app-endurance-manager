@@ -20,8 +20,9 @@ test('le build produit les deux espaces simulateurs et Cloudflare conserve les U
   assert.match(home, /href="\/iracing\/"/);
   assert.match(hub, /'\/lmu\/'/);
   assert.match(hub, /'\/iracing\/'/);
-  assert.match(homeView, /href="\/lmu\/"/);
-  assert.match(homeView, /href="\/iracing\/"/);
+  assert.match(homeView, /href="\/\$\{game\}\/"/);
+  assert.match(homeView, /gameLink\('lmu'/);
+  assert.match(homeView, /gameLink\('iracing'/);
 });
 
 test('la base commune rend les inscriptions sans interface parallèle', async () => {
@@ -47,7 +48,8 @@ test('les scripts actifs ne dépendent plus de MutationObserver ni d’un proxy 
     'front/app/registration.mjs',
     'front/app/crews.mjs',
     'front/app/event-view.mjs',
-    'front/desktop-home-toolbar.mjs',
+    'front/app/router.mjs',
+    'front/app/auto-refresh.mjs',
     'front/timeline-colors.mjs',
     'crew-builder.js'
   ];

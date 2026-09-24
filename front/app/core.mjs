@@ -32,6 +32,7 @@ export function logo(category) {
 }
 export function badge(category) { return `<span class="event-category-badge ${categories[category]?.css || ''}">${logo(category)}<span>${esc(category)}</span></span>`; }
 export function eventTypeBadge(type) { const item = EVENT_TYPES[type] || EVENT_TYPES.private; return `<span class="event-type-badge ${item.css}">${esc(item.label)}</span>`; }
+export function schedulePendingBadge(event) { return event?.schedulePending ? '<span class="event-schedule-badge">Horaires à confirmer</span>' : ''; }
 export function eventCategoryCount(event, category) { return event.departures.reduce((sum,departure) => sum + departure.availability.filter(reg => reg.category === category && reg.status !== 'unavailable').length,0); }
 export function eventBadge(category,count) { return `<span class="event-category-badge ${categories[category]?.css || ''}">${logo(category)}<span class="event-category-copy"><strong>${esc(category)}</strong><small>${count} inscrit${count > 1 ? 's' : ''}</small></span></span>`; }
 export function pilotCount(registrations) { return new Set(registrations.filter(reg => reg.status !== 'unavailable').map(reg => reg.participantId || reg.id)).size; }

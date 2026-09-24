@@ -70,10 +70,12 @@ test('la page événement garde les actions événement séparées des actions �
   assert.doesNotMatch(eventView,/Retour aux événements/);
   assert.match(eventView,/event-toolbar-main/);
   assert.match(crews,/crew-section-create/);
-  const refresh=eventView.indexOf("button('refresh','Actualiser')");
+  // Background refresh replaced the manual "Actualiser" button; sharing comes first.
+  assert.doesNotMatch(eventView,/button\('refresh'/);
+  const share=eventView.indexOf("button('share-event','Copier le lien de la course'");
   const edit=eventView.indexOf("button('edit-event','Modifier l’événement'");
   const remove=eventView.indexOf("button('delete-event','Supprimer l’événement'");
-  assert.ok(refresh>=0&&refresh<edit&&edit<remove);
+  assert.ok(share>=0&&share<edit&&edit<remove);
   assert.doesNotMatch(eventView,/event-create-crew/);
 });
 

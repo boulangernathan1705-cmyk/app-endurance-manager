@@ -61,15 +61,23 @@ export function renderRegistrationForm(event,departure,stateDraft=draftFor(depar
   const categoryMode=stateDraft.mode==='category'; const otherMode=stateDraft.forOther&&!categoryMode;
   const linkedOther=stateDraft.forOther&&!!(stateDraft.participantUserId||stateDraft.discordLinked);
   const manualOther=stateDraft.forOther&&!linkedOther&&!categoryMode&&!!stateDraft.manualOther; const guestSelf=!stateDraft.forOther&&!state.user;
-  const title=categoryMode?`Ajouter une catégorie · ${esc(contextName||'Pilote')}`:otherMode?(stateDraft.id?`Modifier l’inscription · ${esc(contextName||'Pilote')}`:'Inscrire un autre pilote'):'Mon inscription';
-  const banner=categoryMode?`<div class="registration-context-banner category"><span>AJOUT D’UNE CATÉGORIE</span><strong>${esc(contextName||'Pilote')}</strong></div>`:otherMode?`<div class="registration-context-banner other"><span>${stateDraft.id?'INSCRIPTION GÉRÉE':'AUTRE PILOTE'}</span>${contextName?`<strong>${esc(contextName)}</strong>`:''}</div>`:`<div class="registration-context-banner self"><span>TON INSCRIPTION</span><strong>${esc(contextName||state.user?.name||'Mon inscription')}</strong></div>`;
+  const title=registrationTitle(event,departure,stateDraft);
+  const banner=categoryMode?`<div class="registration-context-banner category"><span>AJOUT D’UNE CATÉGORIE</span><strong>${esc(contextName||'Pilote')}</strong></div>`:otherMode?`<div class="registration-context-banner other"><span>${stateDraft.id?'INSCRIPTION GÉRÉE':'AUTRE PILOTE'}</span>${contextName?`<strong>${esc(contextName)}</strong>`:''}</div>`:(contextName||state.user?.name?`<div class="registration-context-banner self"><span>PILOTE</span><strong>${esc(contextName||state.user.name)}</strong></div>`:'');
   return `<form class="form-section registration-form" data-kind="registration" data-departure="${departure.id}"><h3 class="form-title">${title}</h3>${banner}${identityFields(stateDraft,departure,categoryMode,manualOther,linkedOther,guestSelf)}<div class="registration-choices"><span class="form-label">Heures de présence (${duration} h)</span><p class="availability-hint">Clique sur les créneaux où tu es disponible.</p>${renderAvailabilityTimeline({departure,duration,status:stateDraft.status,interactive:true,label:'Heures de présence'})}<div class="special-availability">${button('availability','TOUTE LA COURSE',`data-departure="${departure.id}" data-value="whole" aria-pressed="${stateDraft.status==='whole'}"`,`special-button whole ${stateDraft.status==='whole'?'active':''}`)}</div></div>${stateDraft.status==='unavailable'?'':`<div class="category-area"><span class="form-label">Catégorie</span><div class="categories">${event.categories.map(category=>button('category',`${logo(category)}<span>${esc(category)}</span>`,`data-departure="${departure.id}" data-value="${esc(category)}" ${((assigned&&stateDraft.id&&!categoryMode&&category!==stateDraft.category)||same.some(reg=>reg.id!==stateDraft.id&&reg.category===category))?'disabled':''} aria-pressed="${stateDraft.category===category}"`,`category-button ${categories[category]?.css||''} ${stateDraft.category===category?'active':''}`)).join('')}</div>${stateDraft.category?carPreferenceChoices(stateDraft.category,stateDraft.cars,stateDraft.carAny):''}</div>`}<div class="save-row"><button type="submit" class="save-button">${stateDraft.id?'ENREGISTRER':stateDraft.forOther?'INSCRIRE LE PILOTE':'S’INSCRIRE'}</button>${stateDraft.id?button('delete-registration',stateDraft.forOther?'Supprimer l’inscription':'Se désinscrire',`data-id="${stateDraft.id}" data-departure="${departure.id}"`,'danger-button'):''}</div></form>`;
+}
+
+function registrationTitle(event,departure,stateDraft){
+  const {source}=registrationContext(event,departure,stateDraft);
+  const contextName=stateDraft.name||source?.name||(!stateDraft.forOther?state.user?.name:'')||'';
+  if(stateDraft.mode==='category')return `Ajouter une catégorie · ${esc(contextName||'Pilote')}`;
+  if(stateDraft.forOther)return stateDraft.id?`Modifier l’inscription · ${esc(contextName||'Pilote')}`:'Inscrire un autre pilote';
+  return stateDraft.id?'Modifier ton inscription':'Ton inscription';
 }
 
 export function renderRegistrationWorkspace(event,departure) {
   const stateDraft=draftFor(departure);
   const addCategory=renderAddCategoryAction(event,departure,stateDraft);
-  return `<div class="registration-workspace-head"><h2>Inscriptions</h2><span class="registration-workspace-actions">${addCategory}${button('close-registration','Fermer',`data-departure="${departure.id}"`,'secondary-button registration-close-button')}</span></div>${renderRegistrationForm(event,departure,stateDraft)}`;
+  return `<div class="registration-workspace-head"><h2>${registrationTitle(event,departure,stateDraft)}</h2><span class="registration-workspace-actions">${addCategory}${button('close-registration','Fermer',`data-departure="${departure.id}"`,'secondary-button registration-close-button')}</span></div>${renderRegistrationForm(event,departure,stateDraft)}`;
 }
 
 export function rerenderRegistrationSection(event,departure,focusSelector='',fallback=()=>{}) {

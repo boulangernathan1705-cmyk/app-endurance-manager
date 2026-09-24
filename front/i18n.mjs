@@ -28,7 +28,7 @@ const EN=new Map(Object.entries({
   'GTP, LMP2, GT3, GT4 et TCR avec un catalogue de circuits étendu.':'GTP, LMP2, GT3, GT4 and TCR with an extensive track catalogue.',
   'Le récapitulatif des prochaines endurances est momentanément indisponible. Les espaces restent accessibles.':'The upcoming endurance summary is temporarily unavailable. The simulator areas remain accessible.',
   'À venir':'Upcoming','Archivés':'Archived','Ajouter un évènement':'Add event','Ajouter un événement':'Add event','Mon lien personnel':'My personal link',
-  'Copier le lien':'Copy link','Lien copié':'Link copied','Masquer':'Hide','Filtrer les événements':'Filter events','Aucun événement à venir.':'No upcoming events.','Aucun événement archivé.':'No archived events.',
+  'Copier le lien':'Copy link','Lien copié':'Link copied','Copier le lien de la course':'Copy race link','Lien copié ✓':'Link copied ✓','Horaires à confirmer':'Schedule to be confirmed','Affiche l’étiquette « Horaires à confirmer » tant que les dates et heures peuvent encore changer.':'Shows the “Schedule to be confirmed” label while dates and times may still change.','Ton inscription':'Your entry','Modifier ton inscription':'Edit your entry','PILOTE':'DRIVER','Cette course n’est plus disponible.':'This race is no longer available.','Copie le lien de la course :':'Copy the race link:','Masquer':'Hide','Filtrer les événements':'Filter events','Aucun événement à venir.':'No upcoming events.','Aucun événement archivé.':'No archived events.',
   'Cette semaine':'This week','La semaine prochaine':'Next week','Dates à confirmer':'Dates to be confirmed','Date à confirmer':'Date to be confirmed',
   'Départ passé':'Start passed','· Départ passé':'· Start passed','Départs passés':'Past starts','Tous les départs ont eu lieu':'All starts have taken place',
   'Prochain départ dans':'Next start in','Aucun départ à venir avec pilote inscrit':'No upcoming start with registered drivers',
@@ -171,6 +171,7 @@ const LEGAL_TEXT=new Map(Object.entries({
 }));
 
 const PATTERNS=[
+  [/^\+(\d+) départs?$/u,([,count])=>`+${count} start${count==='1'?'':'s'}`],
   [/^(\d+) inscrit(?:s)?$/u,([,n])=>`${n} driver${n==='1'?'':'s'}`],
   [/^(\d+) pilote(?:s)? inscrit(?:s)?$/u,([,n])=>`${n} registered driver${n==='1'?'':'s'}`],
   [/^(\d+) pilote(?:s)?$/u,([,n])=>`${n} driver${n==='1'?'':'s'}`],

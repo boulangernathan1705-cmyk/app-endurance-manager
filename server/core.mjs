@@ -28,7 +28,9 @@ function redirect(location, cookies = []) {
 function origin(env) {
   let parsed;
   try { parsed = new URL(env.APP_ORIGIN); } catch { fail(503, 'Le site attend sa configuration Cloudflare.'); }
-  if (parsed.protocol !== 'https:' || parsed.origin !== env.APP_ORIGIN) fail(503, 'L’adresse du site doit être une origine HTTPS sans barre finale.');
+  // Plain http is only accepted for a local `wrangler dev` preview.
+  const secure = parsed.protocol === 'https:' || (parsed.protocol === 'http:' && parsed.hostname === 'localhost');
+  if (!secure || parsed.origin !== env.APP_ORIGIN) fail(503, 'L’adresse du site doit être une origine HTTPS sans barre finale.');
   return parsed.origin;
 }
 function requireDiscord(env) {
@@ -126,11 +128,11 @@ async function cleanup(env) {
     env.DB.prepare('DELETE FROM rate_limits WHERE key IN (SELECT key FROM rate_limits WHERE expires_at<? LIMIT 500)').bind(timestamp)
   ]);
 }
-// Same-site page to reopen after Discord login: a plain path, optionally with the opened event.
+// Same-site page to reopen after Discord login: a plain path, optionally with the open race or My entries.
 // Anything else (other hosts, protocol-relative URLs, query strings) falls back to the home page.
 function returnPath(value) {
   const path = typeof value === 'string' ? value : '';
-  return path.length <= 200 && /^\/(?:[A-Za-z0-9._~-]+\/?)*(?:#event=[a-f0-9-]{36})?$/.test(path) ? path : '/';
+  return path.length <= 200 && /^\/(?:[A-Za-z0-9._~-]+\/?)*(?:#event=[a-f0-9-]{36}|#inscriptions)?$/.test(path) ? path : '/';
 }
 function text(value, max, label) {
   if (typeof value !== 'string' || !value.trim() || value.trim().length > max) fail(400, `${label} : indique de 1 à ${max} caractères.`);
@@ -175,7 +177,8 @@ function validateEvent(input, existing = null) {
     if (previous && previous.startsAt <= Date.now() && startsAt !== previous.startsAt) fail(400, 'Un départ passé ne peut plus être déplacé.');
     return {id: departureId, date: item.date, time: item.time, startsAt};
   }).sort((a, b) => a.startsAt - b.startsAt);
-  return {name, durationHours, eventType, circuit, categories: [...new Set(input.categories)], departures};
+  const schedulePending = input.schedulePending == null ? Boolean(existing?.schedule_pending) : input.schedulePending === true;
+  return {name, durationHours, eventType, circuit, schedulePending, categories: [...new Set(input.categories)], departures};
 }
 function validateRegistration(input, event) {
   const name = text(input.name, 30, 'Pseudo');

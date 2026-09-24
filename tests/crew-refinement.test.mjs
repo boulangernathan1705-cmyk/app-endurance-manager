@@ -61,11 +61,12 @@ test('le worker répare la migration de responsabilité équipage avant les appe
 
 test('le rendu principal publie des événements explicites au lieu d’observer le DOM', () => {
   const core = read('front/app/core.mjs');
-  const desktop = read('front/desktop-home-toolbar.mjs');
+  const homeView = read('front/app/home-view.mjs');
+  const router = read('front/app/router.mjs');
   const timeline = read('front/timeline-colors.mjs');
   assert.match(core, /endurance:render/);
   assert.match(core, /endurance:nav/);
-  assert.match(desktop, /addEventListener\('endurance:render'/);
-  assert.match(desktop, /addEventListener\('endurance:nav'/);
+  assert.match(homeView, /addEventListener\('endurance:render'/);
+  assert.match(router, /addEventListener\('endurance:render'/);
   assert.match(timeline, /addEventListener\('endurance:render'/);
 });

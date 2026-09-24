@@ -21,6 +21,7 @@ function harness(withParticipants=true){
  DB.db.exec(readFileSync(new URL('../migrations/0009_registration_owner.sql',import.meta.url),'utf8'));
  DB.db.exec(readFileSync(new URL('../migrations/0011_multi_category_registrations.sql',import.meta.url),'utf8'));
  if(withParticipants)DB.db.exec(readFileSync(new URL('../migrations/0012_participants.sql',import.meta.url),'utf8'));
+ DB.db.exec(readFileSync(new URL('../migrations/0026_event_schedule_pending.sql',import.meta.url),'utf8'));
  const env={DB,APP_ORIGIN:ROOT,DISCORD_CLIENT_ID:'app-id',DISCORD_CLIENT_SECRET:'test-only-secret',ADMIN_DISCORD_IDS:ADMIN,ASSETS:{fetch:async()=>new Response('static')}};
  const jars=new Map();
  async function req(path,method='GET',data,actor='guest',options={}){
@@ -343,6 +344,27 @@ test('Discord login returns to the same-site page and race it started from',asyn
  }
  assert.equal(await loginFrom('/lmu/#event='+eventId,'a'),ROOT+'/lmu/#event='+eventId);
  assert.equal(await loginFrom('/iracing/','b'),ROOT+'/iracing/');
+ assert.equal(await loginFrom('/lmu/#inscriptions','b2'),ROOT+'/lmu/#inscriptions');
  for(const [i,unsafe] of ['//evil.example/','https://evil.example/','/\\evil.example','/lmu/?next=//evil','/lmu/#event=<script>','javascript:alert(1)'].entries())
   assert.equal(await loginFrom(unsafe,'c'+i),ROOT+'/',unsafe);
+});
+test('events can be flagged with a schedule still to confirm',async()=>{
+ const {req,login}=harness();await login(ADMIN,'admin');
+ assert.equal((await req('/api/events','POST',{...eventInput,schedulePending:true},'admin')).status,201);
+ let event=(await req('/api/events')).data.events[0];
+ assert.equal(event.schedulePending,true);
+ const departures=event.departures.map(({id,date,time})=>({id,date,time}));
+ assert.equal((await req('/api/events/'+event.id,'PATCH',{...eventInput,departures,version:event.version},'admin')).status,200);
+ event=(await req('/api/events')).data.events[0];
+ assert.equal(event.schedulePending,true,'omitting the flag keeps it');
+ assert.equal((await req('/api/events/'+event.id,'PATCH',{...eventInput,departures,schedulePending:false,version:event.version},'admin')).status,200);
+ assert.equal((await req('/api/events')).data.events[0].schedulePending,false);
+});
+test('schedule migration moves the "(horaires ...)" suffix out of event names',()=>{
+ const db=new DatabaseSync(':memory:');
+ db.exec("CREATE TABLE events(id TEXT PRIMARY KEY,name TEXT NOT NULL,version INTEGER NOT NULL DEFAULT 1)");
+ db.exec("INSERT INTO events(id,name) VALUES('a','6h FUJI (horaires non définies par LMU)'),('b','12h du Mans'),('c','8h BAHRAIN  (Horaires à venir)')");
+ db.exec(readFileSync(new URL('../migrations/0026_event_schedule_pending.sql',import.meta.url),'utf8'));
+ assert.deepEqual(db.prepare('SELECT id,name,schedule_pending p,version v FROM events ORDER BY id').all().map(r=>({...r})),[
+  {id:'a',name:'6h FUJI',p:1,v:2},{id:'b',name:'12h du Mans',p:0,v:1},{id:'c',name:'8h BAHRAIN',p:1,v:2}]);
 });

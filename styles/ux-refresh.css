@@ -1,0 +1,217 @@
+/*
+ * Navigation et lisibilité des pages simulateur (LMU / iRacing).
+ * Chargée en dernier : elle remplace la barre reconstruite en JavaScript
+ * (ancien desktop-home-toolbar.mjs) par une seule structure, identique sur
+ * ordinateur et mobile, disposée en CSS grid.
+ */
+
+/* Bannière réduite sur les pages intérieures : le contenu arrive plus vite. */
+html[data-game] .site-hero,
+html[data-game] .site-hero .hero-picture,
+html[data-game] .site-hero .header-inner {
+  height: clamp(84px, 13vw, 180px) !important;
+  min-height: 0 !important;
+}
+html[data-game] .site-hero .hero-banner {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+  object-position: 50% 38% !important;
+}
+
+/* ---------- Barre de navigation ---------- */
+html[data-game] .site-nav-shell {
+  display: grid !important;
+  grid-template-columns: auto auto 1fr auto !important;
+  grid-template-areas: "lang switch sections account" !important;
+  align-items: center !important;
+  gap: 10px 14px !important;
+  margin: 10px 18px 6px !important;
+  padding: 8px 12px !important;
+  min-height: 0 !important;
+  height: auto !important;
+  width: auto !important;
+  max-width: none !important;
+  box-sizing: border-box !important;
+}
+html[data-game] .site-nav-shell > .desktop-home-toolbar,
+html[data-game] .site-nav-shell > .desktop-nav-center,
+html[data-game] .site-nav-shell > .desktop-nav-right { display: none !important; }
+
+html[data-game] .site-nav-shell > .game-space-bar {
+  grid-area: lang;
+  display: flex !important;
+  width: auto !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+html[data-game] .game-space-bar > #game-context-label {
+  position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap;
+}
+html[data-game] .site-nav-shell > #navigation {
+  display: contents !important;
+}
+html[data-game] .site-nav-shell > .account-bar {
+  grid-area: account;
+  justify-self: end;
+  margin: 0 !important;
+  width: auto !important;
+}
+
+/* Sélecteur de simulateur : un seul contrôle segmenté. */
+html[data-game] #navigation > .nav-game-switcher {
+  grid-area: switch;
+  display: inline-flex !important;
+  gap: 0 !important;
+  padding: 3px !important;
+  margin: 0 !important;
+  width: auto !important;
+  border: 1px solid rgba(255, 255, 255, .14);
+  border-radius: 10px;
+  background: rgba(0, 0, 0, .25);
+}
+html[data-game] #navigation .nav-game-switcher-button {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px !important;
+  height: auto !important;
+  width: auto !important;
+  min-width: 0 !important;
+  padding: 0 14px !important;
+  margin: 0 !important;
+  border: 0 !important;
+  border-radius: 7px !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  color: #c7d0d4 !important;
+  font-size: 14px !important;
+  font-weight: 700 !important;
+  text-decoration: none !important;
+  white-space: nowrap;
+}
+html[data-game] #navigation .nav-game-switcher-button[aria-current="page"] {
+  color: #fff !important;
+  background: var(--game-accent, #d8322c) !important;
+}
+html[data-game="iracing"] { --game-accent: #2f6fd6; }
+html[data-game="lmu"] { --game-accent: #d8322c; }
+html[data-game] .nav-short { display: none; }
+
+/* Onglets Événements / Mes inscriptions. */
+html[data-game] #navigation > .nav-sections {
+  grid-area: sections;
+  display: flex;
+  gap: 6px;
+  min-width: 0;
+}
+html[data-game] #navigation .nav-section-button {
+  min-height: 36px;
+  padding: 0 14px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: #c7d0d4;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+html[data-game] #navigation .nav-section-button:hover { color: #fff; background: rgba(255, 255, 255, .06); }
+html[data-game] #navigation .nav-section-button[aria-current="page"] {
+  color: #fff;
+  border-color: rgba(255, 255, 255, .18);
+  background: rgba(255, 255, 255, .09);
+}
+
+/* Compte : la phrase de confiance et « Aide » restent sur l'accueil et dans le pied de page. */
+html[data-game] .site-nav-shell .account-oauth-trust,
+html[data-game] .site-nav-shell .account-help-link { display: none !important; }
+html[data-game] .site-nav-shell .account-disconnected-wrap,
+html[data-game] .site-nav-shell .account-disconnected-actions { margin: 0 !important; gap: 0 !important; }
+html[data-game] .site-nav-shell .account-discord-login { min-height: 36px !important; padding: 0 14px !important; }
+.account-discord-login .login-short { display: none; }
+/* Le compte est à droite de la barre : son menu s'ouvre vers la gauche. */
+html[data-game] .site-nav-shell .account-popover {
+  left: auto !important;
+  right: 0 !important;
+  max-width: calc(100vw - 20px) !important;
+}
+
+/* ---------- En-tête de la liste des événements ---------- */
+html[data-game] .page-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: 4px 0 12px;
+}
+html[data-game] .page-head > .page-title {
+  position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap;
+}
+html[data-game] .page-head .event-filter { margin: 0 !important; }
+html[data-game] .page-head .home-create-event { margin: 0 0 0 auto !important; }
+
+/* ---------- Cartes de course ---------- */
+.event-compact-date { display: inline-flex; flex-wrap: wrap; align-items: baseline; }
+.event-compact-date > span + span::before { content: "·"; margin: 0 .4em; opacity: .55; }
+
+.event-schedule-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 9px;
+  border: 1px dashed rgba(243, 179, 61, .75);
+  border-radius: 999px;
+  color: #f3b33d;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.event-info .event-schedule-badge, .event-subtitle .event-schedule-badge { margin-left: 6px; }
+
+/* Formulaire d'événement : case « Horaires à confirmer ». */
+.event-schedule-option {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  cursor: pointer;
+}
+.event-schedule-option input { margin-top: 3px; width: 18px; height: 18px; flex: none; }
+.event-schedule-option span { display: grid; gap: 2px; }
+.event-schedule-option small { opacity: .75; font-weight: 400; }
+
+/* ---------- Écrans intermédiaires ---------- */
+@media (max-width: 1100px) {
+  html[data-game] .nav-full { display: none; }
+  html[data-game] .nav-short { display: inline; }
+  html[data-game] .site-nav-shell .account-discord-login .login-long { display: none; }
+  html[data-game] .site-nav-shell .account-discord-login .login-short { display: inline; }
+}
+
+/* ---------- Tablette et mobile : deux lignes ---------- */
+@media (max-width: 900px) {
+  html[data-game] .site-nav-shell {
+    grid-template-columns: auto 1fr auto !important;
+    grid-template-areas:
+      "lang switch account"
+      "sections sections sections" !important;
+    margin: 8px 10px 4px !important;
+    padding: 8px !important;
+  }
+  html[data-game] #navigation > .nav-game-switcher { justify-self: stretch; }
+  html[data-game] #navigation .nav-game-switcher-button { flex: 1; padding: 0 10px !important; }
+  html[data-game] #navigation > .nav-sections > .nav-section-button { flex: 1; }
+}
+@media (max-width: 760px) {
+  html[data-game] .site-nav-shell .account-trigger-copy,
+  html[data-game] .site-nav-shell .account-chevron { display: none !important; }
+  html[data-game] #app { padding-left: 10px !important; padding-right: 10px !important; }
+  html[data-game] .page-head .event-filter { flex: 1; }
+}
+
+/* Formulaire d'inscription : le titre précis remplace « Inscriptions » dans l'en-tête ; pas de doublon. */
+.fold-registration .registration-form > .form-title { display: none; }

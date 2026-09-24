@@ -72,7 +72,7 @@ function renderDisconnected(discordReady) {
   root.innerHTML = `<div class="account-disconnected-wrap"><div class="account-disconnected-actions">
     <a class="account-menu-item account-help-link" href="/help.html">Aide</a>
     ${discordReady
-      ? `<a class="account-discord-login" href="/api/auth/discord">${discordMark()}<span>Se connecter avec Discord</span></a>`
+      ? `<a class="account-discord-login" href="/api/auth/discord">${discordMark()}<span class="login-long">Se connecter avec Discord</span><span class="login-short">Connexion</span></a>`
       : `<span class="account-discord-unavailable">${discordMark()}<span>Connexion Discord indisponible</span></span>`}
   </div>${discordReady?'<p class="account-oauth-trust">Connexion via Discord OAuth · aucun mot de passe transmis à Endurance Manager. <a href="/about.html#connexion">En savoir plus</a></p>':''}</div>`;
 }
@@ -118,12 +118,9 @@ function activateLegacyHashAction() {
   if (location.hash === '#help') location.replace('/help.html');
 }
 
-// Remember which race is open so Discord login can bring the pilot back to it.
-let currentView = null;
-document.addEventListener('endurance:render', event => { currentView = event.detail; });
+// The address already names the open race (#event=…) or My entries: Discord login brings the pilot back there.
 function loginReturnPath() {
-  const eventId = currentView?.page === 'event' ? String(currentView.eventId || '') : '';
-  return location.pathname + (/^[a-f0-9-]{36}$/.test(eventId) ? `#event=${eventId}` : '');
+  return location.pathname + (/^#(?:event=[a-f0-9-]{36}|inscriptions)$/.test(location.hash) ? location.hash : '');
 }
 
 root?.addEventListener('click', async event => {
