@@ -2,6 +2,7 @@ import {
   HttpError,fail,json,origin,rateLimit,identity,id,now,text,registrationSelect,personal
 } from './core.mjs';
 import {communityDirectoryApi,membership,requireMember,organizationSummary,requireOrganizationEligibility,syncDiscordCommunityUser} from './community-directory.mjs';
+import {siteCommunity} from './site-community.mjs';
 
 const UUID=/^[a-f0-9-]{36}$/;
 const DISCORD_ID=/^\d{15,22}$/;
@@ -159,10 +160,8 @@ async function decorateEvents(response,env,actor){
 async function decorateSession(request,response,env,actor){
   if(!response.ok)return response;
   const data=await response.clone().json().catch(()=>null);if(!data)return response;
-  const requestUrl=new URL(request.url),referer=request.headers.get('Referer');
-  let requestedCommunity=requestUrl.searchParams.get('community');
-  if(!requestedCommunity&&referer){try{requestedCommunity=new URL(referer).searchParams.get('community');}catch{}}
-  if(requestedCommunity)await syncDiscordCommunityUser(env,actor,requestedCommunity);
+  const site=await siteCommunity(env);
+  if(site&&actor.user)await syncDiscordCommunityUser(env,actor,site.id);
   data.organizations=await organizationSummary(env,actor);
   const headers=new Headers(response.headers);headers.delete('Content-Length');
   return new Response(JSON.stringify(data),{status:response.status,headers});
@@ -180,12 +179,13 @@ async function route(request,env,ctx,next){
   const registrationIds=method==='POST'?eventDeparture(path,'registrations'):null;
   if(registrationIds){
     const input=await request.clone().json().catch(()=>null);if(!input)fail(400,'Formulaire invalide.');
+    if(!actor.user)fail(401,'Connecte-toi avec Discord pour t’inscrire.');
+    const site=await siteCommunity(env);
+    if(!site)fail(503,'Le site des Tondeuz n’est pas encore configuré.');
+    await syncDiscordCommunityUser(env,actor,site.id);
     const eventScope=await env.DB.prepare('SELECT organization_id FROM events WHERE id=?').bind(registrationIds.eventId).first();
-    if(eventScope?.organization_id){
-      const supplied=normalizeAudienceIds(input);
-      if(supplied.some(value=>value!==eventScope.organization_id)&&!(supplied.length===1&&supplied[0]===GENERAL))fail(409,'Cette endurance appartient à une communauté : l’inscription doit rester dans cet espace.');
-      input.audienceIds=[eventScope.organization_id];
-    }
+    if(eventScope?.organization_id&&eventScope.organization_id!==site.id)fail(404,'Événement introuvable.');
+    input.audienceIds=[site.id];
     const participantUserId=await targetUserId(env,actor,input);
     const audienceIds=await validateAudiences(env,actor,input,{participantUserId});
     const response=await next(request,env,ctx);
