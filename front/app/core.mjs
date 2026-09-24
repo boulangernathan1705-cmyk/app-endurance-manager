@@ -14,7 +14,7 @@ export const state = {
   events:[], user:null, discordReady:false, currentEventId:null, page:'home', editingEvent:null,
   drafts:{}, recoveryLink:'', busy:false, participants:[], flash:'', eventFilter:'upcoming',
   selectedDepartureId:null, eventSection:'race', pilotName:'', registrationOpen:new Set(), crewManagementOpen:new Set(),
-  pendingCrewJoin:null, currentOrganizationId:null, activeOrganizationId:null, activeCommunityId:null, requestedCommunityId:null, eventCreationOrganizationId:null, organizations:{communities:[],discoverableCommunities:[],preferredCommunityId:null,discordBotReady:false,discordBotInviteUrl:''}, visibleAudienceIds:new Set(['general'])
+  pendingCrewJoin:null, currentOrganizationId:null, activeOrganizationId:null, activeCommunityId:null, requestedCommunityId:null, eventCreationOrganizationId:null, organizations:{communities:[],discoverableCommunities:[],preferredCommunityId:null,siteCommunityId:null,discordBotReady:false,discordBotInviteUrl:''}, visibleAudienceIds:new Set(['general'])
 };
 try { state.pilotName = localStorage.getItem('fmt_pilot_name') || ''; } catch {}
 
@@ -128,21 +128,20 @@ export async function api(path,method='GET',data) {
   }
 }
 export async function load() {
-  const requestedCommunity=new URLSearchParams(location.search).get('community');
-  const session = await api(requestedCommunity?`/api/session?community=${encodeURIComponent(requestedCommunity)}`:'/api/session');
+  const session = await api('/api/session');
   const management=location.pathname==='/communities.html';
   const result = management?{events:[]}:await api(`/api/events?game=${encodeURIComponent(activeGame)}`);
   state.user=session.user;
   state.discordReady=session.discordReady;
-  state.organizations=session.organizations||{communities:[],discoverableCommunities:[],preferredCommunityId:null,discordBotReady:false,discordBotInviteUrl:''};
-  const requestedRaw=typeof location!=='undefined'?new URLSearchParams(location.search).get('community')||'':'';
-  const explicitGeneral=requestedRaw==='general';
-  const requested=/^[a-f0-9-]{36}$/.test(requestedRaw)&&communityById(state.organizations,requestedRaw)?requestedRaw:null;
-  state.requestedCommunityId=requested;
-  state.activeCommunityId=explicitGeneral?null:(requested||preferredCommunityId(state.organizations));
+  state.organizations=session.organizations||{communities:[],discoverableCommunities:[],preferredCommunityId:null,siteCommunityId:null,discordBotReady:false,discordBotInviteUrl:''};
+  const siteId=state.organizations.siteCommunityId||preferredCommunityId(state.organizations);
+  state.requestedCommunityId=siteId||null;
+  state.activeCommunityId=siteId||null;
   state.activeOrganizationId=state.activeCommunityId;
   state.visibleAudienceIds=new Set([state.activeCommunityId||'general']);
-  state.events=(Array.isArray(result.events)?result.events:[]).filter(event => gameForEvent(event) === activeGame);
+  state.events=(Array.isArray(result.events)?result.events:[])
+    .filter(event => gameForEvent(event) === activeGame)
+    .filter(event => !event.organizationId || !siteId || event.organizationId===siteId);
   state.participants=state.user&&!management ? (await api('/api/participants')).participants : [];
   if (state.user && !state.pilotName) state.pilotName=state.user.name.slice(0,30);
 }
