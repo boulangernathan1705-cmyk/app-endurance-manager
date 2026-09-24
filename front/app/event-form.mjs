@@ -1,4 +1,4 @@
-import {app,state,esc,button,canManage,CATEGORIES,EVENT_TYPES,CIRCUITS,categories,logo,notifyRender} from './core.mjs?v=10-community-only';
+import {app,state,esc,button,canManage,CATEGORIES,EVENT_TYPES,CIRCUITS,categories,logo,notifyRender} from './core.mjs?v=11-community-navigation';
 
 const managedCommunities=()=>[
   ...(state.organizations?.communities||[])

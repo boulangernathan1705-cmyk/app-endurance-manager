@@ -1,12 +1,12 @@
-import {app,state,api,load,showError,countdown,CARS} from './core.mjs?v=10-community-only';
-import {renderNav,renderHome} from './home-view.mjs?v=14-community-only';
-import {renderCommunities} from './community-directory.mjs?v=11-community-management-cleanup';
+import {app,state,api,load,showError,countdown,CARS} from './core.mjs?v=11-community-navigation';
+import {renderNav,renderHome} from './home-view.mjs?v=15-community-navigation';
+import {renderCommunities} from './community-directory.mjs?v=12-community-navigation';
 import {renderEvent} from './event-view.mjs?v=21-community-only';
 import {renderEventForm,departureFields,updateRemoveButtons} from './event-form.mjs?v=5-community-only';
 import {renderMyEntries} from './entries-view.mjs?v=9-community-only';
 import {refresh,refreshAfterSave} from './refresh.mjs?v=6-community-only';
 import {draftFor,registrationDraft,ownRegistrations,rerenderRegistrationSection,submitRegistration} from './registration.mjs?v=9-community-only';
-import {updateCrewState} from './crews.mjs?v=14-community-only';
+import {updateCrewState} from './crews.mjs?v=15-community-navigation';
 import {GENERAL_AUDIENCE,defaultRegistrationAudienceIds,registrationAudienceIds,communityById} from './organization-context.mjs?v=7-community-only';
 
 async function submitEvent(form){
@@ -130,7 +130,7 @@ async function perform(action,target){
     }
     case 'communities': {
       const focus=target.dataset.communityId||state.activeCommunityId||null;
-      await load();renderNav();renderCommunities(focus);break;
+      location.assign('/communities.html'+(focus?'?community='+encodeURIComponent(focus):''));break;
     }
     case 'guest-link': state.recoveryLink=(await api('/api/guest/link','POST')).link;state.page==='event'?renderEvent():renderHome();break;
     case 'copy-link':

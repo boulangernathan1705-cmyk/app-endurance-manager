@@ -1,4 +1,4 @@
-import {state} from './core.mjs?v=10-community-only';
+import {state} from './core.mjs?v=11-community-navigation';
 
 export function resetNetworkScope(){
   state.activeOrganizationId=state.activeCommunityId||null;

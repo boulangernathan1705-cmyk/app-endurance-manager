@@ -252,7 +252,7 @@
   background:linear-gradient(90deg,rgba(4,9,11,.94),rgba(4,9,11,.62) 62%,rgba(4,9,11,.78));
 }
 .community-profile-copy { min-width:0; }
-.community-profile-actions-row { display:flex; gap:7px; flex-wrap:wrap; justify-content:flex-end; }
+.community-profile-actions-row { display:contents; }
 
 .community-branding-settings {
   grid-column: 1 / -1;
@@ -381,8 +381,9 @@
   .community-create-trigger { width:100% !important; }
   .community-profile-hero { min-height:210px; grid-template-columns:auto minmax(0,1fr); align-items:end; }
   .community-profile-actions { grid-column:1/-1; }
-  .community-profile-actions-row { justify-content:stretch; }
-  .community-profile-actions-row button { flex:1 1 100%; width:100% !important; }
+  .community-profile-actions-row { display:contents; }
+  .community-profile-actions { align-items:stretch; }
+  .community-profile-actions button { height:48px; min-height:48px; }
   .community-branding-fields { grid-template-columns:1fr; }
   .community-branding-fields label:last-child { grid-column:auto; max-width:none; }
 }

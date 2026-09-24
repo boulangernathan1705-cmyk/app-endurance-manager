@@ -130,7 +130,8 @@ export async function api(path,method='GET',data) {
 export async function load() {
   const requestedCommunity=new URLSearchParams(location.search).get('community');
   const session = await api(requestedCommunity?`/api/session?community=${encodeURIComponent(requestedCommunity)}`:'/api/session');
-  const result = await api(`/api/events?game=${encodeURIComponent(activeGame)}`);
+  const management=location.pathname==='/communities.html';
+  const result = management?{events:[]}:await api(`/api/events?game=${encodeURIComponent(activeGame)}`);
   state.user=session.user;
   state.discordReady=session.discordReady;
   state.organizations=session.organizations||{communities:[],discoverableCommunities:[],preferredCommunityId:null,discordBotReady:false,discordBotInviteUrl:''};
@@ -142,7 +143,7 @@ export async function load() {
   state.activeOrganizationId=state.activeCommunityId;
   state.visibleAudienceIds=new Set([state.activeCommunityId||'general']);
   state.events=(Array.isArray(result.events)?result.events:[]).filter(event => gameForEvent(event) === activeGame);
-  state.participants=state.user ? (await api('/api/participants')).participants : [];
+  state.participants=state.user&&!management ? (await api('/api/participants')).participants : [];
   if (state.user && !state.pilotName) state.pilotName=state.user.name.slice(0,30);
 }
 

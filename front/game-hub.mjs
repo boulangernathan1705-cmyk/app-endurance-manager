@@ -222,13 +222,12 @@ function renderCommunityPicker() {
     ? [requestedCommunity, ...joined]
     : joined;
   const params=new URLSearchParams();
-  params.set('communities','1');
   if (selectedCommunityId) params.set('community',selectedCommunityId);
   communityPicker.innerHTML=`<div class="hub-community-options">
       ${communityOption(null)}
       ${choices.map(communityOption).join('')}
     </div>
-    <a class="hub-community-manage" href="/lmu/?${params.toString()}">Gérer ou découvrir des communautés</a>`;
+    <a class="hub-community-manage" href="/communities.html?${params.toString()}">Paramètres communautés</a>`;
 }
 
 function renderGames() {

@@ -1,6 +1,6 @@
-import {app,nav,state,esc,button,canManage,eventTypeBadge,eventBadge,eventCategoryCount,pilotCount,circuitVisual,dateLabel,countdown,groupEvents,notifyRender,notifyNav} from './core.mjs?v=10-community-only';
+import {app,nav,state,esc,button,canManage,eventTypeBadge,eventBadge,eventCategoryCount,pilotCount,circuitVisual,dateLabel,countdown,groupEvents,notifyRender,notifyNav} from './core.mjs?v=11-community-navigation';
 import {getLocale,localeTag} from '../i18n.mjs';
-import {communityById,registrationAudienceIds} from './organization-context.mjs?v=7-community-only';
+import {communityById} from './organization-context.mjs?v=7-community-only';
 
 const compactDateFormatter=new Intl.DateTimeFormat(localeTag(),{timeZone:'Europe/Paris',day:'2-digit',month:'2-digit'});
 const CREW_COLORS=['#52d3d8','#f3b33d','#ec5b67','#75d66b','#8b7cf6','#e47adf','#58a6ff','#f28f45'];
@@ -59,7 +59,7 @@ function communityContextMarkup(){
         ${communityMark(community)}<span><strong>${esc(community.name)}</strong><small>${community.id===state.organizations?.preferredCommunityId?'Communauté par défaut':community.role?'Membre':'Découvrir'}</small></span>
       </button>`).join('')}
       <span class="community-context-separator" aria-hidden="true"></span>
-      <button type="button" class="community-context-manage" data-action="communities">Gérer ou découvrir des communautés</button>
+      <button type="button" class="community-context-manage" data-action="communities">Paramètres communautés</button>
     </div>
   </details>`;
 }
@@ -91,46 +91,6 @@ function crewSummary(event,{includePast=false}={}){
   const rows=crewRows(event,{includePast});if(!rows.length)return'';
   return `<span class="event-home-crews"><span class="crew-summary-heading"><strong>${rows.length} équipage${rows.length>1?'s':''}</strong><span>engagé${rows.length>1?'s':''}</span></span><span class="crew-summary-list">${rows.map((row,index)=>{const color=CREW_COLORS[index%CREW_COLORS.length];return `<span class="crew-summary-card ${row.locked?'is-complete':'is-open'}">${crewIcon(color)}<span class="crew-summary-main"><span class="crew-summary-title"><strong style="color:${color}">${esc(row.name)}</strong><b>${esc(displayTime(row.time))}</b></span><small>${esc(row.category)}${row.car?` · ${esc(row.car)}`:''}</small></span><span class="crew-summary-pilots">${row.pilots.length?esc(row.pilots.join(' · ')):'Aucun pilote affecté'}</span></span>`;}).join('')}</span></span>`;
 }
-function ownFutureRows(now=Date.now()){
-  const rows=[];
-  for(const event of contextEvents())for(const departure of event.departures||[]){
-    if(!Number.isFinite(Number(departure.startsAt))||Number(departure.startsAt)<=now)continue;
-    for(const registration of departure.availability||[]){
-      if(!registration.mine||registration.status==='unavailable')continue;
-      const crew=(departure.crews||[]).find(item=>(item.registrationIds||[]).includes(registration.id));
-      rows.push({event,departure,registration,crew});
-    }
-  }
-  return rows.sort((a,b)=>Number(a.departure.startsAt)-Number(b.departure.startsAt));
-}
-function paddockSignals(now=Date.now()){
-  const community=activeCommunity();
-  if(!community)return[];
-  const signals=[];
-  for(const event of contextEvents())for(const departure of event.departures||[]){
-    if(!Number.isFinite(Number(departure.startsAt))||Number(departure.startsAt)<=now)continue;
-    const registrations=(departure.availability||[]).filter(reg=>reg.status!=='unavailable'&&registrationAudienceIds(reg).includes(community.id));
-    const crews=(departure.crews||[]).filter(crew=>crew.organizationId===community.id);
-    if(!registrations.length&&!crews.length)continue;
-    const assigned=new Set(crews.flatMap(crew=>crew.registrationIds||[]));
-    const unassigned=registrations.filter(reg=>!assigned.has(reg.id)&&!reg.engaged);
-    const mine=unassigned.find(reg=>reg.mine);
-    const myOpenCrew=crews.find(crew=>!crew.locked&&(crew.registrationIds||[]).some(id=>registrations.find(reg=>reg.id===id)?.mine));
-    if(mine)signals.push({priority:0,event,departure,title:'Tu es inscrit sans équipage',detail:mine.category||'Catégorie à préciser'});
-    else if(myOpenCrew)signals.push({priority:1,event,departure,title:`Ton équipage « ${myOpenCrew.name} » est encore ouvert`,detail:myOpenCrew.category||''});
-    else if(unassigned.length)signals.push({priority:2,event,departure,title:`${unassigned.length} pilote${unassigned.length>1?'s':''} sans équipage`,detail:event.name});
-  }
-  return signals.sort((a,b)=>a.priority-b.priority||Number(a.departure.startsAt)-Number(b.departure.startsAt)).slice(0,3);
-}
-function renderPaddockPulse(){
-  if(!state.user)return'';
-  const next=ownFutureRows()[0]||null,signals=paddockSignals();
-  if(!next&&!signals.length)return'';
-  const nextMarkup=next?`<button type="button" data-action="open" data-id="${next.event.id}" data-departure="${next.departure.id}"><strong>${esc(next.event.name)}</strong><small>${esc(dateLabel(next.departure))} · ${esc(displayTime(next.departure.time))} · ${next.crew?`Équipage ${esc(next.crew.name)}`:'Sans équipage'}</small></button>`:`<span class="paddock-empty-line">Aucun engagement personnel à venir.</span>`;
-  const signalsMarkup=signals.length?signals.map(signal=>`<button type="button" class="paddock-signal" data-action="open" data-id="${signal.event.id}" data-departure="${signal.departure.id}"><span><strong>${esc(signal.title)}</strong><small>${esc(signal.detail)} · ${esc(dateLabel(signal.departure))}</small></span><b aria-hidden="true">›</b></button>`).join(''):`<span class="paddock-empty-line">Rien d’urgent pour le moment.</span>`;
-  return `<section class="paddock-pulse compact-context"><div class="paddock-pulse-grid"><div class="paddock-next"><span class="paddock-panel-label">MON PROCHAIN ENGAGEMENT</span>${nextMarkup}</div>${state.activeCommunityId?`<div class="paddock-signals"><span class="paddock-panel-label">À SURVEILLER</span>${signalsMarkup}</div>`:''}</div></section>`;
-}
-
 export function renderNav(){
   const query=contextQuery();
   nav.innerHTML=`${communityContextMarkup()}${button('home','Événements')}${button('my-entries','Mes inscriptions')}<div class="nav-game-switcher" aria-label="Changer de simulateur"><a class="nav-game-switcher-button nav-game-switcher-lmu" href="/lmu/${query}">Le Mans Ultimate</a><a class="nav-game-switcher-button nav-game-switcher-iracing" href="/iracing/${query}">iRacing</a></div>`;
@@ -151,6 +111,6 @@ export function renderHome(message=''){
   const groups=groupEvents(events,state.eventFilter);
   const community=activeCommunity();
   const createAllowed=canManageContext();
-  app.innerHTML=`${communityIdentity()}<h1 class="page-title">ÉVÉNEMENTS</h1>${renderPaddockPulse()}${createAllowed?`<div class="home-create-event">${button('create',community?'Ajouter une endurance':'Ajouter un évènement','','primary-button')}</div>`:''}${message?`<p class="creation-success" role="status">${esc(message)}</p>`:''}${!state.user?`<div class="toolbar home-toolbar">${button('guest-link','Mon lien personnel')}</div>`:''}<div class="event-filter" role="group" aria-label="Filtrer les événements">${button('event-filter','À venir',`data-filter="upcoming" aria-pressed="${state.eventFilter==='upcoming'}"`,'event-filter-button')}${button('event-filter','Archivés',`data-filter="archived" aria-pressed="${state.eventFilter==='archived'}"`,'event-filter-button')}</div>${groups.length?`<div class="event-agenda">${groups.map(group=>`<section class="event-period" aria-labelledby="period-${group.key}"><h2 class="event-period-heading" id="period-${group.key}"><span>${esc(group.label)}</span><small>${group.items.length} événement${group.items.length>1?'s':''}</small></h2><div class="event-list">${group.items.map(eventCard).join('')}</div></section>`).join('')}</div>`:`<div class="empty">${state.eventFilter==='upcoming'?(community?`Aucune endurance ${globalThis.__ENDURANCE_GAME__==='iracing'?'iRacing':'LMU'} à venir dans cette communauté.`:'Aucun événement indépendant à venir.'):'Aucun événement archivé.'}</div>`}`;
+  app.innerHTML=`${communityIdentity()}<h1 class="page-title">ÉVÉNEMENTS</h1>${createAllowed?`<div class="home-create-event">${button('create',community?'Ajouter une endurance':'Ajouter un évènement','','primary-button')}</div>`:''}${message?`<p class="creation-success" role="status">${esc(message)}</p>`:''}${!state.user?`<div class="toolbar home-toolbar">${button('guest-link','Mon lien personnel')}</div>`:''}<div class="event-filter" role="group" aria-label="Filtrer les événements">${button('event-filter','À venir',`data-filter="upcoming" aria-pressed="${state.eventFilter==='upcoming'}"`,'event-filter-button')}${button('event-filter','Archivés',`data-filter="archived" aria-pressed="${state.eventFilter==='archived'}"`,'event-filter-button')}</div>${groups.length?`<div class="event-agenda">${groups.map(group=>`<section class="event-period" aria-labelledby="period-${group.key}"><h2 class="event-period-heading" id="period-${group.key}"><span>${esc(group.label)}</span><small>${group.items.length} événement${group.items.length>1?'s':''}</small></h2><div class="event-list">${group.items.map(eventCard).join('')}</div></section>`).join('')}</div>`:`<div class="empty">${state.eventFilter==='upcoming'?(community?`Aucune endurance ${globalThis.__ENDURANCE_GAME__==='iracing'?'iRacing':'LMU'} à venir dans cette communauté.`:'Aucun événement indépendant à venir.'):'Aucun événement archivé.'}</div>`}`;
   showRecoveryLink();notifyRender();
 }

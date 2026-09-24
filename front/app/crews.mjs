@@ -1,4 +1,4 @@
-import {state,esc,button,logo,renderAvailabilityTimeline,crewColorClass,coversHour,pilotCount,api} from './core.mjs?v=10-community-only';
+import {state,esc,button,logo,renderAvailabilityTimeline,crewColorClass,coversHour,pilotCount,api} from './core.mjs?v=11-community-navigation';
 import {renderRegistration} from './registration.mjs?v=9-community-only';
 import {organizationShortLabel} from './organization-context.mjs?v=7-community-only';
 

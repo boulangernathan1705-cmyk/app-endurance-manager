@@ -5,6 +5,24 @@
   margin:0 auto;
   padding-bottom:28px
 }
+.community-settings-nav {
+  display:flex;
+  flex-wrap:wrap;
+  gap:12px;
+  max-width:1180px;
+  margin:16px auto;
+  padding:0 16px;
+}
+.community-settings-nav a {
+  display:flex;
+  align-items:center;
+  min-height:44px;
+  padding:0 14px;
+  border:1px solid #43656a;
+  border-radius:10px;
+  color:#dbe5e3;
+  text-decoration:none;
+}
 .community-directory-hero,.community-profile-hero,.community-directory-section,.community-detail-block,.community-create-panel,.community-settings {
   border:1px solid rgba(67,101,106,.7);
   background:linear-gradient(145deg,rgba(19,31,34,.96),rgba(8,15,17,.97));
