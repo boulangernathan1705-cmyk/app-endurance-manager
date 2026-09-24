@@ -4,20 +4,36 @@ import {renderEvent} from './event-view.mjs?v=9-one-course-page';
 import {renderEventForm,departureFields,updateRemoveButtons} from './event-form.mjs';
 import {renderMyEntries} from './entries-view.mjs?v=2-three-accordions';
 import {refresh,refreshAfterSave} from './refresh.mjs';
-import {draftFor,registrationDraft,ownRegistrations,rerenderRegistrationSection,submitRegistration} from './registration.mjs?v=2-preserve-timeline-scroll';
+import {draftFor,registrationDraft,ownRegistrations,rerenderRegistrationSection,submitRegistration,registrationStep} from './registration.mjs?v=2-preserve-timeline-scroll';
 import {updateCrewState} from './crews.mjs?v=8-one-page-compact';
 import {installRouter,routeFromLocation,applyRoute} from './router.mjs';
 import {installAutoRefresh} from './auto-refresh.mjs';
 
-// Registration forms open inside the departure, often below the fold: bring them into view.
+// The registration panel opens over the race: move keyboard and screen-reader focus into it.
 function revealRegistration(departureId){
-  requestAnimationFrame(()=>{
-    const section=document.getElementById(`departure-${departureId}`)?.querySelector('.fold-registration');
-    if(!section||section.hidden)return;
-    const top=section.getBoundingClientRect().top;
-    if(top>=0&&top<innerHeight*0.6)return;
-    section.scrollIntoView({block:'start',behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});
-  });
+  requestAnimationFrame(()=>document.getElementById(`departure-${departureId}`)?.querySelector('.fold-registration:not([hidden]) h2[tabindex]')?.focus({preventScroll:true}));
+}
+
+// Moving forward in the step-by-step registration checks the current step first.
+function validateRegistrationStep(draft,step){
+  if(step===1){
+    if(draft.forOther&&!draft.id&&draft.mode!=='category'&&!draft.participantUserId&&!draft.manualOther)throw Error('Choisis un pilote.');
+    if((draft.manualOther||(!draft.forOther&&!state.user))&&!String(draft.name||'').trim())throw Error(draft.forOther?'Indique le pseudo du pilote.':'Indique ton pseudo pilote.');
+    if(!draft.category)throw Error('Choisis une catégorie.');
+  }
+  if(step===2&&!draft.carAny&&!(draft.cars||[]).length)throw Error('Choisis au moins une voiture, ou « Peu importe la voiture ».');
+  if(step===3&&!draft.status)throw Error('Choisis au moins une heure de présence.');
+}
+function goToRegistrationStep(event,departure,target){
+  const draft=draftFor(departure),current=registrationStep(draft),wanted=Number(target.dataset.step);
+  if(wanted>current)for(let step=current;step<Math.min(wanted,4);step++)validateRegistrationStep(draft,step);
+  if(target.dataset.edit)draft.returnToSummary=true;
+  else if(wanted===4||wanted<current)draft.returnToSummary=false;
+  draft.step=wanted;
+  rerenderRegistrationSection(event,departure,'',renderEvent);
+  const section=document.getElementById(`departure-${departure.id}`)?.querySelector('.fold-registration');
+  section?.querySelector('.registration-sheet')?.scrollTo?.(0,0);
+  section?.querySelector('h2[tabindex]')?.focus({preventScroll:true});
 }
 
 async function submitEvent(form){
@@ -73,6 +89,7 @@ async function perform(action,target){
     case 'open': state.currentEventId=target.dataset.id; state.selectedDepartureId=target.dataset.departure||null; state.eventSection='race'; state.drafts={}; state.pendingCrewJoin=null; state.registrationOpen.clear(); renderEvent(); break;
     case 'event-section': state.eventSection='race'; renderEvent(); break;
     case 'my-registration': { state.pendingCrewJoin=null; state.selectedDepartureId=target.dataset.departure; delete state.drafts[state.selectedDepartureId]; state.registrationOpen.add(state.selectedDepartureId); renderEvent(); revealRegistration(state.selectedDepartureId); break; }
+    case 'registration-step': { const departure=event.departures.find(item=>item.id===target.dataset.departure); goToRegistrationStep(event,departure,target); break; }
     case 'close-registration': if(state.pendingCrewJoin?.departureId===target.dataset.departure)state.pendingCrewJoin=null;state.registrationOpen.delete(target.dataset.departure); renderEvent(); break;
     case 'new-registration': {
       state.pendingCrewJoin=null;state.selectedDepartureId=target.dataset.departure; const departure=event.departures.find(item=>item.id===target.dataset.departure); const categoryMode=target.dataset.mode==='category'; const existing=departure.availability.find(reg=>reg.id===target.dataset.registration)||ownRegistrations(departure)[0];
@@ -126,6 +143,12 @@ document.addEventListener('change',async event=>{
   if(field.name==='participant'){const draft=state.drafts[field.dataset.departure],participant=state.participants.find(item=>item.id===field.value);if(draft){draft.participantUserId=participant?.id||null;draft.participantId=participant?.participantId||null;draft.name=participant?.name||'';draft.category='';draft.cars=[];draft.carAny=false;state.registrationOpen.add(field.dataset.departure);renderEvent();}return;}
   const departureId=field.form?.dataset.departure;if(departureId&&state.drafts[departureId]&&(field.name==='carPreference'||field.name==='carAny')){const draft=state.drafts[departureId];draft.cars=[...field.form.querySelectorAll('[name="carPreference"]:checked')].map(input=>input.value);draft.carAny=!!field.form.elements.carAny?.checked;if(draft.carAny)draft.cars=[];for(const input of field.form.querySelectorAll('[name="carPreference"]')){input.disabled=draft.carAny;if(draft.carAny)input.checked=false;}}
 });
+// "Ta course" jumps to the pilot's start and opens it.
+document.addEventListener('click',event=>{const link=event.target.closest?.('[data-my-race]');if(!link)return;event.preventDefault();const fold=document.getElementById(`departure-${link.dataset.myRace}`);if(!fold)return;fold.open=true;fold.scrollIntoView({block:'start',behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});});
+// Registration panel: Enter moves to the next step, Escape or a click beside the panel closes it.
+document.addEventListener('submit',event=>{const form=event.target;if(form.matches?.('.registration-stepper')&&form.dataset.step!=='4'){event.preventDefault();event.stopImmediatePropagation();form.querySelector('.registration-next')?.click();}},true);
+document.addEventListener('click',event=>{if(event.target.matches?.('.fold-registration'))event.target.querySelector('.registration-close-button')?.click();});
+document.addEventListener('keydown',event=>{if(event.key!=='Escape'||document.querySelector('[data-ux-error-modal]'))return;document.querySelector('.fold-registration:not([hidden]) .registration-close-button')?.click();});
 document.addEventListener('toggle',event=>{const details=event.target;if(details instanceof HTMLDetailsElement&&details.matches('.crew-unified-card[data-crew],.crew-management-accordion[data-crew]'))details.open?state.crewManagementOpen.add(details.dataset.crew):state.crewManagementOpen.delete(details.dataset.crew);},true);
 document.addEventListener('click',async event=>{const target=event.target.closest?.('[data-action]');if(!target||target.disabled)return;if(target.dataset.action==='edit-crew')return;event.preventDefault();if(state.busy&&target.dataset.action!=='dismiss-error')return;state.busy=true;target.disabled=true;try{await perform(target.dataset.action,target);}catch(error){showError(error);}finally{state.busy=false;if(target.isConnected)target.disabled=false;updateRemoveButtons();}});
 document.addEventListener('submit',async event=>{const form=event.target;if(!form.dataset.kind)return;event.preventDefault();if(state.busy)return;state.busy=true;const submit=form.querySelector('[type="submit"]');if(submit)submit.disabled=true;try{if(form.dataset.kind==='event')await submitEvent(form);else if(form.dataset.kind==='registration'){const departureId=form.dataset.departure;const result=await submitRegistration(form,api);if(!(await finishPendingCrewJoin(departureId,result.id)))await refreshAfterSave('Inscription enregistrée.');}}catch(error){showError(error);}finally{state.busy=false;if(submit?.isConnected)submit.disabled=false;}});

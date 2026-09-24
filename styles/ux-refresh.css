@@ -215,3 +215,190 @@ html[data-game] .page-head .home-create-event { margin: 0 0 0 auto !important; }
 
 /* Formulaire d'inscription : le titre précis remplace « Inscriptions » dans l'en-tête ; pas de doublon. */
 .fold-registration .registration-form > .form-title { display: none; }
+
+/* ---------- Inscription en étapes : panneau par-dessus la course ---------- */
+body:has(.fold-registration:not([hidden])) { overflow: hidden; }
+.departure-fold .fold-registration:not([hidden]) {
+  position: fixed !important;
+  inset: 0;
+  z-index: 1200;
+  margin: 0 !important;
+  padding: 24px !important;
+  width: auto !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(4, 8, 10, .72);
+  border: 0 !important;
+}
+.registration-sheet {
+  width: 100%;
+  max-width: 620px;
+  max-height: min(88vh, 860px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 18px 20px 0;
+  border: 1px solid var(--border, #292d31);
+  border-radius: 16px;
+  background: var(--panel, #111315);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, .55);
+}
+.registration-sheet .registration-workspace-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin: 0;
+}
+.registration-workspace-title { flex: 1; min-width: 0; }
+.registration-workspace-title h2 { margin: 0; outline: none; }
+.registration-workspace-title p { margin: 4px 0 0; color: var(--muted, #92979c); font-size: 14px; }
+.registration-stepper { display: flex; flex-direction: column; gap: 12px; }
+.registration-progress { display: flex; gap: 4px; }
+.registration-progress span { flex: 1; height: 4px; border-radius: 2px; background: var(--panel3, #1d2023); }
+.registration-progress span.done { background: #52d3d8; }
+.registration-step-label { margin: -4px 0 0; color: var(--muted, #92979c); font-size: 13px; font-weight: 700; }
+.registration-step[hidden] { display: none !important; }
+.registration-step { display: flex; flex-direction: column; gap: 12px; }
+.registration-step-help { margin: 0; color: var(--muted, #92979c); font-size: 13px; }
+
+/* Étape 1 : grandes cartes de catégorie avec leur logo. */
+.registration-category-list { display: grid !important; grid-template-columns: minmax(0, 1fr); gap: 8px !important; }
+.registration-category-list .category-button {
+  display: flex !important;
+  align-items: center;
+  gap: 12px;
+  width: 100% !important;
+  min-height: 60px;
+  padding: 10px 14px !important;
+  justify-content: flex-start !important;
+  text-align: left;
+}
+.registration-category-copy { display: flex; flex-direction: column; gap: 2px; }
+.registration-category-copy small { font-weight: 500; opacity: .75; }
+
+/* Étape 4 : récapitulatif, chaque ligne ramène à son étape. */
+.registration-summary { display: flex; flex-direction: column; border: 1px solid var(--border, #292d31); border-radius: 12px; overflow: hidden; }
+.registration-summary-row {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 54px;
+  padding: 8px 14px;
+  border: 0;
+  border-bottom: 1px solid var(--border, #292d31);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.registration-summary-row:last-child { border-bottom: 0; }
+.registration-summary-row:hover { background: rgba(255, 255, 255, .04); }
+.registration-summary-row.is-static { cursor: default; }
+.registration-summary-row.is-static:hover { background: transparent; }
+.registration-summary-row > span { color: var(--muted, #92979c); font-size: 13px; }
+.registration-summary-row > strong { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
+.registration-summary-row > strong .category-logo { width: 28px; height: auto; }
+.registration-summary-row > em { font-style: normal; font-size: 13px; font-weight: 700; color: #52d3d8; }
+.registration-danger-zone { display: flex; justify-content: flex-start; }
+
+.registration-step-nav {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  gap: 10px;
+  margin: 4px -20px 0;
+  padding: 12px 20px 16px;
+  border-top: 1px solid var(--border, #292d31);
+  background: var(--panel, #111315);
+}
+.registration-step-nav .registration-next { flex: 1; min-height: 48px; margin: 0 !important; width: auto !important; }
+.registration-step-nav .registration-back { min-height: 48px; }
+
+@media (max-width: 760px) {
+  .departure-fold .fold-registration:not([hidden]) { align-items: flex-end; padding: 0 !important; }
+  .registration-sheet { max-width: none; max-height: 92vh; border-radius: 18px 18px 0 0; padding: 14px 14px 0; }
+  .registration-step-nav { margin: 4px -14px 0; padding: 12px 14px calc(14px + env(safe-area-inset-bottom)); }
+  .registration-sheet .registration-workspace-head { flex-wrap: nowrap; }
+  .registration-workspace-title h2 { font-size: 22px; }
+  .registration-workspace-actions { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+  .registration-workspace-actions .secondary-button { min-height: 40px !important; width: auto !important; padding: 0 12px !important; white-space: nowrap; }
+}
+
+/* ---------- Page de course : « Ta course » ---------- */
+.event-my-race {
+  display: grid;
+  gap: 4px;
+  margin: 12px 0 4px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: 1px solid rgba(49, 184, 107, .55);
+  background: rgba(49, 184, 107, .1);
+  color: inherit;
+  text-decoration: none;
+}
+.event-my-race.is-registered { border-color: rgba(82, 211, 216, .5); background: rgba(82, 211, 216, .08); }
+.event-my-race:hover { border-color: rgba(49, 184, 107, .9); }
+.event-my-race-kicker { font-size: 12px; font-weight: 800; letter-spacing: .1em; color: #7fe0a8; }
+.event-my-race.is-registered .event-my-race-kicker { color: #7fe3ea; }
+.event-my-race strong { font-size: 17px; }
+.event-my-race > span { color: #c9d6d0; font-size: 14px; }
+.event-my-race .event-my-race-countdown { color: #7fe0a8; font-weight: 700; }
+
+/* ---------- Liste des courses : situation du pilote et remplissage ---------- */
+.event-situation {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+  border: 1px solid rgba(49, 184, 107, .7);
+  background: rgba(49, 184, 107, .14);
+  color: #8ff0b6;
+}
+.event-situation.is-registered { border-color: rgba(82, 211, 216, .6); background: rgba(82, 211, 216, .1); color: #9eeef2; }
+html[data-game] .event-card .event-category-badges { display: flex !important; flex-wrap: wrap; gap: 6px; }
+
+/* ---------- Page de course plus aérée : tailles de texte lisibles, espaces réguliers ---------- */
+html[data-game] #app .event-actions-toolbar { margin: 12px 0 !important; }
+html[data-game] #app .event-toolbar-main { gap: 8px !important; }
+html[data-game] #app .event-toolbar-main button { font-size: 13px !important; min-height: 38px !important; padding: 0 14px !important; }
+html[data-game] #app .departure-accordion { display: flex; flex-direction: column; gap: 14px !important; }
+html[data-game] #app .departure-fold > summary { padding: 14px 18px !important; gap: 14px !important; }
+html[data-game] #app .departure-fold .ux-summary-registration-actions > button { font-size: 13px !important; min-height: 40px !important; }
+html[data-game] #app .departure-fold .fold-meta { font-size: 14px !important; }
+html[data-game] #app .departure-fold-body { padding: 4px 18px 20px !important; }
+html[data-game] #app .departure-participation-section { padding: 16px 18px 18px !important; }
+html[data-game] #app .departure-participation-section > * + * { margin-top: 14px; }
+
+/* Cartes d'équipage. */
+html[data-game] #app .crew-unified-card { margin-bottom: 10px !important; }
+html[data-game] #app .crew-unified-card > summary { padding: 12px 14px !important; gap: 12px !important; min-height: 56px; }
+html[data-game] #app .crew-unified-card strong { font-size: 16px !important; }
+html[data-game] #app .crew-compact-pilots,
+html[data-game] #app .crew-compact-car { font-size: 13.5px !important; }
+html[data-game] #app .crew-owner-badge,
+html[data-game] #app .crew-compact-status { font-size: 11px !important; padding: 3px 8px !important; }
+html[data-game] #app .coverage-summary { font-size: 12.5px !important; }
+html[data-game] #app .crew-unified-card button,
+html[data-game] #app .crew-unified-card select { font-size: 13px !important; min-height: 36px !important; }
+html[data-game] #app .pilot-row { padding-top: 10px !important; padding-bottom: 10px !important; }
+html[data-game] #app .pilot-name { font-size: 15px !important; }
+html[data-game] #app .pilot-car,
+html[data-game] #app .pilot-preference { font-size: 13px !important; }
+@media (min-width: 761px) {
+  html[data-game] #app .departure-fold > summary > .ux-summary-registration-actions {
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    grid-template-columns: repeat(3, auto) !important;
+  }
+  html[data-game] #app .departure-fold .ux-summary-registration-actions > button { white-space: nowrap; padding: 0 14px !important; }
+}
