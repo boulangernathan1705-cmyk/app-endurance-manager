@@ -2,7 +2,7 @@ import {CATEGORIES, EVENT_TYPES, CIRCUITS, categories, CARS, gameForEvent} from 
 import {countdown, dateLabel, groupEvents} from '../schedule.mjs';
 import {renderAvailabilityTimeline} from '../timeline.mjs';
 import {circuitMapConfig, circuitMapSource} from '../../shared/circuit-maps.mjs';
-import {preferredCommunityId,communityById} from './organization-context.mjs?v=7-community-only';
+import {preferredCommunityId,communityById} from './organization-context.mjs?v=13-tondeuz-tool';
 
 export {CATEGORIES, EVENT_TYPES, CIRCUITS, categories, CARS, countdown, dateLabel, groupEvents, renderAvailabilityTimeline};
 
