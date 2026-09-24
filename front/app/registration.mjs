@@ -1,4 +1,4 @@
-import {state,esc,button,carPreferenceChoices,registrationCarLabel,renderAvailabilityTimeline,notifyRender,logo,categories} from './core.mjs?v=11-community-navigation';
+import {state,esc,button,carPreferenceChoices,registrationCarLabel,renderAvailabilityTimeline,notifyRender,logo,categories} from './core.mjs?v=12-site-tool';
 import {getLocale} from '../i18n.mjs';
 import {GENERAL_AUDIENCE,audienceChoices,defaultRegistrationAudienceIds,registrationAudienceIds,organizationAudienceLabels,communityById} from './organization-context.mjs?v=7-community-only';
 
