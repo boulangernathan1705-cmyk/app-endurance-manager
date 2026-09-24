@@ -94,11 +94,12 @@ test('la communauté active est choisie avant le simulateur et l’annuaire devi
 
 test('les gérants peuvent personnaliser leur espace sans créer un moteur de thème parallèle',()=>{
   const directory=read('front/app/community-directory.mjs');
+  const directoryCss=read('styles/community-directory.css');
   const css=read('styles/community-context.css');
   const server=read('server/community-directory.mjs');
   const account=read('front/account-menu.mjs');
   const registration=read('front/app/registration.mjs');
-  assert.match(directory,/IDENTITÉ VISUELLE/);
+  assert.match(directory,/Visuels Discord utilisés automatiquement/);
   assert.match(directory,/logoUrl/);
   assert.match(directory,/bannerUrl/);
   assert.match(directory,/accentColor/);
@@ -107,9 +108,14 @@ test('les gérants peuvent personnaliser leur espace sans créer un moteur de th
   assert.match(css,/community-home-banner/);
   assert.match(account,/account-community-badge/);
   assert.match(registration,/pilot-community-logo/);
-  assert.match(directory,/Rôle organisateur du site/);
+  assert.match(directory,/Qui peut administrer le site/);
   assert.match(directory,/Synchroniser automatiquement les membres et organisateurs/);
   assert.match(directory,/Webhook du salon récapitulatif/);
+  assert.match(directory,/community-setup-steps/);
+  assert.match(directory,/Mode développeur/);
+  assert.match(directory,/Chaque partie peut être ouverte séparément/);
+  assert.match(directoryCss,/input:not\(\[type="checkbox"\]\)/);
+  assert.match(directoryCss,/\.community-choice-group input/);
 });
 
 test('les communautés remplacent les anciennes Teams et chargent leurs membres à l’ouverture',()=>{
@@ -145,7 +151,7 @@ test('les assets de la nouvelle interface sont versionnés et les fixtures dev r
   assert.match(seed,/https:\/\/app\.endurance-manager\.workers\.dev/);
   assert.match(seed,/if\(url\.origin!==DEV_ORIGIN\)return/);
   assert.match(html,/community-context\.css\?v=3-language-preserved/);
-  assert.match(html,/community-directory\.css\?v=4-community-only/);
-  assert.match(html,/app\.js\?v=96-community-only/);
+  assert.match(html,/community-directory\.css\?v=5-community-settings-ux/);
+  assert.match(html,/app\.js\?v=97-community-settings-ux/);
   assert.match(app,/paddock-network\.mjs\?v=9-community-only/);
 });

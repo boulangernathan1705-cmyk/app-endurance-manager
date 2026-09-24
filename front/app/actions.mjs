@@ -1,6 +1,6 @@
 import {app,state,api,load,showError,countdown,CARS} from './core.mjs?v=10-community-only';
 import {renderNav,renderHome} from './home-view.mjs?v=14-community-only';
-import {renderCommunities} from './community-directory.mjs?v=9-community-only';
+import {renderCommunities} from './community-directory.mjs?v=10-community-settings-ux';
 import {renderEvent} from './event-view.mjs?v=21-community-only';
 import {renderEventForm,departureFields,updateRemoveButtons} from './event-form.mjs?v=5-community-only';
 import {renderMyEntries} from './entries-view.mjs?v=9-community-only';
