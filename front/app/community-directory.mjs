@@ -1,4 +1,4 @@
-import {app,state,api,load,showError,esc,notifyRender} from './core.mjs?v=11-community-navigation';
+import {app,state,api,load,showError,esc,notifyRender} from './core.mjs?v=12-site-tool';
 
 const ui={search:'',game:'all',creating:false,discord:new Map(),eligibility:new Map(),members:new Map(),memberLoading:new Set(),memberErrors:new Map(),busy:false};
 const communities=()=>[...(state.organizations?.communities||[]),...(state.organizations?.discoverableCommunities||[])];
