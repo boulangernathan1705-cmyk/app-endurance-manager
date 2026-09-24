@@ -1,7 +1,7 @@
 import {CARS} from './shared/catalog.mjs';
 import {dateLabel} from './front/schedule.mjs';
 import {renderAvailabilityTimeline} from './front/timeline.mjs';
-import {scopeDeparture,organizationById,organizationShortLabel} from './front/app/organization-context.mjs?v=7-community-only';
+import {scopeDeparture,organizationById,organizationShortLabel} from './front/app/organization-context.mjs?v=13-tondeuz-tool';
 
 const app = document.getElementById('app');
 let eventsCache = null;
