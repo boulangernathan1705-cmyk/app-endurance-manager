@@ -59,14 +59,8 @@ function communityBadge(){
 }
 function communityFromSession(session){
   const all=[...(session?.organizations?.communities||[]),...(session?.organizations?.discoverableCommunities||[])];
-  const requested=new URLSearchParams(location.search).get('community');
-  if(requested==='general')return null;
-  if(requested){
-    const found=all.find(item=>item.id===requested);
-    if(found)return found;
-  }
-  const preferred=session?.organizations?.preferredCommunityId;
-  return all.find(item=>item.id===preferred)||((session?.organizations?.communities||[]).length===1?session.organizations.communities[0]:null);
+  const siteId=session?.organizations?.siteCommunityId||session?.organizations?.preferredCommunityId;
+  return all.find(item=>item.id===siteId)||null;
 }
 
 function bindAvatarFallbacks() {
