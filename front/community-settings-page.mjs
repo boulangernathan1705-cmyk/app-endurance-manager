@@ -1,5 +1,5 @@
-import {state,load,showError} from './app/core.mjs?v=12-site-tool';
-import {renderCommunities} from './app/community-directory.mjs?v=13-site-tool';
+import {state,load,showError} from './app/core.mjs?v=13-tondeuz-tool';
+import {renderCommunities} from './app/community-directory.mjs?v=13-tondeuz-tool';
 
 try {
   await load();
