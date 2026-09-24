@@ -20,9 +20,6 @@ function harness(withParticipants=true){
  DB.db.exec(readFileSync(new URL('../migrations/0009_registration_owner.sql',import.meta.url),'utf8'));
  DB.db.exec(readFileSync(new URL('../migrations/0011_multi_category_registrations.sql',import.meta.url),'utf8'));
  if(withParticipants)DB.db.exec(readFileSync(new URL('../migrations/0012_participants.sql',import.meta.url),'utf8'));
- if(withParticipants){
-  for(const file of ['0018_organizations.sql','0020_community_directory.sql','0021_event_communities.sql'])DB.db.exec(readFileSync(new URL(`../migrations/${file}`,import.meta.url),'utf8'));
- }
  const env={DB,APP_ORIGIN:ROOT,DISCORD_CLIENT_ID:'app-id',DISCORD_CLIENT_SECRET:'test-only-secret',ADMIN_DISCORD_IDS:ADMIN,ASSETS:{fetch:async()=>new Response('static')}};
  const jars=new Map();
  async function req(path,method='GET',data,actor='guest',options={}){
@@ -238,21 +235,6 @@ test('pilot, organizer and admin keep ownership after Discord logout and login',
    assert.equal((await req('/api/registrations/'+registration.data.id,'DELETE',{version:1},actor)).status,200);
  }
 });
-test('Discord login returns to the requested community context',async()=>{
- const h=harness();
- const community='123e4567-e89b-12d3-a456-426614174000';
- const start=await h.req('/api/auth/discord?return='+encodeURIComponent('/lmu/?community='+community),'GET',null,'community-login');
- assert.equal(start.status,302);
- const authUrl=new URL(start.response.headers.get('Location'));
- const realFetch=globalThis.fetch;
- globalThis.fetch=async url=>new Response(JSON.stringify(String(url).endsWith('/token')?{access_token:'mock-community'}:{id:PILOT,username:'Community pilot'}),{headers:{'Content-Type':'application/json'}});
- try{
-   const callback=await h.req('/api/auth/discord/callback?code=test&state='+authUrl.searchParams.get('state'),'GET',null,'community-login');
-   assert.equal(callback.status,302);
-   assert.equal(callback.response.headers.get('Location'),ROOT+'/lmu/?community='+community);
- }finally{globalThis.fetch=realFetch;}
-});
-
 test('OAuth state is bound to browser, single-use, and profile cannot grant admin',async()=>{
  const h=harness();
  const state=await h.login(PILOT,'pilot');

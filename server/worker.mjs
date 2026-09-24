@@ -4,18 +4,6 @@ import {
   registrationSelect, registrationParticipant, body, rateLimit, cleanup, text, validateEvent, validateRegistration
 } from './core.mjs';
 import {ingestClientError, clientErrorsApi} from './telemetry.mjs';
-const COOKIE_OAUTH_RETURN='__Host-em_oauth_return';
-function safeReturnPath(value){
-  const raw=String(value||'').trim();
-  if(!raw||raw.length>500||!raw.startsWith('/')||raw.startsWith('//'))return'/';
-  try{const parsed=new URL(raw,'https://endurance-manager.invalid');return parsed.origin==='https://endurance-manager.invalid'?parsed.pathname+parsed.search:'/';}catch{return'/';}
-}
-function returnCookiePath(request){
-  const raw=cookie(request,COOKIE_OAUTH_RETURN);if(!raw)return'/';
-  try{return safeReturnPath(decodeURIComponent(raw));}catch{return'/';}
-}
-function authErrorPath(path){const url=new URL(safeReturnPath(path),'https://endurance-manager.invalid');url.searchParams.set('auth','error');return url.pathname+url.search;}
-
 async function eventById(env, eventId) {
   const row = await env.DB.prepare('SELECT * FROM events WHERE id=?').bind(eventId).first();
   if (!row) fail(404, 'Événement introuvable.'); return row;
@@ -28,32 +16,11 @@ function departureById(event, departureId) {
 function isRegistrationManager(actor) {
   return ['admin','organizer'].includes(actor.user?.role);
 }
-async function managedOrganizationIds(env,actor){
-  if(!actor.user)return new Set();
-  const rows=(await env.DB.prepare("SELECT organization_id FROM organization_members WHERE user_id=? AND role IN ('owner','manager')").bind(actor.user.id).all()).results||[];
-  return new Set(rows.map(row=>row.organization_id));
-}
-async function requireCommunityManager(env,actor,organizationId){
-  if(!actor.user)fail(401,'Connecte-toi avec Discord.');
-  if(!/^[a-f0-9-]{36}$/.test(String(organizationId||'')))fail(400,'Communauté invalide.');
-  const row=await env.DB.prepare("SELECT o.id,o.type,m.role FROM organizations o JOIN organization_members m ON m.organization_id=o.id WHERE o.id=? AND m.user_id=?").bind(organizationId,actor.user.id).first();
-  if(!row||row.type!=='community'||!['owner','manager'].includes(row.role))fail(403,'Seul un organisateur de cette communauté peut gérer ses endurances.');
-  return row;
-}
-async function requireEventManager(env,actor,event,{deleting=false}={}){
-  if(event.organization_id){
-    if(actor.user?.role==='admin')return;
-    if(!deleting&&actor.user?.role==='organizer')return;
-    await requireCommunityManager(env,actor,event.organization_id);
-    return;
-  }
-  requireRole(actor.user,deleting);
-}
 function canManageRegistration(reg, actor) {
   return owned(reg, actor) || isRegistrationManager(actor);
 }
-function canManageCrew(crew, actor, managedOrganizations=new Set()) {
-  return isRegistrationManager(actor) || Boolean(actor.user && crew?.owner_user_id === actor.user.id) || Boolean(crew?.organization_id && managedOrganizations.has(crew.organization_id));
+function canManageCrew(crew, actor) {
+  return isRegistrationManager(actor) || Boolean(actor.user && crew?.owner_user_id === actor.user.id);
 }
 function publicRegistration(reg, actor, userNames = new Map()) {
   let cars = [];
@@ -85,15 +52,8 @@ function publicRegistration(reg, actor, userNames = new Map()) {
   };
 }
 async function listEvents(env, actor, game='') {
-  const clauses=[];
-  const params=[];
-  if(game==='iracing')clauses.push("e.circuit LIKE 'iracing-%'");
-  else if(game==='lmu')clauses.push("e.circuit NOT LIKE 'iracing-%'");
-  let visibility="(e.organization_id IS NULL OR o.visibility='public'";
-  if(actor.user){visibility+=" OR EXISTS(SELECT 1 FROM organization_members om WHERE om.organization_id=e.organization_id AND om.user_id=?)";params.push(actor.user.id);}
-  visibility+=')';
-  clauses.push(visibility);
-  const rows = (await env.DB.prepare(`SELECT e.* FROM events e LEFT JOIN organizations o ON o.id=e.organization_id WHERE ${clauses.join(' AND ')} ORDER BY e.created_at DESC,e.id DESC`).bind(...params).all()).results;
+  const where=game==='iracing' ? " WHERE circuit LIKE 'iracing-%'" : game==='lmu' ? " WHERE circuit NOT LIKE 'iracing-%'" : '';
+  const rows = (await env.DB.prepare(`SELECT * FROM events${where} ORDER BY created_at DESC, id DESC`).all()).results;
   if (!rows.length) return [];
   const eventIds=rows.map(row=>row.id);
   const marks=eventIds.map(()=>'?').join(',');
@@ -107,7 +67,6 @@ async function listEvents(env, actor, game='') {
     users=(await env.DB.prepare(`SELECT id,name FROM users WHERE id IN (${userMarks})`).bind(...relevantUserIds).all()).results;
   }
   const userNames = new Map(users.map(item => [item.id,item.name]));
-  const managedOrganizations=await managedOrganizationIds(env,actor);
   const grouped = new Map();
   for (const reg of registrations) { const key = `${reg.event_id}:${reg.departure_id}`; if (!grouped.has(key)) grouped.set(key, []); grouped.get(key).push(publicRegistration(reg, actor, userNames)); }
   const membersByCrew = new Map();
@@ -127,29 +86,28 @@ async function listEvents(env, actor, game='') {
       locked:Boolean(crew.locked),
       version:crew.version,
       registrationIds:membersByCrew.get(crew.id) || [],
-      canManage:canManageCrew(crew,actor,managedOrganizations),
+      canManage:canManageCrew(crew,actor),
       ownedByMe:Boolean(actor.user && crew.owner_user_id===actor.user.id),
       hasOwner:Boolean(crew.owner_user_id)
     });
   }
-  return rows.map(row => ({id:row.id, name:row.name, circuit:row.circuit||'', durationHours:Number(row.duration_hours)||3, eventType:row.event_type||'private', organizationId:row.organization_id||null, categories:JSON.parse(row.categories), version:row.version, departures:JSON.parse(row.departures).map(d => ({...d, availability:grouped.get(`${row.id}:${d.id}`) || [], crews:crewsByDeparture.get(`${row.id}:${d.id}`) || []}))}));
+  return rows.map(row => ({id:row.id, name:row.name, circuit:row.circuit||'', durationHours:Number(row.duration_hours)||3, eventType:row.event_type||'private', categories:JSON.parse(row.categories), version:row.version, departures:JSON.parse(row.departures).map(d => ({...d, availability:grouped.get(`${row.id}:${d.id}`) || [], crews:crewsByDeparture.get(`${row.id}:${d.id}`) || []}))}));
 }
 async function oauthStart(request, env) {
   requireDiscord(env); await rateLimit(request, env, 'oauth', 20); await cleanup(env);
   const state = token();
-  const returnPath=safeReturnPath(new URL(request.url).searchParams.get('return'));
   await env.DB.prepare('INSERT INTO oauth_states(state_hash,expires_at) VALUES(?,?)').bind(await hash(state), now() + 600).run();
   const auth = new URL('https://discord.com/oauth2/authorize');
   auth.search = new URLSearchParams({client_id:env.DISCORD_CLIENT_ID, response_type:'code', redirect_uri:origin(env) + '/api/auth/discord/callback', scope:'identify', state}).toString();
-  return redirect(auth.href, [setCookie(COOKIE_STATE, state, 600),setCookie(COOKIE_OAUTH_RETURN,encodeURIComponent(returnPath),600)]);
+  return redirect(auth.href, [setCookie(COOKIE_STATE, state, 600)]);
 }
 async function oauthCallback(request, env) {
   requireDiscord(env);
   const url = new URL(request.url), state = url.searchParams.get('state');
-  const clear = setCookie(COOKIE_STATE, '', 0),clearReturn=setCookie(COOKIE_OAUTH_RETURN,'',0),returnPath=returnCookiePath(request);
-  if (!state || !/^[a-f0-9]{64}$/.test(state) || state !== cookie(request, COOKIE_STATE)) return redirect(origin(env) + authErrorPath(returnPath), [clear,clearReturn]);
+  const clear = setCookie(COOKIE_STATE, '', 0);
+  if (!state || !/^[a-f0-9]{64}$/.test(state) || state !== cookie(request, COOKIE_STATE)) return redirect(origin(env) + '/?auth=error', [clear]);
   const row = await env.DB.prepare('DELETE FROM oauth_states WHERE state_hash=? AND expires_at>? RETURNING state_hash').bind(await hash(state), now()).first();
-  if (!row || !url.searchParams.get('code') || url.searchParams.has('error')) return redirect(origin(env) + authErrorPath(returnPath), [clear,clearReturn]);
+  if (!row || !url.searchParams.get('code') || url.searchParams.has('error')) return redirect(origin(env) + '/?auth=error', [clear]);
   try {
     const response = await fetch('https://discord.com/api/oauth2/token', {method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:new URLSearchParams({client_id:env.DISCORD_CLIENT_ID, client_secret:env.DISCORD_CLIENT_SECRET, grant_type:'authorization_code', code:url.searchParams.get('code'), redirect_uri:origin(env) + '/api/auth/discord/callback'}), signal:AbortSignal.timeout(10000)});
     if (!response.ok) throw Error('token');
@@ -175,9 +133,9 @@ async function oauthCallback(request, env) {
     const avatarCookie = avatarHash
       ? `fmt_discord_avatar=${encodeURIComponent(`${profile.id}:${avatarHash}`)}; Path=/; Secure; SameSite=Lax; Max-Age=${7 * DAY}`
       : 'fmt_discord_avatar=; Path=/; Secure; SameSite=Lax; Max-Age=0';
-    return redirect(origin(env) + returnPath, [clear,clearReturn,setCookie(COOKIE_SESSION, session, 7 * DAY), avatarCookie]);
+    return redirect(origin(env) + '/', [clear, setCookie(COOKIE_SESSION, session, 7 * DAY), avatarCookie]);
   } catch {
-    return redirect(origin(env) + authErrorPath(returnPath), [clear,clearReturn]);
+    return redirect(origin(env) + '/?auth=error', [clear]);
   }
 }
 async function api(request, env) {
@@ -232,7 +190,6 @@ async function api(request, env) {
   const crewRoute = path.match(/^\/api\/crews\/([a-f0-9-]{36})(?:\/members(?:\/([a-f0-9-]{36}))?)?$/);
   if ((crewCreate && method==='POST') || (crewRoute && ['POST','PATCH','DELETE'].includes(method))) {
     if (!actor.user) fail(401,'Connecte-toi avec Discord pour gérer un équipage.');
-    const managedOrganizations=await managedOrganizationIds(env,actor);
     const input=await body(request);
     const crew=crewRoute ? await env.DB.prepare('SELECT * FROM crews WHERE id=?').bind(crewRoute[1]).first() : null;
     if (crewRoute && !crew) fail(404,'Équipage introuvable.');
@@ -249,7 +206,7 @@ async function api(request, env) {
         if (!selected || selected.event_id!==crew.event_id || selected.departure_id!==crew.departure_id) fail(409,'Ce pilote n’est pas inscrit sur ce départ. Actualise la page.');
         if (selected.category!==crew.category || selected.status==='unavailable') fail(409,'Cette inscription ne correspond pas à la catégorie de l’équipage.');
         const selfJoin=input.selfJoin===true && personal(selected,actor);
-        if (!canManageCrew(crew,actor,managedOrganizations) && !selfJoin) fail(403,'Tu peux uniquement rejoindre un équipage avec ta propre inscription.');
+        if (!canManageCrew(crew,actor) && !selfJoin) fail(403,'Tu peux uniquement rejoindre un équipage avec ta propre inscription.');
         const claimOwner=selfJoin && !crew.owner_user_id ? actor.user.id : null;
         const crewUpdate=claimOwner
           ? env.DB.prepare('UPDATE crews SET version=version+1,owner_user_id=COALESCE(owner_user_id,?) WHERE id=? AND version=?').bind(claimOwner,crew.id,input.version)
@@ -268,7 +225,7 @@ async function api(request, env) {
         const member=await env.DB.prepare('SELECT registration_id FROM crew_members WHERE crew_id=? AND registration_id=?').bind(crew.id,selected.id).first();
         if (!member) fail(409,'Ce pilote ne fait plus partie de cet équipage. Actualise la page.');
         const selfLeave=personal(selected,actor);
-        if (!canManageCrew(crew,actor,managedOrganizations) && !selfLeave) fail(403,'Tu peux uniquement quitter toi-même un équipage.');
+        if (!canManageCrew(crew,actor) && !selfLeave) fail(403,'Tu peux uniquement quitter toi-même un équipage.');
         let nextOwner=crew.owner_user_id;
         if (crew.owner_user_id && selected.participant_user_id===crew.owner_user_id) {
           const replacement=await env.DB.prepare(`SELECT p.user_id
@@ -292,7 +249,7 @@ async function api(request, env) {
       fail(404,'Action introuvable.');
     }
     if (crew) {
-      if (!canManageCrew(crew,actor,managedOrganizations)) fail(403,'Seul le responsable de cet équipage ou un organisateur peut le modifier.');
+      if (!canManageCrew(crew,actor)) fail(403,'Seul le responsable de cet équipage ou un organisateur peut le modifier.');
       if (method==='DELETE') {
         const result = await env.DB.prepare('DELETE FROM crews WHERE id=? AND version=?').bind(crew.id,input.version).run();
         if (!result.meta.changes) fail(409,'Cet équipage a changé. Actualise avant de réessayer.');
@@ -332,22 +289,15 @@ async function api(request, env) {
     return json({id:crewId,joined:true,removedRegistrations:results[2].meta.changes},201);
   }
   if (path === '/api/events' && method === 'POST') {
-    const input=await body(request);
-    const organizationId=String(input.organizationId||'').trim()||null;
-    if(organizationId){
-      if(actor.user?.role!=='admin')await requireCommunityManager(env,actor,organizationId);
-    }else requireRole(actor.user);
-    const data = validateEvent(input), eventId = id();
-    await env.DB.prepare('INSERT INTO events(id,name,duration_hours,event_type,circuit,categories,departures,organization_id,created_by,created_at) VALUES(?,?,?,?,?,?,?,?,?,?)').bind(eventId, data.name, data.durationHours, data.eventType, data.circuit, JSON.stringify(data.categories), JSON.stringify(data.departures), organizationId, actor.user.id, now()).run();
+    requireRole(actor.user);
+    const data = validateEvent(await body(request)), eventId = id();
+    await env.DB.prepare('INSERT INTO events(id,name,duration_hours,event_type,circuit,categories,departures,created_by,created_at) VALUES(?,?,?,?,?,?,?,?,?)').bind(eventId, data.name, data.durationHours, data.eventType, data.circuit, JSON.stringify(data.categories), JSON.stringify(data.departures), actor.user.id, now()).run();
     return json({id:eventId}, 201);
   }
   const eventMatch = path.match(/^\/api\/events\/([a-f0-9-]{36})$/);
   if (eventMatch && ['PATCH','DELETE'].includes(method)) {
-    const event = await eventById(env, eventMatch[1]);
-    await requireEventManager(env,actor,event,{deleting:method==='DELETE'});
-    const input = await body(request);
-    const requestedOrganizationId=String(input.organizationId||'').trim()||null;
-    if(requestedOrganizationId!==(event.organization_id||null))fail(409,'L’espace d’une endurance ne peut pas être déplacé après sa création.');
+    requireRole(actor.user, method === 'DELETE');
+    const event = await eventById(env, eventMatch[1]), input = await body(request);
     if (input.version !== event.version) fail(409, 'Cet événement a changé. Actualise avant de réessayer.');
     if (method === 'DELETE') {
       const result = await env.DB.prepare('DELETE FROM events WHERE id=? AND version=?').bind(event.id, input.version).run();
@@ -428,17 +378,7 @@ export default {
       try { return await ingestClientError(request,env); }
       catch { return new Response(null,{status:204}); }
     }
-    if (!pathname.startsWith('/api/')) {
-      const response=await env.ASSETS.fetch(request);
-      const canonical=origin(env);
-      if (!canonical.includes('.workers.dev')) return response;
-      const lower=pathname.toLowerCase();
-      if (!(request.method==='GET'||request.method==='HEAD') || !(pathname==='/'||lower.endsWith('/')||lower.endsWith('.html')||lower.endsWith('.js')||lower.endsWith('.mjs')||lower.endsWith('.css'))) return response;
-      const headers=new Headers(response.headers);
-      headers.set('Cache-Control','no-store, max-age=0');
-      headers.set('Pragma','no-cache');
-      return new Response(response.body,{status:response.status,statusText:response.statusText,headers});
-    }
+    if (!pathname.startsWith('/api/')) return env.ASSETS.fetch(request);
     try { return await api(request, env); }
     catch (error) {
       if (error instanceof HttpError) return json({error:error.message},error.status);
@@ -453,7 +393,7 @@ export default {
       if (message.includes('crew_event_in_use')) return json({error:'Un équipage utilise encore ce départ ou cette catégorie. Supprime ou modifie cet équipage avant de continuer.'},409);
       if (message.includes('crew_membership_invalid') || message.includes('crew_invalid')) return json({error:'Affectation impossible : vérifie le départ, la catégorie et la disponibilité du pilote, puis actualise.'},409);
       if (message.includes('UNIQUE constraint failed: registrations.')) return json({error:'Ce pilote ou ce pseudo est déjà inscrit dans cette catégorie pour ce départ. Modifie l’inscription existante ou choisis une autre catégorie.'},409);
-      console.error('Endurance Manager API failure', error instanceof Error ? error.message.replace(/[a-f0-9]{64}/g,'[redacted]') : 'unknown');
+      console.error('FMT API failure', error instanceof Error ? error.message.replace(/[a-f0-9]{64}/g,'[redacted]') : 'unknown');
       return json({error:'Le service est momentanément indisponible. Tes changements ne sont pas confirmés ; réessaie dans un instant.'},503);
     }
   }

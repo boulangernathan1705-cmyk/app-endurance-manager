@@ -3,11 +3,6 @@ import {eventSchedule} from './schedule.mjs';
 import {getLocale,localeTag} from './i18n.mjs';
 
 const grid = document.getElementById('game-grid');
-const simulatorStage = document.getElementById('simulator-stage');
-const selectedCommunity = document.getElementById('hub-selected-community');
-let selectedCommunityId = null;
-let sessionState = {organizations:{communities:[],discoverableCommunities:[],preferredCommunityId:null}};
-let cachedEvents = {lmu:[],iracing:[]};
 const formatter = new Intl.DateTimeFormat(localeTag(), {
   timeZone:'Europe/Paris',
   weekday:'short',
@@ -139,89 +134,15 @@ function enduranceQueueMarkup(items, game) {
   return `<div class="hub-race-queue">${items.map(item=>enduranceMarkup(item,game)).join('')}</div>`;
 }
 
-function gameCard(game, events, communityId='') {
+function gameCard(game, events) {
   const catalog = GAME_CATALOGS[game];
-  const base = game === 'lmu' ? '/lmu/' : '/iracing/';
-  const params = new URLSearchParams({runtime:'94'}); const href = `${base}?${params.toString()}`;
+  const href = game === 'lmu' ? '/lmu/' : '/iracing/';
   const badge = game === 'lmu' ? 'LMU' : 'iR';
   return `<article class="game-hub-card game-${game}">
     <div class="game-hub-heading"><div class="game-title-line"><span class="game-badge" aria-hidden="true">${badge}</span><h2>${esc(catalog.name)}</h2></div><p>${game === 'lmu' ? 'Hypercar, prototypes et GT de Le Mans Ultimate.' : 'GTP, LMP2, GT3, GT4 et TCR avec un catalogue de circuits étendu.'}</p></div>
-    <a class="game-hub-enter" data-hub-game="${game}" href="${href}">Accéder à ${esc(catalog.shortName)} <span aria-hidden="true">→</span></a>
+    <a class="game-hub-enter" href="${href}">Accéder à ${esc(catalog.shortName)} <span aria-hidden="true">→</span></a>
     ${enduranceQueueMarkup(homeQueue(events,game),game)}
   </article>`;
-}
-
-
-function knownCommunities(organizations={}) {
-  const map = new Map();
-  for (const community of [...(organizations.communities || []), ...(organizations.discoverableCommunities || [])]) map.set(community.id, community);
-  return [...map.values()];
-}
-
-function communityInitials(name) {
-  return String(name || 'EM').split(/\s+/).filter(Boolean).slice(0,2).map(part=>part[0]).join('').toUpperCase();
-}
-
-function communityMark(community) {
-  const logo=community?.branding?.logoUrl;
-  return logo
-    ? `<span class="hub-community-mark has-image"><img src="${esc(logo)}" alt="" referrerpolicy="no-referrer"></span>`
-    : `<span class="hub-community-mark" aria-hidden="true">${esc(community ? communityInitials(community.name) : 'EM')}</span>`;
-}
-
-function scopedEvents(events, communityId) {
-  return (events || []).filter(event => !event.organizationId || !communityId || event.organizationId === communityId);
-}
-
-function requestedCommunity(organizations={}) {
-  return organizations.siteCommunityId || organizations.preferredCommunityId || null;
-}
-
-function defaultCommunityId(organizations={}) {
-  return organizations.siteCommunityId || organizations.preferredCommunityId || null;
-}
-
-
-function renderGames() {
-  grid.innerHTML = gameCard('lmu',scopedEvents(cachedEvents.lmu,selectedCommunityId),selectedCommunityId)
-    + gameCard('iracing',scopedEvents(cachedEvents.iracing,selectedCommunityId),selectedCommunityId);
-}
-
-function selectedCommunityMarkup() {
-  const community=knownCommunities(sessionState.organizations || {}).find(item=>item.id===selectedCommunityId) || null;
-  const banner=community?.branding?.bannerUrl;
-  return `${banner?`<img class="hub-selected-banner" src="${esc(banner)}" alt="" referrerpolicy="no-referrer">`:''}<span class="hub-selected-shade" aria-hidden="true"></span><span class="hub-selected-brand">${communityMark(community)}<strong>${esc(community?.name || 'Endurance Manager')}</strong></span>`;
-}
-
-
-function showSimulatorStage(communityId,{historyMode='none'}={}) {
-  selectedCommunityId=communityId;
-  renderGames();
-  const community=knownCommunities(sessionState.organizations || {}).find(item=>item.id===selectedCommunityId) || null;
-  selectedCommunity.classList.toggle('has-banner',Boolean(community?.branding?.bannerUrl));
-  selectedCommunity.style.setProperty('--community-accent',community?.branding?.accentColor||'var(--accent)');
-  selectedCommunity.innerHTML=selectedCommunityMarkup();
-  simulatorStage.hidden=false;
-  document.title=`${community?.name || 'Les Tondeuz à gazon'} · Simulateur`;
-
-}
-
-function syncStageFromUrl() {
-  const organizations=sessionState.organizations || {};
-  const siteId=requestedCommunity(organizations)||defaultCommunityId(organizations);
-  if(siteId){showSimulatorStage(siteId);return;}
-  selectedCommunityId=null;
-  renderGames();
-  if(simulatorStage)simulatorStage.hidden=false;
-  if(selectedCommunity)selectedCommunity.innerHTML='<span class="hub-selected-brand"><strong>Les Tondeuz à gazon</strong></span>';
-}
-
-async function fetchSession() {
-  const params=new URLSearchParams(location.search),community=params.get('community');
-  const path=community?`/api/session?community=${encodeURIComponent(community)}`:'/api/session';
-  const response=await fetch(path,{credentials:'same-origin',cache:'no-store',headers:{Accept:'application/json'}});
-  if(!response.ok) throw new Error('session');
-  return response.json();
 }
 
 async function fetchGameEvents(game) {
@@ -232,18 +153,13 @@ async function fetchGameEvents(game) {
 }
 
 async function load() {
-  const notice=document.getElementById('hub-status');
-  const [sessionResult,lmuResult,iracingResult]=await Promise.allSettled([
-    fetchSession(),
-    fetchGameEvents('lmu'),
-    fetchGameEvents('iracing')
-  ]);
-  if(sessionResult.status==='fulfilled') sessionState=sessionResult.value || sessionState;
-  cachedEvents.lmu=lmuResult.status==='fulfilled'?lmuResult.value:[];
-  cachedEvents.iracing=iracingResult.status==='fulfilled'?iracingResult.value:[];
-  syncStageFromUrl();
-  if(notice && (lmuResult.status==='rejected' || iracingResult.status==='rejected')) {
-    notice.textContent='Le récapitulatif des prochaines endurances est momentanément indisponible. Les espaces restent accessibles.';
+  try {
+    const [lmuEvents,iracingEvents] = await Promise.all([fetchGameEvents('lmu'),fetchGameEvents('iracing')]);
+    grid.innerHTML = gameCard('lmu',lmuEvents) + gameCard('iracing',iracingEvents);
+  } catch {
+    grid.innerHTML = gameCard('lmu',[]) + gameCard('iracing',[]);
+    const notice = document.getElementById('hub-status');
+    if (notice) notice.textContent = 'Le récapitulatif des prochaines endurances est momentanément indisponible. Les espaces restent accessibles.';
   }
 }
 

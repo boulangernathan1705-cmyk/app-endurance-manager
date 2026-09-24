@@ -95,6 +95,5 @@ export function isWeeklyDiscordMutation(request){
   if(new RegExp(`^/api/events/${uuid}/departures/${uuid}/crews$`).test(path)&&method==='POST')return true;
   if(new RegExp(`^/api/registrations/${uuid}$`).test(path))return true;
   if(new RegExp(`^/api/crews/${uuid}(?:/members(?:/${uuid})?)?$`).test(path))return true;
-  if(new RegExp(`^/api/organizations/${uuid}/discord$`).test(path)&&method==='PATCH')return true;
   return false;
 }

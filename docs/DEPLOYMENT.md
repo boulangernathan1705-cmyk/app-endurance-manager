@@ -8,7 +8,7 @@ Cloudflare Workers déploie le projet avec `npx wrangler deploy`. Le fichier `wr
 
 - `server/worker.mjs` reste le Worker d’API ;
 - `npm run build:workers` génère les assets statiques dans `public/` ;
-- les routes `/api/*` et `/telemetry/*` passent d’abord par le Worker ;
+- seules les routes `/api/*` passent d’abord par le Worker ;
 - les assets statiques sont servis directement par Cloudflare ;
 - aucun binding `ASSETS` n’est déclaré, car le Worker ne lit pas les fichiers statiques lui-même ;
 - `minify: true` laisse Wrangler minifier le Worker avant l’envoi ;
@@ -30,10 +30,4 @@ Ne pas recréer la base ni rejouer manuellement la migration initiale sur une ba
 
 ## Variables et secrets
 
-`APP_ORIGIN` est versionnée dans `wrangler.jsonc`. Les identifiants Discord non secrets peuvent rester configurés côté Cloudflare grâce à `keep_vars: true`. `DISCORD_CLIENT_SECRET` et `DISCORD_BOT_TOKEN` doivent rester des secrets Cloudflare et ne jamais être ajoutés au dépôt.
-
-`DISCORD_BOT_TOKEN` est utilisé uniquement par l’intégration facultative des communautés Discord. Il permet au Worker de vérifier un membre précis avec son identifiant Discord, de contrôler ses rôles au moment utile et de lire les métadonnées publiques du serveur nécessaires aux visuels (nom, icône, bannière/couleur quand Discord les fournit). Endurance Manager ne télécharge pas la liste complète des membres du serveur. Sans ce secret, les communautés purement Endurance Manager continuent de fonctionner, mais les règles d’accès Discord et la reprise automatique de ces visuels sont indisponibles.
-
-Les logos et bannières personnalisés configurés manuellement sont stockés sous forme d’URL HTTPS dans D1 ; aucun fichier binaire n’est stocké dans D1.
-
-La migration `0024_teams_to_private_communities.sql` conserve les identifiants, membres, inscriptions et équipages des anciennes Teams, puis les transforme en communautés privées sur invitation. Elle ne supprime aucune donnée métier.
+`APP_ORIGIN` est versionnée dans `wrangler.jsonc`. Les identifiants Discord non secrets peuvent rester configurés côté Cloudflare grâce à `keep_vars: true`. `DISCORD_CLIENT_SECRET` doit rester un secret Cloudflare et ne jamais être ajouté au dépôt.

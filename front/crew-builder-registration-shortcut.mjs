@@ -1,5 +1,5 @@
-import {state,api,CARS} from './app/core.mjs?v=13-tondeuz-tool';
-import {renderRegistrationForm,submitRegistration} from './app/registration.mjs?v=13-tondeuz-tool';
+import {state,api,CARS} from './app/core.mjs';
+import {renderRegistrationForm,submitRegistration} from './app/registration.mjs?v=2-preserve-timeline-scroll';
 
 let activeBuilder={mode:'',departureId:''};
 let modalState={departureId:'',category:''};
@@ -10,7 +10,6 @@ function currentEvent(){return state.events.find(item=>item.id===state.currentEv
 function currentDeparture(){const event=currentEvent();return event?.departures.find(item=>item.id===modalState.departureId)||null;}
 function modalRoot(){return document.querySelector('[data-registration-modal]');}
 function builderAllowsPilotRegistration(){return activeBuilder.mode==='create'||activeBuilder.mode==='edit';}
-function builderAudience(){return document.querySelector('[data-crew-builder-panel] [name="builderOrganization"]')?.value||'general';}
 
 function decorateCrewBuilder(){
   const panel=document.querySelector('[data-crew-builder-panel]');
@@ -81,7 +80,7 @@ function openModal(trigger){
   state.drafts[departure.id]={
     name:'',status:'',preferredPilot:'',forOther:!!state.user,
     participantUserId:null,participantId:null,category,cars:[],carAny:false,
-    id:null,version:null,mode:'pilot',audienceIds:[builderAudience()]
+    id:null,version:null,mode:'pilot'
   };
   modalState={departureId:departure.id,category};
 
@@ -219,7 +218,7 @@ document.addEventListener('change',event=>{
     return;
   }
 
-  if(field.matches?.('[data-crew-builder-form] [name="builderCategory"],[data-crew-builder-form] [name="builderOrganization"]'))decorateWhenReady();
+  if(field.matches?.('[data-crew-builder-form] [name="builderCategory"]'))decorateWhenReady();
 },true);
 
 document.addEventListener('submit',event=>{

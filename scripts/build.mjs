@@ -106,12 +106,6 @@ await writeFile(new URL('members.html', out), productionHtml(sourceMembers));
 await writeFile(new URL('diagnostics.html', out), productionHtml(sourceDiagnostics));
 await writeFile(new URL('help.html', out), productionHtml(sourceHelp));
 const gameHtml = productionHtml(sourceGame);
-// Reuse the shell and community editor, without simulator scripts or navigation.
-const communityHtml = gameHtml.replace(/<script\b[^>]*>[\s\S]*?<\/script>/g,'')
-  .replace('</head>','<script type="module" src="/front/community-settings-page.mjs?v=4-tondeuz-tool"></script>\n'+i18nScriptTag+'\n</head>')
-  .replace(/<div class="site-nav-shell">[\s\S]*?<main id="app">/, '<nav class="community-settings-nav" aria-label="Navigation principale"><a href="/">Accueil</a><a href="/communities.html" aria-current="page">Paramètres du site</a></nav><main id="app">')
-  .replace('Chargement des événements…','Chargement des paramètres…');
-await writeFile(new URL('communities.html', out), communityHtml);
 await writeFile(new URL('lmu/index.html', out), gameHtml);
 await writeFile(new URL('iracing/index.html', out), gameHtml);
 
@@ -133,7 +127,7 @@ if (!workers) {
 }
 
 await writeFile(new URL('_headers', out), `/*
-  Content-Security-Policy: default-src 'self'; script-src 'self'; script-src-attr 'none'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self'; font-src 'self' data:; media-src 'none'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; frame-src 'none'; form-action 'self'; worker-src 'self'; manifest-src 'self'; upgrade-insecure-requests
+  Content-Security-Policy: default-src 'self'; script-src 'self'; script-src-attr 'none'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://commons.wikimedia.org https://upload.wikimedia.org https://cdn.discordapp.com; connect-src 'self'; font-src 'self' data:; media-src 'none'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; frame-src 'none'; form-action 'self'; worker-src 'self'; manifest-src 'self'; upgrade-insecure-requests
   Strict-Transport-Security: max-age=63072000; includeSubDomains
   X-Content-Type-Options: nosniff
   Referrer-Policy: no-referrer

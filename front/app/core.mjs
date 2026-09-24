@@ -2,7 +2,6 @@ import {CATEGORIES, EVENT_TYPES, CIRCUITS, categories, CARS, gameForEvent} from 
 import {countdown, dateLabel, groupEvents} from '../schedule.mjs';
 import {renderAvailabilityTimeline} from '../timeline.mjs';
 import {circuitMapConfig, circuitMapSource} from '../../shared/circuit-maps.mjs';
-import {preferredCommunityId,communityById} from './organization-context.mjs?v=13-tondeuz-tool';
 
 export {CATEGORIES, EVENT_TYPES, CIRCUITS, categories, CARS, countdown, dateLabel, groupEvents, renderAvailabilityTimeline};
 
@@ -14,7 +13,7 @@ export const state = {
   events:[], user:null, discordReady:false, currentEventId:null, page:'home', editingEvent:null,
   drafts:{}, recoveryLink:'', busy:false, participants:[], flash:'', eventFilter:'upcoming',
   selectedDepartureId:null, eventSection:'race', pilotName:'', registrationOpen:new Set(), crewManagementOpen:new Set(),
-  pendingCrewJoin:null, currentOrganizationId:null, activeOrganizationId:null, activeCommunityId:null, requestedCommunityId:null, eventCreationOrganizationId:null, organizations:{communities:[],discoverableCommunities:[],preferredCommunityId:null,siteCommunityId:null,discordBotReady:false,discordBotInviteUrl:''}, visibleAudienceIds:new Set(['general'])
+  pendingCrewJoin:null
 };
 try { state.pilotName = localStorage.getItem('fmt_pilot_name') || ''; } catch {}
 
@@ -52,6 +51,8 @@ export function carPreferenceChoices(category, selected=[], any=false) {
   return `<fieldset class="car-preference-panel"><legend class="form-label">Voiture(s) souhaitée(s)</legend><label class="car-any-option"><input type="checkbox" name="carAny" ${any?'checked':''}><span>Peu importe la voiture</span></label><div class="car-preference-grid">${(CARS[category]||[]).map(car => `<label class="car-preference-option"><input type="checkbox" name="carPreference" value="${esc(car)}" ${values.includes(car)&&!any?'checked':''} ${any?'disabled':''}><span>${esc(car)}</span></label>`).join('')}</div><p class="car-preference-help">Choisis un ou plusieurs modèles, ou coche « Peu importe la voiture ». Ces souhaits aident les organisateurs à former les équipages.</p></fieldset>`;
 }
 export function registrationCarLabel(reg) { return reg.carAny ? 'N’importe quelle voiture' : ((reg.cars?.length ? reg.cars.join(' · ') : reg.car) || 'Pas de préférence'); }
+export function pilotAvailability(reg,departure,duration) { return departure ? `<div class="crew-pilot-availability"><span class="crew-pilot-availability-label">Disponibilité</span>${renderAvailabilityTimeline({departure,duration,status:reg.status,label:`Disponibilités de ${reg.name || 'ce pilote'}`})}</div>` : ''; }
+export function pilotWishes(reg,departure=null,duration=0) { return `<dl class="pilot-wishes"><div><dt>Voiture(s) souhaitée(s)</dt><dd>${esc(registrationCarLabel(reg))}</dd></div><div><dt>Coéquipier souhaité</dt><dd>${esc(reg.preferredPilot || 'Aucune préférence renseignée')}</dd></div></dl>${departure&&duration?pilotAvailability(reg,departure,duration):''}`; }
 export function crewColorClass(crewId,index=null) { if (index != null) return `crew-palette-${index%10}`; let hash=0; for (const char of String(crewId||'')) hash=(hash*31+char.charCodeAt(0))>>>0; return `crew-palette-${hash%10}`; }
 export function coversHour(reg,index) { return reg.status === 'whole' || String(reg.status||'').split(',').includes(`h${index+1}`); }
 
@@ -129,20 +130,11 @@ export async function api(path,method='GET',data) {
 }
 export async function load() {
   const session = await api('/api/session');
-  const management=location.pathname==='/communities.html';
-  const result = management?{events:[]}:await api(`/api/events?game=${encodeURIComponent(activeGame)}`);
+  const result = await api(`/api/events?game=${encodeURIComponent(activeGame)}`);
   state.user=session.user;
   state.discordReady=session.discordReady;
-  state.organizations=session.organizations||{communities:[],discoverableCommunities:[],preferredCommunityId:null,siteCommunityId:null,discordBotReady:false,discordBotInviteUrl:''};
-  const siteId=state.organizations.siteCommunityId||preferredCommunityId(state.organizations);
-  state.requestedCommunityId=siteId||null;
-  state.activeCommunityId=siteId||null;
-  state.activeOrganizationId=state.activeCommunityId;
-  state.visibleAudienceIds=new Set([state.activeCommunityId||'general']);
-  state.events=(Array.isArray(result.events)?result.events:[])
-    .filter(event => gameForEvent(event) === activeGame)
-    .filter(event => !event.organizationId || !siteId || event.organizationId===siteId);
-  state.participants=state.user&&!management ? (await api('/api/participants')).participants : [];
+  state.events=(Array.isArray(result.events)?result.events:[]).filter(event => gameForEvent(event) === activeGame);
+  state.participants=state.user ? (await api('/api/participants')).participants : [];
   if (state.user && !state.pilotName) state.pilotName=state.user.name.slice(0,30);
 }
 

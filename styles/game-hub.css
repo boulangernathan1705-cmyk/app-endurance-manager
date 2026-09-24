@@ -15,55 +15,6 @@
   letter-spacing: -.02em;
 }
 
-.hub-stage[hidden] { display: none !important; }
-
-.hub-simulator-stage {
-  position: relative;
-  padding-top: 4px;
-}
-
-.hub-stage-back {
-  display: inline-flex;
-  align-items: center;
-  min-height: 38px;
-  margin: 0 0 12px;
-  padding: 8px 12px;
-  border: 1px solid var(--border);
-  border-radius: 9px;
-  background: var(--panel);
-  color: var(--muted);
-  font: inherit;
-  font-size: 12px;
-  font-weight: 800;
-  cursor: pointer;
-}
-
-.hub-stage-back:hover,
-.hub-stage-back:focus-visible {
-  border-color: var(--accent);
-  color: var(--text);
-}
-
-.hub-selected-community {
-  position: relative;
-  display: grid;
-  place-items: center;
-  min-height: 76px;
-  margin: 0 auto 14px;
-  overflow: hidden;
-  border: 1px solid color-mix(in srgb, var(--community-accent) 58%, var(--border));
-  border-radius: 14px;
-  background: var(--panel);
-  pointer-events: none;
-}
-
-.hub-selected-community.has-banner { min-height: 118px; }
-.hub-selected-banner,.hub-selected-shade { position: absolute; inset: 0; width: 100%; height: 100%; }
-.hub-selected-banner { object-fit: cover; }
-.hub-selected-shade { background: linear-gradient(90deg,rgba(4,10,12,.9),rgba(4,10,12,.55),rgba(4,10,12,.9)); }
-.hub-selected-brand { position: relative; display: flex; align-items: center; gap: 10px; z-index: 1; }
-.hub-selected-community strong { font-size: 16px; }
-
 #hub-status {
   min-height: 0;
   margin: 0 0 10px;
@@ -72,72 +23,6 @@
 }
 
 #hub-status:empty { display: none; }
-
-
-.hub-community-picker {
-  display: grid;
-  gap: 10px;
-  margin: 0 auto 18px;
-}
-
-.hub-community-options {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 9px;
-}
-
-.hub-community-option {
-  display: grid;
-  grid-template-columns: auto minmax(0,1fr) auto;
-  align-items: center;
-  gap: 10px;
-  min-width: 210px;
-  max-width: 330px;
-  padding: 10px 12px;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  background: var(--panel);
-  color: var(--text);
-  text-align: left;
-}
-
-.hub-community-option.is-active {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 32%, transparent);
-}
-
-.hub-community-option span:not(.hub-community-mark) { display: grid; min-width: 0; }
-.hub-community-option strong,.hub-community-option small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.hub-community-option small { margin-top: 2px; color: var(--muted); font-size: 11px; }
-.hub-community-option b { color: var(--muted); font-size: 15px; }
-.hub-community-option.is-active b { color: var(--accent); }
-
-.hub-community-mark {
-  display: grid;
-  place-items: center;
-  width: 36px;
-  height: 36px;
-  overflow: hidden;
-  border: 1px solid var(--border);
-  border-radius: 50%;
-  background: var(--panel2);
-  font-size: 11px;
-  font-weight: 950;
-}
-.hub-community-mark img { width: 100%; height: 100%; object-fit: cover; }
-
-.hub-community-manage {
-  justify-self: center;
-  color: var(--muted);
-  font-size: 12px;
-  text-decoration: none;
-}
-.hub-community-manage:hover,.hub-community-manage:focus-visible { color: var(--text); }
-.hub-community-loading { padding: 12px; color: var(--muted); text-align: center; }
-
-.hub-simulator-intro { margin: 0 auto 10px; text-align: center; }
-.hub-simulator-intro h2 { margin: 0; font-size: 18px; }
 
 .game-hub-grid {
   display: grid;
@@ -274,21 +159,6 @@
   }
   .hub-intro { margin-bottom: 7px; }
   .hub-intro h1 { font-size: 20px; }
-  .hub-stage-back { margin-bottom: 10px; }
-  .hub-selected-community {
-    justify-content: flex-start;
-    margin: 0 0 12px;
-    padding: 9px 11px;
-    border: 1px solid var(--border);
-    border-radius: 11px;
-    background: var(--panel);
-  }
-  .hub-community-picker { margin-bottom: 14px; }
-  .hub-community-options { display: grid; grid-template-columns: 1fr; gap: 7px; }
-  .hub-community-option { width: 100%; min-width: 0; max-width: none; padding: 8px 10px; }
-  .hub-community-mark { width: 32px; height: 32px; }
-  .hub-simulator-intro { margin-bottom: 7px; }
-  .hub-simulator-intro h2 { font-size: 17px; }
   .game-hub-grid {
     grid-template-columns: 1fr;
     gap: 12px;

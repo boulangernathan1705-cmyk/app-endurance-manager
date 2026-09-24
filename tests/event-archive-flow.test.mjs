@@ -41,7 +41,7 @@ test('la vue événement garde les départs fermés par défaut et range les dé
   const html=read('game.html');
   assert.match(view,/class="past-departures-fold"/);
   assert.match(view,/Départs passés/);
-  assert.match(view,/renderDeparturePanel\(event,departure,index,false,\{isPast:true,rawEvent,rawDeparture\}\)/);
+  assert.match(view,/renderDeparturePanel\(event,departure,index,false,\{isPast:true\}\)/);
   assert.doesNotMatch(view,/departure\.id===next\?\.id\|\|/);
   assert.doesNotMatch(view,/next-departure-tag/);
   assert.match(css,/\.past-departures-fold > summary[\s\S]*font-size:\s*15px/);

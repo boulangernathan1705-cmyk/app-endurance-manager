@@ -47,10 +47,8 @@ test('le portail expose les deux espaces et le contexte charge avant l’applica
   const hub = readFileSync(new URL('../index.html',import.meta.url),'utf8');
   const game = readFileSync(new URL('../game.html',import.meta.url),'utf8');
   const build = readFileSync(new URL('../scripts/build.mjs',import.meta.url),'utf8');
-  assert(hub.includes('Choisis ton simulateur'));
-  assert(hub.includes('Le Mans Ultimate'));
-  assert(hub.includes('iRacing'));
-  assert(!hub.includes('community-stage'));
+  assert(hub.includes('href="/lmu/"'));
+  assert(hub.includes('href="/iracing/"'));
   assert(hub.includes('/front/game-hub.mjs'));
   assert(game.indexOf('/front/game-context.js') < game.indexOf('/app.js'));
   assert(build.includes("new URL('lmu/index.html', out)"));

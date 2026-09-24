@@ -5,9 +5,6 @@ const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp
 const isHub = location.pathname === '/' || location.pathname.endsWith('/index.html');
 const isMembers = location.pathname.endsWith('/members.html');
 const isHelp = location.pathname.endsWith('/help.html');
-const isSiteSettings = location.pathname.endsWith('/communities.html');
-let connectedUser=null;
-let activeCommunity=null;
 
 function discordMark() {
   return `<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M19.5 5.3A16.3 16.3 0 0 0 15.4 4l-.5 1.1a14.6 14.6 0 0 0-5.8 0L8.6 4a16.1 16.1 0 0 0-4.1 1.3C1.9 9.2 1.2 13 1.6 16.8A16.8 16.8 0 0 0 6.7 19l1.2-1.7c-.7-.3-1.4-.7-2-1.2l.5-.4c3.8 1.8 7.8 1.8 11.6 0l.5.4c-.6.5-1.3.9-2 1.2l1.2 1.7a16.7 16.7 0 0 0 5.1-2.2c.5-4.4-.9-8.2-3.3-11.5ZM8.5 14.7c-1.2 0-2.1-1.1-2.1-2.4 0-1.4.9-2.4 2.1-2.4s2.1 1.1 2.1 2.4-.9 2.4-2.1 2.4Zm7 0c-1.2 0-2.1-1.1-2.1-2.4 0-1.4.9-2.4 2.1-2.4s2.1 1.1 2.1 2.4-.9 2.4-2.1 2.4Z"/></svg>`;
@@ -53,16 +50,6 @@ function avatarMarkup(user) {
   return `<span class="account-avatar is-fallback">${discordMark()}</span>`;
 }
 
-function communityBadge(){
-  const logo=activeCommunity?.branding?.logoUrl;
-  return `<span class="account-community-badge ${logo?'is-visible':''}" title="${esc(activeCommunity?.name||'')}">${logo?`<img src="${esc(logo)}" alt="" referrerpolicy="no-referrer">`:''}</span>`;
-}
-function communityFromSession(session){
-  const all=[...(session?.organizations?.communities||[]),...(session?.organizations?.discoverableCommunities||[])];
-  const siteId=session?.organizations?.siteCommunityId||session?.organizations?.preferredCommunityId;
-  return all.find(item=>item.id===siteId)||null;
-}
-
 function bindAvatarFallbacks() {
   root?.querySelectorAll('.account-avatar img').forEach(image => image.addEventListener('error', () => {
     const wrapper = image.parentElement;
@@ -85,15 +72,12 @@ function renderDisconnected(discordReady) {
   root.innerHTML = `<div class="account-disconnected-wrap"><div class="account-disconnected-actions">
     <a class="account-menu-item account-help-link" href="/help.html">Aide</a>
     ${discordReady
-      ? `<a class="account-discord-login" href="/api/auth/discord?return=${encodeURIComponent(location.pathname+location.search)}">${discordMark()}<span>Se connecter avec Discord</span></a>`
+      ? `<a class="account-discord-login" href="/api/auth/discord">${discordMark()}<span>Se connecter avec Discord</span></a>`
       : `<span class="account-discord-unavailable">${discordMark()}<span>Connexion Discord indisponible</span></span>`}
   </div>${discordReady?'<p class="account-oauth-trust">Connexion via Discord OAuth · aucun mot de passe transmis à Endurance Manager. <a href="/about.html#connexion">En savoir plus</a></p>':''}</div>`;
 }
 
 function renderConnected(user) {
-  connectedUser=user;
-  const managesSite=['admin','organizer'].includes(user.role)||['owner','manager'].includes(activeCommunity?.role);
-  const settings=managesSite?`<a class="account-menu-item" href="/communities.html"${isSiteSettings?' aria-current="page"':''}>Paramètres du site</a>`:'';
   const manage = user.role === 'admin' ? `<a class="account-menu-item" href="/members.html">Gestion des membres</a>` : '';
   const help = `<a class="account-menu-item" href="/help.html"${isHelp ? ' aria-current="page"' : ''}>Aide</a>`;
 
@@ -105,7 +89,7 @@ function renderConnected(user) {
     </button>
     <div class="account-popover" role="menu" hidden>
       <div class="account-popover-profile">${avatarMarkup(user)}<span><strong>${esc(user.name)}</strong><small>${roleLabel(user.role)}</small></span></div>
-      ${settings}${help}${manage}
+      ${help}${manage}
       <span class="account-menu-separator" aria-hidden="true"></span>
       <button type="button" class="account-menu-item account-menu-logout" data-account-logout>Déconnexion</button>
     </div>
@@ -119,7 +103,6 @@ async function loadSession() {
     const response = await fetch('/api/session', {credentials:'same-origin',cache:'no-store'});
     if (!response.ok) throw new Error('session');
     const session = await response.json();
-    activeCommunity=communityFromSession(session);
     if (session.user) renderConnected(session.user);
     else renderDisconnected(!!session.discordReady);
   } catch {
@@ -165,11 +148,6 @@ document.addEventListener('click', event => {
 
 document.addEventListener('keydown', event => {
   if (event.key === 'Escape') closeMenu();
-});
-
-document.addEventListener('endurance:community-context',event=>{
-  activeCommunity=event.detail?.community||null;
-  if(connectedUser)renderConnected(connectedUser);
 });
 
 void loadSession();

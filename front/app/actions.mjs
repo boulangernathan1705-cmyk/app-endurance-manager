@@ -1,39 +1,29 @@
-import {app,state,api,load,showError,countdown,CARS} from './core.mjs?v=13-tondeuz-tool';
-import {renderNav,renderHome} from './home-view.mjs?v=13-tondeuz-tool';
-import {renderEvent} from './event-view.mjs?v=13-tondeuz-tool';
-import {renderEventForm,departureFields,updateRemoveButtons} from './event-form.mjs?v=13-tondeuz-tool';
-import {renderMyEntries} from './entries-view.mjs?v=13-tondeuz-tool';
-import {refresh,refreshAfterSave} from './refresh.mjs?v=13-tondeuz-tool';
-import {draftFor,registrationDraft,ownRegistrations,rerenderRegistrationSection,submitRegistration} from './registration.mjs?v=13-tondeuz-tool';
-import {updateCrewState} from './crews.mjs?v=13-tondeuz-tool';
-import {GENERAL_AUDIENCE,defaultRegistrationAudienceIds,registrationAudienceIds} from './organization-context.mjs?v=13-tondeuz-tool';
+import {app,state,api,load,showError,countdown,CARS} from './core.mjs';
+import {renderNav,renderHome} from './home-view.mjs?v=3-shared-crew-cards';
+import {renderEvent} from './event-view.mjs?v=9-one-course-page';
+import {renderEventForm,departureFields,updateRemoveButtons} from './event-form.mjs';
+import {renderMyEntries} from './entries-view.mjs?v=2-three-accordions';
+import {refresh,refreshAfterSave} from './refresh.mjs';
+import {draftFor,registrationDraft,ownRegistrations,rerenderRegistrationSection,submitRegistration} from './registration.mjs?v=2-preserve-timeline-scroll';
+import {updateCrewState} from './crews.mjs?v=8-one-page-compact';
 
 async function submitEvent(form){
-  const data={name:form.elements.eventName.value.trim(),durationHours:Number(form.elements.eventDuration.value),eventType:form.elements.eventType.value,circuit:form.elements.eventCircuit.value,organizationId:form.elements.eventOrganization?.value||null,categories:[...form.querySelectorAll('[name="eventCategory"]:checked')].map(input=>input.value),departures:[...form.querySelectorAll('.departure-field')].map(row=>({id:row.dataset.id||undefined,date:row.querySelector('[name="date"]').value,time:row.querySelector('[name="time"]').value})),version:state.editingEvent?.version};
+  const data={name:form.elements.eventName.value.trim(),durationHours:Number(form.elements.eventDuration.value),eventType:form.elements.eventType.value,circuit:form.elements.eventCircuit.value,categories:[...form.querySelectorAll('[name="eventCategory"]:checked')].map(input=>input.value),departures:[...form.querySelectorAll('.departure-field')].map(row=>({id:row.dataset.id||undefined,date:row.querySelector('[name="date"]').value,time:row.querySelector('[name="time"]').value})),version:state.editingEvent?.version};
   if(!data.categories.length)throw Error('Sélectionne au moins une catégorie.'); if(!data.circuit)throw Error('Sélectionne le circuit de la course.');
   const editing=!!state.editingEvent; const result=await api(editing?`/api/events/${state.editingEvent.id}`:'/api/events',editing?'PATCH':'POST',data);
-  state.eventCreationOrganizationId=null;
   if(editing){state.currentEventId=state.editingEvent.id;state.page='event';}else{state.page='home';state.currentEventId=null;}
   await refreshAfterSave(editing?'Événement modifié.':'Événement créé.',result.id);
 }
 
 function beginCrewJoin(event,departure,crew){
   if(!state.user)throw Error('Connecte-toi avec Discord pour rejoindre un équipage.');
-  const crewAudience=crew.organizationId||GENERAL_AUDIENCE;
-  const own=ownRegistrations(departure).filter(reg=>reg.status!=='unavailable'&&!reg.engaged);
-  const matching=own.find(reg=>reg.category===crew.category);
-  const source=matching||own[0]||null;
+  const assigned=new Set((departure.crews||[]).flatMap(item=>item.registrationIds||[]));
+  const source=ownRegistrations(departure).find(reg=>reg.status!=='unavailable'&&!assigned.has(reg.id));
   state.pendingCrewJoin={eventId:event.id,departureId:departure.id,crewId:crew.id};
   state.selectedDepartureId=departure.id;
-  if(matching){
-    const draft=registrationDraft(matching);
-    draft.audienceIds=[...new Set([...registrationAudienceIds(matching),crewAudience])];
-    state.drafts[departure.id]=draft;
-  }else{
-    state.drafts[departure.id]=source
-      ? {...registrationDraft(source),category:crew.category,cars:[],carAny:false,id:null,version:null,mode:'category',forOther:false,audienceIds:[...new Set([...registrationAudienceIds(source),crewAudience])]}
-      : {name:state.user.name?.slice(0,30)||state.pilotName,status:'',preferredPilot:'',forOther:false,participantUserId:null,participantId:null,category:crew.category,cars:[],carAny:false,id:null,version:null,mode:'pilot',audienceIds:[crewAudience]};
-  }
+  state.drafts[departure.id]=source
+    ? {...registrationDraft(source),category:crew.category,cars:[],carAny:false,id:null,version:null,mode:'category',forOther:false}
+    : {name:state.user.name?.slice(0,30)||state.pilotName,status:'',preferredPilot:'',forOther:false,participantUserId:null,participantId:null,category:crew.category,cars:[],carAny:false,id:null,version:null,mode:'pilot'};
   state.registrationOpen.add(departure.id);
   renderEvent();
   document.getElementById(`departure-${departure.id}`)?.scrollIntoView({block:'start',behavior:'smooth'});
@@ -64,21 +54,16 @@ async function perform(action,target){
   const event=state.events.find(item=>item.id===state.currentEventId);
   switch(action){
     case 'dismiss-error': document.querySelector('[data-ux-error-modal]')?.remove(); break;
-    case 'home': {
-      state.eventCreationOrganizationId=null;
-      const url=new URL(location.href);url.searchParams.delete('event');url.searchParams.delete('departure');
-      history.replaceState(null,'',url.pathname+(url.search||''));
-      renderHome();break;
-    }
+    case 'home': renderHome(); break;
     case 'event-filter': state.eventFilter=target.dataset.filter||'upcoming'; renderHome(); break;
     case 'refresh': await refresh(); break;
-    case 'open': { const nextEvent=state.events.find(item=>item.id===target.dataset.id);state.currentEventId=target.dataset.id;state.selectedDepartureId=target.dataset.departure||null;state.eventSection='race';state.drafts={};state.pendingCrewJoin=null;state.registrationOpen.clear();if(nextEvent?.organizationId){state.activeOrganizationId=nextEvent.organizationId;state.visibleAudienceIds=new Set([nextEvent.organizationId]);}renderEvent();break; }
+    case 'open': state.currentEventId=target.dataset.id; state.selectedDepartureId=target.dataset.departure||null; state.eventSection='race'; state.drafts={}; state.pendingCrewJoin=null; state.registrationOpen.clear(); renderEvent(); break;
     case 'event-section': state.eventSection='race'; renderEvent(); break;
     case 'my-registration': { state.pendingCrewJoin=null; state.selectedDepartureId=target.dataset.departure; delete state.drafts[state.selectedDepartureId]; state.registrationOpen.add(state.selectedDepartureId); renderEvent(); break; }
     case 'close-registration': if(state.pendingCrewJoin?.departureId===target.dataset.departure)state.pendingCrewJoin=null;state.registrationOpen.delete(target.dataset.departure); renderEvent(); break;
     case 'new-registration': {
       state.pendingCrewJoin=null;state.selectedDepartureId=target.dataset.departure; const departure=event.departures.find(item=>item.id===target.dataset.departure); const categoryMode=target.dataset.mode==='category'; const existing=departure.availability.find(reg=>reg.id===target.dataset.registration)||ownRegistrations(departure)[0];
-      state.drafts[departure.id]={...(categoryMode&&existing?registrationDraft(existing):{name:'',status:'',preferredPilot:'',forOther:!!state.user,participantUserId:null,audienceIds:defaultRegistrationAudienceIds(state)}),category:'',cars:[],carAny:false,id:null,version:null,mode:categoryMode?'category':'pilot'}; state.registrationOpen.add(departure.id); renderEvent(); (document.querySelector(`[name="participant"][data-departure="${departure.id}"]`)||document.querySelector(`[name="pilotName"][data-departure="${departure.id}"]`))?.focus(); break;
+      state.drafts[departure.id]={...(categoryMode&&existing?registrationDraft(existing):{name:'',status:'',preferredPilot:'',forOther:!!state.user,participantUserId:null}),category:'',cars:[],carAny:false,id:null,version:null,mode:categoryMode?'category':'pilot'}; state.registrationOpen.add(departure.id); renderEvent(); (document.querySelector(`[name="participant"][data-departure="${departure.id}"]`)||document.querySelector(`[name="pilotName"][data-departure="${departure.id}"]`))?.focus(); break;
     }
     case 'edit-registration': { state.pendingCrewJoin=null; const departure=event.departures.find(item=>item.id===target.dataset.departure),reg=departure.availability.find(item=>item.id===target.dataset.id); if(!reg?.canEdit)throw Error('Tu n’as pas l’autorisation de modifier cette inscription.'); state.selectedDepartureId=departure.id; state.drafts[departure.id]=registrationDraft(reg); state.registrationOpen.add(departure.id); state.eventSection='race'; renderEvent(); break; }
     case 'availability': {
@@ -108,17 +93,14 @@ async function perform(action,target){
       else {if(!confirm('Retirer ce pilote de l’équipage ? Son inscription sera conservée.'))return;await api(`/api/crews/${crew.id}/members/${target.dataset.registration}`,'DELETE',{version:crew.version});state.crewManagementOpen.add(crew.id);}
       await refreshAfterSave('Équipages mis à jour.'); break;
     }
-    case 'create': state.eventCreationOrganizationId=state.activeCommunityId||null;renderEventForm(null,{organizationId:state.eventCreationOrganizationId}); break;
-    case 'edit-event': state.eventCreationOrganizationId=event?.organizationId||null;renderEventForm(event); break;
+    case 'create': renderEventForm(); break;
+    case 'edit-event': renderEventForm(event); break;
     case 'add-departure': if(app.querySelectorAll('.departure-field').length>=30)throw Error('Maximum 30 départs par événement.');document.getElementById('departureFields').insertAdjacentHTML('beforeend',departureFields());updateRemoveButtons();break;
     case 'remove-departure': if(app.querySelectorAll('.departure-field').length>1)target.closest('.departure-field').remove();updateRemoveButtons();break;
-    case 'delete-event': if(!confirm(`Supprimer « ${event.name} » et toutes ses inscriptions ? Cette suppression est définitive.`))return;await api(`/api/events/${event.id}`,'DELETE',{version:event.version,organizationId:event.organizationId||null});state.page='home';state.eventCreationOrganizationId=null;await refreshAfterSave('Événement supprimé.');break;
+    case 'delete-event': if(!confirm(`Supprimer « ${event.name} » et toutes ses inscriptions ? Cette suppression est définitive.`))return;await api(`/api/events/${event.id}`,'DELETE',{version:event.version});state.page='home';await refreshAfterSave('Événement supprimé.');break;
     case 'my-entries': await load();renderNav();renderMyEntries();break;
     case 'guest-link': state.recoveryLink=(await api('/api/guest/link','POST')).link;state.page==='event'?renderEvent():renderHome();break;
-    case 'copy-link':
-      try{await navigator.clipboard.writeText(state.recoveryLink);target.textContent='Lien copié';}
-      catch{document.getElementById('personalLink')?.select();throw Error('Copie le lien sélectionné avec Ctrl+C.');}
-      break;
+    case 'copy-link': try{await navigator.clipboard.writeText(state.recoveryLink);target.textContent='Lien copié';}catch{document.getElementById('personalLink')?.select();throw Error('Copie le lien sélectionné avec Ctrl+C.');}break;
     case 'hide-link': state.recoveryLink='';target.closest('.recovery-panel')?.remove();break;
   }
 }
@@ -137,20 +119,6 @@ document.addEventListener('error',event=>{const image=event.target;if(image inst
 setInterval(()=>document.querySelectorAll('[data-countdown]').forEach(element=>{element.textContent=countdown(Number(element.dataset.countdown));}),1000);
 
 async function start(){
-  try{
-    const token=new URLSearchParams(location.hash.slice(1)).get('access');
-    if(token){history.replaceState(null,'',location.pathname+location.search);await api('/api/guest/recover','POST',{token});state.flash='Tes inscriptions invitées sont accessibles sur cet appareil.';}
-    const authError=new URLSearchParams(location.search).get('auth');
-    if(authError){const url=new URL(location.href);url.searchParams.delete('auth');history.replaceState(null,'',url.pathname+(url.search||''));state.flash='La connexion Discord n’a pas abouti. Tu peux réessayer.';}
-    await load();renderNav();
-    const params=new URLSearchParams(location.search);
-    const eventId=params.get('event');
-    const directEvent=eventId?state.events.find(item=>item.id===eventId):null;
-    if(directEvent){
-      state.currentEventId=directEvent.id;
-      state.selectedDepartureId=params.get('departure')||null;
-      renderEvent(state.flash);
-    }else renderHome(state.flash);
-  }catch(error){app.innerHTML='<h1 class="page-title">ENDURANCE MANAGER</h1>';showError(error);}
+  try{const token=new URLSearchParams(location.hash.slice(1)).get('access');if(token){history.replaceState(null,'',location.pathname+location.search);await api('/api/guest/recover','POST',{token});state.flash='Tes inscriptions invitées sont accessibles sur cet appareil.';}const authError=new URLSearchParams(location.search).get('auth');if(authError){history.replaceState(null,'',location.pathname);state.flash='La connexion Discord n’a pas abouti. Tu peux réessayer.';}await load();renderNav();renderHome(state.flash);}catch(error){app.innerHTML='<h1 class="page-title">ENDURANCE MANAGER</h1>';showError(error);}
 }
 start();

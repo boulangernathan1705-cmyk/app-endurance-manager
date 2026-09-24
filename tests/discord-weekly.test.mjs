@@ -132,23 +132,10 @@ test('les mutations qui changent le résumé déclenchent une synchronisation',(
   assert.equal(isWeeklyDiscordMutation(request(`/api/events/${uuid}/departures/${departureUuid}/crews`)),true);
   assert.equal(isWeeklyDiscordMutation(request(`/api/registrations/${uuid}`,'DELETE')),true);
   assert.equal(isWeeklyDiscordMutation(request(`/api/crews/${uuid}/members/${departureUuid}`,'DELETE')),true);
-  assert.equal(isWeeklyDiscordMutation(request(`/api/organizations/${uuid}/discord`,'PATCH')),true);
   assert.equal(isWeeklyDiscordMutation(request('/api/auth/logout')),false);
   assert.equal(isWeeklyDiscordMutation(request('/api/events','GET')),false);
 });
 
 test('la synchronisation reste inactive tant que le webhook secret n’est pas configuré',async()=>{
   assert.deepEqual(await syncWeeklyDiscord({}),{ok:false,skipped:'not-configured'});
-});
-
-test('le récapitulatif communautaire filtre la communauté et le simulateur',async()=>{
-  const organizationId='99999999-9999-4999-8999-999999999999';
-  let capturedSql='',capturedOrganization='';
-  const DB={prepare(sql){capturedSql=sql;return{bind(value){capturedOrganization=value;return{all:async()=>({results:[]})};},all:async()=>({results:[]})};}};
-  const snapshot=await loadWeeklyDiscordSnapshot({DB},Date.parse('2026-09-18T10:00:00Z'),{organizationId,game:'iracing'});
-  assert.match(capturedSql,/circuit LIKE 'iracing-%'/);
-  assert.match(capturedSql,/organization_id=\?/);
-  assert.equal(capturedOrganization,organizationId);
-  assert.deepEqual(snapshot.currentDepartures,[]);
-  assert.deepEqual(snapshot.futureDepartures,[]);
 });

@@ -5,10 +5,6 @@ on:
   push:
     branches: [dev]
 
-concurrency:
-  group: browser-compatibility-${{ github.ref }}
-  cancel-in-progress: true
-
 permissions:
   contents: read
 
@@ -17,35 +13,29 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
-      COMPAT_BASE_URL: http://127.0.0.1:8788
-      COMPAT_REMOTE_BASE_URL: https://app.endurance-manager.workers.dev
+      COMPAT_BASE_URL: https://app.endurance-manager.workers.dev
+      ENV_LABEL: development
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '22.13.0'
       - run: npm install --no-audit --no-fund
-      - name: Build exact commit for browser tests
-        run: npm run build:workers
-      - name: Start local browser-test server
+      - run: npx playwright install --with-deps chromium firefox webkit
+      - name: Wait for deployment
         run: |
-          python3 -m http.server 8788 --bind 127.0.0.1 --directory public >/tmp/endurance-manager-compat.log 2>&1 &
-          echo $! >/tmp/endurance-manager-compat.pid
-          for i in {1..20}; do
-            if curl --fail --silent --show-error --max-time 2 "http://127.0.0.1:8788/" >/dev/null; then
-              echo "Local exact-commit build is ready."
+          echo "Checking ${ENV_LABEL}: ${COMPAT_BASE_URL}"
+          for i in {1..18}; do
+            if curl --fail --silent --show-error --max-time 10 \
+              "${COMPAT_BASE_URL}/api/session" >/dev/null; then
               exit 0
             fi
-            sleep 1
+            sleep 10
           done
-          cat /tmp/endurance-manager-compat.log || true
           exit 1
-      - run: npx playwright install --with-deps chromium firefox webkit
-      - name: Run compatibility tests against exact commit
-        run: npm run compat:test
+      - run: npm run compat:test
         env:
           COMPAT_BASE_URL: ${{ env.COMPAT_BASE_URL }}
-          COMPAT_REMOTE_BASE_URL: ${{ env.COMPAT_REMOTE_BASE_URL }}
       - name: Upload Playwright report on failure
         if: failure()
         uses: actions/upload-artifact@v4

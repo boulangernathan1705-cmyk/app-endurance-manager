@@ -19,14 +19,8 @@ Les permissions sont toujours vérifiées côté serveur. Un pseudo seul ne donn
 - API sur Cloudflare Workers.
 - Base partagée Cloudflare D1 `fmt-endurance`.
 - Authentification Discord.
-- Communautés Endurance Manager facultatives, utilisées comme contexte principal avant le choix LMU / iRacing.
-- Communauté par défaut par utilisateur et liens directs `?community=<id>` pour ouvrir immédiatement l’espace voulu.
-- Personnalisation légère par communauté : logo, bannière et couleur d’accent, avec reprise automatique des visuels Discord quand ils existent.
-- Liaison Discord facultative par communauté pour synchroniser les membres et organisateurs, vérifier un rôle d’éligibilité et publier le récapitulatif hebdomadaire.
 - Assets statiques servis par Cloudflare Workers Static Assets.
 - Catalogue catégories, voitures et circuits partagé entre le front et le serveur.
-
-Une endurance peut rester générale et n’appartenir à aucune communauté. Lorsqu’une communauté est active, le site affiche d’abord son identité et ses endurances, puis le simulateur choisi ; l’annuaire multi-communautés reste une fonction secondaire de gestion/découverte. Une communauté peut être publique ou privée, ouverte, sur demande, sur invitation ou réservée à un serveur Discord. Les anciennes Teams privées sont automatiquement converties en communautés privées sur invitation : il n’existe plus deux systèmes de groupe concurrents. Les listes de membres sont chargées à la demande et paginées afin de rester adaptées aux grands serveurs.
 
 Les horaires sont interprétés en heure de Paris. Les inscriptions se verrouillent au départ. Un pilote peut proposer plusieurs catégories sur le même départ ; lorsqu’il est affecté à un équipage, la catégorie de cet équipage devient celle retenue.
 
@@ -52,6 +46,6 @@ npm run deploy:workers
 
 Cette commande applique les migrations D1 en attente puis déploie le Worker. La base D1 existante ne doit pas être recréée et les migrations déjà appliquées ne doivent pas être rejouées manuellement.
 
-Les variables Discord sont configurées dans Cloudflare. `DISCORD_CLIENT_SECRET` et `DISCORD_BOT_TOKEN` doivent rester des secrets Cloudflare et ne doivent jamais être ajoutés au dépôt. Le bot est nécessaire uniquement pour les communautés qui activent la vérification d’un serveur ou d’un rôle Discord.
+Les variables Discord sont configurées dans Cloudflare. `DISCORD_CLIENT_SECRET` doit rester un secret Cloudflare et ne doit jamais être ajouté au dépôt.
 
 Voir `docs/DEPLOYMENT.md` pour le déploiement Cloudflare et `docs/TECHNICAL_AUDIT.md` pour les règles de maintenance et d’optimisation.
