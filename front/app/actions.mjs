@@ -1,12 +1,12 @@
-import {app,state,api,load,showError,countdown,CARS} from './core.mjs?v=12-site-tool';
-import {renderNav,renderHome} from './home-view.mjs?v=16-site-tool';
-import {renderEvent} from './event-view.mjs?v=23-site-tool';
-import {renderEventForm,departureFields,updateRemoveButtons} from './event-form.mjs?v=6-site-tool';
-import {renderMyEntries} from './entries-view.mjs?v=10-site-tool';
-import {refresh,refreshAfterSave} from './refresh.mjs?v=7-site-tool';
-import {draftFor,registrationDraft,ownRegistrations,rerenderRegistrationSection,submitRegistration} from './registration.mjs?v=10-site-tool';
-import {updateCrewState} from './crews.mjs?v=16-site-tool';
-import {GENERAL_AUDIENCE,defaultRegistrationAudienceIds,registrationAudienceIds} from './organization-context.mjs?v=7-community-only';
+import {app,state,api,load,showError,countdown,CARS} from './core.mjs?v=13-tondeuz-tool';
+import {renderNav,renderHome} from './home-view.mjs?v=13-tondeuz-tool';
+import {renderEvent} from './event-view.mjs?v=13-tondeuz-tool';
+import {renderEventForm,departureFields,updateRemoveButtons} from './event-form.mjs?v=13-tondeuz-tool';
+import {renderMyEntries} from './entries-view.mjs?v=13-tondeuz-tool';
+import {refresh,refreshAfterSave} from './refresh.mjs?v=13-tondeuz-tool';
+import {draftFor,registrationDraft,ownRegistrations,rerenderRegistrationSection,submitRegistration} from './registration.mjs?v=13-tondeuz-tool';
+import {updateCrewState} from './crews.mjs?v=13-tondeuz-tool';
+import {GENERAL_AUDIENCE,defaultRegistrationAudienceIds,registrationAudienceIds} from './organization-context.mjs?v=13-tondeuz-tool';
 
 async function submitEvent(form){
   const data={name:form.elements.eventName.value.trim(),durationHours:Number(form.elements.eventDuration.value),eventType:form.elements.eventType.value,circuit:form.elements.eventCircuit.value,organizationId:form.elements.eventOrganization?.value||null,categories:[...form.querySelectorAll('[name="eventCategory"]:checked')].map(input=>input.value),departures:[...form.querySelectorAll('.departure-field')].map(row=>({id:row.dataset.id||undefined,date:row.querySelector('[name="date"]').value,time:row.querySelector('[name="time"]').value})),version:state.editingEvent?.version};
