@@ -145,7 +145,7 @@ function enduranceQueueMarkup(items, game) {
 function gameCard(game, events, communityId='') {
   const catalog = GAME_CATALOGS[game];
   const base = game === 'lmu' ? '/lmu/' : '/iracing/';
-  const params = new URLSearchParams({runtime:'93',community:communityId || 'general'}); const href = `${base}?${params.toString()}`;
+  const params = new URLSearchParams({runtime:'94'}); if(communityId)params.set('community',communityId); const href = `${base}?${params.toString()}`;
   const badge = game === 'lmu' ? 'LMU' : 'iR';
   return `<article class="game-hub-card game-${game}">
     <div class="game-hub-heading"><div class="game-title-line"><span class="game-badge" aria-hidden="true">${badge}</span><h2>${esc(catalog.name)}</h2></div><p>${game === 'lmu' ? 'Hypercar, prototypes et GT de Le Mans Ultimate.' : 'GTP, LMP2, GT3, GT4 et TCR avec un catalogue de circuits étendu.'}</p></div>
@@ -173,30 +173,15 @@ function communityMark(community) {
 }
 
 function scopedEvents(events, communityId) {
-  return (events || []).filter(event => communityId ? event.organizationId === communityId : !event.organizationId);
+  return (events || []).filter(event => !event.organizationId || !communityId || event.organizationId === communityId);
 }
 
 function requestedCommunity(organizations={}) {
-  const params=new URLSearchParams(location.search);
-  if(!params.has('community')){
-    const joined=organizations.communities||[];
-    const preferred=joined.find(item=>item.id===organizations.preferredCommunityId);
-    if(preferred)return preferred.id;
-    if(joined.length===1)return joined[0].id;
-    return null;
-  }
-  const requested=params.get('community') || '';
-  if(requested==='general')return '';
-  const known=knownCommunities(organizations);
-  if (requested && known.some(item=>item.id===requested)) return requested;
-  return null;
+  return organizations.siteCommunityId || organizations.preferredCommunityId || null;
 }
 
 function defaultCommunityId(organizations={}) {
-  const joined=organizations.communities || [];
-  const preferred=organizations.preferredCommunityId;
-  if (preferred && joined.some(item=>item.id===preferred)) return preferred;
-  return joined.length===1 ? joined[0].id : null;
+  return organizations.siteCommunityId || organizations.preferredCommunityId || null;
 }
 
 function communityOption(community) {
@@ -257,7 +242,7 @@ function showSimulatorStage(communityId,{historyMode='none'}={}) {
   selectedCommunity.innerHTML=selectedCommunityMarkup();
   communityStage.hidden=true;
   simulatorStage.hidden=false;
-  document.title=`${selectedCommunityId ? knownCommunities(sessionState.organizations || {}).find(item=>item.id===selectedCommunityId)?.name || 'Communauté' : 'Endurance Manager'} · Simulateur`;
+  document.title=`${community?.name || 'Les Tondeuz à gazon'} · Simulateur`;
   if(historyMode!=='none'){
     const url=new URL(location.href);
     url.searchParams.set('community',selectedCommunityId || 'general');
@@ -267,11 +252,12 @@ function showSimulatorStage(communityId,{historyMode='none'}={}) {
 
 function syncStageFromUrl() {
   const organizations=sessionState.organizations || {};
-  const requested=requestedCommunity(organizations);
-  if(requested!==null){showSimulatorStage(requested);return;}
-  const preferred=defaultCommunityId(organizations);
-  if(preferred){showSimulatorStage(preferred,{historyMode:'replace'});return;}
-  showCommunityStage();
+  const siteId=requestedCommunity(organizations)||defaultCommunityId(organizations);
+  if(siteId){showSimulatorStage(siteId);return;}
+  selectedCommunityId=null;
+  renderGames();
+  if(simulatorStage)simulatorStage.hidden=false;
+  if(selectedCommunity)selectedCommunity.innerHTML='<span class="hub-selected-brand"><strong>Les Tondeuz à gazon</strong></span>';
 }
 
 async function fetchSession() {
