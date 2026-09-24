@@ -52,20 +52,15 @@ function publicRegistration(reg, actor, userNames = new Map()) {
   };
 }
 async function listEvents(env, actor, game='') {
-  const where=game==='iracing' ? " WHERE circuit LIKE 'iracing-%'" : game==='lmu' ? " WHERE circuit NOT LIKE 'iracing-%'" : '';
-  const rows = (await env.DB.prepare(`SELECT * FROM events${where} ORDER BY created_at DESC, id DESC`).all()).results;
+  // Filter by joining events instead of binding id lists: D1 rejects queries with more than 100 bound parameters.
+  const where=game==='iracing' ? " WHERE e.circuit LIKE 'iracing-%'" : game==='lmu' ? " WHERE e.circuit NOT LIKE 'iracing-%'" : '';
+  const rows = (await env.DB.prepare(`SELECT e.* FROM events e${where} ORDER BY e.created_at DESC, e.id DESC`).all()).results;
   if (!rows.length) return [];
-  const eventIds=rows.map(row=>row.id);
-  const marks=eventIds.map(()=>'?').join(',');
-  const registrations = (await env.DB.prepare(registrationSelect+` WHERE r.event_id IN (${marks}) ORDER BY r.created_at,r.id`).bind(...eventIds).all()).results;
-  const crews = (await env.DB.prepare(`SELECT * FROM crews WHERE event_id IN (${marks}) ORDER BY created_at,id`).bind(...eventIds).all()).results;
-  const memberships = (await env.DB.prepare(`SELECT cm.crew_id,cm.registration_id FROM crew_members cm JOIN crews c ON c.id=cm.crew_id WHERE c.event_id IN (${marks})`).bind(...eventIds).all()).results;
-  const relevantUserIds=[...new Set(registrations.flatMap(reg=>[reg.owner_user_id,reg.participant_user_id,reg.user_id]).filter(Boolean))];
-  let users=[];
-  if (relevantUserIds.length) {
-    const userMarks=relevantUserIds.map(()=>'?').join(',');
-    users=(await env.DB.prepare(`SELECT id,name FROM users WHERE id IN (${userMarks})`).bind(...relevantUserIds).all()).results;
-  }
+  const registrations = (await env.DB.prepare(registrationSelect+` JOIN events e ON e.id=r.event_id${where} ORDER BY r.created_at,r.id`).all()).results;
+  const crews = (await env.DB.prepare(`SELECT c.* FROM crews c JOIN events e ON e.id=c.event_id${where} ORDER BY c.created_at,c.id`).all()).results;
+  const memberships = (await env.DB.prepare(`SELECT cm.crew_id,cm.registration_id FROM crew_members cm JOIN crews c ON c.id=cm.crew_id JOIN events e ON e.id=c.event_id${where}`).all()).results;
+  // Only registration creators' names are displayed (addedByName).
+  const users = (await env.DB.prepare(`SELECT DISTINCT u.id,u.name FROM users u JOIN registrations r ON r.owner_user_id=u.id JOIN events e ON e.id=r.event_id${where}`).all()).results;
   const userNames = new Map(users.map(item => [item.id,item.name]));
   const grouped = new Map();
   for (const reg of registrations) { const key = `${reg.event_id}:${reg.departure_id}`; if (!grouped.has(key)) grouped.set(key, []); grouped.get(key).push(publicRegistration(reg, actor, userNames)); }

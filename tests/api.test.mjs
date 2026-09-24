@@ -7,7 +7,7 @@ const ROOT='https://fmt.example';
 const ADMIN='111111111111111111', PILOT='222222222222222222', OTHER='333333333333333333';
 class D1 {
   constructor(){this.db=new DatabaseSync(':memory:');this.db.exec('PRAGMA foreign_keys=ON;');this.db.exec(readFileSync(new URL('../migrations/0001_initial.sql',import.meta.url),'utf8'));this.db.exec(readFileSync(new URL('../migrations/0002_event_duration.sql',import.meta.url),'utf8'));this.db.exec(readFileSync(new URL('../migrations/0003_event_type.sql',import.meta.url),'utf8'));}
-  prepare(sql){const self=this;return {params:[],bind(...params){this.params=params;return this;},async first(){return self.db.prepare(sql).get(...this.params)||null;},async all(){return {results:self.db.prepare(sql).all(...this.params)};},async run(){const result=self.db.prepare(sql).run(...this.params);return {success:true,meta:{changes:Number(result.changes)}};}};}
+  prepare(sql){const self=this;return {params:[],bind(...params){if(params.length>100)throw new Error('D1_ERROR: too many SQL variables');this.params=params;return this;},async first(){return self.db.prepare(sql).get(...this.params)||null;},async all(){return {results:self.db.prepare(sql).all(...this.params)};},async run(){const result=self.db.prepare(sql).run(...this.params);return {success:true,meta:{changes:Number(result.changes)}};}};}
   async batch(statements){this.db.exec('BEGIN');try{const results=[];for(const statement of statements)results.push(await statement.run());this.db.exec('COMMIT');return results;}catch(error){this.db.exec('ROLLBACK');throw error;}}
 }
 function harness(withParticipants=true){
@@ -288,4 +288,26 @@ test('shortening preserves bookings and crews, rejecting hours outside the new d
  assert.deepEqual(event.departures[0].crews[0].registrationIds,[registration.data.id]);
  assert.equal((await req('/api/events/'+event.id,'PATCH',{...event,durationHours:1},'admin')).status,409);
  assert.equal((await req('/api/events/'+event.id,'PATCH',{...event,durationHours:24},'admin')).status,200);
+});
+test('event list stays available beyond D1 bound-parameter limit',async()=>{
+ const {req,login,DB}=harness();await login(ADMIN,'admin');
+ const insertUser=DB.db.prepare('INSERT INTO users(id,name,created_at) VALUES(?,?,0)');
+ const insertEvent=DB.db.prepare(`INSERT INTO events(id,name,circuit,categories,departures,created_by,created_at) VALUES(?,?,'','["GT3"]',?,?,?)`);
+ const insertParticipant=DB.db.prepare('INSERT INTO participants(id,name,user_id,created_by,created_at) VALUES(?,?,?,?,0)');
+ const insertRegistration=DB.db.prepare(`INSERT INTO registrations(id,event_id,departure_id,user_id,owner_user_id,name,name_key,category,status,created_at,participant_id) VALUES(?,?,'d',?,?,?,?,'GT3','whole',0,?)`);
+ for(let i=0;i<120;i++){
+  const user=String(400000000000000000n+BigInt(i)),creator=String(500000000000000000n+BigInt(i)),suffix=String(i).padStart(12,'0');
+  const eventId='00000000-0000-4000-8000-'+suffix,participantId='10000000-0000-4000-8000-'+suffix;
+  insertUser.run(user,'Pilote '+i);insertUser.run(creator,'Createur '+i);
+  insertEvent.run(eventId,'Course '+i,JSON.stringify([{id:'d',date:'2090-01-01',time:'20:00',startsAt:Date.UTC(2090,0,1)}]),ADMIN,i);
+  insertParticipant.run(participantId,'Pilote '+i,user,creator);
+  insertRegistration.run('20000000-0000-4000-8000-'+suffix,eventId,user,creator,'Pilote '+i,'pilote '+i,participantId);
+ }
+ const list=await req('/api/events','GET',null,'admin');
+ assert.equal(list.status,200);
+ assert.equal(list.data.events.length,120);
+ assert.equal(list.data.events.reduce((total,event)=>total+event.departures[0].availability.length,0),120);
+ assert.equal(list.data.events.find(event=>event.name==='Course 7').departures[0].availability[0].addedByName,'Createur 7');
+ assert.equal((await req('/api/events?game=lmu')).data.events.length,120);
+ assert.equal((await req('/api/events?game=iracing')).data.events.length,0);
 });
