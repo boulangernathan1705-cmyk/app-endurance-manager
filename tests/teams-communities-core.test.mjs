@@ -68,28 +68,18 @@ test('une communauté fonctionne sans Discord et peut ajouter Discord comme règ
   assert.match(directory,/discord_sync_enabled/);
 });
 
-test('la communauté active est choisie avant le simulateur et l’annuaire devient secondaire',()=>{
+test('le produit est centré sur les Tondeuz avec LMU et iRacing séparés',()=>{
   const hub=read('front/game-hub.mjs');
   const index=read('index.html');
   const home=read('front/app/home-view.mjs');
-  const directory=read('front/app/community-directory.mjs');
-  const context=read('front/app/organization-context.mjs');
-  assert.match(home,/nav-community-context/);
-  assert.match(home,/communityContextMarkup/);
-  assert.match(home,/contextEvents/);
-  assert.doesNotMatch(home,/button\('communities','Communautés'\)/);
-  assert.match(directory,/Ton espace actif se choisit depuis la barre principale/);
-  assert.match(directory,/Découvrir d’autres communautés/);
-  assert.doesNotMatch(directory,/Trouve ton paddock/);
-  assert.match(context,/preferredCommunityId/);
-  assert.match(context,/communityById/);
-  assert.match(index,/id="community-stage"/);
-  assert.match(index,/id="simulator-stage"[^>]+hidden/);
-  assert.doesNotMatch(index,/1 · ESPACE|2 · SIMULATEUR/);
-  assert.match(hub,/showSimulatorStage/);
-  assert.match(hub,/communityId \|\| 'general'/);
-  assert.match(hub,/joined\.length===1/);
-  assert.match(directory,/location\.origin\+'\/\?community='/);
+  const server=read('server/community-directory.mjs');
+  assert.match(index,/Choisis ton simulateur/);
+  assert.doesNotMatch(index,/community-stage|Choisis ta communauté|Paramètres communautés/);
+  assert.doesNotMatch(home,/nav-community-context|Endurances indépendantes/);
+  assert.match(hub,/siteCommunityId/);
+  assert.match(hub,/!event\.organizationId \|\| !communityId \|\| event\.organizationId === communityId/);
+  assert.match(server,/siteCommunityId:site\.id/);
+  assert.match(server,/La création de communautés n’est pas disponible sur ce site/);
 });
 
 test('les gérants peuvent personnaliser leur espace sans créer un moteur de thème parallèle',()=>{
@@ -106,7 +96,7 @@ test('les gérants peuvent personnaliser leur espace sans créer un moteur de th
   assert.match(server,/imageUrl\(input\.logoUrl/);
   assert.match(server,/accentColor\(input\.accentColor/);
   assert.match(css,/community-home-banner/);
-  assert.match(account,/account-community-badge/);
+  assert.match(account,/Paramètres du site/);
   assert.match(registration,/pilot-community-logo/);
   assert.match(directory,/Qui peut administrer le site/);
   assert.match(directory,/Synchroniser automatiquement les membres et organisateurs/);
@@ -139,15 +129,19 @@ test('les communautés remplacent les anciennes Teams et chargent leurs membres 
   assert.doesNotMatch(front,/function eventList|ENDURANCES ·|Créer une endurance/);
 });
 
-test('les endurances et inscriptions restent enfermées dans leur communauté active',()=>{
+test('les courses Tondeuz et les anciennes courses générales restent visibles sans exposer les autres communautés',()=>{
   const context=read('front/app/core.mjs');
+  const server=read('server/organizations.mjs');
   const home=read('front/app/home-view.mjs');
   const entries=read('front/app/entries-view.mjs');
   const registration=read('front/app/registration.mjs');
-  assert.match(context,/activeCommunityId/);
-  assert.match(home,/event\.organizationId===communityId/);
-  assert.match(entries,/event\.organizationId===state\.activeCommunityId/);
-  assert.match(registration,/event\.organizationId\?\[event\.organizationId\]/);
+  assert.match(context,/siteCommunityId/);
+  assert.match(context,/!event\.organizationId \|\| !siteId \|\| event\.organizationId===siteId/);
+  assert.match(home,/!event\.organizationId\|\|!communityId\|\|event\.organizationId===communityId/);
+  assert.match(entries,/!event\.organizationId\|\|!state\.activeCommunityId\|\|event\.organizationId===state\.activeCommunityId/);
+  assert.match(server,/Connecte-toi avec Discord pour t’inscrire/);
+  assert.match(server,/input\.audienceIds=\[site\.id\]/);
+  assert.match(registration,/state\.activeCommunityId\|\|event\.organizationId\|\|GENERAL_AUDIENCE/);
 });
 
 test('les assets de la nouvelle interface sont versionnés et les fixtures dev restent isolées',()=>{
