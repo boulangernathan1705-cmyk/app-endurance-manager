@@ -1,6 +1,6 @@
-import {state,esc,button,logo,renderAvailabilityTimeline,crewColorClass,coversHour,pilotCount,api} from './core.mjs?v=12-site-tool';
-import {renderRegistration} from './registration.mjs?v=10-site-tool';
-import {organizationShortLabel} from './organization-context.mjs?v=7-community-only';
+import {state,esc,button,logo,renderAvailabilityTimeline,crewColorClass,coversHour,pilotCount,api} from './core.mjs?v=13-tondeuz-tool';
+import {renderRegistration} from './registration.mjs?v=13-tondeuz-tool';
+import {organizationShortLabel} from './organization-context.mjs?v=13-tondeuz-tool';
 
 function contentSummary(title,count){return `<summary class="ux-content-accordion-summary"><span class="ux-content-accordion-title">${esc(title)}</span><span class="ux-content-accordion-count">${count}</span><span class="ux-content-accordion-chevron" aria-hidden="true">›</span></summary>`;}
 function statusPill(crew){return `<span class="crew-compact-status ${crew.locked?'is-complete':'is-open'}">${crew.locked?'ÉQUIPAGE COMPLET':'ÉQUIPAGE OUVERT'}</span>`;}
