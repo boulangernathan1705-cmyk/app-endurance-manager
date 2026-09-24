@@ -1,8 +1,8 @@
-import {app,state,esc,button,canManage,isAdmin,eventTypeBadge,eventBadge,eventCategoryCount,circuitVisual,pilotCount,dateLabel,countdown,notifyRender} from './core.mjs?v=12-site-tool';
-import {ownRegistration,renderRegistrationWorkspace} from './registration.mjs?v=10-site-tool';
-import {renderPilots} from './crews.mjs?v=16-site-tool';
-import {renderHome,showRecoveryLink} from './home-view.mjs?v=16-site-tool';
-import {scopeEvent,defaultCrewOrganizationId,joinedOrganizations,communityById} from './organization-context.mjs?v=7-community-only';
+import {app,state,esc,button,canManage,isAdmin,eventTypeBadge,eventBadge,eventCategoryCount,circuitVisual,pilotCount,dateLabel,countdown,notifyRender} from './core.mjs?v=13-tondeuz-tool';
+import {ownRegistration,renderRegistrationWorkspace} from './registration.mjs?v=13-tondeuz-tool';
+import {renderPilots} from './crews.mjs?v=13-tondeuz-tool';
+import {renderHome,showRecoveryLink} from './home-view.mjs?v=13-tondeuz-tool';
+import {scopeEvent,defaultCrewOrganizationId,joinedOrganizations,communityById} from './organization-context.mjs?v=13-tondeuz-tool';
 
 function managedCommunity(organizationId){
   return joinedOrganizations(state.organizations).find(organization=>organization.id===organizationId&&organization.type==='community'&&['owner','manager'].includes(organization.role))||null;
