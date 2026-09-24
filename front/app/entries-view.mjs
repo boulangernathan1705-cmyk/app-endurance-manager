@@ -151,7 +151,7 @@ function card({event,departure:rawDeparture,reg}) {
 export function renderMyEntries() {
   state.page='my-entries';
   const community=communityById(state.organizations,state.activeCommunityId);
-  const events=(state.events||[]).filter(event=>state.activeCommunityId?event.organizationId===state.activeCommunityId:!event.organizationId);
+  const events=(state.events||[]).filter(event=>!event.organizationId||!state.activeCommunityId||event.organizationId===state.activeCommunityId);
   const entries=events.flatMap(event=>event.departures.flatMap(departure=>departure.availability
     .filter(reg=>reg.mine||reg.managed)
     .map(reg=>({event,departure,reg}))));
