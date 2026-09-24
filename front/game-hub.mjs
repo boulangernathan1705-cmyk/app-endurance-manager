@@ -3,12 +3,9 @@ import {eventSchedule} from './schedule.mjs';
 import {getLocale,localeTag} from './i18n.mjs';
 
 const grid = document.getElementById('game-grid');
-const communityPicker = document.getElementById('community-picker');
-const communityStage = document.getElementById('community-stage');
 const simulatorStage = document.getElementById('simulator-stage');
 const selectedCommunity = document.getElementById('hub-selected-community');
 let selectedCommunityId = null;
-let selectionPushed = false;
 let sessionState = {organizations:{communities:[],discoverableCommunities:[],preferredCommunityId:null}};
 let cachedEvents = {lmu:[],iracing:[]};
 const formatter = new Intl.DateTimeFormat(localeTag(), {
@@ -145,7 +142,7 @@ function enduranceQueueMarkup(items, game) {
 function gameCard(game, events, communityId='') {
   const catalog = GAME_CATALOGS[game];
   const base = game === 'lmu' ? '/lmu/' : '/iracing/';
-  const params = new URLSearchParams({runtime:'94'}); if(communityId)params.set('community',communityId); const href = `${base}?${params.toString()}`;
+  const params = new URLSearchParams({runtime:'94'}); const href = `${base}?${params.toString()}`;
   const badge = game === 'lmu' ? 'LMU' : 'iR';
   return `<article class="game-hub-card game-${game}">
     <div class="game-hub-heading"><div class="game-title-line"><span class="game-badge" aria-hidden="true">${badge}</span><h2>${esc(catalog.name)}</h2></div><p>${game === 'lmu' ? 'Hypercar, prototypes et GT de Le Mans Ultimate.' : 'GTP, LMP2, GT3, GT4 et TCR avec un catalogue de circuits étendu.'}</p></div>
@@ -184,36 +181,6 @@ function defaultCommunityId(organizations={}) {
   return organizations.siteCommunityId || organizations.preferredCommunityId || null;
 }
 
-function communityOption(community) {
-  const id=community?.id || '';
-  const active=selectedCommunityId!==null&&id===selectedCommunityId;
-  const subtitle=community
-    ? (community.id===sessionState.organizations?.preferredCommunityId ? 'Communauté par défaut' : (community.role ? 'Membre' : 'Communauté publique'))
-    : 'Endurances indépendantes';
-  return `<button type="button" class="hub-community-option ${active?'is-active':''}" data-hub-community="${esc(id)}" aria-pressed="${active}">
-    ${communityMark(community)}
-    <span><strong>${esc(community?.name || 'Endurance Manager')}</strong><small>${esc(subtitle)}</small></span>
-    <b aria-hidden="true">${active?'✓':'›'}</b>
-  </button>`;
-}
-
-function renderCommunityPicker() {
-  if (!communityPicker) return;
-  const organizations=sessionState.organizations || {};
-  const joined=[...(organizations.communities || [])];
-  const requested=new URLSearchParams(location.search).get('community') || '';
-  const requestedCommunity=knownCommunities(organizations).find(item=>item.id===requested) || null;
-  const choices=requestedCommunity && !joined.some(item=>item.id===requestedCommunity.id)
-    ? [requestedCommunity, ...joined]
-    : joined;
-  const params=new URLSearchParams();
-  if (selectedCommunityId) params.set('community',selectedCommunityId);
-  communityPicker.innerHTML=`<div class="hub-community-options">
-      ${communityOption(null)}
-      ${choices.map(communityOption).join('')}
-    </div>
-    <a class="hub-community-manage" href="/communities.html?${params.toString()}">Paramètres communautés</a>`;
-}
 
 function renderGames() {
   grid.innerHTML = gameCard('lmu',scopedEvents(cachedEvents.lmu,selectedCommunityId),selectedCommunityId)
@@ -226,28 +193,17 @@ function selectedCommunityMarkup() {
   return `${banner?`<img class="hub-selected-banner" src="${esc(banner)}" alt="" referrerpolicy="no-referrer">`:''}<span class="hub-selected-shade" aria-hidden="true"></span><span class="hub-selected-brand">${communityMark(community)}<strong>${esc(community?.name || 'Endurance Manager')}</strong></span>`;
 }
 
-function showCommunityStage() {
-  communityStage.hidden=false;
-  simulatorStage.hidden=true;
-  document.title='ENDURANCE MANAGER';
-}
 
 function showSimulatorStage(communityId,{historyMode='none'}={}) {
   selectedCommunityId=communityId;
-  renderCommunityPicker();
   renderGames();
   const community=knownCommunities(sessionState.organizations || {}).find(item=>item.id===selectedCommunityId) || null;
   selectedCommunity.classList.toggle('has-banner',Boolean(community?.branding?.bannerUrl));
   selectedCommunity.style.setProperty('--community-accent',community?.branding?.accentColor||'var(--accent)');
   selectedCommunity.innerHTML=selectedCommunityMarkup();
-  communityStage.hidden=true;
   simulatorStage.hidden=false;
   document.title=`${community?.name || 'Les Tondeuz à gazon'} · Simulateur`;
-  if(historyMode!=='none'){
-    const url=new URL(location.href);
-    url.searchParams.set('community',selectedCommunityId || 'general');
-    history[historyMode==='push'?'pushState':'replaceState'](null,'',url.pathname+url.search);
-  }
+
 }
 
 function syncStageFromUrl() {
@@ -285,35 +241,10 @@ async function load() {
   if(sessionResult.status==='fulfilled') sessionState=sessionResult.value || sessionState;
   cachedEvents.lmu=lmuResult.status==='fulfilled'?lmuResult.value:[];
   cachedEvents.iracing=iracingResult.status==='fulfilled'?iracingResult.value:[];
-  renderCommunityPicker();
   syncStageFromUrl();
   if(notice && (lmuResult.status==='rejected' || iracingResult.status==='rejected')) {
     notice.textContent='Le récapitulatif des prochaines endurances est momentanément indisponible. Les espaces restent accessibles.';
   }
 }
-
-communityPicker?.addEventListener('click',event=>{
-  const button=event.target.closest?.('[data-hub-community]');
-  if(!button)return;
-  selectionPushed=true;
-  showSimulatorStage(String(button.dataset.hubCommunity || ''),{historyMode:'push'});
-  scrollTo({top:0,behavior:'auto'});
-});
-
-document.querySelector('[data-hub-back]')?.addEventListener('click',()=>{
-  if(selectionPushed){history.back();return;}
-  const url=new URL(location.href);url.searchParams.delete('community');
-  history.replaceState(null,'',url.pathname+(url.search||''));
-  selectedCommunityId=null;
-  renderCommunityPicker();
-  showCommunityStage();
-});
-
-addEventListener('popstate',()=>{
-  selectionPushed=false;
-  selectedCommunityId=null;
-  renderCommunityPicker();
-  syncStageFromUrl();
-});
 
 void load();
