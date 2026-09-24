@@ -113,12 +113,12 @@ test('les gérants peuvent personnaliser leur espace sans créer un moteur de th
   assert.match(directory,/Webhook du salon récapitulatif/);
   assert.match(directory,/community-setup-steps/);
   assert.match(directory,/Mode développeur/);
-  assert.match(directory,/Chaque partie peut être ouverte séparément/);
+  assert.match(directory,/Ouvre uniquement la partie que tu souhaites modifier/);
   assert.match(directoryCss,/input:not\(\[type="checkbox"\]\)/);
   assert.match(directoryCss,/\.community-choice-group input/);
 });
 
-test('les communautés remplacent les anciennes Teams et chargent leurs membres à l’ouverture',()=>{
+test('les communautés remplacent les anciennes Teams et chargent leurs membres quel que soit le point d’entrée',()=>{
   const server=read('server/community-directory.mjs');
   const front=read('front/app/community-directory.mjs');
   const context=read('front/app/organization-context.mjs');
@@ -129,8 +129,14 @@ test('les communautés remplacent les anciennes Teams et chargent leurs membres 
   assert.doesNotMatch(front,/teamPanel|data-community-form="team"|Team privée/);
   assert.doesNotMatch(context,/organizations\.team|type==='team'/);
   assert.match(front,/loadCommunityMembers/);
+  assert.match(front,/ensureCommunityMembers/);
+  assert.match(front,/memberLoading:new Set\(\)/);
+  assert.match(front,/memberErrors:new Map\(\)/);
+  assert.match(front,/queueMicrotask\(\(\)=>void ensureCommunityMembers/);
   assert.match(front,/limit=50&offset=/);
   assert.match(front,/more-members/);
+  assert.match(front,/refresh-members/);
+  assert.doesNotMatch(front,/function eventList|ENDURANCES ·|Créer une endurance/);
 });
 
 test('les endurances et inscriptions restent enfermées dans leur communauté active',()=>{
@@ -151,7 +157,7 @@ test('les assets de la nouvelle interface sont versionnés et les fixtures dev r
   assert.match(seed,/https:\/\/app\.endurance-manager\.workers\.dev/);
   assert.match(seed,/if\(url\.origin!==DEV_ORIGIN\)return/);
   assert.match(html,/community-context\.css\?v=3-language-preserved/);
-  assert.match(html,/community-directory\.css\?v=5-community-settings-ux/);
-  assert.match(html,/app\.js\?v=97-community-settings-ux/);
+  assert.match(html,/community-directory\.css\?v=6-community-management-cleanup/);
+  assert.match(html,/app\.js\?v=98-community-management-cleanup/);
   assert.match(app,/paddock-network\.mjs\?v=9-community-only/);
 });
