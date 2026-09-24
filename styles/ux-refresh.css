@@ -402,3 +402,226 @@ html[data-game] #app .pilot-preference { font-size: 13px !important; }
   }
   html[data-game] #app .departure-fold .ux-summary-registration-actions > button { white-space: nowrap; padding: 0 14px !important; }
 }
+
+/* =====================================================================
+   Lisibilité des équipages
+   - tuiles compactes, 2 à 3 par ligne, qui s'élargissent quand on les ouvre ;
+   - un seul niveau de cadre (le départ) : l'intérieur se lit en lignes ;
+   - la couleur d'un équipage sert à le reconnaître (même couleur partout),
+     « Ton équipage » est écrit, et l'orange ne signale que « Places libres ».
+   ===================================================================== */
+
+/* Page de course : grille de tuiles. */
+html[data-game] #app .ux-course-crews-block { border: 0 !important; background: none !important; padding: 0 !important; box-shadow: none !important; }
+html[data-game] #app .ux-course-crews-body {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 10px;
+  align-items: start;
+}
+html[data-game] #app .ux-course-crews-body > .empty { grid-column: 1 / -1; }
+html[data-game] #app .crew-card-shell { margin: 0 !important; border-left-width: 1px !important; border-top: 3px solid var(--crew-color) !important; box-shadow: none !important; }
+html[data-game] #app .crew-card-shell:has(> details[open]) { grid-column: 1 / -1; }
+html[data-game] #app .crew-card-shell.is-mine { outline: 2px solid rgba(255, 255, 255, .55); outline-offset: 2px; }
+
+html[data-game] #app .crew-tile-summary {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: stretch !important;
+  gap: 8px !important;
+  padding: 12px 14px !important;
+  min-height: 0 !important;
+  grid-template-columns: none !important;
+}
+html[data-game] #app .crew-tile-head { display: flex; align-items: center; gap: 10px; min-width: 0; }
+html[data-game] #app .crew-tile-head .crew-compact-team { flex: 1; min-width: 0; display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+html[data-game] #app .crew-tile-head .crew-compact-team strong { color: var(--crew-color); font-size: 17px !important; }
+html[data-game] #app .crew-tile-head .crew-compact-category .category-logo { width: 34px; height: auto; }
+html[data-game] #app .crew-card-shell details[open] .crew-compact-chevron { transform: rotate(90deg); }
+html[data-game] #app .crew-tile-summary .crew-compact-pilots {
+  display: flex !important;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 14.5px !important;
+  font-weight: 400 !important;
+  color: #e6ecea !important;
+  white-space: normal !important;
+  text-align: left !important;
+}
+html[data-game] #app .crew-tile-summary .crew-compact-pilots .is-empty { color: var(--muted, #92979c); font-style: italic; }
+html[data-game] #app .crew-tile-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+html[data-game] #app .crew-tile-foot .crew-compact-car { color: var(--muted, #92979c) !important; font-size: 13px !important; font-weight: 400 !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.crew-mine-badge {
+  align-self: flex-start;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: #f2f5f4;
+  color: #0b0d0e;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .03em;
+  text-transform: uppercase;
+}
+html[data-game] #app .crew-owner-badge { text-transform: none !important; letter-spacing: 0 !important; font-weight: 700 !important; }
+
+/* État : « Places libres » en orange (à compléter), « Complet » en gris neutre. */
+html[data-game] .crew-compact-status { text-transform: none !important; letter-spacing: 0 !important; }
+html[data-game] .crew-compact-status.is-open { color: #f3b33d !important; border-color: rgba(243, 179, 61, .6) !important; background: rgba(243, 179, 61, .1) !important; }
+html[data-game] .crew-compact-status.is-complete { color: #b7bfbc !important; border-color: #3e4649 !important; background: transparent !important; }
+
+/* Intérieur d'une tuile ouverte : des lignes, plus de cartes dans les cartes. */
+html[data-game] #app .crew-unified-body { padding: 4px 14px 12px !important; border: 0 !important; background: none !important; }
+html[data-game] #app .crew-unified-body .crew-member-grid { display: flex !important; flex-direction: column; gap: 0 !important; }
+html[data-game] #app .crew-unified-body .pilot-row,
+html[data-game] #app .ux-unassigned-grid .pilot-row {
+  border: 0 !important;
+  border-top: 1px solid var(--border, #292d31) !important;
+  border-radius: 0 !important;
+  background: none !important;
+  box-shadow: none !important;
+  margin: 0 !important;
+}
+html[data-game] #app .crew-inline-management { border: 0 !important; background: none !important; padding: 6px 0 !important; }
+html[data-game] #app .ux-course-pilots-accordion { border: 0 !important; border-top: 1px solid var(--border, #292d31) !important; border-radius: 0 !important; background: none !important; box-shadow: none !important; margin-top: 14px; }
+html[data-game] #app .ux-course-pilots-accordion > summary { padding-left: 2px !important; padding-right: 2px !important; }
+
+/* Actions d'une tuile : Rejoindre en bouton, Quitter / Gérer en liens, Supprimer isolé en rouge. */
+html[data-game] #app .crew-self-actions {
+  display: flex !important;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 14px !important;
+  padding: 8px 14px 10px !important;
+  border-top: 1px solid var(--border, #292d31);
+  background: none !important;
+}
+.link-button {
+  min-height: 32px;
+  padding: 0 2px;
+  border: 0;
+  background: none;
+  color: #cfe9ec;
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-color: rgba(207, 233, 236, .35);
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.link-button:hover { color: #ffffff; text-decoration-color: currentColor; }
+.danger-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: auto;
+  min-height: 32px;
+  padding: 0 8px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: none;
+  color: #ff8a8a;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.danger-link:hover { border-color: rgba(255, 119, 119, .5); background: rgba(255, 119, 119, .08); }
+
+/* Départ : un seul bouton principal, le reste en liens. */
+html[data-game] #app .departure-fold .ux-summary-registration-actions > .link-button {
+  min-height: 40px !important;
+  width: auto !important;
+  padding: 0 6px !important;
+  border: 0 !important;
+  background: none !important;
+  box-shadow: none !important;
+  color: #cfe9ec !important;
+  font-size: 13.5px !important;
+  font-weight: 600 !important;
+  text-transform: none !important;
+}
+html[data-game] #app .departure-fold .ux-summary-registration-actions > .link-button:hover { color: #ffffff !important; }
+@media (max-width: 760px) {
+  html[data-game] #app .departure-fold .ux-summary-registration-actions {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    align-items: center;
+    gap: 4px 14px !important;
+  }
+  html[data-game] #app .departure-fold .ux-summary-registration-actions > .primary-button { flex: 1 1 100% !important; }
+}
+
+/* En-tête de course : les chiffres sur une ligne. */
+html[data-game] #app p.event-header-stats {
+  display: block !important;
+  margin: 0 !important;
+  color: #c7d0d4;
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+@media (max-width: 760px) { html[data-game] #app p.event-header-stats { white-space: normal; } }
+
+/* Liste des courses : équipages en tuiles. */
+html[data-game] .event-card .crew-summary-list {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)) !important;
+  gap: 8px !important;
+}
+html[data-game] .event-card .crew-summary-card {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  gap: 6px !important;
+  padding: 10px 12px !important;
+  border: 1px solid var(--border, #292d31) !important;
+  border-top: 3px solid var(--crew-color) !important;
+  border-radius: 10px !important;
+  background: rgba(255, 255, 255, .02) !important;
+  min-width: 0;
+}
+html[data-game] .event-card .crew-summary-card.is-mine { outline: 2px solid rgba(255, 255, 255, .55); outline-offset: 2px; }
+html[data-game] .event-card .crew-summary-card .crew-summary-icon { display: none !important; }
+html[data-game] .event-card .crew-summary-title strong { color: var(--crew-color) !important; font-size: 15px; }
+html[data-game] .event-card .crew-summary-pilots {
+  display: flex !important;
+  flex-direction: column;
+  gap: 1px;
+  margin: 0 !important;
+  text-align: left !important;
+  font-size: 13.5px;
+  font-weight: 400 !important;
+  color: #e6ecea;
+}
+
+/* Moins de gras : le gras reste pour les titres et les noms. */
+html[data-game] #app .fold-meta,
+html[data-game] #app .event-pilot-count,
+html[data-game] #app .coverage-summary,
+html[data-game] #app .pilot-car,
+html[data-game] #app .pilot-preference,
+html[data-game] #app .ux-departure-date,
+html[data-game] #app .event-category-copy small,
+html[data-game] #app .event-period-heading small { font-weight: 400 !important; }
+
+/* « Peu importe la voiture » : même bordure que les autres choix. */
+.car-any-option { border-style: solid !important; }
+html[data-game] #app .crew-self-actions > .link-button {
+  min-height: 32px !important;
+  width: auto !important;
+  padding: 0 2px !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: none !important;
+  box-shadow: none !important;
+  color: #cfe9ec !important;
+  font-size: 13.5px !important;
+  font-weight: 600 !important;
+}
+html[data-game] #app .crew-self-actions > .link-button:hover { color: #ffffff !important; }
+html[data-game] #app .crew-self-actions > .danger-link { width: auto !important; box-shadow: none !important; font-size: 13px !important; }
+/* Le départ est le seul cadre : la zone Équipages / pilotes n'en ajoute pas un second. */
+html[data-game] #app .departure-participation-section { border: 0 !important; background: none !important; box-shadow: none !important; padding: 8px 0 0 !important; }
+html[data-game] #app .crew-self-actions > .danger-link { margin-left: auto !important; }

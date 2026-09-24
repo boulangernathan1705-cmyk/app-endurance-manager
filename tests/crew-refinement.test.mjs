@@ -9,8 +9,8 @@ test('Course rend directement les équipages et pilotes du départ sur une seule
   const eventView = read('front/app/event-view.mjs');
   assert.match(crews, /crew-pilot-accordion-summary/);
   assert.match(crews, /crew-unified-card/);
-  assert.match(crews, /ÉQUIPAGE COMPLET/);
-  assert.match(crews, /ÉQUIPAGE OUVERT/);
+  assert.match(crews, /'Complet'/);
+  assert.match(crews, /'Places libres'/);
   assert.match(crews, /Pilotes sans équipage/);
   assert.match(crews, /ux-course-crews-body/);
   assert.match(eventView, /renderPilots\(event,departure/);
@@ -25,7 +25,8 @@ test('un pilote peut rejoindre quitter gérer et supprimer son équipage depuis 
   assert.match(crews, /button\('leave-crew','Quitter'/);
   assert.match(crews, /button\('edit-crew','Gérer'/);
   assert.doesNotMatch(crews, /crew\.ownedByMe\?'Gérer':'Modifier'/);
-  assert.match(crews, /button\('delete-crew','Supprimer'/);
+  assert.match(crews, /button\('delete-crew',.*<span>Supprimer<\/span>/);
+  assert.match(crews, /danger-link crew-delete-button/);
   assert.match(crews, /crew\.canManage/);
   assert.match(crews, /data-crew-state-select/);
   assert.match(actions, /case 'join-crew'/);

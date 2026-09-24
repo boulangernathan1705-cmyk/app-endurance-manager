@@ -1,9 +1,8 @@
-import {app,nav,state,activeGame,esc,button,canManage,eventTypeBadge,schedulePendingBadge,eventBadge,eventCategoryCount,pilotCount,circuitVisual,dateLabel,countdown,groupEvents,notifyRender,notifyNav} from './core.mjs';
+import {app,nav,state,activeGame,esc,button,canManage,sortedCrews,CREW_PALETTE,eventTypeBadge,schedulePendingBadge,eventBadge,eventCategoryCount,pilotCount,circuitVisual,dateLabel,countdown,groupEvents,notifyRender,notifyNav} from './core.mjs';
 import {getLocale,localeTag} from '../i18n.mjs';
 
 const compactDateFormatter=new Intl.DateTimeFormat(localeTag(),{timeZone:'Europe/Paris',day:'2-digit',month:'2-digit'});
 const weekdayFormatter=new Intl.DateTimeFormat(localeTag(),{timeZone:'Europe/Paris',weekday:'short'});
-const CREW_COLORS=['#52d3d8','#f3b33d','#ec5b67','#75d66b','#8b7cf6','#e47adf','#58a6ff','#f28f45'];
 
 function compactDateRange(departures=[]){
   const dated=departures.filter(d=>Number.isFinite(Number(d.startsAt))).sort((a,b)=>Number(a.startsAt)-Number(b.startsAt));
@@ -54,7 +53,7 @@ function crewRows(event,{includePast=false,now=Date.now()}={}){
     .filter(d=>Number.isFinite(Number(d.startsAt))&&(includePast||Number(d.startsAt)>now))
     .sort((a,b)=>Number(a.startsAt)-Number(b.startsAt));
   for(const departure of departures){
-    for(const crew of departure.crews||[]){
+    for(const [position,crew] of sortedCrews(event,departure).entries()){
       const registrations=(crew.registrationIds||[]).map(id=>(departure.availability||[]).find(reg=>reg.id===id)).filter(reg=>reg&&reg.status!=='unavailable');
       if(!registrations.length)continue;
       rows.push({
@@ -65,7 +64,9 @@ function crewRows(event,{includePast=false,now=Date.now()}={}){
         category:crew.category||registrations[0]?.category||'',
         car:crew.car||'',
         pilots:registrations.map(reg=>reg.name).filter(Boolean),
-        locked:Boolean(crew.locked)
+        locked:Boolean(crew.locked),
+        mine:registrations.some(reg=>reg.mine),
+        color:CREW_PALETTE[position%CREW_PALETTE.length]
       });
     }
   }
@@ -75,7 +76,7 @@ function crewRows(event,{includePast=false,now=Date.now()}={}){
 function crewIcon(color){return `<span class="crew-summary-icon" aria-hidden="true" style="--crew-color:${color}"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="7" r="2.2"/><circle cx="6.8" cy="10" r="1.7"/><circle cx="17.2" cy="10" r="1.7"/><path d="M8.5 17.2c.4-2.7 1.6-4.2 3.5-4.2s3.1 1.5 3.5 4.2"/><path d="M3.8 17c.3-2.2 1.3-3.4 3-3.4.7 0 1.3.2 1.8.6"/><path d="M20.2 17c-.3-2.2-1.3-3.4-3-3.4-.7 0-1.3.2-1.8.6"/></svg></span>`;}
 function crewSummary(event,{includePast=false}={}){
   const rows=crewRows(event,{includePast});if(!rows.length)return'';
-  return `<span class="event-home-crews"><span class="crew-summary-heading"><strong>${rows.length} équipage${rows.length>1?'s':''}</strong><span>engagé${rows.length>1?'s':''}</span></span><span class="crew-summary-list">${rows.map((row,index)=>{const color=CREW_COLORS[index%CREW_COLORS.length];return `<span class="crew-summary-card ${row.locked?'is-complete':'is-open'}">${crewIcon(color)}<span class="crew-summary-main"><span class="crew-summary-title"><strong style="color:${color}">${esc(row.name)}</strong><b>${esc(displayTime(row.time))}</b></span><small>${esc(row.category)}${row.car?` · ${esc(row.car)}`:''}</small></span><span class="crew-summary-pilots">${row.pilots.length?esc(row.pilots.join(' · ')):'Aucun pilote affecté'}</span></span>`;}).join('')}</span></span>`;
+  return `<span class="event-home-crews"><span class="crew-summary-heading"><strong>${rows.length} équipage${rows.length>1?'s':''}</strong><span>engagé${rows.length>1?'s':''}</span></span><span class="crew-summary-list">${rows.map(row=>{const color=row.color;return `<span class="crew-summary-card ${row.locked?'is-complete':'is-open'}${row.mine?' is-mine':''}" style="--crew-color:${color}">${crewIcon(color)}<span class="crew-summary-main"><span class="crew-summary-title"><strong style="color:${color}">${esc(row.name)}</strong><b>${esc(displayTime(row.time))}</b></span><small>${esc(row.category)}${row.car?` · ${esc(row.car)}`:''}</small></span>${row.mine?'<span class="crew-mine-badge">Ton équipage</span>':''}<span class="crew-summary-pilots">${row.pilots.length?row.pilots.map(name=>`<span>${esc(name)}</span>`).join(''):'<span>Aucun pilote affecté</span>'}</span></span>`;}).join('')}</span></span>`;
 }
 
 const gameLink=(game,full,short)=>`<a class="nav-game-switcher-button nav-game-switcher-${game}" href="/${game}/"${activeGame===game?' aria-current="page"':''}><span class="nav-full">${full}</span><span class="nav-short">${short}</span></a>`;
