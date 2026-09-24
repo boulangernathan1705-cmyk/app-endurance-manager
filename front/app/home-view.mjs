@@ -1,4 +1,4 @@
-import {app,nav,state,esc,button,canManage,eventTypeBadge,eventBadge,eventCategoryCount,pilotCount,circuitVisual,dateLabel,countdown,groupEvents,notifyRender,notifyNav} from './core.mjs?v=11-community-navigation';
+import {app,nav,state,esc,button,canManage,eventTypeBadge,eventBadge,eventCategoryCount,pilotCount,circuitVisual,dateLabel,countdown,groupEvents,notifyRender,notifyNav} from './core.mjs?v=12-site-tool';
 import {getLocale,localeTag} from '../i18n.mjs';
 import {communityById} from './organization-context.mjs?v=7-community-only';
 
