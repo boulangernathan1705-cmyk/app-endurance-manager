@@ -1,4 +1,4 @@
-import {app,state,esc,button,canManage,CATEGORIES,EVENT_TYPES,CIRCUITS,categories,logo,notifyRender} from './core.mjs?v=11-community-navigation';
+import {app,state,esc,button,canManage,CATEGORIES,EVENT_TYPES,CIRCUITS,categories,logo,notifyRender} from './core.mjs?v=12-site-tool';
 
 const managedCommunities=()=>[
   ...(state.organizations?.communities||[])
@@ -16,20 +16,8 @@ function canManageCommunity(id){
   return managedCommunities().some(community=>community.id===id);
 }
 
-function eventOrganizationField(event,selectedOrganizationId){
-  if(event){
-    const community=knownCommunity(selectedOrganizationId);
-    return `<label class="form-label">Espace<input type="hidden" name="eventOrganization" value="${esc(selectedOrganizationId)}"><span class="event-organization-fixed">${selectedOrganizationId?`Communauté · ${esc(community?.name||'Communauté')}`:'Endurance Manager · Général'}</span></label>`;
-  }
-
-  const communities=managedCommunities();
-  const selectedCommunity=knownCommunity(selectedOrganizationId);
-  if(selectedCommunity&&canManage()&&!communities.some(community=>community.id===selectedCommunity.id))communities.unshift(selectedCommunity);
-  const options=[];
-  if(canManage())options.push('<option value="">Endurance indépendante · Général</option>');
-  options.push(...communities.map(community=>`<option value="${community.id}" ${community.id===selectedOrganizationId?'selected':''}>Communauté · ${esc(community.name)}</option>`));
-  if(!options.length)throw Error('Tu dois être organisateur du site ou d’une communauté pour créer une endurance.');
-  return `<label class="form-label">Espace<select name="eventOrganization">${options.join('')}</select></label>`;
+function eventOrganizationField(_event,selectedOrganizationId){
+  return `<input type="hidden" name="eventOrganization" value="${esc(selectedOrganizationId||'')}">`;
 }
 
 export function departureFields(departure={}){
@@ -43,7 +31,7 @@ export function updateRemoveButtons(){
 }
 
 export function renderEventForm(event=null,{organizationId=state.eventCreationOrganizationId}={}){
-  const selectedOrganizationId=event?.organizationId||organizationId||'';
+  const selectedOrganizationId=event?(event.organizationId||''):(organizationId||state.activeCommunityId||'');
   const allowed=event
     ? (selectedOrganizationId?canManage()||canManageCommunity(selectedOrganizationId):canManage())
     : (canManage()||canManageCommunity(selectedOrganizationId));
