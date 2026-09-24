@@ -1,5 +1,6 @@
 import {fail,json,origin,rateLimit,id,now,text} from './core.mjs';
 import {discordBotInviteUrl,discordEligibility,discordCommunityStatus,inspectDiscordGuild,requireDiscordCommunityAccess} from './community-discord.mjs';
+import {siteCommunity} from './site-community.mjs';
 
 const UUID=/^[a-f0-9-]{36}$/;
 const DISCORD_ID=/^\d{15,22}$/;
@@ -156,32 +157,37 @@ function present(row,extra={}){
 }
 
 export async function organizationSummary(env,actor){
-  const joined=actor.user?(await env.DB.prepare("SELECT o.*,m.role FROM organizations o JOIN organization_members m ON m.organization_id=o.id WHERE m.user_id=? AND o.type='community' ORDER BY lower(o.name),o.id").bind(actor.user.id).all()).results||[]:[];
-  const joinedIds=joined.map(item=>item.id);
-  const managedIds=joined.filter(item=>['owner','manager'].includes(item.role)).map(item=>item.id);
-  const [memberCounts,joinedActivity,requestMap]=await Promise.all([
-    memberCountsFor(env,joinedIds),
-    activityFor(env,joinedIds),
-    requestsFor(env,managedIds)
-  ]);
-  let discoverable=[];
-  if(actor.user){
-    discoverable=(await env.DB.prepare('SELECT o.*,COUNT(om.user_id) member_count,EXISTS(SELECT 1 FROM organization_join_requests r WHERE r.organization_id=o.id AND r.user_id=?) join_pending FROM organizations o LEFT JOIN organization_members om ON om.organization_id=o.id WHERE o.type=\'community\' AND o.visibility=\'public\' AND NOT EXISTS(SELECT 1 FROM organization_members mine WHERE mine.organization_id=o.id AND mine.user_id=?) GROUP BY o.id ORDER BY lower(o.name),o.id').bind(actor.user.id,actor.user.id).all()).results||[];
-  }else{
-    discoverable=(await env.DB.prepare('SELECT o.*,COUNT(om.user_id) member_count,0 join_pending FROM organizations o LEFT JOIN organization_members om ON om.organization_id=o.id WHERE o.type=\'community\' AND o.visibility=\'public\' GROUP BY o.id ORDER BY lower(o.name),o.id').all()).results||[];
-  }
-  const discoverActivity=await activityFor(env,discoverable.map(item=>item.id));
-  const decorate=item=>{
-    const manage=['owner','manager'].includes(item.role);
-    return present(item,{role:item.role,memberCount:memberCounts.get(item.id)||0,eventIds:joinedActivity.get(item.id)||[],manage,joinRequests:requestMap.get(item.id)||[]});
+  const site=await siteCommunity(env);
+  if(!site)return {
+    communities:[],
+    discoverableCommunities:[],
+    preferredCommunityId:null,
+    siteCommunityId:null,
+    discordBotReady:Boolean(env.DISCORD_BOT_TOKEN),
+    discordBotInviteUrl:discordBotInviteUrl(env)
   };
-  const preference=actor.user?await env.DB.prepare('SELECT preferred_community_id FROM users WHERE id=?').bind(actor.user.id).first():null;
-  const joinedCommunities=joined.filter(item=>item.type==='community').map(decorate);
-  const preferredCommunityId=joinedCommunities.some(item=>item.id===preference?.preferred_community_id)?preference.preferred_community_id:null;
+  const membershipRow=actor.user
+    ? await env.DB.prepare('SELECT role FROM organization_members WHERE organization_id=? AND user_id=?').bind(site.id,actor.user.id).first()
+    : null;
+  const role=membershipRow?.role||null;
+  const manage=['owner','manager'].includes(role);
+  const [memberCounts,activity,requestMap]=await Promise.all([
+    memberCountsFor(env,[site.id]),
+    activityFor(env,[site.id]),
+    requestsFor(env,manage?[site.id]:[])
+  ]);
+  const presented=present(site,{
+    role,
+    memberCount:memberCounts.get(site.id)||0,
+    eventIds:activity.get(site.id)||[],
+    manage,
+    joinRequests:requestMap.get(site.id)||[]
+  });
   return {
-    communities:joinedCommunities,
-    discoverableCommunities:discoverable.map(item=>present(item,{memberCount:Number(item.member_count)||0,eventIds:discoverActivity.get(item.id)||[],joinPending:Boolean(item.join_pending)})),
-    preferredCommunityId,
+    communities:role?[presented]:[],
+    discoverableCommunities:role?[]:[presented],
+    preferredCommunityId:site.id,
+    siteCommunityId:site.id,
     discordBotReady:Boolean(env.DISCORD_BOT_TOKEN),
     discordBotInviteUrl:discordBotInviteUrl(env)
   };
@@ -309,7 +315,7 @@ async function decideRequest(request,env,actor,organizationId,userId){
 export async function communityDirectoryApi(request,env,actor){
   const url=new URL(request.url),path=url.pathname,method=request.method;
   if(path==='/api/organizations'&&method==='GET')return json(await organizationSummary(env,actor));
-  if(path==='/api/organizations'&&method==='POST')return createOrganization(request,env,actor);
+  if(path==='/api/organizations'&&method==='POST')fail(404,'La création de communautés n’est pas disponible sur ce site.');
   if(path==='/api/organizations/preferred'&&method==='PATCH'){
     await secureWrite(request,env);
     if(!actor.user)fail(401,'Connecte-toi avec Discord.');
