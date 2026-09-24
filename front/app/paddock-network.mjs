@@ -1,4 +1,4 @@
-import {state} from './core.mjs?v=12-site-tool';
+import {state} from './core.mjs?v=13-tondeuz-tool';
 
 export function resetNetworkScope(){
   state.activeOrganizationId=state.activeCommunityId||null;
