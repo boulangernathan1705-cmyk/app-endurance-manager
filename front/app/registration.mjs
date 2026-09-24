@@ -28,19 +28,7 @@ function communityPilotLogo(){
   const community=currentEventCommunity(),logoUrl=community?.branding?.logoUrl;
   return logoUrl?`<span class="pilot-community-logo" title="${esc(community.name)}"><img src="${esc(logoUrl)}" alt="" loading="lazy" referrerpolicy="no-referrer"></span>`:'';
 }
-function audienceBadges(reg){
-  if(!state.user||currentEventCommunity())return'';
-  const labels=organizationAudienceLabels(state.organizations,registrationAudienceIds(reg));
-  if(!labels.length)return'';
-  return `<span class="registration-audience-badges">${labels.map(label=>`<span>${esc(label)}</span>`).join('')}</span>`;
-}
-
-export function renderRegistration(reg,departure,duration,showCarPreference=true) {
-  const locked=departure.startsAt<=Date.now();
-  const origin=reg.addedByName?` <span class="registration-origin-info" title="Inscription ajoutée par ${esc(reg.addedByName)}" aria-label="Inscription ajoutée par ${esc(reg.addedByName)}">ⓘ</span>`:'';
-  const timeline=renderAvailabilityTimeline({departure,duration,status:reg.status,label:slotLabel(reg.status)});
-  return `<div class="pilot-row${reg.mine?' ux-current-pilot':''}${reg.engaged?' is-engaged':''}"><div class="pilot-main"><span class="pilot-name">${communityPilotLogo()}${esc(reg.name)}${origin}</span><span class="pilot-category-logo" title="${esc(reg.category||'Catégorie')}" aria-label="${esc(reg.category||'Catégorie')}">${reg.category?logo(reg.category):'—'}</span>${showCarPreference?`<span class="pilot-car">${esc(registrationCarLabel(reg))}</span>`:''}${reg.status==='unavailable'?'<span class="registration-status">Indisponible</span>':''}${reg.engaged?'<span class="registration-engaged">Déjà engagé</span>':''}${audienceBadges(reg)}${reg.preferredPilot?`<span class="pilot-preference">Souhaite rouler avec : <strong>${esc(reg.preferredPilot)}</strong></span>`:''}</div>${timeline}${reg.canEdit&&!locked?button('edit-registration','Modifier',`data-id="${reg.id}" data-departure="${departure.id}"`,'edit-button ux-pilot-edit'):''}</div>`;
-}
+function audienceBadges(){return'';}
 
 function identityFields(stateDraft,departure,categoryMode,manualOther,linkedOther,guestSelf) {
   if(categoryMode)return '';
@@ -65,16 +53,7 @@ function participantCanUseAudience(stateDraft,key){
   return !!organization?.members?.some(member=>member.id===targetId);
 }
 
-function audienceSelector(event,stateDraft){
-  if(!state.user)return'';
-  if(event?.organizationId){
-    const community=communityById(state.organizations,event.organizationId);
-    return `<div class="registration-community-context">${community?.branding?.logoUrl?`<span class="pilot-community-logo"><img src="${esc(community.branding.logoUrl)}" alt="" referrerpolicy="no-referrer"></span>`:''}<span><strong>${esc(community?.name||'Communauté')}</strong><small>Cette inscription appartient directement à la communauté de l’endurance.</small></span></div>`;
-  }
-  const selected=new Set(stateDraft.audienceIds?.length?stateDraft.audienceIds:[GENERAL_AUDIENCE]);
-  const choices=audienceChoices(state.organizations);
-  return `<fieldset class="registration-audience-panel"><legend>Partager ma disponibilité avec</legend><p>Une seule inscription, visible dans les espaces que tu coches. Tu peux en sélectionner plusieurs.</p><div class="registration-audience-options">${choices.map(choice=>{const allowed=participantCanUseAudience(stateDraft,choice.key);const checked=selected.has(choice.key);return `<label class="registration-audience-option ${choice.type}${allowed?'':' is-disabled'}"><input type="checkbox" name="registrationAudience" value="${esc(choice.key)}" ${checked?'checked':''} ${allowed?'':'disabled'}><span><strong>${esc(choice.label)}</strong><small>${choice.type==='general'?'Visible dans l’espace commun':'Visible par les membres de cette communauté'}</small></span></label>`;}).join('')}</div>${stateDraft.forOther&&!stateDraft.participantUserId?'<small class="registration-audience-help">Un pilote saisi manuellement peut uniquement être partagé dans Général. Pour une communauté, sélectionne son compte Discord.</small>':''}</fieldset>`;
-}
+function audienceSelector(){return'';}
 
 function registrationContext(event,departure,stateDraft) {
   const all=departure.availability||[];
@@ -139,8 +118,7 @@ export async function submitRegistration(form,api) {
   if(!draft.status)throw Error('Choisis ta disponibilité.'); if(draft.status!=='unavailable'&&!draft.category)throw Error('Choisis ta catégorie.');
   draft.cars=[...form.querySelectorAll('[name="carPreference"]:checked')].map(input=>input.value); draft.carAny=!!form.elements.carAny?.checked;
   if(draft.status!=='unavailable'&&!draft.carAny&&!draft.cars.length)throw Error('Choisis au moins une voiture, ou coche « Peu importe la voiture ».');
-  draft.audienceIds=event.organizationId?[event.organizationId]:state.user?[...form.querySelectorAll('[name="registrationAudience"]:checked')].map(input=>input.value):[GENERAL_AUDIENCE];
-  if(!draft.audienceIds.length)throw Error('Choisis au moins un espace avec lequel partager cette inscription.');
+  draft.audienceIds=[state.activeCommunityId||event.organizationId||GENERAL_AUDIENCE];
   const payload={name:draft.name,status:draft.status,category:draft.category,cars:draft.cars,carAny:draft.carAny,preferredPilot:draft.preferredPilot||'',version:draft.version,participantId:draft.participantId,participantUserId:draft.participantUserId,forOther:!!draft.forOther,audienceIds:draft.audienceIds};
   const savedId=draft.id;
   const result=await api(savedId?`/api/registrations/${savedId}`:`/api/events/${event.id}/departures/${departure.id}/registrations`,savedId?'PATCH':'POST',payload);
