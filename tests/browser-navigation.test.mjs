@@ -23,8 +23,8 @@ test('le build produit deux espaces simulateurs sans sélection de communauté',
   assert.match(hub, /'\/lmu\/'/);
   assert.match(hub, /'\/iracing\/'/);
   assert.match(hub, /siteCommunityId/);
-  assert.match(homeView, /href="\/lmu\/\$\{query\}"/);
-  assert.match(homeView, /href="\/iracing\/\$\{query\}"/);
+  assert.match(homeView, /href="\/lmu\/"/);
+  assert.match(homeView, /href="\/iracing\/"/);
   assert.doesNotMatch(homeView, /nav-community-context|communityContextMarkup\(\)/);
 });
 
