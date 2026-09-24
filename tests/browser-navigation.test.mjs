@@ -4,7 +4,7 @@ import {readFile, access} from 'node:fs/promises';
 
 const read = path => readFile(new URL(`../${path}`, import.meta.url), 'utf8');
 
-test('le build produit les deux espaces simulateurs et Cloudflare conserve les URLs avec slash', async () => {
+test('le build produit deux espaces simulateurs sans sélection de communauté', async () => {
   const [build, wrangler, home, hub, homeView] = await Promise.all([
     read('scripts/build.mjs'),
     read('wrangler.jsonc'),
@@ -16,13 +16,16 @@ test('le build produit les deux espaces simulateurs et Cloudflare conserve les U
   assert.match(build, /lmu\/index\.html/);
   assert.match(build, /iracing\/index\.html/);
   assert.equal(JSON.parse(wrangler).assets.html_handling, 'auto-trailing-slash');
-  assert.match(home, /href="\/lmu\/"/);
-  assert.match(home, /href="\/iracing\/"/);
+  assert.match(home, /Choisis ton simulateur/);
+  assert.match(home, /Le Mans Ultimate/);
+  assert.match(home, /iRacing/);
+  assert.doesNotMatch(home, /community-stage|Choisis ta communauté|Changer de communauté/);
   assert.match(hub, /'\/lmu\/'/);
   assert.match(hub, /'\/iracing\/'/);
+  assert.match(hub, /siteCommunityId/);
   assert.match(homeView, /href="\/lmu\/\$\{query\}"/);
   assert.match(homeView, /href="\/iracing\/\$\{query\}"/);
-  assert.match(homeView, /communityContextMarkup/);
+  assert.doesNotMatch(homeView, /nav-community-context|communityContextMarkup\(\)/);
 });
 
 test('la base commune rend les inscriptions sans interface parallèle', async () => {
