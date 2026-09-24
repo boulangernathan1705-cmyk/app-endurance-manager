@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {DatabaseSync} from 'node:sqlite';
 import {readFileSync} from 'node:fs';
 import worker from '../server/worker.mjs';
+import workerWithMigrations from '../server/worker-with-migrations.mjs';
 const ROOT='https://fmt.example';
 const ADMIN='111111111111111111', PILOT='222222222222222222', OTHER='333333333333333333';
 class D1 {
@@ -310,4 +311,19 @@ test('event list stays available beyond D1 bound-parameter limit',async()=>{
  assert.equal(list.data.events.find(event=>event.name==='Course 7').departures[0].availability[0].addedByName,'Createur 7');
  assert.equal((await req('/api/events?game=lmu')).data.events.length,120);
  assert.equal((await req('/api/events?game=iracing')).data.events.length,0);
+});
+test('organizer-created crews stay ownerless across worker cold starts',async()=>{
+ const {req,login,DB,env,jars}=harness();await login(ADMIN,'admin');await login(PILOT,'pilot');
+ await req('/api/events','POST',eventInput,'admin');
+ const event=(await req('/api/events')).data.events[0],base=`/api/events/${event.id}/departures/${event.departures[0].id}`;
+ const reg=await req(base+'/registrations','POST',{name:'Pilote',category:'GTE',status:'whole'},'pilot');assert.equal(reg.status,201);
+ DB.db.exec("ALTER TABLE crews ADD COLUMN locked INTEGER NOT NULL DEFAULT 0");
+ const cookie=Object.entries(jars.get('pilot')).map(([k,v])=>`${k}=${v}`).join('; ');
+ const listAsPilot=async()=>(await (await workerWithMigrations.fetch(new Request(ROOT+'/api/events',{headers:{Cookie:cookie}}),env,{waitUntil(){}})).json()).events[0].departures[0].crews[0];
+ const crew=await req(base+'/crews','POST',{name:'Orga',category:'GTE'},'admin');assert.equal(crew.status,201);
+ assert.equal((await req('/api/crews/'+crew.data.id+'/members','POST',{registrationId:reg.data.id,version:1},'admin')).status,200);
+ const listed=await listAsPilot();
+ assert.deepEqual(listed.registrationIds,[reg.data.id]);
+ assert.equal(listed.hasOwner,false);assert.equal(listed.ownedByMe,false);assert.equal(listed.canManage,false);
+ assert.equal(DB.db.prepare('SELECT owner_user_id o FROM crews WHERE id=?').get(crew.data.id).o,null);
 });

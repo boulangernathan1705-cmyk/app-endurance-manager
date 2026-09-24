@@ -22,18 +22,9 @@ async function ensureCrewOwnershipSchema(env) {
     }
 
     await env.DB.prepare('CREATE INDEX IF NOT EXISTS crews_owner_user ON crews(owner_user_id)').run();
-    await env.DB.prepare(`UPDATE crews
-      SET owner_user_id = (
-        SELECT p.user_id
-        FROM crew_members cm
-        JOIN registrations r ON r.id = cm.registration_id
-        JOIN participants p ON p.id = r.participant_id
-        WHERE cm.crew_id = crews.id
-          AND p.user_id IS NOT NULL
-        ORDER BY r.created_at, r.id
-        LIMIT 1
-      )
-      WHERE owner_user_id IS NULL`).run();
+    // No ownership backfill here: this runs on every cold start, and crews created by
+    // organizers are intentionally ownerless until a pilot joins one by themselves.
+    // The one-time backfill of pre-existing crews lives in migration 0016_crew_ownership.sql.
 
     // Keep Wrangler's migration history consistent when this recovery path was needed.
     try {
