@@ -4,10 +4,14 @@ import {readFileSync} from 'node:fs';
 import vm from 'node:vm';
 const read=p=>readFileSync(new URL('../'+p,import.meta.url),'utf8');
 
-test('community settings are reachable before choosing a simulator',()=>{
-  assert.match(read('index.html'),/href="\/communities.html">Paramètres communautés/);
-  assert.match(read('front/game-hub.mjs'),/href="\/communities.html\?/);
-  assert.match(read('scripts/build.mjs'),/new URL\('communities.html', out\)/);
+test('site settings are reached from the account menu, outside simulators',()=>{
+  const account=read('front/account-menu.mjs');
+  const hub=read('index.html');
+  const build=read('scripts/build.mjs');
+  assert.match(account,/href="\/communities\.html"[^>]*>Paramètres du site/);
+  assert.doesNotMatch(hub,/Paramètres communautés|Paramètres du site/);
+  assert.match(build,/new URL\('communities\.html', out\)/);
+  assert.match(build,/Paramètres du site/);
   assert.doesNotMatch(read('front/app/home-view.mjs'),/renderPaddockPulse|ownFutureRows|MON PROCHAIN ENGAGEMENT/);
 });
 
