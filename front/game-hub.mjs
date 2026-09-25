@@ -5,7 +5,10 @@ import {dateBlock,timeLabel} from './dates.mjs';
 
 const grid = document.getElementById('game-grid');
 
-const CREW_COLORS = ['#52d3d8','#f3b33d','#ec5b67','#75d66b','#8b7cf6','#e47adf','#58a6ff','#f28f45'];
+// Same palette and order as the crews of a race page (crew-palette-0..9, sortedCrews in front/app/core.mjs),
+// so a crew keeps its color from the home page to the race.
+const CREW_COLORS = ['#53d8ff','#c58cff','#ffae62','#ff79aa','#75a9ff','#b5df62','#ffd45e','#66e0b1','#ff7777','#b99cff'];
+const sortedCrews = (event, departure) => [...(departure.crews || [])].sort((a, b) => (event.categories || []).indexOf(a.category) - (event.categories || []).indexOf(b.category) || String(a.name).localeCompare(String(b.name), 'fr', {sensitivity:'base', numeric:true}));
 const MAX_HOME_ITEMS = 3;
 const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
 
@@ -86,11 +89,12 @@ function crewMarkup(crew, departure, index=0) {
     ${crewIcon(color)}
     <span class="crew-summary-main"><span class="crew-summary-title"><strong style="color:${color}">${esc(crew.name || 'Équipage')}</strong></span><small>${esc(crew.category || '')}${crew.car ? ` · ${esc(crew.car)}` : ''}</small></span>
     <span class="crew-summary-pilots">${pilots.length ? esc(pilots.join(' · ')) : 'Aucun pilote affecté'}</span>
+    <span class="crew-compact-status ${crew.locked ? 'is-complete' : 'is-open'}">${crew.locked ? 'Complet' : 'Places libres'}</span>
   </span>`;
 }
 
-function participationMarkup(departure) {
-  const crews = [...(departure.crews || [])];
+function participationMarkup(event, departure) {
+  const crews = sortedCrews(event, departure);
   const pilotCount = activePilotCount(departure);
   if (crews.length) {
     return `<span class="crew-summary-heading"><strong>${crews.length} équipage${crews.length > 1 ? 's' : ''} engagé${crews.length > 1 ? 's' : ''}</strong><span>${pilotCount ? `${pilotCount} pilote${pilotCount > 1 ? 's' : ''} inscrit${pilotCount > 1 ? 's' : ''}` : 'Aucun pilote inscrit'}</span></span>
@@ -116,7 +120,7 @@ function enduranceMarkup(item, game) {
       <p class="hub-race-meta"><span>${esc(circuit)} · ${Number(event.durationHours) || 6} h</span></p>
       <span class="race-start">Départ ${esc(timeLabel(departure.time))}</span>
     </div></div>
-    ${participationMarkup(departure)}
+    ${participationMarkup(event, departure)}
   </section>`;
 }
 
