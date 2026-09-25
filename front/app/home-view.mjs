@@ -8,7 +8,7 @@ const dayNumberFormatter=new Intl.DateTimeFormat(localeTag(),{timeZone:'Europe/P
 const dayKeyFormatter=new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Paris',year:'numeric',month:'2-digit',day:'2-digit'});
 function datedDepartures(event){return (event.departures||[]).filter(d=>Number.isFinite(Number(d.startsAt))).sort((a,b)=>Number(a.startsAt)-Number(b.startsAt));}
 // Date block of a race card: the next start (the last one for archived races).
-function raceDateBlock(event,archived){
+export function raceDateBlock(event,archived){
   const dated=datedDepartures(event),upcoming=dated.filter(d=>Number(d.startsAt)>Date.now());
   const shown=archived||!upcoming.length?dated.at(-1):upcoming[0];
   if(!shown)return `<span class="race-date is-unknown"><strong>?</strong><small>Date à confirmer</small></span>`;
@@ -16,7 +16,7 @@ function raceDateBlock(event,archived){
   return `<span class="race-date"><small>${esc(weekdayFormatter.format(stamp))}</small><strong>${esc(dayNumberFormatter.format(stamp))}</strong><small>${esc(monthFormatter.format(stamp))}</small><b>${esc(shown.time||'')}</b></span>`;
 }
 // Start times grouped by day ("sam. 26 · 05h 12h 16h"), all shown alike.
-function raceStarts(event,archived){
+export function raceStarts(event,archived){
   const dated=datedDepartures(event),now=Date.now();
   const shown=archived?dated:dated.filter(d=>Number(d.startsAt)>now);
   if(shown.length<2)return '';

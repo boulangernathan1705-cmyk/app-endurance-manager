@@ -1,7 +1,7 @@
-import {app,state,esc,button,canManage,isAdmin,eventTypeBadge,schedulePendingBadge,eventBadge,eventCategoryCount,circuitVisual,pilotCount,dateLabel,countdown,notifyRender} from './core.mjs';
+import {app,state,esc,button,canManage,isAdmin,circuitLabel,eventTypeBadge,schedulePendingBadge,eventBadge,eventCategoryCount,circuitVisual,pilotCount,dateLabel,countdown,notifyRender} from './core.mjs';
 import {ownRegistration,renderRegistrationWorkspace} from './registration.mjs';
 import {renderPilots} from './crews.mjs?v=8-one-page-compact';
-import {renderHome,showRecoveryLink,mySituation} from './home-view.mjs';
+import {renderHome,showRecoveryLink,raceDateBlock,raceStarts} from './home-view.mjs';
 
 function canCreateCrewOnDeparture(departure){
   if(!state.user||departure.startsAt<=Date.now())return false;
@@ -10,12 +10,24 @@ function canCreateCrewOnDeparture(departure){
   return (departure.availability||[]).some(reg=>reg.mine&&reg.status!=='unavailable'&&!assigned.has(reg.id));
 }
 
+// Where the pilot stands on this start, shown in its title line: their crew, or their categories.
+function myDepartureBadge(departure){
+  const regs=(departure.availability||[]).filter(reg=>reg.mine&&reg.status!=='unavailable');
+  if(!regs.length)return '';
+  for(const reg of regs){
+    const crew=(departure.crews||[]).find(item=>(item.registrationIds||[]).includes(reg.id));
+    if(crew)return `<span class="departure-mine-badge is-crew">✓ Équipage ${esc(crew.name)} · ${esc(reg.category)}</span>`;
+  }
+  return `<span class="departure-mine-badge">✓ Inscrit · ${esc(regs.map(reg=>reg.category).join(' / '))}</span>`;
+}
+
 export function renderDeparturePanel(event,departure,index,open=false,{isPast=false}={}){
   const locked=departure.startsAt<=Date.now(),crews=departure.crews||[],available=pilotCount(departure.availability),own=ownRegistration(departure),editorOpen=state.registrationOpen.has(departure.id),canCreateCrew=canCreateCrewOnDeparture(departure);
   const createCrewAction=canCreateCrew?`<button type="button" class="link-button ux-summary-create-crew" data-crew-builder-open data-departure="${departure.id}">${esc(canManage()?'Créer un équipage':'Créer mon équipage')}</button>`:'';
   const actions=locked?'':`<span class="ux-summary-registration-actions${canCreateCrew?' is-three-actions':''}">${button('my-registration',own?'Modifier mon inscription':'S’inscrire',`data-departure="${departure.id}"`,'primary-button ux-summary-registration-toggle')}${state.user?button('new-registration','Inscrire un autre pilote',`data-departure="${departure.id}" data-mode="pilot"`,'link-button ux-summary-registration-other'):''}${createCrewAction}</span>`;
   const participation=renderPilots(event,departure);
-  return `<details class="departure-fold${isPast?' is-past':''}" id="departure-${departure.id}" ${open?'open':''}><summary><span class="fold-index">${String(index+1).padStart(2,'0')}</span><span class="fold-date"><strong class="ux-departure-title">Départ ${esc(departure.time)}</strong><span class="ux-departure-date">${esc(dateLabel(departure))}${locked?' · Départ passé':''}</span></span><span class="fold-meta">${available} pilote${available>1?'s':''} · ${crews.length} équipage${crews.length>1?'s':''}</span>${actions}</summary><div class="departure-fold-body">${locked?'<p class="finished-history">Les inscriptions sont verrouillées. Les équipages restent consultables ci-dessous.</p>':`<section class="fold-section fold-registration" ${editorOpen?'':'hidden'}>${renderRegistrationWorkspace(event,departure)}</section>`}<section class="fold-section departure-participation-section">${participation}</section></div></details>`;
+  const mine=myDepartureBadge(departure);
+  return `<details class="departure-fold${isPast?' is-past':''}${mine?' is-mine':''}" id="departure-${departure.id}" ${open?'open':''}><summary><span class="fold-index">${String(index+1).padStart(2,'0')}</span><span class="fold-date"><strong class="ux-departure-title">Départ ${esc(departure.time)}</strong><span class="ux-departure-date">${esc(dateLabel(departure))}${locked?' · Départ passé':''}</span>${mine}</span><span class="fold-meta">${available} pilote${available>1?'s':''} · ${crews.length} équipage${crews.length>1?'s':''}</span>${actions}</summary><div class="departure-fold-body">${locked?'<p class="finished-history">Les inscriptions sont verrouillées. Les équipages restent consultables ci-dessous.</p>':`<section class="fold-section fold-registration" ${editorOpen?'':'hidden'}>${renderRegistrationWorkspace(event,departure)}</section>`}<section class="fold-section departure-participation-section">${participation}</section></div></details>`;
 }
 
 function renderPastDepartures(event,items){
@@ -23,29 +35,17 @@ function renderPastDepartures(event,items){
   return `<details class="past-departures-fold"><summary><span>Départs passés</span><small>${items.length} départ${items.length>1?'s':''}</small></summary><div class="past-departures-list">${items.map(({departure,index})=>renderDeparturePanel(event,departure,index,false,{isPast:true})).join('')}</div></details>`;
 }
 
-// "Ta course": the pilot's own start, crew and teammates, shown first on the race page.
-function renderMyRace(event){
-  const mine=mySituation(event);
-  if(!mine)return '';
-  const {departure,reg,crew,mates}=mine;
-  const when=`${esc(dateLabel(departure))} · ${esc(departure.time||'')}`;
-  const detail=crew
-    ?`${esc(reg.category)}${mates.length?` · avec ${esc(mates.join(', '))}`:' · seul pour l’instant'}`
-    :'Pas encore d’équipage : rejoins-en un ou crée le tien dans ce départ.';
-  return `<a class="event-my-race ${crew?'is-crew':'is-registered'}" href="#departure-${departure.id}" data-my-race="${departure.id}"><span class="event-my-race-kicker">TA COURSE</span><strong>${when} — ${crew?`équipage ${esc(crew.name)}`:`inscrit en ${esc((mine.categories||[reg.category]).join(' / '))}`}</strong><span>${detail}</span><span class="event-my-race-countdown">Départ dans <b data-countdown="${departure.startsAt}">${countdown(departure.startsAt)}</b></span></a>`;
-}
-
 export function renderEvent(message=''){
   state.page='event';state.eventSection='race';const event=state.events.find(item=>item.id===state.currentEventId);if(!event){renderHome('Cet événement n’est plus disponible.');return;}
   const now=Date.now();
   const ordered=(event.departures||[]).map((departure,index)=>({departure,index})).sort((a,b)=>Number(a.departure.startsAt)-Number(b.departure.startsAt));
   const future=ordered.filter(item=>Number.isFinite(Number(item.departure.startsAt))&&Number(item.departure.startsAt)>now),past=ordered.filter(item=>Number.isFinite(Number(item.departure.startsAt))&&Number(item.departure.startsAt)<=now),undated=ordered.filter(item=>!Number.isFinite(Number(item.departure.startsAt)));
-  const next=future[0]?.departure||null,totalPilots=pilotCount(event.departures.flatMap(d=>d.availability)),totalCrews=event.departures.reduce((sum,d)=>sum+(d.crews||[]).length,0);
+  const next=future[0]?.departure||null;
   const eventActions=`<span class="event-toolbar-main">${button('share-event','Copier le lien de la course',`data-id="${event.id}"`)}${canManage()?button('edit-event','Modifier l’événement',`data-id="${event.id}"`):''}${isAdmin()?button('delete-event','Supprimer l’événement',`data-id="${event.id}"`,'danger-button'):''}</span>`;
   const visible=[...future,...undated];
   const upcoming=visible.map(({departure,index})=>renderDeparturePanel(event,departure,index,departure.id===state.selectedDepartureId||state.registrationOpen.has(departure.id))).join('');
   const countdownCopy=next?`Prochain départ dans <strong data-countdown="${next.startsAt}">${countdown(next.startsAt)}</strong>`:undated.length?'Dates à confirmer':'Tous les départs ont eu lieu';
   app.eventViewData={eventId:event.id,events:state.events,message};
-  app.innerHTML=`<div class="event-header event-header-compact event-type-${event.eventType||'private'}" data-event-id="${event.id}"><div class="event-heading-line"><div class="event-heading-copy"><h1 class="event-title">${esc(event.name)}</h1><p class="event-subtitle">${eventTypeBadge(event.eventType)}${schedulePendingBadge(event)}</p><span class="event-header-countdown">${countdownCopy}</span></div>${circuitVisual(event.circuit)}</div><div class="event-header-summary"><div class="event-category-badges">${event.categories.map(category=>eventBadge(category,eventCategoryCount(event,category))).join('')}</div><p class="event-header-stats">${event.durationHours||6} h · ${event.departures.length} départ${event.departures.length>1?'s':''} · ${totalPilots} pilote${totalPilots>1?'s':''} · ${totalCrews} équipage${totalCrews>1?'s':''}</p></div></div>${renderMyRace(event)}<div class="toolbar event-actions-toolbar">${eventActions}</div><div id="crew-builder-root"></div>${message?`<p class="creation-success" role="status">${esc(message)}</p>`:''}<section class="departure-accordion" aria-label="Départs de la course">${upcoming}${renderPastDepartures(event,past)}</section>`;
+  app.innerHTML=`<div class="event-header event-header-compact race-header event-type-${event.eventType||'private'}" data-event-id="${event.id}"><div class="race-card-top">${raceDateBlock(event,!next&&!undated.length)}<div class="race-head"><h1 class="event-title event-name">${esc(event.name)}</h1><span class="race-meta">${esc(circuitLabel(event.circuit))} · ${event.durationHours||6} h</span><span class="race-badges">${eventTypeBadge(event.eventType)}${schedulePendingBadge(event)}</span><span class="event-header-countdown">${countdownCopy}</span></div>${circuitVisual(event.circuit)}</div>${raceStarts(event,!next&&!undated.length)}<div class="event-header-stats event-category-badges">${event.categories.map(category=>eventBadge(category,eventCategoryCount(event,category))).join('')}</div></div><div class="toolbar event-actions-toolbar">${eventActions}</div><div id="crew-builder-root"></div>${message?`<p class="creation-success" role="status">${esc(message)}</p>`:''}<section class="departure-accordion" aria-label="Départs de la course">${upcoming}${renderPastDepartures(event,past)}</section>`;
   showRecoveryLink();notifyRender();
 }

@@ -1,5 +1,5 @@
 import {state} from './front/app/core.mjs';
 import {installCrewDepartureOpenState} from './front/crew-departure-open-state.mjs?v=1';
-import './front/app/actions.mjs?v=31-date-pickers';
+import './front/app/actions.mjs?v=32-race-header';
 
 installCrewDepartureOpenState(state);

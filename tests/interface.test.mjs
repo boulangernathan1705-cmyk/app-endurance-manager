@@ -55,6 +55,9 @@ test('Course produit directement l’interface finale',()=>{
   const eventView=read('front/app/event-view.mjs');
   const crews=read('front/app/crews.mjs');
   assert.match(eventView,/event-header-stats/);
+  assert.match(eventView,/raceDateBlock\(event/);
+  assert.match(eventView,/raceStarts\(event/);
+  assert.doesNotMatch(eventView,/renderMyRace/);
   assert.match(eventView,/departure-fold/);
   assert.match(eventView,/Modifier mon inscription/);
   assert.match(eventView,/Inscrire un autre pilote/);

@@ -330,26 +330,6 @@ body:has(.fold-registration:not([hidden])) { overflow: hidden; }
   .registration-workspace-actions .secondary-button { min-height: 40px !important; width: auto !important; padding: 0 12px !important; white-space: nowrap; }
 }
 
-/* ---------- Page de course : « Ta course » ---------- */
-.event-my-race {
-  display: grid;
-  gap: 4px;
-  margin: 12px 0 4px;
-  padding: 14px 16px;
-  border-radius: 12px;
-  border: 1px solid rgba(49, 184, 107, .55);
-  background: rgba(49, 184, 107, .1);
-  color: inherit;
-  text-decoration: none;
-}
-.event-my-race.is-registered { border-color: rgba(82, 211, 216, .5); background: rgba(82, 211, 216, .08); }
-.event-my-race:hover { border-color: rgba(49, 184, 107, .9); }
-.event-my-race-kicker { font-size: 12px; font-weight: 800; letter-spacing: .1em; color: #7fe0a8; }
-.event-my-race.is-registered .event-my-race-kicker { color: #7fe3ea; }
-.event-my-race strong { font-size: 17px; }
-.event-my-race > span { color: #c9d6d0; font-size: 14px; }
-.event-my-race .event-my-race-countdown { color: #7fe0a8; font-weight: 700; }
-
 /* ---------- Liste des courses : situation du pilote et remplissage ---------- */
 .event-situation {
   display: inline-flex;
@@ -886,3 +866,81 @@ html[data-game] .race-card .event-card-status { display: none !important; }
   .event-creation .departure-field { grid-template-columns: minmax(0, 1fr) auto !important; }
   .event-creation .departure-field > .time-picker { grid-column: 1 / 2; grid-row: 2; }
 }
+
+/* =====================================================================
+   Page de course : même logique que la carte de la liste, en plus grand.
+   ===================================================================== */
+html[data-game] #app .race-header {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 14px !important;
+  padding: 20px 22px !important;
+  min-height: 0 !important;
+}
+html[data-game] #app .race-header .race-card-top { display: flex; align-items: flex-start; gap: 18px; }
+html[data-game] #app .race-header .race-date {
+  width: 76px; flex: none; display: flex; flex-direction: column; align-items: center; padding: 8px 0 10px;
+  border: 1px solid rgba(255, 255, 255, .16); border-radius: 12px; background: rgba(255, 255, 255, .03); line-height: 1.15;
+}
+html[data-game] #app .race-header .race-date small { font-size: 13px; color: #aab3b6; }
+html[data-game] #app .race-header .race-date strong { font-size: 32px; font-weight: 800; color: #f4f6f5; }
+html[data-game] #app .race-header .race-date b { margin-top: 4px; font-size: 16px; color: #7fe3ea; }
+html[data-game] #app .race-header .race-head { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+html[data-game] #app .race-header .event-title { margin: 0 !important; font-size: 34px !important; line-height: 1.08 !important; }
+html[data-game] #app .race-header .race-meta { font-size: 16px; color: #c7d0d4; }
+html[data-game] #app .race-header .race-badges { display: flex; flex-wrap: wrap; gap: 6px; }
+html[data-game] #app .race-header .event-header-countdown {
+  margin: 2px 0 0 !important; padding: 0 !important; border: 0 !important; background: none !important;
+  font-size: 14px !important; color: #aab3b6 !important;
+}
+html[data-game] #app .race-header .event-header-countdown strong { color: #7fe0a8; }
+html[data-game] #app .race-header .race-card-top > .circuit-visual {
+  position: static !important; flex: none; width: 220px !important; height: 150px !important; margin: 0 !important; transform: none !important;
+}
+html[data-game] #app .race-header .race-card-top > .circuit-visual img { width: 100% !important; height: 100% !important; object-fit: contain !important; transform: none !important; }
+html[data-game] #app .race-header .race-starts { display: flex; flex-direction: column; gap: 6px; padding-top: 12px; border-top: 1px solid rgba(255, 255, 255, .08); }
+html[data-game] #app .race-header .race-day { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+html[data-game] #app .race-header .race-day em { width: 70px; font-style: normal; font-size: 14px; color: #aab3b6; }
+html[data-game] #app .race-header .race-start { min-width: 46px; padding: 4px 10px; border: 1px solid rgba(255, 255, 255, .14); border-radius: 7px; text-align: center; font-size: 14px; font-weight: 600; color: #e6ecea; }
+html[data-game] #app .race-header .event-header-stats { display: flex !important; flex-wrap: wrap; gap: 6px; margin: 0 !important; white-space: normal !important; }
+@media (max-width: 760px) {
+  html[data-game] #app .race-header { padding: 14px !important; }
+  html[data-game] #app .race-header .race-card-top { gap: 12px; }
+  html[data-game] #app .race-header .race-date { width: 62px; }
+  html[data-game] #app .race-header .race-date strong { font-size: 26px; }
+  html[data-game] #app .race-header .event-title { font-size: 24px !important; }
+  html[data-game] #app .race-header .race-meta { font-size: 14px; }
+  html[data-game] #app .race-header .race-card-top > .circuit-visual { width: 90px !important; height: 70px !important; }
+  html[data-game] #app .race-header .race-day em { width: 56px; font-size: 13px; }
+}
+
+/* Départ où tu es inscrit : contour clair et étiquette dans sa ligne de titre. */
+html[data-game] #app .departure-fold.is-mine { outline: 2px solid rgba(255, 255, 255, .55); outline-offset: -2px; }
+.departure-mine-badge {
+  display: inline-flex;
+  align-self: flex-start;
+  margin-top: 4px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(82, 211, 216, .6);
+  background: rgba(82, 211, 216, .1);
+  color: #9eeef2;
+  font-size: 12.5px;
+  font-weight: 800;
+}
+.departure-mine-badge.is-crew { border-color: rgba(49, 184, 107, .7); background: rgba(49, 184, 107, .14); color: #8ff0b6; }
+html[data-game] #app .departure-fold .fold-date { display: flex !important; flex-direction: column; align-items: flex-start; }
+html[data-game] #app .race-header .event-header-stats .event-category-badge {
+  display: inline-flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  gap: 8px !important;
+  padding: 6px 12px !important;
+  width: auto !important;
+  min-width: 0 !important;
+  text-align: left !important;
+}
+html[data-game] #app .race-header .event-header-stats .event-category-copy { display: flex !important; flex-direction: column; align-items: flex-start; }
+html[data-game] #app .race-header .event-header-countdown { display: inline !important; }
+html[data-game] #app .race-header .event-header-countdown strong { display: inline !important; margin: 0 0 0 4px !important; font-size: inherit !important; }
+html[data-game] #app .race-header .event-header-countdown { text-align: left !important; width: auto !important; }

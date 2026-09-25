@@ -145,8 +145,6 @@ document.addEventListener('change',async event=>{
   const departureId=field.form?.dataset.departure;if(departureId&&state.drafts[departureId]&&(field.name==='carPreference'||field.name==='carAny')){const draft=state.drafts[departureId];draft.cars=[...field.form.querySelectorAll('[name="carPreference"]:checked')].map(input=>input.value);draft.carAny=!!field.form.elements.carAny?.checked;if(draft.carAny)draft.cars=[];for(const input of field.form.querySelectorAll('[name="carPreference"]')){input.disabled=draft.carAny;if(draft.carAny)input.checked=false;}}
 });
 document.addEventListener('endurance:refresh',()=>{refresh().catch(showError);});
-// "Ta course" jumps to the pilot's start and opens it.
-document.addEventListener('click',event=>{const link=event.target.closest?.('[data-my-race]');if(!link)return;event.preventDefault();const fold=document.getElementById(`departure-${link.dataset.myRace}`);if(!fold)return;fold.open=true;fold.scrollIntoView({block:'start',behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});});
 // Registration panel: Enter moves to the next step, Escape or a click beside the panel closes it.
 document.addEventListener('submit',event=>{const form=event.target;if(form.matches?.('[data-kind="registration"].registration-stepper,[data-kind="event"].event-stepper')&&form.dataset.step!=='4'){event.preventDefault();event.stopImmediatePropagation();form.querySelector('.registration-next')?.click();}},true);
 document.addEventListener('click',event=>{if(event.target.matches?.('.fold-registration'))event.target.querySelector('.registration-close-button')?.click();});
