@@ -3,6 +3,7 @@ import {isWeeklyDiscordMutation} from './discord-weekly-format.mjs';
 import {ensureDiscordWeeklySchema} from './discord-weekly-schema.mjs';
 import {syncWeeklyDiscord} from './discord-weekly.mjs';
 import {cleanup} from './core.mjs';
+import {isDevelopment,devRobots,markDevelopmentResponse} from './dev-environment.mjs';
 
 let crewOwnershipReady = null;
 
@@ -54,11 +55,13 @@ function queueWeeklySync(env, ctx) {
 export default {
   async fetch(request, env, ctx) {
     const pathname = new URL(request.url).pathname;
+    const development = isDevelopment(env);
+    if (development && pathname === '/robots.txt') return devRobots();
     if (pathname.startsWith('/api/')) await ensureCrewOwnershipSchema(env);
     const weeklyMutation = isWeeklyDiscordMutation(request);
     const response = await worker.fetch(request, env, ctx);
     if (weeklyMutation && response.ok) queueWeeklySync(env, ctx);
-    return response;
+    return development ? markDevelopmentResponse(response) : response;
   },
 
   async scheduled(_controller, env, ctx) {

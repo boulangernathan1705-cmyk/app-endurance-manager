@@ -65,6 +65,7 @@ const EN=new Map(Object.entries({
   'Les dates et heures sont saisies en heure de Paris.':'Dates and times use Paris time.','Les dates et heures sont saisies à l’heure de Paris.':'Dates and times use Paris time.',
   'Un départ avec des inscrits ne peut pas être supprimé, ni une catégorie encore utilisée.':'A start with entries cannot be deleted, nor can a category that is still in use.',
   'ENREGISTRER LES MODIFICATIONS':'SAVE CHANGES','CRÉER L’ÉVÉNEMENT':'CREATE EVENT',
+  'Version de test : les inscriptions faites ici ne comptent pas.':'Test version: entries made here do not count.','Aller sur le site officiel':'Go to the official site',
   'Retrouve ici tes courses, ton équipage et les pilotes inscrits sur le même départ.':'Find your races, your crew and the drivers registered for the same start here.',
   '← Retour':'← Back','← Retour aux événements':'← Back to events','Retour à l’accueil':'Back to home','Retour à l’accueil Endurance Manager':'Back to Endurance Manager home','Retour à Endurance Manager':'Back to Endurance Manager',
   '← Retour au site':'← Back to site','Chargement des événements…':'Loading events…','Chargement des membres…':'Loading members…','Chargement de l’aide…':'Loading help…',

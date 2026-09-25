@@ -10,11 +10,9 @@
   },
   "assets": {
     "directory": "./public",
+    "binding": "ASSETS",
     "html_handling": "auto-trailing-slash",
-    "run_worker_first": [
-      "/api/*",
-      "/telemetry/*"
-    ]
+    "run_worker_first": true
   },
   "d1_databases": [
     {
@@ -25,6 +23,7 @@
     }
   ],
   "vars": {
-    "APP_ORIGIN": "https://app.endurance-manager.workers.dev"
+    "APP_ORIGIN": "https://app.endurance-manager.workers.dev",
+    "SITE_ENV": "development"
   }
 }
