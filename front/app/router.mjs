@@ -1,6 +1,6 @@
 // Keeps the address bar in sync with the page, so a race can be shared as a link
 // (/lmu/#event=<id>) and the browser Back button returns to the previous page.
-import {app,state} from './core.mjs';
+import {app,state,loadArchive,showError} from './core.mjs';
 
 const EVENT_HASH=/^#event=([a-f0-9-]{36})$/;
 const ENTRIES_HASH='#inscriptions';
@@ -25,8 +25,10 @@ function bringPageIntoView(){
   if(app.getBoundingClientRect().top<0)app.scrollIntoView({block:'start'});
 }
 
-export function applyRoute(route,message=''){
+export async function applyRoute(route,message=''){
   if(route.page==='event'){
+    // A shared link can point to a past race: fetch the archive before giving up.
+    if(!state.events.some(event=>event.id===route.eventId)&&!state.archiveLoaded)await loadArchive();
     if(state.events.some(event=>event.id===route.eventId)){
       state.currentEventId=route.eventId;state.selectedDepartureId=null;state.eventSection='race';
       state.drafts={};state.pendingCrewJoin=null;state.registrationOpen.clear();
@@ -56,8 +58,9 @@ export function installRouter(renderers){
   });
   addEventListener('popstate',()=>{
     const route=routeFromLocation();
-    applyRoute(route);
-    if(route.page==='home')requestAnimationFrame(()=>scrollTo(0,homeScroll));
-    else bringPageIntoView();
+    applyRoute(route).then(()=>{
+      if(route.page==='home')requestAnimationFrame(()=>scrollTo(0,homeScroll));
+      else bringPageIntoView();
+    }).catch(showError);
   });
 }

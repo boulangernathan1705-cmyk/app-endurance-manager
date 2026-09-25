@@ -51,9 +51,19 @@ function publicRegistration(reg, actor, userNames = new Map()) {
     addedByName:canSeeCreator ? (userNames.get(creatorId) || '') : ''
   };
 }
-async function listEvents(env, actor, game='') {
+// Archived = every start is in the past (same rule as front/schedule.mjs). "upcoming" keeps a
+// one-day margin so a race that just started stays visible, and undated races stay upcoming.
+const LAST_START="(SELECT max(CAST(json_extract(d.value,'$.startsAt') AS INTEGER)) FROM json_each(e.departures) d)";
+function eventScopeFilter(scope, nowMs=Date.now()) {
+  const cutoff=Math.floor(nowMs);
+  if (scope==='upcoming') return `(${LAST_START} IS NULL OR ${LAST_START}>${cutoff-86400000})`;
+  if (scope==='archived') return `${LAST_START}<=${cutoff}`;
+  return '';
+}
+async function listEvents(env, actor, game='', scope='') {
   // Filter by joining events instead of binding id lists: D1 rejects queries with more than 100 bound parameters.
-  const where=game==='iracing' ? " WHERE e.circuit LIKE 'iracing-%'" : game==='lmu' ? " WHERE e.circuit NOT LIKE 'iracing-%'" : '';
+  const filters=[game==='iracing' ? "e.circuit LIKE 'iracing-%'" : game==='lmu' ? "e.circuit NOT LIKE 'iracing-%'" : '', eventScopeFilter(scope)].filter(Boolean);
+  const where=filters.length ? ` WHERE ${filters.join(' AND ')}` : '';
   const rows = (await env.DB.prepare(`SELECT e.* FROM events e${where} ORDER BY e.created_at DESC, e.id DESC`).all()).results;
   if (!rows.length) return [];
   const registrations = (await env.DB.prepare(registrationSelect+` JOIN events e ON e.id=r.event_id${where} ORDER BY r.created_at,r.id`).all()).results;
@@ -114,7 +124,7 @@ async function oauthCallback(request, env) {
     if (!profileResponse.ok) throw Error('profile');
     const profile = await profileResponse.json();
     if (!/^\d{15,22}$/.test(profile.id)) throw Error('identity');
-    const display = String(profile.global_name || profile.username || 'Pilote').slice(0, 80);
+    const display = String(profile.global_name || profile.username || 'Pilote').slice(0, 32);
     const avatarHash = typeof profile.avatar === 'string' && /^[A-Za-z0-9_]{1,128}$/.test(profile.avatar) ? profile.avatar : '';
     const session = token();
     const guestRaw = cookie(request, COOKIE_GUEST);
@@ -170,10 +180,13 @@ async function api(request, env) {
   if (path === '/api/events' && method === 'GET') {
     const requestedGame=url.searchParams.get('game');
     const game=requestedGame==='lmu'||requestedGame==='iracing'?requestedGame:'';
-    const events=await listEvents(env,actor,game);
+    const requestedScope=url.searchParams.get('scope');
+    const scope=requestedScope==='upcoming'||requestedScope==='archived'?requestedScope:'';
+    const events=await listEvents(env,actor,game,scope);
     const payload={events};
     const response=json(payload);
     response.headers.set('X-Endurance-Game',game||'all');
+    response.headers.set('X-Endurance-Scope',scope||'all');
     response.headers.set('X-Endurance-Events',String(events.length));
     response.headers.set('X-Endurance-Approx-Bytes',String(new TextEncoder().encode(JSON.stringify(payload)).length));
     return response;

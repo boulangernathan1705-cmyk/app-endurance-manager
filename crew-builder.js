@@ -33,7 +33,9 @@ async function loadSession() {
 async function loadEvents(force = false) {
   if (!force && app?.querySelector('[data-event-id]') && app.eventViewData) return app.eventViewData.events;
   if (!force && eventsCache) return eventsCache;
-  const result = await api('/api/events');
+  // Crews are only built for upcoming starts of the current simulator.
+  const game = globalThis.__ENDURANCE_GAME__ === 'iracing' ? 'iracing' : 'lmu';
+  const result = await api(`/api/events?game=${game}&scope=upcoming`);
   eventsCache = Array.isArray(result.events) ? result.events : [];
   return eventsCache;
 }

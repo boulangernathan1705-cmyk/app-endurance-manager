@@ -2,6 +2,7 @@ import worker from './worker.mjs';
 import {isWeeklyDiscordMutation} from './discord-weekly-format.mjs';
 import {ensureDiscordWeeklySchema} from './discord-weekly-schema.mjs';
 import {syncWeeklyDiscord} from './discord-weekly.mjs';
+import {cleanup} from './core.mjs';
 
 let crewOwnershipReady = null;
 
@@ -61,6 +62,10 @@ export default {
   },
 
   async scheduled(_controller, env, ctx) {
+    // Expired sessions, OAuth states and rate-limit counters are purged here too, not only on Discord login.
+    if (env?.DB) ctx.waitUntil(cleanup(env).catch(error => {
+      console.error('Scheduled cleanup failed', error instanceof Error ? error.message : 'unknown');
+    }));
     if (!env?.DISCORD_WEEKLY_WEBHOOK_URL) return;
     ctx.waitUntil(runWeeklySync(env).catch(error => {
       console.error('Discord weekly scheduled sync failed', error instanceof Error ? error.message : 'unknown');

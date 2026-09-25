@@ -180,9 +180,11 @@ function validateEvent(input, existing = null) {
   const schedulePending = input.schedulePending == null ? Boolean(existing?.schedule_pending) : input.schedulePending === true;
   return {name, durationHours, eventType, circuit, schedulePending, categories: [...new Set(input.categories)], departures};
 }
+// Discord display names are at most 32 characters: registrations accept the same length.
+const PILOT_NAME_MAX = 32;
 function validateRegistration(input, event) {
-  const name = text(input.name, 30, 'Pseudo');
-  const preferredPilot = typeof input.preferredPilot === 'string' && input.preferredPilot.trim() ? text(input.preferredPilot, 30, 'Pilote souhaité') : '';
+  const name = text(input.name, PILOT_NAME_MAX, 'Pseudo');
+  const preferredPilot = typeof input.preferredPilot === 'string' && input.preferredPilot.trim() ? text(input.preferredPilot, PILOT_NAME_MAX, 'Pilote souhaité') : '';
   const durationHours = Number(event.duration_hours) || 3;
   const parts = typeof input.status === 'string' ? input.status.split(',').filter(Boolean) : [];
   const hourParts = parts.filter(part => /^h([1-9]|1[0-9]|2[0-4])$/.test(part));

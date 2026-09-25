@@ -368,3 +368,25 @@ test('schedule migration moves the "(horaires ...)" suffix out of event names',(
  assert.deepEqual(db.prepare('SELECT id,name,schedule_pending p,version v FROM events ORDER BY id').all().map(r=>({...r})),[
   {id:'a',name:'6h FUJI',p:1,v:2},{id:'b',name:'12h du Mans',p:0,v:1},{id:'c',name:'8h BAHRAIN',p:1,v:2}]);
 });
+test('events can be listed by scope so the archive is only loaded on demand',async()=>{
+ const {req,login,DB}=harness();await login(ADMIN,'admin');
+ const upcoming=(await req('/api/events','POST',{...eventInput,name:'Course à venir'},'admin')).data.id;
+ const past=(await req('/api/events','POST',{...eventInput,name:'Course passée'},'admin')).data.id;
+ const row=DB.db.prepare('SELECT departures FROM events WHERE id=?').get(past);
+ const departures=JSON.parse(row.departures).map((d,i)=>({...d,startsAt:Date.now()-(3+i)*86400000}));
+ DB.db.prepare('UPDATE events SET departures=? WHERE id=?').run(JSON.stringify(departures),past);
+ const ids=async scope=>(await req('/api/events'+(scope?`?scope=${scope}`:''))).data.events.map(e=>e.id).sort();
+ assert.deepEqual(await ids('upcoming'),[upcoming]);
+ assert.deepEqual(await ids('archived'),[past]);
+ assert.deepEqual(await ids(''),[upcoming,past].sort());
+ assert.equal((await req('/api/events?scope=upcoming')).response.headers.get('X-Endurance-Scope'),'upcoming');
+});
+test('the scheduled job purges expired rate-limit counters and sessions',async()=>{
+ const {DB,env}=harness();
+ const past=Math.floor(Date.now()/1000)-60,future=past+7200;
+ DB.db.prepare('INSERT INTO rate_limits(key,count,expires_at) VALUES(?,?,?),(?,?,?)').run('old',1,past,'fresh',1,future);
+ const pending=[];
+ await workerWithMigrations.scheduled({},env,{waitUntil:promise=>pending.push(promise)});
+ await Promise.all(pending);
+ assert.deepEqual(DB.db.prepare('SELECT key FROM rate_limits ORDER BY key').all().map(row=>row.key),['fresh']);
+});

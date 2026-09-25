@@ -13,7 +13,7 @@ export const state = {
   events:[], user:null, discordReady:false, currentEventId:null, page:'home', editingEvent:null,
   drafts:{}, recoveryLink:'', busy:false, participants:[], flash:'', eventFilter:'upcoming',
   selectedDepartureId:null, eventSection:'race', pilotName:'', registrationOpen:new Set(), crewManagementOpen:new Set(),
-  pendingCrewJoin:null
+  pendingCrewJoin:null, archiveLoaded:false, participantsLoaded:false
 };
 try { state.pilotName = localStorage.getItem('fmt_pilot_name') || ''; } catch {}
 
@@ -131,14 +131,39 @@ export async function api(path,method='GET',data) {
     throw wrapped;
   }
 }
+async function fetchEvents(scope) {
+  const result = await api(`/api/events?game=${encodeURIComponent(activeGame)}&scope=${scope}`);
+  return (Array.isArray(result.events)?result.events:[]).filter(event => gameForEvent(event) === activeGame);
+}
+function mergeEvents(...lists) {
+  const byId=new Map();
+  for (const event of lists.flat()) byId.set(event.id,event);
+  return [...byId.values()];
+}
+// Only upcoming races are loaded at start and on every refresh; the archive is fetched
+// the first time it is needed (Archivés filter, link to a past race) and then kept fresh.
 export async function load() {
-  const session = await api('/api/session');
-  const result = await api(`/api/events?game=${encodeURIComponent(activeGame)}`);
+  const [session,upcoming,archived] = await Promise.all([
+    api('/api/session'),
+    fetchEvents('upcoming'),
+    state.archiveLoaded ? fetchEvents('archived') : []
+  ]);
+  const userChanged=(session.user?.id||null)!==(state.user?.id||null);
   state.user=session.user;
   state.discordReady=session.discordReady;
-  state.events=(Array.isArray(result.events)?result.events:[]).filter(event => gameForEvent(event) === activeGame);
-  state.participants=state.user ? (await api('/api/participants')).participants : [];
-  if (state.user && !state.pilotName) state.pilotName=state.user.name.slice(0,30);
+  state.events=mergeEvents(upcoming,archived);
+  // The members list rarely changes: fetch it once per session instead of on every refresh.
+  if (userChanged || !state.participantsLoaded) {
+    state.participants=state.user ? (await api('/api/participants')).participants : [];
+    state.participantsLoaded=true;
+  }
+  if (state.user && !state.pilotName) state.pilotName=state.user.name.slice(0,32);
+}
+export async function loadArchive() {
+  if (state.archiveLoaded) return;
+  const archived = await fetchEvents('archived');
+  state.events=mergeEvents(state.events,archived);
+  state.archiveLoaded=true;
 }
 
 export function showError(error) {

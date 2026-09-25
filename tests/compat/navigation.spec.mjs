@@ -2,8 +2,20 @@ import {test, expect} from '@playwright/test';
 
 const apiFailures = [];
 
+// The dev site is behind Cloudflare Access. With a service token (GitHub secrets), its headers are
+// added to requests for the tested site only, never to third parties such as Google Fonts.
+const accessHeaders = process.env.CF_ACCESS_CLIENT_ID && process.env.CF_ACCESS_CLIENT_SECRET
+  ? {'CF-Access-Client-Id':process.env.CF_ACCESS_CLIENT_ID, 'CF-Access-Client-Secret':process.env.CF_ACCESS_CLIENT_SECRET}
+  : null;
+
+async function allowThroughAccess(page, baseURL) {
+  if (!accessHeaders || !baseURL) return;
+  const siteOrigin = new URL(baseURL).origin;
+  await page.route(url => url.origin === siteOrigin, route => route.continue({headers:{...route.request().headers(), ...accessHeaders}}));
+}
+
 async function expectApiHealthy(page, path) {
-  const response = await page.request.get(path, {headers:{Accept:'application/json'}});
+  const response = await page.request.get(path, {headers:{Accept:'application/json', ...accessHeaders}});
   expect(response.ok(), `${path} returned ${response.status()}`).toBeTruthy();
   const type = response.headers()['content-type'] || '';
   expect(type).toContain('application/json');
@@ -26,7 +38,8 @@ async function openAndCheck(page, path) {
   page.off('requestfailed', onRequestFailed);
 }
 
-test.beforeEach(async ({page}) => {
+test.beforeEach(async ({page, baseURL}) => {
+  await allowThroughAccess(page, baseURL);
   apiFailures.length = 0;
   page.on('requestfailed', request => {
     if (request.url().includes('/api/')) apiFailures.push(`${request.method()} ${request.url()}: ${request.failure()?.errorText || 'request failed'}`);

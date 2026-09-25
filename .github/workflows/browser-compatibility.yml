@@ -15,25 +15,45 @@ jobs:
     env:
       COMPAT_BASE_URL: https://app.endurance-manager.workers.dev
       ENV_LABEL: development
+      # The dev site is behind Cloudflare Access: a service token lets the tests through.
+      CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+      CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
     steps:
+      - name: Check Cloudflare Access token
+        id: access
+        run: |
+          if [ -z "$CF_ACCESS_CLIENT_ID" ] || [ -z "$CF_ACCESS_CLIENT_SECRET" ]; then
+            echo "::warning::Secrets CF_ACCESS_CLIENT_ID / CF_ACCESS_CLIENT_SECRET missing: the dev site is protected by Cloudflare Access, browser tests skipped."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
       - uses: actions/checkout@v4
+        if: steps.access.outputs.ready == 'true'
       - uses: actions/setup-node@v4
+        if: steps.access.outputs.ready == 'true'
         with:
           node-version: '22.13.0'
       - run: npm install --no-audit --no-fund
+        if: steps.access.outputs.ready == 'true'
       - run: npx playwright install --with-deps chromium firefox webkit
+        if: steps.access.outputs.ready == 'true'
       - name: Wait for deployment
+        if: steps.access.outputs.ready == 'true'
         run: |
           echo "Checking ${ENV_LABEL}: ${COMPAT_BASE_URL}"
           for i in {1..18}; do
             if curl --fail --silent --show-error --max-time 10 \
-              "${COMPAT_BASE_URL}/api/session" >/dev/null; then
+              -H "CF-Access-Client-Id: ${CF_ACCESS_CLIENT_ID}" \
+              -H "CF-Access-Client-Secret: ${CF_ACCESS_CLIENT_SECRET}" \
+              "${COMPAT_BASE_URL}/api/session" | grep -q '"discordReady"'; then
               exit 0
             fi
             sleep 10
           done
           exit 1
       - run: npm run compat:test
+        if: steps.access.outputs.ready == 'true'
         env:
           COMPAT_BASE_URL: ${{ env.COMPAT_BASE_URL }}
       - name: Upload Playwright report on failure

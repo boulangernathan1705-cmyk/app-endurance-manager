@@ -1,3 +1,4 @@
+import {eventSchedule} from '../schedule.mjs';
 import {
   app,
   state,
@@ -111,7 +112,9 @@ function card({event,departure,reg}) {
 
 export function renderMyEntries() {
   state.page='my-entries';
-  const entries=state.events.flatMap(event=>event.departures.flatMap(departure=>departure.availability
+  // Past races live in the Archivés list; this page is about what is coming up.
+  const now=Date.now();
+  const entries=state.events.filter(event=>!eventSchedule(event,now).archived).flatMap(event=>event.departures.flatMap(departure=>departure.availability
     .filter(reg=>reg.mine||reg.managed)
     .map(reg=>({event,departure,reg}))))
     .sort((a,b)=>Number(a.departure.startsAt)-Number(b.departure.startsAt));

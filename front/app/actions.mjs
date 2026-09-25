@@ -1,4 +1,4 @@
-import {app,state,api,load,showError,countdown,CARS} from './core.mjs';
+import {app,state,api,load,loadArchive,showError,countdown,CARS} from './core.mjs';
 import {renderNav,renderHome} from './home-view.mjs';
 import {renderEvent} from './event-view.mjs';
 import {renderEventForm,departureFields,updateRemoveButtons,goToEventStep} from './event-form.mjs';
@@ -52,7 +52,7 @@ function beginCrewJoin(event,departure,crew){
   state.selectedDepartureId=departure.id;
   state.drafts[departure.id]=source
     ? {...registrationDraft(source),category:crew.category,cars:[],carAny:false,id:null,version:null,mode:'category',forOther:false}
-    : {name:state.user.name?.slice(0,30)||state.pilotName,status:'',preferredPilot:'',forOther:false,participantUserId:null,participantId:null,category:crew.category,cars:[],carAny:false,id:null,version:null,mode:'pilot'};
+    : {name:state.user.name?.slice(0,32)||state.pilotName,status:'',preferredPilot:'',forOther:false,participantUserId:null,participantId:null,category:crew.category,cars:[],carAny:false,id:null,version:null,mode:'pilot'};
   state.registrationOpen.add(departure.id);
   renderEvent();
   document.getElementById(`departure-${departure.id}`)?.scrollIntoView({block:'start',behavior:'smooth'});
@@ -84,7 +84,7 @@ async function perform(action,target){
   switch(action){
     case 'dismiss-error': document.querySelector('[data-ux-error-modal]')?.remove(); break;
     case 'home': renderHome(); break;
-    case 'event-filter': state.eventFilter=target.dataset.filter||'upcoming'; renderHome(); break;
+    case 'event-filter': state.eventFilter=target.dataset.filter||'upcoming'; if(state.eventFilter==='archived')await loadArchive(); renderHome(); break;
     case 'refresh': await refresh(); break;
     case 'open': state.currentEventId=target.dataset.id; state.selectedDepartureId=target.dataset.departure||null; state.eventSection='race'; state.drafts={}; state.pendingCrewJoin=null; state.registrationOpen.clear(); renderEvent(); break;
     case 'event-section': state.eventSection='race'; renderEvent(); break;
@@ -156,6 +156,6 @@ document.addEventListener('error',event=>{const image=event.target;if(image inst
 setInterval(()=>document.querySelectorAll('[data-countdown]').forEach(element=>{element.textContent=countdown(Number(element.dataset.countdown));}),1000);
 
 async function start(){
-  try{const token=new URLSearchParams(location.hash.slice(1)).get('access');if(token){history.replaceState(null,'',location.pathname+location.search);await api('/api/guest/recover','POST',{token});state.flash='Tes inscriptions invitées sont accessibles sur cet appareil.';}const authError=new URLSearchParams(location.search).get('auth');if(authError){history.replaceState(null,'',location.pathname);state.flash='La connexion Discord n’a pas abouti. Tu peux réessayer.';}await load();renderNav();installRouter({renderHome,renderEvent,renderMyEntries});applyRoute(routeFromLocation(),state.flash);installAutoRefresh(refresh);}catch(error){app.innerHTML='<h1 class="page-title">ENDURANCE MANAGER</h1>';showError(error);}
+  try{const token=new URLSearchParams(location.hash.slice(1)).get('access');if(token){history.replaceState(null,'',location.pathname+location.search);await api('/api/guest/recover','POST',{token});state.flash='Tes inscriptions invitées sont accessibles sur cet appareil.';}const authError=new URLSearchParams(location.search).get('auth');if(authError){history.replaceState(null,'',location.pathname);state.flash='La connexion Discord n’a pas abouti. Tu peux réessayer.';}await load();renderNav();installRouter({renderHome,renderEvent,renderMyEntries});await applyRoute(routeFromLocation(),state.flash);installAutoRefresh(refresh);}catch(error){app.innerHTML='<h1 class="page-title">ENDURANCE MANAGER</h1>';showError(error);}
 }
 start();
