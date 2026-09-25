@@ -77,7 +77,7 @@ export function registrationStep(stateDraft){
   const step=Number(stateDraft.step)||(stateDraft.id?4:1);
   return Math.min(4,Math.max(1,step));
 }
-export function hoursSummary(status,departure,duration){
+function hoursSummary(status,departure,duration){
   if(status==='whole')return `Toute la course (${duration} h)`;
   const hours=String(status||'').split(',').filter(part=>/^h\d+$/.test(part)).map(part=>Number(part.slice(1))).sort((a,b)=>a-b);
   if(!hours.length)return 'Aucune heure choisie';

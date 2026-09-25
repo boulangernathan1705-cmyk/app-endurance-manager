@@ -1007,39 +1007,24 @@ html[data-game] #app .crew-planning-row:has(.pilot-timeline-tone-10) .pilot-name
 html[data-game] #app .crew-planning-row:has(.pilot-timeline-tone-11) .pilot-name { color: #94adc3 !important; }
 
 /* =====================================================================
-   Équipage ouvert : « Qui est dispo » par tranche, puis la frise de chaque pilote.
+   Équipage ouvert : la frise de chaque pilote, et un avertissement pour les heures sans pilote.
    ===================================================================== */
-html[data-game] #app .crew-section-title { display: block; margin: 6px 0 4px; font-size: 12.5px; font-weight: 700; letter-spacing: .02em; color: #aab3b6; }
-html[data-game] #app .crew-relays { display: grid; gap: 6px; }
-html[data-game] #app .crew-relay {
-  display: grid;
-  grid-template-columns: 150px minmax(0, 1fr);
-  align-items: center;
-  gap: 12px;
+html[data-game] #app .crew-gap-warning {
+  margin: 4px 0 2px;
   padding: 8px 12px;
-  border-left: 4px solid #31b86b;
-  border-radius: 0 8px 8px 0;
-  background: rgba(49, 184, 107, .08);
+  border: 1px solid rgba(227, 76, 76, .55);
+  border-radius: 8px;
+  background: rgba(227, 76, 76, .1);
+  color: #ffb3b3;
+  font-size: 13.5px;
+  font-weight: 700;
 }
-html[data-game] #app .crew-relay.is-solo { border-left-color: #e4c341; background: rgba(228, 195, 65, .08); }
-html[data-game] #app .crew-relay.is-gap { border-left-color: #e34c4c; background: rgba(227, 76, 76, .1); }
-html[data-game] #app .crew-relay-time { display: flex; align-items: baseline; gap: 8px; }
-html[data-game] #app .crew-relay-time strong { font-size: 15px; color: #f2f5f4; white-space: nowrap; }
-html[data-game] #app .crew-relay-time small { font-size: 12.5px; color: #aab3b6; }
-html[data-game] #app .crew-relay-who { font-size: 14.5px; color: #e6ecea; }
-html[data-game] #app .crew-relay-who em { font-style: normal; color: #e4c341; font-weight: 700; margin-left: 4px; }
-html[data-game] #app .crew-relay.is-gap .crew-relay-who { color: #ff9a9a; font-weight: 700; }
-
 html[data-game] #app .crew-pilot-lines { display: grid; gap: 2px; margin-top: 6px; }
 html[data-game] #app .crew-pilot-line { display: grid !important; gap: 4px !important; padding: 6px 0 !important; border-top: 1px solid rgba(255, 255, 255, .06) !important; }
 html[data-game] #app .crew-pilot-line .crew-planning-label { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 10px; }
 html[data-game] #app .crew-pilot-line .pilot-name { font-size: 14.5px; font-weight: 700; }
-html[data-game] #app .crew-pilot-line .crew-planning-when { font-size: 13px; color: #c7d0d4; }
 html[data-game] #app .crew-pilot-line .crew-planning-edit { min-height: 0 !important; margin-left: auto; font-size: 12.5px !important; padding: 0 !important; }
 html[data-game] #app .crew-pilot-line .presence-timeline { margin: 0 !important; }
 html[data-game] #app .crew-pilot-line .presence-edges { display: none !important; }
 html[data-game] #app .crew-pilot-line .presence-track,
 html[data-game] #app .crew-pilot-line .presence-segment { height: 12px !important; min-height: 0 !important; font-size: 0 !important; }
-@media (max-width: 760px) {
-  html[data-game] #app .crew-relay { grid-template-columns: minmax(0, 1fr); gap: 2px; }
-}
