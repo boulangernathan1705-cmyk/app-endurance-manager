@@ -787,3 +787,6 @@ html[data-game] .event-card .event-card-layout { grid-template-rows: auto !impor
   html[data-game] .event-card .event-card-crews .crew-summary-card { padding: 8px 10px !important; }
   html[data-game] .event-card .event-card-crews .crew-summary-title strong { font-size: 14px; }
 }
+/* Les équipages ne figurent plus dans la liste : la course, puis le circuit. */
+html[data-game] .event-card .event-card-layout { grid-template-columns: minmax(0, 1fr) 120px !important; grid-template-areas: "main circuit" !important; }
+@media (max-width: 900px) { html[data-game] .event-card .event-card-layout { grid-template-columns: minmax(0, 1fr) 84px !important; grid-template-areas: "main circuit" !important; grid-template-rows: auto !important; } }

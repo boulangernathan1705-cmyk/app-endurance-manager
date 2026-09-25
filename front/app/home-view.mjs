@@ -1,4 +1,4 @@
-import {app,nav,state,activeGame,esc,button,canManage,sortedCrews,CREW_PALETTE,eventTypeBadge,schedulePendingBadge,eventBadge,eventCategoryCount,pilotCount,circuitVisual,dateLabel,countdown,groupEvents,notifyRender,notifyNav} from './core.mjs';
+import {app,nav,state,activeGame,esc,button,canManage,eventTypeBadge,schedulePendingBadge,eventBadge,eventCategoryCount,pilotCount,circuitVisual,dateLabel,countdown,groupEvents,notifyRender,notifyNav} from './core.mjs';
 import {getLocale,localeTag} from '../i18n.mjs';
 
 const compactDateFormatter=new Intl.DateTimeFormat(localeTag(),{timeZone:'Europe/Paris',day:'2-digit',month:'2-digit'});
@@ -47,38 +47,6 @@ function registeredRaceStatus(event,now=Date.now()){
   const departures=[...(event.departures||[])].filter(d=>Number.isFinite(Number(d.startsAt))&&hasRegisteredPilot(d)).sort((a,b)=>Number(a.startsAt)-Number(b.startsAt));
   return {next:departures.find(d=>Number(d.startsAt)>now)||null};
 }
-function crewRows(event,{includePast=false,now=Date.now()}={}){
-  const rows=[];
-  const departures=[...(event.departures||[])]
-    .filter(d=>Number.isFinite(Number(d.startsAt))&&(includePast||Number(d.startsAt)>now))
-    .sort((a,b)=>Number(a.startsAt)-Number(b.startsAt));
-  for(const departure of departures){
-    for(const [position,crew] of sortedCrews(event,departure).entries()){
-      const registrations=(crew.registrationIds||[]).map(id=>(departure.availability||[]).find(reg=>reg.id===id)).filter(reg=>reg&&reg.status!=='unavailable');
-      if(!registrations.length)continue;
-      rows.push({
-        key:`${departure.id||departure.startsAt}|${crew.id||crew.name}`,
-        startsAt:Number(departure.startsAt),
-        time:departure.time,
-        name:crew.name||'Équipage',
-        category:crew.category||registrations[0]?.category||'',
-        car:crew.car||'',
-        pilots:registrations.map(reg=>reg.name).filter(Boolean),
-        locked:Boolean(crew.locked),
-        mine:registrations.some(reg=>reg.mine),
-        color:CREW_PALETTE[position%CREW_PALETTE.length]
-      });
-    }
-  }
-  const locale=getLocale()==='en'?'en':'fr';
-  return rows.sort((a,b)=>a.startsAt-b.startsAt||String(a.category).localeCompare(String(b.category),locale)||String(a.name).localeCompare(String(b.name),locale,{sensitivity:'base',numeric:true}));
-}
-function crewIcon(color){return `<span class="crew-summary-icon" aria-hidden="true" style="--crew-color:${color}"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="7" r="2.2"/><circle cx="6.8" cy="10" r="1.7"/><circle cx="17.2" cy="10" r="1.7"/><path d="M8.5 17.2c.4-2.7 1.6-4.2 3.5-4.2s3.1 1.5 3.5 4.2"/><path d="M3.8 17c.3-2.2 1.3-3.4 3-3.4.7 0 1.3.2 1.8.6"/><path d="M20.2 17c-.3-2.2-1.3-3.4-3-3.4-.7 0-1.3.2-1.8.6"/></svg></span>`;}
-function crewSummary(event,{includePast=false}={}){
-  const rows=crewRows(event,{includePast});if(!rows.length)return'';
-  return `<span class="event-home-crews"><span class="crew-summary-heading"><strong>${rows.length} équipage${rows.length>1?'s':''}</strong><span>engagé${rows.length>1?'s':''}</span></span><span class="crew-summary-list">${rows.map(row=>{const color=row.color;return `<span class="crew-summary-card ${row.locked?'is-complete':'is-open'}${row.mine?' is-mine':''}" style="--crew-color:${color}">${crewIcon(color)}<span class="crew-summary-main"><span class="crew-summary-title"><strong style="color:${color}">${esc(row.name)}</strong><b>${esc(displayTime(row.time))}</b></span><small>${esc(row.category)}${row.car?` · ${esc(row.car)}`:''}</small></span>${row.mine?'<span class="crew-mine-badge">Ton équipage</span>':''}<span class="crew-summary-pilots">${row.pilots.length?row.pilots.map(name=>`<span>${esc(name)}</span>`).join(''):'<span>Aucun pilote affecté</span>'}</span></span>`;}).join('')}</span></span>`;
-}
-
 const gameLink=(game,full,short)=>`<a class="nav-game-switcher-button nav-game-switcher-${game}" href="/${game}/"${activeGame===game?' aria-current="page"':''}><span class="nav-full">${full}</span><span class="nav-short">${short}</span></a>`;
 function syncNavSection(page){for(const item of nav.querySelectorAll('.nav-section-button')){const current=item.dataset.action==='my-entries'?page==='my-entries':page!=='my-entries';item.setAttribute('aria-current',current?'page':'false');}}
 export function renderNav(){nav.innerHTML=`<div class="nav-game-switcher" role="group" aria-label="Changer de simulateur">${gameLink('lmu','Le Mans Ultimate','LMU')}${gameLink('iracing','iRacing','iRacing')}</div><div class="nav-sections" role="group" aria-label="Sections">${button('home','Événements','','nav-section-button')}${button('my-entries','Mes inscriptions','','nav-section-button')}</div>`;syncNavSection(state.page);notifyNav();}
@@ -89,6 +57,6 @@ function eventCard({event,next,archived,end}){
   const totalPilots=pilotCount((event.departures||[]).flatMap(departure=>departure.availability||[]));
   const untilNext=displayNext?displayNext.startsAt-Date.now():Infinity,statusClass=archived?'finished':displayNext&&untilNext<=3600000?'soon':'upcoming';
   const status=archived?`Tous les départs ont eu lieu · ${esc(dateLabel({startsAt:end}))}`:displayNext?`Prochain départ avec pilotes : ${esc(dateLabel(displayNext))} à ${esc(displayTime(displayNext.time))} · <span data-countdown="${displayNext.startsAt}">${countdown(displayNext.startsAt)}</span>`:next?'Aucun départ à venir avec pilote inscrit':'Dates à confirmer';
-  return `<button class="event-card event-card-harmonized event-type-${event.eventType||'private'} ${archived?'archived':''}" data-action="open" data-id="${event.id}"><span class="event-card-body event-card-layout"><span class="event-card-main"><span class="event-card-title-row"><span class="event-name">${esc(event.name)}</span></span><span class="event-compact-date">${eventWhen(event,archived)}</span><span class="event-info">${eventTypeBadge(event.eventType)}${schedulePendingBadge(event)}${situationBadge(event,archived)}<span class="event-pilot-count">${totalPilots} pilote${totalPilots===1?'':'s'} inscrit${totalPilots===1?'':'s'}</span></span><span class="event-category-badges">${event.categories.map(category=>eventBadge(category,eventCategoryCount(event,category))).join('')}</span></span><span class="event-card-crews">${crewSummary(event,{includePast:archived})||'<span class="event-card-no-crew">Aucun équipage pour l’instant</span>'}</span>${circuitVisual(event.circuit,true)}<span class="event-card-status"><span class="event-countdown ${statusClass}" ${displayNext&&!archived?`data-status-time="${displayNext.startsAt}"`:''}>${status}</span></span></span></button>`;
+  return `<button class="event-card event-card-harmonized event-type-${event.eventType||'private'} ${archived?'archived':''}" data-action="open" data-id="${event.id}"><span class="event-card-body event-card-layout"><span class="event-card-main"><span class="event-card-title-row"><span class="event-name">${esc(event.name)}</span></span><span class="event-compact-date">${eventWhen(event,archived)}</span><span class="event-info">${eventTypeBadge(event.eventType)}${schedulePendingBadge(event)}${situationBadge(event,archived)}<span class="event-pilot-count">${totalPilots} pilote${totalPilots===1?'':'s'} inscrit${totalPilots===1?'':'s'}</span></span><span class="event-category-badges">${event.categories.map(category=>eventBadge(category,eventCategoryCount(event,category))).join('')}</span></span>${circuitVisual(event.circuit,true)}<span class="event-card-status"><span class="event-countdown ${statusClass}" ${displayNext&&!archived?`data-status-time="${displayNext.startsAt}"`:''}>${status}</span></span></span></button>`;
 }
 export function renderHome(message=''){state.page='home';state.currentEventId=null;state.editingEvent=null;state.drafts={};state.registrationOpen.clear();const hasMine=state.events.some(event=>mySituation(event));if(state.eventFilter==='mine'&&!hasMine)state.eventFilter='upcoming';const mineOnly=state.eventFilter==='mine';const groups=groupEvents(mineOnly?state.events.filter(event=>mySituation(event)):state.events,mineOnly?'upcoming':state.eventFilter);const filters=`<div class="event-filter" role="group" aria-label="Filtrer les événements">${button('event-filter','À venir',`data-filter="upcoming" aria-pressed="${state.eventFilter==='upcoming'}"`,'event-filter-button')}${hasMine?button('event-filter','Mes courses',`data-filter="mine" aria-pressed="${state.eventFilter==='mine'}"`,'event-filter-button'):''}${button('event-filter','Archivés',`data-filter="archived" aria-pressed="${state.eventFilter==='archived'}"`,'event-filter-button')}</div>`;app.innerHTML=`<div class="page-head"><h1 class="page-title">ÉVÉNEMENTS</h1>${filters}${canManage()?`<div class="home-create-event">${button('create','Ajouter un évènement','','primary-button')}</div>`:''}</div>${message?`<p class="creation-success" role="status">${esc(message)}</p>`:''}${!state.user&&state.events.some(event=>event.departures.some(departure=>departure.availability.some(reg=>reg.mine||reg.managed)))?`<div class="toolbar home-toolbar">${button('guest-link','Mon lien personnel')}</div>`:''}${groups.length?`<div class="event-agenda">${groups.map(group=>`<section class="event-period" aria-labelledby="period-${group.key}"><h2 class="event-period-heading" id="period-${group.key}"><span>${esc(group.label)}</span><small>${group.items.length} événement${group.items.length>1?'s':''}</small></h2><div class="event-list">${group.items.map(eventCard).join('')}</div></section>`).join('')}</div>`:`<div class="empty">${state.eventFilter==='upcoming'?'Aucun événement à venir.':'Aucun événement archivé.'}</div>`}`;showRecoveryLink();notifyRender();}
