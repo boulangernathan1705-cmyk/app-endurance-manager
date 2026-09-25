@@ -1,3 +1,4 @@
+import {timeLabel} from '../dates.mjs';
 import {app,state,esc,button,canManage,CATEGORIES,EVENT_TYPES,CIRCUITS,categories,logo,notifyRender} from './core.mjs';
 
 // A start = a date (native calendar, opened on click) and a time chosen from hour / minute lists
@@ -39,7 +40,7 @@ export function fillEventRecap(form){
   const value=name=>form.elements[name]?.value||'';
   const selectedText=name=>form.elements[name]?.selectedOptions?.[0]?.textContent||'—';
   const cats=[...form.querySelectorAll('[name="eventCategory"]:checked')].map(input=>input.value);
-  const deps=[...form.querySelectorAll('.departure-field')].map(row=>{const date=row.querySelector('[name="date"]').value,time=row.querySelector('[name="time"]').value;return date?`${parisDate.format(new Date(`${date}T00:00:00Z`))} · ${time}`:'';}).filter(Boolean);
+  const deps=[...form.querySelectorAll('.departure-field')].map(row=>{const date=row.querySelector('[name="date"]').value,time=row.querySelector('[name="time"]').value;return date?`${parisDate.format(new Date(`${date}T00:00:00Z`))} · ${timeLabel(time)}`:'';}).filter(Boolean);
   const row=(step,label,content)=>`<button type="button" class="registration-summary-row" data-action="event-step" data-step="${step}"><span>${label}</span><strong>${content}</strong><em>Modifier</em></button>`;
   recap.innerHTML=row(1,'Course',`${esc(value('eventName')||'—')} · ${esc(value('eventDuration'))} h`)+row(1,'Type',esc(selectedText('eventType'))+(form.elements.eventSchedulePending?.checked?' · Horaires à confirmer':''))+row(1,'Circuit',esc(value('eventCircuit')?selectedText('eventCircuit'):'—'))+row(2,'Catégories',cats.length?cats.map(category=>`${logo(category)} ${esc(category)}`).join(' '):'—')+row(3,'Départs',deps.length?esc(deps.join(' · ')):'—');
 }

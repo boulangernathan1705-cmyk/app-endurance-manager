@@ -1,3 +1,4 @@
+import {dateBlock,timeLabel} from '../dates.mjs';
 import {eventSchedule} from '../schedule.mjs';
 import {
   app,
@@ -15,16 +16,8 @@ import {crewAvailability,pilotLines} from './crews.mjs';
 import {getLocale,localeTag} from '../i18n.mjs';
 
 
-const weekdayFormat = new Intl.DateTimeFormat(localeTag(), {timeZone:'Europe/Paris', weekday:'short'});
-const dayFormat = new Intl.DateTimeFormat(localeTag(), {timeZone:'Europe/Paris', day:'numeric'});
-const monthFormat = new Intl.DateTimeFormat(localeTag(), {timeZone:'Europe/Paris', month:'short'});
-
 // Same date block as the race cards, for this entry's own start.
-function departureDateBlock(departure) {
-  const stamp = new Date(Number(departure.startsAt));
-  if (!Number.isFinite(stamp.getTime())) return '<span class="race-date is-unknown"><strong>?</strong><small>Date à confirmer</small></span>';
-  return `<span class="race-date"><small>${esc(weekdayFormat.format(stamp))}</small><strong>${esc(dayFormat.format(stamp))}</strong><small>${esc(monthFormat.format(stamp))}</small></span>`;
-}
+const departureDateBlock = departure => dateBlock(departure.startsAt);
 
 function categoryIndex(event, category) {
   const index = event.categories.indexOf(category);
@@ -98,7 +91,7 @@ function card({event,departure,reg}) {
         ${reg.managed?`<strong class="ux-managed-entry-name">${esc(reg.name)}</strong>`:''}
         <h2 class="event-name">${esc(event.name)}</h2>
         <span class="race-meta">${esc(circuitLabel(event.circuit))} · ${event.durationHours||6} h</span>
-        <span class="race-badges">${eventTypeBadge(event.eventType)}${badge(reg.category)}<span class="race-start">Départ ${esc(departure.time||'')}</span>${situation}</span>
+        <span class="race-badges">${eventTypeBadge(event.eventType)}${badge(reg.category)}<span class="race-start">Départ ${esc(timeLabel(departure.time))}</span>${situation}</span>
       </span>${circuitVisual(event.circuit,true)}</span>
       <button type="button" class="primary-button native-my-entry-open-event" data-action="open" data-id="${event.id}" data-departure="${departure.id}">Voir la course</button>
     </summary>

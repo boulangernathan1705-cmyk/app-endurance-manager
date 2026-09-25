@@ -1,5 +1,5 @@
 import {CARS} from './shared/catalog.mjs';
-import {dateLabel} from './front/schedule.mjs';
+import {shortDateLabel,timeLabel} from './front/dates.mjs';
 import {renderAvailabilityTimeline} from './front/timeline.mjs';
 
 const app = document.getElementById('app');
@@ -178,7 +178,7 @@ function panelMarkup(event) {
   const nav = `<div class="registration-step-nav">${step > 1 ? `<button type="button" class="secondary-button registration-back" data-crew-builder-step="${step - 1}">Retour</button>` : ''}${step < 3 ? `<button type="button" class="primary-button registration-next" data-crew-builder-step="${step + 1}">Continuer</button>` : `<button type="submit" class="primary-button registration-next" data-crew-builder-submit>${submitLabel()}</button>`}</div>`;
   const steps = ['Équipage', 'Pilotes', 'Récapitulatif'];
   return `<div class="crew-builder-overlay" data-crew-builder-overlay><section class="crew-builder-panel registration-sheet" data-crew-builder-panel role="dialog" aria-modal="true" aria-labelledby="crew-builder-title">
-    <div class="registration-workspace-head"><div class="registration-workspace-title"><h2 id="crew-builder-title" tabindex="-1">${title}</h2><p>${esc(event.name)} · ${esc(dateLabel(departure))} · ${esc(departure.time)}</p></div><span class="registration-workspace-actions"><button type="button" class="secondary-button registration-close-button" data-crew-builder-cancel>Fermer</button></span></div>
+    <div class="registration-workspace-head"><div class="registration-workspace-title"><h2 id="crew-builder-title" tabindex="-1">${title}</h2><p>${esc(event.name)} · ${esc(shortDateLabel(departure.startsAt))} · ${esc(timeLabel(departure.time))}</p></div><span class="registration-workspace-actions"><button type="button" class="secondary-button registration-close-button" data-crew-builder-cancel>Fermer</button></span></div>
     <form class="crew-builder-form registration-stepper" data-crew-builder-form data-step="${step}">
       <div class="registration-progress" aria-hidden="true">${steps.map((_, index) => `<span class="${index < step ? 'done' : ''}"></span>`).join('')}</div>
       <p class="registration-step-label">Étape ${step} sur 3 · ${steps[step - 1]}</p>

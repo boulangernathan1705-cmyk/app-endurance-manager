@@ -20,14 +20,14 @@ test('every duration from 1 to 24 keeps all hourly intervals, final boundary and
 });
 test('real interval labels handle half hours, midnight and both Paris clock changes', () => {
   assert.equal(raceHourLabel(departure,0),'22h30');
-  assert.equal(raceHourLabel(departure,2),'00h30');
-  assert(renderAvailabilityTimeline({departure,duration:2}).includes('23h30 → 00h30'));
+  assert.equal(raceHourLabel(departure,2),'0h30');
+  assert(renderAvailabilityTimeline({departure,duration:2}).includes('23h30 → 0h30'));
   const spring = {startsAt:Date.parse('2026-03-29T00:00:00Z')};
-  assert.equal(raceHourLabel(spring,0),'01h');
-  assert.equal(raceHourLabel(spring,1),'03h');
+  assert.equal(raceHourLabel(spring,0),'1h');
+  assert.equal(raceHourLabel(spring,1),'3h');
   const autumn = {startsAt:Date.parse('2026-10-25T00:00:00Z')};
-  assert.equal(raceHourLabel(autumn,0),'02h');
-  assert.equal(raceHourLabel(autumn,1),'02h');
+  assert.equal(raceHourLabel(autumn,0),'2h');
+  assert.equal(raceHourLabel(autumn,1),'2h');
   const html=renderAvailabilityTimeline({departure:autumn,duration:2});
   assert(html.includes('UTC+2'));assert(html.includes('UTC+1'));
 });

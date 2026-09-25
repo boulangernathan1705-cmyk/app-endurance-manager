@@ -1,19 +1,13 @@
 import {app,nav,state,activeGame,esc,button,canManage,circuitLabel,eventTypeBadge,schedulePendingBadge,eventBadge,eventCategoryCount,circuitVisual,dateLabel,countdown,groupEvents,notifyRender,notifyNav} from './core.mjs';
-import {getLocale,localeTag} from '../i18n.mjs';
+import {dateBlock,dayLabel,timeLabel} from '../dates.mjs';
 
-const weekdayFormatter=new Intl.DateTimeFormat(localeTag(),{timeZone:'Europe/Paris',weekday:'short'});
-
-const monthFormatter=new Intl.DateTimeFormat(localeTag(),{timeZone:'Europe/Paris',month:'short'});
-const dayNumberFormatter=new Intl.DateTimeFormat(localeTag(),{timeZone:'Europe/Paris',day:'numeric'});
 const dayKeyFormatter=new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Paris',year:'numeric',month:'2-digit',day:'2-digit'});
 function datedDepartures(event){return (event.departures||[]).filter(d=>Number.isFinite(Number(d.startsAt))).sort((a,b)=>Number(a.startsAt)-Number(b.startsAt));}
 // Date block of a race card: the day of the next start (the last one for archived races); times are listed below.
 export function raceDateBlock(event,archived){
   const dated=datedDepartures(event),upcoming=dated.filter(d=>Number(d.startsAt)>Date.now());
   const shown=archived||!upcoming.length?dated.at(-1):upcoming[0];
-  if(!shown)return `<span class="race-date is-unknown"><strong>?</strong><small>Date à confirmer</small></span>`;
-  const stamp=new Date(Number(shown.startsAt));
-  return `<span class="race-date"><small>${esc(weekdayFormatter.format(stamp))}</small><strong>${esc(dayNumberFormatter.format(stamp))}</strong><small>${esc(monthFormatter.format(stamp))}</small></span>`;
+  return dateBlock(shown?.startsAt);
 }
 // Start times grouped by day ("sam. 26 · 05h 12h 16h"), all shown alike.
 export function raceStarts(event,archived){
@@ -23,10 +17,9 @@ export function raceStarts(event,archived){
   const days=new Map();
   for(const departure of shown){const key=dayKeyFormatter.format(new Date(Number(departure.startsAt)));if(!days.has(key))days.set(key,[]);days.get(key).push(departure);}
   const entries=[...days.values()],visible=entries.slice(0,3),hidden=entries.length-visible.length;
-  const time=departure=>`<span class="race-start">${esc(displayTime(departure.time))}</span>`;
-  return `<span class="race-starts">${visible.map(list=>{const stamp=new Date(Number(list[0].startsAt));return `<span class="race-day"><em>${esc(weekdayFormatter.format(stamp))} ${esc(dayNumberFormatter.format(stamp))}</em>${list.map(time).join('')}</span>`;}).join('')}${hidden>0?`<span class="race-day race-more">+ ${hidden} jour${hidden>1?'s':''}</span>`:''}</span>`;
+  const time=departure=>`<span class="race-start">${esc(timeLabel(departure.time))}</span>`;
+  return `<span class="race-starts">${visible.map(list=>`<span class="race-day"><em>${esc(dayLabel(list[0].startsAt))}</em>${list.map(time).join('')}</span>`).join('')}${hidden>0?`<span class="race-day race-more">+ ${hidden} jour${hidden>1?'s':''}</span>`:''}</span>`;
 }
-function displayTime(value){const match=String(value||'').match(/^(\d{1,2}):(\d{2})$/);if(!match)return String(value||'').trim();if(getLocale()==='en')return`${String(Number(match[1])).padStart(2,'0')}:${match[2]}`;return match[2]==='00'?`${Number(match[1])}h`:`${Number(match[1])}h${match[2]}`;}
 // Where the current pilot stands on a race: their next start with a registration, and their crew if any.
 export function mySituation(event,{includePast=false}={}){
   const now=Date.now();
@@ -45,7 +38,7 @@ export function mySituation(event,{includePast=false}={}){
 function situationBadge(event,archived){
   const mine=mySituation(event,{includePast:archived});
   if(!mine)return '';
-  const when=(event.departures||[]).length>1?` · ${esc(displayTime(mine.departure.time))}`:'';
+  const when=(event.departures||[]).length>1?` · ${esc(timeLabel(mine.departure.time))}`:'';
   return mine.crew
     ?`<span class="event-situation is-crew">✓ Équipage ${esc(mine.crew.name)} · ${esc(mine.reg.category)}${when}</span>`
     :`<span class="event-situation is-registered">Inscrit · ${esc((mine.categories||[mine.reg.category]).join(' / '))}${when} · sans équipage</span>`;
@@ -63,7 +56,7 @@ export function showRecoveryLink(){if(!state.recoveryLink)return;app.insertAdjac
 function eventCard({event,next,archived,end}){
   const registered=registeredRaceStatus(event);const displayNext=registered.next;
   const untilNext=displayNext?displayNext.startsAt-Date.now():Infinity,statusClass=archived?'finished':displayNext&&untilNext<=3600000?'soon':'upcoming';
-  const status=archived?`Tous les départs ont eu lieu · ${esc(dateLabel({startsAt:end}))}`:displayNext?`Prochain départ avec pilotes : ${esc(dateLabel(displayNext))} à ${esc(displayTime(displayNext.time))} · <span data-countdown="${displayNext.startsAt}">${countdown(displayNext.startsAt)}</span>`:next?'Aucun départ à venir avec pilote inscrit':'Dates à confirmer';
+  const status=archived?`Tous les départs ont eu lieu · ${esc(dateLabel({startsAt:end}))}`:displayNext?`Prochain départ avec pilotes : ${esc(dateLabel(displayNext))} à ${esc(timeLabel(displayNext.time))} · <span data-countdown="${displayNext.startsAt}">${countdown(displayNext.startsAt)}</span>`:next?'Aucun départ à venir avec pilote inscrit':'Dates à confirmer';
   const situation=`${schedulePendingBadge(event)}${situationBadge(event,archived)}`;
   return `<button class="event-card event-card-harmonized race-card event-type-${event.eventType||'private'} ${archived?'archived':''}" data-action="open" data-id="${event.id}"><span class="event-card-body race-card-body"><span class="race-card-content"><span class="race-card-top">${raceDateBlock(event,archived)}<span class="race-head"><span class="event-name">${esc(event.name)}</span><span class="race-meta">${esc(circuitLabel(event.circuit))} · ${Number(event.durationHours)||6} h</span>${eventTypeBadge(event.eventType)}</span></span>${raceStarts(event,archived)}${situation?`<span class="race-situation">${situation}</span>`:''}<span class="race-fill"><span class="event-category-badges">${event.categories.map(category=>eventBadge(category,eventCategoryCount(event,category))).join('')}</span></span></span><span class="race-card-circuit" aria-hidden="true">${circuitVisual(event.circuit,true)}</span><span class="event-card-status"><span class="event-countdown ${statusClass}" ${displayNext&&!archived?`data-status-time="${displayNext.startsAt}"`:''}>${status}</span></span></span></button>`;
 }

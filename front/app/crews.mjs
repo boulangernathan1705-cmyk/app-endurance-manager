@@ -1,3 +1,4 @@
+import {timeLabel} from '../dates.mjs';
 import {state,esc,button,logo,registrationCarLabel,renderAvailabilityTimeline,crewColorClass,sortedCrews,coversHour,pilotCount,api} from './core.mjs';
 import {renderRegistration} from './registration.mjs';
 
@@ -6,7 +7,7 @@ function statusPill(crew){return `<span class="crew-compact-status ${crew.locked
 function coverage(event,departure,regs){const duration=event.durationHours||6;const counts=Array.from({length:duration},(_,i)=>regs.filter(reg=>coversHour(reg,i)).length);const covered=counts.filter(Boolean).length;return{duration,counts,covered,missing:Math.max(0,duration-covered)};}
 
 // Opened crew: each pilot's timeline with its own hour scale, and a warning listing the hours nobody covers.
-function hourLabel(departure,offset){const [hours,minutes]=String(departure.time||'0:00').split(':').map(Number);const hour=((hours||0)+offset)%24;return minutes?`${String(hour).padStart(2,'0')}h${String(minutes).padStart(2,'0')}`:`${String(hour).padStart(2,'0')}h`;}
+function hourLabel(departure,offset){const [hours,minutes]=String(departure.time||'0:00').split(':').map(Number);return timeLabel(`${((hours||0)+offset)%24}:${String(minutes||0).padStart(2,'0')}`);}
 function uncoveredRanges(counts){
   const ranges=[];
   counts.forEach((count,index)=>{if(count)return;const last=ranges.at(-1);if(last&&last.end===index)last.end=index+1;else ranges.push({start:index,end:index+1});});

@@ -1031,3 +1031,50 @@ html[data-game] #app .my-entry-column .crew-pilot-lines { margin-top: 0 !importa
   html[data-game] #app .my-entry-column + .my-entry-column { border-left: 0; border-top: 1px solid rgba(255, 255, 255, .08); }
 }
 html[data-game] #app .my-entry-column .crew-pilot-line { background: none !important; border-radius: 0 !important; box-shadow: none !important; padding-left: 0 !important; padding-right: 0 !important; }
+
+/* ---------- Dates : un seul bloc de date partout (front/dates.mjs) ---------- */
+.race-date {
+  width: 62px;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 6px 0 8px;
+  border: 1px solid rgba(255, 255, 255, .16);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, .03);
+  line-height: 1.15;
+  box-sizing: border-box;
+}
+.race-date small { font-size: 12px; color: #aab3b6; text-transform: lowercase; }
+.race-date strong { font-size: 26px; font-weight: 800; color: #f4f6f5; }
+.race-date.is-unknown small { text-align: center; font-size: 11px; padding: 0 4px; }
+.race-start {
+  display: inline-block;
+  min-width: 42px;
+  padding: 3px 8px;
+  border: 1px solid rgba(255, 255, 255, .14);
+  border-radius: 7px;
+  text-align: center;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #e6ecea;
+  box-sizing: border-box;
+}
+/* Version compacte : titre de chaque départ d'une course. */
+.race-date.is-compact { width: 46px; padding: 3px 0 4px; border-radius: 8px; }
+.race-date.is-compact small { font-size: 10.5px; }
+.race-date.is-compact strong { font-size: 18px; }
+html[data-game] #app .departure-fold .fold-date { flex-direction: row !important; align-items: center !important; gap: 12px; }
+html[data-game] #app .departure-fold > summary > .fold-index { align-self: center !important; }
+html[data-game] #app .departure-fold .fold-date-text { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-width: 0; }
+
+/* Accueil : le prochain départ est présenté comme une carte de course. */
+.hub-race-top { display: flex; align-items: flex-start; gap: 14px; margin: 8px 0 18px; }
+.hub-race-head { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+.hub-race-top .hub-next-race h3,
+.hub-race-head h3 { margin: 0 !important; }
+.hub-race-head .hub-race-meta { margin: 0 !important; }
+html[data-game] #app .departure-fold .race-date.is-compact { align-items: center !important; text-align: center !important; }
+/* Un compte à rebours ne se coupe jamais en deux lignes. */
+[data-countdown] { white-space: nowrap; }

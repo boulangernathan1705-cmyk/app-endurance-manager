@@ -1,4 +1,6 @@
-import {app,state,esc,button,carPreferenceChoices,registrationCarLabel,renderAvailabilityTimeline,notifyRender,logo,categories,dateLabel} from './core.mjs';
+import {raceHourLabel} from '../timeline.mjs';
+import {shortDateLabel,timeLabel} from '../dates.mjs';
+import {app,state,esc,button,carPreferenceChoices,registrationCarLabel,renderAvailabilityTimeline,notifyRender,logo,categories} from './core.mjs';
 import {getLocale} from '../i18n.mjs';
 
 export function ownRegistrations(departure) { return departure.availability.filter(reg => reg.mine); }
@@ -81,8 +83,8 @@ function hoursSummary(status,departure,duration){
   if(status==='whole')return `Toute la course (${duration} h)`;
   const hours=String(status||'').split(',').filter(part=>/^h\d+$/.test(part)).map(part=>Number(part.slice(1))).sort((a,b)=>a-b);
   if(!hours.length)return 'Aucune heure choisie';
-  const startHour=Number(String(departure.time||'0').split(':')[0])||0;
-  const clock=offset=>`${String((startHour+offset)%24).padStart(2,'0')}h`;
+  // Same hour labels as the timeline (minutes of the start and clock changes included).
+  const clock=offset=>raceHourLabel(departure,offset);
   const ranges=[];let first=hours[0],previous=first;
   for(const hour of [...hours.slice(1),null]){
     if(hour!==null&&hour===previous+1){previous=hour;continue;}
@@ -129,7 +131,7 @@ function registrationTitle(event,departure,stateDraft){
 export function renderRegistrationWorkspace(event,departure) {
   const stateDraft=draftFor(departure);
   const addCategory=renderAddCategoryAction(event,departure,stateDraft);
-  const when=`${esc(event.name)} · ${esc(dateLabel(departure))} · ${esc(departure.time||'')}`;
+  const when=`${esc(event.name)} · ${esc(shortDateLabel(departure.startsAt))} · ${esc(timeLabel(departure.time))}`;
   return `<div class="registration-sheet" role="dialog" aria-modal="true" aria-labelledby="registration-title-${departure.id}"><div class="registration-workspace-head"><div class="registration-workspace-title"><h2 id="registration-title-${departure.id}" tabindex="-1">${registrationTitle(event,departure,stateDraft)}</h2><p>${when}</p></div><span class="registration-workspace-actions">${addCategory}${button('close-registration','Fermer',`data-departure="${departure.id}" aria-label="Fermer l’inscription"`,'secondary-button registration-close-button')}</span></div>${renderSteppedRegistration(event,departure,stateDraft)}</div>`;
 }
 
