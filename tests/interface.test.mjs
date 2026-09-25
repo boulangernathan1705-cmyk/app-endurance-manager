@@ -174,15 +174,14 @@ test('le formulaire inscription est unique et compact',()=>{
   assert.match(registration,/pilot-category-logo/);
 });
 
-test('Mes inscriptions restaure les grilles de 1 à 3 colonnes et les visuels catégorie',()=>{
+test('Mes inscriptions reprend la carte de course et les frises d’équipage',()=>{
   const entries=read('front/app/entries-view.mjs');
-  assert.match(entries,/native-my-entry-card/);
+  assert.match(entries,/native-my-entry-card race-card/);
   assert.match(entries,/Mes inscriptions personnelles/);
   assert.match(entries,/Inscriptions que je gère/);
   assert.match(entries,/Pilotes sans équipage/);
-  assert.match(entries,/function pilotGridClass\(count\)/);
-  assert.match(entries,/ux-my-pilot-grid-/);
+  assert.match(entries,/departureDateBlock\(departure\)/);
+  assert.match(entries,/crewAvailability\(event,departure,members,\{editable:false\}\)/);
   assert.match(entries,/ux-my-other-crews-grid/);
-  assert.match(entries,/pilot-category-logo/);
   assert.match(entries,/categories\[crew\.category\]\?\.css/);
 });

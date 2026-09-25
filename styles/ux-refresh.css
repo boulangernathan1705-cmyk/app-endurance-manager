@@ -1028,3 +1028,40 @@ html[data-game] #app .crew-pilot-line .presence-timeline { margin: 0 !important;
 html[data-game] #app .crew-pilot-line .presence-edges { display: none !important; }
 html[data-game] #app .crew-pilot-line .presence-track,
 html[data-game] #app .crew-pilot-line .presence-segment { height: 12px !important; min-height: 0 !important; font-size: 0 !important; }
+
+/* =====================================================================
+   Mes inscriptions : même en-tête que la carte de course, frises d'équipage.
+   ===================================================================== */
+html[data-game] #app .my-entry-race > .native-my-entry-header {
+  display: flex !important;
+  align-items: center !important;
+  gap: 14px !important;
+  padding: 14px 16px !important;
+  grid-template-columns: none !important;
+  min-height: 0 !important;
+}
+html[data-game] #app .my-entry-race .race-card-top { flex: 1; min-width: 0; display: flex; align-items: stretch; gap: 14px; }
+html[data-game] #app .my-entry-race .race-head { justify-content: center; gap: 4px; }
+html[data-game] #app .my-entry-race .race-head h2.event-name { margin: 0 !important; }
+html[data-game] #app .my-entry-race .race-badges { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+html[data-game] #app .my-entry-race .race-badges .event-category-badge { padding: 2px 8px !important; font-size: 12px !important; }
+html[data-game] #app .my-entry-race .race-badges .departure-mine-badge { margin-top: 0; }
+html[data-game] #app .my-entry-race .race-card-top > .circuit-visual { position: static !important; width: 120px !important; height: 78px !important; margin: 0 !important; align-self: center; transform: none !important; }
+html[data-game] #app .my-entry-race .race-card-top > .circuit-visual img { width: 100% !important; height: 100% !important; object-fit: contain !important; transform: none !important; }
+html[data-game] #app .my-entry-race .native-my-entry-open-event { flex: none; width: auto !important; }
+.departure-mine-badge.is-waiting { border-color: rgba(228, 195, 65, .7); background: rgba(228, 195, 65, .1); color: #f0d77a; }
+html[data-game] #app .my-entry-race .ux-my-own-crew .crew-pilot-lines,
+html[data-game] #app .my-entry-race .ux-my-awaiting-crew .crew-pilot-lines { margin-top: 8px; }
+@media (max-width: 760px) {
+  html[data-game] #app .my-entry-race > .native-my-entry-header { flex-wrap: wrap !important; }
+  html[data-game] #app .my-entry-race .race-card-top > .circuit-visual { width: 72px !important; height: 56px !important; }
+  html[data-game] #app .my-entry-race .native-my-entry-open-event { flex: 1 1 100%; }
+}
+@media (max-width: 760px) {
+  html[data-game] #app .my-entry-race > .native-my-entry-header { position: relative; padding: 12px !important; }
+  html[data-game] #app .my-entry-race .native-my-entry-toggle { position: absolute; top: 10px; right: 10px; }
+  html[data-game] #app .my-entry-race .race-card-top { padding-right: 36px; gap: 12px; }
+  html[data-game] #app .my-entry-race .race-card-top > .circuit-visual { display: none !important; }
+  html[data-game] #app .my-entry-race .race-date { width: 56px; }
+  html[data-game] #app .my-entry-race .race-head h2.event-name { font-size: 19px !important; }
+}
