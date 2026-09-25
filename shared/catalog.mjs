@@ -16,10 +16,12 @@ const LMU_CIRCUITS = [
   {id:'interlagos',name:'Interlagos',file:'track-placeholder.svg'},
   {id:'laguna-seca',name:'WeatherTech Raceway Laguna Seca',file:'track-placeholder.svg'},
   {id:'le-mans',name:'Circuit de la Sarthe (Le Mans)',file:'track-placeholder.svg'},
+  {id:'long-beach',name:'Long Beach Street Circuit',file:'track-placeholder.svg'},
   {id:'lusail',name:'Lusail International Circuit',file:'track-placeholder.svg'},
   {id:'monza',name:'Autodromo Nazionale Monza',file:'track-placeholder.svg'},
   {id:'paul-ricard',name:'Circuit Paul Ricard',file:'track-placeholder.svg'},
   {id:'portimao',name:'Algarve International Circuit (Portimão)',file:'track-placeholder.svg'},
+  {id:'road-atlanta',name:'Michelin Raceway Road Atlanta',file:'track-placeholder.svg'},
   {id:'sebring',name:'Sebring International Raceway',file:'track-placeholder.svg'},
   {id:'silverstone',name:'Silverstone Circuit',file:'track-placeholder.svg'},
   {id:'spa',name:'Circuit de Spa-Francorchamps',file:'track-placeholder.svg'}
