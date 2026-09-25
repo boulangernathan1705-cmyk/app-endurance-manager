@@ -944,3 +944,19 @@ html[data-game] #app .race-header .event-header-stats .event-category-copy { dis
 html[data-game] #app .race-header .event-header-countdown { display: inline !important; }
 html[data-game] #app .race-header .event-header-countdown strong { display: inline !important; margin: 0 0 0 4px !important; font-size: inherit !important; }
 html[data-game] #app .race-header .event-header-countdown { text-align: left !important; width: auto !important; }
+
+/* Carte plus basse : carré de date à la hauteur du bloc nom / circuit / type, circuit calé dessus. */
+html[data-game] .race-card .race-card-body { gap: 10px !important; padding: 14px 16px !important; }
+html[data-game] .race-card .race-card-top { align-items: stretch !important; gap: 14px; }
+html[data-game] .race-card .race-date { justify-content: center; padding: 4px 0 !important; }
+html[data-game] .race-card .race-head { justify-content: center; gap: 3px !important; }
+html[data-game] .race-card .race-card-top > .circuit-visual { width: 130px !important; height: 78px !important; align-self: center; }
+html[data-game] .race-card .race-starts { padding-top: 8px !important; gap: 4px !important; }
+html[data-game] .race-card .race-fill { margin-top: 0 !important; }
+
+html[data-game] #app .race-header .race-card-top { align-items: stretch !important; }
+html[data-game] #app .race-header .race-date { justify-content: center; padding: 6px 0 !important; }
+html[data-game] #app .race-header .race-head { justify-content: center; }
+@media (max-width: 600px) {
+  html[data-game] .race-card .race-card-top > .circuit-visual { width: 80px !important; height: 60px !important; }
+}
