@@ -93,7 +93,10 @@ const paths = [
   ...stylesheetPaths(sourceDiagnostics,'diagnostics.html'),
   ...stylesheetPaths(sourceHelp,'help.html')
 ];
-const uniqueStylesheetPaths = [...new Set(paths)];
+// styles/ux-refresh.css is the final layer that replaces older rules: keep it last in the
+// shared bundle whichever page lists it first.
+const FINAL_LAYER = 'styles/ux-refresh.css';
+const uniqueStylesheetPaths = [...new Set(paths)].sort((a, b) => (a === FINAL_LAYER) - (b === FINAL_LAYER));
 
 const cssParts = [];
 for (const path of uniqueStylesheetPaths) cssParts.push(`/* ${path} */\n${await inlineCss(path)}`);

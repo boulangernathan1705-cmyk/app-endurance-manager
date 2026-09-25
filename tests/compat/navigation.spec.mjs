@@ -49,7 +49,7 @@ test('language switch shows the current language, translates event counters and 
   await expect(toggle).toBeVisible();
   await expect(toggle).toContainText('🇫🇷');
   await expect(toggle).toHaveAttribute('data-current-language','fr');
-  await expect(toggle).toHaveAttribute('data-language-placement','hub-topbar');
+  await expect(toggle).toHaveAttribute('data-language-placement','game-space');
   await toggle.click();
   await page.waitForLoadState('networkidle');
   await expect(page.locator('html')).toHaveAttribute('lang','en');
@@ -96,7 +96,7 @@ test('mobile interface stays compact without horizontal overflow across main pag
 
 test('LMU space opens from home', async ({page}) => {
   await openAndCheck(page, '/');
-  const link = page.locator('a[href="/lmu/"]');
+  const link = page.locator('.game-hub-enter[href="/lmu/"]');
   await expect(link).toBeVisible();
   await Promise.all([page.waitForURL('**/lmu/'), link.click()]);
   await page.waitForLoadState('networkidle');
@@ -106,7 +106,7 @@ test('LMU space opens from home', async ({page}) => {
 
 test('iRacing space opens from home', async ({page}) => {
   await openAndCheck(page, '/');
-  const link = page.locator('a[href="/iracing/"]');
+  const link = page.locator('.game-hub-enter[href="/iracing/"]');
   await expect(link).toBeVisible();
   await Promise.all([page.waitForURL('**/iracing/'), link.click()]);
   await page.waitForLoadState('networkidle');

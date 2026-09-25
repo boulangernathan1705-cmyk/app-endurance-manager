@@ -79,3 +79,9 @@ test('les anciens scripts métier ont réellement disparu du dépôt', async () 
     await assert.rejects(access(new URL(`../${path}`, import.meta.url)), undefined, `${path} doit être supprimé`);
   }
 });
+
+test('the shared CSS bundle ends with the ux-refresh layer', async () => {
+  const build = await read('scripts/build.mjs');
+  assert.match(build, /FINAL_LAYER = 'styles\/ux-refresh\.css'/);
+  assert.match(build, /\.sort\(\(a, b\) => \(a === FINAL_LAYER\) - \(b === FINAL_LAYER\)\)/);
+});

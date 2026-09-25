@@ -12,8 +12,9 @@
 <link rel="stylesheet" href="/styles/members-page.css?v=2-global-topbar">
 <link rel="stylesheet" href="/help.css?v=2-global-page">
 <link rel="stylesheet" href="/styles/legal.css?v=2">
+<link rel="stylesheet" href="/styles/ux-refresh.css?v=24-shared-nav">
 <script type="module" src="/front/account-menu.mjs?v=8-navigation"></script>
-<script type="module" src="/front/help-page.mjs?v=2-pilot-crew-roles"></script>
+<script type="module" src="/front/help-page.mjs?v=3-session-role"></script>
 </head>
 <body>
 <div class="top-stripes" aria-hidden="true"><div></div><div></div><div></div><div></div></div>
@@ -23,18 +24,14 @@
   </picture>
   <div class="header-inner"><a class="brand-button logo" href="/" aria-label="Retour à l’accueil Endurance Manager"><span class="brand-mark-frame" aria-hidden="true"><img class="brand-mark" src="/images/endurance-manager-logo.webp" alt=""></span><span class="brand-copy">ENDURANCE <span>MANAGER</span></span></a></div>
 </header>
-<div class="members-topbar">
-  <div class="members-topbar-inner">
-    <div class="members-context"><strong>AIDE</strong><span>Endurance Manager</span></div>
-    <nav class="members-nav" aria-label="Navigation globale">
-      <a href="/">Accueil</a>
-      <a class="members-lmu" href="/lmu/">Le Mans Ultimate</a>
-      <a class="members-iracing" href="/iracing/">iRacing</a>
-    </nav>
-    <div class="account-bar"><div id="account-menu-root" class="account-menu-root" aria-live="polite"></div></div>
-  </div>
+<div class="site-nav-shell">
+  <div class="game-space-bar"></div>
+  <nav id="navigation" aria-label="Navigation principale">
+    <div class="nav-game-switcher" role="group" aria-label="Changer de simulateur"><a class="nav-game-switcher-button nav-game-switcher-lmu" href="/lmu/"><span class="nav-full">Le Mans Ultimate</span><span class="nav-short">LMU</span></a><a class="nav-game-switcher-button nav-game-switcher-iracing" href="/iracing/"><span class="nav-full">iRacing</span><span class="nav-short">iRacing</span></a></div>
+    <div class="nav-sections" role="group" aria-label="Sections"><a class="nav-section-button" href="/help.html" aria-current="page">Aide</a></div>
+  </nav>
+  <div class="account-bar"><div id="account-menu-root" class="account-menu-root" aria-live="polite"></div></div>
 </div>
-<nav id="navigation" hidden><button type="button" data-action="home">Accueil</button></nav>
 <main id="app"><p role="status">Chargement de l’aide…</p></main>
 <footer class="site-footer"><a href="/legal.html">Informations légales</a><span aria-hidden="true">·</span><a href="/privacy.html">Confidentialité</a></footer>
 </body>

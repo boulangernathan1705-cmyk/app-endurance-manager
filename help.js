@@ -1,24 +1,17 @@
-const HELP_BUTTON_ID = 'help-nav-button';
 const HELP_PAGE_CLASS = 'help-page';
-
-const nav = document.getElementById('navigation');
 const app = document.getElementById('app');
+// Session user given by the page ({id,name,role} or null): the help adapts to the pilot's role.
+let currentUser = null;
 
 function normalizedRole() {
-  const roleText = nav?.querySelector('.account-name small')?.textContent?.trim().toLowerCase() || '';
-  if (roleText.includes('administrateur')) return 'admin';
-  if (roleText.includes('organisateur')) return 'organizer';
-  return 'pilot';
+  const role = currentUser?.role;
+  return role === 'admin' || role === 'organizer' ? role : 'pilot';
 }
 
 function accountLabel(role) {
-  const account = nav?.querySelector('.account-name');
-  if (!account) return 'Utilisation sans connexion';
-  const clone = account.cloneNode(true);
-  clone.querySelector('small')?.remove();
-  const name = clone.textContent.trim();
+  if (!currentUser) return 'Utilisation sans connexion';
   const label = role === 'admin' ? 'Administrateur' : role === 'organizer' ? 'Organisateur' : 'Pilote';
-  return `${name} · ${label}`;
+  return `${currentUser.name} · ${label}`;
 }
 
 function helpScreenshot(name, alt, caption = '') {
@@ -40,7 +33,7 @@ function helpItem(index, title, body, open = false) {
 }
 
 function pilotHelp(role) {
-  const connected = !!nav?.querySelector('.account-name');
+  const connected = !!currentUser;
   const connectionBody = connected
     ? `<p>Tu es connecté avec Discord. Tes inscriptions personnelles sont rattachées à ton compte et peuvent être retrouvées depuis <strong>Mes inscriptions</strong>.</p>${helpScreenshot('pilot-my-entries','Vue réelle de Mes inscriptions dans Endurance Manager','Une fois connecté, tes inscriptions sont regroupées dans « Mes inscriptions ».')}`
     : `<p>Tu peux utiliser Endurance Manager sans compte. Après une inscription, conserve ton <strong>lien personnel</strong> : il permet de retrouver et modifier tes inscriptions sur un autre appareil. Garde ce lien privé.</p><p>La création, la gestion et l’adhésion à un équipage nécessitent une connexion Discord afin de savoir qui en est responsable.</p>${helpScreenshot('pilot-connection','Vue réelle du bouton de connexion Discord dans Endurance Manager','Connecte-toi avec Discord pour gérer directement tes équipages.')}`;
@@ -61,7 +54,6 @@ function pilotHelp(role) {
   ];
 
   return `<section class="${HELP_PAGE_CLASS}">
-    <button type="button" class="secondary-button back-button" id="help-back-button">← Retour aux événements</button>
     <header class="help-hero">
       <span class="help-kicker">ENDURANCE MANAGER</span>
       <h1>AIDE PILOTE</h1>
@@ -101,7 +93,6 @@ function organizerHelp(role) {
     : 'Créer les courses, suivre les inscriptions et superviser les équipages.';
 
   return `<section class="${HELP_PAGE_CLASS}">
-    <button type="button" class="secondary-button back-button" id="help-back-button">← Retour aux événements</button>
     <header class="help-hero">
       <span class="help-kicker">ENDURANCE MANAGER</span>
       <h1>${title}</h1>
@@ -112,16 +103,10 @@ function organizerHelp(role) {
   </section>`;
 }
 
-function backToHome() {
-  const home = nav?.querySelector('[data-action="home"]') || document.querySelector('[data-action="home"]');
-  home?.click();
-}
-
-export function renderHelp() {
+export function renderHelp(user = null) {
   if (!app) return;
+  currentUser = user;
   const role = normalizedRole();
   app.innerHTML = role === 'organizer' || role === 'admin' ? organizerHelp(role) : pilotHelp(role);
-  document.getElementById(HELP_BUTTON_ID)?.setAttribute('aria-current', 'page');
-  document.getElementById('help-back-button')?.addEventListener('click', backToHome, {once:true});
   window.scrollTo({top:0, behavior:'smooth'});
 }

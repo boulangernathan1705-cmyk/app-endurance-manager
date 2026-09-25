@@ -12,15 +12,6 @@ function installLayoutStyles(){
       margin:0;background:rgba(12,18,21,.78)
     }
     .game-space-bar:has(>.language-toggle){justify-content:space-between}
-    .hub-topbar>.language-toggle{
-      grid-column:1;grid-row:1;justify-self:start;align-self:center;
-      width:38px;height:38px;margin:0;box-shadow:none
-    }
-    @media(max-width:800px){
-      .hub-topbar>.language-toggle{grid-column:1;grid-row:1;justify-self:start}
-      .hub-topbar:has(>.language-toggle) .account-bar{grid-column:1;grid-row:1;justify-self:end}
-      .hub-topbar:has(>.language-toggle) .hub-intro{grid-column:1;grid-row:2}
-    }
   `;
   document.head.append(style);
 }
@@ -41,12 +32,6 @@ function placeToggle(){
   if(gameSpace){
     gameSpace.prepend(button);
     button.dataset.languagePlacement='game-space';
-    return true;
-  }
-  const hubTopbar=document.querySelector('.hub-topbar');
-  if(hubTopbar){
-    hubTopbar.prepend(button);
-    button.dataset.languagePlacement='hub-topbar';
     return true;
   }
   return true;
