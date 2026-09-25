@@ -171,6 +171,10 @@ const LEGAL_TEXT=new Map(Object.entries({
 }));
 
 const PATTERNS=[
+  [/^✓ Équipage (.+)$/u,([,rest])=>`✓ Crew ${rest}`],
+  [/^Inscrit · (.+) · sans équipage$/u,([,rest])=>`Registered · ${rest} · no crew`],
+  [/^Aucun pilote (de .+)$/u,([,ranges])=>`No driver ${ranges.replace(/\bde (\S+) à (\S+)/gu,'from $1 to $2')}`],
+  [/^Départ (\d{1,2}[:h]\d{0,2})$/u,([,time])=>`Start ${time}`],
   [/^\+ (\d+) jours?$/u,([,count])=>`+ ${count} day${count==='1'?'':'s'}`],
   [/^\+(\d+) départs?$/u,([,count])=>`+${count} start${count==='1'?'':'s'}`],
   [/^(\d+) inscrit(?:s)?$/u,([,n])=>`${n} driver${n==='1'?'':'s'}`],
