@@ -1,5 +1,5 @@
 import {state,esc,button,logo,registrationCarLabel,renderAvailabilityTimeline,crewColorClass,sortedCrews,coversHour,pilotCount,api} from './core.mjs';
-import {renderRegistration} from './registration.mjs';
+import {renderRegistration,hoursSummary} from './registration.mjs';
 
 function contentSummary(title,count){return `<summary class="ux-content-accordion-summary"><span class="ux-content-accordion-title">${esc(title)}</span><span class="ux-content-accordion-count">${count}</span><span class="ux-content-accordion-chevron" aria-hidden="true">›</span></summary>`;}
 function statusPill(crew){return `<span class="crew-compact-status ${crew.locked?'is-complete':'is-open'}">${crew.locked?'Complet':'Places libres'}</span>`;}
@@ -14,7 +14,7 @@ function crewPlanning(event,departure,regs,cov){
   const rows=regs.map(reg=>{
     const origin=reg.addedByName?`<span class="registration-origin-info" title="Inscription ajoutée par ${esc(reg.addedByName)}" aria-label="Inscription ajoutée par ${esc(reg.addedByName)}">ⓘ</span>`:'';
     const edit=reg.canEdit&&!locked?button('edit-registration','Modifier',`data-id="${reg.id}" data-departure="${departure.id}" aria-label="Modifier l’inscription de ${esc(reg.name)}"`,'link-button crew-planning-edit'):'';
-    return `<div class="crew-planning-row pilot-row${reg.mine?' ux-current-pilot':''}"><span class="crew-planning-label"><span class="pilot-name">${esc(reg.name)}</span>${origin}${edit}</span>${renderAvailabilityTimeline({departure,duration,status:reg.status,label:`Disponibilités de ${reg.name}`})}</div>`;
+    return `<div class="crew-planning-row pilot-row${reg.mine?' ux-current-pilot':''}"><span class="crew-planning-label"><span class="pilot-name">${esc(reg.name)}</span>${origin}${edit}<small class="crew-planning-when">${esc(hoursSummary(reg.status,departure,duration))}</small></span>${renderAvailabilityTimeline({departure,duration,status:reg.status,label:`Disponibilités de ${reg.name}`})}</div>`;
   }).join('');
   return `<div class="crew-planning-scroll"><div class="crew-planning" style="--hours:${duration}"><div class="crew-planning-row crew-planning-scale"><span class="crew-planning-label"></span><span class="crew-planning-hours">${scale}</span></div>${rows||'<p class="empty crew-empty-roster">Aucun pilote n’a encore rejoint cet équipage.</p>'}<div class="crew-planning-row crew-planning-coverage"><span class="crew-planning-label">Couverture <small>${cov.covered}/${duration} h</small></span>${renderAvailabilityTimeline({departure,duration,counts:cov.counts,label:'Disponibilité de l’équipage'})}</div></div></div>`;
 }

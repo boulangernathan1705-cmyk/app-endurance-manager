@@ -1049,3 +1049,28 @@ html[data-game] #app .crew-planning-row:has(.pilot-timeline-tone-11) .pilot-name
 html[data-game] #app .crew-planning .crew-planning-row > .crew-planning-label { grid-column: 1 !important; grid-row: 1 !important; }
 html[data-game] #app .crew-planning .crew-planning-row > .presence-timeline,
 html[data-game] #app .crew-planning .crew-planning-row > .crew-planning-hours { grid-column: 2 !important; grid-row: 1 !important; width: auto !important; }
+
+/* Planning lisible : une case par heure (pleine = présent, grisée = absent) et les horaires en clair. */
+html[data-game] #app .crew-planning .crew-planning-row:not(.crew-planning-scale) { padding: 4px 0 !important; }
+html[data-game] #app .crew-planning .crew-planning-when { flex-basis: 100%; font-size: 12.5px; font-weight: 500; color: #c7d0d4; }
+html[data-game] #app .crew-planning .presence-timeline:not(.is-coverage) .presence-track {
+  display: grid !important;
+  grid-template-columns: repeat(var(--hours), minmax(0, 1fr)) !important;
+  gap: 2px !important;
+  height: 24px !important;
+  background: none !important;
+  border: 0 !important;
+  overflow: visible !important;
+}
+html[data-game] #app .crew-planning .presence-timeline:not(.is-coverage) .presence-segment {
+  height: 24px !important;
+  border: 0 !important;
+  border-radius: 3px !important;
+  background: rgba(255, 255, 255, .06) !important;
+  box-shadow: none !important;
+}
+html[data-game] #app .crew-planning .presence-timeline:not(.is-coverage) .presence-segment.is-present { background: var(--pilot-timeline-color, #8fb6c9) !important; }
+html[data-game] #app .crew-planning .presence-timeline.is-coverage .presence-track { display: grid !important; grid-template-columns: repeat(var(--hours), minmax(0, 1fr)) !important; gap: 2px !important; background: none !important; }
+html[data-game] #app .crew-planning .presence-timeline.is-coverage .presence-segment { border: 0 !important; border-radius: 3px !important; }
+html[data-game] #app .crew-planning-hours { gap: 2px; }
+html[data-game] #app .crew-planning-hours > span { border-left: 0; padding-left: 0; text-align: center; font-size: 12.5px; color: #dfe6e4; }
