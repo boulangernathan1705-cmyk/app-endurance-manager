@@ -147,13 +147,24 @@ test('Équipages est intégré directement dans chaque départ avec actions pilo
 
 test('l’aide décrit les droits pilote organisateur et administrateur actuels',()=>{
   const help=read('help.js');
-  assert.match(help,/créer ton propre équipage après ton inscription/);
+  assert.match(help,/créer ton équipage, rejoindre ou quitter un équipage de ta catégorie/);
   assert.match(help,/gérer l’équipage dont tu es responsable/);
-  assert.match(help,/créer et modifier les événements/);
-  assert.match(help,/créer et gérer tous les équipages/);
-  assert.match(help,/Tu ne peux pas[\s\S]*supprimer définitivement un événement/);
-  assert.match(help,/Supprimer définitivement un événement/);
-  assert.doesNotMatch(help,/Tu ne peux pas[\s\S]*composer ou modifier les équipages/);
+  assert.match(help,/créer et modifier les courses/);
+  assert.match(help,/créer, composer et fermer tous les équipages/);
+  assert.match(help,/Tu ne peux pas[\s\S]*supprimer définitivement une course/);
+  // The help follows the current screens: step windows, date format, automatic updates.
+  assert.match(help,/4 étapes/);
+  assert.match(help,/Mise à jour automatique/);
+  assert.doesNotMatch(help,/Actualiser/);
+});
+
+test('chaque capture de l’aide existe et aucune ancienne capture ne traîne',async()=>{
+  const {readdirSync}=await import('node:fs');
+  const help=read('help.js');
+  const used=new Set([...help.matchAll(/helpScreenshot\('([a-z-]+)'/g)].map(match=>match[1]));
+  const files=new Set(readdirSync(new URL('../images/help/',import.meta.url)).filter(name=>name.endsWith('.jpg')).map(name=>name.replace(/\.jpg$/,'')));
+  for(const name of used)assert.ok(files.has(name),`images/help/${name}.jpg is missing`);
+  for(const name of files)assert.ok(used.has(name),`images/help/${name}.jpg is not used by the help`);
 });
 
 test('les cartes pilotes et équipages utilisent les vrais logos de catégorie',()=>{

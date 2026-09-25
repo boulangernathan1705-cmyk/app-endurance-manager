@@ -33,7 +33,10 @@ export function crewAvailability(event,departure,regs,{editable=true}={}){
 
 function stateControl(crew,departure){return `<div class="crew-state-control"><span class="crew-state-lock" aria-hidden="true">${crew.locked?'🔒':'🔓'}</span><label class="crew-state-select-wrap"><span class="sr-only">État de l’équipage</span><select class="crew-state-select" data-crew-state-select data-crew-id="${crew.id}" data-departure="${departure.id}" data-version="${crew.version}"><option value="open" ${crew.locked?'':'selected'}>Ouvert</option><option value="locked" ${crew.locked?'selected':''}>Complet</option></select><span class="crew-state-chevron" aria-hidden="true">▾</span></label></div>`;}
 
+// Once a start has begun, crews are locked by the server: they stay visible without any action.
+const startHasBegun=departure=>Number(departure.startsAt)<=Date.now();
 function crewActions(crew,departure,ownMember,joinRegistration,memberElsewhere){
+  if(startHasBegun(departure))return '';
   const actions=[];
   if(!ownMember&&!memberElsewhere&&!crew.locked&&state.user){
     const registration=joinRegistration?.id||'';
@@ -58,7 +61,7 @@ function crewCard(event,departure,crew,index,unassigned,allCrews){
   const open=state.crewManagementOpen.has(crew.id);
   const ownerBadge=crew.ownedByMe?'<span class="crew-owner-badge">Responsable</span>':'';
   const countLabel=`${regs.length} pilote${regs.length>1?'s':''} · ${cov.covered}/${cov.duration} h`;
-  const management=crew.canManage
+  const management=crew.canManage&&!startHasBegun(departure)
     ? `<div class="crew-inline-management">${stateControl(crew,departure)}<span class="coverage-summary">${countLabel}</span></div>`
     : `<div class="crew-inline-management is-readonly"><span class="crew-state-readonly ${crew.locked?'is-complete':'is-open'}">${crew.locked?'Complet':'Ouvert'}</span><span class="coverage-summary">${countLabel}</span></div>`;
   const actions=crewActions(crew,departure,ownMember,joinRegistration,memberElsewhere);

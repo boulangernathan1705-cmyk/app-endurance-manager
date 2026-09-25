@@ -6,14 +6,27 @@
 <meta name="referrer" content="no-referrer">
 <title>Informations légales — ENDURANCE MANAGER</title>
 <link rel="icon" href="/images/endurance-manager-logo.webp" type="image/webp">
-<link rel="stylesheet" href="/privacy.css?v=2-legal-hub">
+<link rel="stylesheet" href="/app.css">
+<link rel="stylesheet" href="/privacy.css?v=3-site-theme">
+<script type="module" src="/front/account-menu.mjs?v=8-navigation"></script>
 </head>
 <body>
-<header class="legal-header">
-  <a class="brand" href="/" aria-label="Retour à Endurance Manager"><img src="/images/endurance-manager-logo.webp" alt="" width="48" height="48"><span>ENDURANCE <strong>MANAGER</strong></span></a>
+<div class="top-stripes" aria-hidden="true"><div></div><div></div><div></div><div></div></div>
+<header class="site-hero">
+  <picture class="hero-picture" aria-hidden="true">
+    <img class="hero-banner" src="/images/endurance-manager-banner.webp?v=39-optimized" width="2048" height="512" alt="" fetchpriority="high" decoding="async" draggable="false">
+  </picture>
+  <div class="header-inner"><a class="brand-button logo" href="/" aria-label="Retour à l’accueil Endurance Manager"><span class="brand-mark-frame" aria-hidden="true"><img class="brand-mark" src="/images/endurance-manager-logo.webp" alt=""></span><span class="brand-copy">ENDURANCE <span>MANAGER</span></span></a></div>
 </header>
+<div class="site-nav-shell">
+  <div class="game-space-bar"></div>
+  <nav id="navigation" aria-label="Navigation principale">
+    <div class="nav-game-switcher" role="group" aria-label="Changer de simulateur"><a class="nav-game-switcher-button nav-game-switcher-lmu" href="/lmu/"><span class="nav-full">Le Mans Ultimate</span><span class="nav-short">LMU</span></a><a class="nav-game-switcher-button nav-game-switcher-iracing" href="/iracing/"><span class="nav-full">iRacing</span><span class="nav-short">iRacing</span></a></div>
+    <div class="nav-sections nav-sections-info" role="group" aria-label="Informations"><a class="nav-section-button" href="/about.html">À propos</a><a class="nav-section-button" href="/legal.html" aria-current="page">Informations légales</a><a class="nav-section-button" href="/privacy.html">Confidentialité</a><a class="nav-section-button" href="/circuit-credits.html">Crédits des circuits</a></div>
+  </nav>
+  <div class="account-bar"><div id="account-menu-root" class="account-menu-root" aria-live="polite"></div></div>
+</div>
 <main class="legal-page">
-  <a class="back-link" href="/">← Retour au site</a>
   <h1>Informations légales</h1>
   <p class="updated">Dernière mise à jour : 10 septembre 2026</p>
   <nav class="legal-summary" aria-label="Sommaire des informations légales">
@@ -40,6 +53,6 @@
   <section id="responsabilite"><h2>Utilisation du service</h2><p>Endurance Manager est fourni comme outil d’organisation communautaire. Les organisateurs restent responsables des informations qu’ils saisissent, des événements qu’ils créent et de la composition des équipages.</p><p>Le service peut évoluer, être interrompu ou modifié sans garantie de disponibilité permanente. Aucune fonctionnalité du site ne remplace les règlements officiels des compétitions ou des plateformes de simulation concernées.</p></section>
   <section><h2>Données personnelles</h2><p>Les informations relatives aux comptes, inscriptions, disponibilités, cookies nécessaires et droits des utilisateurs sont détaillées dans la <a href="/privacy.html">politique de confidentialité</a>.</p></section>
 </main>
-<footer class="legal-footer"><a href="/">Endurance Manager</a> · <a href="/circuit-credits.html">Crédits des circuits</a> · <a href="/privacy.html">Confidentialité</a></footer>
+<footer class="site-footer"><a href="/help.html">Aide</a><span aria-hidden="true">·</span><a href="/about.html">À propos & sécurité</a><span aria-hidden="true">·</span><a href="/legal.html">Informations légales</a><span aria-hidden="true">·</span><a href="/circuit-credits.html">Crédits des circuits</a><span aria-hidden="true">·</span><a href="/privacy.html">Confidentialité</a></footer>
 </body>
 </html>

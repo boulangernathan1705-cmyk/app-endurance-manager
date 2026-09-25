@@ -13,6 +13,8 @@
 }
 
 .help-hero {
+  /* A global "header" rule sized for the site banner must not stretch this box. */
+  min-height: 0 !important;
   margin: 0 0 22px;
   padding: 26px 28px;
   border: 1px solid var(--border);
@@ -234,9 +236,12 @@
   margin: 0;
 }
 
+/* Screenshots keep their real size (never stretched): narrow ones stay sharp. */
+.help-screenshot { width: fit-content; max-width: 100%; }
 .help-screenshot img {
   display: block;
-  width: 100%;
+  width: auto;
+  max-width: 100%;
   height: auto;
   max-height: 720px;
   object-fit: contain;
