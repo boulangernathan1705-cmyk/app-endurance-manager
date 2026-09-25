@@ -5,20 +5,29 @@ function contentSummary(title,count){return `<summary class="ux-content-accordio
 function statusPill(crew){return `<span class="crew-compact-status ${crew.locked?'is-complete':'is-open'}">${crew.locked?'Complet':'Places libres'}</span>`;}
 function coverage(event,departure,regs){const duration=event.durationHours||6;const counts=Array.from({length:duration},(_,i)=>regs.filter(reg=>coversHour(reg,i)).length);const covered=counts.filter(Boolean).length;return{duration,counts,covered,missing:Math.max(0,duration-covered)};}
 
-// Crew planning: one shared hour scale, one row per pilot (name + availability bar), then the coverage.
-// Hour labels every hour up to 12 h races, every 2 h up to 18 h, every 3 h beyond (ticks stay hourly).
+// Opened crew: "who is available when" as relay slots (consecutive hours with the same pilots),
+// then each pilot's own timeline with its hour scale.
 function hourLabel(departure,offset){const [hours,minutes]=String(departure.time||'0:00').split(':').map(Number);const hour=((hours||0)+offset)%24;return minutes?`${String(hour).padStart(2,'0')}h${String(minutes).padStart(2,'0')}`:`${String(hour).padStart(2,'0')}h`;}
+function relaySlots(regs,duration){
+  const slots=[];
+  for(let index=0;index<duration;index++){
+    const who=regs.filter(reg=>coversHour(reg,index)).map(reg=>reg.name),key=who.join('\u0000'),last=slots.at(-1);
+    if(last&&last.key===key)last.end=index+1;else slots.push({key,who,start:index,end:index+1});
+  }
+  return slots;
+}
 function crewPlanning(event,departure,regs,cov){
-  const duration=cov.duration,step=duration<=12?1:duration<=18?2:3,locked=departure.startsAt<=Date.now();
-  const scale=Array.from({length:duration},(_,index)=>`<span class="${index%step?'is-minor':''}">${hourLabel(departure,index)}</span>`).join('');
-  const rows=regs.map(reg=>{
+  const duration=cov.duration,locked=departure.startsAt<=Date.now();
+  const slots=regs.length?relaySlots(regs,duration):[];
+  const relays=slots.map(slot=>{const tone=slot.who.length>=2?'is-ok':slot.who.length===1?'is-solo':'is-gap';const who=slot.who.length?esc(slot.who.join(', '))+(slot.who.length===1?' <em>seul</em>':''):'Personne · trou à combler';return `<div class="crew-relay ${tone}"><span class="crew-relay-time"><strong>${hourLabel(departure,slot.start)} → ${hourLabel(departure,slot.end)}</strong><small>${slot.end-slot.start} h</small></span><span class="crew-relay-who">${who}</span></div>`;}).join('');
+  const pilots=regs.map(reg=>{
     const origin=reg.addedByName?`<span class="registration-origin-info" title="Inscription ajoutée par ${esc(reg.addedByName)}" aria-label="Inscription ajoutée par ${esc(reg.addedByName)}">ⓘ</span>`:'';
     const edit=reg.canEdit&&!locked?button('edit-registration','Modifier',`data-id="${reg.id}" data-departure="${departure.id}" aria-label="Modifier l’inscription de ${esc(reg.name)}"`,'link-button crew-planning-edit'):'';
-    return `<div class="crew-planning-row pilot-row${reg.mine?' ux-current-pilot':''}"><span class="crew-planning-label"><span class="pilot-name">${esc(reg.name)}</span>${origin}${edit}<small class="crew-planning-when">${esc(hoursSummary(reg.status,departure,duration))}</small></span>${renderAvailabilityTimeline({departure,duration,status:reg.status,label:`Disponibilités de ${reg.name}`})}</div>`;
+    return `<div class="crew-planning-row crew-pilot-line pilot-row${reg.mine?' ux-current-pilot':''}"><span class="crew-planning-label"><span class="pilot-name">${esc(reg.name)}</span>${origin}<small class="crew-planning-when">${esc(hoursSummary(reg.status,departure,duration))}</small>${edit}</span>${renderAvailabilityTimeline({departure,duration,status:reg.status,label:`Disponibilités de ${reg.name}`})}</div>`;
   }).join('');
-  return `<div class="crew-planning-scroll"><div class="crew-planning" style="--hours:${duration}"><div class="crew-planning-row crew-planning-scale"><span class="crew-planning-label"></span><span class="crew-planning-hours">${scale}</span></div>${rows||'<p class="empty crew-empty-roster">Aucun pilote n’a encore rejoint cet équipage.</p>'}<div class="crew-planning-row crew-planning-coverage"><span class="crew-planning-label">Couverture <small>${cov.covered}/${duration} h</small></span>${renderAvailabilityTimeline({departure,duration,counts:cov.counts,label:'Disponibilité de l’équipage'})}</div></div></div>`;
+  if(!regs.length)return '<p class="empty crew-empty-roster">Aucun pilote n’a encore rejoint cet équipage.</p>';
+  return `<section class="crew-relays" aria-label="Qui est dispo, tranche par tranche"><span class="crew-section-title">Qui est dispo · ${cov.covered}/${duration} h couvertes</span>${relays}</section><section class="crew-pilot-lines" aria-label="Heures de chaque pilote"><span class="crew-section-title">Heures par pilote</span>${pilots}</section>`;
 }
-
 
 function stateControl(crew,departure){return `<div class="crew-state-control"><span class="crew-state-lock" aria-hidden="true">${crew.locked?'🔒':'🔓'}</span><label class="crew-state-select-wrap"><span class="sr-only">État de l’équipage</span><select class="crew-state-select" data-crew-state-select data-crew-id="${crew.id}" data-departure="${departure.id}" data-version="${crew.version}"><option value="open" ${crew.locked?'':'selected'}>Ouvert</option><option value="locked" ${crew.locked?'selected':''}>Complet</option></select><span class="crew-state-chevron" aria-hidden="true">▾</span></label></div>`;}
 
