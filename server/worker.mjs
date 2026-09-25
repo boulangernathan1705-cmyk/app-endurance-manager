@@ -1,7 +1,7 @@
 import {
-  LEGACY_CAR_ALIASES, COOKIE_SESSION, COOKIE_GUEST, COOKIE_STATE, DAY, HttpError, fail, now, id, token, hash, cookie,
+  LEGACY_CAR_ALIASES, COOKIE_SESSION, COOKIE_GUEST, COOKIE_STATE, COOKIE_RETURN, DAY, HttpError, fail, now, id, token, hash, cookie,
   setCookie, json, redirect, origin, requireDiscord, administrators, publicUser, requireRole, identity, owned, personal,
-  registrationSelect, registrationParticipant, body, rateLimit, cleanup, text, validateEvent, validateRegistration
+  registrationSelect, registrationParticipant, body, rateLimit, cleanup, returnPath, text, validateEvent, validateRegistration
 } from './core.mjs';
 import {ingestClientError, clientErrorsApi} from './telemetry.mjs';
 async function eventById(env, eventId) {
@@ -51,21 +51,26 @@ function publicRegistration(reg, actor, userNames = new Map()) {
     addedByName:canSeeCreator ? (userNames.get(creatorId) || '') : ''
   };
 }
-async function listEvents(env, actor, game='') {
-  const where=game==='iracing' ? " WHERE circuit LIKE 'iracing-%'" : game==='lmu' ? " WHERE circuit NOT LIKE 'iracing-%'" : '';
-  const rows = (await env.DB.prepare(`SELECT * FROM events${where} ORDER BY created_at DESC, id DESC`).all()).results;
+// Archived = every start is in the past (same rule as front/schedule.mjs). "upcoming" keeps a
+// one-day margin so a race that just started stays visible, and undated races stay upcoming.
+const LAST_START="(SELECT max(CAST(json_extract(d.value,'$.startsAt') AS INTEGER)) FROM json_each(e.departures) d)";
+function eventScopeFilter(scope, nowMs=Date.now()) {
+  const cutoff=Math.floor(nowMs);
+  if (scope==='upcoming') return `(${LAST_START} IS NULL OR ${LAST_START}>${cutoff-86400000})`;
+  if (scope==='archived') return `${LAST_START}<=${cutoff}`;
+  return '';
+}
+async function listEvents(env, actor, game='', scope='') {
+  // Filter by joining events instead of binding id lists: D1 rejects queries with more than 100 bound parameters.
+  const filters=[game==='iracing' ? "e.circuit LIKE 'iracing-%'" : game==='lmu' ? "e.circuit NOT LIKE 'iracing-%'" : '', eventScopeFilter(scope)].filter(Boolean);
+  const where=filters.length ? ` WHERE ${filters.join(' AND ')}` : '';
+  const rows = (await env.DB.prepare(`SELECT e.* FROM events e${where} ORDER BY e.created_at DESC, e.id DESC`).all()).results;
   if (!rows.length) return [];
-  const eventIds=rows.map(row=>row.id);
-  const marks=eventIds.map(()=>'?').join(',');
-  const registrations = (await env.DB.prepare(registrationSelect+` WHERE r.event_id IN (${marks}) ORDER BY r.created_at,r.id`).bind(...eventIds).all()).results;
-  const crews = (await env.DB.prepare(`SELECT * FROM crews WHERE event_id IN (${marks}) ORDER BY created_at,id`).bind(...eventIds).all()).results;
-  const memberships = (await env.DB.prepare(`SELECT cm.crew_id,cm.registration_id FROM crew_members cm JOIN crews c ON c.id=cm.crew_id WHERE c.event_id IN (${marks})`).bind(...eventIds).all()).results;
-  const relevantUserIds=[...new Set(registrations.flatMap(reg=>[reg.owner_user_id,reg.participant_user_id,reg.user_id]).filter(Boolean))];
-  let users=[];
-  if (relevantUserIds.length) {
-    const userMarks=relevantUserIds.map(()=>'?').join(',');
-    users=(await env.DB.prepare(`SELECT id,name FROM users WHERE id IN (${userMarks})`).bind(...relevantUserIds).all()).results;
-  }
+  const registrations = (await env.DB.prepare(registrationSelect+` JOIN events e ON e.id=r.event_id${where} ORDER BY r.created_at,r.id`).all()).results;
+  const crews = (await env.DB.prepare(`SELECT c.* FROM crews c JOIN events e ON e.id=c.event_id${where} ORDER BY c.created_at,c.id`).all()).results;
+  const memberships = (await env.DB.prepare(`SELECT cm.crew_id,cm.registration_id FROM crew_members cm JOIN crews c ON c.id=cm.crew_id JOIN events e ON e.id=c.event_id${where}`).all()).results;
+  // Only registration creators' names are displayed (addedByName).
+  const users = (await env.DB.prepare(`SELECT DISTINCT u.id,u.name FROM users u JOIN registrations r ON r.owner_user_id=u.id JOIN events e ON e.id=r.event_id${where}`).all()).results;
   const userNames = new Map(users.map(item => [item.id,item.name]));
   const grouped = new Map();
   for (const reg of registrations) { const key = `${reg.event_id}:${reg.departure_id}`; if (!grouped.has(key)) grouped.set(key, []); grouped.get(key).push(publicRegistration(reg, actor, userNames)); }
@@ -91,7 +96,7 @@ async function listEvents(env, actor, game='') {
       hasOwner:Boolean(crew.owner_user_id)
     });
   }
-  return rows.map(row => ({id:row.id, name:row.name, circuit:row.circuit||'', durationHours:Number(row.duration_hours)||3, eventType:row.event_type||'private', categories:JSON.parse(row.categories), version:row.version, departures:JSON.parse(row.departures).map(d => ({...d, availability:grouped.get(`${row.id}:${d.id}`) || [], crews:crewsByDeparture.get(`${row.id}:${d.id}`) || []}))}));
+  return rows.map(row => ({id:row.id, name:row.name, circuit:row.circuit||'', durationHours:Number(row.duration_hours)||3, eventType:row.event_type||'private', schedulePending:Boolean(row.schedule_pending), categories:JSON.parse(row.categories), version:row.version, departures:JSON.parse(row.departures).map(d => ({...d, availability:grouped.get(`${row.id}:${d.id}`) || [], crews:crewsByDeparture.get(`${row.id}:${d.id}`) || []}))}));
 }
 async function oauthStart(request, env) {
   requireDiscord(env); await rateLimit(request, env, 'oauth', 20); await cleanup(env);
@@ -99,15 +104,18 @@ async function oauthStart(request, env) {
   await env.DB.prepare('INSERT INTO oauth_states(state_hash,expires_at) VALUES(?,?)').bind(await hash(state), now() + 600).run();
   const auth = new URL('https://discord.com/oauth2/authorize');
   auth.search = new URLSearchParams({client_id:env.DISCORD_CLIENT_ID, response_type:'code', redirect_uri:origin(env) + '/api/auth/discord/callback', scope:'identify', state}).toString();
-  return redirect(auth.href, [setCookie(COOKIE_STATE, state, 600)]);
+  const back = returnPath(new URL(request.url).searchParams.get('return'));
+  return redirect(auth.href, [setCookie(COOKIE_STATE, state, 600), setCookie(COOKIE_RETURN, encodeURIComponent(back), 600)]);
 }
 async function oauthCallback(request, env) {
   requireDiscord(env);
   const url = new URL(request.url), state = url.searchParams.get('state');
-  const clear = setCookie(COOKIE_STATE, '', 0);
-  if (!state || !/^[a-f0-9]{64}$/.test(state) || state !== cookie(request, COOKIE_STATE)) return redirect(origin(env) + '/?auth=error', [clear]);
+  const clear = setCookie(COOKIE_STATE, '', 0), clearReturn = setCookie(COOKIE_RETURN, '', 0);
+  let back = '/';
+  try { back = returnPath(decodeURIComponent(cookie(request, COOKIE_RETURN))); } catch {}
+  if (!state || !/^[a-f0-9]{64}$/.test(state) || state !== cookie(request, COOKIE_STATE)) return redirect(origin(env) + '/?auth=error', [clear, clearReturn]);
   const row = await env.DB.prepare('DELETE FROM oauth_states WHERE state_hash=? AND expires_at>? RETURNING state_hash').bind(await hash(state), now()).first();
-  if (!row || !url.searchParams.get('code') || url.searchParams.has('error')) return redirect(origin(env) + '/?auth=error', [clear]);
+  if (!row || !url.searchParams.get('code') || url.searchParams.has('error')) return redirect(origin(env) + '/?auth=error', [clear, clearReturn]);
   try {
     const response = await fetch('https://discord.com/api/oauth2/token', {method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:new URLSearchParams({client_id:env.DISCORD_CLIENT_ID, client_secret:env.DISCORD_CLIENT_SECRET, grant_type:'authorization_code', code:url.searchParams.get('code'), redirect_uri:origin(env) + '/api/auth/discord/callback'}), signal:AbortSignal.timeout(10000)});
     if (!response.ok) throw Error('token');
@@ -116,7 +124,7 @@ async function oauthCallback(request, env) {
     if (!profileResponse.ok) throw Error('profile');
     const profile = await profileResponse.json();
     if (!/^\d{15,22}$/.test(profile.id)) throw Error('identity');
-    const display = String(profile.global_name || profile.username || 'Pilote').slice(0, 80);
+    const display = String(profile.global_name || profile.username || 'Pilote').slice(0, 32);
     const avatarHash = typeof profile.avatar === 'string' && /^[A-Za-z0-9_]{1,128}$/.test(profile.avatar) ? profile.avatar : '';
     const session = token();
     const guestRaw = cookie(request, COOKIE_GUEST);
@@ -133,9 +141,9 @@ async function oauthCallback(request, env) {
     const avatarCookie = avatarHash
       ? `fmt_discord_avatar=${encodeURIComponent(`${profile.id}:${avatarHash}`)}; Path=/; Secure; SameSite=Lax; Max-Age=${7 * DAY}`
       : 'fmt_discord_avatar=; Path=/; Secure; SameSite=Lax; Max-Age=0';
-    return redirect(origin(env) + '/', [clear, setCookie(COOKIE_SESSION, session, 7 * DAY), avatarCookie]);
+    return redirect(origin(env) + back, [clear, clearReturn, setCookie(COOKIE_SESSION, session, 7 * DAY), avatarCookie]);
   } catch {
-    return redirect(origin(env) + '/?auth=error', [clear]);
+    return redirect(origin(env) + '/?auth=error', [clear, clearReturn]);
   }
 }
 async function api(request, env) {
@@ -172,10 +180,13 @@ async function api(request, env) {
   if (path === '/api/events' && method === 'GET') {
     const requestedGame=url.searchParams.get('game');
     const game=requestedGame==='lmu'||requestedGame==='iracing'?requestedGame:'';
-    const events=await listEvents(env,actor,game);
+    const requestedScope=url.searchParams.get('scope');
+    const scope=requestedScope==='upcoming'||requestedScope==='archived'?requestedScope:'';
+    const events=await listEvents(env,actor,game,scope);
     const payload={events};
     const response=json(payload);
     response.headers.set('X-Endurance-Game',game||'all');
+    response.headers.set('X-Endurance-Scope',scope||'all');
     response.headers.set('X-Endurance-Events',String(events.length));
     response.headers.set('X-Endurance-Approx-Bytes',String(new TextEncoder().encode(JSON.stringify(payload)).length));
     return response;
@@ -291,7 +302,7 @@ async function api(request, env) {
   if (path === '/api/events' && method === 'POST') {
     requireRole(actor.user);
     const data = validateEvent(await body(request)), eventId = id();
-    await env.DB.prepare('INSERT INTO events(id,name,duration_hours,event_type,circuit,categories,departures,created_by,created_at) VALUES(?,?,?,?,?,?,?,?,?)').bind(eventId, data.name, data.durationHours, data.eventType, data.circuit, JSON.stringify(data.categories), JSON.stringify(data.departures), actor.user.id, now()).run();
+    await env.DB.prepare('INSERT INTO events(id,name,duration_hours,event_type,circuit,schedule_pending,categories,departures,created_by,created_at) VALUES(?,?,?,?,?,?,?,?,?,?)').bind(eventId, data.name, data.durationHours, data.eventType, data.circuit, data.schedulePending?1:0, JSON.stringify(data.categories), JSON.stringify(data.departures), actor.user.id, now()).run();
     return json({id:eventId}, 201);
   }
   const eventMatch = path.match(/^\/api\/events\/([a-f0-9-]{36})$/);
@@ -305,11 +316,11 @@ async function api(request, env) {
       return json({ok:true});
     }
     const data = validateEvent(input, event), cats = JSON.stringify(data.categories), deps = JSON.stringify(data.departures);
-    const result = await env.DB.prepare(`UPDATE events SET name=?,duration_hours=?,event_type=?,circuit=?,categories=?,departures=?,version=version+1 WHERE id=? AND version=?
+    const result = await env.DB.prepare(`UPDATE events SET name=?,duration_hours=?,event_type=?,circuit=?,schedule_pending=?,categories=?,departures=?,version=version+1 WHERE id=? AND version=?
       AND NOT EXISTS (SELECT 1 FROM registrations r WHERE r.event_id=events.id AND
         (NOT EXISTS (SELECT 1 FROM json_each(?) d WHERE json_extract(d.value,'$.id')=r.departure_id)
       OR (r.category!='' AND NOT EXISTS (SELECT 1 FROM json_each(?) c WHERE c.value=r.category))
-      OR EXISTS (SELECT 1 FROM json_each(?) h WHERE instr(',' || r.status || ',', ',' || h.value || ',') > 0)))`).bind(data.name, data.durationHours, data.eventType, data.circuit, cats, deps, event.id, input.version, deps, cats, JSON.stringify(Array.from({length:24-data.durationHours},(_,i)=>`h${data.durationHours+i+1}`))).run();
+      OR EXISTS (SELECT 1 FROM json_each(?) h WHERE instr(',' || r.status || ',', ',' || h.value || ',') > 0)))`).bind(data.name, data.durationHours, data.eventType, data.circuit, data.schedulePending?1:0, cats, deps, event.id, input.version, deps, cats, JSON.stringify(Array.from({length:24-data.durationHours},(_,i)=>`h${data.durationHours+i+1}`))).run();
     if (!result.meta.changes) fail(409, 'Modification impossible : événement modifié ailleurs, départ supprimé avec des inscrits, catégorie encore utilisée, ou disponibilités au-delà de la nouvelle durée. Ajuste les disponibilités concernées avant de raccourcir la course.');
     return json({ok:true});
   }

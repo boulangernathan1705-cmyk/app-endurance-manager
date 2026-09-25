@@ -55,6 +55,9 @@ test('Course produit directement l’interface finale',()=>{
   const eventView=read('front/app/event-view.mjs');
   const crews=read('front/app/crews.mjs');
   assert.match(eventView,/event-header-stats/);
+  assert.match(eventView,/raceDateBlock\(event/);
+  assert.match(eventView,/raceStarts\(event/);
+  assert.doesNotMatch(eventView,/renderMyRace/);
   assert.match(eventView,/departure-fold/);
   assert.match(eventView,/Modifier mon inscription/);
   assert.match(eventView,/Inscrire un autre pilote/);
@@ -70,10 +73,12 @@ test('la page événement garde les actions événement séparées des actions �
   assert.doesNotMatch(eventView,/Retour aux événements/);
   assert.match(eventView,/event-toolbar-main/);
   assert.match(crews,/crew-section-create/);
-  const refresh=eventView.indexOf("button('refresh','Actualiser')");
+  // Background refresh replaced the manual "Actualiser" button; sharing comes first.
+  assert.doesNotMatch(eventView,/button\('refresh'/);
+  const share=eventView.indexOf("button('share-event','Copier le lien de la course'");
   const edit=eventView.indexOf("button('edit-event','Modifier l’événement'");
   const remove=eventView.indexOf("button('delete-event','Supprimer l’événement'");
-  assert.ok(refresh>=0&&refresh<edit&&edit<remove);
+  assert.ok(share>=0&&share<edit&&edit<remove);
   assert.doesNotMatch(eventView,/event-create-crew/);
 });
 
@@ -169,15 +174,22 @@ test('le formulaire inscription est unique et compact',()=>{
   assert.match(registration,/pilot-category-logo/);
 });
 
-test('Mes inscriptions restaure les grilles de 1 à 3 colonnes et les visuels catégorie',()=>{
+test('Mes inscriptions reprend la carte de course et les frises d’équipage',()=>{
   const entries=read('front/app/entries-view.mjs');
-  assert.match(entries,/native-my-entry-card/);
+  assert.match(entries,/native-my-entry-card race-card/);
   assert.match(entries,/Mes inscriptions personnelles/);
   assert.match(entries,/Inscriptions que je gère/);
   assert.match(entries,/Pilotes sans équipage/);
-  assert.match(entries,/function pilotGridClass\(count\)/);
-  assert.match(entries,/ux-my-pilot-grid-/);
+  assert.match(entries,/departureDateBlock\(departure\)/);
+  assert.match(entries,/crewAvailability\(event,departure,members,\{editable:false\}\)/);
   assert.match(entries,/ux-my-other-crews-grid/);
-  assert.match(entries,/pilot-category-logo/);
   assert.match(entries,/categories\[crew\.category\]\?\.css/);
+});
+
+test('les blocs dépliables ont un identifiant pour que le rafraîchissement automatique les garde ouverts',()=>{
+  const refresh=read('front/app/auto-refresh.mjs');
+  assert.match(refresh,/details\[open\]/);
+  assert.match(read('front/app/entries-view.mjs'),/<details class="native-my-entry-card[^>]*id="entry-\$\{reg\.id\}"/);
+  assert.match(read('front/app/crews.mjs'),/<details class="ux-course-pilots-accordion" id="pilots-\$\{departure\.id\}"/);
+  assert.match(read('front/app/event-view.mjs'),/<details class="departure-fold[^>]*id="departure-\$\{departure\.id\}"/);
 });

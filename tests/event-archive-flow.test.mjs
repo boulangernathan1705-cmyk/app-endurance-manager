@@ -28,11 +28,9 @@ test('un départ déjà lancé ne crée plus de groupe événement En cours s’
   assert.equal(groups[0].items[0].next.id,'b');
 });
 
-test('la page d’accueil masque les équipages des départs déjà passés tant que l’événement reste à venir',()=>{
+test('la liste des courses n’affiche plus les équipages (trop d’horaires différents pour s’y retrouver)',()=>{
   const home=read('front/app/home-view.mjs');
-  assert.match(home,/function crewRows\(event,\{includePast=false,now=Date\.now\(\)\}=\{\}\)/);
-  assert.match(home,/includePast\|\|Number\(d\.startsAt\)>now/);
-  assert.match(home,/crewSummary\(event,\{includePast:archived\}\)/);
+  assert.doesNotMatch(home,/crewSummary|event-card-crews/);
 });
 
 test('la vue événement garde les départs fermés par défaut et range les départs passés en bas',()=>{

@@ -13,7 +13,7 @@ export const state = {
   events:[], user:null, discordReady:false, currentEventId:null, page:'home', editingEvent:null,
   drafts:{}, recoveryLink:'', busy:false, participants:[], flash:'', eventFilter:'upcoming',
   selectedDepartureId:null, eventSection:'race', pilotName:'', registrationOpen:new Set(), crewManagementOpen:new Set(),
-  pendingCrewJoin:null
+  pendingCrewJoin:null, archiveLoaded:false, participantsLoaded:false
 };
 try { state.pilotName = localStorage.getItem('fmt_pilot_name') || ''; } catch {}
 
@@ -32,6 +32,7 @@ export function logo(category) {
 }
 export function badge(category) { return `<span class="event-category-badge ${categories[category]?.css || ''}">${logo(category)}<span>${esc(category)}</span></span>`; }
 export function eventTypeBadge(type) { const item = EVENT_TYPES[type] || EVENT_TYPES.private; return `<span class="event-type-badge ${item.css}">${esc(item.label)}</span>`; }
+export function schedulePendingBadge(event) { return event?.schedulePending ? '<span class="event-schedule-badge">Horaires à confirmer</span>' : ''; }
 export function eventCategoryCount(event, category) { return event.departures.reduce((sum,departure) => sum + departure.availability.filter(reg => reg.category === category && reg.status !== 'unavailable').length,0); }
 export function eventBadge(category,count) { return `<span class="event-category-badge ${categories[category]?.css || ''}">${logo(category)}<span class="event-category-copy"><strong>${esc(category)}</strong><small>${count} inscrit${count > 1 ? 's' : ''}</small></span></span>`; }
 export function pilotCount(registrations) { return new Set(registrations.filter(reg => reg.status !== 'unavailable').map(reg => reg.participantId || reg.id)).size; }
@@ -53,6 +54,8 @@ export function carPreferenceChoices(category, selected=[], any=false) {
 export function registrationCarLabel(reg) { return reg.carAny ? 'N’importe quelle voiture' : ((reg.cars?.length ? reg.cars.join(' · ') : reg.car) || 'Pas de préférence'); }
 export function pilotAvailability(reg,departure,duration) { return departure ? `<div class="crew-pilot-availability"><span class="crew-pilot-availability-label">Disponibilité</span>${renderAvailabilityTimeline({departure,duration,status:reg.status,label:`Disponibilités de ${reg.name || 'ce pilote'}`})}</div>` : ''; }
 export function pilotWishes(reg,departure=null,duration=0) { return `<dl class="pilot-wishes"><div><dt>Voiture(s) souhaitée(s)</dt><dd>${esc(registrationCarLabel(reg))}</dd></div><div><dt>Coéquipier souhaité</dt><dd>${esc(reg.preferredPilot || 'Aucune préférence renseignée')}</dd></div></dl>${departure&&duration?pilotAvailability(reg,departure,duration):''}`; }
+// Crews of a departure in display order (category order of the event, then name); the position gives the crew its color.
+export function sortedCrews(event,departure){return [...(departure.crews||[])].sort((a,b)=>event.categories.indexOf(a.category)-event.categories.indexOf(b.category)||String(a.name).localeCompare(String(b.name),'fr',{sensitivity:'base',numeric:true}));}
 export function crewColorClass(crewId,index=null) { if (index != null) return `crew-palette-${index%10}`; let hash=0; for (const char of String(crewId||'')) hash=(hash*31+char.charCodeAt(0))>>>0; return `crew-palette-${hash%10}`; }
 export function coversHour(reg,index) { return reg.status === 'whole' || String(reg.status||'').split(',').includes(`h${index+1}`); }
 
@@ -128,14 +131,39 @@ export async function api(path,method='GET',data) {
     throw wrapped;
   }
 }
+async function fetchEvents(scope) {
+  const result = await api(`/api/events?game=${encodeURIComponent(activeGame)}&scope=${scope}`);
+  return (Array.isArray(result.events)?result.events:[]).filter(event => gameForEvent(event) === activeGame);
+}
+function mergeEvents(...lists) {
+  const byId=new Map();
+  for (const event of lists.flat()) byId.set(event.id,event);
+  return [...byId.values()];
+}
+// Only upcoming races are loaded at start and on every refresh; the archive is fetched
+// the first time it is needed (Archivés filter, link to a past race) and then kept fresh.
 export async function load() {
-  const session = await api('/api/session');
-  const result = await api(`/api/events?game=${encodeURIComponent(activeGame)}`);
+  const [session,upcoming,archived] = await Promise.all([
+    api('/api/session'),
+    fetchEvents('upcoming'),
+    state.archiveLoaded ? fetchEvents('archived') : []
+  ]);
+  const userChanged=(session.user?.id||null)!==(state.user?.id||null);
   state.user=session.user;
   state.discordReady=session.discordReady;
-  state.events=(Array.isArray(result.events)?result.events:[]).filter(event => gameForEvent(event) === activeGame);
-  state.participants=state.user ? (await api('/api/participants')).participants : [];
-  if (state.user && !state.pilotName) state.pilotName=state.user.name.slice(0,30);
+  state.events=mergeEvents(upcoming,archived);
+  // The members list rarely changes: fetch it once per session instead of on every refresh.
+  if (userChanged || !state.participantsLoaded) {
+    state.participants=state.user ? (await api('/api/participants')).participants : [];
+    state.participantsLoaded=true;
+  }
+  if (state.user && !state.pilotName) state.pilotName=state.user.name.slice(0,32);
+}
+export async function loadArchive() {
+  if (state.archiveLoaded) return;
+  const archived = await fetchEvents('archived');
+  state.events=mergeEvents(state.events,archived);
+  state.archiveLoaded=true;
 }
 
 export function showError(error) {

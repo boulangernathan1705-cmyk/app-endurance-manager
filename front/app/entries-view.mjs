@@ -1,3 +1,4 @@
+import {eventSchedule} from '../schedule.mjs';
 import {
   app,
   state,
@@ -5,25 +6,24 @@ import {
   eventTypeBadge,
   badge,
   circuitLabel,
-  registrationCarLabel,
-  renderAvailabilityTimeline,
   notifyRender,
   logo,
-  categories
+  categories,
+  circuitVisual
 } from './core.mjs';
+import {crewAvailability,pilotLines} from './crews.mjs';
 import {getLocale,localeTag} from '../i18n.mjs';
 
-const dateFormat = new Intl.DateTimeFormat(localeTag(), {
-  timeZone:'Europe/Paris',
-  weekday:'long',
-  day:'numeric',
-  month:'long',
-  year:'numeric'
-});
 
-function entryDate(departure) {
-  try { return dateFormat.format(new Date(departure.startsAt)); }
-  catch { return departure.date || ''; }
+const weekdayFormat = new Intl.DateTimeFormat(localeTag(), {timeZone:'Europe/Paris', weekday:'short'});
+const dayFormat = new Intl.DateTimeFormat(localeTag(), {timeZone:'Europe/Paris', day:'numeric'});
+const monthFormat = new Intl.DateTimeFormat(localeTag(), {timeZone:'Europe/Paris', month:'short'});
+
+// Same date block as the race cards, for this entry's own start.
+function departureDateBlock(departure) {
+  const stamp = new Date(Number(departure.startsAt));
+  if (!Number.isFinite(stamp.getTime())) return '<span class="race-date is-unknown"><strong>?</strong><small>Date à confirmer</small></span>';
+  return `<span class="race-date"><small>${esc(weekdayFormat.format(stamp))}</small><strong>${esc(dayFormat.format(stamp))}</strong><small>${esc(monthFormat.format(stamp))}</small></span>`;
 }
 
 function categoryIndex(event, category) {
@@ -43,31 +43,9 @@ function crewSort(event) {
     || String(a.name || '').localeCompare(String(b.name || ''),locale,{sensitivity:'base',numeric:true});
 }
 
-function pilotGridClass(count) {
-  return `ux-my-pilot-grid ux-my-pilot-grid-${Math.max(1,Math.min(3,count || 1))}`;
-}
-
-function pilotCard(event,departure,reg,highlighted=false) {
-  return `<article class="pilot-row ux-my-entry-pilot-card${highlighted?' is-own-pilot':''}">
-    <div class="pilot-main">
-      <span class="pilot-name">${esc(reg.name)}</span>
-      <span class="pilot-category-logo">${logo(reg.category)}</span>
-      <span class="pilot-car">${esc(registrationCarLabel(reg))}</span>
-      ${reg.preferredPilot?`<span class="pilot-preference">Souhaite rouler avec : <strong>${esc(reg.preferredPilot)}</strong></span>`:''}
-    </div>
-    ${renderAvailabilityTimeline({departure,duration:event.durationHours||6,status:reg.status,label:`Disponibilités de ${reg.name}`})}
-  </article>`;
-}
-
-function summary(title,count) {
-  return `<summary class="ux-my-entry-accordion-summary"><span>${esc(title)}</span><strong>${count}</strong><span class="ux-my-entry-chevron" aria-hidden="true">›</span></summary>`;
-}
-
-function contentAccordion(title,count,body,compact=false) {
-  return `<details class="ux-my-entry-content-accordion${compact?' is-compact':''}">
-    ${summary(title,count)}
-    <div class="ux-my-entry-content-body">${body}</div>
-  </details>`;
+// The entry body: three side-by-side columns (own crew, other crews, pilots without a crew), no nested frames.
+function column(title,count,body) {
+  return `<section class="my-entry-column"><h3 class="my-entry-column-title">${esc(title)} <span>${count}</span></h3>${body}</section>`;
 }
 
 function compactCrew(departure,crew) {
@@ -96,10 +74,10 @@ function card({event,departure,reg}) {
       <div class="ux-my-own-crew-identity">${logo(crew.category)}<div><strong>${esc(crew.name)}</strong><span>${esc(crew.car||'Voiture à définir')}</span></div></div>
       <span class="ux-my-crew-state">${crew.locked?'Équipage complet':'Équipage ouvert'}</span>
     </div>
-    <div class="${pilotGridClass(members.length)}">${members.map(pilot=>pilotCard(event,departure,pilot,String(pilot.id)===String(reg.id))).join('')}</div>
+    ${crewAvailability(event,departure,members,{editable:false})}
   </article>`:`<article class="ux-my-awaiting-crew">
     <div class="ux-my-awaiting-copy"><strong>En attente d’affectation</strong><span>Cette inscription n’est pas encore rattachée à un équipage.</span></div>
-    <div class="${pilotGridClass(1)}">${pilotCard(event,departure,reg,true)}</div>
+    <section class="crew-pilot-lines">${pilotLines(departure,event.durationHours||6,[reg],{editable:false})}</section>
   </article>`;
 
   const otherCrewsBody = otherCrews.length
@@ -107,34 +85,39 @@ function card({event,departure,reg}) {
     : '<p class="muted">Aucun autre équipage sur ce départ.</p>';
 
   const unassignedBody = unassigned.length
-    ? `<div class="${pilotGridClass(unassigned.length)}">${unassigned.map(pilot=>pilotCard(event,departure,pilot,String(pilot.id)===String(reg.id))).join('')}</div>`
+    ? `<section class="crew-pilot-lines">${pilotLines(departure,event.durationHours||6,unassigned,{editable:false})}</section>`
     : '<p class="empty">Tous les pilotes disponibles sont déjà affectés.</p>';
 
-  return `<details class="native-my-entry-card event-type-${event.eventType||'private'}">
+  const situation = crew
+    ? `<span class="departure-mine-badge is-crew">✓ Équipage ${esc(crew.name)}</span>`
+    : '<span class="departure-mine-badge is-waiting">En attente d’équipage</span>';
+  return `<details class="native-my-entry-card race-card my-entry-race event-type-${event.eventType||'private'}" id="entry-${reg.id}">
     <summary class="native-my-entry-header">
       <span class="native-my-entry-toggle" aria-hidden="true">+</span>
-      <div class="native-my-entry-title">
+      <span class="race-card-top">${departureDateBlock(departure)}<span class="race-head">
         ${reg.managed?`<strong class="ux-managed-entry-name">${esc(reg.name)}</strong>`:''}
-        <span class="ux-my-entry-departure">Départ ${esc(departure.time||'')}</span>
-        <h2>${esc(event.name)}</h2>
-        <span class="ux-my-entry-date">${esc(entryDate(departure))}</span>
-        <div class="native-my-entry-meta">${eventTypeBadge(event.eventType)}${badge(reg.category)}<span>${esc(circuitLabel(event.circuit))}</span><span>${event.durationHours||6} h</span></div>
-      </div>
-      <button type="button" class="primary-button native-my-entry-open-event" data-action="open" data-id="${event.id}" data-departure="${departure.id}">Voir l’événement complet</button>
+        <h2 class="event-name">${esc(event.name)}</h2>
+        <span class="race-meta">${esc(circuitLabel(event.circuit))} · ${event.durationHours||6} h</span>
+        <span class="race-badges">${eventTypeBadge(event.eventType)}${badge(reg.category)}<span class="race-start">Départ ${esc(departure.time||'')}</span>${situation}</span>
+      </span>${circuitVisual(event.circuit,true)}</span>
+      <button type="button" class="primary-button native-my-entry-open-event" data-action="open" data-id="${event.id}" data-departure="${departure.id}">Voir la course</button>
     </summary>
-    <div class="native-my-entry-body">
-      ${contentAccordion('Mon équipage',members.length,ownCrewBody)}
-      ${contentAccordion('Autres équipages',otherCrews.length,otherCrewsBody,true)}
-      ${contentAccordion('Pilotes sans équipage',unassigned.length,unassignedBody,true)}
+    <div class="native-my-entry-body my-entry-columns">
+      ${column('Mon équipage',members.length,ownCrewBody)}
+      ${column('Autres équipages',otherCrews.length,otherCrewsBody)}
+      ${column('Pilotes sans équipage',unassigned.length,unassignedBody)}
     </div>
   </details>`;
 }
 
 export function renderMyEntries() {
   state.page='my-entries';
-  const entries=state.events.flatMap(event=>event.departures.flatMap(departure=>departure.availability
+  // Past races live in the Archivés list; this page is about what is coming up.
+  const now=Date.now();
+  const entries=state.events.filter(event=>!eventSchedule(event,now).archived).flatMap(event=>event.departures.flatMap(departure=>departure.availability
     .filter(reg=>reg.mine||reg.managed)
-    .map(reg=>({event,departure,reg}))));
+    .map(reg=>({event,departure,reg}))))
+    .sort((a,b)=>Number(a.departure.startsAt)-Number(b.departure.startsAt));
   const section=(title,list)=>`<section class="native-my-entries-group">
     <div class="native-my-entries-group-heading"><h2>${title}</h2><span>${list.length} inscription${list.length>1?'s':''}</span></div>
     ${list.length?`<div class="native-my-entry-list">${list.map(card).join('')}</div>`:'<p class="empty">Aucune inscription.</p>'}

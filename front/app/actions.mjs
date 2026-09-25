@@ -1,14 +1,43 @@
-import {app,state,api,load,showError,countdown,CARS} from './core.mjs';
-import {renderNav,renderHome} from './home-view.mjs?v=3-shared-crew-cards';
-import {renderEvent} from './event-view.mjs?v=9-one-course-page';
-import {renderEventForm,departureFields,updateRemoveButtons} from './event-form.mjs';
-import {renderMyEntries} from './entries-view.mjs?v=2-three-accordions';
+import {app,state,api,load,loadArchive,showError,countdown,CARS} from './core.mjs';
+import {renderNav,renderHome} from './home-view.mjs';
+import {renderEvent} from './event-view.mjs';
+import {renderEventForm,departureFields,updateRemoveButtons,goToEventStep} from './event-form.mjs';
+import {renderMyEntries} from './entries-view.mjs';
 import {refresh,refreshAfterSave} from './refresh.mjs';
-import {draftFor,registrationDraft,ownRegistrations,rerenderRegistrationSection,submitRegistration} from './registration.mjs?v=2-preserve-timeline-scroll';
-import {updateCrewState} from './crews.mjs?v=8-one-page-compact';
+import {draftFor,registrationDraft,ownRegistrations,rerenderRegistrationSection,submitRegistration,registrationStep} from './registration.mjs';
+import {updateCrewState} from './crews.mjs';
+import {installRouter,routeFromLocation,applyRoute} from './router.mjs';
+import {installAutoRefresh} from './auto-refresh.mjs';
+
+// The registration panel opens over the race: move keyboard and screen-reader focus into it.
+function revealRegistration(departureId){
+  requestAnimationFrame(()=>document.getElementById(`departure-${departureId}`)?.querySelector('.fold-registration:not([hidden]) h2[tabindex]')?.focus({preventScroll:true}));
+}
+
+// Moving forward in the step-by-step registration checks the current step first.
+function validateRegistrationStep(draft,step){
+  if(step===1){
+    if(draft.forOther&&!draft.id&&draft.mode!=='category'&&!draft.participantUserId&&!draft.manualOther)throw Error('Choisis un pilote.');
+    if((draft.manualOther||(!draft.forOther&&!state.user))&&!String(draft.name||'').trim())throw Error(draft.forOther?'Indique le pseudo du pilote.':'Indique ton pseudo pilote.');
+    if(!draft.category)throw Error('Choisis une catégorie.');
+  }
+  if(step===2&&!draft.carAny&&!(draft.cars||[]).length)throw Error('Choisis au moins une voiture, ou « Peu importe la voiture ».');
+  if(step===3&&!draft.status)throw Error('Choisis au moins une heure de présence.');
+}
+function goToRegistrationStep(event,departure,target){
+  const draft=draftFor(departure),current=registrationStep(draft),wanted=Number(target.dataset.step);
+  if(wanted>current)for(let step=current;step<Math.min(wanted,4);step++)validateRegistrationStep(draft,step);
+  if(target.dataset.edit)draft.returnToSummary=true;
+  else if(wanted===4||wanted<current)draft.returnToSummary=false;
+  draft.step=wanted;
+  rerenderRegistrationSection(event,departure,'',renderEvent);
+  const section=document.getElementById(`departure-${departure.id}`)?.querySelector('.fold-registration');
+  section?.querySelector('.registration-sheet')?.scrollTo?.(0,0);
+  section?.querySelector('h2[tabindex]')?.focus({preventScroll:true});
+}
 
 async function submitEvent(form){
-  const data={name:form.elements.eventName.value.trim(),durationHours:Number(form.elements.eventDuration.value),eventType:form.elements.eventType.value,circuit:form.elements.eventCircuit.value,categories:[...form.querySelectorAll('[name="eventCategory"]:checked')].map(input=>input.value),departures:[...form.querySelectorAll('.departure-field')].map(row=>({id:row.dataset.id||undefined,date:row.querySelector('[name="date"]').value,time:row.querySelector('[name="time"]').value})),version:state.editingEvent?.version};
+  const data={name:form.elements.eventName.value.trim(),durationHours:Number(form.elements.eventDuration.value),eventType:form.elements.eventType.value,circuit:form.elements.eventCircuit.value,schedulePending:form.elements.eventSchedulePending.checked,categories:[...form.querySelectorAll('[name="eventCategory"]:checked')].map(input=>input.value),departures:[...form.querySelectorAll('.departure-field')].map(row=>({id:row.dataset.id||undefined,date:row.querySelector('[name="date"]').value,time:row.querySelector('[name="time"]').value})),version:state.editingEvent?.version};
   if(!data.categories.length)throw Error('Sélectionne au moins une catégorie.'); if(!data.circuit)throw Error('Sélectionne le circuit de la course.');
   const editing=!!state.editingEvent; const result=await api(editing?`/api/events/${state.editingEvent.id}`:'/api/events',editing?'PATCH':'POST',data);
   if(editing){state.currentEventId=state.editingEvent.id;state.page='event';}else{state.page='home';state.currentEventId=null;}
@@ -23,7 +52,7 @@ function beginCrewJoin(event,departure,crew){
   state.selectedDepartureId=departure.id;
   state.drafts[departure.id]=source
     ? {...registrationDraft(source),category:crew.category,cars:[],carAny:false,id:null,version:null,mode:'category',forOther:false}
-    : {name:state.user.name?.slice(0,30)||state.pilotName,status:'',preferredPilot:'',forOther:false,participantUserId:null,participantId:null,category:crew.category,cars:[],carAny:false,id:null,version:null,mode:'pilot'};
+    : {name:state.user.name?.slice(0,32)||state.pilotName,status:'',preferredPilot:'',forOther:false,participantUserId:null,participantId:null,category:crew.category,cars:[],carAny:false,id:null,version:null,mode:'pilot'};
   state.registrationOpen.add(departure.id);
   renderEvent();
   document.getElementById(`departure-${departure.id}`)?.scrollIntoView({block:'start',behavior:'smooth'});
@@ -55,17 +84,19 @@ async function perform(action,target){
   switch(action){
     case 'dismiss-error': document.querySelector('[data-ux-error-modal]')?.remove(); break;
     case 'home': renderHome(); break;
-    case 'event-filter': state.eventFilter=target.dataset.filter||'upcoming'; renderHome(); break;
+    case 'event-filter': state.eventFilter=target.dataset.filter||'upcoming'; if(state.eventFilter==='archived')await loadArchive(); renderHome(); break;
     case 'refresh': await refresh(); break;
     case 'open': state.currentEventId=target.dataset.id; state.selectedDepartureId=target.dataset.departure||null; state.eventSection='race'; state.drafts={}; state.pendingCrewJoin=null; state.registrationOpen.clear(); renderEvent(); break;
     case 'event-section': state.eventSection='race'; renderEvent(); break;
-    case 'my-registration': { state.pendingCrewJoin=null; state.selectedDepartureId=target.dataset.departure; delete state.drafts[state.selectedDepartureId]; state.registrationOpen.add(state.selectedDepartureId); renderEvent(); break; }
+    case 'my-registration': { state.pendingCrewJoin=null; state.selectedDepartureId=target.dataset.departure; delete state.drafts[state.selectedDepartureId]; state.registrationOpen.add(state.selectedDepartureId); renderEvent(); revealRegistration(state.selectedDepartureId); break; }
+    case 'registration-step': { const departure=event.departures.find(item=>item.id===target.dataset.departure); goToRegistrationStep(event,departure,target); break; }
+    case 'event-step': goToEventStep(target.closest('form'),target.dataset.step); break;
     case 'close-registration': if(state.pendingCrewJoin?.departureId===target.dataset.departure)state.pendingCrewJoin=null;state.registrationOpen.delete(target.dataset.departure); renderEvent(); break;
     case 'new-registration': {
       state.pendingCrewJoin=null;state.selectedDepartureId=target.dataset.departure; const departure=event.departures.find(item=>item.id===target.dataset.departure); const categoryMode=target.dataset.mode==='category'; const existing=departure.availability.find(reg=>reg.id===target.dataset.registration)||ownRegistrations(departure)[0];
-      state.drafts[departure.id]={...(categoryMode&&existing?registrationDraft(existing):{name:'',status:'',preferredPilot:'',forOther:!!state.user,participantUserId:null}),category:'',cars:[],carAny:false,id:null,version:null,mode:categoryMode?'category':'pilot'}; state.registrationOpen.add(departure.id); renderEvent(); (document.querySelector(`[name="participant"][data-departure="${departure.id}"]`)||document.querySelector(`[name="pilotName"][data-departure="${departure.id}"]`))?.focus(); break;
+      state.drafts[departure.id]={...(categoryMode&&existing?registrationDraft(existing):{name:'',status:'',preferredPilot:'',forOther:!!state.user,participantUserId:null}),category:'',cars:[],carAny:false,id:null,version:null,mode:categoryMode?'category':'pilot'}; state.registrationOpen.add(departure.id); renderEvent(); revealRegistration(departure.id); break;
     }
-    case 'edit-registration': { state.pendingCrewJoin=null; const departure=event.departures.find(item=>item.id===target.dataset.departure),reg=departure.availability.find(item=>item.id===target.dataset.id); if(!reg?.canEdit)throw Error('Tu n’as pas l’autorisation de modifier cette inscription.'); state.selectedDepartureId=departure.id; state.drafts[departure.id]=registrationDraft(reg); state.registrationOpen.add(departure.id); state.eventSection='race'; renderEvent(); break; }
+    case 'edit-registration': { state.pendingCrewJoin=null; const departure=event.departures.find(item=>item.id===target.dataset.departure),reg=departure.availability.find(item=>item.id===target.dataset.id); if(!reg?.canEdit)throw Error('Tu n’as pas l’autorisation de modifier cette inscription.'); state.selectedDepartureId=departure.id; state.drafts[departure.id]=registrationDraft(reg); state.registrationOpen.add(departure.id); state.eventSection='race'; renderEvent(); revealRegistration(departure.id); break; }
     case 'availability': {
       const departure=event.departures.find(item=>item.id===target.dataset.departure),draft=draftFor(departure),value=target.dataset.value; state.registrationOpen.add(departure.id);
       if(value==='whole')draft.status='whole'; else {const duration=event.durationHours||6,parts=new Set(draft.status==='whole'?Array.from({length:duration},(_,i)=>`h${i+1}`):String(draft.status||'').split(',').filter(part=>/^h\d+$/.test(part)));parts.has(value)?parts.delete(value):parts.add(value);draft.status=parts.size===duration?'whole':[...parts].sort((a,b)=>Number(a.slice(1))-Number(b.slice(1))).join(',');}
@@ -95,11 +126,12 @@ async function perform(action,target){
     }
     case 'create': renderEventForm(); break;
     case 'edit-event': renderEventForm(event); break;
-    case 'add-departure': if(app.querySelectorAll('.departure-field').length>=30)throw Error('Maximum 30 départs par événement.');document.getElementById('departureFields').insertAdjacentHTML('beforeend',departureFields());updateRemoveButtons();break;
+    case 'add-departure': if(app.querySelectorAll('.departure-field').length>=30)throw Error('Maximum 30 départs par événement.');{const rows=document.querySelectorAll('#departureFields .departure-field'),last=rows[rows.length-1];/* A new start copies the previous start's date and time: several starts often share a day. */document.getElementById('departureFields').insertAdjacentHTML('beforeend',departureFields(last?{date:last.querySelector('[name="date"]').value,time:last.querySelector('[name="time"]').value}:{}));}updateRemoveButtons();break;
     case 'remove-departure': if(app.querySelectorAll('.departure-field').length>1)target.closest('.departure-field').remove();updateRemoveButtons();break;
     case 'delete-event': if(!confirm(`Supprimer « ${event.name} » et toutes ses inscriptions ? Cette suppression est définitive.`))return;await api(`/api/events/${event.id}`,'DELETE',{version:event.version});state.page='home';await refreshAfterSave('Événement supprimé.');break;
     case 'my-entries': await load();renderNav();renderMyEntries();break;
     case 'guest-link': state.recoveryLink=(await api('/api/guest/link','POST')).link;state.page==='event'?renderEvent():renderHome();break;
+    case 'share-event': { const link=`${location.origin}${location.pathname}#event=${target.dataset.id}`; try{await navigator.clipboard.writeText(link);}catch{window.prompt('Copie le lien de la course :',link);break;} target.textContent='Lien copié ✓'; setTimeout(()=>{if(target.isConnected)target.textContent='Copier le lien de la course';},2500); break; }
     case 'copy-link': try{await navigator.clipboard.writeText(state.recoveryLink);target.textContent='Lien copié';}catch{document.getElementById('personalLink')?.select();throw Error('Copie le lien sélectionné avec Ctrl+C.');}break;
     case 'hide-link': state.recoveryLink='';target.closest('.recovery-panel')?.remove();break;
   }
@@ -112,6 +144,11 @@ document.addEventListener('change',async event=>{
   if(field.name==='participant'){const draft=state.drafts[field.dataset.departure],participant=state.participants.find(item=>item.id===field.value);if(draft){draft.participantUserId=participant?.id||null;draft.participantId=participant?.participantId||null;draft.name=participant?.name||'';draft.category='';draft.cars=[];draft.carAny=false;state.registrationOpen.add(field.dataset.departure);renderEvent();}return;}
   const departureId=field.form?.dataset.departure;if(departureId&&state.drafts[departureId]&&(field.name==='carPreference'||field.name==='carAny')){const draft=state.drafts[departureId];draft.cars=[...field.form.querySelectorAll('[name="carPreference"]:checked')].map(input=>input.value);draft.carAny=!!field.form.elements.carAny?.checked;if(draft.carAny)draft.cars=[];for(const input of field.form.querySelectorAll('[name="carPreference"]')){input.disabled=draft.carAny;if(draft.carAny)input.checked=false;}}
 });
+document.addEventListener('endurance:refresh',()=>{refresh().catch(showError);});
+// Registration panel: Enter moves to the next step, Escape or a click beside the panel closes it.
+document.addEventListener('submit',event=>{const form=event.target;if(form.matches?.('[data-kind="registration"].registration-stepper,[data-kind="event"].event-stepper')&&form.dataset.step!=='4'){event.preventDefault();event.stopImmediatePropagation();form.querySelector('.registration-next')?.click();}},true);
+document.addEventListener('click',event=>{if(event.target.matches?.('.fold-registration'))event.target.querySelector('.registration-close-button')?.click();});
+document.addEventListener('keydown',event=>{if(event.key!=='Escape'||document.querySelector('[data-ux-error-modal]'))return;document.querySelector('.fold-registration:not([hidden]) .registration-close-button')?.click();});
 document.addEventListener('toggle',event=>{const details=event.target;if(details instanceof HTMLDetailsElement&&details.matches('.crew-unified-card[data-crew],.crew-management-accordion[data-crew]'))details.open?state.crewManagementOpen.add(details.dataset.crew):state.crewManagementOpen.delete(details.dataset.crew);},true);
 document.addEventListener('click',async event=>{const target=event.target.closest?.('[data-action]');if(!target||target.disabled)return;if(target.dataset.action==='edit-crew')return;event.preventDefault();if(state.busy&&target.dataset.action!=='dismiss-error')return;state.busy=true;target.disabled=true;try{await perform(target.dataset.action,target);}catch(error){showError(error);}finally{state.busy=false;if(target.isConnected)target.disabled=false;updateRemoveButtons();}});
 document.addEventListener('submit',async event=>{const form=event.target;if(!form.dataset.kind)return;event.preventDefault();if(state.busy)return;state.busy=true;const submit=form.querySelector('[type="submit"]');if(submit)submit.disabled=true;try{if(form.dataset.kind==='event')await submitEvent(form);else if(form.dataset.kind==='registration'){const departureId=form.dataset.departure;const result=await submitRegistration(form,api);if(!(await finishPendingCrewJoin(departureId,result.id)))await refreshAfterSave('Inscription enregistrée.');}}catch(error){showError(error);}finally{state.busy=false;if(submit?.isConnected)submit.disabled=false;}});
@@ -119,6 +156,6 @@ document.addEventListener('error',event=>{const image=event.target;if(image inst
 setInterval(()=>document.querySelectorAll('[data-countdown]').forEach(element=>{element.textContent=countdown(Number(element.dataset.countdown));}),1000);
 
 async function start(){
-  try{const token=new URLSearchParams(location.hash.slice(1)).get('access');if(token){history.replaceState(null,'',location.pathname+location.search);await api('/api/guest/recover','POST',{token});state.flash='Tes inscriptions invitées sont accessibles sur cet appareil.';}const authError=new URLSearchParams(location.search).get('auth');if(authError){history.replaceState(null,'',location.pathname);state.flash='La connexion Discord n’a pas abouti. Tu peux réessayer.';}await load();renderNav();renderHome(state.flash);}catch(error){app.innerHTML='<h1 class="page-title">ENDURANCE MANAGER</h1>';showError(error);}
+  try{const token=new URLSearchParams(location.hash.slice(1)).get('access');if(token){history.replaceState(null,'',location.pathname+location.search);await api('/api/guest/recover','POST',{token});state.flash='Tes inscriptions invitées sont accessibles sur cet appareil.';}const authError=new URLSearchParams(location.search).get('auth');if(authError){history.replaceState(null,'',location.pathname);state.flash='La connexion Discord n’a pas abouti. Tu peux réessayer.';}await load();renderNav();installRouter({renderHome,renderEvent,renderMyEntries});await applyRoute(routeFromLocation(),state.flash);installAutoRefresh(refresh);}catch(error){app.innerHTML='<h1 class="page-title">ENDURANCE MANAGER</h1>';showError(error);}
 }
 start();

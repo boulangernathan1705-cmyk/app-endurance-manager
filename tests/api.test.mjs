@@ -3,11 +3,12 @@ import assert from 'node:assert/strict';
 import {DatabaseSync} from 'node:sqlite';
 import {readFileSync} from 'node:fs';
 import worker from '../server/worker.mjs';
+import workerWithMigrations from '../server/worker-with-migrations.mjs';
 const ROOT='https://fmt.example';
 const ADMIN='111111111111111111', PILOT='222222222222222222', OTHER='333333333333333333';
 class D1 {
   constructor(){this.db=new DatabaseSync(':memory:');this.db.exec('PRAGMA foreign_keys=ON;');this.db.exec(readFileSync(new URL('../migrations/0001_initial.sql',import.meta.url),'utf8'));this.db.exec(readFileSync(new URL('../migrations/0002_event_duration.sql',import.meta.url),'utf8'));this.db.exec(readFileSync(new URL('../migrations/0003_event_type.sql',import.meta.url),'utf8'));}
-  prepare(sql){const self=this;return {params:[],bind(...params){this.params=params;return this;},async first(){return self.db.prepare(sql).get(...this.params)||null;},async all(){return {results:self.db.prepare(sql).all(...this.params)};},async run(){const result=self.db.prepare(sql).run(...this.params);return {success:true,meta:{changes:Number(result.changes)}};}};}
+  prepare(sql){const self=this;return {params:[],bind(...params){if(params.length>100)throw new Error('D1_ERROR: too many SQL variables');this.params=params;return this;},async first(){return self.db.prepare(sql).get(...this.params)||null;},async all(){return {results:self.db.prepare(sql).all(...this.params)};},async run(){const result=self.db.prepare(sql).run(...this.params);return {success:true,meta:{changes:Number(result.changes)}};}};}
   async batch(statements){this.db.exec('BEGIN');try{const results=[];for(const statement of statements)results.push(await statement.run());this.db.exec('COMMIT');return results;}catch(error){this.db.exec('ROLLBACK');throw error;}}
 }
 function harness(withParticipants=true){
@@ -20,6 +21,7 @@ function harness(withParticipants=true){
  DB.db.exec(readFileSync(new URL('../migrations/0009_registration_owner.sql',import.meta.url),'utf8'));
  DB.db.exec(readFileSync(new URL('../migrations/0011_multi_category_registrations.sql',import.meta.url),'utf8'));
  if(withParticipants)DB.db.exec(readFileSync(new URL('../migrations/0012_participants.sql',import.meta.url),'utf8'));
+ DB.db.exec(readFileSync(new URL('../migrations/0026_event_schedule_pending.sql',import.meta.url),'utf8'));
  const env={DB,APP_ORIGIN:ROOT,DISCORD_CLIENT_ID:'app-id',DISCORD_CLIENT_SECRET:'test-only-secret',ADMIN_DISCORD_IDS:ADMIN,ASSETS:{fetch:async()=>new Response('static')}};
  const jars=new Map();
  async function req(path,method='GET',data,actor='guest',options={}){
@@ -288,4 +290,103 @@ test('shortening preserves bookings and crews, rejecting hours outside the new d
  assert.deepEqual(event.departures[0].crews[0].registrationIds,[registration.data.id]);
  assert.equal((await req('/api/events/'+event.id,'PATCH',{...event,durationHours:1},'admin')).status,409);
  assert.equal((await req('/api/events/'+event.id,'PATCH',{...event,durationHours:24},'admin')).status,200);
+});
+test('event list stays available beyond D1 bound-parameter limit',async()=>{
+ const {req,login,DB}=harness();await login(ADMIN,'admin');
+ const insertUser=DB.db.prepare('INSERT INTO users(id,name,created_at) VALUES(?,?,0)');
+ const insertEvent=DB.db.prepare(`INSERT INTO events(id,name,circuit,categories,departures,created_by,created_at) VALUES(?,?,'','["GT3"]',?,?,?)`);
+ const insertParticipant=DB.db.prepare('INSERT INTO participants(id,name,user_id,created_by,created_at) VALUES(?,?,?,?,0)');
+ const insertRegistration=DB.db.prepare(`INSERT INTO registrations(id,event_id,departure_id,user_id,owner_user_id,name,name_key,category,status,created_at,participant_id) VALUES(?,?,'d',?,?,?,?,'GT3','whole',0,?)`);
+ for(let i=0;i<120;i++){
+  const user=String(400000000000000000n+BigInt(i)),creator=String(500000000000000000n+BigInt(i)),suffix=String(i).padStart(12,'0');
+  const eventId='00000000-0000-4000-8000-'+suffix,participantId='10000000-0000-4000-8000-'+suffix;
+  insertUser.run(user,'Pilote '+i);insertUser.run(creator,'Createur '+i);
+  insertEvent.run(eventId,'Course '+i,JSON.stringify([{id:'d',date:'2090-01-01',time:'20:00',startsAt:Date.UTC(2090,0,1)}]),ADMIN,i);
+  insertParticipant.run(participantId,'Pilote '+i,user,creator);
+  insertRegistration.run('20000000-0000-4000-8000-'+suffix,eventId,user,creator,'Pilote '+i,'pilote '+i,participantId);
+ }
+ const list=await req('/api/events','GET',null,'admin');
+ assert.equal(list.status,200);
+ assert.equal(list.data.events.length,120);
+ assert.equal(list.data.events.reduce((total,event)=>total+event.departures[0].availability.length,0),120);
+ assert.equal(list.data.events.find(event=>event.name==='Course 7').departures[0].availability[0].addedByName,'Createur 7');
+ assert.equal((await req('/api/events?game=lmu')).data.events.length,120);
+ assert.equal((await req('/api/events?game=iracing')).data.events.length,0);
+});
+test('organizer-created crews stay ownerless across worker cold starts',async()=>{
+ const {req,login,DB,env,jars}=harness();await login(ADMIN,'admin');await login(PILOT,'pilot');
+ await req('/api/events','POST',eventInput,'admin');
+ const event=(await req('/api/events')).data.events[0],base=`/api/events/${event.id}/departures/${event.departures[0].id}`;
+ const reg=await req(base+'/registrations','POST',{name:'Pilote',category:'GTE',status:'whole'},'pilot');assert.equal(reg.status,201);
+ DB.db.exec("ALTER TABLE crews ADD COLUMN locked INTEGER NOT NULL DEFAULT 0");
+ const cookie=Object.entries(jars.get('pilot')).map(([k,v])=>`${k}=${v}`).join('; ');
+ const listAsPilot=async()=>(await (await workerWithMigrations.fetch(new Request(ROOT+'/api/events',{headers:{Cookie:cookie}}),env,{waitUntil(){}})).json()).events[0].departures[0].crews[0];
+ const crew=await req(base+'/crews','POST',{name:'Orga',category:'GTE'},'admin');assert.equal(crew.status,201);
+ assert.equal((await req('/api/crews/'+crew.data.id+'/members','POST',{registrationId:reg.data.id,version:1},'admin')).status,200);
+ const listed=await listAsPilot();
+ assert.deepEqual(listed.registrationIds,[reg.data.id]);
+ assert.equal(listed.hasOwner,false);assert.equal(listed.ownedByMe,false);assert.equal(listed.canManage,false);
+ assert.equal(DB.db.prepare('SELECT owner_user_id o FROM crews WHERE id=?').get(crew.data.id).o,null);
+});
+test('Discord login returns to the same-site page and race it started from',async()=>{
+ const {req}=harness();
+ const eventId='12345678-1234-4123-8123-123456789abc';
+ async function loginFrom(returnValue,actor){
+  const start=await req('/api/auth/discord?return='+encodeURIComponent(returnValue),'GET',null,actor);assert.equal(start.status,302);
+  const state=new URL(start.response.headers.get('Location')).searchParams.get('state');
+  const realFetch=globalThis.fetch;
+  globalThis.fetch=async url=>new Response(JSON.stringify(String(url).endsWith('/token')?{access_token:'mock'}:{id:PILOT,username:'Pilote'}),{headers:{'Content-Type':'application/json'}});
+  try{
+   const callback=await req('/api/auth/discord/callback?code=test&state='+state,'GET',null,actor);
+   assert.match(callback.response.headers.getSetCookie().join('\n'),/__Host-fmt_return=; [^\n]*Max-Age=0/);
+   return callback.response.headers.get('Location');
+  }finally{globalThis.fetch=realFetch;}
+ }
+ assert.equal(await loginFrom('/lmu/#event='+eventId,'a'),ROOT+'/lmu/#event='+eventId);
+ assert.equal(await loginFrom('/iracing/','b'),ROOT+'/iracing/');
+ assert.equal(await loginFrom('/lmu/#inscriptions','b2'),ROOT+'/lmu/#inscriptions');
+ for(const [i,unsafe] of ['//evil.example/','https://evil.example/','/\\evil.example','/lmu/?next=//evil','/lmu/#event=<script>','javascript:alert(1)'].entries())
+  assert.equal(await loginFrom(unsafe,'c'+i),ROOT+'/',unsafe);
+});
+test('events can be flagged with a schedule still to confirm',async()=>{
+ const {req,login}=harness();await login(ADMIN,'admin');
+ assert.equal((await req('/api/events','POST',{...eventInput,schedulePending:true},'admin')).status,201);
+ let event=(await req('/api/events')).data.events[0];
+ assert.equal(event.schedulePending,true);
+ const departures=event.departures.map(({id,date,time})=>({id,date,time}));
+ assert.equal((await req('/api/events/'+event.id,'PATCH',{...eventInput,departures,version:event.version},'admin')).status,200);
+ event=(await req('/api/events')).data.events[0];
+ assert.equal(event.schedulePending,true,'omitting the flag keeps it');
+ assert.equal((await req('/api/events/'+event.id,'PATCH',{...eventInput,departures,schedulePending:false,version:event.version},'admin')).status,200);
+ assert.equal((await req('/api/events')).data.events[0].schedulePending,false);
+});
+test('schedule migration moves the "(horaires ...)" suffix out of event names',()=>{
+ const db=new DatabaseSync(':memory:');
+ db.exec("CREATE TABLE events(id TEXT PRIMARY KEY,name TEXT NOT NULL,version INTEGER NOT NULL DEFAULT 1)");
+ db.exec("INSERT INTO events(id,name) VALUES('a','6h FUJI (horaires non définies par LMU)'),('b','12h du Mans'),('c','8h BAHRAIN  (Horaires à venir)')");
+ db.exec(readFileSync(new URL('../migrations/0026_event_schedule_pending.sql',import.meta.url),'utf8'));
+ assert.deepEqual(db.prepare('SELECT id,name,schedule_pending p,version v FROM events ORDER BY id').all().map(r=>({...r})),[
+  {id:'a',name:'6h FUJI',p:1,v:2},{id:'b',name:'12h du Mans',p:0,v:1},{id:'c',name:'8h BAHRAIN',p:1,v:2}]);
+});
+test('events can be listed by scope so the archive is only loaded on demand',async()=>{
+ const {req,login,DB}=harness();await login(ADMIN,'admin');
+ const upcoming=(await req('/api/events','POST',{...eventInput,name:'Course à venir'},'admin')).data.id;
+ const past=(await req('/api/events','POST',{...eventInput,name:'Course passée'},'admin')).data.id;
+ const row=DB.db.prepare('SELECT departures FROM events WHERE id=?').get(past);
+ const departures=JSON.parse(row.departures).map((d,i)=>({...d,startsAt:Date.now()-(3+i)*86400000}));
+ DB.db.prepare('UPDATE events SET departures=? WHERE id=?').run(JSON.stringify(departures),past);
+ const ids=async scope=>(await req('/api/events'+(scope?`?scope=${scope}`:''))).data.events.map(e=>e.id).sort();
+ assert.deepEqual(await ids('upcoming'),[upcoming]);
+ assert.deepEqual(await ids('archived'),[past]);
+ assert.deepEqual(await ids(''),[upcoming,past].sort());
+ assert.equal((await req('/api/events?scope=upcoming')).response.headers.get('X-Endurance-Scope'),'upcoming');
+});
+test('the scheduled job purges expired rate-limit counters and sessions',async()=>{
+ const {DB,env}=harness();
+ const past=Math.floor(Date.now()/1000)-60,future=past+7200;
+ DB.db.prepare('INSERT INTO rate_limits(key,count,expires_at) VALUES(?,?,?),(?,?,?)').run('old',1,past,'fresh',1,future);
+ const pending=[];
+ await workerWithMigrations.scheduled({},env,{waitUntil:promise=>pending.push(promise)});
+ await Promise.all(pending);
+ assert.deepEqual(DB.db.prepare('SELECT key FROM rate_limits ORDER BY key').all().map(row=>row.key),['fresh']);
 });

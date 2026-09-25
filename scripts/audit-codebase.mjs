@@ -114,9 +114,15 @@ if (!trustPage.includes('Discord OAuth') || !trustPage.includes('ne demande, ne 
 
 const wrangler = await readable(resolve(root, 'wrangler.jsonc'));
 const wranglerProd = await readable(resolve(root, 'wrangler.prod.jsonc'));
-if (/"binding"\s*:\s*"ASSETS"/.test(wrangler)) warnings.push('Le binding ASSETS est inutile tant que le Worker ne fait pas env.ASSETS.fetch().');
-if (!/"minify"\s*:\s*true/.test(wrangler)) warnings.push('Wrangler doit minifier le Worker avant déploiement.');
-if (!wrangler.includes('"/api/*"')) warnings.push('Cloudflare doit exécuter le Worker en priorité uniquement sur les routes /api/*.');
+// Production: static files are served directly, the Worker only runs first on /api/*.
+if (/"binding"\s*:\s*"ASSETS"/.test(wranglerProd)) warnings.push('En production, le binding ASSETS est inutile : les fichiers statiques sont servis sans passer par le Worker.');
+if (!wranglerProd.includes('"/api/*"')) warnings.push('En production, Cloudflare doit exécuter le Worker en priorité uniquement sur les routes /api/*.');
+if (!/"minify"\s*:\s*true/.test(wrangler) || !/"minify"\s*:\s*true/.test(wranglerProd)) warnings.push('Wrangler doit minifier le Worker avant déploiement.');
+// Dev: every page goes through the Worker to add the "version de test" banner and noindex.
+const devSite = /"SITE_ENV"\s*:\s*"development"/.test(wrangler);
+if (devSite && !(/"binding"\s*:\s*"ASSETS"/.test(wrangler) && /"run_worker_first"\s*:\s*true/.test(wrangler))) warnings.push('Le dev (SITE_ENV=development) doit passer toutes les pages par le Worker avec le binding ASSETS.');
+if (!devSite && !wrangler.includes('"/api/*"')) warnings.push('Cloudflare doit exécuter le Worker en priorité uniquement sur les routes /api/*.');
+if (/"SITE_ENV"/.test(wranglerProd)) warnings.push('SITE_ENV est réservé au site dev : la production ne doit pas afficher le bandeau de test.');
 if (!wranglerProd.includes('"APP_ORIGIN": "https://endurance-manager.app"')) warnings.push('La production doit conserver endurance-manager.app comme origine canonique HTTPS.');
 
 const publicDir = resolve(root, 'public');

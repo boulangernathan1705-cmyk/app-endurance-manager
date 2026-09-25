@@ -33,7 +33,9 @@ async function loadSession() {
 async function loadEvents(force = false) {
   if (!force && app?.querySelector('[data-event-id]') && app.eventViewData) return app.eventViewData.events;
   if (!force && eventsCache) return eventsCache;
-  const result = await api('/api/events');
+  // Crews are only built for upcoming starts of the current simulator.
+  const game = globalThis.__ENDURANCE_GAME__ === 'iracing' ? 'iracing' : 'lmu';
+  const result = await api(`/api/events?game=${game}&scope=upcoming`);
   eventsCache = Array.isArray(result.events) ? result.events : [];
   return eventsCache;
 }
@@ -168,27 +170,34 @@ function panelMarkup(event) {
   const lockedNote = builderState.locked ? '<p class="crew-builder-warning">Cet équipage est marqué complet. Rouvre-le depuis sa carte avant de modifier sa composition.</p>' : '';
   const categoryNote = memberCategoryLocked && !builderState.locked ? '<p class="crew-builder-help">Pour changer de catégorie, retire d’abord tous les pilotes de cet équipage.</p>' : '';
 
-  return `<section class="crew-builder-panel" data-crew-builder-panel>
-    <div class="crew-builder-heading"><div><span class="creation-kicker">FORMATION D’ÉQUIPAGE</span><h2>${title}</h2><p>${description}</p></div><button type="button" class="secondary-button" data-crew-builder-cancel>Annuler</button></div>
-    <form class="crew-builder-form" data-crew-builder-form>
-      <section class="crew-builder-card"><div class="crew-builder-card-title"><span>01</span><div><h3>Équipage</h3><p>${esc(dateLabel(departure))} · départ ${esc(departure.time)}</p></div></div>
+  const step = Math.min(3, Math.max(1, Number(builderState.step) || 1));
+  const pane = (n, content) => `<section class="crew-builder-step" data-builder-step="${n}" ${n === step ? '' : 'hidden'}>${content}</section>`;
+  const selected = (builderState.registrationIds || []).map(id => departure.availability.find(reg => reg.id === id)).filter(Boolean);
+  const coverage = coverageData(event, departure, builderState.registrationIds || []);
+  const summaryRow = (n, label, value) => `<button type="button" class="registration-summary-row" data-crew-builder-step="${n}"><span>${label}</span><strong>${value}</strong><em>Modifier</em></button>`;
+  const nav = `<div class="registration-step-nav">${step > 1 ? `<button type="button" class="secondary-button registration-back" data-crew-builder-step="${step - 1}">Retour</button>` : ''}${step < 3 ? `<button type="button" class="primary-button registration-next" data-crew-builder-step="${step + 1}">Continuer</button>` : `<button type="submit" class="primary-button registration-next" data-crew-builder-submit>${submitLabel()}</button>`}</div>`;
+  const steps = ['Équipage', 'Pilotes', 'Récapitulatif'];
+  return `<div class="crew-builder-overlay" data-crew-builder-overlay><section class="crew-builder-panel registration-sheet" data-crew-builder-panel role="dialog" aria-modal="true" aria-labelledby="crew-builder-title">
+    <div class="registration-workspace-head"><div class="registration-workspace-title"><h2 id="crew-builder-title" tabindex="-1">${title}</h2><p>${esc(event.name)} · ${esc(dateLabel(departure))} · ${esc(departure.time)}</p></div><span class="registration-workspace-actions"><button type="button" class="secondary-button registration-close-button" data-crew-builder-cancel>Fermer</button></span></div>
+    <form class="crew-builder-form registration-stepper" data-crew-builder-form data-step="${step}">
+      <div class="registration-progress" aria-hidden="true">${steps.map((_, index) => `<span class="${index < step ? 'done' : ''}"></span>`).join('')}</div>
+      <p class="registration-step-label">Étape ${step} sur 3 · ${steps[step - 1]}</p>
+      ${pane(1, `<p class="registration-step-help">${description}</p>
         <div class="crew-builder-fields">
-          <label>Départ<input value="${esc(dateLabel(departure))} · ${esc(departure.time)}" disabled></label>
           <label>Catégorie<select name="builderCategory" ${categoryDisabled?'disabled':''}>${categories.map(category => `<option value="${esc(category)}" ${category === builderState.category ? 'selected' : ''}>${esc(category)}</option>`).join('')}</select></label>
           <label>Nom de l’équipage<input name="builderName" maxlength="60" required value="${esc(builderState.name)}" placeholder="Ex. FMT Racing 1"></label>
           <label>Voiture<select name="builderCar"><option value="">Voiture à définir</option>${(CARS[builderState.category] || []).map(car => `<option value="${esc(car)}" ${car === builderState.car ? 'selected' : ''}>${esc(car)}</option>`).join('')}</select></label>
-        </div>${categoryNote}
-      </section>
-      <section class="crew-builder-card"><div class="crew-builder-card-title"><span>02</span><div><h3>Composition</h3><p>${editMode?'Coche ou décoche les pilotes que tu veux dans cet équipage.':'Tu peux ajouter dès maintenant d’autres pilotes inscrits dans la même catégorie.'}</p></div></div>
-        ${lockedNote}
-        <div class="crew-builder-pilots">${candidates.length ? candidates.map(registration => pilotCard(event,departure,registration,builderState.locked,registration.id===builderState.ownerRegistrationId)).join('') : '<p class="crew-builder-empty">Aucun pilote disponible dans cette catégorie pour ce départ.</p>'}</div>
-        ${!builderState.locked ? '<p class="crew-builder-warning">Un pilote ne peut appartenir qu’à un équipage sur un même départ. Son affectation remplace ses autres inscriptions de catégorie sur ce départ.</p>' : ''}
-      </section>
-      <section class="crew-builder-card crew-builder-coverage" data-crew-builder-coverage>${coverageMarkup(event,departure)}</section>
-      <div class="crew-builder-actions"><span class="crew-builder-submit-note">Les inscriptions des pilotes restent conservées lorsqu’ils quittent un équipage.</span><button type="submit" class="primary-button" data-crew-builder-submit>${submitLabel()}</button></div>
+        </div>${categoryNote}`)}
+      ${pane(2, `${lockedNote}<p class="registration-step-help">${editMode ? 'Coche ou décoche les pilotes que tu veux dans cet équipage.' : 'Choisis les pilotes inscrits en ' + esc(builderState.category) + ' sur ce départ. Tu peux aussi le faire plus tard.'}</p>
+        <div class="crew-builder-pilots">${candidates.length ? candidates.map(registration => pilotCard(event,departure,registration,builderState.locked,registration.id===builderState.ownerRegistrationId)).join('') : '<p class="crew-builder-empty">Aucun pilote disponible dans cette catégorie.</p>'}</div>
+        <section class="crew-builder-coverage" data-crew-builder-coverage>${coverageMarkup(event,departure)}</section>
+        ${!builderState.locked ? '<p class="registration-step-help">Un pilote ne peut appartenir qu’à un équipage sur un même départ. Son affectation remplace ses autres inscriptions de catégorie sur ce départ.</p>' : ''}`)}
+      ${pane(3, `<div class="registration-summary">${summaryRow(1, 'Équipage', esc(builderState.name || '—'))}${summaryRow(1, 'Catégorie', esc(builderState.category || '—'))}${summaryRow(1, 'Voiture', esc(builderState.car || 'À définir'))}${summaryRow(2, 'Pilotes', selected.length ? esc(selected.map(reg => reg.name).join(', ')) : 'Aucun pour l’instant')}${summaryRow(2, 'Couverture', `${coverage.covered}/${coverage.duration} h`)}</div>
+        <p class="registration-step-help">Les inscriptions des pilotes restent conservées lorsqu’ils quittent un équipage.</p>`)}
       <p class="creation-error crew-builder-error" data-crew-builder-error hidden></p>
+      ${nav}
     </form>
-  </section>`;
+  </section></div>`;
 }
 
 function renderPanel(event, {scroll = false} = {}) {
@@ -196,7 +205,8 @@ function renderPanel(event, {scroll = false} = {}) {
   if (!root) return;
   root.innerHTML = panelMarkup(event);
   builderPanel = root.querySelector('[data-crew-builder-panel]');
-  if (scroll) builderPanel?.scrollIntoView({behavior:'smooth',block:'start'});
+  document.dispatchEvent(new CustomEvent('crew-builder:rendered'));
+  if (scroll) builderPanel?.querySelector('#crew-builder-title')?.focus({preventScroll:true});
 }
 
 function updateCoverage(event) {
@@ -255,8 +265,8 @@ function decorateEventView() {
 
 async function refreshMainView() {
   eventsCache = null;
-  const refresh = app?.querySelector('[data-action="refresh"]');
-  if (refresh) refresh.click();
+  // The race page reloads its data and re-renders (front/app/actions.mjs listens for this).
+  document.dispatchEvent(new CustomEvent('endurance:refresh'));
 }
 
 async function openBuilder(crewId = null, preferredDepartureId = '') {
@@ -282,7 +292,7 @@ async function openBuilder(crewId = null, preferredDepartureId = '') {
         mode:'edit', eventId, manager, crewId:found.crew.id, version:found.crew.version,
         departureId:found.departure.id, category:found.crew.category, car:found.crew.car || '',
         name:found.crew.name, locked:!!found.crew.locked, ownerRegistrationId:null,
-        registrationIds:[...(found.crew.registrationIds || [])], originalRegistrationIds:[...(found.crew.registrationIds || [])]
+        registrationIds:[...(found.crew.registrationIds || [])], originalRegistrationIds:[...(found.crew.registrationIds || [])], step:3
       };
     } else {
       const departure = defaultDeparture(event,preferredDepartureId);
@@ -291,11 +301,10 @@ async function openBuilder(crewId = null, preferredDepartureId = '') {
       if (!manager && !own.length) throw new Error('Inscris-toi d’abord sur ce départ avant de créer ton équipage.');
       const category=manager ? (event.categories[0] || '') : own[0].category;
       const ownerRegistrationId=manager ? null : own.find(reg=>reg.category===category)?.id || null;
-      builderState = {mode:'create',eventId,manager,departureId:departure.id,category,car:'',name:'',locked:false,ownerRegistrationId,registrationIds:ownerRegistrationId?[ownerRegistrationId]:[],originalRegistrationIds:[]};
+      builderState = {mode:'create',eventId,manager,departureId:departure.id,category,car:'',name:'',locked:false,ownerRegistrationId,registrationIds:ownerRegistrationId?[ownerRegistrationId]:[],originalRegistrationIds:[],step:1};
     }
 
     renderPanel(event,{scroll:true});
-    builderPanel?.querySelector('[name="builderName"]')?.focus({preventScroll:true});
   } catch (error) {
     pendingMessage = {error:true,text:error?.message || 'Impossible d’ouvrir l’éditeur d’équipage.'};
     insertPendingMessage();
@@ -371,8 +380,8 @@ async function submitBuilder(form) {
   if (submit) submit.disabled = true;
   const mode = builderState.mode;
   try {
-    builderState.name = form.elements.builderName.value.trim();
-    builderState.car = form.elements.builderCar.value;
+    builderState.name = (form.elements.builderName?.value ?? builderState.name).trim();
+    builderState.car = form.elements.builderCar?.value ?? builderState.car;
     if (!builderState.name) throw new Error('Indique le nom de l’équipage.');
     const result = mode === 'edit' ? await editCrew() : await createCrew();
     const suffix = result.removedRegistrations ? ` ${result.removedRegistrations} autre(s) inscription(s) du même départ ont été retirées.` : '';
@@ -401,10 +410,33 @@ document.addEventListener('click', event => {
     void openBuilder(edit.dataset.id);
     return;
   }
-  if (event.target.closest('[data-crew-builder-cancel]')) {
+  if (event.target.closest('[data-crew-builder-cancel]') || event.target.matches?.('[data-crew-builder-overlay]')) {
     event.preventDefault();
     closeBuilder();
+    return;
   }
+  const stepButton = event.target.closest('[data-crew-builder-step]');
+  if (stepButton && builderState) {
+    event.preventDefault();
+    const form = stepButton.closest('[data-crew-builder-form]');
+    const wanted = Number(stepButton.dataset.crewBuilderStep);
+    const current = Number(builderState.step) || 1;
+    if (form?.elements.builderName) builderState.name = form.elements.builderName.value.trim();
+    if (wanted > current && !builderState.name) {
+      showBuilderError('Indique le nom de l’équipage.');
+      form?.elements.builderName?.focus();
+      return;
+    }
+    builderState.step = wanted;
+    loadEvents().then(events => {
+      const current = events.find(item => item.id === builderState?.eventId);
+      if (current) renderPanel(current, {scroll:true});
+    }).catch(() => {});
+  }
+});
+
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape' && builderState && app?.querySelector('[data-crew-builder-panel]') && !document.querySelector('[data-ux-error-modal]')) closeBuilder();
 });
 
 document.addEventListener('input', event => {
@@ -445,6 +477,7 @@ document.addEventListener('submit', event => {
   const form = event.target.closest('[data-crew-builder-form]');
   if (!form) return;
   event.preventDefault();
+  if ((Number(builderState?.step) || 1) < 3) { form.querySelector('.registration-next')?.click(); return; }
   void submitBuilder(form);
 });
 

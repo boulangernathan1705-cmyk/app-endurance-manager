@@ -146,7 +146,7 @@ function gameCard(game, events) {
 }
 
 async function fetchGameEvents(game) {
-  const response = await fetch(`/api/events?game=${encodeURIComponent(game)}`, {credentials:'same-origin',cache:'no-store'});
+  const response = await fetch(`/api/events?game=${encodeURIComponent(game)}&scope=upcoming`, {credentials:'same-origin',cache:'no-store'});
   if (!response.ok) throw new Error(`events-${game}`);
   const result = await response.json();
   return Array.isArray(result.events) ? result.events : [];

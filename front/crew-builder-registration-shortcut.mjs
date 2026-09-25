@@ -1,5 +1,5 @@
 import {state,api,CARS} from './app/core.mjs';
-import {renderRegistrationForm,submitRegistration} from './app/registration.mjs?v=2-preserve-timeline-scroll';
+import {renderRegistrationForm,submitRegistration} from './app/registration.mjs';
 
 let activeBuilder={mode:'',departureId:''};
 let modalState={departureId:'',category:''};
@@ -15,10 +15,8 @@ function decorateCrewBuilder(){
   const panel=document.querySelector('[data-crew-builder-panel]');
   if(!panel||!builderAllowsPilotRegistration()||!activeBuilder.departureId)return false;
   if(panel.querySelector('[data-crew-builder-register-pilot]'))return true;
-  const cards=panel.querySelectorAll('.crew-builder-form > .crew-builder-card');
-  const composition=cards[1];
-  if(!composition)return false;
-  const anchor=composition.querySelector('.crew-builder-pilots');
+  // Pilots step of the crew window.
+  const anchor=panel.querySelector('[data-builder-step="2"] .crew-builder-pilots');
   if(!anchor)return false;
 
   const actions=document.createElement('div');
@@ -132,7 +130,7 @@ async function saveModal(form){
     const result=await submitRegistration(form,api);
     closeModal({discardDraft:false});
     document.dispatchEvent(new CustomEvent('crew-builder:pilot-registered',{detail:{departureId,registrationId:result.id}}));
-    document.querySelector('[data-action="refresh"]')?.click();
+    document.dispatchEvent(new CustomEvent('endurance:refresh'));
   }catch(error){
     setModalError(error?.message||'Impossible d’inscrire ce pilote.');
   }finally{
@@ -237,3 +235,4 @@ document.addEventListener('keydown',event=>{
 },true);
 
 document.addEventListener('endurance:render',()=>decorateWhenReady());
+document.addEventListener('crew-builder:rendered',()=>decorateWhenReady());

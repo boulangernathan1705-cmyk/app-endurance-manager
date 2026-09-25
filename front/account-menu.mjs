@@ -72,7 +72,7 @@ function renderDisconnected(discordReady) {
   root.innerHTML = `<div class="account-disconnected-wrap"><div class="account-disconnected-actions">
     <a class="account-menu-item account-help-link" href="/help.html">Aide</a>
     ${discordReady
-      ? `<a class="account-discord-login" href="/api/auth/discord">${discordMark()}<span>Se connecter avec Discord</span></a>`
+      ? `<a class="account-discord-login" href="/api/auth/discord">${discordMark()}<span class="login-long">Se connecter avec Discord</span><span class="login-short">Connexion</span></a>`
       : `<span class="account-discord-unavailable">${discordMark()}<span>Connexion Discord indisponible</span></span>`}
   </div>${discordReady?'<p class="account-oauth-trust">Connexion via Discord OAuth · aucun mot de passe transmis à Endurance Manager. <a href="/about.html#connexion">En savoir plus</a></p>':''}</div>`;
 }
@@ -118,7 +118,17 @@ function activateLegacyHashAction() {
   if (location.hash === '#help') location.replace('/help.html');
 }
 
+// The address already names the open race (#event=…) or My entries: Discord login brings the pilot back there.
+function loginReturnPath() {
+  return location.pathname + (/^#(?:event=[a-f0-9-]{36}|inscriptions)$/.test(location.hash) ? location.hash : '');
+}
+
 root?.addEventListener('click', async event => {
+  const login = event.target.closest('.account-discord-login');
+  if (login) {
+    login.href = `/api/auth/discord?return=${encodeURIComponent(loginReturnPath())}`;
+    return;
+  }
   const trigger = event.target.closest('.account-trigger');
   if (trigger) {
     const menu = trigger.closest('.account-menu');
