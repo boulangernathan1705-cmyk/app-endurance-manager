@@ -51,6 +51,13 @@ jobs:
             fi
             sleep 10
           done
+          # Diagnose without printing secrets: status, redirect target and content type only.
+          curl --silent --output /dev/null --max-time 10 \
+            -H "CF-Access-Client-Id: ${CF_ACCESS_CLIENT_ID}" \
+            -H "CF-Access-Client-Secret: ${CF_ACCESS_CLIENT_SECRET}" \
+            --write-out 'status=%{http_code} type=%{content_type} redirect=%{redirect_url}\n' \
+            "${COMPAT_BASE_URL}/api/session" | sed -E 's/\?.*$/?…/'
+          echo "::error::Cloudflare Access did not let the service token through (check the Service Auth policy on the dev application)."
           exit 1
       - run: npm run compat:test
         if: steps.access.outputs.ready == 'true'
