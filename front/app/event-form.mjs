@@ -1,6 +1,28 @@
 import {app,state,esc,button,canManage,CATEGORIES,EVENT_TYPES,CIRCUITS,categories,logo,notifyRender} from './core.mjs';
 
-export function departureFields(departure={}){const id=crypto.randomUUID();return `<div class="departure-field" data-id="${esc(departure.id||'')}"><div><label class="form-label" for="date-${id}">Date</label><input id="date-${id}" name="date" type="date" value="${esc(departure.date||'')}" required></div><div><label class="form-label" for="time-${id}">Heure (Paris)</label><input id="time-${id}" name="time" type="time" value="${esc(departure.time||'00:00')}" required></div>${button('remove-departure','×','aria-label="Supprimer ce départ"','remove-departure')}</div>`;}
+// A start = a date (native calendar, opened on click) and a time chosen from hour / minute lists
+// (minutes 00 by default). The hidden "time" input keeps the HH:MM value submitEvent reads.
+const MINUTES=['00','15','30','45'];
+function parisToday(){return new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Paris',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());}
+export function departureFields(departure={}){
+  const id=crypto.randomUUID();
+  const [hour='00',minute='00']=String(departure.time||'00:00').split(':');
+  const minutes=MINUTES.includes(minute)?MINUTES:[...MINUTES,minute].sort();
+  const hours=Array.from({length:24},(_,value)=>String(value).padStart(2,'0'));
+  return `<div class="departure-field" data-id="${esc(departure.id||'')}"><div><label class="form-label" for="date-${id}">Date</label><input id="date-${id}" name="date" type="date" value="${esc(departure.date||'')}" ${departure.id?'':`min="${parisToday()}"`} required data-date-picker></div><div class="time-picker"><span class="form-label" id="time-label-${id}">Heure (Paris)</span><span class="time-picker-row" role="group" aria-labelledby="time-label-${id}"><select name="timeHour" aria-label="Heure">${hours.map(value=>`<option value="${value}" ${value===hour?'selected':''}>${value} h</option>`).join('')}</select><span aria-hidden="true">:</span><select name="timeMinute" aria-label="Minutes">${minutes.map(value=>`<option value="${value}" ${value===minute?'selected':''}>${value}</option>`).join('')}</select></span><input type="hidden" name="time" value="${esc(`${hour}:${minute}`)}"></div>${button('remove-departure','×','aria-label="Supprimer ce départ"','remove-departure')}</div>`;
+}
+if(typeof document!=='undefined'){
+  document.addEventListener('change',event=>{
+    const field=event.target;
+    if(!field.matches?.('[name="timeHour"],[name="timeMinute"]'))return;
+    const row=field.closest('.departure-field');
+    row.querySelector('[name="time"]').value=`${row.querySelector('[name="timeHour"]').value}:${row.querySelector('[name="timeMinute"]').value}`;
+  });
+  document.addEventListener('click',event=>{
+    const input=event.target.closest?.('input[data-date-picker]');
+    try{input?.showPicker?.();}catch{}
+  });
+}
 export function updateRemoveButtons(){const buttons=app.querySelectorAll('[data-action="remove-departure"]');buttons.forEach(button=>{button.disabled=buttons.length===1;});}
 export function renderEventForm(event=null){
   if(!canManage())throw Error('Connecte-toi avec un compte autorisé.');state.page='form';state.editingEvent=event?structuredClone(event):null;
