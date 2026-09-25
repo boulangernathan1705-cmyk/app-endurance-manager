@@ -2,7 +2,7 @@ import {app,state,api,load,showError,countdown,CARS} from './core.mjs';
 import {renderNav,renderHome} from './home-view.mjs?v=3-shared-crew-cards';
 import {renderEvent} from './event-view.mjs?v=9-one-course-page';
 import {renderEventForm,departureFields,updateRemoveButtons,goToEventStep} from './event-form.mjs';
-import {renderMyEntries} from './entries-view.mjs?v=2-three-accordions';
+import {renderMyEntries} from './entries-view.mjs?v=3-three-columns';
 import {refresh,refreshAfterSave} from './refresh.mjs';
 import {draftFor,registrationDraft,ownRegistrations,rerenderRegistrationSection,submitRegistration,registrationStep} from './registration.mjs?v=2-preserve-timeline-scroll';
 import {updateCrewState} from './crews.mjs?v=8-one-page-compact';

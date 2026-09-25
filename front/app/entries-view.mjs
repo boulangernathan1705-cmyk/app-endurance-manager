@@ -42,15 +42,9 @@ function crewSort(event) {
     || String(a.name || '').localeCompare(String(b.name || ''),locale,{sensitivity:'base',numeric:true});
 }
 
-function summary(title,count) {
-  return `<summary class="ux-my-entry-accordion-summary"><span>${esc(title)}</span><strong>${count}</strong><span class="ux-my-entry-chevron" aria-hidden="true">›</span></summary>`;
-}
-
-function contentAccordion(title,count,body,compact=false) {
-  return `<details class="ux-my-entry-content-accordion${compact?' is-compact':''}">
-    ${summary(title,count)}
-    <div class="ux-my-entry-content-body">${body}</div>
-  </details>`;
+// The entry body: three side-by-side columns (own crew, other crews, pilots without a crew), no nested frames.
+function column(title,count,body) {
+  return `<section class="my-entry-column"><h3 class="my-entry-column-title">${esc(title)} <span>${count}</span></h3>${body}</section>`;
 }
 
 function compactCrew(departure,crew) {
@@ -107,10 +101,10 @@ function card({event,departure,reg}) {
       </span>${circuitVisual(event.circuit,true)}</span>
       <button type="button" class="primary-button native-my-entry-open-event" data-action="open" data-id="${event.id}" data-departure="${departure.id}">Voir la course</button>
     </summary>
-    <div class="native-my-entry-body">
-      ${contentAccordion('Mon équipage',members.length,ownCrewBody)}
-      ${contentAccordion('Autres équipages',otherCrews.length,otherCrewsBody,true)}
-      ${contentAccordion('Pilotes sans équipage',unassigned.length,unassignedBody,true)}
+    <div class="native-my-entry-body my-entry-columns">
+      ${column('Mon équipage',members.length,ownCrewBody)}
+      ${column('Autres équipages',otherCrews.length,otherCrewsBody)}
+      ${column('Pilotes sans équipage',unassigned.length,unassignedBody)}
     </div>
   </details>`;
 }

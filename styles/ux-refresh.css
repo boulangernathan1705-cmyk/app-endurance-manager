@@ -1065,3 +1065,38 @@ html[data-game] #app .my-entry-race .ux-my-awaiting-crew .crew-pilot-lines { mar
   html[data-game] #app .my-entry-race .race-date { width: 56px; }
   html[data-game] #app .my-entry-race .race-head h2.event-name { font-size: 19px !important; }
 }
+
+/* Mes inscriptions dépliée : trois colonnes côte à côte, sans cadres dans les cadres. */
+html[data-game] #app .my-entry-race .my-entry-columns {
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  gap: 0 !important;
+  padding: 0 !important;
+  border-top: 1px solid rgba(255, 255, 255, .08);
+}
+html[data-game] #app .my-entry-column { min-width: 0; padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 8px; }
+html[data-game] #app .my-entry-column + .my-entry-column { border-left: 1px solid rgba(255, 255, 255, .08); }
+html[data-game] #app .my-entry-column-title { margin: 0; display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 800; color: #f2f5f4; }
+html[data-game] #app .my-entry-column-title span { min-width: 24px; padding: 1px 8px; border-radius: 999px; border: 1px solid rgba(255, 255, 255, .18); font-size: 12px; text-align: center; color: #c7d0d4; }
+html[data-game] #app .my-entry-column .ux-my-own-crew,
+html[data-game] #app .my-entry-column .ux-my-awaiting-crew,
+html[data-game] #app .my-entry-column .ux-my-other-crew {
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+html[data-game] #app .my-entry-column .ux-my-own-crew-head { padding: 0 0 6px !important; border: 0 !important; background: none !important; }
+html[data-game] #app .my-entry-column .ux-my-other-crews-grid { display: flex !important; flex-direction: column; gap: 0 !important; }
+html[data-game] #app .my-entry-column .ux-my-other-crew { padding: 8px 0 !important; border-top: 1px solid rgba(255, 255, 255, .06) !important; }
+html[data-game] #app .my-entry-column .ux-my-other-crew:first-child { border-top: 0 !important; }
+html[data-game] #app .my-entry-column .ux-my-awaiting-copy { display: grid; gap: 2px; }
+html[data-game] #app .my-entry-column .ux-my-awaiting-copy span { color: #aab3b6; font-size: 13px; }
+html[data-game] #app .my-entry-column .crew-pilot-lines { margin-top: 0 !important; }
+@media (max-width: 1000px) {
+  html[data-game] #app .my-entry-race .my-entry-columns { grid-template-columns: minmax(0, 1fr) !important; }
+  html[data-game] #app .my-entry-column + .my-entry-column { border-left: 0; border-top: 1px solid rgba(255, 255, 255, .08); }
+}
+html[data-game] #app .my-entry-column .crew-pilot-line { background: none !important; border-radius: 0 !important; box-shadow: none !important; padding-left: 0 !important; padding-right: 0 !important; }
