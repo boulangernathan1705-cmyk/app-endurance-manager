@@ -15,16 +15,15 @@ function raceDateBlock(event,archived){
   const stamp=new Date(Number(shown.startsAt));
   return `<span class="race-date"><small>${esc(weekdayFormatter.format(stamp))}</small><strong>${esc(dayNumberFormatter.format(stamp))}</strong><small>${esc(monthFormatter.format(stamp))}</small><b>${esc(shown.time||'')}</b></span>`;
 }
-// Start times grouped by day ("sam. 26 · 05h 12h 16h"), next start and the pilot's own starts marked.
+// Start times grouped by day ("sam. 26 · 05h 12h 16h"), all shown alike.
 function raceStarts(event,archived){
   const dated=datedDepartures(event),now=Date.now();
   const shown=archived?dated:dated.filter(d=>Number(d.startsAt)>now);
   if(shown.length<2)return '';
-  const next=archived?null:shown[0];
   const days=new Map();
   for(const departure of shown){const key=dayKeyFormatter.format(new Date(Number(departure.startsAt)));if(!days.has(key))days.set(key,[]);days.get(key).push(departure);}
   const entries=[...days.values()],visible=entries.slice(0,3),hidden=entries.length-visible.length;
-  const time=departure=>{const mine=(departure.availability||[]).some(reg=>reg.mine&&reg.status!=='unavailable');return `<span class="race-start${departure===next?' is-next':''}${mine?' is-mine':''}"${mine?' title="Tu es inscrit sur ce départ"':''}>${esc(displayTime(departure.time))}</span>`;};
+  const time=departure=>`<span class="race-start">${esc(displayTime(departure.time))}</span>`;
   return `<span class="race-starts">${visible.map(list=>{const stamp=new Date(Number(list[0].startsAt));return `<span class="race-day"><em>${esc(weekdayFormatter.format(stamp))} ${esc(dayNumberFormatter.format(stamp))}</em>${list.map(time).join('')}</span>`;}).join('')}${hidden>0?`<span class="race-day race-more">+ ${hidden} jour${hidden>1?'s':''}</span>`:''}</span>`;
 }
 function displayTime(value){const match=String(value||'').match(/^(\d{1,2}):(\d{2})$/);if(!match)return String(value||'').trim();if(getLocale()==='en')return`${String(Number(match[1])).padStart(2,'0')}:${match[2]}`;return match[2]==='00'?`${Number(match[1])}h`:`${Number(match[1])}h${match[2]}`;}

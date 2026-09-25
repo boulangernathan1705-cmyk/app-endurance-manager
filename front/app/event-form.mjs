@@ -1,8 +1,8 @@
 import {app,state,esc,button,canManage,CATEGORIES,EVENT_TYPES,CIRCUITS,categories,logo,notifyRender} from './core.mjs';
 
 // A start = a date (native calendar, opened on click) and a time chosen from hour / minute lists
-// (minutes 00 by default). The hidden "time" input keeps the HH:MM value submitEvent reads.
-const MINUTES=['00','15','30','45'];
+// (5-minute steps, 00 by default). The hidden "time" input keeps the HH:MM value submitEvent reads.
+const MINUTES=Array.from({length:12},(_,index)=>String(index*5).padStart(2,'0'));
 function parisToday(){return new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Paris',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());}
 export function departureFields(departure={}){
   const id=crypto.randomUUID();

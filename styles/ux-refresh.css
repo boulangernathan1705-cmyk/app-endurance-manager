@@ -797,7 +797,7 @@ html[data-game] .event-card .event-card-layout { grid-template-columns: minmax(0
    ===================================================================== */
 html[data-game] .event-list {
   display: grid !important;
-  grid-template-columns: repeat(auto-fill, minmax(max(440px, calc((100% - 32px) / 3)), 1fr)) !important;
+  grid-template-columns: repeat(auto-fill, minmax(max(440px, calc((100% - 16px) / 2)), 1fr)) !important;
   gap: 16px !important;
   align-items: stretch;
 }
@@ -834,8 +834,8 @@ html[data-game] .race-card .race-head .event-type-badge { font-size: 10.5px !imp
 html[data-game] .race-card .race-card-top > .circuit-visual {
   position: static !important;
   flex: none;
-  width: 92px !important;
-  height: 70px !important;
+  width: 150px !important;
+  height: 112px !important;
   margin: 0 !important;
   opacity: .85;
   transform: none !important;
@@ -856,8 +856,6 @@ html[data-game] .race-card .race-start {
   font-weight: 600;
   color: #e6ecea;
 }
-html[data-game] .race-card .race-start.is-next { border-color: #52d3d8; color: #bff5f8; }
-html[data-game] .race-card .race-start.is-mine { background: #f2f5f4; border-color: #f2f5f4; color: #0b0d0e; }
 html[data-game] .race-card .race-more { font-size: 13px; color: #aab3b6; }
 
 /* Ta situation, puis le remplissage. */
@@ -871,7 +869,7 @@ html[data-game] .race-card .event-card-status { display: none !important; }
 @media (max-width: 600px) {
   html[data-game] .event-list { grid-template-columns: minmax(0, 1fr) !important; }
   html[data-game] .race-card .race-card-body { padding: 14px !important; }
-  html[data-game] .race-card .race-card-top > .circuit-visual { width: 64px !important; height: 50px !important; }
+  html[data-game] .race-card .race-card-top > .circuit-visual { width: 88px !important; height: 68px !important; }
   html[data-game] .race-card .event-name { font-size: 19px !important; }
   html[data-game] .race-card .race-day em { width: 56px; }
 }
