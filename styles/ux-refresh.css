@@ -790,3 +790,88 @@ html[data-game] .event-card .event-card-layout { grid-template-rows: auto !impor
 /* Les équipages ne figurent plus dans la liste : la course, puis le circuit. */
 html[data-game] .event-card .event-card-layout { grid-template-columns: minmax(0, 1fr) 120px !important; grid-template-areas: "main circuit" !important; }
 @media (max-width: 900px) { html[data-game] .event-card .event-card-layout { grid-template-columns: minmax(0, 1fr) 84px !important; grid-template-areas: "main circuit" !important; grid-template-rows: auto !important; } }
+
+/* =====================================================================
+   Carte de course (liste) : quand, quoi, ta situation, remplissage.
+   Deux cartes par ligne sur ordinateur (trois sur très grand écran).
+   ===================================================================== */
+html[data-game] .event-list {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fill, minmax(max(440px, calc((100% - 32px) / 3)), 1fr)) !important;
+  gap: 16px !important;
+  align-items: stretch;
+}
+html[data-game] .event-card.race-card { padding: 0 !important; min-height: 0 !important; margin: 0 !important; height: 100%; text-align: left; }
+html[data-game] .race-card .race-card-body {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 12px !important;
+  padding: 16px 18px !important;
+  height: 100%;
+  box-sizing: border-box;
+}
+html[data-game] .race-card .race-card-top { display: flex; align-items: flex-start; gap: 14px; }
+html[data-game] .race-card .race-date {
+  width: 62px;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 6px 0 8px;
+  border: 1px solid rgba(255, 255, 255, .16);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, .03);
+  line-height: 1.15;
+}
+html[data-game] .race-card .race-date small { font-size: 12px; color: #aab3b6; text-transform: lowercase; }
+html[data-game] .race-card .race-date strong { font-size: 26px; font-weight: 800; color: #f4f6f5; }
+html[data-game] .race-card .race-date b { margin-top: 4px; font-size: 14px; color: #7fe3ea; }
+html[data-game] .race-card .race-date.is-unknown small { text-align: center; font-size: 11px; padding: 0 4px; }
+html[data-game] .race-card .race-head { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+html[data-game] .race-card .event-name { font-size: 22px !important; line-height: 1.15 !important; font-weight: 800 !important; color: #f4f6f5 !important; }
+html[data-game] .race-card .race-meta { font-size: 14px; color: #c7d0d4; }
+html[data-game] .race-card .race-head .event-type-badge { font-size: 10.5px !important; padding: 2px 8px !important; margin-top: 2px; }
+html[data-game] .race-card .race-card-top > .circuit-visual {
+  position: static !important;
+  flex: none;
+  width: 92px !important;
+  height: 70px !important;
+  margin: 0 !important;
+  opacity: .85;
+  transform: none !important;
+}
+html[data-game] .race-card .race-card-top > .circuit-visual img { width: 100% !important; height: 100% !important; object-fit: contain !important; transform: none !important; }
+
+/* Horaires par jour. */
+html[data-game] .race-card .race-starts { display: flex; flex-direction: column; gap: 6px; padding: 10px 0 0; border-top: 1px solid rgba(255, 255, 255, .08); }
+html[data-game] .race-card .race-day { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+html[data-game] .race-card .race-day em { width: 64px; font-style: normal; font-size: 13px; color: #aab3b6; }
+html[data-game] .race-card .race-start {
+  min-width: 42px;
+  padding: 3px 8px;
+  border: 1px solid rgba(255, 255, 255, .14);
+  border-radius: 7px;
+  text-align: center;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #e6ecea;
+}
+html[data-game] .race-card .race-start.is-next { border-color: #52d3d8; color: #bff5f8; }
+html[data-game] .race-card .race-start.is-mine { background: #f2f5f4; border-color: #f2f5f4; color: #0b0d0e; }
+html[data-game] .race-card .race-more { font-size: 13px; color: #aab3b6; }
+
+/* Ta situation, puis le remplissage. */
+html[data-game] .race-card .race-situation { display: flex; flex-wrap: wrap; gap: 6px; }
+html[data-game] .race-card .race-situation .event-schedule-badge { margin: 0; }
+html[data-game] .race-card .race-fill { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: auto; }
+html[data-game] .race-card .race-fill .event-category-badges { display: flex !important; flex-wrap: wrap; gap: 6px; margin: 0 !important; }
+html[data-game] .race-card .race-fill .event-pilot-count { margin-left: auto; font-size: 13px !important; color: #aab3b6 !important; }
+html[data-game] .race-card .event-card-status { display: none !important; }
+
+@media (max-width: 600px) {
+  html[data-game] .event-list { grid-template-columns: minmax(0, 1fr) !important; }
+  html[data-game] .race-card .race-card-body { padding: 14px !important; }
+  html[data-game] .race-card .race-card-top > .circuit-visual { width: 64px !important; height: 50px !important; }
+  html[data-game] .race-card .event-name { font-size: 19px !important; }
+  html[data-game] .race-card .race-day em { width: 56px; }
+}

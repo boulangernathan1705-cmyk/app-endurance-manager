@@ -1,22 +1,31 @@
-import {app,nav,state,activeGame,esc,button,canManage,eventTypeBadge,schedulePendingBadge,eventBadge,eventCategoryCount,pilotCount,circuitVisual,dateLabel,countdown,groupEvents,notifyRender,notifyNav} from './core.mjs';
+import {app,nav,state,activeGame,esc,button,canManage,circuitLabel,eventTypeBadge,schedulePendingBadge,eventBadge,eventCategoryCount,pilotCount,circuitVisual,dateLabel,countdown,groupEvents,notifyRender,notifyNav} from './core.mjs';
 import {getLocale,localeTag} from '../i18n.mjs';
 
-const compactDateFormatter=new Intl.DateTimeFormat(localeTag(),{timeZone:'Europe/Paris',day:'2-digit',month:'2-digit'});
 const weekdayFormatter=new Intl.DateTimeFormat(localeTag(),{timeZone:'Europe/Paris',weekday:'short'});
 
-function compactDateRange(departures=[]){
-  const dated=departures.filter(d=>Number.isFinite(Number(d.startsAt))).sort((a,b)=>Number(a.startsAt)-Number(b.startsAt));
-  if(!dated.length)return'Date à confirmer';
-  const labels=[...new Set(dated.map(d=>compactDateFormatter.format(new Date(Number(d.startsAt)))))];
-  return labels.length===1?labels[0]:`${labels[0]}–${labels.at(-1)}`;
+const monthFormatter=new Intl.DateTimeFormat(localeTag(),{timeZone:'Europe/Paris',month:'short'});
+const dayNumberFormatter=new Intl.DateTimeFormat(localeTag(),{timeZone:'Europe/Paris',day:'numeric'});
+const dayKeyFormatter=new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Paris',year:'numeric',month:'2-digit',day:'2-digit'});
+function datedDepartures(event){return (event.departures||[]).filter(d=>Number.isFinite(Number(d.startsAt))).sort((a,b)=>Number(a.startsAt)-Number(b.startsAt));}
+// Date block of a race card: the next start (the last one for archived races).
+function raceDateBlock(event,archived){
+  const dated=datedDepartures(event),upcoming=dated.filter(d=>Number(d.startsAt)>Date.now());
+  const shown=archived||!upcoming.length?dated.at(-1):upcoming[0];
+  if(!shown)return `<span class="race-date is-unknown"><strong>?</strong><small>Date à confirmer</small></span>`;
+  const stamp=new Date(Number(shown.startsAt));
+  return `<span class="race-date"><small>${esc(weekdayFormatter.format(stamp))}</small><strong>${esc(dayNumberFormatter.format(stamp))}</strong><small>${esc(monthFormatter.format(stamp))}</small><b>${esc(shown.time||'')}</b></span>`;
 }
-// Upcoming races show their next start (day, time, extra starts, duration); archived ones keep the date range.
-function eventWhen(event,archived){
-  const dated=(event.departures||[]).filter(d=>Number.isFinite(Number(d.startsAt))).sort((a,b)=>Number(a.startsAt)-Number(b.startsAt));
-  const upcoming=dated.filter(d=>Number(d.startsAt)>Date.now());
-  if(archived||!upcoming.length)return `<span>${esc(compactDateRange(dated))}</span>`;
-  const next=upcoming[0],stamp=new Date(Number(next.startsAt)),more=upcoming.length-1;
-  return `<span>${esc(weekdayFormatter.format(stamp))} ${esc(compactDateFormatter.format(stamp))}</span><span>${esc(displayTime(next.time))}</span>${more>0?`<span>+${more} départ${more>1?'s':''}</span>`:''}<span>${Number(event.durationHours)||6} h</span>`;
+// Start times grouped by day ("sam. 26 · 05h 12h 16h"), next start and the pilot's own starts marked.
+function raceStarts(event,archived){
+  const dated=datedDepartures(event),now=Date.now();
+  const shown=archived?dated:dated.filter(d=>Number(d.startsAt)>now);
+  if(shown.length<2)return '';
+  const next=archived?null:shown[0];
+  const days=new Map();
+  for(const departure of shown){const key=dayKeyFormatter.format(new Date(Number(departure.startsAt)));if(!days.has(key))days.set(key,[]);days.get(key).push(departure);}
+  const entries=[...days.values()],visible=entries.slice(0,3),hidden=entries.length-visible.length;
+  const time=departure=>{const mine=(departure.availability||[]).some(reg=>reg.mine&&reg.status!=='unavailable');return `<span class="race-start${departure===next?' is-next':''}${mine?' is-mine':''}"${mine?' title="Tu es inscrit sur ce départ"':''}>${esc(displayTime(departure.time))}</span>`;};
+  return `<span class="race-starts">${visible.map(list=>{const stamp=new Date(Number(list[0].startsAt));return `<span class="race-day"><em>${esc(weekdayFormatter.format(stamp))} ${esc(dayNumberFormatter.format(stamp))}</em>${list.map(time).join('')}</span>`;}).join('')}${hidden>0?`<span class="race-day race-more">+ ${hidden} jour${hidden>1?'s':''}</span>`:''}</span>`;
 }
 function displayTime(value){const match=String(value||'').match(/^(\d{1,2}):(\d{2})$/);if(!match)return String(value||'').trim();if(getLocale()==='en')return`${String(Number(match[1])).padStart(2,'0')}:${match[2]}`;return match[2]==='00'?`${Number(match[1])}h`:`${Number(match[1])}h${match[2]}`;}
 // Where the current pilot stands on a race: their next start with a registration, and their crew if any.
@@ -57,6 +66,7 @@ function eventCard({event,next,archived,end}){
   const totalPilots=pilotCount((event.departures||[]).flatMap(departure=>departure.availability||[]));
   const untilNext=displayNext?displayNext.startsAt-Date.now():Infinity,statusClass=archived?'finished':displayNext&&untilNext<=3600000?'soon':'upcoming';
   const status=archived?`Tous les départs ont eu lieu · ${esc(dateLabel({startsAt:end}))}`:displayNext?`Prochain départ avec pilotes : ${esc(dateLabel(displayNext))} à ${esc(displayTime(displayNext.time))} · <span data-countdown="${displayNext.startsAt}">${countdown(displayNext.startsAt)}</span>`:next?'Aucun départ à venir avec pilote inscrit':'Dates à confirmer';
-  return `<button class="event-card event-card-harmonized event-type-${event.eventType||'private'} ${archived?'archived':''}" data-action="open" data-id="${event.id}"><span class="event-card-body event-card-layout"><span class="event-card-main"><span class="event-card-title-row"><span class="event-name">${esc(event.name)}</span></span><span class="event-compact-date">${eventWhen(event,archived)}</span><span class="event-info">${eventTypeBadge(event.eventType)}${schedulePendingBadge(event)}${situationBadge(event,archived)}<span class="event-pilot-count">${totalPilots} pilote${totalPilots===1?'':'s'} inscrit${totalPilots===1?'':'s'}</span></span><span class="event-category-badges">${event.categories.map(category=>eventBadge(category,eventCategoryCount(event,category))).join('')}</span></span>${circuitVisual(event.circuit,true)}<span class="event-card-status"><span class="event-countdown ${statusClass}" ${displayNext&&!archived?`data-status-time="${displayNext.startsAt}"`:''}>${status}</span></span></span></button>`;
+  const situation=`${schedulePendingBadge(event)}${situationBadge(event,archived)}`;
+  return `<button class="event-card event-card-harmonized race-card event-type-${event.eventType||'private'} ${archived?'archived':''}" data-action="open" data-id="${event.id}"><span class="event-card-body race-card-body"><span class="race-card-top">${raceDateBlock(event,archived)}<span class="race-head"><span class="event-name">${esc(event.name)}</span><span class="race-meta">${esc(circuitLabel(event.circuit))} · ${Number(event.durationHours)||6} h</span>${eventTypeBadge(event.eventType)}</span>${circuitVisual(event.circuit,true)}</span>${raceStarts(event,archived)}${situation?`<span class="race-situation">${situation}</span>`:''}<span class="race-fill"><span class="event-category-badges">${event.categories.map(category=>eventBadge(category,eventCategoryCount(event,category))).join('')}</span><span class="event-pilot-count">${totalPilots} pilote${totalPilots===1?'':'s'} inscrit${totalPilots===1?'':'s'}</span></span><span class="event-card-status"><span class="event-countdown ${statusClass}" ${displayNext&&!archived?`data-status-time="${displayNext.startsAt}"`:''}>${status}</span></span></span></button>`;
 }
 export function renderHome(message=''){state.page='home';state.currentEventId=null;state.editingEvent=null;state.drafts={};state.registrationOpen.clear();const hasMine=state.events.some(event=>mySituation(event));if(state.eventFilter==='mine'&&!hasMine)state.eventFilter='upcoming';const mineOnly=state.eventFilter==='mine';const groups=groupEvents(mineOnly?state.events.filter(event=>mySituation(event)):state.events,mineOnly?'upcoming':state.eventFilter);const filters=`<div class="event-filter" role="group" aria-label="Filtrer les événements">${button('event-filter','À venir',`data-filter="upcoming" aria-pressed="${state.eventFilter==='upcoming'}"`,'event-filter-button')}${hasMine?button('event-filter','Mes courses',`data-filter="mine" aria-pressed="${state.eventFilter==='mine'}"`,'event-filter-button'):''}${button('event-filter','Archivés',`data-filter="archived" aria-pressed="${state.eventFilter==='archived'}"`,'event-filter-button')}</div>`;app.innerHTML=`<div class="page-head"><h1 class="page-title">ÉVÉNEMENTS</h1>${filters}${canManage()?`<div class="home-create-event">${button('create','Ajouter un évènement','','primary-button')}</div>`:''}</div>${message?`<p class="creation-success" role="status">${esc(message)}</p>`:''}${!state.user&&state.events.some(event=>event.departures.some(departure=>departure.availability.some(reg=>reg.mine||reg.managed)))?`<div class="toolbar home-toolbar">${button('guest-link','Mon lien personnel')}</div>`:''}${groups.length?`<div class="event-agenda">${groups.map(group=>`<section class="event-period" aria-labelledby="period-${group.key}"><h2 class="event-period-heading" id="period-${group.key}"><span>${esc(group.label)}</span><small>${group.items.length} événement${group.items.length>1?'s':''}</small></h2><div class="event-list">${group.items.map(eventCard).join('')}</div></section>`).join('')}</div>`:`<div class="empty">${state.eventFilter==='upcoming'?'Aucun événement à venir.':'Aucun événement archivé.'}</div>`}`;showRecoveryLink();notifyRender();}
