@@ -960,3 +960,34 @@ html[data-game] #app .race-header .race-head { justify-content: center; }
 @media (max-width: 600px) {
   html[data-game] .race-card .race-card-top > .circuit-visual { width: 80px !important; height: 60px !important; }
 }
+
+/* Circuit en panneau à droite, sur toute la hauteur de la carte. */
+html[data-game] .race-card .race-card-body { flex-direction: row !important; align-items: stretch !important; gap: 0 !important; padding: 0 !important; }
+html[data-game] .race-card .race-card-content { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 10px; padding: 14px 16px; }
+html[data-game] .race-card .race-card-circuit {
+  flex: none;
+  width: 190px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 14px;
+  box-sizing: border-box;
+  border-left: 1px solid rgba(255, 255, 255, .08);
+  background: rgba(255, 255, 255, .025);
+  border-radius: 0 10px 10px 0;
+}
+html[data-game] .race-card .race-card-circuit > .circuit-visual {
+  position: static !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 110px;
+  margin: 0 !important;
+  opacity: .9;
+  transform: none !important;
+}
+html[data-game] .race-card .race-card-circuit > .circuit-visual img { width: 100% !important; height: 100% !important; object-fit: contain !important; transform: none !important; }
+@media (max-width: 600px) {
+  html[data-game] .race-card .race-card-circuit { width: 96px; padding: 8px; }
+  html[data-game] .race-card .race-card-circuit > .circuit-visual { min-height: 80px; }
+  html[data-game] .race-card .race-card-content { padding: 12px; }
+}
