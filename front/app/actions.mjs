@@ -1,11 +1,11 @@
 import {app,state,api,load,showError,countdown,CARS} from './core.mjs';
-import {renderNav,renderHome} from './home-view.mjs?v=3-shared-crew-cards';
-import {renderEvent} from './event-view.mjs?v=9-one-course-page';
+import {renderNav,renderHome} from './home-view.mjs';
+import {renderEvent} from './event-view.mjs';
 import {renderEventForm,departureFields,updateRemoveButtons,goToEventStep} from './event-form.mjs';
-import {renderMyEntries} from './entries-view.mjs?v=3-three-columns';
+import {renderMyEntries} from './entries-view.mjs';
 import {refresh,refreshAfterSave} from './refresh.mjs';
-import {draftFor,registrationDraft,ownRegistrations,rerenderRegistrationSection,submitRegistration,registrationStep} from './registration.mjs?v=2-preserve-timeline-scroll';
-import {updateCrewState} from './crews.mjs?v=8-one-page-compact';
+import {draftFor,registrationDraft,ownRegistrations,rerenderRegistrationSection,submitRegistration,registrationStep} from './registration.mjs';
+import {updateCrewState} from './crews.mjs';
 import {installRouter,routeFromLocation,applyRoute} from './router.mjs';
 import {installAutoRefresh} from './auto-refresh.mjs';
 

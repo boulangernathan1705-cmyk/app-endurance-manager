@@ -89,7 +89,7 @@ export function renderPilots(event,departure,options={}){
   const createCrew=options.canCreateCrew?`<button type="button" class="secondary-button crew-builder-open crew-section-create" data-crew-builder-open data-departure="${departure.id}">${esc(options.createCrewLabel||'Créer un équipage')}</button>`:'';
   return `<div class="pilot-section"><div class="ux-course-overview ux-course-split-overview">
     <section class="ux-course-crews-block"><div class="ux-course-crews-heading"><span class="ux-course-crews-title">Équipages <strong>${crews.length}</strong></span>${createCrew}</div><div class="ux-course-crews-body">${crewCards}</div></section>
-    <details class="ux-course-pilots-accordion">${contentSummary('Pilotes sans équipage',pilotCount(unassigned))}<div class="ux-course-pilots-body">${pilots}${unavailableHtml}</div></details>
+    <details class="ux-course-pilots-accordion" id="pilots-${departure.id}">${contentSummary('Pilotes sans équipage',pilotCount(unassigned))}<div class="ux-course-pilots-body">${pilots}${unavailableHtml}</div></details>
   </div></div>`;
 }
 

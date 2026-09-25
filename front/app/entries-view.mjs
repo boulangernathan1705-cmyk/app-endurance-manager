@@ -10,7 +10,7 @@ import {
   categories,
   circuitVisual
 } from './core.mjs';
-import {crewAvailability,pilotLines} from './crews.mjs?v=8-one-page-compact';
+import {crewAvailability,pilotLines} from './crews.mjs';
 import {getLocale,localeTag} from '../i18n.mjs';
 
 
@@ -90,7 +90,7 @@ function card({event,departure,reg}) {
   const situation = crew
     ? `<span class="departure-mine-badge is-crew">✓ Équipage ${esc(crew.name)}</span>`
     : '<span class="departure-mine-badge is-waiting">En attente d’équipage</span>';
-  return `<details class="native-my-entry-card race-card my-entry-race event-type-${event.eventType||'private'}">
+  return `<details class="native-my-entry-card race-card my-entry-race event-type-${event.eventType||'private'}" id="entry-${reg.id}">
     <summary class="native-my-entry-header">
       <span class="native-my-entry-toggle" aria-hidden="true">+</span>
       <span class="race-card-top">${departureDateBlock(departure)}<span class="race-head">

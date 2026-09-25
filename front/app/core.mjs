@@ -54,9 +54,7 @@ export function carPreferenceChoices(category, selected=[], any=false) {
 export function registrationCarLabel(reg) { return reg.carAny ? 'N’importe quelle voiture' : ((reg.cars?.length ? reg.cars.join(' · ') : reg.car) || 'Pas de préférence'); }
 export function pilotAvailability(reg,departure,duration) { return departure ? `<div class="crew-pilot-availability"><span class="crew-pilot-availability-label">Disponibilité</span>${renderAvailabilityTimeline({departure,duration,status:reg.status,label:`Disponibilités de ${reg.name || 'ce pilote'}`})}</div>` : ''; }
 export function pilotWishes(reg,departure=null,duration=0) { return `<dl class="pilot-wishes"><div><dt>Voiture(s) souhaitée(s)</dt><dd>${esc(registrationCarLabel(reg))}</dd></div><div><dt>Coéquipier souhaité</dt><dd>${esc(reg.preferredPilot || 'Aucune préférence renseignée')}</dd></div></dl>${departure&&duration?pilotAvailability(reg,departure,duration):''}`; }
-// Crews of a departure in display order (category order of the event, then name). The position gives the crew
-// its color, so the same crew has the same color on the race list and on the race page.
-export const CREW_PALETTE=['#53d8ff','#c58cff','#ffae62','#ff79aa','#75a9ff','#b5df62','#ffd45e','#66e0b1','#ff7777','#b99cff'];
+// Crews of a departure in display order (category order of the event, then name); the position gives the crew its color.
 export function sortedCrews(event,departure){return [...(departure.crews||[])].sort((a,b)=>event.categories.indexOf(a.category)-event.categories.indexOf(b.category)||String(a.name).localeCompare(String(b.name),'fr',{sensitivity:'base',numeric:true}));}
 export function crewColorClass(crewId,index=null) { if (index != null) return `crew-palette-${index%10}`; let hash=0; for (const char of String(crewId||'')) hash=(hash*31+char.charCodeAt(0))>>>0; return `crew-palette-${hash%10}`; }
 export function coversHour(reg,index) { return reg.status === 'whole' || String(reg.status||'').split(',').includes(`h${index+1}`); }

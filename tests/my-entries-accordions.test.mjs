@@ -13,9 +13,8 @@ test('Mes inscriptions présente les trois blocs en colonnes, sans cadres imbriq
   assert.doesNotMatch(view,/contentAccordion/);
 });
 
-test('la chaîne de modules Mes inscriptions est versionnée pour éviter un ancien onglet en cache',()=>{
-  const app=read('app.js');
+test('les modules internes sont importés sous une seule adresse (pas de doublon ?v=)',()=>{
   const actions=read('front/app/actions.mjs');
-  assert.match(app,/actions\.mjs\?v=[^'"\s]+/);
-  assert.match(actions,/entries-view\.mjs\?v=[^'"\s]+/);
+  assert.match(actions,/from '\.\/entries-view\.mjs'/);
+  assert.doesNotMatch(actions,/\.mjs\?v=/);
 });

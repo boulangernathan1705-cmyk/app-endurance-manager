@@ -1,5 +1,5 @@
 import {state,api,CARS} from './app/core.mjs';
-import {renderRegistrationForm,submitRegistration} from './app/registration.mjs?v=2-preserve-timeline-scroll';
+import {renderRegistrationForm,submitRegistration} from './app/registration.mjs';
 
 let activeBuilder={mode:'',departureId:''};
 let modalState={departureId:'',category:''};
