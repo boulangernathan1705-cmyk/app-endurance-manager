@@ -991,3 +991,61 @@ html[data-game] .race-card .race-card-circuit > .circuit-visual img { width: 100
   html[data-game] .race-card .race-card-circuit > .circuit-visual { min-height: 0; height: 100% !important; }
   html[data-game] .race-card .race-card-content { padding: 10px 12px 12px; }
 }
+
+
+/* =====================================================================
+   Planning d'un équipage : une échelle d'heures commune, une ligne par pilote,
+   puis la couverture. Chaque pilote garde sa couleur (le nom prend celle de sa barre).
+   ===================================================================== */
+html[data-game] #app .crew-planning-scroll { overflow-x: auto; margin: 4px -2px 0; padding: 0 2px 4px; }
+html[data-game] #app .crew-planning { display: grid; gap: 6px; min-width: 0; }
+html[data-game] #app .crew-planning .crew-planning-row {
+  display: grid !important;
+  grid-template-columns: 150px minmax(0, 1fr) !important;
+  align-items: center !important;
+  gap: 12px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  background: none !important;
+}
+html[data-game] #app .crew-planning .crew-planning-label { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; min-width: 0; font-size: 14px; }
+html[data-game] #app .crew-planning .pilot-name { font-weight: 700; overflow-wrap: anywhere; }
+html[data-game] #app .crew-planning .crew-planning-edit { min-height: 0 !important; font-size: 12.5px !important; padding: 0 !important; }
+html[data-game] #app .crew-planning-hours { display: grid; grid-template-columns: repeat(var(--hours), minmax(0, 1fr)); }
+html[data-game] #app .crew-planning-hours > span { padding-left: 3px; border-left: 1px solid rgba(255, 255, 255, .14); font-size: 12px; font-weight: 600; color: #aab3b6; white-space: nowrap; overflow: visible; }
+html[data-game] #app .crew-planning-hours > span.is-minor { color: transparent; }
+html[data-game] #app .crew-planning .presence-timeline { margin: 0 !important; padding: 0 !important; min-width: 0 !important; }
+html[data-game] #app .crew-planning .presence-scale,
+html[data-game] #app .crew-planning .presence-edges { display: none !important; }
+html[data-game] #app .crew-planning .presence-track {
+  height: 16px !important;
+  min-height: 0 !important;
+  border-radius: 4px !important;
+  background-image: repeating-linear-gradient(to right, rgba(255, 255, 255, .1) 0 1px, transparent 1px calc(100% / var(--hours))) !important;
+}
+html[data-game] #app .crew-planning .presence-timeline:not(.is-coverage) .presence-segment { height: 16px !important; min-height: 0 !important; font-size: 0 !important; }
+html[data-game] #app .crew-planning .crew-planning-coverage { margin-top: 4px; padding-top: 8px !important; border-top: 1px solid rgba(255, 255, 255, .08) !important; }
+html[data-game] #app .crew-planning .crew-planning-coverage .crew-planning-label { color: #aab3b6; font-size: 13px; }
+html[data-game] #app .crew-planning .crew-planning-coverage .presence-track,
+html[data-game] #app .crew-planning .crew-planning-coverage .presence-segment { height: 22px !important; font-size: 11.5px !important; }
+html[data-game] #app .crew-planning-row:has(.pilot-timeline-tone-0) .pilot-name { color: #8fb6c9 !important; }
+html[data-game] #app .crew-planning-row:has(.pilot-timeline-tone-1) .pilot-name { color: #aa9fc2 !important; }
+html[data-game] #app .crew-planning-row:has(.pilot-timeline-tone-2) .pilot-name { color: #91bca8 !important; }
+html[data-game] #app .crew-planning-row:has(.pilot-timeline-tone-3) .pilot-name { color: #c3a08d !important; }
+html[data-game] #app .crew-planning-row:has(.pilot-timeline-tone-4) .pilot-name { color: #bd98a5 !important; }
+html[data-game] #app .crew-planning-row:has(.pilot-timeline-tone-5) .pilot-name { color: #a8b996 !important; }
+html[data-game] #app .crew-planning-row:has(.pilot-timeline-tone-6) .pilot-name { color: #8fb8b6 !important; }
+html[data-game] #app .crew-planning-row:has(.pilot-timeline-tone-7) .pilot-name { color: #99a7c7 !important; }
+html[data-game] #app .crew-planning-row:has(.pilot-timeline-tone-8) .pilot-name { color: #c5b887 !important; }
+html[data-game] #app .crew-planning-row:has(.pilot-timeline-tone-9) .pilot-name { color: #b397b4 !important; }
+html[data-game] #app .crew-planning-row:has(.pilot-timeline-tone-10) .pilot-name { color: #c1a48c !important; }
+html[data-game] #app .crew-planning-row:has(.pilot-timeline-tone-11) .pilot-name { color: #94adc3 !important; }
+@media (max-width: 760px) {
+  html[data-game] #app .crew-planning { min-width: calc(110px + var(--hours) * 46px); }
+  html[data-game] #app .crew-planning .crew-planning-row { grid-template-columns: 100px minmax(0, 1fr) !important; gap: 8px !important; }
+  html[data-game] #app .crew-planning .crew-planning-label { font-size: 13px; position: sticky; left: 0; z-index: 1; background: color-mix(in srgb, var(--crew-color, #52d3d8) 5%, #101617); }
+  html[data-game] #app .crew-planning-hours > span.is-minor { color: #aab3b6; }
+}
+html[data-game] #app .crew-planning .crew-planning-row > .crew-planning-label { grid-column: 1 !important; grid-row: 1 !important; }
+html[data-game] #app .crew-planning .crew-planning-row > .presence-timeline,
+html[data-game] #app .crew-planning .crew-planning-row > .crew-planning-hours { grid-column: 2 !important; grid-row: 1 !important; width: auto !important; }
