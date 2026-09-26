@@ -109,7 +109,7 @@ const insecureReferences = searchable
   .filter(item => !/^http:\/\/localhost(?::\d+)?(?:\/|$)/.test(item.url));
 for (const item of insecureReferences) warnings.push(`Référence HTTP non chiffrée : ${item.path} -> ${item.url}`);
 if (!worker.includes("scope:'identify'") && !worker.includes("scope: 'identify'")) warnings.push('Discord OAuth doit rester limité au scope identify.');
-if (!workerCore.includes("const COOKIE_SESSION = '__Host-fmt_session'")) warnings.push('Le cookie de session doit conserver le préfixe __Host-.');
+if (!workerCore.includes("const COOKIE_SESSION = '__Host-em_session'")) warnings.push('Le cookie de session doit conserver le préfixe __Host-.');
 if (!workerCore.includes('HttpOnly; Secure; SameSite=Lax')) warnings.push('Les cookies sensibles doivent rester HttpOnly, Secure et SameSite=Lax.');
 if (!accountMenu.includes('aucun mot de passe transmis à Endurance Manager')) warnings.push('La connexion Discord doit expliquer visiblement qu’aucun mot de passe n’est transmis au site.');
 if (!trustPage.includes('Discord OAuth') || !trustPage.includes('ne demande, ne reçoit et ne stocke jamais ton mot de passe Discord')) warnings.push('La page publique de confiance doit expliquer clairement Discord OAuth et l’absence de collecte de mot de passe.');

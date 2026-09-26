@@ -139,8 +139,8 @@ async function oauthCallback(request, env) {
     const old = cookie(request, COOKIE_SESSION);
     if (old) await env.DB.prepare('DELETE FROM sessions WHERE token_hash=?').bind(await hash(old)).run();
     const avatarCookie = avatarHash
-      ? `fmt_discord_avatar=${encodeURIComponent(`${profile.id}:${avatarHash}`)}; Path=/; Secure; SameSite=Lax; Max-Age=${7 * DAY}`
-      : 'fmt_discord_avatar=; Path=/; Secure; SameSite=Lax; Max-Age=0';
+      ? `em_discord_avatar=${encodeURIComponent(`${profile.id}:${avatarHash}`)}; Path=/; Secure; SameSite=Lax; Max-Age=${7 * DAY}`
+      : 'em_discord_avatar=; Path=/; Secure; SameSite=Lax; Max-Age=0';
     return redirect(origin(env) + back, [clear, clearReturn, setCookie(COOKIE_SESSION, session, 7 * DAY), avatarCookie]);
   } catch {
     return redirect(origin(env) + '/?auth=error', [clear, clearReturn]);
@@ -164,7 +164,7 @@ async function api(request, env) {
   if (path === '/api/auth/logout' && method === 'POST') {
     const raw = cookie(request, COOKIE_SESSION);
     if (raw) await env.DB.prepare('DELETE FROM sessions WHERE token_hash=?').bind(await hash(raw)).run();
-    return json({ok:true}, 200, [setCookie(COOKIE_SESSION, '', 0), 'fmt_discord_avatar=; Path=/; Secure; SameSite=Lax; Max-Age=0']);
+    return json({ok:true}, 200, [setCookie(COOKIE_SESSION, '', 0), 'em_discord_avatar=; Path=/; Secure; SameSite=Lax; Max-Age=0']);
   }
   if (path === '/api/guest/recover' && method === 'POST') {
     const input = await body(request);
@@ -404,7 +404,7 @@ export default {
       if (message.includes('crew_event_in_use')) return json({error:'Un équipage utilise encore ce départ ou cette catégorie. Supprime ou modifie cet équipage avant de continuer.'},409);
       if (message.includes('crew_membership_invalid') || message.includes('crew_invalid')) return json({error:'Affectation impossible : vérifie le départ, la catégorie et la disponibilité du pilote, puis actualise.'},409);
       if (message.includes('UNIQUE constraint failed: registrations.')) return json({error:'Ce pilote ou ce pseudo est déjà inscrit dans cette catégorie pour ce départ. Modifie l’inscription existante ou choisis une autre catégorie.'},409);
-      console.error('FMT API failure', error instanceof Error ? error.message.replace(/[a-f0-9]{64}/g,'[redacted]') : 'unknown');
+      console.error('API failure', error instanceof Error ? error.message.replace(/[a-f0-9]{64}/g,'[redacted]') : 'unknown');
       return json({error:'Le service est momentanément indisponible. Tes changements ne sont pas confirmés ; réessaie dans un instant.'},503);
     }
   }

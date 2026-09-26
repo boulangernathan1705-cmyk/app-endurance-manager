@@ -11,10 +11,10 @@ function discordMark() {
 }
 
 function sessionAvatar(user) {
-  const raw = document.cookie.split(';').map(item => item.trim()).find(item => item.startsWith('fmt_discord_avatar='));
+  const raw = document.cookie.split(';').map(item => item.trim()).find(item => item.startsWith('em_discord_avatar='));
   if (!raw) return '';
   try {
-    const value = decodeURIComponent(raw.slice('fmt_discord_avatar='.length));
+    const value = decodeURIComponent(raw.slice('em_discord_avatar='.length));
     const separator = value.indexOf(':');
     if (separator < 0) return '';
     const id = value.slice(0, separator);

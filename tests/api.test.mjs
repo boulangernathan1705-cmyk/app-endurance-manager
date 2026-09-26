@@ -4,7 +4,7 @@ import {DatabaseSync} from 'node:sqlite';
 import {readFileSync} from 'node:fs';
 import worker from '../server/worker.mjs';
 import workerWithMigrations from '../server/worker-with-migrations.mjs';
-const ROOT='https://fmt.example';
+const ROOT='https://site.example';
 const ADMIN='111111111111111111', PILOT='222222222222222222', OTHER='333333333333333333';
 class D1 {
   constructor(){this.db=new DatabaseSync(':memory:');this.db.exec('PRAGMA foreign_keys=ON;');this.db.exec(readFileSync(new URL('../migrations/0001_initial.sql',import.meta.url),'utf8'));this.db.exec(readFileSync(new URL('../migrations/0002_event_duration.sql',import.meta.url),'utf8'));this.db.exec(readFileSync(new URL('../migrations/0003_event_type.sql',import.meta.url),'utf8'));}
@@ -131,7 +131,7 @@ test('crews: manager-only writes, category/departure integrity, concurrency and 
  assert.equal((await req('/api/events','POST',eventInput,'admin')).status,201);
  const event=(await req('/api/events')).data.events[0],dep=event.departures[0],second=event.departures[1];
  const base=`/api/events/${event.id}/departures/${dep.id}`;
- const payload={name:'FMT 1',category:'Hypercar',car:'Prototype test'};
+ const payload={name:'Équipe 1',category:'Hypercar',car:'Prototype test'};
  assert.equal((await req(base+'/crews','POST',payload)).status,401);
  assert.equal((await req(base+'/crews','POST',payload,'pilot')).status,403);
  const created=await req(base+'/crews','POST',payload,'organizer');assert.equal(created.status,201);
@@ -152,7 +152,7 @@ test('crews: manager-only writes, category/departure integrity, concurrency and 
  assert.deepEqual((await req('/api/events')).data.events[0].departures[0].availability.find(r=>r.id===reg.data.id).cars,['Ferrari 499P','Porsche 963']);
  assert.equal((await req('/api/events')).data.events[0].departures[0].availability.find(r=>r.id===bad.data.id).carAny,true);
  assert.equal((await req(crewPath,'PATCH',{...payload,version:1},'organizer')).status,409);
- const duplicate=await req(base+'/crews','POST',{...payload,name:'FMT 2'},'admin');assert.equal(duplicate.status,201);
+ const duplicate=await req(base+'/crews','POST',{...payload,name:'Équipe 2'},'admin');assert.equal(duplicate.status,201);
  assert.equal((await req('/api/crews/'+duplicate.data.id+'/members','POST',{registrationId:reg.data.id,version:1},'admin')).status,409);
  assert.equal((await req(crewPath,'PATCH',{...payload,category:'GTE',version:2},'organizer')).status,409);
  assert.equal((await req('/api/registrations/'+reg.data.id,'PATCH',{name:'Pilote A',category:'GTE',status:'whole',version:1},'pilot')).status,409);
@@ -190,7 +190,7 @@ test('shared events, actual Discord callback, role grants/revocation, guest reco
  const reg=await req(regPath,'POST',{name:'Nathan',category:'GTE',status:'whole'});assert.equal(reg.status,201);assert(reg.data.recoveryLink.startsWith(ROOT+'/#access='));
  const regId=reg.data.id;
  await login(PILOT,'guest');
- delete h.jars.get('guest')['__Host-fmt_guest'];
+ delete h.jars.get('guest')['__Host-em_guest'];
  event=(await req('/api/events','GET',null,'guest')).data.events[0];
  assert.equal(event.departures[0].availability.find(r=>r.id===regId).mine,true);
  event=(await req('/api/events')).data.events[0];assert.equal(event.departures[0].availability[0].mine,true);
@@ -203,7 +203,7 @@ test('shared events, actual Discord callback, role grants/revocation, guest reco
  // Removing a category or a departure that still has a registration must be rejected atomically.
  assert.equal((await req('/api/events/'+eventId,'PATCH',{...event,categories:['GTE']},'pilot')).status,409);
  assert.equal((await req('/api/events/'+eventId,'PATCH',{...event,departures:[event.departures[1]]},'pilot')).status,409);
- const changed=await req('/api/events/'+eventId,'PATCH',{...event,name:'Daytona 8H — FMT'},'pilot');assert.equal(changed.status,200);
+ const changed=await req('/api/events/'+eventId,'PATCH',{...event,name:'Daytona 8H — Nuit'},'pilot');assert.equal(changed.status,200);
  assert.equal((await req('/api/events/'+eventId,'PATCH',{...event,name:'stale'},'pilot')).status,409);
  // A connected account owns its registration independently of the display name.
  const own=await req(regPath,'POST',{name:'Etienne',category:'LMP2 ELMS',status:'middle'},'other');assert.equal(own.status,201);
@@ -242,9 +242,9 @@ test('OAuth state is bound to browser, single-use, and profile cannot grant admi
  const state=await h.login(PILOT,'pilot');
  assert.equal((await h.req('/api/session','GET',null,'pilot')).data.user.role,'pilot');
  const invalid=await h.req('/api/auth/discord/callback?code=test&state='+state,'GET',null,'attacker');assert.equal(invalid.response.headers.get('Location'),ROOT+'/?auth=error');
- h.jars.get('pilot')['__Host-fmt_oauth']=state;
+ h.jars.get('pilot')['__Host-em_oauth']=state;
  const replay=await h.req('/api/auth/discord/callback?code=test&state='+state,'GET',null,'pilot');assert.equal(replay.response.headers.get('Location'),ROOT+'/?auth=error');
- const cookie=h.jars.get('pilot')['__Host-fmt_session'];assert.equal(cookie.length,64);
+ const cookie=h.jars.get('pilot')['__Host-em_session'];assert.equal(cookie.length,64);
  assert(!JSON.stringify(h.DB.db.prepare('SELECT * FROM sessions').all()).includes(cookie));
  h.DB.db.exec('UPDATE sessions SET expires_at=1');assert.equal((await h.req('/api/session','GET',null,'pilot')).data.user,null);
 });
@@ -257,7 +257,7 @@ test('validation, closed departures, guest link rejection and free-tier rate lim
  assert.equal((await h.req(`/api/events/${event.id}/departures/${event.departures[0].id}/registrations`,'POST',{name:'Late',status:'whole',category:'GTE'})).status,409);
  for(let i=0;i<80;i++)assert.notEqual((await h.req('/api/guest/recover','POST',{token:'bad'},'spam')).status,429);
  assert.equal((await h.req('/api/guest/recover','POST',{token:'bad'},'spam')).status,429);
- assert.equal((await h.req('/api/events','POST',eventInput,'admin',{headers:{'Cookie':'__Host-fmt_session=forged'}})).status,401);
+ assert.equal((await h.req('/api/events','POST',eventInput,'admin',{headers:{'Cookie':'__Host-em_session=forged'}})).status,401);
 });
 test('Paris timezone is stable across seasons and rejects ambiguous/nonexistent clock changes',async()=>{
  const h=harness();await h.login(ADMIN,'admin');
@@ -338,7 +338,7 @@ test('Discord login returns to the same-site page and race it started from',asyn
   globalThis.fetch=async url=>new Response(JSON.stringify(String(url).endsWith('/token')?{access_token:'mock'}:{id:PILOT,username:'Pilote'}),{headers:{'Content-Type':'application/json'}});
   try{
    const callback=await req('/api/auth/discord/callback?code=test&state='+state,'GET',null,actor);
-   assert.match(callback.response.headers.getSetCookie().join('\n'),/__Host-fmt_return=; [^\n]*Max-Age=0/);
+   assert.match(callback.response.headers.getSetCookie().join('\n'),/__Host-em_return=; [^\n]*Max-Age=0/);
    return callback.response.headers.get('Location');
   }finally{globalThis.fetch=realFetch;}
  }
