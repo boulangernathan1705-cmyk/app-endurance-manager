@@ -41,6 +41,7 @@ function publicRegistration(reg, actor, userNames = new Map()) {
     car:cars[0] || reg.car || '',
     cars,
     carAny:Boolean(reg.car_any),
+    roundChoices:JSON.parse(reg.round_choices||'[]'),
     status:reg.status,
     preferredPilot:reg.preferred_pilot || '',
     version:reg.version,
@@ -170,7 +171,7 @@ async function api(request, env) {
   const actor = await identity(request, env);
   const diagnostics = await clientErrorsApi(path,method,env,actor);
   if (diagnostics) return diagnostics;
-  if (path === '/api/session' && method === 'GET') return json({user:actor.user, discordReady:!!(env.DISCORD_CLIENT_ID && env.DISCORD_CLIENT_SECRET), adminConfigured:administrators(env).length > 0});
+  if (path === '/api/session' && method === 'GET') return json({user:actor.user, discordReady:!!(env.DISCORD_CLIENT_ID && env.DISCORD_CLIENT_SECRET), adminConfigured:administrators(env).length > 0, soloLabel:String(env.SOLO_LABEL || 'Courses solo').slice(0,40)});
   if (path === '/api/auth/logout' && method === 'POST') {
     const raw = cookie(request, COOKIE_SESSION);
     if (raw) await env.DB.prepare('DELETE FROM sessions WHERE token_hash=?').bind(await hash(raw)).run();
@@ -340,7 +341,7 @@ async function api(request, env) {
     const event = await eventById(env, departureMatch[1]);
     const departure = departureById(event, departureMatch[2]);
     if (departure.startsAt <= Date.now()) fail(409, 'Ce départ est passé. Les inscriptions sont fermées.');
-    const input = await body(request), data = validateRegistration(input, event);
+    const input = await body(request);
     const solo = (event.format||'endurance') === 'solo';
     if (solo) {
       // Solo races need a Discord account; SAFE races are reserved to SAFE drivers.
@@ -349,6 +350,7 @@ async function api(request, env) {
       if (input.forOther === true && !organizer) fail(403, 'Seuls les organisateurs peuvent inscrire un autre pilote à une course solo.');
       if (input.forOther !== true && event.access === 'safe' && !actor.user.safe && !organizer) fail(403, 'Cette course est réservée aux pilotes SAFE. Demande à un administrateur de t’ajouter.');
     }
+    const data = validateRegistration(input, event);
     const guestToken = actor.user ? null : actor.guestToken || token();
     if (guestToken) { actor.guestToken=guestToken;actor.guestHash=await hash(guestToken); }
     const participant=await registrationParticipant(env,actor,input,data);
@@ -358,8 +360,8 @@ async function api(request, env) {
     const ownerUserId = actor.user?.id || null;
     const regId = id();
     if (input.participantId) { data.name=participant.name;data.nameKey=data.name.normalize('NFKC').toLocaleLowerCase('fr-FR'); }
-    const result = await env.DB.prepare(`INSERT INTO registrations(id,event_id,departure_id,user_id,owner_user_id,guest_hash,name,name_key,category,car,car_preferences,car_any,status,preferred_pilot,created_at,participant_id)
-      SELECT ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,? FROM events WHERE id=? AND version=?`).bind(regId,event.id,departure.id,userId,ownerUserId,guestHash,data.name,data.nameKey,data.category,data.car,JSON.stringify(data.cars),data.carAny?1:0,data.status,data.preferredPilot,now(),participant.id,event.id,event.version).run();
+    const result = await env.DB.prepare(`INSERT INTO registrations(id,event_id,departure_id,user_id,owner_user_id,guest_hash,name,name_key,category,car,car_preferences,car_any,status,preferred_pilot,created_at,participant_id,round_choices)
+      SELECT ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,? FROM events WHERE id=? AND version=?`).bind(regId,event.id,departure.id,userId,ownerUserId,guestHash,data.name,data.nameKey,data.category,data.car,JSON.stringify(data.cars),data.carAny?1:0,data.status,data.preferredPilot,now(),participant.id,JSON.stringify(data.roundChoices||[]),event.id,event.version).run();
     if (!result.meta.changes) fail(409, 'Cet événement a changé. Actualise avant de t’inscrire.');
     return json({id:regId, recoveryLink:guestToken ? canonical + '/#access=' + guestToken : null}, 201, guestToken ? [setCookie(COOKIE_GUEST, guestToken, 365 * DAY)] : []);
   }
@@ -377,7 +379,7 @@ async function api(request, env) {
     else {
       const data = validateRegistration(input,event);
       const results=await env.DB.batch([
-        env.DB.prepare(`UPDATE registrations SET name=?,name_key=?,category=?,car=?,car_preferences=?,car_any=?,status=?,preferred_pilot=?,version=version+1 WHERE id=? AND version=? AND EXISTS(SELECT 1 FROM events WHERE id=? AND version=?)`).bind(data.name,data.nameKey,data.category,data.car,JSON.stringify(data.cars),data.carAny?1:0,data.status,data.preferredPilot,reg.id,input.version,event.id,event.version),
+        env.DB.prepare(`UPDATE registrations SET name=?,name_key=?,category=?,car=?,car_preferences=?,car_any=?,status=?,preferred_pilot=?,round_choices=?,version=version+1 WHERE id=? AND version=? AND EXISTS(SELECT 1 FROM events WHERE id=? AND version=?)`).bind(data.name,data.nameKey,data.category,data.car,JSON.stringify(data.cars),data.carAny?1:0,data.status,data.preferredPilot,JSON.stringify(data.roundChoices||[]),reg.id,input.version,event.id,event.version),
         env.DB.prepare('UPDATE participants SET name=? WHERE id=? AND changes()=1').bind(data.name,reg.participant_id)
       ]);
       result=results[0];

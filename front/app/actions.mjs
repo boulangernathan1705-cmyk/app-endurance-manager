@@ -16,6 +16,17 @@ function revealRegistration(departureId){
 
 // Moving forward in the step-by-step registration checks the current step first.
 function validateRegistrationStep(draft,step){
+  if(draft.solo){
+    // Solo race: steps 1..rounds are the rounds (category + car), then the summary.
+    if(step===1&&draft.forOther&&!draft.id&&!draft.participantUserId&&!draft.manualOther)throw Error('Choisis un pilote.');
+    if(step===1&&draft.manualOther&&!String(draft.name||'').trim())throw Error('Indique le pseudo du pilote.');
+    const choice=draft.choices?.[step-1];
+    if(!choice)return;
+    const where=draft.solo>1?` pour la manche ${step}`:'';
+    if(!choice.category)throw Error(`Choisis une catégorie${where}.`);
+    if(choice.category!=='*'&&!choice.carAny&&!choice.cars.length)throw Error(`Choisis au moins une voiture${where}, ou « Peu importe la voiture ».`);
+    return;
+  }
   if(step===1){
     if(draft.forOther&&!draft.id&&draft.mode!=='category'&&!draft.participantUserId&&!draft.manualOther)throw Error('Choisis un pilote.');
     if((draft.manualOther||(!draft.forOther&&!state.user))&&!String(draft.name||'').trim())throw Error(draft.forOther?'Indique le pseudo du pilote.':'Indique ton pseudo pilote.');
@@ -26,9 +37,10 @@ function validateRegistrationStep(draft,step){
 }
 function goToRegistrationStep(event,departure,target){
   const draft=draftFor(departure),current=registrationStep(draft),wanted=Number(target.dataset.step);
-  if(wanted>current)for(let step=current;step<Math.min(wanted,4);step++)validateRegistrationStep(draft,step);
+  const solo=draft.solo,soloCurrent=solo?Math.min(Math.max(Number(draft.step)||(draft.id?solo+1:1),1),solo+1):current;
+  if(wanted>soloCurrent)for(let step=soloCurrent;step<Math.min(wanted,solo?solo+1:4);step++)validateRegistrationStep(draft,step);
   if(target.dataset.edit)draft.returnToSummary=true;
-  else if(wanted===4||wanted<current)draft.returnToSummary=false;
+  else if(wanted===(solo?solo+1:4)||wanted<soloCurrent)draft.returnToSummary=false;
   draft.step=wanted;
   rerenderRegistrationSection(event,departure,'',renderEvent);
   const section=document.getElementById(`departure-${departure.id}`)?.querySelector('.fold-registration');
@@ -42,7 +54,8 @@ async function submitEvent(form){
   if(format==='solo'){
     // Solo race: rounds, access and places replace duration, type and circuit.
     Object.assign(data,{format,access:form.querySelector('[name="eventAccess"]:checked')?.value||'open',capacity:Number(form.elements.eventCapacity.value),
-      rounds:[...form.querySelectorAll('.solo-round')].map(round=>({circuit:round.querySelector('[name="roundCircuit"]').value,durationMinutes:Number(round.querySelector('[name="roundMinutes"]').value)}))});
+      rounds:[...form.querySelectorAll('.solo-round')].map((round,index)=>({circuit:round.querySelector('[name="roundCircuit"]').value,durationMinutes:Number(round.querySelector('[name="roundMinutes"]').value),categories:[...form.querySelectorAll(`[name="roundCategory${index}"]:checked`)].map(input=>input.value)}))});
+    data.categories=[...new Set(data.rounds.flatMap(round=>round.categories))];
     delete data.durationHours; delete data.eventType; delete data.circuit;
     if(data.rounds.some(round=>!round.circuit))throw Error('Choisis le circuit de chaque manche.');
   }
@@ -91,7 +104,7 @@ async function perform(action,target){
   const event=state.events.find(item=>item.id===state.currentEventId);
   switch(action){
     case 'dismiss-error': document.querySelector('[data-ux-error-modal]')?.remove(); break;
-    case 'home': renderHome(); break;
+    case 'home': if(target.dataset.list)state.listFormat=target.dataset.list; renderHome(); break;
     case 'event-filter': state.eventFilter=target.dataset.filter||'upcoming'; if(state.eventFilter==='archived')await loadArchive(); renderHome(); break;
     case 'refresh': await refresh(); break;
     case 'open': state.currentEventId=target.dataset.id; state.selectedDepartureId=target.dataset.departure||null; state.eventSection='race'; state.drafts={}; state.pendingCrewJoin=null; state.registrationOpen.clear(); renderEvent(); break;
@@ -110,7 +123,8 @@ async function perform(action,target){
       if(value==='whole')draft.status='whole'; else {const duration=event.durationHours||6,parts=new Set(draft.status==='whole'?Array.from({length:duration},(_,i)=>`h${i+1}`):String(draft.status||'').split(',').filter(part=>/^h\d+$/.test(part)));parts.has(value)?parts.delete(value):parts.add(value);draft.status=parts.size===duration?'whole':[...parts].sort((a,b)=>Number(a.slice(1))-Number(b.slice(1))).join(',');}
       rerenderRegistrationSection(event,departure,`[data-action="availability"][data-value="${value}"]`,renderEvent); break;
     }
-    case 'category': { const departure=event.departures.find(item=>item.id===target.dataset.departure),draft=draftFor(departure); draft.category=target.dataset.value; draft.cars=(draft.cars||[]).filter(car=>CARS[draft.category]?.includes(car)); draft.carAny=draft.category==='*'; rerenderRegistrationSection(event,departure,'',renderEvent); break; }
+    case 'solo-category': { const departure=event.departures.find(item=>item.id===target.dataset.departure),draft=draftFor(departure),choice=draft.choices?.[Number(target.dataset.round)]; if(!choice)break; choice.category=target.dataset.value; choice.cars=choice.cars.filter(car=>CARS[choice.category]?.includes(car)); choice.carAny=choice.category==='*'; rerenderRegistrationSection(event,departure,'',renderEvent); break; }
+    case 'category': { const departure=event.departures.find(item=>item.id===target.dataset.departure),draft=draftFor(departure); draft.category=target.dataset.value; draft.cars=(draft.cars||[]).filter(car=>CARS[draft.category]?.includes(car)); draft.carAny=false; rerenderRegistrationSection(event,departure,'',renderEvent); break; }
     case 'delete-registration': { state.pendingCrewJoin=null; const departure=event.departures.find(item=>item.id===target.dataset.departure),reg=departure.availability.find(item=>item.id===target.dataset.id); if(!reg)throw Error('Inscription introuvable.'); if(!confirm(`Supprimer l’inscription de ${reg.name} pour ce départ ?`))return; await api(`/api/registrations/${reg.id}`,'DELETE',{version:reg.version}); delete state.drafts[departure.id]; state.registrationOpen.delete(departure.id); await refreshAfterSave('Inscription supprimée.'); break; }
     case 'join-crew': {
       const departure=event?.departures.find(item=>item.id===target.dataset.departure);const crew=departure?.crews.find(item=>item.id===target.dataset.id);const reg=departure?.availability.find(item=>item.id===target.dataset.registration);
@@ -132,7 +146,7 @@ async function perform(action,target){
       else {if(!confirm('Retirer ce pilote de l’équipage ? Son inscription sera conservée.'))return;await api(`/api/crews/${crew.id}/members/${target.dataset.registration}`,'DELETE',{version:crew.version});state.crewManagementOpen.add(crew.id);}
       await refreshAfterSave('Équipages mis à jour.'); break;
     }
-    case 'create': renderEventForm(); break;
+    case 'create': if(target.dataset.format)state.listFormat=target.dataset.format; renderEventForm(); break;
     case 'edit-event': renderEventForm(event); break;
     case 'add-departure': if(app.querySelectorAll('.departure-field').length>=30)throw Error('Maximum 30 départs par événement.');{const rows=document.querySelectorAll('#departureFields .departure-field'),last=rows[rows.length-1];/* A new start copies the previous start's date and time: several starts often share a day. */document.getElementById('departureFields').insertAdjacentHTML('beforeend',departureFields(last?{date:last.querySelector('[name="date"]').value,time:last.querySelector('[name="time"]').value}:{}));}updateRemoveButtons();break;
     case 'remove-departure': if(app.querySelectorAll('.departure-field').length>1)target.closest('.departure-field').remove();updateRemoveButtons();break;
@@ -154,7 +168,7 @@ document.addEventListener('change',async event=>{
 });
 document.addEventListener('endurance:refresh',()=>{refresh().catch(showError);});
 // Registration panel: Enter moves to the next step, Escape or a click beside the panel closes it.
-document.addEventListener('submit',event=>{const form=event.target;if(form.matches?.('[data-kind="registration"].registration-stepper,[data-kind="event"].event-stepper')&&form.dataset.step!=='4'){event.preventDefault();event.stopImmediatePropagation();form.querySelector('.registration-next')?.click();}},true);
+document.addEventListener('submit',event=>{const form=event.target;if(form.matches?.('[data-kind="registration"].registration-stepper,[data-kind="event"].event-stepper')&&form.dataset.step!==(form.dataset.lastStep||'4')){event.preventDefault();event.stopImmediatePropagation();form.querySelector('.registration-next')?.click();}},true);
 document.addEventListener('click',event=>{if(event.target.matches?.('.fold-registration'))event.target.querySelector('.registration-close-button')?.click();});
 document.addEventListener('keydown',event=>{if(event.key!=='Escape'||document.querySelector('[data-ux-error-modal]'))return;document.querySelector('.fold-registration:not([hidden]) .registration-close-button')?.click();});
 document.addEventListener('toggle',event=>{const details=event.target;if(details instanceof HTMLDetailsElement&&details.matches('.crew-unified-card[data-crew],.crew-management-accordion[data-crew]'))details.open?state.crewManagementOpen.add(details.dataset.crew):state.crewManagementOpen.delete(details.dataset.crew);},true);

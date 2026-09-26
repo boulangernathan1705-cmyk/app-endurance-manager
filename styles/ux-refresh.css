@@ -1196,3 +1196,15 @@ html[data-game] .race-card .race-fill:has(.solo-fill) { display: flex; flex-wrap
   .solo-entries { grid-template-columns: minmax(0, 1fr); }
   .members-panel .members-row { grid-template-columns: minmax(0, 1fr) !important; }
 }
+/* Course solo à deux manches : catégorie et voiture de chaque manche. */
+.solo-entry-rounds { grid-column: 2 / -1; display: grid; gap: 4px; }
+.solo-entry-round { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; font-size: 13px; }
+.solo-entry-round em { font-style: normal; font-weight: 800; color: #7fe3ea; min-width: 26px; }
+.solo-entry-round .solo-entry-car { grid-column: auto; }
+.solo-round-heading { margin: 0 0 4px; font-weight: 800; color: #7fe3ea; font-size: 15px; }
+.solo-category-group { margin: 0 0 12px; padding: 12px; border: 1px solid rgba(255, 255, 255, .1); border-radius: 10px; }
+.solo-category-group legend { padding: 0 6px; font-weight: 800; color: #7fe3ea; }
+.solo-round-badges { display: flex; flex-wrap: wrap; gap: 8px 18px; }
+.solo-round-badge-group { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.solo-round-badge-group em { font-style: normal; font-weight: 800; color: #7fe3ea; font-size: 13px; }
+.solo-round-badges > .solo-round-badge-group { display: inline-flex !important; flex-direction: row !important; align-items: center !important; gap: 6px !important; width: auto !important; min-height: 0 !important; padding: 0 !important; border: 0 !important; background: none !important; box-shadow: none !important; }

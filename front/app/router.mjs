@@ -4,6 +4,7 @@ import {app,state,loadArchive,showError} from './core.mjs';
 
 const EVENT_HASH=/^#event=([a-f0-9-]{36})$/;
 const ENTRIES_HASH='#inscriptions';
+const SOLO_HASH='#solo';
 let views=null;
 let homeScroll=0;
 
@@ -11,13 +12,14 @@ export function routeFromLocation(){
   const match=location.hash.match(EVENT_HASH);
   if(match)return {page:'event',eventId:match[1]};
   if(location.hash===ENTRIES_HASH)return {page:'my-entries'};
-  return {page:'home'};
+  if(location.hash===SOLO_HASH)return {page:'home',list:'solo'};
+  return {page:'home',list:'endurance'};
 }
 
 function hashFor(detail){
   if(detail.page==='event'&&detail.eventId)return `#event=${detail.eventId}`;
   if(detail.page==='my-entries')return ENTRIES_HASH;
-  if(detail.page==='home')return '';
+  if(detail.page==='home')return detail.list==='solo'?SOLO_HASH:'';
   return null; // Event form: keep the current address.
 }
 
@@ -40,6 +42,7 @@ export async function applyRoute(route,message=''){
     return;
   }
   if(route.page==='my-entries'){views.renderMyEntries();return;}
+  if(route.list)state.listFormat=route.list;
   views.renderHome(message);
 }
 
