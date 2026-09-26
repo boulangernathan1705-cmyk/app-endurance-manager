@@ -6,19 +6,29 @@
 <meta name="referrer" content="no-referrer">
 <title>Confidentialité — ENDURANCE MANAGER</title>
 <link rel="icon" href="/images/endurance-manager-logo.webp" type="image/webp">
-<link rel="stylesheet" href="/privacy.css?v=2-legal-hub">
+<link rel="stylesheet" href="/app.css">
+<link rel="stylesheet" href="/privacy.css?v=3-site-theme">
+<script type="module" src="/front/account-menu.mjs?v=8-navigation"></script>
 </head>
 <body>
-<header class="legal-header">
-  <a class="brand" href="/" aria-label="Retour à Endurance Manager">
-    <img src="/images/endurance-manager-logo.webp" alt="" width="48" height="48">
-    <span>ENDURANCE <strong>MANAGER</strong></span>
-  </a>
+<div class="top-stripes" aria-hidden="true"><div></div><div></div><div></div><div></div></div>
+<header class="site-hero">
+  <picture class="hero-picture" aria-hidden="true">
+    <img class="hero-banner" src="/images/endurance-manager-banner.webp?v=39-optimized" width="2048" height="512" alt="" fetchpriority="high" decoding="async" draggable="false">
+  </picture>
+  <div class="header-inner"><a class="brand-button logo" href="/" aria-label="Retour à l’accueil Endurance Manager"><span class="brand-mark-frame" aria-hidden="true"><img class="brand-mark" src="/images/endurance-manager-logo.webp" alt=""></span><span class="brand-copy">ENDURANCE <span>MANAGER</span></span></a></div>
 </header>
+<div class="site-nav-shell">
+  <div class="game-space-bar"></div>
+  <nav id="navigation" aria-label="Navigation principale">
+    <div class="nav-game-switcher" role="group" aria-label="Changer de simulateur"><a class="nav-game-switcher-button nav-game-switcher-lmu" href="/lmu/"><span class="nav-full">Le Mans Ultimate</span><span class="nav-short">LMU</span></a><a class="nav-game-switcher-button nav-game-switcher-iracing" href="/iracing/"><span class="nav-full">iRacing</span><span class="nav-short">iRacing</span></a></div>
+    <div class="nav-sections nav-sections-info" role="group" aria-label="Informations"><a class="nav-section-button" href="/about.html">À propos</a><a class="nav-section-button" href="/legal.html">Informations légales</a><a class="nav-section-button" href="/privacy.html" aria-current="page">Confidentialité</a><a class="nav-section-button" href="/circuit-credits.html">Crédits des circuits</a></div>
+  </nav>
+  <div class="account-bar"><div id="account-menu-root" class="account-menu-root" aria-live="polite"></div></div>
+</div>
 <main class="legal-page">
-  <a class="back-link" href="/">← Retour au site</a>
   <h1>Politique de confidentialité</h1>
-  <p class="updated">Dernière mise à jour : 10 septembre 2026</p>
+  <p class="updated">Dernière mise à jour : 25 septembre 2026</p>
 
   <nav class="legal-summary" aria-label="Informations légales et confidentialité">
     <a href="/legal.html">Informations légales</a>
@@ -40,7 +50,9 @@
       <li>tes disponibilités, catégorie, préférences de voiture et éventuel pilote souhaité ;</li>
       <li>ton appartenance à un équipage et les informations nécessaires à son organisation ;</li>
       <li>si tu te connectes avec Discord : ton identifiant Discord et ton nom d’affichage. Endurance Manager demande uniquement l’autorisation Discord <code>identify</code> afin de t’authentifier et de t’identifier ; le site ne demande ni ton adresse e-mail, ni le contenu de tes messages Discord, ni l’accès à tes conversations ;</li>
-      <li>des données techniques strictement nécessaires à la connexion, à la récupération d’un accès invité et à la protection contre les abus.</li>
+      <li>si tu te connectes avec Discord : l’identifiant de ton avatar Discord, pour l’afficher dans le menu de ton compte ;</li>
+      <li>des données techniques strictement nécessaires à la connexion, à la récupération d’un accès invité et à la protection contre les abus ;</li>
+      <li>en cas d’erreur technique dans ton navigateur : la page concernée, le message d’erreur, le type de navigateur et la taille d’écran. Ces rapports ne contiennent ni ton identifiant ni ton pseudo ; ils sont consultables uniquement par les organisateurs et administrateurs, afin de corriger les problèmes.</li>
     </ul>
   </section>
 
@@ -56,9 +68,13 @@
     <ul>
       <li><code>__Host-fmt_session</code> : session de connexion, valable jusqu’à 7 jours ;</li>
       <li><code>__Host-fmt_guest</code> : permet de retrouver un accès invité, valable jusqu’à 365 jours ;</li>
-      <li><code>__Host-fmt_oauth</code> : sécurise temporairement la connexion Discord, valable environ 10 minutes.</li>
+      <li><code>__Host-fmt_oauth</code> : sécurise temporairement la connexion Discord, valable environ 10 minutes ;</li>
+      <li><code>__Host-fmt_return</code> : retient la page à rouvrir après la connexion Discord (par exemple la course que tu consultais), valable environ 10 minutes ;</li>
+      <li><code>fmt_discord_avatar</code> : identifiant de ton avatar Discord pour l’afficher dans le menu du compte, valable jusqu’à 7 jours.</li>
     </ul>
-    <p>Ces cookies sont configurés avec les protections <code>HttpOnly</code>, <code>Secure</code> et <code>SameSite=Lax</code>. Le code d’Endurance Manager ne dépose pas de cookie publicitaire ni de cookie d’analyse d’audience. Il n’y a donc pas de bannière de consentement publicitaire sur le site.</p>
+    <p>Ces cookies sont configurés avec les protections <code>Secure</code> et <code>SameSite=Lax</code> ; ceux qui touchent à la connexion (<code>__Host-</code>) sont aussi <code>HttpOnly</code>, donc inaccessibles aux scripts de la page. Le cookie d’avatar ne contient aucune donnée de connexion.</p>
+    <p>Le navigateur garde aussi en mémoire locale, sur ton appareil uniquement, la langue choisie et le dernier pseudo utilisé pour t’inscrire, afin de préremplir le formulaire.</p>
+    <p>Le code d’Endurance Manager ne dépose pas de cookie publicitaire ni de cookie d’analyse d’audience. Il n’y a donc pas de bannière de consentement publicitaire sur le site.</p>
   </section>
 
   <section>
@@ -66,7 +82,8 @@
     <ul>
       <li>les sessions de connexion expirent au plus tard après 7 jours ;</li>
       <li>les données temporaires de connexion Discord expirent après environ 10 minutes ;</li>
-      <li>les données anti-abus sont organisées par périodes de 10 minutes et sont supprimées lors des opérations de nettoyage du service ;</li>
+      <li>les données anti-abus sont organisées par périodes de 10 minutes et sont supprimées automatiquement, au plus tard dans le quart d’heure qui suit leur expiration ;</li>
+      <li>les rapports d’erreur technique sont supprimés après 14 jours ;</li>
       <li>le cookie d’accès invité peut être conservé jusqu’à 365 jours ;</li>
       <li>les comptes, inscriptions et données d’organisation sont conservés pendant la durée nécessaire au fonctionnement du service, puis supprimés lorsqu’ils ne sont plus utiles ou à la suite d’une demande légitime d’effacement.</li>
     </ul>
@@ -95,6 +112,6 @@
     <p>Cette page peut être mise à jour si les fonctions du site, les données traitées ou les prestataires utilisés évoluent. La date de mise à jour affichée en haut de la page permet d’identifier la version en vigueur.</p>
   </section>
 </main>
-<footer class="legal-footer"><a href="/">Endurance Manager</a> · <a href="/legal.html">Informations légales</a></footer>
+<footer class="site-footer"><a href="/help.html">Aide</a><span aria-hidden="true">·</span><a href="/about.html">À propos & sécurité</a><span aria-hidden="true">·</span><a href="/legal.html">Informations légales</a><span aria-hidden="true">·</span><a href="/circuit-credits.html">Crédits des circuits</a><span aria-hidden="true">·</span><a href="/privacy.html">Confidentialité</a></footer>
 </body>
 </html>

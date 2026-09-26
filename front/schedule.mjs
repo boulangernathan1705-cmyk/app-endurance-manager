@@ -4,8 +4,11 @@ export function countdown(timestamp) {
   const seconds=Math.max(0,Math.floor((timestamp-Date.now())/1000));
   const english=getLocale()==='en';
   if (!seconds) return english?'Start passed':'Départ passé';
-  const days=Math.floor(seconds/86400),hours=Math.floor(seconds%86400/3600),minutes=Math.floor(seconds%3600/60);
-  return days?`${days}${english?'d':'j'} ${hours}h ${minutes}m`:`${hours}h ${minutes}m ${seconds%60}s`;
+  // Spaced units ("2 h 05 min") so a countdown is never mistaken for a start time ("22h").
+  const days=Math.floor(seconds/86400),hours=Math.floor(seconds%86400/3600),minutes=Math.floor(seconds%3600/60),pad=value=>String(value).padStart(2,'0');
+  if(days)return `${days} ${english?'d':'j'} ${hours} h`;
+  if(hours)return `${hours} h ${pad(minutes)} min`;
+  return `${minutes} min ${pad(seconds%60)} s`;
 }
 export function dateLabel(departure) { return new Intl.DateTimeFormat(localeTag(),{timeZone:'Europe/Paris',dateStyle:'full'}).format(new Date(departure.startsAt)); }
 export function parisCalendar(timestamp) {

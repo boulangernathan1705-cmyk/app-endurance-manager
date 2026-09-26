@@ -1,26 +1,16 @@
 import {GAME_CATALOGS, gameForEvent} from '../shared/catalog.mjs';
 import {eventSchedule} from './schedule.mjs';
-import {getLocale,localeTag} from './i18n.mjs';
+import {getLocale} from './i18n.mjs';
+import {dateBlock,timeLabel} from './dates.mjs';
 
 const grid = document.getElementById('game-grid');
-const formatter = new Intl.DateTimeFormat(localeTag(), {
-  timeZone:'Europe/Paris',
-  weekday:'short',
-  day:'numeric',
-  month:'short',
-  year:'numeric'
-});
 
-const CREW_COLORS = ['#52d3d8','#f3b33d','#ec5b67','#75d66b','#8b7cf6','#e47adf','#58a6ff','#f28f45'];
+// Same palette and order as the crews of a race page (crew-palette-0..9, sortedCrews in front/app/core.mjs),
+// so a crew keeps its color from the home page to the race.
+const CREW_COLORS = ['#53d8ff','#c58cff','#ffae62','#ff79aa','#75a9ff','#b5df62','#ffd45e','#66e0b1','#ff7777','#b99cff'];
+const sortedCrews = (event, departure) => [...(departure.crews || [])].sort((a, b) => (event.categories || []).indexOf(a.category) - (event.categories || []).indexOf(b.category) || String(a.name).localeCompare(String(b.name), 'fr', {sensitivity:'base', numeric:true}));
 const MAX_HOME_ITEMS = 3;
 const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
-
-function displayTime(value) {
-  const match = String(value || '').match(/^(\d{1,2}):(\d{2})$/);
-  if (!match) return String(value || '').trim();
-  if (getLocale()==='en') return `${String(Number(match[1])).padStart(2,'0')}:${match[2]}`;
-  return match[2] === '00' ? `${Number(match[1])}h` : `${Number(match[1])}h${match[2]}`;
-}
 
 function activeRegistrations(departure) {
   return (departure?.availability || []).filter(registration => registration.status !== 'unavailable');
@@ -99,11 +89,12 @@ function crewMarkup(crew, departure, index=0) {
     ${crewIcon(color)}
     <span class="crew-summary-main"><span class="crew-summary-title"><strong style="color:${color}">${esc(crew.name || 'Équipage')}</strong></span><small>${esc(crew.category || '')}${crew.car ? ` · ${esc(crew.car)}` : ''}</small></span>
     <span class="crew-summary-pilots">${pilots.length ? esc(pilots.join(' · ')) : 'Aucun pilote affecté'}</span>
+    <span class="crew-compact-status ${crew.locked ? 'is-complete' : 'is-open'}">${crew.locked ? 'Complet' : 'Places libres'}</span>
   </span>`;
 }
 
-function participationMarkup(departure) {
-  const crews = [...(departure.crews || [])];
+function participationMarkup(event, departure) {
+  const crews = sortedCrews(event, departure);
   const pilotCount = activePilotCount(departure);
   if (crews.length) {
     return `<span class="crew-summary-heading"><strong>${crews.length} équipage${crews.length > 1 ? 's' : ''} engagé${crews.length > 1 ? 's' : ''}</strong><span>${pilotCount ? `${pilotCount} pilote${pilotCount > 1 ? 's' : ''} inscrit${pilotCount > 1 ? 's' : ''}` : 'Aucun pilote inscrit'}</span></span>
@@ -121,11 +112,15 @@ function enduranceMarkup(item, game) {
   const circuit = catalog.circuits.find(item => item.id === event.circuit)?.name || 'Circuit à préciser';
   const eventStarted = (event.departures || []).some(item => Number.isFinite(Number(item.startsAt)) && Number(item.startsAt) <= Date.now());
   const label = eventStarted ? 'PROCHAIN DÉPART' : 'PROCHAINE ENDURANCE';
-  return `<section class="hub-next-race" aria-label="${esc(event.name)} · départ ${esc(displayTime(departure.time))}">
+  // Same presentation as the race cards: date block, name, circuit · duration, start time.
+  return `<section class="hub-next-race" aria-label="${esc(event.name)} · départ ${esc(timeLabel(departure.time))}">
     <span class="hub-next-label">${label}</span>
-    <h3>${esc(event.name)}</h3>
-    <p class="hub-race-meta"><strong>${esc(formatter.format(new Date(Number(departure.startsAt))))} · ${esc(displayTime(departure.time))}</strong><span>${esc(circuit)} · ${Number(event.durationHours) || 6} h</span></p>
-    ${participationMarkup(departure)}
+    <div class="hub-race-top">${dateBlock(departure.startsAt)}<div class="hub-race-head">
+      <h3>${esc(event.name)}</h3>
+      <p class="hub-race-meta"><span>${esc(circuit)} · ${Number(event.durationHours) || 6} h</span></p>
+      <span class="race-start">Départ ${esc(timeLabel(departure.time))}</span>
+    </div></div>
+    ${participationMarkup(event, departure)}
   </section>`;
 }
 

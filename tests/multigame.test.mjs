@@ -87,7 +87,9 @@ test('le résumé d’accueil affiche chaque équipage créé même sans pilote 
   const hub = readFileSync(new URL('../front/game-hub.mjs',import.meta.url),'utf8');
   assert.match(hub,/function hasVisibleActivity\(departure\)/);
   assert.match(hub,/\(departure\?\.crews \|\| \[\]\)\.length > 0/);
-  assert.match(hub,/const crews = \[\.\.\.\(departure\.crews \|\| \[\]\)\]/);
+  // Every crew of the start is listed, in the same order and colors as on the race page.
+  assert.match(hub,/const crews = sortedCrews\(event, departure\)/);
+  assert.match(hub,/\[\.\.\.\(departure\.crews \|\| \[\]\)\]\.sort\(/);
   assert.match(hub,/Aucun pilote affecté/);
   assert.match(hub,/Aucun participant/);
 });

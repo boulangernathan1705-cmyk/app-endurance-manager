@@ -5,22 +5,8 @@
  * ordinateur et mobile, disposée en CSS grid.
  */
 
-/* Bannière réduite sur les pages intérieures : le contenu arrive plus vite. */
-html[data-game] .site-hero,
-html[data-game] .site-hero .hero-picture,
-html[data-game] .site-hero .header-inner {
-  height: clamp(84px, 13vw, 180px) !important;
-  min-height: 0 !important;
-}
-html[data-game] .site-hero .hero-banner {
-  width: 100% !important;
-  height: 100% !important;
-  object-fit: cover !important;
-  object-position: 50% 38% !important;
-}
-
 /* ---------- Barre de navigation ---------- */
-html[data-game] .site-nav-shell {
+.site-nav-shell {
   display: grid !important;
   grid-template-columns: auto auto 1fr auto !important;
   grid-template-areas: "lang switch sections account" !important;
@@ -35,20 +21,20 @@ html[data-game] .site-nav-shell {
   box-sizing: border-box !important;
 }
 
-html[data-game] .site-nav-shell > .game-space-bar {
+.site-nav-shell > .game-space-bar {
   grid-area: lang;
   display: flex !important;
   width: auto !important;
   margin: 0 !important;
   padding: 0 !important;
 }
-html[data-game] .game-space-bar > #game-context-label {
+.site-nav-shell .game-space-bar > #game-context-label {
   position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap;
 }
-html[data-game] .site-nav-shell > #navigation {
+.site-nav-shell > #navigation {
   display: contents !important;
 }
-html[data-game] .site-nav-shell > .account-bar {
+.site-nav-shell > .account-bar {
   grid-area: account;
   justify-self: end;
   margin: 0 !important;
@@ -56,7 +42,7 @@ html[data-game] .site-nav-shell > .account-bar {
 }
 
 /* Sélecteur de simulateur : un seul contrôle segmenté. */
-html[data-game] #navigation > .nav-game-switcher {
+.site-nav-shell #navigation > .nav-game-switcher {
   grid-area: switch;
   display: inline-flex !important;
   gap: 0 !important;
@@ -67,7 +53,7 @@ html[data-game] #navigation > .nav-game-switcher {
   border-radius: 10px;
   background: rgba(0, 0, 0, .25);
 }
-html[data-game] #navigation .nav-game-switcher-button {
+.site-nav-shell #navigation .nav-game-switcher-button {
   display: inline-flex !important;
   align-items: center;
   justify-content: center;
@@ -87,22 +73,26 @@ html[data-game] #navigation .nav-game-switcher-button {
   text-decoration: none !important;
   white-space: nowrap;
 }
-html[data-game] #navigation .nav-game-switcher-button[aria-current="page"] {
+.site-nav-shell #navigation .nav-game-switcher-button[aria-current="page"] {
   color: #fff !important;
   background: var(--game-accent, #d8322c) !important;
 }
 html[data-game="iracing"] { --game-accent: #2f6fd6; }
 html[data-game="lmu"] { --game-accent: #d8322c; }
-html[data-game] .nav-short { display: none; }
+/* Pages communes (accueil, membres, aide) : chaque simulateur garde sa couleur au survol. */
+.site-nav-shell .nav-game-switcher-lmu:hover { color: #fff !important; background: rgba(216, 50, 44, .35) !important; }
+.site-nav-shell .nav-game-switcher-iracing:hover { color: #fff !important; background: rgba(47, 111, 214, .35) !important; }
+.site-nav-shell #navigation .nav-section-button { display: inline-flex; align-items: center; text-decoration: none; }
+.site-nav-shell .nav-short { display: none; }
 
 /* Onglets Événements / Mes inscriptions. */
-html[data-game] #navigation > .nav-sections {
+.site-nav-shell #navigation > .nav-sections {
   grid-area: sections;
   display: flex;
   gap: 6px;
   min-width: 0;
 }
-html[data-game] #navigation .nav-section-button {
+.site-nav-shell #navigation .nav-section-button {
   min-height: 36px;
   padding: 0 14px;
   border: 1px solid transparent;
@@ -115,8 +105,8 @@ html[data-game] #navigation .nav-section-button {
   cursor: pointer;
   white-space: nowrap;
 }
-html[data-game] #navigation .nav-section-button:hover { color: #fff; background: rgba(255, 255, 255, .06); }
-html[data-game] #navigation .nav-section-button[aria-current="page"] {
+.site-nav-shell #navigation .nav-section-button:hover { color: #fff; background: rgba(255, 255, 255, .06); }
+.site-nav-shell #navigation .nav-section-button[aria-current="page"] {
   color: #fff;
   border-color: rgba(255, 255, 255, .18);
   background: rgba(255, 255, 255, .09);
@@ -125,12 +115,21 @@ html[data-game] #navigation .nav-section-button[aria-current="page"] {
 /* Compte : la phrase de confiance et « Aide » restent sur l'accueil et dans le pied de page. */
 html[data-game] .site-nav-shell .account-oauth-trust,
 html[data-game] .site-nav-shell .account-help-link { display: none !important; }
-html[data-game] .site-nav-shell .account-disconnected-wrap,
-html[data-game] .site-nav-shell .account-disconnected-actions { margin: 0 !important; gap: 0 !important; }
-html[data-game] .site-nav-shell .account-discord-login { min-height: 36px !important; padding: 0 14px !important; }
+.site-nav-shell .account-disconnected-wrap,
+.site-nav-shell .account-disconnected-actions { margin: 0 !important; gap: 0 !important; }
+.site-nav-shell .account-discord-login { min-height: 36px !important; padding: 0 14px !important; }
 .account-discord-login .login-short { display: none; }
+/* Le bouton de compte garde sa largeur naturelle (les anciennes règles mobiles le mettaient à 100 %
+   d'une colonne qui se réduisait, ce qui coupait l'avatar). */
+.site-nav-shell .account-bar,
+.site-nav-shell .account-menu-root,
+.site-nav-shell .account-menu,
+.site-nav-shell .account-trigger { width: auto !important; max-width: none !important; min-width: max-content !important; }
+.site-nav-shell .account-bar:has(.account-menu) .account-menu-root,
+.site-nav-shell .account-bar:has(.account-menu) .account-menu { width: auto !important; }
+.site-nav-shell .account-trigger { flex: none !important; }
 /* Le compte est à droite de la barre : son menu s'ouvre vers la gauche. */
-html[data-game] .site-nav-shell .account-popover {
+.site-nav-shell .account-popover {
   left: auto !important;
   right: 0 !important;
   max-width: calc(100vw - 20px) !important;
@@ -181,15 +180,15 @@ html[data-game] .page-head .home-create-event { margin: 0 0 0 auto !important; }
 
 /* ---------- Écrans intermédiaires ---------- */
 @media (max-width: 1100px) {
-  html[data-game] .nav-full { display: none; }
-  html[data-game] .nav-short { display: inline; }
-  html[data-game] .site-nav-shell .account-discord-login .login-long { display: none; }
-  html[data-game] .site-nav-shell .account-discord-login .login-short { display: inline; }
+  .site-nav-shell .nav-full { display: none; }
+  .site-nav-shell .nav-short { display: inline; }
+  .site-nav-shell .account-discord-login .login-long { display: none; }
+  .site-nav-shell .account-discord-login .login-short { display: inline; }
 }
 
 /* ---------- Tablette et mobile : deux lignes ---------- */
 @media (max-width: 900px) {
-  html[data-game] .site-nav-shell {
+  .site-nav-shell {
     grid-template-columns: auto 1fr auto !important;
     grid-template-areas:
       "lang switch account"
@@ -197,13 +196,13 @@ html[data-game] .page-head .home-create-event { margin: 0 0 0 auto !important; }
     margin: 8px 10px 4px !important;
     padding: 8px !important;
   }
-  html[data-game] #navigation > .nav-game-switcher { justify-self: stretch; }
-  html[data-game] #navigation .nav-game-switcher-button { flex: 1; padding: 0 10px !important; }
-  html[data-game] #navigation > .nav-sections > .nav-section-button { flex: 1; }
+  .site-nav-shell #navigation > .nav-game-switcher { justify-self: stretch; }
+  .site-nav-shell #navigation .nav-game-switcher-button { flex: 1; padding: 0 10px !important; }
+  .site-nav-shell #navigation > .nav-sections > .nav-section-button { flex: 1; }
 }
 @media (max-width: 760px) {
-  html[data-game] .site-nav-shell .account-trigger-copy,
-  html[data-game] .site-nav-shell .account-chevron { display: none !important; }
+  .site-nav-shell .account-trigger-copy,
+  .site-nav-shell .account-chevron { display: none !important; }
   html[data-game] #app { padding-left: 10px !important; padding-right: 10px !important; }
   html[data-game] .page-head .event-filter { flex: 1; }
 }
@@ -315,6 +314,26 @@ body:has(.fold-registration:not([hidden])) { overflow: hidden; }
 .registration-step-nav .registration-next { flex: 1; min-height: 48px; margin: 0 !important; width: auto !important; }
 .registration-step-nav .registration-back { min-height: 48px; }
 
+/* Lisibilité des fenêtres par étapes (inscription, autre pilote) : d'anciennes règles réduisaient
+   certains textes à 8-10 px (boutons de catégorie, « Toute la course », Départ / Arrivée). */
+.registration-sheet { max-width: 680px; }
+.registration-sheet .registration-step-label { font-size: 14px; }
+.registration-sheet .form-label { font-size: 15px !important; }
+.registration-sheet .registration-step-help,
+.registration-sheet .availability-hint,
+.registration-sheet .car-preference-help { font-size: 14px !important; }
+.registration-sheet .registration-category-list .category-button { font-size: 16px !important; font-weight: 800 !important; min-height: 64px; }
+.registration-sheet .registration-category-list .category-button strong { font-size: 16px !important; }
+.registration-sheet .registration-category-list .category-button small { font-size: 13px !important; }
+.registration-sheet .registration-category-list .category-logo { width: 40px !important; height: auto !important; flex: none; }
+.registration-sheet .car-preference-panel label,
+.registration-sheet .car-preference-panel label span { font-size: 15px !important; }
+.registration-sheet .presence-time { font-size: 13px !important; }
+.registration-sheet .presence-edges span { font-size: 12px !important; }
+.registration-sheet .special-button { min-height: 44px !important; font-size: 14px !important; letter-spacing: .04em; }
+.registration-sheet .registration-summary-row > span,
+.registration-sheet .registration-summary-row > em { font-size: 14px; }
+
 @media (max-width: 760px) {
   .departure-fold .fold-registration:not([hidden]) { align-items: flex-end; padding: 0 !important; }
   .registration-sheet { max-width: none; max-height: 92vh; border-radius: 18px 18px 0 0; padding: 14px 14px 0; }
@@ -342,9 +361,6 @@ body:has(.fold-registration:not([hidden])) { overflow: hidden; }
 html[data-game] .event-card .event-category-badges { display: flex !important; flex-wrap: wrap; gap: 6px; }
 
 /* ---------- Page de course plus aérée : tailles de texte lisibles, espaces réguliers ---------- */
-html[data-game] #app .event-actions-toolbar { margin: 12px 0 !important; }
-html[data-game] #app .event-toolbar-main { gap: 8px !important; }
-html[data-game] #app .event-toolbar-main button { font-size: 13px !important; min-height: 38px !important; padding: 0 14px !important; }
 html[data-game] #app .departure-accordion { display: flex; flex-direction: column; gap: 14px !important; }
 html[data-game] #app .departure-fold > summary { padding: 14px 18px !important; gap: 14px !important; }
 html[data-game] #app .departure-fold .ux-summary-registration-actions > button { font-size: 13px !important; min-height: 40px !important; }
@@ -441,9 +457,9 @@ html[data-game] #app .crew-tile-foot .crew-compact-car { color: var(--muted, #92
 html[data-game] #app .crew-owner-badge { text-transform: none !important; letter-spacing: 0 !important; font-weight: 700 !important; }
 
 /* État : « Places libres » en orange (à compléter), « Complet » en gris neutre. */
-html[data-game] .crew-compact-status { text-transform: none !important; letter-spacing: 0 !important; }
-html[data-game] .crew-compact-status.is-open { color: #f3b33d !important; border-color: rgba(243, 179, 61, .6) !important; background: rgba(243, 179, 61, .1) !important; }
-html[data-game] .crew-compact-status.is-complete { color: #b7bfbc !important; border-color: #3e4649 !important; background: transparent !important; }
+.crew-compact-status { text-transform: none !important; letter-spacing: 0 !important; }
+.crew-compact-status.is-open { color: #f3b33d !important; border-color: rgba(243, 179, 61, .6) !important; background: rgba(243, 179, 61, .1) !important; }
+.crew-compact-status.is-complete { color: #b7bfbc !important; border-color: #3e4649 !important; background: transparent !important; }
 
 /* Intérieur d'une tuile ouverte : des lignes, plus de cartes dans les cartes. */
 html[data-game] #app .crew-unified-body { padding: 4px 14px 12px !important; border: 0 !important; background: none !important; }
@@ -1032,3 +1048,89 @@ html[data-game] #app .my-entry-column .crew-pilot-lines { margin-top: 0 !importa
   html[data-game] #app .my-entry-column + .my-entry-column { border-left: 0; border-top: 1px solid rgba(255, 255, 255, .08); }
 }
 html[data-game] #app .my-entry-column .crew-pilot-line { background: none !important; border-radius: 0 !important; box-shadow: none !important; padding-left: 0 !important; padding-right: 0 !important; }
+
+/* ---------- Dates : un seul bloc de date partout (front/dates.mjs) ---------- */
+.race-date {
+  width: 62px;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 6px 0 8px;
+  border: 1px solid rgba(255, 255, 255, .16);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, .03);
+  line-height: 1.15;
+  box-sizing: border-box;
+}
+.race-date small { font-size: 12px; color: #aab3b6; text-transform: lowercase; }
+.race-date strong { font-size: 26px; font-weight: 800; color: #f4f6f5; }
+.race-date.is-unknown small { text-align: center; font-size: 11px; padding: 0 4px; }
+.race-start {
+  display: inline-block;
+  min-width: 42px;
+  padding: 3px 8px;
+  border: 1px solid rgba(255, 255, 255, .14);
+  border-radius: 7px;
+  text-align: center;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #e6ecea;
+  box-sizing: border-box;
+}
+/* Version compacte : titre de chaque départ d'une course. */
+.race-date.is-compact { width: 46px; padding: 3px 0 4px; border-radius: 8px; }
+.race-date.is-compact small { font-size: 10.5px; }
+.race-date.is-compact strong { font-size: 18px; }
+html[data-game] #app .departure-fold .fold-date { flex-direction: row !important; align-items: center !important; gap: 12px; }
+html[data-game] #app .departure-fold > summary > .fold-index { align-self: center !important; }
+html[data-game] #app .departure-fold .fold-date-text { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-width: 0; }
+
+/* Accueil : le prochain départ est présenté comme une carte de course. */
+.hub-race-top { display: flex; align-items: flex-start; gap: 14px; margin: 8px 0 18px; }
+.hub-race-head { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+.hub-race-top .hub-next-race h3,
+.hub-race-head h3 { margin: 0 !important; }
+.hub-race-head .hub-race-meta { margin: 0 !important; }
+html[data-game] #app .departure-fold .race-date.is-compact { align-items: center !important; text-align: center !important; }
+/* Un compte à rebours ne se coupe jamais en deux lignes. */
+[data-countdown] { white-space: nowrap; }
+
+/* Page course : actions de la course dans l'en-tête, sur la ligne des catégories. */
+html[data-game] #app .race-header-footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; }
+html[data-game] #app .race-header-footer > .event-category-badges { margin: 0 !important; }
+html[data-game] #app .race-header-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; margin-left: auto; }
+html[data-game] #app .race-header-actions > .secondary-button { width: auto !important; min-height: 38px !important; padding: 0 14px !important; font-size: 14px !important; }
+html[data-game] #app .race-header-actions > .link-button { width: auto !important; min-height: 38px !important; box-shadow: none !important; }
+html[data-game] #app .race-header-actions > .danger-link { width: auto !important; margin-left: 0; box-shadow: none !important; }
+@media (max-width: 760px) {
+  html[data-game] #app .race-header-actions { margin-left: 0; width: 100%; justify-content: flex-start; }
+}
+
+/* ---------- Gestion des membres : recherche, rôle enregistré dès qu'il change ---------- */
+.members-toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+.members-search { flex: 1; min-width: 0; }
+.members-search input { width: 100%; min-height: 42px; box-sizing: border-box; padding: 0 14px; border: 1px solid var(--border, #292d31); border-radius: 10px; background: rgba(0, 0, 0, .25); color: inherit; font: inherit; font-size: 15px; }
+.members-help { margin: 0 0 14px; color: var(--muted, #92979c); font-size: 14px; }
+.members-panel .members-row { grid-template-columns: minmax(0, 1fr) minmax(160px, 220px) 150px !important; }
+.members-panel .members-row[hidden] { display: none !important; }
+.members-row-status { font-size: 13px; font-weight: 700; color: var(--muted, #92979c); }
+.members-row-status.is-saved { color: #7fe0a8; }
+.members-row-status.is-error { color: #ff8a8a; }
+.members-empty { margin: 12px 0 0; color: var(--muted, #92979c); }
+@media (max-width: 760px) {
+  .members-panel .members-row { grid-template-columns: minmax(0, 1fr) !important; }
+  .members-panel .members-role-select { grid-column: 1 !important; }
+  .members-panel .members-row-status:empty { display: none; }
+}
+
+/* Accueil : équipages avec la même couleur et le même statut que sur la page course. */
+.crew-summary-card { grid-template-columns: auto minmax(120px, .8fr) minmax(0, 1.2fr) auto !important; }
+.crew-summary-card .crew-compact-status { justify-self: end; padding: 3px 8px; border: 1px solid; border-radius: 999px; font-size: 11px; font-weight: 700; white-space: nowrap; }
+@media (max-width: 760px) {
+  .crew-summary-card { grid-template-columns: auto minmax(0, 1fr) auto !important; }
+  .crew-summary-card .crew-summary-pilots { grid-column: 2 / -1; }
+}
+.members-toolbar > .members-help { flex: 1; margin: 0; }
+/* Fenêtre « Créer un équipage » : libellés d'étape lisibles. */
+.crew-builder-step-label { font-size: 12.5px !important; }

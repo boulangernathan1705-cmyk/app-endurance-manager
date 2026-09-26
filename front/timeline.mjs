@@ -1,9 +1,10 @@
+import {timeLabel} from './dates.mjs';
 const timelineEscape = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const timelineTime = new Intl.DateTimeFormat('fr-FR', {timeZone:'Europe/Paris', hour:'2-digit', minute:'2-digit', hourCycle:'h23'});
 const timelineDate = new Intl.DateTimeFormat('fr-FR', {timeZone:'Europe/Paris', day:'2-digit', month:'2-digit', timeZoneName:'short'});
 
 export function raceHourLabel(departure, index) {
-  return timelineTime.format(new Date(departure.startsAt + index * 3600000)).replace(':00', 'h').replace(':', 'h');
+  return timeLabel(timelineTime.format(new Date(departure.startsAt + index * 3600000)));
 }
 
 // Label density follows the containing card, independently of viewport size.

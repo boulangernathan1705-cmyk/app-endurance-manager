@@ -63,9 +63,9 @@ test('le build injecte les deux couches de traduction sur les pages publiques et
 
 test('les dates applicatives utilisent la locale sélectionnée',()=>{
   assert.match(read('front/schedule.mjs'),/localeTag\(\)/);
-  assert.match(read('front/game-hub.mjs'),/Intl\.DateTimeFormat\(localeTag\(\)/);
-  assert.match(read('front/app/home-view.mjs'),/Intl\.DateTimeFormat\(localeTag\(\)/);
-  assert.match(read('front/app/entries-view.mjs'),/Intl\.DateTimeFormat\(localeTag\(\)/);
+  // Dates are formatted in one module, with the selected locale, and used by every page.
+  assert.match(read('front/dates.mjs'),/Intl\.DateTimeFormat\(localeTag\(\)/);
+  for(const file of ['front/game-hub.mjs','front/app/home-view.mjs','front/app/entries-view.mjs','front/app/event-view.mjs','crew-builder.js'])assert.match(read(file),/dates\.mjs/);
 });
 
 test('le sélecteur traduit aussi les confirmations natives en anglais',()=>{

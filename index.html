@@ -14,6 +14,7 @@
 <link rel="stylesheet" href="/styles/account-menu.css?v=4-oauth-trust">
 <link rel="stylesheet" href="/styles/desktop-nav-unified.css?v=2-home-toolbar">
 <link rel="stylesheet" href="/styles/legal.css?v=2">
+<link rel="stylesheet" href="/styles/ux-refresh.css?v=24-shared-nav">
 <script type="module" src="/front/account-menu.mjs?v=8-navigation"></script>
 <script type="module" src="/front/game-hub.mjs?v=13-hide-past-starts"></script>
 </head>
@@ -25,11 +26,15 @@
   </picture>
   <div class="header-inner"><div class="brand-button logo"><span class="brand-mark-frame" aria-hidden="true"><img class="brand-mark" src="/images/endurance-manager-logo.webp" alt=""></span><span class="brand-copy">ENDURANCE <span>MANAGER</span></span></div></div>
 </header>
+<div class="site-nav-shell">
+  <div class="game-space-bar"></div>
+  <nav id="navigation" aria-label="Navigation principale">
+    <div class="nav-game-switcher" role="group" aria-label="Changer de simulateur"><a class="nav-game-switcher-button nav-game-switcher-lmu" href="/lmu/"><span class="nav-full">Le Mans Ultimate</span><span class="nav-short">LMU</span></a><a class="nav-game-switcher-button nav-game-switcher-iracing" href="/iracing/"><span class="nav-full">iRacing</span><span class="nav-short">iRacing</span></a></div>
+  </nav>
+  <div class="account-bar"><div id="account-menu-root" class="account-menu-root" aria-live="polite"></div></div>
+</div>
 <main class="hub-main">
-  <div class="hub-topbar">
-    <div class="account-bar"><div id="account-menu-root" class="account-menu-root" aria-live="polite"></div></div>
-    <section class="hub-intro"><h1>Choisis ton simulateur</h1></section>
-  </div>
+  <section class="hub-intro"><h1>Choisis ton simulateur</h1></section>
   <p id="hub-status" role="status" aria-live="polite"></p>
   <section id="game-grid" class="game-hub-grid" aria-label="Simulateurs disponibles">
     <article class="game-hub-card game-lmu"><div class="game-hub-heading"><div class="game-title-line"><span class="game-badge" aria-hidden="true">LMU</span><h2>Le Mans Ultimate</h2></div><p>Chargement de la prochaine endurance…</p></div><a class="game-hub-enter" href="/lmu/">Accéder à LMU <span aria-hidden="true">→</span></a></article>

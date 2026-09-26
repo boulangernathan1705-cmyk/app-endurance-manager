@@ -104,7 +104,9 @@ for (const item of searchable.filter(item => item.ext === '.html')) {
 const insecureReferences = searchable
   .filter(item => ['.html','.js','.mjs','.cjs'].includes(item.ext))
   .flatMap(item => [...item.content.matchAll(/http:\/\/[^\s"'`<)]+/g)].map(match => ({path:item.path,url:match[0]})))
-  .filter(item => item.url !== 'http://www.sitemaps.org/schemas/sitemap/0.9');
+  .filter(item => item.url !== 'http://www.sitemaps.org/schemas/sitemap/0.9')
+  // The local development server (wrangler dev) has no HTTPS; the Worker accepts http only for localhost too.
+  .filter(item => !/^http:\/\/localhost(?::\d+)?(?:\/|$)/.test(item.url));
 for (const item of insecureReferences) warnings.push(`Référence HTTP non chiffrée : ${item.path} -> ${item.url}`);
 if (!worker.includes("scope:'identify'") && !worker.includes("scope: 'identify'")) warnings.push('Discord OAuth doit rester limité au scope identify.');
 if (!workerCore.includes("const COOKIE_SESSION = '__Host-fmt_session'")) warnings.push('Le cookie de session doit conserver le préfixe __Host-.');
