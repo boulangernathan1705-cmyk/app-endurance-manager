@@ -185,7 +185,7 @@ function panelMarkup(event) {
       ${pane(1, `<p class="registration-step-help">${description}</p>
         <div class="crew-builder-fields">
           <label>Catégorie<select name="builderCategory" ${categoryDisabled?'disabled':''}>${categories.map(category => `<option value="${esc(category)}" ${category === builderState.category ? 'selected' : ''}>${esc(category)}</option>`).join('')}</select></label>
-          <label>Nom de l’équipage<input name="builderName" maxlength="60" required value="${esc(builderState.name)}" placeholder="Ex. FMT Racing 1"></label>
+          <label>Nom de l’équipage<input name="builderName" maxlength="60" required value="${esc(builderState.name)}" placeholder="Ex. Équipage Alpha"></label>
           <label>Voiture<select name="builderCar"><option value="">Voiture à définir</option>${(CARS[builderState.category] || []).map(car => `<option value="${esc(car)}" ${car === builderState.car ? 'selected' : ''}>${esc(car)}</option>`).join('')}</select></label>
         </div>${categoryNote}`)}
       ${pane(2, `${lockedNote}<p class="registration-step-help">${editMode ? 'Coche ou décoche les pilotes que tu veux dans cet équipage.' : 'Choisis les pilotes inscrits en ' + esc(builderState.category) + ' sur ce départ. Tu peux aussi le faire plus tard.'}</p>

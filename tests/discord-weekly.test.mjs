@@ -29,7 +29,7 @@ function dbFixture({events=[],registrations=[],crews=[]}){
 function event(id,name,circuit,durationHours,departures){return{id,name,circuit,duration_hours:durationHours,departures:JSON.stringify(departures)};}
 function singleDepartureEvent(id,name,circuit,durationHours,departureId,startsAt){return event(id,name,circuit,durationHours,[{id:departureId,startsAt}]);}
 function registration({eventId=uuid,departureId=departureUuid,name='Nathan'}={}){return{id:registrationUuid,event_id:eventId,departure_id:departureId,participant_id:`pilot-${name.toLowerCase()}`,category:'Hypercar',status:'all',pilot_name:name};}
-function crewRow({eventId=uuid,departureId=departureUuid,name='FMT #1',pilot='Nathan'}={}){return{id:crewUuid,event_id:eventId,departure_id:departureId,name,category:'Hypercar',car:'Toyota GR010 Hybrid',locked:1,registration_id:pilot?registrationUuid:null,pilot_name:pilot||null};}
+function crewRow({eventId=uuid,departureId=departureUuid,name='Équipe #1',pilot='Nathan'}={}){return{id:crewUuid,event_id:eventId,departure_id:departureId,name,category:'Hypercar',car:'Toyota GR010 Hybrid',locked:1,registration_id:pilot?registrationUuid:null,pilot_name:pilot||null};}
 
 test('la semaine utilitaire suit lundi-dimanche en heure de Paris',()=>{
   const sunday=Date.parse('2026-09-13T19:00:00Z');
@@ -94,7 +94,7 @@ test('quand la semaine est terminée le récap affiche tous les départs de la p
 
 test('le message regroupe les horaires et garde un habillage Discord minimal',()=>{
   const timestamp=Date.parse('2026-09-18T10:00:00Z');
-  const current={eventId:uuid,eventName:'8H Test en cours',circuit:'spa',durationHours:8,departureId:departureUuid,startsAt:Date.parse('2026-09-18T09:00:00Z'),unassignedPilots:[],crews:[{id:crewUuid,name:'FMT #1',category:'Hypercar',car:'Toyota GR010 Hybrid',locked:true,pilots:['Nathan']}]};
+  const current={eventId:uuid,eventName:'8H Test en cours',circuit:'spa',durationHours:8,departureId:departureUuid,startsAt:Date.parse('2026-09-18T09:00:00Z'),unassignedPilots:[],crews:[{id:crewUuid,name:'Équipe #1',category:'Hypercar',car:'Toyota GR010 Hybrid',locked:true,pilots:['Nathan']}]};
   const futureEmpty={eventId:futureEventUuid,eventName:'4h SILVERSTONE (horaires non définis par LMU)',circuit:'silverstone',durationHours:4,departureId:futureDepartureUuid,startsAt:Date.parse('2026-09-18T12:00:00Z'),unassignedPilots:[],crews:[]};
   const futureWithCrew={...futureEmpty,departureId:secondDepartureUuid,startsAt:Date.parse('2026-09-18T16:00:00Z'),crews:[{id:'88888888-8888-4888-8888-888888888888',name:'Mrt blé',category:'LMP2 ELMS',car:'Oreca 07 Gibson ELMS',locked:false,pilots:['Etienne_48']}]};
   const payload=buildWeeklyDiscordPayload({currentDepartures:[current],futureDepartures:[futureEmpty,futureWithCrew],periodLabel:'semaine du 14 septembre au 20 septembre 2026'},'https://endurance-manager.app/lmu/',timestamp);

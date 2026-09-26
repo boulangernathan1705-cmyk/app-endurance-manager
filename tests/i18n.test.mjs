@@ -32,8 +32,8 @@ test('la version française normalise les libellés incohérents ou fautifs',()=
 });
 
 test('les dialogues dynamiques sont traduisibles en anglais',()=>{
-  assert.equal(translateTextForLocale('Marquer « FMT01 » comme équipage complet et verrouiller sa composition ?','en'),'Mark “FMT01” as complete and lock its lineup?');
-  assert.equal(translateTextForLocale('Supprimer « FMT01 » et toutes ses inscriptions ? Cette suppression est définitive.','en'),'Delete “FMT01” and all its entries? This action is permanent.');
+  assert.equal(translateTextForLocale('Marquer « ALPHA01 » comme équipage complet et verrouiller sa composition ?','en'),'Mark “ALPHA01” as complete and lock its lineup?');
+  assert.equal(translateTextForLocale('Supprimer « ALPHA01 » et toutes ses inscriptions ? Cette suppression est définitive.','en'),'Delete “ALPHA01” and all its entries? This action is permanent.');
 });
 
 test('les écrans avancés et contenus longs ont une couverture anglaise cohérente',()=>{
@@ -41,7 +41,7 @@ test('les écrans avancés et contenus longs ont une couverture anglaise cohére
   assert.equal(translateExtendedTextForLocale('Aucun pilote sélectionné.','en'),'No driver selected.');
   assert.equal(translateExtendedTextForLocale('2 h de course ne sont pas encore couvertes.','en'),'2 race hours are still not covered.');
   assert.equal(translateExtendedTextForLocale('1 h de course n’est pas encore couverte.','en'),'1 race hour is still not covered.');
-  assert.equal(translateExtendedTextForLocale('Équipage « FMT01 » créé. 2 autre(s) inscription(s) du même départ ont été retirées.','en'),'Crew “FMT01” created. 2 other entries were removed from the same start.');
+  assert.equal(translateExtendedTextForLocale('Équipage « ALPHA01 » créé. 2 autre(s) inscription(s) du même départ ont été retirées.','en'),'Crew “ALPHA01” created. 2 other entries were removed from the same start.');
   assert.equal(translateExtendedTextForLocale('Consulter les événements','en'),'Browse events');
   assert.equal(translateExtendedTextForLocale('Politique de confidentialité','en'),'Privacy policy');
   assert.equal(translateExtendedTextForLocale('Crédits des cartes de circuits','en'),'Circuit map credits');

@@ -1,4 +1,4 @@
-/* FMT / Arc Raiders inspired visual pass.
+/* Racing visual pass (Arc Raiders inspired).
    Presentation only: no application behavior, data model or information architecture changes. */
 :root {
   --bg: #07090a;
@@ -13,11 +13,11 @@
   --yellow: #e6b452;
   --red: #e4483d;
   --accent: #62dce0;
-  --fmt-cyan: #59d3d8;
-  --fmt-red: #e4483d;
-  --fmt-gold: #e7b653;
-  --fmt-cream: #f1e3c4;
-  --fmt-ink: #090c0e;
+  --brand-cyan: #59d3d8;
+  --brand-red: #e4483d;
+  --brand-gold: #e7b653;
+  --brand-cream: #f1e3c4;
+  --brand-ink: #090c0e;
 }
 
 html { background: #07090a; }
@@ -38,7 +38,7 @@ body::before {
   pointer-events: none;
   background-image:
     linear-gradient(rgba(7,9,10,.58),rgba(7,9,10,.76)),
-    url('/images/fmt-tech-pattern.svg');
+    url('/images/tech-pattern.svg');
   background-repeat: repeat, repeat;
   background-size: auto, 720px 480px;
   background-position: center, 40px 10px;
@@ -86,7 +86,7 @@ header::after {
   position:absolute;
   inset:auto 0 0;
   height:2px;
-  background:linear-gradient(90deg,var(--fmt-cyan),var(--fmt-red) 46%,var(--fmt-gold) 78%,transparent);
+  background:linear-gradient(90deg,var(--brand-cyan),var(--brand-red) 46%,var(--brand-gold) 78%,transparent);
   opacity:.9;
 }
 .header-inner {
@@ -117,7 +117,7 @@ header::after {
   backdrop-filter: blur(9px);
   -webkit-backdrop-filter: blur(9px);
 }
-#navigation .account-name { color: var(--fmt-cream); }
+#navigation .account-name { color: var(--brand-cream); }
 #navigation .account-name small { color: #7fd9dc; }
 
 /* Core surfaces */
@@ -156,7 +156,7 @@ main { position: relative; }
 .creation-intro h2,
 .creation-card h2,
 .my-entry-title h2 {
-  color: var(--fmt-cream);
+  color: var(--brand-cream);
   text-shadow: 0 1px 16px rgba(232,181,82,.05);
 }
 .page-subtitle,
@@ -164,7 +164,7 @@ main { position: relative; }
 .creation-help,
 .muted { color: var(--muted); }
 .creation-kicker,
-.my-entry-kicker { color: var(--fmt-gold); }
+.my-entry-kicker { color: var(--brand-gold); }
 
 /* Buttons and controls */
 .primary-button,
@@ -207,9 +207,9 @@ textarea {
 }
 input:focus,
 select:focus,
-textarea:focus { border-color: var(--fmt-cyan); box-shadow: 0 0 0 2px rgba(89,211,216,.09); }
+textarea:focus { border-color: var(--brand-cyan); box-shadow: 0 0 0 2px rgba(89,211,216,.09); }
 
-/* FMT accent treatments */
+/* Accent treatments */
 .event-period-heading,
 .fold-section > h2,
 .crew-heading,
@@ -270,9 +270,9 @@ textarea:focus { border-color: var(--fmt-cyan); box-shadow: 0 0 0 2px rgba(89,21
   box-shadow: inset 0 1px rgba(255,255,255,.06);
 }
 .form-label { color: #a5b5b6; }
-.registration-context-banner.self { border-left-color: var(--fmt-cyan); }
-.registration-context-banner.other { border-left-color: var(--fmt-gold); }
-.registration-context-banner.category { border-left-color: var(--fmt-red); }
+.registration-context-banner.self { border-left-color: var(--brand-cyan); }
+.registration-context-banner.other { border-left-color: var(--brand-gold); }
+.registration-context-banner.category { border-left-color: var(--brand-red); }
 
 @media (min-width: 1000px) {
   main { max-width: 1180px; }

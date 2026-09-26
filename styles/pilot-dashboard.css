@@ -195,7 +195,7 @@
   grid-column: 1 / -1;
   border-color: rgba(82,207,212,.68);
   background: rgba(82,207,212,.055);
-  box-shadow: inset 3px 0 0 var(--fmt-cyan, var(--accent));
+  box-shadow: inset 3px 0 0 var(--brand-cyan, var(--accent));
 }
 
 .my-entry-pilot:not(.is-me) .crew-pilot-availability {

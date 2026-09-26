@@ -131,7 +131,7 @@ test('crews: manager-only writes, category/departure integrity, concurrency and 
  assert.equal((await req('/api/events','POST',eventInput,'admin')).status,201);
  const event=(await req('/api/events')).data.events[0],dep=event.departures[0],second=event.departures[1];
  const base=`/api/events/${event.id}/departures/${dep.id}`;
- const payload={name:'FMT 1',category:'Hypercar',car:'Prototype test'};
+ const payload={name:'Équipe 1',category:'Hypercar',car:'Prototype test'};
  assert.equal((await req(base+'/crews','POST',payload)).status,401);
  assert.equal((await req(base+'/crews','POST',payload,'pilot')).status,403);
  const created=await req(base+'/crews','POST',payload,'organizer');assert.equal(created.status,201);
@@ -152,7 +152,7 @@ test('crews: manager-only writes, category/departure integrity, concurrency and 
  assert.deepEqual((await req('/api/events')).data.events[0].departures[0].availability.find(r=>r.id===reg.data.id).cars,['Ferrari 499P','Porsche 963']);
  assert.equal((await req('/api/events')).data.events[0].departures[0].availability.find(r=>r.id===bad.data.id).carAny,true);
  assert.equal((await req(crewPath,'PATCH',{...payload,version:1},'organizer')).status,409);
- const duplicate=await req(base+'/crews','POST',{...payload,name:'FMT 2'},'admin');assert.equal(duplicate.status,201);
+ const duplicate=await req(base+'/crews','POST',{...payload,name:'Équipe 2'},'admin');assert.equal(duplicate.status,201);
  assert.equal((await req('/api/crews/'+duplicate.data.id+'/members','POST',{registrationId:reg.data.id,version:1},'admin')).status,409);
  assert.equal((await req(crewPath,'PATCH',{...payload,category:'GTE',version:2},'organizer')).status,409);
  assert.equal((await req('/api/registrations/'+reg.data.id,'PATCH',{name:'Pilote A',category:'GTE',status:'whole',version:1},'pilot')).status,409);
@@ -203,7 +203,7 @@ test('shared events, actual Discord callback, role grants/revocation, guest reco
  // Removing a category or a departure that still has a registration must be rejected atomically.
  assert.equal((await req('/api/events/'+eventId,'PATCH',{...event,categories:['GTE']},'pilot')).status,409);
  assert.equal((await req('/api/events/'+eventId,'PATCH',{...event,departures:[event.departures[1]]},'pilot')).status,409);
- const changed=await req('/api/events/'+eventId,'PATCH',{...event,name:'Daytona 8H — FMT'},'pilot');assert.equal(changed.status,200);
+ const changed=await req('/api/events/'+eventId,'PATCH',{...event,name:'Daytona 8H — Nuit'},'pilot');assert.equal(changed.status,200);
  assert.equal((await req('/api/events/'+eventId,'PATCH',{...event,name:'stale'},'pilot')).status,409);
  // A connected account owns its registration independently of the display name.
  const own=await req(regPath,'POST',{name:'Etienne',category:'LMP2 ELMS',status:'middle'},'other');assert.equal(own.status,201);

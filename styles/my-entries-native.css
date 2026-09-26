@@ -182,7 +182,7 @@
 .ux-my-entry-pilot-card.is-own-pilot {
   border-color: rgba(82,207,212,.8) !important;
   background: rgba(82,207,212,.07);
-  box-shadow: inset 3px 0 0 var(--fmt-cyan, #52cfd4);
+  box-shadow: inset 3px 0 0 var(--brand-cyan, #52cfd4);
 }
 
 .ux-my-entry-pilot-card .pilot-main {
