@@ -1,5 +1,6 @@
 import {timeLabel} from '../dates.mjs';
 import {app,state,esc,button,canManage,CATEGORIES,EVENT_TYPES,CIRCUITS,categories,logo,notifyRender} from './core.mjs';
+import {gridSizeFor} from '../../shared/catalog.mjs';
 
 // A start = a date (native calendar, opened on click) and a time chosen from hour / minute lists
 // (5-minute steps, 00 by default). The hidden "time" input keeps the HH:MM value submitEvent reads.
@@ -24,10 +25,64 @@ if(typeof document!=='undefined'){
     try{input?.showPicker?.();}catch{}
   });
 }
+// Solo race fields: access, one or two rounds (circuit, possibly random, and duration in minutes)
+// and the number of places, suggested from the game server size of the first circuit.
+// Format of the event: chosen at creation, fixed afterwards.
+function formatChoice(event){
+  if(event)return `<p class="event-format-fixed">Format : <strong>${event.format==='solo'?'Course solo':'Endurance'}</strong></p><input type="hidden" data-format-value value="${event.format||'endurance'}">`;
+  const option=(value,label,help,checked)=>`<label class="solo-access-option event-format-option"><input type="radio" name="eventFormat" value="${value}" ${checked?'checked':''}><span><strong>${label}</strong><small>${help}</small></span></label>`;
+  return `<div class="event-format-choice" role="radiogroup" aria-label="Format">${option('endurance','Endurance','Équipages, relais et heures de présence.',true)}${option('solo','Course solo','Une inscription par pilote, places limitées, une ou deux manches.',false)}</div>`;
+}
+const circuitOptions=selected=>`<option value="">Sélectionner un circuit</option>${CIRCUITS.map(c=>`<option value="${c.id}" ${selected===c.id?'selected':''}>${esc(c.random?'Circuit aléatoire (annoncé au dernier moment)':c.name)}</option>`).join('')}`;
+function roundFields(index,round={}){
+  return `<div class="solo-round" data-round="${index}"><span class="form-label solo-round-title">Manche ${index+1}</span><label class="form-label">Circuit<select name="roundCircuit" required>${circuitOptions(round.circuit||'')}</select></label><label class="form-label">Durée (minutes)<input name="roundMinutes" type="number" min="5" max="600" step="5" value="${esc(round.durationMinutes||20)}" required></label></div>`;
+}
+function soloFields(event){
+  const rounds=event?.rounds?.length?event.rounds:[{}];
+  const access=event?.access||'open';
+  const choice=(value,label,help)=>`<label class="solo-access-option"><input type="radio" name="eventAccess" value="${value}" ${access===value?'checked':''}><span><strong>${label}</strong><small>${help}</small></span></label>`;
+  return `<div class="solo-fields" data-format-section="solo"><div class="solo-access" role="radiogroup" aria-label="Accès">${choice('open','OPEN','Ouverte à tous les pilotes connectés.')}${choice('safe','SAFE','Réservée aux pilotes SAFE.')}</div>
+    <div class="solo-rounds">${roundFields(0,rounds[0])}${rounds[1]?roundFields(1,rounds[1]):''}</div>
+    <label class="event-schedule-option"><input type="checkbox" name="eventTwoRounds" ${rounds[1]?'checked':''}><span><strong>Deux manches</strong><small>Deux courses courtes le même soir, avec une seule inscription.</small></span></label>
+    <label class="form-label">Nombre de places<input name="eventCapacity" type="number" min="2" max="120" step="1" value="${esc(event?.capacity||gridSizeFor(rounds[0].circuit))}" required ${event?'data-edited="true"':''}></label>
+    <p class="creation-help">Au-delà, les pilotes peuvent s’inscrire en liste d’attente. Proposé d’après la taille du serveur de jeu (62 au Mans, 38 ailleurs sur LMU).</p></div>`;
+}
+// Shows the fields of the chosen format; the hidden ones are disabled so they are not validated.
+export function applyEventFormat(form){
+  const format=form.querySelector('[name="eventFormat"]:checked')?.value||form.querySelector('[data-format-value]')?.value||'endurance';
+  form.dataset.format=format;
+  form.querySelectorAll('[data-format-section]').forEach(section=>{
+    const active=section.dataset.formatSection===format;
+    section.hidden=!active;
+    section.querySelectorAll('input,select').forEach(field=>{field.disabled=!active;});
+  });
+  const addDeparture=form.querySelector('.add-departure-button');
+  if(addDeparture)addDeparture.hidden=format==='solo';
+  if(format==='solo')form.querySelectorAll('.departure-field').forEach((row,index)=>{if(index>0)row.remove();});
+}
+if(typeof document!=='undefined'){
+  document.addEventListener('change',event=>{
+    const field=event.target,form=field.closest?.('form[data-kind="event"]');
+    if(!form)return;
+    if(field.name==='eventFormat'){applyEventFormat(form);return;}
+    if(field.name==='eventTwoRounds'){
+      const rounds=form.querySelector('.solo-rounds');
+      if(field.checked&&!rounds.querySelector('[data-round="1"]'))rounds.insertAdjacentHTML('beforeend',roundFields(1,{circuit:'random',durationMinutes:rounds.querySelector('[name="roundMinutes"]')?.value||20}));
+      if(!field.checked)rounds.querySelector('[data-round="1"]')?.remove();
+      return;
+    }
+    if(field.name==='eventCapacity'){field.dataset.edited='true';return;}
+    if(field.name==='roundCircuit'&&field.closest('[data-round="0"]')){
+      const capacity=form.querySelector('[name="eventCapacity"]');
+      if(capacity&&!capacity.dataset.edited)capacity.value=gridSizeFor(field.value);
+    }
+  });
+}
 export function updateRemoveButtons(){const buttons=app.querySelectorAll('[data-action="remove-departure"]');buttons.forEach(button=>{button.disabled=buttons.length===1;});}
 export function renderEventForm(event=null){
   if(!canManage())throw Error('Connecte-toi avec un compte autorisé.');state.page='form';state.editingEvent=event?structuredClone(event):null;
-  app.innerHTML=`${button('home','← Retour','','secondary-button back-button')}<h1 class="page-title">${event?'MODIFIER L’ÉVÉNEMENT':'NOUVEL ÉVÉNEMENT'}</h1><form class="form-panel event-creation event-stepper" data-kind="event" data-step="${event?4:1}"><div class="registration-progress" aria-hidden="true" data-event-progress>${EVENT_STEPS.map((_,index)=>`<span class="${index<(event?4:1)?'done':''}"></span>`).join('')}</div><p class="registration-step-label" data-event-step-label>Étape ${event?4:1} sur 4 · ${EVENT_STEPS[event?3:0]}</p><div class="creation-intro"><span class="creation-kicker">${event?'ÉDITION':'CONFIGURATION'} DE LA COURSE</span><h2>${event?'Mettre à jour la course':'Préparer une nouvelle course'}</h2><p>Renseigne les informations essentielles, puis ajoute les départs et les catégories ouvertes aux pilotes.</p></div><section class="creation-card creation-basics event-step" data-event-step="1" ${event?'hidden':''}><div class="creation-card-heading"><span class="creation-step">01</span><div><h2>Informations générales</h2><p>Le nom, le format et le circuit apparaîtront dans le récapitulatif.</p></div></div><div class="creation-field-grid"><label class="form-label">Nom de l’événement<input name="eventName" maxlength="100" value="${esc(event?.name||'')}" required></label><label class="form-label">Durée de la course<input name="eventDuration" type="number" min="1" max="24" step="1" value="${esc(event?.durationHours||6)}" required></label><label class="form-label">Type d’événement<select name="eventType">${Object.entries(EVENT_TYPES).map(([key,item])=>`<option value="${key}" ${(event?.eventType||'private')===key?'selected':''}>${esc(item.label)}</option>`).join('')}</select></label><label class="form-label">Circuit<select name="eventCircuit" required><option value="">Sélectionner un circuit</option>${CIRCUITS.map(c=>`<option value="${c.id}" ${(event?.circuit||'')===c.id?'selected':''}>${esc(c.name)}</option>`).join('')}</select></label><label class="event-schedule-option"><input type="checkbox" name="eventSchedulePending" ${event?.schedulePending?'checked':''}><span><strong>Horaires à confirmer</strong><small>Affiche l’étiquette « Horaires à confirmer » tant que les dates et heures peuvent encore changer.</small></span></label></div></section><fieldset class="creation-card creation-fieldset event-step" data-event-step="2" hidden><legend>02 · Catégories autorisées</legend><p class="creation-help">Choisis une ou plusieurs catégories disponibles pour cette course.</p><div class="event-category-options">${CATEGORIES.map(category=>`<label class="event-category-option ${categories[category].css}"><input type="checkbox" name="eventCategory" value="${esc(category)}" ${event?.categories.includes(category)?'checked':''}>${logo(category)}<span>${esc(category)}</span></label>`).join('')}</div></fieldset><fieldset class="creation-card creation-fieldset event-step" data-event-step="3" hidden><legend>03 · Départs possibles</legend><p class="creation-help">Les dates et heures sont saisies à l’heure de Paris.</p><div id="departureFields" class="departure-fields">${(event?.departures||[{}]).map(departureFields).join('')}</div>${button('add-departure','+ Ajouter un départ','','secondary-button add-departure-button')}</fieldset><section class="creation-card event-step event-recap" data-event-step="4" ${event?'':'hidden'}><div class="creation-card-heading"><span class="creation-step">04</span><div><h2>Récapitulatif</h2><p>Vérifie la course avant de ${event?'l’enregistrer':'la créer'}. Touche une ligne pour la modifier.</p></div></div><div class="registration-summary" data-event-recap></div>${event?'<p class="creation-help">Un départ avec des inscrits ne peut pas être supprimé, ni une catégorie encore utilisée.</p>':''}</section><div class="creation-actions registration-step-nav event-step-nav">${button('event-step','Retour','data-step="back" '+(event?'':'hidden'),'secondary-button registration-back')}${button('event-step','Continuer','data-step="next" '+(event?'hidden':''),'primary-button registration-next')}<button type="submit" class="primary-button registration-next" data-event-submit ${event?'':'hidden'}>${event?'ENREGISTRER LES MODIFICATIONS':'CRÉER L’ÉVÉNEMENT'}</button></div></form>`;
+  app.innerHTML=`${button('home','← Retour','','secondary-button back-button')}<h1 class="page-title">${event?'MODIFIER L’ÉVÉNEMENT':'NOUVEL ÉVÉNEMENT'}</h1><form class="form-panel event-creation event-stepper" data-kind="event" data-step="${event?4:1}"><div class="registration-progress" aria-hidden="true" data-event-progress>${EVENT_STEPS.map((_,index)=>`<span class="${index<(event?4:1)?'done':''}"></span>`).join('')}</div><p class="registration-step-label" data-event-step-label>Étape ${event?4:1} sur 4 · ${EVENT_STEPS[event?3:0]}</p><div class="creation-intro"><span class="creation-kicker">${event?'ÉDITION':'CONFIGURATION'} DE LA COURSE</span><h2>${event?'Mettre à jour la course':'Préparer une nouvelle course'}</h2><p>Renseigne les informations essentielles, puis ajoute les départs et les catégories ouvertes aux pilotes.</p></div><section class="creation-card creation-basics event-step" data-event-step="1" ${event?'hidden':''}><div class="creation-card-heading"><span class="creation-step">01</span><div><h2>Informations générales</h2><p>Le nom, le format et le circuit apparaîtront dans le récapitulatif.</p></div></div>${formatChoice(event)}<div class="creation-field-grid"><label class="form-label">Nom de l’événement<input name="eventName" maxlength="100" value="${esc(event?.name||'')}" required></label><div class="format-contents" data-format-section="endurance"><label class="form-label">Durée de la course<input name="eventDuration" type="number" min="1" max="24" step="1" value="${esc(event?.durationHours||6)}" required></label><label class="form-label">Type d’événement<select name="eventType">${Object.entries(EVENT_TYPES).map(([key,item])=>`<option value="${key}" ${(event?.eventType||'private')===key?'selected':''}>${esc(item.label)}</option>`).join('')}</select></label><label class="form-label">Circuit<select name="eventCircuit" required><option value="">Sélectionner un circuit</option>${CIRCUITS.map(c=>`<option value="${c.id}" ${(event?.circuit||'')===c.id?'selected':''}>${esc(c.random?'Circuit à confirmer':c.name)}</option>`).join('')}</select></label></div><label class="event-schedule-option"><input type="checkbox" name="eventSchedulePending" ${event?.schedulePending?'checked':''}><span><strong>Horaires à confirmer</strong><small>Affiche l’étiquette « Horaires à confirmer » tant que les dates et heures peuvent encore changer.</small></span></label></div>${soloFields(event)}</section><fieldset class="creation-card creation-fieldset event-step" data-event-step="2" hidden><legend>02 · Catégories autorisées</legend><p class="creation-help">Choisis une ou plusieurs catégories disponibles pour cette course.</p><div class="event-category-options">${CATEGORIES.map(category=>`<label class="event-category-option ${categories[category].css}"><input type="checkbox" name="eventCategory" value="${esc(category)}" ${event?.categories.includes(category)?'checked':''}>${logo(category)}<span>${esc(category)}</span></label>`).join('')}</div></fieldset><fieldset class="creation-card creation-fieldset event-step" data-event-step="3" hidden><legend>03 · Départs possibles</legend><p class="creation-help">Les dates et heures sont saisies à l’heure de Paris.</p><div id="departureFields" class="departure-fields">${(event?.departures||[{}]).map(departureFields).join('')}</div>${button('add-departure','+ Ajouter un départ','','secondary-button add-departure-button')}</fieldset><section class="creation-card event-step event-recap" data-event-step="4" ${event?'':'hidden'}><div class="creation-card-heading"><span class="creation-step">04</span><div><h2>Récapitulatif</h2><p>Vérifie la course avant de ${event?'l’enregistrer':'la créer'}. Touche une ligne pour la modifier.</p></div></div><div class="registration-summary" data-event-recap></div>${event?'<p class="creation-help">Un départ avec des inscrits ne peut pas être supprimé, ni une catégorie encore utilisée.</p>':''}</section><div class="creation-actions registration-step-nav event-step-nav">${button('event-step','Retour','data-step="back" '+(event?'':'hidden'),'secondary-button registration-back')}${button('event-step','Continuer','data-step="next" '+(event?'hidden':''),'primary-button registration-next')}<button type="submit" class="primary-button registration-next" data-event-submit ${event?'':'hidden'}>${event?'ENREGISTRER LES MODIFICATIONS':'CRÉER L’ÉVÉNEMENT'}</button></div></form>`;
+  applyEventFormat(app.querySelector('form[data-kind="event"]'));
   updateRemoveButtons();if(event)fillEventRecap(app.querySelector('form[data-kind="event"]'));notifyRender();
 }
 
@@ -42,6 +97,12 @@ export function fillEventRecap(form){
   const cats=[...form.querySelectorAll('[name="eventCategory"]:checked')].map(input=>input.value);
   const deps=[...form.querySelectorAll('.departure-field')].map(row=>{const date=row.querySelector('[name="date"]').value,time=row.querySelector('[name="time"]').value;return date?`${parisDate.format(new Date(`${date}T00:00:00Z`))} · ${timeLabel(time)}`:'';}).filter(Boolean);
   const row=(step,label,content)=>`<button type="button" class="registration-summary-row" data-action="event-step" data-step="${step}"><span>${label}</span><strong>${content}</strong><em>Modifier</em></button>`;
+  if(form.dataset.format==='solo'){
+    const rounds=[...form.querySelectorAll('.solo-round')].map(round=>{const select=round.querySelector('[name="roundCircuit"]');return `${esc(select.value?select.selectedOptions[0].textContent.replace(' (annoncé au dernier moment)',''):'—')} · ${esc(round.querySelector('[name="roundMinutes"]').value)} min`;});
+    const access=form.querySelector('[name="eventAccess"]:checked')?.value==='safe'?'SAFE':'OPEN';
+    recap.innerHTML=row(1,'Course',`${esc(value('eventName')||'—')} · Course solo`)+row(1,'Accès',access+(form.elements.eventSchedulePending?.checked?' · Horaires à confirmer':''))+row(1,rounds.length>1?'Manches':'Manche',rounds.join(' + '))+row(1,'Places',`${esc(value('eventCapacity'))} (puis liste d’attente)`)+row(2,'Catégories',cats.length?cats.map(category=>`${logo(category)} ${esc(category)}`).join(' '):'—')+row(3,'Départ',deps.length?esc(deps.join(' · ')):'—');
+    return;
+  }
   recap.innerHTML=row(1,'Course',`${esc(value('eventName')||'—')} · ${esc(value('eventDuration'))} h`)+row(1,'Type',esc(selectedText('eventType'))+(form.elements.eventSchedulePending?.checked?' · Horaires à confirmer':''))+row(1,'Circuit',esc(value('eventCircuit')?selectedText('eventCircuit'):'—'))+row(2,'Catégories',cats.length?cats.map(category=>`${logo(category)} ${esc(category)}`).join(' '):'—')+row(3,'Départs',deps.length?esc(deps.join(' · ')):'—');
 }
 function validateEventStep(form,step){

@@ -22,6 +22,7 @@ function harness(withParticipants=true){
  DB.db.exec(readFileSync(new URL('../migrations/0011_multi_category_registrations.sql',import.meta.url),'utf8'));
  if(withParticipants)DB.db.exec(readFileSync(new URL('../migrations/0012_participants.sql',import.meta.url),'utf8'));
  DB.db.exec(readFileSync(new URL('../migrations/0026_event_schedule_pending.sql',import.meta.url),'utf8'));
+ DB.db.exec(readFileSync(new URL('../migrations/0027_solo_races.sql',import.meta.url),'utf8'));
  const env={DB,APP_ORIGIN:ROOT,DISCORD_CLIENT_ID:'app-id',DISCORD_CLIENT_SECRET:'test-only-secret',ADMIN_DISCORD_IDS:ADMIN,ASSETS:{fetch:async()=>new Response('static')}};
  const jars=new Map();
  async function req(path,method='GET',data,actor='guest',options={}){
@@ -389,4 +390,45 @@ test('the scheduled job purges expired rate-limit counters and sessions',async()
  await workerWithMigrations.scheduled({},env,{waitUntil:promise=>pending.push(promise)});
  await Promise.all(pending);
  assert.deepEqual(DB.db.prepare('SELECT key FROM rate_limits ORDER BY key').all().map(row=>row.key),['fresh']);
+});
+
+const soloInput={name:'Sprint du jeudi',format:'solo',access:'open',capacity:2,rounds:[{circuit:'spa',durationMinutes:20},{circuit:'random',durationMinutes:20}],categories:['Hypercar','GT3'],departures:[{date:'2090-10-15',time:'21:00'}]};
+test('solo race: places, waiting list, one entry per driver, no crews',async()=>{
+ const {req,login}=harness();await login(ADMIN,'admin');await login(PILOT,'pilot');await login(OTHER,'other');
+ const created=await req('/api/events','POST',soloInput,'admin');assert.equal(created.status,201,JSON.stringify(created.data));
+ let event=(await req('/api/events')).data.events.find(e=>e.id===created.data.id);
+ assert.equal(event.format,'solo');assert.equal(event.capacity,2);assert.equal(event.durationHours,1);assert.equal(event.circuit,'spa');
+ assert.deepEqual(event.rounds,[{circuit:'spa',durationMinutes:20},{circuit:'random',durationMinutes:20}]);
+ const path=`/api/events/${event.id}/departures/${event.departures[0].id}/registrations`;
+ assert.equal((await req(path,'POST',{name:'Invité',category:'GT3',carAny:true})).status,401,'guests cannot enter a solo race');
+ assert.equal((await req(path,'POST',{name:'Admin',category:'*'},'admin')).status,201);
+ const pilot=await req(path,'POST',{name:'Pilote',category:'GT3',cars:['Ferrari 296 LMGT3']},'pilot');assert.equal(pilot.status,201);
+ assert.equal((await req(path,'POST',{name:'Autre',category:'Hypercar',carAny:true},'other')).status,201);
+ assert.equal((await req(path,'POST',{name:'Pilote',category:'Hypercar',carAny:true},'pilot')).status,409,'one entry per driver');
+ event=(await req('/api/events')).data.events.find(e=>e.id===created.data.id);
+ const regs=event.departures[0].availability;
+ assert.deepEqual(regs.map(r=>r.waitlistPosition),[null,null,1]);
+ assert.equal(regs[0].category,'*');assert.equal(regs[0].carAny,true);assert.equal(regs[0].status,'whole');
+ // The pilot withdraws: the first driver waiting gets the place.
+ const mine=regs.find(r=>r.id===pilot.data.id);
+ assert.equal((await req('/api/registrations/'+mine.id,'DELETE',{version:mine.version},'pilot')).status,200);
+ event=(await req('/api/events')).data.events.find(e=>e.id===created.data.id);
+ assert.deepEqual(event.departures[0].availability.map(r=>r.waitlistPosition),[null,null]);
+ const crew=await req(`/api/events/${event.id}/departures/${event.departures[0].id}/crews`,'POST',{name:'Équipe',category:'GT3'},'admin');
+ assert.equal(crew.status,409,'no crews in solo races');
+ // Bad solo definitions are refused.
+ for(const bad of [{...soloInput,rounds:[]},{...soloInput,capacity:1},{...soloInput,rounds:[{circuit:'spa',durationMinutes:2}]},{...soloInput,departures:[...soloInput.departures,{date:'2090-10-16',time:'21:00'}]},{...soloInput,rounds:[{circuit:'spa',durationMinutes:20},{circuit:'iracing-spa',durationMinutes:20}]}])
+  assert.equal((await req('/api/events','POST',bad,'admin')).status,400);
+});
+test('SAFE solo races are reserved to drivers marked SAFE by an administrator',async()=>{
+ const {req,login}=harness();await login(ADMIN,'admin');await login(PILOT,'pilot');
+ const created=await req('/api/events','POST',{...soloInput,access:'safe'},'admin');
+ const event=(await req('/api/events')).data.events.find(e=>e.id===created.data.id);
+ assert.equal(event.access,'safe');
+ const path=`/api/events/${event.id}/departures/${event.departures[0].id}/registrations`;
+ assert.equal((await req(path,'POST',{name:'Pilote',category:'GT3',carAny:true},'pilot')).status,403);
+ assert.equal((await req('/api/members/'+PILOT,'PATCH',{safe:true},'pilot')).status,403,'only administrators mark drivers SAFE');
+ assert.equal((await req('/api/members/'+PILOT,'PATCH',{safe:true},'admin')).status,200);
+ assert.equal((await req('/api/session','GET',null,'pilot')).data.user.safe,true);
+ assert.equal((await req(path,'POST',{name:'Pilote',category:'GT3',carAny:true},'pilot')).status,201);
 });

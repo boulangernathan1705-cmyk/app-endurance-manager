@@ -28,6 +28,7 @@ function memberRow(member) {
   // The role is saved as soon as it changes: no separate "Enregistrer" button per member.
   return `<article class="members-row" data-member-id="${esc(member.id)}" data-search="${search}">
     <div class="members-identity"><strong>${esc(member.name)}</strong><small>Discord : ${esc(member.id)}</small></div>
+    <label class="members-safe" title="Accès aux courses solo SAFE"><input type="checkbox" name="safe" data-saved="${member.safe ? 'true' : 'false'}" ${member.safe ? 'checked' : ''}><span>Pilote SAFE</span></label>
     <label class="members-role-select"><span class="sr-only">Rôle de ${esc(member.name)}</span><select name="role" data-saved="${esc(member.role)}">${Object.entries(ROLE_LABELS).map(([value,label]) => `<option value="${value}" ${member.role === value ? 'selected' : ''}>${label}</option>`).join('')}</select></label>
     <span class="members-row-status" role="status" aria-live="polite"></span>
   </article>`;
@@ -42,7 +43,7 @@ async function load() {
     // The page name is already the active tab of the navigation bar: the title stays for screen readers only.
     app.innerHTML = `<section class="members-panel"><h1 class="sr-only">Gestion des membres</h1>
       <div class="members-toolbar"><label class="members-search"><span class="sr-only">Rechercher un membre</span><input type="search" name="memberSearch" placeholder="Rechercher un pilote…" autocomplete="off"></label><span class="members-count">${members.length} membre${members.length > 1 ? 's' : ''}</span></div>
-      <p class="members-help">Commun à LMU et iRacing. Un pilote apparaît ici après sa première connexion Discord ; son rôle est enregistré dès que tu le changes.</p>
+      <p class="members-help">Commun à LMU et iRacing. Un pilote apparaît ici après sa première connexion Discord ; son rôle est enregistré dès que tu le changes. « Pilote SAFE » donne accès aux courses solo SAFE.</p>
       <div class="members-list">${members.map(memberRow).join('')}</div>
       <p class="members-empty" hidden>Aucun membre ne correspond à cette recherche.</p></section>`;
   } catch (error) {
@@ -66,18 +67,20 @@ app.addEventListener('input', event => {
 app.addEventListener('change', async event => {
   const select = event.target;
   const row = select.closest('.members-row[data-member-id]');
-  if (!row || select.name !== 'role') return;
+  if (!row || !['role','safe'].includes(select.name)) return;
   const status = row.querySelector('.members-row-status');
   select.disabled = true;
   status.className = 'members-row-status';
   status.textContent = 'Enregistrement…';
+  const isSafe = select.name === 'safe';
   try {
-    await api(`/api/members/${row.dataset.memberId}`, 'PATCH', {role:select.value});
-    select.dataset.saved = select.value;
+    await api(`/api/members/${row.dataset.memberId}`, 'PATCH', isSafe ? {safe:select.checked} : {role:select.value});
+    select.dataset.saved = isSafe ? String(select.checked) : select.value;
     status.classList.add('is-saved');
     status.textContent = '✓ Enregistré';
   } catch (error) {
-    select.value = select.dataset.saved;
+    if (isSafe) select.checked = select.dataset.saved === 'true';
+    else select.value = select.dataset.saved;
     status.classList.add('is-error');
     status.textContent = error.message || String(error);
   } finally {

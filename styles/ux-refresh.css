@@ -1134,3 +1134,65 @@ html[data-game] #app .race-header-actions > .danger-link { width: auto !importan
 .members-toolbar > .members-help { flex: 1; margin: 0; }
 /* Fenêtre « Créer un équipage » : libellés d'étape lisibles. */
 .crew-builder-step-label { font-size: 12.5px !important; }
+
+/* ---------- Courses solo ---------- */
+.event-access-badge { display: inline-flex; align-items: center; padding: 2px 9px; border: 1px solid; border-radius: 999px; font-size: 10.5px; font-weight: 800; letter-spacing: .08em; }
+.event-access-badge.is-open { color: #7fe3ea; border-color: rgba(82, 211, 216, .6); background: rgba(82, 211, 216, .08); }
+.event-access-badge.is-safe { color: #f3b33d; border-color: rgba(243, 179, 61, .65); background: rgba(243, 179, 61, .08); }
+/* Le liseré de couleur suit l'accès : cyan OPEN, ambre SAFE (au lieu de la couleur du type). */
+.event-card.is-solo-open, .race-header.is-solo-open { --event-accent: #52d3d8 !important; }
+.event-card.is-solo-safe, .race-header.is-solo-safe { --event-accent: #f3b33d !important; }
+.solo-fill { display: flex; flex-direction: column; gap: 5px; min-width: 180px; }
+.solo-fill-copy { font-size: 13.5px; color: #c7d0d4; }
+.solo-fill-copy strong { color: #f4f6f5; font-size: 15px; }
+.solo-fill-copy em { font-style: normal; color: #f3b33d; font-weight: 700; }
+.solo-fill-bar { display: block; height: 5px; border-radius: 3px; background: rgba(255, 255, 255, .08); overflow: hidden; }
+.solo-fill-bar > span { display: block; height: 100%; background: #52d3d8; }
+.solo-fill.is-full .solo-fill-bar > span { background: #f3b33d; }
+html[data-game] .race-card .race-fill:has(.solo-fill) { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.solo-card-categories { display: inline-flex; gap: 6px; }
+.solo-card-categories .category-logo { width: 26px; height: auto; }
+.departure-mine-badge.is-waiting { color: #f3b33d !important; border-color: rgba(243, 179, 61, .6) !important; }
+.solo-blocked { font-size: 13.5px; font-weight: 700; color: #f3b33d; }
+.solo-participants { display: flex; flex-direction: column; gap: 8px; }
+.solo-subtitle { display: flex; align-items: center; gap: 8px; margin: 6px 0 0; font-size: 16px; }
+.solo-help { margin: 0; color: var(--muted, #92979c); font-size: 13.5px; }
+.solo-entries { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 6px 14px; }
+.solo-entry { display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; align-items: center; gap: 4px 10px; padding: 8px 12px; border: 1px solid rgba(255, 255, 255, .1); border-radius: 10px; background: rgba(255, 255, 255, .025); }
+.solo-entry.is-mine { border-color: rgba(82, 211, 216, .55); }
+.solo-entries.is-waiting .solo-entry { border-style: dashed; }
+.solo-entry-rank { font-weight: 800; color: #aab3b6; text-align: center; }
+.solo-entries.is-waiting .solo-entry-rank { color: #f3b33d; }
+.solo-entry-name { font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.solo-entry .solo-category, .solo-entry .solo-any-category { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; }
+.solo-entry .solo-category .category-logo { width: 24px; height: auto; }
+.solo-entry-car { grid-column: 2 / -1; font-size: 13px; color: #aab3b6; }
+.solo-muted { color: #8a9396; }
+.solo-any-logo { display: inline-grid; place-items: center; width: 40px; height: 28px; border: 1px solid rgba(255, 255, 255, .2); border-radius: 6px; font-size: 18px; color: #c7d0d4; flex: none; }
+.solo-wait-notice { margin: 10px 0 0; padding: 10px 12px; border-left: 3px solid #f3b33d; border-radius: 0 8px 8px 0; background: rgba(243, 179, 61, .08); color: #f1e3c4; font-size: 14px; }
+/* Formulaire : format, accès et manches */
+.format-contents { display: contents; }
+.format-contents[hidden], .solo-fields[hidden] { display: none !important; }
+.event-format-choice, .solo-access { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin: 0 0 14px; }
+.solo-access-option { display: flex; align-items: flex-start; gap: 10px; padding: 12px 14px; border: 1px solid rgba(255, 255, 255, .14); border-radius: 10px; cursor: pointer; }
+.solo-access-option:has(input:checked) { border-color: #52d3d8; background: rgba(82, 211, 216, .08); }
+.solo-access-option input { margin: 3px 0 0 !important; flex: none !important; width: 18px !important; height: 18px !important; min-height: 0 !important; padding: 0 !important; }
+.solo-access-option span { flex: 1; min-width: 0; }
+.solo-fields .event-schedule-option input { width: 18px !important; height: 18px !important; min-height: 0 !important; flex: none !important; }
+.solo-access-option span { display: grid; gap: 2px; }
+.solo-access-option small { opacity: .75; }
+.solo-fields { display: flex; flex-direction: column; gap: 12px; margin-top: 12px; }
+.solo-rounds { display: flex; flex-direction: column; gap: 10px; }
+.solo-round { display: grid; grid-template-columns: 90px minmax(0, 1fr) 170px; align-items: end; gap: 10px; }
+.solo-round-title { align-self: center; }
+.event-format-fixed { margin: 0 0 12px; color: #c7d0d4; }
+/* Gestion des membres : case « Pilote SAFE » */
+.members-panel .members-row { grid-template-columns: minmax(0, 1fr) auto minmax(160px, 220px) 150px !important; }
+.members-safe { display: inline-flex; align-items: center; gap: 6px; font-size: 13.5px; font-weight: 700; color: #f3b33d; cursor: pointer; white-space: nowrap; }
+@media (max-width: 760px) {
+  .event-format-choice, .solo-access { grid-template-columns: minmax(0, 1fr); }
+  .solo-round { grid-template-columns: minmax(0, 1fr) 120px; }
+  .solo-round-title { grid-column: 1 / -1; }
+  .solo-entries { grid-template-columns: minmax(0, 1fr); }
+  .members-panel .members-row { grid-template-columns: minmax(0, 1fr) !important; }
+}

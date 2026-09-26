@@ -1,3 +1,4 @@
+import {isSolo,accessBadge,soloRoundsLabel,renderSoloEntries,ANY_CATEGORY} from './solo.mjs';
 import {dateBlock,timeLabel} from '../dates.mjs';
 import {eventSchedule} from '../schedule.mjs';
 import {
@@ -51,7 +52,29 @@ function compactCrew(departure,crew) {
   </article>`;
 }
 
+// Solo race entry: same header as an endurance entry, then the participants and the waiting list.
+function soloCard({event,departure,reg}) {
+  const category = reg.category === ANY_CATEGORY ? '<span class="event-category-badge">Peu importe</span>' : badge(reg.category);
+  const situation = reg.waitlistPosition
+    ? `<span class="departure-mine-badge is-waiting">Liste d’attente · ${reg.waitlistPosition}${reg.waitlistPosition === 1 ? 'er' : 'e'}</span>`
+    : '<span class="departure-mine-badge is-crew">✓ Inscrit</span>';
+  return `<details class="native-my-entry-card race-card my-entry-race is-solo is-solo-${event.access||'open'}" id="entry-${reg.id}">
+    <summary class="native-my-entry-header">
+      <span class="native-my-entry-toggle" aria-hidden="true">+</span>
+      <span class="race-card-top">${departureDateBlock(departure)}<span class="race-head">
+        ${reg.managed?`<strong class="ux-managed-entry-name">${esc(reg.name)}</strong>`:''}
+        <h2 class="event-name">${esc(event.name)}</h2>
+        <span class="race-meta">${soloRoundsLabel(event)}</span>
+        <span class="race-badges">${accessBadge(event)}${category}<span class="race-start">Départ ${esc(timeLabel(departure.time))}</span>${situation}</span>
+      </span>${circuitVisual(event.circuit,true)}</span>
+      <button type="button" class="primary-button native-my-entry-open-event" data-action="open" data-id="${event.id}" data-departure="${departure.id}">Voir la course</button>
+    </summary>
+    <div class="native-my-entry-body">${renderSoloEntries(event,departure)}</div>
+  </details>`;
+}
+
 function card({event,departure,reg}) {
+  if (isSolo(event)) return soloCard({event,departure,reg});
   const crew = (departure.crews||[]).find(item => (item.registrationIds||[]).some(id => String(id) === String(reg.id)));
   const assigned = new Set((departure.crews||[]).flatMap(item => (item.registrationIds||[]).map(String)));
   const unassigned = (departure.availability||[])
