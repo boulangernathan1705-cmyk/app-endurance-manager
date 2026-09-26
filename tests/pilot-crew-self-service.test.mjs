@@ -4,7 +4,7 @@ import {DatabaseSync} from 'node:sqlite';
 import {readFileSync} from 'node:fs';
 import worker from '../server/worker.mjs';
 
-const ROOT='https://fmt.example';
+const ROOT='https://site.example';
 const ADMIN='111111111111111111';
 const PILOT='222222222222222222';
 const TEAMMATE='333333333333333333';

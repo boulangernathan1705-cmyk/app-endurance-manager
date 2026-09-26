@@ -139,8 +139,8 @@ async function oauthCallback(request, env) {
     const old = cookie(request, COOKIE_SESSION);
     if (old) await env.DB.prepare('DELETE FROM sessions WHERE token_hash=?').bind(await hash(old)).run();
     const avatarCookie = avatarHash
-      ? `fmt_discord_avatar=${encodeURIComponent(`${profile.id}:${avatarHash}`)}; Path=/; Secure; SameSite=Lax; Max-Age=${7 * DAY}`
-      : 'fmt_discord_avatar=; Path=/; Secure; SameSite=Lax; Max-Age=0';
+      ? `em_discord_avatar=${encodeURIComponent(`${profile.id}:${avatarHash}`)}; Path=/; Secure; SameSite=Lax; Max-Age=${7 * DAY}`
+      : 'em_discord_avatar=; Path=/; Secure; SameSite=Lax; Max-Age=0';
     return redirect(origin(env) + back, [clear, clearReturn, setCookie(COOKIE_SESSION, session, 7 * DAY), avatarCookie]);
   } catch {
     return redirect(origin(env) + '/?auth=error', [clear, clearReturn]);
@@ -164,7 +164,7 @@ async function api(request, env) {
   if (path === '/api/auth/logout' && method === 'POST') {
     const raw = cookie(request, COOKIE_SESSION);
     if (raw) await env.DB.prepare('DELETE FROM sessions WHERE token_hash=?').bind(await hash(raw)).run();
-    return json({ok:true}, 200, [setCookie(COOKIE_SESSION, '', 0), 'fmt_discord_avatar=; Path=/; Secure; SameSite=Lax; Max-Age=0']);
+    return json({ok:true}, 200, [setCookie(COOKIE_SESSION, '', 0), 'em_discord_avatar=; Path=/; Secure; SameSite=Lax; Max-Age=0']);
   }
   if (path === '/api/guest/recover' && method === 'POST') {
     const input = await body(request);

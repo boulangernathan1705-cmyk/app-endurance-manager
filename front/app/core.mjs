@@ -15,7 +15,7 @@ export const state = {
   selectedDepartureId:null, eventSection:'race', pilotName:'', registrationOpen:new Set(), crewManagementOpen:new Set(),
   pendingCrewJoin:null, archiveLoaded:false, participantsLoaded:false
 };
-try { state.pilotName = localStorage.getItem('fmt_pilot_name') || ''; } catch {}
+try { state.pilotName = localStorage.getItem('em_pilot_name') || ''; } catch {}
 
 export const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 export const canManage = () => ['admin','organizer'].includes(state.user?.role);

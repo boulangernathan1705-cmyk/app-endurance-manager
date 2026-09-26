@@ -2,10 +2,10 @@ import {CATEGORIES, EVENT_TYPE_IDS as EVENT_TYPES, CIRCUIT_IDS as CIRCUITS, CARS
 const LEGACY_CAR_ALIASES = new Map([
   ['BMW M Hybrid V8 Evo (2026)','BMW M Hybrid V8'],['Cadillac V-Series.R Evo (2026)','Cadillac V-Series.R'],['Peugeot 9X8 2023','Peugeot 9X8'],['Peugeot 9X8 2024','Peugeot 9X8'],['Toyota TR010 Hybrid (2026)','Toyota GR010 Hybrid'],['Ginetta G61-LT-P3 Evo','Ginetta G61-LT-P3'],['Ferrari 488 GTE Evo','Ferrari 488 GTE'],['Aston Martin Vantage AMR LMGT3 Evo','Aston Martin Vantage AMR LMGT3'],['BMW M4 LMGT3 Evo','BMW M4 LMGT3'],['Ferrari 296 LMGT3 Evo','Ferrari 296 LMGT3'],['Ford Mustang LMGT3 Evo','Ford Mustang LMGT3'],['Lamborghini Huracán LMGT3 Evo 2','Lamborghini Huracán LMGT3'],['McLaren 720S LMGT3 Evo','McLaren 720S LMGT3'],['Porsche 911 LMGT3 R (992)','Porsche 911 GT3 R LMGT3'],['Porsche 911 LMGT3 R (992) 2026','Porsche 911 GT3 R LMGT3']
 ]);
-const COOKIE_SESSION = '__Host-fmt_session';
-const COOKIE_GUEST = '__Host-fmt_guest';
-const COOKIE_STATE = '__Host-fmt_oauth';
-const COOKIE_RETURN = '__Host-fmt_return';
+const COOKIE_SESSION = '__Host-em_session';
+const COOKIE_GUEST = '__Host-em_guest';
+const COOKIE_STATE = '__Host-em_oauth';
+const COOKIE_RETURN = '__Host-em_return';
 const DAY = 86400;
 class HttpError extends Error { constructor(status, message) { super(message); this.status = status; } }
 const fail = (status, message) => { throw new HttpError(status, message); };

@@ -16,7 +16,7 @@ async function pageAs(role, width = 1280, height = 900) {
   const context = await browser.newContext({viewport:{width, height}, deviceScaleFactor:1, locale:'fr-FR', timezoneId:'Europe/Paris'});
   // Session cookie of the seed account (set from the page: __Host- cookies cannot be added over http://localhost).
   await context.addInitScript(token => {
-    document.cookie = `__Host-fmt_session=${token}; path=/; secure`;
+    document.cookie = `__Host-em_session=${token}; path=/; secure`;
     try { localStorage.setItem('endurance_manager_locale', 'fr'); } catch {}
     // The local dev banner is not part of the real site.
     document.addEventListener('DOMContentLoaded', () => document.querySelector('.dev-site-banner')?.remove());
