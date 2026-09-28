@@ -185,7 +185,10 @@ export function planIracingEvents(season, timestamp = Date.now()) {
     const details = detailsFromSeries.get(event.slug) || {};
     const hours = /(\d+)\s*(?:h\b|hr\b|hours?\b)/i.exec(event.name)?.[1];
     const known = SPECIAL_MINUTES.find(([pattern]) => pattern.test(normalize(event.name)))?.[1];
-    const durationMinutes = Math.min(1440, Number(details.duration) || known || (hours ? Number(hours) * 60 : 360));
+    // Races run over a number of laps (Bathurst 1000: 161 laps) have a meaningless duration in the schedule
+    // data (15 min): under an hour it is ignored.
+    const scheduled = Number(details.duration) >= 60 ? Number(details.duration) : 0;
+    const durationMinutes = Math.min(1440, scheduled || known || (hours ? Number(hours) * 60 : 360));
     plans.push({
       externalId:`special:${slug(event.slug || event.name)}:${event.date_start}`,
       special:{name:event.name, dateStart:event.date_start, dateEnd:event.date_end || event.date_start},
