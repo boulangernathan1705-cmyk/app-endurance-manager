@@ -102,7 +102,9 @@ function xhrApi(path,method,data,priorDetail='') {
 }
 export async function api(path,method='GET',data) {
   const attempts=[];
-  for (let attempt=0;attempt<2;attempt++) {
+  // Only reads are tried again: a creation whose answer was lost may already be saved (no duplicate race).
+  const tries=method==='GET'?2:1;
+  for (let attempt=0;attempt<tries;attempt++) {
     const started=tick();
     try {
       const response = await fetch(path,{method,credentials:'same-origin',cache:'no-store',headers:method==='GET'?{'Accept':'application/json'}:{'Accept':'application/json','Content-Type':'application/json'},body:method==='GET'?undefined:JSON.stringify(data||{})});
@@ -118,10 +120,15 @@ export async function api(path,method='GET',data) {
       const elapsed=Math.round(tick()-started);
       if (!networkFailure(error)) throw error;
       attempts.push(`fetch ${attempt+1}: ${elapsed}ms ${String(error?.message || error || 'erreur réseau').slice(0,90)}`);
-      if (attempt===0) await wait(250);
+      if (attempt+1<tries) await wait(250);
     }
   }
   const priorDetail=attempts.join(' | ');
+  if (method!=='GET') {
+    const error=Error('Connexion au service impossible : ta demande n’a peut-être pas été enregistrée. Actualise la page pour vérifier avant de réessayer.');
+    reportClientError({path,method,message:diagnosticMessage(path,method,'envoi en échec, non renvoyé'),detail:priorDetail});
+    throw error;
+  }
   try { return await xhrApi(path,method,data,priorDetail); }
   catch (error) {
     if (/Diagnostic :/.test(String(error?.message || ''))) throw error;
