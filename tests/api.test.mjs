@@ -489,6 +489,15 @@ test('official iRacing endurances are imported once, by the daily task or by an 
  assert.ok(!(await req('/api/members','GET',null,'admin')).data.members.some(member=>member.id==='system:iracing'));
  assert.ok(!(await req('/api/participants','GET',null,'pilot')).data.participants.some(member=>member.id==='system:iracing'));
  assert.ok(DB.db.prepare("SELECT COUNT(*) n FROM iracing_imports").get().n>=4);
+ // The article of the race week gives the special event its time slots (Indianapolis: 2099-10-16 → 18).
+ const article={date:'2099-10-12T09:00:00',title:{rendered:'THIS WEEK: iRacing 8 Hours of Indianapolis | Special Event'},content:{rendered:'<p>Timeslot #1: Friday at 22:00 GMT</p><p>Timeslot #2: Saturday at 12:00 GMT</p>'}};
+ globalThis.fetch=async url=>new Response(JSON.stringify(String(url).includes('wp-json')?[article]:String(url).endsWith('manifest.json')?{current:'2099S4'}:future));
+ let indy=(await req('/api/races?game=iracing')).data.events.find(event=>event.name==='8 Hours of Indianapolis');
+ assert.equal(indy.schedulePending,true);
+ await req('/api/admin/iracing-import','POST',{},'admin');
+ indy=(await req('/api/races?game=iracing')).data.events.find(event=>event.name==='8 Hours of Indianapolis');
+ assert.equal(indy.schedulePending,false);
+ assert.deepEqual(indy.departures.map(d=>`${d.date} ${d.time}`),['2099-10-17 00:00','2099-10-17 14:00'],'Friday 22:00 GMT is Saturday midnight in Paris');
 });
 
 test('a driver can race an endurance alone; organizers set whether a driver change is required', async () => {

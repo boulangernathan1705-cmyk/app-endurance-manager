@@ -7,8 +7,10 @@
 // Only races run in teams with driver changes are imported (TEAM_SERIES).
 // - Endurance series: one race per series and per race week, with every official start of the week
 //   (times published in GMT, converted to Paris time).
-// - Special events (Petit Le Mans, Bathurst 1000…): their start times are not published in advance, so
-//   the race is created on its first day with "Horaires à confirmer" for an organizer to complete.
+// - Special events (Petit Le Mans, Bathurst 1000…): their start times are not in the schedule, so the race
+//   is created on its first day with "Horaires à confirmer". iRacing gives the time slots in its article
+//   "THIS WEEK: … | Special Event" (iracing.com, published on the Monday of the race week): they are read
+//   from there and replace the placeholder (completeSpecialTimes).
 // A race is imported once (table iracing_imports): editing or deleting it on the site is never undone.
 import {validateEvent, parisTimestamp, id, now} from './core.mjs';
 
@@ -186,6 +188,7 @@ export function planIracingEvents(season, timestamp = Date.now()) {
     const durationMinutes = Math.min(1440, Number(details.duration) || known || (hours ? Number(hours) * 60 : 360));
     plans.push({
       externalId:`special:${slug(event.slug || event.name)}:${event.date_start}`,
+      special:{name:event.name, dateStart:event.date_start, dateEnd:event.date_end || event.date_start},
       input:{name:cleanName(event.name), format:'endurance', durationMinutes, eventType:'special', circuit:circuitFor(details.track, event.track_name, event.name),
         schedulePending:true, categories:categoriesFor(event.name, event.car_class), departures:[{date:event.date_start, time:PENDING_TIME}]}
     });
@@ -223,5 +226,66 @@ export async function syncIracingEvents(env, {timestamp = Date.now(), fetchImpl 
     ]);
     created++;
   }
+  await completeSpecialTimes(env, plans, {timestamp, fetchImpl});
   return created;
+}
+
+export const IRACING_NEWS = 'https://www.iracing.com/wp-json/wp/v2/posts?search=THIS%20WEEK&per_page=20&_fields=date,title,content';
+const WEEKDAYS = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
+const decode = value => String(value || '').replace(/<[^>]+>/g, '\n').replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code))).replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&');
+
+// "Timeslot #1: Friday at 22:00 GMT (6:00 p.m. ET)" → start times, dated within the event weekend
+// (the day before its first day to the day after its last: "Sunday at 00:00 GMT" is Saturday night).
+export function specialStarts(text, dateStart, dateEnd) {
+  const first = Date.parse(`${dateStart}T00:00:00Z`) - DAY_MS, last = Date.parse(`${dateEnd}T00:00:00Z`) + DAY_MS;
+  const starts = [];
+  for (const [, day, hours, minutes] of decode(text).matchAll(/time\s*slot\s*#?\s*\d+\s*:\s*(sunday|monday|tuesday|wednesday|thursday|friday|saturday)\s+at\s+(\d{1,2}):(\d{2})\s*(?:gmt|utc)/gi)) {
+    for (let date = first; date <= last; date += DAY_MS) {
+      if (WEEKDAYS[new Date(date).getUTCDay()] !== day.toLowerCase()) continue;
+      starts.push(date + (Number(hours) * 60 + Number(minutes)) * 60_000);
+      break;
+    }
+  }
+  return [...new Set(starts)].sort((a, b) => a - b);
+}
+
+// The article of a special event: "THIS WEEK: iRacing Bathurst 1000 presented by … | Special Event",
+// published in the ten days before the event.
+export function articleFor(posts, special) {
+  const eventWords = normalize(special.name).split(/[^a-z0-9]+/).filter(word => word.length >= 4 && !/\d/.test(word) && !['hours','hour','presented'].includes(word));
+  const start = Date.parse(`${special.dateStart}T00:00:00Z`);
+  return posts.find(post => {
+    const title = normalize(decode(post?.title?.rendered));
+    const published = Date.parse(post?.date);
+    return title.includes('special event') && eventWords.length && eventWords.every(word => title.includes(word)) && published > start - 10 * DAY_MS && published < start + DAY_MS;
+  }) || null;
+}
+
+// Imported special events still waiting for their times: the placeholder start is replaced by the official
+// time slots, only if nobody entered it and no organizer changed its schedule.
+export async function completeSpecialTimes(env, plans, {timestamp = Date.now(), fetchImpl = fetch} = {}) {
+  const waiting = (await env.DB.prepare(`SELECT e.id, e.version, e.departures, i.external_id FROM iracing_imports i JOIN events e ON e.id=i.event_id
+    WHERE i.external_id LIKE 'special:%' AND e.schedule_pending=1`).all()).results || [];
+  const candidates = waiting.map(row => ({row, plan:plans.find(plan => plan.externalId === row.external_id)})).filter(({row, plan}) => {
+    const departures = JSON.parse(row.departures || '[]');
+    return plan?.special && departures.length === 1 && departures[0].time === PENDING_TIME && departures[0].startsAt > timestamp;
+  });
+  if (!candidates.length) return 0;
+  const response = await fetchImpl(IRACING_NEWS, {headers:{Accept:'application/json'}});
+  if (!response.ok) return 0;
+  const posts = await response.json();
+  let completed = 0;
+  for (const {row, plan} of candidates) {
+    const article = articleFor(Array.isArray(posts) ? posts : [], plan.special);
+    const starts = article ? specialStarts(article.content?.rendered, plan.special.dateStart, plan.special.dateEnd).filter(start => start > timestamp && representable(start)) : [];
+    if (!starts.length || starts.length > MAX_DEPARTURES) continue;
+    const placeholder = JSON.parse(row.departures)[0];
+    if (await env.DB.prepare('SELECT 1 FROM registrations WHERE event_id=? LIMIT 1').bind(row.id).first()) continue;
+    // The placeholder start keeps its id (first slot); the others are new.
+    const departures = starts.map((start, index) => ({id:index ? id() : placeholder.id, ...parisDateTime(start), startsAt:start}));
+    const result = await env.DB.prepare(`UPDATE events SET departures=?, schedule_pending=0, version=version+1 WHERE id=? AND version=?
+      AND NOT EXISTS (SELECT 1 FROM registrations WHERE event_id=?)`).bind(JSON.stringify(departures), row.id, row.version, row.id).run();
+    if (result.meta.changes) completed++;
+  }
+  return completed;
 }

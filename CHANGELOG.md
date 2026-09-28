@@ -17,7 +17,7 @@ Les changements du site, version par version. La plus récente est en haut.
 ### Endurances iRacing officielles
 - Les endurances officielles iRacing **en équipe avec changement de pilotes** arrivent **toutes seules** sur le site, mises à jour chaque nuit : IMSA Endurance Series, Global Endurance Tour, GT Endurance Series, Nürburgring Endurance Championship, Creventic et Production Endurance Challenge, plus les événements spéciaux (8 Hours of Indianapolis, Bathurst 1000, 992 Endurance Cup…).
 - Une course par série et par semaine, avec **tous les horaires de départ officiels**, à l'heure de Paris.
-- Les événements spéciaux (Bathurst 1000, 8 Hours of Indianapolis…) sont créés avec **Horaires à confirmer** : il reste à mettre l'heure du départ.
+- Les événements spéciaux (Bathurst 1000, 8 Hours of Indianapolis…) arrivent d'abord avec **Horaires à confirmer**. Leurs créneaux officiels sont ajoutés tout seuls dès qu'iRacing les publie, en général le lundi de la semaine de course.
 - Circuits iRacing ajoutés : Long Beach, Motegi, Brands Hatch, Zolder, Summit Point, Circuit Gilles-Villeneuve, The Bend, Charlotte Roval, Navarra, Oschersleben, Oulton Park et Snetterton.
 
 ### Grands écrans

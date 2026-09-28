@@ -75,11 +75,12 @@ export default {
   },
 
   async scheduled(controller, env, ctx) {
-    // Official iRacing endurances: once a day (the schedule it reads is refreshed daily around 6:17 UTC),
-    // and at the next run as long as nothing was ever imported (first deployment).
+    // Official iRacing endurances: twice a day, 7:00 UTC (the schedule it reads is refreshed around 6:17 UTC)
+    // and 13:00 UTC (special event time slots, published on iracing.com on the Monday morning of the race
+    // week), and at the next run as long as nothing was ever imported (first deployment).
     const at = new Date(controller?.scheduledTime || Date.now());
     if (env?.DB && env.IRACING_IMPORT !== 'off') ctx.waitUntil((async () => {
-      const daily = at.getUTCHours() === 7 && at.getUTCMinutes() < 15;
+      const daily = [7, 13].includes(at.getUTCHours()) && at.getUTCMinutes() < 15;
       if (daily || !(await env.DB.prepare('SELECT 1 FROM iracing_imports LIMIT 1').first())) await syncIracingEvents(env);
     })().catch(error => {
       console.error('iRacing import failed', error instanceof Error ? error.message : 'unknown');

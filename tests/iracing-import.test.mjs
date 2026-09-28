@@ -65,3 +65,19 @@ test('special events missing from the schedule data are added, with their offici
   assert.equal(cup.input.durationMinutes, 720);
   assert.deepEqual(cup.input.categories, ['Porsche Cup']);
 });
+
+test('special event time slots are read from the iracing.com article of the race week', async () => {
+  const {articleFor, specialStarts} = await import('../server/iracing-import.mjs');
+  const posts = [
+    {date:'2099-09-21T10:00:25', title:{rendered:'THIS WEEK: iRacing Creventic Endurance Series at Barcelona (24H)'}, content:{rendered:'<p>Endurance</p>'}},
+    {date:'2099-09-28T09:00:21', title:{rendered:'THIS WEEK: iRacing Bathurst 1000 presented by Next Level Racing | Special Event'},
+      content:{rendered:'<ul><li>Timeslot #1: Saturday at 03:00 GMT on the Australian servers (11:00 p.m. ET Friday night)</li><li>Timeslot #2: Saturday at 7:00 GMT (3:00 a.m. ET)</li><li>Timeslot #5: Sunday at 00:00 GMT (8:00 p.m. ET Saturday)</li></ul>'}}
+  ];
+  const special = {name:'Bathurst 1000', dateStart:'2099-10-02', dateEnd:'2099-10-04'};
+  const article = articleFor(posts, special);
+  assert.match(article.title.rendered, /Bathurst 1000/);
+  assert.equal(articleFor(posts, {name:'8 Hours of Indianapolis', dateStart:'2099-10-16', dateEnd:'2099-10-18'}), null, 'no article yet');
+  assert.equal(articleFor(posts, {name:'Bathurst 1000', dateStart:'2099-12-02', dateEnd:'2099-12-04'}), null, 'an old article is not reused');
+  assert.deepEqual(specialStarts(article.content.rendered, special.dateStart, special.dateEnd).map(start => new Date(start).toISOString()),
+    ['2099-10-03T03:00:00.000Z','2099-10-03T07:00:00.000Z','2099-10-04T00:00:00.000Z']);
+});
