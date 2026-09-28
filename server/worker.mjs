@@ -6,7 +6,7 @@ import {
 import {ingestClientError, clientErrorsApi} from './telemetry.mjs';
 import {racesPath} from './races-path.mjs';
 import {currentCommunity} from './community.mjs';
-import {communityAccess, requirePermission, displayRole, PERMISSIONS, discordGuild, memberPermissions} from './access.mjs';
+import {communityAccess, requirePermission, displayRole, PERMISSIONS, DEFAULT_EVERYONE, discordGuild, memberPermissions} from './access.mjs';
 // Solo races and SAFE drivers: still being built, only on the sites where SOLO_RACES is "on" (dev).
 const soloRacesEnabled = env => env?.SOLO_RACES === 'on';
 import {syncIracingEvents} from './iracing-import.mjs';
@@ -499,6 +499,37 @@ async function api(request, env) {
       roles:JSON.parse(row.discord_roles || '[]').map(roleId => ({id:roleId, name:roleNames.get(roleId) || roleId})),
       permissions:[...await memberPermissions(env, community, row)], checkedAt:row.checked_at});
     return json({community:{name:community.name, discordServer:discord?.name || null}, members, permissions:PERMISSIONS});
+  }
+  // Community settings (admins): what each Discord role allows, and the enabled modules.
+  if (path === '/api/community/settings' && method === 'GET') {
+    requirePermission(actor,'admin');
+    const discord = community.discordGuildId ? await discordGuild(env, community.discordGuildId) : null;
+    const rows = (await env.DB.prepare('SELECT discord_role_id, permissions FROM community_role_permissions WHERE community_id=?').bind(community.id).all()).results || [];
+    const saved = new Map(rows.map(row => [row.discord_role_id, JSON.parse(row.permissions || '[]')]));
+    const roles = (discord?.roles || []).sort((a, b) => b.position - a.position).map(role => ({id:role.id, name:role.id === community.discordGuildId ? '@everyone' : role.name,
+      administrator:role.administrator, permissions:saved.get(role.id) ?? (role.id === community.discordGuildId ? [...DEFAULT_EVERYONE] : [])}));
+    return json({community:{name:community.name, discordServer:discord?.name || null}, roles, permissions:PERMISSIONS,
+      modules:{iracingImport:community.modules.iracingImport === true, discordWeekly:community.modules.discordWeekly === true}});
+  }
+  const roleSetting = path.match(/^\/api\/community\/roles\/(\d{15,22})$/);
+  if (roleSetting && method === 'PUT') {
+    requirePermission(actor,'admin');
+    const input = await body(request);
+    const discord = community.discordGuildId ? await discordGuild(env, community.discordGuildId) : null;
+    if (!discord?.roles.some(role => role.id === roleSetting[1])) fail(404, 'Ce rôle n’existe pas sur le serveur Discord de la communauté.');
+    if (!Array.isArray(input.permissions) || input.permissions.some(permission => !PERMISSIONS.includes(permission))) fail(400, 'Autorisations invalides.');
+    await env.DB.prepare(`INSERT INTO community_role_permissions(community_id,discord_role_id,permissions,updated_at) VALUES(?,?,?,?)
+      ON CONFLICT(community_id,discord_role_id) DO UPDATE SET permissions=excluded.permissions,updated_at=excluded.updated_at`)
+      .bind(community.id, roleSetting[1], JSON.stringify([...new Set(input.permissions)]), now()).run();
+    return json({ok:true});
+  }
+  if (path === '/api/community/modules' && method === 'PATCH') {
+    requirePermission(actor,'admin');
+    const input = await body(request);
+    const modules = {...community.modules};
+    for (const key of ['iracingImport','discordWeekly']) if (typeof input[key] === 'boolean') modules[key] = input[key];
+    await env.DB.prepare('UPDATE communities SET modules=? WHERE id=?').bind(JSON.stringify(modules), community.id).run();
+    return json({ok:true, modules});
   }
   if (path.startsWith('/api/members/')) fail(410, 'Les rôles se gèrent maintenant sur le serveur Discord de la communauté.');
   fail(404, 'Action introuvable.');

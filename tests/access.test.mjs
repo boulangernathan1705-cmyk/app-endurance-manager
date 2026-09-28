@@ -129,3 +129,24 @@ test('the site: nothing for visitors or non-members, the members page lists the 
   assert.deepEqual(listed.roles,[{id:ADMIN_ROLE,name:'Staff'}]);assert.equal(listed.discordAdmin,true);
   assert.ok(!members.members.some(member=>member.id==='555555555555555555'),'only members of the server');
 });
+
+test('community admins set the permissions of each Discord role and the modules', async t => {
+  const {DB,env}=setup();
+  fakeDiscord(t,{[PILOT]:[SAFE_ROLE],[BOSS]:[ADMIN_ROLE]});
+  const as=async (userId,path,method='GET',body)=>{
+    const raw='d'.repeat(63)+userId.slice(0,1);const hash=[...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(raw)))].map(b=>b.toString(16).padStart(2,'0')).join('');
+    DB.db.prepare('INSERT OR REPLACE INTO sessions(token_hash,user_id,expires_at) VALUES(?,?,?)').run(hash,userId,4102444800);
+    const headers={Cookie:`__Host-em_session=${raw}`,'CF-Connecting-IP':userId};
+    if(method!=='GET'){headers.Origin=ROOT;headers['Content-Type']='application/json';}
+    return worker.fetch(new Request(ROOT+'/api/community/'+path,{method,headers,body:body?JSON.stringify(body):undefined}),env);
+  };
+  assert.equal((await as(PILOT,'settings')).status,403);
+  const settings=await (await as(BOSS,'settings')).json();
+  assert.deepEqual(settings.roles.find(role=>role.name==='@everyone').permissions,[...DEFAULT_EVERYONE]);
+  assert.equal((await as(BOSS,`roles/${SAFE_ROLE}`,'PUT',{permissions:['register','create_race']})).status,200);
+  assert.equal((await as(BOSS,`roles/${SAFE_ROLE}`,'PUT',{permissions:['everything']})).status,400);
+  assert.equal((await as(BOSS,'roles/999999999999999999','PUT',{permissions:[]})).status,404,'only roles of the server');
+  assert.ok((await communityAccess(env,{user:{id:PILOT}},{...(await import('../server/community.mjs')).DEFAULT_COMMUNITY_SLUG&&{id:DEV_COMMUNITY,slug:'commu-dev',discordGuildId:GUILD,modules:{}}})).permissions.has('create_race'));
+  assert.equal((await as(BOSS,'modules','PATCH',{iracingImport:true,discordWeekly:false})).status,200);
+  assert.deepEqual(JSON.parse(DB.db.prepare('SELECT modules FROM communities WHERE id=?').get(DEV_COMMUNITY).modules),{iracingImport:true,discordWeekly:false});
+});

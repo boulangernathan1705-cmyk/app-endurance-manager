@@ -1303,6 +1303,18 @@ html[data-game] .race-card .race-fill:has(.solo-fill) { display: flex; flex-wrap
 .members-discord-role.is-empty { border-color: var(--border, #292d31); background: transparent; color: #99a3a0; }
 .members-permissions { margin: 0; color: #c7d0d4; font-size: 13px; line-height: 1.5; }
 
+/* Community settings (members page). */
+.community-settings { margin-top: 18px; }
+.community-settings h2 { margin: 0 0 8px; font-size: 20px; }
+.community-settings h3 { margin: 18px 0 6px; font-size: 16px; color: #52d3d8; }
+.settings-roles-scroll { overflow-x: auto; }
+.settings-roles { width: 100%; border-collapse: collapse; font-size: 13px; }
+.settings-roles th, .settings-roles td { padding: 8px 6px; border-bottom: 1px solid var(--border, #292d31); text-align: center; }
+.settings-roles th[scope="row"], .settings-roles thead th:first-child { text-align: left; white-space: nowrap; }
+.settings-roles th small { display: block; color: #99a3a0; font-weight: 400; }
+.settings-module { display: flex; gap: 10px; align-items: flex-start; margin: 8px 0; }
+.settings-module small { display: block; color: #99a3a0; }
+
 /* Large screens (27–34 inch, ultrawide): the whole interface grows in proportion and the page uses
    more of the width. The banner keeps its own sizing (its image is capped at its source resolution). */
 @media (min-width: 2200px) { :root { --wide-zoom: 1.15; } }
