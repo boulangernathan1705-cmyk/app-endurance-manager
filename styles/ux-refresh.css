@@ -1272,6 +1272,15 @@ html[data-game] .race-card .race-fill:has(.solo-fill) { display: flex; flex-wrap
 .hub-sim-choice strong { flex: 1; }
 .hub-sim-choice:hover, .hub-sim-choice:focus-visible { background: color-mix(in srgb, var(--game-accent) 18%, var(--panel2, #171a1d)); outline: none; }
 
+/* "Je la fais tout seul" (endurances raced alone). */
+.special-availability:has(.solo-driver) { display: flex; flex-wrap: wrap; gap: 8px; }
+.special-button.solo-driver.active { border-color: rgba(243,179,61,.8); background: rgba(243,179,61,.16); color: #ffd98a; }
+.solo-driver-tag { margin-left: 6px; padding: 1px 7px; border-radius: 999px; background: rgba(243,179,61,.16); color: #ffd98a; font-size: .85em; font-weight: 800; }
+.solo-driver-warning, .solo-driver-note { margin: 10px 0 0; padding: 10px 12px; border-radius: 10px; font-size: 14px; line-height: 1.5; }
+.solo-driver-warning { border: 1px solid rgba(243,179,61,.55); border-left: 4px solid #f3b33d; background: rgba(243,179,61,.1); color: #ffe2a8; font-weight: 700; }
+.solo-driver-note { border: 1px solid rgba(82,211,216,.35); background: rgba(82,211,216,.07); color: #c7eef0; }
+.solo-driver-badge { display: inline-flex; align-items: center; margin-left: 6px; padding: 1px 6px; border: 1px solid rgba(243,179,61,.6); border-radius: 6px; color: #ffd98a; font-size: 10px; font-weight: 900; letter-spacing: .04em; vertical-align: middle; }
+
 /* Large screens (27–34 inch, ultrawide): the whole interface grows in proportion and the page uses
    more of the width. The banner keeps its own sizing (its image is capped at its source resolution). */
 @media (min-width: 2200px) { :root { --wide-zoom: 1.15; } }

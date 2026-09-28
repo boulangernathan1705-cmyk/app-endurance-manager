@@ -215,7 +215,10 @@ function validateEvent(input, existing = null) {
     return {id: departureId, date: item.date, time: item.time, startsAt};
   }).sort((a, b) => a.startsAt - b.startsAt);
   const schedulePending = input.schedulePending == null ? Boolean(existing?.schedule_pending) : input.schedulePending === true;
-  return {name, format, access: solo?.access || 'open', capacity: solo?.capacity ?? null, rounds: solo?.rounds || [], durationHours, durationMinutes, eventType, circuit, schedulePending, categories: [...new Set(categoriesInput)], departures};
+  // Driver change required (iRacing endurances; always on LMU): true / false, or null for the site rule.
+  const driverChangeRequired = solo ? null : typeof input.driverChangeRequired === 'boolean' ? input.driverChangeRequired
+    : input.driverChangeRequired === undefined && existing?.driver_change_required != null ? Boolean(existing.driver_change_required) : null;
+  return {name, format, access: solo?.access || 'open', capacity: solo?.capacity ?? null, rounds: solo?.rounds || [], durationHours, durationMinutes, eventType, circuit, schedulePending, driverChangeRequired, categories: [...new Set(categoriesInput)], departures};
 }
 // Discord display names are at most 32 characters: registrations accept the same length.
 const PILOT_NAME_MAX = 32;
@@ -265,7 +268,9 @@ function validateRegistration(input, event) {
   cars.splice(0, cars.length, ...normalizedCars);
   if (carAny) cars.length = 0;
   const car = cars[0] || '';
-  return {name, nameKey: name.normalize('NFKC').toLocaleLowerCase('fr-FR'), status: input.status, category, car, cars, carAny, preferredPilot};
+  // "Je la fais tout seul": the driver races the whole race without a team-mate.
+  const soloDriver = input.status !== 'unavailable' && input.soloDriver === true;
+  return {name, nameKey: name.normalize('NFKC').toLocaleLowerCase('fr-FR'), status: soloDriver ? 'whole' : input.status, category, car, cars, carAny, preferredPilot, soloDriver};
 }
 
 export {

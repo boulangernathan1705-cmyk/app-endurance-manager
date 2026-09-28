@@ -27,6 +27,7 @@ function harness(withParticipants=true){
  DB.db.exec(readFileSync(new URL('../migrations/0028_solo_round_choices.sql',import.meta.url),'utf8'));
  DB.db.exec(readFileSync(new URL('../migrations/0029_event_duration_minutes.sql',import.meta.url),'utf8'));
  DB.db.exec(readFileSync(new URL('../migrations/0030_iracing_import.sql',import.meta.url),'utf8'));
+ DB.db.exec(readFileSync(new URL('../migrations/0031_solo_driver.sql',import.meta.url),'utf8'));
  const env={DB,APP_ORIGIN:ROOT,DISCORD_CLIENT_ID:'app-id',DISCORD_CLIENT_SECRET:'test-only-secret',ADMIN_DISCORD_IDS:ADMIN,ASSETS:{fetch:async()=>new Response('static')}};
  const jars=new Map();
  async function req(path,method='GET',data,actor='guest',options={}){
@@ -488,4 +489,25 @@ test('official iRacing endurances are imported once, by the daily task or by an 
  assert.ok(!(await req('/api/members','GET',null,'admin')).data.members.some(member=>member.id==='system:iracing'));
  assert.ok(!(await req('/api/participants','GET',null,'pilot')).data.participants.some(member=>member.id==='system:iracing'));
  assert.ok(DB.db.prepare("SELECT COUNT(*) n FROM iracing_imports").get().n>=4);
+});
+
+test('a driver can race an endurance alone; organizers set whether a driver change is required', async () => {
+ const {req,login}=harness();await login(ADMIN,'admin');await login(PILOT,'pilot');
+ await req('/api/events','POST',{...eventInput,circuit:'iracing-spa',categories:['GT3'],durationMinutes:180,driverChangeRequired:true},'admin');
+ let event=(await req('/api/events?game=iracing')).data.events[0];
+ assert.equal(event.driverChangeRequired,true);
+ const base=`/api/events/${event.id}/departures/${event.departures[0].id}`;
+ const reg=await req(base+'/registrations','POST',{name:'Leo',category:'GT3',status:'h1',soloDriver:true},'pilot');
+ assert.equal(reg.status,201);
+ event=(await req('/api/events?game=iracing')).data.events[0];
+ const saved=event.departures[0].availability[0];
+ assert.equal(saved.soloDriver,true);assert.equal(saved.status,'whole','alone means the whole race');
+ // Back to a team: the flag is cleared.
+ assert.equal((await req('/api/registrations/'+reg.data.id,'PATCH',{name:'Leo',category:'GT3',status:'h1',soloDriver:false,version:saved.version},'pilot')).status,200);
+ event=(await req('/api/events?game=iracing')).data.events[0];
+ assert.equal(event.departures[0].availability[0].soloDriver,false);
+ // Editing the race without the field keeps the organizer's choice.
+ const {driverChangeRequired,...rest}=event;
+ assert.equal((await req('/api/events/'+event.id,'PATCH',rest,'admin')).status,200);
+ assert.equal((await req('/api/events?game=iracing')).data.events[0].driverChangeRequired,true);
 });

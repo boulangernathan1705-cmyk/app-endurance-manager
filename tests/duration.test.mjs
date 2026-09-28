@@ -10,3 +10,12 @@ test('race durations read in hours and minutes', () => {
   assert.equal(eventMinutes({durationHours:4}), 240);
   assert.equal(eventMinutes({durationHours:3, durationMinutes:150}), 150);
 });
+
+test('driver change required: always on LMU; on iRacing the organizer decides, over 4 h by default', async () => {
+  const {driverChangeRequired} = await import('../shared/duration.mjs');
+  assert.equal(driverChangeRequired({circuit:'spa', durationMinutes:120}), true);
+  assert.equal(driverChangeRequired({circuit:'iracing-spa', durationMinutes:240}), false);
+  assert.equal(driverChangeRequired({circuit:'iracing-spa', durationMinutes:360}), true);
+  assert.equal(driverChangeRequired({circuit:'iracing-spa', durationMinutes:360, driverChangeRequired:false}), false);
+  assert.equal(driverChangeRequired({circuit:'iracing-spa', durationMinutes:120, driverChangeRequired:true}), true);
+});

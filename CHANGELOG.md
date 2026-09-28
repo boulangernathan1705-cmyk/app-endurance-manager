@@ -11,6 +11,8 @@ Les changements du site, version par version. La plus récente est en haut.
 
 ### Endurances
 - La durée d'une endurance peut avoir des minutes, par exemple **2 h 30**. La frise de présence s'arrête à l'heure de fin réelle.
+- À l'inscription, **Je la fais tout seul** : tu peux courir une endurance sans équipier, sur LMU comme sur iRacing. Un badge **SOLO** l'indique aux organisateurs.
+- Si la course impose un changement de pilote (toujours sur LMU, sur iRacing au-delà de 4 h ou selon l'organisateur), un message te prévient que ta course ne comptera pas au classement en solo.
 
 ### Endurances iRacing officielles
 - Les endurances officielles iRacing **en équipe avec changement de pilotes** arrivent **toutes seules** sur le site, mises à jour chaque nuit : IMSA Endurance Series, Global Endurance Tour, GT Endurance Series, Nürburgring Endurance Championship, Creventic et Production Endurance Challenge, plus les événements spéciaux (8 Hours of Indianapolis, Bathurst 1000, 992 Endurance Cup…).
