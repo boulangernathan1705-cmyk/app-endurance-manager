@@ -95,3 +95,34 @@ test('a lap race whose schedule entry gives a few minutes keeps a real duration 
   assert.equal(bathurst[0].input.durationMinutes, 360);
   assert.ok(validateEvent(bathurst[0].input));
 });
+
+test('a special event listed as a series with real-looking times still gives one race', () => {
+  const plans = planIracingEvents({
+    championships:[{name:'2099 Bathurst 1000 AU', category:'SPORTS CAR', typical_session_duration_minutes:400, session_times_by_day:{'5':['03:00','12:00']},
+      weeks:[{week_number:1, track_name:'Mount Panorama Circuit', date_start:'2099-10-03', date_end:'2099-10-09', duration_minutes:400}]}],
+    special_events:[{slug:'bathurst-1000', name:'Bathurst 1000', date_start:'2099-10-02', date_end:'2099-10-04', track_name:'Mount Panorama Circuit', car_class:'Supercars'}]
+  }, NOW);
+  assert.deepEqual(plans.filter(plan => /bathurst/.test(plan.externalId)).map(plan => plan.externalId), ['special:bathurst-1000:2099-10-02']);
+  assert.equal(plans.find(plan => /bathurst/.test(plan.externalId)).input.durationMinutes, 400);
+});
+
+test('an event name made of generic words is found by its whole name', async () => {
+  const {articleFor} = await import('../server/iracing-import.mjs');
+  const posts = [
+    {date:'2099-11-23T09:00:00', title:{rendered:'THIS WEEK: iRacing Creventic Endurance Series at Spa'}, content:{rendered:''}},
+    {date:'2099-11-23T10:00:00', title:{rendered:'THIS WEEK: iRacing 992 Endurance Cup presented by Porsche | Special Event'}, content:{rendered:''}}
+  ];
+  assert.match(articleFor(posts, {name:'992 Endurance Cup', dateStart:'2099-11-27', dateEnd:'2099-11-29'}).title.rendered, /992 Endurance Cup/);
+  assert.equal(articleFor(posts.slice(0, 1), {name:'992 Endurance Cup', dateStart:'2099-11-27', dateEnd:'2099-11-29'}), null);
+});
+
+test('a regular series is never taken for a special event with a similar name', () => {
+  const plans = planIracingEvents({
+    championships:[{name:'Production Endurance Challenge', category:'SPORTS CAR', typical_session_duration_minutes:120, session_times_by_day:{'4':['19:00'],'5':['07:00']},
+      weeks:[{week_number:1, track_name:'Snetterton Circuit - 300', date_start:'2099-10-02', date_end:'2099-10-08', duration_minutes:120},
+             {week_number:2, track_name:'Silverstone Circuit - International', date_start:'2099-10-09', date_end:'2099-10-15', duration_minutes:120}]}],
+    special_events:[{slug:'pcc-vir', name:'THE Production Car Challenge @ViR', date_start:'2099-10-02', date_end:'2099-10-03', track_name:'ViR Grand Course', car_class:'Production Car Challenge Cars'}]
+  }, NOW);
+  assert.equal(plans.filter(plan => plan.externalId.startsWith('series:production-endurance-challenge')).length, 2);
+  assert.equal(plans.filter(plan => plan.externalId.startsWith('special:pcc-vir')).length, 1);
+});

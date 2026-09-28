@@ -10,7 +10,9 @@ const soloRacesEnabled = env => env?.SOLO_RACES === 'on';
 import {syncIracingEvents} from './iracing-import.mjs';
 async function eventById(env, eventId) {
   const row = await env.DB.prepare('SELECT * FROM events WHERE id=?').bind(eventId).first();
-  if (!row) fail(404, 'Événement introuvable.'); return row;
+  // A solo race does not exist where solo races are off (production): no entry, edit or crew through its id.
+  if (!row || (row.format === 'solo' && !soloRacesEnabled(env))) fail(404, 'Événement introuvable.');
+  return row;
 }
 function departureById(event, departureId) {
   const departure = JSON.parse(event.departures).find(d => d.id === departureId);
