@@ -141,3 +141,13 @@ test('les mutations qui changent le résumé déclenchent une synchronisation',(
 test('la synchronisation reste inactive tant que le webhook secret n’est pas configuré',async()=>{
   assert.deepEqual(await syncWeeklyDiscord({}),{ok:false,skipped:'not-configured'});
 });
+
+test('une course « Horaires à confirmer » n’est jamais annoncée en cours et son heure provisoire n’est pas publiée',async()=>{
+  const now=Date.parse('2026-10-03T23:30:00Z');
+  const pending={...event(uuid,'6h FUJI','fuji',6,[{id:departureUuid,startsAt:Date.parse('2026-10-03T22:00:00Z')},{id:secondDepartureUuid,startsAt:Date.parse('2026-10-04T22:00:00Z')}]),schedule_pending:1};
+  const snapshot=await loadWeeklyDiscordSnapshot({DB:dbFixture({events:[pending],registrations:[registration()],crews:[crewRow()]})},now);
+  assert.equal(snapshot.currentDepartures.length,0,'placeholder 0:00 start is not "en cours"');
+  const payload=JSON.stringify(buildWeeklyDiscordPayload(snapshot,'https://endurance-manager.app',now));
+  assert.doesNotMatch(payload,/00:00/);
+  assert.match(payload,/lundi 5 octobre — horaire à confirmer/);
+});

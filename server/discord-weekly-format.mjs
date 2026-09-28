@@ -8,6 +8,7 @@ const ymd=new Intl.DateTimeFormat('en-CA',{timeZone:TIME_ZONE,year:'numeric',mon
 const startLabel=new Intl.DateTimeFormat('fr-FR',{timeZone:'UTC',day:'numeric',month:'long'});
 const endLabel=new Intl.DateTimeFormat('fr-FR',{timeZone:'UTC',day:'numeric',month:'long',year:'numeric'});
 const departureLabel=new Intl.DateTimeFormat('fr-FR',{timeZone:TIME_ZONE,weekday:'long',day:'numeric',month:'long',hour:'2-digit',minute:'2-digit',hourCycle:'h23'});
+const departureDayLabel=new Intl.DateTimeFormat('fr-FR',{timeZone:TIME_ZONE,weekday:'long',day:'numeric',month:'long'});
 const updateTimeLabel=new Intl.DateTimeFormat('fr-FR',{timeZone:TIME_ZONE,hour:'2-digit',minute:'2-digit',hourCycle:'h23'});
 const markers=new Map([['Hypercar','🟦'],['LMP2 ELMS','🟨'],['LMP2 WEC','🟨'],['LMP3','🟩'],['GT3','🟪'],['GTE','🟥']]);
 
@@ -56,7 +57,8 @@ function eventTitleAndNote(eventName){
 function futureDepartureBlock(departure){
   const details=[...departure.crews.map(crewText)];
   if(departure.unassignedPilots?.length)details.push(`📋 Pilotes inscrits non affectés\n${pilotLines(departure.unassignedPilots)}`);
-  const heading=`🕐 **${clean(departureLabel.format(departure.startsAt).replace(' à ',' — '))}**`;
+  const when=departure.timePending?`${departureDayLabel.format(departure.startsAt)} — horaire à confirmer`:departureLabel.format(departure.startsAt).replace(' à ',' — ');
+  const heading=`🕐 **${clean(when)}**`;
   return cut(details.length?`${heading}\n${details.join('\n\n')}`:heading,1024);
 }
 function groupedFutureFields(departures){

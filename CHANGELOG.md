@@ -2,6 +2,12 @@
 
 Les changements du site, version par version. La plus récente est en haut.
 
+## Prochaine version — en test
+
+### Corrections
+- Une course en **Horaires à confirmer** (LMU comme iRacing) n'affiche plus d'heure provisoire : ses départs indiquent la date et « à définir ».
+- Le récap Discord n'annonce plus « Course en cours » pour une course aux horaires à confirmer, et écrit « horaire à confirmer » au lieu d'une heure provisoire.
+
 ## v1.1.2 — 28 septembre 2026
 
 ### Corrections

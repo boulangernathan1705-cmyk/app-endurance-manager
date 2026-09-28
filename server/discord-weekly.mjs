@@ -32,6 +32,8 @@ function flattenDepartures(events) {
         durationHours,
         durationMinutes,
         departureId: departure.id,
+        // "Horaires à confirmer": the time of the start is only a placeholder.
+        timePending: Boolean(event.schedule_pending) || departure.tbd === true,
         startsAt,
         endsAt: startsAt + durationMinutes * 60_000,
         crews: [],
@@ -62,11 +64,12 @@ function selectPlanningWeek(allDepartures, timestamp) {
 }
 
 export async function loadWeeklyDiscordSnapshot(env, timestamp) {
-  const events = (await env.DB.prepare(`SELECT id,name,circuit,duration_hours,duration_minutes,departures
+  const events = (await env.DB.prepare(`SELECT id,name,circuit,duration_hours,duration_minutes,schedule_pending,departures
     FROM events WHERE circuit NOT LIKE 'iracing-%' ORDER BY created_at,id`).all()).results || [];
   const allDepartures = flattenDepartures(events);
   const currentWeek = parisWeek(timestamp);
-  const currentCandidates = allDepartures.filter(item => item.startsAt <= timestamp && item.endsAt > timestamp);
+  // A start whose time is still to be confirmed is never announced as running (its placeholder is 0:00).
+  const currentCandidates = allDepartures.filter(item => !item.timePending && item.startsAt <= timestamp && item.endsAt > timestamp);
   const planning = selectPlanningWeek(allDepartures, timestamp);
   const selected = [...currentCandidates, ...planning.futureDepartures];
 
