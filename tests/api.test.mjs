@@ -475,12 +475,16 @@ test('official iRacing endurances are imported once, by the daily task or by an 
  globalThis.fetch=async url=>new Response(JSON.stringify(String(url).endsWith('manifest.json')?{current:'2099S4'}:future));
  assert.equal((await req('/api/admin/iracing-import','POST',{},'pilot')).status,403);
  const first=await req('/api/admin/iracing-import','POST',{},'admin');
- assert.equal(first.status,200);assert.ok(first.data.created>=4);
+ assert.equal(first.status,200);assert.ok(first.data.created>=4);assert.equal(typeof first.data.completed,'number');
  const events=(await req('/api/races?game=iracing')).data.events;
  assert.equal(events.length,first.data.created);
  const imsa=events.find(event=>event.name==='IMSA Endurance Series'&&event.circuit==='iracing-long-beach');
  assert.equal(imsa.departures.length,4);assert.equal(imsa.durationMinutes,160);
  assert.ok(events.some(event=>event.schedulePending&&event.eventType==='special'));
+ // The schedule source is down: a clear error, nothing changed.
+ const saved=globalThis.fetch;globalThis.fetch=async()=>new Response('down',{status:503});
+ assert.equal((await req('/api/admin/iracing-import','POST',{},'admin')).status,502);
+ globalThis.fetch=saved;
  // Run again: nothing new. Delete a race: it is not created again.
  assert.equal((await req('/api/admin/iracing-import','POST',{},'admin')).data.created,0);
  assert.equal((await req('/api/events/'+imsa.id,'DELETE',{version:imsa.version},'admin')).status,200);

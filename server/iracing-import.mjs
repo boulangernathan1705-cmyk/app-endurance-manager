@@ -205,7 +205,7 @@ async function fetchJson(url, fetchImpl) {
   return response.json();
 }
 
-// Creates the races that are not imported yet. Returns the number of races created.
+// Creates the races that are not imported yet and completes special event times. Returns both counts.
 export async function syncIracingEvents(env, {timestamp = Date.now(), fetchImpl = fetch} = {}) {
   const manifest = await fetchJson(IRACING_FEED + 'manifest.json', fetchImpl);
   // The current season, and the next one as soon as the schedule publishes it.
@@ -213,7 +213,7 @@ export async function syncIracingEvents(env, {timestamp = Date.now(), fetchImpl 
   if (!codes.length) throw new Error('iRacing schedule: unknown season');
   const plans = [];
   for (const code of codes) plans.push(...planIracingEvents(await fetchJson(`${IRACING_FEED}${code.slice(0, 4)}_s${code.slice(5)}.json`, fetchImpl), timestamp));
-  if (!plans.length) return 0;
+  if (!plans.length) return {created:0, completed:0};
   const known = new Set((await env.DB.prepare('SELECT external_id FROM iracing_imports').all()).results.map(row => row.external_id));
   let created = 0;
   for (const plan of plans) {
@@ -229,8 +229,8 @@ export async function syncIracingEvents(env, {timestamp = Date.now(), fetchImpl 
     ]);
     created++;
   }
-  await completeSpecialTimes(env, {timestamp, fetchImpl});
-  return created;
+  const completed = await completeSpecialTimes(env, {timestamp, fetchImpl});
+  return {created, completed};
 }
 
 export const IRACING_NEWS = 'https://www.iracing.com/wp-json/wp/v2/posts?search=THIS%20WEEK&per_page=20&_fields=date,title,content';

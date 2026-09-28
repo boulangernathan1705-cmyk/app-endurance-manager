@@ -153,6 +153,15 @@ async function perform(action,target){
       else {if(!confirm('Retirer ce pilote de l’équipage ? Son inscription sera conservée.'))return;await api(`/api/crews/${crew.id}/members/${target.dataset.registration}`,'DELETE',{version:crew.version});state.crewManagementOpen.add(crew.id);}
       await refreshAfterSave('Équipages mis à jour.'); break;
     }
+    case 'iracing-import': {
+      // Admins: official iRacing calendar updated at once (the nightly import does it too).
+      const label=target.textContent;target.disabled=true;target.textContent='Mise à jour…';
+      let result;
+      try{result=await api('/api/admin/iracing-import','POST',{});}finally{target.disabled=false;target.textContent=label;}
+      const parts=[result.created?`${result.created} course${result.created>1?'s':''} ajoutée${result.created>1?'s':''}`:'',result.completed?`${result.completed} horaire${result.completed>1?'s':''} complété${result.completed>1?'s':''}`:''].filter(Boolean);
+      await refreshAfterSave(parts.length?`Calendrier iRacing mis à jour : ${parts.join(', ')}.`:'Calendrier iRacing déjà à jour.');
+      break;
+    }
     case 'create': if(target.dataset.format)state.listFormat=target.dataset.format; renderEventForm(); break;
     case 'edit-event': renderEventForm(event); break;
     case 'add-departure': if(app.querySelectorAll('.departure-field').length>=30)throw Error('Maximum 30 départs par événement.');{const rows=document.querySelectorAll('#departureFields .departure-field'),last=rows[rows.length-1];/* A new start copies the previous start's date and time: several starts often share a day. */document.getElementById('departureFields').insertAdjacentHTML('beforeend',departureFields(last?{date:last.querySelector('[name="date"]').value,time:last.querySelector('[name="time"]').value}:{}));}updateRemoveButtons();break;
