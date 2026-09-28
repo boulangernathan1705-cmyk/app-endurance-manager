@@ -2,7 +2,7 @@
 
 Les changements du site, version par version. La plus récente est en haut.
 
-## Prochaine version — en test
+## v1.1.3 — 28 septembre 2026
 
 ### Corrections
 - Une course en **Horaires à confirmer** (LMU comme iRacing) n'affiche plus d'heure provisoire : ses départs indiquent la date et « à définir ».
