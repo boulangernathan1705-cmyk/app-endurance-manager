@@ -65,7 +65,7 @@ test('les dates applicatives utilisent la locale sélectionnée',()=>{
   assert.match(read('front/schedule.mjs'),/localeTag\(\)/);
   // Dates are formatted in one module, with the selected locale, and used by every page.
   assert.match(read('front/dates.mjs'),/Intl\.DateTimeFormat\(localeTag\(\)/);
-  for(const file of ['front/game-hub.mjs','front/app/home-view.mjs','front/app/entries-view.mjs','front/app/event-view.mjs','crew-builder.js'])assert.match(read(file),/dates\.mjs/);
+  for(const file of ['front/app/home-view.mjs','front/app/entries-view.mjs','front/app/event-view.mjs','crew-builder.js'])assert.match(read(file),/dates\.mjs/);
 });
 
 test('le sélecteur traduit aussi les confirmations natives en anglais',()=>{

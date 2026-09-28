@@ -92,3 +92,8 @@
   .site-nav-shell .nav-sections-info { display: grid !important; grid-template-columns: 1fr 1fr; }
   .site-nav-shell .nav-sections-info .nav-section-button { justify-content: center; font-size: 13px !important; padding: 0 8px !important; }
 }
+
+/* Page « Nouveautés » (générée depuis CHANGELOG.md). */
+.changelog-page .changelog-version h2 { font-size: 21px; }
+.changelog-page .changelog-version h3 { margin: 16px 0 4px; font-size: 16px; color: #f4f6f5; }
+.changelog-page .changelog-version:first-of-type { border-color: rgba(82, 211, 216, .45); }

@@ -24,6 +24,7 @@
   ],
   "vars": {
     "APP_ORIGIN": "https://app.endurance-manager.workers.dev",
-    "SITE_ENV": "development"
+    "SITE_ENV": "development",
+    "SOLO_RACES": "on"
   }
 }

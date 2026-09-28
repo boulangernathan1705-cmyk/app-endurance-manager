@@ -2,7 +2,6 @@ import {buildWeeklyDiscordPayload, isInParisWeek, parisWeek} from './discord-wee
 
 const STATE_KEY = 'lmu-weekly-v1'; // Conservé pour réutiliser le message Discord existant.
 const LOCK_SECONDS = 90;
-const HOUR_MS = 3_600_000;
 
 function parseJson(value, fallback) {
   try { return JSON.parse(value); } catch { return fallback; }
@@ -22,7 +21,7 @@ function flattenDepartures(events) {
   for (const event of events) {
     const eventDepartures = parseJson(event.departures, []);
     if (!Array.isArray(eventDepartures)) continue;
-    const durationHours = Number(event.duration_hours) || 0;
+    const durationHours = Number(event.duration_hours) || 0, durationMinutes = Number(event.duration_minutes) || durationHours * 60;
     for (const departure of eventDepartures) {
       const startsAt = Number(departure?.startsAt);
       if (!departure?.id || !Number.isFinite(startsAt)) continue;
@@ -31,9 +30,10 @@ function flattenDepartures(events) {
         eventName: event.name,
         circuit: event.circuit || '',
         durationHours,
+        durationMinutes,
         departureId: departure.id,
         startsAt,
-        endsAt: startsAt + durationHours * HOUR_MS,
+        endsAt: startsAt + durationMinutes * 60_000,
         crews: [],
         registrations: [],
         pilotCount: 0,
@@ -62,7 +62,7 @@ function selectPlanningWeek(allDepartures, timestamp) {
 }
 
 export async function loadWeeklyDiscordSnapshot(env, timestamp) {
-  const events = (await env.DB.prepare(`SELECT id,name,circuit,duration_hours,departures
+  const events = (await env.DB.prepare(`SELECT id,name,circuit,duration_hours,duration_minutes,departures
     FROM events WHERE circuit NOT LIKE 'iracing-%' ORDER BY created_at,id`).all()).results || [];
   const allDepartures = flattenDepartures(events);
   const currentWeek = parisWeek(timestamp);

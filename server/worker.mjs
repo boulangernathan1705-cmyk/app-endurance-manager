@@ -1,9 +1,13 @@
 import {
   LEGACY_CAR_ALIASES, COOKIE_SESSION, COOKIE_GUEST, COOKIE_STATE, COOKIE_RETURN, DAY, HttpError, fail, now, id, token, hash, cookie,
   setCookie, json, redirect, origin, requireDiscord, administrators, publicUser, requireRole, identity, owned, personal,
-  registrationSelect, registrationParticipant, body, rateLimit, cleanup, returnPath, text, validateEvent, validateRegistration
+  registrationSelect, registrationParticipant, body, rateLimit, cleanup, returnPath, text, validateEvent, validateRegistration, ANY_CATEGORY
 } from './core.mjs';
 import {ingestClientError, clientErrorsApi} from './telemetry.mjs';
+import {racesPath} from './races-path.mjs';
+// Solo races and SAFE drivers: still being built, only on the sites where SOLO_RACES is "on" (dev).
+const soloRacesEnabled = env => env?.SOLO_RACES === 'on';
+import {syncIracingEvents} from './iracing-import.mjs';
 async function eventById(env, eventId) {
   const row = await env.DB.prepare('SELECT * FROM events WHERE id=?').bind(eventId).first();
   if (!row) fail(404, 'Événement introuvable.'); return row;
@@ -12,6 +16,14 @@ function departureById(event, departureId) {
   const departure = JSON.parse(event.departures).find(d => d.id === departureId);
   if (!departure) fail(404, 'Départ introuvable.');
   return departure;
+}
+// An official slot for pilots leaving the common "Horaire à définir" start of the same race.
+function slotFor(event, from, departureId) {
+  if (!from.tbd) fail(409, 'Ce départ a déjà son horaire.');
+  const target = JSON.parse(event.departures).find(d => d.id === departureId);
+  if (!target || target.tbd) fail(400, 'Choisis un des horaires proposés.');
+  if (target.startsAt <= Date.now()) fail(409, 'Ce départ est passé.');
+  return target;
 }
 function isRegistrationManager(actor) {
   return ['admin','organizer'].includes(actor.user?.role);
@@ -41,8 +53,10 @@ function publicRegistration(reg, actor, userNames = new Map()) {
     car:cars[0] || reg.car || '',
     cars,
     carAny:Boolean(reg.car_any),
+    roundChoices:JSON.parse(reg.round_choices||'[]'),
     status:reg.status,
     preferredPilot:reg.preferred_pilot || '',
+    soloDriver:Boolean(reg.solo_driver),
     version:reg.version,
     discordLinked:Boolean(reg.participant_user_id),
     mine:personal(reg, actor),
@@ -62,11 +76,11 @@ function eventScopeFilter(scope, nowMs=Date.now()) {
 }
 async function listEvents(env, actor, game='', scope='') {
   // Filter by joining events instead of binding id lists: D1 rejects queries with more than 100 bound parameters.
-  const filters=[game==='iracing' ? "e.circuit LIKE 'iracing-%'" : game==='lmu' ? "e.circuit NOT LIKE 'iracing-%'" : '', eventScopeFilter(scope)].filter(Boolean);
+  const filters=[game==='iracing' ? "e.circuit LIKE 'iracing-%'" : game==='lmu' ? "e.circuit NOT LIKE 'iracing-%'" : '', eventScopeFilter(scope), soloRacesEnabled(env) ? '' : "COALESCE(e.format,'endurance')!='solo'"].filter(Boolean);
   const where=filters.length ? ` WHERE ${filters.join(' AND ')}` : '';
   const rows = (await env.DB.prepare(`SELECT e.* FROM events e${where} ORDER BY e.created_at DESC, e.id DESC`).all()).results;
   if (!rows.length) return [];
-  const registrations = (await env.DB.prepare(registrationSelect+` JOIN events e ON e.id=r.event_id${where} ORDER BY r.created_at,r.id`).all()).results;
+  const registrations = (await env.DB.prepare(registrationSelect+` JOIN events e ON e.id=r.event_id${where} ORDER BY r.created_at,r.rowid`).all()).results;
   const crews = (await env.DB.prepare(`SELECT c.* FROM crews c JOIN events e ON e.id=c.event_id${where} ORDER BY c.created_at,c.id`).all()).results;
   const memberships = (await env.DB.prepare(`SELECT cm.crew_id,cm.registration_id FROM crew_members cm JOIN crews c ON c.id=cm.crew_id JOIN events e ON e.id=c.event_id${where}`).all()).results;
   // Only registration creators' names are displayed (addedByName).
@@ -96,7 +110,19 @@ async function listEvents(env, actor, game='', scope='') {
       hasOwner:Boolean(crew.owner_user_id)
     });
   }
-  return rows.map(row => ({id:row.id, name:row.name, circuit:row.circuit||'', durationHours:Number(row.duration_hours)||3, eventType:row.event_type||'private', schedulePending:Boolean(row.schedule_pending), categories:JSON.parse(row.categories), version:row.version, departures:JSON.parse(row.departures).map(d => ({...d, availability:grouped.get(`${row.id}:${d.id}`) || [], crews:crewsByDeparture.get(`${row.id}:${d.id}`) || []}))}));
+  return rows.map(row => {
+    const format=row.format||'endurance', capacity=row.capacity==null?null:Number(row.capacity);
+    const durationHours=Number(row.duration_hours)||3, durationMinutes=Number(row.duration_minutes)||durationHours*60;
+    return {id:row.id, name:row.name, format, access:row.access||'open', capacity, rounds:JSON.parse(row.rounds||'[]'), circuit:row.circuit||'', durationHours, durationMinutes, driverChangeRequired:row.driver_change_required==null?null:Boolean(row.driver_change_required), eventType:row.event_type||'private', schedulePending:Boolean(row.schedule_pending), categories:JSON.parse(row.categories), version:row.version,
+      departures:JSON.parse(row.departures).map(d => {
+        const availability=grouped.get(`${row.id}:${d.id}`) || [];
+        // Solo race: entries keep their order of arrival; beyond the number of places they are on the
+        // waiting list, and the first one waiting moves up by itself when someone withdraws.
+        if (format==='solo' && capacity) availability.forEach((reg,index)=>{ reg.waitlistPosition=index>=capacity?index-capacity+1:null; });
+        // endsAt: the real finish (2 h 30 ends 30 min into the third presence slot).
+        return {...d, endsAt:d.startsAt+durationMinutes*60000, availability, crews:crewsByDeparture.get(`${row.id}:${d.id}`) || []};
+      })};
+  });
 }
 async function oauthStart(request, env) {
   requireDiscord(env); await rateLimit(request, env, 'oauth', 20); await cleanup(env);
@@ -148,7 +174,7 @@ async function oauthCallback(request, env) {
 }
 async function api(request, env) {
   if (!env.DB) fail(503, 'La base partagée n’est pas encore configurée.');
-  const url = new URL(request.url), path = url.pathname, method = request.method;
+  const url = new URL(request.url), path = racesPath(url.pathname), method = request.method;
   const canonical = origin(env);
   if (url.origin !== canonical) fail(403, 'Utilise l’adresse principale du site pour cette action.');
   if (!['GET','HEAD'].includes(method)) {
@@ -160,7 +186,7 @@ async function api(request, env) {
   const actor = await identity(request, env);
   const diagnostics = await clientErrorsApi(path,method,env,actor);
   if (diagnostics) return diagnostics;
-  if (path === '/api/session' && method === 'GET') return json({user:actor.user, discordReady:!!(env.DISCORD_CLIENT_ID && env.DISCORD_CLIENT_SECRET), adminConfigured:administrators(env).length > 0});
+  if (path === '/api/session' && method === 'GET') return json({user:actor.user, discordReady:!!(env.DISCORD_CLIENT_ID && env.DISCORD_CLIENT_SECRET), adminConfigured:administrators(env).length > 0, soloRaces:soloRacesEnabled(env), soloLabel:String(env.SOLO_LABEL || 'Courses solo').slice(0,40)});
   if (path === '/api/auth/logout' && method === 'POST') {
     const raw = cookie(request, COOKIE_SESSION);
     if (raw) await env.DB.prepare('DELETE FROM sessions WHERE token_hash=?').bind(await hash(raw)).run();
@@ -195,6 +221,7 @@ async function api(request, env) {
     if (!actor.user) fail(401,'Connecte-toi avec Discord pour choisir un pilote.');
     return json({participants:(await env.DB.prepare(`SELECT u.id,u.name,p.id AS participantId
       FROM users u LEFT JOIN participants p ON p.user_id=u.id
+      WHERE u.id NOT LIKE 'system:%'
       ORDER BY lower(u.name),u.id`).all()).results});
   }
   const crewCreate = path.match(/^\/api\/events\/([a-f0-9-]{36})\/departures\/([a-f0-9-]{36})\/crews$/);
@@ -205,6 +232,7 @@ async function api(request, env) {
     const crew=crewRoute ? await env.DB.prepare('SELECT * FROM crews WHERE id=?').bind(crewRoute[1]).first() : null;
     if (crewRoute && !crew) fail(404,'Équipage introuvable.');
     const event=await eventById(env,crew?.event_id || crewCreate[1]);
+    if ((event.format||'endurance')==='solo') fail(409,'Les courses solo n’ont pas d’équipage.');
     const departure=departureById(event,crew?.departure_id || crewCreate[2]);
     if (departure.startsAt<=Date.now()) fail(409,'Ce départ est passé. Les équipages sont verrouillés.');
     if (crew && input.version!==crew.version) fail(409,'Cet équipage a changé. Actualise avant de réessayer.');
@@ -267,6 +295,18 @@ async function api(request, env) {
         return json({ok:true});
       }
       if (method!=='PATCH') fail(404,'Action introuvable.');
+      // Common "Horaire à définir" start: once the official slots are known, the crew picks its start and
+      // moves there with its pilots.
+      if (input.departureId!==undefined) {
+        const target=slotFor(event,departure,input.departureId);
+        const results=await env.DB.batch([
+          env.DB.prepare(`UPDATE registrations SET departure_id=?,version=version+1 WHERE id IN (SELECT registration_id FROM crew_members WHERE crew_id=?)
+            AND EXISTS(SELECT 1 FROM crews WHERE id=? AND version=?)`).bind(target.id,crew.id,crew.id,input.version),
+          env.DB.prepare('UPDATE crews SET departure_id=?,version=version+1 WHERE id=? AND version=?').bind(target.id,crew.id,input.version)
+        ]);
+        if (!results[1].meta.changes) fail(409,'Cet équipage a changé. Actualise avant de réessayer.');
+        return json({ok:true,departureId:target.id});
+      }
       if (typeof input.locked==='boolean' && input.name===undefined && input.category===undefined && input.car===undefined) {
         const result=await env.DB.prepare('UPDATE crews SET locked=?,version=version+1 WHERE id=? AND version=?').bind(input.locked?1:0,crew.id,input.version).run();
         if (!result.meta.changes) fail(409,'Cet équipage a changé. Actualise avant de réessayer.');
@@ -301,8 +341,10 @@ async function api(request, env) {
   }
   if (path === '/api/events' && method === 'POST') {
     requireRole(actor.user);
-    const data = validateEvent(await body(request)), eventId = id();
-    await env.DB.prepare('INSERT INTO events(id,name,duration_hours,event_type,circuit,schedule_pending,categories,departures,created_by,created_at) VALUES(?,?,?,?,?,?,?,?,?,?)').bind(eventId, data.name, data.durationHours, data.eventType, data.circuit, data.schedulePending?1:0, JSON.stringify(data.categories), JSON.stringify(data.departures), actor.user.id, now()).run();
+    const input = await body(request);
+    if (input.format === 'solo' && !soloRacesEnabled(env)) fail(400, 'Les courses solo ne sont pas encore disponibles.');
+    const data = validateEvent(input), eventId = id();
+    await env.DB.prepare('INSERT INTO events(id,name,duration_hours,duration_minutes,event_type,circuit,schedule_pending,driver_change_required,format,access,capacity,rounds,categories,departures,created_by,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)').bind(eventId, data.name, data.durationHours, data.durationMinutes, data.eventType, data.circuit, data.schedulePending?1:0, data.driverChangeRequired==null?null:(data.driverChangeRequired?1:0), data.format, data.access, data.capacity, JSON.stringify(data.rounds), JSON.stringify(data.categories), JSON.stringify(data.departures), actor.user.id, now()).run();
     return json({id:eventId}, 201);
   }
   const eventMatch = path.match(/^\/api\/events\/([a-f0-9-]{36})$/);
@@ -316,11 +358,11 @@ async function api(request, env) {
       return json({ok:true});
     }
     const data = validateEvent(input, event), cats = JSON.stringify(data.categories), deps = JSON.stringify(data.departures);
-    const result = await env.DB.prepare(`UPDATE events SET name=?,duration_hours=?,event_type=?,circuit=?,schedule_pending=?,categories=?,departures=?,version=version+1 WHERE id=? AND version=?
+    const result = await env.DB.prepare(`UPDATE events SET name=?,duration_hours=?,duration_minutes=?,event_type=?,circuit=?,schedule_pending=?,driver_change_required=?,access=?,capacity=?,rounds=?,categories=?,departures=?,version=version+1 WHERE id=? AND version=?
       AND NOT EXISTS (SELECT 1 FROM registrations r WHERE r.event_id=events.id AND
         (NOT EXISTS (SELECT 1 FROM json_each(?) d WHERE json_extract(d.value,'$.id')=r.departure_id)
-      OR (r.category!='' AND NOT EXISTS (SELECT 1 FROM json_each(?) c WHERE c.value=r.category))
-      OR EXISTS (SELECT 1 FROM json_each(?) h WHERE instr(',' || r.status || ',', ',' || h.value || ',') > 0)))`).bind(data.name, data.durationHours, data.eventType, data.circuit, data.schedulePending?1:0, cats, deps, event.id, input.version, deps, cats, JSON.stringify(Array.from({length:24-data.durationHours},(_,i)=>`h${data.durationHours+i+1}`))).run();
+      OR (r.category NOT IN ('','*') AND NOT EXISTS (SELECT 1 FROM json_each(?) c WHERE c.value=r.category))
+      OR EXISTS (SELECT 1 FROM json_each(?) h WHERE instr(',' || r.status || ',', ',' || h.value || ',') > 0)))`).bind(data.name, data.durationHours, data.durationMinutes, data.eventType, data.circuit, data.schedulePending?1:0, data.driverChangeRequired==null?null:(data.driverChangeRequired?1:0), data.access, data.capacity, JSON.stringify(data.rounds), cats, deps, event.id, input.version, deps, cats, JSON.stringify(Array.from({length:24-data.durationHours},(_,i)=>`h${data.durationHours+i+1}`))).run();
     if (!result.meta.changes) fail(409, 'Modification impossible : événement modifié ailleurs, départ supprimé avec des inscrits, catégorie encore utilisée, ou disponibilités au-delà de la nouvelle durée. Ajuste les disponibilités concernées avant de raccourcir la course.');
     return json({ok:true});
   }
@@ -329,19 +371,43 @@ async function api(request, env) {
     const event = await eventById(env, departureMatch[1]);
     const departure = departureById(event, departureMatch[2]);
     if (departure.startsAt <= Date.now()) fail(409, 'Ce départ est passé. Les inscriptions sont fermées.');
-    const input = await body(request), data = validateRegistration(input, event);
+    const input = await body(request);
+    const solo = (event.format||'endurance') === 'solo';
+    if (solo) {
+      // Solo races need a Discord account; SAFE races are reserved to SAFE drivers.
+      if (!actor.user) fail(401, 'Connecte-toi avec Discord pour t’inscrire à une course solo.');
+      const organizer = ['admin','organizer'].includes(actor.user.role);
+      if (input.forOther === true && !organizer) fail(403, 'Seuls les organisateurs peuvent inscrire un autre pilote à une course solo.');
+      if (input.forOther !== true && event.access === 'safe' && !actor.user.safe && !organizer) fail(403, 'Cette course est réservée aux pilotes SAFE. Demande à un administrateur de t’ajouter.');
+    }
+    const data = validateRegistration(input, event);
     const guestToken = actor.user ? null : actor.guestToken || token();
     if (guestToken) { actor.guestToken=guestToken;actor.guestHash=await hash(guestToken); }
     const participant=await registrationParticipant(env,actor,input,data);
+    if (solo && await env.DB.prepare('SELECT 1 FROM registrations WHERE event_id=? AND departure_id=? AND participant_id=? LIMIT 1').bind(event.id,departure.id,participant.id).first()) fail(409, 'Ce pilote est déjà inscrit à cette course. Modifie son inscription.');
     const userId=participant.user_id;
     const guestHash=userId?null:participant.guest_hash||await hash(token());
     const ownerUserId = actor.user?.id || null;
     const regId = id();
     if (input.participantId) { data.name=participant.name;data.nameKey=data.name.normalize('NFKC').toLocaleLowerCase('fr-FR'); }
-    const result = await env.DB.prepare(`INSERT INTO registrations(id,event_id,departure_id,user_id,owner_user_id,guest_hash,name,name_key,category,car,car_preferences,car_any,status,preferred_pilot,created_at,participant_id)
-      SELECT ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,? FROM events WHERE id=? AND version=?`).bind(regId,event.id,departure.id,userId,ownerUserId,guestHash,data.name,data.nameKey,data.category,data.car,JSON.stringify(data.cars),data.carAny?1:0,data.status,data.preferredPilot,now(),participant.id,event.id,event.version).run();
+    const result = await env.DB.prepare(`INSERT INTO registrations(id,event_id,departure_id,user_id,owner_user_id,guest_hash,name,name_key,category,car,car_preferences,car_any,status,preferred_pilot,created_at,participant_id,round_choices,solo_driver)
+      SELECT ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,? FROM events WHERE id=? AND version=?`).bind(regId,event.id,departure.id,userId,ownerUserId,guestHash,data.name,data.nameKey,data.category,data.car,JSON.stringify(data.cars),data.carAny?1:0,data.status,data.preferredPilot,now(),participant.id,JSON.stringify(data.roundChoices||[]),data.soloDriver?1:0,event.id,event.version).run();
     if (!result.meta.changes) fail(409, 'Cet événement a changé. Actualise avant de t’inscrire.');
     return json({id:regId, recoveryLink:guestToken ? canonical + '/#access=' + guestToken : null}, 201, guestToken ? [setCookie(COOKIE_GUEST, guestToken, 365 * DAY)] : []);
+  }
+  // A pilot without a crew on the common "Horaire à définir" start picks one of the official slots.
+  const regMove = path.match(/^\/api\/registrations\/([a-f0-9-]{36})\/departure$/);
+  if (regMove && method === 'PATCH') {
+    const reg = await env.DB.prepare(registrationSelect+' WHERE r.id=?').bind(regMove[1]).first();
+    if (!reg) fail(404, 'Inscription introuvable.');
+    if (!canManageRegistration(reg,actor)) fail(403, 'Tu n’as pas l’autorisation de modifier cette inscription.');
+    const input = await body(request);
+    if (input.version !== reg.version) fail(409, 'Cette inscription a changé. Actualise la page.');
+    const event = await eventById(env, reg.event_id), target = slotFor(event, departureById(event, reg.departure_id), input.departureId);
+    const result = await env.DB.prepare(`UPDATE registrations SET departure_id=?,version=version+1 WHERE id=? AND version=?
+      AND NOT EXISTS(SELECT 1 FROM crew_members WHERE registration_id=?)`).bind(target.id, reg.id, input.version, reg.id).run();
+    if (!result.meta.changes) fail(409, 'Rejoins ou quitte d’abord ton équipage : c’est lui qui choisit le départ.');
+    return json({ok:true, departureId:target.id});
   }
   const regMatch = path.match(/^\/api\/registrations\/([a-f0-9-]{36})$/);
   if (regMatch && ['PATCH','DELETE'].includes(method)) {
@@ -357,7 +423,7 @@ async function api(request, env) {
     else {
       const data = validateRegistration(input,event);
       const results=await env.DB.batch([
-        env.DB.prepare(`UPDATE registrations SET name=?,name_key=?,category=?,car=?,car_preferences=?,car_any=?,status=?,preferred_pilot=?,version=version+1 WHERE id=? AND version=? AND EXISTS(SELECT 1 FROM events WHERE id=? AND version=?)`).bind(data.name,data.nameKey,data.category,data.car,JSON.stringify(data.cars),data.carAny?1:0,data.status,data.preferredPilot,reg.id,input.version,event.id,event.version),
+        env.DB.prepare(`UPDATE registrations SET name=?,name_key=?,category=?,car=?,car_preferences=?,car_any=?,status=?,preferred_pilot=?,round_choices=?,solo_driver=?,version=version+1 WHERE id=? AND version=? AND EXISTS(SELECT 1 FROM events WHERE id=? AND version=?)`).bind(data.name,data.nameKey,data.category,data.car,JSON.stringify(data.cars),data.carAny?1:0,data.status,data.preferredPilot,JSON.stringify(data.roundChoices||[]),data.soloDriver?1:0,reg.id,input.version,event.id,event.version),
         env.DB.prepare('UPDATE participants SET name=? WHERE id=? AND changes()=1').bind(data.name,reg.participant_id)
       ]);
       result=results[0];
@@ -365,9 +431,14 @@ async function api(request, env) {
     if (!result.meta.changes) fail(409, 'Les données ont changé. Actualise avant de réessayer.');
     return json({ok:true});
   }
+  // Admins can run the daily import of official iRacing endurances at once.
+  if (path === '/api/admin/iracing-import' && method === 'POST') {
+    requireRole(actor.user,true);
+    return json({created:await syncIracingEvents(env)});
+  }
   if (path === '/api/members' && method === 'GET') {
     requireRole(actor.user,true);
-    const rows = (await env.DB.prepare('SELECT * FROM users ORDER BY name LIMIT 200').all()).results;
+    const rows = (await env.DB.prepare("SELECT * FROM users WHERE id NOT LIKE 'system:%' ORDER BY name LIMIT 200").all()).results;
     return json({members:rows.map(u => publicUser(u,env))});
   }
   const memberMatch = path.match(/^\/api\/members\/(\d{15,22})$/);
@@ -375,8 +446,14 @@ async function api(request, env) {
     requireRole(actor.user,true);
     if (administrators(env).includes(memberMatch[1])) fail(403, 'Les administrateurs principaux sont définis dans la configuration du site.');
     const input = await body(request);
-    if (!['pilot','organizer'].includes(input.role)) fail(400, 'Rôle invalide.');
-    const result = await env.DB.prepare('UPDATE users SET role=? WHERE id=?').bind(input.role,memberMatch[1]).run();
+    // Either the role or the "pilote SAFE" mark (solo SAFE races) is changed.
+    let result;
+    if (typeof input.safe === 'boolean' && !soloRacesEnabled(env)) fail(404, 'Action introuvable.');
+    if (typeof input.safe === 'boolean') result = await env.DB.prepare('UPDATE users SET safe=? WHERE id=?').bind(input.safe?1:0,memberMatch[1]).run();
+    else {
+      if (!['pilot','organizer'].includes(input.role)) fail(400, 'Rôle invalide.');
+      result = await env.DB.prepare('UPDATE users SET role=? WHERE id=?').bind(input.role,memberMatch[1]).run();
+    }
     if (!result.meta.changes) fail(404, 'Ce pilote doit d’abord se connecter avec Discord.');
     return json({ok:true});
   }

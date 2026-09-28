@@ -130,6 +130,8 @@ test('les mutations qui changent le résumé déclenchent une synchronisation',(
   assert.equal(isWeeklyDiscordMutation(request(`/api/events/${uuid}`,'PATCH')),true);
   assert.equal(isWeeklyDiscordMutation(request(`/api/events/${uuid}/departures/${departureUuid}/registrations`)),true);
   assert.equal(isWeeklyDiscordMutation(request(`/api/events/${uuid}/departures/${departureUuid}/crews`)),true);
+  assert.equal(isWeeklyDiscordMutation(request('/api/races')),true);
+  assert.equal(isWeeklyDiscordMutation(request(`/api/races/${uuid}/departures/${departureUuid}/registrations`)),true);
   assert.equal(isWeeklyDiscordMutation(request(`/api/registrations/${uuid}`,'DELETE')),true);
   assert.equal(isWeeklyDiscordMutation(request(`/api/crews/${uuid}/members/${departureUuid}`,'DELETE')),true);
   assert.equal(isWeeklyDiscordMutation(request('/api/auth/logout')),false);

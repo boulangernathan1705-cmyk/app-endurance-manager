@@ -11,7 +11,7 @@ export const activeGame = globalThis.__ENDURANCE_GAME__ === 'iracing' ? 'iracing
 
 export const state = {
   events:[], user:null, discordReady:false, currentEventId:null, page:'home', editingEvent:null,
-  drafts:{}, recoveryLink:'', busy:false, participants:[], flash:'', eventFilter:'upcoming',
+  drafts:{}, recoveryLink:'', busy:false, participants:[], flash:'', eventFilter:'upcoming', listFormat:'endurance', soloLabel:'Courses solo', soloRaces:false,
   selectedDepartureId:null, eventSection:'race', pilotName:'', registrationOpen:new Set(), crewManagementOpen:new Set(),
   pendingCrewJoin:null, archiveLoaded:false, participantsLoaded:false
 };
@@ -22,7 +22,7 @@ export const canManage = () => ['admin','organizer'].includes(state.user?.role);
 export const isAdmin = () => state.user?.role === 'admin';
 
 export function notifyRender() {
-  queueMicrotask(() => document.dispatchEvent(new CustomEvent('endurance:render',{detail:{page:state.page,eventId:state.currentEventId}})));
+  queueMicrotask(() => document.dispatchEvent(new CustomEvent('endurance:render',{detail:{page:state.page,eventId:state.currentEventId,list:state.listFormat}})));
 }
 export function notifyNav() { queueMicrotask(() => document.dispatchEvent(new CustomEvent('endurance:nav'))); }
 
@@ -73,9 +73,8 @@ function diagnosticMessage(path,method,stage,extra='') {
 function reportClientError({kind='network',path='',method='',message='',detail=''}) {
   try {
     const payload=JSON.stringify({kind,page:location.pathname.slice(0,160),apiPath:String(path).slice(0,160),method:String(method).slice(0,12),message:String(message).slice(0,500),detail:String(detail).slice(0,1000),userAgent:navigator.userAgent.slice(0,500),viewport:`${innerWidth}x${innerHeight}`,online:navigator.onLine!==false});
-    if (navigator.sendBeacon) {
-      try { navigator.sendBeacon('/telemetry/client-error',new Blob([payload],{type:'text/plain;charset=UTF-8'})); } catch {}
-    }
+    // One report per error: the beacon when the browser accepts it, a keepalive fetch otherwise.
+    try { if (navigator.sendBeacon?.('/telemetry/client-error',new Blob([payload],{type:'text/plain;charset=UTF-8'}))) return; } catch {}
     fetch('/telemetry/client-error',{method:'POST',credentials:'same-origin',cache:'no-store',keepalive:true,headers:{'Content-Type':'text/plain;charset=UTF-8'},body:payload}).catch(()=>{});
   } catch {}
 }
@@ -132,8 +131,19 @@ export async function api(path,method='GET',data) {
   }
 }
 async function fetchEvents(scope) {
-  const result = await api(`/api/events?game=${encodeURIComponent(activeGame)}&scope=${scope}`);
+  const result = await api(`/api/races?game=${encodeURIComponent(activeGame)}&scope=${scope}`);
   return (Array.isArray(result.events)?result.events:[]).filter(event => gameForEvent(event) === activeGame);
+}
+// Common start of a race whose time is not known yet ("Horaire à définir"): its time reads "à définir"
+// everywhere; the stored time stays in departure.clock (event form).
+function markUndefinedStarts(events) {
+  for (const event of events) for (const departure of event.departures || []) if (departure.tbd && !departure.clock) { departure.clock = departure.time; departure.time = 'à définir'; }
+  return events;
+}
+// Official slots a crew or a pilot of the common start can pick.
+export function pickableSlots(event, departure) {
+  if (!departure?.tbd) return [];
+  return (event.departures || []).filter(item => !item.tbd && item.startsAt > Date.now());
 }
 function mergeEvents(...lists) {
   const byId=new Map();
@@ -151,7 +161,12 @@ export async function load() {
   const userChanged=(session.user?.id||null)!==(state.user?.id||null);
   state.user=session.user;
   state.discordReady=session.discordReady;
-  state.events=mergeEvents(upcoming,archived);
+  // Name of the solo races tab: a site setting (SOLO_LABEL), e.g. "Courses TDZ" for one community.
+  if (session.soloLabel) state.soloLabel=session.soloLabel;
+  // Solo races and SAFE drivers only where the site enables them (dev for now).
+  state.soloRaces=session.soloRaces===true;
+  if (!state.soloRaces) state.listFormat='endurance';
+  state.events=markUndefinedStarts(mergeEvents(upcoming,archived));
   // The members list rarely changes: fetch it once per session instead of on every refresh.
   if (userChanged || !state.participantsLoaded) {
     state.participants=state.user ? (await api('/api/participants')).participants : [];
@@ -162,7 +177,7 @@ export async function load() {
 export async function loadArchive() {
   if (state.archiveLoaded) return;
   const archived = await fetchEvents('archived');
-  state.events=mergeEvents(state.events,archived);
+  state.events=markUndefinedStarts(mergeEvents(state.events,archived));
   state.archiveLoaded=true;
 }
 

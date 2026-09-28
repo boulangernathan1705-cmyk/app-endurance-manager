@@ -37,7 +37,7 @@ function requireDiscord(env) {
   if (!env.DISCORD_CLIENT_ID || !env.DISCORD_CLIENT_SECRET) fail(503, 'La connexion Discord n’est pas encore configurée.');
 }
 const administrators = env => String(env.ADMIN_DISCORD_IDS || '').split(',').map(x => x.trim()).filter(x => /^\d{15,22}$/.test(x));
-function publicUser(row, env) { return row ? {id: row.id, name: row.name, role: administrators(env).includes(row.id) ? 'admin' : row.role} : null; }
+function publicUser(row, env) { return row ? {id: row.id, name: row.name, role: administrators(env).includes(row.id) ? 'admin' : row.role, safe: Boolean(row.safe)} : null; }
 function requireRole(user, admin = false) {
   if (!user) fail(401, 'Connecte-toi avec Discord.');
   if (admin ? user.role !== 'admin' : !['admin', 'organizer'].includes(user.role)) fail(403, 'Tu n’as pas l’autorisation de gérer les événements.');
@@ -154,16 +154,53 @@ function parisTimestamp(date, time) {
   if (matches.length !== 1) fail(400, 'Cette heure est inexistante ou ambiguë lors du changement d’heure. Choisis un autre horaire.');
   return matches[0];
 }
+const EVENT_FORMATS = ['endurance','solo'];
+const SOLO_ACCESS = ['open','safe'];
+// A solo race: one or two rounds (circuit, possibly random, and a duration in minutes), one start,
+// a number of places and an OPEN / SAFE access.
+function validateSoloRace(input, existing) {
+  const access = input.access == null ? (existing?.access || 'open') : input.access;
+  if (!SOLO_ACCESS.includes(access)) fail(400, 'Choisis l’accès OPEN ou SAFE.');
+  const rounds = input.rounds;
+  if (!Array.isArray(rounds) || rounds.length < 1 || rounds.length > 2) fail(400, 'Une course solo a une ou deux manches.');
+  const cleanRounds = rounds.map((round, index) => {
+    const circuit = typeof round?.circuit === 'string' ? round.circuit : '';
+    if (!CIRCUITS.includes(circuit)) fail(400, `Choisis le circuit de la manche ${index + 1}.`);
+    const durationMinutes = Number(round.durationMinutes);
+    if (!Number.isInteger(durationMinutes) || durationMinutes < 5 || durationMinutes > 600) fail(400, `La durée de la manche ${index + 1} doit être comprise entre 5 et 600 minutes.`);
+    // Each round has its own categories (by default the race categories).
+    const roundCategories = Array.isArray(round.categories) && round.categories.length ? round.categories : input.categories;
+    if (!Array.isArray(roundCategories) || !roundCategories.length || roundCategories.some(c => !CATEGORIES.includes(c))) fail(400, `Choisis au moins une catégorie pour la manche ${index + 1}.`);
+    return {circuit, durationMinutes, categories:[...new Set(roundCategories)]};
+  });
+  const games = new Set(cleanRounds.map(round => round.circuit.startsWith('iracing-')));
+  if (games.size > 1) fail(400, 'Les deux manches doivent être sur le même simulateur.');
+  const capacity = Number(input.capacity);
+  if (!Number.isInteger(capacity) || capacity < 2 || capacity > 120) fail(400, 'Le nombre de places doit être compris entre 2 et 120.');
+  const totalMinutes = cleanRounds.reduce((sum, round) => sum + round.durationMinutes, 0);
+  if (totalMinutes > 24 * 60) fail(400, 'Une course solo ne peut pas dépasser 24 heures.');
+  const categories = [...new Set(cleanRounds.flatMap(round => round.categories))];
+  return {access, rounds:cleanRounds, capacity, categories, circuit:cleanRounds[0].circuit, durationMinutes:totalMinutes};
+}
 function validateEvent(input, existing = null) {
   const name = text(input.name, 100, 'Nom de l’événement');
-  const durationHours = input.durationHours == null ? 6 : Number(input.durationHours);
-  if (!Number.isInteger(durationHours) || durationHours < 1 || durationHours > 24) fail(400, 'La durée doit être comprise entre 1 et 24 heures.');
-  const eventType = input.eventType || 'private';
+  // The format is chosen at creation and never changes (crews and solo entries do not mix).
+  const format = existing ? (existing.format || 'endurance') : (input.format == null ? 'endurance' : input.format);
+  if (!EVENT_FORMATS.includes(format)) fail(400, 'Format d’événement invalide.');
+  const solo = format === 'solo' ? validateSoloRace(input, existing) : null;
+  // Duration in minutes (endurances: 1 h to 24 h, in 5-minute steps); older clients send whole hours.
+  const durationMinutes = solo ? solo.durationMinutes : input.durationMinutes != null ? Number(input.durationMinutes) : input.durationHours == null ? 360 : Number(input.durationHours) * 60;
+  if (!solo && (!Number.isInteger(durationMinutes) || durationMinutes < 60 || durationMinutes > 1440 || durationMinutes % 5)) fail(400, 'La durée doit être comprise entre 1 h et 24 h, par pas de 5 minutes.');
+  // Presence slots: one per hour started (2 h 30 → 3 slots).
+  const durationHours = Math.max(1, Math.ceil(durationMinutes / 60));
+  const eventType = solo ? 'private' : input.eventType || 'private';
   if (!EVENT_TYPES.includes(eventType)) fail(400, 'Type d’événement invalide.');
-  const circuit = input.circuit == null ? (existing?.circuit || '') : (input.circuit === '' ? '' : text(input.circuit, 40, 'Circuit'));
+  const circuit = solo ? solo.circuit : input.circuit == null ? (existing?.circuit || '') : (input.circuit === '' ? '' : text(input.circuit, 40, 'Circuit'));
   if (circuit && !CIRCUITS.includes(circuit)) fail(400, 'Choisis un circuit proposé.');
-  if (!Array.isArray(input.categories) || !input.categories.length || input.categories.some(c => !CATEGORIES.includes(c))) fail(400, 'Choisis au moins une catégorie autorisée.');
+  const categoriesInput = solo ? solo.categories : input.categories;
+  if (!Array.isArray(categoriesInput) || !categoriesInput.length || categoriesInput.some(c => !CATEGORIES.includes(c))) fail(400, 'Choisis au moins une catégorie autorisée.');
   if (!Array.isArray(input.departures) || !input.departures.length || input.departures.length > 30) fail(400, 'Ajoute entre 1 et 30 départs.');
+  if (solo && input.departures.length !== 1) fail(400, 'Une course solo a un seul départ.');
   const known = existing ? JSON.parse(existing.departures) : [];
   const seen = new Set(), ids = new Set();
   const departures = input.departures.map(item => {
@@ -175,14 +212,45 @@ function validateEvent(input, existing = null) {
     const departureId = previous?.id || id();
     if (ids.has(departureId)) fail(400, 'Départ répété.'); ids.add(departureId);
     if (previous && previous.startsAt <= Date.now() && startsAt !== previous.startsAt) fail(400, 'Un départ passé ne peut plus être déplacé.');
-    return {id: departureId, date: item.date, time: item.time, startsAt};
+    // "Horaire à définir": a common start where everyone enters and forms crews until the official time
+    // slots are known (imported iRacing special events). Kept as long as its date and time are unchanged.
+    const tbd = item.tbd === true || Boolean(previous?.tbd && previous.startsAt === startsAt);
+    return {id: departureId, date: item.date, time: item.time, startsAt, ...(tbd ? {tbd:true} : {})};
   }).sort((a, b) => a.startsAt - b.startsAt);
   const schedulePending = input.schedulePending == null ? Boolean(existing?.schedule_pending) : input.schedulePending === true;
-  return {name, durationHours, eventType, circuit, schedulePending, categories: [...new Set(input.categories)], departures};
+  // Driver change required (iRacing endurances; always on LMU): true / false, or null for the site rule.
+  const driverChangeRequired = solo ? null : typeof input.driverChangeRequired === 'boolean' ? input.driverChangeRequired
+    : input.driverChangeRequired === undefined && existing?.driver_change_required != null ? Boolean(existing.driver_change_required) : null;
+  return {name, format, access: solo?.access || 'open', capacity: solo?.capacity ?? null, rounds: solo?.rounds || [], durationHours, durationMinutes, eventType, circuit, schedulePending, driverChangeRequired, categories: [...new Set(categoriesInput)], departures};
 }
 // Discord display names are at most 32 characters: registrations accept the same length.
 const PILOT_NAME_MAX = 32;
+// Solo race entry: category and car, each of them possibly "Peu importe" (category '*'); no hours.
+const ANY_CATEGORY = '*';
+function validateSoloChoice(choice, allowed, index, rounds) {
+  const category = choice?.category;
+  const where = rounds > 1 ? ` pour la manche ${index + 1}` : '';
+  if (category !== ANY_CATEGORY && !allowed.includes(category)) fail(400, `Choisis une catégorie${where}, ou « Peu importe ».`);
+  const rawCars = category === ANY_CATEGORY ? [] : Array.isArray(choice.cars) ? choice.cars : [];
+  const cars = [...new Set(rawCars.filter(car => typeof car === 'string' && car.trim()).map(car => LEGACY_CAR_ALIASES.get(car) || car))];
+  if (cars.some(car => !CARS[category]?.includes(car))) fail(400, `Choisis uniquement des voitures proposées${where}.`);
+  const carAny = category === ANY_CATEGORY || choice.carAny === true || !cars.length;
+  return {category, cars: carAny ? [] : cars, carAny};
+}
+function validateSoloRegistration(input, event) {
+  const name = text(input.name, PILOT_NAME_MAX, 'Pseudo');
+  const eventCategories = JSON.parse(event.categories);
+  const rounds = JSON.parse(event.rounds || '[]');
+  const roundCategories = rounds.length ? rounds.map(round => round.categories?.length ? round.categories : eventCategories) : [eventCategories];
+  // One choice per round; a single-round entry may still send category / cars directly.
+  const rawChoices = Array.isArray(input.choices) ? input.choices : [{category:input.category, cars:input.cars, carAny:input.carAny}];
+  if (rawChoices.length !== roundCategories.length) fail(400, 'Choisis une catégorie pour chaque manche.');
+  const choices = rawChoices.map((choice, index) => validateSoloChoice(choice, roundCategories[index], index, roundCategories.length));
+  const first = choices[0];
+  return {name, nameKey: name.normalize('NFKC').toLocaleLowerCase('fr-FR'), status: 'whole', category: first.category, car: first.cars[0] || '', cars: first.cars, carAny: first.carAny, preferredPilot: '', roundChoices: choices};
+}
 function validateRegistration(input, event) {
+  if ((event.format || 'endurance') === 'solo') return validateSoloRegistration(input, event);
   const name = text(input.name, PILOT_NAME_MAX, 'Pseudo');
   const preferredPilot = typeof input.preferredPilot === 'string' && input.preferredPilot.trim() ? text(input.preferredPilot, PILOT_NAME_MAX, 'Pilote souhaité') : '';
   const durationHours = Number(event.duration_hours) || 3;
@@ -203,11 +271,13 @@ function validateRegistration(input, event) {
   cars.splice(0, cars.length, ...normalizedCars);
   if (carAny) cars.length = 0;
   const car = cars[0] || '';
-  return {name, nameKey: name.normalize('NFKC').toLocaleLowerCase('fr-FR'), status: input.status, category, car, cars, carAny, preferredPilot};
+  // "Je la fais tout seul": the driver races the whole race without a team-mate.
+  const soloDriver = input.status !== 'unavailable' && input.soloDriver === true;
+  return {name, nameKey: name.normalize('NFKC').toLocaleLowerCase('fr-FR'), status: soloDriver ? 'whole' : input.status, category, car, cars, carAny, preferredPilot, soloDriver};
 }
 
 export {
   LEGACY_CAR_ALIASES, COOKIE_SESSION, COOKIE_GUEST, COOKIE_STATE, COOKIE_RETURN, DAY, HttpError, fail, now, id, token, hash, cookie,
   setCookie, json, redirect, origin, requireDiscord, administrators, publicUser, requireRole, identity, owned, personal,
-  registrationSelect, registrationParticipant, body, rateLimit, cleanup, returnPath, text, parisTimestamp, validateEvent, validateRegistration
+  registrationSelect, registrationParticipant, body, rateLimit, cleanup, returnPath, text, parisTimestamp, validateEvent, validateRegistration, ANY_CATEGORY
 };

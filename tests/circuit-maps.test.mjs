@@ -6,7 +6,7 @@ import {circuitMapConfig} from '../shared/circuit-maps.mjs';
 
 test('every LMU circuit has a map and a credit line', () => {
   const credits = readFileSync(new URL('../circuit-credits.html', import.meta.url), 'utf8');
-  for (const circuit of GAME_CATALOGS.lmu.circuits) {
+  for (const circuit of GAME_CATALOGS.lmu.circuits.filter(item => !item.random)) {
     const map = circuitMapConfig(circuit.id);
     assert.ok(map, `${circuit.id} has no map`);
     assert.ok(credits.includes(`File:${map.file.replaceAll(' ', '_')}`.replace(/[^\x00-\x7F]/g, c => encodeURIComponent(c))), `${map.file} is not credited`);

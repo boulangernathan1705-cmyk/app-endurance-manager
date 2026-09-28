@@ -3,6 +3,9 @@
   const labels = {lmu:'Le Mans Ultimate',iracing:'iRacing'};
   globalThis.__ENDURANCE_GAME__ = game;
   document.documentElement.dataset.game = game;
+  // Remembers the simulator the pilot chose: next time, the home page sends them straight here
+  // (the logo also leads there; the navigation bar switches between simulators).
+  try { document.cookie = `em_sim=${game}; path=/; max-age=31536000; SameSite=Lax${location.protocol === 'https:' ? '; Secure' : ''}`; } catch {}
 
   const applyLabel = () => {
     const label = document.getElementById('game-context-label');

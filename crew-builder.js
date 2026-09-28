@@ -35,7 +35,7 @@ async function loadEvents(force = false) {
   if (!force && eventsCache) return eventsCache;
   // Crews are only built for upcoming starts of the current simulator.
   const game = globalThis.__ENDURANCE_GAME__ === 'iracing' ? 'iracing' : 'lmu';
-  const result = await api(`/api/events?game=${game}&scope=upcoming`);
+  const result = await api(`/api/races?game=${game}&scope=upcoming`);
   eventsCache = Array.isArray(result.events) ? result.events : [];
   return eventsCache;
 }
@@ -312,7 +312,7 @@ async function openBuilder(crewId = null, preferredDepartureId = '') {
 }
 
 async function createCrew() {
-  const result = await api(`/api/events/${builderState.eventId}/departures/${builderState.departureId}/crews`,'POST',{
+  const result = await api(`/api/races/${builderState.eventId}/departures/${builderState.departureId}/crews`,'POST',{
     name:builderState.name,
     category:builderState.category,
     car:builderState.car

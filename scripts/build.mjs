@@ -2,6 +2,7 @@ import './validate-image-assets.mjs';
 import {mkdir, copyFile, cp, writeFile, rm, readFile} from 'node:fs/promises';
 import {posix} from 'node:path';
 import {fileURLToPath} from 'node:url';
+import {changelogHtml} from './changelog.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const out = new URL('../public/', import.meta.url);
@@ -116,6 +117,11 @@ for (const file of ['privacy.html', 'legal.html', 'about.html', 'circuit-credits
   const source = await readFile(root + file, 'utf8');
   await writeFile(new URL(file, out), injectI18n(source));
 }
+// "Nouveautés" page: its content is generated from CHANGELOG.md, the single source of the changelog.
+const changelogPlaceholder = '<!-- CHANGELOG: generated from CHANGELOG.md by scripts/build.mjs -->';
+const changelogTemplate = await readFile(root + 'changelog.html', 'utf8');
+if (!changelogTemplate.includes(changelogPlaceholder)) throw new Error('changelog.html doit contenir l’emplacement du changelog.');
+await writeFile(new URL('changelog.html', out), injectI18n(changelogTemplate.replace(changelogPlaceholder, changelogHtml(await readFile(root + 'CHANGELOG.md', 'utf8')))));
 for (const file of ['app.js', 'crew-builder.js', 'help.js', 'privacy.css']) {
   await copyFile(root + file, new URL(file, out));
 }
@@ -166,6 +172,7 @@ await writeFile(new URL('sitemap.xml', out), `<?xml version="1.0" encoding="UTF-
   <url><loc>https://endurance-manager.app/lmu/</loc></url>
   <url><loc>https://endurance-manager.app/iracing/</loc></url>
   <url><loc>https://endurance-manager.app/help.html</loc></url>
+  <url><loc>https://endurance-manager.app/changelog.html</loc></url>
   <url><loc>https://endurance-manager.app/about.html</loc></url>
   <url><loc>https://endurance-manager.app/legal.html</loc></url>
   <url><loc>https://endurance-manager.app/privacy.html</loc></url>

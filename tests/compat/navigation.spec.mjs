@@ -35,7 +35,7 @@ test.beforeEach(async ({page}) => {
 
 test('public API responds', async ({page}) => {
   await expectApiHealthy(page, '/api/session');
-  await expectApiHealthy(page, '/api/events');
+  await expectApiHealthy(page, '/api/races');
 });
 
 test('home loads without network error', async ({page}) => {
@@ -59,7 +59,7 @@ test('language switch shows the current language, translates event counters and 
 
   await openAndCheck(page, '/iracing/');
   await expect(page.locator('html')).toHaveAttribute('lang','en');
-  await expect(page.getByRole('heading',{name:'EVENTS',exact:true})).toBeVisible();
+  await expect(page.getByRole('heading',{name:'ENDURANCE',exact:true})).toBeVisible();
   await expect(page.locator('[data-language-toggle]')).toContainText('🇬🇧');
   await expect(page.locator('[data-language-toggle]')).toHaveAttribute('data-language-placement','game-space');
   const cards=page.locator('.event-card');
@@ -73,7 +73,7 @@ test('language switch shows the current language, translates event counters and 
 
   await openAndCheck(page, '/lmu/');
   await expect(page.locator('html')).toHaveAttribute('lang','en');
-  await expect(page.getByRole('heading',{name:'EVENTS',exact:true})).toBeVisible();
+  await expect(page.getByRole('heading',{name:'ENDURANCE',exact:true})).toBeVisible();
   await expect(page.locator('[data-language-toggle]')).toContainText('🇬🇧');
   await expect(page.locator('[data-language-toggle]')).toHaveAttribute('data-language-placement','game-space');
   expect(apiFailures).toEqual([]);

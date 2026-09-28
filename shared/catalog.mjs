@@ -24,7 +24,8 @@ const LMU_CIRCUITS = [
   {id:'road-atlanta',name:'Michelin Raceway Road Atlanta',file:'track-placeholder.svg'},
   {id:'sebring',name:'Sebring International Raceway',file:'track-placeholder.svg'},
   {id:'silverstone',name:'Silverstone Circuit',file:'track-placeholder.svg'},
-  {id:'spa',name:'Circuit de Spa-Francorchamps',file:'track-placeholder.svg'}
+  {id:'spa',name:'Circuit de Spa-Francorchamps',file:'track-placeholder.svg'},
+  {id:'random',name:'Circuit aléatoire',file:'track-placeholder.svg',random:true}
 ];
 
 const IRACING_CIRCUITS = [
@@ -60,7 +61,21 @@ const IRACING_CIRCUITS = [
   {id:'iracing-watkins-glen',name:'Watkins Glen International',file:'track-placeholder.svg'},
   {id:'iracing-laguna-seca',name:'WeatherTech Raceway Laguna Seca',file:'track-placeholder.svg'},
   {id:'iracing-zandvoort',name:'Circuit Zandvoort',file:'track-placeholder.svg'},
-  {id:'iracing-tbd',name:'Circuit à préciser',file:'track-placeholder.svg'}
+  // Tracks of the official iRacing endurance series (automatic import, server/iracing-import.mjs).
+  {id:'iracing-brands-hatch',name:'Brands Hatch Circuit',file:'track-placeholder.svg'},
+  {id:'iracing-charlotte',name:'Charlotte Motor Speedway (Roval)',file:'track-placeholder.svg'},
+  {id:'iracing-montreal',name:'Circuit Gilles-Villeneuve',file:'track-placeholder.svg'},
+  {id:'iracing-navarra',name:'Circuito de Navarra',file:'track-placeholder.svg'},
+  {id:'iracing-zolder',name:'Circuit Zolder',file:'track-placeholder.svg'},
+  {id:'iracing-long-beach',name:'Long Beach Street Circuit',file:'track-placeholder.svg'},
+  {id:'iracing-motegi',name:'Mobility Resort Motegi',file:'track-placeholder.svg'},
+  {id:'iracing-oschersleben',name:'Motorsport Arena Oschersleben',file:'track-placeholder.svg'},
+  {id:'iracing-oulton-park',name:'Oulton Park Circuit',file:'track-placeholder.svg'},
+  {id:'iracing-snetterton',name:'Snetterton Circuit',file:'track-placeholder.svg'},
+  {id:'iracing-summit-point',name:'Summit Point Raceway',file:'track-placeholder.svg'},
+  {id:'iracing-the-bend',name:'The Bend Motorsport Park',file:'track-placeholder.svg'},
+  {id:'iracing-tbd',name:'Circuit à préciser',file:'track-placeholder.svg'},
+  {id:'iracing-random',name:'Circuit aléatoire',file:'track-placeholder.svg',random:true}
 ];
 
 const LMU_CATEGORIES = {
@@ -123,6 +138,15 @@ export const GAME_CATALOGS = {
 };
 
 export function catalogForGame(game='lmu') { return GAME_CATALOGS[GAME_IDS.includes(game) ? game : 'lmu']; }
+// Circuit announced at the last minute (solo races).
+export function isRandomCircuit(id) { return id === 'random' || id === 'iracing-random'; }
+// Default number of places of a solo race: the game server size for that track. LMU hosted servers
+// have 20, 38 or 62 slots, 62 only at Le Mans (pit garages); iRacing grids vary, 40 is a safe default.
+// The organizer can change it for each race.
+export function gridSizeFor(circuitId) {
+  if (circuitId === 'le-mans') return 62;
+  return String(circuitId || '').startsWith('iracing-') ? 40 : 38;
+}
 export function gameForEvent(event) { return String(event?.circuit || '').startsWith('iracing-') ? 'iracing' : 'lmu'; }
 export const LEGACY_CIRCUIT_IDS = ['nurburgring'];
 export const EVENT_TYPE_IDS = Object.keys(SHARED_EVENT_TYPES);

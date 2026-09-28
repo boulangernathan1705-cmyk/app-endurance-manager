@@ -1,3 +1,5 @@
+import {racesPath} from './races-path.mjs';
+import {durationLabel} from '../shared/duration.mjs';
 import {catalogForGame} from '../shared/catalog.mjs';
 
 const DAY_MS=86_400_000,HOUR_MS=3_600_000,TIME_ZONE='Europe/Paris';
@@ -42,7 +44,7 @@ function departureFields(departure){
 }
 function currentDepartureEmbed(departure,appUrl){
   const circuit=circuitNames.get(departure.circuit)||departure.circuit||'Circuit à préciser';
-  const embed={title:cut(`🔴 Course en cours — ${clean(departure.eventName)}`,256),description:cut(`📅 **${departureLabel.format(departure.startsAt)}**\n📍 ${clean(circuit)}\n⏱️ ${departure.durationHours||'?'} h`,4096),color:0xd71920,fields:departureFields(departure)};
+  const embed={title:cut(`🔴 Course en cours — ${clean(departure.eventName)}`,256),description:cut(`📅 **${departureLabel.format(departure.startsAt)}**\n📍 ${clean(circuit)}\n⏱️ ${departure.durationMinutes||departure.durationHours?durationLabel(departure.durationMinutes||departure.durationHours*60):'?'}`,4096),color:0xd71920,fields:departureFields(departure)};
   if(appUrl)embed.url=appUrl;
   return embed;
 }
@@ -87,7 +89,7 @@ export function buildWeeklyDiscordPayload(snapshot,appUrl,updatedAt=Date.now()){
 
 export function isWeeklyDiscordMutation(request){
   const method=String(request?.method||'').toUpperCase();if(!['POST','PATCH','DELETE'].includes(method))return false;
-  let path;try{path=new URL(request.url).pathname;}catch{return false;}
+  let path;try{path=racesPath(new URL(request.url).pathname);}catch{return false;}
   const uuid='[a-f0-9-]{36}';
   if(path==='/api/events'&&method==='POST')return true;
   if(new RegExp(`^/api/events/${uuid}$`).test(path)&&['PATCH','DELETE'].includes(method))return true;
