@@ -2,6 +2,11 @@
 
 Les changements du site, version par version. La plus récente est en haut.
 
+## v1.1.5 — 28 septembre 2026
+
+### Corrections
+- Un équipage peut bien **choisir son départ** quand les horaires d'une course « à définir » sont connus : le déplacement échouait dès que l'équipage avait des pilotes.
+
 ## v1.1.4 — 28 septembre 2026
 
 ### Corrections

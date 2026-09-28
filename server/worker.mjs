@@ -310,12 +310,18 @@ async function api(request, env) {
       // moves there with its pilots.
       if (input.departureId!==undefined) {
         const target=slotFor(event,departure,input.departureId);
+        // One atomic batch: the crew assignment guards forbid moving an assigned entry, so the members leave
+        // the crew, their entries and the crew move, then they join it again. Every step checks the crew
+        // version, so a crew changed in the meantime is left untouched.
+        const members=((await env.DB.prepare('SELECT registration_id FROM crew_members WHERE crew_id=?').bind(crew.id).all()).results||[]).map(row=>row.registration_id);
+        const current='EXISTS(SELECT 1 FROM crews WHERE id=? AND version=?)';
         const results=await env.DB.batch([
-          env.DB.prepare(`UPDATE registrations SET departure_id=?,version=version+1 WHERE id IN (SELECT registration_id FROM crew_members WHERE crew_id=?)
-            AND EXISTS(SELECT 1 FROM crews WHERE id=? AND version=?)`).bind(target.id,crew.id,crew.id,input.version),
-          env.DB.prepare('UPDATE crews SET departure_id=?,version=version+1 WHERE id=? AND version=?').bind(target.id,crew.id,input.version)
+          env.DB.prepare(`DELETE FROM crew_members WHERE crew_id=? AND ${current}`).bind(crew.id,crew.id,input.version),
+          ...members.map(registrationId=>env.DB.prepare(`UPDATE registrations SET departure_id=?,version=version+1 WHERE id=? AND ${current}`).bind(target.id,registrationId,crew.id,input.version)),
+          env.DB.prepare('UPDATE crews SET departure_id=?,version=version+1 WHERE id=? AND version=?').bind(target.id,crew.id,input.version),
+          ...members.map(registrationId=>env.DB.prepare('INSERT INTO crew_members(registration_id,crew_id) SELECT ?,? WHERE EXISTS(SELECT 1 FROM crews WHERE id=? AND version=? AND departure_id=?)').bind(registrationId,crew.id,crew.id,input.version+1,target.id))
         ]);
-        if (!results[1].meta.changes) fail(409,'Cet équipage a changé. Actualise avant de réessayer.');
+        if (!results[1+members.length].meta.changes) fail(409,'Cet équipage a changé. Actualise avant de réessayer.');
         return json({ok:true,departureId:target.id});
       }
       if (typeof input.locked==='boolean' && input.name===undefined && input.category===undefined && input.car===undefined) {

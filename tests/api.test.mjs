@@ -22,6 +22,8 @@ function harness(withParticipants=true){
  DB.db.exec(readFileSync(new URL('../migrations/0009_registration_owner.sql',import.meta.url),'utf8'));
  DB.db.exec(readFileSync(new URL('../migrations/0011_multi_category_registrations.sql',import.meta.url),'utf8'));
  if(withParticipants)DB.db.exec(readFileSync(new URL('../migrations/0012_participants.sql',import.meta.url),'utf8'));
+ // Same guards as production (crew assignment triggers).
+ if(withParticipants){DB.db.exec(readFileSync(new URL('../migrations/0013_allow_assigned_category_interests.sql',import.meta.url),'utf8'));DB.db.exec(readFileSync(new URL('../migrations/0014_lock_categories_after_crew_assignment.sql',import.meta.url),'utf8'));}
  DB.db.exec(readFileSync(new URL('../migrations/0026_event_schedule_pending.sql',import.meta.url),'utf8'));
  DB.db.exec(readFileSync(new URL('../migrations/0027_solo_races.sql',import.meta.url),'utf8'));
  DB.db.exec(readFileSync(new URL('../migrations/0028_solo_round_choices.sql',import.meta.url),'utf8'));
