@@ -4,6 +4,11 @@ Les changements du site, version par version. La plus récente est en haut.
 
 ## Prochaine version — en test
 
+### Accueil
+- Nouvelle page d'accueil pour les nouveaux : ce qu'est le site, la connexion Discord et comment ça marche en 4 étapes.
+- Le site retient ta simu : la prochaine fois, tu arrives directement sur LMU ou iRacing. Le logo te ramène à l'accueil pour en changer.
+- Les prochaines courses s'affichent tout de suite, sans temps de chargement, avec la prochaine endurance et la prochaine course solo de chaque simu.
+
 ### Courses solo
 - Nouvel onglet **Courses solo** à côté des **Endurances** : chaque onglet a son propre calendrier.
 - Inscription en un clic avec **Je participe** : tu choisis ta catégorie et ta voiture, ou **Peu importe**.

@@ -1208,3 +1208,37 @@ html[data-game] .race-card .race-fill:has(.solo-fill) { display: flex; flex-wrap
 .solo-round-badge-group { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .solo-round-badge-group em { font-style: normal; font-weight: 800; color: #7fe3ea; font-size: 13px; }
 .solo-round-badges > .solo-round-badge-group { display: inline-flex !important; flex-direction: row !important; align-items: center !important; gap: 6px !important; width: auto !important; min-height: 0 !important; padding: 0 !important; border: 0 !important; background: none !important; box-shadow: none !important; }
+
+/* ---------- Accueil : présentation, choix de la simu, étapes ---------- */
+.hub-main .hub-welcome { max-width: 760px; margin: 28px auto 8px; text-align: center; }
+.hub-welcome h1 { margin: 0 0 10px; font-size: clamp(26px, 4vw, 40px); line-height: 1.12; color: #f4f6f5; }
+.hub-welcome-lead { margin: 0 auto 18px; max-width: 620px; color: #c7d0d4; font-size: 17px; line-height: 1.5; }
+.hub-welcome-actions { display: flex; justify-content: center; }
+.hub-welcome-actions .hub-login-button { display: inline-flex; align-items: center; justify-content: center; min-height: 48px; padding: 0 26px; border-radius: 12px; font-size: 16px; font-weight: 800; text-decoration: none; }
+.hub-welcome-back { margin: 0; font-size: 16px; color: #c7d0d4; }
+.hub-trust { margin: 12px auto 0; max-width: 560px; font-size: 13.5px; color: var(--muted, #92979c); }
+.hub-trust a { color: #7fe3ea; }
+.hub-main .hub-intro { margin: 30px 0 14px; text-align: center; }
+.hub-main .hub-intro h2 { margin: 0; font-size: clamp(22px, 3vw, 30px); }
+.hub-main .hub-intro p { margin: 6px 0 0; color: var(--muted, #92979c); font-size: 14px; }
+.hub-next-solo { border-top: 1px dashed rgba(255, 255, 255, .12); }
+.hub-solo-line { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.hub-solo-places { font-size: 13.5px; color: #c7d0d4; }
+.hub-steps { max-width: 980px; margin: 34px auto 10px; }
+.hub-steps h2 { margin: 0 0 14px; text-align: center; font-size: clamp(20px, 2.6vw, 26px); }
+.hub-steps-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; counter-reset: hub-step; }
+.hub-steps-list li { counter-increment: hub-step; display: flex; flex-direction: column; gap: 4px; padding: 16px; border: 1px solid var(--border, #292d31); border-radius: 12px; background: var(--panel, #111315); }
+.hub-steps-list li::before { content: counter(hub-step); display: inline-grid; place-items: center; width: 30px; height: 30px; margin-bottom: 6px; border-radius: 50%; background: rgba(82, 211, 216, .14); color: #7fe3ea; font-weight: 800; }
+.hub-steps-list strong { font-size: 15.5px; color: #f4f6f5; }
+.hub-steps-list span { font-size: 13.5px; color: var(--muted, #92979c); }
+@media (max-width: 900px) { .hub-steps-list { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 520px) {
+  .hub-main .hub-welcome { margin-top: 18px; padding: 0 4px; }
+  .hub-welcome-lead { font-size: 15.5px; }
+  .hub-welcome-actions .hub-login-button { width: 100%; }
+  .hub-steps-list { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+  .hub-steps-list li { display: grid; grid-template-columns: 30px minmax(0, 1fr); column-gap: 12px; row-gap: 2px; padding: 12px 14px; }
+  .hub-steps-list li::before { grid-row: span 2; align-self: center; margin: 0; }
+}
+/* Accueil : la phrase de confiance est déjà dans la présentation, pas en double dans la barre. */
+.site-nav-shell:has(+ .hub-main) .account-oauth-trust { display: none !important; }

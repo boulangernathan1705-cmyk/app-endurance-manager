@@ -45,8 +45,9 @@ function remainingDepartures(event, timestamp=Date.now()) {
 }
 
 function orderedEvents(events, game, timestamp=Date.now()) {
+  // Endurances only: solo races have their own block on each simulator card.
   return events
-    .filter(event => gameForEvent(event) === game)
+    .filter(event => gameForEvent(event) === game && event.format !== 'solo')
     .map(event => ({event,schedule:eventSchedule(event,timestamp),bounds:eventBounds(event)}))
     .filter(item => item.bounds && !item.schedule.archived && item.schedule.timestamp !== null)
     .sort((a,b) => Number(!!b.schedule.running)-Number(!!a.schedule.running)
@@ -129,6 +130,34 @@ function enduranceQueueMarkup(items, game) {
   return `<div class="hub-race-queue">${items.map(item=>enduranceMarkup(item,game)).join('')}</div>`;
 }
 
+// Next solo race of a simulator: date, name, rounds, OPEN / SAFE and the places taken.
+function nextSoloRace(events, game, timestamp=Date.now()) {
+  return events
+    .filter(event => gameForEvent(event) === game && event.format === 'solo')
+    .map(event => ({event, departure:remainingDepartures(event, timestamp)[0]}))
+    .filter(item => item.departure)
+    .sort((a,b) => Number(a.departure.startsAt) - Number(b.departure.startsAt))[0] || null;
+}
+
+function soloMarkup(item, game) {
+  if (!item) return '';
+  const {event, departure} = item;
+  const catalog = GAME_CATALOGS[game];
+  const circuitName = id => catalog.circuits.find(circuit => circuit.id === id)?.name || 'Circuit à préciser';
+  const rounds = (event.rounds?.length ? event.rounds : [{circuit:event.circuit}]).map(round => `${esc(circuitName(round.circuit))}${round.durationMinutes ? ` · ${round.durationMinutes} min` : ''}`).join(' + ');
+  const entries = (departure.availability || []).filter(reg => reg.status !== 'unavailable');
+  const confirmed = entries.filter(reg => !reg.waitlistPosition).length, waiting = entries.length - confirmed;
+  const safe = event.access === 'safe';
+  return `<section class="hub-next-race hub-next-solo" aria-label="${esc(event.name)} · départ ${esc(timeLabel(departure.time))}">
+    <span class="hub-next-label">PROCHAINE COURSE SOLO</span>
+    <div class="hub-race-top">${dateBlock(departure.startsAt)}<div class="hub-race-head">
+      <h3>${esc(event.name)}</h3>
+      <p class="hub-race-meta"><span>${rounds}</span></p>
+      <span class="hub-solo-line"><span class="event-access-badge ${safe ? 'is-safe' : 'is-open'}">${safe ? 'SAFE' : 'OPEN'}</span><span class="race-start">Départ ${esc(timeLabel(departure.time))}</span><span class="hub-solo-places">${confirmed}${event.capacity ? ` / ${event.capacity}` : ''} ${confirmed > 1 ? 'inscrits' : 'inscrit'}${waiting ? ` · ${waiting} en attente` : ''}</span></span>
+    </div></div>
+  </section>`;
+}
+
 function gameCard(game, events) {
   const catalog = GAME_CATALOGS[game];
   const href = game === 'lmu' ? '/lmu/' : '/iracing/';
@@ -137,6 +166,7 @@ function gameCard(game, events) {
     <div class="game-hub-heading"><div class="game-title-line"><span class="game-badge" aria-hidden="true">${badge}</span><h2>${esc(catalog.name)}</h2></div><p>${game === 'lmu' ? 'Hypercar, prototypes et GT de Le Mans Ultimate.' : 'GTP, LMP2, GT3, GT4 et TCR avec un catalogue de circuits étendu.'}</p></div>
     <a class="game-hub-enter" href="${href}">Accéder à ${esc(catalog.shortName)} <span aria-hidden="true">→</span></a>
     ${enduranceQueueMarkup(homeQueue(events,game),game)}
+    ${soloMarkup(nextSoloRace(events,game),game)}
   </article>`;
 }
 
@@ -147,8 +177,36 @@ async function fetchGameEvents(game) {
   return Array.isArray(result.events) ? result.events : [];
 }
 
-async function load() {
+// The server embeds the upcoming races in the page (no "Chargement…"); fetched only as a fallback.
+function embeddedRaces() {
   try {
+    const events = JSON.parse(document.getElementById('hub-races')?.textContent || 'null')?.events;
+    return Array.isArray(events) ? events : null;
+  } catch { return null; }
+}
+
+// "Se connecter avec Discord" is only for visitors who are not signed in yet.
+async function showSignIn() {
+  const box = document.getElementById('hub-login');
+  if (!box) return;
+  try {
+    const session = await (await fetch('/api/session', {credentials:'same-origin', cache:'no-store'})).json();
+    if (session.user) {
+      box.innerHTML = `<p class="hub-welcome-back">Content de te revoir, <strong>${esc(session.user.name)}</strong>. Choisis ta simu ci-dessous.</p>`;
+      document.querySelector('.hub-trust')?.remove();
+    }
+  } catch {}
+  box.hidden = false;
+}
+
+async function load() {
+  void showSignIn();
+  try {
+    const embedded = embeddedRaces();
+    if (embedded) {
+      grid.innerHTML = gameCard('lmu',embedded) + gameCard('iracing',embedded);
+      return;
+    }
     const [lmuEvents,iracingEvents] = await Promise.all([fetchGameEvents('lmu'),fetchGameEvents('iracing')]);
     grid.innerHTML = gameCard('lmu',lmuEvents) + gameCard('iracing',iracingEvents);
   } catch {

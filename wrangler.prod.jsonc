@@ -11,9 +11,11 @@
   "assets": {
     "directory": "./public",
     "html_handling": "auto-trailing-slash",
+    "binding": "ASSETS",
     "run_worker_first": [
       "/api/*",
-      "/telemetry/*"
+      "/telemetry/*",
+      "/"
     ]
   },
   "d1_databases": [

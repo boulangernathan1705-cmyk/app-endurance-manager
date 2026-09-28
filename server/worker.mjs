@@ -109,6 +109,12 @@ async function listEvents(env, actor, game='', scope='') {
       })};
   });
 }
+// Upcoming races of both simulators for the home page, as a visitor sees them.
+export async function homeRaces(env) {
+  const visitor = {user:null, guestToken:null, guestHash:null};
+  const [lmu, iracing] = await Promise.all([listEvents(env, visitor, 'lmu', 'upcoming'), listEvents(env, visitor, 'iracing', 'upcoming')]);
+  return {events:[...lmu, ...iracing]};
+}
 async function oauthStart(request, env) {
   requireDiscord(env); await rateLimit(request, env, 'oauth', 20); await cleanup(env);
   const state = token();

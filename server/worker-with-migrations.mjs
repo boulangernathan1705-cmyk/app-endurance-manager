@@ -1,4 +1,5 @@
-import worker from './worker.mjs';
+import worker, {homeRaces} from './worker.mjs';
+import {homeRedirect, homeWithRaces} from './home.mjs';
 import {isWeeklyDiscordMutation} from './discord-weekly-format.mjs';
 import {ensureDiscordWeeklySchema} from './discord-weekly-schema.mjs';
 import {syncWeeklyDiscord} from './discord-weekly.mjs';
@@ -57,6 +58,14 @@ export default {
     const pathname = new URL(request.url).pathname;
     const development = isDevelopment(env);
     if (development && pathname === '/robots.txt') return devRobots();
+    if (pathname === '/' && ['GET','HEAD'].includes(request.method)) {
+      const redirect = homeRedirect(request);
+      if (redirect) return redirect;
+      if (env?.ASSETS) {
+        const home = await homeWithRaces(request, env, () => homeRaces(env));
+        return development ? markDevelopmentResponse(home) : home;
+      }
+    }
     if (pathname.startsWith('/api/')) await ensureCrewOwnershipSchema(env);
     const weeklyMutation = isWeeklyDiscordMutation(request);
     const response = await worker.fetch(request, env, ctx);

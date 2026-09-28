@@ -15,7 +15,7 @@ async function api(path, method='GET', data) {
 }
 
 function renderError(message) {
-  app.innerHTML = `<section class="members-panel members-error"><h1>Accès impossible</h1><p>${esc(message)}</p><a class="secondary-button" href="/">Retour à l’accueil</a></section>`;
+  app.innerHTML = `<section class="members-panel members-error"><h1>Accès impossible</h1><p>${esc(message)}</p><a class="secondary-button" href="/?accueil">Retour à l’accueil</a></section>`;
 }
 
 const ROLE_LABELS = {pilot:'Pilote', organizer:'Organisateur'};
