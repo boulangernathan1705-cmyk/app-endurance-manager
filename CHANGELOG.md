@@ -2,6 +2,14 @@
 
 Les changements du site, version par version. La plus récente est en haut.
 
+## v1.1.2 — 28 septembre 2026
+
+### Corrections
+- Import des endurances iRacing plus fiable : une série ne peut plus être confondue avec un événement spécial au nom proche, et un événement spécial n'est jamais créé en double.
+- Les horaires d'un événement spécial sont complétés même si iRacing les publie tard, jusqu'à la fin du week-end de course.
+- En cas de coupure réseau, le site ne renvoie plus tout seul une création ou une modification : fini les courses créées en double.
+- Le créateur d'équipage affiche « à définir » pour un départ dont l'horaire n'est pas encore connu.
+
 ## v1.1.1 — 28 septembre 2026
 
 ### Endurances iRacing officielles

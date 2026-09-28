@@ -144,6 +144,8 @@ const EXTRA_SPECIALS = [
 ];
 const SPECIAL_MINUTES = [[/992 endurance cup/, 720], [/production car challenge/, 240]];
 
+const GENERIC_WORDS = ['hours','hour','presented','powered','endurance','series','challenge','championship','season','iracing','special','event'];
+
 // Special event slot when its times are not known yet: its first day, 20h in Paris (to be confirmed).
 const PENDING_TIME = '20:00';
 
@@ -154,19 +156,27 @@ export function planIracingEvents(season, timestamp = Date.now()) {
   const extras = EXTRA_SPECIALS.filter(extra => !listed.some(event => normalize(event.name) === normalize(extra.name)));
   const specials = [...listed, ...extras].filter(event => isEnduranceClass(event.car_class) && !EXCLUDED_SPECIALS.test(`${event.name} ${event.car_class}`));
   // "Petit Le Mans" ↔ "2026 Petit Le Mans Presented by VCO": every significant word of the event is in the series name.
-  const words = name => normalize(name).split(/[^a-z0-9]+/).filter(word => word.length >= 4 && !/\d/.test(word) && !['hours','hour','presented'].includes(word));
-  const specialFor = name => specials.find(event => words(event.name).length && words(event.name).every(word => normalize(name).includes(word)));
+  // Generic words ("Endurance", "Cup"…) never match on their own: "992 Endurance Cup" is not "IMSA Endurance Series".
+  const words = name => normalize(name).split(/[^a-z0-9]+/).filter(word => word.length >= 4 && !/\d/.test(word) && !GENERIC_WORDS.includes(word));
+  // Without a distinctive word ("992 Endurance Cup"), the whole name must appear.
+  const sameEvent = (name, event) => words(event.name).length ? words(event.name).every(word => normalize(name).includes(word)) : normalize(name).includes(normalize(event.name));
+  // A special event listed as a series has a single week, within a week of the event: a regular series
+  // ("Production Endurance Challenge", "Nurburgring Endurance Championship") is never taken for one.
+  const specialFor = series => (series.weeks || []).length === 1 && specials.find(event => sameEvent(series.name, event)
+    && Math.abs(Date.parse(`${series.weeks[0].date_start}T00:00:00Z`) - Date.parse(`${event.date_start}T00:00:00Z`)) <= 7 * DAY_MS) || null;
   const detailsFromSeries = new Map();
 
   for (const series of season?.championships || []) {
     const duration = Number(series.typical_session_duration_minutes) || 0;
     if (series.category !== 'SPORTS CAR' || !TEAM_SERIES.test(normalize(series.name))) continue;
-    const special = specialFor(series.name);
-    // A special event listed as a series: its times are placeholders, the special event list is used.
-    if (!hasRealTimes(series.session_times_by_day)) {
-      if (special) detailsFromSeries.set(special.slug, {track:series.weeks?.[0]?.track_name, duration:series.weeks?.[0]?.duration_minutes || duration});
+    const special = specialFor(series);
+    // A special event listed as a series ("2026 Bathurst 1000 AU", "… US"): only its track and duration are
+    // used, the race comes from the special event list (one race, whatever the number of entries).
+    if (special) {
+      detailsFromSeries.set(special.slug, {track:series.weeks?.[0]?.track_name, duration:series.weeks?.[0]?.duration_minutes || duration});
       continue;
     }
+    if (!hasRealTimes(series.session_times_by_day)) continue;
     const name = cleanName(series.name);
     for (const week of series.weeks || []) {
       const starts = weekStarts(week, series.session_times_by_day).filter(start => start > timestamp && representable(start));
@@ -200,7 +210,7 @@ export function planIracingEvents(season, timestamp = Date.now()) {
 }
 
 async function fetchJson(url, fetchImpl) {
-  const response = await fetchImpl(url, {headers:{Accept:'application/json'}, cf:{cacheTtl:3600}});
+  const response = await fetchImpl(url, {headers:{Accept:'application/json'}});
   if (!response.ok) throw new Error(`iRacing schedule unavailable (${response.status})`);
   return response.json();
 }
@@ -255,12 +265,13 @@ export function specialStarts(text, dateStart, dateEnd) {
 // The article of a special event: "THIS WEEK: iRacing Bathurst 1000 presented by … | Special Event",
 // published in the ten days before the event.
 export function articleFor(posts, special) {
-  const eventWords = normalize(special.name).split(/[^a-z0-9]+/).filter(word => word.length >= 4 && !/\d/.test(word) && !['hours','hour','presented'].includes(word));
+  const eventWords = normalize(special.name).split(/[^a-z0-9]+/).filter(word => word.length >= 4 && !/\d/.test(word) && !GENERIC_WORDS.includes(word));
   const start = Date.parse(`${special.dateStart}T00:00:00Z`);
   return posts.find(post => {
     const title = normalize(decode(post?.title?.rendered));
     const published = Date.parse(post?.date);
-    return title.includes('special event') && eventWords.length && eventWords.every(word => title.includes(word)) && published > start - 10 * DAY_MS && published < start + DAY_MS;
+    const named = eventWords.length ? eventWords.every(word => title.includes(word)) : title.includes(normalize(special.name));
+    return title.includes('special event') && named && published > start - 10 * DAY_MS && published < start + DAY_MS;
   }) || null;
 }
 
@@ -279,8 +290,9 @@ export async function completeSpecialTimes(env, {timestamp = Date.now(), fetchIm
   }).filter(({row, first}) => {
     const departures = JSON.parse(row.departures || '[]');
     // (races imported before the flag existed: their placeholder time)
-    return Number.isFinite(first) && first - timestamp < withinDays * DAY_MS && departures.length === 1
-      && (departures[0].tbd || departures[0].time === PENDING_TIME) && departures[0].startsAt > timestamp;
+    // Until the end of the event weekend: the placeholder start (first day, 20h) may already be past.
+    return Number.isFinite(first) && first - timestamp < withinDays * DAY_MS && first + 3 * DAY_MS > timestamp && departures.length === 1
+      && (departures[0].tbd || departures[0].time === PENDING_TIME);
   });
   if (!candidates.length) return 0;
   const response = await fetchImpl(IRACING_NEWS, {headers:{Accept:'application/json'}});

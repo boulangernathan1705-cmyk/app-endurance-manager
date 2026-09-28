@@ -552,12 +552,15 @@ test('a driver can race an endurance alone; organizers set whether a driver chan
 test('solo races and SAFE drivers stay off where SOLO_RACES is not "on" (production)', async () => {
  const {req,login,env,DB}=harness();await login(ADMIN,'admin');await login(PILOT,'pilot');
  const solo=soloInput;
- assert.equal((await req('/api/events','POST',solo,'admin')).status,201,'on: allowed');
+ const soloRace=await req('/api/events','POST',solo,'admin');
+ assert.equal(soloRace.status,201,'on: allowed');
+ const soloDeparture=(await req('/api/events')).data.events.find(event=>event.id===soloRace.data.id).departures[0].id;
  delete env.SOLO_RACES;
  assert.equal((await req('/api/session','GET',null,'pilot')).data.soloRaces,false);
  assert.equal((await req('/api/events','POST',solo,'admin')).status,400);
  assert.equal((await req('/api/events')).data.events.length,0,'existing solo races are hidden');
  assert.equal(DB.db.prepare("SELECT COUNT(*) n FROM events WHERE format='solo'").get().n,1,'but kept');
  assert.equal((await req('/api/members/'+PILOT,'PATCH',{safe:true},'admin')).status,404);
+ assert.equal((await req(`/api/events/${soloRace.data.id}/departures/${soloDeparture}/registrations`,'POST',{name:'Leo',choices:[{category:'Hypercar',cars:[],carAny:true}]},'pilot')).status,404,'not reachable by its id');
  assert.equal((await req('/api/events','POST',eventInput,'admin')).status,201,'endurances unchanged');
 });
