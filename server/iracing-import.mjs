@@ -4,6 +4,7 @@
 // BSD 3-Clause, © PMSoftwareDevs), built every day from iRacing's own public pages and schedule PDF.
 // iRacing's Data API needs an OAuth client, whose creation iRacing has paused.
 //
+// Only races run in teams with driver changes are imported (TEAM_SERIES).
 // - Endurance series: one race per series and per race week, with every official start of the week
 //   (times published in GMT, converted to Paris time).
 // - Special events (Petit Le Mans, Bathurst 1000…): their start times are not published in advance, so
@@ -14,8 +15,11 @@ import {validateEvent, parisTimestamp, id, now} from './core.mjs';
 export const IRACING_FEED = 'https://raw.githubusercontent.com/pmsoftwaredevs/iracing-schedule/main/docs/data/';
 export const IMPORT_AUTHOR = 'system:iracing';
 const DAY_MS = 86_400_000;
-// Races shorter than this are sprints, not endurances.
-const MIN_ENDURANCE_MINUTES = 120;
+// Official series raced in teams with driver changes ("Min 1/2 drivers, Max 16 drivers" in iRacing's
+// season schedule PDF, members-assets.iracing.com/public/schedulepdf/SeasonSchedule.pdf, checked for
+// 2026 S4). Long solo series (IMSA Michelin Pilot Challenge, IMSA Sportscar Endurance Challenge) are left out.
+// A new team series must be added here after checking the PDF.
+const TEAM_SERIES = /imsa endurance series|global endurance tour|gt endurance series|nurburgring endurance|creventic|production endurance challenge|britcar|petit le mans|road america|daytona 24|sebring 12|watkins glen 6|spa 24|bathurst|nurburgring 24|suzuka 1000|indianapolis|portimao 1000|thruxton/;
 // More start times than this a day: the schedule says "see the event page" (special events), not real times.
 const MAX_TIMES_PER_DAY = 8;
 const MAX_DEPARTURES = 30;
@@ -78,8 +82,6 @@ export function circuitFor(...texts) {
 // Car classes of each series (the schedule does not list them), then the classes named by special events.
 const SERIES_CATEGORIES = [
   [/imsa endurance series|global endurance tour|petit le mans|road america|daytona 24|sebring|watkins glen/, ['GTP','LMP2 P217','GT3']],
-  [/michelin pilot challenge/, ['GT4','TCR']],
-  [/imsa sportscar endurance/, ['LMP3 P320','GT4']],
   [/nurburgring endurance|nurburgring 24/, ['GT3','Porsche Cup','GT4','TCR','M2']],
   [/creventic/, ['GT3','Porsche Cup','GT4','TCR']],
   [/britcar/, ['GT3','GT4']],
@@ -133,13 +135,22 @@ export function weekStarts(week, timesByDay) {
 const hasRealTimes = timesByDay => Object.values(timesByDay || {}).every(times => times.length <= MAX_TIMES_PER_DAY) && Object.values(timesByDay || {}).some(times => times.length);
 const isEnduranceClass = carClass => /gt3|gt4|gtp|hyp|lmp|tcr|touring|porsche|hpd|gt1|gt2|supercars|production car|audi 90/i.test(carClass || '');
 const EXCLUDED_SPECIALS = /roar|festival|runoffs|showdown|nascar/i;
+// Special events announced on iracing.com/special-events but missing from the schedule data, and durations
+// the data does not give (name without "N Hours"). Checked on the official page on 2026-09-28.
+const EXTRA_SPECIALS = [
+  {slug:'992-endurance-cup', name:'992 Endurance Cup', date_start:'2026-11-27', date_end:'2026-11-29', track_name:null, car_class:'Porsche Cup'}
+];
+const SPECIAL_MINUTES = [[/992 endurance cup/, 720], [/production car challenge/, 240]];
+
 // Special event slot when its times are not known yet: its first day, 20h in Paris (to be confirmed).
 const PENDING_TIME = '20:00';
 
 // Races to create from one season file of the schedule, from `now` on.
 export function planIracingEvents(season, timestamp = Date.now()) {
   const plans = [];
-  const specials = (season?.special_events || []).filter(event => isEnduranceClass(event.car_class) && !EXCLUDED_SPECIALS.test(`${event.name} ${event.car_class}`));
+  const listed = season?.special_events || [];
+  const extras = EXTRA_SPECIALS.filter(extra => !listed.some(event => normalize(event.name) === normalize(extra.name)));
+  const specials = [...listed, ...extras].filter(event => isEnduranceClass(event.car_class) && !EXCLUDED_SPECIALS.test(`${event.name} ${event.car_class}`));
   // "Petit Le Mans" ↔ "2026 Petit Le Mans Presented by VCO": every significant word of the event is in the series name.
   const words = name => normalize(name).split(/[^a-z0-9]+/).filter(word => word.length >= 4 && !/\d/.test(word) && !['hours','hour','presented'].includes(word));
   const specialFor = name => specials.find(event => words(event.name).length && words(event.name).every(word => normalize(name).includes(word)));
@@ -147,7 +158,7 @@ export function planIracingEvents(season, timestamp = Date.now()) {
 
   for (const series of season?.championships || []) {
     const duration = Number(series.typical_session_duration_minutes) || 0;
-    if (series.category !== 'SPORTS CAR' || duration < MIN_ENDURANCE_MINUTES) continue;
+    if (series.category !== 'SPORTS CAR' || !TEAM_SERIES.test(normalize(series.name))) continue;
     const special = specialFor(series.name);
     // A special event listed as a series: its times are placeholders, the special event list is used.
     if (!hasRealTimes(series.session_times_by_day)) {
@@ -171,7 +182,8 @@ export function planIracingEvents(season, timestamp = Date.now()) {
     if (!Number.isFinite(firstDay) || Date.parse(`${event.date_end || event.date_start}T23:59:59Z`) <= timestamp) continue;
     const details = detailsFromSeries.get(event.slug) || {};
     const hours = /(\d+)\s*(?:h\b|hr\b|hours?\b)/i.exec(event.name)?.[1];
-    const durationMinutes = Math.min(1440, Number(details.duration) || (hours ? Number(hours) * 60 : 360));
+    const known = SPECIAL_MINUTES.find(([pattern]) => pattern.test(normalize(event.name)))?.[1];
+    const durationMinutes = Math.min(1440, Number(details.duration) || known || (hours ? Number(hours) * 60 : 360));
     plans.push({
       externalId:`special:${slug(event.slug || event.name)}:${event.date_start}`,
       input:{name:cleanName(event.name), format:'endurance', durationMinutes, eventType:'special', circuit:circuitFor(details.track, event.track_name, event.name),
@@ -190,10 +202,11 @@ async function fetchJson(url, fetchImpl) {
 // Creates the races that are not imported yet. Returns the number of races created.
 export async function syncIracingEvents(env, {timestamp = Date.now(), fetchImpl = fetch} = {}) {
   const manifest = await fetchJson(IRACING_FEED + 'manifest.json', fetchImpl);
-  const code = String(manifest?.current || '');
-  if (!/^\d{4}S[1-4]$/.test(code)) throw new Error('iRacing schedule: unknown season');
-  const season = await fetchJson(`${IRACING_FEED}${code.slice(0, 4)}_s${code.slice(5)}.json`, fetchImpl);
-  const plans = planIracingEvents(season, timestamp);
+  // The current season, and the next one as soon as the schedule publishes it.
+  const codes = [manifest?.current, manifest?.next].map(String).filter(code => /^\d{4}S[1-4]$/.test(code));
+  if (!codes.length) throw new Error('iRacing schedule: unknown season');
+  const plans = [];
+  for (const code of codes) plans.push(...planIracingEvents(await fetchJson(`${IRACING_FEED}${code.slice(0, 4)}_s${code.slice(5)}.json`, fetchImpl), timestamp));
   if (!plans.length) return 0;
   const known = new Set((await env.DB.prepare('SELECT external_id FROM iracing_imports').all()).results.map(row => row.external_id));
   let created = 0;

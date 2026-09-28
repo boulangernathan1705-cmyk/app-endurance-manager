@@ -20,10 +20,11 @@ test('endurance series become one race per week with every official start, in Pa
   assert.deepEqual(race.departures, [{date:'2026-10-17',time:'04:00'},{date:'2026-10-17',time:'09:00'},{date:'2026-10-17',time:'20:00'},{date:'2026-10-18',time:'16:00'}]);
   assert.ok(validateEvent(race));
   assert.ok(!plans.some(plan => plan.input.name.startsWith('Formula')), 'sprints are not endurances');
+  assert.ok(!plans.some(plan => plan.input.name.startsWith('IMSA Sportscar')), 'long races without driver changes are not imported');
 });
 
 test('a start in the repeated hour of the clock change is left out, not the whole race', () => {
-  const race = planIracingEvents(SEASON, NOW).find(plan => plan.externalId.includes('michelin')).input;
+  const race = planIracingEvents(SEASON, NOW).find(plan => plan.externalId.includes('production-endurance')).input;
   assert.deepEqual(race.departures.map(d => `${d.date} ${d.time}`), ['2026-10-24 06:00','2026-10-24 17:00','2026-10-25 21:00']);
   assert.ok(validateEvent(race));
 });
@@ -53,4 +54,14 @@ test('names, tracks and classes of the schedule match the site catalog', () => {
   assert.equal(circuitFor('Somewhere new'), 'iracing-tbd');
   assert.deepEqual(categoriesFor('Nürburgring 24h', 'GT3 // Porsche Cup // GT4 // TCR // BMW M2 CS Racing'), ['GT3','GT4','TCR','Porsche Cup','M2']);
   assert.deepEqual(weekStarts({date_start:'2026-10-17', date_end:'2026-10-18'}, {'5':['10:00']}), [Date.parse('2026-10-17T10:00:00Z')]);
+});
+
+test('special events missing from the schedule data are added, with their official duration', () => {
+  const plans = planIracingEvents({championships:[], special_events:[
+    {slug:'pcc-vir', name:'THE Production Car Challenge @ViR', date_start:'2099-12-18', date_end:'2099-12-19', track_name:'ViR Grand Course', car_class:'Production Car Challenge Cars'}
+  ]}, NOW);
+  assert.equal(plans.find(plan => plan.externalId.startsWith('special:pcc-vir')).input.durationMinutes, 240);
+  const cup = plans.find(plan => plan.externalId.startsWith('special:992-endurance-cup'));
+  assert.equal(cup.input.durationMinutes, 720);
+  assert.deepEqual(cup.input.categories, ['Porsche Cup']);
 });
