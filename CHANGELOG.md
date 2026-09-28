@@ -2,7 +2,7 @@
 
 Les changements du site, version par version. La plus récente est en haut.
 
-## Prochaine version — en test
+## v1.1 — 28 septembre 2026
 
 ### Accueil
 - Nouvelle page d'accueil pour les nouveaux : ce qu'est le site, la connexion Discord et comment ça marche en 4 étapes.
@@ -26,13 +26,6 @@ Les changements du site, version par version. La plus récente est en haut.
 
 ### Corrections
 - Les bloqueurs de pub n'empêchent plus l'affichage des courses.
-
-### Courses solo
-- Nouvel onglet **Courses solo** à côté des **Endurances** : chaque onglet a son propre calendrier.
-- Inscription en un clic avec **Je participe** : tu choisis ta catégorie et ta voiture, ou **Peu importe**.
-- **Places limitées** selon le serveur de jeu (62 au Mans, 38 ailleurs sur LMU). Quand c'est complet, tu peux t'inscrire en **liste d'attente** : si un pilote se désiste, le premier en attente prend sa place automatiquement.
-- Une ou **deux manches** par course, chacune avec son circuit, sa durée et ses catégories. Le circuit peut être **aléatoire**, annoncé au dernier moment.
-- Courses **OPEN**, ouvertes à tous les pilotes connectés, ou **SAFE**, réservées aux pilotes Safe.
 
 ## v1.0 — 26 septembre 2026
 

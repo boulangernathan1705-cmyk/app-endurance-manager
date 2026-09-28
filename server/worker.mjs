@@ -5,6 +5,8 @@ import {
 } from './core.mjs';
 import {ingestClientError, clientErrorsApi} from './telemetry.mjs';
 import {racesPath} from './races-path.mjs';
+// Solo races and SAFE drivers: still being built, only on the sites where SOLO_RACES is "on" (dev).
+const soloRacesEnabled = env => env?.SOLO_RACES === 'on';
 import {syncIracingEvents} from './iracing-import.mjs';
 async function eventById(env, eventId) {
   const row = await env.DB.prepare('SELECT * FROM events WHERE id=?').bind(eventId).first();
@@ -74,7 +76,7 @@ function eventScopeFilter(scope, nowMs=Date.now()) {
 }
 async function listEvents(env, actor, game='', scope='') {
   // Filter by joining events instead of binding id lists: D1 rejects queries with more than 100 bound parameters.
-  const filters=[game==='iracing' ? "e.circuit LIKE 'iracing-%'" : game==='lmu' ? "e.circuit NOT LIKE 'iracing-%'" : '', eventScopeFilter(scope)].filter(Boolean);
+  const filters=[game==='iracing' ? "e.circuit LIKE 'iracing-%'" : game==='lmu' ? "e.circuit NOT LIKE 'iracing-%'" : '', eventScopeFilter(scope), soloRacesEnabled(env) ? '' : "COALESCE(e.format,'endurance')!='solo'"].filter(Boolean);
   const where=filters.length ? ` WHERE ${filters.join(' AND ')}` : '';
   const rows = (await env.DB.prepare(`SELECT e.* FROM events e${where} ORDER BY e.created_at DESC, e.id DESC`).all()).results;
   if (!rows.length) return [];
@@ -184,7 +186,7 @@ async function api(request, env) {
   const actor = await identity(request, env);
   const diagnostics = await clientErrorsApi(path,method,env,actor);
   if (diagnostics) return diagnostics;
-  if (path === '/api/session' && method === 'GET') return json({user:actor.user, discordReady:!!(env.DISCORD_CLIENT_ID && env.DISCORD_CLIENT_SECRET), adminConfigured:administrators(env).length > 0, soloLabel:String(env.SOLO_LABEL || 'Courses solo').slice(0,40)});
+  if (path === '/api/session' && method === 'GET') return json({user:actor.user, discordReady:!!(env.DISCORD_CLIENT_ID && env.DISCORD_CLIENT_SECRET), adminConfigured:administrators(env).length > 0, soloRaces:soloRacesEnabled(env), soloLabel:String(env.SOLO_LABEL || 'Courses solo').slice(0,40)});
   if (path === '/api/auth/logout' && method === 'POST') {
     const raw = cookie(request, COOKIE_SESSION);
     if (raw) await env.DB.prepare('DELETE FROM sessions WHERE token_hash=?').bind(await hash(raw)).run();
@@ -339,7 +341,9 @@ async function api(request, env) {
   }
   if (path === '/api/events' && method === 'POST') {
     requireRole(actor.user);
-    const data = validateEvent(await body(request)), eventId = id();
+    const input = await body(request);
+    if (input.format === 'solo' && !soloRacesEnabled(env)) fail(400, 'Les courses solo ne sont pas encore disponibles.');
+    const data = validateEvent(input), eventId = id();
     await env.DB.prepare('INSERT INTO events(id,name,duration_hours,duration_minutes,event_type,circuit,schedule_pending,driver_change_required,format,access,capacity,rounds,categories,departures,created_by,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)').bind(eventId, data.name, data.durationHours, data.durationMinutes, data.eventType, data.circuit, data.schedulePending?1:0, data.driverChangeRequired==null?null:(data.driverChangeRequired?1:0), data.format, data.access, data.capacity, JSON.stringify(data.rounds), JSON.stringify(data.categories), JSON.stringify(data.departures), actor.user.id, now()).run();
     return json({id:eventId}, 201);
   }
@@ -444,6 +448,7 @@ async function api(request, env) {
     const input = await body(request);
     // Either the role or the "pilote SAFE" mark (solo SAFE races) is changed.
     let result;
+    if (typeof input.safe === 'boolean' && !soloRacesEnabled(env)) fail(404, 'Action introuvable.');
     if (typeof input.safe === 'boolean') result = await env.DB.prepare('UPDATE users SET safe=? WHERE id=?').bind(input.safe?1:0,memberMatch[1]).run();
     else {
       if (!['pilot','organizer'].includes(input.role)) fail(400, 'Rôle invalide.');

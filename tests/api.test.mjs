@@ -28,7 +28,7 @@ function harness(withParticipants=true){
  DB.db.exec(readFileSync(new URL('../migrations/0029_event_duration_minutes.sql',import.meta.url),'utf8'));
  DB.db.exec(readFileSync(new URL('../migrations/0030_iracing_import.sql',import.meta.url),'utf8'));
  DB.db.exec(readFileSync(new URL('../migrations/0031_solo_driver.sql',import.meta.url),'utf8'));
- const env={DB,APP_ORIGIN:ROOT,DISCORD_CLIENT_ID:'app-id',DISCORD_CLIENT_SECRET:'test-only-secret',ADMIN_DISCORD_IDS:ADMIN,ASSETS:{fetch:async()=>new Response('static')}};
+ const env={DB,APP_ORIGIN:ROOT,SOLO_RACES:'on',DISCORD_CLIENT_ID:'app-id',DISCORD_CLIENT_SECRET:'test-only-secret',ADMIN_DISCORD_IDS:ADMIN,ASSETS:{fetch:async()=>new Response('static')}};
  const jars=new Map();
  async function req(path,method='GET',data,actor='guest',options={}){
   const jar=jars.get(actor)||{};
@@ -543,4 +543,17 @@ test('a driver can race an endurance alone; organizers set whether a driver chan
  const {driverChangeRequired,...rest}=event;
  assert.equal((await req('/api/events/'+event.id,'PATCH',rest,'admin')).status,200);
  assert.equal((await req('/api/events?game=iracing')).data.events[0].driverChangeRequired,true);
+});
+
+test('solo races and SAFE drivers stay off where SOLO_RACES is not "on" (production)', async () => {
+ const {req,login,env,DB}=harness();await login(ADMIN,'admin');await login(PILOT,'pilot');
+ const solo=soloInput;
+ assert.equal((await req('/api/events','POST',solo,'admin')).status,201,'on: allowed');
+ delete env.SOLO_RACES;
+ assert.equal((await req('/api/session','GET',null,'pilot')).data.soloRaces,false);
+ assert.equal((await req('/api/events','POST',solo,'admin')).status,400);
+ assert.equal((await req('/api/events')).data.events.length,0,'existing solo races are hidden');
+ assert.equal(DB.db.prepare("SELECT COUNT(*) n FROM events WHERE format='solo'").get().n,1,'but kept');
+ assert.equal((await req('/api/members/'+PILOT,'PATCH',{safe:true},'admin')).status,404);
+ assert.equal((await req('/api/events','POST',eventInput,'admin')).status,201,'endurances unchanged');
 });

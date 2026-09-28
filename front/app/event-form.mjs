@@ -53,6 +53,8 @@ if(typeof document!=='undefined'){
 // and the number of places, suggested from the game server size of the first circuit.
 // Format of the event: chosen at creation, fixed afterwards.
 function formatChoice(event){
+  // Solo races not enabled on this site: endurance only, nothing to choose.
+  if(!state.soloRaces&&event?.format!=='solo')return '<input type="hidden" data-format-value value="endurance">';
   if(event)return `<p class="event-format-fixed">Format : <strong>${event.format==='solo'?'Course solo':'Endurance'}</strong></p><input type="hidden" data-format-value value="${event.format||'endurance'}">`;
   const option=(value,label,help,checked)=>`<label class="solo-access-option event-format-option"><input type="radio" name="eventFormat" value="${value}" ${checked?'checked':''}><span><strong>${label}</strong><small>${help}</small></span></label>`;
   return `<div class="event-format-choice" role="radiogroup" aria-label="Format">${option('endurance','Endurance','Équipages, relais et heures de présence.',state.listFormat!=='solo')}${option('solo','Course solo','Une inscription par pilote, places limitées, une ou deux manches.',state.listFormat==='solo')}</div>`;

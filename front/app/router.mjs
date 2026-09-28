@@ -42,7 +42,7 @@ export async function applyRoute(route,message=''){
     return;
   }
   if(route.page==='my-entries'){views.renderMyEntries();return;}
-  if(route.list)state.listFormat=route.list;
+  if(route.list)state.listFormat=route.list==='solo'&&!state.soloRaces?'endurance':route.list;
   views.renderHome(message);
 }
 
