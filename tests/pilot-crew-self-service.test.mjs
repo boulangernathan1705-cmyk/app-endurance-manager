@@ -14,7 +14,7 @@ const MIGRATIONS=[
   '0005_registration_preference.sql','0006_registration_car.sql','0007_registration_car_preferences.sql',
   '0008_event_circuit.sql','0009_registration_owner.sql','0011_multi_category_registrations.sql',
   '0012_participants.sql','0013_allow_assigned_category_interests.sql','0014_lock_categories_after_crew_assignment.sql',
-  '0015_crew_lock.sql','0016_crew_ownership.sql','0016_client_errors.sql','0017_discord_weekly.sql','0026_event_schedule_pending.sql','0027_solo_races.sql','0028_solo_round_choices.sql','0029_event_duration_minutes.sql','0030_iracing_import.sql','0031_solo_driver.sql','0032_tbd_imported_specials.sql','0033_lmu_pending_common_start.sql','0034_communities.sql','0035_memberships.sql'
+  '0015_crew_lock.sql','0016_crew_ownership.sql','0016_client_errors.sql','0017_discord_weekly.sql','0026_event_schedule_pending.sql','0027_solo_races.sql','0028_solo_round_choices.sql','0029_event_duration_minutes.sql','0030_iracing_import.sql','0031_solo_driver.sql','0032_tbd_imported_specials.sql','0033_lmu_pending_common_start.sql','0034_communities.sql','0035_memberships.sql','0036_commu_dev_discord.sql'
 ];
 
 class D1 {
