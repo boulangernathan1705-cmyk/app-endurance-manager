@@ -226,7 +226,7 @@ export async function syncIracingEvents(env, {timestamp = Date.now(), fetchImpl 
     ]);
     created++;
   }
-  await completeSpecialTimes(env, plans, {timestamp, fetchImpl});
+  await completeSpecialTimes(env, {timestamp, fetchImpl});
   return created;
 }
 
@@ -263,13 +263,21 @@ export function articleFor(posts, special) {
 
 // Imported special events still waiting for their times (a single "Horaire à définir" start, unless an
 // organizer changed it): the official time slots are added; without any entry they replace the common start.
-export async function completeSpecialTimes(env, plans, {timestamp = Date.now(), fetchImpl = fetch} = {}) {
-  const waiting = (await env.DB.prepare(`SELECT e.id, e.version, e.departures, i.external_id FROM iracing_imports i JOIN events e ON e.id=i.event_id
+// Also runs every hour (worker-with-migrations, withinDays 10): iracing.com is then only asked when an
+// imported special event of the coming days still waits for its times. The event weekend is read from the import id
+// ("special:<slug>:<first day>", three days).
+export async function completeSpecialTimes(env, {timestamp = Date.now(), fetchImpl = fetch, withinDays = Infinity} = {}) {
+  const waiting = (await env.DB.prepare(`SELECT e.id, e.name, e.version, e.departures, i.external_id FROM iracing_imports i JOIN events e ON e.id=i.event_id
     WHERE i.external_id LIKE 'special:%' AND e.schedule_pending=1`).all()).results || [];
-  const candidates = waiting.map(row => ({row, plan:plans.find(plan => plan.externalId === row.external_id)})).filter(({row, plan}) => {
+  const candidates = waiting.map(row => {
+    const dateStart = /:(\d{4}-\d{2}-\d{2})$/.exec(row.external_id)?.[1];
+    const first = Date.parse(`${dateStart}T00:00:00Z`);
+    return {row, plan:{special:{name:row.name, dateStart, dateEnd:new Date(first + 2 * DAY_MS).toISOString().slice(0, 10)}}, first};
+  }).filter(({row, first}) => {
     const departures = JSON.parse(row.departures || '[]');
     // (races imported before the flag existed: their placeholder time)
-    return plan?.special && departures.length === 1 && (departures[0].tbd || departures[0].time === PENDING_TIME) && departures[0].startsAt > timestamp;
+    return Number.isFinite(first) && first - timestamp < withinDays * DAY_MS && departures.length === 1
+      && (departures[0].tbd || departures[0].time === PENDING_TIME) && departures[0].startsAt > timestamp;
   });
   if (!candidates.length) return 0;
   const response = await fetchImpl(IRACING_NEWS, {headers:{Accept:'application/json'}});

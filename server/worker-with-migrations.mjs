@@ -4,7 +4,7 @@ import {isWeeklyDiscordMutation} from './discord-weekly-format.mjs';
 import {ensureDiscordWeeklySchema} from './discord-weekly-schema.mjs';
 import {syncWeeklyDiscord} from './discord-weekly.mjs';
 import {cleanup} from './core.mjs';
-import {syncIracingEvents} from './iracing-import.mjs';
+import {syncIracingEvents, completeSpecialTimes} from './iracing-import.mjs';
 import {isDevelopment,devRobots,markDevelopmentResponse} from './dev-environment.mjs';
 
 let crewOwnershipReady = null;
@@ -75,13 +75,15 @@ export default {
   },
 
   async scheduled(controller, env, ctx) {
-    // Official iRacing endurances: twice a day, 7:00 UTC (the schedule it reads is refreshed around 6:17 UTC)
-    // and 13:00 UTC (special event time slots, published on iracing.com on the Monday morning of the race
-    // week), and at the next run as long as nothing was ever imported (first deployment).
+    // Official iRacing endurances: twice a day (7:00 and 13:00 UTC; the schedule it reads is refreshed around
+    // 6:17 UTC), and at the next run as long as nothing was ever imported (first deployment). Special event
+    // time slots (iracing.com article of the race week) are looked for every hour.
     const at = new Date(controller?.scheduledTime || Date.now());
     if (env?.DB && env.IRACING_IMPORT !== 'off') ctx.waitUntil((async () => {
       const daily = [7, 13].includes(at.getUTCHours()) && at.getUTCMinutes() < 15;
       if (daily || !(await env.DB.prepare('SELECT 1 FROM iracing_imports LIMIT 1').first())) await syncIracingEvents(env);
+      // Every hour: time slots of the special events of the coming days (article of the race week).
+      else if (at.getUTCMinutes() < 15) await completeSpecialTimes(env, {withinDays:10});
     })().catch(error => {
       console.error('iRacing import failed', error instanceof Error ? error.message : 'unknown');
     }));
