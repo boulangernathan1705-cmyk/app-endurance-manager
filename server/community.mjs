@@ -12,7 +12,7 @@ function parseJson(value) {
 }
 function toCommunity(row) {
   return {id:row.id, slug:row.slug, name:row.name, shortName:row.short_name, discordGuildId:row.discord_guild_id || null,
-    appearance:parseJson(row.appearance), modules:parseJson(row.modules)};
+    appearance:parseJson(row.appearance), modules:parseJson(row.modules), discordInviteUrl:row.discord_invite_url || null};
 }
 
 export async function currentCommunity(env) {
@@ -20,6 +20,10 @@ export async function currentCommunity(env) {
   const row = await env.DB.prepare('SELECT * FROM communities WHERE slug=?').bind(slug).first();
   if (!row) fail(404, 'Communauté introuvable.');
   return toCommunity(row);
+}
+
+export async function allCommunities(env) {
+  return ((await env.DB.prepare('SELECT * FROM communities ORDER BY created_at, id').all()).results || []).map(toCommunity);
 }
 
 // Communities with a module enabled (scheduled tasks: iRacing import, weekly Discord recap).

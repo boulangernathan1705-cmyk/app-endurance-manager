@@ -65,7 +65,8 @@ const registrationSelect = `SELECT r.*,p.user_id AS participant_user_id,p.guest_
 // Pilot entries (participants) belong to the community of the race: every lookup and creation is scoped to it.
 async function registrationParticipant(env, actor, input, data, community) {
   const cid = community.id;
-  const manager=!!actor.user && ['admin','organizer'].includes(actor.user.role);
+  // "Inscrire un autre pilote" in this community (server/access.mjs).
+  const manager=Boolean(actor.permissions?.has('register_others'));
   if (input.participantUserId) {
     if (!actor.user) fail(401,'Connecte-toi avec Discord pour inscrire un autre pilote.');
     if (!/^\d{15,22}$/.test(input.participantUserId)) fail(400,'Compte Discord invalide.');

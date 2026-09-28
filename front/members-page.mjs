@@ -18,37 +18,38 @@ function renderError(message) {
   app.innerHTML = `<section class="members-panel members-error"><h1>Accès impossible</h1><p>${esc(message)}</p><a class="secondary-button" href="/">Retour à l’accueil</a></section>`;
 }
 
-const ROLE_LABELS = {pilot:'Pilote', organizer:'Organisateur'};
+// What each permission means (server/access.mjs, PERMISSIONS).
+const PERMISSION_LABELS = {register:'S’inscrire', register_others:'Inscrire un autre pilote', create_crew:'Créer un équipage',
+  manage_crews:'Gérer tous les équipages', create_race:'Créer une course', manage_races:'Gérer toutes les courses',
+  safe_races:'Courses SAFE', admin:'Administrer la communauté'};
 
-// SAFE drivers only where solo races are enabled (dev for now).
-let safeEnabled = false;
-
-function memberRow(member) {
-  const search = esc(`${member.name} ${member.id}`.toLocaleLowerCase('fr-FR'));
-  if (member.role === 'admin') {
-    return `<article class="members-row" data-search="${search}"><div class="members-identity"><strong>${esc(member.name)}</strong><small>Discord : ${esc(member.id)}</small></div><span class="members-role members-role-admin">Administrateur principal</span><span class="members-row-status"></span></article>`;
-  }
-  // The role is saved as soon as it changes: no separate "Enregistrer" button per member.
-  return `<article class="members-row" data-member-id="${esc(member.id)}" data-search="${search}">
-    <div class="members-identity"><strong>${esc(member.name)}</strong><small>Discord : ${esc(member.id)}</small></div>
-    ${safeEnabled ? `<label class="members-safe" title="Accès aux courses solo SAFE"><input type="checkbox" name="safe" data-saved="${member.safe ? 'true' : 'false'}" ${member.safe ? 'checked' : ''}><span>Pilote SAFE</span></label>` : ''}
-    <label class="members-role-select"><span class="sr-only">Rôle de ${esc(member.name)}</span><select name="role" data-saved="${esc(member.role)}">${Object.entries(ROLE_LABELS).map(([value,label]) => `<option value="${value}" ${member.role === value ? 'selected' : ''}>${label}</option>`).join('')}</select></label>
-    <span class="members-row-status" role="status" aria-live="polite"></span>
+// Members of the community: found on its Discord server by the bot. Roles are managed on Discord; this page
+// shows them with what they allow here (the settings of each role come with the community settings page).
+function memberRow(member, allPermissions) {
+  const search = esc(`${member.name} ${member.nickname} ${member.id} ${member.roles.map(role => role.name).join(' ')}`.toLocaleLowerCase('fr-FR'));
+  const badge = member.manager ? '<span class="members-role members-role-admin">Gestionnaire de la plateforme</span>'
+    : member.discordAdmin ? '<span class="members-role members-role-admin">Administrateur du Discord</span>' : '';
+  const roles = member.roles.length ? member.roles.map(role => `<span class="members-discord-role">${esc(role.name)}</span>`).join('') : '<span class="members-discord-role is-empty">Aucun rôle</span>';
+  const allowed = allPermissions.filter(permission => member.permissions.includes(permission)).map(permission => esc(PERMISSION_LABELS[permission] || permission)).join(' · ') || 'Aucune autorisation';
+  return `<article class="members-row" data-search="${search}">
+    <div class="members-identity"><strong>${esc(member.name)}</strong><small>${member.nickname ? `${esc(member.nickname)} · ` : ''}Discord : ${esc(member.id)}</small></div>
+    <div class="members-discord-roles">${badge}${roles}</div>
+    <p class="members-permissions">${allowed}</p>
   </article>`;
 }
 
 async function load() {
   try {
     const session = await api('/api/session');
-    if (!session.user || session.user.role !== 'admin') throw new Error('Accès réservé aux administrateurs.');
-    safeEnabled = session.soloRaces === true;
+    if (!session.user || !(session.permissions || []).includes('admin')) throw new Error('Accès réservé aux administrateurs de la communauté.');
     const result = await api('/api/members');
     const members = Array.isArray(result.members) ? result.members : [];
+    const server = result.community?.discordServer ? ` « ${esc(result.community.discordServer)} »` : '';
     // The page name is already the active tab of the navigation bar: the title stays for screen readers only.
-    app.innerHTML = `<section class="members-panel"><h1 class="sr-only">Gestion des membres</h1>
-      <div class="members-toolbar"><label class="members-search"><span class="sr-only">Rechercher un membre</span><input type="search" name="memberSearch" placeholder="Rechercher un pilote…" autocomplete="off"></label><span class="members-count">${members.length} membre${members.length > 1 ? 's' : ''}</span></div>
-      <p class="members-help">Commun à LMU et iRacing. Un pilote apparaît ici après sa première connexion Discord ; son rôle est enregistré dès que tu le changes.${safeEnabled ? ' « Pilote SAFE » donne accès aux courses solo SAFE.' : ''}</p>
-      <div class="members-list">${members.map(memberRow).join('')}</div>
+    app.innerHTML = `<section class="members-panel"><h1 class="sr-only">Membres</h1>
+      <div class="members-toolbar"><label class="members-search"><span class="sr-only">Rechercher un membre</span><input type="search" name="memberSearch" placeholder="Rechercher un pilote ou un rôle…" autocomplete="off"></label><span class="members-count">${members.length} membre${members.length > 1 ? 's' : ''}</span></div>
+      <p class="members-help">Les membres du serveur Discord${server} qui se sont connectés au site. Leurs rôles se gèrent sur Discord et sont vérifiés chaque jour ; ce qu’ils permettent ici se règle dans les réglages de la communauté.</p>
+      <div class="members-list">${members.map(member => memberRow(member, result.permissions || [])).join('')}</div>
       <p class="members-empty" hidden>Aucun membre ne correspond à cette recherche.</p></section>`;
   } catch (error) {
     renderError(error.message || String(error));
@@ -66,30 +67,6 @@ app.addEventListener('input', event => {
   }
   const empty = app.querySelector('.members-empty');
   if (empty) empty.hidden = visible > 0;
-});
-
-app.addEventListener('change', async event => {
-  const select = event.target;
-  const row = select.closest('.members-row[data-member-id]');
-  if (!row || !['role','safe'].includes(select.name)) return;
-  const status = row.querySelector('.members-row-status');
-  select.disabled = true;
-  status.className = 'members-row-status';
-  status.textContent = 'Enregistrement…';
-  const isSafe = select.name === 'safe';
-  try {
-    await api(`/api/members/${row.dataset.memberId}`, 'PATCH', isSafe ? {safe:select.checked} : {role:select.value});
-    select.dataset.saved = isSafe ? String(select.checked) : select.value;
-    status.classList.add('is-saved');
-    status.textContent = '✓ Enregistré';
-  } catch (error) {
-    if (isSafe) select.checked = select.dataset.saved === 'true';
-    else select.value = select.dataset.saved;
-    status.classList.add('is-error');
-    status.textContent = error.message || String(error);
-  } finally {
-    select.disabled = false;
-  }
 });
 
 void load();

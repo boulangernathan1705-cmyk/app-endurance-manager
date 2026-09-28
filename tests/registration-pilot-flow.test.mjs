@@ -13,9 +13,10 @@ const game=fs.readFileSync('game.html','utf8');
 
 test('all logged in pilots can use the Discord pilot picker',()=>{
   assert.match(worker,/if \(!actor\.user\) fail\(401,'Connecte-toi avec Discord pour choisir un pilote\.'/);
-  assert.match(worker,/FROM users u LEFT JOIN participants p ON p\.user_id=u\.id/);
+  // Only the members of the community (its Discord server) can be picked.
+  assert.match(worker,/FROM memberships m JOIN users u ON u\.id=m\.user_id/);
   assert.doesNotMatch(core,/if \(!manager\) fail\(403,'Seuls les organisateurs peuvent inscrire un autre pilote\.'/);
-  assert.match(clientCore,/state\.participants=state\.user \? \(await api\('\/api\/participants'\)\)\.participants : \[\]/);
+  assert.match(clientCore,/state\.participants=state\.user && member \? \(await api\('\/api\/participants'\)\)\.participants : \[\]/);
   assert.match(eventView,/Inscrire un autre pilote/);
   assert.match(registration,/name="participant"/);
   assert.match(registration,/participantUserId/);
@@ -66,7 +67,7 @@ test('Discord registrations are editable by both creator and participant',()=>{
 });
 
 test('organizers and admins can edit every registration without owning it',()=>{
-  assert.match(worker,/\['admin','organizer'\]\.includes\(actor\.user\?\.role\)/);
+  assert.match(worker,/return can\(actor, 'register_others'\);/);
   assert.match(worker,/if \(!canManageRegistration\(reg,actor\)\) fail\(403/);
 });
 

@@ -1292,6 +1292,17 @@ html[data-game] .race-card .race-fill:has(.solo-fill) { display: flex; flex-wrap
 .departure-tbd-note strong { color: #ffd98a; font-size: 15px; }
 .departure-tbd-note small { color: #c7d0d4; font-size: 12.5px; line-height: 1.45; }
 
+/* Community gate: not signed in, or not a member of the community's Discord server. */
+.community-gate { max-width: 620px; margin: 40px auto; padding: 28px 26px; border: 1px solid var(--border, #292d31); border-top: 4px solid #52d3d8; border-radius: 16px; background: var(--panel, #111315); text-align: center; }
+.community-gate h1 { margin: 0 0 12px; font-size: 28px; font-weight: 850; color: #f4f6f5; }
+.community-gate p { margin: 0 0 20px; color: #c7d0d4; font-size: 16px; line-height: 1.6; }
+.community-gate-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
+/* Members page: Discord roles and permissions. */
+.members-discord-roles { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.members-discord-role { padding: 2px 8px; border: 1px solid rgba(88,101,242,.55); border-radius: 999px; background: rgba(88,101,242,.12); color: #d6dafe; font-size: 12.5px; font-weight: 700; }
+.members-discord-role.is-empty { border-color: var(--border, #292d31); background: transparent; color: #99a3a0; }
+.members-permissions { margin: 0; color: #c7d0d4; font-size: 13px; line-height: 1.5; }
+
 /* Large screens (27–34 inch, ultrawide): the whole interface grows in proportion and the page uses
    more of the width. The banner keeps its own sizing (its image is capped at its source resolution). */
 @media (min-width: 2200px) { :root { --wide-zoom: 1.15; } }

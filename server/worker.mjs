@@ -6,6 +6,7 @@ import {
 import {ingestClientError, clientErrorsApi} from './telemetry.mjs';
 import {racesPath} from './races-path.mjs';
 import {currentCommunity} from './community.mjs';
+import {communityAccess, requirePermission, displayRole, PERMISSIONS, discordGuild, memberPermissions} from './access.mjs';
 // Solo races and SAFE drivers: still being built, only on the sites where SOLO_RACES is "on" (dev).
 const soloRacesEnabled = env => env?.SOLO_RACES === 'on';
 import {syncIracingEvents} from './iracing-import.mjs';
@@ -38,14 +39,16 @@ function slotFor(event, from, departureId) {
   if (target.startsAt <= Date.now()) fail(409, 'Ce départ est passé.');
   return target;
 }
+// Permissions of the actor in the current community (server/access.mjs).
+const can = (actor, permission) => Boolean(actor.permissions?.has(permission));
 function isRegistrationManager(actor) {
-  return ['admin','organizer'].includes(actor.user?.role);
+  return can(actor, 'register_others');
 }
 function canManageRegistration(reg, actor) {
   return owned(reg, actor) || isRegistrationManager(actor);
 }
 function canManageCrew(crew, actor) {
-  return isRegistrationManager(actor) || Boolean(actor.user && crew?.owner_user_id === actor.user.id);
+  return can(actor, 'manage_crews') || Boolean(actor.user && crew?.owner_user_id === actor.user.id);
 }
 function publicRegistration(reg, actor, userNames = new Map()) {
   let cars = [];
@@ -127,7 +130,7 @@ async function listEvents(env, actor, game='', scope='', community) {
   return rows.map(row => {
     const format=row.format||'endurance', capacity=row.capacity==null?null:Number(row.capacity);
     const durationHours=Number(row.duration_hours)||3, durationMinutes=Number(row.duration_minutes)||durationHours*60;
-    return {id:row.id, name:row.name, format, access:row.access||'open', capacity, rounds:JSON.parse(row.rounds||'[]'), circuit:row.circuit||'', durationHours, durationMinutes, driverChangeRequired:row.driver_change_required==null?null:Boolean(row.driver_change_required), eventType:row.event_type||'private', schedulePending:Boolean(row.schedule_pending), categories:JSON.parse(row.categories), version:row.version,
+    return {id:row.id, name:row.name, format, access:row.access||'open', capacity, rounds:JSON.parse(row.rounds||'[]'), circuit:row.circuit||'', durationHours, durationMinutes, driverChangeRequired:row.driver_change_required==null?null:Boolean(row.driver_change_required), eventType:row.event_type||'private', schedulePending:Boolean(row.schedule_pending), createdByMe:Boolean(actor.user && row.created_by===actor.user.id), categories:JSON.parse(row.categories), version:row.version,
       departures:JSON.parse(row.departures).map(d => {
         const availability=grouped.get(`${row.id}:${d.id}`) || [];
         // Solo race: entries keep their order of arrival; beyond the number of places they are on the
@@ -198,27 +201,31 @@ async function api(request, env) {
   if (path === '/api/auth/discord' && method === 'GET') return oauthStart(request, env);
   if (path === '/api/auth/discord/callback' && method === 'GET') return oauthCallback(request, env);
   const actor = await identity(request, env);
-  // Every request below works inside one community (separation entry point, server/community.mjs).
+  // Every request below works inside one community (separation entry point, server/community.mjs), with
+  // the permissions the player's Discord roles give in it (server/access.mjs).
   const community = await currentCommunity(env);
+  const access = await communityAccess(env, actor, community);
+  actor.permissions = access.permissions;
+  actor.manager = access.manager;
+  if (actor.user) actor.user = {...actor.user, role:displayRole(access)};
   const diagnostics = await clientErrorsApi(path,method,env,actor,community);
   if (diagnostics) return diagnostics;
-  if (path === '/api/session' && method === 'GET') return json({user:actor.user, discordReady:!!(env.DISCORD_CLIENT_ID && env.DISCORD_CLIENT_SECRET), adminConfigured:administrators(env).length > 0, soloRaces:soloRacesEnabled(env), soloLabel:String(env.SOLO_LABEL || 'Courses solo').slice(0,40)});
+  if (path === '/api/session' && method === 'GET') return json({user:actor.user, discordReady:!!(env.DISCORD_CLIENT_ID && env.DISCORD_CLIENT_SECRET), adminConfigured:administrators(env).length > 0, soloRaces:soloRacesEnabled(env), soloLabel:String(env.SOLO_LABEL || 'Courses solo').slice(0,40),
+    community:{slug:community.slug, name:community.name, shortName:community.shortName, discordInviteUrl:community.discordInviteUrl},
+    access:access.status, permissions:[...access.permissions], manager:access.manager,
+    platformDiscordUrl:/^https:\/\/(discord\.gg|discord\.com\/invite)\//.test(env.PLATFORM_DISCORD_URL || '') ? env.PLATFORM_DISCORD_URL : null});
   if (path === '/api/auth/logout' && method === 'POST') {
     const raw = cookie(request, COOKIE_SESSION);
     if (raw) await env.DB.prepare('DELETE FROM sessions WHERE token_hash=?').bind(await hash(raw)).run();
     return json({ok:true}, 200, [setCookie(COOKIE_SESSION, '', 0), 'em_discord_avatar=; Path=/; Secure; SameSite=Lax; Max-Age=0']);
   }
-  if (path === '/api/guest/recover' && method === 'POST') {
-    const input = await body(request);
-    if (!/^[a-f0-9]{64}$/.test(input.token || '')) fail(400, 'Lien personnel invalide.');
-    const reg = await env.DB.prepare('SELECT id FROM registrations WHERE guest_hash=? AND community_id=? LIMIT 1').bind(await hash(input.token), community.id).first();
-    if (!reg) fail(404, 'Ce lien ne correspond plus à une inscription.');
-    return json({ok:true}, 200, [setCookie(COOKIE_GUEST, input.token, 365 * DAY)]);
-  }
-  if (path === '/api/guest/link' && method === 'POST') {
-    if (!actor.guestToken || !(await env.DB.prepare('SELECT id FROM registrations WHERE guest_hash=? AND community_id=? LIMIT 1').bind(actor.guestHash, community.id).first())) fail(404, 'Aucune inscription invitée sur cet appareil.');
-    return json({link:canonical + '/#access=' + actor.guestToken});
-  }
+  // Entries without an account are gone: a community is only open to the members of its Discord server.
+  if (path === '/api/guest/recover' || path === '/api/guest/link') fail(410, 'Les inscriptions sans compte Discord ne sont plus possibles.');
+  // Everything below needs a member of the community (or a platform manager).
+  if (access.status === 'anonymous') fail(401, 'Connecte-toi avec Discord pour accéder à cette communauté.');
+  if (access.status !== 'member') fail(403, access.status === 'not-member'
+    ? `Cette communauté est réservée aux membres du serveur Discord « ${community.name} ».`
+    : 'L’accès à cette communauté ne peut pas être vérifié pour le moment. Réessaie plus tard.');
   if (path === '/api/events' && method === 'GET') {
     const requestedGame=url.searchParams.get('game');
     const game=requestedGame==='lmu'||requestedGame==='iracing'?requestedGame:'';
@@ -235,11 +242,11 @@ async function api(request, env) {
   }
   if (path === '/api/participants' && method === 'GET') {
     if (!actor.user) fail(401,'Connecte-toi avec Discord pour choisir un pilote.');
-    // Pilot entries of this community only. (Until the members of each community are known from its
-    // Discord server, step 2, the accounts listed are all the accounts of the platform.)
+    // The members of this community only (its Discord server), with their pilot entry here.
     return json({participants:(await env.DB.prepare(`SELECT u.id,u.name,p.id AS participantId
-      FROM users u LEFT JOIN participants p ON p.user_id=u.id AND p.community_id=?
-      WHERE u.id NOT LIKE 'system:%'
+      FROM memberships m JOIN users u ON u.id=m.user_id
+      LEFT JOIN participants p ON p.user_id=u.id AND p.community_id=m.community_id
+      WHERE m.community_id=? AND m.status='member'
       ORDER BY lower(u.name),u.id`).bind(community.id).all()).results});
   }
   const crewCreate = path.match(/^\/api\/events\/([a-f0-9-]{36})\/departures\/([a-f0-9-]{36})\/crews$/);
@@ -347,11 +354,12 @@ async function api(request, env) {
     if (!JSON.parse(event.categories).includes(input.category)) fail(400,'Choisis une catégorie de cet événement.');
     const car=input.car==null || input.car==='' ? '' : text(input.car,100,'Voiture');
     const crewId=id();
-    if (isRegistrationManager(actor)) {
+    if (can(actor,'manage_crews')) {
       const result=await env.DB.prepare('INSERT INTO crews(id,event_id,departure_id,name,category,car,created_at,community_id) VALUES(?,?,?,?,?,?,?,?)').bind(crewId,event.id,departure.id,name,input.category,car,now(),community.id).run();
       if (!result.meta.changes) fail(409,'Impossible de créer cet équipage. Actualise avant de réessayer.');
       return json({id:crewId,joined:false},201);
     }
+    requirePermission(actor,'create_crew','Tu n’as pas l’autorisation de créer un équipage dans cette communauté.');
     const ownRows=(await env.DB.prepare(registrationSelect+' WHERE r.event_id=? AND r.departure_id=? AND r.category=? AND r.status!=?').bind(event.id,departure.id,input.category,'unavailable').all()).results;
     const selected=ownRows.find(reg=>personal(reg,actor));
     if (!selected) fail(403,'Inscris-toi d’abord sur ce départ dans cette catégorie avant de créer ton équipage.');
@@ -364,7 +372,7 @@ async function api(request, env) {
     return json({id:crewId,joined:true,removedRegistrations:results[2].meta.changes},201);
   }
   if (path === '/api/events' && method === 'POST') {
-    requireRole(actor.user);
+    requirePermission(actor,'create_race','Tu n’as pas l’autorisation de créer une course dans cette communauté.');
     const input = await body(request);
     if (input.format === 'solo' && !soloRacesEnabled(env)) fail(400, 'Les courses solo ne sont pas encore disponibles.');
     const data = validateEvent(input), eventId = id();
@@ -374,8 +382,9 @@ async function api(request, env) {
   }
   const eventMatch = path.match(/^\/api\/events\/([a-f0-9-]{36})$/);
   if (eventMatch && ['PATCH','DELETE'].includes(method)) {
-    requireRole(actor.user, method === 'DELETE');
     const event = await eventById(env, eventMatch[1], community), input = await body(request);
+    // Every race with "Gérer toutes les courses"; one's own races with "Créer une course".
+    if (!can(actor,'manage_races') && !(can(actor,'create_race') && event.created_by === actor.user?.id)) requirePermission(actor,'manage_races','Tu n’as pas l’autorisation de modifier cette course.');
     if (input.version !== event.version) fail(409, 'Cet événement a changé. Actualise avant de réessayer.');
     if (method === 'DELETE') {
       const result = await env.DB.prepare('DELETE FROM events WHERE id=? AND version=?').bind(event.id, input.version).run();
@@ -400,13 +409,12 @@ async function api(request, env) {
     if (departure.startsAt <= Date.now()) fail(409, 'Ce départ est passé. Les inscriptions sont fermées.');
     const input = await body(request);
     const solo = (event.format||'endurance') === 'solo';
-    if (solo) {
-      // Solo races need a Discord account; SAFE races are reserved to SAFE drivers.
-      if (!actor.user) fail(401, 'Connecte-toi avec Discord pour t’inscrire à une course solo.');
-      const organizer = ['admin','organizer'].includes(actor.user.role);
-      if (input.forOther === true && !organizer) fail(403, 'Seuls les organisateurs peuvent inscrire un autre pilote à une course solo.');
-      if (input.forOther !== true && event.access === 'safe' && !actor.user.safe && !organizer) fail(403, 'Cette course est réservée aux pilotes SAFE. Demande à un administrateur de t’ajouter.');
-    }
+    // Own entry: "S'inscrire". Someone else's (Discord pilot or typed name): "Inscrire un autre pilote".
+    const forOther = input.forOther === true || Boolean(input.participantUserId);
+    if (forOther) requirePermission(actor,'register_others','Tu n’as pas l’autorisation d’inscrire un autre pilote dans cette communauté.');
+    else requirePermission(actor,'register','Tu n’as pas l’autorisation de t’inscrire aux courses de cette communauté.');
+    // SAFE solo races: the Discord roles with "Courses SAFE".
+    if (solo && !forOther && event.access === 'safe' && !can(actor,'safe_races')) fail(403, 'Cette course est réservée aux pilotes SAFE. Demande à un administrateur du Discord.');
     const data = validateRegistration(input, event);
     const guestToken = actor.user ? null : actor.guestToken || token();
     if (guestToken) { actor.guestToken=guestToken;actor.guestHash=await hash(guestToken); }
@@ -460,32 +468,27 @@ async function api(request, env) {
   }
   // Admins can run the daily import of official iRacing endurances at once.
   if (path === '/api/admin/iracing-import' && method === 'POST') {
-    requireRole(actor.user,true);
+    requirePermission(actor,'admin');
     // Manual update from the iRacing space (admins), e.g. to repair after a change of the schedule data.
     try { return json(await syncIracingEvents(env, {communities:[community]})); }
     catch (error) { fail(502, 'Le calendrier iRacing est momentanément indisponible. Réessaie plus tard.'); }
   }
+  // Members of the community: the players found on its Discord server, with their Discord roles and what
+  // these roles allow here. Roles and access are managed on Discord; the role settings page comes with step 4.
   if (path === '/api/members' && method === 'GET') {
-    requireRole(actor.user,true);
-    const rows = (await env.DB.prepare("SELECT * FROM users WHERE id NOT LIKE 'system:%' ORDER BY name LIMIT 200").all()).results;
-    return json({members:rows.map(u => publicUser(u,env))});
+    requirePermission(actor,'admin');
+    const rows = (await env.DB.prepare(`SELECT m.*, u.name FROM memberships m JOIN users u ON u.id=m.user_id
+      WHERE m.community_id=? AND m.status='member' ORDER BY lower(u.name) LIMIT 500`).bind(community.id).all()).results || [];
+    const discord = community.discordGuildId ? await discordGuild(env, community.discordGuildId) : null;
+    const roleNames = new Map((discord?.roles || []).map(role => [role.id, role.name]));
+    const members = [];
+    for (const row of rows) members.push({id:row.user_id, name:row.name, nickname:row.nickname, discordAdmin:Boolean(row.discord_admin),
+      manager:administrators(env).includes(row.user_id),
+      roles:JSON.parse(row.discord_roles || '[]').map(roleId => ({id:roleId, name:roleNames.get(roleId) || roleId})),
+      permissions:[...await memberPermissions(env, community, row)], checkedAt:row.checked_at});
+    return json({community:{name:community.name, discordServer:discord?.name || null}, members, permissions:PERMISSIONS});
   }
-  const memberMatch = path.match(/^\/api\/members\/(\d{15,22})$/);
-  if (memberMatch && method === 'PATCH') {
-    requireRole(actor.user,true);
-    if (administrators(env).includes(memberMatch[1])) fail(403, 'Les administrateurs principaux sont définis dans la configuration du site.');
-    const input = await body(request);
-    // Either the role or the "pilote SAFE" mark (solo SAFE races) is changed.
-    let result;
-    if (typeof input.safe === 'boolean' && !soloRacesEnabled(env)) fail(404, 'Action introuvable.');
-    if (typeof input.safe === 'boolean') result = await env.DB.prepare('UPDATE users SET safe=? WHERE id=?').bind(input.safe?1:0,memberMatch[1]).run();
-    else {
-      if (!['pilot','organizer'].includes(input.role)) fail(400, 'Rôle invalide.');
-      result = await env.DB.prepare('UPDATE users SET role=? WHERE id=?').bind(input.role,memberMatch[1]).run();
-    }
-    if (!result.meta.changes) fail(404, 'Ce pilote doit d’abord se connecter avec Discord.');
-    return json({ok:true});
-  }
+  if (path.startsWith('/api/members/')) fail(410, 'Les rôles se gèrent maintenant sur le serveur Discord de la communauté.');
   fail(404, 'Action introuvable.');
 }
 export default {

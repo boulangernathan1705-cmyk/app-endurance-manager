@@ -5,6 +5,7 @@ import {readFileSync, readdirSync} from 'node:fs';
 import worker from '../server/worker.mjs';
 import {syncIracingEvents} from '../server/iracing-import.mjs';
 import {SEASON} from './fixtures/iracing-season.mjs';
+import {linkTestServer, setMember} from './fixtures/discord-server.mjs';
 
 // Separation between communities, with every migration applied in order (as in production) and two
 // communities: commu-dev (all the existing data) and commu-test.
@@ -24,6 +25,9 @@ class D1 {
 function harness(){
   const DB=new D1();DB.migrate();
   DB.db.prepare("INSERT INTO communities(id,slug,name,short_name,created_at) VALUES(?,'commu-test','Commu Test','TEST',0)").run(TEST);
+  // Each community has its Discord server; the test players are members of both.
+  linkTestServer(DB.db, DEV);
+  DB.db.prepare("UPDATE communities SET discord_guild_id='900000000000000009' WHERE id=?").run(TEST);
   const env={DB,APP_ORIGIN:ROOT,COMMUNITY:'commu-dev',DISCORD_CLIENT_ID:'app-id',DISCORD_CLIENT_SECRET:'test-only-secret',ADMIN_DISCORD_IDS:ADMIN,ASSETS:{fetch:async()=>new Response('static')}};
   const jars=new Map();
   async function req(path,method='GET',data,actor='guest'){
@@ -42,6 +46,7 @@ function harness(){
     const realFetch=globalThis.fetch;
     globalThis.fetch=async url=>new Response(JSON.stringify(String(url).endsWith('/token')?{access_token:'mock'}:{id:discordId,username:`Pilot ${discordId}`}),{headers:{'Content-Type':'application/json'}});
     try{await req(`/api/auth/discord/callback?code=test&state=${state}`,'GET',null,actor);}finally{globalThis.fetch=realFetch;}
+    for(const community of [DEV,TEST])setMember(DB.db,discordId,[],{communityId:community});
   }
   const inCommunity=slug=>{env.COMMUNITY=slug;};
   return {DB,env,req,login,inCommunity};
@@ -74,13 +79,13 @@ test('a community never sees, reaches or changes the data of another one', async
   await login(ADMIN,'admin');await login(PILOT,'pilot');
   // commu-dev: a race, an entry and a crew.
   assert.equal((await req('/api/events','POST',race,'admin')).status,201);
-  const event=(await req('/api/events')).data.events[0];
+  const event=(await req('/api/events','GET',null,'admin')).data.events[0];
   const base=`/api/events/${event.id}/departures/${event.departures[0].id}`;
   const entry=await req(base+'/registrations','POST',{name:'Leo',category:'Hypercar',status:'whole'},'pilot');assert.equal(entry.status,201);
   const crew=await req(base+'/crews','POST',{name:'Team',category:'Hypercar'},'admin');assert.equal(crew.status,201);
   // commu-test sees nothing and reaches nothing by id.
   inCommunity('commu-test');
-  assert.equal((await req('/api/events')).data.events.length,0);
+  assert.equal((await req('/api/events','GET',null,'admin')).data.events.length,0);
   assert.equal((await req(`/api/events/${event.id}`,'PATCH',{...race,version:event.version},'admin')).status,404);
   assert.equal((await req(`/api/events/${event.id}`,'DELETE',{version:event.version},'admin')).status,404);
   assert.equal((await req(base+'/registrations','POST',{name:'Leo',category:'Hypercar',status:'whole'},'pilot')).status,404);
@@ -90,19 +95,20 @@ test('a community never sees, reaches or changes the data of another one', async
   assert.equal((await req(`/api/registrations/${entry.data.id}`,'DELETE',{version:1},'pilot')).status,404);
   assert.equal((await req(`/api/registrations/${entry.data.id}/departure`,'PATCH',{departureId:event.departures[0].id,version:1},'pilot')).status,404);
   assert.ok((await req('/api/participants','GET',null,'admin')).data.participants.every(item=>item.participantId===null),'no pilot entry of commu-dev');
+  assert.equal((await req('/api/events','GET',null,'guest')).status,401,'not signed in: nothing');
   // Its own race stays its own.
   assert.equal((await req('/api/events','POST',{...race,name:'4h FUJI',circuit:'fuji'},'admin')).status,201);
-  assert.deepEqual((await req('/api/events')).data.events.map(item=>item.name),['4h FUJI']);
+  assert.deepEqual((await req('/api/events','GET',null,'admin')).data.events.map(item=>item.name),['4h FUJI']);
   inCommunity('commu-dev');
-  assert.deepEqual((await req('/api/events')).data.events.map(item=>item.name),['6h SPA']);
-  assert.equal((await req('/api/events')).data.events[0].departures[0].availability.length,1,'commu-dev data untouched');
+  assert.deepEqual((await req('/api/events','GET',null,'admin')).data.events.map(item=>item.name),['6h SPA']);
+  assert.equal((await req('/api/events','GET',null,'admin')).data.events[0].departures[0].availability.length,1,'commu-dev data untouched');
 });
 
 test('the database itself refuses mixing communities or moving data between them', async () => {
   const {DB,req,login}=harness();
   await login(ADMIN,'admin');await login(PILOT,'pilot');
   await req('/api/events','POST',race,'admin');
-  const event=(await req('/api/events')).data.events[0];
+  const event=(await req('/api/events','GET',null,'admin')).data.events[0];
   const base=`/api/events/${event.id}/departures/${event.departures[0].id}`;
   const entry=await req(base+'/registrations','POST',{name:'Leo',category:'Hypercar',status:'whole'},'pilot');
   const db=DB.db, participant=db.prepare('SELECT participant_id FROM registrations WHERE id=?').get(entry.data.id).participant_id;

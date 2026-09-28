@@ -40,11 +40,8 @@ export async function ingestClientError(request,env) {
   const requestOrigin=request.headers.get('Origin');
   if (url.origin!==canonical || requestOrigin!==canonical) return request.method==='GET' ? json({error:'Utilise l’adresse principale du site pour cette action.'},403) : new Response(null,{status:204});
 
-  if (request.method==='GET') {
-    const actor=await identity(request,env);
-    if (!actor.user || !['admin','organizer'].includes(actor.user.role)) return json({error:'Accès réservé aux organisateurs et administrateurs.'},403);
-    return json({errors:await readClientErrors(env, await currentCommunity(env))});
-  }
+  // Reading goes through /api/client-errors (community permissions); this address only receives reports.
+  if (request.method==='GET') return json({error:'Action introuvable.'},404);
   if (request.method!=='POST') return new Response(null,{status:405});
   if (!request.headers.get('Content-Type')?.toLowerCase().startsWith('text/plain')) return new Response(null,{status:415});
   await rateLimit(request,env,'telemetry',30);
@@ -77,6 +74,6 @@ export async function ingestClientError(request,env) {
 export async function clientErrorsApi(path,method,env,actor,community) {
   if (path!=='/api/client-errors') return null;
   if (method!=='GET') fail(405,'Méthode non autorisée.');
-  if (!actor.user || !['admin','organizer'].includes(actor.user.role)) fail(403,'Accès réservé aux organisateurs et administrateurs.');
+  if (!actor.user || !(actor.permissions?.has('admin') || actor.permissions?.has('manage_races'))) fail(403,'Accès réservé aux organisateurs et administrateurs.');
   return json({errors:await readClientErrors(env, community)});
 }
