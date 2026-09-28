@@ -41,6 +41,7 @@ async function guild(env, guildId) {
   const [info, roles] = await Promise.all([bot(env, `/guilds/${guildId}`), bot(env, `/guilds/${guildId}/roles`)]);
   if (!info.ok || !roles.ok) return null;
   const value = {ownerId:String(info.data.owner_id || ''), name:String(info.data.name || ''),
+    icon:/^(a_)?[a-f0-9]{32}$/.test(info.data.icon || '') ? info.data.icon : '', banner:/^(a_)?[a-f0-9]{32}$/.test(info.data.banner || '') ? info.data.banner : '',
     roles:(roles.data || []).map(role => ({id:String(role.id), name:String(role.name), position:Number(role.position) || 0,
       administrator:(BigInt(role.permissions || '0') & ADMINISTRATOR) === ADMINISTRATOR}))};
   guildCache.set(guildId, {value, until:Date.now() + 5 * 60_000});

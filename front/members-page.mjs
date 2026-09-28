@@ -46,9 +46,17 @@ async function settingsMarkup() {
   const roles = settings.roles.length
     ? `<div class="settings-roles-scroll"><table class="settings-roles"><thead><tr><th scope="col">Rôle Discord</th>${settings.permissions.map(permission => `<th scope="col">${esc(PERMISSION_LABELS[permission] || permission)}</th>`).join('')}<th></th></tr></thead><tbody>${settings.roles.map(role).join('')}</tbody></table></div>`
     : '<p class="members-help">Les rôles du serveur Discord ne peuvent pas être lus : vérifie que le bot est bien sur le serveur.</p>';
-  return `<section class="members-panel community-settings"><h2>Réglages de la communauté</h2>
+  const look = settings.community;
+  const appearance = `<h3>Apparence</h3><form class="settings-appearance" data-appearance>
+    <label>Nom de la communauté<input name="name" maxlength="80" required value="${esc(look.name)}"></label>
+    <label>Nom court (onglet du navigateur)<input name="shortName" maxlength="12" required value="${esc(look.shortName)}"></label>
+    <label>Couleur d’accent<input name="accent" type="color" value="${esc(look.accent || '#52d3d8')}"></label>
+    <label class="settings-module"><input type="checkbox" name="defaultAccent" ${look.accent ? '' : 'checked'}><span>Garder la couleur du site</span></label>
+    <p class="members-help">Le logo et la bannière sont ceux du serveur Discord${look.discordServer ? ` « ${esc(look.discordServer)} »` : ''} : change-les sur Discord.${look.logoUrl ? '' : ' Le serveur n’a pas d’icône : le logo du site est utilisé.'}${look.bannerUrl ? '' : ' Sans bannière de serveur, la bannière du site est utilisée.'}</p>
+    <button class="primary-button" type="submit">Enregistrer l’apparence</button><span class="settings-status" aria-live="polite"></span></form>`;
+  return `<section class="members-panel community-settings"><h2>Réglages de la communauté</h2>${appearance}
     <h3>Autorisations des rôles Discord</h3><p class="members-help">Un membre cumule les autorisations de tous ses rôles. « @everyone » s’applique à tous les membres du serveur. Le propriétaire du serveur et les rôles « Administrateur » de Discord ont tout.</p>${roles}
-    <h3>Modules</h3>${module('iracingImport','Endurances iRacing officielles','Import automatique des séries en équipe et des événements spéciaux.')}${module('discordWeekly','Récap Discord hebdomadaire','Message des courses de la semaine sur le salon Discord.')}</section>`;
+    <h3>Modules</h3>${module('iracingImport','Endurances iRacing officielles','Import automatique des séries en équipe et des événements spéciaux.')}${module('discordWeekly','Récap Discord hebdomadaire','Message des courses de la semaine sur le salon Discord.')}${module('soloRaces','Courses solo','Onglet « Courses solo », places limitées, liste d’attente, courses OPEN / SAFE.')}</section>`;
 }
 
 async function load() {
@@ -80,6 +88,18 @@ app.addEventListener('input', event => {
   }
   const empty = app.querySelector('.members-empty');
   if (empty) empty.hidden = visible > 0;
+});
+
+app.addEventListener('submit', async event => {
+  const form = event.target.closest('form[data-appearance]');
+  if (!form) return;
+  event.preventDefault();
+  const status = form.querySelector('.settings-status');
+  status.textContent = 'Enregistrement…';
+  try {
+    await api('/api/community/appearance', 'PATCH', {name:form.elements.name.value, shortName:form.elements.shortName.value, accent:form.elements.defaultAccent.checked ? null : form.elements.accent.value});
+    status.textContent = '✓ Enregistré. Recharge la page pour voir le résultat.';
+  } catch (error) { status.textContent = error.message; }
 });
 
 app.addEventListener('change', async event => {

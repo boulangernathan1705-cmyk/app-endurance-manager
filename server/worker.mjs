@@ -5,16 +5,16 @@ import {
 } from './core.mjs';
 import {ingestClientError, clientErrorsApi} from './telemetry.mjs';
 import {racesPath} from './races-path.mjs';
-import {currentCommunity} from './community.mjs';
+import {currentCommunity, appearanceOf} from './community.mjs';
 import {communityAccess, requirePermission, displayRole, PERMISSIONS, DEFAULT_EVERYONE, discordGuild, memberPermissions} from './access.mjs';
 // Solo races and SAFE drivers: still being built, only on the sites where SOLO_RACES is "on" (dev).
-const soloRacesEnabled = env => env?.SOLO_RACES === 'on';
+const soloRacesEnabled = (env, community) => env?.SOLO_RACES === 'on' || community?.modules?.soloRaces === true;
 import {syncIracingEvents} from './iracing-import.mjs';
 // A race of the current community only: any id from another community answers "introuvable".
 async function eventById(env, eventId, community) {
   const row = await env.DB.prepare('SELECT * FROM events WHERE id=? AND community_id=?').bind(eventId, community.id).first();
   // A solo race does not exist where solo races are off (production): no entry, edit or crew through its id.
-  if (!row || (row.format === 'solo' && !soloRacesEnabled(env))) fail(404, 'Événement introuvable.');
+  if (!row || (row.format === 'solo' && !soloRacesEnabled(env, community))) fail(404, 'Événement introuvable.');
   return row;
 }
 function departureById(event, departureId) {
@@ -93,7 +93,7 @@ function eventScopeFilter(scope, nowMs=Date.now()) {
 async function listEvents(env, actor, game='', scope='', community) {
   // Filter by joining events instead of binding id lists: D1 rejects queries with more than 100 bound parameters.
   // The community filter comes first: it is the only bound parameter of these queries.
-  const filters=['e.community_id=?',game==='iracing' ? "e.circuit LIKE 'iracing-%'" : game==='lmu' ? "e.circuit NOT LIKE 'iracing-%'" : '', eventScopeFilter(scope), soloRacesEnabled(env) ? '' : "COALESCE(e.format,'endurance')!='solo'"].filter(Boolean);
+  const filters=['e.community_id=?',game==='iracing' ? "e.circuit LIKE 'iracing-%'" : game==='lmu' ? "e.circuit NOT LIKE 'iracing-%'" : '', eventScopeFilter(scope), soloRacesEnabled(env, community) ? '' : "COALESCE(e.format,'endurance')!='solo'"].filter(Boolean);
   const where=filters.length ? ` WHERE ${filters.join(' AND ')}` : '';
   const rows = (await env.DB.prepare(`SELECT e.* FROM events e${where} ORDER BY e.created_at DESC, e.id DESC`).bind(community.id).all()).results;
   if (!rows.length) return [];
@@ -222,8 +222,8 @@ async function api(request, env) {
   if (actor.user) actor.user = {...actor.user, role:displayRole(access)};
   const diagnostics = await clientErrorsApi(path,method,env,actor,community);
   if (diagnostics) return diagnostics;
-  if (path === '/api/session' && method === 'GET') return json({user:actor.user, discordReady:!!(env.DISCORD_CLIENT_ID && env.DISCORD_CLIENT_SECRET), adminConfigured:administrators(env).length > 0, soloRaces:soloRacesEnabled(env), soloLabel:String(env.SOLO_LABEL || 'Courses solo').slice(0,40),
-    community:{slug:community.slug, name:community.name, shortName:community.shortName, discordInviteUrl:community.discordInviteUrl},
+  if (path === '/api/session' && method === 'GET') return json({user:actor.user, discordReady:!!(env.DISCORD_CLIENT_ID && env.DISCORD_CLIENT_SECRET), adminConfigured:administrators(env).length > 0, soloRaces:soloRacesEnabled(env, community), soloLabel:String(env.SOLO_LABEL || 'Courses solo').slice(0,40),
+    community:{slug:community.slug, name:community.name, shortName:community.shortName, discordInviteUrl:community.discordInviteUrl, appearance:appearanceOf(community)},
     access:access.status, permissions:[...access.permissions], manager:access.manager,
     platformDiscordUrl:/^https:\/\/(discord\.gg|discord\.com\/invite)\//.test(env.PLATFORM_DISCORD_URL || '') ? env.PLATFORM_DISCORD_URL : null});
   if (path === '/api/auth/logout' && method === 'POST') {
@@ -386,7 +386,7 @@ async function api(request, env) {
   if (path === '/api/events' && method === 'POST') {
     requirePermission(actor,'create_race','Tu n’as pas l’autorisation de créer une course dans cette communauté.');
     const input = await body(request);
-    if (input.format === 'solo' && !soloRacesEnabled(env)) fail(400, 'Les courses solo ne sont pas encore disponibles.');
+    if (input.format === 'solo' && !soloRacesEnabled(env, community)) fail(400, 'Les courses solo ne sont pas encore disponibles.');
     const data = validateEvent(input), eventId = id();
     await dropEmptyCommonStart(env, null, data);
     await env.DB.prepare('INSERT INTO events(id,name,duration_hours,duration_minutes,event_type,circuit,schedule_pending,driver_change_required,format,access,capacity,rounds,categories,departures,created_by,created_at,community_id) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)').bind(eventId, data.name, data.durationHours, data.durationMinutes, data.eventType, data.circuit, data.schedulePending?1:0, data.driverChangeRequired==null?null:(data.driverChangeRequired?1:0), data.format, data.access, data.capacity, JSON.stringify(data.rounds), JSON.stringify(data.categories), JSON.stringify(data.departures), actor.user.id, now(), community.id).run();
@@ -508,8 +508,21 @@ async function api(request, env) {
     const saved = new Map(rows.map(row => [row.discord_role_id, JSON.parse(row.permissions || '[]')]));
     const roles = (discord?.roles || []).sort((a, b) => b.position - a.position).map(role => ({id:role.id, name:role.id === community.discordGuildId ? '@everyone' : role.name,
       administrator:role.administrator, permissions:saved.get(role.id) ?? (role.id === community.discordGuildId ? [...DEFAULT_EVERYONE] : [])}));
-    return json({community:{name:community.name, discordServer:discord?.name || null}, roles, permissions:PERMISSIONS,
-      modules:{iracingImport:community.modules.iracingImport === true, discordWeekly:community.modules.discordWeekly === true}});
+    if (discord && (discord.icon !== (community.appearance.discordIcon || '') || discord.banner !== (community.appearance.discordBanner || ''))) {
+      community.appearance = {...community.appearance, discordIcon:discord.icon, discordBanner:discord.banner};
+      await env.DB.prepare('UPDATE communities SET appearance=? WHERE id=?').bind(JSON.stringify(community.appearance), community.id).run();
+    }
+    return json({community:{name:community.name, shortName:community.shortName, discordServer:discord?.name || null, ...appearanceOf(community)}, roles, permissions:PERMISSIONS,
+      modules:{iracingImport:community.modules.iracingImport === true, discordWeekly:community.modules.discordWeekly === true, soloRaces:community.modules.soloRaces === true}});
+  }
+  if (path === '/api/community/appearance' && method === 'PATCH') {
+    requirePermission(actor,'admin');
+    const input = await body(request);
+    const name = text(input.name, 80, 'Nom de la communauté'), shortName = text(input.shortName, 12, 'Nom court');
+    if (input.accent !== null && !/^#[0-9a-f]{6}$/i.test(input.accent || '')) fail(400, 'Choisis une couleur valide.');
+    const appearance = {...community.appearance, accent:input.accent || null};
+    await env.DB.prepare('UPDATE communities SET name=?, short_name=?, appearance=? WHERE id=?').bind(name, shortName, JSON.stringify(appearance), community.id).run();
+    return json({ok:true});
   }
   const roleSetting = path.match(/^\/api\/community\/roles\/(\d{15,22})$/);
   if (roleSetting && method === 'PUT') {
@@ -527,7 +540,7 @@ async function api(request, env) {
     requirePermission(actor,'admin');
     const input = await body(request);
     const modules = {...community.modules};
-    for (const key of ['iracingImport','discordWeekly']) if (typeof input[key] === 'boolean') modules[key] = input[key];
+    for (const key of ['iracingImport','discordWeekly','soloRaces']) if (typeof input[key] === 'boolean') modules[key] = input[key];
     await env.DB.prepare('UPDATE communities SET modules=? WHERE id=?').bind(JSON.stringify(modules), community.id).run();
     return json({ok:true, modules});
   }

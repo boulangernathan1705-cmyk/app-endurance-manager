@@ -97,12 +97,34 @@ function renderConnected(user) {
   bindAvatarFallbacks();
 }
 
+// Look of the community of this site (communities platform): its name always visible in the bar, the
+// short name before the page title, the icon and banner of its Discord server, its accent color.
+function applyCommunity(community) {
+  if (!community) return;
+  const look = community.appearance || {};
+  document.documentElement.dataset.community = community.slug;
+  if (look.accent) { document.documentElement.style.setProperty('--community-accent', look.accent); document.documentElement.dataset.communityAccent = 'true'; }
+  if (community.shortName && !document.title.startsWith(`${community.shortName} · `)) document.title = `${community.shortName} · ${document.title}`;
+  if (look.logoUrl) {
+    for (const image of document.querySelectorAll('.brand-mark')) image.src = look.logoUrl;
+    const icon = document.querySelector('link[rel="icon"]'); if (icon) { icon.href = look.logoUrl; icon.type = 'image/png'; }
+  }
+  if (look.bannerUrl) for (const image of document.querySelectorAll('.hero-banner')) { image.removeAttribute('srcset'); image.src = look.bannerUrl; }
+  const bar = document.querySelector('.site-nav-shell');
+  if (bar && !bar.querySelector('.community-chip')) {
+    const chip = document.createElement('span');
+    chip.className = 'community-chip'; chip.textContent = community.name; chip.title = `Communauté : ${community.name}`;
+    bar.prepend(chip);
+  }
+}
+
 async function loadSession() {
   if (!root) return;
   try {
     const response = await fetch('/api/session', {credentials:'same-origin',cache:'no-store'});
     if (!response.ok) throw new Error('session');
     const session = await response.json();
+    applyCommunity(session.community);
     if (session.user) renderConnected(session.user);
     else renderDisconnected(!!session.discordReady);
   } catch {

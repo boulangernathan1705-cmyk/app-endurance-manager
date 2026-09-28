@@ -25,7 +25,7 @@ function fakeDiscord(t, members, {down=false}={}) {
     calls.push(path);
     assert.equal(options.headers?.Authorization,'Bot test-bot','the bot token is used');
     if(down)return new Response('{}',{status:500});
-    if(path===`/guilds/${GUILD}`)return Response.json({id:GUILD,name:'Serveur test',owner_id:OWNER});
+    if(path===`/guilds/${GUILD}`)return Response.json({id:GUILD,name:'Serveur test',owner_id:OWNER,icon:'0123456789abcdef0123456789abcdef',banner:null});
     if(path===`/guilds/${GUILD}/roles`)return Response.json([
       {id:GUILD,name:'@everyone',permissions:'0',position:0},
       {id:ORGA_ROLE,name:'Orga',permissions:'0',position:2},
@@ -149,4 +149,20 @@ test('community admins set the permissions of each Discord role and the modules'
   assert.ok((await communityAccess(env,{user:{id:PILOT}},{...(await import('../server/community.mjs')).DEFAULT_COMMUNITY_SLUG&&{id:DEV_COMMUNITY,slug:'commu-dev',discordGuildId:GUILD,modules:{}}})).permissions.has('create_race'));
   assert.equal((await as(BOSS,'modules','PATCH',{iracingImport:true,discordWeekly:false})).status,200);
   assert.deepEqual(JSON.parse(DB.db.prepare('SELECT modules FROM communities WHERE id=?').get(DEV_COMMUNITY).modules),{iracingImport:true,discordWeekly:false});
+});
+
+test('community look: name, short name and accent by its admins, icon from its Discord server', async t => {
+  const {DB,env}=setup();
+  fakeDiscord(t,{[BOSS]:[ADMIN_ROLE]});
+  const raw='e'.repeat(64);const hash=[...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(raw)))].map(b=>b.toString(16).padStart(2,'0')).join('');
+  DB.db.prepare('INSERT INTO sessions(token_hash,user_id,expires_at) VALUES(?,?,?)').run(hash,BOSS,4102444800);
+  const call=(path,method='GET',body)=>worker.fetch(new Request(ROOT+path,{method,headers:{Cookie:`__Host-em_session=${raw}`,'CF-Connecting-IP':'b',...(body?{Origin:ROOT,'Content-Type':'application/json'}:{})},body:body?JSON.stringify(body):undefined}),env);
+  const settings=await (await call('/api/community/settings')).json();
+  assert.match(settings.community.logoUrl,/^https:\/\/cdn\.discordapp\.com\/icons\/\d+\/0123456789abcdef0123456789abcdef\.png/);
+  assert.equal(settings.community.bannerUrl,null);
+  assert.equal((await call('/api/community/appearance','PATCH',{name:'Commu Dev',shortName:'DEV',accent:'javascript:x'})).status,400);
+  assert.equal((await call('/api/community/appearance','PATCH',{name:'Ma Commu',shortName:'MC',accent:'#ff8800'})).status,200);
+  const session=await (await call('/api/session')).json();
+  assert.equal(session.community.name,'Ma Commu');assert.equal(session.community.shortName,'MC');
+  assert.equal(session.community.appearance.accent,'#ff8800');assert.ok(session.community.appearance.logoUrl);
 });

@@ -1315,6 +1315,14 @@ html[data-game] .race-card .race-fill:has(.solo-fill) { display: flex; flex-wrap
 .settings-module { display: flex; gap: 10px; align-items: flex-start; margin: 8px 0; }
 .settings-module small { display: block; color: #99a3a0; }
 
+/* Community of the site: name always visible, accent color set by its admins. */
+.community-chip { align-self: center; padding: 4px 10px; border: 1px solid var(--community-accent, #52d3d8); border-radius: 999px; color: #f4f6f5; font-size: 12.5px; font-weight: 800; white-space: nowrap; }
+:root[data-community-accent] .primary-button { background: var(--community-accent) !important; border-color: var(--community-accent) !important; }
+:root[data-community-accent] .top-stripes div:first-child { background: var(--community-accent) !important; }
+.settings-appearance { display: grid; gap: 10px; max-width: 520px; }
+.settings-appearance label { display: grid; gap: 4px; font-size: 13px; color: #c7d0d4; }
+.settings-appearance input[type="color"] { width: 64px; height: 34px; padding: 0; border: 0; background: none; }
+
 /* Large screens (27–34 inch, ultrawide): the whole interface grows in proportion and the page uses
    more of the width. The banner keeps its own sizing (its image is capped at its source resolution). */
 @media (min-width: 2200px) { :root { --wide-zoom: 1.15; } }
