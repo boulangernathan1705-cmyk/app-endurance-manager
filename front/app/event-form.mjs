@@ -25,7 +25,7 @@ export function formDurationMinutes(form){
 function parisToday(){return new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Paris',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());}
 export function departureFields(departure={}){
   const id=crypto.randomUUID();
-  const [hour='00',minute='00']=String(departure.time||'00:00').split(':');
+  const [hour='00',minute='00']=String(departure.clock||departure.time||'00:00').split(':');
   const minutes=MINUTES.includes(minute)?MINUTES:[...MINUTES,minute].sort();
   const hours=Array.from({length:24},(_,value)=>String(value).padStart(2,'0'));
   return `<div class="departure-field" data-id="${esc(departure.id||'')}"><div><label class="form-label" for="date-${id}">Date</label><input id="date-${id}" name="date" type="date" value="${esc(departure.date||'')}" ${departure.id?'':`min="${parisToday()}"`} required data-date-picker></div><div class="time-picker"><span class="form-label" id="time-label-${id}">Heure (Paris)</span><span class="time-picker-row" role="group" aria-labelledby="time-label-${id}"><select name="timeHour" aria-label="Heure">${hours.map(value=>`<option value="${value}" ${value===hour?'selected':''}>${value} h</option>`).join('')}</select><span aria-hidden="true">:</span><select name="timeMinute" aria-label="Minutes">${minutes.map(value=>`<option value="${value}" ${value===minute?'selected':''}>${value}</option>`).join('')}</select></span><input type="hidden" name="time" value="${esc(`${hour}:${minute}`)}"></div>${button('remove-departure','×','aria-label="Supprimer ce départ"','remove-departure')}</div>`;

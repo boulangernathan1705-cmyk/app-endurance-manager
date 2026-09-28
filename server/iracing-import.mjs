@@ -190,7 +190,7 @@ export function planIracingEvents(season, timestamp = Date.now()) {
       externalId:`special:${slug(event.slug || event.name)}:${event.date_start}`,
       special:{name:event.name, dateStart:event.date_start, dateEnd:event.date_end || event.date_start},
       input:{name:cleanName(event.name), format:'endurance', durationMinutes, eventType:'special', circuit:circuitFor(details.track, event.track_name, event.name),
-        schedulePending:true, categories:categoriesFor(event.name, event.car_class), departures:[{date:event.date_start, time:PENDING_TIME}]}
+        schedulePending:true, categories:categoriesFor(event.name, event.car_class), departures:[{date:event.date_start, time:PENDING_TIME, tbd:true}]}
     });
   }
   return plans;
@@ -261,14 +261,15 @@ export function articleFor(posts, special) {
   }) || null;
 }
 
-// Imported special events still waiting for their times: the placeholder start is replaced by the official
-// time slots, only if nobody entered it and no organizer changed its schedule.
+// Imported special events still waiting for their times (a single "Horaire à définir" start, unless an
+// organizer changed it): the official time slots are added; without any entry they replace the common start.
 export async function completeSpecialTimes(env, plans, {timestamp = Date.now(), fetchImpl = fetch} = {}) {
   const waiting = (await env.DB.prepare(`SELECT e.id, e.version, e.departures, i.external_id FROM iracing_imports i JOIN events e ON e.id=i.event_id
     WHERE i.external_id LIKE 'special:%' AND e.schedule_pending=1`).all()).results || [];
   const candidates = waiting.map(row => ({row, plan:plans.find(plan => plan.externalId === row.external_id)})).filter(({row, plan}) => {
     const departures = JSON.parse(row.departures || '[]');
-    return plan?.special && departures.length === 1 && departures[0].time === PENDING_TIME && departures[0].startsAt > timestamp;
+    // (races imported before the flag existed: their placeholder time)
+    return plan?.special && departures.length === 1 && (departures[0].tbd || departures[0].time === PENDING_TIME) && departures[0].startsAt > timestamp;
   });
   if (!candidates.length) return 0;
   const response = await fetchImpl(IRACING_NEWS, {headers:{Accept:'application/json'}});
@@ -279,12 +280,14 @@ export async function completeSpecialTimes(env, plans, {timestamp = Date.now(), 
     const article = articleFor(Array.isArray(posts) ? posts : [], plan.special);
     const starts = article ? specialStarts(article.content?.rendered, plan.special.dateStart, plan.special.dateEnd).filter(start => start > timestamp && representable(start)) : [];
     if (!starts.length || starts.length > MAX_DEPARTURES) continue;
-    const placeholder = JSON.parse(row.departures)[0];
-    if (await env.DB.prepare('SELECT 1 FROM registrations WHERE event_id=? LIMIT 1').bind(row.id).first()) continue;
-    // The placeholder start keeps its id (first slot); the others are new.
-    const departures = starts.map((start, index) => ({id:index ? id() : placeholder.id, ...parisDateTime(start), startsAt:start}));
-    const result = await env.DB.prepare(`UPDATE events SET departures=?, schedule_pending=0, version=version+1 WHERE id=? AND version=?
-      AND NOT EXISTS (SELECT 1 FROM registrations WHERE event_id=?)`).bind(JSON.stringify(departures), row.id, row.version, row.id).run();
+    const common = JSON.parse(row.departures)[0];
+    const slots = starts.map(start => ({id:id(), ...parisDateTime(start), startsAt:start}));
+    // Nobody entered yet: the official slots replace the common start. Otherwise the common start stays
+    // (its pilots and crews keep everything) and each crew then picks its slot; it closes with the first slot.
+    const used = await env.DB.prepare('SELECT 1 FROM registrations WHERE event_id=? UNION SELECT 1 FROM crews WHERE event_id=? LIMIT 1').bind(row.id, row.id).first();
+    const departures = used ? [{...common, ...parisDateTime(starts[0]), startsAt:starts[0], tbd:true}, ...slots] : slots;
+    const result = await env.DB.prepare('UPDATE events SET departures=?, schedule_pending=0, version=version+1 WHERE id=? AND version=?')
+      .bind(JSON.stringify(departures), row.id, row.version).run();
     if (result.meta.changes) completed++;
   }
   return completed;

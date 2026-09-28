@@ -212,7 +212,10 @@ function validateEvent(input, existing = null) {
     const departureId = previous?.id || id();
     if (ids.has(departureId)) fail(400, 'Départ répété.'); ids.add(departureId);
     if (previous && previous.startsAt <= Date.now() && startsAt !== previous.startsAt) fail(400, 'Un départ passé ne peut plus être déplacé.');
-    return {id: departureId, date: item.date, time: item.time, startsAt};
+    // "Horaire à définir": a common start where everyone enters and forms crews until the official time
+    // slots are known (imported iRacing special events). Kept as long as its date and time are unchanged.
+    const tbd = item.tbd === true || Boolean(previous?.tbd && previous.startsAt === startsAt);
+    return {id: departureId, date: item.date, time: item.time, startsAt, ...(tbd ? {tbd:true} : {})};
   }).sort((a, b) => a.startsAt - b.startsAt);
   const schedulePending = input.schedulePending == null ? Boolean(existing?.schedule_pending) : input.schedulePending === true;
   // Driver change required (iRacing endurances; always on LMU): true / false, or null for the site rule.

@@ -5,7 +5,7 @@ import {renderEventForm,departureFields,updateRemoveButtons,goToEventStep,formDu
 import {renderMyEntries} from './entries-view.mjs';
 import {refresh,refreshAfterSave} from './refresh.mjs';
 import {draftFor,registrationDraft,ownRegistrations,rerenderRegistrationSection,submitRegistration,registrationStep} from './registration.mjs';
-import {updateCrewState} from './crews.mjs';
+import {updateCrewState,pickSlot} from './crews.mjs';
 import {installRouter,routeFromLocation,applyRoute} from './router.mjs';
 import {installAutoRefresh} from './auto-refresh.mjs';
 
@@ -169,6 +169,7 @@ async function perform(action,target){
 document.addEventListener('input',event=>{const field=event.target;if(field.dataset.departure&&state.drafts[field.dataset.departure]){if(field.name==='pilotName')state.drafts[field.dataset.departure].name=field.value;if(field.name==='preferredPilot')state.drafts[field.dataset.departure].preferredPilot=field.value;}});
 document.addEventListener('change',async event=>{
   const field=event.target;
+  if(field.matches?.('[data-slot-picker]')){try{if(await pickSlot(field))await refreshAfterSave('Départ choisi.');}catch(error){showError(error);}return;}
   if(field.matches?.('[data-crew-state-select]')){try{await updateCrewState(field);await refreshAfterSave('Équipage mis à jour.');}catch(error){showError(error);}return;}
   if(field.name==='participant'){const draft=state.drafts[field.dataset.departure],participant=state.participants.find(item=>item.id===field.value);if(draft){draft.participantUserId=participant?.id||null;draft.participantId=participant?.participantId||null;draft.name=participant?.name||'';draft.category='';draft.cars=[];draft.carAny=false;state.registrationOpen.add(field.dataset.departure);renderEvent();}return;}
   const departureId=field.form?.dataset.departure;if(departureId&&state.drafts[departureId]&&(field.name==='carPreference'||field.name==='carAny')){const draft=state.drafts[departureId];draft.cars=[...field.form.querySelectorAll('[name="carPreference"]:checked')].map(input=>input.value);draft.carAny=!!field.form.elements.carAny?.checked;if(draft.carAny)draft.cars=[];for(const input of field.form.querySelectorAll('[name="carPreference"]')){input.disabled=draft.carAny;if(draft.carAny)input.checked=false;}}

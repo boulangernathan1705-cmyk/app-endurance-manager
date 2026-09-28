@@ -1281,6 +1281,11 @@ html[data-game] .race-card .race-fill:has(.solo-fill) { display: flex; flex-wrap
 .solo-driver-note { border: 1px solid rgba(82,211,216,.35); background: rgba(82,211,216,.07); color: #c7eef0; }
 .solo-driver-badge { display: inline-flex; align-items: center; margin-left: 6px; padding: 1px 6px; border: 1px solid rgba(243,179,61,.6); border-radius: 6px; color: #ffd98a; font-size: 10px; font-weight: 900; letter-spacing: .04em; vertical-align: middle; }
 
+/* Common "Horaire à définir" start: notice and the choice of an official slot. */
+.tbd-notice { margin: 0 0 12px; padding: 10px 12px; border: 1px solid rgba(243,179,61,.45); border-left: 4px solid #f3b33d; border-radius: 10px; background: rgba(243,179,61,.08); color: #ffe2a8; font-size: 14px; line-height: 1.5; }
+.slot-picker { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 6px 0; color: #c7d0d4; font-size: 13px; font-weight: 700; }
+.slot-picker select { min-height: 34px; padding: 0 10px; border: 1px solid rgba(82,211,216,.5); border-radius: 8px; background: var(--panel2, #171a1d); color: #f4f6f5; font-weight: 700; }
+
 /* Large screens (27–34 inch, ultrawide): the whole interface grows in proportion and the page uses
    more of the width. The banner keeps its own sizing (its image is capped at its source resolution). */
 @media (min-width: 2200px) { :root { --wide-zoom: 1.15; } }

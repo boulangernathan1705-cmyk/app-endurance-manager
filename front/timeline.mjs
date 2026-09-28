@@ -4,11 +4,14 @@ const timelineTime = new Intl.DateTimeFormat('fr-FR', {timeZone:'Europe/Paris', 
 const timelineDate = new Intl.DateTimeFormat('fr-FR', {timeZone:'Europe/Paris', day:'2-digit', month:'2-digit', timeZoneName:'short'});
 
 export function raceHourLabel(departure, index) {
+  // Start time not known yet: hours of race ("0 h", "1 h"…).
+  if (departure.tbd) return `${index} h`;
   return timeLabel(timelineTime.format(new Date(departure.startsAt + index * 3600000)));
 }
 
 // Finish time of a departure (its real end when the duration has minutes).
 export function raceEndLabel(departure) {
+  if (departure.tbd) return `${Math.round((Number(departure.endsAt) - departure.startsAt) / 60000 / 60 * 10) / 10} h`.replace('.', ',');
   return timeLabel(timelineTime.format(new Date(Number(departure.endsAt))));
 }
 

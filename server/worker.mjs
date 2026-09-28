@@ -15,6 +15,14 @@ function departureById(event, departureId) {
   if (!departure) fail(404, 'Départ introuvable.');
   return departure;
 }
+// An official slot for pilots leaving the common "Horaire à définir" start of the same race.
+function slotFor(event, from, departureId) {
+  if (!from.tbd) fail(409, 'Ce départ a déjà son horaire.');
+  const target = JSON.parse(event.departures).find(d => d.id === departureId);
+  if (!target || target.tbd) fail(400, 'Choisis un des horaires proposés.');
+  if (target.startsAt <= Date.now()) fail(409, 'Ce départ est passé.');
+  return target;
+}
 function isRegistrationManager(actor) {
   return ['admin','organizer'].includes(actor.user?.role);
 }
@@ -285,6 +293,18 @@ async function api(request, env) {
         return json({ok:true});
       }
       if (method!=='PATCH') fail(404,'Action introuvable.');
+      // Common "Horaire à définir" start: once the official slots are known, the crew picks its start and
+      // moves there with its pilots.
+      if (input.departureId!==undefined) {
+        const target=slotFor(event,departure,input.departureId);
+        const results=await env.DB.batch([
+          env.DB.prepare(`UPDATE registrations SET departure_id=?,version=version+1 WHERE id IN (SELECT registration_id FROM crew_members WHERE crew_id=?)
+            AND EXISTS(SELECT 1 FROM crews WHERE id=? AND version=?)`).bind(target.id,crew.id,crew.id,input.version),
+          env.DB.prepare('UPDATE crews SET departure_id=?,version=version+1 WHERE id=? AND version=?').bind(target.id,crew.id,input.version)
+        ]);
+        if (!results[1].meta.changes) fail(409,'Cet équipage a changé. Actualise avant de réessayer.');
+        return json({ok:true,departureId:target.id});
+      }
       if (typeof input.locked==='boolean' && input.name===undefined && input.category===undefined && input.car===undefined) {
         const result=await env.DB.prepare('UPDATE crews SET locked=?,version=version+1 WHERE id=? AND version=?').bind(input.locked?1:0,crew.id,input.version).run();
         if (!result.meta.changes) fail(409,'Cet équipage a changé. Actualise avant de réessayer.');
@@ -370,6 +390,20 @@ async function api(request, env) {
       SELECT ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,? FROM events WHERE id=? AND version=?`).bind(regId,event.id,departure.id,userId,ownerUserId,guestHash,data.name,data.nameKey,data.category,data.car,JSON.stringify(data.cars),data.carAny?1:0,data.status,data.preferredPilot,now(),participant.id,JSON.stringify(data.roundChoices||[]),data.soloDriver?1:0,event.id,event.version).run();
     if (!result.meta.changes) fail(409, 'Cet événement a changé. Actualise avant de t’inscrire.');
     return json({id:regId, recoveryLink:guestToken ? canonical + '/#access=' + guestToken : null}, 201, guestToken ? [setCookie(COOKIE_GUEST, guestToken, 365 * DAY)] : []);
+  }
+  // A pilot without a crew on the common "Horaire à définir" start picks one of the official slots.
+  const regMove = path.match(/^\/api\/registrations\/([a-f0-9-]{36})\/departure$/);
+  if (regMove && method === 'PATCH') {
+    const reg = await env.DB.prepare(registrationSelect+' WHERE r.id=?').bind(regMove[1]).first();
+    if (!reg) fail(404, 'Inscription introuvable.');
+    if (!canManageRegistration(reg,actor)) fail(403, 'Tu n’as pas l’autorisation de modifier cette inscription.');
+    const input = await body(request);
+    if (input.version !== reg.version) fail(409, 'Cette inscription a changé. Actualise la page.');
+    const event = await eventById(env, reg.event_id), target = slotFor(event, departureById(event, reg.departure_id), input.departureId);
+    const result = await env.DB.prepare(`UPDATE registrations SET departure_id=?,version=version+1 WHERE id=? AND version=?
+      AND NOT EXISTS(SELECT 1 FROM crew_members WHERE registration_id=?)`).bind(target.id, reg.id, input.version, reg.id).run();
+    if (!result.meta.changes) fail(409, 'Rejoins ou quitte d’abord ton équipage : c’est lui qui choisit le départ.');
+    return json({ok:true, departureId:target.id});
   }
   const regMatch = path.match(/^\/api\/registrations\/([a-f0-9-]{36})$/);
   if (regMatch && ['PATCH','DELETE'].includes(method)) {

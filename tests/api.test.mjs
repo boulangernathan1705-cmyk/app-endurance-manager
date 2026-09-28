@@ -494,10 +494,34 @@ test('official iRacing endurances are imported once, by the daily task or by an 
  globalThis.fetch=async url=>new Response(JSON.stringify(String(url).includes('wp-json')?[article]:String(url).endsWith('manifest.json')?{current:'2099S4'}:future));
  let indy=(await req('/api/races?game=iracing')).data.events.find(event=>event.name==='8 Hours of Indianapolis');
  assert.equal(indy.schedulePending,true);
+ // Time not known yet: one common "Horaire à définir" start, where pilots enter and form crews.
+ assert.equal(indy.departures.length,1);assert.equal(indy.departures[0].tbd,true);
+ const pool=indy.departures[0];
+ const leo=await req(`/api/events/${indy.id}/departures/${pool.id}/registrations`,'POST',{name:'Leo',category:'GT3',status:'whole'},'pilot');
+ const max=await req(`/api/events/${indy.id}/departures/${pool.id}/registrations`,'POST',{name:'Max',category:'GT3',status:'whole'},'admin');
+ const crew=await req(`/api/events/${indy.id}/departures/${pool.id}/crews`,'POST',{name:'Team',category:'GT3'},'admin');
+ assert.equal((await req('/api/crews/'+crew.data.id+'/members','POST',{registrationId:max.data.id,version:1},'admin')).status,200);
+ // The official slots arrive: the common start stays (closing with the first slot), the slots are added.
  await req('/api/admin/iracing-import','POST',{},'admin');
  indy=(await req('/api/races?game=iracing')).data.events.find(event=>event.name==='8 Hours of Indianapolis');
  assert.equal(indy.schedulePending,false);
- assert.deepEqual(indy.departures.map(d=>`${d.date} ${d.time}`),['2099-10-17 00:00','2099-10-17 14:00'],'Friday 22:00 GMT is Saturday midnight in Paris');
+ assert.deepEqual(indy.departures.map(d=>`${d.date} ${d.time}${d.tbd?' tbd':''}`),['2099-10-17 00:00 tbd','2099-10-17 00:00','2099-10-17 14:00'],'Friday 22:00 GMT is Saturday midnight in Paris');
+ const [common,slotA,slotB]=indy.departures;
+ assert.equal(common.id,pool.id);assert.equal(common.availability.length,2);
+ // The crew picks its start and moves there with its pilots; a pilot without crew picks theirs.
+ const team=common.crews[0];
+ assert.equal((await req('/api/crews/'+team.id,'PATCH',{departureId:common.id,version:team.version},'admin')).status,400,'not the common start');
+ assert.equal((await req('/api/crews/'+team.id,'PATCH',{departureId:slotB.id,version:team.version},'admin')).status,200);
+ const leoReg=common.availability.find(reg=>reg.name==='Leo');
+ assert.equal((await req('/api/registrations/'+leoReg.id+'/departure','PATCH',{departureId:slotA.id,version:leoReg.version},'pilot')).status,200);
+ indy=(await req('/api/races?game=iracing')).data.events.find(event=>event.name==='8 Hours of Indianapolis');
+ const [after,slot1,slot2]=indy.departures;
+ assert.equal(after.availability.length,0);assert.equal(after.crews.length,0);
+ assert.deepEqual(slot1.availability.map(reg=>reg.name),['Leo']);
+ assert.deepEqual(slot2.availability.map(reg=>reg.name),['Max']);assert.equal(slot2.crews[0].registrationIds[0],max.data.id);
+ // A start that already has its time cannot be left this way.
+ const leoAfter=slot1.availability[0];
+ assert.equal((await req('/api/registrations/'+leoAfter.id+'/departure','PATCH',{departureId:slotB.id,version:leoAfter.version},'pilot')).status,409);
 });
 
 test('a driver can race an endurance alone; organizers set whether a driver change is required', async () => {

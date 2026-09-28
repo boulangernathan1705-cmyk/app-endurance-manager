@@ -134,6 +134,17 @@ async function fetchEvents(scope) {
   const result = await api(`/api/races?game=${encodeURIComponent(activeGame)}&scope=${scope}`);
   return (Array.isArray(result.events)?result.events:[]).filter(event => gameForEvent(event) === activeGame);
 }
+// Common start of a race whose time is not known yet ("Horaire à définir"): its time reads "à définir"
+// everywhere; the stored time stays in departure.clock (event form).
+function markUndefinedStarts(events) {
+  for (const event of events) for (const departure of event.departures || []) if (departure.tbd && !departure.clock) { departure.clock = departure.time; departure.time = 'à définir'; }
+  return events;
+}
+// Official slots a crew or a pilot of the common start can pick.
+export function pickableSlots(event, departure) {
+  if (!departure?.tbd) return [];
+  return (event.departures || []).filter(item => !item.tbd && item.startsAt > Date.now());
+}
 function mergeEvents(...lists) {
   const byId=new Map();
   for (const event of lists.flat()) byId.set(event.id,event);
@@ -152,7 +163,7 @@ export async function load() {
   state.discordReady=session.discordReady;
   // Name of the solo races tab: a site setting (SOLO_LABEL), e.g. "Courses TDZ" for one community.
   if (session.soloLabel) state.soloLabel=session.soloLabel;
-  state.events=mergeEvents(upcoming,archived);
+  state.events=markUndefinedStarts(mergeEvents(upcoming,archived));
   // The members list rarely changes: fetch it once per session instead of on every refresh.
   if (userChanged || !state.participantsLoaded) {
     state.participants=state.user ? (await api('/api/participants')).participants : [];
@@ -163,7 +174,7 @@ export async function load() {
 export async function loadArchive() {
   if (state.archiveLoaded) return;
   const archived = await fetchEvents('archived');
-  state.events=mergeEvents(state.events,archived);
+  state.events=markUndefinedStarts(mergeEvents(state.events,archived));
   state.archiveLoaded=true;
 }
 
