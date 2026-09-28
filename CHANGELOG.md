@@ -2,6 +2,11 @@
 
 Les changements du site, version par version. La plus récente est en haut.
 
+## v1.1.4 — 28 septembre 2026
+
+### Corrections
+- En modifiant une course, cocher ou décocher **Horaires à confirmer** ajoute ou retire bien le départ **à définir** (auparavant, seule la création réagissait). Les inscrits restent sur leur départ.
+
 ## v1.1.3 — 28 septembre 2026
 
 ### Horaires à confirmer (LMU et iRacing)

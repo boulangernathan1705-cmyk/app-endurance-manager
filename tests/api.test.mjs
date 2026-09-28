@@ -590,6 +590,16 @@ test('"Horaires à confirmer": a common start "à définir", real times added la
  assert.deepEqual(event.departures.map(d=>`${d.date} ${d.time}${d.tbd?' tbd':''}`),['2090-10-17 09:00 tbd','2090-10-17 09:00','2090-10-17 14:00']);
  const leo=event.departures[0].availability[0];
  assert.equal((await req('/api/registrations/'+leo.id+'/departure','PATCH',{departureId:event.departures[2].id,version:leo.version},'pilot')).status,200);
+ // Unticking "Horaires à confirmer" on a race with only its common start: it becomes a start with a time,
+ // its entries stay on it.
+ const fourth=await req('/api/events','POST',{...base,name:'6h SPA',circuit:'spa',departures:[{date:'2090-12-04',time:'20:00',tbd:true}]},'admin');
+ event=(await req('/api/events')).data.events.find(e=>e.id===fourth.data.id);
+ const spaPool=event.departures[0];
+ await req(`/api/events/${event.id}/departures/${spaPool.id}/registrations`,'POST',{name:'Leo',category:'Hypercar',status:'whole'},'pilot');
+ event=(await req('/api/events')).data.events.find(e=>e.id===fourth.data.id);
+ assert.equal((await edit(event,[{id:spaPool.id,date:'2090-12-04',time:'20:00',tbd:false}])).status,200);
+ event=(await req('/api/events')).data.events.find(e=>e.id===fourth.data.id);
+ assert.equal(event.departures[0].tbd,undefined);assert.equal(event.departures[0].id,spaPool.id);assert.equal(event.departures[0].availability.length,1);
  // Upcoming LMU races "à confirmer" without entries become a single common start (migration 0033).
  const third=await req('/api/events','POST',{...base,name:'8h BAHRAIN',circuit:'bahrain',departures:[{date:'2090-11-13',time:'00:00'},{date:'2090-11-14',time:'00:00'}]},'admin');
  DB.db.exec(readFileSync(new URL('../migrations/0033_lmu_pending_common_start.sql',import.meta.url),'utf8'));
