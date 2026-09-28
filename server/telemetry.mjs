@@ -1,4 +1,5 @@
 import {json, origin, fail, identity, rateLimit} from './core.mjs';
+import {currentCommunity} from './community.mjs';
 
 const DAY=86400;
 const clean=(value,max)=>String(value??'').replace(/[\u0000-\u001f\u007f]/g,' ').slice(0,max);
@@ -16,18 +17,20 @@ async function ensureClientErrorsTable(env) {
       detail TEXT NOT NULL DEFAULT '',
       user_agent TEXT NOT NULL DEFAULT '',
       viewport TEXT NOT NULL DEFAULT '',
-      online INTEGER NOT NULL DEFAULT 1
+      online INTEGER NOT NULL DEFAULT 1,
+      community_id TEXT NOT NULL DEFAULT ''
     )`),
     env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_client_errors_created_at ON client_errors(created_at DESC)')
   ]);
 }
 
-async function readClientErrors(env) {
+// Errors of one community only (its organizers and admins read them on the diagnostics page).
+async function readClientErrors(env, community) {
   await ensureClientErrorsTable(env);
   const cutoff=Math.floor(Date.now()/1000)-14*DAY;
   await env.DB.prepare('DELETE FROM client_errors WHERE created_at < ?').bind(cutoff).run();
   return (await env.DB.prepare(`SELECT created_at,kind,page,api_path,method,message,detail,user_agent,viewport,online
-    FROM client_errors ORDER BY created_at DESC LIMIT 200`).all()).results;
+    FROM client_errors WHERE community_id=? ORDER BY created_at DESC LIMIT 200`).bind(community.id).all()).results;
 }
 
 export async function ingestClientError(request,env) {
@@ -40,7 +43,7 @@ export async function ingestClientError(request,env) {
   if (request.method==='GET') {
     const actor=await identity(request,env);
     if (!actor.user || !['admin','organizer'].includes(actor.user.role)) return json({error:'Accès réservé aux organisateurs et administrateurs.'},403);
-    return json({errors:await readClientErrors(env)});
+    return json({errors:await readClientErrors(env, await currentCommunity(env))});
   }
   if (request.method!=='POST') return new Response(null,{status:405});
   if (!request.headers.get('Content-Type')?.toLowerCase().startsWith('text/plain')) return new Response(null,{status:415});
@@ -55,10 +58,11 @@ export async function ingestClientError(request,env) {
   const createdAt=Math.floor(Date.now()/1000);
   try {
     await ensureClientErrorsTable(env);
+    const community=await currentCommunity(env);
     await env.DB.batch([
-      env.DB.prepare(`INSERT INTO client_errors(id,created_at,kind,page,api_path,method,message,detail,user_agent,viewport,online)
-        VALUES(?,?,?,?,?,?,?,?,?,?,?)`).bind(
-          crypto.randomUUID(),createdAt,clean(input.kind||'network',40),clean(input.page,160),clean(input.apiPath,160),clean(input.method,12),clean(input.message,500),clean(input.detail,1000),clean(input.userAgent,500),clean(input.viewport,40),input.online===false?0:1
+      env.DB.prepare(`INSERT INTO client_errors(id,created_at,kind,page,api_path,method,message,detail,user_agent,viewport,online,community_id)
+        VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`).bind(
+          crypto.randomUUID(),createdAt,clean(input.kind||'network',40),clean(input.page,160),clean(input.apiPath,160),clean(input.method,12),clean(input.message,500),clean(input.detail,1000),clean(input.userAgent,500),clean(input.viewport,40),input.online===false?0:1,community.id
         ),
       env.DB.prepare('DELETE FROM client_errors WHERE created_at < ?').bind(createdAt-14*DAY)
     ]);
@@ -70,9 +74,9 @@ export async function ingestClientError(request,env) {
   return new Response(null,{status:204});
 }
 
-export async function clientErrorsApi(path,method,env,actor) {
+export async function clientErrorsApi(path,method,env,actor,community) {
   if (path!=='/api/client-errors') return null;
   if (method!=='GET') fail(405,'Méthode non autorisée.');
   if (!actor.user || !['admin','organizer'].includes(actor.user.role)) fail(403,'Accès réservé aux organisateurs et administrateurs.');
-  return json({errors:await readClientErrors(env)});
+  return json({errors:await readClientErrors(env, community)});
 }

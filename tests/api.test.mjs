@@ -30,6 +30,9 @@ function harness(withParticipants=true){
  DB.db.exec(readFileSync(new URL('../migrations/0029_event_duration_minutes.sql',import.meta.url),'utf8'));
  DB.db.exec(readFileSync(new URL('../migrations/0030_iracing_import.sql',import.meta.url),'utf8'));
  DB.db.exec(readFileSync(new URL('../migrations/0031_solo_driver.sql',import.meta.url),'utf8'));
+ DB.db.exec(readFileSync(new URL('../migrations/0016_client_errors.sql',import.meta.url),'utf8'));
+ DB.db.exec(readFileSync(new URL('../migrations/0017_discord_weekly.sql',import.meta.url),'utf8'));
+ if(withParticipants)DB.db.exec(readFileSync(new URL('../migrations/0034_communities.sql',import.meta.url),'utf8'));
  const env={DB,APP_ORIGIN:ROOT,SOLO_RACES:'on',DISCORD_CLIENT_ID:'app-id',DISCORD_CLIENT_SECRET:'test-only-secret',ADMIN_DISCORD_IDS:ADMIN,ASSETS:{fetch:async()=>new Response('static')}};
  const jars=new Map();
  async function req(path,method='GET',data,actor='guest',options={}){
@@ -309,9 +312,9 @@ test('shortening preserves bookings and crews, rejecting hours outside the new d
 test('event list stays available beyond D1 bound-parameter limit',async()=>{
  const {req,login,DB}=harness();await login(ADMIN,'admin');
  const insertUser=DB.db.prepare('INSERT INTO users(id,name,created_at) VALUES(?,?,0)');
- const insertEvent=DB.db.prepare(`INSERT INTO events(id,name,circuit,categories,departures,created_by,created_at) VALUES(?,?,'','["GT3"]',?,?,?)`);
- const insertParticipant=DB.db.prepare('INSERT INTO participants(id,name,user_id,created_by,created_at) VALUES(?,?,?,?,0)');
- const insertRegistration=DB.db.prepare(`INSERT INTO registrations(id,event_id,departure_id,user_id,owner_user_id,name,name_key,category,status,created_at,participant_id) VALUES(?,?,'d',?,?,?,?,'GT3','whole',0,?)`);
+ const insertEvent=DB.db.prepare(`INSERT INTO events(id,name,circuit,categories,departures,created_by,created_at,community_id) VALUES(?,?,'','["GT3"]',?,?,?,'e0a1c0de-0000-4000-8000-000000000001')`);
+ const insertParticipant=DB.db.prepare(`INSERT INTO participants(id,name,user_id,created_by,created_at,community_id) VALUES(?,?,?,?,0,'e0a1c0de-0000-4000-8000-000000000001')`);
+ const insertRegistration=DB.db.prepare(`INSERT INTO registrations(id,event_id,departure_id,user_id,owner_user_id,name,name_key,category,status,created_at,participant_id,community_id) VALUES(?,?,'d',?,?,?,?,'GT3','whole',0,?,'e0a1c0de-0000-4000-8000-000000000001')`);
  for(let i=0;i<120;i++){
   const user=String(400000000000000000n+BigInt(i)),creator=String(500000000000000000n+BigInt(i)),suffix=String(i).padStart(12,'0');
   const eventId='00000000-0000-4000-8000-'+suffix,participantId='10000000-0000-4000-8000-'+suffix;

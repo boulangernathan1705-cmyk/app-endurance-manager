@@ -17,10 +17,12 @@ const secondDepartureUuid='55555555-5555-4555-8555-555555555555';
 const registrationUuid='66666666-6666-4666-8666-666666666666';
 const crewUuid='77777777-7777-4777-8777-777777777777';
 
+const COMMUNITY={id:'e0a1c0de-0000-4000-8000-000000000001',slug:'commu-dev',modules:{discordWeekly:true}};
 function request(path,method='POST'){return new Request(`https://endurance-manager.app${path}`,{method});}
 function dbFixture({events=[],registrations=[],crews=[]}){
   return{prepare(sql){
-    if(sql.includes('FROM events'))return{all:async()=>({results:events})};
+    // Events are read for one community (its id is the bound parameter).
+    if(sql.includes('FROM events'))return{bind:communityId=>({all:async()=>({results:events.filter(item=>(item.community_id||COMMUNITY.id)===communityId)})})};
     if(sql.includes('FROM registrations'))return{bind:()=>({all:async()=>({results:registrations.filter(item=>item.status!=='unavailable')})})};
     if(sql.includes('FROM crews'))return{bind:()=>({all:async()=>({results:crews})})};
     throw new Error(`Requête D1 inattendue dans le test: ${sql}`);
@@ -49,7 +51,7 @@ test('le récap garde tous les départs futurs de la semaine et retire ceux déj
     {id:secondDepartureUuid,startsAt:Date.parse('2026-09-18T16:00:00Z')},
     {id:futureDepartureUuid,startsAt:Date.parse('2026-09-19T08:00:00Z')}
   ])];
-  const snapshot=await loadWeeklyDiscordSnapshot({DB:dbFixture({events})},now);
+  const snapshot=await loadWeeklyDiscordSnapshot({DB:dbFixture({events})},now,COMMUNITY);
   assert.equal(snapshot.currentDepartures.length,0);
   assert.equal(snapshot.futureDepartures.length,3);
   assert.deepEqual(snapshot.futureDepartures.map(item=>item.departureId),[departureUuid,secondDepartureUuid,futureDepartureUuid]);
@@ -60,7 +62,7 @@ test('un départ déjà commencé sans équipage engagé disparaît même si un 
   const now=Date.parse('2026-09-18T14:00:00Z');
   const startsAt=Date.parse('2026-09-18T13:00:00Z');
   const events=[singleDepartureEvent(uuid,'4h SILVERSTONE','silverstone',4,departureUuid,startsAt)];
-  const snapshot=await loadWeeklyDiscordSnapshot({DB:dbFixture({events,registrations:[registration()]})},now);
+  const snapshot=await loadWeeklyDiscordSnapshot({DB:dbFixture({events,registrations:[registration()]})},now,COMMUNITY);
   assert.equal(snapshot.currentDepartures.length,0);
   assert.equal(snapshot.futureDepartures.length,0);
 });
@@ -69,7 +71,7 @@ test('un départ déjà commencé avec un équipage engagé reste affiché comme
   const now=Date.parse('2026-09-18T14:00:00Z');
   const startsAt=Date.parse('2026-09-18T13:00:00Z');
   const events=[singleDepartureEvent(uuid,'4h SILVERSTONE','silverstone',4,departureUuid,startsAt)];
-  const snapshot=await loadWeeklyDiscordSnapshot({DB:dbFixture({events,registrations:[registration()],crews:[crewRow()]})},now);
+  const snapshot=await loadWeeklyDiscordSnapshot({DB:dbFixture({events,registrations:[registration()],crews:[crewRow()]})},now,COMMUNITY);
   assert.equal(snapshot.currentDepartures.length,1);
   assert.equal(snapshot.currentDepartures[0].crews.length,1);
   assert.deepEqual(snapshot.currentDepartures[0].crews[0].pilots,['Nathan']);
@@ -85,7 +87,7 @@ test('quand la semaine est terminée le récap affiche tous les départs de la p
       {id:secondDepartureUuid,startsAt:Date.parse('2026-09-19T10:00:00Z')}
     ])
   ];
-  const snapshot=await loadWeeklyDiscordSnapshot({DB:dbFixture({events})},now);
+  const snapshot=await loadWeeklyDiscordSnapshot({DB:dbFixture({events})},now,COMMUNITY);
   assert.equal(snapshot.currentDepartures.length,0);
   assert.equal(snapshot.futureDepartures.length,2);
   assert.equal(snapshot.periodKey,'2026-09-14');
@@ -145,7 +147,7 @@ test('la synchronisation reste inactive tant que le webhook secret n’est pas c
 test('une course « Horaires à confirmer » n’est jamais annoncée en cours et son heure provisoire n’est pas publiée',async()=>{
   const now=Date.parse('2026-10-03T23:30:00Z');
   const pending={...event(uuid,'6h FUJI','fuji',6,[{id:departureUuid,startsAt:Date.parse('2026-10-03T22:00:00Z')},{id:secondDepartureUuid,startsAt:Date.parse('2026-10-04T22:00:00Z')}]),schedule_pending:1};
-  const snapshot=await loadWeeklyDiscordSnapshot({DB:dbFixture({events:[pending],registrations:[registration()],crews:[crewRow()]})},now);
+  const snapshot=await loadWeeklyDiscordSnapshot({DB:dbFixture({events:[pending],registrations:[registration()],crews:[crewRow()]})},now,COMMUNITY);
   assert.equal(snapshot.currentDepartures.length,0,'placeholder 0:00 start is not "en cours"');
   const payload=JSON.stringify(buildWeeklyDiscordPayload(snapshot,'https://endurance-manager.app',now));
   assert.doesNotMatch(payload,/00:00/);

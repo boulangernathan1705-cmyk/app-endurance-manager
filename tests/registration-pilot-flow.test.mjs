@@ -29,7 +29,7 @@ test('Discord identity is authoritative when another pilot is selected',()=>{
 
 test('external pilots stay owned by the account that created them',()=>{
   assert.match(core,/user_id IS NULL AND guest_hash IS NULL AND created_by=\? AND lower\(name\)=lower\(\?\)/);
-  assert.match(core,/\.bind\(actor\.user\.id,data\.name\)/);
+  assert.match(core,/\.bind\(cid,actor\.user\.id,data\.name\)/, 'and scoped to the community of the race');
   assert.match(core,/Connecte-toi avec Discord pour inscrire un autre pilote/);
 });
 

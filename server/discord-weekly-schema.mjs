@@ -10,7 +10,8 @@ export function ensureDiscordWeeklySchema(env) {
     updated_at INTEGER NOT NULL DEFAULT 0,
     dirty INTEGER NOT NULL DEFAULT 0,
     lock_token TEXT NOT NULL DEFAULT '',
-    lock_until INTEGER NOT NULL DEFAULT 0
+    lock_until INTEGER NOT NULL DEFAULT 0,
+    community_id TEXT NOT NULL DEFAULT ''
   )`).run().catch(error => {
     ready = null;
     throw error;

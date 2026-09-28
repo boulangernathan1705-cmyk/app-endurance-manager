@@ -62,7 +62,9 @@ function personal(reg, actor) {
 }
 const registrationSelect = `SELECT r.*,p.user_id AS participant_user_id,p.guest_hash AS participant_guest_hash,
  p.created_by AS participant_created_by,p.name AS participant_name FROM registrations r JOIN participants p ON p.id=r.participant_id`;
-async function registrationParticipant(env, actor, input, data) {
+// Pilot entries (participants) belong to the community of the race: every lookup and creation is scoped to it.
+async function registrationParticipant(env, actor, input, data, community) {
+  const cid = community.id;
   const manager=!!actor.user && ['admin','organizer'].includes(actor.user.role);
   if (input.participantUserId) {
     if (!actor.user) fail(401,'Connecte-toi avec Discord pour inscrire un autre pilote.');
@@ -71,12 +73,12 @@ async function registrationParticipant(env, actor, input, data) {
     if (!discordUser) fail(404,'Ce pilote Discord est introuvable. Actualise la page.');
     data.name=discordUser.name;
     data.nameKey=data.name.normalize('NFKC').toLocaleLowerCase('fr-FR');
-    await env.DB.prepare(`INSERT INTO participants(id,name,user_id,created_by,created_at) VALUES(?,?,?,?,?)
-      ON CONFLICT(user_id) WHERE user_id IS NOT NULL DO UPDATE SET name=excluded.name`).bind(id(),discordUser.name,discordUser.id,actor.user.id,now()).run();
-    return env.DB.prepare('SELECT * FROM participants WHERE user_id=?').bind(discordUser.id).first();
+    await env.DB.prepare(`INSERT INTO participants(id,name,user_id,created_by,created_at,community_id) VALUES(?,?,?,?,?,?)
+      ON CONFLICT(community_id,user_id) WHERE user_id IS NOT NULL DO UPDATE SET name=excluded.name`).bind(id(),discordUser.name,discordUser.id,actor.user.id,now(),cid).run();
+    return env.DB.prepare('SELECT * FROM participants WHERE user_id=? AND community_id=?').bind(discordUser.id,cid).first();
   }
   if (input.participantId) {
-    const participant=await env.DB.prepare('SELECT * FROM participants WHERE id=?').bind(input.participantId).first();
+    const participant=await env.DB.prepare('SELECT * FROM participants WHERE id=? AND community_id=?').bind(input.participantId,cid).first();
     if (!participant) fail(404,'Ce pilote est introuvable. Actualise la page.');
     const existing=await env.DB.prepare(registrationSelect+' WHERE r.participant_id=?').bind(participant.id).all();
     const self=!!(actor.user && participant.user_id===actor.user.id) || !!(actor.guestHash && participant.guest_hash===actor.guestHash);
@@ -90,19 +92,19 @@ async function registrationParticipant(env, actor, input, data) {
     const linkedUser=await env.DB.prepare('SELECT id FROM users WHERE lower(name)=lower(?) LIMIT 1').bind(data.name).first();
     if (linkedUser) fail(409,'Ce pseudo correspond à un pilote Discord. Sélectionne son compte dans la liste.');
     const existing=await env.DB.prepare(`SELECT * FROM participants
-      WHERE user_id IS NULL AND guest_hash IS NULL AND created_by=? AND lower(name)=lower(?)
-      ORDER BY created_at,id LIMIT 1`).bind(actor.user.id,data.name).first();
+      WHERE community_id=? AND user_id IS NULL AND guest_hash IS NULL AND created_by=? AND lower(name)=lower(?)
+      ORDER BY created_at,id LIMIT 1`).bind(cid,actor.user.id,data.name).first();
     if (existing) return existing;
-    const participant={id:id(),name:data.name,user_id:null,guest_hash:null,created_by:actor.user.id};
-    await env.DB.prepare('INSERT INTO participants(id,name,created_by,created_at) VALUES(?,?,?,?)').bind(participant.id,participant.name,actor.user.id,now()).run();
+    const participant={id:id(),name:data.name,user_id:null,guest_hash:null,created_by:actor.user.id,community_id:cid};
+    await env.DB.prepare('INSERT INTO participants(id,name,created_by,created_at,community_id) VALUES(?,?,?,?,?)').bind(participant.id,participant.name,actor.user.id,now(),cid).run();
     return participant;
   }
   if (actor.user) {
-    await env.DB.prepare('INSERT INTO participants(id,name,user_id,created_by,created_at) VALUES(?,?,?,?,?) ON CONFLICT(user_id) WHERE user_id IS NOT NULL DO NOTHING').bind(id(),data.name,actor.user.id,actor.user.id,now()).run();
-    return env.DB.prepare('SELECT * FROM participants WHERE user_id=?').bind(actor.user.id).first();
+    await env.DB.prepare('INSERT INTO participants(id,name,user_id,created_by,created_at,community_id) VALUES(?,?,?,?,?,?) ON CONFLICT(community_id,user_id) WHERE user_id IS NOT NULL DO NOTHING').bind(id(),data.name,actor.user.id,actor.user.id,now(),cid).run();
+    return env.DB.prepare('SELECT * FROM participants WHERE user_id=? AND community_id=?').bind(actor.user.id,cid).first();
   }
-  await env.DB.prepare('INSERT INTO participants(id,name,guest_hash,created_at) VALUES(?,?,?,?) ON CONFLICT(guest_hash) WHERE guest_hash IS NOT NULL DO NOTHING').bind(id(),data.name,actor.guestHash,now()).run();
-  return env.DB.prepare('SELECT * FROM participants WHERE guest_hash=?').bind(actor.guestHash).first();
+  await env.DB.prepare('INSERT INTO participants(id,name,guest_hash,created_at,community_id) VALUES(?,?,?,?,?) ON CONFLICT(community_id,guest_hash) WHERE guest_hash IS NOT NULL DO NOTHING').bind(id(),data.name,actor.guestHash,now(),cid).run();
+  return env.DB.prepare('SELECT * FROM participants WHERE guest_hash=? AND community_id=?').bind(actor.guestHash,cid).first();
 }
 async function body(request) {
   if (!request.headers.get('Content-Type')?.startsWith('application/json')) fail(415, 'Format JSON requis.');
