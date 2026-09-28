@@ -185,7 +185,10 @@ export function planIracingEvents(season, timestamp = Date.now()) {
     const details = detailsFromSeries.get(event.slug) || {};
     const hours = /(\d+)\s*(?:h\b|hr\b|hours?\b)/i.exec(event.name)?.[1];
     const known = SPECIAL_MINUTES.find(([pattern]) => pattern.test(normalize(event.name)))?.[1];
-    const durationMinutes = Math.min(1440, Number(details.duration) || known || (hours ? Number(hours) * 60 : 360));
+    // Races run over a number of laps (Bathurst 1000: 161 laps) have a meaningless duration in the schedule
+    // data (15 min): under an hour it is ignored.
+    const scheduled = Number(details.duration) >= 60 ? Number(details.duration) : 0;
+    const durationMinutes = Math.min(1440, scheduled || known || (hours ? Number(hours) * 60 : 360));
     plans.push({
       externalId:`special:${slug(event.slug || event.name)}:${event.date_start}`,
       special:{name:event.name, dateStart:event.date_start, dateEnd:event.date_end || event.date_start},
@@ -202,7 +205,7 @@ async function fetchJson(url, fetchImpl) {
   return response.json();
 }
 
-// Creates the races that are not imported yet. Returns the number of races created.
+// Creates the races that are not imported yet and completes special event times. Returns both counts.
 export async function syncIracingEvents(env, {timestamp = Date.now(), fetchImpl = fetch} = {}) {
   const manifest = await fetchJson(IRACING_FEED + 'manifest.json', fetchImpl);
   // The current season, and the next one as soon as the schedule publishes it.
@@ -210,7 +213,7 @@ export async function syncIracingEvents(env, {timestamp = Date.now(), fetchImpl 
   if (!codes.length) throw new Error('iRacing schedule: unknown season');
   const plans = [];
   for (const code of codes) plans.push(...planIracingEvents(await fetchJson(`${IRACING_FEED}${code.slice(0, 4)}_s${code.slice(5)}.json`, fetchImpl), timestamp));
-  if (!plans.length) return 0;
+  if (!plans.length) return {created:0, completed:0};
   const known = new Set((await env.DB.prepare('SELECT external_id FROM iracing_imports').all()).results.map(row => row.external_id));
   let created = 0;
   for (const plan of plans) {
@@ -226,8 +229,8 @@ export async function syncIracingEvents(env, {timestamp = Date.now(), fetchImpl 
     ]);
     created++;
   }
-  await completeSpecialTimes(env, {timestamp, fetchImpl});
-  return created;
+  const completed = await completeSpecialTimes(env, {timestamp, fetchImpl});
+  return {created, completed};
 }
 
 export const IRACING_NEWS = 'https://www.iracing.com/wp-json/wp/v2/posts?search=THIS%20WEEK&per_page=20&_fields=date,title,content';

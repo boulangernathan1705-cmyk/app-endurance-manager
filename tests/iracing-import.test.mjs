@@ -81,3 +81,17 @@ test('special event time slots are read from the iracing.com article of the race
   assert.deepEqual(specialStarts(article.content.rendered, special.dateStart, special.dateEnd).map(start => new Date(start).toISOString()),
     ['2099-10-03T03:00:00.000Z','2099-10-03T07:00:00.000Z','2099-10-04T00:00:00.000Z']);
 });
+
+test('a lap race whose schedule entry gives a few minutes keeps a real duration (Bathurst 1000)', () => {
+  const HALF_HOURS = Array.from({length:48}, (_, i) => `${String(Math.floor(i / 2)).padStart(2, '0')}:${i % 2 ? '30' : '00'}`);
+  const plans = planIracingEvents({
+    championships:[{name:'2026 Bathurst 1000 AU Presented by Next Level Racing', category:'SPORTS CAR', typical_session_duration_minutes:15,
+      session_times_by_day:Object.fromEntries(Array.from({length:7}, (_, day) => [String(day), HALF_HOURS])),
+      weeks:[{week_number:1, track_name:'Mount Panorama Circuit', date_start:'2099-10-03', date_end:'2099-10-09', duration_minutes:null}]}],
+    special_events:[{slug:'bathurst-1000', name:'Bathurst 1000', date_start:'2099-10-02', date_end:'2099-10-04', track_name:'Mount Panorama Circuit', car_class:'Supercars'}]
+  }, NOW);
+  const bathurst = plans.filter(plan => plan.externalId.startsWith('special:bathurst-1000'));
+  assert.equal(bathurst.length, 1, 'one race, not one per schedule entry');
+  assert.equal(bathurst[0].input.durationMinutes, 360);
+  assert.ok(validateEvent(bathurst[0].input));
+});

@@ -2,6 +2,12 @@
 
 Les changements du site, version par version. La plus récente est en haut.
 
+## v1.1.1 — 28 septembre 2026
+
+### Endurances iRacing officielles
+- Le **Bathurst 1000** est bien importé (sa fiche du calendrier indiquait une durée de 15 minutes).
+- Les administrateurs ont un bouton **Mettre à jour le calendrier iRacing** pour lancer l'import tout de suite, sans attendre la mise à jour automatique.
+
 ## v1.1 — 28 septembre 2026
 
 ### Accueil

@@ -434,7 +434,9 @@ async function api(request, env) {
   // Admins can run the daily import of official iRacing endurances at once.
   if (path === '/api/admin/iracing-import' && method === 'POST') {
     requireRole(actor.user,true);
-    return json({created:await syncIracingEvents(env)});
+    // Manual update from the iRacing space (admins), e.g. to repair after a change of the schedule data.
+    try { return json(await syncIracingEvents(env)); }
+    catch (error) { fail(502, 'Le calendrier iRacing est momentanément indisponible. Réessaie plus tard.'); }
   }
   if (path === '/api/members' && method === 'GET') {
     requireRole(actor.user,true);
