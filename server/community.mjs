@@ -1,9 +1,9 @@
 // The community of a request: every piece of data belongs to exactly one community, and every query is
 // scoped to the community resolved here (the single entry point of the separation).
 //
-// Step 1: one community per site, set by the COMMUNITY variable (slug, "commu-dev" by default).
-// Step 3 will read it from the address (<slug>.endurance-manager.app).
-import {fail} from './core.mjs';
+// On the platform (BASE_DOMAIN), the address says it: <slug>.endurance-manager.app. Elsewhere (main
+// address, local preview, tests): the COMMUNITY variable (slug, "commu-dev" by default).
+import {fail, communityLabel} from './core.mjs';
 
 export const DEFAULT_COMMUNITY_SLUG = 'commu-dev';
 
@@ -15,8 +15,12 @@ function toCommunity(row) {
     appearance:parseJson(row.appearance), modules:parseJson(row.modules), discordInviteUrl:row.discord_invite_url || null};
 }
 
-export async function currentCommunity(env) {
-  const slug = String(env?.COMMUNITY || DEFAULT_COMMUNITY_SLUG).toLowerCase();
+export function communitySlug(env, request) {
+  const label = request ? communityLabel(new URL(request.url), env) : '';
+  return label || String(env?.COMMUNITY || DEFAULT_COMMUNITY_SLUG).toLowerCase();
+}
+export async function currentCommunity(env, request) {
+  const slug = communitySlug(env, request);
   const row = await env.DB.prepare('SELECT * FROM communities WHERE slug=?').bind(slug).first();
   if (!row) fail(404, 'Communauté introuvable.');
   return toCommunity(row);

@@ -1,4 +1,4 @@
-import {json, origin, fail, identity, rateLimit} from './core.mjs';
+import {json, siteOrigin, fail, identity, rateLimit} from './core.mjs';
 import {currentCommunity} from './community.mjs';
 
 const DAY=86400;
@@ -36,7 +36,7 @@ async function readClientErrors(env, community) {
 export async function ingestClientError(request,env) {
   if (!env.DB) return request.method==='GET' ? json({error:'La base partagée n’est pas encore configurée.'},503) : new Response(null,{status:204});
   const url=new URL(request.url);
-  const canonical=origin(env);
+  const canonical=siteOrigin(request,env);
   const requestOrigin=request.headers.get('Origin');
   if (url.origin!==canonical || requestOrigin!==canonical) return request.method==='GET' ? json({error:'Utilise l’adresse principale du site pour cette action.'},403) : new Response(null,{status:204});
 
@@ -55,7 +55,7 @@ export async function ingestClientError(request,env) {
   const createdAt=Math.floor(Date.now()/1000);
   try {
     await ensureClientErrorsTable(env);
-    const community=await currentCommunity(env);
+    const community=await currentCommunity(env, request);
     await env.DB.batch([
       env.DB.prepare(`INSERT INTO client_errors(id,created_at,kind,page,api_path,method,message,detail,user_agent,viewport,online,community_id)
         VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`).bind(

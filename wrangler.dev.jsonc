@@ -36,6 +36,8 @@
     "APP_ORIGIN": "https://commu-dev.endurance-manager.app",
     "SITE_ENV": "development",
     "SOLO_RACES": "on",
-    "COMMUNITY": "commu-dev"
+    "COMMUNITY": "commu-dev",
+    // Communities platform: <slug>.endurance-manager.app, one sign-in for all of them.
+    "BASE_DOMAIN": "endurance-manager.app"
   }
 }
