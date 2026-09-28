@@ -38,7 +38,7 @@ async function loadEvents(force = false) {
   const result = await api(`/api/races?game=${game}&scope=upcoming`);
   eventsCache = Array.isArray(result.events) ? result.events : [];
   // Common start whose time is not known yet: "à définir", as on the race page (front/app/core.mjs).
-  for (const event of eventsCache) for (const departure of event.departures || []) if (departure.tbd && !departure.clock) { departure.clock = departure.time; departure.time = 'à définir'; }
+  for (const event of eventsCache) for (const departure of event.departures || []) if ((departure.tbd || event.schedulePending) && !departure.clock) { departure.clock = departure.time; departure.time = 'à définir'; departure.hideClock = true; }
   return eventsCache;
 }
 

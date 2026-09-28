@@ -206,17 +206,23 @@ function validateEvent(input, existing = null) {
   const departures = input.departures.map(item => {
     if (!item || typeof item !== 'object') fail(400, 'Départ invalide.');
     const startsAt = parisTimestamp(item.date, item.time);
-    if (seen.has(startsAt)) fail(400, 'Deux départs ont la même date et la même heure.'); seen.add(startsAt);
     const previous = item.id ? known.find(d => d.id === item.id) : null;
+    // "Horaire à définir": a common start where everyone enters and forms crews until the real times are
+    // known (both simulators). Kept as long as its date and time are unchanged, or when sent as such.
+    const tbd = item.tbd === true || Boolean(previous?.tbd && previous.startsAt === startsAt);
+    if (!tbd) { if (seen.has(startsAt)) fail(400, 'Deux départs ont la même date et la même heure.'); seen.add(startsAt); }
     if (item.id && !previous) fail(400, 'Départ inconnu.');
     const departureId = previous?.id || id();
     if (ids.has(departureId)) fail(400, 'Départ répété.'); ids.add(departureId);
     if (previous && previous.startsAt <= Date.now() && startsAt !== previous.startsAt) fail(400, 'Un départ passé ne peut plus être déplacé.');
-    // "Horaire à définir": a common start where everyone enters and forms crews until the official time
-    // slots are known (imported iRacing special events). Kept as long as its date and time are unchanged.
-    const tbd = item.tbd === true || Boolean(previous?.tbd && previous.startsAt === startsAt);
     return {id: departureId, date: item.date, time: item.time, startsAt, ...(tbd ? {tbd:true} : {})};
   }).sort((a, b) => a.startsAt - b.startsAt);
+  const common = departures.filter(departure => departure.tbd);
+  if (common.length > 1) fail(400, 'Un seul départ « à définir » par course.');
+  const timed = departures.filter(departure => !departure.tbd);
+  // Real times known: the common start closes with the first of them (each crew then picks its start).
+  if (common.length && timed.length && common[0].startsAt !== timed[0].startsAt) Object.assign(common[0], {date:timed[0].date, time:timed[0].time, startsAt:timed[0].startsAt});
+  departures.sort((a, b) => a.startsAt - b.startsAt || Number(Boolean(b.tbd)) - Number(Boolean(a.tbd)));
   const schedulePending = input.schedulePending == null ? Boolean(existing?.schedule_pending) : input.schedulePending === true;
   // Driver change required (iRacing endurances; always on LMU): true / false, or null for the site rule.
   const driverChangeRequired = solo ? null : typeof input.driverChangeRequired === 'boolean' ? input.driverChangeRequired

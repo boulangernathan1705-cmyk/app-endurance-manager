@@ -19,6 +19,15 @@ function departureById(event, departureId) {
   if (!departure) fail(404, 'Départ introuvable.');
   return departure;
 }
+// Real starts were added next to the common "Horaire à définir" start: nobody is on it (no entry, no
+// crew), so it is not needed any more and is left out.
+async function dropEmptyCommonStart(env, eventId, data) {
+  const common = data.departures.find(departure => departure.tbd);
+  if (!common || data.departures.length < 2) return;
+  const used = eventId && await env.DB.prepare('SELECT 1 FROM registrations WHERE event_id=? AND departure_id=? UNION SELECT 1 FROM crews WHERE event_id=? AND departure_id=? LIMIT 1')
+    .bind(eventId, common.id, eventId, common.id).first();
+  if (!used) data.departures = data.departures.filter(departure => departure !== common);
+}
 // An official slot for pilots leaving the common "Horaire à définir" start of the same race.
 function slotFor(event, from, departureId) {
   if (!from.tbd) fail(409, 'Ce départ a déjà son horaire.');
@@ -346,6 +355,7 @@ async function api(request, env) {
     const input = await body(request);
     if (input.format === 'solo' && !soloRacesEnabled(env)) fail(400, 'Les courses solo ne sont pas encore disponibles.');
     const data = validateEvent(input), eventId = id();
+    await dropEmptyCommonStart(env, null, data);
     await env.DB.prepare('INSERT INTO events(id,name,duration_hours,duration_minutes,event_type,circuit,schedule_pending,driver_change_required,format,access,capacity,rounds,categories,departures,created_by,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)').bind(eventId, data.name, data.durationHours, data.durationMinutes, data.eventType, data.circuit, data.schedulePending?1:0, data.driverChangeRequired==null?null:(data.driverChangeRequired?1:0), data.format, data.access, data.capacity, JSON.stringify(data.rounds), JSON.stringify(data.categories), JSON.stringify(data.departures), actor.user.id, now()).run();
     return json({id:eventId}, 201);
   }
@@ -359,7 +369,9 @@ async function api(request, env) {
       if (!result.meta.changes) fail(409, 'Cet événement a changé. Actualise avant de réessayer.');
       return json({ok:true});
     }
-    const data = validateEvent(input, event), cats = JSON.stringify(data.categories), deps = JSON.stringify(data.departures);
+    const data = validateEvent(input, event);
+    await dropEmptyCommonStart(env, event.id, data);
+    const cats = JSON.stringify(data.categories), deps = JSON.stringify(data.departures);
     const result = await env.DB.prepare(`UPDATE events SET name=?,duration_hours=?,duration_minutes=?,event_type=?,circuit=?,schedule_pending=?,driver_change_required=?,access=?,capacity=?,rounds=?,categories=?,departures=?,version=version+1 WHERE id=? AND version=?
       AND NOT EXISTS (SELECT 1 FROM registrations r WHERE r.event_id=events.id AND
         (NOT EXISTS (SELECT 1 FROM json_each(?) d WHERE json_extract(d.value,'$.id')=r.departure_id)
