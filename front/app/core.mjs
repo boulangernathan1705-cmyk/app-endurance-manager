@@ -73,9 +73,8 @@ function diagnosticMessage(path,method,stage,extra='') {
 function reportClientError({kind='network',path='',method='',message='',detail=''}) {
   try {
     const payload=JSON.stringify({kind,page:location.pathname.slice(0,160),apiPath:String(path).slice(0,160),method:String(method).slice(0,12),message:String(message).slice(0,500),detail:String(detail).slice(0,1000),userAgent:navigator.userAgent.slice(0,500),viewport:`${innerWidth}x${innerHeight}`,online:navigator.onLine!==false});
-    if (navigator.sendBeacon) {
-      try { navigator.sendBeacon('/telemetry/client-error',new Blob([payload],{type:'text/plain;charset=UTF-8'})); } catch {}
-    }
+    // One report per error: the beacon when the browser accepts it, a keepalive fetch otherwise.
+    try { if (navigator.sendBeacon?.('/telemetry/client-error',new Blob([payload],{type:'text/plain;charset=UTF-8'}))) return; } catch {}
     fetch('/telemetry/client-error',{method:'POST',credentials:'same-origin',cache:'no-store',keepalive:true,headers:{'Content-Type':'text/plain;charset=UTF-8'},body:payload}).catch(()=>{});
   } catch {}
 }
