@@ -1,5 +1,6 @@
 import {isSolo,accessBadge,soloRoundsLabel,renderSoloEntries,ANY_CATEGORY} from './solo.mjs';
 import {dateBlock,timeLabel} from '../dates.mjs';
+import {durationLabel,eventMinutes} from '../../shared/duration.mjs';
 import {eventSchedule} from '../schedule.mjs';
 import {
   app,
@@ -113,7 +114,7 @@ function card({event,departure,reg}) {
       <span class="race-card-top">${departureDateBlock(departure)}<span class="race-head">
         ${reg.managed?`<strong class="ux-managed-entry-name">${esc(reg.name)}</strong>`:''}
         <h2 class="event-name">${esc(event.name)}</h2>
-        <span class="race-meta">${esc(circuitLabel(event.circuit))} · ${event.durationHours||6} h</span>
+        <span class="race-meta">${esc(circuitLabel(event.circuit))} · ${durationLabel(eventMinutes(event))}</span>
         <span class="race-badges">${eventTypeBadge(event.eventType)}${badge(reg.category)}<span class="race-start">Départ ${esc(timeLabel(departure.time))}</span>${situation}</span>
       </span>${circuitVisual(event.circuit,true)}</span>
       <button type="button" class="primary-button native-my-entry-open-event" data-action="open" data-id="${event.id}" data-departure="${departure.id}">Voir la course</button>

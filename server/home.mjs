@@ -1,6 +1,5 @@
-// Home page ("/"): a returning pilot goes straight to the simulator space they last visited (cookie
-// em_sim set by that space); "/?accueil" always shows the home. For the others, the upcoming races are
-// embedded in the page so it shows them at once, without a "Chargement…" step.
+// Home page ("/"): only newcomers see it. A pilot who already chose a simulator (cookie em_sim, set by
+// that space) goes straight to it, from the address bar as from the logo of every page.
 const SIMULATORS = ['lmu','iracing'];
 
 export function homeRedirect(request) {
@@ -12,8 +11,9 @@ export function homeRedirect(request) {
   return new Response(null, {status:302, headers:{Location:`/${sim}/`, 'Cache-Control':'no-store', Vary:'Cookie'}});
 }
 
-// The embedded data changes with every entry: the page is never served from a cache or as a 304.
-export async function homeWithRaces(request, env, loadRaces) {
+// The answer depends on the cookie: the home page is never reused from a cache or as a 304, otherwise a
+// pilot who has just chosen a simulator would see it again instead of being redirected.
+export async function homePage(request, env) {
   const headers = new Headers(request.headers);
   headers.delete('If-None-Match');
   headers.delete('If-Modified-Since');
@@ -23,11 +23,5 @@ export async function homeWithRaces(request, env, loadRaces) {
   page.headers.delete('Last-Modified');
   page.headers.set('Cache-Control', 'no-store');
   page.headers.set('Vary', 'Cookie');
-  if (!asset.ok || typeof HTMLRewriter === 'undefined' || !(page.headers.get('Content-Type') || '').includes('text/html')) return page;
-  let races;
-  try { races = await loadRaces(); } catch { return page; }
-  // JSON in a data block (not executed, allowed by the Content Security Policy); "<" escaped so the
-  // data can never close the tag.
-  const data = JSON.stringify(races).replace(/</g, '\\u003c');
-  return new HTMLRewriter().on('body', {element(body) { body.append(`<script type="application/json" id="hub-races">${data}</script>`, {html:true}); }}).transform(page);
+  return page;
 }

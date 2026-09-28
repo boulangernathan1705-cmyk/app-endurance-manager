@@ -1,5 +1,5 @@
-import worker, {homeRaces} from './worker.mjs';
-import {homeRedirect, homeWithRaces} from './home.mjs';
+import worker from './worker.mjs';
+import {homeRedirect, homePage} from './home.mjs';
 import {isWeeklyDiscordMutation} from './discord-weekly-format.mjs';
 import {ensureDiscordWeeklySchema} from './discord-weekly-schema.mjs';
 import {syncWeeklyDiscord} from './discord-weekly.mjs';
@@ -62,7 +62,7 @@ export default {
       const redirect = homeRedirect(request);
       if (redirect) return redirect;
       if (env?.ASSETS) {
-        const home = await homeWithRaces(request, env, () => homeRaces(env));
+        const home = await homePage(request, env);
         return development ? markDevelopmentResponse(home) : home;
       }
     }

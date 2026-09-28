@@ -100,21 +100,17 @@ async function listEvents(env, actor, game='', scope='') {
   }
   return rows.map(row => {
     const format=row.format||'endurance', capacity=row.capacity==null?null:Number(row.capacity);
-    return {id:row.id, name:row.name, format, access:row.access||'open', capacity, rounds:JSON.parse(row.rounds||'[]'), circuit:row.circuit||'', durationHours:Number(row.duration_hours)||3, eventType:row.event_type||'private', schedulePending:Boolean(row.schedule_pending), categories:JSON.parse(row.categories), version:row.version,
+    const durationHours=Number(row.duration_hours)||3, durationMinutes=Number(row.duration_minutes)||durationHours*60;
+    return {id:row.id, name:row.name, format, access:row.access||'open', capacity, rounds:JSON.parse(row.rounds||'[]'), circuit:row.circuit||'', durationHours, durationMinutes, eventType:row.event_type||'private', schedulePending:Boolean(row.schedule_pending), categories:JSON.parse(row.categories), version:row.version,
       departures:JSON.parse(row.departures).map(d => {
         const availability=grouped.get(`${row.id}:${d.id}`) || [];
         // Solo race: entries keep their order of arrival; beyond the number of places they are on the
         // waiting list, and the first one waiting moves up by itself when someone withdraws.
         if (format==='solo' && capacity) availability.forEach((reg,index)=>{ reg.waitlistPosition=index>=capacity?index-capacity+1:null; });
-        return {...d, availability, crews:crewsByDeparture.get(`${row.id}:${d.id}`) || []};
+        // endsAt: the real finish (2 h 30 ends 30 min into the third presence slot).
+        return {...d, endsAt:d.startsAt+durationMinutes*60000, availability, crews:crewsByDeparture.get(`${row.id}:${d.id}`) || []};
       })};
   });
-}
-// Upcoming races of both simulators for the home page, as a visitor sees them.
-export async function homeRaces(env) {
-  const visitor = {user:null, guestToken:null, guestHash:null};
-  const [lmu, iracing] = await Promise.all([listEvents(env, visitor, 'lmu', 'upcoming'), listEvents(env, visitor, 'iracing', 'upcoming')]);
-  return {events:[...lmu, ...iracing]};
 }
 async function oauthStart(request, env) {
   requireDiscord(env); await rateLimit(request, env, 'oauth', 20); await cleanup(env);
@@ -321,7 +317,7 @@ async function api(request, env) {
   if (path === '/api/events' && method === 'POST') {
     requireRole(actor.user);
     const data = validateEvent(await body(request)), eventId = id();
-    await env.DB.prepare('INSERT INTO events(id,name,duration_hours,event_type,circuit,schedule_pending,format,access,capacity,rounds,categories,departures,created_by,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)').bind(eventId, data.name, data.durationHours, data.eventType, data.circuit, data.schedulePending?1:0, data.format, data.access, data.capacity, JSON.stringify(data.rounds), JSON.stringify(data.categories), JSON.stringify(data.departures), actor.user.id, now()).run();
+    await env.DB.prepare('INSERT INTO events(id,name,duration_hours,duration_minutes,event_type,circuit,schedule_pending,format,access,capacity,rounds,categories,departures,created_by,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)').bind(eventId, data.name, data.durationHours, data.durationMinutes, data.eventType, data.circuit, data.schedulePending?1:0, data.format, data.access, data.capacity, JSON.stringify(data.rounds), JSON.stringify(data.categories), JSON.stringify(data.departures), actor.user.id, now()).run();
     return json({id:eventId}, 201);
   }
   const eventMatch = path.match(/^\/api\/events\/([a-f0-9-]{36})$/);
@@ -335,11 +331,11 @@ async function api(request, env) {
       return json({ok:true});
     }
     const data = validateEvent(input, event), cats = JSON.stringify(data.categories), deps = JSON.stringify(data.departures);
-    const result = await env.DB.prepare(`UPDATE events SET name=?,duration_hours=?,event_type=?,circuit=?,schedule_pending=?,access=?,capacity=?,rounds=?,categories=?,departures=?,version=version+1 WHERE id=? AND version=?
+    const result = await env.DB.prepare(`UPDATE events SET name=?,duration_hours=?,duration_minutes=?,event_type=?,circuit=?,schedule_pending=?,access=?,capacity=?,rounds=?,categories=?,departures=?,version=version+1 WHERE id=? AND version=?
       AND NOT EXISTS (SELECT 1 FROM registrations r WHERE r.event_id=events.id AND
         (NOT EXISTS (SELECT 1 FROM json_each(?) d WHERE json_extract(d.value,'$.id')=r.departure_id)
       OR (r.category NOT IN ('','*') AND NOT EXISTS (SELECT 1 FROM json_each(?) c WHERE c.value=r.category))
-      OR EXISTS (SELECT 1 FROM json_each(?) h WHERE instr(',' || r.status || ',', ',' || h.value || ',') > 0)))`).bind(data.name, data.durationHours, data.eventType, data.circuit, data.schedulePending?1:0, data.access, data.capacity, JSON.stringify(data.rounds), cats, deps, event.id, input.version, deps, cats, JSON.stringify(Array.from({length:24-data.durationHours},(_,i)=>`h${data.durationHours+i+1}`))).run();
+      OR EXISTS (SELECT 1 FROM json_each(?) h WHERE instr(',' || r.status || ',', ',' || h.value || ',') > 0)))`).bind(data.name, data.durationHours, data.durationMinutes, data.eventType, data.circuit, data.schedulePending?1:0, data.access, data.capacity, JSON.stringify(data.rounds), cats, deps, event.id, input.version, deps, cats, JSON.stringify(Array.from({length:24-data.durationHours},(_,i)=>`h${data.durationHours+i+1}`))).run();
     if (!result.meta.changes) fail(409, 'Modification impossible : événement modifié ailleurs, départ supprimé avec des inscrits, catégorie encore utilisée, ou disponibilités au-delà de la nouvelle durée. Ajuste les disponibilités concernées avant de raccourcir la course.');
     return json({ok:true});
   }

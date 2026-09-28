@@ -4,7 +4,7 @@
   globalThis.__ENDURANCE_GAME__ = game;
   document.documentElement.dataset.game = game;
   // Remembers the simulator the pilot chose: next time, the home page sends them straight here
-  // ("/?accueil" still shows the home page to change).
+  // (the logo also leads there; the navigation bar switches between simulators).
   try { document.cookie = `em_sim=${game}; path=/; max-age=31536000; SameSite=Lax${location.protocol === 'https:' ? '; Secure' : ''}`; } catch {}
 
   const applyLabel = () => {

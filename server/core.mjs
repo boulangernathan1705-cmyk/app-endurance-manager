@@ -180,7 +180,7 @@ function validateSoloRace(input, existing) {
   const totalMinutes = cleanRounds.reduce((sum, round) => sum + round.durationMinutes, 0);
   if (totalMinutes > 24 * 60) fail(400, 'Une course solo ne peut pas dépasser 24 heures.');
   const categories = [...new Set(cleanRounds.flatMap(round => round.categories))];
-  return {access, rounds:cleanRounds, capacity, categories, circuit:cleanRounds[0].circuit, durationHours:Math.max(1, Math.ceil(totalMinutes / 60))};
+  return {access, rounds:cleanRounds, capacity, categories, circuit:cleanRounds[0].circuit, durationMinutes:totalMinutes};
 }
 function validateEvent(input, existing = null) {
   const name = text(input.name, 100, 'Nom de l’événement');
@@ -188,8 +188,11 @@ function validateEvent(input, existing = null) {
   const format = existing ? (existing.format || 'endurance') : (input.format == null ? 'endurance' : input.format);
   if (!EVENT_FORMATS.includes(format)) fail(400, 'Format d’événement invalide.');
   const solo = format === 'solo' ? validateSoloRace(input, existing) : null;
-  const durationHours = solo ? solo.durationHours : input.durationHours == null ? 6 : Number(input.durationHours);
-  if (!Number.isInteger(durationHours) || durationHours < 1 || durationHours > 24) fail(400, 'La durée doit être comprise entre 1 et 24 heures.');
+  // Duration in minutes (endurances: 1 h to 24 h, in 5-minute steps); older clients send whole hours.
+  const durationMinutes = solo ? solo.durationMinutes : input.durationMinutes != null ? Number(input.durationMinutes) : input.durationHours == null ? 360 : Number(input.durationHours) * 60;
+  if (!solo && (!Number.isInteger(durationMinutes) || durationMinutes < 60 || durationMinutes > 1440 || durationMinutes % 5)) fail(400, 'La durée doit être comprise entre 1 h et 24 h, par pas de 5 minutes.');
+  // Presence slots: one per hour started (2 h 30 → 3 slots).
+  const durationHours = Math.max(1, Math.ceil(durationMinutes / 60));
   const eventType = solo ? 'private' : input.eventType || 'private';
   if (!EVENT_TYPES.includes(eventType)) fail(400, 'Type d’événement invalide.');
   const circuit = solo ? solo.circuit : input.circuit == null ? (existing?.circuit || '') : (input.circuit === '' ? '' : text(input.circuit, 40, 'Circuit'));
@@ -212,7 +215,7 @@ function validateEvent(input, existing = null) {
     return {id: departureId, date: item.date, time: item.time, startsAt};
   }).sort((a, b) => a.startsAt - b.startsAt);
   const schedulePending = input.schedulePending == null ? Boolean(existing?.schedule_pending) : input.schedulePending === true;
-  return {name, format, access: solo?.access || 'open', capacity: solo?.capacity ?? null, rounds: solo?.rounds || [], durationHours, eventType, circuit, schedulePending, categories: [...new Set(categoriesInput)], departures};
+  return {name, format, access: solo?.access || 'open', capacity: solo?.capacity ?? null, rounds: solo?.rounds || [], durationHours, durationMinutes, eventType, circuit, schedulePending, categories: [...new Set(categoriesInput)], departures};
 }
 // Discord display names are at most 32 characters: registrations accept the same length.
 const PILOT_NAME_MAX = 32;

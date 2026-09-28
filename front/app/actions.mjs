@@ -1,7 +1,7 @@
 import {app,state,api,load,loadArchive,showError,countdown,CARS} from './core.mjs';
 import {renderNav,renderHome} from './home-view.mjs';
 import {renderEvent} from './event-view.mjs';
-import {renderEventForm,departureFields,updateRemoveButtons,goToEventStep} from './event-form.mjs';
+import {renderEventForm,departureFields,updateRemoveButtons,goToEventStep,formDurationMinutes} from './event-form.mjs';
 import {renderMyEntries} from './entries-view.mjs';
 import {refresh,refreshAfterSave} from './refresh.mjs';
 import {draftFor,registrationDraft,ownRegistrations,rerenderRegistrationSection,submitRegistration,registrationStep} from './registration.mjs';
@@ -49,14 +49,14 @@ function goToRegistrationStep(event,departure,target){
 }
 
 async function submitEvent(form){
-  const data={name:form.elements.eventName.value.trim(),durationHours:Number(form.elements.eventDuration.value),eventType:form.elements.eventType.value,circuit:form.elements.eventCircuit.value,schedulePending:form.elements.eventSchedulePending.checked,categories:[...form.querySelectorAll('[name="eventCategory"]:checked')].map(input=>input.value),departures:[...form.querySelectorAll('.departure-field')].map(row=>({id:row.dataset.id||undefined,date:row.querySelector('[name="date"]').value,time:row.querySelector('[name="time"]').value})),version:state.editingEvent?.version};
+  const data={name:form.elements.eventName.value.trim(),durationMinutes:formDurationMinutes(form),eventType:form.elements.eventType.value,circuit:form.elements.eventCircuit.value,schedulePending:form.elements.eventSchedulePending.checked,categories:[...form.querySelectorAll('[name="eventCategory"]:checked')].map(input=>input.value),departures:[...form.querySelectorAll('.departure-field')].map(row=>({id:row.dataset.id||undefined,date:row.querySelector('[name="date"]').value,time:row.querySelector('[name="time"]').value})),version:state.editingEvent?.version};
   const format=form.dataset.format||'endurance';
   if(format==='solo'){
     // Solo race: rounds, access and places replace duration, type and circuit.
     Object.assign(data,{format,access:form.querySelector('[name="eventAccess"]:checked')?.value||'open',capacity:Number(form.elements.eventCapacity.value),
       rounds:[...form.querySelectorAll('.solo-round')].map((round,index)=>({circuit:round.querySelector('[name="roundCircuit"]').value,durationMinutes:Number(round.querySelector('[name="roundMinutes"]').value),categories:[...form.querySelectorAll(`[name="roundCategory${index}"]:checked`)].map(input=>input.value)}))});
     data.categories=[...new Set(data.rounds.flatMap(round=>round.categories))];
-    delete data.durationHours; delete data.eventType; delete data.circuit;
+    delete data.durationMinutes; delete data.eventType; delete data.circuit;
     if(data.rounds.some(round=>!round.circuit))throw Error('Choisis le circuit de chaque manche.');
   }
   if(!data.categories.length)throw Error('Sélectionne au moins une catégorie.'); if(format!=='solo'&&!data.circuit)throw Error('Sélectionne le circuit de la course.');

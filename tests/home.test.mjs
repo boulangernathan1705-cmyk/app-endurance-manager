@@ -22,11 +22,19 @@ test('the home page stays reachable with ?accueil, for new visitors and unknown 
   }
 });
 
-test('simulator spaces remember the choice and the logo always leads back to the home page', () => {
+test('simulator spaces remember the choice and the logo leads to the chosen simulator', () => {
   assert.match(readFileSync(new URL('../front/game-context.js', import.meta.url), 'utf8'), /em_sim=\$\{game\}; path=\/; max-age=31536000; SameSite=Lax/);
   for (const page of ['game.html', 'members.html', 'help.html', 'about.html'])
-    assert.match(readFileSync(new URL(`../${page}`, import.meta.url), 'utf8'), /class="brand-button logo" href="\/\?accueil"/, page);
+    assert.match(readFileSync(new URL(`../${page}`, import.meta.url), 'utf8'), /class="brand-button logo" href="\/"/, page);
   const prod = JSON.parse(readFileSync(new URL('../wrangler.prod.jsonc', import.meta.url), 'utf8'));
   assert.ok(prod.assets.run_worker_first.includes('/'));
   assert.equal(prod.assets.binding, 'ASSETS');
+});
+
+test('after the Discord login, a pilot without a simulator picks one in a small window', () => {
+  const hub = readFileSync(new URL('../front/game-hub.mjs', import.meta.url), 'utf8');
+  assert.match(hub, /if \(!\/\(\?:\^\|;\\s\*\)em_sim=\/\.test\(document\.cookie\)\) openSimChooser\(session\.user\.name\)/);
+  assert.match(hub, /href="\$\{sim\.href\}"/);
+  // The home page no longer lists races: the simulator spaces do.
+  assert.doesNotMatch(hub, /\/api\/races/);
 });

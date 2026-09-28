@@ -24,6 +24,7 @@ function harness(withParticipants=true){
  DB.db.exec(readFileSync(new URL('../migrations/0026_event_schedule_pending.sql',import.meta.url),'utf8'));
  DB.db.exec(readFileSync(new URL('../migrations/0027_solo_races.sql',import.meta.url),'utf8'));
  DB.db.exec(readFileSync(new URL('../migrations/0028_solo_round_choices.sql',import.meta.url),'utf8'));
+ DB.db.exec(readFileSync(new URL('../migrations/0029_event_duration_minutes.sql',import.meta.url),'utf8'));
  const env={DB,APP_ORIGIN:ROOT,DISCORD_CLIENT_ID:'app-id',DISCORD_CLIENT_SECRET:'test-only-secret',ADMIN_DISCORD_IDS:ADMIN,ASSETS:{fetch:async()=>new Response('static')}};
  const jars=new Map();
  async function req(path,method='GET',data,actor='guest',options={}){
@@ -280,18 +281,25 @@ test('shortening preserves bookings and crews, rejecting hours outside the new d
  const crew=await req(base+'/crews','POST',{name:'Team',category:'Hypercar'},'admin');
  await req('/api/crews/'+crew.data.id+'/members','POST',{registrationId:registration.data.id,version:1},'admin');
  const before=DB.db.prepare('SELECT * FROM registrations').all();
- const rejected=await req('/api/events/'+event.id,'PATCH',{...event,durationHours:2},'admin');
+ const rejected=await req('/api/events/'+event.id,'PATCH',{...event,durationMinutes:120},'admin');
  assert.equal(rejected.status,409);assert.match(rejected.data.error,/disponibilités/);
  assert.deepEqual(DB.db.prepare('SELECT * FROM registrations').all(),before);
  assert.equal(DB.db.prepare('SELECT duration_hours FROM events').get().duration_hours,24);
  assert.equal(DB.db.prepare('SELECT COUNT(*) n FROM crew_members').get().n,1);
  assert.equal((await req('/api/registrations/'+registration.data.id,'PATCH',{name:'Late pilot',category:'Hypercar',status:'h1,h2',version:1},'admin')).status,200);
- assert.equal((await req('/api/events/'+event.id,'PATCH',{...event,durationHours:2},'admin')).status,200);
+ assert.equal((await req('/api/events/'+event.id,'PATCH',{...event,durationMinutes:120},'admin')).status,200);
  event=(await req('/api/events','GET',null,'admin')).data.events[0];
  assert.equal(event.durationHours,2);assert.equal(event.departures[0].availability[0].status,'h1,h2');
  assert.deepEqual(event.departures[0].crews[0].registrationIds,[registration.data.id]);
- assert.equal((await req('/api/events/'+event.id,'PATCH',{...event,durationHours:1},'admin')).status,409);
- assert.equal((await req('/api/events/'+event.id,'PATCH',{...event,durationHours:24},'admin')).status,200);
+ assert.equal((await req('/api/events/'+event.id,'PATCH',{...event,durationMinutes:60},'admin')).status,409);
+ assert.equal((await req('/api/events/'+event.id,'PATCH',{...event,durationMinutes:1440},'admin')).status,200);
+ // Durations with minutes: 2 h 30 gives 3 presence slots; the duration is kept in minutes.
+ event=(await req('/api/events')).data.events[0];
+ assert.equal((await req('/api/events/'+event.id,'PATCH',{...event,durationMinutes:150},'admin')).status,200);
+ event=(await req('/api/events')).data.events[0];
+ assert.equal(event.durationMinutes,150);assert.equal(event.durationHours,3);
+ assert.equal((await req('/api/events/'+event.id,'PATCH',{...event,durationMinutes:152},'admin')).status,400);
+ assert.equal((await req('/api/events/'+event.id,'PATCH',{...event,durationMinutes:1445},'admin')).status,400);
 });
 test('event list stays available beyond D1 bound-parameter limit',async()=>{
  const {req,login,DB}=harness();await login(ADMIN,'admin');

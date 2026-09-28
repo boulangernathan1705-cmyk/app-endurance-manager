@@ -1,6 +1,7 @@
 import {isSolo,ANY_CATEGORY,soloCounts} from './solo.mjs';
-import {raceHourLabel} from '../timeline.mjs';
+import {raceHourLabel,raceEndLabel} from '../timeline.mjs';
 import {shortDateLabel,timeLabel} from '../dates.mjs';
+import {durationLabel,eventMinutes} from '../../shared/duration.mjs';
 import {app,state,esc,button,carPreferenceChoices,registrationCarLabel,renderAvailabilityTimeline,notifyRender,logo,categories,CARS,circuitLabel} from './core.mjs';
 import {getLocale} from '../i18n.mjs';
 
@@ -70,7 +71,7 @@ export function renderRegistrationForm(event,departure,stateDraft=draftFor(depar
   const manualOther=stateDraft.forOther&&!linkedOther&&!categoryMode&&!!stateDraft.manualOther; const guestSelf=!stateDraft.forOther&&!state.user;
   const title=registrationTitle(event,departure,stateDraft);
   const banner=categoryMode?`<div class="registration-context-banner category"><span>AJOUT D’UNE CATÉGORIE</span><strong>${esc(contextName||'Pilote')}</strong></div>`:otherMode?`<div class="registration-context-banner other"><span>${stateDraft.id?'INSCRIPTION GÉRÉE':'AUTRE PILOTE'}</span>${contextName?`<strong>${esc(contextName)}</strong>`:''}</div>`:(contextName||state.user?.name?`<div class="registration-context-banner self"><span>PILOTE</span><strong>${esc(contextName||state.user.name)}</strong></div>`:'');
-  return `<form class="form-section registration-form" data-kind="registration" data-departure="${departure.id}"><h3 class="form-title">${title}</h3>${banner}${identityFields(stateDraft,departure,categoryMode,manualOther,linkedOther,guestSelf)}<div class="registration-choices"><span class="form-label">Heures de présence (${duration} h)</span><p class="availability-hint">Clique sur les créneaux où tu es disponible.</p>${renderAvailabilityTimeline({departure,duration,status:stateDraft.status,interactive:true,label:'Heures de présence'})}<div class="special-availability">${button('availability','TOUTE LA COURSE',`data-departure="${departure.id}" data-value="whole" aria-pressed="${stateDraft.status==='whole'}"`,`special-button whole ${stateDraft.status==='whole'?'active':''}`)}</div></div>${stateDraft.status==='unavailable'?'':`<div class="category-area"><span class="form-label">Catégorie</span><div class="categories">${event.categories.map(category=>button('category',`${logo(category)}<span>${esc(category)}</span>`,`data-departure="${departure.id}" data-value="${esc(category)}" ${((assigned&&stateDraft.id&&!categoryMode&&category!==stateDraft.category)||same.some(reg=>reg.id!==stateDraft.id&&reg.category===category))?'disabled':''} aria-pressed="${stateDraft.category===category}"`,`category-button ${categories[category]?.css||''} ${stateDraft.category===category?'active':''}`)).join('')}</div>${stateDraft.category?carPreferenceChoices(stateDraft.category,stateDraft.cars,stateDraft.carAny):''}</div>`}<div class="save-row"><button type="submit" class="save-button">${stateDraft.id?'ENREGISTRER':stateDraft.forOther?'INSCRIRE LE PILOTE':'S’INSCRIRE'}</button>${stateDraft.id?button('delete-registration',stateDraft.forOther?'Supprimer l’inscription':'Se désinscrire',`data-id="${stateDraft.id}" data-departure="${departure.id}"`,'danger-button'):''}</div></form>`;
+  return `<form class="form-section registration-form" data-kind="registration" data-departure="${departure.id}"><h3 class="form-title">${title}</h3>${banner}${identityFields(stateDraft,departure,categoryMode,manualOther,linkedOther,guestSelf)}<div class="registration-choices"><span class="form-label">Heures de présence (${durationLabel(eventMinutes(event))})</span><p class="availability-hint">Clique sur les créneaux où tu es disponible.</p>${renderAvailabilityTimeline({departure,duration,status:stateDraft.status,interactive:true,label:'Heures de présence'})}<div class="special-availability">${button('availability','TOUTE LA COURSE',`data-departure="${departure.id}" data-value="whole" aria-pressed="${stateDraft.status==='whole'}"`,`special-button whole ${stateDraft.status==='whole'?'active':''}`)}</div></div>${stateDraft.status==='unavailable'?'':`<div class="category-area"><span class="form-label">Catégorie</span><div class="categories">${event.categories.map(category=>button('category',`${logo(category)}<span>${esc(category)}</span>`,`data-departure="${departure.id}" data-value="${esc(category)}" ${((assigned&&stateDraft.id&&!categoryMode&&category!==stateDraft.category)||same.some(reg=>reg.id!==stateDraft.id&&reg.category===category))?'disabled':''} aria-pressed="${stateDraft.category===category}"`,`category-button ${categories[category]?.css||''} ${stateDraft.category===category?'active':''}`)).join('')}</div>${stateDraft.category?carPreferenceChoices(stateDraft.category,stateDraft.cars,stateDraft.carAny):''}</div>`}<div class="save-row"><button type="submit" class="save-button">${stateDraft.id?'ENREGISTRER':stateDraft.forOther?'INSCRIRE LE PILOTE':'S’INSCRIRE'}</button>${stateDraft.id?button('delete-registration',stateDraft.forOther?'Supprimer l’inscription':'Se désinscrire',`data-id="${stateDraft.id}" data-departure="${departure.id}"`,'danger-button'):''}</div></form>`;
 }
 
 // Step-by-step version of the same form, used in the registration panel of a departure:
@@ -82,17 +83,19 @@ export function registrationStep(stateDraft){
   return Math.min(4,Math.max(1,step));
 }
 function hoursSummary(status,departure,duration){
-  if(status==='whole')return `Toute la course (${duration} h)`;
+  if(status==='whole')return `Toute la course (${durationLabel(Number(departure?.endsAt)?(departure.endsAt-departure.startsAt)/60000:duration*60)})`;
   const hours=String(status||'').split(',').filter(part=>/^h\d+$/.test(part)).map(part=>Number(part.slice(1))).sort((a,b)=>a-b);
   if(!hours.length)return 'Aucune heure choisie';
   // Same hour labels as the timeline (minutes of the start and clock changes included).
-  const clock=offset=>raceHourLabel(departure,offset);
+  const clock=offset=>offset===duration&&Number(departure.endsAt)?raceEndLabel(departure):raceHourLabel(departure,offset);
   const ranges=[];let first=hours[0],previous=first;
   for(const hour of [...hours.slice(1),null]){
     if(hour!==null&&hour===previous+1){previous=hour;continue;}
     ranges.push(`${clock(first-1)}–${clock(previous)}`);first=hour;previous=hour;
   }
-  return `${ranges.join(', ')} (${hours.length} h)`;
+  // The last slot of a race with minutes is shorter (2 h 30: the third slot lasts 30 min).
+  const total=Number(departure.endsAt)?(departure.endsAt-departure.startsAt)/60000:duration*60;
+  return `${ranges.join(', ')} (${durationLabel(hours.reduce((sum,hour)=>sum+Math.max(0,Math.min(60,total-(hour-1)*60)),0))})`;
 }
 // Solo race: one step per round (category and car on the same screen), then the summary.
 // draft.choices holds one {category,cars,carAny} per round; draft.solo is the number of rounds.
@@ -188,7 +191,7 @@ export function renderSteppedRegistration(event,departure,stateDraft=draftFor(de
 <p class="registration-step-label">Étape ${step} sur 4 · ${step===1&&identity?'Pilote et catégorie':REGISTRATION_STEPS[step-1]}</p>
 ${pane(1,`${identity}<div class="category-area"><span class="form-label">Dans quelle catégorie ${stateDraft.forOther?'ce pilote veut-il':'veux-tu'} rouler ?</span><div class="categories registration-category-list">${categoryButtons}</div>${categoryMode?'':'<p class="registration-step-help">Tu pourras ajouter une autre catégorie ensuite : les organisateurs choisiront au moment de former les équipages.</p>'}</div>`)}
 ${pane(2,stateDraft.category?carPreferenceChoices(stateDraft.category,stateDraft.cars,stateDraft.carAny):'<p class="registration-step-help">Choisis d’abord une catégorie.</p>')}
-${pane(3,`<div class="registration-choices"><span class="form-label">Heures de présence (${duration} h)</span><p class="availability-hint">Touche les heures où tu seras là.</p>${renderAvailabilityTimeline({departure,duration,status:stateDraft.status,interactive:true,label:'Heures de présence'})}<div class="special-availability">${button('availability','TOUTE LA COURSE',`data-departure="${departure.id}" data-value="whole" aria-pressed="${stateDraft.status==='whole'}"`,`special-button whole ${stateDraft.status==='whole'?'active':''}`)}</div><p class="registration-step-help">${esc(hoursSummary(stateDraft.status,departure,duration))}</p></div>`)}
+${pane(3,`<div class="registration-choices"><span class="form-label">Heures de présence (${durationLabel(eventMinutes(event))})</span><p class="availability-hint">Touche les heures où tu seras là.</p>${renderAvailabilityTimeline({departure,duration,status:stateDraft.status,interactive:true,label:'Heures de présence'})}<div class="special-availability">${button('availability','TOUTE LA COURSE',`data-departure="${departure.id}" data-value="whole" aria-pressed="${stateDraft.status==='whole'}"`,`special-button whole ${stateDraft.status==='whole'?'active':''}`)}</div><p class="registration-step-help">${esc(hoursSummary(stateDraft.status,departure,duration))}</p></div>`)}
 ${pane(4,`<div class="registration-summary">${pilot?`<div class="registration-summary-row is-static"><span>Pilote</span><strong>${esc(pilot)}</strong></div>`:''}${summaryRow(1,'Catégorie',stateDraft.category?`${logo(stateDraft.category)} ${esc(stateDraft.category)}`:'—')}${summaryRow(2,'Voiture(s)',cars)}${summaryRow(3,'Présence',esc(hoursSummary(stateDraft.status,departure,duration)))}</div>${preferredPilotField(stateDraft,departure)}${stateDraft.id?`<div class="registration-danger-zone">${button('delete-registration',stateDraft.forOther?'Supprimer l’inscription':'Se désinscrire',`data-id="${stateDraft.id}" data-departure="${departure.id}"`,'danger-button')}</div>`:''}`)}
 <div class="registration-step-nav">${step>1?button('registration-step','Retour',`data-departure="${departure.id}" data-step="${step-1}"`,'secondary-button registration-back'):''}${next}</div>
 </form>`;

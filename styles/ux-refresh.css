@@ -1242,3 +1242,45 @@ html[data-game] .race-card .race-fill:has(.solo-fill) { display: flex; flex-wrap
 }
 /* Accueil : la phrase de confiance est déjà dans la présentation, pas en double dans la barre. */
 .site-nav-shell:has(+ .hub-main) .account-oauth-trust { display: none !important; }
+
+/* Home: window to choose a simulator after the first Discord login. */
+.hub-sim-dialog {
+  width: min(520px, calc(100% - 32px));
+  padding: 26px 26px 22px;
+  border: 1px solid var(--border, #292d31);
+  border-top: 4px solid #52d3d8;
+  border-radius: 16px;
+  background: var(--panel, #111315);
+  color: #e6ecea;
+  box-shadow: 0 30px 80px rgba(0,0,0,.6);
+}
+.hub-sim-dialog::backdrop { background: rgba(3,5,7,.72); backdrop-filter: blur(3px); }
+.hub-sim-dialog h2 { margin: 0 0 8px; font-size: 24px; font-weight: 850; color: #f4f6f5; }
+.hub-sim-dialog p { margin: 0 0 18px; color: #c7d0d4; font-size: 15px; line-height: 1.55; }
+.hub-sim-choices { display: grid; gap: 10px; }
+.hub-sim-choice.game-lmu { --game-accent: #e30613; }
+.hub-sim-choice.game-iracing { --game-accent: #4f74d8; }
+.hub-sim-choice {
+  display: flex; align-items: center; gap: 14px;
+  min-height: 64px; padding: 12px 16px;
+  border: 1px solid color-mix(in srgb, var(--game-accent) 45%, var(--border, #292d31));
+  border-left: 4px solid var(--game-accent);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--game-accent) 8%, var(--panel2, #171a1d));
+  color: #f4f6f5; font-size: 17px; text-decoration: none;
+}
+.hub-sim-choice strong { flex: 1; }
+.hub-sim-choice:hover, .hub-sim-choice:focus-visible { background: color-mix(in srgb, var(--game-accent) 18%, var(--panel2, #171a1d)); outline: none; }
+
+/* Large screens (27–34 inch, ultrawide): the whole interface grows in proportion and the page uses
+   more of the width. The banner keeps its own sizing (its image is capped at its source resolution). */
+@media (min-width: 2200px) { :root { --wide-zoom: 1.15; } }
+@media (min-width: 2500px) { :root { --wide-zoom: 1.25; } main { max-width: 1760px; } }
+@media (min-width: 3000px) {
+  :root { --wide-zoom: 1.4; }
+  main { max-width: 2000px; }
+  html[data-game] .event-list { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
+}
+@media (min-width: 2200px) {
+  body > :not(.site-hero):not(.top-stripes):not(script):not(noscript) { zoom: var(--wide-zoom); }
+}

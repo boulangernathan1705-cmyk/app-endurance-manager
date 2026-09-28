@@ -6,8 +6,17 @@ Les changements du site, version par version. La plus récente est en haut.
 
 ### Accueil
 - Nouvelle page d'accueil pour les nouveaux : ce qu'est le site, la connexion Discord et comment ça marche en 4 étapes.
-- Le site retient ta simu : la prochaine fois, tu arrives directement sur LMU ou iRacing. Le logo te ramène à l'accueil pour en changer.
-- Les prochaines courses s'affichent tout de suite, sans temps de chargement, avec la prochaine endurance et la prochaine course solo de chaque simu.
+- À ta première connexion, une petite fenêtre te demande ta simu. Le site s'en souvient : ensuite, tu arrives directement sur LMU ou iRacing.
+- Le logo **Endurance Manager** te ramène aux endurances de ta simu. Pour changer de simu, utilise la barre de navigation.
+
+### Endurances
+- La durée d'une endurance peut avoir des minutes, par exemple **2 h 30**. La frise de présence s'arrête à l'heure de fin réelle.
+
+### Grands écrans
+- Sur les grands écrans (27 à 34 pouces, ultralarges), le site s'agrandit et utilise mieux la largeur : jusqu'à trois courses par ligne.
+
+### Corrections
+- Les bloqueurs de pub n'empêchent plus l'affichage des courses.
 
 ### Courses solo
 - Nouvel onglet **Courses solo** à côté des **Endurances** : chaque onglet a son propre calendrier.

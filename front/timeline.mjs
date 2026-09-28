@@ -7,6 +7,11 @@ export function raceHourLabel(departure, index) {
   return timeLabel(timelineTime.format(new Date(departure.startsAt + index * 3600000)));
 }
 
+// Finish time of a departure (its real end when the duration has minutes).
+export function raceEndLabel(departure) {
+  return timeLabel(timelineTime.format(new Date(Number(departure.endsAt))));
+}
+
 // Label density follows the containing card, independently of viewport size.
 // Always leave at least one full step before the final label (odd durations too).
 export function timelineLabelVisible(index, duration, capacity) {
@@ -18,6 +23,9 @@ export function renderAvailabilityTimeline({departure, duration, status = '', co
   const parts = new Set(status.split(','));
   const isCoverage = Array.isArray(counts);
   const hours = Array.from({length:duration + 1}, (_, i) => raceHourLabel(departure, i));
+  // A race of 2 h 30 has 3 slots; its finish is the real end, not the end of the third hour.
+  const endsAt = Number(departure.endsAt);
+  if (endsAt > departure.startsAt + (duration - 1) * 3600000 && endsAt < departure.startsAt + duration * 3600000) hours[duration] = raceEndLabel(departure);
   const boundaries = hours.map((hour, i) => {
     const density = [4,6,10,16,24].filter(capacity => timelineLabelVisible(i, duration, capacity)).map(capacity => `ticks-${capacity}`).join(' ');
     return `<span class="presence-boundary boundary-${i} ${i===duration?'is-finish':''}"><span class="presence-time ${density}">${hour}</span></span>`;

@@ -1,188 +1,30 @@
-import {GAME_CATALOGS, gameForEvent} from '../shared/catalog.mjs';
-import {eventSchedule} from './schedule.mjs';
-import {getLocale} from './i18n.mjs';
-import {dateBlock,timeLabel} from './dates.mjs';
+// Home page: only newcomers see it. Once a simulator is chosen (cookie em_sim set by its space), the
+// server sends "/" and the logo straight to that simulator.
+// A signed-in pilot who has not chosen yet (first visit after the Discord login) gets a small window
+// to pick their simulator.
+// Translation (English) and the language button of the page.
+import './i18n.mjs';
 
-const grid = document.getElementById('game-grid');
-
-// Same palette and order as the crews of a race page (crew-palette-0..9, sortedCrews in front/app/core.mjs),
-// so a crew keeps its color from the home page to the race.
-const CREW_COLORS = ['#53d8ff','#c58cff','#ffae62','#ff79aa','#75a9ff','#b5df62','#ffd45e','#66e0b1','#ff7777','#b99cff'];
-const sortedCrews = (event, departure) => [...(departure.crews || [])].sort((a, b) => (event.categories || []).indexOf(a.category) - (event.categories || []).indexOf(b.category) || String(a.name).localeCompare(String(b.name), 'fr', {sensitivity:'base', numeric:true}));
-const MAX_HOME_ITEMS = 3;
 const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
 
-function activeRegistrations(departure) {
-  return (departure?.availability || []).filter(registration => registration.status !== 'unavailable');
-}
+const SIMS = [
+  {href:'/lmu/', badge:'LMU', name:'Le Mans Ultimate', css:'game-lmu'},
+  {href:'/iracing/', badge:'iR', name:'iRacing', css:'game-iracing'}
+];
 
-function activePilotCount(departure) {
-  return new Set(activeRegistrations(departure).map(registration => registration.participantId || registration.id)).size;
-}
-
-function hasVisibleActivity(departure) {
-  return activeRegistrations(departure).length > 0 || (departure?.crews || []).length > 0;
-}
-
-function hasCrew(departure) {
-  return (departure?.crews || []).length > 0;
-}
-
-function eventBounds(event) {
-  const duration = (Number(event.durationHours) || 6) * 3600000;
-  const starts = (event.departures || [])
-    .map(item => Number(item.startsAt))
-    .filter(Number.isFinite)
-    .sort((a,b) => a-b);
-  if (!starts.length) return null;
-  return {start:starts[0],end:starts[starts.length-1]+duration,duration};
-}
-
-function remainingDepartures(event, timestamp=Date.now()) {
-  return [...(event.departures || [])]
-    .filter(item => Number.isFinite(Number(item.startsAt)) && Number(item.startsAt) > timestamp)
-    .sort((a,b) => Number(a.startsAt) - Number(b.startsAt));
-}
-
-function orderedEvents(events, game, timestamp=Date.now()) {
-  // Endurances only: solo races have their own block on each simulator card.
-  return events
-    .filter(event => gameForEvent(event) === game && event.format !== 'solo')
-    .map(event => ({event,schedule:eventSchedule(event,timestamp),bounds:eventBounds(event)}))
-    .filter(item => item.bounds && !item.schedule.archived && item.schedule.timestamp !== null)
-    .sort((a,b) => Number(!!b.schedule.running)-Number(!!a.schedule.running)
-      || (a.schedule.timestamp ?? Infinity)-(b.schedule.timestamp ?? Infinity)
-      || a.event.name.localeCompare(b.event.name,getLocale()==='en'?'en':'fr'));
-}
-
-function homeQueue(events, game, timestamp=Date.now()) {
-  const queue=[];
-  for (const item of orderedEvents(events,game,timestamp)) {
-    const remaining=remainingDepartures(item.event,timestamp);
-    if (!remaining.length) continue;
-    const active=remaining.filter(hasVisibleActivity);
-
-    if (!active.length) {
-      queue.push({...item,departure:remaining[0]});
-      break;
-    }
-
-    for (const departure of active) {
-      queue.push({...item,departure});
-      if (hasCrew(departure) || queue.length >= MAX_HOME_ITEMS) return queue;
-    }
-
-    if (queue.length >= MAX_HOME_ITEMS) return queue;
-  }
-  return queue.slice(0,MAX_HOME_ITEMS);
-}
-
-function crewIcon(color) {
-  return `<span class="crew-summary-icon" aria-hidden="true" style="--crew-color:${color}"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="7" r="2.2"/><circle cx="6.8" cy="10" r="1.7"/><circle cx="17.2" cy="10" r="1.7"/><path d="M8.5 17.2c.4-2.7 1.6-4.2 3.5-4.2s3.1 1.5 3.5 4.2"/><path d="M3.8 17c.3-2.2 1.3-3.4 3-3.4.7 0 1.3.2 1.8.6"/><path d="M20.2 17c-.3-2.2-1.3-3.4-3-3.4-.7 0-1.3.2-1.8.6"/></svg></span>`;
-}
-
-function crewMarkup(crew, departure, index=0) {
-  const pilots = (crew.registrationIds || [])
-    .map(id => (departure.availability || []).find(registration => registration.id === id)?.name)
-    .filter(Boolean);
-  const color = CREW_COLORS[index % CREW_COLORS.length];
-  return `<span class="crew-summary-card ${crew.locked ? 'is-complete' : 'is-open'}">
-    ${crewIcon(color)}
-    <span class="crew-summary-main"><span class="crew-summary-title"><strong style="color:${color}">${esc(crew.name || 'Équipage')}</strong></span><small>${esc(crew.category || '')}${crew.car ? ` · ${esc(crew.car)}` : ''}</small></span>
-    <span class="crew-summary-pilots">${pilots.length ? esc(pilots.join(' · ')) : 'Aucun pilote affecté'}</span>
-    <span class="crew-compact-status ${crew.locked ? 'is-complete' : 'is-open'}">${crew.locked ? 'Complet' : 'Places libres'}</span>
-  </span>`;
-}
-
-function participationMarkup(event, departure) {
-  const crews = sortedCrews(event, departure);
-  const pilotCount = activePilotCount(departure);
-  if (crews.length) {
-    return `<span class="crew-summary-heading"><strong>${crews.length} équipage${crews.length > 1 ? 's' : ''} engagé${crews.length > 1 ? 's' : ''}</strong><span>${pilotCount ? `${pilotCount} pilote${pilotCount > 1 ? 's' : ''} inscrit${pilotCount > 1 ? 's' : ''}` : 'Aucun pilote inscrit'}</span></span>
-      <span class="crew-summary-list">${crews.map((crew,index) => crewMarkup(crew,departure,index)).join('')}</span>`;
-  }
-  if (pilotCount) {
-    return `<span class="crew-summary-heading"><strong>${pilotCount} pilote${pilotCount > 1 ? 's' : ''} inscrit${pilotCount > 1 ? 's' : ''}</strong><span>Aucun équipage formé</span></span>`;
-  }
-  return '<span class="crew-summary-heading"><strong>Aucun participant</strong><span>Aucune inscription pour ce départ</span></span>';
-}
-
-function enduranceMarkup(item, game) {
-  const {event,departure} = item;
-  const catalog = GAME_CATALOGS[game];
-  const circuit = catalog.circuits.find(item => item.id === event.circuit)?.name || 'Circuit à préciser';
-  const eventStarted = (event.departures || []).some(item => Number.isFinite(Number(item.startsAt)) && Number(item.startsAt) <= Date.now());
-  const label = eventStarted ? 'PROCHAIN DÉPART' : 'PROCHAINE ENDURANCE';
-  // Same presentation as the race cards: date block, name, circuit · duration, start time.
-  return `<section class="hub-next-race" aria-label="${esc(event.name)} · départ ${esc(timeLabel(departure.time))}">
-    <span class="hub-next-label">${label}</span>
-    <div class="hub-race-top">${dateBlock(departure.startsAt)}<div class="hub-race-head">
-      <h3>${esc(event.name)}</h3>
-      <p class="hub-race-meta"><span>${esc(circuit)} · ${Number(event.durationHours) || 6} h</span></p>
-      <span class="race-start">Départ ${esc(timeLabel(departure.time))}</span>
-    </div></div>
-    ${participationMarkup(event, departure)}
-  </section>`;
-}
-
-function enduranceQueueMarkup(items, game) {
-  if (!items.length) return `<div class="hub-empty"><strong>Aucune endurance à venir</strong><span>Le prochain événement apparaîtra ici dès qu’il sera créé.</span></div>`;
-  return `<div class="hub-race-queue">${items.map(item=>enduranceMarkup(item,game)).join('')}</div>`;
-}
-
-// Next solo race of a simulator: date, name, rounds, OPEN / SAFE and the places taken.
-function nextSoloRace(events, game, timestamp=Date.now()) {
-  return events
-    .filter(event => gameForEvent(event) === game && event.format === 'solo')
-    .map(event => ({event, departure:remainingDepartures(event, timestamp)[0]}))
-    .filter(item => item.departure)
-    .sort((a,b) => Number(a.departure.startsAt) - Number(b.departure.startsAt))[0] || null;
-}
-
-function soloMarkup(item, game) {
-  if (!item) return '';
-  const {event, departure} = item;
-  const catalog = GAME_CATALOGS[game];
-  const circuitName = id => catalog.circuits.find(circuit => circuit.id === id)?.name || 'Circuit à préciser';
-  const rounds = (event.rounds?.length ? event.rounds : [{circuit:event.circuit}]).map(round => `${esc(circuitName(round.circuit))}${round.durationMinutes ? ` · ${round.durationMinutes} min` : ''}`).join(' + ');
-  const entries = (departure.availability || []).filter(reg => reg.status !== 'unavailable');
-  const confirmed = entries.filter(reg => !reg.waitlistPosition).length, waiting = entries.length - confirmed;
-  const safe = event.access === 'safe';
-  return `<section class="hub-next-race hub-next-solo" aria-label="${esc(event.name)} · départ ${esc(timeLabel(departure.time))}">
-    <span class="hub-next-label">PROCHAINE COURSE SOLO</span>
-    <div class="hub-race-top">${dateBlock(departure.startsAt)}<div class="hub-race-head">
-      <h3>${esc(event.name)}</h3>
-      <p class="hub-race-meta"><span>${rounds}</span></p>
-      <span class="hub-solo-line"><span class="event-access-badge ${safe ? 'is-safe' : 'is-open'}">${safe ? 'SAFE' : 'OPEN'}</span><span class="race-start">Départ ${esc(timeLabel(departure.time))}</span><span class="hub-solo-places">${confirmed}${event.capacity ? ` / ${event.capacity}` : ''} ${confirmed > 1 ? 'inscrits' : 'inscrit'}${waiting ? ` · ${waiting} en attente` : ''}</span></span>
-    </div></div>
-  </section>`;
-}
-
-function gameCard(game, events) {
-  const catalog = GAME_CATALOGS[game];
-  const href = game === 'lmu' ? '/lmu/' : '/iracing/';
-  const badge = game === 'lmu' ? 'LMU' : 'iR';
-  return `<article class="game-hub-card game-${game}">
-    <div class="game-hub-heading"><div class="game-title-line"><span class="game-badge" aria-hidden="true">${badge}</span><h2>${esc(catalog.name)}</h2></div><p>${game === 'lmu' ? 'Hypercar, prototypes et GT de Le Mans Ultimate.' : 'GTP, LMP2, GT3, GT4 et TCR avec un catalogue de circuits étendu.'}</p></div>
-    <a class="game-hub-enter" href="${href}">Accéder à ${esc(catalog.shortName)} <span aria-hidden="true">→</span></a>
-    ${enduranceQueueMarkup(homeQueue(events,game),game)}
-    ${soloMarkup(nextSoloRace(events,game),game)}
-  </article>`;
-}
-
-async function fetchGameEvents(game) {
-  const response = await fetch(`/api/races?game=${encodeURIComponent(game)}&scope=upcoming`, {credentials:'same-origin',cache:'no-store'});
-  if (!response.ok) throw new Error(`events-${game}`);
-  const result = await response.json();
-  return Array.isArray(result.events) ? result.events : [];
-}
-
-// The server embeds the upcoming races in the page (no "Chargement…"); fetched only as a fallback.
-function embeddedRaces() {
-  try {
-    const events = JSON.parse(document.getElementById('hub-races')?.textContent || 'null')?.events;
-    return Array.isArray(events) ? events : null;
-  } catch { return null; }
+function openSimChooser(name) {
+  if (document.querySelector('.hub-sim-dialog')) return;
+  const dialog = document.createElement('dialog');
+  dialog.className = 'hub-sim-dialog';
+  dialog.setAttribute('aria-labelledby', 'hub-sim-title');
+  dialog.innerHTML = `<h2 id="hub-sim-title">Bienvenue ${esc(name)} !</h2>
+    <p>Sur quelle simu roules-tu ? Le site s’en souviendra, et tu pourras changer à tout moment depuis la barre de navigation.</p>
+    <div class="hub-sim-choices">${SIMS.map(sim => `<a class="hub-sim-choice ${sim.css}" href="${sim.href}"><span class="game-badge" aria-hidden="true">${sim.badge}</span><strong>${sim.name}</strong><span aria-hidden="true">→</span></a>`).join('')}</div>`;
+  document.body.append(dialog);
+  // Closing (Échap) leaves the home page, where the cards offer the same choice.
+  dialog.addEventListener('close', () => dialog.remove());
+  if (typeof dialog.showModal === 'function') dialog.showModal(); else dialog.setAttribute('open', '');
+  dialog.querySelector('a')?.focus();
 }
 
 // "Se connecter avec Discord" is only for visitors who are not signed in yet.
@@ -194,26 +36,10 @@ async function showSignIn() {
     if (session.user) {
       box.innerHTML = `<p class="hub-welcome-back">Content de te revoir, <strong>${esc(session.user.name)}</strong>. Choisis ta simu ci-dessous.</p>`;
       document.querySelector('.hub-trust')?.remove();
+      if (!/(?:^|;\s*)em_sim=/.test(document.cookie)) openSimChooser(session.user.name);
     }
   } catch {}
   box.hidden = false;
 }
 
-async function load() {
-  void showSignIn();
-  try {
-    const embedded = embeddedRaces();
-    if (embedded) {
-      grid.innerHTML = gameCard('lmu',embedded) + gameCard('iracing',embedded);
-      return;
-    }
-    const [lmuEvents,iracingEvents] = await Promise.all([fetchGameEvents('lmu'),fetchGameEvents('iracing')]);
-    grid.innerHTML = gameCard('lmu',lmuEvents) + gameCard('iracing',iracingEvents);
-  } catch {
-    grid.innerHTML = gameCard('lmu',[]) + gameCard('iracing',[]);
-    const notice = document.getElementById('hub-status');
-    if (notice) notice.textContent = 'Le récapitulatif des prochaines endurances est momentanément indisponible. Les espaces restent accessibles.';
-  }
-}
-
-void load();
+void showSignIn();
