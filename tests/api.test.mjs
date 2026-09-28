@@ -564,3 +564,36 @@ test('solo races and SAFE drivers stay off where SOLO_RACES is not "on" (product
  assert.equal((await req(`/api/events/${soloRace.data.id}/departures/${soloDeparture}/registrations`,'POST',{name:'Leo',choices:[{category:'Hypercar',cars:[],carAny:true}]},'pilot')).status,404,'not reachable by its id');
  assert.equal((await req('/api/events','POST',eventInput,'admin')).status,201,'endurances unchanged');
 });
+
+test('"Horaires à confirmer": a common start "à définir", real times added later, then each crew picks its start', async () => {
+ const {req,login,DB}=harness();await login(ADMIN,'admin');await login(PILOT,'pilot');
+ const base={name:'6h FUJI',circuit:'fuji',categories:['Hypercar'],durationMinutes:360,schedulePending:true};
+ // Creation: only the day.
+ assert.equal((await req('/api/events','POST',{...base,departures:[{date:'2090-10-04',time:'20:00',tbd:true},{date:'2090-10-05',time:'20:00',tbd:true}]},'admin')).status,400,'one common start only');
+ const created=await req('/api/events','POST',{...base,departures:[{date:'2090-10-04',time:'20:00',tbd:true}]},'admin');
+ assert.equal(created.status,201);
+ let event=(await req('/api/events')).data.events.find(e=>e.id===created.data.id);
+ assert.equal(event.departures.length,1);assert.equal(event.departures[0].tbd,true);
+ // Nobody entered: adding the real times replaces the common start.
+ const edit=(e,deps)=>req('/api/events/'+e.id,'PATCH',{...base,schedulePending:false,version:e.version,departures:deps},'admin');
+ assert.equal((await edit(event,[{id:event.departures[0].id,date:'2090-10-04',time:'20:00',tbd:true},{date:'2090-10-04',time:'14:00'},{date:'2090-10-05',time:'10:00'}])).status,200);
+ event=(await req('/api/events')).data.events.find(e=>e.id===created.data.id);
+ assert.deepEqual(event.departures.map(d=>`${d.date} ${d.time}${d.tbd?' tbd':''}`),['2090-10-04 14:00','2090-10-05 10:00']);
+ // With entries: the common start stays, closing with the first real start, and crews pick theirs.
+ const second=await req('/api/events','POST',{...base,name:'4h PORTIMAO',circuit:'portimao',departures:[{date:'2090-10-16',time:'20:00',tbd:true}]},'admin');
+ event=(await req('/api/events')).data.events.find(e=>e.id===second.data.id);
+ const pool=event.departures[0];
+ const reg=await req(`/api/events/${event.id}/departures/${pool.id}/registrations`,'POST',{name:'Leo',category:'Hypercar',status:'whole'},'pilot');
+ assert.equal(reg.status,201);
+ assert.equal((await edit(event,[{id:pool.id,date:pool.date,time:pool.time,tbd:true},{date:'2090-10-17',time:'09:00'},{date:'2090-10-17',time:'14:00'}])).status,200);
+ event=(await req('/api/events')).data.events.find(e=>e.id===second.data.id);
+ assert.deepEqual(event.departures.map(d=>`${d.date} ${d.time}${d.tbd?' tbd':''}`),['2090-10-17 09:00 tbd','2090-10-17 09:00','2090-10-17 14:00']);
+ const leo=event.departures[0].availability[0];
+ assert.equal((await req('/api/registrations/'+leo.id+'/departure','PATCH',{departureId:event.departures[2].id,version:leo.version},'pilot')).status,200);
+ // Upcoming LMU races "à confirmer" without entries become a single common start (migration 0033).
+ const third=await req('/api/events','POST',{...base,name:'8h BAHRAIN',circuit:'bahrain',departures:[{date:'2090-11-13',time:'00:00'},{date:'2090-11-14',time:'00:00'}]},'admin');
+ DB.db.exec(readFileSync(new URL('../migrations/0033_lmu_pending_common_start.sql',import.meta.url),'utf8'));
+ event=(await req('/api/events')).data.events.find(e=>e.id===third.data.id);
+ assert.deepEqual(event.departures.map(d=>`${d.date} ${d.time}${d.tbd?' tbd':''}`),['2090-11-13 00:00 tbd']);
+ assert.equal((await req('/api/events')).data.events.find(e=>e.id===second.data.id).departures.length,3,'races with entries are left as they are');
+});

@@ -4,6 +4,11 @@ Les changements du site, version par version. La plus récente est en haut.
 
 ## v1.1.3 — 28 septembre 2026
 
+### Horaires à confirmer (LMU et iRacing)
+- En cochant **Horaires à confirmer** à la création d'une course, tu indiques seulement le **jour** : la course a un départ **à définir** où tout le monde s'inscrit et forme ses équipages.
+- Quand les horaires sont connus, **modifie la course** et ajoute les vrais départs. Si personne n'était inscrit, le départ à définir disparaît ; sinon **chaque équipage choisit son départ**.
+- Les courses LMU à venir en horaires à confirmer (Fuji, Portimão, Bahreïn, Silverstone) passent à ce fonctionnement.
+
 ### Corrections
 - Une course en **Horaires à confirmer** (LMU comme iRacing) n'affiche plus d'heure provisoire : ses départs indiquent la date et « à définir ».
 - Le récap Discord n'annonce plus « Course en cours » pour une course aux horaires à confirmer, et écrit « horaire à confirmer » au lieu d'une heure provisoire.
