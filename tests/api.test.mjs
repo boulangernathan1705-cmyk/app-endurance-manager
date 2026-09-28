@@ -4,6 +4,7 @@ import {DatabaseSync} from 'node:sqlite';
 import {readFileSync} from 'node:fs';
 import worker from '../server/worker.mjs';
 import workerWithMigrations from '../server/worker-with-migrations.mjs';
+import {SEASON} from './fixtures/iracing-season.mjs';
 const ROOT='https://site.example';
 const ADMIN='111111111111111111', PILOT='222222222222222222', OTHER='333333333333333333';
 class D1 {
@@ -25,6 +26,7 @@ function harness(withParticipants=true){
  DB.db.exec(readFileSync(new URL('../migrations/0027_solo_races.sql',import.meta.url),'utf8'));
  DB.db.exec(readFileSync(new URL('../migrations/0028_solo_round_choices.sql',import.meta.url),'utf8'));
  DB.db.exec(readFileSync(new URL('../migrations/0029_event_duration_minutes.sql',import.meta.url),'utf8'));
+ DB.db.exec(readFileSync(new URL('../migrations/0030_iracing_import.sql',import.meta.url),'utf8'));
  const env={DB,APP_ORIGIN:ROOT,DISCORD_CLIENT_ID:'app-id',DISCORD_CLIENT_SECRET:'test-only-secret',ADMIN_DISCORD_IDS:ADMIN,ASSETS:{fetch:async()=>new Response('static')}};
  const jars=new Map();
  async function req(path,method='GET',data,actor='guest',options={}){
@@ -462,4 +464,28 @@ test('solo race with two rounds: categories per round, one choice per round',asy
  assert.equal(edited.status,200,JSON.stringify(edited.data));
  event=(await req('/api/events')).data.events.find(e=>e.id===created.data.id);
  assert.equal(event.departures[0].availability[0].roundChoices[1].category,'LMP2 ELMS');
+});
+
+test('official iRacing endurances are imported once, by the daily task or by an admin', async t => {
+ const {req,login,DB}=harness();await login(ADMIN,'admin');await login(PILOT,'pilot');
+ const realFetch=globalThis.fetch;t.after(()=>{globalThis.fetch=realFetch;});
+ // Far-future dates: every week of the test season is still to come.
+ const future=JSON.parse(JSON.stringify(SEASON).replaceAll('2026-','2099-'));
+ globalThis.fetch=async url=>new Response(JSON.stringify(String(url).endsWith('manifest.json')?{current:'2099S4'}:future));
+ assert.equal((await req('/api/admin/iracing-import','POST',{},'pilot')).status,403);
+ const first=await req('/api/admin/iracing-import','POST',{},'admin');
+ assert.equal(first.status,200);assert.ok(first.data.created>=4);
+ const events=(await req('/api/races?game=iracing')).data.events;
+ assert.equal(events.length,first.data.created);
+ const imsa=events.find(event=>event.name==='IMSA Endurance Series'&&event.circuit==='iracing-long-beach');
+ assert.equal(imsa.departures.length,4);assert.equal(imsa.durationMinutes,160);
+ assert.ok(events.some(event=>event.schedulePending&&event.eventType==='special'));
+ // Run again: nothing new. Delete a race: it is not created again.
+ assert.equal((await req('/api/admin/iracing-import','POST',{},'admin')).data.created,0);
+ assert.equal((await req('/api/events/'+imsa.id,'DELETE',{version:imsa.version},'admin')).status,200);
+ assert.equal((await req('/api/admin/iracing-import','POST',{},'admin')).data.created,0);
+ // The import account never shows up among the pilots or the members.
+ assert.ok(!(await req('/api/members','GET',null,'admin')).data.members.some(member=>member.id==='system:iracing'));
+ assert.ok(!(await req('/api/participants','GET',null,'pilot')).data.participants.some(member=>member.id==='system:iracing'));
+ assert.ok(DB.db.prepare("SELECT COUNT(*) n FROM iracing_imports").get().n>=4);
 });

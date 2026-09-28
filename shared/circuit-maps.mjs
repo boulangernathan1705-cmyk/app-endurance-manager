@@ -46,6 +46,7 @@ export const CIRCUIT_MAPS = Object.freeze({
 
 export const CIRCUIT_MAP_ALIASES = Object.freeze({
   'iracing-barcelona':'barcelona',
+  'iracing-long-beach':'long-beach',
   'iracing-cota':'cota',
   'iracing-daytona':'daytona',
   'iracing-fuji':'fuji',

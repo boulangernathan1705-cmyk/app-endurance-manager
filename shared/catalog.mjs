@@ -61,6 +61,19 @@ const IRACING_CIRCUITS = [
   {id:'iracing-watkins-glen',name:'Watkins Glen International',file:'track-placeholder.svg'},
   {id:'iracing-laguna-seca',name:'WeatherTech Raceway Laguna Seca',file:'track-placeholder.svg'},
   {id:'iracing-zandvoort',name:'Circuit Zandvoort',file:'track-placeholder.svg'},
+  // Tracks of the official iRacing endurance series (automatic import, server/iracing-import.mjs).
+  {id:'iracing-brands-hatch',name:'Brands Hatch Circuit',file:'track-placeholder.svg'},
+  {id:'iracing-charlotte',name:'Charlotte Motor Speedway (Roval)',file:'track-placeholder.svg'},
+  {id:'iracing-montreal',name:'Circuit Gilles-Villeneuve',file:'track-placeholder.svg'},
+  {id:'iracing-navarra',name:'Circuito de Navarra',file:'track-placeholder.svg'},
+  {id:'iracing-zolder',name:'Circuit Zolder',file:'track-placeholder.svg'},
+  {id:'iracing-long-beach',name:'Long Beach Street Circuit',file:'track-placeholder.svg'},
+  {id:'iracing-motegi',name:'Mobility Resort Motegi',file:'track-placeholder.svg'},
+  {id:'iracing-oschersleben',name:'Motorsport Arena Oschersleben',file:'track-placeholder.svg'},
+  {id:'iracing-oulton-park',name:'Oulton Park Circuit',file:'track-placeholder.svg'},
+  {id:'iracing-snetterton',name:'Snetterton Circuit',file:'track-placeholder.svg'},
+  {id:'iracing-summit-point',name:'Summit Point Raceway',file:'track-placeholder.svg'},
+  {id:'iracing-the-bend',name:'The Bend Motorsport Park',file:'track-placeholder.svg'},
   {id:'iracing-tbd',name:'Circuit à préciser',file:'track-placeholder.svg'},
   {id:'iracing-random',name:'Circuit aléatoire',file:'track-placeholder.svg',random:true}
 ];

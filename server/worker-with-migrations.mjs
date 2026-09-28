@@ -4,6 +4,7 @@ import {isWeeklyDiscordMutation} from './discord-weekly-format.mjs';
 import {ensureDiscordWeeklySchema} from './discord-weekly-schema.mjs';
 import {syncWeeklyDiscord} from './discord-weekly.mjs';
 import {cleanup} from './core.mjs';
+import {syncIracingEvents} from './iracing-import.mjs';
 import {isDevelopment,devRobots,markDevelopmentResponse} from './dev-environment.mjs';
 
 let crewOwnershipReady = null;
@@ -73,7 +74,16 @@ export default {
     return development ? markDevelopmentResponse(response) : response;
   },
 
-  async scheduled(_controller, env, ctx) {
+  async scheduled(controller, env, ctx) {
+    // Official iRacing endurances: once a day (the schedule it reads is refreshed daily around 6:17 UTC),
+    // and at the next run as long as nothing was ever imported (first deployment).
+    const at = new Date(controller?.scheduledTime || Date.now());
+    if (env?.DB && env.IRACING_IMPORT !== 'off') ctx.waitUntil((async () => {
+      const daily = at.getUTCHours() === 7 && at.getUTCMinutes() < 15;
+      if (daily || !(await env.DB.prepare('SELECT 1 FROM iracing_imports LIMIT 1').first())) await syncIracingEvents(env);
+    })().catch(error => {
+      console.error('iRacing import failed', error instanceof Error ? error.message : 'unknown');
+    }));
     // Expired sessions, OAuth states and rate-limit counters are purged here too, not only on Discord login.
     if (env?.DB) ctx.waitUntil(cleanup(env).catch(error => {
       console.error('Scheduled cleanup failed', error instanceof Error ? error.message : 'unknown');

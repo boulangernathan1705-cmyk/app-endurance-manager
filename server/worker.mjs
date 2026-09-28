@@ -5,6 +5,7 @@ import {
 } from './core.mjs';
 import {ingestClientError, clientErrorsApi} from './telemetry.mjs';
 import {racesPath} from './races-path.mjs';
+import {syncIracingEvents} from './iracing-import.mjs';
 async function eventById(env, eventId) {
   const row = await env.DB.prepare('SELECT * FROM events WHERE id=?').bind(eventId).first();
   if (!row) fail(404, 'Événement introuvable.'); return row;
@@ -209,6 +210,7 @@ async function api(request, env) {
     if (!actor.user) fail(401,'Connecte-toi avec Discord pour choisir un pilote.');
     return json({participants:(await env.DB.prepare(`SELECT u.id,u.name,p.id AS participantId
       FROM users u LEFT JOIN participants p ON p.user_id=u.id
+      WHERE u.id NOT LIKE 'system:%'
       ORDER BY lower(u.name),u.id`).all()).results});
   }
   const crewCreate = path.match(/^\/api\/events\/([a-f0-9-]{36})\/departures\/([a-f0-9-]{36})\/crews$/);
@@ -390,9 +392,14 @@ async function api(request, env) {
     if (!result.meta.changes) fail(409, 'Les données ont changé. Actualise avant de réessayer.');
     return json({ok:true});
   }
+  // Admins can run the daily import of official iRacing endurances at once.
+  if (path === '/api/admin/iracing-import' && method === 'POST') {
+    requireRole(actor.user,true);
+    return json({created:await syncIracingEvents(env)});
+  }
   if (path === '/api/members' && method === 'GET') {
     requireRole(actor.user,true);
-    const rows = (await env.DB.prepare('SELECT * FROM users ORDER BY name LIMIT 200').all()).results;
+    const rows = (await env.DB.prepare("SELECT * FROM users WHERE id NOT LIKE 'system:%' ORDER BY name LIMIT 200").all()).results;
     return json({members:rows.map(u => publicUser(u,env))});
   }
   const memberMatch = path.match(/^\/api\/members\/(\d{15,22})$/);

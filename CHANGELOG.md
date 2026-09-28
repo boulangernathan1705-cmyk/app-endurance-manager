@@ -12,6 +12,12 @@ Les changements du site, version par version. La plus récente est en haut.
 ### Endurances
 - La durée d'une endurance peut avoir des minutes, par exemple **2 h 30**. La frise de présence s'arrête à l'heure de fin réelle.
 
+### Endurances iRacing officielles
+- Les endurances officielles iRacing avec changement de pilotes arrivent **toutes seules** sur le site, mises à jour chaque nuit : IMSA Endurance Series, Global Endurance Tour, GT Endurance Series, Nürburgring Endurance Championship, Creventic, Production Endurance Challenge…
+- Une course par série et par semaine, avec **tous les horaires de départ officiels**, à l'heure de Paris.
+- Les événements spéciaux (Bathurst 1000, 8 Hours of Indianapolis…) sont créés avec **Horaires à confirmer** : il reste à mettre l'heure du départ.
+- Circuits iRacing ajoutés : Long Beach, Motegi, Brands Hatch, Zolder, Summit Point, Circuit Gilles-Villeneuve, The Bend, Charlotte Roval, Navarra, Oschersleben, Oulton Park et Snetterton.
+
 ### Grands écrans
 - Sur les grands écrans (27 à 34 pouces, ultralarges), le site s'agrandit et utilise mieux la largeur : jusqu'à trois courses par ligne.
 
