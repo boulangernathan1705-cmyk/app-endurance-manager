@@ -62,7 +62,7 @@ test('le résumé d’accueil suit la chronologie course et charge LMU/iRacing s
   assert.match(hub,/Number\(!!b\.schedule\.running\)-Number\(!!a\.schedule\.running\)/);
   assert.match(hub,/fetchGameEvents\('lmu'\)/);
   assert.match(hub,/fetchGameEvents\('iracing'\)/);
-  assert.match(hub,/\/api\/events\?game=/);
+  assert.match(hub,/\/api\/races\?game=/);
 });
 
 test('l’accueil affiche jusqu’à trois départs et s’arrête au premier équipage', () => {

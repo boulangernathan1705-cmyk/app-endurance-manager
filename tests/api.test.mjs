@@ -314,6 +314,8 @@ test('event list stays available beyond D1 bound-parameter limit',async()=>{
  assert.equal(list.data.events.find(event=>event.name==='Course 7').departures[0].availability[0].addedByName,'Createur 7');
  assert.equal((await req('/api/events?game=lmu')).data.events.length,120);
  assert.equal((await req('/api/events?game=iracing')).data.events.length,0);
+ // Public name of the race API (ad blockers block "/api/events"); the old address keeps working.
+ assert.equal((await req('/api/races?game=lmu')).data.events.length,120);
 });
 test('organizer-created crews stay ownerless across worker cold starts',async()=>{
  const {req,login,DB,env,jars}=harness();await login(ADMIN,'admin');await login(PILOT,'pilot');

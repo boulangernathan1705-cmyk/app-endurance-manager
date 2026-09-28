@@ -131,7 +131,7 @@ export async function api(path,method='GET',data) {
   }
 }
 async function fetchEvents(scope) {
-  const result = await api(`/api/events?game=${encodeURIComponent(activeGame)}&scope=${scope}`);
+  const result = await api(`/api/races?game=${encodeURIComponent(activeGame)}&scope=${scope}`);
   return (Array.isArray(result.events)?result.events:[]).filter(event => gameForEvent(event) === activeGame);
 }
 function mergeEvents(...lists) {

@@ -1,3 +1,4 @@
+import {racesPath} from './races-path.mjs';
 import {catalogForGame} from '../shared/catalog.mjs';
 
 const DAY_MS=86_400_000,HOUR_MS=3_600_000,TIME_ZONE='Europe/Paris';
@@ -87,7 +88,7 @@ export function buildWeeklyDiscordPayload(snapshot,appUrl,updatedAt=Date.now()){
 
 export function isWeeklyDiscordMutation(request){
   const method=String(request?.method||'').toUpperCase();if(!['POST','PATCH','DELETE'].includes(method))return false;
-  let path;try{path=new URL(request.url).pathname;}catch{return false;}
+  let path;try{path=racesPath(new URL(request.url).pathname);}catch{return false;}
   const uuid='[a-f0-9-]{36}';
   if(path==='/api/events'&&method==='POST')return true;
   if(new RegExp(`^/api/events/${uuid}$`).test(path)&&['PATCH','DELETE'].includes(method))return true;

@@ -35,7 +35,7 @@ test.beforeEach(async ({page}) => {
 
 test('public API responds', async ({page}) => {
   await expectApiHealthy(page, '/api/session');
-  await expectApiHealthy(page, '/api/events');
+  await expectApiHealthy(page, '/api/races');
 });
 
 test('home loads without network error', async ({page}) => {

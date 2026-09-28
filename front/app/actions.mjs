@@ -60,7 +60,7 @@ async function submitEvent(form){
     if(data.rounds.some(round=>!round.circuit))throw Error('Choisis le circuit de chaque manche.');
   }
   if(!data.categories.length)throw Error('Sélectionne au moins une catégorie.'); if(format!=='solo'&&!data.circuit)throw Error('Sélectionne le circuit de la course.');
-  const editing=!!state.editingEvent; const result=await api(editing?`/api/events/${state.editingEvent.id}`:'/api/events',editing?'PATCH':'POST',data);
+  const editing=!!state.editingEvent; const result=await api(editing?`/api/races/${state.editingEvent.id}`:'/api/races',editing?'PATCH':'POST',data);
   if(editing){state.currentEventId=state.editingEvent.id;state.page='event';}else{state.page='home';state.currentEventId=null;}
   await refreshAfterSave(editing?'Événement modifié.':'Événement créé.',result.id);
 }
@@ -150,7 +150,7 @@ async function perform(action,target){
     case 'edit-event': renderEventForm(event); break;
     case 'add-departure': if(app.querySelectorAll('.departure-field').length>=30)throw Error('Maximum 30 départs par événement.');{const rows=document.querySelectorAll('#departureFields .departure-field'),last=rows[rows.length-1];/* A new start copies the previous start's date and time: several starts often share a day. */document.getElementById('departureFields').insertAdjacentHTML('beforeend',departureFields(last?{date:last.querySelector('[name="date"]').value,time:last.querySelector('[name="time"]').value}:{}));}updateRemoveButtons();break;
     case 'remove-departure': if(app.querySelectorAll('.departure-field').length>1)target.closest('.departure-field').remove();updateRemoveButtons();break;
-    case 'delete-event': if(!confirm(`Supprimer « ${event.name} » et toutes ses inscriptions ? Cette suppression est définitive.`))return;await api(`/api/events/${event.id}`,'DELETE',{version:event.version});state.page='home';await refreshAfterSave('Événement supprimé.');break;
+    case 'delete-event': if(!confirm(`Supprimer « ${event.name} » et toutes ses inscriptions ? Cette suppression est définitive.`))return;await api(`/api/races/${event.id}`,'DELETE',{version:event.version});state.page='home';await refreshAfterSave('Événement supprimé.');break;
     case 'my-entries': await load();renderNav();renderMyEntries();break;
     case 'guest-link': state.recoveryLink=(await api('/api/guest/link','POST')).link;state.page==='event'?renderEvent():renderHome();break;
     case 'share-event': { const link=`${location.origin}${location.pathname}#event=${target.dataset.id}`; try{await navigator.clipboard.writeText(link);}catch{window.prompt('Copie le lien de la course :',link);break;} target.textContent='Lien copié ✓'; setTimeout(()=>{if(target.isConnected)target.textContent='Copier le lien de la course';},2500); break; }

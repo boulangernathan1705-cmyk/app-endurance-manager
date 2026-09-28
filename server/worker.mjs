@@ -4,6 +4,7 @@ import {
   registrationSelect, registrationParticipant, body, rateLimit, cleanup, returnPath, text, validateEvent, validateRegistration, ANY_CATEGORY
 } from './core.mjs';
 import {ingestClientError, clientErrorsApi} from './telemetry.mjs';
+import {racesPath} from './races-path.mjs';
 async function eventById(env, eventId) {
   const row = await env.DB.prepare('SELECT * FROM events WHERE id=?').bind(eventId).first();
   if (!row) fail(404, 'Événement introuvable.'); return row;
@@ -165,7 +166,7 @@ async function oauthCallback(request, env) {
 }
 async function api(request, env) {
   if (!env.DB) fail(503, 'La base partagée n’est pas encore configurée.');
-  const url = new URL(request.url), path = url.pathname, method = request.method;
+  const url = new URL(request.url), path = racesPath(url.pathname), method = request.method;
   const canonical = origin(env);
   if (url.origin !== canonical) fail(403, 'Utilise l’adresse principale du site pour cette action.');
   if (!['GET','HEAD'].includes(method)) {
