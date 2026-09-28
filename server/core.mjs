@@ -209,7 +209,8 @@ function validateEvent(input, existing = null) {
     const previous = item.id ? known.find(d => d.id === item.id) : null;
     // "Horaire à définir": a common start where everyone enters and forms crews until the real times are
     // known (both simulators). Kept as long as its date and time are unchanged, or when sent as such.
-    const tbd = item.tbd === true || Boolean(previous?.tbd && previous.startsAt === startsAt);
+    // The event form always says it (true / false); older pages and the import may leave it out.
+    const tbd = typeof item.tbd === 'boolean' ? item.tbd : Boolean(previous?.tbd && previous.startsAt === startsAt);
     if (!tbd) { if (seen.has(startsAt)) fail(400, 'Deux départs ont la même date et la même heure.'); seen.add(startsAt); }
     if (item.id && !previous) fail(400, 'Départ inconnu.');
     const departureId = previous?.id || id();

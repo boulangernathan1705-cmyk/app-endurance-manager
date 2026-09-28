@@ -41,13 +41,7 @@ if(typeof document!=='undefined'){
   document.addEventListener('change',event=>{
     const field=event.target;
     if(field.matches?.('[name="eventDriverChange"]')){field.dataset.touched='true';return;}
-    // New race with "Horaires à confirmer": only the day is asked (a common start "à définir").
-    if(field.matches?.('[name="eventSchedulePending"]')&&!state.editingEvent){
-      const list=document.getElementById('departureFields');
-      const date=list?.querySelector('[name="date"]')?.value||'';
-      if(list){list.innerHTML=departureFields(field.checked?{tbd:true,date}:{date});syncDepartureStep(field.form);updateRemoveButtons();}
-      return;
-    }
+    if(field.matches?.('[name="eventSchedulePending"]')){toggleCommonStart(field);return;}
     // 24 h is the longest race: no minutes beyond it.
     if(field.matches?.('[name="eventDurationHours"],[name="eventDurationMinutes"]')){
       const form=field.form;if(form.elements.eventDurationHours.value==='24')form.elements.eventDurationMinutes.value='00';
@@ -131,6 +125,27 @@ if(typeof document!=='undefined'){
       if(capacity&&!capacity.dataset.edited)capacity.value=gridSizeFor(field.value);
     }
   });
+}
+// "Horaires à confirmer" ticked: a common start "à définir" (day only); unticked: a start with a time.
+// New race: the single start switches between both. Edited race with a single start: it switches too (same
+// start, its entries stay on it); with several starts, ticking adds a common start next to them.
+// Next to real starts it stays (it may hold entries; the server drops it when nobody is on it).
+function toggleCommonStart(field){
+  const list=document.getElementById('departureFields');
+  if(!list)return;
+  const rows=[...list.querySelectorAll('.departure-field')],common=rows.find(row=>row.dataset.tbd==='true');
+  const values=row=>({id:row.dataset.id||undefined,date:row.querySelector('[name="date"]')?.value||'',time:row.querySelector('[name="time"]')?.value||'20:00'});
+  if(!state.editingEvent){
+    const first=rows[0]?values(rows[0]):{};
+    list.innerHTML=departureFields(field.checked?{tbd:true,date:first.date}:{date:first.date});
+  }else if(field.checked&&!common&&rows.length===1){
+    rows[0].outerHTML=departureFields({...values(rows[0]),tbd:true});
+  }else if(field.checked&&!common){
+    list.insertAdjacentHTML('afterbegin',departureFields({tbd:true,date:rows[0]?values(rows[0]).date:''}));
+  }else if(!field.checked&&common&&rows.length===1){
+    common.outerHTML=departureFields(values(common));
+  }
+  syncDepartureStep(field.form);updateRemoveButtons();
 }
 // Creating a race with "Horaires à confirmer": a single common start, no other start to add until the
 // race is edited with its real times.
