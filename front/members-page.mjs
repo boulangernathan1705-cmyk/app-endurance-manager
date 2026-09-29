@@ -83,7 +83,7 @@ function step(done, number, title, status, body, open = !done) {
     <div class="setup-body">${body}</div></details></li>`;
 }
 function webhookField(key, label, saved) {
-  return `<div class="setup-hook"><label>Webhook du salon ${label}<input name="hook-${key}" type="url" inputmode="url" autocomplete="off" spellcheck="false"
+  return `<div class="setup-hook"><label>Adresse du webhook ${label ? `du salon ${label}` : 'du salon'}<input name="hook-${key}" type="url" inputmode="url" autocomplete="off" spellcheck="false"
     placeholder="${saved ? `Déjà relié (${esc(saved)}) : laisse vide pour le garder` : 'https://discord.com/api/webhooks/…'}"></label>
     <button type="button" class="secondary-button" data-recap-test="${key}">Tester</button><span class="settings-status" aria-live="polite"></span></div>`;
 }
@@ -106,28 +106,35 @@ function setupMarkup(setup) {
     <li>Pour réserver le site à un rôle (par exemple « Pilote »), décoche tout sur @everyone et coche <strong>Endurances</strong> sur ce rôle.</li>
     <li>Les rôles se donnent sur Discord : le site les relit chaque jour, ou à la connexion suivante.</li></ul>
     <div class="setup-actions"><button type="button" class="secondary-button" data-go-tab="settings">Ouvrir les autorisations des rôles</button></div>`;
-  // 3. Recap on Discord.
+  // 3. Recap on Discord: a switch, then « Où le publier ? » (one channel, or one per simulator).
   const byScope = Object.fromEntries((setup.recaps || []).map(recap => [recap.scope, recap.webhook]));
-  const count = (setup.recaps || []).length, mode = count === 2 ? 'two' : count === 1 ? 'one' : 'none';
+  const count = (setup.recaps || []).length, layout = count === 2 ? 'two' : 'one';
   const oneScope = count === 1 ? setup.recaps[0].scope : 'all';
-  const radio = (value, label, help) => `<label class="setup-mode"><input type="radio" name="mode" value="${value}" ${mode === value ? 'checked' : ''}><span><strong>${label}</strong><small>${help}</small></span></label>`;
-  const recap = `<p>Un message sur ton Discord montre les courses de la semaine, les équipages et les pilotes inscrits. Il se met à jour tout seul à chaque inscription : pas besoin de le reposter.</p>
-    ${setup.legacyRecap ? '<p class="setup-note">Le récap actuel (courses LMU) passe par le salon réglé à la création du site. Choisis ton salon ci-dessous pour le reprendre en main.</p>' : ''}
-    <details class="setup-guide" ${count ? '' : 'open'}><summary>Créer un webhook sur Discord (1 minute)</summary><ol class="setup-howto">
-      <li>Sur Discord, survole le salon où publier le récap et clique sur la roue dentée <strong>⚙ Modifier le salon</strong>.</li>
-      <li>Ouvre <strong>Intégrations</strong>, puis <strong>Webhooks</strong>, et clique sur <strong>Nouveau webhook</strong>.</li>
-      <li>Donne-lui un nom (par exemple « Endurance Manager ») et, si tu veux, une image.</li>
-      <li>Clique sur <strong>Copier l’URL du webhook</strong>, puis colle-la ci-dessous et clique sur <strong>Tester</strong> : un message de test doit apparaître dans le salon.</li></ol>
-      <p class="setup-note">Garde cette adresse pour toi : elle permet d’écrire dans le salon. Une fois enregistrée, le site ne la réaffiche plus.</p></details>
-    <form class="setup-form" data-recaps data-mode="${mode}">
-      <fieldset class="setup-modes"><legend>Quel récap veux-tu ?</legend>
-        ${radio('none','Pas de récap','Aucun message sur Discord.')}
-        ${radio('one','Un seul message','Une simu, ou LMU et iRacing ensemble, dans un salon.')}
-        ${radio('two','Deux messages','Un pour LMU et un pour iRacing, par exemple dans deux salons séparés.')}</fieldset>
-      <div class="setup-mode-block" data-mode-block="one"><label>Courses du message<select name="oneScope">${['all','lmu','iracing'].map(scope => `<option value="${scope}" ${oneScope === scope ? 'selected' : ''}>${RECAP_LABELS[scope]}</option>`).join('')}</select></label>
-        ${webhookField('one', '', count === 1 ? setup.recaps[0].webhook : '')}</div>
-      <div class="setup-mode-block" data-mode-block="two">${webhookField('lmu', 'LMU', count === 2 ? byScope.lmu : '')}${webhookField('iracing', 'iRacing', count === 2 ? byScope.iracing : '')}</div>
-      <div class="setup-actions"><button class="primary-button" type="submit">Enregistrer le récap</button><span class="settings-status" aria-live="polite"></span></div></form>`;
+  const guide = `<details class="setup-guide"><summary>Comment obtenir cette adresse ?</summary><ol class="setup-howto">
+      <li>Sur Discord, survole le salon choisi et clique sur la roue dentée <strong>⚙ Modifier le salon</strong>.</li>
+      <li>Ouvre <strong>Intégrations</strong> → <strong>Webhooks</strong> → <strong>Nouveau webhook</strong>.</li>
+      <li>Clique sur le webhook créé, puis sur <strong>Copier l’URL du webhook</strong>, et colle-la ici.</li></ol>
+      <p class="setup-note">Garde cette adresse pour toi : elle permet d’écrire dans le salon. Une fois enregistrée, le site ne la réaffiche plus.</p></details>`;
+  const preview = `<figure class="recap-preview" aria-label="Exemple de récap sur Discord"><figcaption>Exemple de message sur Discord</figcaption>
+      <div class="recap-preview-bot"><span class="recap-preview-avatar">EM</span><strong>Endurance Manager</strong><span class="recap-preview-tag">APP</span></div>
+      <div class="recap-preview-embed"><strong>📝 Semaine du 6 au 12 octobre</strong><b>🏁 6h de Fuji</b><span>🕐 samedi 11 octobre — 21:00</span>
+      <span>🟦 Équipe Alpha · Hypercar · 🔓 Ouvert</span><span>👤 Pilote 1 &nbsp; 👤 Pilote 2</span><em>mise à jour à 18:42</em></div></figure>`;
+  const card = (value, title, help) => `<label class="recap-card"><input type="radio" name="layout" value="${value}" ${layout === value ? 'checked' : ''}><span><strong>${title}</strong><small>${help}</small></span></label>`;
+  const sim = (key, label, checked) => `<label class="role-pill"><input type="checkbox" name="${key}" ${checked ? 'checked' : ''}><span>${label}</span></label>`;
+  const recap = `<div class="recap-intro"><p>Endurance Manager publie sur ton Discord <strong>un message avec les courses de la semaine</strong>, les équipages et les pilotes inscrits. Il se met à jour tout seul à chaque inscription : personne n’a besoin de le reposter.</p>${preview}</div>
+    ${setup.legacyRecap ? '<p class="setup-note">Le récap actuel (courses LMU) passe par le salon réglé à la création du site. Règle ton salon ci-dessous pour le reprendre en main.</p>' : ''}
+    <form class="setup-form" data-recaps data-mode="${count ? layout : 'none'}">
+      <label class="settings-switch recap-switch"><span><strong>Publier le récap sur Discord</strong><small>Si c’est désactivé, aucun message n’est publié.</small></span><input type="checkbox" role="switch" name="enabled" ${count ? 'checked' : ''}><i aria-hidden="true"></i></label>
+      <div class="recap-options">
+        <p class="recap-question">Où le publier ?</p>
+        <div class="recap-cards">${card('one', 'Dans un seul salon', 'Un message avec toutes les courses.')}${card('two', 'Un salon par simu', 'Un message LMU et un message iRacing, chacun dans son salon.')}</div>
+        <div class="setup-mode-block" data-mode-block="one">
+          <div class="recap-sims"><span>Courses à inclure</span>${sim('simLmu', 'LMU', oneScope !== 'iracing')}${sim('simIracing', 'iRacing', oneScope !== 'lmu')}</div>
+          ${webhookField('one', '', count === 1 ? setup.recaps[0].webhook : '')}</div>
+        <div class="setup-mode-block" data-mode-block="two">${webhookField('lmu', 'LMU', count === 2 ? byScope.lmu : '')}${webhookField('iracing', 'iRacing', count === 2 ? byScope.iracing : '')}</div>
+        ${guide}
+      </div>
+      <div class="setup-actions"><button class="primary-button" type="submit">Enregistrer</button><span class="settings-status" aria-live="polite"></span></div></form>`;
   // 4. Invitation link.
   const invite = `<p>Un joueur qui arrive sur le site sans être membre de ton serveur voit un bouton pour le rejoindre.</p>
     <ol class="setup-howto"><li>Sur Discord, fais un clic droit sur l’icône de ton serveur, puis <strong>Inviter des gens</strong>.</li>
@@ -199,6 +206,8 @@ async function load() {
   }
 }
 
+// Simulators of a single recap message: both (all), LMU or iRacing ('' when none is ticked).
+const oneScopeOf = form => form.elements.simLmu.checked && form.elements.simIracing.checked ? 'all' : form.elements.simLmu.checked ? 'lmu' : form.elements.simIracing.checked ? 'iracing' : '';
 // Reloads the page content and comes back to the same tab.
 async function reload(tab) { openTab = tab; await load(); }
 
@@ -216,7 +225,7 @@ app.addEventListener('click', async event => {
   const testButton = event.target.closest('[data-recap-test]');
   if (testButton) {
     const form = testButton.closest('form'), key = testButton.dataset.recapTest, status = testButton.parentElement.querySelector('.settings-status');
-    const scope = key === 'one' ? form.elements.oneScope.value : key;
+    const scope = key === 'one' ? oneScopeOf(form) : key;
     status.textContent = 'Envoi…';
     try { await api('/api/community/recaps/test', 'POST', {webhookUrl:form.elements[`hook-${key}`].value.trim(), scope}); status.textContent = '✓ Message de test envoyé : regarde ton salon Discord.'; }
     catch (error) { status.textContent = error.message; }
@@ -249,8 +258,9 @@ app.addEventListener('submit', async event => {
     if (status) status.textContent = 'Enregistrement…';
     try {
       if (recaps) {
-        const mode = form.elements.mode.value, hook = key => form.elements[`hook-${key}`].value.trim();
-        const list = mode === 'one' ? [{scope:form.elements.oneScope.value, webhookUrl:hook('one')}] : mode === 'two' ? [{scope:'lmu', webhookUrl:hook('lmu')}, {scope:'iracing', webhookUrl:hook('iracing')}] : [];
+        const mode = form.dataset.mode, hook = key => form.elements[`hook-${key}`].value.trim();
+        if (mode === 'one' && !oneScopeOf(form)) throw new Error('Coche au moins une simu : LMU ou iRacing.');
+        const list = mode === 'one' ? [{scope:oneScopeOf(form), webhookUrl:hook('one')}] : mode === 'two' ? [{scope:'lmu', webhookUrl:hook('lmu')}, {scope:'iracing', webhookUrl:hook('iracing')}] : [];
         const result = await api('/api/community/recaps', 'PUT', {recaps:list});
         if (list.length && !result.published) throw new Error('Enregistré, mais Discord a refusé le message : clique sur « Tester » pour vérifier chaque webhook.');
         await reload('setup');
@@ -283,7 +293,8 @@ app.addEventListener('submit', async event => {
 app.addEventListener('change', async event => {
   const box = event.target;
   // Recap: the fields of the chosen kind of recap.
-  if (box.name === 'mode' && box.closest('form[data-recaps]')) { box.closest('form').dataset.mode = box.value; return; }
+  const recapForm = box.closest('form[data-recaps]');
+  if (recapForm) { recapForm.dataset.mode = recapForm.elements.enabled.checked ? recapForm.elements.layout.value : 'none'; return; }
   if (box.dataset.module) {
     box.disabled = true;
     try {

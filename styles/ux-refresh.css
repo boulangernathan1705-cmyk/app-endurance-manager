@@ -1453,6 +1453,36 @@ body:has(.community-gate.welcome.is-visitor) .site-nav-shell { display: none !im
   .platform-slug { flex-wrap: wrap; }
 }
 
+/* Recap step: example of the Discord message, switch, « Où le publier ? » cards. */
+.recap-intro { display: grid; grid-template-columns: minmax(0, 1fr) minmax(240px, 320px); gap: 18px; align-items: start; margin-bottom: 14px; }
+.recap-intro p { margin: 0; }
+.recap-preview { margin: 0; padding: 12px; border-radius: 10px; background: #313338; color: #dbdee1; font-size: 12.5px; }
+.recap-preview figcaption { margin-bottom: 8px; color: #949ba4; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; }
+.recap-preview-bot { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.recap-preview-bot strong { color: #f2f3f5; font-size: 13px; }
+.recap-preview-avatar { width: 26px; height: 26px; display: grid; place-items: center; border-radius: 50%; background: #5865f2; color: #fff; font-size: 10px; font-weight: 900; }
+.recap-preview-tag { padding: 0 4px; border-radius: 3px; background: #5865f2; color: #fff; font-size: 9.5px; font-weight: 800; }
+.recap-preview-embed { display: grid; gap: 3px; margin-left: 34px; padding: 8px 10px; border-left: 4px solid #2563eb; border-radius: 4px; background: #2b2d31; }
+.recap-preview-embed strong { color: #f2f3f5; }
+.recap-preview-embed b { margin-top: 4px; color: #f2f3f5; }
+.recap-preview-embed em { margin-top: 4px; color: #949ba4; font-size: 11px; font-style: normal; }
+.setup-form .recap-switch { display: flex !important; align-items: center; justify-content: space-between; gap: 14px; padding: 12px 14px !important; border: 1px solid var(--border, #292d31) !important; border-radius: 12px; font-weight: 400; }
+.setup-form .recap-switch > span { display: grid; gap: 2px; }
+.setup-form .recap-switch strong { color: #f4f6f5; font-size: 15px; }
+.setup-form .recap-switch i { flex: 0 0 44px; width: 44px; }
+.recap-options { display: grid; gap: 12px; }
+.setup-form[data-mode="none"] .recap-options { display: none; }
+.recap-question { margin: 4px 0 0 !important; color: #f4f6f5; font-size: 15px; font-weight: 800; }
+.recap-cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.recap-card { display: flex !important; align-items: flex-start; gap: 10px; padding: 14px; border: 1px solid var(--border, #292d31); border-radius: 12px; cursor: pointer; }
+.recap-card:has(input:checked) { border-color: var(--community-accent, #52d3d8); background: rgba(82,211,216,.07); }
+.recap-card input { flex: 0 0 auto; width: auto !important; min-height: 0 !important; margin: 3px 0 0; accent-color: var(--community-accent, #52d3d8); }
+.recap-card strong { display: block; color: #f4f6f5; font-size: 14.5px; }
+.recap-card small { display: block; margin-top: 2px; color: #99a3a0; font-weight: 400; }
+.recap-sims { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.recap-sims > span { margin-right: 4px; color: #c7d0d4; font-size: 13px; font-weight: 700; }
+@media (max-width: 760px) { .recap-intro, .recap-cards { grid-template-columns: minmax(0, 1fr); } }
+
 /* Community of the site: name always visible, accent color set by its admins. */
 .community-chip { align-self: center; padding: 6px 18px; border: 1px solid var(--community-accent, #52d3d8); border-radius: 999px; background: rgba(82,211,216,.08); color: #f4f6f5; font-size: 15px; font-weight: 850; letter-spacing: .01em; white-space: nowrap; }
 /* The community's name sits in the middle of the navigation bar (no extra row on a computer). */
