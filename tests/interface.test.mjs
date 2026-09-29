@@ -210,3 +210,12 @@ test('les blocs dépliables ont un identifiant pour que le rafraîchissement aut
   assert.match(read('front/app/crews.mjs'),/<details class="ux-course-pilots-accordion" id="pilots-\$\{departure\.id\}"/);
   assert.match(read('front/app/event-view.mjs'),/<details class="departure-fold[^>]*id="departure-\$\{departure\.id\}"/);
 });
+
+test('no remains of the entries without an account (personal link) in the site', async () => {
+  const {readdirSync, readFileSync} = await import('node:fs');
+  const files = readdirSync(new URL('../front/app/', import.meta.url)).filter(name => name.endsWith('.mjs'));
+  for (const name of files) {
+    const code = readFileSync(new URL(`../front/app/${name}`, import.meta.url), 'utf8');
+    assert.doesNotMatch(code, /showRecoveryLink|recoveryLink|guest-link|\/api\/guest\//, name);
+  }
+});
