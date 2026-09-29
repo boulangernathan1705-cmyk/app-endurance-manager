@@ -1321,10 +1321,27 @@ body:has(.community-gate.welcome.is-visitor) .site-nav-shell { display: none !im
 @media (max-width: 900px) { .welcome-features { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 560px) { .community-gate.welcome { margin-top: 16px; } .welcome-features { grid-template-columns: minmax(0, 1fr); } .welcome-discord { width: 100%; justify-content: center; } }
 
-/* Presence timeline: the hour separators are drawn inside the bar, clearly visible, instead of small ticks above it. */
+/* Presence timeline: a thin white separator between the hours inside the bar; a small tick rises only towards
+   the hours written above it (the labels shown depend on the width, timeline.css). */
+.presence-track > .presence-segment + .presence-segment { box-shadow: inset 1px 0 0 rgba(255, 255, 255, .35) !important; }
 .presence-boundary::after { display: none !important; }
-.presence-track > .presence-segment + .presence-segment { box-shadow: inset 2px 0 0 rgba(8, 12, 14, .6) !important; }
-.presence-track > .presence-segment:not(.is-present):not(.coverage-one):not(.coverage-two) + .presence-segment:not(.is-present):not(.coverage-one):not(.coverage-two) { box-shadow: inset 2px 0 0 #56666b !important; }
+.presence-boundary:has(> .presence-time.ticks-4)::after { display: block !important; }
+@container presence (min-width: 400px) {
+  .presence-boundary:has(> .presence-time[class])::after { display: none !important; }
+  .presence-boundary:has(> .presence-time.ticks-6)::after { display: block !important; }
+}
+@container presence (min-width: 640px) {
+  .presence-boundary:has(> .presence-time[class])::after { display: none !important; }
+  .presence-boundary:has(> .presence-time.ticks-10)::after { display: block !important; }
+}
+@container presence (min-width: 1000px) {
+  .presence-boundary:has(> .presence-time[class])::after { display: none !important; }
+  .presence-boundary:has(> .presence-time.ticks-16)::after { display: block !important; }
+}
+@container presence (min-width: 1500px) {
+  .presence-boundary:has(> .presence-time[class])::after { display: none !important; }
+  .presence-boundary:has(> .presence-time.ticks-24)::after { display: block !important; }
+}
 
 /* Pilots without a crew: cards in the style of the crew cards (frame, top stripe, category logo, name, car). */
 html[data-game] #app .ux-unassigned-grid > .pilot-row { display: flex !important; flex-direction: column !important; gap: 8px !important; padding: 12px 14px !important; border: 1px solid #2b3538 !important; border-top: 3px solid var(--community-accent, #52d3d8) !important; border-radius: 10px !important; background: #101617 !important; }
