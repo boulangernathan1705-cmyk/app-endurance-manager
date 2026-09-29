@@ -1674,7 +1674,11 @@ html[data-game] #app .planning-actions .ux-summary-registration-actions > * { fl
 html[data-game] #app .planning-actions .ux-summary-registration-toggle { padding: 0 16px !important; }
 html[data-game] #app .planning-body .departure-fold-body { padding: 0 !important; }
 html[data-game] #app .planning-body .ux-course-crews-body { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
-html[data-game] #app .planning-body .ux-unassigned-grid { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)) !important; }
+/* Pilots without a crew on the same grid as the crews above: same left edge, same columns, same gap. */
+html[data-game] #app .planning-body .ux-course-crews-body { gap: 10px !important; }
+html[data-game] #app .planning-body .ux-course-pilots-accordion { padding: 0 0 4px !important; }
+html[data-game] #app .planning-body .ux-course-pilots-body, html[data-game] #app .planning-body .ux-unassigned-section { padding: 0 !important; margin: 0 !important; border: 0 !important; background: none !important; }
+html[data-game] #app .planning-body .ux-unassigned-grid { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)) !important; gap: 10px !important; padding-top: 4px; }
 html[data-game] #app .planning-body .pilot-row { min-width: 0; }
 /* Crews of a start: no empty room kept under the pilots. */
 html[data-game] #app .planning-body .crew-tile-summary .crew-compact-pilots { min-height: 0; }
