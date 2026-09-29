@@ -2,6 +2,11 @@
 
 Les changements du site, version par version. La plus récente est en haut.
 
+## v1.5.1 — 29 septembre 2026
+
+### Communautés
+- **Cadrage de la bannière** : après avoir choisi une image, l'admin la fait glisser et la zoome pour choisir la partie visible, avant de l'enregistrer.
+
 ## v1.5 — 29 septembre 2026
 
 ### Communautés
