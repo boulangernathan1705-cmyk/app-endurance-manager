@@ -644,8 +644,7 @@ async function api(request, env) {
     const input = await body(request);
     if (input.confirm !== 'VITRINE') fail(400, 'Tape VITRINE pour confirmer.');
     const result = await resetShowcase(env, community);
-    // The official iRacing calendar fills the iRacing space.
-    try { await syncIracingEvents(env, {communities:[{...community, modules:{iracingImport:true, soloRaces:true}}]}); } catch {}
+    // The official iRacing calendar comes back with the next scheduled import (within 15 minutes).
     return json({ok:true, ...result});
   }
   if (path === '/api/platform/communities' && method === 'GET') {
