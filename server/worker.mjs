@@ -40,10 +40,10 @@ function slotFor(event, from, departureId) {
   return target;
 }
 // "Mes communautés": the communities where the player is a member (managers: all of them), with the address of
-// each site. Empty when there is a single site, or when the current community turned the selector off.
+// each site. A feature of the platform (not a community module): empty unless the player has several communities.
 async function myCommunities(env, actor, community) {
   const domain = baseDomain(env);
-  if (!domain || !actor.user || community.modules.communitySwitcher === false) return [];
+  if (!domain || !actor.user) return [];
   const list = actor.manager ? await allCommunities(env)
     : ((await env.DB.prepare(`SELECT c.* FROM communities c JOIN memberships m ON m.community_id=c.id WHERE m.user_id=? AND m.status='member' ORDER BY c.id`)
       .bind(actor.user.id).all()).results || []).map(row => ({slug:row.slug, name:row.name}));
@@ -525,7 +525,7 @@ async function api(request, env) {
       await env.DB.prepare('UPDATE communities SET appearance=? WHERE id=?').bind(JSON.stringify(community.appearance), community.id).run();
     }
     return json({community:{name:community.name, shortName:community.shortName, discordServer:discord?.name || null, ...appearanceOf(community)}, roles, permissions:PERMISSIONS,
-      modules:{iracingImport:community.modules.iracingImport === true, discordWeekly:community.modules.discordWeekly === true, soloRaces:community.modules.soloRaces === true, communitySwitcher:community.modules.communitySwitcher !== false}});
+      modules:{iracingImport:community.modules.iracingImport === true, discordWeekly:community.modules.discordWeekly === true, soloRaces:community.modules.soloRaces === true}});
   }
   if (path === '/api/community/appearance' && method === 'PATCH') {
     requirePermission(actor,'admin');
@@ -552,7 +552,7 @@ async function api(request, env) {
     requirePermission(actor,'admin');
     const input = await body(request);
     const modules = {...community.modules};
-    for (const key of ['iracingImport','discordWeekly','soloRaces','communitySwitcher']) if (typeof input[key] === 'boolean') modules[key] = input[key];
+    for (const key of ['iracingImport','discordWeekly','soloRaces']) if (typeof input[key] === 'boolean') modules[key] = input[key];
     await env.DB.prepare('UPDATE communities SET modules=? WHERE id=?').bind(JSON.stringify(modules), community.id).run();
     return json({ok:true, modules});
   }
