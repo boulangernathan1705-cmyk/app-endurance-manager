@@ -67,12 +67,12 @@ async function settingsMarkup() {
     <div class="settings-accent"><label>Couleur d’accent<input name="accent" type="color" value="${esc(look.accent || '#52d3d8')}"></label>
       <label class="role-pill"><input type="checkbox" name="defaultAccent" ${look.accent ? '' : 'checked'}><span>Couleur du site</span></label></div>
     <p class="members-help">Le logo est l’icône du serveur Discord${look.discordServer ? ` « ${esc(look.discordServer)} »` : ''} : change-la sur Discord.${look.logoUrl ? '' : ' Le serveur n’a pas d’icône : le logo du site est utilisé.'}</p>
-    <div class="settings-actions"><button class="primary-button" type="submit">Enregistrer</button><span class="settings-status" aria-live="polite"></span></div></form>
-    <div class="settings-banner"><strong>Bannière</strong>
+    <div class="settings-actions"><button class="primary-button" type="submit">Enregistrer</button><span class="settings-status" aria-live="polite"></span></div></form></section>
+    <section class="settings-card settings-banner-card"><h2>Bannière</h2><div class="settings-banner">
       <img class="settings-banner-preview" src="${esc(look.bannerUrl || '/images/endurance-manager-banner.webp')}" alt="Bannière actuelle">
       <div class="settings-actions"><label class="secondary-button settings-banner-pick">Choisir une image<input type="file" accept="image/png,image/jpeg,image/webp" data-banner-file hidden></label>
         ${look.bannerUrl ? '<button type="button" class="secondary-button" data-banner-remove>Remettre la bannière du site</button>' : ''}<span class="settings-status" aria-live="polite"></span></div>
-      <p class="members-help">${look.bannerUrl ? 'Ta bannière est affichée en haut de toutes les pages.' : 'C’est la bannière du site. Choisis une image pour afficher la tienne.'} Format conseillé : 2048 × 512 (4 fois plus large que haute). L’image est recadrée au centre et allégée automatiquement.</p></div></section>`;
+      <p class="members-help">${look.bannerUrl ? 'Ta bannière est affichée en haut de toutes les pages.' : 'C’est la bannière du site. Choisis une image pour afficher la tienne.'} Format conseillé : 2048 × 512 (4 fois plus large que haute). Après le choix de l’image, tu la cadres et la zoomes avant de l’enregistrer ; elle est allégée automatiquement.</p></div></section>`;
   return `${appearance}
     <section class="settings-card"><h2>Modules</h2>${module('iracingImport','Endurances iRacing officielles','Import automatique des séries en équipe et des événements spéciaux.')}${module('soloRaces','Courses solo','Onglet « Courses solo », places limitées, liste d’attente, courses OPEN / SAFE.')}</section>
     <section class="settings-card settings-roles-card"><h2>Autorisations des rôles Discord</h2><p class="members-help">Un membre cumule les autorisations de tous ses rôles. « @everyone » s’applique à tous les membres du serveur. Le propriétaire du serveur et les rôles « Administrateur » de Discord ont tout.</p>${legend}${roles}</section>`;
@@ -216,11 +216,65 @@ async function load() {
 }
 
 // Banner: cropped to 2048 × 512 in the browser (centre) and compressed, WebP (JPEG where WebP is not available).
-async function bannerImage(file) {
+// Framing of a new banner by the admin: the image is dragged in a 2048 × 512 frame and zoomed with a slider
+// (or the mouse wheel); it always covers the whole frame.
+let cropper = null;
+function drawCropper() {
+  const {canvas, bitmap, zoom} = cropper, W = canvas.width, H = canvas.height;
+  const scale = Math.max(W / bitmap.width, H / bitmap.height) * zoom, w = bitmap.width * scale, h = bitmap.height * scale;
+  cropper.x = Math.min(0, Math.max(W - w, cropper.x ?? (W - w) / 2));
+  cropper.y = Math.min(0, Math.max(H - h, cropper.y ?? (H - h) / 2));
+  const context = canvas.getContext('2d');
+  context.clearRect(0, 0, W, H);
+  context.drawImage(bitmap, cropper.x, cropper.y, w, h);
+}
+function setZoom(zoom) {
+  const W = cropper.canvas.width, H = cropper.canvas.height;
+  // Zoom around the centre of the frame.
+  const ratio = zoom / cropper.zoom;
+  cropper.x = W / 2 - (W / 2 - cropper.x) * ratio;
+  cropper.y = H / 2 - (H / 2 - cropper.y) * ratio;
+  cropper.zoom = zoom;
+  drawCropper();
+}
+async function openCropper(file, container) {
   const bitmap = await createImageBitmap(file);
-  const canvas = Object.assign(document.createElement('canvas'), {width:2048, height:512});
-  const scale = Math.max(canvas.width / bitmap.width, canvas.height / bitmap.height), w = bitmap.width * scale, h = bitmap.height * scale;
-  canvas.getContext('2d').drawImage(bitmap, (canvas.width - w) / 2, (canvas.height - h) / 2, w, h);
+  container.querySelector('.banner-cropper')?.remove();
+  const box = document.createElement('div');
+  box.className = 'banner-cropper';
+  box.innerHTML = `<div class="banner-crop-frame"><canvas width="2048" height="512" aria-label="Cadrage de la bannière"></canvas></div>
+    <label class="banner-crop-zoom">Zoom<input type="range" min="1" max="4" step="0.01" value="1" data-banner-zoom></label>
+    <p class="members-help">Fais glisser l’image pour choisir la partie visible, et zoome si besoin.</p>
+    <div class="settings-actions"><button type="button" class="primary-button" data-banner-save>Enregistrer la bannière</button><button type="button" class="secondary-button" data-banner-cancel>Annuler</button></div>`;
+  container.querySelector('.settings-banner-preview').after(box);
+  container.querySelector('.settings-banner-preview').hidden = true;
+  const canvas = box.querySelector('canvas');
+  cropper = {canvas, bitmap, zoom:1, x:null, y:null};
+  drawCropper();
+  let drag = null;
+  canvas.addEventListener('pointerdown', event => { drag = {x:event.clientX, y:event.clientY}; canvas.setPointerCapture(event.pointerId); });
+  canvas.addEventListener('pointermove', event => {
+    if (!drag) return;
+    const ratio = canvas.width / canvas.getBoundingClientRect().width;
+    cropper.x += (event.clientX - drag.x) * ratio; cropper.y += (event.clientY - drag.y) * ratio;
+    drag = {x:event.clientX, y:event.clientY};
+    drawCropper();
+  });
+  canvas.addEventListener('pointerup', () => { drag = null; });
+  canvas.addEventListener('wheel', event => {
+    event.preventDefault();
+    const slider = box.querySelector('[data-banner-zoom]');
+    slider.value = Math.min(4, Math.max(1, cropper.zoom * (event.deltaY < 0 ? 1.08 : 1 / 1.08)));
+    setZoom(Number(slider.value));
+  }, {passive:false});
+}
+function closeCropper(container) {
+  container.querySelector('.banner-cropper')?.remove();
+  const preview = container.querySelector('.settings-banner-preview');
+  if (preview) preview.hidden = false;
+  cropper = null;
+}
+async function bannerImage(canvas) {
   for (const quality of [.85, .75, .62, .5]) {
     let blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/webp', quality));
     if (blob?.type !== 'image/webp') blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', quality));
@@ -244,6 +298,21 @@ app.addEventListener('click', async event => {
     setTimeout(() => { copy.textContent = 'Copier'; }, 2000);
     return;
   }
+  if (event.target.closest('[data-banner-cancel]')) { closeCropper(event.target.closest('.settings-banner')); return; }
+  if (event.target.closest('[data-banner-save]') && cropper) {
+    const container = event.target.closest('.settings-banner'), status = container.querySelector('.settings-status');
+    status.textContent = 'Envoi…';
+    try {
+      const image = await bannerImage(cropper.canvas);
+      const response = await fetch('/api/community/banner', {method:'PUT', credentials:'same-origin', headers:{'Content-Type':image.type}, body:image});
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error || 'L’envoi a échoué.');
+      for (const img of document.querySelectorAll('.hero-banner, .settings-banner-preview')) { img.removeAttribute('srcset'); img.src = result.bannerUrl; }
+      cropper = null;
+      await reload('settings');
+    } catch (error) { status.textContent = error.message; }
+    return;
+  }
   if (event.target.closest('[data-banner-remove]')) {
     if (!confirm('Remettre la bannière du site ?')) return;
     try { await api('/api/community/banner', 'DELETE', {}); await reload('settings'); } catch (error) { alert(error.message); }
@@ -265,6 +334,7 @@ app.addEventListener('click', async event => {
 });
 
 app.addEventListener('input', event => {
+  if (event.target.matches?.('[data-banner-zoom]') && cropper) { setZoom(Number(event.target.value)); return; }
   if (event.target.name !== 'memberSearch') return;
   const query = event.target.value.trim().toLocaleLowerCase('fr-FR');
   let visible = 0;
@@ -331,19 +401,13 @@ app.addEventListener('change', async event => {
   const box = event.target;
   // Recap: the fields of the chosen kind of recap.
   if (box.matches('[data-banner-file]') && box.files?.[0]) {
-    const status = box.closest('.settings-banner').querySelector('.settings-status');
-    status.textContent = 'Préparation de l’image…';
-    try {
-      const image = await bannerImage(box.files[0]);
-      status.textContent = 'Envoi…';
-      const response = await fetch('/api/community/banner', {method:'PUT', credentials:'same-origin', headers:{'Content-Type':image.type}, body:image});
-      const result = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(result.error || 'L’envoi a échoué.');
-      for (const img of document.querySelectorAll('.hero-banner, .settings-banner-preview')) { img.removeAttribute('srcset'); img.src = result.bannerUrl; }
-      await reload('settings');
-    } catch (error) { status.textContent = error.message; }
+    const container = box.closest('.settings-banner'), status = container.querySelector('.settings-status');
+    status.textContent = '';
+    try { await openCropper(box.files[0], container); } catch { status.textContent = 'Cette image ne peut pas être lue : essaie un fichier PNG, JPEG ou WebP.'; }
+    box.value = '';
     return;
   }
+  if (box.matches('[data-banner-zoom]') && cropper) { setZoom(Number(box.value)); return; }
   const recapForm = box.closest('form[data-recaps]');
   if (recapForm) { recapForm.dataset.mode = recapForm.elements.enabled.checked ? recapForm.elements.layout.value : 'none'; return; }
   if (box.dataset.module) {

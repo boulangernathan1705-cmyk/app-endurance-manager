@@ -1423,11 +1423,18 @@ html[data-game] #app .ux-unassigned-grid > .pilot-row > .edit-button { align-sel
   .settings-card { padding: 14px; }
 }
 
-.settings-banner { display: grid; gap: 10px; margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--border, #292d31); }
-.settings-banner > strong { color: #c7d0d4; font-size: 13px; }
+.settings-banner-card { grid-column: 1 / -1; }
+.settings-banner { display: grid; gap: 10px; }
 .settings-banner-preview { width: 100%; aspect-ratio: 4 / 1; object-fit: cover; border: 1px solid var(--border, #292d31); border-radius: 10px; }
 .settings-banner-pick { cursor: pointer; }
 .settings-banner .members-help { margin: 0; }
+
+.banner-cropper { display: grid; gap: 10px; }
+.banner-crop-frame { overflow: hidden; border: 2px solid var(--community-accent, #52d3d8); border-radius: 10px; }
+.banner-crop-frame canvas { display: block; width: 100%; aspect-ratio: 4 / 1; cursor: grab; touch-action: none; }
+.banner-crop-frame canvas:active { cursor: grabbing; }
+.banner-crop-zoom { display: flex; align-items: center; gap: 10px; color: #c7d0d4; font-size: 13px; font-weight: 700; }
+.banner-crop-zoom input { flex: 1; accent-color: var(--community-accent, #52d3d8); }
 
 /* « Mise en place » (members page): the setup steps of a community, and the platform tab of the managers. */
 .setup { max-width: 920px; }
