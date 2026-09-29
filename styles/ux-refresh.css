@@ -444,6 +444,9 @@ html[data-game] #app .crew-tile-summary .crew-compact-pilots .is-empty { color: 
 html[data-game] #app .crew-tile-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 html[data-game] #app .crew-tile-foot .crew-compact-car { color: var(--muted, #92979c) !important; font-size: 13px !important; font-weight: 400 !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
+/* « Ton équipage » and « Responsable » side by side, on one line under the crew's name. */
+.crew-tile-badges { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: -2px; }
+html[data-game] #app .crew-tile-badges .crew-owner-badge { margin: 0 !important; }
 .crew-mine-badge {
   align-self: flex-start;
   padding: 2px 9px;
@@ -1652,7 +1655,11 @@ html[data-game] #app .departure-planning { display: grid; gap: 14px; margin-top:
 .planning-crew.crew-palette-4 { --crew-color: #75a9ff; } .planning-crew.crew-palette-5 { --crew-color: #b5df62; }
 .planning-crew.crew-palette-6 { --crew-color: #ffd45e; } .planning-crew.crew-palette-7 { --crew-color: #66e0b1; }
 .planning-crew.crew-palette-8 { --crew-color: #ff7777; } .planning-crew.crew-palette-9 { --crew-color: #b99cff; }
-.planning-start[open] .planning-start-line, .planning-start[open] .planning-crews { display: none; }
+.planning-row { display: grid; grid-template-columns: 104px minmax(0, 1fr); align-items: center; gap: 4px 10px; }
+.planning-row-label { color: #7d878a; font-size: 10.5px; font-weight: 800; letter-spacing: .09em; text-transform: uppercase; white-space: nowrap; }
+.planning-row-items { display: flex; flex-wrap: wrap; align-items: center; gap: 5px 14px; min-width: 0; }
+.planning-row-items .planning-free-pill + .planning-free-pill { margin-left: -8px; }
+.planning-start[open] .planning-row { display: none; }
 
 /* Opened start: buttons first, then the crews (side by side when the day has widened) and the pilots. */
 html[data-game] #app .planning-body.departure-fold { margin: 0 !important; padding: 0 16px 16px !important; border: 0 !important; border-radius: 0 !important; background: none !important; box-shadow: none !important; opacity: 1 !important; }
@@ -1665,6 +1672,8 @@ html[data-game] #app .planning-body .departure-fold-body { padding: 0 !important
 html[data-game] #app .planning-body .ux-course-crews-body { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
 html[data-game] #app .planning-body .ux-unassigned-grid { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)) !important; }
 html[data-game] #app .planning-body .pilot-row { min-width: 0; }
+/* Crews of a start: no empty room kept under the pilots. */
+html[data-game] #app .planning-body .crew-tile-summary .crew-compact-pilots { min-height: 0; }
 html[data-game] #app .planning-body .pilot-row * { overflow-wrap: normal; word-break: normal; }
 
 /* Date block of a race over several days: "ven. → dim." / "16–18" / "oct." */

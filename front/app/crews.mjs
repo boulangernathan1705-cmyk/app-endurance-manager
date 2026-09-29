@@ -77,8 +77,8 @@ function crewCard(event,departure,crew,index,unassigned,allCrews){
   return `<div class="crew-card-shell ${crewColorClass(crew.id,index)} ${crew.locked?'is-complete':'is-open'}${ownMember?' is-mine':''}">
     <details class="crew-pilot-group crew-pilot-accordion crew-unified-card ${crew.locked?'is-complete':'is-open'}" data-crew="${crew.id}" data-crew-id="${crew.id}" data-crew-locked="${Boolean(crew.locked)}" data-crew-mine="${Boolean(ownMember)}" data-crew-team="${esc(crew.name)}" ${open?'open':''}>
       <summary class="crew-pilot-accordion-summary crew-tile-summary" aria-label="${esc(crew.name)} · ${esc(names)} · ${esc(crew.car||'Voiture à choisir')}">
-        <span class="crew-tile-head"><span class="crew-compact-category" aria-hidden="true">${logo(crew.category)}</span><span class="crew-compact-team"><strong>${esc(crew.name)}</strong>${ownerBadge}</span><span class="crew-compact-chevron" aria-hidden="true">›</span></span>
-        ${ownMember?'<span class="crew-mine-badge">Ton équipage</span>':''}
+        <span class="crew-tile-head"><span class="crew-compact-category" aria-hidden="true">${logo(crew.category)}</span><span class="crew-compact-team"><strong>${esc(crew.name)}</strong></span><span class="crew-compact-chevron" aria-hidden="true">›</span></span>
+        ${ownMember||ownerBadge?`<span class="crew-tile-badges">${ownMember?'<span class="crew-mine-badge">Ton équipage</span>':''}${ownerBadge}</span>`:''}
         <span class="crew-compact-pilots">${regs.length?regs.map(reg=>`<span>${esc(reg.name)}</span>`).join(''):'<span class="is-empty">Aucun pilote</span>'}</span>
         <span class="crew-tile-foot"><span class="crew-compact-car">${esc(crew.car||'Voiture à choisir')}</span>${statusPill(crew)}</span>
       </summary>
