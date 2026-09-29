@@ -50,10 +50,17 @@ function races() {
   ];
 }
 
-// Replaces the data of the main community by the showcase. Returns what was created.
+// SQL literal of a value of the showcase (our own constants, ids and JSON: never a visitor's input).
+const literal = value => value === null ? 'NULL' : typeof value === 'number' ? String(value) : `'${String(value).replaceAll("'", "''")}'`;
+
+// Replaces the data of the main community by the showcase, in a few statements (D1 counts every statement
+// of a request: 50 at most on the free plan). Returns what was created.
 export async function resetShowcase(env, community) {
   const cid = community.id, time = now(), statements = [];
   const run = (sql, ...values) => statements.push(env.DB.prepare(sql).bind(...values));
+  // Rows of each table, inserted together at the end (one statement per table).
+  const rows = {participants:[], events:[], crews:[], registrations:[], crew_members:[]};
+  const add = (table, ...values) => rows[table].push(`(${values.map(literal).join(',')})`);
   // Everything of this community goes (races with their entries and crews, pilots, members, settings).
   run('DELETE FROM crew_members WHERE crew_id IN (SELECT id FROM crews WHERE community_id=?)', cid);
   run('DELETE FROM crews WHERE community_id=?', cid);
@@ -67,11 +74,10 @@ export async function resetShowcase(env, community) {
   run("INSERT OR IGNORE INTO users(id,name,role,created_at) VALUES(?, 'Démo', 'organizer', 0)", DEMO_USER);
 
   const pilotIds = new Map(PILOTS.map(name => [name, id()]));
-  for (const [name, pilotId] of pilotIds) run('INSERT INTO participants(id,name,guest_hash,created_at,community_id) VALUES(?,?,?,?,?)', pilotId, name, `demo-${pilotId}`, time, cid);
+  for (const [name, pilotId] of pilotIds) add('participants', pilotId, name, `demo-${pilotId}`, time, cid);
   const entry = (eventId, departureId, name, category, status, car = '', roundChoices = []) => {
     const regId = id(), pilotId = pilotIds.get(name);
-    run(`INSERT INTO registrations(id,event_id,departure_id,guest_hash,name,name_key,category,car,car_preferences,car_any,status,created_at,participant_id,round_choices,community_id)
-      VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, regId, eventId, departureId, `demo-${regId}`, name, name.toLocaleLowerCase('fr-FR'), category, car,
+    add('registrations', regId, eventId, departureId, `demo-${regId}`, name, name.toLocaleLowerCase('fr-FR'), category, car,
       JSON.stringify(car ? [car] : []), car ? 0 : 1, status, time, pilotId, JSON.stringify(roundChoices), cid);
     return regId;
   };
@@ -79,27 +85,32 @@ export async function resetShowcase(env, community) {
   let count = 0;
   for (const race of races()) {
     const eventId = id(), departures = race.starts.map(([days, clock]) => ({id:id(), startsAt:start(days, clock), ...(race.pending ? {tbd:true} : {})}));
-    run(`INSERT INTO events(id,name,duration_hours,duration_minutes,event_type,circuit,schedule_pending,categories,departures,created_by,created_at,community_id)
-      VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`, eventId, race.name, race.hours, race.hours * 60, race.type, race.circuit, race.pending ? 1 : 0,
+    add('events', eventId, race.name, race.hours, race.hours * 60, race.type, race.circuit, race.pending ? 1 : 0, 'endurance', 'open', null, '[]',
       JSON.stringify(race.categories), JSON.stringify(departures), DEMO_USER, time + count++, cid);
     for (const crew of race.crews) {
       const crewId = id(), departureId = departures[crew.start].id;
-      run('INSERT INTO crews(id,event_id,departure_id,name,category,car,locked,created_at,community_id) VALUES(?,?,?,?,?,?,?,?,?)',
-        crewId, eventId, departureId, crew.name, crew.category, crew.car, crew.locked ? 1 : 0, time, cid);
-      for (const [name, status] of crew.pilots) run('INSERT INTO crew_members(registration_id,crew_id) VALUES(?,?)', entry(eventId, departureId, name, crew.category, status, crew.car), crewId);
+      add('crews', crewId, eventId, departureId, crew.name, crew.category, crew.car, crew.locked ? 1 : 0, time, cid);
+      for (const [name, status] of crew.pilots) add('crew_members', entry(eventId, departureId, name, crew.category, status, crew.car), crewId);
     }
     for (const [index, name, category, status] of race.alone) entry(eventId, departures[index].id, name, category, status);
   }
   // A solo race (module "Courses solo"): two rounds, places limited, entries in order of arrival.
   const soloId = id(), soloStart = {id:id(), startsAt:start(daysUntil(4), '21:00')};
-  run(`INSERT INTO events(id,name,duration_hours,duration_minutes,event_type,circuit,format,access,capacity,rounds,categories,departures,created_by,created_at,community_id)
-    VALUES(?,?,1,50,'private','imola','solo','open',20,?,?,?,?,?,?)`, soloId, 'Sprint GT3 du jeudi',
+  add('events', soloId, 'Sprint GT3 du jeudi', 1, 50, 'private', 'imola', 0, 'solo', 'open', 20,
     JSON.stringify([{circuit:'imola', durationMinutes:25, categories:['GT3']}, {circuit:'random', durationMinutes:25, categories:['GT3']}]),
     JSON.stringify(['GT3']), JSON.stringify([soloStart]), DEMO_USER, time + count++, cid);
   for (const [name, car] of [['Sara Lopes', 'BMW M4 LMGT3'], ['Nico Varga', ''], ['Jules Martin', 'Aston Martin Vantage AMR LMGT3'], ['Paul Novak', ''], ['Eva Kowal', 'BMW M4 LMGT3']]) {
     const choice = car ? {category:'GT3', cars:[car], carAny:false} : {category:'GT3', cars:[], carAny:true};
     entry(soloId, soloStart.id, name, 'GT3', 'whole', car, [choice, {category:'GT3', cars:[], carAny:true}]);
   }
+  // Parents before children (the database checks each row's community and crew).
+  const columns = {participants:'id,name,guest_hash,created_at,community_id',
+    events:'id,name,duration_hours,duration_minutes,event_type,circuit,schedule_pending,format,access,capacity,rounds,categories,departures,created_by,created_at,community_id',
+    crews:'id,event_id,departure_id,name,category,car,locked,created_at,community_id',
+    registrations:'id,event_id,departure_id,guest_hash,name,name_key,category,car,car_preferences,car_any,status,created_at,participant_id,round_choices,community_id',
+    crew_members:'registration_id,crew_id'};
+  for (const table of ['participants', 'events', 'crews', 'registrations', 'crew_members'])
+    statements.push(env.DB.prepare(`INSERT INTO ${table}(${columns[table]}) VALUES ${rows[table].join(',')}`));
   await env.DB.batch(statements);
   return {races:count, pilots:PILOTS.length};
 }

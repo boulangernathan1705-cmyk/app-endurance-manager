@@ -109,8 +109,10 @@ test('the main address is a showcase: anyone looks without signing in, only the 
   DB.db.prepare("UPDATE communities SET discord_guild_id='900000000000000001' WHERE slug='commu-dev'").run();
   assert.equal((await write(pilot,'/api/platform/showcase',{confirm:'VITRINE'})).status,403,'managers only');
   assert.equal((await write(manager,'/api/platform/showcase',{})).status,400,'confirmation needed');
-  const realFetch=globalThis.fetch;globalThis.fetch=async()=>new Response('{}',{status:503});
-  let reset;try{reset=await write(manager,'/api/platform/showcase',{confirm:'VITRINE'});}finally{globalThis.fetch=realFetch;}
+  // D1 counts every statement of a request (50 at most on the free plan): the reset stays well below.
+  let statements=0;const prepare=DB.prepare.bind(DB);DB.prepare=sql=>{statements++;return prepare(sql);};
+  let reset;try{reset=await write(manager,'/api/platform/showcase',{confirm:'VITRINE'});}finally{DB.prepare=prepare;}
+  assert.ok(statements<=35,`${statements} statements`);
   assert.equal(reset.status,200,await reset.clone().text());
   const community=DB.db.prepare("SELECT * FROM communities WHERE slug='commu-dev'").get();
   assert.equal(community.discord_guild_id,null);assert.equal(community.name,'Endurance Manager');

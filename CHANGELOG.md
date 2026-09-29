@@ -2,6 +2,11 @@
 
 Les changements du site, version par version. La plus récente est en haut.
 
+## v1.4.1 — 29 septembre 2026
+
+### Corrections
+- La réinitialisation de la vitrine fonctionne en production (elle dépassait le nombre de requêtes autorisé par appel).
+
 ## v1.4 — 29 septembre 2026
 
 ### Vitrine

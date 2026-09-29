@@ -261,7 +261,7 @@ app.addEventListener('submit', async event => {
     const status = showcaseForm.querySelector('.settings-status');
     if (!confirm('Supprimer définitivement toutes les données de ce site et les remplacer par la vitrine ?')) return;
     status.textContent = 'Réinitialisation…';
-    try { const result = await api('/api/platform/showcase', 'POST', {confirm:showcaseForm.elements.confirm.value.trim()}); status.textContent = `✓ Vitrine prête : ${result.races} courses fictives et le calendrier iRacing.`; }
+    try { const result = await api('/api/platform/showcase', 'POST', {confirm:showcaseForm.elements.confirm.value.trim()}); status.textContent = `✓ Vitrine prête : ${result.races} courses fictives. Le calendrier iRacing officiel revient dans les 15 minutes.`; }
     catch (error) { status.textContent = error.message; }
     return;
   }
