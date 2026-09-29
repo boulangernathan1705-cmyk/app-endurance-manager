@@ -1656,7 +1656,9 @@ html[data-game] #app .departure-planning { display: grid; gap: 14px; margin-top:
 .planning-crew.crew-palette-6 { --crew-color: #ffd45e; } .planning-crew.crew-palette-7 { --crew-color: #66e0b1; }
 .planning-crew.crew-palette-8 { --crew-color: #ff7777; } .planning-crew.crew-palette-9 { --crew-color: #b99cff; }
 .planning-row { display: flex; flex-wrap: wrap; align-items: center; gap: 5px 14px; min-width: 0; }
-.planning-row .planning-free-pill + .planning-free-pill { margin-left: -8px; }
+.planning-row .planning-free-pill + .planning-free-pill, .planning-free-icon + .planning-free-pill { margin-left: -8px; }
+.planning-free-icon { display: inline-flex; color: #92999c; }
+.planning-free-icon svg { width: 17px; height: 17px; }
 .planning-row + .planning-row { padding-top: 8px; border-top: 1px solid #343e41; }
 .planning-start[open] .planning-row { display: none; }
 

@@ -7,6 +7,8 @@ import {eventMinutes} from '../../shared/duration.mjs';
 import {raceDays,parisDayKey as dayKey} from '../../shared/start-times.mjs';
 import {state,esc,categories,logo,sortedCrews,crewColorClass,pilotCount} from './core.mjs';
 
+// Pilots without a crew: a person with a « + » (available to join or to form a crew).
+const FREE_ICON='<span class="planning-free-icon" title="Pilotes sans équipage" aria-label="Pilotes sans équipage"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M8 7a4 4 0 1 0 8 0a4 4 0 0 0-8 0M6 21v-2a4 4 0 0 1 4-4h4M16 19h6M19 16v6"/></svg></span>';
 const CHEVRON='<svg class="planning-chevron" viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6"/></svg>';
 
 // The race days with their starts, or [] when the race is not over several days (a start to define, a solo
@@ -35,7 +37,7 @@ function startCard(event,departure,body,{minutes,now,open}){
   // The crews (by name, in their colour), then, under a thin line, the pilots without a crew.
   const row=content=>`<span class="planning-row">${content}</span>`;
   const crewLine=crews.length?row(crews.map((crew,index)=>`<span class="planning-crew ${crewColorClass(crew.id,index)}">${logo(crew.category)}<span>${esc(crew.name)}</span></span>`).join('')):'';
-  const freeLine=free.length?row(free.map(([category,count])=>`<span class="planning-free-pill ${categories[category]?.css||''}" title="${count} pilote${count>1?'s':''} ${esc(category)} sans équipage">${count} ${esc(category)}</span>`).join('')):'';
+  const freeLine=free.length?row(FREE_ICON+free.map(([category,count])=>`<span class="planning-free-pill ${categories[category]?.css||''}" title="${count} pilote${count>1?'s':''} ${esc(category)} sans équipage">${count} ${esc(category)}</span>`).join('')):'';
   const details=compact?'':`${crewLine}${freeLine}`;
   return `<details class="planning-start${compact?' is-compact':''}${done?' is-done':''}${mine?' is-mine':''}${!pilots?' is-empty':''}" id="departure-${departure.id}" ${open?'open':''}><summary>${head}${details}${CHEVRON}</summary><div class="departure-fold planning-body">${body}</div></details>`;
 }
