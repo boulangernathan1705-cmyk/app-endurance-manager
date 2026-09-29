@@ -97,10 +97,12 @@ export async function memberPermissions(env, community, membership) {
 export async function communityAccess(env, actor, community) {
   const none = status => ({status, permissions:new Set(), manager:false});
   if (!actor.user) return none('anonymous');
-  if (administrators(env).includes(actor.user.id)) return {status:'member', permissions:new Set(PERMISSIONS), manager:true};
-  if (!community.discordGuildId) return none('unavailable');
+  const manager = administrators(env).includes(actor.user.id);
+  if (!community.discordGuildId) return manager ? {status:'member', permissions:new Set(PERMISSIONS), manager} : none('unavailable');
   let membership = await env.DB.prepare('SELECT * FROM memberships WHERE community_id=? AND user_id=?').bind(community.id, actor.user.id).first();
-  if (!membership || membership.checked_at < now() - CHECK_EVERY) membership = (await checkMembership(env, community, actor.user.id)) || membership;
+  // Managers are checked too (to appear on the members page when they are on the server), but their access never depends on it.
+  if (!membership || membership.checked_at < now() - CHECK_EVERY) membership = (await checkMembership(env, community, actor.user.id).catch(error => { if (!manager) throw error; return null; })) || membership;
+  if (manager) return {status:'member', permissions:new Set(PERMISSIONS), manager};
   if (!membership) return none('unavailable');
   if (membership.status !== 'member') return none('not-member');
   if (membership.discord_admin) return {status:'member', permissions:new Set(PERMISSIONS), manager:false};
