@@ -24,14 +24,15 @@ jobs:
           node-version: '22.13.0'
       - run: npm install --no-audit --no-fund
       - run: npx playwright install --with-deps chromium firefox webkit
-      - run: npm run build:workers
       # The local site is served over http: Safari (unlike Chrome) applies upgrade-insecure-requests to localhost too.
-      - run: sed -i 's/; upgrade-insecure-requests//' public/_headers
+      - run: npm run build:workers
+        env:
+          LOCAL_HTTP: '1'
       - name: Local database with every migration
         run: npx --yes wrangler@4.138.0 d1 migrations apply DB --local
       - name: Start the site locally
         run: |
-          npx --yes wrangler@4.138.0 dev --port 8787 --var APP_ORIGIN:http://localhost:8787 \
+          LOCAL_HTTP=1 npx --yes wrangler@4.138.0 dev --port 8787 --var APP_ORIGIN:http://localhost:8787 \
             --var DISCORD_CLIENT_ID:ci --var DISCORD_CLIENT_SECRET:ci > wrangler-dev.log 2>&1 &
           for i in {1..60}; do
             if curl --fail --silent --max-time 5 "${COMPAT_BASE_URL}/api/session" | grep -q '"discordReady"'; then exit 0; fi
