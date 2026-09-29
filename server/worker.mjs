@@ -227,7 +227,9 @@ async function api(request, env) {
   // Every request below works inside one community (separation entry point, server/community.mjs), with
   // the permissions the player's Discord roles give in it (server/access.mjs).
   const community = await currentCommunity(env, request);
-  const access = await communityAccess(env, actor, community);
+  // The main address of the platform (endurance-manager.app) stays open to every Discord player, as before
+  // the communities: it shows future community admins how the site works.
+  const access = await communityAccess(env, actor, community, {open:Boolean(baseDomain(env)) && url.hostname === baseDomain(env)});
   actor.permissions = access.permissions;
   actor.manager = access.manager;
   if (actor.user) actor.user = {...actor.user, role:displayRole(access)};

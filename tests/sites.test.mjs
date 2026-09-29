@@ -91,3 +91,16 @@ test('"Mes communautés": the communities of the player, with the address of eac
   assert.deepEqual(mine.map(item=>[item.slug,item.url,item.current]),[['commu-dev',`${MAIN}/`,true],['commu-test',`${TEST_SITE}/`,false]]);
   assert.equal((await (await call(`${TEST_SITE}/api/session`,{headers})).json()).communities.length,2,'the same on every site');
 });
+
+test('the main address stays open to every Discord player, organizers keep their role; community sites stay reserved', async () => {
+  const APEX='https://endurance-manager.app';
+  const {DB,call}=setup({APP_ORIGIN:APEX});
+  const session=async (user,role)=>{const raw=user.slice(0,1).repeat(64);const hash=[...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(raw)))].map(b=>b.toString(16).padStart(2,'0')).join('');
+    DB.db.prepare("INSERT INTO users(id,name,role,created_at) VALUES(?,?,?,0)").run(user,'Joueur',role);DB.db.prepare('INSERT INTO sessions(token_hash,user_id,expires_at) VALUES(?,?,?)').run(hash,user,4102444800);return {Cookie:`__Secure-em_dev_session=${raw}`};};
+  const pilot=await session('555555555555555555','pilot'),organizer=await session('666666666666666666','organizer');
+  const apex=await (await call(`${APEX}/api/session`,{headers:pilot})).json();
+  assert.equal(apex.access,'member');assert.deepEqual(apex.permissions.sort(),['endurance','solo_open']);
+  assert.ok((await (await call(`${APEX}/api/session`,{headers:organizer})).json()).permissions.includes('create_race'));
+  assert.equal((await (await call(`${APEX}/api/session`)).json()).access,'anonymous','signed in with Discord');
+  assert.notEqual((await (await call(`${MAIN}/api/session`,{headers:pilot})).json()).access,'member','community sites: members of their Discord only');
+});
