@@ -2,6 +2,11 @@
 
 Les changements du site, version par version. La plus récente est en haut.
 
+## v1.6.1 — 29 septembre 2026
+
+### Créer une course
+- **Plusieurs départs d'un coup** : choisis le premier jour, le nombre de jours et tape les heures (« 10h 14h 18h 22h ») ; tous les départs sont créés, à retoucher si besoin. Idéal pour les événements spéciaux sur un week-end.
+
 ## v1.6 — 29 septembre 2026
 
 ### Application

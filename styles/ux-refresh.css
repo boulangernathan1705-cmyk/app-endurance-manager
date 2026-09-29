@@ -1558,6 +1558,16 @@ details.community-chip summary::after { content: " ▾"; color: var(--community-
 :root[data-community-accent] .primary-button { background: var(--community-accent) !important; border-color: var(--community-accent) !important; }
 :root[data-community-accent] .top-stripes div:first-child { background: var(--community-accent) !important; }
 
+/* Event form: several starts at once. */
+.bulk-departures { margin: 0 0 12px; padding: 10px 14px; border: 1px dashed var(--border, #3a4447); border-radius: 12px; }
+.bulk-departures > summary { cursor: pointer; color: var(--community-accent, #52d3d8); font-weight: 800; }
+.bulk-departures-body { display: grid; gap: 10px; margin-top: 10px; }
+.bulk-departures-grid { display: grid; grid-template-columns: minmax(0, 1fr) 120px; gap: 10px; }
+.bulk-departures-grid label { display: grid; gap: 4px; }
+.bulk-departures-times { grid-column: 1 / -1; }
+.bulk-departures-grid input, .bulk-departures-grid select { min-height: 40px; }
+.bulk-departures-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
+
 /* ---------- Phone pass (≤ 760px): compact bar, race cards on fewer lines, categories on one row ---------- */
 @media (max-width: 760px) {
   .site-nav-shell { gap: 6px !important; padding: 6px !important; }

@@ -219,3 +219,11 @@ test('no remains of the entries without an account (personal link) in the site',
     assert.doesNotMatch(code, /showRecoveryLink|recoveryLink|guest-link|\/api\/guest\//, name);
   }
 });
+
+test('several starts at once: times typed freely, same times on each day', async () => {
+  const {parseStartTimes, bulkStartDays} = await import('../shared/start-times.mjs');
+  assert.deepEqual(parseStartTimes('10h 14h 18h30, 22:00'), ['10:00', '14:00', '18:30', '22:00']);
+  assert.deepEqual(parseStartTimes('8h;12h;23h55 25h'), ['08:00', '12:00', '23:55'], 'impossible hours are ignored');
+  assert.deepEqual(bulkStartDays('2026-10-30', 3), ['2026-10-30', '2026-10-31', '2026-11-01'], 'Friday, Saturday, Sunday');
+  assert.match(read('front/app/actions.mjs'), /case 'bulk-departures'/);
+});
