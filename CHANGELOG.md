@@ -2,6 +2,19 @@
 
 Les changements du site, version par version. La plus récente est en haut.
 
+## v1.5 — 29 septembre 2026
+
+### Communautés
+- **Bannière personnalisée** : dans Administration → Réglages → Apparence, les admins envoient leur propre bannière (recadrée et allégée automatiquement). Sans bannière, c'est celle du site.
+- La page « Gestion des membres » s'appelle maintenant **Administration**.
+
+### Courses
+- Dans un départ sans équipage, les **pilotes inscrits** s'affichent directement, sur des cartes dans le style des équipages.
+- La **frise de présence** marque chaque heure d'un trait dans la barre.
+
+### Vitrine
+- Les courses de démonstration affichent bien leurs horaires.
+
 ## v1.4.1 — 29 septembre 2026
 
 ### Corrections

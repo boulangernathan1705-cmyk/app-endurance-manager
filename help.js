@@ -49,7 +49,7 @@ const navigationSection = () => [L('Se repérer sur le site', 'Finding your way 
     <li>${L('le <strong>drapeau</strong> change la langue (français / anglais) ;', 'the <strong>flag</strong> switches the language (French / English);')}</li>
     <li>${L('<strong>Le Mans Ultimate</strong> / <strong>iRacing</strong> choisit le simulateur ;', '<strong>Le Mans Ultimate</strong> / <strong>iRacing</strong> picks the simulator;')}</li>
     <li>${L('<strong>Événements</strong> liste les courses, <strong>Mes inscriptions</strong> regroupe les tiennes ;', '<strong>Events</strong> lists the races, <strong>My entries</strong> gathers yours;')}</li>
-    <li>${L('à droite, ton <strong>compte</strong> : connexion Discord, Aide, et selon ton rôle Gestion des membres.', 'on the right, your <strong>account</strong>: Discord sign-in, Help and, depending on your role, Member management.')}</li>
+    <li>${L('à droite, ton <strong>compte</strong> : connexion Discord, Aide, et selon ton rôle Administration.', 'on the right, your <strong>account</strong>: Discord sign-in, Help and, depending on your role, Member management.')}</li>
   </ul>
   <p>${L('Le logo de la bannière ramène à l’accueil. Le bouton Retour du navigateur fonctionne normalement, et chaque course a sa propre adresse : <strong>Copier le lien de la course</strong> permet de la partager.', 'The banner logo takes you back home. Your browser’s Back button works as usual, and every race has its own address: <strong>Copy race link</strong> lets you share it.')}</p>
   ${helpScreenshot('pilot-navigation', L('Barre de navigation', 'Navigation bar'))}`];
@@ -203,11 +203,11 @@ function organizerHelp(role) {
   ];
 
   if (role === 'admin') {
-    sections.push([L('Gestion des membres', 'Member management'), `
-      <p>${L('Menu du compte → <strong>Gestion des membres</strong>. Chaque pilote apparaît après sa première connexion Discord. Change son rôle (<strong>Pilote</strong> ou <strong>Organisateur</strong>) dans la liste : c’est enregistré aussitôt, « ✓ Enregistré » le confirme. Le champ de recherche retrouve un pilote par son pseudo ou son identifiant Discord.', 'Account menu → <strong>Member management</strong>. Each driver appears after their first Discord sign-in. Change their role (<strong>Driver</strong> or <strong>Organizer</strong>) in the list: it is saved at once, “✓ Saved” confirms it. The search field finds a driver by name or Discord identifier.')}</p>
-      ${helpScreenshot('admin-members', L('Gestion des membres', 'Member management'))}`]);
+    sections.push([L('Administration', 'Administration'), `
+      <p>${L('Menu du compte → <strong>Administration</strong>, en trois onglets. <strong>Membres</strong> : les membres du serveur Discord qui se sont connectés, avec leurs rôles Discord et ce qu’ils permettent ici. <strong>Mise en place</strong> : les étapes pour installer ta communauté (bot Discord, rôles, récap de la semaine, lien d’invitation, annonce). <strong>Réglages</strong> : nom, couleur, bannière, modules et autorisations de chaque rôle Discord. Les rôles se donnent sur Discord : le site les relit chaque jour.', 'Account menu → <strong>Administration</strong>, in three tabs. <strong>Members</strong>: the members of the Discord server who signed in, with their Discord roles and what these allow here. <strong>Setup</strong>: the steps to set your community up (Discord bot, roles, weekly recap, invitation link, announcement). <strong>Settings</strong>: name, colour, banner, modules and permissions of each Discord role. Roles are given on Discord: the site reads them again every day.')}</p>
+      ${helpScreenshot('admin-members', L('Administration', 'Administration'))}`]);
     sections.push([L('Diagnostics', 'Diagnostics'), `
-      <p>${L('L’onglet <strong>Diagnostics</strong>, à côté de la gestion des membres, liste les erreurs techniques remontées automatiquement par les navigateurs (page, message, navigateur). Elles sont conservées 14 jours et servent à repérer un problème avant qu’on te le signale.', 'The <strong>Diagnostics</strong> tab, next to member management, lists technical errors reported automatically by browsers (page, message, browser). They are kept for 14 days and help spot a problem before anyone reports it.')}</p>`]);
+      <p>${L('L’onglet <strong>Diagnostics</strong>, à côté de l’administration, liste les erreurs techniques remontées automatiquement par les navigateurs (page, message, navigateur). Elles sont conservées 14 jours et servent à repérer un problème avant qu’on te le signale.', 'The <strong>Diagnostics</strong> tab, next to administration, lists technical errors reported automatically by browsers (page, message, browser). They are kept for 14 days and help spot a problem before anyone reports it.')}</p>`]);
   }
 
   const title = role === 'admin' ? L('AIDE ORGANISATEUR & ADMINISTRATION', 'ORGANIZER & ADMINISTRATION HELP') : L('AIDE ORGANISATEUR', 'ORGANIZER HELP');

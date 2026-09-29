@@ -15,7 +15,7 @@ const FR_NORMALIZE=new Map(Object.entries({
 const EN=new Map(Object.entries({
   'Accueil':'Home','Aide':'Help','Événements':'Events','ÉVÉNEMENTS':'EVENTS','Mes inscriptions':'My entries','MES INSCRIPTIONS':'MY ENTRIES',
   'Mon inscription':'My entry','Inscriptions':'Entries','Mes inscriptions personnelles':'My personal entries','Inscriptions que je gère':'Entries I manage',
-  'Gestion des membres':'Member management','GESTION DES MEMBRES':'MEMBER MANAGEMENT','Membres':'Members','Diagnostics':'Diagnostics','DIAGNOSTICS':'DIAGNOSTICS',
+  'Gestion des membres':'Member management','GESTION DES MEMBRES':'MEMBER MANAGEMENT','Administration':'Administration','Membres':'Members','Diagnostics':'Diagnostics','DIAGNOSTICS':'DIAGNOSTICS',
   'Erreurs techniques':'Technical errors','AIDE':'HELP','AIDE PILOTE':'DRIVER HELP','ESPACE PILOTE':'DRIVER AREA','Pilote':'Driver','Pilotes':'Drivers',
   'Organisateur':'Organizer','Administrateur':'Administrator','Administrateur principal':'Primary administrator','Déconnexion':'Log out',
   'Se connecter avec Discord':'Sign in with Discord','Connexion Discord indisponible':'Discord sign-in unavailable','Compte indisponible':'Account unavailable',
