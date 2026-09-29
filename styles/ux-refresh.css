@@ -1658,6 +1658,9 @@ html[data-game] #app .departure-planning { display: grid; gap: 14px; margin-top:
 .planning-row { display: flex; flex-wrap: wrap; align-items: center; gap: 5px 14px; min-width: 0; }
 .planning-row .planning-free-pill + .planning-free-pill, .planning-free-icon + .planning-free-pill { margin-left: -8px; }
 .planning-free-icon { display: inline-flex; color: #92999c; }
+.planning-row[data-free-pilots] { cursor: pointer; border-radius: 6px; }
+.planning-row[data-free-pilots]:hover .planning-free-icon { color: var(--community-accent, #52d3d8); }
+.planning-row[data-free-pilots]:hover .planning-free-pill { filter: brightness(1.25); }
 .planning-free-icon svg { width: 17px; height: 17px; }
 .planning-row + .planning-row { padding-top: 8px; border-top: 1px solid #343e41; }
 .planning-start[open] .planning-row { display: none; }
