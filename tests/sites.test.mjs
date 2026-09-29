@@ -103,6 +103,7 @@ test('the main address is a showcase: anyone looks without signing in, only the 
   assert.equal((await call(`${APEX}/api/races`)).status,200,'the races are visible without signing in');
   assert.deepEqual((await (await call(`${APEX}/api/session`,{headers:pilot})).json()).permissions,[],'a signed-in player only looks too');
   assert.ok((await (await call(`${APEX}/api/session`,{headers:manager})).json()).permissions.includes('admin'));
+  assert.deepEqual((await (await call(`${APEX}/api/participants`,{headers:pilot})).json()).participants,[],'never every account of the platform');
   const write=(headers,path,body)=>call(`${APEX}${path}`,{method:'POST',headers:{...headers,Origin:APEX,'Content-Type':'application/json'},body:JSON.stringify(body)});
   assert.equal((await write(pilot,'/api/races',{name:'Test',categories:['GT3'],departures:[{date:'2090-10-15',time:'21:00'}]})).status,403);
   // Reset of the showcase: fictional races, crews and pilots; no Discord server; nobody real.

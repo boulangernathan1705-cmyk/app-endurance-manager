@@ -300,10 +300,11 @@ async function api(request, env) {
   if (path === '/api/participants' && method === 'GET') {
     if (!actor.user) fail(401,'Connecte-toi avec Discord pour choisir un pilote.');
     // The members of this community only (its Discord server), with their pilot entry here.
-    // The main address is open to every Discord player (no memberships there): all the accounts, as before.
+    // The main address has no members (anyone signed in only looks): the players with a pilot entry here, never
+    // every account of the platform (the other communities' players stay out of sight).
     if (openSite) return json({participants:(await env.DB.prepare(`SELECT u.id,u.name,p.id AS participantId
-      FROM users u LEFT JOIN participants p ON p.user_id=u.id AND p.community_id=?
-      WHERE u.id NOT LIKE 'system:%'
+      FROM participants p JOIN users u ON u.id=p.user_id
+      WHERE p.community_id=? AND u.id NOT LIKE 'system:%'
       ORDER BY lower(u.name),u.id`).bind(community.id).all()).results});
     return json({participants:(await env.DB.prepare(`SELECT u.id,u.name,p.id AS participantId
       FROM memberships m JOIN users u ON u.id=m.user_id

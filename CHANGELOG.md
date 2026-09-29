@@ -8,7 +8,7 @@ Les changements du site, version par version. La plus récente est en haut.
 - **Plusieurs départs d'un coup** : coche les jours de course (vendredi, samedi, dimanche…) puis les heures de départ ; chaque jour coché reçoit toutes les heures cochées, et le nombre de départs s'affiche avant de valider. Idéal pour les événements spéciaux sur un week-end.
 
 ### Application
-- **L'application installée prend l'icône de ton serveur Discord** (et plus le logo d'Endurance Manager), sur téléphone comme sur ordinateur. Une nouvelle icône sur Discord remplace l'ancienne automatiquement.
+- L'application installée porte **le logo de ta communauté**, sur téléphone comme sur ordinateur.
 
 ## v1.6 — 29 septembre 2026
 
@@ -19,61 +19,21 @@ Les changements du site, version par version. La plus récente est en haut.
 - Barre de navigation plus compacte, sans débordement.
 - Cartes de course plus serrées : le tracé du circuit en petit à côté du titre, et les **catégories sur une seule ligne**.
 - Page d'une course : en-tête compact, équipages à leur juste hauteur, cartes pilote en pleine largeur.
-- Administration : onglets sur deux colonnes.
-
-### Fiabilité
-- Les tâches automatiques (vérification des membres, import iRacing, récap Discord) sont réparties dans le temps pour rester fiables quand les communautés se multiplient.
-- La vitrine se renouvelle toute seule chaque lundi.
-
-## v1.5.1 — 29 septembre 2026
-
-### Communautés
-- **Cadrage de la bannière** : après avoir choisi une image, l'admin la fait glisser et la zoome pour choisir la partie visible, avant de l'enregistrer.
 
 ## v1.5 — 29 septembre 2026
-
-### Communautés
-- **Bannière personnalisée** : dans Administration → Réglages → Apparence, les admins envoient leur propre bannière (recadrée et allégée automatiquement). Sans bannière, c'est celle du site.
-- La page « Gestion des membres » s'appelle maintenant **Administration**.
 
 ### Courses
 - Dans un départ sans équipage, les **pilotes inscrits** s'affichent directement, sur des cartes dans le style des équipages.
 - La **frise de présence** marque chaque heure d'un trait dans la barre.
 
-### Vitrine
-- Les courses de démonstration affichent bien leurs horaires.
-
 ### Récap de la semaine sur Discord
-- **Un bloc par course** : son nom mène directement à la course sur le site de ta communauté, avec la couleur du simulateur, le circuit, la durée, les équipages et les pilotes sans équipage.
-- Les **horaires s'affichent dans le fuseau horaire** de chaque lecteur, et le message porte le nom, le logo et la bannière de la communauté.
-
-### Aide et informations
-- **Aide**, **Confidentialité**, **Informations légales** et **À propos** mises à jour : communautés, accès par le serveur Discord, droits donnés par les rôles Discord, bot, récap de la semaine, bannière, vitrine.
-
-## v1.4.1 — 29 septembre 2026
-
-### Corrections
-- La réinitialisation de la vitrine fonctionne en production (elle dépassait le nombre de requêtes autorisé par appel).
-
-## v1.4 — 29 septembre 2026
-
-### Vitrine
-- **endurance-manager.app devient une vitrine** : visible sans connexion, avec des courses LMU, une course solo, des équipages et des pilotes fictifs, et le calendrier iRacing officiel. Elle n'est reliée à aucun serveur Discord et ne contient aucune vraie personne.
-- Pour organiser les endurances de ta communauté, chaque communauté a son propre site, relié à son Discord.
-
-## v1.3.1 — 29 septembre 2026
-
-### Corrections
-- Sur endurance-manager.app, **Inscrire un autre pilote** propose de nouveau tous les pilotes Discord (la liste était vide).
-- Le récap Discord d'une communauté ne peut être publié que dans les salons choisis par ses propres admins.
+- **Un bloc par course** : son nom mène directement à la course sur le site, avec la couleur du simulateur, le circuit, la durée, les équipages et les pilotes sans équipage.
+- Les **horaires s'affichent dans ton fuseau horaire**.
 
 ## v1.3 — 29 septembre 2026
 
-### Pour les admins des communautés
-- Nouvel onglet **Mise en place** dans « Gestion des membres » : les étapes pour installer ta communauté, expliquées pas à pas et cochées toutes seules une fois faites (bot Discord, rôles, récap, lien d'invitation, annonce du site).
-- **Récap de la semaine sur Discord** réglé par chaque communauté : dans un seul salon (LMU, iRacing ou les deux) ou un salon par simu, avec un bouton pour tester le salon. Le lien du message mène au site de la communauté.
-- Le **lien d'invitation** du serveur Discord est proposé aux joueurs qui n'en sont pas encore membres.
-- Page Membres plus claire : nom de la communauté au centre de la barre, autorisations des rôles plus lisibles.
+### Accès
+- Pas encore membre du serveur Discord de ta communauté ? Le site te propose directement son **lien d'invitation**.
 
 ## v1.2.2 — 29 septembre 2026
 
@@ -87,13 +47,10 @@ Les changements du site, version par version. La plus récente est en haut.
 
 ## v1.2 — 29 septembre 2026
 
-### Communautés
-- Endurance Manager accueille maintenant des **communautés** : chacune a son propre site (`nom.endurance-manager.app`), ses courses, ses équipages et ses inscriptions, bien séparés des autres.
-- L'accès à une communauté passe par **son serveur Discord** : seuls ses membres y entrent, et ce que chacun peut faire (s'inscrire, créer des courses, gérer les inscriptions…) dépend de ses **rôles Discord**, réglés par les admins du serveur.
-- Page **Membres** pour les admins : les membres du serveur, et les **réglages** de la communauté (nom, couleur, autorisations de chaque rôle, modules comme l'import des endurances iRacing ou le récap Discord). Le logo et la bannière sont ceux du serveur Discord.
-- **Mes communautés** : un pilote membre de plusieurs communautés passe de l'une à l'autre depuis le nom de la communauté, en haut du site.
-- Une seule connexion Discord pour tous les sites. À cette mise à jour, il faut **se reconnecter une fois**.
-- endurance-manager.app garde ses courses et reste ouvert à tous les joueurs Discord : connecte-toi avec Discord pour voir les courses.
+### Connexion
+- Tu entres sur le site avec ton compte Discord, en tant que membre du serveur de ta communauté.
+- **Mes communautés** : si tu fais partie de plusieurs communautés, passe de l'une à l'autre depuis le nom en haut du site. Une seule connexion suffit pour toutes.
+- À cette mise à jour, il faut **se reconnecter une fois**.
 
 ## v1.1.5 — 28 septembre 2026
 
@@ -110,7 +67,6 @@ Les changements du site, version par version. La plus récente est en haut.
 ### Horaires à confirmer (LMU et iRacing)
 - En cochant **Horaires à confirmer** à la création d'une course, tu indiques seulement le **jour** : la course a un départ **à définir** où tout le monde s'inscrit et forme ses équipages.
 - Quand les horaires sont connus, **modifie la course** et ajoute les vrais départs. Si personne n'était inscrit, le départ à définir disparaît ; sinon **chaque équipage choisit son départ**.
-- Les courses LMU à venir en horaires à confirmer (Fuji, Portimão, Bahreïn, Silverstone) passent à ce fonctionnement.
 
 ### Corrections
 - Une course en **Horaires à confirmer** (LMU comme iRacing) n'affiche plus d'heure provisoire : ses départs indiquent la date et « à définir ».
@@ -119,7 +75,7 @@ Les changements du site, version par version. La plus récente est en haut.
 ## v1.1.2 — 28 septembre 2026
 
 ### Corrections
-- Import des endurances iRacing plus fiable : une série ne peut plus être confondue avec un événement spécial au nom proche, et un événement spécial n'est jamais créé en double.
+- Endurances iRacing plus fiables : une série ne peut plus être confondue avec un événement spécial au nom proche, et un événement spécial n'apparaît jamais en double.
 - Les horaires d'un événement spécial sont complétés même si iRacing les publie tard, jusqu'à la fin du week-end de course.
 - En cas de coupure réseau, le site ne renvoie plus tout seul une création ou une modification : fini les courses créées en double.
 - Le créateur d'équipage affiche « à définir » pour un départ dont l'horaire n'est pas encore connu.
@@ -127,8 +83,7 @@ Les changements du site, version par version. La plus récente est en haut.
 ## v1.1.1 — 28 septembre 2026
 
 ### Endurances iRacing officielles
-- Le **Bathurst 1000** est bien importé (sa fiche du calendrier indiquait une durée de 15 minutes).
-- Les administrateurs ont un bouton **Mettre à jour le calendrier iRacing** pour lancer l'import tout de suite, sans attendre la mise à jour automatique.
+- Le **Bathurst 1000** apparaît bien (sa fiche du calendrier indiquait une durée de 15 minutes).
 
 ## v1.1 — 28 septembre 2026
 
