@@ -148,3 +148,12 @@ test('installable app of a community with a Discord icon: that icon only, served
   const platform=await (await call('https://endurance-manager.app/manifest.webmanifest')).json();
   assert.ok(platform.icons.some(icon=>icon.src==='/images/app-icon-512.png'),'the main site keeps its logo');
 });
+
+test('the community of the main address is not served at <slug>.endurance-manager.app as well', async () => {
+  const {call}=setup({APP_ORIGIN:'https://endurance-manager.app',SITE_ENV:'production'});
+  const alias=await call(`${MAIN}/lmu/`,{headers:{Accept:'text/html'}});
+  assert.equal(alias.status,404);assert.match(await alias.text(),/Communauté introuvable/);
+  assert.equal((await call(`${MAIN}/api/session`)).status,404);
+  assert.equal((await call('https://endurance-manager.app/api/session')).status,200,'its main address serves it');
+  assert.equal((await call(`${TEST_SITE}/api/session`)).status,200,'the other communities keep their address');
+});
