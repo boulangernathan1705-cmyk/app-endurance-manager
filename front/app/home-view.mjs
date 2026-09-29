@@ -1,4 +1,5 @@
 import {app,nav,state,activeGame,esc,button,canManage,isAdmin,can,circuitLabel,eventTypeBadge,schedulePendingBadge,eventBadge,eventCategoryCount,circuitVisual,logo,dateLabel,countdown,groupEvents,notifyRender,notifyNav} from './core.mjs';
+import {raceRangeBlock} from './planning.mjs';
 import {dateBlock,dayLabel,timeLabel} from '../dates.mjs';
 import {durationLabel,eventMinutes} from '../../shared/duration.mjs';
 import {isSolo,accessBadge,soloRoundsLabel,soloFill,ANY_CATEGORY} from './solo.mjs';
@@ -7,6 +8,9 @@ const dayKeyFormatter=new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Paris',y
 function datedDepartures(event){return (event.departures||[]).filter(d=>Number.isFinite(Number(d.startsAt))).sort((a,b)=>Number(a.startsAt)-Number(b.startsAt));}
 // Date block of a race card: the day of the next start (the last one for archived races); times are listed below.
 export function raceDateBlock(event,archived){
+  // A race over several days: the span of its days ("ven. → dim. 16–18 oct.").
+  const range=raceRangeBlock(event);
+  if(range)return range;
   const dated=datedDepartures(event),upcoming=dated.filter(d=>Number(d.startsAt)>Date.now());
   const shown=archived||!upcoming.length?dated.at(-1):upcoming[0];
   return dateBlock(shown?.startsAt);

@@ -230,3 +230,20 @@ test('several starts at once: the ticked days of a week times the ticked hours',
   assert.deepEqual(starts.slice(0, 3), [{date:'2026-10-30',time:'10:30'},{date:'2026-10-30',time:'14:30'},{date:'2026-10-30',time:'22:30'}]);
   assert.match(read('front/app/actions.mjs'), /case 'bulk-departures'/);
 });
+
+test('race page: a race over several days shows its starts as a planning, one column per day', async () => {
+  const {raceDays} = await import('../shared/start-times.mjs');
+  const at = (date, time) => Date.parse(`${date}T${time}:00+02:00`);
+  const starts = [['2026-10-17', '14:00'], ['2026-10-16', '22:00'], ['2026-10-16', '02:00'], ['2026-10-18', '00:30'], ['2026-10-17', '02:00']]
+    .map(([date, time], index) => ({id:`d${index}`, date, time, startsAt:at(date, time)}));
+  const days = raceDays(starts);
+  assert.deepEqual(days.map(day => day.key), ['2026-10-16', '2026-10-17', '2026-10-18'], 'days in Paris time, in order');
+  assert.deepEqual(days[0].items.map(item => item.departure.time), ['02:00', '22:00'], 'starts of a day in order');
+  assert.equal(days[1].items[1].index, 0, 'each start keeps its place in the race (its number)');
+  assert.deepEqual(raceDays(starts.slice(1, 3)), [], 'a single day keeps the list of starts');
+  assert.deepEqual(raceDays([...starts, {id:'tbd', tbd:true, startsAt:null}]), [], 'a start to define keeps the list');
+  const view = readFileSync(new URL('../front/app/event-view.mjs', import.meta.url), 'utf8');
+  assert.match(view, /planningDays\(event\)/);
+  const planning = readFileSync(new URL('../front/app/planning.mjs', import.meta.url), 'utf8');
+  assert.match(planning, /id="departure-\$\{departure\.id\}"/, 'a start keeps its id: registration, auto-refresh and links find it');
+});
