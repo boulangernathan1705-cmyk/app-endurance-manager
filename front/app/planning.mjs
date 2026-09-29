@@ -37,7 +37,7 @@ function startCard(event,departure,body,{minutes,now,open}){
   // The crews (by name, in their colour), then, under a thin line, the pilots without a crew.
   const row=(content,extra='')=>`<span class="planning-row"${extra}>${content}</span>`;
   const crewLine=crews.length?row(crews.map((crew,index)=>`<span class="planning-crew ${crewColorClass(crew.id,index)}">${logo(crew.category)}<span>${esc(crew.name)}</span></span>`).join('')):'';
-  const freeLine=free.length?row(FREE_ICON+free.map(([category,count,names])=>`<span class="planning-free-pill ${categories[category]?.css||''}" data-tip="${esc(names.join(', '))}">${count} ${esc(category)}</span>`).join(''),` data-free-pilots data-tip="${esc(free.flatMap(([,,names])=>names).join(', '))}"`):'';
+  const freeLine=free.length?row(FREE_ICON+free.map(([category,count,names])=>`<span class="planning-free-pill ${categories[category]?.css||''}" data-tip="${esc(names.join(', '))}">${count} ${esc(category)}</span>`).join(''),' data-free-pilots data-tip="Pilotes cherchant un équipage"'):'';
   const details=compact?'':`${crewLine}${freeLine}`;
   return `<details class="planning-start${compact?' is-compact':''}${done?' is-done':''}${mine?' is-mine':''}${!pilots?' is-empty':''}" id="departure-${departure.id}" ${open?'open':''}><summary>${head}${details}${CHEVRON}</summary><div class="departure-fold planning-body">${body}</div></details>`;
 }
