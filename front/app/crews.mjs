@@ -105,7 +105,7 @@ export function renderPilots(event,departure,options={}){
     :'Horaire pas encore connu : inscris-toi et forme ton équipage ici. Quand les horaires seront publiés, chaque équipage choisira son départ.'}</p>`:'';
   return `<div class="pilot-section">${tbdNotice}<div class="ux-course-overview ux-course-split-overview">
     <section class="ux-course-crews-block"><div class="ux-course-crews-heading"><span class="ux-course-crews-title">Équipages <strong>${crews.length}</strong></span>${createCrew}</div><div class="ux-course-crews-body">${crewCards}</div></section>
-    <details class="ux-course-pilots-accordion" id="pilots-${departure.id}">${contentSummary('Pilotes sans équipage',pilotCount(unassigned))}<div class="ux-course-pilots-body">${pilots}${unavailableHtml}</div></details>
+    <details class="ux-course-pilots-accordion" id="pilots-${departure.id}" ${crews.length||!unassigned.length?'':'open'}>${contentSummary('Pilotes sans équipage',pilotCount(unassigned))}<div class="ux-course-pilots-body">${pilots}${unavailableHtml}</div></details>
   </div></div>`;
 }
 
