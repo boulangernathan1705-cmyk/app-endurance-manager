@@ -58,21 +58,42 @@ function queueWeeklySync(env, ctx, request) {
   }));
 }
 
-async function appManifest(request, env) {
+// Logo of the community whose site this is (the icon of its Discord server), or null on the main site.
+async function communityLogo(request, env) {
   let community = null;
   try { community = await currentCommunity(env, request); } catch {}
   const onCommunitySite = Boolean(community && communityLabel(new URL(request.url), env));
-  const logo = onCommunitySite ? appearanceOf(community).logoUrl : null;
-  const icons = [
-    ...(logo ? [{src:logo.replace('size=256', 'size=512'), sizes:'512x512', type:'image/png'}] : []),
-    {src:'/images/app-icon-192.png', sizes:'192x192', type:'image/png'},
-    {src:'/images/app-icon-512.png', sizes:'512x512', type:'image/png'},
-    {src:'/images/app-icon-maskable-512.png', sizes:'512x512', type:'image/png', purpose:'maskable'}];
+  return {community:onCommunitySite ? community : null, logo:onCommunitySite ? appearanceOf(community).logoUrl : null};
+}
+
+// Installable app. On a community's site, its icons are the icon of its Discord server only (phones and
+// computers otherwise pick the site's logo, maskable or same address); the icon's id in the address makes a new
+// Discord icon a new file.
+async function appManifest(request, env) {
+  const {community, logo} = await communityLogo(request, env);
+  const version = logo ? (logo.match(/\/([a-f0-9_]+)\.png/)?.[1] || '') : '';
+  const icons = logo
+    ? [192, 512].map(size => ({src:`/app-icon.png?size=${size}&v=${version}`, sizes:`${size}x${size}`, type:'image/png'}))
+    : [{src:'/images/app-icon-192.png', sizes:'192x192', type:'image/png'},
+      {src:'/images/app-icon-512.png', sizes:'512x512', type:'image/png'},
+      {src:'/images/app-icon-maskable-512.png', sizes:'512x512', type:'image/png', purpose:'maskable'}];
   const manifest = {id:'/', start_url:'/', scope:'/', display:'standalone', lang:'fr', background_color:'#0a0b0c', theme_color:'#0a0b0c',
-    name:onCommunitySite ? `${community.name} · Endurance Manager` : 'Endurance Manager',
-    short_name:onCommunitySite ? community.shortName : 'Endurance',
+    name:community ? `${community.name} · Endurance Manager` : 'Endurance Manager',
+    short_name:community ? community.shortName : 'Endurance',
     description:'Organisation des courses d’endurance simracing : inscriptions, disponibilités et équipages.', icons};
   return new Response(JSON.stringify(manifest), {headers:{'Content-Type':'application/manifest+json; charset=utf-8', 'Cache-Control':'public, max-age=3600'}});
+}
+
+// The app's icon at the site's own address (home screen of the iPhone, installed app): the community's
+// Discord icon, or the site's logo when there is none or Discord does not answer.
+async function appIcon(request, env) {
+  const url = new URL(request.url), size = [180, 512].includes(Number(url.searchParams.get('size'))) ? Number(url.searchParams.get('size')) : 192;
+  const {logo} = await communityLogo(request, env);
+  if (logo) {
+    const image = await fetch(logo.replace('size=256', `size=${size > 256 ? 512 : 256}`), {cf:{cacheTtl:86400, cacheEverything:true}}).catch(() => null);
+    if (image?.ok) return new Response(image.body, {headers:{'Content-Type':'image/png', 'Cache-Control':'public, max-age=86400'}});
+  }
+  return env.ASSETS.fetch(new Request(new URL(`/images/app-icon-${size}.png`, url)));
 }
 
 function communityNotFound() {
@@ -88,6 +109,7 @@ export default {
     const development = isDevelopment(env);
     if (development && pathname === '/robots.txt') return devRobots();
     if (pathname === '/manifest.webmanifest' && env?.DB) return appManifest(request, env);
+    if (pathname === '/app-icon.png' && env?.DB && env?.ASSETS) return appIcon(request, env);
     // A page of <slug>.BASE_DOMAIN for a community that does not exist: a plain "not found" page.
     if (env?.DB && communityLabel(new URL(request.url), env) && !pathname.startsWith('/api/') && (request.headers.get('Accept') || '').includes('text/html')
       && !(await env.DB.prepare('SELECT 1 FROM communities WHERE slug=?').bind(communityLabel(new URL(request.url), env)).first())) return communityNotFound();
