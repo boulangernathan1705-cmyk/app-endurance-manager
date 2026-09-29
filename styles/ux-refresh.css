@@ -1679,6 +1679,8 @@ html[data-game] #app .planning-body .ux-course-crews-body { gap: 10px !important
 html[data-game] #app .planning-body .ux-course-pilots-accordion { padding: 0 0 4px !important; }
 html[data-game] #app .planning-body .ux-course-pilots-body, html[data-game] #app .planning-body .ux-unassigned-section { padding: 0 !important; margin: 0 !important; border: 0 !important; background: none !important; }
 html[data-game] #app .planning-body .ux-unassigned-grid { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)) !important; gap: 10px !important; padding-top: 4px; }
+/* « Ton équipage » / your own entry: the white ring drawn inside the card, so every card keeps the same edges. */
+html[data-game] #app .planning-body .crew-card-shell.is-mine, html[data-game] #app .planning-body .ux-unassigned-grid > .pilot-row.ux-current-pilot { outline: 2px solid rgba(255, 255, 255, .55); outline-offset: -2px; }
 html[data-game] #app .planning-body .pilot-row { min-width: 0; }
 /* Crews of a start: no empty room kept under the pilots. */
 html[data-game] #app .planning-body .crew-tile-summary .crew-compact-pilots { min-height: 0; }
