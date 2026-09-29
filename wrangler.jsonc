@@ -1,5 +1,5 @@
 {
-  "name": "app",
+  "name": "endurance-manager-local",
   "main": "server/worker-with-migrations.mjs",
   "compatibility_date": "2026-09-07",
   "keep_vars": true,
@@ -23,8 +23,7 @@
     }
   ],
   "vars": {
-    "APP_ORIGIN": "https://app.endurance-manager.workers.dev",
-    "SITE_ENV": "development",
-    "SOLO_RACES": "on"
+    "APP_ORIGIN": "http://localhost:8787",
+    "SITE_ENV": "development"
   }
 }
