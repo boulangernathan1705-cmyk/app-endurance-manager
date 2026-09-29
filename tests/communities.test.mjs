@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {DatabaseSync} from 'node:sqlite';
 import {readFileSync, readdirSync} from 'node:fs';
 import worker from '../server/worker.mjs';
-import {syncIracingEvents} from '../server/iracing-import.mjs';
+import {syncIracingEvents, importNextCommunity} from '../server/iracing-import.mjs';
 import {SEASON} from './fixtures/iracing-season.mjs';
 import {linkTestServer, setMember} from './fixtures/discord-server.mjs';
 
@@ -135,4 +135,27 @@ test('official iRacing races are imported separately for each community that ena
   DB.db.prepare("UPDATE communities SET modules='{}' WHERE id=?").run(TEST);
   DB.db.prepare('DELETE FROM iracing_imports WHERE community_id=?').run(TEST);
   assert.equal((await syncIracingEvents(env,{fetchImpl})).created,0,'module off: nothing imported');
+});
+
+// Calls to the database the way D1 counts them (a batch is one call): a run may make 50.
+function countCalls(DB){
+  const counter={calls:0};let inBatch=false;const batch=DB.batch.bind(DB),prepare=DB.prepare.bind(DB);
+  DB.batch=async statements=>{counter.calls++;inBatch=true;try{return await batch(statements);}finally{inBatch=false;}};
+  DB.prepare=sql=>{const statement=prepare(sql);for(const name of ['run','first','all']){const call=statement[name].bind(statement);statement[name]=(...args)=>{if(!inBatch)counter.calls++;return call(...args);};}return statement;};
+  return counter;
+}
+
+test('the scheduled iRacing import takes one community per run, a new one first, within the database budget', async () => {
+  const {DB,env}=harness();
+  DB.db.prepare("UPDATE communities SET modules='{\"iracingImport\":true}' WHERE id=?").run(TEST);
+  const future=JSON.parse(JSON.stringify(SEASON).replaceAll('2026-','2099-'));
+  const fetchImpl=async url=>new Response(JSON.stringify(String(url).includes('wp-json')?[]:String(url).endsWith('manifest.json')?{current:'2099S4'}:future));
+  const count=id=>DB.db.prepare('SELECT COUNT(*) n FROM events WHERE community_id=?').get(id).n;
+  const counter=countCalls(DB);
+  const first=await importNextCommunity(env,new Date('2099-01-05T10:15:00Z'),{fetchImpl});
+  assert.ok(first.created>0);
+  assert.ok(counter.calls<=20,`${counter.calls} calls to the database for ${first.created} races`);
+  assert.ok((count(DEV)>0)!==(count(TEST)>0),'one community per run');
+  await importNextCommunity(env,new Date('2099-01-05T11:15:00Z'),{fetchImpl});
+  assert.equal(count(DEV),count(TEST),'the other one (never imported) at the next run');
 });

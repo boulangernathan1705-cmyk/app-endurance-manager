@@ -2,9 +2,10 @@ import worker from './worker.mjs';
 import {homeRedirect, homePage} from './home.mjs';
 import {isWeeklyDiscordMutation} from './discord-weekly-format.mjs';
 import {ensureDiscordWeeklySchema} from './discord-weekly-schema.mjs';
-import {syncWeeklyDiscord} from './discord-weekly.mjs';
+import {syncWeeklyDiscord, syncDueRecaps} from './discord-weekly.mjs';
 import {cleanup, communityLabel} from './core.mjs';
-import {syncIracingEvents, completeSpecialTimes} from './iracing-import.mjs';
+import {importNextCommunity, completeSpecialTimes} from './iracing-import.mjs';
+import {refreshShowcaseIfDue} from './demo.mjs';
 import {refreshMemberships} from './access.mjs';
 import {allCommunities, currentCommunity} from './community.mjs';
 import {isDevelopment,devRobots,markDevelopmentResponse} from './dev-environment.mjs';
@@ -87,31 +88,25 @@ export default {
     return development ? markDevelopmentResponse(response) : response;
   },
 
+  // Every 15 minutes. A run may make 50 calls to the database and 50 requests: one heavy task per quarter of
+  // an hour, each working by small batches (the cleanup, light, runs every time).
   async scheduled(controller, env, ctx) {
-    // Members and Discord roles not checked for a day are checked again by the bot (every hour, a few at a time).
-    if (env?.DB && env.DISCORD_BOT_TOKEN && new Date(controller?.scheduledTime || Date.now()).getUTCMinutes() < 15) ctx.waitUntil(
-      allCommunities(env).then(communities => refreshMemberships(env, communities)).catch(error => {
-        console.error('Membership check failed', error instanceof Error ? error.message : 'unknown');
-      }));
-    // Official iRacing endurances: twice a day (7:00 and 13:00 UTC; the schedule it reads is refreshed around
-    // 6:17 UTC), and at the next run as long as nothing was ever imported (first deployment). Special event
-    // time slots (iracing.com article of the race week) are looked for every hour.
-    const at = new Date(controller?.scheduledTime || Date.now());
-    if (env?.DB && env.IRACING_IMPORT !== 'off') ctx.waitUntil((async () => {
-      const daily = [7, 13].includes(at.getUTCHours()) && at.getUTCMinutes() < 15;
-      if (daily || !(await env.DB.prepare('SELECT 1 FROM iracing_imports LIMIT 1').first())) await syncIracingEvents(env);
-      // Every hour: time slots of the special events of the coming days (article of the race week).
-      else if (at.getUTCMinutes() < 15) await completeSpecialTimes(env, {withinDays:10});
-    })().catch(error => {
-      console.error('iRacing import failed', error instanceof Error ? error.message : 'unknown');
-    }));
-    // Expired sessions, OAuth states and rate-limit counters are purged here too, not only on Discord login.
-    if (env?.DB) ctx.waitUntil(cleanup(env).catch(error => {
-      console.error('Scheduled cleanup failed', error instanceof Error ? error.message : 'unknown');
-    }));
     if (!env?.DB) return;
-    ctx.waitUntil(runWeeklySync(env).catch(error => {
-      console.error('Discord weekly scheduled sync failed', error instanceof Error ? error.message : 'unknown');
-    }));
+    const at = new Date(controller?.scheduledTime || Date.now());
+    const slot = Math.floor(at.getUTCMinutes() / 15);
+    const run = (label, task) => ctx.waitUntil(task().catch(error => console.error(label, error instanceof Error ? error.message : 'unknown')));
+    // Expired sessions, OAuth states and rate-limit counters are purged here too, not only on Discord login.
+    run('Scheduled cleanup failed', () => cleanup(env));
+    // :00 Members and Discord roles not checked for a day are checked again by the bot, a few at a time.
+    if (slot === 0 && env.DISCORD_BOT_TOKEN) run('Membership check failed', async () => refreshMemberships(env, await allCommunities(env), 12));
+    // :15 Official iRacing endurances of one community (a new one first, then each in turn).
+    if (slot === 1 && env.IRACING_IMPORT !== 'off') run('iRacing import failed', () => importNextCommunity(env, at));
+    // :30 The weekly Discord recaps checked longest ago.
+    if (slot === 2) run('Discord weekly scheduled sync failed', async () => { await ensureDiscordWeeklySchema(env); await syncDueRecaps(env, 3); });
+    // :45 Time slots of the coming special events (iracing.com article of the race week), and the showcase on Mondays.
+    if (slot === 3) run('Special times or showcase failed', async () => {
+      if (env.IRACING_IMPORT !== 'off') await completeSpecialTimes(env, {withinDays:10});
+      await refreshShowcaseIfDue(env, at);
+    });
   }
 };

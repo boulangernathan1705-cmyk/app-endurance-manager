@@ -236,6 +236,30 @@ export async function syncWeeklyDiscord(env,timestamp=Date.now(),community=null)
   return failed || last;
 }
 
+// Scheduled task: the recap messages checked longest ago first, a few per run (each takes about 11 calls to
+// the database; a run may make 50).
+export async function syncDueRecaps(env,limit=3,timestamp=Date.now()) {
+  if (!env?.DB) return 0;
+  const communities = await allCommunities(env);
+  const rows = (await env.DB.prepare('SELECT community_id, scope, webhook_url FROM community_recaps').all()).results || [];
+  const checked = new Map(((await env.DB.prepare('SELECT key, updated_at FROM discord_weekly_state').all()).results || []).map(row => [row.key, Number(row.updated_at) || 0]));
+  const targets = [];
+  for (const community of communities) {
+    const own = rows.filter(row => row.community_id === community.id);
+    if (own.length) for (const row of own) targets.push({community, scope:row.scope, url:row.webhook_url});
+    else if (usesSiteRecap(env, community)) targets.push({community, scope:'lmu', url:String(env.DISCORD_WEEKLY_WEBHOOK_URL).trim()});
+  }
+  targets.sort((a, b) => (checked.get(stateKey(a.community, a.scope)) || 0) - (checked.get(stateKey(b.community, b.scope)) || 0));
+  let done = 0;
+  for (const target of targets.slice(0, limit)) {
+    try { await syncRecap(env,timestamp,target.community,target.scope,target.url); done++; }
+    catch (error) { console.error('Discord weekly sync failed', target.community.slug, target.scope, error instanceof Error ? error.message : 'unknown'); }
+    // Checked now (even when nothing changed): the next run takes the others.
+    await env.DB.prepare('UPDATE discord_weekly_state SET updated_at=? WHERE key=?').bind(Math.floor(Date.now()/1000), stateKey(target.community, target.scope)).run().catch(() => {});
+  }
+  return done;
+}
+
 async function syncRecap(env,timestamp,community,scope,base) {
   const STATE_KEY = stateKey(community, scope);
   const now = Math.floor(Date.now()/1000);

@@ -187,3 +187,36 @@ test('each community\'s recap only has its own races, and every link goes to its
     for(const url of links)assert.ok(url.startsWith(site),`${url} is on ${site}`);
   }
 });
+
+test('scheduled recaps: a few per run, those checked longest ago first, every one in turn', async t => {
+  const posts=fakeDiscord(t);
+  const {DB,env}=setup();
+  const {syncDueRecaps}=await import('../server/discord-weekly.mjs');
+  const hooks=[];
+  for(let i=1;i<=5;i++){
+    const id=`c-${i}`,hook=`https://discord.com/api/webhooks/${'9'.repeat(17)}${i}/token-${'x'.repeat(24)}-${i}`;hooks.push(hook);
+    DB.db.prepare(`INSERT INTO communities(id,slug,name,short_name,created_at) VALUES(?,?,?,?,0)`).run(id,`commu-${i}`,`Commu ${i}`,`C${i}`);
+    DB.db.prepare("INSERT INTO community_recaps(community_id,scope,webhook_url,updated_at) VALUES(?,'all',?,0)").run(id,hook);
+  }
+  assert.equal(await syncDueRecaps(env,3),3);
+  const first=new Set(posts.map(post=>post.url));assert.equal(first.size,3);
+  posts.length=0;
+  assert.equal(await syncDueRecaps(env,3),3);
+  const second=new Set(posts.map(post=>post.url));
+  for(const hook of hooks.filter(hook=>!first.has(hook)))assert.ok(second.has(hook),'the ones not done yet come next');
+});
+
+test('the showcase starts again every Monday morning, only on the production main address', async () => {
+  const {DB,env}=setup();
+  const {refreshShowcaseIfDue}=await import('../server/demo.mjs');
+  const monday=new Date('2026-10-05T03:45:00Z'),tuesday=new Date('2026-10-06T03:45:00Z');
+  const prod={...env,APP_ORIGIN:'https://endurance-manager.app',BASE_DOMAIN:'endurance-manager.app'};
+  const dev={...env,APP_ORIGIN:'https://commu-dev.endurance-manager.app',BASE_DOMAIN:'endurance-manager.app'};
+  DB.db.prepare('UPDATE communities SET discord_guild_id=NULL WHERE id=?').run(DEV_COMMUNITY);
+  assert.equal(await refreshShowcaseIfDue(dev,monday),false,'never on the development site (its main community is a real team)');
+  assert.equal(await refreshShowcaseIfDue(prod,tuesday),false);
+  assert.equal(await refreshShowcaseIfDue(prod,monday),true);
+  assert.ok(DB.db.prepare('SELECT COUNT(*) n FROM events WHERE community_id=?').get(DEV_COMMUNITY).n>=6);
+  DB.db.prepare("UPDATE communities SET discord_guild_id='900000000000000001' WHERE id=?").run(DEV_COMMUNITY);
+  assert.equal(await refreshShowcaseIfDue(prod,monday),false,'a community with a Discord server is never taken for the showcase');
+});

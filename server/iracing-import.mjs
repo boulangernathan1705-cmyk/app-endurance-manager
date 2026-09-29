@@ -236,22 +236,35 @@ export async function syncIracingEvents(env, {timestamp = Date.now(), fetchImpl 
   return {created, completed};
 }
 
+// Scheduled task: one community per run. A community never imported goes first (new one, or showcase just
+// reset); otherwise each one in turn, one per hour (the schedule data changes twice a day at most).
+export async function importNextCommunity(env, at = new Date(), {fetchImpl = fetch} = {}) {
+  const targets = await communitiesWith(env, 'iracingImport');
+  if (!targets.length) return {created:0, completed:0};
+  const imported = new Set(((await env.DB.prepare('SELECT DISTINCT community_id FROM iracing_imports').all()).results || []).map(row => row.community_id));
+  const community = targets.find(item => !imported.has(item.id)) || targets[Math.floor(at.getTime() / 3600000) % targets.length];
+  return syncIracingEvents(env, {timestamp:at.getTime(), fetchImpl, communities:[community]});
+}
+
 async function importForCommunity(env, community, plans, {timestamp, fetchImpl}) {
   const known = new Set((await env.DB.prepare('SELECT external_id FROM iracing_imports WHERE community_id=?').bind(community.id).all()).results.map(row => row.external_id));
-  let created = 0;
+  let created = 0, pending = [];
+  // New races are written 10 at a time: each batch is one call to the database (at most 50 per run).
+  const flush = async () => { if (pending.length) await env.DB.batch(pending); pending = []; };
   for (const plan of plans) {
     if (known.has(plan.externalId)) continue;
     let data;
     // A start that does not exist in Paris time (clock change) or any invalid entry: that race is skipped.
     try { data = validateEvent(plan.input); } catch { continue; }
     const eventId = id();
-    await env.DB.batch([
+    pending.push(
       env.DB.prepare('INSERT INTO events(id,name,duration_hours,duration_minutes,event_type,circuit,schedule_pending,driver_change_required,format,access,capacity,rounds,categories,departures,created_by,created_at,community_id) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
         .bind(eventId, data.name, data.durationHours, data.durationMinutes, data.eventType, data.circuit, data.schedulePending ? 1 : 0, data.driverChangeRequired==null?null:(data.driverChangeRequired?1:0), data.format, data.access, data.capacity, JSON.stringify(data.rounds), JSON.stringify(data.categories), JSON.stringify(data.departures), IMPORT_AUTHOR, now(), community.id),
-      env.DB.prepare('INSERT OR IGNORE INTO iracing_imports(community_id,external_id,event_id,created_at) VALUES(?,?,?,?)').bind(community.id, plan.externalId, eventId, now())
-    ]);
+      env.DB.prepare('INSERT OR IGNORE INTO iracing_imports(community_id,external_id,event_id,created_at) VALUES(?,?,?,?)').bind(community.id, plan.externalId, eventId, now()));
     created++;
+    if (pending.length >= 20) await flush();
   }
+  await flush();
   const completed = await completeSpecialTimes(env, {timestamp, fetchImpl, community});
   return {created, completed};
 }
