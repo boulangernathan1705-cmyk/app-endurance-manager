@@ -133,3 +133,18 @@ test('installable app: the manifest has the name of the community of the address
   const unknown=await call('https://inconnue.endurance-manager.app/manifest.webmanifest');
   assert.equal((await unknown.json()).name,'Endurance Manager','an unknown address never names a community');
 });
+
+test('installable app of a community with a Discord icon: that icon only, served at the site\'s address', async t => {
+  const {DB,call}=setup();
+  DB.db.prepare("UPDATE communities SET discord_guild_id='1269541162025353289', appearance=? WHERE slug='commu-test'").run(JSON.stringify({discordIcon:'72be2adc50e3b4d47e29f5609d3cb8da'}));
+  const manifest=await (await call(`${TEST_SITE}/manifest.webmanifest`)).json();
+  assert.deepEqual(manifest.icons.map(icon=>icon.src),['/app-icon.png?size=192&v=72be2adc50e3b4d47e29f5609d3cb8da','/app-icon.png?size=512&v=72be2adc50e3b4d47e29f5609d3cb8da'],'never the site\'s logo, nor a maskable one');
+  const realFetch=globalThis.fetch,asked=[];
+  globalThis.fetch=async url=>{asked.push(String(url));return new Response('png',{headers:{'Content-Type':'image/png'}});};
+  t.after(()=>{globalThis.fetch=realFetch;});
+  const icon=await call(`${TEST_SITE}/app-icon.png?size=180`);
+  assert.equal(icon.headers.get('Content-Type'),'image/png');assert.equal(await icon.text(),'png');
+  assert.deepEqual(asked,['https://cdn.discordapp.com/icons/1269541162025353289/72be2adc50e3b4d47e29f5609d3cb8da.png?size=256']);
+  const platform=await (await call('https://endurance-manager.app/manifest.webmanifest')).json();
+  assert.ok(platform.icons.some(icon=>icon.src==='/images/app-icon-512.png'),'the main site keeps its logo');
+});

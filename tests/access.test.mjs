@@ -166,3 +166,15 @@ test('community look: name, short name and accent by its admins, icon from its D
   assert.equal(session.community.name,'Ma Commu');assert.equal(session.community.shortName,'MC');
   assert.equal(session.community.appearance.accent,'#ff8800');assert.ok(session.community.appearance.logoUrl);
 });
+
+test('a new icon on the Discord server becomes the community logo when a member is checked; the rest of the appearance stays', async t => {
+  const {DB,env,community}=setup();
+  fakeDiscord(t,{[PILOT]:[]});
+  DB.db.prepare('UPDATE communities SET appearance=? WHERE id=?').run(JSON.stringify({discordIcon:'ffffffffffffffffffffffffffffffff',accent:'#50d779'}),DEV_COMMUNITY);
+  community.appearance={discordIcon:'ffffffffffffffffffffffffffffffff',accent:'#50d779'};
+  assert.equal((await accessOf(env,community,PILOT)).status,'member');
+  const stored=JSON.parse(DB.db.prepare('SELECT appearance FROM communities WHERE id=?').get(DEV_COMMUNITY).appearance);
+  assert.equal(stored.discordIcon,'0123456789abcdef0123456789abcdef','the icon of the server now');
+  assert.equal(stored.accent,'#50d779','the accent chosen by the admins is kept');
+  assert.equal(community.appearance.discordIcon,'0123456789abcdef0123456789abcdef');
+});

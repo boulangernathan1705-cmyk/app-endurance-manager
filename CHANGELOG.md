@@ -2,6 +2,14 @@
 
 Les changements du site, version par version. La plus récente est en haut.
 
+## v1.6.1 — 29 septembre 2026
+
+### Créer une course
+- **Plusieurs départs d'un coup** : coche les jours de course (vendredi, samedi, dimanche…) puis les heures de départ ; chaque jour coché reçoit toutes les heures cochées, et le nombre de départs s'affiche avant de valider. Idéal pour les événements spéciaux sur un week-end.
+
+### Application
+- **L'application installée prend l'icône de ton serveur Discord** (et plus le logo d'Endurance Manager), sur téléphone comme sur ordinateur. Une nouvelle icône sur Discord remplace l'ancienne automatiquement.
+
 ## v1.6 — 29 septembre 2026
 
 ### Application

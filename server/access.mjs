@@ -53,6 +53,17 @@ async function guild(env, guildId) {
 }
 export const discordGuild = guild;
 
+// The logo and banner of the community follow its Discord server: a new icon on Discord replaces the stored one
+// (site header, installed app, weekly recap). Only these two keys change, the rest of the appearance stays.
+export async function keepDiscordLook(env, community, details) {
+  const appearance = community.appearance || {};
+  if (!details || (details.icon === (appearance.discordIcon || '') && details.banner === (appearance.discordBanner || ''))) return false;
+  community.appearance = {...appearance, discordIcon:details.icon, discordBanner:details.banner};
+  await env.DB.prepare("UPDATE communities SET appearance=json_set(COALESCE(appearance,'{}'),'$.discordIcon',?,'$.discordBanner',?) WHERE id=?")
+    .bind(details.icon, details.banner, community.id).run();
+  return true;
+}
+
 // Asks Discord (bot) whether the player is on the server and with which roles; stores the answer.
 // Returns the membership row, or null when Discord could not answer (the previous row is kept).
 export async function checkMembership(env, community, userId) {
@@ -68,6 +79,7 @@ export async function checkMembership(env, community, userId) {
   }
   if (!member.ok) return null;
   const details = await guild(env, guildId);
+  await keepDiscordLook(env, community, details);
   const roles = (member.data?.roles || []).map(String);
   const adminRoles = new Set((details?.roles || []).filter(role => role.administrator).map(role => role.id));
   const discordAdmin = details?.ownerId === userId || roles.some(role => adminRoles.has(role)) ? 1 : 0;

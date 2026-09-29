@@ -1,7 +1,7 @@
 import {app,state,api,load,loadArchive,showError,countdown,CARS,inCommunity} from './core.mjs';
 import {renderNav,renderHome} from './home-view.mjs';
 import {renderEvent} from './event-view.mjs';
-import {renderEventForm,departureFields,updateRemoveButtons,goToEventStep,formDurationMinutes} from './event-form.mjs';
+import {renderEventForm,departureFields,updateRemoveButtons,goToEventStep,formDurationMinutes,bulkPreview,shiftBulkWeek} from './event-form.mjs';
 import {renderMyEntries} from './entries-view.mjs';
 import {refresh,refreshAfterSave} from './refresh.mjs';
 import {draftFor,registrationDraft,ownRegistrations,rerenderRegistrationSection,submitRegistration,registrationStep} from './registration.mjs';
@@ -165,6 +165,19 @@ async function perform(action,target){
     case 'create': if(target.dataset.format)state.listFormat=target.dataset.format; renderEventForm(); break;
     case 'edit-event': renderEventForm(event); break;
     case 'add-departure': if(app.querySelectorAll('.departure-field').length>=30)throw Error('Maximum 30 départs par événement.');{const rows=document.querySelectorAll('#departureFields .departure-field'),last=rows[rows.length-1];/* A new start copies the previous start's date and time: several starts often share a day. */document.getElementById('departureFields').insertAdjacentHTML('beforeend',departureFields(last?{date:last.querySelector('[name="date"]').value,time:last.querySelector('[name="time"]').value}:{}));/* Real times added next to the common start: they are no longer "à confirmer". */const pending=target.closest('form')?.elements.eventSchedulePending;if(pending?.checked&&document.querySelector('#departureFields [data-tbd="true"]'))pending.checked=false;}updateRemoveButtons();break;
+    case 'bulk-departures': {
+      const form=target.closest('form'),starts=bulkPreview(form),list=document.getElementById('departureFields');
+      if(!starts.length)throw Error('Coche au moins un jour et une heure de départ.');
+      // Empty starts (no date yet) are replaced; the others are kept.
+      for(const row of list.querySelectorAll('.departure-field:not([data-tbd="true"])'))if(!row.querySelector('[name="date"]').value)row.remove();
+      const existing=new Set([...list.querySelectorAll('.departure-field')].map(row=>`${row.querySelector('[name="date"]').value} ${row.querySelector('[name="time"]').value}`));
+      const added=starts.filter(start=>!existing.has(`${start.date} ${start.time}`));
+      if(list.querySelectorAll('.departure-field').length+added.length>30)throw Error('Maximum 30 départs par événement : réduis le nombre de jours ou d’heures.');
+      list.insertAdjacentHTML('beforeend',added.map(departureFields).join(''));
+      form.querySelector('[data-bulk-departures]').open=false;
+      updateRemoveButtons();break;
+    }
+    case 'bulk-week': shiftBulkWeek(target.closest('[data-bulk-departures]'),Number(target.dataset.shift));break;
     case 'remove-departure': if(app.querySelectorAll('.departure-field').length>1)target.closest('.departure-field').remove();updateRemoveButtons();break;
     case 'delete-event': if(!confirm(`Supprimer « ${event.name} » et toutes ses inscriptions ? Cette suppression est définitive.${inCommunity()}`))return;await api(`/api/races/${event.id}`,'DELETE',{version:event.version});state.page='home';await refreshAfterSave('Événement supprimé.');break;
     case 'my-entries': await load();renderNav();renderMyEntries();break;
