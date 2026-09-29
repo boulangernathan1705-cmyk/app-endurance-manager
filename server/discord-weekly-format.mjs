@@ -61,6 +61,19 @@ function departureValue(departure,compact=false){
   if(!departure.crews.length&&!departure.unassignedPilots?.length)lines.push('Personne d’inscrit pour l’instant.');
   return cut(lines.join('\n'),1024);
 }
+// The starts of a race: only those with entries in detail (time, crews, pilots without a crew); the empty ones
+// in one line at the end, so a special event with 15 starts stays short. A race with a single start keeps it.
+const BLANK='\u200b';
+function raceFields(departures,compact,url){
+  const hasEntries=departure=>departure.crews.length||departure.unassignedPilots?.length;
+  if(departures.length===1)return [{name:BLANK,value:departureValue(departures[0],compact),inline:false}];
+  const filled=departures.filter(hasEntries),empty=departures.length-filled.length;
+  const fields=filled.slice(0,23).map(departure=>({name:BLANK,value:departureValue(departure,compact),inline:false}));
+  const more=url?` · [voir la course](${url})`:'';
+  if(!filled.length)fields.push({name:BLANK,value:`Personne d’inscrit pour l’instant sur les ${departures.length} départs${more}.`,inline:false});
+  else if(empty)fields.push({name:BLANK,value:`➕ ${empty} autre${empty>1?'s':''} départ${empty>1?'s':''} sans inscrit${more}`,inline:false});
+  return fields;
+}
 // One block per race: its name is the link to the race, the bar has the colour of its simulator.
 function raceEmbed(departures,siteUrl,compact=false,current=false){
   const first=departures[0],{title,note}=eventTitleAndNote(first.eventName);
@@ -68,7 +81,7 @@ function raceEmbed(departures,siteUrl,compact=false,current=false){
   const duration=first.durationMinutes||first.durationHours?durationLabel(first.durationMinutes||first.durationHours*60):'';
   const details=[`📍 ${clean(circuit)}`,duration&&`⏱️ ${duration}`,TYPE_LABELS[first.eventType]&&`🏷️ ${TYPE_LABELS[first.eventType]}`].filter(Boolean).join(' · ');
   const embed={title:cut(`${current?'🔴 En cours — ':'🏁 '}${title}`,256),description:cut(note?`${details}\n${note}`:details,4096),color:current?0xd71920:SIM_COLORS[simOf(first)],
-    fields:departures.slice(0,24).map((departure,index)=>({name:departures.length>1?`Départ ${index+1}`:'Départ',value:departureValue(departure,compact),inline:false}))};
+    fields:raceFields(departures,compact,raceUrl(siteUrl,first))};
   const url=raceUrl(siteUrl,first);if(url)embed.url=url;
   return embed;
 }

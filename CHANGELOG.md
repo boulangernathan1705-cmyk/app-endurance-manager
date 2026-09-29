@@ -2,6 +2,11 @@
 
 Les changements du site, version par version. La plus récente est en haut.
 
+## Prochaine version — en test
+
+### Récap de la semaine sur Discord
+- **Plus court** : seuls les départs où il y a des inscrits sont détaillés (équipages et pilotes sans équipage) ; les départs vides tiennent en une ligne avec le lien de la course.
+
 ## v1.7 — 29 septembre 2026
 
 ### Courses sur plusieurs jours
