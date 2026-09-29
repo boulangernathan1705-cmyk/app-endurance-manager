@@ -9,6 +9,9 @@ Les changements du site, version par version. La plus récente est en haut.
 - Chaque départ montre en un coup d'œil ses pilotes, **les pilotes sans équipage par catégorie** et ses équipages ; clique dessus pour l'ouvrir, t'inscrire ou rejoindre un équipage.
 - La date de la course montre tous ses jours (« ven. → dim. 16–18 oct. »), et un bouton **Ton départ** t'emmène directement au tien.
 
+### Aide au survol
+- **Infobulles** : passe la souris sur un badge, une pastille ou un ⓘ (ou touche-le sur téléphone) pour savoir ce qu'il veut dire : type de course, horaires à confirmer, places libres, responsable d'équipage, heures sans pilote…
+
 ## v1.6.1 — 29 septembre 2026
 
 ### Créer une course

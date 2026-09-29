@@ -64,7 +64,7 @@ async function settingsMarkup() {
   const appearance = `<section class="settings-card"><h2>Apparence</h2><form class="settings-appearance" data-appearance>
     <label>Nom de la communauté<input name="name" maxlength="80" required value="${esc(look.name)}"></label>
     <label>Nom court <small>(onglet du navigateur)</small><input name="shortName" maxlength="12" required value="${esc(look.shortName)}"></label>
-    <div class="settings-accent"><label>Couleur d’accent<input name="accent" type="color" value="${esc(look.accent || '#52d3d8')}"></label>
+    <div class="settings-accent"><label>Couleur d’accent <span class="tip-info" data-tip="Couleur des boutons, des traits et des repères sur le site de ta communauté.">ⓘ</span><input name="accent" type="color" value="${esc(look.accent || '#52d3d8')}"></label>
       <label class="role-pill"><input type="checkbox" name="defaultAccent" ${look.accent ? '' : 'checked'}><span>Couleur du site</span></label></div>
     <p class="members-help">Le logo est l’icône du serveur Discord${look.discordServer ? ` « ${esc(look.discordServer)} »` : ''} : change-la sur Discord.${look.logoUrl ? '' : ' Le serveur n’a pas d’icône : le logo du site est utilisé.'}</p>
     <div class="settings-actions"><button class="primary-button" type="submit">Enregistrer</button><span class="settings-status" aria-live="polite"></span></div></form></section>
@@ -88,7 +88,7 @@ function step(done, number, title, status, body, open = !done) {
     <div class="setup-body">${body}</div></details></li>`;
 }
 function webhookField(key, label, saved) {
-  return `<div class="setup-hook"><label>Adresse du webhook ${label ? `du salon ${label}` : 'du salon'}<input name="hook-${key}" type="url" inputmode="url" autocomplete="off" spellcheck="false"
+  return `<div class="setup-hook"><label>Adresse du webhook ${label ? `du salon ${label}` : 'du salon'} <span class="tip-info" data-tip="Un webhook laisse le site publier dans ce salon, et seulement là : il ne donne aucun autre accès à ton serveur.">ⓘ</span><input name="hook-${key}" type="url" inputmode="url" autocomplete="off" spellcheck="false"
     placeholder="${saved ? `Déjà relié (${esc(saved)}) : laisse vide pour le garder` : 'https://discord.com/api/webhooks/…'}"></label>
     <button type="button" class="secondary-button" data-recap-test="${key}">Tester</button><span class="settings-status" aria-live="polite"></span></div>`;
 }

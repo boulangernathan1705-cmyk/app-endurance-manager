@@ -1716,6 +1716,16 @@ html[data-game] #app .race-my-start .secondary-button { border-color: var(--comm
   html[data-game] #app .race-header .race-my-start { order: 5; flex: 1 1 100%; justify-items: stretch; margin-left: 0; text-align: left; }
 }
 
+/* =====================================================================
+   Info bubbles (data-tip, front/tooltip.mjs): a short explanation on hover (computer) or on a tap (phone).
+   ===================================================================== */
+.em-tip { position: fixed; z-index: 10000; max-width: min(280px, calc(100vw - 16px)); padding: 7px 11px; border: 1px solid #3a4548; border-radius: 9px; background: #1a2123; color: #e6ecea; font-size: 13px; font-weight: 500; line-height: 1.4; text-align: left; box-shadow: 0 8px 22px rgba(0, 0, 0, .45); pointer-events: none; }
+.em-tip[hidden] { display: none; }
+[data-tip]:not(button):not(a):not(summary):not(label) { cursor: help; }
+.planning-row[data-free-pilots], .planning-start [data-tip] { cursor: pointer; }
+.tip-info { display: inline-grid; place-items: center; width: 17px; height: 17px; margin-left: 4px; border: 1px solid #4a5558; border-radius: 50%; color: #aab3b6; font-size: 11px; font-style: normal; line-height: 1; vertical-align: 1px; cursor: help; }
+.tip-info:hover { color: var(--community-accent, #52d3d8); border-color: var(--community-accent, #52d3d8); }
+
 /* ---------- Phone pass (≤ 760px): compact bar, race cards on fewer lines, categories on one row ---------- */
 @media (max-width: 760px) {
   .site-nav-shell { gap: 6px !important; padding: 6px !important; }

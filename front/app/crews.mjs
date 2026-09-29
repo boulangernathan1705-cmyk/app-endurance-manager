@@ -5,7 +5,7 @@ import {shortDateLabel,timeLabel as clockLabel} from '../dates.mjs';
 import {renderRegistration} from './registration.mjs';
 
 function contentSummary(title,count){return `<summary class="ux-content-accordion-summary"><span class="ux-content-accordion-title">${esc(title)}</span><span class="ux-content-accordion-count">${count}</span><span class="ux-content-accordion-chevron" aria-hidden="true">›</span></summary>`;}
-function statusPill(crew){return `<span class="crew-compact-status ${crew.locked?'is-complete':'is-open'}">${crew.locked?'Complet':'Places libres'}</span>`;}
+function statusPill(crew){return `<span class="crew-compact-status ${crew.locked?'is-complete':'is-open'}" data-tip="${crew.locked?'Le responsable a verrouillé l’équipage : sa composition est fixée.':'Des pilotes de la catégorie peuvent encore rejoindre cet équipage.'}">${crew.locked?'Complet':'Places libres'}</span>`;}
 function coverage(event,departure,regs){const duration=event.durationHours||6;const counts=Array.from({length:duration},(_,i)=>regs.filter(reg=>coversHour(reg,i)).length);const covered=counts.filter(Boolean).length;return{duration,counts,covered,missing:Math.max(0,duration-covered)};}
 
 // Opened crew: each pilot's timeline with its own hour scale, and a warning listing the hours nobody covers.
@@ -19,9 +19,9 @@ function uncoveredRanges(counts){
 export function pilotLines(departure,duration,regs,{editable=true}={}){
   const locked=departure.startsAt<=Date.now();
   return regs.map(reg=>{
-    const origin=reg.addedByName?`<span class="registration-origin-info" title="Inscription ajoutée par ${esc(reg.addedByName)}" aria-label="Inscription ajoutée par ${esc(reg.addedByName)}">ⓘ</span>`:'';
+    const origin=reg.addedByName?`<span class="registration-origin-info" data-tip="Inscription ajoutée par ${esc(reg.addedByName)}" aria-label="Inscription ajoutée par ${esc(reg.addedByName)}">ⓘ</span>`:'';
     const edit=editable&&reg.canEdit&&!locked?button('edit-registration','Modifier',`data-id="${reg.id}" data-departure="${departure.id}" aria-label="Modifier l’inscription de ${esc(reg.name)}"`,'link-button crew-planning-edit'):'';
-    return `<div class="crew-planning-row crew-pilot-line pilot-row${reg.mine?' ux-current-pilot':''}"><span class="crew-planning-label"><span class="pilot-name">${esc(reg.name)}</span>${reg.soloDriver?'<span class="solo-driver-badge" title="Fait la course seul, sans équipier">SOLO</span>':''}${origin}${edit}</span>${renderAvailabilityTimeline({departure,duration,status:reg.status,label:`Disponibilités de ${reg.name}`})}</div>`;
+    return `<div class="crew-planning-row crew-pilot-line pilot-row${reg.mine?' ux-current-pilot':''}"><span class="crew-planning-label"><span class="pilot-name">${esc(reg.name)}</span>${reg.soloDriver?'<span class="solo-driver-badge" data-tip="Fait la course seul, sans équipier.">SOLO</span>':''}${origin}${edit}</span>${renderAvailabilityTimeline({departure,duration,status:reg.status,label:`Disponibilités de ${reg.name}`})}</div>`;
   }).join('');
 }
 // A crew's availability: the pilots' timelines, with a warning listing the hours nobody covers.
@@ -29,7 +29,7 @@ export function crewAvailability(event,departure,regs,{editable=true}={}){
   if(!regs.length)return '<p class="empty crew-empty-roster">Aucun pilote n’a encore rejoint cet équipage.</p>';
   const cov=coverage(event,departure,regs);
   const gaps=uncoveredRanges(cov.counts);
-  const warning=gaps.length?`<p class="crew-gap-warning" role="note"><span aria-hidden="true">⚠</span> Aucun pilote ${gaps.map(gap=>`de ${hourLabel(departure,gap.start)} à ${hourLabel(departure,gap.end)}`).join(', ')}</p>`:'';
+  const warning=gaps.length?`<p class="crew-gap-warning" role="note" data-tip="Personne n’est disponible sur ces heures : ajoutez un pilote ou ajustez les disponibilités."><span aria-hidden="true">⚠</span> Aucun pilote ${gaps.map(gap=>`de ${hourLabel(departure,gap.start)} à ${hourLabel(departure,gap.end)}`).join(', ')}</p>`:'';
   return `${warning}<section class="crew-pilot-lines" aria-label="Heures de chaque pilote">${pilotLines(departure,cov.duration,regs,{editable})}</section>`;
 }
 
@@ -68,7 +68,7 @@ function crewCard(event,departure,crew,index,unassigned,allCrews){
   const memberElsewhere=allCrews.some(other=>other.id!==crew.id&&(other.registrationIds||[]).some(id=>ownRegistrationIds.has(id)));
   const joinRegistration=ownMember||memberElsewhere?null:unassigned.find(reg=>reg.mine&&reg.category===crew.category)||null;
   const open=state.crewManagementOpen.has(crew.id);
-  const ownerBadge=crew.ownedByMe?'<span class="crew-owner-badge">Responsable</span>':'';
+  const ownerBadge=crew.ownedByMe?'<span class="crew-owner-badge" data-tip="Tu as créé cet équipage : tu gères ses pilotes, sa voiture et son verrouillage.">Responsable</span>':'';
   const countLabel=`${regs.length} pilote${regs.length>1?'s':''} · ${cov.covered}/${cov.duration} h`;
   const management=crew.canManage&&!startHasBegun(departure)
     ? `<div class="crew-inline-management">${stateControl(crew,departure)}<span class="coverage-summary">${countLabel}</span></div>`
@@ -80,7 +80,7 @@ function crewCard(event,departure,crew,index,unassigned,allCrews){
         <span class="crew-tile-head"><span class="crew-compact-category" aria-hidden="true">${logo(crew.category)}</span><span class="crew-compact-team"><strong>${esc(crew.name)}</strong></span><span class="crew-compact-chevron" aria-hidden="true">›</span></span>
         ${ownMember||ownerBadge?`<span class="crew-tile-badges">${ownMember?'<span class="crew-mine-badge">Ton équipage</span>':''}${ownerBadge}</span>`:''}
         <span class="crew-compact-pilots">${regs.length?regs.map(reg=>`<span>${esc(reg.name)}</span>`).join(''):'<span class="is-empty">Aucun pilote</span>'}</span>
-        <span class="crew-tile-foot"><span class="crew-compact-car">${esc(crew.car||'Voiture à choisir')}</span>${statusPill(crew)}</span>
+        <span class="crew-tile-foot"><span class="crew-compact-car"${crew.car?'':' data-tip="Le responsable choisit la voiture dans « Gérer »."'}>${esc(crew.car||'Voiture à choisir')}</span>${statusPill(crew)}</span>
       </summary>
       <div class="crew-pilot-accordion-body crew-unified-body">
         ${management}

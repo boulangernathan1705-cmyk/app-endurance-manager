@@ -37,10 +37,12 @@ export function logo(category) {
   return config?.image ? `<img class="category-logo" src="/images/${esc(config.image)}" alt="">` : `<span class="category-text-logo" aria-hidden="true">${esc(category)}</span>`;
 }
 export function badge(category) { return `<span class="event-category-badge ${categories[category]?.css || ''}">${logo(category)}<span>${esc(category)}</span></span>`; }
-export function eventTypeBadge(type) { const item = EVENT_TYPES[type] || EVENT_TYPES.private; return `<span class="event-type-badge ${item.css}">${esc(item.label)}</span>`; }
-export function schedulePendingBadge(event) { return event?.schedulePending ? '<span class="event-schedule-badge">Horaires à confirmer</span>' : ''; }
+// Info bubbles (data-tip, see front/tooltip.mjs) of the race badges.
+const EVENT_TYPE_TIPS = {special:'Course officielle ponctuelle, souvent sur un week-end, avec ses propres créneaux de départ.', lmu:'Manche du championnat officiel de Le Mans Ultimate.', private:'Course organisée par ta communauté.'};
+export function eventTypeBadge(type) { const key = EVENT_TYPES[type] ? type : 'private', item = EVENT_TYPES[key]; return `<span class="event-type-badge ${item.css}" data-tip="${esc(EVENT_TYPE_TIPS[key] || '')}">${esc(item.label)}</span>`; }
+export function schedulePendingBadge(event) { return event?.schedulePending ? '<span class="event-schedule-badge" data-tip="Les horaires officiels ne sont pas encore connus : inscris-toi et forme ton équipage, chacun choisira son départ quand ils seront publiés.">Horaires à confirmer</span>' : ''; }
 export function eventCategoryCount(event, category) { return event.departures.reduce((sum,departure) => sum + departure.availability.filter(reg => reg.category === category && reg.status !== 'unavailable').length,0); }
-export function eventBadge(category,count) { return `<span class="event-category-badge ${categories[category]?.css || ''}">${logo(category)}<span class="event-category-copy"><strong>${esc(category)}</strong><small>${count} inscrit${count > 1 ? 's' : ''}</small></span></span>`; }
+export function eventBadge(category,count) { return `<span class="event-category-badge ${categories[category]?.css || ''}" data-tip="${count} pilote${count > 1 ? 's' : ''} inscrit${count > 1 ? 's' : ''} en ${esc(category)}, tous départs confondus.">${logo(category)}<span class="event-category-copy"><strong>${esc(category)}</strong><small>${count} inscrit${count > 1 ? 's' : ''}</small></span></span>`; }
 export function pilotCount(registrations) { return new Set(registrations.filter(reg => reg.status !== 'unavailable').map(reg => reg.participantId || reg.id)).size; }
 export function circuitInfo(id) { return CIRCUITS.find(circuit => circuit.id === id) || null; }
 export function circuitLabel(id) { return circuitInfo(id)?.name || 'Circuit à préciser'; }
@@ -49,13 +51,13 @@ export function circuitVisual(id, compact = false) {
   const map = circuitMapConfig(id);
   const src = map ? circuitMapSource(map.file) : `/images/circuits/${circuit.file}`;
   const attrs = map ? ` data-circuit-source="commons" data-circuit-map="${esc(map.key)}" style="--circuit-scale:${map.scale};--circuit-x:${map.x}%;--circuit-y:${map.y}%;--circuit-mobile-scale:${map.mobileScale};--circuit-mobile-x:${map.mobileX}%;--circuit-mobile-y:${map.mobileY}%"` : '';
-  return `<span class="circuit-visual ${compact ? 'compact' : ''}"><img data-circuit="${esc(circuit.id)}" src="${esc(src)}" alt="Plan du ${esc(circuit.name)}" loading="lazy"${attrs}></span>`;
+  return `<span class="circuit-visual ${compact ? 'compact' : ''}" data-tip="${esc(circuit.name)}"><img data-circuit="${esc(circuit.id)}" src="${esc(src)}" alt="Plan du ${esc(circuit.name)}" loading="lazy"${attrs}></span>`;
 }
 export function button(action,label,extra='',css='secondary-button') { return `<button type="button" class="${css}" data-action="${action}" ${extra}>${label}</button>`; }
 
 export function carPreferenceChoices(category, selected=[], any=false) {
   const values = Array.isArray(selected) ? selected : selected ? [selected] : [];
-  return `<fieldset class="car-preference-panel"><legend class="form-label">Voiture(s) souhaitée(s)</legend><label class="car-any-option"><input type="checkbox" name="carAny" ${any?'checked':''}><span>Peu importe la voiture</span></label><div class="car-preference-grid">${(CARS[category]||[]).map(car => `<label class="car-preference-option"><input type="checkbox" name="carPreference" value="${esc(car)}" ${values.includes(car)&&!any?'checked':''} ${any?'disabled':''}><span>${esc(car)}</span></label>`).join('')}</div><p class="car-preference-help">Choisis un ou plusieurs modèles, ou coche « Peu importe la voiture ». Ces souhaits aident les organisateurs à former les équipages.</p></fieldset>`;
+  return `<fieldset class="car-preference-panel"><legend class="form-label">Voiture(s) souhaitée(s)</legend><label class="car-any-option" data-tip="Tu t’adaptes à la voiture que choisira ton équipage."><input type="checkbox" name="carAny" ${any?'checked':''}><span>Peu importe la voiture</span></label><div class="car-preference-grid">${(CARS[category]||[]).map(car => `<label class="car-preference-option"><input type="checkbox" name="carPreference" value="${esc(car)}" ${values.includes(car)&&!any?'checked':''} ${any?'disabled':''}><span>${esc(car)}</span></label>`).join('')}</div><p class="car-preference-help">Choisis un ou plusieurs modèles, ou coche « Peu importe la voiture ». Ces souhaits aident les organisateurs à former les équipages.</p></fieldset>`;
 }
 export function registrationCarLabel(reg) { return reg.carAny ? 'N’importe quelle voiture' : ((reg.cars?.length ? reg.cars.join(' · ') : reg.car) || 'Pas de préférence'); }
 export function pilotAvailability(reg,departure,duration) { return departure ? `<div class="crew-pilot-availability"><span class="crew-pilot-availability-label">Disponibilité</span>${renderAvailabilityTimeline({departure,duration,status:reg.status,label:`Disponibilités de ${reg.name || 'ce pilote'}`})}</div>` : ''; }

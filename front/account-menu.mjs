@@ -1,3 +1,5 @@
+// Info bubbles on every page (data-tip).
+import './tooltip.mjs';
 const root = document.getElementById('account-menu-root');
 
 const roleLabel = role => ({admin:'Administrateur',organizer:'Organisateur',pilot:'Pilote'}[role] || 'Pilote');
