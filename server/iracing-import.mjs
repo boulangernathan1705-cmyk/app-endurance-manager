@@ -297,7 +297,7 @@ export async function completeSpecialTimes(env, {timestamp = Date.now(), fetchIm
   // One community (import) or all of them (hourly task): each race is completed in its own community.
   const waiting = (await env.DB.prepare(`SELECT e.id, e.name, e.version, e.departures, i.external_id FROM iracing_imports i
     JOIN events e ON e.id=i.event_id AND e.community_id=i.community_id
-    WHERE i.external_id LIKE 'special:%' AND e.schedule_pending=1 AND (?1 IS NULL OR i.community_id=?1)`).bind(community?.id ?? null).all()).results || [];
+    WHERE i.external_id LIKE 'special:%' AND e.schedule_pending=1 AND (? IS NULL OR i.community_id=?)`).bind(community?.id ?? null, community?.id ?? null).all()).results || [];
   const candidates = waiting.map(row => {
     const dateStart = /:(\d{4}-\d{2}-\d{2})$/.exec(row.external_id)?.[1];
     const first = Date.parse(`${dateStart}T00:00:00Z`);
