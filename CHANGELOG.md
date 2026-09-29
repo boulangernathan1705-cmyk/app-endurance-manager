@@ -15,6 +15,10 @@ Les changements du site, version par version. La plus récente est en haut.
 ### Vitrine
 - Les courses de démonstration affichent bien leurs horaires.
 
+### Récap de la semaine sur Discord
+- **Un bloc par course** : son nom mène directement à la course sur le site de ta communauté, avec la couleur du simulateur, le circuit, la durée, les équipages et les pilotes sans équipage.
+- Les **horaires s'affichent dans le fuseau horaire** de chaque lecteur, et le message porte le nom, le logo et la bannière de la communauté.
+
 ### Aide et informations
 - **Aide**, **Confidentialité**, **Informations légales** et **À propos** mises à jour : communautés, accès par le serveur Discord, droits donnés par les rôles Discord, bot, récap de la semaine, bannière, vitrine.
 
