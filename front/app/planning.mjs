@@ -29,11 +29,12 @@ function startCard(event,departure,body,{minutes,now,open}){
   const endDay=dayKey(end)!==dayKey(start)?` le ${weekdayLabel(end)}`:'';
   const tags=compact?'':`${mine?'<span class="planning-tag is-mine">Ton départ</span>':''}${live?'<span class="planning-tag is-live">En cours</span>':''}`;
   const head=`<span class="planning-start-head"><strong>Départ ${esc(timeLabel(departure.time))}</strong>${compact?(done?'<span class="planning-start-state">Terminé</span>':''):`<span class="planning-start-end">fin ${esc(timeAt(end))}${esc(endDay)}</span>`}${tags}</span>`;
-  // Pilots without a crew, by category ("sans équipage 2 GT3 1 Hypercar"): where a pilot can find a crew.
+  // Pilots without a crew, by category (« 2 GT3 » « 1 Hypercar »): where a pilot can find a crew. The crews
+  // follow, by name.
   const free=event.categories.map(category=>[category,present.filter(reg=>!assigned.has(reg.id)&&reg.category===category).length]).filter(([,count])=>count);
-  const freeLine=free.length?`<span class="planning-free"><span>· sans équipage</span>${free.map(([category,count])=>`<span class="planning-free-pill ${categories[category]?.css||''}">${count} ${esc(category)}</span>`).join('')}</span>`:'';
+  const freeLine=free.length?`<span class="planning-start-line">${free.map(([category,count])=>`<span class="planning-free-pill ${categories[category]?.css||''}" title="${count} pilote${count>1?'s':''} ${esc(category)} sans équipage">${count} ${esc(category)}</span>`).join('')}</span>`:'';
   const crewLine=crews.length?`<span class="planning-crews">${crews.map((crew,index)=>`<span class="planning-crew ${crewColorClass(crew.id,index)}">${logo(crew.category)}<span>${esc(crew.name)}</span></span>`).join('')}</span>`:'';
-  const details=compact?'':`<span class="planning-start-line"><span>${pilots} pilote${pilots>1?'s':''}</span>${freeLine}</span>${crewLine}`;
+  const details=compact?'':`${freeLine}${crewLine}`;
   return `<details class="planning-start${compact?' is-compact':''}${done?' is-done':''}${mine?' is-mine':''}${!pilots?' is-empty':''}" id="departure-${departure.id}" ${open?'open':''}><summary>${head}${details}${CHEVRON}</summary><div class="departure-fold planning-body">${body}</div></details>`;
 }
 
