@@ -78,7 +78,7 @@ function renderDisconnected(discordReady) {
 }
 
 function renderConnected(user) {
-  const manage = user.role === 'admin' ? `<a class="account-menu-item" href="/members.html">Gestion des membres</a>` : '';
+  const manage = user.role === 'admin' ? `<a class="account-menu-item" href="/members.html">Administration</a>` : '';
   const help = `<a class="account-menu-item" href="/help.html"${isHelp ? ' aria-current="page"' : ''}>Aide</a>`;
 
   root.innerHTML = `<div class="account-menu">

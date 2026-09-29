@@ -9,8 +9,6 @@ const SCOPE_LABELS={all:'',lmu:' LMU',iracing:' iRacing'};
 const ymd=new Intl.DateTimeFormat('en-CA',{timeZone:TIME_ZONE,year:'numeric',month:'2-digit',day:'2-digit'});
 const startLabel=new Intl.DateTimeFormat('fr-FR',{timeZone:'UTC',day:'numeric',month:'long'});
 const endLabel=new Intl.DateTimeFormat('fr-FR',{timeZone:'UTC',day:'numeric',month:'long',year:'numeric'});
-const departureLabel=new Intl.DateTimeFormat('fr-FR',{timeZone:TIME_ZONE,weekday:'long',day:'numeric',month:'long',hour:'2-digit',minute:'2-digit',hourCycle:'h23'});
-const departureDayLabel=new Intl.DateTimeFormat('fr-FR',{timeZone:TIME_ZONE,weekday:'long',day:'numeric',month:'long'});
 const updateTimeLabel=new Intl.DateTimeFormat('fr-FR',{timeZone:TIME_ZONE,hour:'2-digit',minute:'2-digit',hourCycle:'h23'});
 const markers=new Map([['Hypercar','🟦'],['LMP2 ELMS','🟨'],['LMP2 WEC','🟨'],['LMP3','🟩'],['GT3','🟪'],['GTE','🟥']]);
 
@@ -33,63 +31,86 @@ export function isDepartureRelevant(startsAt,durationHours,week,now=Date.now()){
 function clean(value){return String(value??'').replace(/[\\`*_~|>]/g,'\\$&').trim();}
 function cut(value,length){const text=String(value??'');return text.length<=length?text:`${text.slice(0,length-1).trimEnd()}…`;}
 function cap(value){const text=String(value??'').trim();return text?text[0].toUpperCase()+text.slice(1):'';}
-function pilotLines(pilots){return pilots.map(name=>`👤 ${clean(name)}`).join('\n');}
-function crewText(crew){
-  const marker=markers.get(crew.category)||'⬜',status=crew.locked?'🔒 Complet':'🔓 Ouvert',pilots=crew.pilots.length?pilotLines(crew.pilots):'Aucun pilote affecté';
-  return `${marker} ${clean(crew.name)} · ${clean(crew.category)} · ${status}\n${crew.car?`🏎️ ${clean(crew.car)}`:'🏎️ Voiture à définir'}\n${pilots}`;
-}
-function crewField(crew){const [name,...rest]=crewText(crew).split('\n');return{name:cut(name,256),value:cut(rest.join('\n'),1024),inline:false};}
-function departureFields(departure){
-  const fields=departure.crews.slice(0,23).map(crewField);
-  if(departure.crews.length>23)fields.push({name:'Autres équipages',value:`${departure.crews.length-23} équipage(s) supplémentaire(s) sont visibles sur Endurance Manager.`,inline:false});
-  if(departure.unassignedPilots?.length)fields.push({name:'📋 Pilotes inscrits non affectés',value:cut(pilotLines(departure.unassignedPilots),1024),inline:false});
-  return fields.slice(0,25);
-}
-function currentDepartureEmbed(departure,appUrl){
-  const circuit=circuitNames.get(departure.circuit)||departure.circuit||'Circuit à préciser';
-  const embed={title:cut(`🔴 Course en cours — ${clean(departure.eventName)}`,256),description:cut(`📅 **${departureLabel.format(departure.startsAt)}**\n📍 ${clean(circuit)}\n⏱️ ${departure.durationMinutes||departure.durationHours?durationLabel(departure.durationMinutes||departure.durationHours*60):'?'}`,4096),color:0xd71920,fields:departureFields(departure)};
-  if(appUrl)embed.url=appUrl;
-  return embed;
-}
+// "Le Mans (horaires à confirmer)": the note in brackets is shown under the race name.
 function eventTitleAndNote(eventName){
   const text=String(eventName??'').trim(),match=text.match(/^(.*?)\s*\(([^)]*horaires?[^)]*)\)\s*$/i);
   if(!match)return{title:clean(text),note:''};
   return{title:clean(match[1]),note:cap(clean(match[2]))};
 }
-function futureDepartureBlock(departure){
-  const details=[...departure.crews.map(crewText)];
-  if(departure.unassignedPilots?.length)details.push(`📋 Pilotes inscrits non affectés\n${pilotLines(departure.unassignedPilots)}`);
-  const when=departure.timePending?`${departureDayLabel.format(departure.startsAt)} — horaire à confirmer`:departureLabel.format(departure.startsAt).replace(' à ',' — ');
-  const heading=`🕐 **${clean(when)}**`;
-  return cut(details.length?`${heading}\n${details.join('\n\n')}`:heading,1024);
-}
-function groupedFutureFields(departures){
-  const groups=new Map();
-  for(const departure of departures){const key=departure.eventId||departure.eventName||'event';if(!groups.has(key))groups.set(key,{eventName:departure.eventName,departures:[]});groups.get(key).departures.push(departure);}
-  const fields=[];
-  for(const group of groups.values()){
-    const {title,note}=eventTitleAndNote(group.eventName);let first=true,chunk=note;
-    for(const departure of group.departures){const block=futureDepartureBlock(departure),candidate=chunk?`${chunk}\n\n${block}`:block;if(candidate.length>1024&&chunk){fields.push({name:cut(first?`🏁 ${title}`:'↳ Suite',256),value:cut(chunk,1024),inline:false});first=false;chunk=block;}else chunk=candidate;}
-    if(chunk)fields.push({name:cut(first?`🏁 ${title}`:'↳ Suite',256),value:cut(chunk,1024),inline:false});
-  }
-  return fields;
-}
-function futureDepartureEmbeds(departures,periodLabel,appUrl){
-  const fields=groupedFutureFields(departures),embeds=[];
-  for(let i=0;i<fields.length;i+=25){const embed={title:cut(`📝 ${cap(periodLabel||'semaine à venir')}`,256),color:0x2563eb,fields:fields.slice(i,i+25)};if(appUrl)embed.url=appUrl;embeds.push(embed);}
-  return embeds;
-}
-function footer(updatedAt){return{text:`mise à jour à ${updateTimeLabel.format(updatedAt)}`};}
 
-export function buildWeeklyDiscordPayload(snapshot,appUrl,updatedAt=Date.now(),scope='lmu'){
-  const sim=SCOPE_LABELS[scope]??' LMU';
-  const content='',current=Array.isArray(snapshot.currentDepartures)?snapshot.currentDepartures:[],future=Array.isArray(snapshot.futureDepartures)?snapshot.futureDepartures:[];
-  if(!current.length&&!future.length)return{content,embeds:[{title:`Aucune endurance${sim} à préparer`,description:`Aucune course avec un équipage engagé n’est en cours et aucun prochain départ${sim} n’est programmé.`,color:0x6b7280,footer:footer(updatedAt)}],allowed_mentions:{parse:[]}};
-  const embeds=[];
-  for(const departure of current)embeds.push(currentDepartureEmbed(departure,appUrl));
-  if(future.length)embeds.push(...futureDepartureEmbeds(future,snapshot.periodLabel,appUrl));
-  const visible=embeds.slice(0,10);visible[visible.length-1].footer=footer(updatedAt);
-  return{content,embeds:visible,allowed_mentions:{parse:[]}};
+// Link of a race on the site of its community: the simulator space of the race, then the race itself.
+export function raceUrl(siteUrl,departure){
+  if(!siteUrl)return undefined;
+  const space=String(departure.circuit||'').startsWith('iracing-')?'iracing':'lmu';
+  return `${siteUrl}/${space}/#event=${encodeURIComponent(departure.eventId)}`;
+}
+const SIM_COLORS={lmu:0xd8322c,iracing:0x2f6fd6};
+const TYPE_LABELS={special:'Événement spécial',lmu:'Championnat',private:'Championnat privé'};
+const simOf=departure=>String(departure.circuit||'').startsWith('iracing-')?'iracing':'lmu';
+// Discord shows <t:…> timestamps in each reader's own time zone.
+const discordTime=(startsAt,style)=>`<t:${Math.floor(startsAt/1000)}:${style}>`;
+function departureTitle(departure){return departure.timePending?`${discordTime(departure.startsAt,'D')} — horaire à confirmer`:discordTime(departure.startsAt,'F');}
+function departureValue(departure,compact=false){
+  const lines=[`🕐 **${departureTitle(departure)}**`];
+  for(const crew of departure.crews){
+    const marker=markers.get(crew.category)||'⬜',status=crew.locked?'🔒':'🔓';
+    lines.push(compact?`${marker} ${clean(crew.name)} · ${crew.pilots.length} pilote${crew.pilots.length>1?'s':''}`
+      :`${marker} **${clean(crew.name)}** · ${clean(crew.category)} ${status}\n${crew.car?`🏎️ ${clean(crew.car)}\n`:''}${crew.pilots.length?crew.pilots.map(name=>`👤 ${clean(name)}`).join(' · '):'Aucun pilote affecté'}`);
+  }
+  if(departure.unassignedPilots?.length)lines.push(`📋 Sans équipage : ${compact?departure.unassignedPilots.length:departure.unassignedPilots.map(clean).join(', ')}`);
+  if(!departure.crews.length&&!departure.unassignedPilots?.length)lines.push('Personne d’inscrit pour l’instant.');
+  return cut(lines.join('\n'),1024);
+}
+// One block per race: its name is the link to the race, the bar has the colour of its simulator.
+function raceEmbed(departures,siteUrl,compact=false,current=false){
+  const first=departures[0],{title,note}=eventTitleAndNote(first.eventName);
+  const circuit=circuitNames.get(first.circuit)||first.circuit||'Circuit à préciser';
+  const duration=first.durationMinutes||first.durationHours?durationLabel(first.durationMinutes||first.durationHours*60):'';
+  const details=[`📍 ${clean(circuit)}`,duration&&`⏱️ ${duration}`,TYPE_LABELS[first.eventType]&&`🏷️ ${TYPE_LABELS[first.eventType]}`].filter(Boolean).join(' · ');
+  const embed={title:cut(`${current?'🔴 En cours — ':'🏁 '}${title}`,256),description:cut(note?`${details}\n${note}`:details,4096),color:current?0xd71920:SIM_COLORS[simOf(first)],
+    fields:departures.slice(0,24).map((departure,index)=>({name:departures.length>1?`Départ ${index+1}`:'Départ',value:departureValue(departure,compact),inline:false}))};
+  const url=raceUrl(siteUrl,first);if(url)embed.url=url;
+  return embed;
+}
+function groupByRace(departures){
+  const groups=new Map();
+  for(const departure of departures){const key=departure.eventId||departure.eventName;if(!groups.has(key))groups.set(key,[]);groups.get(key).push(departure);}
+  return [...groups.values()];
+}
+const embedSize=embed=>JSON.stringify([embed.title,embed.description,embed.author?.name,embed.footer?.text,...(embed.fields||[]).flatMap(field=>[field.name,field.value])]).length;
+function footer(updatedAt){return{text:`Endurance Manager · mise à jour à ${updateTimeLabel.format(updatedAt)}`};}
+
+// The weekly message: a header with the community, one block per race (its name links to the race on the
+// community's site), the community's banner at the bottom. Discord allows 10 blocks and 6000 characters.
+// `site`: {url, name, logoUrl, bannerUrl} of the community (url: address of its site).
+export function buildWeeklyDiscordPayload(snapshot,site={},updatedAt=Date.now(),scope='lmu'){
+  const siteUrl=typeof site==='string'?(()=>{try{return new URL(site).origin;}catch{return '';}})():String(site.url||'');
+  const sim=SCOPE_LABELS[scope]??' LMU',simPage=scope==='iracing'?'/iracing/':scope==='all'?'/':'/lmu/';
+  const current=Array.isArray(snapshot.currentDepartures)?snapshot.currentDepartures:[],future=Array.isArray(snapshot.futureDepartures)?snapshot.futureDepartures:[];
+  const header={title:cut(`📝 ${cap(snapshot.periodLabel||'semaine à venir')}`,256),color:0x52d3d8};
+  if(siteUrl)header.url=`${siteUrl}${simPage}`;
+  if(site.name){header.author={name:cut(site.name,256)};if(siteUrl)header.author.url=`${siteUrl}/`;if(site.logoUrl)header.author.icon_url=site.logoUrl;}
+  if(!current.length&&!future.length){
+    header.description=`Aucune course avec un équipage engagé n’est en cours et aucun prochain départ${sim} n’est programmé.`;
+    header.title=`Aucune endurance${sim} à préparer`;header.color=0x6b7280;header.footer=footer(updatedAt);
+    return{content:'',embeds:[header],allowed_mentions:{parse:[]}};
+  }
+  const build=compact=>{
+    const blocks=[...groupByRace(current).map(group=>raceEmbed(group,siteUrl,compact,true)),...groupByRace(future).map(group=>raceEmbed(group,siteUrl,compact))];
+    // 10 blocks at most: beyond 8 races, the others are listed (linked) in one last block.
+    if(blocks.length>8){
+      const rest=groupByRace([...current,...future]).slice(8);
+      blocks.length=8;
+      blocks.push({title:'Autres courses de la semaine',color:0x52d3d8,description:cut(rest.map(group=>{const url=raceUrl(siteUrl,group[0]),name=clean(eventTitleAndNote(group[0].eventName).title);return `🏁 ${url?`[${name}](${url})`:name} — ${departureTitle(group[0])}`;}).join('\n'),4096)});
+    }
+    return [header,...blocks];
+  };
+  let embeds=build(false);
+  if(embeds.reduce((total,embed)=>total+embedSize(embed),0)>5600)embeds=build(true);
+  const last=embeds[embeds.length-1];
+  if(site.bannerUrl)last.image={url:site.bannerUrl};
+  last.footer=footer(updatedAt);
+  return{content:'',embeds:embeds.slice(0,10),allowed_mentions:{parse:[]}};
 }
 
 export function isWeeklyDiscordMutation(request){

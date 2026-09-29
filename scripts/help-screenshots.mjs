@@ -1,4 +1,5 @@
-// Regenerates the help screenshots (images/help/*.jpg) from a local `wrangler dev` with the seed data.
+// Regenerates the help screenshots (images/help/*.jpg) from a local `wrangler dev` with the showcase data
+// (server/demo.mjs: « 6h de Spa » with crews, drivers without a crew and free starts).
 // Usage: node scripts/help-screenshots.mjs [baseURL]   (default http://localhost:8787)
 // Uses the locally installed Chrome through Playwright: nothing is downloaded.
 import {chromium} from 'playwright';
@@ -62,12 +63,12 @@ async function firstFreeDeparture(page) {
   await shot(page.locator('.site-nav-shell'), 'pilot-navigation');
   await shotTop(page, page.locator('#app'), 'pilot-events', 640);
 
-  await openRace(page, '12h du Mans');
+  await openRace(page, '6h de Spa');
   await shot(page.locator('.race-header'), 'pilot-race');
   const withCrews = page.locator('.departure-accordion > .departure-fold:has(.crew-card-shell)').first();
   if (!(await withCrews.evaluate(el => el.open))) await withCrews.locator(':scope > summary').click();
   await wait(400);
-  // Overview with several crews: the first 12h du Mans start (already started, kept under "Départs passés").
+  // Overview with several crews: a start already begun (under "Départs passés") when there is one, else the open start.
   const pastFold = page.locator('.past-departures-fold');
   if (await pastFold.count()) {
     if (!(await pastFold.evaluate(el => el.open))) await pastFold.locator(':scope > summary').click();
@@ -75,14 +76,17 @@ async function firstFreeDeparture(page) {
     if (!(await pastStart.evaluate(el => el.open))) await pastStart.locator(':scope > summary').click();
     await wait(400);
     await shot(pastStart.locator('.ux-course-crews-block'), 'pilot-crews');
-  }
+  } else await shot(withCrews.locator('.ux-course-crews-block'), 'pilot-crews');
   const tile = withCrews.locator('.crew-card-shell details').first();
   if (await tile.count()) {
     if (!(await tile.evaluate(el => el.open))) await tile.locator(':scope > summary').first().click();
     await wait(400);
     await shot(withCrews.locator('.crew-card-shell').first(), 'pilot-crew-open');
   }
-  await shot(withCrews.locator('.ux-course-pilots-accordion'), 'pilot-unassigned');
+  const pilots = withCrews.locator('.ux-course-pilots-accordion');
+  if (!(await pilots.evaluate(el => el.open))) await pilots.locator(':scope > summary').click();
+  await wait(400);
+  await shot(pilots, 'pilot-unassigned');
 
   await openRace(page, '6h de Spa');
   const free = await firstFreeDeparture(page);
@@ -112,7 +116,7 @@ async function firstFreeDeparture(page) {
 // ---------- Organizer / administrator views ----------
 {
   const page = await pageAs('admin');
-  await openRace(page, '12h du Mans');
+  await openRace(page, '6h de Spa');
   await shot(page.locator('.race-header'), 'org-race-actions');
 
   await page.goto(`${BASE}/lmu/`, {waitUntil:'networkidle'});

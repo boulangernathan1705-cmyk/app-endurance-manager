@@ -94,37 +94,46 @@ test('quand la semaine est terminée le récap affiche tous les départs de la p
   assert.match(snapshot.periodLabel,/14 septembre/);
 });
 
-test('le message regroupe les horaires et garde un habillage Discord minimal',()=>{
+test('le message : un bloc par course, dont le nom mène à la course sur le site de la communauté',()=>{
   const timestamp=Date.parse('2026-09-18T10:00:00Z');
-  const current={eventId:uuid,eventName:'8H Test en cours',circuit:'spa',durationHours:8,departureId:departureUuid,startsAt:Date.parse('2026-09-18T09:00:00Z'),unassignedPilots:[],crews:[{id:crewUuid,name:'Équipe #1',category:'Hypercar',car:'Toyota GR010 Hybrid',locked:true,pilots:['Nathan']}]};
-  const futureEmpty={eventId:futureEventUuid,eventName:'4h SILVERSTONE (horaires non définis par LMU)',circuit:'silverstone',durationHours:4,departureId:futureDepartureUuid,startsAt:Date.parse('2026-09-18T12:00:00Z'),unassignedPilots:[],crews:[]};
-  const futureWithCrew={...futureEmpty,departureId:secondDepartureUuid,startsAt:Date.parse('2026-09-18T16:00:00Z'),crews:[{id:'88888888-8888-4888-8888-888888888888',name:'Mrt blé',category:'LMP2 ELMS',car:'Oreca 07 Gibson ELMS',locked:false,pilots:['Etienne_48']}]};
-  const payload=buildWeeklyDiscordPayload({currentDepartures:[current],futureDepartures:[futureEmpty,futureWithCrew],periodLabel:'semaine du 14 septembre au 20 septembre 2026'},'https://endurance-manager.app/lmu/',timestamp);
-
+  const current={eventId:uuid,eventName:'8H Test en cours',eventType:'lmu',circuit:'spa',durationHours:8,departureId:departureUuid,startsAt:Date.parse('2026-09-18T09:00:00Z'),unassignedPilots:[],crews:[{id:crewUuid,name:'Équipe #1',category:'Hypercar',car:'Toyota GR010 Hybrid',locked:true,pilots:['Nathan']}]};
+  const futureEmpty={eventId:futureEventUuid,eventName:'4h SILVERSTONE (horaires non définis par LMU)',eventType:'special',circuit:'silverstone',durationHours:4,departureId:futureDepartureUuid,startsAt:Date.parse('2026-09-18T12:00:00Z'),unassignedPilots:[],crews:[]};
+  const futureWithCrew={...futureEmpty,departureId:secondDepartureUuid,startsAt:Date.parse('2026-09-18T16:00:00Z'),unassignedPilots:['Léo'],crews:[{id:'88888888-8888-4888-8888-888888888888',name:'Mrt blé',category:'LMP2 ELMS',car:'Oreca 07 Gibson ELMS',locked:false,pilots:['Etienne_48']}]};
+  const iracing={eventId:'99999999-9999-4999-8999-999999999999',eventName:'IMSA Endurance',eventType:'lmu',circuit:'iracing-spa',durationHours:6,departureId:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',startsAt:Date.parse('2026-09-19T12:00:00Z'),unassignedPilots:[],crews:[]};
+  const site={url:'https://team-rookie.endurance-manager.app',name:'Team Rookie',logoUrl:'https://cdn.discordapp.com/icons/1/abc.png',bannerUrl:'https://team-rookie.endurance-manager.app/images/endurance-manager-banner.webp'};
+  const payload=buildWeeklyDiscordPayload({currentDepartures:[current],futureDepartures:[futureEmpty,futureWithCrew,iracing],periodLabel:'semaine du 14 septembre au 20 septembre 2026'},site,timestamp,'all');
   assert.deepEqual(payload.allowed_mentions,{parse:[]});
-  assert.equal(payload.content,'');
-  assert.equal(payload.embeds.length,2);
-  assert.match(payload.embeds[0].title,/Course en cours/);
-  assert.match(payload.embeds[0].fields[0].value,/👤 Nathan/);
-  assert.equal(payload.embeds[0].footer,undefined);
-  assert.match(payload.embeds[1].title,/^📝 Semaine du 14 septembre au 20 septembre 2026$/);
-  assert.doesNotMatch(payload.embeds[1].title,/Départs disponibles/i);
-  assert.equal(payload.embeds[1].description,undefined);
-  assert.equal(payload.embeds[1].fields.length,1);
-  assert.match(payload.embeds[1].fields[0].name,/🏁 4h SILVERSTONE/);
-  assert.doesNotMatch(payload.embeds[1].fields[0].name,/horaires non définis/i);
-  assert.match(payload.embeds[1].fields[0].value,/Horaires non définis par LMU/);
-  assert.match(payload.embeds[1].fields[0].value,/vendredi 18 septembre — 14:00/i);
-  assert.match(payload.embeds[1].fields[0].value,/vendredi 18 septembre — 18:00/i);
-  assert.match(payload.embeds[1].fields[0].value,/\n\n🕐/);
-  assert.match(payload.embeds[1].fields[0].value,/Mrt blé/);
-  assert.match(payload.embeds[1].fields[0].value,/👤 Etienne\\_48/);
-  assert.equal((JSON.stringify(payload.embeds[1]).match(/4h SILVERSTONE/g)||[]).length,1);
-  assert.equal(payload.embeds[1].footer.text,'mise à jour à 12:00');
-  assert.equal(payload.embeds[1].timestamp,undefined);
-  const serialized=JSON.stringify(payload);
-  assert.doesNotMatch(serialized,/Endurance Manager — LMU/);
-  assert.doesNotMatch(serialized,/Tous les horaires encore disponibles/);
+  const [header,running,silverstone,imsa]=payload.embeds;
+  assert.equal(payload.embeds.length,4,'a header, then one block per race');
+  assert.match(header.title,/^📝 Semaine du 14 septembre au 20 septembre 2026$/);
+  assert.equal(header.author.name,'Team Rookie');assert.equal(header.author.icon_url,site.logoUrl);
+  assert.match(running.title,/En cours — 8H Test en cours/);
+  // Each race name links to the race itself, on the community's site, in its simulator's space.
+  assert.equal(running.url,`${site.url}/lmu/#event=${uuid}`);
+  assert.equal(silverstone.url,`${site.url}/lmu/#event=${futureEventUuid}`);
+  assert.equal(imsa.url,`${site.url}/iracing/#event=99999999-9999-4999-8999-999999999999`);
+  assert.notEqual(silverstone.color,imsa.color,'the bar has the colour of the simulator');
+  assert.equal((JSON.stringify(payload).match(/4h SILVERSTONE/g)||[]).length,1,'one block for the race and its two starts');
+  assert.equal(silverstone.fields.length,2);
+  assert.match(silverstone.description,/Horaires non définis par LMU/);
+  // Times in each reader's own time zone.
+  assert.match(silverstone.fields[1].value,/<t:1789747200:F>/);
+  assert.match(silverstone.fields[1].value,/Mrt blé/);assert.match(silverstone.fields[1].value,/👤 Etienne\\_48/);
+  assert.match(silverstone.fields[1].value,/Sans équipage : Léo/);
+  const last=payload.embeds.at(-1);
+  assert.equal(last.image.url,site.bannerUrl);assert.match(last.footer.text,/mise à jour à 12:00/);
+  // Every link of the message goes to the community's own site.
+  for(const url of JSON.stringify(payload).match(/https?:\/\/[^"\s)]+/g).filter(url=>!url.startsWith('https://cdn.discordapp.com/')))
+    assert.ok(url.startsWith(site.url+'/'),url);
+});
+
+test('beaucoup de courses : 10 blocs au plus, les autres listées avec leur lien',()=>{
+  const races=Array.from({length:12},(_,i)=>({eventId:`00000000-0000-4000-8000-${String(i).padStart(12,'0')}`,eventName:`Course ${i+1}`,circuit:'spa',durationHours:4,departureId:`10000000-0000-4000-8000-${String(i).padStart(12,'0')}`,startsAt:Date.parse('2026-09-19T12:00:00Z')+i*3600000,unassignedPilots:[],crews:[]}));
+  const payload=buildWeeklyDiscordPayload({currentDepartures:[],futureDepartures:races,periodLabel:'semaine'},{url:'https://a.endurance-manager.app'},Date.now());
+  assert.ok(payload.embeds.length<=10);
+  const rest=payload.embeds.at(-1);
+  assert.equal(rest.title,'Autres courses de la semaine');
+  assert.match(rest.description,/\[Course 12\]\(https:\/\/a\.endurance-manager\.app\/lmu\/#event=00000000-0000-4000-8000-000000000011\)/);
 });
 
 test('les mutations qui changent le résumé déclenchent une synchronisation',()=>{
@@ -149,7 +158,8 @@ test('une course « Horaires à confirmer » n’est jamais annoncée en cours e
   const pending={...event(uuid,'6h FUJI','fuji',6,[{id:departureUuid,startsAt:Date.parse('2026-10-03T22:00:00Z')},{id:secondDepartureUuid,startsAt:Date.parse('2026-10-04T22:00:00Z')}]),schedule_pending:1};
   const snapshot=await loadWeeklyDiscordSnapshot({DB:dbFixture({events:[pending],registrations:[registration()],crews:[crewRow()]})},now,COMMUNITY);
   assert.equal(snapshot.currentDepartures.length,0,'placeholder 0:00 start is not "en cours"');
-  const payload=JSON.stringify(buildWeeklyDiscordPayload(snapshot,'https://endurance-manager.app',now));
-  assert.doesNotMatch(payload,/00:00/);
-  assert.match(payload,/lundi 5 octobre — horaire à confirmer/);
+  const payload=JSON.stringify(buildWeeklyDiscordPayload(snapshot,{url:'https://endurance-manager.app'},now));
+  // Only the day is shown (in the reader's time zone), never the placeholder time.
+  assert.match(payload,/<t:\d+:D> — horaire à confirmer/);
+  assert.doesNotMatch(payload,/<t:\d+:F>/);
 });

@@ -1321,6 +1321,40 @@ body:has(.community-gate.welcome.is-visitor) .site-nav-shell { display: none !im
 @media (max-width: 900px) { .welcome-features { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 560px) { .community-gate.welcome { margin-top: 16px; } .welcome-features { grid-template-columns: minmax(0, 1fr); } .welcome-discord { width: 100%; justify-content: center; } }
 
+/* Presence timeline: a thin white separator between the hours inside the bar; a small tick rises only towards
+   the hours written above it (the labels shown depend on the width, timeline.css). */
+.presence-track > .presence-segment + .presence-segment { box-shadow: inset 2px 0 0 rgba(255, 255, 255, .35) !important; }
+.presence-boundary::after { display: none !important; }
+.presence-boundary:has(> .presence-time.ticks-4)::after { display: block !important; }
+@container presence (min-width: 400px) {
+  .presence-boundary:has(> .presence-time[class])::after { display: none !important; }
+  .presence-boundary:has(> .presence-time.ticks-6)::after { display: block !important; }
+}
+@container presence (min-width: 640px) {
+  .presence-boundary:has(> .presence-time[class])::after { display: none !important; }
+  .presence-boundary:has(> .presence-time.ticks-10)::after { display: block !important; }
+}
+@container presence (min-width: 1000px) {
+  .presence-boundary:has(> .presence-time[class])::after { display: none !important; }
+  .presence-boundary:has(> .presence-time.ticks-16)::after { display: block !important; }
+}
+@container presence (min-width: 1500px) {
+  .presence-boundary:has(> .presence-time[class])::after { display: none !important; }
+  .presence-boundary:has(> .presence-time.ticks-24)::after { display: block !important; }
+}
+
+/* Pilots without a crew: cards in the style of the crew cards (frame, top stripe, category logo, name, car). */
+html[data-game] #app .ux-unassigned-grid > .pilot-row { display: flex !important; flex-direction: column !important; gap: 8px !important; padding: 12px 14px !important; border: 1px solid #2b3538 !important; border-top: 3px solid var(--community-accent, #52d3d8) !important; border-radius: 10px !important; background: #101617 !important; }
+html[data-game] #app .ux-unassigned-grid > .pilot-row.ux-current-pilot { outline: 2px solid rgba(255, 255, 255, .55); outline-offset: 2px; }
+html[data-game] #app .ux-unassigned-grid > .pilot-row > .pilot-main { display: grid !important; grid-template-columns: 34px minmax(0, 1fr); align-items: center; gap: 2px 10px !important; }
+html[data-game] #app .ux-unassigned-grid .pilot-main > .pilot-category-logo { grid-column: 1; grid-row: 1 / span 2; }
+html[data-game] #app .ux-unassigned-grid .pilot-main > .pilot-category-logo .category-logo { width: 34px; height: auto; }
+html[data-game] #app .ux-unassigned-grid .pilot-main > :not(.pilot-category-logo) { grid-column: 2; justify-self: start; min-width: 0; }
+html[data-game] #app .ux-unassigned-grid .pilot-main > .pilot-name { font-size: 16px !important; font-weight: 800 !important; color: #f4f6f5 !important; }
+html[data-game] #app .ux-unassigned-grid .pilot-main > .pilot-car { color: var(--muted, #92979c) !important; font-size: 13px !important; font-weight: 400 !important; }
+html[data-game] #app .ux-unassigned-grid .pilot-main > .pilot-preference { font-size: 12.5px; color: #c7d0d4; }
+html[data-game] #app .ux-unassigned-grid > .pilot-row > .edit-button { align-self: flex-end; }
+
 /* Members page: tabs, member cards, settings cards. */
 .members-tabs { display: flex; gap: 6px; margin-bottom: 14px; }
 .members-tabs button { min-height: 42px; padding: 0 18px; border: 1px solid var(--border, #292d31); border-radius: 10px; background: var(--panel, #111315); color: #c7d0d4; font: inherit; font-weight: 800; cursor: pointer; }
@@ -1388,6 +1422,12 @@ body:has(.community-gate.welcome.is-visitor) .site-nav-shell { display: none !im
   .settings-appearance { grid-template-columns: minmax(0, 1fr); }
   .settings-card { padding: 14px; }
 }
+
+.settings-banner { display: grid; gap: 10px; margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--border, #292d31); }
+.settings-banner > strong { color: #c7d0d4; font-size: 13px; }
+.settings-banner-preview { width: 100%; aspect-ratio: 4 / 1; object-fit: cover; border: 1px solid var(--border, #292d31); border-radius: 10px; }
+.settings-banner-pick { cursor: pointer; }
+.settings-banner .members-help { margin: 0; }
 
 /* « Mise en place » (members page): the setup steps of a community, and the platform tab of the managers. */
 .setup { max-width: 920px; }

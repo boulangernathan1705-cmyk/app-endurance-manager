@@ -150,9 +150,12 @@ test('l’aide décrit les droits pilote organisateur et administrateur actuels'
   const help=read('help.js');
   assert.match(help,/créer ton équipage, rejoindre ou quitter un équipage de ta catégorie/);
   assert.match(help,/gérer l’équipage dont tu es responsable/);
-  assert.match(help,/créer et modifier les courses/);
+  // Organizer rights come from the permissions of the Discord roles (server/access.mjs).
+  assert.match(help,/avec <strong>Créer des courses<\/strong> : créer des courses, modifier et supprimer les tiennes/);
   assert.match(help,/créer, composer et fermer tous les équipages/);
-  assert.match(help,/Tu ne peux pas[\s\S]*supprimer définitivement une course/);
+  assert.match(help,/Tu ne peux pas[\s\S]*donner des rôles : ils se donnent sur le serveur Discord/);
+  // No more entries without an account.
+  assert.doesNotMatch(help,/lien personnel|sans compte/);
   // The help follows the current screens: step windows, date format, automatic updates.
   assert.match(help,/4 étapes/);
   assert.match(help,/Mise à jour automatique/);

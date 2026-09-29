@@ -138,3 +138,52 @@ test('the site\'s own recap channel is only for the community of the main addres
   await as(OWNER,'/api/community/modules','PATCH',{discordWeekly:true,iracingImport:false});
   assert.equal(JSON.parse(DB.db.prepare('SELECT modules FROM communities WHERE id=?').get(DEV_COMMUNITY).modules).iracingImport,false);
 });
+
+test('community banner: sent by its admins (checked image, 600 KB at most), public, the site\'s banner without one', async t => {
+  fakeDiscord(t);
+  const {env,as}=setup();
+  await as(OWNER,'/api/community/setup');await as(PILOT,'/api/community/setup');
+  const send=async (userId,bytes,type='image/webp')=>{
+    const raw=userId.slice(0,1).repeat(64);
+    return worker.fetch(new Request(ROOT+'/api/community/banner',{method:'PUT',headers:{Cookie:`__Host-em_session=${raw}`,'CF-Connecting-IP':userId,Origin:ROOT,'Content-Type':type},body:bytes}),env);
+  };
+  const webp=new Uint8Array([...new TextEncoder().encode('RIFF'),0,0,0,0,...new TextEncoder().encode('WEBPVP8 '),...new Array(200).fill(7)]);
+  assert.equal((await send(PILOT,webp)).status,403,'admins only');
+  assert.equal((await send(OWNER,new TextEncoder().encode('<svg onload=alert(1)>'),'image/webp')).status,400,'the bytes decide, not the declared type');
+  assert.equal((await send(OWNER,new Uint8Array(600001))).status,413);
+  const saved=await send(OWNER,webp);
+  assert.equal(saved.status,200);
+  const {bannerUrl}=await saved.json();
+  assert.match(bannerUrl,/^\/api\/community\/banner\?v=\d+$/);
+  const image=await worker.fetch(new Request(ROOT+bannerUrl),env);
+  assert.equal(image.status,200,'public: shown on the welcome screen too');
+  assert.equal(image.headers.get('Content-Type'),'image/webp');
+  assert.deepEqual(new Uint8Array(await image.arrayBuffer()),webp);
+  assert.equal((await as(OWNER,'/api/session')).data.community.appearance.bannerUrl,bannerUrl);
+  assert.equal((await as(OWNER,'/api/community/banner','DELETE',{})).status,200);
+  assert.equal((await as(OWNER,'/api/session')).data.community.appearance.bannerUrl,null,'the site\'s banner again');
+});
+
+test('each community\'s recap only has its own races, and every link goes to its own site', async t => {
+  const posts=fakeDiscord(t);
+  const {DB,env}=setup();
+  const platform={...env,APP_ORIGIN:'https://endurance-manager.app',BASE_DOMAIN:'endurance-manager.app'};
+  DB.db.prepare(`INSERT INTO communities(id,slug,name,short_name,created_at) VALUES('c-autre','autre','Autre commu','AUT',0)`).run();
+  const race=(id,name,community)=>DB.db.prepare(`INSERT INTO events(id,name,duration_hours,circuit,categories,departures,created_by,created_at,community_id)
+    VALUES(?,?,4,'spa','["GT3"]',?,?,0,?)`).run(id,name,JSON.stringify([{id:id.replace(/^1/,'2'),startsAt:future}]),OWNER,community);
+  race('10000000-0000-4000-8000-00000000000a','Course du site principal',DEV_COMMUNITY);
+  race('10000000-0000-4000-8000-00000000000b','Course de la commu Autre','c-autre');
+  const recap=DB.db.prepare("INSERT INTO community_recaps(community_id,scope,webhook_url,updated_at) VALUES(?,'all',?,0)");
+  recap.run(DEV_COMMUNITY,HOOK_LMU);recap.run('c-autre',HOOK_IR);
+  await syncWeeklyDiscord(platform);
+  const sites={[HOOK_LMU]:['https://endurance-manager.app/','Course du site principal','Course de la commu Autre'],[HOOK_IR]:['https://autre.endurance-manager.app/','Course de la commu Autre','Course du site principal']};
+  for(const [hook,[site,own,other]] of Object.entries(sites)){
+    const post=posts.find(item=>item.url===hook);
+    assert.ok(post,hook);
+    const text=JSON.stringify(post.body);
+    assert.match(text,new RegExp(own));assert.doesNotMatch(text,new RegExp(other),'never the races of another community');
+    const links=text.match(/https?:\/\/[^"\s)\\]+/g).filter(url=>!url.startsWith('https://cdn.discordapp.com/'));
+    assert.ok(links.length>=3);
+    for(const url of links)assert.ok(url.startsWith(site),`${url} is on ${site}`);
+  }
+});

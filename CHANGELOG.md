@@ -2,6 +2,26 @@
 
 Les changements du site, version par version. La plus récente est en haut.
 
+## v1.5 — 29 septembre 2026
+
+### Communautés
+- **Bannière personnalisée** : dans Administration → Réglages → Apparence, les admins envoient leur propre bannière (recadrée et allégée automatiquement). Sans bannière, c'est celle du site.
+- La page « Gestion des membres » s'appelle maintenant **Administration**.
+
+### Courses
+- Dans un départ sans équipage, les **pilotes inscrits** s'affichent directement, sur des cartes dans le style des équipages.
+- La **frise de présence** marque chaque heure d'un trait dans la barre.
+
+### Vitrine
+- Les courses de démonstration affichent bien leurs horaires.
+
+### Récap de la semaine sur Discord
+- **Un bloc par course** : son nom mène directement à la course sur le site de ta communauté, avec la couleur du simulateur, le circuit, la durée, les équipages et les pilotes sans équipage.
+- Les **horaires s'affichent dans le fuseau horaire** de chaque lecteur, et le message porte le nom, le logo et la bannière de la communauté.
+
+### Aide et informations
+- **Aide**, **Confidentialité**, **Informations légales** et **À propos** mises à jour : communautés, accès par le serveur Discord, droits donnés par les rôles Discord, bot, récap de la semaine, bannière, vitrine.
+
 ## v1.4.1 — 29 septembre 2026
 
 ### Corrections

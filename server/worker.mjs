@@ -53,6 +53,24 @@ async function myCommunities(env, actor, community) {
     url:`${communityUrl(env, item)}/`, current:item.slug === community.slug}));
   return mine.length > 1 ? mine : [];
 }
+// Body of an image upload (the banner), read up to `limit` bytes.
+async function imageBody(request, limit) {
+  const reader = request.body?.getReader();
+  if (!reader) fail(400, 'Image manquante.');
+  let size = 0; const chunks = [];
+  while (true) { const {value, done} = await reader.read(); if (done) break; size += value.length; if (size > limit) { await reader.cancel(); fail(413, 'Image trop lourde (600 Ko au plus).'); } chunks.push(value); }
+  const all = new Uint8Array(size); let offset = 0;
+  for (const chunk of chunks) { all.set(chunk, offset); offset += chunk.length; }
+  return all;
+}
+// Type of an image from its first bytes (never from what the browser says).
+function imageType(bytes) {
+  const text = (start, end) => String.fromCharCode(...bytes.slice(start, end));
+  if (text(0, 4) === 'RIFF' && text(8, 12) === 'WEBP') return 'image/webp';
+  if (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return 'image/jpeg';
+  if (text(1, 4) === 'PNG' && bytes[0] === 0x89) return 'image/png';
+  return null;
+}
 // Recap messages (community_recaps): one simulator or both.
 const RECAP_SCOPES = ['all', 'lmu', 'iracing'];
 const RECAP_NAMES = {all:'LMU et iRacing', lmu:'LMU', iracing:'iRacing'};
@@ -256,6 +274,12 @@ async function api(request, env) {
     const names = cookieNames(env), raw = cookie(request, names.session);
     if (raw) await env.DB.prepare('DELETE FROM sessions WHERE token_hash=?').bind(await hash(raw)).run();
     return json({ok:true}, 200, [setCookie(names.session, '', 0, names.domain), `em_discord_avatar=; Path=/;${names.domain ? ` Domain=${names.domain};` : ''} Secure; SameSite=Lax; Max-Age=0`]);
+  }
+  // Banner of the community: public (shown on the welcome screen too), cached for good (its address changes with it).
+  if (path === '/api/community/banner' && method === 'GET') {
+    const row = await env.DB.prepare('SELECT image, content_type FROM community_banners WHERE community_id=?').bind(community.id).first();
+    if (!row) fail(404, 'Aucune bannière.');
+    return new Response(new Uint8Array(row.image), {headers:{'Content-Type':row.content_type, 'Cache-Control':'public, max-age=31536000, immutable', 'X-Content-Type-Options':'nosniff'}});
   }
   // Entries without an account are gone: a community is only open to the members of its Discord server.
   if (path === '/api/guest/recover' || path === '/api/guest/link') fail(410, 'Les inscriptions sans compte Discord ne sont plus possibles.');
@@ -546,6 +570,26 @@ async function api(request, env) {
     }
     return json({community:{name:community.name, shortName:community.shortName, discordServer:discord?.name || null, ...appearanceOf(community)}, roles, permissions:PERMISSIONS,
       modules:{iracingImport:community.modules.iracingImport === true, discordWeekly:community.modules.discordWeekly === true, soloRaces:community.modules.soloRaces === true}});
+  }
+  // Banner sent by the admins: the image itself (already resized by the browser), WebP, JPEG or PNG, 600 KB at most.
+  if (path === '/api/community/banner' && ['PUT','DELETE'].includes(method)) {
+    requirePermission(actor,'admin');
+    const appearance = {...community.appearance};
+    if (method === 'DELETE') {
+      delete appearance.bannerVersion;
+      await env.DB.batch([env.DB.prepare('DELETE FROM community_banners WHERE community_id=?').bind(community.id),
+        env.DB.prepare('UPDATE communities SET appearance=? WHERE id=?').bind(JSON.stringify(appearance), community.id)]);
+      return json({ok:true});
+    }
+    const image = await imageBody(request, 600000);
+    const type = imageType(image);
+    if (!type) fail(400, 'Envoie une image WebP, JPEG ou PNG.');
+    appearance.bannerVersion = now();
+    await env.DB.batch([
+      env.DB.prepare(`INSERT INTO community_banners(community_id,image,content_type,updated_at) VALUES(?,?,?,?)
+        ON CONFLICT(community_id) DO UPDATE SET image=excluded.image,content_type=excluded.content_type,updated_at=excluded.updated_at`).bind(community.id, image, type, now()),
+      env.DB.prepare('UPDATE communities SET appearance=? WHERE id=?').bind(JSON.stringify(appearance), community.id)]);
+    return json({ok:true, bannerUrl:`/api/community/banner?v=${appearance.bannerVersion}`});
   }
   if (path === '/api/community/appearance' && method === 'PATCH') {
     requirePermission(actor,'admin');

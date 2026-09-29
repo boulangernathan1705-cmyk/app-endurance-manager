@@ -66,8 +66,13 @@ async function settingsMarkup() {
     <label>Nom court <small>(onglet du navigateur)</small><input name="shortName" maxlength="12" required value="${esc(look.shortName)}"></label>
     <div class="settings-accent"><label>Couleur d’accent<input name="accent" type="color" value="${esc(look.accent || '#52d3d8')}"></label>
       <label class="role-pill"><input type="checkbox" name="defaultAccent" ${look.accent ? '' : 'checked'}><span>Couleur du site</span></label></div>
-    <p class="members-help">Le logo et la bannière sont ceux du serveur Discord${look.discordServer ? ` « ${esc(look.discordServer)} »` : ''} : change-les sur Discord.${look.logoUrl ? '' : ' Le serveur n’a pas d’icône : le logo du site est utilisé.'}${look.bannerUrl ? '' : ' Sans bannière de serveur, la bannière du site est utilisée.'}</p>
-    <div class="settings-actions"><button class="primary-button" type="submit">Enregistrer</button><span class="settings-status" aria-live="polite"></span></div></form></section>`;
+    <p class="members-help">Le logo est l’icône du serveur Discord${look.discordServer ? ` « ${esc(look.discordServer)} »` : ''} : change-la sur Discord.${look.logoUrl ? '' : ' Le serveur n’a pas d’icône : le logo du site est utilisé.'}</p>
+    <div class="settings-actions"><button class="primary-button" type="submit">Enregistrer</button><span class="settings-status" aria-live="polite"></span></div></form>
+    <div class="settings-banner"><strong>Bannière</strong>
+      <img class="settings-banner-preview" src="${esc(look.bannerUrl || '/images/endurance-manager-banner.webp')}" alt="Bannière actuelle">
+      <div class="settings-actions"><label class="secondary-button settings-banner-pick">Choisir une image<input type="file" accept="image/png,image/jpeg,image/webp" data-banner-file hidden></label>
+        ${look.bannerUrl ? '<button type="button" class="secondary-button" data-banner-remove>Remettre la bannière du site</button>' : ''}<span class="settings-status" aria-live="polite"></span></div>
+      <p class="members-help">${look.bannerUrl ? 'Ta bannière est affichée en haut de toutes les pages.' : 'C’est la bannière du site. Choisis une image pour afficher la tienne.'} Format conseillé : 2048 × 512 (4 fois plus large que haute). L’image est recadrée au centre et allégée automatiquement.</p></div></section>`;
   return `${appearance}
     <section class="settings-card"><h2>Modules</h2>${module('iracingImport','Endurances iRacing officielles','Import automatique des séries en équipe et des événements spéciaux.')}${module('soloRaces','Courses solo','Onglet « Courses solo », places limitées, liste d’attente, courses OPEN / SAFE.')}</section>
     <section class="settings-card settings-roles-card"><h2>Autorisations des rôles Discord</h2><p class="members-help">Un membre cumule les autorisations de tous ses rôles. « @everyone » s’applique à tous les membres du serveur. Le propriétaire du serveur et les rôles « Administrateur » de Discord ont tout.</p>${legend}${roles}</section>`;
@@ -166,7 +171,7 @@ async function platformMarkup() {
     <span class="${item.botPresent ? 'platform-ok' : 'platform-ko'}">${item.botPresent ? '✓ Bot présent' : item.botInviteUrl ? `<a href="${esc(item.botInviteUrl)}" target="_blank" rel="noopener">Bot absent : lien d’invitation</a>` : 'Bot absent'}</span></article>`).join('');
   return `<section class="settings-card"><h2>Communautés (${communities.length})</h2><div class="platform-list">${rows}</div></section>
     <section class="settings-card"><h2>Nouvelle communauté</h2>
-      <p class="members-help">Les administrateurs du serveur Discord deviennent automatiquement administrateurs de la communauté. Ils terminent ensuite l’installation dans « Gestion des membres → Mise en place ».</p>
+      <p class="members-help">Les administrateurs du serveur Discord deviennent automatiquement administrateurs de la communauté. Ils terminent ensuite l’installation dans « Administration → Mise en place ».</p>
       <form class="settings-appearance" data-new-community>
         <label>Nom de la communauté<input name="name" maxlength="80" required placeholder="Ex. : Team Rookie Racing"></label>
         <label>Nom court <small>(onglet du navigateur)</small><input name="shortName" maxlength="12" required placeholder="Ex. : TRR"></label>
@@ -210,6 +215,19 @@ async function load() {
   }
 }
 
+// Banner: cropped to 2048 × 512 in the browser (centre) and compressed, WebP (JPEG where WebP is not available).
+async function bannerImage(file) {
+  const bitmap = await createImageBitmap(file);
+  const canvas = Object.assign(document.createElement('canvas'), {width:2048, height:512});
+  const scale = Math.max(canvas.width / bitmap.width, canvas.height / bitmap.height), w = bitmap.width * scale, h = bitmap.height * scale;
+  canvas.getContext('2d').drawImage(bitmap, (canvas.width - w) / 2, (canvas.height - h) / 2, w, h);
+  for (const quality of [.85, .75, .62, .5]) {
+    let blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/webp', quality));
+    if (blob?.type !== 'image/webp') blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', quality));
+    if (blob && blob.size <= 600000) return blob;
+  }
+  throw new Error('Cette image reste trop lourde : essaie une image plus simple.');
+}
 // Simulators of a single recap message: both (all), LMU or iRacing ('' when none is ticked).
 const oneScopeOf = form => form.elements.simLmu.checked && form.elements.simIracing.checked ? 'all' : form.elements.simLmu.checked ? 'lmu' : form.elements.simIracing.checked ? 'iracing' : '';
 // Reloads the page content and comes back to the same tab.
@@ -224,6 +242,11 @@ app.addEventListener('click', async event => {
     const field = document.getElementById(copy.dataset.copy);
     try { await navigator.clipboard.writeText(field.value); copy.textContent = '✓ Copié'; } catch { field.select(); }
     setTimeout(() => { copy.textContent = 'Copier'; }, 2000);
+    return;
+  }
+  if (event.target.closest('[data-banner-remove]')) {
+    if (!confirm('Remettre la bannière du site ?')) return;
+    try { await api('/api/community/banner', 'DELETE', {}); await reload('settings'); } catch (error) { alert(error.message); }
     return;
   }
   const testButton = event.target.closest('[data-recap-test]');
@@ -285,7 +308,7 @@ app.addEventListener('submit', async event => {
         const input = Object.fromEntries(['name','shortName','slug','guildId'].map(key => [key, form.elements[key].value.trim()]));
         const result = await api('/api/platform/communities', 'POST', input);
         await reload('platform');
-        const message = `Ta communauté est prête sur Endurance Manager : ${result.url}/\n\n1. Invite le bot sur ton serveur Discord : ${result.botInviteUrl || '(lien indisponible)'}\n2. Connecte-toi sur ${result.url}/ avec Discord, puis ouvre « Gestion des membres » → « Mise en place » et suis les étapes.`;
+        const message = `Ta communauté est prête sur Endurance Manager : ${result.url}/\n\n1. Invite le bot sur ton serveur Discord : ${result.botInviteUrl || '(lien indisponible)'}\n2. Connecte-toi sur ${result.url}/ avec Discord, puis ouvre « Administration » → « Mise en place » et suis les étapes.`;
         const box = app.querySelector('[data-created]');
         if (box) box.innerHTML = `<div class="setup-created"><strong>✓ ${esc(input.name)} est créée.</strong><p>Envoie ce message à un administrateur du serveur Discord :</p>
           <textarea id="platform-created" rows="5" readonly>${esc(message)}</textarea><div class="setup-actions">${copyButton('platform-created')}</div></div>`;
@@ -307,6 +330,20 @@ app.addEventListener('submit', async event => {
 app.addEventListener('change', async event => {
   const box = event.target;
   // Recap: the fields of the chosen kind of recap.
+  if (box.matches('[data-banner-file]') && box.files?.[0]) {
+    const status = box.closest('.settings-banner').querySelector('.settings-status');
+    status.textContent = 'Préparation de l’image…';
+    try {
+      const image = await bannerImage(box.files[0]);
+      status.textContent = 'Envoi…';
+      const response = await fetch('/api/community/banner', {method:'PUT', credentials:'same-origin', headers:{'Content-Type':image.type}, body:image});
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error || 'L’envoi a échoué.');
+      for (const img of document.querySelectorAll('.hero-banner, .settings-banner-preview')) { img.removeAttribute('srcset'); img.src = result.bannerUrl; }
+      await reload('settings');
+    } catch (error) { status.textContent = error.message; }
+    return;
+  }
   const recapForm = box.closest('form[data-recaps]');
   if (recapForm) { recapForm.dataset.mode = recapForm.elements.enabled.checked ? recapForm.elements.layout.value : 'none'; return; }
   if (box.dataset.module) {

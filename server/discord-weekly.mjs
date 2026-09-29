@@ -1,4 +1,4 @@
-import {allCommunities, communityUrl, communitySlug} from './community.mjs';
+import {allCommunities, communityUrl, communitySlug, appearanceOf} from './community.mjs';
 import {buildWeeklyDiscordPayload, isInParisWeek, parisWeek} from './discord-weekly-format.mjs';
 
 // The recap messages of a community (community_recaps, set on its « Mise en place » page): one message per
@@ -8,7 +8,6 @@ const stateKey = (community, scope = 'lmu') => `${community.id}:${scope}-weekly-
 const LOCK_SECONDS = 90;
 export const WEBHOOK_URL = /^https:\/\/(?:(?:ptb|canary)\.)?discord(?:app)?\.com\/api\/webhooks\/\d{15,22}\/[\w-]{20,120}$/;
 const CIRCUITS = {all:'', lmu:"AND circuit NOT LIKE 'iracing-%'", iracing:"AND circuit LIKE 'iracing-%'"};
-const PAGES = {all:'/', lmu:'/lmu/', iracing:'/iracing/'};
 
 // The former recap (LMU races, through the site's webhook DISCORD_WEEKLY_WEBHOOK_URL) only belongs to the
 // community of the main address: no other community can ever post into that channel.
@@ -26,8 +25,12 @@ function parseJson(value, fallback) {
   try { return JSON.parse(value); } catch { return fallback; }
 }
 
-function appUrl(env, community, scope) {
-  try { return `${communityUrl(env, community)}${PAGES[scope] || '/'}`; } catch { return undefined; }
+// The community in the message: its site (every link goes there), name, Discord icon and banner.
+function siteOf(env, community) {
+  let url = '';
+  try { url = communityUrl(env, community); } catch { return {name:community.name}; }
+  const look = appearanceOf(community);
+  return {url, name:community.name, logoUrl:look.logoUrl || undefined, bannerUrl:`${url}${look.bannerUrl || '/images/endurance-manager-banner.webp'}`};
 }
 
 async function hashSnapshot(snapshot) {
@@ -47,6 +50,7 @@ function flattenDepartures(events) {
       departures.push({
         eventId: event.id,
         eventName: event.name,
+        eventType: event.event_type || '',
         circuit: event.circuit || '',
         durationHours,
         durationMinutes,
@@ -83,7 +87,7 @@ function selectPlanningWeek(allDepartures, timestamp) {
 }
 
 export async function loadWeeklyDiscordSnapshot(env, timestamp, community, scope = 'lmu') {
-  const events = (await env.DB.prepare(`SELECT id,name,circuit,duration_hours,duration_minutes,schedule_pending,departures
+  const events = (await env.DB.prepare(`SELECT id,name,circuit,duration_hours,duration_minutes,event_type,schedule_pending,departures
     FROM events WHERE community_id=? ${CIRCUITS[scope] ?? CIRCUITS.lmu} ORDER BY created_at,id`).bind(community.id).all()).results || [];
   const allDepartures = flattenDepartures(events);
   const currentWeek = parisWeek(timestamp);
@@ -211,7 +215,7 @@ async function syncLocked(env,base,lockToken,timestamp,community,scope) {
   const state = await env.DB.prepare('SELECT message_id,content_hash FROM discord_weekly_state WHERE key=? AND lock_token=?').bind(STATE_KEY,lockToken).first();
   if (!state) throw new Error('État Discord hebdomadaire indisponible.');
   if (state.message_id && state.content_hash === contentHash) return {ok:true,changed:false};
-  const payload = buildWeeklyDiscordPayload(snapshot,appUrl(env,community,scope),timestamp,scope);
+  const payload = buildWeeklyDiscordPayload(snapshot,siteOf(env,community),timestamp,scope);
   const messageId = state.message_id ? await editMessage(base,state.message_id,payload) : await createMessage(base,payload);
   await env.DB.prepare('UPDATE discord_weekly_state SET message_id=?,content_hash=?,week_key=?,updated_at=? WHERE key=? AND lock_token=?')
     .bind(messageId,contentHash,snapshot.periodKey,Math.floor(Date.now()/1000),STATE_KEY,lockToken).run();
