@@ -2,6 +2,11 @@
 
 Les changements du site, version par version. La plus récente est en haut.
 
+## v1.2.2 — 29 septembre 2026
+
+### Accueil
+- L'écran d'accueil avant connexion est plus épuré : sans barre de navigation, il met en avant la **création d'équipage** et le bouton Discord.
+
 ## v1.2.1 — 29 septembre 2026
 
 ### Accueil

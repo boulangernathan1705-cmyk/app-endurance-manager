@@ -79,7 +79,7 @@ function eventCard({event,next,archived,end}){
 const DISCORD_MARK=`<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M19.5 5.3A16.3 16.3 0 0 0 15.4 4l-.5 1.1a14.6 14.6 0 0 0-5.8 0L8.6 4a16.1 16.1 0 0 0-4.1 1.3C1.9 9.2 1.2 13 1.6 16.8A16.8 16.8 0 0 0 6.7 19l1.2-1.7c-.7-.3-1.4-.7-2-1.2l.5-.4c3.8 1.8 7.8 1.8 11.6 0l.5.4c-.6.5-1.3.9-2 1.2l1.2 1.7a16.7 16.7 0 0 0 5.1-2.2c.5-4.4-.9-8.2-3.3-11.5ZM8.5 14.7c-1.2 0-2.1-1.1-2.1-2.4 0-1.4.9-2.4 2.1-2.4s2.1 1.1 2.1 2.4-.9 2.4-2.1 2.4Zm7 0c-1.2 0-2.1-1.1-2.1-2.4 0-1.4.9-2.4 2.1-2.4s2.1 1.1 2.1 2.4-.9 2.4-2.1 2.4Z"/></svg>`;
 const WELCOME_FEATURES=[
   ['M12 7v5l3 2M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18Z','Disponibilités heure par heure','Chaque pilote indique ses relais possibles ; les trous du plateau se voient d’un coup d’œil.'],
-  ['M16 19v-1a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v1M9 10a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm13 9v-1a4 4 0 0 0-3-3.9M16 4.1a3 3 0 0 1 0 5.8','Équipages','Crée ton équipage, choisis ta catégorie et ta voiture, compose tes relais avec tes coéquipiers.'],
+  ['M16 19v-1a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v1M9 10a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm13 9v-1a4 4 0 0 0-3-3.9M16 4.1a3 3 0 0 1 0 5.8','Création d’équipage','Crée ton équipage en quelques clics : catégorie, voiture, coéquipiers, puis les relais de chacun.'],
   ['M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z','Calendrier LMU et iRacing','Les endurances officielles iRacing arrivent toutes seules, avec leurs horaires dès qu’ils sont publiés.'],
   ['M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2Z','Pensé pour Discord','Connexion en un clic avec ton compte Discord, et récap des courses de la semaine sur le serveur.']];
 export function communityGate(){
@@ -91,7 +91,7 @@ export function communityGate(){
   let kicker,title,lead,actions;
   if(state.openSite){
     kicker='Simracing · Endurance';title='Vos endurances en équipe, enfin simples à organiser';
-    lead='Inscriptions, disponibilités, équipages et relais : tout le plateau au même endroit, pour Le Mans Ultimate et iRacing.';actions=login+trust;
+    lead='Inscriptions, disponibilités, création d’équipage et relais : tout le plateau au même endroit, pour Le Mans Ultimate et iRacing.';actions=login+trust;
   }else if(state.access==='anonymous'){
     kicker=name;title=`Bienvenue sur l’espace de ${name}`;
     lead='Cet espace est réservé aux membres de son serveur Discord. Connecte-toi pour voir les courses et t’inscrire.';actions=login+trust;
@@ -102,7 +102,7 @@ export function communityGate(){
     kicker=name;title='Accès momentanément indisponible';lead=`L’accès à ${name} ne peut pas être vérifié pour le moment. Réessaie dans quelques minutes.`;actions='';
   }
   const features=WELCOME_FEATURES.map(([icon,heading,text])=>`<li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="${icon}"/></svg><strong>${heading}</strong><span>${text}</span></li>`).join('');
-  return `<section class="community-gate welcome" aria-labelledby="community-gate-title">
+  return `<section class="community-gate welcome${state.access==='anonymous'?' is-visitor':''}" aria-labelledby="community-gate-title">
     <div class="welcome-hero"><p class="welcome-kicker">${kicker}</p><h1 id="community-gate-title">${title}</h1><p class="welcome-lead">${lead}</p>${actions}</div>
     <ul class="welcome-features">${features}</ul></section>`;
 }

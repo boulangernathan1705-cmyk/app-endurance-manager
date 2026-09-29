@@ -1299,6 +1299,8 @@ html[data-game] .race-card .race-fill:has(.solo-fill) { display: flex; flex-wrap
 .community-gate-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
 /* Welcome screen for visitors (home of the main address and of each community). */
 .community-gate.welcome { max-width: 1080px; margin: 34px auto 20px; padding: 0; border: 0; border-radius: 0; background: none; text-align: left; }
+/* The navigation bar is of no use before signing in: the welcome screen has the Discord button. */
+body:has(.community-gate.welcome.is-visitor) .site-nav-shell { display: none !important; }
 .welcome-hero { position: relative; overflow: hidden; padding: clamp(28px, 5vw, 56px); border: 1px solid var(--border, #292d31); border-radius: 20px; background: radial-gradient(circle at 100% 0%, rgba(82,211,216,.14), transparent 26rem), radial-gradient(circle at 0% 100%, rgba(227,6,19,.10), transparent 24rem), var(--panel, #111315); box-shadow: 0 24px 60px rgba(0,0,0,.35); }
 .welcome-hero::before { content: ""; position: absolute; inset: 0 0 auto; height: 4px; background: linear-gradient(90deg, #52d3d8, #e30613 55%, #f3b33d); }
 .welcome-kicker { margin: 0 0 12px; color: var(--community-accent, #52d3d8); font-size: 12px; font-weight: 900; letter-spacing: .18em; text-transform: uppercase; }

@@ -76,7 +76,9 @@ async function settingsMarkup() {
 async function load() {
   try {
     const session = await api('/api/session');
-    if (!session.user || !(session.permissions || []).includes('admin')) throw new Error('Accès réservé aux administrateurs de la communauté.');
+    // A visitor who is not signed in goes to the welcome screen (Discord sign-in).
+    if (!session.user) { location.replace('/'); return; }
+    if (!(session.permissions || []).includes('admin')) throw new Error('Accès réservé aux administrateurs de la communauté.');
     const [result, settings] = await Promise.all([api('/api/members'), settingsMarkup()]);
     const members = Array.isArray(result.members) ? result.members : [];
     const server = result.community?.discordServer ? ` « ${esc(result.community.discordServer)} »` : '';

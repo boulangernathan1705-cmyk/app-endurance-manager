@@ -12,8 +12,10 @@
   "triggers": {
     "crons": ["*/15 * * * *"]
   },
+  // The route (more specific than production's *.endurance-manager.app/*) keeps commu-dev on this Worker.
   "routes": [
-    { "pattern": "commu-dev.endurance-manager.app", "custom_domain": true }
+    { "pattern": "commu-dev.endurance-manager.app", "custom_domain": true },
+    { "pattern": "commu-dev.endurance-manager.app/*", "zone_name": "endurance-manager.app" }
   ],
   "workers_dev": false,
   "assets": {
