@@ -1624,6 +1624,10 @@ html[data-game] #app .departure-planning { display: grid; gap: 14px; margin-top:
 .planning-start.is-compact { background: transparent; border-style: dashed; }
 .planning-start.is-compact > summary { padding-block: 11px; }
 .planning-start.is-done:not([open]) { opacity: .5; }
+/* Nobody on a start: greyed, no words needed (pilots, crews and « Ton départ » bring the colour). */
+.planning-start.is-empty:not([open]) { border-color: #232b2d; }
+.planning-start.is-empty:not([open]) .planning-start-head strong { color: #7d878a; }
+.planning-start.is-empty:not([open]) .planning-chevron { color: #5b6568; }
 .planning-start[open] { border-style: solid; border-color: var(--community-accent, #52d3d8); background: #141a1c; box-shadow: 0 14px 34px rgba(0, 0, 0, .45); opacity: 1; }
 .planning-chevron { position: absolute; top: 13px; right: 12px; width: 18px; height: 18px; color: #92999c; transition: transform .2s ease; }
 .planning-start.is-compact .planning-chevron { top: 10px; }

@@ -27,7 +27,7 @@ function startCard(event,departure,body,{minutes,now,open}){
   const compact=!open&&(done||!pilots);
   const endDay=dayKey(end)!==dayKey(start)?` le ${weekdayLabel(end)}`:'';
   const tags=compact?'':`${mine?'<span class="planning-tag is-mine">Ton départ</span>':''}${live?'<span class="planning-tag is-live">En cours</span>':''}`;
-  const head=`<span class="planning-start-head"><strong>Départ ${esc(timeLabel(departure.time))}</strong>${compact?`<span class="planning-start-state">${done?'Terminé':'Personne'}</span>`:`<span class="planning-start-end">fin ${esc(timeAt(end))}${esc(endDay)}</span>`}${tags}</span>`;
+  const head=`<span class="planning-start-head"><strong>Départ ${esc(timeLabel(departure.time))}</strong>${compact?(done?'<span class="planning-start-state">Terminé</span>':''):`<span class="planning-start-end">fin ${esc(timeAt(end))}${esc(endDay)}</span>`}${tags}</span>`;
   // Pilots without a crew, by category ("sans équipage 2 GT3 1 Hypercar"): where a pilot can find a crew.
   const free=event.categories.map(category=>[category,present.filter(reg=>!assigned.has(reg.id)&&reg.category===category).length]).filter(([,count])=>count);
   const freeLine=free.length?`<span class="planning-free"><span>· sans équipage</span>${free.map(([category,count])=>`<span class="planning-free-pill ${categories[category]?.css||''}">${count} ${esc(category)}</span>`).join('')}</span>`:'';
