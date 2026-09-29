@@ -25,6 +25,8 @@ jobs:
       - run: npm install --no-audit --no-fund
       - run: npx playwright install --with-deps chromium firefox webkit
       - run: npm run build:workers
+      # The local site is served over http: Safari (unlike Chrome) applies upgrade-insecure-requests to localhost too.
+      - run: sed -i 's/; upgrade-insecure-requests//' public/_headers
       - name: Local database with every migration
         run: npx --yes wrangler@4.138.0 d1 migrations apply DB --local
       - name: Start the site locally
