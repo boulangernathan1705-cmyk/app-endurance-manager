@@ -27,7 +27,7 @@ test('simulator spaces remember the choice and the logo leads to the chosen simu
   for (const page of ['game.html', 'members.html', 'help.html', 'about.html'])
     assert.match(readFileSync(new URL(`../${page}`, import.meta.url), 'utf8'), /class="brand-button logo" href="\/"/, page);
   const prod = JSON.parse(readFileSync(new URL('../wrangler.prod.jsonc', import.meta.url), 'utf8'));
-  assert.ok(prod.assets.run_worker_first.includes('/'));
+  assert.equal(prod.assets.run_worker_first, true, 'every page: the address says which community');
   assert.equal(prod.assets.binding, 'ASSETS');
 });
 

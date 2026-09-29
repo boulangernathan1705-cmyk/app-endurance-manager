@@ -116,10 +116,10 @@ if (!trustPage.includes('Discord OAuth') || !trustPage.includes('ne demande, ne 
 
 const wrangler = await readable(resolve(root, 'wrangler.jsonc'));
 const wranglerProd = await readable(resolve(root, 'wrangler.prod.jsonc'));
-// Production: static files are served directly; the Worker runs first on /api/*, /telemetry/* and on
-// the home page "/" (redirect to the pilot's simulator, races embedded), which it reads through ASSETS.
+// Production (communities platform): every page goes through the Worker, which reads the community from the
+// address (<slug>.endurance-manager.app, unknown one: 404 page) and serves the files through ASSETS.
 const prodRoutes = (() => { try { return JSON.parse(wranglerProd.replace(/^\s*\/\/.*$/gm, '')).assets?.run_worker_first; } catch { return null; } })();
-if (!Array.isArray(prodRoutes) || prodRoutes.some(route => !['/api/*','/telemetry/*','/'].includes(route)) || !prodRoutes.includes('/api/*') || !prodRoutes.includes('/')) warnings.push('En production, le Worker doit passer en premier uniquement sur /api/*, /telemetry/* et la page d’accueil /.');
+if (prodRoutes !== true) warnings.push('En production, toutes les pages doivent passer par le Worker (sites des communautés).');
 if (!/"binding"\s*:\s*"ASSETS"/.test(wranglerProd)) warnings.push('En production, la page d’accueil a besoin du binding ASSETS.');
 if (!/"minify"\s*:\s*true/.test(wrangler) || !/"minify"\s*:\s*true/.test(wranglerProd)) warnings.push('Wrangler doit minifier le Worker avant déploiement.');
 // Dev: every page goes through the Worker to add the "version de test" banner and noindex.

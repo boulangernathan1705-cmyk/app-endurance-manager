@@ -12,12 +12,12 @@
     "directory": "./public",
     "html_handling": "auto-trailing-slash",
     "binding": "ASSETS",
-    "run_worker_first": [
-      "/api/*",
-      "/telemetry/*",
-      "/"
-    ]
+    "run_worker_first": true
   },
+  "routes": [
+    { "pattern": "endurance-manager.app", "custom_domain": true },
+    { "pattern": "*.endurance-manager.app/*", "zone_name": "endurance-manager.app" }
+  ],
   "d1_databases": [
     {
       "binding": "DB",
@@ -27,6 +27,7 @@
     }
   ],
   "vars": {
-    "APP_ORIGIN": "https://endurance-manager.app"
+    "APP_ORIGIN": "https://endurance-manager.app",
+    "BASE_DOMAIN": "endurance-manager.app"
   }
 }
