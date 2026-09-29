@@ -28,7 +28,7 @@
 </div>
 <main class="legal-page">
   <h1>Politique de confidentialité</h1>
-  <p class="updated">Dernière mise à jour : 28 septembre 2026</p>
+  <p class="updated">Dernière mise à jour : 29 septembre 2026</p>
 
   <nav class="legal-summary" aria-label="Informations légales et confidentialité">
     <a href="/legal.html">Informations légales</a>
@@ -38,8 +38,9 @@
 
   <section>
     <h2>1. À quoi sert Endurance Manager ?</h2>
-    <p>Endurance Manager est un outil d’organisation de courses d’endurance simracing. Les données traitées servent uniquement à gérer les comptes, les inscriptions, les disponibilités des pilotes, les équipages, les rôles d’organisation et la sécurité du service.</p>
+    <p>Endurance Manager est un outil d’organisation de courses d’endurance simracing utilisé par des communautés. Chaque communauté a son propre site (nom.endurance-manager.app), réservé aux membres de son serveur Discord. Les données traitées servent uniquement à gérer les comptes, l’accès aux communautés, les inscriptions, les disponibilités des pilotes, les équipages et la sécurité du service.</p>
     <p>Les responsables du traitement sont Nathan Boulanger et Raphaël Nagel, cofondateurs et responsables d’Endurance Manager. Pour toute question ou demande concernant tes données, contacte les responsables par le moyen de contact habituel communiqué au sein de ta communauté Endurance Manager.</p>
+    <p>Les administrateurs de chaque communauté (les administrateurs de son serveur Discord) la gèrent sur le site : ils voient ses membres, leurs rôles Discord et leurs inscriptions, et règlent ce que chaque rôle permet.</p>
   </section>
 
   <section>
@@ -51,14 +52,17 @@
       <li>ton appartenance à un équipage et les informations nécessaires à son organisation ;</li>
       <li>si tu te connectes avec Discord : ton identifiant Discord et ton nom d’affichage. Endurance Manager demande uniquement l’autorisation Discord <code>identify</code> afin de t’authentifier et de t’identifier ; le site ne demande ni ton adresse e-mail, ni le contenu de tes messages Discord, ni l’accès à tes conversations ;</li>
       <li>si tu te connectes avec Discord : l’identifiant de ton avatar Discord, pour l’afficher dans le menu de ton compte ;</li>
-      <li>des données techniques strictement nécessaires à la connexion, à la récupération d’un accès invité et à la protection contre les abus ;</li>
+      <li>pour chaque communauté dont tu ouvres le site : si tu es membre de son serveur Discord, tes rôles et ton pseudo sur ce serveur, et si tu en es administrateur. Le bot d’Endurance Manager lit ces informations sur le serveur de cette communauté uniquement, à ta connexion puis une fois par jour ; tes autres serveurs ne sont jamais consultés ;</li>
+      <li>des données techniques strictement nécessaires à la connexion et à la protection contre les abus ;</li>
       <li>en cas d’erreur technique dans ton navigateur : la page concernée, le message d’erreur, le type de navigateur et la taille d’écran. Ces rapports ne contiennent ni ton identifiant ni ton pseudo ; ils sont consultables uniquement par les organisateurs et administrateurs, afin de corriger les problèmes.</li>
     </ul>
+    <p>Tes inscriptions ne sont visibles que par les membres de ta communauté. Si les administrateurs de la communauté activent le récap de la semaine, les courses, les équipages et les pseudos des pilotes inscrits sont aussi publiés dans les salons de leur serveur Discord qu’ils ont choisis.</p>
+    <p>Les administrateurs d’une communauté peuvent enregistrer une bannière pour leur site. Le site principal endurance-manager.app est une vitrine : il ne montre que des courses et des pilotes fictifs.</p>
   </section>
 
   <section>
     <h2>3. Pourquoi ces données sont-elles utilisées ?</h2>
-    <p>Elles sont utilisées pour fournir les fonctions demandées par les utilisateurs : afficher les événements, enregistrer et retrouver les inscriptions, identifier les pilotes, constituer les équipages, appliquer les droits organisateur/administrateur et sécuriser les accès.</p>
+    <p>Elles sont utilisées pour fournir les fonctions demandées par les utilisateurs : afficher les événements, enregistrer et retrouver les inscriptions, identifier les pilotes, constituer les équipages, vérifier l’accès à ta communauté, appliquer les droits donnés par tes rôles Discord et sécuriser les accès.</p>
     <p>Ces traitements reposent sur le fonctionnement du service demandé par l’utilisateur et sur l’intérêt légitime des responsables à organiser les événements et à protéger le service.</p>
   </section>
 
@@ -66,14 +70,13 @@
     <h2>4. Cookies et accès</h2>
     <p>Endurance Manager utilise uniquement des cookies nécessaires au fonctionnement du service :</p>
     <ul>
-      <li><code>__Host-em_session</code> : session de connexion, valable jusqu’à 7 jours ;</li>
-      <li><code>__Host-em_guest</code> : permet de retrouver un accès invité, valable jusqu’à 365 jours ;</li>
-      <li><code>__Host-em_oauth</code> : sécurise temporairement la connexion Discord, valable environ 10 minutes ;</li>
-      <li><code>__Host-em_return</code> : retient la page à rouvrir après la connexion Discord (par exemple la course que tu consultais), valable environ 10 minutes ;</li>
+      <li><code>__Secure-em_session</code> : session de connexion, valable jusqu’à 7 jours, commune à tous les sites des communautés pour ne te connecter qu’une fois ;</li>
+      <li><code>__Secure-em_oauth</code> : sécurise temporairement la connexion Discord, valable environ 10 minutes ;</li>
+      <li><code>__Secure-em_return</code> : retient la page à rouvrir après la connexion Discord (sur le site de la communauté d’où tu viens), valable environ 10 minutes ;</li>
       <li><code>em_discord_avatar</code> : identifiant de ton avatar Discord pour l’afficher dans le menu du compte, valable jusqu’à 7 jours ;</li>
       <li><code>em_sim</code> : retient le simulateur que tu as choisi (LMU ou iRacing) pour t’y amener directement depuis l’accueil, valable jusqu’à 1 an.</li>
     </ul>
-    <p>Ces cookies sont configurés avec les protections <code>Secure</code> et <code>SameSite=Lax</code> ; ceux qui touchent à la connexion (<code>__Host-</code>) sont aussi <code>HttpOnly</code>, donc inaccessibles aux scripts de la page. Le cookie d’avatar ne contient aucune donnée de connexion.</p>
+    <p>Ces cookies sont configurés avec les protections Secure et SameSite=Lax. Ceux de la connexion sont aussi HttpOnly, donc inaccessibles aux scripts de la page, et ne sont envoyés qu’à endurance-manager.app et aux sites de ses communautés. Le cookie d’avatar ne contient aucune donnée de connexion.</p>
     <p>Le navigateur garde aussi en mémoire locale, sur ton appareil uniquement, la langue choisie et le dernier pseudo utilisé pour t’inscrire, afin de préremplir le formulaire.</p>
     <p>Le code d’Endurance Manager ne dépose pas de cookie publicitaire ni de cookie d’analyse d’audience. Il n’y a donc pas de bannière de consentement publicitaire sur le site.</p>
   </section>
@@ -85,7 +88,7 @@
       <li>les données temporaires de connexion Discord expirent après environ 10 minutes ;</li>
       <li>les données anti-abus sont organisées par périodes de 10 minutes et sont supprimées automatiquement, au plus tard dans le quart d’heure qui suit leur expiration ;</li>
       <li>les rapports d’erreur technique sont supprimés après 14 jours ;</li>
-      <li>le cookie d’accès invité peut être conservé jusqu’à 365 jours ;</li>
+      <li>ton appartenance à une communauté est revérifiée chaque jour : si tu quittes son serveur Discord, ton accès à son site est retiré ;</li>
       <li>les comptes, inscriptions et données d’organisation sont conservés pendant la durée nécessaire au fonctionnement du service, puis supprimés lorsqu’ils ne sont plus utiles ou à la suite d’une demande légitime d’effacement.</li>
     </ul>
   </section>
@@ -94,6 +97,7 @@
     <h2>6. Prestataires utilisés</h2>
     <p>Le service s’appuie sur Cloudflare pour l’hébergement de l’application et de la base de données.</p>
     <p>Discord est utilisé uniquement comme fournisseur d’authentification et d’identification lorsque tu choisis de te connecter avec Discord. Endurance Manager utilise l’autorisation <code>identify</code> pour récupérer les informations minimales nécessaires à cette connexion.</p>
+    <p>Discord est aussi utilisé par le bot d’Endurance Manager, invité par les administrateurs de chaque communauté sur leur serveur, pour vérifier qui en est membre et avec quels rôles. Le bot n’a aucune permission d’écriture. Le récap de la semaine est publié par les webhooks que les administrateurs créent dans leurs salons.</p>
     <p>Endurance Manager ne vend pas les données personnelles et ne les utilise pas à des fins publicitaires.</p>
   </section>
 

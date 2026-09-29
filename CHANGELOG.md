@@ -15,6 +15,9 @@ Les changements du site, version par version. La plus récente est en haut.
 ### Vitrine
 - Les courses de démonstration affichent bien leurs horaires.
 
+### Aide et informations
+- **Aide**, **Confidentialité**, **Informations légales** et **À propos** mises à jour : communautés, accès par le serveur Discord, droits donnés par les rôles Discord, bot, récap de la semaine, bannière, vitrine.
+
 ## v1.4.1 — 29 septembre 2026
 
 ### Corrections
