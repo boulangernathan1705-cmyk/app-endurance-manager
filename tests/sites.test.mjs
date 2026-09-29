@@ -99,7 +99,7 @@ test('the main address stays open to every Discord player, organizers keep their
     DB.db.prepare("INSERT INTO users(id,name,role,created_at) VALUES(?,?,?,0)").run(user,'Joueur',role);DB.db.prepare('INSERT INTO sessions(token_hash,user_id,expires_at) VALUES(?,?,?)').run(hash,user,4102444800);return {Cookie:`__Secure-em_dev_session=${raw}`};};
   const pilot=await session('555555555555555555','pilot'),organizer=await session('666666666666666666','organizer');
   const apex=await (await call(`${APEX}/api/session`,{headers:pilot})).json();
-  assert.equal(apex.access,'member');assert.deepEqual(apex.permissions.sort(),['endurance','solo_open']);
+  assert.equal(apex.access,'member');assert.equal(apex.openSite,true,'the site keeps its look (no community name)');assert.deepEqual(apex.permissions.sort(),['endurance','solo_open']);
   assert.ok((await (await call(`${APEX}/api/session`,{headers:organizer})).json()).permissions.includes('create_race'));
   assert.equal((await (await call(`${APEX}/api/session`)).json()).access,'anonymous','signed in with Discord');
   assert.notEqual((await (await call(`${MAIN}/api/session`,{headers:pilot})).json()).access,'member','community sites: members of their Discord only');

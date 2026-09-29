@@ -24,7 +24,7 @@ export const can = permission => Boolean(state.permissions?.includes(permission)
 export const canManage = () => can('create_race') || can('manage_races');
 export const isAdmin = () => can('admin');
 // Important actions name the community they apply to (a player may belong to several).
-export const inCommunity = () => state.community?.name ? `\n\nCommunauté : ${state.community.name}` : '';
+export const inCommunity = () => state.community?.name && !state.openSite ? `\n\nCommunauté : ${state.community.name}` : '';
 export const canEditRace = event => can('manage_races') || (can('create_race') && Boolean(event?.createdByMe));
 
 export function notifyRender() {
@@ -171,7 +171,7 @@ function mergeEvents(...lists) {
 export async function load() {
   // The community is only open to the members of its Discord server: nothing else is loaded otherwise.
   const session = await api('/api/session');
-  state.access=session.access; state.permissions=session.permissions||[]; state.community=session.community||null; state.platformDiscordUrl=session.platformDiscordUrl||null;
+  state.access=session.access; state.permissions=session.permissions||[]; state.community=session.community||null; state.openSite=session.openSite===true; state.platformDiscordUrl=session.platformDiscordUrl||null;
   const member = session.access === 'member';
   const [upcoming,archived] = member ? await Promise.all([fetchEvents('upcoming'), state.archiveLoaded ? fetchEvents('archived') : []]) : [[],[]];
   const userChanged=(session.user?.id||null)!==(state.user?.id||null);

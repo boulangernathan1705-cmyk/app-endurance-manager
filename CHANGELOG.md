@@ -10,7 +10,7 @@ Les changements du site, version par version. La plus récente est en haut.
 - Page **Membres** pour les admins : les membres du serveur, et les **réglages** de la communauté (nom, couleur, autorisations de chaque rôle, modules comme l'import des endurances iRacing ou le récap Discord). Le logo et la bannière sont ceux du serveur Discord.
 - **Mes communautés** : un pilote membre de plusieurs communautés passe de l'une à l'autre depuis le nom de la communauté, en haut du site.
 - Une seule connexion Discord pour tous les sites. À cette mise à jour, il faut **se reconnecter une fois**.
-- endurance-manager.app ne change pas : il reste ouvert à tous les joueurs Discord et garde ses courses.
+- endurance-manager.app garde ses courses et reste ouvert à tous les joueurs Discord : connecte-toi avec Discord pour voir les courses.
 
 ## v1.1.5 — 28 septembre 2026
 

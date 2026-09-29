@@ -5,7 +5,7 @@ import {
 } from './core.mjs';
 import {ingestClientError, clientErrorsApi} from './telemetry.mjs';
 import {racesPath} from './races-path.mjs';
-import {currentCommunity, appearanceOf, allCommunities} from './community.mjs';
+import {currentCommunity, communitySlug, appearanceOf, allCommunities} from './community.mjs';
 import {communityAccess, requirePermission, displayRole, PERMISSIONS, DEFAULT_EVERYONE, normalizePermissions, discordGuild, memberPermissions} from './access.mjs';
 // Solo races: a module each community turns on or off (settings of the members page).
 const soloRacesEnabled = (env, community) => community?.modules?.soloRaces === true;
@@ -47,7 +47,10 @@ async function myCommunities(env, actor, community) {
   const list = actor.manager ? await allCommunities(env)
     : ((await env.DB.prepare(`SELECT c.* FROM communities c JOIN memberships m ON m.community_id=c.id WHERE m.user_id=? AND m.status='member' ORDER BY c.id`)
       .bind(actor.user.id).all()).results || []).map(row => ({slug:row.slug, name:row.name}));
-  const mine = [...list].sort((x, y) => x.name.localeCompare(y.name, 'fr')).map(item => ({slug:item.slug, name:item.name, url:`https://${item.slug}.${domain}/`, current:item.slug === community.slug}));
+  // The community of the main address (COMMUNITY) is reached there, not on a subdomain.
+  const main = communitySlug(env, null);
+  const mine = [...list].sort((x, y) => x.name.localeCompare(y.name, 'fr')).map(item => ({slug:item.slug, name:item.name,
+    url:item.slug === main ? `${origin(env)}/` : `https://${item.slug}.${domain}/`, current:item.slug === community.slug}));
   return mine.length > 1 ? mine : [];
 }
 // Permissions of the actor in the current community (server/access.mjs).
@@ -229,7 +232,8 @@ async function api(request, env) {
   const community = await currentCommunity(env, request);
   // The main address of the platform (endurance-manager.app) stays open to every Discord player, as before
   // the communities: it shows future community admins how the site works.
-  const access = await communityAccess(env, actor, community, {open:Boolean(baseDomain(env)) && url.hostname === baseDomain(env)});
+  const openSite = Boolean(baseDomain(env)) && url.hostname === baseDomain(env);
+  const access = await communityAccess(env, actor, community, {open:openSite});
   actor.permissions = access.permissions;
   actor.manager = access.manager;
   if (actor.user) actor.user = {...actor.user, role:displayRole(access)};
@@ -237,7 +241,7 @@ async function api(request, env) {
   if (diagnostics) return diagnostics;
   if (path === '/api/session' && method === 'GET') return json({user:actor.user, discordReady:!!(env.DISCORD_CLIENT_ID && env.DISCORD_CLIENT_SECRET), adminConfigured:administrators(env).length > 0, soloRaces:soloRacesEnabled(env, community), soloLabel:String(env.SOLO_LABEL || 'Courses solo').slice(0,40),
     community:{slug:community.slug, name:community.name, shortName:community.shortName, discordInviteUrl:community.discordInviteUrl, appearance:appearanceOf(community)},
-    access:access.status, permissions:[...access.permissions], manager:access.manager, communities:await myCommunities(env, actor, community),
+    access:access.status, permissions:[...access.permissions], manager:access.manager, communities:await myCommunities(env, actor, community), openSite,
     platformDiscordUrl:/^https:\/\/(discord\.gg|discord\.com\/invite)\//.test(env.PLATFORM_DISCORD_URL || '') ? env.PLATFORM_DISCORD_URL : null});
   if (path === '/api/auth/logout' && method === 'POST') {
     const names = cookieNames(env), raw = cookie(request, names.session);

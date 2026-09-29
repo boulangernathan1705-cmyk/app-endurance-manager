@@ -99,8 +99,10 @@ function renderConnected(user) {
 
 // Look of the community of this site (communities platform): its name always visible in the bar, the
 // short name before the page title, the icon and banner of its Discord server, its accent color.
-function applyCommunity(community, communities = []) {
+function applyCommunity(community, communities = [], openSite = false) {
   if (!community) return;
+  // The main address keeps the look of the site: no community name, only "Mes communautés" when the player has some.
+  if (openSite) community = {name:'Mes communautés', appearance:{}};
   const look = community.appearance || {};
   document.documentElement.dataset.community = community.slug;
   if (look.accent) { document.documentElement.style.setProperty('--community-accent', look.accent); document.documentElement.dataset.communityAccent = 'true'; }
@@ -111,7 +113,7 @@ function applyCommunity(community, communities = []) {
   }
   if (look.bannerUrl) for (const image of document.querySelectorAll('.hero-banner')) { image.removeAttribute('srcset'); image.src = look.bannerUrl; }
   const bar = document.querySelector('.site-nav-shell');
-  if (bar && !bar.querySelector('.community-chip')) {
+  if (bar && !bar.querySelector('.community-chip') && !(openSite && !communities.some(item => !item.current))) {
     // "Mes communautés": the name opens the list of the player's other communities (only when there are several).
     const others = communities.filter(item => !item.current && /^https:\/\//.test(item.url));
     const chip = document.createElement(others.length ? 'details' : 'span');
@@ -136,7 +138,7 @@ async function loadSession() {
     const response = await fetch('/api/session', {credentials:'same-origin',cache:'no-store'});
     if (!response.ok) throw new Error('session');
     const session = await response.json();
-    applyCommunity(session.community, Array.isArray(session.communities) ? session.communities : []);
+    applyCommunity(session.community, Array.isArray(session.communities) ? session.communities : [], session.openSite === true);
     if (session.user) renderConnected(session.user);
     else renderDisconnected(!!session.discordReady);
   } catch {

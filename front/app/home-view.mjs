@@ -79,6 +79,7 @@ export function communityGate(){
   const login=`<a class="primary-button" href="/api/auth/discord?return=${encodeURIComponent(location.pathname)}">Se connecter avec Discord</a>`;
   const invite=state.community?.discordInviteUrl?`<a class="primary-button" href="${esc(state.community.discordInviteUrl)}" rel="noopener">Rejoindre le Discord de ${name}</a>`:'';
   const partner=state.platformDiscordUrl?`<a class="secondary-button" href="${esc(state.platformDiscordUrl)}" rel="noopener">Trouver une communauté partenaire</a>`:'';
+  if(state.openSite)return `<section class="community-gate" aria-labelledby="community-gate-title"><h1 id="community-gate-title">Endurance Manager</h1><p>Connecte-toi avec ton compte Discord pour voir les courses et t’inscrire.</p><div class="community-gate-actions">${login}</div></section>`;
   const body=state.access==='anonymous'
     ?`<p>Cette communauté est réservée aux membres de son serveur Discord. Connecte-toi avec ton compte Discord pour y accéder.</p><div class="community-gate-actions">${login}</div>`
     :state.access==='not-member'
