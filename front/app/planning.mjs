@@ -46,19 +46,55 @@ export function renderPlanning(event,days,body){
     return `<button type="button" class="planning-tab${day===active?' is-active':''}" data-action="planning-day" data-day="${day.key}" aria-pressed="${day===active}"><small>${esc(weekdayLabel(first))}</small><strong>${esc(dayMonthShort(first))}</strong><small>${finished(day)?'terminé':`${day.items.length} départ${day.items.length>1?'s':''}`}</small>${mine?'<i class="planning-tab-mine" aria-label="ton départ"></i>':''}</button>`;}).join('');
   const columns=days.map(day=>{const first=day.items[0].departure.startsAt,pilots=day.items.reduce((sum,{departure})=>sum+pilotCount(departure.availability||[]),0),today=dayKey(now)===day.key;
     return `<section class="planning-day${finished(day)?' is-past':''}${day===active?' is-active':''}" data-day="${day.key}" aria-label="${esc(weekdayLong(first))} ${esc(dayMonthLong(first))}"><div class="planning-day-head"><span class="planning-day-name"><strong>${esc(weekdayLong(first))}</strong><span>${esc(dayMonthLong(first))}</span></span>${today?'<span class="planning-today">Aujourd’hui</span>':`<small>${finished(day)?'Terminé':`${day.items.length} départ${day.items.length>1?'s':''} · ${pilots} pilote${pilots>1?'s':''}`}</small>`}</div>${day.items.map(({departure,index})=>startCard(event,departure,body(departure,index),{minutes,now,open:departure.id===openId})).join('')}</section>`;}).join('');
-  const total=days.reduce((sum,day)=>sum+day.items.length,0);
-  return `<section class="departure-planning${days.length<=3?' is-fit':''}" style="--days:${days.length}" aria-label="Départs de la course"><div class="planning-heading"><h2>Départs</h2><small>${total} départs sur ${days.length} jours</small><span class="planning-arrows"><button type="button" data-action="planning-scroll" data-step="-1" aria-label="Jours précédents">‹</button><button type="button" data-action="planning-scroll" data-step="1" aria-label="Jours suivants">›</button></span></div><div class="planning-tabs" role="group" aria-label="Jour de course">${tabs}</div><div class="planning-scroll"><div class="planning-days">${columns}</div></div></section>`;
+  const total=days.reduce((sum,day)=>sum+day.items.length,0),span=planningSpan(days.length);
+  // More than three days: three on screen by default, or five or seven at once (remembered on this browser).
+  const spans=days.length>3?[...new Set([...SPANS.filter(count=>count<days.length),days.length])]:[];
+  const spanChoice=spans.length?`<span class="planning-span" role="group" aria-label="Jours affichés">${spans.map(count=>`<button type="button" data-action="planning-span" data-span="${count}" aria-pressed="${count===span}">${count} jours</button>`).join('')}</span>`:'';
+  return `<section class="departure-planning${span>=days.length?' is-fit':''}" style="--days:${days.length}" data-span="${span}" data-event="${event.id}" aria-label="Départs de la course"><div class="planning-heading"><h2>Départs</h2><small>${total} départs sur ${days.length} jours</small>${spanChoice}<span class="planning-arrows"><button type="button" data-action="planning-scroll" data-step="-1" aria-label="Jours précédents">‹</button><button type="button" data-action="planning-scroll" data-step="1" aria-label="Jours suivants">›</button></span></div><div class="planning-tabs" role="group" aria-label="Jour de course">${tabs}</div><div class="planning-scroll"><div class="planning-days">${columns}</div></div></section>`;
 }
 
-// Widths of the days (the one of the opened start wider, a finished one narrower) and the arrows when every
-// day does not fit on the screen.
+const SPANS=[3,5,7],GAP=16;
+function planningSpan(count){
+  if(count<=3)return count;
+  let chosen=state.planningSpan;
+  if(!chosen)try{chosen=Number(globalThis.localStorage?.getItem('em_planning_span'))||3;}catch{chosen=3;}
+  return Math.min(chosen,count);
+}
+
+// Widths of the days and the arrows when every day is not on screen. All the days on screen: the one of the
+// opened start wider (its crews side by side), a finished one narrower. Fewer days on screen (3 of 7): days of
+// equal width, the opened one wider.
 export function syncPlanning(root=globalThis.document){
   for(const planning of root?.querySelectorAll?.('.departure-planning')||[]){
-    const days=[...planning.querySelectorAll('.planning-day')];
-    if(planning.classList.contains('is-fit'))planning.querySelector('.planning-days').style.setProperty('--cols',days.map(day=>day.querySelector('.planning-start[open]')?'minmax(360px,1.8fr)':day.classList.contains('is-past')?'minmax(170px,.75fr)':'minmax(210px,1fr)').join(' '));
-    const scroll=planning.querySelector('.planning-scroll');
+    const days=[...planning.querySelectorAll('.planning-day')],scroll=planning.querySelector('.planning-scroll');
+    const span=Math.min(Number(planning.dataset.span)||days.length,days.length),fit=span>=days.length;
+    const unit=Math.max(210,(scroll.clientWidth-(span-1)*GAP)/span);
+    const columns=days.map(day=>{
+      const open=day.querySelector('.planning-start[open]');
+      if(fit)return open?'minmax(440px,1.8fr)':day.classList.contains('is-past')?'minmax(170px,.75fr)':'minmax(210px,1fr)';
+      return `${Math.round(open?Math.max(440,unit*1.6):unit)}px`;
+    });
+    planning.classList.toggle('is-fit',fit);
+    planning.querySelector('.planning-days').style.setProperty('--cols',columns.join(' '));
     planning.classList.toggle('has-overflow',scroll.scrollWidth>scroll.clientWidth+2);
   }
+}
+// After drawing: the planning scrolled as the pilot left it, otherwise on the day to come.
+export function placePlanning(root=globalThis.document){
+  const planning=root?.querySelector?.('.departure-planning');
+  if(!planning)return;
+  const scroll=planning.querySelector('.planning-scroll');
+  if(state.planningScroll?.event===planning.dataset.event){scroll.scrollLeft=state.planningScroll.left;return;}
+  const active=planning.querySelector('.planning-day.is-active');
+  if(active)scroll.scrollLeft+=active.getBoundingClientRect().left-scroll.getBoundingClientRect().left;
+}
+export function setPlanningSpan(button){
+  const planning=button.closest('.departure-planning');
+  state.planningSpan=Number(button.dataset.span);
+  try{globalThis.localStorage?.setItem('em_planning_span',button.dataset.span);}catch{}
+  planning.dataset.span=button.dataset.span;
+  for(const item of planning.querySelectorAll('[data-action="planning-span"]'))item.setAttribute('aria-pressed',String(item===button));
+  syncPlanning();
 }
 
 // Phone: shows one day (the tab pressed).
@@ -70,7 +106,7 @@ export function showPlanningDay(button){
 }
 export function scrollPlanning(button){
   const scroll=button.closest('.departure-planning').querySelector('.planning-scroll'),day=scroll.querySelector('.planning-day');
-  scroll.scrollBy({left:Number(button.dataset.step)*(day.offsetWidth+14),behavior:'smooth'});
+  scroll.scrollBy({left:Number(button.dataset.step)*(day.offsetWidth+GAP),behavior:'smooth'});
 }
 // "Ton départ" of the race header: opens that start (its day on a phone) and brings it on screen.
 export function goToDeparture(departureId){
@@ -92,3 +128,7 @@ globalThis.document?.addEventListener('toggle',event=>{
   syncPlanning();
 },true);
 globalThis.addEventListener?.('resize',()=>syncPlanning());
+globalThis.document?.addEventListener('scroll',event=>{
+  const scroll=event.target;
+  if(scroll?.classList?.contains('planning-scroll'))state.planningScroll={event:scroll.closest('.departure-planning')?.dataset.event,left:scroll.scrollLeft};
+},true);
