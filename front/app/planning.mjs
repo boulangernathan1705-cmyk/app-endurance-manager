@@ -1,6 +1,7 @@
 // Race over several days (special events: Friday to Sunday, sometimes a whole week): the starts as a planning,
-// one column per race day; on a phone, one day at a time with a tab per day. A start opens where it is; up to
-// three days, its day widens so its crews sit side by side, and a finished day narrows.
+// one column per race day; on a phone, one day at a time with a tab per day. The days on screen always fit the
+// window (three by default, five or seven by choice, fewer when the window is narrow); the arrows move them by
+// one day. A start opens where it is and its day widens so its crews sit side by side.
 import {timeLabel,timeAt,weekdayLabel,weekdayLong,dayMonthLong,dayMonthShort,dateRangeBlock} from '../dates.mjs';
 import {eventMinutes} from '../../shared/duration.mjs';
 import {raceDays,parisDayKey as dayKey} from '../../shared/start-times.mjs';
@@ -50,7 +51,8 @@ export function renderPlanning(event,days,body){
   // More than three days: three on screen by default, or five or seven at once (remembered on this browser).
   const spans=days.length>3?[...new Set([...SPANS.filter(count=>count<days.length),days.length])]:[];
   const spanChoice=spans.length?`<span class="planning-span" role="group" aria-label="Jours affichés">${spans.map(count=>`<button type="button" data-action="planning-span" data-span="${count}" aria-pressed="${count===span}">${count} jours</button>`).join('')}</span>`:'';
-  return `<section class="departure-planning${span>=days.length?' is-fit':''}" style="--days:${days.length}" data-span="${span}" data-event="${event.id}" aria-label="Départs de la course"><div class="planning-heading"><h2>Départs</h2><small>${total} départs sur ${days.length} jours</small>${spanChoice}<span class="planning-arrows"><button type="button" data-action="planning-scroll" data-step="-1" aria-label="Jours précédents">‹</button><button type="button" data-action="planning-scroll" data-step="1" aria-label="Jours suivants">›</button></span></div><div class="planning-tabs" role="group" aria-label="Jour de course">${tabs}</div><div class="planning-scroll"><div class="planning-days">${columns}</div></div></section>`;
+  const offset=state.planningWindow?.event===event.id?state.planningWindow.offset:days.indexOf(active);
+  return `<section class="departure-planning" style="--days:${days.length}" data-span="${span}" data-offset="${offset}" data-event="${event.id}" aria-label="Départs de la course"><div class="planning-heading"><h2>Départs</h2><small>${total} départs sur ${days.length} jours</small>${spanChoice}<span class="planning-arrows"><button type="button" data-action="planning-scroll" data-step="-1" aria-label="Jour précédent">‹</button><button type="button" data-action="planning-scroll" data-step="1" aria-label="Jour suivant">›</button></span></div><div class="planning-tabs" role="group" aria-label="Jour de course">${tabs}</div><div class="planning-scroll"><div class="planning-days">${columns}</div></div></section>`;
 }
 
 const SPANS=[3,5,7],GAP=16;
@@ -61,32 +63,31 @@ function planningSpan(count){
   return Math.min(chosen,count);
 }
 
-// Widths of the days and the arrows when every day is not on screen. All the days on screen: the one of the
-// opened start wider (its crews side by side), a finished one narrower. Fewer days on screen (3 of 7): days of
-// equal width, the opened one wider.
+// The days on screen: as many as chosen, fewer when the window is too narrow for them (a day stays readable,
+// an opened one keeps room for its buttons and crews), always including the opened start.
+const DAY_MIN=210,OPEN_MIN=440;
+function planningWindow(planning){
+  const days=[...planning.querySelectorAll('.planning-day')],width=planning.querySelector('.planning-scroll').clientWidth;
+  const open=days.findIndex(day=>day.querySelector('.planning-start[open]'));
+  let span=Math.min(Number(planning.dataset.span)||days.length,days.length);
+  while(span>1&&(open>=0?OPEN_MIN+(span-1)*DAY_MIN:span*DAY_MIN)+(span-1)*GAP>width)span--;
+  let offset=Math.max(0,Math.min(Number(planning.dataset.offset)||0,days.length-span));
+  if(open>=0&&(open<offset||open>=offset+span))offset=Math.min(open,days.length-span);
+  return {days,span,offset,open};
+}
+// Shows the days of the window, their widths (the opened day wider, a finished one narrower) and the arrows.
 export function syncPlanning(root=globalThis.document){
   for(const planning of root?.querySelectorAll?.('.departure-planning')||[]){
-    const days=[...planning.querySelectorAll('.planning-day')],scroll=planning.querySelector('.planning-scroll');
-    const span=Math.min(Number(planning.dataset.span)||days.length,days.length),fit=span>=days.length;
-    const unit=Math.max(210,(scroll.clientWidth-(span-1)*GAP)/span);
-    const columns=days.map(day=>{
-      const open=day.querySelector('.planning-start[open]');
-      if(fit)return open?'minmax(440px,1.8fr)':day.classList.contains('is-past')?'minmax(170px,.75fr)':'minmax(210px,1fr)';
-      return `${Math.round(open?Math.max(440,unit*1.6):unit)}px`;
-    });
-    planning.classList.toggle('is-fit',fit);
-    planning.querySelector('.planning-days').style.setProperty('--cols',columns.join(' '));
-    planning.classList.toggle('has-overflow',scroll.scrollWidth>scroll.clientWidth+2);
+    const {days,span,offset}=planningWindow(planning);
+    planning.dataset.offset=offset;
+    state.planningWindow={event:planning.dataset.event,offset};
+    const shown=days.filter((day,index)=>{const inside=index>=offset&&index<offset+span;day.classList.toggle('is-out',!inside);return inside;});
+    planning.querySelector('.planning-days').style.setProperty('--cols',shown.map(day=>day.querySelector('.planning-start[open]')?`minmax(${OPEN_MIN}px,1.8fr)`:day.classList.contains('is-past')?'minmax(170px,.75fr)':`minmax(${DAY_MIN}px,1fr)`).join(' '));
+    planning.classList.toggle('has-more',span<days.length);
+    const [previous,next]=planning.querySelectorAll('[data-action="planning-scroll"]');
+    if(previous)previous.disabled=offset<=0;
+    if(next)next.disabled=offset+span>=days.length;
   }
-}
-// After drawing: the planning scrolled as the pilot left it, otherwise on the day to come.
-export function placePlanning(root=globalThis.document){
-  const planning=root?.querySelector?.('.departure-planning');
-  if(!planning)return;
-  const scroll=planning.querySelector('.planning-scroll');
-  if(state.planningScroll?.event===planning.dataset.event){scroll.scrollLeft=state.planningScroll.left;return;}
-  const active=planning.querySelector('.planning-day.is-active');
-  if(active)scroll.scrollLeft+=active.getBoundingClientRect().left-scroll.getBoundingClientRect().left;
 }
 export function setPlanningSpan(button){
   const planning=button.closest('.departure-planning');
@@ -104,9 +105,11 @@ export function showPlanningDay(button){
   for(const item of planning.querySelectorAll('[data-day]'))item.classList.toggle('is-active',item.dataset.day===button.dataset.day);
   for(const tab of planning.querySelectorAll('.planning-tab'))tab.setAttribute('aria-pressed',String(tab.dataset.day===button.dataset.day));
 }
+// Arrows: the window moves by one day.
 export function scrollPlanning(button){
-  const scroll=button.closest('.departure-planning').querySelector('.planning-scroll'),day=scroll.querySelector('.planning-day');
-  scroll.scrollBy({left:Number(button.dataset.step)*(day.offsetWidth+GAP),behavior:'smooth'});
+  const planning=button.closest('.departure-planning');
+  planning.dataset.offset=Math.max(0,(Number(planning.dataset.offset)||0)+Number(button.dataset.step));
+  syncPlanning();
 }
 // "Ton départ" of the race header: opens that start (its day on a phone) and brings it on screen.
 export function goToDeparture(departureId){
@@ -115,7 +118,8 @@ export function goToDeparture(departureId){
   const tab=start.closest('.departure-planning')?.querySelector(`.planning-tab[data-day="${start.closest('.planning-day')?.dataset.day}"]`);
   if(tab)showPlanningDay(tab);
   start.open=true;
-  start.scrollIntoView({behavior:'smooth',block:'center',inline:'center'});
+  syncPlanning();
+  start.scrollIntoView({behavior:'smooth',block:'center'});
 }
 
 // One start open at a time in a planning; the widths follow.
@@ -128,7 +132,4 @@ globalThis.document?.addEventListener('toggle',event=>{
   syncPlanning();
 },true);
 globalThis.addEventListener?.('resize',()=>syncPlanning());
-globalThis.document?.addEventListener('scroll',event=>{
-  const scroll=event.target;
-  if(scroll?.classList?.contains('planning-scroll'))state.planningScroll={event:scroll.closest('.departure-planning')?.dataset.event,left:scroll.scrollLeft};
-},true);
+
