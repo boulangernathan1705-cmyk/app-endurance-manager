@@ -32,10 +32,10 @@ function startCard(event,departure,body,{minutes,now,open}){
   // Pilots without a crew, by category (« 2 GT3 » « 1 Hypercar »): where a pilot can find a crew. The crews
   // follow, by name.
   const free=event.categories.map(category=>[category,present.filter(reg=>!assigned.has(reg.id)&&reg.category===category).length]).filter(([,count])=>count);
-  // Each line says what it lists: the crews (by name, in their colour), then the pilots without a crew.
-  const row=(label,content)=>`<span class="planning-row"><span class="planning-row-label">${label}</span><span class="planning-row-items">${content}</span></span>`;
-  const crewLine=crews.length?row('Équipages',crews.map((crew,index)=>`<span class="planning-crew ${crewColorClass(crew.id,index)}">${logo(crew.category)}<span>${esc(crew.name)}</span></span>`).join('')):'';
-  const freeLine=free.length?row('Sans équipage',free.map(([category,count])=>`<span class="planning-free-pill ${categories[category]?.css||''}" title="${count} pilote${count>1?'s':''} ${esc(category)} sans équipage">${count} ${esc(category)}</span>`).join('')):'';
+  // The crews (by name, in their colour), then, under a thin line, the pilots without a crew.
+  const row=content=>`<span class="planning-row">${content}</span>`;
+  const crewLine=crews.length?row(crews.map((crew,index)=>`<span class="planning-crew ${crewColorClass(crew.id,index)}">${logo(crew.category)}<span>${esc(crew.name)}</span></span>`).join('')):'';
+  const freeLine=free.length?row(free.map(([category,count])=>`<span class="planning-free-pill ${categories[category]?.css||''}" title="${count} pilote${count>1?'s':''} ${esc(category)} sans équipage">${count} ${esc(category)}</span>`).join('')):'';
   const details=compact?'':`${crewLine}${freeLine}`;
   return `<details class="planning-start${compact?' is-compact':''}${done?' is-done':''}${mine?' is-mine':''}${!pilots?' is-empty':''}" id="departure-${departure.id}" ${open?'open':''}><summary>${head}${details}${CHEVRON}</summary><div class="departure-fold planning-body">${body}</div></details>`;
 }

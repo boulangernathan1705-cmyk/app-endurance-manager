@@ -1655,10 +1655,9 @@ html[data-game] #app .departure-planning { display: grid; gap: 14px; margin-top:
 .planning-crew.crew-palette-4 { --crew-color: #75a9ff; } .planning-crew.crew-palette-5 { --crew-color: #b5df62; }
 .planning-crew.crew-palette-6 { --crew-color: #ffd45e; } .planning-crew.crew-palette-7 { --crew-color: #66e0b1; }
 .planning-crew.crew-palette-8 { --crew-color: #ff7777; } .planning-crew.crew-palette-9 { --crew-color: #b99cff; }
-.planning-row { display: grid; grid-template-columns: 104px minmax(0, 1fr); align-items: center; gap: 4px 10px; }
-.planning-row-label { color: #7d878a; font-size: 10.5px; font-weight: 800; letter-spacing: .09em; text-transform: uppercase; white-space: nowrap; }
-.planning-row-items { display: flex; flex-wrap: wrap; align-items: center; gap: 5px 14px; min-width: 0; }
-.planning-row-items .planning-free-pill + .planning-free-pill { margin-left: -8px; }
+.planning-row { display: flex; flex-wrap: wrap; align-items: center; gap: 5px 14px; min-width: 0; }
+.planning-row .planning-free-pill + .planning-free-pill { margin-left: -8px; }
+.planning-row + .planning-row { padding-top: 8px; border-top: 1px solid #343e41; }
 .planning-start[open] .planning-row { display: none; }
 
 /* Opened start: buttons first, then the crews (side by side when the day has widened) and the pilots. */
