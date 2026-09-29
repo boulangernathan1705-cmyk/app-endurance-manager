@@ -1386,6 +1386,68 @@ body:has(.community-gate.welcome.is-visitor) .site-nav-shell { display: none !im
   .settings-card { padding: 14px; }
 }
 
+/* « Mise en place » (members page): the setup steps of a community, and the platform tab of the managers. */
+.setup { max-width: 920px; }
+.setup-intro { margin: 0 0 14px; color: #c7d0d4; font-size: 15px; }
+.setup-steps { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.setup-step > details { border: 1px solid var(--border, #292d31); border-radius: 14px; background: var(--panel, #111315); }
+.setup-step.is-todo > details { border-left: 4px solid #f3b33d; }
+.setup-step.is-done > details { border-left: 4px solid #7fe0a8; }
+.setup-step.is-info > details { border-left: 4px solid var(--community-accent, #52d3d8); }
+.setup-step > details > summary { display: flex; align-items: center; gap: 14px; padding: 16px 18px; cursor: pointer; list-style: none; }
+.setup-step > details > summary::-webkit-details-marker { display: none; }
+.setup-step > details > summary::after { content: "▾"; margin-left: auto; color: #99a3a0; transition: transform .15s; }
+.setup-step > details[open] > summary::after { transform: rotate(180deg); }
+.setup-check { flex: 0 0 32px; height: 32px; display: grid; place-items: center; border-radius: 50%; background: rgba(243,179,61,.14); color: #f3b33d; font-weight: 900; }
+.setup-step.is-done .setup-check { background: rgba(127,224,168,.14); color: #7fe0a8; }
+.setup-step.is-info .setup-check { background: rgba(82,211,216,.14); color: var(--community-accent, #52d3d8); }
+.setup-title { display: grid; gap: 2px; min-width: 0; }
+.setup-title strong { color: #f4f6f5; font-size: 16px; }
+.setup-title small { color: #99a3a0; font-size: 13px; overflow-wrap: anywhere; }
+.setup-body { padding: 0 18px 18px 64px; color: #c7d0d4; font-size: 14.5px; line-height: 1.6; }
+.setup-body p { margin: 0 0 10px; }
+.setup-howto, .setup-tips { margin: 0 0 12px; padding-left: 20px; }
+.setup-howto li, .setup-tips li { margin: 4px 0; }
+.setup-note { padding: 8px 12px; border-radius: 8px; background: rgba(243,179,61,.08); color: #e8d3a6; font-size: 13.5px; }
+.setup-guide { margin: 0 0 14px; padding: 10px 14px; border: 1px solid var(--border, #292d31); border-radius: 10px; background: rgba(255,255,255,.02); }
+.setup-guide summary { cursor: pointer; color: #f4f6f5; font-weight: 800; }
+.setup-guide .setup-howto { margin-top: 10px; }
+.setup-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 12px; }
+.setup-actions .welcome-discord { min-height: 44px; font-size: 15px; }
+.setup-form { display: grid; gap: 12px; }
+.setup-form label { display: grid; gap: 5px; font-size: 13px; font-weight: 700; color: #c7d0d4; }
+.setup-form input:not([type=radio]), .setup-form select, .setup-inline input, .setup-message textarea, .setup-created textarea, .platform-slug input { width: 100%; min-height: 40px; box-sizing: border-box; padding: 8px 12px; border: 1px solid var(--border, #292d31); border-radius: 9px; background: rgba(0,0,0,.25); color: inherit; font: inherit; font-size: 14px; }
+.setup-modes { display: grid; gap: 8px; margin: 0; padding: 0; border: 0; }
+.setup-modes legend { margin-bottom: 6px; color: #f4f6f5; font-weight: 800; }
+.setup-mode { display: flex !important; align-items: flex-start; gap: 10px; padding: 10px 12px; border: 1px solid var(--border, #292d31); border-radius: 10px; cursor: pointer; }
+.setup-mode:has(input:checked) { border-color: var(--community-accent, #52d3d8); background: rgba(82,211,216,.07); }
+.setup-mode input { margin-top: 3px; accent-color: var(--community-accent, #52d3d8); }
+.setup-mode small { display: block; color: #99a3a0; font-weight: 400; }
+.setup-mode-block { display: none; gap: 12px; }
+.setup-form[data-mode="one"] [data-mode-block="one"], .setup-form[data-mode="two"] [data-mode-block="two"] { display: grid; }
+.setup-hook { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 8px; }
+.setup-hook .settings-status { grid-column: 1 / -1; }
+.setup-inline { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 10px; }
+.setup-inline input { flex: 1 1 260px; width: auto; }
+.setup-message { display: grid; gap: 6px; font-weight: 700; color: #c7d0d4; }
+.setup-message textarea, .setup-created textarea { resize: vertical; line-height: 1.5; }
+.setup-created { margin-top: 16px; padding: 14px; border: 1px solid rgba(127,224,168,.45); border-radius: 12px; background: rgba(127,224,168,.06); }
+.setup-created strong { color: #7fe0a8; }
+.platform-list { display: grid; gap: 8px; }
+.platform-row { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--border, #292d31); border-radius: 10px; background: var(--panel2, #16191c); font-size: 13.5px; color: #c7d0d4; }
+.platform-row div { display: grid; min-width: 0; }
+.platform-row div a { color: #99a3a0; overflow-wrap: anywhere; }
+.platform-ok { color: #7fe0a8; font-weight: 700; }
+.platform-ko, .platform-ko a { color: #f3b33d; font-weight: 700; }
+.platform-slug { display: flex; align-items: center; gap: 6px; }
+.platform-slug input { flex: 1 1 auto; min-width: 0; }
+.platform-slug span { color: #99a3a0; font-weight: 400; white-space: nowrap; }
+@media (max-width: 760px) {
+  .setup-body { padding: 0 14px 14px; }
+  .setup-hook, .platform-row { grid-template-columns: minmax(0, 1fr); }
+  .platform-slug { flex-wrap: wrap; }
+}
+
 /* Community of the site: name always visible, accent color set by its admins. */
 .community-chip { align-self: center; padding: 4px 10px; border: 1px solid var(--community-accent, #52d3d8); border-radius: 999px; color: #f4f6f5; font-size: 12.5px; font-weight: 800; white-space: nowrap; }
 details.community-chip { position: relative; padding: 0; }

@@ -3,7 +3,9 @@ import {durationLabel} from '../shared/duration.mjs';
 import {catalogForGame} from '../shared/catalog.mjs';
 
 const DAY_MS=86_400_000,HOUR_MS=3_600_000,TIME_ZONE='Europe/Paris';
-const circuitNames=new Map(catalogForGame('lmu').circuits.map(c=>[c.id,c.name]));
+const circuitNames=new Map([...catalogForGame('lmu').circuits,...catalogForGame('iracing').circuits].map(c=>[c.id,c.name]));
+// What a recap message covers (community_recaps.scope).
+const SCOPE_LABELS={all:'',lmu:' LMU',iracing:' iRacing'};
 const ymd=new Intl.DateTimeFormat('en-CA',{timeZone:TIME_ZONE,year:'numeric',month:'2-digit',day:'2-digit'});
 const startLabel=new Intl.DateTimeFormat('fr-FR',{timeZone:'UTC',day:'numeric',month:'long'});
 const endLabel=new Intl.DateTimeFormat('fr-FR',{timeZone:'UTC',day:'numeric',month:'long',year:'numeric'});
@@ -79,9 +81,10 @@ function futureDepartureEmbeds(departures,periodLabel,appUrl){
 }
 function footer(updatedAt){return{text:`mise à jour à ${updateTimeLabel.format(updatedAt)}`};}
 
-export function buildWeeklyDiscordPayload(snapshot,appUrl,updatedAt=Date.now()){
+export function buildWeeklyDiscordPayload(snapshot,appUrl,updatedAt=Date.now(),scope='lmu'){
+  const sim=SCOPE_LABELS[scope]??' LMU';
   const content='',current=Array.isArray(snapshot.currentDepartures)?snapshot.currentDepartures:[],future=Array.isArray(snapshot.futureDepartures)?snapshot.futureDepartures:[];
-  if(!current.length&&!future.length)return{content,embeds:[{title:'Aucune endurance LMU à préparer',description:'Aucune course avec un équipage engagé n’est en cours et aucun prochain départ LMU n’est programmé.',color:0x6b7280,footer:footer(updatedAt)}],allowed_mentions:{parse:[]}};
+  if(!current.length&&!future.length)return{content,embeds:[{title:`Aucune endurance${sim} à préparer`,description:`Aucune course avec un équipage engagé n’est en cours et aucun prochain départ${sim} n’est programmé.`,color:0x6b7280,footer:footer(updatedAt)}],allowed_mentions:{parse:[]}};
   const embeds=[];
   for(const departure of current)embeds.push(currentDepartureEmbed(departure,appUrl));
   if(future.length)embeds.push(...futureDepartureEmbeds(future,snapshot.periodLabel,appUrl));

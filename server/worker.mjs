@@ -5,11 +5,12 @@ import {
 } from './core.mjs';
 import {ingestClientError, clientErrorsApi} from './telemetry.mjs';
 import {racesPath} from './races-path.mjs';
-import {currentCommunity, communitySlug, appearanceOf, allCommunities} from './community.mjs';
+import {currentCommunity, appearanceOf, allCommunities, communityUrl} from './community.mjs';
 import {communityAccess, requirePermission, displayRole, PERMISSIONS, DEFAULT_EVERYONE, normalizePermissions, discordGuild, memberPermissions} from './access.mjs';
 // Solo races: a module each community turns on or off (settings of the members page).
 const soloRacesEnabled = (env, community) => community?.modules?.soloRaces === true;
 import {syncIracingEvents} from './iracing-import.mjs';
+import {syncWeeklyDiscord, sendRecapTest, WEBHOOK_URL} from './discord-weekly.mjs';
 // A race of the current community only: any id from another community answers "introuvable".
 async function eventById(env, eventId, community) {
   const row = await env.DB.prepare('SELECT * FROM events WHERE id=? AND community_id=?').bind(eventId, community.id).first();
@@ -47,11 +48,19 @@ async function myCommunities(env, actor, community) {
   const list = actor.manager ? await allCommunities(env)
     : ((await env.DB.prepare(`SELECT c.* FROM communities c JOIN memberships m ON m.community_id=c.id WHERE m.user_id=? AND m.status='member' ORDER BY c.id`)
       .bind(actor.user.id).all()).results || []).map(row => ({slug:row.slug, name:row.name}));
-  // The community of the main address (COMMUNITY) is reached there, not on a subdomain.
-  const main = communitySlug(env, null);
   const mine = [...list].sort((x, y) => x.name.localeCompare(y.name, 'fr')).map(item => ({slug:item.slug, name:item.name,
-    url:item.slug === main ? `${origin(env)}/` : `https://${item.slug}.${domain}/`, current:item.slug === community.slug}));
+    url:`${communityUrl(env, item)}/`, current:item.slug === community.slug}));
   return mine.length > 1 ? mine : [];
+}
+// Recap messages (community_recaps): one simulator or both.
+const RECAP_SCOPES = ['all', 'lmu', 'iracing'];
+const RECAP_NAMES = {all:'LMU et iRacing', lmu:'LMU', iracing:'iRacing'};
+// A saved webhook is never shown again in full: only the end of its id, to tell which one it is.
+const maskWebhook = url => `webhook …${(String(url).match(/webhooks\/(\d+)\//) || [,'????'])[1].slice(-4)}`;
+// Invitation of the bot (the site's Discord application) to a community's server: it only reads members and roles.
+function botInvite(env, guildId) {
+  if (!env.DISCORD_CLIENT_ID) return null;
+  return `https://discord.com/oauth2/authorize?client_id=${encodeURIComponent(env.DISCORD_CLIENT_ID)}&scope=bot&permissions=0${guildId ? `&guild_id=${guildId}&disable_guild_select=true` : ''}`;
 }
 // Permissions of the actor in the current community (server/access.mjs).
 const can = (actor, permission) => Boolean(actor.permissions?.has(permission));
@@ -561,6 +570,93 @@ async function api(request, env) {
     for (const key of ['iracingImport','discordWeekly','soloRaces']) if (typeof input[key] === 'boolean') modules[key] = input[key];
     await env.DB.prepare('UPDATE communities SET modules=? WHERE id=?').bind(JSON.stringify(modules), community.id).run();
     return json({ok:true, modules});
+  }
+  // « Mise en place » (admins): where the community stands, step by step (members page).
+  if (path === '/api/community/setup' && method === 'GET') {
+    requirePermission(actor,'admin');
+    const discord = community.discordGuildId ? await discordGuild(env, community.discordGuildId) : null;
+    const recaps = ((await env.DB.prepare('SELECT scope, webhook_url, updated_at FROM community_recaps WHERE community_id=? ORDER BY scope').bind(community.id).all()).results || [])
+      .map(row => ({scope:row.scope, webhook:maskWebhook(row.webhook_url), updatedAt:row.updated_at}));
+    const rolesConfigured = Boolean(await env.DB.prepare('SELECT 1 FROM community_role_permissions WHERE community_id=? LIMIT 1').bind(community.id).first());
+    return json({community:{name:community.name, slug:community.slug}, siteUrl:communityUrl(env, community), rolesConfigured, recaps,
+      // Former recap (site's webhook, LMU only) still running until the admins choose their own.
+      legacyRecap:!recaps.length && community.modules.discordWeekly === true && Boolean(env.DISCORD_WEEKLY_WEBHOOK_URL),
+      guild:{id:community.discordGuildId, name:discord?.name || null, botPresent:Boolean(discord)}, botInviteUrl:botInvite(env, community.discordGuildId),
+      discordInviteUrl:community.discordInviteUrl});
+  }
+  // The recap messages of the community: one message (one simulator or both) or two (one per simulator,
+  // e.g. in two channels). An empty address keeps the webhook already saved for that message.
+  if (path === '/api/community/recaps' && method === 'PUT') {
+    requirePermission(actor,'admin');
+    const input = await body(request);
+    const list = Array.isArray(input.recaps) ? input.recaps : [];
+    const scopes = list.map(item => item?.scope);
+    const valid = !scopes.length || (scopes.length === 1 && RECAP_SCOPES.includes(scopes[0])) || (scopes.length === 2 && scopes.includes('lmu') && scopes.includes('iracing'));
+    if (!valid) fail(400, 'Choisis un message (une simu ou les deux) ou deux messages (un par simu).');
+    const saved = new Map(((await env.DB.prepare('SELECT scope, webhook_url FROM community_recaps WHERE community_id=?').bind(community.id).all()).results || []).map(row => [row.scope, row.webhook_url]));
+    const rows = list.map(item => {
+      const url = String(item.webhookUrl || '').trim() || saved.get(item.scope) || '';
+      if (!WEBHOOK_URL.test(url)) fail(400, `Colle l’adresse du webhook Discord pour le message ${RECAP_NAMES[item.scope]}. Elle commence par https://discord.com/api/webhooks/.`);
+      return {scope:item.scope, url};
+    });
+    const modules = {...community.modules, discordWeekly:rows.length > 0};
+    await env.DB.batch([
+      env.DB.prepare('DELETE FROM community_recaps WHERE community_id=?').bind(community.id),
+      ...rows.map(row => env.DB.prepare('INSERT INTO community_recaps(community_id,scope,webhook_url,updated_at) VALUES(?,?,?,?)').bind(community.id, row.scope, row.url, now())),
+      // New settings: new messages (those already posted stay where they are).
+      env.DB.prepare('DELETE FROM discord_weekly_state WHERE community_id=?').bind(community.id),
+      env.DB.prepare('UPDATE communities SET modules=? WHERE id=?').bind(JSON.stringify(modules), community.id)]);
+    const published = rows.length ? await syncWeeklyDiscord(env, Date.now(), {...community, modules}) : {ok:true};
+    return json({ok:true, published:published.ok !== false});
+  }
+  if (path === '/api/community/recaps/test' && method === 'POST') {
+    requirePermission(actor,'admin');
+    await rateLimit(request, env, 'recap-test', 10);
+    const input = await body(request);
+    const url = String(input.webhookUrl || '').trim() || (await env.DB.prepare('SELECT webhook_url FROM community_recaps WHERE community_id=? AND scope=?').bind(community.id, String(input.scope || '')).first())?.webhook_url || '';
+    try { await sendRecapTest(url, community); }
+    catch (error) {
+      if (error.status === 400) fail(400, 'Cette adresse n’est pas un webhook Discord. Elle commence par https://discord.com/api/webhooks/.');
+      fail(400, 'Discord refuse ce webhook : il a peut-être été supprimé. Crée-en un nouveau dans les paramètres du salon.');
+    }
+    return json({ok:true});
+  }
+  // Invitation to the community's Discord server, shown to the players who are not members yet.
+  if (path === '/api/community/invite' && method === 'PATCH') {
+    requirePermission(actor,'admin');
+    const input = await body(request);
+    const url = input.url == null || input.url === '' ? null : String(input.url).trim();
+    if (url && !/^https:\/\/(?:discord\.gg|discord\.com\/invite)\/[\w-]{2,64}$/.test(url)) fail(400, 'Colle un lien d’invitation Discord (https://discord.gg/…).');
+    await env.DB.prepare('UPDATE communities SET discord_invite_url=? WHERE id=?').bind(url, community.id).run();
+    return json({ok:true});
+  }
+  // Platform managers: the communities, and a new one (its admins then set it up on its « Mise en place » page).
+  if (path === '/api/platform/communities' && method === 'GET') {
+    if (!actor.manager) fail(403, 'Réservé aux gestionnaires de la plateforme.');
+    const list = [];
+    for (const item of await allCommunities(env)) {
+      const discord = item.discordGuildId ? await discordGuild(env, item.discordGuildId) : null;
+      list.push({slug:item.slug, name:item.name, url:communityUrl(env, item), guildId:item.discordGuildId, discordServer:discord?.name || null, botPresent:Boolean(discord), botInviteUrl:botInvite(env, item.discordGuildId)});
+    }
+    return json({communities:list, baseDomain:baseDomain(env) || null});
+  }
+  if (path === '/api/platform/communities' && method === 'POST') {
+    if (!actor.manager) fail(403, 'Réservé aux gestionnaires de la plateforme.');
+    const input = await body(request);
+    const name = text(input.name, 80, 'Nom de la communauté'), shortName = text(input.shortName, 12, 'Nom court');
+    const slug = String(input.slug || '').trim().toLowerCase();
+    if (!/^[a-z0-9](?:[a-z0-9-]{1,38}[a-z0-9])$/.test(slug)) fail(400, 'L’adresse : 3 à 40 caractères, lettres minuscules, chiffres et tirets (pas au début ni à la fin).');
+    const guildId = String(input.guildId || '').trim();
+    if (!/^\d{15,22}$/.test(guildId)) fail(400, 'L’ID du serveur Discord : un nombre de 17 à 20 chiffres (clic droit sur le serveur → Copier l’identifiant du serveur).');
+    if (await env.DB.prepare('SELECT 1 FROM communities WHERE discord_guild_id=?').bind(guildId).first()) fail(409, 'Ce serveur Discord est déjà relié à une communauté.');
+    try {
+      await env.DB.prepare('INSERT INTO communities(id,slug,name,short_name,discord_guild_id,created_at) VALUES(?,?,?,?,?,?)').bind(crypto.randomUUID(), slug, name, shortName, guildId, now()).run();
+    } catch (error) {
+      if (/UNIQUE|CHECK|constraint/i.test(String(error?.message))) fail(409, 'Cette adresse est déjà prise ou réservée : choisis-en une autre.');
+      throw error;
+    }
+    const created = {slug};
+    return json({ok:true, url:communityUrl(env, created), botInviteUrl:botInvite(env, guildId)}, 201);
   }
   if (path.startsWith('/api/members/')) fail(410, 'Les rôles se gèrent maintenant sur le serveur Discord de la communauté.');
   fail(404, 'Action introuvable.');

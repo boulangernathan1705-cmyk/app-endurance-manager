@@ -1,18 +1,30 @@
-import {communitiesWith} from './community.mjs';
+import {allCommunities, communityUrl} from './community.mjs';
 import {buildWeeklyDiscordPayload, isInParisWeek, parisWeek} from './discord-weekly-format.mjs';
 
-// One recap per community (module "discordWeekly"): its state key is "<community id>:lmu-weekly-v1"
-// (migration 0034 kept the existing Discord message of commu-dev).
-const STATE_SUFFIX = 'lmu-weekly-v1';
-const stateKey = community => `${community.id}:${STATE_SUFFIX}`;
+// The recap messages of a community (community_recaps, set on its « Mise en place » page): one message per
+// row, for one simulator or both. Each message has its state key "<community id>:<scope>-weekly-v1"
+// (migration 0034 kept the existing LMU message of commu-dev under "<id>:lmu-weekly-v1").
+const stateKey = (community, scope = 'lmu') => `${community.id}:${scope}-weekly-v1`;
 const LOCK_SECONDS = 90;
+export const WEBHOOK_URL = /^https:\/\/(?:(?:ptb|canary)\.)?discord(?:app)?\.com\/api\/webhooks\/\d{15,22}\/[\w-]{20,120}$/;
+const CIRCUITS = {all:'', lmu:"AND circuit NOT LIKE 'iracing-%'", iracing:"AND circuit LIKE 'iracing-%'"};
+const PAGES = {all:'/', lmu:'/lmu/', iracing:'/iracing/'};
+
+// Recap messages to keep up to date. A community without any setting keeps the former one: module
+// "discordWeekly", LMU races, through the site's webhook (DISCORD_WEEKLY_WEBHOOK_URL).
+export async function recapTargets(env, community) {
+  const rows = (await env.DB.prepare('SELECT scope, webhook_url FROM community_recaps WHERE community_id=? ORDER BY scope').bind(community.id).all()).results || [];
+  if (rows.length) return rows.map(row => ({scope:row.scope, url:row.webhook_url}));
+  const site = String(env.DISCORD_WEEKLY_WEBHOOK_URL || '').trim();
+  return community.modules?.discordWeekly === true && site ? [{scope:'lmu', url:site}] : [];
+}
 
 function parseJson(value, fallback) {
   try { return JSON.parse(value); } catch { return fallback; }
 }
 
-function appUrl(env) {
-  try { return `${new URL(env.APP_ORIGIN).origin}/lmu/`; } catch { return undefined; }
+function appUrl(env, community, scope) {
+  try { return `${communityUrl(env, community)}${PAGES[scope] || '/'}`; } catch { return undefined; }
 }
 
 async function hashSnapshot(snapshot) {
@@ -67,9 +79,9 @@ function selectPlanningWeek(allDepartures, timestamp) {
   return {week, futureDepartures};
 }
 
-export async function loadWeeklyDiscordSnapshot(env, timestamp, community) {
+export async function loadWeeklyDiscordSnapshot(env, timestamp, community, scope = 'lmu') {
   const events = (await env.DB.prepare(`SELECT id,name,circuit,duration_hours,duration_minutes,schedule_pending,departures
-    FROM events WHERE community_id=? AND circuit NOT LIKE 'iracing-%' ORDER BY created_at,id`).bind(community.id).all()).results || [];
+    FROM events WHERE community_id=? ${CIRCUITS[scope] ?? CIRCUITS.lmu} ORDER BY created_at,id`).bind(community.id).all()).results || [];
   const allDepartures = flattenDepartures(events);
   const currentWeek = parisWeek(timestamp);
   // A start whose time is still to be confirmed is never announced as running (its placeholder is 0:00).
@@ -189,31 +201,36 @@ async function editMessage(base,messageId,payload) {
   catch (error) { if (error?.status !== 404) throw error; return createMessage(base,payload); }
 }
 
-async function syncLocked(env,base,lockToken,timestamp,community) {
-  const STATE_KEY = stateKey(community);
-  const snapshot = await loadWeeklyDiscordSnapshot(env,timestamp,community);
+async function syncLocked(env,base,lockToken,timestamp,community,scope) {
+  const STATE_KEY = stateKey(community, scope);
+  const snapshot = await loadWeeklyDiscordSnapshot(env,timestamp,community,scope);
   const contentHash = await hashSnapshot(snapshot);
   const state = await env.DB.prepare('SELECT message_id,content_hash FROM discord_weekly_state WHERE key=? AND lock_token=?').bind(STATE_KEY,lockToken).first();
   if (!state) throw new Error('État Discord hebdomadaire indisponible.');
   if (state.message_id && state.content_hash === contentHash) return {ok:true,changed:false};
-  const payload = buildWeeklyDiscordPayload(snapshot,appUrl(env),timestamp);
+  const payload = buildWeeklyDiscordPayload(snapshot,appUrl(env,community,scope),timestamp,scope);
   const messageId = state.message_id ? await editMessage(base,state.message_id,payload) : await createMessage(base,payload);
   await env.DB.prepare('UPDATE discord_weekly_state SET message_id=?,content_hash=?,week_key=?,updated_at=? WHERE key=? AND lock_token=?')
     .bind(messageId,contentHash,snapshot.periodKey,Math.floor(Date.now()/1000),STATE_KEY,lockToken).run();
   return {ok:true,changed:true,messageId};
 }
 
+// Keeps the recap messages up to date: those of one community, or of every community (scheduled task).
 export async function syncWeeklyDiscord(env,timestamp=Date.now(),community=null) {
-  const base = String(env?.DISCORD_WEEKLY_WEBHOOK_URL || '').trim();
-  if (!env?.DB || !base) return {ok:false,skipped:'not-configured'};
-  // Without a community: every community that enables the recap. (Until each community has its own
-  // Discord settings, step 4, they all use the site's webhook: only commu-dev enables it.)
-  if (!community) {
-    let last={ok:true,changed:false};
-    for (const target of await communitiesWith(env,'discordWeekly')) last=await syncWeeklyDiscord(env,timestamp,target);
-    return last;
+  if (!env?.DB) return {ok:false,skipped:'not-configured'};
+  let last={ok:false,skipped:'not-configured'};
+  for (const target of community ? [community] : await allCommunities(env)) {
+    for (const recap of await recapTargets(env,target)) {
+      try { last=await syncRecap(env,timestamp,target,recap.scope,recap.url); }
+      // One broken webhook (deleted on Discord) never stops the other messages.
+      catch (error) { last={ok:false,error:error?.status || 'failed'}; console.error('Discord weekly sync failed', target.slug, recap.scope, error instanceof Error ? error.message : 'unknown'); }
+    }
   }
-  const STATE_KEY = stateKey(community);
+  return last;
+}
+
+async function syncRecap(env,timestamp,community,scope,base) {
+  const STATE_KEY = stateKey(community, scope);
   const now = Math.floor(Date.now()/1000);
   await env.DB.prepare(`INSERT OR IGNORE INTO discord_weekly_state
     (key,message_id,content_hash,week_key,updated_at,dirty,lock_token,lock_until,community_id) VALUES(?,?,?,?,?,?,?,?,?)`)
@@ -228,7 +245,7 @@ export async function syncWeeklyDiscord(env,timestamp=Date.now(),community=null)
   try {
     for (let attempt=0; attempt<5; attempt+=1) {
       await env.DB.prepare('UPDATE discord_weekly_state SET dirty=0 WHERE key=? AND lock_token=?').bind(STATE_KEY,lockToken).run();
-      result=await syncLocked(env,base,lockToken,timestamp,community);
+      result=await syncLocked(env,base,lockToken,timestamp,community,scope);
       const state=await env.DB.prepare('SELECT dirty FROM discord_weekly_state WHERE key=? AND lock_token=?').bind(STATE_KEY,lockToken).first();
       if (!state?.dirty) break;
       if (attempt===4) rerun=true;
@@ -239,5 +256,13 @@ export async function syncWeeklyDiscord(env,timestamp=Date.now(),community=null)
   } finally {
     await env.DB.prepare("UPDATE discord_weekly_state SET lock_token='',lock_until=0 WHERE key=? AND lock_token=?").bind(STATE_KEY,lockToken).run().catch(()=>{});
   }
-  return rerun ? syncWeeklyDiscord(env,Date.now(),community) : result;
+  return rerun ? syncRecap(env,Date.now(),community,scope,base) : result;
+}
+
+// « Tester » on the setup page: a short message in the channel of the webhook. Throws when Discord refuses it.
+export async function sendRecapTest(url, community) {
+  if (!WEBHOOK_URL.test(url)) { const error = new Error('bad-url'); error.status = 400; throw error; }
+  const name = String(community.name || '').replace(/[^\p{L}\p{N} '’.-]/gu, '').trim() || 'ta communauté';
+  const content = '✅ Ce salon est bien relié à **' + name + '** sur Endurance Manager. Le récap des courses de la semaine sera publié ici.';
+  await sendDiscord(url, 'POST', {content, allowed_mentions:{parse:[]}});
 }

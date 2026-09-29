@@ -6,7 +6,7 @@ import {syncWeeklyDiscord} from './discord-weekly.mjs';
 import {cleanup, communityLabel} from './core.mjs';
 import {syncIracingEvents, completeSpecialTimes} from './iracing-import.mjs';
 import {refreshMemberships} from './access.mjs';
-import {allCommunities} from './community.mjs';
+import {allCommunities, currentCommunity} from './community.mjs';
 import {isDevelopment,devRobots,markDevelopmentResponse} from './dev-environment.mjs';
 
 let crewOwnershipReady = null;
@@ -44,14 +44,15 @@ async function ensureCrewOwnershipSchema(env) {
   return crewOwnershipReady;
 }
 
-async function runWeeklySync(env) {
+async function runWeeklySync(env, community = null) {
   await ensureDiscordWeeklySchema(env);
-  return syncWeeklyDiscord(env);
+  return syncWeeklyDiscord(env, Date.now(), community);
 }
 
-function queueWeeklySync(env, ctx) {
-  if (!env?.DISCORD_WEEKLY_WEBHOOK_URL || !ctx?.waitUntil) return;
-  ctx.waitUntil(runWeeklySync(env).catch(error => {
+// After a change of races or entries: the recap messages of this community only.
+function queueWeeklySync(env, ctx, request) {
+  if (!env?.DB || !ctx?.waitUntil) return;
+  ctx.waitUntil(currentCommunity(env, request).then(community => runWeeklySync(env, community)).catch(error => {
     console.error('Discord weekly sync failed', error instanceof Error ? error.message : 'unknown');
   }));
 }
@@ -82,7 +83,7 @@ export default {
     if (pathname.startsWith('/api/')) await ensureCrewOwnershipSchema(env);
     const weeklyMutation = isWeeklyDiscordMutation(request);
     const response = await worker.fetch(request, env, ctx);
-    if (weeklyMutation && response.ok) queueWeeklySync(env, ctx);
+    if (weeklyMutation && response.ok) queueWeeklySync(env, ctx, request);
     return development ? markDevelopmentResponse(response) : response;
   },
 
@@ -108,7 +109,7 @@ export default {
     if (env?.DB) ctx.waitUntil(cleanup(env).catch(error => {
       console.error('Scheduled cleanup failed', error instanceof Error ? error.message : 'unknown');
     }));
-    if (!env?.DISCORD_WEEKLY_WEBHOOK_URL) return;
+    if (!env?.DB) return;
     ctx.waitUntil(runWeeklySync(env).catch(error => {
       console.error('Discord weekly scheduled sync failed', error instanceof Error ? error.message : 'unknown');
     }));
