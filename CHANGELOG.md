@@ -2,11 +2,11 @@
 
 Les changements du site, version par version. La plus récente est en haut.
 
-## Prochaine version — en test
+## v1.7 — 29 septembre 2026
 
 ### Courses sur plusieurs jours
-- **Planning des départs** : quand une course se court sur plusieurs jours (vendredi, samedi, dimanche…), ses départs s'affichent en planning, un jour par colonne (un onglet par jour sur téléphone).
-- Chaque départ montre en un coup d'œil ses pilotes, **les pilotes sans équipage par catégorie** et ses équipages ; clique dessus pour l'ouvrir, t'inscrire ou rejoindre un équipage.
+- **Planning des départs** : quand une course se court sur plusieurs jours (vendredi, samedi, dimanche…), ses départs s'affichent en planning, un jour par colonne (un onglet par jour sur téléphone). Au-delà de 3 jours, choisis d'en voir 3, 5 ou 7 à la fois et passe d'un jour à l'autre avec les flèches.
+- Chaque départ montre en un coup d'œil ses équipages et **les pilotes sans équipage par catégorie** (« 2 GT3 ») ; un départ vide est grisé. Clique dessus pour l'ouvrir, t'inscrire ou rejoindre un équipage, ou sur la ligne des pilotes sans équipage pour les voir directement.
 - La date de la course montre tous ses jours (« ven. → dim. 16–18 oct. »), et un bouton **Ton départ** t'emmène directement au tien.
 
 ### Aide au survol
