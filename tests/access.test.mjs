@@ -54,7 +54,7 @@ test('members get the permissions of their Discord roles; others get nothing', a
   const pilot=await accessOf(env,community,PILOT);
   assert.equal(pilot.status,'member');assert.deepEqual([...pilot.permissions].sort(),[...DEFAULT_EVERYONE].sort(),'@everyone by default: enter and create one\'s crew');
   const boss=await accessOf(env,community,BOSS);
-  assert.ok(['create_race','manage_races','manage_crews','safe_races','register'].every(p=>boss.permissions.has(p)),'roles add up');
+  assert.ok(['create_race','manage_races','manage_registrations','solo_safe','endurance'].every(p=>boss.permissions.has(p)),'roles add up');
   assert.ok(!boss.permissions.has('admin'));
   const stranger=await accessOf(env,community,'555555555555555555');
   assert.equal(stranger.status,'not-member');assert.equal(stranger.permissions.size,0);
@@ -100,7 +100,7 @@ test('a community admin sets what each Discord role allows, "@everyone" included
   const {DB,env,community}=setup();
   fakeDiscord(t,{[PILOT]:[SAFE_ROLE]});
   DB.db.prepare("INSERT INTO community_role_permissions(community_id,discord_role_id,permissions,updated_at) VALUES(?,?,?,0)").run(DEV_COMMUNITY,GUILD,JSON.stringify(['register','not-a-permission']));
-  assert.deepEqual([...(await accessOf(env,community,PILOT)).permissions].sort(),['register','safe_races'],'unknown names are ignored');
+  assert.deepEqual([...(await accessOf(env,community,PILOT)).permissions].sort(),['endurance','solo_open','solo_safe'],'old names keep their meaning, unknown names are ignored');
 });
 
 test('the site: nothing for visitors or non-members, the members page lists the Discord roles', async t => {
@@ -143,7 +143,7 @@ test('community admins set the permissions of each Discord role and the modules'
   assert.equal((await as(PILOT,'settings')).status,403);
   const settings=await (await as(BOSS,'settings')).json();
   assert.deepEqual(settings.roles.find(role=>role.name==='@everyone').permissions,[...DEFAULT_EVERYONE]);
-  assert.equal((await as(BOSS,`roles/${SAFE_ROLE}`,'PUT',{permissions:['register','create_race']})).status,200);
+  assert.equal((await as(BOSS,`roles/${SAFE_ROLE}`,'PUT',{permissions:['endurance','create_race']})).status,200);
   assert.equal((await as(BOSS,`roles/${SAFE_ROLE}`,'PUT',{permissions:['everything']})).status,400);
   assert.equal((await as(BOSS,'roles/999999999999999999','PUT',{permissions:[]})).status,404,'only roles of the server');
   assert.ok((await communityAccess(env,{user:{id:PILOT}},{...(await import('../server/community.mjs')).DEFAULT_COMMUNITY_SLUG&&{id:DEV_COMMUNITY,slug:'commu-dev',discordGuildId:GUILD,modules:{}}})).permissions.has('create_race'));

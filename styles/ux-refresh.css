@@ -1341,6 +1341,9 @@ html[data-game] .race-card .race-fill:has(.solo-fill) { display: flex; flex-wrap
 .settings-switch input:checked + i::after { transform: translateX(20px); }
 .settings-switch input:focus-visible + i { outline: 2px solid var(--community-accent, #52d3d8); outline-offset: 2px; }
 .settings-switch input:disabled + i { opacity: .5; }
+.role-legend { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 6px 16px; margin: 0 0 14px; padding: 12px 14px; border-radius: 10px; background: rgba(255,255,255,.03); }
+.role-legend dt { font-size: 13px; font-weight: 800; color: #f4f6f5; }
+.role-legend dd { margin: 1px 0 0; font-size: 12.5px; color: #99a3a0; }
 .role-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 10px; }
 .role-card { padding: 12px 14px; border: 1px solid var(--border, #292d31); border-radius: 12px; background: var(--panel2, #16191c); }
 .role-card .role-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; margin-bottom: 10px; }

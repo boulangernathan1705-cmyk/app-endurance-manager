@@ -93,7 +93,7 @@ const registrationSelect = `SELECT r.*,p.user_id AS participant_user_id,p.guest_
 async function registrationParticipant(env, actor, input, data, community) {
   const cid = community.id;
   // "Inscrire un autre pilote" in this community (server/access.mjs).
-  const manager=Boolean(actor.permissions?.has('register_others'));
+  const manager=Boolean(actor.permissions?.has('manage_registrations'));
   if (input.participantUserId) {
     if (!actor.user) fail(401,'Connecte-toi avec Discord pour inscrire un autre pilote.');
     if (!/^\d{15,22}$/.test(input.participantUserId)) fail(400,'Compte Discord invalide.');

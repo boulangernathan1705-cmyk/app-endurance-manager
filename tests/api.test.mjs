@@ -463,8 +463,23 @@ test('SAFE solo races are reserved to the Discord roles with "Courses SAFE"',asy
  assert.equal((await req(path,'POST',{name:'Pilote',choices:[{category:'GT3',carAny:true},{category:'GT3',carAny:true}]},'pilot')).status,403);
  // The Safe role is given by the admins of the Discord server, never by the site.
  grant(PILOT,[SAFE_ROLE]);
- assert.ok((await req('/api/session','GET',null,'pilot')).data.permissions.includes('safe_races'));
+ assert.ok((await req('/api/session','GET',null,'pilot')).data.permissions.includes('solo_safe'));
  assert.equal((await req(path,'POST',{name:'Pilote',choices:[{category:'GT3',carAny:true},{category:'GT3',carAny:true}]},'pilot')).status,201);
+});
+test('the most demanding community: newcomers race solo OPEN only; the SAFE role opens SAFE races and endurances',async()=>{
+ const {req,login}=harness();await login(ADMIN,'admin');await login(PILOT,'pilot');
+ const setRole=(role,permissions)=>lastDB.db.prepare('INSERT OR REPLACE INTO community_role_permissions(community_id,discord_role_id,permissions,updated_at) VALUES(?,?,?,0)').run('e0a1c0de-0000-4000-8000-000000000001',role,JSON.stringify(permissions));
+ setRole('900000000000000001',['solo_open']);setRole(SAFE_ROLE,['solo_safe','endurance']);
+ const pathOf=async input=>{const id=(await req('/api/events','POST',input,'admin')).data.id;const event=(await req('/api/events','GET',null,'admin')).data.events.find(e=>e.id===id);return '/api/events/'+id+'/departures/'+event.departures[0].id+'/registrations';};
+ const open=await pathOf(soloInput),safe=await pathOf({...soloInput,access:'safe'}),endurance=await pathOf(eventInput);
+ const solo={name:'Pilote',choices:[{category:'GT3',carAny:true},{category:'GT3',carAny:true}]},crewEntry={name:'Pilote',category:'Hypercar',cars:[],carAny:true,status:'whole'};
+ assert.equal((await req(open,'POST',solo,'pilot')).status,201,'newcomer: solo OPEN');
+ assert.equal((await req(safe,'POST',solo,'pilot')).status,403,'newcomer: no SAFE race');
+ assert.equal((await req(endurance,'POST',crewEntry,'pilot')).status,403,'newcomer: no endurance');
+ grant(PILOT,[SAFE_ROLE]);
+ assert.equal((await req(safe,'POST',solo,'pilot')).status,201,'SAFE: SAFE races');
+ const entered=await req(endurance,'POST',crewEntry,'pilot');
+ assert.notEqual(entered.status,403,'SAFE: endurances '+JSON.stringify(entered.data));
 });
 test('solo race with two rounds: categories per round, one choice per round',async()=>{
  const {req,login}=harness();await login(ADMIN,'admin');await login(PILOT,'pilot');

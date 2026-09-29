@@ -8,8 +8,8 @@ import {renderHome,showRecoveryLink,raceDateBlock,raceStarts} from './home-view.
 
 function canCreateCrewOnDeparture(departure){
   if(!state.user||departure.startsAt<=Date.now())return false;
-  if(can('manage_crews'))return true;
-  if(!can('create_crew'))return false;
+  if(can('manage_registrations'))return true;
+  if(!can('endurance'))return false;
   const assigned=new Set((departure.crews||[]).flatMap(crew=>crew.registrationIds||[]));
   return (departure.availability||[]).some(reg=>reg.mine&&reg.status!=='unavailable'&&!assigned.has(reg.id));
 }
@@ -32,7 +32,7 @@ function renderSoloDeparture(event,departure,open){
   const main=own?button('my-registration','Modifier mon inscription',`data-departure="${departure.id}"`,'primary-button ux-summary-registration-toggle')
     :blocked?`<span class="solo-blocked">${esc(blocked)}</span>`
     :button('my-registration','Je participe',`data-departure="${departure.id}"`,'primary-button ux-summary-registration-toggle');
-  const other=can('register_others')?button('new-registration','Inscrire un autre pilote',`data-departure="${departure.id}" data-mode="pilot"`,'link-button ux-summary-registration-other'):'';
+  const other=can('manage_registrations')?button('new-registration','Inscrire un autre pilote',`data-departure="${departure.id}" data-mode="pilot"`,'link-button ux-summary-registration-other'):'';
   const actions=locked?'':`<span class="ux-summary-registration-actions">${main}${other}</span>`;
   const mine=own?`<span class="departure-mine-badge${waiting?' is-waiting':''}">${waiting?`Liste d’attente · ${waiting}${waiting===1?'er':'e'}`:'✓ Inscrit'}</span>`:'';
   return `<details class="departure-fold solo-departure${mine?' is-mine':''}" id="departure-${departure.id}" ${open?'open':''}><summary><span class="fold-index">01</span><span class="fold-date">${dateBlock(departure.startsAt,{compact:true})}<span class="fold-date-text"><strong class="ux-departure-title">Départ ${esc(timeLabel(departure.time))}</strong>${locked?'<span class="ux-departure-date">Départ passé</span>':''}${mine}</span></span><span class="fold-meta">${soloFill(event,departure)}</span>${actions}</summary><div class="departure-fold-body">${locked?'<p class="finished-history">Les inscriptions sont fermées.</p>':`<section class="fold-section fold-registration" ${editorOpen?'':'hidden'}>${renderRegistrationWorkspace(event,departure)}</section>`}<section class="fold-section departure-participation-section">${renderSoloEntries(event,departure)}</section></div></details>`;
@@ -41,8 +41,8 @@ function renderSoloDeparture(event,departure,open){
 export function renderDeparturePanel(event,departure,index,open=false,{isPast=false}={}){
   if(isSolo(event))return renderSoloDeparture(event,departure,true);
   const locked=departure.startsAt<=Date.now(),crews=departure.crews||[],available=pilotCount(departure.availability),own=ownRegistration(departure),editorOpen=state.registrationOpen.has(departure.id),canCreateCrew=canCreateCrewOnDeparture(departure);
-  const createCrewAction=canCreateCrew?`<button type="button" class="link-button ux-summary-create-crew" data-crew-builder-open data-departure="${departure.id}">${esc(can('manage_crews')?'Créer un équipage':'Créer mon équipage')}</button>`:'';
-  const actions=locked?'':`<span class="ux-summary-registration-actions${canCreateCrew?' is-three-actions':''}">${own||can('register')?button('my-registration',own?'Modifier mon inscription':'S’inscrire',`data-departure="${departure.id}"`,'primary-button ux-summary-registration-toggle'):''}${can('register_others')?button('new-registration','Inscrire un autre pilote',`data-departure="${departure.id}" data-mode="pilot"`,'link-button ux-summary-registration-other'):''}${createCrewAction}</span>`;
+  const createCrewAction=canCreateCrew?`<button type="button" class="link-button ux-summary-create-crew" data-crew-builder-open data-departure="${departure.id}">${esc(can('manage_registrations')?'Créer un équipage':'Créer mon équipage')}</button>`:'';
+  const actions=locked?'':`<span class="ux-summary-registration-actions${canCreateCrew?' is-three-actions':''}">${own||can('endurance')?button('my-registration',own?'Modifier mon inscription':'S’inscrire',`data-departure="${departure.id}"`,'primary-button ux-summary-registration-toggle'):''}${can('register_others')?button('new-registration','Inscrire un autre pilote',`data-departure="${departure.id}" data-mode="pilot"`,'link-button ux-summary-registration-other'):''}${createCrewAction}</span>`;
   const participation=renderPilots(event,departure);
   const mine=myDepartureBadge(departure);
   return `<details class="departure-fold${isPast?' is-past':''}${mine?' is-mine':''}" id="departure-${departure.id}" ${open?'open':''}><summary><span class="fold-index">${String(index+1).padStart(2,'0')}</span><span class="fold-date">${dateBlock(departure.startsAt,{compact:true})}<span class="fold-date-text"><strong class="ux-departure-title">Départ ${esc(timeLabel(departure.time))}</strong>${locked?'<span class="ux-departure-date">Départ passé</span>':''}${mine}</span></span><span class="fold-meta">${available} pilote${available>1?'s':''} · ${crews.length} équipage${crews.length>1?'s':''}</span>${actions}</summary><div class="departure-fold-body">${locked?'<p class="finished-history">Les inscriptions sont verrouillées. Les équipages restent consultables ci-dessous.</p>':`<section class="fold-section fold-registration" ${editorOpen?'':'hidden'}>${renderRegistrationWorkspace(event,departure)}</section>`}<section class="fold-section departure-participation-section">${participation}</section></div></details>`;

@@ -19,9 +19,13 @@ function renderError(message) {
 }
 
 // What each permission means (server/access.mjs, PERMISSIONS).
-const PERMISSION_LABELS = {register:'S’inscrire', register_others:'Inscrire un autre pilote', create_crew:'Créer un équipage',
-  manage_crews:'Gérer tous les équipages', create_race:'Créer une course', manage_races:'Gérer toutes les courses',
-  safe_races:'Courses SAFE', admin:'Administrer la communauté'};
+const PERMISSION_LABELS = {endurance:'Endurances', solo_open:'Courses solo OPEN', solo_safe:'Courses solo SAFE',
+  manage_registrations:'Gérer les inscriptions', create_race:'Créer des courses', manage_races:'Gérer toutes les courses', admin:'Administrer'};
+const PERMISSION_HELP = {endurance:'S’inscrire aux endurances, rejoindre, créer et gérer son équipage.',
+  solo_open:'S’inscrire aux courses solo OPEN.', solo_safe:'S’inscrire aux courses solo SAFE (et OPEN).',
+  manage_registrations:'Inscrire, modifier ou retirer n’importe quel pilote, composer tous les équipages.',
+  create_race:'Créer des courses, modifier et supprimer les siennes.', manage_races:'Modifier et supprimer toutes les courses, y compris celles importées d’iRacing.',
+  admin:'Page Membres et réglages : apparence, modules, autorisations des rôles.'};
 
 // Members of the community: found on its Discord server by the bot. Roles are managed on Discord; this page
 // shows them with what they allow here (the settings of each role are in the « Réglages » tab).
@@ -47,9 +51,12 @@ function memberCard(member, allPermissions) {
 async function settingsMarkup() {
   const settings = await api('/api/community/settings');
   const module = (key, label, help) => `<label class="settings-switch"><span><strong>${label}</strong><small>${help}</small></span><input type="checkbox" role="switch" data-module="${key}" ${settings.modules[key] ? 'checked' : ''}><i aria-hidden="true"></i></label>`;
-  const role = item => `<article class="role-card" data-role="${esc(item.id)}">
+  // The solo races permissions only matter with the solo races module.
+  const shown = settings.permissions.filter(permission => settings.modules.soloRaces || !permission.startsWith('solo_'));
+  const legend = `<dl class="role-legend">${shown.map(permission => `<div><dt>${esc(PERMISSION_LABELS[permission])}</dt><dd>${esc(PERMISSION_HELP[permission])}</dd></div>`).join('')}</dl>`;
+  const role = item => `<article class="role-card" data-role="${esc(item.id)}" data-kept="${esc(JSON.stringify(item.permissions.filter(permission => !shown.includes(permission))))}">
     <div class="role-head"><strong>${esc(item.name)}</strong>${item.administrator ? '<small>Administrateur Discord : toutes les autorisations</small>' : ''}<span class="settings-status" aria-live="polite"></span></div>
-    <div class="role-pills">${settings.permissions.map(permission => `<label class="role-pill"><input type="checkbox" data-permission="${permission}" ${item.permissions.includes(permission) || item.administrator ? 'checked' : ''} ${item.administrator ? 'disabled' : ''}><span>${esc(PERMISSION_LABELS[permission] || permission)}</span></label>`).join('')}</div>
+    <div class="role-pills">${shown.map(permission => `<label class="role-pill" title="${esc(PERMISSION_HELP[permission])}"><input type="checkbox" data-permission="${permission}" ${item.permissions.includes(permission) || item.administrator ? 'checked' : ''} ${item.administrator ? 'disabled' : ''}><span>${esc(PERMISSION_LABELS[permission] || permission)}</span></label>`).join('')}</div>
   </article>`;
   const roles = settings.roles.length ? `<div class="role-list">${settings.roles.map(role).join('')}</div>`
     : '<p class="members-help">Les rôles du serveur Discord ne peuvent pas être lus : vérifie que le bot est bien sur le serveur.</p>';
@@ -63,7 +70,7 @@ async function settingsMarkup() {
     <div class="settings-actions"><button class="primary-button" type="submit">Enregistrer</button><span class="settings-status" aria-live="polite"></span></div></form></section>`;
   return `${appearance}
     <section class="settings-card"><h2>Modules</h2>${module('iracingImport','Endurances iRacing officielles','Import automatique des séries en équipe et des événements spéciaux.')}${module('discordWeekly','Récap Discord hebdomadaire','Message des courses de la semaine sur le salon Discord.')}${module('soloRaces','Courses solo','Onglet « Courses solo », places limitées, liste d’attente, courses OPEN / SAFE.')}</section>
-    <section class="settings-card settings-roles-card"><h2>Autorisations des rôles Discord</h2><p class="members-help">Un membre cumule les autorisations de tous ses rôles. « @everyone » s’applique à tous les membres du serveur. Le propriétaire du serveur et les rôles « Administrateur » de Discord ont tout.</p>${roles}</section>`;
+    <section class="settings-card settings-roles-card"><h2>Autorisations des rôles Discord</h2><p class="members-help">Un membre cumule les autorisations de tous ses rôles. « @everyone » s’applique à tous les membres du serveur. Le propriétaire du serveur et les rôles « Administrateur » de Discord ont tout.</p>${legend}${roles}</section>`;
 }
 
 async function load() {
@@ -123,13 +130,18 @@ app.addEventListener('change', async event => {
   const box = event.target;
   if (box.dataset.module) {
     box.disabled = true;
-    try { await api('/api/community/modules', 'PATCH', {[box.dataset.module]:box.checked}); } catch (error) { box.checked = !box.checked; alert(error.message); } finally { box.disabled = false; }
+    try {
+      await api('/api/community/modules', 'PATCH', {[box.dataset.module]:box.checked});
+      // The solo races permissions appear or disappear with the module.
+      if (box.dataset.module === 'soloRaces') { await load(); app.querySelector('[data-tab="settings"]')?.click(); return; }
+    } catch (error) { box.checked = !box.checked; alert(error.message); } finally { box.disabled = false; }
     return;
   }
   const row = box.closest('[data-role]');
   if (!row || !box.dataset.permission) return;
   const status = row.querySelector('.settings-status');
-  const permissions = [...row.querySelectorAll('input[data-permission]:checked')].map(input => input.dataset.permission);
+  // Permissions not shown (solo races module off) are kept as they are.
+  const permissions = [...JSON.parse(row.dataset.kept || '[]'), ...[...row.querySelectorAll('input[data-permission]:checked')].map(input => input.dataset.permission)];
   status.textContent = 'Enregistrement…';
   try { await api(`/api/community/roles/${row.dataset.role}`, 'PUT', {permissions}); status.textContent = '✓'; }
   catch (error) { box.checked = !box.checked; status.textContent = error.message; }

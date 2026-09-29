@@ -280,7 +280,7 @@ async function openBuilder(crewId = null, preferredDepartureId = '') {
     if (!event) throw new Error('Événement introuvable. Actualise la page.');
     if (!session.user) throw new Error('Connecte-toi avec Discord pour gérer un équipage.');
     // "Gérer tous les équipages" in this community (Discord roles).
-    const manager=(session.permissions || []).includes('manage_crews');
+    const manager=(session.permissions || []).includes('manage_registrations');
 
     if (crewId) {
       let found = null;

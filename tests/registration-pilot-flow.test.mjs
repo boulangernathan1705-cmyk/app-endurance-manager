@@ -67,7 +67,7 @@ test('Discord registrations are editable by both creator and participant',()=>{
 });
 
 test('organizers and admins can edit every registration without owning it',()=>{
-  assert.match(worker,/return can\(actor, 'register_others'\);/);
+  assert.match(worker,/return can\(actor, 'manage_registrations'\);/);
   assert.match(worker,/if \(!canManageRegistration\(reg,actor\)\) fail\(403/);
 });
 

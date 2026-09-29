@@ -6,7 +6,7 @@ import {
 import {ingestClientError, clientErrorsApi} from './telemetry.mjs';
 import {racesPath} from './races-path.mjs';
 import {currentCommunity, appearanceOf} from './community.mjs';
-import {communityAccess, requirePermission, displayRole, PERMISSIONS, DEFAULT_EVERYONE, discordGuild, memberPermissions} from './access.mjs';
+import {communityAccess, requirePermission, displayRole, PERMISSIONS, DEFAULT_EVERYONE, normalizePermissions, discordGuild, memberPermissions} from './access.mjs';
 // Solo races and SAFE drivers: still being built, only on the sites where SOLO_RACES is "on" (dev).
 const soloRacesEnabled = (env, community) => env?.SOLO_RACES === 'on' || community?.modules?.soloRaces === true;
 import {syncIracingEvents} from './iracing-import.mjs';
@@ -42,13 +42,13 @@ function slotFor(event, from, departureId) {
 // Permissions of the actor in the current community (server/access.mjs).
 const can = (actor, permission) => Boolean(actor.permissions?.has(permission));
 function isRegistrationManager(actor) {
-  return can(actor, 'register_others');
+  return can(actor, 'manage_registrations');
 }
 function canManageRegistration(reg, actor) {
   return owned(reg, actor) || isRegistrationManager(actor);
 }
 function canManageCrew(crew, actor) {
-  return can(actor, 'manage_crews') || Boolean(actor.user && crew?.owner_user_id === actor.user.id);
+  return can(actor, 'manage_registrations') || Boolean(actor.user && crew?.owner_user_id === actor.user.id);
 }
 function publicRegistration(reg, actor, userNames = new Map()) {
   let cars = [];
@@ -366,12 +366,12 @@ async function api(request, env) {
     if (!JSON.parse(event.categories).includes(input.category)) fail(400,'Choisis une catégorie de cet événement.');
     const car=input.car==null || input.car==='' ? '' : text(input.car,100,'Voiture');
     const crewId=id();
-    if (can(actor,'manage_crews')) {
+    if (can(actor,'manage_registrations')) {
       const result=await env.DB.prepare('INSERT INTO crews(id,event_id,departure_id,name,category,car,created_at,community_id) VALUES(?,?,?,?,?,?,?,?)').bind(crewId,event.id,departure.id,name,input.category,car,now(),community.id).run();
       if (!result.meta.changes) fail(409,'Impossible de créer cet équipage. Actualise avant de réessayer.');
       return json({id:crewId,joined:false},201);
     }
-    requirePermission(actor,'create_crew','Tu n’as pas l’autorisation de créer un équipage dans cette communauté.');
+    requirePermission(actor,'endurance','Tu n’as pas l’autorisation de créer un équipage dans cette communauté.');
     const ownRows=(await env.DB.prepare(registrationSelect+' WHERE r.event_id=? AND r.departure_id=? AND r.category=? AND r.status!=?').bind(event.id,departure.id,input.category,'unavailable').all()).results;
     const selected=ownRows.find(reg=>personal(reg,actor));
     if (!selected) fail(403,'Inscris-toi d’abord sur ce départ dans cette catégorie avant de créer ton équipage.');
@@ -423,10 +423,11 @@ async function api(request, env) {
     const solo = (event.format||'endurance') === 'solo';
     // Own entry: "S'inscrire". Someone else's (Discord pilot or typed name): "Inscrire un autre pilote".
     const forOther = input.forOther === true || Boolean(input.participantUserId);
-    if (forOther) requirePermission(actor,'register_others','Tu n’as pas l’autorisation d’inscrire un autre pilote dans cette communauté.');
-    else requirePermission(actor,'register','Tu n’as pas l’autorisation de t’inscrire aux courses de cette communauté.');
-    // SAFE solo races: the Discord roles with "Courses SAFE".
-    if (solo && !forOther && event.access === 'safe' && !can(actor,'safe_races')) fail(403, 'Cette course est réservée aux pilotes SAFE. Demande à un administrateur du Discord.');
+    if (forOther) requirePermission(actor,'manage_registrations','Tu n’as pas l’autorisation d’inscrire un autre pilote dans cette communauté.');
+    // Solo races: OPEN for "Courses solo OPEN" or "SAFE", SAFE only for "SAFE". Endurances: "Endurances".
+    else if (solo && event.access === 'safe') requirePermission(actor,'solo_safe','Cette course est réservée aux pilotes SAFE. Demande à un administrateur du Discord.');
+    else if (solo) { if (!can(actor,'solo_safe')) requirePermission(actor,'solo_open','Tu n’as pas l’autorisation de t’inscrire aux courses solo de cette communauté.'); }
+    else requirePermission(actor,'endurance','Tu n’as pas l’autorisation de t’inscrire aux endurances de cette communauté.');
     const data = validateRegistration(input, event);
     const guestToken = actor.user ? null : actor.guestToken || token();
     if (guestToken) { actor.guestToken=guestToken;actor.guestHash=await hash(guestToken); }
@@ -507,7 +508,7 @@ async function api(request, env) {
     const rows = (await env.DB.prepare('SELECT discord_role_id, permissions FROM community_role_permissions WHERE community_id=?').bind(community.id).all()).results || [];
     const saved = new Map(rows.map(row => [row.discord_role_id, JSON.parse(row.permissions || '[]')]));
     const roles = (discord?.roles || []).sort((a, b) => b.position - a.position).map(role => ({id:role.id, name:role.id === community.discordGuildId ? '@everyone' : role.name,
-      administrator:role.administrator, permissions:saved.get(role.id) ?? (role.id === community.discordGuildId ? [...DEFAULT_EVERYONE] : [])}));
+      administrator:role.administrator, permissions:saved.has(role.id) ? normalizePermissions(saved.get(role.id)) : (role.id === community.discordGuildId ? [...DEFAULT_EVERYONE] : [])}));
     if (discord && (discord.icon !== (community.appearance.discordIcon || '') || discord.banner !== (community.appearance.discordBanner || ''))) {
       community.appearance = {...community.appearance, discordIcon:discord.icon, discordBanner:discord.banner};
       await env.DB.prepare('UPDATE communities SET appearance=? WHERE id=?').bind(JSON.stringify(community.appearance), community.id).run();

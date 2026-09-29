@@ -48,7 +48,8 @@ function carCell(reg) {
 // Why the driver cannot enter, or '' when they can.
 export function soloEntryBlock(event) {
   if (!state.user) return 'Connecte-toi avec Discord pour participer.';
-  if (event.access === 'safe' && !can('safe_races')) return 'Course réservée aux pilotes SAFE.';
+  if (event.access === 'safe' && !can('solo_safe')) return 'Course réservée aux pilotes SAFE.';
+  if (!can('solo_safe') && !can('solo_open')) return 'Tu n’as pas accès aux courses solo de cette communauté.';
   return '';
 }
 

@@ -11,16 +11,20 @@
 import {administrators, fail, now} from './core.mjs';
 
 export const PERMISSIONS = Object.freeze([
-  'register',        // s'inscrire aux courses, rejoindre / quitter un équipage
-  'register_others', // inscrire un autre pilote, gérer les inscriptions des autres
-  'create_crew',     // créer son équipage et le gérer
-  'manage_crews',    // gérer tous les équipages
-  'create_race',     // créer des courses (et gérer les siennes)
-  'manage_races',    // modifier et supprimer toutes les courses
-  'safe_races',      // accès aux courses réservées SAFE (module courses solo)
-  'admin'            // administrer la communauté (réglages, rôles, apparence, membres)
+  'endurance',            // s'inscrire aux endurances, rejoindre, créer et gérer son équipage
+  'solo_open',            // s'inscrire aux courses solo OPEN (module courses solo)
+  'solo_safe',            // s'inscrire aux courses solo SAFE et OPEN (module courses solo)
+  'manage_registrations', // inscrire, modifier, retirer n'importe quel pilote ; composer tous les équipages
+  'create_race',          // créer des courses, modifier et supprimer les siennes
+  'manage_races',         // modifier et supprimer toutes les courses
+  'admin'                 // page Membres et réglages de la communauté
 ]);
-export const DEFAULT_EVERYONE = Object.freeze(['register', 'create_crew']);
+export const DEFAULT_EVERYONE = Object.freeze(['endurance', 'solo_open']);
+// Names used before the permissions were redefined (settings saved with them keep their meaning).
+const LEGACY = {register:['endurance', 'solo_open'], create_crew:['endurance'], register_others:['manage_registrations'],
+  manage_crews:['manage_registrations'], safe_races:['solo_safe']};
+export const normalizePermissions = list => [...new Set((list || []).flatMap(permission => LEGACY[permission] || [permission]))]
+  .filter(permission => PERMISSIONS.includes(permission));
 
 const DISCORD_API = 'https://discord.com/api/v10';
 const CHECK_EVERY = 24 * 3600; // seconds
@@ -79,7 +83,7 @@ export async function checkMembership(env, community, userId) {
 async function rolePermissions(env, community, roles) {
   const everyone = community.discordGuildId;
   const rows = (await env.DB.prepare('SELECT discord_role_id, permissions FROM community_role_permissions WHERE community_id=?').bind(community.id).all()).results || [];
-  const byRole = new Map(rows.map(row => [row.discord_role_id, JSON.parse(row.permissions || '[]')]));
+  const byRole = new Map(rows.map(row => [row.discord_role_id, normalizePermissions(JSON.parse(row.permissions || '[]'))]));
   const granted = new Set(byRole.has(everyone) ? byRole.get(everyone) : DEFAULT_EVERYONE);
   for (const role of roles) for (const permission of byRole.get(role) || []) granted.add(permission);
   return new Set([...granted].filter(permission => PERMISSIONS.includes(permission)));
