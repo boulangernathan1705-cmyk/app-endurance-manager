@@ -1,15 +1,21 @@
-// Several starts at once in the event form (special events: often 3 days with 5 or 6 starts each).
-// Times typed in one go (« 10h 14h 18h30 », « 10:00, 13:30 »): each "HH:MM", sorted, impossible ones ignored.
-export function parseStartTimes(text){
-  const times=new Set();
-  for(const match of String(text||'').matchAll(/(\d{1,2})(?:\s*[h:.](\d{2})?)?(?!\d)/gi)){
-    const hour=Number(match[1]),minute=Number(match[2]||0);
-    if(hour<=23&&minute<=59)times.add(`${String(hour).padStart(2,'0')}:${String(minute).padStart(2,'0')}`);
-  }
-  return [...times].sort();
+// Several starts at once in the event form (special events: often 3 days with 5 or 6 starts each): the days
+// ticked in a week, times the hours ticked in a grid, all at the same minute.
+
+// "YYYY-MM-DD" n days after a date (calendar days, no time zone involved).
+export function addDays(date, days) {
+  const [y, m, d] = date.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10);
 }
-export function bulkStartDays(first,count){
-  if(!/^\d{4}-\d{2}-\d{2}$/.test(first||''))return [];
-  const [y,m,d]=first.split('-').map(Number);
-  return Array.from({length:Math.max(1,Math.min(7,Number(count)||1))},(_,index)=>new Date(Date.UTC(y,m-1,d+index)).toISOString().slice(0,10));
+// The seven days (Monday to Sunday) of the week of a date.
+export function weekDates(date) {
+  const [y, m, d] = date.split('-').map(Number);
+  const weekday = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+  const monday = addDays(date, weekday === 0 ? -6 : 1 - weekday);
+  return Array.from({length:7}, (_, index) => addDays(monday, index));
+}
+// Every start of the ticked days and hours, sorted: [{date, time:"HH:MM"}].
+export function bulkStarts(days, hours, minute = '00') {
+  const times = [...new Set(hours.map(Number))].filter(hour => hour >= 0 && hour <= 23).sort((a, b) => a - b)
+    .map(hour => `${String(hour).padStart(2, '0')}:${/^[0-5]\d$/.test(minute) ? minute : '00'}`);
+  return [...new Set(days)].sort().flatMap(date => times.map(time => ({date, time})));
 }

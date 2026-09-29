@@ -5,7 +5,10 @@ Les changements du site, version par version. La plus récente est en haut.
 ## v1.6.1 — 29 septembre 2026
 
 ### Créer une course
-- **Plusieurs départs d'un coup** : choisis le premier jour, le nombre de jours et tape les heures (« 10h 14h 18h 22h ») ; tous les départs sont créés, à retoucher si besoin. Idéal pour les événements spéciaux sur un week-end.
+- **Plusieurs départs d'un coup** : coche les jours de course (vendredi, samedi, dimanche…) puis les heures de départ ; chaque jour coché reçoit toutes les heures cochées, et le nombre de départs s'affiche avant de valider. Idéal pour les événements spéciaux sur un week-end.
+
+### Application
+- Le logo de ta communauté suit l'icône de ton serveur Discord : une nouvelle icône sur Discord remplace l'ancienne sur le site et dans l'application installée.
 
 ## v1.6 — 29 septembre 2026
 
