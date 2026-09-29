@@ -2,6 +2,11 @@
 
 Les changements du site, version par version. La plus récente est en haut.
 
+## v1.2.1 — 29 septembre 2026
+
+### Accueil
+- Nouvel **écran d'accueil** avant la connexion : ce que fait le site en un coup d'œil, et un bouton **Se connecter avec Discord** bien visible.
+
 ## v1.2 — 29 septembre 2026
 
 ### Communautés

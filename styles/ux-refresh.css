@@ -1297,6 +1297,27 @@ html[data-game] .race-card .race-fill:has(.solo-fill) { display: flex; flex-wrap
 .community-gate h1 { margin: 0 0 12px; font-size: 28px; font-weight: 850; color: #f4f6f5; }
 .community-gate p { margin: 0 0 20px; color: #c7d0d4; font-size: 16px; line-height: 1.6; }
 .community-gate-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
+/* Welcome screen for visitors (home of the main address and of each community). */
+.community-gate.welcome { max-width: 1080px; margin: 34px auto 20px; padding: 0; border: 0; border-radius: 0; background: none; text-align: left; }
+.welcome-hero { position: relative; overflow: hidden; padding: clamp(28px, 5vw, 56px); border: 1px solid var(--border, #292d31); border-radius: 20px; background: radial-gradient(circle at 100% 0%, rgba(82,211,216,.14), transparent 26rem), radial-gradient(circle at 0% 100%, rgba(227,6,19,.10), transparent 24rem), var(--panel, #111315); box-shadow: 0 24px 60px rgba(0,0,0,.35); }
+.welcome-hero::before { content: ""; position: absolute; inset: 0 0 auto; height: 4px; background: linear-gradient(90deg, #52d3d8, #e30613 55%, #f3b33d); }
+.welcome-kicker { margin: 0 0 12px; color: var(--community-accent, #52d3d8); font-size: 12px; font-weight: 900; letter-spacing: .18em; text-transform: uppercase; }
+.community-gate.welcome h1 { max-width: 720px; margin: 0 0 14px; font-size: clamp(28px, 4.2vw, 46px); line-height: 1.08; font-weight: 900; color: #f4f6f5; letter-spacing: -.01em; }
+.welcome-lead { max-width: 640px; margin: 0 0 26px; color: #c7d0d4; font-size: clamp(15px, 1.6vw, 18px); line-height: 1.6; }
+.welcome-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.welcome-discord { display: inline-flex; align-items: center; gap: 10px; min-height: 52px; padding: 0 24px; border-radius: 12px; background: #5865f2; color: #fff !important; font-size: 16px; font-weight: 800; text-decoration: none !important; box-shadow: 0 10px 26px rgba(88,101,242,.35); transition: transform .15s, box-shadow .15s, background .15s; }
+.welcome-discord:hover, .welcome-discord:focus-visible { background: #4752c4; transform: translateY(-1px); box-shadow: 0 14px 30px rgba(88,101,242,.45); }
+.welcome-discord svg { width: 22px; height: 22px; flex: 0 0 22px; }
+.welcome-trust { margin: 16px 0 0; color: #99a3a0; font-size: 13px; }
+.welcome-trust a { color: #c7d0d4; }
+.welcome-features { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 14px 0 0; padding: 0; list-style: none; }
+.welcome-features li { display: grid; gap: 6px; align-content: start; padding: 18px; border: 1px solid var(--border, #292d31); border-radius: 14px; background: var(--panel, #111315); }
+.welcome-features svg { width: 26px; height: 26px; margin-bottom: 4px; fill: none; stroke: var(--community-accent, #52d3d8); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.welcome-features strong { color: #f4f6f5; font-size: 15px; }
+.welcome-features span { color: #99a3a0; font-size: 13.5px; line-height: 1.5; }
+@media (max-width: 900px) { .welcome-features { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .community-gate.welcome { margin-top: 16px; } .welcome-features { grid-template-columns: minmax(0, 1fr); } .welcome-discord { width: 100%; justify-content: center; } }
+
 /* Members page: tabs, member cards, settings cards. */
 .members-tabs { display: flex; gap: 6px; margin-bottom: 14px; }
 .members-tabs button { min-height: 42px; padding: 0 18px; border: 1px solid var(--border, #292d31); border-radius: 10px; background: var(--panel, #111315); color: #c7d0d4; font: inherit; font-weight: 800; cursor: pointer; }
