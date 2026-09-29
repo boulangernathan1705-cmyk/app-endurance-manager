@@ -7,7 +7,7 @@ import {cleanup, communityLabel} from './core.mjs';
 import {importNextCommunity, completeSpecialTimes} from './iracing-import.mjs';
 import {refreshShowcaseIfDue} from './demo.mjs';
 import {refreshMemberships} from './access.mjs';
-import {allCommunities, currentCommunity} from './community.mjs';
+import {allCommunities, currentCommunity, appearanceOf} from './community.mjs';
 import {isDevelopment,devRobots,markDevelopmentResponse} from './dev-environment.mjs';
 
 let crewOwnershipReady = null;
@@ -58,6 +58,23 @@ function queueWeeklySync(env, ctx, request) {
   }));
 }
 
+async function appManifest(request, env) {
+  let community = null;
+  try { community = await currentCommunity(env, request); } catch {}
+  const onCommunitySite = Boolean(community && communityLabel(new URL(request.url), env));
+  const logo = onCommunitySite ? appearanceOf(community).logoUrl : null;
+  const icons = [
+    ...(logo ? [{src:logo.replace('size=256', 'size=512'), sizes:'512x512', type:'image/png'}] : []),
+    {src:'/images/app-icon-192.png', sizes:'192x192', type:'image/png'},
+    {src:'/images/app-icon-512.png', sizes:'512x512', type:'image/png'},
+    {src:'/images/app-icon-maskable-512.png', sizes:'512x512', type:'image/png', purpose:'maskable'}];
+  const manifest = {id:'/', start_url:'/', scope:'/', display:'standalone', lang:'fr', background_color:'#0a0b0c', theme_color:'#0a0b0c',
+    name:onCommunitySite ? `${community.name} · Endurance Manager` : 'Endurance Manager',
+    short_name:onCommunitySite ? community.shortName : 'Endurance',
+    description:'Organisation des courses d’endurance simracing : inscriptions, disponibilités et équipages.', icons};
+  return new Response(JSON.stringify(manifest), {headers:{'Content-Type':'application/manifest+json; charset=utf-8', 'Cache-Control':'public, max-age=3600'}});
+}
+
 function communityNotFound() {
   const page = `<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex"><title>Communauté introuvable · ENDURANCE MANAGER</title>
 <style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#0b0d0f;color:#e6ecea;font-family:system-ui,sans-serif;text-align:center;padding:24px}main{max-width:520px}h1{font-size:28px;margin:0 0 12px}p{color:#c7d0d4;line-height:1.6}</style></head>
@@ -70,6 +87,7 @@ export default {
     const pathname = new URL(request.url).pathname;
     const development = isDevelopment(env);
     if (development && pathname === '/robots.txt') return devRobots();
+    if (pathname === '/manifest.webmanifest' && env?.DB) return appManifest(request, env);
     // A page of <slug>.BASE_DOMAIN for a community that does not exist: a plain "not found" page.
     if (env?.DB && communityLabel(new URL(request.url), env) && !pathname.startsWith('/api/') && (request.headers.get('Accept') || '').includes('text/html')
       && !(await env.DB.prepare('SELECT 1 FROM communities WHERE slug=?').bind(communityLabel(new URL(request.url), env)).first())) return communityNotFound();

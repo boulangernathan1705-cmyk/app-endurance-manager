@@ -121,3 +121,15 @@ test('the main address is a showcase: anyone looks without signing in, only the 
   assert.ok(races.some(race=>race.departures.some(departure=>departure.crews.length&&departure.crews[0].registrationIds?.length)),'crews with their pilots');
   assert.equal(DB.db.prepare("SELECT COUNT(*) n FROM registrations WHERE user_id IS NOT NULL").get().n,0,'no real person');
 });
+
+test('installable app: the manifest has the name of the community of the address, the platform\'s own elsewhere', async () => {
+  const {call}=setup();
+  const own=await (await call(`${TEST_SITE}/manifest.webmanifest`)).json();
+  assert.equal(own.name,'Commu Test · Endurance Manager');assert.equal(own.short_name,'TEST');
+  assert.equal(own.display,'standalone');assert.equal(own.start_url,'/');
+  assert.ok(own.icons.some(icon=>icon.purpose==='maskable'));
+  const platform=await (await call('https://endurance-manager.app/manifest.webmanifest')).json();
+  assert.equal(platform.name,'Endurance Manager');
+  const unknown=await call('https://inconnue.endurance-manager.app/manifest.webmanifest');
+  assert.equal((await unknown.json()).name,'Endurance Manager','an unknown address never names a community');
+});

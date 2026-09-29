@@ -122,7 +122,7 @@ const changelogPlaceholder = '<!-- CHANGELOG: generated from CHANGELOG.md by scr
 const changelogTemplate = await readFile(root + 'changelog.html', 'utf8');
 if (!changelogTemplate.includes(changelogPlaceholder)) throw new Error('changelog.html doit contenir l’emplacement du changelog.');
 await writeFile(new URL('changelog.html', out), injectI18n(changelogTemplate.replace(changelogPlaceholder, changelogHtml(await readFile(root + 'CHANGELOG.md', 'utf8')))));
-for (const file of ['app.js', 'crew-builder.js', 'help.js', 'privacy.css']) {
+for (const file of ['app.js', 'crew-builder.js', 'help.js', 'privacy.css', 'sw.js', 'offline.html']) {
   await copyFile(root + file, new URL(file, out));
 }
 await copyFile(root + 'help.css', new URL('help.css', out));
