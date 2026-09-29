@@ -1558,6 +1558,57 @@ details.community-chip summary::after { content: " ▾"; color: var(--community-
 :root[data-community-accent] .primary-button { background: var(--community-accent) !important; border-color: var(--community-accent) !important; }
 :root[data-community-accent] .top-stripes div:first-child { background: var(--community-accent) !important; }
 
+/* ---------- Phone pass (≤ 760px): compact bar, race cards on fewer lines, categories on one row ---------- */
+@media (max-width: 760px) {
+  .site-nav-shell { gap: 6px !important; padding: 6px !important; }
+  .site-nav-shell #navigation .nav-game-switcher-button { min-height: 36px !important; font-size: 14px !important; }
+  .site-nav-shell #navigation > .nav-sections { gap: 4px !important; }
+  .site-nav-shell #navigation > .nav-sections > .nav-section-button { flex: 1 1 0 !important; min-width: 0; min-height: 34px !important; padding: 0 6px !important; justify-content: center; font-size: 13px !important; overflow: hidden; text-overflow: ellipsis; }
+  .site-nav-shell > .community-chip { padding: 3px 12px; font-size: 12.5px; }
+  .site-nav-shell > details.community-chip { padding: 0; }
+  details.community-chip summary { padding: 3px 12px; }
+
+  /* Race list: filters and the add button on one line. */
+  html[data-game] #app .page-head { display: flex !important; flex-wrap: wrap; align-items: center; gap: 8px !important; }
+  html[data-game] #app .page-head .event-filter { flex: 1 1 auto; }
+  html[data-game] #app .page-head .event-filter-button { min-height: 36px !important; padding: 0 10px !important; font-size: 14px !important; }
+  html[data-game] #app .page-head [data-action="create"] { min-height: 36px !important; padding: 0 12px !important; font-size: 13.5px !important; }
+
+  /* Race card: the circuit drawing small at the top right, next to the title (no empty band above). */
+  html[data-game] #app .race-card-body { position: relative; }
+  html[data-game] #app .race-card-circuit { position: absolute !important; top: 10px; right: 10px; width: 64px !important; height: 56px !important; min-height: 0 !important; margin: 0 !important; padding: 0 !important; border: 0 !important; background: none !important; }
+  html[data-game] #app .race-card-circuit .circuit-visual { width: 64px !important; height: 56px !important; }
+  html[data-game] #app .race-card-circuit img { width: 100% !important; height: 100% !important; object-fit: contain; }
+  html[data-game] #app .race-card .race-head { padding-right: 68px; min-width: 0; }
+  html[data-game] #app .race-card .race-date { min-width: 52px; }
+
+  /* Categories on one row (three per row at most, each keeps its logo, name and count). */
+  html[data-game] #app .race-fill { display: block !important; }
+  html[data-game] #app .event-category-badges { display: grid !important; width: 100% !important; grid-template-columns: repeat(auto-fit, minmax(86px, 1fr)); gap: 4px !important; }
+  html[data-game] #app .event-category-badge { min-width: 0; padding: 5px 5px !important; gap: 5px !important; }
+  html[data-game] #app .event-category-badge .category-logo { width: 22px !important; height: auto !important; flex: 0 0 22px; }
+  html[data-game] #app .event-category-copy { min-width: 0; }
+  html[data-game] #app .event-category-copy strong { display: block; font-size: 11.5px !important; letter-spacing: -.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  html[data-game] #app .event-category-copy small { font-size: 10.5px !important; white-space: nowrap; }
+  html[data-game] #app .race-header .event-category-badges.event-header-stats { display: grid !important; width: 100% !important; grid-template-columns: repeat(auto-fit, minmax(86px, 1fr)) !important; gap: 4px !important; }
+
+  /* Race page: the date block keeps its size; crew cards only as tall as their drivers. */
+  html[data-game] #app .race-header .race-date { align-self: flex-start !important; height: auto !important; }
+  html[data-game] #app .crew-tile-summary .crew-compact-pilots { min-height: 0 !important; }
+  html[data-game] #app .crew-tile-summary { gap: 6px !important; padding: 10px 12px !important; }
+  /* Drivers without a crew: one card per row, full width (logo, name and car, then the whole timeline). */
+  html[data-game] #app .ux-unassigned-grid { display: grid !important; grid-template-columns: minmax(0, 1fr) !important; }
+  html[data-game] #app .ux-unassigned-grid > .pilot-row { width: auto !important; max-width: none !important; }
+  html[data-game] #app .ux-unassigned-grid > .pilot-row > .pilot-main { grid-template-columns: 30px minmax(0, 1fr) !important; }
+  html[data-game] #app .ux-unassigned-grid .pilot-main > .pilot-category-logo { grid-column: 1 !important; grid-row: 1 / span 2 !important; }
+  html[data-game] #app .ux-unassigned-grid .pilot-main > :not(.pilot-category-logo) { grid-column: 2 !important; }
+  html[data-game] #app .ux-unassigned-grid .presence-timeline { width: 100% !important; }
+  html[data-game] #app .ux-course-pilots-body, html[data-game] #app .ux-unassigned-section { padding: 4px 0 !important; }
+  /* Administration: the tabs on two columns (never out of the screen). */
+  .members-tabs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+  .members-tabs button { min-height: 40px; padding: 0 8px; font-size: 14px; white-space: nowrap; }
+}
+
 /* Large screens (27–34 inch, ultrawide): the whole interface grows in proportion and the page uses
    more of the width. The banner keeps its own sizing (its image is capped at its source resolution). */
 @media (min-width: 2200px) { :root { --wide-zoom: 1.15; } }
