@@ -2,6 +2,13 @@
 
 Les changements du site, version par version. La plus récente est en haut.
 
+## Prochaine version — en test
+
+### Courses sur plusieurs jours
+- **Planning des départs** : quand une course se court sur plusieurs jours (vendredi, samedi, dimanche…), ses départs s'affichent en planning, un jour par colonne (un onglet par jour sur téléphone).
+- Chaque départ montre en un coup d'œil ses pilotes, **les pilotes sans équipage par catégorie** et ses équipages ; clique dessus pour l'ouvrir, t'inscrire ou rejoindre un équipage.
+- La date de la course montre tous ses jours (« ven. → dim. 16–18 oct. »), et un bouton **Ton départ** t'emmène directement au tien.
+
 ## v1.6.1 — 29 septembre 2026
 
 ### Créer une course

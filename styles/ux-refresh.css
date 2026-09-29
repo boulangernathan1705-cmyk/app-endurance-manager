@@ -1583,6 +1583,104 @@ details.community-chip summary::after { content: " ▾"; color: var(--community-
 .bulk-departures-actions strong { color: #f4f6f5; font-size: 14px; }
 @media (max-width: 760px) { .bulk-hours { grid-template-columns: repeat(6, minmax(0, 1fr)); } .bulk-day span { min-height: 52px; } }
 
+/* =====================================================================
+   Race over several days: the starts as a planning
+   - one column per race day (made for Friday–Sunday, up to a week: the days scroll sideways with arrows);
+   - a start fits on three lines at most: « Départ 14h », its pilots and those without a crew by category,
+     its crews in their colour; a start with nobody or already run fits on one line;
+   - an opened start grows where it is, and its day widens (three days or fewer);
+   - on a phone, one day at a time with a tab per day.
+   ===================================================================== */
+html[data-game] #app .departure-planning { display: grid; gap: 14px; margin-top: 18px; }
+.planning-heading { display: flex; align-items: center; gap: 8px 14px; flex-wrap: wrap; }
+.planning-heading h2 { margin: 0; font-size: 14px; letter-spacing: .08em; text-transform: uppercase; color: #c7d0d4; }
+.planning-heading small { color: #92999c; font-size: 13px; }
+.planning-arrows { display: none; margin-left: auto; gap: 6px; }
+.departure-planning.has-overflow .planning-arrows { display: flex; }
+.planning-arrows button { width: 36px; height: 32px; border: 1px solid #343c3f; border-radius: 9px; background: #111617; color: #f4f6f5; font-size: 18px; line-height: 1; cursor: pointer; }
+.planning-tabs { display: none; }
+.planning-scroll { overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: thin; padding-bottom: 4px; }
+.planning-days { display: grid; grid-template-columns: repeat(var(--days), minmax(230px, 1fr)); gap: 16px; align-items: start; }
+.departure-planning.is-fit .planning-days { grid-template-columns: var(--cols, repeat(var(--days), minmax(0, 1fr))); transition: grid-template-columns .28s ease; }
+.planning-day { display: grid; gap: 10px; min-width: 0; scroll-snap-align: start; }
+.planning-day-head { display: flex; align-items: center; justify-content: space-between; gap: 6px 12px; flex-wrap: wrap; padding: 14px 16px; border: 1px solid #262e31; border-radius: 12px; background: #111617; }
+.planning-day-name { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.planning-day-name strong { font-size: 19px; color: #f4f6f5; }
+.planning-day-name span { font-size: 14px; color: #c7d0d4; white-space: nowrap; }
+.planning-day-head small { color: #92999c; font-size: 13px; white-space: nowrap; }
+.planning-today { padding: 2px 9px; border-radius: 999px; background: color-mix(in srgb, var(--community-accent, #52d3d8) 16%, transparent); color: var(--community-accent, #52d3d8); font-size: 11px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; }
+.planning-day.is-past .planning-day-head { opacity: .55; }
+
+/* A start */
+.planning-start { position: relative; border: 1px solid #2b3538; border-radius: 12px; background: #111617; transition: border-color .15s ease, background .15s ease, box-shadow .2s ease; }
+.planning-start > summary { display: grid; gap: 8px; padding: 14px 44px 15px 16px; cursor: pointer; list-style: none; }
+.planning-start > summary::-webkit-details-marker { display: none; }
+.planning-start:hover { border-color: #3f4b4e; background: #141a1c; }
+.planning-start.is-mine { border-color: var(--community-accent, #52d3d8); box-shadow: inset 0 0 0 1px var(--community-accent, #52d3d8); }
+.planning-start.is-compact { background: transparent; border-style: dashed; }
+.planning-start.is-compact > summary { padding-block: 11px; }
+.planning-start.is-done:not([open]) { opacity: .5; }
+.planning-start[open] { border-style: solid; border-color: var(--community-accent, #52d3d8); background: #141a1c; box-shadow: 0 14px 34px rgba(0, 0, 0, .45); opacity: 1; }
+.planning-chevron { position: absolute; top: 13px; right: 12px; width: 18px; height: 18px; color: #92999c; transition: transform .2s ease; }
+.planning-start.is-compact .planning-chevron { top: 10px; }
+.planning-start[open] .planning-chevron { transform: rotate(180deg); color: var(--community-accent, #52d3d8); }
+.planning-start-head { display: flex; align-items: baseline; flex-wrap: wrap; gap: 3px 9px; }
+.planning-start-head strong { font-size: 18px; color: #f4f6f5; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.planning-start-end, .planning-start-state { color: #92999c; font-size: 13px; font-weight: 600; white-space: nowrap; }
+.planning-tag { align-self: center; padding: 2px 8px; border-radius: 999px; font-size: 10.5px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; white-space: nowrap; }
+.planning-tag.is-mine { background: var(--community-accent, #52d3d8); color: #062a2c; }
+.planning-tag.is-live { background: #2f6e3f; color: #e6ffec; }
+.planning-start-line { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; color: #dfe6e4; font-size: 14px; }
+.planning-free { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; color: #92999c; font-size: 13.5px; }
+.planning-free-pill { padding: 1px 8px; border-radius: 999px; border: 1px solid color-mix(in srgb, var(--category-color, #8e9996) 65%, transparent); background: color-mix(in srgb, var(--category-color, #8e9996) 12%, transparent); color: color-mix(in srgb, var(--category-color, #c7d0d4) 55%, #fff); font-size: 12.5px; font-weight: 700; white-space: nowrap; }
+.planning-crews { display: flex; flex-wrap: wrap; gap: 6px 16px; }
+.planning-crew { display: inline-flex; align-items: center; gap: 7px; min-width: 0; color: var(--crew-color, #c7d0d4); font-size: 14px; font-weight: 700; }
+.planning-crew .category-logo { width: 24px; height: auto; flex: none; }
+.planning-crew .category-text-logo { font-size: 10px; color: #c7d0d4; }
+.planning-crew.crew-palette-0 { --crew-color: #53d8ff; } .planning-crew.crew-palette-1 { --crew-color: #c58cff; }
+.planning-crew.crew-palette-2 { --crew-color: #ffae62; } .planning-crew.crew-palette-3 { --crew-color: #ff79aa; }
+.planning-crew.crew-palette-4 { --crew-color: #75a9ff; } .planning-crew.crew-palette-5 { --crew-color: #b5df62; }
+.planning-crew.crew-palette-6 { --crew-color: #ffd45e; } .planning-crew.crew-palette-7 { --crew-color: #66e0b1; }
+.planning-crew.crew-palette-8 { --crew-color: #ff7777; } .planning-crew.crew-palette-9 { --crew-color: #b99cff; }
+.planning-start[open] .planning-start-line, .planning-start[open] .planning-crews { display: none; }
+
+/* Opened start: buttons first, then the crews (side by side when the day has widened) and the pilots. */
+html[data-game] #app .planning-body.departure-fold { margin: 0 !important; padding: 0 16px 16px !important; border: 0 !important; border-radius: 0 !important; background: none !important; box-shadow: none !important; opacity: 1 !important; }
+.planning-actions { padding: 12px 0 14px; border-top: 1px solid #262e31; }
+html[data-game] #app .planning-actions .ux-summary-registration-actions { display: flex !important; flex-wrap: wrap; align-items: center; justify-content: flex-start !important; gap: 10px 18px !important; margin: 0 !important; width: auto !important; }
+html[data-game] #app .planning-body .departure-fold-body { padding: 0 !important; }
+html[data-game] #app .planning-body .ux-course-crews-body { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
+
+/* Date block of a race over several days: "ven. → dim." / "16–18" / "oct." */
+html[data-game] #app .race-card .race-date.is-range, html[data-game] #app .race-header .race-date.is-range { width: auto !important; min-width: 62px; padding-inline: 10px !important; align-self: flex-start; height: auto; }
+html[data-game] #app .race-card .race-date.is-range strong { font-size: 23px; }
+html[data-game] #app .race-header .race-date.is-range strong { font-size: 28px; }
+.race-date.is-range small { white-space: nowrap; }
+
+/* Race header: a shortcut to the pilot's own start */
+html[data-game] #app .race-header .race-my-start { display: grid; gap: 6px; justify-items: end; align-self: center; margin-left: auto; text-align: right; }
+.race-my-start small { color: #92999c; font-size: 12.5px; }
+html[data-game] #app .race-my-start .secondary-button { border-color: var(--community-accent, #52d3d8) !important; }
+
+@media (prefers-reduced-motion: reduce) { .departure-planning.is-fit .planning-days, .planning-start, .planning-chevron { transition: none; } }
+
+/* Phone: one day at a time */
+@media (max-width: 760px) {
+  .planning-arrows, .departure-planning.has-overflow .planning-arrows { display: none; }
+  .planning-tabs { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; }
+  .planning-tab { flex: 1 0 70px; position: relative; display: grid; gap: 1px; padding: 8px 4px; border: 1px solid #343c3f; border-radius: 11px; background: #111617; color: #f4f6f5; line-height: 1.2; cursor: pointer; }
+  .planning-tab small { color: #92999c; font-size: 11px; }
+  .planning-tab strong { font-size: 15px; }
+  .planning-tab.is-active { border-color: var(--community-accent, #52d3d8); background: color-mix(in srgb, var(--community-accent, #52d3d8) 12%, #111617); }
+  .planning-tab-mine { width: 6px; height: 6px; border-radius: 50%; background: var(--community-accent, #52d3d8); justify-self: center; }
+  .planning-scroll { overflow: visible; }
+  .planning-days, .departure-planning.is-fit .planning-days { grid-template-columns: minmax(0, 1fr) !important; }
+  .planning-day:not(.is-active) { display: none; }
+  .planning-day-head { display: none; }
+  html[data-game] #app .race-header .race-card-top { flex-wrap: wrap; }
+  html[data-game] #app .race-header .race-my-start { order: 5; flex: 1 1 100%; justify-items: stretch; margin-left: 0; text-align: left; }
+}
+
 /* ---------- Phone pass (≤ 760px): compact bar, race cards on fewer lines, categories on one row ---------- */
 @media (max-width: 760px) {
   .site-nav-shell { gap: 6px !important; padding: 6px !important; }
