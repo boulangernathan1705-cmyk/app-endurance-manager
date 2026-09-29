@@ -1,9 +1,9 @@
 name: Browser compatibility
 
+# Manual only: the Cloudflare bot protection of endurance-manager.app answers 403 to GitHub's runners,
+# so an automatic run on each push to dev could never reach the site.
 on:
   workflow_dispatch:
-  push:
-    branches: [dev]
 
 permissions:
   contents: read
