@@ -99,7 +99,7 @@ function renderConnected(user) {
 
 // Look of the community of this site (communities platform): its name always visible in the bar, the
 // short name before the page title, the icon and banner of its Discord server, its accent color.
-function applyCommunity(community) {
+function applyCommunity(community, communities = []) {
   if (!community) return;
   const look = community.appearance || {};
   document.documentElement.dataset.community = community.slug;
@@ -112,8 +112,20 @@ function applyCommunity(community) {
   if (look.bannerUrl) for (const image of document.querySelectorAll('.hero-banner')) { image.removeAttribute('srcset'); image.src = look.bannerUrl; }
   const bar = document.querySelector('.site-nav-shell');
   if (bar && !bar.querySelector('.community-chip')) {
-    const chip = document.createElement('span');
-    chip.className = 'community-chip'; chip.textContent = community.name; chip.title = `Communauté : ${community.name}`;
+    // "Mes communautés": the name opens the list of the player's other communities (only when there are several).
+    const others = communities.filter(item => !item.current && /^https:\/\//.test(item.url));
+    const chip = document.createElement(others.length ? 'details' : 'span');
+    chip.className = 'community-chip';
+    if (others.length) {
+      const summary = document.createElement('summary');
+      summary.textContent = community.name; summary.title = 'Mes communautés';
+      const list = document.createElement('div');
+      list.className = 'community-switcher';
+      const heading = document.createElement('strong'); heading.textContent = 'Mes communautés'; list.append(heading);
+      for (const item of others) { const link = document.createElement('a'); link.href = item.url; link.textContent = item.name; list.append(link); }
+      chip.append(summary, list);
+      document.addEventListener('click', event => { if (!chip.contains(event.target)) chip.open = false; });
+    } else { chip.textContent = community.name; chip.title = `Communauté : ${community.name}`; }
     bar.prepend(chip);
   }
 }
@@ -124,7 +136,7 @@ async function loadSession() {
     const response = await fetch('/api/session', {credentials:'same-origin',cache:'no-store'});
     if (!response.ok) throw new Error('session');
     const session = await response.json();
-    applyCommunity(session.community);
+    applyCommunity(session.community, Array.isArray(session.communities) ? session.communities : []);
     if (session.user) renderConnected(session.user);
     else renderDisconnected(!!session.discordReady);
   } catch {

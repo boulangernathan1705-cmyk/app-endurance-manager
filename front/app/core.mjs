@@ -23,6 +23,8 @@ export const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'
 export const can = permission => Boolean(state.permissions?.includes(permission));
 export const canManage = () => can('create_race') || can('manage_races');
 export const isAdmin = () => can('admin');
+// Important actions name the community they apply to (a player may belong to several).
+export const inCommunity = () => state.community?.name ? `\n\nCommunauté : ${state.community.name}` : '';
 export const canEditRace = event => can('manage_races') || (can('create_race') && Boolean(event?.createdByMe));
 
 export function notifyRender() {

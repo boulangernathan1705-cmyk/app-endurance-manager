@@ -1,11 +1,11 @@
 import {
   LEGACY_CAR_ALIASES, COOKIE_SESSION, COOKIE_GUEST, COOKIE_STATE, COOKIE_RETURN, DAY, HttpError, fail, now, id, token, hash, cookie,
-  setCookie, cookieNames, siteOrigin, communityLabel, json, redirect, origin, requireDiscord, administrators, publicUser, requireRole, identity, owned, personal,
+  setCookie, cookieNames, siteOrigin, communityLabel, baseDomain, json, redirect, origin, requireDiscord, administrators, publicUser, requireRole, identity, owned, personal,
   registrationSelect, registrationParticipant, body, rateLimit, cleanup, returnPath, text, validateEvent, validateRegistration, ANY_CATEGORY
 } from './core.mjs';
 import {ingestClientError, clientErrorsApi} from './telemetry.mjs';
 import {racesPath} from './races-path.mjs';
-import {currentCommunity, appearanceOf} from './community.mjs';
+import {currentCommunity, appearanceOf, allCommunities} from './community.mjs';
 import {communityAccess, requirePermission, displayRole, PERMISSIONS, DEFAULT_EVERYONE, normalizePermissions, discordGuild, memberPermissions} from './access.mjs';
 // Solo races: a module each community turns on or off (settings of the members page).
 const soloRacesEnabled = (env, community) => community?.modules?.soloRaces === true;
@@ -38,6 +38,17 @@ function slotFor(event, from, departureId) {
   if (!target || target.tbd) fail(400, 'Choisis un des horaires proposés.');
   if (target.startsAt <= Date.now()) fail(409, 'Ce départ est passé.');
   return target;
+}
+// "Mes communautés": the communities where the player is a member (managers: all of them), with the address of
+// each site. Empty when there is a single site, or when the current community turned the selector off.
+async function myCommunities(env, actor, community) {
+  const domain = baseDomain(env);
+  if (!domain || !actor.user || community.modules.communitySwitcher === false) return [];
+  const list = actor.manager ? await allCommunities(env)
+    : ((await env.DB.prepare(`SELECT c.* FROM communities c JOIN memberships m ON m.community_id=c.id WHERE m.user_id=? AND m.status='member' ORDER BY c.id`)
+      .bind(actor.user.id).all()).results || []).map(row => ({slug:row.slug, name:row.name}));
+  const mine = [...list].sort((x, y) => x.name.localeCompare(y.name, 'fr')).map(item => ({slug:item.slug, name:item.name, url:`https://${item.slug}.${domain}/`, current:item.slug === community.slug}));
+  return mine.length > 1 ? mine : [];
 }
 // Permissions of the actor in the current community (server/access.mjs).
 const can = (actor, permission) => Boolean(actor.permissions?.has(permission));
@@ -224,7 +235,7 @@ async function api(request, env) {
   if (diagnostics) return diagnostics;
   if (path === '/api/session' && method === 'GET') return json({user:actor.user, discordReady:!!(env.DISCORD_CLIENT_ID && env.DISCORD_CLIENT_SECRET), adminConfigured:administrators(env).length > 0, soloRaces:soloRacesEnabled(env, community), soloLabel:String(env.SOLO_LABEL || 'Courses solo').slice(0,40),
     community:{slug:community.slug, name:community.name, shortName:community.shortName, discordInviteUrl:community.discordInviteUrl, appearance:appearanceOf(community)},
-    access:access.status, permissions:[...access.permissions], manager:access.manager,
+    access:access.status, permissions:[...access.permissions], manager:access.manager, communities:await myCommunities(env, actor, community),
     platformDiscordUrl:/^https:\/\/(discord\.gg|discord\.com\/invite)\//.test(env.PLATFORM_DISCORD_URL || '') ? env.PLATFORM_DISCORD_URL : null});
   if (path === '/api/auth/logout' && method === 'POST') {
     const names = cookieNames(env), raw = cookie(request, names.session);
@@ -514,7 +525,7 @@ async function api(request, env) {
       await env.DB.prepare('UPDATE communities SET appearance=? WHERE id=?').bind(JSON.stringify(community.appearance), community.id).run();
     }
     return json({community:{name:community.name, shortName:community.shortName, discordServer:discord?.name || null, ...appearanceOf(community)}, roles, permissions:PERMISSIONS,
-      modules:{iracingImport:community.modules.iracingImport === true, discordWeekly:community.modules.discordWeekly === true, soloRaces:community.modules.soloRaces === true}});
+      modules:{iracingImport:community.modules.iracingImport === true, discordWeekly:community.modules.discordWeekly === true, soloRaces:community.modules.soloRaces === true, communitySwitcher:community.modules.communitySwitcher !== false}});
   }
   if (path === '/api/community/appearance' && method === 'PATCH') {
     requirePermission(actor,'admin');
@@ -541,7 +552,7 @@ async function api(request, env) {
     requirePermission(actor,'admin');
     const input = await body(request);
     const modules = {...community.modules};
-    for (const key of ['iracingImport','discordWeekly','soloRaces']) if (typeof input[key] === 'boolean') modules[key] = input[key];
+    for (const key of ['iracingImport','discordWeekly','soloRaces','communitySwitcher']) if (typeof input[key] === 'boolean') modules[key] = input[key];
     await env.DB.prepare('UPDATE communities SET modules=? WHERE id=?').bind(JSON.stringify(modules), community.id).run();
     return json({ok:true, modules});
   }

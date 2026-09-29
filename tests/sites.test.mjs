@@ -73,3 +73,23 @@ test('never sent back to another site after Discord, and production cookies keep
   assert.equal(cookieNames({BASE_DOMAIN:'endurance-manager.app'}).session,'__Secure-em_session');
   assert.equal(cookieNames({}).session,'__Host-em_session','single site (production today): unchanged');
 });
+
+test('"Mes communautés": the communities of the player, with the address of each site; each community may turn it off', async () => {
+  const {DB,call}=setup();
+  const user='222222222222222222',raw='e'.repeat(64);
+  const hash=[...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(raw)))].map(b=>b.toString(16).padStart(2,'0')).join('');
+  DB.db.prepare("INSERT INTO users(id,name,created_at) VALUES(?,?,0)").run(user,'Leo');
+  DB.db.prepare('INSERT INTO sessions(token_hash,user_id,expires_at) VALUES(?,?,?)').run(hash,user,4102444800);
+  DB.db.prepare("UPDATE communities SET discord_guild_id='900000000000000001'").run();
+  const time=Math.floor(Date.now()/1000);
+  const member=DB.db.prepare("INSERT INTO memberships(community_id,user_id,status,checked_at,created_at) VALUES(?,?,'member',?,?)");
+  const headers={Cookie:`__Secure-em_dev_session=${raw}`};
+  member.run('e0a1c0de-0000-4000-8000-000000000001',user,time,time);
+  assert.deepEqual((await (await call(`${MAIN}/api/session`,{headers})).json()).communities,[],'a single community: no selector');
+  member.run('c-test',user,time,time);
+  const mine=(await (await call(`${MAIN}/api/session`,{headers})).json()).communities;
+  assert.deepEqual(mine.map(item=>[item.slug,item.url,item.current]),[['commu-dev',`${MAIN}/`,true],['commu-test',`${TEST_SITE}/`,false]]);
+  DB.db.prepare(`UPDATE communities SET modules=json_set(modules,'$.communitySwitcher',json('false')) WHERE slug='commu-dev'`).run();
+  assert.deepEqual((await (await call(`${MAIN}/api/session`,{headers})).json()).communities,[],'turned off by this community');
+  assert.equal((await (await call(`${TEST_SITE}/api/session`,{headers})).json()).communities.length,2,'still on in the other one');
+});

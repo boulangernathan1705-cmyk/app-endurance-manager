@@ -1365,6 +1365,14 @@ html[data-game] .race-card .race-fill:has(.solo-fill) { display: flex; flex-wrap
 
 /* Community of the site: name always visible, accent color set by its admins. */
 .community-chip { align-self: center; padding: 4px 10px; border: 1px solid var(--community-accent, #52d3d8); border-radius: 999px; color: #f4f6f5; font-size: 12.5px; font-weight: 800; white-space: nowrap; }
+details.community-chip { position: relative; padding: 0; }
+details.community-chip summary { padding: 4px 10px; cursor: pointer; list-style: none; }
+details.community-chip summary::-webkit-details-marker { display: none; }
+details.community-chip summary::after { content: " ▾"; color: var(--community-accent, #52d3d8); }
+.community-switcher { position: absolute; z-index: 40; top: calc(100% + 6px); left: 0; min-width: 220px; display: grid; gap: 2px; padding: 8px; border: 1px solid var(--border, #292d31); border-radius: 12px; background: var(--panel, #111315); box-shadow: 0 14px 34px rgba(0,0,0,.45); }
+.community-switcher strong { padding: 4px 8px 6px; color: #99a3a0; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; }
+.community-switcher a { padding: 8px 10px; border-radius: 8px; color: #f4f6f5; font-weight: 700; text-decoration: none; }
+.community-switcher a:hover, .community-switcher a:focus-visible { background: rgba(82,211,216,.12); }
 :root[data-community-accent] .primary-button { background: var(--community-accent) !important; border-color: var(--community-accent) !important; }
 :root[data-community-accent] .top-stripes div:first-child { background: var(--community-accent) !important; }
 
