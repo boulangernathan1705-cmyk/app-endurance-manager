@@ -1650,6 +1650,9 @@ html[data-game] #app .planning-body.departure-fold { margin: 0 !important; paddi
 html[data-game] #app .planning-actions .ux-summary-registration-actions { display: flex !important; flex-wrap: wrap; align-items: center; justify-content: flex-start !important; gap: 10px 18px !important; margin: 0 !important; width: auto !important; }
 html[data-game] #app .planning-body .departure-fold-body { padding: 0 !important; }
 html[data-game] #app .planning-body .ux-course-crews-body { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
+html[data-game] #app .planning-body .ux-unassigned-grid { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)) !important; }
+html[data-game] #app .planning-body .pilot-row { min-width: 0; }
+html[data-game] #app .planning-body .pilot-row * { overflow-wrap: normal; word-break: normal; }
 
 /* Date block of a race over several days: "ven. → dim." / "16–18" / "oct." */
 html[data-game] #app .race-card .race-date.is-range, html[data-game] #app .race-header .race-date.is-range { width: auto !important; min-width: 62px; padding-inline: 10px !important; align-self: flex-start; height: auto; }

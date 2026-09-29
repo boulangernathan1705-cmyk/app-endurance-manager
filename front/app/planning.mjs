@@ -55,7 +55,7 @@ export function renderPlanning(event,days,body){
 export function syncPlanning(root=globalThis.document){
   for(const planning of root?.querySelectorAll?.('.departure-planning')||[]){
     const days=[...planning.querySelectorAll('.planning-day')];
-    if(planning.classList.contains('is-fit'))planning.querySelector('.planning-days').style.setProperty('--cols',days.map(day=>day.querySelector('.planning-start[open]')?'minmax(0,1.8fr)':day.classList.contains('is-past')?'minmax(0,.75fr)':'minmax(0,1fr)').join(' '));
+    if(planning.classList.contains('is-fit'))planning.querySelector('.planning-days').style.setProperty('--cols',days.map(day=>day.querySelector('.planning-start[open]')?'minmax(360px,1.8fr)':day.classList.contains('is-past')?'minmax(170px,.75fr)':'minmax(210px,1fr)').join(' '));
     const scroll=planning.querySelector('.planning-scroll');
     planning.classList.toggle('has-overflow',scroll.scrollWidth>scroll.clientWidth+2);
   }
