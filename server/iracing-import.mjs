@@ -11,8 +11,10 @@
 //   is created on its first day with "Horaires à confirmer". iRacing gives the time slots in its article
 //   "THIS WEEK: … | Special Event" (iracing.com, published on the Monday of the race week): they are read
 //   from there and replace the placeholder (completeSpecialTimes).
-// A race is imported once (table iracing_imports): editing or deleting it on the site is never undone.
+// A race is imported once per community (table iracing_imports): editing or deleting it is never undone.
+// Module "iracingImport": each community that enables it gets its own copies (own entries and crews).
 import {validateEvent, parisTimestamp, id, now} from './core.mjs';
+import {communitiesWith} from './community.mjs';
 
 export const IRACING_FEED = 'https://raw.githubusercontent.com/pmsoftwaredevs/iracing-schedule/main/docs/data/';
 export const IMPORT_AUTHOR = 'system:iracing';
@@ -216,7 +218,9 @@ async function fetchJson(url, fetchImpl) {
 }
 
 // Creates the races that are not imported yet and completes special event times. Returns both counts.
-export async function syncIracingEvents(env, {timestamp = Date.now(), fetchImpl = fetch} = {}) {
+export async function syncIracingEvents(env, {timestamp = Date.now(), fetchImpl = fetch, communities = null} = {}) {
+  const targets = communities || await communitiesWith(env, 'iracingImport');
+  if (!targets.length) return {created:0, completed:0};
   const manifest = await fetchJson(IRACING_FEED + 'manifest.json', fetchImpl);
   // The current season, and the next one as soon as the schedule publishes it.
   const codes = [manifest?.current, manifest?.next].map(String).filter(code => /^\d{4}S[1-4]$/.test(code));
@@ -224,7 +228,16 @@ export async function syncIracingEvents(env, {timestamp = Date.now(), fetchImpl 
   const plans = [];
   for (const code of codes) plans.push(...planIracingEvents(await fetchJson(`${IRACING_FEED}${code.slice(0, 4)}_s${code.slice(5)}.json`, fetchImpl), timestamp));
   if (!plans.length) return {created:0, completed:0};
-  const known = new Set((await env.DB.prepare('SELECT external_id FROM iracing_imports').all()).results.map(row => row.external_id));
+  let created = 0, completed = 0;
+  for (const community of targets) {
+    const result = await importForCommunity(env, community, plans, {timestamp, fetchImpl});
+    created += result.created; completed += result.completed;
+  }
+  return {created, completed};
+}
+
+async function importForCommunity(env, community, plans, {timestamp, fetchImpl}) {
+  const known = new Set((await env.DB.prepare('SELECT external_id FROM iracing_imports WHERE community_id=?').bind(community.id).all()).results.map(row => row.external_id));
   let created = 0;
   for (const plan of plans) {
     if (known.has(plan.externalId)) continue;
@@ -233,13 +246,13 @@ export async function syncIracingEvents(env, {timestamp = Date.now(), fetchImpl 
     try { data = validateEvent(plan.input); } catch { continue; }
     const eventId = id();
     await env.DB.batch([
-      env.DB.prepare('INSERT INTO events(id,name,duration_hours,duration_minutes,event_type,circuit,schedule_pending,driver_change_required,format,access,capacity,rounds,categories,departures,created_by,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
-        .bind(eventId, data.name, data.durationHours, data.durationMinutes, data.eventType, data.circuit, data.schedulePending ? 1 : 0, data.driverChangeRequired==null?null:(data.driverChangeRequired?1:0), data.format, data.access, data.capacity, JSON.stringify(data.rounds), JSON.stringify(data.categories), JSON.stringify(data.departures), IMPORT_AUTHOR, now()),
-      env.DB.prepare('INSERT OR IGNORE INTO iracing_imports(external_id,event_id,created_at) VALUES(?,?,?)').bind(plan.externalId, eventId, now())
+      env.DB.prepare('INSERT INTO events(id,name,duration_hours,duration_minutes,event_type,circuit,schedule_pending,driver_change_required,format,access,capacity,rounds,categories,departures,created_by,created_at,community_id) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
+        .bind(eventId, data.name, data.durationHours, data.durationMinutes, data.eventType, data.circuit, data.schedulePending ? 1 : 0, data.driverChangeRequired==null?null:(data.driverChangeRequired?1:0), data.format, data.access, data.capacity, JSON.stringify(data.rounds), JSON.stringify(data.categories), JSON.stringify(data.departures), IMPORT_AUTHOR, now(), community.id),
+      env.DB.prepare('INSERT OR IGNORE INTO iracing_imports(community_id,external_id,event_id,created_at) VALUES(?,?,?,?)').bind(community.id, plan.externalId, eventId, now())
     ]);
     created++;
   }
-  const completed = await completeSpecialTimes(env, {timestamp, fetchImpl});
+  const completed = await completeSpecialTimes(env, {timestamp, fetchImpl, community});
   return {created, completed};
 }
 
@@ -280,9 +293,11 @@ export function articleFor(posts, special) {
 // Also runs every hour (worker-with-migrations, withinDays 10): iracing.com is then only asked when an
 // imported special event of the coming days still waits for its times. The event weekend is read from the import id
 // ("special:<slug>:<first day>", three days).
-export async function completeSpecialTimes(env, {timestamp = Date.now(), fetchImpl = fetch, withinDays = Infinity} = {}) {
-  const waiting = (await env.DB.prepare(`SELECT e.id, e.name, e.version, e.departures, i.external_id FROM iracing_imports i JOIN events e ON e.id=i.event_id
-    WHERE i.external_id LIKE 'special:%' AND e.schedule_pending=1`).all()).results || [];
+export async function completeSpecialTimes(env, {timestamp = Date.now(), fetchImpl = fetch, withinDays = Infinity, community = null} = {}) {
+  // One community (import) or all of them (hourly task): each race is completed in its own community.
+  const waiting = (await env.DB.prepare(`SELECT e.id, e.name, e.version, e.departures, i.external_id FROM iracing_imports i
+    JOIN events e ON e.id=i.event_id AND e.community_id=i.community_id
+    WHERE i.external_id LIKE 'special:%' AND e.schedule_pending=1 AND (? IS NULL OR i.community_id=?)`).bind(community?.id ?? null, community?.id ?? null).all()).results || [];
   const candidates = waiting.map(row => {
     const dateStart = /:(\d{4}-\d{2}-\d{2})$/.exec(row.external_id)?.[1];
     const first = Date.parse(`${dateStart}T00:00:00Z`);

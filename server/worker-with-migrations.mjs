@@ -3,8 +3,10 @@ import {homeRedirect, homePage} from './home.mjs';
 import {isWeeklyDiscordMutation} from './discord-weekly-format.mjs';
 import {ensureDiscordWeeklySchema} from './discord-weekly-schema.mjs';
 import {syncWeeklyDiscord} from './discord-weekly.mjs';
-import {cleanup} from './core.mjs';
+import {cleanup, communityLabel} from './core.mjs';
 import {syncIracingEvents, completeSpecialTimes} from './iracing-import.mjs';
+import {refreshMemberships} from './access.mjs';
+import {allCommunities} from './community.mjs';
 import {isDevelopment,devRobots,markDevelopmentResponse} from './dev-environment.mjs';
 
 let crewOwnershipReady = null;
@@ -54,11 +56,21 @@ function queueWeeklySync(env, ctx) {
   }));
 }
 
+function communityNotFound() {
+  const page = `<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex"><title>Communauté introuvable · ENDURANCE MANAGER</title>
+<style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#0b0d0f;color:#e6ecea;font-family:system-ui,sans-serif;text-align:center;padding:24px}main{max-width:520px}h1{font-size:28px;margin:0 0 12px}p{color:#c7d0d4;line-height:1.6}</style></head>
+<body><main><h1>Communauté introuvable</h1><p>Aucune communauté n’existe à cette adresse. Vérifie le lien qu’on t’a donné, ou demande-le aux administrateurs de ta communauté.</p></main></body></html>`;
+  return new Response(page, {status:404, headers:{'Content-Type':'text/html; charset=utf-8', 'Cache-Control':'no-store', 'X-Robots-Tag':'noindex'}});
+}
+
 export default {
   async fetch(request, env, ctx) {
     const pathname = new URL(request.url).pathname;
     const development = isDevelopment(env);
     if (development && pathname === '/robots.txt') return devRobots();
+    // A page of <slug>.BASE_DOMAIN for a community that does not exist: a plain "not found" page.
+    if (env?.DB && communityLabel(new URL(request.url), env) && !pathname.startsWith('/api/') && (request.headers.get('Accept') || '').includes('text/html')
+      && !(await env.DB.prepare('SELECT 1 FROM communities WHERE slug=?').bind(communityLabel(new URL(request.url), env)).first())) return communityNotFound();
     if (pathname === '/' && ['GET','HEAD'].includes(request.method)) {
       const redirect = homeRedirect(request);
       if (redirect) return redirect;
@@ -75,6 +87,11 @@ export default {
   },
 
   async scheduled(controller, env, ctx) {
+    // Members and Discord roles not checked for a day are checked again by the bot (every hour, a few at a time).
+    if (env?.DB && env.DISCORD_BOT_TOKEN && new Date(controller?.scheduledTime || Date.now()).getUTCMinutes() < 15) ctx.waitUntil(
+      allCommunities(env).then(communities => refreshMemberships(env, communities)).catch(error => {
+        console.error('Membership check failed', error instanceof Error ? error.message : 'unknown');
+      }));
     // Official iRacing endurances: twice a day (7:00 and 13:00 UTC; the schedule it reads is refreshed around
     // 6:17 UTC), and at the next run as long as nothing was ever imported (first deployment). Special event
     // time slots (iracing.com article of the race week) are looked for every hour.

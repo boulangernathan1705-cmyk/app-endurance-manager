@@ -1,7 +1,7 @@
 // Solo races: one entry per driver, limited places with a waiting list, one or two rounds and an
 // OPEN / SAFE access. They reuse the race cards, the race page and the registration window; this module
 // only holds what differs from endurance events.
-import {state,esc,button,canManage,logo,badge,categories,circuitLabel} from './core.mjs';
+import {state,esc,button,canManage,can,logo,badge,categories,circuitLabel} from './core.mjs';
 
 export const ANY_CATEGORY = '*';
 export const isSolo = event => event?.format === 'solo';
@@ -48,7 +48,8 @@ function carCell(reg) {
 // Why the driver cannot enter, or '' when they can.
 export function soloEntryBlock(event) {
   if (!state.user) return 'Connecte-toi avec Discord pour participer.';
-  if (event.access === 'safe' && !state.user.safe && !canManage()) return 'Course réservée aux pilotes SAFE.';
+  if (event.access === 'safe' && !can('solo_safe')) return 'Course réservée aux pilotes SAFE.';
+  if (!can('solo_safe') && !can('solo_open')) return 'Tu n’as pas accès aux courses solo de cette communauté.';
   return '';
 }
 

@@ -11,6 +11,7 @@ export const activeGame = globalThis.__ENDURANCE_GAME__ === 'iracing' ? 'iracing
 
 export const state = {
   events:[], user:null, discordReady:false, currentEventId:null, page:'home', editingEvent:null,
+  access:'anonymous', permissions:[], community:null, platformDiscordUrl:null,
   drafts:{}, recoveryLink:'', busy:false, participants:[], flash:'', eventFilter:'upcoming', listFormat:'endurance', soloLabel:'Courses solo', soloRaces:false,
   selectedDepartureId:null, eventSection:'race', pilotName:'', registrationOpen:new Set(), crewManagementOpen:new Set(),
   pendingCrewJoin:null, archiveLoaded:false, participantsLoaded:false
@@ -18,8 +19,13 @@ export const state = {
 try { state.pilotName = localStorage.getItem('em_pilot_name') || ''; } catch {}
 
 export const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-export const canManage = () => ['admin','organizer'].includes(state.user?.role);
-export const isAdmin = () => state.user?.role === 'admin';
+// Permissions of the player in this community (their Discord roles, server/access.mjs).
+export const can = permission => Boolean(state.permissions?.includes(permission));
+export const canManage = () => can('create_race') || can('manage_races');
+export const isAdmin = () => can('admin');
+// Important actions name the community they apply to (a player may belong to several).
+export const inCommunity = () => state.community?.name && !state.openSite ? `\n\nCommunauté : ${state.community.name}` : '';
+export const canEditRace = event => can('manage_races') || (can('create_race') && Boolean(event?.createdByMe));
 
 export function notifyRender() {
   queueMicrotask(() => document.dispatchEvent(new CustomEvent('endurance:render',{detail:{page:state.page,eventId:state.currentEventId,list:state.listFormat}})));
@@ -163,11 +169,11 @@ function mergeEvents(...lists) {
 // Only upcoming races are loaded at start and on every refresh; the archive is fetched
 // the first time it is needed (Archivés filter, link to a past race) and then kept fresh.
 export async function load() {
-  const [session,upcoming,archived] = await Promise.all([
-    api('/api/session'),
-    fetchEvents('upcoming'),
-    state.archiveLoaded ? fetchEvents('archived') : []
-  ]);
+  // The community is only open to the members of its Discord server: nothing else is loaded otherwise.
+  const session = await api('/api/session');
+  state.access=session.access; state.permissions=session.permissions||[]; state.community=session.community||null; state.openSite=session.openSite===true; state.platformDiscordUrl=session.platformDiscordUrl||null;
+  const member = session.access === 'member';
+  const [upcoming,archived] = member ? await Promise.all([fetchEvents('upcoming'), state.archiveLoaded ? fetchEvents('archived') : []]) : [[],[]];
   const userChanged=(session.user?.id||null)!==(state.user?.id||null);
   state.user=session.user;
   state.discordReady=session.discordReady;
@@ -179,7 +185,7 @@ export async function load() {
   state.events=markUndefinedStarts(mergeEvents(upcoming,archived));
   // The members list rarely changes: fetch it once per session instead of on every refresh.
   if (userChanged || !state.participantsLoaded) {
-    state.participants=state.user ? (await api('/api/participants')).participants : [];
+    state.participants=state.user && member ? (await api('/api/participants')).participants : [];
     state.participantsLoaded=true;
   }
   if (state.user && !state.pilotName) state.pilotName=state.user.name.slice(0,32);

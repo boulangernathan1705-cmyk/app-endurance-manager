@@ -1,4 +1,4 @@
-import {app,state,api,load,loadArchive,showError,countdown,CARS} from './core.mjs';
+import {app,state,api,load,loadArchive,showError,countdown,CARS,inCommunity} from './core.mjs';
 import {renderNav,renderHome} from './home-view.mjs';
 import {renderEvent} from './event-view.mjs';
 import {renderEventForm,departureFields,updateRemoveButtons,goToEventStep,formDurationMinutes} from './event-form.mjs';
@@ -132,7 +132,7 @@ async function perform(action,target){
     }
     case 'solo-category': { const departure=event.departures.find(item=>item.id===target.dataset.departure),draft=draftFor(departure),choice=draft.choices?.[Number(target.dataset.round)]; if(!choice)break; choice.category=target.dataset.value; choice.cars=choice.cars.filter(car=>CARS[choice.category]?.includes(car)); choice.carAny=choice.category==='*'; rerenderRegistrationSection(event,departure,'',renderEvent); break; }
     case 'category': { const departure=event.departures.find(item=>item.id===target.dataset.departure),draft=draftFor(departure); draft.category=target.dataset.value; draft.cars=(draft.cars||[]).filter(car=>CARS[draft.category]?.includes(car)); draft.carAny=false; rerenderRegistrationSection(event,departure,'',renderEvent); break; }
-    case 'delete-registration': { state.pendingCrewJoin=null; const departure=event.departures.find(item=>item.id===target.dataset.departure),reg=departure.availability.find(item=>item.id===target.dataset.id); if(!reg)throw Error('Inscription introuvable.'); if(!confirm(`Supprimer l’inscription de ${reg.name} pour ce départ ?`))return; await api(`/api/registrations/${reg.id}`,'DELETE',{version:reg.version}); delete state.drafts[departure.id]; state.registrationOpen.delete(departure.id); await refreshAfterSave('Inscription supprimée.'); break; }
+    case 'delete-registration': { state.pendingCrewJoin=null; const departure=event.departures.find(item=>item.id===target.dataset.departure),reg=departure.availability.find(item=>item.id===target.dataset.id); if(!reg)throw Error('Inscription introuvable.'); if(!confirm(`Supprimer l’inscription de ${reg.name} pour ce départ ?${inCommunity()}`))return; await api(`/api/registrations/${reg.id}`,'DELETE',{version:reg.version}); delete state.drafts[departure.id]; state.registrationOpen.delete(departure.id); await refreshAfterSave('Inscription supprimée.'); break; }
     case 'join-crew': {
       const departure=event?.departures.find(item=>item.id===target.dataset.departure);const crew=departure?.crews.find(item=>item.id===target.dataset.id);const reg=departure?.availability.find(item=>item.id===target.dataset.registration);
       if(!crew||crew.locked)throw Error('Cet équipage n’est plus disponible. Actualise la page.');
@@ -143,14 +143,14 @@ async function perform(action,target){
     case 'leave-crew': {
       const departure=event?.departures.find(item=>item.id===target.dataset.departure);const crew=departure?.crews.find(item=>item.id===target.dataset.id);const reg=departure?.availability.find(item=>item.id===target.dataset.registration);
       if(!crew||!reg)throw Error('Équipage ou inscription introuvable. Actualise la page.');
-      if(!confirm(`Quitter « ${crew.name} » ? Ton inscription à la course sera conservée.`))return;
+      if(!confirm(`Quitter « ${crew.name} » ? Ton inscription à la course sera conservée.${inCommunity()}`))return;
       await api(`/api/crews/${crew.id}/members/${reg.id}`,'DELETE',{version:crew.version});state.crewManagementOpen.delete(crew.id);await refreshAfterSave(`Tu as quitté « ${crew.name} ».`);break;
     }
     case 'add-crew-pilot': case 'remove-crew-pilot': case 'delete-crew': {
       const departure=event.departures.find(item=>item.id===target.dataset.departure); const crew=departure.crews.find(item=>item.id===target.dataset.id); if(!crew)throw Error('Équipage introuvable.');
-      if(action==='delete-crew'){if(!confirm(`Supprimer « ${crew.name} » ? Les inscriptions des pilotes seront conservées.`))return; await api(`/api/crews/${crew.id}`,'DELETE',{version:crew.version});}
+      if(action==='delete-crew'){if(!confirm(`Supprimer « ${crew.name} » ? Les inscriptions des pilotes seront conservées.${inCommunity()}`))return; await api(`/api/crews/${crew.id}`,'DELETE',{version:crew.version});}
       else if(action==='add-crew-pilot'){const registrationId=target.dataset.registration;if(!registrationId)throw Error('Choisis un pilote.');const result=await api(`/api/crews/${crew.id}/members`,'POST',{registrationId,version:crew.version});state.crewManagementOpen.add(crew.id);await refreshAfterSave(`Pilote affecté. ${result.removedRegistrations||0} autre(s) inscription(s) retirée(s) pour ce départ.`);return;}
-      else {if(!confirm('Retirer ce pilote de l’équipage ? Son inscription sera conservée.'))return;await api(`/api/crews/${crew.id}/members/${target.dataset.registration}`,'DELETE',{version:crew.version});state.crewManagementOpen.add(crew.id);}
+      else {if(!confirm(`Retirer ce pilote de l’équipage ? Son inscription sera conservée.${inCommunity()}`))return;await api(`/api/crews/${crew.id}/members/${target.dataset.registration}`,'DELETE',{version:crew.version});state.crewManagementOpen.add(crew.id);}
       await refreshAfterSave('Équipages mis à jour.'); break;
     }
     case 'iracing-import': {
@@ -166,7 +166,7 @@ async function perform(action,target){
     case 'edit-event': renderEventForm(event); break;
     case 'add-departure': if(app.querySelectorAll('.departure-field').length>=30)throw Error('Maximum 30 départs par événement.');{const rows=document.querySelectorAll('#departureFields .departure-field'),last=rows[rows.length-1];/* A new start copies the previous start's date and time: several starts often share a day. */document.getElementById('departureFields').insertAdjacentHTML('beforeend',departureFields(last?{date:last.querySelector('[name="date"]').value,time:last.querySelector('[name="time"]').value}:{}));/* Real times added next to the common start: they are no longer "à confirmer". */const pending=target.closest('form')?.elements.eventSchedulePending;if(pending?.checked&&document.querySelector('#departureFields [data-tbd="true"]'))pending.checked=false;}updateRemoveButtons();break;
     case 'remove-departure': if(app.querySelectorAll('.departure-field').length>1)target.closest('.departure-field').remove();updateRemoveButtons();break;
-    case 'delete-event': if(!confirm(`Supprimer « ${event.name} » et toutes ses inscriptions ? Cette suppression est définitive.`))return;await api(`/api/races/${event.id}`,'DELETE',{version:event.version});state.page='home';await refreshAfterSave('Événement supprimé.');break;
+    case 'delete-event': if(!confirm(`Supprimer « ${event.name} » et toutes ses inscriptions ? Cette suppression est définitive.${inCommunity()}`))return;await api(`/api/races/${event.id}`,'DELETE',{version:event.version});state.page='home';await refreshAfterSave('Événement supprimé.');break;
     case 'my-entries': await load();renderNav();renderMyEntries();break;
     case 'guest-link': state.recoveryLink=(await api('/api/guest/link','POST')).link;state.page==='event'?renderEvent():renderHome();break;
     case 'share-event': { const link=`${location.origin}${location.pathname}#event=${target.dataset.id}`; try{await navigator.clipboard.writeText(link);}catch{window.prompt('Copie le lien de la course :',link);break;} target.textContent='Lien copié ✓'; setTimeout(()=>{if(target.isConnected)target.textContent='Copier le lien de la course';},2500); break; }

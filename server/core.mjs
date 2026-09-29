@@ -16,7 +16,34 @@ async function hash(value) { return Array.from(new Uint8Array(await crypto.subtl
 function cookie(request, name) {
   return (request.headers.get('Cookie') || '').split(';').map(x => x.trim()).find(x => x.startsWith(name + '='))?.slice(name.length + 1) || '';
 }
-function setCookie(name, value, age) { return `${name}=${value}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${age}`; }
+function setCookie(name, value, age, domain = '') { return `${name}=${value}; Path=/;${domain ? ` Domain=${domain};` : ''} HttpOnly; Secure; SameSite=Lax; Max-Age=${age}`; }
+
+// Communities platform (BASE_DOMAIN set, e.g. "endurance-manager.app"): every <community>.BASE_DOMAIN is a
+// site of its own, one sign-in is shared by all of them (cookies on .BASE_DOMAIN, "__Secure-" instead of
+// "__Host-", which forbids a domain), and each environment has its own cookie names so the development
+// site never reads or overwrites the production session. Without BASE_DOMAIN: one site, host-only cookies.
+const SLUG_LABEL = /^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])$/;
+function baseDomain(env) {
+  const domain = String(env?.BASE_DOMAIN || '').toLowerCase();
+  return /^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(domain) ? domain : '';
+}
+// "<slug>" when the address is <slug>.BASE_DOMAIN (one level), otherwise ''.
+function communityLabel(url, env) {
+  const domain = baseDomain(env);
+  if (!domain || url.protocol !== 'https:' || !url.hostname.endsWith('.' + domain)) return '';
+  const label = url.hostname.slice(0, -domain.length - 1);
+  return SLUG_LABEL.test(label) ? label : '';
+}
+function cookieNames(env) {
+  if (!baseDomain(env)) return {session:COOKIE_SESSION, guest:COOKIE_GUEST, state:COOKIE_STATE, ret:COOKIE_RETURN, domain:''};
+  const prefix = `__Secure-em${env.SITE_ENV === 'development' ? '_dev' : ''}`;
+  return {session:`${prefix}_session`, guest:`${prefix}_guest`, state:`${prefix}_oauth`, ret:`${prefix}_return`, domain:'.' + baseDomain(env)};
+}
+// The origin of the site the request was made on: a community address, or the main address.
+function siteOrigin(request, env) {
+  const url = new URL(request.url);
+  return communityLabel(url, env) ? url.origin : origin(env);
+}
 function json(data, status = 200, cookies = []) {
   const headers = new Headers({'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer'});
   for (const c of cookies) headers.append('Set-Cookie', c);
@@ -43,13 +70,13 @@ function requireRole(user, admin = false) {
   if (admin ? user.role !== 'admin' : !['admin', 'organizer'].includes(user.role)) fail(403, 'Tu n’as pas l’autorisation de gérer les événements.');
 }
 async function identity(request, env) {
-  const raw = cookie(request, COOKIE_SESSION);
+  const raw = cookie(request, cookieNames(env).session);
   let user = null;
   if (/^[a-f0-9]{64}$/.test(raw)) {
     const row = await env.DB.prepare('SELECT u.* FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=? AND s.expires_at>?').bind(await hash(raw), now()).first();
     user = publicUser(row, env);
   }
-  const guest = cookie(request, COOKIE_GUEST);
+  const guest = cookie(request, cookieNames(env).guest);
   return {user, guestHash: /^[a-f0-9]{64}$/.test(guest) ? await hash(guest) : null, guestToken: /^[a-f0-9]{64}$/.test(guest) ? guest : null};
 }
 function owned(reg, actor) {
@@ -62,8 +89,11 @@ function personal(reg, actor) {
 }
 const registrationSelect = `SELECT r.*,p.user_id AS participant_user_id,p.guest_hash AS participant_guest_hash,
  p.created_by AS participant_created_by,p.name AS participant_name FROM registrations r JOIN participants p ON p.id=r.participant_id`;
-async function registrationParticipant(env, actor, input, data) {
-  const manager=!!actor.user && ['admin','organizer'].includes(actor.user.role);
+// Pilot entries (participants) belong to the community of the race: every lookup and creation is scoped to it.
+async function registrationParticipant(env, actor, input, data, community) {
+  const cid = community.id;
+  // "Inscrire un autre pilote" in this community (server/access.mjs).
+  const manager=Boolean(actor.permissions?.has('manage_registrations'));
   if (input.participantUserId) {
     if (!actor.user) fail(401,'Connecte-toi avec Discord pour inscrire un autre pilote.');
     if (!/^\d{15,22}$/.test(input.participantUserId)) fail(400,'Compte Discord invalide.');
@@ -71,12 +101,12 @@ async function registrationParticipant(env, actor, input, data) {
     if (!discordUser) fail(404,'Ce pilote Discord est introuvable. Actualise la page.');
     data.name=discordUser.name;
     data.nameKey=data.name.normalize('NFKC').toLocaleLowerCase('fr-FR');
-    await env.DB.prepare(`INSERT INTO participants(id,name,user_id,created_by,created_at) VALUES(?,?,?,?,?)
-      ON CONFLICT(user_id) WHERE user_id IS NOT NULL DO UPDATE SET name=excluded.name`).bind(id(),discordUser.name,discordUser.id,actor.user.id,now()).run();
-    return env.DB.prepare('SELECT * FROM participants WHERE user_id=?').bind(discordUser.id).first();
+    await env.DB.prepare(`INSERT INTO participants(id,name,user_id,created_by,created_at,community_id) VALUES(?,?,?,?,?,?)
+      ON CONFLICT(community_id,user_id) WHERE user_id IS NOT NULL DO UPDATE SET name=excluded.name`).bind(id(),discordUser.name,discordUser.id,actor.user.id,now(),cid).run();
+    return env.DB.prepare('SELECT * FROM participants WHERE user_id=? AND community_id=?').bind(discordUser.id,cid).first();
   }
   if (input.participantId) {
-    const participant=await env.DB.prepare('SELECT * FROM participants WHERE id=?').bind(input.participantId).first();
+    const participant=await env.DB.prepare('SELECT * FROM participants WHERE id=? AND community_id=?').bind(input.participantId,cid).first();
     if (!participant) fail(404,'Ce pilote est introuvable. Actualise la page.');
     const existing=await env.DB.prepare(registrationSelect+' WHERE r.participant_id=?').bind(participant.id).all();
     const self=!!(actor.user && participant.user_id===actor.user.id) || !!(actor.guestHash && participant.guest_hash===actor.guestHash);
@@ -90,19 +120,19 @@ async function registrationParticipant(env, actor, input, data) {
     const linkedUser=await env.DB.prepare('SELECT id FROM users WHERE lower(name)=lower(?) LIMIT 1').bind(data.name).first();
     if (linkedUser) fail(409,'Ce pseudo correspond à un pilote Discord. Sélectionne son compte dans la liste.');
     const existing=await env.DB.prepare(`SELECT * FROM participants
-      WHERE user_id IS NULL AND guest_hash IS NULL AND created_by=? AND lower(name)=lower(?)
-      ORDER BY created_at,id LIMIT 1`).bind(actor.user.id,data.name).first();
+      WHERE community_id=? AND user_id IS NULL AND guest_hash IS NULL AND created_by=? AND lower(name)=lower(?)
+      ORDER BY created_at,id LIMIT 1`).bind(cid,actor.user.id,data.name).first();
     if (existing) return existing;
-    const participant={id:id(),name:data.name,user_id:null,guest_hash:null,created_by:actor.user.id};
-    await env.DB.prepare('INSERT INTO participants(id,name,created_by,created_at) VALUES(?,?,?,?)').bind(participant.id,participant.name,actor.user.id,now()).run();
+    const participant={id:id(),name:data.name,user_id:null,guest_hash:null,created_by:actor.user.id,community_id:cid};
+    await env.DB.prepare('INSERT INTO participants(id,name,created_by,created_at,community_id) VALUES(?,?,?,?,?)').bind(participant.id,participant.name,actor.user.id,now(),cid).run();
     return participant;
   }
   if (actor.user) {
-    await env.DB.prepare('INSERT INTO participants(id,name,user_id,created_by,created_at) VALUES(?,?,?,?,?) ON CONFLICT(user_id) WHERE user_id IS NOT NULL DO NOTHING').bind(id(),data.name,actor.user.id,actor.user.id,now()).run();
-    return env.DB.prepare('SELECT * FROM participants WHERE user_id=?').bind(actor.user.id).first();
+    await env.DB.prepare('INSERT INTO participants(id,name,user_id,created_by,created_at,community_id) VALUES(?,?,?,?,?,?) ON CONFLICT(community_id,user_id) WHERE user_id IS NOT NULL DO NOTHING').bind(id(),data.name,actor.user.id,actor.user.id,now(),cid).run();
+    return env.DB.prepare('SELECT * FROM participants WHERE user_id=? AND community_id=?').bind(actor.user.id,cid).first();
   }
-  await env.DB.prepare('INSERT INTO participants(id,name,guest_hash,created_at) VALUES(?,?,?,?) ON CONFLICT(guest_hash) WHERE guest_hash IS NOT NULL DO NOTHING').bind(id(),data.name,actor.guestHash,now()).run();
-  return env.DB.prepare('SELECT * FROM participants WHERE guest_hash=?').bind(actor.guestHash).first();
+  await env.DB.prepare('INSERT INTO participants(id,name,guest_hash,created_at,community_id) VALUES(?,?,?,?,?) ON CONFLICT(community_id,guest_hash) WHERE guest_hash IS NOT NULL DO NOTHING').bind(id(),data.name,actor.guestHash,now(),cid).run();
+  return env.DB.prepare('SELECT * FROM participants WHERE guest_hash=? AND community_id=?').bind(actor.guestHash,cid).first();
 }
 async function body(request) {
   if (!request.headers.get('Content-Type')?.startsWith('application/json')) fail(415, 'Format JSON requis.');
@@ -285,6 +315,6 @@ function validateRegistration(input, event) {
 
 export {
   LEGACY_CAR_ALIASES, COOKIE_SESSION, COOKIE_GUEST, COOKIE_STATE, COOKIE_RETURN, DAY, HttpError, fail, now, id, token, hash, cookie,
-  setCookie, json, redirect, origin, requireDiscord, administrators, publicUser, requireRole, identity, owned, personal,
+  setCookie, cookieNames, siteOrigin, communityLabel, baseDomain, json, redirect, origin, requireDiscord, administrators, publicUser, requireRole, identity, owned, personal,
   registrationSelect, registrationParticipant, body, rateLimit, cleanup, returnPath, text, parisTimestamp, validateEvent, validateRegistration, ANY_CATEGORY
 };

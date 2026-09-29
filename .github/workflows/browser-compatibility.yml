@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
-      COMPAT_BASE_URL: https://app.endurance-manager.workers.dev
+      COMPAT_BASE_URL: https://commu-dev.endurance-manager.app
       ENV_LABEL: development
     steps:
       - uses: actions/checkout@v4

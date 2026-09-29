@@ -1,3 +1,4 @@
+import {renderHome} from './home-view.mjs';
 import {isSolo,accessBadge,soloRoundsLabel,renderSoloEntries,ANY_CATEGORY} from './solo.mjs';
 import {dateBlock,timeLabel} from '../dates.mjs';
 import {durationLabel,eventMinutes} from '../../shared/duration.mjs';
@@ -128,6 +129,7 @@ function card({event,departure,reg}) {
 }
 
 export function renderMyEntries() {
+  if(state.access!=='member'){renderHome();return;}
   state.page='my-entries';
   // Past races live in the Archivés list; this page is about what is coming up.
   const now=Date.now();

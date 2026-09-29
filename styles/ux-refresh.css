@@ -1292,6 +1292,90 @@ html[data-game] .race-card .race-fill:has(.solo-fill) { display: flex; flex-wrap
 .departure-tbd-note strong { color: #ffd98a; font-size: 15px; }
 .departure-tbd-note small { color: #c7d0d4; font-size: 12.5px; line-height: 1.45; }
 
+/* Community gate: not signed in, or not a member of the community's Discord server. */
+.community-gate { max-width: 620px; margin: 40px auto; padding: 28px 26px; border: 1px solid var(--border, #292d31); border-top: 4px solid #52d3d8; border-radius: 16px; background: var(--panel, #111315); text-align: center; }
+.community-gate h1 { margin: 0 0 12px; font-size: 28px; font-weight: 850; color: #f4f6f5; }
+.community-gate p { margin: 0 0 20px; color: #c7d0d4; font-size: 16px; line-height: 1.6; }
+.community-gate-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
+/* Members page: tabs, member cards, settings cards. */
+.members-tabs { display: flex; gap: 6px; margin-bottom: 14px; }
+.members-tabs button { min-height: 42px; padding: 0 18px; border: 1px solid var(--border, #292d31); border-radius: 10px; background: var(--panel, #111315); color: #c7d0d4; font: inherit; font-weight: 800; cursor: pointer; }
+.members-tabs button span { margin-left: 6px; padding: 1px 8px; border-radius: 999px; background: rgba(255,255,255,.08); font-size: 12px; }
+.members-tabs button[aria-selected="true"] { border-color: var(--community-accent, #52d3d8); color: #f4f6f5; box-shadow: inset 0 -3px 0 var(--community-accent, #52d3d8); }
+.member-grid { grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 12px; }
+.members-panel .member-card { display: flex !important; flex-direction: column; align-items: stretch; gap: 10px; padding: 14px; }
+.member-head { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.member-head .members-identity { flex: 1; }
+.member-avatar { flex: 0 0 38px; height: 38px; display: grid; place-items: center; border-radius: 50%; background: rgba(82,211,216,.14); border: 1px solid rgba(82,211,216,.45); color: var(--community-accent, #52d3d8); font-size: 13px; font-weight: 900; }
+.member-badge { flex: 0 0 auto; padding: 3px 8px; border-radius: 999px; background: var(--community-accent, #52d3d8); color: #06181a; font-size: 11px; font-weight: 900; text-transform: uppercase; letter-spacing: .04em; }
+.members-discord-roles { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.members-discord-role { padding: 2px 8px; border: 1px solid rgba(88,101,242,.55); border-radius: 999px; background: rgba(88,101,242,.12); color: #d6dafe; font-size: 12.5px; font-weight: 700; }
+.members-discord-role.is-empty { border-color: var(--border, #292d31); background: transparent; color: #99a3a0; }
+.member-rights { display: flex; flex-wrap: wrap; gap: 5px; padding-top: 10px; border-top: 1px solid var(--border, #292d31); }
+.member-right { padding: 2px 7px; border-radius: 6px; background: rgba(255,255,255,.05); color: #c7d0d4; font-size: 12px; }
+.member-right.is-all { background: rgba(127,224,168,.12); color: #7fe0a8; font-weight: 700; }
+.member-right.is-none { color: #99a3a0; }
+
+/* Community settings (members page, « Réglages » tab). */
+.community-settings { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 14px; }
+.community-settings[hidden] { display: none; }
+.settings-card { padding: 20px; border: 1px solid var(--border, #292d31); border-radius: 16px; background: var(--panel, #111315); }
+.settings-card h2 { margin: 0 0 12px; font-size: 17px; color: var(--community-accent, #52d3d8); }
+.settings-roles-card { grid-column: 1 / -1; }
+.settings-appearance { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.settings-appearance label { display: grid; gap: 5px; font-size: 13px; font-weight: 700; color: #c7d0d4; }
+.settings-appearance label small { font-weight: 400; color: #99a3a0; }
+.settings-appearance input:not([type]) { min-height: 40px; box-sizing: border-box; padding: 0 12px; border: 1px solid var(--border, #292d31); border-radius: 9px; background: rgba(0,0,0,.25); color: inherit; font: inherit; }
+.settings-appearance .members-help, .settings-actions { grid-column: 1 / -1; margin: 0; }
+.settings-accent { grid-column: 1 / -1; display: flex; align-items: flex-end; gap: 12px; }
+.settings-appearance input[type="color"] { width: 64px; height: 38px; padding: 0; border: 1px solid var(--border, #292d31); border-radius: 9px; background: none; cursor: pointer; }
+.settings-actions { display: flex; align-items: center; gap: 12px; }
+.settings-status { color: #7fe0a8; font-size: 13px; font-weight: 700; }
+.settings-switch { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 12px 0; border-top: 1px solid var(--border, #292d31); cursor: pointer; }
+.settings-switch:first-of-type { border-top: 0; padding-top: 0; }
+.settings-switch small { display: block; margin-top: 2px; color: #99a3a0; font-size: 13px; }
+.settings-switch input { position: absolute; opacity: 0; pointer-events: none; }
+.settings-switch i { position: relative; flex: 0 0 44px; height: 24px; border-radius: 999px; background: #2b3034; transition: background .15s; }
+.settings-switch i::after { content: ""; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: #f4f6f5; transition: transform .15s; }
+.settings-switch input:checked + i { background: var(--community-accent, #52d3d8); }
+.settings-switch input:checked + i::after { transform: translateX(20px); }
+.settings-switch input:focus-visible + i { outline: 2px solid var(--community-accent, #52d3d8); outline-offset: 2px; }
+.settings-switch input:disabled + i { opacity: .5; }
+.role-legend { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 6px 16px; margin: 0 0 14px; padding: 12px 14px; border-radius: 10px; background: rgba(255,255,255,.03); }
+.role-legend dt { font-size: 13px; font-weight: 800; color: #f4f6f5; }
+.role-legend dd { margin: 1px 0 0; font-size: 12.5px; color: #99a3a0; }
+.role-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 10px; }
+.role-card { padding: 12px 14px; border: 1px solid var(--border, #292d31); border-radius: 12px; background: var(--panel2, #16191c); }
+.role-card .role-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; margin-bottom: 10px; }
+.role-card .role-head small { color: #99a3a0; font-size: 12px; }
+.role-card .role-head .settings-status { margin-left: auto; }
+.role-pills { display: flex; flex-wrap: wrap; gap: 6px; }
+.role-pill { position: relative; display: inline-flex; cursor: pointer; }
+.role-pill input { position: absolute; opacity: 0; pointer-events: none; }
+.role-pill span { padding: 5px 11px; border: 1px solid var(--border, #292d31); border-radius: 999px; color: #99a3a0; font-size: 12.5px; font-weight: 700; transition: background .12s, color .12s, border-color .12s; }
+.role-pill input:checked + span { border-color: var(--community-accent, #52d3d8); background: rgba(82,211,216,.14); color: #f4f6f5; }
+.role-pill input:checked + span::before { content: "✓ "; }
+.role-pill input:focus-visible + span { outline: 2px solid var(--community-accent, #52d3d8); outline-offset: 2px; }
+.role-pill input:disabled + span { opacity: .6; cursor: default; }
+@media (max-width: 760px) {
+  .community-settings, .role-list, .member-grid { grid-template-columns: minmax(0, 1fr); }
+  .settings-appearance { grid-template-columns: minmax(0, 1fr); }
+  .settings-card { padding: 14px; }
+}
+
+/* Community of the site: name always visible, accent color set by its admins. */
+.community-chip { align-self: center; padding: 4px 10px; border: 1px solid var(--community-accent, #52d3d8); border-radius: 999px; color: #f4f6f5; font-size: 12.5px; font-weight: 800; white-space: nowrap; }
+details.community-chip { position: relative; padding: 0; }
+details.community-chip summary { padding: 4px 10px; cursor: pointer; list-style: none; }
+details.community-chip summary::-webkit-details-marker { display: none; }
+details.community-chip summary::after { content: " ▾"; color: var(--community-accent, #52d3d8); }
+.community-switcher { position: absolute; z-index: 40; top: calc(100% + 6px); left: 0; min-width: 220px; display: grid; gap: 2px; padding: 8px; border: 1px solid var(--border, #292d31); border-radius: 12px; background: var(--panel, #111315); box-shadow: 0 14px 34px rgba(0,0,0,.45); }
+.community-switcher strong { padding: 4px 8px 6px; color: #99a3a0; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; }
+.community-switcher a { padding: 8px 10px; border-radius: 8px; color: #f4f6f5; font-weight: 700; text-decoration: none; }
+.community-switcher a:hover, .community-switcher a:focus-visible { background: rgba(82,211,216,.12); }
+:root[data-community-accent] .primary-button { background: var(--community-accent) !important; border-color: var(--community-accent) !important; }
+:root[data-community-accent] .top-stripes div:first-child { background: var(--community-accent) !important; }
+
 /* Large screens (27–34 inch, ultrawide): the whole interface grows in proportion and the page uses
    more of the width. The banner keeps its own sizing (its image is capped at its source resolution). */
 @media (min-width: 2200px) { :root { --wide-zoom: 1.15; } }

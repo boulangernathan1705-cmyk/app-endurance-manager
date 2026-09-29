@@ -1,0 +1,42 @@
+{
+  // Development of the community platform, in the endurance-manager.app account: it serves the test
+  // communities only (commu-dev.endurance-manager.app), with its own database. Production is
+  // wrangler.prod.jsonc.
+  "name": "endurance-manager-dev",
+  "main": "server/worker-with-migrations.mjs",
+  "compatibility_date": "2026-09-07",
+  "account_id": "880b4cbe0740cbc099a25c17773c0ec7",
+  "keep_vars": true,
+  "minify": true,
+  "build": { "command": "npm run build:workers" },
+  "triggers": {
+    "crons": ["*/15 * * * *"]
+  },
+  "routes": [
+    { "pattern": "commu-dev.endurance-manager.app", "custom_domain": true }
+  ],
+  "workers_dev": false,
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "html_handling": "auto-trailing-slash",
+    "run_worker_first": true
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "endurance-manager-dev",
+      "database_id": "3fbdc526-3bc6-43e9-92d9-e699004bee4f",
+      "migrations_dir": "migrations"
+    }
+  ],
+  // Secrets set in the dashboard (never here): DISCORD_CLIENT_ID, DISCORD_CLIENT_SECRET, DISCORD_BOT_TOKEN,
+  // ADMIN_DISCORD_IDS (the platform managers).
+  "vars": {
+    "APP_ORIGIN": "https://commu-dev.endurance-manager.app",
+    "SITE_ENV": "development",
+    "COMMUNITY": "commu-dev",
+    // Communities platform: <slug>.endurance-manager.app, one sign-in for all of them.
+    "BASE_DOMAIN": "endurance-manager.app"
+  }
+}

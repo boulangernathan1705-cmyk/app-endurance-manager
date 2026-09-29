@@ -1,6 +1,10 @@
+import {communitiesWith} from './community.mjs';
 import {buildWeeklyDiscordPayload, isInParisWeek, parisWeek} from './discord-weekly-format.mjs';
 
-const STATE_KEY = 'lmu-weekly-v1'; // Conservé pour réutiliser le message Discord existant.
+// One recap per community (module "discordWeekly"): its state key is "<community id>:lmu-weekly-v1"
+// (migration 0034 kept the existing Discord message of commu-dev).
+const STATE_SUFFIX = 'lmu-weekly-v1';
+const stateKey = community => `${community.id}:${STATE_SUFFIX}`;
 const LOCK_SECONDS = 90;
 
 function parseJson(value, fallback) {
@@ -63,9 +67,9 @@ function selectPlanningWeek(allDepartures, timestamp) {
   return {week, futureDepartures};
 }
 
-export async function loadWeeklyDiscordSnapshot(env, timestamp) {
+export async function loadWeeklyDiscordSnapshot(env, timestamp, community) {
   const events = (await env.DB.prepare(`SELECT id,name,circuit,duration_hours,duration_minutes,schedule_pending,departures
-    FROM events WHERE circuit NOT LIKE 'iracing-%' ORDER BY created_at,id`).all()).results || [];
+    FROM events WHERE community_id=? AND circuit NOT LIKE 'iracing-%' ORDER BY created_at,id`).bind(community.id).all()).results || [];
   const allDepartures = flattenDepartures(events);
   const currentWeek = parisWeek(timestamp);
   // A start whose time is still to be confirmed is never announced as running (its placeholder is 0:00).
@@ -185,8 +189,9 @@ async function editMessage(base,messageId,payload) {
   catch (error) { if (error?.status !== 404) throw error; return createMessage(base,payload); }
 }
 
-async function syncLocked(env,base,lockToken,timestamp) {
-  const snapshot = await loadWeeklyDiscordSnapshot(env,timestamp);
+async function syncLocked(env,base,lockToken,timestamp,community) {
+  const STATE_KEY = stateKey(community);
+  const snapshot = await loadWeeklyDiscordSnapshot(env,timestamp,community);
   const contentHash = await hashSnapshot(snapshot);
   const state = await env.DB.prepare('SELECT message_id,content_hash FROM discord_weekly_state WHERE key=? AND lock_token=?').bind(STATE_KEY,lockToken).first();
   if (!state) throw new Error('État Discord hebdomadaire indisponible.');
@@ -198,13 +203,21 @@ async function syncLocked(env,base,lockToken,timestamp) {
   return {ok:true,changed:true,messageId};
 }
 
-export async function syncWeeklyDiscord(env,timestamp=Date.now()) {
+export async function syncWeeklyDiscord(env,timestamp=Date.now(),community=null) {
   const base = String(env?.DISCORD_WEEKLY_WEBHOOK_URL || '').trim();
   if (!env?.DB || !base) return {ok:false,skipped:'not-configured'};
+  // Without a community: every community that enables the recap. (Until each community has its own
+  // Discord settings, step 4, they all use the site's webhook: only commu-dev enables it.)
+  if (!community) {
+    let last={ok:true,changed:false};
+    for (const target of await communitiesWith(env,'discordWeekly')) last=await syncWeeklyDiscord(env,timestamp,target);
+    return last;
+  }
+  const STATE_KEY = stateKey(community);
   const now = Math.floor(Date.now()/1000);
   await env.DB.prepare(`INSERT OR IGNORE INTO discord_weekly_state
-    (key,message_id,content_hash,week_key,updated_at,dirty,lock_token,lock_until) VALUES(?,?,?,?,?,?,?,?)`)
-    .bind(STATE_KEY,'','','',0,0,'',0).run();
+    (key,message_id,content_hash,week_key,updated_at,dirty,lock_token,lock_until,community_id) VALUES(?,?,?,?,?,?,?,?,?)`)
+    .bind(STATE_KEY,'','','',0,0,'',0,community.id).run();
   await env.DB.prepare('UPDATE discord_weekly_state SET dirty=1 WHERE key=?').bind(STATE_KEY).run();
   const lockToken = crypto.randomUUID();
   const lock = await env.DB.prepare("UPDATE discord_weekly_state SET lock_token=?,lock_until=? WHERE key=? AND (lock_token='' OR lock_until<?)")
@@ -215,7 +228,7 @@ export async function syncWeeklyDiscord(env,timestamp=Date.now()) {
   try {
     for (let attempt=0; attempt<5; attempt+=1) {
       await env.DB.prepare('UPDATE discord_weekly_state SET dirty=0 WHERE key=? AND lock_token=?').bind(STATE_KEY,lockToken).run();
-      result=await syncLocked(env,base,lockToken,timestamp);
+      result=await syncLocked(env,base,lockToken,timestamp,community);
       const state=await env.DB.prepare('SELECT dirty FROM discord_weekly_state WHERE key=? AND lock_token=?').bind(STATE_KEY,lockToken).first();
       if (!state?.dirty) break;
       if (attempt===4) rerun=true;
@@ -226,5 +239,5 @@ export async function syncWeeklyDiscord(env,timestamp=Date.now()) {
   } finally {
     await env.DB.prepare("UPDATE discord_weekly_state SET lock_token='',lock_until=0 WHERE key=? AND lock_token=?").bind(STATE_KEY,lockToken).run().catch(()=>{});
   }
-  return rerun ? syncWeeklyDiscord(env,Date.now()) : result;
+  return rerun ? syncWeeklyDiscord(env,Date.now(),community) : result;
 }

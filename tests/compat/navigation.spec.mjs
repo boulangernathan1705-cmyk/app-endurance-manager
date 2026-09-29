@@ -35,7 +35,10 @@ test.beforeEach(async ({page}) => {
 
 test('public API responds', async ({page}) => {
   await expectApiHealthy(page, '/api/session');
-  await expectApiHealthy(page, '/api/races');
+  // The races are for the members of the community: a visitor is asked to sign in with Discord.
+  const races = await page.request.get('/api/races', {headers:{Accept:'application/json'}});
+  expect(races.status()).toBe(401);
+  expect(races.headers()['content-type'] || '').toContain('application/json');
 });
 
 test('home loads without network error', async ({page}) => {
@@ -59,7 +62,7 @@ test('language switch shows the current language, translates event counters and 
 
   await openAndCheck(page, '/iracing/');
   await expect(page.locator('html')).toHaveAttribute('lang','en');
-  await expect(page.getByRole('heading',{name:'ENDURANCE',exact:true})).toBeVisible();
+  await expect(page.getByRole('heading',{name:'ENDURANCE',exact:true}).or(page.locator('.community-gate h1'))).toBeVisible();
   await expect(page.locator('[data-language-toggle]')).toContainText('🇬🇧');
   await expect(page.locator('[data-language-toggle]')).toHaveAttribute('data-language-placement','game-space');
   const cards=page.locator('.event-card');
@@ -73,7 +76,7 @@ test('language switch shows the current language, translates event counters and 
 
   await openAndCheck(page, '/lmu/');
   await expect(page.locator('html')).toHaveAttribute('lang','en');
-  await expect(page.getByRole('heading',{name:'ENDURANCE',exact:true})).toBeVisible();
+  await expect(page.getByRole('heading',{name:'ENDURANCE',exact:true}).or(page.locator('.community-gate h1'))).toBeVisible();
   await expect(page.locator('[data-language-toggle]')).toContainText('🇬🇧');
   await expect(page.locator('[data-language-toggle]')).toHaveAttribute('data-language-placement','game-space');
   expect(apiFailures).toEqual([]);
@@ -91,7 +94,7 @@ test('mobile interface stays compact without horizontal overflow across main pag
   const shell = await page.locator('.site-nav-shell').boundingBox();
   expect(shell).not.toBeNull();
   expect(shell.height).toBeLessThan(190);
-  await expect(page.locator('.page-title')).toBeVisible();
+  await expect(page.locator('.page-title').or(page.locator('.community-gate'))).toBeVisible();
 });
 
 test('LMU space opens from home', async ({page}) => {

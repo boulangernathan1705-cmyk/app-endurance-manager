@@ -112,7 +112,8 @@ test('le compte déconnecté garde Aide et Discord alignés horizontalement et e
 
 test('inscrire un autre pilote reste réservé à un compte connecté',()=>{
   const eventView=read('front/app/event-view.mjs');
-  assert.match(eventView,/state\.user\?button\('new-registration','Inscrire un autre pilote'/);
+  // "Inscrire un autre pilote": the Discord roles with this permission in the community.
+  assert.match(eventView,/can\('manage_registrations'\)\?button\('new-registration','Inscrire un autre pilote'/);
 });
 
 test('Ajouter une catégorie est placé à côté de Fermer dans l’en-tête inscription',()=>{
