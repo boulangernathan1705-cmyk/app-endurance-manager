@@ -3,7 +3,7 @@
 //
 // On the platform (BASE_DOMAIN), the address says it: <slug>.endurance-manager.app. Elsewhere (main
 // address, local preview, tests): the COMMUNITY variable (slug, "commu-dev" by default).
-import {fail, communityLabel} from './core.mjs';
+import {fail, communityLabel, baseDomain, origin} from './core.mjs';
 
 export const DEFAULT_COMMUNITY_SLUG = 'commu-dev';
 
@@ -37,6 +37,14 @@ export async function communitiesWith(env, module) {
 }
 
 export const hasModule = (community, module) => community?.modules?.[module] === true;
+
+// Address of the site of a community: <slug>.BASE_DOMAIN, or the main address for the community of the main
+// address (COMMUNITY) and when there is a single site.
+export function communityUrl(env, community) {
+  const domain = baseDomain(env);
+  if (!domain || community.slug === communitySlug(env, null)) return origin(env);
+  return `https://${community.slug}.${domain}`;
+}
 
 // Look of a community: its accent color (set by its admins) and the icon and banner of its Discord
 // server (kept by the settings page), as image addresses on Discord's CDN (allowed by the site's CSP).

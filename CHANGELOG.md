@@ -2,6 +2,14 @@
 
 Les changements du site, version par version. La plus récente est en haut.
 
+## v1.3 — 29 septembre 2026
+
+### Pour les admins des communautés
+- Nouvel onglet **Mise en place** dans « Gestion des membres » : les étapes pour installer ta communauté, expliquées pas à pas et cochées toutes seules une fois faites (bot Discord, rôles, récap, lien d'invitation, annonce du site).
+- **Récap de la semaine sur Discord** réglé par chaque communauté : dans un seul salon (LMU, iRacing ou les deux) ou un salon par simu, avec un bouton pour tester le salon. Le lien du message mène au site de la communauté.
+- Le **lien d'invitation** du serveur Discord est proposé aux joueurs qui n'en sont pas encore membres.
+- Page Membres plus claire : nom de la communauté au centre de la barre, autorisations des rôles plus lisibles.
+
 ## v1.2.2 — 29 septembre 2026
 
 ### Accueil
