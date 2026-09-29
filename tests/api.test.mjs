@@ -33,8 +33,8 @@ function harness(withParticipants=true){
  DB.db.exec(readFileSync(new URL('../migrations/0031_solo_driver.sql',import.meta.url),'utf8'));
  DB.db.exec(readFileSync(new URL('../migrations/0016_client_errors.sql',import.meta.url),'utf8'));
  DB.db.exec(readFileSync(new URL('../migrations/0017_discord_weekly.sql',import.meta.url),'utf8'));
- if(withParticipants){DB.db.exec(readFileSync(new URL('../migrations/0034_communities.sql',import.meta.url),'utf8'));DB.db.exec(readFileSync(new URL('../migrations/0035_memberships.sql',import.meta.url),'utf8'));linkTestServer(DB.db);}
- const env={DB,APP_ORIGIN:ROOT,SOLO_RACES:'on',DISCORD_CLIENT_ID:'app-id',DISCORD_CLIENT_SECRET:'test-only-secret',ADMIN_DISCORD_IDS:ADMIN,ASSETS:{fetch:async()=>new Response('static')}};
+ if(withParticipants){DB.db.exec(readFileSync(new URL('../migrations/0034_communities.sql',import.meta.url),'utf8'));DB.db.exec(readFileSync(new URL('../migrations/0035_memberships.sql',import.meta.url),'utf8'));linkTestServer(DB.db);DB.db.exec(`UPDATE communities SET modules=json_set(modules,'$.soloRaces',json('true'))`);}
+ const env={DB,APP_ORIGIN:ROOT,DISCORD_CLIENT_ID:'app-id',DISCORD_CLIENT_SECRET:'test-only-secret',ADMIN_DISCORD_IDS:ADMIN,ASSETS:{fetch:async()=>new Response('static')}};
  const jars=new Map();
  async function req(path,method='GET',data,actor='guest',options={}){
   const jar=jars.get(actor)||{};
@@ -584,13 +584,13 @@ test('a driver can race an endurance alone; organizers set whether a driver chan
  assert.equal((await req('/api/events?game=iracing','GET',null,'admin')).data.events[0].driverChangeRequired,true);
 });
 
-test('solo races and SAFE drivers stay off where SOLO_RACES is not "on" (production)', async () => {
+test('solo races stay off in a community without the solo races module', async () => {
  const {req,login,env,DB}=harness();await login(ADMIN,'admin');await login(PILOT,'pilot');
  const solo=soloInput;
  const soloRace=await req('/api/events','POST',solo,'admin');
  assert.equal(soloRace.status,201,'on: allowed');
  const soloDeparture=(await req('/api/events','GET',null,'admin')).data.events.find(event=>event.id===soloRace.data.id).departures[0].id;
- delete env.SOLO_RACES;
+ DB.db.exec(`UPDATE communities SET modules=json_set(modules,'$.soloRaces',json('false'))`);
  assert.equal((await req('/api/session','GET',null,'pilot')).data.soloRaces,false);
  assert.equal((await req('/api/events','POST',solo,'admin')).status,400);
  assert.equal((await req('/api/events','GET',null,'admin')).data.events.length,0,'existing solo races are hidden');

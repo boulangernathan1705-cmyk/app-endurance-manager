@@ -7,8 +7,8 @@ import {ingestClientError, clientErrorsApi} from './telemetry.mjs';
 import {racesPath} from './races-path.mjs';
 import {currentCommunity, appearanceOf} from './community.mjs';
 import {communityAccess, requirePermission, displayRole, PERMISSIONS, DEFAULT_EVERYONE, normalizePermissions, discordGuild, memberPermissions} from './access.mjs';
-// Solo races and SAFE drivers: still being built, only on the sites where SOLO_RACES is "on" (dev).
-const soloRacesEnabled = (env, community) => env?.SOLO_RACES === 'on' || community?.modules?.soloRaces === true;
+// Solo races: a module each community turns on or off (settings of the members page).
+const soloRacesEnabled = (env, community) => community?.modules?.soloRaces === true;
 import {syncIracingEvents} from './iracing-import.mjs';
 // A race of the current community only: any id from another community answers "introuvable".
 async function eventById(env, eventId, community) {
