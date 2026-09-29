@@ -2,6 +2,12 @@
 
 Les changements du site, version par version. La plus récente est en haut.
 
+## v1.4 — 29 septembre 2026
+
+### Vitrine
+- **endurance-manager.app devient une vitrine** : visible sans connexion, avec des courses LMU, une course solo, des équipages et des pilotes fictifs, et le calendrier iRacing officiel. Elle n'est reliée à aucun serveur Discord et ne contient aucune vraie personne.
+- Pour organiser les endurances de ta communauté, chaque communauté a son propre site, relié à son Discord.
+
 ## v1.3.1 — 29 septembre 2026
 
 ### Corrections
