@@ -92,17 +92,30 @@ test('"Mes communautés": the communities of the player, with the address of eac
   assert.equal((await (await call(`${TEST_SITE}/api/session`,{headers})).json()).communities.length,2,'the same on every site');
 });
 
-test('the main address stays open to every Discord player, organizers keep their role; community sites stay reserved', async () => {
-  const APEX='https://endurance-manager.app';
-  const {DB,call}=setup({APP_ORIGIN:APEX});
+test('the main address is a showcase: anyone looks without signing in, only the platform managers change it', async () => {
+  const APEX='https://endurance-manager.app', MANAGER='111111111111111111';
+  const {DB,call}=setup({APP_ORIGIN:APEX,ADMIN_DISCORD_IDS:MANAGER});
   const session=async (user,role)=>{const raw=user.slice(0,1).repeat(64);const hash=[...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(raw)))].map(b=>b.toString(16).padStart(2,'0')).join('');
     DB.db.prepare("INSERT INTO users(id,name,role,created_at) VALUES(?,?,?,0)").run(user,'Joueur',role);DB.db.prepare('INSERT INTO sessions(token_hash,user_id,expires_at) VALUES(?,?,?)').run(hash,user,4102444800);return {Cookie:`__Secure-em_dev_session=${raw}`};};
-  const pilot=await session('555555555555555555','pilot'),organizer=await session('666666666666666666','organizer');
-  const apex=await (await call(`${APEX}/api/session`,{headers:pilot})).json();
-  assert.equal(apex.access,'member');assert.equal(apex.openSite,true,'the site keeps its look (no community name)');assert.deepEqual(apex.permissions.sort(),['endurance','solo_open']);
-  assert.ok((await (await call(`${APEX}/api/session`,{headers:organizer})).json()).permissions.includes('create_race'));
-  assert.equal((await (await call(`${APEX}/api/session`)).json()).access,'anonymous','signed in with Discord');
-  const picker=(await (await call(`${APEX}/api/participants`,{headers:organizer})).json()).participants.map(item=>item.id);
-  assert.ok(picker.includes('555555555555555555'),'"Inscrire un autre pilote": every Discord player of the open site');
-  assert.notEqual((await (await call(`${MAIN}/api/session`,{headers:pilot})).json()).access,'member','community sites: members of their Discord only');
+  const pilot=await session('555555555555555555','organizer'),manager=await session(MANAGER,'pilot');
+  const visitor=await (await call(`${APEX}/api/session`)).json();
+  assert.equal(visitor.access,'member');assert.equal(visitor.openSite,true);assert.deepEqual(visitor.permissions,[],'read only');
+  assert.equal((await call(`${APEX}/api/races`)).status,200,'the races are visible without signing in');
+  assert.deepEqual((await (await call(`${APEX}/api/session`,{headers:pilot})).json()).permissions,[],'a signed-in player only looks too');
+  assert.ok((await (await call(`${APEX}/api/session`,{headers:manager})).json()).permissions.includes('admin'));
+  const write=(headers,path,body)=>call(`${APEX}${path}`,{method:'POST',headers:{...headers,Origin:APEX,'Content-Type':'application/json'},body:JSON.stringify(body)});
+  assert.equal((await write(pilot,'/api/races',{name:'Test',categories:['GT3'],departures:[{date:'2090-10-15',time:'21:00'}]})).status,403);
+  // Reset of the showcase: fictional races, crews and pilots; no Discord server; nobody real.
+  DB.db.prepare("UPDATE communities SET discord_guild_id='900000000000000001' WHERE slug='commu-dev'").run();
+  assert.equal((await write(pilot,'/api/platform/showcase',{confirm:'VITRINE'})).status,403,'managers only');
+  assert.equal((await write(manager,'/api/platform/showcase',{})).status,400,'confirmation needed');
+  const realFetch=globalThis.fetch;globalThis.fetch=async()=>new Response('{}',{status:503});
+  let reset;try{reset=await write(manager,'/api/platform/showcase',{confirm:'VITRINE'});}finally{globalThis.fetch=realFetch;}
+  assert.equal(reset.status,200,await reset.clone().text());
+  const community=DB.db.prepare("SELECT * FROM communities WHERE slug='commu-dev'").get();
+  assert.equal(community.discord_guild_id,null);assert.equal(community.name,'Endurance Manager');
+  const races=(await (await call(`${APEX}/api/races`)).json()).events;
+  assert.ok(races.length>=6);assert.ok(races.some(race=>race.format==='solo'));assert.ok(races.some(race=>race.schedulePending));
+  assert.ok(races.some(race=>race.departures.some(departure=>departure.crews.length&&departure.crews[0].registrationIds?.length)),'crews with their pilots');
+  assert.equal(DB.db.prepare("SELECT COUNT(*) n FROM registrations WHERE user_id IS NOT NULL").get().n,0,'no real person');
 });

@@ -10,6 +10,7 @@ import {communityAccess, requirePermission, displayRole, PERMISSIONS, DEFAULT_EV
 // Solo races: a module each community turns on or off (settings of the members page).
 const soloRacesEnabled = (env, community) => community?.modules?.soloRaces === true;
 import {syncIracingEvents} from './iracing-import.mjs';
+import {resetShowcase} from './demo.mjs';
 import {syncWeeklyDiscord, sendRecapTest, usesSiteRecap, WEBHOOK_URL} from './discord-weekly.mjs';
 // A race of the current community only: any id from another community answers "introuvable".
 async function eventById(env, eventId, community) {
@@ -239,8 +240,7 @@ async function api(request, env) {
   // Every request below works inside one community (separation entry point, server/community.mjs), with
   // the permissions the player's Discord roles give in it (server/access.mjs).
   const community = await currentCommunity(env, request);
-  // The main address of the platform (endurance-manager.app) stays open to every Discord player, as before
-  // the communities: it shows future community admins how the site works.
+  // The main address of the platform (endurance-manager.app) is a showcase: fictional races anyone can look at.
   const openSite = Boolean(baseDomain(env)) && url.hostname === baseDomain(env);
   const access = await communityAccess(env, actor, community, {open:openSite});
   actor.permissions = access.permissions;
@@ -637,6 +637,17 @@ async function api(request, env) {
     return json({ok:true});
   }
   // Platform managers: the communities, and a new one (its admins then set it up on its « Mise en place » page).
+  // Showcase of the main address: its data replaced by fictional races, crews and pilots (server/demo.mjs).
+  if (path === '/api/platform/showcase' && method === 'POST') {
+    if (!actor.manager) fail(403, 'Réservé aux gestionnaires de la plateforme.');
+    if (!openSite) fail(400, 'La vitrine se réinitialise depuis l’adresse principale du site.');
+    const input = await body(request);
+    if (input.confirm !== 'VITRINE') fail(400, 'Tape VITRINE pour confirmer.');
+    const result = await resetShowcase(env, community);
+    // The official iRacing calendar fills the iRacing space.
+    try { await syncIracingEvents(env, {communities:[{...community, modules:{iracingImport:true, soloRaces:true}}]}); } catch {}
+    return json({ok:true, ...result});
+  }
   if (path === '/api/platform/communities' && method === 'GET') {
     if (!actor.manager) fail(403, 'Réservé aux gestionnaires de la plateforme.');
     const list = [];
@@ -644,7 +655,7 @@ async function api(request, env) {
       const discord = item.discordGuildId ? await discordGuild(env, item.discordGuildId) : null;
       list.push({slug:item.slug, name:item.name, url:communityUrl(env, item), guildId:item.discordGuildId, discordServer:discord?.name || null, botPresent:Boolean(discord), botInviteUrl:botInvite(env, item.discordGuildId)});
     }
-    return json({communities:list, baseDomain:baseDomain(env) || null});
+    return json({communities:list, baseDomain:baseDomain(env) || null, showcase:openSite});
   }
   if (path === '/api/platform/communities' && method === 'POST') {
     if (!actor.manager) fail(403, 'Réservé aux gestionnaires de la plateforme.');

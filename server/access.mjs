@@ -20,7 +20,6 @@ export const PERMISSIONS = Object.freeze([
   'admin'                 // page Membres et réglages de la communauté
 ]);
 export const DEFAULT_EVERYONE = Object.freeze(['endurance', 'solo_open']);
-const ORGANIZER = Object.freeze([...DEFAULT_EVERYONE, 'manage_registrations', 'create_race', 'manage_races']);
 // Names used before the permissions were redefined (settings saved with them keep their meaning).
 const LEGACY = {register:['endurance', 'solo_open'], create_crew:['endurance'], register_others:['manage_registrations'],
   manage_crews:['manage_registrations'], safe_races:['solo_safe']};
@@ -101,14 +100,10 @@ export async function memberPermissions(env, community, membership) {
 //   'unavailable' (the server or the bot cannot be checked).
 export async function communityAccess(env, actor, community, {open = false} = {}) {
   const none = status => ({status, permissions:new Set(), manager:false});
+  const manager = Boolean(actor.user) && administrators(env).includes(actor.user.id);
+  // Showcase (main address): everyone looks, signed in or not; only the platform managers change it.
+  if (open) return manager ? {status:'member', permissions:new Set(PERMISSIONS), manager} : none('member');
   if (!actor.user) return none('anonymous');
-  const manager = administrators(env).includes(actor.user.id);
-  // Open site (main address): every signed-in player enters; the organizers keep their role of the site.
-  if (open) {
-    if (manager) return {status:'member', permissions:new Set(PERMISSIONS), manager};
-    const row = await env.DB.prepare('SELECT role FROM users WHERE id=?').bind(actor.user.id).first();
-    return {status:'member', permissions:new Set(row?.role === 'organizer' ? ORGANIZER : DEFAULT_EVERYONE), manager:false};
-  }
   if (!community.discordGuildId) return manager ? {status:'member', permissions:new Set(PERMISSIONS), manager} : none('unavailable');
   let membership = await env.DB.prepare('SELECT * FROM memberships WHERE community_id=? AND user_id=?').bind(community.id, actor.user.id).first();
   // Managers are checked too (to appear on the members page when they are on the server), but their access never depends on it.

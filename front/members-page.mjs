@@ -160,7 +160,7 @@ function setupMarkup(setup) {
 
 // « Plateforme » (managers of Endurance Manager): the communities, and a new one.
 async function platformMarkup() {
-  const {communities, baseDomain} = await api('/api/platform/communities');
+  const {communities, baseDomain, showcase} = await api('/api/platform/communities');
   const rows = communities.map(item => `<article class="platform-row"><div><strong>${esc(item.name)}</strong><a href="${esc(item.url)}/" target="_blank" rel="noopener">${esc(item.url.replace(/^https:\/\//, ''))}</a></div>
     <span>${item.discordServer ? `Discord « ${esc(item.discordServer)} »` : item.guildId ? `Serveur ${esc(item.guildId)}` : 'Aucun serveur'}</span>
     <span class="${item.botPresent ? 'platform-ok' : 'platform-ko'}">${item.botPresent ? '✓ Bot présent' : item.botInviteUrl ? `<a href="${esc(item.botInviteUrl)}" target="_blank" rel="noopener">Bot absent : lien d’invitation</a>` : 'Bot absent'}</span></article>`).join('');
@@ -174,7 +174,11 @@ async function platformMarkup() {
         <label>ID du serveur Discord<input name="guildId" inputmode="numeric" required pattern="[0-9]{15,22}" placeholder="Ex. : 1269541162025353289"></label>
         <p class="members-help">Pour l’ID : sur Discord, active <strong>Paramètres utilisateur → Avancés → Mode développeur</strong>, puis fais un clic droit sur l’icône du serveur et choisis <strong>Copier l’identifiant du serveur</strong>.</p>
         <div class="settings-actions"><button class="primary-button" type="submit">Créer la communauté</button><span class="settings-status" aria-live="polite"></span></div>
-      </form><div data-created></div></section>`;
+      </form><div data-created></div></section>
+    ${showcase ? `<section class="settings-card showcase-reset"><h2>Vitrine de l’adresse principale</h2>
+      <p class="members-help">Remplace <strong>toutes</strong> les données de ce site (courses, inscriptions, équipages, pilotes, réglages) par des courses et des pilotes fictifs, datés à partir d’aujourd’hui, et le détache de tout serveur Discord. Le calendrier iRacing officiel est ensuite réimporté. Les données actuelles sont définitivement supprimées.</p>
+      <form class="setup-form setup-inline" data-showcase><input name="confirm" autocomplete="off" placeholder="Tape VITRINE pour confirmer">
+        <button class="primary-button showcase-danger" type="submit">Réinitialiser la vitrine</button><span class="settings-status" aria-live="polite"></span></form></section>` : ''}`;
 }
 
 let openTab = '';
@@ -251,6 +255,16 @@ app.addEventListener('input', event => {
 });
 
 app.addEventListener('submit', async event => {
+  const showcaseForm = event.target.closest('form[data-showcase]');
+  if (showcaseForm) {
+    event.preventDefault();
+    const status = showcaseForm.querySelector('.settings-status');
+    if (!confirm('Supprimer définitivement toutes les données de ce site et les remplacer par la vitrine ?')) return;
+    status.textContent = 'Réinitialisation…';
+    try { const result = await api('/api/platform/showcase', 'POST', {confirm:showcaseForm.elements.confirm.value.trim()}); status.textContent = `✓ Vitrine prête : ${result.races} courses fictives et le calendrier iRacing.`; }
+    catch (error) { status.textContent = error.message; }
+    return;
+  }
   const recaps = event.target.closest('form[data-recaps]'), invite = event.target.closest('form[data-invite]'), created = event.target.closest('form[data-new-community]');
   if (recaps || invite || created) {
     event.preventDefault();

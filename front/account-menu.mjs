@@ -132,6 +132,23 @@ function applyCommunity(community, communities = [], openSite = false) {
   }
 }
 
+// Main address: a showcase with fictional races. Says so on every page, and where to go for a real community.
+function showcaseBanner(platformDiscordUrl) {
+  const bar = document.querySelector('.site-nav-shell');
+  if (!bar || document.querySelector('.showcase-banner')) return;
+  const banner = document.createElement('aside');
+  banner.className = 'showcase-banner';
+  const label = document.createElement('strong'); label.textContent = 'Vitrine';
+  const text = document.createElement('span');
+  text.textContent = 'Tu regardes une démonstration d’Endurance Manager : les courses, les équipages et les pilotes sont fictifs.';
+  banner.append(label, text);
+  if (/^https:\/\/(discord\.gg|discord\.com\/invite)\//.test(platformDiscordUrl || '')) {
+    const link = document.createElement('a'); link.href = platformDiscordUrl; link.rel = 'noopener'; link.textContent = 'Utiliser Endurance Manager pour ta communauté';
+    banner.append(link);
+  }
+  bar.after(banner);
+}
+
 async function loadSession() {
   if (!root) return;
   try {
@@ -139,6 +156,7 @@ async function loadSession() {
     if (!response.ok) throw new Error('session');
     const session = await response.json();
     applyCommunity(session.community, Array.isArray(session.communities) ? session.communities : [], session.openSite === true);
+    if (session.openSite) showcaseBanner(session.platformDiscordUrl);
     if (session.user) renderConnected(session.user);
     else renderDisconnected(!!session.discordReady);
   } catch {
