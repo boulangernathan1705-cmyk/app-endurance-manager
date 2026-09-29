@@ -1,4 +1,4 @@
-import {allCommunities, communityUrl} from './community.mjs';
+import {allCommunities, communityUrl, communitySlug} from './community.mjs';
 import {buildWeeklyDiscordPayload, isInParisWeek, parisWeek} from './discord-weekly-format.mjs';
 
 // The recap messages of a community (community_recaps, set on its « Mise en place » page): one message per
@@ -10,13 +10,16 @@ export const WEBHOOK_URL = /^https:\/\/(?:(?:ptb|canary)\.)?discord(?:app)?\.com
 const CIRCUITS = {all:'', lmu:"AND circuit NOT LIKE 'iracing-%'", iracing:"AND circuit LIKE 'iracing-%'"};
 const PAGES = {all:'/', lmu:'/lmu/', iracing:'/iracing/'};
 
-// Recap messages to keep up to date. A community without any setting keeps the former one: module
-// "discordWeekly", LMU races, through the site's webhook (DISCORD_WEEKLY_WEBHOOK_URL).
+// The former recap (LMU races, through the site's webhook DISCORD_WEEKLY_WEBHOOK_URL) only belongs to the
+// community of the main address: no other community can ever post into that channel.
+export const usesSiteRecap = (env, community) => community.slug === communitySlug(env, null) && community.modules?.discordWeekly === true
+  && Boolean(String(env.DISCORD_WEEKLY_WEBHOOK_URL || '').trim());
+
+// Recap messages to keep up to date: those set on the « Mise en place » page, or else the former one.
 export async function recapTargets(env, community) {
   const rows = (await env.DB.prepare('SELECT scope, webhook_url FROM community_recaps WHERE community_id=? ORDER BY scope').bind(community.id).all()).results || [];
   if (rows.length) return rows.map(row => ({scope:row.scope, url:row.webhook_url}));
-  const site = String(env.DISCORD_WEEKLY_WEBHOOK_URL || '').trim();
-  return community.modules?.discordWeekly === true && site ? [{scope:'lmu', url:site}] : [];
+  return usesSiteRecap(env, community) ? [{scope:'lmu', url:String(env.DISCORD_WEEKLY_WEBHOOK_URL).trim()}] : [];
 }
 
 function parseJson(value, fallback) {
@@ -218,15 +221,15 @@ async function syncLocked(env,base,lockToken,timestamp,community,scope) {
 // Keeps the recap messages up to date: those of one community, or of every community (scheduled task).
 export async function syncWeeklyDiscord(env,timestamp=Date.now(),community=null) {
   if (!env?.DB) return {ok:false,skipped:'not-configured'};
-  let last={ok:false,skipped:'not-configured'};
+  let last={ok:false,skipped:'not-configured'}, failed=null;
   for (const target of community ? [community] : await allCommunities(env)) {
     for (const recap of await recapTargets(env,target)) {
       try { last=await syncRecap(env,timestamp,target,recap.scope,recap.url); }
       // One broken webhook (deleted on Discord) never stops the other messages.
-      catch (error) { last={ok:false,error:error?.status || 'failed'}; console.error('Discord weekly sync failed', target.slug, recap.scope, error instanceof Error ? error.message : 'unknown'); }
+      catch (error) { failed={ok:false,error:error?.status || 'failed'}; console.error('Discord weekly sync failed', target.slug, recap.scope, error instanceof Error ? error.message : 'unknown'); }
     }
   }
-  return last;
+  return failed || last;
 }
 
 async function syncRecap(env,timestamp,community,scope,base) {
