@@ -2,6 +2,12 @@
 
 Les changements du site, version par version. La plus récente est en haut.
 
+## v1.3.1 — 29 septembre 2026
+
+### Corrections
+- Sur endurance-manager.app, **Inscrire un autre pilote** propose de nouveau tous les pilotes Discord (la liste était vide).
+- Le récap Discord d'une communauté ne peut être publié que dans les salons choisis par ses propres admins.
+
 ## v1.3 — 29 septembre 2026
 
 ### Pour les admins des communautés

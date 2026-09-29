@@ -125,3 +125,16 @@ test('platform managers create a community, linked to its Discord server; nobody
   const list=(await as(MANAGER,'/api/platform/communities')).data.communities;
   assert.deepEqual(list.map(item=>item.slug).sort(),['commu-dev','team-rookie']);
 });
+
+test('the site\'s own recap channel is only for the community of the main address', async t => {
+  fakeDiscord(t);
+  const {DB,env,as}=setup();
+  const {recapTargets}=await import('../server/discord-weekly.mjs');
+  env.DISCORD_WEEKLY_WEBHOOK_URL=HOOK_LMU;
+  DB.db.prepare(`INSERT INTO communities(id,slug,name,short_name,modules,created_at) VALUES('c-other','autre','Autre','AUT','{"discordWeekly":true}',0)`).run();
+  assert.deepEqual(await recapTargets(env,{id:'c-other',slug:'autre',modules:{discordWeekly:true}}),[],'another community never posts into the site\'s channel');
+  assert.equal((await recapTargets(env,{id:DEV_COMMUNITY,slug:'commu-dev',modules:{discordWeekly:true}})).length,1);
+  // The module can no longer be switched on from the settings.
+  await as(OWNER,'/api/community/modules','PATCH',{discordWeekly:true,iracingImport:false});
+  assert.equal(JSON.parse(DB.db.prepare('SELECT modules FROM communities WHERE id=?').get(DEV_COMMUNITY).modules).iracingImport,false);
+});

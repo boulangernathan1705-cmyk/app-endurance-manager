@@ -10,7 +10,7 @@ import {communityAccess, requirePermission, displayRole, PERMISSIONS, DEFAULT_EV
 // Solo races: a module each community turns on or off (settings of the members page).
 const soloRacesEnabled = (env, community) => community?.modules?.soloRaces === true;
 import {syncIracingEvents} from './iracing-import.mjs';
-import {syncWeeklyDiscord, sendRecapTest, WEBHOOK_URL} from './discord-weekly.mjs';
+import {syncWeeklyDiscord, sendRecapTest, usesSiteRecap, WEBHOOK_URL} from './discord-weekly.mjs';
 // A race of the current community only: any id from another community answers "introuvable".
 async function eventById(env, eventId, community) {
   const row = await env.DB.prepare('SELECT * FROM events WHERE id=? AND community_id=?').bind(eventId, community.id).first();
@@ -281,6 +281,11 @@ async function api(request, env) {
   if (path === '/api/participants' && method === 'GET') {
     if (!actor.user) fail(401,'Connecte-toi avec Discord pour choisir un pilote.');
     // The members of this community only (its Discord server), with their pilot entry here.
+    // The main address is open to every Discord player (no memberships there): all the accounts, as before.
+    if (openSite) return json({participants:(await env.DB.prepare(`SELECT u.id,u.name,p.id AS participantId
+      FROM users u LEFT JOIN participants p ON p.user_id=u.id AND p.community_id=?
+      WHERE u.id NOT LIKE 'system:%'
+      ORDER BY lower(u.name),u.id`).bind(community.id).all()).results});
     return json({participants:(await env.DB.prepare(`SELECT u.id,u.name,p.id AS participantId
       FROM memberships m JOIN users u ON u.id=m.user_id
       LEFT JOIN participants p ON p.user_id=u.id AND p.community_id=m.community_id
@@ -567,7 +572,8 @@ async function api(request, env) {
     requirePermission(actor,'admin');
     const input = await body(request);
     const modules = {...community.modules};
-    for (const key of ['iracingImport','discordWeekly','soloRaces']) if (typeof input[key] === 'boolean') modules[key] = input[key];
+    // The Discord recap is set on the « Mise en place » page (its own webhook), not here.
+    for (const key of ['iracingImport','soloRaces']) if (typeof input[key] === 'boolean') modules[key] = input[key];
     await env.DB.prepare('UPDATE communities SET modules=? WHERE id=?').bind(JSON.stringify(modules), community.id).run();
     return json({ok:true, modules});
   }
@@ -580,7 +586,7 @@ async function api(request, env) {
     const rolesConfigured = Boolean(await env.DB.prepare('SELECT 1 FROM community_role_permissions WHERE community_id=? LIMIT 1').bind(community.id).first());
     return json({community:{name:community.name, slug:community.slug}, siteUrl:communityUrl(env, community), rolesConfigured, recaps,
       // Former recap (site's webhook, LMU only) still running until the admins choose their own.
-      legacyRecap:!recaps.length && community.modules.discordWeekly === true && Boolean(env.DISCORD_WEEKLY_WEBHOOK_URL),
+      legacyRecap:!recaps.length && usesSiteRecap(env, community),
       guild:{id:community.discordGuildId, name:discord?.name || null, botPresent:Boolean(discord)}, botInviteUrl:botInvite(env, community.discordGuildId),
       discordInviteUrl:community.discordInviteUrl});
   }

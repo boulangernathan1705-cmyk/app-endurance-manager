@@ -102,5 +102,7 @@ test('the main address stays open to every Discord player, organizers keep their
   assert.equal(apex.access,'member');assert.equal(apex.openSite,true,'the site keeps its look (no community name)');assert.deepEqual(apex.permissions.sort(),['endurance','solo_open']);
   assert.ok((await (await call(`${APEX}/api/session`,{headers:organizer})).json()).permissions.includes('create_race'));
   assert.equal((await (await call(`${APEX}/api/session`)).json()).access,'anonymous','signed in with Discord');
+  const picker=(await (await call(`${APEX}/api/participants`,{headers:organizer})).json()).participants.map(item=>item.id);
+  assert.ok(picker.includes('555555555555555555'),'"Inscrire un autre pilote": every Discord player of the open site');
   assert.notEqual((await (await call(`${MAIN}/api/session`,{headers:pilot})).json()).access,'member','community sites: members of their Discord only');
 });
