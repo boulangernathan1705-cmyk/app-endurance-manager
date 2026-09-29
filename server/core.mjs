@@ -3,7 +3,6 @@ const LEGACY_CAR_ALIASES = new Map([
   ['BMW M Hybrid V8 Evo (2026)','BMW M Hybrid V8'],['Cadillac V-Series.R Evo (2026)','Cadillac V-Series.R'],['Peugeot 9X8 2023','Peugeot 9X8'],['Peugeot 9X8 2024','Peugeot 9X8'],['Toyota TR010 Hybrid (2026)','Toyota GR010 Hybrid'],['Ginetta G61-LT-P3 Evo','Ginetta G61-LT-P3'],['Ferrari 488 GTE Evo','Ferrari 488 GTE'],['Aston Martin Vantage AMR LMGT3 Evo','Aston Martin Vantage AMR LMGT3'],['BMW M4 LMGT3 Evo','BMW M4 LMGT3'],['Ferrari 296 LMGT3 Evo','Ferrari 296 LMGT3'],['Ford Mustang LMGT3 Evo','Ford Mustang LMGT3'],['Lamborghini Huracán LMGT3 Evo 2','Lamborghini Huracán LMGT3'],['McLaren 720S LMGT3 Evo','McLaren 720S LMGT3'],['Porsche 911 LMGT3 R (992)','Porsche 911 GT3 R LMGT3'],['Porsche 911 LMGT3 R (992) 2026','Porsche 911 GT3 R LMGT3']
 ]);
 const COOKIE_SESSION = '__Host-em_session';
-const COOKIE_GUEST = '__Host-em_guest';
 const COOKIE_STATE = '__Host-em_oauth';
 const COOKIE_RETURN = '__Host-em_return';
 const DAY = 86400;
@@ -35,9 +34,9 @@ function communityLabel(url, env) {
   return SLUG_LABEL.test(label) ? label : '';
 }
 function cookieNames(env) {
-  if (!baseDomain(env)) return {session:COOKIE_SESSION, guest:COOKIE_GUEST, state:COOKIE_STATE, ret:COOKIE_RETURN, domain:''};
+  if (!baseDomain(env)) return {session:COOKIE_SESSION, state:COOKIE_STATE, ret:COOKIE_RETURN, domain:''};
   const prefix = `__Secure-em${env.SITE_ENV === 'development' ? '_dev' : ''}`;
-  return {session:`${prefix}_session`, guest:`${prefix}_guest`, state:`${prefix}_oauth`, ret:`${prefix}_return`, domain:'.' + baseDomain(env)};
+  return {session:`${prefix}_session`, state:`${prefix}_oauth`, ret:`${prefix}_return`, domain:'.' + baseDomain(env)};
 }
 // The origin of the site the request was made on: a community address, or the main address.
 function siteOrigin(request, env) {
@@ -64,28 +63,22 @@ function requireDiscord(env) {
   if (!env.DISCORD_CLIENT_ID || !env.DISCORD_CLIENT_SECRET) fail(503, 'La connexion Discord n’est pas encore configurée.');
 }
 const administrators = env => String(env.ADMIN_DISCORD_IDS || '').split(',').map(x => x.trim()).filter(x => /^\d{15,22}$/.test(x));
-function publicUser(row, env) { return row ? {id: row.id, name: row.name, role: administrators(env).includes(row.id) ? 'admin' : row.role, safe: Boolean(row.safe)} : null; }
-function requireRole(user, admin = false) {
-  if (!user) fail(401, 'Connecte-toi avec Discord.');
-  if (admin ? user.role !== 'admin' : !['admin', 'organizer'].includes(user.role)) fail(403, 'Tu n’as pas l’autorisation de gérer les événements.');
-}
+// The signed-in player (their role in the community is given by server/access.mjs).
+function publicUser(row) { return row ? {id: row.id, name: row.name} : null; }
 async function identity(request, env) {
   const raw = cookie(request, cookieNames(env).session);
   let user = null;
   if (/^[a-f0-9]{64}$/.test(raw)) {
     const row = await env.DB.prepare('SELECT u.* FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=? AND s.expires_at>?').bind(await hash(raw), now()).first();
-    user = publicUser(row, env);
+    user = publicUser(row);
   }
-  const guest = cookie(request, cookieNames(env).guest);
-  return {user, guestHash: /^[a-f0-9]{64}$/.test(guest) ? await hash(guest) : null, guestToken: /^[a-f0-9]{64}$/.test(guest) ? guest : null};
+  return {user};
 }
 function owned(reg, actor) {
-  return !!((actor.user && (reg.participant_user_id === actor.user.id || reg.user_id === actor.user.id || reg.owner_user_id === actor.user.id)) ||
-    (actor.guestHash && reg.guest_hash === actor.guestHash));
+  return !!(actor.user && (reg.participant_user_id === actor.user.id || reg.user_id === actor.user.id || reg.owner_user_id === actor.user.id));
 }
 function personal(reg, actor) {
-  return !!((actor.user && (reg.participant_user_id === actor.user.id || reg.user_id === actor.user.id)) ||
-    (!actor.user && !reg.participant_created_by && actor.guestHash && reg.participant_guest_hash === actor.guestHash));
+  return !!(actor.user && (reg.participant_user_id === actor.user.id || reg.user_id === actor.user.id));
 }
 const registrationSelect = `SELECT r.*,p.user_id AS participant_user_id,p.guest_hash AS participant_guest_hash,
  p.created_by AS participant_created_by,p.name AS participant_name FROM registrations r JOIN participants p ON p.id=r.participant_id`;
@@ -109,7 +102,7 @@ async function registrationParticipant(env, actor, input, data, community) {
     const participant=await env.DB.prepare('SELECT * FROM participants WHERE id=? AND community_id=?').bind(input.participantId,cid).first();
     if (!participant) fail(404,'Ce pilote est introuvable. Actualise la page.');
     const existing=await env.DB.prepare(registrationSelect+' WHERE r.participant_id=?').bind(participant.id).all();
-    const self=!!(actor.user && participant.user_id===actor.user.id) || !!(actor.guestHash && participant.guest_hash===actor.guestHash);
+    const self=!!(actor.user && participant.user_id===actor.user.id);
     if (!manager && !self && !existing.results.some(r=>owned(r,actor))) fail(403,'Tu ne peux pas inscrire ce pilote.');
     return participant;
   }
@@ -127,12 +120,9 @@ async function registrationParticipant(env, actor, input, data, community) {
     await env.DB.prepare('INSERT INTO participants(id,name,created_by,created_at,community_id) VALUES(?,?,?,?,?)').bind(participant.id,participant.name,actor.user.id,now(),cid).run();
     return participant;
   }
-  if (actor.user) {
-    await env.DB.prepare('INSERT INTO participants(id,name,user_id,created_by,created_at,community_id) VALUES(?,?,?,?,?,?) ON CONFLICT(community_id,user_id) WHERE user_id IS NOT NULL DO NOTHING').bind(id(),data.name,actor.user.id,actor.user.id,now(),cid).run();
-    return env.DB.prepare('SELECT * FROM participants WHERE user_id=? AND community_id=?').bind(actor.user.id,cid).first();
-  }
-  await env.DB.prepare('INSERT INTO participants(id,name,guest_hash,created_at,community_id) VALUES(?,?,?,?,?) ON CONFLICT(community_id,guest_hash) WHERE guest_hash IS NOT NULL DO NOTHING').bind(id(),data.name,actor.guestHash,now(),cid).run();
-  return env.DB.prepare('SELECT * FROM participants WHERE guest_hash=? AND community_id=?').bind(actor.guestHash,cid).first();
+  if (!actor.user) fail(401, 'Connecte-toi avec Discord pour t’inscrire.');
+  await env.DB.prepare('INSERT INTO participants(id,name,user_id,created_by,created_at,community_id) VALUES(?,?,?,?,?,?) ON CONFLICT(community_id,user_id) WHERE user_id IS NOT NULL DO NOTHING').bind(id(),data.name,actor.user.id,actor.user.id,now(),cid).run();
+  return env.DB.prepare('SELECT * FROM participants WHERE user_id=? AND community_id=?').bind(actor.user.id,cid).first();
 }
 async function body(request) {
   if (!request.headers.get('Content-Type')?.startsWith('application/json')) fail(415, 'Format JSON requis.');
@@ -314,7 +304,7 @@ function validateRegistration(input, event) {
 }
 
 export {
-  LEGACY_CAR_ALIASES, COOKIE_SESSION, COOKIE_GUEST, COOKIE_STATE, COOKIE_RETURN, DAY, HttpError, fail, now, id, token, hash, cookie,
-  setCookie, cookieNames, siteOrigin, communityLabel, baseDomain, json, redirect, origin, requireDiscord, administrators, publicUser, requireRole, identity, owned, personal,
+  LEGACY_CAR_ALIASES, COOKIE_SESSION, COOKIE_STATE, COOKIE_RETURN, DAY, HttpError, fail, now, id, token, hash, cookie,
+  setCookie, cookieNames, siteOrigin, communityLabel, baseDomain, json, redirect, origin, requireDiscord, administrators, identity, owned, personal,
   registrationSelect, registrationParticipant, body, rateLimit, cleanup, returnPath, text, parisTimestamp, validateEvent, validateRegistration, ANY_CATEGORY
 };

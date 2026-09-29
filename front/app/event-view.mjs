@@ -4,7 +4,7 @@ import {app,state,esc,button,canManage,isAdmin,can,canEditRace,circuitLabel,even
 import {ownRegistration,renderRegistrationWorkspace} from './registration.mjs';
 import {renderPilots} from './crews.mjs';
 import {isSolo,accessBadge,soloRoundsLabel,soloFill,soloEntryBlock,myWaitlistPosition,renderSoloEntries,soloCategoriesSummary} from './solo.mjs';
-import {renderHome,showRecoveryLink,raceDateBlock,raceStarts} from './home-view.mjs';
+import {renderHome,raceDateBlock,raceStarts} from './home-view.mjs';
 
 function canCreateCrewOnDeparture(departure){
   if(!state.user||departure.startsAt<=Date.now())return false;
@@ -68,5 +68,5 @@ export function renderEvent(message=''){
   const countdownCopy=next?`Prochain départ dans <strong data-countdown="${next.startsAt}">${countdown(next.startsAt)}</strong>`:undated.length?'Dates à confirmer':'Tous les départs ont eu lieu';
   app.eventViewData={eventId:event.id,events:state.events,message};
   app.innerHTML=`<div class="event-header event-header-compact race-header event-type-${event.eventType||'private'}${isSolo(event)?` is-solo-${event.access||'open'}`:''}" data-event-id="${event.id}"><div class="race-card-top">${raceDateBlock(event,!next&&!undated.length)}<div class="race-head"><h1 class="event-title event-name">${esc(event.name)}</h1><span class="race-meta">${isSolo(event)?soloRoundsLabel(event):`${esc(circuitLabel(event.circuit))} · ${durationLabel(eventMinutes(event))}`}</span><span class="race-badges">${isSolo(event)?accessBadge(event):eventTypeBadge(event.eventType)}${schedulePendingBadge(event)}</span><span class="event-header-countdown">${countdownCopy}</span></div>${circuitVisual(event.circuit)}</div>${raceStarts(event,!next&&!undated.length)}<div class="race-header-footer">${isSolo(event)?soloCategoriesSummary(event):`<div class="event-header-stats event-category-badges">${event.categories.map(category=>eventBadge(category,eventCategoryCount(event,category))).join('')}</div>`}${eventActions}</div></div><div id="crew-builder-root"></div>${message?`<p class="creation-success" role="status">${esc(message)}</p>`:''}<section class="departure-accordion" aria-label="Départs de la course">${upcoming}${renderPastDepartures(event,past)}</section>`;
-  showRecoveryLink();notifyRender();
+  notifyRender();
 }

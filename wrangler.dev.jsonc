@@ -37,6 +37,8 @@
   "vars": {
     "APP_ORIGIN": "https://commu-dev.endurance-manager.app",
     "SITE_ENV": "development",
+    // Used for real by a team: no « Version de test » banner (still out of search engines, own cookies).
+    "TEST_BANNER": "off",
     "COMMUNITY": "commu-dev",
     // Communities platform: <slug>.endurance-manager.app, one sign-in for all of them.
     "BASE_DOMAIN": "endurance-manager.app"

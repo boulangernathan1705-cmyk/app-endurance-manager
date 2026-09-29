@@ -1,9 +1,11 @@
 name: Browser compatibility
 
-# Manual only: the Cloudflare bot protection of endurance-manager.app answers 403 to GitHub's runners,
-# so an automatic run on each push to dev could never reach the site.
+# The site runs on the GitHub machine itself (wrangler dev, local database with every migration): nothing depends
+# on a deployed site (the Cloudflare bot protection of endurance-manager.app answers 403 to GitHub's machines).
 on:
   workflow_dispatch:
+  push:
+    branches: [dev]
 
 permissions:
   contents: read
@@ -11,10 +13,10 @@ permissions:
 jobs:
   browser-compatibility:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     env:
-      COMPAT_BASE_URL: https://commu-dev.endurance-manager.app
-      ENV_LABEL: development
+      COMPAT_BASE_URL: http://localhost:8787
+      WRANGLER_SEND_METRICS: 'false'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -22,23 +24,24 @@ jobs:
           node-version: '22.13.0'
       - run: npm install --no-audit --no-fund
       - run: npx playwright install --with-deps chromium firefox webkit
-      - name: Wait for deployment
+      # The local site is served over http: Safari (unlike Chrome) applies upgrade-insecure-requests to localhost too.
+      - run: npm run build:workers
+        env:
+          LOCAL_HTTP: '1'
+      - name: Local database with every migration
+        run: npx --yes wrangler@4.138.0 d1 migrations apply DB --local
+      - name: Start the site locally
         run: |
-          echo "Checking ${ENV_LABEL}: ${COMPAT_BASE_URL}"
-          for i in {1..18}; do
-            if curl --fail --silent --show-error --max-time 10 \
-              "${COMPAT_BASE_URL}/api/session" | grep -q '"discordReady"'; then
-              exit 0
-            fi
-            sleep 10
+          LOCAL_HTTP=1 npx --yes wrangler@4.138.0 dev --port 8787 --var APP_ORIGIN:http://localhost:8787 \
+            --var DISCORD_CLIENT_ID:ci --var DISCORD_CLIENT_SECRET:ci > wrangler-dev.log 2>&1 &
+          for i in {1..60}; do
+            if curl --fail --silent --max-time 5 "${COMPAT_BASE_URL}/api/session" | grep -q '"discordReady"'; then exit 0; fi
+            sleep 2
           done
-          curl --silent --output /dev/null --max-time 10 \
-            --write-out 'status=%{http_code} type=%{content_type}\n' "${COMPAT_BASE_URL}/api/session"
-          echo "::error::${COMPAT_BASE_URL}/api/session did not answer with the API (site down or protected by a login page)."
+          cat wrangler-dev.log
+          echo "::error::the local site did not start"
           exit 1
       - run: npm run compat:test
-        env:
-          COMPAT_BASE_URL: ${{ env.COMPAT_BASE_URL }}
       - name: Upload Playwright report on failure
         if: failure()
         uses: actions/upload-artifact@v4
@@ -47,5 +50,6 @@ jobs:
           path: |
             playwright-report/
             test-results/
+            wrangler-dev.log
           if-no-files-found: ignore
           retention-days: 7

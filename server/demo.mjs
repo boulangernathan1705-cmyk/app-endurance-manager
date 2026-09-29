@@ -1,7 +1,8 @@
 // Showcase of the main address (endurance-manager.app): no Discord server, no real person, only fictional
 // races, crews and pilots that show what the site can do. A platform manager resets it from the
 // « Plateforme » tab: the data of the main community is replaced by a fresh set, dated from today.
-import {id, now, parisTimestamp} from './core.mjs';
+import {id, now, parisTimestamp, baseDomain} from './core.mjs';
+import {currentCommunity} from './community.mjs';
 
 const DEMO_USER = 'system:demo';
 const DAY = 86_400_000;
@@ -53,6 +54,20 @@ function races() {
 
 // SQL literal of a value of the showcase (our own constants, ids and JSON: never a visitor's input).
 const literal = value => value === null ? 'NULL' : typeof value === 'number' ? String(value) : `'${String(value).replaceAll("'", "''")}'`;
+
+// Scheduled task: every Monday morning (Paris), the showcase starts again with fresh dates. Only where the main
+// address is the platform's own (production) and its community is the showcase (no Discord server): never on
+// the development site, whose main community is a real team.
+export async function refreshShowcaseIfDue(env, at = new Date()) {
+  const domain = baseDomain(env);
+  let host = '';
+  try { host = new URL(env.APP_ORIGIN).hostname; } catch { return false; }
+  if (!domain || host !== domain || at.getUTCDay() !== 1 || at.getUTCHours() !== 3) return false;
+  const community = await currentCommunity(env, new Request(`https://${domain}/`));
+  if (community.discordGuildId) return false;
+  await resetShowcase(env, community);
+  return true;
+}
 
 // Replaces the data of the main community by the showcase, in a few statements (D1 counts every statement
 // of a request: 50 at most on the free plan). Returns what was created.

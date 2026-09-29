@@ -2,6 +2,21 @@
 
 Les changements du site, version par version. La plus récente est en haut.
 
+## v1.6 — 29 septembre 2026
+
+### Application
+- **Endurance Manager s'installe sur ton téléphone** (et ton ordinateur) comme une application : ouverture en plein écran depuis l'écran d'accueil, avec le nom et le logo de ta communauté.
+
+### Sur téléphone
+- Barre de navigation plus compacte, sans débordement.
+- Cartes de course plus serrées : le tracé du circuit en petit à côté du titre, et les **catégories sur une seule ligne**.
+- Page d'une course : en-tête compact, équipages à leur juste hauteur, cartes pilote en pleine largeur.
+- Administration : onglets sur deux colonnes.
+
+### Fiabilité
+- Les tâches automatiques (vérification des membres, import iRacing, récap Discord) sont réparties dans le temps pour rester fiables quand les communautés se multiplient.
+- La vitrine se renouvelle toute seule chaque lundi.
+
 ## v1.5.1 — 29 septembre 2026
 
 ### Communautés

@@ -1,6 +1,6 @@
 import {
-  LEGACY_CAR_ALIASES, COOKIE_SESSION, COOKIE_GUEST, COOKIE_STATE, COOKIE_RETURN, DAY, HttpError, fail, now, id, token, hash, cookie,
-  setCookie, cookieNames, siteOrigin, communityLabel, baseDomain, json, redirect, origin, requireDiscord, administrators, publicUser, requireRole, identity, owned, personal,
+  LEGACY_CAR_ALIASES, COOKIE_SESSION, COOKIE_STATE, COOKIE_RETURN, DAY, HttpError, fail, now, id, token, hash, cookie,
+  setCookie, cookieNames, siteOrigin, communityLabel, baseDomain, json, redirect, origin, requireDiscord, administrators, identity, owned, personal,
   registrationSelect, registrationParticipant, body, rateLimit, cleanup, returnPath, text, validateEvent, validateRegistration, ANY_CATEGORY
 } from './core.mjs';
 import {ingestClientError, clientErrorsApi} from './telemetry.mjs';
@@ -222,13 +222,8 @@ async function oauthCallback(request, env) {
     const display = String(profile.global_name || profile.username || 'Pilote').slice(0, 32);
     const avatarHash = typeof profile.avatar === 'string' && /^[A-Za-z0-9_]{1,128}$/.test(profile.avatar) ? profile.avatar : '';
     const session = token();
-    const guestRaw = cookie(request, names.guest);
-    const guestHash = /^[a-f0-9]{64}$/.test(guestRaw) ? await hash(guestRaw) : null;
     await env.DB.batch([
       env.DB.prepare('INSERT INTO users(id,name,created_at) VALUES(?,?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name').bind(profile.id, display, now()),
-      ...(guestHash ? [env.DB.prepare('UPDATE registrations SET owner_user_id=? WHERE guest_hash=? AND owner_user_id IS NULL').bind(profile.id, guestHash)] : []),
-      ...(guestHash ? [env.DB.prepare(`UPDATE participants SET user_id=? WHERE guest_hash=? AND user_id IS NULL AND created_by IS NULL
-        AND NOT EXISTS(SELECT 1 FROM participants WHERE user_id=?)`).bind(profile.id,guestHash,profile.id)] : []),
       env.DB.prepare('INSERT INTO sessions(token_hash,user_id,expires_at) VALUES(?,?,?)').bind(await hash(session), profile.id, now() + 7 * DAY)
     ]);
     const old = cookie(request, names.session);
@@ -266,7 +261,7 @@ async function api(request, env) {
   if (actor.user) actor.user = {...actor.user, role:displayRole(access)};
   const diagnostics = await clientErrorsApi(path,method,env,actor,community);
   if (diagnostics) return diagnostics;
-  if (path === '/api/session' && method === 'GET') return json({user:actor.user, discordReady:!!(env.DISCORD_CLIENT_ID && env.DISCORD_CLIENT_SECRET), adminConfigured:administrators(env).length > 0, soloRaces:soloRacesEnabled(env, community), soloLabel:String(env.SOLO_LABEL || 'Courses solo').slice(0,40),
+  if (path === '/api/session' && method === 'GET') return json({user:actor.user, discordReady:!!(env.DISCORD_CLIENT_ID && env.DISCORD_CLIENT_SECRET), adminConfigured:administrators(env).length > 0, soloRaces:soloRacesEnabled(env, community),
     community:{slug:community.slug, name:community.name, shortName:community.shortName, discordInviteUrl:community.discordInviteUrl, appearance:appearanceOf(community)},
     access:access.status, permissions:[...access.permissions], manager:access.manager, communities:await myCommunities(env, actor, community), openSite,
     platformDiscordUrl:/^https:\/\/(discord\.gg|discord\.com\/invite)\//.test(env.PLATFORM_DISCORD_URL || '') ? env.PLATFORM_DISCORD_URL : null});
@@ -484,8 +479,6 @@ async function api(request, env) {
     else if (solo) { if (!can(actor,'solo_safe')) requirePermission(actor,'solo_open','Tu n’as pas l’autorisation de t’inscrire aux courses solo de cette communauté.'); }
     else requirePermission(actor,'endurance','Tu n’as pas l’autorisation de t’inscrire aux endurances de cette communauté.');
     const data = validateRegistration(input, event);
-    const guestToken = actor.user ? null : actor.guestToken || token();
-    if (guestToken) { actor.guestToken=guestToken;actor.guestHash=await hash(guestToken); }
     const participant=await registrationParticipant(env,actor,input,data,community);
     if (solo && await env.DB.prepare('SELECT 1 FROM registrations WHERE event_id=? AND departure_id=? AND participant_id=? LIMIT 1').bind(event.id,departure.id,participant.id).first()) fail(409, 'Ce pilote est déjà inscrit à cette course. Modifie son inscription.');
     const userId=participant.user_id;
@@ -496,7 +489,7 @@ async function api(request, env) {
     const result = await env.DB.prepare(`INSERT INTO registrations(id,event_id,departure_id,user_id,owner_user_id,guest_hash,name,name_key,category,car,car_preferences,car_any,status,preferred_pilot,created_at,participant_id,round_choices,solo_driver,community_id)
       SELECT ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,community_id FROM events WHERE id=? AND version=? AND community_id=?`).bind(regId,event.id,departure.id,userId,ownerUserId,guestHash,data.name,data.nameKey,data.category,data.car,JSON.stringify(data.cars),data.carAny?1:0,data.status,data.preferredPilot,now(),participant.id,JSON.stringify(data.roundChoices||[]),data.soloDriver?1:0,event.id,event.version,community.id).run();
     if (!result.meta.changes) fail(409, 'Cet événement a changé. Actualise avant de t’inscrire.');
-    return json({id:regId, recoveryLink:guestToken ? canonical + '/#access=' + guestToken : null}, 201, guestToken ? [setCookie(COOKIE_GUEST, guestToken, 365 * DAY)] : []);
+    return json({id:regId}, 201);
   }
   // A pilot without a crew on the common "Horaire à définir" start picks one of the official slots.
   const regMove = path.match(/^\/api\/registrations\/([a-f0-9-]{36})\/departure$/);

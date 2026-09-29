@@ -12,7 +12,7 @@ export const activeGame = globalThis.__ENDURANCE_GAME__ === 'iracing' ? 'iracing
 export const state = {
   events:[], user:null, discordReady:false, currentEventId:null, page:'home', editingEvent:null,
   access:'anonymous', permissions:[], community:null, platformDiscordUrl:null,
-  drafts:{}, recoveryLink:'', busy:false, participants:[], flash:'', eventFilter:'upcoming', listFormat:'endurance', soloLabel:'Courses solo', soloRaces:false,
+  drafts:{}, busy:false, participants:[], flash:'', eventFilter:'upcoming', listFormat:'endurance', soloLabel:'Courses solo', soloRaces:false,
   selectedDepartureId:null, eventSection:'race', pilotName:'', registrationOpen:new Set(), crewManagementOpen:new Set(),
   pendingCrewJoin:null, archiveLoaded:false, participantsLoaded:false
 };
@@ -177,8 +177,6 @@ export async function load() {
   const userChanged=(session.user?.id||null)!==(state.user?.id||null);
   state.user=session.user;
   state.discordReady=session.discordReady;
-  // Name of the solo races tab: a site setting (SOLO_LABEL), e.g. "Courses TDZ" for one community.
-  if (session.soloLabel) state.soloLabel=session.soloLabel;
   // Solo races and SAFE drivers only where the site enables them (dev for now).
   state.soloRaces=session.soloRaces===true;
   if (!state.soloRaces) state.listFormat='endurance';

@@ -91,9 +91,12 @@ test('mobile interface stays compact without horizontal overflow across main pag
   }
 
   await openAndCheck(page, '/lmu/');
-  const shell = await page.locator('.site-nav-shell').boundingBox();
-  expect(shell).not.toBeNull();
-  expect(shell.height).toBeLessThan(190);
+  // A visitor sees the welcome screen without the navigation bar; a member sees a compact bar.
+  if (!(await page.locator('.community-gate.is-visitor').count())) {
+    const shell = await page.locator('.site-nav-shell').boundingBox();
+    expect(shell).not.toBeNull();
+    expect(shell.height).toBeLessThan(190);
+  }
   await expect(page.locator('.page-title').or(page.locator('.community-gate'))).toBeVisible();
 });
 

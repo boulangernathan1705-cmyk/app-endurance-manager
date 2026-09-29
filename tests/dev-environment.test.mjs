@@ -25,3 +25,16 @@ test('dev pages are kept out of search engines; production pages are untouched',
   assert.equal(prod.headers.get('X-Robots-Tag'), null);
   assert.doesNotMatch(await prod.text(), /dev-site-banner/);
 });
+
+test('a development site used for real by a team (TEST_BANNER=off) has no banner but stays out of search engines', async () => {
+  const assets = {fetch: async () => page()};
+  const env = {ASSETS:assets, SITE_ENV:'development', TEST_BANNER:'off'};
+  globalThis.HTMLRewriter ??= class { on(){return this;} transform(){ throw new Error('the banner must not be added'); } };
+  try {
+    const response = await workerWithMigrations.fetch(new Request('https://commu-dev.example/lmu/'), env, {});
+    assert.equal(response.headers.get('X-Robots-Tag'), 'noindex, nofollow');
+    assert.doesNotMatch(await response.text(), /dev-site-banner/);
+  } finally { delete globalThis.HTMLRewriter; }
+  const dev = JSON.parse(readFileSync(new URL('../wrangler.dev.jsonc', import.meta.url), 'utf8').replace(/^\s*\/\/.*$/gm, ''));
+  assert.equal(dev.vars.TEST_BANNER, 'off');
+});

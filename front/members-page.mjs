@@ -209,6 +209,11 @@ async function load() {
       <section class="setup" data-panel="setup" hidden>${setup.html}</section>
       <div class="community-settings" data-panel="settings" hidden>${settings}</div>
       ${platform ? `<div class="community-settings" data-panel="platform" hidden>${platform}</div>` : ''}`;
+    // The showcase (main address) has no Discord server and nobody real: no members nor setup there.
+    if (session.openSite) {
+      for (const tab of ['members', 'setup']) { app.querySelector(`[data-tab="${tab}"]`)?.remove(); app.querySelector(`[data-panel="${tab}"]`)?.remove(); }
+      if (!openTab) openTab = platform ? 'platform' : 'settings';
+    }
     if (openTab) app.querySelector(`[data-tab="${openTab}"]`)?.click();
   } catch (error) {
     renderError(error.message || String(error));

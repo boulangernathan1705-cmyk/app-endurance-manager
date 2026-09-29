@@ -1,5 +1,6 @@
 // Regenerates the help screenshots (images/help/*.jpg) from a local `wrangler dev` with the showcase data
 // (server/demo.mjs: « 6h de Spa » with crews, drivers without a crew and free starts).
+// Data: `npm run seed:local` (scripts/seed-local.mjs), with `wrangler dev` stopped, then restart it.
 // Usage: node scripts/help-screenshots.mjs [baseURL]   (default http://localhost:8787)
 // Uses the locally installed Chrome through Playwright: nothing is downloaded.
 import {chromium} from 'playwright';

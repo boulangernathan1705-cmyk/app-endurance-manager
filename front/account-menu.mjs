@@ -110,6 +110,7 @@ function applyCommunity(community, communities = [], openSite = false) {
   if (look.logoUrl) {
     for (const image of document.querySelectorAll('.brand-mark')) image.src = look.logoUrl;
     const icon = document.querySelector('link[rel="icon"]'); if (icon) { icon.href = look.logoUrl; icon.type = 'image/png'; }
+    const touch = document.querySelector('link[rel="apple-touch-icon"]'); if (touch) touch.href = look.logoUrl;
   }
   if (look.bannerUrl) for (const image of document.querySelectorAll('.hero-banner')) { image.removeAttribute('srcset'); image.src = look.bannerUrl; }
   const bar = document.querySelector('.site-nav-shell');
@@ -148,6 +149,9 @@ function showcaseBanner(platformDiscordUrl) {
   }
   bar.after(banner);
 }
+
+// Installable app (home screen): the service worker only shows an offline page, it never caches the races.
+if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('/sw.js').catch(() => {});
 
 async function loadSession() {
   if (!root) return;
