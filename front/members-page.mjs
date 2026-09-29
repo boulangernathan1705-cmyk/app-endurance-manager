@@ -53,7 +53,7 @@ async function settingsMarkup() {
   const module = (key, label, help) => `<label class="settings-switch"><span><strong>${label}</strong><small>${help}</small></span><input type="checkbox" role="switch" data-module="${key}" ${settings.modules[key] ? 'checked' : ''}><i aria-hidden="true"></i></label>`;
   // The solo races permissions only matter with the solo races module.
   const shown = settings.permissions.filter(permission => settings.modules.soloRaces || !permission.startsWith('solo_'));
-  const legend = `<dl class="role-legend">${shown.map(permission => `<div><dt>${esc(PERMISSION_LABELS[permission])}</dt><dd>${esc(PERMISSION_HELP[permission])}</dd></div>`).join('')}</dl>`;
+  const legend = `<details class="role-legend-wrap"><summary>Que permet chaque autorisation ?</summary><dl class="role-legend">${shown.map(permission => `<div><dt>${esc(PERMISSION_LABELS[permission])}</dt><dd>${esc(PERMISSION_HELP[permission])}</dd></div>`).join('')}</dl></details>`;
   const role = item => `<article class="role-card" data-role="${esc(item.id)}" data-kept="${esc(JSON.stringify(item.permissions.filter(permission => !shown.includes(permission))))}">
     <div class="role-head"><strong>${esc(item.name)}</strong>${item.administrator ? '<small>Administrateur Discord : toutes les autorisations</small>' : ''}<span class="settings-status" aria-live="polite"></span></div>
     <div class="role-pills">${shown.map(permission => `<label class="role-pill" title="${esc(PERMISSION_HELP[permission])}"><input type="checkbox" data-permission="${permission}" ${item.permissions.includes(permission) || item.administrator ? 'checked' : ''} ${item.administrator ? 'disabled' : ''}><span>${esc(PERMISSION_LABELS[permission] || permission)}</span></label>`).join('')}</div>
