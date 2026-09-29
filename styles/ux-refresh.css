@@ -1423,6 +1423,12 @@ html[data-game] #app .ux-unassigned-grid > .pilot-row > .edit-button { align-sel
   .settings-card { padding: 14px; }
 }
 
+.settings-banner { display: grid; gap: 10px; margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--border, #292d31); }
+.settings-banner > strong { color: #c7d0d4; font-size: 13px; }
+.settings-banner-preview { width: 100%; aspect-ratio: 4 / 1; object-fit: cover; border: 1px solid var(--border, #292d31); border-radius: 10px; }
+.settings-banner-pick { cursor: pointer; }
+.settings-banner .members-help { margin: 0; }
+
 /* « Mise en place » (members page): the setup steps of a community, and the platform tab of the managers. */
 .setup { max-width: 920px; }
 .setup-intro { margin: 0 0 14px; color: #c7d0d4; font-size: 15px; }

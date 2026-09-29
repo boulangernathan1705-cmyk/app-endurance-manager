@@ -117,7 +117,7 @@ test('the main address is a showcase: anyone looks without signing in, only the 
   const community=DB.db.prepare("SELECT * FROM communities WHERE slug='commu-dev'").get();
   assert.equal(community.discord_guild_id,null);assert.equal(community.name,'Endurance Manager');
   const races=(await (await call(`${APEX}/api/races`)).json()).events;
-  assert.ok(races.length>=6);assert.ok(races.some(race=>race.format==='solo'));assert.ok(races.some(race=>race.schedulePending));
+  assert.ok(races.length>=6);assert.ok(races.every(race=>race.departures.every(departure=>/^\d{4}-\d{2}-\d{2}$/.test(departure.date)&&/^\d{2}:\d{2}$/.test(departure.time))),'each start has its date and time, as shown on the cards');assert.ok(races.some(race=>race.format==='solo'));assert.ok(races.some(race=>race.schedulePending));
   assert.ok(races.some(race=>race.departures.some(departure=>departure.crews.length&&departure.crews[0].registrationIds?.length)),'crews with their pilots');
   assert.equal(DB.db.prepare("SELECT COUNT(*) n FROM registrations WHERE user_id IS NOT NULL").get().n,0,'no real person');
 });

@@ -21,7 +21,8 @@ function daysUntil(weekday, min = 1) {
   while (days < min) days += 7;
   return days;
 }
-const start = (days, time) => parisTimestamp(parisDay(days), time);
+// A start as the site stores it: its date and time in Paris (shown on the cards) and its timestamp.
+const start = (days, time) => ({date:parisDay(days), time, startsAt:parisTimestamp(parisDay(days), time)});
 
 // The fictional content: endurances with crews, a race with its times to confirm, a solo race, a past race.
 function races() {
@@ -67,7 +68,7 @@ export async function resetShowcase(env, community) {
   run('DELETE FROM registrations WHERE community_id=?', cid);
   run('DELETE FROM events WHERE community_id=?', cid);
   run('DELETE FROM participants WHERE community_id=?', cid);
-  for (const table of ['iracing_imports', 'memberships', 'community_role_permissions', 'community_recaps', 'discord_weekly_state']) run(`DELETE FROM ${table} WHERE community_id=?`, cid);
+  for (const table of ['iracing_imports', 'memberships', 'community_role_permissions', 'community_recaps', 'discord_weekly_state', 'community_banners']) run(`DELETE FROM ${table} WHERE community_id=?`, cid);
   // No Discord server, no recap; iRacing's official calendar and solo races show what the site offers.
   run(`UPDATE communities SET name='Endurance Manager', short_name='EM', discord_guild_id=NULL, discord_invite_url=NULL, appearance='{}',
     modules='{"iracingImport":true,"soloRaces":true}' WHERE id=?`, cid);
@@ -84,7 +85,7 @@ export async function resetShowcase(env, community) {
 
   let count = 0;
   for (const race of races()) {
-    const eventId = id(), departures = race.starts.map(([days, clock]) => ({id:id(), startsAt:start(days, clock), ...(race.pending ? {tbd:true} : {})}));
+    const eventId = id(), departures = race.starts.map(([days, clock]) => ({id:id(), ...start(days, clock), ...(race.pending ? {tbd:true} : {})}));
     add('events', eventId, race.name, race.hours, race.hours * 60, race.type, race.circuit, race.pending ? 1 : 0, 'endurance', 'open', null, '[]',
       JSON.stringify(race.categories), JSON.stringify(departures), DEMO_USER, time + count++, cid);
     for (const crew of race.crews) {
@@ -95,7 +96,7 @@ export async function resetShowcase(env, community) {
     for (const [index, name, category, status] of race.alone) entry(eventId, departures[index].id, name, category, status);
   }
   // A solo race (module "Courses solo"): two rounds, places limited, entries in order of arrival.
-  const soloId = id(), soloStart = {id:id(), startsAt:start(daysUntil(4), '21:00')};
+  const soloId = id(), soloStart = {id:id(), ...start(daysUntil(4), '21:00')};
   add('events', soloId, 'Sprint GT3 du jeudi', 1, 50, 'private', 'imola', 0, 'solo', 'open', 20,
     JSON.stringify([{circuit:'imola', durationMinutes:25, categories:['GT3']}, {circuit:'random', durationMinutes:25, categories:['GT3']}]),
     JSON.stringify(['GT3']), JSON.stringify([soloStart]), DEMO_USER, time + count++, cid);

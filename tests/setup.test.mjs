@@ -138,3 +138,28 @@ test('the site\'s own recap channel is only for the community of the main addres
   await as(OWNER,'/api/community/modules','PATCH',{discordWeekly:true,iracingImport:false});
   assert.equal(JSON.parse(DB.db.prepare('SELECT modules FROM communities WHERE id=?').get(DEV_COMMUNITY).modules).iracingImport,false);
 });
+
+test('community banner: sent by its admins (checked image, 600 KB at most), public, the site\'s banner without one', async t => {
+  fakeDiscord(t);
+  const {env,as}=setup();
+  await as(OWNER,'/api/community/setup');await as(PILOT,'/api/community/setup');
+  const send=async (userId,bytes,type='image/webp')=>{
+    const raw=userId.slice(0,1).repeat(64);
+    return worker.fetch(new Request(ROOT+'/api/community/banner',{method:'PUT',headers:{Cookie:`__Host-em_session=${raw}`,'CF-Connecting-IP':userId,Origin:ROOT,'Content-Type':type},body:bytes}),env);
+  };
+  const webp=new Uint8Array([...new TextEncoder().encode('RIFF'),0,0,0,0,...new TextEncoder().encode('WEBPVP8 '),...new Array(200).fill(7)]);
+  assert.equal((await send(PILOT,webp)).status,403,'admins only');
+  assert.equal((await send(OWNER,new TextEncoder().encode('<svg onload=alert(1)>'),'image/webp')).status,400,'the bytes decide, not the declared type');
+  assert.equal((await send(OWNER,new Uint8Array(600001))).status,413);
+  const saved=await send(OWNER,webp);
+  assert.equal(saved.status,200);
+  const {bannerUrl}=await saved.json();
+  assert.match(bannerUrl,/^\/api\/community\/banner\?v=\d+$/);
+  const image=await worker.fetch(new Request(ROOT+bannerUrl),env);
+  assert.equal(image.status,200,'public: shown on the welcome screen too');
+  assert.equal(image.headers.get('Content-Type'),'image/webp');
+  assert.deepEqual(new Uint8Array(await image.arrayBuffer()),webp);
+  assert.equal((await as(OWNER,'/api/session')).data.community.appearance.bannerUrl,bannerUrl);
+  assert.equal((await as(OWNER,'/api/community/banner','DELETE',{})).status,200);
+  assert.equal((await as(OWNER,'/api/session')).data.community.appearance.bannerUrl,null,'the site\'s banner again');
+});

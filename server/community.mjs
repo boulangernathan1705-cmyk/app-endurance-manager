@@ -46,12 +46,13 @@ export function communityUrl(env, community) {
   return `https://${community.slug}.${domain}`;
 }
 
-// Look of a community: its accent color (set by its admins) and the icon and banner of its Discord
-// server (kept by the settings page), as image addresses on Discord's CDN (allowed by the site's CSP).
+// Look of a community: its accent color and banner (set by its admins) and the icon of its Discord server
+// (kept by the settings page) on Discord's CDN (allowed by the site's CSP).
 export function appearanceOf(community) {
   const appearance = community.appearance || {}, guild = community.discordGuildId;
   const accent = /^#[0-9a-f]{6}$/i.test(appearance.accent || '') ? appearance.accent : null;
   const logoUrl = guild && appearance.discordIcon ? `https://cdn.discordapp.com/icons/${guild}/${appearance.discordIcon}.png?size=256` : null;
-  const bannerUrl = guild && appearance.discordBanner ? `https://cdn.discordapp.com/banners/${guild}/${appearance.discordBanner}.png?size=2048` : null;
+  // The banner sent by the admins (Réglages → Apparence); without one, the site's banner.
+  const bannerUrl = Number.isInteger(appearance.bannerVersion) ? `/api/community/banner?v=${appearance.bannerVersion}` : null;
   return {accent, logoUrl, bannerUrl};
 }
