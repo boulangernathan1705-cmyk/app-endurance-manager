@@ -3,11 +3,11 @@ import {homeRedirect, homePage} from './home.mjs';
 import {isWeeklyDiscordMutation} from './discord-weekly-format.mjs';
 import {ensureDiscordWeeklySchema} from './discord-weekly-schema.mjs';
 import {syncWeeklyDiscord, syncDueRecaps} from './discord-weekly.mjs';
-import {cleanup, communityLabel} from './core.mjs';
+import {cleanup, communityLabel, origin} from './core.mjs';
 import {importNextCommunity, completeSpecialTimes} from './iracing-import.mjs';
 import {refreshShowcaseIfDue} from './demo.mjs';
 import {refreshMemberships} from './access.mjs';
-import {allCommunities, currentCommunity, appearanceOf} from './community.mjs';
+import {allCommunities, currentCommunity, communitySlug, appearanceOf} from './community.mjs';
 import {isDevelopment,devRobots,markDevelopmentResponse} from './dev-environment.mjs';
 
 let crewOwnershipReady = null;
@@ -110,6 +110,9 @@ export default {
     if (development && pathname === '/robots.txt') return devRobots();
     if (pathname === '/manifest.webmanifest' && env?.DB) return appManifest(request, env);
     if (pathname === '/app-icon.png' && env?.DB && env?.ASSETS) return appIcon(request, env);
+    // The community of the main address has no <slug>.BASE_DOMAIN of its own (e.g. commu-dev.endurance-manager.app
+    // on production): only its main address serves it.
+    if (env?.DB && communityLabel(new URL(request.url), env) === communitySlug(env, null) && new URL(request.url).hostname !== new URL(origin(env)).hostname) return communityNotFound();
     // A page of <slug>.BASE_DOMAIN for a community that does not exist: a plain "not found" page.
     if (env?.DB && communityLabel(new URL(request.url), env) && !pathname.startsWith('/api/') && (request.headers.get('Accept') || '').includes('text/html')
       && !(await env.DB.prepare('SELECT 1 FROM communities WHERE slug=?').bind(communityLabel(new URL(request.url), env)).first())) return communityNotFound();
