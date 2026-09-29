@@ -96,14 +96,14 @@ export default {
       if (redirect) return redirect;
       if (env?.ASSETS) {
         const home = await homePage(request, env);
-        return development ? markDevelopmentResponse(home) : home;
+        return development ? markDevelopmentResponse(home, env) : home;
       }
     }
     if (pathname.startsWith('/api/')) await ensureCrewOwnershipSchema(env);
     const weeklyMutation = isWeeklyDiscordMutation(request);
     const response = await worker.fetch(request, env, ctx);
     if (weeklyMutation && response.ok) queueWeeklySync(env, ctx, request);
-    return development ? markDevelopmentResponse(response) : response;
+    return development ? markDevelopmentResponse(response, env) : response;
   },
 
   // Every 15 minutes. A run may make 50 calls to the database and 50 requests: one heavy task per quarter of

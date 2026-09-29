@@ -11,10 +11,12 @@ export function devRobots() {
   return new Response('User-agent: *\nDisallow: /\n',{headers:{'Content-Type':'text/plain; charset=utf-8','X-Robots-Tag':'noindex, nofollow'}});
 }
 
-export function markDevelopmentResponse(response) {
+// TEST_BANNER=off: a development site used for real by a team (commu-dev) keeps its own cookies and stays out of
+// search engines, without the « Version de test » banner.
+export function markDevelopmentResponse(response, env = {}) {
   const marked=new Response(response.body,response);
   marked.headers.set('X-Robots-Tag','noindex, nofollow');
   const type=marked.headers.get('Content-Type')||'';
-  if (!type.includes('text/html') || typeof HTMLRewriter==='undefined') return marked;
+  if (env?.TEST_BANNER==='off' || !type.includes('text/html') || typeof HTMLRewriter==='undefined') return marked;
   return new HTMLRewriter().on('body',{element(body){body.prepend(BANNER,{html:true});}}).transform(marked);
 }
