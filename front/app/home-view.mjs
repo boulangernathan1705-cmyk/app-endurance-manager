@@ -119,7 +119,7 @@ function raceMatches(event,filters){
   }
   return true;
 }
-function filterChip(group,value,label,active,extra='',tile=false){return button('race-filter',label,`data-group="${group}" data-value="${esc(value)}" aria-pressed="${active}" ${extra}`,`race-filter-chip${tile?' race-filter-tile':''}${active?' active':''}`);}
+function filterChip(group,value,label,active,extra=''){return button('race-filter',label,`data-group="${group}" data-value="${esc(value)}" aria-pressed="${active}" ${extra}`,`race-filter-chip${active?' active':''}`);}
 function filterPanel(events,filters){
   const communities=filterCommunities();
   // LMU: its six categories, always; iRacing (many classes): the ones its races use, in the catalog's order.
@@ -130,7 +130,7 @@ function filterPanel(events,filters){
   const parts=[];
   if(communities.length>1)parts.push(group('Communautés',communities.map(item=>filterChip('communities',item.id,`${mark(item)}<span>${esc(item.shortName||item.name)}</span>`,filters.communities.includes(item.id),`data-tip="${esc(item.name)}"`)).join('')));
   parts.push(group('Type',[['official','Officielles'],...Object.entries(EVENT_TYPES).map(([key,item])=>[key,item.label])].map(([value,label])=>filterChip('types',value,esc(label),filters.types.includes(value))).join('')));
-  if(categoriesShown.length)parts.push(group('Catégorie',categoriesShown.map(category=>filterChip('categories',category,`${logo(category)}<span>${esc(category)}</span>`,filters.categories.includes(category),'',activeGame==='lmu')).join('')));
+  if(categoriesShown.length)parts.push(group('Catégorie',categoriesShown.map(category=>filterChip('categories',category,`${logo(category)}<span>${esc(category)}</span>`,filters.categories.includes(category))).join('')));
   parts.push(group('Dates',`<label class="race-filter-date"><span>Du</span><input type="date" data-race-filter-date="from" value="${esc(filters.from)}"></label><label class="race-filter-date"><span>Au</span><input type="date" data-race-filter-date="to" value="${esc(filters.to)}"></label>`));
   parts.push(group('Ma situation',[['registered','Inscrit'],['crew','Avec équipage'],['no-crew','Sans équipage'],['free','Pas inscrit']].map(([value,label])=>filterChip('situation',value,label,filters.situation===value)).join('')));
   return `<section class="race-filter-panel" aria-label="Filtres des courses">${parts.join('')}${activeFilterCount(filters)?`<div class="race-filter-foot">${button('race-filter-reset','Effacer les filtres','','link-button')}</div>`:''}</section>`;

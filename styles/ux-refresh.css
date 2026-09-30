@@ -1895,15 +1895,13 @@ html[data-game] .race-card .race-head .official-badge { font-size: 10.5px; paddi
 .race-filter-chip { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 0 12px; border: 1px solid rgba(255, 255, 255, .14); border-radius: 999px; background: transparent; color: #dfe6e4; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
 .race-filter-chip:hover { border-color: rgba(82, 211, 216, .6); }
 .race-filter-chip.active { border-color: var(--community-accent, #52d3d8); background: color-mix(in srgb, var(--community-accent, #52d3d8) 16%, transparent); color: #fff; }
-.race-filter-chip img { width: 20px; height: 20px; border-radius: 50%; object-fit: cover; }
-.race-filter-chip .category-logo { width: 22px; height: auto; }
+.race-filter-chip img:not(.category-logo) { width: 20px; height: 20px; border-radius: 50%; object-fit: cover; }
+/* Category logos as on the cars: square on LMU, round on iRacing. */
+.race-filter-chip .category-logo { width: 22px; height: auto; border-radius: 0; }
+html[data-game="iracing"] .race-filter-chip .category-logo { border-radius: 50%; }
 .race-filter-date { display: inline-flex; align-items: center; gap: 6px; color: #99a3a0; font-size: 13px; font-weight: 700; }
 .race-filter-date input { min-height: 32px; padding: 0 8px; border: 1px solid rgba(255, 255, 255, .14); border-radius: 8px; background: rgba(0, 0, 0, .25); color: #eef3f2; font: inherit; color-scheme: dark; }
 .race-filter-foot { display: flex; justify-content: flex-end; }
 @media (max-width: 760px) {
   .race-filter-group { grid-template-columns: minmax(0, 1fr); gap: 6px; }
 }
-/* LMU categories: square tiles, the logo above its name. */
-.race-filter-chip.race-filter-tile { flex-direction: column; justify-content: center; gap: 6px; width: 92px; height: 76px; padding: 6px; border-radius: 10px; font-size: 12px; line-height: 1.15; text-align: center; }
-.race-filter-chip.race-filter-tile .category-logo { width: 34px; }
-@media (max-width: 760px) { .race-filter-chip.race-filter-tile { width: 78px; height: 68px; font-size: 11px; } }
