@@ -1,7 +1,7 @@
 import {app,state,api,load,loadArchive,showError,countdown,CARS,inCommunity} from './core.mjs';
 import {renderNav,renderHome} from './home-view.mjs';
 import {renderEvent} from './event-view.mjs';
-import {showPlanningDay,scrollPlanning,goToDeparture,setPlanningSpan} from './planning.mjs';
+import {showPlanningDay,scrollPlanning,goToDeparture,setPlanningSpan,toggleQuickMenu} from './planning.mjs';
 import {renderEventForm,departureFields,updateRemoveButtons,goToEventStep,formDurationMinutes,bulkPreview,shiftBulkWeek} from './event-form.mjs';
 import {renderMyEntries} from './entries-view.mjs';
 import {refresh,refreshAfterSave} from './refresh.mjs';
@@ -181,6 +181,7 @@ async function perform(action,target){
     case 'planning-day': showPlanningDay(target);break;
     case 'planning-scroll': scrollPlanning(target);break;
     case 'planning-span': setPlanningSpan(target);break;
+    case 'quick-menu': toggleQuickMenu(target);break;
     case 'goto-departure': goToDeparture(target.dataset.departure);break;
     case 'bulk-week': shiftBulkWeek(target.closest('[data-bulk-departures]'),Number(target.dataset.shift));break;
     case 'remove-departure': if(app.querySelectorAll('.departure-field').length>1)target.closest('.departure-field').remove();updateRemoveButtons();break;

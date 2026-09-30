@@ -39,6 +39,27 @@ function renderSoloDeparture(event,departure,open){
   return `<details class="departure-fold solo-departure${mine?' is-mine':''}" id="departure-${departure.id}" ${open?'open':''}><summary><span class="fold-index">01</span><span class="fold-date">${dateBlock(departure.startsAt,{compact:true})}<span class="fold-date-text"><strong class="ux-departure-title">Départ ${esc(timeLabel(departure.time))}</strong>${locked?'<span class="ux-departure-date">Départ passé</span>':''}${mine}</span></span><span class="fold-meta">${soloFill(event,departure)}</span>${actions}</summary><div class="departure-fold-body">${locked?'<p class="finished-history">Les inscriptions sont fermées.</p>':`<section class="fold-section fold-registration" ${editorOpen?'':'hidden'}>${renderRegistrationWorkspace(event,departure)}</section>`}<section class="fold-section departure-participation-section">${renderSoloEntries(event,departure)}</section></div></details>`;
 }
 
+// Quick actions of a start in the planning, as small squares with an icon and a +: « Inscription » (me, me in
+// another category, another pilot: one menu, or the only choice straight away) and « Créer un équipage ».
+const QUICK_ICON=path=>`<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="${path}"/></svg>`;
+const ICON_REGISTER=QUICK_ICON('M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2a2 2 0 0 1-2 2h-2a2 2 0 0 1-2-2M10 14h4M12 12v4');
+const ICON_CREW=QUICK_ICON('M5 7a4 4 0 1 0 8 0a4 4 0 1 0-8 0M3 21v-2a4 4 0 0 1 4-4h4c.96 0 1.84.34 2.53.9M16 3.13a4 4 0 0 1 0 7.75M16 19h6M19 16v6');
+function quickActions(event,departure){
+  if(departure.startsAt<=Date.now()||!state.user)return '';
+  const own=ownRegistration(departure),mine=(departure.availability||[]).filter(reg=>reg.mine&&reg.status!=='unavailable');
+  const assigned=(departure.crews||[]).some(crew=>(crew.registrationIds||[]).some(id=>mine.some(reg=>reg.id===id)));
+  const items=[];
+  if(own||can('endurance'))items.push({action:'my-registration',label:own?'Modifier mon inscription':'M’inscrire',extra:''});
+  if(own&&!assigned&&event.categories.some(category=>!mine.some(reg=>reg.category===category)))items.push({action:'new-registration',label:'M’inscrire dans une autre catégorie',extra:`data-mode="category" data-registration="${own.id}"`});
+  if(can('manage_registrations'))items.push({action:'new-registration',label:'Inscrire un autre pilote',extra:'data-mode="pilot"'});
+  const square=(icon,tip,attrs)=>`<button type="button" class="planning-quick-button" ${attrs} data-tip="${esc(tip)}" aria-label="${esc(tip)}">${icon}</button>`;
+  const register=!items.length?'':items.length===1?square(ICON_REGISTER,items[0].label,`data-action="${items[0].action}" data-departure="${departure.id}" ${items[0].extra}`)
+    :`<span class="planning-quick-menu-wrap">${square(ICON_REGISTER,'Inscription','data-action="quick-menu" aria-haspopup="menu" aria-expanded="false"')}<span class="planning-quick-menu" role="menu" hidden>${items.map(item=>`<button type="button" role="menuitem" class="planning-quick-item" data-action="${item.action}" data-departure="${departure.id}" ${item.extra}>${esc(item.label)}</button>`).join('')}</span></span>`;
+  const crewLabel=can('manage_registrations')?'Créer un équipage':'Créer mon équipage';
+  const crew=canCreateCrewOnDeparture(departure)?square(ICON_CREW,crewLabel,`data-crew-builder-open data-departure="${departure.id}"`):'';
+  return register||crew?`<span class="planning-quick">${register}${crew}</span>`:'';
+}
+
 // Buttons of a start (enter, enter another pilot, create a crew) and what an opened start shows.
 function departureActions(event,departure){
   if(departure.startsAt<=Date.now())return '';
@@ -80,7 +101,7 @@ export function renderEvent(message=''){
   const days=planningDays(event);
   // The planning shows the crews and pilots of every start: no category summary above it, and the race
   // actions sit on its heading line.
-  const starts=days.length?renderPlanning(event,days,departure=>{const actions=departureActions(event,departure);return `${actions?`<div class="planning-actions">${actions}</div>`:''}${departureFoldBody(event,departure)}`;},{actions:eventActions})
+  const starts=days.length?renderPlanning(event,days,departure=>departureFoldBody(event,departure),{actions:eventActions,quick:departure=>quickActions(event,departure)})
     :`<section class="departure-accordion" aria-label="Départs de la course">${upcoming}${renderPastDepartures(event,past)}</section>`;
   const myStart=days.length?days.flatMap(day=>day.items).map(item=>item.departure).find(departure=>Number(departure.startsAt)>now&&(departure.availability||[]).some(reg=>reg.mine&&reg.status!=='unavailable')):null;
   const myStartLink=myStart?`<span class="race-my-start"><small>Ton départ</small>${button('goto-departure',`${esc(weekdayLong(myStart.startsAt))} ${esc(dayMonthShort(myStart.startsAt))} · Départ ${esc(timeLabel(myStart.time))}`,`data-departure="${myStart.id}"`,'secondary-button')}</span>`:'';

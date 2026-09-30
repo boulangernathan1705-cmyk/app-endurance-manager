@@ -1670,6 +1670,23 @@ html[data-game] #app .planning-race-actions .race-header-actions > .secondary-bu
 .planning-free-icon svg { width: 17px; height: 17px; }
 .planning-row + .planning-row { padding-top: 8px; border-top: 1px solid #343e41; }
 .planning-start[open] .planning-row { display: none; }
+/* Quick actions of a start (« Inscription », « Créer un équipage »): small squares with an icon and a +. */
+.planning-start.has-quick > summary { padding-right: 118px; }
+.planning-start.has-quick .planning-row { margin-right: -74px; }
+.planning-quick { position: absolute; top: 9px; right: 40px; display: flex; gap: 6px; }
+.planning-start.is-compact .planning-quick { top: 7px; }
+.planning-start.is-compact.has-quick > summary { min-height: 46px; align-content: center; }
+.planning-quick-button { display: grid; place-items: center; width: 32px !important; height: 32px !important; min-width: 0 !important; min-height: 0 !important; padding: 0 !important; border: 1px solid #3a4548; border-radius: 9px; background: #151b1d; color: #c7d0d4; cursor: pointer; transition: border-color .15s ease, color .15s ease, background .15s ease; }
+.planning-quick-button svg { width: 18px; height: 18px; }
+.planning-quick-button:hover, .planning-quick-button[aria-expanded="true"] { border-color: var(--community-accent, #52d3d8); color: var(--community-accent, #52d3d8); background: color-mix(in srgb, var(--community-accent, #52d3d8) 10%, #151b1d); }
+.planning-quick-menu-wrap { position: relative; }
+.planning-quick-menu { position: absolute; top: calc(100% + 6px); right: 0; z-index: 20; display: grid; min-width: 250px; padding: 6px; border: 1px solid #3a4548; border-radius: 11px; background: #161c1e; box-shadow: 0 14px 32px rgba(0, 0, 0, .5); }
+.planning-quick-menu[hidden] { display: none; }
+.planning-quick-item { padding: 9px 11px; border: 0; border-radius: 8px; background: none; color: #e6ecea; font-size: 14px; font-weight: 600; text-align: left; white-space: nowrap; cursor: pointer; }
+.planning-quick-item:hover, .planning-quick-item:focus-visible { background: color-mix(in srgb, var(--community-accent, #52d3d8) 14%, transparent); color: #fff; }
+/* A crew that still takes pilots: an open padlock, orange like « Places libres ». */
+.planning-crew-open { display: inline-flex; color: #f3b33d; }
+.planning-crew-open svg { width: 14px; height: 14px; }
 
 /* Opened start: buttons first, then the crews (side by side when the day has widened) and the pilots. */
 html[data-game] #app .planning-body.departure-fold { margin: 0 !important; padding: 0 16px 16px !important; border: 0 !important; border-radius: 0 !important; background: none !important; box-shadow: none !important; opacity: 1 !important; }
@@ -1709,6 +1726,10 @@ html[data-game] #app .race-my-start .secondary-button { border-color: var(--comm
 @media (max-width: 760px) {
   .planning-arrows, .departure-planning.has-more .planning-arrows, .planning-span { display: none; }
   .planning-race-actions { order: 5; flex-basis: 100%; margin-left: 0; }
+  .planning-quick-button { width: 36px !important; height: 36px !important; }
+  .planning-start.has-quick > summary { padding-right: 126px; }
+  .planning-start.is-compact.has-quick > summary { min-height: 52px; }
+  .planning-start.has-quick .planning-row { margin-right: -82px; }
   html[data-game] #app .planning-race-actions .race-header-actions { flex-wrap: wrap; gap: 6px 16px; }
   html[data-game] #app .planning-race-actions .race-header-actions > * { min-height: 32px !important; font-size: 13px !important; }
   html[data-game] #app .planning-race-actions .race-header-actions > .secondary-button { padding: 0 10px !important; }
