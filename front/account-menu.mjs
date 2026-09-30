@@ -109,7 +109,7 @@ function renderConnected(user, communities = []) {
   bindAvatarFallbacks();
 }
 
-// Look of the community of this site (communities platform): its name always visible in the bar, the
+// Look of the community of this site (communities platform): its logo and short name next to the language flag, the
 // short name before the page title, the icon and banner of its Discord server, its accent color.
 function applyCommunity(community, communities = [], openSite = false) {
   if (!community) return;
@@ -124,13 +124,16 @@ function applyCommunity(community, communities = [], openSite = false) {
     const icon = document.querySelector('link[rel="icon"]'); if (icon) { icon.href = look.logoUrl; icon.type = 'image/png'; }
   }
   if (look.bannerUrl) for (const image of document.querySelectorAll('.hero-banner')) { image.removeAttribute('srcset'); image.src = look.bannerUrl; }
-  const bar = document.querySelector('.site-nav-shell');
-  // The name of the community of this site, in the bar (the other communities are in the account menu).
-  if (bar && !bar.querySelector('.community-chip')) {
-    const chip = document.createElement('span');
-    chip.className = 'community-chip';
-    chip.textContent = community.name; chip.title = `Communauté : ${community.name}`;
-    bar.prepend(chip);
+  // The community of this site next to the language flag: its Discord logo and its short name (the other
+  // communities are in the account menu).
+  const place = document.querySelector('.site-nav-shell .game-space-bar');
+  if (place && !place.querySelector('.community-badge')) {
+    const badge = document.createElement('span');
+    badge.className = 'community-badge';
+    badge.dataset.tip = `Communauté ${community.name}`; badge.setAttribute('aria-label', `Communauté ${community.name}`);
+    if (look.logoUrl) { const logo = document.createElement('img'); logo.src = look.logoUrl; logo.alt = ''; badge.append(logo); }
+    const name = document.createElement('strong'); name.textContent = community.shortName || community.name; badge.append(name);
+    place.append(badge);
   }
 }
 
