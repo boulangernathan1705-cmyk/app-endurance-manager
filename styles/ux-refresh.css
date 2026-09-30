@@ -1903,3 +1903,7 @@ html[data-game] .race-card .race-head .official-badge { font-size: 10.5px; paddi
 @media (max-width: 760px) {
   .race-filter-group { grid-template-columns: minmax(0, 1fr); gap: 6px; }
 }
+/* LMU categories: square tiles, the logo above its name. */
+.race-filter-chip.race-filter-tile { flex-direction: column; justify-content: center; gap: 6px; width: 92px; height: 76px; padding: 6px; border-radius: 10px; font-size: 12px; line-height: 1.15; text-align: center; }
+.race-filter-chip.race-filter-tile .category-logo { width: 34px; }
+@media (max-width: 760px) { .race-filter-chip.race-filter-tile { width: 78px; height: 68px; font-size: 11px; } }
