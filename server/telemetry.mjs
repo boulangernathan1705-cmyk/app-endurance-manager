@@ -63,8 +63,9 @@ export async function ingestClientError(request,env) {
         ),
       env.DB.prepare('DELETE FROM client_errors WHERE created_at < ?').bind(createdAt-14*DAY)
     ]);
-    const count=await env.DB.prepare('SELECT COUNT(*) AS total FROM client_errors').first();
-    if (Number(count?.total)>500) await env.DB.prepare('DELETE FROM client_errors WHERE id IN (SELECT id FROM client_errors ORDER BY created_at DESC LIMIT -1 OFFSET 500)').run();
+    // At most 500 reports per community: a busy community never pushes out the reports of the others.
+    const count=await env.DB.prepare('SELECT COUNT(*) AS total FROM client_errors WHERE community_id=?').bind(community.id).first();
+    if (Number(count?.total)>500) await env.DB.prepare('DELETE FROM client_errors WHERE id IN (SELECT id FROM client_errors WHERE community_id=? ORDER BY created_at DESC LIMIT -1 OFFSET 500)').bind(community.id).run();
   } catch (error) {
     console.error('Client telemetry failure',String(error?.message||error||'unknown').slice(0,200));
   }

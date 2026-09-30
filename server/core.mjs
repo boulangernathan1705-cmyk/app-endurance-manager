@@ -125,6 +125,9 @@ async function registrationParticipant(env, actor, input, data, community) {
     return participant;
   }
   if (!actor.user) fail(401, 'Connecte-toi avec Discord pour t’inscrire.');
+  // An own entry always shows the player's Discord name: never a pseudo typed in the form (another member's name).
+  data.name=actor.user.name||data.name;
+  data.nameKey=data.name.normalize('NFKC').toLocaleLowerCase('fr-FR');
   await env.DB.prepare('INSERT INTO participants(id,name,user_id,created_by,created_at,community_id) VALUES(?,?,?,?,?,?) ON CONFLICT(community_id,user_id) WHERE user_id IS NOT NULL DO NOTHING').bind(id(),data.name,actor.user.id,actor.user.id,now(),cid).run();
   return env.DB.prepare('SELECT * FROM participants WHERE user_id=? AND community_id=?').bind(actor.user.id,cid).first();
 }
