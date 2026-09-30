@@ -43,21 +43,22 @@ function startCard(event,departure,body,{minutes,now,open}){
 }
 
 // `body(departure, index)`: what an opened start shows (buttons, registration, crews and pilots), as in the list.
-export function renderPlanning(event,days,body){
+// `actions`: the race's own buttons (link, edit, delete), on the heading line of the planning.
+export function renderPlanning(event,days,body,{actions=''}={}){
   const minutes=eventMinutes(event),now=Date.now();
   const finished=day=>day.items.every(({departure})=>Number(departure.startsAt)+minutes*60000<=now);
   const openId=state.selectedDepartureId||[...state.registrationOpen].find(id=>days.some(day=>day.items.some(item=>item.departure.id===id)));
   const active=days.find(day=>day.key===state.planningDay)||days.find(day=>day.items.some(item=>item.departure.id===openId))||days.find(day=>!finished(day))||days[0];
   const tabs=days.map(day=>{const first=day.items[0].departure.startsAt,mine=day.items.some(({departure})=>(departure.availability||[]).some(reg=>reg.mine&&reg.status!=='unavailable'));
     return `<button type="button" class="planning-tab${day===active?' is-active':''}" data-action="planning-day" data-day="${day.key}" aria-pressed="${day===active}"><small>${esc(weekdayLabel(first))}</small><strong>${esc(dayMonthShort(first))}</strong><small>${finished(day)?'terminé':`${day.items.length} départ${day.items.length>1?'s':''}`}</small>${mine?'<i class="planning-tab-mine" aria-label="ton départ"></i>':''}</button>`;}).join('');
-  const columns=days.map(day=>{const first=day.items[0].departure.startsAt,pilots=day.items.reduce((sum,{departure})=>sum+pilotCount(departure.availability||[]),0),today=dayKey(now)===day.key;
+  const columns=days.map(day=>{const first=day.items[0].departure.startsAt,pilots=pilotCount(day.items.flatMap(({departure})=>departure.availability||[])),today=dayKey(now)===day.key;
     return `<section class="planning-day${finished(day)?' is-past':''}${day===active?' is-active':''}" data-day="${day.key}" aria-label="${esc(weekdayLong(first))} ${esc(dayMonthLong(first))}"><div class="planning-day-head"><span class="planning-day-name"><strong>${esc(weekdayLong(first))}</strong><span>${esc(dayMonthLong(first))}</span></span>${today?'<span class="planning-today">Aujourd’hui</span>':`<small>${finished(day)?'Terminé':`${day.items.length} départ${day.items.length>1?'s':''} · ${pilots} pilote${pilots>1?'s':''}`}</small>`}</div>${day.items.map(({departure,index})=>startCard(event,departure,body(departure,index),{minutes,now,open:departure.id===openId})).join('')}</section>`;}).join('');
   const total=days.reduce((sum,day)=>sum+day.items.length,0),span=planningSpan(days.length);
   // More than three days: three on screen by default, or five or seven at once (remembered on this browser).
   const spans=days.length>3?[...new Set([...SPANS.filter(count=>count<days.length),days.length])]:[];
   const spanChoice=spans.length?`<span class="planning-span" role="group" aria-label="Jours affichés">${spans.map(count=>`<button type="button" data-action="planning-span" data-span="${count}" aria-pressed="${count===span}">${count} jours</button>`).join('')}</span>`:'';
   const offset=state.planningWindow?.event===event.id?state.planningWindow.offset:days.indexOf(active);
-  return `<section class="departure-planning" style="--days:${days.length}" data-span="${span}" data-offset="${offset}" data-event="${event.id}" aria-label="Départs de la course"><div class="planning-heading"><h2>Départs</h2><small>${total} départs sur ${days.length} jours</small>${spanChoice}<span class="planning-arrows"><button type="button" data-action="planning-scroll" data-step="-1" aria-label="Jour précédent">‹</button><button type="button" data-action="planning-scroll" data-step="1" aria-label="Jour suivant">›</button></span></div><div class="planning-tabs" role="group" aria-label="Jour de course">${tabs}</div><div class="planning-scroll"><div class="planning-days">${columns}</div></div></section>`;
+  return `<section class="departure-planning" style="--days:${days.length}" data-span="${span}" data-offset="${offset}" data-event="${event.id}" aria-label="Départs de la course"><div class="planning-heading"><h2>Départs</h2><small>${total} départs sur ${days.length} jours</small>${spanChoice}${actions?`<span class="planning-race-actions">${actions}</span>`:''}<span class="planning-arrows"><button type="button" data-action="planning-scroll" data-step="-1" aria-label="Jour précédent">‹</button><button type="button" data-action="planning-scroll" data-step="1" aria-label="Jour suivant">›</button></span></div><div class="planning-tabs" role="group" aria-label="Jour de course">${tabs}</div><div class="planning-scroll"><div class="planning-days">${columns}</div></div></section>`;
 }
 
 const SPANS=[3,5,7],GAP=16;

@@ -5,8 +5,9 @@ Les changements du site, version par version. La plus récente est en haut.
 ## Prochaine version — en test
 
 ### Page d'une course
-- **Plus compacte** : la bannière se réduit à une bande et l'en-tête de la course tient sur quelques lignes, pour que le planning des départs arrive tout de suite.
+- **Plus compacte** : la bannière se réduit à une bande, l'en-tête de la course tient sur deux lignes et ses boutons passent à côté des jours du planning, pour que les départs arrivent tout de suite.
 - Au survol d'une pastille de catégorie (« 2 GT3 »), le nom des pilotes qui cherchent un équipage.
+- Le nombre d'inscrits par catégorie compte chaque pilote une seule fois, même s'il est inscrit sur plusieurs départs.
 
 ## v1.7.1 — 29 septembre 2026
 

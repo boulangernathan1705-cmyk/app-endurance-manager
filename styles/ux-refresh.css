@@ -1598,7 +1598,13 @@ html[data-game] #app .departure-planning { display: grid; gap: 14px; margin-top:
 .planning-heading { display: flex; align-items: center; gap: 8px 14px; flex-wrap: wrap; }
 .planning-heading h2 { margin: 0; font-size: 14px; letter-spacing: .08em; text-transform: uppercase; color: #c7d0d4; }
 .planning-heading small { color: #92999c; font-size: 13px; }
-.planning-arrows { display: none; margin-left: auto; gap: 6px; }
+.planning-arrows { display: none; gap: 6px; }
+/* The race's buttons (link, edit, delete) on the heading line of the planning, the arrows after them. */
+.planning-race-actions { margin-left: auto; }
+html[data-game] #app .planning-race-actions .race-header-actions { margin: 0; flex-wrap: nowrap; gap: 6px 16px; }
+html[data-game] #app .planning-race-actions .race-header-actions > * { min-height: 34px !important; font-size: 13.5px !important; white-space: nowrap; }
+html[data-game] #app .planning-race-actions .race-header-actions > .secondary-button { padding: 0 12px !important; }
+.departure-planning:not(:has(.planning-race-actions)) .planning-arrows { margin-left: auto; }
 .departure-planning.has-more .planning-arrows { display: flex; }
 .planning-arrows button { width: 36px; height: 32px; border: 1px solid #343c3f; border-radius: 9px; background: #111617; color: #f4f6f5; font-size: 18px; line-height: 1; cursor: pointer; }
 .planning-tabs { display: none; }
@@ -1702,6 +1708,10 @@ html[data-game] #app .race-my-start .secondary-button { border-color: var(--comm
 /* Phone: one day at a time */
 @media (max-width: 760px) {
   .planning-arrows, .departure-planning.has-more .planning-arrows, .planning-span { display: none; }
+  .planning-race-actions { order: 5; flex-basis: 100%; margin-left: 0; }
+  html[data-game] #app .planning-race-actions .race-header-actions { flex-wrap: wrap; gap: 6px 16px; }
+  html[data-game] #app .planning-race-actions .race-header-actions > * { min-height: 32px !important; font-size: 13px !important; }
+  html[data-game] #app .planning-race-actions .race-header-actions > .secondary-button { padding: 0 10px !important; }
   html[data-game] #app .planning-actions .ux-summary-registration-actions { flex-wrap: wrap !important; }
   .planning-tabs { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; }
   .planning-tab { flex: 1 0 70px; position: relative; display: grid; gap: 1px; padding: 8px 4px; border: 1px solid #343c3f; border-radius: 11px; background: #111617; color: #f4f6f5; line-height: 1.2; cursor: pointer; }
