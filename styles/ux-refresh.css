@@ -1917,3 +1917,10 @@ html[data-game="iracing"] .race-filter-chip .category-logo { border-radius: 50%;
 .community-intro li strong { color: #f4f6f5; }
 .community-intro-foot { margin: 0; color: #8e9996; font-size: 13px; }
 .community-intro .primary-button { justify-self: end; min-width: 160px; }
+
+/* Official race: the communities shown on the planning (chips above the starts). */
+.race-community-filter { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 0 0 12px; }
+.race-community-filter .race-filter-chip small { color: #99a3a0; font-size: 11.5px; font-weight: 800; }
+.race-community-filter .race-filter-chip.active small { color: inherit; }
+.race-community-filter .community-tag { height: 20px; min-width: 20px; font-size: 10px; }
+.race-community-filter .community-tag.has-logo { width: 20px; }

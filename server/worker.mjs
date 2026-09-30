@@ -320,6 +320,12 @@ async function api(request, env) {
     community:{id:community.id, slug:community.slug, name:community.name, shortName:community.shortName, discordInviteUrl:community.discordInviteUrl, appearance:appearanceOf(community)},
     access:access.status, permissions:[...access.permissions], manager:access.manager, communities:await myCommunities(env, actor, community), openSite,
     platformDiscordUrl:/^https:\/\/(discord\.gg|discord\.com\/invite)\//.test(env.PLATFORM_DISCORD_URL || '') ? env.PLATFORM_DISCORD_URL : null});
+  // The explanation of communities has been read: not shown again, on any device.
+  if (path === '/api/me/community-intro' && method === 'POST') {
+    if (!actor.user) fail(401, 'Connecte-toi avec Discord.');
+    await env.DB.prepare('UPDATE users SET community_intro_seen=1 WHERE id=?').bind(actor.user.id).run();
+    return json({ok:true});
+  }
   if (path === '/api/auth/logout' && method === 'POST') {
     const names = cookieNames(env), raw = cookie(request, names.session);
     if (raw) await env.DB.prepare('DELETE FROM sessions WHERE token_hash=?').bind(await hash(raw)).run();

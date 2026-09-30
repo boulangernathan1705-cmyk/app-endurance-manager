@@ -4,7 +4,11 @@ const SEEN_KEY = 'em_community_intro_seen_v1';
 const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
 
 function seen() { try { return localStorage.getItem(SEEN_KEY) === '1'; } catch { return false; } }
-function markSeen() { try { localStorage.setItem(SEEN_KEY, '1'); } catch {} }
+// Read: remembered in this browser and on the account (every device, migration 0041).
+function markSeen({account = true} = {}) {
+  try { localStorage.setItem(SEEN_KEY, '1'); } catch {}
+  if (account) fetch('/api/me/community-intro', {method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'}, body:'{}'}).catch(() => {});
+}
 
 // `forced`: the first time, only « J'ai compris » closes it; reopened from the menu, Escape and a click outside too.
 export function showCommunityIntro({forced = false, communityName = ''} = {}) {
@@ -32,8 +36,10 @@ export function showCommunityIntro({forced = false, communityName = ''} = {}) {
   overlay.querySelector('[data-community-intro-ok]').focus();
 }
 
-// The first entry or crew of this browser, for a pilot of several communities: the explanation first.
-export function introduceCommunitiesOnce(communityName = '', communityCount = 0) {
-  if (communityCount < 2 || seen()) return;
+// The first entry or crew of a pilot of several communities (on any device): the explanation first.
+export function introduceCommunitiesOnce(communityName = '', communityCount = 0, seenByAccount = false) {
+  if (communityCount < 2) return;
+  if (seenByAccount) { markSeen({account:false}); return; }
+  if (seen()) { markSeen(); return; }
   showCommunityIntro({forced:true, communityName});
 }

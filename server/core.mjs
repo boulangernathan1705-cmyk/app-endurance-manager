@@ -73,6 +73,8 @@ async function identity(request, env) {
   if (/^[a-f0-9]{64}$/.test(raw)) {
     const row = await env.DB.prepare('SELECT u.* FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=? AND s.expires_at>?').bind(await hash(raw), now()).first();
     user = publicUser(row);
+    // The explanation of communities, already read by this account (migration 0041).
+    if (user) user.communityIntroSeen = Boolean(row.community_intro_seen);
   }
   return {user};
 }

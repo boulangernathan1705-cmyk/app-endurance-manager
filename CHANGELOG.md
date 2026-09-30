@@ -2,6 +2,14 @@
 
 Les changements du site, version par version. La plus récente est en haut.
 
+## v1.11 — 30 septembre 2026
+
+### Courses officielles
+- **Choisis les communautés affichées** sur le planning d'une course officielle : « Toutes », ou seulement la tienne (ou quelques-unes), avec le nombre de pilotes de chacune. Ton choix est gardé pour les autres courses.
+
+### Communautés
+- L'explication des communautés ne s'affiche plus qu'**une seule fois pour ton compte**, quel que soit l'appareil.
+
 ## v1.10 — 30 septembre 2026
 
 ### Liste des courses
