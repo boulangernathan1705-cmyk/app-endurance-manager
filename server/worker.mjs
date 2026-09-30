@@ -7,7 +7,7 @@ import {ingestClientError, clientErrorsApi} from './telemetry.mjs';
 import {racesPath} from './races-path.mjs';
 import {currentCommunity, appearanceOf, allCommunities, communityUrl, communitySlug} from './community.mjs';
 import {isDevelopment} from './dev-environment.mjs';
-import {communityAccess, requirePermission, displayRole, PERMISSIONS, DEFAULT_EVERYONE, normalizePermissions, discordGuild, keepDiscordLook, memberPermissions} from './access.mjs';
+import {communityAccess, requirePermission, displayRole, PERMISSIONS, DEFAULT_EVERYONE, normalizePermissions, discordGuild, keepDiscordLook, memberPermissions, refreshCommunityMembers} from './access.mjs';
 // Solo races: a module each community turns on or off (settings of the members page).
 const soloRacesEnabled = (env, community) => community?.modules?.soloRaces === true;
 import {syncIracingEvents} from './iracing-import.mjs';
@@ -538,6 +538,10 @@ async function api(request, env) {
   }
   // Members of the community: the players found on its Discord server, with their Discord roles and what
   // these roles allow here. Roles and access are managed on Discord; the role settings page comes with step 4.
+  if (path === '/api/members/refresh' && method === 'POST') {
+    requirePermission(actor,'admin');
+    return json({ok:true, checked:await refreshCommunityMembers(env, community)});
+  }
   if (path === '/api/members' && method === 'GET') {
     requirePermission(actor,'admin');
     const rows = (await env.DB.prepare(`SELECT m.*, u.name FROM memberships m JOIN users u ON u.id=m.user_id

@@ -27,7 +27,9 @@ export const normalizePermissions = list => [...new Set((list || []).flatMap(per
   .filter(permission => PERMISSIONS.includes(permission));
 
 const DISCORD_API = 'https://discord.com/api/v10';
-const CHECK_EVERY = 24 * 3600; // seconds
+const CHECK_EVERY = 24 * 3600; // seconds, the daily check of every member
+// The player on the site: roles asked again after 10 minutes, so a role given on Discord soon counts here.
+const VISIT_CHECK_EVERY = 10 * 60;
 const ADMINISTRATOR = 0x8n;
 
 async function bot(env, path) {
@@ -52,6 +54,8 @@ async function guild(env, guildId) {
   return value;
 }
 export const discordGuild = guild;
+// The server's roles read again at the next request (a role renamed or created on Discord).
+export function forgetGuild(guildId) { guildCache.delete(guildId); }
 
 // The logo and banner of the community follow its Discord server: a new icon on Discord replaces the stored one
 // (site header, installed app, weekly recap). Only these two keys change, the rest of the appearance stays.
@@ -119,7 +123,8 @@ export async function communityAccess(env, actor, community, {open = false} = {}
   if (!community.discordGuildId) return manager ? {status:'member', permissions:new Set(PERMISSIONS), manager} : none('unavailable');
   let membership = await env.DB.prepare('SELECT * FROM memberships WHERE community_id=? AND user_id=?').bind(community.id, actor.user.id).first();
   // Managers are checked too (to appear on the members page when they are on the server), but their access never depends on it.
-  if (!membership || membership.checked_at < now() - CHECK_EVERY) membership = (await checkMembership(env, community, actor.user.id).catch(error => { if (!manager) throw error; return null; })) || membership;
+  // Discord not answering: the roles known last time stay (never an error for a member already checked).
+  if (!membership || membership.checked_at < now() - VISIT_CHECK_EVERY) membership = (await checkMembership(env, community, actor.user.id).catch(error => { if (!manager && !membership) throw error; return null; })) || membership;
   if (manager) return {status:'member', permissions:new Set(PERMISSIONS), manager};
   if (!membership) return none('unavailable');
   if (membership.status !== 'member') return none('not-member');
@@ -140,6 +145,17 @@ export function displayRole(access) {
 }
 
 // Daily task: memberships not checked for a day are checked again (a few at a time).
+// Administration → Membres → « Actualiser depuis Discord »: the members of one community checked now, the
+// longest unchecked first (a request may call Discord 50 times at most).
+export async function refreshCommunityMembers(env, community, limit = 40) {
+  if (!community.discordGuildId) return 0;
+  forgetGuild(community.discordGuildId);
+  const rows = (await env.DB.prepare(`SELECT user_id FROM memberships WHERE community_id=? AND status='member' ORDER BY checked_at LIMIT ?`).bind(community.id, limit).all()).results || [];
+  let checked = 0;
+  for (const row of rows) if (await checkMembership(env, community, row.user_id).catch(() => null)) checked++;
+  return checked;
+}
+
 export async function refreshMemberships(env, communities, limit = 40) {
   const byId = new Map(communities.filter(community => community.discordGuildId).map(community => [community.id, community]));
   if (!byId.size) return 0;

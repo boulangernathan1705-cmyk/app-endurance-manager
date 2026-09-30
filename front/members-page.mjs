@@ -202,7 +202,7 @@ async function load() {
     app.innerHTML = `<h1 class="sr-only">Membres</h1>
       <div class="members-tabs" role="tablist"><button type="button" role="tab" data-tab="members" aria-selected="true">Membres <span>${members.length}</span></button><button type="button" role="tab" data-tab="setup" aria-selected="false">Mise en place${setup.todo ? ` <span>${setup.todo}</span>` : ''}</button><button type="button" role="tab" data-tab="settings" aria-selected="false">Réglages</button>${platform ? '<button type="button" role="tab" data-tab="platform" aria-selected="false">Plateforme</button>' : ''}</div>
       <section class="members-panel" data-panel="members">
-        <div class="members-toolbar"><label class="members-search"><span class="sr-only">Rechercher un membre</span><input type="search" name="memberSearch" placeholder="Rechercher un pilote ou un rôle…" autocomplete="off"></label></div>
+        <div class="members-toolbar"><label class="members-search"><span class="sr-only">Rechercher un membre</span><input type="search" name="memberSearch" placeholder="Rechercher un pilote ou un rôle…" autocomplete="off"></label><button type="button" class="secondary-button" data-members-refresh data-tip="Relit tout de suite sur Discord les rôles de chaque membre et le nom des rôles. Sinon, le site les relit tout seul : toutes les 10 minutes pour un pilote connecté, chaque jour pour les autres.">Actualiser depuis Discord</button></div>
         <p class="members-help">Les membres du serveur Discord${server} qui se sont connectés au site. Leurs rôles se gèrent sur Discord et sont vérifiés chaque jour.</p>
         <div class="members-list member-grid">${members.map(member => memberCard(member, result.permissions || [])).join('')}</div>
         <p class="members-empty" hidden>Aucun membre ne correspond à cette recherche.</p></section>
@@ -296,6 +296,13 @@ app.addEventListener('click', async event => {
   const go = event.target.closest('[data-go-tab]');
   if (go) { app.querySelector(`[data-tab="${go.dataset.goTab}"]`)?.click(); return; }
   if (event.target.closest('[data-setup-refresh]')) { await reload('setup'); return; }
+  const refresh = event.target.closest('[data-members-refresh]');
+  if (refresh) {
+    refresh.disabled = true; refresh.textContent = 'Actualisation…';
+    try { await api('/api/members/refresh', 'POST', {}); await reload('members'); }
+    catch (error) { refresh.disabled = false; refresh.textContent = 'Actualiser depuis Discord'; alert(error.message); }
+    return;
+  }
   const remove = event.target.closest('[data-delete-community]');
   if (remove) {
     if (!confirm(`Supprimer la communauté « ${remove.dataset.name} » ? Seule une communauté sans course ni pilote peut l’être.`)) return;

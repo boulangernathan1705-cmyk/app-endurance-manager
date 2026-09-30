@@ -2,6 +2,11 @@
 
 Les changements du site, version par version. La plus récente est en haut.
 
+## Prochaine version — en test
+
+### Rôles Discord
+- Un rôle donné (ou retiré) à un pilote sur Discord compte sur le site **en 10 minutes**, au lieu du lendemain.
+
 ## v1.8 — 30 septembre 2026
 
 ### Page d'une course
