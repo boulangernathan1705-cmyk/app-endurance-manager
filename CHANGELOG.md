@@ -2,7 +2,7 @@
 
 Les changements du site, version par version. La plus récente est en haut.
 
-## Prochaine version — en test
+## v1.8 — 30 septembre 2026
 
 ### Page d'une course
 - **Plus compacte** : la bannière se réduit à une bande, l'en-tête de la course tient sur deux lignes et ses boutons passent à côté des jours du planning, pour que les départs arrivent tout de suite.
