@@ -1,6 +1,7 @@
 import {CARS} from './shared/catalog.mjs';
 import {shortDateLabel,timeLabel} from './front/dates.mjs';
 import {renderAvailabilityTimeline} from './front/timeline.mjs';
+import {introduceCommunitiesOnce} from './front/community-intro.mjs';
 
 const app = document.getElementById('app');
 let eventsCache = null;
@@ -151,20 +152,24 @@ function createCategories(event, departure) {
   return [...new Set(ownAvailableRegistrations(departure).map(reg => reg.category))];
 }
 
-// First step of a crew on an official race: the community it belongs to (the player's own community of entry, or
-// the site's one where he manages the crews).
+// First step of a crew on an official race: the community it belongs to, any of the player's communities
+// whatever the site he is on (then its entries only, and his rights there).
 function communityOptions(event, departure, session) {
   if (!event.official) return [];
+  const list = Array.isArray(session.communities) ? session.communities.filter(item => item.id) : [];
+  if (list.length > 1) return list;
+  // One community only: the site's one, or the one of his entry.
   const site = session.community?.id || '';
-  const list = Array.isArray(session.communities) ? session.communities : [];
   const ids = new Set([...((session.permissions || []).includes('manage_registrations') ? [site] : []),
     ...(departure?.availability || []).filter(reg => reg.mine && reg.status !== 'unavailable').map(communityOf)]);
-  return [...ids].filter(Boolean).map(id => list.find(item => item.id === id) || {id, name:session.community?.id === id ? session.community.name : 'Communauté'});
+  return [...ids].filter(Boolean).map(id => ({id, name:session.community?.id === id ? session.community.name : 'Communauté'}));
 }
 function chooseCommunity(event, departure, id) {
   const siteManager = builderState.siteManager;
+  const site = sessionCache?.community?.id || '';
+  const option = (builderState.communityOptions || []).find(item => item.id === id);
   builderState.communityId = id;
-  builderState.manager = siteManager && (!id || id === (sessionCache?.community?.id || ''));
+  builderState.manager = !id || id === site ? siteManager : Boolean(option?.manageCrews);
   const own = ownAvailableRegistrations(departure);
   builderState.category = builderState.manager ? (event.categories[0] || '') : own[0]?.category || '';
   builderState.ownerRegistrationId = builderState.manager ? null : own.find(reg => reg.category === builderState.category)?.id || null;
@@ -189,7 +194,7 @@ function panelMarkup(event) {
   const categories = editMode ? event.categories : createCategories(event,departure);
   if (!categories.includes(builderState.category)) builderState.category = categories[0] || '';
   if (!(CARS[builderState.category] || []).includes(builderState.car)) builderState.car = '';
-  if (!builderState.category) return `<section class="crew-builder-panel"><div class="crew-builder-heading"><div><span class="creation-kicker">FORMATION D’ÉQUIPAGE</span><h2>Inscription nécessaire</h2><p>Inscris-toi d’abord sur ce départ pour pouvoir créer ton équipage.</p></div><button type="button" class="secondary-button" data-crew-builder-cancel>Fermer</button></div></section>`;
+  if (!builderState.category) return `<section class="crew-builder-panel"><div class="crew-builder-heading"><div><span class="creation-kicker">FORMATION D’ÉQUIPAGE</span><h2>Inscription nécessaire</h2><p>Inscris-toi d’abord sur ce départ${builderState.communityId && builderState.communityOptions?.length > 1 ? ' avec cette communauté' : ''} pour pouvoir créer ton équipage.</p></div>${builderState.communityOptions?.length > 1 ? '<button type="button" class="secondary-button" data-crew-builder-community="">Changer de communauté</button>' : ''}<button type="button" class="secondary-button" data-crew-builder-cancel>Fermer</button></div></section>`;
   const candidates = availableCandidates(event, departure, builderState.category, editMode ? builderState.crewId : null);
   const ownerRegistration = !builderState.manager && !editMode ? candidates.find(reg => reg.mine) : null;
   if (ownerRegistration) builderState.ownerRegistrationId = ownerRegistration.id;
@@ -338,14 +343,16 @@ async function openBuilder(crewId = null, preferredDepartureId = '') {
       const departure = defaultDeparture(event,preferredDepartureId);
       if (!departure) throw new Error('Tous les départs de cet événement sont déjà passés.');
       const own=ownAvailableRegistrations(departure);
-      if (!manager && !own.length) throw new Error('Inscris-toi d’abord sur ce départ avant de créer ton équipage.');
       const options=communityOptions(event,departure,session);
+      if (!manager && !own.length && !options.some(item => item.manageCrews)) throw new Error('Inscris-toi d’abord sur ce départ avant de créer ton équipage.');
       builderState = {mode:'create',eventId,manager,siteManager:manager,communityOptions:options,communityId:'',departureId:departure.id,category:'',car:'',name:'',locked:false,ownerRegistrationId:null,registrationIds:[],originalRegistrationIds:[],step:1};
       // Only one possible community (always, on a race of the site's community): chosen already.
       if (options.length <= 1) chooseCommunity(event,departure,options[0]?.id || '');
     }
 
     renderPanel(event,{scroll:true});
+    // The first crew: how communities work, explained once.
+    if (!crewId) introduceCommunitiesOnce(session.openSite ? '' : session.community?.name || '', (session.communities || []).length);
   } catch (error) {
     pendingMessage = {error:true,text:error?.message || 'Impossible d’ouvrir l’éditeur d’équipage.'};
     insertPendingMessage();

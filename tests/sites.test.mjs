@@ -89,6 +89,7 @@ test('"Mes communautés": the communities of the player, with the address of eac
   member.run('c-test',user,time,time);
   const mine=(await (await call(`${MAIN}/api/session`,{headers})).json()).communities;
   assert.deepEqual(mine.map(item=>[item.slug,item.url,item.current]),[['commu-dev',`${MAIN}/`,true],['commu-test',`${TEST_SITE}/`,false]]);
+  assert.ok(mine.every(item=>item.manageCrews===false),'no role to manage the crews: a crew only with his own entry');
   assert.equal((await (await call(`${TEST_SITE}/api/session`,{headers})).json()).communities.length,2,'the same on every site');
 });
 
@@ -102,7 +103,10 @@ test('the main address is a showcase: anyone looks without signing in, only the 
   assert.equal(visitor.access,'member');assert.equal(visitor.openSite,true);assert.deepEqual(visitor.permissions,[],'read only');
   assert.equal((await call(`${APEX}/api/races`)).status,200,'the races are visible without signing in');
   assert.deepEqual((await (await call(`${APEX}/api/session`,{headers:pilot})).json()).permissions,[],'a signed-in player only looks too');
-  assert.ok((await (await call(`${APEX}/api/session`,{headers:manager})).json()).permissions.includes('admin'));
+  DB.db.prepare("INSERT INTO communities(id,slug,name,short_name,created_at) VALUES('c-third','commu-third','Third','TRD',0)").run();
+  const managed=await (await call(`${APEX}/api/session`,{headers:manager})).json();
+  assert.ok(managed.permissions.includes('admin'));
+  assert.deepEqual(managed.communities.map(item=>item.slug).sort(),['commu-test','commu-third'],'"Mes communautés" never lists the showcase');
   assert.deepEqual((await (await call(`${APEX}/api/participants`,{headers:pilot})).json()).participants,[],'never every account of the platform');
   const write=(headers,path,body)=>call(`${APEX}${path}`,{method:'POST',headers:{...headers,Origin:APEX,'Content-Type':'application/json'},body:JSON.stringify(body)});
   assert.equal((await write(pilot,'/api/races',{name:'Test',categories:['GT3'],departures:[{date:'2090-10-15',time:'21:00'}]})).status,403);

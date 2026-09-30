@@ -1,4 +1,4 @@
-import {app,nav,state,activeGame,esc,button,canManage,isAdmin,can,circuitLabel,eventTypeBadge,officialBadge,schedulePendingBadge,eventBadge,eventCategoryCount,circuitVisual,logo,dateLabel,countdown,groupEvents,notifyRender,notifyNav} from './core.mjs';
+import {app,nav,state,activeGame,esc,button,canManage,isAdmin,can,circuitLabel,EVENT_TYPES,CATEGORIES,eventTypeBadge,officialBadge,schedulePendingBadge,eventBadge,eventCategoryCount,circuitVisual,logo,dateLabel,countdown,groupEvents,notifyRender,notifyNav} from './core.mjs';
 import {raceRangeBlock} from './planning.mjs';
 import {dateBlock,dayLabel,timeLabel} from '../dates.mjs';
 import {durationLabel,eventMinutes} from '../../shared/duration.mjs';
@@ -76,6 +76,71 @@ function eventCard({event,next,archived,end}){
   const situation=`${schedulePendingBadge(event)}${situationBadge(event,archived)}`;
   return `<button class="event-card event-card-harmonized race-card event-type-${event.eventType||'private'}${isSolo(event)?` is-solo is-solo-${event.access||'open'}`:''} ${archived?'archived':''}" data-action="open" data-id="${event.id}"><span class="event-card-body race-card-body"><span class="race-card-content"><span class="race-card-top">${raceDateBlock(event,archived)}<span class="race-head"><span class="event-name">${esc(event.name)}</span><span class="race-meta">${isSolo(event)?soloRoundsLabel(event):`${esc(circuitLabel(event.circuit))} · ${durationLabel(eventMinutes(event))}`}</span>${officialBadge(event)}${isSolo(event)?accessBadge(event):eventTypeBadge(event.eventType)}</span></span>${raceStarts(event,archived)}${situation?`<span class="race-situation">${situation}</span>`:''}<span class="race-fill">${isSolo(event)?`${soloFill(event)}<span class="solo-card-categories">${event.categories.map(category=>logo(category)).join('')}</span>`:`<span class="event-category-badges">${event.categories.map(category=>eventBadge(category,eventCategoryCount(event,category))).join('')}</span>`}</span></span><span class="race-card-circuit" aria-hidden="true">${circuitVisual(event.circuit,true)}</span><span class="event-card-status"><span class="event-countdown ${statusClass}" ${displayNext&&!archived?`data-status-time="${displayNext.startsAt}"`:''}>${status}</span></span></span></button>`;
 }
+// Filters of the race list (communities, type, category, dates, situation), kept in the browser.
+const FILTER_KEY='em_race_filters_v1';
+const emptyFilters=()=>({communities:[],types:[],categories:[],from:'',to:'',situation:''});
+export function raceFilters(){
+  if(!state.raceFilters){let saved={};try{saved=JSON.parse(localStorage.getItem(FILTER_KEY)||'{}')||{};}catch{}state.raceFilters={...emptyFilters(),...saved};}
+  return state.raceFilters;
+}
+export function saveRaceFilters(){try{localStorage.setItem(FILTER_KEY,JSON.stringify(state.raceFilters));}catch{}}
+export function resetRaceFilters(){state.raceFilters=emptyFilters();saveRaceFilters();}
+// A filter group toggles its values (several may be chosen); the situation is a single choice.
+export function toggleRaceFilter(group,value){
+  const filters=raceFilters();
+  if(group==='situation')filters.situation=filters.situation===value?'':value;
+  else if(Array.isArray(filters[group]))filters[group]=filters[group].includes(value)?filters[group].filter(item=>item!==value):[...filters[group],value];
+  saveRaceFilters();
+}
+const activeFilterCount=filters=>filters.communities.length+filters.types.length+filters.categories.length+(filters.from||filters.to?1:0)+(filters.situation?1:0);
+// Communities offered: the player's ones (only when he has several).
+const filterCommunities=()=>(state.communities||[]).filter(item=>item.id);
+const communityOfEntry=item=>item?.community?.id||state.community?.id||'';
+function raceMatches(event,filters){
+  if(filters.communities.length){
+    // A race of the site's community, or an official race with an entry or a crew of a chosen community.
+    const chosen=new Set(filters.communities);
+    const ok=event.official?(event.departures||[]).some(departure=>(departure.availability||[]).some(reg=>chosen.has(communityOfEntry(reg)))||(departure.crews||[]).some(crew=>chosen.has(communityOfEntry(crew)))):chosen.has(state.community?.id);
+    if(!ok)return false;
+  }
+  if(filters.types.length&&!filters.types.some(type=>type==='official'?event.official:!event.official&&(event.eventType||'private')===type))return false;
+  if(filters.categories.length&&!(event.categories||[]).some(category=>filters.categories.includes(category)))return false;
+  if(filters.from||filters.to){
+    // One start (its Paris date) in the chosen days.
+    const days=(event.departures||[]).map(departure=>departure.date).filter(Boolean);
+    if(!days.some(day=>(!filters.from||day>=filters.from)&&(!filters.to||day<=filters.to)))return false;
+  }
+  if(filters.situation){
+    const mine=mySituation(event,{includePast:true});
+    if(filters.situation==='registered'&&!mine)return false;
+    if(filters.situation==='crew'&&!mine?.crew)return false;
+    if(filters.situation==='no-crew'&&(!mine||mine.crew))return false;
+    if(filters.situation==='free'&&mine)return false;
+  }
+  return true;
+}
+function filterChip(group,value,label,active,extra=''){return button('race-filter',label,`data-group="${group}" data-value="${esc(value)}" aria-pressed="${active}" ${extra}`,`race-filter-chip${active?' active':''}`);}
+function filterPanel(events,filters){
+  const communities=filterCommunities();
+  // LMU: its six categories, always; iRacing (many classes): the ones its races use, in the catalog's order.
+  const used=new Set(events.flatMap(event=>event.categories||[]));
+  const categoriesShown=[...new Set([...CATEGORIES.filter(category=>activeGame==='lmu'||used.has(category)),...used])].filter(category=>category!==ANY_CATEGORY);
+  const group=(title,content)=>`<div class="race-filter-group"><span class="race-filter-title">${title}</span><div class="race-filter-chips">${content}</div></div>`;
+  const mark=item=>item.logoUrl?`<img src="${esc(item.logoUrl)}" alt="">`:'';
+  const parts=[];
+  if(communities.length>1)parts.push(group('Communautés',communities.map(item=>filterChip('communities',item.id,`${mark(item)}<span>${esc(item.shortName||item.name)}</span>`,filters.communities.includes(item.id),`data-tip="${esc(item.name)}"`)).join('')));
+  parts.push(group('Type',[['official','Officielles'],...Object.entries(EVENT_TYPES).map(([key,item])=>[key,item.label])].map(([value,label])=>filterChip('types',value,esc(label),filters.types.includes(value))).join('')));
+  if(categoriesShown.length)parts.push(group('Catégorie',categoriesShown.map(category=>filterChip('categories',category,`${logo(category)}<span>${esc(category)}</span>`,filters.categories.includes(category))).join('')));
+  parts.push(group('Dates',`<label class="race-filter-date"><span>Du</span><input type="date" data-race-filter-date="from" value="${esc(filters.from)}"></label><label class="race-filter-date"><span>Au</span><input type="date" data-race-filter-date="to" value="${esc(filters.to)}"></label>`));
+  parts.push(group('Ma situation',[['registered','Inscrit'],['crew','Avec équipage'],['no-crew','Sans équipage'],['free','Pas inscrit']].map(([value,label])=>filterChip('situation',value,label,filters.situation===value)).join('')));
+  return `<section class="race-filter-panel" aria-label="Filtres des courses">${parts.join('')}${activeFilterCount(filters)?`<div class="race-filter-foot">${button('race-filter-reset','Effacer les filtres','','link-button')}</div>`:''}</section>`;
+}
+if(typeof document!=='undefined')document.addEventListener('change',event=>{
+  const field=event.target;
+  if(!field?.dataset?.raceFilterDate)return;
+  raceFilters()[field.dataset.raceFilterDate]=field.value||'';saveRaceFilters();renderHome();
+});
+
 // Not a member of the community (or not signed in): no data, only how to get in.
 // Welcome screen for visitors (not signed in, or not members of the community): what the site does, and the
 // Discord sign-in. The main address presents the platform; a community site presents the community.
@@ -109,4 +174,4 @@ export function communityGate(){
     <div class="welcome-hero"><p class="welcome-kicker">${kicker}</p><h1 id="community-gate-title">${title}</h1><p class="welcome-lead">${lead}</p>${actions}</div>
     <ul class="welcome-features">${features}</ul></section>`;
 }
-export function renderHome(message=''){if(state.access!=='member'){state.page='home';app.innerHTML=communityGate();notifyRender();return;}state.page='home';state.currentEventId=null;state.editingEvent=null;state.drafts={};state.registrationOpen.clear();const solo=state.listFormat==='solo';const listEvents=state.events.filter(event=>(event.format==='solo')===solo);const hasMine=listEvents.some(event=>mySituation(event));if(state.eventFilter==='mine'&&!hasMine)state.eventFilter='upcoming';const mineOnly=state.eventFilter==='mine';const groups=groupEvents(mineOnly?listEvents.filter(event=>mySituation(event)):listEvents,mineOnly?'upcoming':state.eventFilter);const filters=`<div class="event-filter" role="group" aria-label="Filtrer les événements">${button('event-filter','À venir',`data-filter="upcoming" aria-pressed="${state.eventFilter==='upcoming'}"`,'event-filter-button')}${hasMine?button('event-filter','Mes courses',`data-filter="mine" aria-pressed="${state.eventFilter==='mine'}"`,'event-filter-button'):''}${button('event-filter','Archivés',`data-filter="archived" aria-pressed="${state.eventFilter==='archived'}"`,'event-filter-button')}</div>`;app.innerHTML=`<div class="page-head"><h1 class="page-title">${solo?esc(state.soloLabel).toUpperCase():'ENDURANCE'}</h1>${filters}${can('create_race')||(activeGame==='iracing'&&isAdmin())?`<div class="home-create-event">${activeGame==='iracing'&&isAdmin()&&!solo?button('iracing-import','Mettre à jour le calendrier iRacing','title="Importe les nouvelles endurances officielles et les horaires des événements spéciaux"','secondary-button'):''}${can('create_race')?button('create',solo?'Ajouter une course solo':'Ajouter un événement',`data-format="${solo?'solo':'endurance'}"`,'primary-button'):''}</div>`:''}</div>${message?`<p class="creation-success" role="status">${esc(message)}</p>`:''}${groups.length?`<div class="event-agenda">${groups.map(group=>`<section class="event-period" aria-labelledby="period-${group.key}"><h2 class="event-period-heading" id="period-${group.key}"><span>${esc(group.label)}</span><small>${group.items.length} événement${group.items.length>1?'s':''}</small></h2><div class="event-list">${group.items.map(eventCard).join('')}</div></section>`).join('')}</div>`:`<div class="empty">${state.eventFilter==='upcoming'?'Aucun événement à venir.':'Aucun événement archivé.'}</div>`}`;notifyRender();}
+export function renderHome(message=''){if(state.access!=='member'){state.page='home';app.innerHTML=communityGate();notifyRender();return;}state.page='home';state.currentEventId=null;state.editingEvent=null;state.drafts={};state.registrationOpen.clear();const solo=state.listFormat==='solo';const formatEvents=state.events.filter(event=>(event.format==='solo')===solo);const raceFilter=raceFilters(),filtered=activeFilterCount(raceFilter);const listEvents=formatEvents.filter(event=>raceMatches(event,raceFilter));const hasMine=listEvents.some(event=>mySituation(event));if(state.eventFilter==='mine'&&!hasMine)state.eventFilter='upcoming';const mineOnly=state.eventFilter==='mine';const groups=groupEvents(mineOnly?listEvents.filter(event=>mySituation(event)):listEvents,mineOnly?'upcoming':state.eventFilter);const filters=`<div class="event-filter" role="group" aria-label="Filtrer les événements">${button('event-filter','À venir',`data-filter="upcoming" aria-pressed="${state.eventFilter==='upcoming'}"`,'event-filter-button')}${hasMine?button('event-filter','Mes courses',`data-filter="mine" aria-pressed="${state.eventFilter==='mine'}"`,'event-filter-button'):''}${button('event-filter','Archivés',`data-filter="archived" aria-pressed="${state.eventFilter==='archived'}"`,'event-filter-button')}${button('race-filter-toggle',`<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M3 5h18l-7 8v6l-4 2v-8z"/></svg><span>Filtres</span>${filtered?`<em>${filtered}</em>`:''}`,`aria-expanded="${!!state.raceFilterOpen}" data-tip="Communautés, type, catégorie, dates, ta situation"`,`event-filter-button race-filter-toggle${filtered?' has-filters':''}`)}</div>`;app.innerHTML=`<div class="page-head"><h1 class="page-title">${solo?esc(state.soloLabel).toUpperCase():'ENDURANCE'}</h1>${filters}${can('create_race')||(activeGame==='iracing'&&isAdmin())?`<div class="home-create-event">${activeGame==='iracing'&&isAdmin()&&!solo?button('iracing-import','Mettre à jour le calendrier iRacing','title="Importe les nouvelles endurances officielles et les horaires des événements spéciaux"','secondary-button'):''}${can('create_race')?button('create',solo?'Ajouter une course solo':'Ajouter un événement',`data-format="${solo?'solo':'endurance'}"`,'primary-button'):''}</div>`:''}</div>${state.raceFilterOpen?filterPanel(formatEvents,raceFilter):''}${message?`<p class="creation-success" role="status">${esc(message)}</p>`:''}${groups.length?`<div class="event-agenda">${groups.map(group=>`<section class="event-period" aria-labelledby="period-${group.key}"><h2 class="event-period-heading" id="period-${group.key}"><span>${esc(group.label)}</span><small>${group.items.length} événement${group.items.length>1?'s':''}</small></h2><div class="event-list">${group.items.map(eventCard).join('')}</div></section>`).join('')}</div>`:`<div class="empty">${filtered?`Aucune course ne correspond aux filtres. ${button('race-filter-reset','Effacer les filtres','','link-button')}`:state.eventFilter==='upcoming'?'Aucun événement à venir.':'Aucun événement archivé.'}</div>`}`;notifyRender();}

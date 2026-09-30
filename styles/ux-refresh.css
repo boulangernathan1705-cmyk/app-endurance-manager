@@ -1675,9 +1675,11 @@ html[data-game] #app .planning-race-actions .race-header-actions > .secondary-bu
 .planning-quick-menu[hidden] { display: none; }
 .planning-quick-item { padding: 9px 11px; border: 0; border-radius: 8px; background: none; color: #e6ecea; font-size: 14px; font-weight: 600; text-align: left; white-space: nowrap; cursor: pointer; }
 .planning-quick-item:hover, .planning-quick-item:focus-visible { background: color-mix(in srgb, var(--community-accent, #52d3d8) 14%, transparent); color: #fff; }
-/* A crew that still takes pilots: an open padlock, orange like « Places libres ». */
-.planning-crew-open { display: inline-flex; color: #f3b33d; }
-.planning-crew-open svg { width: 14px; height: 14px; }
+/* A crew's padlock: green and open while it takes pilots, red and closed once full. */
+.planning-crew-lock { display: inline-flex; }
+.planning-crew-lock.is-open { color: #35c26b; }
+.planning-crew-lock.is-locked { color: #e0534f; }
+.planning-crew-lock svg { width: 14px; height: 14px; }
 
 /* Opened start: buttons first, then the crews (side by side when the day has widened) and the pilots. */
 html[data-game] #app .planning-body.departure-fold { margin: 0 !important; padding: 0 16px 16px !important; border: 0 !important; border-radius: 0 !important; background: none !important; box-shadow: none !important; opacity: 1 !important; }
@@ -1881,3 +1883,37 @@ html[data-game] .race-card .race-head .official-badge { font-size: 10.5px; paddi
 .game-space-bar > .community-badge img { width: 22px; height: 22px; flex: none; border-radius: 50%; object-fit: cover; }
 .game-space-bar > .community-badge strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .game-space-bar:has(> .community-badge) { gap: 8px; }
+
+/* ---------- Filtres de la liste des courses ---------- */
+.race-filter-toggle { display: inline-flex !important; align-items: center; gap: 6px; }
+.race-filter-toggle svg { width: 15px; height: 15px; }
+.race-filter-toggle em { min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: var(--community-accent, #52d3d8); color: #061014; font-size: 11px; font-style: normal; font-weight: 900; line-height: 18px; text-align: center; }
+.race-filter-panel { display: grid; gap: 12px; margin: 0 0 18px; padding: 14px 16px; border: 1px solid rgba(255, 255, 255, .1); border-radius: 12px; background: rgba(12, 18, 21, .78); }
+.race-filter-group { display: grid; grid-template-columns: 130px minmax(0, 1fr); align-items: center; gap: 10px; }
+.race-filter-title { color: #99a3a0; font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.race-filter-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.race-filter-chip { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 0 12px; border: 1px solid rgba(255, 255, 255, .14); border-radius: 999px; background: transparent; color: #dfe6e4; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+.race-filter-chip:hover { border-color: rgba(82, 211, 216, .6); }
+.race-filter-chip.active { border-color: var(--community-accent, #52d3d8); background: color-mix(in srgb, var(--community-accent, #52d3d8) 16%, transparent); color: #fff; }
+.race-filter-chip img:not(.category-logo) { width: 20px; height: 20px; border-radius: 50%; object-fit: cover; }
+/* Category logos as on the cars: square on LMU, round on iRacing. */
+.race-filter-chip .category-logo { width: 22px; height: auto; border-radius: 0; }
+html[data-game="iracing"] .race-filter-chip .category-logo { border-radius: 50%; }
+.race-filter-date { display: inline-flex; align-items: center; gap: 6px; color: #99a3a0; font-size: 13px; font-weight: 700; }
+.race-filter-date input { min-height: 32px; padding: 0 8px; border: 1px solid rgba(255, 255, 255, .14); border-radius: 8px; background: rgba(0, 0, 0, .25); color: #eef3f2; font: inherit; color-scheme: dark; }
+.race-filter-foot { display: flex; justify-content: flex-end; }
+@media (max-width: 760px) {
+  .race-filter-group { grid-template-columns: minmax(0, 1fr); gap: 6px; }
+}
+
+/* ---------- Comment fonctionnent les communautés (une fois, puis depuis le menu du compte) ---------- */
+.community-intro-overlay { position: fixed; inset: 0; z-index: 10050; display: grid; place-items: center; padding: 16px; background: rgba(0, 0, 0, .66); backdrop-filter: blur(3px); }
+.community-intro { width: min(560px, 100%); max-height: calc(100vh - 32px); overflow: auto; display: grid; gap: 14px; padding: 24px; border: 1px solid rgba(82, 211, 216, .35); border-radius: 16px; background: #0d1316; color: #e6ecea; box-shadow: 0 24px 60px rgba(0, 0, 0, .55); }
+.community-intro h2 { margin: 0; font-size: 21px; color: #f4f6f5; }
+.community-intro ul { display: grid; gap: 12px; margin: 0; padding: 0; list-style: none; }
+.community-intro li { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 10px; align-items: start; }
+.community-intro li > span { font-size: 19px; line-height: 1.3; text-align: center; }
+.community-intro li p { margin: 0; font-size: 14.5px; line-height: 1.5; color: #c7d0d4; }
+.community-intro li strong { color: #f4f6f5; }
+.community-intro-foot { margin: 0; color: #8e9996; font-size: 13px; }
+.community-intro .primary-button { justify-self: end; min-width: 160px; }

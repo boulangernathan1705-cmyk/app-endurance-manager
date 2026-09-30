@@ -7,9 +7,11 @@ import {isSolo,accessBadge,soloRoundsLabel,soloFill,soloEntryBlock,myWaitlistPos
 import {renderHome,raceDateBlock,raceStarts} from './home-view.mjs';
 import {planningDays,renderPlanning,syncPlanning} from './planning.mjs';
 
-function canCreateCrewOnDeparture(departure){
+function canCreateCrewOnDeparture(departure,event=null){
   if(!state.user||departure.startsAt<=Date.now())return false;
   if(can('manage_registrations'))return true;
+  // Official race: a crew may be created for any community where the player manages the crews.
+  if(event?.official&&(state.communities||[]).some(item=>item.manageCrews))return true;
   if(!can('endurance'))return false;
   const assigned=new Set((departure.crews||[]).flatMap(crew=>crew.registrationIds||[]));
   return (departure.availability||[]).some(reg=>reg.mine&&reg.status!=='unavailable'&&!assigned.has(reg.id));
@@ -58,14 +60,14 @@ function quickActions(event,departure){
   const register=!items.length?'':items.length===1?square(ICON_REGISTER,items[0].label,`data-action="${items[0].action}" data-departure="${departure.id}" ${items[0].extra}`,'Inscription')
     :`<span class="planning-quick-menu-wrap">${square(ICON_REGISTER,'Inscription','data-action="quick-menu" aria-haspopup="menu" aria-expanded="false"')}<span class="planning-quick-menu" role="menu" hidden>${items.map(item=>`<button type="button" role="menuitem" class="planning-quick-item" data-action="${item.action}" data-departure="${departure.id}" ${item.extra}>${esc(item.label)}</button>`).join('')}</span></span>`;
   const crewLabel=can('manage_registrations')?'Créer un équipage':'Créer mon équipage';
-  const crew=canCreateCrewOnDeparture(departure)?square(ICON_CREW,crewLabel,`data-crew-builder-open data-departure="${departure.id}"`):'';
+  const crew=canCreateCrewOnDeparture(departure,event)?square(ICON_CREW,crewLabel,`data-crew-builder-open data-departure="${departure.id}"`):'';
   return register||crew?`<span class="planning-quick">${register}${crew}</span>`:'';
 }
 
 // Buttons of a start (enter, enter another pilot, create a crew) and what an opened start shows.
 function departureActions(event,departure){
   if(departure.startsAt<=Date.now())return '';
-  const own=ownRegistration(departure),canCreateCrew=canCreateCrewOnDeparture(departure);
+  const own=ownRegistration(departure),canCreateCrew=canCreateCrewOnDeparture(departure,event);
   const createCrewAction=canCreateCrew?`<button type="button" class="link-button ux-summary-create-crew" data-crew-builder-open data-departure="${departure.id}" data-tip="Tu en deviens le responsable : tu choisis la voiture, tu gères les pilotes et tu le verrouilles quand il est complet.">${esc(can('manage_registrations')?'Créer un équipage':'Créer mon équipage')}</button>`:'';
   return `<span class="ux-summary-registration-actions${canCreateCrew?' is-three-actions':''}">${own||can('endurance')?button('my-registration',own?'Modifier mon inscription':'S’inscrire',`data-departure="${departure.id}"`,'primary-button ux-summary-registration-toggle'):''}${can('manage_registrations')?button('new-registration','Inscrire un autre pilote',`data-departure="${departure.id}" data-mode="pilot"`,'link-button ux-summary-registration-other'):''}${createCrewAction}</span>`;
 }

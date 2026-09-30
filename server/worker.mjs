@@ -64,9 +64,19 @@ async function myCommunities(env, actor, community) {
   const list = actor.manager ? await allCommunities(env)
     : ((await env.DB.prepare(`SELECT c.* FROM communities c JOIN memberships m ON m.community_id=c.id WHERE m.user_id=? AND m.status='member' ORDER BY c.id`)
       .bind(actor.user.id).all()).results || []).map(communityFromRow);
-  const mine = [...list].sort((x, y) => x.name.localeCompare(y.name, 'fr')).map(item => ({id:item.id, slug:item.slug, name:item.name, shortName:item.shortName,
-    logoUrl:appearanceOf(item).logoUrl, accent:appearanceOf(item).accent, url:`${communityUrl(env, item)}/`, current:item.slug === community.slug}));
-  return mine.length > 1 ? mine : [];
+  // The showcase (community of the main address, when that address is the platform's domain) is never one of them.
+  const showcase = (() => { try { return new URL(env.APP_ORIGIN).hostname === domain ? communitySlug(env, null) : ''; } catch { return ''; } })();
+  const mine = list.filter(item => item.slug !== showcase).sort((x, y) => x.name.localeCompare(y.name, 'fr')).map(item => ({id:item.id, slug:item.slug, name:item.name, shortName:item.shortName,
+    logoUrl:appearanceOf(item).logoUrl, accent:appearanceOf(item).accent, url:`${communityUrl(env, item)}/`, current:item.slug === community.slug, item}));
+  if (mine.length < 2) return [];
+  // "Gérer tous les équipages" in each (a crew of an official race is created for any of them, whatever the site).
+  const memberships = actor.manager ? [] : (await env.DB.prepare("SELECT * FROM memberships WHERE user_id=? AND status='member'").bind(actor.user.id).all()).results || [];
+  for (const entry of mine) {
+    const membership = memberships.find(row => row.community_id === entry.id);
+    entry.manageCrews = actor.manager || Boolean(membership && (await memberPermissions(env, entry.item, membership)).has('manage_registrations'));
+    delete entry.item;
+  }
+  return mine;
 }
 // Body of an image upload (the banner), read up to `limit` bytes.
 async function imageBody(request, limit) {

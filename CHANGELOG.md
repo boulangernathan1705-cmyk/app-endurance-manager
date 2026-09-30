@@ -2,6 +2,18 @@
 
 Les changements du site, version par version. La plus récente est en haut.
 
+## v1.10 — 30 septembre 2026
+
+### Liste des courses
+- **Filtres** : un bouton « Filtres » ouvre le choix des communautés, du type de course (officielles, événement spécial, championnat LMU ou privé), des catégories, des dates (du … au …) et de ta situation (inscrit, avec ou sans équipage, pas inscrit). Tes filtres sont gardés d'une visite à l'autre.
+
+### Équipages
+- Le cadenas d'un équipage dans le planning est **vert et ouvert** s'il a encore des places, **rouge et fermé** s'il est complet.
+- Sur une course officielle, la création d'un équipage demande toujours **pour quelle communauté**, quel que soit le site où tu es.
+
+### Communautés
+- Si tu es dans plusieurs communautés, une courte explication s'affiche à ta première inscription : chaque communauté est privée, les courses officielles sont communes, un équipage réunit une seule communauté. Tu la retrouves dans ton menu, « Les communautés ».
+
 ## v1.9 — 30 septembre 2026
 
 ### Courses officielles

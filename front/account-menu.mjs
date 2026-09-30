@@ -1,5 +1,6 @@
 // Info bubbles on every page (data-tip).
 import './tooltip.mjs?v=2';
+import {showCommunityIntro} from './community-intro.mjs';
 const root = document.getElementById('account-menu-root');
 
 const roleLabel = role => ({admin:'Administrateur',organizer:'Organisateur',pilot:'Pilote'}[role] || 'Pilote');
@@ -7,6 +8,7 @@ const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp
 const isHub = location.pathname === '/' || location.pathname.endsWith('/index.html');
 const isMembers = location.pathname.endsWith('/members.html');
 const isHelp = location.pathname.endsWith('/help.html');
+let siteCommunityName = '';
 
 function discordMark() {
   return `<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M19.5 5.3A16.3 16.3 0 0 0 15.4 4l-.5 1.1a14.6 14.6 0 0 0-5.8 0L8.6 4a16.1 16.1 0 0 0-4.1 1.3C1.9 9.2 1.2 13 1.6 16.8A16.8 16.8 0 0 0 6.7 19l1.2-1.7c-.7-.3-1.4-.7-2-1.2l.5-.4c3.8 1.8 7.8 1.8 11.6 0l.5.4c-.6.5-1.3.9-2 1.2l1.2 1.7a16.7 16.7 0 0 0 5.1-2.2c.5-4.4-.9-8.2-3.3-11.5ZM8.5 14.7c-1.2 0-2.1-1.1-2.1-2.4 0-1.4.9-2.4 2.1-2.4s2.1 1.1 2.1 2.4-.9 2.4-2.1 2.4Zm7 0c-1.2 0-2.1-1.1-2.1-2.4 0-1.4.9-2.4 2.1-2.4s2.1 1.1 2.1 2.4-.9 2.4-2.1 2.4Z"/></svg>`;
@@ -84,7 +86,8 @@ function communitiesMarkup(communities) {
   const sites = communities.filter(item => item.current || /^https:\/\//.test(item.url || ''));
   if (sites.length < 2) return '';
   const mark = item => item.logoUrl ? `<img class="account-community-logo" src="${esc(item.logoUrl)}" alt="">` : `<span class="account-community-logo is-short">${esc(String(item.shortName || item.name).slice(0, 4))}</span>`;
-  return `<span class="account-menu-separator" aria-hidden="true"></span><span class="account-menu-heading">Mes communautés</span>${sites.map(item => item.current
+  // How communities work (a pilot of several communities only), shown once on his first entry.
+  return `<button type="button" class="account-menu-item" data-community-intro-open>Les communautés</button><span class="account-menu-separator" aria-hidden="true"></span><span class="account-menu-heading">Mes communautés</span>${sites.map(item => item.current
     ? `<span class="account-menu-item account-community is-current" aria-current="true">${mark(item)}<span>${esc(item.name)}</span><small>ici</small></span>`
     : `<a class="account-menu-item account-community" href="${esc(item.url)}">${mark(item)}<span>${esc(item.name)}</span></a>`).join('')}`;
 }
@@ -165,6 +168,7 @@ async function loadSession() {
     const session = await response.json();
     applyCommunity(session.community, Array.isArray(session.communities) ? session.communities : [], session.openSite === true);
     if (session.openSite) showcaseBanner(session.platformDiscordUrl);
+    siteCommunityName = session.openSite ? '' : session.community?.name || '';
     if (session.user) renderConnected(session.user, Array.isArray(session.communities) ? session.communities : []);
     else renderDisconnected(!!session.discordReady);
   } catch {
@@ -199,6 +203,11 @@ root?.addEventListener('click', async event => {
     menu.classList.toggle('is-open', open);
     trigger.setAttribute('aria-expanded', String(open));
     popover.hidden = !open;
+    return;
+  }
+  if (event.target.closest('[data-community-intro-open]')) {
+    closeMenu();
+    showCommunityIntro({communityName:siteCommunityName});
     return;
   }
   if (event.target.closest('[data-account-logout]')) {
