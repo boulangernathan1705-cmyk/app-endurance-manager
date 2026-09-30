@@ -38,3 +38,14 @@ test('a development site used for real by a team (TEST_BANNER=off) has no banner
   const dev = JSON.parse(readFileSync(new URL('../wrangler.dev.jsonc', import.meta.url), 'utf8').replace(/^\s*\/\/.*$/gm, ''));
   assert.equal(dev.vars.TEST_BANNER, 'off');
 });
+
+test('an unknown page shows a "page introuvable" page, not a blank one', async () => {
+  const assets = {fetch:async () => new Response(null, {status:404})};
+  const html = await workerWithMigrations.fetch(new Request('https://site.example/page-inexistante', {headers:{Accept:'text/html'}}), {ASSETS:assets}, {});
+  assert.equal(html.status, 404);
+  assert.match(await html.text(), /Page introuvable/);
+  // A missing image or script keeps its plain 404.
+  const image = await workerWithMigrations.fetch(new Request('https://site.example/images/absente.png', {headers:{Accept:'image/*'}}), {ASSETS:assets}, {});
+  assert.equal(image.status, 404);
+  assert.equal(await image.text(), '');
+});
