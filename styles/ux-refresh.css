@@ -1675,9 +1675,11 @@ html[data-game] #app .planning-race-actions .race-header-actions > .secondary-bu
 .planning-quick-menu[hidden] { display: none; }
 .planning-quick-item { padding: 9px 11px; border: 0; border-radius: 8px; background: none; color: #e6ecea; font-size: 14px; font-weight: 600; text-align: left; white-space: nowrap; cursor: pointer; }
 .planning-quick-item:hover, .planning-quick-item:focus-visible { background: color-mix(in srgb, var(--community-accent, #52d3d8) 14%, transparent); color: #fff; }
-/* A crew that still takes pilots: an open padlock, orange like « Places libres ». */
-.planning-crew-open { display: inline-flex; color: #f3b33d; }
-.planning-crew-open svg { width: 14px; height: 14px; }
+/* A crew's padlock: green and open while it takes pilots, red and closed once full. */
+.planning-crew-lock { display: inline-flex; }
+.planning-crew-lock.is-open { color: #35c26b; }
+.planning-crew-lock.is-locked { color: #e0534f; }
+.planning-crew-lock svg { width: 14px; height: 14px; }
 
 /* Opened start: buttons first, then the crews (side by side when the day has widened) and the pilots. */
 html[data-game] #app .planning-body.departure-fold { margin: 0 !important; padding: 0 16px 16px !important; border: 0 !important; border-radius: 0 !important; background: none !important; box-shadow: none !important; opacity: 1 !important; }
