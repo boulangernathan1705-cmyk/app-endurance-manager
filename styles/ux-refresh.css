@@ -1864,3 +1864,20 @@ html[data-game] #app .departure-planning { margin-top: 12px; }
 @media (min-width: 2200px) {
   body > :not(.site-hero):not(.top-stripes):not(script):not(noscript) { zoom: var(--wide-zoom); }
 }
+
+/* ---------- Courses officielles : communauté de chaque inscrit et équipage ---------- */
+.community-tag { display: inline-flex; align-items: center; justify-content: center; flex: none; height: 18px; min-width: 18px; padding: 0 5px; border: 1px solid var(--tag); border-radius: 5px; color: var(--tag); background: color-mix(in srgb, var(--tag) 14%, transparent); font-size: 10px; font-weight: 900; letter-spacing: .04em; line-height: 1; text-transform: uppercase; vertical-align: middle; }
+.community-tag.has-logo { width: 18px; padding: 0; border: 0; border-radius: 50%; overflow: hidden; background: none; }
+.community-tag.has-logo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.planning-crew .community-tag, .pilot-main .community-tag, .crew-planning-label .community-tag { margin-right: -2px; }
+.crew-planning-label .community-tag { margin-right: 6px; }
+.official-badge { display: inline-flex; align-items: center; padding: 2px 9px; border: 1px solid rgba(83, 216, 255, .75); border-radius: 999px; color: #53d8ff; background: rgba(83, 216, 255, .1); font-size: 11px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+html[data-game] .race-card .race-head .official-badge { font-size: 10.5px; padding: 2px 8px; margin: 2px 6px 0 0; }
+.community-choice { display: grid; gap: 8px; }
+.community-choice-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 8px; }
+.community-choice-button { display: flex; align-items: center; gap: 12px; min-height: 64px; padding: 10px 14px; border: 1px solid rgba(255, 255, 255, .16); border-radius: 10px; background: rgba(255, 255, 255, .04); color: inherit; font: inherit; font-size: 16px; text-align: left; cursor: pointer; }
+.community-choice-button:hover, .community-choice-button.active { border-color: #53d8ff; background: rgba(83, 216, 255, .1); }
+.community-choice-button img, .community-choice-short { width: 36px; height: 36px; flex: none; border-radius: 50%; }
+.community-choice-short { display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--tag, #8e9996); color: var(--tag, #8e9996); background: color-mix(in srgb, var(--tag, #8e9996) 14%, transparent); font-size: 12px; font-weight: 900; }
+.registration-community-line { display: flex; align-items: center; gap: 8px; margin: 0 0 12px; font-size: 14px; }
+.registration-community-line > span:first-child { color: #8e9996; font-size: 12px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }

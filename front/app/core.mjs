@@ -25,7 +25,31 @@ export const canManage = () => can('create_race') || can('manage_races');
 export const isAdmin = () => can('admin');
 // Important actions name the community they apply to (a player may belong to several).
 export const inCommunity = () => state.community?.name && !state.openSite ? `\n\nCommunauté : ${state.community.name}` : '';
-export const canEditRace = event => can('manage_races') || (can('create_race') && Boolean(event?.createdByMe));
+// An official race (common to every community) is changed by the platform managers only.
+export const canEditRace = event => event?.official ? state.manager === true : can('manage_races') || (can('create_race') && Boolean(event?.createdByMe));
+// Community of an entry or a crew on an official race (common to every community): its Discord logo, or its short
+// name (FMT, TDZ…) in its colour.
+export const communityTag = item => {
+  const community = item?.community;
+  if (!community) return '';
+  const tip = `data-tip="Communauté ${esc(community.name)}" aria-label="Communauté ${esc(community.name)}"`;
+  return community.logoUrl
+    ? `<span class="community-tag has-logo" ${tip}><img src="${esc(community.logoUrl)}" alt=""></span>`
+    : `<span class="community-tag" style="--tag:${esc(community.accent || '#8e9996')}" ${tip}>${esc(String(community.shortName || community.name).slice(0, 4))}</span>`;
+};
+// Short label of a community in a text (tooltip): « [FMT] Leo ».
+export const communityPrefix = item => item?.community ? `[${String(item.community.shortName || item.community.name).slice(0, 4)}] ` : '';
+// Communities the player may enter an official race with (the site's first).
+export const entryCommunities = () => {
+  const list = (state.communities || []).filter(item => item.id);
+  const here = list.find(item => item.id === state.community?.id);
+  return here ? [here, ...list.filter(item => item !== here)] : list;
+};
+// Choice of the community, first step of an entry or a crew on an official race: one button per community.
+export function communityChoice(options, {action, attrs = '', selected = '', title = 'Avec quelle communauté ?', help = ''}) {
+  return `<div class="community-choice"><span class="form-label">${esc(title)}</span>${help ? `<p class="registration-step-help">${esc(help)}</p>` : ''}<div class="community-choice-list">${options.map(item => `<button type="button" class="community-choice-button${item.id === selected ? ' active' : ''}" data-action="${action}" data-community="${esc(item.id)}" ${attrs} aria-pressed="${item.id === selected}">${item.logoUrl ? `<img src="${esc(item.logoUrl)}" alt="">` : `<span class="community-choice-short" style="--tag:${esc(item.accent || '#8e9996')}">${esc(String(item.shortName || item.name).slice(0, 4))}</span>`}<strong>${esc(item.name)}</strong></button>`).join('')}</div></div>`;
+}
+export const officialBadge = event => event?.official ? '<span class="official-badge" data-tip="Course officielle : commune à toutes les communautés. Tu y vois les inscrits de toutes tes communautés.">Officielle</span>' : '';
 
 export function notifyRender() {
   // The page shown (home, event, my-entries) on <html>: the race page has a thin banner.
@@ -176,7 +200,7 @@ function mergeEvents(...lists) {
 export async function load() {
   // The community is only open to the members of its Discord server: nothing else is loaded otherwise.
   const session = await api('/api/session');
-  state.access=session.access; state.permissions=session.permissions||[]; state.community=session.community||null; state.openSite=session.openSite===true; state.platformDiscordUrl=session.platformDiscordUrl||null;
+  state.access=session.access; state.permissions=session.permissions||[]; state.manager=session.manager===true; state.community=session.community||null; state.communities=Array.isArray(session.communities)?session.communities:[]; state.openSite=session.openSite===true; state.platformDiscordUrl=session.platformDiscordUrl||null;
   const member = session.access === 'member';
   const [upcoming,archived] = member ? await Promise.all([fetchEvents('upcoming'), state.archiveLoaded ? fetchEvents('archived') : []]) : [[],[]];
   const userChanged=(session.user?.id||null)!==(state.user?.id||null);

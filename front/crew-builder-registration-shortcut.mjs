@@ -14,6 +14,8 @@ function builderAllowsPilotRegistration(){return activeBuilder.mode==='create'||
 function decorateCrewBuilder(){
   const panel=document.querySelector('[data-crew-builder-panel]');
   if(!panel||!builderAllowsPilotRegistration()||!activeBuilder.departureId)return false;
+  // A crew of another community (official race): the pilots entered here would be of the site's community.
+  if(panel.dataset.crewForeign==='true')return false;
   if(panel.querySelector('[data-crew-builder-register-pilot]'))return true;
   // Pilots step of the crew window.
   const anchor=panel.querySelector('[data-builder-step="2"] .crew-builder-pilots');

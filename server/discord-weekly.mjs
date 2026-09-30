@@ -87,8 +87,11 @@ function selectPlanningWeek(allDepartures, timestamp) {
 }
 
 export async function loadWeeklyDiscordSnapshot(env, timestamp, community, scope = 'lmu') {
+  // The community's races, and the official races (common to every community) where it has entries: only its
+  // own entries and crews are shown.
   const events = (await env.DB.prepare(`SELECT id,name,circuit,duration_hours,duration_minutes,event_type,schedule_pending,departures
-    FROM events WHERE community_id=? ${CIRCUITS[scope] ?? CIRCUITS.lmu} ORDER BY created_at,id`).bind(community.id).all()).results || [];
+    FROM events WHERE (community_id=? OR (community_id='official' AND EXISTS (SELECT 1 FROM registrations r WHERE r.event_id=events.id AND r.community_id=?)))
+    ${CIRCUITS[scope] ?? CIRCUITS.lmu} ORDER BY created_at,id`).bind(community.id, community.id).all()).results || [];
   const allDepartures = flattenDepartures(events);
   const currentWeek = parisWeek(timestamp);
   // A start whose time is still to be confirmed is never announced as running (its placeholder is 0:00).
@@ -113,8 +116,8 @@ export async function loadWeeklyDiscordSnapshot(env, timestamp, community, scope
       COALESCE(p.name,r.name) AS pilot_name
     FROM registrations r
     LEFT JOIN participants p ON p.id=r.participant_id
-    WHERE r.event_id IN (${marks}) AND COALESCE(r.status,'') <> 'unavailable'
-    ORDER BY r.created_at,r.id`).bind(...eventIds).all()).results || [];
+    WHERE r.event_id IN (${marks}) AND r.community_id=? AND COALESCE(r.status,'') <> 'unavailable'
+    ORDER BY r.created_at,r.id`).bind(...eventIds, community.id).all()).results || [];
 
   const registrationsById = new Map();
   for (const row of registrationRows) {
@@ -136,8 +139,8 @@ export async function loadWeeklyDiscordSnapshot(env, timestamp, community, scope
     LEFT JOIN crew_members cm ON cm.crew_id=c.id
     LEFT JOIN registrations r ON r.id=cm.registration_id
     LEFT JOIN participants p ON p.id=r.participant_id
-    WHERE c.event_id IN (${marks})
-    ORDER BY c.created_at,c.id,r.created_at,r.id`).bind(...eventIds).all()).results || [];
+    WHERE c.event_id IN (${marks}) AND c.community_id=?
+    ORDER BY c.created_at,c.id,r.created_at,r.id`).bind(...eventIds, community.id).all()).results || [];
 
   const crews = new Map();
   const assignedParticipantsByDeparture = new Map();

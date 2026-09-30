@@ -11,10 +11,12 @@
 //   is created on its first day with "Horaires à confirmer". iRacing gives the time slots in its article
 //   "THIS WEEK: … | Special Event" (iracing.com, published on the Monday of the race week): they are read
 //   from there and replace the placeholder (completeSpecialTimes).
-// A race is imported once per community (table iracing_imports): editing or deleting it is never undone.
-// Module "iracingImport": each community that enables it gets its own copies (own entries and crews).
+// A race is imported once for the whole platform, as an official race (community 'official', migration 0039;
+// table iracing_imports): editing or deleting it is never undone. Module "iracingImport": the communities that
+// enable it show these races, each with its own entries and crews on them.
 import {validateEvent, parisTimestamp, id, now} from './core.mjs';
-import {communitiesWith} from './community.mjs';
+
+const OFFICIAL = {id:'official'};
 
 export const IRACING_FEED = 'https://raw.githubusercontent.com/pmsoftwaredevs/iracing-schedule/main/docs/data/';
 export const IMPORT_AUTHOR = 'system:iracing';
@@ -218,9 +220,7 @@ async function fetchJson(url, fetchImpl) {
 }
 
 // Creates the races that are not imported yet and completes special event times. Returns both counts.
-export async function syncIracingEvents(env, {timestamp = Date.now(), fetchImpl = fetch, communities = null} = {}) {
-  const targets = communities || await communitiesWith(env, 'iracingImport');
-  if (!targets.length) return {created:0, completed:0};
+export async function syncIracingEvents(env, {timestamp = Date.now(), fetchImpl = fetch} = {}) {
   const manifest = await fetchJson(IRACING_FEED + 'manifest.json', fetchImpl);
   // The current season, and the next one as soon as the schedule publishes it.
   const codes = [manifest?.current, manifest?.next].map(String).filter(code => /^\d{4}S[1-4]$/.test(code));
@@ -228,25 +228,16 @@ export async function syncIracingEvents(env, {timestamp = Date.now(), fetchImpl 
   const plans = [];
   for (const code of codes) plans.push(...planIracingEvents(await fetchJson(`${IRACING_FEED}${code.slice(0, 4)}_s${code.slice(5)}.json`, fetchImpl), timestamp));
   if (!plans.length) return {created:0, completed:0};
-  let created = 0, completed = 0;
-  for (const community of targets) {
-    const result = await importForCommunity(env, community, plans, {timestamp, fetchImpl});
-    created += result.created; completed += result.completed;
-  }
-  return {created, completed};
+  return importOfficial(env, plans, {timestamp, fetchImpl});
 }
 
-// Scheduled task: one community per run. A community never imported goes first (new one, or showcase just
-// reset); otherwise each one in turn, one per hour (the schedule data changes twice a day at most).
+// Scheduled task (every hour): the official races, once for every community.
 export async function importNextCommunity(env, at = new Date(), {fetchImpl = fetch} = {}) {
-  const targets = await communitiesWith(env, 'iracingImport');
-  if (!targets.length) return {created:0, completed:0};
-  const imported = new Set(((await env.DB.prepare('SELECT DISTINCT community_id FROM iracing_imports').all()).results || []).map(row => row.community_id));
-  const community = targets.find(item => !imported.has(item.id)) || targets[Math.floor(at.getTime() / 3600000) % targets.length];
-  return syncIracingEvents(env, {timestamp:at.getTime(), fetchImpl, communities:[community]});
+  return syncIracingEvents(env, {timestamp:at.getTime(), fetchImpl});
 }
 
-async function importForCommunity(env, community, plans, {timestamp, fetchImpl}) {
+async function importOfficial(env, plans, {timestamp, fetchImpl}) {
+  const community = OFFICIAL;
   const known = new Set((await env.DB.prepare('SELECT external_id FROM iracing_imports WHERE community_id=?').bind(community.id).all()).results.map(row => row.external_id));
   let created = 0, pending = [];
   // New races are written 10 at a time: each batch is one call to the database (at most 50 per run).

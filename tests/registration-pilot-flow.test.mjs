@@ -63,12 +63,12 @@ test('Discord registrations are editable by both creator and participant',()=>{
   assert.match(core,/reg\.owner_user_id === actor\.user\.id/);
   assert.match(worker,/function canManageRegistration\(reg, actor\)/);
   assert.match(worker,/owned\(reg, actor\) \|\| isRegistrationManager\(actor\)/);
-  assert.match(worker,/canEdit:canManageRegistration\(reg, actor\)/);
+  assert.match(worker,/canManageRegistration\(reg, actor\)/);
 });
 
 test('organizers and admins can edit every registration without owning it',()=>{
   assert.match(worker,/return can\(actor, 'manage_registrations'\);/);
-  assert.match(worker,/if \(!canManageRegistration\(reg,actor\)\) fail\(403/);
+  assert.match(worker,/if \(!canManageRegistration\(reg,(actor|who)\)\) fail\(403/);
 });
 
 test('creator metadata is only exposed to creator participant or managers',()=>{
