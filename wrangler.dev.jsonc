@@ -15,7 +15,10 @@
   // The route (more specific than production's *.endurance-manager.app/*) keeps dev on this Worker.
   "routes": [
     { "pattern": "dev.endurance-manager.app", "custom_domain": true },
-    { "pattern": "dev.endurance-manager.app/*", "zone_name": "endurance-manager.app" }
+    { "pattern": "dev.endurance-manager.app/*", "zone_name": "endurance-manager.app" },
+    // Second test community (official races seen from two communities).
+    { "pattern": "dev2.endurance-manager.app", "custom_domain": true },
+    { "pattern": "dev2.endurance-manager.app/*", "zone_name": "endurance-manager.app" }
   ],
   "workers_dev": false,
   "assets": {
