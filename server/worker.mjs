@@ -156,21 +156,21 @@ function eventScopeFilter(scope, nowMs=Date.now()) {
 }
 async function listEvents(env, actor, game='', scope='', community) {
   // Filter by joining events instead of binding id lists: D1 rejects queries with more than 100 bound parameters.
-  // ?1: the site's community, ?2: the player. The races of the community and the official races (iRacing's ones
+  // Bound in order: the site's community (filters), then the site's community and the player (mine). The races of the community and the official races (iRacing's ones
   // where the community shows the iRacing calendar); on an official race, the entries and crews of every
   // community the player is a member of, never of the others.
   const officialRaces = community.modules?.iracingImport === true ? "e.community_id='official'" : "(e.community_id='official' AND e.circuit NOT LIKE 'iracing-%')";
-  const filters=[`(e.community_id=?1 OR ${officialRaces})`,game==='iracing' ? "e.circuit LIKE 'iracing-%'" : game==='lmu' ? "e.circuit NOT LIKE 'iracing-%'" : '', eventScopeFilter(scope), soloRacesEnabled(env, community) ? '' : "COALESCE(e.format,'endurance')!='solo'"].filter(Boolean);
+  const filters=[`(e.community_id=? OR ${officialRaces})`,game==='iracing' ? "e.circuit LIKE 'iracing-%'" : game==='lmu' ? "e.circuit NOT LIKE 'iracing-%'" : '', eventScopeFilter(scope), soloRacesEnabled(env, community) ? '' : "COALESCE(e.format,'endurance')!='solo'"].filter(Boolean);
   const where=filters.length ? ` WHERE ${filters.join(' AND ')}` : '';
   const player = actor.user?.id || '';
-  const mine = column => `${column} IN (SELECT ?1 UNION SELECT community_id FROM memberships WHERE user_id=?2 AND status='member')`;
+  const mine = column => `${column} IN (SELECT ? UNION SELECT community_id FROM memberships WHERE user_id=? AND status='member')`;
   const rows = (await env.DB.prepare(`SELECT e.* FROM events e${where} ORDER BY e.created_at DESC, e.id DESC`).bind(community.id).all()).results;
   if (!rows.length) return [];
-  const registrations = (await env.DB.prepare(registrationSelect+` JOIN events e ON e.id=r.event_id${where} AND ${mine('r.community_id')} ORDER BY r.created_at,r.rowid`).bind(community.id, player).all()).results;
-  const crews = (await env.DB.prepare(`SELECT c.* FROM crews c JOIN events e ON e.id=c.event_id${where} AND ${mine('c.community_id')} ORDER BY c.created_at,c.id`).bind(community.id, player).all()).results;
-  const memberships = (await env.DB.prepare(`SELECT cm.crew_id,cm.registration_id FROM crew_members cm JOIN crews c ON c.id=cm.crew_id JOIN events e ON e.id=c.event_id${where} AND ${mine('c.community_id')}`).bind(community.id, player).all()).results;
+  const registrations = (await env.DB.prepare(registrationSelect+` JOIN events e ON e.id=r.event_id${where} AND ${mine('r.community_id')} ORDER BY r.created_at,r.rowid`).bind(community.id, community.id, player).all()).results;
+  const crews = (await env.DB.prepare(`SELECT c.* FROM crews c JOIN events e ON e.id=c.event_id${where} AND ${mine('c.community_id')} ORDER BY c.created_at,c.id`).bind(community.id, community.id, player).all()).results;
+  const memberships = (await env.DB.prepare(`SELECT cm.crew_id,cm.registration_id FROM crew_members cm JOIN crews c ON c.id=cm.crew_id JOIN events e ON e.id=c.event_id${where} AND ${mine('c.community_id')}`).bind(community.id, community.id, player).all()).results;
   // Only registration creators' names are displayed (addedByName).
-  const users = (await env.DB.prepare(`SELECT DISTINCT u.id,u.name FROM users u JOIN registrations r ON r.owner_user_id=u.id JOIN events e ON e.id=r.event_id${where} AND ${mine('r.community_id')}`).bind(community.id, player).all()).results;
+  const users = (await env.DB.prepare(`SELECT DISTINCT u.id,u.name FROM users u JOIN registrations r ON r.owner_user_id=u.id JOIN events e ON e.id=r.event_id${where} AND ${mine('r.community_id')}`).bind(community.id, community.id, player).all()).results;
   // On official races, every entry and crew shows its community (Discord logo or short name, colour); in the
   // player's other communities, the rights of his Discord roles there apply.
   const official = new Set(rows.filter(row => row.community_id === OFFICIAL).map(row => row.id));
