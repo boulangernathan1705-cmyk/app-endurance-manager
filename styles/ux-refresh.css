@@ -1541,23 +1541,6 @@ html[data-game] #app .ux-unassigned-grid > .pilot-row > .edit-button { align-sel
 .showcase-danger { background: #d9534f !important; border-color: #d9534f !important; color: #fff !important; }
 @media (max-width: 760px) { .showcase-banner { margin: 0 10px 6px; } .showcase-banner a { margin-left: 0; } }
 
-/* Community of the site: name always visible, accent color set by its admins. */
-.community-chip { align-self: center; padding: 6px 18px; border: 1px solid var(--community-accent, #52d3d8); border-radius: 999px; background: rgba(82,211,216,.08); color: #f4f6f5; font-size: 15px; font-weight: 850; letter-spacing: .01em; white-space: nowrap; }
-/* The community's name sits in the middle of the navigation bar (no extra row on a computer). */
-.site-nav-shell > .community-chip { grid-area: community; justify-self: center; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
-@media (min-width: 1400px) {
-  .site-nav-shell { position: relative; }
-  .site-nav-shell > .community-chip { grid-area: auto; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); max-width: 26%; }
-}
-details.community-chip { position: relative; padding: 0; }
-details.community-chip summary { padding: 6px 18px; cursor: pointer; list-style: none; }
-.site-nav-shell > details.community-chip, details.community-chip { overflow: visible; }
-details.community-chip summary::-webkit-details-marker { display: none; }
-details.community-chip summary::after { content: " ▾"; color: var(--community-accent, #52d3d8); }
-.community-switcher { position: absolute; z-index: 40; top: calc(100% + 6px); left: 0; min-width: 220px; display: grid; gap: 2px; padding: 8px; border: 1px solid var(--border, #292d31); border-radius: 12px; background: var(--panel, #111315); box-shadow: 0 14px 34px rgba(0,0,0,.45); }
-.community-switcher strong { padding: 4px 8px 6px; color: #99a3a0; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; }
-.community-switcher a { padding: 8px 10px; border-radius: 8px; color: #f4f6f5; font-weight: 700; text-decoration: none; }
-.community-switcher a:hover, .community-switcher a:focus-visible { background: rgba(82,211,216,.12); }
 :root[data-community-accent] .primary-button { background: var(--community-accent) !important; border-color: var(--community-accent) !important; }
 :root[data-community-accent] .top-stripes div:first-child { background: var(--community-accent) !important; }
 
@@ -1807,9 +1790,6 @@ html[data-game] #app .departure-planning { margin-top: 12px; }
   .site-nav-shell #navigation .nav-game-switcher-button { min-height: 36px !important; font-size: 14px !important; }
   .site-nav-shell #navigation > .nav-sections { gap: 4px !important; }
   .site-nav-shell #navigation > .nav-sections > .nav-section-button { flex: 1 1 0 !important; min-width: 0; min-height: 34px !important; padding: 0 6px !important; justify-content: center; font-size: 13px !important; overflow: hidden; text-overflow: ellipsis; }
-  .site-nav-shell > .community-chip { padding: 3px 12px; font-size: 12.5px; }
-  .site-nav-shell > details.community-chip { padding: 0; }
-  details.community-chip summary { padding: 3px 12px; }
 
   /* Race list: filters and the add button on one line. */
   html[data-game] #app .page-head { display: flex !important; flex-wrap: wrap; align-items: center; gap: 8px !important; }
@@ -1864,3 +1844,40 @@ html[data-game] #app .departure-planning { margin-top: 12px; }
 @media (min-width: 2200px) {
   body > :not(.site-hero):not(.top-stripes):not(script):not(noscript) { zoom: var(--wide-zoom); }
 }
+
+/* ---------- Courses officielles : communauté de chaque inscrit et équipage ---------- */
+.community-tag { display: inline-flex; align-items: center; justify-content: center; flex: none; height: 22px; min-width: 22px; padding: 0 6px; border: 1px solid var(--tag); border-radius: 6px; color: var(--tag); background: color-mix(in srgb, var(--tag) 14%, transparent); font-size: 11px; font-weight: 900; letter-spacing: .04em; line-height: 1; text-transform: uppercase; vertical-align: middle; }
+.community-tag.has-logo { width: 22px; padding: 0; border: 0; border-radius: 50%; overflow: hidden; background: none; }
+.community-tag.has-logo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+/* Bigger in front of a pilot's or a crew's name, well visible: 30 px. */
+.pilot-name:has(> .community-tag), .crew-planning-label { display: inline-flex; align-items: center; gap: 8px; }
+.pilot-name > .community-tag, .crew-compact-team > .community-tag, .crew-planning-label > .community-tag { height: 30px; min-width: 30px; font-size: 12px; }
+.pilot-name > .community-tag.has-logo, .crew-compact-team > .community-tag.has-logo, .crew-planning-label > .community-tag.has-logo { width: 30px; }
+.planning-crew > .community-tag { height: 24px; min-width: 24px; }
+.planning-crew > .community-tag.has-logo { width: 24px; }
+.official-badge { display: inline-flex; align-items: center; padding: 2px 9px; border: 1px solid rgba(83, 216, 255, .75); border-radius: 999px; color: #53d8ff; background: rgba(83, 216, 255, .1); font-size: 11px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+html[data-game] .race-card .race-head .official-badge { font-size: 10.5px; padding: 2px 8px; margin: 2px 6px 0 0; }
+.community-choice { display: grid; gap: 8px; }
+.community-choice-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 8px; }
+.community-choice-button { display: flex; align-items: center; gap: 12px; min-height: 64px; padding: 10px 14px; border: 1px solid rgba(255, 255, 255, .16); border-radius: 10px; background: rgba(255, 255, 255, .04); color: inherit; font: inherit; font-size: 16px; text-align: left; cursor: pointer; }
+.community-choice-button:hover, .community-choice-button.active { border-color: #53d8ff; background: rgba(83, 216, 255, .1); }
+.community-choice-button img, .community-choice-short { width: 36px; height: 36px; flex: none; border-radius: 50%; }
+.community-choice-short { display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--tag, #8e9996); color: var(--tag, #8e9996); background: color-mix(in srgb, var(--tag, #8e9996) 14%, transparent); font-size: 12px; font-weight: 900; }
+.registration-community-line { display: flex; align-items: center; gap: 8px; margin: 0 0 12px; font-size: 14px; }
+.registration-community-line > span:first-child { color: #8e9996; font-size: 12px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+
+/* « Mes communautés », dans le menu du compte : le site de chacune, logo Discord ou nom court. */
+.account-menu-heading { display: block; padding: 4px 10px 2px; color: #99a3a0; font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.account-community { gap: 10px; }
+.account-community > span:not(.account-community-logo) { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.account-community.is-current { cursor: default; background: rgba(89, 211, 216, .09); }
+.account-community small { color: #52d3d8; font-size: 11px; font-weight: 800; text-transform: uppercase; }
+.account-community-logo { width: 24px; height: 24px; flex: none; border-radius: 50%; object-fit: cover; }
+.account-community-logo.is-short { display: inline-flex; align-items: center; justify-content: center; background: rgba(255, 255, 255, .1); font-size: 9.5px; font-weight: 900; }
+
+/* Community of the site, next to the language flag: its Discord logo and its short name. */
+.game-space-bar > .community-badge { display: inline-flex; align-items: center; gap: 7px; height: 32px; max-width: 120px; padding: 0 10px 0 5px; border: 1px solid var(--community-accent, rgba(82, 211, 216, .5)); border-radius: 8px; background: rgba(12, 18, 21, .78); color: #f4f6f5; font-size: 13px; font-weight: 900; letter-spacing: .05em; white-space: nowrap; }
+.game-space-bar > .community-badge:not(:has(img)) { padding-left: 10px; }
+.game-space-bar > .community-badge img { width: 22px; height: 22px; flex: none; border-radius: 50%; object-fit: cover; }
+.game-space-bar > .community-badge strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.game-space-bar:has(> .community-badge) { gap: 8px; }

@@ -2,6 +2,23 @@
 
 Les changements du site, version par version. La plus récente est en haut.
 
+## v1.9 — 30 septembre 2026
+
+### Courses officielles
+- Les **courses officielles** (endurances iRacing, courses LMU officielles) sont communes à toutes les communautés : si tu es dans plusieurs communautés, tu vois sur leur planning les inscrits et les équipages **de toutes tes communautés**.
+- Devant chaque pilote et chaque équipage, le **logo Discord** (ou le nom court) de sa communauté.
+- À l'inscription et à la création d'un équipage, tu choisis d'abord **avec quelle communauté** : un équipage réunit les pilotes d'une seule communauté.
+- Un badge **Officielle** sur ces courses.
+
+### Navigation
+- Le logo et le nom court de ta communauté à côté du drapeau de langue.
+- **Mes communautés** passe dans le menu de ton compte, sous « Aide » : un clic pour aller sur le site d'une autre de tes communautés.
+
+## v1.8.1 — 30 septembre 2026
+
+### Rôles Discord
+- Un rôle donné (ou retiré) à un pilote sur Discord compte sur le site **en 10 minutes**, au lieu du lendemain.
+
 ## v1.8 — 30 septembre 2026
 
 ### Page d'une course

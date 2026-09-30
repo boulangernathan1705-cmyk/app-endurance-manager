@@ -1,6 +1,6 @@
 import {timeLabel} from '../dates.mjs';
 import {raceEndLabel,raceHourLabel} from '../timeline.mjs';
-import {state,esc,button,logo,registrationCarLabel,renderAvailabilityTimeline,crewColorClass,sortedCrews,coversHour,pilotCount,api,pickableSlots} from './core.mjs';
+import {state,esc,button,logo,registrationCarLabel,renderAvailabilityTimeline,crewColorClass,sortedCrews,coversHour,pilotCount,api,pickableSlots,communityTag} from './core.mjs';
 import {shortDateLabel,timeLabel as clockLabel} from '../dates.mjs';
 import {renderRegistration} from './registration.mjs';
 
@@ -21,7 +21,7 @@ export function pilotLines(departure,duration,regs,{editable=true}={}){
   return regs.map(reg=>{
     const origin=reg.addedByName?`<span class="registration-origin-info" data-tip="Inscription ajoutée par ${esc(reg.addedByName)}" aria-label="Inscription ajoutée par ${esc(reg.addedByName)}">ⓘ</span>`:'';
     const edit=editable&&reg.canEdit&&!locked?button('edit-registration','Modifier',`data-id="${reg.id}" data-departure="${departure.id}" aria-label="Modifier l’inscription de ${esc(reg.name)}"`,'link-button crew-planning-edit'):'';
-    return `<div class="crew-planning-row crew-pilot-line pilot-row${reg.mine?' ux-current-pilot':''}"><span class="crew-planning-label"><span class="pilot-name">${esc(reg.name)}</span>${reg.soloDriver?'<span class="solo-driver-badge" data-tip="Fait la course seul, sans équipier.">SOLO</span>':''}${origin}${edit}</span>${renderAvailabilityTimeline({departure,duration,status:reg.status,label:`Disponibilités de ${reg.name}`})}</div>`;
+    return `<div class="crew-planning-row crew-pilot-line pilot-row${reg.mine?' ux-current-pilot':''}"><span class="crew-planning-label">${communityTag(reg)}<span class="pilot-name">${esc(reg.name)}</span>${reg.soloDriver?'<span class="solo-driver-badge" data-tip="Fait la course seul, sans équipier.">SOLO</span>':''}${origin}${edit}</span>${renderAvailabilityTimeline({departure,duration,status:reg.status,label:`Disponibilités de ${reg.name}`})}</div>`;
   }).join('');
 }
 // A crew's availability: the pilots' timelines, with a warning listing the hours nobody covers.
@@ -43,11 +43,11 @@ export function slotPicker(event,departure,{kind,id,version,label}){
   if(!slots.length)return '';
   return `<label class="slot-picker"><span>${esc(label)}</span><select data-slot-picker data-kind="${kind}" data-id="${id}" data-version="${version}" data-departure="${departure.id}"><option value="">Choisir…</option>${slots.map(slot=>`<option value="${slot.id}">${esc(shortDateLabel(slot.startsAt))} · ${esc(clockLabel(slot.time))}</option>`).join('')}</select></label>`;
 }
-function crewActions(crew,departure,ownMember,joinRegistration,memberElsewhere,event){
+function crewActions(crew,departure,ownMember,joinRegistration,memberElsewhere,event,otherCommunity=false){
   if(startHasBegun(departure))return '';
   const actions=[];
   if(crew.canManage)actions.push(slotPicker(event,departure,{kind:'crew',id:crew.id,version:crew.version,label:'Choisir notre départ'}));
-  if(!ownMember&&!memberElsewhere&&!crew.locked&&state.user){
+  if(!ownMember&&!memberElsewhere&&!otherCommunity&&!crew.locked&&state.user){
     const registration=joinRegistration?.id||'';
     actions.push(button('join-crew','Rejoindre',`data-id="${crew.id}" data-departure="${departure.id}" data-registration="${registration}" data-version="${crew.version}" aria-label="Rejoindre l’équipage ${esc(crew.name)}"`,'primary-button crew-join-button'));
   }
@@ -65,19 +65,22 @@ function crewCard(event,departure,crew,index,unassigned,allCrews){
   const names=regs.map(reg=>reg.name).join(' · ')||'Aucun pilote affecté';
   const ownMember=regs.find(reg=>reg.mine)||null;
   const ownRegistrationIds=new Set((departure.availability||[]).filter(reg=>reg.mine).map(reg=>reg.id));
+  const sameCommunity=reg=>(reg.community?.id||'')===(crew.community?.id||'');
   const memberElsewhere=allCrews.some(other=>other.id!==crew.id&&(other.registrationIds||[]).some(id=>ownRegistrationIds.has(id)));
-  const joinRegistration=ownMember||memberElsewhere?null:unassigned.find(reg=>reg.mine&&reg.category===crew.category)||null;
+  // Official race: entered with another community, the player never joins this crew (no mixed crews).
+  const otherCommunity=Boolean(event.official)&&(departure.availability||[]).some(reg=>reg.mine&&!sameCommunity(reg));
+  const joinRegistration=ownMember||memberElsewhere?null:unassigned.find(reg=>reg.mine&&reg.category===crew.category&&sameCommunity(reg))||null;
   const open=state.crewManagementOpen.has(crew.id);
   const ownerBadge=crew.ownedByMe?'<span class="crew-owner-badge" data-tip="Tu as créé cet équipage : tu gères ses pilotes, sa voiture et son verrouillage.">Responsable</span>':'';
   const countLabel=`${regs.length} pilote${regs.length>1?'s':''} · ${cov.covered}/${cov.duration} h`;
   const management=crew.canManage&&!startHasBegun(departure)
     ? `<div class="crew-inline-management">${stateControl(crew,departure)}<span class="coverage-summary">${countLabel}</span></div>`
     : `<div class="crew-inline-management is-readonly"><span class="crew-state-readonly ${crew.locked?'is-complete':'is-open'}">${crew.locked?'Complet':'Ouvert'}</span><span class="coverage-summary">${countLabel}</span></div>`;
-  const actions=crewActions(crew,departure,ownMember,joinRegistration,memberElsewhere,event);
+  const actions=crewActions(crew,departure,ownMember,joinRegistration,memberElsewhere,event,otherCommunity);
   return `<div class="crew-card-shell ${crewColorClass(crew.id,index)} ${crew.locked?'is-complete':'is-open'}${ownMember?' is-mine':''}">
     <details class="crew-pilot-group crew-pilot-accordion crew-unified-card ${crew.locked?'is-complete':'is-open'}" data-crew="${crew.id}" data-crew-id="${crew.id}" data-crew-locked="${Boolean(crew.locked)}" data-crew-mine="${Boolean(ownMember)}" data-crew-team="${esc(crew.name)}" ${open?'open':''}>
       <summary class="crew-pilot-accordion-summary crew-tile-summary" aria-label="${esc(crew.name)} · ${esc(names)} · ${esc(crew.car||'Voiture à choisir')}">
-        <span class="crew-tile-head"><span class="crew-compact-category" aria-hidden="true">${logo(crew.category)}</span><span class="crew-compact-team"><strong>${esc(crew.name)}</strong></span><span class="crew-compact-chevron" aria-hidden="true">›</span></span>
+        <span class="crew-tile-head"><span class="crew-compact-category" aria-hidden="true">${logo(crew.category)}</span><span class="crew-compact-team">${communityTag(crew)}<strong>${esc(crew.name)}</strong></span><span class="crew-compact-chevron" aria-hidden="true">›</span></span>
         ${ownMember||ownerBadge?`<span class="crew-tile-badges">${ownMember?'<span class="crew-mine-badge">Ton équipage</span>':''}${ownerBadge}</span>`:''}
         <span class="crew-compact-pilots">${regs.length?regs.map(reg=>`<span>${esc(reg.name)}</span>`).join(''):'<span class="is-empty">Aucun pilote</span>'}</span>
         <span class="crew-tile-foot"><span class="crew-compact-car"${crew.car?'':' data-tip="Le responsable choisit la voiture dans « Gérer »."'}>${esc(crew.car||'Voiture à choisir')}</span>${statusPill(crew)}</span>

@@ -79,7 +79,17 @@ function renderDisconnected(discordReady) {
   </div>${discordReady?'<p class="account-oauth-trust">Connexion via Discord OAuth · aucun mot de passe transmis à Endurance Manager. <a href="/about.html#connexion">En savoir plus</a></p>':''}</div>`;
 }
 
-function renderConnected(user) {
+// "Mes communautés" (a player of several communities): the site of each one, under "Aide"; the current one marked.
+function communitiesMarkup(communities) {
+  const sites = communities.filter(item => item.current || /^https:\/\//.test(item.url || ''));
+  if (sites.length < 2) return '';
+  const mark = item => item.logoUrl ? `<img class="account-community-logo" src="${esc(item.logoUrl)}" alt="">` : `<span class="account-community-logo is-short">${esc(String(item.shortName || item.name).slice(0, 4))}</span>`;
+  return `<span class="account-menu-separator" aria-hidden="true"></span><span class="account-menu-heading">Mes communautés</span>${sites.map(item => item.current
+    ? `<span class="account-menu-item account-community is-current" aria-current="true">${mark(item)}<span>${esc(item.name)}</span><small>ici</small></span>`
+    : `<a class="account-menu-item account-community" href="${esc(item.url)}">${mark(item)}<span>${esc(item.name)}</span></a>`).join('')}`;
+}
+
+function renderConnected(user, communities = []) {
   const manage = user.role === 'admin' ? `<a class="account-menu-item" href="/members.html">Administration</a>` : '';
   const help = `<a class="account-menu-item" href="/help.html"${isHelp ? ' aria-current="page"' : ''}>Aide</a>`;
 
@@ -91,7 +101,7 @@ function renderConnected(user) {
     </button>
     <div class="account-popover" role="menu" hidden>
       <div class="account-popover-profile">${avatarMarkup(user)}<span><strong>${esc(user.name)}</strong><small>${roleLabel(user.role)}</small></span></div>
-      ${help}${manage}
+      ${help}${manage}${communitiesMarkup(communities)}
       <span class="account-menu-separator" aria-hidden="true"></span>
       <button type="button" class="account-menu-item account-menu-logout" data-account-logout>Déconnexion</button>
     </div>
@@ -99,12 +109,12 @@ function renderConnected(user) {
   bindAvatarFallbacks();
 }
 
-// Look of the community of this site (communities platform): its name always visible in the bar, the
+// Look of the community of this site (communities platform): its logo and short name next to the language flag, the
 // short name before the page title, the icon and banner of its Discord server, its accent color.
 function applyCommunity(community, communities = [], openSite = false) {
   if (!community) return;
-  // The main address keeps the look of the site: no community name, only "Mes communautés" when the player has some.
-  if (openSite) community = {name:'Mes communautés', appearance:{}};
+  // The main address keeps the look of the site, without community name ("Mes communautés" is in the account menu).
+  if (openSite) return;
   const look = community.appearance || {};
   document.documentElement.dataset.community = community.slug;
   if (look.accent) { document.documentElement.style.setProperty('--community-accent', look.accent); document.documentElement.dataset.communityAccent = 'true'; }
@@ -114,23 +124,16 @@ function applyCommunity(community, communities = [], openSite = false) {
     const icon = document.querySelector('link[rel="icon"]'); if (icon) { icon.href = look.logoUrl; icon.type = 'image/png'; }
   }
   if (look.bannerUrl) for (const image of document.querySelectorAll('.hero-banner')) { image.removeAttribute('srcset'); image.src = look.bannerUrl; }
-  const bar = document.querySelector('.site-nav-shell');
-  if (bar && !bar.querySelector('.community-chip') && !(openSite && !communities.some(item => !item.current))) {
-    // "Mes communautés": the name opens the list of the player's other communities (only when there are several).
-    const others = communities.filter(item => !item.current && /^https:\/\//.test(item.url));
-    const chip = document.createElement(others.length ? 'details' : 'span');
-    chip.className = 'community-chip';
-    if (others.length) {
-      const summary = document.createElement('summary');
-      summary.textContent = community.name; summary.title = 'Mes communautés';
-      const list = document.createElement('div');
-      list.className = 'community-switcher';
-      const heading = document.createElement('strong'); heading.textContent = 'Mes communautés'; list.append(heading);
-      for (const item of others) { const link = document.createElement('a'); link.href = item.url; link.textContent = item.name; list.append(link); }
-      chip.append(summary, list);
-      document.addEventListener('click', event => { if (!chip.contains(event.target)) chip.open = false; });
-    } else { chip.textContent = community.name; chip.title = `Communauté : ${community.name}`; }
-    bar.prepend(chip);
+  // The community of this site next to the language flag: its Discord logo and its short name (the other
+  // communities are in the account menu).
+  const place = document.querySelector('.site-nav-shell .game-space-bar');
+  if (place && !place.querySelector('.community-badge')) {
+    const badge = document.createElement('span');
+    badge.className = 'community-badge';
+    badge.dataset.tip = `Communauté ${community.name}`; badge.setAttribute('aria-label', `Communauté ${community.name}`);
+    if (look.logoUrl) { const logo = document.createElement('img'); logo.src = look.logoUrl; logo.alt = ''; badge.append(logo); }
+    const name = document.createElement('strong'); name.textContent = community.shortName || community.name; badge.append(name);
+    place.append(badge);
   }
 }
 
@@ -162,7 +165,7 @@ async function loadSession() {
     const session = await response.json();
     applyCommunity(session.community, Array.isArray(session.communities) ? session.communities : [], session.openSite === true);
     if (session.openSite) showcaseBanner(session.platformDiscordUrl);
-    if (session.user) renderConnected(session.user);
+    if (session.user) renderConnected(session.user, Array.isArray(session.communities) ? session.communities : []);
     else renderDisconnected(!!session.discordReady);
   } catch {
     root.innerHTML = '<span class="account-discord-unavailable">Compte indisponible</span>';

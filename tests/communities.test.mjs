@@ -63,9 +63,13 @@ test('migration 0034: existing data goes to commu-dev, community addresses follo
   db.prepare("INSERT INTO crews(id,event_id,departure_id,name,category,created_at) VALUES('c1','e1','d1','Team','GT3',1)").run();
   db.prepare("INSERT INTO iracing_imports(external_id,event_id,created_at) VALUES('series:x:2090-01-01','e1',1)").run();
   db.prepare("INSERT INTO discord_weekly_state(key) VALUES('lmu-weekly-v1')").run();
-  DB.migrate();
+  DB.migrate('0040_official_iracing_merge.sql');
   for (const table of ['events','registrations','crews','participants','iracing_imports'])
     assert.deepEqual(db.prepare(`SELECT DISTINCT community_id FROM ${table}`).all().map(row=>row.community_id),[DEV],table);
+  // Then the imported iRacing race becomes official (0040), its entries and crews staying in commu-dev.
+  DB.migrate();
+  assert.deepEqual(db.prepare("SELECT community_id FROM events WHERE id='e1'").get().community_id,'official');
+  assert.deepEqual(db.prepare("SELECT community_id FROM registrations WHERE id='r1'").get().community_id,DEV);
   assert.equal(db.prepare('SELECT key FROM discord_weekly_state').get().key,`${DEV}:lmu-weekly-v1`,'the existing Discord message is kept');
   assert.equal(db.prepare("SELECT slug FROM communities").get().slug,'commu-dev');
   const add=slug=>()=>db.prepare("INSERT INTO communities(id,slug,name,short_name,created_at) VALUES(?,?,'X','X',0)").run(crypto.randomUUID(),slug);
@@ -122,19 +126,16 @@ test('the database itself refuses mixing communities or moving data between them
   assert.throws(()=>db.prepare("INSERT INTO crew_members(registration_id,crew_id) VALUES(?, 'oc')").run(entry.data.id),/community_mismatch|crew_membership_invalid/);
 });
 
-test('official iRacing races are imported separately for each community that enables the module', async () => {
+test('official iRacing races are imported once, common to the communities that show the iRacing calendar', async () => {
   const {DB,env}=harness();
   DB.db.prepare("UPDATE communities SET modules='{\"iracingImport\":true}' WHERE id=?").run(TEST);
   const future=JSON.parse(JSON.stringify(SEASON).replaceAll('2026-','2099-'));
   const fetchImpl=async url=>new Response(JSON.stringify(String(url).includes('wp-json')?[]:String(url).endsWith('manifest.json')?{current:'2099S4'}:future));
   const first=await syncIracingEvents(env,{fetchImpl});
   const count=id=>DB.db.prepare('SELECT COUNT(*) n FROM events WHERE community_id=?').get(id).n;
-  assert.ok(count(DEV)>0);assert.equal(count(DEV),count(TEST),'same races, separate copies');
-  assert.equal(first.created,count(DEV)*2);
-  assert.equal((await syncIracingEvents(env,{fetchImpl})).created,0,'imported once per community');
-  DB.db.prepare("UPDATE communities SET modules='{}' WHERE id=?").run(TEST);
-  DB.db.prepare('DELETE FROM iracing_imports WHERE community_id=?').run(TEST);
-  assert.equal((await syncIracingEvents(env,{fetchImpl})).created,0,'module off: nothing imported');
+  assert.ok(count('official')>0);assert.equal(first.created,count('official'));
+  assert.equal(count(DEV)+count(TEST),0,'no copy per community');
+  assert.equal((await syncIracingEvents(env,{fetchImpl})).created,0,'imported once');
 });
 
 // Calls to the database the way D1 counts them (a batch is one call): a run may make 50.
@@ -145,7 +146,7 @@ function countCalls(DB){
   return counter;
 }
 
-test('the scheduled iRacing import takes one community per run, a new one first, within the database budget', async () => {
+test('the scheduled iRacing import makes the official races once, within the database budget', async () => {
   const {DB,env}=harness();
   DB.db.prepare("UPDATE communities SET modules='{\"iracingImport\":true}' WHERE id=?").run(TEST);
   const future=JSON.parse(JSON.stringify(SEASON).replaceAll('2026-','2099-'));
@@ -155,7 +156,43 @@ test('the scheduled iRacing import takes one community per run, a new one first,
   const first=await importNextCommunity(env,new Date('2099-01-05T10:15:00Z'),{fetchImpl});
   assert.ok(first.created>0);
   assert.ok(counter.calls<=20,`${counter.calls} calls to the database for ${first.created} races`);
-  assert.ok((count(DEV)>0)!==(count(TEST)>0),'one community per run');
-  await importNextCommunity(env,new Date('2099-01-05T11:15:00Z'),{fetchImpl});
-  assert.equal(count(DEV),count(TEST),'the other one (never imported) at the next run');
+  assert.equal(count('official'),first.created);
+  assert.equal((await importNextCommunity(env,new Date('2099-01-05T11:15:00Z'),{fetchImpl})).created,0,'nothing twice');
+});
+
+test('official races: every community enters them; a player sees the entries of all his communities, never of the others', async () => {
+  const {DB,req,login,inCommunity}=harness();
+  const OUT='333333333333333333';
+  await login(ADMIN,'admin');await login(PILOT,'pilot');await login(OUT,'out');
+  DB.db.prepare("UPDATE memberships SET status='left' WHERE user_id=? AND community_id=?").run(OUT,TEST);
+  // Only the platform managers make an official race.
+  assert.equal((await req('/api/events','POST',{...race,official:true},'pilot')).status,403);
+  assert.equal((await req('/api/events','POST',{...race,official:true,name:'6h Officielle'},'admin')).status,201);
+  const official=(await req('/api/events','GET',null,'pilot')).data.events.find(event=>event.name==='6h Officielle');
+  assert.equal(official.official,true);
+  const base=`/api/events/${official.id}/departures/${official.departures[0].id}`;
+  assert.equal((await req(base+'/registrations','POST',{name:'Leo',category:'Hypercar',status:'whole'},'pilot')).status,201,'an entry of commu-dev');
+  inCommunity('commu-test');
+  const twice=await req(base+'/registrations','POST',{name:'Leo',category:'Hypercar',status:'whole'},'pilot');
+  assert.equal(twice.status,409,'one Discord account enters a start once');assert.match(twice.data.error,/autre de tes communautés/);
+  assert.equal((await req(base+'/registrations','POST',{name:'Leo',category:'Hypercar',status:'whole',forOther:true},'admin')).status,201,'another pilot named Leo, in commu-test');
+  assert.equal((await req(base+'/crews','POST',{name:'Test Team',category:'Hypercar'},'admin')).status,201);
+  // On commu-test: its own entry and crew, and the pilot's entry of commu-dev, marked with its community.
+  let departure=(await req('/api/events','GET',null,'pilot')).data.events.find(event=>event.id===official.id).departures[0];
+  assert.equal(departure.availability.length,2);
+  const foreign=departure.availability.find(reg=>reg.foreign);
+  assert.equal(foreign.community.name,'Commu Dev');assert.equal(foreign.canEdit,true,'his own entry, with his rights in commu-dev');
+  assert.equal(departure.availability.find(reg=>!reg.foreign).community.shortName.length>0,true,'every entry of an official race shows its community');
+  assert.equal(departure.crews.length,1);assert.ok(!departure.crews[0].foreign);
+  // A player of commu-dev only: commu-dev's entry, never the entry or the crew of commu-test.
+  inCommunity('commu-dev');
+  departure=(await req('/api/events','GET',null,'out')).data.events.find(event=>event.id===official.id).departures[0];
+  assert.equal(departure.availability.length,1);assert.ok(!departure.availability[0].foreign);
+  assert.equal(departure.crews.length,0);
+  // An official race is changed by the managers only; « Rendre officielle » too.
+  assert.equal((await req('/api/events/'+official.id,'DELETE',{version:official.version},'pilot')).status,403);
+  const own=await req('/api/events','POST',{...race,name:'Privée'},'admin');
+  assert.equal((await req(`/api/events/${own.data.id}/official`,'POST',{},'pilot')).status,403);
+  assert.equal((await req(`/api/events/${own.data.id}/official`,'POST',{},'admin')).status,200);
+  assert.equal(DB.db.prepare('SELECT community_id FROM events WHERE id=?').get(own.data.id).community_id,'official');
 });

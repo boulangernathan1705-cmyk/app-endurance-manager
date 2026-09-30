@@ -75,9 +75,14 @@ function assignedIds(departure, exceptCrewId = null) {
   return new Set((departure?.crews || []).filter(crew => crew.id !== exceptCrewId).flatMap(crew => crew.registrationIds || []));
 }
 
+// On an official race (common to every community), a crew belongs to one community and never mixes them: only the
+// entries of the crew's community are offered.
+const communityOf = registration => registration?.community?.id || sessionCache?.community?.id || '';
+const inCrewCommunity = registration => !builderState?.communityId || communityOf(registration) === builderState.communityId;
+
 function ownAvailableRegistrations(departure) {
   const assigned = assignedIds(departure);
-  return (departure?.availability || []).filter(registration => registration.mine && registration.status !== 'unavailable' && !assigned.has(registration.id));
+  return (departure?.availability || []).filter(registration => registration.mine && registration.status !== 'unavailable' && !assigned.has(registration.id) && inCrewCommunity(registration));
 }
 
 function availableCandidates(event, departure, category, editingCrewId = null) {
@@ -92,7 +97,7 @@ function availableCandidates(event, departure, category, editingCrewId = null) {
   );
   const seen = new Set();
   return registrations.filter(registration => {
-    if (registration.status === 'unavailable' || registration.category !== category) return false;
+    if (registration.status === 'unavailable' || registration.category !== category || !inCrewCommunity(registration)) return false;
     if (assignedRegistrationIds.has(registration.id)) return false;
     if (registration.participantId && assignedParticipants.has(registration.participantId)) return false;
     const key = registration.participantId || registration.id;
@@ -146,9 +151,40 @@ function createCategories(event, departure) {
   return [...new Set(ownAvailableRegistrations(departure).map(reg => reg.category))];
 }
 
+// First step of a crew on an official race: the community it belongs to (the player's own community of entry, or
+// the site's one where he manages the crews).
+function communityOptions(event, departure, session) {
+  if (!event.official) return [];
+  const site = session.community?.id || '';
+  const list = Array.isArray(session.communities) ? session.communities : [];
+  const ids = new Set([...((session.permissions || []).includes('manage_registrations') ? [site] : []),
+    ...(departure?.availability || []).filter(reg => reg.mine && reg.status !== 'unavailable').map(communityOf)]);
+  return [...ids].filter(Boolean).map(id => list.find(item => item.id === id) || {id, name:session.community?.id === id ? session.community.name : 'Communauté'});
+}
+function chooseCommunity(event, departure, id) {
+  const siteManager = builderState.siteManager;
+  builderState.communityId = id;
+  builderState.manager = siteManager && (!id || id === (sessionCache?.community?.id || ''));
+  const own = ownAvailableRegistrations(departure);
+  builderState.category = builderState.manager ? (event.categories[0] || '') : own[0]?.category || '';
+  builderState.ownerRegistrationId = builderState.manager ? null : own.find(reg => reg.category === builderState.category)?.id || null;
+  builderState.registrationIds = builderState.ownerRegistrationId ? [builderState.ownerRegistrationId] : [];
+}
+function communityMarkup(event, departure) {
+  const options = builderState.communityOptions || [];
+  return `<div class="crew-builder-overlay" data-crew-builder-overlay><section class="crew-builder-panel registration-sheet" data-crew-builder-panel role="dialog" aria-modal="true" aria-labelledby="crew-builder-title">
+    <div class="registration-workspace-head"><div class="registration-workspace-title"><h2 id="crew-builder-title" tabindex="-1">${builderState.siteManager ? 'Créer un nouvel équipage' : 'Créer mon équipage'}</h2><p>${esc(event.name)} · ${esc(shortDateLabel(departure.startsAt))} · ${esc(timeLabel(departure.time))}</p></div><span class="registration-workspace-actions"><button type="button" class="secondary-button registration-close-button" data-crew-builder-cancel>Fermer</button></span></div>
+    <div class="registration-stepper"><p class="registration-step-label">Étape 1 · Communauté</p>
+      <div class="community-choice"><span class="form-label">Pour quelle communauté ?</span><p class="registration-step-help">Course officielle : un équipage réunit les pilotes d’une seule communauté.</p>
+      <div class="community-choice-list">${options.map(item => `<button type="button" class="community-choice-button" data-crew-builder-community="${esc(item.id)}">${item.logoUrl ? `<img src="${esc(item.logoUrl)}" alt="">` : `<span class="community-choice-short" style="--tag:${esc(item.accent || '#8e9996')}">${esc(String(item.shortName || item.name).slice(0, 4))}</span>`}<strong>${esc(item.name)}</strong></button>`).join('')}</div></div>
+    </div>
+  </section></div>`;
+}
+
 function panelMarkup(event) {
   const editMode = builderState.mode === 'edit';
   const departure = futureDepartures(event).find(item => item.id === builderState.departureId);
+  if (departure && !editMode && !builderState.communityId && builderState.communityOptions?.length > 1) return communityMarkup(event, departure);
   if (!departure) return `<section class="crew-builder-panel"><div class="crew-builder-heading"><div><span class="creation-kicker">FORMATION D’ÉQUIPAGE</span><h2>Aucun départ disponible</h2></div><button type="button" class="secondary-button" data-crew-builder-cancel>Fermer</button></div><p class="creation-help">Ce départ est déjà passé.</p></section>`;
   const categories = editMode ? event.categories : createCategories(event,departure);
   if (!categories.includes(builderState.category)) builderState.category = categories[0] || '';
@@ -179,7 +215,8 @@ function panelMarkup(event) {
   const summaryRow = (n, label, value) => `<button type="button" class="registration-summary-row" data-crew-builder-step="${n}"><span>${label}</span><strong>${value}</strong><em>Modifier</em></button>`;
   const nav = `<div class="registration-step-nav">${step > 1 ? `<button type="button" class="secondary-button registration-back" data-crew-builder-step="${step - 1}">Retour</button>` : ''}${step < 3 ? `<button type="button" class="primary-button registration-next" data-crew-builder-step="${step + 1}">Continuer</button>` : `<button type="submit" class="primary-button registration-next" data-crew-builder-submit>${submitLabel()}</button>`}</div>`;
   const steps = ['Équipage', 'Pilotes', 'Récapitulatif'];
-  return `<div class="crew-builder-overlay" data-crew-builder-overlay><section class="crew-builder-panel registration-sheet" data-crew-builder-panel role="dialog" aria-modal="true" aria-labelledby="crew-builder-title">
+  const foreign = Boolean(builderState.communityId && builderState.communityId !== (sessionCache?.community?.id || ''));
+  return `<div class="crew-builder-overlay" data-crew-builder-overlay><section class="crew-builder-panel registration-sheet" data-crew-builder-panel data-crew-foreign="${foreign}" role="dialog" aria-modal="true" aria-labelledby="crew-builder-title">
     <div class="registration-workspace-head"><div class="registration-workspace-title"><h2 id="crew-builder-title" tabindex="-1">${title}</h2><p>${esc(event.name)} · ${esc(shortDateLabel(departure.startsAt))} · ${esc(timeLabel(departure.time))}</p></div><span class="registration-workspace-actions"><button type="button" class="secondary-button registration-close-button" data-crew-builder-cancel>Fermer</button></span></div>
     <form class="crew-builder-form registration-stepper" data-crew-builder-form data-step="${step}">
       <div class="registration-progress" aria-hidden="true">${steps.map((_, index) => `<span class="${index < step ? 'done' : ''}"></span>`).join('')}</div>
@@ -292,7 +329,7 @@ async function openBuilder(crewId = null, preferredDepartureId = '') {
       if (!found.crew.canManage) throw new Error('Tu n’es pas responsable de cet équipage.');
       if (found.departure.startsAt <= Date.now()) throw new Error('Ce départ est passé. L’équipage est verrouillé.');
       builderState = {
-        mode:'edit', eventId, manager, crewId:found.crew.id, version:found.crew.version,
+        mode:'edit', eventId, manager, siteManager:manager, communityId:found.crew.community?.id || '', crewId:found.crew.id, version:found.crew.version,
         departureId:found.departure.id, category:found.crew.category, car:found.crew.car || '',
         name:found.crew.name, locked:!!found.crew.locked, ownerRegistrationId:null,
         registrationIds:[...(found.crew.registrationIds || [])], originalRegistrationIds:[...(found.crew.registrationIds || [])], step:3
@@ -302,9 +339,10 @@ async function openBuilder(crewId = null, preferredDepartureId = '') {
       if (!departure) throw new Error('Tous les départs de cet événement sont déjà passés.');
       const own=ownAvailableRegistrations(departure);
       if (!manager && !own.length) throw new Error('Inscris-toi d’abord sur ce départ avant de créer ton équipage.');
-      const category=manager ? (event.categories[0] || '') : own[0].category;
-      const ownerRegistrationId=manager ? null : own.find(reg=>reg.category===category)?.id || null;
-      builderState = {mode:'create',eventId,manager,departureId:departure.id,category,car:'',name:'',locked:false,ownerRegistrationId,registrationIds:ownerRegistrationId?[ownerRegistrationId]:[],originalRegistrationIds:[],step:1};
+      const options=communityOptions(event,departure,session);
+      builderState = {mode:'create',eventId,manager,siteManager:manager,communityOptions:options,communityId:'',departureId:departure.id,category:'',car:'',name:'',locked:false,ownerRegistrationId:null,registrationIds:[],originalRegistrationIds:[],step:1};
+      // Only one possible community (always, on a race of the site's community): chosen already.
+      if (options.length <= 1) chooseCommunity(event,departure,options[0]?.id || '');
     }
 
     renderPanel(event,{scroll:true});
@@ -318,7 +356,8 @@ async function createCrew() {
   const result = await api(`/api/races/${builderState.eventId}/departures/${builderState.departureId}/crews`,'POST',{
     name:builderState.name,
     category:builderState.category,
-    car:builderState.car
+    car:builderState.car,
+    ...(builderState.communityId && builderState.communityId !== sessionCache?.community?.id ? {communityId:builderState.communityId} : {})
   });
   const createdId = result.id;
   let removedRegistrations = Number(result.removedRegistrations) || 0;
@@ -416,6 +455,18 @@ document.addEventListener('click', event => {
   if (event.target.closest('[data-crew-builder-cancel]') || event.target.matches?.('[data-crew-builder-overlay]')) {
     event.preventDefault();
     closeBuilder();
+    return;
+  }
+  const communityButton = event.target.closest('[data-crew-builder-community]');
+  if (communityButton && builderState) {
+    event.preventDefault();
+    loadEvents().then(events => {
+      const current = events.find(item => item.id === builderState?.eventId);
+      const departure = current?.departures?.find(item => item.id === builderState.departureId);
+      if (!departure) return;
+      chooseCommunity(current, departure, communityButton.dataset.crewBuilderCommunity);
+      renderPanel(current, {scroll:true});
+    }).catch(() => {});
     return;
   }
   const stepButton = event.target.closest('[data-crew-builder-step]');

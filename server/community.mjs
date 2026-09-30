@@ -26,6 +26,12 @@ export async function currentCommunity(env, request) {
   return toCommunity(row);
 }
 
+export async function communityById(env, id) {
+  const row = await env.DB.prepare('SELECT * FROM communities WHERE id=?').bind(String(id || '')).first();
+  return row ? toCommunity(row) : null;
+}
+export const communityFromRow = toCommunity;
+
 export async function allCommunities(env) {
   return ((await env.DB.prepare('SELECT * FROM communities ORDER BY created_at, id').all()).results || []).map(toCommunity);
 }

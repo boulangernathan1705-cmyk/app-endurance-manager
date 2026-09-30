@@ -2,13 +2,32 @@ import {isSolo,ANY_CATEGORY,soloCounts} from './solo.mjs';
 import {raceHourLabel,raceEndLabel} from '../timeline.mjs';
 import {shortDateLabel,timeLabel} from '../dates.mjs';
 import {durationLabel,eventMinutes,driverChangeRequired} from '../../shared/duration.mjs';
-import {app,state,esc,button,carPreferenceChoices,registrationCarLabel,renderAvailabilityTimeline,notifyRender,logo,categories,CARS,circuitLabel} from './core.mjs';
+import {app,state,esc,button,carPreferenceChoices,registrationCarLabel,renderAvailabilityTimeline,notifyRender,logo,categories,CARS,circuitLabel,communityTag,entryCommunities,communityChoice} from './core.mjs';
 import {getLocale} from '../i18n.mjs';
 
+// The player's own entries (on an official race, possibly made with another of his communities).
 export function ownRegistrations(departure) { return departure.availability.filter(reg => reg.mine); }
 export function ownRegistration(departure) { return ownRegistrations(departure)[0]; }
 export function registrationDraft(reg) {
-  return {name:reg.name,category:reg.category,cars:reg.cars||[],carAny:!!reg.carAny,status:reg.status,preferredPilot:reg.preferredPilot||'',soloDriver:!!reg.soloDriver,id:reg.id,version:reg.version,participantId:reg.participantId,participantUserId:reg.participantUserId||null,discordLinked:!!reg.discordLinked,mine:reg.mine,forOther:!reg.mine,manualOther:!reg.mine&&!reg.participantUserId&&!reg.discordLinked};
+  return {name:reg.name,category:reg.category,cars:reg.cars||[],carAny:!!reg.carAny,status:reg.status,preferredPilot:reg.preferredPilot||'',soloDriver:!!reg.soloDriver,id:reg.id,version:reg.version,participantId:reg.participantId,participantUserId:reg.participantUserId||null,discordLinked:!!reg.discordLinked,mine:reg.mine,forOther:!reg.mine,manualOther:!reg.mine&&!reg.participantUserId&&!reg.discordLinked,communityId:reg.community?.id||''};
+}
+// Official race: the player first chooses the community he enters with (one of his, when he has several).
+export function needsCommunityChoice(event,departure,stateDraft){
+  return Boolean(event.official&&state.user&&!stateDraft.id&&!stateDraft.forOther&&stateDraft.mode!=='category'&&!stateDraft.communityId&&entryCommunities().length>1&&!ownRegistrations(departure).length);
+}
+function renderCommunityStep(departure){
+  return `<form class="form-section registration-form registration-stepper" data-kind="registration" data-departure="${departure.id}" data-step="0">
+<p class="registration-step-label">Étape 1 · Communauté</p>
+${communityChoice(entryCommunities(),{action:'registration-community',attrs:`data-departure="${departure.id}"`,help:'Course officielle : chaque pilote y court avec l’une de ses communautés, et rejoint les équipages de celle-ci.'})}
+</form>`;
+}
+// Community of the entry, above its first step (changeable until it is saved).
+function communityLine(event,departure,stateDraft){
+  if(!event.official||!stateDraft.communityId)return '';
+  const community=entryCommunities().find(item=>item.id===stateDraft.communityId);
+  if(!community)return '';
+  const change=!stateDraft.id&&stateDraft.mode!=='category'&&!state.pendingCrewJoin&&entryCommunities().length>1?button('registration-community','Changer',`data-departure="${departure.id}" data-community=""`,'link-button'):'';
+  return `<p class="registration-community-line"><span>Communauté</span>${communityTag({community})}<strong>${esc(community.name)}</strong>${change}</p>`;
 }
 export function draftFor(departure) {
   if (!state.drafts[departure.id]) {
@@ -27,7 +46,7 @@ export function renderRegistration(reg,departure,duration,showCarPreference=true
   const locked=departure.startsAt<=Date.now();
   const origin=reg.addedByName?` <span class="registration-origin-info" title="Inscription ajoutée par ${esc(reg.addedByName)}" aria-label="Inscription ajoutée par ${esc(reg.addedByName)}">ⓘ</span>`:'';
   const timeline=renderAvailabilityTimeline({departure,duration,status:reg.status,label:slotLabel(reg.status)});
-  return `<div class="pilot-row${reg.mine?' ux-current-pilot':''}"><div class="pilot-main"><span class="pilot-name">${esc(reg.name)}${origin}</span>${reg.soloDriver?'<span class="solo-driver-badge" data-tip="Fait la course seul, sans équipier.">SOLO</span>':''}<span class="pilot-category-logo" title="${esc(reg.category||'Catégorie')}" aria-label="${esc(reg.category||'Catégorie')}">${reg.category?logo(reg.category):'—'}</span>${showCarPreference?`<span class="pilot-car">${esc(registrationCarLabel(reg))}</span>`:''}${reg.status==='unavailable'?'<span class="registration-status">Indisponible</span>':''}${reg.preferredPilot?`<span class="pilot-preference">Souhaite rouler avec : <strong>${esc(reg.preferredPilot)}</strong></span>`:''}</div>${timeline}${reg.canEdit&&!locked?button('edit-registration','Modifier',`data-id="${reg.id}" data-departure="${departure.id}"`,'edit-button ux-pilot-edit'):''}</div>`;
+  return `<div class="pilot-row${reg.mine?' ux-current-pilot':''}"><div class="pilot-main"><span class="pilot-name">${communityTag(reg)}${esc(reg.name)}${origin}</span>${reg.soloDriver?'<span class="solo-driver-badge" data-tip="Fait la course seul, sans équipier.">SOLO</span>':''}<span class="pilot-category-logo" title="${esc(reg.category||'Catégorie')}" aria-label="${esc(reg.category||'Catégorie')}">${reg.category?logo(reg.category):'—'}</span>${showCarPreference?`<span class="pilot-car">${esc(registrationCarLabel(reg))}</span>`:''}${reg.status==='unavailable'?'<span class="registration-status">Indisponible</span>':''}${reg.preferredPilot?`<span class="pilot-preference">Souhaite rouler avec : <strong>${esc(reg.preferredPilot)}</strong></span>`:''}</div>${timeline}${reg.canEdit&&!locked?button('edit-registration','Modifier',`data-id="${reg.id}" data-departure="${departure.id}"`,'edit-button ux-pilot-edit'):''}</div>`;
 }
 
 function identityFields(stateDraft,departure,categoryMode,manualOther,linkedOther,guestSelf,withPreferred=true) {
@@ -149,7 +168,7 @@ function renderSoloStepper(event,departure,stateDraft){
     }).join('');
     const heading=rounds.length>1?`<p class="solo-round-heading">Manche ${index+1} · ${esc(circuitLabel(round.circuit))}${round.durationMinutes?` · ${round.durationMinutes} min`:''}</p>`:'';
     const cars=choice.category===ANY_CATEGORY?'<p class="registration-step-help">Catégorie « Peu importe » : la voiture est libre aussi.</p>':choice.category?soloCarChoices(departure,index,choice):'';
-    return pane(index+1,`${index===0?identity:''}${heading}<div class="category-area"><span class="form-label">Dans quelle catégorie ${stateDraft.forOther?'ce pilote veut-il':'veux-tu'} rouler ?</span><div class="categories registration-category-list">${buttons}</div></div>${cars}`);
+    return pane(index+1,`${index===0?communityLine(event,departure,stateDraft)+identity:''}${heading}<div class="category-area"><span class="form-label">Dans quelle catégorie ${stateDraft.forOther?'ce pilote veut-il':'veux-tu'} rouler ?</span><div class="categories registration-category-list">${buttons}</div></div>${cars}`);
   };
   const summaryRow=(n,label,value)=>`<button type="button" class="registration-summary-row" data-action="registration-step" data-departure="${departure.id}" data-step="${n}" data-edit="true"><span>${label}</span><strong>${value}</strong><em>Modifier</em></button>`;
   const pilot=stateDraft.name||(!stateDraft.forOther?state.user?.name:'')||'';
@@ -177,6 +196,7 @@ if(typeof document!=='undefined')document.addEventListener('change',event=>{
   } else choice.cars=[...field.closest('fieldset').querySelectorAll('[data-solo-field="car"]:checked')].map(input=>input.value);
 });
 export function renderSteppedRegistration(event,departure,stateDraft=draftFor(departure)) {
+  if(needsCommunityChoice(event,departure,stateDraft))return renderCommunityStep(departure);
   if(isSolo(event))return renderSoloStepper(event,departure,stateDraft);
   const duration=event.durationHours||6,step=registrationStep(stateDraft);
   const {same,assigned}=registrationContext(event,departure,stateDraft);
@@ -197,7 +217,7 @@ export function renderSteppedRegistration(event,departure,stateDraft=draftFor(de
   return `<form class="form-section registration-form registration-stepper" data-kind="registration" data-departure="${departure.id}" data-step="${step}">
 <div class="registration-progress" aria-hidden="true">${REGISTRATION_STEPS.map((_,index)=>`<span class="${index<step?'done':''}"></span>`).join('')}</div>
 <p class="registration-step-label">Étape ${step} sur 4 · ${step===1&&identity?'Pilote et catégorie':REGISTRATION_STEPS[step-1]}</p>
-${pane(1,`${identity}<div class="category-area"><span class="form-label">Dans quelle catégorie ${stateDraft.forOther?'ce pilote veut-il':'veux-tu'} rouler ?</span><div class="categories registration-category-list">${categoryButtons}</div>${categoryMode?'':'<p class="registration-step-help">Tu pourras ajouter une autre catégorie ensuite : les organisateurs choisiront au moment de former les équipages.</p>'}</div>`)}
+${pane(1,`${communityLine(event,departure,stateDraft)}${identity}<div class="category-area"><span class="form-label">Dans quelle catégorie ${stateDraft.forOther?'ce pilote veut-il':'veux-tu'} rouler ?</span><div class="categories registration-category-list">${categoryButtons}</div>${categoryMode?'':'<p class="registration-step-help">Tu pourras ajouter une autre catégorie ensuite : les organisateurs choisiront au moment de former les équipages.</p>'}</div>`)}
 ${pane(2,stateDraft.category?carPreferenceChoices(stateDraft.category,stateDraft.cars,stateDraft.carAny):'<p class="registration-step-help">Choisis d’abord une catégorie.</p>')}
 ${pane(3,`<div class="registration-choices"><span class="form-label">Heures de présence (${durationLabel(eventMinutes(event))})</span><p class="availability-hint">Touche les heures où tu seras là.</p>${renderAvailabilityTimeline({departure,duration,status:stateDraft.status,interactive:true,label:'Heures de présence'})}<div class="special-availability">${button('availability','TOUTE LA COURSE',`data-departure="${departure.id}" data-value="whole" aria-pressed="${stateDraft.status==='whole'}"`,`special-button whole ${stateDraft.status==='whole'&&!stateDraft.soloDriver?'active':''}`)}${button('solo-driver','JE LA FAIS TOUT SEUL',`data-departure="${departure.id}" aria-pressed="${!!stateDraft.soloDriver}"`,`special-button solo-driver ${stateDraft.soloDriver?'active':''}`)}</div><p class="registration-step-help">${esc(hoursSummary(stateDraft.status,departure,duration))}${stateDraft.soloDriver?'<span class="solo-driver-tag">en solo</span>':''}</p>${soloDriverNotice(event,stateDraft)}</div>`)}
 ${pane(4,`<div class="registration-summary">${pilot?`<div class="registration-summary-row is-static"><span>Pilote</span><strong>${esc(pilot)}</strong></div>`:''}${summaryRow(1,'Catégorie',stateDraft.category?`${logo(stateDraft.category)} ${esc(stateDraft.category)}`:'—')}${summaryRow(2,'Voiture(s)',cars)}${summaryRow(3,'Présence',esc(hoursSummary(stateDraft.status,departure,duration))+(stateDraft.soloDriver?'<span class="solo-driver-tag">en solo</span>':''))}</div>${soloDriverNotice(event,stateDraft)}${preferredPilotField(stateDraft,departure)}${stateDraft.id?`<div class="registration-danger-zone">${button('delete-registration',stateDraft.forOther?'Supprimer l’inscription':'Se désinscrire',`data-id="${stateDraft.id}" data-departure="${departure.id}"`,'danger-button')}</div>`:''}`)}
@@ -242,6 +262,8 @@ if(typeof document!=='undefined')document.addEventListener('change',event=>{
   if(draft)draft.manualOther=field.value==='__manual__';
 },true);
 
+// A new own entry made with another of the player's communities (official race).
+const entryCommunity=draft=>!draft.id&&!draft.forOther&&draft.communityId&&draft.communityId!==state.community?.id?{communityId:draft.communityId}:{};
 export async function submitRegistration(form,api) {
   const departureId=form.dataset.departure; const event=state.events.find(item=>item.id===state.currentEventId); const departure=event.departures.find(item=>item.id===departureId); const draft=draftFor(departure);
   if(draft.forOther&&!draft.id&&!draft.participantUserId&&!draft.manualOther)throw Error('Choisis un pilote.');
@@ -249,7 +271,7 @@ export async function submitRegistration(form,api) {
   if(!draft.name)throw Error(draft.forOther?'Indique le pseudo du pilote.':'Ton compte Discord ne contient pas de nom utilisable.');
   if(draft.solo){
     // Solo race: one category / car choice per round.
-    const payload={name:draft.name,choices:draft.choices.map(choice=>({category:choice.category,cars:choice.carAny?[]:choice.cars,carAny:choice.category===ANY_CATEGORY||choice.carAny||!choice.cars.length})),version:draft.version,participantId:draft.participantId,participantUserId:draft.participantUserId,forOther:!!draft.forOther};
+    const payload={name:draft.name,choices:draft.choices.map(choice=>({category:choice.category,cars:choice.carAny?[]:choice.cars,carAny:choice.category===ANY_CATEGORY||choice.carAny||!choice.cars.length})),version:draft.version,participantId:draft.participantId,participantUserId:draft.participantUserId,forOther:!!draft.forOther,...entryCommunity(draft)};
     const result=await api(draft.id?`/api/registrations/${draft.id}`:`/api/races/${event.id}/departures/${departure.id}/registrations`,draft.id?'PATCH':'POST',payload);
     if(!draft.forOther){state.pilotName=draft.name;try{localStorage.setItem('em_pilot_name',state.pilotName);}catch{}}
     delete state.drafts[departureId]; state.registrationOpen.delete(departureId); return result;
@@ -257,7 +279,7 @@ export async function submitRegistration(form,api) {
   if(!draft.status)throw Error('Choisis ta disponibilité.'); if(draft.status!=='unavailable'&&!draft.category)throw Error('Choisis ta catégorie.');
   draft.cars=[...form.querySelectorAll('[name="carPreference"]:checked')].map(input=>input.value); draft.carAny=!!form.elements.carAny?.checked;
   if(draft.status!=='unavailable'&&!draft.carAny&&!draft.cars.length)throw Error('Choisis au moins une voiture, ou coche « Peu importe la voiture ».');
-  const payload={name:draft.name,status:draft.status,category:draft.category,cars:draft.cars,carAny:draft.carAny,preferredPilot:draft.preferredPilot||'',soloDriver:!!draft.soloDriver,version:draft.version,participantId:draft.participantId,participantUserId:draft.participantUserId,forOther:!!draft.forOther};
+  const payload={name:draft.name,status:draft.status,category:draft.category,cars:draft.cars,carAny:draft.carAny,preferredPilot:draft.preferredPilot||'',soloDriver:!!draft.soloDriver,version:draft.version,participantId:draft.participantId,participantUserId:draft.participantUserId,forOther:!!draft.forOther,...entryCommunity(draft)};
   const result=await api(draft.id?`/api/registrations/${draft.id}`:`/api/races/${event.id}/departures/${departure.id}/registrations`,draft.id?'PATCH':'POST',payload);
   if(!draft.forOther){state.pilotName=draft.name;try{localStorage.setItem('em_pilot_name',state.pilotName);}catch{}}
   delete state.drafts[departureId]; state.registrationOpen.delete(departureId); return result;

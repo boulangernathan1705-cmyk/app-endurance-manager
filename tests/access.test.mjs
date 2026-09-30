@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {DatabaseSync} from 'node:sqlite';
 import {readFileSync, readdirSync} from 'node:fs';
-import {communityAccess, refreshMemberships, PERMISSIONS, DEFAULT_EVERYONE} from '../server/access.mjs';
+import {communityAccess, refreshMemberships, refreshCommunityMembers, PERMISSIONS, DEFAULT_EVERYONE} from '../server/access.mjs';
 import worker from '../server/worker.mjs';
 import {GUILD, ORGA_ROLE, SAFE_ROLE, DEV_COMMUNITY, linkTestServer} from './fixtures/discord-server.mjs';
 
@@ -177,4 +177,30 @@ test('a new icon on the Discord server becomes the community logo when a member 
   assert.equal(stored.discordIcon,'0123456789abcdef0123456789abcdef','the icon of the server now');
   assert.equal(stored.accent,'#50d779','the accent chosen by the admins is kept');
   assert.equal(community.appearance.discordIcon,'0123456789abcdef0123456789abcdef');
+});
+
+test('a role given on Discord counts on the site 10 minutes later (or at once with « Actualiser »); Discord down keeps the known roles', async t => {
+  const {DB,env,community}=setup();
+  const members={[PILOT]:[]};
+  const calls=fakeDiscord(t,members);
+  assert.ok(!(await accessOf(env,community,PILOT)).permissions.has('create_race'));
+  members[PILOT]=[ORGA_ROLE];
+  assert.ok(!(await accessOf(env,community,PILOT)).permissions.has('create_race'),'just checked: not asked again yet');
+  DB.db.prepare('UPDATE memberships SET checked_at=checked_at-700').run();
+  assert.ok((await accessOf(env,community,PILOT)).permissions.has('create_race'),'after 10 minutes: the new role counts');
+  // The admins' button: everyone checked now.
+  members[PILOT]=[];
+  assert.equal(await refreshCommunityMembers(env,community),1);
+  assert.ok(!(await accessOf(env,community,PILOT)).permissions.has('create_race'));
+  assert.ok(calls.length>0);
+});
+
+test('Discord not answering: a member already checked keeps the roles known last time', async t => {
+  const {DB,env,community}=setup();
+  fakeDiscord(t,{[PILOT]:[ORGA_ROLE]});
+  assert.ok((await accessOf(env,community,PILOT)).permissions.has('create_race'));
+  globalThis.fetch=async()=>new Response('{}',{status:500});
+  DB.db.prepare('UPDATE memberships SET checked_at=checked_at-700').run();
+  const access=await accessOf(env,community,PILOT);
+  assert.equal(access.status,'member');assert.ok(access.permissions.has('create_race'));
 });

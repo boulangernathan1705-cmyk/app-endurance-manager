@@ -50,7 +50,7 @@ function goToRegistrationStep(event,departure,target){
 }
 
 async function submitEvent(form){
-  const data={name:form.elements.eventName.value.trim(),durationMinutes:formDurationMinutes(form),...(form.elements.eventDriverChange?{driverChangeRequired:form.elements.eventDriverChange.checked}:{}),eventType:form.elements.eventType.value,circuit:form.elements.eventCircuit.value,schedulePending:form.elements.eventSchedulePending.checked,categories:[...form.querySelectorAll('[name="eventCategory"]:checked')].map(input=>input.value),departures:[...form.querySelectorAll('.departure-field')].map(row=>({id:row.dataset.id||undefined,date:row.querySelector('[name="date"]').value,time:row.querySelector('[name="time"]').value,tbd:row.dataset.tbd==='true'})),version:state.editingEvent?.version};
+  const data={name:form.elements.eventName.value.trim(),durationMinutes:formDurationMinutes(form),...(form.elements.eventDriverChange?{driverChangeRequired:form.elements.eventDriverChange.checked}:{}),eventType:form.elements.eventType.value,circuit:form.elements.eventCircuit.value,schedulePending:form.elements.eventSchedulePending.checked,categories:[...form.querySelectorAll('[name="eventCategory"]:checked')].map(input=>input.value),departures:[...form.querySelectorAll('.departure-field')].map(row=>({id:row.dataset.id||undefined,date:row.querySelector('[name="date"]').value,time:row.querySelector('[name="time"]').value,tbd:row.dataset.tbd==='true'})),version:state.editingEvent?.version,...(!state.editingEvent&&form.elements.eventOfficial?.checked?{official:true}:{})};
   const format=form.dataset.format||'endurance';
   if(format==='solo'){
     // Solo race: rounds, access and places replace duration, type and circuit.
@@ -69,12 +69,13 @@ async function submitEvent(form){
 function beginCrewJoin(event,departure,crew){
   if(!state.user)throw Error('Connecte-toi avec Discord pour rejoindre un équipage.');
   const assigned=new Set((departure.crews||[]).flatMap(item=>item.registrationIds||[]));
-  const source=ownRegistrations(departure).find(reg=>reg.status!=='unavailable'&&!assigned.has(reg.id));
+  // A crew never mixes communities: the entry joining it is of the crew's community.
+  const source=ownRegistrations(departure).find(reg=>reg.status!=='unavailable'&&!assigned.has(reg.id)&&(reg.community?.id||'')===(crew.community?.id||''));
   state.pendingCrewJoin={eventId:event.id,departureId:departure.id,crewId:crew.id};
   state.selectedDepartureId=departure.id;
   state.drafts[departure.id]=source
     ? {...registrationDraft(source),category:crew.category,cars:[],carAny:false,id:null,version:null,mode:'category',forOther:false}
-    : {name:state.user.name?.slice(0,32)||state.pilotName,status:'',preferredPilot:'',forOther:false,participantUserId:null,participantId:null,category:crew.category,cars:[],carAny:false,id:null,version:null,mode:'pilot'};
+    : {name:state.user.name?.slice(0,32)||state.pilotName,status:'',preferredPilot:'',forOther:false,participantUserId:null,participantId:null,category:crew.category,cars:[],carAny:false,id:null,version:null,mode:'pilot',communityId:crew.community?.id||''};
   state.registrationOpen.add(departure.id);
   renderEvent();
   document.getElementById(`departure-${departure.id}`)?.scrollIntoView({block:'start',behavior:'smooth'});
@@ -111,6 +112,8 @@ async function perform(action,target){
     case 'open': state.currentEventId=target.dataset.id; state.selectedDepartureId=target.dataset.departure||null; state.eventSection='race'; state.drafts={}; state.pendingCrewJoin=null; state.registrationOpen.clear(); renderEvent(); break;
     case 'event-section': state.eventSection='race'; renderEvent(); break;
     case 'my-registration': { state.pendingCrewJoin=null; state.selectedDepartureId=target.dataset.departure; delete state.drafts[state.selectedDepartureId]; state.registrationOpen.add(state.selectedDepartureId); renderEvent(); revealRegistration(state.selectedDepartureId); break; }
+    case 'make-official': { if(!event||!state.manager)break; if(!confirm(`Rendre « ${event.name} » officielle ?\n\nElle sera commune à toutes les communautés : chacune pourra s’y inscrire. Ses inscriptions et équipages restent dans ta communauté. Impossible de revenir en arrière.`))return; await api(`/api/races/${event.id}/official`,'POST',{version:event.version}); await refreshAfterSave('Course rendue officielle.'); break; }
+    case 'registration-community': { const departure=event.departures.find(item=>item.id===target.dataset.departure),draft=draftFor(departure); draft.communityId=target.dataset.community||''; state.registrationOpen.add(departure.id); rerenderRegistrationSection(event,departure,'',renderEvent); break; }
     case 'registration-step': { const departure=event.departures.find(item=>item.id===target.dataset.departure); goToRegistrationStep(event,departure,target); break; }
     case 'event-step': goToEventStep(target.closest('form'),target.dataset.step); break;
     case 'close-registration': if(state.pendingCrewJoin?.departureId===target.dataset.departure)state.pendingCrewJoin=null;state.registrationOpen.delete(target.dataset.departure); renderEvent(); break;
