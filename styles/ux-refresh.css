@@ -1677,7 +1677,15 @@ html[data-game] #app .planning-race-actions .race-header-actions > .secondary-bu
 .planning-start.is-compact .planning-quick { top: 7px; }
 .planning-start.is-compact.has-quick > summary { min-height: 46px; align-content: center; }
 .planning-quick-button { display: grid; place-items: center; width: 32px !important; height: 32px !important; min-width: 0 !important; min-height: 0 !important; padding: 0 !important; border: 1px solid #3a4548; border-radius: 9px; background: #151b1d; color: #c7d0d4; cursor: pointer; transition: border-color .15s ease, color .15s ease, background .15s ease; }
-.planning-quick-button svg { width: 18px; height: 18px; }
+.planning-quick-button svg { width: 19px; height: 19px; }
+.planning-quick-icon { position: relative; display: grid; place-items: center; }
+.planning-quick-icon i { position: absolute; right: -6px; bottom: -5px; display: grid; place-items: center; width: 12px; height: 12px; border-radius: 50%; background: var(--community-accent, #52d3d8); color: #062a2c; font-size: 11px; font-style: normal; font-weight: 900; line-height: 1; }
+.planning-quick-label { display: none; }
+/* Opened start: the two actions become buttons with their name, on their own line under the title. */
+.planning-start[open].has-quick > summary { padding-right: 44px; }
+.planning-start[open] .planning-quick { position: static; margin-top: 2px; gap: 10px; }
+.planning-start[open] .planning-quick-button { width: auto !important; gap: 9px; grid-auto-flow: column; padding: 0 14px 0 11px !important; }
+.planning-start[open] .planning-quick-label { display: inline; font-size: 13.5px; font-weight: 700; white-space: nowrap; }
 .planning-quick-button:hover, .planning-quick-button[aria-expanded="true"] { border-color: var(--community-accent, #52d3d8); color: var(--community-accent, #52d3d8); background: color-mix(in srgb, var(--community-accent, #52d3d8) 10%, #151b1d); }
 .planning-quick-menu-wrap { position: relative; }
 .planning-quick-menu { position: absolute; top: calc(100% + 6px); right: 0; z-index: 20; display: grid; min-width: 250px; padding: 6px; border: 1px solid #3a4548; border-radius: 11px; background: #161c1e; box-shadow: 0 14px 32px rgba(0, 0, 0, .5); }

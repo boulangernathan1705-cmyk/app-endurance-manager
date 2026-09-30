@@ -7,8 +7,6 @@ import {eventMinutes} from '../../shared/duration.mjs';
 import {raceDays,parisDayKey as dayKey} from '../../shared/start-times.mjs';
 import {state,esc,categories,logo,sortedCrews,crewColorClass,pilotCount} from './core.mjs';
 
-// Pilots without a crew: a person with a « + » (available to join or to form a crew).
-const FREE_ICON='<span class="planning-free-icon" aria-label="Pilotes sans équipage"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M8 7a4 4 0 1 0 8 0a4 4 0 0 0-8 0M6 21v-2a4 4 0 0 1 4-4h4M16 19h6M19 16v6"/></svg></span>';
 const OPEN_ICON='<span class="planning-crew-open" data-tip="Places libres : tu peux le rejoindre" aria-label="Places libres"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" d="M5 13a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2zM8 11V7a4 4 0 0 1 8 0"/></svg></span>';
 const CHEVRON='<svg class="planning-chevron" viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6"/></svg>';
 
@@ -39,7 +37,7 @@ function startCard(event,departure,body,{minutes,now,open,quick=''}){
   const row=(content,extra='')=>`<span class="planning-row"${extra}>${content}</span>`;
   // A crew that still takes pilots shows an open padlock (orange, as « Places libres »).
   const crewLine=crews.length?row(crews.map((crew,index)=>`<span class="planning-crew ${crewColorClass(crew.id,index)}">${logo(crew.category)}<span>${esc(crew.name)}</span>${crew.locked?'':OPEN_ICON}</span>`).join('')):'';
-  const freeLine=free.length?row(FREE_ICON+free.map(([category,count,names])=>`<span class="planning-free-pill ${categories[category]?.css||''}" data-tip="${esc(names.join(', '))}">${count} ${esc(category)}</span>`).join(''),' data-free-pilots data-tip="Pilotes cherchant un équipage"'):'';
+  const freeLine=free.length?row(free.map(([category,count,names])=>`<span class="planning-free-pill ${categories[category]?.css||''}" data-tip="${esc(names.join(', '))}">${count} ${esc(category)}</span>`).join(''),' data-free-pilots data-tip="Pilotes cherchant un équipage"'):'';
   const details=compact?'':`${crewLine}${freeLine}`;
   return `<details class="planning-start${compact?' is-compact':''}${done?' is-done':''}${mine?' is-mine':''}${!pilots?' is-empty':''}${quick?' has-quick':''}" id="departure-${departure.id}" ${open?'open':''}><summary>${head}${details}${quick}${CHEVRON}</summary><div class="departure-fold planning-body">${body}</div></details>`;
 }

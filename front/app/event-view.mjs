@@ -42,8 +42,9 @@ function renderSoloDeparture(event,departure,open){
 // Quick actions of a start in the planning, as small squares with an icon and a +: « Inscription » (me, me in
 // another category, another pilot: one menu, or the only choice straight away) and « Créer un équipage ».
 const QUICK_ICON=path=>`<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="${path}"/></svg>`;
-const ICON_REGISTER=QUICK_ICON('M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2a2 2 0 0 1-2 2h-2a2 2 0 0 1-2-2M10 14h4M12 12v4');
-const ICON_CREW=QUICK_ICON('M5 7a4 4 0 1 0 8 0a4 4 0 1 0-8 0M3 21v-2a4 4 0 0 1 4-4h4c.96 0 1.84.34 2.53.9M16 3.13a4 4 0 0 1 0 7.75M16 19h6M19 16v6');
+// A pilot (entry) or a group of three (crew), each with a small « + » badge.
+const ICON_REGISTER=QUICK_ICON('M8 7a4 4 0 1 0 8 0a4 4 0 0 0-8 0M6 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2');
+const ICON_CREW=QUICK_ICON('M10 13a2 2 0 1 0 4 0a2 2 0 0 0-4 0M8 21v-1a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v1M15 5a2 2 0 1 0 4 0a2 2 0 0 0-4 0M17 10h2a2 2 0 0 1 2 2v1M5 5a2 2 0 1 0 4 0a2 2 0 0 0-4 0M3 13v-1a2 2 0 0 1 2-2h2');
 function quickActions(event,departure){
   if(departure.startsAt<=Date.now()||!state.user)return '';
   const own=ownRegistration(departure),mine=(departure.availability||[]).filter(reg=>reg.mine&&reg.status!=='unavailable');
@@ -52,8 +53,9 @@ function quickActions(event,departure){
   if(own||can('endurance'))items.push({action:'my-registration',label:own?'Modifier mon inscription':'M’inscrire',extra:''});
   if(own&&!assigned&&event.categories.some(category=>!mine.some(reg=>reg.category===category)))items.push({action:'new-registration',label:'M’inscrire dans une autre catégorie',extra:`data-mode="category" data-registration="${own.id}"`});
   if(can('manage_registrations'))items.push({action:'new-registration',label:'Inscrire un autre pilote',extra:'data-mode="pilot"'});
-  const square=(icon,tip,attrs)=>`<button type="button" class="planning-quick-button" ${attrs} data-tip="${esc(tip)}" aria-label="${esc(tip)}">${icon}</button>`;
-  const register=!items.length?'':items.length===1?square(ICON_REGISTER,items[0].label,`data-action="${items[0].action}" data-departure="${departure.id}" ${items[0].extra}`)
+  // Closed start: the icon alone (its name in the bubble); opened start: the icon and its name.
+  const square=(icon,tip,attrs,label=tip)=>`<button type="button" class="planning-quick-button" ${attrs} data-tip="${esc(tip)}" aria-label="${esc(tip)}"><span class="planning-quick-icon">${icon}<i aria-hidden="true">+</i></span><span class="planning-quick-label">${esc(label)}</span></button>`;
+  const register=!items.length?'':items.length===1?square(ICON_REGISTER,items[0].label,`data-action="${items[0].action}" data-departure="${departure.id}" ${items[0].extra}`,'Inscription')
     :`<span class="planning-quick-menu-wrap">${square(ICON_REGISTER,'Inscription','data-action="quick-menu" aria-haspopup="menu" aria-expanded="false"')}<span class="planning-quick-menu" role="menu" hidden>${items.map(item=>`<button type="button" role="menuitem" class="planning-quick-item" data-action="${item.action}" data-departure="${departure.id}" ${item.extra}>${esc(item.label)}</button>`).join('')}</span></span>`;
   const crewLabel=can('manage_registrations')?'Créer un équipage':'Créer mon équipage';
   const crew=canCreateCrewOnDeparture(departure)?square(ICON_CREW,crewLabel,`data-crew-builder-open data-departure="${departure.id}"`):'';
