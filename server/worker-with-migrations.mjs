@@ -1,7 +1,6 @@
 import worker from './worker.mjs';
 import {homeRedirect, homePage} from './home.mjs';
 import {isWeeklyDiscordMutation} from './discord-weekly-format.mjs';
-import {ensureDiscordWeeklySchema} from './discord-weekly-schema.mjs';
 import {syncWeeklyDiscord, syncDueRecaps} from './discord-weekly.mjs';
 import {cleanup, communityLabel, origin} from './core.mjs';
 import {importNextCommunity, completeSpecialTimes} from './iracing-import.mjs';
@@ -10,43 +9,7 @@ import {refreshMemberships} from './access.mjs';
 import {allCommunities, currentCommunity, communitySlug, appearanceOf} from './community.mjs';
 import {isDevelopment,devRobots,markDevelopmentResponse} from './dev-environment.mjs';
 
-let crewOwnershipReady = null;
-
-async function ensureCrewOwnershipSchema(env) {
-  if (!env.DB) return;
-  if (crewOwnershipReady) return crewOwnershipReady;
-
-  crewOwnershipReady = (async () => {
-    const info = (await env.DB.prepare('PRAGMA table_info(crews)').all()).results || [];
-    const hasOwner = info.some(column => column.name === 'owner_user_id');
-
-    if (!hasOwner) {
-      try {
-        await env.DB.prepare('ALTER TABLE crews ADD COLUMN owner_user_id TEXT REFERENCES users(id) ON DELETE SET NULL').run();
-      } catch (error) {
-        if (!String(error?.message || error).toLowerCase().includes('duplicate column')) throw error;
-      }
-    }
-
-    await env.DB.prepare('CREATE INDEX IF NOT EXISTS crews_owner_user ON crews(owner_user_id)').run();
-    // No ownership backfill here: this runs on every cold start, and crews created by
-    // organizers are intentionally ownerless until a pilot joins one by themselves.
-    // The one-time backfill of pre-existing crews lives in migration 0016_crew_ownership.sql.
-
-    // Keep Wrangler's migration history consistent when this recovery path was needed.
-    try {
-      await env.DB.prepare("INSERT OR IGNORE INTO d1_migrations(name) VALUES('0016_crew_ownership.sql')").run();
-    } catch {}
-  })().catch(error => {
-    crewOwnershipReady = null;
-    throw error;
-  });
-
-  return crewOwnershipReady;
-}
-
 async function runWeeklySync(env, community = null) {
-  await ensureDiscordWeeklySchema(env);
   return syncWeeklyDiscord(env, Date.now(), community);
 }
 
@@ -124,7 +87,6 @@ export default {
         return development ? markDevelopmentResponse(home, env) : home;
       }
     }
-    if (pathname.startsWith('/api/')) await ensureCrewOwnershipSchema(env);
     const weeklyMutation = isWeeklyDiscordMutation(request);
     const response = await worker.fetch(request, env, ctx);
     if (weeklyMutation && response.ok) queueWeeklySync(env, ctx, request);
@@ -145,7 +107,7 @@ export default {
     // :15 Official iRacing endurances of one community (a new one first, then each in turn).
     if (slot === 1 && env.IRACING_IMPORT !== 'off') run('iRacing import failed', () => importNextCommunity(env, at));
     // :30 The weekly Discord recaps checked longest ago.
-    if (slot === 2) run('Discord weekly scheduled sync failed', async () => { await ensureDiscordWeeklySchema(env); await syncDueRecaps(env, 3); });
+    if (slot === 2) run('Discord weekly scheduled sync failed', () => syncDueRecaps(env, 3));
     // :45 Time slots of the coming special events (iracing.com article of the race week), and the showcase on Mondays.
     if (slot === 3) run('Special times or showcase failed', async () => {
       if (env.IRACING_IMPORT !== 'off') await completeSpecialTimes(env, {withinDays:10});

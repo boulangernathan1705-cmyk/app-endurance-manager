@@ -1,6 +1,6 @@
 import {app,state,api,load,loadArchive,showError,countdown,CARS,inCommunity} from './core.mjs';
 import {renderNav,renderHome,toggleRaceFilter,resetRaceFilters} from './home-view.mjs';
-import {renderEvent} from './event-view.mjs';
+import {renderEvent,togglePlanningCommunity} from './event-view.mjs';
 import {showPlanningDay,scrollPlanning,goToDeparture,setPlanningSpan,toggleQuickMenu} from './planning.mjs';
 import {renderEventForm,departureFields,updateRemoveButtons,goToEventStep,formDurationMinutes,bulkPreview,shiftBulkWeek} from './event-form.mjs';
 import {renderMyEntries} from './entries-view.mjs';
@@ -14,7 +14,7 @@ import {introduceCommunitiesOnce} from '../community-intro.mjs';
 // The registration panel opens over the race: move keyboard and screen-reader focus into it.
 function revealRegistration(departureId){
   // The first entry: how communities work, explained once.
-  introduceCommunitiesOnce(state.openSite?'':state.community?.name||'',(state.communities||[]).length);
+  introduceCommunitiesOnce(state.openSite?'':state.community?.name||'',(state.communities||[]).length,state.user?.communityIntroSeen===true);
   requestAnimationFrame(()=>document.getElementById(`departure-${departureId}`)?.querySelector('.fold-registration:not([hidden]) h2[tabindex]')?.focus({preventScroll:true}));
 }
 
@@ -82,7 +82,7 @@ function beginCrewJoin(event,departure,crew){
   state.registrationOpen.add(departure.id);
   renderEvent();
   document.getElementById(`departure-${departure.id}`)?.scrollIntoView({block:'start',behavior:'smooth'});
-  introduceCommunitiesOnce(state.openSite?'':state.community?.name||'',(state.communities||[]).length);
+  introduceCommunitiesOnce(state.openSite?'':state.community?.name||'',(state.communities||[]).length,state.user?.communityIntroSeen===true);
 }
 
 async function finishPendingCrewJoin(departureId,registrationId){
@@ -111,6 +111,7 @@ async function perform(action,target){
   switch(action){
     case 'dismiss-error': document.querySelector('[data-ux-error-modal]')?.remove(); break;
     case 'home': if(target.dataset.list)state.listFormat=target.dataset.list; renderHome(); break;
+    case 'planning-community': togglePlanningCommunity(target.dataset.community||''); renderEvent(); break;
     case 'race-filter-toggle': state.raceFilterOpen=!state.raceFilterOpen; renderHome(); break;
     case 'race-filter': toggleRaceFilter(target.dataset.group,target.dataset.value); renderHome(); break;
     case 'race-filter-reset': resetRaceFilters(); renderHome(); break;

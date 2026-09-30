@@ -10,6 +10,8 @@ const ymd=new Intl.DateTimeFormat('en-CA',{timeZone:TIME_ZONE,year:'numeric',mon
 const startLabel=new Intl.DateTimeFormat('fr-FR',{timeZone:'UTC',day:'numeric',month:'long'});
 const endLabel=new Intl.DateTimeFormat('fr-FR',{timeZone:'UTC',day:'numeric',month:'long',year:'numeric'});
 const updateTimeLabel=new Intl.DateTimeFormat('fr-FR',{timeZone:TIME_ZONE,hour:'2-digit',minute:'2-digit',hourCycle:'h23'});
+const recapDay=new Intl.DateTimeFormat('fr-FR',{timeZone:TIME_ZONE,weekday:'short',day:'numeric',month:'short'});
+const recapTime=new Intl.DateTimeFormat('fr-FR',{timeZone:TIME_ZONE,hour:'numeric',minute:'2-digit',hourCycle:'h23'});
 const markers=new Map([['Hypercar','🟦'],['LMP2 ELMS','🟨'],['LMP2 WEC','🟨'],['LMP3','🟩'],['GT3','🟪'],['GTE','🟥']]);
 
 function localDay(timestamp){
@@ -64,15 +66,24 @@ function departureValue(departure,compact=false){
 // The starts of a race: only those with entries in detail (time, crews, pilots without a crew); the empty ones
 // in one line at the end, so a special event with 15 starts stays short. A race with a single start keeps it.
 const BLANK='\u200b';
-function raceFields(departures,compact,url){
+function raceFields(departures,compact){
   const hasEntries=departure=>departure.crews.length||departure.unassignedPilots?.length;
   if(departures.length===1)return [{name:BLANK,value:departureValue(departures[0],compact),inline:false}];
-  const filled=departures.filter(hasEntries),empty=departures.length-filled.length;
+  const filled=departures.filter(hasEntries);
   const fields=filled.slice(0,23).map(departure=>({name:BLANK,value:departureValue(departure,compact),inline:false}));
-  const more=url?` · [voir la course](${url})`:'';
-  if(!filled.length)fields.push({name:BLANK,value:`Personne d’inscrit pour l’instant sur les ${departures.length} départs${more}.`,inline:false});
-  else if(empty)fields.push({name:BLANK,value:`➕ ${empty} autre${empty>1?'s':''} départ${empty>1?'s':''} sans inscrit${more}`,inline:false});
+  if(!filled.length)fields.push({name:BLANK,value:'Personne d’inscrit pour l’instant.',inline:false});
   return fields;
+}
+// At the top of a race: its days and their start times, Paris time (« 📅 **sam. 17 oct.** · 8h, 14h, 20h »).
+function hourLabel(startsAt){return recapTime.format(startsAt).replace(/^(\d+):00$/,'$1h').replace(':','h');}
+function startsRecap(departures){
+  const days=new Map();
+  for(const departure of [...departures].sort((a,b)=>a.startsAt-b.startsAt)){
+    const day=recapDay.format(departure.startsAt);
+    if(!days.has(day))days.set(day,[]);
+    days.get(day).push(departure.timePending?'horaire à confirmer':hourLabel(departure.startsAt));
+  }
+  return [...days].map(([day,times])=>`📅 **${day}** · ${[...new Set(times)].join(', ')}`).join('\n');
 }
 // One block per race: its name is the link to the race, the bar has the colour of its simulator.
 function raceEmbed(departures,siteUrl,compact=false,current=false){
@@ -80,8 +91,8 @@ function raceEmbed(departures,siteUrl,compact=false,current=false){
   const circuit=circuitNames.get(first.circuit)||first.circuit||'Circuit à préciser';
   const duration=first.durationMinutes||first.durationHours?durationLabel(first.durationMinutes||first.durationHours*60):'';
   const details=[`📍 ${clean(circuit)}`,duration&&`⏱️ ${duration}`,TYPE_LABELS[first.eventType]&&`🏷️ ${TYPE_LABELS[first.eventType]}`].filter(Boolean).join(' · ');
-  const embed={title:cut(`${current?'🔴 En cours — ':'🏁 '}${title}`,256),description:cut(note?`${details}\n${note}`:details,4096),color:current?0xd71920:SIM_COLORS[simOf(first)],
-    fields:raceFields(departures,compact,raceUrl(siteUrl,first))};
+  const embed={title:cut(`${current?'🔴 En cours — ':'🏁 '}${title}`,256),description:cut([details,note,startsRecap(departures)].filter(Boolean).join('\n'),4096),color:current?0xd71920:SIM_COLORS[simOf(first)],
+    fields:raceFields(departures,compact)};
   const url=raceUrl(siteUrl,first);if(url)embed.url=url;
   return embed;
 }

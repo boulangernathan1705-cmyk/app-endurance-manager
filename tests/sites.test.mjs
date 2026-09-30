@@ -91,6 +91,11 @@ test('"Mes communautés": the communities of the player, with the address of eac
   assert.deepEqual(mine.map(item=>[item.slug,item.url,item.current]),[['commu-dev',`${MAIN}/`,true],['commu-test',`${TEST_SITE}/`,false]]);
   assert.ok(mine.every(item=>item.manageCrews===false),'no role to manage the crews: a crew only with his own entry');
   assert.equal((await (await call(`${TEST_SITE}/api/session`,{headers})).json()).communities.length,2,'the same on every site');
+  // The explanation of communities, read once for the account (every device, every site).
+  assert.equal((await (await call(`${MAIN}/api/session`,{headers})).json()).user.communityIntroSeen,false);
+  const read=await call(`${TEST_SITE}/api/me/community-intro`,{method:'POST',headers:{...headers,Origin:TEST_SITE,'Content-Type':'application/json'},body:'{}'});
+  assert.equal(read.status,200,await read.clone().text());
+  assert.equal((await (await call(`${MAIN}/api/session`,{headers})).json()).user.communityIntroSeen,true);
 });
 
 test('the main address is a showcase: anyone looks without signing in, only the platform managers change it', async () => {

@@ -352,7 +352,7 @@ async function openBuilder(crewId = null, preferredDepartureId = '') {
 
     renderPanel(event,{scroll:true});
     // The first crew: how communities work, explained once.
-    if (!crewId) introduceCommunitiesOnce(session.openSite ? '' : session.community?.name || '', (session.communities || []).length);
+    if (!crewId) introduceCommunitiesOnce(session.openSite ? '' : session.community?.name || '', (session.communities || []).length, session.user?.communityIntroSeen === true);
   } catch (error) {
     pendingMessage = {error:true,text:error?.message || 'Impossible d’ouvrir l’éditeur d’équipage.'};
     insertPendingMessage();

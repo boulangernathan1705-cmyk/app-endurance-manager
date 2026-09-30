@@ -31,7 +31,10 @@ function harness(withParticipants=true){
  DB.db.exec(readFileSync(new URL('../migrations/0029_event_duration_minutes.sql',import.meta.url),'utf8'));
  DB.db.exec(readFileSync(new URL('../migrations/0030_iracing_import.sql',import.meta.url),'utf8'));
  DB.db.exec(readFileSync(new URL('../migrations/0031_solo_driver.sql',import.meta.url),'utf8'));
+ DB.db.exec(readFileSync(new URL('../migrations/0015_crew_lock.sql',import.meta.url),'utf8'));
  DB.db.exec(readFileSync(new URL('../migrations/0016_client_errors.sql',import.meta.url),'utf8'));
+ // The crews' owner column of migration 0016_crew_ownership (its backfill needs no data here).
+ DB.db.exec('ALTER TABLE crews ADD COLUMN owner_user_id TEXT REFERENCES users(id) ON DELETE SET NULL;CREATE INDEX crews_owner_user ON crews(owner_user_id);');
  DB.db.exec(readFileSync(new URL('../migrations/0017_discord_weekly.sql',import.meta.url),'utf8'));
  if(withParticipants){DB.db.exec(readFileSync(new URL('../migrations/0034_communities.sql',import.meta.url),'utf8'));DB.db.exec(readFileSync(new URL('../migrations/0035_memberships.sql',import.meta.url),'utf8'));DB.db.exec(readFileSync(new URL('../migrations/0039_official_races.sql',import.meta.url),'utf8'));linkTestServer(DB.db);DB.db.exec(`UPDATE communities SET modules=json_set(modules,'$.soloRaces',json('true'))`);}
  const env={DB,APP_ORIGIN:ROOT,DISCORD_CLIENT_ID:'app-id',DISCORD_CLIENT_SECRET:'test-only-secret',ADMIN_DISCORD_IDS:ADMIN,ASSETS:{fetch:async()=>new Response('static')}};
@@ -353,7 +356,6 @@ test('organizer-created crews stay ownerless across worker cold starts',async()=
  await req('/api/events','POST',eventInput,'admin');
  const event=(await req('/api/events','GET',null,'admin')).data.events[0],base=`/api/events/${event.id}/departures/${event.departures[0].id}`;
  const reg=await req(base+'/registrations','POST',{name:'Pilote',category:'GTE',status:'whole'},'pilot');assert.equal(reg.status,201);
- DB.db.exec("ALTER TABLE crews ADD COLUMN locked INTEGER NOT NULL DEFAULT 0");
  const cookie=Object.entries(jars.get('pilot')).map(([k,v])=>`${k}=${v}`).join('; ');
  const listAsPilot=async()=>(await (await workerWithMigrations.fetch(new Request(ROOT+'/api/events',{headers:{Cookie:cookie}}),env,{waitUntil(){}})).json()).events[0].departures[0].crews[0];
  const crew=await req(base+'/crews','POST',{name:'Orga',category:'GTE'},'admin');assert.equal(crew.status,201);

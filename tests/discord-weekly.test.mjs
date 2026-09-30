@@ -114,13 +114,15 @@ test('le message : un bloc par course, dont le nom mène à la course sur le sit
   assert.equal(imsa.url,`${site.url}/iracing/#event=99999999-9999-4999-8999-999999999999`);
   assert.notEqual(silverstone.color,imsa.color,'the bar has the colour of the simulator');
   assert.equal((JSON.stringify(payload).match(/4h SILVERSTONE/g)||[]).length,1,'one block for the race and its two starts');
-  assert.equal(silverstone.fields.length,2,'the start with entries, then one line for the empty one');
+  assert.equal(silverstone.fields.length,1,'only the start with entries');
+  // At the top: the days of the race and their start times (Paris time).
+  assert.match(silverstone.description,/📅 \*\*ven\. 18 sept\.\*\* · 14h, 18h/);
   assert.match(silverstone.description,/Horaires non définis par LMU/);
   // Times in each reader's own time zone.
   assert.match(silverstone.fields[0].value,/<t:1789747200:F>/);
   assert.match(silverstone.fields[0].value,/Mrt blé/);assert.match(silverstone.fields[0].value,/👤 Etienne\\_48/);
   assert.match(silverstone.fields[0].value,/Sans équipage : Léo/);
-  assert.match(silverstone.fields[1].value,/^➕ 1 autre départ sans inscrit · \[voir la course\]/);
+  assert.doesNotMatch(JSON.stringify(silverstone),/autre départ|voir la course/,'no line for the empty starts');
   assert.doesNotMatch(JSON.stringify(silverstone),/Départ \d/,'no « Départ 1, Départ 2 » headings');
   const last=payload.embeds.at(-1);
   assert.equal(last.image.url,site.bannerUrl);assert.match(last.footer.text,/mise à jour à 12:00/);
@@ -172,8 +174,11 @@ test('un événement spécial à 15 départs : seuls les départs avec des inscr
   departures[7].crews=[{id:'56565656-5656-4565-8565-565656565656',name:'FMT 001',category:'GT3',car:'',locked:false,pilots:['Etienne_48']}];
   departures[7].unassignedPilots=['Nathan'];
   const [,fuji]=buildWeeklyDiscordPayload({currentDepartures:[],futureDepartures:departures,periodLabel:'semaine'},{url:'https://fmt.endurance-manager.app'},Date.parse('2026-09-29T10:00:00Z')).embeds;
-  assert.equal(fuji.fields.length,2);
+  assert.equal(fuji.fields.length,1,'the start with entries only');
   assert.match(fuji.fields[0].value,/FMT 001/);assert.match(fuji.fields[0].value,/Sans équipage : Nathan/);
-  assert.match(fuji.fields[1].value,/➕ 14 autres départs sans inscrit/);
+  // Every day of the event and its start times, at the top.
+  assert.match(fuji.description,/📅 \*\*ven\. 2 oct\.\*\* · 7h, 12h, 17h, 22h/);
+  assert.equal((fuji.description.match(/📅/g)||[]).length,4,'four days');
+  assert.doesNotMatch(JSON.stringify(fuji),/autres départs|voir la course/);
   assert.doesNotMatch(JSON.stringify(fuji),/Personne d’inscrit/);
 });

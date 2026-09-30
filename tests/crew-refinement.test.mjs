@@ -49,13 +49,13 @@ test('création et modification utilisent le même éditeur équipage contextual
   assert.doesNotMatch(builder, /MutationObserver/);
 });
 
-test('le worker répare la migration de responsabilité équipage avant les appels API', () => {
+test('la responsabilité d’équipage vient de la migration 0016, jamais d’un contrôle à chaque démarrage du worker', () => {
   const wrapper = read('server/worker-with-migrations.mjs');
   const dev = read('wrangler.jsonc');
   const prod = read('wrangler.prod.jsonc');
-  assert.match(wrapper, /PRAGMA table_info\(crews\)/);
-  assert.match(wrapper, /ALTER TABLE crews ADD COLUMN owner_user_id/);
-  assert.match(wrapper, /0016_crew_ownership\.sql/);
+  // The deployment applies the migrations first: no database call spent on the schema at each cold start.
+  assert.doesNotMatch(wrapper, /PRAGMA table_info|ALTER TABLE|CREATE (TABLE|INDEX)/);
+  assert.match(read('migrations/0016_crew_ownership.sql'), /ALTER TABLE crews ADD COLUMN owner_user_id/);
   assert.match(dev, /server\/worker-with-migrations\.mjs/);
   assert.match(prod, /server\/worker-with-migrations\.mjs/);
 });

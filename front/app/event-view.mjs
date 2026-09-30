@@ -1,6 +1,6 @@
 import {dateBlock,timeLabel,weekdayLong,dayMonthShort,fullDateLabel} from '../dates.mjs';
 import {durationLabel,eventMinutes} from '../../shared/duration.mjs';
-import {app,state,esc,button,canManage,isAdmin,can,canEditRace,officialBadge,circuitLabel,eventTypeBadge,schedulePendingBadge,eventBadge,eventCategoryCount,circuitVisual,pilotCount,countdown,notifyRender} from './core.mjs';
+import {app,state,esc,button,canManage,isAdmin,can,canEditRace,officialBadge,communityTag,circuitLabel,eventTypeBadge,schedulePendingBadge,eventBadge,eventCategoryCount,circuitVisual,pilotCount,countdown,notifyRender} from './core.mjs';
 import {ownRegistration,renderRegistrationWorkspace} from './registration.mjs';
 import {renderPilots} from './crews.mjs';
 import {isSolo,accessBadge,soloRoundsLabel,soloFill,soloEntryBlock,myWaitlistPosition,renderSoloEntries,soloCategoriesSummary} from './solo.mjs';
@@ -89,8 +89,46 @@ function renderPastDepartures(event,items){
   return `<details class="past-departures-fold"><summary><span>Départs passés</span><small>${items.length} départ${items.length>1?'s':''}</small></summary><div class="past-departures-list">${items.map(({departure,index})=>renderDeparturePanel(event,departure,index,false,{isPast:true})).join('')}</div></details>`;
 }
 
+// Official race: the player may show the pilots and crews of some of his communities only (chips above the
+// starts, kept in the browser for every race). Nothing chosen, or none of them on this race: all of them.
+const PLANNING_COMMUNITIES_KEY='em_planning_communities_v1';
+function planningCommunities(){
+  if(!Array.isArray(state.planningCommunities)){let saved=[];try{saved=JSON.parse(localStorage.getItem(PLANNING_COMMUNITIES_KEY)||'[]');}catch{}state.planningCommunities=Array.isArray(saved)?saved:[];}
+  return state.planningCommunities;
+}
+export function togglePlanningCommunity(id){
+  const list=planningCommunities();
+  state.planningCommunities=!id?[]:list.includes(id)?list.filter(item=>item!==id):[...list,id];
+  try{localStorage.setItem(PLANNING_COMMUNITIES_KEY,JSON.stringify(state.planningCommunities));}catch{}
+}
+// The communities entered on the race, with their number of pilots (each pilot once).
+function raceCommunities(event){
+  const found=new Map();
+  for(const departure of event.departures||[])for(const item of [...(departure.availability||[]),...(departure.crews||[])]){
+    if(!item.community?.id)continue;
+    if(!found.has(item.community.id))found.set(item.community.id,{community:item.community,pilots:new Set()});
+    if(item.status!==undefined&&item.status!=='unavailable')found.get(item.community.id).pilots.add(item.participantId||item.id);
+  }
+  return found;
+}
+function communityView(event){
+  if(!event.official)return {shown:event,present:new Map(),chosen:[]};
+  const present=raceCommunities(event),chosen=planningCommunities().filter(id=>present.has(id));
+  if(!chosen.length)return {shown:event,present,chosen};
+  const keep=item=>chosen.includes(item.community?.id);
+  return {shown:{...event,departures:(event.departures||[]).map(departure=>({...departure,availability:(departure.availability||[]).filter(keep),crews:(departure.crews||[]).filter(keep)}))},present,chosen};
+}
+function communityFilter(present,chosen){
+  if(present.size<2)return '';
+  const chip=(id,label,active,tip)=>button('planning-community',label,`data-community="${esc(id)}" aria-pressed="${active}"${tip?` data-tip="${esc(tip)}"`:''}`,`race-filter-chip${active?' active':''}`);
+  const items=[...present.values()].sort((a,b)=>String(a.community.name).localeCompare(String(b.community.name),'fr'));
+  return `<div class="race-community-filter" role="group" aria-label="Communautés affichées"><span class="race-filter-title">Communautés</span><div class="race-filter-chips">${chip('','Toutes',!chosen.length,'Les pilotes et équipages de toutes tes communautés')}${items.map(({community,pilots})=>chip(community.id,`${community.logoUrl?`${communityTag({community})}<span>${esc(community.shortName||community.name)}</span>`:communityTag({community})}<small>${pilots.size}</small>`,chosen.includes(community.id),`${community.name} : ${pilots.size} pilote${pilots.size>1?'s':''}`)).join('')}</div></div>`;
+}
+
 export function renderEvent(message=''){
-  state.page='event';state.eventSection='race';const event=state.events.find(item=>item.id===state.currentEventId);if(!event){renderHome('Cet événement n’est plus disponible.');return;}
+  state.page='event';state.eventSection='race';const full=state.events.find(item=>item.id===state.currentEventId);if(!full){renderHome('Cet événement n’est plus disponible.');return;}
+  // The race as shown: on an official race, the pilots and crews of the chosen communities only.
+  const {shown:event,present,chosen}=communityView(full);
   const now=Date.now();
   const ordered=(event.departures||[]).map((departure,index)=>({departure,index})).sort((a,b)=>Number(a.departure.startsAt)-Number(b.departure.startsAt));
   const future=ordered.filter(item=>Number.isFinite(Number(item.departure.startsAt))&&Number(item.departure.startsAt)>now),past=ordered.filter(item=>Number.isFinite(Number(item.departure.startsAt))&&Number(item.departure.startsAt)<=now),undated=ordered.filter(item=>!Number.isFinite(Number(item.departure.startsAt)));
@@ -111,7 +149,7 @@ export function renderEvent(message=''){
   const myStartLink=myStart?`<span class="race-my-start"><small>Ton départ</small>${button('goto-departure',`${esc(weekdayLong(myStart.startsAt))} ${esc(dayMonthShort(myStart.startsAt))} · Départ ${esc(timeLabel(myStart.time))}`,`data-departure="${myStart.id}"`,'secondary-button')}</span>`:'';
   const countdownCopy=next?`Prochain départ dans <strong data-tip="${esc(fullDateLabel(next.startsAt))} à ${esc(timeLabel(next.time))}" data-countdown="${next.startsAt}">${countdown(next.startsAt)}</strong>`:undated.length?'Dates à confirmer':'Tous les départs ont eu lieu';
   app.eventViewData={eventId:event.id,events:state.events,message};
-  app.innerHTML=`<div class="event-header event-header-compact race-header event-type-${event.eventType||'private'}${isSolo(event)?` is-solo-${event.access||'open'}`:''}" data-event-id="${event.id}"><div class="race-card-top">${raceDateBlock(event,!next&&!undated.length)}<div class="race-head"><h1 class="event-title event-name">${esc(event.name)}</h1><span class="race-meta">${isSolo(event)?soloRoundsLabel(event):`${esc(circuitLabel(event.circuit))} · ${durationLabel(eventMinutes(event))}`}</span><span class="race-badges">${officialBadge(event)}${isSolo(event)?accessBadge(event):eventTypeBadge(event.eventType)}${schedulePendingBadge(event)}</span><span class="event-header-countdown">${countdownCopy}</span></div>${myStartLink}${circuitVisual(event.circuit)}</div>${days.length?'':`${raceStarts(event,!next&&!undated.length)}<div class="race-header-footer">${isSolo(event)?soloCategoriesSummary(event):`<div class="event-header-stats event-category-badges">${event.categories.map(category=>eventBadge(category,eventCategoryCount(event,category))).join('')}</div>`}${eventActions}</div>`}</div><div id="crew-builder-root"></div>${message?`<p class="creation-success" role="status">${esc(message)}</p>`:''}${starts}`;
+  app.innerHTML=`<div class="event-header event-header-compact race-header event-type-${event.eventType||'private'}${isSolo(event)?` is-solo-${event.access||'open'}`:''}" data-event-id="${event.id}"><div class="race-card-top">${raceDateBlock(event,!next&&!undated.length)}<div class="race-head"><h1 class="event-title event-name">${esc(event.name)}</h1><span class="race-meta">${isSolo(event)?soloRoundsLabel(event):`${esc(circuitLabel(event.circuit))} · ${durationLabel(eventMinutes(event))}`}</span><span class="race-badges">${officialBadge(event)}${isSolo(event)?accessBadge(event):eventTypeBadge(event.eventType)}${schedulePendingBadge(event)}</span><span class="event-header-countdown">${countdownCopy}</span></div>${myStartLink}${circuitVisual(event.circuit)}</div>${days.length?'':`${raceStarts(event,!next&&!undated.length)}<div class="race-header-footer">${isSolo(event)?soloCategoriesSummary(event):`<div class="event-header-stats event-category-badges">${event.categories.map(category=>eventBadge(category,eventCategoryCount(event,category))).join('')}</div>`}${eventActions}</div>`}</div><div id="crew-builder-root"></div>${message?`<p class="creation-success" role="status">${esc(message)}</p>`:''}${communityFilter(present,chosen)}${starts}`;
   if(days.length)syncPlanning(app);
   notifyRender();
 }
