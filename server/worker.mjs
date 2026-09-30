@@ -64,7 +64,9 @@ async function myCommunities(env, actor, community) {
   const list = actor.manager ? await allCommunities(env)
     : ((await env.DB.prepare(`SELECT c.* FROM communities c JOIN memberships m ON m.community_id=c.id WHERE m.user_id=? AND m.status='member' ORDER BY c.id`)
       .bind(actor.user.id).all()).results || []).map(communityFromRow);
-  const mine = [...list].sort((x, y) => x.name.localeCompare(y.name, 'fr')).map(item => ({id:item.id, slug:item.slug, name:item.name, shortName:item.shortName,
+  // The showcase (community of the main address, when that address is the platform's domain) is never one of them.
+  const showcase = (() => { try { return new URL(env.APP_ORIGIN).hostname === domain ? communitySlug(env, null) : ''; } catch { return ''; } })();
+  const mine = list.filter(item => item.slug !== showcase).sort((x, y) => x.name.localeCompare(y.name, 'fr')).map(item => ({id:item.id, slug:item.slug, name:item.name, shortName:item.shortName,
     logoUrl:appearanceOf(item).logoUrl, accent:appearanceOf(item).accent, url:`${communityUrl(env, item)}/`, current:item.slug === community.slug}));
   return mine.length > 1 ? mine : [];
 }
