@@ -5,7 +5,8 @@ import {
 } from './core.mjs';
 import {ingestClientError, clientErrorsApi} from './telemetry.mjs';
 import {racesPath} from './races-path.mjs';
-import {currentCommunity, appearanceOf, allCommunities, communityUrl} from './community.mjs';
+import {currentCommunity, appearanceOf, allCommunities, communityUrl, communitySlug} from './community.mjs';
+import {isDevelopment} from './dev-environment.mjs';
 import {communityAccess, requirePermission, displayRole, PERMISSIONS, DEFAULT_EVERYONE, normalizePermissions, discordGuild, keepDiscordLook, memberPermissions} from './access.mjs';
 // Solo races: a module each community turns on or off (settings of the members page).
 const soloRacesEnabled = (env, community) => community?.modules?.soloRaces === true;
@@ -682,6 +683,20 @@ async function api(request, env) {
     // The official iRacing calendar comes back with the next scheduled import (within 15 minutes).
     return json({ok:true, ...result});
   }
+  // A community with no race and no pilot yet (made by mistake): its settings and members go with it. Never the
+  // community of the main address.
+  const platformCommunity = path.match(/^\/api\/platform\/communities\/([a-z0-9-]{3,40})$/);
+  if (platformCommunity && method === 'DELETE') {
+    if (!actor.manager) fail(403, 'Réservé aux gestionnaires de la plateforme.');
+    const row = await env.DB.prepare('SELECT id, slug FROM communities WHERE slug=?').bind(platformCommunity[1]).first();
+    if (!row) fail(404, 'Communauté introuvable.');
+    if (row.slug === communitySlug(env, null)) fail(400, 'La communauté de l’adresse principale ne se supprime pas.');
+    const used = await env.DB.prepare('SELECT (SELECT COUNT(*) FROM events WHERE community_id=?) + (SELECT COUNT(*) FROM participants WHERE community_id=?) AS n').bind(row.id, row.id).first();
+    if (Number(used?.n) > 0) fail(409, 'Cette communauté a déjà des courses ou des pilotes : elle ne peut pas être supprimée.');
+    await env.DB.batch([...['iracing_imports', 'memberships', 'community_role_permissions', 'community_recaps', 'discord_weekly_state', 'community_banners']
+      .map(table => env.DB.prepare(`DELETE FROM ${table} WHERE community_id=?`).bind(row.id)), env.DB.prepare('DELETE FROM communities WHERE id=?').bind(row.id)]);
+    return json({ok:true});
+  }
   if (path === '/api/platform/communities' && method === 'GET') {
     if (!actor.manager) fail(403, 'Réservé aux gestionnaires de la plateforme.');
     const list = [];
@@ -689,10 +704,12 @@ async function api(request, env) {
       const discord = item.discordGuildId ? await discordGuild(env, item.discordGuildId) : null;
       list.push({slug:item.slug, name:item.name, url:communityUrl(env, item), guildId:item.discordGuildId, discordServer:discord?.name || null, botPresent:Boolean(discord), botInviteUrl:botInvite(env, item.discordGuildId)});
     }
-    return json({communities:list, baseDomain:baseDomain(env) || null, showcase:openSite});
+    return json({communities:list, baseDomain:baseDomain(env) || null, showcase:openSite, testSite:isDevelopment(env)});
   }
   if (path === '/api/platform/communities' && method === 'POST') {
     if (!actor.manager) fail(403, 'Réservé aux gestionnaires de la plateforme.');
+    // The test site has its own database: a community made there could never be reached at its address.
+    if (isDevelopment(env)) fail(403, 'Ce site est la version de test : une communauté créée ici n’est pas accessible. Crée-la depuis endurance-manager.app.');
     const input = await body(request);
     const name = text(input.name, 80, 'Nom de la communauté'), shortName = text(input.shortName, 12, 'Nom court');
     const slug = String(input.slug || '').trim().toLowerCase();

@@ -158,3 +158,29 @@ test('the community of the main address is not served at <slug>.endurance-manage
   assert.equal((await call('https://endurance-manager.app/api/session')).status,200,'its main address serves it');
   assert.equal((await call(`${TEST_SITE}/api/session`)).status,200,'the other communities keep their address');
 });
+
+test('platform: no community is made on the test site; an empty community can be deleted, never one in use or the main one', async () => {
+  const MANAGER='111111111111111111';
+  const {DB,call}=setup({ADMIN_DISCORD_IDS:MANAGER});
+  const raw='d'.repeat(64),hash=[...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(raw)))].map(b=>b.toString(16).padStart(2,'0')).join('');
+  DB.db.prepare("INSERT INTO users(id,name,role,created_at) VALUES(?,?,?,0)").run(MANAGER,'Gestionnaire','pilot');
+  DB.db.prepare('INSERT INTO sessions(token_hash,user_id,expires_at) VALUES(?,?,?)').run(hash,MANAGER,4102444800);
+  const send=(method,path,body={})=>call(`${MAIN}${path}`,{method,headers:{Cookie:`__Secure-em_dev_session=${raw}`,Origin:MAIN,'Content-Type':'application/json'},body:JSON.stringify(body)});
+  const created=await send('POST','/api/platform/communities',{name:'Nouvelle',shortName:'NEW',slug:'nouvelle-team',guildId:'123456789012345678'});
+  const createdBody=await created.json();assert.equal(created.status,403,JSON.stringify(createdBody));assert.match(createdBody.error,/version de test/);
+  assert.equal((await (await call(`${MAIN}/api/platform/communities`,{headers:{Cookie:`__Secure-em_dev_session=${raw}`}})).json()).testSite,true);
+  // A community with a pilot stays.
+  DB.db.prepare("INSERT INTO communities(id,slug,name,short_name,created_at) VALUES('c-used','used-team','Utilisée','USED',0)").run();
+  DB.db.prepare("INSERT INTO participants(id,name,guest_hash,created_at,community_id) VALUES('p-1','Pilote','g-1',0,'c-used')").run();
+  assert.equal((await send('DELETE','/api/platform/communities/used-team')).status,409);
+  assert.equal((await send('DELETE','/api/platform/communities/commu-dev')).status,400,'never the main community');
+  assert.equal((await send('DELETE','/api/platform/communities/commu-test')).status,200);
+  assert.equal(DB.db.prepare("SELECT COUNT(*) n FROM communities WHERE slug='commu-test'").get().n,0);
+  assert.equal(DB.db.prepare("SELECT COUNT(*) n FROM communities WHERE slug='used-team'").get().n,1);
+});
+
+test('dev.endurance-manager.app is a site of its own: a reserved name never names a community', async () => {
+  const {DB,call}=setup({APP_ORIGIN:'https://dev.endurance-manager.app',COMMUNITY:'commu-test'});
+  const session=await (await call('https://dev.endurance-manager.app/api/session')).json();
+  assert.equal(session.community.slug,'commu-test','the community of the main address (COMMUNITY)');
+});

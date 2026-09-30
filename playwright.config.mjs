@@ -1,6 +1,6 @@
 import {defineConfig, devices} from '@playwright/test';
 
-const baseURL = process.env.COMPAT_BASE_URL || 'https://fmt.endurance-manager.app';
+const baseURL = process.env.COMPAT_BASE_URL || 'https://dev.endurance-manager.app';
 
 export default defineConfig({
   testDir: './tests/compat',

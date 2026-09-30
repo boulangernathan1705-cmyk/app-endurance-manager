@@ -1,6 +1,6 @@
 {
   // Development of the community platform, in the endurance-manager.app account: it serves the test
-  // communities only (fmt.endurance-manager.app), with its own database. Production is
+  // communities only (dev.endurance-manager.app), with its own database. Production is
   // wrangler.prod.jsonc.
   "name": "endurance-manager-dev",
   "main": "server/worker-with-migrations.mjs",
@@ -12,10 +12,10 @@
   "triggers": {
     "crons": ["*/15 * * * *"]
   },
-  // The route (more specific than production's *.endurance-manager.app/*) keeps fmt on this Worker.
+  // The route (more specific than production's *.endurance-manager.app/*) keeps dev on this Worker.
   "routes": [
-    { "pattern": "fmt.endurance-manager.app", "custom_domain": true },
-    { "pattern": "fmt.endurance-manager.app/*", "zone_name": "endurance-manager.app" }
+    { "pattern": "dev.endurance-manager.app", "custom_domain": true },
+    { "pattern": "dev.endurance-manager.app/*", "zone_name": "endurance-manager.app" }
   ],
   "workers_dev": false,
   "assets": {
@@ -35,11 +35,11 @@
   // Secrets set in the dashboard (never here): DISCORD_CLIENT_ID, DISCORD_CLIENT_SECRET, DISCORD_BOT_TOKEN,
   // ADMIN_DISCORD_IDS (the platform managers).
   "vars": {
-    "APP_ORIGIN": "https://fmt.endurance-manager.app",
+    "APP_ORIGIN": "https://dev.endurance-manager.app",
     "SITE_ENV": "development",
     // Used for real by a team: no « Version de test » banner (still out of search engines, own cookies).
     "TEST_BANNER": "off",
-    "COMMUNITY": "fmt",
+    "COMMUNITY": "test",
     // Communities platform: <slug>.endurance-manager.app, one sign-in for all of them.
     "BASE_DOMAIN": "endurance-manager.app"
   }

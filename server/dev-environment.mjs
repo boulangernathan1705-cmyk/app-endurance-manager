@@ -11,7 +11,7 @@ export function devRobots() {
   return new Response('User-agent: *\nDisallow: /\n',{headers:{'Content-Type':'text/plain; charset=utf-8','X-Robots-Tag':'noindex, nofollow'}});
 }
 
-// TEST_BANNER=off: a development site used for real by a team (fmt) keeps its own cookies and stays out of
+// TEST_BANNER=off: the development site (dev) keeps its own cookies and stays out of
 // search engines, without the « Version de test » banner.
 export function markDevelopmentResponse(response, env = {}) {
   const marked=new Response(response.body,response);
