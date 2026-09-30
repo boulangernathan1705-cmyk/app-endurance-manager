@@ -1,4 +1,4 @@
-import {app,nav,state,activeGame,esc,button,canManage,isAdmin,can,circuitLabel,EVENT_TYPES,eventTypeBadge,officialBadge,schedulePendingBadge,eventBadge,eventCategoryCount,circuitVisual,logo,dateLabel,countdown,groupEvents,notifyRender,notifyNav} from './core.mjs';
+import {app,nav,state,activeGame,esc,button,canManage,isAdmin,can,circuitLabel,EVENT_TYPES,CATEGORIES,eventTypeBadge,officialBadge,schedulePendingBadge,eventBadge,eventCategoryCount,circuitVisual,logo,dateLabel,countdown,groupEvents,notifyRender,notifyNav} from './core.mjs';
 import {raceRangeBlock} from './planning.mjs';
 import {dateBlock,dayLabel,timeLabel} from '../dates.mjs';
 import {durationLabel,eventMinutes} from '../../shared/duration.mjs';
@@ -122,13 +122,15 @@ function raceMatches(event,filters){
 function filterChip(group,value,label,active,extra=''){return button('race-filter',label,`data-group="${group}" data-value="${esc(value)}" aria-pressed="${active}" ${extra}`,`race-filter-chip${active?' active':''}`);}
 function filterPanel(events,filters){
   const communities=filterCommunities();
-  const categoriesShown=[...new Set(events.flatMap(event=>event.categories||[]))].filter(category=>category!==ANY_CATEGORY);
+  // LMU: its six categories, always; iRacing (many classes): the ones its races use, in the catalog's order.
+  const used=new Set(events.flatMap(event=>event.categories||[]));
+  const categoriesShown=[...new Set([...CATEGORIES.filter(category=>activeGame==='lmu'||used.has(category)),...used])].filter(category=>category!==ANY_CATEGORY);
   const group=(title,content)=>`<div class="race-filter-group"><span class="race-filter-title">${title}</span><div class="race-filter-chips">${content}</div></div>`;
   const mark=item=>item.logoUrl?`<img src="${esc(item.logoUrl)}" alt="">`:'';
   const parts=[];
   if(communities.length>1)parts.push(group('Communautés',communities.map(item=>filterChip('communities',item.id,`${mark(item)}<span>${esc(item.shortName||item.name)}</span>`,filters.communities.includes(item.id),`data-tip="${esc(item.name)}"`)).join('')));
   parts.push(group('Type',[['official','Officielles'],...Object.entries(EVENT_TYPES).map(([key,item])=>[key,item.label])].map(([value,label])=>filterChip('types',value,esc(label),filters.types.includes(value))).join('')));
-  if(categoriesShown.length>1)parts.push(group('Catégorie',categoriesShown.map(category=>filterChip('categories',category,`${logo(category)}<span>${esc(category)}</span>`,filters.categories.includes(category))).join('')));
+  if(categoriesShown.length)parts.push(group('Catégorie',categoriesShown.map(category=>filterChip('categories',category,`${logo(category)}<span>${esc(category)}</span>`,filters.categories.includes(category))).join('')));
   parts.push(group('Dates',`<label class="race-filter-date"><span>Du</span><input type="date" data-race-filter-date="from" value="${esc(filters.from)}"></label><label class="race-filter-date"><span>Au</span><input type="date" data-race-filter-date="to" value="${esc(filters.to)}"></label>`));
   parts.push(group('Ma situation',[['registered','Inscrit'],['crew','Avec équipage'],['no-crew','Sans équipage'],['free','Pas inscrit']].map(([value,label])=>filterChip('situation',value,label,filters.situation===value)).join('')));
   return `<section class="race-filter-panel" aria-label="Filtres des courses">${parts.join('')}${activeFilterCount(filters)?`<div class="race-filter-foot">${button('race-filter-reset','Effacer les filtres','','link-button')}</div>`:''}</section>`;
