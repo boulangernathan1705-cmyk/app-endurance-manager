@@ -89,6 +89,7 @@ test('"Mes communautés": the communities of the player, with the address of eac
   member.run('c-test',user,time,time);
   const mine=(await (await call(`${MAIN}/api/session`,{headers})).json()).communities;
   assert.deepEqual(mine.map(item=>[item.slug,item.url,item.current]),[['commu-dev',`${MAIN}/`,true],['commu-test',`${TEST_SITE}/`,false]]);
+  assert.ok(mine.every(item=>item.manageCrews===false),'no role to manage the crews: a crew only with his own entry');
   assert.equal((await (await call(`${TEST_SITE}/api/session`,{headers})).json()).communities.length,2,'the same on every site');
 });
 

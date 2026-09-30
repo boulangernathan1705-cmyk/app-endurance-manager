@@ -1,5 +1,5 @@
 import {app,state,api,load,loadArchive,showError,countdown,CARS,inCommunity} from './core.mjs';
-import {renderNav,renderHome} from './home-view.mjs';
+import {renderNav,renderHome,toggleRaceFilter,resetRaceFilters} from './home-view.mjs';
 import {renderEvent} from './event-view.mjs';
 import {showPlanningDay,scrollPlanning,goToDeparture,setPlanningSpan,toggleQuickMenu} from './planning.mjs';
 import {renderEventForm,departureFields,updateRemoveButtons,goToEventStep,formDurationMinutes,bulkPreview,shiftBulkWeek} from './event-form.mjs';
@@ -107,6 +107,9 @@ async function perform(action,target){
   switch(action){
     case 'dismiss-error': document.querySelector('[data-ux-error-modal]')?.remove(); break;
     case 'home': if(target.dataset.list)state.listFormat=target.dataset.list; renderHome(); break;
+    case 'race-filter-toggle': state.raceFilterOpen=!state.raceFilterOpen; renderHome(); break;
+    case 'race-filter': toggleRaceFilter(target.dataset.group,target.dataset.value); renderHome(); break;
+    case 'race-filter-reset': resetRaceFilters(); renderHome(); break;
     case 'event-filter': state.eventFilter=target.dataset.filter||'upcoming'; if(state.eventFilter==='archived')await loadArchive(); renderHome(); break;
     case 'refresh': await refresh(); break;
     case 'open': state.currentEventId=target.dataset.id; state.selectedDepartureId=target.dataset.departure||null; state.eventSection='race'; state.drafts={}; state.pendingCrewJoin=null; state.registrationOpen.clear(); renderEvent(); break;

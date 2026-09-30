@@ -1883,3 +1883,23 @@ html[data-game] .race-card .race-head .official-badge { font-size: 10.5px; paddi
 .game-space-bar > .community-badge img { width: 22px; height: 22px; flex: none; border-radius: 50%; object-fit: cover; }
 .game-space-bar > .community-badge strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .game-space-bar:has(> .community-badge) { gap: 8px; }
+
+/* ---------- Filtres de la liste des courses ---------- */
+.race-filter-toggle { display: inline-flex !important; align-items: center; gap: 6px; }
+.race-filter-toggle svg { width: 15px; height: 15px; }
+.race-filter-toggle em { min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: var(--community-accent, #52d3d8); color: #061014; font-size: 11px; font-style: normal; font-weight: 900; line-height: 18px; text-align: center; }
+.race-filter-panel { display: grid; gap: 12px; margin: 0 0 18px; padding: 14px 16px; border: 1px solid rgba(255, 255, 255, .1); border-radius: 12px; background: rgba(12, 18, 21, .78); }
+.race-filter-group { display: grid; grid-template-columns: 130px minmax(0, 1fr); align-items: center; gap: 10px; }
+.race-filter-title { color: #99a3a0; font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.race-filter-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.race-filter-chip { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 0 12px; border: 1px solid rgba(255, 255, 255, .14); border-radius: 999px; background: transparent; color: #dfe6e4; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+.race-filter-chip:hover { border-color: rgba(82, 211, 216, .6); }
+.race-filter-chip.active { border-color: var(--community-accent, #52d3d8); background: color-mix(in srgb, var(--community-accent, #52d3d8) 16%, transparent); color: #fff; }
+.race-filter-chip img { width: 20px; height: 20px; border-radius: 50%; object-fit: cover; }
+.race-filter-chip .category-logo { width: 22px; height: auto; }
+.race-filter-date { display: inline-flex; align-items: center; gap: 6px; color: #99a3a0; font-size: 13px; font-weight: 700; }
+.race-filter-date input { min-height: 32px; padding: 0 8px; border: 1px solid rgba(255, 255, 255, .14); border-radius: 8px; background: rgba(0, 0, 0, .25); color: #eef3f2; font: inherit; color-scheme: dark; }
+.race-filter-foot { display: flex; justify-content: flex-end; }
+@media (max-width: 760px) {
+  .race-filter-group { grid-template-columns: minmax(0, 1fr); gap: 6px; }
+}
