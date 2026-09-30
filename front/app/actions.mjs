@@ -9,9 +9,12 @@ import {draftFor,registrationDraft,ownRegistrations,rerenderRegistrationSection,
 import {updateCrewState,pickSlot} from './crews.mjs';
 import {installRouter,routeFromLocation,applyRoute} from './router.mjs';
 import {installAutoRefresh} from './auto-refresh.mjs';
+import {introduceCommunitiesOnce} from '../community-intro.mjs';
 
 // The registration panel opens over the race: move keyboard and screen-reader focus into it.
 function revealRegistration(departureId){
+  // The first entry: how communities work, explained once.
+  introduceCommunitiesOnce(state.openSite?'':state.community?.name||'',(state.communities||[]).length);
   requestAnimationFrame(()=>document.getElementById(`departure-${departureId}`)?.querySelector('.fold-registration:not([hidden]) h2[tabindex]')?.focus({preventScroll:true}));
 }
 
@@ -79,6 +82,7 @@ function beginCrewJoin(event,departure,crew){
   state.registrationOpen.add(departure.id);
   renderEvent();
   document.getElementById(`departure-${departure.id}`)?.scrollIntoView({block:'start',behavior:'smooth'});
+  introduceCommunitiesOnce(state.openSite?'':state.community?.name||'',(state.communities||[]).length);
 }
 
 async function finishPendingCrewJoin(departureId,registrationId){

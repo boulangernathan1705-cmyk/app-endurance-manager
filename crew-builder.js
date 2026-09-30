@@ -1,6 +1,7 @@
 import {CARS} from './shared/catalog.mjs';
 import {shortDateLabel,timeLabel} from './front/dates.mjs';
 import {renderAvailabilityTimeline} from './front/timeline.mjs';
+import {introduceCommunitiesOnce} from './front/community-intro.mjs';
 
 const app = document.getElementById('app');
 let eventsCache = null;
@@ -350,6 +351,8 @@ async function openBuilder(crewId = null, preferredDepartureId = '') {
     }
 
     renderPanel(event,{scroll:true});
+    // The first crew: how communities work, explained once.
+    if (!crewId) introduceCommunitiesOnce(session.openSite ? '' : session.community?.name || '', (session.communities || []).length);
   } catch (error) {
     pendingMessage = {error:true,text:error?.message || 'Impossible d’ouvrir l’éditeur d’équipage.'};
     insertPendingMessage();
