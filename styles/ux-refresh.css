@@ -1866,11 +1866,15 @@ html[data-game] #app .departure-planning { margin-top: 12px; }
 }
 
 /* ---------- Courses officielles : communauté de chaque inscrit et équipage ---------- */
-.community-tag { display: inline-flex; align-items: center; justify-content: center; flex: none; height: 18px; min-width: 18px; padding: 0 5px; border: 1px solid var(--tag); border-radius: 5px; color: var(--tag); background: color-mix(in srgb, var(--tag) 14%, transparent); font-size: 10px; font-weight: 900; letter-spacing: .04em; line-height: 1; text-transform: uppercase; vertical-align: middle; }
-.community-tag.has-logo { width: 18px; padding: 0; border: 0; border-radius: 50%; overflow: hidden; background: none; }
+.community-tag { display: inline-flex; align-items: center; justify-content: center; flex: none; height: 22px; min-width: 22px; padding: 0 6px; border: 1px solid var(--tag); border-radius: 6px; color: var(--tag); background: color-mix(in srgb, var(--tag) 14%, transparent); font-size: 11px; font-weight: 900; letter-spacing: .04em; line-height: 1; text-transform: uppercase; vertical-align: middle; }
+.community-tag.has-logo { width: 22px; padding: 0; border: 0; border-radius: 50%; overflow: hidden; background: none; }
 .community-tag.has-logo img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.planning-crew .community-tag, .pilot-main .community-tag, .crew-planning-label .community-tag { margin-right: -2px; }
-.crew-planning-label .community-tag { margin-right: 6px; }
+/* Bigger in front of a pilot's or a crew's name, well visible: 30 px. */
+.pilot-name:has(> .community-tag), .crew-planning-label { display: inline-flex; align-items: center; gap: 8px; }
+.pilot-name > .community-tag, .crew-compact-team > .community-tag, .crew-planning-label > .community-tag { height: 30px; min-width: 30px; font-size: 12px; }
+.pilot-name > .community-tag.has-logo, .crew-compact-team > .community-tag.has-logo, .crew-planning-label > .community-tag.has-logo { width: 30px; }
+.planning-crew > .community-tag { height: 24px; min-width: 24px; }
+.planning-crew > .community-tag.has-logo { width: 24px; }
 .official-badge { display: inline-flex; align-items: center; padding: 2px 9px; border: 1px solid rgba(83, 216, 255, .75); border-radius: 999px; color: #53d8ff; background: rgba(83, 216, 255, .1); font-size: 11px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
 html[data-game] .race-card .race-head .official-badge { font-size: 10.5px; padding: 2px 8px; margin: 2px 6px 0 0; }
 .community-choice { display: grid; gap: 8px; }
