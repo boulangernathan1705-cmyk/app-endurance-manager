@@ -1488,7 +1488,7 @@ html[data-game] #app .ux-unassigned-grid > .pilot-row > .edit-button { align-sel
 .setup-created { margin-top: 16px; padding: 14px; border: 1px solid rgba(127,224,168,.45); border-radius: 12px; background: rgba(127,224,168,.06); }
 .setup-created strong { color: #7fe0a8; }
 .platform-list { display: grid; gap: 8px; }
-.platform-row { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--border, #292d31); border-radius: 10px; background: var(--panel2, #16191c); font-size: 13.5px; color: #c7d0d4; }
+.platform-row { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) auto auto; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--border, #292d31); border-radius: 10px; background: var(--panel2, #16191c); font-size: 13.5px; color: #c7d0d4; }
 .platform-row div { display: grid; min-width: 0; }
 .platform-row div a { overflow: hidden; color: #99a3a0; white-space: nowrap; text-overflow: ellipsis; }
 .community-settings[data-panel="platform"] { grid-template-columns: minmax(0, 1fr); max-width: 980px; }

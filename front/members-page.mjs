@@ -165,12 +165,12 @@ function setupMarkup(setup) {
 
 // « Plateforme » (managers of Endurance Manager): the communities, and a new one.
 async function platformMarkup() {
-  const {communities, baseDomain, showcase} = await api('/api/platform/communities');
+  const {communities, baseDomain, showcase, testSite} = await api('/api/platform/communities');
   const rows = communities.map(item => `<article class="platform-row"><div><strong>${esc(item.name)}</strong><a href="${esc(item.url)}/" target="_blank" rel="noopener">${esc(item.url.replace(/^https:\/\//, ''))}</a></div>
     <span>${item.discordServer ? `Discord « ${esc(item.discordServer)} »` : item.guildId ? `Serveur ${esc(item.guildId)}` : 'Aucun serveur'}</span>
-    <span class="${item.botPresent ? 'platform-ok' : 'platform-ko'}">${item.botPresent ? '✓ Bot présent' : item.botInviteUrl ? `<a href="${esc(item.botInviteUrl)}" target="_blank" rel="noopener">Bot absent : lien d’invitation</a>` : 'Bot absent'}</span></article>`).join('');
+    <span class="${item.botPresent ? 'platform-ok' : 'platform-ko'}">${item.botPresent ? '✓ Bot présent' : item.botInviteUrl ? `<a href="${esc(item.botInviteUrl)}" target="_blank" rel="noopener">Bot absent : lien d’invitation</a>` : 'Bot absent'}</span><button type="button" class="danger-link platform-delete" data-delete-community="${esc(item.slug)}" data-name="${esc(item.name)}">Supprimer</button></article>`).join('');
   return `<section class="settings-card"><h2>Communautés (${communities.length})</h2><div class="platform-list">${rows}</div></section>
-    <section class="settings-card"><h2>Nouvelle communauté</h2>
+    ${testSite ? `<section class="settings-card"><h2>Nouvelle communauté</h2><p class="members-help">Ce site est la version de test : une communauté créée ici n’est pas accessible à son adresse. Crée-la depuis <a href="https://endurance-manager.app/members.html">endurance-manager.app</a>.</p></section>` : `<section class="settings-card"><h2>Nouvelle communauté</h2>
       <p class="members-help">Les administrateurs du serveur Discord deviennent automatiquement administrateurs de la communauté. Ils terminent ensuite l’installation dans « Administration → Mise en place ».</p>
       <form class="settings-appearance" data-new-community>
         <label>Nom de la communauté<input name="name" maxlength="80" required placeholder="Ex. : Team Rookie Racing"></label>
@@ -179,7 +179,7 @@ async function platformMarkup() {
         <label>ID du serveur Discord<input name="guildId" inputmode="numeric" required pattern="[0-9]{15,22}" placeholder="Ex. : 1269541162025353289"></label>
         <p class="members-help">Pour l’ID : sur Discord, active <strong>Paramètres utilisateur → Avancés → Mode développeur</strong>, puis fais un clic droit sur l’icône du serveur et choisis <strong>Copier l’identifiant du serveur</strong>.</p>
         <div class="settings-actions"><button class="primary-button" type="submit">Créer la communauté</button><span class="settings-status" aria-live="polite"></span></div>
-      </form><div data-created></div></section>
+      </form><div data-created></div></section>`}
     ${showcase ? `<section class="settings-card showcase-reset"><h2>Vitrine de l’adresse principale</h2>
       <p class="members-help">Remplace <strong>toutes</strong> les données de ce site (courses, inscriptions, équipages, pilotes, réglages) par des courses et des pilotes fictifs, datés à partir d’aujourd’hui, et le détache de tout serveur Discord. Le calendrier iRacing officiel est ensuite réimporté. Les données actuelles sont définitivement supprimées.</p>
       <form class="setup-form setup-inline" data-showcase><input name="confirm" autocomplete="off" placeholder="Tape VITRINE pour confirmer">
@@ -296,6 +296,14 @@ app.addEventListener('click', async event => {
   const go = event.target.closest('[data-go-tab]');
   if (go) { app.querySelector(`[data-tab="${go.dataset.goTab}"]`)?.click(); return; }
   if (event.target.closest('[data-setup-refresh]')) { await reload('setup'); return; }
+  const remove = event.target.closest('[data-delete-community]');
+  if (remove) {
+    if (!confirm(`Supprimer la communauté « ${remove.dataset.name} » ? Seule une communauté sans course ni pilote peut l’être.`)) return;
+    remove.disabled = true;
+    try { await api(`/api/platform/communities/${encodeURIComponent(remove.dataset.deleteCommunity)}`, 'DELETE'); await reload('platform'); }
+    catch (error) { remove.disabled = false; alert(error.message); }
+    return;
+  }
   const copy = event.target.closest('[data-copy]');
   if (copy) {
     const field = document.getElementById(copy.dataset.copy);
