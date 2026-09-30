@@ -2,6 +2,12 @@
 
 Les changements du site, version par version. La plus récente est en haut.
 
+## Prochaine version — en test
+
+### Page d'une course
+- **Plus compacte** : la bannière se réduit à une bande et l'en-tête de la course tient sur quelques lignes, pour que le planning des départs arrive tout de suite.
+- Au survol d'une pastille de catégorie (« 2 GT3 »), le nom des pilotes qui cherchent un équipage.
+
 ## v1.7.1 — 29 septembre 2026
 
 ### Récap de la semaine sur Discord

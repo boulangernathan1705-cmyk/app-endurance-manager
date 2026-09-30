@@ -28,6 +28,8 @@ export const inCommunity = () => state.community?.name && !state.openSite ? `\n\
 export const canEditRace = event => can('manage_races') || (can('create_race') && Boolean(event?.createdByMe));
 
 export function notifyRender() {
+  // The page shown (home, event, my-entries) on <html>: the race page has a thin banner.
+  document.documentElement.dataset.view = state.page;
   queueMicrotask(() => document.dispatchEvent(new CustomEvent('endurance:render',{detail:{page:state.page,eventId:state.currentEventId,list:state.listFormat}})));
 }
 export function notifyNav() { queueMicrotask(() => document.dispatchEvent(new CustomEvent('endurance:nav'))); }

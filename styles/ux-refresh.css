@@ -1719,6 +1719,40 @@ html[data-game] #app .race-my-start .secondary-button { border-color: var(--comm
 }
 
 /* =====================================================================
+   Race page, compact: the banner as a thin band and the race header on few lines, so the starts come right
+   under it (the full banner stays on the list of races and the home page).
+   ===================================================================== */
+html[data-view="event"] header.site-hero .hero-picture { aspect-ratio: auto; height: clamp(76px, 8vw, 140px); }
+html[data-view="event"] header.site-hero .hero-banner { object-fit: cover; object-position: center 40%; }
+html[data-game] #app .race-header { gap: 10px !important; padding: 14px 18px !important; }
+html[data-game] #app .race-header .race-card-top { align-items: center; gap: 16px; }
+html[data-game] #app .race-header .race-date { width: 66px; padding: 5px 0 6px; }
+html[data-game] #app .race-header .race-date strong { font-size: 25px; }
+html[data-game] #app .race-header .race-date small { font-size: 12px; }
+html[data-game] #app .race-header .race-date.is-range strong { font-size: 23px; }
+html[data-game] #app .race-header .race-head { flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: flex-start !important; gap: 4px 12px; text-align: left; }
+html[data-game] #app .race-header .event-title { flex-basis: 100%; font-size: 28px !important; }
+html[data-game] #app .race-header .race-meta { font-size: 15px; }
+html[data-game] #app .race-header .event-header-countdown { margin: 0 !important; }
+html[data-game] #app .race-header .race-card-top > .circuit-visual { width: 150px !important; height: 84px !important; }
+html[data-game] #app .race-header .race-header-footer { padding-top: 10px; border-top: 1px solid rgba(255, 255, 255, .07); }
+html[data-game] #app .race-header .race-header-actions .secondary-button { min-height: 34px !important; padding: 0 12px !important; font-size: 13.5px !important; }
+html[data-game] #app .race-header .event-category-badge { padding-block: 4px !important; }
+html[data-game] #app .departure-planning { margin-top: 12px; }
+@media (max-width: 760px) {
+  html[data-view="event"] header.site-hero .hero-picture { height: 64px; }
+  html[data-game] #app .race-header { padding: 12px !important; }
+  html[data-game] #app .race-header .event-title { font-size: 22px !important; }
+  html[data-game] #app .race-header .race-card-top > .circuit-visual { width: 72px !important; height: 56px !important; }
+  html[data-game] #app .race-header .race-my-start small { display: none; }
+  html[data-game] #app .race-header .race-my-start .secondary-button { min-height: 38px !important; font-size: 14px !important; }
+  html[data-game] #app .race-header .race-header-actions { flex-wrap: wrap; gap: 8px 16px; justify-content: flex-start; }
+  html[data-game] #app .race-header .race-header-actions > * { min-height: 32px !important; font-size: 13px !important; white-space: nowrap; }
+  html[data-game] #app .race-header .race-header-actions > .secondary-button { padding: 0 10px !important; }
+  html[data-game] #app .race-header .race-header-footer { gap: 10px !important; }
+}
+
+/* =====================================================================
    Info bubbles (data-tip, front/tooltip.mjs): a short explanation on hover (computer) or on a tap (phone).
    ===================================================================== */
 .em-tip { position: fixed; z-index: 10000; max-width: min(280px, calc(100vw - 16px)); padding: 7px 11px; border: 1px solid #3a4548; border-radius: 9px; background: #1a2123; color: #e6ecea; font-size: 13px; font-weight: 500; line-height: 1.4; text-align: left; box-shadow: 0 8px 22px rgba(0, 0, 0, .45); pointer-events: none; }
