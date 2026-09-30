@@ -178,3 +178,9 @@ test('platform: no community is made on the test site; an empty community can be
   assert.equal(DB.db.prepare("SELECT COUNT(*) n FROM communities WHERE slug='commu-test'").get().n,0);
   assert.equal(DB.db.prepare("SELECT COUNT(*) n FROM communities WHERE slug='used-team'").get().n,1);
 });
+
+test('dev.endurance-manager.app is a site of its own: a reserved name never names a community', async () => {
+  const {DB,call}=setup({APP_ORIGIN:'https://dev.endurance-manager.app',COMMUNITY:'commu-test'});
+  const session=await (await call('https://dev.endurance-manager.app/api/session')).json();
+  assert.equal(session.community.slug,'commu-test','the community of the main address (COMMUNITY)');
+});

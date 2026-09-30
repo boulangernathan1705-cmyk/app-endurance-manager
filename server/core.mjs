@@ -26,12 +26,14 @@ function baseDomain(env) {
   const domain = String(env?.BASE_DOMAIN || '').toLowerCase();
   return /^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(domain) ? domain : '';
 }
+// Names no community can take (the database refuses them too): dev.<domain> and the like are sites of their own.
+const RESERVED_LABELS = new Set(['www', 'app', 'api', 'admin', 'dev', 'auth']);
 // "<slug>" when the address is <slug>.BASE_DOMAIN (one level), otherwise ''.
 function communityLabel(url, env) {
   const domain = baseDomain(env);
   if (!domain || url.protocol !== 'https:' || !url.hostname.endsWith('.' + domain)) return '';
   const label = url.hostname.slice(0, -domain.length - 1);
-  return SLUG_LABEL.test(label) ? label : '';
+  return SLUG_LABEL.test(label) && !RESERVED_LABELS.has(label) ? label : '';
 }
 function cookieNames(env) {
   if (!baseDomain(env)) return {session:COOKIE_SESSION, state:COOKIE_STATE, ret:COOKIE_RETURN, domain:''};
