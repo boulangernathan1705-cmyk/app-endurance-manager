@@ -10,6 +10,9 @@ Les changements du site, version par version. La plus récente est en haut.
 ### Communautés
 - L'explication des communautés ne s'affiche plus qu'**une seule fois pour ton compte**, quel que soit l'appareil.
 
+### Récap de la semaine sur Discord
+- En haut de chaque course, **ses jours et ses horaires de départ** ; la ligne « autres départs sans inscrit · voir la course » disparaît.
+
 ## v1.10 — 30 septembre 2026
 
 ### Liste des courses
