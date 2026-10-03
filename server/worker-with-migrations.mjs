@@ -6,6 +6,7 @@ import {cleanup, communityLabel, origin} from './core.mjs';
 import {importNextCommunity, completeSpecialTimes} from './iracing-import.mjs';
 import {refreshShowcaseIfDue} from './demo.mjs';
 import {refreshMemberships} from './access.mjs';
+import {purgeNotifications} from './notifications.mjs';
 import {allCommunities, currentCommunity, communitySlug, appearanceOf} from './community.mjs';
 import {isDevelopment,devRobots,markDevelopmentResponse} from './dev-environment.mjs';
 
@@ -102,6 +103,8 @@ export default {
     const run = (label, task) => ctx.waitUntil(task().catch(error => console.error(label, error instanceof Error ? error.message : 'unknown')));
     // Expired sessions, OAuth states and rate-limit counters are purged here too, not only on Discord login.
     run('Scheduled cleanup failed', () => cleanup(env));
+    // Notifications of the bell older than 30 days.
+    run('Notifications cleanup failed', () => purgeNotifications(env));
     // :00 Members and Discord roles not checked for a day are checked again by the bot, a few at a time.
     if (slot === 0 && env.DISCORD_BOT_TOKEN) run('Membership check failed', async () => refreshMemberships(env, await allCommunities(env), 12));
     // :15 Official iRacing endurances of one community (a new one first, then each in turn).
