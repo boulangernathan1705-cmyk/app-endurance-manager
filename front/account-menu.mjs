@@ -150,8 +150,11 @@ function showcaseBanner(platformDiscordUrl) {
   const text = document.createElement('span');
   text.textContent = 'Tu regardes une démonstration d’Endurance Manager : les courses, les équipages et les pilotes sont fictifs.';
   banner.append(label, text);
+  // The manager of a Discord server asks for the space of their community (demande-communaute.html).
+  const request = document.createElement('a'); request.href = '/demande-communaute.html'; request.textContent = 'Demander un espace pour ta communauté';
+  banner.append(request);
   if (/^https:\/\/(discord\.gg|discord\.com\/invite)\//.test(platformDiscordUrl || '')) {
-    const link = document.createElement('a'); link.href = platformDiscordUrl; link.rel = 'noopener'; link.textContent = 'Utiliser Endurance Manager pour ta communauté';
+    const link = document.createElement('a'); link.href = platformDiscordUrl; link.rel = 'noopener'; link.textContent = 'Rejoindre le Discord d’Endurance Manager';
     banner.append(link);
   }
   bar.after(banner);
