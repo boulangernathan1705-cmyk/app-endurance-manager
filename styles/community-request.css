@@ -1,0 +1,29 @@
+/* « Demander un espace » (demande-communaute.html) and the requests of « Administration → Plateforme ». */
+#request-app { display: grid; gap: 16px; }
+.request-intro h1 { margin: 0 0 10px; font-size: 22px; }
+.request-intro p { margin: 0 0 8px; color: #c7d0d4; line-height: 1.6; }
+.request-form select, .request-form textarea, .request-form input[type="url"] { width: 100%; min-height: 40px; box-sizing: border-box; padding: 8px 12px; border: 1px solid var(--border, #292d31); border-radius: 9px; background: rgba(0,0,0,.25); color: inherit; font: inherit; font-size: 14px; }
+.request-form textarea { resize: vertical; line-height: 1.5; }
+.request-wide, .request-games { grid-column: 1 / -1; }
+.request-games { display: flex; flex-wrap: wrap; gap: 8px 18px; margin: 0; padding: 10px 12px; border: 1px solid var(--border, #292d31); border-radius: 9px; }
+.request-games legend { padding: 0 6px; font-size: 13px; font-weight: 700; color: #c7d0d4; }
+.request-games label { display: inline-flex !important; align-items: center; gap: 8px; font-weight: 600 !important; white-space: nowrap; }
+.request-games input[type="radio"] { flex: none; width: 18px !important; height: 18px; min-height: 0 !important; margin: 0; padding: 0; }
+.request-history { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.request-history li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 12px; padding: 10px 12px; border: 1px solid var(--border, #292d31); border-radius: 10px; background: var(--panel2, #16191c); }
+.request-history li span { grid-column: 1; color: #99a3a0; font-size: 13px; }
+.request-history li em, .request-card .request-status { grid-column: 2; grid-row: 1 / span 2; align-self: center; padding: 3px 10px; border-radius: 999px; font-size: 12px; font-style: normal; font-weight: 800; }
+.request-pending { background: rgba(243,179,61,.14); color: #f3b33d; }
+.request-done { background: rgba(127,224,168,.12); color: #7fe0a8; }
+.request-rejected { background: rgba(255,120,120,.12); color: #ff9a9a; }
+.request-list { display: grid; gap: 10px; }
+.request-card { display: grid; gap: 8px; padding: 12px 14px; border: 1px solid var(--border, #292d31); border-radius: 12px; background: var(--panel2, #16191c); font-size: 13.5px; color: #c7d0d4; }
+.request-card header { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
+.request-card header strong { font-size: 15px; color: #f4f6f5; }
+.request-card dl { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 4px 12px; margin: 0; }
+.request-card dt { color: #99a3a0; }
+.request-card dd { margin: 0; overflow-wrap: anywhere; }
+.request-card blockquote { margin: 0; padding: 8px 12px; border-left: 3px solid var(--border, #292d31); white-space: pre-wrap; overflow-wrap: anywhere; }
+.request-card .settings-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+@media (max-width: 760px) { .request-card dl { grid-template-columns: minmax(0, 1fr); } .request-card dt { margin-top: 4px; } }
+.showcase-banner a + a { margin-left: 0; }
