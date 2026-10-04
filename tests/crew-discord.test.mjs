@@ -3,14 +3,14 @@ import assert from 'node:assert/strict';
 import {DatabaseSync} from 'node:sqlite';
 import {readFileSync, readdirSync} from 'node:fs';
 import worker from '../server/worker.mjs';
-import {syncCrewDiscord, OPEN_BEFORE, CLOSE_AFTER} from '../server/crew-discord.mjs';
+import {syncCrewDiscord, OPEN_BEFORE, CLOSE_AFTER, KEEP_ARCHIVES} from '../server/crew-discord.mjs';
 import {linkTestServer, setMember, ORGA_ROLE, GUILD} from './fixtures/discord-server.mjs';
 
-// Crews on Discord and race reminders (migration 0044): the bot is a fake Discord that records each request.
+// Crews on Discord and race reminders (migrations 0044, 0045): the bot is a fake Discord that records each request.
 const ROOT='https://site.example';
 const ADMIN='111111111111111111', PILOT='222222222222222222', MATE='333333333333333333';
 const DEV='e0a1c0de-0000-4000-8000-000000000001';
-const THREADS='800000000000000001', VOICES='800000000000000002';
+const ARCHIVES='800000000000000002';
 const HOUR=3600_000;
 const MIGRATIONS=readdirSync(new URL('../migrations/',import.meta.url)).filter(name=>name.endsWith('.sql')).sort();
 
@@ -22,14 +22,14 @@ class D1 {
 
 // Fake Discord: every request is kept; new channels, threads and messages get new ids.
 function fakeDiscord(){
-  const calls=[];let next=700000000000000000n;const voiceStates=new Map();const gone=new Set();
+  const calls=[];let next=700000000000000000n;const voiceStates=new Map();const gone=new Set();const unknownChannel=new Set();
   const reply=(status,data)=>new Response(status===204?null:JSON.stringify(data),{status,headers:{'Content-Type':'application/json'}});
   async function handler(url,init={}){
     const path=String(url).replace('https://discord.com/api/v10','');const method=init.method||'GET';
     const body=init.body?JSON.parse(init.body):null;calls.push({method,path,body});
+    if(unknownChannel.has(path))return reply(404,{code:10003});
     if(gone.has(path))return reply(404,{code:10008});
-    if(method==='POST'&&path==='/channels/800000000000000004/threads')return reply(201,{id:String(next),message:{id:String(next++)}});
-    if(method==='GET'&&path===`/guilds/${GUILD}/channels`)return reply(200,[{id:THREADS,name:'equipages',type:0,position:1},{id:'800000000000000004',name:'forum-equipages',type:15,position:4},{id:VOICES,name:'Vocaux',type:4,position:2},{id:'800000000000000003',name:'vocal',type:2,position:3}]);
+    if(method==='GET'&&path===`/guilds/${GUILD}/channels`)return reply(200,[{id:'800000000000000001',name:'general',type:0,position:1},{id:ARCHIVES,name:'Archives',type:4,position:2}]);
     if(method==='GET'&&path===`/guilds/${GUILD}`)return reply(200,{id:GUILD,name:'Test',owner_id:ADMIN});
     if(method==='GET'&&path===`/guilds/${GUILD}/roles`)return reply(200,[{id:GUILD,name:'@everyone',permissions:'0',position:0}]);
     const voice=path.match(/^\/guilds\/\d+\/voice-states\/(\d+)$/);
@@ -37,7 +37,7 @@ function fakeDiscord(){
     if(method==='POST'||(method==='GET'))return reply(200,{id:String(next++)});
     return reply(method==='DELETE'?204:200,{});
   }
-  return {calls,handler,voiceStates,gone};
+  return {calls,handler,voiceStates,gone,unknownChannel};
 }
 
 function harness(){
@@ -81,16 +81,17 @@ function harness(){
 const race={name:'6h SPA',circuit:'spa',categories:['Hypercar','GT3'],departures:[{date:'2090-10-15',time:'20:00'}]};
 const since=(calls,from)=>calls.slice(from).map(call=>`${call.method} ${call.path}`);
 const notifications=async (req,actor)=>(await req('/api/notifications','GET',null,actor)).data.notifications;
+const created=(calls,from)=>calls.slice(from).filter(call=>call.method==='POST'&&call.path===`/guilds/${GUILD}/channels`);
 
-test('a crew gets a thread and a voice channel, followed until 24 h after its race, with its reminders', async () => {
+test('a crew gets its category with a text channel and its voice channel below, followed until 24 h after its race', async () => {
   const {DB,req,login,sync,discord}=harness();
   await login(ADMIN,'admin','Orga');await login(PILOT,'pilot','Alice');await login(MATE,'mate','Bob');
-  // The admins choose the channel of the threads and the category of the voice channels.
+  // The admins choose the category of the archives (optional).
   const setup=(await req('/api/community/setup','GET',null,'admin')).data;
-  assert.deepEqual(setup.crews.channels.threads.map(item=>[item.id,item.forum]),[[THREADS,false],['800000000000000004',true]]);
-  assert.match(setup.crews.botInviteUrl,/permissions=\d{12,}/);
-  assert.equal((await req('/api/community/crew-discord','PUT',{enabled:true,reminders:true,threadChannelId:'999999999999999999'},'admin')).status,400);
-  assert.equal((await req('/api/community/crew-discord','PUT',{enabled:true,reminders:true,threadChannelId:THREADS,voiceCategoryId:VOICES},'admin')).status,200);
+  assert.deepEqual(setup.crews.categories,[{id:ARCHIVES,name:'Archives'}]);
+  assert.match(setup.crews.botInviteUrl,/permissions=68624&/);
+  assert.equal((await req('/api/community/crew-discord','PUT',{enabled:true,reminders:true,archiveCategoryId:'999999999999999999'},'admin')).status,400);
+  assert.equal((await req('/api/community/crew-discord','PUT',{enabled:true,reminders:true,archiveCategoryId:ARCHIVES},'admin')).status,200);
   assert.equal((await req('/api/community/crew-discord','PUT',{enabled:true},'pilot')).status,403);
 
   assert.equal((await req('/api/events','POST',race,'admin')).status,201);
@@ -104,21 +105,22 @@ test('a crew gets a thread and a voice channel, followed until 24 h after its ra
   let mark=discord.calls.length;
   await sync(startsAt-OPEN_BEFORE-HOUR);
   assert.deepEqual(since(discord.calls,mark),[]);
-  // A few days before: a voice channel in the category, a thread in the channel, the recap mentioning the pilot.
+  // A few days before: its category, the text channel, the voice channel below, the recap mentioning the pilot.
   mark=discord.calls.length;
   assert.equal((await sync(startsAt-3*24*HOUR)).opened,1);
-  const opened=discord.calls.slice(mark);
-  assert.deepEqual(opened.map(call=>`${call.method} ${call.path.replace(/\d{18}/g,'ID')}`),[`POST /guilds/ID/channels`,`POST /channels/ID/threads`,`POST /channels/ID/messages`]);
-  assert.equal(opened[0].body.type,2);assert.equal(opened[0].body.parent_id,VOICES);assert.match(opened[0].body.name,/Les Tondeuz/);
-  assert.equal(opened[1].path,`/channels/${THREADS}/threads`);assert.equal(opened[1].body.type,11);assert.match(opened[1].body.name,/Les Tondeuz · 6h SPA/);
-  assert.match(opened[2].body.content,new RegExp(`<@${PILOT}>`));assert.deepEqual(opened[2].body.allowed_mentions,{users:[PILOT]});
+  const [category,text,voice]=created(discord.calls,mark);
+  assert.deepEqual([category.body.type,text.body.type,voice.body.type],[4,0,2]);
+  assert.match(category.body.name,/🏁 Les Tondeuz · 6h SPA/);
   const row=DB.db.prepare('SELECT * FROM crew_discord').get();
-  assert.ok(row.thread_id&&row.voice_id&&row.message_id);
-  assert.match(opened[2].body.content,new RegExp(`Salon vocal : <#${row.voice_id}>`));
+  assert.ok(row.category_id&&row.text_id&&row.voice_id&&row.message_id);
+  assert.equal(text.body.parent_id,row.category_id);assert.equal(voice.body.parent_id,row.category_id);
+  const recap=discord.calls.slice(mark).find(call=>call.path===`/channels/${row.text_id}/messages`);
+  assert.match(recap.body.content,new RegExp(`<@${PILOT}>`));assert.deepEqual(recap.body.allowed_mentions,{users:[PILOT]});
+  assert.match(recap.body.content,new RegExp(`Salon vocal : <#${row.voice_id}>`));
   // Nothing changed: nothing sent.
   mark=discord.calls.length;await sync(startsAt-3*24*HOUR+HOUR);assert.deepEqual(since(discord.calls,mark),[]);
 
-  // Bob joins and the crew gets a car: the recap is edited (without pinging) and Bob is welcomed in the thread.
+  // Bob joins and the crew gets a car: the recap is edited (without pinging) and Bob is welcomed.
   let crewRow=(await req('/api/events','GET',null,'pilot')).data.events[0].departures[0].crews[0];
   assert.equal((await req(`/api/crews/${crew.data.id}/members`,'POST',{registrationId:mate.data.id,version:crewRow.version,selfJoin:true},'mate')).status,200);
   crewRow=(await req('/api/events','GET',null,'pilot')).data.events[0].departures[0].crews[0];
@@ -126,21 +128,23 @@ test('a crew gets a thread and a voice channel, followed until 24 h after its ra
   mark=discord.calls.length;await sync(startsAt-2*24*HOUR);
   const changed=discord.calls.slice(mark);
   assert.deepEqual(changed.map(call=>call.method),['PATCH','POST']);
-  assert.equal(changed[0].path,`/channels/${row.thread_id}/messages/${row.message_id}`);assert.match(changed[0].body.content,/Ferrari 296 LMGT3/);assert.deepEqual(changed[0].body.allowed_mentions,{parse:[]});
+  assert.equal(changed[0].path,`/channels/${row.text_id}/messages/${row.message_id}`);assert.match(changed[0].body.content,/Ferrari 296 LMGT3/);assert.deepEqual(changed[0].body.allowed_mentions,{parse:[]});
   assert.match(changed[1].body.content,new RegExp(`Bienvenue <@${MATE}>`));assert.deepEqual(changed[1].body.allowed_mentions,{users:[MATE]});
 
-  // 24 h before: a reminder in the thread and on the bell (with the thread); sent once.
+  // 24 h before: a reminder in the text channel and on the bell (with the channel); sent once.
   mark=discord.calls.length;await sync(startsAt-23*HOUR);
   const reminder=discord.calls.slice(mark).filter(call=>call.method==='POST');
-  assert.equal(reminder.length,1);assert.match(reminder[0].body.content,/⏰ .*Rappel/);assert.deepEqual(reminder[0].body.allowed_mentions.users.sort(),[PILOT,MATE].sort());
-  for(const actor of ['pilot','mate']){const item=(await notifications(req,actor)).find(item=>item.kind==='race_reminder');assert.ok(item,actor);assert.equal(item.crewName,'Les Tondeuz');assert.equal(item.threadUrl,`https://discord.com/channels/${GUILD}/${row.thread_id}`);}
+  assert.equal(reminder.length,1);assert.equal(reminder[0].path,`/channels/${row.text_id}/messages`);assert.match(reminder[0].body.content,/⏰ .*Rappel/);
+  assert.deepEqual(reminder[0].body.allowed_mentions.users.sort(),[PILOT,MATE].sort());
+  for(const actor of ['pilot','mate']){const item=(await notifications(req,actor)).find(item=>item.kind==='race_reminder');assert.ok(item,actor);assert.equal(item.crewName,'Les Tondeuz');assert.equal(item.channelUrl,`https://discord.com/channels/${GUILD}/${row.text_id}`);}
   mark=discord.calls.length;await sync(startsAt-22*HOUR);assert.deepEqual(since(discord.calls,mark),[]);
   assert.equal((await notifications(req,'pilot')).filter(item=>item.kind==='race_reminder').length,1);
   // 1 h before: the last reminder, with the voice channel.
   mark=discord.calls.length;await sync(startsAt-30*60_000);
   assert.match(discord.calls.slice(mark).find(call=>call.method==='POST').body.content,new RegExp(`<#${row.voice_id}>`));
 
-  // 24 h after the end: still a pilot in the voice channel, so it waits; then archived and deleted.
+  // 24 h after the end: still a pilot in the voice channel, so it waits; then the voice channel is deleted, the
+  // text channel goes to the archives with their permissions, and the crew's category is deleted.
   const endsAt=startsAt+6*HOUR;
   discord.voiceStates.set(MATE,row.voice_id);
   mark=discord.calls.length;await sync(endsAt+CLOSE_AFTER+HOUR);
@@ -149,9 +153,12 @@ test('a crew gets a thread and a voice channel, followed until 24 h after its ra
   discord.voiceStates.clear();
   mark=discord.calls.length;assert.equal((await sync(endsAt+CLOSE_AFTER+2*HOUR)).closed,1);
   const closing=discord.calls.slice(mark).filter(call=>call.method!=='GET');
-  assert.deepEqual(closing.map(call=>`${call.method} ${call.path}`),[`DELETE /channels/${row.voice_id}`,`PATCH /channels/${row.thread_id}`]);
-  assert.deepEqual(closing[1].body,{archived:true,locked:true});
+  assert.deepEqual(closing.map(call=>`${call.method} ${call.path}`),[`DELETE /channels/${row.voice_id}`,`PATCH /channels/${row.text_id}`,`DELETE /channels/${row.category_id}`]);
+  assert.deepEqual(closing[1].body,{parent_id:ARCHIVES,lock_permissions:true});
   mark=discord.calls.length;await sync(endsAt+CLOSE_AFTER+3*HOUR);assert.deepEqual(since(discord.calls,mark),[]);
+  // 30 days later, the archived text channel is deleted.
+  mark=discord.calls.length;assert.equal((await sync(endsAt+CLOSE_AFTER+2*HOUR+KEEP_ARCHIVES+HOUR)).purged,1);
+  assert.deepEqual(since(discord.calls,mark),[`DELETE /channels/${row.text_id}`]);
 });
 
 test('a deleted crew is closed at once, and nothing happens without the module', async () => {
@@ -166,37 +173,45 @@ test('a deleted crew is closed at once, and nothing happens without the module',
   await sync(departure.startsAt-3*24*HOUR);await sync(departure.startsAt-HOUR);
   assert.deepEqual(discord.calls.filter(call=>call.path.startsWith('/channels')),[]);
   assert.deepEqual((await notifications(req,'pilot')).filter(item=>item.kind==='race_reminder'),[]);
-  // Module on (without category): opened, then the crew is deleted: voice channel deleted and thread archived.
-  assert.equal((await req('/api/community/crew-discord','PUT',{enabled:true,reminders:false,threadChannelId:THREADS},'admin')).status,200);
+  // Module on without archives: opened, then the crew is deleted: everything is deleted.
+  assert.equal((await req('/api/community/crew-discord','PUT',{enabled:true,reminders:false},'admin')).status,200);
   assert.equal((await sync(departure.startsAt-2*HOUR)).opened,1);
-  const voice=discord.calls.find(call=>call.path===`/guilds/${GUILD}/channels`&&call.method==='POST');assert.equal(voice.body.parent_id,undefined);
+  const row=DB.db.prepare('SELECT * FROM crew_discord').get();
   const crewRow=(await req('/api/events','GET',null,'pilot')).data.events[0].departures[0].crews[0];
   assert.equal((await req(`/api/crews/${crew.data.id}`,'DELETE',{version:crewRow.version},'pilot')).status,200);
   const mark=discord.calls.length;assert.equal((await sync(departure.startsAt-HOUR)).closed,1);
-  assert.deepEqual(discord.calls.slice(mark).map(call=>call.method),['DELETE','PATCH']);
-  assert.ok(DB.db.prepare('SELECT closed_at FROM crew_discord').get().closed_at);
+  assert.deepEqual(since(discord.calls,mark),[`DELETE /channels/${row.voice_id}`,`DELETE /channels/${row.text_id}`,`DELETE /channels/${row.category_id}`]);
+  const closed=DB.db.prepare('SELECT * FROM crew_discord').get();
+  assert.ok(closed.closed_at);assert.equal(closed.archived_id,null);
 });
 
-test('in a forum the recap opens the post; a recap deleted on Discord is posted again', async () => {
+test('a recap or a text channel deleted on Discord is made again', async () => {
   const {DB,req,login,sync,discord}=harness();
   await login(ADMIN,'admin','Orga');await login(PILOT,'pilot','Alice');
-  assert.equal((await req('/api/community/crew-discord','PUT',{enabled:true,threadChannelId:'800000000000000004'},'admin')).status,200);
+  assert.equal((await req('/api/community/crew-discord','PUT',{enabled:true},'admin')).status,200);
   assert.equal((await req('/api/events','POST',race,'admin')).status,201);
   const event=(await req('/api/events','GET',null,'admin')).data.events[0];
-  const departure=event.departures[0], base=`/api/events/${event.id}/departures/${departure.id}`;
+  const departure=event.departures[0], base=`/api/events/${event.id}/departures/${departure.id}`, at=departure.startsAt-2*24*HOUR;
   assert.equal((await req(base+'/registrations','POST',{name:'x',category:'GT3',status:'whole'},'pilot')).status,201);
-  assert.equal((await req(base+'/crews','POST',{name:'Forum',category:'GT3'},'pilot')).status,201);
-  let mark=discord.calls.length;await sync(departure.startsAt-24*HOUR*2);
-  const post=discord.calls.slice(mark).find(call=>call.path==='/channels/800000000000000004/threads');
-  assert.equal(post.body.type,undefined);assert.match(post.body.message.content,new RegExp(`<@${PILOT}>`));
-  assert.equal(discord.calls.slice(mark).filter(call=>call.path.endsWith('/messages')).length,0,'no second message');
-  let row=DB.db.prepare('SELECT * FROM crew_discord').get();assert.ok(row.message_id);
+  assert.equal((await req(base+'/crews','POST',{name:'Retour',category:'GT3'},'pilot')).status,201);
+  await sync(at);
+  const row=DB.db.prepare('SELECT * FROM crew_discord').get();assert.ok(row.message_id);
   // Someone deletes the recap: it comes back at the next checks.
-  discord.gone.add(`/channels/${row.thread_id}/messages/${row.message_id}`);
-  DB.db.prepare("UPDATE crew_discord SET recap_hash='' ").run();
-  await sync(departure.startsAt-24*HOUR*2+HOUR);
+  discord.gone.add(`/channels/${row.text_id}/messages/${row.message_id}`);
+  DB.db.prepare("UPDATE crew_discord SET recap_hash=''").run();
+  await sync(at+HOUR);
   assert.equal(DB.db.prepare('SELECT message_id FROM crew_discord').get().message_id,null);
-  mark=discord.calls.length;await sync(departure.startsAt-24*HOUR*2+2*HOUR);
-  assert.deepEqual(discord.calls.slice(mark).map(call=>`${call.method} ${call.path}`),[`POST /channels/${row.thread_id}/messages`]);
-  assert.ok(DB.db.prepare('SELECT message_id FROM crew_discord').get().message_id);
+  let mark=discord.calls.length;await sync(at+2*HOUR);
+  assert.deepEqual(since(discord.calls,mark),[`POST /channels/${row.text_id}/messages`]);
+  // Someone deletes the text channel: a new one in the same category, with the recap.
+  const now=DB.db.prepare('SELECT * FROM crew_discord').get();
+  discord.gone.add(`/channels/${row.text_id}/messages/${now.message_id}`);
+  discord.unknownChannel.add(`/channels/${row.text_id}/messages/${now.message_id}`);
+  DB.db.prepare("UPDATE crew_discord SET recap_hash=''").run();
+  await sync(at+3*HOUR);
+  assert.equal(DB.db.prepare('SELECT text_id FROM crew_discord').get().text_id,null);
+  mark=discord.calls.length;await sync(at+4*HOUR);
+  const again=discord.calls.slice(mark);
+  assert.equal(again[0].body.type,0);assert.equal(again[0].body.parent_id,row.category_id);
+  assert.equal(again[1].method,'POST');assert.match(again[1].path,/\/messages$/);
 });
