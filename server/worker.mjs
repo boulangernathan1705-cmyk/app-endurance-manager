@@ -499,6 +499,8 @@ async function api(request, env) {
       const car=crewCar(input);
       const result=await env.DB.prepare('UPDATE crews SET name=?,category=?,car=?,version=version+1 WHERE id=? AND version=?').bind(name,input.category,car,crew.id,input.version).run();
       if (!result.meta.changes) fail(409,'Cet équipage a changé. Actualise avant de réessayer.');
+      // A new car: the crew's pilots are told (not a change of name or category alone).
+      if ((crew.car||'')!==(car||'')) await notify(env,await crewPilots(env,crew.id),'crew_car',event,{departure,skip:[actor.user.id],crewName:name,car:car||'',by:actor.user.name});
       return json({id:crew.id});
     }
     const name=text(input.name,60,'Nom de l’équipage');

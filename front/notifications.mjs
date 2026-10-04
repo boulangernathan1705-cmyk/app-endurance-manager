@@ -18,6 +18,7 @@ function sentence(item) {
     case 'crew_removed': return `${b(item.by)} t’a retiré de l’équipage ${crew}`;
     case 'crew_deleted': return `L’équipage ${crew} a été supprimé${item.by ? ` par ${b(item.by)}` : ''}`;
     case 'crew_start': return `Ton équipage ${crew} a choisi son départ`;
+    case 'crew_car': return item.car ? `Ton équipage ${crew} roulera en ${b(item.car)}` : `Ton équipage ${crew} n’a plus de voiture choisie`;
     case 'withdrawn': return `${b(item.pilot)} s’est désinscrit : une place se libère dans ton équipage ${crew}`;
     case 'removed_by': return `${item.by ? b(item.by) : 'Un organisateur'} a retiré ton inscription`;
     case 'race_changed': {
