@@ -6,7 +6,7 @@ Application web de gestion de courses d’endurance simracing : événements, in
 
 **La simplicité est la sophistication suprême.**
 
-Afficher d’abord l’action utile au pilote. Organiser la préparation en onglets et pages dédiées, avec des tableaux lisibles et des pastilles de suivi. Ne pas utiliser d’accordéons pour cette interface. Garder une seule séance conseillée ; les détails appartiennent à la page concernée.
+Afficher d’abord l’action utile au pilote. Garder une seule séance conseillée et un suivi visuel lisible ; présenter les données, explications et réglages à la demande. Ajouter des détails doit enrichir le guide sans charger l’écran principal.
 
 ## Profils et droits
 
