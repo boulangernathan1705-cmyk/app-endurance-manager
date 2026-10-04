@@ -16,7 +16,7 @@ import {syncIracingEvents} from './iracing-import.mjs';
 import {resetShowcase} from './demo.mjs';
 import {syncWeeklyDiscord, sendRecapTest, usesSiteRecap, WEBHOOK_URL} from './discord-weekly.mjs';
 import {notify, notificationsApi, departurePilots, eventPilots, crewPilots} from './notifications.mjs';
-import {guildCategories, CREW_BOT_PERMISSIONS} from './crew-discord.mjs';
+import {botCanManageChannels, CREW_BOT_PERMISSIONS} from './crew-discord.mjs';
 // Official races (iRacing's official endurances, LMU official events): common to every community (migration 0039).
 const OFFICIAL = 'official';
 // A race of the current community, or an official race: any id from another community answers "introuvable".
@@ -119,13 +119,12 @@ function botInvite(env, guildId, permissions = '0') {
   if (!env.DISCORD_CLIENT_ID) return null;
   return `https://discord.com/oauth2/authorize?client_id=${encodeURIComponent(env.DISCORD_CLIENT_ID)}&scope=bot&permissions=${permissions}${guildId ? `&guild_id=${guildId}&disable_guild_select=true` : ''}`;
 }
-// « Mise en place »: the crews on Discord, with the categories of the server the admins can choose for the archives.
-async function crewDiscordSetup(env, community, discord) {
-  const saved = await env.DB.prepare('SELECT archive_category_id, last_error, last_error_at FROM community_crew_discord WHERE community_id=?').bind(community.id).first();
-  return {enabled:community.modules.crewChannels === true, reminders:community.modules.raceReminders === true,
-    archiveCategoryId:saved?.archive_category_id || null, lastError:saved?.last_error || null, lastErrorAt:saved?.last_error_at || null,
-    categories:discord ? await guildCategories(env, community.discordGuildId) : null,
-    botInviteUrl:botInvite(env, community.discordGuildId, CREW_BOT_PERMISSIONS)};
+// « Modules »: whether the bot may make the crews' channels, its invite link with those rights, and what last
+// stopped it.
+async function crewDiscordState(env, community) {
+  const saved = await env.DB.prepare('SELECT last_error, last_error_at FROM community_crew_discord WHERE community_id=?').bind(community.id).first();
+  return {botReady:await botCanManageChannels(env, community.discordGuildId), botInviteUrl:botInvite(env, community.discordGuildId, CREW_BOT_PERMISSIONS),
+    lastError:community.modules.crewChannels === true ? saved?.last_error || null : null};
 }
 // Permissions of the actor in the current community (server/access.mjs).
 const can = (actor, permission) => Boolean(actor.permissions?.has(permission));
@@ -712,7 +711,9 @@ async function api(request, env) {
       administrator:role.administrator, permissions:saved.has(role.id) ? normalizePermissions(saved.get(role.id)) : (role.id === community.discordGuildId ? [...DEFAULT_EVERYONE] : [])}));
     await keepDiscordLook(env, community, discord);
     return json({community:{name:community.name, shortName:community.shortName, discordServer:discord?.name || null, ...appearanceOf(community)}, roles, permissions:PERMISSIONS,
-      modules:{iracingImport:community.modules.iracingImport === true, discordWeekly:community.modules.discordWeekly === true, soloRaces:community.modules.soloRaces === true}});
+      modules:{iracingImport:community.modules.iracingImport === true, discordWeekly:community.modules.discordWeekly === true, soloRaces:community.modules.soloRaces === true,
+        crewChannels:community.modules.crewChannels === true, raceReminders:community.modules.raceReminders === true},
+      crews:await crewDiscordState(env, community)});
   }
   // Banner sent by the admins: the image itself (already resized by the browser), WebP, JPEG or PNG, 600 KB at most.
   if (path === '/api/community/banner' && ['PUT','DELETE'].includes(method)) {
@@ -760,8 +761,18 @@ async function api(request, env) {
     const input = await body(request);
     const modules = {...community.modules};
     // The Discord recap is set on the « Mise en place » page (its own webhook), not here.
-    for (const key of ['iracingImport','soloRaces']) if (typeof input[key] === 'boolean') modules[key] = input[key];
-    await env.DB.prepare('UPDATE communities SET modules=? WHERE id=?').bind(JSON.stringify(modules), community.id).run();
+    for (const key of ['iracingImport','soloRaces','raceReminders']) if (typeof input[key] === 'boolean') modules[key] = input[key];
+    const statements = [];
+    // Crews on Discord (server/crew-discord.mjs): only once the bot has the rights to make the channels.
+    if (typeof input.crewChannels === 'boolean') {
+      if (input.crewChannels && await botCanManageChannels(env, community.discordGuildId) !== true)
+        fail(400, 'Le bot n’a pas encore les droits pour créer les salons : clique sur « Donner les droits au bot », puis réessaie.');
+      modules.crewChannels = input.crewChannels;
+      if (input.crewChannels) statements.push(env.DB.prepare(`INSERT INTO community_crew_discord(community_id,updated_at) VALUES(?,?)
+        ON CONFLICT(community_id) DO UPDATE SET last_error=NULL,last_error_at=NULL,updated_at=excluded.updated_at`).bind(community.id, now()));
+    }
+    statements.push(env.DB.prepare('UPDATE communities SET modules=? WHERE id=?').bind(JSON.stringify(modules), community.id));
+    await env.DB.batch(statements);
     return json({ok:true, modules});
   }
   // « Mise en place » (admins): where the community stands, step by step (members page).
@@ -775,27 +786,7 @@ async function api(request, env) {
       // Former recap (site's webhook, LMU only) still running until the admins choose their own.
       legacyRecap:!recaps.length && usesSiteRecap(env, community),
       guild:{id:community.discordGuildId, name:discord?.name || null, botPresent:Boolean(discord)}, botInviteUrl:botInvite(env, community.discordGuildId),
-      discordInviteUrl:community.discordInviteUrl, crews:await crewDiscordSetup(env, community, discord)});
-  }
-  // Crews on Discord and race reminders (server/crew-discord.mjs): the two modules and the category where the
-  // text channels of finished races go (none: deleted).
-  if (path === '/api/community/crew-discord' && method === 'PUT') {
-    requirePermission(actor,'admin');
-    const input = await body(request);
-    const modules = {...community.modules, crewChannels:input.enabled === true, raceReminders:input.reminders === true};
-    const statements = [];
-    if (modules.crewChannels) {
-      const categories = await guildCategories(env, community.discordGuildId);
-      if (!categories) fail(400, 'Le bot ne peut pas lire les salons de ton serveur : invite-le d’abord avec « Donner les droits au bot ».');
-      const archive = input.archiveCategoryId ? categories.find(item => item.id === String(input.archiveCategoryId)) : null;
-      if (input.archiveCategoryId && !archive) fail(400, 'Cette catégorie n’existe plus sur ton serveur.');
-      statements.push(env.DB.prepare(`INSERT INTO community_crew_discord(community_id,archive_category_id,updated_at) VALUES(?,?,?)
-        ON CONFLICT(community_id) DO UPDATE SET archive_category_id=excluded.archive_category_id,last_error=NULL,last_error_at=NULL,updated_at=excluded.updated_at`)
-        .bind(community.id, archive?.id || null, now()));
-    }
-    statements.push(env.DB.prepare('UPDATE communities SET modules=? WHERE id=?').bind(JSON.stringify(modules), community.id));
-    await env.DB.batch(statements);
-    return json({ok:true, modules:{crewChannels:modules.crewChannels, raceReminders:modules.raceReminders}});
+      discordInviteUrl:community.discordInviteUrl});
   }
   // The recap messages of the community: one message (one simulator or both) or two (one per simulator,
   // e.g. in two channels). An empty address keeps the webhook already saved for that message.

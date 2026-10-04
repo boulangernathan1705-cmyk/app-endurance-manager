@@ -50,7 +50,7 @@ function memberCard(member, allPermissions) {
 // are saved as soon as a box changes.
 async function settingsMarkup() {
   const settings = await api('/api/community/settings');
-  const module = (key, label, help) => `<label class="settings-switch"><span><strong>${label}</strong><small>${help}</small></span><input type="checkbox" role="switch" data-module="${key}" ${settings.modules[key] ? 'checked' : ''}><i aria-hidden="true"></i></label>`;
+  const module = (key, label, help, locked = false) => `<label class="settings-switch"><span><strong>${label}</strong><small>${help}</small></span><input type="checkbox" role="switch" data-module="${key}" ${settings.modules[key] ? 'checked' : ''} ${locked ? 'disabled' : ''}><i aria-hidden="true"></i></label>`;
   // The solo races permissions only matter with the solo races module.
   const shown = settings.permissions.filter(permission => settings.modules.soloRaces || !permission.startsWith('solo_'));
   const legend = `<details class="role-legend-wrap"><summary>Que permet chaque autorisation ?</summary><dl class="role-legend">${shown.map(permission => `<div><dt>${esc(PERMISSION_LABELS[permission])}</dt><dd>${esc(PERMISSION_HELP[permission])}</dd></div>`).join('')}</dl></details>`;
@@ -73,8 +73,16 @@ async function settingsMarkup() {
       <div class="settings-actions"><label class="secondary-button settings-banner-pick">Choisir une image<input type="file" accept="image/png,image/jpeg,image/webp" data-banner-file hidden></label>
         ${look.bannerUrl ? '<button type="button" class="secondary-button" data-banner-remove>Remettre la bannière du site</button>' : ''}<span class="settings-status" aria-live="polite"></span></div>
       <p class="members-help">${look.bannerUrl ? 'Ta bannière est affichée en haut de toutes les pages.' : 'C’est la bannière du site. Choisis une image pour afficher la tienne.'} Format conseillé : 2048 × 512 (4 fois plus large que haute). Après le choix de l’image, tu la cadres et la zoomes avant de l’enregistrer ; elle est allégée automatiquement.</p></div></section>`;
+  // Crews on Discord: the switch only works once the bot has the rights to make the channels.
+  const crews = settings.crews || {};
+  const crewNote = crews.botReady === true
+    ? (crews.lastError ? `<p class="setup-note setup-error">⚠️ ${esc(crews.lastError)}</p>` : '')
+    : `<div class="crew-module-rights"><p class="members-help">Avant d’activer : donne au bot le droit de créer des salons sur ton serveur.</p>
+      <div class="setup-actions">${crews.botInviteUrl ? `<a class="welcome-discord" href="${esc(crews.botInviteUrl)}" target="_blank" rel="noopener">Donner les droits au bot</a>` : ''}<button type="button" class="secondary-button" data-settings-refresh>C’est fait</button></div></div>`;
   return `${appearance}
-    <section class="settings-card"><h2>Modules</h2>${module('iracingImport','Endurances iRacing officielles','Import automatique des séries en équipe et des événements spéciaux.')}${module('soloRaces','Courses solo','Onglet « Courses solo », places limitées, liste d’attente, courses OPEN / SAFE.')}</section>
+    <section class="settings-card"><h2>Modules</h2>${module('iracingImport','Endurances iRacing officielles','Import automatique des séries en équipe et des événements spéciaux.')}${module('soloRaces','Courses solo','Onglet « Courses solo », places limitées, liste d’attente, courses OPEN / SAFE.')}
+      ${module('crewChannels','Salons d’équipage sur Discord','Quelques jours avant la course, chaque équipage reçoit sur ton serveur un salon texte avec son récap et un salon vocal juste en dessous. Après la course, le vocal est supprimé et le salon texte rangé dans « Archives équipages » pendant 30 jours. Tout est automatique.', crews.botReady !== true && !settings.modules.crewChannels)}${crewNote}
+      ${module('raceReminders','Rappels de course','24 h avant le départ dans la cloche du site, et 24 h et 1 h avant dans le salon de l’équipage.')}</section>
     <section class="settings-card settings-roles-card"><h2>Autorisations des rôles Discord</h2><p class="members-help">Un membre cumule les autorisations de tous ses rôles. « @everyone » s’applique à tous les membres du serveur. Le propriétaire du serveur et les rôles « Administrateur » de Discord ont tout.</p>${legend}${roles}</section>`;
 }
 
@@ -99,7 +107,7 @@ function setupMarkup(setup) {
   const bot = !guild.id
     ? '<p>Cette communauté n’est reliée à aucun serveur Discord. Demande à un gestionnaire d’Endurance Manager de la relier.</p>'
     : guild.botPresent
-      ? `<p>Le bot Endurance Manager est sur le serveur ${server}. Il lit la liste des membres et leurs rôles, pour savoir qui a accès au site. Il n’écrit sur ton serveur que si tu actives les salons d’équipage (étape 5).</p>`
+      ? `<p>Le bot Endurance Manager est sur le serveur ${server}. Il lit la liste des membres et leurs rôles, pour savoir qui a accès au site. Il n’écrit sur ton serveur que si tu actives les salons d’équipage (Réglages → Modules).</p>`
       : `<p>Le bot d’Endurance Manager vérifie qui est membre de ton serveur Discord et avec quels rôles. Sans lui, personne ne peut entrer sur le site de la communauté.</p>
         <ol class="setup-howto"><li>Clique sur <strong>Inviter le bot</strong> : Discord s’ouvre directement sur ton serveur.</li>
         <li>Vérifie le nom du serveur, puis clique sur <strong>Autoriser</strong>. Il faut être administrateur du serveur (ou avoir la permission « Gérer le serveur »).</li>
@@ -146,24 +154,7 @@ function setupMarkup(setup) {
     <li>Clique sur <strong>Modifier le lien d’invitation</strong> et choisis « Expire après : <strong>Jamais</strong> ».</li><li>Copie le lien et colle-le ici.</li></ol>
     <form class="setup-form setup-inline" data-invite><input name="invite" type="url" placeholder="https://discord.gg/…" value="${esc(setup.discordInviteUrl || '')}">
       <button class="primary-button" type="submit">Enregistrer</button><span class="settings-status" aria-live="polite"></span></form>`;
-  // 5. Crews on Discord and race reminders (server/crew-discord.mjs).
-  const crews = setup.crews || {};
-  const channelsList = crews.categories
-    ? `<label>Catégorie des archives <select name="archiveCategory"><option value="">Aucune : supprimer le salon texte</option>${crews.categories.map(item => `<option value="${esc(item.id)}" ${item.id === crews.archiveCategoryId ? 'selected' : ''}>${esc(item.name)}</option>`).join('')}</select></label>
-      <p class="setup-note">Mets cette catégorie en lecture seule pour tes membres : les salons archivés le seront aussi. Ils sont supprimés au bout de 30 jours.</p>`
-    : '<p class="setup-note">Le bot ne peut pas encore lire les salons de ton serveur : clique sur « Donner les droits au bot », puis sur « Vérifier ».</p>';
-  const crewForm = `<p>Quelques jours avant chaque course, le bot crée pour chaque équipage <strong>une catégorie</strong> avec <strong>un salon texte</strong> et <strong>son salon vocal juste en dessous</strong>. Le salon texte contient le récap (course, horaire, voiture, pilotes), qui se met à jour tout seul, et les pilotes y sont mentionnés. 24 h après la fin prévue, le salon vocal est supprimé et le salon texte est archivé. Les pilotes n’ont rien à faire.</p>
-    <ol class="setup-howto"><li>Clique sur <strong>Donner les droits au bot</strong> : il peut alors créer et supprimer les salons des équipages (gérer les salons, envoyer des messages).</li>
-    <li>Choisis, si tu veux, la catégorie où ranger les salons texte des courses terminées.</li></ol>
-    <div class="setup-actions">${crews.botInviteUrl ? `<a class="welcome-discord" href="${esc(crews.botInviteUrl)}" target="_blank" rel="noopener">Donner les droits au bot</a>` : ''}<button type="button" class="secondary-button" data-setup-refresh>Vérifier</button></div>
-    ${crews.lastError ? `<p class="setup-note setup-error">⚠️ ${esc(crews.lastError)}</p>` : ''}
-    <form class="setup-form" data-crews data-on="${crews.enabled ? '1' : '0'}">
-      <label class="settings-switch recap-switch"><span><strong>Salons d’équipage</strong><small>Créés et fermés automatiquement par le bot.</small></span><input type="checkbox" role="switch" name="enabled" ${crews.enabled ? 'checked' : ''}><i aria-hidden="true"></i></label>
-      <div class="crew-options">${channelsList}</div>
-      <label class="settings-switch recap-switch"><span><strong>Rappels de course</strong><small>24 h et 1 h avant le départ dans le salon de l’équipage, et 24 h avant dans la cloche du site.</small></span><input type="checkbox" role="switch" name="reminders" ${crews.reminders ? 'checked' : ''}><i aria-hidden="true"></i></label>
-      <div class="setup-actions"><button class="primary-button" type="submit">Enregistrer</button><span class="settings-status" aria-live="polite"></span></div></form>`;
-  const crewStatus = crews.enabled ? (crews.lastError ? 'Activé, mais le bot est bloqué' : `Activé${crews.reminders ? ', avec les rappels' : ''}`) : crews.reminders ? 'Rappels activés' : 'Facultatif';
-  // 6. Announce the site.
+  // 5. Announce the site.
   const message = `🏁 Nos courses d’endurance s’organisent maintenant sur Endurance Manager !\n👉 ${setup.siteUrl}/\n\nConnecte-toi avec ton compte Discord : tu y retrouves les courses LMU et iRacing, tu t’inscris avec tes disponibilités et tu crées ou rejoins un équipage.`;
   const announce = `<p>Partage l’adresse du site sur ton Discord, et épingle le message dans ton salon d’annonces.</p>
     <div class="setup-inline"><input readonly id="setup-site-url" value="${esc(setup.siteUrl)}/">${copyButton('setup-site-url')}</div>
@@ -176,8 +167,7 @@ function setupMarkup(setup) {
       ${step(setup.rolesConfigured, 2, 'Choisir ce que chaque rôle peut faire', setup.rolesConfigured ? 'Autorisations réglées' : 'Conseillé : réglages par défaut en place', roles, false)}
       ${step(count > 0 || setup.legacyRecap, 3, 'Publier le récap de la semaine sur Discord', count ? (setup.recaps || []).map(item => `${RECAP_LABELS[item.scope]} : ${esc(item.webhook)}`).join(' · ') : setup.legacyRecap ? 'Récap LMU actif (salon d’origine)' : 'Facultatif', recap)}
       ${step(Boolean(setup.discordInviteUrl), 4, 'Ajouter le lien d’invitation de ton serveur', setup.discordInviteUrl ? 'Lien enregistré' : 'Facultatif', invite)}
-      ${step(crews.enabled || crews.reminders ? !crews.lastError : false, 5, 'Créer les salons des équipages', crewStatus, crewForm, false)}
-      ${step(null, 6, 'Annoncer le site à tes membres', 'Adresse et message prêts à copier', announce, false)}
+      ${step(null, 5, 'Annoncer le site à tes membres', 'Adresse et message prêts à copier', announce, false)}
     </ol>`};
 }
 
@@ -340,6 +330,7 @@ app.addEventListener('click', async event => {
   const go = event.target.closest('[data-go-tab]');
   if (go) { app.querySelector(`[data-tab="${go.dataset.goTab}"]`)?.click(); return; }
   if (event.target.closest('[data-setup-refresh]')) { await reload('setup'); return; }
+  if (event.target.closest('[data-settings-refresh]')) { await reload('settings'); return; }
   const refresh = event.target.closest('[data-members-refresh]');
   if (refresh) {
     refresh.disabled = true; refresh.textContent = 'Actualisation…';
@@ -439,18 +430,6 @@ app.addEventListener('submit', async event => {
     catch (error) { status.textContent = error.message; }
     return;
   }
-  const crewForm = event.target.closest('form[data-crews]');
-  if (crewForm) {
-    event.preventDefault();
-    const status = crewForm.querySelector('.setup-actions .settings-status'), field = name => crewForm.elements[name]?.value || '';
-    status.textContent = 'Enregistrement…';
-    try {
-      await api('/api/community/crew-discord', 'PUT', {enabled:crewForm.elements.enabled.checked, reminders:crewForm.elements.reminders.checked,
-        archiveCategoryId:field('archiveCategory') || null});
-      await reload('setup');
-    } catch (error) { status.textContent = error.message; }
-    return;
-  }
   const recaps = event.target.closest('form[data-recaps]'), invite = event.target.closest('form[data-invite]'), created = event.target.closest('form[data-new-community]');
   if (recaps || invite || created) {
     event.preventDefault();
@@ -501,8 +480,6 @@ app.addEventListener('change', async event => {
     return;
   }
   if (box.matches('[data-banner-zoom]') && cropper) { setZoom(Number(box.value)); return; }
-  const crewsForm = box.closest('form[data-crews]');
-  if (crewsForm) { crewsForm.dataset.on = crewsForm.elements.enabled.checked ? '1' : '0'; return; }
   const recapForm = box.closest('form[data-recaps]');
   if (recapForm) { recapForm.dataset.mode = recapForm.elements.enabled.checked ? recapForm.elements.layout.value : 'none'; return; }
   if (box.dataset.module) {
@@ -511,6 +488,7 @@ app.addEventListener('change', async event => {
       await api('/api/community/modules', 'PATCH', {[box.dataset.module]:box.checked});
       // The solo races permissions appear or disappear with the module.
       if (box.dataset.module === 'soloRaces') { await load(); app.querySelector('[data-tab="settings"]')?.click(); return; }
+      if (box.dataset.module === 'crewChannels') { await reload('settings'); return; }
     } catch (error) { box.checked = !box.checked; alert(error.message); } finally { box.disabled = false; }
     return;
   }
