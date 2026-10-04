@@ -2,6 +2,20 @@
 
 Les changements du site, version par version. La plus récente est en haut.
 
+## v1.11.1 — 4 octobre 2026
+
+### Inscriptions
+- Ton inscription affiche toujours **ton nom Discord** : personne ne peut s'inscrire ou modifier son inscription sous le pseudo d'un autre membre.
+
+### Équipages
+- La voiture d'un équipage se choisit **parmi les voitures de sa catégorie**.
+
+### Navigation
+- Une adresse qui n'existe pas affiche **« Page introuvable »** avec un lien vers l'accueil, au lieu d'une page blanche.
+
+### Diagnostics
+- Chaque communauté garde ses propres signalements d'erreurs : une communauté très active n'efface plus ceux des autres.
+
 ## v1.11 — 30 septembre 2026
 
 ### Courses officielles

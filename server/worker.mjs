@@ -5,6 +5,7 @@ import {
 } from './core.mjs';
 import {ingestClientError, clientErrorsApi} from './telemetry.mjs';
 import {racesPath} from './races-path.mjs';
+import {CARS} from '../shared/catalog.mjs';
 import {currentCommunity, appearanceOf, allCommunities, communityUrl, communitySlug, communityById, communityFromRow} from './community.mjs';
 import {isDevelopment} from './dev-environment.mjs';
 import {communityAccess, requirePermission, displayRole, PERMISSIONS, DEFAULT_EVERYONE, normalizePermissions, discordGuild, keepDiscordLook, memberPermissions, refreshCommunityMembers} from './access.mjs';
@@ -33,6 +34,13 @@ async function actingCommunity(env, actor, site, communityId, event = null) {
   const access = await communityAccess(env, actor, target);
   if (access.status !== 'member') fail(403, `Tu n’es pas membre de la communauté ${target.name}.`);
   return {community:target, actor:{...actor, permissions:access.permissions, manager:access.manager}};
+}
+// Car of a crew: none, or one of the catalog's cars of its category (older names accepted and renamed).
+function crewCar(input) {
+  if (input.car==null || input.car==='') return '';
+  const car=LEGACY_CAR_ALIASES.get(input.car) || text(input.car,100,'Voiture');
+  if (!CARS[input.category]?.includes(car)) fail(400,'Choisis une voiture proposée pour cette catégorie.');
+  return car;
 }
 function departureById(event, departureId) {
   const departure = JSON.parse(event.departures).find(d => d.id === departureId);
@@ -472,14 +480,14 @@ async function api(request, env) {
       }
       const name=text(input.name,60,'Nom de l’équipage');
       if (!JSON.parse(event.categories).includes(input.category)) fail(400,'Choisis une catégorie de cet événement.');
-      const car=input.car==null || input.car==='' ? '' : text(input.car,100,'Voiture');
+      const car=crewCar(input);
       const result=await env.DB.prepare('UPDATE crews SET name=?,category=?,car=?,version=version+1 WHERE id=? AND version=?').bind(name,input.category,car,crew.id,input.version).run();
       if (!result.meta.changes) fail(409,'Cet équipage a changé. Actualise avant de réessayer.');
       return json({id:crew.id});
     }
     const name=text(input.name,60,'Nom de l’équipage');
     if (!JSON.parse(event.categories).includes(input.category)) fail(400,'Choisis une catégorie de cet événement.');
-    const car=input.car==null || input.car==='' ? '' : text(input.car,100,'Voiture');
+    const car=crewCar(input);
     const crewId=id();
     if (can(who,'manage_registrations')) {
       const result=await env.DB.prepare('INSERT INTO crews(id,event_id,departure_id,name,category,car,created_at,community_id) VALUES(?,?,?,?,?,?,?,?)').bind(crewId,event.id,departure.id,name,input.category,car,now(),here.id).run();
@@ -607,6 +615,11 @@ async function api(request, env) {
     if (method === 'DELETE') result = await env.DB.prepare('DELETE FROM registrations WHERE id=? AND version=?').bind(reg.id,input.version).run();
     else {
       const data = validateRegistration(input,event);
+      // A pilot linked to Discord keeps his Discord name: an edit cannot show him as another member.
+      if (reg.participant_user_id) {
+        data.name=(await env.DB.prepare('SELECT name FROM users WHERE id=?').bind(reg.participant_user_id).first())?.name || reg.participant_name || data.name;
+        data.nameKey=data.name.normalize('NFKC').toLocaleLowerCase('fr-FR');
+      }
       const results=await env.DB.batch([
         env.DB.prepare(`UPDATE registrations SET name=?,name_key=?,category=?,car=?,car_preferences=?,car_any=?,status=?,preferred_pilot=?,round_choices=?,solo_driver=?,version=version+1 WHERE id=? AND version=? AND EXISTS(SELECT 1 FROM events WHERE id=? AND version=?)`).bind(data.name,data.nameKey,data.category,data.car,JSON.stringify(data.cars),data.carAny?1:0,data.status,data.preferredPilot,JSON.stringify(data.roundChoices||[]),data.soloDriver?1:0,reg.id,input.version,event.id,event.version),
         env.DB.prepare('UPDATE participants SET name=? WHERE id=? AND changes()=1').bind(data.name,reg.participant_id)
@@ -820,6 +833,13 @@ async function api(request, env) {
   if (path.startsWith('/api/members/')) fail(410, 'Les rôles se gèrent maintenant sur le serveur Discord de la communauté.');
   fail(404, 'Action introuvable.');
 }
+// An address that leads nowhere (old link, typo): a page saying so, with the way back, instead of a blank page.
+function pageNotFound() {
+  const page = `<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex"><title>Page introuvable · ENDURANCE MANAGER</title>
+<style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#0b0d0f;color:#e6ecea;font-family:system-ui,sans-serif;text-align:center;padding:24px}main{max-width:520px}h1{font-size:28px;margin:0 0 12px}p{color:#c7d0d4;line-height:1.6}a{color:#5fd3dc}</style></head>
+<body><main><h1>Page introuvable</h1><p>Cette page n’existe pas ou plus. Le lien est peut-être ancien ou incomplet.</p><p><a href="/">Revenir à l’accueil</a></p></main></body></html>`;
+  return new Response(page, {status:404, headers:{'Content-Type':'text/html; charset=utf-8', 'Cache-Control':'no-store', 'X-Robots-Tag':'noindex'}});
+}
 export default {
   async fetch(request, env) {
     const pathname=new URL(request.url).pathname;
@@ -827,7 +847,10 @@ export default {
       try { return await ingestClientError(request,env); }
       catch { return new Response(null,{status:204}); }
     }
-    if (!pathname.startsWith('/api/')) return env.ASSETS.fetch(request);
+    if (!pathname.startsWith('/api/')) {
+      const asset = await env.ASSETS.fetch(request);
+      return asset.status === 404 && (request.headers.get('Accept') || '').includes('text/html') ? pageNotFound() : asset;
+    }
     try { return await api(request, env); }
     catch (error) {
       if (error instanceof HttpError) return json({error:error.message},error.status);

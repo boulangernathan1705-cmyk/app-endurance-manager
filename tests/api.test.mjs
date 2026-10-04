@@ -156,11 +156,14 @@ test('crews: manager-only writes, category/departure integrity, concurrency and 
  assert.equal((await req('/api/events','POST',eventInput,'admin')).status,201);
  const event=(await req('/api/events','GET',null,'admin')).data.events[0],dep=event.departures[0],second=event.departures[1];
  const base=`/api/events/${event.id}/departures/${dep.id}`;
- const payload={name:'Équipe 1',category:'Hypercar',car:'Prototype test'};
+ const payload={name:'Équipe 1',category:'Hypercar',car:'Ferrari 499P'};
  assert.equal((await req(base+'/crews','POST',payload)).status,401);
  assert.equal((await req(base+'/crews','POST',payload,'pilot')).status,403);
  const created=await req(base+'/crews','POST',payload,'organizer');assert.equal(created.status,201);
  const id=created.data.id,crewPath='/api/crews/'+id;
+ // The car of a crew comes from the catalog of its category, like the cars of an entry.
+ assert.equal((await req(base+'/crews','POST',{...payload,car:'Voiture imaginaire 3000'},'organizer')).status,400);
+ assert.equal((await req(base+'/crews','POST',{...payload,car:'Ferrari 296 LMGT3'},'organizer')).status,400,'a GT3 car in a Hypercar crew');
  const invalidCar=await req(base+'/registrations','POST',{name:'Pilote invalide',category:'Hypercar',car:'Voiture inconnue',status:'whole'},'admin');assert.equal(invalidCar.status,400);
  const reg=await req(base+'/registrations','POST',{name:'Pilote A',category:'Hypercar',cars:['Ferrari 499P','Porsche 963'],status:'h1,h3',preferredPilot:'Pilote B'},'pilot');assert.equal(reg.status,201);
  const bad=await req(base+'/registrations','POST',{name:'Pilote B',category:'GTE',carAny:true,status:'whole'},'guest2');assert.equal(bad.status,201);
@@ -171,7 +174,7 @@ test('crews: manager-only writes, category/departure integrity, concurrency and 
  assert.equal((await add(elsewhere.data.id)).status,409);
  assert.equal((await add(reg.data.id)).status,200);
  let listing=(await req('/api/events','GET',null,'admin')).data.events[0].departures[0].crews[0];
- assert.equal(listing.car,'Prototype test');assert.deepEqual(listing.registrationIds,[reg.data.id]);assert.equal(listing.version,2);
+ assert.equal(listing.car,'Ferrari 499P');assert.deepEqual(listing.registrationIds,[reg.data.id]);assert.equal(listing.version,2);
  assert.equal((await req('/api/events','GET',null,'admin')).data.events[0].departures[0].availability.find(r=>r.id===reg.data.id).preferredPilot,'Pilote B');
  assert.equal((await req('/api/events','GET',null,'admin')).data.events[0].departures[0].availability.find(r=>r.id===reg.data.id).car,'Ferrari 499P');
  assert.deepEqual((await req('/api/events','GET',null,'admin')).data.events[0].departures[0].availability.find(r=>r.id===reg.data.id).cars,['Ferrari 499P','Porsche 963']);
@@ -179,14 +182,14 @@ test('crews: manager-only writes, category/departure integrity, concurrency and 
  assert.equal((await req(crewPath,'PATCH',{...payload,version:1},'organizer')).status,409);
  const duplicate=await req(base+'/crews','POST',{...payload,name:'Équipe 2'},'admin');assert.equal(duplicate.status,201);
  assert.equal((await req('/api/crews/'+duplicate.data.id+'/members','POST',{registrationId:reg.data.id,version:1},'admin')).status,409);
- assert.equal((await req(crewPath,'PATCH',{...payload,category:'GTE',version:2},'organizer')).status,409);
+ assert.equal((await req(crewPath,'PATCH',{...payload,category:'GTE',car:'',version:2},'organizer')).status,409);
  assert.equal((await req('/api/registrations/'+reg.data.id,'PATCH',{name:'Pilote A',category:'GTE',status:'whole',version:1},'pilot')).status,409);
  assert.equal((await req('/api/events/'+event.id,'PATCH',{...event,categories:['GTE']},'admin')).status,409);
  assert.equal((await req(crewPath,'DELETE',{version:2},'pilot')).status,403);
  assert.equal((await req(crewPath+'/members/'+reg.data.id,'DELETE',{version:2},'organizer')).status,200);
  assert.equal(DB.db.prepare('SELECT count(*) n FROM registrations').get().n,3);
  assert.equal((await req('/api/registrations/'+reg.data.id,'PATCH',{name:'Pilote A',category:'GTE',status:'whole',version:1},'pilot')).status,200);
- assert.equal((await req(crewPath,'PATCH',{...payload,category:'GTE',version:3},'organizer')).status,200);
+ assert.equal((await req(crewPath,'PATCH',{...payload,category:'GTE',car:'',version:3},'organizer')).status,200);
  assert.equal((await add(reg.data.id,4)).status,200);
  assert.equal((await req('/api/registrations/'+reg.data.id,'DELETE',{version:2},'pilot')).status,200);
  assert.equal(DB.db.prepare('SELECT count(*) n FROM crew_members').get().n,0);
@@ -555,13 +558,13 @@ test('official iRacing endurances are imported once, by the daily task or by an 
  const team=common.crews[0];
  assert.equal((await req('/api/crews/'+team.id,'PATCH',{departureId:common.id,version:team.version},'admin')).status,400,'not the common start');
  assert.equal((await req('/api/crews/'+team.id,'PATCH',{departureId:slotB.id,version:team.version},'admin')).status,200);
- const leoReg=common.availability.find(reg=>reg.name==='Leo');
+ const leoReg=common.availability.find(reg=>reg.id===leo.data.id);
  assert.equal((await req('/api/registrations/'+leoReg.id+'/departure','PATCH',{departureId:slotA.id,version:leoReg.version},'pilot')).status,200);
  indy=(await req('/api/races?game=iracing','GET',null,'admin')).data.events.find(event=>event.name==='8 Hours of Indianapolis');
  const [after,slot1,slot2]=indy.departures;
  assert.equal(after.availability.length,0);assert.equal(after.crews.length,0);
- assert.deepEqual(slot1.availability.map(reg=>reg.name),['Leo']);
- assert.deepEqual(slot2.availability.map(reg=>reg.name),['Max']);assert.equal(slot2.crews[0].registrationIds[0],max.data.id);
+ assert.deepEqual(slot1.availability.map(reg=>reg.id),[leo.data.id]);
+ assert.deepEqual(slot2.availability.map(reg=>reg.id),[max.data.id]);assert.equal(slot2.crews[0].registrationIds[0],max.data.id);
  // A start that already has its time cannot be left this way.
  const leoAfter=slot1.availability[0];
  assert.equal((await req('/api/registrations/'+leoAfter.id+'/departure','PATCH',{departureId:slotB.id,version:leoAfter.version},'pilot')).status,409);
@@ -645,4 +648,18 @@ test('"Horaires à confirmer": a common start "à définir", real times added la
  event=(await req('/api/events','GET',null,'admin')).data.events.find(e=>e.id===third.data.id);
  assert.deepEqual(event.departures.map(d=>`${d.date} ${d.time}${d.tbd?' tbd':''}`),['2090-11-13 00:00 tbd']);
  assert.equal((await req('/api/events','GET',null,'admin')).data.events.find(e=>e.id===second.data.id).departures.length,3,'races with entries are left as they are');
+});
+test('a pilot linked to Discord always shows his Discord name, never another member’s',async()=>{
+ const {req,login}=harness();
+ await login(ADMIN,'admin');await login(PILOT,'pilot');
+ assert.equal((await req('/api/events','POST',eventInput,'admin')).status,201);
+ const event=(await req('/api/events','GET',null,'admin')).data.events[0],dep=event.departures[0];
+ const path=`/api/events/${event.id}/departures/${dep.id}/registrations`;
+ // Own entry with another member's name typed in: the Discord name is kept.
+ const reg=await req(path,'POST',{name:'Pilote '+ADMIN,category:'Hypercar',status:'whole'},'pilot');assert.equal(reg.status,201);
+ const shown=async()=>(await req('/api/events','GET',null,'admin')).data.events[0].departures[0].availability.find(item=>item.id===reg.data.id);
+ assert.equal((await shown()).name,'Pilote '+PILOT);
+ // Nor through an edit of the entry.
+ assert.equal((await req('/api/registrations/'+reg.data.id,'PATCH',{name:'Pilote '+ADMIN,category:'Hypercar',status:'whole',version:(await shown()).version},'pilot')).status,200);
+ assert.equal((await shown()).name,'Pilote '+PILOT);
 });
