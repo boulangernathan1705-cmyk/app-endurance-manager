@@ -10,7 +10,7 @@ import {linkTestServer, setMember, ORGA_ROLE, GUILD} from './fixtures/discord-se
 const ROOT='https://site.example';
 const ADMIN='111111111111111111', PILOT='222222222222222222', MATE='333333333333333333';
 const DEV='e0a1c0de-0000-4000-8000-000000000001';
-const ARCHIVES='800000000000000002';
+const BOT_ROLE='900000000000000009';
 const HOUR=3600_000;
 const MIGRATIONS=readdirSync(new URL('../migrations/',import.meta.url)).filter(name=>name.endsWith('.sql')).sort();
 
@@ -22,22 +22,22 @@ class D1 {
 
 // Fake Discord: every request is kept; new channels, threads and messages get new ids.
 function fakeDiscord(){
-  const calls=[];let next=700000000000000000n;const voiceStates=new Map();const gone=new Set();const unknownChannel=new Set();
+  const calls=[];const state={botRights:true};let next=700000000000000000n;const voiceStates=new Map();const gone=new Set();const unknownChannel=new Set();
   const reply=(status,data)=>new Response(status===204?null:JSON.stringify(data),{status,headers:{'Content-Type':'application/json'}});
   async function handler(url,init={}){
     const path=String(url).replace('https://discord.com/api/v10','');const method=init.method||'GET';
     const body=init.body?JSON.parse(init.body):null;calls.push({method,path,body});
     if(unknownChannel.has(path))return reply(404,{code:10003});
     if(gone.has(path))return reply(404,{code:10008});
-    if(method==='GET'&&path===`/guilds/${GUILD}/channels`)return reply(200,[{id:'800000000000000001',name:'general',type:0,position:1},{id:ARCHIVES,name:'Archives',type:4,position:2}]);
+    if(method==='GET'&&path===`/guilds/${GUILD}/members/app-id`)return reply(200,{roles:[BOT_ROLE]});
     if(method==='GET'&&path===`/guilds/${GUILD}`)return reply(200,{id:GUILD,name:'Test',owner_id:ADMIN});
-    if(method==='GET'&&path===`/guilds/${GUILD}/roles`)return reply(200,[{id:GUILD,name:'@everyone',permissions:'0',position:0}]);
+    if(method==='GET'&&path===`/guilds/${GUILD}/roles`)return reply(200,[{id:GUILD,name:'@everyone',permissions:'0',position:0},{id:BOT_ROLE,name:'Endurance Manager',permissions:state.botRights?'68624':'0',position:1}]);
     const voice=path.match(/^\/guilds\/\d+\/voice-states\/(\d+)$/);
     if(voice)return voiceStates.has(voice[1])?reply(200,{channel_id:voiceStates.get(voice[1])}):reply(404,{code:10065});
     if(method==='POST'||(method==='GET'))return reply(200,{id:String(next++)});
     return reply(method==='DELETE'?204:200,{});
   }
-  return {calls,handler,voiceStates,gone,unknownChannel};
+  return {calls,handler,voiceStates,gone,unknownChannel,state};
 }
 
 function harness(){
@@ -86,13 +86,17 @@ const created=(calls,from)=>calls.slice(from).filter(call=>call.method==='POST'&
 test('a crew gets its category with a text channel and its voice channel below, followed until 24 h after its race', async () => {
   const {DB,req,login,sync,discord}=harness();
   await login(ADMIN,'admin','Orga');await login(PILOT,'pilot','Alice');await login(MATE,'mate','Bob');
-  // The admins choose the category of the archives (optional).
-  const setup=(await req('/api/community/setup','GET',null,'admin')).data;
-  assert.deepEqual(setup.crews.categories,[{id:ARCHIVES,name:'Archives'}]);
-  assert.match(setup.crews.botInviteUrl,/permissions=68624&/);
-  assert.equal((await req('/api/community/crew-discord','PUT',{enabled:true,reminders:true,archiveCategoryId:'999999999999999999'},'admin')).status,400);
-  assert.equal((await req('/api/community/crew-discord','PUT',{enabled:true,reminders:true,archiveCategoryId:ARCHIVES},'admin')).status,200);
-  assert.equal((await req('/api/community/crew-discord','PUT',{enabled:true},'pilot')).status,403);
+  // The admins turn the modules on in the settings, once the bot has the rights to make channels.
+  discord.state.botRights=false;
+  let settings=(await req('/api/community/settings','GET',null,'admin')).data;
+  assert.equal(settings.crews.botReady,false);assert.match(settings.crews.botInviteUrl,/permissions=68624&/);
+  assert.equal((await req('/api/community/modules','PATCH',{crewChannels:true},'admin')).status,400);
+  discord.state.botRights=true;
+  assert.equal((await req('/api/community/settings','GET',null,'admin')).data.crews.botReady,true);
+  assert.equal((await req('/api/community/modules','PATCH',{crewChannels:true,raceReminders:true},'pilot')).status,403);
+  assert.equal((await req('/api/community/modules','PATCH',{crewChannels:true,raceReminders:true},'admin')).status,200);
+  settings=(await req('/api/community/settings','GET',null,'admin')).data;
+  assert.equal(settings.modules.crewChannels,true);assert.equal(settings.modules.raceReminders,true);
 
   assert.equal((await req('/api/events','POST',race,'admin')).status,201);
   const event=(await req('/api/events','GET',null,'admin')).data.events[0];
@@ -144,7 +148,8 @@ test('a crew gets its category with a text channel and its voice channel below, 
   assert.match(discord.calls.slice(mark).find(call=>call.method==='POST').body.content,new RegExp(`<#${row.voice_id}>`));
 
   // 24 h after the end: still a pilot in the voice channel, so it waits; then the voice channel is deleted, the
-  // text channel goes to the archives with their permissions, and the crew's category is deleted.
+  // bot makes the read-only « Archives équipages » category, the text channel goes there with its permissions,
+  // and the crew's category is deleted.
   const endsAt=startsAt+6*HOUR;
   discord.voiceStates.set(MATE,row.voice_id);
   mark=discord.calls.length;await sync(endsAt+CLOSE_AFTER+HOUR);
@@ -153,8 +158,10 @@ test('a crew gets its category with a text channel and its voice channel below, 
   discord.voiceStates.clear();
   mark=discord.calls.length;assert.equal((await sync(endsAt+CLOSE_AFTER+2*HOUR)).closed,1);
   const closing=discord.calls.slice(mark).filter(call=>call.method!=='GET');
-  assert.deepEqual(closing.map(call=>`${call.method} ${call.path}`),[`DELETE /channels/${row.voice_id}`,`PATCH /channels/${row.text_id}`,`DELETE /channels/${row.category_id}`]);
-  assert.deepEqual(closing[1].body,{parent_id:ARCHIVES,lock_permissions:true});
+  assert.deepEqual(closing.map(call=>`${call.method} ${call.path}`),[`DELETE /channels/${row.voice_id}`,`POST /guilds/${GUILD}/channels`,`PATCH /channels/${row.text_id}`,`DELETE /channels/${row.category_id}`]);
+  assert.equal(closing[1].body.type,4);assert.deepEqual(closing[1].body.permission_overwrites,[{id:GUILD,type:0,allow:'0',deny:'2048'}]);
+  const archives=DB.db.prepare('SELECT archive_category_id FROM community_crew_discord').get().archive_category_id;
+  assert.ok(archives);assert.deepEqual(closing[2].body,{parent_id:archives,lock_permissions:true});
   mark=discord.calls.length;await sync(endsAt+CLOSE_AFTER+3*HOUR);assert.deepEqual(since(discord.calls,mark),[]);
   // 30 days later, the archived text channel is deleted.
   mark=discord.calls.length;assert.equal((await sync(endsAt+CLOSE_AFTER+2*HOUR+KEEP_ARCHIVES+HOUR)).purged,1);
@@ -173,8 +180,8 @@ test('a deleted crew is closed at once, and nothing happens without the module',
   await sync(departure.startsAt-3*24*HOUR);await sync(departure.startsAt-HOUR);
   assert.deepEqual(discord.calls.filter(call=>call.path.startsWith('/channels')),[]);
   assert.deepEqual((await notifications(req,'pilot')).filter(item=>item.kind==='race_reminder'),[]);
-  // Module on without archives: opened, then the crew is deleted: everything is deleted.
-  assert.equal((await req('/api/community/crew-discord','PUT',{enabled:true,reminders:false},'admin')).status,200);
+  // Module on: opened, then the crew is deleted: everything is deleted, nothing archived.
+  assert.equal((await req('/api/community/modules','PATCH',{crewChannels:true},'admin')).status,200);
   assert.equal((await sync(departure.startsAt-2*HOUR)).opened,1);
   const row=DB.db.prepare('SELECT * FROM crew_discord').get();
   const crewRow=(await req('/api/events','GET',null,'pilot')).data.events[0].departures[0].crews[0];
@@ -188,7 +195,7 @@ test('a deleted crew is closed at once, and nothing happens without the module',
 test('a recap or a text channel deleted on Discord is made again', async () => {
   const {DB,req,login,sync,discord}=harness();
   await login(ADMIN,'admin','Orga');await login(PILOT,'pilot','Alice');
-  assert.equal((await req('/api/community/crew-discord','PUT',{enabled:true},'admin')).status,200);
+  assert.equal((await req('/api/community/modules','PATCH',{crewChannels:true},'admin')).status,200);
   assert.equal((await req('/api/events','POST',race,'admin')).status,201);
   const event=(await req('/api/events','GET',null,'admin')).data.events[0];
   const departure=event.departures[0], base=`/api/events/${event.id}/departures/${departure.id}`, at=departure.startsAt-2*24*HOUR;

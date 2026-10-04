@@ -3,8 +3,8 @@
 //   small category with a text channel and its voice channel right below, open to the whole server. A recap
 //   message in the text channel follows the crew (race, time, car, pilots); a pilot who joins is welcomed there.
 //   24 h after the planned end the voice channel is deleted (once no pilot of the crew is in it) and the text
-//   channel goes to the archives category chosen by the admins (deleted 30 days later), or is deleted when there
-//   is none. A crew deleted before is closed at once.
+//   channel goes, read-only, to the « Archives équipages » category the bot makes on the server the first time
+//   (deleted 30 days later). A crew deleted before is closed at once.
 // - raceReminders (« Rappels de course »): 24 h and 1 h before the start, a message in the crew's text channel
 //   that mentions its pilots; 24 h before, a notification on the bell for every pilot entered on the start.
 // Everything is done by the bot (DISCORD_BOT_TOKEN) through Discord's REST API, by the scheduled task and right
@@ -22,9 +22,12 @@ const GIVE_UP_AFTER = 7 * 24 * HOUR;
 const LOCK_MS = 60_000;
 export const KEEP_ARCHIVES = 30 * 24 * HOUR;
 export const REMINDERS = [{bit:1, before:24 * HOUR}, {bit:2, before:HOUR}];
-// What the bot needs on the server for the crews (invite link of the « Mise en place » page): view channels,
+// What the bot needs on the server for the crews (invite link of the « Modules » settings): view channels,
 // manage channels (categories, text and voice channels), send messages, read the history.
-export const CREW_BOT_PERMISSIONS = String((1n << 4n) | (1n << 10n) | (1n << 11n) | (1n << 16n));
+const MANAGE_CHANNELS = 1n << 4n, SEND_MESSAGES = 1n << 11n, ADMINISTRATOR = 1n << 3n;
+const NEEDED = MANAGE_CHANNELS | (1n << 10n) | SEND_MESSAGES | (1n << 16n);
+export const CREW_BOT_PERMISSIONS = String(NEEDED);
+const ARCHIVES_NAME = '🗄️ Archives équipages';
 const TEXT = 0, VOICE = 2, CATEGORY = 4;
 
 class Stop extends Error {}
@@ -48,8 +51,7 @@ async function discord(env, budget, method, path, body) {
 
 // What an admin can do when the bot is refused.
 function errorText(error) {
-  if (error?.status === 403) return 'Le bot n’a pas les droits nécessaires : clique sur « Donner les droits au bot » et vérifie qu’il peut voir la catégorie des archives.';
-  if (error?.status === 404) return 'La catégorie des archives n’existe plus sur ton serveur : choisis-en une autre.';
+  if (error?.status === 403) return 'Le bot n’a pas les droits nécessaires : clique sur « Donner les droits au bot ».';
   return 'Discord n’a pas répondu : le bot réessaiera tout seul.';
 }
 
@@ -219,23 +221,26 @@ async function closeRow(env, budget, timestamp, row, setting, members, {force = 
     row.voice_id = null;
   }
   if (row.text_id) {
+    // In the archives, with that category's permissions (read-only); without the right to change permissions, the
+    // channel is moved as it is. A crew deleted before its race has nothing worth keeping: deleted.
     let archived = null;
-    if (setting?.archive_category_id) {
-      // In the archives, with that category's permissions (read-only if it is). Without the right to change
-      // permissions, the channel is moved as it is.
+    if (force || !setting) await remove(env, budget, row.text_id);
+    else {
+      const archives = await archivesCategory(env, budget, row, setting);
       try {
-        try { await discord(env, budget, 'PATCH', `/channels/${row.text_id}`, {parent_id:setting.archive_category_id, lock_permissions:true}); }
-        catch (error) { if (error?.status !== 403) throw error; await discord(env, budget, 'PATCH', `/channels/${row.text_id}`, {parent_id:setting.archive_category_id}); }
+        try { await discord(env, budget, 'PATCH', `/channels/${row.text_id}`, {parent_id:archives, lock_permissions:true}); }
+        catch (error) { if (error?.status !== 403) throw error; await discord(env, budget, 'PATCH', `/channels/${row.text_id}`, {parent_id:archives}); }
         archived = row.text_id;
       } catch (error) {
         if (error?.status === 400) {
-          // The archives category is gone: the channel is deleted and the admins are told.
-          await remove(env, budget, row.text_id);
-          await env.DB.prepare('UPDATE community_crew_discord SET last_error=?, last_error_at=? WHERE community_id=?')
-            .bind(errorText({status:404}), Math.floor(timestamp / 1000), row.row_community).run();
-        } else if (error?.status !== 404) throw error;
+          // The archives category was deleted on Discord: made again at the next check.
+          await env.DB.prepare('UPDATE community_crew_discord SET archive_category_id=NULL WHERE community_id=?').bind(row.row_community).run();
+          setting.archive_category_id = null;
+          throw new Stop('gone');
+        }
+        if (error?.status !== 404) throw error;
       }
-    } else await remove(env, budget, row.text_id);
+    }
     await env.DB.prepare('UPDATE crew_discord SET text_id=NULL, archived_id=? WHERE crew_id=?').bind(archived, row.row_id).run();
     row.text_id = null;
   }
@@ -246,6 +251,17 @@ async function closeRow(env, budget, timestamp, row, setting, members, {force = 
   }
   await env.DB.prepare('UPDATE crew_discord SET closed_at=? WHERE crew_id=?').bind(timestamp, row.row_id).run();
   return true;
+}
+
+// The « Archives équipages » category, made by the bot the first time it is needed: members can read the
+// channels there but no longer write in them.
+async function archivesCategory(env, budget, row, setting) {
+  if (setting.archive_category_id) return setting.archive_category_id;
+  const category = await discord(env, budget, 'POST', `/guilds/${row.guild_id}/channels`, {name:ARCHIVES_NAME, type:CATEGORY,
+    permission_overwrites:[{id:row.guild_id, type:0, allow:'0', deny:String(SEND_MESSAGES)}]});
+  await env.DB.prepare('UPDATE community_crew_discord SET archive_category_id=? WHERE community_id=?').bind(category.id, row.row_community).run();
+  setting.archive_category_id = category.id;
+  return category.id;
 }
 
 // A message in the text channel. A channel or recap message deleted by someone on Discord is made again at
@@ -385,16 +401,19 @@ async function bellReminders(env, timestamp, communities) {
   return told;
 }
 
-// « Mise en place »: the categories of the server the admins can choose for the archives, or null when the bot
-// cannot read them.
-export async function guildCategories(env, guildId) {
-  if (!guildId || !String(env.DISCORD_BOT_TOKEN || '').trim()) return null;
+// Whether the bot may make the crews' channels on the server: true, false, or null when it cannot tell (bot not
+// on the server, Discord not answering).
+export async function botCanManageChannels(env, guildId) {
+  if (!guildId || !env.DISCORD_CLIENT_ID || !String(env.DISCORD_BOT_TOKEN || '').trim()) return null;
   try {
-    const list = await discord(env, {left:1}, 'GET', `/guilds/${guildId}/channels`);
-    return (Array.isArray(list) ? list : []).filter(item => item.type === CATEGORY).sort((a, b) => (a.position || 0) - (b.position || 0))
-      .map(item => ({id:String(item.id), name:String(item.name || '')}));
+    const budget = {left:2};
+    const [member, roles] = await Promise.all([discord(env, budget, 'GET', `/guilds/${guildId}/members/${env.DISCORD_CLIENT_ID}`),
+      discord(env, budget, 'GET', `/guilds/${guildId}/roles`)]);
+    const mine = new Set([String(guildId), ...(member?.roles || []).map(String)]);
+    const rights = (Array.isArray(roles) ? roles : []).filter(role => mine.has(String(role.id))).reduce((all, role) => all | BigInt(role.permissions || '0'), 0n);
+    return (rights & ADMINISTRATOR) === ADMINISTRATOR || (rights & NEEDED) === NEEDED;
   } catch (error) {
-    if (!(error instanceof Stop)) console.error('Guild channels failed', error instanceof Error ? error.message : 'unknown');
+    if (!(error instanceof Stop)) console.error('Bot rights failed', error instanceof Error ? error.message : 'unknown');
     return null;
   }
 }
