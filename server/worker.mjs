@@ -15,6 +15,7 @@ const soloRacesEnabled = (env, community) => community?.modules?.soloRaces === t
 import {syncIracingEvents} from './iracing-import.mjs';
 import {resetShowcase} from './demo.mjs';
 import {syncWeeklyDiscord, sendRecapTest, usesSiteRecap, WEBHOOK_URL} from './discord-weekly.mjs';
+import {notify, notificationsApi, departurePilots, eventPilots, crewPilots} from './notifications.mjs';
 // Official races (iRacing's official endurances, LMU official events): common to every community (migration 0039).
 const OFFICIAL = 'official';
 // A race of the current community, or an official race: any id from another community answers "introuvable".
@@ -356,6 +357,9 @@ async function api(request, env) {
   if (access.status !== 'member') fail(403, access.status === 'not-member'
     ? `Cette communauté est réservée aux membres du serveur Discord « ${community.name} ».`
     : 'L’accès à cette communauté ne peut pas être vérifié pour le moment. Réessaie plus tard.');
+  // The bell next to the account (server/notifications.mjs).
+  const notifications = await notificationsApi(path, method, env, actor, community);
+  if (notifications) return notifications;
   if (path === '/api/events' && method === 'GET') {
     const requestedGame=url.searchParams.get('game');
     const game=requestedGame==='lmu'||requestedGame==='iracing'?requestedGame:'';
@@ -420,6 +424,9 @@ async function api(request, env) {
           env.DB.prepare(`DELETE FROM registrations WHERE changes()=1 AND id!=? AND event_id=? AND departure_id=? AND participant_id=?`).bind(selected.id,selected.event_id,selected.departure_id,selected.participant_id)
         ]);
         if (!results[0].meta.changes) fail(409,'Cet équipage a changé. Actualise la page.');
+        const pilot=selected.participant_name||selected.name;
+        await notify(env,await crewPilots(env,crew.id),'crew_join',event,{departure,skip:[actor.user.id,selected.participant_user_id],pilot,crewName:crew.name});
+        if (!selfJoin && selected.participant_user_id) await notify(env,[{user_id:selected.participant_user_id,community_id:here.id}],'crew_added',event,{departure,skip:[actor.user.id],crewName:crew.name,by:actor.user.name});
         return json({ok:true,removedRegistrations:results[2].meta.changes,claimedOwnership:Boolean(claimOwner)});
       }
       if (method==='DELETE' && crewRoute[2]) {
@@ -447,6 +454,8 @@ async function api(request, env) {
           env.DB.prepare('DELETE FROM crew_members WHERE crew_id=? AND registration_id=? AND changes()=1').bind(crew.id,selected.id)
         ]);
         if (!results[0].meta.changes) fail(409,'Cet équipage a changé. Actualise la page.');
+        await notify(env,await crewPilots(env,crew.id),'crew_leave',event,{departure,skip:[actor.user.id,selected.participant_user_id],pilot:selected.participant_name||selected.name,crewName:crew.name});
+        if (!selfLeave && selected.participant_user_id) await notify(env,[{user_id:selected.participant_user_id,community_id:here.id}],'crew_removed',event,{departure,skip:[actor.user.id],crewName:crew.name,by:actor.user.name});
         return json({ok:true,unlocked:Boolean(crew.locked)});
       }
       fail(404,'Action introuvable.');
@@ -454,8 +463,10 @@ async function api(request, env) {
     if (crew) {
       if (!canManageCrew(crew,who)) fail(403,'Seul le responsable de cet équipage ou un organisateur peut le modifier.');
       if (method==='DELETE') {
+        const told = await crewPilots(env,crew.id);
         const result = await env.DB.prepare('DELETE FROM crews WHERE id=? AND version=?').bind(crew.id,input.version).run();
         if (!result.meta.changes) fail(409,'Cet équipage a changé. Actualise avant de réessayer.');
+        await notify(env,told,'crew_deleted',event,{departure,skip:[actor.user.id],crewName:crew.name,by:actor.user.name});
         return json({ok:true});
       }
       if (method!=='PATCH') fail(404,'Action introuvable.');
@@ -475,6 +486,7 @@ async function api(request, env) {
           ...members.map(registrationId=>env.DB.prepare('INSERT INTO crew_members(registration_id,crew_id) SELECT ?,? WHERE EXISTS(SELECT 1 FROM crews WHERE id=? AND version=? AND departure_id=?)').bind(registrationId,crew.id,crew.id,input.version+1,target.id))
         ]);
         if (!results[1+members.length].meta.changes) fail(409,'Cet équipage a changé. Actualise avant de réessayer.');
+        await notify(env,await crewPilots(env,crew.id),'crew_start',event,{departure:target,skip:[actor.user.id],crewName:crew.name,by:actor.user.name});
         return json({ok:true,departureId:target.id});
       }
       if (typeof input.locked==='boolean' && input.name===undefined && input.category===undefined && input.car===undefined) {
@@ -541,8 +553,10 @@ async function api(request, env) {
     if (!can(actor,'manage_races') && !(can(actor,'create_race') && event.created_by === actor.user?.id)) requirePermission(actor,'manage_races','Tu n’as pas l’autorisation de modifier cette course.');
     if (input.version !== event.version) fail(409, 'Cet événement a changé. Actualise avant de réessayer.');
     if (method === 'DELETE') {
+      const told = await eventPilots(env, event.id);
       const result = await env.DB.prepare('DELETE FROM events WHERE id=? AND version=?').bind(event.id, input.version).run();
       if (!result.meta.changes) fail(409, 'Cet événement a changé. Actualise avant de réessayer.');
+      await notify(env, told, 'race_deleted', event, {skip:[actor.user?.id]});
       return json({ok:true});
     }
     const data = validateEvent(input, event);
@@ -554,6 +568,11 @@ async function api(request, env) {
       OR (r.category NOT IN ('','*') AND NOT EXISTS (SELECT 1 FROM json_each(?) c WHERE c.value=r.category))
       OR EXISTS (SELECT 1 FROM json_each(?) h WHERE instr(',' || r.status || ',', ',' || h.value || ',') > 0)))`).bind(data.name, data.durationHours, data.durationMinutes, data.eventType, data.circuit, data.schedulePending?1:0, data.driverChangeRequired==null?null:(data.driverChangeRequired?1:0), data.access, data.capacity, JSON.stringify(data.rounds), cats, deps, event.id, input.version, deps, cats, JSON.stringify(Array.from({length:24-data.durationHours},(_,i)=>`h${data.durationHours+i+1}`))).run();
     if (!result.meta.changes) fail(409, 'Modification impossible : événement modifié ailleurs, départ supprimé avec des inscrits, catégorie encore utilisée, ou disponibilités au-delà de la nouvelle durée. Ajuste les disponibilités concernées avant de raccourcir la course.');
+    // The entered pilots are told what changed for them: the starts, the track, the length or the name.
+    const starts = list => JSON.stringify(JSON.parse(list).map(d => [d.id, d.startsAt, Boolean(d.tbd)]));
+    const changes = [starts(event.departures) !== starts(deps) && 'starts', (event.circuit || '') !== data.circuit && 'circuit',
+      (Number(event.duration_minutes) || Number(event.duration_hours) * 60) !== data.durationMinutes && 'duration', event.name !== data.name && 'name'].filter(Boolean);
+    if (changes.length) await notify(env, await eventPilots(env, event.id), 'race_changed', {...event, name:data.name, circuit:data.circuit}, {skip:[actor.user?.id], changes, previousName:event.name !== data.name ? event.name : undefined});
     return json({ok:true});
   }
   const departureMatch = path.match(/^\/api\/events\/([a-f0-9-]{36})\/departures\/([a-f0-9-]{36})\/registrations$/);
@@ -584,9 +603,13 @@ async function api(request, env) {
     const ownerUserId = actor.user?.id || null;
     const regId = id();
     if (input.participantId) { data.name=participant.name;data.nameKey=data.name.normalize('NFKC').toLocaleLowerCase('fr-FR'); }
+    // Another category on a start the pilot is already entered on: the others were told the first time.
+    const alreadyThere=Boolean(await env.DB.prepare('SELECT 1 FROM registrations WHERE event_id=? AND departure_id=? AND participant_id=? LIMIT 1').bind(event.id,departure.id,participant.id).first());
     const result = await env.DB.prepare(`INSERT INTO registrations(id,event_id,departure_id,user_id,owner_user_id,guest_hash,name,name_key,category,car,car_preferences,car_any,status,preferred_pilot,created_at,participant_id,round_choices,solo_driver,community_id)
       SELECT ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,? FROM events WHERE id=? AND version=? AND (community_id=? OR community_id=?)`).bind(regId,event.id,departure.id,userId,ownerUserId,guestHash,data.name,data.nameKey,data.category,data.car,JSON.stringify(data.cars),data.carAny?1:0,data.status,data.preferredPilot,now(),participant.id,JSON.stringify(data.roundChoices||[]),data.soloDriver?1:0,here.id,event.id,event.version,community.id,OFFICIAL).run();
     if (!result.meta.changes) fail(409, 'Cet événement a changé. Actualise avant de t’inscrire.');
+    if (!alreadyThere && data.status!=='unavailable') await notify(env,await departurePilots(env,event.id,departure.id,here.id),'entry',event,{departure,skip:[actor.user?.id,userId],pilot:data.name,category:data.category});
+    if (forOther && userId && userId!==actor.user?.id) await notify(env,[{user_id:userId,community_id:here.id}],'entered_by',event,{departure,by:actor.user.name,category:data.category});
     return json({id:regId}, 201);
   }
   // A pilot without a crew on the common "Horaire à définir" start picks one of the official slots.
@@ -616,6 +639,8 @@ async function api(request, env) {
     const input = await body(request);
     if (input.version !== reg.version) fail(409, 'Cette inscription a changé. Actualise la page.');
     let result;
+    // A pilot leaving the race: his crew is told (and he is, when someone else takes him off).
+    const crewOfEntry = method === 'DELETE' ? await env.DB.prepare('SELECT c.id,c.name FROM crew_members cm JOIN crews c ON c.id=cm.crew_id WHERE cm.registration_id=?').bind(reg.id).first() : null;
     if (method === 'DELETE') result = await env.DB.prepare('DELETE FROM registrations WHERE id=? AND version=?').bind(reg.id,input.version).run();
     else {
       const data = validateRegistration(input,event);
@@ -631,6 +656,11 @@ async function api(request, env) {
       result=results[0];
     }
     if (!result.meta.changes) fail(409, 'Les données ont changé. Actualise avant de réessayer.');
+    if (method === 'DELETE') {
+      const pilot = reg.participant_name || reg.name;
+      if (crewOfEntry) await notify(env,await crewPilots(env,crewOfEntry.id),'withdrawn',event,{departure,skip:[actor.user?.id,reg.participant_user_id],pilot,crewName:crewOfEntry.name});
+      if (reg.participant_user_id && reg.participant_user_id !== actor.user?.id) await notify(env,[{user_id:reg.participant_user_id,community_id:reg.community_id}],'removed_by',event,{departure,by:actor.user?.name||'',category:reg.category});
+    }
     return json({ok:true});
   }
   // Admins can run the daily import of official iRacing endurances at once.

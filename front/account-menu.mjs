@@ -1,6 +1,7 @@
 // Info bubbles on every page (data-tip).
 import './tooltip.mjs?v=2';
 import {showCommunityIntro} from './community-intro.mjs';
+import {installNotifications} from './notifications.mjs?v=1';
 const root = document.getElementById('account-menu-root');
 
 const roleLabel = role => ({admin:'Administrateur',organizer:'Organisateur',pilot:'Pilote'}[role] || 'Pilote');
@@ -172,7 +173,11 @@ async function loadSession() {
     applyCommunity(session.community, Array.isArray(session.communities) ? session.communities : [], session.openSite === true);
     if (session.openSite) showcaseBanner(session.platformDiscordUrl);
     siteCommunityName = session.openSite ? '' : session.community?.name || '';
-    if (session.user) renderConnected(session.user, Array.isArray(session.communities) ? session.communities : []);
+    if (session.user) {
+      renderConnected(session.user, Array.isArray(session.communities) ? session.communities : []);
+      // The bell of the races the player is entered in, next to his account (members of the community only).
+      if (session.access === 'member') installNotifications(root);
+    }
     else renderDisconnected(!!session.discordReady);
   } catch {
     root.innerHTML = '<span class="account-discord-unavailable">Compte indisponible</span>';
