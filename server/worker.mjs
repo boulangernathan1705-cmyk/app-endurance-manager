@@ -5,6 +5,7 @@ import {
 } from './core.mjs';
 import {ingestClientError, clientErrorsApi} from './telemetry.mjs';
 import {communityRequestsApi, closeCommunityRequest} from './community-requests.mjs';
+import {crewPreparationApi, crewPreparations} from './crew-preparation.mjs';
 import {racesPath} from './races-path.mjs';
 import {CARS} from '../shared/catalog.mjs';
 import {currentCommunity, appearanceOf, allCommunities, communityUrl, communitySlug, communityById, communityFromRow} from './community.mjs';
@@ -225,11 +226,11 @@ async function listEvents(env, actor, game='', scope='', community) {
     if (!membersByCrew.has(member.crew_id)) membersByCrew.set(member.crew_id, []);
     membersByCrew.get(member.crew_id).push(member.registration_id);
   }
-  const crewsByDeparture = new Map();
+  const crewsByDeparture = new Map(), ownCrews = [];
   for (const crew of crews) {
     const key = `${crew.event_id}:${crew.departure_id}`;
     if (!crewsByDeparture.has(key)) crewsByDeparture.set(key, []);
-    crewsByDeparture.get(key).push({
+    const shown = {
       id:crew.id,
       name:crew.name,
       category:crew.category,
@@ -242,8 +243,13 @@ async function listEvents(env, actor, game='', scope='', community) {
       hasOwner:Boolean(crew.owner_user_id),
       ...(crew.community_id!==community.id ? {foreign:true} : {}),
       ...(official.has(crew.event_id) ? {community:names.get(crew.community_id) || null} : {})
-    });
+    };
+    crewsByDeparture.get(key).push(shown);
+    if (crew.community_id===community.id) ownCrews.push({row:crew, registrationIds:shown.registrationIds, canManage:shown.canManage, shown});
   }
+  // Crew preparation (server/crew-preparation.mjs): only for the crews the player is in or manages.
+  const preparations = await crewPreparations(env, community, ownCrews, new Set(registrations.filter(reg => personal(reg, actor)).map(reg => reg.id)));
+  for (const item of ownCrews) if (preparations.has(item.row.id)) item.shown.preparation = preparations.get(item.row.id);
   return rows.map(row => {
     const format=row.format||'endurance', capacity=row.capacity==null?null:Number(row.capacity);
     const durationHours=Number(row.duration_hours)||3, durationMinutes=Number(row.duration_minutes)||durationHours*60;
@@ -370,6 +376,8 @@ async function api(request, env) {
   // The bell next to the account (server/notifications.mjs).
   const notifications = await notificationsApi(path, method, env, actor, community);
   if (notifications) return notifications;
+  const preparation = await crewPreparationApi(path, method, request, env, actor, community, canManageCrew);
+  if (preparation) return preparation;
   if (path === '/api/events' && method === 'GET') {
     const requestedGame=url.searchParams.get('game');
     const game=requestedGame==='lmu'||requestedGame==='iracing'?requestedGame:'';
@@ -712,7 +720,7 @@ async function api(request, env) {
     await keepDiscordLook(env, community, discord);
     return json({community:{name:community.name, shortName:community.shortName, discordServer:discord?.name || null, ...appearanceOf(community)}, roles, permissions:PERMISSIONS,
       modules:{iracingImport:community.modules.iracingImport === true, discordWeekly:community.modules.discordWeekly === true, soloRaces:community.modules.soloRaces === true,
-        crewChannels:community.modules.crewChannels === true, raceReminders:community.modules.raceReminders === true},
+        crewChannels:community.modules.crewChannels === true, raceReminders:community.modules.raceReminders === true, preparation:community.modules.preparation === true},
       crews:await crewDiscordState(env, community)});
   }
   // Banner sent by the admins: the image itself (already resized by the browser), WebP, JPEG or PNG, 600 KB at most.
@@ -761,7 +769,7 @@ async function api(request, env) {
     const input = await body(request);
     const modules = {...community.modules};
     // The Discord recap is set on the « Mise en place » page (its own webhook), not here.
-    for (const key of ['iracingImport','soloRaces','raceReminders']) if (typeof input[key] === 'boolean') modules[key] = input[key];
+    for (const key of ['iracingImport','soloRaces','raceReminders','preparation']) if (typeof input[key] === 'boolean') modules[key] = input[key];
     const statements = [];
     // Crews on Discord (server/crew-discord.mjs): only once the bot has the rights to make the channels.
     if (typeof input.crewChannels === 'boolean') {

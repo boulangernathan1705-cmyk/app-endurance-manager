@@ -3,6 +3,7 @@ import {raceEndLabel,raceHourLabel} from '../timeline.mjs';
 import {state,esc,button,logo,registrationCarLabel,renderAvailabilityTimeline,crewColorClass,sortedCrews,coversHour,pilotCount,api,pickableSlots,communityTag} from './core.mjs';
 import {shortDateLabel,timeLabel as clockLabel} from '../dates.mjs';
 import {renderRegistration} from './registration.mjs';
+import {crewPreparation} from './preparation.mjs';
 
 function contentSummary(title,count){return `<summary class="ux-content-accordion-summary"><span class="ux-content-accordion-title">${esc(title)}</span><span class="ux-content-accordion-count">${count}</span><span class="ux-content-accordion-chevron" aria-hidden="true">›</span></summary>`;}
 function statusPill(crew){return `<span class="crew-compact-status ${crew.locked?'is-complete':'is-open'}" data-tip="${crew.locked?'Le responsable a verrouillé l’équipage : sa composition est fixée.':'Des pilotes de la catégorie peuvent encore rejoindre cet équipage.'}">${crew.locked?'Complet':'Places libres'}</span>`;}
@@ -88,6 +89,7 @@ function crewCard(event,departure,crew,index,unassigned,allCrews){
       <div class="crew-pilot-accordion-body crew-unified-body">
         ${management}
         ${crewAvailability(event,departure,regs)}
+        ${crewPreparation(event,crew,regs)}
       </div>
     </details>
     ${actions}
