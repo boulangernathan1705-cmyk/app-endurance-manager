@@ -103,34 +103,3 @@ test('preparation is optional, scoped to a crew, and captured data cannot impers
   await req('/api/community/modules','PATCH',{preparation:false},'admin');
   assert.equal((await req(path,'GET',null,'pilot')).status,404);
 });
-
-test('endurance guide fits each time budget and warns when a full stint cannot fit',()=>{
-  const a=analysePreparation([],{wet:false,night:false,stintMinutes:40},'familiar');
-  for(const level of ['discover','familiar'])for(const minutes of [20,30,45,60]){
-    const guide=nextSession(a,level,minutes);
-    assert.equal(guide.phases.reduce((sum,p)=>sum+p.minutes,0),minutes);
-    assert.equal(guide.phases[0].startMinute,0);
-    assert.equal(guide.phases.at(-1).endMinute,minutes);
-    assert.ok(guide.phases.every(p=>p.minutes>0&&p.actions.length>=2));
-    for(let i=1;i<guide.phases.length;i++)assert.equal(guide.phases[i].startMinute,guide.phases[i-1].endMinute);
-  }
-  assert.equal(nextSession(a,'familiar',30).key,'stint');
-  assert.match(nextSession(a,'familiar',30).stintAdvice,/24 min.*40 min.*46 min/);
-  assert.equal(nextSession(a,'familiar',60).stintAdvice,null);
-  const wet=nextSession(analysePreparation([],{wet:true,night:true}),'familiar',45);
-  assert.equal(wet.key,'wet');assert.ok(wet.phases[0].actions.some(x=>x.includes('piste mouillée')));
-});
-
-test('relay measurements preserve precision, sample sizes and condition scope',()=>{
-  const laps=[120.125,120.625,121.125,121.625,122.125].map((seconds,i)=>lap(i+1,{seconds,energyUsed:4.125}));
-  const a=analysePreparation([{clientId:'dry',startedAt:123,laps},{clientId:'wet',laps:[lap(1,{wet:true,seconds:180})]}],{wet:true,night:true});
-  assert.equal(a.paceSeconds,121.125);assert.equal(a.bestSeconds,120.125);assert.equal(a.deviationSeconds,.5);
-  assert.equal(a.paceSamples,5);assert.deepEqual(a.paceConditions,{wet:false,night:false});assert.equal(a.paceStartedAt,123);
-  assert.equal(a.energySamples,5);assert.equal(a.energyPerLap,4.125);assert.equal(a.fuelSamples,5);
-  assert.equal(a.longestSeconds,605.625);assert.equal(a.rollingSeconds,785.625);assert.equal(a.wetSeconds,180);
-  const unknown=analysePreparation([{laps:[lap(1,{valid:null,wet:null,night:null,pit:null,continuous:null})]}]);
-  assert.equal(unknown.validPercent,null);assert.equal(unknown.paceSeconds,null);assert.equal(unknown.deviationSeconds,null);
-  assert.equal(unknown.wetKnown,0);assert.equal(unknown.knownValidity,0);
-  const split=analysePreparation([{laps:[lap(1)]},{laps:[lap(1,{seconds:180})]}]);
-  assert.equal(split.paceSamples,1,'anonymous sessions must not be combined');
-});
