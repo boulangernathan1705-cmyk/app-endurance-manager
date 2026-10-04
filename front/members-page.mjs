@@ -62,7 +62,7 @@ const ICONS = {
   crewChannels:'<path d="M4 5h16v10H9l-5 4V5Z"/><path d="M14 19h1l4 3v-3"/>',
   raceReminders:'<path d="M6 16V11a6 6 0 1 1 12 0v5l2 2H4l2-2Z"/><path d="M10 21h4"/>',
   iracingImport:'<path d="M4 21V4M4 4h13l-2 4 2 4H4"/>',
-  preparation:'<path d="M9 4h6l1 3H8l1-3Z"/><rect x="5" y="7" width="14" height="14" rx="2"/><path d="m9 14 2 2 4-4"/>',
+  training:'<path d="M3 12h4l3-8 4 16 3-8h4"/>',
   soloRaces:'<circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/>'
 };
 const icon = key => `<svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[key]}</svg>`;
@@ -73,7 +73,7 @@ const copyButton = target => `<button type="button" class="secondary-button setu
 function moduleStates(settings, setup) {
   const recaps = setup.recaps || [];
   return {recap:recaps.length > 0 || Boolean(setup.legacyRecap), crewChannels:settings.modules.crewChannels === true, raceReminders:settings.modules.raceReminders === true,
-    iracingImport:settings.modules.iracingImport === true, soloRaces:settings.modules.soloRaces === true, preparation:settings.modules.preparation === true};
+    iracingImport:settings.modules.iracingImport === true, soloRaces:settings.modules.soloRaces === true, training:settings.modules.training === true};
 }
 
 // « Vue d'ensemble ».
@@ -199,8 +199,8 @@ function modulesMarkup(settings, setup) {
       state:states.iracingImport ? ['ok', 'Actif'] : ['off', 'Éteint'], control:toggle('iracingImport', 'Endurances iRacing officielles'), settings:''},
     {key:'soloRaces', name:'Courses solo', text:'Onglet « Courses solo » : places limitées, liste d’attente, courses OPEN et SAFE.',
       state:states.soloRaces ? ['ok', 'Actif'] : ['off', 'Éteint'], control:toggle('soloRaces', 'Courses solo'), settings:''},
-    {key:'preparation', name:'Préparation des équipages', text:'Dans chaque équipage : le setup commun partagé par le responsable, et la check-list, le chrono et la conso de chaque pilote.',
-      state:states.preparation ? ['ok', 'Actif'] : ['off', 'Éteint'], control:toggle('preparation', 'Préparation des équipages'), settings:''}];
+    {key:'training', name:'Entraînement', text:'Page « Mon entraînement » : programme guidé, séance du jour et conseils tirés des séances LMU de chaque pilote.',
+      state:states.training ? ['ok', 'Actif'] : ['off', 'Éteint'], control:toggle('training', 'Entraînement'), settings:''}];
   const tile = item => `<article class="admin-module ${states[item.key] ? 'is-on' : ''}" data-module-tile="${item.key}">
     <div class="admin-module-top"><span class="admin-module-icon">${icon(item.key)}</span><strong>${item.name}</strong>${item.control}</div>
     <p>${item.text}</p>

@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rFactorXML version="1.0">
+<RaceResults>
+  <Setting>Race Weekend</Setting>
+  <PlayerFile>Pilote</PlayerFile>
+  <DateTime>1790000000</DateTime>
+  <TimeString>2026/09/21 16:13:20</TimeString>
+  <TrackVenue>Circuit de Spa-Francorchamps</TrackVenue>
+  <TrackCourse>Circuit de Spa-Francorchamps</TrackCourse>
+  <TrackEvent>Spa 6 Hours</TrackEvent>
+  <TrackLength>7004.0</TrackLength>
+  <Practice1>
+    <DateTime>1790000000</DateTime>
+    <Driver>
+      <Name>IA Rival</Name>
+      <isPlayer>0</isPlayer>
+      <CarType>Ferrari 296 LMGT3</CarType>
+      <CarClass>GT3</CarClass>
+      <Lap num="1" p="1" s1="33.9" s2="42.1" s3="45.2" fuel="0.9">121.2000</Lap>
+      <Lap num="2" p="1" s1="33.9" s2="42.1" s3="45.2" fuel="0.9">121.2000</Lap>
+      <Lap num="3" p="1" s1="33.9" s2="42.1" s3="45.2" fuel="0.9">121.2000</Lap>
+    </Driver>
+    <Driver>
+      <Name>Max &amp; Co</Name>
+      <VehName>Alpine A424 #35</VehName>
+      <CarType>Alpine A424</CarType>
+      <CarClass>Hypercar</CarClass>
+      <isPlayer>1</isPlayer>
+      <Lap num="1" p="3" et="126.000" s1="38.1240" s2="48.0080" s3="55.0680" topspeed="292.1" fuel="0.964" ve="0.966" twfl="0.95" twfr="0.95" twrl="0.96" twrr="0.96" fcompound="0,Medium" rcompound="0,Medium">141.2000</Lap>
+      <Lap num="2" p="3" et="252.000" s1="33.8030" s2="42.5670" s3="48.8260" topspeed="292.1" fuel="0.928" ve="0.932" twfl="0.95" twfr="0.95" twrl="0.96" twrr="0.96" fcompound="0,Medium" rcompound="0,Medium">125.1960</Lap>
+      <Lap num="3" p="3" et="378.000" s1="33.7750" s2="42.5320" s3="48.7860" topspeed="292.1" fuel="0.892" ve="0.898" twfl="0.95" twfr="0.95" twrl="0.96" twrr="0.96" fcompound="0,Medium" rcompound="0,Medium">125.0930</Lap>
+      <Lap num="4" p="3" et="504.000" s1="33.8620" s2="42.6410" s3="48.9130" topspeed="292.1" fuel="0.856" ve="0.864" twfl="0.95" twfr="0.95" twrl="0.96" twrr="0.96" fcompound="0,Medium" rcompound="0,Medium">125.4160</Lap>
+      <Lap num="5" p="3" et="630.000" s1="33.8050" s2="42.5700" s3="48.8300" topspeed="292.1" fuel="0.820" ve="0.830" twfl="0.95" twfr="0.95" twrl="0.96" twrr="0.96" fcompound="0,Medium" rcompound="0,Medium">125.2050</Lap>
+      <Lap num="6" p="3" et="756.000" s1="33.7900" s2="42.5500" s3="48.8070" topspeed="292.1" fuel="0.784" ve="0.796" twfl="0.95" twfr="0.95" twrl="0.96" twrr="0.96" fcompound="0,Medium" rcompound="0,Medium">125.1470</Lap>
+      <Lap num="7" p="3" et="882.000" s1="33.8880" s2="42.6740" s3="48.9500" topspeed="292.1" fuel="0.748" ve="0.762" twfl="0.95" twfr="0.95" twrl="0.96" twrr="0.96" fcompound="0,Medium" rcompound="0,Medium">125.5120</Lap>
+      <Lap num="8" p="3" et="1008.000" s1="37.2330" s2="46.8860" s3="53.7810" topspeed="292.1" fuel="0.712" ve="0.728" twfl="0.95" twfr="0.95" twrl="0.96" twrr="0.96" fcompound="0,Medium" rcompound="0,Medium">137.9000</Lap>
+      <Lap num="9" p="3" et="1134.000" s1="34.0440" s2="42.8700" s3="49.1740" topspeed="292.1" fuel="0.676" ve="0.694" twfl="0.95" twfr="0.95" twrl="0.96" twrr="0.96" fcompound="0,Medium" rcompound="0,Medium">126.0880</Lap>
+      <Lap num="10" p="3" et="1260.000" s1="34.0200" s2="42.8400" s3="49.1400" topspeed="292.1" fuel="0.640" ve="0.660" twfl="0.95" twfr="0.95" twrl="0.96" twrr="0.96" fcompound="0,Medium" rcompound="0,Medium">126.0000</Lap>
+      <Lap num="11" p="3" et="1386.000" s1="34.0190" s2="42.8380" s3="49.1380" topspeed="292.1" fuel="0.604" ve="0.626" twfl="0.95" twfr="0.95" twrl="0.96" twrr="0.96" fcompound="0,Medium" rcompound="0,Medium">125.9950</Lap>
+      <Lap num="12" p="3" et="1512.000" s1="33.8800" s2="42.6640" s3="48.9380" topspeed="292.1" fuel="0.568" ve="0.592" twfl="0.95" twfr="0.95" twrl="0.96" twrr="0.96" fcompound="0,Medium" rcompound="0,Medium">125.4820</Lap>
+      <Lap num="13" p="3" et="1638.000" s1="33.9730" s2="42.7810" s3="49.0730" topspeed="292.1" fuel="0.532" ve="0.558" twfl="0.95" twfr="0.95" twrl="0.96" twrr="0.96" fcompound="0,Medium" rcompound="0,Medium">125.8270</Lap>
+      <Lap num="14" p="3" et="1764.000" s1="41.1480" s2="51.8160" s3="59.4360" topspeed="292.1" fuel="0.980" ve="1.000" twfl="0.95" twfr="0.95" twrl="0.96" twrr="0.96" fcompound="0,Medium" rcompound="0,Medium" pit="1">152.4000</Lap>
+      <Lap num="15" p="3" et="1890.000" s1="33.7500" s2="42.5000" topspeed="292.1" fuel="0.944" ve="0.966" twfl="0.95" twfr="0.95" twrl="0.96" twrr="0.96" fcompound="0,Medium" rcompound="0,Medium">--.----</Lap>
+      <Lap num="16" p="3" et="2016.000" s1="33.8990" s2="42.6880" s3="48.9660" topspeed="292.1" fuel="0.908" ve="0.932" twfl="0.95" twfr="0.95" twrl="0.96" twrr="0.96" fcompound="0,Medium" rcompound="0,Medium">125.5530</Lap>
+      <Lap num="17" p="3" et="2142.000" s1="33.8890" s2="42.6750" s3="48.9520" topspeed="292.1" fuel="0.872" ve="0.898" twfl="0.95" twfr="0.95" twrl="0.96" twrr="0.96" fcompound="0,Medium" rcompound="0,Medium">125.5160</Lap>
+      <Lap num="18" p="3" et="2268.000" s1="33.9270" s2="42.7220" s3="49.0050" topspeed="292.1" fuel="0.836" ve="0.864" twfl="0.95" twfr="0.95" twrl="0.96" twrr="0.96" fcompound="0,Medium" rcompound="0,Medium">125.6540</Lap>
+      <Lap num="19" p="3" et="2394.000" s1="34.1270" s2="42.9750" s3="49.2950" topspeed="292.1" fuel="0.800" ve="0.830" twfl="0.95" twfr="0.95" twrl="0.96" twrr="0.96" fcompound="0,Medium" rcompound="0,Medium">126.3970</Lap>
+      <Lap num="20" p="3" et="2520.000" s1="34.1090" s2="42.9520" s3="49.2680" topspeed="292.1" fuel="0.764" ve="0.796" twfl="0.95" twfr="0.95" twrl="0.96" twrr="0.96" fcompound="0,Medium" rcompound="0,Medium">126.3290</Lap>
+      <Lap num="21" p="3" et="2646.000" s1="34.1110" s2="42.9550" s3="49.2710" topspeed="292.1" fuel="0.728" ve="0.762" twfl="0.95" twfr="0.95" twrl="0.96" twrr="0.96" fcompound="0,Medium" rcompound="0,Medium">126.3370</Lap>
+      <Lap num="22" p="3" et="2772.000" s1="34.1170" s2="42.9620" s3="49.2810" topspeed="292.1" fuel="0.692" ve="0.728" twfl="0.95" twfr="0.95" twrl="0.96" twrr="0.96" fcompound="0,Medium" rcompound="0,Medium">126.3600</Lap>
+      <Lap num="23" p="3" et="2898.000" s1="33.9610" s2="42.7660" s3="49.0560" topspeed="292.1" fuel="0.656" ve="0.694" twfl="0.95" twfr="0.95" twrl="0.96" twrr="0.96" fcompound="0,Medium" rcompound="0,Medium">125.7830</Lap>
+      <Lap num="24" p="3" et="3024.000" s1="34.0010" s2="42.8160" s3="49.1130" topspeed="292.1" fuel="0.620" ve="0.660" twfl="0.95" twfr="0.95" twrl="0.96" twrr="0.96" fcompound="0,Medium" rcompound="0,Medium">125.9300</Lap>
+      <Lap num="25" p="3" et="3150.000" s1="34.0950" s2="42.9340" s3="49.2480" topspeed="292.1" fuel="0.584" ve="0.626" twfl="0.95" twfr="0.95" twrl="0.96" twrr="0.96" fcompound="0,Medium" rcompound="0,Medium">126.2770</Lap>
+      <BestLapTime>125.0</BestLapTime>
+    </Driver>
+  </Practice1>
+</RaceResults>
+</rFactorXML>

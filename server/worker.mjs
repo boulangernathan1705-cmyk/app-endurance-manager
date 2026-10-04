@@ -5,7 +5,7 @@ import {
 } from './core.mjs';
 import {ingestClientError, clientErrorsApi} from './telemetry.mjs';
 import {communityRequestsApi, closeCommunityRequest} from './community-requests.mjs';
-import {crewPreparationApi, crewPreparations} from './crew-preparation.mjs';
+import {trainingApi, trainingCollector} from './training.mjs';
 import {racesPath} from './races-path.mjs';
 import {CARS} from '../shared/catalog.mjs';
 import {currentCommunity, appearanceOf, allCommunities, communityUrl, communitySlug, communityById, communityFromRow} from './community.mjs';
@@ -226,11 +226,11 @@ async function listEvents(env, actor, game='', scope='', community) {
     if (!membersByCrew.has(member.crew_id)) membersByCrew.set(member.crew_id, []);
     membersByCrew.get(member.crew_id).push(member.registration_id);
   }
-  const crewsByDeparture = new Map(), ownCrews = [];
+  const crewsByDeparture = new Map();
   for (const crew of crews) {
     const key = `${crew.event_id}:${crew.departure_id}`;
     if (!crewsByDeparture.has(key)) crewsByDeparture.set(key, []);
-    const shown = {
+    crewsByDeparture.get(key).push({
       id:crew.id,
       name:crew.name,
       category:crew.category,
@@ -243,13 +243,8 @@ async function listEvents(env, actor, game='', scope='', community) {
       hasOwner:Boolean(crew.owner_user_id),
       ...(crew.community_id!==community.id ? {foreign:true} : {}),
       ...(official.has(crew.event_id) ? {community:names.get(crew.community_id) || null} : {})
-    };
-    crewsByDeparture.get(key).push(shown);
-    if (crew.community_id===community.id) ownCrews.push({row:crew, registrationIds:shown.registrationIds, canManage:shown.canManage, shown});
+    });
   }
-  // Crew preparation (server/crew-preparation.mjs): only for the crews the player is in or manages.
-  const preparations = await crewPreparations(env, community, ownCrews, new Set(registrations.filter(reg => personal(reg, actor)).map(reg => reg.id)));
-  for (const item of ownCrews) if (preparations.has(item.row.id)) item.shown.preparation = preparations.get(item.row.id);
   return rows.map(row => {
     const format=row.format||'endurance', capacity=row.capacity==null?null:Number(row.capacity);
     const durationHours=Number(row.duration_hours)||3, durationMinutes=Number(row.duration_minutes)||durationHours*60;
@@ -324,6 +319,8 @@ async function api(request, env) {
   // The main address, or a community address of the platform (BASE_DOMAIN).
   const canonical = siteOrigin(request, env);
   if (url.origin !== canonical) fail(403, 'Utilise l’adresse principale du site pour cette action.');
+  // The LMU sync program (server/training.mjs): no browser, only the pilot's own key.
+  if (path === '/api/training/collector') return trainingCollector(request, env);
   if (!['GET','HEAD'].includes(method)) {
     if (request.headers.get('Origin') !== canonical) fail(403, 'Origine de la requête refusée.');
     await rateLimit(request, env, 'write', 80);
@@ -345,7 +342,7 @@ async function api(request, env) {
   // Requests for a new community: sent by anyone signed in with Discord, from any site (server/community-requests.mjs).
   const requests = await communityRequestsApi(path, method, request, env, actor);
   if (requests) return requests;
-  if (path === '/api/session' && method === 'GET') return json({user:actor.user, discordReady:!!(env.DISCORD_CLIENT_ID && env.DISCORD_CLIENT_SECRET), adminConfigured:administrators(env).length > 0, soloRaces:soloRacesEnabled(env, community),
+  if (path === '/api/session' && method === 'GET') return json({user:actor.user, discordReady:!!(env.DISCORD_CLIENT_ID && env.DISCORD_CLIENT_SECRET), adminConfigured:administrators(env).length > 0, soloRaces:soloRacesEnabled(env, community), training:community.modules?.training === true,
     community:{id:community.id, slug:community.slug, name:community.name, shortName:community.shortName, discordInviteUrl:community.discordInviteUrl, appearance:appearanceOf(community)},
     access:access.status, permissions:[...access.permissions], manager:access.manager, communities:await myCommunities(env, actor, community), openSite,
     platformDiscordUrl:/^https:\/\/(discord\.gg|discord\.com\/invite)\//.test(env.PLATFORM_DISCORD_URL || '') ? env.PLATFORM_DISCORD_URL : null});
@@ -376,8 +373,9 @@ async function api(request, env) {
   // The bell next to the account (server/notifications.mjs).
   const notifications = await notificationsApi(path, method, env, actor, community);
   if (notifications) return notifications;
-  const preparation = await crewPreparationApi(path, method, request, env, actor, community, canManageCrew);
-  if (preparation) return preparation;
+  // « Mon entraînement » (server/training.mjs).
+  const training = await trainingApi(path, method, request, env, actor, community);
+  if (training) return training;
   if (path === '/api/events' && method === 'GET') {
     const requestedGame=url.searchParams.get('game');
     const game=requestedGame==='lmu'||requestedGame==='iracing'?requestedGame:'';
@@ -720,7 +718,7 @@ async function api(request, env) {
     await keepDiscordLook(env, community, discord);
     return json({community:{name:community.name, shortName:community.shortName, discordServer:discord?.name || null, ...appearanceOf(community)}, roles, permissions:PERMISSIONS,
       modules:{iracingImport:community.modules.iracingImport === true, discordWeekly:community.modules.discordWeekly === true, soloRaces:community.modules.soloRaces === true,
-        crewChannels:community.modules.crewChannels === true, raceReminders:community.modules.raceReminders === true, preparation:community.modules.preparation === true},
+        crewChannels:community.modules.crewChannels === true, raceReminders:community.modules.raceReminders === true, training:community.modules.training === true},
       crews:await crewDiscordState(env, community)});
   }
   // Banner sent by the admins: the image itself (already resized by the browser), WebP, JPEG or PNG, 600 KB at most.
@@ -769,7 +767,7 @@ async function api(request, env) {
     const input = await body(request);
     const modules = {...community.modules};
     // The Discord recap is set on the « Mise en place » page (its own webhook), not here.
-    for (const key of ['iracingImport','soloRaces','raceReminders','preparation']) if (typeof input[key] === 'boolean') modules[key] = input[key];
+    for (const key of ['iracingImport','soloRaces','raceReminders','training']) if (typeof input[key] === 'boolean') modules[key] = input[key];
     const statements = [];
     // Crews on Discord (server/crew-discord.mjs): only once the bot has the rights to make the channels.
     if (typeof input.crewChannels === 'boolean') {
