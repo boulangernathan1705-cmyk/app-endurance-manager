@@ -88,7 +88,6 @@ function crewCard(event,departure,crew,index,unassigned,allCrews){
       <div class="crew-pilot-accordion-body crew-unified-body">
         ${management}
         ${crewAvailability(event,departure,regs)}
-        ${crew.preparationEnabled&&(ownMember||crew.canManage)?`<a class="secondary-button crew-preparation-link" href="/preparation.html?crew=${encodeURIComponent(crew.id)}">Préparer la course</a>`:''}
       </div>
     </details>
     ${actions}
