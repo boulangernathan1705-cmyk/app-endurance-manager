@@ -53,9 +53,10 @@ function hero(data) {
   </header>`;
 }
 
-function stats(a) {
-  const items = [['Meilleur tour', lapLabel(a.best)], ['Tours roulés', a.totalLaps], ['Conso / tour', a.fuelPerLap ? `${num(a.fuelPerLap)} %` : '—'],
-    ['Énergie / tour', a.energyPerLap ? `${num(a.energyPerLap)} %` : '—'], ['Tours avec un plein', a.tankLaps ?? '—'], ['Régularité', a.regularity !== null && a.regularity !== undefined ? `± ${num(a.regularity, 2)} s` : '—']];
+function stats(a, live) {
+  const litres = live?.fuelPerLap || a.fuelLitres;
+  const items = [['Meilleur tour', lapLabel(a.best)], ['Tours roulés', a.totalLaps], ['Carburant / tour', litres ? `${num(litres, 2)} L` : a.fuelPerLap ? `${num(a.fuelPerLap)} %` : '—'],
+    ['Énergie / tour', a.energyPerLap ? `${num(a.energyPerLap)} %` : '—'], ['Tours avec un plein', live?.tankLaps ?? a.tankLaps ?? '—'], ['Régularité', a.regularity !== null && a.regularity !== undefined ? `± ${num(a.regularity, 2)} s` : '—']];
   return `<div class="training-stats">${items.map(([label, value]) => `<div><small>${label}</small><strong>${esc(value)}</strong></div>`).join('')}</div>`;
 }
 
@@ -114,6 +115,46 @@ function comparison(data) {
     <p class="training-note">Ton rang n’est visible que par toi. Les autres pilotes ne sont jamais nommés.</p></section>`;
 }
 
+const WHEELS = ['Avant gauche', 'Avant droit', 'Arrière gauche', 'Arrière droit'];
+
+// Fuel and energy: litres per lap, energy per lap and the ratio to set at the stop so both run out together.
+function fuel(live) {
+  if (!live || (!live.fuelPerLap && !live.energyPerLap)) return '';
+  const items = [['Carburant / tour', live.fuelPerLap ? `${num(live.fuelPerLap, 2)} L` : '—'], ['Énergie / tour', live.energyPerLap ? `${num(live.energyPerLap)} %` : '—'],
+    ['Tours avec un plein', live.tankLaps ?? '—'], ['Tours avec 100 % d’énergie', live.energyLaps ?? '—']];
+  return `<section class="training-card"><div class="training-card-head"><h2>Carburant et énergie</h2>${live.capacity ? `<span class="training-count">Réservoir ${num(live.capacity, 0)} L</span>` : ''}</div>
+    <div class="training-stats">${items.map(([label, value]) => `<div><small>${label}</small><strong>${esc(value)}</strong></div>`).join('')}</div>
+    ${live.ratio ? `<p class="training-ratio">Rapport carburant conseillé : <strong>${num(live.ratio, 2)}</strong></p>
+    <p class="training-note">Règle ce rapport au stand : le carburant et l’énergie s’épuisent alors au même tour, et tu ne charges pas de carburant pour rien.${live.ratio > 1 ? ' Au-dessus de 1, c’est le carburant qui limite ton relais.' : ''}</p>` : ''}</section>`;
+}
+
+// Tyres per compound: wear per lap, temperatures and pressures, wheel by wheel, as on the car.
+function tyres(live) {
+  if (!live?.compounds?.length) return '';
+  const cell = (item, index) => `<div class="training-wheel${item.wear[index] !== null && item.wear[index] === Math.max(...item.wear.filter(value => value !== null)) ? ' is-worst' : ''}">
+    <small>${WHEELS[index]}</small><strong>${item.wear[index] !== null ? `${num(item.wear[index], 2)} %` : '—'}</strong>
+    <span>${item.temp[index] !== null ? `${num(item.temp[index], 0)} °C` : '—'} · ${item.kpa[index] ? `${num(item.kpa[index], 0)} kPa` : '—'}</span>
+    <span>Freins ${item.brake[index] !== null ? `${num(item.brake[index], 0)} °C` : '—'}</span></div>`;
+  return `<section class="training-card"><div class="training-card-head"><h2>Pneus</h2>${live.trackTemp !== null ? `<span class="training-count">Piste ${num(live.trackTemp, 0)} °C${live.airTemp !== null ? ` · air ${num(live.airTemp, 0)} °C` : ''}</span>` : ''}</div>
+    ${live.compounds.map(item => `<div class="training-compound"><p><strong>${esc(item.name)}</strong> · ${item.laps} tour${item.laps > 1 ? 's' : ''}${item.track !== null ? ` · piste ${num(item.track, 0)} °C` : ''}${item.lapsTo50 ? ` · environ ${item.lapsTo50} tours pour user un pneu à moitié` : ''}</p>
+      <div class="training-wheels">${[0, 1, 2, 3].map(index => cell(item, index)).join('')}</div></div>`).join('')}
+    <p class="training-note">Usure par tour, en pourcentage du pneu. Température moyenne de la bande de roulement, hors stands.${live.top ? ` Vitesse max : <strong>${num(live.top, 0)} km/h</strong>${live.topMedian ? ` (${num(live.topMedian, 0)} km/h en moyenne par tour)` : ''}.` : ''}</p></section>`;
+}
+
+// The stops measured in training, broken down: crossing the pit lane, tyres, refuelling, repairs.
+function stops(live) {
+  const pit = live?.pit;
+  if (!pit) return '';
+  const items = [['Traversée de la voie', pit.through !== null ? `${num(pit.through)} s` : '—'], ['4 pneus seuls', pit.tyres4 !== null ? `${num(pit.tyres4)} s` : '—'],
+    ['2 pneus seuls', pit.tyres2 !== null ? `${num(pit.tyres2)} s` : '—'], ['Remplissage', pit.fuelRate ? `${num(pit.fuelRate, 2)} L/s` : '—'],
+    ['Réparation', pit.repair !== null ? `${num(pit.repair)} s` : '—']];
+  return `<section class="training-card"><div class="training-card-head"><h2>Arrêts aux stands</h2><span class="training-count">${pit.stops} arrêt${pit.stops > 1 ? 's' : ''} mesuré${pit.stops > 1 ? 's' : ''}</span></div>
+    <div class="training-stats">${items.map(([label, value]) => `<div><small>${label}</small><strong>${esc(value)}</strong></div>`).join('')}</div>
+    <ul class="training-stops">${pit.last.map(stop => `<li><strong>Tour ${stop.lap}</strong><span>${num(stop.lane)} s dans la voie, ${num(stop.stopped)} s arrêté</span>
+      <small>${[stop.fuel > 1 ? `${num(stop.fuel, 0)} L` : '', stop.tyres ? `${stop.tyres} pneus` : '', stop.repair ? 'réparation' : ''].filter(Boolean).join(' · ') || 'sans service'}</small></li>`).join('')}</ul>
+    <p class="training-note">Traversée : le temps dans la voie des stands sans l’arrêt. Pour isoler un temps, fais des arrêts avec un seul service : 4 pneus seuls, puis du carburant seul. <a href="/stands.html">Guide des stands</a></p></section>`;
+}
+
 function sync(data) {
   const device = data.device;
   const status = device.linked
@@ -122,7 +163,7 @@ function sync(data) {
   return `<section class="training-card training-sync"><h2>${device.linked ? 'Ton jeu est relié' : 'Relie ton jeu en une fois'}</h2>${status}
     <div class="training-actions"><form method="post" action="/api/training/sync"><button type="submit" class="${device.linked ? 'secondary-button' : 'primary-button'}">${device.linked ? 'Retélécharger' : 'Télécharger le synchroniseur'}</button></form>
     ${device.linked ? '<button type="button" class="secondary-button" data-unlink>Retirer la liaison</button>' : ''}</div>
-    <p class="training-note">Petit programme Windows, sans fenêtre, qui lit seulement les résultats de LMU (dossier UserData\\Log\\Results) et les envoie ici. Windows peut afficher un avertissement au premier lancement : clique sur « Informations complémentaires » puis « Exécuter quand même ».</p>
+    <p class="training-note">Petit programme Windows, sans fenêtre, qui lit les résultats de LMU (dossier UserData\\Log\\Results) et, pendant que tu roules, les données que le jeu publie (pneus, carburant, vitesse, arrêts). Il ne modifie rien dans le jeu. Windows peut afficher un avertissement au premier lancement : clique sur « Informations complémentaires » puis « Exécuter quand même ».</p>
     <label class="training-drop" data-drop><input type="file" accept=".xml" multiple data-file><strong>Ou dépose tes fichiers de résultats ici</strong><small>Documents ou Steam › Le Mans Ultimate › UserData › Log › Results</small></label>
     ${view.busy ? `<p class="training-busy" role="status">${esc(view.busy)}</p>` : ''}</section>`;
 }
@@ -139,8 +180,9 @@ function render() {
   const data = view.data;
   const empty = !data.analysis.totalLaps;
   app.innerHTML = `${hero(data)}
-    ${empty ? `<section class="training-card training-welcome"><h2>Ta première séance</h2><p>Relie ton jeu ci-dessous puis roule dans Le Mans Ultimate. Dès la fin de ta séance, tes tours arrivent ici : programme, séance du jour, conseils et comparaison avec les autres pilotes.</p></section>` : stats(data.analysis)}
-    <div class="training-grid"><div>${today(data)}${program(data)}</div><div>${advice(data)}${chart(data.analysis)}${comparison(data)}</div></div>
+    ${empty ? `<section class="training-card training-welcome"><h2>Ta première séance</h2><p>Relie ton jeu ci-dessous puis roule dans Le Mans Ultimate. Dès la fin de ta séance, tes tours arrivent ici : programme, séance du jour, conseils et comparaison avec les autres pilotes.</p></section>` : stats(data.analysis, data.live)}
+    <div class="training-grid"><div>${today(data)}${program(data)}${fuel(data.live)}</div><div>${advice(data)}${chart(data.analysis)}${comparison(data)}${stops(data.live)}</div></div>
+    ${tyres(data.live)}
     ${sync(data)}${sessions(data)}`;
 }
 

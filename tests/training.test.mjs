@@ -4,7 +4,7 @@ import {DatabaseSync} from 'node:sqlite';
 import {readFileSync, readdirSync} from 'node:fs';
 import worker from '../server/worker.mjs';
 import {linkTestServer, setMember, ORGA_ROLE} from './fixtures/discord-server.mjs';
-import {parseResults, analyse, programSteps, adviceFor, todaySession, circuitOf} from '../shared/training.mjs';
+import {parseResults, analyse, programSteps, adviceFor, todaySession, circuitOf, cleanLive, analyseLive} from '../shared/training.mjs';
 
 // Individual training (migration 0046): LMU results files, the program, the advice and the sync program.
 const ROOT='https://site.example';
@@ -125,4 +125,53 @@ test('the sync program carries the pilot key, sends sessions with it only, and s
   assert.equal(data.sessions.length,1);assert.equal(data.device.linked,true);assert.ok(data.device.lastSeen);
   assert.equal((await req('/api/training/sync','DELETE',null,'pilot')).status,200);
   assert.equal((await collect(XML,'Bearer '+key)).status,401);
+});
+
+// What connectors/lmu-sync/live.go sends after a session: laps with tyres and litres, and the stops broken down.
+const liveLap=(n,extra={})=>({n,t:137+n/10,top:300+n,fuel:2.9,ve:3.4,wear:[1.2,1.1,1.6,1.5],temp:[88,87,92,91],brake:[520,515,480,470],kpa:[150,150,148,148],compound:'Medium',track:31,air:22,rain:0,...extra});
+const LIVE={at:1790000100000,track:'Circuit de Spa-Francorchamps',car:'Alpine A424',class:'Hypercar',session:1,capacity:90,
+  laps:[liveLap(1),liveLap(2),liveLap(3,{pit:true,fuel:0,ve:0}),liveLap(4,{compound:'Soft',wear:[2,2,2.4,2.4],temp:[95,94,99,98]}),liveLap(5,{invalid:true,fuel:9})],
+  stops:[{lap:3,lane:52.4,stopped:24.1,fuel:40,ve:48,tyres:4},{lap:9,lane:40,stopped:12,fuel:36,ve:0,tyres:0},{lap:14,lane:38,stopped:9,fuel:0,ve:0,tyres:4}]};
+
+test('live data gives litres, the fuel ratio, tyres by compound and the stops broken down', async () => {
+  const live=cleanLive(LIVE);
+  assert.equal(live.laps.length,5);
+  assert.throws(()=>cleanLive({laps:[],stops:[]}),/incomplète|illisible/);
+  assert.equal(cleanLive({...LIVE,laps:[{...liveLap(1),top:'<script>',wear:[1,2]}]}).laps[0].top,null);
+  const a=analyseLive([live]);
+  assert.deepEqual([a.fuelPerLap,a.energyPerLap,a.capacity,a.tankLaps,a.energyLaps,a.top],[2.9,3.4,90,31,29,305]);
+  // 2,9 l of 90 l is 3,22 % of the tank, against 3,4 % of energy: ratio 0,95.
+  assert.equal(a.ratio,0.95);
+  assert.deepEqual(a.compounds.map(item=>[item.name,item.laps,item.wear[2],item.temp[2]]),[['Medium',2,1.6,92],['Soft',1,2.4,99]]);
+  assert.equal(a.compounds[0].lapsTo50,31);
+  assert.deepEqual([a.pit.stops,a.pit.through,a.pit.tyres4,a.pit.fuelRate],[3,28.3,9,3]);
+
+  const {req,send,login}=harness();
+  await login(ADMIN,'admin','Orga');await login(PILOT,'pilot','Alice');
+  await req('/api/community/modules','PATCH',{training:true},'admin');
+  const program=await send('/api/training/sync','POST','pilot',{raw:''});
+  const key=new TextDecoder().decode(new Uint8Array(await program.arrayBuffer()).slice(4096)).match(/([a-f0-9]{64})/)[1];
+  const push=(body,auth='Bearer '+key)=>send('/api/training/live','POST','sync',{raw:body,headers:{'Content-Type':'application/json',Authorization:auth}});
+  assert.equal((await push(JSON.stringify(LIVE),'Bearer '+'0'.repeat(64))).status,401);
+  assert.equal((await push('{oops')).status,400);
+  let response=await push(JSON.stringify(LIVE));
+  assert.equal(response.status,200);assert.equal((await response.json()).created,true);
+  assert.equal((await (await push(JSON.stringify(LIVE))).json()).created,false);
+  await send('/api/training/collector','POST','sync',{raw:XML,headers:{'Content-Type':'application/xml',Authorization:'Bearer '+key}});
+  const data=(await req('/api/training','GET',null,'pilot')).data;
+  assert.equal(data.live.ratio,0.95);assert.equal(data.live.pit.stops,3);
+  // The results file's 3,6 % of the tank, in litres now that the game told the tank size.
+  assert.equal(data.analysis.fuelLitres,3.24);
+});
+
+test('the pit guide gives the stops of every pilot per class, without names', async () => {
+  const {req,send,login}=harness();
+  await login(ADMIN,'admin','Orga');await login(PILOT,'pilot','Alice');
+  await req('/api/community/modules','PATCH',{training:true},'admin');
+  const program=await send('/api/training/sync','POST','pilot',{raw:''});
+  const key=new TextDecoder().decode(new Uint8Array(await program.arrayBuffer()).slice(4096)).match(/([a-f0-9]{64})/)[1];
+  await send('/api/training/live','POST','sync',{raw:JSON.stringify(LIVE),headers:{'Content-Type':'application/json',Authorization:'Bearer '+key}});
+  const data=(await req('/api/training/pits','GET',null,'pilot')).data;
+  assert.deepEqual(data.classes.map(item=>[item.name,item.pilots,item.stops,item.tyres4,item.fuelRate]),[['Hypercar',1,3,9,3]]);
+  assert.ok(!JSON.stringify(data).includes('Alice'));
 });

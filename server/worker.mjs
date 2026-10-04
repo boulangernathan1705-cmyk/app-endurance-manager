@@ -321,6 +321,7 @@ async function api(request, env) {
   if (url.origin !== canonical) fail(403, 'Utilise l’adresse principale du site pour cette action.');
   // The LMU sync program (server/training.mjs): no browser, only the pilot's own key.
   if (path === '/api/training/collector') return trainingCollector(request, env);
+  if (path === '/api/training/live') return trainingCollector(request, env, true);
   if (!['GET','HEAD'].includes(method)) {
     if (request.headers.get('Origin') !== canonical) fail(403, 'Origine de la requête refusée.');
     await rateLimit(request, env, 'write', 80);

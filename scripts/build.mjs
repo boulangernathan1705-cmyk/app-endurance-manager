@@ -89,6 +89,7 @@ const sourceDiagnostics = await readFile(root + 'diagnostics.html', 'utf8');
 const sourceHelp = await readFile(root + 'help.html', 'utf8');
 const sourceRequest = await readFile(root + 'demande-communaute.html', 'utf8');
 const sourceTraining = await readFile(root + 'entrainement.html', 'utf8');
+const sourcePits = await readFile(root + 'stands.html', 'utf8');
 const paths = [
   ...stylesheetPaths(sourceIndex,'index.html'),
   ...stylesheetPaths(sourceGame,'game.html'),
@@ -96,7 +97,8 @@ const paths = [
   ...stylesheetPaths(sourceDiagnostics,'diagnostics.html'),
   ...stylesheetPaths(sourceHelp,'help.html'),
   ...stylesheetPaths(sourceRequest,'demande-communaute.html'),
-  ...stylesheetPaths(sourceTraining,'entrainement.html')
+  ...stylesheetPaths(sourceTraining,'entrainement.html'),
+  ...stylesheetPaths(sourcePits,'stands.html')
 ];
 // styles/ux-refresh.css is the final layer that replaces older rules: keep it last in the
 // shared bundle whichever page lists it first.
@@ -115,6 +117,7 @@ await writeFile(new URL('diagnostics.html', out), productionHtml(sourceDiagnosti
 await writeFile(new URL('help.html', out), productionHtml(sourceHelp));
 await writeFile(new URL('demande-communaute.html', out), productionHtml(sourceRequest));
 await writeFile(new URL('entrainement.html', out), productionHtml(sourceTraining));
+await writeFile(new URL('stands.html', out), productionHtml(sourcePits));
 const gameHtml = productionHtml(sourceGame);
 await writeFile(new URL('lmu/index.html', out), gameHtml);
 await writeFile(new URL('iracing/index.html', out), gameHtml);
@@ -165,6 +168,9 @@ await writeFile(new URL('_headers', out), `/*
 /entrainement.html
   X-Robots-Tag: noindex, nofollow
 
+/stands.html
+  X-Robots-Tag: noindex, nofollow
+
 https://app.endurance-manager.workers.dev/*
   X-Robots-Tag: noindex, nofollow
 `);
@@ -176,6 +182,7 @@ Disallow: /telemetry/
 Disallow: /members.html
 Disallow: /diagnostics.html
 Disallow: /entrainement.html
+Disallow: /stands.html
 Disallow: /downloads/
 Sitemap: https://endurance-manager.app/sitemap.xml
 `);

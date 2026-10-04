@@ -1,8 +1,8 @@
-// Individual training (migration 0046, module "training"): each pilot's LMU sessions, read from the results files
+// Individual training (migrations 0046-0047, module "training"): each pilot's LMU sessions, read from the results files
 // the sync program sends (or the pilot drops on the page), turned into a program, a session for today, advice and a
 // comparison with the other pilots of the site. Only the pilot sees his own data; the others are counted, never named.
 import {fail, json, now, id, token, hash, siteOrigin, rateLimit, body, DAY} from './core.mjs';
-import {parseResults, analyse, programSteps, adviceFor, trackKey, cleanLaps, circuitOf, STEPS} from '../shared/training.mjs';
+import {parseResults, analyse, programSteps, adviceFor, trackKey, cleanLaps, circuitOf, normal, cleanLive, analyseLive, pitTimes, STEPS} from '../shared/training.mjs';
 
 const FILE_LIMIT = 3_000_000;
 const KEEP_DAYS = 120;
@@ -36,15 +36,28 @@ export async function saveSession(env, userId, xml) {
   return {created:result.meta.changes === 1, venue:session.venue, laps:session.laps.length};
 }
 
-// The sync program: no browser and no cookie, only the pilot's own key, which can do nothing but send sessions.
-export async function trainingCollector(request, env) {
+// Live data on one session (tyres, speed, litres, stops). The circuit is the site's name for it when known, so the
+// session sits next to the results files of the same track.
+export async function saveLive(env, userId, text) {
+  let session;
+  try { session = cleanLive(JSON.parse(text)); } catch (error) { fail(400, error instanceof SyntaxError ? 'Séance en direct illisible.' : error.message); }
+  const fingerprint = await hash(JSON.stringify([session.at, session.track, session.car]));
+  const result = await env.DB.prepare(`INSERT OR IGNORE INTO training_live(id,user_id,fingerprint,started_at,circuit,track,car,car_class,capacity,laps,stops,created_at)
+    VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`).bind(id(), userId, fingerprint, session.at, circuitOf(session.track) || normal(session.track), session.track, session.car,
+    session.carClass, session.capacity, JSON.stringify(session.laps), JSON.stringify(session.stops), now()).run();
+  return {created:result.meta.changes === 1, track:session.track, laps:session.laps.length};
+}
+
+// The sync program (or the SimHub plugin): no browser and no cookie, only the pilot's own key, which can do nothing
+// but send sessions: the results files to /collector, what it reads live to /live.
+export async function trainingCollector(request, env, live = false) {
   if (request.method !== 'POST') fail(405, 'Méthode non prise en charge.');
   const raw = request.headers.get('Authorization') || '';
   if (!/^Bearer [a-f0-9]{64}$/.test(raw)) fail(401, 'Liaison requise.');
   await rateLimit(request, env, 'training-sync', 300);
   const device = await env.DB.prepare('SELECT user_id FROM training_devices WHERE token_hash=?').bind(await hash(raw.slice(7))).first();
   if (!device) fail(401, 'Cette liaison a été retirée. Télécharge à nouveau le synchroniseur depuis le site.');
-  const saved = await saveSession(env, device.user_id, await rawBody(request));
+  const saved = live ? await saveLive(env, device.user_id, await rawBody(request)) : await saveSession(env, device.user_id, await rawBody(request));
   await env.DB.prepare('UPDATE training_devices SET last_seen=? WHERE user_id=?').bind(now(), device.user_id).run();
   return json({ok:true, ...saved});
 }
@@ -97,13 +110,33 @@ export async function trainingApi(path, method, request, env, actor, community) 
     const chosen = onTrack.filter(row => row.car_class === carClass).slice(0, 50)
       .map(row => ({at:row.started_at, car:row.car, kind:row.kind, laps:JSON.parse(row.laps)}));
     const analysis = analyse(chosen);
+    // Live sessions on the same circuit and class (a track the site does not know is matched by its name).
+    const circuit = track ? track.circuit || normal(track.venue) : null;
+    const liveRows = circuit && carClass ? await all(env, `SELECT started_at,car,capacity,laps,stops FROM training_live WHERE user_id=? AND circuit=? AND car_class=?
+      AND started_at>=? ORDER BY started_at DESC LIMIT 30`, user, circuit, carClass, Date.now() - KEEP_DAYS * DAY * 1000) : [];
+    const live = liveRows.length ? analyseLive(liveRows.map(row => ({at:row.started_at, car:row.car, capacity:row.capacity, laps:JSON.parse(row.laps), stops:JSON.parse(row.stops)}))) : null;
+    // The results files give the fuel as a share of the tank: in litres once the game told the tank size.
+    if (live?.capacity && analysis.fuelPerLap) analysis.fuelLitres = Math.round(analysis.fuelPerLap * live.capacity) / 100;
     const marks = track ? (await all(env, 'SELECT step FROM training_marks WHERE user_id=? AND track_key=?', user, track.key)).map(row => row.step) : [];
     const compared = track && carClass ? await comparison(env, user, track.key, carClass) : null;
     const device = await env.DB.prepare('SELECT created_at,last_seen FROM training_devices WHERE user_id=?').bind(user).first();
-    return json({race, tracks, track, classes, carClass, analysis, steps:programSteps(analysis, marks), advice:adviceFor(analysis, compared), comparison:compared,
+    return json({race, tracks, track, classes, carClass, analysis, live, steps:programSteps(analysis, marks), advice:adviceFor(analysis, compared), comparison:compared,
       sessions:sessions.slice(0, 20).map(row => ({id:row.id, at:row.started_at, venue:row.venue, course:row.course, car:row.car, carClass:row.car_class, kind:row.kind,
         laps:JSON.parse(row.laps).length, best:row.best})),
       device:device ? {linked:true, lastSeen:device.last_seen} : {linked:false}});
+  }
+  // The pit guide (stands.html): the stops measured by every pilot of the site, per class, never named.
+  if (path === '/api/training/pits' && method === 'GET') {
+    const rows = await all(env, `SELECT user_id,car_class,stops FROM training_live WHERE started_at>? AND stops!='[]' ORDER BY started_at DESC LIMIT 2000`, Date.now() - KEEP_DAYS * DAY * 1000);
+    const classes = {};
+    for (const row of rows) {
+      const entry = classes[row.car_class] ||= {pilots:new Set(), stops:[]};
+      entry.pilots.add(row.user_id); entry.stops.push(...JSON.parse(row.stops));
+    }
+    return json({classes:Object.entries(classes).map(([name, entry]) => {
+      const {last, ...times} = pitTimes(entry.stops);
+      return {name, pilots:entry.pilots.size, ...times};
+    })});
   }
   if (path === '/api/training/sessions' && method === 'POST') {
     await rateLimit(request, env, 'training-import', 200);
@@ -142,5 +175,5 @@ export async function trainingApi(path, method, request, env, actor, community) 
 }
 
 export async function purgeTraining(env) {
-  await env.DB.prepare('DELETE FROM training_sessions WHERE id IN (SELECT id FROM training_sessions WHERE started_at<? LIMIT 500)').bind(Date.now() - KEEP_DAYS * DAY * 1000).run();
+  for (const table of ['training_sessions', 'training_live']) await env.DB.prepare(`DELETE FROM ${table} WHERE id IN (SELECT id FROM ${table} WHERE started_at<? LIMIT 500)`).bind(Date.now() - KEEP_DAYS * DAY * 1000).run();
 }

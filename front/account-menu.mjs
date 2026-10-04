@@ -94,7 +94,7 @@ function communitiesMarkup(communities) {
 }
 
 function renderConnected(user, communities = [], training = false) {
-  const train = training ? `<a class="account-menu-item" href="/entrainement.html"${location.pathname.endsWith('/entrainement.html') ? ' aria-current="page"' : ''}>Mon entraînement</a>` : '';
+  const train = training ? `<a class="account-menu-item" href="/entrainement.html"${location.pathname.endsWith('/entrainement.html') ? ' aria-current="page"' : ''}>Mon entraînement</a><a class="account-menu-item" href="/stands.html"${location.pathname.endsWith('/stands.html') ? ' aria-current="page"' : ''}>Guide des stands</a>` : '';
   const manage = user.role === 'admin' ? `<a class="account-menu-item" href="/members.html">Administration</a>` : '';
   const help = `<a class="account-menu-item" href="/help.html"${isHelp ? ' aria-current="page"' : ''}>Aide</a>`;
 

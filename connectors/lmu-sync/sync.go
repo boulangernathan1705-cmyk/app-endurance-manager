@@ -1,8 +1,9 @@
 // Endurance Manager · synchroniseur LMU.
 //
-// Lit les fichiers de résultats que Le Mans Ultimate écrit après chaque séance
-// (UserData\Log\Results\*.xml) et les envoie à la page « Mon entraînement ».
-// Il ne lit rien d'autre, ne modifie rien dans le jeu et n'ouvre aucune fenêtre.
+// Envoie à la page « Mon entraînement » les fichiers de résultats que Le Mans Ultimate écrit après chaque
+// séance (UserData\Log\Results\*.xml) et, pendant que le pilote roule, ce que le jeu publie dans sa mémoire
+// partagée (usure et températures des pneus, vitesse, carburant, arrêts aux stands : voir live.go).
+// Il ne fait que lire : il ne modifie rien dans le jeu et n'ouvre aucune fenêtre.
 // Le site écrit l'adresse et la clé personnelle du pilote à la fin du fichier
 // téléchargé ; la clé ne permet que d'envoyer des séances et se retire depuis le site.
 package main
@@ -11,6 +12,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -128,12 +130,16 @@ func send(client *http.Client, cfg config, path string) (done bool, err error) {
 	if err != nil {
 		return false, err
 	}
-	request, err := http.NewRequest(http.MethodPost, cfg.Origin+"/api/training/collector", bytes.NewReader(data))
+	endpoint, kind := "/api/training/collector", "application/xml"
+	if strings.EqualFold(filepath.Ext(path), ".json") {
+		endpoint, kind = "/api/training/live", "application/json"
+	}
+	request, err := http.NewRequest(http.MethodPost, cfg.Origin+endpoint, bytes.NewReader(data))
 	if err != nil {
 		return false, err
 	}
 	request.Header.Set("Authorization", "Bearer "+cfg.Token)
-	request.Header.Set("Content-Type", "application/xml")
+	request.Header.Set("Content-Type", kind)
 	request.Header.Set("User-Agent", "EnduranceManagerSync/1")
 	response, err := client.Do(request)
 	if err != nil {
@@ -148,6 +154,22 @@ func send(client *http.Client, cfg config, path string) (done bool, err error) {
 	default:
 		return false, errors.New(response.Status)
 	}
+}
+
+// sendLive sends the sessions read live from the game, kept as files until the site has them.
+func sendLive(client *http.Client, cfg config, folder string) error {
+	files, _ := filepath.Glob(filepath.Join(folder, "*.json"))
+	sort.Strings(files)
+	for _, path := range files {
+		done, err := send(client, cfg, path)
+		if err != nil {
+			return err
+		}
+		if done {
+			_ = os.Remove(path)
+		}
+	}
+	return nil
 }
 
 // syncOnce sends what is pending; it stops at the first network error and tries again at the next scan.
@@ -176,7 +198,10 @@ func loadJSON(path string, value any) {
 
 func saveJSON(path string, value any) {
 	if data, err := json.Marshal(value); err == nil {
-		_ = os.WriteFile(path, data, 0o600)
+		// Written aside then renamed, so a file is never read half written.
+		if os.WriteFile(path+".tmp", data, 0o600) == nil {
+			_ = os.Rename(path+".tmp", path)
+		}
 	}
 }
 
@@ -189,11 +214,19 @@ func run(home string, steamRoots func() []string) {
 		st.Sent = map[string]bool{}
 	}
 	revoked := ""
+	live := filepath.Join(home, "live")
+	_ = os.MkdirAll(live, 0o700)
+	go watchGame(&recorder{now: time.Now, done: func(session liveSession) {
+		saveJSON(filepath.Join(live, fmt.Sprintf("%d.json", session.At)), session)
+	}})
 	for {
 		var cfg config
 		loadJSON(filepath.Join(home, "config.json"), &cfg)
 		if cfg.Token != "" && cfg.Token != revoked {
 			err := syncOnce(client, cfg, resultsDirs(steamRoots()), &st, time.Now())
+			if err == nil {
+				err = sendLive(client, cfg, live)
+			}
 			if errors.Is(err, errRevoked) {
 				revoked = cfg.Token
 			}

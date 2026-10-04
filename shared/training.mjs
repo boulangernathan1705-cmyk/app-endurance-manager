@@ -178,3 +178,69 @@ const VENUES = {bahrain:/bahrain|sakhir/, barcelona:/barcelon|catalun/, cota:/am
   lusail:/lusail|qatar|losail/, monza:/monza/, 'paul-ricard':/ricard/, portimao:/algarve|portimao/, 'road-atlanta':/atlanta/, sebring:/sebring/,
   silverstone:/silverstone/, spa:/spa/};
 export const circuitOf = venue => Object.entries(VENUES).find(([, pattern]) => pattern.test(normal(venue)))?.[0] || null;
+
+// Live data: what the sync program reads from LMU while the pilot drives (connectors/lmu-sync/live.go), one session
+// at a time. Checked here before it is kept: bounded numbers, short texts, nothing else.
+const finite = (value, min, max) => { const parsed = Number(value); return Number.isFinite(parsed) && parsed >= min && parsed <= max ? parsed : null; };
+const four = (value, min, max) => Array.isArray(value) && value.length === 4 ? value.map(item => finite(item, min, max)) : [null, null, null, null];
+const label = (value, size) => String(value ?? '').replace(/[\u0000-\u001f]/g, '').trim().slice(0, size);
+
+export function cleanLive(input) {
+  if (!input || typeof input !== 'object' || !Array.isArray(input.laps) || !Array.isArray(input.stops)) throw Error('Séance en direct illisible.');
+  const at = finite(input.at, 1_500_000_000_000, 4_000_000_000_000);
+  const track = label(input.track, 120), car = label(input.car, 120);
+  if (!at || !track || !car) throw Error('Séance en direct incomplète.');
+  const laps = input.laps.slice(0, 600).map(lap => ({n:finite(lap?.n, 0, 10000) ?? 0, t:finite(lap?.t, 1, 3600), top:finite(lap?.top, 0, 500),
+    fuel:finite(lap?.fuel, 0, 200), ve:finite(lap?.ve, 0, 100), wear:four(lap?.wear, 0, 100), temp:four(lap?.temp, -50, 250), brake:four(lap?.brake, -50, 1500),
+    kpa:four(lap?.kpa, 0, 1000), compound:label(lap?.compound, 40), track:finite(lap?.track, -30, 80), air:finite(lap?.air, -30, 60), rain:finite(lap?.rain, 0, 1),
+    invalid:lap?.invalid === true, pit:lap?.pit === true, limits:finite(lap?.limits, 0, 255) ?? 0})).filter(lap => lap.t);
+  if (!laps.length) throw Error('Aucun tour roulé dans cette séance.');
+  const stops = input.stops.slice(0, 60).map(stop => ({lap:finite(stop?.lap, 0, 10000) ?? 0, lane:finite(stop?.lane, 0, 600), stopped:finite(stop?.stopped, 0, 600),
+    fuel:finite(stop?.fuel, 0, 200) ?? 0, ve:finite(stop?.ve, 0, 100) ?? 0, tyres:finite(stop?.tyres, 0, 4) ?? 0, repair:stop?.repair === true})).filter(stop => stop.lane && stop.stopped !== null);
+  return {at, track, car, carClass:label(input.class, 60), capacity:finite(input.capacity, 1, 300), laps, stops};
+}
+
+// The stops broken down: the pit lane without the stop, then each service on its own (a stop with one service only
+// tells its time; stops mixing services are kept in the list but not in these times).
+export function pitTimes(stops) {
+  if (!stops.length) return null;
+  const stationary = filter => round(median(stops.filter(filter).map(stop => stop.stopped)), 1);
+  const refuels = stops.filter(stop => stop.fuel > 1 && !stop.tyres && !stop.repair && stop.stopped > 0);
+  return {stops:stops.length, through:round(median(stops.map(stop => stop.lane - stop.stopped)), 1), lane:round(median(stops.map(stop => stop.lane)), 1),
+    tyres4:stationary(stop => stop.tyres === 4 && stop.fuel <= 1 && !stop.repair), tyres2:stationary(stop => stop.tyres === 2 && stop.fuel <= 1 && !stop.repair),
+    fuelRate:refuels.length ? round(median(refuels.map(stop => stop.fuel / stop.stopped)), 2) : null, repair:stationary(stop => stop.repair),
+    last:stops.slice(-8).reverse()};
+}
+
+// Everything the page shows from the live sessions on one track and class: litres, the fuel ratio, tyres, speed, stops.
+export function analyseLive(sessions) {
+  const list = [...sessions].sort((a, b) => a.at - b.at);
+  const laps = list.flatMap(session => session.laps.map(lap => ({...lap, capacity:session.capacity})));
+  // A lap that tells the truth about fuel and tyres: on track all the way, no stop.
+  const clean = laps.filter(lap => !lap.pit && !lap.invalid);
+  const fuel = median(clean.map(lap => lap.fuel).filter(value => value > 0));
+  const energy = median(clean.map(lap => lap.ve).filter(value => value > 0));
+  const capacity = list.map(session => session.capacity).filter(Boolean).at(-1) || null;
+  // LMU's fuel ratio: the share of the tank against the share of energy one lap takes. Set at the stop, the fuel and
+  // the energy run out on the same lap, and no fuel is carried for nothing.
+  const ratio = fuel && energy && capacity ? fuel / capacity * 100 / energy : null;
+  const compounds = [];
+  for (const lap of clean) {
+    if (!lap.compound) continue;
+    let item = compounds.find(entry => entry.name === lap.compound);
+    if (!item) compounds.push(item = {name:lap.compound, laps:[]});
+    item.laps.push(lap);
+  }
+  const wheels = (group, field, digits) => [0, 1, 2, 3].map(index => round(median(group.map(lap => lap[field][index]).filter(value => value !== null && value >= 0)), digits));
+  return {sessions:list.length, laps:laps.length, fuelPerLap:round(fuel, 2), energyPerLap:round(energy, 2), capacity, ratio:round(ratio, 2),
+    tankLaps:fuel && capacity ? Math.floor(capacity / fuel) : null, energyLaps:energy ? Math.floor(100 / energy) : null,
+    top:laps.length ? round(Math.max(...laps.map(lap => lap.top || 0)), 1) || null : null, topMedian:round(median(clean.map(lap => lap.top).filter(Boolean)), 1),
+    trackTemp:round(median(laps.map(lap => lap.track).filter(value => value !== null)), 1), airTemp:round(median(laps.map(lap => lap.air).filter(value => value !== null)), 1),
+    compounds:compounds.map(item => {
+      const wear = wheels(item.laps, 'wear', 2), worst = Math.max(...wear.filter(value => value !== null), 0);
+      return {name:item.name, laps:item.laps.length, wear, temp:wheels(item.laps, 'temp', 0), brake:wheels(item.laps, 'brake', 0), kpa:wheels(item.laps, 'kpa', 0),
+        track:round(median(item.laps.map(lap => lap.track).filter(value => value !== null)), 1), lapsTo50:worst > 0 ? Math.floor(50 / worst) : null};
+    }),
+    pit:pitTimes(list.flatMap(session => session.stops)),
+    last:list.length ? {at:list.at(-1).at, car:list.at(-1).car, laps:list.at(-1).laps.slice(-60)} : null};
+}
