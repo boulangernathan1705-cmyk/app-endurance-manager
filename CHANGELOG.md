@@ -2,6 +2,28 @@
 
 Les changements du site, version par version. La plus récente est en haut.
 
+## v1.13 — 4 octobre 2026
+
+### Administration
+- L'administration est réorganisée en **quatre rubriques** : **Vue d'ensemble** (état du serveur Discord, des membres et des modules, étapes de démarrage, ce qui demande ton attention), **Membres et rôles**, **Modules** et **Apparence**.
+- Les autorisations des rôles se règlent dans un **tableau** : on voit d'un coup d'œil ce que chaque rôle peut faire.
+- Chaque module a sa **tuile** avec son état, et le récap de la semaine sur Discord y est rangé avec les autres.
+- L'Apparence montre un **aperçu en direct** du site avant d'enregistrer.
+
+### Salons d'équipage sur Discord (nouveau module)
+- Quelques jours avant la course, chaque équipage reçoit sur le serveur Discord **un salon texte avec son récap, et son salon vocal juste en dessous**. Les pilotes y sont mentionnés, et le récap se met à jour tout seul.
+- 24 h après la course, le vocal est supprimé et le salon texte est rangé dans « Archives équipages » pendant 30 jours.
+- Il s'active avec un simple interrupteur dans **Administration → Modules**, après avoir donné les droits au bot.
+
+### Rappels de course (nouveau module)
+- **24 h avant le départ**, un rappel dans la cloche du site ; 24 h et 1 h avant, un message dans le salon de l'équipage.
+
+### Notifications
+- La cloche te prévient quand **la voiture de ton équipage change**.
+
+### Communautés
+- Les gérants de serveur Discord peuvent **demander un espace** pour leur communauté avec un formulaire.
+
 ## v1.12 — 4 octobre 2026
 
 ### Notifications
