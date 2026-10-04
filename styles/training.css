@@ -106,3 +106,7 @@
 .pit-list{display:grid;gap:8px;margin:0;padding-left:18px;color:var(--muted);font-size:14px;line-height:1.45}
 .pit-list strong{color:var(--text)}
 .training-note a{color:var(--accent)}
+.training-simhub summary{cursor:pointer;font-weight:700}
+.training-simhub p{margin:8px 0;color:var(--muted);font-size:13px;line-height:1.45}
+.training-code{display:flex;gap:8px}
+.training-code input{flex:1;min-width:0;min-height:38px;padding:6px 10px;border:1px solid var(--border);border-radius:10px;background:#0c0e10;color:var(--text);font-family:ui-monospace,Consolas,monospace;font-size:12px}

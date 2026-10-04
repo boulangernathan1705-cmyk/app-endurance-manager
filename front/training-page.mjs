@@ -9,7 +9,7 @@ const num = (value, digits = 1) => value === null || value === undefined ? '—'
 const stamp = ms => `${shortDateLabel(ms)} · ${timeAt(ms)}`;
 const KINDS = {Practice1:'Essais', Practice2:'Essais', Practice3:'Essais', Practice4:'Essais', Qualify:'Qualif', Warmup:'Warm-up', Race:'Course'};
 const MINUTES = [20, 30, 45, 60, 90];
-const view = {track:null, carClass:null, minutes:readMinutes(), data:null, busy:''};
+const view = {track:null, carClass:null, minutes:readMinutes(), data:null, busy:'', simhub:''};
 
 function readMinutes() { try { const value = Number(localStorage.getItem('training-minutes')); return MINUTES.includes(value) ? value : 30; } catch { return 30; } }
 
@@ -164,6 +164,9 @@ function sync(data) {
     <div class="training-actions"><form method="post" action="/api/training/sync"><button type="submit" class="${device.linked ? 'secondary-button' : 'primary-button'}">${device.linked ? 'Retélécharger' : 'Télécharger le synchroniseur'}</button></form>
     ${device.linked ? '<button type="button" class="secondary-button" data-unlink>Retirer la liaison</button>' : ''}</div>
     <p class="training-note">Petit programme Windows, sans fenêtre, qui lit les résultats de LMU (dossier UserData\\Log\\Results) et, pendant que tu roules, les données que le jeu publie (pneus, carburant, vitesse, arrêts). Il ne modifie rien dans le jeu. Windows peut afficher un avertissement au premier lancement : clique sur « Informations complémentaires » puis « Exécuter quand même ».</p>
+    <details class="training-simhub"${view.simhub ? ' open' : ''}><summary>Tu utilises SimHub ?</summary>
+      <p>Le plugin Endurance Manager pour SimHub fait la même chose que le synchroniseur. Dans SimHub, ouvre ses réglages et colle ce code. Un nouveau code remplace la liaison précédente : n’utilise que le plugin ou que le synchroniseur.</p>
+      ${view.simhub ? `<div class="training-code"><input type="text" readonly value="${esc(view.simhub)}" aria-label="Code de liaison SimHub" data-code><button type="button" class="secondary-button" data-copy>Copier</button></div>` : '<button type="button" class="secondary-button" data-simhub>Obtenir mon code SimHub</button>'}</details>
     <label class="training-drop" data-drop><input type="file" accept=".xml" multiple data-file><strong>Ou dépose tes fichiers de résultats ici</strong><small>Documents ou Steam › Le Mans Ultimate › UserData › Log › Results</small></label>
     ${view.busy ? `<p class="training-busy" role="status">${esc(view.busy)}</p>` : ''}</section>`;
 }
@@ -215,6 +218,8 @@ app.addEventListener('click', event => {
   if (minutes) { view.minutes = Number(minutes.dataset.minutes); try { localStorage.setItem('training-minutes', String(view.minutes)); } catch {} render(); return; }
   const remove = event.target.closest('[data-delete]');
   if (remove && confirm('Supprimer cette séance ?')) act(() => call(`/api/training/sessions/${remove.dataset.delete}`, {method:'DELETE'}));
+  if (event.target.closest('[data-simhub]')) act(async () => { view.simhub = (await call('/api/training/sync/code', {method:'POST', headers:{'Content-Type':'application/json'}, body:'{}'})).code; });
+  if (event.target.closest('[data-copy]')) { const input = app.querySelector('[data-code]'); input.select(); navigator.clipboard?.writeText(input.value).catch(() => {}); }
   if (event.target.closest('[data-unlink]') && confirm('Retirer la liaison ? Le synchroniseur n’enverra plus rien. Tu peux le supprimer du dossier Démarrage de Windows.')) act(() => call('/api/training/sync', {method:'DELETE'}));
 });
 app.addEventListener('dragover', event => { const zone = event.target.closest('[data-drop]'); if (zone) { event.preventDefault(); zone.classList.add('is-over'); } });

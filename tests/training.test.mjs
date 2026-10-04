@@ -175,3 +175,18 @@ test('the pit guide gives the stops of every pilot per class, without names', as
   assert.deepEqual(data.classes.map(item=>[item.name,item.pilots,item.stops,item.tyres4,item.fuelRate]),[['Hypercar',1,3,9,3]]);
   assert.ok(!JSON.stringify(data).includes('Alice'));
 });
+
+test('the SimHub plugin gets the same kind of key as a code, which replaces the program one', async () => {
+  const {req,send,login}=harness();
+  await login(ADMIN,'admin','Orga');await login(PILOT,'pilot','Alice');
+  await req('/api/community/modules','PATCH',{training:true},'admin');
+  const program=await send('/api/training/sync','POST','pilot',{raw:''});
+  const old=new TextDecoder().decode(new Uint8Array(await program.arrayBuffer()).slice(4096)).match(/([a-f0-9]{64})/)[1];
+  const {status,data}=await req('/api/training/sync/code','POST',{},'pilot');
+  assert.equal(status,200);
+  const [,origin,key]=data.code.match(/^EMSYNC1 (\S+) ([a-f0-9]{64}) EMSYNC1$/);
+  assert.equal(origin,ROOT);
+  const collect=auth=>send('/api/training/collector','POST','sync',{raw:XML,headers:{'Content-Type':'application/xml',Authorization:'Bearer '+auth}});
+  assert.equal((await collect(old)).status,401);
+  assert.equal((await collect(key)).status,200);
+});

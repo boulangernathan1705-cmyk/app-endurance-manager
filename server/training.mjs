@@ -90,6 +90,14 @@ async function comparison(env, userId, key, carClass) {
     fuelGap:fuel && mine.per_lap ? (mine.per_lap - fuel) / fuel * 100 : null};
 }
 
+// One key per pilot: a new one (program or SimHub code) replaces the last, which stops working.
+async function linkDevice(env, user) {
+  const raw = token();
+  await env.DB.prepare(`INSERT INTO training_devices(user_id,token_hash,created_at) VALUES(?,?,?)
+    ON CONFLICT(user_id) DO UPDATE SET token_hash=excluded.token_hash,created_at=excluded.created_at,last_seen=NULL`).bind(user, await hash(raw), now()).run();
+  return raw;
+}
+
 export async function trainingApi(path, method, request, env, actor, community) {
   if (!path.startsWith('/api/training')) return null;
   if (!enabled(community)) fail(404, 'L’entraînement n’est pas activé dans cette communauté.');
@@ -154,15 +162,17 @@ export async function trainingApi(path, method, request, env, actor, community) 
       .bind(user, input.track, input.step).run();
     return json({ok:true});
   }
+  // The SimHub plugin: the same key, as a code the pilot pastes in the plugin's settings.
+  if (path === '/api/training/sync/code' && method === 'POST') {
+    return json({code:`EMSYNC1 ${siteOrigin(request, env)} ${await linkDevice(env, user)} EMSYNC1`});
+  }
   // The sync program, with the pilot's key written at its end: download it, double-click it, nothing else to do.
   if (path === '/api/training/sync' && method === 'POST') {
     const asset = await env.ASSETS.fetch(new Request(new URL('/downloads/EnduranceManagerSync.exe', request.url)));
     if (!asset.ok) fail(503, 'Le synchroniseur n’est pas disponible pour le moment.');
     const program = new Uint8Array(await asset.arrayBuffer());
     if (program.length < 1024) fail(503, 'Le synchroniseur n’est pas disponible pour le moment.');
-    const raw = token();
-    await env.DB.prepare(`INSERT INTO training_devices(user_id,token_hash,created_at) VALUES(?,?,?)
-      ON CONFLICT(user_id) DO UPDATE SET token_hash=excluded.token_hash,created_at=excluded.created_at,last_seen=NULL`).bind(user, await hash(raw), now()).run();
+    const raw = await linkDevice(env, user);
     const trailer = new TextEncoder().encode(`\nEMSYNC1 ${siteOrigin(request, env)} ${raw} EMSYNC1\n`);
     const file = new Uint8Array(program.length + trailer.length); file.set(program); file.set(trailer, program.length);
     return new Response(file, {headers:{'Content-Type':'application/octet-stream', 'Content-Disposition':'attachment; filename="EnduranceManagerSync.exe"', 'Cache-Control':'no-store'}});
