@@ -1,6 +1,6 @@
 # Équipages sur Discord et rappels de course
 
-Deux modules, activés par les admins de chaque communauté avec un simple interrupteur dans **Membres → Réglages → Modules**.
+Deux modules, activés par les admins de chaque communauté avec un simple interrupteur dans **Administration → Modules**.
 
 ## Salons d'équipage (`crewChannels`)
 
