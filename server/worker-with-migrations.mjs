@@ -1,4 +1,3 @@
-import {purgePreparation} from './preparation.mjs';
 import worker from './worker.mjs';
 import {homeRedirect, homePage} from './home.mjs';
 import {isWeeklyDiscordMutation} from './discord-weekly-format.mjs';
@@ -111,7 +110,6 @@ export default {
     run('Scheduled cleanup failed', () => cleanup(env));
     // Notifications of the bell older than 30 days.
     run('Notifications cleanup failed', () => purgeNotifications(env));
-    run('Preparation cleanup failed', () => purgePreparation(env));
     // Every quarter of an hour: the crews on Discord (threads, voice channels, reminders), a few requests at a
     // time (fewer next to the iRacing import, which makes many).
     run('Crew Discord sync failed', () => syncCrewDiscord(env, at.getTime(), {requests:slot === 1 ? 4 : 8}));

@@ -90,7 +90,6 @@ function crewCard(event,departure,crew,index,unassigned,allCrews){
         ${crewAvailability(event,departure,regs)}
       </div>
     </details>
-    ${crew.preparationEnabled&&crew.canManage&&!ownMember?`<a class="secondary-button crew-preparation-link" href="/preparation.html?crew=${encodeURIComponent(crew.id)}">Préparation de l’équipage</a>`:''}
     ${actions}
   </div>`;
 }
