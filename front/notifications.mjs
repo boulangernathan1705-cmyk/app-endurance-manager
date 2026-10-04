@@ -26,6 +26,7 @@ function sentence(item) {
       return `La course a été modifiée${what.length ? ` : ${esc(what.join(', '))}` : ''}${item.previousName ? ` (ancien nom : ${esc(item.previousName)})` : ''}`;
     }
     case 'race_deleted': return 'La course a été supprimée';
+    case 'race_reminder': return `Rappel : ta course commence dans moins de 24 h${item.crewName ? ` avec ton équipage ${crew}` : ''}${discordThread(item) ? ' · ouvre le fil de l’équipage sur Discord' : ''}`;
     default: return 'Du nouveau sur une de tes courses';
   }
 }
@@ -46,8 +47,12 @@ function ago(seconds) {
   return `il y a ${days} j`;
 }
 
+// The reminder of a crew with its thread on Discord opens the thread (server/crew-discord.mjs).
+const discordThread = item => item.kind === 'race_reminder' && /^https:\/\/discord\.com\/channels\/\d+\/\d+$/.test(item.threadUrl || '') ? item.threadUrl : '';
+
 function link(item) {
   if (!item.eventId || item.kind === 'race_deleted') return '';
+  if (discordThread(item)) return discordThread(item);
   return `/${item.game === 'iracing' ? 'iracing' : 'lmu'}/#event=${item.eventId}`;
 }
 

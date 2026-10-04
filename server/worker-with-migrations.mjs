@@ -7,6 +7,7 @@ import {importNextCommunity, completeSpecialTimes} from './iracing-import.mjs';
 import {refreshShowcaseIfDue} from './demo.mjs';
 import {refreshMemberships} from './access.mjs';
 import {purgeNotifications} from './notifications.mjs';
+import {syncCrewDiscord} from './crew-discord.mjs';
 import {allCommunities, currentCommunity, communitySlug, appearanceOf} from './community.mjs';
 import {isDevelopment,devRobots,markDevelopmentResponse} from './dev-environment.mjs';
 
@@ -17,8 +18,12 @@ async function runWeeklySync(env, community = null) {
 // After a change of races or entries: the recap messages of this community only.
 function queueWeeklySync(env, ctx, request) {
   if (!env?.DB || !ctx?.waitUntil) return;
-  ctx.waitUntil(currentCommunity(env, request).then(community => runWeeklySync(env, community)).catch(error => {
-    console.error('Discord weekly sync failed', error instanceof Error ? error.message : 'unknown');
+  ctx.waitUntil(currentCommunity(env, request).then(async community => {
+    await runWeeklySync(env, community).catch(error => console.error('Discord weekly sync failed', error instanceof Error ? error.message : 'unknown'));
+    // The threads of its crews on Discord follow at once (a new pilot, another car…).
+    if (community?.modules?.crewChannels === true) await syncCrewDiscord(env, Date.now(), {community, requests:6});
+  }).catch(error => {
+    console.error('Discord sync failed', error instanceof Error ? error.message : 'unknown');
   }));
 }
 
@@ -105,6 +110,9 @@ export default {
     run('Scheduled cleanup failed', () => cleanup(env));
     // Notifications of the bell older than 30 days.
     run('Notifications cleanup failed', () => purgeNotifications(env));
+    // Every quarter of an hour: the crews on Discord (threads, voice channels, reminders), a few requests at a
+    // time (fewer next to the iRacing import, which makes many).
+    run('Crew Discord sync failed', () => syncCrewDiscord(env, at.getTime(), {requests:slot === 1 ? 4 : 8}));
     // :00 Members and Discord roles not checked for a day are checked again by the bot, a few at a time.
     if (slot === 0 && env.DISCORD_BOT_TOKEN) run('Membership check failed', async () => refreshMemberships(env, await allCommunities(env), 12));
     // :15 Official iRacing endurances of one community (a new one first, then each in turn).
