@@ -99,7 +99,7 @@ function setupMarkup(setup) {
   const bot = !guild.id
     ? '<p>Cette communauté n’est reliée à aucun serveur Discord. Demande à un gestionnaire d’Endurance Manager de la relier.</p>'
     : guild.botPresent
-      ? `<p>Le bot Endurance Manager est sur le serveur ${server}. Il lit seulement la liste des membres et leurs rôles, pour savoir qui a accès au site : il n’écrit jamais rien sur ton serveur.</p>`
+      ? `<p>Le bot Endurance Manager est sur le serveur ${server}. Il lit la liste des membres et leurs rôles, pour savoir qui a accès au site. Il n’écrit sur ton serveur que si tu actives les fils d’équipage (étape 5).</p>`
       : `<p>Le bot d’Endurance Manager vérifie qui est membre de ton serveur Discord et avec quels rôles. Sans lui, personne ne peut entrer sur le site de la communauté.</p>
         <ol class="setup-howto"><li>Clique sur <strong>Inviter le bot</strong> : Discord s’ouvre directement sur ton serveur.</li>
         <li>Vérifie le nom du serveur, puis clique sur <strong>Autoriser</strong>. Il faut être administrateur du serveur (ou avoir la permission « Gérer le serveur »).</li>
@@ -146,7 +146,25 @@ function setupMarkup(setup) {
     <li>Clique sur <strong>Modifier le lien d’invitation</strong> et choisis « Expire après : <strong>Jamais</strong> ».</li><li>Copie le lien et colle-le ici.</li></ol>
     <form class="setup-form setup-inline" data-invite><input name="invite" type="url" placeholder="https://discord.gg/…" value="${esc(setup.discordInviteUrl || '')}">
       <button class="primary-button" type="submit">Enregistrer</button><span class="settings-status" aria-live="polite"></span></form>`;
-  // 5. Announce the site.
+  // 5. Crews on Discord and race reminders (server/crew-discord.mjs).
+  const crews = setup.crews || {};
+  const option = (item, selected) => `<option value="${esc(item.id)}" ${item.id === selected ? 'selected' : ''}>${item.forum ? '💬 ' : '# '}${esc(item.name)}</option>`;
+  const channelsList = crews.channels
+    ? `<label>Salon où créer les fils <select name="threadChannel"><option value="">Choisis un salon</option>${crews.channels.threads.map(item => option(item, crews.threadChannelId)).join('')}</select></label>
+      <label>Catégorie des salons vocaux <select name="voiceCategory"><option value="">Aucune (en haut du serveur)</option>${crews.channels.categories.map(item => `<option value="${esc(item.id)}" ${item.id === crews.voiceCategoryId ? 'selected' : ''}>${esc(item.name)}</option>`).join('')}</select></label>`
+    : '<p class="setup-note">Le bot ne peut pas encore lire les salons de ton serveur : clique sur « Donner les droits au bot », puis sur « Vérifier ».</p>';
+  const crewForm = `<p>Quelques jours avant chaque course, le bot crée pour chaque équipage <strong>un fil</strong> avec le récap (course, horaire, voiture, pilotes) et <strong>un salon vocal</strong>. Les pilotes sont mentionnés et ajoutés au fil. 24 h après la fin prévue, le fil est archivé et le salon vocal supprimé. Les pilotes n’ont rien à faire.</p>
+    <ol class="setup-howto"><li>Clique sur <strong>Donner les droits au bot</strong> : il peut alors créer les fils et les salons vocaux (gérer les salons et les fils, envoyer des messages).</li>
+    <li>Choisis le salon où créer les fils (un salon texte ou un forum, visible par les pilotes) et, si tu veux, la catégorie des salons vocaux.</li></ol>
+    <div class="setup-actions">${crews.botInviteUrl ? `<a class="welcome-discord" href="${esc(crews.botInviteUrl)}" target="_blank" rel="noopener">Donner les droits au bot</a>` : ''}<button type="button" class="secondary-button" data-setup-refresh>Vérifier</button></div>
+    ${crews.lastError ? `<p class="setup-note setup-error">⚠️ ${esc(crews.lastError)}</p>` : ''}
+    <form class="setup-form" data-crews data-on="${crews.enabled ? '1' : '0'}">
+      <label class="settings-switch recap-switch"><span><strong>Fils et salons vocaux d’équipage</strong><small>Créés et fermés automatiquement par le bot.</small></span><input type="checkbox" role="switch" name="enabled" ${crews.enabled ? 'checked' : ''}><i aria-hidden="true"></i></label>
+      <div class="crew-options">${channelsList}</div>
+      <label class="settings-switch recap-switch"><span><strong>Rappels de course</strong><small>24 h et 1 h avant le départ dans le fil de l’équipage, et 24 h avant dans la cloche du site.</small></span><input type="checkbox" role="switch" name="reminders" ${crews.reminders ? 'checked' : ''}><i aria-hidden="true"></i></label>
+      <div class="setup-actions"><button class="primary-button" type="submit">Enregistrer</button><span class="settings-status" aria-live="polite"></span></div></form>`;
+  const crewStatus = crews.enabled ? (crews.lastError ? 'Activé, mais le bot est bloqué' : `Activé${crews.reminders ? ', avec les rappels' : ''}`) : crews.reminders ? 'Rappels activés' : 'Facultatif';
+  // 6. Announce the site.
   const message = `🏁 Nos courses d’endurance s’organisent maintenant sur Endurance Manager !\n👉 ${setup.siteUrl}/\n\nConnecte-toi avec ton compte Discord : tu y retrouves les courses LMU et iRacing, tu t’inscris avec tes disponibilités et tu crées ou rejoins un équipage.`;
   const announce = `<p>Partage l’adresse du site sur ton Discord, et épingle le message dans ton salon d’annonces.</p>
     <div class="setup-inline"><input readonly id="setup-site-url" value="${esc(setup.siteUrl)}/">${copyButton('setup-site-url')}</div>
@@ -159,7 +177,8 @@ function setupMarkup(setup) {
       ${step(setup.rolesConfigured, 2, 'Choisir ce que chaque rôle peut faire', setup.rolesConfigured ? 'Autorisations réglées' : 'Conseillé : réglages par défaut en place', roles, false)}
       ${step(count > 0 || setup.legacyRecap, 3, 'Publier le récap de la semaine sur Discord', count ? (setup.recaps || []).map(item => `${RECAP_LABELS[item.scope]} : ${esc(item.webhook)}`).join(' · ') : setup.legacyRecap ? 'Récap LMU actif (salon d’origine)' : 'Facultatif', recap)}
       ${step(Boolean(setup.discordInviteUrl), 4, 'Ajouter le lien d’invitation de ton serveur', setup.discordInviteUrl ? 'Lien enregistré' : 'Facultatif', invite)}
-      ${step(null, 5, 'Annoncer le site à tes membres', 'Adresse et message prêts à copier', announce, false)}
+      ${step(crews.enabled || crews.reminders ? !crews.lastError : false, 5, 'Créer les fils et salons vocaux des équipages', crewStatus, crewForm, false)}
+      ${step(null, 6, 'Annoncer le site à tes membres', 'Adresse et message prêts à copier', announce, false)}
     </ol>`};
 }
 
@@ -421,6 +440,18 @@ app.addEventListener('submit', async event => {
     catch (error) { status.textContent = error.message; }
     return;
   }
+  const crewForm = event.target.closest('form[data-crews]');
+  if (crewForm) {
+    event.preventDefault();
+    const status = crewForm.querySelector('.setup-actions .settings-status'), field = name => crewForm.elements[name]?.value || '';
+    status.textContent = 'Enregistrement…';
+    try {
+      await api('/api/community/crew-discord', 'PUT', {enabled:crewForm.elements.enabled.checked, reminders:crewForm.elements.reminders.checked,
+        threadChannelId:field('threadChannel'), voiceCategoryId:field('voiceCategory') || null});
+      await reload('setup');
+    } catch (error) { status.textContent = error.message; }
+    return;
+  }
   const recaps = event.target.closest('form[data-recaps]'), invite = event.target.closest('form[data-invite]'), created = event.target.closest('form[data-new-community]');
   if (recaps || invite || created) {
     event.preventDefault();
@@ -471,6 +502,8 @@ app.addEventListener('change', async event => {
     return;
   }
   if (box.matches('[data-banner-zoom]') && cropper) { setZoom(Number(box.value)); return; }
+  const crewsForm = box.closest('form[data-crews]');
+  if (crewsForm) { crewsForm.dataset.on = crewsForm.elements.enabled.checked ? '1' : '0'; return; }
   const recapForm = box.closest('form[data-recaps]');
   if (recapForm) { recapForm.dataset.mode = recapForm.elements.enabled.checked ? recapForm.elements.layout.value : 'none'; return; }
   if (box.dataset.module) {

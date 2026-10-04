@@ -6,7 +6,7 @@ import {id, now, fail, json} from './core.mjs';
 const KEEP_DAYS = 30;
 const LIST_SIZE = 30;
 const MAX_RECIPIENTS = 200;
-export const NOTIFICATION_KINDS = ['entry', 'entered_by', 'crew_join', 'crew_added', 'crew_leave', 'crew_removed', 'crew_deleted', 'crew_start', 'crew_car', 'withdrawn', 'removed_by', 'race_changed', 'race_deleted'];
+export const NOTIFICATION_KINDS = ['entry', 'entered_by', 'crew_join', 'crew_added', 'crew_leave', 'crew_removed', 'crew_deleted', 'crew_start', 'crew_car', 'withdrawn', 'removed_by', 'race_changed', 'race_deleted', 'race_reminder'];
 
 const all = async (env, sql, ...params) => (await env.DB.prepare(sql).bind(...params).all()).results || [];
 const game = event => String(event?.circuit || '').startsWith('iracing-') ? 'iracing' : 'lmu';
