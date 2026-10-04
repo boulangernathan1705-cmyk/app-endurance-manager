@@ -2,6 +2,12 @@
 
 Application web de gestion de courses d’endurance simracing : événements, inscriptions pilotes, disponibilités heure par heure, préférences de voitures, équipages et rôles d’organisation.
 
+## Devise et interface
+
+**La simplicité est la sophistication suprême.**
+
+Afficher d’abord l’action utile au pilote. Garder une seule séance conseillée et un suivi visuel lisible ; présenter les données, explications et réglages à la demande. Ajouter des détails doit enrichir le guide sans charger l’écran principal.
+
 ## Profils et droits
 
 | Profil | Principales possibilités |
