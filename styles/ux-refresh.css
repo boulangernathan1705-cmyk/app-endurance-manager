@@ -1467,6 +1467,8 @@ html[data-game] #app .ux-unassigned-grid > .pilot-row > .edit-button { align-sel
 .setup-guide .setup-howto { margin-top: 10px; }
 .setup-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 12px; }
 .setup-actions .welcome-discord { min-height: 44px; font-size: 15px; }
+.crew-module-rights { display: grid; gap: 8px; margin: -4px 0 12px; }
+.setup-error { color: #ffb4a8; }
 .setup-form { display: grid; gap: 12px; }
 .setup-form label { display: grid; gap: 5px; font-size: 13px; font-weight: 700; color: #c7d0d4; }
 .setup-form input:not([type=radio]), .setup-form select, .setup-inline input, .setup-message textarea, .setup-created textarea, .platform-slug input { width: 100%; min-height: 40px; box-sizing: border-box; padding: 8px 12px; border: 1px solid var(--border, #292d31); border-radius: 9px; background: rgba(0,0,0,.25); color: inherit; font: inherit; font-size: 14px; }

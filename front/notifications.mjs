@@ -18,6 +18,7 @@ function sentence(item) {
     case 'crew_removed': return `${b(item.by)} t’a retiré de l’équipage ${crew}`;
     case 'crew_deleted': return `L’équipage ${crew} a été supprimé${item.by ? ` par ${b(item.by)}` : ''}`;
     case 'crew_start': return `Ton équipage ${crew} a choisi son départ`;
+    case 'crew_car': return item.car ? `Ton équipage ${crew} roulera en ${b(item.car)}` : `Ton équipage ${crew} n’a plus de voiture choisie`;
     case 'withdrawn': return `${b(item.pilot)} s’est désinscrit : une place se libère dans ton équipage ${crew}`;
     case 'removed_by': return `${item.by ? b(item.by) : 'Un organisateur'} a retiré ton inscription`;
     case 'race_changed': {
@@ -25,6 +26,7 @@ function sentence(item) {
       return `La course a été modifiée${what.length ? ` : ${esc(what.join(', '))}` : ''}${item.previousName ? ` (ancien nom : ${esc(item.previousName)})` : ''}`;
     }
     case 'race_deleted': return 'La course a été supprimée';
+    case 'race_reminder': return `Rappel : ta course commence dans moins de 24 h${item.crewName ? ` avec ton équipage ${crew}` : ''}${discordChannel(item) ? ' · ouvre le salon de l’équipage sur Discord' : ''}`;
     default: return 'Du nouveau sur une de tes courses';
   }
 }
@@ -45,8 +47,12 @@ function ago(seconds) {
   return `il y a ${days} j`;
 }
 
+// The reminder of a crew with its channel on Discord opens the channel (server/crew-discord.mjs).
+const discordChannel = item => item.kind === 'race_reminder' && /^https:\/\/discord\.com\/channels\/\d+\/\d+$/.test(item.channelUrl || '') ? item.channelUrl : '';
+
 function link(item) {
   if (!item.eventId || item.kind === 'race_deleted') return '';
+  if (discordChannel(item)) return discordChannel(item);
   return `/${item.game === 'iracing' ? 'iracing' : 'lmu'}/#event=${item.eventId}`;
 }
 

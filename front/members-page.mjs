@@ -28,7 +28,7 @@ const PERMISSION_HELP = {endurance:'S’inscrire aux endurances, rejoindre, cré
   admin:'Page Membres et réglages : apparence, modules, autorisations des rôles.'};
 
 // Members of the community: found on its Discord server by the bot. Roles are managed on Discord; this page
-// shows them with what they allow here (the settings of each role are in the « Réglages » tab).
+// shows them with what they allow here (and in « Rôles », what each role allows).
 const initials = name => esc(String(name || '?').trim().slice(0, 2).toLocaleUpperCase('fr-FR'));
 function memberCard(member, allPermissions) {
   const search = esc(`${member.name} ${member.nickname} ${member.id} ${member.roles.map(role => role.name).join(' ')}`.toLocaleLowerCase('fr-FR'));
@@ -46,72 +46,108 @@ function memberCard(member, allPermissions) {
   </article>`;
 }
 
-// Community settings: appearance, the permissions of each Discord role, and the modules. Roles and modules
-// are saved as soon as a box changes.
-async function settingsMarkup() {
-  const settings = await api('/api/community/settings');
-  const module = (key, label, help) => `<label class="settings-switch"><span><strong>${label}</strong><small>${help}</small></span><input type="checkbox" role="switch" data-module="${key}" ${settings.modules[key] ? 'checked' : ''}><i aria-hidden="true"></i></label>`;
+// The administration of a community, in four sections (rail on the left, chips on a phone):
+// - « Vue d'ensemble »: how the community stands, the steps to set it up while some are left, what needs a look;
+// - « Membres et rôles »: the members, and what each Discord role allows (a table);
+// - « Modules »: everything that can be turned on or off, each with its own settings;
+// - « Apparence »: name, colour, banner, with a preview of the site.
+// Plus « Plateforme » for the managers of Endurance Manager. Every setting is in one place only.
+const ICONS = {
+  overview:'<path d="M3 12h4l3-8 4 16 3-8h4"/>',
+  people:'<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14.6c2 .6 3.2 2.4 3.6 5.4"/>',
+  modules:'<rect x="3" y="3" width="7.5" height="7.5" rx="2"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="2"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="2"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="2"/>',
+  look:'<path d="M12 3a9 9 0 1 0 0 18c1.4 0 2-1 2-2 0-1.6-1.3-2-1.3-3.3 0-1 .8-1.7 1.8-1.7H17a4 4 0 0 0 4-4c0-3.9-4-7-9-7Z"/><circle cx="7.5" cy="11" r="1.2"/><circle cx="10.5" cy="7.5" r="1.2"/><circle cx="15" cy="7.5" r="1.2"/>',
+  platform:'<path d="M12 3 3 8l9 5 9-5-9-5Z"/><path d="m3 13 9 5 9-5"/>',
+  recap:'<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/>',
+  crewChannels:'<path d="M4 5h16v10H9l-5 4V5Z"/><path d="M14 19h1l4 3v-3"/>',
+  raceReminders:'<path d="M6 16V11a6 6 0 1 1 12 0v5l2 2H4l2-2Z"/><path d="M10 21h4"/>',
+  iracingImport:'<path d="M4 21V4M4 4h13l-2 4 2 4H4"/>',
+  soloRaces:'<circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/>'
+};
+const icon = key => `<svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[key]}</svg>`;
+const RECAP_LABELS = {all:'LMU et iRacing', lmu:'LMU', iracing:'iRacing'};
+const copyButton = target => `<button type="button" class="secondary-button setup-copy" data-copy="${target}">Copier</button>`;
+
+// What is on, for the overview and the modules.
+function moduleStates(settings, setup) {
+  const recaps = setup.recaps || [];
+  return {recap:recaps.length > 0 || Boolean(setup.legacyRecap), crewChannels:settings.modules.crewChannels === true, raceReminders:settings.modules.raceReminders === true,
+    iracingImport:settings.modules.iracingImport === true, soloRaces:settings.modules.soloRaces === true};
+}
+
+// « Vue d'ensemble ».
+function overviewMarkup(setup, settings, members) {
+  const guild = setup.guild || {}, crews = settings.crews || {};
+  const server = guild.name ? `« ${esc(guild.name)} »` : 'de la communauté';
+  const states = moduleStates(settings, setup), active = Object.values(states).filter(Boolean).length;
+  const recapDone = states.recap;
+  const tile = (label, value, sub, tone = '') => `<div class="admin-tile"><span class="admin-tile-label">${label}</span><strong class="admin-tile-value ${tone}">${value}</strong><span class="admin-tile-sub">${sub}</span></div>`;
+  const tiles = `<div class="admin-tiles">
+    ${tile('Serveur Discord', !guild.id ? '<i class="admin-dot is-bad"></i>Aucun' : guild.botPresent ? '<i class="admin-dot is-ok"></i>Relié' : '<i class="admin-dot is-bad"></i>Bot absent', guild.botPresent ? `Bot présent sur ${server}` : 'Personne ne peut entrer sur le site', 'is-small')}
+    ${tile('Membres connectés', members.length, 'Membres du serveur venus sur le site')}
+    ${tile('Modules actifs', `${active} / 5`, Object.entries(states).filter(([, on]) => !on).length ? 'Le reste est dans Modules' : 'Tout est allumé')}</div>`;
+  // Getting started: the four steps, then the announcement once they are done.
+  const steps = [
+    {done:Boolean(guild.botPresent), title:'Inviter le bot sur ton serveur Discord', action:!guild.id ? '<small>Demande à un gestionnaire de relier ton serveur.</small>'
+      : `${setup.botInviteUrl ? `<a class="primary-button" href="${esc(setup.botInviteUrl)}" target="_blank" rel="noopener">Inviter le bot</a>` : ''}<button type="button" class="secondary-button" data-setup-refresh>Vérifier</button>`},
+    {done:Boolean(setup.rolesConfigured), title:'Choisir ce que chaque rôle peut faire', action:'<button type="button" class="secondary-button" data-go-tab="people" data-go-view="roles">Ouvrir les rôles</button>'},
+    {done:recapDone, title:'Publier le récap de la semaine sur Discord', action:'<button type="button" class="secondary-button" data-go-tab="modules" data-go-module="recap">Régler le récap</button>'},
+    {done:Boolean(setup.discordInviteUrl), title:'Ajouter le lien d’invitation de ton serveur', action:`<form class="admin-inline-form" data-invite><input name="invite" type="url" placeholder="https://discord.gg/…" aria-label="Lien d’invitation Discord" value="${esc(setup.discordInviteUrl || '')}"><button class="primary-button" type="submit">Ajouter</button><span class="settings-status" aria-live="polite"></span></form>`}];
+  const left = steps.filter(item => !item.done).length;
+  const message = `🏁 Nos courses d’endurance s’organisent maintenant sur Endurance Manager !\n👉 ${setup.siteUrl}/\n\nConnecte-toi avec ton compte Discord : tu y retrouves les courses LMU et iRacing, tu t’inscris avec tes disponibilités et tu crées ou rejoins un équipage.`;
+  const announce = `<div class="admin-announce"><p>Partage l’adresse du site sur ton Discord et épingle le message dans ton salon d’annonces.</p>
+    <div class="setup-inline"><input readonly id="setup-site-url" value="${esc(setup.siteUrl)}/" aria-label="Adresse du site">${copyButton('setup-site-url')}</div>
+    <label class="setup-message">Message prêt à poster<textarea id="setup-announce" rows="4" readonly>${esc(message)}</textarea></label>
+    <div class="setup-actions">${copyButton('setup-announce')}</div></div>`;
+  const start = `<section class="admin-card"><div class="admin-card-head"><h2>${left ? 'Démarrage de la communauté' : 'Annoncer le site'}</h2>${left ? `<span class="admin-muted">${4 - left} étape${4 - left > 1 ? 's' : ''} sur 4</span>` : ''}</div>
+    ${left ? `<div class="admin-progress" role="progressbar" aria-valuemin="0" aria-valuemax="4" aria-valuenow="${4 - left}"><i style="width:${(4 - left) * 25}%"></i></div>
+    <ol class="admin-steps">${steps.map((item, index) => `<li class="${item.done ? 'is-done' : ''}"><span class="admin-step-check" aria-hidden="true">${item.done ? '✓' : index + 1}</span><span class="admin-step-title">${item.title}</span>${item.done ? '' : `<span class="admin-step-action">${item.action}</span>`}</li>`).join('')}</ol>
+    <details class="admin-later"><summary>Message pour annoncer le site</summary>${announce}</details>` : announce}</section>`;
+  // What needs a look: problems first, then what works.
+  const alerts = [];
+  if (guild.id && !guild.botPresent) alerts.push(['bad', 'Le bot n’est pas sur ton serveur Discord : personne ne peut entrer sur le site.', '']);
+  if (states.crewChannels && crews.botReady !== true) alerts.push(['warn', 'Salons d’équipage : le bot n’a pas les droits pour créer les salons.', '<button type="button" class="link-button" data-go-tab="modules" data-go-module="crewChannels">Régler</button>']);
+  else if (states.crewChannels && crews.lastError) alerts.push(['warn', `Salons d’équipage : ${esc(crews.lastError)}`, '<button type="button" class="link-button" data-go-tab="modules" data-go-module="crewChannels">Voir</button>']);
+  if (setup.legacyRecap) alerts.push(['warn', 'Le récap de la semaine passe encore par le salon réglé à la création du site : règle ton propre salon.', '<button type="button" class="link-button" data-go-tab="modules" data-go-module="recap">Régler</button>']);
+  if ((setup.recaps || []).length) alerts.push(['ok', `Récap de la semaine publié sur Discord (${(setup.recaps || []).map(item => RECAP_LABELS[item.scope]).join(', ')}).`, '']);
+  if (states.iracingImport) alerts.push(['ok', 'Endurances iRacing officielles importées automatiquement.', '']);
+  if (!alerts.some(([tone]) => tone !== 'ok')) alerts.unshift(['ok', 'Rien à signaler : tout fonctionne.', '']);
+  const watch = `<section class="admin-card"><div class="admin-card-head"><h2>À surveiller</h2></div><ul class="admin-alerts">${alerts.map(([tone, text, action]) => `<li class="is-${tone}"><span>${text}</span>${action}</li>`).join('')}</ul></section>`;
+  return {todo:left, html:`<div class="admin-head"><h2>Vue d’ensemble</h2><p>Ce qui marche, ce qui reste à faire et ce qui demande ton attention.</p></div>${tiles}<div class="admin-columns">${start}${watch}</div>`};
+}
+
+// « Membres et rôles »: the members, or the table of the roles.
+function peopleMarkup(result, settings) {
+  const members = Array.isArray(result.members) ? result.members : [];
+  const server = result.community?.discordServer ? ` « ${esc(result.community.discordServer)} »` : '';
   // The solo races permissions only matter with the solo races module.
   const shown = settings.permissions.filter(permission => settings.modules.soloRaces || !permission.startsWith('solo_'));
   const legend = `<details class="role-legend-wrap"><summary>Que permet chaque autorisation ?</summary><dl class="role-legend">${shown.map(permission => `<div><dt>${esc(PERMISSION_LABELS[permission])}</dt><dd>${esc(PERMISSION_HELP[permission])}</dd></div>`).join('')}</dl></details>`;
-  const role = item => `<article class="role-card" data-role="${esc(item.id)}" data-kept="${esc(JSON.stringify(item.permissions.filter(permission => !shown.includes(permission))))}">
-    <div class="role-head"><strong>${esc(item.name)}</strong>${item.administrator ? '<small>Administrateur Discord : toutes les autorisations</small>' : ''}<span class="settings-status" aria-live="polite"></span></div>
-    <div class="role-pills">${shown.map(permission => `<label class="role-pill" title="${esc(PERMISSION_HELP[permission])}"><input type="checkbox" data-permission="${permission}" ${item.permissions.includes(permission) || item.administrator ? 'checked' : ''} ${item.administrator ? 'disabled' : ''}><span>${esc(PERMISSION_LABELS[permission] || permission)}</span></label>`).join('')}</div>
-  </article>`;
-  const roles = settings.roles.length ? `<div class="role-list">${settings.roles.map(role).join('')}</div>`
+  const row = item => `<tr data-role="${esc(item.id)}" data-kept="${esc(JSON.stringify(item.permissions.filter(permission => !shown.includes(permission))))}">
+    <th scope="row"><strong>${esc(item.name)}</strong>${item.administrator ? '<small>Admin Discord : tout</small>' : ''}<span class="settings-status" aria-live="polite"></span></th>
+    ${shown.map(permission => `<td><label class="admin-tick"><input type="checkbox" data-permission="${permission}" aria-label="${esc(item.name)} : ${esc(PERMISSION_LABELS[permission] || permission)}" ${item.permissions.includes(permission) || item.administrator ? 'checked' : ''} ${item.administrator ? 'disabled' : ''}><span aria-hidden="true"></span></label></td>`).join('')}</tr>`;
+  const roles = settings.roles.length
+    ? `<div class="admin-matrix-wrap"><table class="admin-matrix"><thead><tr><th scope="col">Rôle Discord</th>${shown.map(permission => `<th scope="col" title="${esc(PERMISSION_HELP[permission])}">${esc(PERMISSION_LABELS[permission] || permission)}</th>`).join('')}</tr></thead><tbody>${settings.roles.map(row).join('')}</tbody></table></div>`
     : '<p class="members-help">Les rôles du serveur Discord ne peuvent pas être lus : vérifie que le bot est bien sur le serveur.</p>';
-  const look = settings.community;
-  const appearance = `<section class="settings-card"><h2>Apparence</h2><form class="settings-appearance" data-appearance>
-    <label>Nom de la communauté<input name="name" maxlength="80" required value="${esc(look.name)}"></label>
-    <label>Nom court <small>(onglet du navigateur)</small><input name="shortName" maxlength="12" required value="${esc(look.shortName)}"></label>
-    <div class="settings-accent"><label>Couleur d’accent <span class="tip-info" data-tip="Couleur des boutons, des traits et des repères sur le site de ta communauté.">ⓘ</span><input name="accent" type="color" value="${esc(look.accent || '#52d3d8')}"></label>
-      <label class="role-pill"><input type="checkbox" name="defaultAccent" ${look.accent ? '' : 'checked'}><span>Couleur du site</span></label></div>
-    <p class="members-help">Le logo est l’icône du serveur Discord${look.discordServer ? ` « ${esc(look.discordServer)} »` : ''} : change-la sur Discord.${look.logoUrl ? '' : ' Le serveur n’a pas d’icône : le logo du site est utilisé.'}</p>
-    <div class="settings-actions"><button class="primary-button" type="submit">Enregistrer</button><span class="settings-status" aria-live="polite"></span></div></form></section>
-    <section class="settings-card settings-banner-card"><h2>Bannière</h2><div class="settings-banner">
-      <img class="settings-banner-preview" src="${esc(look.bannerUrl || '/images/endurance-manager-banner.webp')}" alt="Bannière actuelle">
-      <div class="settings-actions"><label class="secondary-button settings-banner-pick">Choisir une image<input type="file" accept="image/png,image/jpeg,image/webp" data-banner-file hidden></label>
-        ${look.bannerUrl ? '<button type="button" class="secondary-button" data-banner-remove>Remettre la bannière du site</button>' : ''}<span class="settings-status" aria-live="polite"></span></div>
-      <p class="members-help">${look.bannerUrl ? 'Ta bannière est affichée en haut de toutes les pages.' : 'C’est la bannière du site. Choisis une image pour afficher la tienne.'} Format conseillé : 2048 × 512 (4 fois plus large que haute). Après le choix de l’image, tu la cadres et la zoomes avant de l’enregistrer ; elle est allégée automatiquement.</p></div></section>`;
-  return `${appearance}
-    <section class="settings-card"><h2>Modules</h2>${module('iracingImport','Endurances iRacing officielles','Import automatique des séries en équipe et des événements spéciaux.')}${module('soloRaces','Courses solo','Onglet « Courses solo », places limitées, liste d’attente, courses OPEN / SAFE.')}</section>
-    <section class="settings-card settings-roles-card"><h2>Autorisations des rôles Discord</h2><p class="members-help">Un membre cumule les autorisations de tous ses rôles. « @everyone » s’applique à tous les membres du serveur. Le propriétaire du serveur et les rôles « Administrateur » de Discord ont tout.</p>${legend}${roles}</section>`;
+  return `<div class="admin-head admin-head-row"><div><h2>Membres et rôles</h2><p>Les membres venus sur le site, et ce que chaque rôle Discord leur permet.</p></div>
+      <div class="admin-seg" role="group" aria-label="Affichage"><button type="button" data-view="members" aria-pressed="true">Membres <span>${members.length}</span></button><button type="button" data-view="roles" aria-pressed="false">Rôles</button></div></div>
+    <div data-view-pane="members" class="admin-stack">
+      <div class="members-toolbar"><label class="members-search"><span class="sr-only">Rechercher un membre</span><input type="search" name="memberSearch" placeholder="Rechercher un pilote ou un rôle…" autocomplete="off"></label><button type="button" class="secondary-button" data-members-refresh data-tip="Relit tout de suite sur Discord les rôles de chaque membre et le nom des rôles. Sinon, c’est fait chaque jour.">Actualiser depuis Discord</button></div>
+      <p class="members-help">Les membres du serveur Discord${server} qui se sont connectés au site. Leurs rôles se donnent sur Discord.</p>
+      <div class="members-list member-grid">${members.map(member => memberCard(member, result.permissions || [])).join('')}</div>
+      <p class="members-empty" hidden>Aucun membre ne correspond à cette recherche.</p></div>
+    <div data-view-pane="roles" class="admin-stack" hidden>
+      <p class="members-help">Un membre cumule les autorisations de tous ses rôles. « @everyone » s’applique à tout le serveur. Le propriétaire du serveur et les rôles « Administrateur » de Discord ont tout. Chaque case s’enregistre dès qu’on la coche.</p>
+      ${roles}${legend}</div>`;
 }
 
-
-// « Mise en place » (admins): the steps to set the community up, each one explained and checked by itself.
-const RECAP_LABELS = {all:'LMU et iRacing', lmu:'LMU', iracing:'iRacing'};
-const copyButton = target => `<button type="button" class="secondary-button setup-copy" data-copy="${target}">Copier</button>`;
-function step(done, number, title, status, body, open = !done) {
-  return `<li class="setup-step ${done === null ? 'is-info' : done ? 'is-done' : 'is-todo'}"><details ${open ? 'open' : ''}>
-    <summary><span class="setup-check" aria-hidden="true">${done ? '✓' : number}</span><span class="setup-title"><strong>${title}</strong><small>${status}</small></span></summary>
-    <div class="setup-body">${body}</div></details></li>`;
-}
+// « Modules »: one tile each, its settings below it once opened.
 function webhookField(key, label, saved) {
   return `<div class="setup-hook"><label>Adresse du webhook ${label ? `du salon ${label}` : 'du salon'} <span class="tip-info" data-tip="Un webhook laisse le site publier dans ce salon, et seulement là : il ne donne aucun autre accès à ton serveur.">ⓘ</span><input name="hook-${key}" type="url" inputmode="url" autocomplete="off" spellcheck="false"
     placeholder="${saved ? `Déjà relié (${esc(saved)}) : laisse vide pour le garder` : 'https://discord.com/api/webhooks/…'}"></label>
     <button type="button" class="secondary-button" data-recap-test="${key}">Tester</button><span class="settings-status" aria-live="polite"></span></div>`;
 }
-function setupMarkup(setup) {
-  const guild = setup.guild || {};
-  const server = guild.name ? `« ${esc(guild.name)} »` : 'de la communauté';
-  // 1. Discord server and bot.
-  const bot = !guild.id
-    ? '<p>Cette communauté n’est reliée à aucun serveur Discord. Demande à un gestionnaire d’Endurance Manager de la relier.</p>'
-    : guild.botPresent
-      ? `<p>Le bot Endurance Manager est sur le serveur ${server}. Il lit seulement la liste des membres et leurs rôles, pour savoir qui a accès au site : il n’écrit jamais rien sur ton serveur.</p>`
-      : `<p>Le bot d’Endurance Manager vérifie qui est membre de ton serveur Discord et avec quels rôles. Sans lui, personne ne peut entrer sur le site de la communauté.</p>
-        <ol class="setup-howto"><li>Clique sur <strong>Inviter le bot</strong> : Discord s’ouvre directement sur ton serveur.</li>
-        <li>Vérifie le nom du serveur, puis clique sur <strong>Autoriser</strong>. Il faut être administrateur du serveur (ou avoir la permission « Gérer le serveur »).</li>
-        <li>Reviens ici et clique sur <strong>Vérifier</strong>.</li></ol>
-        <div class="setup-actions">${setup.botInviteUrl ? `<a class="welcome-discord" href="${esc(setup.botInviteUrl)}" target="_blank" rel="noopener">Inviter le bot</a>` : ''}<button type="button" class="secondary-button" data-setup-refresh>Vérifier</button></div>`;
-  // 2. Roles.
-  const roles = `<p>Par défaut, tous les membres du serveur (@everyone) peuvent s’inscrire aux endurances et créer leur équipage. Les administrateurs du Discord ont déjà tout.</p>
-    <ul class="setup-tips"><li>Donne à tes organisateurs <strong>Créer des courses</strong> et <strong>Gérer les inscriptions</strong>.</li>
-    <li>Pour réserver le site à un rôle (par exemple « Pilote »), décoche tout sur @everyone et coche <strong>Endurances</strong> sur ce rôle.</li>
-    <li>Les rôles se donnent sur Discord : le site les relit chaque jour, ou à la connexion suivante.</li></ul>
-    <div class="setup-actions"><button type="button" class="secondary-button" data-go-tab="settings">Ouvrir les autorisations des rôles</button></div>`;
-  // 3. Recap on Discord: a switch, then « Où le publier ? » (one channel, or one per simulator).
+function recapForm(setup) {
   const byScope = Object.fromEntries((setup.recaps || []).map(recap => [recap.scope, recap.webhook]));
   const count = (setup.recaps || []).length, layout = count === 2 ? 'two' : 'one';
   const oneScope = count === 1 ? setup.recaps[0].scope : 'all';
@@ -126,7 +162,7 @@ function setupMarkup(setup) {
       <span>🟦 Équipe Alpha · Hypercar · 🔓 Ouvert</span><span>👤 Pilote 1 &nbsp; 👤 Pilote 2</span><em>mise à jour à 18:42</em></div></figure>`;
   const card = (value, title, help) => `<label class="recap-card"><input type="radio" name="layout" value="${value}" ${layout === value ? 'checked' : ''}><span><strong>${title}</strong><small>${help}</small></span></label>`;
   const sim = (key, label, checked) => `<label class="role-pill"><input type="checkbox" name="${key}" ${checked ? 'checked' : ''}><span>${label}</span></label>`;
-  const recap = `<div class="recap-intro"><p>Endurance Manager publie sur ton Discord <strong>un message avec les courses de la semaine</strong>, les équipages et les pilotes inscrits. Il se met à jour tout seul à chaque inscription : personne n’a besoin de le reposter.</p>${preview}</div>
+  return `<div class="recap-intro"><p>Un message avec <strong>les courses de la semaine</strong>, les équipages et les pilotes inscrits. Il se met à jour tout seul à chaque inscription.</p>${preview}</div>
     ${setup.legacyRecap ? '<p class="setup-note">Le récap actuel (courses LMU) passe par le salon réglé à la création du site. Règle ton salon ci-dessous pour le reprendre en main.</p>' : ''}
     <form class="setup-form" data-recaps data-mode="${count ? layout : 'none'}">
       <label class="settings-switch recap-switch"><span><strong>Publier le récap sur Discord</strong><small>Si c’est désactivé, aucun message n’est publié.</small></span><input type="checkbox" role="switch" name="enabled" ${count ? 'checked' : ''}><i aria-hidden="true"></i></label>
@@ -140,44 +176,108 @@ function setupMarkup(setup) {
         ${guide}
       </div>
       <div class="setup-actions"><button class="primary-button" type="submit">Enregistrer</button><span class="settings-status" aria-live="polite"></span></div></form>`;
-  // 4. Invitation link.
-  const invite = `<p>Un joueur qui arrive sur le site sans être membre de ton serveur voit un bouton pour le rejoindre.</p>
-    <ol class="setup-howto"><li>Sur Discord, fais un clic droit sur l’icône de ton serveur, puis <strong>Inviter des gens</strong>.</li>
-    <li>Clique sur <strong>Modifier le lien d’invitation</strong> et choisis « Expire après : <strong>Jamais</strong> ».</li><li>Copie le lien et colle-le ici.</li></ol>
-    <form class="setup-form setup-inline" data-invite><input name="invite" type="url" placeholder="https://discord.gg/…" value="${esc(setup.discordInviteUrl || '')}">
-      <button class="primary-button" type="submit">Enregistrer</button><span class="settings-status" aria-live="polite"></span></form>`;
-  // 5. Announce the site.
-  const message = `🏁 Nos courses d’endurance s’organisent maintenant sur Endurance Manager !\n👉 ${setup.siteUrl}/\n\nConnecte-toi avec ton compte Discord : tu y retrouves les courses LMU et iRacing, tu t’inscris avec tes disponibilités et tu crées ou rejoins un équipage.`;
-  const announce = `<p>Partage l’adresse du site sur ton Discord, et épingle le message dans ton salon d’annonces.</p>
-    <div class="setup-inline"><input readonly id="setup-site-url" value="${esc(setup.siteUrl)}/">${copyButton('setup-site-url')}</div>
-    <label class="setup-message">Message prêt à poster<textarea id="setup-announce" rows="5" readonly>${esc(message)}</textarea></label>
-    <div class="setup-actions">${copyButton('setup-announce')}</div>`;
-  const todo = [guild.botPresent, setup.rolesConfigured, count > 0 || setup.legacyRecap, Boolean(setup.discordInviteUrl)].filter(done => !done).length;
-  return {todo, html:`<p class="setup-intro">Suis ces étapes pour installer ${esc(setup.community?.name || 'ta communauté')} sur Endurance Manager. Chaque étape se coche toute seule une fois faite.</p>
-    <ol class="setup-steps">
-      ${step(Boolean(guild.botPresent), 1, 'Inviter le bot sur ton serveur Discord', guild.botPresent ? `Relié au serveur ${server}` : 'À faire : sans lui, personne ne peut entrer', bot)}
-      ${step(setup.rolesConfigured, 2, 'Choisir ce que chaque rôle peut faire', setup.rolesConfigured ? 'Autorisations réglées' : 'Conseillé : réglages par défaut en place', roles, false)}
-      ${step(count > 0 || setup.legacyRecap, 3, 'Publier le récap de la semaine sur Discord', count ? (setup.recaps || []).map(item => `${RECAP_LABELS[item.scope]} : ${esc(item.webhook)}`).join(' · ') : setup.legacyRecap ? 'Récap LMU actif (salon d’origine)' : 'Facultatif', recap)}
-      ${step(Boolean(setup.discordInviteUrl), 4, 'Ajouter le lien d’invitation de ton serveur', setup.discordInviteUrl ? 'Lien enregistré' : 'Facultatif', invite)}
-      ${step(null, 5, 'Annoncer le site à tes membres', 'Adresse et message prêts à copier', announce, false)}
-    </ol>`};
+}
+function modulesMarkup(settings, setup) {
+  const crews = settings.crews || {}, states = moduleStates(settings, setup);
+  const toggle = (key, label, locked = false) => `<label class="admin-switch"><input type="checkbox" role="switch" data-module="${key}" aria-label="${label}" ${states[key] ? 'checked' : ''} ${locked ? 'disabled' : ''}><i aria-hidden="true"></i></label>`;
+  const crewRights = crews.botReady === true ? (crews.lastError ? `<p class="setup-note setup-error">⚠️ ${esc(crews.lastError)}</p>` : '<p class="members-help">Le bot a les droits pour créer les salons.</p>')
+    : `<p class="members-help">Avant d’activer : donne au bot le droit de créer des salons sur ton serveur.</p>
+      <div class="setup-actions">${crews.botInviteUrl ? `<a class="primary-button" href="${esc(crews.botInviteUrl)}" target="_blank" rel="noopener">Donner les droits au bot</a>` : ''}<button type="button" class="secondary-button" data-modules-refresh="crewChannels">C’est fait</button></div>`;
+  const crewWarn = states.crewChannels && (crews.botReady !== true || crews.lastError);
+  const tiles = [
+    {key:'recap', name:'Récap de la semaine sur Discord', text:'Les courses de la semaine dans un salon de ton serveur, mis à jour tout seul.',
+      state:states.recap ? ['ok', (setup.recaps || []).length ? `Actif · ${(setup.recaps || []).map(item => RECAP_LABELS[item.scope]).join(', ')}` : 'Actif · salon d’origine'] : ['off', 'Éteint'],
+      control:'', settings:recapForm(setup)},
+    {key:'crewChannels', name:'Salons d’équipage sur Discord', text:'Un salon texte et son vocal juste en dessous pour chaque équipage, ouverts quelques jours avant la course et fermés tout seuls après.',
+      state:crewWarn ? ['warn', crews.botReady !== true ? 'Le bot n’a pas les droits' : 'Le bot est bloqué'] : states.crewChannels ? ['ok', 'Actif'] : ['off', crews.botReady === true ? 'Éteint' : 'Éteint · droits du bot à donner'],
+      control:toggle('crewChannels', 'Salons d’équipage sur Discord', crews.botReady !== true && !states.crewChannels),
+      settings:`${crewRights}<p class="members-help">Après la course, le vocal est supprimé et le salon texte rangé dans « Archives équipages » pendant 30 jours.</p>`},
+    {key:'raceReminders', name:'Rappels de course', text:'24 h avant le départ dans la cloche du site, 24 h et 1 h avant dans le salon de l’équipage.',
+      state:states.raceReminders ? ['ok', 'Actif'] : ['off', 'Éteint'], control:toggle('raceReminders', 'Rappels de course'), settings:''},
+    {key:'iracingImport', name:'Endurances iRacing officielles', text:'Les séries en équipe et les événements spéciaux importés automatiquement.',
+      state:states.iracingImport ? ['ok', 'Actif'] : ['off', 'Éteint'], control:toggle('iracingImport', 'Endurances iRacing officielles'), settings:''},
+    {key:'soloRaces', name:'Courses solo', text:'Onglet « Courses solo » : places limitées, liste d’attente, courses OPEN et SAFE.',
+      state:states.soloRaces ? ['ok', 'Actif'] : ['off', 'Éteint'], control:toggle('soloRaces', 'Courses solo'), settings:''}];
+  const tile = item => `<article class="admin-module ${states[item.key] ? 'is-on' : ''}" data-module-tile="${item.key}">
+    <div class="admin-module-top"><span class="admin-module-icon">${icon(item.key)}</span><strong>${item.name}</strong>${item.control}</div>
+    <p>${item.text}</p>
+    <div class="admin-module-foot"><span class="admin-state is-${item.state[0]}">${item.state[1]}</span>${item.settings ? `<button type="button" class="link-button" data-module-open="${item.key}" aria-expanded="false">Régler</button>` : ''}</div>
+    ${item.settings ? `<div class="admin-module-settings" hidden>${item.settings}</div>` : ''}</article>`;
+  return `<div class="admin-head"><h2>Modules</h2><p>Tout ce qui s’allume ou s’éteint. Les interrupteurs s’enregistrent tout de suite.</p></div><div class="admin-modules">${tiles.map(tile).join('')}</div>`;
+}
+
+// « Apparence »: the form on the left, the preview of the site on the right.
+function lookMarkup(settings) {
+  const look = settings.community;
+  const accent = look.accent || '#52d3d8';
+  return `<div class="admin-head"><h2>Apparence</h2><p>L’aperçu montre tout de suite ce que verront tes membres.</p></div>
+    <div class="admin-look">
+      <div class="admin-stack">
+        <section class="admin-card"><form class="settings-appearance" data-appearance>
+          <label>Nom de la communauté<input name="name" maxlength="80" required value="${esc(look.name)}"></label>
+          <label>Nom court <small>(onglet du navigateur)</small><input name="shortName" maxlength="12" required value="${esc(look.shortName)}"></label>
+          <div class="settings-accent"><label>Couleur d’accent <span class="tip-info" data-tip="Couleur des boutons, des traits et des repères sur le site de ta communauté.">ⓘ</span><input name="accent" type="color" value="${esc(accent)}"></label>
+            <label class="role-pill"><input type="checkbox" name="defaultAccent" ${look.accent ? '' : 'checked'}><span>Couleur du site</span></label></div>
+          <p class="members-help">Le logo est l’icône du serveur Discord${look.discordServer ? ` « ${esc(look.discordServer)} »` : ''} : change-la sur Discord.${look.logoUrl ? '' : ' Le serveur n’a pas d’icône : le logo du site est utilisé.'}</p>
+          <div class="settings-actions"><button class="primary-button" type="submit">Enregistrer</button><span class="settings-status" aria-live="polite"></span></div></form></section>
+        <section class="admin-card settings-banner-card"><h3>Bannière</h3><div class="settings-banner">
+          <img class="settings-banner-preview" src="${esc(look.bannerUrl || '/images/endurance-manager-banner.webp')}" alt="Bannière actuelle">
+          <div class="settings-actions"><label class="secondary-button settings-banner-pick">Choisir une image<input type="file" accept="image/png,image/jpeg,image/webp" data-banner-file hidden></label>
+            ${look.bannerUrl ? '<button type="button" class="secondary-button" data-banner-remove>Remettre la bannière du site</button>' : ''}<span class="settings-status" aria-live="polite"></span></div>
+          <p class="members-help">Format conseillé : 2048 × 512 (4 fois plus large que haute). Tu la cadres et la zoomes avant de l’enregistrer ; elle est allégée automatiquement.</p></div></section>
+      </div>
+      <div class="admin-preview-wrap"><p class="admin-preview-label">Aperçu : ce que verront tes membres</p>
+        <div class="admin-preview" data-look-preview style="--preview-accent:${esc(accent)}">
+          <div class="admin-preview-banner"><img src="${esc(look.bannerUrl || '/images/endurance-manager-banner.webp')}" alt=""><b data-preview-name>${esc(look.name)}</b></div>
+          <div class="admin-preview-nav"><span>Courses</span><span>Mes inscriptions</span><span>Aide</span></div>
+          <div class="admin-preview-body">
+            <div class="admin-preview-race"><span><b>6h de Spa</b><small>samedi 20:00 · LMU</small></span><span class="admin-preview-button">S’inscrire</span></div>
+            <div class="admin-preview-race"><span><b>Daytona 24h</b><small>dimanche 14:00 · iRacing</small></span><span class="admin-preview-button">S’inscrire</span></div>
+          </div></div></div>
+    </div>`;
+}
+
+// Requests sent from the page « Demander un espace » (demande-communaute.html): the pending ones first.
+const REQUEST_STATUS = {pending:['En attente', 'request-pending'], done:['Traitée', 'request-done'], rejected:['Refusée', 'request-rejected']};
+let platformRequests = [];
+function requestsMarkup(requests, baseDomain, testSite) {
+  platformRequests = requests;
+  const pending = requests.filter(item => item.status === 'pending').length;
+  const date = seconds => new Date(seconds * 1000).toLocaleDateString('fr-FR', {day:'numeric', month:'long', year:'numeric'});
+  const cards = requests.map(item => {
+    const [label, css] = REQUEST_STATUS[item.status] || REQUEST_STATUS.pending;
+    const actions = item.status === 'pending'
+      ? `${testSite ? '' : `<button type="button" class="primary-button" data-request-fill="${esc(item.id)}">Préremplir la création</button>`}<button type="button" class="secondary-button" data-request-status="done" data-request-id="${esc(item.id)}">Marquer comme traitée</button><button type="button" class="danger-link" data-request-status="rejected" data-request-id="${esc(item.id)}">Refuser</button>`
+      : `<button type="button" class="secondary-button" data-request-status="pending" data-request-id="${esc(item.id)}">Remettre en attente</button>`;
+    return `<article class="request-card"><header><strong>${esc(item.communityName)}</strong><span class="request-status ${css}">${label}</span><span>le ${esc(date(item.createdAt))}</span></header>
+      <dl><dt>Demandée par</dt><dd>${esc(item.requester?.name || '')} <small>(Discord ${esc(item.requester?.id || '')})</small></dd>
+        <dt>Adresse souhaitée</dt><dd>${esc(item.slug)}.${esc(baseDomain || 'endurance-manager.app')} · nom court ${esc(item.shortName)}</dd>
+        <dt>Serveur Discord</dt><dd>${esc(item.guildId)}${item.inviteUrl ? ` · <a href="${esc(item.inviteUrl)}" target="_blank" rel="noopener">invitation</a>` : ''}</dd>
+        <dt>Simulateurs</dt><dd>${esc(item.gamesLabel)} · ${esc(item.members)} membres</dd>
+        ${item.contact ? `<dt>Autre contact</dt><dd>${esc(item.contact)}</dd>` : ''}</dl>
+      ${item.message ? `<blockquote>${esc(item.message)}</blockquote>` : ''}
+      <div class="settings-actions">${actions}</div></article>`;
+  }).join('');
+  return `<section class="settings-card"><h2>Demandes de communauté${pending ? ` (${pending} en attente)` : ''}</h2>
+    ${requests.length ? `<div class="request-list">${cards}</div>` : '<p class="members-help">Aucune demande pour le moment. Les gérants de serveur Discord la font depuis la page <a href="/demande-communaute.html">Demander un espace</a>.</p>'}</section>`;
 }
 
 // « Plateforme » (managers of Endurance Manager): the communities, and a new one.
 async function platformMarkup() {
-  const {communities, baseDomain, showcase, testSite} = await api('/api/platform/communities');
+  const [{communities, baseDomain, showcase, testSite}, {requests}] = await Promise.all([api('/api/platform/communities'), api('/api/platform/community-requests')]);
   const rows = communities.map(item => `<article class="platform-row"><div><strong>${esc(item.name)}</strong><a href="${esc(item.url)}/" target="_blank" rel="noopener">${esc(item.url.replace(/^https:\/\//, ''))}</a></div>
     <span>${item.discordServer ? `Discord « ${esc(item.discordServer)} »` : item.guildId ? `Serveur ${esc(item.guildId)}` : 'Aucun serveur'}</span>
     <span class="${item.botPresent ? 'platform-ok' : 'platform-ko'}">${item.botPresent ? '✓ Bot présent' : item.botInviteUrl ? `<a href="${esc(item.botInviteUrl)}" target="_blank" rel="noopener">Bot absent : lien d’invitation</a>` : 'Bot absent'}</span><button type="button" class="danger-link platform-delete" data-delete-community="${esc(item.slug)}" data-name="${esc(item.name)}">Supprimer</button></article>`).join('');
-  return `<section class="settings-card"><h2>Communautés (${communities.length})</h2><div class="platform-list">${rows}</div></section>
+  return `${requestsMarkup(requests, baseDomain, testSite)}<section class="settings-card"><h2>Communautés (${communities.length})</h2><div class="platform-list">${rows}</div></section>
     ${testSite ? `<section class="settings-card"><h2>Nouvelle communauté</h2><p class="members-help">Ce site est la version de test : une communauté créée ici n’est pas accessible à son adresse. Crée-la depuis <a href="https://endurance-manager.app/members.html">endurance-manager.app</a>.</p></section>` : `<section class="settings-card"><h2>Nouvelle communauté</h2>
-      <p class="members-help">Les administrateurs du serveur Discord deviennent automatiquement administrateurs de la communauté. Ils terminent ensuite l’installation dans « Administration → Mise en place ».</p>
+      <p class="members-help">Les administrateurs du serveur Discord deviennent automatiquement administrateurs de la communauté. Ils terminent ensuite l’installation dans « Administration → Vue d’ensemble ».</p>
       <form class="settings-appearance" data-new-community>
         <label>Nom de la communauté<input name="name" maxlength="80" required placeholder="Ex. : Team Rookie Racing"></label>
         <label>Nom court <small>(onglet du navigateur)</small><input name="shortName" maxlength="12" required placeholder="Ex. : TRR"></label>
         <label>Adresse du site<span class="platform-slug"><input name="slug" maxlength="40" required pattern="[a-z0-9][a-z0-9-]{1,38}[a-z0-9]" placeholder="team-rookie"><span>.${esc(baseDomain || 'endurance-manager.app')}</span></span></label>
         <label>ID du serveur Discord<input name="guildId" inputmode="numeric" required pattern="[0-9]{15,22}" placeholder="Ex. : 1269541162025353289"></label>
         <p class="members-help">Pour l’ID : sur Discord, active <strong>Paramètres utilisateur → Avancés → Mode développeur</strong>, puis fais un clic droit sur l’icône du serveur et choisis <strong>Copier l’identifiant du serveur</strong>.</p>
+        <input type="hidden" name="requestId">
         <div class="settings-actions"><button class="primary-button" type="submit">Créer la communauté</button><span class="settings-status" aria-live="polite"></span></div>
       </form><div data-created></div></section>`}
     ${showcase ? `<section class="settings-card showcase-reset"><h2>Vitrine de l’adresse principale</h2>
@@ -186,38 +286,54 @@ async function platformMarkup() {
         <button class="primary-button showcase-danger" type="submit">Réinitialiser la vitrine</button><span class="settings-status" aria-live="polite"></span></form></section>` : ''}`;
 }
 
-let openTab = '';
+let openTab = '', openView = '', openModule = '';
+const SECTIONS = [['overview', 'Vue d’ensemble'], ['people', 'Membres et rôles'], ['modules', 'Modules'], ['look', 'Apparence']];
 async function load() {
   try {
     const session = await api('/api/session');
     // A visitor who is not signed in goes to the welcome screen (Discord sign-in).
     if (!session.user) { location.replace('/'); return; }
     if (!(session.permissions || []).includes('admin')) throw new Error('Accès réservé aux administrateurs de la communauté.');
-    const [result, settings, setupData, platform] = await Promise.all([api('/api/members'), settingsMarkup(), api('/api/community/setup'),
+    const [result, settings, setup, platform] = await Promise.all([api('/api/members'), api('/api/community/settings'), api('/api/community/setup'),
       session.manager ? platformMarkup() : Promise.resolve('')]);
-    const setup = setupMarkup(setupData);
     const members = Array.isArray(result.members) ? result.members : [];
-    const server = result.community?.discordServer ? ` « ${esc(result.community.discordServer)} »` : '';
-    // The page name is already the active tab of the navigation bar: the title stays for screen readers only.
-    app.innerHTML = `<h1 class="sr-only">Membres</h1>
-      <div class="members-tabs" role="tablist"><button type="button" role="tab" data-tab="members" aria-selected="true">Membres <span>${members.length}</span></button><button type="button" role="tab" data-tab="setup" aria-selected="false">Mise en place${setup.todo ? ` <span>${setup.todo}</span>` : ''}</button><button type="button" role="tab" data-tab="settings" aria-selected="false">Réglages</button>${platform ? '<button type="button" role="tab" data-tab="platform" aria-selected="false">Plateforme</button>' : ''}</div>
-      <section class="members-panel" data-panel="members">
-        <div class="members-toolbar"><label class="members-search"><span class="sr-only">Rechercher un membre</span><input type="search" name="memberSearch" placeholder="Rechercher un pilote ou un rôle…" autocomplete="off"></label><button type="button" class="secondary-button" data-members-refresh data-tip="Relit tout de suite sur Discord les rôles de chaque membre et le nom des rôles. Sinon, le site les relit tout seul : toutes les 10 minutes pour un pilote connecté, chaque jour pour les autres.">Actualiser depuis Discord</button></div>
-        <p class="members-help">Les membres du serveur Discord${server} qui se sont connectés au site. Leurs rôles se gèrent sur Discord et sont vérifiés chaque jour.</p>
-        <div class="members-list member-grid">${members.map(member => memberCard(member, result.permissions || [])).join('')}</div>
-        <p class="members-empty" hidden>Aucun membre ne correspond à cette recherche.</p></section>
-      <section class="setup" data-panel="setup" hidden>${setup.html}</section>
-      <div class="community-settings" data-panel="settings" hidden>${settings}</div>
-      ${platform ? `<div class="community-settings" data-panel="platform" hidden>${platform}</div>` : ''}`;
-    // The showcase (main address) has no Discord server and nobody real: no members nor setup there.
-    if (session.openSite) {
-      for (const tab of ['members', 'setup']) { app.querySelector(`[data-tab="${tab}"]`)?.remove(); app.querySelector(`[data-panel="${tab}"]`)?.remove(); }
-      if (!openTab) openTab = platform ? 'platform' : 'settings';
-    }
-    if (openTab) app.querySelector(`[data-tab="${openTab}"]`)?.click();
+    const overview = overviewMarkup(setup, settings, members);
+    // The showcase (main address) has no Discord server and nobody real: no overview nor members there.
+    const sections = SECTIONS.filter(([key]) => !session.openSite || !['overview', 'people'].includes(key));
+    if (platform) sections.push(['platform', 'Plateforme']);
+    const panels = {overview:overview.html, people:peopleMarkup(result, settings), modules:modulesMarkup(settings, setup), look:lookMarkup(settings), platform};
+    const current = sections.some(([key]) => key === openTab) ? openTab : sections[0][0];
+    const brand = settings.community?.logoUrl ? `<img src="${esc(settings.community.logoUrl)}" alt="">` : `<span>${initials(settings.community?.shortName || settings.community?.name)}</span>`;
+    app.innerHTML = `<h1 class="sr-only">Administration</h1><div class="admin-shell">
+      <nav class="admin-rail" role="tablist" aria-label="Administration">
+        <div class="admin-brand">${brand}<div><strong>${esc(settings.community?.name || '')}</strong><small>Administration</small></div></div>
+        ${sections.map(([key, label]) => `<button type="button" role="tab" class="admin-nav${key === 'platform' ? ' is-platform' : ''}" data-tab="${key}" aria-selected="${key === current}">${icon(key)}<span>${label}</span>${key === 'overview' && overview.todo ? `<b class="admin-count">${overview.todo}</b>` : ''}</button>`).join('')}
+      </nav>
+      <div class="admin-main">${sections.map(([key]) => `<section class="admin-panel${key === 'platform' ? ' community-settings' : ''}" data-panel="${key}" role="tabpanel" ${key === current ? '' : 'hidden'}>${panels[key]}</section>`).join('')}</div></div>`;
+    if (openView) showView(openView);
+    if (openModule) openModuleSettings(openModule);
+    openView = ''; openModule = '';
   } catch (error) {
     renderError(error.message || String(error));
   }
+}
+function showView(view) {
+  for (const button of app.querySelectorAll('[data-view]')) button.setAttribute('aria-pressed', String(button.dataset.view === view));
+  for (const pane of app.querySelectorAll('[data-view-pane]')) pane.hidden = pane.dataset.viewPane !== view;
+}
+function openModuleSettings(key, open = true) {
+  const tile = app.querySelector(`[data-module-tile="${key}"]`), settings = tile?.querySelector('.admin-module-settings');
+  if (!settings) return;
+  settings.hidden = !open; tile.classList.toggle('is-open', open);
+  tile.querySelector('[data-module-open]')?.setAttribute('aria-expanded', String(open));
+  const button = tile.querySelector('[data-module-open]');
+  if (button) button.textContent = open ? 'Fermer' : 'Régler';
+  if (open) tile.scrollIntoView({behavior:'smooth', block:'nearest'});
+}
+function selectTab(key) {
+  for (const button of app.querySelectorAll('[data-tab]')) button.setAttribute('aria-selected', String(button.dataset.tab === key));
+  for (const panel of app.querySelectorAll('[data-panel]')) panel.hidden = panel.dataset.panel !== key;
+  openTab = key;
 }
 
 // Banner: cropped to 2048 × 512 in the browser (centre) and compressed, WebP (JPEG where WebP is not available).
@@ -290,16 +406,27 @@ async function bannerImage(canvas) {
 // Simulators of a single recap message: both (all), LMU or iRacing ('' when none is ticked).
 const oneScopeOf = form => form.elements.simLmu.checked && form.elements.simIracing.checked ? 'all' : form.elements.simLmu.checked ? 'lmu' : form.elements.simIracing.checked ? 'iracing' : '';
 // Reloads the page content and comes back to the same tab.
-async function reload(tab) { openTab = tab; await load(); }
+async function reload(tab, {view = '', module = ''} = {}) { openTab = tab; openView = view; openModule = module; await load(); }
 
 app.addEventListener('click', async event => {
   const go = event.target.closest('[data-go-tab]');
-  if (go) { app.querySelector(`[data-tab="${go.dataset.goTab}"]`)?.click(); return; }
-  if (event.target.closest('[data-setup-refresh]')) { await reload('setup'); return; }
+  if (go) {
+    selectTab(go.dataset.goTab);
+    if (go.dataset.goView) showView(go.dataset.goView);
+    if (go.dataset.goModule) openModuleSettings(go.dataset.goModule);
+    return;
+  }
+  if (event.target.closest('[data-setup-refresh]')) { await reload('overview'); return; }
+  const modulesRefresh = event.target.closest('[data-modules-refresh]');
+  if (modulesRefresh) { await reload('modules', {module:modulesRefresh.dataset.modulesRefresh}); return; }
+  const view = event.target.closest('[data-view]');
+  if (view) { showView(view.dataset.view); return; }
+  const moduleOpen = event.target.closest('[data-module-open]');
+  if (moduleOpen) { openModuleSettings(moduleOpen.dataset.moduleOpen, moduleOpen.getAttribute('aria-expanded') !== 'true'); return; }
   const refresh = event.target.closest('[data-members-refresh]');
   if (refresh) {
     refresh.disabled = true; refresh.textContent = 'Actualisation…';
-    try { await api('/api/members/refresh', 'POST', {}); await reload('members'); }
+    try { await api('/api/members/refresh', 'POST', {}); await reload('people'); }
     catch (error) { refresh.disabled = false; refresh.textContent = 'Actualiser depuis Discord'; alert(error.message); }
     return;
   }
@@ -309,6 +436,23 @@ app.addEventListener('click', async event => {
     remove.disabled = true;
     try { await api(`/api/platform/communities/${encodeURIComponent(remove.dataset.deleteCommunity)}`, 'DELETE'); await reload('platform'); }
     catch (error) { remove.disabled = false; alert(error.message); }
+    return;
+  }
+  // A request fills the form « Nouvelle communauté »; creating the community closes the request.
+  const fill = event.target.closest('[data-request-fill]');
+  if (fill) {
+    const item = platformRequests.find(request => request.id === fill.dataset.requestFill), form = app.querySelector('form[data-new-community]');
+    if (!item || !form) return;
+    form.elements.name.value = item.communityName; form.elements.shortName.value = item.shortName;
+    form.elements.slug.value = item.slug; form.elements.guildId.value = item.guildId; form.elements.requestId.value = item.id;
+    form.scrollIntoView({behavior:'smooth', block:'center'}); form.elements.name.focus({preventScroll:true});
+    return;
+  }
+  const requestStatus = event.target.closest('[data-request-status]');
+  if (requestStatus) {
+    requestStatus.disabled = true;
+    try { await api(`/api/platform/community-requests/${encodeURIComponent(requestStatus.dataset.requestId)}`, 'PATCH', {status:requestStatus.dataset.requestStatus}); await reload('platform'); }
+    catch (error) { requestStatus.disabled = false; alert(error.message); }
     return;
   }
   const copy = event.target.closest('[data-copy]');
@@ -329,13 +473,13 @@ app.addEventListener('click', async event => {
       if (!response.ok) throw new Error(result.error || 'L’envoi a échoué.');
       for (const img of document.querySelectorAll('.hero-banner, .settings-banner-preview')) { img.removeAttribute('srcset'); img.src = result.bannerUrl; }
       cropper = null;
-      await reload('settings');
+      await reload('look');
     } catch (error) { status.textContent = error.message; }
     return;
   }
   if (event.target.closest('[data-banner-remove]')) {
     if (!confirm('Remettre la bannière du site ?')) return;
-    try { await api('/api/community/banner', 'DELETE', {}); await reload('settings'); } catch (error) { alert(error.message); }
+    try { await api('/api/community/banner', 'DELETE', {}); await reload('look'); } catch (error) { alert(error.message); }
     return;
   }
   const testButton = event.target.closest('[data-recap-test]');
@@ -348,13 +492,13 @@ app.addEventListener('click', async event => {
     return;
   }
   const tab = event.target.closest('[data-tab]');
-  if (!tab) return;
-  for (const button of app.querySelectorAll('[data-tab]')) button.setAttribute('aria-selected', String(button === tab));
-  for (const panel of app.querySelectorAll('[data-panel]')) panel.hidden = panel.dataset.panel !== tab.dataset.tab;
+  if (tab) selectTab(tab.dataset.tab);
 });
 
 app.addEventListener('input', event => {
   if (event.target.matches?.('[data-banner-zoom]') && cropper) { setZoom(Number(event.target.value)); return; }
+  const look = event.target.closest?.('form[data-appearance]');
+  if (look) { updatePreview(look); return; }
   if (event.target.name !== 'memberSearch') return;
   const query = event.target.value.trim().toLocaleLowerCase('fr-FR');
   let visible = 0;
@@ -390,15 +534,15 @@ app.addEventListener('submit', async event => {
         const list = mode === 'one' ? [{scope:oneScopeOf(form), webhookUrl:hook('one')}] : mode === 'two' ? [{scope:'lmu', webhookUrl:hook('lmu')}, {scope:'iracing', webhookUrl:hook('iracing')}] : [];
         const result = await api('/api/community/recaps', 'PUT', {recaps:list});
         if (list.length && !result.published) throw new Error('Enregistré, mais Discord a refusé le message : clique sur « Tester » pour vérifier chaque webhook.');
-        await reload('setup');
+        await reload('modules', {module:'recap'});
       } else if (invite) {
         await api('/api/community/invite', 'PATCH', {url:form.elements.invite.value.trim() || null});
-        await reload('setup');
+        await reload('overview');
       } else {
-        const input = Object.fromEntries(['name','shortName','slug','guildId'].map(key => [key, form.elements[key].value.trim()]));
+        const input = Object.fromEntries(['name','shortName','slug','guildId','requestId'].map(key => [key, form.elements[key].value.trim()]));
         const result = await api('/api/platform/communities', 'POST', input);
         await reload('platform');
-        const message = `Ta communauté est prête sur Endurance Manager : ${result.url}/\n\n1. Invite le bot sur ton serveur Discord : ${result.botInviteUrl || '(lien indisponible)'}\n2. Connecte-toi sur ${result.url}/ avec Discord, puis ouvre « Administration » → « Mise en place » et suis les étapes.`;
+        const message = `Ta communauté est prête sur Endurance Manager : ${result.url}/\n\n1. Invite le bot sur ton serveur Discord : ${result.botInviteUrl || '(lien indisponible)'}\n2. Connecte-toi sur ${result.url}/ avec Discord, puis ouvre « Administration » et suis les étapes de la vue d’ensemble.`;
         const box = app.querySelector('[data-created]');
         if (box) box.innerHTML = `<div class="setup-created"><strong>✓ ${esc(input.name)} est créée.</strong><p>Envoie ce message à un administrateur du serveur Discord :</p>
           <textarea id="platform-created" rows="5" readonly>${esc(message)}</textarea><div class="setup-actions">${copyButton('platform-created')}</div></div>`;
@@ -417,8 +561,18 @@ app.addEventListener('submit', async event => {
   } catch (error) { status.textContent = error.message; }
 });
 
+// The preview of « Apparence » follows the form before it is saved.
+function updatePreview(form) {
+  const preview = app.querySelector('[data-look-preview]');
+  if (!preview) return;
+  preview.querySelector('[data-preview-name]').textContent = form.elements.name.value || 'Ta communauté';
+  preview.style.setProperty('--preview-accent', form.elements.defaultAccent.checked ? '#52d3d8' : form.elements.accent.value);
+}
+
 app.addEventListener('change', async event => {
   const box = event.target;
+  const look = box.closest('form[data-appearance]');
+  if (look) { if (box.name === 'accent') look.elements.defaultAccent.checked = false; updatePreview(look); return; }
   // Recap: the fields of the chosen kind of recap.
   if (box.matches('[data-banner-file]') && box.files?.[0]) {
     const container = box.closest('.settings-banner'), status = container.querySelector('.settings-status');
@@ -435,7 +589,8 @@ app.addEventListener('change', async event => {
     try {
       await api('/api/community/modules', 'PATCH', {[box.dataset.module]:box.checked});
       // The solo races permissions appear or disappear with the module.
-      if (box.dataset.module === 'soloRaces') { await load(); app.querySelector('[data-tab="settings"]')?.click(); return; }
+      await reload('modules');
+      return;
     } catch (error) { box.checked = !box.checked; alert(error.message); } finally { box.disabled = false; }
     return;
   }

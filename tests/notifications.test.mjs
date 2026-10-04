@@ -74,6 +74,14 @@ test('the pilots of a start and of a crew are told what happens, never the one w
   crewRow=(await req('/api/events','GET',null,'pilot')).data.events[0].departures[0].crews[0];
   assert.equal((await req(`/api/crews/${crew.data.id}/members/${mate.data.id}`,'DELETE',{version:crewRow.version},'mate')).status,200);
   assert.equal((await kinds(req,'pilot'))[0],'crew_leave');
+  // The crew gets a car: its pilots are told, not when only its name changes.
+  crewRow=(await req('/api/events','GET',null,'admin')).data.events[0].departures[0].crews[0];
+  assert.equal((await req(`/api/crews/${crew.data.id}`,'PATCH',{name:'Les Tondeuz',category:'GT3',car:'Ferrari 296 LMGT3',version:crewRow.version},'admin')).status,200);
+  list=(await req('/api/notifications','GET',null,'pilot')).data;
+  assert.deepEqual({kind:list.notifications[0].kind,car:list.notifications[0].car,by:list.notifications[0].by},{kind:'crew_car',car:'Ferrari 296 LMGT3',by:'Orga'});
+  crewRow=(await req('/api/events','GET',null,'admin')).data.events[0].departures[0].crews[0];
+  assert.equal((await req(`/api/crews/${crew.data.id}`,'PATCH',{name:'Tondeuz',category:'GT3',car:'Ferrari 296 LMGT3',version:crewRow.version},'admin')).status,200);
+  assert.equal((await kinds(req,'pilot')).filter(kind=>kind==='crew_car').length,1);
   // Bell opened: everything read.
   assert.equal((await req('/api/notifications/read','POST',{},'pilot')).status,200);
   assert.equal((await req('/api/notifications','GET',null,'pilot')).data.unread,0);

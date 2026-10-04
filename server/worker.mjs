@@ -4,6 +4,7 @@ import {
   registrationSelect, registrationParticipant, body, rateLimit, cleanup, returnPath, text, validateEvent, validateRegistration, ANY_CATEGORY
 } from './core.mjs';
 import {ingestClientError, clientErrorsApi} from './telemetry.mjs';
+import {communityRequestsApi, closeCommunityRequest} from './community-requests.mjs';
 import {racesPath} from './races-path.mjs';
 import {CARS} from '../shared/catalog.mjs';
 import {currentCommunity, appearanceOf, allCommunities, communityUrl, communitySlug, communityById, communityFromRow} from './community.mjs';
@@ -15,6 +16,7 @@ import {syncIracingEvents} from './iracing-import.mjs';
 import {resetShowcase} from './demo.mjs';
 import {syncWeeklyDiscord, sendRecapTest, usesSiteRecap, WEBHOOK_URL} from './discord-weekly.mjs';
 import {notify, notificationsApi, departurePilots, eventPilots, crewPilots} from './notifications.mjs';
+import {botCanManageChannels, CREW_BOT_PERMISSIONS} from './crew-discord.mjs';
 // Official races (iRacing's official endurances, LMU official events): common to every community (migration 0039).
 const OFFICIAL = 'official';
 // A race of the current community, or an official race: any id from another community answers "introuvable".
@@ -111,9 +113,18 @@ const RECAP_NAMES = {all:'LMU et iRacing', lmu:'LMU', iracing:'iRacing'};
 // A saved webhook is never shown again in full: only the end of its id, to tell which one it is.
 const maskWebhook = url => `webhook …${(String(url).match(/webhooks\/(\d+)\//) || [,'????'])[1].slice(-4)}`;
 // Invitation of the bot (the site's Discord application) to a community's server: it only reads members and roles.
-function botInvite(env, guildId) {
+// Without permissions the bot only reads the members and their roles; the crews on Discord need more
+// (server/crew-discord.mjs): the admins invite it again with them.
+function botInvite(env, guildId, permissions = '0') {
   if (!env.DISCORD_CLIENT_ID) return null;
-  return `https://discord.com/oauth2/authorize?client_id=${encodeURIComponent(env.DISCORD_CLIENT_ID)}&scope=bot&permissions=0${guildId ? `&guild_id=${guildId}&disable_guild_select=true` : ''}`;
+  return `https://discord.com/oauth2/authorize?client_id=${encodeURIComponent(env.DISCORD_CLIENT_ID)}&scope=bot&permissions=${permissions}${guildId ? `&guild_id=${guildId}&disable_guild_select=true` : ''}`;
+}
+// « Modules »: whether the bot may make the crews' channels, its invite link with those rights, and what last
+// stopped it.
+async function crewDiscordState(env, community) {
+  const saved = await env.DB.prepare('SELECT last_error, last_error_at FROM community_crew_discord WHERE community_id=?').bind(community.id).first();
+  return {botReady:await botCanManageChannels(env, community.discordGuildId), botInviteUrl:botInvite(env, community.discordGuildId, CREW_BOT_PERMISSIONS),
+    lastError:community.modules.crewChannels === true ? saved?.last_error || null : null};
 }
 // Permissions of the actor in the current community (server/access.mjs).
 const can = (actor, permission) => Boolean(actor.permissions?.has(permission));
@@ -325,6 +336,9 @@ async function api(request, env) {
   if (actor.user) actor.user = {...actor.user, role:displayRole(access)};
   const diagnostics = await clientErrorsApi(path,method,env,actor,community);
   if (diagnostics) return diagnostics;
+  // Requests for a new community: sent by anyone signed in with Discord, from any site (server/community-requests.mjs).
+  const requests = await communityRequestsApi(path, method, request, env, actor);
+  if (requests) return requests;
   if (path === '/api/session' && method === 'GET') return json({user:actor.user, discordReady:!!(env.DISCORD_CLIENT_ID && env.DISCORD_CLIENT_SECRET), adminConfigured:administrators(env).length > 0, soloRaces:soloRacesEnabled(env, community),
     community:{id:community.id, slug:community.slug, name:community.name, shortName:community.shortName, discordInviteUrl:community.discordInviteUrl, appearance:appearanceOf(community)},
     access:access.status, permissions:[...access.permissions], manager:access.manager, communities:await myCommunities(env, actor, community), openSite,
@@ -495,6 +509,8 @@ async function api(request, env) {
       const car=crewCar(input);
       const result=await env.DB.prepare('UPDATE crews SET name=?,category=?,car=?,version=version+1 WHERE id=? AND version=?').bind(name,input.category,car,crew.id,input.version).run();
       if (!result.meta.changes) fail(409,'Cet équipage a changé. Actualise avant de réessayer.');
+      // A new car: the crew's pilots are told (not a change of name or category alone).
+      if ((crew.car||'')!==(car||'')) await notify(env,await crewPilots(env,crew.id),'crew_car',event,{departure,skip:[actor.user.id],crewName:name,car:car||'',by:actor.user.name});
       return json({id:crew.id});
     }
     const name=text(input.name,60,'Nom de l’équipage');
@@ -695,7 +711,9 @@ async function api(request, env) {
       administrator:role.administrator, permissions:saved.has(role.id) ? normalizePermissions(saved.get(role.id)) : (role.id === community.discordGuildId ? [...DEFAULT_EVERYONE] : [])}));
     await keepDiscordLook(env, community, discord);
     return json({community:{name:community.name, shortName:community.shortName, discordServer:discord?.name || null, ...appearanceOf(community)}, roles, permissions:PERMISSIONS,
-      modules:{iracingImport:community.modules.iracingImport === true, discordWeekly:community.modules.discordWeekly === true, soloRaces:community.modules.soloRaces === true}});
+      modules:{iracingImport:community.modules.iracingImport === true, discordWeekly:community.modules.discordWeekly === true, soloRaces:community.modules.soloRaces === true,
+        crewChannels:community.modules.crewChannels === true, raceReminders:community.modules.raceReminders === true},
+      crews:await crewDiscordState(env, community)});
   }
   // Banner sent by the admins: the image itself (already resized by the browser), WebP, JPEG or PNG, 600 KB at most.
   if (path === '/api/community/banner' && ['PUT','DELETE'].includes(method)) {
@@ -743,8 +761,18 @@ async function api(request, env) {
     const input = await body(request);
     const modules = {...community.modules};
     // The Discord recap is set on the « Mise en place » page (its own webhook), not here.
-    for (const key of ['iracingImport','soloRaces']) if (typeof input[key] === 'boolean') modules[key] = input[key];
-    await env.DB.prepare('UPDATE communities SET modules=? WHERE id=?').bind(JSON.stringify(modules), community.id).run();
+    for (const key of ['iracingImport','soloRaces','raceReminders']) if (typeof input[key] === 'boolean') modules[key] = input[key];
+    const statements = [];
+    // Crews on Discord (server/crew-discord.mjs): only once the bot has the rights to make the channels.
+    if (typeof input.crewChannels === 'boolean') {
+      if (input.crewChannels && await botCanManageChannels(env, community.discordGuildId) !== true)
+        fail(400, 'Le bot n’a pas encore les droits pour créer les salons : clique sur « Donner les droits au bot », puis réessaie.');
+      modules.crewChannels = input.crewChannels;
+      if (input.crewChannels) statements.push(env.DB.prepare(`INSERT INTO community_crew_discord(community_id,updated_at) VALUES(?,?)
+        ON CONFLICT(community_id) DO UPDATE SET last_error=NULL,last_error_at=NULL,updated_at=excluded.updated_at`).bind(community.id, now()));
+    }
+    statements.push(env.DB.prepare('UPDATE communities SET modules=? WHERE id=?').bind(JSON.stringify(modules), community.id));
+    await env.DB.batch(statements);
     return json({ok:true, modules});
   }
   // « Mise en place » (admins): where the community stands, step by step (members page).
@@ -857,6 +885,8 @@ async function api(request, env) {
       if (/UNIQUE|CHECK|constraint/i.test(String(error?.message))) fail(409, 'Cette adresse est déjà prise ou réservée : choisis-en une autre.');
       throw error;
     }
+    // Created from a request of the page « Demander un espace »: that request is done.
+    await closeCommunityRequest(env, input.requestId);
     const created = {slug};
     return json({ok:true, url:communityUrl(env, created), botInviteUrl:botInvite(env, guildId)}, 201);
   }
