@@ -86,6 +86,7 @@ const sourceIndex = await readFile(root + 'index.html', 'utf8');
 const sourceGame = await readFile(root + 'game.html', 'utf8');
 const sourceMembers = await readFile(root + 'members.html', 'utf8');
 const sourceDiagnostics = await readFile(root + 'diagnostics.html', 'utf8');
+const sourcePreparation = await readFile(root + 'preparation.html', 'utf8');
 const sourceHelp = await readFile(root + 'help.html', 'utf8');
 const sourceRequest = await readFile(root + 'demande-communaute.html', 'utf8');
 const paths = [
@@ -93,6 +94,7 @@ const paths = [
   ...stylesheetPaths(sourceGame,'game.html'),
   ...stylesheetPaths(sourceMembers,'members.html'),
   ...stylesheetPaths(sourceDiagnostics,'diagnostics.html'),
+  ...stylesheetPaths(sourcePreparation,'preparation.html'),
   ...stylesheetPaths(sourceHelp,'help.html'),
   ...stylesheetPaths(sourceRequest,'demande-communaute.html')
 ];
@@ -110,6 +112,7 @@ await writeFile(new URL('app.css', out), bundledCss);
 await writeFile(new URL('index.html', out), productionHtml(sourceIndex));
 await writeFile(new URL('members.html', out), productionHtml(sourceMembers));
 await writeFile(new URL('diagnostics.html', out), productionHtml(sourceDiagnostics));
+await writeFile(new URL('preparation.html', out), productionHtml(sourcePreparation));
 await writeFile(new URL('help.html', out), productionHtml(sourceHelp));
 await writeFile(new URL('demande-communaute.html', out), productionHtml(sourceRequest));
 const gameHtml = productionHtml(sourceGame);

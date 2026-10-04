@@ -4,6 +4,7 @@ import {
   registrationSelect, registrationParticipant, body, rateLimit, cleanup, returnPath, text, validateEvent, validateRegistration, ANY_CATEGORY
 } from './core.mjs';
 import {ingestClientError, clientErrorsApi} from './telemetry.mjs';
+import {preparationApi,collectorApi} from './preparation.mjs';
 import {communityRequestsApi, closeCommunityRequest} from './community-requests.mjs';
 import {racesPath} from './races-path.mjs';
 import {CARS} from '../shared/catalog.mjs';
@@ -238,6 +239,7 @@ async function listEvents(env, actor, game='', scope='', community) {
       version:crew.version,
       registrationIds:membersByCrew.get(crew.id) || [],
       canManage:crew.community_id===community.id ? canManageCrew(crew,actor) : perms.has(crew.community_id) && canManageCrew(crew,{...actor, permissions:perms.get(crew.community_id)}),
+      preparationEnabled:crew.community_id===community.id && community.modules.preparation===true,
       ownedByMe:Boolean(actor.user && crew.owner_user_id===actor.user.id),
       hasOwner:Boolean(crew.owner_user_id),
       ...(crew.community_id!==community.id ? {foreign:true} : {}),
@@ -318,6 +320,8 @@ async function api(request, env) {
   // The main address, or a community address of the platform (BASE_DOMAIN).
   const canonical = siteOrigin(request, env);
   if (url.origin !== canonical) fail(403, 'Utilise l’adresse principale du site pour cette action.');
+  const captured = await collectorApi(path,method,request,env);
+  if(captured)return captured;
   if (!['GET','HEAD'].includes(method)) {
     if (request.headers.get('Origin') !== canonical) fail(403, 'Origine de la requête refusée.');
     await rateLimit(request, env, 'write', 80);
@@ -367,6 +371,8 @@ async function api(request, env) {
   if (access.status !== 'member') fail(403, access.status === 'not-member'
     ? `Cette communauté est réservée aux membres du serveur Discord « ${community.name} ».`
     : 'L’accès à cette communauté ne peut pas être vérifié pour le moment. Réessaie plus tard.');
+  const preparation = await preparationApi(path,method,request,env,actor,community);
+  if(preparation)return preparation;
   // The bell next to the account (server/notifications.mjs).
   const notifications = await notificationsApi(path, method, env, actor, community);
   if (notifications) return notifications;
@@ -712,7 +718,7 @@ async function api(request, env) {
     await keepDiscordLook(env, community, discord);
     return json({community:{name:community.name, shortName:community.shortName, discordServer:discord?.name || null, ...appearanceOf(community)}, roles, permissions:PERMISSIONS,
       modules:{iracingImport:community.modules.iracingImport === true, discordWeekly:community.modules.discordWeekly === true, soloRaces:community.modules.soloRaces === true,
-        crewChannels:community.modules.crewChannels === true, raceReminders:community.modules.raceReminders === true},
+        crewChannels:community.modules.crewChannels === true, raceReminders:community.modules.raceReminders === true, preparation:community.modules.preparation === true},
       crews:await crewDiscordState(env, community)});
   }
   // Banner sent by the admins: the image itself (already resized by the browser), WebP, JPEG or PNG, 600 KB at most.
@@ -761,7 +767,7 @@ async function api(request, env) {
     const input = await body(request);
     const modules = {...community.modules};
     // The Discord recap is set on the « Mise en place » page (its own webhook), not here.
-    for (const key of ['iracingImport','soloRaces','raceReminders']) if (typeof input[key] === 'boolean') modules[key] = input[key];
+    for (const key of ['iracingImport','soloRaces','raceReminders','preparation']) if (typeof input[key] === 'boolean') modules[key] = input[key];
     const statements = [];
     // Crews on Discord (server/crew-discord.mjs): only once the bot has the rights to make the channels.
     if (typeof input.crewChannels === 'boolean') {

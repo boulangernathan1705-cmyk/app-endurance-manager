@@ -62,6 +62,7 @@ const ICONS = {
   crewChannels:'<path d="M4 5h16v10H9l-5 4V5Z"/><path d="M14 19h1l4 3v-3"/>',
   raceReminders:'<path d="M6 16V11a6 6 0 1 1 12 0v5l2 2H4l2-2Z"/><path d="M10 21h4"/>',
   iracingImport:'<path d="M4 21V4M4 4h13l-2 4 2 4H4"/>',
+  preparation:'<path d="M3 12h4l3-8 4 16 3-8h4"/>',
   soloRaces:'<circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/>'
 };
 const icon = key => `<svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[key]}</svg>`;
@@ -72,7 +73,7 @@ const copyButton = target => `<button type="button" class="secondary-button setu
 function moduleStates(settings, setup) {
   const recaps = setup.recaps || [];
   return {recap:recaps.length > 0 || Boolean(setup.legacyRecap), crewChannels:settings.modules.crewChannels === true, raceReminders:settings.modules.raceReminders === true,
-    iracingImport:settings.modules.iracingImport === true, soloRaces:settings.modules.soloRaces === true};
+    iracingImport:settings.modules.iracingImport === true, soloRaces:settings.modules.soloRaces === true, preparation:settings.modules.preparation === true};
 }
 
 // « Vue d'ensemble ».
@@ -85,7 +86,7 @@ function overviewMarkup(setup, settings, members) {
   const tiles = `<div class="admin-tiles">
     ${tile('Serveur Discord', !guild.id ? '<i class="admin-dot is-bad"></i>Aucun' : guild.botPresent ? '<i class="admin-dot is-ok"></i>Relié' : '<i class="admin-dot is-bad"></i>Bot absent', guild.botPresent ? `Bot présent sur ${server}` : 'Personne ne peut entrer sur le site', 'is-small')}
     ${tile('Membres connectés', members.length, 'Membres du serveur venus sur le site')}
-    ${tile('Modules actifs', `${active} / 5`, Object.entries(states).filter(([, on]) => !on).length ? 'Le reste est dans Modules' : 'Tout est allumé')}</div>`;
+    ${tile('Modules actifs', `${active} / ${Object.keys(states).length}`, Object.entries(states).filter(([, on]) => !on).length ? 'Le reste est dans Modules' : 'Tout est allumé')}</div>`;
   // Getting started: the four steps, then the announcement once they are done.
   const steps = [
     {done:Boolean(guild.botPresent), title:'Inviter le bot sur ton serveur Discord', action:!guild.id ? '<small>Demande à un gestionnaire de relier ton serveur.</small>'
@@ -197,7 +198,9 @@ function modulesMarkup(settings, setup) {
     {key:'iracingImport', name:'Endurances iRacing officielles', text:'Les séries en équipe et les événements spéciaux importés automatiquement.',
       state:states.iracingImport ? ['ok', 'Actif'] : ['off', 'Éteint'], control:toggle('iracingImport', 'Endurances iRacing officielles'), settings:''},
     {key:'soloRaces', name:'Courses solo', text:'Onglet « Courses solo » : places limitées, liste d’attente, courses OPEN et SAFE.',
-      state:states.soloRaces ? ['ok', 'Actif'] : ['off', 'Éteint'], control:toggle('soloRaces', 'Courses solo'), settings:''}];
+      state:states.soloRaces ? ['ok', 'Actif'] : ['off', 'Éteint'], control:toggle('soloRaces', 'Courses solo'), settings:''},
+    {key:'preparation', name:'Préparation endurance', text:'Une routine adaptée à chaque pilote, le setup commun et le suivi des entraînements depuis son équipage.',
+      state:states.preparation ? ['ok', 'Actif'] : ['off', 'Éteint'], control:toggle('preparation', 'Préparation endurance'), settings:'<p class="members-help">Disponible depuis « Préparer la course » dans chaque équipage. Le collecteur SimHub est un prototype à valider en jeu.</p>'}];
   const tile = item => `<article class="admin-module ${states[item.key] ? 'is-on' : ''}" data-module-tile="${item.key}">
     <div class="admin-module-top"><span class="admin-module-icon">${icon(item.key)}</span><strong>${item.name}</strong>${item.control}</div>
     <p>${item.text}</p>
