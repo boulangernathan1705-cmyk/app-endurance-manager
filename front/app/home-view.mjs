@@ -159,7 +159,8 @@ export function communityGate(){
   let kicker,title,lead,actions;
   if(state.openSite){
     kicker='Simracing · Endurance';title='Vos endurances en équipe, enfin simples à organiser';
-    lead='Inscriptions, disponibilités, création d’équipage et relais : tout le plateau au même endroit, pour Le Mans Ultimate et iRacing.';actions=login+trust;
+    lead='Inscriptions, disponibilités, création d’équipage et relais : tout le plateau au même endroit, pour Le Mans Ultimate et iRacing.';
+    actions=`<div class="welcome-actions">${login}<a class="secondary-button" href="/demande-communaute.html">Demander un espace pour ta communauté</a></div>${trust}`;
   }else if(state.access==='anonymous'){
     kicker=name;title=`Bienvenue sur l’espace de ${name}`;
     lead='Cet espace est réservé aux membres de son serveur Discord. Connecte-toi pour voir les courses et t’inscrire.';actions=login+trust;

@@ -4,8 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="referrer" content="no-referrer">
-<meta name="description" content="Les nouveautés d’Endurance Manager, version par version.">
-<title>Nouveautés — ENDURANCE MANAGER</title>
+<title>Demander un espace · ENDURANCE MANAGER</title>
+<meta name="description" content="Demande la création de l’espace de ta communauté Discord sur Endurance Manager.">
 <link rel="icon" href="/images/endurance-manager-logo.webp" type="image/webp">
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="apple-touch-icon" href="/app-icon.png?size=180">
@@ -13,29 +13,31 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
-<link rel="stylesheet" href="/app.css">
-<link rel="stylesheet" href="/privacy.css?v=3-site-theme">
-<script type="module" src="/front/account-menu.mjs?v=15-notifications-community-request"></script>
+<link rel="stylesheet" href="/styles.css">
+<link rel="stylesheet" href="/styles/account-menu.css">
+<link rel="stylesheet" href="/styles/members-page.css">
+<link rel="stylesheet" href="/styles/legal.css">
+<link rel="stylesheet" href="/styles/mobile-final.css">
+<link rel="stylesheet" href="/styles/community-request.css?v=1">
+<link rel="stylesheet" href="/styles/ux-refresh.css?v=24-shared-nav">
+<script type="module" src="/front/account-menu.mjs"></script>
+<script type="module" src="/front/community-request-page.mjs?v=1"></script>
 </head>
 <body>
 <div class="top-stripes" aria-hidden="true"><div></div><div></div><div></div><div></div></div>
 <header class="site-hero">
-  <picture class="hero-picture" aria-hidden="true">
-    <img class="hero-banner" src="/images/endurance-manager-banner.webp?v=39-optimized" width="2048" height="512" alt="" fetchpriority="high" decoding="async" draggable="false">
-  </picture>
+  <picture class="hero-picture" aria-hidden="true"><img class="hero-banner" src="/images/endurance-manager-banner.webp?v=39-optimized" width="2048" height="512" alt="" fetchpriority="high" decoding="async" draggable="false"></picture>
   <div class="header-inner"><a class="brand-button logo" href="/" aria-label="Retour à l’accueil Endurance Manager"><span class="brand-mark-frame" aria-hidden="true"><img class="brand-mark" src="/images/endurance-manager-logo.webp" alt=""></span><span class="brand-copy">ENDURANCE <span>MANAGER</span></span></a></div>
 </header>
 <div class="site-nav-shell">
   <div class="game-space-bar"></div>
   <nav id="navigation" aria-label="Navigation principale">
     <div class="nav-game-switcher" role="group" aria-label="Changer de simulateur"><a class="nav-game-switcher-button nav-game-switcher-lmu" href="/lmu/"><span class="nav-full">Le Mans Ultimate</span><span class="nav-short">LMU</span></a><a class="nav-game-switcher-button nav-game-switcher-iracing" href="/iracing/"><span class="nav-full">iRacing</span><span class="nav-short">iRacing</span></a></div>
-    <div class="nav-sections" role="group" aria-label="Sections"><a class="nav-section-button" href="/changelog.html" aria-current="page">Nouveautés</a></div>
+    <div class="nav-sections" role="group" aria-label="Sections"><a class="nav-section-button" href="/demande-communaute.html" aria-current="page">Demander un espace</a></div>
   </nav>
   <div class="account-bar"><div id="account-menu-root" class="account-menu-root" aria-live="polite"></div></div>
 </div>
-<main class="legal-page changelog-page">
-<!-- CHANGELOG: generated from CHANGELOG.md by scripts/build.mjs -->
-</main>
-<footer class="site-footer"><a href="/changelog.html">Nouveautés</a><span aria-hidden="true">·</span><a href="/help.html">Aide</a><span aria-hidden="true">·</span><a href="/about.html">À propos & sécurité</a><span aria-hidden="true">·</span><a href="/legal.html">Informations légales</a><span aria-hidden="true">·</span><a href="/circuit-credits.html">Crédits des circuits</a><span aria-hidden="true">·</span><a href="/privacy.html">Confidentialité</a></footer>
+<main id="request-app" class="members-main"><p class="members-loading" role="status">Chargement…</p></main>
+<footer class="site-footer"><a href="/changelog.html">Nouveautés</a><span aria-hidden="true">·</span><a href="/legal.html">Informations légales</a><span aria-hidden="true">·</span><a href="/privacy.html">Confidentialité</a></footer>
 </body>
 </html>
