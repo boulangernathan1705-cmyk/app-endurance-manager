@@ -31,3 +31,12 @@ Ne pas recréer la base ni rejouer manuellement la migration initiale sur une ba
 ## Variables et secrets
 
 `APP_ORIGIN` est versionnée dans `wrangler.jsonc`. Les identifiants Discord non secrets peuvent rester configurés côté Cloudflare grâce à `keep_vars: true`. `DISCORD_CLIENT_SECRET` doit rester un secret Cloudflare et ne jamais être ajouté au dépôt.
+
+## Mise en production (release dev → main)
+
+1. Les changements arrivent sur `dev` (version de test `https://app.endurance-manager.workers.dev`).
+2. `CHANGELOG.md` reçoit la nouvelle version en haut (`## vX.Y — date`), sur `dev`.
+3. Une PR `dev` → `main` est ouverte, titrée `vX.Y : …`. Le ruleset « Protect production » exige les checks `check` et `Release must come from dev`, et une fusion en squash.
+4. Après la fusion, Cloudflare déploie `https://endurance-manager.app` et le workflow `Sync dev after release` remet `main` dans `dev` (commit « Synchronisation avec main après vX.Y »), sans quoi la release suivante serait refusée.
+
+Claude peut faire toutes ces étapes depuis le projet ; il ne fusionne la PR vers `main` qu'après l'accord explicite de Nathan.
