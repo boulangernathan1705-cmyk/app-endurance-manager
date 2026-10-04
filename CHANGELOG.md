@@ -2,6 +2,12 @@
 
 Les changements du site, version par version. La plus récente est en haut.
 
+## v1.12 — 4 octobre 2026
+
+### Notifications
+- Une **cloche** à côté de ton compte te dit ce qui se passe sur les courses où tu es inscrit : un pilote s'inscrit sur ton départ, quelqu'un rejoint ou quitte ton équipage, un équipage choisit son départ, la course change d'horaires, de circuit, de durée ou de nom, ou elle est supprimée.
+- Le nombre de notifications non lues s'affiche sur la cloche ; l'ouvrir les marque comme lues, et chacune ouvre sa course. Elles sont gardées 30 jours.
+
 ## v1.11.1 — 4 octobre 2026
 
 ### Inscriptions

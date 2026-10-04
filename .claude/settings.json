@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__github__merge_pull_request",
+      "Bash(gh api -X POST repos/boulangernathan1705-cmyk/app-endurance-manager/pulls/*/ccr/ready_for_review)",
+      "Bash(gh api repos/boulangernathan1705-cmyk/app-endurance-manager/actions/runs*)"
+    ]
+  }
+}
