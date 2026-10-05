@@ -113,8 +113,8 @@ namespace EnduranceManager.SimHub
             try
             {
                 string settings = File.ReadAllText(Path.Combine(resultsDir, "..", "..", "player", "Settings.JSON"));
-                var match = Regex.Match(settings, "\"Player Name\"\\s*:\\s*\"([^\"]{1,60})\"");
-                return match.Success ? match.Groups[1].Value.Trim() : null;
+                var match = Regex.Match(settings, "\"Player Name\"\\s*:\\s*\"((?:[^\"\\\\]|\\\\.)*)\"");
+                return match.Success ? Regex.Unescape(match.Groups[1].Value).Trim() : null;
             }
             catch { return null; }
         }

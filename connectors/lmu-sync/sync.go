@@ -160,7 +160,7 @@ func send(client *http.Client, cfg config, path string) (done bool, err error) {
 	}
 }
 
-var playerPattern = regexp.MustCompile(`"Player Name"\s*:\s*"([^"]{1,60})"`)
+var playerPattern = regexp.MustCompile(`"Player Name"\s*:\s*("(?:[^"\\]|\\.)*")`)
 
 // playerName is the pilot's name in LMU (UserData\player\Settings.JSON, next to the results folder): online, every
 // driver of a results file is marked as the player, and the site finds the pilot by this name.
@@ -169,10 +169,12 @@ func playerName(resultsFile string) string {
 	if err != nil {
 		return ""
 	}
-	if match := playerPattern.FindSubmatch(data); match != nil {
-		return strings.TrimSpace(string(match[1]))
+	match := playerPattern.FindSubmatch(data)
+	var name string
+	if match == nil || json.Unmarshal(match[1], &name) != nil {
+		return ""
 	}
-	return ""
+	return strings.TrimSpace(name)
 }
 
 // sendLive sends the sessions read live from the game, kept as files until the site has them.

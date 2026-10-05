@@ -31,7 +31,7 @@ func TestFindsAndSendsResults(t *testing.T) {
 	// The pilot's name in LMU's settings goes with each file (online, every driver is marked as the player).
 	player := filepath.Join(library, "steamapps", "common", "Le Mans Ultimate", "UserData", "player")
 	os.MkdirAll(player, 0o755)
-	os.WriteFile(filepath.Join(player, "Settings.JSON"), []byte(`{"DRIVER":{"Player Name":"Nathan Boulanger","Player Nick":""}}`), 0o644)
+	os.WriteFile(filepath.Join(player, "Settings.JSON"), []byte("{\"DRIVER\":{\n    \"Player Name\": \"Zo\\u00e9 Durand\",\n    \"Player Nick\": \"\"}}"), 0o644)
 	old := time.Now().Add(-time.Minute)
 	for _, name := range []string{"a.xml", "b.xml", "notes.txt"} {
 		path := filepath.Join(results, name)
@@ -49,7 +49,7 @@ func TestFindsAndSendsResults(t *testing.T) {
 		if r.URL.Path != "/api/training/collector" || r.Header.Get("Authorization") != "Bearer key" {
 			t.Errorf("bad request %s %s", r.URL.Path, r.Header.Get("Authorization"))
 		}
-		if r.Header.Get("X-LMU-Name") != "Nathan%20Boulanger" {
+		if r.Header.Get("X-LMU-Name") != "Zo%C3%A9%20Durand" {
 			t.Errorf("player name: %q", r.Header.Get("X-LMU-Name"))
 		}
 		w.WriteHeader(status)

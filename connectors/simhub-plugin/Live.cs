@@ -84,10 +84,11 @@ namespace EnduranceManager.SimHub
             for (int i = 0; i < 4; i++)
             {
                 int w = t + 848 + i * 260;
+                // The tyre's carcass temperature, the one the game shows (the surface swings by 20 °C a corner); kelvin, as the brakes.
                 s.Wheels[i] = new Wheel
                 {
-                    Temp = (F64(b, w + 128) + F64(b, w + 136) + F64(b, w + 144)) / 3 - 273.15, Wear = F64(b, w + 152),
-                    Pressure = F64(b, w + 120), Brake = F64(b, w + 24)
+                    Temp = F64(b, w + 204) - 273.15, Wear = F64(b, w + 152),
+                    Pressure = F64(b, w + 120), Brake = F64(b, w + 24) - 273.15
                 };
             }
             return true;
@@ -166,13 +167,14 @@ namespace EnduranceManager.SimHub
         LapState lap;
         StopState stop;
         int idle;
+        bool onTrack; // out of the pit lane at least once in this session
 
         public Recorder(Func<DateTime> now, Action<LiveSession> done) { this.now = now; this.done = done; }
 
         public void Flush()
         {
             if (session != null && session.Laps.Count > 0) done(session);
-            session = null; lap = null; stop = null;
+            session = null; lap = null; stop = null; onTrack = false;
         }
 
         static double Round(double value, int digits) => Math.Round(value, digits, MidpointRounding.AwayFromZero);
@@ -205,6 +207,7 @@ namespace EnduranceManager.SimHub
             lap.TrackCount++;
             if (s.TrackLimits > lap.Limits) lap.Limits = s.TrackLimits;
             PitStop(s);
+            if (!s.InPits) onTrack = true;
             if (s.LapsDone > last.LapsDone && last.Realtime) CloseLap(s);
             last = s;
         }
@@ -240,12 +243,15 @@ namespace EnduranceManager.SimHub
         // A stop: from the pit lane entry to its exit, with the time stopped in the box and what changed meanwhile.
         void PitStop(Sample s)
         {
-            if (s.InPits && stop == null) stop = new StopState { Enter = s.ET, Before = s };
+            // Only a lane entered from the track: leaving the garage is not a stop.
+            if (s.InPits && stop == null) { if (onTrack) stop = new StopState { Enter = s.ET, Before = s }; }
             else if (s.InPits)
             {
-                if (s.PitState == 3 || (s.Speed < 1 && stop.Stopped))
+                // Stopped in the box (LMU's pit state is not reliable: 4, not 3, while serviced).
+                if (s.Speed < 1)
                 {
-                    if (!stop.Stopped) { stop.Stopped = true; stop.StopStart = s.ET; stop.Before = s; }
+                    // What changed is counted from the lane entry: the game may serve as soon as the car stops.
+                    if (!stop.Stopped) { stop.Stopped = true; stop.StopStart = s.ET; }
                     stop.StopEnd = s.ET; stop.After = s;
                 }
             }
