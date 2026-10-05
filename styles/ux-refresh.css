@@ -1155,7 +1155,7 @@ html[data-game] #app .race-header-actions > .danger-link { width: auto !importan
 /* Simulateur d'un événement : LMU, iRacing, AMS2, ACE. */
 .event-badge-row { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .event-sim-badge { --sim: #8a949a; display: inline-flex; align-items: center; padding: 2px 9px; border-radius: 999px; background: var(--sim); color: #fff; font-size: 10.5px; font-weight: 800; letter-spacing: .06em; }
-.sim-lmu { --sim: #d8322c; } .sim-iracing { --sim: #2f6fd6; } .sim-ams2 { --sim: #1f9d63; } .sim-ace { --sim: #c9861a; }
+.sim-lmu { --sim: #d8322c; } .sim-iracing { --sim: #2f6fd6; } .sim-ams2 { --sim: #e07a1f; } .sim-ace { --sim: #1f9d63; }
 .access-open { --sim: #52d3d8; } .access-safe { --sim: #f3b33d; }
 
 /* Création d'un événement : étapes courtes, choix en pastilles. */
@@ -1198,9 +1198,8 @@ html[data-game] #app .race-header-actions > .danger-link { width: auto !importan
 .solo-form-start, .solo-form-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; align-items: end; }
 .solo-form-start .departure-field { display: contents; }
 @media (max-width: 600px) { .sim-option { flex: 1 1 40%; } .sim-option span { width: 100%; } }
-/* Le liseré de couleur suit l'accès : cyan OPEN, ambre SAFE (au lieu de la couleur du type). */
-.event-card.is-solo-open, .race-header.is-solo-open { --event-accent: #52d3d8 !important; }
-.event-card.is-solo-safe, .race-header.is-solo-safe { --event-accent: #f3b33d !important; }
+/* Le liseré de couleur suit le simulateur : rouge LMU, bleu iRacing, orange AMS2, vert ACE. */
+.event-card.is-solo-open, .race-header.is-solo-open, .event-card.is-solo-safe, .race-header.is-solo-safe { --event-accent: var(--sim, #52d3d8) !important; }
 .solo-fill { display: flex; flex-direction: column; gap: 5px; min-width: 180px; }
 .solo-fill-copy { font-size: 13.5px; color: #c7d0d4; }
 .solo-fill-copy strong { color: #f4f6f5; font-size: 15px; }
