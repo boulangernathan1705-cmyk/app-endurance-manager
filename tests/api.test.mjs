@@ -481,10 +481,9 @@ test('events calendar: every simulator, typed circuit on AMS2 / ACE, no limit an
  const iracing=await req('/api/events','POST',{...input,sim:'iracing',rounds:[{circuit:'Indianapolis',durationMinutes:40,category:'GT3',car:'Ferrari 296 GT3'}]},'admin');assert.equal(iracing.status,201,'iRacing circuits and categories are typed');
  const lmu=await req('/api/events','POST',{...soloInput,sim:undefined},'admin');assert.equal(lmu.status,201);
  assert.equal((await req('/api/events','GET',null,'admin')).data.events.find(e=>e.id===lmu.data.id).sim,'lmu');
- // The community's event types, offered in the creation form.
- assert.equal((await req('/api/community/modules','PATCH',{eventTypes:[' SAFE ','Bouboule','SAFE','']},'admin')).status,200);
- assert.deepEqual((await req('/api/session','GET',null,'pilot')).data.eventTypes,['SAFE','Bouboule']);
- assert.equal((await req('/api/community/modules','PATCH',{eventTypes:['x'.repeat(21)]},'admin')).status,400);
+ // EVENT TDZ: its name and its event types are fixed (offered in the creation form).
+ const session=(await req('/api/session','GET',null,'pilot')).data;
+ assert.deepEqual(session.eventTypes,['OPEN','SAFE','Bouboule']);assert.equal(session.soloLabel,'EVENT TDZ');
 });
 test('a pilot says he will miss an event, and entering it withdraws the absence',async()=>{
  const {req,login}=harness();await login(ADMIN,'admin');await login(PILOT,'pilot');

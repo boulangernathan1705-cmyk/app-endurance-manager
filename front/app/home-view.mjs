@@ -1,4 +1,4 @@
-import {simForEvent,SIMS,isRandomCircuit} from '../../shared/catalog.mjs';
+import {simForEvent,SIMS} from '../../shared/catalog.mjs';
 import {app,nav,state,activeGame,esc,button,canManage,isAdmin,can,circuitLabel,EVENT_TYPES,CATEGORIES,eventTypeBadge,officialBadge,schedulePendingBadge,eventBadge,eventCategoryCount,circuitVisual,logo,dateLabel,countdown,groupEvents,notifyRender,notifyNav} from './core.mjs';
 import {raceRangeBlock} from './planning.mjs';
 import {dateBlock,dayLabel,timeLabel} from '../dates.mjs';
@@ -82,10 +82,10 @@ function soloCardFoot(event,archived,situation){
   const start=shown?`<span class="solo-card-start"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>${esc(timeLabel(shown.time))}${end}</span>`:'';
   return `<span class="solo-card-foot">${start}${soloFill(event,shown)}${situation?`<span class="race-situation">${situation}</span>`:''}</span>`;
 }
-// The circuit map of a solo event, only when there is one (a typed circuit or a random one has none).
+// EVENT TDZ card: no circuit map; the panel is kept for the logo of the event type (OPEN, SAFE, Bouboule…),
+// which will come later.
 function soloCircuit(event){
-  const visual=isRandomCircuit(event.circuit)?'':circuitVisual(event.circuit,true);
-  return visual?`<span class="race-card-circuit" aria-hidden="true">${visual}</span>`:'';
+  return `<span class="race-card-circuit race-card-type-logo" data-type="${esc(event.details?.type||'')}" aria-hidden="true"></span>`;
 }
 function eventCard({event,next,archived,end}){
   const registered=registeredRaceStatus(event);const displayNext=registered.next;

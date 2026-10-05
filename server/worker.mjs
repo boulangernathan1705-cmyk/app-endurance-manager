@@ -7,7 +7,7 @@ import {ingestClientError, clientErrorsApi} from './telemetry.mjs';
 import {communityRequestsApi, closeCommunityRequest} from './community-requests.mjs';
 import {trainingApi, trainingCollector, nextRace} from './training.mjs';
 import {racesPath} from './races-path.mjs';
-import {CARS, simForEvent} from '../shared/catalog.mjs';
+import {CARS, simForEvent, TDZ_EVENT_TYPES, TDZ_EVENTS_LABEL} from '../shared/catalog.mjs';
 import {currentCommunity, appearanceOf, allCommunities, communityUrl, communitySlug, communityById, communityFromRow} from './community.mjs';
 import {isDevelopment} from './dev-environment.mjs';
 import {communityAccess, requirePermission, displayRole, PERMISSIONS, DEFAULT_EVERYONE, normalizePermissions, discordGuild, keepDiscordLook, memberPermissions, refreshCommunityMembers} from './access.mjs';
@@ -15,8 +15,9 @@ import {communityAccess, requirePermission, displayRole, PERMISSIONS, DEFAULT_EV
 const soloRacesEnabled = (env, community) => community?.modules?.soloRaces === true;
 // Name of the events calendar tab, chosen by each community (« EVENT TDZ »).
 // Event types of the community calendar (« SAFE », « Bouboule »…), chosen when creating an event.
-const eventTypes = community => Array.isArray(community?.modules?.eventTypes) ? community.modules.eventTypes : [];
-const eventsLabel = community => typeof community?.modules?.eventsLabel === 'string' && community.modules.eventsLabel ? community.modules.eventsLabel : 'Événements';
+// The events module is the Tondeuz' EVENT TDZ: its name and its types are fixed.
+const eventTypes = () => TDZ_EVENT_TYPES;
+const eventsLabel = () => TDZ_EVENTS_LABEL;
 import {syncIracingEvents} from './iracing-import.mjs';
 import {resetShowcase} from './demo.mjs';
 import {syncWeeklyDiscord, sendRecapTest, usesSiteRecap, WEBHOOK_URL} from './discord-weekly.mjs';
@@ -793,12 +794,6 @@ async function api(request, env) {
     const modules = {...community.modules};
     // The Discord recap is set on the « Mise en place » page (its own webhook), not here.
     for (const key of ['iracingImport','soloRaces','raceReminders','training']) if (typeof input[key] === 'boolean') modules[key] = input[key];
-    if (typeof input.eventsLabel === 'string') { const label = input.eventsLabel.trim(); if (label.length > 20) fail(400, 'Le nom de l’onglet fait au plus 20 caractères.'); if (label) modules.eventsLabel = label; else delete modules.eventsLabel; }
-    if (Array.isArray(input.eventTypes)) {
-      const types = [...new Set(input.eventTypes.map(type => String(type ?? '').trim()).filter(Boolean))];
-      if (types.length > 12 || types.some(type => type.length > 20)) fail(400, 'Au plus 12 types de 20 caractères.');
-      if (types.length) modules.eventTypes = types; else delete modules.eventTypes;
-    }
     const statements = [];
     // Crews on Discord (server/crew-discord.mjs): only once the bot has the rights to make the channels.
     if (typeof input.crewChannels === 'boolean') {

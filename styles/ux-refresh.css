@@ -1995,3 +1995,5 @@ html[data-game] .race-card.is-solo .solo-card-start { display: inline-flex; alig
 html[data-game] .race-card.is-solo .solo-card-start svg { width: 15px; height: 15px; fill: none; stroke: #7fe3ea; stroke-width: 2; stroke-linecap: round; }
 html[data-game] .race-card.is-solo .solo-card-foot .solo-fill { flex: 1; min-width: 140px; max-width: 240px; }
 html[data-game] .race-card.is-solo .solo-card-foot .race-situation { margin-left: auto; }
+/* Panel kept for the event type logo (to come); on a phone an empty one takes no room. */
+@media (max-width: 600px) { html[data-game] .race-card .race-card-type-logo:empty { display: none; } }

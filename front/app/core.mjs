@@ -12,7 +12,7 @@ export const activeGame = globalThis.__ENDURANCE_GAME__ === 'iracing' ? 'iracing
 export const state = {
   events:[], user:null, discordReady:false, currentEventId:null, page:'home', editingEvent:null,
   access:'anonymous', permissions:[], community:null, platformDiscordUrl:null,
-  drafts:{}, busy:false, participants:[], flash:'', eventFilter:'upcoming', listFormat:'endurance', soloLabel:'Événements', eventTypes:[], soloRaces:false, training:false, trainingRace:false,
+  drafts:{}, busy:false, participants:[], flash:'', eventFilter:'upcoming', listFormat:'endurance', soloLabel:'EVENT TDZ', eventTypes:[], soloRaces:false, training:false, trainingRace:false,
   selectedDepartureId:null, eventSection:'race', pilotName:'', registrationOpen:new Set(), crewManagementOpen:new Set(),
   pendingCrewJoin:null, archiveLoaded:false, participantsLoaded:false
 };
