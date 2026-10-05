@@ -1,18 +1,16 @@
 // « Mon entraînement » (server/training.mjs): the pilot's own LMU sessions turned into a guide. The sync program sends
 // them on its own; dropping a results file here does the same by hand.
 import {shortDateLabel, timeAt} from './dates.mjs';
-import {todaySession, lapLabel, levelOf, levelBands} from '../shared/training.mjs';
+import {lapLabel} from '../shared/training.mjs';
 
 const app = document.getElementById('training-app');
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const num = (value, digits = 1) => value === null || value === undefined ? '—' : Number(value).toFixed(digits).replace('.', ',');
 const stamp = ms => `${shortDateLabel(ms)} · ${timeAt(ms)}`;
 const KINDS = {Practice1:'Essais', Practice2:'Essais', Practice3:'Essais', Practice4:'Essais', Qualify:'Qualif', Warmup:'Warm-up', Race:'Course'};
-const MINUTES = [20, 30, 45, 60, 90];
-const view = {track:null, carClass:null, minutes:readMinutes(), data:null, busy:'', simhub:'', method:'simhub',sessionsOpen:false,linkOpen:null};
+const view = {track:null, carClass:null, checklistOpen:false, data:null, busy:'', simhub:'', method:'simhub',sessionsOpen:false,linkOpen:null};
 let loadController;
 
-function readMinutes() { try { const value = Number(localStorage.getItem('training-minutes')); return MINUTES.includes(value) ? value : 30; } catch { return 30; } }
 
 async function call(path, options = {}) {
   let response;
@@ -57,7 +55,7 @@ const average = values => { const list=values.filter(v=>Number.isFinite(v)); ret
 const relative = at => { const days=Math.floor((Date.now()-at)/86400000); return days<=0?'aujourd’hui':days===1?'hier':'il y a '+days+' jours'; };
 function crewTable(data) {
   if (!data.crew) return '';
-  return '<section class="training-card preparation-crew"><h2>Où en est l’équipage</h2><div class="memo-table-wrap"><table class="memo-table"><caption>Préparation de '+esc(data.crew.name)+'</caption><thead><tr>'+['Pilote','Programme','Meilleur tour','Rythme','Niveau','Conso / tour','Dernière séance'].map(t=>'<th scope="col">'+t+'</th>').join('')+'</tr></thead><tbody>'+data.crew.pilots.map(p=>'<tr class="'+(p.you?'is-you-row':'is-pilots')+'"><th scope="row">'+esc(p.you?'Toi':p.name)+'</th><td><span class="preparation-progress" aria-hidden="true">'+p.steps.map(step=>'<i class="'+(step.done?'is-done':'')+'"></i>').join('')+'</span>'+p.steps.filter(step=>step.done).length+'/'+p.steps.length+'</td><td>'+lapLabel(p.best)+'</td><td>'+lapLabel(p.pace)+'</td><td>'+(p.level?'<span class="memo-chip">'+esc(p.level)+'</span>':'—')+'</td><td>'+(p.fuel?num(p.fuel,2)+' L':'—')+'</td><td>'+(p.last?relative(p.last.at)+'<small>'+p.last.laps+' tours</small>':'—')+'</td></tr>').join('')+'</tbody></table></div><p class="training-note">Visible seulement par les pilotes de l’équipage.</p></section>';
+  return '<section class="training-card preparation-crew"><h2>Où en est l’équipage</h2><div class="memo-table-wrap"><table class="memo-table"><caption>Préparation de '+esc(data.crew.name)+'</caption><thead><tr>'+['Pilote','Meilleur tour','Rythme','Niveau','Conso / tour','Dernière séance'].map(t=>'<th scope="col">'+t+'</th>').join('')+'</tr></thead><tbody>'+data.crew.pilots.map(p=>'<tr class="'+(p.you?'is-you-row':'is-pilots')+'"><th scope="row">'+esc(p.you?'Toi':p.name)+'</th><td>'+lapLabel(p.best)+'</td><td>'+lapLabel(p.pace)+'</td><td>'+(p.level?'<span class="memo-chip">'+esc(p.level)+'</span>':'—')+'</td><td>'+(p.fuel?num(p.fuel,2)+' L':'—')+'</td><td>'+(p.last?relative(p.last.at)+'<small>'+p.last.laps+' tours</small>':'—')+'</td></tr>').join('')+'</tbody></table></div><p class="training-note">Visible seulement par les pilotes de l’équipage.</p></section>';
 }
 function lapCard(data) {
   const a=data.analysis;
@@ -76,21 +74,11 @@ function consumption(data) {
   return '<section class="training-card"><h2>Conso et pneus</h2><dl>'+figure('Énergie / tour',energy?num(energy,2)+' %':'—',team?'équipage '+num(team,2)+' %':'')+figure('Carburant / tour',litres?num(litres,2)+' L':'—',data.game?.fuel?'jeu '+num(data.game.fuel,2)+' L':'','is-you','is-game')+figure('Usure / tour',wear!==null?num(wear,2)+' %':'—',wear!==null?'moyenne des pneus · '+(l.compounds[0].name||''):'')+figure('Relais',laps?laps+' tours':'—',l?.energyLaps?'avec 100 % d’énergie':laps?'avec un plein':'')+'</dl></section>';
 }
 
-function today(data) {
-  const plan=todaySession(data.analysis,data.steps,{minutes:view.minutes,daysLeft:data.race?daysUntil(data.race.startsAt):null});
-  const next=data.steps.find(s=>!s.done);
-  const peers=(data.crew?.pilots||[]).filter(p=>!p.you&&p.pace).sort((a,b)=>a.pace-b.pace);
-  const bands=data.reference?levelBands(data.reference):[];
-  const level=levelOf(data.analysis.median,data.reference), index=bands.findIndex(b=>b.name===level), goal=index>0?bands[index-1]:null;
-  return '<section class="training-card training-today"><h2>Séance du jour</h2><div class="preparation-session"><p class="memo-big">'+view.minutes+'<span>min · '+esc(plan.focus.toLowerCase())+'</span></p><p>'+esc(next?.advice || plan.blocks.map(b=>b.tip).join(' '))+'</p></div><div class="training-chips" role="group" aria-label="Temps disponible">'+MINUTES.map(m=>'<button type="button" data-minutes="'+m+'" aria-pressed="'+(m===view.minutes)+'">'+m+' min</button>').join('')+'</div><dl>'+figure('Ton objectif',goal?.name||level||'Construire ton rythme',goal?.to?lapLabel(goal.to)+' en course':data.analysis.median?'Garder un rythme régulier':'Ajoute ta première séance')+(peers[0]&&data.analysis.median?figure('Écart avec '+peers[0].name,(data.analysis.median-peers[0].pace>=0?'+':'')+num(data.analysis.median-peers[0].pace,3)+' s','au rythme de course'): '')+'</dl><details class="preparation-details"><summary>Déroulé de la séance</summary><ol class="training-blocks">'+plan.blocks.map(b=>'<li><strong>'+b.laps+' tours</strong><span><b>'+esc(b.title)+'</b>'+esc(b.tip)+'</span></li>').join('')+'</ol></details></section>';
+function checklist(data) {
+  const list=data.checklist;if(!list)return '';
+  const chosen=list.items.filter(item=>item.selected),done=chosen.filter(item=>item.done).length;
+  return '<section class="training-card endurance-checklist"><div class="checklist-head"><div><h2>Ma checklist endurance</h2><p>Choisis ce que tu veux travailler, dans l’ordre qui te convient.</p></div><strong>'+done+' / '+chosen.length+' faits</strong></div><p class="training-note">Les séances valident automatiquement les exercices détectables. Tu peux aussi confirmer un exercice toi-même. Tes validations restent enregistrées pour ce circuit et cette catégorie.</p><ul class="checklist-exercises">'+chosen.map(item=>'<li class="'+(item.done?'is-done':'')+'"><label class="checklist-validation"><input type="checkbox" data-exercise="'+esc(item.key)+'" data-field="manual" '+(item.done?'checked ':'')+(item.auto?'disabled ':'')+'aria-label="Valider : '+esc(item.title)+'"><span class="checklist-status">'+(item.auto?'Détecté dans tes séances':item.manual?'Validé par toi':'À travailler')+'</span></label><div><h3>'+esc(item.title)+'</h3><p>'+esc(item.tip)+'</p><small>'+esc(item.proof||'Validation : '+item.rule)+'</small></div></li>').join('')+'</ul>'+(chosen.length?'':'<p>Aucun exercice choisi. Ouvre la liste ci-dessous pour préparer ta checklist.</p>')+'<details data-fold="checklist" '+(view.checklistOpen?'open':'')+'><summary>Choisir mes exercices · '+chosen.length+' sélectionnés</summary><div class="checklist-picker">'+list.items.map(item=>'<label><input type="checkbox" data-exercise="'+esc(item.key)+'" data-field="selected" '+(item.selected?'checked':'')+'><span><strong>'+esc(item.title)+'</strong><small>'+esc(item.rule)+'</small></span></label>').join('')+'</div></details><p class="checklist-feedback" role="status">'+esc(view.checklistMessage||'')+'</p></section>';
 }
-
-function program(data) {
-  const next=data.steps.find(s=>!s.done)?.key;
-  return '<section class="training-card"><h2>Programme</h2><ol class="training-steps">'+data.steps.map((step,i)=>'<li class="'+(step.done?'is-done':'')+(step.key===next?' is-current':'')+'"><span class="training-step-mark" aria-hidden="true">'+(i+1)+'</span><div><strong>'+esc(step.title)+'</strong><p>'+esc(step.proof || (step.key==='simulation'?'Avant la course':step.key==='pit'?'À faire : arrêt aux stands':step.advice))+'</p></div><div class="preparation-marks">'+(data.crew?.pilots||[]).filter(p=>!p.you).map(p=>'<span class="preparation-initial '+(p.steps.find(s=>s.key===step.key)?.done?'is-done':'')+'" title="'+esc(p.name)+'">'+esc(p.name.slice(0,3))+'</span>').join('')+(step.auto?'':'<label class="training-tick"><input type="checkbox" data-step="'+esc(step.key)+'" '+(step.manual?'checked ':'')+(!data.track?'disabled ':'')+'aria-label="Valider : '+esc(step.title)+'"></label>')+'</div></li>').join('')+'</ol></section>';
-}
-
-
 
 // Online, every driver of a results file is marked as the player: the pilot's name in LMU tells which one he is.
 function lmuName(data) {
@@ -117,7 +105,7 @@ function sessions(data) {
 
 function render() {
   const data=view.data;
-  app.innerHTML=hero(data)+crewTable(data)+(data.analysis.totalLaps?'':'<section class="training-card training-welcome"><h2>Ta première séance</h2><p>Relie ton jeu puis roule dans Le Mans Ultimate. Tes données rempliront cette préparation.</p></section>')+'<div class="preparation-grid">'+program(data)+today(data)+lapCard(data)+consumption(data)+'</div>'+sessions(data)+'<p class="training-note training-analysis-window">Chiffres calculés sur les '+(data.analysisWindow||5)+' dernières séances du circuit et de la catégorie sélectionnés.</p><details class="training-card preparation-details" data-fold="link"'+((view.linkOpen??!data.device.linked)||data.pending||view.busy||view.simhub?' open':'')+'><summary>Liaison du jeu</summary>'+sync(data)+'</details>';
+  app.innerHTML=hero(data)+crewTable(data)+(data.analysis.totalLaps?'':'<section class="training-card training-welcome"><h2>Ta première séance</h2><p>Relie ton jeu puis roule dans Le Mans Ultimate. Tes données rempliront cette préparation.</p></section>')+checklist(data)+'<div class="preparation-grid">'+lapCard(data)+consumption(data)+'</div>'+sessions(data)+'<p class="training-note training-analysis-window">Chiffres calculés sur les '+(data.analysisWindow||5)+' dernières séances du circuit et de la catégorie sélectionnés.</p><details class="training-card preparation-details" data-fold="link"'+((view.linkOpen??!data.device.linked)||data.pending||view.busy||view.simhub?' open':'')+'><summary>Liaison du jeu</summary>'+sync(data)+'</details>';
 }
 
 
@@ -140,6 +128,14 @@ async function act(task) {
 
 app.addEventListener('change', event => {
   const target = event.target;
+  if(target.matches('[data-exercise]')) {
+    const item=view.data.checklist.items.find(item=>item.key===target.dataset.exercise),field=target.dataset.field,value=target.checked;
+    target.disabled=true;view.checklistMessage='';
+    call('/api/training/checklist',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({scope:view.data.checklist.scope,exercise:item.key,field,value})})
+      .then(()=>{item[field]=value;item.done=item.auto||item.manual;if(!item.auto)item.proof=item.manual?'Validé par toi':'';view.checklistMessage='Checklist enregistrée.';render();})
+      .catch(error=>{view.checklistMessage=error.message;render();});
+    return;
+  }
   if (target.matches('[data-track]')) { view.track = target.value; view.carClass = null; load(); }
   else if (target.matches('[data-class]')) { view.carClass = target.value; load(); }
   else if (target.matches('[data-file]')) upload(target.files);
@@ -148,8 +144,6 @@ app.addEventListener('change', event => {
 app.addEventListener('click', event => {
   const method=event.target.closest('[data-method]');
   if(method){view.method=method.dataset.method;view.linkOpen=true;render();return;}
-  const minutes = event.target.closest('[data-minutes]');
-  if (minutes) { view.minutes = Number(minutes.dataset.minutes); try { localStorage.setItem('training-minutes', String(view.minutes)); } catch {} render(); return; }
   const remove = event.target.closest('[data-delete]');
   if (remove && confirm('Supprimer cette séance ?')) act(() => call(`/api/training/sessions/${remove.dataset.delete}`, {method:'DELETE'}));
   if(event.target.closest('[data-simhub]')){view.busy='Création du code…';render();call('/api/training/sync/code',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'}).then(result=>{view.simhub=result.code;view.data.device={linked:true,lastSeen:null};view.busy='';render();}).catch(error=>{view.busy=error.message;render();});}
@@ -170,6 +164,6 @@ app.addEventListener('dragover', event => { const zone = event.target.closest('[
 app.addEventListener('dragleave', event => event.target.closest('[data-drop]')?.classList.remove('is-over'));
 app.addEventListener('drop', event => { const zone = event.target.closest('[data-drop]'); if (zone) { event.preventDefault(); upload(event.dataTransfer.files); } });
 
-app.addEventListener('toggle',event=>{if(!app.contains(event.target))return;const fold=event.target.dataset.fold;if(fold==='sessions')view.sessionsOpen=event.target.open;if(fold==='link')view.linkOpen=event.target.open;},true);
+app.addEventListener('toggle',event=>{if(!app.contains(event.target))return;const fold=event.target.dataset.fold;if(fold==='sessions')view.sessionsOpen=event.target.open;if(fold==='link')view.linkOpen=event.target.open;if(fold==='checklist')view.checklistOpen=event.target.open;},true);
 
 load();

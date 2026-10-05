@@ -304,3 +304,21 @@
 .memo-collection form{display:grid;gap:12px;margin-top:12px;max-width:620px}
 .memo-collection form label{display:grid;gap:6px}
 .memo-collection form button{justify-self:start;white-space:normal}
+.endurance-checklist{margin-bottom:16px}
+.checklist-head{display:flex;justify-content:space-between;gap:20px;align-items:start}
+.checklist-head p{margin:4px 0 0}
+.checklist-head>strong{white-space:nowrap;color:var(--memo-you)}
+.checklist-exercises{display:grid;gap:10px;list-style:none;padding:0;margin:18px 0}
+.checklist-exercises>li{display:grid;grid-template-columns:160px minmax(0,1fr);gap:18px;padding:16px;border:1px solid var(--border);border-radius:7px;background:var(--bg)}
+.checklist-exercises>li.is-done{border-color:var(--memo-you)}
+.checklist-exercises h3{margin:0 0 5px;font-size:16px}
+.checklist-exercises p{margin:0 0 8px;line-height:1.5}
+.checklist-exercises small,.checklist-picker small{color:var(--muted);line-height:1.45}
+.checklist-validation{display:flex;gap:9px;align-items:start;font-size:12px;line-height:1.5}
+.checklist-validation input,.checklist-picker input{width:20px;height:20px;flex-shrink:0;accent-color:var(--memo-you)}
+.checklist-exercises .is-done .checklist-status{color:var(--memo-you)}
+.checklist-picker{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:16px}
+.checklist-picker label{display:flex;gap:10px;padding:10px;border:1px solid var(--border);border-radius:6px;cursor:pointer}
+.checklist-picker span{display:grid;gap:4px}
+.checklist-feedback{color:var(--muted);font-size:13px}
+@media(max-width:600px){.checklist-head{display:block}.checklist-head>strong{display:block;margin-top:10px}.checklist-exercises>li{grid-template-columns:1fr;gap:10px}.checklist-picker{grid-template-columns:1fr}}

@@ -5,6 +5,7 @@ import {readFileSync, readdirSync} from 'node:fs';
 import worker from '../server/worker.mjs';
 import {refreshLaptimes, crewPreparation,refreshMemoPilot,saveLive} from '../server/training.mjs';
 import {collectMemo,collectiveMemo,restartMemo,MEMO_PERIOD} from '../server/memo-collection.mjs';
+import {checklistEvidence} from '../shared/training-checklist.mjs';
 import {BOP} from '../shared/lmu-bop.mjs';
 import {bopFor} from '../shared/bop.mjs';
 import {linkTestServer, setMember, ORGA_ROLE} from './fixtures/discord-server.mjs';
@@ -322,6 +323,43 @@ test('memo aggregates a contributor across sessions, ignores replay and bounds s
   await restartMemo(env,'Test renewal',at+1);
   await collectMemo(env,user,session(9,50),'old-cycle','spa',at+1);
   assert.equal((await collectiveMemo(env,entry,at+1)).collection.laps,0);
+});
+
+test('endurance checklist detects supported exercises without inventing night, traffic or pit exit',()=>{
+  const a={...analyse([]),totalLaps:20,longestRun:20,regularity:1.1,tankLaps:20,cleanLaps:18,fuelPerLap:2};
+  let proof=checklistEvidence(a);
+  assert.ok(proof.discover&&proof.stint&&proof.consumption);assert.equal(proof.pace,undefined);
+  a.regularity=.6;assert.ok(checklistEvidence(a).pace);
+  const wet={...LIVE,laps:Array.from({length:7},(_,i)=>liveLap(i+1,{rain:.2,pit:i===5,invalid:i===6})),stops:[{lap:7,fuel:10,ve:5,tyres:4}]};
+  proof=checklistEvidence(analyse([]),[wet]);assert.ok(proof.rain);assert.equal(proof.refuel,undefined);
+  wet.stops[0].lap=1;proof=checklistEvidence(analyse([]),[wet]);assert.ok(proof.refuel&&proof.pit);
+  for(const key of ['night','traffic','crew','simulation','start'])assert.equal(proof[key],undefined);
+});
+
+test('personal checklist selections and confirmations persist; live-only sessions auto-check without rescanning old history',async()=>{
+  const {req,login,env,DB}=harness();await login(ADMIN,'admin','Orga');await login(PILOT,'pilot','Alice');await login(MATE,'mate','Bob');
+  await req('/api/community/modules','PATCH',{training:true},'admin');
+  const user=DB.db.prepare('SELECT id FROM users WHERE name=?').get('Alice').id;
+  const wet={...LIVE,at:Date.now(),laps:Array.from({length:12},(_,i)=>liveLap(i+1,{rain:.3})),stops:[]};
+  await saveLive(env,user,JSON.stringify(wet));
+  let data=(await req('/api/training','GET',null,'pilot')).data;
+  assert.equal(data.track.circuit,'spa');assert.equal(data.analysis.totalLaps,12);
+  assert.ok(data.checklist.items.find(item=>item.key==='rain').auto);
+  assert.equal(data.checklist.items.find(item=>item.key==='rain').selected,false);
+  const scope=data.checklist.scope;
+  for(const [exercise,field,value]of [['rain','selected',true],['night','selected',true],['night','manual',true],['discover','selected',false]])
+    assert.equal((await req('/api/training/checklist','PUT',{scope,exercise,field,value},'pilot')).status,200);
+  for(let i=1;i<=6;i++)await saveLive(env,user,JSON.stringify({...wet,at:wet.at+i,laps:[liveLap(1,{rain:0})]}));
+  data=(await req('/api/training','GET',null,'pilot')).data;
+  assert.ok(data.checklist.items.find(item=>item.key==='rain').auto,'completed exercise survives the five-session analysis window');
+  assert.equal(data.checklist.items.find(item=>item.key==='discover').selected,false);
+  assert.ok(data.checklist.items.find(item=>item.key==='night').manual);
+  const other=(await req('/api/training','GET',null,'mate')).data;
+  assert.ok(!other.checklist.items.some(item=>item.manual||item.auto),'private checklist is isolated by user');
+  assert.equal((await req('/api/training/checklist','PUT',{scope,exercise:'night',field:'manual',value:false},'pilot')).status,200);
+  data=(await req('/api/training','GET',null,'pilot')).data;assert.equal(data.checklist.items.find(item=>item.key==='night').done,false);
+  assert.equal((await req('/api/training/checklist','PUT',{scope,exercise:'bad',field:'manual',value:true},'pilot')).status,400);
+  assert.equal((await req('/api/training/checklist','PUT',{scope,exercise:'rain',field:'auto',value:true},'pilot')).status,400);
 });
 
 test('a stop takes the game’s time: tyres, ducts and brakes after, fuel, energy, wing and driver at the same time', () => {
