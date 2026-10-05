@@ -17,12 +17,11 @@ export function accessBadge(event) {
   return `<span class="event-badge-row">${simBadge(event)}<span class="event-access-badge ${safe ? 'is-safe' : 'is-open'}" title="${safe ? 'Réservé aux pilotes SAFE' : 'Ouvert à tous les pilotes connectés'}">${safe ? 'SAFE' : 'OPEN'}</span></span>`;
 }
 
-// Circuit of an event: from its simulator's catalog (LMU, iRacing), or as typed (AMS2, ACE).
+// Circuit of an event: from the catalog (LMU, older iRacing events), or as typed (AMS2, iRacing, ACE).
 export function eventCircuitName(event, id) {
-  const catalog = simCatalog(simForEvent(event));
-  if (!catalog) return String(id || '') || 'Circuit à préciser';
-  const circuit = catalog.circuits.find(item => item.id === id);
-  return circuit ? (circuit.random ? 'Circuit aléatoire' : circuit.name) : 'Circuit à préciser';
+  const sim = simForEvent(event), circuit = simCatalog(sim)?.circuits.find(item => item.id === id);
+  if (circuit) return circuit.random ? 'Circuit aléatoire' : circuit.name;
+  return (sim !== 'lmu' && id) || 'Circuit à préciser';
 }
 
 // "Circuit de Spa-Francorchamps · 20 min + Circuit aléatoire · 20 min"
@@ -89,13 +88,13 @@ export function renderSoloEntries(event, departure) {
   return `<section class="solo-participants"><h3 class="solo-subtitle">Participants <span class="count-pill">${grid.length}${event.capacity ? ` / ${event.capacity}` : ''}</span></h3>${gridList}${waitingList}</section>`;
 }
 
-export const WEATHERS = [['','—'],['random','Aléatoire'],['sun','Soleil'],['cloud','Nuageux'],['rain','Pluie']];
+export const WEATHERS = [['random','❓','Aléatoire'],['sun','☀️','Soleil'],['cloud','⛅','Nuageux'],['overcast','☁️','Couvert'],['rain','🌧️','Pluie']];
 // « P5/Q10/C40 »: the session lengths of a round.
 export function roundFormat(round) {
   return [round.practice ? `P${round.practice}` : '', round.qualifying ? `Q${round.qualifying}` : '', `C${round.durationMinutes}`].filter(Boolean).join('/');
 }
 export function roundExtras(round) {
-  const weather = WEATHERS.find(([value]) => value && value === round.weather)?.[1];
+  const weather = WEATHERS.find(([value]) => value === round.weather)?.[1];
   return [weather, round.fuel != null ? `essence ×${round.fuel}` : '', round.tyres != null ? `pneus ×${round.tyres}` : ''].filter(Boolean).join(' · ');
 }
 // What the community's calendar shows: the end of an open session, the server password, the note, and per
@@ -105,7 +104,7 @@ export function soloEventInfo(event, departure = event.departures?.[0]) {
   const rows = [];
   if (details.endTime && departure) rows.push(['Horaire', `${departure.time}-${details.endTime}`]);
   if (details.password) rows.push(['Mot de passe', details.password]);
-  rounds.forEach((round, index) => rows.push([rounds.length > 1 ? `Manche ${index + 1}` : 'Manche', [eventCircuitName(event, round.circuit), (round.categories || []).join(' '), roundFormat(round), roundExtras(round)].filter(Boolean).join(' · ')]));
+  rounds.forEach((round, index) => rows.push([rounds.length > 1 ? `Manche ${index + 1}` : 'Manche', [eventCircuitName(event, round.circuit), (round.categories || []).join(' ') || round.category, round.car, roundFormat(round), roundExtras(round)].filter(Boolean).join(' · ')]));
   if (details.note) rows.push(['Info', details.note]);
   return `<dl class="solo-event-info">${rows.map(([label, value]) => `<div><dt>${esc(label)}</dt><dd>${esc(value)}</dd></div>`).join('')}</dl>`;
 }

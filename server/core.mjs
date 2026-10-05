@@ -1,4 +1,4 @@
-import {CATEGORIES, EVENT_TYPE_IDS as EVENT_TYPES, CIRCUIT_IDS as CIRCUITS, CARS, SIM_IDS, simCatalog, simForEvent} from '../shared/catalog.mjs';
+import {CATEGORIES, EVENT_TYPE_IDS as EVENT_TYPES, CIRCUIT_IDS as CIRCUITS, CARS, SIM_IDS, eventCatalog, simForEvent} from '../shared/catalog.mjs';
 const LEGACY_CAR_ALIASES = new Map([
   ['BMW M Hybrid V8 Evo (2026)','BMW M Hybrid V8'],['Cadillac V-Series.R Evo (2026)','Cadillac V-Series.R'],['Peugeot 9X8 2023','Peugeot 9X8'],['Peugeot 9X8 2024','Peugeot 9X8'],['Toyota TR010 Hybrid (2026)','Toyota GR010 Hybrid'],['Ginetta G61-LT-P3 Evo','Ginetta G61-LT-P3'],['Ferrari 488 GTE Evo','Ferrari 488 GTE'],['Aston Martin Vantage AMR LMGT3 Evo','Aston Martin Vantage AMR LMGT3'],['BMW M4 LMGT3 Evo','BMW M4 LMGT3'],['Ferrari 296 LMGT3 Evo','Ferrari 296 LMGT3'],['Ford Mustang LMGT3 Evo','Ford Mustang LMGT3'],['Lamborghini Huracán LMGT3 Evo 2','Lamborghini Huracán LMGT3'],['McLaren 720S LMGT3 Evo','McLaren 720S LMGT3'],['Porsche 911 LMGT3 R (992)','Porsche 911 GT3 R LMGT3'],['Porsche 911 LMGT3 R (992) 2026','Porsche 911 GT3 R LMGT3']
 ]);
@@ -183,10 +183,10 @@ function parisTimestamp(date, time) {
 }
 const EVENT_FORMATS = ['endurance','solo'];
 const SOLO_ACCESS = ['open','safe'];
-const WEATHERS = ['random','sun','cloud','rain'];
+const WEATHERS = ['random','sun','cloud','overcast','rain'];
 // An event of the calendar (solo format): a simulator, one to four rounds (circuit and duration in minutes),
-// one start, an optional number of places and an OPEN / SAFE access. LMU and iRacing circuits come from
-// the catalog and categories may be offered; on the other simulators the circuit is typed, no category.
+// one start, an optional number of places and an OPEN / SAFE access. LMU circuits and categories come from
+// the catalog; on the other simulators the circuit, category and car are typed.
 function validateSoloRace(input, existing) {
   const access = input.access == null ? (existing?.access || 'open') : input.access;
   if (!SOLO_ACCESS.includes(access)) fail(400, 'Choisis l’accès OPEN ou SAFE.');
@@ -194,7 +194,7 @@ function validateSoloRace(input, existing) {
   if (!Array.isArray(rounds) || rounds.length < 1 || rounds.length > 4) fail(400, 'Un événement a de une à quatre manches.');
   const sim = input.sim == null ? (existing ? simForEvent(existing) : simForEvent({circuit:rounds[0]?.circuit})) : input.sim;
   if (!SIM_IDS.includes(sim)) fail(400, 'Choisis le simulateur.');
-  const catalog = simCatalog(sim);
+  const catalog = eventCatalog(sim);
   const cleanRounds = rounds.map((round, index) => {
     const where = rounds.length > 1 ? ` de la manche ${index + 1}` : '';
     const circuit = catalog ? (typeof round?.circuit === 'string' ? round.circuit : '') : text(round?.circuit, 60, `Circuit${where}`);
@@ -218,6 +218,11 @@ function validateSoloRace(input, existing) {
       extras[key] = value;
     }
     if (round.weather) { if (!WEATHERS.includes(round.weather)) fail(400, `Météo${where} invalide.`); extras.weather = round.weather; }
+    // Simulators without a catalog: the category and the car are typed.
+    if (!catalog) {
+      if (round.category) extras.category = text(round.category, 40, `Catégorie${where}`);
+      if (round.car) extras.car = text(round.car, 60, `Voiture${where}`);
+    }
     return {circuit, durationMinutes, categories:[...new Set(roundCategories)], ...extras};
   });
   const capacity = input.capacity == null || input.capacity === '' ? null : Number(input.capacity);

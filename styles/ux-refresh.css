@@ -1161,6 +1161,12 @@ html[data-game] #app .race-header-actions > .danger-link { width: auto !importan
 .solo-event-form .solo-form-step { display: grid; gap: 18px; }
 .solo-event-form .solo-form-step[hidden] { display: none; }
 .solo-event-form .solo-rounds { display: grid; gap: 12px; }
+.solo-weather-row { display: flex; gap: 6px; flex-wrap: wrap; }
+.solo-weather-chip { position: relative; cursor: pointer; }
+.solo-weather-chip input { position: absolute; opacity: 0; pointer-events: none; }
+.solo-weather-chip span[aria-hidden] { display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 42px; border: 1px solid var(--border, #2b3236); border-radius: 8px; background: var(--panel2, #12171a); font-size: 22px; filter: grayscale(.7); opacity: .6; }
+.solo-weather-chip input:checked + span { filter: none; opacity: 1; border-color: #52d3d8; box-shadow: inset 0 -3px #52d3d8; }
+.solo-weather-chip input:focus-visible + span { outline: 2px solid #52d3d8; outline-offset: 2px; }
 .solo-event-info { display: grid; gap: 4px; margin: 0; font-size: 13.5px; }
 .solo-event-info div { display: flex; gap: 10px; }
 .solo-event-info dt { min-width: 96px; color: var(--muted, #9aa5aa); font-weight: 700; }
@@ -1170,6 +1176,7 @@ html[data-game] #app .race-header-actions > .danger-link { width: auto !importan
 .solo-event-form .solo-round-title { color: #7fe3ea; font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; }
 .solo-event-form .solo-round-head [data-remove-round][hidden] { display: none; }
 .solo-event-form .solo-round-format { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.solo-event-form fieldset.solo-weather { margin: 0; }
 .solo-event-form .solo-round-categories { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
 .solo-category-chip { position: relative; display: inline-flex; align-items: center; justify-content: center; min-width: 56px; min-height: 44px; padding: 4px 8px; border: 1px solid var(--border, #2b3236); border-radius: 8px; background: var(--panel2, #12171a); cursor: pointer; opacity: .55; }
 .solo-category-chip input { position: absolute; opacity: 0; pointer-events: none; }
