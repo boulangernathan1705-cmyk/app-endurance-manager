@@ -4,7 +4,7 @@ import {durationLabel,eventMinutes} from '../../shared/duration.mjs';
 import {app,state,esc,button,canManage,isAdmin,can,canEditRace,officialBadge,communityTag,circuitLabel,eventTypeBadge,schedulePendingBadge,eventBadge,eventCategoryCount,circuitVisual,pilotCount,countdown,notifyRender} from './core.mjs';
 import {ownRegistration,renderRegistrationWorkspace,soloRounds} from './registration.mjs';
 import {renderPilots} from './crews.mjs';
-import {isSolo,accessBadge,soloCardMeta,soloCardInfo,soloEventDetails,roundTiles,roundPilots,categoryCell,carCell,eventCircuitName,soloFill,soloEntryBlock,myWaitlistPosition,renderSoloEntries} from './solo.mjs';
+import {isSolo,accessBadge,soloCardMeta,soloCardInfo,soloEventDetails,roundTiles,roundPilots,soloEntryList,eventCircuitName,soloFill,soloEntryBlock,myWaitlistPosition,renderSoloEntries} from './solo.mjs';
 import {renderHome,raceDateBlock,raceStarts} from './home-view.mjs';
 import {planningDays,renderPlanning,syncPlanning,CHEVRON} from './planning.mjs';
 
@@ -110,12 +110,7 @@ function roundQuick(event,departure,index){
   return register||absence||more?`<span class="planning-quick">${register}${absence}${more}</span>`:'';
 }
 function roundEntries(event,departure,index){
-  const entries=(departure.availability||[]).filter(reg=>reg.status!=='unavailable'&&!reg.roundChoices?.[index]?.skip);
-  const grid=entries.filter(reg=>!reg.waitlistPosition),waiting=entries.filter(reg=>reg.waitlistPosition);
-  const random=event.rounds[index]?.randomCategory;
-  const row=(reg,rank)=>{const choice=reg.roundChoices?.[index]||{category:reg.category,cars:reg.cars,carAny:reg.carAny};
-    return `<li class="solo-entry${reg.mine?' is-mine':''}"><span class="solo-entry-rank">${rank}</span><strong class="solo-entry-name">${esc(reg.name)}</strong>${!random&&choice.category?`${categoryCell(choice.category)}<span class="solo-entry-car">${carCell(choice)}</span>`:''}</li>`;};
-  return `<section class="solo-participants"><h3 class="solo-subtitle">Pilotes <span class="count-pill">${grid.length}</span></h3>${grid.length?`<ol class="solo-entries">${grid.map((reg,i)=>row(reg,i+1)).join('')}</ol>`:'<p class="empty">Aucun inscrit pour l’instant.</p>'}${waiting.length?`<h3 class="solo-subtitle">Liste d’attente <span class="count-pill">${waiting.length}</span></h3><ol class="solo-entries is-waiting">${waiting.map(reg=>row(reg,reg.waitlistPosition)).join('')}</ol>`:''}</section>`;
+  return soloEntryList(event,departure,(departure.availability||[]).filter(reg=>reg.status!=='unavailable'&&!reg.roundChoices?.[index]?.skip),{round:index});
 }
 function roundCards(event,departure){
   const rounds=event.rounds||[];

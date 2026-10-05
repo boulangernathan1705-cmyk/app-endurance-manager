@@ -127,14 +127,6 @@ export function soloFill(event, departure = event.departures?.[0]) {
   return `<span class="solo-fill${full ? ' is-full' : ''}"><span class="solo-fill-copy"><strong>${confirmed}${capacity ? ` / ${capacity}` : ''}</strong> ${confirmed > 1 ? 'inscrits' : 'inscrit'}${waiting ? ` · <em>${waiting} en attente</em>` : ''}${full && !waiting ? ' · <em>complet</em>' : ''}</span><span class="solo-fill-bar" aria-hidden="true"><span style="width:${Math.round(ratio * 100)}%"></span></span></span>`;
 }
 
-export function categoryCell(category) {
-  if (category === ANY_CATEGORY) return '<span class="solo-any-category">Peu importe</span>';
-  return `<span class="solo-category ${categories[category]?.css || ''}">${logo(category)}<span>${esc(category)}</span></span>`;
-}
-export function carCell(reg) {
-  if (reg.carAny || !(reg.cars || []).length) return '<span class="solo-muted">Peu importe</span>';
-  return esc(reg.cars.join(', '));
-}
 
 // Why the driver cannot enter, or '' when they can.
 export function soloEntryBlock(event) {
@@ -148,28 +140,29 @@ export function myWaitlistPosition(departure) {
   return (departure.availability || []).find(reg => reg.mine && reg.waitlistPosition)?.waitlistPosition || null;
 }
 
-// Category and car of each round (two-round races), or of the race.
-function choicesCell(event, reg) {
-  if (!reg.category && !reg.roundChoices?.length) return '';
-  // A round with nothing to choose (random or typed category) shows just « ✓ ».
-  const rounds = event.rounds || [];
-  const choices = reg.roundChoices?.length ? reg.roundChoices : [{category:reg.category, cars:reg.cars, carAny:reg.carAny}];
-  if (rounds.length > 1 && !reg.roundChoices?.length) return '';
-  if (rounds.length < 2) return `${categoryCell(choices[0].category)}<span class="solo-entry-car">${carCell(choices[0])}</span>`;
-  return `<span class="solo-entry-rounds">${choices.map((choice, index) => `<span class="solo-entry-round${choice?.skip ? ' is-skipped' : ''}"><em>M${index + 1}</em>${choice?.skip ? '<span class="solo-muted">Ne la fait pas</span>' : !choice?.category || rounds[index]?.randomCategory ? '<span class="solo-any-category">Aléatoire</span>' : `${categoryCell(choice.category)}<span class="solo-entry-car">${carCell(choice)}</span>`}</span>`).join('')}</span>`;
-}
 
 // Participants of a solo race: the grid, then the waiting list, in order of arrival.
 export function renderSoloEntries(event, departure) {
   const {entries} = soloCounts(event, departure);
-  const row = (reg, index) => {
-    const edit = reg.canEdit && departure.startsAt > Date.now() && reg.managed ? button('edit-registration', 'Modifier', `data-id="${reg.id}" data-departure="${departure.id}" aria-label="Modifier l’inscription de ${esc(reg.name)}"`, 'link-button') : '';
-    return `<li class="solo-entry${reg.mine ? ' is-mine' : ''}"><span class="solo-entry-rank">${reg.waitlistPosition ? `${reg.waitlistPosition}` : index + 1}</span><strong class="solo-entry-name">${esc(reg.name)}</strong>${choicesCell(event, reg)}${edit}</li>`;
-  };
+  return soloEntryList(event, departure, entries, {title: 'Participants', capacity: event.capacity});
+}
+// The pilots of a solo event (or of one of its rounds): by category, in the order of the round (« Peu importe »
+// last), and in each category in the order they entered; small cards, the category only (no car).
+const EDIT_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4ZM14 6l4 4"/></svg>';
+export function soloEntryList(event, departure, entries, {round = 0, title = 'Pilotes', capacity = null} = {}) {
+  const current = (event.rounds || [])[round] || {}, order = current.randomCategory ? [] : current.categories?.length ? current.categories : event.categories || [];
+  const categoryOf = reg => current.randomCategory ? '' : (reg.roundChoices?.[round]?.category ?? reg.category) || '';
+  const edit = reg => reg.canEdit && departure.startsAt > Date.now() && reg.managed ? `<button type="button" class="solo-entry-edit" data-action="edit-registration" data-id="${reg.id}" data-departure="${departure.id}" data-tip="Modifier" aria-label="Modifier l’inscription de ${esc(reg.name)}">${EDIT_ICON}</button>` : '';
+  const pill = (reg, rank, withLogo) => `<li class="solo-entry${reg.mine ? ' is-mine' : ''}"><span class="solo-entry-rank">${rank}</span><strong class="solo-entry-name">${esc(reg.name)}</strong>${withLogo && categoryOf(reg) && categoryOf(reg) !== ANY_CATEGORY ? `<span class="solo-entry-logo" title="${esc(categoryOf(reg))}">${logo(categoryOf(reg))}</span>` : ''}${edit(reg)}</li>`;
   const grid = entries.filter(reg => !reg.waitlistPosition), waiting = entries.filter(reg => reg.waitlistPosition);
-  const gridList = grid.length ? `<ol class="solo-entries">${grid.map(row).join('')}</ol>` : '<p class="empty">Aucun inscrit pour l’instant.</p>';
-  const waitingList = waiting.length ? `<h3 class="solo-subtitle">Liste d’attente <span class="count-pill">${waiting.length}</span></h3><p class="solo-help">Le premier en attente prend automatiquement la place d’un pilote qui se désinscrit.</p><ol class="solo-entries is-waiting">${waiting.map(row).join('')}</ol>` : '';
-  return `<section class="solo-participants"><h3 class="solo-subtitle">Participants <span class="count-pill">${grid.length}${event.capacity ? ` / ${event.capacity}` : ''}</span></h3>${gridList}${waitingList}</section>`;
+  const keys = [...order, ANY_CATEGORY, ''];
+  const groups = keys.map(key => [key, grid.filter(reg => (keys.includes(categoryOf(reg)) ? categoryOf(reg) : '') === key)]).filter(([, list]) => list.length);
+  const head = key => key === ANY_CATEGORY ? '<span class="solo-entry-group-head"><span class="solo-any-logo" aria-hidden="true">✱</span>Peu importe' : `<span class="solo-entry-group-head ${categories[key]?.css || ''}">${logo(key)}${esc(key)}`;
+  const gridList = !grid.length ? '<p class="empty">Aucun inscrit pour l’instant.</p>'
+    : groups.length === 1 && !groups[0][0] ? `<ol class="solo-entries">${grid.map((reg, index) => pill(reg, index + 1, false)).join('')}</ol>`
+    : `<div class="solo-entry-groups">${groups.map(([key, list]) => `<div class="solo-entry-group">${key ? `${head(key)}<em>${list.length}</em></span>` : ''}<ol class="solo-entries">${list.map((reg, index) => pill(reg, index + 1, false)).join('')}</ol></div>`).join('')}</div>`;
+  const waitingList = waiting.length ? `<h3 class="solo-subtitle">Liste d’attente <span class="count-pill">${waiting.length}</span></h3><ol class="solo-entries is-waiting">${waiting.map(reg => pill(reg, reg.waitlistPosition, true)).join('')}</ol>` : '';
+  return `<section class="solo-participants"><h3 class="solo-subtitle">${title} <span class="count-pill">${grid.length}${capacity ? ` / ${capacity}` : ''}</span></h3>${gridList}${waitingList}</section>`;
 }
 
 export const WEATHERS = [['random','❓','Aléatoire'],['sun','☀️','Soleil'],['cloud','⛅','Nuageux'],['overcast','☁️','Couvert'],['rain','🌧️','Pluie']];

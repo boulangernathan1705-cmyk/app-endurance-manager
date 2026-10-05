@@ -29,7 +29,6 @@ function validateRegistrationStep(draft,step){
     if(!choice||choice.skip)return;
     const where=draft.solo>1?` pour la manche ${step}`:'';
     if(!choice.category)throw Error(`Choisis une catégorie${where}.`);
-    if(choice.category!=='*'&&!choice.carAny&&!choice.cars.length)throw Error(`Choisis au moins une voiture${where}, ou « Peu importe la voiture ».`);
     return;
   }
   if(step===1){
@@ -140,7 +139,7 @@ async function perform(action,target){
       rerenderRegistrationSection(event,departure,`[data-action="availability"][data-value="${value}"]`,renderEvent); break;
     }
     case 'solo-skip': { const departure=event.departures.find(item=>item.id===target.dataset.departure),draft=draftFor(departure),choice=draft.choices?.[Number(target.dataset.round)]; if(!choice)break; choice.skip=target.dataset.value==='1'; rerenderRegistrationSection(event,departure,'',renderEvent); break; }
-    case 'solo-category': { const departure=event.departures.find(item=>item.id===target.dataset.departure),draft=draftFor(departure),choice=draft.choices?.[Number(target.dataset.round)]; if(!choice)break; choice.category=target.dataset.value; choice.cars=choice.cars.filter(car=>CARS[choice.category]?.includes(car)); choice.carAny=choice.category==='*'; rerenderRegistrationSection(event,departure,'',renderEvent); break; }
+    case 'solo-category': { const departure=event.departures.find(item=>item.id===target.dataset.departure),draft=draftFor(departure),choice=draft.choices?.[Number(target.dataset.round)]; if(!choice)break; choice.category=target.dataset.value; choice.cars=[]; choice.carAny=true; rerenderRegistrationSection(event,departure,'',renderEvent); break; }
     case 'category': { const departure=event.departures.find(item=>item.id===target.dataset.departure),draft=draftFor(departure); draft.category=target.dataset.value; draft.cars=(draft.cars||[]).filter(car=>CARS[draft.category]?.includes(car)); draft.carAny=false; rerenderRegistrationSection(event,departure,'',renderEvent); break; }
     case 'delete-registration': { state.pendingCrewJoin=null; const departure=event.departures.find(item=>item.id===target.dataset.departure),reg=departure.availability.find(item=>item.id===target.dataset.id); if(!reg)throw Error('Inscription introuvable.'); if(!confirm(`Supprimer l’inscription de ${reg.name} pour ce départ ?${inCommunity()}`))return; await api(`/api/registrations/${reg.id}`,'DELETE',{version:reg.version}); delete state.drafts[departure.id]; state.registrationOpen.delete(departure.id); await refreshAfterSave('Inscription supprimée.'); break; }
     case 'join-crew': {

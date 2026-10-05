@@ -1,5 +1,4 @@
 import {isSolo,ANY_CATEGORY,soloCounts,eventCircuitName} from './solo.mjs';
-import {simCatalog,simForEvent} from '../../shared/catalog.mjs';
 import {raceHourLabel,raceEndLabel} from '../timeline.mjs';
 import {shortDateLabel,timeLabel} from '../dates.mjs';
 import {durationLabel,eventMinutes,driverChangeRequired} from '../../shared/duration.mjs';
@@ -148,21 +147,16 @@ function initSoloDraft(event,departure,stateDraft){
     const mine=stateDraft.id?(departure.availability||[]).find(reg=>reg.id===stateDraft.id):null;
     const saved=mine?.roundChoices?.length?mine.roundChoices:mine?[{category:mine.category,cars:mine.cars||[],carAny:mine.carAny}]:[];
     // A round with a single category has it chosen already.
-    stateDraft.choices=rounds.map((round,index)=>saved[index]?.skip?{skip:true,category:ANY_CATEGORY,cars:[],carAny:true}:saved[index]&&round.categories.length?{...saved[index],cars:[...(saved[index].cars||[])]}:!round.categories.length?{category:ANY_CATEGORY,cars:[],carAny:true}:{category:round.categories.length===1?round.categories[0]:'',cars:[],carAny:false});
+    stateDraft.choices=rounds.map((round,index)=>saved[index]?.skip?{skip:true,category:ANY_CATEGORY,cars:[],carAny:true}:saved[index]&&round.categories.length?{...saved[index],cars:[...(saved[index].cars||[])]}:!round.categories.length?{category:ANY_CATEGORY,cars:[],carAny:true}:{category:round.categories.length===1?round.categories[0]:'',cars:[],carAny:true});
   }
   return rounds;
-}
-function soloCarChoices(event,departure,index,choice){
-  const cars=simCatalog(simForEvent(event))?.cars[choice.category]||CARS[choice.category]||[];
-  return `<fieldset class="car-preference-panel"><legend class="form-label">Voiture(s) souhaitée(s)</legend><label class="car-any-option" data-tip="Tu t’adaptes à la voiture que choisira ton équipage."><input type="checkbox" data-solo-round="${index}" data-solo-field="carAny" data-departure="${departure.id}" ${choice.carAny?'checked':''}><span>Peu importe la voiture</span></label><div class="car-preference-grid">${cars.map(car=>`<label class="car-preference-option"><input type="checkbox" data-solo-round="${index}" data-solo-field="car" data-departure="${departure.id}" value="${esc(car)}" ${choice.cars.includes(car)&&!choice.carAny?'checked':''} ${choice.carAny?'disabled':''}><span>${esc(car)}</span></label>`).join('')}</div></fieldset>`;
 }
 function soloChoiceLabel(choice,round){
   if(choice?.skip)return 'Ne fait pas cette manche';
   if(round&&!round.categories.length)return round.randomCategory?'Je la fais · catégorie aléatoire':'Je la fais';
   if(!choice?.category)return '—';
   if(choice.category===ANY_CATEGORY)return 'Peu importe';
-  const car=choice.carAny||!choice.cars.length?'voiture : peu importe':esc(choice.cars.join(', '));
-  return `${logo(choice.category)} ${esc(choice.category)} · ${car}`;
+  return `${logo(choice.category)} ${esc(choice.category)}`;
 }
 function renderSoloStepper(event,departure,stateDraft){
   const rounds=initSoloDraft(event,departure,stateDraft),total=rounds.length+1;
@@ -187,7 +181,8 @@ function renderSoloStepper(event,departure,stateDraft){
     if(choice.skip)return pane(index+1,`${index===0?communityLine(event,departure,stateDraft)+identity:''}${heading}<p class="registration-step-help">${stateDraft.forOther?'Ce pilote ne fait pas':'Tu ne fais pas'} cette manche.</p>`);
     // Random circuit and category: nothing to choose for this round.
     if(!round.categories.length)return pane(index+1,`${index===0?communityLine(event,departure,stateDraft)+identity:''}${heading}${round.randomCategory?'<p class="registration-step-help">Circuit et catégorie aléatoires : rien à choisir pour cette manche.</p>':''}`);
-    const cars=choice.category===ANY_CATEGORY?'<p class="registration-step-help">Catégorie « Peu importe » : la voiture est libre aussi.</p>':choice.category?soloCarChoices(event,departure,index,choice):'';
+    // Solo event: the category only, the car does not matter.
+    const cars='';
     return pane(index+1,`${index===0?communityLine(event,departure,stateDraft)+identity:''}${heading}${single?`<p class="solo-single-category">${logo(round.categories[0])}<strong>${esc(round.categories[0])}</strong></p>`:`<div class="category-area"><span class="form-label">Dans quelle catégorie ${stateDraft.forOther?'ce pilote veut-il':'veux-tu'} rouler ?</span><div class="categories registration-category-list">${buttons}</div></div>`}${cars}`);
   };
   const summaryRow=(n,label,value)=>`<button type="button" class="registration-summary-row" data-action="registration-step" data-departure="${departure.id}" data-step="${n}" data-edit="true"><span>${label}</span><strong>${value}</strong><em>Modifier</em></button>`;
@@ -292,7 +287,7 @@ export async function submitRegistration(form,api) {
   if(draft.soloEvent){
     // Solo race: one category / car choice per round.
     if(draft.choices.length&&draft.choices.every(choice=>choice.skip))throw Error('Choisis au moins une manche.');
-    const payload={name:draft.name,choices:draft.choices.map(choice=>choice.skip?{skip:true}:({category:choice.category,cars:choice.carAny?[]:choice.cars,carAny:choice.category===ANY_CATEGORY||choice.carAny||!choice.cars.length})),version:draft.version,participantId:draft.participantId,participantUserId:draft.participantUserId,forOther:!!draft.forOther,...entryCommunity(draft)};
+    const payload={name:draft.name,choices:draft.choices.map(choice=>choice.skip?{skip:true}:({category:choice.category,cars:[],carAny:true})),version:draft.version,participantId:draft.participantId,participantUserId:draft.participantUserId,forOther:!!draft.forOther,...entryCommunity(draft)};
     const result=await api(draft.id?`/api/registrations/${draft.id}`:`/api/races/${event.id}/departures/${departure.id}/registrations`,draft.id?'PATCH':'POST',payload);
     if(!draft.forOther){state.pilotName=draft.name;try{localStorage.setItem('em_pilot_name',state.pilotName);}catch{}}
     delete state.drafts[departureId]; state.registrationOpen.delete(departureId); return result;
@@ -328,7 +323,7 @@ export async function enterRound(event,departure,index,api){
   }
   // Categories to choose: the registration opens on this round.
   const draft=own?registrationDraft(own):{name:'',status:'',preferredPilot:'',forOther:false,participantUserId:null,category:'',cars:[],carAny:false,id:null,version:null};
-  choices[index]={category:rounds[index].categories.length===1?rounds[index].categories[0]:'',cars:[],carAny:false};
+  choices[index]={category:rounds[index].categories.length===1?rounds[index].categories[0]:'',cars:[],carAny:true};
   state.drafts[departure.id]={...draft,choices,step:index+1};
   state.registrationOpen.add(departure.id);
   return false;
