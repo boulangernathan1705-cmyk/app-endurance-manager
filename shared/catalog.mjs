@@ -148,6 +148,20 @@ export function gridSizeFor(circuitId) {
   return String(circuitId || '').startsWith('iracing-') ? 40 : 38;
 }
 export function gameForEvent(event) { return String(event?.circuit || '').startsWith('iracing-') ? 'iracing' : 'lmu'; }
+// Simulators of the events calendar (solo format).
+export const SIMS = [
+  {id:'lmu',name:'Le Mans Ultimate',short:'LMU'},
+  {id:'iracing',name:'iRacing',short:'iRacing'},
+  {id:'ams2',name:'Automobilista 2',short:'AMS2'},
+  {id:'ace',name:'Assetto Corsa EVO',short:'ACE'}
+];
+export const SIM_IDS = SIMS.map(sim => sim.id);
+// Older events have no simulator saved: it follows their circuit.
+export function simForEvent(event) { return SIM_IDS.includes(event?.sim) ? event.sim : gameForEvent(event); }
+export function simCatalog(sim) { return GAME_IDS.includes(sim) ? GAME_CATALOGS[sim] : null; }
+// Events of the calendar: only LMU picks its circuits and categories from the site's lists; on the other
+// simulators (AMS2, iRacing, ACE) the circuit, category and car are typed.
+export function eventCatalog(sim) { return sim === 'lmu' ? GAME_CATALOGS.lmu : null; }
 export const LEGACY_CIRCUIT_IDS = ['nurburgring'];
 export const EVENT_TYPE_IDS = Object.keys(SHARED_EVENT_TYPES);
 const browserGame = GAME_IDS.includes(globalThis?.__ENDURANCE_GAME__) ? globalThis.__ENDURANCE_GAME__ : 'lmu';

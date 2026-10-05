@@ -19,10 +19,10 @@ function renderError(message) {
 }
 
 // What each permission means (server/access.mjs, PERMISSIONS).
-const PERMISSION_LABELS = {endurance:'Endurances', solo_open:'Courses solo OPEN', solo_safe:'Courses solo SAFE',
+const PERMISSION_LABELS = {endurance:'Endurances', solo_open:'Événements OPEN', solo_safe:'Événements SAFE',
   manage_registrations:'Gérer les inscriptions', create_race:'Créer des courses', manage_races:'Gérer toutes les courses', admin:'Administrer'};
 const PERMISSION_HELP = {endurance:'S’inscrire aux endurances, rejoindre, créer et gérer son équipage.',
-  solo_open:'S’inscrire aux courses solo OPEN.', solo_safe:'S’inscrire aux courses solo SAFE (et OPEN).',
+  solo_open:'S’inscrire aux événements OPEN.', solo_safe:'S’inscrire aux événements SAFE (et OPEN).',
   manage_registrations:'Inscrire, modifier ou retirer n’importe quel pilote, composer tous les équipages.',
   create_race:'Créer des courses, modifier et supprimer les siennes.', manage_races:'Modifier et supprimer toutes les courses, y compris celles importées d’iRacing.',
   admin:'Page Membres et réglages : apparence, modules, autorisations des rôles.'};
@@ -197,8 +197,11 @@ function modulesMarkup(settings, setup) {
       state:states.raceReminders ? ['ok', 'Actif'] : ['off', 'Éteint'], control:toggle('raceReminders', 'Rappels de course'), settings:''},
     {key:'iracingImport', name:'Endurances iRacing officielles', text:'Les séries en équipe et les événements spéciaux importés automatiquement.',
       state:states.iracingImport ? ['ok', 'Actif'] : ['off', 'Éteint'], control:toggle('iracingImport', 'Endurances iRacing officielles'), settings:''},
-    {key:'soloRaces', name:'Courses solo', text:'Onglet « Courses solo » : places limitées, liste d’attente, courses OPEN et SAFE.',
-      state:states.soloRaces ? ['ok', 'Actif'] : ['off', 'Éteint'], control:toggle('soloRaces', 'Courses solo'), settings:''},
+    {key:'soloRaces', name:'Événements', text:'Le calendrier de la communauté, toutes simus : places limitées, liste d’attente, OPEN ou SAFE.',
+      state:states.soloRaces ? ['ok', `Actif · onglet « ${esc(settings.modules.eventsLabel || 'Événements')} »`] : ['off', 'Éteint'], control:toggle('soloRaces', 'Événements'),
+      settings:`<form class="settings-events-label" data-events-label><label>Nom de l’onglet<input name="label" maxlength="20" placeholder="Événements" value="${esc(settings.modules.eventsLabel || '')}"></label>
+        <label>Types d’événements <small>(séparés par des virgules)</small><input name="types" maxlength="260" placeholder="SAFE, OPEN, Bouboule" value="${esc((settings.modules.eventTypes || []).join(', '))}"></label>
+        <div class="settings-actions"><button class="primary-button" type="submit">Enregistrer</button><span class="settings-status" aria-live="polite"></span></div></form>`},
     {key:'training', name:'Entraînement', text:'Page « Mon entraînement » : programme guidé, séance du jour et conseils tirés des séances LMU de chaque pilote.',
       state:states.training ? ['ok', 'Actif'] : ['off', 'Éteint'], control:toggle('training', 'Entraînement'), settings:''}];
   const tile = item => `<article class="admin-module ${states[item.key] ? 'is-on' : ''}" data-module-tile="${item.key}">
@@ -515,6 +518,15 @@ app.addEventListener('input', event => {
 });
 
 app.addEventListener('submit', async event => {
+  const eventsLabel = event.target.closest('form[data-events-label]');
+  if (eventsLabel) {
+    event.preventDefault();
+    const status = eventsLabel.querySelector('.settings-status');
+    status.textContent = 'Enregistrement…';
+    try { await api('/api/community/modules', 'PATCH', {eventsLabel:eventsLabel.elements.label.value, eventTypes:eventsLabel.elements.types.value.split(',')}); await reload('modules', {module:'soloRaces'}); }
+    catch (error) { status.textContent = error.message; }
+    return;
+  }
   const showcaseForm = event.target.closest('form[data-showcase]');
   if (showcaseForm) {
     event.preventDefault();

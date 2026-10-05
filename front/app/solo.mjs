@@ -1,25 +1,36 @@
 // Solo races: one entry per driver, limited places with a waiting list, one or two rounds and an
 // OPEN / SAFE access. They reuse the race cards, the race page and the registration window; this module
 // only holds what differs from endurance events.
-import {state,esc,button,canManage,can,logo,badge,categories,circuitLabel} from './core.mjs';
+import {state,esc,button,canManage,can,logo,badge,categories} from './core.mjs';
+import {SIMS,simCatalog,simForEvent} from '../../shared/catalog.mjs';
 
 export const ANY_CATEGORY = '*';
 export const isSolo = event => event?.format === 'solo';
 
+export function simBadge(event) {
+  const sim = SIMS.find(item => item.id === simForEvent(event));
+  return `<span class="event-sim-badge sim-${sim.id}" title="${esc(sim.name)}">${esc(sim.short)}</span>`;
+}
+// The simulator, the event type, then OPEN or SAFE (unless the type already says it).
 export function accessBadge(event) {
-  const safe = event.access === 'safe';
-  return `<span class="event-access-badge ${safe ? 'is-safe' : 'is-open'}" title="${safe ? 'Réservée aux pilotes SAFE' : 'Ouverte à tous les pilotes connectés'}">${safe ? 'SAFE' : 'OPEN'}</span>`;
+  const safe = event.access === 'safe', type = event.details?.type || '';
+  const typeBadge = type ? `<span class="event-type-badge">${esc(type)}</span>` : '';
+  if (type.toLowerCase() === (safe ? 'safe' : 'open')) return `<span class="event-badge-row">${simBadge(event)}<span class="event-access-badge ${safe ? 'is-safe' : 'is-open'}">${esc(type)}</span></span>`;
+  return `<span class="event-badge-row">${simBadge(event)}${typeBadge}<span class="event-access-badge ${safe ? 'is-safe' : 'is-open'}" title="${safe ? 'Réservé aux pilotes SAFE' : 'Ouvert à tous les pilotes connectés'}">${safe ? 'SAFE' : 'OPEN'}</span></span>`;
 }
 
-function roundCircuit(round) {
-  return circuitLabel(round.circuit);
+// Circuit of an event: from the catalog (LMU, older iRacing events), or as typed (AMS2, iRacing, ACE).
+export function eventCircuitName(event, id) {
+  const sim = simForEvent(event), circuit = simCatalog(sim)?.circuits.find(item => item.id === id);
+  if (circuit) return circuit.random ? 'Circuit aléatoire' : circuit.name;
+  return (sim !== 'lmu' && id) || 'Circuit à préciser';
 }
 
 // "Circuit de Spa-Francorchamps · 20 min + Circuit aléatoire · 20 min"
 export function soloRoundsLabel(event) {
   const rounds = event.rounds || [];
-  if (!rounds.length) return esc(circuitLabel(event.circuit));
-  return rounds.map(round => `${esc(roundCircuit(round))} · ${Number(round.durationMinutes) || 0} min`).join(' + ');
+  if (!rounds.length) return esc(eventCircuitName(event, event.circuit));
+  return rounds.map(round => `${esc(eventCircuitName(event, round.circuit))} · ${Number(round.durationMinutes) || 0} min`).join(' + ');
 }
 
 export function soloCounts(event, departure) {
@@ -48,8 +59,8 @@ function carCell(reg) {
 // Why the driver cannot enter, or '' when they can.
 export function soloEntryBlock(event) {
   if (!state.user) return 'Connecte-toi avec Discord pour participer.';
-  if (event.access === 'safe' && !can('solo_safe')) return 'Course réservée aux pilotes SAFE.';
-  if (!can('solo_safe') && !can('solo_open')) return 'Tu n’as pas accès aux courses solo de cette communauté.';
+  if (event.access === 'safe' && !can('solo_safe')) return 'Événement réservé aux pilotes SAFE.';
+  if (!can('solo_safe') && !can('solo_open')) return 'Tu n’as pas accès aux événements de cette communauté.';
   return '';
 }
 
@@ -59,6 +70,7 @@ export function myWaitlistPosition(departure) {
 
 // Category and car of each round (two-round races), or of the race.
 function choicesCell(event, reg) {
+  if (!reg.category && !reg.roundChoices?.length) return '';
   const rounds = event.rounds || [];
   const choices = reg.roundChoices?.length ? reg.roundChoices : [{category:reg.category, cars:reg.cars, carAny:reg.carAny}];
   if (rounds.length < 2) return `${categoryCell(choices[0].category)}<span class="solo-entry-car">${carCell(choices[0])}</span>`;
@@ -78,9 +90,23 @@ export function renderSoloEntries(event, departure) {
   return `<section class="solo-participants"><h3 class="solo-subtitle">Participants <span class="count-pill">${grid.length}${event.capacity ? ` / ${event.capacity}` : ''}</span></h3>${gridList}${waitingList}</section>`;
 }
 
-// Race header: the categories of each round (no counters, the places gauge gives the entries).
-export function soloCategoriesSummary(event) {
-  const rounds = event.rounds || [];
-  if (rounds.length < 2) return `<div class="event-header-stats event-category-badges">${event.categories.map(category => badge(category)).join('')}</div>`;
-  return `<div class="event-header-stats solo-round-badges">${rounds.map((round, index) => `<span class="solo-round-badge-group"><em>Manche ${index + 1}</em>${(round.categories?.length ? round.categories : event.categories).map(category => badge(category)).join('')}</span>`).join('')}</div>`;
+export const WEATHERS = [['random','❓','Aléatoire'],['sun','☀️','Soleil'],['cloud','⛅','Nuageux'],['overcast','☁️','Couvert'],['rain','🌧️','Pluie']];
+// « P5/Q10/C40 »: the session lengths of a round.
+export function roundFormat(round) {
+  return [round.practice ? `P${round.practice}` : '', round.qualifying ? `Q${round.qualifying}` : '', `C${round.durationMinutes}`].filter(Boolean).join('/');
+}
+export function roundExtras(round) {
+  const weather = WEATHERS.find(([value]) => value === round.weather)?.[1];
+  return [weather, round.fuel != null ? `carburant ×${round.fuel}` : '', round.tyres != null ? `usure pneus ×${round.tyres}` : ''].filter(Boolean).join(' · ');
+}
+// What the community's calendar shows: the end of an open session, the server password, the note, and per
+// round its circuit, categories, session lengths, weather and multipliers.
+export function soloEventInfo(event, departure = event.departures?.[0]) {
+  const details = event.details || {}, rounds = event.rounds || [];
+  const rows = [];
+  if (details.endTime && departure) rows.push(['Horaire', `${departure.time}-${details.endTime}`]);
+  if (details.password) rows.push(['Mot de passe', details.password]);
+  rounds.forEach((round, index) => rows.push([rounds.length > 1 ? `Manche ${index + 1}` : 'Manche', [eventCircuitName(event, round.circuit), (round.categories || []).join(' ') || round.category, round.car, roundFormat(round), roundExtras(round)].filter(Boolean).join(' · ')]));
+  if (details.note) rows.push(['Info', details.note]);
+  return `<dl class="solo-event-info">${rows.map(([label, value]) => `<div><dt>${esc(label)}</dt><dd>${esc(value)}</dd></div>`).join('')}</dl>`;
 }

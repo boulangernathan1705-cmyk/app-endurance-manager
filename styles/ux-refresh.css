@@ -41,18 +41,21 @@
   width: auto !important;
 }
 
-/* Sélecteur de simulateur : un seul contrôle segmenté. */
-.site-nav-shell #navigation > .nav-game-switcher {
-  grid-area: switch;
+/* Sélecteur de simulateur : un seul contrôle segmenté, juste après l'onglet Endurance. */
+.site-nav-shell #navigation .nav-game-switcher {
   display: inline-flex !important;
   gap: 0 !important;
   padding: 3px !important;
   margin: 0 !important;
   width: auto !important;
+  align-self: center;
   border: 1px solid rgba(255, 255, 255, .14);
   border-radius: 10px;
   background: rgba(0, 0, 0, .25);
 }
+.site-nav-shell #navigation .nav-game-switcher[hidden] { display: none !important; }
+/* Pages fixes (aide, administration…) : le sélecteur reste devant les onglets. */
+.site-nav-shell #navigation > .nav-game-switcher { grid-area: switch; }
 .site-nav-shell #navigation .nav-game-switcher-button {
   display: inline-flex !important;
   align-items: center;
@@ -90,6 +93,7 @@ html[data-game="lmu"] { --game-accent: #d8322c; }
 .site-nav-shell #navigation > .nav-sections {
   grid-area: sections;
   display: flex;
+  align-items: center;
   gap: 6px;
   min-width: 0;
 }
@@ -198,7 +202,10 @@ html[data-game] .page-head .home-create-event { margin: 0 0 0 auto !important; }
     margin: 8px 10px 4px !important;
     padding: 8px !important;
   }
+  .site-nav-shell #navigation > .nav-sections { flex-wrap: wrap; }
+  /* Mobile : le choix du simulateur passe sur sa propre ligne, sous les onglets. */
   .site-nav-shell #navigation > .nav-game-switcher { justify-self: stretch; }
+  .site-nav-shell #navigation .nav-sections .nav-game-switcher { order: 10; flex: 1 0 100%; }
   .site-nav-shell #navigation .nav-game-switcher-button { flex: 1; padding: 0 10px !important; }
   .site-nav-shell #navigation > .nav-sections > .nav-section-button { flex: 1; }
 }
@@ -1140,10 +1147,57 @@ html[data-game] #app .race-header-actions > .danger-link { width: auto !importan
 /* Fenêtre « Créer un équipage » : libellés d'étape lisibles. */
 .crew-builder-step-label { font-size: 12.5px !important; }
 
-/* ---------- Courses solo ---------- */
+/* ---------- Événements (format solo) ---------- */
 .event-access-badge { display: inline-flex; align-items: center; padding: 2px 9px; border: 1px solid; border-radius: 999px; font-size: 10.5px; font-weight: 800; letter-spacing: .08em; }
 .event-access-badge.is-open { color: #7fe3ea; border-color: rgba(82, 211, 216, .6); background: rgba(82, 211, 216, .08); }
 .event-access-badge.is-safe { color: #f3b33d; border-color: rgba(243, 179, 61, .65); background: rgba(243, 179, 61, .08); }
+.event-type-badge { display: inline-flex; align-items: center; padding: 2px 9px; border: 1px solid rgba(255, 255, 255, .35); border-radius: 999px; font-size: 10.5px; font-weight: 800; letter-spacing: .06em; color: #f2f4f7; background: rgba(255, 255, 255, .06); }
+/* Simulateur d'un événement : LMU, iRacing, AMS2, ACE. */
+.event-badge-row { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.event-sim-badge { --sim: #8a949a; display: inline-flex; align-items: center; padding: 2px 9px; border-radius: 999px; background: var(--sim); color: #fff; font-size: 10.5px; font-weight: 800; letter-spacing: .06em; }
+.sim-lmu { --sim: #d8322c; } .sim-iracing { --sim: #2f6fd6; } .sim-ams2 { --sim: #1f9d63; } .sim-ace { --sim: #c9861a; }
+.access-open { --sim: #52d3d8; } .access-safe { --sim: #f3b33d; }
+
+/* Création d'un événement : étapes courtes, choix en pastilles. */
+.solo-event-form .solo-form-step { display: grid; gap: 18px; }
+.solo-event-form .solo-form-step[hidden] { display: none; }
+.solo-event-form .solo-rounds { display: grid; gap: 12px; }
+.solo-weather-row { display: flex; gap: 6px; flex-wrap: wrap; }
+.solo-weather-chip { position: relative; cursor: pointer; }
+.solo-weather-chip input { position: absolute; opacity: 0; pointer-events: none; }
+.solo-weather-chip span[aria-hidden] { display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 42px; border: 1px solid var(--border, #2b3236); border-radius: 8px; background: var(--panel2, #12171a); font-size: 22px; filter: grayscale(.7); opacity: .6; }
+.solo-weather-chip input:checked + span { filter: none; opacity: 1; border-color: #52d3d8; box-shadow: inset 0 -3px #52d3d8; }
+.solo-weather-chip input:focus-visible + span { outline: 2px solid #52d3d8; outline-offset: 2px; }
+.solo-event-info { display: grid; gap: 4px; margin: 0; font-size: 13.5px; }
+.solo-event-info div { display: flex; gap: 10px; }
+.solo-event-info dt { min-width: 96px; color: var(--muted, #9aa5aa); font-weight: 700; }
+.solo-event-info dd { margin: 0; color: #e7ecee; }
+.solo-event-form .solo-round { display: grid; gap: 12px; padding: 14px; border: 1px solid var(--border, #2b3236); border-radius: 10px; background: rgba(0, 0, 0, .18); }
+.solo-event-form .solo-round-head { display: flex; align-items: center; justify-content: space-between; }
+.solo-event-form .solo-round-title { color: #7fe3ea; font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; }
+.solo-event-form .solo-round-head [data-remove-round][hidden] { display: none; }
+.solo-event-form .solo-round-format { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.solo-event-form fieldset.solo-weather { margin: 0; }
+.solo-event-form .solo-round-categories { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+.solo-category-chip { position: relative; display: inline-flex; align-items: center; justify-content: center; min-width: 56px; min-height: 44px; padding: 4px 8px; border: 1px solid var(--border, #2b3236); border-radius: 8px; background: var(--panel2, #12171a); cursor: pointer; opacity: .55; }
+.solo-category-chip input { position: absolute; opacity: 0; pointer-events: none; }
+.solo-category-chip .category-logo { width: 40px; height: 32px; object-fit: contain; }
+.solo-category-chip:has(input:checked) { opacity: 1; border-color: var(--category-color, #52d3d8); box-shadow: inset 0 -3px var(--category-color, #52d3d8); }
+.solo-category-chip:has(input:focus-visible) { outline: 2px solid #52d3d8; outline-offset: 2px; }
+.solo-event-form [data-add-round] { justify-self: start; }
+.solo-event-form [data-add-round][hidden] { display: none; }
+.solo-event-form fieldset { margin: 0; padding: 0; border: 0; min-width: 0; }
+.solo-event-form legend { padding: 0; margin-bottom: 8px; }
+.sim-option-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.sim-option { position: relative; cursor: pointer; }
+.sim-option input { position: absolute; opacity: 0; pointer-events: none; }
+.sim-option span { display: inline-flex; align-items: center; justify-content: center; min-width: 88px; min-height: 42px; padding: 0 16px; border: 1px solid var(--border, #2b3236); border-radius: 8px; background: var(--panel2, #12171a); color: #c7d0d4; font-weight: 800; letter-spacing: .04em; }
+.sim-option:hover span { border-color: var(--sim); }
+.sim-option input:checked + span { border-color: var(--sim); background: color-mix(in srgb, var(--sim) 28%, transparent); color: #fff; box-shadow: inset 0 -3px var(--sim); }
+.sim-option input:focus-visible + span { outline: 2px solid var(--sim); outline-offset: 2px; }
+.solo-form-start, .solo-form-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; align-items: end; }
+.solo-form-start .departure-field { display: contents; }
+@media (max-width: 600px) { .sim-option { flex: 1 1 40%; } .sim-option span { width: 100%; } }
 /* Le liseré de couleur suit l'accès : cyan OPEN, ambre SAFE (au lieu de la couleur du type). */
 .event-card.is-solo-open, .race-header.is-solo-open { --event-accent: #52d3d8 !important; }
 .event-card.is-solo-safe, .race-header.is-solo-safe { --event-accent: #f3b33d !important; }
@@ -1177,27 +1231,10 @@ html[data-game] .race-card .race-fill:has(.solo-fill) { display: flex; flex-wrap
 .solo-wait-notice { margin: 10px 0 0; padding: 10px 12px; border-left: 3px solid #f3b33d; border-radius: 0 8px 8px 0; background: rgba(243, 179, 61, .08); color: #f1e3c4; font-size: 14px; }
 /* Formulaire : format, accès et manches */
 .format-contents { display: contents; }
-.format-contents[hidden], .solo-fields[hidden] { display: none !important; }
-.event-format-choice, .solo-access { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin: 0 0 14px; }
-.solo-access-option { display: flex; align-items: flex-start; gap: 10px; padding: 12px 14px; border: 1px solid rgba(255, 255, 255, .14); border-radius: 10px; cursor: pointer; }
-.solo-access-option:has(input:checked) { border-color: #52d3d8; background: rgba(82, 211, 216, .08); }
-.solo-access-option input { margin: 3px 0 0 !important; flex: none !important; width: 18px !important; height: 18px !important; min-height: 0 !important; padding: 0 !important; }
-.solo-access-option span { flex: 1; min-width: 0; }
-.solo-fields .event-schedule-option input { width: 18px !important; height: 18px !important; min-height: 0 !important; flex: none !important; }
-.solo-access-option span { display: grid; gap: 2px; }
-.solo-access-option small { opacity: .75; }
-.solo-fields { display: flex; flex-direction: column; gap: 12px; margin-top: 12px; }
-.solo-rounds { display: flex; flex-direction: column; gap: 10px; }
-.solo-round { display: grid; grid-template-columns: 90px minmax(0, 1fr) 170px; align-items: end; gap: 10px; }
-.solo-round-title { align-self: center; }
-.event-format-fixed { margin: 0 0 12px; color: #c7d0d4; }
 /* Gestion des membres : case « Pilote SAFE » */
 .members-panel .members-row { grid-template-columns: minmax(0, 1fr) auto minmax(160px, 220px) 150px !important; }
 .members-safe { display: inline-flex; align-items: center; gap: 6px; font-size: 13.5px; font-weight: 700; color: #f3b33d; cursor: pointer; white-space: nowrap; }
 @media (max-width: 760px) {
-  .event-format-choice, .solo-access { grid-template-columns: minmax(0, 1fr); }
-  .solo-round { grid-template-columns: minmax(0, 1fr) 120px; }
-  .solo-round-title { grid-column: 1 / -1; }
   .solo-entries { grid-template-columns: minmax(0, 1fr); }
   .members-panel .members-row { grid-template-columns: minmax(0, 1fr) !important; }
 }
@@ -1207,8 +1244,6 @@ html[data-game] .race-card .race-fill:has(.solo-fill) { display: flex; flex-wrap
 .solo-entry-round em { font-style: normal; font-weight: 800; color: #7fe3ea; min-width: 26px; }
 .solo-entry-round .solo-entry-car { grid-column: auto; }
 .solo-round-heading { margin: 0 0 4px; font-weight: 800; color: #7fe3ea; font-size: 15px; }
-.solo-category-group { margin: 0 0 12px; padding: 12px; border: 1px solid rgba(255, 255, 255, .1); border-radius: 10px; }
-.solo-category-group legend { padding: 0 6px; font-weight: 800; color: #7fe3ea; }
 .solo-round-badges { display: flex; flex-wrap: wrap; gap: 8px 18px; }
 .solo-round-badge-group { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .solo-round-badge-group em { font-style: normal; font-weight: 800; color: #7fe3ea; font-size: 13px; }

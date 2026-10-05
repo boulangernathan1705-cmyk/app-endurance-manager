@@ -31,6 +31,7 @@ function harness(withParticipants=true){
  DB.db.exec(readFileSync(new URL('../migrations/0029_event_duration_minutes.sql',import.meta.url),'utf8'));
  DB.db.exec(readFileSync(new URL('../migrations/0030_iracing_import.sql',import.meta.url),'utf8'));
  DB.db.exec(readFileSync(new URL('../migrations/0031_solo_driver.sql',import.meta.url),'utf8'));
+ DB.db.exec(readFileSync(new URL('../migrations/0054_event_sim.sql',import.meta.url),'utf8'));
  DB.db.exec(readFileSync(new URL('../migrations/0015_crew_lock.sql',import.meta.url),'utf8'));
  DB.db.exec(readFileSync(new URL('../migrations/0016_client_errors.sql',import.meta.url),'utf8'));
  // The crews' owner column of migration 0016_crew_ownership (its backfill needs no data here).
@@ -458,6 +459,31 @@ test('solo race: places, waiting list, one entry per driver, no crews',async()=>
  // Bad solo definitions are refused.
  for(const bad of [{...soloInput,rounds:[]},{...soloInput,capacity:1},{...soloInput,rounds:[{circuit:'spa',durationMinutes:2}]},{...soloInput,departures:[...soloInput.departures,{date:'2090-10-16',time:'21:00'}]},{...soloInput,rounds:[{circuit:'spa',durationMinutes:20},{circuit:'iracing-spa',durationMinutes:20}]}])
   assert.equal((await req('/api/events','POST',bad,'admin')).status,400);
+});
+test('events calendar: every simulator, typed circuit on AMS2 / ACE, no limit and one-click entry without category',async()=>{
+ const {req,login}=harness();await login(ADMIN,'admin');await login(PILOT,'pilot');
+ const input={name:'Bouboule',format:'solo',sim:'ams2',access:'open',capacity:null,rounds:[{circuit:'Interlagos',durationMinutes:30,practice:5,qualifying:10,weather:'sun',fuel:1,tyres:2,category:'GT3',car:'Porsche 911 GT3 R'},{circuit:'Spa',durationMinutes:25}],categories:[],details:{type:'Bouboule',endTime:'00:00',password:'tdz',note:'Special event'},departures:[{date:'2090-10-15',time:'21:00'}]};
+ const created=await req('/api/events','POST',input,'admin');assert.equal(created.status,201,JSON.stringify(created.data));
+ // Shown on both simulator sites: the calendar is common to every simulator.
+ for(const game of ['lmu','iracing']){
+  const event=(await req(`/api/events?game=${game}`,'GET',null,'admin')).data.events.find(e=>e.id===created.data.id);
+  assert.ok(event,game);assert.equal(event.sim,'ams2');assert.deepEqual(event.details,{type:'Bouboule',endTime:'00:00',password:'tdz',note:'Special event'});assert.deepEqual(event.rounds[0],{circuit:'Interlagos',durationMinutes:30,categories:[],practice:5,qualifying:10,fuel:1,tyres:2,weather:'sun',category:'GT3',car:'Porsche 911 GT3 R'});assert.equal(event.durationMinutes,180,'the open session lasts until midnight');assert.equal(event.capacity,null);assert.equal(event.circuit,'Interlagos');assert.deepEqual(event.categories,[]);
+ }
+ const event=(await req('/api/events','GET',null,'admin')).data.events.find(e=>e.id===created.data.id);
+ const path=`/api/events/${event.id}/departures/${event.departures[0].id}/registrations`;
+ assert.equal((await req(path,'POST',{name:'Pilote',choices:[]},'pilot')).status,201);
+ const reg=(await req('/api/events','GET',null,'admin')).data.events.find(e=>e.id===created.data.id).departures[0].availability[0];
+ assert.equal(reg.category,'');assert.ok(!reg.waitlistPosition);
+ // LMU keeps its catalog; categories must belong to the simulator; an older event follows its circuit.
+ for(const bad of [{...input,sim:'lmu'},{...input,sim:'xbox'},{...input,sim:'ace',categories:['GT3']},{...input,sim:'iracing',rounds:[{circuit:'Daytona',durationMinutes:20,categories:['GT3']}]},{...input,rounds:Array(5).fill({circuit:'Spa',durationMinutes:20})},{...input,details:{endTime:'25:00'}},{...input,rounds:[{circuit:'Spa',durationMinutes:20,weather:'snow'}]},{...input,rounds:[{circuit:'Spa',durationMinutes:20,fuel:11}]}])
+  assert.equal((await req('/api/events','POST',bad,'admin')).status,400,JSON.stringify(bad));
+ const iracing=await req('/api/events','POST',{...input,sim:'iracing',rounds:[{circuit:'Indianapolis',durationMinutes:40,category:'GT3',car:'Ferrari 296 GT3'}]},'admin');assert.equal(iracing.status,201,'iRacing circuits and categories are typed');
+ const lmu=await req('/api/events','POST',{...soloInput,sim:undefined},'admin');assert.equal(lmu.status,201);
+ assert.equal((await req('/api/events','GET',null,'admin')).data.events.find(e=>e.id===lmu.data.id).sim,'lmu');
+ // The community's event types, offered in the creation form.
+ assert.equal((await req('/api/community/modules','PATCH',{eventTypes:[' SAFE ','Bouboule','SAFE','']},'admin')).status,200);
+ assert.deepEqual((await req('/api/session','GET',null,'pilot')).data.eventTypes,['SAFE','Bouboule']);
+ assert.equal((await req('/api/community/modules','PATCH',{eventTypes:['x'.repeat(21)]},'admin')).status,400);
 });
 test('SAFE solo races are reserved to the Discord roles with "Courses SAFE"',async()=>{
  const {req,login}=harness();await login(ADMIN,'admin');await login(PILOT,'pilot');
