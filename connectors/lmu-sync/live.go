@@ -97,8 +97,9 @@ func readSample(b []byte) (s sample, ok bool) {
 	}
 	for i := range s.Wheels {
 		w := t + 848 + i*260
-		s.Wheels[i] = wheel{Temp: (f64(b, w+128)+f64(b, w+136)+f64(b, w+144))/3 - 273.15, Wear: f64(b, w+152), Pressure: f64(b, w+120),
-			Brake: f64(b, w+24), Compound: b[w+241]}
+		// The tyre's carcass temperature, the one the game shows (the surface swings by 20 °C a corner); kelvin, as the brakes.
+		s.Wheels[i] = wheel{Temp: f64(b, w+204) - 273.15, Wear: f64(b, w+152), Pressure: f64(b, w+120),
+			Brake: f64(b, w+24) - 273.15, Compound: b[w+241]}
 	}
 	return s, true
 }
@@ -168,13 +169,14 @@ type recorder struct {
 	lap     *lapState
 	stop    *stopState
 	idle    int
+	onTrack bool // out of the pit lane at least once in this session
 }
 
 func (r *recorder) flush() {
 	if r.session != nil && len(r.session.Laps) > 0 {
 		r.done(*r.session)
 	}
-	r.session, r.lap, r.stop = nil, nil, nil
+	r.session, r.lap, r.stop, r.onTrack = nil, nil, nil, false
 }
 
 // feed takes one sample (ok=false when the game is closed or nobody drives).
@@ -215,6 +217,9 @@ func (r *recorder) feed(s sample, ok bool) {
 		lap.limits = s.TrackLimits
 	}
 	r.pitStop(s)
+	if !s.InPits {
+		r.onTrack = true
+	}
 	if s.LapsDone > r.last.LapsDone && r.last.Realtime {
 		r.closeLap(s)
 	}
@@ -263,11 +268,16 @@ func (r *recorder) closeLap(s sample) {
 func (r *recorder) pitStop(s sample) {
 	switch {
 	case s.InPits && r.stop == nil:
-		r.stop = &stopState{enter: s.ET, before: s}
+		// Only a lane entered from the track: leaving the garage is not a stop.
+		if r.onTrack {
+			r.stop = &stopState{enter: s.ET, before: s}
+		}
 	case s.InPits && r.stop != nil:
-		if s.PitState == 3 || (s.Speed < 1 && r.stop.stopped) {
+		// Stopped in the box (LMU's pit state is not reliable: 4, not 3, while serviced).
+		if s.Speed < 1 {
+			// What changed is counted from the lane entry: the game may serve as soon as the car stops.
 			if !r.stop.stopped {
-				r.stop.stopped, r.stop.stopStart, r.stop.before = true, s.ET, s
+				r.stop.stopped, r.stop.stopStart = true, s.ET
 			}
 			r.stop.stopEnd, r.stop.after = s.ET, s
 		}

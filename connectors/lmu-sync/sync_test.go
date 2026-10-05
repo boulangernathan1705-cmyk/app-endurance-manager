@@ -64,3 +64,28 @@ func TestFindsAndSendsResults(t *testing.T) {
 		t.Fatalf("revoked link not seen: %v", err)
 	}
 }
+
+func TestSendsThePlayerName(t *testing.T) {
+	lmu := filepath.Join(t.TempDir(), "UserData")
+	results := filepath.Join(lmu, "Log", "Results")
+	os.MkdirAll(results, 0o755)
+	os.MkdirAll(filepath.Join(lmu, "player"), 0o755)
+	if playerName(results) != "" {
+		t.Fatal("name without settings")
+	}
+	os.WriteFile(filepath.Join(lmu, "player", "Settings.JSON"), []byte("{\"DRIVER\":{\n    \"Player Name\": \"Zo\\u00e9 \\\"Z\\\" Durand\",\n    \"Player Nick\": \"Zo\"}}"), 0o644)
+	if name := playerName(results); name != `Zoé "Z" Durand` {
+		t.Fatalf("name: %q", name)
+	}
+	path := filepath.Join(results, "a.xml")
+	os.WriteFile(path, []byte("<rFactorXML/>"), 0o644)
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if got := r.Header.Get("X-LMU-Player"); got != "Zo%C3%A9%20%22Z%22%20Durand" {
+			t.Errorf("header: %q", got)
+		}
+	}))
+	defer server.Close()
+	if done, err := send(server.Client(), config{Origin: server.URL, Token: "key"}, path); !done || err != nil {
+		t.Fatalf("send: %v %v", done, err)
+	}
+}

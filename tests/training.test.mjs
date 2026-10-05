@@ -76,6 +76,27 @@ test('a results file gives the player laps, fuel and sectors, and a program from
   assert.equal(adviceFor(analyse([]))[0].key,'none');
 });
 
+// Online, LMU marks every driver as the player: the pilot is found by his LMU name, on the car or in its swaps.
+const online=XML.replace('<isPlayer>0</isPlayer>','<isPlayer>1</isPlayer>');
+const ONLINE_SWAP=online.replace('<Name>Max &amp; Co</Name>','<Name>Equipe</Name><Swap startLap="1" endLap="25">Zoé Durand</Swap>');
+
+test('an online results file gives the laps of the pilot named as in LMU, never those of the first driver', async () => {
+  assert.throws(()=>parseResults(online),/Séance en ligne/);
+  assert.throws(()=>parseResults(online,['Personne']),/Séance en ligne/);
+  assert.equal(parseResults(online,['MAX & CO']).laps.length,25);
+  assert.equal(parseResults(online,['IA Rival']).laps.length,3);
+  assert.equal(parseResults(ONLINE_SWAP,['zoe durand']).laps.length,25);
+  const {req,send,login}=harness();
+  await login(ADMIN,'admin','Orga');await login(PILOT,'pilot','Alice');
+  await req('/api/community/modules','PATCH',{training:true},'admin');
+  const key=new TextDecoder().decode(new Uint8Array(await (await send('/api/training/sync','POST','pilot',{raw:''})).arrayBuffer()).slice(4096)).match(/([a-f0-9]{64})/)[1];
+  const collect=headers=>send('/api/training/collector','POST','sync',{raw:ONLINE_SWAP,headers:{'Content-Type':'application/xml',Authorization:'Bearer '+key,...headers}});
+  assert.equal((await collect({})).status,400);
+  assert.equal((await collect({'X-LMU-Player':'%E0%A4%A'})).status,400);
+  assert.equal((await collect({'X-LMU-Player':encodeURIComponent('Zoé Durand')})).status,200);
+  assert.equal((await req('/api/training','GET',null,'pilot')).data.analysis.totalLaps,24);
+});
+
 test('the pilot drops his files, sees his program, and compares with the pilots of the site without names', async () => {
   const {req,send,login}=harness();
   await login(ADMIN,'admin','Orga');await login(PILOT,'pilot','Alice');await login(MATE,'mate','Bob');await login('444444444444444444','other','Chloé');

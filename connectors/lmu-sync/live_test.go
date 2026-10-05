@@ -22,6 +22,14 @@ func TestLapsAndStops(t *testing.T) {
 	for i := range s.Wheels {
 		s.Wheels[i] = wheel{Temp: 85, Wear: 1, Brake: 500}
 	}
+	// Out of the garage first: not a stop.
+	s = drive(r, s, 300, func(s *sample, i int) { s.InPits, s.PitState, s.Speed = i < 299, 5, float64(i%2) * 0.5 })
+	s.PitState, s.Speed = 0, 200
+	s = drive(r, s, 600, func(s *sample, i int) {})
+	// The out lap has no time: it is not kept.
+	s.LapsDone = 1
+	s.ET += 0.1
+	r.feed(s, true)
 	// Two laps on track: fuel, energy and tyres go down, top speed 310 km/h.
 	for lap := 1; lap <= 2; lap++ {
 		s = drive(r, s, 1200, func(s *sample, i int) {
@@ -32,14 +40,14 @@ func TestLapsAndStops(t *testing.T) {
 			}
 			s.Speed = 200 + float64(i%110)
 		})
-		s.LapsDone, s.LastLap = int16(lap), 120+float64(lap)
+		s.LapsDone, s.LastLap = int16(lap+1), 120+float64(lap)
 		s.ET += 0.1
 		r.feed(s, true)
 	}
-	// A stop: 20 s in the lane, 12 s stopped, 30 l of fuel and four new tyres.
-	s = drive(r, s, 40, func(s *sample, i int) { s.InPits, s.Speed = true, 60 })
+	// A stop: 20 s in the lane, 12 s stopped, 30 l of fuel and four new tyres (LMU's pit state: 2, 4 when serviced, 5).
+	s = drive(r, s, 40, func(s *sample, i int) { s.InPits, s.PitState, s.Speed = true, 2, 60 })
 	s = drive(r, s, 120, func(s *sample, i int) {
-		s.PitState, s.Speed = 3, 0
+		s.PitState, s.Speed = 4, 0
 		if i == 60 {
 			s.Fuel += 30
 			for w := range s.Wheels {
@@ -47,9 +55,9 @@ func TestLapsAndStops(t *testing.T) {
 			}
 		}
 	})
-	s = drive(r, s, 40, func(s *sample, i int) { s.PitState, s.Speed = 4, 60 })
+	s = drive(r, s, 40, func(s *sample, i int) { s.PitState, s.Speed = 5, 60 })
 	s = drive(r, s, 1, func(s *sample, i int) { s.InPits, s.PitState, s.Speed = false, 0, 200 })
-	s.LapsDone, s.LastLap = 3, 140
+	s.LapsDone, s.LastLap = 4, 140
 	r.feed(s, true)
 	// Back to the menus: the session is sent.
 	for i := 0; i < 1300; i++ {

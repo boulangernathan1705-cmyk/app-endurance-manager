@@ -14,6 +14,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -122,7 +123,24 @@ func fileKey(path string, info os.FileInfo) string {
 	return strings.ToLower(filepath.Base(path)) + "|" + info.ModTime().UTC().Format(time.RFC3339)
 }
 
-var errRevoked = errors.New("liaison retirée")
+var playerPattern = regexp.MustCompile(`"Player Name"\s*:\s*("(?:[^"\\]|\\.)*")`)
+
+// playerName reads the pilot's name in LMU (UserData\player\Settings.JSON, next to the results): online, every driver
+// of a results file is marked as the player, and the site finds the pilot by this name.
+func playerName(resultsDir string) string {
+	data, err := os.ReadFile(filepath.Join(resultsDir, "..", "..", "player", "Settings.JSON"))
+	if err != nil {
+		return ""
+	}
+	match := playerPattern.FindSubmatch(data)
+	var name string
+	if match == nil || json.Unmarshal(match[1], &name) != nil {
+		return ""
+	}
+	return strings.TrimSpace(name)
+}
+
+var errRevoked =errors.New("liaison retirée")
 
 // send posts one file. A file the site refuses (not a session of the pilot) is never sent again.
 func send(client *http.Client, cfg config, path string) (done bool, err error) {
@@ -141,6 +159,11 @@ func send(client *http.Client, cfg config, path string) (done bool, err error) {
 	request.Header.Set("Authorization", "Bearer "+cfg.Token)
 	request.Header.Set("Content-Type", kind)
 	request.Header.Set("User-Agent", "EnduranceManagerSync/1")
+	if kind == "application/xml" {
+		if name := playerName(filepath.Dir(path)); name != "" {
+			request.Header.Set("X-LMU-Player", url.PathEscape(name))
+		}
+	}
 	response, err := client.Do(request)
 	if err != nil {
 		return false, err

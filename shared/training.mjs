@@ -14,13 +14,20 @@ const round = (value, digits = 1) => value === null ? null : Math.round(value * 
 export const normal = value => String(value || '').normalize('NFKD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 export const trackKey = session => `${normal(session.venue)}|${normal(session.course || session.venue)}`;
 
-// One results file → the player's session, or an error the pilot can understand.
-export function parseResults(xml) {
+// One results file → the player's session, or an error the pilot can understand. Online, LMU marks every driver as
+// the player: the pilot is then the one named as in LMU (names, from the sync program or the site account), on the
+// car or in its driver swaps.
+export function parseResults(xml, names = []) {
   const text = String(xml || '');
   if (!/<rFactorXML\b/.test(text) || !/<RaceResults>/.test(text)) throw Error('Ce fichier n’est pas un fichier de résultats LMU.');
   const kind = (text.match(SESSION_TAGS) || [])[1] || '';
   const drivers = text.split('<Driver>').slice(1).map(part => part.split('</Driver>')[0]);
-  const player = drivers.find(driver => /<isPlayer>\s*1\s*<\/isPlayer>/.test(driver));
+  const players = drivers.filter(driver => /<isPlayer>\s*1\s*<\/isPlayer>/.test(driver));
+  const wanted = names.map(normal).filter(Boolean);
+  const named = driver => wanted.includes(normal(tag(driver, 'Name')));
+  const swapped = driver => [...driver.matchAll(/<Swap\b[^>]*>([^<]*)<\/Swap>/g)].some(match => wanted.includes(normal(decode(match[1]))));
+  const player = players.length === 1 ? players[0] : players.find(named) || players.find(swapped);
+  if (!player && players.length > 1) throw Error('Séance en ligne : ton nom LMU n’apparaît pas parmi les pilotes de ce fichier.');
   if (!player) throw Error('Ton pilote n’apparaît pas dans ce fichier.');
   const laps = [];
   let previousFuel = null, previousEnergy = null;

@@ -77,6 +77,19 @@ namespace EnduranceManager.SimHub
                 .Where(Directory.Exists).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         }
 
+        // The pilot's name in LMU (UserData\player\Settings.JSON, next to the results): online, every driver of a results
+        // file is marked as the player, and the site finds the pilot by this name.
+        public static string PlayerName(string resultsDir)
+        {
+            try
+            {
+                string text = File.ReadAllText(Path.Combine(resultsDir, "..", "..", "player", "Settings.JSON"));
+                var match = Regex.Match(text, "\"Player Name\"\\s*:\\s*\"((?:[^\"\\\\]|\\\\.)*)\"");
+                return match.Success ? Regex.Unescape(match.Groups[1].Value).Trim() : "";
+            }
+            catch { return ""; }
+        }
+
         static string FileKey(FileInfo info) => info.Name.ToLowerInvariant() + "|" + info.LastWriteTimeUtc.ToString("yyyy-MM-ddTHH:mm:ssZ");
 
         // One pass: the results files not sent yet (finished, recent, oldest first), then the live sessions.
@@ -92,11 +105,11 @@ namespace EnduranceManager.SimHub
                     .OrderBy(info => info.LastWriteTimeUtc).ToList();
                 foreach (var info in files)
                 {
-                    if (Send(code, info.FullName, "/api/training/collector", "application/xml")) { sent.Add(FileKey(info)); SaveSent(); }
+                    if (Send(code, info.FullName, "/api/training/collector", "application/xml", PlayerName(info.DirectoryName))) { sent.Add(FileKey(info)); SaveSent(); }
                 }
                 foreach (var path in Directory.GetFiles(LiveFolder, "*.json").OrderBy(path => path))
                 {
-                    if (Send(code, path, "/api/training/live", "application/json")) File.Delete(path);
+                    if (Send(code, path, "/api/training/live", "application/json", "")) File.Delete(path);
                 }
                 Revoked = false;
                 Status = "Synchronisation active · " + DateTime.Now.ToString("HH:mm");
@@ -106,12 +119,13 @@ namespace EnduranceManager.SimHub
         }
 
         // A file the site refuses (not a session of the pilot) is never sent again; a refused key stops everything.
-        bool Send(LinkCode code, string path, string endpoint, string kind)
+        bool Send(LinkCode code, string path, string endpoint, string kind, string player)
         {
             var content = new ByteArrayContent(File.ReadAllBytes(path));
             content.Headers.ContentType = new MediaTypeHeaderValue(kind);
             var request = new HttpRequestMessage(HttpMethod.Post, code.Origin + endpoint) { Content = content };
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", code.Token);
+            if (player != "") request.Headers.Add("X-LMU-Player", Uri.EscapeDataString(player));
             using (var response = client.SendAsync(request).GetAwaiter().GetResult())
             {
                 if (response.StatusCode == HttpStatusCode.Unauthorized) throw new UnauthorizedAccessException();

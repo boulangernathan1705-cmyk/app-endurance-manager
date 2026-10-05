@@ -20,10 +20,19 @@ async function rawBody(request) {
   return new TextDecoder().decode(all);
 }
 
+// The names the pilot may drive under, to find him in an online session: the LMU name the sync program read (sent
+// percent-encoded in X-LMU-Player), then his account and pilot names on the site.
+async function pilotNames(request, env, userId) {
+  const names = [];
+  try { names.push(decodeURIComponent(request.headers.get('X-LMU-Player') || '').slice(0, 64)); } catch {}
+  const rows = await all(env, 'SELECT name FROM users WHERE id=? UNION SELECT name FROM participants WHERE user_id=?', userId, userId);
+  return [...names, ...rows.map(row => row.name)].filter(Boolean);
+}
+
 // One results file → one stored session (the same file sent twice is kept once).
-export async function saveSession(env, userId, xml) {
+export async function saveSession(env, userId, xml, names = []) {
   let session;
-  try { session = parseResults(xml); } catch (error) { fail(400, error.message); }
+  try { session = parseResults(xml, names); } catch (error) { fail(400, error.message); }
   if (!session.at) fail(400, 'Date de séance absente du fichier.');
   const laps = cleanLaps(session), clean = laps.filter(lap => lap.clean);
   const best = clean.length ? Math.min(...clean.map(lap => lap.t)) : null;
@@ -57,7 +66,8 @@ export async function trainingCollector(request, env, live = false) {
   await rateLimit(request, env, 'training-sync', 300);
   const device = await env.DB.prepare('SELECT user_id FROM training_devices WHERE token_hash=?').bind(await hash(raw.slice(7))).first();
   if (!device) fail(401, 'Cette liaison a été retirée. Télécharge à nouveau le synchroniseur depuis le site.');
-  const saved = live ? await saveLive(env, device.user_id, await rawBody(request)) : await saveSession(env, device.user_id, await rawBody(request));
+  const saved = live ? await saveLive(env, device.user_id, await rawBody(request))
+    : await saveSession(env, device.user_id, await rawBody(request), await pilotNames(request, env, device.user_id));
   await env.DB.prepare('UPDATE training_devices SET last_seen=? WHERE user_id=?').bind(now(), device.user_id).run();
   return json({ok:true, ...saved});
 }
@@ -148,7 +158,7 @@ export async function trainingApi(path, method, request, env, actor, community) 
   }
   if (path === '/api/training/sessions' && method === 'POST') {
     await rateLimit(request, env, 'training-import', 200);
-    return json({ok:true, ...await saveSession(env, user, await rawBody(request))});
+    return json({ok:true, ...await saveSession(env, user, await rawBody(request), await pilotNames(request, env, user))});
   }
   const remove = path.match(/^\/api\/training\/sessions\/([a-f0-9-]{36})$/);
   if (remove && method === 'DELETE') {
