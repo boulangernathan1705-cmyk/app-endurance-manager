@@ -27,12 +27,14 @@ async function namesOf(env, userId) {
 }
 
 // One results file → one stored session (the same file sent twice is kept once). An online file where the pilot's
-// name is not found waits until he gives it (the last 20 files, without their <Stream> section).
+// name is not found waits until he gives it (the last 20 files, without their <Stream> section). Once his LMU name is
+// known, such a file is a session he did not drive (joined or watched): it is left out.
 export async function saveSession(env, userId, xml, keep = true) {
   let session;
   try { session = parseResults(xml, await namesOf(env, userId)); }
   catch (error) {
-    if (error.code !== 'driver' || !keep) fail(400, error.message);
+    const known = error.code === 'driver' && keep && await env.DB.prepare('SELECT 1 FROM training_profiles WHERE user_id=?').bind(userId).first();
+    if (error.code !== 'driver' || !keep || known) fail(400, error.message);
     await env.DB.prepare('INSERT INTO training_pending(id,user_id,xml,drivers,created_at) VALUES(?,?,?,?,?)')
       .bind(id(), userId, xml.replace(/<Stream>[\s\S]*?<\/Stream>/, ''), JSON.stringify(error.drivers), now()).run();
     await env.DB.prepare('DELETE FROM training_pending WHERE user_id=? AND id NOT IN (SELECT id FROM training_pending WHERE user_id=? ORDER BY created_at DESC LIMIT 20)').bind(userId, userId).run();
@@ -168,7 +170,7 @@ export async function trainingApi(path, method, request, env, actor, community) 
       sessions:sessions.slice(0, 20).map(row => ({id:row.id, at:row.started_at, venue:row.venue, course:row.course, car:row.car, carClass:row.car_class, kind:row.kind,
         laps:JSON.parse(row.laps).length, best:row.best})),
       device:device ? {linked:true, lastSeen:device.last_seen} : {linked:false}, lmuName:profile?.lmu_name || null,
-      pending:waiting.length ? {files:waiting.length, drivers:[...new Set(waiting.flatMap(row => JSON.parse(row.drivers)))].sort((a, b) => a.localeCompare(b)).slice(0, 60)} : null});
+      pending:waiting.length && !profile?.lmu_name ? {files:waiting.length, drivers:[...new Set(waiting.flatMap(row => JSON.parse(row.drivers)))].sort((a, b) => a.localeCompare(b)).slice(0, 60)} : null});
   }
   // The pit guide (stands.html): the stops measured by every pilot of the site, per class, never named.
   if (path === '/api/training/pits' && method === 'GET') {
