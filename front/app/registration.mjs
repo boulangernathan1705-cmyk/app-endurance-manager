@@ -13,6 +13,13 @@ export function registrationDraft(reg) {
   return {name:reg.name,category:reg.category,cars:reg.cars||[],carAny:!!reg.carAny,status:reg.status,preferredPilot:reg.preferredPilot||'',soloDriver:!!reg.soloDriver,id:reg.id,version:reg.version,participantId:reg.participantId,participantUserId:reg.participantUserId||null,discordLinked:!!reg.discordLinked,mine:reg.mine,forOther:!reg.mine,manualOther:!reg.mine&&!reg.participantUserId&&!reg.discordLinked,communityId:reg.community?.id||''};
 }
 // Official race: the player first chooses the community he enters with (one of his, when he has several).
+// Solo event with nothing to choose (no category): one click enters the pilot, no form.
+export function canEnterInOneClick(event,departure){
+  return Boolean(isSolo(event)&&state.user?.name&&!soloRounds(event).length&&!ownRegistrations(departure).length&&!(event.official&&entryCommunities().length>1));
+}
+export async function enterInOneClick(event,departure,api){
+  return api(`/api/races/${event.id}/departures/${departure.id}/registrations`,'POST',{name:state.user.name.slice(0,32),choices:[],forOther:false});
+}
 export function needsCommunityChoice(event,departure,stateDraft){
   return Boolean(event.official&&state.user&&!stateDraft.id&&!stateDraft.forOther&&stateDraft.mode!=='category'&&!stateDraft.communityId&&entryCommunities().length>1&&!ownRegistrations(departure).length);
 }
@@ -127,7 +134,7 @@ function hoursSummary(status,departure,duration){
 }
 // Solo race: one step per round (category and car on the same screen), then the summary.
 // draft.choices holds one {category,cars,carAny} per round; draft.solo is the number of rounds.
-function soloRounds(event){
+export function soloRounds(event){
   const rounds=event.rounds?.length?event.rounds:[{circuit:event.circuit,durationMinutes:0,categories:event.categories}];
   const list=rounds.map(round=>({...round,categories:round.categories?.length?round.categories:event.categories}));
   // No category offered (AMS2, ACE, or none ticked): a simple entry, straight to the summary.
@@ -164,14 +171,16 @@ function renderSoloStepper(event,departure,stateDraft){
   const pane=(n,content)=>`<section class="registration-step" data-step="${n}" ${n===step?'':'hidden'}>${content}</section>`;
   const roundPane=(round,index)=>{
     const choice=stateDraft.choices[index];
-    const buttons=[...round.categories,ANY_CATEGORY].map(category=>{
+    // A single category is already chosen: no question, straight to the cars.
+    const single=round.categories.length===1;
+    const buttons=(single?[]:[...round.categories,ANY_CATEGORY]).map(category=>{
       const any=category===ANY_CATEGORY,active=choice.category===category;
       const label=any?`<span class="solo-any-logo" aria-hidden="true">✱</span><span class="registration-category-copy"><strong>Peu importe</strong><small>N’importe quelle catégorie</small></span>`:`${logo(category)}<span class="registration-category-copy"><strong>${esc(category)}</strong></span>`;
       return button('solo-category',label,`data-departure="${departure.id}" data-round="${index}" data-value="${esc(category)}" aria-pressed="${active}"`,`category-button ${any?'':categories[category]?.css||''} ${active?'active':''}`);
     }).join('');
     const heading=rounds.length>1?`<p class="solo-round-heading">Manche ${index+1} · ${esc(eventCircuitName(event,round.circuit))}${round.durationMinutes?` · ${round.durationMinutes} min`:''}</p>`:'';
     const cars=choice.category===ANY_CATEGORY?'<p class="registration-step-help">Catégorie « Peu importe » : la voiture est libre aussi.</p>':choice.category?soloCarChoices(event,departure,index,choice):'';
-    return pane(index+1,`${index===0?communityLine(event,departure,stateDraft)+identity:''}${heading}<div class="category-area"><span class="form-label">Dans quelle catégorie ${stateDraft.forOther?'ce pilote veut-il':'veux-tu'} rouler ?</span><div class="categories registration-category-list">${buttons}</div></div>${cars}`);
+    return pane(index+1,`${index===0?communityLine(event,departure,stateDraft)+identity:''}${heading}${single?`<p class="solo-single-category">${logo(round.categories[0])}<strong>${esc(round.categories[0])}</strong></p>`:`<div class="category-area"><span class="form-label">Dans quelle catégorie ${stateDraft.forOther?'ce pilote veut-il':'veux-tu'} rouler ?</span><div class="categories registration-category-list">${buttons}</div></div>`}${cars}`);
   };
   const summaryRow=(n,label,value)=>`<button type="button" class="registration-summary-row" data-action="registration-step" data-departure="${departure.id}" data-step="${n}" data-edit="true"><span>${label}</span><strong>${value}</strong><em>Modifier</em></button>`;
   const pilot=stateDraft.name||(!stateDraft.forOther?state.user?.name:'')||'';

@@ -32,6 +32,7 @@ function harness(withParticipants=true){
  DB.db.exec(readFileSync(new URL('../migrations/0030_iracing_import.sql',import.meta.url),'utf8'));
  DB.db.exec(readFileSync(new URL('../migrations/0031_solo_driver.sql',import.meta.url),'utf8'));
  DB.db.exec(readFileSync(new URL('../migrations/0054_event_sim.sql',import.meta.url),'utf8'));
+ DB.db.exec(readFileSync(new URL('../migrations/0055_event_absences.sql',import.meta.url),'utf8'));
  DB.db.exec(readFileSync(new URL('../migrations/0015_crew_lock.sql',import.meta.url),'utf8'));
  DB.db.exec(readFileSync(new URL('../migrations/0016_client_errors.sql',import.meta.url),'utf8'));
  // The crews' owner column of migration 0016_crew_ownership (its backfill needs no data here).
@@ -484,6 +485,20 @@ test('events calendar: every simulator, typed circuit on AMS2 / ACE, no limit an
  assert.equal((await req('/api/community/modules','PATCH',{eventTypes:[' SAFE ','Bouboule','SAFE','']},'admin')).status,200);
  assert.deepEqual((await req('/api/session','GET',null,'pilot')).data.eventTypes,['SAFE','Bouboule']);
  assert.equal((await req('/api/community/modules','PATCH',{eventTypes:['x'.repeat(21)]},'admin')).status,400);
+});
+test('a pilot says he will miss an event, and entering it withdraws the absence',async()=>{
+ const {req,login}=harness();await login(ADMIN,'admin');await login(PILOT,'pilot');
+ const created=await req('/api/events','POST',{...soloInput,categories:[],rounds:[{circuit:soloInput.rounds?.[0]?.circuit||'spa',durationMinutes:30}]},'admin');assert.equal(created.status,201,JSON.stringify(created.data));
+ const find=async()=>(await req('/api/events','GET',null,'pilot')).data.events.find(e=>e.id===created.data.id);
+ assert.deepEqual((await find()).absences,[]);
+ assert.equal((await req(`/api/events/${created.data.id}/absence`,'PUT',{},'pilot')).status,200);
+ assert.deepEqual((await find()).absences.map(a=>[a.mine]),[[true]]);
+ assert.equal((await req('/api/events','GET',null,'admin')).data.events.find(e=>e.id===created.data.id).absences[0].mine,false);
+ const event=await find(),path=`/api/events/${event.id}/departures/${event.departures[0].id}/registrations`;
+ assert.equal((await req(path,'POST',{name:'Pilote',choices:[]},'pilot')).status,201);
+ assert.deepEqual((await find()).absences,[],'entering withdraws the absence');
+ assert.equal((await req(`/api/events/${created.data.id}/absence`,'PUT',{},'pilot')).status,409,'an entered pilot is not absent');
+ assert.equal((await req(`/api/events/${created.data.id}/absence`,'DELETE',null,'pilot')).status,200);
 });
 test('SAFE solo races are reserved to the Discord roles with "Courses SAFE"',async()=>{
  const {req,login}=harness();await login(ADMIN,'admin');await login(PILOT,'pilot');

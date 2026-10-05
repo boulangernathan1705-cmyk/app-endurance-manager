@@ -44,16 +44,16 @@ const ICONS = {
   info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/>',
 };
 const infoChip = (icon, value, title) => `<span class="solo-info-chip" title="${esc(title)}"><svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[icon]}</svg><span>${esc(value)}</span></span>`;
-const hourLabel = time => time.endsWith(':00') ? `${time.slice(0, 2)}h` : time.replace(':', 'h');
 // The event's details on the calendar card: per round its sessions, weather, multipliers and car, then the
 // schedule of an open session, the server password and the note.
-export function soloCardInfo(event, departure = event.departures?.[0]) {
+export function soloCardInfo(event) {
   const details = event.details || {}, rounds = event.rounds?.length ? event.rounds : [{circuit: event.circuit, durationMinutes: event.durationMinutes}];
   const roundRow = round => {
     const weather = WEATHERS.find(([value]) => value === round.weather);
     const car = [(round.categories || []).length ? '' : round.category, round.car].filter(Boolean).join(' · ');
     const chips = [
       rounds.length > 1 ? `<span class="solo-info-circuit">${esc(eventCircuitName(event, round.circuit))}</span>` : '',
+      ...(round.categories || []).map(category => `<span class="solo-info-category" title="${esc(category)}">${logo(category)}</span>`),
       infoChip('format', roundFormat(round).replaceAll('/', ' · '), 'Essais · Qualifs · Course (min)'),
       weather ? `<span class="solo-info-chip solo-info-weather" title="Météo : ${esc(weather[2])}"><span aria-hidden="true">${weather[1]}</span><span class="sr-only">${esc(weather[2])}</span></span>` : '',
       round.fuel != null ? infoChip('fuel', `×${round.fuel}`, 'Consommation de carburant') : '',
@@ -63,7 +63,6 @@ export function soloCardInfo(event, departure = event.departures?.[0]) {
     return `<span class="solo-info-row">${chips.join('')}</span>`;
   };
   const extra = [
-    details.endTime && departure?.time ? infoChip('time', `${hourLabel(departure.time)} → ${hourLabel(details.endTime)}`, 'Horaire') : '',
     details.password ? infoChip('lock', details.password, 'Mot de passe du serveur') : '',
     details.note ? infoChip('info', details.note, 'Info') : '',
   ].filter(Boolean);
@@ -140,15 +139,4 @@ export function roundFormat(round) {
 export function roundExtras(round) {
   const weather = WEATHERS.find(([value]) => value === round.weather)?.[1];
   return [weather, round.fuel != null ? `carburant ×${round.fuel}` : '', round.tyres != null ? `usure pneus ×${round.tyres}` : ''].filter(Boolean).join(' · ');
-}
-// What the community's calendar shows: the end of an open session, the server password, the note, and per
-// round its circuit, categories, session lengths, weather and multipliers.
-export function soloEventInfo(event, departure = event.departures?.[0]) {
-  const details = event.details || {}, rounds = event.rounds || [];
-  const rows = [];
-  if (details.endTime && departure) rows.push(['Horaire', `${departure.time}-${details.endTime}`]);
-  if (details.password) rows.push(['Mot de passe', details.password]);
-  rounds.forEach((round, index) => rows.push([rounds.length > 1 ? `Manche ${index + 1}` : 'Manche', [eventCircuitName(event, round.circuit), (round.categories || []).join(' ') || round.category, round.car, roundFormat(round), roundExtras(round)].filter(Boolean).join(' · ')]));
-  if (details.note) rows.push(['Info', details.note]);
-  return `<dl class="solo-event-info">${rows.map(([label, value]) => `<div><dt>${esc(label)}</dt><dd>${esc(value)}</dd></div>`).join('')}</dl>`;
 }
