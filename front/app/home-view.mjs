@@ -1,4 +1,4 @@
-import {simForEvent,SIMS} from '../../shared/catalog.mjs';
+import {simForEvent,SIMS,isRandomCircuit} from '../../shared/catalog.mjs';
 import {app,nav,state,activeGame,esc,button,canManage,isAdmin,can,circuitLabel,EVENT_TYPES,CATEGORIES,eventTypeBadge,officialBadge,schedulePendingBadge,eventBadge,eventCategoryCount,circuitVisual,logo,dateLabel,countdown,groupEvents,notifyRender,notifyNav} from './core.mjs';
 import {raceRangeBlock} from './planning.mjs';
 import {dateBlock,dayLabel,timeLabel} from '../dates.mjs';
@@ -75,12 +75,24 @@ function syncNavSection(page){for(const item of nav.querySelectorAll('.nav-secti
 // Events of the community first (every simulator), then Endurance with its simulator (LMU or iRacing).
 export function renderNav(){const games=`<div class="nav-game-switcher" role="group" aria-label="Changer de simulateur">${gameLink('lmu','Le Mans Ultimate','LMU')}${gameLink('iracing','iRacing','iRacing')}</div>`;nav.innerHTML=`<div class="nav-sections" role="group" aria-label="Sections">${state.soloRaces?button('home',esc(state.soloLabel),'data-list="solo"','nav-section-button nav-events-button'):''}${button('home','ENDURANCE','data-list="endurance"','nav-section-button')}${games}${button('my-entries','Mes inscriptions','','nav-section-button')}${activeGame==='lmu'&&state.training?`${state.trainingRace?'<a class="nav-section-button" href="/entrainement.html">Entraînement</a>':''}<a class="nav-section-button" href="/stands.html">Mémo</a>`:''}</div>`;syncNavSection(state.page);notifyNav();}
 document.addEventListener('endurance:render',event=>syncNavSection(event.detail?.page));
+// Solo event card: one bottom line with the start (« 21h – 23h »), the places and where the pilot stands.
+function soloCardFoot(event,archived,situation){
+  const dated=datedDepartures(event),shown=archived?dated.at(-1):dated.find(d=>Number(d.startsAt)>Date.now())||dated.at(-1);
+  const end=event.details?.endTime?` – ${esc(timeLabel(event.details.endTime))}`:'';
+  const start=shown?`<span class="solo-card-start"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>${esc(timeLabel(shown.time))}${end}</span>`:'';
+  return `<span class="solo-card-foot">${start}${soloFill(event,shown)}${situation?`<span class="race-situation">${situation}</span>`:''}</span>`;
+}
+// The circuit map of a solo event, only when there is one (a typed circuit or a random one has none).
+function soloCircuit(event){
+  const visual=isRandomCircuit(event.circuit)?'':circuitVisual(event.circuit,true);
+  return visual?`<span class="race-card-circuit" aria-hidden="true">${visual}</span>`:'';
+}
 function eventCard({event,next,archived,end}){
   const registered=registeredRaceStatus(event);const displayNext=registered.next;
   const untilNext=displayNext?displayNext.startsAt-Date.now():Infinity,statusClass=archived?'finished':displayNext&&untilNext<=3600000?'soon':'upcoming';
   const status=archived?`Tous les départs ont eu lieu · ${esc(dateLabel({startsAt:end}))}`:displayNext?`Prochain départ avec pilotes : ${esc(dateLabel(displayNext))} à ${esc(timeLabel(displayNext.time))} · <span data-countdown="${displayNext.startsAt}">${countdown(displayNext.startsAt)}</span>`:next?'Aucun départ à venir avec pilote inscrit':'Dates à confirmer';
   const situation=`${schedulePendingBadge(event)}${situationBadge(event,archived)}`;
-  return `<button class="event-card event-card-harmonized race-card event-type-${event.eventType||'private'}${isSolo(event)?` is-solo is-solo-${event.access||'open'} sim-${simForEvent(event)}`:''} ${archived?'archived':''}" data-action="open" data-id="${event.id}"><span class="event-card-body race-card-body"><span class="race-card-content"><span class="race-card-top">${raceDateBlock(event,archived)}<span class="race-head"><span class="event-name">${esc(event.name)}</span><span class="race-meta">${isSolo(event)?soloCardMeta(event):`${esc(circuitLabel(event.circuit))} · ${durationLabel(eventMinutes(event))}`}</span>${officialBadge(event)}${isSolo(event)?accessBadge(event):eventTypeBadge(event.eventType)}</span></span>${isSolo(event)?soloCardInfo(event):''}${raceStarts(event,archived)}${situation?`<span class="race-situation">${situation}</span>`:''}<span class="race-fill">${isSolo(event)?soloFill(event):`<span class="event-category-badges">${event.categories.map(category=>eventBadge(category,eventCategoryCount(event,category))).join('')}</span>`}</span></span><span class="race-card-circuit" aria-hidden="true">${circuitVisual(event.circuit,true)}</span><span class="event-card-status"><span class="event-countdown ${statusClass}" ${displayNext&&!archived?`data-status-time="${displayNext.startsAt}"`:''}>${status}</span></span></span></button>`;
+  return `<button class="event-card event-card-harmonized race-card event-type-${event.eventType||'private'}${isSolo(event)?` is-solo is-solo-${event.access||'open'} sim-${simForEvent(event)}`:''} ${archived?'archived':''}" data-action="open" data-id="${event.id}"><span class="event-card-body race-card-body"><span class="race-card-content"><span class="race-card-top">${raceDateBlock(event,archived)}<span class="race-head"><span class="event-name">${esc(event.name)}</span><span class="race-meta">${isSolo(event)?soloCardMeta(event):`${esc(circuitLabel(event.circuit))} · ${durationLabel(eventMinutes(event))}`}</span>${officialBadge(event)}${isSolo(event)?accessBadge(event):eventTypeBadge(event.eventType)}</span></span>${isSolo(event)?`${soloCardInfo(event)}${soloCardFoot(event,archived,situation)}</span>${soloCircuit(event)}`:`${raceStarts(event,archived)}${situation?`<span class="race-situation">${situation}</span>`:''}<span class="race-fill"><span class="event-category-badges">${event.categories.map(category=>eventBadge(category,eventCategoryCount(event,category))).join('')}</span></span></span><span class="race-card-circuit" aria-hidden="true">${circuitVisual(event.circuit,true)}</span>`}<span class="event-card-status"><span class="event-countdown ${statusClass}" ${displayNext&&!archived?`data-status-time="${displayNext.startsAt}"`:''}>${status}</span></span></span></button>`;
 }
 // Filters of the race list (communities, type, category, dates, situation), kept in the browser.
 const FILTER_KEY='em_race_filters_v1';
