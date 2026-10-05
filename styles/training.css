@@ -50,6 +50,24 @@
 #training-app .training-sessions li>div{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:baseline}
 #training-app .training-sessions li>span{display:block;color:var(--text);font-family:var(--memo-mono)}
 #training-app .training-delete{width:28px;height:28px;border:0}
+.preparation-sessions>summary{cursor:pointer;font:700 26px/1.1 var(--memo-display)}
+.preparation-sessions>summary span{margin-left:12px;color:var(--muted);font:400 12px/1.3 sans-serif}
+.preparation-sessions[open]>summary{margin-bottom:12px}
+.training-sync{display:grid;gap:16px}
+.training-sync p{margin:6px 0}
+.training-methods{display:flex;flex-wrap:wrap;gap:8px}
+.training-methods button{min-height:42px;padding:8px 12px;border:1px solid var(--border);border-radius:6px;background:transparent;color:var(--muted);font:inherit;cursor:pointer}
+.training-methods button[aria-pressed=true]{border-color:var(--memo-you);color:var(--text);background:color-mix(in srgb,var(--memo-you) 12%,transparent)}
+.training-sync .training-howto{display:grid;gap:16px;padding-left:24px}
+.training-sync .training-howto p,.training-troubleshooting li{font-size:14px;color:var(--muted);line-height:1.6}
+.training-sync .training-howto form{margin-top:8px}
+.training-troubleshooting summary{cursor:pointer;font-size:14px;font-weight:700}
+.training-troubleshooting[open]>summary{margin-bottom:12px}
+.training-sync .training-busy{padding:10px 12px;border:1px solid var(--memo-you);border-radius:6px;color:var(--memo-you)}
+.memo-energy-control{display:grid;grid-template-columns:minmax(0,1fr) 68px;gap:14px;align-items:center}
+.memo-energy-control input[type=range]{min-width:0;min-height:32px;cursor:grab;touch-action:pan-y}
+.memo-energy-control input[type=range]:active{cursor:grabbing}
+.memo-energy-control input[type=number]{width:68px;box-sizing:border-box;min-height:36px;border:1px solid var(--border);border-radius:4px;padding:6px;background:var(--panel);color:var(--text);font:500 14px var(--memo-mono)}
 @media(max-width:760px){.preparation-grid{grid-template-columns:1fr}#training-app .training-card{padding:14px}.preparation-head{gap:14px}#training-app .training-steps li>:last-child{grid-column:auto;justify-self:end}.preparation-crew .memo-table{min-width:780px}}
 .training-page h1,.training-page h2{margin:0}
 .training-page h2{font-size:18px}

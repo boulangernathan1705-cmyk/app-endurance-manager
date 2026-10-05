@@ -3,12 +3,13 @@
 // comparison with the other pilots of the site. Only the pilot sees his own data; the others are counted, never named.
 import {fail, json, now, id, token, hash, siteOrigin, rateLimit, body, DAY} from './core.mjs';
 import {parseResults, analyse, programSteps, adviceFor, trackKey, cleanLaps, circuitOf, normal, cleanLive, analyseLive, resultsAsLive, pitTimes, memoSheet, parseLaptimes, laptimesUpdated, mainLayout, LAPTIME_SOURCE, STEPS} from '../shared/training.mjs';
-import {levelOf} from '../shared/training.mjs';
+import {levelOf, memoPilots} from '../shared/training.mjs';
 import {BOP} from '../shared/lmu-bop.mjs';
 import {bopFor} from '../shared/bop.mjs';
 
 const FILE_LIMIT = 3_000_000;
 const KEEP_DAYS = 120;
+const ANALYSIS_SESSIONS = 5;
 const enabled = community => community?.modules?.training === true;
 const all = async (env, sql, ...params) => (await env.DB.prepare(sql).bind(...params).all()).results || [];
 const median = values => { const list = values.filter(value => value > 0).sort((a, b) => a - b); return list.length ? (list[Math.floor((list.length - 1) / 2)] + list[Math.ceil((list.length - 1) / 2)]) / 2 : null; };
@@ -49,9 +50,9 @@ export async function saveSession(env, userId, xml, keep = true) {
   const sector = index => { const values = clean.map(lap => lap.s[index]).filter(Boolean); return values.length ? Math.min(...values) : null; };
   const perLap = Math.max(median(clean.map(lap => lap.fuel)) || 0, median(clean.map(lap => lap.ve)) || 0) || null;
   const fingerprint = await hash(JSON.stringify([session.at, session.venue, session.course, session.kind, session.car, session.laps]));
-  const result = await env.DB.prepare(`INSERT OR IGNORE INTO training_sessions(id,user_id,fingerprint,started_at,track_key,venue,course,car,car_class,kind,laps,best,s1,s2,s3,per_lap,created_at)
-    VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).bind(id(), userId, fingerprint, session.at, trackKey(session), session.venue.slice(0, 120), session.course.slice(0, 120),
-    session.car.slice(0, 120), session.carClass.slice(0, 60), session.kind.slice(0, 20), JSON.stringify(session.laps), best, sector(0), sector(1), sector(2), perLap, now()).run();
+  const result = await env.DB.prepare(`INSERT OR IGNORE INTO training_sessions(id,user_id,fingerprint,started_at,track_key,venue,course,car,car_class,kind,laps,best,s1,s2,s3,per_lap,created_at,lap_count)
+    VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).bind(id(), userId, fingerprint, session.at, trackKey(session), session.venue.slice(0, 120), session.course.slice(0, 120),
+    session.car.slice(0, 120), session.carClass.slice(0, 60), session.kind.slice(0, 20), JSON.stringify(session.laps), best, sector(0), sector(1), sector(2), perLap, now(),session.laps.length).run();
   return {created:result.meta.changes === 1, venue:session.venue, laps:session.laps.length};
 }
 
@@ -81,7 +82,29 @@ export async function saveLive(env, userId, text) {
     ON CONFLICT(car) DO UPDATE SET car_class=excluded.car_class,service=excluded.service,updated_at=excluded.updated_at`).bind(session.car, session.carClass, JSON.stringify(session.service), now()).run();
   // The game names the pilot: learnt once, so his online results files find him.
   if (session.driver && !(await env.DB.prepare('SELECT 1 FROM training_profiles WHERE user_id=?').bind(userId).first())) await setLmuName(env, userId, session.driver);
+  if (result.meta.changes === 1) await refreshMemoPilot(env, userId, circuitOf(session.track) || normal(session.track), session.car);
   return {created:result.meta.changes === 1, track:session.track, laps:session.laps.length};
+}
+
+// At most five raw sessions are read once when new data arrives. The shared page only reads these small summaries.
+export async function refreshMemoPilot(env, user, circuit, car) {
+  const rows = await all(env, `SELECT track,car_class,started_at,capacity,laps,stops,game FROM training_live
+    WHERE user_id=? AND circuit=? AND car=? AND started_at>=? ORDER BY started_at DESC LIMIT ?`,user,circuit,car,Date.now()-KEEP_DAYS*DAY*1000,ANALYSIS_SESSIONS);
+  if (!rows.length) return;
+  const sessions=rows.map(row=>({user,capacity:row.capacity,laps:JSON.parse(row.laps)}));
+  const stops=rows.flatMap(row=>JSON.parse(row.stops)).slice(0,20);
+  const summary={...memoPilots(sessions)[0],lane:pitTimes(stops),game:rows.map(row=>row.game&&JSON.parse(row.game)).find(Boolean)||null};
+  const latest=rows[0];
+  await env.DB.prepare(`INSERT INTO training_memo_pilots(user_id,circuit,track,car,car_class,started_at,summary,stops) VALUES(?,?,?,?,?,?,?,?)
+    ON CONFLICT(user_id,circuit,car) DO UPDATE SET track=excluded.track,car_class=excluded.car_class,started_at=excluded.started_at,summary=excluded.summary,stops=excluded.stops`)
+    .bind(user,circuit,latest.track,car,latest.car_class,latest.started_at,JSON.stringify(summary),JSON.stringify(stops)).run();
+}
+
+async function backfillMemo(env, user = null) {
+  const pairs=await all(env,`SELECT DISTINCT t.user_id,t.circuit,t.car FROM training_live t LEFT JOIN training_memo_pilots m
+    ON m.user_id=t.user_id AND m.circuit=t.circuit AND m.car=t.car WHERE m.user_id IS NULL AND t.started_at>=?
+    ${user ? 'AND t.user_id=?' : ''} LIMIT 3`,Date.now()-KEEP_DAYS*DAY*1000,...(user?[user]:[]));
+  for(const pair of pairs) await refreshMemoPilot(env,pair.user_id,pair.circuit,pair.car);
 }
 
 // The sync program (or the SimHub plugin): no browser and no cookie, only the pilot's own key, which can do nothing
@@ -147,7 +170,8 @@ export async function refreshLaptimes(env, fetcher = fetch) {
 // the viewer's own figures come with them.
 async function memo(env, user, url) {
   const since = Date.now() - KEEP_DAYS * DAY * 1000;
-  const rows = await all(env, `SELECT circuit,MIN(track) AS track,car,car_class,COUNT(DISTINCT user_id) AS pilots FROM training_live WHERE started_at>=?
+  await backfillMemo(env,user);
+  const rows = await all(env, `SELECT circuit,MIN(track) AS track,car,car_class,COUNT(DISTINCT user_id) AS pilots FROM training_memo_pilots WHERE started_at>=?
     GROUP BY circuit,car,car_class ORDER BY circuit,car`, since);
   const circuits = [];
   for (const row of rows) {
@@ -159,15 +183,17 @@ async function memo(env, user, url) {
   if (!circuit) return {circuits, circuit:null};
   const car = circuit.cars.find(item => item.car === url.searchParams.get('car'))
     || circuit.cars.find(item => item.carClass === url.searchParams.get('class')) || [...circuit.cars].sort((a, b) => b.pilots - a.pilots)[0];
-  const lane = await all(env, `SELECT stops FROM training_live WHERE circuit=? AND started_at>=? AND stops!='[]' ORDER BY started_at DESC LIMIT 500`, circuit.key, since);
-  const sessions = await all(env, `SELECT user_id,capacity,laps,stops,game FROM training_live WHERE circuit=? AND car=? AND started_at>=? ORDER BY started_at DESC LIMIT 500`,
-    circuit.key, car.car, since);
+  const lane = await all(env, `SELECT json_extract(summary,'$.lane.through') AS through FROM training_memo_pilots
+    WHERE circuit=? AND started_at>=? AND json_extract(summary,'$.lane.through')>0 LIMIT 500`,circuit.key,since);
+  const summaries = await all(env, `SELECT user_id,summary,stops FROM training_memo_pilots WHERE circuit=? AND car=? AND started_at>=? ORDER BY (user_id=?) DESC,started_at DESC LIMIT 500`,
+    circuit.key, car.car, since,user);
   const stored = await env.DB.prepare('SELECT service FROM training_cars WHERE car=?').bind(car.car).first();
-  const game = sessions.map(row => row.game && JSON.parse(row.game)).find(Boolean) || null;
+  const pilots=summaries.map(row=>JSON.parse(row.summary));
+  const game = pilots.find(pilot=>pilot.game)?.game || null;
   const laptimes = await env.DB.prepare("SELECT data,updated FROM training_reference WHERE id='laptimes'").first();
   const references = laptimes ? JSON.parse(laptimes.data).filter(row => row.circuit === circuit.key && row.carClass === LAPTIME_CLASS[car.carClass]) : [];
-  const sheet = memoSheet({reference:mainLayout(references),laneStops:lane.flatMap(row => JSON.parse(row.stops)), carStops:sessions.flatMap(row => JSON.parse(row.stops)),
-    sessions:sessions.map(row => ({user:row.user_id, capacity:row.capacity, laps:JSON.parse(row.laps)})), viewer:user,
+  const sheet = memoSheet({reference:mainLayout(references),laneStops:lane.map(row=>({lane:row.through,stopped:0})),carStops:summaries.flatMap(row=>JSON.parse(row.stops)),
+    summaries:pilots, viewer:user,
     service:stored ? JSON.parse(stored.service) : null, game});
   return {circuits, circuit:{key:circuit.key, name:circuit.name}, car, ...sheet,
     bop:bopFor(BOP, circuit.key, car.car, car.carClass),
@@ -216,23 +242,24 @@ export async function crewPreparation(env, user, community, race, track, carClas
   const members = await all(env, `SELECT DISTINCT p.user_id,p.name FROM crew_members cm JOIN registrations r ON r.id=cm.registration_id
     JOIN participants p ON p.id=r.participant_id WHERE cm.crew_id=? ORDER BY p.name`, crew.id);
   const since = Date.now() - KEEP_DAYS * DAY * 1000;
-  const rows = await all(env, `SELECT t.user_id,t.started_at,t.car,t.kind,t.laps FROM training_sessions t WHERE t.track_key=? AND t.car_class=? AND t.started_at>=?
+  const rows = await all(env, `WITH recent AS (SELECT t.id,
+    ROW_NUMBER() OVER (PARTITION BY t.user_id ORDER BY t.started_at DESC) AS position FROM training_sessions t WHERE t.track_key=? AND t.car_class=? AND t.started_at>=?
     AND t.user_id IN (SELECT p.user_id FROM crew_members cm JOIN registrations r ON r.id=cm.registration_id JOIN participants p ON p.id=r.participant_id WHERE cm.crew_id=?)
-    ORDER BY t.started_at DESC LIMIT 200`, track.key, carClass, since, crew.id);
+    ) SELECT t.user_id,t.started_at,t.car,t.kind,t.laps FROM recent JOIN training_sessions t ON t.id=recent.id
+    WHERE recent.position<=? ORDER BY t.started_at DESC`, track.key, carClass, since, crew.id,ANALYSIS_SESSIONS);
   const marks = await all(env, `SELECT m.user_id,m.step FROM training_marks m WHERE m.track_key=? AND m.user_id IN
     (SELECT p.user_id FROM crew_members cm JOIN registrations r ON r.id=cm.registration_id JOIN participants p ON p.id=r.participant_id WHERE cm.crew_id=?)`, track.key, crew.id);
-  const live = await all(env, `SELECT t.user_id,t.started_at,t.car,t.capacity,t.laps,t.stops FROM training_live t WHERE t.circuit=? AND t.car_class=? AND t.started_at>=?
-    AND t.user_id IN (SELECT p.user_id FROM crew_members cm JOIN registrations r ON r.id=cm.registration_id JOIN participants p ON p.id=r.participant_id WHERE cm.crew_id=?)
-    ORDER BY t.started_at DESC LIMIT 200`, circuit, carClass, since, crew.id);
+  const live = await all(env, `SELECT m.user_id,m.summary FROM training_memo_pilots m WHERE m.circuit=? AND m.car_class=? AND m.started_at>=?
+    AND m.user_id IN (SELECT p.user_id FROM crew_members cm JOIN registrations r ON r.id=cm.registration_id JOIN participants p ON p.id=r.participant_id WHERE cm.crew_id=?)`,circuit,carClass,since,crew.id);
   const pilots = members.map(member => {
     const sessions = rows.filter(row => member.user_id && row.user_id === member.user_id).slice(0,50).map(row => ({at:row.started_at,car:row.car,kind:row.kind,laps:JSON.parse(row.laps)}));
     const a = analyse(sessions);
-    const ownLive = live.filter(row => member.user_id && row.user_id === member.user_id).slice(0,30);
-    const telemetry = ownLive.length ? analyseLive(ownLive.map(row => ({at:row.started_at,car:row.car,capacity:row.capacity,laps:JSON.parse(row.laps),stops:JSON.parse(row.stops)}))) : null;
+    const telemetry = live.filter(row => member.user_id && row.user_id === member.user_id).map(row=>JSON.parse(row.summary));
+    const fuel=median(telemetry.map(row=>row.fuel)), capacity=median(telemetry.map(row=>row.capacity));
     const steps = programSteps(a, marks.filter(row => member.user_id && row.user_id === member.user_id).map(row => row.step));
     return {name:member.name, you:member.user_id === user, steps:steps.map(step => ({key:step.key,done:step.done})), best:a.best, pace:a.median,
-      level:levelOf(a.median,reference), fuel:telemetry?.fuelPerLap ?? (telemetry?.capacity && a.fuelPerLap ? a.fuelPerLap*telemetry.capacity/100 : null),
-      energy:telemetry?.energyPerLap ?? a.energyPerLap, last:a.last ? {at:a.last.at,laps:a.last.laps.length} : null};
+      level:levelOf(a.median,reference), fuel:fuel ?? (capacity && a.fuelPerLap ? a.fuelPerLap*capacity/100 : null),
+      energy:median(telemetry.map(row=>row.ve)) ?? a.energyPerLap,last:a.last ? {at:a.last.at,laps:a.last.laps.length} : null};
   });
   pilots.sort((a,b) => Number(b.you)-Number(a.you));
   return {crew:{name:crew.name,car:crew.car,pilots},reference};
@@ -253,7 +280,7 @@ export async function trainingApi(path, method, request, env, actor, community) 
   const user = actor.user.id;
   if (path === '/api/training' && method === 'GET') {
     const url = new URL(request.url);
-    const sessions = await all(env, `SELECT id,started_at,track_key,venue,course,car,car_class,kind,laps,best FROM training_sessions
+    const sessions = await all(env, `SELECT id,started_at,track_key,venue,course,car,car_class,kind,lap_count,best FROM training_sessions
       WHERE user_id=? AND started_at>=? ORDER BY started_at DESC LIMIT 200`, user, Date.now() - KEEP_DAYS * DAY * 1000);
     const race = await nextRace(env, user);
     const tracks = [];
@@ -263,13 +290,15 @@ export async function trainingApi(path, method, request, env, actor, community) 
     const onTrack = track ? sessions.filter(row => row.track_key === track.key) : [];
     const classes = [...new Set(onTrack.map(row => row.car_class))];
     const carClass = classes.includes(url.searchParams.get('class')) ? url.searchParams.get('class') : classes[0] || null;
-    const chosen = onTrack.filter(row => row.car_class === carClass).slice(0, 50)
+    const chosenRows=track&&carClass ? await all(env,`SELECT started_at,car,kind,laps FROM training_sessions
+      WHERE user_id=? AND track_key=? AND car_class=? AND started_at>=? ORDER BY started_at DESC LIMIT ?`,user,track.key,carClass,Date.now()-KEEP_DAYS*DAY*1000,ANALYSIS_SESSIONS):[];
+    const chosen = chosenRows
       .map(row => ({at:row.started_at, car:row.car, kind:row.kind, laps:JSON.parse(row.laps)}));
     const analysis = analyse(chosen);
     // Live sessions on the same circuit and class (a track the site does not know is matched by its name).
     const circuit = track ? track.circuit || normal(track.venue) : null;
     const liveRows = circuit && carClass ? await all(env, `SELECT started_at,car,capacity,laps,stops,game FROM training_live WHERE user_id=? AND circuit=? AND car_class=?
-      AND started_at>=? ORDER BY started_at DESC LIMIT 30`, user, circuit, carClass, Date.now() - KEEP_DAYS * DAY * 1000) : [];
+      AND started_at>=? ORDER BY started_at DESC LIMIT ?`, user, circuit, carClass, Date.now() - KEEP_DAYS * DAY * 1000,ANALYSIS_SESSIONS) : [];
     const live = liveRows.length ? analyseLive(liveRows.map(row => ({at:row.started_at, car:row.car, capacity:row.capacity, laps:JSON.parse(row.laps), stops:JSON.parse(row.stops)})))
       : resultsAsLive(chosen);
     // The results files give the fuel as a share of the tank: in litres once the game told the tank size.
@@ -283,7 +312,8 @@ export async function trainingApi(path, method, request, env, actor, community) 
     const game = liveRows.map(row => row.game && JSON.parse(row.game)).find(Boolean) || null;
     return json({race, tracks, track, classes, carClass, analysis, live, game, ...preparation, steps:programSteps(analysis, marks), advice:adviceFor(analysis, compared), comparison:compared,
       sessions:sessions.slice(0, 20).map(row => ({id:row.id, at:row.started_at, venue:row.venue, course:row.course, car:row.car, carClass:row.car_class, kind:row.kind,
-        laps:JSON.parse(row.laps).length, best:row.best})),
+        laps:row.lap_count, best:row.best})),
+      analysisWindow:ANALYSIS_SESSIONS,
       device:device ? {linked:true, lastSeen:device.last_seen} : {linked:false}, lmuName:profile?.lmu_name || null,
       pending:waiting.length && !profile?.lmu_name ? {files:waiting.length, drivers:[...new Set(waiting.flatMap(row => JSON.parse(row.drivers)))].sort((a, b) => a.localeCompare(b)).slice(0, 60)} : null});
   }
@@ -335,4 +365,6 @@ export async function trainingApi(path, method, request, env, actor, community) 
 
 export async function purgeTraining(env) {
   for (const table of ['training_sessions', 'training_live']) await env.DB.prepare(`DELETE FROM ${table} WHERE id IN (SELECT id FROM ${table} WHERE started_at<? LIMIT 500)`).bind(Date.now() - KEEP_DAYS * DAY * 1000).run();
+  await env.DB.prepare('DELETE FROM training_memo_pilots WHERE started_at<?').bind(Date.now()-KEEP_DAYS*DAY*1000).run();
+  await backfillMemo(env);
 }

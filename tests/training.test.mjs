@@ -3,11 +3,11 @@ import assert from 'node:assert/strict';
 import {DatabaseSync} from 'node:sqlite';
 import {readFileSync, readdirSync} from 'node:fs';
 import worker from '../server/worker.mjs';
-import {refreshLaptimes, crewPreparation} from '../server/training.mjs';
+import {refreshLaptimes, crewPreparation,refreshMemoPilot} from '../server/training.mjs';
 import {BOP} from '../shared/lmu-bop.mjs';
 import {bopFor} from '../shared/bop.mjs';
 import {linkTestServer, setMember, ORGA_ROLE} from './fixtures/discord-server.mjs';
-import {parseResults, analyse, programSteps, adviceFor, todaySession, circuitOf, cleanLive, analyseLive, stopTime, memoSheet, parseLaptimes, levelOf, levelBands} from '../shared/training.mjs';
+import {parseResults, analyse, programSteps, adviceFor, todaySession, circuitOf, cleanLive, analyseLive, stopTime,refuelAmounts,memoPilots, memoSheet, parseLaptimes, levelOf, levelBands} from '../shared/training.mjs';
 
 // Individual training (migration 0046): LMU results files, the program, the advice and the sync program.
 const ROOT='https://site.example';
@@ -15,8 +15,8 @@ const ADMIN='111111111111111111', PILOT='222222222222222222', MATE='333333333333
 const MIGRATIONS=readdirSync(new URL('../migrations/',import.meta.url)).filter(name=>name.endsWith('.sql')).sort();
 
 class D1 {
-  constructor(){this.db=new DatabaseSync(':memory:');this.db.exec('PRAGMA foreign_keys=ON;');for(const file of MIGRATIONS)this.db.exec(readFileSync(new URL(`../migrations/${file}`,import.meta.url),'utf8'));}
-  prepare(sql){const self=this;return {params:[],bind(...params){this.params=params;return this;},async first(){return self.db.prepare(sql).get(...this.params)||null;},async all(){return {results:self.db.prepare(sql).all(...this.params)};},async run(){const result=self.db.prepare(sql).run(...this.params);return {meta:{changes:Number(result.changes)}};}};}
+  constructor(){this.reads=[];this.db=new DatabaseSync(':memory:');this.db.exec('PRAGMA foreign_keys=ON;');for(const file of MIGRATIONS)this.db.exec(readFileSync(new URL(`../migrations/${file}`,import.meta.url),'utf8'));}
+  prepare(sql){const self=this;return {params:[],bind(...params){this.params=params;return this;},async first(){return self.db.prepare(sql).get(...this.params)||null;},async all(){const results=self.db.prepare(sql).all(...this.params);self.reads.push({sql,params:this.params,rows:results.length,bytes:Buffer.byteLength(JSON.stringify(results))});return {results};},async run(){const result=self.db.prepare(sql).run(...this.params);return {meta:{changes:Number(result.changes)}};}};}
   async batch(statements){this.db.exec('BEGIN');try{const results=[];for(const statement of statements)results.push(await statement.run());this.db.exec('COMMIT');return results;}catch(error){this.db.exec('ROLLBACK');throw error;}}
 }
 
@@ -207,6 +207,51 @@ test('live data gives litres, the fuel ratio, tyres by compound and the stops br
 
 // The Ferrari 296 GT3's service times, read in LMU's API and checked on three real stops at Long Beach (5 October).
 const SERVICE_296={fuelRate:3.4,energyRate:2.5,connect:2,tyres4:12,tyres2:4.5,wing:25,ductFront:10,ductRear:9,brakes:120,driver:25,repair:30};
+
+test('refuel estimates use the difference between current and target energy at one-percent precision',()=>{
+  const a=refuelAmounts(20,73,1,90);
+  assert.equal(a.energy,53);assert.ok(Math.abs(a.fuel-47.7)<0.00001);
+  assert.equal(stopTime(SERVICE_296,{...a}),21.2);
+  assert.equal(refuelAmounts(20,74,1,90).energy,54);
+  assert.deepEqual(refuelAmounts(70,70,1,90),{energy:0,fuel:0});
+  assert.deepEqual(refuelAmounts(80,60,1,90),{energy:0,fuel:0});
+  assert.deepEqual(refuelAmounts(0,100,null,90),{energy:100,fuel:null});
+});
+
+test('history is metadata, individual analysis is bounded, and memo reads summaries instead of all pilots laps',async()=>{
+  const {req,send,login,DB,env}=harness();
+  await login(ADMIN,'admin','Orga');await login(PILOT,'pilot','Alice');
+  await req('/api/community/modules','PATCH',{training:true},'admin');
+  for(let i=0;i<25;i++) {
+    const xml=XML.replace(/<DateTime>\d+<\/DateTime>/,`<DateTime>${Math.floor(Date.now()/1000)-i*3600}</DateTime>`);
+    assert.equal((await upload(send,'pilot',xml)).status,200);
+  }
+  DB.reads=[];
+  const data=(await req('/api/training','GET',null,'pilot')).data;
+  assert.equal(data.sessions.length,20);assert.equal(data.analysis.sessions,5);assert.equal(data.analysisWindow,5);
+  const history=DB.reads.find(read=>read.sql.includes('lap_count,best FROM training_sessions'));
+  const detail=DB.reads.find(read=>read.sql.includes('SELECT started_at,car,kind,laps FROM training_sessions'));
+  assert.equal(detail.rows,5);assert.equal(detail.params.at(-1),5);assert.ok(history.bytes<detail.bytes,'history omits lap arrays');
+  assert.ok(data.sessions.every(session=>session.laps===25));
+  // Seed an old imported live history: summaries are refreshed using just the last five sessions.
+  const user=DB.db.prepare('SELECT id FROM users WHERE name=?').get('Alice').id;
+  const live=cleanLive(LIVE),laps=JSON.stringify(live.laps),stops=JSON.stringify(live.stops);
+  for(let i=0;i<25;i++) DB.db.prepare(`INSERT INTO training_live(id,user_id,fingerprint,started_at,circuit,track,car,car_class,capacity,laps,stops,created_at)
+    VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`).run('live-'+i,user,'live-'+i,Date.now()-i*3600000,'spa','Spa','Alpine A424','Hypercar',90,laps,stops,Math.floor(Date.now()/1000));
+  DB.reads=[];await refreshMemoPilot(env,user,'spa','Alpine A424');
+  assert.equal(DB.reads.find(read=>read.sql.includes('capacity,laps,stops,game FROM training_live')).rows,5);
+  DB.reads=[];
+  assert.equal((await req('/api/training/memo?circuit=spa','GET',null,'pilot')).status,200);
+  assert.ok(!DB.reads.some(read=>read.sql.includes(' FROM training_live')&&/SELECT[^;]*\blaps\b/.test(read.sql)),'shared memo reads no raw lap arrays');
+  const rows=DB.db.prepare('SELECT capacity,laps FROM training_live ORDER BY started_at DESC LIMIT 5').all().map(row=>({user,capacity:row.capacity,laps:JSON.parse(row.laps)}));
+  const summary=JSON.parse(DB.db.prepare('SELECT summary FROM training_memo_pilots WHERE user_id=?').get(user).summary);
+  const rawSheet=memoSheet({sessions:rows,viewer:user}),cachedSheet=memoSheet({summaries:[summary],viewer:user});
+  for(const field of ['fuel','energy','tyres','levels','stint']) assert.deepEqual(cachedSheet[field],rawSheet[field]);
+  // Existing imports are warmed in small batches, never a full historical scan of lap data.
+  DB.db.prepare('DELETE FROM training_memo_pilots').run();DB.reads=[];
+  assert.equal((await req('/api/training/memo?circuit=spa','GET',null,'pilot')).status,200);
+  assert.equal(DB.reads.filter(read=>read.sql.includes('capacity,laps,stops,game FROM training_live')).length,1);
+});
 
 test('a stop takes the game’s time: tyres, ducts and brakes after, fuel, energy, wing and driver at the same time', () => {
   assert.equal(stopTime(SERVICE_296,{fuel:10.25,energy:10.3,tyres:4}),17);
