@@ -4,6 +4,8 @@ import {DatabaseSync} from 'node:sqlite';
 import {readFileSync, readdirSync} from 'node:fs';
 import worker from '../server/worker.mjs';
 import {refreshLaptimes} from '../server/training.mjs';
+import {BOP} from '../shared/lmu-bop.mjs';
+import {bopFor} from '../shared/bop.mjs';
 import {linkTestServer, setMember, ORGA_ROLE} from './fixtures/discord-server.mjs';
 import {parseResults, analyse, programSteps, adviceFor, todaySession, circuitOf, cleanLive, analyseLive, stopTime, memoSheet, parseLaptimes, levelOf, levelBands} from '../shared/training.mjs';
 
@@ -216,11 +218,26 @@ test('the circuit sheet on the site: every circuit driven, the car’s service t
   assert.deepEqual([data.energy.you,data.energy.median,data.energy.game],[null,null,2.12]);
   assert.ok(!JSON.stringify(data).includes('Alice'));
   const alice=(await req('/api/training/memo?circuit=long-beach','GET',null,'pilot')).data;
-  assert.equal(alice.energy.you,2.15);assert.equal(alice.levels,null);
+  assert.equal(alice.energy.you,2.15);assert.equal(alice.levels,null);assert.equal(alice.bop?.version,'1.4.2');
   await refreshLaptimes(env,async()=>new Response(LAPTIMES));
   const withLevels=(await req('/api/training/memo?circuit=long-beach','GET',null,'pilot')).data;
   assert.deepEqual([withLevels.levels.q,withLevels.levels.you.level,withLevels.levels.you.next],[78.16,'Offline',{name:'Tail-ender',time:83.26}]);
   assert.deepEqual(withLevels.source,{name:'Ohne Speed',title:'LMU laptimes spreadsheet',url:'https://www.youtube.com/@ohne_speed',updated:'2026-10-02'});
+});
+
+test('the BoP of a car on a circuit: LMU’s line for all its versions, the main layout, the class LMU writes', () => {
+  assert.equal(BOP.version,'1.4.2');assert.equal(BOP.layouts.length,21);
+  const ferrari=bopFor(BOP,'long-beach','Ferrari 296 LMGT3 Evo','GT3');
+  assert.deepEqual([ferrari.car,ferrari.layout,ferrari.weight,ferrari.power,ferrari.energy,ferrari.wingMin,ferrari.wingMax,ferrari.compounds],['Ferrari 296 LMGT3','Long Beach',1442,86,775,0.6,4.5,[]]);
+  const peugeot=bopFor(BOP,'le-mans','Peugeot 9x8','Hyper');
+  assert.deepEqual([peugeot.car,peugeot.layout,peugeot.compounds],['Peugeot 9x8','Le Mans',['Soft','Medium','Hard']]);
+  assert.equal(bopFor(BOP,'le-mans','Peugeot 9x8 Evo','Hyper').car,'Peugeot 9x8 Evo');
+  assert.deepEqual(bopFor(BOP,'bahrain','Isotta Tipo 6','Hyper').changes,{weight:4,energy:-46});
+  assert.equal(bopFor(BOP,'lusail','Oreca 07','LMP2_ELMS').car,'Oreca 07 ELMS');
+  assert.equal(bopFor(BOP,'lusail','Oreca 07','LMP2').car,'Oreca 07 WEC');
+  assert.deepEqual([bopFor(BOP,'bahrain','Porsche 911 RSR-19','GTE').tank,bopFor(BOP,'bahrain','Porsche 911 RSR-19','GTE').refuel],[98,3.2666]);
+  assert.equal(bopFor(BOP,'long-beach','Unknown car','GT3'),null);
+  assert.equal(bopFor(BOP,'nowhere','Ferrari 296 LMGT3','GT3'),null);
 });
 
 const LAPTIMES=readFileSync(new URL('./fixtures/laptimes.csv',import.meta.url),'utf8');

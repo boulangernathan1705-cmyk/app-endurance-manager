@@ -3,6 +3,8 @@
 // comparison with the other pilots of the site. Only the pilot sees his own data; the others are counted, never named.
 import {fail, json, now, id, token, hash, siteOrigin, rateLimit, body, DAY} from './core.mjs';
 import {parseResults, analyse, programSteps, adviceFor, trackKey, cleanLaps, circuitOf, normal, cleanLive, analyseLive, resultsAsLive, pitTimes, memoSheet, parseLaptimes, laptimesUpdated, mainLayout, LAPTIME_SOURCE, STEPS} from '../shared/training.mjs';
+import {BOP} from '../shared/lmu-bop.mjs';
+import {bopFor} from '../shared/bop.mjs';
 
 const FILE_LIMIT = 3_000_000;
 const KEEP_DAYS = 120;
@@ -101,7 +103,7 @@ export async function trainingCollector(request, env, live = false) {
 }
 
 // The class LMU writes for a car, as the spreadsheet of reference lap times names it.
-const LAPTIME_CLASS = {GT3:'GT3', LMGT3:'GT3', Hypercar:'Hypercar', LMH:'Hypercar', LMDh:'Hypercar', LMP2:'LMP2', LMP3:'LMP3', GTE:'GTE', LMGTE:'GTE'};
+const LAPTIME_CLASS = {Hyper:'Hypercar', LMP2_ELMS:'LMP2 ELMS', LMP2_WEC:'LMP2', GT3:'GT3', LMGT3:'GT3', Hypercar:'Hypercar', LMH:'Hypercar', LMDh:'Hypercar', LMP2:'LMP2', LMP3:'LMP3', GTE:'GTE', LMGTE:'GTE'};
 
 // Once a day (cron): the spreadsheet of reference lap times, read whole and kept only when it still looks right.
 export async function refreshLaptimes(env, fetcher = fetch) {
@@ -144,6 +146,7 @@ async function memo(env, user, url) {
     sessions:sessions.map(row => ({user:row.user_id, capacity:row.capacity, laps:JSON.parse(row.laps)})), viewer:user,
     service:stored ? JSON.parse(stored.service) : null, game});
   return {circuits, circuit:{key:circuit.key, name:circuit.name}, car, ...sheet,
+    bop:bopFor(BOP, circuit.key, car.car, car.carClass),
     source:laptimes ? {name:LAPTIME_SOURCE.name, title:LAPTIME_SOURCE.title, url:LAPTIME_SOURCE.url, updated:laptimes.updated} : null};
 }
 

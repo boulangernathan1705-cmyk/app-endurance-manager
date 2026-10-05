@@ -67,6 +67,25 @@ function levels(data) {
     ${you?.pace ? `<p class="memo-level is-you"><i class="dot"></i>Ton rythme : <strong>${esc(you.level)}</strong> (${lap(you.pace, 3)})${you.next ? ` · Prochain objectif : <strong>${esc(you.next.name)}</strong> en ${lap(you.next.time)}` : ''}${you.best ? ` · Meilleur tour ${lap(you.best, 3)}` : ''}</p>` : ''}</section>`;
 }
 
+// The car's line in LMU's BoP for this circuit, with what changed since the previous BoP.
+const COMPOUNDS = {Soft:'Tendre', Medium:'Médium', Hard:'Dur'};
+function bop(data) {
+  const b = data.bop;
+  if (!b) return '';
+  const change = key => b.changes?.[key] ? ` (${b.changes[key] > 0 ? '+' : ''}${num(b.changes[key], Number.isInteger(b.changes[key]) ? 0 : 1)})` : '';
+  const line = (label, key, value, note = '') => b[key] === null || b[key] === undefined ? '' : row(label, `${value}${change(key)}`, '', note);
+  const power = b.carClass === 'Hypercar' ? `${num(b.power, 0)} kW` : typeof b.power === 'number' ? `${num(b.power, 1).replace(',0', '')} %` : esc(b.power);
+  return `<section class="training-card"><h2>BoP LMU ${esc(b.version)}</h2>
+    <p class="training-note">${esc(b.car)} · ${esc(b.layout)}.${b.changes ? ' Entre parenthèses, l’écart avec la BoP précédente.' : ''}</p>
+    <dl>${line('Poids minimum', 'weight', `${num(b.weight, 0)} kg`, 'pilote compris')}${line('Puissance maximale', 'power', power)}
+      ${line('Énergie max par relais', 'energy', `${num(b.energy, 0)} MJ`, 'ce que vaut 100 % d’énergie')}
+      ${b.carClass === 'Hypercar' ? line('Branchement avant la recharge', 'docking', `${num(b.docking, 1)} s`, 'le tuyau branché avant que l’énergie remonte') : ''}
+      ${line('Réservoir', 'tank', `${num(b.tank, 0)} L`)}${line('Débit du ravitaillement', 'refuel', `${num(b.refuel, 2)} L/s`)}
+      ${b.wingMin !== undefined ? row('Aileron arrière autorisé', `${num(b.wingMin, 1)}° à ${num(b.wingMax, 1)}°`) : ''}
+      ${b.compounds.length ? row('Gommes sèches autorisées', b.compounds.map(item => COMPOUNDS[item] || esc(item)).join(', ')) : ''}</dl>
+    <p class="training-note"><a href="${esc(b.url)}" target="_blank" rel="noopener">BoP officielle LMU ${esc(b.version)}</a> du ${esc(b.date.split('-').reverse().join('/'))}.</p></section>`;
+}
+
 function render() {
   const data = view.data;
   if (!data.circuit) {
@@ -108,7 +127,8 @@ function render() {
         ${tyre.ideal ? row('Température idéale', `${num(tyre.ideal, 0)} °C`, 'is-game') : ''}${tyre.track !== null ? row('Piste pendant les mesures', `${num(tyre.track)} °C`) : ''}</dl></div>
         ${data.tyres.length > 1 ? `<p class="training-note">Autres gommes : ${data.tyres.slice(1).map(item => `${esc(item.name)} ${num(item.median ?? item.you, 2)} %`).join(', ')}.</p>` : ''}`
       : '<p class="training-empty">Pas encore de tour mesuré.</p>'}</section>
-    <section class="training-card memo-wide"><h2>Un relais</h2><div class="training-stats">
+    ${bop(data)}
+    <section class="training-card${data.bop ? '' : ' memo-wide'}"><h2>Un relais</h2><div class="training-stats">
       <div><small>Tours avec 100 % d’énergie</small><strong>${data.stint.energyLaps ?? '—'}</strong></div>
       <div><small>Tours avec un plein${data.capacity ? ` de ${num(data.capacity, 0)} L` : ''}</small><strong>${data.stint.tankLaps ?? '—'}</strong></div>
       <div><small>Tours avant 50 % d’usure</small><strong>${data.stint.lapsTo50 ?? '—'}</strong></div></div>
