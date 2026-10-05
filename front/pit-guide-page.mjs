@@ -19,7 +19,7 @@ const row = (label, value, kind = '', note = '') => `<div class="memo-row"><dt>$
 function band(item, unit, digits) {
   const values = [item.low, item.high, item.you, item.game].filter(value => value !== null && value !== undefined);
   if (item.median === null) {
-    return `<p class="training-note">Fourchette des pilotes à partir de 3 pilotes et 30 tours : ${item.pilots} pilote${item.pilots > 1 ? 's' : ''} et ${item.laps} tours pour l’instant.</p>`;
+    return `<p class="training-note memo-small">Fourchette dès 3 pilotes et 30 tours (${item.pilots} pilote${item.pilots > 1 ? 's' : ''}, ${item.laps} tours).</p>`;
   }
   const min = Math.min(...values) * 0.95, max = Math.max(...values) * 1.05, at = value => `${((value - min) / (max - min) * 100).toFixed(1)}%`;
   return `<div class="memo-band" role="img" aria-label="Pilotes de ${num(item.low, digits)} à ${num(item.high, digits)} ${unit}, médiane ${num(item.median, digits)}">
@@ -37,7 +37,7 @@ function perLap(title, item, unit, digits, extra = '') {
 
 function calculator(data) {
   const service = data.service?.source === 'game' ? data.service : null;
-  if (!service) return `<p class="training-note">Le calcul d’un arrêt arrive dès qu’un pilote roule avec cette voiture et la dernière version du plugin : il lit les temps de service dans le jeu.</p>`;
+  if (!service) return `<p class="training-note memo-small">Le calcul d’un arrêt arrive quand le plugin envoie les temps de service de cette voiture.</p>`;
   const c = view.calc, energy = Math.max(0, c.leave - c.arrive), ratio = data.fuel.ratio, capacity = data.capacity;
   // Litres follow the energy through the fuel ratio, as in the pit menu.
   const fuel = ratio && capacity ? energy / 100 * capacity * ratio : 0;
@@ -70,7 +70,7 @@ function levels(data) {
     <div class="memo-table-wrap"><table class="memo-table"><caption>Chronos de référence par niveau, ${esc(ref.track)}</caption>
       <thead><tr><th scope="col">Niveau</th><th scope="col">Chrono<small>tour lancé</small></th><th scope="col">Rythme de course<small>tour moyen en course</small></th></tr></thead>
       <tbody>${you ? `<tr class="is-you-row"><th scope="row">Toi <span class="memo-chip is-you">${esc(you.level)}</span></th><td>${lap(you.best, 3)}<small>ton meilleur tour</small></td><td>${lap(you.pace, 3)}<small>ton tour médian</small></td></tr>` : ''}${rows}</tbody></table></div>
-    <p class="training-note">${you?.next ? `<span class="is-pilots">Prochain objectif : ${esc(you.next.name)}, un rythme de ${lap(you.next.time)}.</span> ` : ''}Le chrono en tour lancé est la moyenne des meilleurs tours de la catégorie, le niveau des Aliens${ref.fastest ? ` ; la voiture la plus rapide est la ${esc(ref.fastest.car)} en ${lap(ref.fastest.time)}` : ''}. Le tableur ne donne pas de chrono pour les autres niveaux. ${esc(ref.track)}, version ${esc(ref.patch)} du jeu.</p></section>`;
+    <p class="training-note memo-small">${you?.next ? `<span class="is-pilots">Objectif : ${esc(you.next.name)} en ${lap(you.next.time)}.</span> ` : ''}${ref.fastest ? `Plus rapide : ${esc(ref.fastest.car)} en ${lap(ref.fastest.time)}. ` : ''}Version ${esc(ref.patch)} du jeu.</p></section>`;
 }
 
 // The car's line in LMU's BoP for this circuit, with what changed since the previous BoP.
@@ -82,10 +82,10 @@ function bop(data) {
   const line = (label, key, value, note = '') => b[key] === null || b[key] === undefined ? '' : row(label, `${value}${change(key)}`, '', note);
   const power = b.carClass === 'Hypercar' ? `${num(b.power, 0)} kW` : typeof b.power === 'number' ? `${num(b.power, 1).replace(',0', '')} %` : esc(b.power);
   return `<section class="training-card"><p class="memo-scope">Circuit · voiture · BoP officielle</p><h2>BoP LMU ${esc(b.version)}</h2>
-    <p class="training-note">${esc(b.car)} · ${esc(b.layout)}.${b.changes ? ' Entre parenthèses, l’écart avec la BoP précédente.' : ''}</p>
-    <dl>${line('Poids minimum', 'weight', `${num(b.weight, 0)} kg`, 'pilote compris')}${line('Puissance maximale', 'power', power)}
-      ${line('Énergie max par relais', 'energy', `${num(b.energy, 0)} MJ`, 'ce que vaut 100 % d’énergie')}
-      ${b.carClass === 'Hypercar' ? line('Branchement avant la recharge', 'docking', `${num(b.docking, 1)} s`, 'le tuyau branché avant que l’énergie remonte') : ''}
+    <p class="training-note memo-small">${esc(b.car)} · ${esc(b.layout)}${b.changes ? ' · (écart avec la BoP précédente)' : ''}</p>
+    <dl>${line('Poids minimum', 'weight', `${num(b.weight, 0)} kg`)}${line('Puissance maximale', 'power', power)}
+      ${line('Énergie max par relais', 'energy', `${num(b.energy, 0)} MJ`, '= 100 %')}
+      ${b.carClass === 'Hypercar' ? line('Branchement avant la recharge', 'docking', `${num(b.docking, 1)} s`) : ''}
       ${line('Réservoir', 'tank', `${num(b.tank, 0)} L`)}${line('Débit du ravitaillement', 'refuel', `${num(b.refuel, 2)} L/s`)}
       ${b.wingMin !== undefined ? row('Aileron arrière autorisé', `${num(b.wingMin, 1)}° à ${num(b.wingMax, 1)}°`) : ''}
       ${b.compounds.length ? row('Gommes sèches autorisées', b.compounds.map(item => COMPOUNDS[item] || esc(item)).join(', ')) : ''}</dl>
@@ -108,11 +108,9 @@ function render() {
     s.brakes ? row('Freins', `${num(s.brakes, 0)} s`, '', 'en plus') : '', s.repair ? row('Réparation', `${num(s.repair, 0)} s`) : ''].join('') : '';
   const classes = [...new Set(circuit.cars.map(item => item.carClass))];
   const cars = circuit.cars.filter(item => item.carClass === data.car.carClass);
-  const st = data.stint, stintLaps = Math.min(st.energyLaps ?? Infinity, st.tankLaps ?? Infinity);
-  const limit = st.energyLaps && st.tankLaps ? st.energyLaps <= st.tankLaps ? 'energy' : 'tank' : null;
-  const perSet = st.lapsTo50 && Number.isFinite(stintLaps) ? Math.floor(st.lapsTo50 / stintLaps) : null;
+  const st = data.stint;
   app.innerHTML = `<div class="memo-head"><p class="memo-kicker">Mémo officiel · commun à tous les pilotes</p><h1>${esc(data.circuit.name)}</h1>
-    <p class="memo-sub">Ce qu’il faut savoir en course sur ce circuit, mesuré par les pilotes du site avec le plugin.</p>
+    
     <div class="memo-pick">
       <label class="memo-select">Circuit<select data-pick="circuit">${data.circuits.map(item => `<option value="${esc(item.key)}"${item.key === data.circuit.key ? ' selected' : ''}>${esc(item.name)}</option>`).join('')}</select></label>
       <div class="memo-classes" role="group" aria-label="Catégorie">${classes.map(name => `<button type="button" data-class="${esc(name)}" aria-pressed="${name === data.car.carClass}">${esc(CLASS_NAMES[name] || name)}</button>`).join('')}</div>
@@ -121,15 +119,14 @@ function render() {
     <p class="memo-key"><span class="is-you"><i class="dot"></i>Toi (point)</span><span class="is-pilots"><i class="bar"></i>Les pilotes du site : bande et trait de la médiane</span><span class="is-game"><i class="tri"></i>Le jeu (triangle)</span></p></div>
     <div class="memo-grid">
     ${levels(data)}
-    <section class="training-card"><p class="memo-scope">Circuit · voiture</p><h2>Temps perdu au stand</h2>
-      <p class="training-note">Un arrêt, c’est la traversée de la voie, qui est fixe, plus le temps arrêté, qui dépend de ce que tu remets.</p>
-      <dl>${row('Traversée de la voie', data.lane ? `${num(data.lane.through)} s` : '—', 'is-pilots', data.lane ? `${data.lane.stops} arrêt${data.lane.stops > 1 ? 's' : ''} mesuré${data.lane.stops > 1 ? 's' : ''} · aussi le prix d’un drive-through` : 'pas encore d’arrêt mesuré')}</dl>
+    <section class="training-card"><p class="memo-scope">Circuit · voiture</p><h2>Stand</h2>
+      <dl>${row('Traversée de la voie', data.lane ? `${num(data.lane.through)} s` : '—', 'is-pilots', data.lane ? 'aussi le prix d’un drive-through' : 'pas encore mesurée')}</dl>
       ${calculator(data)}
-      ${s?.source === 'game' ? '<p class="training-note memo-small">La règle du jeu : temps arrêté = pneus + freins + écopes + le plus long entre carburant, énergie, aileron et changement de pilote. L’estimation du jeu annonce 40 s pour l’aileron, à tort : c’est 25 s. Le jeu ajoute jusqu’à 3 s au hasard.</p>' : ''}</section>
+      ${s?.source === 'game' ? '<p class="training-note memo-small">Le jeu ajoute jusqu’à 3 s au hasard.</p>' : ''}</section>
     <section class="training-card"><p class="memo-scope">Voiture · donné par le jeu</p><h2>Temps de service</h2>
       ${s ? `<p class="memo-tag ${s.source === 'game' ? 'is-game' : 'is-pilots'}">${s.source === 'game' ? 'Valeurs exactes du jeu' : 'Mesuré sur les arrêts'}</p><dl class="${s.source === 'game' ? 'is-game' : 'is-pilots'}">${serviceRows}
         ${s.source === 'game' ? row('Pressions, grille de radiateur', '0 s', '', 'avec un changement de pneus') : ''}</dl>
-      <p class="training-note">Pneus, écopes et freins se font après le plein. Carburant, énergie, aileron et changement de pilote se font en même temps : seul le plus long compte.</p>`
+      <p class="training-note memo-small">Pendant le plein : seul le plus long compte. En plus : s’ajoute.</p>`
       : '<p class="training-empty">Pas encore relevé pour cette voiture.</p>'}</section>
     <section class="training-card"><p class="memo-scope">Circuit · voiture · par tour</p><h2>Énergie et carburant</h2>
       ${data.energy.median !== null || data.energy.you !== null || data.energy.game ? perLap('Énergie', data.energy, '%', 2) : ''}
@@ -142,17 +139,15 @@ function render() {
         ${data.tyres.length > 1 ? `<p class="training-note">Autres gommes : ${data.tyres.slice(1).map(item => `${esc(item.name)} ${num(item.median ?? item.you, 2)} %`).join(', ')}.</p>` : ''}`
       : '<p class="training-empty">Pas encore de tour mesuré.</p>'}</section>
     ${bop(data)}
-    <section class="training-card${data.bop ? '' : ' memo-wide'}"><p class="memo-scope">Ce que ça donne en course · calculé avec la médiane</p><h2>Un relais</h2><div class="memo-stint">
-      <div><small>Tours avec 100 % d’énergie</small><b class="${limit === 'energy' ? 'is-pilots' : ''}">${st.energyLaps ?? '—'}</b>${limit === 'energy' ? '<small class="is-pilots">c’est l’énergie qui limite</small>' : ''}</div>
-      <div><small>Tours avec un plein${data.capacity ? ` de ${num(data.capacity, 0)} L` : ''}</small><b class="${limit === 'tank' ? 'is-pilots' : ''}">${st.tankLaps ?? '—'}</b>${limit === 'tank' ? '<small class="is-pilots">c’est le carburant qui limite</small>' : ''}</div>
-      <div><small>Tours avant 50 % d’usure</small><b>${st.lapsTo50 ?? '—'}</b>${perSet ? `<small>${perSet} relais par train de pneus</small>` : ''}</div></div>
-      <p class="training-note">Calculé avec la médiane des pilotes, sinon avec tes chiffres, sinon avec la prévision du jeu.</p></section>
+    <section class="training-card${data.bop ? '' : ' memo-wide'}"><p class="memo-scope">Circuit · voiture · un relais</p><h2>Relais</h2>
+      ${st.laps ? `<p class="memo-big is-pilots">${st.laps}<span>tours ${st.by === 'energy' ? 'avec 100 % d’énergie' : 'avec un plein'}</span></p>
+      <dl>${st.by === 'energy' && st.fuel ? row('Carburant pour les faire', `${num(st.fuel, 1)} L`, 'is-pilots', data.fuel.ratio ? `ratio conseillé ${num(data.fuel.ratio, 2)}` : '') : ''}
+        ${st.wear ? st.wear.map((value, index) => value === null ? '' : row(`Usure ${WHEELS[index]}`, `−${num(value, 1)} %`, 'is-pilots')).join('') : ''}</dl>`
+      : '<p class="training-empty">Pas encore de tour mesuré.</p>'}</section>
     </div>
     <section class="training-card"><h2>Comment les chiffres sont faits</h2><div class="memo-how">
-      <p><strong>Ce qui ne dépend pas du pilote</strong> vient du jeu ou se mesure une fois : temps de service lus dans le jeu, traversée de la voie mesurée à chaque arrêt. Le chiffre retenu est la médiane de tous les arrêts.</p>
-      <p><strong>Ce qui dépend du pilote</strong>, la conso et l’usure, est montré en fourchette : la médiane des pilotes, la moitié centrale des pilotes, et ta propre valeur à côté. Chaque pilote compte une fois, sans aucun nom.</p>
-      <p><strong>Tours retenus</strong> : en piste, sans arrêt, sans tour invalidé, et proches du rythme du pilote. Les tours de sortie et les tours ratés sont écartés.</p>
-      <p><strong>Seuil de publication</strong> : la fourchette n’apparaît qu’avec au moins ${data.min.pilots} pilotes et ${data.min.laps} tours. Avant, la fiche affiche ta valeur et la prévision du jeu.</p></div></section>
+      <p><strong>Temps de service</strong> : lus dans le jeu. <strong>Traversée</strong> : médiane des arrêts mesurés.</p>
+      <p><strong>Conso et usure</strong> : médiane des pilotes et fourchette, à partir de ${data.min.pilots} pilotes et ${data.min.laps} tours, sans aucun nom.</p></div></section>
     ${data.source ? `<p class="memo-credit">Chronos de référence : <a href="${esc(data.source.url)}" target="_blank" rel="noopener">${esc(data.source.title)}</a> de ${esc(data.source.name)}${data.source.updated ? `, mis à jour le ${esc(data.source.updated.split('-').reverse().join('/'))}` : ''}.</p>` : ''}`;
 }
 

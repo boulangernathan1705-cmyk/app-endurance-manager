@@ -191,7 +191,7 @@ test('the circuit sheet shows the pilots’ median only from 3 pilots and 30 lap
   assert.equal(sheet.lane.through,39.7);assert.equal(sheet.service.source,'game');
   assert.deepEqual([sheet.energy.median,sheet.energy.you,sheet.energy.game,sheet.energy.pilots],[null,2.1,2.12,2]);
   // Without the pilots' median, a stint is planned with the viewer's own figures.
-  assert.deepEqual(sheet.stint,{energyLaps:47,tankLaps:57,lapsTo50:83});
+  assert.deepEqual(sheet.stint,{laps:47,by:'energy',fuel:98.7,wear:[23.5,18.8,23.5,28.2]});
   sessions.push({user:'c',capacity:120,laps:[...laps(2.2,2.2,0.6),{...laps(9,9,9,1)[0],t:200}]});
   sheet=memoSheet({sessions,viewer:'b'});
   assert.deepEqual([sheet.energy.median,sheet.energy.low,sheet.energy.high,sheet.energy.laps],[2.1,2.05,2.15,36]);
