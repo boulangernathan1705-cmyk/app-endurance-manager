@@ -56,36 +56,32 @@ const QUICK_ICON=path=>`<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="
 // A pilot (entry) or a group of three (crew), each with a small « + » drawn in the same line.
 const ICON_REGISTER=QUICK_ICON('M8 7a4 4 0 1 0 8 0a4 4 0 0 0-8 0M6 21v-2a4 4 0 0 1 4-4h4M16 19h6M19 16v6');
 const ICON_CREW=QUICK_ICON('M10 13a2 2 0 1 0 4 0a2 2 0 0 0-4 0M8 21v-1a2 2 0 0 1 2-2h3M15 5a2 2 0 1 0 4 0a2 2 0 0 0-4 0M17 10h2a2 2 0 0 1 2 2v1M5 5a2 2 0 1 0 4 0a2 2 0 0 0-4 0M3 13v-1a2 2 0 0 1 2-2h2M16 19h6M19 16v6');
+const ICON_MORE=QUICK_ICON('M5 12h.01M12 12h.01M19 12h.01');
+// The pilot's own entry, always unfolded: one click enters him (or opens his entry). The other choices
+// (another category, another pilot) sit in a small « … » menu, the crew in its own square.
 function quickActions(event,departure){
   if(departure.startsAt<=Date.now()||!state.user)return '';
-  if(isSolo(event))return soloQuickActions(event,departure);
-  const own=ownRegistration(departure),mine=(departure.availability||[]).filter(reg=>reg.mine&&reg.status!=='unavailable');
-  const assigned=(departure.crews||[]).some(crew=>(crew.registrationIds||[]).some(id=>mine.some(reg=>reg.id===id)));
-  const items=[];
-  if(own||can('endurance'))items.push({action:'my-registration',label:own?'Modifier mon inscription':'M’inscrire',extra:''});
-  if(own&&!assigned&&event.categories.some(category=>!mine.some(reg=>reg.category===category)))items.push({action:'new-registration',label:'M’inscrire dans une autre catégorie',extra:`data-mode="category" data-registration="${own.id}"`});
-  if(can('manage_registrations'))items.push({action:'new-registration',label:'Inscrire un autre pilote',extra:'data-mode="pilot"'});
-  // Closed start: the icon alone (its name in the bubble); opened start: the icon and its name.
-  const square=(icon,tip,attrs,label=tip)=>`<button type="button" class="planning-quick-button" ${attrs} data-tip="${esc(tip)}" aria-label="${esc(tip)}"><span class="planning-quick-icon">${icon}</span><span class="planning-quick-label">${esc(label)}</span></button>`;
-  const register=!items.length?'':items.length===1?square(ICON_REGISTER,items[0].label,`data-action="${items[0].action}" data-departure="${departure.id}" ${items[0].extra}`,'Inscription')
-    :`<span class="planning-quick-menu-wrap">${square(ICON_REGISTER,'Inscription','data-action="quick-menu" aria-haspopup="menu" aria-expanded="false"')}<span class="planning-quick-menu" role="menu" hidden>${items.map(item=>`<button type="button" role="menuitem" class="planning-quick-item" data-action="${item.action}" data-departure="${departure.id}" ${item.extra}>${esc(item.label)}</button>`).join('')}</span></span>`;
+  const solo=isSolo(event),own=ownRegistration(departure),mine=(departure.availability||[]).filter(reg=>reg.mine&&reg.status!=='unavailable');
+  let main=null;const more=[];
+  if(solo){
+    const blocked=soloEntryBlock(event);
+    if(own&&!soloRounds(event).length)main={action:'delete-registration',label:'Me désinscrire',extra:`data-id="${own.id}"`};
+    else if(own)main={action:'my-registration',label:'Mon inscription',extra:''};
+    else if(!blocked)main={action:'my-registration',label:'M’inscrire',extra:''};
+    if(!main&&blocked&&!can('manage_registrations'))return `<span class="planning-quick"><span class="solo-blocked">${esc(blocked)}</span></span>`;
+  }else{
+    const assigned=(departure.crews||[]).some(crew=>(crew.registrationIds||[]).some(id=>mine.some(reg=>reg.id===id)));
+    if(own||can('endurance'))main={action:'my-registration',label:own?'Mon inscription':'M’inscrire',extra:''};
+    if(own&&!assigned&&event.categories.some(category=>!mine.some(reg=>reg.category===category)))more.push({action:'new-registration',label:'M’inscrire dans une autre catégorie',extra:`data-mode="category" data-registration="${own.id}"`});
+  }
+  if(can('manage_registrations'))more.push({action:'new-registration',label:'Inscrire un autre pilote',extra:'data-mode="pilot"'});
+  const square=(icon,tip,attrs,label='')=>`<button type="button" class="planning-quick-button${label?' is-labelled':''}" ${attrs} data-tip="${esc(tip)}" aria-label="${esc(tip)}"><span class="planning-quick-icon">${icon}</span>${label?`<span class="planning-quick-label">${esc(label)}</span>`:''}</button>`;
+  const register=main?square(ICON_REGISTER,main.label,`data-action="${main.action}" data-departure="${departure.id}" ${main.extra}`,main.label):'';
+  const menu=!more.length?'':more.length===1&&!main?square(ICON_REGISTER,more[0].label,`data-action="${more[0].action}" data-departure="${departure.id}" ${more[0].extra}`,'Inscrire')
+    :`<span class="planning-quick-menu-wrap">${square(ICON_MORE,'Autres inscriptions','data-action="quick-menu" aria-haspopup="menu" aria-expanded="false"')}<span class="planning-quick-menu" role="menu" hidden>${more.map(item=>`<button type="button" role="menuitem" class="planning-quick-item" data-action="${item.action}" data-departure="${departure.id}" ${item.extra}>${esc(item.label)}</button>`).join('')}</span></span>`;
   const crewLabel=can('manage_registrations')?'Créer un équipage':'Créer mon équipage';
-  const crew=canCreateCrewOnDeparture(departure,event)?square(ICON_CREW,crewLabel,`data-crew-builder-open data-departure="${departure.id}"`):'';
-  return register||crew?`<span class="planning-quick">${register}${crew}</span>`:'';
-}
-
-// Solo start: the same « Inscription » square (enter, edit, withdraw when there is nothing to choose, another pilot).
-function soloQuickActions(event,departure){
-  const own=ownRegistration(departure),blocked=soloEntryBlock(event),items=[];
-  if(own&&!soloRounds(event).length)items.push({action:'delete-registration',label:'Me désinscrire',extra:`data-id="${own.id}"`});
-  else if(own)items.push({action:'my-registration',label:'Modifier mon inscription',extra:''});
-  else if(!blocked)items.push({action:'my-registration',label:'Je participe',extra:''});
-  if(can('manage_registrations'))items.push({action:'new-registration',label:'Inscrire un autre pilote',extra:'data-mode="pilot"'});
-  if(!items.length)return blocked?`<span class="planning-quick"><span class="solo-blocked">${esc(blocked)}</span></span>`:'';
-  const square=(tip,attrs)=>`<button type="button" class="planning-quick-button" ${attrs} data-tip="${esc(tip)}" aria-label="${esc(tip)}"><span class="planning-quick-icon">${ICON_REGISTER}</span><span class="planning-quick-label">Inscription</span></button>`;
-  const register=items.length===1?square(items[0].label,`data-action="${items[0].action}" data-departure="${departure.id}" ${items[0].extra}`)
-    :`<span class="planning-quick-menu-wrap">${square('Inscription','data-action="quick-menu" aria-haspopup="menu" aria-expanded="false"')}<span class="planning-quick-menu" role="menu" hidden>${items.map(item=>`<button type="button" role="menuitem" class="planning-quick-item" data-action="${item.action}" data-departure="${departure.id}" ${item.extra}>${esc(item.label)}</button>`).join('')}</span></span>`;
-  return `<span class="planning-quick">${register}</span>`;
+  const crew=!solo&&canCreateCrewOnDeparture(departure,event)?square(ICON_CREW,crewLabel,`data-crew-builder-open data-departure="${departure.id}"`):'';
+  return register||menu||crew?`<span class="planning-quick">${register}${menu}${crew}</span>`:'';
 }
 
 // Buttons of a start (enter, enter another pilot, create a crew) and what an opened start shows.

@@ -2000,3 +2000,6 @@ html[data-game] .race-card.is-solo .solo-card-foot .race-situation { margin-left
 html[data-game] #app .race-header .event-type-panel { flex: none; display: flex; align-items: center; justify-content: center; width: 220px; height: 150px; border: 1px solid rgba(255, 255, 255, .12); border-radius: 12px; background: rgba(255, 255, 255, .03); }
 html[data-game] #app .race-header .event-type-panel span { font-size: 28px; font-weight: 900; letter-spacing: .06em; text-transform: uppercase; color: var(--sim, #7fe3ea); text-align: center; padding: 0 10px; overflow-wrap: anywhere; }
 @media (max-width: 600px) { html[data-game] #app .race-header .event-type-panel { width: 90px; height: 70px; } html[data-game] #app .race-header .event-type-panel span { font-size: 15px; } }
+/* « M'inscrire » is always unfolded: icon and label, one click enters the pilot. */
+.planning-quick-button.is-labelled { width: auto !important; grid-auto-flow: column; gap: 8px; padding: 0 12px 0 9px !important; border-color: var(--community-accent, #52d3d8); color: var(--community-accent, #52d3d8); }
+.planning-quick-button.is-labelled .planning-quick-label { display: inline; font-size: 13px; font-weight: 800; white-space: nowrap; }
