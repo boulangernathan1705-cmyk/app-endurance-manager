@@ -116,3 +116,39 @@
 .training-name.is-pending{padding:12px;border:1px solid rgba(255,176,32,.55);border-radius:12px;background:rgba(255,176,32,.08)}
 .training-name select{flex:1;min-width:0;min-height:38px;padding:6px 10px;border:1px solid var(--border);border-radius:10px;background:#0c0e10;color:var(--text)}
 .training-name input{flex:1;min-width:0;min-height:38px;padding:6px 10px;border:1px solid var(--border);border-radius:10px;background:#0c0e10;color:var(--text)}
+/* Mémo des circuits (stands.html, front/pit-guide-page.mjs): one colour and one shape per source. */
+.training-page{--memo-you:#5eb3ff;--memo-pilots:#f0a04b;--memo-game:#7ee38f}
+.training-page .is-you{color:var(--memo-you)}.training-page .is-pilots{color:var(--memo-pilots)}.training-page .is-game{color:var(--memo-game)}
+.memo-key{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:6px 18px;margin:0;font-size:13px}
+.memo-key span{display:inline-flex;align-items:center;gap:6px}
+.memo-key i{display:inline-block;width:12px;height:12px;background:currentColor}
+.memo-key .dot{border-radius:50%}.memo-key .bar{height:8px;border-radius:4px;opacity:.6}.memo-key .tri{clip-path:polygon(0 0,100% 0,50% 100%)}
+.memo-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;align-items:start}
+.memo-wide{grid-column:1/-1}
+.memo-grid dl{display:grid;margin:0}
+.memo-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:baseline;padding:7px 0;border-bottom:1px solid var(--border)}
+.memo-row:last-child{border-bottom:0}
+.memo-row dt{color:var(--muted)}
+.memo-row dd{margin:0;text-align:right;font-variant-numeric:tabular-nums;font-weight:700}
+.memo-row dd small{display:block;color:var(--muted);font-size:11px;font-weight:400}
+.memo-block{display:grid;gap:10px}
+.memo-block+.memo-block{padding-top:14px;border-top:1px solid var(--border)}
+.memo-block h3{margin:0;color:var(--muted);font-size:12px;letter-spacing:.08em;text-transform:uppercase}
+.memo-big{margin:0;font-size:34px;font-weight:800;line-height:1;font-variant-numeric:tabular-nums}
+.memo-big span{margin-left:6px;color:var(--muted);font-size:15px;font-weight:600}
+.memo-tag{justify-self:start;margin:0;padding:3px 8px;border:1px solid currentColor;border-radius:6px;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
+.memo-band{position:relative;height:10px;border-radius:5px;background:rgba(255,255,255,.07)}
+.memo-iqr{position:absolute;top:0;bottom:0;border-radius:5px;background:var(--memo-pilots);opacity:.45}
+.memo-median{position:absolute;top:-4px;width:3px;height:18px;margin-left:-1px;border-radius:1px;background:var(--memo-pilots)}
+.memo-game{position:absolute;top:-9px;margin-left:-6px;border-left:6px solid transparent;border-right:6px solid transparent;border-top:8px solid var(--memo-game)}
+.memo-you{position:absolute;top:-2px;width:14px;height:14px;margin-left:-7px;border:2px solid var(--panel);border-radius:50%;background:var(--memo-you)}
+.memo-scale{display:flex;justify-content:space-between;gap:8px;color:var(--muted);font-size:12px;font-variant-numeric:tabular-nums}
+.memo-calc{display:grid;gap:10px;padding:14px;border:1px solid var(--border);border-radius:14px;background:rgba(0,0,0,.2)}
+.memo-calc label{display:flex;justify-content:space-between;gap:8px;align-items:center;font-size:14px}
+.memo-calc input[type=range]{width:100%;accent-color:var(--memo-pilots)}
+.memo-calc fieldset{display:flex;flex-wrap:wrap;gap:6px 14px;margin:0;padding:0;border:0}
+.memo-calc legend{margin-bottom:4px;padding:0;color:var(--muted);font-size:12px}
+.memo-calc fieldset label{justify-content:flex-start;gap:6px}
+@media (max-width:760px){.memo-grid{grid-template-columns:1fr}}
+.memo-calc fieldset label{display:inline-flex;flex:0 1 auto}
+.memo-calc input[type=checkbox],.memo-calc input[type=radio]{width:auto;min-width:0;height:auto;margin:0;flex:none}

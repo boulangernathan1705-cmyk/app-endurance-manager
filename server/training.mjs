@@ -2,7 +2,7 @@
 // the sync program sends (or the pilot drops on the page), turned into a program, a session for today, advice and a
 // comparison with the other pilots of the site. Only the pilot sees his own data; the others are counted, never named.
 import {fail, json, now, id, token, hash, siteOrigin, rateLimit, body, DAY} from './core.mjs';
-import {parseResults, analyse, programSteps, adviceFor, trackKey, cleanLaps, circuitOf, normal, cleanLive, analyseLive, resultsAsLive, pitTimes, STEPS} from '../shared/training.mjs';
+import {parseResults, analyse, programSteps, adviceFor, trackKey, cleanLaps, circuitOf, normal, cleanLive, analyseLive, resultsAsLive, pitTimes, memoSheet, STEPS} from '../shared/training.mjs';
 
 const FILE_LIMIT = 3_000_000;
 const KEEP_DAYS = 120;
@@ -70,9 +70,12 @@ export async function saveLive(env, userId, text) {
   let session;
   try { session = cleanLive(JSON.parse(text)); } catch (error) { fail(400, error instanceof SyntaxError ? 'Séance en direct illisible.' : error.message); }
   const fingerprint = await hash(JSON.stringify([session.at, session.track, session.car]));
-  const result = await env.DB.prepare(`INSERT OR IGNORE INTO training_live(id,user_id,fingerprint,started_at,circuit,track,car,car_class,capacity,laps,stops,created_at)
-    VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`).bind(id(), userId, fingerprint, session.at, circuitOf(session.track) || normal(session.track), session.track, session.car,
-    session.carClass, session.capacity, JSON.stringify(session.laps), JSON.stringify(session.stops), now()).run();
+  const result = await env.DB.prepare(`INSERT OR IGNORE INTO training_live(id,user_id,fingerprint,started_at,circuit,track,car,car_class,capacity,laps,stops,game,created_at)
+    VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)`).bind(id(), userId, fingerprint, session.at, circuitOf(session.track) || normal(session.track), session.track, session.car,
+    session.carClass, session.capacity, JSON.stringify(session.laps), JSON.stringify(session.stops), session.game ? JSON.stringify(session.game) : null, now()).run();
+  // The car's service times, the same for everyone: the latest the game gave.
+  if (session.service) await env.DB.prepare(`INSERT INTO training_cars(car,car_class,service,updated_at) VALUES(?,?,?,?)
+    ON CONFLICT(car) DO UPDATE SET car_class=excluded.car_class,service=excluded.service,updated_at=excluded.updated_at`).bind(session.car, session.carClass, JSON.stringify(session.service), now()).run();
   // The game names the pilot: learnt once, so his online results files find him.
   if (session.driver && !(await env.DB.prepare('SELECT 1 FROM training_profiles WHERE user_id=?').bind(userId).first())) await setLmuName(env, userId, session.driver);
   return {created:result.meta.changes === 1, track:session.track, laps:session.laps.length};
@@ -95,6 +98,34 @@ export async function trainingCollector(request, env, live = false) {
   const saved = live ? await saveLive(env, device.user_id, await rawBody(request)) : await saveSession(env, device.user_id, await rawBody(request));
   await env.DB.prepare('UPDATE training_devices SET last_seen=? WHERE user_id=?').bind(now(), device.user_id).run();
   return json({ok:true, ...saved});
+}
+
+// The circuit sheet: every circuit where the pilots of the site drove with the plugin, then for the one asked (or
+// the first) and one of its cars, the figures of memoSheet. Only medians leave the server, never a pilot's name;
+// the viewer's own figures come with them.
+async function memo(env, user, url) {
+  const since = Date.now() - KEEP_DAYS * DAY * 1000;
+  const rows = await all(env, `SELECT circuit,MIN(track) AS track,car,car_class,COUNT(DISTINCT user_id) AS pilots FROM training_live WHERE started_at>=?
+    GROUP BY circuit,car,car_class ORDER BY circuit,car`, since);
+  const circuits = [];
+  for (const row of rows) {
+    let item = circuits.find(entry => entry.key === row.circuit);
+    if (!item) circuits.push(item = {key:row.circuit, name:row.track, cars:[]});
+    item.cars.push({car:row.car, carClass:row.car_class, pilots:row.pilots});
+  }
+  const circuit = circuits.find(item => item.key === url.searchParams.get('circuit')) || circuits[0];
+  if (!circuit) return {circuits, circuit:null};
+  const car = circuit.cars.find(item => item.car === url.searchParams.get('car'))
+    || circuit.cars.find(item => item.carClass === url.searchParams.get('class')) || [...circuit.cars].sort((a, b) => b.pilots - a.pilots)[0];
+  const lane = await all(env, `SELECT stops FROM training_live WHERE circuit=? AND started_at>=? AND stops!='[]' ORDER BY started_at DESC LIMIT 500`, circuit.key, since);
+  const sessions = await all(env, `SELECT user_id,capacity,laps,stops,game FROM training_live WHERE circuit=? AND car=? AND started_at>=? ORDER BY started_at DESC LIMIT 500`,
+    circuit.key, car.car, since);
+  const stored = await env.DB.prepare('SELECT service FROM training_cars WHERE car=?').bind(car.car).first();
+  const game = sessions.map(row => row.game && JSON.parse(row.game)).find(Boolean) || null;
+  const sheet = memoSheet({laneStops:lane.flatMap(row => JSON.parse(row.stops)), carStops:sessions.flatMap(row => JSON.parse(row.stops)),
+    sessions:sessions.map(row => ({user:row.user_id, capacity:row.capacity, laps:JSON.parse(row.laps)})), viewer:user,
+    service:stored ? JSON.parse(stored.service) : null, game});
+  return {circuits, circuit:{key:circuit.key, name:circuit.name}, car, ...sheet};
 }
 
 // The next LMU race the pilot is entered in (for the program's deadline and the circuit shown first).
@@ -173,18 +204,7 @@ export async function trainingApi(path, method, request, env, actor, community) 
       pending:waiting.length && !profile?.lmu_name ? {files:waiting.length, drivers:[...new Set(waiting.flatMap(row => JSON.parse(row.drivers)))].sort((a, b) => a.localeCompare(b)).slice(0, 60)} : null});
   }
   // The pit guide (stands.html): the stops measured by every pilot of the site, per class, never named.
-  if (path === '/api/training/pits' && method === 'GET') {
-    const rows = await all(env, `SELECT user_id,car_class,stops FROM training_live WHERE started_at>? AND stops!='[]' ORDER BY started_at DESC LIMIT 2000`, Date.now() - KEEP_DAYS * DAY * 1000);
-    const classes = {};
-    for (const row of rows) {
-      const entry = classes[row.car_class] ||= {pilots:new Set(), stops:[]};
-      entry.pilots.add(row.user_id); entry.stops.push(...JSON.parse(row.stops));
-    }
-    return json({classes:Object.entries(classes).map(([name, entry]) => {
-      const {last, ...times} = pitTimes(entry.stops);
-      return {name, pilots:entry.pilots.size, ...times};
-    })});
-  }
+  if (path === '/api/training/memo' && method === 'GET') return json(await memo(env, user, new URL(request.url)));
   if (path === '/api/training/profile' && method === 'PUT') {
     const input = await body(request);
     const name = typeof input.lmuName === 'string' ? input.lmuName.replace(/[\u0000-\u001f]/g, '').trim() : '';

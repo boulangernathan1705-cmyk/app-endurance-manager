@@ -152,7 +152,7 @@ function stops(live) {
     <div class="training-stats">${items.map(([label, value]) => `<div><small>${label}</small><strong>${esc(value)}</strong></div>`).join('')}</div>
     <ul class="training-stops">${pit.last.map(stop => `<li><strong>Tour ${stop.lap}</strong><span>${num(stop.lane)} s dans la voie, ${num(stop.stopped)} s arrêté</span>
       <small>${[stop.fuel > 1 ? `${num(stop.fuel, 0)} L` : '', stop.tyres ? `${stop.tyres} pneus` : '', stop.repair ? 'réparation' : ''].filter(Boolean).join(' · ') || 'sans service'}</small></li>`).join('')}</ul>
-    <p class="training-note">Traversée : le temps dans la voie des stands sans l’arrêt. Pour isoler un temps, fais des arrêts avec un seul service : 4 pneus seuls, puis du carburant seul. <a href="/stands.html">Guide des stands</a></p></section>`;
+    <p class="training-note">Traversée : le temps dans la voie des stands sans l’arrêt. Pour isoler un temps, fais des arrêts avec un seul service : 4 pneus seuls, puis du carburant seul. <a href="/stands.html">Mémo des circuits</a></p></section>`;
 }
 
 // Online, every driver of a results file is marked as the player: the pilot's name in LMU tells which one he is.

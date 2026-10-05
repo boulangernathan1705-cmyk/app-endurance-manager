@@ -4,7 +4,7 @@ import {DatabaseSync} from 'node:sqlite';
 import {readFileSync, readdirSync} from 'node:fs';
 import worker from '../server/worker.mjs';
 import {linkTestServer, setMember, ORGA_ROLE} from './fixtures/discord-server.mjs';
-import {parseResults, analyse, programSteps, adviceFor, todaySession, circuitOf, cleanLive, analyseLive} from '../shared/training.mjs';
+import {parseResults, analyse, programSteps, adviceFor, todaySession, circuitOf, cleanLive, analyseLive, stopTime, memoSheet} from '../shared/training.mjs';
 
 // Individual training (migration 0046): LMU results files, the program, the advice and the sync program.
 const ROOT='https://site.example';
@@ -170,16 +170,51 @@ test('live data gives litres, the fuel ratio, tyres by compound and the stops br
   assert.equal(data.analysis.fuelLitres,3.24);
 });
 
-test('the pit guide gives the stops of every pilot per class, without names', async () => {
+// The Ferrari 296 GT3's service times, read in LMU's API and checked on three real stops at Long Beach (5 October).
+const SERVICE_296={fuelRate:3.4,energyRate:2.5,connect:2,tyres4:12,tyres2:4.5,wing:25,ductFront:10,ductRear:9,brakes:120,driver:25,repair:30};
+
+test('a stop takes the game’s time: tyres, ducts and brakes after, fuel, energy, wing and driver at the same time', () => {
+  assert.equal(stopTime(SERVICE_296,{fuel:10.25,energy:10.3,tyres:4}),17);
+  assert.equal(stopTime(SERVICE_296,{fuel:43.4,energy:46,wing:true}),25);
+  assert.equal(stopTime(SERVICE_296,{fuel:84,energy:85,tyres:4,ductFront:true,ductRear:true}),65);
+  assert.equal(stopTime(SERVICE_296,{fuel:5,driver:true}),25);
+  assert.equal(stopTime(null,{fuel:10}),0);
+});
+
+test('the circuit sheet shows the pilots’ median only from 3 pilots and 30 laps, and the viewer’s own figure', () => {
+  const laps=(fuel,ve,wear,count=12)=>Array.from({length:count},(_,i)=>({n:i+1,t:80+i/10,fuel,ve,wear:[wear,wear-0.1,wear,wear+0.1],temp:[73,72,74,75],compound:'Medium',track:30.8,pit:false,invalid:false}));
+  const sessions=[{user:'a',capacity:120,laps:laps(2.0,2.0,0.4)},{user:'b',capacity:120,laps:laps(2.1,2.1,0.5)}];
+  let sheet=memoSheet({sessions,viewer:'b',laneStops:[{lane:60.45,stopped:17.13},{lane:61,stopped:25}],service:SERVICE_296,game:{fuel:2.06,ve:2.12,ideal:92}});
+  assert.equal(sheet.lane.through,39.7);assert.equal(sheet.service.source,'game');
+  assert.deepEqual([sheet.energy.median,sheet.energy.you,sheet.energy.game,sheet.energy.pilots],[null,2.1,2.12,2]);
+  // Without the pilots' median, a stint is planned with the viewer's own figures.
+  assert.deepEqual(sheet.stint,{energyLaps:47,tankLaps:57,lapsTo50:83});
+  sessions.push({user:'c',capacity:120,laps:[...laps(2.2,2.2,0.6),{...laps(9,9,9,1)[0],t:200}]});
+  sheet=memoSheet({sessions,viewer:'b'});
+  assert.deepEqual([sheet.energy.median,sheet.energy.low,sheet.energy.high,sheet.energy.laps],[2.1,2.05,2.15,36]);
+  assert.deepEqual([sheet.tyres[0].name,sheet.tyres[0].median,sheet.tyres[0].worst,sheet.tyres[0].temp],['Medium',0.6,3,74]);
+  assert.equal(sheet.fuel.ratio,0.83);assert.equal(sheet.service,null);
+});
+
+test('the circuit sheet on the site: every circuit driven, the car’s service times from the game, no names', async () => {
   const {req,send,login}=harness();
-  await login(ADMIN,'admin','Orga');await login(PILOT,'pilot','Alice');
+  await login(ADMIN,'admin','Orga');await login(PILOT,'pilot','Alice');await login(MATE,'mate','Bob');
   await req('/api/community/modules','PATCH',{training:true},'admin');
-  const program=await send('/api/training/sync','POST','pilot',{raw:''});
-  const key=new TextDecoder().decode(new Uint8Array(await program.arrayBuffer()).slice(4096)).match(/([a-f0-9]{64})/)[1];
-  await send('/api/training/live','POST','sync',{raw:JSON.stringify(LIVE),headers:{'Content-Type':'application/json',Authorization:'Bearer '+key}});
-  const data=(await req('/api/training/pits','GET',null,'pilot')).data;
-  assert.deepEqual(data.classes.map(item=>[item.name,item.pilots,item.stops,item.tyres4,item.fuelRate]),[['Hypercar',1,3,9,3]]);
+  const keyOf=async actor=>{const program=await send('/api/training/sync','POST',actor,{raw:''});return new TextDecoder().decode(new Uint8Array(await program.arrayBuffer()).slice(4096)).match(/([a-f0-9]{64})/)[1];};
+  const push=async(actor,body)=>send('/api/training/live','POST','sync',{raw:JSON.stringify(body),headers:{'Content-Type':'application/json',Authorization:'Bearer '+await keyOf(actor)}});
+  const lb={at:1790000200000,track:'Grand Prix of Long Beach',car:'Ferrari 296 LMGT3 Evo',class:'GT3',capacity:120,laps:[liveLap(1,{fuel:2.1,ve:2.15}),liveLap(2,{fuel:2.1,ve:2.15})],
+    stops:[{lap:12,lane:60.45,stopped:17.13,fuel:10.25,ve:10.3,tyres:4}],service:{...SERVICE_296,brakes:'x'},game:{fuel:2.06,ve:2.12,ideal:92}};
+  assert.equal((await push('pilot',lb)).status,200);
+  assert.equal((await push('mate',{...LIVE,at:1790000300000})).status,200);
+  const {status,data}=await req('/api/training/memo?circuit=long-beach','GET',null,'mate');
+  assert.equal(status,200);
+  assert.deepEqual(data.circuits.map(item=>item.key).sort(),['long-beach','spa']);
+  assert.equal(data.car.car,'Ferrari 296 LMGT3 Evo');assert.equal(data.lane.through,43.3);
+  assert.equal(data.service.wing,25);assert.equal(data.service.brakes,null);
+  // Bob never drove there: no figure of his, and Alice's alone is not shown.
+  assert.deepEqual([data.energy.you,data.energy.median,data.energy.game],[null,null,2.12]);
   assert.ok(!JSON.stringify(data).includes('Alice'));
+  assert.equal((await req('/api/training/memo?circuit=long-beach','GET',null,'pilot')).data.energy.you,2.15);
 });
 
 test('the SimHub plugin gets the same kind of key as a code, which replaces the program one', async () => {
