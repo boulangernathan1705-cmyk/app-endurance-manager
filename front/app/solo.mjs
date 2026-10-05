@@ -89,24 +89,25 @@ export function canSeePassword(event) {
 }
 const detailSvg = path => `<svg viewBox="0 0 24 24" aria-hidden="true">${path}</svg>`;
 const detailTile = (icon, label, value, extra = '') => value ? `<div class="solo-detail${extra}"><span class="solo-detail-icon">${icon}</span><span class="solo-detail-copy"><span class="solo-detail-label">${esc(label)}</span><strong>${value}</strong></span></div>` : '';
-// The format of a round: its sessions as a bar (each as wide as it lasts: essais, qualifs, course), then its
-// conditions (weather, fuel, tyres) and its categories.
+// The format of a round, on one quiet line: practice, qualifying and race, then weather, fuel, tyres and the
+// categories; an icon, a small label and the value each.
 export function roundTiles(round) {
-  const sessions = [['practice', 'Essais', round.practice], ['qualifying', 'Qualifs', round.qualifying], ['race', 'Course', round.durationMinutes]].filter(([, , minutes]) => Number(minutes) > 0);
-  const bar = sessions.length ? `<div class="round-sessions">${sessions.map(([key, label, minutes]) => `<div class="round-session is-${key}" style="flex-grow:${Number(minutes)}"><span class="round-session-icon">${detailSvg(TILE_ICONS[key])}</span><span class="round-session-copy"><small>${label}</small><strong>${Number(minutes)}<em>min</em></strong></span></div>`).join('')}</div>` : '';
   const weather = WEATHERS.find(([value]) => value === round.weather);
-  const condition = (icon, label, value, extra = '') => `<span class="round-condition${extra}"><span class="round-condition-icon">${icon}</span><span class="round-condition-copy"><small>${esc(label)}</small><strong>${value}</strong></span></span>`;
-  const categoriesValue = round.randomCategory ? condition('<span class="round-emoji">❓</span>', 'Catégorie', 'Aléatoire')
-    : (round.categories || []).length ? `<span class="round-condition is-categories">${round.categories.map(category => `<span class="round-category" title="${esc(category)}">${logo(category)}</span>`).join('')}</span>`
-    : round.category ? condition(detailSvg(ICONS.car), 'Catégorie', esc(round.category)) : '';
-  const conditions = [
-    weather ? condition(`<span class="round-emoji">${weather[1]}</span>`, 'Météo', esc(weather[2])) : '',
-    round.fuel != null ? condition(detailSvg(ICONS.fuel), 'Carburant', `×${esc(round.fuel)}`) : '',
-    round.tyres != null ? condition(detailSvg(ICONS.tyres), 'Pneus', `×${esc(round.tyres)}`) : '',
-    round.car ? condition(detailSvg(ICONS.car), 'Voiture', esc(round.car)) : '',
-    categoriesValue,
-  ].filter(Boolean).join('');
-  return `<div class="round-info">${bar}${conditions ? `<div class="round-conditions">${conditions}</div>` : ''}</div>`;
+  const item = (icon, label, value) => `<span class="round-item"><span class="round-item-icon">${icon}</span><span class="round-item-copy"><small>${esc(label)}</small><strong>${value}</strong></span></span>`;
+  const minutes = value => Number(value) > 0 ? `${Number(value)} min` : '';
+  const items = [
+    minutes(round.practice) && item(detailSvg(TILE_ICONS.practice), 'Essais', minutes(round.practice)),
+    minutes(round.qualifying) && item(detailSvg(TILE_ICONS.qualifying), 'Qualifs', minutes(round.qualifying)),
+    minutes(round.durationMinutes) && item(detailSvg(TILE_ICONS.race), 'Course', minutes(round.durationMinutes)),
+    weather && item(`<span class="round-item-emoji">${weather[1]}</span>`, 'Météo', esc(weather[2])),
+    round.fuel != null && item(detailSvg(ICONS.fuel), 'Carburant', `×${esc(round.fuel)}`),
+    round.tyres != null && item(detailSvg(ICONS.tyres), 'Pneus', `×${esc(round.tyres)}`),
+    round.car && item(detailSvg(ICONS.car), 'Voiture', esc(round.car)),
+    round.randomCategory ? item('<span class="round-item-emoji">❓</span>', 'Catégorie', 'Aléatoire')
+      : (round.categories || []).length ? `<span class="round-item round-item-categories">${round.categories.map(category => `<span title="${esc(category)}">${logo(category)}</span>`).join('')}</span>`
+      : round.category ? item(detailSvg(ICONS.car), 'Catégorie', esc(round.category)) : '',
+  ].filter(Boolean);
+  return items.length ? `<div class="round-info">${items.join('')}</div>` : '';
 }
 // Event page header: a single round shows its tiles; several rounds show theirs in their own cards, below.
 // Then the note, and the password for the pilots entered.
