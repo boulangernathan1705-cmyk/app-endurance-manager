@@ -344,7 +344,7 @@ export async function skipRound(event,departure,index,api){
   const own=ownRegistration(departure),choices=choicesOf(event,own);
   choices[index]={skip:true};
   if(choices.every(choice=>choice.skip)){
-    if(!confirm('C’est ta seule manche : te désinscrire de l’événement ?'))return false;
+    if(!confirm('Te désinscrire de cette manche ? C’était ta seule manche de l’événement.'))return false;
     await api(`/api/registrations/${own.id}`,'DELETE',{version:own.version});
     return true;
   }
