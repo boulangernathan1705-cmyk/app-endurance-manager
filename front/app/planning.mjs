@@ -151,11 +151,13 @@ globalThis.document?.addEventListener('click',event=>{
 },true);
 globalThis.document?.addEventListener('keydown',event=>{if(event.key==='Escape')closeQuickMenus();});
 
-// One start open at a time in a planning; the widths follow.
+// One start open at a time in a planning (the rounds of an event apart); the widths follow.
 globalThis.document?.addEventListener('toggle',event=>{
   const start=event.target;
   if(!start?.classList?.contains('planning-start'))return;
-  if(start.open)for(const other of start.closest('.departure-planning')?.querySelectorAll('.planning-start[open]')||[])if(other!==start)other.open=false;
+  // The rounds of an event stay open together.
+  if(start.dataset.roundKey){syncPlanning();return;}
+  if(start.open)for(const other of start.closest('.departure-planning')?.querySelectorAll('.planning-start[open]:not([data-round-key])')||[])if(other!==start)other.open=false;
   if(start.open)state.selectedDepartureId=start.id.replace('departure-','');
   else if(state.selectedDepartureId===start.id.replace('departure-',''))state.selectedDepartureId=null;
   syncPlanning();

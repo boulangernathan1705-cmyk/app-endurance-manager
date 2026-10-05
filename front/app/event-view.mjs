@@ -97,7 +97,7 @@ function quickActions(event,departure){
 }
 
 // An event in several rounds: each round is shown like a start, « Manche 1 », « Manche 2 », with its own
-// « M'inscrire » and « Absent »; a click opens it on its details and its pilots.
+// « M'inscrire » and « Absent »; open by default on its details and its pilots.
 function roundQuick(event,departure,index){
   if(departure.startsAt<=Date.now()||!state.user)return '';
   const own=ownRegistration(departure),inRound=own&&own.status!=='unavailable'&&!own.roundChoices?.[index]?.skip,blocked=soloEntryBlock(event);
@@ -123,7 +123,7 @@ function roundCards(event,departure){
   const locked=departure.startsAt<=Date.now(),editing=state.registrationOpen.has(departure.id),focus=Number(state.roundFocus?.[departure.id])||0;
   return `<div class="solo-round-starts" id="departure-${departure.id}">${rounds.map((round,index)=>{
     const pilots=roundPilots(event,index,departure),own=ownRegistration(departure),mine=own&&own.status!=='unavailable'&&!own.roundChoices?.[index]?.skip;
-    const open=(editing&&focus===index)||state.openRounds?.has(`${departure.id}:${index}`);
+    const open=(editing&&focus===index)||!state.closedRounds?.has(`${departure.id}:${index}`);
     const editor=!locked&&editing&&focus===index?`<section class="fold-section fold-registration">${renderRegistrationWorkspace(event,departure)}</section>`:'';
     return `<details class="planning-start solo-round-start has-quick${mine?' is-mine':''}" data-round-key="${departure.id}:${index}" ${open?'open':''}><summary><span class="planning-start-head"><strong>Manche ${index+1}</strong><span class="planning-start-end">${esc(eventCircuitName(event,round.circuit))}</span>${mine?'<span class="planning-tag is-mine">Inscrit</span>':''}</span><span class="planning-row"><span class="solo-round-pilots">${pilots} pilote${pilots>1?'s':''}</span></span>${roundQuick(event,departure,index)}${CHEVRON}</summary><div class="departure-fold planning-body"><div class="departure-fold-body">${editor}${roundTiles(round)}${roundEntries(event,departure,index)}</div></div></details>`;
   }).join('')}</div>`;
@@ -241,10 +241,10 @@ export function renderEvent(message=''){
   notifyRender();
 }
 
-// The rounds opened by the player stay open when the page is drawn again.
+// The rounds are open by default; the ones the player closes stay closed when the page is drawn again.
 if(typeof document!=='undefined')document.addEventListener('toggle',event=>{
   const key=event.target?.dataset?.roundKey;
   if(!key)return;
-  state.openRounds??=new Set();
-  if(event.target.open)state.openRounds.add(key);else state.openRounds.delete(key);
+  state.closedRounds??=new Set();
+  if(event.target.open)state.closedRounds.delete(key);else state.closedRounds.add(key);
 },true);
