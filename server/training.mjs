@@ -3,6 +3,7 @@
 // comparison with the other pilots of the site. Only the pilot sees his own data; the others are counted, never named.
 import {fail, json, now, id, token, hash, siteOrigin, rateLimit, body, DAY} from './core.mjs';
 import {parseResults, analyse, programSteps, adviceFor, trackKey, cleanLaps, circuitOf, normal, cleanLive, analyseLive, resultsAsLive, pitTimes, memoSheet, parseLaptimes, laptimesUpdated, mainLayout, LAPTIME_SOURCE, STEPS} from '../shared/training.mjs';
+import {levelOf} from '../shared/training.mjs';
 import {BOP} from '../shared/lmu-bop.mjs';
 import {bopFor} from '../shared/bop.mjs';
 
@@ -181,7 +182,7 @@ export async function nextRace(env, userId) {
   for (const row of rows) {
     const departure = JSON.parse(row.departures || '[]').find(item => item.id === row.departure_id);
     if (!departure?.startsAt || departure.startsAt < Date.now()) continue;
-    if (!next || departure.startsAt < next.startsAt) next = {eventId:row.id, name:row.name, circuit:row.circuit, category:row.category, startsAt:departure.startsAt};
+    if (!next || departure.startsAt < next.startsAt) next = {eventId:row.id, departureId:row.departure_id, name:row.name, circuit:row.circuit, category:row.category, startsAt:departure.startsAt};
   }
   return next;
 }
@@ -199,6 +200,42 @@ async function comparison(env, userId, key, carClass) {
   return {pilots:rows.length, rank, faster:Math.round((rows.length - rank) / (rows.length - 1) * 100), siteBest:sorted[0].best, gap:mine.best - sorted[0].best,
     sectorGaps:['s1', 's2', 's3'].map((field, index) => mine[field] && Number.isFinite(sectorBest[index]) ? mine[field] - sectorBest[index] : null),
     fuelGap:fuel && mine.per_lap ? (mine.per_lap - fuel) / fuel * 100 : null};
+}
+
+// Named summaries are restricted to the viewer's crew in the active community and next departure.
+export async function crewPreparation(env, user, community, race, track, carClass) {
+  const circuit = track?.circuit || (track && normal(track.venue));
+  const stored = circuit && carClass ? await env.DB.prepare("SELECT data FROM training_reference WHERE id='laptimes'").first() : null;
+  const reference = stored ? mainLayout(JSON.parse(stored.data).filter(row => row.circuit === circuit && row.carClass === LAPTIME_CLASS[carClass])) : null;
+  if (!race || !track || circuit !== race.circuit) return {crew:null, reference};
+  const crew = await env.DB.prepare(`SELECT c.id,c.name,c.car FROM crews c JOIN crew_members cm ON cm.crew_id=c.id
+    JOIN registrations r ON r.id=cm.registration_id JOIN participants p ON p.id=r.participant_id
+    WHERE p.user_id=? AND c.community_id=? AND c.event_id=? AND c.departure_id=? AND r.category=? LIMIT 1`)
+    .bind(user, community, race.eventId, race.departureId, race.category).first();
+  if (!crew) return {crew:null, reference};
+  const members = await all(env, `SELECT DISTINCT p.user_id,p.name FROM crew_members cm JOIN registrations r ON r.id=cm.registration_id
+    JOIN participants p ON p.id=r.participant_id WHERE cm.crew_id=? ORDER BY p.name`, crew.id);
+  const since = Date.now() - KEEP_DAYS * DAY * 1000;
+  const rows = await all(env, `SELECT t.user_id,t.started_at,t.car,t.kind,t.laps FROM training_sessions t WHERE t.track_key=? AND t.car_class=? AND t.started_at>=?
+    AND t.user_id IN (SELECT p.user_id FROM crew_members cm JOIN registrations r ON r.id=cm.registration_id JOIN participants p ON p.id=r.participant_id WHERE cm.crew_id=?)
+    ORDER BY t.started_at DESC LIMIT 200`, track.key, carClass, since, crew.id);
+  const marks = await all(env, `SELECT m.user_id,m.step FROM training_marks m WHERE m.track_key=? AND m.user_id IN
+    (SELECT p.user_id FROM crew_members cm JOIN registrations r ON r.id=cm.registration_id JOIN participants p ON p.id=r.participant_id WHERE cm.crew_id=?)`, track.key, crew.id);
+  const live = await all(env, `SELECT t.user_id,t.started_at,t.car,t.capacity,t.laps,t.stops FROM training_live t WHERE t.circuit=? AND t.car_class=? AND t.started_at>=?
+    AND t.user_id IN (SELECT p.user_id FROM crew_members cm JOIN registrations r ON r.id=cm.registration_id JOIN participants p ON p.id=r.participant_id WHERE cm.crew_id=?)
+    ORDER BY t.started_at DESC LIMIT 200`, circuit, carClass, since, crew.id);
+  const pilots = members.map(member => {
+    const sessions = rows.filter(row => member.user_id && row.user_id === member.user_id).slice(0,50).map(row => ({at:row.started_at,car:row.car,kind:row.kind,laps:JSON.parse(row.laps)}));
+    const a = analyse(sessions);
+    const ownLive = live.filter(row => member.user_id && row.user_id === member.user_id).slice(0,30);
+    const telemetry = ownLive.length ? analyseLive(ownLive.map(row => ({at:row.started_at,car:row.car,capacity:row.capacity,laps:JSON.parse(row.laps),stops:JSON.parse(row.stops)}))) : null;
+    const steps = programSteps(a, marks.filter(row => member.user_id && row.user_id === member.user_id).map(row => row.step));
+    return {name:member.name, you:member.user_id === user, steps:steps.map(step => ({key:step.key,done:step.done})), best:a.best, pace:a.median,
+      level:levelOf(a.median,reference), fuel:telemetry?.fuelPerLap ?? (telemetry?.capacity && a.fuelPerLap ? a.fuelPerLap*telemetry.capacity/100 : null),
+      energy:telemetry?.energyPerLap ?? a.energyPerLap, last:a.last ? {at:a.last.at,laps:a.last.laps.length} : null};
+  });
+  pilots.sort((a,b) => Number(b.you)-Number(a.you));
+  return {crew:{name:crew.name,car:crew.car,pilots},reference};
 }
 
 // One key per pilot: a new one (program or SimHub code) replaces the last, which stops working.
@@ -231,7 +268,7 @@ export async function trainingApi(path, method, request, env, actor, community) 
     const analysis = analyse(chosen);
     // Live sessions on the same circuit and class (a track the site does not know is matched by its name).
     const circuit = track ? track.circuit || normal(track.venue) : null;
-    const liveRows = circuit && carClass ? await all(env, `SELECT started_at,car,capacity,laps,stops FROM training_live WHERE user_id=? AND circuit=? AND car_class=?
+    const liveRows = circuit && carClass ? await all(env, `SELECT started_at,car,capacity,laps,stops,game FROM training_live WHERE user_id=? AND circuit=? AND car_class=?
       AND started_at>=? ORDER BY started_at DESC LIMIT 30`, user, circuit, carClass, Date.now() - KEEP_DAYS * DAY * 1000) : [];
     const live = liveRows.length ? analyseLive(liveRows.map(row => ({at:row.started_at, car:row.car, capacity:row.capacity, laps:JSON.parse(row.laps), stops:JSON.parse(row.stops)})))
       : resultsAsLive(chosen);
@@ -242,7 +279,9 @@ export async function trainingApi(path, method, request, env, actor, community) 
     const device = await env.DB.prepare('SELECT created_at,last_seen FROM training_devices WHERE user_id=?').bind(user).first();
     const profile = await env.DB.prepare('SELECT lmu_name FROM training_profiles WHERE user_id=?').bind(user).first();
     const waiting = await all(env, 'SELECT drivers FROM training_pending WHERE user_id=? ORDER BY created_at DESC', user);
-    return json({race, tracks, track, classes, carClass, analysis, live, steps:programSteps(analysis, marks), advice:adviceFor(analysis, compared), comparison:compared,
+    const preparation = await crewPreparation(env, user, community.id, race, track, carClass);
+    const game = liveRows.map(row => row.game && JSON.parse(row.game)).find(Boolean) || null;
+    return json({race, tracks, track, classes, carClass, analysis, live, game, ...preparation, steps:programSteps(analysis, marks), advice:adviceFor(analysis, compared), comparison:compared,
       sessions:sessions.slice(0, 20).map(row => ({id:row.id, at:row.started_at, venue:row.venue, course:row.course, car:row.car, carClass:row.car_class, kind:row.kind,
         laps:JSON.parse(row.laps).length, best:row.best})),
       device:device ? {linked:true, lastSeen:device.last_seen} : {linked:false}, lmuName:profile?.lmu_name || null,

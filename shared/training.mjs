@@ -117,7 +117,7 @@ export const STEPS = [
   {key:'pace', title:'Trouver son rythme', advice:'Enchaîne 10 tours propres d’affilée. Vise la régularité : moins d’une seconde d’écart d’un tour à l’autre.'},
   {key:'stint', title:'Relais complet', advice:'Roule un plein entier sans t’arrêter, comme en course. Garde un œil sur la conso et l’usure des pneus.'},
   {key:'pit', title:'Arrêt aux stands', advice:'Rentre aux stands, fais le plein et repars. Respecte la limitation de vitesse dans la voie des stands.'},
-  {key:'conditions', title:'Nuit et pluie', advice:'Si la course passe la nuit ou sous la pluie, fais quelques tours dans ces conditions avant le départ.'}
+  {key:'simulation', title:'Simulation de course', advice:'La veille, roule une courte simulation au rythme de course, avec les conditions et les réglages prévus pour le départ.'}
 ];
 const fmt = value => value === null || value === undefined ? '' : String(round(value, 1)).replace('.', ',');
 export function programSteps(a, marks = []) {
@@ -127,7 +127,7 @@ export function programSteps(a, marks = []) {
     pace:[a.longestRun >= 10, a.longestRun ? `${a.longestRun} tours propres d’affilée${a.regularity !== null ? `, écart moyen ± ${fmt(a.regularity)} s` : ''}` : ''],
     stint:[Boolean(stintTarget && a.longestRun >= stintTarget), stintTarget ? `Ton plus long relais : ${a.longestRun} tours sur ${a.tankLaps} avec un plein` : a.totalLaps ? 'La conso de tes tours dira la longueur d’un plein' : ''],
     pit:[a.pitDone, a.pitDone ? 'Arrêt aux stands roulé' : ''],
-    conditions:[false, '']
+    simulation:[false, '']
   };
   return STEPS.map(step => {
     const [auto, proof] = checks[step.key];
@@ -164,11 +164,11 @@ export function todaySession(a, steps, {minutes = 30, daysLeft = null} = {}) {
   if (daysLeft !== null && daysLeft <= 1) return {focus:'Veille de course', blocks:[
     block(3, 'Mise en route', 'Tours calmes pour retrouver tes repères.'),
     block(Math.min(8, fit - 3), 'Série régulière', 'Rythme de course, sans chercher le chrono. Pas de nouveau réglage aujourd’hui.')]};
-  if (!next || next.key === 'conditions') {
+  if (!next || next.key === 'simulation') {
     const sector = a.sectors.map((s, i) => s ? {i, loss:s.median - s.best} : null).filter(Boolean).sort((x, y) => y.loss - x.loss)[0];
-    return {focus:next ? 'Nuit et pluie' : 'Entretenir le rythme', blocks:next ? [
+    return {focus:next ? 'Simulation de course' : 'Entretenir le rythme', blocks:next ? [
       block(3, 'Mise en route', 'Tours calmes, dans les conditions de la course.'),
-      block(fit - 3, 'Série dans les conditions', 'Repère les nouveaux points de freinage de nuit ou sous la pluie.')] : [
+      block(fit - 3, 'Série dans les conditions', 'Roule avec les conditions et les réglages prévus pour la course.')] : [
       block(3, 'Mise en route', 'Tours calmes pour chauffer les pneus.'),
       block(Math.floor((fit - 3) / 2), sector ? `Travail du secteur ${sector.i + 1}` : 'Série rapide', sector ? `Concentre-toi sur le secteur ${sector.i + 1}, où tu perds le plus.` : 'Cherche ton meilleur tour sans erreur.'),
       block(Math.ceil((fit - 3) / 2), 'Série régulière', 'Rythme de course, écart de moins d’une demi-seconde.')]};

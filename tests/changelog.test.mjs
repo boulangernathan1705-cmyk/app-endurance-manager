@@ -15,7 +15,7 @@ test('the changelog page is generated from CHANGELOG.md', () => {
 test('CHANGELOG.md starts with the upcoming version and every page links to it', () => {
   const changelog = readFileSync(new URL('../CHANGELOG.md', import.meta.url), 'utf8');
   assert.match(changelog, /^# Nouveautés d'Endurance Manager/);
-  assert.match(changelog, /\n## v1\.0 — 26 septembre 2026\n/);
+  assert.match(changelog, /\r?\n## v1\.0 — 26 septembre 2026\r?\n/);
   for (const page of ['index.html', 'game.html', 'members.html', 'help.html', 'about.html', 'changelog.html'])
     assert.match(readFileSync(new URL(`../${page}`, import.meta.url), 'utf8'), /href="\/changelog\.html"/, page);
 });

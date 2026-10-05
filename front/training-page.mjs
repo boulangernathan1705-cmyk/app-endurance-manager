@@ -1,7 +1,7 @@
 // « Mon entraînement » (server/training.mjs): the pilot's own LMU sessions turned into a guide. The sync program sends
 // them on its own; dropping a results file here does the same by hand.
 import {shortDateLabel, timeAt} from './dates.mjs';
-import {todaySession, lapLabel} from '../shared/training.mjs';
+import {todaySession, lapLabel, levelOf, levelBands} from '../shared/training.mjs';
 
 const app = document.getElementById('training-app');
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -41,79 +41,51 @@ function renderError(error) {
 const daysUntil = ms => Math.max(0, Math.ceil((ms - Date.now()) / 86400000));
 
 function hero(data) {
-  const race = data.race;
-  const days = race ? daysUntil(race.startsAt) : null;
-  const tracks = data.tracks.length > 1 ? `<label class="training-select"><span>Circuit</span><select data-track>${data.tracks.map(track => `<option value="${esc(track.key)}"${track.key === view.track ? ' selected' : ''}>${esc(track.venue)}${track.course && track.course !== track.venue ? ` · ${esc(track.course)}` : ''}</option>`).join('')}</select></label>` : '';
-  const classes = data.classes.length > 1 ? `<label class="training-select"><span>Catégorie</span><select data-class>${data.classes.map(item => `<option${item === view.carClass ? ' selected' : ''}>${esc(item)}</option>`).join('')}</select></label>` : '';
-  return `<header class="training-intro">
-    <div><p class="training-kicker">Entraînement individuel · Le Mans Ultimate</p><h1>Mon entraînement</h1>
-    <p class="training-lead">${data.track ? `${esc(data.track.venue)}${data.carClass ? ` · ${esc(data.carClass)}` : ''}` : 'Roule, le guide fait le reste.'}</p></div>
-    ${race ? `<a class="training-race" href="/lmu/#event=${esc(race.eventId)}"><strong>${days === 0 ? 'Aujourd’hui' : `J-${days}`}</strong><span>${esc(race.name)}</span><small>${esc(race.category || '')}</small></a>` : ''}
-    ${tracks || classes ? `<div class="training-filters">${tracks}${classes}</div>` : ''}
-  </header>`;
+  const race = data.race, days = race ? daysUntil(race.startsAt) : null;
+  const tracks = data.tracks.length > 1 ? '<label class="training-select">Circuit<select data-track>' + data.tracks.map(t => '<option value="'+esc(t.key)+'"'+(t.key===view.track?' selected':'')+'>'+esc(t.venue)+'</option>').join('')+'</select></label>' : '';
+  const classes = data.classes.length > 1 ? '<label class="training-select">Catégorie<select data-class>'+data.classes.map(c=>'<option'+(c===view.carClass?' selected':'')+'>'+esc(c)+'</option>').join('')+'</select></label>' : '';
+  return '<header class="preparation-head"><p class="memo-kicker">Entraînement · Ma préparation</p><h1>'+esc(race?.name || 'Mon entraînement')+'</h1><p class="preparation-sub">'+(race ? 'Départ <strong>'+esc(stamp(race.startsAt))+'</strong><span>'+days+' jour'+(days>1?'s':'')+' pour se préparer</span>' : esc(data.track?.venue || 'Roule, le guide fait le reste.'))+'<span>'+esc(data.crew?.car || data.analysis.last?.car || data.carClass || '')+'</span><a href="/stands.html">Mémo du circuit</a></p><p class="memo-key"><span class="is-you"><i class="dot"></i>Toi</span>'+(data.crew?'<span class="is-pilots"><i class="dot"></i>L’équipage</span>':'')+'<span class="is-game"><i class="dot"></i>Le jeu</span></p>'+(tracks||classes?'<div class="training-filters">'+tracks+classes+'</div>':'')+'</header>';
 }
 
-function stats(a, live) {
-  const litres = live?.fuelPerLap || a.fuelLitres;
-  const items = [['Meilleur tour', lapLabel(a.best)], ['Tours roulés', a.totalLaps], ['Carburant / tour', litres ? `${num(litres, 2)} L` : a.fuelPerLap ? `${num(a.fuelPerLap)} %` : '—'],
-    ['Énergie / tour', a.energyPerLap ? `${num(a.energyPerLap)} %` : '—'], ['Tours avec un plein', live?.tankLaps ?? a.tankLaps ?? '—'], ['Régularité', a.regularity !== null && a.regularity !== undefined ? `± ${num(a.regularity, 2)} s` : '—']];
-  return `<div class="training-stats">${items.map(([label, value]) => `<div><small>${label}</small><strong>${esc(value)}</strong></div>`).join('')}</div>`;
+const figure = (label, value, note = '', source = 'is-you', noteSource = '') => '<div class="memo-row"><dt>'+esc(label)+'</dt><dd class="'+source+'">'+esc(value)+'<small class="'+noteSource+'">'+esc(note)+'</small></dd></div>';
+const average = values => { const list=values.filter(v=>Number.isFinite(v)); return list.length?list.reduce((a,b)=>a+b,0)/list.length:null; };
+const relative = at => { const days=Math.floor((Date.now()-at)/86400000); return days<=0?'aujourd’hui':days===1?'hier':'il y a '+days+' jours'; };
+function crewTable(data) {
+  if (!data.crew) return '';
+  return '<section class="training-card preparation-crew"><h2>Où en est l’équipage</h2><div class="memo-table-wrap"><table class="memo-table"><caption>Préparation de '+esc(data.crew.name)+'</caption><thead><tr>'+['Pilote','Programme','Meilleur tour','Rythme','Niveau','Conso / tour','Dernière séance'].map(t=>'<th scope="col">'+t+'</th>').join('')+'</tr></thead><tbody>'+data.crew.pilots.map(p=>'<tr class="'+(p.you?'is-you-row':'is-pilots')+'"><th scope="row">'+esc(p.you?'Toi':p.name)+'</th><td><span class="preparation-progress" aria-hidden="true">'+p.steps.map(step=>'<i class="'+(step.done?'is-done':'')+'"></i>').join('')+'</span>'+p.steps.filter(step=>step.done).length+'/'+p.steps.length+'</td><td>'+lapLabel(p.best)+'</td><td>'+lapLabel(p.pace)+'</td><td>'+(p.level?'<span class="memo-chip">'+esc(p.level)+'</span>':'—')+'</td><td>'+(p.fuel?num(p.fuel,2)+' L':'—')+'</td><td>'+(p.last?relative(p.last.at)+'<small>'+p.last.laps+' tours</small>':'—')+'</td></tr>').join('')+'</tbody></table></div><p class="training-note">Visible seulement par les pilotes de l’équipage.</p></section>';
+}
+function lapCard(data) {
+  const a=data.analysis;
+  const losses=a.sectors.map((v,i)=>v?{sector:i+1,gap:v.median-v.best}:null).filter(Boolean).sort((a,b)=>b.gap-a.gap);
+  const paces=[a.median,...(data.crew?.pilots.map(p=>p.pace)||[])].filter(v=>Number.isFinite(v)&&v>0);
+  const low=paces.length?Math.min(...paces)-0.5:0, high=paces.length?Math.max(...paces)+0.5:0;
+  const band=high?'<div class="preparation-pace"><h3>Rythme de course</h3><div class="memo-band">'+(data.crew?'<span class="memo-iqr" style="left:'+((Math.min(...paces)-low)/(high-low)*100)+'%;width:'+((Math.max(...paces)-Math.min(...paces))/(high-low)*100)+'%"></span>':'')+(data.crew?.pilots||[]).filter(p=>!p.you&&p.pace).map(p=>'<span class="memo-you preparation-peer" style="left:'+((p.pace-low)/(high-low)*100)+'%" title="'+esc(p.name+' · '+lapLabel(p.pace))+'"></span>').join('')+(a.median?'<span class="memo-you" style="left:'+((a.median-low)/(high-low)*100)+'%" title="Ton rythme"></span>':'')+'</div><div class="memo-scale"><span>'+lapLabel(low)+'</span>'+(data.crew?'<span>L’équipage</span>':'')+'<span>'+lapLabel(high)+'</span></div></div>':'';
+  return '<section class="training-card"><h2>Mes chronos</h2><dl>'+figure('Meilleur tour',lapLabel(a.best))+figure('Rythme de course',lapLabel(a.median),'tour médian')+figure('Secteurs à gagner',losses.length?'S'+losses[0].sector+' +'+num(losses[0].gap,2)+' s':'—',losses.length?'sur ton meilleur S'+losses[0].sector:'')+'</dl>'+band+'</section>';
+}
+function consumption(data) {
+  const a=data.analysis,l=data.live;
+  const energy=l?.energyPerLap ?? a.energyPerLap, litres=l?.fuelPerLap ?? a.fuelLitres;
+  const wear=average(l?.compounds?.[0]?.wear || []);
+  const team=average(data.crew?.pilots.map(p=>p.energy)||[]);
+  const laps=l?.energyLaps ?? l?.tankLaps ?? a.tankLaps;
+  return '<section class="training-card"><h2>Conso et pneus</h2><dl>'+figure('Énergie / tour',energy?num(energy,2)+' %':'—',team?'équipage '+num(team,2)+' %':'')+figure('Carburant / tour',litres?num(litres,2)+' L':'—',data.game?.fuel?'jeu '+num(data.game.fuel,2)+' L':'','is-you','is-game')+figure('Usure / tour',wear!==null?num(wear,2)+' %':'—',wear!==null?'moyenne des pneus · '+(l.compounds[0].name||''):'')+figure('Relais',laps?laps+' tours':'—',l?.energyLaps?'avec 100 % d’énergie':laps?'avec un plein':'')+'</dl></section>';
 }
 
 function today(data) {
-  const days = data.race ? daysUntil(data.race.startsAt) : null;
-  const plan = todaySession(data.analysis, data.steps, {minutes:view.minutes, daysLeft:days});
-  const total = plan.blocks.reduce((sum, block) => sum + block.laps, 0) || 1;
-  return `<section class="training-card training-today"><div class="training-card-head"><h2>Séance du jour</h2>
-    <div class="training-chips" role="group" aria-label="Temps disponible">${MINUTES.map(value => `<button type="button" data-minutes="${value}" aria-pressed="${value === view.minutes}">${value} min</button>`).join('')}</div></div>
-    <p class="training-focus">Objectif : <strong>${esc(plan.focus)}</strong></p>
-    <div class="training-blocks-bar" aria-hidden="true">${plan.blocks.map((block, index) => `<span class="block-${index % 3}" style="flex:${block.laps}"></span>`).join('')}</div>
-    <ol class="training-blocks">${plan.blocks.map((block, index) => `<li class="block-${index % 3}"><strong>${block.laps} tour${block.laps > 1 ? 's' : ''}</strong><span><b>${esc(block.title)}</b>${esc(block.tip)}</span></li>`).join('')}</ol>
-    <p class="training-note">${total} tours en tout${data.analysis.median ? `, sur la base de tes tours en ${lapLabel(data.analysis.median)}` : ''}.</p></section>`;
+  const plan=todaySession(data.analysis,data.steps,{minutes:view.minutes,daysLeft:data.race?daysUntil(data.race.startsAt):null});
+  const next=data.steps.find(s=>!s.done);
+  const peers=(data.crew?.pilots||[]).filter(p=>!p.you&&p.pace).sort((a,b)=>a.pace-b.pace);
+  const bands=data.reference?levelBands(data.reference):[];
+  const level=levelOf(data.analysis.median,data.reference), index=bands.findIndex(b=>b.name===level), goal=index>0?bands[index-1]:null;
+  return '<section class="training-card training-today"><h2>Séance du jour</h2><div class="preparation-session"><p class="memo-big">'+view.minutes+'<span>min · '+esc(plan.focus.toLowerCase())+'</span></p><p>'+esc(next?.advice || plan.blocks.map(b=>b.tip).join(' '))+'</p></div><div class="training-chips" role="group" aria-label="Temps disponible">'+MINUTES.map(m=>'<button type="button" data-minutes="'+m+'" aria-pressed="'+(m===view.minutes)+'">'+m+' min</button>').join('')+'</div><dl>'+figure('Ton objectif',goal?.name||level||'Construire ton rythme',goal?.to?lapLabel(goal.to)+' en course':data.analysis.median?'Garder un rythme régulier':'Ajoute ta première séance')+(peers[0]&&data.analysis.median?figure('Écart avec '+peers[0].name,(data.analysis.median-peers[0].pace>=0?'+':'')+num(data.analysis.median-peers[0].pace,3)+' s','au rythme de course'): '')+'</dl><details class="preparation-details"><summary>Déroulé de la séance</summary><ol class="training-blocks">'+plan.blocks.map(b=>'<li><strong>'+b.laps+' tours</strong><span><b>'+esc(b.title)+'</b>'+esc(b.tip)+'</span></li>').join('')+'</ol></details></section>';
 }
 
 function program(data) {
-  const done = data.steps.filter(step => step.done).length;
-  return `<section class="training-card"><div class="training-card-head"><h2>Programme</h2><span class="training-count">${done} / ${data.steps.length}</span></div>
-    <div class="training-progress"><span style="width:${done / data.steps.length * 100}%"></span></div>
-    <ol class="training-steps">${data.steps.map((step, index) => `<li class="${step.done ? 'is-done' : ''}">
-      <span class="training-step-mark" aria-hidden="true">${step.done ? '✓' : index + 1}</span>
-      <div><strong>${esc(step.title)}</strong><p>${esc(step.advice)}</p>${step.proof ? `<small>${esc(step.proof)}</small>` : ''}</div>
-      ${step.auto ? '<span class="training-auto" data-tip="Validé par tes tours">Auto</span>' : `<label class="training-tick"><input type="checkbox" data-step="${esc(step.key)}"${step.manual ? ' checked' : ''}${data.track ? '' : ' disabled'}><span>Fait</span></label>`}
-    </li>`).join('')}</ol></section>`;
+  const next=data.steps.find(s=>!s.done)?.key;
+  return '<section class="training-card"><h2>Programme</h2><ol class="training-steps">'+data.steps.map((step,i)=>'<li class="'+(step.done?'is-done':'')+(step.key===next?' is-current':'')+'"><span class="training-step-mark" aria-hidden="true">'+(i+1)+'</span><div><strong>'+esc(step.title)+'</strong><p>'+esc(step.proof || (step.key==='simulation'?'Avant la course':step.key==='pit'?'À faire : arrêt aux stands':step.advice))+'</p></div><div class="preparation-marks">'+(data.crew?.pilots||[]).filter(p=>!p.you).map(p=>'<span class="preparation-initial '+(p.steps.find(s=>s.key===step.key)?.done?'is-done':'')+'" title="'+esc(p.name)+'">'+esc(p.name.slice(0,3))+'</span>').join('')+(step.auto?'':'<label class="training-tick"><input type="checkbox" data-step="'+esc(step.key)+'" '+(step.manual?'checked ':'')+(!data.track?'disabled ':'')+'aria-label="Valider : '+esc(step.title)+'"></label>')+'</div></li>').join('')+'</ol></section>';
 }
 
-function advice(data) {
-  return `<section class="training-card"><h2>Conseils tirés de tes tours</h2><div class="training-advice">${data.advice.map(item => `<article class="advice-${esc(item.key)}"><strong>${esc(item.title)}</strong><p>${esc(item.text)}</p></article>`).join('')}</div></section>`;
-}
 
-// The last session, lap by lap: clean laps in colour, the others greyed out.
-function chart(a) {
-  const laps = (a.last?.laps || []).filter(lap => lap.t);
-  if (laps.length < 2) return '';
-  const times = laps.filter(lap => lap.clean).map(lap => lap.t);
-  const best = Math.min(...(times.length ? times : laps.map(lap => lap.t)));
-  const top = best + Math.max(2, (Math.max(...(times.length ? times : [best + 2])) - best) * 1.3);
-  const width = 640, height = 160, step = width / laps.length;
-  const bars = laps.map((lap, index) => {
-    const value = Math.min(lap.t, top), h = Math.max(6, (top - value) / (top - best + 0.0001) * (height - 24) + 6);
-    return `<rect x="${(index * step + step * 0.15).toFixed(1)}" y="${(height - h).toFixed(1)}" width="${(step * 0.7).toFixed(1)}" height="${h.toFixed(1)}" rx="2" class="${lap.pit ? 'is-pit' : lap.clean ? (lap.t === best ? 'is-best' : 'is-clean') : 'is-slow'}"><title>Tour ${lap.n} · ${lapLabel(lap.t)}${lap.pit ? ' · stands' : lap.clean ? '' : ' · hors rythme'}</title></rect>`;
-  }).join('');
-  return `<section class="training-card"><div class="training-card-head"><h2>Dernière séance</h2><span class="training-count">${esc(stamp(a.last.at))}</span></div>
-    <svg class="training-chart" viewBox="0 0 ${width} ${height}" role="img" aria-label="Temps au tour de la dernière séance : plus la barre est haute, plus le tour est rapide">${bars}</svg>
-    <p class="training-legend"><span class="is-best"></span>Meilleur tour <span class="is-clean"></span>Tour propre <span class="is-slow"></span>Hors rythme <span class="is-pit"></span>Stands</p></section>`;
-}
-
-function comparison(data) {
-  const c = data.comparison;
-  if (!c) return '';
-  if (!c.rank) return `<section class="training-card"><h2>Face aux autres pilotes</h2><p class="training-empty">${c.pilots} pilote${c.pilots > 1 ? 's' : ''} du site ${c.pilots > 1 ? 'ont' : 'a'} roulé ici dans cette catégorie. La comparaison s’affiche à partir de 3, sans aucun nom.</p></section>`;
-  const sectors = c.sectorGaps.map((gap, index) => gap === null ? '' : `<div><small>Secteur ${index + 1}</small><strong class="${gap < 0.15 ? 'is-close' : ''}">+${num(gap, 2)} s</strong></div>`).join('');
-  return `<section class="training-card"><div class="training-card-head"><h2>Face aux autres pilotes</h2><span class="training-count">${c.pilots} pilotes · 120 jours</span></div>
-    <p class="training-rank"><strong>${c.rank}<sup>${c.rank === 1 ? 'er' : 'e'}</sup></strong> sur ${c.pilots} · plus rapide que ${c.faster} % des pilotes du site</p>
-    <div class="training-stats">${c.rank > 1 ? `<div><small>Écart au meilleur</small><strong>+${num(c.gap, 3)} s</strong></div>` : '<div><small>Meilleur tour du site</small><strong>C’est toi</strong></div>'}${sectors}${c.fuelGap !== null ? `<div><small>Conso vs les autres</small><strong>${c.fuelGap > 0 ? '+' : ''}${Math.round(c.fuelGap)} %</strong></div>` : ''}</div>
-    <p class="training-note">Ton rang n’est visible que par toi. Les autres pilotes ne sont jamais nommés.</p></section>`;
-}
 
 const WHEELS = ['Avant gauche', 'Avant droit', 'Arrière gauche', 'Arrière droit'];
 
@@ -184,21 +156,14 @@ function sync(data) {
 
 function sessions(data) {
   if (!data.sessions.length) return '';
-  return `<section class="training-card"><h2>Mes séances</h2><ul class="training-sessions">${data.sessions.map(item => `<li>
-    <div><strong>${esc(item.venue)}</strong><small>${esc(stamp(item.at))} · ${esc(KINDS[item.kind] || item.kind)} · ${esc(item.car)}</small></div>
-    <span>${item.laps} tours</span><span>${lapLabel(item.best)}</span>
-    <button type="button" class="training-delete" data-delete="${esc(item.id)}" aria-label="Supprimer la séance du ${esc(stamp(item.at))}">✕</button></li>`).join('')}</ul></section>`;
+  return '<section class="training-card preparation-sessions"><h2>Mes séances</h2><ul class="training-sessions">'+data.sessions.map(item=>'<li><div><small>'+esc(relative(item.at))+'</small><span>'+esc(item.venue+' · '+item.car+' · '+(KINDS[item.kind]||item.kind))+'</span></div><span>'+item.laps+' tours</span><button type="button" class="training-delete" data-delete="'+esc(item.id)+'" aria-label="Supprimer la séance du '+esc(stamp(item.at))+'">✕</button></li>').join('')+'</ul></section>';
 }
 
 function render() {
-  const data = view.data;
-  const empty = !data.analysis.totalLaps;
-  app.innerHTML = `${hero(data)}
-    ${empty ? `<section class="training-card training-welcome"><h2>Ta première séance</h2><p>Relie ton jeu ci-dessous puis roule dans Le Mans Ultimate. Dès la fin de ta séance, tes tours arrivent ici : programme, séance du jour, conseils et comparaison avec les autres pilotes.</p></section>` : stats(data.analysis, data.live)}
-    <div class="training-grid"><div>${today(data)}${program(data)}${fuel(data.live)}</div><div>${advice(data)}${chart(data.analysis)}${comparison(data)}${stops(data.live)}</div></div>
-    ${tyres(data.live)}
-    ${sync(data)}${sessions(data)}`;
+  const data=view.data;
+  app.innerHTML=hero(data)+crewTable(data)+(data.analysis.totalLaps?'':'<section class="training-card training-welcome"><h2>Ta première séance</h2><p>Relie ton jeu puis roule dans Le Mans Ultimate. Tes données rempliront cette préparation.</p></section>')+'<div class="preparation-grid">'+program(data)+today(data)+lapCard(data)+consumption(data)+'</div>'+sessions(data)+'<details class="training-card preparation-details"><summary>Données détaillées : pneus et arrêts</summary>'+fuel(data.live)+tyres(data.live)+stops(data.live)+'</details><details class="training-card preparation-details"'+(!data.device.linked||data.pending||view.busy||view.simhub?' open':'')+'><summary>Liaison du jeu et import des séances</summary>'+sync(data)+'</details>';
 }
+
 
 async function upload(files) {
   const list = [...files].filter(file => /\.xml$/i.test(file.name));

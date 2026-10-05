@@ -3,9 +3,10 @@ import assert from 'node:assert/strict';
 import {execFileSync} from 'node:child_process';
 import {readdirSync} from 'node:fs';
 import {join} from 'node:path';
+import {fileURLToPath} from 'node:url';
 
 // Most interface tests read source text; this one makes sure every browser and worker script still parses.
-const root = new URL('../', import.meta.url).pathname;
+const root = fileURLToPath(new URL('../', import.meta.url));
 function scripts(dir) {
   return readdirSync(join(root, dir), {withFileTypes: true}).flatMap(entry => {
     const path = join(dir, entry.name);
