@@ -299,3 +299,8 @@
 .memo-group h3{margin:0;color:var(--muted);font-size:12px;letter-spacing:.08em;text-transform:uppercase}
 .memo-group h3 small{margin-left:6px;font-size:11px;letter-spacing:0;text-transform:none}
 .memo-tyre small+b+small{line-height:1.35}
+.memo-collection{margin:0 0 20px}
+.memo-collection p{margin:0;line-height:1.5}
+.memo-collection form{display:grid;gap:12px;margin-top:12px;max-width:620px}
+.memo-collection form label{display:grid;gap:6px}
+.memo-collection form button{justify-self:start;white-space:normal}

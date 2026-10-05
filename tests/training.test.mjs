@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import {DatabaseSync} from 'node:sqlite';
 import {readFileSync, readdirSync} from 'node:fs';
 import worker from '../server/worker.mjs';
-import {refreshLaptimes, crewPreparation,refreshMemoPilot} from '../server/training.mjs';
+import {refreshLaptimes, crewPreparation,refreshMemoPilot,saveLive} from '../server/training.mjs';
+import {collectMemo,collectiveMemo,restartMemo,MEMO_PERIOD} from '../server/memo-collection.mjs';
 import {BOP} from '../shared/lmu-bop.mjs';
 import {bopFor} from '../shared/bop.mjs';
 import {linkTestServer, setMember, ORGA_ROLE} from './fixtures/discord-server.mjs';
@@ -251,6 +252,76 @@ test('history is metadata, individual analysis is bounded, and memo reads summar
   DB.db.prepare('DELETE FROM training_memo_pilots').run();DB.reads=[];
   assert.equal((await req('/api/training/memo?circuit=spa','GET',null,'pilot')).status,200);
   assert.equal(DB.reads.filter(read=>read.sql.includes('capacity,laps,stops,game FROM training_live')).length,1);
+});
+
+test('memo freezes at five contributors and 100 usable laps, remains public to non-contributors and keeps personal figures fresh',async()=>{
+  const {req,login,env,DB}=harness();
+  await login(ADMIN,'admin','Orga');await login(PILOT,'pilot','Alice');await login(MATE,'mate','Bob');
+  for(let i=4;i<=6;i++)await login(String(i).repeat(18),'p'+i,'Pilot '+i);
+  await req('/api/community/modules','PATCH',{training:true},'admin');
+  const names=['Alice','Bob','Pilot 4','Pilot 5','Pilot 6'];
+  const users=names.map(name=>DB.db.prepare('SELECT id FROM users WHERE name=?').get(name).id);
+  const at=Date.now()-1000,entry={circuit:'spa',car:'Alpine A424',track:'Spa',car_class:'Hypercar'};
+  const session=(fuel,count,time=at)=>cleanLive({...LIVE,at:time,laps:Array.from({length:count},(_,i)=>liveLap(i+1,{fuel,ve:fuel})),stops:[]});
+  for(let i=0;i<4;i++)await collectMemo(env,users[i],session(i+1,25),'s'+i,'spa',at);
+  let result=await collectiveMemo(env,entry,at);
+  assert.equal(result.collection.state,'collecting');assert.equal(result.collection.laps,100);
+  await collectMemo(env,users[4],session(5,1),'s4','spa',at);
+  result=await collectiveMemo(env,entry,at);
+  assert.equal(result.collection.state,'stable');assert.equal(result.collection.pilots,5);assert.equal(result.collection.laps,101);
+  assert.equal(result.sheet.fuel.median,3,'each pilot has equal weight, regardless of lap count');
+  const frozen=JSON.stringify(result.sheet);
+  await collectMemo(env,users[0],session(9,100),'after-freeze','spa',at);
+  assert.equal(JSON.stringify((await collectiveMemo(env,entry,at)).sheet),frozen);
+  assert.equal(DB.db.prepare('SELECT COUNT(*) AS n FROM training_memo_contributions').get().n,5);
+  const publicMemo=(await req('/api/training/memo?circuit=spa','GET',null,'admin')).data;
+  assert.equal(publicMemo.fuel.median,3);assert.equal(publicMemo.fuel.you,null);assert.equal(publicMemo.canRestart,true);
+  await saveLive(env,users[0],JSON.stringify({...LIVE,at:Date.now()+1000,laps:[liveLap(1,{fuel:8,ve:8})],stops:[]}));
+  const personalMemo=(await req('/api/training/memo?circuit=spa','GET',null,'pilot')).data;
+  assert.equal(personalMemo.fuel.median,3);assert.equal(personalMemo.fuel.you,8);assert.equal(personalMemo.canRestart,false);
+  assert.equal(personalMemo.stint.laps,publicMemo.stint.laps,'shared stint estimate is independent of the viewer');
+  const simultaneous={...LIVE,track:'Grand Prix of Long Beach',at:Date.now()+100000,laps:Array.from({length:20},(_,i)=>liveLap(i+1)),stops:[]};
+  for(const user of users)await saveLive(env,user,JSON.stringify(simultaneous));
+  const together=(await req('/api/training/memo?circuit=long-beach','GET',null,'admin')).data;
+  assert.equal(together.collection.pilots,5);assert.equal(together.collection.laps,100);assert.equal(together.collection.state,'stable','simultaneous sessions from different pilots are distinct');
+  DB.reads=[];
+  await req('/api/training/memo?circuit=spa','GET',null,'admin');
+  assert.ok(!DB.reads.some(read=>/SELECT.*\b(sample|summary|laps)\b.*FROM training_(live|memo_contributions|memo_pilots)/s.test(read.sql)),'warmed shared publication reads no per-pilot arrays');
+  assert.equal((await req('/api/training/memo/restart','POST',{reason:'Game 1.5'},'pilot')).status,403);
+  assert.equal((await req('/api/training/memo/restart','POST',{reason:''},'admin')).status,400);
+  assert.equal((await req('/api/training/memo/restart','POST',{reason:'Game 1.5'},'admin')).status,200);
+  result=await collectiveMemo(env,entry);
+  assert.equal(result.collection.state,'collecting');assert.equal(result.collection.previous,true);
+  assert.equal(result.collection.laps,0);assert.equal(result.collection.reason,'Game 1.5');assert.equal(JSON.stringify(result.sheet),frozen);
+  await collectMemo(env,users[0],session(9,100,at),'backlog','spa');
+  assert.equal((await collectiveMemo(env,entry)).collection.laps,0,'pre-update session is excluded');
+  const renewedAt=result.collection.startedAt+MEMO_PERIOD;
+  result=await collectiveMemo(env,entry,renewedAt);
+  assert.equal(result.collection.startedAt,renewedAt);assert.equal(result.collection.renewAt,renewedAt+MEMO_PERIOD);
+  assert.equal(JSON.stringify(result.sheet),frozen);assert.equal(result.collection.reason,'Renouvellement de 15 jours');
+  // The last published memo survives raw telemetry retention and pilot summary expiry.
+  DB.db.prepare('DELETE FROM training_live').run();DB.db.prepare('DELETE FROM training_memo_pilots').run();
+  assert.equal((await req('/api/training/memo?circuit=spa','GET',null,'admin')).data.fuel.median,3);
+});
+
+test('memo aggregates a contributor across sessions, ignores replay and bounds samples while waiting for quorum',async()=>{
+  const {login,env,DB}=harness();await login(PILOT,'pilot','Alice');
+  const user=DB.db.prepare('SELECT id FROM users WHERE name=?').get('Alice').id;
+  const at=Date.now(),entry={circuit:'spa',car:LIVE.car,track:LIVE.track,car_class:LIVE.class};
+  const session=(fuel,count)=>cleanLive({...LIVE,at,laps:Array.from({length:count},(_,i)=>liveLap(i+1,{fuel})),stops:[]});
+  await collectMemo(env,user,session(1,10),'first','spa',at);
+  await collectMemo(env,user,session(3,20),'second','spa',at);
+  await collectMemo(env,user,session(3,20),'second','spa',at);
+  let result=await collectiveMemo(env,entry,at);
+  assert.equal(result.collection.laps,30);assert.equal(result.sheet.fuel.median,2.33);
+  await collectMemo(env,user,session(2,200),'large','spa',at);
+  result=await collectiveMemo(env,entry,at);assert.equal(result.collection.laps,100);
+  await collectMemo(env,user,session(8,50),'overflow','spa',at);
+  assert.equal((await collectiveMemo(env,entry,at)).collection.laps,100);
+  assert.equal(DB.db.prepare('SELECT COUNT(*) AS n FROM training_memo_contributions').get().n,3);
+  await restartMemo(env,'Test renewal',at+1);
+  await collectMemo(env,user,session(9,50),'old-cycle','spa',at+1);
+  assert.equal((await collectiveMemo(env,entry,at+1)).collection.laps,0);
 });
 
 test('a stop takes the game’s time: tyres, ducts and brakes after, fuel, energy, wing and driver at the same time', () => {
