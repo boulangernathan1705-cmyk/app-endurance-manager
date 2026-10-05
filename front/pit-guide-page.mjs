@@ -15,22 +15,26 @@ const view = {data:null, calc:{arrive:50, leave:100, tyres:4, driver:false, wing
 const lap = (seconds, digits = 2) => seconds ? `${Math.floor(seconds / 60)}:${(seconds % 60).toFixed(digits).padStart(digits + 3, '0')}` : '—';
 const row = (label, value, kind = '', note = '') => `<div class="memo-row"><dt>${label}</dt><dd class="${kind}">${value}${note ? `<small>${note}</small>` : ''}</dd></div>`;
 
-// The pilots' band, the median's line, the game's triangle and the viewer's dot, on one scale.
+// One scale: the pilots' band and their median's line once they are enough, else the viewer's own band from their
+// lowest to their highest lap; the game's triangle and the viewer's dot on top.
 function band(item, unit, digits) {
-  const values = [item.low, item.high, item.you, item.game].filter(value => value !== null && value !== undefined);
-  if (item.median === null) {
-    return `<p class="training-note memo-small">Fourchette dès 3 pilotes et 30 tours (${item.pilots} pilote${item.pilots > 1 ? 's' : ''}, ${item.laps} tours).</p>`;
-  }
-  const min = Math.min(...values) * 0.95, max = Math.max(...values) * 1.05, at = value => `${((value - min) / (max - min) * 100).toFixed(1)}%`;
-  return `<div class="memo-band" role="img" aria-label="Pilotes de ${num(item.low, digits)} à ${num(item.high, digits)} ${unit}, médiane ${num(item.median, digits)}">
-    <span class="memo-iqr" style="left:${at(item.low)};width:calc(${at(item.high)} - ${at(item.low)})"></span><span class="memo-median" style="left:${at(item.median)}"></span>
+  const pilots = item.median !== null, own = !pilots && item.youMin !== null && item.youMax !== null && item.youMax > item.youMin;
+  if (!pilots && !own) return '';
+  const low = pilots ? item.low : item.youMin, high = pilots ? item.high : item.youMax;
+  const values = [low, high, item.you, item.game].filter(value => value !== null && value !== undefined);
+  const min = Math.min(...values) * 0.97, max = Math.max(...values) * 1.03, at = value => `${((value - min) / (max - min) * 100).toFixed(1)}%`;
+  return `<div class="memo-band${own ? ' is-own' : ''}" role="img" aria-label="${pilots ? 'Pilotes' : 'Toi'} de ${num(low, digits)} à ${num(high, digits)} ${unit}">
+    <span class="memo-iqr" style="left:${at(low)};width:calc(${at(high)} - ${at(low)})"></span>${pilots ? `<span class="memo-median" style="left:${at(item.median)}"></span>` : ''}
     ${item.game ? `<span class="memo-game" style="left:${at(item.game)}"></span>` : ''}${item.you ? `<span class="memo-you" style="left:${at(item.you)}"></span>` : ''}</div>
-    <div class="memo-scale"><span>${num(item.low, digits)} ${unit}</span><span>${item.pilots} pilotes · ${item.laps} tours</span><span>${num(item.high, digits)} ${unit}</span></div>`;
+    <div class="memo-scale ${pilots ? '' : 'is-you'}"><span>${pilots ? '' : 'min '}${num(low, digits)} ${unit}</span><span>${pilots ? `${item.pilots} pilotes · ${item.laps} tours` : 'ta fourchette'}</span><span>${pilots ? '' : 'max '}${num(high, digits)} ${unit}</span></div>`;
 }
+
+// The colour of a figure is the colour of where it comes from: the pilots' median, else the viewer, else the game.
+const source = item => !item ? '' : item.median !== null && item.median !== undefined ? 'is-pilots' : item.you !== null && item.you !== undefined ? 'is-you' : 'is-game';
 
 function perLap(title, item, unit, digits, extra = '') {
   const main = item.median ?? item.you ?? item.game;
-  const kind = item.median !== null ? 'is-pilots' : item.you !== null ? 'is-you' : 'is-game';
+  const kind = source(item);
   return `<div class="memo-block"><h3>${title}</h3><p class="memo-big ${kind}">${num(main, digits)}<span>${unit} / tour</span></p>${band(item, unit, digits)}
     <dl>${item.you !== null ? row('Toi', `${num(item.you, digits)} ${unit}`, 'is-you') : ''}${item.game ? row('Prévu par le jeu', `${num(item.game, digits)} ${unit}`, 'is-game') : ''}${extra}</dl></div>`;
 }
@@ -63,14 +67,14 @@ function levels(data) {
   const range = band => band.from === null ? `jusqu’à ${lap(band.to)}` : band.to === null ? `plus de ${lap(band.from)}` : `${lap(band.from)} à ${lap(band.to)}`;
   const rows = ref.bands.map((band, index) => {
     const mine = you?.level === band.name, goal = you?.next?.name === band.name;
-    return `<tr class="${mine ? 'is-mine' : goal ? 'is-goal' : ''}"><th scope="row">${esc(band.name)}${mine ? ' <span class="memo-chip is-you">ton niveau</span>' : goal ? ' <span class="memo-chip is-pilots">objectif</span>' : ''}</th>
+    return `<tr class="${mine ? 'is-mine' : goal ? 'is-goal' : ''}"><th scope="row">${esc(band.name)}${mine ? ' <span class="memo-chip is-you">ton niveau</span>' : goal ? ' <span class="memo-chip">objectif</span>' : ''}</th>
       <td>${index ? '<span class="memo-none">—</span>' : lap(ref.q)}</td><td>${range(band)}</td></tr>`;
   }).join('');
   return `<section class="training-card memo-wide"><p class="memo-scope">Circuit · catégorie · tableur d’Ohne Speed</p><h2>Chronos de référence</h2>
     <div class="memo-table-wrap"><table class="memo-table"><caption>Chronos de référence par niveau, ${esc(ref.track)}</caption>
       <thead><tr><th scope="col">Niveau</th><th scope="col">Chrono<small>tour lancé</small></th><th scope="col">Rythme de course<small>tour moyen en course</small></th></tr></thead>
       <tbody>${you ? `<tr class="is-you-row"><th scope="row">Toi <span class="memo-chip is-you">${esc(you.level)}</span></th><td>${lap(you.best, 3)}<small>ton meilleur tour</small></td><td>${lap(you.pace, 3)}<small>ton tour médian</small></td></tr>` : ''}${rows}</tbody></table></div>
-    <p class="training-note memo-small">${you?.next ? `<span class="is-pilots">Objectif : ${esc(you.next.name)} en ${lap(you.next.time)}.</span> ` : ''}${ref.fastest ? `Plus rapide : ${esc(ref.fastest.car)} en ${lap(ref.fastest.time)}. ` : ''}Version ${esc(ref.patch)} du jeu.</p></section>`;
+    <p class="training-note memo-small">${you?.next ? `<span>Objectif : ${esc(you.next.name)} en ${lap(you.next.time)}.</span> ` : ''}${ref.fastest ? `Plus rapide : ${esc(ref.fastest.car)} en ${lap(ref.fastest.time)}. ` : ''}Version ${esc(ref.patch)} du jeu.</p></section>`;
 }
 
 // The car's line in LMU's BoP for this circuit, with what changed since the previous BoP.
@@ -108,7 +112,7 @@ function render() {
     s.brakes ? row('Freins', `${num(s.brakes, 0)} s`, '', 'en plus') : '', s.repair ? row('Réparation', `${num(s.repair, 0)} s`) : ''].join('') : '';
   const classes = [...new Set(circuit.cars.map(item => item.carClass))];
   const cars = circuit.cars.filter(item => item.carClass === data.car.carClass);
-  const st = data.stint;
+  const st = data.stint, stintKind = source(st.by === 'energy' ? data.energy : data.fuel), wearKind = source(data.tyres[0]);
   app.innerHTML = `<div class="memo-head"><p class="memo-kicker">Mémo officiel · commun à tous les pilotes</p><h1>${esc(data.circuit.name)}</h1>
     
     <div class="memo-pick">
@@ -116,7 +120,7 @@ function render() {
       <div class="memo-classes" role="group" aria-label="Catégorie">${classes.map(name => `<button type="button" data-class="${esc(name)}" aria-pressed="${name === data.car.carClass}">${esc(CLASS_NAMES[name] || name)}</button>`).join('')}</div>
       <label class="memo-select">Voiture<select data-pick="car">${cars.map(item => `<option value="${esc(item.car)}"${item.car === data.car.car ? ' selected' : ''}>${esc(item.car)}</option>`).join('')}</select></label>
     </div>
-    <p class="memo-key"><span class="is-you"><i class="dot"></i>Toi (point)</span><span class="is-pilots"><i class="bar"></i>Les pilotes du site : bande et trait de la médiane</span><span class="is-game"><i class="tri"></i>Le jeu (triangle)</span></p></div>
+    <p class="memo-key"><span class="is-you"><i class="dot"></i>Toi</span><span class="is-pilots"><i class="bar"></i>Les pilotes du site</span><span class="is-game"><i class="tri"></i>Le jeu</span></p></div>
     <div class="memo-grid">
     ${levels(data)}
     <section class="training-card"><p class="memo-scope">Circuit · voiture</p><h2>Stand</h2>
@@ -130,24 +134,23 @@ function render() {
       : '<p class="training-empty">Pas encore relevé pour cette voiture.</p>'}</section>
     <section class="training-card"><p class="memo-scope">Circuit · voiture · par tour</p><h2>Énergie et carburant</h2>
       ${data.energy.median !== null || data.energy.you !== null || data.energy.game ? perLap('Énergie', data.energy, '%', 2) : ''}
-      ${perLap('Carburant', data.fuel, 'L', 2, data.fuel.ratio ? row('Ratio carburant conseillé', num(data.fuel.ratio, 2), 'is-pilots') : '')}</section>
+      ${perLap('Carburant', data.fuel, 'L', 2, data.fuel.ratio ? row('Ratio carburant conseillé', num(data.fuel.ratio, 2), source(data.fuel)) : '')}</section>
     <section class="training-card"><p class="memo-scope">Circuit · voiture · gomme</p><h2>Pneus${tyre ? ` · ${esc(tyre.name)}` : ''}</h2>
       ${tyre ? `<div class="memo-block"><p class="memo-big ${tyre.median !== null ? 'is-pilots' : 'is-you'}">${num(tyre.median ?? tyre.you, 2)}<span>% d’usure / tour</span></p>${band(tyre, '%', 2)}
-        <dl>${tyre.you !== null ? row('Ton usure', `${num(tyre.you, 2)} % / tour`, 'is-you') : ''}${tyre.worst !== null ? row('Pneu le plus usé', WHEELS[tyre.worst], 'is-pilots') : ''}
+        <dl>${tyre.you !== null ? row('Ton usure', `${num(tyre.you, 2)} % / tour`, 'is-you') : ''}${tyre.worst !== null ? row('Pneu le plus usé', WHEELS[tyre.worst], source(tyre)) : ''}
         ${tyre.temp ? row('Température des pilotes', `${tyre.temp} °C`, 'is-pilots') : ''}${tyre.youTemp ? row('Ta température', `${tyre.youTemp} °C`, 'is-you') : ''}
         ${tyre.ideal ? row('Température idéale', `${num(tyre.ideal, 0)} °C`, 'is-game') : ''}${tyre.track !== null ? row('Piste pendant les mesures', `${num(tyre.track)} °C`) : ''}</dl></div>
         ${data.tyres.length > 1 ? `<p class="training-note">Autres gommes : ${data.tyres.slice(1).map(item => `${esc(item.name)} ${num(item.median ?? item.you, 2)} %`).join(', ')}.</p>` : ''}`
       : '<p class="training-empty">Pas encore de tour mesuré.</p>'}</section>
     ${bop(data)}
     <section class="training-card${data.bop ? '' : ' memo-wide'}"><p class="memo-scope">Circuit · voiture · un relais</p><h2>Relais</h2>
-      ${st.laps ? `<p class="memo-big is-pilots">${st.laps}<span>tours ${st.by === 'energy' ? 'avec 100 % d’énergie' : 'avec un plein'}</span></p>
-      <dl>${st.by === 'energy' && st.fuel ? row('Carburant pour les faire', `${num(st.fuel, 1)} L`, 'is-pilots', data.fuel.ratio ? `ratio conseillé ${num(data.fuel.ratio, 2)}` : '') : ''}
-        ${st.wear ? st.wear.map((value, index) => value === null ? '' : row(`Usure ${WHEELS[index]}`, `−${num(value, 1)} %`, 'is-pilots')).join('') : ''}</dl>`
+      ${st.laps ? `<p class="memo-big ${stintKind}">${st.laps}<span>tours ${st.by === 'energy' ? 'avec 100 % d’énergie' : 'avec un plein'}</span></p>
+      <dl>${st.by === 'energy' && st.fuel ? row('Carburant pour les faire', `${num(st.fuel, 1)} L`, stintKind, data.fuel.ratio ? `ratio conseillé ${num(data.fuel.ratio, 2)}` : '') : ''}
+</dl>
+      ${st.wear ? `<div class="memo-car ${wearKind}" role="img" aria-label="Usure des pneus sur un relais">${st.wear.map((value, index) => `<div class="memo-tyre"><small>${['Avant gauche', 'Avant droit', 'Arrière gauche', 'Arrière droit'][index]}</small><b>${value === null ? '—' : `−${num(value, 1)} %`}</b></div>`).join('')}<span class="memo-car-body" aria-hidden="true"></span></div>
+        <p class="training-note memo-small">Usure de chaque pneu sur le relais.</p>` : ''}`
       : '<p class="training-empty">Pas encore de tour mesuré.</p>'}</section>
     </div>
-    <section class="training-card"><h2>Comment les chiffres sont faits</h2><div class="memo-how">
-      <p><strong>Temps de service</strong> : lus dans le jeu. <strong>Traversée</strong> : médiane des arrêts mesurés.</p>
-      <p><strong>Conso et usure</strong> : médiane des pilotes et fourchette, à partir de ${data.min.pilots} pilotes et ${data.min.laps} tours, sans aucun nom.</p></div></section>
     ${data.source ? `<p class="memo-credit">Chronos de référence : <a href="${esc(data.source.url)}" target="_blank" rel="noopener">${esc(data.source.title)}</a> de ${esc(data.source.name)}${data.source.updated ? `, mis à jour le ${esc(data.source.updated.split('-').reverse().join('/'))}` : ''}.</p>` : ''}`;
 }
 
