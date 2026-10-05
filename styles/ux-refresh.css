@@ -1151,6 +1151,7 @@ html[data-game] #app .race-header-actions > .danger-link { width: auto !importan
 .event-access-badge { display: inline-flex; align-items: center; padding: 2px 9px; border: 1px solid; border-radius: 999px; font-size: 10.5px; font-weight: 800; letter-spacing: .08em; }
 .event-access-badge.is-open { color: #7fe3ea; border-color: rgba(82, 211, 216, .6); background: rgba(82, 211, 216, .08); }
 .event-access-badge.is-safe { color: #f3b33d; border-color: rgba(243, 179, 61, .65); background: rgba(243, 179, 61, .08); }
+.event-type-badge { display: inline-flex; align-items: center; padding: 2px 9px; border: 1px solid rgba(255, 255, 255, .35); border-radius: 999px; font-size: 10.5px; font-weight: 800; letter-spacing: .06em; color: #f2f4f7; background: rgba(255, 255, 255, .06); }
 /* Simulateur d'un événement : LMU, iRacing, AMS2, ACE. */
 .event-badge-row { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .event-sim-badge { --sim: #8a949a; display: inline-flex; align-items: center; padding: 2px 9px; border-radius: 999px; background: var(--sim); color: #fff; font-size: 10.5px; font-weight: 800; letter-spacing: .06em; }

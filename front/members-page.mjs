@@ -200,6 +200,7 @@ function modulesMarkup(settings, setup) {
     {key:'soloRaces', name:'Événements', text:'Le calendrier de la communauté, toutes simus : places limitées, liste d’attente, OPEN ou SAFE.',
       state:states.soloRaces ? ['ok', `Actif · onglet « ${esc(settings.modules.eventsLabel || 'Événements')} »`] : ['off', 'Éteint'], control:toggle('soloRaces', 'Événements'),
       settings:`<form class="settings-events-label" data-events-label><label>Nom de l’onglet<input name="label" maxlength="20" placeholder="Événements" value="${esc(settings.modules.eventsLabel || '')}"></label>
+        <label>Types d’événements <small>(séparés par des virgules)</small><input name="types" maxlength="260" placeholder="SAFE, OPEN, Bouboule" value="${esc((settings.modules.eventTypes || []).join(', '))}"></label>
         <div class="settings-actions"><button class="primary-button" type="submit">Enregistrer</button><span class="settings-status" aria-live="polite"></span></div></form>`},
     {key:'training', name:'Entraînement', text:'Page « Mon entraînement » : programme guidé, séance du jour et conseils tirés des séances LMU de chaque pilote.',
       state:states.training ? ['ok', 'Actif'] : ['off', 'Éteint'], control:toggle('training', 'Entraînement'), settings:''}];
@@ -522,7 +523,7 @@ app.addEventListener('submit', async event => {
     event.preventDefault();
     const status = eventsLabel.querySelector('.settings-status');
     status.textContent = 'Enregistrement…';
-    try { await api('/api/community/modules', 'PATCH', {eventsLabel:eventsLabel.elements.label.value}); await reload('modules', {module:'soloRaces'}); }
+    try { await api('/api/community/modules', 'PATCH', {eventsLabel:eventsLabel.elements.label.value, eventTypes:eventsLabel.elements.types.value.split(',')}); await reload('modules', {module:'soloRaces'}); }
     catch (error) { status.textContent = error.message; }
     return;
   }

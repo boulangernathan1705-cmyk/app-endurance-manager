@@ -11,10 +11,12 @@ export function simBadge(event) {
   const sim = SIMS.find(item => item.id === simForEvent(event));
   return `<span class="event-sim-badge sim-${sim.id}" title="${esc(sim.name)}">${esc(sim.short)}</span>`;
 }
-// The simulator, then OPEN or SAFE.
+// The simulator, the event type, then OPEN or SAFE (unless the type already says it).
 export function accessBadge(event) {
-  const safe = event.access === 'safe';
-  return `<span class="event-badge-row">${simBadge(event)}<span class="event-access-badge ${safe ? 'is-safe' : 'is-open'}" title="${safe ? 'Réservé aux pilotes SAFE' : 'Ouvert à tous les pilotes connectés'}">${safe ? 'SAFE' : 'OPEN'}</span></span>`;
+  const safe = event.access === 'safe', type = event.details?.type || '';
+  const typeBadge = type ? `<span class="event-type-badge">${esc(type)}</span>` : '';
+  if (type.toLowerCase() === (safe ? 'safe' : 'open')) return `<span class="event-badge-row">${simBadge(event)}<span class="event-access-badge ${safe ? 'is-safe' : 'is-open'}">${esc(type)}</span></span>`;
+  return `<span class="event-badge-row">${simBadge(event)}${typeBadge}<span class="event-access-badge ${safe ? 'is-safe' : 'is-open'}" title="${safe ? 'Réservé aux pilotes SAFE' : 'Ouvert à tous les pilotes connectés'}">${safe ? 'SAFE' : 'OPEN'}</span></span>`;
 }
 
 // Circuit of an event: from the catalog (LMU, older iRacing events), or as typed (AMS2, iRacing, ACE).

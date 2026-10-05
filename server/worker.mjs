@@ -14,6 +14,8 @@ import {communityAccess, requirePermission, displayRole, PERMISSIONS, DEFAULT_EV
 // Solo races: a module each community turns on or off (settings of the members page).
 const soloRacesEnabled = (env, community) => community?.modules?.soloRaces === true;
 // Name of the events calendar tab, chosen by each community (« EVENT TDZ »).
+// Event types of the community calendar (« SAFE », « Bouboule »…), chosen when creating an event.
+const eventTypes = community => Array.isArray(community?.modules?.eventTypes) ? community.modules.eventTypes : [];
 const eventsLabel = community => typeof community?.modules?.eventsLabel === 'string' && community.modules.eventsLabel ? community.modules.eventsLabel : 'Événements';
 import {syncIracingEvents} from './iracing-import.mjs';
 import {resetShowcase} from './demo.mjs';
@@ -345,7 +347,7 @@ async function api(request, env) {
   // Requests for a new community: sent by anyone signed in with Discord, from any site (server/community-requests.mjs).
   const requests = await communityRequestsApi(path, method, request, env, actor);
   if (requests) return requests;
-  if (path === '/api/session' && method === 'GET') return json({user:actor.user, discordReady:!!(env.DISCORD_CLIENT_ID && env.DISCORD_CLIENT_SECRET), adminConfigured:administrators(env).length > 0, soloRaces:soloRacesEnabled(env, community), soloLabel:eventsLabel(community), training:community.modules?.training === true,
+  if (path === '/api/session' && method === 'GET') return json({user:actor.user, discordReady:!!(env.DISCORD_CLIENT_ID && env.DISCORD_CLIENT_SECRET), adminConfigured:administrators(env).length > 0, soloRaces:soloRacesEnabled(env, community), soloLabel:eventsLabel(community), eventTypes:eventTypes(community), training:community.modules?.training === true,
     // Training shows in the bar only for a pilot entered in an upcoming LMU race; the circuit memo always.
     trainingRace:community.modules?.training === true && access.status === 'member' && !!actor.user && !!(await nextRace(env, actor.user.id)),
     community:{id:community.id, slug:community.slug, name:community.name, shortName:community.shortName, discordInviteUrl:community.discordInviteUrl, appearance:appearanceOf(community)},
@@ -722,7 +724,7 @@ async function api(request, env) {
       administrator:role.administrator, permissions:saved.has(role.id) ? normalizePermissions(saved.get(role.id)) : (role.id === community.discordGuildId ? [...DEFAULT_EVERYONE] : [])}));
     await keepDiscordLook(env, community, discord);
     return json({community:{name:community.name, shortName:community.shortName, discordServer:discord?.name || null, ...appearanceOf(community)}, roles, permissions:PERMISSIONS,
-      modules:{iracingImport:community.modules.iracingImport === true, discordWeekly:community.modules.discordWeekly === true, soloRaces:community.modules.soloRaces === true, eventsLabel:eventsLabel(community),
+      modules:{iracingImport:community.modules.iracingImport === true, discordWeekly:community.modules.discordWeekly === true, soloRaces:community.modules.soloRaces === true, eventsLabel:eventsLabel(community), eventTypes:eventTypes(community),
         crewChannels:community.modules.crewChannels === true, raceReminders:community.modules.raceReminders === true, training:community.modules.training === true},
       crews:await crewDiscordState(env, community)});
   }
@@ -774,6 +776,11 @@ async function api(request, env) {
     // The Discord recap is set on the « Mise en place » page (its own webhook), not here.
     for (const key of ['iracingImport','soloRaces','raceReminders','training']) if (typeof input[key] === 'boolean') modules[key] = input[key];
     if (typeof input.eventsLabel === 'string') { const label = input.eventsLabel.trim(); if (label.length > 20) fail(400, 'Le nom de l’onglet fait au plus 20 caractères.'); if (label) modules.eventsLabel = label; else delete modules.eventsLabel; }
+    if (Array.isArray(input.eventTypes)) {
+      const types = [...new Set(input.eventTypes.map(type => String(type ?? '').trim()).filter(Boolean))];
+      if (types.length > 12 || types.some(type => type.length > 20)) fail(400, 'Au plus 12 types de 20 caractères.');
+      if (types.length) modules.eventTypes = types; else delete modules.eventTypes;
+    }
     const statements = [];
     // Crews on Discord (server/crew-discord.mjs): only once the bot has the rights to make the channels.
     if (typeof input.crewChannels === 'boolean') {

@@ -10,6 +10,12 @@ import {WEATHERS,roundFormat,roundExtras} from './solo.mjs';
 
 const MAX_ROUNDS=4;
 const simChoice=(sim,selected)=>`<label class="sim-option sim-${sim.id}"><input type="radio" name="eventSim" value="${sim.id}" ${sim.id===selected?'checked':''} required><span>${esc(sim.short)}</span></label>`;
+// The community's event types; an event keeps its type even once removed from the list.
+function typeField(chosen){
+  const types=[...state.eventTypes];if(chosen&&!types.includes(chosen))types.push(chosen);
+  if(!types.length)return '';
+  return `<fieldset class="sim-options"><legend class="form-label">Type d’événement</legend><div class="sim-option-row">${types.map(type=>`<label class="sim-option event-type-option"><input type="radio" name="eventType" value="${esc(type)}" ${type===chosen?'checked':''} required><span>${esc(type)}</span></label>`).join('')}</div></fieldset>`;
+}
 const categoryLogo=config=>config?.image?`<img class="category-logo" src="/images/${esc(config.image)}" alt="">`:'';
 const numberField=(name,label,value,max,extra='')=>`<label class="form-label">${label}<input name="${name}" type="number" min="0" max="${max}" step="1" value="${esc(value??'')}" ${extra}></label>`;
 const hours=Array.from({length:24},(_,hour)=>String(hour).padStart(2,'0'));
@@ -59,7 +65,7 @@ export function renderSoloEventForm(event=null){
   <div class="registration-progress" aria-hidden="true" data-solo-progress>${STEPS.map((_,index)=>`<span class="${index<first?'done':''}"></span>`).join('')}</div>
   <p class="registration-step-label" data-solo-step-label>Étape ${first} sur ${LAST} · ${STEPS[first-1]}</p>
   ${step(1,`<label class="form-label">Nom de l’événement<input name="eventName" maxlength="100" value="${esc(event?.name||'')}" required></label>
-    <fieldset class="sim-options"><legend class="form-label">Simulateur</legend><div class="sim-option-row">${SIMS.map(item=>simChoice(item,sim)).join('')}</div></fieldset>`)}
+    <fieldset class="sim-options"><legend class="form-label">Simulateur</legend><div class="sim-option-row">${SIMS.map(item=>simChoice(item,sim)).join('')}</div></fieldset>${typeField(details.type)}`)}
   ${step(2,`<div class="solo-form-start">${start}</div>
     <div class="solo-form-row"><div class="time-picker"><span class="form-label">Fin <small>(facultatif)</small></span><span class="time-picker-row"><select name="endHour" aria-label="Heure de fin"><option value="">—</option>${hours.map(value=>`<option value="${value}" ${value===endHour?'selected':''}>${value} h</option>`).join('')}</select><span aria-hidden="true">:</span><select name="endMinute" aria-label="Minutes de fin">${['00','15','30','45'].map(value=>`<option value="${value}" ${value===endMinute?'selected':''}>${value}</option>`).join('')}</select></span></div>
     <label class="form-label">Mot de passe du serveur <small>(facultatif)</small><input name="eventPassword" maxlength="30" value="${esc(details.password||'')}" autocomplete="off"></label></div>`)}
@@ -83,7 +89,7 @@ function formData(form){
     categories:[...row.querySelectorAll('[name="roundCategory"]:checked')].map(input=>input.value),
     category:value(row,'roundCategoryText'),car:value(row,'roundCar'),practice:optional(row,'roundPractice'),qualifying:optional(row,'roundQualifying'),weather:row.querySelector('[data-weather]:checked')?.value||'',fuel:optional(row,'roundFuel'),tyres:optional(row,'roundTyres')}));
   const start=form.querySelector('.departure-field'),capacity=form.elements.eventCapacity.value.trim();
-  const details={endTime:form.elements.endHour.value?`${form.elements.endHour.value}:${form.elements.endMinute.value}`:'',password:form.elements.eventPassword.value.trim(),note:form.elements.eventNote.value.trim()};
+  const details={type:form.querySelector('[name="eventType"]:checked')?.value||'',endTime:form.elements.endHour.value?`${form.elements.endHour.value}:${form.elements.endMinute.value}`:'',password:form.elements.eventPassword.value.trim(),note:form.elements.eventNote.value.trim()};
   return {name:form.elements.eventName.value.trim(),format:'solo',sim:form.elements.eventSim.value,access:form.querySelector('[name="eventAccess"]:checked')?.value||'open',
     capacity:capacity?Number(capacity):null,rounds,categories:[],details,
     departures:[{id:start.dataset.id||undefined,date:start.querySelector('[name="date"]').value,time:start.querySelector('[name="time"]').value,tbd:false}]};
@@ -94,7 +100,7 @@ function fillRecap(form){
   const date=data.departures[0].date,day=date?new Intl.DateTimeFormat('fr-FR',{weekday:'short',day:'numeric',month:'short',timeZone:'UTC'}).format(new Date(`${date}T00:00:00Z`)):'—';
   const line=(n,label,value)=>`<button type="button" class="registration-summary-row" data-solo-step="${n}"><span>${label}</span><strong>${esc(value)}</strong><em>Modifier</em></button>`;
   const time=`${data.departures[0].time}${data.details.endTime?`-${data.details.endTime}`:''}`;
-  form.querySelector('[data-solo-recap]').innerHTML=line(1,'Événement',`${data.name||'—'} · ${sim.short}`)
+  form.querySelector('[data-solo-recap]').innerHTML=line(1,'Événement',[data.name||'—',sim.short,data.details.type].filter(Boolean).join(' · '))
     +line(2,'Horaire',`${day} · ${time}${data.details.password?` · mdp : ${data.details.password}`:''}`)
     +data.rounds.map((round,index)=>line(3,data.rounds.length>1?`Manche ${index+1}`:'Manche',[circuitName(round.circuit),round.categories.join(' ')||round.category,round.car,roundFormat(round),roundExtras(round)].filter(Boolean).join(' · '))).join('')
     +line(4,'Inscriptions',[data.access==='safe'?'SAFE':'OPEN',data.capacity?`${data.capacity} places`:'places illimitées',data.details.note].filter(Boolean).join(' · '));
@@ -123,6 +129,10 @@ function showStep(form,n){
 if(typeof document!=='undefined'){
   document.addEventListener('change',event=>{
     const field=event.target,form=field.closest?.('form[data-kind="solo-event"]');
+    if(form&&field.name==='eventType'){
+      // A type named OPEN or SAFE sets the access.
+      const access=form.querySelector(`[name="eventAccess"][value="${field.value.toLowerCase()}"]`);if(access)access.checked=true;return;
+    }
     if(!form||field.name!=='eventSim')return;
     // Another simulator: its circuits and categories.
     form.querySelectorAll('.solo-round').forEach(row=>{row.querySelector('.solo-round-circuit').outerHTML=circuitField(field.value);row.querySelector('[data-round-categories]').innerHTML=categoryField(field.value);});

@@ -230,6 +230,7 @@ function validateSoloRace(input, existing) {
   // Event details: an end time (open sessions, « 17h-00h »), the server password and a short note.
   const raw = input.details && typeof input.details === 'object' ? input.details : {};
   const details = {};
+  if (raw.type) details.type = text(raw.type, 20, 'Type');
   if (raw.endTime) { if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(raw.endTime)) fail(400, 'Heure de fin invalide.'); details.endTime = raw.endTime; }
   if (raw.password) details.password = text(raw.password, 30, 'Mot de passe');
   if (raw.note) details.note = text(raw.note, 120, 'Info');
