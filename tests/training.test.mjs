@@ -259,8 +259,13 @@ test('reference lap times: levels by name from the spreadsheet, read again once 
   assert.equal((await env.DB.prepare("SELECT updated FROM training_reference WHERE id='laptimes'").first()).updated,'2026-10-02');
   const other=harness().env;
   await assert.rejects(refreshLaptimes(other,async()=>new Response('nothing here')),/unreadable/);
-  assert.match(JSON.parse((await other.DB.prepare("SELECT data FROM training_reference WHERE id='laptimes-error'").first()).data).error,/unreadable \(0 rows\): nothing here/);
-  await refreshLaptimes(other,async()=>new Response(LAPTIMES));
+  assert.match(JSON.parse((await other.DB.prepare("SELECT data FROM training_reference WHERE id='laptimes-error'").first()).data).error,/^1\. 0 rows: nothing here \| 2\./);
+  // Following Google's redirect gives another tab: the redirect followed by hand gives the lap times.
+  const asked=[];
+  await refreshLaptimes(other,async(url,options)=>{asked.push(options.redirect);
+    if(url==='https://google.test/one-off')return new Response(LAPTIMES);
+    return options.redirect==='manual'?new Response('',{status:302,headers:{Location:'https://google.test/one-off'}}):new Response('Spa,,,,1.4+');});
+  assert.deepEqual(asked,['follow','manual','follow']);
   assert.equal(await other.DB.prepare("SELECT 1 FROM training_reference WHERE id='laptimes-error'").first(),null);
 });
 
