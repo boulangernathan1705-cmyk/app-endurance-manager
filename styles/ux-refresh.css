@@ -1997,3 +1997,6 @@ html[data-game] .race-card.is-solo .solo-card-foot .solo-fill { flex: 1; min-wid
 html[data-game] .race-card.is-solo .solo-card-foot .race-situation { margin-left: auto; }
 /* Panel kept for the event type logo (to come); on a phone an empty one takes no room. */
 @media (max-width: 600px) { html[data-game] .race-card .race-card-type-logo:empty { display: none; } }
+html[data-game] #app .race-header .event-type-panel { flex: none; display: flex; align-items: center; justify-content: center; width: 220px; height: 150px; border: 1px solid rgba(255, 255, 255, .12); border-radius: 12px; background: rgba(255, 255, 255, .03); }
+html[data-game] #app .race-header .event-type-panel span { font-size: 28px; font-weight: 900; letter-spacing: .06em; text-transform: uppercase; color: var(--sim, #7fe3ea); text-align: center; padding: 0 10px; overflow-wrap: anywhere; }
+@media (max-width: 600px) { html[data-game] #app .race-header .event-type-panel { width: 90px; height: 70px; } html[data-game] #app .race-header .event-type-panel span { font-size: 15px; } }
