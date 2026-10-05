@@ -33,6 +33,48 @@ export function soloRoundsLabel(event) {
   return rounds.map(round => `${esc(eventCircuitName(event, round.circuit))} · ${Number(round.durationMinutes) || 0} min`).join(' + ');
 }
 
+// Line icons of the calendar card.
+const ICONS = {
+  time: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  format: '<circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2M9 2h6M12 2v3"/>',
+  fuel: '<path d="M4 21V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v16M3 21h12M4 10h10M14 9h2a2 2 0 0 1 2 2v5a1.5 1.5 0 0 0 3 0V8l-3-3"/>',
+  tyres: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.5"/><path d="M12 3v5.5M12 15.5V21M3 12h5.5M15.5 12H21"/>',
+  car: '<path d="M3 16v-3l2.5-5h13l2.5 5v3"/><path d="M3 16h18"/><circle cx="7.5" cy="16.5" r="2"/><circle cx="16.5" cy="16.5" r="2"/>',
+  lock: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
+  info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/>',
+};
+const infoChip = (icon, value, title) => `<span class="solo-info-chip" title="${esc(title)}"><svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[icon]}</svg><span>${esc(value)}</span></span>`;
+const hourLabel = time => time.endsWith(':00') ? `${time.slice(0, 2)}h` : time.replace(':', 'h');
+// The event's details on the calendar card: per round its sessions, weather, multipliers and car, then the
+// schedule of an open session, the server password and the note.
+export function soloCardInfo(event, departure = event.departures?.[0]) {
+  const details = event.details || {}, rounds = event.rounds?.length ? event.rounds : [{circuit: event.circuit, durationMinutes: event.durationMinutes}];
+  const roundRow = round => {
+    const weather = WEATHERS.find(([value]) => value === round.weather);
+    const car = [(round.categories || []).length ? '' : round.category, round.car].filter(Boolean).join(' · ');
+    const chips = [
+      rounds.length > 1 ? `<span class="solo-info-circuit">${esc(eventCircuitName(event, round.circuit))}</span>` : '',
+      infoChip('format', roundFormat(round).replaceAll('/', ' · '), 'Essais · Qualifs · Course (min)'),
+      weather ? `<span class="solo-info-chip solo-info-weather" title="Météo : ${esc(weather[2])}"><span aria-hidden="true">${weather[1]}</span><span class="sr-only">${esc(weather[2])}</span></span>` : '',
+      round.fuel != null ? infoChip('fuel', `×${round.fuel}`, 'Consommation de carburant') : '',
+      round.tyres != null ? infoChip('tyres', `×${round.tyres}`, 'Usure des pneus') : '',
+      car ? infoChip('car', car, 'Catégorie et voiture') : '',
+    ].filter(Boolean);
+    return `<span class="solo-info-row">${chips.join('')}</span>`;
+  };
+  const extra = [
+    details.endTime && departure?.time ? infoChip('time', `${hourLabel(departure.time)} → ${hourLabel(details.endTime)}`, 'Horaire') : '',
+    details.password ? infoChip('lock', details.password, 'Mot de passe du serveur') : '',
+    details.note ? infoChip('info', details.note, 'Info') : '',
+  ].filter(Boolean);
+  return `<span class="solo-card-info">${rounds.map(roundRow).join('')}${extra.length ? `<span class="solo-info-row">${extra.join('')}</span>` : ''}</span>`;
+}
+// Above the card's details: the circuit, or the number of rounds.
+export function soloCardMeta(event) {
+  const rounds = event.rounds || [];
+  return rounds.length > 1 ? `${rounds.length} manches` : esc(eventCircuitName(event, rounds[0]?.circuit ?? event.circuit));
+}
+
 export function soloCounts(event, departure) {
   const entries = (departure?.availability || []).filter(reg => reg.status !== 'unavailable');
   const waiting = entries.filter(reg => reg.waitlistPosition);

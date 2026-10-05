@@ -1962,3 +1962,12 @@ html[data-game="iracing"] .race-filter-chip .category-logo { border-radius: 50%;
 .race-community-filter .race-filter-chip.active small { color: inherit; }
 .race-community-filter .community-tag { height: 20px; min-width: 20px; font-size: 10px; }
 .race-community-filter .community-tag.has-logo { width: 20px; }
+
+/* EVENT TDZ: the event's details on the calendar card, one line per round. */
+.solo-card-info { display: grid; gap: 6px; margin: 10px 0 2px; }
+.solo-info-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.solo-info-circuit { min-width: 0; margin-right: 2px; font-size: 12px; font-weight: 700; color: var(--text, #f2f4f7); }
+.solo-info-chip { display: inline-flex; align-items: center; gap: 5px; max-width: 100%; padding: 3px 9px; border: 1px solid rgba(255, 255, 255, .14); border-radius: 999px; background: rgba(255, 255, 255, .04); font-size: 12px; font-weight: 700; line-height: 1.2; color: #dfe5ea; }
+.solo-info-chip > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.solo-info-chip svg { flex: none; width: 14px; height: 14px; fill: none; stroke: #7fe3ea; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.solo-info-weather { padding: 2px 8px; font-size: 14px; }
