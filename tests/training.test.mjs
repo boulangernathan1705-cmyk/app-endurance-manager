@@ -195,7 +195,9 @@ test('the circuit sheet shows the pilots’ median only from 3 pilots and 30 lap
   sessions.push({user:'c',capacity:120,laps:[...laps(2.2,2.2,0.6),{...laps(9,9,9,1)[0],t:200}]});
   sheet=memoSheet({sessions,viewer:'b'});
   assert.deepEqual([sheet.energy.median,sheet.energy.low,sheet.energy.high,sheet.energy.laps],[2.1,2.05,2.15,36]);
-  assert.deepEqual([sheet.tyres[0].name,sheet.tyres[0].median,sheet.tyres[0].worst,sheet.tyres[0].temp],['Medium',0.6,3,74]);
+  // The wear of a lap is the average of the four tyres; each tyre has its own wear, range and temperature.
+  assert.deepEqual([sheet.tyres[0].name,sheet.tyres[0].median,sheet.tyres[0].worst,sheet.tyres[0].temp],['Medium',0.5,3,74]);
+  assert.deepEqual(sheet.tyres[0].wheels[3],{wear:0.6,min:0.5,max:0.7,temp:75});
   assert.equal(sheet.fuel.ratio,0.83);assert.equal(sheet.service,null);
 });
 

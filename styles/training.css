@@ -218,3 +218,16 @@
 .memo-tyre{display:grid;gap:2px;padding:10px;border:2px solid currentColor;border-radius:8px;text-align:center}
 .memo-tyre small{color:var(--muted);font-size:11px}
 .memo-tyre b{color:inherit;font:700 26px/1.05 var(--memo-display)}
+/* Stop calculator: choices as tiles, lit when chosen. */
+.memo-calc .memo-toggle{position:relative;display:inline-flex;align-items:baseline;gap:6px;padding:8px 12px;border:1px solid var(--border);border-radius:6px;background:rgba(255,255,255,.04);cursor:pointer;font-size:13px}
+.memo-calc .memo-toggle input{position:absolute;opacity:0;width:1px;height:1px;pointer-events:none}
+.memo-calc .memo-toggle small{color:var(--muted);font:500 11px/1 var(--memo-mono)}
+.memo-calc .memo-toggle:has(input:checked){border-color:var(--memo-pilots);background:color-mix(in srgb,var(--memo-pilots) 22%,transparent);color:var(--text)}
+.memo-calc .memo-toggle:has(input:checked) small{color:var(--text)}
+.memo-calc .memo-toggle:has(input:focus-visible){outline:2px solid var(--memo-pilots);outline-offset:2px}
+.memo-calc fieldset{gap:6px}
+/* Service times in two groups. */
+.memo-group{display:grid;gap:4px}
+.memo-group h3{margin:0;color:var(--muted);font-size:12px;letter-spacing:.08em;text-transform:uppercase}
+.memo-group h3 small{margin-left:6px;font-size:11px;letter-spacing:0;text-transform:none}
+.memo-tyre small+b+small{line-height:1.35}

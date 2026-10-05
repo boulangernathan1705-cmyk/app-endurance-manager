@@ -7,8 +7,6 @@ import {stopTime} from '../shared/training.mjs';
 const app = document.getElementById('pit-guide');
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const num = (value, digits = 1) => value === null || value === undefined ? '—' : Number(value).toFixed(digits).replace('.', ',');
-const CLASS_NAMES = {Hyper:'Hypercar', Hypercar:'Hypercar', GT3:'LMGT3', LMGT3:'LMGT3', GTE:'LMGTE', LMP2:'LMP2', LMP2_ELMS:'LMP2 ELMS', LMP2_WEC:'LMP2 WEC', LMP3:'LMP3'};
-const WHEELS = ['avant gauche', 'avant droit', 'arrière gauche', 'arrière droit'];
 const view = {data:null, calc:{arrive:50, leave:100, tyres:4, driver:false, wing:false, ductFront:false, ductRear:false, brakes:false}};
 
 // 80.887 -> 1:20.887 (times from the spreadsheet have two decimals).
@@ -29,6 +27,10 @@ function band(item, unit, digits) {
     <div class="memo-scale ${pilots ? '' : 'is-you'}"><span>${pilots ? '' : 'min '}${num(low, digits)} ${unit}</span><span>${pilots ? `${item.pilots} pilotes · ${item.laps} tours` : 'ta fourchette'}</span><span>${pilots ? '' : 'max '}${num(high, digits)} ${unit}</span></div>`;
 }
 
+// The four tyres around the car, front at the top, each with its figure and a line under it.
+const TYRES = ['Avant gauche', 'Avant droit', 'Arrière gauche', 'Arrière droit'];
+const car = (kind, cells, label) => `<div class="memo-car ${kind}" role="img" aria-label="${label}">${cells.map((cell, index) => `<div class="memo-tyre"><small>${TYRES[index]}</small><b>${cell.main}</b>${cell.sub ? `<small>${cell.sub}</small>` : ''}</div>`).join('')}<span class="memo-car-body" aria-hidden="true"></span></div>`;
+
 // The colour of a figure is the colour of where it comes from: the pilots' median, else the viewer, else the game.
 const source = item => !item ? '' : item.median !== null && item.median !== undefined ? 'is-pilots' : item.you !== null && item.you !== undefined ? 'is-you' : 'is-game';
 
@@ -46,13 +48,13 @@ function calculator(data) {
   // Litres follow the energy through the fuel ratio, as in the pit menu.
   const fuel = ratio && capacity ? energy / 100 * capacity * ratio : 0;
   const stopped = stopTime(service, {fuel, energy, tyres:c.tyres, wing:c.wing, driver:c.driver, ductFront:c.ductFront, ductRear:c.ductRear, brakes:c.brakes});
-  const check = (key, label, seconds) => seconds ? `<label><input type="checkbox" data-calc="${key}"${c[key] ? ' checked' : ''}> ${label} · ${num(seconds, 0)} s</label>` : '';
+  const check = (key, label, seconds) => seconds ? `<label class="memo-toggle"><input type="checkbox" data-calc="${key}"${c[key] ? ' checked' : ''}><span>${label}</span><small>${num(seconds, 0)} s</small></label>` : '';
   return `<form class="memo-calc" aria-label="Calculer un arrêt">
     <label for="memo-arrive">Énergie à l’arrivée <output>${c.arrive} %</output></label><input id="memo-arrive" type="range" min="0" max="100" step="5" value="${c.arrive}" data-calc="arrive">
     <label for="memo-leave">Énergie en sortant <output>${c.leave} %</output></label><input id="memo-leave" type="range" min="0" max="100" step="5" value="${c.leave}" data-calc="leave">
-    <fieldset><legend>Pneus</legend>${[[0, 'Aucun'], [2, '2 pneus'], [4, '4 pneus']].map(([value, label]) => `<label><input type="radio" name="memo-tyres" value="${value}" data-calc="tyres"${c.tyres === value ? ' checked' : ''}> ${label}</label>`).join('')}</fieldset>
-    <fieldset><legend>Pendant le plein</legend>${check('driver', 'Changement de pilote', service.driver)}${check('wing', 'Réglage de l’aileron arrière', service.wing)}</fieldset>
-    <fieldset><legend>En plus</legend>${check('ductFront', 'Écopes de frein avant', service.ductFront)}${check('ductRear', 'Écopes de frein arrière', service.ductRear)}${check('brakes', 'Changement des freins', service.brakes)}</fieldset>
+    <fieldset><legend>Pneus</legend>${[[0, 'Aucun'], [2, '2 pneus'], [4, '4 pneus']].map(([value, label]) => `<label class="memo-toggle"><input type="radio" name="memo-tyres" value="${value}" data-calc="tyres"${c.tyres === value ? ' checked' : ''}><span>${label}</span></label>`).join('')}</fieldset>
+    <fieldset><legend>Pendant le plein</legend>${check('driver', 'Pilote', service.driver)}${check('wing', 'Aileron arrière', service.wing)}</fieldset>
+    <fieldset><legend>En plus du plein</legend>${check('ductFront', 'Écopes avant', service.ductFront)}${check('ductRear', 'Écopes arrière', service.ductRear)}${check('brakes', 'Freins', service.brakes)}</fieldset>
   </form>
   <dl>${row('Remis', `${energy} %${fuel ? ` · ${num(fuel, 1)} L` : ''}`)}${row('Temps arrêté', `${num(stopped)} s`, 'is-game')}
     ${data.lane ? row('<strong>Temps perdu</strong>', `<strong>${num(data.lane.through + stopped)} s</strong>`, '', 'traversée + arrêt') : ''}</dl>`;
@@ -105,19 +107,19 @@ function render() {
   }
   const circuit = data.circuits.find(item => item.key === data.circuit.key);
   const s = data.service, tyre = data.tyres[0];
-  const serviceRows = s ? [row('Carburant', s.fuelRate ? `${num(s.fuelRate)} L/s` : '—', '', s.connect ? `+ ${num(s.connect, 0)} s pour brancher` : ''),
-    s.energyRate ? row('Énergie', `${num(s.energyRate)} %/s`) : '', row('4 pneus', s.tyres4 ? `${num(s.tyres4)} s` : '—'), s.tyres2 ? row('2 pneus', `${num(s.tyres2)} s`) : '',
-    s.driver ? row('Changement de pilote', `${num(s.driver, 0)} s`, '', 'pendant le plein') : '', s.wing ? row('Réglage aileron arrière', `${num(s.wing, 0)} s`, '', 'pendant le plein') : '',
-    s.ductFront ? row('Écopes de frein', `${num(s.ductFront, 0)} s · ${num(s.ductRear, 0)} s`, '', 'avant · arrière, en plus') : '',
-    s.brakes ? row('Freins', `${num(s.brakes, 0)} s`, '', 'en plus') : ''].join('') : '';
-  const classes = [...new Set(circuit.cars.map(item => item.carClass))];
-  const cars = circuit.cars.filter(item => item.carClass === data.car.carClass);
+  // Service times in the two groups of the game's rule: what is done during the refuel (only the longest counts)
+  // and what is added to it.
+  const during = s ? [row('Carburant', s.fuelRate ? `${num(s.fuelRate)} L/s` : '—', '', s.connect ? `+ ${num(s.connect, 0)} s pour brancher` : ''),
+    s.energyRate ? row('Énergie', `${num(s.energyRate)} %/s`) : '', s.driver ? row('Pilote', `${num(s.driver, 0)} s`) : '', s.wing ? row('Aileron arrière', `${num(s.wing, 0)} s`) : ''].join('') : '';
+  const added = s ? [row('4 pneus', s.tyres4 ? `${num(s.tyres4)} s` : '—'), s.tyres2 ? row('2 pneus', `${num(s.tyres2)} s`) : '',
+    s.ductFront ? row('Écopes avant · arrière', `${num(s.ductFront, 0)} s · ${num(s.ductRear, 0)} s`) : '', s.brakes ? row('Freins', `${num(s.brakes, 0)} s`) : '',
+    s.source === 'game' ? row('Pressions, grille', '0 s', '', 'avec des pneus') : ''].join('') : '';
+  const cars = circuit.cars;
   const st = data.stint, stintKind = source(st.by === 'energy' ? data.energy : data.fuel), wearKind = source(data.tyres[0]);
   app.innerHTML = `<div class="memo-head"><p class="memo-kicker">Mémo officiel · commun à tous les pilotes</p><h1>${esc(data.circuit.name)}</h1>
     
     <div class="memo-pick">
       <label class="memo-select">Circuit<select data-pick="circuit">${data.circuits.map(item => `<option value="${esc(item.key)}"${item.key === data.circuit.key ? ' selected' : ''}>${esc(item.name)}</option>`).join('')}</select></label>
-      <div class="memo-classes" role="group" aria-label="Catégorie">${classes.map(name => `<button type="button" data-class="${esc(name)}" aria-pressed="${name === data.car.carClass}">${esc(CLASS_NAMES[name] || name)}</button>`).join('')}</div>
       <label class="memo-select">Voiture<select data-pick="car">${cars.map(item => `<option value="${esc(item.car)}"${item.car === data.car.car ? ' selected' : ''}>${esc(item.car)}</option>`).join('')}</select></label>
     </div>
     <p class="memo-key"><span class="is-you"><i class="dot"></i>Toi</span><span class="is-pilots"><i class="bar"></i>Les pilotes du site</span><span class="is-game"><i class="tri"></i>Le jeu</span></p></div>
@@ -128,17 +130,18 @@ function render() {
       ${calculator(data)}
       ${s?.source === 'game' ? '<p class="training-note memo-small">Le jeu ajoute jusqu’à 3 s au hasard.</p>' : ''}</section>
     <section class="training-card"><p class="memo-scope">Voiture · donné par le jeu</p><h2>Temps de service</h2>
-      ${s ? `<p class="memo-tag ${s.source === 'game' ? 'is-game' : 'is-pilots'}">${s.source === 'game' ? 'Valeurs exactes du jeu' : 'Mesuré sur les arrêts'}</p><dl class="${s.source === 'game' ? 'is-game' : 'is-pilots'}">${serviceRows}
-        ${s.source === 'game' ? row('Pressions, grille de radiateur', '0 s', '', 'avec un changement de pneus') : ''}</dl>
-      <p class="training-note memo-small">Pendant le plein : seul le plus long compte. En plus : s’ajoute.</p>`
+      ${s ? `<p class="memo-tag ${s.source === 'game' ? 'is-game' : 'is-pilots'}">${s.source === 'game' ? 'Valeurs exactes du jeu' : 'Mesuré sur les arrêts'}</p>
+      <div class="memo-group"><h3>Pendant le plein <small>seul le plus long compte</small></h3><dl class="${s.source === 'game' ? 'is-game' : 'is-pilots'}">${during}</dl></div>
+      <div class="memo-group"><h3>En plus du plein <small>s’ajoutent</small></h3><dl class="${s.source === 'game' ? 'is-game' : 'is-pilots'}">${added}</dl></div>`
       : '<p class="training-empty">Pas encore relevé pour cette voiture.</p>'}</section>
     <section class="training-card"><p class="memo-scope">Circuit · voiture · par tour</p><h2>Énergie et carburant</h2>
       ${data.energy.median !== null || data.energy.you !== null || data.energy.game ? perLap('Énergie', data.energy, '%', 2) : ''}
       ${perLap('Carburant', data.fuel, 'L', 2, data.fuel.ratio ? row('Ratio carburant conseillé', num(data.fuel.ratio, 2), source(data.fuel)) : '')}</section>
     <section class="training-card"><p class="memo-scope">Circuit · voiture · gomme</p><h2>Pneus${tyre ? ` · ${esc(tyre.name)}` : ''}</h2>
-      ${tyre ? `<div class="memo-block"><p class="memo-big ${tyre.median !== null ? 'is-pilots' : 'is-you'}">${num(tyre.median ?? tyre.you, 2)}<span>% d’usure / tour</span></p>${band(tyre, '%', 2)}
-        <dl>${tyre.you !== null ? row('Ton usure', `${num(tyre.you, 2)} % / tour`, 'is-you') : ''}${tyre.worst !== null ? row('Pneu le plus usé', WHEELS[tyre.worst], source(tyre)) : ''}
-        ${tyre.temp ? row('Température des pilotes', `${tyre.temp} °C`, 'is-pilots') : ''}${tyre.youTemp ? row('Ta température', `${tyre.youTemp} °C`, 'is-you') : ''}
+      ${tyre ? `<div class="memo-block"><p class="memo-big ${source(tyre)}">${num(tyre.median ?? tyre.you, 2)}<span>% / tour · moyenne des 4 pneus</span></p>${band(tyre, '%', 2)}
+        ${tyre.wheels ? car(source(tyre), tyre.wheels.map(wheel => ({main:wheel.wear === null ? '—' : `${num(wheel.wear, 2)} %`,
+          sub:`${wheel.min !== null ? `${num(wheel.min, 2)} – ${num(wheel.max, 2)} %` : ''}${wheel.temp ? `<br>${wheel.temp} °C` : ''}`})), 'Usure par tour de chaque pneu, avec son minimum, son maximum et sa température moyenne') : ''}
+        <dl>${tyre.median !== null && tyre.you !== null ? row('Ton usure moyenne', `${num(tyre.you, 2)} % / tour`, 'is-you') : ''}
         ${tyre.ideal ? row('Température idéale', `${num(tyre.ideal, 0)} °C`, 'is-game') : ''}${tyre.track !== null ? row('Piste pendant les mesures', `${num(tyre.track)} °C`) : ''}</dl></div>
         ${data.tyres.length > 1 ? `<p class="training-note">Autres gommes : ${data.tyres.slice(1).map(item => `${esc(item.name)} ${num(item.median ?? item.you, 2)} %`).join(', ')}.</p>` : ''}`
       : '<p class="training-empty">Pas encore de tour mesuré.</p>'}</section>
@@ -147,7 +150,7 @@ function render() {
       ${st.laps ? `<p class="memo-big ${stintKind}">${st.laps}<span>tours ${st.by === 'energy' ? 'avec 100 % d’énergie' : 'avec un plein'}</span></p>
       <dl>${st.by === 'energy' && st.fuel ? row('Carburant pour les faire', `${num(st.fuel, 1)} L`, stintKind, data.fuel.ratio ? `ratio conseillé ${num(data.fuel.ratio, 2)}` : '') : ''}
 </dl>
-      ${st.wear ? `<div class="memo-car ${wearKind}" role="img" aria-label="Usure des pneus sur un relais">${st.wear.map((value, index) => `<div class="memo-tyre"><small>${['Avant gauche', 'Avant droit', 'Arrière gauche', 'Arrière droit'][index]}</small><b>${value === null ? '—' : `−${num(value, 1)} %`}</b></div>`).join('')}<span class="memo-car-body" aria-hidden="true"></span></div>
+      ${st.wear ? `${car(wearKind, st.wear.map(value => ({main:value === null ? '—' : `−${num(value, 1)} %`, sub:''})), 'Usure de chaque pneu sur un relais')}
         <p class="training-note memo-small">Usure de chaque pneu sur le relais.</p>` : ''}`
       : '<p class="training-empty">Pas encore de tour mesuré.</p>'}</section>
     </div>
@@ -182,10 +185,6 @@ app.addEventListener('input', event => {
   const focus = input.id;
   render();
   if (focus) document.getElementById(focus)?.focus();
-});
-app.addEventListener('click', event => {
-  const button = event.target.closest('[data-class]');
-  if (button && button.getAttribute('aria-pressed') !== 'true') load(`?${new URLSearchParams({circuit:view.data.circuit.key, class:button.dataset.class})}`);
 });
 app.addEventListener('submit', event => event.preventDefault());
 

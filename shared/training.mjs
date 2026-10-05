@@ -304,7 +304,7 @@ export function cleanGame(input) {
 function stintOf({ve, litres, capacity, wheels}) {
   const laps = ve ? Math.floor(100 / ve) : litres && capacity ? Math.floor(capacity / litres) : null;
   return {laps, by:ve ? 'energy' : laps ? 'tank' : null, fuel:laps && litres ? round(laps * litres, 1) : null,
-    wear:laps && wheels ? wheels.map(value => value === null ? null : round(value * laps, 1)) : null};
+    wear:laps && wheels ? wheels.map(wheel => wheel.wear === null ? null : round(wheel.wear * laps, 1)) : null};
 }
 
 // The time stopped, by the game's own rule (checked on real stops): tyres, brakes and brake ducts one after the
@@ -339,11 +339,15 @@ export function memoSheet({laneStops = [], carStops = [], sessions = [], viewer 
     const laps = entry.laps.filter(lap => !lap.t || !pace || lap.t <= pace * 1.07);
     const compounds = {};
     for (const lap of laps.filter(lap => lap.compound && lap.wear.some(value => value > 0))) (compounds[lap.compound] ||= []).push(lap);
+    // A lap's wear: the average of the four tyres.
+    const average = lap => { const values = lap.wear.filter(value => value !== null); return values.reduce((sum, value) => sum + value, 0) / values.length; };
     const fuels = laps.map(lap => lap.fuel).filter(value => value > 0), ves = laps.map(lap => lap.ve).filter(value => value > 0);
     return {user, laps:laps.length, capacity:entry.capacity, fuel:median(fuels), ve:median(ves), range:{fuel:extent(fuels), ve:extent(ves)},
       tyres:Object.fromEntries(Object.entries(compounds).map(([name, list]) => [name, {laps:list.length,
-        wear:median(list.map(lap => Math.max(...lap.wear.map(value => value ?? 0)))), range:extent(list.map(lap => Math.max(...lap.wear.map(value => value ?? 0)))),
+        wear:median(list.map(average)), range:extent(list.map(average)),
         worst:[0, 1, 2, 3].map(index => median(list.map(lap => lap.wear[index]).filter(value => value !== null)) ?? 0),
+        wheelRange:[0, 1, 2, 3].map(index => extent(list.map(lap => lap.wear[index]).filter(value => value !== null))),
+        wheelTemp:[0, 1, 2, 3].map(index => median(list.map(lap => lap.temp[index]).filter(value => value !== null))),
         temp:median(list.map(lap => median(lap.temp.filter(value => value !== null))).filter(value => value !== null)),
         track:median(list.map(lap => lap.track).filter(value => value !== null))}]))};
   });
@@ -365,7 +369,14 @@ export function memoSheet({laneStops = [], carStops = [], sessions = [], viewer 
     const laps = rows.reduce((sum, row) => sum + row.laps, 0), you = mine?.tyres[name] || null;
     const wear = spread(rows.map(row => row.wear), laps, you?.wear, 2, you?.range), open = wear.median !== null;
     const worst = open ? [0, 1, 2, 3].map(index => median(rows.map(row => row.worst[index]))) : you?.worst;
-    return {name, ...wear, worst:worst ? worst.indexOf(Math.max(...worst)) : null, wheels:worst ? worst.map(value => round(value ?? null, 2)) : null, temp:open ? round(median(rows.map(row => row.temp).filter(Boolean)), 0) : null,
+    // Each tyre: its wear per lap with the lowest and highest (the pilots' medians once they are enough, else the
+    // viewer's laps) and its mean temperature.
+    const wheels = worst ? [0, 1, 2, 3].map(index => {
+      const range = open ? extent(rows.map(row => row.worst[index]).filter(value => value !== null)) : you.wheelRange[index];
+      const temp = open ? median(rows.map(row => row.wheelTemp[index]).filter(value => value !== null)) : you.wheelTemp[index];
+      return {wear:round(worst[index] ?? null, 2), min:round(range?.[0] ?? null, 2), max:round(range?.[1] ?? null, 2), temp:round(temp ?? null, 0)};
+    }) : null;
+    return {name, ...wear, worst:worst ? worst.indexOf(Math.max(...worst)) : null, wheels, temp:open ? round(median(rows.map(row => row.temp).filter(Boolean)), 0) : null,
       youTemp:round(you?.temp ?? null, 0), track:round(median(rows.map(row => row.track).filter(value => value !== null)), 1), ideal:game?.ideal ?? null};
   }).sort((a, b) => b.laps - a.laps);
   // The figures a stint is planned with: the pilots' median, else the viewer's own, else the game's forecast.
