@@ -265,6 +265,12 @@ async function listEvents(env, actor, game='', scope='', community) {
         // Solo race: entries keep their order of arrival; beyond the number of places they are on the
         // waiting list, and the first one waiting moves up by itself when someone withdraws.
         if (format==='solo' && capacity) availability.forEach((reg,index)=>{ reg.waitlistPosition=index>=capacity?index-capacity+1:null; });
+        // Rounds with their own places: the same, round by round (a pilot skipping a round takes no place in it).
+        const rounds=format==='solo'?JSON.parse(row.rounds||'[]'):[];
+        if (rounds.some(round=>round.capacity)) {
+          const counts=rounds.map(()=>0);
+          availability.forEach(reg=>{ reg.roundWaitlist=rounds.map((round,index)=>{ if(reg.roundChoices?.[index]?.skip)return null; counts[index]++; return round.capacity&&counts[index]>round.capacity?counts[index]-round.capacity:null; }); });
+        }
         // endsAt: the real finish (2 h 30 ends 30 min into the third presence slot).
         return {...d, endsAt:d.startsAt+durationMinutes*60000, availability, crews:crewsByDeparture.get(`${row.id}:${d.id}`) || []};
       })};

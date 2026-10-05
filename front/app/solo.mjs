@@ -74,7 +74,7 @@ export function soloCardInfo(event) {
 }
 // Pilots doing a round (a pilot may skip one round of a multi-round event).
 export function roundPilots(event, index, departure = event.departures?.[0]) {
-  return (departure?.availability || []).filter(reg => reg.status !== 'unavailable' && !reg.waitlistPosition && !reg.roundChoices?.[index]?.skip).length;
+  return (departure?.availability || []).filter(reg => reg.status !== 'unavailable' && !reg.waitlistPosition && !reg.roundWaitlist?.[index] && !reg.roundChoices?.[index]?.skip).length;
 }
 // Event page: every detail shown at once, one tile with its icon each (« Essais 5 min », « Usure des pneus ×1 »);
 // several rounds side by side, each with its pilots.
@@ -159,17 +159,17 @@ export function renderSoloEntries(event, departure) {
 // The pilots of a solo event (or of one of its rounds), all together: by category in the order of the round
 // (« Peu importe » last), then in the order they entered; small cards with the category logo (no car).
 const EDIT_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4ZM14 6l4 4"/></svg>';
-export function soloEntryList(event, departure, entries, {round = 0, title = 'Pilotes', capacity = null} = {}) {
+export function soloEntryList(event, departure, entries, {round = 0, title = 'Pilotes', capacity = null, waitOf = reg => reg.waitlistPosition} = {}) {
   const current = (event.rounds || [])[round] || {}, order = current.randomCategory ? [] : current.categories?.length ? current.categories : event.categories || [];
   const categoryOf = reg => current.randomCategory ? '' : (reg.roundChoices?.[round]?.category ?? reg.category) || '';
   const edit = reg => reg.canEdit && departure.startsAt > Date.now() && reg.managed ? `<button type="button" class="solo-entry-edit" data-action="edit-registration" data-id="${reg.id}" data-departure="${departure.id}" data-tip="Modifier" aria-label="Modifier l’inscription de ${esc(reg.name)}">${EDIT_ICON}</button>` : '';
   const pill = (reg, rank, withLogo) => `<li class="solo-entry${reg.mine ? ' is-mine' : ''}"><span class="solo-entry-rank">${rank}</span><strong class="solo-entry-name">${esc(reg.name)}</strong>${!withLogo || !categoryOf(reg) ? '' : categoryOf(reg) === ANY_CATEGORY ? '<span class="solo-entry-logo is-any" title="Peu importe">✱</span>' : `<span class="solo-entry-logo" title="${esc(categoryOf(reg))}">${logo(categoryOf(reg))}</span>`}${edit(reg)}</li>`;
-  const grid = entries.filter(reg => !reg.waitlistPosition), waiting = entries.filter(reg => reg.waitlistPosition);
+  const grid = entries.filter(reg => !waitOf(reg)), waiting = entries.filter(reg => waitOf(reg)).sort((a, b) => waitOf(a) - waitOf(b));
   // One list, sorted by category (each pilot with its logo), then by order of entry.
   const keys = [...order, ANY_CATEGORY, ''], rankOf = reg => { const index = keys.indexOf(categoryOf(reg)); return index < 0 ? keys.length : index; };
   const sorted = grid.map((reg, index) => [reg, index]).sort((a, b) => rankOf(a[0]) - rankOf(b[0]) || a[1] - b[1]).map(([reg]) => reg);
   const gridList = sorted.length ? `<ol class="solo-entries">${sorted.map((reg, index) => pill(reg, index + 1, true)).join('')}</ol>` : '<p class="empty">Aucun inscrit pour l’instant.</p>';
-  const waitingList = waiting.length ? `<h3 class="solo-subtitle">Liste d’attente <span class="count-pill">${waiting.length}</span></h3><ol class="solo-entries is-waiting">${waiting.map(reg => pill(reg, reg.waitlistPosition, true)).join('')}</ol>` : '';
+  const waitingList = waiting.length ? `<h3 class="solo-subtitle">Liste d’attente <span class="count-pill">${waiting.length}</span></h3><ol class="solo-entries is-waiting">${waiting.map(reg => pill(reg, waitOf(reg), true)).join('')}</ol>` : '';
   return `<section class="solo-participants"><h3 class="solo-subtitle">${title} <span class="count-pill">${grid.length}${capacity ? ` / ${capacity}` : ''}</span></h3>${gridList}${waitingList}</section>`;
 }
 

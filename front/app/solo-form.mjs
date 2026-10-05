@@ -43,7 +43,7 @@ function roundField(sim,round={}){
   return `<div class="solo-round"><div class="solo-round-head"><span class="solo-round-title"></span><button type="button" class="link-button" data-remove-round>Retirer</button></div>
     ${circuitField(sim,round)}<div data-round-categories>${categoryField(sim,round)}</div>
     <div class="solo-round-format">${numberField('roundPractice','Essais (min)',round.practice,600)}${numberField('roundQualifying','Qualifs (min)',round.qualifying,600)}${numberField('roundMinutes','Course (min)',round.durationMinutes||30,600,'min="5" required')}</div>
-    ${weatherField(round)}<div class="solo-round-format">${numberField('roundFuel','Conso carburant ×',round.fuel,10)}${numberField('roundTyres','Usure pneus ×',round.tyres,10)}</div></div>`;
+    ${weatherField(round)}<div class="solo-round-format">${numberField('roundFuel','Conso carburant ×',round.fuel,10)}${numberField('roundTyres','Usure pneus ×',round.tyres,10)}${numberField('roundCapacity','Places <small>(vide = illimité)</small>',round.capacity,120,'placeholder="∞"')}</div></div>`;
 }
 // Weather as icons; touching the chosen one again clears it.
 function weatherField(round){
@@ -88,7 +88,7 @@ function formData(form){
   const optional=(row,name)=>value(row,name)===''?null:Number(value(row,name));
   const rounds=[...form.querySelectorAll('.solo-round')].map(row=>({circuit:value(row,'roundCircuit'),durationMinutes:Number(value(row,'roundMinutes')),
     categories:[...row.querySelectorAll('[name="roundCategory"]:checked')].map(input=>input.value),
-    category:value(row,'roundCategoryText'),car:value(row,'roundCar'),practice:optional(row,'roundPractice'),qualifying:optional(row,'roundQualifying'),weather:row.querySelector('[data-weather]:checked')?.value||'',fuel:optional(row,'roundFuel'),tyres:optional(row,'roundTyres')}));
+    category:value(row,'roundCategoryText'),car:value(row,'roundCar'),practice:optional(row,'roundPractice'),qualifying:optional(row,'roundQualifying'),weather:row.querySelector('[data-weather]:checked')?.value||'',fuel:optional(row,'roundFuel'),tyres:optional(row,'roundTyres'),capacity:optional(row,'roundCapacity')}));
   const start=form.querySelector('.departure-field'),capacity=form.elements.eventCapacity.value.trim();
   const details={type:form.querySelector('[name="eventType"]:checked')?.value||'',password:form.elements.eventPassword.value.trim(),note:form.elements.eventNote.value.trim()};
   return {name:form.elements.eventName.value.trim(),format:'solo',sim:form.elements.eventSim.value,access:form.querySelector('[name="eventAccess"]:checked')?.value||'open',
