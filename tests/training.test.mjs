@@ -252,7 +252,11 @@ test('reference lap times: levels by name from the spreadsheet, read again once 
   assert.equal(await refreshLaptimes(env,fetcher),false);
   assert.equal(calls.length,1);
   assert.equal((await env.DB.prepare("SELECT updated FROM training_reference WHERE id='laptimes'").first()).updated,'2026-10-02');
-  await assert.rejects(refreshLaptimes({DB:harness().env.DB},async()=>new Response('nothing here')),/unreadable/);
+  const other=harness().env;
+  await assert.rejects(refreshLaptimes(other,async()=>new Response('nothing here')),/unreadable/);
+  assert.match(JSON.parse((await other.DB.prepare("SELECT data FROM training_reference WHERE id='laptimes-error'").first()).data).error,/unreadable \(0 rows\): nothing here/);
+  await refreshLaptimes(other,async()=>new Response(LAPTIMES));
+  assert.equal(await other.DB.prepare("SELECT 1 FROM training_reference WHERE id='laptimes-error'").first(),null);
 });
 
 test('the SimHub plugin gets the same kind of key as a code, which replaces the program one', async () => {

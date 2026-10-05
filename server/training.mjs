@@ -109,13 +109,23 @@ const LAPTIME_CLASS = {Hyper:'Hypercar', LMP2_ELMS:'LMP2 ELMS', LMP2_WEC:'LMP2',
 export async function refreshLaptimes(env, fetcher = fetch) {
   const kept = await env.DB.prepare("SELECT fetched_at FROM training_reference WHERE id='laptimes'").first();
   if (kept && kept.fetched_at > now() - 86400) return false;
-  const response = await fetcher(LAPTIME_SOURCE.csv, {headers:{Accept:'text/csv'}, redirect:'follow'});
-  if (!response.ok) throw Error(`laptimes ${response.status}`);
-  const text = await response.text(), rows = parseLaptimes(text);
-  if (rows.length < 3) throw Error('laptimes unreadable');
-  await env.DB.prepare(`INSERT INTO training_reference(id,data,updated,fetched_at) VALUES('laptimes',?,?,?)
-    ON CONFLICT(id) DO UPDATE SET data=excluded.data,updated=excluded.updated,fetched_at=excluded.fetched_at`).bind(JSON.stringify(rows), laptimesUpdated(text), now()).run();
-  return true;
+  try {
+    const response = await fetcher(LAPTIME_SOURCE.csv, {headers:{Accept:'text/csv', 'User-Agent':'EnduranceManager/1.0 (+https://endurance-manager.app)'}, redirect:'follow'});
+    const text = await response.text();
+    if (!response.ok) throw Error(`laptimes ${response.status}: ${text.slice(0, 120)}`);
+    const rows = parseLaptimes(text);
+    if (rows.length < 3) throw Error(`laptimes unreadable (${rows.length} rows): ${text.slice(0, 120)}`);
+    await env.DB.prepare(`INSERT INTO training_reference(id,data,updated,fetched_at) VALUES('laptimes',?,?,?)
+      ON CONFLICT(id) DO UPDATE SET data=excluded.data,updated=excluded.updated,fetched_at=excluded.fetched_at`).bind(JSON.stringify(rows), laptimesUpdated(text), now()).run();
+    await env.DB.prepare("DELETE FROM training_reference WHERE id='laptimes-error'").run();
+    return true;
+  } catch (error) {
+    // Kept where it can be read (the cron's logs are not), and tried again at the next :45.
+    const message = String(error?.message || error).replace(/[\u0000-\u001f]/g, ' ').slice(0, 300);
+    await env.DB.prepare(`INSERT INTO training_reference(id,data,updated,fetched_at) VALUES('laptimes-error',?,NULL,?)
+      ON CONFLICT(id) DO UPDATE SET data=excluded.data,fetched_at=excluded.fetched_at`).bind(JSON.stringify({error:message}), now()).run();
+    throw error;
+  }
 }
 
 // The circuit sheet: every circuit where the pilots of the site drove with the plugin, then for the one asked (or
