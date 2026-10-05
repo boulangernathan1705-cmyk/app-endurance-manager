@@ -88,13 +88,17 @@ const sourceMembers = await readFile(root + 'members.html', 'utf8');
 const sourceDiagnostics = await readFile(root + 'diagnostics.html', 'utf8');
 const sourceHelp = await readFile(root + 'help.html', 'utf8');
 const sourceRequest = await readFile(root + 'demande-communaute.html', 'utf8');
+const sourceTraining = await readFile(root + 'entrainement.html', 'utf8');
+const sourcePits = await readFile(root + 'stands.html', 'utf8');
 const paths = [
   ...stylesheetPaths(sourceIndex,'index.html'),
   ...stylesheetPaths(sourceGame,'game.html'),
   ...stylesheetPaths(sourceMembers,'members.html'),
   ...stylesheetPaths(sourceDiagnostics,'diagnostics.html'),
   ...stylesheetPaths(sourceHelp,'help.html'),
-  ...stylesheetPaths(sourceRequest,'demande-communaute.html')
+  ...stylesheetPaths(sourceRequest,'demande-communaute.html'),
+  ...stylesheetPaths(sourceTraining,'entrainement.html'),
+  ...stylesheetPaths(sourcePits,'stands.html')
 ];
 // styles/ux-refresh.css is the final layer that replaces older rules: keep it last in the
 // shared bundle whichever page lists it first.
@@ -112,6 +116,8 @@ await writeFile(new URL('members.html', out), productionHtml(sourceMembers));
 await writeFile(new URL('diagnostics.html', out), productionHtml(sourceDiagnostics));
 await writeFile(new URL('help.html', out), productionHtml(sourceHelp));
 await writeFile(new URL('demande-communaute.html', out), productionHtml(sourceRequest));
+await writeFile(new URL('entrainement.html', out), productionHtml(sourceTraining));
+await writeFile(new URL('stands.html', out), productionHtml(sourcePits));
 const gameHtml = productionHtml(sourceGame);
 await writeFile(new URL('lmu/index.html', out), gameHtml);
 await writeFile(new URL('iracing/index.html', out), gameHtml);
@@ -132,6 +138,8 @@ await copyFile(root + 'help.css', new URL('help.css', out));
 await cp(root + 'images', new URL('images/', out), {recursive: true});
 await cp(root + 'front', new URL('front/', out), {recursive: true});
 await cp(root + 'shared', new URL('shared/', out), {recursive: true});
+// The LMU sync program (connectors/lmu-sync, built with `npm run build:sync`): the server adds the pilot's key at download.
+await cp(root + 'downloads', new URL('downloads/', out), {recursive: true});
 
 if (!workers) {
   await copyFile(root + 'server/worker.mjs', new URL('_worker.js', out));
@@ -157,6 +165,12 @@ await writeFile(new URL('_headers', out), `/*
 /diagnostics.html
   X-Robots-Tag: noindex, nofollow
 
+/entrainement.html
+  X-Robots-Tag: noindex, nofollow
+
+/stands.html
+  X-Robots-Tag: noindex, nofollow
+
 https://app.endurance-manager.workers.dev/*
   X-Robots-Tag: noindex, nofollow
 `);
@@ -167,6 +181,9 @@ Disallow: /api/
 Disallow: /telemetry/
 Disallow: /members.html
 Disallow: /diagnostics.html
+Disallow: /entrainement.html
+Disallow: /stands.html
+Disallow: /downloads/
 Sitemap: https://endurance-manager.app/sitemap.xml
 `);
 
