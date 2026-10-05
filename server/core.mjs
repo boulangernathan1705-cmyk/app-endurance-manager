@@ -311,13 +311,16 @@ function validateSoloRegistration(input, event) {
   const eventCategories = JSON.parse(event.categories);
   const rounds = JSON.parse(event.rounds || '[]');
   const roundCategories = rounds.length ? rounds.map(round => round.randomCategory ? [] : round.categories?.length ? round.categories : eventCategories) : [eventCategories];
-  // No category offered: a simple entry.
-  if (roundCategories.every(list => !list.length)) return {name, nameKey: name.normalize('NFKC').toLocaleLowerCase('fr-FR'), status: 'whole', category: '', car: '', cars: [], carAny: true, preferredPilot: '', roundChoices: []};
+  // Several rounds: a pilot may skip some of them ({skip:true}), not all.
+  const multi = roundCategories.length > 1, skips = multi && Array.isArray(input.choices) && input.choices.length === roundCategories.length ? input.choices.map(choice => choice?.skip === true) : [];
+  if (skips.length && skips.every(Boolean)) fail(400, 'Choisis au moins une manche.');
+  // No category offered: a simple entry (every round, unless some are skipped).
+  if (roundCategories.every(list => !list.length)) return {name, nameKey: name.normalize('NFKC').toLocaleLowerCase('fr-FR'), status: 'whole', category: '', car: '', cars: [], carAny: true, preferredPilot: '', roundChoices: skips.some(Boolean) ? skips.map(skip => skip ? {skip: true} : {category: '', cars: [], carAny: true}) : []};
   // One choice per round; a single-round entry may still send category / cars directly.
   const rawChoices = Array.isArray(input.choices) ? input.choices : [{category:input.category, cars:input.cars, carAny:input.carAny}];
   if (rawChoices.length !== roundCategories.length) fail(400, 'Choisis une catégorie pour chaque manche.');
-  const choices = rawChoices.map((choice, index) => validateSoloChoice(choice, roundCategories[index], index, roundCategories.length));
-  const first = choices[0];
+  const choices = rawChoices.map((choice, index) => skips[index] ? {skip: true} : validateSoloChoice(choice, roundCategories[index], index, roundCategories.length));
+  const first = choices.find(choice => !choice.skip);
   return {name, nameKey: name.normalize('NFKC').toLocaleLowerCase('fr-FR'), status: 'whole', category: first.category, car: first.cars[0] || '', cars: first.cars, carAny: first.carAny, preferredPilot: '', roundChoices: choices};
 }
 function validateRegistration(input, event) {

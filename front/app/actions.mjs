@@ -6,7 +6,7 @@ import {renderEventForm,departureFields,updateRemoveButtons,goToEventStep,formDu
 import {renderMyEntries} from './entries-view.mjs';
 import {submitSoloEvent} from './solo-form.mjs';
 import {refresh,refreshAfterSave} from './refresh.mjs';
-import {draftFor,registrationDraft,ownRegistrations,rerenderRegistrationSection,submitRegistration,registrationStep,canEnterInOneClick,enterInOneClick} from './registration.mjs';
+import {draftFor,registrationDraft,ownRegistrations,rerenderRegistrationSection,submitRegistration,registrationStep,canEnterInOneClick,enterInOneClick,enterRound,editRound,skipRound} from './registration.mjs';
 import {updateCrewState,pickSlot} from './crews.mjs';
 import {installRouter,routeFromLocation,applyRoute} from './router.mjs';
 import {installAutoRefresh} from './auto-refresh.mjs';
@@ -26,10 +26,9 @@ function validateRegistrationStep(draft,step){
     if(step===1&&draft.forOther&&!draft.id&&!draft.participantUserId&&!draft.manualOther)throw Error('Choisis un pilote.');
     if(step===1&&draft.manualOther&&!String(draft.name||'').trim())throw Error('Indique le pseudo du pilote.');
     const choice=draft.choices?.[step-1];
-    if(!choice)return;
+    if(!choice||choice.skip)return;
     const where=draft.solo>1?` pour la manche ${step}`:'';
     if(!choice.category)throw Error(`Choisis une catégorie${where}.`);
-    if(choice.category!=='*'&&!choice.carAny&&!choice.cars.length)throw Error(`Choisis au moins une voiture${where}, ou « Peu importe la voiture ».`);
     return;
   }
   if(step===1){
@@ -112,6 +111,9 @@ async function perform(action,target){
     case 'open': state.currentEventId=target.dataset.id; state.selectedDepartureId=target.dataset.departure||null; state.eventSection='race'; state.drafts={}; state.pendingCrewJoin=null; state.registrationOpen.clear(); renderEvent(); break;
     case 'event-section': state.eventSection='race'; renderEvent(); break;
     case 'my-registration': { state.pendingCrewJoin=null; state.selectedDepartureId=target.dataset.departure; const oneClick=event?.departures.find(item=>item.id===target.dataset.departure); if(oneClick&&canEnterInOneClick(event,oneClick)){await enterInOneClick(event,oneClick,api); await refreshAfterSave('Tu es inscrit.'); break;} delete state.drafts[state.selectedDepartureId]; state.registrationOpen.add(state.selectedDepartureId); renderEvent(); revealRegistration(state.selectedDepartureId); break; }
+    case 'round-enter': { const departure=event.departures.find(item=>item.id===target.dataset.departure); state.selectedDepartureId=departure.id; if(await enterRound(event,departure,Number(target.dataset.round),api)){await refreshAfterSave('Tu es inscrit à cette manche.');break;} renderEvent(); revealRegistration(departure.id); break; }
+    case 'round-edit': { const departure=event.departures.find(item=>item.id===target.dataset.departure); state.selectedDepartureId=departure.id; editRound(event,departure,Number(target.dataset.round)); renderEvent(); revealRegistration(departure.id); break; }
+    case 'round-skip': { const departure=event.departures.find(item=>item.id===target.dataset.departure); if(await skipRound(event,departure,Number(target.dataset.round),api))await refreshAfterSave('C’est noté.'); break; }
     case 'event-absence': await api(`/api/events/${target.dataset.id}/absence`,'PUT'); await refreshAfterSave('C’est noté : tu seras absent.'); break;
     case 'event-absence-cancel': await api(`/api/events/${target.dataset.id}/absence`,'DELETE'); await refreshAfterSave('Tu n’es plus noté absent.'); break;
     case 'make-official': { if(!event||!state.manager)break; if(!confirm(`Rendre « ${event.name} » officielle ?\n\nElle sera commune à toutes les communautés : chacune pourra s’y inscrire. Ses inscriptions et équipages restent dans ta communauté. Impossible de revenir en arrière.`))return; await api(`/api/races/${event.id}/official`,'POST',{version:event.version}); await refreshAfterSave('Course rendue officielle.'); break; }
@@ -121,7 +123,7 @@ async function perform(action,target){
     case 'close-registration': if(state.pendingCrewJoin?.departureId===target.dataset.departure)state.pendingCrewJoin=null;state.registrationOpen.delete(target.dataset.departure); renderEvent(); break;
     case 'new-registration': {
       state.pendingCrewJoin=null;state.selectedDepartureId=target.dataset.departure; const departure=event.departures.find(item=>item.id===target.dataset.departure); const categoryMode=target.dataset.mode==='category'; const existing=departure.availability.find(reg=>reg.id===target.dataset.registration)||ownRegistrations(departure)[0];
-      state.drafts[departure.id]={...(categoryMode&&existing?registrationDraft(existing):{name:'',status:'',preferredPilot:'',forOther:!!state.user,participantUserId:null}),category:'',cars:[],carAny:false,id:null,version:null,mode:categoryMode?'category':'pilot'}; state.registrationOpen.add(departure.id); renderEvent(); revealRegistration(departure.id); break;
+      state.drafts[departure.id]={...(categoryMode&&existing?registrationDraft(existing):{name:'',status:'',preferredPilot:'',forOther:!!state.user,participantUserId:null}),category:'',cars:[],carAny:false,id:null,version:null,mode:categoryMode?'category':'pilot'}; if(target.dataset.round)state.roundFocus={...(state.roundFocus||{}),[departure.id]:Number(target.dataset.round)}; state.registrationOpen.add(departure.id); renderEvent(); revealRegistration(departure.id); break;
     }
     case 'edit-registration': { state.pendingCrewJoin=null; const departure=event.departures.find(item=>item.id===target.dataset.departure),reg=departure.availability.find(item=>item.id===target.dataset.id); if(!reg?.canEdit)throw Error('Tu n’as pas l’autorisation de modifier cette inscription.'); state.selectedDepartureId=departure.id; state.drafts[departure.id]=registrationDraft(reg); state.registrationOpen.add(departure.id); state.eventSection='race'; renderEvent(); revealRegistration(departure.id); break; }
     case 'solo-driver': {
@@ -136,7 +138,8 @@ async function perform(action,target){
       if(value==='whole')draft.status='whole'; else {const duration=event.durationHours||6,parts=new Set(draft.status==='whole'?Array.from({length:duration},(_,i)=>`h${i+1}`):String(draft.status||'').split(',').filter(part=>/^h\d+$/.test(part)));parts.has(value)?parts.delete(value):parts.add(value);draft.status=parts.size===duration?'whole':[...parts].sort((a,b)=>Number(a.slice(1))-Number(b.slice(1))).join(',');}
       rerenderRegistrationSection(event,departure,`[data-action="availability"][data-value="${value}"]`,renderEvent); break;
     }
-    case 'solo-category': { const departure=event.departures.find(item=>item.id===target.dataset.departure),draft=draftFor(departure),choice=draft.choices?.[Number(target.dataset.round)]; if(!choice)break; choice.category=target.dataset.value; choice.cars=choice.cars.filter(car=>CARS[choice.category]?.includes(car)); choice.carAny=choice.category==='*'; rerenderRegistrationSection(event,departure,'',renderEvent); break; }
+    case 'solo-skip': { const departure=event.departures.find(item=>item.id===target.dataset.departure),draft=draftFor(departure),choice=draft.choices?.[Number(target.dataset.round)]; if(!choice)break; choice.skip=target.dataset.value==='1'; rerenderRegistrationSection(event,departure,'',renderEvent); break; }
+    case 'solo-category': { const departure=event.departures.find(item=>item.id===target.dataset.departure),draft=draftFor(departure),choice=draft.choices?.[Number(target.dataset.round)]; if(!choice)break; choice.category=target.dataset.value; choice.cars=[]; choice.carAny=true; rerenderRegistrationSection(event,departure,'',renderEvent); break; }
     case 'category': { const departure=event.departures.find(item=>item.id===target.dataset.departure),draft=draftFor(departure); draft.category=target.dataset.value; draft.cars=(draft.cars||[]).filter(car=>CARS[draft.category]?.includes(car)); draft.carAny=false; rerenderRegistrationSection(event,departure,'',renderEvent); break; }
     case 'delete-registration': { state.pendingCrewJoin=null; const departure=event.departures.find(item=>item.id===target.dataset.departure),reg=departure.availability.find(item=>item.id===target.dataset.id); if(!reg)throw Error('Inscription introuvable.'); if(!confirm(`Supprimer l’inscription de ${reg.name} pour ce départ ?${inCommunity()}`))return; await api(`/api/registrations/${reg.id}`,'DELETE',{version:reg.version}); delete state.drafts[departure.id]; state.registrationOpen.delete(departure.id); await refreshAfterSave('Inscription supprimée.'); break; }
     case 'join-crew': {

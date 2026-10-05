@@ -558,6 +558,18 @@ test('LMU random circuit: the category is random too, nothing to choose for that
  const ok=await req(path,'POST',{name:'Pilote',choices:[{category:'GT3',carAny:true},{category:'*'}]},'pilot');assert.equal(ok.status,201,JSON.stringify(ok.data));
 });
 
+test('multi-round event: a pilot may do one round only, not none',async()=>{
+ const {req,login}=harness();await login(ADMIN,'admin');await login(PILOT,'pilot');
+ const input={...soloInput,capacity:10,rounds:[{circuit:'spa',durationMinutes:20,categories:['GT3']},{circuit:'random',durationMinutes:20,categories:[]}],categories:[]};
+ const created=await req('/api/events','POST',input,'admin');assert.equal(created.status,201,JSON.stringify(created.data));
+ let event=(await req('/api/events','GET',null,'admin')).data.events.find(e=>e.id===created.data.id);
+ const path=`/api/events/${event.id}/departures/${event.departures[0].id}/registrations`;
+ assert.equal((await req(path,'POST',{name:'Pilote',choices:[{skip:true},{skip:true}]},'pilot')).status,400);
+ const ok=await req(path,'POST',{name:'Pilote',choices:[{skip:true},{category:'*'}]},'pilot');assert.equal(ok.status,201,JSON.stringify(ok.data));
+ event=(await req('/api/events','GET',null,'admin')).data.events.find(e=>e.id===created.data.id);
+ assert.deepEqual(event.departures[0].availability[0].roundChoices,[{skip:true},{category:'*',cars:[],carAny:true}]);
+});
+
 test('official iRacing endurances are imported once, by the daily task or by an admin', async t => {
  const {req,login,DB}=harness();await login(ADMIN,'admin');await login(PILOT,'pilot');
  // The community shows the official iRacing calendar (module): the races are common to every community.

@@ -2013,3 +2013,71 @@ html[data-game] #app .race-header .event-type-panel span { font-size: 28px; font
   .planning-start.has-quick:not([open]) > summary { padding-right: 44px !important; }
   .planning-start.has-quick:not([open]) .planning-row { margin-right: 0 !important; }
 }
+
+/* Participants of a solo event: compact cards, several per row. */
+.solo-entries { grid-template-columns: repeat(auto-fill, minmax(190px, 240px)); gap: 8px; }
+.solo-entry { grid-template-columns: 26px minmax(0, 1fr) auto; gap: 2px 10px; padding: 7px 12px 7px 8px; border-radius: 12px; background: linear-gradient(135deg, rgba(255, 255, 255, .05), rgba(255, 255, 255, .015)); }
+.solo-entry-rank { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: rgba(255, 255, 255, .08); font-size: 12.5px; color: #dfe5ea; }
+.solo-entry-name { font-size: 14.5px; font-weight: 800; color: #f4f6f5; }
+.solo-entry.is-mine { border-color: var(--community-accent, #52d3d8); background: color-mix(in srgb, var(--community-accent, #52d3d8) 10%, transparent); }
+.solo-entry.is-mine .solo-entry-rank { background: var(--community-accent, #52d3d8); color: #0b1012; }
+.solo-entry-car, .solo-entry-round { font-size: 12px; }
+@media (max-width: 600px) { .solo-entries { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); } }
+html[data-game] #app .race-header .race-header-time { display: inline-flex; align-items: center; gap: 7px; padding: 4px 12px; border: 1px solid rgba(255, 255, 255, .16); border-radius: 9px; font-size: 18px; font-weight: 800; color: #f4f6f5; }
+html[data-game] #app .race-header .race-header-time svg { width: 18px; height: 18px; fill: none; stroke: #7fe3ea; stroke-width: 2; stroke-linecap: round; }
+
+/* EVENT TDZ page: every detail as an icon tile; several rounds side by side. */
+.solo-event-details { display: grid; gap: 10px; width: 100%; }
+.solo-detail-rounds { display: grid; gap: 10px; }
+.solo-detail-rounds.is-multi { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+.solo-detail-round.is-card { padding: 12px; border: 1px solid rgba(255, 255, 255, .1); border-radius: 12px; background: rgba(255, 255, 255, .02); }
+.solo-detail-round-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.solo-detail-round-head strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15px; font-weight: 800; color: #f2f5f7; }
+.solo-detail-round-head em { margin-left: auto; flex: none; font-style: normal; font-size: 12px; font-weight: 700; color: #9aa6b0; }
+.solo-round-index { display: inline-grid; place-items: center; flex: none; width: 22px; height: 22px; border-radius: 50%; background: var(--community-accent, #7fe3ea); color: #061014; font-size: 12px; font-weight: 900; }
+.solo-detail-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.solo-detail { display: flex; align-items: center; gap: 10px; min-width: 0; padding: 8px 10px; border: 1px solid rgba(255, 255, 255, .1); border-radius: 10px; background: rgba(255, 255, 255, .03); }
+.solo-detail.is-wide { grid-column: 1 / -1; }
+.solo-detail-icon { display: inline-grid; place-items: center; flex: none; width: 32px; height: 32px; border-radius: 8px; background: rgba(127, 227, 234, .1); }
+.solo-detail-icon svg { width: 18px; height: 18px; fill: none; stroke: #7fe3ea; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.solo-detail-emoji { font-size: 18px; line-height: 1; }
+.solo-detail-copy { display: grid; min-width: 0; }
+.solo-detail-label { font-size: 10.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: #8c98a2; }
+.solo-detail-copy strong { overflow-wrap: anywhere; font-size: 15px; font-weight: 800; color: #f2f5f7; }
+.solo-detail-logos { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+.solo-detail-logos .category-logo, .solo-detail-logos img { height: 20px; width: auto; }
+
+/* EVENT TDZ card, several rounds: one aligned line per round. */
+.solo-round-lines { display: grid; grid-template-columns: auto minmax(0, max-content) auto auto; align-items: center; justify-content: start; gap: 6px 10px; }
+.solo-round-line { display: contents; }
+.solo-round-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 700; color: #f2f5f7; }
+.solo-round-cats { display: inline-flex; gap: 4px; align-items: center; }
+.solo-entry-round.is-skipped { opacity: .55; }
+/* Registration, several rounds: « Je la fais » / « Je ne la fais pas ». */
+.solo-round-toggle { display: inline-flex; gap: 0; margin: 4px 0 12px; border: 1px solid rgba(255, 255, 255, .14); border-radius: 10px; overflow: hidden; }
+.solo-round-toggle .secondary-button { margin: 0; border: 0; border-radius: 0; background: transparent; color: #9aa6b0; }
+.solo-round-toggle .secondary-button + .secondary-button { border-left: 1px solid rgba(255, 255, 255, .14); }
+.solo-round-toggle .secondary-button.active { background: var(--community-accent, #7fe3ea); color: #061014; }
+/* EVENT TDZ in rounds: the rounds as starts (« Manche 1 »), opened on their details and pilots. */
+.solo-round-starts { display: grid; gap: 10px; min-width: 0; }
+.solo-round-start .solo-detail-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); margin-bottom: 12px; }
+.solo-round-pilots { font-size: 13px; color: #9aa6b0; }
+.solo-round-label { font-size: 11px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: var(--community-accent, #7fe3ea); white-space: nowrap; }
+.planning-quick-button.is-labelled.is-active { border-color: rgba(46, 204, 113, .6); color: #6fe3a1; }
+/* Solo pilots: small cards, by category (rank within its category). */
+.solo-entry-groups { display: grid; gap: 10px; }
+.solo-entry-group { display: grid; gap: 6px; }
+.solo-entry-group-head { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: #dfe5ea; }
+.solo-entry-group-head .category-logo, .solo-entry-group-head img { width: auto; height: 18px; }
+.solo-entry-group-head em { font-style: normal; color: #8c98a2; }
+.solo-entries { grid-template-columns: repeat(auto-fill, minmax(140px, 180px)); gap: 6px; }
+.solo-entry { grid-template-columns: 20px minmax(0, 1fr) auto auto; gap: 6px; padding: 4px 8px 4px 5px; border-radius: 999px; }
+.solo-entry-rank { width: 20px; height: 20px; font-size: 11px; }
+.solo-entry-name { font-size: 13px; }
+.solo-entry-logo { display: inline-flex; }
+.solo-entry-logo .category-logo, .solo-entry-logo img { width: auto; height: 16px; }
+.solo-entry-edit { display: inline-grid; place-items: center; width: 22px; height: 22px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: #9aa6b0; cursor: pointer; }
+.solo-entry-edit:hover { background: rgba(255, 255, 255, .08); color: #f2f5f7; }
+.solo-entry-edit svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+@media (max-width: 600px) { .solo-entries { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.solo-entry-group-head .solo-any-logo { display: inline-grid; place-items: center; width: 18px; height: 18px; padding: 0; border: 0; border-radius: 4px; background: rgba(255, 255, 255, .1); font-size: 11px; }

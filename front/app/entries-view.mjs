@@ -68,7 +68,7 @@ function soloCard({event,departure,reg}) {
         ${reg.managed?`<strong class="ux-managed-entry-name">${esc(reg.name)}</strong>`:''}
         <h2 class="event-name">${esc(event.name)}</h2>
         <span class="race-meta">${soloCardMeta(event)}</span>
-        <span class="race-badges">${accessBadge(event)}${category}<span class="race-start">Départ ${esc(timeLabel(departure.time))}${event.details?.endTime?` – ${esc(timeLabel(event.details.endTime))}`:''}</span>${situation}</span>
+        <span class="race-badges">${accessBadge(event)}${category}<span class="race-start">Départ ${esc(timeLabel(departure.time))}</span>${situation}</span>
       </span>${circuitVisual(event.circuit,true)}</span>
       <button type="button" class="primary-button native-my-entry-open-event" data-action="open" data-id="${event.id}" data-departure="${departure.id}">Voir l’événement</button>
     </summary>

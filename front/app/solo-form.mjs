@@ -62,7 +62,6 @@ export function renderSoloEventForm(event=null){
   const details=event?.details||{},access=event?.access||'open',departure=event?.departures?.[0]||{time:'21:00'},first=event?LAST:1;
   const start=departureFields(departure).replace(/<button[^>]*data-action="remove-departure"[^>]*>.*?<\/button>/,'');
   const step=(n,content)=>`<section class="creation-card solo-form-step" data-solo-step-pane="${n}" ${n===first?'':'hidden'}>${content}</section>`;
-  const [endHour,endMinute]=(details.endTime||':').split(':');
   app.innerHTML=`${button('home','← Retour','','secondary-button back-button')}<h1 class="page-title">${event?'MODIFIER L’ÉVÉNEMENT':'NOUVEL ÉVÉNEMENT'}</h1>
 <form class="form-panel event-creation solo-event-form" data-kind="solo-event" data-step="${first}">
   <div class="registration-progress" aria-hidden="true" data-solo-progress>${STEPS.map((_,index)=>`<span class="${index<first?'done':''}"></span>`).join('')}</div>
@@ -70,8 +69,7 @@ export function renderSoloEventForm(event=null){
   ${step(1,`<label class="form-label">Nom de l’événement<input name="eventName" maxlength="100" value="${esc(event?.name||'')}" required></label>
     <fieldset class="sim-options"><legend class="form-label">Simulateur</legend><div class="sim-option-row">${SIMS.map(item=>simChoice(item,sim)).join('')}</div></fieldset>${typeField(details.type)}`)}
   ${step(2,`<div class="solo-form-start">${start}</div>
-    <div class="solo-form-row"><div class="time-picker"><span class="form-label">Fin <small>(facultatif)</small></span><span class="time-picker-row"><select name="endHour" aria-label="Heure de fin"><option value="">—</option>${hours.map(value=>`<option value="${value}" ${value===endHour?'selected':''}>${value} h</option>`).join('')}</select><span aria-hidden="true">:</span><select name="endMinute" aria-label="Minutes de fin">${['00','15','30','45'].map(value=>`<option value="${value}" ${value===endMinute?'selected':''}>${value}</option>`).join('')}</select></span></div>
-    <label class="form-label">Mot de passe du serveur <small>(facultatif)</small><input name="eventPassword" maxlength="30" value="${esc(details.password||'')}" autocomplete="off"></label></div>`)}
+    <div class="solo-form-row"><label class="form-label">Mot de passe du serveur <small>(facultatif)</small><input name="eventPassword" maxlength="30" value="${esc(details.password||'')}" autocomplete="off"></label></div>`)}
   ${step(3,`<div class="solo-rounds" data-rounds>${rounds.map(round=>roundField(sim,round)).join('')}</div><button type="button" class="secondary-button" data-add-round>+ Ajouter une manche</button>`)}
   ${step(4,`<div class="solo-form-row"><label class="form-label">Places <small>(vide = illimité)</small><input name="eventCapacity" type="number" min="2" max="120" step="1" value="${esc(event?.capacity||'')}"></label>
     <fieldset class="solo-access" ${accessType(details.type)?'hidden':''}><legend class="form-label">Accès</legend><div class="sim-option-row">${['open','safe'].map(value=>`<label class="sim-option access-${value}"><input type="radio" name="eventAccess" value="${value}" ${access===value?'checked':''}><span>${value.toUpperCase()}</span></label>`).join('')}</div></fieldset></div>
@@ -92,7 +90,7 @@ function formData(form){
     categories:[...row.querySelectorAll('[name="roundCategory"]:checked')].map(input=>input.value),
     category:value(row,'roundCategoryText'),car:value(row,'roundCar'),practice:optional(row,'roundPractice'),qualifying:optional(row,'roundQualifying'),weather:row.querySelector('[data-weather]:checked')?.value||'',fuel:optional(row,'roundFuel'),tyres:optional(row,'roundTyres')}));
   const start=form.querySelector('.departure-field'),capacity=form.elements.eventCapacity.value.trim();
-  const details={type:form.querySelector('[name="eventType"]:checked')?.value||'',endTime:form.elements.endHour.value?`${form.elements.endHour.value}:${form.elements.endMinute.value}`:'',password:form.elements.eventPassword.value.trim(),note:form.elements.eventNote.value.trim()};
+  const details={type:form.querySelector('[name="eventType"]:checked')?.value||'',password:form.elements.eventPassword.value.trim(),note:form.elements.eventNote.value.trim()};
   return {name:form.elements.eventName.value.trim(),format:'solo',sim:form.elements.eventSim.value,access:form.querySelector('[name="eventAccess"]:checked')?.value||'open',
     capacity:capacity?Number(capacity):null,rounds,categories:[],details,
     departures:[{id:start.dataset.id||undefined,date:start.querySelector('[name="date"]').value,time:start.querySelector('[name="time"]').value,tbd:false}]};
@@ -102,7 +100,7 @@ function fillRecap(form){
   const circuitName=id=>catalog?(catalog.circuits.find(item=>item.id===id)?.name||'—'):id||'—';
   const date=data.departures[0].date,day=date?new Intl.DateTimeFormat('fr-FR',{weekday:'short',day:'numeric',month:'short',timeZone:'UTC'}).format(new Date(`${date}T00:00:00Z`)):'—';
   const line=(n,label,value)=>`<button type="button" class="registration-summary-row" data-solo-step="${n}"><span>${label}</span><strong>${esc(value)}</strong><em>Modifier</em></button>`;
-  const time=`${data.departures[0].time}${data.details.endTime?` – ${data.details.endTime}`:''}`;
+  const time=data.departures[0].time;
   form.querySelector('[data-solo-recap]').innerHTML=line(1,'Événement',[data.name||'—',sim.short,data.details.type].filter(Boolean).join(' · '))
     +line(2,'Horaire',`${day} · ${time}${data.details.password?` · mdp : ${data.details.password}`:''}`)
     +data.rounds.map((round,index)=>line(3,data.rounds.length>1?`Manche ${index+1}`:'Manche',[circuitName(round.circuit),isRandomCircuit(round.circuit)&&eventCatalog(data.sim)?'catégorie aléatoire':round.categories.join(' ')||round.category,round.car,roundFormat(round),roundExtras(round)].filter(Boolean).join(' · '))).join('')
