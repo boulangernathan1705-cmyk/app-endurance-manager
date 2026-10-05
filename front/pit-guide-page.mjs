@@ -109,7 +109,7 @@ function render() {
     s.energyRate ? row('Énergie', `${num(s.energyRate)} %/s`) : '', row('4 pneus', s.tyres4 ? `${num(s.tyres4)} s` : '—'), s.tyres2 ? row('2 pneus', `${num(s.tyres2)} s`) : '',
     s.driver ? row('Changement de pilote', `${num(s.driver, 0)} s`, '', 'pendant le plein') : '', s.wing ? row('Réglage aileron arrière', `${num(s.wing, 0)} s`, '', 'pendant le plein') : '',
     s.ductFront ? row('Écopes de frein', `${num(s.ductFront, 0)} s · ${num(s.ductRear, 0)} s`, '', 'avant · arrière, en plus') : '',
-    s.brakes ? row('Freins', `${num(s.brakes, 0)} s`, '', 'en plus') : '', s.repair ? row('Réparation', `${num(s.repair, 0)} s`) : ''].join('') : '';
+    s.brakes ? row('Freins', `${num(s.brakes, 0)} s`, '', 'en plus') : ''].join('') : '';
   const classes = [...new Set(circuit.cars.map(item => item.carClass))];
   const cars = circuit.cars.filter(item => item.carClass === data.car.carClass);
   const st = data.stint, stintKind = source(st.by === 'energy' ? data.energy : data.fuel), wearKind = source(data.tyres[0]);
