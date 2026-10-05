@@ -243,7 +243,7 @@ test('the BoP of a car on a circuit: LMU’s line for all its versions, the main
 const LAPTIMES=readFileSync(new URL('./fixtures/laptimes.csv',import.meta.url),'utf8');
 test('reference lap times: levels by name from the spreadsheet, read again once a day', async () => {
   const rows=parseLaptimes(LAPTIMES), lb=rows.find(row=>row.circuit==='long-beach');
-  assert.equal(rows.length,4);assert.equal(lb.q,78.16);
+  assert.equal(rows.length,4);assert.equal(lb.q,78.16);assert.deepEqual(lb.fastest,{car:'Corvette Z06',time:77.97});
   assert.deepEqual([levelOf(80.887,lb),levelOf(78.2,lb),levelOf(82.2,lb),levelOf(90,lb),levelOf(null,lb)],['Good','Alien','Midpack','Offline',null]);
   assert.deepEqual(levelBands(lb).find(band=>band.name==='Good'),{name:'Good',from:79.34,to:80.91});
   const {env}=harness(), calls=[];
