@@ -59,6 +59,8 @@ const ICON_CREW=QUICK_ICON('M10 13a2 2 0 1 0 4 0a2 2 0 0 0-4 0M8 21v-1a2 2 0 0 1
 const ICON_MORE=QUICK_ICON('M5 12h.01M12 12h.01M19 12h.01');
 // A pilot with a small cross: « Je serai absent ».
 const ICON_ABSENT=QUICK_ICON('M8 7a4 4 0 1 0 8 0a4 4 0 0 0-8 0M6 21v-2a4 4 0 0 1 4-4h3M17 16l4 4M21 16l-4 4');
+// A pilot with a small minus: « Me désinscrire ».
+const ICON_UNREGISTER=QUICK_ICON('M8 7a4 4 0 1 0 8 0a4 4 0 0 0-8 0M6 21v-2a4 4 0 0 1 4-4h4M16 19h6');
 // « Je serai absent » next to « M'inscrire » (the absence is for the whole event); once said, a click withdraws it.
 function absenceButton(event){
   if(!state.user)return '';
@@ -103,14 +105,21 @@ function roundQuick(event,departure,index){
   const own=ownRegistration(departure),inRound=own&&own.status!=='unavailable'&&!own.roundChoices?.[index]?.skip,blocked=soloEntryBlock(event);
   const square=(icon,tip,attrs,label,extra='')=>`<button type="button" class="planning-quick-button is-labelled${extra}" ${attrs} data-tip="${esc(tip)}" aria-label="${esc(tip)}"><span class="planning-quick-icon">${icon}</span><span class="planning-quick-label">${esc(label)}</span></button>`;
   const attrs=action=>`data-action="${action}" data-departure="${departure.id}" data-round="${index}"`;
-  const register=inRound?square(ICON_REGISTER,'Mon inscription',attrs('round-edit'),'Inscrit',' is-active')
+  // Entered on this round: « Me désinscrire » (from this round only), as on every event; the category can be
+  // changed from the « … » menu.
+  const register=inRound?square(ICON_UNREGISTER,`Me désinscrire de la manche ${index+1}`,attrs('round-skip'),'Me désinscrire',' is-leave')
     :blocked?'':square(ICON_REGISTER,`M’inscrire à la manche ${index+1}`,attrs('round-enter'),'M’inscrire');
-  const absence=inRound?square(ICON_ABSENT,`Je ne fais pas la manche ${index+1}`,attrs('round-skip'),'Absent',' is-absence'):own?'':absenceButton(event);
-  const more=can('manage_registrations')?`<span class="planning-quick-menu-wrap">${`<button type="button" class="planning-quick-button" data-action="quick-menu" aria-haspopup="menu" aria-expanded="false" data-tip="Autres inscriptions" aria-label="Autres inscriptions"><span class="planning-quick-icon">${ICON_MORE}</span></button>`}<span class="planning-quick-menu" role="menu" hidden><button type="button" role="menuitem" class="planning-quick-item" data-action="new-registration" data-departure="${departure.id}" data-round="${index}" data-mode="pilot">Inscrire un autre pilote</button></span></span>`:'';
+  const absence=inRound||own?'':absenceButton(event);
+  const items=[
+    inRound&&soloRounds(event)[index]?.categories.length>1?`<button type="button" role="menuitem" class="planning-quick-item" ${attrs('round-edit')}>Changer de catégorie</button>`:'',
+    can('manage_registrations')?`<button type="button" role="menuitem" class="planning-quick-item" data-action="new-registration" data-departure="${departure.id}" data-round="${index}" data-mode="pilot">Inscrire un autre pilote</button>`:'',
+  ].filter(Boolean);
+  const more=items.length?`<span class="planning-quick-menu-wrap"><button type="button" class="planning-quick-button" data-action="quick-menu" aria-haspopup="menu" aria-expanded="false" data-tip="Autres choix" aria-label="Autres choix"><span class="planning-quick-icon">${ICON_MORE}</span></button><span class="planning-quick-menu" role="menu" hidden>${items.join('')}</span></span>`:'';
   return register||absence||more?`<span class="planning-quick">${register}${absence}${more}</span>`:'';
 }
 function roundEntries(event,departure,index){
-  return soloEntryList(event,departure,(departure.availability||[]).filter(reg=>reg.status!=='unavailable'&&!reg.roundChoices?.[index]?.skip),{round:index});
+  const capacity=event.rounds[index]?.capacity||null;
+  return soloEntryList(event,departure,(departure.availability||[]).filter(reg=>reg.status!=='unavailable'&&!reg.roundChoices?.[index]?.skip),{round:index,capacity,waitOf:capacity?reg=>reg.roundWaitlist?.[index]:reg=>reg.waitlistPosition});
 }
 function roundCards(event,departure){
   const rounds=event.rounds||[];
@@ -120,7 +129,7 @@ function roundCards(event,departure){
     const pilots=roundPilots(event,index,departure),own=ownRegistration(departure),mine=own&&own.status!=='unavailable'&&!own.roundChoices?.[index]?.skip;
     const open=(editing&&focus===index)||!state.closedRounds?.has(`${departure.id}:${index}`);
     const editor=!locked&&editing&&focus===index?`<section class="fold-section fold-registration">${renderRegistrationWorkspace(event,departure)}</section>`:'';
-    return `<details class="planning-start solo-round-start has-quick${mine?' is-mine':''}" data-round-key="${departure.id}:${index}" ${open?'open':''}><summary><span class="planning-start-head"><strong>Manche ${index+1}</strong><span class="planning-start-end">${esc(eventCircuitName(event,round.circuit))}</span>${mine?'<span class="planning-tag is-mine">Inscrit</span>':''}</span><span class="planning-row"><span class="solo-round-pilots">${pilots} pilote${pilots>1?'s':''}</span></span>${roundQuick(event,departure,index)}${CHEVRON}</summary><div class="departure-fold planning-body"><div class="departure-fold-body">${editor}${roundTiles(round)}${roundEntries(event,departure,index)}</div></div></details>`;
+    return `<details class="planning-start solo-round-start has-quick${mine?' is-mine':''}" data-round-key="${departure.id}:${index}" ${open?'open':''}><summary><span class="planning-start-head solo-round-head"><span class="round-start-title"><small>Manche ${index+1}</small><strong>${esc(eventCircuitName(event,round.circuit))}</strong></span>${mine?'<span class="planning-tag is-mine">Inscrit</span>':''}</span><span class="planning-row"><span class="solo-round-pilots">${round.capacity?`<strong>${pilots} / ${round.capacity}</strong> places prises`:`${pilots} pilote${pilots>1?'s':''}`}</span></span>${roundQuick(event,departure,index)}${CHEVRON}</summary><div class="departure-fold planning-body"><div class="departure-fold-body">${editor}${roundTiles(round)}${roundEntries(event,departure,index)}</div></div></details>`;
   }).join('')}</div>`;
 }
 

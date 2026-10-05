@@ -219,6 +219,12 @@ function validateSoloRace(input, existing) {
       if (!Number.isInteger(value) || value < 0 || value > 10) fail(400, `Multiplicateur essence ou pneus${where} invalide.`);
       extras[key] = value;
     }
+    // Places of the round (empty = unlimited): beyond them, pilots wait for a place on that round.
+    if (round.capacity != null && round.capacity !== '') {
+      const value = Number(round.capacity);
+      if (!Number.isInteger(value) || value < 2 || value > 120) fail(400, `Le nombre de places${where} doit être compris entre 2 et 120.`);
+      extras.capacity = value;
+    }
     if (round.weather) { if (!WEATHERS.includes(round.weather)) fail(400, `Météo${where} invalide.`); extras.weather = round.weather; }
     // Simulators without a catalog: the category and the car are typed.
     if (!catalog) {
