@@ -2111,3 +2111,8 @@ html[data-game] #app .race-header .race-header-time svg { width: 18px; height: 1
 .solo-round-name { font-size: 14px; }
 @media (max-width: 600px) { .round-start-title strong { font-size: 18px; } }
 .solo-round-pilots strong { color: #eef2f4; }
+
+/* EVENT TDZ: single-round event, the circuit name is the header's main info. */
+.race-meta .solo-header-circuit { font-size: 24px; font-weight: 800; color: var(--text, #fff); letter-spacing: 0; }
+@media (max-width: 640px) { .race-meta .solo-header-circuit { font-size: 20px; } }
+.solo-round-start.is-single > summary { cursor: default; }
