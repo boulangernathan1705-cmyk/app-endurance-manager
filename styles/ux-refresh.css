@@ -2116,3 +2116,6 @@ html[data-game] #app .race-header .race-header-time svg { width: 18px; height: 1
 .race-meta .solo-header-circuit { font-size: 24px; font-weight: 800; color: var(--text, #fff); letter-spacing: 0; }
 @media (max-width: 640px) { .race-meta .solo-header-circuit { font-size: 20px; } }
 .solo-round-start.is-single > summary { cursor: default; }
+/* Its pilot count sits in the frame's head, next to the buttons. */
+.solo-round-start.is-single .solo-round-head .solo-subtitle { margin: 0; font-size: 16px; font-weight: 800; }
+.solo-round-start.is-single .solo-participants > .solo-subtitle:first-child { display: none; }
