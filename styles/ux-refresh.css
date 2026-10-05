@@ -2026,18 +2026,35 @@ html[data-game] #app .race-header .event-type-panel span { font-size: 28px; font
 html[data-game] #app .race-header .race-header-time { display: inline-flex; align-items: center; gap: 7px; padding: 4px 12px; border: 1px solid rgba(255, 255, 255, .16); border-radius: 9px; font-size: 18px; font-weight: 800; color: #f4f6f5; }
 html[data-game] #app .race-header .race-header-time svg { width: 18px; height: 18px; fill: none; stroke: #7fe3ea; stroke-width: 2; stroke-linecap: round; }
 
-/* EVENT TDZ page: the chips unfold into plain words. */
-.solo-event-details { width: 100%; }
-.solo-event-details > summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; cursor: pointer; list-style: none; }
-.solo-event-details > summary::-webkit-details-marker { display: none; }
-.solo-event-details > summary .solo-card-info { margin: 0; }
-.solo-details-toggle { display: inline-flex; flex: none; align-items: center; gap: 4px; font-size: 12px; font-weight: 700; color: #9aa6b0; }
-.solo-details-toggle svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; transition: transform .15s; }
-.solo-event-details > summary:hover .solo-details-toggle { color: #7fe3ea; }
-.solo-event-details[open] .solo-details-toggle svg { transform: rotate(180deg); }
-.solo-details-body { display: grid; gap: 14px; margin-top: 14px; }
-.solo-detail-round h3 { margin: 0 0 8px; font-size: 13px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: #dfe5ea; }
-.solo-detail-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; margin: 0; }
-.solo-detail { padding: 9px 12px; border: 1px solid rgba(255, 255, 255, .1); border-radius: 10px; background: rgba(255, 255, 255, .03); }
-.solo-detail dt { font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: #8c98a2; }
-.solo-detail dd { margin: 3px 0 0; font-size: 16px; font-weight: 800; color: #f2f5f7; overflow-wrap: anywhere; }
+/* EVENT TDZ page: every detail as an icon tile; several rounds side by side. */
+.solo-event-details { display: grid; gap: 10px; width: 100%; }
+.solo-detail-rounds { display: grid; gap: 10px; }
+.solo-detail-rounds.is-multi { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+.solo-detail-round.is-card { padding: 12px; border: 1px solid rgba(255, 255, 255, .1); border-radius: 12px; background: rgba(255, 255, 255, .02); }
+.solo-detail-round-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.solo-detail-round-head strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15px; font-weight: 800; color: #f2f5f7; }
+.solo-detail-round-head em { margin-left: auto; flex: none; font-style: normal; font-size: 12px; font-weight: 700; color: #9aa6b0; }
+.solo-round-index { display: inline-grid; place-items: center; flex: none; width: 22px; height: 22px; border-radius: 50%; background: var(--community-accent, #7fe3ea); color: #061014; font-size: 12px; font-weight: 900; }
+.solo-detail-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.solo-detail { display: flex; align-items: center; gap: 10px; min-width: 0; padding: 8px 10px; border: 1px solid rgba(255, 255, 255, .1); border-radius: 10px; background: rgba(255, 255, 255, .03); }
+.solo-detail.is-wide { grid-column: 1 / -1; }
+.solo-detail-icon { display: inline-grid; place-items: center; flex: none; width: 32px; height: 32px; border-radius: 8px; background: rgba(127, 227, 234, .1); }
+.solo-detail-icon svg { width: 18px; height: 18px; fill: none; stroke: #7fe3ea; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.solo-detail-emoji { font-size: 18px; line-height: 1; }
+.solo-detail-copy { display: grid; min-width: 0; }
+.solo-detail-label { font-size: 10.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: #8c98a2; }
+.solo-detail-copy strong { overflow-wrap: anywhere; font-size: 15px; font-weight: 800; color: #f2f5f7; }
+.solo-detail-logos { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+.solo-detail-logos .category-logo, .solo-detail-logos img { height: 20px; width: auto; }
+
+/* EVENT TDZ card, several rounds: one aligned line per round. */
+.solo-round-lines { display: grid; grid-template-columns: auto minmax(0, max-content) auto auto; align-items: center; justify-content: start; gap: 6px 10px; }
+.solo-round-line { display: contents; }
+.solo-round-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 700; color: #f2f5f7; }
+.solo-round-cats { display: inline-flex; gap: 4px; align-items: center; }
+.solo-entry-round.is-skipped { opacity: .55; }
+/* Registration, several rounds: « Je la fais » / « Je ne la fais pas ». */
+.solo-round-toggle { display: inline-flex; gap: 0; margin: 4px 0 12px; border: 1px solid rgba(255, 255, 255, .14); border-radius: 10px; overflow: hidden; }
+.solo-round-toggle .secondary-button { margin: 0; border: 0; border-radius: 0; background: transparent; color: #9aa6b0; }
+.solo-round-toggle .secondary-button + .secondary-button { border-left: 1px solid rgba(255, 255, 255, .14); }
+.solo-round-toggle .secondary-button.active { background: var(--community-accent, #7fe3ea); color: #061014; }
