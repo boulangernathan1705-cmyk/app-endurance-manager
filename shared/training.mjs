@@ -298,6 +298,14 @@ export function cleanGame(input) {
   return game.fuel || game.ve || game.ideal ? game : null;
 }
 
+// One stint: as many laps as 100 % of energy lasts (the tank's, for a car without virtual energy), the fuel those
+// laps take (what the advised fuel ratio puts in) and what each tyre loses over them.
+function stintOf({ve, litres, capacity, wheels}) {
+  const laps = ve ? Math.floor(100 / ve) : litres && capacity ? Math.floor(capacity / litres) : null;
+  return {laps, by:ve ? 'energy' : laps ? 'tank' : null, fuel:laps && litres ? round(laps * litres, 1) : null,
+    wear:laps && wheels ? wheels.map(value => value === null ? null : round(value * laps, 1)) : null};
+}
+
 // The time stopped, by the game's own rule (checked on real stops): tyres, brakes and brake ducts one after the
 // other, plus the longest of fuel, energy, rear wing and driver swap, which are done at the same time.
 export function stopTime(service, {fuel = 0, energy = 0, tyres = 0, wing = false, driver = false, ductFront = false, ductRear = false, brakes = false}) {
@@ -353,12 +361,12 @@ export function memoSheet({laneStops = [], carStops = [], sessions = [], viewer 
     const laps = rows.reduce((sum, row) => sum + row.laps, 0), you = mine?.tyres[name] || null;
     const wear = spread(rows.map(row => row.wear), laps, you?.wear, 2), open = wear.median !== null;
     const worst = open ? [0, 1, 2, 3].map(index => median(rows.map(row => row.worst[index]))) : you?.worst;
-    return {name, ...wear, worst:worst ? worst.indexOf(Math.max(...worst)) : null, temp:open ? round(median(rows.map(row => row.temp).filter(Boolean)), 0) : null,
+    return {name, ...wear, worst:worst ? worst.indexOf(Math.max(...worst)) : null, wheels:worst ? worst.map(value => round(value ?? null, 2)) : null, temp:open ? round(median(rows.map(row => row.temp).filter(Boolean)), 0) : null,
       youTemp:round(you?.temp ?? null, 0), track:round(median(rows.map(row => row.track).filter(value => value !== null)), 1), ideal:game?.ideal ?? null};
   }).sort((a, b) => b.laps - a.laps);
   // The figures a stint is planned with: the pilots' median, else the viewer's own, else the game's forecast.
   const pick = item => item.median ?? item.you ?? item.game;
-  const ve = pick(energy), litres = pick(fuel), wear = tyres[0] ? tyres[0].median ?? tyres[0].you : null;
+  const ve = pick(energy), litres = pick(fuel);
   const measured = pitTimes(carStops);
   // Where the viewer's race pace (his median clean lap) stands among the reference levels, and the next one up.
   let levels = null;
@@ -371,7 +379,7 @@ export function memoSheet({laneStops = [], carStops = [], sessions = [], viewer 
   return {levels, lane:through.length ? {through:round(median(through), 1), stops:through.length} : null,
     service:service ? {source:'game', ...service} : measured && (measured.tyres4 || measured.fuelRate) ? {source:'stops', tyres4:measured.tyres4, tyres2:measured.tyres2, fuelRate:measured.fuelRate, repair:measured.repair} : null,
     energy, fuel:{...fuel, ratio:litres && ve && capacity ? round(litres / capacity * 100 / ve, 2) : null}, capacity, tyres,
-    stint:{energyLaps:ve ? Math.floor(100 / ve) : null, tankLaps:litres && capacity ? Math.floor(capacity / litres) : null, lapsTo50:wear ? Math.floor(50 / wear) : null},
+    stint:stintOf({ve, litres, capacity, wheels:tyres[0]?.wheels}),
     min};
 }
 
