@@ -87,6 +87,9 @@ test('the pilot drops his files, sees his program, and compares with the pilots 
   await login(ADMIN,'admin','Orga');await login(PILOT,'pilot','Alice');await login(MATE,'mate','Bob');await login('444444444444444444','other','Chloé');
   assert.equal((await req('/api/training','GET',null,'pilot')).status,404);
   assert.equal((await req('/api/community/modules','PATCH',{training:true},'admin')).status,200);
+  // Not entered in any race: the memo shows in the bar, the training does not.
+  const session=(await req('/api/session','GET',null,'pilot')).data;
+  assert.equal(session.training,true);assert.equal(session.trainingRace,false);
   let data=(await req('/api/training','GET',null,'pilot')).data;
   assert.equal(data.track,null);assert.equal(data.steps[0].done,false);assert.equal(data.device.linked,false);
   let response=await upload(send,'pilot',XML);

@@ -93,8 +93,7 @@ function communitiesMarkup(communities) {
     : `<a class="account-menu-item account-community" href="${esc(item.url)}">${mark(item)}<span>${esc(item.name)}</span></a>`).join('')}`;
 }
 
-function renderConnected(user, communities = [], training = false) {
-  const train = training ? `<a class="account-menu-item" href="/entrainement.html"${location.pathname.endsWith('/entrainement.html') ? ' aria-current="page"' : ''}>Mon entraînement</a><a class="account-menu-item" href="/stands.html"${location.pathname.endsWith('/stands.html') ? ' aria-current="page"' : ''}>Mémo des circuits</a>` : '';
+function renderConnected(user, communities = []) {
   const manage = user.role === 'admin' ? `<a class="account-menu-item" href="/members.html">Administration</a>` : '';
   const help = `<a class="account-menu-item" href="/help.html"${isHelp ? ' aria-current="page"' : ''}>Aide</a>`;
 
@@ -106,7 +105,7 @@ function renderConnected(user, communities = [], training = false) {
     </button>
     <div class="account-popover" role="menu" hidden>
       <div class="account-popover-profile">${avatarMarkup(user)}<span><strong>${esc(user.name)}</strong><small>${roleLabel(user.role)}</small></span></div>
-      ${train}${help}${manage}${communitiesMarkup(communities)}
+      ${help}${manage}${communitiesMarkup(communities)}
       <span class="account-menu-separator" aria-hidden="true"></span>
       <button type="button" class="account-menu-item account-menu-logout" data-account-logout>Déconnexion</button>
     </div>
@@ -175,7 +174,9 @@ async function loadSession() {
     if (session.openSite) showcaseBanner(session.platformDiscordUrl);
     siteCommunityName = session.openSite ? '' : session.community?.name || '';
     if (session.user) {
-      renderConnected(session.user, Array.isArray(session.communities) ? session.communities : [], session.training === true);
+      renderConnected(session.user, Array.isArray(session.communities) ? session.communities : []);
+      // The training pages' own bar: Training only for a pilot entered in an upcoming race.
+      if (session.trainingRace) for (const link of document.querySelectorAll('[data-training-race]')) link.hidden = false;
       // The bell of the races the player is entered in, next to his account (members of the community only).
       if (session.access === 'member') installNotifications(root);
     }

@@ -161,7 +161,7 @@ async function memo(env, user, url) {
 }
 
 // The next LMU race the pilot is entered in (for the program's deadline and the circuit shown first).
-async function nextRace(env, userId) {
+export async function nextRace(env, userId) {
   const rows = await all(env, `SELECT r.departure_id,r.category,e.id,e.name,e.circuit,e.departures FROM registrations r JOIN participants p ON p.id=r.participant_id
     JOIN events e ON e.id=r.event_id WHERE p.user_id=? AND r.status!='unavailable' AND e.circuit NOT LIKE 'iracing-%'`, userId);
   let next = null;
