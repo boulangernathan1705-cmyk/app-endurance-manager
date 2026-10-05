@@ -7,7 +7,7 @@ import {stopTime} from '../shared/training.mjs';
 const app = document.getElementById('pit-guide');
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const num = (value, digits = 1) => value === null || value === undefined ? '—' : Number(value).toFixed(digits).replace('.', ',');
-const view = {data:null, calc:{arrive:50, leave:100, tyres:4, driver:false, wing:false, ductFront:false, ductRear:false, brakes:false}};
+const view = {data:null, calc:{energy:50, fuel:null, tyres:4, driver:false, wing:false, ductFront:false, ductRear:false, brakes:false}};
 
 // 80.887 -> 1:20.887 (times from the spreadsheet have two decimals).
 const lap = (seconds, digits = 2) => seconds ? `${Math.floor(seconds / 60)}:${(seconds % 60).toFixed(digits).padStart(digits + 3, '0')}` : '—';
@@ -44,19 +44,19 @@ function perLap(title, item, unit, digits, extra = '') {
 function calculator(data) {
   const service = data.service?.source === 'game' ? data.service : null;
   if (!service) return `<p class="training-note memo-small">Le calcul d’un arrêt arrive quand le plugin envoie les temps de service de cette voiture.</p>`;
-  const c = view.calc, energy = Math.max(0, c.leave - c.arrive), ratio = data.fuel.ratio, capacity = data.capacity;
-  // Litres follow the energy through the fuel ratio, as in the pit menu.
-  const fuel = ratio && capacity ? energy / 100 * capacity * ratio : 0;
+  const c = view.calc, energy = c.energy, ratio = data.fuel.ratio, capacity = data.capacity;
+  // The fuel follows the energy through the advised ratio until it is set by hand, as in the pit menu.
+  const share = c.fuel ?? Math.min(100, Math.round(energy * (ratio || 0))), fuel = capacity ? share / 100 * capacity : 0;
   const stopped = stopTime(service, {fuel, energy, tyres:c.tyres, wing:c.wing, driver:c.driver, ductFront:c.ductFront, ductRear:c.ductRear, brakes:c.brakes});
   const check = (key, label, seconds) => seconds ? `<label class="memo-toggle"><input type="checkbox" data-calc="${key}"${c[key] ? ' checked' : ''}><span>${label}</span><small>${num(seconds, 0)} s</small></label>` : '';
   return `<form class="memo-calc" aria-label="Calculer un arrêt">
-    <label for="memo-arrive">Énergie à l’arrivée <output>${c.arrive} %</output></label><input id="memo-arrive" type="range" min="0" max="100" step="5" value="${c.arrive}" data-calc="arrive">
-    <label for="memo-leave">Énergie en sortant <output>${c.leave} %</output></label><input id="memo-leave" type="range" min="0" max="100" step="5" value="${c.leave}" data-calc="leave">
+    <label for="memo-energy">Énergie remise <output>${energy} %</output></label><input id="memo-energy" type="range" min="0" max="100" step="1" value="${energy}" data-calc="energy">
+    <label for="memo-fuel">Carburant remis <output>${share} %${fuel ? ` · ${num(fuel, 1)} L` : ''}</output></label><input id="memo-fuel" type="range" min="0" max="100" step="1" value="${share}" data-calc="fuel">
     <fieldset><legend>Pneus</legend>${[[0, 'Aucun'], [2, '2 pneus'], [4, '4 pneus']].map(([value, label]) => `<label class="memo-toggle"><input type="radio" name="memo-tyres" value="${value}" data-calc="tyres"${c.tyres === value ? ' checked' : ''}><span>${label}</span></label>`).join('')}</fieldset>
     <fieldset><legend>Pendant le plein</legend>${check('driver', 'Pilote', service.driver)}${check('wing', 'Aileron arrière', service.wing)}</fieldset>
     <fieldset><legend>En plus du plein</legend>${check('ductFront', 'Écopes avant', service.ductFront)}${check('ductRear', 'Écopes arrière', service.ductRear)}${check('brakes', 'Freins', service.brakes)}</fieldset>
   </form>
-  <dl>${row('Remis', `${energy} %${fuel ? ` · ${num(fuel, 1)} L` : ''}`)}${row('Temps arrêté', `${num(stopped)} s`, 'is-game')}
+  <dl>${row('Temps arrêté', `${num(stopped)} s`, 'is-game')}
     ${data.lane ? row('<strong>Temps total au stand</strong>', `<strong>${num(data.lane.through + stopped)} s</strong>`, '', 'traversée + arrêt') : ''}</dl>`;
 }
 
@@ -178,8 +178,6 @@ app.addEventListener('input', event => {
   if (!input) return;
   const key = input.dataset.calc;
   view.calc[key] = input.type === 'checkbox' ? input.checked : Number(input.value);
-  if (key === 'arrive' && view.calc.leave < view.calc.arrive) view.calc.leave = view.calc.arrive;
-  if (key === 'leave' && view.calc.leave < view.calc.arrive) view.calc.arrive = view.calc.leave;
   const focus = input.id;
   render();
   if (focus) document.getElementById(focus)?.focus();
