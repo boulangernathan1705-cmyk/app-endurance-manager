@@ -4,7 +4,7 @@ import {DatabaseSync} from 'node:sqlite';
 import {readFileSync, readdirSync} from 'node:fs';
 import worker from '../server/worker.mjs';
 import {syncCrewDiscord, OPEN_BEFORE, CLOSE_AFTER, KEEP_ARCHIVES} from '../server/crew-discord.mjs';
-import {linkTestServer, setMember, ORGA_ROLE, GUILD} from './fixtures/discord-server.mjs';
+import {linkTestServer, allowCrews, setMember, ORGA_ROLE, GUILD} from './fixtures/discord-server.mjs';
 
 // Crews on Discord and race reminders (migrations 0044, 0045): the bot is a fake Discord that records each request.
 const ROOT='https://site.example';
@@ -42,7 +42,7 @@ function fakeDiscord(){
 
 function harness(){
   const DB=new D1();
-  linkTestServer(DB.db, DEV);
+  linkTestServer(DB.db, DEV); allowCrews(DB.db, DEV);
   const env={DB,APP_ORIGIN:ROOT,COMMUNITY:'commu-dev',DISCORD_CLIENT_ID:'app-id',DISCORD_CLIENT_SECRET:'test-only-secret',DISCORD_BOT_TOKEN:'bot-token',ADMIN_DISCORD_IDS:ADMIN,ASSETS:{fetch:async()=>new Response('static')}};
   const discord=fakeDiscord();
   const jars=new Map();

@@ -2119,3 +2119,10 @@ html[data-game] #app .race-header .race-header-time svg { width: 18px; height: 1
 /* Its pilot count sits in the frame's head, next to the buttons. */
 .solo-round-start.is-single .solo-round-head .solo-subtitle { margin: 0; font-size: 16px; font-weight: 800; }
 .solo-round-start.is-single .solo-participants > .solo-subtitle:first-child { display: none; }
+/* « Me désinscrire » is red everywhere (endurances and events). */
+.secondary-button.is-leave { border-color: rgba(255, 107, 107, .55) !important; color: #ff8a8a !important; }
+/* Header of an event: the type panel the size of an endurance's circuit, the title and its line kept together. */
+html[data-game] #app .race-header .race-head { align-content: center; }
+html[data-game] #app .race-header .event-type-panel { width: 150px; height: 84px; }
+html[data-game] #app .race-header .event-type-panel span { font-size: 22px; }
+@media (max-width: 600px) { html[data-game] #app .race-header .event-type-panel { width: 90px; height: 70px; } html[data-game] #app .race-header .event-type-panel span { font-size: 15px; } }

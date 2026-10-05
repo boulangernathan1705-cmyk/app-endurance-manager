@@ -3,7 +3,7 @@
 // - The platform managers (ADMIN_DISCORD_IDS) have every permission everywhere.
 // - A member's permissions = the permissions of all their Discord roles (community_role_permissions),
 //   "@everyone" included (its role id is the server id). Without any setting for "@everyone", members may
-//   enter races and create their crew.
+//   enter endurances and OPEN events. Without any permission, a member only sees the races.
 // - The owner of the server and any role with Discord's "Administrator" permission have every permission.
 // - Membership and roles are checked by the bot (DISCORD_BOT_TOKEN) when the player comes, at most once a
 //   day, and by the daily task. The player's other servers are never looked at.
@@ -11,18 +11,22 @@
 import {administrators, fail, now} from './core.mjs';
 
 export const PERMISSIONS = Object.freeze([
-  'endurance',            // s'inscrire aux endurances, rejoindre, créer et gérer son équipage
-  'solo_open',            // s'inscrire aux courses solo OPEN (module courses solo)
-  'solo_safe',            // s'inscrire aux courses solo SAFE et OPEN (module courses solo)
-  'manage_registrations', // inscrire, modifier, retirer n'importe quel pilote ; composer tous les équipages
-  'create_race',          // créer des courses, modifier et supprimer les siennes
-  'manage_races',         // modifier et supprimer toutes les courses
-  'admin'                 // page Membres et réglages de la communauté
+  'endurance',            // s'inscrire aux endurances (et rejoindre un équipage existant)
+  'solo_open',            // s'inscrire aux événements OPEN (module EVENT TDZ)
+  'solo_safe',            // s'inscrire aux événements SAFE et OPEN (module EVENT TDZ)
+  'crews',                // créer et gérer les équipages (tous)
+  'admin'                 // administrer le site de la communauté : réglages, rôles, courses, inscriptions
 ]);
+// What « admin » brings besides the administration (never ticked on their own): enter any pilot, create races
+// and events, change and delete every race.
+const ADMIN_ALSO = ['manage_registrations', 'create_race', 'manage_races'];
+export const ALL_PERMISSIONS = Object.freeze([...PERMISSIONS, ...ADMIN_ALSO]);
+export const withImplied = permissions => permissions.has('admin') ? new Set(ALL_PERMISSIONS) : permissions;
 export const DEFAULT_EVERYONE = Object.freeze(['endurance', 'solo_open']);
-// Names used before the permissions were redefined (settings saved with them keep their meaning).
-const LEGACY = {register:['endurance', 'solo_open'], create_crew:['endurance'], register_others:['manage_registrations'],
-  manage_crews:['manage_registrations'], safe_races:['solo_safe']};
+// Names used before the permissions were redefined (settings saved with them keep their meaning). Since
+// 2026-10-05 creating races and entering other pilots belong to « admin »; composing crews is « crews ».
+const LEGACY = {register:['endurance', 'solo_open'], create_crew:[], register_others:['crews'],
+  manage_crews:['crews'], safe_races:['solo_safe'], manage_registrations:['crews'], create_race:[], manage_races:[]};
 export const normalizePermissions = list => [...new Set((list || []).flatMap(permission => LEGACY[permission] || [permission]))]
   .filter(permission => PERMISSIONS.includes(permission));
 
@@ -102,12 +106,12 @@ async function rolePermissions(env, community, roles) {
   const byRole = new Map(rows.map(row => [row.discord_role_id, normalizePermissions(JSON.parse(row.permissions || '[]'))]));
   const granted = new Set(byRole.has(everyone) ? byRole.get(everyone) : DEFAULT_EVERYONE);
   for (const role of roles) for (const permission of byRole.get(role) || []) granted.add(permission);
-  return new Set([...granted].filter(permission => PERMISSIONS.includes(permission)));
+  return withImplied(new Set([...granted].filter(permission => PERMISSIONS.includes(permission))));
 }
 
 // Permissions of a stored membership (members page).
 export async function memberPermissions(env, community, membership) {
-  if (membership.discord_admin) return new Set(PERMISSIONS);
+  if (membership.discord_admin) return new Set(ALL_PERMISSIONS);
   return rolePermissions(env, community, JSON.parse(membership.discord_roles || '[]'));
 }
 
@@ -118,17 +122,17 @@ export async function communityAccess(env, actor, community, {open = false} = {}
   const none = status => ({status, permissions:new Set(), manager:false});
   const manager = Boolean(actor.user) && administrators(env).includes(actor.user.id);
   // Showcase (main address): everyone looks, signed in or not; only the platform managers change it.
-  if (open) return manager ? {status:'member', permissions:new Set(PERMISSIONS), manager} : none('member');
+  if (open) return manager ? {status:'member', permissions:new Set(ALL_PERMISSIONS), manager} : none('member');
   if (!actor.user) return none('anonymous');
-  if (!community.discordGuildId) return manager ? {status:'member', permissions:new Set(PERMISSIONS), manager} : none('unavailable');
+  if (!community.discordGuildId) return manager ? {status:'member', permissions:new Set(ALL_PERMISSIONS), manager} : none('unavailable');
   let membership = await env.DB.prepare('SELECT * FROM memberships WHERE community_id=? AND user_id=?').bind(community.id, actor.user.id).first();
   // Managers are checked too (to appear on the members page when they are on the server), but their access never depends on it.
   // Discord not answering: the roles known last time stay (never an error for a member already checked).
   if (!membership || membership.checked_at < now() - VISIT_CHECK_EVERY) membership = (await checkMembership(env, community, actor.user.id).catch(error => { if (!manager && !membership) throw error; return null; })) || membership;
-  if (manager) return {status:'member', permissions:new Set(PERMISSIONS), manager};
+  if (manager) return {status:'member', permissions:new Set(ALL_PERMISSIONS), manager};
   if (!membership) return none('unavailable');
   if (membership.status !== 'member') return none('not-member');
-  if (membership.discord_admin) return {status:'member', permissions:new Set(PERMISSIONS), manager:false};
+  if (membership.discord_admin) return {status:'member', permissions:new Set(ALL_PERMISSIONS), manager:false};
   return {status:'member', permissions:await rolePermissions(env, community, JSON.parse(membership.discord_roles || '[]')), manager:false};
 }
 

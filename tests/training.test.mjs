@@ -8,7 +8,7 @@ import {collectMemo,collectiveMemo,restartMemo,MEMO_PERIOD} from '../server/memo
 import {checklistEvidence} from '../shared/training-checklist.mjs';
 import {BOP} from '../shared/lmu-bop.mjs';
 import {bopFor} from '../shared/bop.mjs';
-import {linkTestServer, setMember, ORGA_ROLE} from './fixtures/discord-server.mjs';
+import {linkTestServer, allowCrews, setMember, ORGA_ROLE} from './fixtures/discord-server.mjs';
 import {parseResults, analyse, programSteps, adviceFor, todaySession, circuitOf, cleanLive, analyseLive, stopTime,refuelAmounts,memoPilots, memoSheet, parseLaptimes, levelOf, levelBands} from '../shared/training.mjs';
 
 // Individual training (migration 0046): LMU results files, the program, the advice and the sync program.
@@ -26,7 +26,7 @@ const DEV='e0a1c0de-0000-4000-8000-000000000001';
 const quietDiscord=async()=>new Response('{}',{status:200,headers:{'Content-Type':'application/json'}});
 function harness(){
   const DB=new D1();
-  linkTestServer(DB.db, DEV);
+  linkTestServer(DB.db, DEV); allowCrews(DB.db, DEV);
   const env={DB,APP_ORIGIN:ROOT,COMMUNITY:'commu-dev',DISCORD_CLIENT_ID:'app-id',DISCORD_CLIENT_SECRET:'test-only-secret',ADMIN_DISCORD_IDS:ADMIN,ASSETS:{fetch:async request=>new URL(request.url).pathname==='/downloads/EnduranceManagerSync.exe'?new Response(new Uint8Array(4096).fill(77)):new Response('static')}};
   const jars=new Map();
   async function send(path,method,actor,{json:data,raw,headers:extra={}}={}){

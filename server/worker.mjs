@@ -10,7 +10,7 @@ import {racesPath} from './races-path.mjs';
 import {CARS, simForEvent, TDZ_EVENT_TYPES, TDZ_EVENTS_LABEL} from '../shared/catalog.mjs';
 import {currentCommunity, appearanceOf, allCommunities, communityUrl, communitySlug, communityById, communityFromRow} from './community.mjs';
 import {isDevelopment} from './dev-environment.mjs';
-import {communityAccess, requirePermission, displayRole, PERMISSIONS, DEFAULT_EVERYONE, normalizePermissions, discordGuild, keepDiscordLook, memberPermissions, refreshCommunityMembers} from './access.mjs';
+import {communityAccess, requirePermission, displayRole, PERMISSIONS, ALL_PERMISSIONS, DEFAULT_EVERYONE, normalizePermissions, discordGuild, keepDiscordLook, memberPermissions, refreshCommunityMembers} from './access.mjs';
 // Solo races: a module each community turns on or off (settings of the members page).
 const soloRacesEnabled = (env, community) => community?.modules?.soloRaces === true;
 // Name of the events calendar tab, chosen by each community (« EVENT TDZ »).
@@ -90,7 +90,7 @@ async function myCommunities(env, actor, community) {
   const memberships = actor.manager ? [] : (await env.DB.prepare("SELECT * FROM memberships WHERE user_id=? AND status='member'").bind(actor.user.id).all()).results || [];
   for (const entry of mine) {
     const membership = memberships.find(row => row.community_id === entry.id);
-    entry.manageCrews = actor.manager || Boolean(membership && (await memberPermissions(env, entry.item, membership)).has('manage_registrations'));
+    entry.manageCrews = actor.manager || Boolean(membership && (await memberPermissions(env, entry.item, membership)).has('crews'));
     delete entry.item;
   }
   return mine;
@@ -141,7 +141,7 @@ function canManageRegistration(reg, actor) {
   return owned(reg, actor) || isRegistrationManager(actor);
 }
 function canManageCrew(crew, actor) {
-  return can(actor, 'manage_registrations') || Boolean(actor.user && crew?.owner_user_id === actor.user.id);
+  return can(actor, 'crews') || Boolean(actor.user && crew?.owner_user_id === actor.user.id);
 }
 // `community`: the site's community. An entry of another of the player's communities (on an official race) is shown
 // with its community, and is changed on that community's site only.
@@ -218,7 +218,7 @@ async function listEvents(env, actor, game='', scope='', community) {
       const item = communityFromRow(row), look = appearanceOf(item);
       names.set(row.id, {id:row.id, name:item.name, shortName:item.shortName, accent:look.accent, logoUrl:look.logoUrl});
       if (row.id === community.id || !actor.user) continue;
-      if (actor.manager) { perms.set(row.id, new Set(PERMISSIONS)); continue; }
+      if (actor.manager) { perms.set(row.id, new Set(ALL_PERMISSIONS)); continue; }
       const membership = await env.DB.prepare("SELECT * FROM memberships WHERE community_id=? AND user_id=? AND status='member'").bind(row.id, actor.user.id).first();
       if (membership) perms.set(row.id, await memberPermissions(env, item, membership));
     }
@@ -543,15 +543,16 @@ async function api(request, env) {
     if (!JSON.parse(event.categories).includes(input.category)) fail(400,'Choisis une catégorie de cet événement.');
     const car=crewCar(input);
     const crewId=id();
-    if (can(who,'manage_registrations')) {
+    // « Équipages »: a crew is created by whoever has that permission. Entered on this start and category, they
+    // lead it and join it; otherwise (or as an administrator) the crew starts empty, to be composed.
+    requirePermission(who,'crews','Tu n’as pas l’autorisation de créer un équipage dans cette communauté.');
+    const ownRows=can(who,'manage_registrations')?[]:(await env.DB.prepare(registrationSelect+' WHERE r.event_id=? AND r.departure_id=? AND r.category=? AND r.status!=? AND r.community_id=?').bind(event.id,departure.id,input.category,'unavailable',here.id).all()).results;
+    const selected=ownRows.find(reg=>personal(reg,actor));
+    if (!selected) {
       const result=await env.DB.prepare('INSERT INTO crews(id,event_id,departure_id,name,category,car,created_at,community_id) VALUES(?,?,?,?,?,?,?,?)').bind(crewId,event.id,departure.id,name,input.category,car,now(),here.id).run();
       if (!result.meta.changes) fail(409,'Impossible de créer cet équipage. Actualise avant de réessayer.');
       return json({id:crewId,joined:false},201);
     }
-    requirePermission(who,'endurance','Tu n’as pas l’autorisation de créer un équipage dans cette communauté.');
-    const ownRows=(await env.DB.prepare(registrationSelect+' WHERE r.event_id=? AND r.departure_id=? AND r.category=? AND r.status!=? AND r.community_id=?').bind(event.id,departure.id,input.category,'unavailable',here.id).all()).results;
-    const selected=ownRows.find(reg=>personal(reg,actor));
-    if (!selected) fail(403,'Inscris-toi d’abord sur ce départ dans cette catégorie avant de créer ton équipage.');
     const results=await env.DB.batch([
       env.DB.prepare('INSERT INTO crews(id,event_id,departure_id,name,category,car,owner_user_id,created_at,community_id) VALUES(?,?,?,?,?,?,?,?,?)').bind(crewId,event.id,departure.id,name,input.category,car,actor.user.id,now(),here.id),
       env.DB.prepare('INSERT INTO crew_members(registration_id,crew_id) SELECT ?,? WHERE changes()=1').bind(selected.id,crewId),
