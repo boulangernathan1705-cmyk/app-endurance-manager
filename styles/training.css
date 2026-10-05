@@ -1,5 +1,56 @@
 /* « Mon entraînement » (entrainement.html, front/training-page.mjs): every rule is scoped to .training-page. */
 .training-page{display:grid;gap:18px}
+#training-app{--memo-you:#7fb2ee;--memo-pilots:#f0814a;--memo-game:#5fc79a;--memo-display:"Memo Display","Arial Narrow",sans-serif;--memo-mono:"Memo Mono",ui-monospace,Consolas,monospace;max-width:1080px;gap:16px}
+#training-app h1{font:700 clamp(36px,5vw,52px)/1.1 var(--memo-display);text-wrap:balance}
+#training-app h2{font:700 26px/1.1 var(--memo-display)}
+#training-app .training-card{border-radius:8px;padding:18px;align-content:start;background:#14191c}
+.preparation-head{display:grid;gap:20px;padding:12px 0 20px;background:none;min-height:0;overflow:visible;border:0;box-shadow:none}
+.preparation-head::after{display:none}
+.preparation-sub{display:flex;flex-wrap:wrap;gap:8px 20px;margin:0;color:var(--muted)}
+.preparation-sub strong{color:var(--text)}
+.preparation-sub a{color:var(--memo-you)}
+.preparation-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:stretch}
+#training-app .memo-row{padding:12px 0}
+#training-app .memo-row dd,#training-app .memo-scale,#training-app .memo-table td{font-family:var(--memo-mono);font-size:14px}
+#training-app .memo-row dd small{font-size:11px;font-weight:400}
+#training-app .memo-row small.is-game{color:var(--memo-game)}
+#training-app .training-steps{gap:8px}
+#training-app .training-steps li{grid-template-columns:28px minmax(0,1fr) auto;padding:12px;border-radius:6px;background:#0b1012;gap:10px;align-items:center}
+#training-app .training-steps li.is-done{border-color:var(--border)}
+#training-app .training-steps li.is-current{border-color:var(--memo-you)}
+#training-app .training-step-mark{width:28px;height:28px;border:0;background:#20272b;color:var(--muted);font-family:var(--memo-display)}
+#training-app .is-done .training-step-mark{background:var(--memo-you);color:#0b1012}
+#training-app .training-steps p{font:500 12px/1.5 var(--memo-mono);color:var(--muted);margin-top:6px}
+.preparation-marks{display:flex;flex-wrap:wrap;justify-content:end;gap:4px;align-items:center;max-width:100px}
+.preparation-initial{font-size:10px;padding:3px 5px;border-radius:3px;background:#20272b;color:var(--muted)}
+.preparation-initial.is-done{color:var(--memo-pilots);background:color-mix(in srgb,var(--memo-pilots) 20%,transparent)}
+.preparation-session{display:grid;gap:12px;border:1px solid var(--border);border-radius:6px;background:#0b1012;padding:16px;line-height:1.6}
+#training-app .memo-big{font:700 42px/1 var(--memo-display)}
+#training-app .memo-big span{font:700 20px/1.2 var(--memo-display)}
+#training-app .training-chips button{border-radius:4px;font-size:12px}
+#training-app .training-chips button[aria-pressed=true]{border-color:var(--memo-you);background:color-mix(in srgb,var(--memo-you) 15%,transparent)}
+.preparation-details summary{cursor:pointer;color:var(--muted);font-size:13px}
+.preparation-details[open]>summary{margin-bottom:12px}
+.preparation-details>.training-card{margin-top:10px}
+.preparation-details .training-blocks{margin-top:12px}
+.preparation-pace{display:grid;gap:10px;margin-top:8px}
+.preparation-pace h3{margin:0;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em}
+#training-app .preparation-peer{background:var(--memo-pilots)}
+.preparation-progress{display:inline-flex;gap:3px;margin-right:8px;vertical-align:middle}
+.preparation-progress i{width:14px;height:8px;border-radius:2px;background:#20272b}
+.preparation-progress i.is-done{background:var(--memo-pilots)}
+.is-you-row .preparation-progress i.is-done{background:var(--memo-you)}
+#training-app .memo-table thead th{font-size:10px;text-align:right}
+#training-app .memo-table thead th:first-child{text-align:left}
+#training-app .memo-table td{white-space:nowrap}
+#training-app .memo-table td .memo-chip{font:700 10px/1.3 var(--memo-mono);margin:0}
+#training-app .memo-table caption{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+#training-app .training-sessions li{grid-template-columns:minmax(0,1fr) auto 28px;border:0;border-bottom:1px solid var(--border);border-radius:0;padding:10px 0}
+#training-app .training-sessions li:last-child{border-bottom:0}
+#training-app .training-sessions li>div{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:baseline}
+#training-app .training-sessions li>span{display:block;color:var(--text);font-family:var(--memo-mono)}
+#training-app .training-delete{width:28px;height:28px;border:0}
+@media(max-width:760px){.preparation-grid{grid-template-columns:1fr}#training-app .training-card{padding:14px}.preparation-head{gap:14px}#training-app .training-steps li>:last-child{grid-column:auto;justify-self:end}.preparation-crew .memo-table{min-width:780px}}
 .training-page h1,.training-page h2{margin:0}
 .training-page h2{font-size:18px}
 .training-intro{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:16px;align-items:center;padding:22px;border:1px solid var(--border);border-radius:18px;background:linear-gradient(120deg,rgba(126,227,143,.12),rgba(37,137,216,.08) 60%,transparent),var(--panel)}

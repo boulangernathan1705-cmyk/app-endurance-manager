@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {DatabaseSync} from 'node:sqlite';
 import {readFileSync, readdirSync} from 'node:fs';
 import worker from '../server/worker.mjs';
-import {refreshLaptimes} from '../server/training.mjs';
+import {refreshLaptimes, crewPreparation} from '../server/training.mjs';
 import {BOP} from '../shared/lmu-bop.mjs';
 import {bopFor} from '../shared/bop.mjs';
 import {linkTestServer, setMember, ORGA_ROLE} from './fixtures/discord-server.mjs';
@@ -72,7 +72,7 @@ test('a results file gives the player laps, fuel and sectors, and a program from
   assert.equal(circuitOf(session.venue),'spa');assert.equal(circuitOf('Circuit de la Sarthe'),'le-mans');
   const a=analyse([session]);
   assert.deepEqual([a.totalLaps,a.longestRun,a.pitDone,a.fuelPerLap,a.tankLaps],[24,10,true,3.6,27]);
-  const steps=programSteps(a,['conditions']);
+  const steps=programSteps(a,['simulation']);
   assert.deepEqual(steps.map(step=>step.done),[true,true,false,true,true]);
   assert.equal(steps[4].proof,'Coché par toi');
   // The first step left (a full tank) shapes today's session; the eve of the race is always short.
@@ -107,7 +107,7 @@ test('the pilot drops his files, sees his program, and compares with the pilots 
   assert.ok(Math.abs(data.comparison.gap-1)<0.001);
   assert.ok(!JSON.stringify(data.comparison).includes('Bob'));
   // A step the file cannot tell is ticked by the pilot.
-  assert.equal((await req('/api/training/marks','PUT',{track:data.track.key,step:'conditions',done:true},'pilot')).status,200);
+  assert.equal((await req('/api/training/marks','PUT',{track:data.track.key,step:'simulation',done:true},'pilot')).status,200);
   assert.equal((await req('/api/training/marks','PUT',{track:data.track.key,step:'nope',done:true},'pilot')).status,400);
   assert.equal((await req('/api/training','GET',null,'pilot')).data.steps[4].done,true);
   // Removing a session removes it for Alice only.
@@ -115,6 +115,35 @@ test('the pilot drops his files, sees his program, and compares with the pilots 
   assert.equal((await req('/api/training','GET',null,'pilot')).data.sessions.length,1);
   assert.equal((await req(`/api/training/sessions/${data.sessions[0].id}`,'DELETE',null,'pilot')).status,200);
   assert.equal((await req('/api/training','GET',null,'pilot')).data.sessions.length,0);
+});
+
+test('named preparation is only returned to members of the same crew and community', async () => {
+  const {req,send,login,env}=harness();
+  await login(ADMIN,'admin','Orga');await login(PILOT,'pilot','Alice');await login(MATE,'mate','Bob');
+  await req('/api/community/modules','PATCH',{training:true},'admin');
+  const created=await req('/api/events','POST',{name:'Spa preparation',circuit:'spa',categories:['Hypercar'],departures:[{date:'2090-10-15',time:'15:00'}]},'admin');
+  assert.equal(created.status,201);
+  const event=(await req('/api/events','GET',null,'pilot')).data.events[0], dep=event.departures[0];
+  const base=`/api/events/${event.id}/departures/${dep.id}`;
+  assert.equal((await req(base+'/registrations','POST',{name:'Alice',category:'Hypercar',status:'whole'},'pilot')).status,201);
+  const crew=await req(base+'/crews','POST',{name:'Spa crew',category:'Hypercar',car:'Alpine A424'},'pilot');
+  assert.equal(crew.status,201);
+  const mate=await req(base+'/registrations','POST',{name:'Bob',category:'Hypercar',status:'whole'},'mate');
+  assert.equal(mate.status,201);
+  await upload(send,'pilot',XML);await upload(send,'mate',variant(XML,1,-1));
+  // Being registered on the same departure does not reveal another crew's pilot data.
+  let data=(await req('/api/training','GET',null,'mate')).data;
+  assert.equal(data.crew,null);
+  let listing=(await req('/api/events','GET',null,'pilot')).data.events[0].departures[0].crews[0];
+  assert.equal((await req(`/api/crews/${crew.data.id}/members`,'POST',{registrationId:mate.data.id,version:listing.version,selfJoin:true},'mate')).status,200);
+  data=(await req('/api/training','GET',null,'pilot')).data;
+  assert.deepEqual(data.crew.pilots.map(p=>p.name),['Alice','Bob']);
+  assert.equal(data.crew.pilots[0].you,true);assert.ok(data.crew.pilots[1].pace>0);
+  assert.equal((await crewPreparation(env,PILOT,'another-community',data.race,data.track,data.carClass)).crew,null);
+  assert.equal((await crewPreparation(env,PILOT,DEV,data.race,{...data.track,circuit:'long-beach'},data.carClass)).crew,null);
+  listing=(await req('/api/events','GET',null,'mate')).data.events[0].departures[0].crews[0];
+  assert.equal((await req(`/api/crews/${crew.data.id}/members/${mate.data.id}`,'DELETE',{version:listing.version},'mate')).status,200);
+  assert.equal((await req('/api/training','GET',null,'mate')).data.crew,null);
 });
 
 test('the sync program carries the pilot key, sends sessions with it only, and stops once the link is removed', async () => {
