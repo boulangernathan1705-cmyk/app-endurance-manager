@@ -57,7 +57,7 @@ function calculator(data) {
     <fieldset><legend>En plus du plein</legend>${check('ductFront', 'Écopes avant', service.ductFront)}${check('ductRear', 'Écopes arrière', service.ductRear)}${check('brakes', 'Freins', service.brakes)}</fieldset>
   </form>
   <dl>${row('Remis', `${energy} %${fuel ? ` · ${num(fuel, 1)} L` : ''}`)}${row('Temps arrêté', `${num(stopped)} s`, 'is-game')}
-    ${data.lane ? row('<strong>Temps perdu</strong>', `<strong>${num(data.lane.through + stopped)} s</strong>`, '', 'traversée + arrêt') : ''}</dl>`;
+    ${data.lane ? row('<strong>Temps total au stand</strong>', `<strong>${num(data.lane.through + stopped)} s</strong>`, '', 'traversée + arrêt') : ''}</dl>`;
 }
 
 // Reference lap times by level, as a table (the names of the spreadsheet, never its percentages): the hotlap the
