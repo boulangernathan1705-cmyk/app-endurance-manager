@@ -24,9 +24,7 @@ export function raceStarts(event,archived){
   const days=new Map();
   for(const departure of shown){const key=dayKeyFormatter.format(new Date(Number(departure.startsAt)));if(!days.has(key))days.set(key,[]);days.get(key).push(departure);}
   const entries=[...days.values()],visible=entries.slice(0,3),hidden=entries.length-visible.length;
-  // An event with an end time (open session): « 21h – 23h ».
-  const end=event.details?.endTime?` – ${esc(timeLabel(event.details.endTime))}`:'';
-  const time=departure=>`<span class="race-start">${esc(timeLabel(departure.time))}${end}</span>`;
+  const time=departure=>`<span class="race-start">${esc(timeLabel(departure.time))}</span>`;
   return `<span class="race-starts">${visible.map(list=>`<span class="race-day"><em>${esc(dayLabel(list[0].startsAt))}</em>${list.map(time).join('')}</span>`).join('')}${hidden>0?`<span class="race-day race-more">+ ${hidden} jour${hidden>1?'s':''}</span>`:''}</span>`;
 }
 // Where the current pilot stands on a race: their next start with a registration, and their crew if any.
@@ -75,11 +73,10 @@ function syncNavSection(page){for(const item of nav.querySelectorAll('.nav-secti
 // Events of the community first (every simulator), then Endurance with its simulator (LMU or iRacing).
 export function renderNav(){const games=`<div class="nav-game-switcher" role="group" aria-label="Changer de simulateur">${gameLink('lmu','Le Mans Ultimate','LMU')}${gameLink('iracing','iRacing','iRacing')}</div>`;nav.innerHTML=`<div class="nav-sections" role="group" aria-label="Sections">${state.soloRaces?button('home',esc(state.soloLabel),'data-list="solo"','nav-section-button nav-events-button'):''}${button('home','ENDURANCE','data-list="endurance"','nav-section-button')}${games}${button('my-entries','Mes inscriptions','','nav-section-button')}${activeGame==='lmu'&&state.training?`${state.trainingRace?'<a class="nav-section-button" href="/entrainement.html">Entraînement</a>':''}<a class="nav-section-button" href="/stands.html">Mémo</a>`:''}</div>`;syncNavSection(state.page);notifyNav();}
 document.addEventListener('endurance:render',event=>syncNavSection(event.detail?.page));
-// Solo event card: one bottom line with the start (« 21h – 23h »), the places and where the pilot stands.
+// Solo event card: one bottom line with the start (« 21h »), the places and where the pilot stands.
 function soloCardFoot(event,archived,situation){
   const dated=datedDepartures(event),shown=archived?dated.at(-1):dated.find(d=>Number(d.startsAt)>Date.now())||dated.at(-1);
-  const end=event.details?.endTime?` – ${esc(timeLabel(event.details.endTime))}`:'';
-  const start=shown?`<span class="solo-card-start"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>${esc(timeLabel(shown.time))}${end}</span>`:'';
+  const start=shown?`<span class="solo-card-start"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>${esc(timeLabel(shown.time))}</span>`:'';
   return `<span class="solo-card-foot">${start}${soloFill(event,shown)}${situation?`<span class="race-situation">${situation}</span>`:''}</span>`;
 }
 // EVENT TDZ card: no circuit map; the panel is kept for the logo of the event type (OPEN, SAFE, Bouboule…),

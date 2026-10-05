@@ -31,7 +31,7 @@ function startCard(event,departure,body,{minutes,now,open,quick=''}){
   const compact=!open&&(done||!pilots);
   const endDay=dayKey(end)!==dayKey(start)?` le ${weekdayLabel(end)}`:'';
   const tags=compact?'':`${mine?'<span class="planning-tag is-mine">Ton départ</span>':''}${live?'<span class="planning-tag is-live">En cours</span>':''}`;
-  const head=`<span class="planning-start-head"><strong>Départ ${esc(timeLabel(departure.time))}</strong>${compact?(done?'<span class="planning-start-state">Terminé</span>':''):`<span class="planning-start-end">fin ${esc(timeAt(end))}${esc(endDay)}</span>`}${tags}</span>`;
+  const head=`<span class="planning-start-head"><strong>Départ ${esc(timeLabel(departure.time))}</strong>${compact?(done?'<span class="planning-start-state">Terminé</span>':''):(isSolo(event)?'':`<span class="planning-start-end">fin ${esc(timeAt(end))}${esc(endDay)}</span>`)}${tags}</span>`;
   // Pilots without a crew, by category (« 2 GT3 » « 1 Hypercar »): where a pilot can find a crew. The crews
   // follow, by name.
   const free=event.categories.map(category=>{const regs=present.filter(reg=>!assigned.has(reg.id)&&reg.category===category);return [category,regs.length,regs.map(reg=>communityPrefix(reg)+reg.name)];}).filter(([,count])=>count);

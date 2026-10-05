@@ -41,7 +41,7 @@ function renderSoloDeparture(event,departure,open){
   const other=can('manage_registrations')?button('new-registration','Inscrire un autre pilote',`data-departure="${departure.id}" data-mode="pilot" data-tip="Inscris un coéquipier ou un autre pilote de ta communauté à sa place."`,'link-button ux-summary-registration-other'):'';
   const actions=locked?'':`<span class="ux-summary-registration-actions">${main}${other}</span>`;
   const mine=own?`<span class="departure-mine-badge${waiting?' is-waiting':''}">${waiting?`Liste d’attente · ${waiting}${waiting===1?'er':'e'}`:'✓ Inscrit'}</span>`:'';
-  return `<details class="departure-fold solo-departure${mine?' is-mine':''}" id="departure-${departure.id}" ${open?'open':''}><summary><span class="fold-index">01</span><span class="fold-date">${dateBlock(departure.startsAt,{compact:true})}<span class="fold-date-text"><strong class="ux-departure-title">Départ ${esc(timeLabel(departure.time))}${event.details?.endTime?` – ${esc(timeLabel(event.details.endTime))}`:''}</strong>${locked?'<span class="ux-departure-date">Départ passé</span>':''}${mine}</span></span><span class="fold-meta">${soloFill(event,departure)}</span>${actions}</summary><div class="departure-fold-body">${locked?'<p class="finished-history">Les inscriptions sont fermées.</p>':`<section class="fold-section fold-registration" ${editorOpen?'':'hidden'}>${renderRegistrationWorkspace(event,departure)}</section>`}<section class="fold-section departure-participation-section">${renderSoloEntries(event,departure)}</section></div></details>`;
+  return `<details class="departure-fold solo-departure${mine?' is-mine':''}" id="departure-${departure.id}" ${open?'open':''}><summary><span class="fold-index">01</span><span class="fold-date">${dateBlock(departure.startsAt,{compact:true})}<span class="fold-date-text"><strong class="ux-departure-title">Départ ${esc(timeLabel(departure.time))}</strong>${locked?'<span class="ux-departure-date">Départ passé</span>':''}${mine}</span></span><span class="fold-meta">${soloFill(event,departure)}</span>${actions}</summary><div class="departure-fold-body">${locked?'<p class="finished-history">Les inscriptions sont fermées.</p>':`<section class="fold-section fold-registration" ${editorOpen?'':'hidden'}>${renderRegistrationWorkspace(event,departure)}</section>`}<section class="fold-section departure-participation-section">${renderSoloEntries(event,departure)}</section></div></details>`;
 }
 
 // What an opened solo start shows: the registration panel, then the participants.
@@ -169,12 +169,11 @@ function absencesSection(event,open){
   return `<section class="event-absences" aria-label="Pilotes absents"><div class="event-absences-head"><h2>Absents <span>${list.length}</span></h2></div><ul>${list.map(item=>`<li class="${item.mine?'is-mine':''}">${esc(item.name)}</li>`).join('')}</ul></section>`;
 }
 // EVENT TDZ: the event type where an endurance shows its circuit (its logo will take this place).
-// EVENT TDZ: the time of the event, large, under its name (« 21h – 23h »).
+// EVENT TDZ: the time of the event, large, under its name (« 21h »).
 function soloHeaderTime(event,next){
   const departure=next||(event.departures||[]).at(-1);
   if(!departure)return '';
-  const end=event.details?.endTime?` – ${esc(timeLabel(event.details.endTime))}`:'';
-  return `<span class="race-header-time"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>${esc(timeLabel(departure.time))}${end}</span>`;
+  return `<span class="race-header-time"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>${esc(timeLabel(departure.time))}</span>`;
 }
 function eventTypePanel(event){
   const type=event.details?.type;
