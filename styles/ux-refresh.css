@@ -1161,10 +1161,21 @@ html[data-game] #app .race-header-actions > .danger-link { width: auto !importan
 .solo-event-form .solo-form-step { display: grid; gap: 18px; }
 .solo-event-form .solo-form-step[hidden] { display: none; }
 .solo-event-form .solo-rounds { display: grid; gap: 12px; }
-.solo-event-form .solo-round { display: grid; grid-template-columns: minmax(0, 1fr) 140px 40px; gap: 12px; align-items: end; }
-.solo-event-form .solo-round-title { grid-column: 1 / -1; color: var(--muted, #9aa5aa); font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; }
-.solo-event-form .solo-round-title:empty { display: none; }
-.solo-event-form .solo-round [data-remove-round][hidden] { visibility: hidden; display: block; }
+.solo-event-info { display: grid; gap: 4px; margin: 0; font-size: 13.5px; }
+.solo-event-info div { display: flex; gap: 10px; }
+.solo-event-info dt { min-width: 96px; color: var(--muted, #9aa5aa); font-weight: 700; }
+.solo-event-info dd { margin: 0; color: #e7ecee; }
+.solo-event-form .solo-round { display: grid; gap: 12px; padding: 14px; border: 1px solid var(--border, #2b3236); border-radius: 10px; background: rgba(0, 0, 0, .18); }
+.solo-event-form .solo-round-head { display: flex; align-items: center; justify-content: space-between; }
+.solo-event-form .solo-round-title { color: #7fe3ea; font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; }
+.solo-event-form .solo-round-head [data-remove-round][hidden] { display: none; }
+.solo-event-form .solo-round-format { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.solo-event-form .solo-round-categories { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+.solo-category-chip { position: relative; display: inline-flex; align-items: center; justify-content: center; min-width: 56px; min-height: 44px; padding: 4px 8px; border: 1px solid var(--border, #2b3236); border-radius: 8px; background: var(--panel2, #12171a); cursor: pointer; opacity: .55; }
+.solo-category-chip input { position: absolute; opacity: 0; pointer-events: none; }
+.solo-category-chip .category-logo { width: 40px; height: 32px; object-fit: contain; }
+.solo-category-chip:has(input:checked) { opacity: 1; border-color: var(--category-color, #52d3d8); box-shadow: inset 0 -3px var(--category-color, #52d3d8); }
+.solo-category-chip:has(input:focus-visible) { outline: 2px solid #52d3d8; outline-offset: 2px; }
 .solo-event-form [data-add-round] { justify-self: start; }
 .solo-event-form [data-add-round][hidden] { display: none; }
 .solo-event-form fieldset { margin: 0; padding: 0; border: 0; min-width: 0; }

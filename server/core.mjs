@@ -183,6 +183,7 @@ function parisTimestamp(date, time) {
 }
 const EVENT_FORMATS = ['endurance','solo'];
 const SOLO_ACCESS = ['open','safe'];
+const WEATHERS = ['random','sun','cloud','rain'];
 // An event of the calendar (solo format): a simulator, one to four rounds (circuit and duration in minutes),
 // one start, an optional number of places and an OPEN / SAFE access. LMU and iRacing circuits come from
 // the catalog and categories may be offered; on the other simulators the circuit is typed, no category.
@@ -203,14 +204,37 @@ function validateSoloRace(input, existing) {
     // Categories: optional; none means a simple entry (no category or car to choose).
     const roundCategories = Array.isArray(round.categories) && round.categories.length ? round.categories : Array.isArray(input.categories) ? input.categories : [];
     if (roundCategories.length && (!catalog || roundCategories.some(c => !catalog.categories[c]))) fail(400, 'Catégorie inconnue pour ce simulateur.');
-    return {circuit, durationMinutes, categories:[...new Set(roundCategories)]};
+    // As on the community's calendar: practice / qualifying minutes (race = durationMinutes), weather,
+    // fuel and tyre wear multipliers. All optional.
+    const extras = {};
+    for (const key of ['practice','qualifying']) if (round[key] != null && round[key] !== '') {
+      const value = Number(round[key]);
+      if (!Number.isInteger(value) || value < 0 || value > 600) fail(400, `Durée des essais ou qualifs${where} invalide.`);
+      extras[key] = value;
+    }
+    for (const key of ['fuel','tyres']) if (round[key] != null && round[key] !== '') {
+      const value = Number(round[key]);
+      if (!Number.isInteger(value) || value < 0 || value > 10) fail(400, `Multiplicateur essence ou pneus${where} invalide.`);
+      extras[key] = value;
+    }
+    if (round.weather) { if (!WEATHERS.includes(round.weather)) fail(400, `Météo${where} invalide.`); extras.weather = round.weather; }
+    return {circuit, durationMinutes, categories:[...new Set(roundCategories)], ...extras};
   });
   const capacity = input.capacity == null || input.capacity === '' ? null : Number(input.capacity);
   if (capacity !== null && (!Number.isInteger(capacity) || capacity < 2 || capacity > 120)) fail(400, 'Le nombre de places doit être compris entre 2 et 120.');
-  const totalMinutes = cleanRounds.reduce((sum, round) => sum + round.durationMinutes, 0);
+  // Event details: an end time (open sessions, « 17h-00h »), the server password and a short note.
+  const raw = input.details && typeof input.details === 'object' ? input.details : {};
+  const details = {};
+  if (raw.endTime) { if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(raw.endTime)) fail(400, 'Heure de fin invalide.'); details.endTime = raw.endTime; }
+  if (raw.password) details.password = text(raw.password, 30, 'Mot de passe');
+  if (raw.note) details.note = text(raw.note, 120, 'Info');
+  const roundsMinutes = cleanRounds.reduce((sum, round) => sum + (round.practice || 0) + (round.qualifying || 0) + round.durationMinutes, 0);
+  const startTime = input.departures?.[0]?.time;
+  const windowMinutes = details.endTime && /^\d{2}:\d{2}$/.test(startTime || '') ? (() => { const [h1, m1] = startTime.split(':').map(Number), [h2, m2] = details.endTime.split(':').map(Number); return ((h2 * 60 + m2) - (h1 * 60 + m1) + 1440) % 1440 || 1440; })() : 0;
+  const totalMinutes = Math.max(roundsMinutes, windowMinutes);
   if (totalMinutes > 24 * 60) fail(400, 'Un événement ne peut pas dépasser 24 heures.');
   const categories = [...new Set(cleanRounds.flatMap(round => round.categories))];
-  return {sim, access, rounds:cleanRounds, capacity, categories, circuit:cleanRounds[0].circuit, durationMinutes:totalMinutes};
+  return {sim, access, rounds:cleanRounds, capacity, categories, details, circuit:cleanRounds[0].circuit, durationMinutes:totalMinutes};
 }
 function validateEvent(input, existing = null) {
   const name = text(input.name, 100, 'Nom de l’événement');
@@ -258,7 +282,7 @@ function validateEvent(input, existing = null) {
   // Driver change required (iRacing endurances; always on LMU): true / false, or null for the site rule.
   const driverChangeRequired = solo ? null : typeof input.driverChangeRequired === 'boolean' ? input.driverChangeRequired
     : input.driverChangeRequired === undefined && existing?.driver_change_required != null ? Boolean(existing.driver_change_required) : null;
-  return {name, format, sim: solo?.sim || null, access: solo?.access || 'open', capacity: solo?.capacity ?? null, rounds: solo?.rounds || [], durationHours, durationMinutes, eventType, circuit, schedulePending, driverChangeRequired, categories: [...new Set(categoriesInput)], departures};
+  return {name, format, sim: solo?.sim || null, details: solo?.details || {}, access: solo?.access || 'open', capacity: solo?.capacity ?? null, rounds: solo?.rounds || [], durationHours, durationMinutes, eventType, circuit, schedulePending, driverChangeRequired, categories: [...new Set(categoriesInput)], departures};
 }
 // Discord display names are at most 32 characters: registrations accept the same length.
 const PILOT_NAME_MAX = 32;

@@ -462,12 +462,12 @@ test('solo race: places, waiting list, one entry per driver, no crews',async()=>
 });
 test('events calendar: every simulator, typed circuit on AMS2 / ACE, no limit and one-click entry without category',async()=>{
  const {req,login}=harness();await login(ADMIN,'admin');await login(PILOT,'pilot');
- const input={name:'Bouboule',format:'solo',sim:'ams2',access:'open',capacity:null,rounds:[{circuit:'Interlagos',durationMinutes:30},{circuit:'Spa',durationMinutes:25}],categories:[],departures:[{date:'2090-10-15',time:'21:00'}]};
+ const input={name:'Bouboule',format:'solo',sim:'ams2',access:'open',capacity:null,rounds:[{circuit:'Interlagos',durationMinutes:30,practice:5,qualifying:10,weather:'sun',fuel:1,tyres:2},{circuit:'Spa',durationMinutes:25}],categories:[],details:{endTime:'00:00',password:'tdz',note:'Special event'},departures:[{date:'2090-10-15',time:'21:00'}]};
  const created=await req('/api/events','POST',input,'admin');assert.equal(created.status,201,JSON.stringify(created.data));
  // Shown on both simulator sites: the calendar is common to every simulator.
  for(const game of ['lmu','iracing']){
   const event=(await req(`/api/events?game=${game}`,'GET',null,'admin')).data.events.find(e=>e.id===created.data.id);
-  assert.ok(event,game);assert.equal(event.sim,'ams2');assert.equal(event.capacity,null);assert.equal(event.circuit,'Interlagos');assert.deepEqual(event.categories,[]);
+  assert.ok(event,game);assert.equal(event.sim,'ams2');assert.deepEqual(event.details,{endTime:'00:00',password:'tdz',note:'Special event'});assert.deepEqual(event.rounds[0],{circuit:'Interlagos',durationMinutes:30,categories:[],practice:5,qualifying:10,fuel:1,tyres:2,weather:'sun'});assert.equal(event.durationMinutes,180,'the open session lasts until midnight');assert.equal(event.capacity,null);assert.equal(event.circuit,'Interlagos');assert.deepEqual(event.categories,[]);
  }
  const event=(await req('/api/events','GET',null,'admin')).data.events.find(e=>e.id===created.data.id);
  const path=`/api/events/${event.id}/departures/${event.departures[0].id}/registrations`;
@@ -475,7 +475,7 @@ test('events calendar: every simulator, typed circuit on AMS2 / ACE, no limit an
  const reg=(await req('/api/events','GET',null,'admin')).data.events.find(e=>e.id===created.data.id).departures[0].availability[0];
  assert.equal(reg.category,'');assert.ok(!reg.waitlistPosition);
  // LMU keeps its catalog; categories must belong to the simulator; an older event follows its circuit.
- for(const bad of [{...input,sim:'lmu'},{...input,sim:'xbox'},{...input,sim:'ace',categories:['GT3']},{...input,sim:'iracing',rounds:[{circuit:'spa',durationMinutes:20}]},{...input,rounds:Array(5).fill({circuit:'Spa',durationMinutes:20})}])
+ for(const bad of [{...input,sim:'lmu'},{...input,sim:'xbox'},{...input,sim:'ace',categories:['GT3']},{...input,sim:'iracing',rounds:[{circuit:'spa',durationMinutes:20}]},{...input,rounds:Array(5).fill({circuit:'Spa',durationMinutes:20})},{...input,details:{endTime:'25:00'}},{...input,rounds:[{circuit:'Spa',durationMinutes:20,weather:'snow'}]},{...input,rounds:[{circuit:'Spa',durationMinutes:20,fuel:11}]}])
   assert.equal((await req('/api/events','POST',bad,'admin')).status,400,JSON.stringify(bad));
  const lmu=await req('/api/events','POST',{...soloInput,sim:undefined},'admin');assert.equal(lmu.status,201);
  assert.equal((await req('/api/events','GET',null,'admin')).data.events.find(e=>e.id===lmu.data.id).sim,'lmu');

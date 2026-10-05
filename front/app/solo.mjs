@@ -89,10 +89,23 @@ export function renderSoloEntries(event, departure) {
   return `<section class="solo-participants"><h3 class="solo-subtitle">Participants <span class="count-pill">${grid.length}${event.capacity ? ` / ${event.capacity}` : ''}</span></h3>${gridList}${waitingList}</section>`;
 }
 
-// Race header: the categories of each round (no counters, the places gauge gives the entries).
-export function soloCategoriesSummary(event) {
-  if (!event.categories.length) return '';
-  const rounds = event.rounds || [];
-  if (rounds.length < 2) return `<div class="event-header-stats event-category-badges">${event.categories.map(category => badge(category)).join('')}</div>`;
-  return `<div class="event-header-stats solo-round-badges">${rounds.map((round, index) => `<span class="solo-round-badge-group"><em>Manche ${index + 1}</em>${(round.categories?.length ? round.categories : event.categories).map(category => badge(category)).join('')}</span>`).join('')}</div>`;
+export const WEATHERS = [['','—'],['random','Aléatoire'],['sun','Soleil'],['cloud','Nuageux'],['rain','Pluie']];
+// « P5/Q10/C40 »: the session lengths of a round.
+export function roundFormat(round) {
+  return [round.practice ? `P${round.practice}` : '', round.qualifying ? `Q${round.qualifying}` : '', `C${round.durationMinutes}`].filter(Boolean).join('/');
+}
+export function roundExtras(round) {
+  const weather = WEATHERS.find(([value]) => value && value === round.weather)?.[1];
+  return [weather, round.fuel != null ? `essence ×${round.fuel}` : '', round.tyres != null ? `pneus ×${round.tyres}` : ''].filter(Boolean).join(' · ');
+}
+// What the community's calendar shows: the end of an open session, the server password, the note, and per
+// round its circuit, categories, session lengths, weather and multipliers.
+export function soloEventInfo(event, departure = event.departures?.[0]) {
+  const details = event.details || {}, rounds = event.rounds || [];
+  const rows = [];
+  if (details.endTime && departure) rows.push(['Horaire', `${departure.time}-${details.endTime}`]);
+  if (details.password) rows.push(['Mot de passe', details.password]);
+  rounds.forEach((round, index) => rows.push([rounds.length > 1 ? `Manche ${index + 1}` : 'Manche', [eventCircuitName(event, round.circuit), (round.categories || []).join(' '), roundFormat(round), roundExtras(round)].filter(Boolean).join(' · ')]));
+  if (details.note) rows.push(['Info', details.note]);
+  return `<dl class="solo-event-info">${rows.map(([label, value]) => `<div><dt>${esc(label)}</dt><dd>${esc(value)}</dd></div>`).join('')}</dl>`;
 }
