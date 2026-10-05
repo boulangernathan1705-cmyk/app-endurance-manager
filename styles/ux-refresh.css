@@ -2003,3 +2003,13 @@ html[data-game] #app .race-header .event-type-panel span { font-size: 28px; font
 /* « M'inscrire » is always unfolded: icon and label, one click enters the pilot. */
 .planning-quick-button.is-labelled { width: auto !important; grid-auto-flow: column; gap: 8px; padding: 0 12px 0 9px !important; border-color: var(--community-accent, #52d3d8); color: var(--community-accent, #52d3d8); }
 .planning-quick-button.is-labelled .planning-quick-label { display: inline; font-size: 13px; font-weight: 800; white-space: nowrap; }
+.planning-quick-button.is-absence { border-color: #f3b33d; color: #f3b33d; }
+.planning-quick-button.is-absence:hover { border-color: #f3b33d; color: #f3b33d; background: rgba(243, 179, 61, .1); }
+.planning-quick-button.is-absence.is-active { background: rgba(243, 179, 61, .16); }
+/* A narrow start (a day among several): the buttons go on their own line under « Départ 15h ». */
+.planning-day { container-type: inline-size; }
+@container (max-width: 520px) {
+  .planning-start:not([open]) .planning-quick { position: static; grid-row: 2; flex-direction: row; flex-wrap: wrap; align-items: center; }
+  .planning-start.has-quick:not([open]) > summary { padding-right: 44px !important; }
+  .planning-start.has-quick:not([open]) .planning-row { margin-right: 0 !important; }
+}
