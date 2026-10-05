@@ -123,7 +123,7 @@
 .memo-key span{display:inline-flex;align-items:center;gap:6px}
 .memo-key i{display:inline-block;width:12px;height:12px;background:currentColor}
 .memo-key .dot{border-radius:50%}.memo-key .bar{height:8px;border-radius:4px}.memo-key .tri{clip-path:polygon(0 0,100% 0,50% 100%)}
-.memo-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;align-items:start}
+.memo-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;align-items:stretch}
 .memo-wide{grid-column:1/-1}
 .memo-grid dl{display:grid;margin:0}
 .memo-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:baseline;padding:7px 0;border-bottom:1px solid var(--border)}
