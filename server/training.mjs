@@ -153,7 +153,7 @@ async function laptimesText(fetcher, url, manual) {
 }
 
 // Once a day (cron): the spreadsheet of reference lap times, read whole and kept only when it still looks right.
-// Until it has been read once, it is tried again every quarter of an hour.
+// Until it has been read once, it is tried again every hour.
 export async function refreshLaptimes(env, fetcher = fetch) {
   const kept = await env.DB.prepare("SELECT fetched_at FROM training_reference WHERE id='laptimes'").first();
   if (kept && kept.fetched_at > now() - 86400) return false;
