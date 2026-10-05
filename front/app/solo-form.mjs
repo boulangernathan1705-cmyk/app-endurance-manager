@@ -3,7 +3,7 @@
 // circuit, categories, practice / qualifying / race minutes, weather, fuel and tyre multipliers.
 // LMU takes its circuits and categories from the catalog; on AMS2, iRacing and ACE they are typed, with the car.
 import {app,state,esc,button,api,notifyRender} from './core.mjs';
-import {SIMS,simCatalog,eventCatalog,simForEvent} from '../../shared/catalog.mjs';
+import {SIMS,simCatalog,eventCatalog,simForEvent,isRandomCircuit} from '../../shared/catalog.mjs';
 import {departureFields} from './event-form.mjs';
 import {refreshAfterSave} from './refresh.mjs';
 import {WEATHERS,roundFormat,roundExtras} from './solo.mjs';
@@ -16,6 +16,8 @@ function typeField(chosen){
   if(!types.length)return '';
   return `<fieldset class="sim-options"><legend class="form-label">Type d’événement</legend><div class="sim-option-row">${types.map(type=>`<label class="sim-option event-type-option"><input type="radio" name="eventType" value="${esc(type)}" ${type===chosen?'checked':''} required><span>${esc(type)}</span></label>`).join('')}</div></fieldset>`;
 }
+// A type named OPEN or SAFE already says the access: the access choice is then hidden.
+const accessType=type=>['open','safe'].includes(String(type||'').toLowerCase());
 const categoryLogo=config=>config?.image?`<img class="category-logo" src="/images/${esc(config.image)}" alt="">`:'';
 const numberField=(name,label,value,max,extra='')=>`<label class="form-label">${label}<input name="${name}" type="number" min="0" max="${max}" step="1" value="${esc(value??'')}" ${extra}></label>`;
 const hours=Array.from({length:24},(_,hour)=>String(hour).padStart(2,'0'));
@@ -33,7 +35,8 @@ function categoryField(sim,round={}){
   const catalog=eventCatalog(sim),chosen=round.categories||[];
   // No catalog (AMS2, iRacing, ACE): the category and the car are typed.
   if(!catalog)return `<div class="solo-form-row"><label class="form-label">Catégorie <small>(facultatif)</small><input name="roundCategoryText" maxlength="40" value="${esc(round.category||'')}"></label><label class="form-label">Voiture <small>(facultatif)</small><input name="roundCar" maxlength="60" value="${esc(round.car||'')}"></label></div>`;
-  return `<span class="form-label">Catégories <small>(facultatif)</small></span><div class="solo-round-categories" role="group" aria-label="Catégories">${Object.entries(catalog.categories).map(([name,config])=>`<label class="solo-category-chip ${esc(config.css||'')}" title="${esc(name)}"><input type="checkbox" name="roundCategory" value="${esc(name)}" ${chosen.includes(name)?'checked':''}>${categoryLogo(config)||`<span>${esc(name)}</span>`}</label>`).join('')}</div>`;
+  if(isRandomCircuit(round.circuit))return '<p class="solo-random-category"><span aria-hidden="true">❓</span> Circuit aléatoire : la catégorie sera aléatoire aussi.</p>';
+  return `<span class="form-label">Catégories <small>(facultatif)</small></span><div class="solo-round-categories" role="group" aria-label="Catégories">${Object.entries(catalog.categories).map(([name,config])=>`<label class="solo-category-chip ${esc(config.css||'')}" title="${esc(name)}"><input type="checkbox" name="roundCategory" value="${esc(name)}" ${chosen.includes(name)?'checked':''}>${categoryLogo(config)}<span>${esc(name)}</span></label>`).join('')}</div>`;
 }
 function roundField(sim,round={}){
   return `<div class="solo-round"><div class="solo-round-head"><span class="solo-round-title"></span><button type="button" class="link-button" data-remove-round>Retirer</button></div>
@@ -71,7 +74,7 @@ export function renderSoloEventForm(event=null){
     <label class="form-label">Mot de passe du serveur <small>(facultatif)</small><input name="eventPassword" maxlength="30" value="${esc(details.password||'')}" autocomplete="off"></label></div>`)}
   ${step(3,`<div class="solo-rounds" data-rounds>${rounds.map(round=>roundField(sim,round)).join('')}</div><button type="button" class="secondary-button" data-add-round>+ Ajouter une manche</button>`)}
   ${step(4,`<div class="solo-form-row"><label class="form-label">Places <small>(vide = illimité)</small><input name="eventCapacity" type="number" min="2" max="120" step="1" value="${esc(event?.capacity||'')}"></label>
-    <fieldset class="solo-access"><legend class="form-label">Accès</legend><div class="sim-option-row">${['open','safe'].map(value=>`<label class="sim-option access-${value}"><input type="radio" name="eventAccess" value="${value}" ${access===value?'checked':''}><span>${value.toUpperCase()}</span></label>`).join('')}</div></fieldset></div>
+    <fieldset class="solo-access" ${accessType(details.type)?'hidden':''}><legend class="form-label">Accès</legend><div class="sim-option-row">${['open','safe'].map(value=>`<label class="sim-option access-${value}"><input type="radio" name="eventAccess" value="${value}" ${access===value?'checked':''}><span>${value.toUpperCase()}</span></label>`).join('')}</div></fieldset></div>
     <label class="form-label">Info <small>(facultatif)</small><input name="eventNote" maxlength="120" value="${esc(details.note||'')}" placeholder="Special event, BoP…"></label>`)}
   ${step(LAST,'<div class="registration-summary" data-solo-recap></div>')}
   <div class="creation-actions registration-step-nav"><button type="button" class="secondary-button registration-back" data-solo-step="back" ${first>1?'':'hidden'}>Retour</button><button type="button" class="primary-button registration-next" data-solo-step="next" ${first<LAST?'':'hidden'}>Continuer</button><button type="submit" class="primary-button registration-next" data-solo-submit ${first===LAST?'':'hidden'}>${event?'ENREGISTRER':'CRÉER L’ÉVÉNEMENT'}</button></div>
@@ -99,11 +102,11 @@ function fillRecap(form){
   const circuitName=id=>catalog?(catalog.circuits.find(item=>item.id===id)?.name||'—'):id||'—';
   const date=data.departures[0].date,day=date?new Intl.DateTimeFormat('fr-FR',{weekday:'short',day:'numeric',month:'short',timeZone:'UTC'}).format(new Date(`${date}T00:00:00Z`)):'—';
   const line=(n,label,value)=>`<button type="button" class="registration-summary-row" data-solo-step="${n}"><span>${label}</span><strong>${esc(value)}</strong><em>Modifier</em></button>`;
-  const time=`${data.departures[0].time}${data.details.endTime?`-${data.details.endTime}`:''}`;
+  const time=`${data.departures[0].time}${data.details.endTime?` – ${data.details.endTime}`:''}`;
   form.querySelector('[data-solo-recap]').innerHTML=line(1,'Événement',[data.name||'—',sim.short,data.details.type].filter(Boolean).join(' · '))
     +line(2,'Horaire',`${day} · ${time}${data.details.password?` · mdp : ${data.details.password}`:''}`)
-    +data.rounds.map((round,index)=>line(3,data.rounds.length>1?`Manche ${index+1}`:'Manche',[circuitName(round.circuit),round.categories.join(' ')||round.category,round.car,roundFormat(round),roundExtras(round)].filter(Boolean).join(' · '))).join('')
-    +line(4,'Inscriptions',[data.access==='safe'?'SAFE':'OPEN',data.capacity?`${data.capacity} places`:'places illimitées',data.details.note].filter(Boolean).join(' · '));
+    +data.rounds.map((round,index)=>line(3,data.rounds.length>1?`Manche ${index+1}`:'Manche',[circuitName(round.circuit),isRandomCircuit(round.circuit)&&eventCatalog(data.sim)?'catégorie aléatoire':round.categories.join(' ')||round.category,round.car,roundFormat(round),roundExtras(round)].filter(Boolean).join(' · '))).join('')
+    +line(4,'Inscriptions',[accessType(data.details.type)?'':data.access==='safe'?'SAFE':'OPEN',data.capacity?`${data.capacity} places`:'places illimitées',data.details.note].filter(Boolean).join(' · '));
 }
 function goToStep(form,target){
   const current=Number(form.dataset.step)||1;
@@ -131,7 +134,13 @@ if(typeof document!=='undefined'){
     const field=event.target,form=field.closest?.('form[data-kind="solo-event"]');
     if(form&&field.name==='eventType'){
       // A type named OPEN or SAFE sets the access.
-      const access=form.querySelector(`[name="eventAccess"][value="${field.value.toLowerCase()}"]`);if(access)access.checked=true;return;
+      const access=form.querySelector(`[name="eventAccess"][value="${field.value.toLowerCase()}"]`);if(access)access.checked=true;const fieldset=form.querySelector('.solo-access');if(fieldset)fieldset.hidden=accessType(field.value);return;
+    }
+    if(form&&field.name==='roundCircuit'&&field.tagName==='SELECT'){
+      // Random circuit: the category is random too (and back to the chips otherwise).
+      const row=field.closest('.solo-round'),box=row.querySelector('[data-round-categories]'),random=isRandomCircuit(field.value);
+      if(random||box.querySelector('.solo-random-category'))box.innerHTML=categoryField(form.elements.eventSim.value,{circuit:field.value});
+      return;
     }
     if(!form||field.name!=='eventSim')return;
     // Another simulator: its circuits and categories.
@@ -146,9 +155,9 @@ if(typeof document!=='undefined'){
     const target=event.target.closest('[data-solo-step]');
     if(target){goToStep(form,target.dataset.soloStep);return;}
     if(event.target.closest('[data-add-round]')){
-      // A new round starts like the previous one (categories, lengths, multipliers), on another circuit.
+      // A new round keeps the lengths and multipliers of the previous one; circuit and categories are chosen again.
       const previous=formData(form).rounds.pop()||{};
-      form.querySelector('[data-rounds]').insertAdjacentHTML('beforeend',roundField(form.elements.eventSim.value,{...previous,circuit:''}));syncRounds(form);return;
+      form.querySelector('[data-rounds]').insertAdjacentHTML('beforeend',roundField(form.elements.eventSim.value,{...previous,circuit:'',categories:[],category:'',car:''}));syncRounds(form);return;
     }
     const remove=event.target.closest('[data-remove-round]');
     if(remove){remove.closest('.solo-round').remove();syncRounds(form);}

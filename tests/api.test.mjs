@@ -32,6 +32,7 @@ function harness(withParticipants=true){
  DB.db.exec(readFileSync(new URL('../migrations/0030_iracing_import.sql',import.meta.url),'utf8'));
  DB.db.exec(readFileSync(new URL('../migrations/0031_solo_driver.sql',import.meta.url),'utf8'));
  DB.db.exec(readFileSync(new URL('../migrations/0054_event_sim.sql',import.meta.url),'utf8'));
+ DB.db.exec(readFileSync(new URL('../migrations/0055_event_absences.sql',import.meta.url),'utf8'));
  DB.db.exec(readFileSync(new URL('../migrations/0015_crew_lock.sql',import.meta.url),'utf8'));
  DB.db.exec(readFileSync(new URL('../migrations/0016_client_errors.sql',import.meta.url),'utf8'));
  // The crews' owner column of migration 0016_crew_ownership (its backfill needs no data here).
@@ -432,13 +433,13 @@ test('the scheduled job purges expired rate-limit counters and sessions',async()
  assert.deepEqual(DB.db.prepare('SELECT key FROM rate_limits ORDER BY key').all().map(row=>row.key),['fresh']);
 });
 
-const soloInput={name:'Sprint du jeudi',format:'solo',access:'open',capacity:2,rounds:[{circuit:'spa',durationMinutes:20},{circuit:'random',durationMinutes:20}],categories:['Hypercar','GT3'],departures:[{date:'2090-10-15',time:'21:00'}]};
+const soloInput={name:'Sprint du jeudi',format:'solo',access:'open',capacity:2,rounds:[{circuit:'spa',durationMinutes:20},{circuit:'monza',durationMinutes:20}],categories:['Hypercar','GT3'],departures:[{date:'2090-10-15',time:'21:00'}]};
 test('solo race: places, waiting list, one entry per driver, no crews',async()=>{
  const {req,login}=harness();await login(ADMIN,'admin');await login(PILOT,'pilot');await login(OTHER,'other');
  const created=await req('/api/events','POST',soloInput,'admin');assert.equal(created.status,201,JSON.stringify(created.data));
  let event=(await req('/api/events','GET',null,'admin')).data.events.find(e=>e.id===created.data.id);
  assert.equal(event.format,'solo');assert.equal(event.capacity,2);assert.equal(event.durationHours,1);assert.equal(event.circuit,'spa');
- assert.deepEqual(event.rounds,[{circuit:'spa',durationMinutes:20,categories:['Hypercar','GT3']},{circuit:'random',durationMinutes:20,categories:['Hypercar','GT3']}]);
+ assert.deepEqual(event.rounds,[{circuit:'spa',durationMinutes:20,categories:['Hypercar','GT3']},{circuit:'monza',durationMinutes:20,categories:['Hypercar','GT3']}]);
  const path=`/api/events/${event.id}/departures/${event.departures[0].id}/registrations`;
  assert.equal((await req(path,'POST',{name:'Invité',choices:[{category:'GT3',carAny:true},{category:'GT3',carAny:true}]})).status,401,'guests cannot enter a solo race');
  assert.equal((await req(path,'POST',{name:'Admin',choices:[{category:'*'},{category:'*'}]},'admin')).status,201);
@@ -485,6 +486,20 @@ test('events calendar: every simulator, typed circuit on AMS2 / ACE, no limit an
  assert.deepEqual((await req('/api/session','GET',null,'pilot')).data.eventTypes,['SAFE','Bouboule']);
  assert.equal((await req('/api/community/modules','PATCH',{eventTypes:['x'.repeat(21)]},'admin')).status,400);
 });
+test('a pilot says he will miss an event, and entering it withdraws the absence',async()=>{
+ const {req,login}=harness();await login(ADMIN,'admin');await login(PILOT,'pilot');
+ const created=await req('/api/events','POST',{...soloInput,categories:[],rounds:[{circuit:soloInput.rounds?.[0]?.circuit||'spa',durationMinutes:30}]},'admin');assert.equal(created.status,201,JSON.stringify(created.data));
+ const find=async()=>(await req('/api/events','GET',null,'pilot')).data.events.find(e=>e.id===created.data.id);
+ assert.deepEqual((await find()).absences,[]);
+ assert.equal((await req(`/api/events/${created.data.id}/absence`,'PUT',{},'pilot')).status,200);
+ assert.deepEqual((await find()).absences.map(a=>[a.mine]),[[true]]);
+ assert.equal((await req('/api/events','GET',null,'admin')).data.events.find(e=>e.id===created.data.id).absences[0].mine,false);
+ const event=await find(),path=`/api/events/${event.id}/departures/${event.departures[0].id}/registrations`;
+ assert.equal((await req(path,'POST',{name:'Pilote',choices:[]},'pilot')).status,201);
+ assert.deepEqual((await find()).absences,[],'entering withdraws the absence');
+ assert.equal((await req(`/api/events/${created.data.id}/absence`,'PUT',{},'pilot')).status,409,'an entered pilot is not absent');
+ assert.equal((await req(`/api/events/${created.data.id}/absence`,'DELETE',null,'pilot')).status,200);
+});
 test('SAFE solo races are reserved to the Discord roles with "Courses SAFE"',async()=>{
  const {req,login}=harness();await login(ADMIN,'admin');await login(PILOT,'pilot');
  const created=await req('/api/events','POST',{...soloInput,access:'safe'},'admin');
@@ -514,7 +529,7 @@ test('the most demanding community: newcomers race solo OPEN only; the SAFE role
 });
 test('solo race with two rounds: categories per round, one choice per round',async()=>{
  const {req,login}=harness();await login(ADMIN,'admin');await login(PILOT,'pilot');
- const input={...soloInput,capacity:10,rounds:[{circuit:'spa',durationMinutes:20,categories:['GT3']},{circuit:'random',durationMinutes:20,categories:['Hypercar','LMP2 ELMS']}],categories:[]};
+ const input={...soloInput,capacity:10,rounds:[{circuit:'spa',durationMinutes:20,categories:['GT3']},{circuit:'monza',durationMinutes:20,categories:['Hypercar','LMP2 ELMS']}],categories:[]};
  const created=await req('/api/events','POST',input,'admin');assert.equal(created.status,201,JSON.stringify(created.data));
  let event=(await req('/api/events','GET',null,'admin')).data.events.find(e=>e.id===created.data.id);
  assert.deepEqual(event.rounds.map(r=>r.categories),[['GT3'],['Hypercar','LMP2 ELMS']]);
@@ -531,6 +546,17 @@ test('solo race with two rounds: categories per round, one choice per round',asy
  assert.equal(edited.status,200,JSON.stringify(edited.data));
  event=(await req('/api/events','GET',null,'admin')).data.events.find(e=>e.id===created.data.id);
  assert.equal(event.departures[0].availability[0].roundChoices[1].category,'LMP2 ELMS');
+});
+
+test('LMU random circuit: the category is random too, nothing to choose for that round',async()=>{
+ const {req,login}=harness();await login(ADMIN,'admin');await login(PILOT,'pilot');
+ const input={...soloInput,capacity:10,rounds:[{circuit:'spa',durationMinutes:20,categories:['GT3']},{circuit:'random',durationMinutes:20,categories:['Hypercar']}],categories:[]};
+ const created=await req('/api/events','POST',input,'admin');assert.equal(created.status,201,JSON.stringify(created.data));
+ const event=(await req('/api/events','GET',null,'admin')).data.events.find(e=>e.id===created.data.id);
+ assert.deepEqual(event.rounds[1].categories,[]);assert.equal(event.rounds[1].randomCategory,true);
+ const path=`/api/events/${event.id}/departures/${event.departures[0].id}/registrations`;
+ assert.equal((await req(path,'POST',{name:'Pilote',choices:[{category:'GT3',carAny:true},{category:'Hypercar',carAny:true}]},'pilot')).status,400);
+ const ok=await req(path,'POST',{name:'Pilote',choices:[{category:'GT3',carAny:true},{category:'*'}]},'pilot');assert.equal(ok.status,201,JSON.stringify(ok.data));
 });
 
 test('official iRacing endurances are imported once, by the daily task or by an admin', async t => {

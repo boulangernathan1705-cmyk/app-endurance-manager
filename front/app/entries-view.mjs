@@ -1,6 +1,6 @@
 import {simForEvent} from '../../shared/catalog.mjs';
 import {renderHome} from './home-view.mjs';
-import {isSolo,accessBadge,soloRoundsLabel,renderSoloEntries,ANY_CATEGORY} from './solo.mjs';
+import {isSolo,accessBadge,soloCardMeta,renderSoloEntries,ANY_CATEGORY} from './solo.mjs';
 import {dateBlock,timeLabel} from '../dates.mjs';
 import {durationLabel,eventMinutes} from '../../shared/duration.mjs';
 import {eventSchedule} from '../schedule.mjs';
@@ -57,7 +57,7 @@ function compactCrew(departure,crew) {
 
 // Solo race entry: same header as an endurance entry, then the participants and the waiting list.
 function soloCard({event,departure,reg}) {
-  const category = reg.category === ANY_CATEGORY ? '<span class="event-category-badge">Peu importe</span>' : badge(reg.category);
+  const category = reg.category === ANY_CATEGORY ? '<span class="event-category-badge">Peu importe</span>' : reg.category ? badge(reg.category) : '';
   const situation = reg.waitlistPosition
     ? `<span class="departure-mine-badge is-waiting">Liste d’attente · ${reg.waitlistPosition}${reg.waitlistPosition === 1 ? 'er' : 'e'}</span>`
     : '<span class="departure-mine-badge is-crew">✓ Inscrit</span>';
@@ -67,10 +67,10 @@ function soloCard({event,departure,reg}) {
       <span class="race-card-top">${departureDateBlock(departure)}<span class="race-head">
         ${reg.managed?`<strong class="ux-managed-entry-name">${esc(reg.name)}</strong>`:''}
         <h2 class="event-name">${esc(event.name)}</h2>
-        <span class="race-meta">${soloRoundsLabel(event)}</span>
-        <span class="race-badges">${accessBadge(event)}${category}<span class="race-start">Départ ${esc(timeLabel(departure.time))}</span>${situation}</span>
+        <span class="race-meta">${soloCardMeta(event)}</span>
+        <span class="race-badges">${accessBadge(event)}${category}<span class="race-start">Départ ${esc(timeLabel(departure.time))}${event.details?.endTime?` – ${esc(timeLabel(event.details.endTime))}`:''}</span>${situation}</span>
       </span>${circuitVisual(event.circuit,true)}</span>
-      <button type="button" class="primary-button native-my-entry-open-event" data-action="open" data-id="${event.id}" data-departure="${departure.id}">Voir la course</button>
+      <button type="button" class="primary-button native-my-entry-open-event" data-action="open" data-id="${event.id}" data-departure="${departure.id}">Voir l’événement</button>
     </summary>
     <div class="native-my-entry-body">${renderSoloEntries(event,departure)}</div>
   </details>`;
@@ -142,7 +142,7 @@ export function renderMyEntries() {
     <div class="native-my-entries-group-heading"><h2>${title}</h2><span>${list.length} inscription${list.length>1?'s':''}</span></div>
     ${list.length?`<div class="native-my-entry-list">${list.map(card).join('')}</div>`:'<p class="empty">Aucune inscription.</p>'}
   </section>`;
-  app.innerHTML=`<div class="native-my-entries-heading"><span class="creation-kicker">ESPACE PILOTE</span><h1 class="page-title">MES INSCRIPTIONS</h1><p>Retrouve ici tes courses, ton équipage et les pilotes inscrits sur le même départ.</p></div>
+  app.innerHTML=`<div class="native-my-entries-heading"><span class="creation-kicker">ESPACE PILOTE</span><h1 class="page-title">MES INSCRIPTIONS</h1><p>Tes événements et tes endurances, avec ton équipage.</p></div>
     ${section('Mes inscriptions personnelles',entries.filter(item=>item.reg.mine))}
     ${entries.some(item=>item.reg.managed)?section('Inscriptions que je gère',entries.filter(item=>item.reg.managed)):''}`;
   notifyRender();

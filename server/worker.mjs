@@ -223,6 +223,12 @@ async function listEvents(env, actor, game='', scope='', community) {
     }
   }
   const userNames = new Map(users.map(item => [item.id,item.name]));
+  // « Je serai absent »: the pilots of the site's community who said they will miss the event.
+  const absences = new Map();
+  for (const item of (await env.DB.prepare(`SELECT a.event_id,a.user_id,u.name FROM event_absences a JOIN users u ON u.id=a.user_id JOIN events e ON e.id=a.event_id${where} AND a.community_id=? ORDER BY a.created_at`).bind(community.id, community.id).all()).results || []) {
+    if (!absences.has(item.event_id)) absences.set(item.event_id, []);
+    absences.get(item.event_id).push({name:item.name, mine:item.user_id === player});
+  }
   const grouped = new Map();
   for (const reg of registrations) { const key = `${reg.event_id}:${reg.departure_id}`; if (!grouped.has(key)) grouped.set(key, []); grouped.get(key).push(publicRegistration(reg, actor, userNames, community, names, perms, official)); }
   const membersByCrew = new Map();
@@ -253,7 +259,7 @@ async function listEvents(env, actor, game='', scope='', community) {
     const format=row.format||'endurance', capacity=row.capacity==null?null:Number(row.capacity);
     const durationHours=Number(row.duration_hours)||3, durationMinutes=Number(row.duration_minutes)||durationHours*60;
     return {id:row.id, name:row.name, official:row.community_id===OFFICIAL, format, ...(format==='solo' ? {sim:simForEvent(row), details:JSON.parse(row.details||'{}')} : {}), access:row.access||'open', capacity, rounds:JSON.parse(row.rounds||'[]'), circuit:row.circuit||'', durationHours, durationMinutes, driverChangeRequired:row.driver_change_required==null?null:Boolean(row.driver_change_required), eventType:row.event_type||'private', schedulePending:Boolean(row.schedule_pending), createdByMe:Boolean(actor.user && row.created_by===actor.user.id), categories:JSON.parse(row.categories), version:row.version,
-      departures:JSON.parse(row.departures).map(d => {
+      absences:absences.get(row.id) || [], departures:JSON.parse(row.departures).map(d => {
         const availability=grouped.get(`${row.id}:${d.id}`) || [];
         // Solo race: entries keep their order of arrival; beyond the number of places they are on the
         // waiting list, and the first one waiting moves up by itself when someone withdraws.
@@ -600,6 +606,17 @@ async function api(request, env) {
     if (changes.length) await notify(env, await eventPilots(env, event.id), 'race_changed', {...event, name:data.name, circuit:data.circuit}, {skip:[actor.user?.id], changes, previousName:event.name !== data.name ? event.name : undefined});
     return json({ok:true});
   }
+  // « Je serai absent » on an event or an endurance, for oneself; entering the event withdraws it.
+  const absenceMatch = path.match(/^\/api\/events\/([a-f0-9-]{36})\/absence$/);
+  if (absenceMatch && ['PUT','DELETE'].includes(method)) {
+    const event = await eventById(env, absenceMatch[1], community);
+    if (!actor.user) fail(401, 'Connecte-toi avec Discord.');
+    if (method === 'DELETE') { await env.DB.prepare('DELETE FROM event_absences WHERE event_id=? AND user_id=? AND community_id=?').bind(event.id, actor.user.id, community.id).run(); return json({ok:true}); }
+    if (await env.DB.prepare("SELECT 1 FROM registrations WHERE event_id=? AND user_id=? AND community_id=? AND COALESCE(status,'')!='unavailable' LIMIT 1").bind(event.id, actor.user.id, community.id).first())
+      fail(409, 'Tu es inscrit à cet événement : retire d’abord ton inscription.');
+    await env.DB.prepare('INSERT OR IGNORE INTO event_absences(event_id,user_id,community_id,created_at) VALUES(?,?,?,?)').bind(event.id, actor.user.id, community.id, now()).run();
+    return json({ok:true});
+  }
   const departureMatch = path.match(/^\/api\/events\/([a-f0-9-]{36})\/departures\/([a-f0-9-]{36})\/registrations$/);
   if (departureMatch && method === 'POST') {
     const event = await eventById(env, departureMatch[1], community);
@@ -633,6 +650,7 @@ async function api(request, env) {
     const result = await env.DB.prepare(`INSERT INTO registrations(id,event_id,departure_id,user_id,owner_user_id,guest_hash,name,name_key,category,car,car_preferences,car_any,status,preferred_pilot,created_at,participant_id,round_choices,solo_driver,community_id)
       SELECT ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,? FROM events WHERE id=? AND version=? AND (community_id=? OR community_id=?)`).bind(regId,event.id,departure.id,userId,ownerUserId,guestHash,data.name,data.nameKey,data.category,data.car,JSON.stringify(data.cars),data.carAny?1:0,data.status,data.preferredPilot,now(),participant.id,JSON.stringify(data.roundChoices||[]),data.soloDriver?1:0,here.id,event.id,event.version,community.id,OFFICIAL).run();
     if (!result.meta.changes) fail(409, 'Cet événement a changé. Actualise avant de t’inscrire.');
+    if (userId && data.status!=='unavailable') await env.DB.prepare('DELETE FROM event_absences WHERE event_id=? AND user_id=? AND community_id=?').bind(event.id, userId, here.id).run();
     if (!alreadyThere && data.status!=='unavailable') await notify(env,await departurePilots(env,event.id,departure.id,here.id),'entry',event,{departure,skip:[actor.user?.id,userId],pilot:data.name,category:data.category});
     if (forOther && userId && userId!==actor.user?.id) await notify(env,[{user_id:userId,community_id:here.id}],'entered_by',event,{departure,by:actor.user.name,category:data.category});
     return json({id:regId}, 201);

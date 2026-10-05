@@ -75,7 +75,7 @@ test('la page événement garde les actions événement séparées des actions �
   assert.match(crews,/crew-section-create/);
   // Background refresh replaced the manual "Actualiser" button; sharing comes first.
   assert.doesNotMatch(eventView,/button\('refresh'/);
-  const share=eventView.indexOf("button('share-event','Copier le lien de la course'");
+  const share=eventView.indexOf("button('share-event','Copier le lien'");
   const edit=eventView.indexOf("button('edit-event','Modifier l’événement'");
   const remove=eventView.indexOf("button('delete-event',`${trash}<span>Supprimer l’événement</span>`");
   // Deletion is a discreet red link, not a button with the same weight as the others.
@@ -241,6 +241,7 @@ test('race page: a race over several days shows its starts as a planning, one co
   assert.deepEqual(days[0].items.map(item => item.departure.time), ['02:00', '22:00'], 'starts of a day in order');
   assert.equal(days[1].items[1].index, 0, 'each start keeps its place in the race (its number)');
   assert.deepEqual(raceDays(starts.slice(1, 3)), [], 'a single day keeps the list of starts');
+  assert.equal(raceDays(starts.slice(1, 3), {minDays:1}).length, 1, 'the event page shows a single day as a planning too');
   assert.deepEqual(raceDays([...starts, {id:'tbd', tbd:true, startsAt:null}]), [], 'a start to define keeps the list');
   const view = readFileSync(new URL('../front/app/event-view.mjs', import.meta.url), 'utf8');
   assert.match(view, /planningDays\(event\)/);
