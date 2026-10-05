@@ -10,7 +10,7 @@ import {isSolo,soloFill} from './solo.mjs';
 
 const LOCKED_ICON='<span class="planning-crew-lock is-locked" data-tip="Complet : l’équipage est verrouillé" aria-label="Complet"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" d="M5 13a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2zM8 11V7a4 4 0 1 1 8 0v4"/></svg></span>';
 const OPEN_ICON='<span class="planning-crew-lock is-open" data-tip="Places libres : tu peux le rejoindre" aria-label="Places libres"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" d="M5 13a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2zM8 11V7a4 4 0 0 1 8 0"/></svg></span>';
-const CHEVRON='<svg class="planning-chevron" viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6"/></svg>';
+export const CHEVRON='<svg class="planning-chevron" viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6"/></svg>';
 
 // The race days with their starts: every race and event uses the planning, over one day or several (a start
 // still to define keeps the list of starts).
@@ -47,7 +47,9 @@ function startCard(event,departure,body,{minutes,now,open,quick=''}){
 
 // `body(departure, index)`: what an opened start shows (buttons, registration, crews and pilots), as in the list.
 // `actions`: the race's own buttons (link, edit, delete), on the heading line of the planning.
-export function renderPlanning(event,days,body,{actions='',quick=()=>''}={}){
+// `cards(departure)`: when it returns something, the start is shown as those cards (an event in rounds: one
+// card per round) instead of one start card.
+export function renderPlanning(event,days,body,{actions='',quick=()=>'',cards=()=>''}={}){
   const minutes=eventMinutes(event),now=Date.now();
   const finished=day=>day.items.every(({departure})=>Number(departure.startsAt)+minutes*60000<=now);
   const openId=state.selectedDepartureId||[...state.registrationOpen].find(id=>days.some(day=>day.items.some(item=>item.departure.id===id)));
@@ -55,7 +57,7 @@ export function renderPlanning(event,days,body,{actions='',quick=()=>''}={}){
   const tabs=days.map(day=>{const first=day.items[0].departure.startsAt,mine=day.items.some(({departure})=>(departure.availability||[]).some(reg=>reg.mine&&reg.status!=='unavailable'));
     return `<button type="button" class="planning-tab${day===active?' is-active':''}" data-action="planning-day" data-day="${day.key}" aria-pressed="${day===active}"><small>${esc(weekdayLabel(first))}</small><strong>${esc(dayMonthShort(first))}</strong><small>${finished(day)?'terminé':`${day.items.length} départ${day.items.length>1?'s':''}`}</small>${mine?'<i class="planning-tab-mine" aria-label="ton départ"></i>':''}</button>`;}).join('');
   const columns=days.map(day=>{const first=day.items[0].departure.startsAt,pilots=pilotCount(day.items.flatMap(({departure})=>departure.availability||[])),today=dayKey(now)===day.key;
-    return `<section class="planning-day${finished(day)?' is-past':''}${day===active?' is-active':''}" data-day="${day.key}" aria-label="${esc(weekdayLong(first))} ${esc(dayMonthLong(first))}"><div class="planning-day-head"><span class="planning-day-name"><strong>${esc(weekdayLong(first))}</strong><span>${esc(dayMonthLong(first))}</span></span>${today?'<span class="planning-today">Aujourd’hui</span>':`<small>${finished(day)?'Terminé':`${day.items.length} départ${day.items.length>1?'s':''} · ${pilots} pilote${pilots>1?'s':''}`}</small>`}</div>${day.items.map(({departure,index})=>startCard(event,departure,body(departure,index),{minutes,now,open:departure.id===openId,quick:quick(departure)})).join('')}</section>`;}).join('');
+    return `<section class="planning-day${finished(day)?' is-past':''}${day===active?' is-active':''}" data-day="${day.key}" aria-label="${esc(weekdayLong(first))} ${esc(dayMonthLong(first))}"><div class="planning-day-head"><span class="planning-day-name"><strong>${esc(weekdayLong(first))}</strong><span>${esc(dayMonthLong(first))}</span></span>${today?'<span class="planning-today">Aujourd’hui</span>':`<small>${finished(day)?'Terminé':`${day.items.length} départ${day.items.length>1?'s':''} · ${pilots} pilote${pilots>1?'s':''}`}</small>`}</div>${day.items.map(({departure,index})=>cards(departure)||startCard(event,departure,body(departure,index),{minutes,now,open:departure.id===openId,quick:quick(departure)})).join('')}</section>`;}).join('');
   const total=days.reduce((sum,day)=>sum+day.items.length,0),span=planningSpan(days.length);
   // More than three days: three on screen by default, or five or seven at once (remembered on this browser).
   const spans=days.length>3?[...new Set([...SPANS.filter(count=>count<days.length),days.length])]:[];

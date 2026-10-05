@@ -305,3 +305,49 @@ export async function submitRegistration(form,api) {
   if(!draft.forOther){state.pilotName=draft.name;try{localStorage.setItem('em_pilot_name',state.pilotName);}catch{}}
   delete state.drafts[departureId]; state.registrationOpen.delete(departureId); return result;
 }
+
+// An event in several rounds: entering one round, or leaving it. A round with nothing to choose is done in one
+// click; one with categories opens the registration on that round (the others kept as they are, or skipped).
+function choicesOf(event,reg){
+  const rounds=soloRounds(event);
+  return rounds.map((round,index)=>{
+    const saved=reg?.roundChoices?.[index];
+    if(!reg||saved?.skip)return {skip:true};
+    if(!round.categories.length||!saved?.category)return {category:ANY_CATEGORY,cars:[],carAny:true};
+    return {category:saved.category,cars:saved.cars||[],carAny:!!saved.carAny};
+  });
+}
+export async function enterRound(event,departure,index,api){
+  const rounds=soloRounds(event),own=ownRegistration(departure),choices=choicesOf(event,own);
+  state.roundFocus={...(state.roundFocus||{}),[departure.id]:index};
+  if(!rounds[index].categories.length&&!(event.official&&!own&&entryCommunities().length>1)){
+    choices[index]={category:ANY_CATEGORY,cars:[],carAny:true};
+    const body={name:own?.name||state.user.name.slice(0,32),choices,forOther:false,...(own?{version:own.version}:{})};
+    await api(own?`/api/registrations/${own.id}`:`/api/races/${event.id}/departures/${departure.id}/registrations`,own?'PATCH':'POST',body);
+    return true;
+  }
+  // Categories to choose: the registration opens on this round.
+  const draft=own?registrationDraft(own):{name:'',status:'',preferredPilot:'',forOther:false,participantUserId:null,category:'',cars:[],carAny:false,id:null,version:null};
+  choices[index]={category:rounds[index].categories.length===1?rounds[index].categories[0]:'',cars:[],carAny:false};
+  state.drafts[departure.id]={...draft,choices,step:index+1};
+  state.registrationOpen.add(departure.id);
+  return false;
+}
+export function editRound(event,departure,index){
+  const own=ownRegistration(departure);
+  state.roundFocus={...(state.roundFocus||{}),[departure.id]:index};
+  state.drafts[departure.id]={...registrationDraft(own),choices:choicesOf(event,own),step:index+1};
+  state.registrationOpen.add(departure.id);
+}
+// « Absent » on a round the pilot does: he leaves it; on his only round, he leaves the event.
+export async function skipRound(event,departure,index,api){
+  const own=ownRegistration(departure),choices=choicesOf(event,own);
+  choices[index]={skip:true};
+  if(choices.every(choice=>choice.skip)){
+    if(!confirm('C’est ta seule manche : te désinscrire de l’événement ?'))return false;
+    await api(`/api/registrations/${own.id}`,'DELETE',{version:own.version});
+    return true;
+  }
+  await api(`/api/registrations/${own.id}`,'PATCH',{name:own.name,version:own.version,choices,forOther:false});
+  return true;
+}

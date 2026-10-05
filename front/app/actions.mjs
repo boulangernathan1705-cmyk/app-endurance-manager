@@ -6,7 +6,7 @@ import {renderEventForm,departureFields,updateRemoveButtons,goToEventStep,formDu
 import {renderMyEntries} from './entries-view.mjs';
 import {submitSoloEvent} from './solo-form.mjs';
 import {refresh,refreshAfterSave} from './refresh.mjs';
-import {draftFor,registrationDraft,ownRegistrations,rerenderRegistrationSection,submitRegistration,registrationStep,canEnterInOneClick,enterInOneClick} from './registration.mjs';
+import {draftFor,registrationDraft,ownRegistrations,rerenderRegistrationSection,submitRegistration,registrationStep,canEnterInOneClick,enterInOneClick,enterRound,editRound,skipRound} from './registration.mjs';
 import {updateCrewState,pickSlot} from './crews.mjs';
 import {installRouter,routeFromLocation,applyRoute} from './router.mjs';
 import {installAutoRefresh} from './auto-refresh.mjs';
@@ -112,6 +112,9 @@ async function perform(action,target){
     case 'open': state.currentEventId=target.dataset.id; state.selectedDepartureId=target.dataset.departure||null; state.eventSection='race'; state.drafts={}; state.pendingCrewJoin=null; state.registrationOpen.clear(); renderEvent(); break;
     case 'event-section': state.eventSection='race'; renderEvent(); break;
     case 'my-registration': { state.pendingCrewJoin=null; state.selectedDepartureId=target.dataset.departure; const oneClick=event?.departures.find(item=>item.id===target.dataset.departure); if(oneClick&&canEnterInOneClick(event,oneClick)){await enterInOneClick(event,oneClick,api); await refreshAfterSave('Tu es inscrit.'); break;} delete state.drafts[state.selectedDepartureId]; state.registrationOpen.add(state.selectedDepartureId); renderEvent(); revealRegistration(state.selectedDepartureId); break; }
+    case 'round-enter': { const departure=event.departures.find(item=>item.id===target.dataset.departure); state.selectedDepartureId=departure.id; if(await enterRound(event,departure,Number(target.dataset.round),api)){await refreshAfterSave('Tu es inscrit à cette manche.');break;} renderEvent(); revealRegistration(departure.id); break; }
+    case 'round-edit': { const departure=event.departures.find(item=>item.id===target.dataset.departure); state.selectedDepartureId=departure.id; editRound(event,departure,Number(target.dataset.round)); renderEvent(); revealRegistration(departure.id); break; }
+    case 'round-skip': { const departure=event.departures.find(item=>item.id===target.dataset.departure); if(await skipRound(event,departure,Number(target.dataset.round),api))await refreshAfterSave('C’est noté.'); break; }
     case 'event-absence': await api(`/api/events/${target.dataset.id}/absence`,'PUT'); await refreshAfterSave('C’est noté : tu seras absent.'); break;
     case 'event-absence-cancel': await api(`/api/events/${target.dataset.id}/absence`,'DELETE'); await refreshAfterSave('Tu n’es plus noté absent.'); break;
     case 'make-official': { if(!event||!state.manager)break; if(!confirm(`Rendre « ${event.name} » officielle ?\n\nElle sera commune à toutes les communautés : chacune pourra s’y inscrire. Ses inscriptions et équipages restent dans ta communauté. Impossible de revenir en arrière.`))return; await api(`/api/races/${event.id}/official`,'POST',{version:event.version}); await refreshAfterSave('Course rendue officielle.'); break; }
@@ -121,7 +124,7 @@ async function perform(action,target){
     case 'close-registration': if(state.pendingCrewJoin?.departureId===target.dataset.departure)state.pendingCrewJoin=null;state.registrationOpen.delete(target.dataset.departure); renderEvent(); break;
     case 'new-registration': {
       state.pendingCrewJoin=null;state.selectedDepartureId=target.dataset.departure; const departure=event.departures.find(item=>item.id===target.dataset.departure); const categoryMode=target.dataset.mode==='category'; const existing=departure.availability.find(reg=>reg.id===target.dataset.registration)||ownRegistrations(departure)[0];
-      state.drafts[departure.id]={...(categoryMode&&existing?registrationDraft(existing):{name:'',status:'',preferredPilot:'',forOther:!!state.user,participantUserId:null}),category:'',cars:[],carAny:false,id:null,version:null,mode:categoryMode?'category':'pilot'}; state.registrationOpen.add(departure.id); renderEvent(); revealRegistration(departure.id); break;
+      state.drafts[departure.id]={...(categoryMode&&existing?registrationDraft(existing):{name:'',status:'',preferredPilot:'',forOther:!!state.user,participantUserId:null}),category:'',cars:[],carAny:false,id:null,version:null,mode:categoryMode?'category':'pilot'}; if(target.dataset.round)state.roundFocus={...(state.roundFocus||{}),[departure.id]:Number(target.dataset.round)}; state.registrationOpen.add(departure.id); renderEvent(); revealRegistration(departure.id); break;
     }
     case 'edit-registration': { state.pendingCrewJoin=null; const departure=event.departures.find(item=>item.id===target.dataset.departure),reg=departure.availability.find(item=>item.id===target.dataset.id); if(!reg?.canEdit)throw Error('Tu n’as pas l’autorisation de modifier cette inscription.'); state.selectedDepartureId=departure.id; state.drafts[departure.id]=registrationDraft(reg); state.registrationOpen.add(departure.id); state.eventSection='race'; renderEvent(); revealRegistration(departure.id); break; }
     case 'solo-driver': {

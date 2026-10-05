@@ -64,9 +64,9 @@ export function soloCardInfo(event) {
     return `<span class="solo-info-row">${chips.join('')}</span>`;
   };
   // Several rounds: one aligned line each (number, circuit, categories, sessions); the rest is on the event page.
-  const roundLine = (round, index) => `<span class="solo-round-line"><span class="solo-round-index">${index + 1}</span><span class="solo-round-name">${esc(eventCircuitName(event, round.circuit))}</span><span class="solo-round-cats">${round.randomCategory ? '<span class="solo-info-chip" title="Catégorie aléatoire">❓</span>' : (round.categories || []).map(category => `<span class="solo-info-category" title="${esc(category)}">${logo(category)}</span>`).join('')}</span>${infoChip('format', roundFormat(round).replaceAll('/', ' · '), 'Essais · Qualifs · Course (min)')}</span>`;
+  const roundLine = (round, index) => `<span class="solo-round-line"><span class="solo-round-label">Manche ${index + 1}</span><span class="solo-round-name">${esc(eventCircuitName(event, round.circuit))}</span><span class="solo-round-cats">${round.randomCategory ? '<span class="solo-info-chip" title="Catégorie aléatoire">❓</span>' : (round.categories || []).map(category => `<span class="solo-info-category" title="${esc(category)}">${logo(category)}</span>`).join('')}</span>${infoChip('format', roundFormat(round).replaceAll('/', ' · '), 'Essais · Qualifs · Course (min)')}</span>`;
+  // The server password is not on the card: on the event page, for its pilots only.
   const extra = [
-    details.password ? infoChip('lock', details.password, 'Mot de passe du serveur') : '',
     details.note ? infoChip('info', details.note, 'Info') : '',
   ].filter(Boolean);
   if (rounds.length > 1) return `<span class="solo-card-info"><span class="solo-round-lines">${rounds.map(roundLine).join('')}</span>${extra.length ? `<span class="solo-info-row">${extra.join('')}</span>` : ''}</span>`;
@@ -83,23 +83,29 @@ const TILE_ICONS = {
   qualifying: '<circle cx="12" cy="14" r="7"/><path d="M12 10.5V14l2 1.5M10 3h4M12 3v4M18.5 7.5l1.5-1.5"/>',
   race: '<path d="M5 21V4M5 4h13l-2.5 4L18 12H5"/><path d="M9 4v8M13 4v8M5 8h11"/>',
 };
+// The server password: for the pilots entered (and whoever manages the event).
+export function canSeePassword(event) {
+  return canManage() || (event.departures || []).some(departure => (departure.availability || []).some(reg => reg.mine && reg.status !== 'unavailable'));
+}
+const detailSvg = path => `<svg viewBox="0 0 24 24" aria-hidden="true">${path}</svg>`;
+const detailTile = (icon, label, value, extra = '') => value ? `<div class="solo-detail${extra}"><span class="solo-detail-icon">${icon}</span><span class="solo-detail-copy"><span class="solo-detail-label">${esc(label)}</span><strong>${value}</strong></span></div>` : '';
+// The tiles of a round: sessions, weather, multipliers, category and car.
+export function roundTiles(round) {
+  const minutes = value => value ? `${Number(value)} min` : '';
+  const weather = WEATHERS.find(([value]) => value === round.weather);
+  const category = round.randomCategory ? 'Aléatoire' : (round.categories || []).length ? `<span class="solo-detail-logos">${round.categories.map(category => `<span title="${esc(category)}">${logo(category)}</span>`).join('')}</span>` : esc(round.category || '');
+  return `<div class="solo-detail-grid">${
+    detailTile(detailSvg(TILE_ICONS.practice), 'Essais', minutes(round.practice))}${detailTile(detailSvg(TILE_ICONS.qualifying), 'Qualifications', minutes(round.qualifying))}${detailTile(detailSvg(TILE_ICONS.race), 'Course', minutes(round.durationMinutes))}${
+    detailTile(`<span class="solo-detail-emoji">${weather?.[1] || ''}</span>`, 'Météo', weather ? esc(weather[2]) : '')}${detailTile(detailSvg(ICONS.fuel), 'Consommation', round.fuel != null ? `×${esc(round.fuel)}` : '')}${detailTile(detailSvg(ICONS.tyres), 'Usure des pneus', round.tyres != null ? `×${esc(round.tyres)}` : '')}${
+    detailTile(round.randomCategory ? '<span class="solo-detail-emoji">❓</span>' : detailSvg(ICONS.car), 'Catégorie', category)}${detailTile(detailSvg(ICONS.car), 'Voiture', esc(round.car || ''))}</div>`;
+}
+// Event page header: a single round shows its tiles; several rounds show theirs in their own cards, below.
+// Then the note, and the password for the pilots entered.
 export function soloEventDetails(event) {
   const details = event.details || {}, rounds = event.rounds?.length ? event.rounds : [{circuit: event.circuit, durationMinutes: event.durationMinutes}];
-  const svg = path => `<svg viewBox="0 0 24 24" aria-hidden="true">${path}</svg>`;
-  const tile = (icon, label, value, extra = '') => value ? `<div class="solo-detail${extra}"><span class="solo-detail-icon">${icon}</span><span class="solo-detail-copy"><span class="solo-detail-label">${esc(label)}</span><strong>${value}</strong></span></div>` : '';
-  const minutes = value => value ? `${Number(value)} min` : '';
-  const round = (round, index) => {
-    const weather = WEATHERS.find(([value]) => value === round.weather);
-    const category = round.randomCategory ? 'Aléatoire' : (round.categories || []).length ? `<span class="solo-detail-logos">${round.categories.map(category => `<span title="${esc(category)}">${logo(category)}</span>`).join('')}</span>` : esc(round.category || '');
-    const pilots = rounds.length > 1 ? roundPilots(event, index) : null;
-    const head = rounds.length > 1 ? `<div class="solo-detail-round-head"><span class="solo-round-index">${index + 1}</span><strong>${esc(eventCircuitName(event, round.circuit))}</strong><em>${pilots} pilote${pilots > 1 ? 's' : ''}</em></div>` : '';
-    return `<div class="solo-detail-round${rounds.length > 1 ? ' is-card' : ''}">${head}<div class="solo-detail-grid">${
-      tile(svg(TILE_ICONS.practice), 'Essais', minutes(round.practice))}${tile(svg(TILE_ICONS.qualifying), 'Qualifications', minutes(round.qualifying))}${tile(svg(TILE_ICONS.race), 'Course', minutes(round.durationMinutes))}${
-      tile(`<span class="solo-detail-emoji">${weather?.[1] || ''}</span>`, 'Météo', weather ? esc(weather[2]) : '')}${tile(svg(ICONS.fuel), 'Consommation', round.fuel != null ? `×${esc(round.fuel)}` : '')}${tile(svg(ICONS.tyres), 'Usure des pneus', round.tyres != null ? `×${esc(round.tyres)}` : '')}${
-      tile(round.randomCategory ? '<span class="solo-detail-emoji">❓</span>' : svg(ICONS.car), 'Catégorie', category)}${tile(svg(ICONS.car), 'Voiture', esc(round.car || ''))}</div></div>`;
-  };
-  const extra = `${tile(svg(ICONS.lock), 'Mot de passe', esc(details.password || ''))}${tile(svg(ICONS.info), 'Info', esc(details.note || ''), ' is-wide')}`;
-  return `<div class="solo-event-details"><div class="solo-detail-rounds${rounds.length > 1 ? ' is-multi' : ''}">${rounds.map(round).join('')}</div>${extra ? `<div class="solo-detail-grid solo-detail-extra">${extra}</div>` : ''}</div>`;
+  const extra = `${canSeePassword(event) ? detailTile(detailSvg(ICONS.lock), 'Mot de passe', esc(details.password || '')) : ''}${detailTile(detailSvg(ICONS.info), 'Info', esc(details.note || ''), ' is-wide')}`;
+  const tiles = rounds.length > 1 ? '' : roundTiles(rounds[0]);
+  return tiles || extra ? `<div class="solo-event-details">${tiles}${extra ? `<div class="solo-detail-grid solo-detail-extra">${extra}</div>` : ''}</div>` : '';
 }
 // Above the card's details: the circuit, or the number of rounds.
 export function soloCardMeta(event) {
@@ -121,11 +127,11 @@ export function soloFill(event, departure = event.departures?.[0]) {
   return `<span class="solo-fill${full ? ' is-full' : ''}"><span class="solo-fill-copy"><strong>${confirmed}${capacity ? ` / ${capacity}` : ''}</strong> ${confirmed > 1 ? 'inscrits' : 'inscrit'}${waiting ? ` · <em>${waiting} en attente</em>` : ''}${full && !waiting ? ' · <em>complet</em>' : ''}</span><span class="solo-fill-bar" aria-hidden="true"><span style="width:${Math.round(ratio * 100)}%"></span></span></span>`;
 }
 
-function categoryCell(category) {
+export function categoryCell(category) {
   if (category === ANY_CATEGORY) return '<span class="solo-any-category">Peu importe</span>';
   return `<span class="solo-category ${categories[category]?.css || ''}">${logo(category)}<span>${esc(category)}</span></span>`;
 }
-function carCell(reg) {
+export function carCell(reg) {
   if (reg.carAny || !(reg.cars || []).length) return '<span class="solo-muted">Peu importe</span>';
   return esc(reg.cars.join(', '));
 }

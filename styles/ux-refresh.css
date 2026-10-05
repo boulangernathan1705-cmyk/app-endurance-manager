@@ -2058,3 +2058,9 @@ html[data-game] #app .race-header .race-header-time svg { width: 18px; height: 1
 .solo-round-toggle .secondary-button { margin: 0; border: 0; border-radius: 0; background: transparent; color: #9aa6b0; }
 .solo-round-toggle .secondary-button + .secondary-button { border-left: 1px solid rgba(255, 255, 255, .14); }
 .solo-round-toggle .secondary-button.active { background: var(--community-accent, #7fe3ea); color: #061014; }
+/* EVENT TDZ in rounds: the rounds as starts (« Manche 1 »), opened on their details and pilots. */
+.solo-round-starts { display: grid; gap: 10px; min-width: 0; }
+.solo-round-start .solo-detail-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); margin-bottom: 12px; }
+.solo-round-pilots { font-size: 13px; color: #9aa6b0; }
+.solo-round-label { font-size: 11px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: var(--community-accent, #7fe3ea); white-space: nowrap; }
+.planning-quick-button.is-labelled.is-active { border-color: rgba(46, 204, 113, .6); color: #6fe3a1; }
