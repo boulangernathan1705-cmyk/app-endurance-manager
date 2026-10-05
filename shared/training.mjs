@@ -218,7 +218,9 @@ export function cleanLive(input) {
   const laps = input.laps.slice(0, 600).map(lap => ({n:finite(lap?.n, 0, 10000) ?? 0, t:finite(lap?.t, 1, 3600), top:finite(lap?.top, 0, 500),
     fuel:finite(lap?.fuel, 0, 200), ve:finite(lap?.ve, 0, 100), wear:four(lap?.wear, 0, 100), temp:four(lap?.temp, -50, 250), brake:four(lap?.brake, -50, 1500),
     kpa:four(lap?.kpa, 0, 1000), compound:label(lap?.compound, 40), track:finite(lap?.track, -30, 80), air:finite(lap?.air, -30, 60), rain:finite(lap?.rain, 0, 1),
-    invalid:lap?.invalid === true, pit:lap?.pit === true, limits:finite(lap?.limits, 0, 255) ?? 0})).filter(lap => lap.t);
+    invalid:lap?.invalid === true, pit:lap?.pit === true, limits:finite(lap?.limits, 0, 255) ?? 0}))
+    // A lap LMU counted without a time still tells its fuel and tyres.
+    .filter(lap => lap.t || lap.fuel || lap.ve || lap.wear.some(value => value > 0));
   if (!laps.length) throw Error('Aucun tour roulé dans cette séance.');
   const stops = input.stops.slice(0, 60).map(stop => ({lap:finite(stop?.lap, 0, 10000) ?? 0, lane:finite(stop?.lane, 0, 600), stopped:finite(stop?.stopped, 0, 600),
     fuel:finite(stop?.fuel, 0, 200) ?? 0, ve:finite(stop?.ve, 0, 100) ?? 0, tyres:finite(stop?.tyres, 0, 4) ?? 0, repair:stop?.repair === true})).filter(stop => stop.lane && stop.stopped !== null);

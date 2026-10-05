@@ -59,6 +59,10 @@ func TestLapsAndStops(t *testing.T) {
 	s = drive(r, s, 1, func(s *sample, i int) { s.InPits, s.PitState, s.Speed = false, 0, 200 })
 	s.LapsDone, s.LastLap = 4, 140
 	r.feed(s, true)
+	// A lap on track LMU counts without a time (-1): kept for its fuel, without the time.
+	s = drive(r, s, 1200, func(s *sample, i int) { s.Fuel -= 0.003 })
+	s.LapsDone, s.LastLap = 5, -1
+	r.feed(s, true)
 	// Back to the menus: the session is sent.
 	for i := 0; i < 1300; i++ {
 		r.feed(sample{}, false)
@@ -67,7 +71,7 @@ func TestLapsAndStops(t *testing.T) {
 		t.Fatalf("sessions: %d", len(sessions))
 	}
 	got := sessions[0]
-	if len(got.Laps) != 3 || got.Laps[0].Time != 121 || got.Laps[1].Top < 300 || got.Laps[0].Fuel < 3.5 || got.Laps[0].Fuel > 3.7 {
+	if got.Laps[0].Time != 121 || got.Laps[1].Top < 300 || got.Laps[0].Fuel < 3.5 || got.Laps[0].Fuel > 3.7 {
 		t.Fatalf("laps: %+v", got.Laps)
 	}
 	if got.Laps[0].Wear[0] < 1.1 || got.Laps[0].Wear[0] > 1.3 || got.Laps[0].Temp[0] != 85 || got.Laps[0].TrackTemp != 30 {
@@ -75,6 +79,9 @@ func TestLapsAndStops(t *testing.T) {
 	}
 	if !got.Laps[2].Pit || got.Laps[2].Fuel != 0 {
 		t.Fatalf("pit lap: %+v", got.Laps[2])
+	}
+	if len(got.Laps) != 4 || got.Laps[3].Time != 0 || got.Laps[3].Fuel < 3.5 {
+		t.Fatalf("untimed lap: %+v", got.Laps)
 	}
 	if len(got.Stops) != 1 {
 		t.Fatalf("stops: %+v", got.Stops)

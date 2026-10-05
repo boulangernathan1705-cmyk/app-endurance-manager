@@ -236,7 +236,12 @@ namespace EnduranceManager.SimHub
                 }
                 output.Pressure[i] = Round(s.Wheels[i].Pressure, 1);
             }
-            if (output.Time > 0) session.Laps.Add(output);
+            // LMU sometimes counts a lap on track without a time (-1): kept for its fuel and tyres, without the time.
+            if (output.Time > 0 || !lap.Pit)
+            {
+                output.Time = Math.Max(output.Time, 0);
+                session.Laps.Add(output);
+            }
             lap = new LapState { Start = s };
         }
 
