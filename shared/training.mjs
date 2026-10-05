@@ -357,31 +357,31 @@ export function memoPilots(sessions) {
   });
 }
 
-export function memoSheet({laneStops = [], carStops = [], sessions = [], summaries = null, viewer = null, service = null, game = null, reference = null, min = MEMO_MIN}) {
+export function memoSheet({laneStops = [], carStops = [], sessions = [], summaries = null, viewer = null, service = null, game = null, reference = null, min = MEMO_MIN, aggregate = median}) {
   const through = laneStops.map(stop => stop.lane - stop.stopped).filter(value => value > 0);
   const pilots = summaries || memoPilots(sessions);
   const mine = pilots.find(pilot => pilot.user === viewer) || null;
   // The viewer's own spread comes with it: their lowest and highest lap, for the bar before the pilots' one opens.
   const spread = (values, laps, you, digits, range) => {
     const list = values.filter(value => value > 0), open = list.length >= min.pilots && laps >= min.laps;
-    return {pilots:list.length, laps, you:round(you ?? null, digits), median:open ? round(quantile(list, 0.5), digits) : null,
+    return {pilots:list.length, laps, you:round(you ?? null, digits), median:open ? round(aggregate(list), digits) : null,
       low:open ? round(quantile(list, 0.25), digits) : null, high:open ? round(quantile(list, 0.75), digits) : null,
       youMin:round(range?.[0] ?? null, digits), youMax:round(range?.[1] ?? null, digits)};
   };
   const lapCount = key => pilots.filter(pilot => pilot[key] > 0).reduce((sum, pilot) => sum + pilot.laps, 0);
   const energy = {...spread(pilots.map(pilot => pilot.ve), lapCount('ve'), mine?.ve, 2, mine?.range.ve), game:game?.ve ?? null};
   const fuel = {...spread(pilots.map(pilot => pilot.fuel), lapCount('fuel'), mine?.fuel, 2, mine?.range.fuel), game:game?.fuel ?? null};
-  const capacity = median(pilots.map(pilot => pilot.capacity).filter(Boolean));
+  const capacity = aggregate(pilots.map(pilot => pilot.capacity).filter(Boolean));
   const names = [...new Set(pilots.flatMap(pilot => Object.keys(pilot.tyres)))];
   const tyres = names.map(name => {
     const rows = pilots.filter(pilot => pilot.tyres[name]).map(pilot => pilot.tyres[name]);
     const laps = rows.reduce((sum, row) => sum + row.laps, 0), you = mine?.tyres[name] || null;
     const wear = spread(rows.map(row => row.wear), laps, you?.wear, 2, you?.range), open = wear.median !== null;
-    const worst = open ? [0, 1, 2, 3].map(index => median(rows.map(row => row.worst[index]))) : you?.worst;
+    const worst = open ? [0, 1, 2, 3].map(index => aggregate(rows.map(row => row.worst[index]).filter(value => value !== null))) : you?.worst;
     // Each tyre's wear per lap: the pilots' median once they are enough, else the viewer's laps.
     const wheels = worst ? worst.map(value => ({wear:round(value ?? null, 2)})) : null;
-    return {name, ...wear, worst:worst ? worst.indexOf(Math.max(...worst)) : null, wheels, temp:open ? round(median(rows.map(row => row.temp).filter(Boolean)), 0) : null,
-      youTemp:round(you?.temp ?? null, 0), track:round(median(rows.map(row => row.track).filter(value => value !== null)), 1), ideal:game?.ideal ?? null};
+    return {name, ...wear, worst:worst ? worst.indexOf(Math.max(...worst)) : null, wheels, temp:open ? round(aggregate(rows.map(row => row.temp).filter(Boolean)), 0) : null,
+      youTemp:round(you?.temp ?? null, 0), track:round(aggregate(rows.map(row => row.track).filter(value => value !== null)), 1), ideal:game?.ideal ?? null};
   }).sort((a, b) => b.laps - a.laps);
   // The figures a stint is planned with: the pilots' median, else the viewer's own, else the game's forecast.
   const pick = item => item.median ?? item.you ?? item.game;
@@ -394,7 +394,7 @@ export function memoSheet({laneStops = [], carStops = [], sessions = [], summari
     levels = {track:reference.track, patch:reference.patch, q:reference.q, fastest:reference.fastest || null, bands:levelBands(reference),
       you:pace ? {pace:round(pace, 3), best:round(mine.best, 3), level, next:index > 0 ? {name:LEVELS[index - 1].name, time:reference.pace[LEVELS[index - 1].to]} : null} : null};
   }
-  return {levels, lane:through.length ? {through:round(median(through), 1), stops:through.length} : null,
+  return {levels, lane:through.length ? {through:round(aggregate(through), 1), stops:through.length} : null,
     service:service ? {source:'game', ...service} : measured && (measured.tyres4 || measured.fuelRate) ? {source:'stops', tyres4:measured.tyres4, tyres2:measured.tyres2, fuelRate:measured.fuelRate, repair:measured.repair} : null,
     energy, fuel:{...fuel, ratio:litres && ve && capacity ? round(litres / capacity * 100 / ve, 2) : null}, capacity, tyres,
     stint:stintOf({ve, litres, capacity, wheels:tyres[0]?.wheels}),

@@ -6,6 +6,7 @@ import {parseResults, analyse, programSteps, adviceFor, trackKey, cleanLaps, cir
 import {levelOf, memoPilots} from '../shared/training.mjs';
 import {BOP} from '../shared/lmu-bop.mjs';
 import {bopFor} from '../shared/bop.mjs';
+import {collectMemo, collectiveMemo, restartMemo, renewMemos} from './memo-collection.mjs';
 
 const FILE_LIMIT = 3_000_000;
 const KEEP_DAYS = 120;
@@ -82,7 +83,12 @@ export async function saveLive(env, userId, text) {
     ON CONFLICT(car) DO UPDATE SET car_class=excluded.car_class,service=excluded.service,updated_at=excluded.updated_at`).bind(session.car, session.carClass, JSON.stringify(session.service), now()).run();
   // The game names the pilot: learnt once, so his online results files find him.
   if (session.driver && !(await env.DB.prepare('SELECT 1 FROM training_profiles WHERE user_id=?').bind(userId).first())) await setLmuName(env, userId, session.driver);
-  if (result.meta.changes === 1) await refreshMemoPilot(env, userId, circuitOf(session.track) || normal(session.track), session.car);
+  if (result.meta.changes === 1) {
+    const circuit=circuitOf(session.track)||normal(session.track);
+    await refreshMemoPilot(env,userId,circuit,session.car);
+  }
+  // Idempotent collection also retries a previous upload whose compact aggregation failed.
+  await collectMemo(env,userId,session,`${userId}:${fingerprint}`,circuitOf(session.track)||normal(session.track));
   return {created:result.meta.changes === 1, track:session.track, laps:session.laps.length};
 }
 
@@ -168,10 +174,12 @@ export async function refreshLaptimes(env, fetcher = fetch) {
 // The circuit sheet: every circuit where the pilots of the site drove with the plugin, then for the one asked (or
 // the first) and one of its cars, the figures of memoSheet. Only medians leave the server, never a pilot's name;
 // the viewer's own figures come with them.
-async function memo(env, user, url) {
+async function memo(env, user, url, canRestart = false) {
   const since = Date.now() - KEEP_DAYS * DAY * 1000;
   await backfillMemo(env,user);
-  const rows = await all(env, `SELECT circuit,MIN(track) AS track,car,car_class,COUNT(DISTINCT user_id) AS pilots FROM training_memo_pilots WHERE started_at>=?
+  const rows = await all(env, `SELECT circuit,MIN(track) AS track,car,car_class,COUNT(DISTINCT user_id) AS pilots FROM (
+    SELECT circuit,track,car,car_class,user_id FROM training_memo_pilots WHERE started_at>=?
+    UNION ALL SELECT circuit,track,car,car_class,NULL AS user_id FROM training_memo_cycles)
     GROUP BY circuit,car,car_class ORDER BY circuit,car`, since);
   const circuits = [];
   for (const row of rows) {
@@ -180,22 +188,28 @@ async function memo(env, user, url) {
     item.cars.push({car:row.car, carClass:row.car_class, pilots:row.pilots});
   }
   const circuit = circuits.find(item => item.key === url.searchParams.get('circuit')) || circuits[0];
-  if (!circuit) return {circuits, circuit:null};
+  if (!circuit) return {circuits, circuit:null,canRestart};
   const car = circuit.cars.find(item => item.car === url.searchParams.get('car'))
     || circuit.cars.find(item => item.carClass === url.searchParams.get('class')) || [...circuit.cars].sort((a, b) => b.pilots - a.pilots)[0];
-  const lane = await all(env, `SELECT json_extract(summary,'$.lane.through') AS through FROM training_memo_pilots
-    WHERE circuit=? AND started_at>=? AND json_extract(summary,'$.lane.through')>0 LIMIT 500`,circuit.key,since);
-  const summaries = await all(env, `SELECT user_id,summary,stops FROM training_memo_pilots WHERE circuit=? AND car=? AND started_at>=? ORDER BY (user_id=?) DESC,started_at DESC LIMIT 500`,
-    circuit.key, car.car, since,user);
+  const personal = await env.DB.prepare('SELECT summary,stops FROM training_memo_pilots WHERE circuit=? AND car=? AND user_id=? AND started_at>=?')
+    .bind(circuit.key,car.car,user,since).first();
+  const collective = await collectiveMemo(env,{circuit:circuit.key,car:car.car,track:circuit.name,car_class:car.carClass});
   const stored = await env.DB.prepare('SELECT service FROM training_cars WHERE car=?').bind(car.car).first();
-  const pilots=summaries.map(row=>JSON.parse(row.summary));
-  const game = pilots.find(pilot=>pilot.game)?.game || null;
+  const pilots=personal?[JSON.parse(personal.summary)]:[];
+  const game = collective.sheet ? {fuel:collective.sheet.fuel.game,ve:collective.sheet.energy.game,ideal:collective.sheet.tyres[0]?.ideal} : pilots[0]?.game || null;
   const laptimes = await env.DB.prepare("SELECT data,updated FROM training_reference WHERE id='laptimes'").first();
   const references = laptimes ? JSON.parse(laptimes.data).filter(row => row.circuit === circuit.key && row.carClass === LAPTIME_CLASS[car.carClass]) : [];
-  const sheet = memoSheet({reference:mainLayout(references),laneStops:lane.map(row=>({lane:row.through,stopped:0})),carStops:summaries.flatMap(row=>JSON.parse(row.stops)),
+  const own = memoSheet({reference:mainLayout(references),carStops:personal?JSON.parse(personal.stops):[],
     summaries:pilots, viewer:user,
     service:stored ? JSON.parse(stored.service) : null, game});
-  return {circuits, circuit:{key:circuit.key, name:circuit.name}, car, ...sheet,
+  const common=collective.sheet;
+  const compare=(shared,personal)=>({...shared,you:personal?.you??null,youMin:personal?.youMin??null,youMax:personal?.youMax??null});
+  const sheet=common?{...common,levels:own.levels,service:own.service,
+    energy:compare(common.energy,own.energy),fuel:compare(common.fuel,own.fuel),
+    tyres:[...common.tyres.map(tyre=>({...compare(tyre,own.tyres.find(item=>item.name===tyre.name)),youTemp:own.tyres.find(item=>item.name===tyre.name)?.youTemp??null})),
+      ...own.tyres.filter(tyre=>!common.tyres.some(item=>item.name===tyre.name)).map(tyre=>({...tyre,median:null,low:null,high:null}))]
+  }:{...own,energy:{...own.energy,median:null,low:null,high:null},fuel:{...own.fuel,median:null,low:null,high:null},tyres:own.tyres.map(tyre=>({...tyre,median:null,low:null,high:null}))};
+  return {circuits, circuit:{key:circuit.key, name:circuit.name}, car, ...sheet,collection:collective.collection,canRestart,
     bop:bopFor(BOP, circuit.key, car.car, car.carClass),
     source:laptimes ? {name:LAPTIME_SOURCE.name, title:LAPTIME_SOURCE.title, url:LAPTIME_SOURCE.url, updated:laptimes.updated} : null};
 }
@@ -318,7 +332,15 @@ export async function trainingApi(path, method, request, env, actor, community) 
       pending:waiting.length && !profile?.lmu_name ? {files:waiting.length, drivers:[...new Set(waiting.flatMap(row => JSON.parse(row.drivers)))].sort((a, b) => a.localeCompare(b)).slice(0, 60)} : null});
   }
   // The pit guide (stands.html): the stops measured by every pilot of the site, per class, never named.
-  if (path === '/api/training/memo' && method === 'GET') return json(await memo(env, user, new URL(request.url)));
+  if (path === '/api/training/memo' && method === 'GET') return json(await memo(env, user, new URL(request.url),actor.manager===true));
+  if (path === '/api/training/memo/restart' && method === 'POST') {
+    if(!actor.manager)fail(403,'Réservé aux administrateurs de la plateforme.');
+    const input=await body(request);
+    const reason=typeof input.reason==='string'?input.reason.trim():'';
+    if(reason.length<3||reason.length>120)fail(400,'Indique la version du jeu ou la raison de la relance (3 à 120 caractères).');
+    await restartMemo(env,reason);
+    return json({ok:true});
+  }
   if (path === '/api/training/profile' && method === 'PUT') {
     const input = await body(request);
     const name = typeof input.lmuName === 'string' ? input.lmuName.replace(/[\u0000-\u001f]/g, '').trim() : '';
@@ -364,6 +386,7 @@ export async function trainingApi(path, method, request, env, actor, community) 
 }
 
 export async function purgeTraining(env) {
+  await renewMemos(env);
   for (const table of ['training_sessions', 'training_live']) await env.DB.prepare(`DELETE FROM ${table} WHERE id IN (SELECT id FROM ${table} WHERE started_at<? LIMIT 500)`).bind(Date.now() - KEEP_DAYS * DAY * 1000).run();
   await env.DB.prepare('DELETE FROM training_memo_pilots WHERE started_at<?').bind(Date.now()-KEEP_DAYS*DAY*1000).run();
   await backfillMemo(env);

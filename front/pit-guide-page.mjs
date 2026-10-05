@@ -20,7 +20,7 @@ function band(item, unit, digits) {
   const pilots = item.median !== null, own = !pilots && item.youMin !== null && item.youMax !== null && item.youMax > item.youMin;
   if (!pilots && !own) return '';
   const low = pilots ? item.low : item.youMin, high = pilots ? item.high : item.youMax;
-  const values = [low, high, item.you, item.game].filter(value => value !== null && value !== undefined);
+  const values = [low, high, item.median, item.you, item.game].filter(value => value !== null && value !== undefined);
   const min = Math.min(...values) * 0.97, max = Math.max(...values) * 1.03, at = value => `${((value - min) / (max - min) * 100).toFixed(1)}%`;
   return `<div class="memo-band${own ? ' is-own' : ''}" role="img" aria-label="${pilots ? 'Pilotes' : 'Toi'} de ${num(low, digits)} à ${num(high, digits)} ${unit}">
     <span class="memo-iqr" style="left:${at(low)};width:calc(${at(high)} - ${at(low)})"></span>${pilots ? `<span class="memo-median" style="left:${at(item.median)}"></span>` : ''}
@@ -38,7 +38,7 @@ const source = item => !item ? '' : item.median !== null && item.median !== unde
 function perLap(title, item, unit, digits, extra = '') {
   const main = item.median ?? item.you ?? item.game;
   const kind = source(item);
-  return `<div class="memo-block"><h3>${title}</h3><p class="memo-big ${kind}">${num(main, digits)}<span>${unit} / tour</span></p>${band(item, unit, digits)}
+  return `<div class="memo-block"><h3>${title}</h3>${item.median!==null?'<p class="memo-tag is-pilots">Moyenne du site</p>':''}<p class="memo-big ${kind}">${num(main, digits)}<span>${unit} / tour</span></p>${band(item, unit, digits)}
     <dl>${item.you !== null ? row('Toi', `${num(item.you, digits)} ${unit}`, 'is-you') : ''}${item.game ? row('Prévu par le jeu', `${num(item.game, digits)} ${unit}`, 'is-game') : ''}${extra}</dl></div>`;
 }
 
@@ -119,6 +119,24 @@ function bop(data) {
     <p class="training-note"><a href="${esc(b.url)}" target="_blank" rel="noopener">BoP officielle LMU ${esc(b.version)}</a> du ${esc(b.date.split('-').reverse().join('/'))}.</p></section>`;
 }
 
+const date = value => value ? new Date(value).toLocaleDateString('fr-FR') : '—';
+function collectionStatus(data) {
+  const c=data.collection;
+  if(!c)return '';
+  return `<section class="training-card memo-collection" aria-label="Mise à jour du mémo">
+    <h2>${c.state==='stable'?'Mémo stabilisé':'Collecte en cours'}</h2>
+    <p>${c.state==='stable'?`Moyennes stabilisées le ${date(c.publishedAt)}. Prochaine collecte le ${date(c.renewAt)}.`
+      : `${c.pilots} / ${c.target.pilots} pilotes · ${c.laps} / ${c.target.laps} tours exploitables. Renouvellement le ${date(c.renewAt)}.`}</p>
+    <p class="training-note">${c.previous?`Le mémo du ${date(c.publishedAt)} reste affiché jusqu’à ce que la nouvelle collecte soit suffisante. `:c.state==='collecting'?'Les valeurs disponibles sont provisoires. ':''}
+      Accessible à tous les pilotes, même sans partager de données. Chaque contributeur a le même poids dans la moyenne.${c.sample?` Valeurs affichées : ${c.sample.pilots} pilotes, ${c.sample.laps} tours.`:''}</p>
+    ${c.reason?`<p class="training-note">Relance : ${esc(c.reason)}.</p>`:''}
+    ${data.canRestart?`<details><summary>Administration · relancer après une mise à jour du jeu</summary>
+      <form data-memo-restart><label>Version du jeu ou raison de la relance<input name="reason" required minlength="3" maxlength="120" placeholder="Ex. mise à jour LMU 1.5"></label>
+      <p class="training-note">Relance la collecte de tous les circuits et voitures pour 15 jours. Les mémos disponibles restent visibles.</p>
+      <button type="submit">Relancer la collecte du site</button><p data-restart-message role="status"></p></form></details>`:''}
+    </section>`;
+}
+
 function render() {
   const data = view.data;
   if (!data.circuit) {
@@ -144,6 +162,7 @@ function render() {
       <label class="memo-select">Voiture<select data-pick="car">${cars.map(item => `<option value="${esc(item.car)}"${item.car === data.car.car ? ' selected' : ''}>${esc(item.car)}</option>`).join('')}</select></label>
     </div>
     <p class="memo-key"><span class="is-you"><i class="dot"></i>Toi</span><span class="is-pilots"><i class="bar"></i>Les pilotes du site</span><span class="is-game"><i class="tri"></i>Le jeu</span></p></div>
+    ${collectionStatus(data)}
     <div class="memo-grid">
     ${levels(data)}
     <section class="training-card"><h2>Stand</h2>
@@ -208,6 +227,16 @@ app.addEventListener('input', event => {
   }
   updateCalculator();
 });
-app.addEventListener('submit', event => event.preventDefault());
+app.addEventListener('submit', async event => {
+  event.preventDefault();
+  const form=event.target.closest('[data-memo-restart]');if(!form)return;
+  const button=form.querySelector('button'),message=form.querySelector('[data-restart-message]');
+  button.disabled=true;
+  try {
+    const response=await fetch('/api/training/memo/restart',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({reason:form.elements.reason.value})});
+    const result=await response.json();if(!response.ok)throw Error(result.error||'Relance indisponible.');
+    await load(`?${new URLSearchParams({circuit:view.data.circuit.key,car:view.data.car.car})}`);
+  }catch(error){message.textContent=error.message;button.disabled=false;}
+});
 
 load();
