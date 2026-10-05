@@ -315,7 +315,7 @@ export function stopTime(service, {fuel = 0, energy = 0, tyres = 0, wing = false
 // own figure and the game's forecast are shown, so that no pilot can be singled out.
 const quantile = (list, q) => { if (!list.length) return null; const sorted = [...list].sort((a, b) => a - b), at = (sorted.length - 1) * q, low = Math.floor(at); return sorted[low] + (sorted[Math.ceil(at)] - sorted[low]) * (at - low); };
 export const MEMO_MIN = {pilots:3, laps:30};
-export function memoSheet({laneStops = [], carStops = [], sessions = [], viewer = null, service = null, game = null, min = MEMO_MIN}) {
+export function memoSheet({laneStops = [], carStops = [], sessions = [], viewer = null, service = null, game = null, reference = null, min = MEMO_MIN}) {
   const through = laneStops.map(stop => stop.lane - stop.stopped).filter(value => value > 0);
   // Laps that tell the truth: on track, valid, close to the pilot's own pace.
   const byPilot = new Map();
@@ -360,9 +360,65 @@ export function memoSheet({laneStops = [], carStops = [], sessions = [], viewer 
   const pick = item => item.median ?? item.you ?? item.game;
   const ve = pick(energy), litres = pick(fuel), wear = tyres[0] ? tyres[0].median ?? tyres[0].you : null;
   const measured = pitTimes(carStops);
-  return {lane:through.length ? {through:round(median(through), 1), stops:through.length} : null,
+  // Where the viewer's race pace (his median clean lap) stands among the reference levels, and the next one up.
+  let levels = null;
+  if (reference) {
+    const own = byPilot.get(viewer)?.laps.map(lap => lap.t).filter(Boolean) || [];
+    const pace = median(own), level = levelOf(pace, reference), index = LEVELS.findIndex(item => item.name === level);
+    levels = {track:reference.track, patch:reference.patch, q:reference.q, bands:levelBands(reference),
+      you:pace ? {pace:round(pace, 3), best:round(Math.min(...own), 3), level, next:index > 0 ? {name:LEVELS[index - 1].name, time:reference.pace[LEVELS[index - 1].to]} : null} : null};
+  }
+  return {levels, lane:through.length ? {through:round(median(through), 1), stops:through.length} : null,
     service:service ? {source:'game', ...service} : measured && (measured.tyres4 || measured.fuelRate) ? {source:'stops', tyres4:measured.tyres4, tyres2:measured.tyres2, fuelRate:measured.fuelRate, repair:measured.repair} : null,
     energy, fuel:{...fuel, ratio:litres && ve && capacity ? round(litres / capacity * 100 / ve, 2) : null}, capacity, tyres,
     stint:{energyLaps:ve ? Math.floor(100 / ve) : null, tankLaps:litres && capacity ? Math.floor(capacity / litres) : null, lapsTo50:wear ? Math.floor(50 / wear) : null},
     min};
+}
+
+// Reference lap times (Ohne Speed's « LMU laptimes spreadsheet », shared with credit at the foot of the page): per
+// track and class, the qualifying time and the race pace of each level. Its columns go from the alien's race pace to
+// the offline driver's; the levels are named, never given in percent.
+export const LAPTIME_SOURCE = {name:'Ohne Speed', title:'LMU laptimes spreadsheet', url:'https://www.youtube.com/@ohne_speed',
+  csv:'https://docs.google.com/spreadsheets/d/e/2PACX-1vTN03UvJDm99byA6vQPZHKOCYVvfxLu1zkJAzdaKyROykzEKY2-Xl1rl1q5znZEf36m88dxMKsY2eaO/pub?gid=253434982&single=true&output=csv'};
+export const LEVELS = [{name:'Alien', from:0, to:0}, {name:'Competitive', from:1, to:1}, {name:'Good', from:2, to:3}, {name:'Midpack', from:4, to:5}, {name:'Tail-ender', from:6, to:6}, {name:'Offline', from:7, to:null}];
+const LAPTIME_CLASSES = {LMGT3:'GT3', LMH:'Hypercar', LMP3:'LMP3', LMP2elms:'LMP2 ELMS', LMP2wec:'LMP2', GTE:'GTE'};
+const csvRows = text => {
+  const rows = []; let row = [], cell = '', quoted = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (quoted) { if (c === '"' && text[i + 1] === '"') { cell += '"'; i++; } else if (c === '"') quoted = false; else cell += c; }
+    else if (c === '"') quoted = true;
+    else if (c === ',') { row.push(cell); cell = ''; }
+    else if (c === '\n' || c === '\r') { if (c === '\r' && text[i + 1] === '\n') i++; row.push(cell); rows.push(row); row = []; cell = ''; }
+    else cell += c;
+  }
+  if (cell || row.length) { row.push(cell); rows.push(row); }
+  return rows;
+};
+const clock = value => { const match = String(value || '').trim().match(/^(?:(\d+):)?(\d{1,2}(?:\.\d+)?)$/); return match ? Number(match[1] || 0) * 60 + Number(match[2]) : null; };
+export function parseLaptimes(text) {
+  const out = [];
+  for (const cells of csvRows(String(text || '').slice(0, 2_000_000))) {
+    const [key, track, patch, q, ...rest] = cells.map(cell => cell.trim());
+    const suffix = track && key?.startsWith(track) ? key.slice(track.length) : '';
+    const carClass = LAPTIME_CLASSES[suffix], pace = rest.slice(0, 8).map(clock);
+    if (!carClass || !clock(q) || pace.some(value => !value || value < clock(q) * 0.95 || value > 3600)) continue;
+    out.push({track:track.slice(0, 80), carClass, patch:patch.slice(0, 20), q:clock(q), pace, circuit:circuitOf(track)});
+  }
+  return out;
+}
+const UPDATED = /Last updated:\s*(\d{4})\.(\d{2})\.(\d{2})/;
+export const laptimesUpdated = text => { const match = String(text || '').match(UPDATED); return match ? `${match[1]}-${match[2]}-${match[3]}` : null; };
+// The level a race pace belongs to: alien up to the first column, then each level up to its last column.
+export function levelOf(pace, reference) {
+  if (!pace || !reference) return null;
+  return LEVELS.find(level => level.to === null || pace <= reference.pace[level.to])?.name ?? null;
+}
+// The levels shown on the sheet, end to end like levelOf: each from the previous level's last column to its own.
+export function levelBands(reference) {
+  return LEVELS.map((level, index) => ({name:level.name, from:index ? reference.pace[LEVELS[index - 1].to] : null, to:level.to === null ? null : reference.pace[level.to]}));
+}
+// Of a circuit's layouts, the main one: no variant in brackets, else the WEC one.
+export function mainLayout(rows) {
+  return rows.find(row => !/\(/.test(row.track)) || rows.find(row => /\(wec\)/i.test(row.track)) || rows[0] || null;
 }

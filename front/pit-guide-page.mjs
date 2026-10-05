@@ -10,6 +10,8 @@ const num = (value, digits = 1) => value === null || value === undefined ? '—'
 const WHEELS = ['avant gauche', 'avant droit', 'arrière gauche', 'arrière droit'];
 const view = {data:null, calc:{arrive:50, leave:100, tyres:4, driver:false, wing:false, ductFront:false, ductRear:false, brakes:false}};
 
+// 80.887 -> 1:20.887 (times from the spreadsheet have two decimals).
+const lap = (seconds, digits = 2) => seconds ? `${Math.floor(seconds / 60)}:${(seconds % 60).toFixed(digits).padStart(digits + 3, '0')}` : '—';
 const row = (label, value, kind = '', note = '') => `<div class="memo-row"><dt>${label}</dt><dd class="${kind}">${value}${note ? `<small>${note}</small>` : ''}</dd></div>`;
 
 // The pilots' band, the median's line, the game's triangle and the viewer's dot, on one scale.
@@ -51,6 +53,20 @@ function calculator(data) {
     ${data.lane ? row('<strong>Temps perdu</strong>', `<strong>${num(data.lane.through + stopped)} s</strong>`, '', 'traversée + arrêt') : ''}</dl>`;
 }
 
+// Reference lap times by level (the names of the spreadsheet, never its percentages), the viewer's level and the
+// next one to reach.
+function levels(data) {
+  const ref = data.levels;
+  if (!ref) return '';
+  const you = ref.you;
+  const range = band => band.from === null ? `jusqu’à ${lap(band.to)}` : band.to === null ? `plus de ${lap(band.from)}` : `${lap(band.from)} à ${lap(band.to)}`;
+  return `<section class="training-card memo-wide"><h2>Chronos de référence</h2>
+    <p class="training-note">Rythme de course moyen par niveau en ${esc(ref.track)}, version ${esc(ref.patch)} du jeu.</p>
+    <dl>${row('Qualif', lap(ref.q), 'is-game', 'meilleur tour moyen de la catégorie')}
+      ${ref.bands.map(band => row(esc(band.name), range(band), you?.level === band.name ? 'is-you' : '')).join('')}</dl>
+    ${you?.pace ? `<p class="memo-level is-you"><i class="dot"></i>Ton rythme : <strong>${esc(you.level)}</strong> (${lap(you.pace, 3)})${you.next ? ` · Prochain objectif : <strong>${esc(you.next.name)}</strong> en ${lap(you.next.time)}` : ''}${you.best ? ` · Meilleur tour ${lap(you.best, 3)}` : ''}</p>` : ''}</section>`;
+}
+
 function render() {
   const data = view.data;
   if (!data.circuit) {
@@ -73,6 +89,7 @@ function render() {
     </div>
     <p class="memo-key"><span class="is-you"><i class="dot"></i>Toi</span><span class="is-pilots"><i class="bar"></i>Les pilotes du site : médiane et fourchette</span><span class="is-game"><i class="tri"></i>Le jeu</span></p></header>
     <div class="memo-grid">
+    ${levels(data)}
     <section class="training-card"><h2>Temps perdu au stand</h2>
       <p class="training-note">Un arrêt, c’est la traversée de la voie, fixe, plus le temps arrêté, qui dépend de ce que tu fais.</p>
       <dl>${row('Traversée de la voie', data.lane ? `${num(data.lane.through)} s` : '—', 'is-pilots', data.lane ? `${data.lane.stops} arrêt${data.lane.stops > 1 ? 's' : ''} mesuré${data.lane.stops > 1 ? 's' : ''} · aussi le prix d’un drive-through` : 'pas encore d’arrêt mesuré')}</dl>
@@ -101,7 +118,8 @@ function render() {
       <li><strong>Ce qui ne dépend pas du pilote</strong> : les temps de service sont lus dans le jeu, la traversée de la voie est la médiane de tous les arrêts mesurés sur ce circuit.</li>
       <li><strong>Ce qui dépend du pilote</strong>, la conso et l’usure, est montré en fourchette : la médiane des pilotes et la moitié d’entre eux autour d’elle. Chaque pilote compte une fois, sans aucun nom.</li>
       <li><strong>Tours retenus</strong> : en piste, sans arrêt, sans tour invalidé, et proches du rythme du pilote.</li>
-      <li><strong>Seuil</strong> : la fourchette n’apparaît qu’à partir de ${data.min.pilots} pilotes et ${data.min.laps} tours. Avant, la fiche montre ta valeur et la prévision du jeu.</li></ul></section>`;
+      <li><strong>Seuil</strong> : la fourchette n’apparaît qu’à partir de ${data.min.pilots} pilotes et ${data.min.laps} tours. Avant, la fiche montre ta valeur et la prévision du jeu.</li></ul></section>
+    ${data.source ? `<p class="memo-credit">Chronos de référence : <a href="${esc(data.source.url)}" target="_blank" rel="noopener">${esc(data.source.title)}</a> de ${esc(data.source.name)}${data.source.updated ? `, mis à jour le ${esc(data.source.updated.split('-').reverse().join('/'))}` : ''}.</p>` : ''}`;
 }
 
 async function load(params = '') {
