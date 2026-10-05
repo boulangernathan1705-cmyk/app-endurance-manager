@@ -2025,3 +2025,19 @@ html[data-game] #app .race-header .event-type-panel span { font-size: 28px; font
 @media (max-width: 600px) { .solo-entries { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); } }
 html[data-game] #app .race-header .race-header-time { display: inline-flex; align-items: center; gap: 7px; padding: 4px 12px; border: 1px solid rgba(255, 255, 255, .16); border-radius: 9px; font-size: 18px; font-weight: 800; color: #f4f6f5; }
 html[data-game] #app .race-header .race-header-time svg { width: 18px; height: 18px; fill: none; stroke: #7fe3ea; stroke-width: 2; stroke-linecap: round; }
+
+/* EVENT TDZ page: the chips unfold into plain words. */
+.solo-event-details { width: 100%; }
+.solo-event-details > summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; cursor: pointer; list-style: none; }
+.solo-event-details > summary::-webkit-details-marker { display: none; }
+.solo-event-details > summary .solo-card-info { margin: 0; }
+.solo-details-toggle { display: inline-flex; flex: none; align-items: center; gap: 4px; font-size: 12px; font-weight: 700; color: #9aa6b0; }
+.solo-details-toggle svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; transition: transform .15s; }
+.solo-event-details > summary:hover .solo-details-toggle { color: #7fe3ea; }
+.solo-event-details[open] .solo-details-toggle svg { transform: rotate(180deg); }
+.solo-details-body { display: grid; gap: 14px; margin-top: 14px; }
+.solo-detail-round h3 { margin: 0 0 8px; font-size: 13px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: #dfe5ea; }
+.solo-detail-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; margin: 0; }
+.solo-detail { padding: 9px 12px; border: 1px solid rgba(255, 255, 255, .1); border-radius: 10px; background: rgba(255, 255, 255, .03); }
+.solo-detail dt { font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: #8c98a2; }
+.solo-detail dd { margin: 3px 0 0; font-size: 16px; font-weight: 800; color: #f2f5f7; overflow-wrap: anywhere; }

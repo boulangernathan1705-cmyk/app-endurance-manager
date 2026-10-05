@@ -69,6 +69,22 @@ export function soloCardInfo(event) {
   ].filter(Boolean);
   return `<span class="solo-card-info">${rounds.map(roundRow).join('')}${extra.length ? `<span class="solo-info-row">${extra.join('')}</span>` : ''}</span>`;
 }
+// Event page: the same chips, and a click unfolds them in plain words (« Essais 5 min », « Usure des pneus ×1 »).
+export function soloEventDetails(event) {
+  const details = event.details || {}, rounds = event.rounds?.length ? event.rounds : [{circuit: event.circuit, durationMinutes: event.durationMinutes}];
+  const item = (label, value) => value ? `<div class="solo-detail"><dt>${esc(label)}</dt><dd>${value}</dd></div>` : '';
+  const minutes = value => value ? `${Number(value)} min` : '';
+  const round = (round, index) => {
+    const weather = WEATHERS.find(([value]) => value === round.weather);
+    const category = round.randomCategory ? 'Aléatoire' : (round.categories || []).length ? round.categories.map(esc).join(', ') : esc(round.category || '');
+    return `<div class="solo-detail-round">${rounds.length > 1 ? `<h3>Manche ${index + 1} · ${esc(eventCircuitName(event, round.circuit))}</h3>` : ''}<dl class="solo-detail-grid">
+      ${item('Essais', minutes(round.practice))}${item('Qualifications', minutes(round.qualifying))}${item('Course', minutes(round.durationMinutes))}
+      ${item('Météo', weather ? `${weather[1]} ${esc(weather[2])}` : '')}${item('Consommation', round.fuel != null ? `×${esc(round.fuel)}` : '')}${item('Usure des pneus', round.tyres != null ? `×${esc(round.tyres)}` : '')}
+      ${item('Catégorie', category)}${item('Voiture', esc(round.car || ''))}</dl></div>`;
+  };
+  const extra = `${item('Mot de passe du serveur', esc(details.password || ''))}${item('Info', esc(details.note || ''))}`;
+  return `<details class="solo-event-details"><summary>${soloCardInfo(event)}<span class="solo-details-toggle">Détails<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span></summary><div class="solo-details-body">${rounds.map(round).join('')}${extra ? `<dl class="solo-detail-grid">${extra}</dl>` : ''}</div></details>`;
+}
 // Above the card's details: the circuit, or the number of rounds.
 export function soloCardMeta(event) {
   const rounds = event.rounds || [];
