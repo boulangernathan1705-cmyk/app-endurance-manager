@@ -225,6 +225,10 @@ test('an online file waits for the pilot name, then is read; the sync program ca
   assert.equal((await req('/api/training/profile','PUT',{lmuName:'Pilote 01'},'pilot')).data.added,1);
   data=(await req('/api/training','GET',null,'pilot')).data;
   assert.equal(data.pending,null);assert.equal(data.lmuName,'Pilote 01');
+  // His name now known, an online file without it is a session he did not drive: refused, not kept waiting.
+  response=await upload(send,'pilot',recent.replaceAll('Pilote 01','Pilote 99'));
+  assert.equal(response.status,400);
+  assert.equal((await req('/api/training','GET',null,'pilot')).data.pending,null);
   assert.equal(data.sessions[0].car,'Genesis GMR001');assert.equal(data.sessions[0].laps,14);
   // The program sends the name read in LMU's settings: the pilot of the shared Peugeot is found at once.
   await login(MATE,'mate','Bob');
