@@ -224,7 +224,8 @@ export function cleanLive(input) {
   if (!laps.length) throw Error('Aucun tour roulé dans cette séance.');
   const stops = input.stops.slice(0, 60).map(stop => ({lap:finite(stop?.lap, 0, 10000) ?? 0, lane:finite(stop?.lane, 0, 600), stopped:finite(stop?.stopped, 0, 600),
     fuel:finite(stop?.fuel, 0, 200) ?? 0, ve:finite(stop?.ve, 0, 100) ?? 0, tyres:finite(stop?.tyres, 0, 4) ?? 0, repair:stop?.repair === true})).filter(stop => stop.lane && stop.stopped !== null);
-  return {at, track, car, carClass:label(input.class, 60), driver:label(input.driver, 60), capacity:finite(input.capacity, 1, 300), laps, stops};
+  return {at, track, car, carClass:label(input.class, 60), driver:label(input.driver, 60), capacity:finite(input.capacity, 1, 300), laps, stops,
+    service:cleanService(input.service), game:cleanGame(input.game)};
 }
 
 // The stops broken down: the pit lane without the stop, then each service on its own (a stop with one service only
@@ -280,4 +281,88 @@ export function resultsAsLive(sessions) {
       wear:lap.wear || NONE, temp:NONE, brake:NONE, kpa:NONE, compound:lap.compound || '', track:null, air:null, rain:null, invalid:false, pit:lap.pit, limits:0}))}))
     .filter(session => session.laps.length);
   return list.length ? {...analyseLive(list), source:'results'} : null;
+}
+
+// What the game says about a car (read by the plugin in LMU's own API): its service times, fixed for everyone who
+// drives it, and its forecast for one lap on this track. Bounded numbers only; anything missing stays null.
+const SERVICE = {fuelRate:[0.1, 20], energyRate:[0.1, 20], connect:[0, 30], tyres4:[0, 120], tyres2:[0, 120], wing:[0, 300],
+  ductFront:[0, 120], ductRear:[0, 120], brakes:[0, 600], driver:[0, 120], repair:[0, 600]};
+export function cleanService(input) {
+  if (!input || typeof input !== 'object') return null;
+  const service = Object.fromEntries(Object.entries(SERVICE).map(([key, [min, max]]) => [key, finite(input[key], min, max)]));
+  return service.fuelRate || service.energyRate || service.tyres4 ? service : null;
+}
+export function cleanGame(input) {
+  if (!input || typeof input !== 'object') return null;
+  const game = {fuel:finite(input.fuel, 0.01, 50), ve:finite(input.ve, 0.01, 50), ideal:finite(input.ideal, 0, 200)};
+  return game.fuel || game.ve || game.ideal ? game : null;
+}
+
+// The time stopped, by the game's own rule (checked on real stops): tyres, brakes and brake ducts one after the
+// other, plus the longest of fuel, energy, rear wing and driver swap, which are done at the same time.
+export function stopTime(service, {fuel = 0, energy = 0, tyres = 0, wing = false, driver = false, ductFront = false, ductRear = false, brakes = false}) {
+  const s = service || {};
+  const fill = fuel > 0 && s.fuelRate ? (s.connect ?? 2) + fuel / s.fuelRate : 0;
+  const charge = energy > 0 && s.energyRate ? energy / s.energyRate : 0;
+  const along = Math.max(fill, charge, wing ? s.wing || 0 : 0, driver ? s.driver || 0 : 0);
+  const after = (tyres === 4 ? s.tyres4 || 0 : tyres === 2 ? s.tyres2 || 0 : 0) + (ductFront ? s.ductFront || 0 : 0) + (ductRear ? s.ductRear || 0 : 0) + (brakes ? s.brakes || 0 : 0);
+  return round(along + after, 1);
+}
+
+// The circuit sheet (« mémo », stands.html), the same for everyone: the pit lane of the circuit, the service times of
+// the car, and what one lap takes. Fuel, energy and tyres depend on the pilot: each pilot counts once (his median),
+// and the sheet shows the median of the pilots with the middle half of them; below the threshold only the viewer's
+// own figure and the game's forecast are shown, so that no pilot can be singled out.
+const quantile = (list, q) => { if (!list.length) return null; const sorted = [...list].sort((a, b) => a - b), at = (sorted.length - 1) * q, low = Math.floor(at); return sorted[low] + (sorted[Math.ceil(at)] - sorted[low]) * (at - low); };
+export const MEMO_MIN = {pilots:3, laps:30};
+export function memoSheet({laneStops = [], carStops = [], sessions = [], viewer = null, service = null, game = null, min = MEMO_MIN}) {
+  const through = laneStops.map(stop => stop.lane - stop.stopped).filter(value => value > 0);
+  // Laps that tell the truth: on track, valid, close to the pilot's own pace.
+  const byPilot = new Map();
+  for (const session of sessions) {
+    const entry = byPilot.get(session.user) || {laps:[], capacity:null};
+    entry.laps.push(...session.laps.filter(lap => !lap.pit && !lap.invalid));
+    entry.capacity = session.capacity || entry.capacity;
+    byPilot.set(session.user, entry);
+  }
+  const pilots = [...byPilot].map(([user, entry]) => {
+    const pace = median(entry.laps.map(lap => lap.t).filter(Boolean));
+    const laps = entry.laps.filter(lap => !lap.t || !pace || lap.t <= pace * 1.07);
+    const compounds = {};
+    for (const lap of laps.filter(lap => lap.compound && lap.wear.some(value => value > 0))) (compounds[lap.compound] ||= []).push(lap);
+    return {user, laps:laps.length, capacity:entry.capacity, fuel:median(laps.map(lap => lap.fuel).filter(value => value > 0)), ve:median(laps.map(lap => lap.ve).filter(value => value > 0)),
+      tyres:Object.fromEntries(Object.entries(compounds).map(([name, list]) => [name, {laps:list.length,
+        wear:median(list.map(lap => Math.max(...lap.wear.map(value => value ?? 0)))),
+        worst:[0, 1, 2, 3].map(index => median(list.map(lap => lap.wear[index]).filter(value => value !== null)) ?? 0),
+        temp:median(list.map(lap => median(lap.temp.filter(value => value !== null))).filter(value => value !== null)),
+        track:median(list.map(lap => lap.track).filter(value => value !== null))}]))};
+  });
+  const mine = pilots.find(pilot => pilot.user === viewer) || null;
+  const spread = (values, laps, you, digits) => {
+    const list = values.filter(value => value > 0), open = list.length >= min.pilots && laps >= min.laps;
+    return {pilots:list.length, laps, you:round(you ?? null, digits), median:open ? round(quantile(list, 0.5), digits) : null,
+      low:open ? round(quantile(list, 0.25), digits) : null, high:open ? round(quantile(list, 0.75), digits) : null};
+  };
+  const lapCount = key => pilots.filter(pilot => pilot[key] > 0).reduce((sum, pilot) => sum + pilot.laps, 0);
+  const energy = {...spread(pilots.map(pilot => pilot.ve), lapCount('ve'), mine?.ve, 2), game:game?.ve ?? null};
+  const fuel = {...spread(pilots.map(pilot => pilot.fuel), lapCount('fuel'), mine?.fuel, 2), game:game?.fuel ?? null};
+  const capacity = median(pilots.map(pilot => pilot.capacity).filter(Boolean));
+  const names = [...new Set(pilots.flatMap(pilot => Object.keys(pilot.tyres)))];
+  const tyres = names.map(name => {
+    const rows = pilots.filter(pilot => pilot.tyres[name]).map(pilot => pilot.tyres[name]);
+    const laps = rows.reduce((sum, row) => sum + row.laps, 0), you = mine?.tyres[name] || null;
+    const wear = spread(rows.map(row => row.wear), laps, you?.wear, 2), open = wear.median !== null;
+    const worst = open ? [0, 1, 2, 3].map(index => median(rows.map(row => row.worst[index]))) : you?.worst;
+    return {name, ...wear, worst:worst ? worst.indexOf(Math.max(...worst)) : null, temp:open ? round(median(rows.map(row => row.temp).filter(Boolean)), 0) : null,
+      youTemp:round(you?.temp ?? null, 0), track:round(median(rows.map(row => row.track).filter(value => value !== null)), 1), ideal:game?.ideal ?? null};
+  }).sort((a, b) => b.laps - a.laps);
+  // The figures a stint is planned with: the pilots' median, else the viewer's own, else the game's forecast.
+  const pick = item => item.median ?? item.you ?? item.game;
+  const ve = pick(energy), litres = pick(fuel), wear = tyres[0] ? tyres[0].median ?? tyres[0].you : null;
+  const measured = pitTimes(carStops);
+  return {lane:through.length ? {through:round(median(through), 1), stops:through.length} : null,
+    service:service ? {source:'game', ...service} : measured && (measured.tyres4 || measured.fuelRate) ? {source:'stops', tyres4:measured.tyres4, tyres2:measured.tyres2, fuelRate:measured.fuelRate, repair:measured.repair} : null,
+    energy, fuel:{...fuel, ratio:litres && ve && capacity ? round(litres / capacity * 100 / ve, 2) : null}, capacity, tyres,
+    stint:{energyLaps:ve ? Math.floor(100 / ve) : null, tankLaps:litres && capacity ? Math.floor(capacity / litres) : null, lapsTo50:wear ? Math.floor(50 / wear) : null},
+    min};
 }
