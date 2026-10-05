@@ -65,7 +65,7 @@ function absenceButton(event){
   const absent=(event.absences||[]).some(item=>item.mine);
   const entered=(event.departures||[]).some(departure=>(departure.availability||[]).some(reg=>reg.mine&&reg.status!=='unavailable'));
   if(entered&&!absent)return '';
-  const label=absent?'Absent':'Je serai absent',tip=absent?'Tu es noté absent : clique pour retirer ton absence':'Je serai absent';
+  const label='Absent',tip=absent?'Tu es noté absent : clique pour retirer ton absence':'Je serai absent';
   return `<button type="button" class="planning-quick-button is-labelled is-absence${absent?' is-active':''}" data-action="${absent?'event-absence-cancel':'event-absence'}" data-id="${event.id}" data-tip="${esc(tip)}" aria-label="${esc(tip)}"><span class="planning-quick-icon">${ICON_ABSENT}</span><span class="planning-quick-label">${esc(label)}</span></button>`;
 }
 // The pilot's own entry, always unfolded: one click enters him (or opens his entry). The other choices
