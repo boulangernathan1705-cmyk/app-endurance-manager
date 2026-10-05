@@ -159,14 +159,19 @@ function soloChoiceLabel(choice,round){
   return `${logo(choice.category)} ${esc(choice.category)}`;
 }
 function renderSoloStepper(event,departure,stateDraft){
-  const rounds=initSoloDraft(event,departure,stateDraft),total=rounds.length+1;
+  const rounds=initSoloDraft(event,departure,stateDraft);
+  // Opened from a round (« Manche 2 »): that round only; the others are entered on their own.
+  const only=Number.isInteger(stateDraft.onlyRound)&&rounds[stateDraft.onlyRound],shown=only?[stateDraft.onlyRound]:rounds.map((_,index)=>index);
+  stateDraft.solo=shown.length;stateDraft.shownRounds=shown;
+  const total=shown.length+1;
   const step=Math.min(Math.max(Number(stateDraft.step)||(stateDraft.id?total:1),1),total);
   const linkedOther=stateDraft.forOther&&!!(stateDraft.participantUserId||stateDraft.discordLinked);
   const manualOther=stateDraft.forOther&&!linkedOther&&!!stateDraft.manualOther;
   const identity=identityFields(stateDraft,departure,false,manualOther,linkedOther,false,false);
-  const stepName=n=>n===total?'Récapitulatif':rounds.length>1?`Manche ${n}`:'Catégorie et voiture';
+  const stepName=n=>n===total?'Récapitulatif':rounds.length>1?`Manche ${shown[n-1]+1}`:'Catégorie';
   const pane=(n,content)=>`<section class="registration-step" data-step="${n}" ${n===step?'':'hidden'}>${content}</section>`;
-  const roundPane=(round,index)=>{
+  const roundPane=(index,position)=>{
+    const round=rounds[index],n=position+1;
     const choice=stateDraft.choices[index];
     // A single category is already chosen: no question, straight to the cars.
     const single=round.categories.length===1;
@@ -176,25 +181,25 @@ function renderSoloStepper(event,departure,stateDraft){
       return button('solo-category',label,`data-departure="${departure.id}" data-round="${index}" data-value="${esc(category)}" aria-pressed="${active}"`,`category-button ${any?'':categories[category]?.css||''} ${active?'active':''}`);
     }).join('');
     // Several rounds: the pilot does this one or not.
-    const toggle=rounds.length>1?`<div class="solo-round-toggle" role="group" aria-label="Manche ${index+1}">${[[false,'Je la fais'],[true,'Je ne la fais pas']].map(([skip,label])=>button('solo-skip',label,`data-departure="${departure.id}" data-round="${index}" data-value="${skip?1:0}" aria-pressed="${!!choice.skip===skip}"`,`secondary-button ${!!choice.skip===skip?'active':''}`)).join('')}</div>`:'';
+    const toggle=rounds.length>1&&!only?`<div class="solo-round-toggle" role="group" aria-label="Manche ${index+1}">${[[false,'Je la fais'],[true,'Je ne la fais pas']].map(([skip,label])=>button('solo-skip',label,`data-departure="${departure.id}" data-round="${index}" data-value="${skip?1:0}" aria-pressed="${!!choice.skip===skip}"`,`secondary-button ${!!choice.skip===skip?'active':''}`)).join('')}</div>`:'';
     const heading=rounds.length>1?`<p class="solo-round-heading">Manche ${index+1} · ${esc(eventCircuitName(event,round.circuit))}${round.durationMinutes?` · ${round.durationMinutes} min`:''}</p>${toggle}`:'';
-    if(choice.skip)return pane(index+1,`${index===0?communityLine(event,departure,stateDraft)+identity:''}${heading}<p class="registration-step-help">${stateDraft.forOther?'Ce pilote ne fait pas':'Tu ne fais pas'} cette manche.</p>`);
+    if(choice.skip)return pane(n,`${n===1?communityLine(event,departure,stateDraft)+identity:''}${heading}<p class="registration-step-help">${stateDraft.forOther?'Ce pilote ne fait pas':'Tu ne fais pas'} cette manche.</p>`);
     // Random circuit and category: nothing to choose for this round.
-    if(!round.categories.length)return pane(index+1,`${index===0?communityLine(event,departure,stateDraft)+identity:''}${heading}${round.randomCategory?'<p class="registration-step-help">Circuit et catégorie aléatoires : rien à choisir pour cette manche.</p>':''}`);
+    if(!round.categories.length)return pane(n,`${n===1?communityLine(event,departure,stateDraft)+identity:''}${heading}${round.randomCategory?'<p class="registration-step-help">Circuit et catégorie aléatoires : rien à choisir pour cette manche.</p>':''}`);
     // Solo event: the category only, the car does not matter.
     const cars='';
-    return pane(index+1,`${index===0?communityLine(event,departure,stateDraft)+identity:''}${heading}${single?`<p class="solo-single-category">${logo(round.categories[0])}<strong>${esc(round.categories[0])}</strong></p>`:`<div class="category-area"><span class="form-label">Dans quelle catégorie ${stateDraft.forOther?'ce pilote veut-il':'veux-tu'} rouler ?</span><div class="categories registration-category-list">${buttons}</div></div>`}${cars}`);
+    return pane(n,`${n===1?communityLine(event,departure,stateDraft)+identity:''}${heading}${single?`<p class="solo-single-category">${logo(round.categories[0])}<strong>${esc(round.categories[0])}</strong></p>`:`<div class="category-area"><span class="form-label">Dans quelle catégorie ${stateDraft.forOther?'ce pilote veut-il':'veux-tu'} rouler ?</span><div class="categories registration-category-list">${buttons}</div></div>`}${cars}`);
   };
   const summaryRow=(n,label,value)=>`<button type="button" class="registration-summary-row" data-action="registration-step" data-departure="${departure.id}" data-step="${n}" data-edit="true"><span>${label}</span><strong>${value}</strong><em>Modifier</em></button>`;
   const pilot=stateDraft.name||(!stateDraft.forOther?state.user?.name:'')||'';
   const {confirmed,waiting,capacity}=soloCounts(event,departure);
   const waitNotice=!stateDraft.id&&capacity&&confirmed>=capacity?`<p class="solo-wait-notice">La course est complète : ${stateDraft.forOther?'ce pilote sera':'tu seras'} en liste d’attente (${waiting+1}${waiting===0?'er':'e'}). En cas de désistement, la place revient automatiquement au premier en attente.</p>`:'';
-  const summary=`<div class="registration-summary">${pilot?`<div class="registration-summary-row is-static"><span>Pilote</span><strong>${esc(pilot)}</strong></div>`:''}${rounds.map((round,index)=>summaryRow(index+1,rounds.length>1?`Manche ${index+1}`:'Catégorie',soloChoiceLabel(stateDraft.choices[index],round))).join('')}</div>${waitNotice}${stateDraft.id?`<div class="registration-danger-zone">${button('delete-registration',stateDraft.forOther?'Supprimer l’inscription':'Se désinscrire',`data-id="${stateDraft.id}" data-departure="${departure.id}"`,'danger-button')}</div>`:''}`;
+  const summary=`<div class="registration-summary">${pilot?`<div class="registration-summary-row is-static"><span>Pilote</span><strong>${esc(pilot)}</strong></div>`:''}${shown.map((index,position)=>summaryRow(position+1,rounds.length>1?`Manche ${index+1}`:'Catégorie',soloChoiceLabel(stateDraft.choices[index],rounds[index]))).join('')}</div>${waitNotice}${stateDraft.id&&!only?`<div class="registration-danger-zone">${button('delete-registration',stateDraft.forOther?'Supprimer l’inscription':'Se désinscrire',`data-id="${stateDraft.id}" data-departure="${departure.id}"`,'danger-button')}</div>`:''}`;
   const next=step<total?button('registration-step',stateDraft.returnToSummary?'Revenir au récapitulatif':'Continuer',`data-departure="${departure.id}" data-step="${stateDraft.returnToSummary?total:step+1}"`,'primary-button registration-next'):`<button type="submit" class="save-button registration-next">${stateDraft.id?'ENREGISTRER':stateDraft.forOther?'INSCRIRE LE PILOTE':'JE PARTICIPE'}</button>`;
   return `<form class="form-section registration-form registration-stepper" data-kind="registration" data-departure="${departure.id}" data-step="${step}" data-last-step="${total}">
 <div class="registration-progress" aria-hidden="true">${Array.from({length:total},(_,index)=>`<span class="${index<step?'done':''}"></span>`).join('')}</div>
 <p class="registration-step-label">Étape ${step} sur ${total} · ${step===1&&identity?(rounds.length?'Pilote et catégorie':'Pilote'):stepName(step)}</p>
-${rounds.map(roundPane).join('')}
+${shown.map(roundPane).join('')}
 ${pane(total,`${rounds.length?'':communityLine(event,departure,stateDraft)+identity}${summary}`)}
 <div class="registration-step-nav">${step>1?button('registration-step','Retour',`data-departure="${departure.id}" data-step="${step-1}"`,'secondary-button registration-back'):''}${next}</div>
 </form>`;
@@ -315,8 +320,8 @@ function choicesOf(event,reg){
 export async function enterRound(event,departure,index,api){
   const rounds=soloRounds(event),own=ownRegistration(departure),choices=choicesOf(event,own);
   state.roundFocus={...(state.roundFocus||{}),[departure.id]:index};
-  if(!rounds[index].categories.length&&!(event.official&&!own&&entryCommunities().length>1)){
-    choices[index]={category:ANY_CATEGORY,cars:[],carAny:true};
+  if(rounds[index].categories.length<2&&!(event.official&&!own&&entryCommunities().length>1)){
+    choices[index]={category:rounds[index].categories[0]||ANY_CATEGORY,cars:[],carAny:true};
     const body={name:own?.name||state.user.name.slice(0,32),choices,forOther:false,...(own?{version:own.version}:{})};
     await api(own?`/api/registrations/${own.id}`:`/api/races/${event.id}/departures/${departure.id}/registrations`,own?'PATCH':'POST',body);
     return true;
@@ -324,14 +329,14 @@ export async function enterRound(event,departure,index,api){
   // Categories to choose: the registration opens on this round.
   const draft=own?registrationDraft(own):{name:'',status:'',preferredPilot:'',forOther:false,participantUserId:null,category:'',cars:[],carAny:false,id:null,version:null};
   choices[index]={category:rounds[index].categories.length===1?rounds[index].categories[0]:'',cars:[],carAny:true};
-  state.drafts[departure.id]={...draft,choices,step:index+1};
+  state.drafts[departure.id]={...draft,choices,step:1,onlyRound:index};
   state.registrationOpen.add(departure.id);
   return false;
 }
 export function editRound(event,departure,index){
   const own=ownRegistration(departure);
   state.roundFocus={...(state.roundFocus||{}),[departure.id]:index};
-  state.drafts[departure.id]={...registrationDraft(own),choices:choicesOf(event,own),step:index+1};
+  state.drafts[departure.id]={...registrationDraft(own),choices:choicesOf(event,own),step:1,onlyRound:index};
   state.registrationOpen.add(departure.id);
 }
 // « Absent » on a round the pilot does: he leaves it; on his only round, he leaves the event.

@@ -25,9 +25,9 @@ function validateRegistrationStep(draft,step){
     // Solo race: steps 1..rounds are the rounds (category + car), then the summary.
     if(step===1&&draft.forOther&&!draft.id&&!draft.participantUserId&&!draft.manualOther)throw Error('Choisis un pilote.');
     if(step===1&&draft.manualOther&&!String(draft.name||'').trim())throw Error('Indique le pseudo du pilote.');
-    const choice=draft.choices?.[step-1];
+    const round=draft.shownRounds?.[step-1]??step-1,choice=draft.choices?.[round];
     if(!choice||choice.skip)return;
-    const where=draft.solo>1?` pour la manche ${step}`:'';
+    const where=(draft.shownRounds||[]).length>1?` pour la manche ${round+1}`:'';
     if(!choice.category)throw Error(`Choisis une catégorie${where}.`);
     return;
   }
@@ -123,7 +123,7 @@ async function perform(action,target){
     case 'close-registration': if(state.pendingCrewJoin?.departureId===target.dataset.departure)state.pendingCrewJoin=null;state.registrationOpen.delete(target.dataset.departure); renderEvent(); break;
     case 'new-registration': {
       state.pendingCrewJoin=null;state.selectedDepartureId=target.dataset.departure; const departure=event.departures.find(item=>item.id===target.dataset.departure); const categoryMode=target.dataset.mode==='category'; const existing=departure.availability.find(reg=>reg.id===target.dataset.registration)||ownRegistrations(departure)[0];
-      state.drafts[departure.id]={...(categoryMode&&existing?registrationDraft(existing):{name:'',status:'',preferredPilot:'',forOther:!!state.user,participantUserId:null}),category:'',cars:[],carAny:false,id:null,version:null,mode:categoryMode?'category':'pilot'}; if(target.dataset.round)state.roundFocus={...(state.roundFocus||{}),[departure.id]:Number(target.dataset.round)}; state.registrationOpen.add(departure.id); renderEvent(); revealRegistration(departure.id); break;
+      state.drafts[departure.id]={...(categoryMode&&existing?registrationDraft(existing):{name:'',status:'',preferredPilot:'',forOther:!!state.user,participantUserId:null}),category:'',cars:[],carAny:false,id:null,version:null,mode:categoryMode?'category':'pilot'}; if(target.dataset.round){const round=Number(target.dataset.round);state.roundFocus={...(state.roundFocus||{}),[departure.id]:round};const draft=state.drafts[departure.id],count=(event.rounds||[]).length;draft.onlyRound=round;draft.choices=Array.from({length:count},(_,index)=>index===round?{category:(event.rounds[round]?.randomCategory||!(event.rounds[round]?.categories?.length||event.categories.length))?'*':'',cars:[],carAny:true}:{skip:true});} state.registrationOpen.add(departure.id); renderEvent(); revealRegistration(departure.id); break;
     }
     case 'edit-registration': { state.pendingCrewJoin=null; const departure=event.departures.find(item=>item.id===target.dataset.departure),reg=departure.availability.find(item=>item.id===target.dataset.id); if(!reg?.canEdit)throw Error('Tu n’as pas l’autorisation de modifier cette inscription.'); state.selectedDepartureId=departure.id; state.drafts[departure.id]=registrationDraft(reg); state.registrationOpen.add(departure.id); state.eventSection='race'; renderEvent(); revealRegistration(departure.id); break; }
     case 'solo-driver': {
@@ -173,6 +173,7 @@ async function perform(action,target){
     }
     case 'create': if(target.dataset.format)state.listFormat=target.dataset.format; renderEventForm(); break;
     case 'edit-event': renderEventForm(event); break;
+    case 'close-form': { const edited=state.events.find(item=>item.id===target.dataset.id); if(edited){state.currentEventId=edited.id;renderEvent();}else renderHome(); break; }
     case 'add-departure': if(app.querySelectorAll('.departure-field').length>=30)throw Error('Maximum 30 départs par événement.');{const rows=document.querySelectorAll('#departureFields .departure-field'),last=rows[rows.length-1];/* A new start copies the previous start's date and time: several starts often share a day. */document.getElementById('departureFields').insertAdjacentHTML('beforeend',departureFields(last?{date:last.querySelector('[name="date"]').value,time:last.querySelector('[name="time"]').value}:{}));/* Real times added next to the common start: they are no longer "à confirmer". */const pending=target.closest('form')?.elements.eventSchedulePending;if(pending?.checked&&document.querySelector('#departureFields [data-tbd="true"]'))pending.checked=false;}updateRemoveButtons();break;
     case 'bulk-departures': {
       const form=target.closest('form'),starts=bulkPreview(form),list=document.getElementById('departureFields');

@@ -1,7 +1,8 @@
 // Creating or editing an event of the community calendar (solo format), step by step, for every simulator.
-// The fields follow the community's calendar: start (and end) time, server password, and per round the
+// The fields follow the community’s calendar: start time, server password, and per round the
 // circuit, categories, practice / qualifying / race minutes, weather, fuel and tyre multipliers.
 // LMU takes its circuits and categories from the catalog; on AMS2, iRacing and ACE they are typed, with the car.
+import {formSheet} from './event-form.mjs';
 import {app,state,esc,button,api,notifyRender} from './core.mjs';
 import {SIMS,simCatalog,eventCatalog,simForEvent,isRandomCircuit} from '../../shared/catalog.mjs';
 import {departureFields} from './event-form.mjs';
@@ -62,8 +63,7 @@ export function renderSoloEventForm(event=null){
   const details=event?.details||{},access=event?.access||'open',departure=event?.departures?.[0]||{time:'21:00'},first=event?LAST:1;
   const start=departureFields(departure).replace(/<button[^>]*data-action="remove-departure"[^>]*>.*?<\/button>/,'');
   const step=(n,content)=>`<section class="creation-card solo-form-step" data-solo-step-pane="${n}" ${n===first?'':'hidden'}>${content}</section>`;
-  app.innerHTML=`${button('home','← Retour','','secondary-button back-button')}<h1 class="page-title">${event?'MODIFIER L’ÉVÉNEMENT':'NOUVEL ÉVÉNEMENT'}</h1>
-<form class="form-panel event-creation solo-event-form" data-kind="solo-event" data-step="${first}">
+  formSheet(event,event?'Modifier l’événement':'Nouvel événement').innerHTML=`<form class="form-panel event-creation solo-event-form" data-kind="solo-event" data-step="${first}">
   <div class="registration-progress" aria-hidden="true" data-solo-progress>${STEPS.map((_,index)=>`<span class="${index<first?'done':''}"></span>`).join('')}</div>
   <p class="registration-step-label" data-solo-step-label>Étape ${first} sur ${LAST} · ${STEPS[first-1]}</p>
   ${step(1,`<label class="form-label">Nom de l’événement<input name="eventName" maxlength="100" value="${esc(event?.name||'')}" required></label>
