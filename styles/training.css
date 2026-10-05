@@ -122,7 +122,7 @@
 .memo-key{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:6px 18px;margin:0;font-size:13px}
 .memo-key span{display:inline-flex;align-items:center;gap:6px}
 .memo-key i{display:inline-block;width:12px;height:12px;background:currentColor}
-.memo-key .dot{border-radius:50%}.memo-key .bar{height:8px;border-radius:4px;opacity:.6}.memo-key .tri{clip-path:polygon(0 0,100% 0,50% 100%)}
+.memo-key .dot{border-radius:50%}.memo-key .bar{height:8px;border-radius:4px}.memo-key .tri{clip-path:polygon(0 0,100% 0,50% 100%)}
 .memo-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;align-items:start}
 .memo-wide{grid-column:1/-1}
 .memo-grid dl{display:grid;margin:0}
@@ -197,8 +197,8 @@
 .memo-table tr.is-you-row{background:color-mix(in srgb,var(--memo-you) 10%,transparent)}
 .memo-table tr.is-mine{box-shadow:inset 3px 0 0 var(--memo-you)}
 .memo-table tr.is-mine td{color:var(--memo-you)}
-.memo-table tr.is-goal{box-shadow:inset 3px 0 0 var(--memo-pilots)}
-.memo-table tr.is-goal td{color:var(--memo-pilots)}
+.memo-table tr.is-goal{box-shadow:inset 3px 0 0 var(--text)}
+.memo-table tr.is-goal td{color:var(--text);font-weight:700}
 .memo-chip{display:inline-block;margin-left:6px;padding:2px 6px;border:1px solid currentColor;border-radius:4px;font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;vertical-align:2px}
 .memo-stint{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
 .memo-stint div{display:grid;gap:4px;align-content:start;padding:10px;border:1px solid var(--border);border-radius:6px}
@@ -211,3 +211,10 @@
 @media (max-width:720px){.memo-how{grid-template-columns:1fr}}
 @media (max-width:560px){.memo-stint{grid-template-columns:1fr}.memo-table th,.memo-table td{padding:8px 4px;white-space:normal}.memo-table td{font-size:13px}.memo-table thead th{font-size:11px}.memo-chip{display:table;margin:3px 0 0}}
 .memo-table caption{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+#pit-guide .memo-band.is-own .memo-iqr{background:var(--memo-you);opacity:.35}
+#pit-guide .memo-scale.is-you{color:var(--memo-you)}
+.memo-car{position:relative;display:grid;grid-template-columns:1fr 1fr;gap:10px 64px;padding:6px 0}
+.memo-car-body{position:absolute;left:50%;top:0;bottom:0;width:44px;margin-left:-22px;border:2px solid var(--border);border-radius:18px 18px 10px 10px}
+.memo-tyre{display:grid;gap:2px;padding:10px;border:2px solid currentColor;border-radius:8px;text-align:center}
+.memo-tyre small{color:var(--muted);font-size:11px}
+.memo-tyre b{color:inherit;font:700 26px/1.05 var(--memo-display)}

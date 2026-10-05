@@ -67,6 +67,7 @@ export function parseResults(xml, names = []) {
 }
 
 const median = values => { const list = values.filter(value => value !== null && value !== undefined).sort((a, b) => a - b); return list.length ? (list[Math.floor((list.length - 1) / 2)] + list[Math.ceil((list.length - 1) / 2)]) / 2 : null; };
+const extent = values => values.length ? [Math.min(...values), Math.max(...values)] : null;
 const spread = values => { const middle = median(values); return middle === null ? null : median(values.map(value => Math.abs(value - middle))); };
 
 // A clean lap: timed, no stop, not the first lap nor the lap out of the pits, and not a spin (over 107 % of the median).
@@ -338,28 +339,31 @@ export function memoSheet({laneStops = [], carStops = [], sessions = [], viewer 
     const laps = entry.laps.filter(lap => !lap.t || !pace || lap.t <= pace * 1.07);
     const compounds = {};
     for (const lap of laps.filter(lap => lap.compound && lap.wear.some(value => value > 0))) (compounds[lap.compound] ||= []).push(lap);
-    return {user, laps:laps.length, capacity:entry.capacity, fuel:median(laps.map(lap => lap.fuel).filter(value => value > 0)), ve:median(laps.map(lap => lap.ve).filter(value => value > 0)),
+    const fuels = laps.map(lap => lap.fuel).filter(value => value > 0), ves = laps.map(lap => lap.ve).filter(value => value > 0);
+    return {user, laps:laps.length, capacity:entry.capacity, fuel:median(fuels), ve:median(ves), range:{fuel:extent(fuels), ve:extent(ves)},
       tyres:Object.fromEntries(Object.entries(compounds).map(([name, list]) => [name, {laps:list.length,
-        wear:median(list.map(lap => Math.max(...lap.wear.map(value => value ?? 0)))),
+        wear:median(list.map(lap => Math.max(...lap.wear.map(value => value ?? 0)))), range:extent(list.map(lap => Math.max(...lap.wear.map(value => value ?? 0)))),
         worst:[0, 1, 2, 3].map(index => median(list.map(lap => lap.wear[index]).filter(value => value !== null)) ?? 0),
         temp:median(list.map(lap => median(lap.temp.filter(value => value !== null))).filter(value => value !== null)),
         track:median(list.map(lap => lap.track).filter(value => value !== null))}]))};
   });
   const mine = pilots.find(pilot => pilot.user === viewer) || null;
-  const spread = (values, laps, you, digits) => {
+  // The viewer's own spread comes with it: their lowest and highest lap, for the bar before the pilots' one opens.
+  const spread = (values, laps, you, digits, range) => {
     const list = values.filter(value => value > 0), open = list.length >= min.pilots && laps >= min.laps;
     return {pilots:list.length, laps, you:round(you ?? null, digits), median:open ? round(quantile(list, 0.5), digits) : null,
-      low:open ? round(quantile(list, 0.25), digits) : null, high:open ? round(quantile(list, 0.75), digits) : null};
+      low:open ? round(quantile(list, 0.25), digits) : null, high:open ? round(quantile(list, 0.75), digits) : null,
+      youMin:round(range?.[0] ?? null, digits), youMax:round(range?.[1] ?? null, digits)};
   };
   const lapCount = key => pilots.filter(pilot => pilot[key] > 0).reduce((sum, pilot) => sum + pilot.laps, 0);
-  const energy = {...spread(pilots.map(pilot => pilot.ve), lapCount('ve'), mine?.ve, 2), game:game?.ve ?? null};
-  const fuel = {...spread(pilots.map(pilot => pilot.fuel), lapCount('fuel'), mine?.fuel, 2), game:game?.fuel ?? null};
+  const energy = {...spread(pilots.map(pilot => pilot.ve), lapCount('ve'), mine?.ve, 2, mine?.range.ve), game:game?.ve ?? null};
+  const fuel = {...spread(pilots.map(pilot => pilot.fuel), lapCount('fuel'), mine?.fuel, 2, mine?.range.fuel), game:game?.fuel ?? null};
   const capacity = median(pilots.map(pilot => pilot.capacity).filter(Boolean));
   const names = [...new Set(pilots.flatMap(pilot => Object.keys(pilot.tyres)))];
   const tyres = names.map(name => {
     const rows = pilots.filter(pilot => pilot.tyres[name]).map(pilot => pilot.tyres[name]);
     const laps = rows.reduce((sum, row) => sum + row.laps, 0), you = mine?.tyres[name] || null;
-    const wear = spread(rows.map(row => row.wear), laps, you?.wear, 2), open = wear.median !== null;
+    const wear = spread(rows.map(row => row.wear), laps, you?.wear, 2, you?.range), open = wear.median !== null;
     const worst = open ? [0, 1, 2, 3].map(index => median(rows.map(row => row.worst[index]))) : you?.worst;
     return {name, ...wear, worst:worst ? worst.indexOf(Math.max(...worst)) : null, wheels:worst ? worst.map(value => round(value ?? null, 2)) : null, temp:open ? round(median(rows.map(row => row.temp).filter(Boolean)), 0) : null,
       youTemp:round(you?.temp ?? null, 0), track:round(median(rows.map(row => row.track).filter(value => value !== null)), 1), ideal:game?.ideal ?? null};
