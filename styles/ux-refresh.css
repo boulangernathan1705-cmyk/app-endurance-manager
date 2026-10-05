@@ -2081,21 +2081,20 @@ html[data-game] #app .race-header .race-header-time svg { width: 18px; height: 1
 .solo-entry-edit svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 @media (max-width: 600px) { .solo-entries { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .solo-entry-group-head .solo-any-logo { display: inline-grid; place-items: center; width: 18px; height: 18px; padding: 0; border: 0; border-radius: 4px; background: rgba(255, 255, 255, .1); font-size: 11px; }
-/* A round's format, on one quiet line: icon, small label, value; thin separators. */
-.round-info { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 0; margin: 2px 0 14px; padding: 10px 0; border-top: 1px solid rgba(255, 255, 255, .07); border-bottom: 1px solid rgba(255, 255, 255, .07); }
-.round-item { display: inline-flex; align-items: center; gap: 8px; padding: 0 16px; border-left: 1px solid rgba(255, 255, 255, .08); }
-.round-item:first-child { padding-left: 0; border-left: 0; }
-.round-item-icon { display: inline-grid; place-items: center; width: 18px; color: #8c98a2; }
+/* A round's format: one small frame per item, its icon on the left, then label and value. */
+.round-info { display: flex; flex-wrap: wrap; gap: 8px; margin: 2px 0 14px; }
+.round-item { display: inline-flex; align-items: center; gap: 10px; padding: 8px 14px 8px 8px; border: 1px solid rgba(255, 255, 255, .1); border-radius: 10px; background: rgba(255, 255, 255, .03); }
+.round-item-icon { display: inline-grid; place-items: center; flex: none; width: 32px; height: 32px; border-radius: 8px; background: rgba(127, 227, 234, .1); color: #7fe3ea; }
 .round-item-icon svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-.round-item-emoji { font-size: 15px; line-height: 1; }
+.round-item-emoji { font-size: 16px; line-height: 1; }
 .round-item-copy { display: grid; line-height: 1.15; }
 .round-item-copy small { font-size: 10.5px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: #8c98a2; }
-.round-item-copy strong { font-size: 14px; font-weight: 700; color: #eef2f4; white-space: nowrap; }
-.round-item-categories { gap: 6px; }
-.round-item-categories .category-logo, .round-item-categories img { display: block; width: auto; height: 22px; }
+.round-item-copy strong { font-size: 15px; font-weight: 700; color: #eef2f4; white-space: nowrap; }
+.round-item-categories { gap: 6px; padding: 8px 12px; }
+.round-item-categories .category-logo, .round-item-categories img { display: block; width: auto; height: 24px; }
 @media (max-width: 600px) {
-  .round-info { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px 8px; }
-  .round-item, .round-item:first-child { padding: 0; border-left: 0; }
+  .round-info { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .round-item { padding-right: 8px; }
 }
 .solo-entry-logo.is-any { display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 4px; background: rgba(255, 255, 255, .1); font-size: 11px; color: #dfe5ea; }
 .planning-quick-button.is-labelled.is-leave { border-color: rgba(255, 107, 107, .55); color: #ff8a8a; }

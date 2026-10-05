@@ -89,7 +89,7 @@ export function canSeePassword(event) {
 }
 const detailSvg = path => `<svg viewBox="0 0 24 24" aria-hidden="true">${path}</svg>`;
 const detailTile = (icon, label, value, extra = '') => value ? `<div class="solo-detail${extra}"><span class="solo-detail-icon">${icon}</span><span class="solo-detail-copy"><span class="solo-detail-label">${esc(label)}</span><strong>${value}</strong></span></div>` : '';
-// The format of a round, on one quiet line: practice, qualifying and race, then weather, fuel, tyres and the
+// The format of a round, one small frame per item: practice, qualifying and race, then weather, fuel, tyres and the
 // categories; an icon, a small label and the value each.
 export function roundTiles(round) {
   const weather = WEATHERS.find(([value]) => value === round.weather);
