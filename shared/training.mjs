@@ -320,10 +320,10 @@ export function stopTime(service, {fuel = 0, energy = 0, tyres = 0, wing = false
 
 // The circuit sheet (« mémo », stands.html), the same for everyone: the pit lane of the circuit, the service times of
 // the car, and what one lap takes. Fuel, energy and tyres depend on the pilot: each pilot counts once (his median),
-// and the sheet shows the median of the pilots with the middle half of them; below the threshold only the viewer's
-// own figure and the game's forecast are shown, so that no pilot can be singled out.
+// and the sheet shows the median of the pilots with the middle half of them, from the first pilot on: the sheet is
+// shared by all, never with a name.
 const quantile = (list, q) => { if (!list.length) return null; const sorted = [...list].sort((a, b) => a - b), at = (sorted.length - 1) * q, low = Math.floor(at); return sorted[low] + (sorted[Math.ceil(at)] - sorted[low]) * (at - low); };
-export const MEMO_MIN = {pilots:3, laps:30};
+export const MEMO_MIN = {pilots:1, laps:5};
 export function memoSheet({laneStops = [], carStops = [], sessions = [], viewer = null, service = null, game = null, reference = null, min = MEMO_MIN}) {
   const through = laneStops.map(stop => stop.lane - stop.stopped).filter(value => value > 0);
   // Laps that tell the truth: on track, valid, close to the pilot's own pace.

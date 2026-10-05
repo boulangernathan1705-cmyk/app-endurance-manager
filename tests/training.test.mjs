@@ -187,16 +187,18 @@ test('a stop takes the game’s time: tyres, ducts and brakes after, fuel, energ
   assert.equal(stopTime(null,{fuel:10}),0);
 });
 
-test('the circuit sheet shows the pilots’ median only from 3 pilots and 30 laps, and the viewer’s own figure', () => {
+test('the circuit sheet shows the pilots’ median from a threshold (by default one pilot and 5 laps), and the viewer’s own figure', () => {
   const laps=(fuel,ve,wear,count=12)=>Array.from({length:count},(_,i)=>({n:i+1,t:80+i/10,fuel,ve,wear:[wear,wear-0.1,wear,wear+0.1],temp:[73,72,74,75],compound:'Medium',track:30.8,pit:false,invalid:false}));
   const sessions=[{user:'a',capacity:120,laps:laps(2.0,2.0,0.4)},{user:'b',capacity:120,laps:laps(2.1,2.1,0.5)}];
-  let sheet=memoSheet({sessions,viewer:'b',laneStops:[{lane:60.45,stopped:17.13},{lane:61,stopped:25}],service:SERVICE_296,game:{fuel:2.06,ve:2.12,ideal:92}});
+  const min={pilots:3,laps:30};
+  assert.equal(memoSheet({sessions:sessions.slice(0,1),viewer:'b'}).energy.median,2);
+  let sheet=memoSheet({min,sessions,viewer:'b',laneStops:[{lane:60.45,stopped:17.13},{lane:61,stopped:25}],service:SERVICE_296,game:{fuel:2.06,ve:2.12,ideal:92}});
   assert.equal(sheet.lane.through,39.7);assert.equal(sheet.service.source,'game');
   assert.deepEqual([sheet.energy.median,sheet.energy.you,sheet.energy.game,sheet.energy.pilots],[null,2.1,2.12,2]);
   // Without the pilots' median, a stint is planned with the viewer's own figures.
   assert.deepEqual(sheet.stint,{laps:47,by:'energy',fuel:98.7,wear:[23.5,18.8,23.5,28.2]});
   sessions.push({user:'c',capacity:120,laps:[...laps(2.2,2.2,0.6),{...laps(9,9,9,1)[0],t:200}]});
-  sheet=memoSheet({sessions,viewer:'b'});
+  sheet=memoSheet({min,sessions,viewer:'b'});
   assert.deepEqual([sheet.energy.median,sheet.energy.low,sheet.energy.high,sheet.energy.laps],[2.1,2.05,2.15,36]);
   // The wear of a lap is the average of the four tyres; each tyre has its own wear, range and temperature.
   assert.deepEqual([sheet.tyres[0].name,sheet.tyres[0].median,sheet.tyres[0].worst,sheet.tyres[0].temp],['Medium',0.5,3,74]);
