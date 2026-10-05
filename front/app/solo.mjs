@@ -81,7 +81,7 @@ export function roundPilots(event, index, departure = event.departures?.[0]) {
 const TILE_ICONS = {
   practice: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2"/><path d="M12 14v7M10.2 11 3.5 9.5M13.8 11l6.7-1.5"/>',
   qualifying: '<circle cx="12" cy="14" r="7"/><path d="M12 10.5V14l2 1.5M10 3h4M12 3v4M18.5 7.5l1.5-1.5"/>',
-  race: '<path d="M5 21V4M5 4h13l-2.5 4L18 12H5"/><path d="M9 4v8M13 4v8M5 8h11"/>',
+  race: '<path d="M5 21V3"/><path d="M5 4h14v10H5z" fill="none"/><path d="M5 4h3.5v3.33H5zM12 4h3.5v3.33H12zM8.5 7.33H12v3.33H8.5zM15.5 7.33H19v3.33h-3.5zM5 10.67h3.5V14H5zM12 10.67h3.5V14H12z" fill="currentColor" stroke="none"/>',
 };
 // The server password: for the pilots entered (and whoever manages the event).
 export function canSeePassword(event) {
