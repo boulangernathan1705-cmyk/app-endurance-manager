@@ -136,7 +136,7 @@ function hoursSummary(status,departure,duration){
 // draft.choices holds one {category,cars,carAny} per round; draft.solo is the number of rounds.
 export function soloRounds(event){
   const rounds=event.rounds?.length?event.rounds:[{circuit:event.circuit,durationMinutes:0,categories:event.categories}];
-  const list=rounds.map(round=>({...round,categories:round.categories?.length?round.categories:event.categories}));
+  const list=rounds.map(round=>({...round,categories:round.randomCategory?[]:round.categories?.length?round.categories:event.categories}));
   // No category offered (AMS2, ACE, or none ticked): a simple entry, straight to the summary.
   return list.every(round=>!round.categories?.length)?[]:list;
 }
@@ -147,7 +147,7 @@ function initSoloDraft(event,departure,stateDraft){
     const mine=stateDraft.id?(departure.availability||[]).find(reg=>reg.id===stateDraft.id):null;
     const saved=mine?.roundChoices?.length?mine.roundChoices:mine?[{category:mine.category,cars:mine.cars||[],carAny:mine.carAny}]:[];
     // A round with a single category has it chosen already.
-    stateDraft.choices=rounds.map((round,index)=>saved[index]?{...saved[index],cars:[...(saved[index].cars||[])]}:{category:round.categories.length===1?round.categories[0]:'',cars:[],carAny:false});
+    stateDraft.choices=rounds.map((round,index)=>saved[index]?{...saved[index],cars:[...(saved[index].cars||[])]}:!round.categories.length?{category:ANY_CATEGORY,cars:[],carAny:true}:{category:round.categories.length===1?round.categories[0]:'',cars:[],carAny:false});
   }
   return rounds;
 }
@@ -179,6 +179,8 @@ function renderSoloStepper(event,departure,stateDraft){
       return button('solo-category',label,`data-departure="${departure.id}" data-round="${index}" data-value="${esc(category)}" aria-pressed="${active}"`,`category-button ${any?'':categories[category]?.css||''} ${active?'active':''}`);
     }).join('');
     const heading=rounds.length>1?`<p class="solo-round-heading">Manche ${index+1} · ${esc(eventCircuitName(event,round.circuit))}${round.durationMinutes?` · ${round.durationMinutes} min`:''}</p>`:'';
+    // Random circuit and category: nothing to choose for this round.
+    if(!round.categories.length)return pane(index+1,`${index===0?communityLine(event,departure,stateDraft)+identity:''}${heading}<p class="registration-step-help">Circuit et catégorie aléatoires : rien à choisir pour cette manche.</p>`);
     const cars=choice.category===ANY_CATEGORY?'<p class="registration-step-help">Catégorie « Peu importe » : la voiture est libre aussi.</p>':choice.category?soloCarChoices(event,departure,index,choice):'';
     return pane(index+1,`${index===0?communityLine(event,departure,stateDraft)+identity:''}${heading}${single?`<p class="solo-single-category">${logo(round.categories[0])}<strong>${esc(round.categories[0])}</strong></p>`:`<div class="category-area"><span class="form-label">Dans quelle catégorie ${stateDraft.forOther?'ce pilote veut-il':'veux-tu'} rouler ?</span><div class="categories registration-category-list">${buttons}</div></div>`}${cars}`);
   };

@@ -1987,3 +1987,4 @@ html[data-game="iracing"] .race-filter-chip .category-logo { border-radius: 50%;
 .event-absences li { padding: 3px 10px; border-radius: 999px; background: rgba(255, 255, 255, .06); font-size: 13px; color: #dfe5ea; }
 .event-absences li.is-mine { outline: 1px solid #7fe3ea; }
 .event-absences p { margin: 8px 0 0; font-size: 13px; color: #8a959c; }
+.solo-random-category { margin: 0; padding: 8px 12px; border: 1px dashed rgba(255, 255, 255, .18); border-radius: 8px; color: #c7d0d6; font-size: 13px; }

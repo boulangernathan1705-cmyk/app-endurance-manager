@@ -53,6 +53,7 @@ export function soloCardInfo(event) {
     const car = [(round.categories || []).length ? '' : round.category, round.car].filter(Boolean).join(' · ');
     const chips = [
       rounds.length > 1 ? `<span class="solo-info-circuit">${esc(eventCircuitName(event, round.circuit))}</span>` : '',
+      round.randomCategory ? '<span class="solo-info-chip" title="Catégorie aléatoire"><span aria-hidden="true">❓</span><span>Catégorie aléatoire</span></span>' : '',
       ...(round.categories || []).map(category => `<span class="solo-info-category" title="${esc(category)}">${logo(category)}</span>`),
       infoChip('format', roundFormat(round).replaceAll('/', ' · '), 'Essais · Qualifs · Course (min)'),
       weather ? `<span class="solo-info-chip solo-info-weather" title="Météo : ${esc(weather[2])}"><span aria-hidden="true">${weather[1]}</span><span class="sr-only">${esc(weather[2])}</span></span>` : '',
@@ -115,7 +116,7 @@ function choicesCell(event, reg) {
   const rounds = event.rounds || [];
   const choices = reg.roundChoices?.length ? reg.roundChoices : [{category:reg.category, cars:reg.cars, carAny:reg.carAny}];
   if (rounds.length < 2) return `${categoryCell(choices[0].category)}<span class="solo-entry-car">${carCell(choices[0])}</span>`;
-  return `<span class="solo-entry-rounds">${choices.map((choice, index) => `<span class="solo-entry-round"><em>M${index + 1}</em>${categoryCell(choice.category)}<span class="solo-entry-car">${carCell(choice)}</span></span>`).join('')}</span>`;
+  return `<span class="solo-entry-rounds">${choices.map((choice, index) => `<span class="solo-entry-round"><em>M${index + 1}</em>${rounds[index]?.randomCategory ? '<span class="solo-any-category">Aléatoire</span>' : `${categoryCell(choice.category)}<span class="solo-entry-car">${carCell(choice)}</span>`}</span>`).join('')}</span>`;
 }
 
 // Participants of a solo race: the grid, then the waiting list, in order of arrival.

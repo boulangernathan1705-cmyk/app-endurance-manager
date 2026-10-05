@@ -1,4 +1,4 @@
-import {CATEGORIES, EVENT_TYPE_IDS as EVENT_TYPES, CIRCUIT_IDS as CIRCUITS, CARS, SIM_IDS, eventCatalog, simForEvent} from '../shared/catalog.mjs';
+import {CATEGORIES, EVENT_TYPE_IDS as EVENT_TYPES, CIRCUIT_IDS as CIRCUITS, CARS, SIM_IDS, eventCatalog, simForEvent, isRandomCircuit} from '../shared/catalog.mjs';
 const LEGACY_CAR_ALIASES = new Map([
   ['BMW M Hybrid V8 Evo (2026)','BMW M Hybrid V8'],['Cadillac V-Series.R Evo (2026)','Cadillac V-Series.R'],['Peugeot 9X8 2023','Peugeot 9X8'],['Peugeot 9X8 2024','Peugeot 9X8'],['Toyota TR010 Hybrid (2026)','Toyota GR010 Hybrid'],['Ginetta G61-LT-P3 Evo','Ginetta G61-LT-P3'],['Ferrari 488 GTE Evo','Ferrari 488 GTE'],['Aston Martin Vantage AMR LMGT3 Evo','Aston Martin Vantage AMR LMGT3'],['BMW M4 LMGT3 Evo','BMW M4 LMGT3'],['Ferrari 296 LMGT3 Evo','Ferrari 296 LMGT3'],['Ford Mustang LMGT3 Evo','Ford Mustang LMGT3'],['Lamborghini Huracán LMGT3 Evo 2','Lamborghini Huracán LMGT3'],['McLaren 720S LMGT3 Evo','McLaren 720S LMGT3'],['Porsche 911 LMGT3 R (992)','Porsche 911 GT3 R LMGT3'],['Porsche 911 LMGT3 R (992) 2026','Porsche 911 GT3 R LMGT3']
 ]);
@@ -202,11 +202,13 @@ function validateSoloRace(input, existing) {
     const durationMinutes = Number(round.durationMinutes);
     if (!Number.isInteger(durationMinutes) || durationMinutes < 5 || durationMinutes > 600) fail(400, `La durée${where} doit être comprise entre 5 et 600 minutes.`);
     // Categories: optional; none means a simple entry (no category or car to choose).
-    const roundCategories = Array.isArray(round.categories) && round.categories.length ? round.categories : Array.isArray(input.categories) ? input.categories : [];
+    // A random circuit (LMU) comes with a random category: nothing to choose.
+    const randomCategory = Boolean(catalog && isRandomCircuit(circuit));
+    const roundCategories = randomCategory ? [] : Array.isArray(round.categories) && round.categories.length ? round.categories : Array.isArray(input.categories) ? input.categories : [];
     if (roundCategories.length && (!catalog || roundCategories.some(c => !catalog.categories[c]))) fail(400, 'Catégorie inconnue pour ce simulateur.');
     // As on the community's calendar: practice / qualifying minutes (race = durationMinutes), weather,
     // fuel and tyre wear multipliers. All optional.
-    const extras = {};
+    const extras = randomCategory ? {randomCategory: true} : {};
     for (const key of ['practice','qualifying']) if (round[key] != null && round[key] !== '') {
       const value = Number(round[key]);
       if (!Number.isInteger(value) || value < 0 || value > 600) fail(400, `Durée des essais ou qualifs${where} invalide.`);
@@ -308,7 +310,7 @@ function validateSoloRegistration(input, event) {
   const name = text(input.name, PILOT_NAME_MAX, 'Pseudo');
   const eventCategories = JSON.parse(event.categories);
   const rounds = JSON.parse(event.rounds || '[]');
-  const roundCategories = rounds.length ? rounds.map(round => round.categories?.length ? round.categories : eventCategories) : [eventCategories];
+  const roundCategories = rounds.length ? rounds.map(round => round.randomCategory ? [] : round.categories?.length ? round.categories : eventCategories) : [eventCategories];
   // No category offered: a simple entry.
   if (roundCategories.every(list => !list.length)) return {name, nameKey: name.normalize('NFKC').toLocaleLowerCase('fr-FR'), status: 'whole', category: '', car: '', cars: [], carAny: true, preferredPilot: '', roundChoices: []};
   // One choice per round; a single-round entry may still send category / cars directly.

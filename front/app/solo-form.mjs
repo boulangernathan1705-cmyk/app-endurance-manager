@@ -3,7 +3,7 @@
 // circuit, categories, practice / qualifying / race minutes, weather, fuel and tyre multipliers.
 // LMU takes its circuits and categories from the catalog; on AMS2, iRacing and ACE they are typed, with the car.
 import {app,state,esc,button,api,notifyRender} from './core.mjs';
-import {SIMS,simCatalog,eventCatalog,simForEvent} from '../../shared/catalog.mjs';
+import {SIMS,simCatalog,eventCatalog,simForEvent,isRandomCircuit} from '../../shared/catalog.mjs';
 import {departureFields} from './event-form.mjs';
 import {refreshAfterSave} from './refresh.mjs';
 import {WEATHERS,roundFormat,roundExtras} from './solo.mjs';
@@ -35,6 +35,7 @@ function categoryField(sim,round={}){
   const catalog=eventCatalog(sim),chosen=round.categories||[];
   // No catalog (AMS2, iRacing, ACE): the category and the car are typed.
   if(!catalog)return `<div class="solo-form-row"><label class="form-label">Catégorie <small>(facultatif)</small><input name="roundCategoryText" maxlength="40" value="${esc(round.category||'')}"></label><label class="form-label">Voiture <small>(facultatif)</small><input name="roundCar" maxlength="60" value="${esc(round.car||'')}"></label></div>`;
+  if(isRandomCircuit(round.circuit))return '<p class="solo-random-category"><span aria-hidden="true">❓</span> Circuit aléatoire : la catégorie sera aléatoire aussi.</p>';
   return `<span class="form-label">Catégories <small>(facultatif)</small></span><div class="solo-round-categories" role="group" aria-label="Catégories">${Object.entries(catalog.categories).map(([name,config])=>`<label class="solo-category-chip ${esc(config.css||'')}" title="${esc(name)}"><input type="checkbox" name="roundCategory" value="${esc(name)}" ${chosen.includes(name)?'checked':''}>${categoryLogo(config)}<span>${esc(name)}</span></label>`).join('')}</div>`;
 }
 function roundField(sim,round={}){
@@ -104,7 +105,7 @@ function fillRecap(form){
   const time=`${data.departures[0].time}${data.details.endTime?` – ${data.details.endTime}`:''}`;
   form.querySelector('[data-solo-recap]').innerHTML=line(1,'Événement',[data.name||'—',sim.short,data.details.type].filter(Boolean).join(' · '))
     +line(2,'Horaire',`${day} · ${time}${data.details.password?` · mdp : ${data.details.password}`:''}`)
-    +data.rounds.map((round,index)=>line(3,data.rounds.length>1?`Manche ${index+1}`:'Manche',[circuitName(round.circuit),round.categories.join(' ')||round.category,round.car,roundFormat(round),roundExtras(round)].filter(Boolean).join(' · '))).join('')
+    +data.rounds.map((round,index)=>line(3,data.rounds.length>1?`Manche ${index+1}`:'Manche',[circuitName(round.circuit),isRandomCircuit(round.circuit)&&eventCatalog(data.sim)?'catégorie aléatoire':round.categories.join(' ')||round.category,round.car,roundFormat(round),roundExtras(round)].filter(Boolean).join(' · '))).join('')
     +line(4,'Inscriptions',[accessType(data.details.type)?'':data.access==='safe'?'SAFE':'OPEN',data.capacity?`${data.capacity} places`:'places illimitées',data.details.note].filter(Boolean).join(' · '));
 }
 function goToStep(form,target){
@@ -135,6 +136,12 @@ if(typeof document!=='undefined'){
       // A type named OPEN or SAFE sets the access.
       const access=form.querySelector(`[name="eventAccess"][value="${field.value.toLowerCase()}"]`);if(access)access.checked=true;const fieldset=form.querySelector('.solo-access');if(fieldset)fieldset.hidden=accessType(field.value);return;
     }
+    if(form&&field.name==='roundCircuit'&&field.tagName==='SELECT'){
+      // Random circuit: the category is random too (and back to the chips otherwise).
+      const row=field.closest('.solo-round'),box=row.querySelector('[data-round-categories]'),random=isRandomCircuit(field.value);
+      if(random||box.querySelector('.solo-random-category'))box.innerHTML=categoryField(form.elements.eventSim.value,{circuit:field.value});
+      return;
+    }
     if(!form||field.name!=='eventSim')return;
     // Another simulator: its circuits and categories.
     form.querySelectorAll('.solo-round').forEach(row=>{row.querySelector('.solo-round-circuit').outerHTML=circuitField(field.value);row.querySelector('[data-round-categories]').innerHTML=categoryField(field.value);});
@@ -148,9 +155,9 @@ if(typeof document!=='undefined'){
     const target=event.target.closest('[data-solo-step]');
     if(target){goToStep(form,target.dataset.soloStep);return;}
     if(event.target.closest('[data-add-round]')){
-      // A new round starts like the previous one (categories, lengths, multipliers), on another circuit.
+      // A new round keeps the lengths and multipliers of the previous one; circuit and categories are chosen again.
       const previous=formData(form).rounds.pop()||{};
-      form.querySelector('[data-rounds]').insertAdjacentHTML('beforeend',roundField(form.elements.eventSim.value,{...previous,circuit:''}));syncRounds(form);return;
+      form.querySelector('[data-rounds]').insertAdjacentHTML('beforeend',roundField(form.elements.eventSim.value,{...previous,circuit:'',categories:[],category:'',car:''}));syncRounds(form);return;
     }
     const remove=event.target.closest('[data-remove-round]');
     if(remove){remove.closest('.solo-round').remove();syncRounds(form);}
