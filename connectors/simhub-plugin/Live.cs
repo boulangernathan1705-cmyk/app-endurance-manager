@@ -20,7 +20,7 @@ namespace EnduranceManager.SimHub
         public double ET;
         public bool Realtime;
         public int Session;
-        public string Track, Car, Class;
+        public string Track, Car, Class, Driver;
         public double TrackTemp, AirTemp, Rain;
         public short LapsDone;
         public double LastLap;
@@ -70,7 +70,7 @@ namespace EnduranceManager.SimHub
             s = new Sample
             {
                 ET = F64(b, t + 12), Realtime = b[ScoringInfo + 115] != 0, Session = I32(b, ScoringInfo + 64),
-                Track = Text(b, ScoringInfo, 64), Car = Text(b, v + 36, 64), Class = Text(b, v + 200, 32),
+                Track = Text(b, ScoringInfo, 64), Driver = Text(b, v + 4, 32), Car = Text(b, v + 36, 64), Class = Text(b, v + 200, 32),
                 TrackTemp = F64(b, ScoringInfo + 236), AirTemp = F64(b, ScoringInfo + 228), Rain = F64(b, ScoringInfo + 220),
                 LapsDone = I16(b, v + 100), LastLap = F64(b, v + 168), InPits = b[v + 198] != 0, PitState = b[v + 457],
                 Speed = Math.Sqrt(vx * vx + vy * vy + vz * vz) * 3.6,
@@ -132,6 +132,7 @@ namespace EnduranceManager.SimHub
         [JsonProperty("track")] public string Track;
         [JsonProperty("car")] public string Car;
         [JsonProperty("class")] public string Class;
+        [JsonProperty("driver")] public string Driver;
         [JsonProperty("session")] public int Session;
         [JsonProperty("capacity")] public double FuelCapacity;
         [JsonProperty("laps")] public List<LiveLap> Laps = new List<LiveLap>();
@@ -189,7 +190,7 @@ namespace EnduranceManager.SimHub
             if (session != null && (s.Session != last.Session || s.Track != last.Track || s.Car != last.Car || s.ET + 5 < last.ET)) Flush();
             if (session == null)
             {
-                session = new LiveSession { At = new DateTimeOffset(now()).ToUnixTimeMilliseconds(), Track = s.Track, Car = s.Car, Class = s.Class, Session = s.Session };
+                session = new LiveSession { At = new DateTimeOffset(now()).ToUnixTimeMilliseconds(), Track = s.Track, Car = s.Car, Class = s.Class, Driver = s.Driver, Session = s.Session };
                 lap = new LapState { Start = s };
             }
             session.FuelCapacity = s.FuelCapacity;

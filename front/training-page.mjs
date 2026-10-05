@@ -138,7 +138,7 @@ function tyres(live) {
   return `<section class="training-card"><div class="training-card-head"><h2>Pneus</h2>${live.trackTemp !== null ? `<span class="training-count">Piste ${num(live.trackTemp, 0)} °C${live.airTemp !== null ? ` · air ${num(live.airTemp, 0)} °C` : ''}</span>` : ''}</div>
     ${live.compounds.map(item => `<div class="training-compound"><p><strong>${esc(item.name)}</strong> · ${item.laps} tour${item.laps > 1 ? 's' : ''}${item.track !== null ? ` · piste ${num(item.track, 0)} °C` : ''}${item.lapsTo50 ? ` · environ ${item.lapsTo50} tours pour user un pneu à moitié` : ''}</p>
       <div class="training-wheels">${[0, 1, 2, 3].map(index => cell(item, index)).join('')}</div></div>`).join('')}
-    <p class="training-note">Usure par tour, en pourcentage du pneu. Température moyenne de la bande de roulement, hors stands.${live.top ? ` Vitesse max : <strong>${num(live.top, 0)} km/h</strong>${live.topMedian ? ` (${num(live.topMedian, 0)} km/h en moyenne par tour)` : ''}.` : ''}</p></section>`;
+    <p class="training-note">Usure par tour, en pourcentage du pneu.${live.source === 'results' ? ' Tirée de tes fichiers de résultats : les températures et les pressions arrivent avec la lecture en direct (synchroniseur ou plugin SimHub).' : ' Température moyenne de la bande de roulement, hors stands.'}${live.top ? ` Vitesse max : <strong>${num(live.top, 0)} km/h</strong>${live.topMedian ? ` (${num(live.topMedian, 0)} km/h en moyenne par tour)` : ''}.` : ''}</p></section>`;
 }
 
 // The stops measured in training, broken down: crossing the pit lane, tyres, refuelling, repairs.
@@ -155,6 +155,16 @@ function stops(live) {
     <p class="training-note">Traversée : le temps dans la voie des stands sans l’arrêt. Pour isoler un temps, fais des arrêts avec un seul service : 4 pneus seuls, puis du carburant seul. <a href="/stands.html">Guide des stands</a></p></section>`;
 }
 
+// Online, every driver of a results file is marked as the player: the pilot's name in LMU tells which one he is.
+function lmuName(data) {
+  const pending = data.pending;
+  if (pending) return `<form class="training-name is-pending" data-name-form><p><strong>${pending.files} séance${pending.files > 1 ? 's' : ''} en ligne attend${pending.files > 1 ? 'ent' : ''} ton nom.</strong> En multijoueur, LMU met tous les pilotes dans le fichier : choisis lequel est toi.</p>
+    <div class="training-code"><select name="lmuName" aria-label="Ton nom dans LMU">${pending.drivers.map(name => `<option${name === data.lmuName ? ' selected' : ''}>${esc(name)}</option>`).join('')}</select><button type="submit" class="primary-button">C’est moi</button></div></form>`;
+  return `<form class="training-name" data-name-form><label for="training-lmu-name">Ton nom dans LMU</label>
+    <div class="training-code"><input id="training-lmu-name" name="lmuName" type="text" maxlength="60" value="${esc(data.lmuName || '')}" placeholder="Tel qu’il apparaît en course"><button type="submit" class="secondary-button">Enregistrer</button></div>
+    <small>Sert à retrouver tes tours dans les séances en ligne. Le synchroniseur le trouve tout seul.</small></form>`;
+}
+
 function sync(data) {
   const device = data.device;
   const status = device.linked
@@ -164,6 +174,7 @@ function sync(data) {
     <div class="training-actions"><form method="post" action="/api/training/sync"><button type="submit" class="${device.linked ? 'secondary-button' : 'primary-button'}">${device.linked ? 'Retélécharger' : 'Télécharger le synchroniseur'}</button></form>
     ${device.linked ? '<button type="button" class="secondary-button" data-unlink>Retirer la liaison</button>' : ''}</div>
     <p class="training-note">Petit programme Windows, sans fenêtre, qui lit les résultats de LMU (dossier UserData\\Log\\Results) et, pendant que tu roules, les données que le jeu publie (pneus, carburant, vitesse, arrêts). Il ne modifie rien dans le jeu. Windows peut afficher un avertissement au premier lancement : clique sur « Informations complémentaires » puis « Exécuter quand même ».</p>
+    ${lmuName(data)}
     <details class="training-simhub"${view.simhub ? ' open' : ''}><summary>Tu utilises SimHub ?</summary>
       <p>Le plugin Endurance Manager pour SimHub fait la même chose que le synchroniseur. Dans SimHub, ouvre ses réglages et colle ce code. Un nouveau code remplace la liaison précédente : n’utilise que le plugin ou que le synchroniseur.</p>
       ${view.simhub ? `<div class="training-code"><input type="text" readonly value="${esc(view.simhub)}" aria-label="Code de liaison SimHub" data-code><button type="button" class="secondary-button" data-copy>Copier</button></div>` : '<button type="button" class="secondary-button" data-simhub>Obtenir mon code SimHub</button>'}</details>
@@ -195,7 +206,7 @@ async function upload(files) {
   let added = 0, errors = [];
   for (const [index, file] of list.entries()) {
     view.busy = `Envoi ${index + 1} / ${list.length}…`; render();
-    try { const result = await call('/api/training/sessions', {method:'POST', headers:{'Content-Type':'application/xml'}, body:file}); if (result.created) added++; }
+    try { const result = await call('/api/training/sessions', {method:'POST', headers:{'Content-Type':'application/xml'}, body:file}); if (result.created) added++; else if (result.pending) errors.push(`${file.name} : choisis ton nom ci-dessus.`); }
     catch (error) { errors.push(`${file.name} : ${error.message}`); }
   }
   view.busy = [added ? `${added} séance${added > 1 ? 's' : ''} ajoutée${added > 1 ? 's' : ''}.` : 'Aucune nouvelle séance.', ...errors].join(' ');
@@ -221,6 +232,16 @@ app.addEventListener('click', event => {
   if (event.target.closest('[data-simhub]')) act(async () => { view.simhub = (await call('/api/training/sync/code', {method:'POST', headers:{'Content-Type':'application/json'}, body:'{}'})).code; });
   if (event.target.closest('[data-copy]')) { const input = app.querySelector('[data-code]'); input.select(); navigator.clipboard?.writeText(input.value).catch(() => {}); }
   if (event.target.closest('[data-unlink]') && confirm('Retirer la liaison ? Le synchroniseur n’enverra plus rien. Tu peux le supprimer du dossier Démarrage de Windows.')) act(() => call('/api/training/sync', {method:'DELETE'}));
+});
+app.addEventListener('submit', event => {
+  const form = event.target.closest('[data-name-form]');
+  if (!form) return;
+  event.preventDefault();
+  const name = new FormData(form).get('lmuName');
+  act(async () => {
+    const result = await call('/api/training/profile', {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({lmuName:name})});
+    view.busy = result.added ? `${result.added} séance${result.added > 1 ? 's' : ''} ajoutée${result.added > 1 ? 's' : ''}.` : 'Nom enregistré.';
+  });
 });
 app.addEventListener('dragover', event => { const zone = event.target.closest('[data-drop]'); if (zone) { event.preventDefault(); zone.classList.add('is-over'); } });
 app.addEventListener('dragleave', event => event.target.closest('[data-drop]')?.classList.remove('is-over'));

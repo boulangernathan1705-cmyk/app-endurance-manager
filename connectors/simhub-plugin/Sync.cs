@@ -92,7 +92,7 @@ namespace EnduranceManager.SimHub
                     .OrderBy(info => info.LastWriteTimeUtc).ToList();
                 foreach (var info in files)
                 {
-                    if (Send(code, info.FullName, "/api/training/collector", "application/xml")) { sent.Add(FileKey(info)); SaveSent(); }
+                    if (Send(code, info.FullName, "/api/training/collector", "application/xml", PlayerName(info.DirectoryName))) { sent.Add(FileKey(info)); SaveSent(); }
                 }
                 foreach (var path in Directory.GetFiles(LiveFolder, "*.json").OrderBy(path => path))
                 {
@@ -106,12 +106,26 @@ namespace EnduranceManager.SimHub
         }
 
         // A file the site refuses (not a session of the pilot) is never sent again; a refused key stops everything.
-        bool Send(LinkCode code, string path, string endpoint, string kind)
+        // The pilot's name in LMU (UserData\player\Settings.JSON, next to the results folder): online, every driver of a
+        // results file is marked as the player, and the site finds the pilot by this name.
+        static string PlayerName(string resultsDir)
+        {
+            try
+            {
+                string settings = File.ReadAllText(Path.Combine(resultsDir, "..", "..", "player", "Settings.JSON"));
+                var match = Regex.Match(settings, "\"Player Name\"\\s*:\\s*\"([^\"]{1,60})\"");
+                return match.Success ? match.Groups[1].Value.Trim() : null;
+            }
+            catch { return null; }
+        }
+
+        bool Send(LinkCode code, string path, string endpoint, string kind, string player = null)
         {
             var content = new ByteArrayContent(File.ReadAllBytes(path));
             content.Headers.ContentType = new MediaTypeHeaderValue(kind);
             var request = new HttpRequestMessage(HttpMethod.Post, code.Origin + endpoint) { Content = content };
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", code.Token);
+            if (!string.IsNullOrEmpty(player)) request.Headers.Add("X-LMU-Name", Uri.EscapeDataString(player));
             using (var response = client.SendAsync(request).GetAwaiter().GetResult())
             {
                 if (response.StatusCode == HttpStatusCode.Unauthorized) throw new UnauthorizedAccessException();

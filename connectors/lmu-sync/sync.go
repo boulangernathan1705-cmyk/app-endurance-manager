@@ -14,6 +14,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -141,6 +142,9 @@ func send(client *http.Client, cfg config, path string) (done bool, err error) {
 	request.Header.Set("Authorization", "Bearer "+cfg.Token)
 	request.Header.Set("Content-Type", kind)
 	request.Header.Set("User-Agent", "EnduranceManagerSync/1")
+	if name := playerName(path); name != "" && kind == "application/xml" {
+		request.Header.Set("X-LMU-Name", url.PathEscape(name))
+	}
 	response, err := client.Do(request)
 	if err != nil {
 		return false, err
@@ -154,6 +158,21 @@ func send(client *http.Client, cfg config, path string) (done bool, err error) {
 	default:
 		return false, errors.New(response.Status)
 	}
+}
+
+var playerPattern = regexp.MustCompile(`"Player Name"\s*:\s*"([^"]{1,60})"`)
+
+// playerName is the pilot's name in LMU (UserData\player\Settings.JSON, next to the results folder): online, every
+// driver of a results file is marked as the player, and the site finds the pilot by this name.
+func playerName(resultsFile string) string {
+	data, err := os.ReadFile(filepath.Join(filepath.Dir(resultsFile), "..", "..", "player", "Settings.JSON"))
+	if err != nil {
+		return ""
+	}
+	if match := playerPattern.FindSubmatch(data); match != nil {
+		return strings.TrimSpace(string(match[1]))
+	}
+	return ""
 }
 
 // sendLive sends the sessions read live from the game, kept as files until the site has them.

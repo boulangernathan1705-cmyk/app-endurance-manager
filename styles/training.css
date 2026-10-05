@@ -110,3 +110,9 @@
 .training-simhub p{margin:8px 0;color:var(--muted);font-size:13px;line-height:1.45}
 .training-code{display:flex;gap:8px}
 .training-code input{flex:1;min-width:0;min-height:38px;padding:6px 10px;border:1px solid var(--border);border-radius:10px;background:#0c0e10;color:var(--text);font-family:ui-monospace,Consolas,monospace;font-size:12px}
+.training-name{display:grid;gap:6px}
+.training-name label{font-weight:700}
+.training-name small{color:var(--muted);font-size:12px}
+.training-name.is-pending{padding:12px;border:1px solid rgba(255,176,32,.55);border-radius:12px;background:rgba(255,176,32,.08)}
+.training-name select{flex:1;min-width:0;min-height:38px;padding:6px 10px;border:1px solid var(--border);border-radius:10px;background:#0c0e10;color:var(--text)}
+.training-name input{flex:1;min-width:0;min-height:38px;padding:6px 10px;border:1px solid var(--border);border-radius:10px;background:#0c0e10;color:var(--text)}

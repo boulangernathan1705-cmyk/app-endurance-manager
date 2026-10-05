@@ -14,16 +14,34 @@ const round = (value, digits = 1) => value === null ? null : Math.round(value * 
 export const normal = value => String(value || '').normalize('NFKD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 export const trackKey = session => `${normal(session.venue)}|${normal(session.course || session.venue)}`;
 
-// One results file → the player's session, or an error the pilot can understand.
-export function parseResults(xml) {
+// The tyre's compound as LMU writes it ("0,Medium"), without its index.
+const compoundOf = value => String(value || '').split(',').slice(1).join(',').trim().replace(/^N\/A$/, '');
+const sameName = (a, b) => normal(a) && normal(a) === normal(b);
+
+// One results file → the pilot's session, or an error the pilot can understand. Offline, the pilot is the one driver
+// marked isPlayer; online every driver is, so the pilot is found by name (his name in LMU, or on the site), and when
+// a car is shared, only the laps he drove are his (the <Swap> lines of the car).
+export function parseResults(xml, names = []) {
   const text = String(xml || '');
   if (!/<rFactorXML\b/.test(text) || !/<RaceResults>/.test(text)) throw Error('Ce fichier n’est pas un fichier de résultats LMU.');
   const kind = (text.match(SESSION_TAGS) || [])[1] || '';
   const drivers = text.split('<Driver>').slice(1).map(part => part.split('</Driver>')[0]);
-  const player = drivers.find(driver => /<isPlayer>\s*1\s*<\/isPlayer>/.test(driver));
+  const players = drivers.filter(driver => /<isPlayer>\s*1\s*<\/isPlayer>/.test(driver));
+  const swapsOf = driver => [...driver.matchAll(/<Swap startLap="(\d+)" endLap="(\d+)">([^<]*)<\/Swap>/g)].map(([, from, to, name]) => ({from:Number(from), to:Number(to), name:decode(name)}));
+  const mine = name => names.some(candidate => sameName(candidate, name));
+  let player = players.length === 1 ? players[0] : null;
+  if (!player && players.length > 1) {
+    player = players.find(driver => mine(tag(driver, 'Name'))) || players.find(driver => swapsOf(driver).some(swap => mine(swap.name))) || null;
+    if (!player) throw Object.assign(Error(names.length
+      ? 'Ce fichier contient plusieurs pilotes et ton nom LMU n’y est pas. Vérifie ton nom dans LMU sur la page Mon entraînement.'
+      : 'Ce fichier contient plusieurs pilotes. Indique ton nom dans LMU sur la page Mon entraînement pour qu’on y retrouve tes tours.'), {code:'driver', drivers:players.map(driver => tag(driver, 'Name')).filter(Boolean).slice(0, 40)});
+  }
   if (!player) throw Error('Ton pilote n’apparaît pas dans ce fichier.');
+  // A shared car: keep the laps of the pilot's turns at the wheel only.
+  const swaps = swapsOf(player);
+  const turns = players.length > 1 && swaps.some(swap => mine(swap.name)) && !swaps.every(swap => mine(swap.name)) ? swaps.filter(swap => mine(swap.name)) : null;
   const laps = [];
-  let previousFuel = null, previousEnergy = null;
+  let previousFuel = null, previousEnergy = null, previousWear = null;
   for (const match of player.matchAll(/<Lap\b([^>]*)>([^<]*)<\/Lap>/g)) {
     const attributes = Object.fromEntries([...match[1].matchAll(/([A-Za-z0-9]+)="([^"]*)"/g)].map(([, key, value]) => [key.toLowerCase(), value]));
     const pit = attributes.pit === '1';
@@ -31,14 +49,21 @@ export function parseResults(xml) {
     // Used on the lap: written by LMU when it is, else what left the tank since the last lap (never across a stop).
     const fuelUsed = attributes.fuelused !== undefined ? percent(attributes.fuelused) : !pit && previousFuel !== null && fuel !== null && previousFuel >= fuel ? previousFuel - fuel : null;
     const energyUsed = attributes.veused !== undefined ? percent(attributes.veused) : !pit && previousEnergy !== null && energy !== null && previousEnergy >= energy ? previousEnergy - energy : null;
-    previousFuel = fuel; previousEnergy = energy;
-    laps.push({n:Number.parseInt(attributes.num, 10) || laps.length + 1, t:seconds(match[2]), s:[seconds(attributes.s1), seconds(attributes.s2), seconds(attributes.s3)],
-      pit, fuel:round(fuelUsed, 2), ve:round(energyUsed, 2)});
+    // Tyres: what is left of each (1 = new); the lap wore what went away, nothing when they were changed.
+    const wear = ['twfl', 'twfr', 'twrl', 'twrr'].map(key => number(attributes[key]));
+    const worn = wear.map((value, index) => value !== null && previousWear?.[index] !== null && previousWear?.[index] !== undefined && previousWear[index] >= value ? round((previousWear[index] - value) * 100, 2) : null);
+    previousFuel = fuel; previousEnergy = energy; previousWear = wear;
+    const n = Number.parseInt(attributes.num, 10) || laps.length + 1;
+    if (turns && !turns.some(turn => n >= turn.from && n <= turn.to)) continue;
+    const front = compoundOf(attributes.fcompound), rear = compoundOf(attributes.rcompound);
+    laps.push({n, t:seconds(match[2]), s:[seconds(attributes.s1), seconds(attributes.s2), seconds(attributes.s3)],
+      pit, fuel:round(fuelUsed, 2), ve:round(energyUsed, 2), top:seconds(attributes.topspeed) ? round(Number(attributes.topspeed), 1) : null,
+      wear:worn.some(value => value !== null) ? worn : null, compound:rear && rear !== front ? `${front} / ${rear}` : front || null});
   }
   if (!laps.length) throw Error('Aucun tour roulé dans ce fichier.');
   const at = Number.parseInt(tag(text, 'DateTime'), 10);
   return {at:Number.isFinite(at) ? at * 1000 : null, venue:tag(text, 'TrackVenue'), course:tag(text, 'TrackCourse'), kind,
-    car:tag(player, 'CarType') || tag(player, 'VehName'), carClass:tag(player, 'CarClass'), laps};
+    car:tag(player, 'CarType') || tag(player, 'VehName'), carClass:tag(player, 'CarClass'), driver:tag(player, 'Name'), laps};
 }
 
 const median = values => { const list = values.filter(value => value !== null && value !== undefined).sort((a, b) => a - b); return list.length ? (list[Math.floor((list.length - 1) / 2)] + list[Math.ceil((list.length - 1) / 2)]) / 2 : null; };
@@ -197,7 +222,7 @@ export function cleanLive(input) {
   if (!laps.length) throw Error('Aucun tour roulé dans cette séance.');
   const stops = input.stops.slice(0, 60).map(stop => ({lap:finite(stop?.lap, 0, 10000) ?? 0, lane:finite(stop?.lane, 0, 600), stopped:finite(stop?.stopped, 0, 600),
     fuel:finite(stop?.fuel, 0, 200) ?? 0, ve:finite(stop?.ve, 0, 100) ?? 0, tyres:finite(stop?.tyres, 0, 4) ?? 0, repair:stop?.repair === true})).filter(stop => stop.lane && stop.stopped !== null);
-  return {at, track, car, carClass:label(input.class, 60), capacity:finite(input.capacity, 1, 300), laps, stops};
+  return {at, track, car, carClass:label(input.class, 60), driver:label(input.driver, 60), capacity:finite(input.capacity, 1, 300), laps, stops};
 }
 
 // The stops broken down: the pit lane without the stop, then each service on its own (a stop with one service only
@@ -243,4 +268,14 @@ export function analyseLive(sessions) {
     }),
     pit:pitTimes(list.flatMap(session => session.stops)),
     last:list.length ? {at:list.at(-1).at, car:list.at(-1).car, laps:list.at(-1).laps.slice(-60)} : null};
+}
+
+// Without live data, the results files still tell the tyre wear, the compound and the top speed of each lap.
+const NONE = [null, null, null, null];
+export function resultsAsLive(sessions) {
+  const list = sessions.map(session => ({at:session.at, car:session.car, capacity:null, stops:[],
+    laps:session.laps.filter(lap => lap.t && (lap.wear || lap.top)).map(lap => ({n:lap.n, t:lap.t, top:lap.top ?? null, fuel:null, ve:lap.ve ?? null,
+      wear:lap.wear || NONE, temp:NONE, brake:NONE, kpa:NONE, compound:lap.compound || '', track:null, air:null, rain:null, invalid:false, pit:lap.pit, limits:0}))}))
+    .filter(session => session.laps.length);
+  return list.length ? {...analyseLive(list), source:'results'} : null;
 }

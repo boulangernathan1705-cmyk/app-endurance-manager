@@ -51,6 +51,8 @@ function harness(){
   return {DB,req,send,login};
 }
 const XML=readFileSync(new URL('./fixtures/lmu-results-practice.xml',import.meta.url),'utf8');
+// A real online practice (names replaced): every driver is marked isPlayer, and one car was shared.
+const ONLINE=readFileSync(new URL('./fixtures/lmu-results-online-barcelona.xml',import.meta.url),'utf8');
 // The same session another day, by another pilot: only the date and the lap times change.
 const variant=(xml,day,shift)=>xml.replace(/<DateTime>\d+<\/DateTime>/g,`<DateTime>${1790000000+day*86400}</DateTime>`).replace(/>(1\d\d\.\d{4})<\/Lap>/g,(_,t)=>`>${(Number(t)+shift).toFixed(4)}</Lap>`);
 const upload=(send,actor,xml)=>send('/api/training/sessions','POST',actor,{raw:xml,headers:{'Content-Type':'application/xml'}});
@@ -59,7 +61,8 @@ test('a results file gives the player laps, fuel and sectors, and a program from
   const session=parseResults(XML);
   assert.deepEqual([session.venue,session.car,session.carClass,session.kind,session.laps.length],['Circuit de Spa-Francorchamps','Alpine A424','Hypercar','Practice1',25]);
   assert.equal(session.at,1790000000000);
-  assert.deepEqual(session.laps[13],{n:14,t:152.4,s:[41.148,51.816,59.436],pit:true,fuel:null,ve:null});
+  const {n,t,s,pit,fuel,ve}=session.laps[13];
+  assert.deepEqual({n,t,s,pit,fuel,ve},{n:14,t:152.4,s:[41.148,51.816,59.436],pit:true,fuel:null,ve:null});
   assert.equal(session.laps[14].t,null);assert.equal(session.laps[12].fuel,3.6);
   assert.throws(()=>parseResults('<html></html>'),/fichier de résultats LMU/);
   assert.throws(()=>parseResults(XML.replace('<isPlayer>1</isPlayer>','<isPlayer>0</isPlayer>')),/Ton pilote/);
@@ -189,4 +192,44 @@ test('the SimHub plugin gets the same kind of key as a code, which replaces the 
   const collect=auth=>send('/api/training/collector','POST','sync',{raw:XML,headers:{'Content-Type':'application/xml',Authorization:'Bearer '+auth}});
   assert.equal((await collect(old)).status,401);
   assert.equal((await collect(key)).status,200);
+});
+
+test('an online results file: the pilot is found by name, with the laps of his turns, tyre wear and top speed', () => {
+  assert.throws(()=>parseResults(ONLINE),error=>error.code==='driver'&&error.drivers.length===18);
+  assert.throws(()=>parseResults(ONLINE,['Personne']),/ton nom LMU n’y est pas/);
+  const fast=parseResults(ONLINE,['pilote 01']);
+  assert.deepEqual([fast.venue,fast.car,fast.carClass,fast.kind,fast.laps.length],['Circuit de Barcelona','Genesis GMR001','Hyper','Practice1',14]);
+  const lap=fast.laps.find(item=>item.n===8);
+  assert.deepEqual([lap.t,lap.top,lap.fuel,lap.ve,lap.compound],[95.0398,298.6,2,2.7,'Medium']);
+  assert.deepEqual(lap.wear,[1.6,0.8,1.2,1.2]);
+  // New tyres on lap 14: nothing worn is counted there.
+  assert.equal(fast.laps.find(item=>item.n===14).wear,null);
+  // The shared car: lap 1 was driven by someone else.
+  const shared=parseResults(ONLINE,['Moi Pilote']);
+  assert.deepEqual([shared.car,shared.laps.map(item=>item.n)],['Peugeot 9x8',[2,3,4]]);
+});
+
+test('an online file waits for the pilot name, then is read; the sync program can send the name itself', async () => {
+  // Kept 120 days: the file is dated yesterday here.
+  const recent=ONLINE.replace(/<DateTime>\d+<\/DateTime>/g,`<DateTime>${Math.floor(Date.now()/1000)-86400}</DateTime>`);
+  const {req,send,login}=harness();
+  await login(ADMIN,'admin','Orga');await login(PILOT,'pilot','Alice');
+  await req('/api/community/modules','PATCH',{training:true},'admin');
+  let response=await upload(send,'pilot',recent);
+  assert.equal(response.status,200);
+  const result=await response.json();
+  assert.equal(result.pending,true);assert.equal(result.drivers.length,18);
+  let data=(await req('/api/training','GET',null,'pilot')).data;
+  assert.equal(data.pending.files,1);assert.ok(data.pending.drivers.includes('Pilote 01'));assert.equal(data.sessions.length,0);
+  assert.equal((await req('/api/training/profile','PUT',{lmuName:''},'pilot')).status,400);
+  assert.equal((await req('/api/training/profile','PUT',{lmuName:'Pilote 01'},'pilot')).data.added,1);
+  data=(await req('/api/training','GET',null,'pilot')).data;
+  assert.equal(data.pending,null);assert.equal(data.lmuName,'Pilote 01');
+  assert.equal(data.sessions[0].car,'Genesis GMR001');assert.equal(data.sessions[0].laps,14);
+  // The program sends the name read in LMU's settings: the pilot of the shared Peugeot is found at once.
+  await login(MATE,'mate','Bob');
+  const program=await send('/api/training/sync','POST','mate',{raw:''});
+  const key=new TextDecoder().decode(new Uint8Array(await program.arrayBuffer()).slice(4096)).match(/([a-f0-9]{64})/)[1];
+  response=await send('/api/training/collector','POST','sync',{raw:recent,headers:{'Content-Type':'application/xml',Authorization:'Bearer '+key,'X-LMU-Name':'Moi%20Pilote'}});
+  assert.deepEqual(await response.json(),{ok:true,created:true,venue:'Circuit de Barcelona',laps:3});
 });

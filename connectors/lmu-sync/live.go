@@ -34,7 +34,7 @@ type sample struct {
 	ET                          float64
 	Realtime                    bool
 	Session                     int32
-	Track, Car, Class           string
+	Track, Car, Class, Driver   string
 	TrackTemp, AirTemp, Rain    float64
 	LapsDone                    int16
 	LastLap                     float64
@@ -82,7 +82,7 @@ func readSample(b []byte) (s sample, ok bool) {
 		return s, false
 	}
 	s = sample{ET: f64(b, t+12), Realtime: b[scoringInfo+115] != 0, Session: int32(binary.LittleEndian.Uint32(b[scoringInfo+64:])),
-		Track: text(b, scoringInfo, 64), Car: text(b, v+36, 64), Class: text(b, v+200, 32),
+		Track: text(b, scoringInfo, 64), Driver: text(b, v+4, 32), Car: text(b, v+36, 64), Class: text(b, v+200, 32),
 		TrackTemp: f64(b, scoringInfo+236), AirTemp: f64(b, scoringInfo+228), Rain: f64(b, scoringInfo+220),
 		LapsDone: int16(binary.LittleEndian.Uint16(b[v+100:])), LastLap: f64(b, v+168), InPits: b[v+198] != 0, PitState: b[v+457],
 		Pitstops: int16(binary.LittleEndian.Uint16(b[v+192:])),
@@ -138,6 +138,7 @@ type liveSession struct {
 	Track        string     `json:"track"`
 	Car          string     `json:"car"`
 	Class        string     `json:"class"`
+	Driver       string     `json:"driver,omitempty"`
 	Session      int32      `json:"session"`
 	FuelCapacity float64    `json:"capacity"`
 	Laps         []liveLap  `json:"laps"`
@@ -192,7 +193,7 @@ func (r *recorder) feed(s sample, ok bool) {
 		r.flush()
 	}
 	if r.session == nil {
-		r.session = &liveSession{At: r.now().UnixMilli(), Track: s.Track, Car: s.Car, Class: s.Class, Session: s.Session}
+		r.session = &liveSession{At: r.now().UnixMilli(), Track: s.Track, Car: s.Car, Class: s.Class, Driver: s.Driver, Session: s.Session}
 		r.lap = &lapState{start: s}
 	}
 	r.session.FuelCapacity = s.FuelCapacity

@@ -2,7 +2,7 @@
 // the sync program sends (or the pilot drops on the page), turned into a program, a session for today, advice and a
 // comparison with the other pilots of the site. Only the pilot sees his own data; the others are counted, never named.
 import {fail, json, now, id, token, hash, siteOrigin, rateLimit, body, DAY} from './core.mjs';
-import {parseResults, analyse, programSteps, adviceFor, trackKey, cleanLaps, circuitOf, normal, cleanLive, analyseLive, pitTimes, STEPS} from '../shared/training.mjs';
+import {parseResults, analyse, programSteps, adviceFor, trackKey, cleanLaps, circuitOf, normal, cleanLive, analyseLive, resultsAsLive, pitTimes, STEPS} from '../shared/training.mjs';
 
 const FILE_LIMIT = 3_000_000;
 const KEEP_DAYS = 120;
@@ -20,10 +20,24 @@ async function rawBody(request) {
   return new TextDecoder().decode(all);
 }
 
-// One results file → one stored session (the same file sent twice is kept once).
-export async function saveSession(env, userId, xml) {
+// The names that are the pilot in an online results file: his name in LMU, then his name on the site.
+async function namesOf(env, userId) {
+  const row = await env.DB.prepare('SELECT p.lmu_name,u.name FROM users u LEFT JOIN training_profiles p ON p.user_id=u.id WHERE u.id=?').bind(userId).first();
+  return [row?.lmu_name, row?.name].filter(Boolean);
+}
+
+// One results file → one stored session (the same file sent twice is kept once). An online file where the pilot's
+// name is not found waits until he gives it (the last 20 files, without their <Stream> section).
+export async function saveSession(env, userId, xml, keep = true) {
   let session;
-  try { session = parseResults(xml); } catch (error) { fail(400, error.message); }
+  try { session = parseResults(xml, await namesOf(env, userId)); }
+  catch (error) {
+    if (error.code !== 'driver' || !keep) fail(400, error.message);
+    await env.DB.prepare('INSERT INTO training_pending(id,user_id,xml,drivers,created_at) VALUES(?,?,?,?,?)')
+      .bind(id(), userId, xml.replace(/<Stream>[\s\S]*?<\/Stream>/, ''), JSON.stringify(error.drivers), now()).run();
+    await env.DB.prepare('DELETE FROM training_pending WHERE user_id=? AND id NOT IN (SELECT id FROM training_pending WHERE user_id=? ORDER BY created_at DESC LIMIT 20)').bind(userId, userId).run();
+    return {created:false, pending:true, drivers:error.drivers, message:error.message};
+  }
   if (!session.at) fail(400, 'Date de séance absente du fichier.');
   const laps = cleanLaps(session), clean = laps.filter(lap => lap.clean);
   const best = clean.length ? Math.min(...clean.map(lap => lap.t)) : null;
@@ -36,6 +50,18 @@ export async function saveSession(env, userId, xml) {
   return {created:result.meta.changes === 1, venue:session.venue, laps:session.laps.length};
 }
 
+// The pilot's name in LMU: kept, then the files that waited for it are read.
+async function setLmuName(env, userId, name) {
+  await env.DB.prepare(`INSERT INTO training_profiles(user_id,lmu_name,updated_at) VALUES(?,?,?)
+    ON CONFLICT(user_id) DO UPDATE SET lmu_name=excluded.lmu_name,updated_at=excluded.updated_at`).bind(userId, name, now()).run();
+  let added = 0;
+  for (const row of await all(env, 'SELECT id,xml FROM training_pending WHERE user_id=? ORDER BY created_at', userId)) {
+    try { if ((await saveSession(env, userId, row.xml, false)).created) added++; await env.DB.prepare('DELETE FROM training_pending WHERE id=?').bind(row.id).run(); }
+    catch { /* his name is not in this one: it stays until another name is given */ }
+  }
+  return added;
+}
+
 // Live data on one session (tyres, speed, litres, stops). The circuit is the site's name for it when known, so the
 // session sits next to the results files of the same track.
 export async function saveLive(env, userId, text) {
@@ -45,6 +71,8 @@ export async function saveLive(env, userId, text) {
   const result = await env.DB.prepare(`INSERT OR IGNORE INTO training_live(id,user_id,fingerprint,started_at,circuit,track,car,car_class,capacity,laps,stops,created_at)
     VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`).bind(id(), userId, fingerprint, session.at, circuitOf(session.track) || normal(session.track), session.track, session.car,
     session.carClass, session.capacity, JSON.stringify(session.laps), JSON.stringify(session.stops), now()).run();
+  // The game names the pilot: learnt once, so his online results files find him.
+  if (session.driver && !(await env.DB.prepare('SELECT 1 FROM training_profiles WHERE user_id=?').bind(userId).first())) await setLmuName(env, userId, session.driver);
   return {created:result.meta.changes === 1, track:session.track, laps:session.laps.length};
 }
 
@@ -57,6 +85,11 @@ export async function trainingCollector(request, env, live = false) {
   await rateLimit(request, env, 'training-sync', 300);
   const device = await env.DB.prepare('SELECT user_id FROM training_devices WHERE token_hash=?').bind(await hash(raw.slice(7))).first();
   if (!device) fail(401, 'Cette liaison a été retirée. Télécharge à nouveau le synchroniseur depuis le site.');
+  // The program reads the pilot's name in LMU's settings and sends it along: his online files find him.
+  let named = request.headers.get('X-LMU-Name') || '';
+  try { named = decodeURIComponent(named); } catch { named = ''; }
+  named = named.replace(/[\u0000-\u001f]/g, '').trim().slice(0, 60);
+  if (named && !(await env.DB.prepare('SELECT 1 FROM training_profiles WHERE user_id=? AND lmu_name=?').bind(device.user_id, named).first())) await setLmuName(env, device.user_id, named);
   const saved = live ? await saveLive(env, device.user_id, await rawBody(request)) : await saveSession(env, device.user_id, await rawBody(request));
   await env.DB.prepare('UPDATE training_devices SET last_seen=? WHERE user_id=?').bind(now(), device.user_id).run();
   return json({ok:true, ...saved});
@@ -122,16 +155,20 @@ export async function trainingApi(path, method, request, env, actor, community) 
     const circuit = track ? track.circuit || normal(track.venue) : null;
     const liveRows = circuit && carClass ? await all(env, `SELECT started_at,car,capacity,laps,stops FROM training_live WHERE user_id=? AND circuit=? AND car_class=?
       AND started_at>=? ORDER BY started_at DESC LIMIT 30`, user, circuit, carClass, Date.now() - KEEP_DAYS * DAY * 1000) : [];
-    const live = liveRows.length ? analyseLive(liveRows.map(row => ({at:row.started_at, car:row.car, capacity:row.capacity, laps:JSON.parse(row.laps), stops:JSON.parse(row.stops)}))) : null;
+    const live = liveRows.length ? analyseLive(liveRows.map(row => ({at:row.started_at, car:row.car, capacity:row.capacity, laps:JSON.parse(row.laps), stops:JSON.parse(row.stops)})))
+      : resultsAsLive(chosen);
     // The results files give the fuel as a share of the tank: in litres once the game told the tank size.
     if (live?.capacity && analysis.fuelPerLap) analysis.fuelLitres = Math.round(analysis.fuelPerLap * live.capacity) / 100;
     const marks = track ? (await all(env, 'SELECT step FROM training_marks WHERE user_id=? AND track_key=?', user, track.key)).map(row => row.step) : [];
     const compared = track && carClass ? await comparison(env, user, track.key, carClass) : null;
     const device = await env.DB.prepare('SELECT created_at,last_seen FROM training_devices WHERE user_id=?').bind(user).first();
+    const profile = await env.DB.prepare('SELECT lmu_name FROM training_profiles WHERE user_id=?').bind(user).first();
+    const waiting = await all(env, 'SELECT drivers FROM training_pending WHERE user_id=? ORDER BY created_at DESC', user);
     return json({race, tracks, track, classes, carClass, analysis, live, steps:programSteps(analysis, marks), advice:adviceFor(analysis, compared), comparison:compared,
       sessions:sessions.slice(0, 20).map(row => ({id:row.id, at:row.started_at, venue:row.venue, course:row.course, car:row.car, carClass:row.car_class, kind:row.kind,
         laps:JSON.parse(row.laps).length, best:row.best})),
-      device:device ? {linked:true, lastSeen:device.last_seen} : {linked:false}});
+      device:device ? {linked:true, lastSeen:device.last_seen} : {linked:false}, lmuName:profile?.lmu_name || null,
+      pending:waiting.length ? {files:waiting.length, drivers:[...new Set(waiting.flatMap(row => JSON.parse(row.drivers)))].sort((a, b) => a.localeCompare(b)).slice(0, 60)} : null});
   }
   // The pit guide (stands.html): the stops measured by every pilot of the site, per class, never named.
   if (path === '/api/training/pits' && method === 'GET') {
@@ -145,6 +182,12 @@ export async function trainingApi(path, method, request, env, actor, community) 
       const {last, ...times} = pitTimes(entry.stops);
       return {name, pilots:entry.pilots.size, ...times};
     })});
+  }
+  if (path === '/api/training/profile' && method === 'PUT') {
+    const input = await body(request);
+    const name = typeof input.lmuName === 'string' ? input.lmuName.replace(/[\u0000-\u001f]/g, '').trim() : '';
+    if (!name || name.length > 60) fail(400, 'Indique ton nom tel qu’il apparaît dans LMU.');
+    return json({ok:true, added:await setLmuName(env, user, name)});
   }
   if (path === '/api/training/sessions' && method === 'POST') {
     await rateLimit(request, env, 'training-import', 200);
