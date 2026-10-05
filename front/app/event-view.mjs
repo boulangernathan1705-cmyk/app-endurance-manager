@@ -57,6 +57,17 @@ const QUICK_ICON=path=>`<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="
 const ICON_REGISTER=QUICK_ICON('M8 7a4 4 0 1 0 8 0a4 4 0 0 0-8 0M6 21v-2a4 4 0 0 1 4-4h4M16 19h6M19 16v6');
 const ICON_CREW=QUICK_ICON('M10 13a2 2 0 1 0 4 0a2 2 0 0 0-4 0M8 21v-1a2 2 0 0 1 2-2h3M15 5a2 2 0 1 0 4 0a2 2 0 0 0-4 0M17 10h2a2 2 0 0 1 2 2v1M5 5a2 2 0 1 0 4 0a2 2 0 0 0-4 0M3 13v-1a2 2 0 0 1 2-2h2M16 19h6M19 16v6');
 const ICON_MORE=QUICK_ICON('M5 12h.01M12 12h.01M19 12h.01');
+// A pilot with a small cross: « Je serai absent ».
+const ICON_ABSENT=QUICK_ICON('M8 7a4 4 0 1 0 8 0a4 4 0 0 0-8 0M6 21v-2a4 4 0 0 1 4-4h3M17 16l4 4M21 16l-4 4');
+// « Je serai absent » next to « M'inscrire » (the absence is for the whole event); once said, a click withdraws it.
+function absenceButton(event){
+  if(!state.user)return '';
+  const absent=(event.absences||[]).some(item=>item.mine);
+  const entered=(event.departures||[]).some(departure=>(departure.availability||[]).some(reg=>reg.mine&&reg.status!=='unavailable'));
+  if(entered&&!absent)return '';
+  const label='Absent',tip=absent?'Tu es noté absent : clique pour retirer ton absence':'Je serai absent';
+  return `<button type="button" class="planning-quick-button is-labelled is-absence${absent?' is-active':''}" data-action="${absent?'event-absence-cancel':'event-absence'}" data-id="${event.id}" data-tip="${esc(tip)}" aria-label="${esc(tip)}"><span class="planning-quick-icon">${ICON_ABSENT}</span><span class="planning-quick-label">${esc(label)}</span></button>`;
+}
 // The pilot's own entry, always unfolded: one click enters him (or opens his entry). The other choices
 // (another category, another pilot) sit in a small « … » menu, the crew in its own square.
 function quickActions(event,departure){
@@ -81,7 +92,8 @@ function quickActions(event,departure){
     :`<span class="planning-quick-menu-wrap">${square(ICON_MORE,'Autres inscriptions','data-action="quick-menu" aria-haspopup="menu" aria-expanded="false"')}<span class="planning-quick-menu" role="menu" hidden>${more.map(item=>`<button type="button" role="menuitem" class="planning-quick-item" data-action="${item.action}" data-departure="${departure.id}" ${item.extra}>${esc(item.label)}</button>`).join('')}</span></span>`;
   const crewLabel=can('manage_registrations')?'Créer un équipage':'Créer mon équipage';
   const crew=!solo&&canCreateCrewOnDeparture(departure,event)?square(ICON_CREW,crewLabel,`data-crew-builder-open data-departure="${departure.id}"`):'';
-  return register||menu||crew?`<span class="planning-quick">${register}${menu}${crew}</span>`:'';
+  const absence=absenceButton(event);
+  return register||absence||menu||crew?`<span class="planning-quick">${register}${absence}${menu}${crew}</span>`:'';
 }
 
 // Buttons of a start (enter, enter another pilot, create a crew) and what an opened start shows.
@@ -151,11 +163,10 @@ function absencesSection(event,open){
   const names=new Map();
   for(const item of event.absences||[])names.set(item.name.toLowerCase(),item);
   for(const departure of event.departures||[])for(const reg of departure.availability||[])if(reg.status==='unavailable'&&!names.has(String(reg.name).toLowerCase()))names.set(String(reg.name).toLowerCase(),{name:reg.name,mine:reg.mine});
-  const list=[...names.values()],mine=(event.absences||[]).some(item=>item.mine);
-  const entered=(event.departures||[]).some(departure=>(departure.availability||[]).some(reg=>reg.mine&&reg.status!=='unavailable'));
-  const action=!state.user||!open?'':mine?button('event-absence-cancel','Je ne serai plus absent',`data-id="${event.id}"`,'link-button'):entered?'':button('event-absence','Je serai absent',`data-id="${event.id}"`,'secondary-button');
-  if(!list.length&&!action)return '';
-  return `<section class="event-absences" aria-label="Pilotes absents"><div class="event-absences-head"><h2>Absents <span>${list.length}</span></h2>${action}</div>${list.length?`<ul>${list.map(item=>`<li class="${item.mine?'is-mine':''}">${esc(item.name)}</li>`).join('')}</ul>`:'<p>Personne ne s’est encore dit absent.</p>'}</section>`;
+  const list=[...names.values()];
+  // « Je serai absent » sits next to « M'inscrire » on each start; here, only the list.
+  if(!list.length)return '';
+  return `<section class="event-absences" aria-label="Pilotes absents"><div class="event-absences-head"><h2>Absents <span>${list.length}</span></h2></div><ul>${list.map(item=>`<li class="${item.mine?'is-mine':''}">${esc(item.name)}</li>`).join('')}</ul></section>`;
 }
 // EVENT TDZ: the event type where an endurance shows its circuit (its logo will take this place).
 function eventTypePanel(event){
