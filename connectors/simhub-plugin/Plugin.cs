@@ -27,14 +27,33 @@ namespace EnduranceManager.SimHub
     {
         public Settings Settings;
         public PluginManager PluginManager { get; set; }
-        public ImageSource PictureIcon => null;
+        public ImageSource PictureIcon => Icon;
+
+        // The menu icon: a stopwatch, drawn rather than shipped as a file.
+        static readonly ImageSource Icon = MakeIcon();
+        static ImageSource MakeIcon()
+        {
+            var pen = new Pen(Brushes.White, 2.2) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round };
+            var group = new DrawingGroup();
+            group.Children.Add(new GeometryDrawing(null, pen, new EllipseGeometry(new System.Windows.Point(12, 13.5), 8, 8)));
+            group.Children.Add(new GeometryDrawing(null, pen, Geometry.Parse("M12,13.5 L15.5,10 M10,3 L14,3 M12,3 L12,5.5")));
+            var image = new DrawingImage(group);
+            image.Freeze();
+            return image;
+        }
         public string LeftMenuTitle => "Endurance Manager";
 
         Uploader uploader;
+        readonly LmuApi api = new LmuApi();
         Thread reader, sender;
         volatile bool running;
         int laps;
 
+        public Uploader Uploader => uploader;
+        public LmuApi Api => api;
+        // What the game is doing, for the settings screen: closed, in the menus, or on track.
+        public volatile string GameState = "closed";
+        public bool OtherSync => SyncRunning();
         public string Status => SyncRunning() ? "Le synchroniseur Windows tourne déjà sur ce PC : le plugin le laisse envoyer tes séances." : uploader?.Status ?? "";
 
         // The synchroniser holds this mutex while it runs (connectors/lmu-sync/platform_windows.go).
@@ -86,6 +105,9 @@ namespace EnduranceManager.SimHub
             var recorder = new Recorder(() => DateTime.Now, session =>
             {
                 laps += session.Laps.Count;
+                // The game's service times and forecast for this car, read while the pilot drove.
+                session.Service = api.Service;
+                session.Game = api.Game;
                 if (!SyncRunning()) try { uploader.SaveLive(session); } catch { }
             });
             var buffer = new byte[LmuMemory.Size];
@@ -96,6 +118,7 @@ namespace EnduranceManager.SimHub
                 if (memory == null)
                 {
                     // The game is closed: the session is over, send it now.
+                    GameState = "closed";
                     recorder.Flush();
                     Thread.Sleep(5000);
                     continue;
@@ -103,12 +126,17 @@ namespace EnduranceManager.SimHub
                 using (memory)
                 using (var view = memory.CreateViewAccessor(0, LmuMemory.Size, MemoryMappedFileAccess.Read))
                 {
-                    for (int misses = 0; running && misses < 600;)
+                    for (int misses = 0, tick = 0; running && misses < 600; tick++)
                     {
                         view.ReadArray(0, buffer, 0, buffer.Length);
                         bool ok = LmuMemory.Read(buffer, out var sample);
                         recorder.Feed(sample, ok);
-                        misses = ok && sample.Realtime ? 0 : misses + 1;
+                        bool driving = ok && sample.Realtime;
+                        GameState = driving ? "track" : "menu";
+                        misses = driving ? 0 : misses + 1;
+                        // The game's API, every 30 s on track: its tables do not change during a session.
+                        // Read aside, so a slow answer never holds up the samples.
+                        if (driving && tick % 300 == 0) { string compound = sample.FrontCompound; ThreadPool.QueueUserWorkItem(_ => api.Read(compound)); }
                         Thread.Sleep(100);
                     }
                 }

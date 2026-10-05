@@ -36,6 +36,11 @@ namespace EnduranceManager.SimHub
         public string LiveFolder => Path.Combine(home, "live");
         public string Status { get; private set; } = "En attente";
         public bool Revoked { get; private set; }
+        // For the settings screen: did the last pass reach the site, and what went with it.
+        public bool? Reached { get; private set; }
+        public DateTime? LastSent { get; private set; }
+        public int SentToday { get; private set; }
+        DateTime sentDay = DateTime.Today;
 
         public Uploader(string home)
         {
@@ -90,19 +95,21 @@ namespace EnduranceManager.SimHub
                     .Where(info => info.Length > 0 && info.Length <= MaxFile && now - info.LastWriteTimeUtc >= TimeSpan.FromSeconds(15)
                         && now - info.LastWriteTimeUtc <= TimeSpan.FromDays(KeepDays) && !sent.Contains(FileKey(info)))
                     .OrderBy(info => info.LastWriteTimeUtc).ToList();
+                if (sentDay != DateTime.Today) { sentDay = DateTime.Today; SentToday = 0; }
                 foreach (var info in files)
                 {
-                    if (Send(code, info.FullName, "/api/training/collector", "application/xml", PlayerName(info.DirectoryName))) { sent.Add(FileKey(info)); SaveSent(); }
+                    if (Send(code, info.FullName, "/api/training/collector", "application/xml", PlayerName(info.DirectoryName))) { sent.Add(FileKey(info)); SaveSent(); Count(); }
                 }
                 foreach (var path in Directory.GetFiles(LiveFolder, "*.json").OrderBy(path => path))
                 {
-                    if (Send(code, path, "/api/training/live", "application/json")) File.Delete(path);
+                    if (Send(code, path, "/api/training/live", "application/json")) { File.Delete(path); Count(); }
                 }
                 Revoked = false;
+                Reached = true;
                 Status = "Synchronisation active · " + DateTime.Now.ToString("HH:mm");
             }
-            catch (UnauthorizedAccessException) { Revoked = true; Status = "Cette liaison a été retirée. Demande un nouveau code sur la page Mon entraînement."; }
-            catch (Exception error) { Status = "Site injoignable, nouvel essai dans une minute (" + error.Message + ")"; }
+            catch (UnauthorizedAccessException) { Revoked = true; Reached = false; Status = "Cette liaison a été retirée. Demande un nouveau code sur la page Mon entraînement."; }
+            catch (Exception error) { Reached = false; Status = "Site injoignable, nouvel essai dans une minute (" + error.Message + ")"; }
         }
 
         // A file the site refuses (not a session of the pilot) is never sent again; a refused key stops everything.
@@ -133,6 +140,8 @@ namespace EnduranceManager.SimHub
                 return true;
             }
         }
+
+        void Count() { SentToday++; LastSent = DateTime.Now; }
 
         void SaveSent()
         {
