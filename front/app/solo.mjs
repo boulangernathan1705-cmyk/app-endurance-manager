@@ -95,7 +95,7 @@ export function roundFormat(round) {
 }
 export function roundExtras(round) {
   const weather = WEATHERS.find(([value]) => value === round.weather)?.[1];
-  return [weather, round.fuel != null ? `essence ×${round.fuel}` : '', round.tyres != null ? `pneus ×${round.tyres}` : ''].filter(Boolean).join(' · ');
+  return [weather, round.fuel != null ? `carburant ×${round.fuel}` : '', round.tyres != null ? `usure pneus ×${round.tyres}` : ''].filter(Boolean).join(' · ');
 }
 // What the community's calendar shows: the end of an open session, the server password, the note, and per
 // round its circuit, categories, session lengths, weather and multipliers.

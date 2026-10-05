@@ -33,7 +33,7 @@ function roundField(sim,round={}){
   return `<div class="solo-round"><div class="solo-round-head"><span class="solo-round-title"></span><button type="button" class="link-button" data-remove-round>Retirer</button></div>
     ${circuitField(sim,round)}<div data-round-categories>${categoryField(sim,round)}</div>
     <div class="solo-round-format">${numberField('roundPractice','Essais (min)',round.practice,600)}${numberField('roundQualifying','Qualifs (min)',round.qualifying,600)}${numberField('roundMinutes','Course (min)',round.durationMinutes||30,600,'min="5" required')}</div>
-    ${weatherField(round)}<div class="solo-round-format">${numberField('roundFuel','Essence ×',round.fuel,10)}${numberField('roundTyres','Pneus ×',round.tyres,10)}</div></div>`;
+    ${weatherField(round)}<div class="solo-round-format">${numberField('roundFuel','Conso carburant ×',round.fuel,10)}${numberField('roundTyres','Usure pneus ×',round.tyres,10)}</div></div>`;
 }
 // Weather as icons; touching the chosen one again clears it.
 function weatherField(round){
