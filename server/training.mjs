@@ -7,6 +7,8 @@ import {levelOf, memoPilots} from '../shared/training.mjs';
 import {BOP} from '../shared/lmu-bop.mjs';
 import {bopFor} from '../shared/bop.mjs';
 import {collectMemo, collectiveMemo, restartMemo, renewMemos} from './memo-collection.mjs';
+import {EXERCISES,checklistScope,checklistEvidence,analysisFromLive} from '../shared/training-checklist.mjs';
+import {sessionChecklist,getChecklist} from './training-checklist.mjs';
 
 const FILE_LIMIT = 3_000_000;
 const KEEP_DAYS = 120;
@@ -54,6 +56,7 @@ export async function saveSession(env, userId, xml, keep = true) {
   const result = await env.DB.prepare(`INSERT OR IGNORE INTO training_sessions(id,user_id,fingerprint,started_at,track_key,venue,course,car,car_class,kind,laps,best,s1,s2,s3,per_lap,created_at,lap_count)
     VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).bind(id(), userId, fingerprint, session.at, trackKey(session), session.venue.slice(0, 120), session.course.slice(0, 120),
     session.car.slice(0, 120), session.carClass.slice(0, 60), session.kind.slice(0, 20), JSON.stringify(session.laps), best, sector(0), sector(1), sector(2), perLap, now(),session.laps.length).run();
+  await sessionChecklist(env,userId,session);
   return {created:result.meta.changes === 1, venue:session.venue, laps:session.laps.length};
 }
 
@@ -89,6 +92,7 @@ export async function saveLive(env, userId, text) {
   }
   // Idempotent collection also retries a previous upload whose compact aggregation failed.
   await collectMemo(env,userId,session,`${userId}:${fingerprint}`,circuitOf(session.track)||normal(session.track));
+  await sessionChecklist(env,userId,session,true);
   return {created:result.meta.changes === 1, track:session.track, laps:session.laps.length};
 }
 
@@ -297,34 +301,39 @@ export async function trainingApi(path, method, request, env, actor, community) 
     const sessions = await all(env, `SELECT id,started_at,track_key,venue,course,car,car_class,kind,lap_count,best FROM training_sessions
       WHERE user_id=? AND started_at>=? ORDER BY started_at DESC LIMIT 200`, user, Date.now() - KEEP_DAYS * DAY * 1000);
     const race = await nextRace(env, user);
+    const liveMeta=await all(env,'SELECT circuit,track,car_class FROM training_live WHERE user_id=? AND started_at>=? ORDER BY started_at DESC LIMIT 200',user,Date.now()-KEEP_DAYS*DAY*1000);
     const tracks = [];
     for (const row of sessions) if (!tracks.some(track => track.key === row.track_key)) tracks.push({key:row.track_key, venue:row.venue, course:row.course, circuit:circuitOf(row.venue)});
+    for(const row of liveMeta)if(!tracks.some(track=>track.circuit===row.circuit))tracks.push({key:row.circuit,venue:row.track,course:'',circuit:row.circuit});
     const wanted = url.searchParams.get('track');
     const track = tracks.find(item => item.key === wanted) || (race && tracks.find(item => item.circuit === race.circuit)) || tracks[0] || null;
     const onTrack = track ? sessions.filter(row => row.track_key === track.key) : [];
-    const classes = [...new Set(onTrack.map(row => row.car_class))];
-    const carClass = classes.includes(url.searchParams.get('class')) ? url.searchParams.get('class') : classes[0] || null;
+    const classes = [...new Set([...onTrack.map(row => row.car_class),...liveMeta.filter(row=>row.circuit===track?.circuit).map(row=>row.car_class)])];
+    const carClass = classes.includes(url.searchParams.get('class')) ? url.searchParams.get('class') : classes[0] || race?.category || null;
     const chosenRows=track&&carClass ? await all(env,`SELECT started_at,car,kind,laps FROM training_sessions
       WHERE user_id=? AND track_key=? AND car_class=? AND started_at>=? ORDER BY started_at DESC LIMIT ?`,user,track.key,carClass,Date.now()-KEEP_DAYS*DAY*1000,ANALYSIS_SESSIONS):[];
     const chosen = chosenRows
       .map(row => ({at:row.started_at, car:row.car, kind:row.kind, laps:JSON.parse(row.laps)}));
-    const analysis = analyse(chosen);
+    let analysis = analyse(chosen);
     // Live sessions on the same circuit and class (a track the site does not know is matched by its name).
-    const circuit = track ? track.circuit || normal(track.venue) : null;
+    const circuit = track ? track.circuit || normal(track.venue) : race?.circuit || null;
     const liveRows = circuit && carClass ? await all(env, `SELECT started_at,car,capacity,laps,stops,game FROM training_live WHERE user_id=? AND circuit=? AND car_class=?
       AND started_at>=? ORDER BY started_at DESC LIMIT ?`, user, circuit, carClass, Date.now() - KEEP_DAYS * DAY * 1000,ANALYSIS_SESSIONS) : [];
     const live = liveRows.length ? analyseLive(liveRows.map(row => ({at:row.started_at, car:row.car, capacity:row.capacity, laps:JSON.parse(row.laps), stops:JSON.parse(row.stops)})))
       : resultsAsLive(chosen);
+    const liveSessions=liveRows.map(row=>({at:row.started_at,car:row.car,capacity:row.capacity,laps:JSON.parse(row.laps),stops:JSON.parse(row.stops)}));
+    if(!chosen.length&&liveSessions.length)analysis=analysisFromLive(liveSessions);
     // The results files give the fuel as a share of the tank: in litres once the game told the tank size.
     if (live?.capacity && analysis.fuelPerLap) analysis.fuelLitres = Math.round(analysis.fuelPerLap * live.capacity) / 100;
     const marks = track ? (await all(env, 'SELECT step FROM training_marks WHERE user_id=? AND track_key=?', user, track.key)).map(row => row.step) : [];
+    const checklist=await getChecklist(env,user,checklistScope(circuit,carClass),checklistEvidence(analysis,liveSessions),marks);
     const compared = track && carClass ? await comparison(env, user, track.key, carClass) : null;
     const device = await env.DB.prepare('SELECT created_at,last_seen FROM training_devices WHERE user_id=?').bind(user).first();
     const profile = await env.DB.prepare('SELECT lmu_name FROM training_profiles WHERE user_id=?').bind(user).first();
     const waiting = await all(env, 'SELECT drivers FROM training_pending WHERE user_id=? ORDER BY created_at DESC', user);
     const preparation = await crewPreparation(env, user, community.id, race, track, carClass);
     const game = liveRows.map(row => row.game && JSON.parse(row.game)).find(Boolean) || null;
-    return json({race, tracks, track, classes, carClass, analysis, live, game, ...preparation, steps:programSteps(analysis, marks), advice:adviceFor(analysis, compared), comparison:compared,
+    return json({race, tracks, track, classes, carClass, analysis, live, game, checklist,...preparation, steps:programSteps(analysis, marks), advice:adviceFor(analysis, compared), comparison:compared,
       sessions:sessions.slice(0, 20).map(row => ({id:row.id, at:row.started_at, venue:row.venue, course:row.course, car:row.car, carClass:row.car_class, kind:row.kind,
         laps:row.lap_count, best:row.best})),
       analysisWindow:ANALYSIS_SESSIONS,
@@ -361,6 +370,16 @@ export async function trainingApi(path, method, request, env, actor, community) 
     if (typeof input.track !== 'string' || input.track.length > 300 || !STEPS.some(step => step.key === input.step) || typeof input.done !== 'boolean') fail(400, 'Étape invalide.');
     await env.DB.prepare(input.done ? 'INSERT OR IGNORE INTO training_marks(user_id,track_key,step) VALUES(?,?,?)' : 'DELETE FROM training_marks WHERE user_id=? AND track_key=? AND step=?')
       .bind(user, input.track, input.step).run();
+    return json({ok:true});
+  }
+  if(path==='/api/training/checklist'&&method==='PUT') {
+    const input=await body(request),exercise=EXERCISES.find(item=>item.key===input.exercise);
+    if(!exercise||typeof input.scope!=='string'||input.scope.length>300||!/^[a-z0-9 -]+::[a-z0-9 -]+$/.test(input.scope)||
+      !['selected','manual'].includes(input.field)||typeof input.value!=='boolean')fail(400,'Exercice ou état invalide.');
+    const field=input.field;
+    await env.DB.prepare(`INSERT INTO training_checklist(user_id,scope,exercise,selected,manual) VALUES(?,?,?,?,?)
+      ON CONFLICT(user_id,scope,exercise) DO UPDATE SET ${field}=excluded.${field}`)
+      .bind(user,input.scope,exercise.key,field==='selected'?(input.value?1:0):(exercise.default?1:0),field==='manual'&&input.value?1:0).run();
     return json({ok:true});
   }
   // The SimHub plugin: the same key, as a code the pilot pastes in the plugin's settings.
