@@ -365,7 +365,7 @@ export function memoSheet({laneStops = [], carStops = [], sessions = [], viewer 
   if (reference) {
     const own = byPilot.get(viewer)?.laps.map(lap => lap.t).filter(Boolean) || [];
     const pace = median(own), level = levelOf(pace, reference), index = LEVELS.findIndex(item => item.name === level);
-    levels = {track:reference.track, patch:reference.patch, q:reference.q, bands:levelBands(reference),
+    levels = {track:reference.track, patch:reference.patch, q:reference.q, fastest:reference.fastest || null, bands:levelBands(reference),
       you:pace ? {pace:round(pace, 3), best:round(Math.min(...own), 3), level, next:index > 0 ? {name:LEVELS[index - 1].name, time:reference.pace[LEVELS[index - 1].to]} : null} : null};
   }
   return {levels, lane:through.length ? {through:round(median(through), 1), stops:through.length} : null,
@@ -403,7 +403,9 @@ export function parseLaptimes(text) {
     const suffix = track && key?.startsWith(track) ? key.slice(track.length) : '';
     const carClass = LAPTIME_CLASSES[suffix], pace = rest.slice(0, 8).map(clock);
     if (!carClass || !clock(q) || pace.some(value => !value || value < clock(q) * 0.95 || value > 3600)) continue;
-    out.push({track:track.slice(0, 80), carClass, patch:patch.slice(0, 20), q:clock(q), pace, circuit:circuitOf(track)});
+    // The fastest car of the class and its hotlap, when the row gives them (its name ends with the game version).
+    const fastest = clock(rest[9]) ? {car:String(rest[8] || '').replace(/\s*\(v[\d.]+\)\s*$/, '').slice(0, 60), time:clock(rest[9])} : null;
+    out.push({track:track.slice(0, 80), carClass, patch:patch.slice(0, 20), q:clock(q), pace, fastest, circuit:circuitOf(track)});
   }
   return out;
 }

@@ -157,3 +157,57 @@
 .memo-level .dot { width: .6rem; height: .6rem; border-radius: 50%; background: var(--memo-you); display: inline-block; }
 .memo-credit { margin: 1.5rem 0 0; font-size: .85rem; color: var(--muted, #9aa3b2); text-align: center; }
 .memo-credit a { color: inherit; text-decoration: underline; }
+
+/* Mémo des circuits (stands.html), drawn like a race sheet: condensed titles, monospaced figures, flat cards with
+   what each one is about over its title, the three colours of the sources. */
+@font-face{font-family:"Memo Display";src:url("/images/fonts/barlow-condensed-latin-700-normal.woff2") format("woff2");font-weight:700;font-display:swap}
+@font-face{font-family:"Memo Mono";src:url("/images/fonts/jetbrains-mono-latin-500-normal.woff2") format("woff2");font-weight:500;font-display:swap}
+#pit-guide{--memo-you:#7fb2ee;--memo-pilots:#f0814a;--memo-game:#5fc79a;--memo-display:"Memo Display","Arial Narrow",sans-serif;--memo-mono:"Memo Mono",ui-monospace,Consolas,monospace;display:grid;gap:20px}
+#pit-guide .training-card{border-radius:8px;gap:12px;align-content:start}
+#pit-guide h2{margin:0;font:700 26px/1.1 var(--memo-display);letter-spacing:.01em}
+.memo-head{display:grid;gap:10px;padding:4px 0}
+.memo-head h1{margin:0;font:700 clamp(36px,6vw,56px)/1 var(--memo-display);text-wrap:balance}
+.memo-kicker{margin:0;color:var(--memo-pilots);font-size:13px;font-weight:700;letter-spacing:.12em;text-transform:uppercase}
+.memo-sub{margin:0;color:var(--muted)}
+.memo-pick{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:end}
+.memo-select{display:grid;gap:4px;color:var(--muted);font-size:12px}
+.memo-select select{min-height:38px;padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--panel);color:var(--text);font-size:14px;font-weight:600}
+.memo-classes{display:flex;flex-wrap:wrap;gap:6px}
+.memo-classes button{min-height:38px;padding:8px 12px;border:1px solid var(--border);border-radius:6px;background:var(--panel);color:var(--text);font-size:14px;font-weight:700;cursor:pointer}
+.memo-classes button[aria-pressed="true"]{background:var(--text);color:var(--panel);border-color:var(--text)}
+.memo-classes button:focus-visible{outline:2px solid var(--memo-pilots);outline-offset:2px}
+.memo-scope{margin:0;color:var(--muted);font:500 11px/1.3 var(--memo-mono);letter-spacing:.06em;text-transform:uppercase}
+#pit-guide .memo-row dd,#pit-guide .memo-scale,#pit-guide .memo-calc output{font-family:var(--memo-mono);font-weight:500}
+#pit-guide .memo-row dd small{font-family:Arial,Helvetica,sans-serif;white-space:normal}
+#pit-guide .memo-big{font:700 42px/1 var(--memo-display)}
+#pit-guide .memo-big span{font-family:inherit;font-size:20px}
+#pit-guide dl.is-game dd{color:var(--memo-game)}
+.memo-small{font-size:13px}
+.memo-table-wrap{overflow-x:auto}
+.memo-table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+.memo-table th,.memo-table td{padding:9px 10px;border-bottom:1px solid var(--border);text-align:right;vertical-align:baseline;white-space:nowrap}
+.memo-table th:first-child{text-align:left}
+.memo-table thead th{color:var(--muted);font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;vertical-align:bottom}
+.memo-table small{display:block;color:var(--muted);font:400 11px/1.3 inherit;letter-spacing:0;text-transform:none}
+.memo-table tbody th{font-weight:700}
+.memo-table td{font:500 15px/1.3 var(--memo-mono)}
+.memo-table td small{font-family:Arial,Helvetica,sans-serif}
+.memo-table .memo-none{color:var(--muted)}
+.memo-table tr.is-you-row th,.memo-table tr.is-you-row td{color:var(--memo-you)}
+.memo-table tr.is-you-row{background:color-mix(in srgb,var(--memo-you) 10%,transparent)}
+.memo-table tr.is-mine{box-shadow:inset 3px 0 0 var(--memo-you)}
+.memo-table tr.is-mine td{color:var(--memo-you)}
+.memo-table tr.is-goal{box-shadow:inset 3px 0 0 var(--memo-pilots)}
+.memo-table tr.is-goal td{color:var(--memo-pilots)}
+.memo-chip{display:inline-block;margin-left:6px;padding:2px 6px;border:1px solid currentColor;border-radius:4px;font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;vertical-align:2px}
+.memo-stint{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.memo-stint div{display:grid;gap:4px;align-content:start;padding:10px;border:1px solid var(--border);border-radius:6px}
+.memo-stint small{color:var(--muted);font-size:12px}
+.memo-stint small.is-pilots{color:var(--memo-pilots);font-weight:700}
+.memo-stint b{font:700 32px/1.05 var(--memo-display)}
+.memo-how{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px 20px}
+.memo-how p{margin:0;color:var(--muted);line-height:1.5}
+.memo-how strong{color:var(--text)}
+@media (max-width:720px){.memo-how{grid-template-columns:1fr}}
+@media (max-width:560px){.memo-stint{grid-template-columns:1fr}.memo-table th,.memo-table td{padding:8px 4px;white-space:normal}.memo-table td{font-size:13px}.memo-table thead th{font-size:11px}.memo-chip{display:table;margin:3px 0 0}}
+.memo-table caption{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
