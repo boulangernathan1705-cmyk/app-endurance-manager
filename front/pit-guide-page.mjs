@@ -2,12 +2,13 @@
 // (server/training.mjs, /api/training/memo). Three sources, each with its colour and its shape: the viewer (a dot),
 // the pilots of the site (a band and the median's line), the game (a triangle). The stop calculator applies the
 // game's rule (shared/training.mjs, stopTime) to the car's service times.
-import {stopTime} from '../shared/training.mjs';
+import {stopTime,refuelAmounts} from '../shared/training.mjs';
 
 const app = document.getElementById('pit-guide');
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const num = (value, digits = 1) => value === null || value === undefined ? '—' : Number(value).toFixed(digits).replace('.', ',');
-const view = {data:null, calc:{energy:50, fuel:null, tyres:4, driver:false, wing:false, ductFront:false, ductRear:false, brakes:false}};
+const view = {data:null, calc:{before:50, after:100, tyres:4, driver:false, wing:false, ductFront:false, ductRear:false, brakes:false}};
+let loadController;
 
 // 80.887 -> 1:20.887 (times from the spreadsheet have two decimals).
 const lap = (seconds, digits = 2) => seconds ? `${Math.floor(seconds / 60)}:${(seconds % 60).toFixed(digits).padStart(digits + 3, '0')}` : '—';
@@ -44,20 +45,40 @@ function perLap(title, item, unit, digits, extra = '') {
 function calculator(data) {
   const service = data.service?.source === 'game' ? data.service : null;
   if (!service) return `<p class="training-note memo-small">Le calcul d’un arrêt arrive quand le plugin envoie les temps de service de cette voiture.</p>`;
-  const c = view.calc, energy = c.energy, ratio = data.fuel.ratio, capacity = data.capacity;
-  // The fuel follows the energy through the advised ratio until it is set by hand, as in the pit menu.
-  const share = c.fuel ?? Math.min(100, Math.round(energy * (ratio || 0))), fuel = capacity ? share / 100 * capacity : 0;
-  const stopped = stopTime(service, {fuel, energy, tyres:c.tyres, wing:c.wing, driver:c.driver, ductFront:c.ductFront, ductRear:c.ductRear, brakes:c.brakes});
+  const c = view.calc;
   const check = (key, label, seconds) => seconds ? `<label class="memo-toggle"><input type="checkbox" data-calc="${key}"${c[key] ? ' checked' : ''}><span>${label}</span><small>${num(seconds, 0)} s</small></label>` : '';
   return `<form class="memo-calc" aria-label="Calculer un arrêt">
-    <label for="memo-energy">Énergie remise <output>${energy} %</output></label><input id="memo-energy" type="range" min="0" max="100" step="1" value="${energy}" data-calc="energy">
-    <label for="memo-fuel">Carburant remis <output>${share} %${fuel ? ` · ${num(fuel, 1)} L` : ''}</output></label><input id="memo-fuel" type="range" min="0" max="100" step="1" value="${share}" data-calc="fuel">
+    <label for="memo-before">Énergie actuelle dans la voiture <output data-output="before">${c.before} %</output></label>
+    <div class="memo-energy-control"><input id="memo-before" type="range" min="0" max="100" step="1" value="${c.before}" data-calc="before"><input type="number" min="0" max="100" step="1" value="${c.before}" data-calc="before" aria-label="Énergie actuelle en pourcentage"></div>
+    <label for="memo-after">Énergie dans la voiture après le pit <output data-output="after">${c.after} %</output></label>
+    <div class="memo-energy-control"><input id="memo-after" type="range" min="0" max="100" step="1" value="${c.after}" data-calc="after"><input type="number" min="0" max="100" step="1" value="${c.after}" data-calc="after" aria-label="Énergie après le pit en pourcentage"></div>
+    <p class="training-note">Glisse les jauges ou saisis une valeur à 1 % près. Le temps de ravitaillement porte sur la différence entre les deux niveaux.</p>
     <fieldset><legend>Pneus</legend>${[[0, 'Aucun'], [2, '2 pneus'], [4, '4 pneus']].map(([value, label]) => `<label class="memo-toggle"><input type="radio" name="memo-tyres" value="${value}" data-calc="tyres"${c.tyres === value ? ' checked' : ''}><span>${label}</span></label>`).join('')}</fieldset>
     <fieldset><legend>Pendant le plein</legend>${check('driver', 'Pilote', service.driver)}${check('wing', 'Aileron arrière', service.wing)}</fieldset>
     <fieldset><legend>En plus du plein</legend>${check('ductFront', 'Écopes avant', service.ductFront)}${check('ductRear', 'Écopes arrière', service.ductRear)}${check('brakes', 'Freins', service.brakes)}</fieldset>
   </form>
-  <dl>${row('Temps arrêté', `${num(stopped)} s`, 'is-game')}
-    ${data.lane ? row('<strong>Temps total au stand</strong>', `<strong>${num(data.lane.through + stopped)} s</strong>`, '', 'traversée + arrêt') : ''}</dl>`;
+  <div data-calc-result aria-live="polite" aria-atomic="true">${calculatorResult(data)}</div>`;
+}
+
+function calculatorResult(data) {
+  const c=view.calc,{energy,fuel}=refuelAmounts(c.before,c.after,data.fuel.ratio,data.capacity);
+  const service=data.service;
+  const complete=energy===0 || (service.energyRate>0 && fuel!==null && (fuel===0||service.fuelRate>0));
+  const refuel=stopTime(service,{fuel:fuel||0,energy});
+  const stopped=stopTime(service,{fuel:fuel||0,energy,tyres:c.tyres,wing:c.wing,driver:c.driver,ductFront:c.ductFront,ductRear:c.ductRear,brakes:c.brakes});
+  return `<dl>${row('Énergie ajoutée',`${energy} %`)}${row('Carburant estimé',fuel===null?'—':`${num(fuel,2)} L`,'',fuel===null?'ratio carburant pas encore mesuré':'avec le ratio conseillé')}
+    ${row('Temps de ravitaillement',complete?`${num(refuel)} s`:'—','is-game')}${row('Temps arrêté',complete?`${num(stopped)} s`:'—','is-game')}
+    ${data.lane ? row('<strong>Temps total au stand</strong>',complete?`<strong>${num(data.lane.through+stopped)} s</strong>`:'—','','traversée + arrêt') : ''}</dl>
+    ${complete?'':'<p class="training-note">Il manque un débit de service, la capacité du réservoir ou le ratio carburant pour estimer le temps complet.</p>'}`;
+}
+
+// Keep the input node under the pointer: replacing the page during input cancels native range dragging.
+function updateCalculator() {
+  for(const key of ['before','after']) {
+    app.querySelector(`[data-output="${key}"]`).textContent=`${view.calc[key]} %`;
+    app.querySelectorAll(`[data-calc="${key}"]`).forEach(input=>{input.value=view.calc[key];});
+  }
+  app.querySelector('[data-calc-result]').innerHTML=calculatorResult(view.data);
 }
 
 // Reference lap times by level, as a table (the names of the spreadsheet, never its percentages): the hotlap the
@@ -156,13 +177,15 @@ function render() {
 }
 
 async function load(params = '') {
+  loadController?.abort();const controller=new AbortController();loadController=controller;
   try {
-    const response = await fetch(`/api/training/memo${params}`, {credentials:'same-origin', cache:'no-store', headers:{Accept:'application/json'}});
+    const response = await fetch(`/api/training/memo${params}`, {credentials:'same-origin', cache:'no-store',signal:controller.signal, headers:{Accept:'application/json'}});
     const data = await response.json().catch(() => ({}));
+    if(controller.signal.aborted)return;
     if (!response.ok) { app.innerHTML = `<p class="training-empty">${esc(data.error || 'Mémo indisponible.')}</p>`; return; }
     view.data = data;
     render();
-  } catch { app.innerHTML = '<p class="training-empty">Mémo indisponible pour l’instant.</p>'; }
+  } catch { if(!controller.signal.aborted)app.innerHTML = '<p class="training-empty">Mémo indisponible pour l’instant.</p>'; }
 }
 
 app.addEventListener('change', event => {
@@ -177,10 +200,13 @@ app.addEventListener('input', event => {
   const input = event.target.closest('[data-calc]');
   if (!input) return;
   const key = input.dataset.calc;
+  if(input.type==='number'&&input.value==='')return;
   view.calc[key] = input.type === 'checkbox' ? input.checked : Number(input.value);
-  const focus = input.id;
-  render();
-  if (focus) document.getElementById(focus)?.focus();
+  if(key==='before'||key==='after') {
+    view.calc[key]=Math.max(0,Math.min(100,Math.round(view.calc[key])));
+    if(view.calc.after<view.calc.before) view.calc.after=view.calc.before;
+  }
+  updateCalculator();
 });
 app.addEventListener('submit', event => event.preventDefault());
 

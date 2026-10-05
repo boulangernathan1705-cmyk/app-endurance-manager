@@ -9,7 +9,8 @@ const num = (value, digits = 1) => value === null || value === undefined ? '—'
 const stamp = ms => `${shortDateLabel(ms)} · ${timeAt(ms)}`;
 const KINDS = {Practice1:'Essais', Practice2:'Essais', Practice3:'Essais', Practice4:'Essais', Qualify:'Qualif', Warmup:'Warm-up', Race:'Course'};
 const MINUTES = [20, 30, 45, 60, 90];
-const view = {track:null, carClass:null, minutes:readMinutes(), data:null, busy:'', simhub:''};
+const view = {track:null, carClass:null, minutes:readMinutes(), data:null, busy:'', simhub:'', method:'simhub',sessionsOpen:false,linkOpen:null};
+let loadController;
 
 function readMinutes() { try { const value = Number(localStorage.getItem('training-minutes')); return MINUTES.includes(value) ? value : 30; } catch { return 30; } }
 
@@ -23,14 +24,18 @@ async function call(path, options = {}) {
 }
 
 async function load() {
+  loadController?.abort();
+  const controller=new AbortController();loadController=controller;
   const query = new URLSearchParams();
   if (view.track) query.set('track', view.track);
   if (view.carClass) query.set('class', view.carClass);
   try {
-    view.data = await call(`/api/training?${query}`);
+    const data = await call(`/api/training?${query}`,{signal:controller.signal});
+    if(controller.signal.aborted)return;
+    view.data=data;
     view.track = view.data.track?.key || null; view.carClass = view.data.carClass || null;
     render();
-  } catch (error) { renderError(error); }
+  } catch (error) { if(!controller.signal.aborted)renderError(error); }
 }
 
 function renderError(error) {
@@ -87,46 +92,6 @@ function program(data) {
 
 
 
-const WHEELS = ['Avant gauche', 'Avant droit', 'Arrière gauche', 'Arrière droit'];
-
-// Fuel and energy: litres per lap, energy per lap and the ratio to set at the stop so both run out together.
-function fuel(live) {
-  if (!live || (!live.fuelPerLap && !live.energyPerLap)) return '';
-  const items = [['Carburant / tour', live.fuelPerLap ? `${num(live.fuelPerLap, 2)} L` : '—'], ['Énergie / tour', live.energyPerLap ? `${num(live.energyPerLap)} %` : '—'],
-    ['Tours avec un plein', live.tankLaps ?? '—'], ['Tours avec 100 % d’énergie', live.energyLaps ?? '—']];
-  return `<section class="training-card"><div class="training-card-head"><h2>Carburant et énergie</h2>${live.capacity ? `<span class="training-count">Réservoir ${num(live.capacity, 0)} L</span>` : ''}</div>
-    <div class="training-stats">${items.map(([label, value]) => `<div><small>${label}</small><strong>${esc(value)}</strong></div>`).join('')}</div>
-    ${live.ratio ? `<p class="training-ratio">Rapport carburant conseillé : <strong>${num(live.ratio, 2)}</strong></p>
-    <p class="training-note">Règle ce rapport au stand : le carburant et l’énergie s’épuisent alors au même tour, et tu ne charges pas de carburant pour rien.${live.ratio > 1 ? ' Au-dessus de 1, c’est le carburant qui limite ton relais.' : ''}</p>` : ''}</section>`;
-}
-
-// Tyres per compound: wear per lap, temperatures and pressures, wheel by wheel, as on the car.
-function tyres(live) {
-  if (!live?.compounds?.length) return '';
-  const cell = (item, index) => `<div class="training-wheel${item.wear[index] !== null && item.wear[index] === Math.max(...item.wear.filter(value => value !== null)) ? ' is-worst' : ''}">
-    <small>${WHEELS[index]}</small><strong>${item.wear[index] !== null ? `${num(item.wear[index], 2)} %` : '—'}</strong>
-    <span>${item.temp[index] !== null ? `${num(item.temp[index], 0)} °C` : '—'} · ${item.kpa[index] ? `${num(item.kpa[index], 0)} kPa` : '—'}</span>
-    <span>Freins ${item.brake[index] !== null ? `${num(item.brake[index], 0)} °C` : '—'}</span></div>`;
-  return `<section class="training-card"><div class="training-card-head"><h2>Pneus</h2>${live.trackTemp !== null ? `<span class="training-count">Piste ${num(live.trackTemp, 0)} °C${live.airTemp !== null ? ` · air ${num(live.airTemp, 0)} °C` : ''}</span>` : ''}</div>
-    ${live.compounds.map(item => `<div class="training-compound"><p><strong>${esc(item.name)}</strong> · ${item.laps} tour${item.laps > 1 ? 's' : ''}${item.track !== null ? ` · piste ${num(item.track, 0)} °C` : ''}${item.lapsTo50 ? ` · environ ${item.lapsTo50} tours pour user un pneu à moitié` : ''}</p>
-      <div class="training-wheels">${[0, 1, 2, 3].map(index => cell(item, index)).join('')}</div></div>`).join('')}
-    <p class="training-note">Usure par tour, en pourcentage du pneu.${live.source === 'results' ? ' Tirée de tes fichiers de résultats : les températures et les pressions arrivent avec la lecture en direct (synchroniseur ou plugin SimHub).' : ' Température moyenne de la bande de roulement, hors stands.'}${live.top ? ` Vitesse max : <strong>${num(live.top, 0)} km/h</strong>${live.topMedian ? ` (${num(live.topMedian, 0)} km/h en moyenne par tour)` : ''}.` : ''}</p></section>`;
-}
-
-// The stops measured in training, broken down: crossing the pit lane, tyres, refuelling, repairs.
-function stops(live) {
-  const pit = live?.pit;
-  if (!pit) return '';
-  const items = [['Traversée de la voie', pit.through !== null ? `${num(pit.through)} s` : '—'], ['4 pneus seuls', pit.tyres4 !== null ? `${num(pit.tyres4)} s` : '—'],
-    ['2 pneus seuls', pit.tyres2 !== null ? `${num(pit.tyres2)} s` : '—'], ['Remplissage', pit.fuelRate ? `${num(pit.fuelRate, 2)} L/s` : '—'],
-    ['Réparation', pit.repair !== null ? `${num(pit.repair)} s` : '—']];
-  return `<section class="training-card"><div class="training-card-head"><h2>Arrêts aux stands</h2><span class="training-count">${pit.stops} arrêt${pit.stops > 1 ? 's' : ''} mesuré${pit.stops > 1 ? 's' : ''}</span></div>
-    <div class="training-stats">${items.map(([label, value]) => `<div><small>${label}</small><strong>${esc(value)}</strong></div>`).join('')}</div>
-    <ul class="training-stops">${pit.last.map(stop => `<li><strong>Tour ${stop.lap}</strong><span>${num(stop.lane)} s dans la voie, ${num(stop.stopped)} s arrêté</span>
-      <small>${[stop.fuel > 1 ? `${num(stop.fuel, 0)} L` : '', stop.tyres ? `${stop.tyres} pneus` : '', stop.repair ? 'réparation' : ''].filter(Boolean).join(' · ') || 'sans service'}</small></li>`).join('')}</ul>
-    <p class="training-note">Traversée : le temps dans la voie des stands sans l’arrêt. Pour isoler un temps, fais des arrêts avec un seul service : 4 pneus seuls, puis du carburant seul. <a href="/stands.html">Mémo des circuits</a></p></section>`;
-}
-
 // Online, every driver of a results file is marked as the player: the pilot's name in LMU tells which one he is.
 function lmuName(data) {
   const pending = data.pending;
@@ -138,30 +103,21 @@ function lmuName(data) {
 }
 
 function sync(data) {
-  const device = data.device;
-  const status = device.linked
-    ? `<p class="training-linked"><span aria-hidden="true">●</span> Synchronisation active${device.lastSeen ? ` · dernière séance reçue le ${esc(stamp(device.lastSeen * 1000))}` : ' · en attente de ta première séance'}</p>`
-    : '<ol class="training-howto"><li>Télécharge le synchroniseur.</li><li>Double-clique dessus, une seule fois.</li><li>Roule : chaque séance LMU arrive ici toute seule.</li></ol>';
-  return `<section class="training-card training-sync"><h2>${device.linked ? 'Ton jeu est relié' : 'Relie ton jeu en une fois'}</h2>${status}
-    <div class="training-actions"><form method="post" action="/api/training/sync"><button type="submit" class="${device.linked ? 'secondary-button' : 'primary-button'}">${device.linked ? 'Retélécharger' : 'Télécharger le synchroniseur'}</button></form>
-    ${device.linked ? '<button type="button" class="secondary-button" data-unlink>Retirer la liaison</button>' : ''}</div>
-    <p class="training-note">Petit programme Windows, sans fenêtre, qui lit les résultats de LMU (dossier UserData\\Log\\Results) et, pendant que tu roules, les données que le jeu publie (pneus, carburant, vitesse, arrêts). Il ne modifie rien dans le jeu. Windows peut afficher un avertissement au premier lancement : clique sur « Informations complémentaires » puis « Exécuter quand même ».</p>
-    ${lmuName(data)}
-    <details class="training-simhub"${view.simhub ? ' open' : ''}><summary>Tu utilises SimHub ?</summary>
-      <p>Le plugin Endurance Manager pour SimHub fait la même chose que le synchroniseur. Dans SimHub, ouvre ses réglages et colle ce code. Un nouveau code remplace la liaison précédente : n’utilise que le plugin ou que le synchroniseur.</p>
-      ${view.simhub ? `<div class="training-code"><input type="text" readonly value="${esc(view.simhub)}" aria-label="Code de liaison SimHub" data-code><button type="button" class="secondary-button" data-copy>Copier</button></div>` : '<button type="button" class="secondary-button" data-simhub>Obtenir mon code SimHub</button>'}</details>
-    <label class="training-drop" data-drop><input type="file" accept=".xml" multiple data-file><strong>Ou dépose tes fichiers de résultats ici</strong><small>Documents ou Steam › Le Mans Ultimate › UserData › Log › Results</small></label>
-    ${view.busy ? `<p class="training-busy" role="status">${esc(view.busy)}</p>` : ''}</section>`;
+  const device=data.device;
+  const received=device.lastSeen?'<p class="training-linked"><span aria-hidden="true">●</span> Dernière séance reçue : '+esc(stamp(device.lastSeen*1000))+'</p>':device.linked?'<p class="training-note">Code de liaison créé. La connexion sera confirmée à la réception de ta première séance.</p>':'<p>Choisis une méthode pour envoyer tes séances LMU automatiquement.</p>';
+  const simhub='<ol class="training-howto"><li><strong>Installe le plugin Endurance Manager dans SimHub.</strong><p>Ferme SimHub, copie le fichier EnduranceManager.SimHub.dll fourni par ton organisateur dans le dossier de SimHub, puis relance SimHub et accepte le plugin.</p></li><li><strong>Relie le plugin à ton compte.</strong><p>Clique sur « Créer mon code », copie-le, puis dans SimHub ouvre Endurance Manager et colle le code de liaison.</p>'+(view.simhub?'<div class="training-code"><input type="text" readonly value="'+esc(view.simhub)+'" aria-label="Code de liaison SimHub" data-code><button type="button" class="secondary-button" data-copy>Copier le code</button></div>':'<button type="button" class="primary-button" data-simhub>'+ (device.linked?'Créer un nouveau code':'Créer mon code')+'</button>')+'</li><li><strong>Vérifie avec une courte séance.</strong><p>Lance LMU avec SimHub ouvert, roule quelques tours puis reviens au menu du jeu. Ta séance arrive ici après environ une à deux minutes. Recharge cette page pour la voir.</p></li></ol>';
+  const windows='<ol class="training-howto"><li><strong>Télécharge ton synchroniseur personnel.</strong><form method="post" action="/api/training/sync"><button type="submit" class="primary-button">Télécharger le synchroniseur Windows</button></form><p>Le fichier est déjà lié à ton compte. Garde-le sur le PC où tu joues à LMU.</p></li><li><strong>Lance-le une première fois.</strong><p>Double-clique sur EnduranceManagerSync.exe. Il fonctionne sans fenêtre et démarre ensuite avec Windows. Vérifie que le fichier vient bien de ce site avant de l’autoriser si Windows affiche un avertissement.</p></li><li><strong>Roule puis vérifie l’arrivée d’une séance.</strong><p>Reviens au menu LMU après quelques tours. Attends une à deux minutes puis recharge cette page : la dernière séance reçue doit apparaître ci-dessus.</p></li></ol>';
+  return '<section class="training-sync"><h2>Relier mon jeu</h2>'+received+'<div class="training-methods" role="group" aria-label="Méthode de liaison"><button type="button" data-method="simhub" aria-pressed="'+(view.method==='simhub')+'">Avec SimHub</button><button type="button" data-method="windows" aria-pressed="'+(view.method==='windows')+'">Sans SimHub · Windows</button></div>'+(view.method==='simhub'?simhub:windows)+'<p class="training-note">Utilise une seule méthode. Créer un code ou télécharger un nouveau synchroniseur remplace la liaison précédente.</p><details class="training-troubleshooting"><summary>La séance n’arrive pas ?</summary><ul><li>Vérifie que LMU et SimHub sont ouverts sur le même PC, ou que le synchroniseur Windows est lancé.</li><li>Reviens au menu du jeu et attends deux minutes : les échantillons restent sur ton PC pendant que tu roules.</li><li>Si tu as recréé un code, colle le nouveau dans SimHub. Pour le synchroniseur, lance le dernier fichier téléchargé.</li><li>Si une séance en ligne attend ton nom LMU, renseigne-le ci-dessous.</li></ul>'+lmuName(data)+'</details><details class="training-troubleshooting"><summary>Importer un fichier manuellement</summary><p class="training-note">Pour une séance manquante, dépose son fichier XML depuis Steam › steamapps › common › Le Mans Ultimate › UserData › Log › Results.</p><label class="training-drop" data-drop><input type="file" accept=".xml" multiple data-file><strong>Choisir ou déposer des fichiers XML</strong></label></details>'+(device.linked?'<button type="button" class="secondary-button" data-unlink>Retirer la liaison</button>':'')+(view.busy?'<p class="training-busy" role="status">'+esc(view.busy)+'</p>':'')+'</section>';
 }
 
 function sessions(data) {
   if (!data.sessions.length) return '';
-  return '<section class="training-card preparation-sessions"><h2>Mes séances</h2><ul class="training-sessions">'+data.sessions.map(item=>'<li><div><small>'+esc(relative(item.at))+'</small><span>'+esc(item.venue+' · '+item.car+' · '+(KINDS[item.kind]||item.kind))+'</span></div><span>'+item.laps+' tours</span><button type="button" class="training-delete" data-delete="'+esc(item.id)+'" aria-label="Supprimer la séance du '+esc(stamp(item.at))+'">✕</button></li>').join('')+'</ul></section>';
+  return '<details class="training-card preparation-sessions" data-fold="sessions"'+(view.sessionsOpen?' open':'')+'><summary>Mes séances <span>'+data.sessions.length+(data.sessions.length===1?' séance récente':' dernières')+'</span></summary><ul class="training-sessions">'+data.sessions.map(item=>'<li><div><small>'+esc(relative(item.at))+'</small><span>'+esc(item.venue+' · '+item.car+' · '+(KINDS[item.kind]||item.kind))+'</span></div><span>'+item.laps+' tours</span><button type="button" class="training-delete" data-delete="'+esc(item.id)+'" aria-label="Supprimer la séance du '+esc(stamp(item.at))+'">✕</button></li>').join('')+'</ul></details>';
 }
 
 function render() {
   const data=view.data;
-  app.innerHTML=hero(data)+crewTable(data)+(data.analysis.totalLaps?'':'<section class="training-card training-welcome"><h2>Ta première séance</h2><p>Relie ton jeu puis roule dans Le Mans Ultimate. Tes données rempliront cette préparation.</p></section>')+'<div class="preparation-grid">'+program(data)+today(data)+lapCard(data)+consumption(data)+'</div>'+sessions(data)+'<details class="training-card preparation-details"><summary>Données détaillées : pneus et arrêts</summary>'+fuel(data.live)+tyres(data.live)+stops(data.live)+'</details><details class="training-card preparation-details"'+(!data.device.linked||data.pending||view.busy||view.simhub?' open':'')+'><summary>Liaison du jeu et import des séances</summary>'+sync(data)+'</details>';
+  app.innerHTML=hero(data)+crewTable(data)+(data.analysis.totalLaps?'':'<section class="training-card training-welcome"><h2>Ta première séance</h2><p>Relie ton jeu puis roule dans Le Mans Ultimate. Tes données rempliront cette préparation.</p></section>')+'<div class="preparation-grid">'+program(data)+today(data)+lapCard(data)+consumption(data)+'</div>'+sessions(data)+'<p class="training-note training-analysis-window">Chiffres calculés sur les '+(data.analysisWindow||5)+' dernières séances du circuit et de la catégorie sélectionnés.</p><details class="training-card preparation-details" data-fold="link"'+((view.linkOpen??!data.device.linked)||data.pending||view.busy||view.simhub?' open':'')+'><summary>Liaison du jeu</summary>'+sync(data)+'</details>';
 }
 
 
@@ -190,13 +146,15 @@ app.addEventListener('change', event => {
   else if (target.matches('[data-step]')) act(() => call('/api/training/marks', {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({track:view.track, step:target.dataset.step, done:target.checked})}));
 });
 app.addEventListener('click', event => {
+  const method=event.target.closest('[data-method]');
+  if(method){view.method=method.dataset.method;view.linkOpen=true;render();return;}
   const minutes = event.target.closest('[data-minutes]');
   if (minutes) { view.minutes = Number(minutes.dataset.minutes); try { localStorage.setItem('training-minutes', String(view.minutes)); } catch {} render(); return; }
   const remove = event.target.closest('[data-delete]');
   if (remove && confirm('Supprimer cette séance ?')) act(() => call(`/api/training/sessions/${remove.dataset.delete}`, {method:'DELETE'}));
-  if (event.target.closest('[data-simhub]')) act(async () => { view.simhub = (await call('/api/training/sync/code', {method:'POST', headers:{'Content-Type':'application/json'}, body:'{}'})).code; });
-  if (event.target.closest('[data-copy]')) { const input = app.querySelector('[data-code]'); input.select(); navigator.clipboard?.writeText(input.value).catch(() => {}); }
-  if (event.target.closest('[data-unlink]') && confirm('Retirer la liaison ? Le synchroniseur n’enverra plus rien. Tu peux le supprimer du dossier Démarrage de Windows.')) act(() => call('/api/training/sync', {method:'DELETE'}));
+  if(event.target.closest('[data-simhub]')){view.busy='Création du code…';render();call('/api/training/sync/code',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'}).then(result=>{view.simhub=result.code;view.data.device={linked:true,lastSeen:null};view.busy='';render();}).catch(error=>{view.busy=error.message;render();});}
+  if(event.target.closest('[data-copy]')){const input=app.querySelector('[data-code]');input.select();if(navigator.clipboard)navigator.clipboard.writeText(input.value).then(()=>{view.busy='Code copié. Colle-le maintenant dans SimHub.';render();}).catch(()=>{view.busy='Sélectionne le code puis copie-le avec Ctrl+C.';render();});}
+  if (event.target.closest('[data-unlink]') && confirm('Retirer la liaison ? Le plugin et le synchroniseur n’enverront plus de séances.')) act(async()=>{await call('/api/training/sync',{method:'DELETE'});view.simhub='';view.busy='Liaison retirée.';});
 });
 app.addEventListener('submit', event => {
   const form = event.target.closest('[data-name-form]');
@@ -211,5 +169,7 @@ app.addEventListener('submit', event => {
 app.addEventListener('dragover', event => { const zone = event.target.closest('[data-drop]'); if (zone) { event.preventDefault(); zone.classList.add('is-over'); } });
 app.addEventListener('dragleave', event => event.target.closest('[data-drop]')?.classList.remove('is-over'));
 app.addEventListener('drop', event => { const zone = event.target.closest('[data-drop]'); if (zone) { event.preventDefault(); upload(event.dataTransfer.files); } });
+
+app.addEventListener('toggle',event=>{if(!app.contains(event.target))return;const fold=event.target.dataset.fold;if(fold==='sessions')view.sessionsOpen=event.target.open;if(fold==='link')view.linkOpen=event.target.open;},true);
 
 load();

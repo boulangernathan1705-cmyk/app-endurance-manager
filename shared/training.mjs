@@ -309,6 +309,12 @@ function stintOf({ve, litres, capacity, wheels}) {
 
 // The time stopped, by the game's own rule (checked on real stops): tyres, brakes and brake ducts one after the
 // other, plus the longest of fuel, energy, rear wing and driver swap, which are done at the same time.
+export function refuelAmounts(before, after, ratio, capacity) {
+  const energy=Math.max(0,Math.min(100,Math.round(after))-Math.max(0,Math.min(100,Math.round(before))));
+  const fuel=ratio>0&&capacity>0 ? Math.min(capacity,energy*ratio*capacity/100) : null;
+  return {energy,fuel};
+}
+
 export function stopTime(service, {fuel = 0, energy = 0, tyres = 0, wing = false, driver = false, ductFront = false, ductRear = false, brakes = false}) {
   const s = service || {};
   const fill = fuel > 0 && s.fuelRate ? (s.connect ?? 2) + fuel / s.fuelRate : 0;
@@ -324,8 +330,7 @@ export function stopTime(service, {fuel = 0, energy = 0, tyres = 0, wing = false
 // shared by all, never with a name.
 const quantile = (list, q) => { if (!list.length) return null; const sorted = [...list].sort((a, b) => a - b), at = (sorted.length - 1) * q, low = Math.floor(at); return sorted[low] + (sorted[Math.ceil(at)] - sorted[low]) * (at - low); };
 export const MEMO_MIN = {pilots:1, laps:5};
-export function memoSheet({laneStops = [], carStops = [], sessions = [], viewer = null, service = null, game = null, reference = null, min = MEMO_MIN}) {
-  const through = laneStops.map(stop => stop.lane - stop.stopped).filter(value => value > 0);
+export function memoPilots(sessions) {
   // Laps that tell the truth: on track, valid, close to the pilot's own pace.
   const byPilot = new Map();
   for (const session of sessions) {
@@ -334,7 +339,7 @@ export function memoSheet({laneStops = [], carStops = [], sessions = [], viewer 
     entry.capacity = session.capacity || entry.capacity;
     byPilot.set(session.user, entry);
   }
-  const pilots = [...byPilot].map(([user, entry]) => {
+  return [...byPilot].map(([user, entry]) => {
     const pace = median(entry.laps.map(lap => lap.t).filter(Boolean));
     const laps = entry.laps.filter(lap => !lap.t || !pace || lap.t <= pace * 1.07);
     const compounds = {};
@@ -342,13 +347,19 @@ export function memoSheet({laneStops = [], carStops = [], sessions = [], viewer 
     // A lap's wear: the average of the four tyres.
     const average = lap => { const values = lap.wear.filter(value => value !== null); return values.reduce((sum, value) => sum + value, 0) / values.length; };
     const fuels = laps.map(lap => lap.fuel).filter(value => value > 0), ves = laps.map(lap => lap.ve).filter(value => value > 0);
-    return {user, laps:laps.length, capacity:entry.capacity, fuel:median(fuels), ve:median(ves), range:{fuel:extent(fuels), ve:extent(ves)},
+    return {user, laps:laps.length, capacity:entry.capacity, pace, best:entry.laps.some(lap => lap.t) ? Math.min(...entry.laps.map(lap => lap.t).filter(Boolean)) : null,
+      fuel:median(fuels), ve:median(ves), range:{fuel:extent(fuels), ve:extent(ves)},
       tyres:Object.fromEntries(Object.entries(compounds).map(([name, list]) => [name, {laps:list.length,
         wear:median(list.map(average)), range:extent(list.map(average)),
         worst:[0, 1, 2, 3].map(index => median(list.map(lap => lap.wear[index]).filter(value => value !== null)) ?? 0),
         temp:median(list.map(lap => median(lap.temp.filter(value => value !== null))).filter(value => value !== null)),
         track:median(list.map(lap => lap.track).filter(value => value !== null))}]))};
   });
+}
+
+export function memoSheet({laneStops = [], carStops = [], sessions = [], summaries = null, viewer = null, service = null, game = null, reference = null, min = MEMO_MIN}) {
+  const through = laneStops.map(stop => stop.lane - stop.stopped).filter(value => value > 0);
+  const pilots = summaries || memoPilots(sessions);
   const mine = pilots.find(pilot => pilot.user === viewer) || null;
   // The viewer's own spread comes with it: their lowest and highest lap, for the bar before the pilots' one opens.
   const spread = (values, laps, you, digits, range) => {
@@ -379,10 +390,9 @@ export function memoSheet({laneStops = [], carStops = [], sessions = [], viewer 
   // Where the viewer's race pace (his median clean lap) stands among the reference levels, and the next one up.
   let levels = null;
   if (reference) {
-    const own = byPilot.get(viewer)?.laps.map(lap => lap.t).filter(Boolean) || [];
-    const pace = median(own), level = levelOf(pace, reference), index = LEVELS.findIndex(item => item.name === level);
+    const pace = mine?.pace, level = levelOf(pace, reference), index = LEVELS.findIndex(item => item.name === level);
     levels = {track:reference.track, patch:reference.patch, q:reference.q, fastest:reference.fastest || null, bands:levelBands(reference),
-      you:pace ? {pace:round(pace, 3), best:round(Math.min(...own), 3), level, next:index > 0 ? {name:LEVELS[index - 1].name, time:reference.pace[LEVELS[index - 1].to]} : null} : null};
+      you:pace ? {pace:round(pace, 3), best:round(mine.best, 3), level, next:index > 0 ? {name:LEVELS[index - 1].name, time:reference.pace[LEVELS[index - 1].to]} : null} : null};
   }
   return {levels, lane:through.length ? {through:round(median(through), 1), stops:through.length} : null,
     service:service ? {source:'game', ...service} : measured && (measured.tyres4 || measured.fuelRate) ? {source:'stops', tyres4:measured.tyres4, tyres2:measured.tyres2, fuelRate:measured.fuelRate, repair:measured.repair} : null,
