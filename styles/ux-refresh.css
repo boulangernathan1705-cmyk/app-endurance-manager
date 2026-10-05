@@ -734,11 +734,11 @@ html[data-game] .event-card.event-card-harmonized { padding: 0 !important; min-h
 
 /* =====================================================================
    Carte de course (liste) : quand, quoi, ta situation, remplissage.
-   Trois cartes par ligne sur ordinateur, deux puis une quand l’écran se rétrécit.
+   Deux cartes par ligne sur ordinateur (trois sur très grand écran).
    ===================================================================== */
 html[data-game] .event-list {
   display: grid !important;
-  grid-template-columns: repeat(auto-fill, minmax(max(370px, calc((100% - 32px) / 3)), 1fr)) !important;
+  grid-template-columns: repeat(auto-fill, minmax(max(440px, calc((100% - 16px) / 2)), 1fr)) !important;
   gap: 16px !important;
   align-items: stretch;
 }
@@ -924,10 +924,9 @@ html[data-game] #app .race-header .race-head { justify-content: center; }
 /* Circuit en panneau à droite, sur toute la hauteur de la carte. */
 html[data-game] .race-card .race-card-body { flex-direction: row !important; align-items: stretch !important; gap: 0 !important; padding: 0 !important; }
 html[data-game] .race-card .race-card-content { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 10px; padding: 14px 16px; }
-html[data-game] .race-card .race-card-circuit:empty { display: none !important; }
 html[data-game] .race-card .race-card-circuit {
   flex: none;
-  width: 120px;
+  width: 190px;
   display: flex;
   align-items: center;
   justify-content: center;
