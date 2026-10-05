@@ -346,8 +346,6 @@ export function memoSheet({laneStops = [], carStops = [], sessions = [], viewer 
       tyres:Object.fromEntries(Object.entries(compounds).map(([name, list]) => [name, {laps:list.length,
         wear:median(list.map(average)), range:extent(list.map(average)),
         worst:[0, 1, 2, 3].map(index => median(list.map(lap => lap.wear[index]).filter(value => value !== null)) ?? 0),
-        wheelRange:[0, 1, 2, 3].map(index => extent(list.map(lap => lap.wear[index]).filter(value => value !== null))),
-        wheelTemp:[0, 1, 2, 3].map(index => median(list.map(lap => lap.temp[index]).filter(value => value !== null))),
         temp:median(list.map(lap => median(lap.temp.filter(value => value !== null))).filter(value => value !== null)),
         track:median(list.map(lap => lap.track).filter(value => value !== null))}]))};
   });
@@ -369,13 +367,8 @@ export function memoSheet({laneStops = [], carStops = [], sessions = [], viewer 
     const laps = rows.reduce((sum, row) => sum + row.laps, 0), you = mine?.tyres[name] || null;
     const wear = spread(rows.map(row => row.wear), laps, you?.wear, 2, you?.range), open = wear.median !== null;
     const worst = open ? [0, 1, 2, 3].map(index => median(rows.map(row => row.worst[index]))) : you?.worst;
-    // Each tyre: its wear per lap with the lowest and highest (the pilots' medians once they are enough, else the
-    // viewer's laps) and its mean temperature.
-    const wheels = worst ? [0, 1, 2, 3].map(index => {
-      const range = open ? extent(rows.map(row => row.worst[index]).filter(value => value !== null)) : you.wheelRange[index];
-      const temp = open ? median(rows.map(row => row.wheelTemp[index]).filter(value => value !== null)) : you.wheelTemp[index];
-      return {wear:round(worst[index] ?? null, 2), min:round(range?.[0] ?? null, 2), max:round(range?.[1] ?? null, 2), temp:round(temp ?? null, 0)};
-    }) : null;
+    // Each tyre's wear per lap: the pilots' median once they are enough, else the viewer's laps.
+    const wheels = worst ? worst.map(value => ({wear:round(value ?? null, 2)})) : null;
     return {name, ...wear, worst:worst ? worst.indexOf(Math.max(...worst)) : null, wheels, temp:open ? round(median(rows.map(row => row.temp).filter(Boolean)), 0) : null,
       youTemp:round(you?.temp ?? null, 0), track:round(median(rows.map(row => row.track).filter(value => value !== null)), 1), ideal:game?.ideal ?? null};
   }).sort((a, b) => b.laps - a.laps);
