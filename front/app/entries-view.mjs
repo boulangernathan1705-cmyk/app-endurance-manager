@@ -1,3 +1,4 @@
+import {simForEvent} from '../../shared/catalog.mjs';
 import {renderHome} from './home-view.mjs';
 import {isSolo,accessBadge,soloRoundsLabel,renderSoloEntries,ANY_CATEGORY} from './solo.mjs';
 import {dateBlock,timeLabel} from '../dates.mjs';
@@ -60,7 +61,7 @@ function soloCard({event,departure,reg}) {
   const situation = reg.waitlistPosition
     ? `<span class="departure-mine-badge is-waiting">Liste d’attente · ${reg.waitlistPosition}${reg.waitlistPosition === 1 ? 'er' : 'e'}</span>`
     : '<span class="departure-mine-badge is-crew">✓ Inscrit</span>';
-  return `<details class="native-my-entry-card race-card my-entry-race is-solo is-solo-${event.access||'open'}" id="entry-${reg.id}">
+  return `<details class="native-my-entry-card race-card my-entry-race is-solo is-solo-${event.access||'open'} sim-${simForEvent(event)}" id="entry-${reg.id}">
     <summary class="native-my-entry-header">
       <span class="native-my-entry-toggle" aria-hidden="true">+</span>
       <span class="race-card-top">${departureDateBlock(departure)}<span class="race-head">
