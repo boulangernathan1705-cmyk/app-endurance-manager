@@ -25,7 +25,7 @@ export function bulkStarts(days, hours, minute = '00') {
 // of starts stays then).
 const parisDay = new Intl.DateTimeFormat('en-CA', {timeZone:'Europe/Paris', year:'numeric', month:'2-digit', day:'2-digit'});
 export const parisDayKey = timestamp => parisDay.format(new Date(Number(timestamp)));
-export function raceDays(departures = []) {
+export function raceDays(departures = [], {minDays = 2} = {}) {
   if (!departures.length || departures.some(departure => departure.tbd || !Number.isFinite(Number(departure.startsAt)))) return [];
   const days = new Map();
   departures.forEach((departure, index) => {
@@ -33,7 +33,7 @@ export function raceDays(departures = []) {
     if (!days.has(key)) days.set(key, []);
     days.get(key).push({departure, index});
   });
-  if (days.size < 2) return [];
+  if (days.size < minDays) return [];
   return [...days.entries()].sort(([a], [b]) => a.localeCompare(b))
     .map(([key, items]) => ({key, items: items.sort((a, b) => Number(a.departure.startsAt) - Number(b.departure.startsAt))}));
 }

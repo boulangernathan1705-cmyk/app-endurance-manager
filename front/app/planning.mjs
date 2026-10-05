@@ -6,19 +6,20 @@ import {timeLabel,timeAt,weekdayLabel,weekdayLong,dayMonthLong,dayMonthShort,dat
 import {eventMinutes} from '../../shared/duration.mjs';
 import {raceDays,parisDayKey as dayKey} from '../../shared/start-times.mjs';
 import {state,esc,categories,logo,sortedCrews,crewColorClass,pilotCount,communityTag,communityPrefix} from './core.mjs';
+import {isSolo,soloFill} from './solo.mjs';
 
 const LOCKED_ICON='<span class="planning-crew-lock is-locked" data-tip="Complet : l’équipage est verrouillé" aria-label="Complet"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" d="M5 13a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2zM8 11V7a4 4 0 1 1 8 0v4"/></svg></span>';
 const OPEN_ICON='<span class="planning-crew-lock is-open" data-tip="Places libres : tu peux le rejoindre" aria-label="Places libres"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" d="M5 13a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2zM8 11V7a4 4 0 0 1 8 0"/></svg></span>';
 const CHEVRON='<svg class="planning-chevron" viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6"/></svg>';
 
-// The race days with their starts, or [] when the race is not over several days (a start to define, a solo
-// race or a single day keep the list of starts).
-export function planningDays(event){return event.format==='solo'?[]:raceDays(event.departures||[]);}
+// The race days with their starts: every race and event uses the planning, over one day or several (a start
+// still to define keeps the list of starts).
+export function planningDays(event){return raceDays(event.departures||[],{minDays:1});}
 
 // Date block of a race: the span of its days when it runs over several days.
 export function raceRangeBlock(event){
   const days=planningDays(event);
-  if(!days.length)return '';
+  if(days.length<2)return '';
   return dateRangeBlock(days[0].items[0].departure.startsAt,days.at(-1).items[0].departure.startsAt);
 }
 
@@ -39,7 +40,8 @@ function startCard(event,departure,body,{minutes,now,open,quick=''}){
   // A crew that still takes pilots shows a green open padlock, a full one a red closed padlock.
   const crewLine=crews.length?row(crews.map((crew,index)=>`<span class="planning-crew ${crewColorClass(crew.id,index)}">${logo(crew.category)}${communityTag(crew)}<span>${esc(crew.name)}</span>${crew.locked?LOCKED_ICON:OPEN_ICON}</span>`).join('')):'';
   const freeLine=free.length?row(free.map(([category,count,names])=>`<span class="planning-free-pill ${categories[category]?.css||''}" data-tip="${esc(names.join(', '))}">${count} ${esc(category)}</span>`).join(''),' data-free-pilots data-tip="Pilotes cherchant un équipage"'):'';
-  const details=compact?'':`${crewLine}${freeLine}`;
+  // Solo event: no crews, the number of participants (and places) instead.
+  const details=compact?'':isSolo(event)?row(soloFill(event,departure)):`${crewLine}${freeLine}`;
   return `<details class="planning-start${compact?' is-compact':''}${done?' is-done':''}${mine?' is-mine':''}${!pilots?' is-empty':''}${quick?' has-quick':''}" id="departure-${departure.id}" ${open?'open':''}><summary>${head}${details}${quick}${CHEVRON}</summary><div class="departure-fold planning-body">${body}</div></details>`;
 }
 
@@ -59,7 +61,7 @@ export function renderPlanning(event,days,body,{actions='',quick=()=>''}={}){
   const spans=days.length>3?[...new Set([...SPANS.filter(count=>count<days.length),days.length])]:[];
   const spanChoice=spans.length?`<span class="planning-span" role="group" aria-label="Jours affichés">${spans.map(count=>`<button type="button" data-action="planning-span" data-span="${count}" aria-pressed="${count===span}">${count} jours</button>`).join('')}</span>`:'';
   const offset=state.planningWindow?.event===event.id?state.planningWindow.offset:days.indexOf(active);
-  return `<section class="departure-planning" style="--days:${days.length}" data-span="${span}" data-offset="${offset}" data-event="${event.id}" aria-label="Départs de la course"><div class="planning-heading"><h2>Départs</h2><small>${total} départs sur ${days.length} jours</small>${spanChoice}${actions?`<span class="planning-race-actions">${actions}</span>`:''}<span class="planning-arrows"><button type="button" data-action="planning-scroll" data-step="-1" aria-label="Jour précédent">‹</button><button type="button" data-action="planning-scroll" data-step="1" aria-label="Jour suivant">›</button></span></div><div class="planning-tabs" role="group" aria-label="Jour de course">${tabs}</div><div class="planning-scroll"><div class="planning-days">${columns}</div></div></section>`;
+  return `<section class="departure-planning" style="--days:${days.length}" data-span="${span}" data-offset="${offset}" data-event="${event.id}" aria-label="Départs de la course"><div class="planning-heading"><h2>Départs</h2><small>${total} départ${total>1?'s':''}${days.length>1?` sur ${days.length} jours`:''}</small>${spanChoice}${actions?`<span class="planning-race-actions">${actions}</span>`:''}<span class="planning-arrows"><button type="button" data-action="planning-scroll" data-step="-1" aria-label="Jour précédent">‹</button><button type="button" data-action="planning-scroll" data-step="1" aria-label="Jour suivant">›</button></span></div><div class="planning-tabs" role="group" aria-label="Jour de course">${tabs}</div><div class="planning-scroll"><div class="planning-days">${columns}</div></div></section>`;
 }
 
 const SPANS=[3,5,7],GAP=16;
