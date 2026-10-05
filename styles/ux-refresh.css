@@ -1988,3 +1988,18 @@ html[data-game="iracing"] .race-filter-chip .category-logo { border-radius: 50%;
 .event-absences li.is-mine { outline: 1px solid #7fe3ea; }
 .event-absences p { margin: 8px 0 0; font-size: 13px; color: #8a959c; }
 .solo-random-category { margin: 0; padding: 8px 12px; border: 1px dashed rgba(255, 255, 255, .18); border-radius: 8px; color: #c7d0d6; font-size: 13px; }
+
+/* EVENT TDZ card: one bottom line (start, places, my situation), the circuit only when there is a map. */
+html[data-game] .race-card.is-solo .solo-card-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; margin-top: auto; padding-top: 10px; border-top: 1px solid rgba(255, 255, 255, .08); }
+html[data-game] .race-card.is-solo .solo-card-start { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border: 1px solid rgba(255, 255, 255, .16); border-radius: 8px; font-size: 15px; font-weight: 800; color: #f4f6f5; }
+html[data-game] .race-card.is-solo .solo-card-start svg { width: 15px; height: 15px; fill: none; stroke: #7fe3ea; stroke-width: 2; stroke-linecap: round; }
+html[data-game] .race-card.is-solo .solo-card-foot .solo-fill { flex: 1; min-width: 140px; max-width: 240px; }
+html[data-game] .race-card.is-solo .solo-card-foot .race-situation { margin-left: auto; }
+/* Panel kept for the event type logo (to come); on a phone an empty one takes no room. */
+@media (max-width: 600px) { html[data-game] .race-card .race-card-type-logo:empty { display: none; } }
+html[data-game] #app .race-header .event-type-panel { flex: none; display: flex; align-items: center; justify-content: center; width: 220px; height: 150px; border: 1px solid rgba(255, 255, 255, .12); border-radius: 12px; background: rgba(255, 255, 255, .03); }
+html[data-game] #app .race-header .event-type-panel span { font-size: 28px; font-weight: 900; letter-spacing: .06em; text-transform: uppercase; color: var(--sim, #7fe3ea); text-align: center; padding: 0 10px; overflow-wrap: anywhere; }
+@media (max-width: 600px) { html[data-game] #app .race-header .event-type-panel { width: 90px; height: 70px; } html[data-game] #app .race-header .event-type-panel span { font-size: 15px; } }
+/* « M'inscrire » is always unfolded: icon and label, one click enters the pilot. */
+.planning-quick-button.is-labelled { width: auto !important; grid-auto-flow: column; gap: 8px; padding: 0 12px 0 9px !important; border-color: var(--community-accent, #52d3d8); color: var(--community-accent, #52d3d8); }
+.planning-quick-button.is-labelled .planning-quick-label { display: inline; font-size: 13px; font-weight: 800; white-space: nowrap; }

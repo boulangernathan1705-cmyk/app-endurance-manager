@@ -197,11 +197,8 @@ function modulesMarkup(settings, setup) {
       state:states.raceReminders ? ['ok', 'Actif'] : ['off', 'Éteint'], control:toggle('raceReminders', 'Rappels de course'), settings:''},
     {key:'iracingImport', name:'Endurances iRacing officielles', text:'Les séries en équipe et les événements spéciaux importés automatiquement.',
       state:states.iracingImport ? ['ok', 'Actif'] : ['off', 'Éteint'], control:toggle('iracingImport', 'Endurances iRacing officielles'), settings:''},
-    {key:'soloRaces', name:'Événements', text:'Le calendrier de la communauté, toutes simus : places limitées, liste d’attente, OPEN ou SAFE.',
-      state:states.soloRaces ? ['ok', `Actif · onglet « ${esc(settings.modules.eventsLabel || 'Événements')} »`] : ['off', 'Éteint'], control:toggle('soloRaces', 'Événements'),
-      settings:`<form class="settings-events-label" data-events-label><label>Nom de l’onglet<input name="label" maxlength="20" placeholder="Événements" value="${esc(settings.modules.eventsLabel || '')}"></label>
-        <label>Types d’événements <small>(séparés par des virgules)</small><input name="types" maxlength="260" placeholder="SAFE, OPEN, Bouboule" value="${esc((settings.modules.eventTypes || []).join(', '))}"></label>
-        <div class="settings-actions"><button class="primary-button" type="submit">Enregistrer</button><span class="settings-status" aria-live="polite"></span></div></form>`},
+    {key:'soloRaces', name:'EVENT TDZ', text:'Le calendrier des Tondeuz, toutes simus : places limitées, liste d’attente, types OPEN, SAFE, Bouboule…',
+      state:states.soloRaces ? ['ok', 'Actif'] : ['off', 'Éteint'], control:toggle('soloRaces', 'EVENT TDZ'), settings:''},
     {key:'training', name:'Entraînement', text:'Page « Mon entraînement » : programme guidé, séance du jour et conseils tirés des séances LMU de chaque pilote.',
       state:states.training ? ['ok', 'Actif'] : ['off', 'Éteint'], control:toggle('training', 'Entraînement'), settings:''}];
   const tile = item => `<article class="admin-module ${states[item.key] ? 'is-on' : ''}" data-module-tile="${item.key}">
@@ -518,15 +515,6 @@ app.addEventListener('input', event => {
 });
 
 app.addEventListener('submit', async event => {
-  const eventsLabel = event.target.closest('form[data-events-label]');
-  if (eventsLabel) {
-    event.preventDefault();
-    const status = eventsLabel.querySelector('.settings-status');
-    status.textContent = 'Enregistrement…';
-    try { await api('/api/community/modules', 'PATCH', {eventsLabel:eventsLabel.elements.label.value, eventTypes:eventsLabel.elements.types.value.split(',')}); await reload('modules', {module:'soloRaces'}); }
-    catch (error) { status.textContent = error.message; }
-    return;
-  }
   const showcaseForm = event.target.closest('form[data-showcase]');
   if (showcaseForm) {
     event.preventDefault();
