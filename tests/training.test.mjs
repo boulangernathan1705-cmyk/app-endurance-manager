@@ -141,6 +141,9 @@ test('live data gives litres, the fuel ratio, tyres by compound and the stops br
   assert.equal(live.laps.length,5);
   assert.throws(()=>cleanLive({laps:[],stops:[]}),/incomplète|illisible/);
   assert.equal(cleanLive({...LIVE,laps:[{...liveLap(1),top:'<script>',wear:[1,2]}]}).laps[0].top,null);
+  // A lap LMU counted without a time keeps its fuel; one with nothing in it is dropped.
+  const untimed=cleanLive({...LIVE,laps:[liveLap(1),liveLap(2,{t:0}),liveLap(3,{t:0,fuel:0,ve:0,wear:[0,0,0,0]})]}).laps;
+  assert.deepEqual(untimed.map(lap=>[lap.n,lap.t,lap.fuel]),[[1,LIVE.laps[0].t,LIVE.laps[0].fuel],[2,null,LIVE.laps[1].fuel]]);
   const a=analyseLive([live]);
   assert.deepEqual([a.fuelPerLap,a.energyPerLap,a.capacity,a.tankLaps,a.energyLaps,a.top],[2.9,3.4,90,31,29,305]);
   // 2,9 l of 90 l is 3,22 % of the tank, against 3,4 % of energy: ratio 0,95.

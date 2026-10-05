@@ -259,7 +259,9 @@ func (r *recorder) closeLap(s sample) {
 		}
 		out.Pressure[i] = round(s.Wheels[i].Pressure, 1)
 	}
-	if out.Time > 0 {
+	// LMU sometimes counts a lap on track without a time (-1): kept for its fuel and tyres, without the time.
+	if out.Time > 0 || !lap.pit {
+		out.Time = math.Max(out.Time, 0)
 		r.session.Laps = append(r.session.Laps, out)
 	}
 	r.lap = &lapState{start: s}
