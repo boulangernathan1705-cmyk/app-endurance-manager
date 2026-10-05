@@ -3,8 +3,9 @@ import assert from 'node:assert/strict';
 import {DatabaseSync} from 'node:sqlite';
 import {readFileSync, readdirSync} from 'node:fs';
 import worker from '../server/worker.mjs';
+import {refreshLaptimes} from '../server/training.mjs';
 import {linkTestServer, setMember, ORGA_ROLE} from './fixtures/discord-server.mjs';
-import {parseResults, analyse, programSteps, adviceFor, todaySession, circuitOf, cleanLive, analyseLive, stopTime, memoSheet} from '../shared/training.mjs';
+import {parseResults, analyse, programSteps, adviceFor, todaySession, circuitOf, cleanLive, analyseLive, stopTime, memoSheet, parseLaptimes, levelOf, levelBands} from '../shared/training.mjs';
 
 // Individual training (migration 0046): LMU results files, the program, the advice and the sync program.
 const ROOT='https://site.example';
@@ -48,7 +49,7 @@ function harness(){
     }finally{globalThis.fetch=realFetch;}
     setMember(DB.db,discordId,discordId===ADMIN?[ORGA_ROLE]:[],{communityId:DEV});
   }
-  return {DB,req,send,login};
+  return {DB,req,send,login,env};
 }
 const XML=readFileSync(new URL('./fixtures/lmu-results-practice.xml',import.meta.url),'utf8');
 // A real online practice (names replaced): every driver is marked isPlayer, and one car was shared.
@@ -197,7 +198,7 @@ test('the circuit sheet shows the pilots’ median only from 3 pilots and 30 lap
 });
 
 test('the circuit sheet on the site: every circuit driven, the car’s service times from the game, no names', async () => {
-  const {req,send,login}=harness();
+  const {req,send,login,env}=harness();
   await login(ADMIN,'admin','Orga');await login(PILOT,'pilot','Alice');await login(MATE,'mate','Bob');
   await req('/api/community/modules','PATCH',{training:true},'admin');
   const keyOf=async actor=>{const program=await send('/api/training/sync','POST',actor,{raw:''});return new TextDecoder().decode(new Uint8Array(await program.arrayBuffer()).slice(4096)).match(/([a-f0-9]{64})/)[1];};
@@ -214,7 +215,27 @@ test('the circuit sheet on the site: every circuit driven, the car’s service t
   // Bob never drove there: no figure of his, and Alice's alone is not shown.
   assert.deepEqual([data.energy.you,data.energy.median,data.energy.game],[null,null,2.12]);
   assert.ok(!JSON.stringify(data).includes('Alice'));
-  assert.equal((await req('/api/training/memo?circuit=long-beach','GET',null,'pilot')).data.energy.you,2.15);
+  const alice=(await req('/api/training/memo?circuit=long-beach','GET',null,'pilot')).data;
+  assert.equal(alice.energy.you,2.15);assert.equal(alice.levels,null);
+  await refreshLaptimes(env,async()=>new Response(LAPTIMES));
+  const withLevels=(await req('/api/training/memo?circuit=long-beach','GET',null,'pilot')).data;
+  assert.deepEqual([withLevels.levels.q,withLevels.levels.you.level,withLevels.levels.you.next],[78.16,'Offline',{name:'Tail-ender',time:83.26}]);
+  assert.deepEqual(withLevels.source,{name:'Ohne Speed',title:'LMU laptimes spreadsheet',url:'https://www.youtube.com/@ohne_speed',updated:'2026-10-02'});
+});
+
+const LAPTIMES=readFileSync(new URL('./fixtures/laptimes.csv',import.meta.url),'utf8');
+test('reference lap times: levels by name from the spreadsheet, read again once a day', async () => {
+  const rows=parseLaptimes(LAPTIMES), lb=rows.find(row=>row.circuit==='long-beach');
+  assert.equal(rows.length,4);assert.equal(lb.q,78.16);
+  assert.deepEqual([levelOf(80.887,lb),levelOf(78.2,lb),levelOf(82.2,lb),levelOf(90,lb),levelOf(null,lb)],['Good','Alien','Midpack','Offline',null]);
+  assert.deepEqual(levelBands(lb).find(band=>band.name==='Good'),{name:'Good',from:79.34,to:80.91});
+  const {env}=harness(), calls=[];
+  const fetcher=async url=>{calls.push(url);return new Response(LAPTIMES);};
+  assert.equal(await refreshLaptimes(env,fetcher),true);
+  assert.equal(await refreshLaptimes(env,fetcher),false);
+  assert.equal(calls.length,1);
+  assert.equal((await env.DB.prepare("SELECT updated FROM training_reference WHERE id='laptimes'").first()).updated,'2026-10-02');
+  await assert.rejects(refreshLaptimes({DB:harness().env.DB},async()=>new Response('nothing here')),/unreadable/);
 });
 
 test('the SimHub plugin gets the same kind of key as a code, which replaces the program one', async () => {

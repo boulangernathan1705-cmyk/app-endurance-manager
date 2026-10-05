@@ -2,7 +2,7 @@
 // the sync program sends (or the pilot drops on the page), turned into a program, a session for today, advice and a
 // comparison with the other pilots of the site. Only the pilot sees his own data; the others are counted, never named.
 import {fail, json, now, id, token, hash, siteOrigin, rateLimit, body, DAY} from './core.mjs';
-import {parseResults, analyse, programSteps, adviceFor, trackKey, cleanLaps, circuitOf, normal, cleanLive, analyseLive, resultsAsLive, pitTimes, memoSheet, STEPS} from '../shared/training.mjs';
+import {parseResults, analyse, programSteps, adviceFor, trackKey, cleanLaps, circuitOf, normal, cleanLive, analyseLive, resultsAsLive, pitTimes, memoSheet, parseLaptimes, laptimesUpdated, mainLayout, LAPTIME_SOURCE, STEPS} from '../shared/training.mjs';
 
 const FILE_LIMIT = 3_000_000;
 const KEEP_DAYS = 120;
@@ -100,6 +100,22 @@ export async function trainingCollector(request, env, live = false) {
   return json({ok:true, ...saved});
 }
 
+// The class LMU writes for a car, as the spreadsheet of reference lap times names it.
+const LAPTIME_CLASS = {GT3:'GT3', LMGT3:'GT3', Hypercar:'Hypercar', LMH:'Hypercar', LMDh:'Hypercar', LMP2:'LMP2', LMP3:'LMP3', GTE:'GTE', LMGTE:'GTE'};
+
+// Once a day (cron): the spreadsheet of reference lap times, read whole and kept only when it still looks right.
+export async function refreshLaptimes(env, fetcher = fetch) {
+  const kept = await env.DB.prepare("SELECT fetched_at FROM training_reference WHERE id='laptimes'").first();
+  if (kept && kept.fetched_at > now() - 86400) return false;
+  const response = await fetcher(LAPTIME_SOURCE.csv, {headers:{Accept:'text/csv'}, redirect:'follow'});
+  if (!response.ok) throw Error(`laptimes ${response.status}`);
+  const text = await response.text(), rows = parseLaptimes(text);
+  if (rows.length < 3) throw Error('laptimes unreadable');
+  await env.DB.prepare(`INSERT INTO training_reference(id,data,updated,fetched_at) VALUES('laptimes',?,?,?)
+    ON CONFLICT(id) DO UPDATE SET data=excluded.data,updated=excluded.updated,fetched_at=excluded.fetched_at`).bind(JSON.stringify(rows), laptimesUpdated(text), now()).run();
+  return true;
+}
+
 // The circuit sheet: every circuit where the pilots of the site drove with the plugin, then for the one asked (or
 // the first) and one of its cars, the figures of memoSheet. Only medians leave the server, never a pilot's name;
 // the viewer's own figures come with them.
@@ -122,10 +138,13 @@ async function memo(env, user, url) {
     circuit.key, car.car, since);
   const stored = await env.DB.prepare('SELECT service FROM training_cars WHERE car=?').bind(car.car).first();
   const game = sessions.map(row => row.game && JSON.parse(row.game)).find(Boolean) || null;
-  const sheet = memoSheet({laneStops:lane.flatMap(row => JSON.parse(row.stops)), carStops:sessions.flatMap(row => JSON.parse(row.stops)),
+  const laptimes = await env.DB.prepare("SELECT data,updated FROM training_reference WHERE id='laptimes'").first();
+  const references = laptimes ? JSON.parse(laptimes.data).filter(row => row.circuit === circuit.key && row.carClass === LAPTIME_CLASS[car.carClass]) : [];
+  const sheet = memoSheet({reference:mainLayout(references),laneStops:lane.flatMap(row => JSON.parse(row.stops)), carStops:sessions.flatMap(row => JSON.parse(row.stops)),
     sessions:sessions.map(row => ({user:row.user_id, capacity:row.capacity, laps:JSON.parse(row.laps)})), viewer:user,
     service:stored ? JSON.parse(stored.service) : null, game});
-  return {circuits, circuit:{key:circuit.key, name:circuit.name}, car, ...sheet};
+  return {circuits, circuit:{key:circuit.key, name:circuit.name}, car, ...sheet,
+    source:laptimes ? {name:LAPTIME_SOURCE.name, title:LAPTIME_SOURCE.title, url:LAPTIME_SOURCE.url, updated:laptimes.updated} : null};
 }
 
 // The next LMU race the pilot is entered in (for the program's deadline and the circuit shown first).
