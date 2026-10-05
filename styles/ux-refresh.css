@@ -2013,3 +2013,13 @@ html[data-game] #app .race-header .event-type-panel span { font-size: 28px; font
   .planning-start.has-quick:not([open]) > summary { padding-right: 44px !important; }
   .planning-start.has-quick:not([open]) .planning-row { margin-right: 0 !important; }
 }
+
+/* Participants of a solo event: compact cards, several per row. */
+.solo-entries { grid-template-columns: repeat(auto-fill, minmax(190px, 240px)); gap: 8px; }
+.solo-entry { grid-template-columns: 26px minmax(0, 1fr) auto; gap: 2px 10px; padding: 7px 12px 7px 8px; border-radius: 12px; background: linear-gradient(135deg, rgba(255, 255, 255, .05), rgba(255, 255, 255, .015)); }
+.solo-entry-rank { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: rgba(255, 255, 255, .08); font-size: 12.5px; color: #dfe5ea; }
+.solo-entry-name { font-size: 14.5px; font-weight: 800; color: #f4f6f5; }
+.solo-entry.is-mine { border-color: var(--community-accent, #52d3d8); background: color-mix(in srgb, var(--community-accent, #52d3d8) 10%, transparent); }
+.solo-entry.is-mine .solo-entry-rank { background: var(--community-accent, #52d3d8); color: #0b1012; }
+.solo-entry-car, .solo-entry-round { font-size: 12px; }
+@media (max-width: 600px) { .solo-entries { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); } }
