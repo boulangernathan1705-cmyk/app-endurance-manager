@@ -173,6 +173,7 @@ async function perform(action,target){
     }
     case 'create': if(target.dataset.format)state.listFormat=target.dataset.format; renderEventForm(); break;
     case 'edit-event': renderEventForm(event); break;
+    case 'close-form': { const edited=state.events.find(item=>item.id===target.dataset.id); if(edited){state.currentEventId=edited.id;renderEvent();}else renderHome(); break; }
     case 'add-departure': if(app.querySelectorAll('.departure-field').length>=30)throw Error('Maximum 30 départs par événement.');{const rows=document.querySelectorAll('#departureFields .departure-field'),last=rows[rows.length-1];/* A new start copies the previous start's date and time: several starts often share a day. */document.getElementById('departureFields').insertAdjacentHTML('beforeend',departureFields(last?{date:last.querySelector('[name="date"]').value,time:last.querySelector('[name="time"]').value}:{}));/* Real times added next to the common start: they are no longer "à confirmer". */const pending=target.closest('form')?.elements.eventSchedulePending;if(pending?.checked&&document.querySelector('#departureFields [data-tbd="true"]'))pending.checked=false;}updateRemoveButtons();break;
     case 'bulk-departures': {
       const form=target.closest('form'),starts=bulkPreview(form),list=document.getElementById('departureFields');

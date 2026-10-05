@@ -2110,3 +2110,14 @@ html[data-game] #app .race-header .race-header-time svg { width: 18px; height: 1
   .round-session { min-width: calc(50% - 2px); }
   .round-session.is-race { flex-basis: 100%; }
 }
+/* Creating or editing a race or an event: the same step-by-step window as entering a race. */
+body:has(.form-sheet-overlay) { overflow: hidden; }
+.form-sheet-overlay { position: fixed; inset: 0; z-index: 1200; display: flex; align-items: center; justify-content: center; padding: 24px; background: rgba(4, 8, 10, .72); }
+.form-sheet { max-width: 760px; padding-bottom: 18px; }
+.form-sheet .form-panel { margin: 0; padding: 0; border: 0; background: none; box-shadow: none; }
+@media (max-width: 600px) { .form-sheet-overlay { padding: 0; align-items: stretch; } .form-sheet { max-height: none; border-radius: 0; } }
+/* In the window, the steps read like an entry: no intro, no numbered heading, no box around each step. */
+.form-sheet .creation-intro, .form-sheet .creation-card-heading { display: none; }
+.form-sheet .creation-card { margin: 0; padding: 0; border: 0; border-radius: 0; background: none; box-shadow: none; }
+.form-sheet .form-label { font-size: 13px !important; }
+.form-sheet .registration-step-nav { position: sticky; bottom: -18px; margin: 12px -20px -18px; padding: 12px 20px 18px; background: var(--panel, #111315); border-top: 1px solid rgba(255, 255, 255, .08); }
