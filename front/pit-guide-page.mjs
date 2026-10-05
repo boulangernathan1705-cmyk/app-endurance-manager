@@ -27,9 +27,9 @@ function band(item, unit, digits) {
     <div class="memo-scale ${pilots ? '' : 'is-you'}"><span>${pilots ? '' : 'min '}${num(low, digits)} ${unit}</span><span>${pilots ? `${item.pilots} pilotes · ${item.laps} tours` : 'ta fourchette'}</span><span>${pilots ? '' : 'max '}${num(high, digits)} ${unit}</span></div>`;
 }
 
-// The four tyres around the car, front at the top, each with its figure and a line under it.
+// The four tyres around the car, front at the top, each with its figure.
 const TYRES = ['Avant gauche', 'Avant droit', 'Arrière gauche', 'Arrière droit'];
-const car = (kind, cells, label) => `<div class="memo-car ${kind}" role="img" aria-label="${label}">${cells.map((cell, index) => `<div class="memo-tyre"><small>${TYRES[index]}</small><b>${cell.main}</b>${cell.sub ? `<small>${cell.sub}</small>` : ''}</div>`).join('')}<span class="memo-car-body" aria-hidden="true"></span></div>`;
+const car = (kind, cells, label) => `<div class="memo-car ${kind}" role="img" aria-label="${label}">${cells.map((cell, index) => `<div class="memo-tyre"><small>${TYRES[index]}</small><b>${cell}</b></div>`).join('')}<span class="memo-car-body" aria-hidden="true"></span></div>`;
 
 // The colour of a figure is the colour of where it comes from: the pilots' median, else the viewer, else the game.
 const source = item => !item ? '' : item.median !== null && item.median !== undefined ? 'is-pilots' : item.you !== null && item.you !== undefined ? 'is-you' : 'is-game';
@@ -72,7 +72,7 @@ function levels(data) {
     return `<tr class="${mine ? 'is-mine' : goal ? 'is-goal' : ''}"><th scope="row">${esc(band.name)}${mine ? ' <span class="memo-chip is-you">ton niveau</span>' : goal ? ' <span class="memo-chip">objectif</span>' : ''}</th>
       <td>${index ? '<span class="memo-none">—</span>' : lap(ref.q)}</td><td>${range(band)}</td></tr>`;
   }).join('');
-  return `<section class="training-card memo-wide"><p class="memo-scope">Circuit · catégorie · tableur d’Ohne Speed</p><h2>Chronos de référence</h2>
+  return `<section class="training-card memo-wide"><h2>Chronos de référence</h2>
     <div class="memo-table-wrap"><table class="memo-table"><caption>Chronos de référence par niveau, ${esc(ref.track)}</caption>
       <thead><tr><th scope="col">Niveau</th><th scope="col">Chrono<small>tour lancé</small></th><th scope="col">Rythme de course<small>tour moyen en course</small></th></tr></thead>
       <tbody>${you ? `<tr class="is-you-row"><th scope="row">Toi <span class="memo-chip is-you">${esc(you.level)}</span></th><td>${lap(you.best, 3)}<small>ton meilleur tour</small></td><td>${lap(you.pace, 3)}<small>ton tour médian</small></td></tr>` : ''}${rows}</tbody></table></div>
@@ -87,7 +87,7 @@ function bop(data) {
   const change = key => b.changes?.[key] ? ` (${b.changes[key] > 0 ? '+' : ''}${num(b.changes[key], Number.isInteger(b.changes[key]) ? 0 : 1)})` : '';
   const line = (label, key, value, note = '') => b[key] === null || b[key] === undefined ? '' : row(label, `${value}${change(key)}`, '', note);
   const power = b.carClass === 'Hypercar' ? `${num(b.power, 0)} kW` : typeof b.power === 'number' ? `${num(b.power, 1).replace(',0', '')} %` : esc(b.power);
-  return `<section class="training-card"><p class="memo-scope">Circuit · voiture · BoP officielle</p><h2>BoP LMU ${esc(b.version)}</h2>
+  return `<section class="training-card"><h2>BoP LMU ${esc(b.version)}</h2>
     <p class="training-note memo-small">${esc(b.car)} · ${esc(b.layout)}${b.changes ? ' · (écart avec la BoP précédente)' : ''}</p>
     <dl>${line('Poids minimum', 'weight', `${num(b.weight, 0)} kg`)}${line('Puissance maximale', 'power', power)}
       ${line('Énergie max par relais', 'energy', `${num(b.energy, 0)} MJ`, '= 100 %')}
@@ -125,33 +125,31 @@ function render() {
     <p class="memo-key"><span class="is-you"><i class="dot"></i>Toi</span><span class="is-pilots"><i class="bar"></i>Les pilotes du site</span><span class="is-game"><i class="tri"></i>Le jeu</span></p></div>
     <div class="memo-grid">
     ${levels(data)}
-    <section class="training-card"><p class="memo-scope">Circuit · voiture</p><h2>Stand</h2>
+    <section class="training-card"><h2>Stand</h2>
       <dl>${row('Traversée de la voie', data.lane ? `${num(data.lane.through)} s` : '—', 'is-pilots', data.lane ? 'aussi le prix d’un drive-through' : 'pas encore mesurée')}</dl>
       ${calculator(data)}
       ${s?.source === 'game' ? '<p class="training-note memo-small">Le jeu ajoute jusqu’à 3 s au hasard.</p>' : ''}</section>
-    <section class="training-card"><p class="memo-scope">Voiture · donné par le jeu</p><h2>Temps de service</h2>
+    <section class="training-card"><h2>Temps de service</h2>
       ${s ? `<p class="memo-tag ${s.source === 'game' ? 'is-game' : 'is-pilots'}">${s.source === 'game' ? 'Valeurs exactes du jeu' : 'Mesuré sur les arrêts'}</p>
       <div class="memo-group"><h3>Pendant le plein <small>seul le plus long compte</small></h3><dl class="${s.source === 'game' ? 'is-game' : 'is-pilots'}">${during}</dl></div>
       <div class="memo-group"><h3>En plus du plein <small>s’ajoutent</small></h3><dl class="${s.source === 'game' ? 'is-game' : 'is-pilots'}">${added}</dl></div>`
       : '<p class="training-empty">Pas encore relevé pour cette voiture.</p>'}</section>
-    <section class="training-card"><p class="memo-scope">Circuit · voiture · par tour</p><h2>Énergie et carburant</h2>
+    <section class="training-card"><h2>Énergie et carburant</h2>
       ${data.energy.median !== null || data.energy.you !== null || data.energy.game ? perLap('Énergie', data.energy, '%', 2) : ''}
       ${perLap('Carburant', data.fuel, 'L', 2, data.fuel.ratio ? row('Ratio carburant conseillé', num(data.fuel.ratio, 2), source(data.fuel)) : '')}</section>
-    <section class="training-card"><p class="memo-scope">Circuit · voiture · gomme</p><h2>Pneus${tyre ? ` · ${esc(tyre.name)}` : ''}</h2>
+    <section class="training-card"><h2>Pneus${tyre ? ` · ${esc(tyre.name)}` : ''}</h2>
       ${tyre ? `<div class="memo-block"><p class="memo-big ${source(tyre)}">${num(tyre.median ?? tyre.you, 2)}<span>% / tour · moyenne des 4 pneus</span></p>${band(tyre, '%', 2)}
-        ${tyre.wheels ? car(source(tyre), tyre.wheels.map(wheel => ({main:wheel.wear === null ? '—' : `${num(wheel.wear, 2)} %`,
-          sub:`${wheel.min !== null ? `${num(wheel.min, 2)} – ${num(wheel.max, 2)} %` : ''}${wheel.temp ? `<br>${wheel.temp} °C` : ''}`})), 'Usure par tour de chaque pneu, avec son minimum, son maximum et sa température moyenne') : ''}
+        ${tyre.wheels ? car(source(tyre), tyre.wheels.map(wheel => wheel.wear === null ? '—' : `${num(wheel.wear, 2)} %`), 'Usure par tour de chaque pneu') : ''}
         <dl>${tyre.median !== null && tyre.you !== null ? row('Ton usure moyenne', `${num(tyre.you, 2)} % / tour`, 'is-you') : ''}
         ${tyre.ideal ? row('Température idéale', `${num(tyre.ideal, 0)} °C`, 'is-game') : ''}${tyre.track !== null ? row('Piste pendant les mesures', `${num(tyre.track)} °C`) : ''}</dl></div>
         ${data.tyres.length > 1 ? `<p class="training-note">Autres gommes : ${data.tyres.slice(1).map(item => `${esc(item.name)} ${num(item.median ?? item.you, 2)} %`).join(', ')}.</p>` : ''}`
       : '<p class="training-empty">Pas encore de tour mesuré.</p>'}</section>
     ${bop(data)}
-    <section class="training-card${data.bop ? '' : ' memo-wide'}"><p class="memo-scope">Circuit · voiture · un relais</p><h2>Relais</h2>
+    <section class="training-card${data.bop ? '' : ' memo-wide'}"><h2>Relais</h2>
       ${st.laps ? `<p class="memo-big ${stintKind}">${st.laps}<span>tours ${st.by === 'energy' ? 'avec 100 % d’énergie' : 'avec un plein'}</span></p>
       <dl>${st.by === 'energy' && st.fuel ? row('Carburant pour les faire', `${num(st.fuel, 1)} L`, stintKind, data.fuel.ratio ? `ratio conseillé ${num(data.fuel.ratio, 2)}` : '') : ''}
 </dl>
-      ${st.wear ? `${car(wearKind, st.wear.map(value => ({main:value === null ? '—' : `−${num(value, 1)} %`, sub:''})), 'Usure de chaque pneu sur un relais')}
-        <p class="training-note memo-small">Usure de chaque pneu sur le relais.</p>` : ''}`
+      ${st.wear ? `<div class="memo-group"><h3>Usure des pneus sur le relais</h3>${car(wearKind, st.wear.map(value => value === null ? '—' : `−${num(value, 0)} %`), 'Usure de chaque pneu sur un relais')}</div>` : ''}`
       : '<p class="training-empty">Pas encore de tour mesuré.</p>'}</section>
     </div>
     ${data.source ? `<p class="memo-credit">Chronos de référence : <a href="${esc(data.source.url)}" target="_blank" rel="noopener">${esc(data.source.title)}</a> de ${esc(data.source.name)}${data.source.updated ? `, mis à jour le ${esc(data.source.updated.split('-').reverse().join('/'))}` : ''}.</p>` : ''}`;
