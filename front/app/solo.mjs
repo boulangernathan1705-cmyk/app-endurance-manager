@@ -1,25 +1,35 @@
 // Solo races: one entry per driver, limited places with a waiting list, one or two rounds and an
 // OPEN / SAFE access. They reuse the race cards, the race page and the registration window; this module
 // only holds what differs from endurance events.
-import {state,esc,button,canManage,can,logo,badge,categories,circuitLabel} from './core.mjs';
+import {state,esc,button,canManage,can,logo,badge,categories} from './core.mjs';
+import {SIMS,simCatalog,simForEvent} from '../../shared/catalog.mjs';
 
 export const ANY_CATEGORY = '*';
 export const isSolo = event => event?.format === 'solo';
 
+export function simBadge(event) {
+  const sim = SIMS.find(item => item.id === simForEvent(event));
+  return `<span class="event-sim-badge sim-${sim.id}" title="${esc(sim.name)}">${esc(sim.short)}</span>`;
+}
+// The simulator, then OPEN or SAFE.
 export function accessBadge(event) {
   const safe = event.access === 'safe';
-  return `<span class="event-access-badge ${safe ? 'is-safe' : 'is-open'}" title="${safe ? 'Réservée aux pilotes SAFE' : 'Ouverte à tous les pilotes connectés'}">${safe ? 'SAFE' : 'OPEN'}</span>`;
+  return `<span class="event-badge-row">${simBadge(event)}<span class="event-access-badge ${safe ? 'is-safe' : 'is-open'}" title="${safe ? 'Réservé aux pilotes SAFE' : 'Ouvert à tous les pilotes connectés'}">${safe ? 'SAFE' : 'OPEN'}</span></span>`;
 }
 
-function roundCircuit(round) {
-  return circuitLabel(round.circuit);
+// Circuit of an event: from its simulator's catalog (LMU, iRacing), or as typed (AMS2, ACE).
+export function eventCircuitName(event, id) {
+  const catalog = simCatalog(simForEvent(event));
+  if (!catalog) return String(id || '') || 'Circuit à préciser';
+  const circuit = catalog.circuits.find(item => item.id === id);
+  return circuit ? (circuit.random ? 'Circuit aléatoire' : circuit.name) : 'Circuit à préciser';
 }
 
 // "Circuit de Spa-Francorchamps · 20 min + Circuit aléatoire · 20 min"
 export function soloRoundsLabel(event) {
   const rounds = event.rounds || [];
-  if (!rounds.length) return esc(circuitLabel(event.circuit));
-  return rounds.map(round => `${esc(roundCircuit(round))} · ${Number(round.durationMinutes) || 0} min`).join(' + ');
+  if (!rounds.length) return esc(eventCircuitName(event, event.circuit));
+  return rounds.map(round => `${esc(eventCircuitName(event, round.circuit))} · ${Number(round.durationMinutes) || 0} min`).join(' + ');
 }
 
 export function soloCounts(event, departure) {
@@ -48,8 +58,8 @@ function carCell(reg) {
 // Why the driver cannot enter, or '' when they can.
 export function soloEntryBlock(event) {
   if (!state.user) return 'Connecte-toi avec Discord pour participer.';
-  if (event.access === 'safe' && !can('solo_safe')) return 'Course réservée aux pilotes SAFE.';
-  if (!can('solo_safe') && !can('solo_open')) return 'Tu n’as pas accès aux courses solo de cette communauté.';
+  if (event.access === 'safe' && !can('solo_safe')) return 'Événement réservé aux pilotes SAFE.';
+  if (!can('solo_safe') && !can('solo_open')) return 'Tu n’as pas accès aux événements de cette communauté.';
   return '';
 }
 
@@ -59,6 +69,7 @@ export function myWaitlistPosition(departure) {
 
 // Category and car of each round (two-round races), or of the race.
 function choicesCell(event, reg) {
+  if (!reg.category && !reg.roundChoices?.length) return '';
   const rounds = event.rounds || [];
   const choices = reg.roundChoices?.length ? reg.roundChoices : [{category:reg.category, cars:reg.cars, carAny:reg.carAny}];
   if (rounds.length < 2) return `${categoryCell(choices[0].category)}<span class="solo-entry-car">${carCell(choices[0])}</span>`;
@@ -80,6 +91,7 @@ export function renderSoloEntries(event, departure) {
 
 // Race header: the categories of each round (no counters, the places gauge gives the entries).
 export function soloCategoriesSummary(event) {
+  if (!event.categories.length) return '';
   const rounds = event.rounds || [];
   if (rounds.length < 2) return `<div class="event-header-stats event-category-badges">${event.categories.map(category => badge(category)).join('')}</div>`;
   return `<div class="event-header-stats solo-round-badges">${rounds.map((round, index) => `<span class="solo-round-badge-group"><em>Manche ${index + 1}</em>${(round.categories?.length ? round.categories : event.categories).map(category => badge(category)).join('')}</span>`).join('')}</div>`;
