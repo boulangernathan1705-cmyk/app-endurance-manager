@@ -19,13 +19,11 @@ function renderError(message) {
 }
 
 // What each permission means (server/access.mjs, PERMISSIONS).
-const PERMISSION_LABELS = {endurance:'Endurances', solo_open:'Événements OPEN', solo_safe:'Événements SAFE',
-  manage_registrations:'Gérer les inscriptions', create_race:'Créer des courses', manage_races:'Gérer toutes les courses', admin:'Administrer'};
-const PERMISSION_HELP = {endurance:'S’inscrire aux endurances, rejoindre, créer et gérer son équipage.',
+const PERMISSION_LABELS = {endurance:'Endurances', solo_open:'Événements OPEN', solo_safe:'Événements SAFE', crews:'Équipages', admin:'Administrer'};
+const PERMISSION_HELP = {endurance:'S’inscrire aux endurances (et rejoindre un équipage existant).',
   solo_open:'S’inscrire aux événements OPEN.', solo_safe:'S’inscrire aux événements SAFE (et OPEN).',
-  manage_registrations:'Inscrire, modifier ou retirer n’importe quel pilote, composer tous les équipages.',
-  create_race:'Créer des courses, modifier et supprimer les siennes.', manage_races:'Modifier et supprimer toutes les courses, y compris celles importées d’iRacing.',
-  admin:'Page Membres et réglages : apparence, modules, autorisations des rôles.'};
+  crews:'Créer et gérer les équipages.',
+  admin:'Administrer le site : réglages, rôles, créer et gérer les courses et les événements, inscrire n’importe quel pilote.'};
 
 // Members of the community: found on its Discord server by the bot. Roles are managed on Discord; this page
 // shows them with what they allow here (and in « Rôles », what each role allows).
@@ -138,7 +136,7 @@ function peopleMarkup(result, settings) {
       <div class="members-list member-grid">${members.map(member => memberCard(member, result.permissions || [])).join('')}</div>
       <p class="members-empty" hidden>Aucun membre ne correspond à cette recherche.</p></div>
     <div data-view-pane="roles" class="admin-stack" hidden>
-      <p class="members-help">Un membre cumule les autorisations de tous ses rôles. « @everyone » s’applique à tout le serveur. Le propriétaire du serveur et les rôles « Administrateur » de Discord ont tout. Chaque case s’enregistre dès qu’on la coche.</p>
+      <p class="members-help">Un membre cumule les autorisations de tous ses rôles ; sans aucune, il voit seulement les courses. « @everyone » s’applique à tout le serveur. Le propriétaire du serveur et les rôles « Administrateur » de Discord ont tout. Chaque case s’enregistre dès qu’on la coche.</p>
       ${roles}${legend}</div>`;
 }
 

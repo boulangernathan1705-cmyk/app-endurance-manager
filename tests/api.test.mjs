@@ -215,7 +215,7 @@ test('shared events, actual Discord callback, Discord role grants/revocation and
  assert.equal((await req('/api/members/'+PILOT,'PATCH',{role:'organizer'},'admin')).status,410,'roles are managed on Discord');
  // Organizer role on the Discord server: the site follows it.
  grant(PILOT,[ORGA_ROLE]);
- assert.equal((await req('/api/session','GET',null,'pilot')).data.user.role,'organizer');
+ assert.equal((await req('/api/session','GET',null,'pilot')).data.user.role,'admin','the organizers administer the site');
  const created=await req('/api/events','POST',eventInput,'pilot');assert.equal(created.status,201);
  let event=(await req('/api/events','GET',null,'admin')).data.events[0];assert.equal(event.name,'Daytona 8H');assert.equal(event.departures[0].date,'2090-10-14');
  const eventId=event.id,depId=event.departures[0].id;
