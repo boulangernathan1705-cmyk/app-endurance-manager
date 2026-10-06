@@ -176,6 +176,12 @@ function recapForm(setup) {
       </div>
       <div class="setup-actions"><button class="primary-button" type="submit">Enregistrer</button><span class="settings-status" aria-live="polite"></span></div></form>`;
 }
+// Where the crews' voice channels are made, asked as soon as the module is turned on.
+function crewCategory(crews) {
+  const list = crews.categories || [], current = crews.voiceCategoryId || '';
+  const options = [{id:'', name:'En haut du serveur'}, ...list, ...(current && !list.some(item => item.id === current) ? [{id:current, name:'Catégorie actuelle'}] : [])];
+  return `<label class="crew-category">Où créer les vocaux ?<select data-crew-category>${options.map(item => `<option value="${esc(item.id)}" ${item.id === current ? 'selected' : ''}>${esc(item.name)}</option>`).join('')}</select></label><span class="settings-status" aria-live="polite"></span>`;
+}
 function modulesMarkup(settings, setup) {
   const crews = settings.crews || {}, states = moduleStates(settings, setup);
   const toggle = (key, label, locked = false) => `<label class="admin-switch"><input type="checkbox" role="switch" data-module="${key}" aria-label="${label}" ${states[key] ? 'checked' : ''} ${locked ? 'disabled' : ''}><i aria-hidden="true"></i></label>`;
@@ -190,7 +196,7 @@ function modulesMarkup(settings, setup) {
     {key:'crewChannels', name:'Salons d’équipage sur Discord', text:'Un salon vocal par équipage (« LMU-Les Tondeuz »), ouvert quelques jours avant la course.',
       state:crewWarn ? ['warn', crews.botReady !== true ? 'Le bot n’a pas les droits' : 'Le bot est bloqué'] : states.crewChannels ? ['ok', 'Actif'] : ['off', crews.botReady === true ? 'Éteint' : 'Éteint · droits du bot à donner'],
       control:toggle('crewChannels', 'Salons d’équipage sur Discord', crews.botReady !== true && !states.crewChannels),
-      settings:`${crewRights}<p class="members-help">Le vocal arrive en haut du serveur : range-le où tu veux. Il est supprimé 2 h après la course.</p>`},
+      settings:`${crewRights}${states.crewChannels ? crewCategory(crews) : ''}<p class="members-help">Il est supprimé 2 h après la course.</p>`},
     {key:'raceReminders', name:'Rappels de course', text:'24&nbsp;h avant le départ dans la cloche du site, 24&nbsp;h et 1&nbsp;h avant dans le salon de l’équipage.',
       state:states.raceReminders ? ['ok', 'Actif'] : ['off', 'Éteint'], control:toggle('raceReminders', 'Rappels de course'), settings:''},
     {key:'iracingImport', name:'Endurances iRacing officielles', text:'Les séries en équipe et les événements spéciaux importés automatiquement.',
@@ -596,12 +602,19 @@ app.addEventListener('change', async event => {
   if (box.matches('[data-banner-zoom]') && cropper) { setZoom(Number(box.value)); return; }
   const recapForm = box.closest('form[data-recaps]');
   if (recapForm) { recapForm.dataset.mode = recapForm.elements.enabled.checked ? recapForm.elements.layout.value : 'none'; return; }
+  if (box.matches('[data-crew-category]')) {
+    const status = box.closest('.admin-module-settings').querySelector('.crew-category + .settings-status');
+    box.disabled = true; status.textContent = 'Enregistrement…';
+    try { await api('/api/community/modules', 'PATCH', {crewCategory:box.value}); status.textContent = '✓'; }
+    catch (error) { status.textContent = error.message; } finally { box.disabled = false; }
+    return;
+  }
   if (box.dataset.module) {
     box.disabled = true;
     try {
       await api('/api/community/modules', 'PATCH', {[box.dataset.module]:box.checked});
-      // The solo races permissions appear or disappear with the module.
-      await reload('modules');
+      // The solo races permissions appear or disappear with the module; the crews' channels ask where to go.
+      await reload('modules', {module:box.dataset.module === 'crewChannels' && box.checked ? 'crewChannels' : ''});
       return;
     } catch (error) { box.checked = !box.checked; alert(error.message); } finally { box.disabled = false; }
     return;

@@ -1,7 +1,7 @@
 // Crews on Discord (migrations 0044, 0045). Two modules, each enabled by the admins of a community:
 // - crewChannels (« Salons d'équipage »): a few days before its start, every crew with a pilot gets a voice
-//   channel named after its sim and its name (« LMU-TDZ 001 »), made outside any category: the server's owner
-//   puts it where they like, the bot never moves it. A recap message in the voice channel's chat follows the crew
+//   channel named after its sim and its name (« LMU-Les Tondeuz »), made in the category the admins chose
+//   (none: at the top of the server); the bot never moves it afterwards. A recap message in the voice channel's chat follows the crew
 //   (race, time, car, pilots); a pilot who joins is welcomed there. 2 h after the planned end the voice channel
 //   is deleted with its chat, once no pilot of the crew is in it. A crew deleted before is closed at once.
 //   (The first version made a category with a text channel and archived it: what is left of it is deleted too.)
@@ -28,7 +28,7 @@ export const REMINDERS = [{bit:1, before:24 * HOUR}, {bit:2, before:HOUR}];
 const MANAGE_CHANNELS = 1n << 4n, SEND_MESSAGES = 1n << 11n, ADMINISTRATOR = 1n << 3n;
 const NEEDED = MANAGE_CHANNELS | (1n << 10n) | SEND_MESSAGES | (1n << 16n);
 export const CREW_BOT_PERMISSIONS = String(NEEDED);
-const VOICE = 2;
+const VOICE = 2, CATEGORY = 4;
 
 class Stop extends Error {}
 
@@ -245,6 +245,33 @@ async function sendInChannel(env, budget, row, method, path, body) {
   }
 }
 
+// The crew's voice channel, in the category chosen by the admins. That category deleted on Discord: the choice
+// is forgotten (the admins are told) and the channel is made at the top of the server next time.
+async function createVoice(env, budget, row, setting, body) {
+  const parent = setting.voice_category_id;
+  try { return await discord(env, budget, 'POST', `/guilds/${row.guild_id}/channels`, parent ? {...body, parent_id:parent} : body); }
+  catch (error) {
+    if (!parent || (error?.status !== 400 && error?.status !== 404)) throw error;
+    await env.DB.prepare('UPDATE community_crew_discord SET voice_category_id=NULL, last_error=?, last_error_at=? WHERE community_id=?')
+      .bind('La catégorie choisie pour les vocaux n’existe plus : ils arrivent en haut du serveur.', Math.floor(Date.now() / 1000), row.row_community).run();
+    setting.voice_category_id = null;
+    throw new Stop('gone');
+  }
+}
+
+// The categories of the server, in Discord's order (for the admins' choice), or null when Discord does not answer.
+export async function serverCategories(env, guildId) {
+  if (!guildId || !String(env.DISCORD_BOT_TOKEN || '').trim()) return null;
+  try {
+    const channels = await discord(env, {left:1}, 'GET', `/guilds/${guildId}/channels`);
+    return (Array.isArray(channels) ? channels : []).filter(item => item?.type === CATEGORY)
+      .sort((a, b) => (a.position || 0) - (b.position || 0)).map(item => ({id:String(item.id), name:String(item.name || '')}));
+  } catch (error) {
+    if (!(error instanceof Stop)) console.error('Server categories failed', error instanceof Error ? error.message : 'unknown');
+    return null;
+  }
+}
+
 async function syncRow(env, budget, timestamp, community, setting, row, pilots) {
   const start = row.crew_id && row.event_name ? startOf(row) : null;
   const members = JSON.parse(row.members || '[]');
@@ -271,7 +298,7 @@ async function syncRow(env, budget, timestamp, community, setting, row, pilots) 
     await env.DB.prepare('UPDATE crew_discord SET message_id=NULL WHERE crew_id=?').bind(row.row_id).run();
   }
   if (!row.voice_id) {
-    const voice = await discord(env, budget, 'POST', `/guilds/${row.guild_id}/channels`, {name:clip(`${game(row.circuit) === 'iracing' ? 'iRacing' : 'LMU'}-${crewName}`, 100), type:VOICE});
+    const voice = await createVoice(env, budget, row, setting, {name:clip(`${game(row.circuit) === 'iracing' ? 'iRacing' : 'LMU'}-${crewName}`, 100), type:VOICE});
     Object.assign(row, {voice_id:voice.id, message_id:null});
     await env.DB.prepare('UPDATE crew_discord SET voice_id=?, message_id=NULL WHERE crew_id=?').bind(voice.id, row.row_id).run();
     await env.DB.prepare('UPDATE community_crew_discord SET last_error=NULL, last_error_at=NULL WHERE community_id=?').bind(community.id).run();
