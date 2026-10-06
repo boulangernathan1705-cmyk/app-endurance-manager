@@ -4,7 +4,7 @@ Deux modules, activés par les admins de chaque communauté avec un simple inter
 
 ## Salons d'équipage (`crewChannels`)
 
-- 6 jours avant le départ au plus (horaire connu), chaque équipage avec au moins un pilote reçoit **son salon vocal**, au nom de la simu et de l'équipage (« LMU-Les Tondeuz »). Le bot le crée hors catégorie : le propriétaire du serveur le range où il veut, le bot ne le déplace jamais.
+- 6 jours avant le départ au plus (horaire connu), chaque équipage avec au moins un pilote reçoit **son salon vocal**, au nom de la simu et de l'équipage (« LMU-Les Tondeuz »). Le bot le crée dans la catégorie choisie à l'activation du module (**Où créer les vocaux ?**, par défaut en haut du serveur), puis ne le déplace jamais. Si cette catégorie est supprimée sur Discord, le choix revient à « En haut du serveur » et les admins en sont prévenus.
 - Dans le chat du vocal, un récap : course, horaire (à l'heure de chaque joueur), durée, voiture, pilotes, lien du site. Les pilotes y sont mentionnés, et un pilote qui rejoint l'équipage y est accueilli.
 - Le récap est modifié à chaque changement (voiture, horaire, pilotes…), sans renvoyer de mention.
 - 2 h après la fin prévue, le vocal est supprimé avec son chat (dès qu'aucun pilote de l'équipage n'y est connecté). Un équipage supprimé avant sa course est fermé tout de suite.

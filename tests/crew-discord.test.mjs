@@ -31,6 +31,8 @@ function fakeDiscord(){
     if(gone.has(path))return reply(404,{code:10008});
     if(method==='GET'&&path===`/guilds/${GUILD}/members/app-id`)return reply(200,{roles:[BOT_ROLE]});
     if(method==='GET'&&path===`/guilds/${GUILD}`)return reply(200,{id:GUILD,name:'Test',owner_id:ADMIN});
+    if(method==='GET'&&path===`/guilds/${GUILD}/channels`)return reply(200,[{id:'500000000000000002',name:'Courses',type:4,position:2},{id:'500000000000000003',name:'général',type:0,position:0},{id:'500000000000000001',name:'Accueil',type:4,position:1}]);
+    if(method==='POST'&&body?.parent_id&&state.goneCategory===body.parent_id)return reply(400,{code:50035});
     if(method==='GET'&&path===`/guilds/${GUILD}/roles`)return reply(200,[{id:GUILD,name:'@everyone',permissions:'0',position:0},{id:BOT_ROLE,name:'Endurance Manager',permissions:state.botRights?'68624':'0',position:1}]);
     const voice=path.match(/^\/guilds\/\d+\/voice-states\/(\d+)$/);
     if(voice)return voiceStates.has(voice[1])?reply(200,{channel_id:voiceStates.get(voice[1])}):reply(404,{code:10065});
@@ -230,4 +232,35 @@ test('a recap or a voice channel deleted on Discord is made again', async () => 
   const again=discord.calls.slice(mark);
   assert.deepEqual(again[0].body,{name:'LMU-Retour',type:2});
   assert.equal(again[1].method,'POST');assert.match(again[1].path,/\/messages$/);
+});
+
+test('the admins choose where the voice channels are made, as soon as they turn the module on', async () => {
+  const {DB,req,login,sync,discord}=harness();
+  await login(ADMIN,'admin','Orga');await login(PILOT,'pilot','Alice');
+  assert.equal((await req('/api/community/settings','GET',null,'admin')).data.crews.categories,null);
+  assert.equal((await req('/api/community/modules','PATCH',{crewChannels:true},'admin')).status,200);
+  const crews=(await req('/api/community/settings','GET',null,'admin')).data.crews;
+  assert.deepEqual(crews.categories,[{id:'500000000000000001',name:'Accueil'},{id:'500000000000000002',name:'Courses'}]);assert.equal(crews.voiceCategoryId,null);
+  assert.equal((await req('/api/community/modules','PATCH',{crewCategory:'500000000000000003'},'admin')).status,400);
+  assert.equal((await req('/api/community/modules','PATCH',{crewCategory:'500000000000000002'},'pilot')).status,403);
+  assert.equal((await req('/api/community/modules','PATCH',{crewCategory:'500000000000000002'},'admin')).status,200);
+  assert.equal((await req('/api/community/settings','GET',null,'admin')).data.crews.voiceCategoryId,'500000000000000002');
+  assert.equal((await req('/api/events','POST',race,'admin')).status,201);
+  const event=(await req('/api/events','GET',null,'admin')).data.events[0];
+  const departure=event.departures[0], base=`/api/events/${event.id}/departures/${departure.id}`, at=departure.startsAt-2*24*HOUR;
+  assert.equal((await req(base+'/registrations','POST',{name:'x',category:'GT3',status:'whole'},'pilot')).status,201);
+  assert.equal((await req(base+'/crews','POST',{name:'Rangés',category:'GT3'},'pilot')).status,201);
+  let mark=discord.calls.length;await sync(at);
+  assert.deepEqual(created(discord.calls,mark)[0].body,{name:'LMU-Rangés',type:2,parent_id:'500000000000000002'});
+  // The category is deleted on Discord: the choice is forgotten, the admins are told, the next one goes on top.
+  const row=DB.db.prepare('SELECT * FROM crew_discord').get();
+  discord.state.goneCategory='500000000000000002';
+  discord.unknownChannel.add(`/channels/${row.voice_id}/messages/${row.message_id}`);
+  DB.db.prepare("UPDATE crew_discord SET recap_hash=''").run();
+  await sync(at+HOUR);await sync(at+2*HOUR);
+  const setting=DB.db.prepare('SELECT * FROM community_crew_discord').get();
+  assert.equal(setting.voice_category_id,null);assert.match(setting.last_error,/n’existe plus/);
+  mark=discord.calls.length;await sync(at+3*HOUR);
+  assert.deepEqual(created(discord.calls,mark)[0].body,{name:'LMU-Rangés',type:2});
+  assert.equal((await req('/api/community/modules','PATCH',{crewCategory:''},'admin')).status,200);
 });
