@@ -180,11 +180,11 @@ function publicRegistration(reg, actor, userNames = new Map(), community = null,
 }
 // Archived = every start is in the past (same rule as front/schedule.mjs). "upcoming" keeps a
 // one-day margin so a race that just started stays visible, and undated races stay upcoming.
-const LAST_START="(SELECT max(CAST(json_extract(d.value,'$.startsAt') AS INTEGER)) FROM json_each(e.departures) d)";
+// last_start (the latest departure's start, kept by triggers, migration 0057) is indexed: only the races asked for are read.
 function eventScopeFilter(scope, nowMs=Date.now()) {
   const cutoff=Math.floor(nowMs);
-  if (scope==='upcoming') return `(${LAST_START} IS NULL OR ${LAST_START}>${cutoff-86400000})`;
-  if (scope==='archived') return `${LAST_START}<=${cutoff}`;
+  if (scope==='upcoming') return `(e.last_start IS NULL OR e.last_start>${cutoff-86400000})`;
+  if (scope==='archived') return `e.last_start<=${cutoff}`;
   return '';
 }
 async function listEvents(env, actor, game='', scope='', community) {
