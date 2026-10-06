@@ -34,13 +34,18 @@ const DISCORD_API = 'https://discord.com/api/v10';
 const CHECK_EVERY = 24 * 3600; // seconds, the daily check of every member
 // The player on the site: roles asked again after 10 minutes, so a role given on Discord soon counts here.
 const VISIT_CHECK_EVERY = 10 * 60;
+// Not on the server yet: asked again after a minute, so a player who has just joined gets in on their next visit.
+const NOT_MEMBER_CHECK_EVERY = 60;
+const UNKNOWN_MEMBER = 10007; // Discord: this user is not on the server (a 404 can also mean the bot is not on it)
 const ADMINISTRATOR = 0x8n;
 
 async function bot(env, path) {
   const tokenValue = String(env?.DISCORD_BOT_TOKEN || '').trim();
   if (!tokenValue) return {ok:false, status:0};
   const response = await fetch(`${DISCORD_API}${path}`, {headers:{Authorization:`Bot ${tokenValue}`}, signal:AbortSignal.timeout(8000)});
-  return {ok:response.ok, status:response.status, data:response.ok ? await response.json() : null};
+  if (response.ok) return {ok:true, status:response.status, data:await response.json()};
+  const error = await response.json().catch(() => null);
+  return {ok:false, status:response.status, code:Number(error?.code) || 0, data:null};
 }
 
 // Server details (owner, roles with their Discord permissions), kept a few minutes per Worker instance.
@@ -79,7 +84,9 @@ export async function checkMembership(env, community, userId) {
   if (!guildId) return null;
   const member = await bot(env, `/guilds/${guildId}/members/${userId}`);
   const time = now();
-  if (member.status === 404) {
+  // Only Discord's « Unknown Member » means the player is not on the server; any other refusal (bot not on the
+  // server, server unknown) says nothing about the player.
+  if (member.status === 404 && member.code === UNKNOWN_MEMBER) {
     await env.DB.prepare(`INSERT INTO memberships(community_id,user_id,status,checked_at,created_at) VALUES(?,?,'left',?,?)
       ON CONFLICT(community_id,user_id) DO UPDATE SET status='left',discord_roles='[]',discord_admin=0,checked_at=excluded.checked_at`)
       .bind(community.id, userId, time, time).run();
@@ -128,7 +135,8 @@ export async function communityAccess(env, actor, community, {open = false} = {}
   let membership = await env.DB.prepare('SELECT * FROM memberships WHERE community_id=? AND user_id=?').bind(community.id, actor.user.id).first();
   // Managers are checked too (to appear on the members page when they are on the server), but their access never depends on it.
   // Discord not answering: the roles known last time stay (never an error for a member already checked).
-  if (!membership || membership.checked_at < now() - VISIT_CHECK_EVERY) membership = (await checkMembership(env, community, actor.user.id).catch(error => { if (!manager && !membership) throw error; return null; })) || membership;
+  const recheck = membership?.status === 'member' ? VISIT_CHECK_EVERY : NOT_MEMBER_CHECK_EVERY;
+  if (!membership || membership.checked_at < now() - recheck) membership = (await checkMembership(env, community, actor.user.id).catch(error => { if (!manager && !membership) throw error; return null; })) || membership;
   if (manager) return {status:'member', permissions:new Set(ALL_PERMISSIONS), manager};
   if (!membership) return none('unavailable');
   if (membership.status !== 'member') return none('not-member');
