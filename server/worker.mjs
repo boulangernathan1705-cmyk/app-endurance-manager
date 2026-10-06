@@ -500,7 +500,7 @@ async function api(request, env) {
       fail(404,'Action introuvable.');
     }
     if (crew) {
-      if (!canManageCrew(crew,who)) fail(403,'Seul le responsable de cet équipage ou un organisateur peut le modifier.');
+      if (!canManageCrew(crew,who)) fail(403,'Seul le responsable de cet équipage ou un pilote qui gère les équipages peut le modifier.');
       if (method==='DELETE') {
         const told = await crewPilots(env,crew.id);
         const result = await env.DB.prepare('DELETE FROM crews WHERE id=? AND version=?').bind(crew.id,input.version).run();

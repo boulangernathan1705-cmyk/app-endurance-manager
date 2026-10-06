@@ -206,7 +206,7 @@ function panelMarkup(event) {
   const categoryDisabled = builderState.locked || memberCategoryLocked;
   const title = editMode ? `Gérer « ${esc(builderState.name || 'Équipage')} »` : builderState.manager ? 'Créer un nouvel équipage' : 'Créer mon équipage';
   const description = editMode
-    ? 'Modifie le nom, la voiture et la composition. Les organisateurs gardent toujours un droit de supervision.'
+    ? 'Modifie le nom, la voiture et la composition.'
     : builderState.manager
       ? 'Crée l’équipage sur ce départ puis choisis les pilotes déjà inscrits.'
       : 'Tu deviens responsable de l’équipage et tu y es ajouté automatiquement.';

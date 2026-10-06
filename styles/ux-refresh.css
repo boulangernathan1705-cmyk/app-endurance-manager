@@ -2140,3 +2140,30 @@ body:has(.form-sheet-overlay) { overflow: hidden; }
 .planning-quick-button.is-safe-guide { width: auto !important; padding: 0 12px !important; border-color: rgba(240, 192, 64, .55); color: #f0c040; text-decoration: none; }
 .settings-safe-guide { display: grid; gap: 10px; }
 .settings-safe-guide label { display: grid; gap: 6px; font-weight: 700; }
+/* Site tour (2026-10-06). A duration (« 6 h ») never leaves its unit on the next line. */
+.nowrap { white-space: nowrap; }
+/* Countdown of a race header: « 4 j 8 h » stays together. */
+.event-header-countdown strong { white-space: nowrap; }
+/* Entry window: the note under the categories is not glued to the last one. */
+.registration-category-list + .registration-step-help { margin-top: 10px; }
+/* Race list filters on a phone: each on one line (« Mes courses » no longer wraps). */
+@media (max-width: 640px) {
+  html[data-game] #app .page-head .event-filter-button { white-space: nowrap; padding: 0 8px !important; font-size: 13px !important; }
+}
+/* Administration: every button the same size as the overview's; module tiles of a row the same height,
+   their state at the bottom. */
+.admin-shell .admin-main .primary-button, .admin-shell .admin-main .secondary-button { display: inline-flex; align-items: center; justify-content: center; min-height: 34px; padding: 0 12px; font-size: 13px; }
+.admin-modules { align-items: stretch; }
+.admin-module { display: flex; flex-direction: column; }
+.admin-module-foot { margin-top: auto; }
+/* Appearance: both name fields line up, the label text above each input. */
+.settings-appearance label { align-content: end; }
+.settings-appearance label > span:first-child { display: block; }
+.admin-module-foot { min-height: 32px; }
+/* Step windows: an opaque panel (the page no longer shows through), every field the same height and the
+   fields of a row lined up on their bottom edge. */
+.registration-sheet.form-sheet { background-color: #0c1012; }
+.form-sheet .creation-field-grid { align-items: end; }
+.form-sheet .creation-field-grid > .form-label, .form-sheet .creation-field-grid > .format-contents > .form-label { align-self: end; margin-bottom: 0; }
+.form-sheet input:not([type="checkbox"]):not([type="radio"]):not([type="color"]):not([type="file"]), .form-sheet select { min-height: 46px; box-sizing: border-box; }
+.solo-event-form .solo-form-step > .form-label > input { margin-top: 8px; }

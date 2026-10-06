@@ -146,19 +146,18 @@ test('Équipages est intégré directement dans chaque départ avec actions pilo
   assert.match(crews,/logo\(crew\.category\)/);
 });
 
-test('l’aide décrit les droits pilote organisateur et administrateur actuels',()=>{
+test('l’aide décrit les 5 autorisations et les écrans actuels',()=>{
   const help=read('help.js');
-  assert.match(help,/créer ton équipage, rejoindre ou quitter un équipage de ta catégorie/);
-  assert.match(help,/gérer l’équipage dont tu es responsable/);
-  // Organizer rights come from the permissions of the Discord roles (server/access.mjs).
-  assert.match(help,/avec <strong>Créer des courses<\/strong> : créer des courses, modifier et supprimer les tiennes/);
-  assert.match(help,/créer, composer et fermer tous les équipages/);
-  assert.match(help,/Tu ne peux pas[\s\S]*donner des rôles : ils se donnent sur le serveur Discord/);
+  // The five permissions of a Discord role (server/access.mjs), no more « organisateur ».
+  for(const key of ['endurance','solo_open','solo_safe','crews','admin'])assert.match(help,new RegExp(`\\['${key}', L\\(`));
+  assert.doesNotMatch(help,/[Oo]rganisateur|Créer des courses|Gérer toutes les courses/);
   // No more entries without an account.
   assert.doesNotMatch(help,/lien personnel|sans compte/);
-  // The help follows the current screens: step windows, date format, automatic updates.
+  // The help follows the current screens: one-click entry, Absent, step windows, the 4 parts of Administration.
+  assert.match(help,/<strong>M’inscrire<\/strong>/);
+  assert.match(help,/<strong>Absent<\/strong>/);
   assert.match(help,/4 étapes/);
-  assert.match(help,/Mise à jour automatique/);
+  assert.match(help,/en 4 parties/);
   assert.doesNotMatch(help,/Actualiser/);
 });
 

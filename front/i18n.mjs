@@ -53,7 +53,7 @@ const EN=new Map(Object.entries({
   'Catégorie':'Category','Voiture(s) souhaitée(s)':'Preferred car(s)','N’importe quelle voiture':'Any car','Pas de préférence':'No preference','Peu importe la voiture':'Any car',
   'Pilote souhaité':'Preferred teammate','Coéquipier souhaité':'Preferred teammate','(facultatif)':'(optional)','Pseudo du pilote souhaité':'Preferred teammate name','Pseudo du coéquipier souhaité':'Preferred teammate name','Pseudo pilote':'Driver name','Pilote Discord':'Discord driver','Souhaite rouler avec :':'Wants to race with:',
   'Aucune préférence renseignée':'No preference provided','ce pilote':'this driver',
-  'Choisis un ou plusieurs modèles, ou coche « Peu importe la voiture ». Ces souhaits aident les organisateurs à former les équipages.':'Choose one or more cars, or select “Any car”. These preferences help organizers form crews.',
+  'Choisis un ou plusieurs modèles, ou coche « Peu importe la voiture ». Ces souhaits aident à former les équipages.':'Choose one or more cars, or select “Any car”. These preferences help form crews.',
   'ENREGISTRER':'SAVE','INSCRIRE LE PILOTE':'REGISTER DRIVER','S’INSCRIRE':'REGISTER','Supprimer l’inscription':'Delete entry','Se désinscrire':'Withdraw','Fermer':'Close',
   'Disponibilité':'Availability','Disponible':'Available','Non sélectionné':'Not selected','DÉPART':'START','ARRIVÉE':'FINISH',
   'Informations générales':'General information','Nom de l’événement':'Event name','Durée de la course':'Race duration','Type d’événement':'Event type',

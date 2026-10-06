@@ -20,7 +20,7 @@ function sentence(item) {
     case 'crew_start': return `Ton équipage ${crew} a choisi son départ`;
     case 'crew_car': return item.car ? `Ton équipage ${crew} roulera en ${b(item.car)}` : `Ton équipage ${crew} n’a plus de voiture choisie`;
     case 'withdrawn': return `${b(item.pilot)} s’est désinscrit : une place se libère dans ton équipage ${crew}`;
-    case 'removed_by': return `${item.by ? b(item.by) : 'Un organisateur'} a retiré ton inscription`;
+    case 'removed_by': return `${item.by ? b(item.by) : 'Un admin'} a retiré ton inscription`;
     case 'race_changed': {
       const what = (item.changes || []).map(key => CHANGES[key]).filter(Boolean);
       return `La course a été modifiée${what.length ? ` : ${esc(what.join(', '))}` : ''}${item.previousName ? ` (ancien nom : ${esc(item.previousName)})` : ''}`;

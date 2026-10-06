@@ -1,12 +1,12 @@
-// Standalone help page: the help content adapts to the connected pilot's role.
+// Standalone help page: the help follows the connected pilot's rights and the community's modules.
 async function renderStandaloneHelp() {
-  let user = null;
+  let session = null;
   try {
     const response = await fetch('/api/session', {credentials:'same-origin', cache:'no-store'});
-    if (response.ok) user = (await response.json()).user || null;
+    if (response.ok) session = await response.json();
   } catch {}
-  const module = await import('../help.js?v=3-session-role');
-  module.renderHelp(user);
+  const module = await import('../help.js?v=4-site-tour');
+  module.renderHelp(session);
 }
 
 void renderStandaloneHelp();

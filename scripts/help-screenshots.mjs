@@ -1,8 +1,9 @@
 // Regenerates the help screenshots (images/help/*.jpg) from a local `wrangler dev` with the showcase data
-// (server/demo.mjs: « 6h de Spa » with crews, drivers without a crew and free starts).
-// Data: `npm run seed:local` (scripts/seed-local.mjs), with `wrangler dev` stopped, then restart it.
+// (server/demo.mjs: « 6h de Spa » with crews, drivers without a crew and free starts, « Sprint GT3 du jeudi »).
+// Data: `npm run seed:local` (scripts/seed-local.mjs), with `wrangler dev` stopped, then restart it with
+// `npx wrangler dev --var ADMIN_DISCORD_IDS:100000000000000001` (Max is then an admin).
 // Usage: node scripts/help-screenshots.mjs [baseURL]   (default http://localhost:8787)
-// Uses the locally installed Chrome through Playwright: nothing is downloaded.
+// Uses the locally installed Chrome through Playwright (or CHROME_PATH): nothing is downloaded.
 import {chromium} from 'playwright';
 import {mkdir} from 'node:fs/promises';
 
@@ -12,7 +13,7 @@ const SESSIONS = {pilot:'b'.repeat(64), admin:'a'.repeat(64)};
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
 
 await mkdir(OUT, {recursive:true});
-const browser = await chromium.launch({channel:'chrome', headless:true});
+const browser = await chromium.launch(process.env.CHROME_PATH ? {executablePath:process.env.CHROME_PATH, headless:true} : {channel:'chrome', headless:true});
 
 async function pageAs(role, width = 1280, height = 900) {
   const context = await browser.newContext({viewport:{width, height}, deviceScaleFactor:1, locale:'fr-FR', timezoneId:'Europe/Paris'});
@@ -20,11 +21,12 @@ async function pageAs(role, width = 1280, height = 900) {
   await context.addInitScript(token => {
     document.cookie = `__Host-em_session=${token}; path=/; secure`;
     try { localStorage.setItem('endurance_manager_locale', 'fr'); } catch {}
-    // The local dev banner is not part of the real site.
-    document.addEventListener('DOMContentLoaded', () => document.querySelector('.dev-site-banner')?.remove());
+    // The local test banner is not part of the real site.
+    document.addEventListener('DOMContentLoaded', () => document.querySelectorAll('.dev-site-banner, .test-site-banner').forEach(item => item.remove()));
   }, SESSIONS[role]);
-  const page = await context.newPage();
-  return page;
+  // Without internet access (OFFLINE_MAPS=1), the circuit drawings are replaced by the local placeholder.
+  if (process.env.OFFLINE_MAPS) await context.route('https://commons.wikimedia.org/**', route => route.fulfill({path:new URL('../images/circuits/track-placeholder.svg', import.meta.url).pathname, contentType:'image/svg+xml'}));
+  return context.newPage();
 }
 
 async function shot(locator, name, options = {}) {
@@ -44,130 +46,80 @@ async function shotTop(page, locator, name, maxHeight) {
   console.log('✓', name);
 }
 
-async function openRace(page, name) {
-  await page.goto(`${BASE}/lmu/`, {waitUntil:'networkidle'});
+async function openRace(page, name, list = '') {
+  await page.goto(`${BASE}/lmu/${list}`, {waitUntil:'networkidle'});
   await page.locator('.race-card', {hasText:name}).first().click();
   await page.waitForSelector('.race-header');
   await wait(500);
 }
 
-async function firstFreeDeparture(page) {
-  // A start where the pilot is not registered yet: its main action is "S'inscrire".
-  return page.locator('.departure-fold').filter({has:page.locator('button', {hasText:/^S’inscrire$/})}).first();
-}
-
-// ---------- Pilot views ----------
+// ---------- Pilot views (Leo) ----------
 {
   const page = await pageAs('pilot');
   await page.goto(`${BASE}/lmu/`, {waitUntil:'networkidle'});
   await wait(600);
-  await shot(page.locator('.site-nav-shell'), 'pilot-navigation');
-  await shotTop(page, page.locator('#app'), 'pilot-events', 640);
+  await shot(page.locator('.site-nav-shell'), 'nav');
+  await shotTop(page, page.locator('#app'), 'endurance-list', 560);
 
   await openRace(page, '6h de Spa');
-  await shot(page.locator('.race-header'), 'pilot-race');
-  const withCrews = page.locator('.departure-accordion > .departure-fold:has(.crew-card-shell)').first();
-  if (!(await withCrews.evaluate(el => el.open))) await withCrews.locator(':scope > summary').click();
+  await shot(page.locator('.planning-start').first().locator('xpath=..'), 'endurance-starts');
+  // A start with a crew, opened: its crews and the drivers without a crew.
+  const withCrew = page.locator('.planning-start:has(.crew-card-shell)').last();
+  if (!(await withCrew.evaluate(el => el.open))) await withCrew.locator(':scope > summary').click();
   await wait(400);
-  // Overview with several crews: a start already begun (under "Départs passés") when there is one, else the open start.
-  const pastFold = page.locator('.past-departures-fold');
-  if (await pastFold.count()) {
-    if (!(await pastFold.evaluate(el => el.open))) await pastFold.locator(':scope > summary').click();
-    const pastStart = pastFold.locator('.departure-fold').first();
-    if (!(await pastStart.evaluate(el => el.open))) await pastStart.locator(':scope > summary').click();
-    await wait(400);
-    await shot(pastStart.locator('.ux-course-crews-block'), 'pilot-crews');
-  } else await shot(withCrews.locator('.ux-course-crews-block'), 'pilot-crews');
-  const tile = withCrews.locator('.crew-card-shell details').first();
-  if (await tile.count()) {
-    if (!(await tile.evaluate(el => el.open))) await tile.locator(':scope > summary').first().click();
-    await wait(400);
-    await shot(withCrews.locator('.crew-card-shell').first(), 'pilot-crew-open');
-  }
-  const pilots = withCrews.locator('.ux-course-pilots-accordion');
-  if (!(await pilots.evaluate(el => el.open))) await pilots.locator(':scope > summary').click();
+  const tile = withCrew.locator('.crew-card-shell details').first();
+  if (await tile.count() && !(await tile.evaluate(el => el.open))) await tile.locator(':scope > summary').first().click();
   await wait(400);
-  await shot(pilots, 'pilot-unassigned');
+  await shot(withCrew, 'crews');
 
-  await openRace(page, '6h de Spa');
-  const free = await firstFreeDeparture(page);
-  await shot(free.locator(':scope > summary'), 'pilot-departure');
-  await free.locator('button', {hasText:/^S’inscrire$/}).click();
-  const sheet = page.locator('.fold-registration:not([hidden]) .registration-sheet');
+  // The entry window, at the hours step.
+  await page.locator('[data-action="my-registration"]').first().click();
+  const sheet = page.locator('.registration-sheet').first();
   await sheet.waitFor();
-  await shot(sheet, 'pilot-register-category');
   await sheet.locator('.category-button').first().click();
   await sheet.locator('.registration-next').click();
   await wait(300);
-  await shot(sheet, 'pilot-register-cars');
   await sheet.locator('label', {hasText:'Peu importe'}).first().click();
   await sheet.locator('.registration-next').click();
   await wait(300);
-  for (const hour of ['h1','h2','h3']) await sheet.locator(`.registration-step:not([hidden]) [data-value="${hour}"]`).click();
+  for (const hour of ['h1', 'h2', 'h3']) await sheet.locator(`.registration-step:not([hidden]) [data-value="${hour}"]`).click();
   await wait(300);
-  await shot(sheet, 'pilot-register-hours');
-  await sheet.locator('.registration-next').click();
-  await wait(300);
-  await shot(sheet, 'pilot-register-summary');
+  await shot(sheet, 'register-hours');
   await sheet.locator('.registration-close-button').click();
 
+  await openRace(page, 'Sprint GT3 du jeudi', '#solo');
+  await shotTop(page, page.locator('#app'), 'event-page', 760);
   await page.context().close();
 }
 
-// ---------- Organizer / administrator views ----------
+// ---------- Admin views (Max) ----------
 {
   const page = await pageAs('admin');
-  await openRace(page, '6h de Spa');
-  await shot(page.locator('.race-header'), 'org-race-actions');
+  // My entries (Max rides in Apex Racing #7 at Spa).
+  await page.goto(`${BASE}/lmu/#inscriptions`, {waitUntil:'networkidle'});
+  await wait(600);
+  await shot(page.locator('.native-my-entry-card').first(), 'my-entries');
 
   await page.goto(`${BASE}/lmu/`, {waitUntil:'networkidle'});
   await page.locator('[data-action="create"]').click();
-  const form = page.locator('form[data-kind="event"]');
+  const form = page.locator('.form-sheet').first();
   await form.waitFor();
   await wait(300);
-  await shot(form, 'org-create-event');
-  await form.locator('[name="eventName"]').fill('6h de Portimão');
-  await form.locator('[name="eventCircuit"]').selectOption('portimao');
-  const next = form.locator('[data-action="event-step"][data-step="next"]');
-  await next.click();
-  await wait(300);
-  await form.locator('[name="eventCategory"]').first().check();
-  await next.click();
-  await wait(300);
-  const start = form.locator('.departure-field').first();
-  await start.locator('input[name="date"]').fill('2026-10-17');
-  await start.locator('select').first().selectOption('20');
-  await wait(200);
-  await shot(form, 'org-create-departures');
+  await shot(form, 'admin-create-endurance');
+  await page.keyboard.press('Escape');
 
-  await openRace(page, '6h de Spa');
-  const departure = page.locator('.departure-fold').first();
-  await departure.locator('button, a', {hasText:'Créer un équipage'}).first().click();
-  const builder = page.locator('[data-crew-builder-overlay] .registration-sheet, [data-crew-builder-overlay] [role="dialog"]').first();
-  await builder.waitFor();
-  await wait(400);
-  await shot(builder, 'org-create-crew');
-  await page.locator('[data-crew-builder-cancel]').first().click();
-
-  await departure.locator('button, a', {hasText:'Inscrire un autre pilote'}).first().click();
-  const other = page.locator('.fold-registration:not([hidden]) .registration-sheet');
-  await other.waitFor();
+  await page.goto(`${BASE}/lmu/#solo`, {waitUntil:'networkidle'});
+  await page.locator('[data-action="create"]').click();
+  const solo = page.locator('.form-sheet').first();
+  await solo.waitFor();
+  await solo.locator('input').first().fill('Sprint du mardi');
   await wait(300);
-  await shot(other, 'org-add-pilot');
-  await other.locator('.registration-close-button').click();
+  await shot(solo, 'admin-create-event');
 
-  // My entries (the pilot seed account has none; the page looks the same for every role).
-  await page.goto(`${BASE}/lmu/`, {waitUntil:'networkidle'});
-  await page.locator('.nav-section-button', {hasText:'Mes inscriptions'}).click();
-  await page.waitForSelector('.native-my-entry-card');
-  await wait(600);
-  const entry = page.locator('.native-my-entry-card').first();
-  if (!(await entry.evaluate(el => el.open))) await entry.locator(':scope > summary').click();
-  await wait(400);
-  await shot(entry, 'pilot-my-entries');
   await page.goto(`${BASE}/members.html`, {waitUntil:'networkidle'});
-  await wait(600);
-  await shotTop(page, page.locator('.members-panel'), 'admin-members', 460);
+  await page.locator('.admin-nav', {hasText:'Modules'}).click();
+  await wait(500);
+  await shot(page.locator('.admin-shell'), 'admin-modules');
   await page.context().close();
 }
 
