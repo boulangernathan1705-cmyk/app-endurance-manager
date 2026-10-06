@@ -141,6 +141,38 @@ await cp(root + 'shared', new URL('shared/', out), {recursive: true});
 // The LMU sync program (connectors/lmu-sync, built with `npm run build:sync`): the server adds the pilot's key at download.
 await cp(root + 'downloads', new URL('downloads/', out), {recursive: true});
 
+// Module preloads: each page lists every module its scripts import (and their own imports), so the browser
+// fetches them all at once instead of discovering them one level at a time.
+const staticImportPattern = /(?:^|[;\n])\s*(?:import|export)\s*(?:[\w*{}\s,$]+\s*from\s*)?['"]([^'"]+)['"]/g;
+async function moduleGraph(entries) {
+  const seen = new Set(), queue = [...entries];
+  while (queue.length) {
+    const url = queue.shift();
+    if (seen.has(url)) continue;
+    seen.add(url);
+    let source;
+    try { source = await readFile(new URL('.' + new URL(url, 'https://site.invalid').pathname, out), 'utf8'); } catch { continue; }
+    for (const [, specifier] of source.matchAll(staticImportPattern)) {
+      if (!/^\.{0,2}\//.test(specifier)) continue;
+      const resolved = new URL(specifier, new URL(url, 'https://site.invalid'));
+      queue.push(resolved.pathname + resolved.search);
+    }
+  }
+  for (const entry of entries) seen.delete(entry);
+  return [...seen];
+}
+async function addModulePreloads(file) {
+  const target = new URL(file, out);
+  const html = await readFile(target, 'utf8');
+  const entries = [...html.matchAll(/<script\b[^>]*\btype=["']module["'][^>]*\bsrc=["'](\/[^"']+)["'][^>]*><\/script>/g)].map(match => match[1]);
+  const modules = await moduleGraph(entries);
+  if (!modules.length) return;
+  const links = modules.map(url => `<link rel="modulepreload" href="${url}">`).join('\n');
+  await writeFile(target, html.replace('</head>', `${links}\n</head>`));
+}
+for (const file of ['index.html', 'members.html', 'diagnostics.html', 'help.html', 'demande-communaute.html', 'entrainement.html', 'stands.html',
+  'lmu/index.html', 'iracing/index.html', 'privacy.html', 'legal.html', 'about.html', 'circuit-credits.html', 'changelog.html']) await addModulePreloads(file);
+
 if (!workers) {
   await copyFile(root + 'server/worker.mjs', new URL('_worker.js', out));
   await writeFile(new URL('_routes.json', out), JSON.stringify({version: 1, include: ['/api/*','/telemetry/*'], exclude: []}, null, 2) + '\n');

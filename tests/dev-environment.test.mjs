@@ -9,8 +9,9 @@ const page = () => new Response('<html><body><main>ok</main></body></html>', {he
 test('only the dev configuration marks the site as a test version', () => {
   const dev = read('wrangler.jsonc');
   assert.equal(dev.vars.SITE_ENV, 'development');
-  // Pages go through the worker on dev, which then needs the static files binding.
-  assert.equal(dev.assets.run_worker_first, true);
+  // Pages go through the worker on dev, which then needs the static files binding (static files are served directly).
+  assert.ok(dev.assets.run_worker_first.includes('/*'));
+  assert.ok(dev.assets.run_worker_first.every(route => route === '/*' || /^!\/(?:front|shared|images)\/\*$|^!\/[\w-]+\.(?:js|css)$/.test(route)));
   assert.equal(dev.assets.binding, 'ASSETS');
   assert.equal(read('wrangler.prod.jsonc').vars.SITE_ENV, undefined);
 });
