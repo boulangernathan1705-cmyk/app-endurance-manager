@@ -13,11 +13,6 @@ import {isDevelopment} from './dev-environment.mjs';
 import {communityAccess, requirePermission, displayRole, PERMISSIONS, ALL_PERMISSIONS, DEFAULT_EVERYONE, normalizePermissions, discordGuild, keepDiscordLook, memberPermissions, refreshCommunityMembers} from './access.mjs';
 // Solo races: a module each community turns on or off (settings of the members page).
 const soloRacesEnabled = (env, community) => community?.modules?.soloRaces === true;
-// Name of the events calendar tab, chosen by each community (« EVENT TDZ »).
-// Event types of the community calendar (« SAFE », « Bouboule »…), chosen when creating an event.
-// The events module is the Tondeuz' EVENT TDZ: its name and its types are fixed.
-const eventTypes = () => TDZ_EVENT_TYPES;
-const eventsLabel = () => TDZ_EVENTS_LABEL;
 import {syncIracingEvents} from './iracing-import.mjs';
 import {resetShowcase} from './demo.mjs';
 import {syncWeeklyDiscord, sendRecapTest, usesSiteRecap, WEBHOOK_URL} from './discord-weekly.mjs';
@@ -267,14 +262,22 @@ async function listEvents(env, actor, game='', scope='', community) {
         if (format==='solo' && capacity) availability.forEach((reg,index)=>{ reg.waitlistPosition=index>=capacity?index-capacity+1:null; });
         // Rounds with their own places: the same, round by round (a pilot skipping a round takes no place in it).
         const rounds=format==='solo'?JSON.parse(row.rounds||'[]'):[];
-        if (rounds.some(round=>round.capacity)) {
+        if (rounds.length>1 && rounds.some(round=>round.capacity)) {
           const counts=rounds.map(()=>0);
           availability.forEach(reg=>{ reg.roundWaitlist=rounds.map((round,index)=>{ if(reg.roundChoices?.[index]?.skip)return null; counts[index]++; return round.capacity&&counts[index]>round.capacity?counts[index]-round.capacity:null; }); });
         }
         // endsAt: the real finish (2 h 30 ends 30 min into the third presence slot).
         return {...d, endsAt:d.startsAt+durationMinutes*60000, availability, crews:crewsByDeparture.get(`${row.id}:${d.id}`) || []};
       })};
-  });
+  }).map(event => hidePassword(event, actor));
+}
+// The server password of an event: only for its entered pilots and for those who manage the races.
+function hidePassword(event, actor) {
+  if (!event.details?.password || can(actor, 'manage_races')) return event;
+  const entered = event.departures.some(departure => departure.availability.some(reg => reg.mine && reg.status !== 'unavailable'));
+  if (entered) return event;
+  const {password, ...details} = event.details;
+  return {...event, details};
 }
 async function oauthStart(request, env) {
   requireDiscord(env); await rateLimit(request, env, 'oauth', 20); await cleanup(env);
@@ -360,7 +363,7 @@ async function api(request, env) {
   // Requests for a new community: sent by anyone signed in with Discord, from any site (server/community-requests.mjs).
   const requests = await communityRequestsApi(path, method, request, env, actor);
   if (requests) return requests;
-  if (path === '/api/session' && method === 'GET') return json({user:actor.user, discordReady:!!(env.DISCORD_CLIENT_ID && env.DISCORD_CLIENT_SECRET), adminConfigured:administrators(env).length > 0, soloRaces:soloRacesEnabled(env, community), soloLabel:eventsLabel(community), eventTypes:eventTypes(community), training:community.modules?.training === true,
+  if (path === '/api/session' && method === 'GET') return json({user:actor.user, discordReady:!!(env.DISCORD_CLIENT_ID && env.DISCORD_CLIENT_SECRET), adminConfigured:administrators(env).length > 0, soloRaces:soloRacesEnabled(env, community), soloLabel:TDZ_EVENTS_LABEL, eventTypes:TDZ_EVENT_TYPES, training:community.modules?.training === true, safeGuideUrl:community.modules?.safeGuideUrl || '',
     // Training shows in the bar only for a pilot entered in an upcoming LMU race; the circuit memo always.
     trainingRace:community.modules?.training === true && access.status === 'member' && !!actor.user && !!(await nextRace(env, actor.user.id)),
     community:{id:community.id, slug:community.slug, name:community.name, shortName:community.shortName, discordInviteUrl:community.discordInviteUrl, appearance:appearanceOf(community)},
@@ -619,7 +622,10 @@ async function api(request, env) {
   if (absenceMatch && ['PUT','DELETE'].includes(method)) {
     const event = await eventById(env, absenceMatch[1], community);
     if (!actor.user) fail(401, 'Connecte-toi avec Discord.');
+    // After the last start, nothing changes any more; « Absent » is for those who could enter.
+    if (Math.max(...JSON.parse(event.departures || '[]').map(d => Number(d.startsAt) || 0)) <= Date.now()) fail(409, 'Cet événement est passé.');
     if (method === 'DELETE') { await env.DB.prepare('DELETE FROM event_absences WHERE event_id=? AND user_id=? AND community_id=?').bind(event.id, actor.user.id, community.id).run(); return json({ok:true}); }
+    if (!(event.format === 'solo' ? can(actor, 'solo_open') || can(actor, 'solo_safe') : can(actor, 'endurance'))) fail(403, 'Tu n’as pas l’autorisation de t’inscrire à cet événement.');
     if (await env.DB.prepare("SELECT 1 FROM registrations WHERE event_id=? AND user_id=? AND community_id=? AND COALESCE(status,'')!='unavailable' LIMIT 1").bind(event.id, actor.user.id, community.id).first())
       fail(409, 'Tu es inscrit à cet événement : retire d’abord ton inscription.');
     await env.DB.prepare('INSERT OR IGNORE INTO event_absences(event_id,user_id,community_id,created_at) VALUES(?,?,?,?)').bind(event.id, actor.user.id, community.id, now()).run();
@@ -750,7 +756,7 @@ async function api(request, env) {
       administrator:role.administrator, permissions:saved.has(role.id) ? normalizePermissions(saved.get(role.id)) : (role.id === community.discordGuildId ? [...DEFAULT_EVERYONE] : [])}));
     await keepDiscordLook(env, community, discord);
     return json({community:{name:community.name, shortName:community.shortName, discordServer:discord?.name || null, ...appearanceOf(community)}, roles, permissions:PERMISSIONS,
-      modules:{iracingImport:community.modules.iracingImport === true, discordWeekly:community.modules.discordWeekly === true, soloRaces:community.modules.soloRaces === true, eventsLabel:eventsLabel(community), eventTypes:eventTypes(community),
+      modules:{iracingImport:community.modules.iracingImport === true, discordWeekly:community.modules.discordWeekly === true, soloRaces:community.modules.soloRaces === true, eventsLabel:TDZ_EVENTS_LABEL, eventTypes:TDZ_EVENT_TYPES,
         crewChannels:community.modules.crewChannels === true, raceReminders:community.modules.raceReminders === true, training:community.modules.training === true},
       crews:await crewDiscordState(env, community)});
   }
@@ -801,6 +807,12 @@ async function api(request, env) {
     const modules = {...community.modules};
     // The Discord recap is set on the « Mise en place » page (its own webhook), not here.
     for (const key of ['iracingImport','soloRaces','raceReminders','training']) if (typeof input[key] === 'boolean') modules[key] = input[key];
+    // EVENT TDZ: the Discord channel that explains how to become SAFE (a button for the pilots who are not).
+    if (typeof input.safeGuideUrl === 'string') {
+      const url = input.safeGuideUrl.trim();
+      if (url && (url.length > 200 || !/^https:\/\/((ptb\.|canary\.)?discord\.com|discord\.gg)\//.test(url))) fail(400, 'Colle le lien d’un salon Discord (clic droit sur le salon → Copier le lien).');
+      modules.safeGuideUrl = url;
+    }
     const statements = [];
     // Crews on Discord (server/crew-discord.mjs): only once the bot has the rights to make the channels.
     if (typeof input.crewChannels === 'boolean') {

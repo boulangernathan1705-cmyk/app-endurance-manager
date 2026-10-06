@@ -196,7 +196,9 @@ function modulesMarkup(settings, setup) {
     {key:'iracingImport', name:'Endurances iRacing officielles', text:'Les séries en équipe et les événements spéciaux importés automatiquement.',
       state:states.iracingImport ? ['ok', 'Actif'] : ['off', 'Éteint'], control:toggle('iracingImport', 'Endurances iRacing officielles'), settings:''},
     {key:'soloRaces', name:'EVENT TDZ', text:'Le calendrier des Tondeuz, toutes simus : places limitées, liste d’attente, types OPEN, SAFE, Bouboule…',
-      state:states.soloRaces ? ['ok', 'Actif'] : ['off', 'Éteint'], control:toggle('soloRaces', 'EVENT TDZ'), settings:''},
+      state:states.soloRaces ? ['ok', 'Actif'] : ['off', 'Éteint'], control:toggle('soloRaces', 'EVENT TDZ'),
+      settings:`<form class="settings-safe-guide" data-safe-guide><label>Salon Discord « Comment devenir SAFE »<input name="url" type="url" maxlength="200" placeholder="https://discord.com/channels/…" value="${esc(settings.modules.safeGuideUrl || '')}"></label>
+        <div class="settings-actions"><button class="primary-button" type="submit">Enregistrer</button><span class="settings-status" aria-live="polite"></span></div></form>`},
     {key:'training', name:'Entraînement', text:'Page « Mon entraînement » : programme guidé, séance du jour et conseils tirés des séances LMU de chaque pilote.',
       state:states.training ? ['ok', 'Actif'] : ['off', 'Éteint'], control:toggle('training', 'Entraînement'), settings:''}];
   const tile = item => `<article class="admin-module ${states[item.key] ? 'is-on' : ''}" data-module-tile="${item.key}">
@@ -513,6 +515,15 @@ app.addEventListener('input', event => {
 });
 
 app.addEventListener('submit', async event => {
+  const safeGuide = event.target.closest('form[data-safe-guide]');
+  if (safeGuide) {
+    event.preventDefault();
+    const status = safeGuide.querySelector('.settings-status');
+    status.textContent = 'Enregistrement…';
+    try { await api('/api/community/modules', 'PATCH', {safeGuideUrl:safeGuide.elements.url.value}); await reload('modules', {module:'soloRaces'}); }
+    catch (error) { status.textContent = error.message; }
+    return;
+  }
   const showcaseForm = event.target.closest('form[data-showcase]');
   if (showcaseForm) {
     event.preventDefault();

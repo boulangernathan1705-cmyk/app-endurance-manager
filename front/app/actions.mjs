@@ -12,6 +12,13 @@ import {installRouter,routeFromLocation,applyRoute} from './router.mjs';
 import {installAutoRefresh} from './auto-refresh.mjs';
 import {introduceCommunitiesOnce} from '../community-intro.mjs';
 
+// After an entry: the place on the waiting list when the event (or the round) is full.
+function enteredMessage(eventId,departureId,round,done){
+  const reg=state.events.find(item=>item.id===eventId)?.departures.find(item=>item.id===departureId)?.availability?.find(item=>item.mine&&item.status!=='unavailable');
+  const position=round==null?reg?.waitlistPosition:reg?.roundWaitlist?.[round]||reg?.waitlistPosition;
+  return position?`C’est complet : tu es en liste d’attente (${position}${position===1?'er':'e'}).`:done;
+}
+
 // The registration panel opens over the race: move keyboard and screen-reader focus into it.
 function revealRegistration(departureId){
   // The first entry: how communities work, explained once.
@@ -110,8 +117,8 @@ async function perform(action,target){
     case 'refresh': await refresh(); break;
     case 'open': state.currentEventId=target.dataset.id; state.selectedDepartureId=target.dataset.departure||null; state.eventSection='race'; state.drafts={}; state.pendingCrewJoin=null; state.registrationOpen.clear(); renderEvent(); break;
     case 'event-section': state.eventSection='race'; renderEvent(); break;
-    case 'my-registration': { state.pendingCrewJoin=null; state.selectedDepartureId=target.dataset.departure; const oneClick=event?.departures.find(item=>item.id===target.dataset.departure); if(oneClick&&canEnterInOneClick(event,oneClick)){await enterInOneClick(event,oneClick,api); await refreshAfterSave('Tu es inscrit.'); break;} delete state.drafts[state.selectedDepartureId]; state.registrationOpen.add(state.selectedDepartureId); renderEvent(); revealRegistration(state.selectedDepartureId); break; }
-    case 'round-enter': { const departure=event.departures.find(item=>item.id===target.dataset.departure); state.selectedDepartureId=departure.id; if(await enterRound(event,departure,Number(target.dataset.round),api)){await refreshAfterSave('Tu es inscrit à cette manche.');break;} renderEvent(); revealRegistration(departure.id); break; }
+    case 'my-registration': { state.pendingCrewJoin=null; state.selectedDepartureId=target.dataset.departure; const oneClick=event?.departures.find(item=>item.id===target.dataset.departure); if(oneClick&&canEnterInOneClick(event,oneClick)){await enterInOneClick(event,oneClick,api); await refreshAfterSave(()=>enteredMessage(event.id,oneClick.id,null,'Tu es inscrit.')); break;} delete state.drafts[state.selectedDepartureId]; state.registrationOpen.add(state.selectedDepartureId); renderEvent(); revealRegistration(state.selectedDepartureId); break; }
+    case 'round-enter': { const departure=event.departures.find(item=>item.id===target.dataset.departure); state.selectedDepartureId=departure.id; if(await enterRound(event,departure,Number(target.dataset.round),api)){await refreshAfterSave(()=>enteredMessage(event.id,departure.id,Number(target.dataset.round),'Tu es inscrit à cette manche.'));break;} renderEvent(); revealRegistration(departure.id); break; }
     case 'round-edit': { const departure=event.departures.find(item=>item.id===target.dataset.departure); state.selectedDepartureId=departure.id; editRound(event,departure,Number(target.dataset.round)); renderEvent(); revealRegistration(departure.id); break; }
     case 'round-skip': { const departure=event.departures.find(item=>item.id===target.dataset.departure); if(await skipRound(event,departure,Number(target.dataset.round),api))await refreshAfterSave('Tu es désinscrit de cette manche.'); break; }
     case 'event-absence': await api(`/api/events/${target.dataset.id}/absence`,'PUT'); await refreshAfterSave('C’est noté : tu seras absent.'); break;
@@ -212,7 +219,7 @@ document.addEventListener('endurance:refresh',()=>{refresh().catch(showError);})
 // Registration panel: Enter moves to the next step, Escape or a click beside the panel closes it.
 document.addEventListener('submit',event=>{const form=event.target;if(form.matches?.('[data-kind="registration"].registration-stepper,[data-kind="event"].event-stepper')&&form.dataset.step!==(form.dataset.lastStep||'4')){event.preventDefault();event.stopImmediatePropagation();form.querySelector('.registration-next')?.click();}},true);
 document.addEventListener('click',event=>{if(event.target.matches?.('.fold-registration'))event.target.querySelector('.registration-close-button')?.click();});
-document.addEventListener('keydown',event=>{if(event.key!=='Escape'||document.querySelector('[data-ux-error-modal]'))return;document.querySelector('.fold-registration:not([hidden]) .registration-close-button')?.click();});
+document.addEventListener('keydown',event=>{if(event.key!=='Escape'||document.querySelector('[data-ux-error-modal]'))return;document.querySelector('.fold-registration:not([hidden]) .registration-close-button, .form-sheet [data-action="close-form"]')?.click();});
 document.addEventListener('toggle',event=>{const details=event.target;if(details instanceof HTMLDetailsElement&&details.matches('.crew-unified-card[data-crew],.crew-management-accordion[data-crew]'))details.open?state.crewManagementOpen.add(details.dataset.crew):state.crewManagementOpen.delete(details.dataset.crew);},true);
 document.addEventListener('click',async event=>{const target=event.target.closest?.('[data-action]');if(!target||target.disabled)return;if(target.dataset.action==='edit-crew')return;event.preventDefault();if(state.busy&&target.dataset.action!=='dismiss-error')return;state.busy=true;target.disabled=true;try{await perform(target.dataset.action,target);}catch(error){showError(error);}finally{state.busy=false;if(target.isConnected)target.disabled=false;updateRemoveButtons();}});
 document.addEventListener('submit',async event=>{const form=event.target;if(!form.dataset.kind)return;event.preventDefault();if(state.busy)return;state.busy=true;const submit=form.querySelector('[type="submit"]');if(submit)submit.disabled=true;try{if(form.dataset.kind==='event')await submitEvent(form);else if(form.dataset.kind==='solo-event')await submitSoloEvent(form);else if(form.dataset.kind==='registration'){const departureId=form.dataset.departure;const result=await submitRegistration(form,api);if(!(await finishPendingCrewJoin(departureId,result.id)))await refreshAfterSave('Inscription enregistrée.');}}catch(error){showError(error);}finally{state.busy=false;if(submit?.isConnected)submit.disabled=false;}});

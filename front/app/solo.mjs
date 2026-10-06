@@ -26,13 +26,6 @@ export function eventCircuitName(event, id) {
   return (sim !== 'lmu' && id) || 'Circuit à préciser';
 }
 
-// "Circuit de Spa-Francorchamps · 20 min + Circuit aléatoire · 20 min"
-export function soloRoundsLabel(event) {
-  const rounds = event.rounds || [];
-  if (!rounds.length) return esc(eventCircuitName(event, event.circuit));
-  return rounds.map(round => `${esc(eventCircuitName(event, round.circuit))} · ${Number(round.durationMinutes) || 0} min`).join(' + ');
-}
-
 // Line icons of the calendar card.
 const ICONS = {
   time: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
@@ -144,6 +137,12 @@ export function soloEntryBlock(event) {
   if (event.access === 'safe' && !can('solo_safe')) return 'Événement réservé aux pilotes SAFE.';
   if (!can('solo_safe') && !can('solo_open')) return 'Tu n’as pas accès aux événements de cette communauté.';
   return '';
+}
+
+// A SAFE event, the pilot is not SAFE: a button to the Discord channel that explains how to become SAFE.
+export function safeGuideLink(event) {
+  if (event.access !== 'safe' || can('solo_safe') || !state.safeGuideUrl || !state.user) return '';
+  return `<a class="planning-quick-button is-labelled is-safe-guide" href="${esc(state.safeGuideUrl)}" target="_blank" rel="noopener"><span class="planning-quick-label">Comment devenir SAFE</span></a>`;
 }
 
 export function myWaitlistPosition(departure) {

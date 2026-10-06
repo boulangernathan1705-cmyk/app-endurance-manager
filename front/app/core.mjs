@@ -211,6 +211,7 @@ export async function load() {
   if (typeof session.soloLabel==='string' && session.soloLabel) state.soloLabel=session.soloLabel;
   state.eventTypes=Array.isArray(session.eventTypes)?session.eventTypes:[];
   state.training=session.training===true; state.trainingRace=session.trainingRace===true;
+  state.safeGuideUrl=typeof session.safeGuideUrl==='string'?session.safeGuideUrl:'';
   if (!state.soloRaces) state.listFormat='endurance';
   state.events=markUndefinedStarts(mergeEvents(upcoming,archived));
   // The members list rarely changes: fetch it once per session instead of on every refresh.
