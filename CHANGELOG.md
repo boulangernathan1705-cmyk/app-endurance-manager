@@ -2,6 +2,34 @@
 
 Les changements du site, version par version. La plus récente est en haut.
 
+## v1.14 — 6 octobre 2026
+
+### EVENT TDZ (nouveau module)
+- Un **calendrier des événements toutes simus** : LMU, iRacing, AMS2 et ACE, chacune avec sa couleur.
+- **M'inscrire** en un clic, ou **Absent** ; par manche quand l'événement en a plusieurs, avec des places par manche.
+- Événements **OPEN** ou **SAFE** : l'accès suit les autorisations de ton rôle.
+- Quand le module est actif, il devient la page d'accueil ; **ENDURANCE** te demande une fois LMU ou iRacing.
+
+### Endurances
+- **Absent** à côté de **M'inscrire** sur chaque départ.
+- **Me désinscrire** est en rouge quand tu es inscrit.
+
+### Autorisations des rôles
+- Cinq cases claires : **Endurances**, **Events OPEN**, **Events SAFE**, **Équipages** et **Administrer**.
+- Créer et gérer les courses, et inscrire un autre pilote, font partie d'**Administrer**.
+
+### Salons d'équipage sur Discord
+- **Un seul salon vocal par équipage**, nommé avec la simu et l'équipage. Son chat reçoit le récap et les rappels 24 h et 1 h avant.
+- Il est supprimé **2 h après la course**, une fois vide.
+- À l'activation, l'admin choisit la **catégorie Discord** des vocaux. Le module dit ce qui bloque s'il ne peut pas s'activer.
+
+### Navigation
+- La **même barre** en haut de chaque page ; l'administration se lit mieux sur téléphone.
+- L'**aide** est à jour.
+
+### Rapidité
+- Le site est **plus léger** : moins de requêtes, et une page laissée ouverte arrête de se rafraîchir après 15 min sans geste.
+
 ## v1.13 — 4 octobre 2026
 
 ### Administration

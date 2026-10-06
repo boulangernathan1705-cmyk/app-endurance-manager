@@ -75,7 +75,7 @@ test('la page événement garde les actions événement séparées des actions �
   assert.match(crews,/crew-section-create/);
   // Background refresh replaced the manual "Actualiser" button; sharing comes first.
   assert.doesNotMatch(eventView,/button\('refresh'/);
-  const share=eventView.indexOf("button('share-event','Copier le lien de la course'");
+  const share=eventView.indexOf("button('share-event','Copier le lien'");
   const edit=eventView.indexOf("button('edit-event','Modifier l’événement'");
   const remove=eventView.indexOf("button('delete-event',`${trash}<span>Supprimer l’événement</span>`");
   // Deletion is a discreet red link, not a button with the same weight as the others.
@@ -133,7 +133,7 @@ test('Équipages est intégré directement dans chaque départ avec actions pilo
   const eventView=read('front/app/event-view.mjs');
   assert.doesNotMatch(eventView,/event-section','Équipages'/);
   assert.match(eventView,/renderPilots\(event,departure\);/);
-  assert.match(eventView,/Créer mon équipage/);
+  assert.match(eventView,/Créer un équipage/);
   assert.match(eventView,/data-crew-builder-open/);
   assert.match(crews,/crew-unified-card/);
   assert.match(crews,/crew-card-shell/);
@@ -146,19 +146,18 @@ test('Équipages est intégré directement dans chaque départ avec actions pilo
   assert.match(crews,/logo\(crew\.category\)/);
 });
 
-test('l’aide décrit les droits pilote organisateur et administrateur actuels',()=>{
+test('l’aide décrit les 5 autorisations et les écrans actuels',()=>{
   const help=read('help.js');
-  assert.match(help,/créer ton équipage, rejoindre ou quitter un équipage de ta catégorie/);
-  assert.match(help,/gérer l’équipage dont tu es responsable/);
-  // Organizer rights come from the permissions of the Discord roles (server/access.mjs).
-  assert.match(help,/avec <strong>Créer des courses<\/strong> : créer des courses, modifier et supprimer les tiennes/);
-  assert.match(help,/créer, composer et fermer tous les équipages/);
-  assert.match(help,/Tu ne peux pas[\s\S]*donner des rôles : ils se donnent sur le serveur Discord/);
+  // The five permissions of a Discord role (server/access.mjs), no more « organisateur ».
+  for(const key of ['endurance','solo_open','solo_safe','crews','admin'])assert.match(help,new RegExp(`\\['${key}', L\\(`));
+  assert.doesNotMatch(help,/[Oo]rganisateur|Créer des courses|Gérer toutes les courses/);
   // No more entries without an account.
   assert.doesNotMatch(help,/lien personnel|sans compte/);
-  // The help follows the current screens: step windows, date format, automatic updates.
+  // The help follows the current screens: one-click entry, Absent, step windows, the 4 parts of Administration.
+  assert.match(help,/<strong>M’inscrire<\/strong>/);
+  assert.match(help,/<strong>Absent<\/strong>/);
   assert.match(help,/4 étapes/);
-  assert.match(help,/Mise à jour automatique/);
+  assert.match(help,/en 4 parties/);
   assert.doesNotMatch(help,/Actualiser/);
 });
 
@@ -241,6 +240,7 @@ test('race page: a race over several days shows its starts as a planning, one co
   assert.deepEqual(days[0].items.map(item => item.departure.time), ['02:00', '22:00'], 'starts of a day in order');
   assert.equal(days[1].items[1].index, 0, 'each start keeps its place in the race (its number)');
   assert.deepEqual(raceDays(starts.slice(1, 3)), [], 'a single day keeps the list of starts');
+  assert.equal(raceDays(starts.slice(1, 3), {minDays:1}).length, 1, 'the event page shows a single day as a planning too');
   assert.deepEqual(raceDays([...starts, {id:'tbd', tbd:true, startsAt:null}]), [], 'a start to define keeps the list');
   const view = readFileSync(new URL('../front/app/event-view.mjs', import.meta.url), 'utf8');
   assert.match(view, /planningDays\(event\)/);

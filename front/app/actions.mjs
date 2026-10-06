@@ -1,15 +1,23 @@
 import {app,state,api,load,loadArchive,showError,countdown,CARS,inCommunity} from './core.mjs';
-import {renderNav,renderHome,toggleRaceFilter,resetRaceFilters} from './home-view.mjs';
+import {renderNav,renderHome,toggleRaceFilter,resetRaceFilters,simChosen,openSimChooser} from './home-view.mjs';
 import {renderEvent,togglePlanningCommunity} from './event-view.mjs';
 import {showPlanningDay,scrollPlanning,goToDeparture,setPlanningSpan,toggleQuickMenu} from './planning.mjs';
 import {renderEventForm,departureFields,updateRemoveButtons,goToEventStep,formDurationMinutes,bulkPreview,shiftBulkWeek} from './event-form.mjs';
 import {renderMyEntries} from './entries-view.mjs';
+import {submitSoloEvent} from './solo-form.mjs';
 import {refresh,refreshAfterSave} from './refresh.mjs';
-import {draftFor,registrationDraft,ownRegistrations,rerenderRegistrationSection,submitRegistration,registrationStep} from './registration.mjs';
+import {draftFor,registrationDraft,ownRegistrations,rerenderRegistrationSection,submitRegistration,registrationStep,canEnterInOneClick,enterInOneClick,enterRound,editRound,skipRound} from './registration.mjs';
 import {updateCrewState,pickSlot} from './crews.mjs';
 import {installRouter,routeFromLocation,applyRoute} from './router.mjs';
 import {installAutoRefresh} from './auto-refresh.mjs';
 import {introduceCommunitiesOnce} from '../community-intro.mjs';
+
+// After an entry: the place on the waiting list when the event (or the round) is full.
+function enteredMessage(eventId,departureId,round,done){
+  const reg=state.events.find(item=>item.id===eventId)?.departures.find(item=>item.id===departureId)?.availability?.find(item=>item.mine&&item.status!=='unavailable');
+  const position=round==null?reg?.waitlistPosition:reg?.roundWaitlist?.[round]||reg?.waitlistPosition;
+  return position?`C’est complet : tu es en liste d’attente (${position}${position===1?'er':'e'}).`:done;
+}
 
 // The registration panel opens over the race: move keyboard and screen-reader focus into it.
 function revealRegistration(departureId){
@@ -20,15 +28,14 @@ function revealRegistration(departureId){
 
 // Moving forward in the step-by-step registration checks the current step first.
 function validateRegistrationStep(draft,step){
-  if(draft.solo){
+  if(draft.soloEvent){
     // Solo race: steps 1..rounds are the rounds (category + car), then the summary.
     if(step===1&&draft.forOther&&!draft.id&&!draft.participantUserId&&!draft.manualOther)throw Error('Choisis un pilote.');
     if(step===1&&draft.manualOther&&!String(draft.name||'').trim())throw Error('Indique le pseudo du pilote.');
-    const choice=draft.choices?.[step-1];
-    if(!choice)return;
-    const where=draft.solo>1?` pour la manche ${step}`:'';
+    const round=draft.shownRounds?.[step-1]??step-1,choice=draft.choices?.[round];
+    if(!choice||choice.skip)return;
+    const where=(draft.shownRounds||[]).length>1?` pour la manche ${round+1}`:'';
     if(!choice.category)throw Error(`Choisis une catégorie${where}.`);
-    if(choice.category!=='*'&&!choice.carAny&&!choice.cars.length)throw Error(`Choisis au moins une voiture${where}, ou « Peu importe la voiture ».`);
     return;
   }
   if(step===1){
@@ -54,16 +61,7 @@ function goToRegistrationStep(event,departure,target){
 
 async function submitEvent(form){
   const data={name:form.elements.eventName.value.trim(),durationMinutes:formDurationMinutes(form),...(form.elements.eventDriverChange?{driverChangeRequired:form.elements.eventDriverChange.checked}:{}),eventType:form.elements.eventType.value,circuit:form.elements.eventCircuit.value,schedulePending:form.elements.eventSchedulePending.checked,categories:[...form.querySelectorAll('[name="eventCategory"]:checked')].map(input=>input.value),departures:[...form.querySelectorAll('.departure-field')].map(row=>({id:row.dataset.id||undefined,date:row.querySelector('[name="date"]').value,time:row.querySelector('[name="time"]').value,tbd:row.dataset.tbd==='true'})),version:state.editingEvent?.version,...(!state.editingEvent&&form.elements.eventOfficial?.checked?{official:true}:{})};
-  const format=form.dataset.format||'endurance';
-  if(format==='solo'){
-    // Solo race: rounds, access and places replace duration, type and circuit.
-    Object.assign(data,{format,access:form.querySelector('[name="eventAccess"]:checked')?.value||'open',capacity:Number(form.elements.eventCapacity.value),
-      rounds:[...form.querySelectorAll('.solo-round')].map((round,index)=>({circuit:round.querySelector('[name="roundCircuit"]').value,durationMinutes:Number(round.querySelector('[name="roundMinutes"]').value),categories:[...form.querySelectorAll(`[name="roundCategory${index}"]:checked`)].map(input=>input.value)}))});
-    data.categories=[...new Set(data.rounds.flatMap(round=>round.categories))];
-    delete data.durationMinutes; delete data.eventType; delete data.circuit;
-    if(data.rounds.some(round=>!round.circuit))throw Error('Choisis le circuit de chaque manche.');
-  }
-  if(!data.categories.length)throw Error('Sélectionne au moins une catégorie.'); if(format!=='solo'&&!data.circuit)throw Error('Sélectionne le circuit de la course.');
+  if(!data.categories.length)throw Error('Sélectionne au moins une catégorie.'); if(!data.circuit)throw Error('Sélectionne le circuit de la course.');
   const editing=!!state.editingEvent; const result=await api(editing?`/api/races/${state.editingEvent.id}`:'/api/races',editing?'PATCH':'POST',data);
   if(editing){state.currentEventId=state.editingEvent.id;state.page='event';}else{state.page='home';state.currentEventId=null;}
   await refreshAfterSave(editing?'Événement modifié.':'Événement créé.',result.id);
@@ -110,7 +108,7 @@ async function perform(action,target){
   const event=state.events.find(item=>item.id===state.currentEventId);
   switch(action){
     case 'dismiss-error': document.querySelector('[data-ux-error-modal]')?.remove(); break;
-    case 'home': if(target.dataset.list)state.listFormat=target.dataset.list; renderHome(); break;
+    case 'home': if(target.dataset.list==='endurance'&&state.soloRaces&&!simChosen()){openSimChooser();break;} if(target.dataset.list)state.listFormat=target.dataset.list; renderHome(); break;
     case 'planning-community': togglePlanningCommunity(target.dataset.community||''); renderEvent(); break;
     case 'race-filter-toggle': state.raceFilterOpen=!state.raceFilterOpen; renderHome(); break;
     case 'race-filter': toggleRaceFilter(target.dataset.group,target.dataset.value); renderHome(); break;
@@ -119,7 +117,12 @@ async function perform(action,target){
     case 'refresh': await refresh(); break;
     case 'open': state.currentEventId=target.dataset.id; state.selectedDepartureId=target.dataset.departure||null; state.eventSection='race'; state.drafts={}; state.pendingCrewJoin=null; state.registrationOpen.clear(); renderEvent(); break;
     case 'event-section': state.eventSection='race'; renderEvent(); break;
-    case 'my-registration': { state.pendingCrewJoin=null; state.selectedDepartureId=target.dataset.departure; delete state.drafts[state.selectedDepartureId]; state.registrationOpen.add(state.selectedDepartureId); renderEvent(); revealRegistration(state.selectedDepartureId); break; }
+    case 'my-registration': { state.pendingCrewJoin=null; state.selectedDepartureId=target.dataset.departure; const oneClick=event?.departures.find(item=>item.id===target.dataset.departure); if(oneClick&&canEnterInOneClick(event,oneClick)){await enterInOneClick(event,oneClick,api); await refreshAfterSave(()=>enteredMessage(event.id,oneClick.id,null,'Tu es inscrit.')); break;} delete state.drafts[state.selectedDepartureId]; state.registrationOpen.add(state.selectedDepartureId); renderEvent(); revealRegistration(state.selectedDepartureId); break; }
+    case 'round-enter': { const departure=event.departures.find(item=>item.id===target.dataset.departure); state.selectedDepartureId=departure.id; if(await enterRound(event,departure,Number(target.dataset.round),api)){await refreshAfterSave(()=>enteredMessage(event.id,departure.id,Number(target.dataset.round),'Tu es inscrit à cette manche.'));break;} renderEvent(); revealRegistration(departure.id); break; }
+    case 'round-edit': { const departure=event.departures.find(item=>item.id===target.dataset.departure); state.selectedDepartureId=departure.id; editRound(event,departure,Number(target.dataset.round)); renderEvent(); revealRegistration(departure.id); break; }
+    case 'round-skip': { const departure=event.departures.find(item=>item.id===target.dataset.departure); if(await skipRound(event,departure,Number(target.dataset.round),api))await refreshAfterSave('Tu es désinscrit de cette manche.'); break; }
+    case 'event-absence': await api(`/api/events/${target.dataset.id}/absence`,'PUT'); await refreshAfterSave('C’est noté : tu seras absent.'); break;
+    case 'event-absence-cancel': await api(`/api/events/${target.dataset.id}/absence`,'DELETE'); await refreshAfterSave('Tu n’es plus noté absent.'); break;
     case 'make-official': { if(!event||!state.manager)break; if(!confirm(`Rendre « ${event.name} » officielle ?\n\nElle sera commune à toutes les communautés : chacune pourra s’y inscrire. Ses inscriptions et équipages restent dans ta communauté. Impossible de revenir en arrière.`))return; await api(`/api/races/${event.id}/official`,'POST',{version:event.version}); await refreshAfterSave('Course rendue officielle.'); break; }
     case 'registration-community': { const departure=event.departures.find(item=>item.id===target.dataset.departure),draft=draftFor(departure); draft.communityId=target.dataset.community||''; state.registrationOpen.add(departure.id); rerenderRegistrationSection(event,departure,'',renderEvent); break; }
     case 'registration-step': { const departure=event.departures.find(item=>item.id===target.dataset.departure); goToRegistrationStep(event,departure,target); break; }
@@ -127,7 +130,7 @@ async function perform(action,target){
     case 'close-registration': if(state.pendingCrewJoin?.departureId===target.dataset.departure)state.pendingCrewJoin=null;state.registrationOpen.delete(target.dataset.departure); renderEvent(); break;
     case 'new-registration': {
       state.pendingCrewJoin=null;state.selectedDepartureId=target.dataset.departure; const departure=event.departures.find(item=>item.id===target.dataset.departure); const categoryMode=target.dataset.mode==='category'; const existing=departure.availability.find(reg=>reg.id===target.dataset.registration)||ownRegistrations(departure)[0];
-      state.drafts[departure.id]={...(categoryMode&&existing?registrationDraft(existing):{name:'',status:'',preferredPilot:'',forOther:!!state.user,participantUserId:null}),category:'',cars:[],carAny:false,id:null,version:null,mode:categoryMode?'category':'pilot'}; state.registrationOpen.add(departure.id); renderEvent(); revealRegistration(departure.id); break;
+      state.drafts[departure.id]={...(categoryMode&&existing?registrationDraft(existing):{name:'',status:'',preferredPilot:'',forOther:!!state.user,participantUserId:null}),category:'',cars:[],carAny:false,id:null,version:null,mode:categoryMode?'category':'pilot'}; if(target.dataset.round){const round=Number(target.dataset.round);state.roundFocus={...(state.roundFocus||{}),[departure.id]:round};const draft=state.drafts[departure.id],count=(event.rounds||[]).length;draft.onlyRound=round;draft.choices=Array.from({length:count},(_,index)=>index===round?{category:(event.rounds[round]?.randomCategory||!(event.rounds[round]?.categories?.length||event.categories.length))?'*':'',cars:[],carAny:true}:{skip:true});} state.registrationOpen.add(departure.id); renderEvent(); revealRegistration(departure.id); break;
     }
     case 'edit-registration': { state.pendingCrewJoin=null; const departure=event.departures.find(item=>item.id===target.dataset.departure),reg=departure.availability.find(item=>item.id===target.dataset.id); if(!reg?.canEdit)throw Error('Tu n’as pas l’autorisation de modifier cette inscription.'); state.selectedDepartureId=departure.id; state.drafts[departure.id]=registrationDraft(reg); state.registrationOpen.add(departure.id); state.eventSection='race'; renderEvent(); revealRegistration(departure.id); break; }
     case 'solo-driver': {
@@ -142,7 +145,8 @@ async function perform(action,target){
       if(value==='whole')draft.status='whole'; else {const duration=event.durationHours||6,parts=new Set(draft.status==='whole'?Array.from({length:duration},(_,i)=>`h${i+1}`):String(draft.status||'').split(',').filter(part=>/^h\d+$/.test(part)));parts.has(value)?parts.delete(value):parts.add(value);draft.status=parts.size===duration?'whole':[...parts].sort((a,b)=>Number(a.slice(1))-Number(b.slice(1))).join(',');}
       rerenderRegistrationSection(event,departure,`[data-action="availability"][data-value="${value}"]`,renderEvent); break;
     }
-    case 'solo-category': { const departure=event.departures.find(item=>item.id===target.dataset.departure),draft=draftFor(departure),choice=draft.choices?.[Number(target.dataset.round)]; if(!choice)break; choice.category=target.dataset.value; choice.cars=choice.cars.filter(car=>CARS[choice.category]?.includes(car)); choice.carAny=choice.category==='*'; rerenderRegistrationSection(event,departure,'',renderEvent); break; }
+    case 'solo-skip': { const departure=event.departures.find(item=>item.id===target.dataset.departure),draft=draftFor(departure),choice=draft.choices?.[Number(target.dataset.round)]; if(!choice)break; choice.skip=target.dataset.value==='1'; rerenderRegistrationSection(event,departure,'',renderEvent); break; }
+    case 'solo-category': { const departure=event.departures.find(item=>item.id===target.dataset.departure),draft=draftFor(departure),choice=draft.choices?.[Number(target.dataset.round)]; if(!choice)break; choice.category=target.dataset.value; choice.cars=[]; choice.carAny=true; rerenderRegistrationSection(event,departure,'',renderEvent); break; }
     case 'category': { const departure=event.departures.find(item=>item.id===target.dataset.departure),draft=draftFor(departure); draft.category=target.dataset.value; draft.cars=(draft.cars||[]).filter(car=>CARS[draft.category]?.includes(car)); draft.carAny=false; rerenderRegistrationSection(event,departure,'',renderEvent); break; }
     case 'delete-registration': { state.pendingCrewJoin=null; const departure=event.departures.find(item=>item.id===target.dataset.departure),reg=departure.availability.find(item=>item.id===target.dataset.id); if(!reg)throw Error('Inscription introuvable.'); if(!confirm(`Supprimer l’inscription de ${reg.name} pour ce départ ?${inCommunity()}`))return; await api(`/api/registrations/${reg.id}`,'DELETE',{version:reg.version}); delete state.drafts[departure.id]; state.registrationOpen.delete(departure.id); await refreshAfterSave('Inscription supprimée.'); break; }
     case 'join-crew': {
@@ -176,6 +180,7 @@ async function perform(action,target){
     }
     case 'create': if(target.dataset.format)state.listFormat=target.dataset.format; renderEventForm(); break;
     case 'edit-event': renderEventForm(event); break;
+    case 'close-form': { const edited=state.events.find(item=>item.id===target.dataset.id); if(edited){state.currentEventId=edited.id;renderEvent();}else renderHome(); break; }
     case 'add-departure': if(app.querySelectorAll('.departure-field').length>=30)throw Error('Maximum 30 départs par événement.');{const rows=document.querySelectorAll('#departureFields .departure-field'),last=rows[rows.length-1];/* A new start copies the previous start's date and time: several starts often share a day. */document.getElementById('departureFields').insertAdjacentHTML('beforeend',departureFields(last?{date:last.querySelector('[name="date"]').value,time:last.querySelector('[name="time"]').value}:{}));/* Real times added next to the common start: they are no longer "à confirmer". */const pending=target.closest('form')?.elements.eventSchedulePending;if(pending?.checked&&document.querySelector('#departureFields [data-tbd="true"]'))pending.checked=false;}updateRemoveButtons();break;
     case 'bulk-departures': {
       const form=target.closest('form'),starts=bulkPreview(form),list=document.getElementById('departureFields');
@@ -214,10 +219,10 @@ document.addEventListener('endurance:refresh',()=>{refresh().catch(showError);})
 // Registration panel: Enter moves to the next step, Escape or a click beside the panel closes it.
 document.addEventListener('submit',event=>{const form=event.target;if(form.matches?.('[data-kind="registration"].registration-stepper,[data-kind="event"].event-stepper')&&form.dataset.step!==(form.dataset.lastStep||'4')){event.preventDefault();event.stopImmediatePropagation();form.querySelector('.registration-next')?.click();}},true);
 document.addEventListener('click',event=>{if(event.target.matches?.('.fold-registration'))event.target.querySelector('.registration-close-button')?.click();});
-document.addEventListener('keydown',event=>{if(event.key!=='Escape'||document.querySelector('[data-ux-error-modal]'))return;document.querySelector('.fold-registration:not([hidden]) .registration-close-button')?.click();});
+document.addEventListener('keydown',event=>{if(event.key!=='Escape'||document.querySelector('[data-ux-error-modal]'))return;document.querySelector('.fold-registration:not([hidden]) .registration-close-button, .form-sheet [data-action="close-form"]')?.click();});
 document.addEventListener('toggle',event=>{const details=event.target;if(details instanceof HTMLDetailsElement&&details.matches('.crew-unified-card[data-crew],.crew-management-accordion[data-crew]'))details.open?state.crewManagementOpen.add(details.dataset.crew):state.crewManagementOpen.delete(details.dataset.crew);},true);
 document.addEventListener('click',async event=>{const target=event.target.closest?.('[data-action]');if(!target||target.disabled)return;if(target.dataset.action==='edit-crew')return;event.preventDefault();if(state.busy&&target.dataset.action!=='dismiss-error')return;state.busy=true;target.disabled=true;try{await perform(target.dataset.action,target);}catch(error){showError(error);}finally{state.busy=false;if(target.isConnected)target.disabled=false;updateRemoveButtons();}});
-document.addEventListener('submit',async event=>{const form=event.target;if(!form.dataset.kind)return;event.preventDefault();if(state.busy)return;state.busy=true;const submit=form.querySelector('[type="submit"]');if(submit)submit.disabled=true;try{if(form.dataset.kind==='event')await submitEvent(form);else if(form.dataset.kind==='registration'){const departureId=form.dataset.departure;const result=await submitRegistration(form,api);if(!(await finishPendingCrewJoin(departureId,result.id)))await refreshAfterSave('Inscription enregistrée.');}}catch(error){showError(error);}finally{state.busy=false;if(submit?.isConnected)submit.disabled=false;}});
+document.addEventListener('submit',async event=>{const form=event.target;if(!form.dataset.kind)return;event.preventDefault();if(state.busy)return;state.busy=true;const submit=form.querySelector('[type="submit"]');if(submit)submit.disabled=true;try{if(form.dataset.kind==='event')await submitEvent(form);else if(form.dataset.kind==='solo-event')await submitSoloEvent(form);else if(form.dataset.kind==='registration'){const departureId=form.dataset.departure;const result=await submitRegistration(form,api);if(!(await finishPendingCrewJoin(departureId,result.id)))await refreshAfterSave('Inscription enregistrée.');}}catch(error){showError(error);}finally{state.busy=false;if(submit?.isConnected)submit.disabled=false;}});
 document.addEventListener('error',event=>{const image=event.target;if(image instanceof HTMLImageElement&&image.matches('.circuit-visual img'))image.remove();},true);
 setInterval(()=>document.querySelectorAll('[data-countdown]').forEach(element=>{element.textContent=countdown(Number(element.dataset.countdown));}),1000);
 

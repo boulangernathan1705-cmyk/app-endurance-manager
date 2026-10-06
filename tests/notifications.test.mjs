@@ -4,7 +4,7 @@ import {DatabaseSync} from 'node:sqlite';
 import {readFileSync, readdirSync} from 'node:fs';
 import worker from '../server/worker.mjs';
 import {notify, purgeNotifications} from '../server/notifications.mjs';
-import {linkTestServer, setMember, ORGA_ROLE} from './fixtures/discord-server.mjs';
+import {linkTestServer, allowCrews, setMember, ORGA_ROLE} from './fixtures/discord-server.mjs';
 
 // Notifications of the bell (migration 0043), with every migration applied and two communities.
 const ROOT='https://site.example';
@@ -21,7 +21,7 @@ class D1 {
 function harness(){
   const DB=new D1();
   DB.db.prepare("INSERT INTO communities(id,slug,name,short_name,created_at) VALUES(?,'commu-test','Commu Test','TEST',0)").run(TEST);
-  linkTestServer(DB.db, DEV);
+  linkTestServer(DB.db, DEV); allowCrews(DB.db, DEV);
   DB.db.prepare("UPDATE communities SET discord_guild_id='900000000000000009' WHERE id=?").run(TEST);
   const env={DB,APP_ORIGIN:ROOT,COMMUNITY:'commu-dev',DISCORD_CLIENT_ID:'app-id',DISCORD_CLIENT_SECRET:'test-only-secret',ADMIN_DISCORD_IDS:ADMIN,ASSETS:{fetch:async()=>new Response('static')}};
   const jars=new Map();

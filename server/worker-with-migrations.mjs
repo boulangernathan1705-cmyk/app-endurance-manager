@@ -1,4 +1,5 @@
 import worker from './worker.mjs';
+import {purgeTraining, refreshLaptimes} from './training.mjs';
 import {homeRedirect, homePage} from './home.mjs';
 import {isWeeklyDiscordMutation} from './discord-weekly-format.mjs';
 import {syncWeeklyDiscord, syncDueRecaps} from './discord-weekly.mjs';
@@ -86,7 +87,8 @@ export default {
     if (env?.DB && communityLabel(new URL(request.url), env) && !pathname.startsWith('/api/') && (request.headers.get('Accept') || '').includes('text/html')
       && !(await env.DB.prepare('SELECT 1 FROM communities WHERE slug=?').bind(communityLabel(new URL(request.url), env)).first())) return communityNotFound();
     if (pathname === '/' && ['GET','HEAD'].includes(request.method)) {
-      const redirect = homeRedirect(request);
+      const community = env?.DB ? await currentCommunity(env, request).catch(() => null) : null;
+      const redirect = homeRedirect(request, community);
       if (redirect) return redirect;
       if (env?.ASSETS) {
         const home = await homePage(request, env);
@@ -110,7 +112,10 @@ export default {
     run('Scheduled cleanup failed', () => cleanup(env));
     // Notifications of the bell older than 30 days.
     run('Notifications cleanup failed', () => purgeNotifications(env));
-    // Every quarter of an hour: the crews on Discord (threads, voice channels, reminders), a few requests at a
+    run('Training cleanup failed', () => purgeTraining(env));
+    // :45 The reference lap times of the circuit sheets: read again once a day, tried every hour until read.
+    if (slot === 3) run('Laptimes import failed', () => refreshLaptimes(env));
+    // Every quarter of an hour: the crews on Discord (voice channels, reminders), a few requests at a
     // time (fewer next to the iRacing import, which makes many).
     run('Crew Discord sync failed', () => syncCrewDiscord(env, at.getTime(), {requests:slot === 1 ? 4 : 8}));
     // :00 Members and Discord roles not checked for a day are checked again by the bot, a few at a time.

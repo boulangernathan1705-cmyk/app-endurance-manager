@@ -88,13 +88,17 @@ const sourceMembers = await readFile(root + 'members.html', 'utf8');
 const sourceDiagnostics = await readFile(root + 'diagnostics.html', 'utf8');
 const sourceHelp = await readFile(root + 'help.html', 'utf8');
 const sourceRequest = await readFile(root + 'demande-communaute.html', 'utf8');
+const sourceTraining = await readFile(root + 'entrainement.html', 'utf8');
+const sourcePits = await readFile(root + 'stands.html', 'utf8');
 const paths = [
   ...stylesheetPaths(sourceIndex,'index.html'),
   ...stylesheetPaths(sourceGame,'game.html'),
   ...stylesheetPaths(sourceMembers,'members.html'),
   ...stylesheetPaths(sourceDiagnostics,'diagnostics.html'),
   ...stylesheetPaths(sourceHelp,'help.html'),
-  ...stylesheetPaths(sourceRequest,'demande-communaute.html')
+  ...stylesheetPaths(sourceRequest,'demande-communaute.html'),
+  ...stylesheetPaths(sourceTraining,'entrainement.html'),
+  ...stylesheetPaths(sourcePits,'stands.html')
 ];
 // styles/ux-refresh.css is the final layer that replaces older rules: keep it last in the
 // shared bundle whichever page lists it first.
@@ -112,6 +116,8 @@ await writeFile(new URL('members.html', out), productionHtml(sourceMembers));
 await writeFile(new URL('diagnostics.html', out), productionHtml(sourceDiagnostics));
 await writeFile(new URL('help.html', out), productionHtml(sourceHelp));
 await writeFile(new URL('demande-communaute.html', out), productionHtml(sourceRequest));
+await writeFile(new URL('entrainement.html', out), productionHtml(sourceTraining));
+await writeFile(new URL('stands.html', out), productionHtml(sourcePits));
 const gameHtml = productionHtml(sourceGame);
 await writeFile(new URL('lmu/index.html', out), gameHtml);
 await writeFile(new URL('iracing/index.html', out), gameHtml);
@@ -132,6 +138,40 @@ await copyFile(root + 'help.css', new URL('help.css', out));
 await cp(root + 'images', new URL('images/', out), {recursive: true});
 await cp(root + 'front', new URL('front/', out), {recursive: true});
 await cp(root + 'shared', new URL('shared/', out), {recursive: true});
+// The LMU sync program (connectors/lmu-sync, built with `npm run build:sync`): the server adds the pilot's key at download.
+await cp(root + 'downloads', new URL('downloads/', out), {recursive: true});
+
+// Module preloads: each page lists every module its scripts import (and their own imports), so the browser
+// fetches them all at once instead of discovering them one level at a time.
+const staticImportPattern = /(?:^|[;\n])\s*(?:import|export)\s*(?:[\w*{}\s,$]+\s*from\s*)?['"]([^'"]+)['"]/g;
+async function moduleGraph(entries) {
+  const seen = new Set(), queue = [...entries];
+  while (queue.length) {
+    const url = queue.shift();
+    if (seen.has(url)) continue;
+    seen.add(url);
+    let source;
+    try { source = await readFile(new URL('.' + new URL(url, 'https://site.invalid').pathname, out), 'utf8'); } catch { continue; }
+    for (const [, specifier] of source.matchAll(staticImportPattern)) {
+      if (!/^\.{0,2}\//.test(specifier)) continue;
+      const resolved = new URL(specifier, new URL(url, 'https://site.invalid'));
+      queue.push(resolved.pathname + resolved.search);
+    }
+  }
+  for (const entry of entries) seen.delete(entry);
+  return [...seen];
+}
+async function addModulePreloads(file) {
+  const target = new URL(file, out);
+  const html = await readFile(target, 'utf8');
+  const entries = [...html.matchAll(/<script\b[^>]*\btype=["']module["'][^>]*\bsrc=["'](\/[^"']+)["'][^>]*><\/script>/g)].map(match => match[1]);
+  const modules = await moduleGraph(entries);
+  if (!modules.length) return;
+  const links = modules.map(url => `<link rel="modulepreload" href="${url}">`).join('\n');
+  await writeFile(target, html.replace('</head>', `${links}\n</head>`));
+}
+for (const file of ['index.html', 'members.html', 'diagnostics.html', 'help.html', 'demande-communaute.html', 'entrainement.html', 'stands.html',
+  'lmu/index.html', 'iracing/index.html', 'privacy.html', 'legal.html', 'about.html', 'circuit-credits.html', 'changelog.html']) await addModulePreloads(file);
 
 if (!workers) {
   await copyFile(root + 'server/worker.mjs', new URL('_worker.js', out));
@@ -157,6 +197,12 @@ await writeFile(new URL('_headers', out), `/*
 /diagnostics.html
   X-Robots-Tag: noindex, nofollow
 
+/entrainement.html
+  X-Robots-Tag: noindex, nofollow
+
+/stands.html
+  X-Robots-Tag: noindex, nofollow
+
 https://app.endurance-manager.workers.dev/*
   X-Robots-Tag: noindex, nofollow
 `);
@@ -167,6 +213,9 @@ Disallow: /api/
 Disallow: /telemetry/
 Disallow: /members.html
 Disallow: /diagnostics.html
+Disallow: /entrainement.html
+Disallow: /stands.html
+Disallow: /downloads/
 Sitemap: https://endurance-manager.app/sitemap.xml
 `);
 

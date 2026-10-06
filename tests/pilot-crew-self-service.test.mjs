@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import {DatabaseSync} from 'node:sqlite';
 import {readFileSync} from 'node:fs';
 import worker from '../server/worker.mjs';
-import {linkTestServer, setMember} from './fixtures/discord-server.mjs';
+import {linkTestServer, setMember, DEV_COMMUNITY} from './fixtures/discord-server.mjs';
+const CREW_ROLE='900000000000000009';
 
 const ROOT='https://site.example';
 const ADMIN='111111111111111111';
@@ -14,7 +15,7 @@ const MIGRATIONS=[
   '0005_registration_preference.sql','0006_registration_car.sql','0007_registration_car_preferences.sql',
   '0008_event_circuit.sql','0009_registration_owner.sql','0011_multi_category_registrations.sql',
   '0012_participants.sql','0013_allow_assigned_category_interests.sql','0014_lock_categories_after_crew_assignment.sql',
-  '0015_crew_lock.sql','0016_crew_ownership.sql','0016_client_errors.sql','0017_discord_weekly.sql','0026_event_schedule_pending.sql','0027_solo_races.sql','0028_solo_round_choices.sql','0029_event_duration_minutes.sql','0030_iracing_import.sql','0031_solo_driver.sql','0032_tbd_imported_specials.sql','0033_lmu_pending_common_start.sql','0034_communities.sql','0035_memberships.sql','0036_commu_dev_discord.sql'
+  '0015_crew_lock.sql','0016_crew_ownership.sql','0016_client_errors.sql','0017_discord_weekly.sql','0026_event_schedule_pending.sql','0027_solo_races.sql','0028_solo_round_choices.sql','0029_event_duration_minutes.sql','0030_iracing_import.sql','0031_solo_driver.sql','0054_event_sim.sql','0055_event_absences.sql','0032_tbd_imported_specials.sql','0033_lmu_pending_common_start.sql','0034_communities.sql','0035_memberships.sql','0036_commu_dev_discord.sql','0057_event_last_start.sql','0058_event_last_start_undated.sql'
 ];
 
 class D1 {
@@ -56,7 +57,7 @@ function harness(){
 }
 
 test('registered pilots can create join leave and manage crews without event organizer rights',async()=>{
-  const {req,login}=harness();
+  const {DB,req,login}=harness();
   await login(ADMIN,'admin');await login(PILOT,'pilot');await login(TEAMMATE,'teammate');
   const eventInput={name:'Self service',categories:['Hypercar'],departures:[{date:'2090-10-15',time:'15:00'}]};
   assert.equal((await req('/api/events','POST',eventInput,'admin')).status,201);
@@ -67,6 +68,10 @@ test('registered pilots can create join leave and manage crews without event org
 
   const mine=await req(base+'/registrations','POST',{name:'Pilot owner',category:'Hypercar',status:'whole'},'pilot');
   assert.equal(mine.status,201);
+  assert.equal((await req(base+'/crews','POST',{name:'Crew pilot',category:'Hypercar',car:'Ferrari 499P'},'pilot')).status,403,'creating a crew needs « crews »');
+  // A role with « crews » on the Discord server; the teammate keeps only @everyone.
+  DB.db.prepare('INSERT INTO community_role_permissions(community_id,discord_role_id,permissions,updated_at) VALUES(?,?,?,0)').run(DEV_COMMUNITY,CREW_ROLE,JSON.stringify(['crews']));
+  setMember(DB.db,PILOT,[CREW_ROLE]);
   const created=await req(base+'/crews','POST',{name:'Crew pilot',category:'Hypercar',car:'Ferrari 499P'},'pilot');
   assert.equal(created.status,201);assert.equal(created.data.joined,true);
 

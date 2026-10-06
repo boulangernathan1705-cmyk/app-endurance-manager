@@ -1,5 +1,6 @@
 // The bell next to the account (signed-in players): what happens on the races the player is entered in, with the
 // number of notifications not read yet. Opening it marks them read; each one opens its race.
+import {isIdle, onWake} from './idle.mjs';
 const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
 const REFRESH_MS = 60000;
 const CHANGES = {starts:'horaires', circuit:'circuit', duration:'durée', name:'nom'};
@@ -20,7 +21,7 @@ function sentence(item) {
     case 'crew_start': return `Ton équipage ${crew} a choisi son départ`;
     case 'crew_car': return item.car ? `Ton équipage ${crew} roulera en ${b(item.car)}` : `Ton équipage ${crew} n’a plus de voiture choisie`;
     case 'withdrawn': return `${b(item.pilot)} s’est désinscrit : une place se libère dans ton équipage ${crew}`;
-    case 'removed_by': return `${item.by ? b(item.by) : 'Un organisateur'} a retiré ton inscription`;
+    case 'removed_by': return `${item.by ? b(item.by) : 'Un admin'} a retiré ton inscription`;
     case 'race_changed': {
       const what = (item.changes || []).map(key => CHANGES[key]).filter(Boolean);
       return `La course a été modifiée${what.length ? ` : ${esc(what.join(', '))}` : ''}${item.previousName ? ` (ancien nom : ${esc(item.previousName)})` : ''}`;
@@ -75,7 +76,7 @@ function render() {
 }
 
 async function load() {
-  if (loading || document.hidden) return;
+  if (loading || document.hidden || isIdle()) return;
   loading = true;
   try {
     const response = await fetch('/api/notifications', {credentials:'same-origin', cache:'no-store'});
@@ -124,5 +125,6 @@ export function installNotifications(root) {
   document.addEventListener('keydown', event => { if (event.key === 'Escape' && !wrap.querySelector('.notif-panel').hidden) setOpen(false); });
   document.addEventListener('visibilitychange', () => { if (!document.hidden) load(); });
   setInterval(load, REFRESH_MS);
+  onWake(load);
   load();
 }

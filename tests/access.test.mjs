@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {DatabaseSync} from 'node:sqlite';
 import {readFileSync, readdirSync} from 'node:fs';
-import {communityAccess, refreshMemberships, refreshCommunityMembers, PERMISSIONS, DEFAULT_EVERYONE} from '../server/access.mjs';
+import {communityAccess, refreshMemberships, refreshCommunityMembers, PERMISSIONS, ALL_PERMISSIONS, DEFAULT_EVERYONE} from '../server/access.mjs';
 import worker from '../server/worker.mjs';
 import {GUILD, ORGA_ROLE, SAFE_ROLE, DEV_COMMUNITY, linkTestServer} from './fixtures/discord-server.mjs';
 
@@ -52,10 +52,10 @@ test('members get the permissions of their Discord roles; others get nothing', a
   const calls=fakeDiscord(t,{[PILOT]:[],[BOSS]:[ORGA_ROLE,SAFE_ROLE]});
   assert.equal((await accessOf(env,community,null)).status,'anonymous');
   const pilot=await accessOf(env,community,PILOT);
-  assert.equal(pilot.status,'member');assert.deepEqual([...pilot.permissions].sort(),[...DEFAULT_EVERYONE].sort(),'@everyone by default: enter and create one\'s crew');
+  assert.equal(pilot.status,'member');assert.deepEqual([...pilot.permissions].sort(),[...DEFAULT_EVERYONE].sort(),'@everyone by default: enter endurances and OPEN events');
   const boss=await accessOf(env,community,BOSS);
-  assert.ok(['create_race','manage_races','manage_registrations','solo_safe','endurance'].every(p=>boss.permissions.has(p)),'roles add up');
-  assert.ok(!boss.permissions.has('admin'));
+  assert.ok(['admin','crews','solo_safe','endurance'].every(p=>boss.permissions.has(p)),'roles add up');
+  assert.ok(['create_race','manage_races','manage_registrations'].every(p=>boss.permissions.has(p)),'administering brings creating races and entering any pilot');
   const stranger=await accessOf(env,community,'555555555555555555');
   assert.equal(stranger.status,'not-member');assert.equal(stranger.permissions.size,0);
   // The player's other servers are never asked: only this server.
@@ -65,14 +65,14 @@ test('members get the permissions of their Discord roles; others get nothing', a
 test('the owner of the server and roles with the Discord "Administrator" permission can do everything', async t => {
   const {env,community}=setup();
   fakeDiscord(t,{[OWNER]:[],[BOSS]:[ADMIN_ROLE]});
-  for(const id of [OWNER,BOSS])assert.deepEqual([...(await accessOf(env,community,id)).permissions].sort(),[...PERMISSIONS].sort(),id);
+  for(const id of [OWNER,BOSS])assert.deepEqual([...(await accessOf(env,community,id)).permissions].sort(),[...ALL_PERMISSIONS].sort(),id);
 });
 
 test('platform managers enter every community; no server or no bot answer means no access', async t => {
   const {env,community}=setup();
   fakeDiscord(t,{},{down:true});
   const manager=await accessOf(env,community,MANAGER);
-  assert.equal(manager.manager,true);assert.equal(manager.permissions.size,PERMISSIONS.length);
+  assert.equal(manager.manager,true);assert.equal(manager.permissions.size,ALL_PERMISSIONS.length);
   assert.equal((await accessOf(env,community,PILOT)).status,'unavailable','Discord down and never checked: closed');
   assert.equal((await accessOf(env,{...community,discordGuildId:null},PILOT)).status,'unavailable','no server linked: closed');
 });
@@ -143,12 +143,17 @@ test('community admins set the permissions of each Discord role and the modules'
   assert.equal((await as(PILOT,'settings')).status,403);
   const settings=await (await as(BOSS,'settings')).json();
   assert.deepEqual(settings.roles.find(role=>role.name==='@everyone').permissions,[...DEFAULT_EVERYONE]);
-  assert.equal((await as(BOSS,`roles/${SAFE_ROLE}`,'PUT',{permissions:['endurance','create_race']})).status,200);
+  assert.equal((await as(BOSS,`roles/${SAFE_ROLE}`,'PUT',{permissions:['endurance','crews']})).status,200);
+  assert.equal((await as(BOSS,`roles/${SAFE_ROLE}`,'PUT',{permissions:['create_race']})).status,400,'creating races comes with « admin » only');
   assert.equal((await as(BOSS,`roles/${SAFE_ROLE}`,'PUT',{permissions:['everything']})).status,400);
   assert.equal((await as(BOSS,'roles/999999999999999999','PUT',{permissions:[]})).status,404,'only roles of the server');
-  assert.ok((await communityAccess(env,{user:{id:PILOT}},{...(await import('../server/community.mjs')).DEFAULT_COMMUNITY_SLUG&&{id:DEV_COMMUNITY,slug:'commu-dev',discordGuildId:GUILD,modules:{}}})).permissions.has('create_race'));
+  assert.ok((await communityAccess(env,{user:{id:PILOT}},{...(await import('../server/community.mjs')).DEFAULT_COMMUNITY_SLUG&&{id:DEV_COMMUNITY,slug:'commu-dev',discordGuildId:GUILD,modules:{}}})).permissions.has('crews'));
   assert.equal((await as(BOSS,'modules','PATCH',{iracingImport:true,discordWeekly:false})).status,200);
-  assert.deepEqual(JSON.parse(DB.db.prepare('SELECT modules FROM communities WHERE id=?').get(DEV_COMMUNITY).modules),{iracingImport:true,discordWeekly:true},'the recap is set on the setup page, not as a module');
+  assert.equal((await as(BOSS,'modules','PATCH',{safeGuideUrl:'https://evil.example/x'})).status,400,'only a Discord link');
+  assert.equal((await as(BOSS,'modules','PATCH',{safeGuideUrl:'https://discord.com/channels/1/2'})).status,200);
+  assert.equal(JSON.parse(DB.db.prepare('SELECT modules FROM communities WHERE id=?').get(DEV_COMMUNITY).modules).safeGuideUrl,'https://discord.com/channels/1/2');
+  assert.equal((await as(BOSS,'modules','PATCH',{safeGuideUrl:''})).status,200);
+  assert.deepEqual(JSON.parse(DB.db.prepare('SELECT modules FROM communities WHERE id=?').get(DEV_COMMUNITY).modules),{iracingImport:true,discordWeekly:true,safeGuideUrl:''},'the recap is set on the setup page, not as a module');
 });
 
 test('community look: name, short name and accent by its admins, icon from its Discord server', async t => {

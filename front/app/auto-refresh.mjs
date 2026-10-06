@@ -2,6 +2,7 @@
 // It never runs while the pilot is typing, has a form or dialog open, or an action is in progress,
 // and it keeps open sections and the scroll position.
 import {app,state} from './core.mjs';
+import {isIdle,onWake} from '../idle.mjs';
 
 const INTERVAL_MS=60000;
 const STALE_AFTER_MS=20000;
@@ -23,7 +24,7 @@ function openSections(){
 }
 
 async function refreshInBackground(refresh){
-  if(running||document.hidden||pilotIsBusy())return;
+  if(running||document.hidden||isIdle()||pilotIsBusy())return;
   running=true;
   const sections=openSections(),scroll=scrollY;
   try{
@@ -40,7 +41,7 @@ async function refreshInBackground(refresh){
 
 export function installAutoRefresh(refresh){
   setInterval(()=>refreshInBackground(refresh),INTERVAL_MS);
-  document.addEventListener('visibilitychange',()=>{
-    if(!document.hidden&&Date.now()-lastRefresh>STALE_AFTER_MS)refreshInBackground(refresh);
-  });
+  const catchUp=()=>{if(!document.hidden&&Date.now()-lastRefresh>STALE_AFTER_MS)refreshInBackground(refresh);};
+  document.addEventListener('visibilitychange',catchUp);
+  onWake(catchUp);
 }

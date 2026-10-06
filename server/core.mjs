@@ -1,4 +1,4 @@
-import {CATEGORIES, EVENT_TYPE_IDS as EVENT_TYPES, CIRCUIT_IDS as CIRCUITS, CARS} from '../shared/catalog.mjs';
+import {CATEGORIES, EVENT_TYPE_IDS as EVENT_TYPES, CIRCUIT_IDS as CIRCUITS, CARS, SIM_IDS, eventCatalog, simForEvent, isRandomCircuit, TDZ_EVENT_TYPES} from '../shared/catalog.mjs';
 const LEGACY_CAR_ALIASES = new Map([
   ['BMW M Hybrid V8 Evo (2026)','BMW M Hybrid V8'],['Cadillac V-Series.R Evo (2026)','Cadillac V-Series.R'],['Peugeot 9X8 2023','Peugeot 9X8'],['Peugeot 9X8 2024','Peugeot 9X8'],['Toyota TR010 Hybrid (2026)','Toyota GR010 Hybrid'],['Ginetta G61-LT-P3 Evo','Ginetta G61-LT-P3'],['Ferrari 488 GTE Evo','Ferrari 488 GTE'],['Aston Martin Vantage AMR LMGT3 Evo','Aston Martin Vantage AMR LMGT3'],['BMW M4 LMGT3 Evo','BMW M4 LMGT3'],['Ferrari 296 LMGT3 Evo','Ferrari 296 LMGT3'],['Ford Mustang LMGT3 Evo','Ford Mustang LMGT3'],['Lamborghini Huracán LMGT3 Evo 2','Lamborghini Huracán LMGT3'],['McLaren 720S LMGT3 Evo','McLaren 720S LMGT3'],['Porsche 911 LMGT3 R (992)','Porsche 911 GT3 R LMGT3'],['Porsche 911 LMGT3 R (992) 2026','Porsche 911 GT3 R LMGT3']
 ]);
@@ -183,31 +183,69 @@ function parisTimestamp(date, time) {
 }
 const EVENT_FORMATS = ['endurance','solo'];
 const SOLO_ACCESS = ['open','safe'];
-// A solo race: one or two rounds (circuit, possibly random, and a duration in minutes), one start,
-// a number of places and an OPEN / SAFE access.
+const WEATHERS = ['random','sun','cloud','overcast','rain'];
+// An event of the calendar (solo format): a simulator, one to four rounds (circuit and duration in minutes),
+// one start, an optional number of places and an OPEN / SAFE access. LMU circuits and categories come from
+// the catalog; on the other simulators the circuit, category and car are typed.
 function validateSoloRace(input, existing) {
   const access = input.access == null ? (existing?.access || 'open') : input.access;
   if (!SOLO_ACCESS.includes(access)) fail(400, 'Choisis l’accès OPEN ou SAFE.');
   const rounds = input.rounds;
-  if (!Array.isArray(rounds) || rounds.length < 1 || rounds.length > 2) fail(400, 'Une course solo a une ou deux manches.');
+  if (!Array.isArray(rounds) || rounds.length < 1 || rounds.length > 4) fail(400, 'Un événement a de une à quatre manches.');
+  const sim = input.sim == null ? (existing ? simForEvent(existing) : simForEvent({circuit:rounds[0]?.circuit})) : input.sim;
+  if (!SIM_IDS.includes(sim)) fail(400, 'Choisis le simulateur.');
+  const catalog = eventCatalog(sim);
   const cleanRounds = rounds.map((round, index) => {
-    const circuit = typeof round?.circuit === 'string' ? round.circuit : '';
-    if (!CIRCUITS.includes(circuit)) fail(400, `Choisis le circuit de la manche ${index + 1}.`);
+    const where = rounds.length > 1 ? ` de la manche ${index + 1}` : '';
+    const circuit = catalog ? (typeof round?.circuit === 'string' ? round.circuit : '') : text(round?.circuit, 60, `Circuit${where}`);
+    if (catalog && (!CIRCUITS.includes(circuit) || circuit.startsWith('iracing-') !== (sim === 'iracing'))) fail(400, `Choisis le circuit${where}.`);
     const durationMinutes = Number(round.durationMinutes);
-    if (!Number.isInteger(durationMinutes) || durationMinutes < 5 || durationMinutes > 600) fail(400, `La durée de la manche ${index + 1} doit être comprise entre 5 et 600 minutes.`);
-    // Each round has its own categories (by default the race categories).
-    const roundCategories = Array.isArray(round.categories) && round.categories.length ? round.categories : input.categories;
-    if (!Array.isArray(roundCategories) || !roundCategories.length || roundCategories.some(c => !CATEGORIES.includes(c))) fail(400, `Choisis au moins une catégorie pour la manche ${index + 1}.`);
-    return {circuit, durationMinutes, categories:[...new Set(roundCategories)]};
+    if (!Number.isInteger(durationMinutes) || durationMinutes < 5 || durationMinutes > 600) fail(400, `La durée${where} doit être comprise entre 5 et 600 minutes.`);
+    // Categories: optional; none means a simple entry (no category or car to choose).
+    // A random circuit (LMU) comes with a random category: nothing to choose.
+    const randomCategory = Boolean(catalog && isRandomCircuit(circuit));
+    const roundCategories = randomCategory ? [] : Array.isArray(round.categories) && round.categories.length ? round.categories : Array.isArray(input.categories) ? input.categories : [];
+    if (roundCategories.length && (!catalog || roundCategories.some(c => !catalog.categories[c]))) fail(400, 'Catégorie inconnue pour ce simulateur.');
+    // As on the community's calendar: practice / qualifying minutes (race = durationMinutes), weather,
+    // fuel and tyre wear multipliers. All optional.
+    const extras = randomCategory ? {randomCategory: true} : {};
+    for (const key of ['practice','qualifying']) if (round[key] != null && round[key] !== '') {
+      const value = Number(round[key]);
+      if (!Number.isInteger(value) || value < 0 || value > 600) fail(400, `Durée des essais ou qualifs${where} invalide.`);
+      extras[key] = value;
+    }
+    for (const key of ['fuel','tyres']) if (round[key] != null && round[key] !== '') {
+      const value = Number(round[key]);
+      if (!Number.isInteger(value) || value < 0 || value > 10) fail(400, `Multiplicateur essence ou pneus${where} invalide.`);
+      extras[key] = value;
+    }
+    // Places of the round (empty = unlimited): beyond them, pilots wait for a place on that round.
+    if (round.capacity != null && round.capacity !== '') {
+      const value = Number(round.capacity);
+      if (!Number.isInteger(value) || value < 2 || value > 120) fail(400, `Le nombre de places${where} doit être compris entre 2 et 120.`);
+      extras.capacity = value;
+    }
+    if (round.weather) { if (!WEATHERS.includes(round.weather)) fail(400, `Météo${where} invalide.`); extras.weather = round.weather; }
+    // Simulators without a catalog: the category and the car are typed.
+    if (!catalog) {
+      if (round.category) extras.category = text(round.category, 40, `Catégorie${where}`);
+      if (round.car) extras.car = text(round.car, 60, `Voiture${where}`);
+    }
+    return {circuit, durationMinutes, categories:[...new Set(roundCategories)], ...extras};
   });
-  const games = new Set(cleanRounds.map(round => round.circuit.startsWith('iracing-')));
-  if (games.size > 1) fail(400, 'Les deux manches doivent être sur le même simulateur.');
-  const capacity = Number(input.capacity);
-  if (!Number.isInteger(capacity) || capacity < 2 || capacity > 120) fail(400, 'Le nombre de places doit être compris entre 2 et 120.');
-  const totalMinutes = cleanRounds.reduce((sum, round) => sum + round.durationMinutes, 0);
-  if (totalMinutes > 24 * 60) fail(400, 'Une course solo ne peut pas dépasser 24 heures.');
+  // Places are set round by round; one round: they are the event's places (one waiting list).
+  const capacity = cleanRounds.length === 1 ? cleanRounds[0].capacity ?? null : null;
+  // Event details: its type (OPEN, SAFE… which sets the access), the server password and a short note.
+  const raw = input.details && typeof input.details === 'object' ? input.details : {};
+  const details = {};
+  if (raw.type) { if (!TDZ_EVENT_TYPES.includes(raw.type)) fail(400, 'Choisis un type d’événement de la liste.'); details.type = raw.type; }
+  if (raw.password) details.password = text(raw.password, 30, 'Mot de passe');
+  if (raw.note) details.note = text(raw.note, 120, 'Info');
+  const totalMinutes = cleanRounds.reduce((sum, round) => sum + (round.practice || 0) + (round.qualifying || 0) + round.durationMinutes, 0);
+  if (totalMinutes > 24 * 60) fail(400, 'Un événement ne peut pas dépasser 24 heures.');
   const categories = [...new Set(cleanRounds.flatMap(round => round.categories))];
-  return {access, rounds:cleanRounds, capacity, categories, circuit:cleanRounds[0].circuit, durationMinutes:totalMinutes};
+  const typedAccess = {OPEN:'open', SAFE:'safe'}[details.type];
+  return {sim, access:typedAccess || access, rounds:cleanRounds, capacity, categories, details, circuit:cleanRounds[0].circuit, durationMinutes:totalMinutes};
 }
 function validateEvent(input, existing = null) {
   const name = text(input.name, 100, 'Nom de l’événement');
@@ -223,11 +261,11 @@ function validateEvent(input, existing = null) {
   const eventType = solo ? 'private' : input.eventType || 'private';
   if (!EVENT_TYPES.includes(eventType)) fail(400, 'Type d’événement invalide.');
   const circuit = solo ? solo.circuit : input.circuit == null ? (existing?.circuit || '') : (input.circuit === '' ? '' : text(input.circuit, 40, 'Circuit'));
-  if (circuit && !CIRCUITS.includes(circuit)) fail(400, 'Choisis un circuit proposé.');
+  if (!solo && circuit && !CIRCUITS.includes(circuit)) fail(400, 'Choisis un circuit proposé.');
   const categoriesInput = solo ? solo.categories : input.categories;
-  if (!Array.isArray(categoriesInput) || !categoriesInput.length || categoriesInput.some(c => !CATEGORIES.includes(c))) fail(400, 'Choisis au moins une catégorie autorisée.');
+  if (!solo && (!Array.isArray(categoriesInput) || !categoriesInput.length || categoriesInput.some(c => !CATEGORIES.includes(c)))) fail(400, 'Choisis au moins une catégorie autorisée.');
   if (!Array.isArray(input.departures) || !input.departures.length || input.departures.length > 30) fail(400, 'Ajoute entre 1 et 30 départs.');
-  if (solo && input.departures.length !== 1) fail(400, 'Une course solo a un seul départ.');
+  if (solo && input.departures.length !== 1) fail(400, 'Un événement a un seul départ.');
   const known = existing ? JSON.parse(existing.departures) : [];
   const seen = new Set(), ids = new Set();
   const departures = input.departures.map(item => {
@@ -255,32 +293,33 @@ function validateEvent(input, existing = null) {
   // Driver change required (iRacing endurances; always on LMU): true / false, or null for the site rule.
   const driverChangeRequired = solo ? null : typeof input.driverChangeRequired === 'boolean' ? input.driverChangeRequired
     : input.driverChangeRequired === undefined && existing?.driver_change_required != null ? Boolean(existing.driver_change_required) : null;
-  return {name, format, access: solo?.access || 'open', capacity: solo?.capacity ?? null, rounds: solo?.rounds || [], durationHours, durationMinutes, eventType, circuit, schedulePending, driverChangeRequired, categories: [...new Set(categoriesInput)], departures};
+  return {name, format, sim: solo?.sim || null, details: solo?.details || {}, access: solo?.access || 'open', capacity: solo?.capacity ?? null, rounds: solo?.rounds || [], durationHours, durationMinutes, eventType, circuit, schedulePending, driverChangeRequired, categories: [...new Set(categoriesInput)], departures};
 }
 // Discord display names are at most 32 characters: registrations accept the same length.
 const PILOT_NAME_MAX = 32;
-// Solo race entry: category and car, each of them possibly "Peu importe" (category '*'); no hours.
+// Solo race entry: a category per round, possibly "Peu importe" (category '*'); no car, no hours.
 const ANY_CATEGORY = '*';
 function validateSoloChoice(choice, allowed, index, rounds) {
   const category = choice?.category;
   const where = rounds > 1 ? ` pour la manche ${index + 1}` : '';
   if (category !== ANY_CATEGORY && !allowed.includes(category)) fail(400, `Choisis une catégorie${where}, ou « Peu importe ».`);
-  const rawCars = category === ANY_CATEGORY ? [] : Array.isArray(choice.cars) ? choice.cars : [];
-  const cars = [...new Set(rawCars.filter(car => typeof car === 'string' && car.trim()).map(car => LEGACY_CAR_ALIASES.get(car) || car))];
-  if (cars.some(car => !CARS[category]?.includes(car))) fail(400, `Choisis uniquement des voitures proposées${where}.`);
-  const carAny = category === ANY_CATEGORY || choice.carAny === true || !cars.length;
-  return {category, cars: carAny ? [] : cars, carAny};
+  return {category, cars: [], carAny: true};
 }
 function validateSoloRegistration(input, event) {
   const name = text(input.name, PILOT_NAME_MAX, 'Pseudo');
   const eventCategories = JSON.parse(event.categories);
   const rounds = JSON.parse(event.rounds || '[]');
-  const roundCategories = rounds.length ? rounds.map(round => round.categories?.length ? round.categories : eventCategories) : [eventCategories];
+  const roundCategories = rounds.length ? rounds.map(round => round.randomCategory ? [] : round.categories?.length ? round.categories : eventCategories) : [eventCategories];
+  // Several rounds: a pilot may skip some of them ({skip:true}), not all.
+  const multi = roundCategories.length > 1, skips = multi && Array.isArray(input.choices) && input.choices.length === roundCategories.length ? input.choices.map(choice => choice?.skip === true) : [];
+  if (skips.length && skips.every(Boolean)) fail(400, 'Choisis au moins une manche.');
+  // No category offered: a simple entry (every round, unless some are skipped).
+  if (roundCategories.every(list => !list.length)) return {name, nameKey: name.normalize('NFKC').toLocaleLowerCase('fr-FR'), status: 'whole', category: '', car: '', cars: [], carAny: true, preferredPilot: '', roundChoices: skips.some(Boolean) ? skips.map(skip => skip ? {skip: true} : {category: '', cars: [], carAny: true}) : []};
   // One choice per round; a single-round entry may still send category / cars directly.
   const rawChoices = Array.isArray(input.choices) ? input.choices : [{category:input.category, cars:input.cars, carAny:input.carAny}];
   if (rawChoices.length !== roundCategories.length) fail(400, 'Choisis une catégorie pour chaque manche.');
-  const choices = rawChoices.map((choice, index) => validateSoloChoice(choice, roundCategories[index], index, roundCategories.length));
-  const first = choices[0];
+  const choices = rawChoices.map((choice, index) => skips[index] ? {skip: true} : validateSoloChoice(choice, roundCategories[index], index, roundCategories.length));
+  const first = choices.find(choice => !choice.skip);
   return {name, nameKey: name.normalize('NFKC').toLocaleLowerCase('fr-FR'), status: 'whole', category: first.category, car: first.cars[0] || '', cars: first.cars, carAny: first.carAny, preferredPilot: '', roundChoices: choices};
 }
 function validateRegistration(input, event) {

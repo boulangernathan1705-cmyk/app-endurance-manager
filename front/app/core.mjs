@@ -12,7 +12,7 @@ export const activeGame = globalThis.__ENDURANCE_GAME__ === 'iracing' ? 'iracing
 export const state = {
   events:[], user:null, discordReady:false, currentEventId:null, page:'home', editingEvent:null,
   access:'anonymous', permissions:[], community:null, platformDiscordUrl:null,
-  drafts:{}, busy:false, participants:[], flash:'', eventFilter:'upcoming', listFormat:'endurance', soloLabel:'Courses solo', soloRaces:false,
+  drafts:{}, busy:false, participants:[], flash:'', eventFilter:'upcoming', listFormat:'endurance', soloLabel:'EVENT TDZ', eventTypes:[], soloRaces:false, training:false, trainingRace:false,
   selectedDepartureId:null, eventSection:'race', pilotName:'', registrationOpen:new Set(), crewManagementOpen:new Set(),
   pendingCrewJoin:null, archiveLoaded:false, participantsLoaded:false
 };
@@ -84,7 +84,7 @@ export function button(action,label,extra='',css='secondary-button') { return `<
 
 export function carPreferenceChoices(category, selected=[], any=false) {
   const values = Array.isArray(selected) ? selected : selected ? [selected] : [];
-  return `<fieldset class="car-preference-panel"><legend class="form-label">Voiture(s) souhaitée(s)</legend><label class="car-any-option" data-tip="Tu t’adaptes à la voiture que choisira ton équipage."><input type="checkbox" name="carAny" ${any?'checked':''}><span>Peu importe la voiture</span></label><div class="car-preference-grid">${(CARS[category]||[]).map(car => `<label class="car-preference-option"><input type="checkbox" name="carPreference" value="${esc(car)}" ${values.includes(car)&&!any?'checked':''} ${any?'disabled':''}><span>${esc(car)}</span></label>`).join('')}</div><p class="car-preference-help">Choisis un ou plusieurs modèles, ou coche « Peu importe la voiture ». Ces souhaits aident les organisateurs à former les équipages.</p></fieldset>`;
+  return `<fieldset class="car-preference-panel"><legend class="form-label">Voiture(s) souhaitée(s)</legend><label class="car-any-option" data-tip="Tu t’adaptes à la voiture que choisira ton équipage."><input type="checkbox" name="carAny" ${any?'checked':''}><span>Peu importe la voiture</span></label><div class="car-preference-grid">${(CARS[category]||[]).map(car => `<label class="car-preference-option"><input type="checkbox" name="carPreference" value="${esc(car)}" ${values.includes(car)&&!any?'checked':''} ${any?'disabled':''}><span>${esc(car)}</span></label>`).join('')}</div><p class="car-preference-help">Choisis un ou plusieurs modèles, ou coche « Peu importe la voiture ». Ces souhaits aident à former les équipages.</p></fieldset>`;
 }
 export function registrationCarLabel(reg) { return reg.carAny ? 'N’importe quelle voiture' : ((reg.cars?.length ? reg.cars.join(' · ') : reg.car) || 'Pas de préférence'); }
 export function pilotAvailability(reg,departure,duration) { return departure ? `<div class="crew-pilot-availability"><span class="crew-pilot-availability-label">Disponibilité</span>${renderAvailabilityTimeline({departure,duration,status:reg.status,label:`Disponibilités de ${reg.name || 'ce pilote'}`})}</div>` : ''; }
@@ -174,7 +174,7 @@ export async function api(path,method='GET',data) {
 }
 async function fetchEvents(scope) {
   const result = await api(`/api/races?game=${encodeURIComponent(activeGame)}&scope=${scope}`);
-  return (Array.isArray(result.events)?result.events:[]).filter(event => gameForEvent(event) === activeGame);
+  return (Array.isArray(result.events)?result.events:[]).filter(event => event.format === 'solo' || gameForEvent(event) === activeGame);
 }
 // Common start of a race whose time is not known yet ("Horaire à définir"): its time reads "à définir"
 // everywhere; the stored time stays in departure.clock (event form).
@@ -208,6 +208,10 @@ export async function load() {
   state.discordReady=session.discordReady;
   // Solo races and SAFE drivers only where the site enables them (dev for now).
   state.soloRaces=session.soloRaces===true;
+  if (typeof session.soloLabel==='string' && session.soloLabel) state.soloLabel=session.soloLabel;
+  state.eventTypes=Array.isArray(session.eventTypes)?session.eventTypes:[];
+  state.training=session.training===true; state.trainingRace=session.trainingRace===true;
+  state.safeGuideUrl=typeof session.safeGuideUrl==='string'?session.safeGuideUrl:'';
   if (!state.soloRaces) state.listFormat='endurance';
   state.events=markUndefinedStarts(mergeEvents(upcoming,archived));
   // The members list rarely changes: fetch it once per session instead of on every refresh.

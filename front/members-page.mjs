@@ -19,13 +19,11 @@ function renderError(message) {
 }
 
 // What each permission means (server/access.mjs, PERMISSIONS).
-const PERMISSION_LABELS = {endurance:'Endurances', solo_open:'Courses solo OPEN', solo_safe:'Courses solo SAFE',
-  manage_registrations:'Gérer les inscriptions', create_race:'Créer des courses', manage_races:'Gérer toutes les courses', admin:'Administrer'};
-const PERMISSION_HELP = {endurance:'S’inscrire aux endurances, rejoindre, créer et gérer son équipage.',
-  solo_open:'S’inscrire aux courses solo OPEN.', solo_safe:'S’inscrire aux courses solo SAFE (et OPEN).',
-  manage_registrations:'Inscrire, modifier ou retirer n’importe quel pilote, composer tous les équipages.',
-  create_race:'Créer des courses, modifier et supprimer les siennes.', manage_races:'Modifier et supprimer toutes les courses, y compris celles importées d’iRacing.',
-  admin:'Page Membres et réglages : apparence, modules, autorisations des rôles.'};
+const PERMISSION_LABELS = {endurance:'Endurances', solo_open:'Événements OPEN', solo_safe:'Événements SAFE', crews:'Équipages', admin:'Administrer'};
+const PERMISSION_HELP = {endurance:'S’inscrire aux endurances (et rejoindre un équipage existant).',
+  solo_open:'S’inscrire aux événements OPEN.', solo_safe:'S’inscrire aux événements SAFE (et OPEN).',
+  crews:'Créer et gérer les équipages.',
+  admin:'Administrer le site : réglages, rôles, créer et gérer les courses et les événements, inscrire n’importe quel pilote.'};
 
 // Members of the community: found on its Discord server by the bot. Roles are managed on Discord; this page
 // shows them with what they allow here (and in « Rôles », what each role allows).
@@ -62,6 +60,7 @@ const ICONS = {
   crewChannels:'<path d="M4 5h16v10H9l-5 4V5Z"/><path d="M14 19h1l4 3v-3"/>',
   raceReminders:'<path d="M6 16V11a6 6 0 1 1 12 0v5l2 2H4l2-2Z"/><path d="M10 21h4"/>',
   iracingImport:'<path d="M4 21V4M4 4h13l-2 4 2 4H4"/>',
+  training:'<path d="M3 12h4l3-8 4 16 3-8h4"/>',
   soloRaces:'<circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/>'
 };
 const icon = key => `<svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[key]}</svg>`;
@@ -72,7 +71,7 @@ const copyButton = target => `<button type="button" class="secondary-button setu
 function moduleStates(settings, setup) {
   const recaps = setup.recaps || [];
   return {recap:recaps.length > 0 || Boolean(setup.legacyRecap), crewChannels:settings.modules.crewChannels === true, raceReminders:settings.modules.raceReminders === true,
-    iracingImport:settings.modules.iracingImport === true, soloRaces:settings.modules.soloRaces === true};
+    iracingImport:settings.modules.iracingImport === true, soloRaces:settings.modules.soloRaces === true, training:settings.modules.training === true};
 }
 
 // « Vue d'ensemble ».
@@ -85,7 +84,7 @@ function overviewMarkup(setup, settings, members) {
   const tiles = `<div class="admin-tiles">
     ${tile('Serveur Discord', !guild.id ? '<i class="admin-dot is-bad"></i>Aucun' : guild.botPresent ? '<i class="admin-dot is-ok"></i>Relié' : '<i class="admin-dot is-bad"></i>Bot absent', guild.botPresent ? `Bot présent sur ${server}` : 'Personne ne peut entrer sur le site', 'is-small')}
     ${tile('Membres connectés', members.length, 'Membres du serveur venus sur le site')}
-    ${tile('Modules actifs', `${active} / 5`, Object.entries(states).filter(([, on]) => !on).length ? 'Le reste est dans Modules' : 'Tout est allumé')}</div>`;
+    ${tile('Modules actifs', `${active} / ${Object.keys(states).length}`, Object.entries(states).filter(([, on]) => !on).length ? 'Le reste est dans Modules' : 'Tout est allumé')}</div>`;
   // Getting started: the four steps, then the announcement once they are done.
   const steps = [
     {done:Boolean(guild.botPresent), title:'Inviter le bot sur ton serveur Discord', action:!guild.id ? '<small>Demande à un gestionnaire de relier ton serveur.</small>'
@@ -137,7 +136,7 @@ function peopleMarkup(result, settings) {
       <div class="members-list member-grid">${members.map(member => memberCard(member, result.permissions || [])).join('')}</div>
       <p class="members-empty" hidden>Aucun membre ne correspond à cette recherche.</p></div>
     <div data-view-pane="roles" class="admin-stack" hidden>
-      <p class="members-help">Un membre cumule les autorisations de tous ses rôles. « @everyone » s’applique à tout le serveur. Le propriétaire du serveur et les rôles « Administrateur » de Discord ont tout. Chaque case s’enregistre dès qu’on la coche.</p>
+      <p class="members-help">Un membre cumule les autorisations de tous ses rôles ; sans aucune, il voit seulement les courses. « @everyone » s’applique à tout le serveur. Le propriétaire du serveur et les rôles « Administrateur » de Discord ont tout. Chaque case s’enregistre dès qu’on la coche.</p>
       ${roles}${legend}</div>`;
 }
 
@@ -177,27 +176,43 @@ function recapForm(setup) {
       </div>
       <div class="setup-actions"><button class="primary-button" type="submit">Enregistrer</button><span class="settings-status" aria-live="polite"></span></div></form>`;
 }
+// Where the crews' voice channels are made, asked as soon as the module is turned on.
+function crewCategory(crews) {
+  const list = crews.categories || [], current = crews.voiceCategoryId || '';
+  const options = [{id:'', name:'En haut du serveur'}, ...list, ...(current && !list.some(item => item.id === current) ? [{id:current, name:'Catégorie actuelle'}] : [])];
+  return `<label class="crew-category">Où créer les vocaux ?<select data-crew-category>${options.map(item => `<option value="${esc(item.id)}" ${item.id === current ? 'selected' : ''}>${esc(item.name)}</option>`).join('')}</select></label><span class="settings-status" aria-live="polite"></span>`;
+}
+// Why the crews' channels cannot be turned on yet (the bot's state on the server, checked by the site).
+const BOT_PROBLEMS = {
+  rights:'Avant d’activer : touche « Donner les droits au bot », valide sur Discord, puis « C’est fait ».',
+  absent:'Le bot n’est pas sur ton serveur : touche « Donner les droits au bot » pour l’ajouter avec ses droits, puis « C’est fait ».',
+  config:'Le bot du site n’est pas configuré : préviens le gérant de la plateforme.',
+  discord:'Discord ne répond pas pour l’instant : réessaie avec « C’est fait » dans un moment.'};
 function modulesMarkup(settings, setup) {
   const crews = settings.crews || {}, states = moduleStates(settings, setup);
   const toggle = (key, label, locked = false) => `<label class="admin-switch"><input type="checkbox" role="switch" data-module="${key}" aria-label="${label}" ${states[key] ? 'checked' : ''} ${locked ? 'disabled' : ''}><i aria-hidden="true"></i></label>`;
   const crewRights = crews.botReady === true ? (crews.lastError ? `<p class="setup-note setup-error">⚠️ ${esc(crews.lastError)}</p>` : '<p class="members-help">Le bot a les droits pour créer les salons.</p>')
-    : `<p class="members-help">Avant d’activer : donne au bot le droit de créer des salons sur ton serveur.</p>
+    : `<p class="members-help">${BOT_PROBLEMS[crews.botProblem] || BOT_PROBLEMS.rights}</p>
       <div class="setup-actions">${crews.botInviteUrl ? `<a class="primary-button" href="${esc(crews.botInviteUrl)}" target="_blank" rel="noopener">Donner les droits au bot</a>` : ''}<button type="button" class="secondary-button" data-modules-refresh="crewChannels">C’est fait</button></div>`;
   const crewWarn = states.crewChannels && (crews.botReady !== true || crews.lastError);
   const tiles = [
     {key:'recap', name:'Récap de la semaine sur Discord', text:'Les courses de la semaine dans un salon de ton serveur, mis à jour tout seul.',
       state:states.recap ? ['ok', (setup.recaps || []).length ? `Actif · ${(setup.recaps || []).map(item => RECAP_LABELS[item.scope]).join(', ')}` : 'Actif · salon d’origine'] : ['off', 'Éteint'],
       control:'', settings:recapForm(setup)},
-    {key:'crewChannels', name:'Salons d’équipage sur Discord', text:'Un salon texte et son vocal juste en dessous pour chaque équipage, ouverts quelques jours avant la course et fermés tout seuls après.',
-      state:crewWarn ? ['warn', crews.botReady !== true ? 'Le bot n’a pas les droits' : 'Le bot est bloqué'] : states.crewChannels ? ['ok', 'Actif'] : ['off', crews.botReady === true ? 'Éteint' : 'Éteint · droits du bot à donner'],
+    {key:'crewChannels', name:'Salons d’équipage sur Discord', text:'Un salon vocal par équipage, nommé simu + nom de l’équipage, ouvert quelques jours avant la course.',
+      state:crewWarn ? ['warn', crews.botReady !== true ? 'Le bot n’a pas les droits' : 'Le bot est bloqué'] : states.crewChannels ? ['ok', 'Actif'] : ['off', crews.botReady === true ? 'Éteint' : crews.botProblem === 'rights' ? 'Éteint · droits du bot à donner' : 'Éteint · bot à vérifier'],
       control:toggle('crewChannels', 'Salons d’équipage sur Discord', crews.botReady !== true && !states.crewChannels),
-      settings:`${crewRights}<p class="members-help">Après la course, le vocal est supprimé et le salon texte rangé dans « Archives équipages » pendant 30 jours.</p>`},
-    {key:'raceReminders', name:'Rappels de course', text:'24 h avant le départ dans la cloche du site, 24 h et 1 h avant dans le salon de l’équipage.',
+      settings:`${crewRights}${states.crewChannels ? crewCategory(crews) : ''}<p class="members-help">Il est supprimé 2 h après la course.</p>`},
+    {key:'raceReminders', name:'Rappels de course', text:'24&nbsp;h avant le départ dans la cloche du site, 24&nbsp;h et 1&nbsp;h avant dans le salon de l’équipage.',
       state:states.raceReminders ? ['ok', 'Actif'] : ['off', 'Éteint'], control:toggle('raceReminders', 'Rappels de course'), settings:''},
     {key:'iracingImport', name:'Endurances iRacing officielles', text:'Les séries en équipe et les événements spéciaux importés automatiquement.',
       state:states.iracingImport ? ['ok', 'Actif'] : ['off', 'Éteint'], control:toggle('iracingImport', 'Endurances iRacing officielles'), settings:''},
-    {key:'soloRaces', name:'Courses solo', text:'Onglet « Courses solo » : places limitées, liste d’attente, courses OPEN et SAFE.',
-      state:states.soloRaces ? ['ok', 'Actif'] : ['off', 'Éteint'], control:toggle('soloRaces', 'Courses solo'), settings:''}];
+    {key:'soloRaces', name:'EVENT TDZ', text:'Le calendrier des Tondeuz, toutes simus&nbsp;: places limitées, liste d’attente, types OPEN, SAFE, Bouboule…',
+      state:states.soloRaces ? ['ok', 'Actif'] : ['off', 'Éteint'], control:toggle('soloRaces', 'EVENT TDZ'),
+      settings:`<form class="settings-safe-guide" data-safe-guide><label>Salon Discord « Comment devenir SAFE »<input name="url" type="url" maxlength="200" placeholder="https://discord.com/channels/…" value="${esc(settings.modules.safeGuideUrl || '')}"></label>
+        <div class="settings-actions"><button class="primary-button" type="submit">Enregistrer</button><span class="settings-status" aria-live="polite"></span></div></form>`},
+    {key:'training', name:'Entraînement', text:'Page « Mon entraînement » : programme guidé, séance du jour et conseils tirés des séances LMU de chaque pilote.',
+      state:states.training ? ['ok', 'Actif'] : ['off', 'Éteint'], control:toggle('training', 'Entraînement'), settings:''}];
   const tile = item => `<article class="admin-module ${states[item.key] ? 'is-on' : ''}" data-module-tile="${item.key}">
     <div class="admin-module-top"><span class="admin-module-icon">${icon(item.key)}</span><strong>${item.name}</strong>${item.control}</div>
     <p>${item.text}</p>
@@ -215,8 +230,8 @@ function lookMarkup(settings) {
       <div class="admin-stack">
         <section class="admin-card"><form class="settings-appearance" data-appearance>
           <label>Nom de la communauté<input name="name" maxlength="80" required value="${esc(look.name)}"></label>
-          <label>Nom court <small>(onglet du navigateur)</small><input name="shortName" maxlength="12" required value="${esc(look.shortName)}"></label>
-          <div class="settings-accent"><label>Couleur d’accent <span class="tip-info" data-tip="Couleur des boutons, des traits et des repères sur le site de ta communauté.">ⓘ</span><input name="accent" type="color" value="${esc(accent)}"></label>
+          <label><span>Nom court <small>(onglet du navigateur)</small></span><input name="shortName" maxlength="12" required value="${esc(look.shortName)}"></label>
+          <div class="settings-accent"><label><span>Couleur d’accent <span class="tip-info" data-tip="Couleur des boutons, des traits et des repères sur le site de ta communauté.">ⓘ</span></span><input name="accent" type="color" value="${esc(accent)}"></label>
             <label class="role-pill"><input type="checkbox" name="defaultAccent" ${look.accent ? '' : 'checked'}><span>Couleur du site</span></label></div>
           <p class="members-help">Le logo est l’icône du serveur Discord${look.discordServer ? ` « ${esc(look.discordServer)} »` : ''} : change-la sur Discord.${look.logoUrl ? '' : ' Le serveur n’a pas d’icône : le logo du site est utilisé.'}</p>
           <div class="settings-actions"><button class="primary-button" type="submit">Enregistrer</button><span class="settings-status" aria-live="polite"></span></div></form></section>
@@ -229,10 +244,10 @@ function lookMarkup(settings) {
       <div class="admin-preview-wrap"><p class="admin-preview-label">Aperçu : ce que verront tes membres</p>
         <div class="admin-preview" data-look-preview style="--preview-accent:${esc(accent)}">
           <div class="admin-preview-banner"><img src="${esc(look.bannerUrl || '/images/endurance-manager-banner.webp')}" alt=""><b data-preview-name>${esc(look.name)}</b></div>
-          <div class="admin-preview-nav"><span>Courses</span><span>Mes inscriptions</span><span>Aide</span></div>
+          <div class="admin-preview-nav"><span>Endurance</span><span>Mes inscriptions</span></div>
           <div class="admin-preview-body">
-            <div class="admin-preview-race"><span><b>6h de Spa</b><small>samedi 20:00 · LMU</small></span><span class="admin-preview-button">S’inscrire</span></div>
-            <div class="admin-preview-race"><span><b>Daytona 24h</b><small>dimanche 14:00 · iRacing</small></span><span class="admin-preview-button">S’inscrire</span></div>
+            <div class="admin-preview-race"><span><b>6h de Spa</b><small>samedi 20:00 · LMU</small></span><span class="admin-preview-button">M’inscrire</span></div>
+            <div class="admin-preview-race"><span><b>Daytona 24h</b><small>dimanche 14:00 · iRacing</small></span><span class="admin-preview-button">M’inscrire</span></div>
           </div></div></div>
     </div>`;
 }
@@ -512,6 +527,15 @@ app.addEventListener('input', event => {
 });
 
 app.addEventListener('submit', async event => {
+  const safeGuide = event.target.closest('form[data-safe-guide]');
+  if (safeGuide) {
+    event.preventDefault();
+    const status = safeGuide.querySelector('.settings-status');
+    status.textContent = 'Enregistrement…';
+    try { await api('/api/community/modules', 'PATCH', {safeGuideUrl:safeGuide.elements.url.value}); await reload('modules', {module:'soloRaces'}); }
+    catch (error) { status.textContent = error.message; }
+    return;
+  }
   const showcaseForm = event.target.closest('form[data-showcase]');
   if (showcaseForm) {
     event.preventDefault();
@@ -584,12 +608,19 @@ app.addEventListener('change', async event => {
   if (box.matches('[data-banner-zoom]') && cropper) { setZoom(Number(box.value)); return; }
   const recapForm = box.closest('form[data-recaps]');
   if (recapForm) { recapForm.dataset.mode = recapForm.elements.enabled.checked ? recapForm.elements.layout.value : 'none'; return; }
+  if (box.matches('[data-crew-category]')) {
+    const status = box.closest('.admin-module-settings').querySelector('.crew-category + .settings-status');
+    box.disabled = true; status.textContent = 'Enregistrement…';
+    try { await api('/api/community/modules', 'PATCH', {crewCategory:box.value}); status.textContent = '✓'; }
+    catch (error) { status.textContent = error.message; } finally { box.disabled = false; }
+    return;
+  }
   if (box.dataset.module) {
     box.disabled = true;
     try {
       await api('/api/community/modules', 'PATCH', {[box.dataset.module]:box.checked});
-      // The solo races permissions appear or disappear with the module.
-      await reload('modules');
+      // The solo races permissions appear or disappear with the module; the crews' channels ask where to go.
+      await reload('modules', {module:box.dataset.module === 'crewChannels' && box.checked ? 'crewChannels' : ''});
       return;
     } catch (error) { box.checked = !box.checked; alert(error.message); } finally { box.disabled = false; }
     return;

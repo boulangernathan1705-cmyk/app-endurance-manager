@@ -106,7 +106,7 @@ const IRACING_CATEGORIES = {
 };
 
 const LMU_CARS = {
-  Hypercar: ['Alpine A424','Aston Martin Valkyrie AMR LMH','BMW M Hybrid V8','Cadillac V-Series.R','Ferrari 499P','Genesis GMR-001 LMDh','Glickenhaus SCG 007','Isotta Fraschini Tipo 6-C','Lamborghini SC63','Peugeot 9X8','Porsche 963','Toyota GR010 Hybrid','Vanwall Vandervell 680'],
+  Hypercar: ['Alpine A424','Aston Martin Valkyrie AMR LMH','BMW M Hybrid V8','Cadillac V-Series.R','Ferrari 499P','Genesis GMR-001 LMDh','Glickenhaus SCG 007','Isotta Fraschini Tipo 6-C','Lamborghini SC63','Peugeot 9X8','Peugeot 9X8 Evo','Porsche 963','Toyota GR010 Hybrid','Vanwall Vandervell 680'],
   'LMP2 ELMS': ['Oreca 07 Gibson ELMS'],
   'LMP2 WEC': ['Oreca 07 Gibson'],
   LMP3: ['Ligier JS P325','Ginetta G61-LT-P3','Duqueine D09','Adess AD25'],
@@ -139,6 +139,9 @@ export const GAME_CATALOGS = {
 
 export function catalogForGame(game='lmu') { return GAME_CATALOGS[GAME_IDS.includes(game) ? game : 'lmu']; }
 // Circuit announced at the last minute (solo races).
+// EVENT TDZ (Tondeuz): the event types, set here (their logos will come with them).
+export const TDZ_EVENT_TYPES = ['OPEN', 'SAFE', 'Bouboule'];
+export const TDZ_EVENTS_LABEL = 'EVENT TDZ';
 export function isRandomCircuit(id) { return id === 'random' || id === 'iracing-random'; }
 // Default number of places of a solo race: the game server size for that track. LMU hosted servers
 // have 20, 38 or 62 slots, 62 only at Le Mans (pit garages); iRacing grids vary, 40 is a safe default.
@@ -148,6 +151,20 @@ export function gridSizeFor(circuitId) {
   return String(circuitId || '').startsWith('iracing-') ? 40 : 38;
 }
 export function gameForEvent(event) { return String(event?.circuit || '').startsWith('iracing-') ? 'iracing' : 'lmu'; }
+// Simulators of the events calendar (solo format).
+export const SIMS = [
+  {id:'lmu',name:'Le Mans Ultimate',short:'LMU'},
+  {id:'iracing',name:'iRacing',short:'iRacing'},
+  {id:'ams2',name:'Automobilista 2',short:'AMS2'},
+  {id:'ace',name:'Assetto Corsa EVO',short:'ACE'}
+];
+export const SIM_IDS = SIMS.map(sim => sim.id);
+// Older events have no simulator saved: it follows their circuit.
+export function simForEvent(event) { return SIM_IDS.includes(event?.sim) ? event.sim : gameForEvent(event); }
+export function simCatalog(sim) { return GAME_IDS.includes(sim) ? GAME_CATALOGS[sim] : null; }
+// Events of the calendar: only LMU picks its circuits and categories from the site's lists; on the other
+// simulators (AMS2, iRacing, ACE) the circuit, category and car are typed.
+export function eventCatalog(sim) { return sim === 'lmu' ? GAME_CATALOGS.lmu : null; }
 export const LEGACY_CIRCUIT_IDS = ['nurburgring'];
 export const EVENT_TYPE_IDS = Object.keys(SHARED_EVENT_TYPES);
 const browserGame = GAME_IDS.includes(globalThis?.__ENDURANCE_GAME__) ? globalThis.__ENDURANCE_GAME__ : 'lmu';

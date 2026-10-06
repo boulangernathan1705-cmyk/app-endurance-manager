@@ -119,12 +119,16 @@ const wranglerProd = await readable(resolve(root, 'wrangler.prod.jsonc'));
 // Production (communities platform): every page goes through the Worker, which reads the community from the
 // address (<slug>.endurance-manager.app, unknown one: 404 page) and serves the files through ASSETS.
 const prodRoutes = (() => { try { return JSON.parse(wranglerProd.replace(/^\s*\/\/.*$/gm, '')).assets?.run_worker_first; } catch { return null; } })();
-if (prodRoutes !== true) warnings.push('En production, toutes les pages doivent passer par le Worker (sites des communautés).');
+// The static files (scripts, styles, images) skip it: served directly, free and outside the daily quota.
+const pagesThroughWorker = routes => Array.isArray(routes) && routes.includes('/*')
+  && routes.every(route => route === '/*' || /^!\/(?:front|shared|images)\/\*$|^!\/[\w-]+\.(?:js|css)$/.test(route));
+if (!pagesThroughWorker(prodRoutes)) warnings.push('En production, toutes les pages doivent passer par le Worker (sites des communautés).');
 if (!/"binding"\s*:\s*"ASSETS"/.test(wranglerProd)) warnings.push('En production, la page d’accueil a besoin du binding ASSETS.');
 if (!/"minify"\s*:\s*true/.test(wrangler) || !/"minify"\s*:\s*true/.test(wranglerProd)) warnings.push('Wrangler doit minifier le Worker avant déploiement.');
 // Dev: every page goes through the Worker to add the "version de test" banner and noindex.
 const devSite = /"SITE_ENV"\s*:\s*"development"/.test(wrangler);
-if (devSite && !(/"binding"\s*:\s*"ASSETS"/.test(wrangler) && /"run_worker_first"\s*:\s*true/.test(wrangler))) warnings.push('Le dev (SITE_ENV=development) doit passer toutes les pages par le Worker avec le binding ASSETS.');
+const devRoutes = (() => { try { return JSON.parse(wrangler.replace(/^\s*\/\/.*$/gm, '')).assets?.run_worker_first; } catch { return null; } })();
+if (devSite && !(/"binding"\s*:\s*"ASSETS"/.test(wrangler) && pagesThroughWorker(devRoutes))) warnings.push('Le dev (SITE_ENV=development) doit passer toutes les pages par le Worker avec le binding ASSETS.');
 if (!devSite && !wrangler.includes('"/api/*"')) warnings.push('Cloudflare doit exécuter le Worker en priorité uniquement sur les routes /api/*.');
 if (/"SITE_ENV"/.test(wranglerProd)) warnings.push('SITE_ENV est réservé au site dev : la production ne doit pas afficher le bandeau de test.');
 if (!wranglerProd.includes('"APP_ORIGIN": "https://endurance-manager.app"')) warnings.push('La production doit conserver endurance-manager.app comme origine canonique HTTPS.');

@@ -6,19 +6,20 @@ import {timeLabel,timeAt,weekdayLabel,weekdayLong,dayMonthLong,dayMonthShort,dat
 import {eventMinutes} from '../../shared/duration.mjs';
 import {raceDays,parisDayKey as dayKey} from '../../shared/start-times.mjs';
 import {state,esc,categories,logo,sortedCrews,crewColorClass,pilotCount,communityTag,communityPrefix} from './core.mjs';
+import {isSolo,soloFill} from './solo.mjs';
 
 const LOCKED_ICON='<span class="planning-crew-lock is-locked" data-tip="Complet : l’équipage est verrouillé" aria-label="Complet"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" d="M5 13a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2zM8 11V7a4 4 0 1 1 8 0v4"/></svg></span>';
 const OPEN_ICON='<span class="planning-crew-lock is-open" data-tip="Places libres : tu peux le rejoindre" aria-label="Places libres"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" d="M5 13a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2zM8 11V7a4 4 0 0 1 8 0"/></svg></span>';
-const CHEVRON='<svg class="planning-chevron" viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6"/></svg>';
+export const CHEVRON='<svg class="planning-chevron" viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6"/></svg>';
 
-// The race days with their starts, or [] when the race is not over several days (a start to define, a solo
-// race or a single day keep the list of starts).
-export function planningDays(event){return event.format==='solo'?[]:raceDays(event.departures||[]);}
+// The race days with their starts: every race and event uses the planning, over one day or several (a start
+// still to define keeps the list of starts).
+export function planningDays(event){return raceDays(event.departures||[],{minDays:1});}
 
 // Date block of a race: the span of its days when it runs over several days.
 export function raceRangeBlock(event){
   const days=planningDays(event);
-  if(!days.length)return '';
+  if(days.length<2)return '';
   return dateRangeBlock(days[0].items[0].departure.startsAt,days.at(-1).items[0].departure.startsAt);
 }
 
@@ -30,7 +31,7 @@ function startCard(event,departure,body,{minutes,now,open,quick=''}){
   const compact=!open&&(done||!pilots);
   const endDay=dayKey(end)!==dayKey(start)?` le ${weekdayLabel(end)}`:'';
   const tags=compact?'':`${mine?'<span class="planning-tag is-mine">Ton départ</span>':''}${live?'<span class="planning-tag is-live">En cours</span>':''}`;
-  const head=`<span class="planning-start-head"><strong>Départ ${esc(timeLabel(departure.time))}</strong>${compact?(done?'<span class="planning-start-state">Terminé</span>':''):`<span class="planning-start-end">fin ${esc(timeAt(end))}${esc(endDay)}</span>`}${tags}</span>`;
+  const head=`<span class="planning-start-head"><strong>Départ ${esc(timeLabel(departure.time))}</strong>${compact?(done?'<span class="planning-start-state">Terminé</span>':''):(isSolo(event)?'':`<span class="planning-start-end">fin ${esc(timeAt(end))}${esc(endDay)}</span>`)}${tags}</span>`;
   // Pilots without a crew, by category (« 2 GT3 » « 1 Hypercar »): where a pilot can find a crew. The crews
   // follow, by name.
   const free=event.categories.map(category=>{const regs=present.filter(reg=>!assigned.has(reg.id)&&reg.category===category);return [category,regs.length,regs.map(reg=>communityPrefix(reg)+reg.name)];}).filter(([,count])=>count);
@@ -39,27 +40,31 @@ function startCard(event,departure,body,{minutes,now,open,quick=''}){
   // A crew that still takes pilots shows a green open padlock, a full one a red closed padlock.
   const crewLine=crews.length?row(crews.map((crew,index)=>`<span class="planning-crew ${crewColorClass(crew.id,index)}">${logo(crew.category)}${communityTag(crew)}<span>${esc(crew.name)}</span>${crew.locked?LOCKED_ICON:OPEN_ICON}</span>`).join('')):'';
   const freeLine=free.length?row(free.map(([category,count,names])=>`<span class="planning-free-pill ${categories[category]?.css||''}" data-tip="${esc(names.join(', '))}">${count} ${esc(category)}</span>`).join(''),' data-free-pilots data-tip="Pilotes cherchant un équipage"'):'';
-  const details=compact?'':`${crewLine}${freeLine}`;
+  // Solo event: no crews, the number of participants (and places) instead.
+  const details=compact?'':isSolo(event)?row(soloFill(event,departure)):`${crewLine}${freeLine}`;
   return `<details class="planning-start${compact?' is-compact':''}${done?' is-done':''}${mine?' is-mine':''}${!pilots?' is-empty':''}${quick?' has-quick':''}" id="departure-${departure.id}" ${open?'open':''}><summary>${head}${details}${quick}${CHEVRON}</summary><div class="departure-fold planning-body">${body}</div></details>`;
 }
 
 // `body(departure, index)`: what an opened start shows (buttons, registration, crews and pilots), as in the list.
 // `actions`: the race's own buttons (link, edit, delete), on the heading line of the planning.
-export function renderPlanning(event,days,body,{actions='',quick=()=>''}={}){
+// `cards(departure)`: when it returns something, the start is shown as those cards (an event in rounds: one
+// card per round) instead of one start card.
+export function renderPlanning(event,days,body,{actions='',quick=()=>'',cards=()=>''}={}){
   const minutes=eventMinutes(event),now=Date.now();
   const finished=day=>day.items.every(({departure})=>Number(departure.startsAt)+minutes*60000<=now);
   const openId=state.selectedDepartureId||[...state.registrationOpen].find(id=>days.some(day=>day.items.some(item=>item.departure.id===id)));
   const active=days.find(day=>day.key===state.planningDay)||days.find(day=>day.items.some(item=>item.departure.id===openId))||days.find(day=>!finished(day))||days[0];
+  // One day only: no day tabs on phones, the day heading below already gives the date.
   const tabs=days.map(day=>{const first=day.items[0].departure.startsAt,mine=day.items.some(({departure})=>(departure.availability||[]).some(reg=>reg.mine&&reg.status!=='unavailable'));
     return `<button type="button" class="planning-tab${day===active?' is-active':''}" data-action="planning-day" data-day="${day.key}" aria-pressed="${day===active}"><small>${esc(weekdayLabel(first))}</small><strong>${esc(dayMonthShort(first))}</strong><small>${finished(day)?'terminé':`${day.items.length} départ${day.items.length>1?'s':''}`}</small>${mine?'<i class="planning-tab-mine" aria-label="ton départ"></i>':''}</button>`;}).join('');
   const columns=days.map(day=>{const first=day.items[0].departure.startsAt,pilots=pilotCount(day.items.flatMap(({departure})=>departure.availability||[])),today=dayKey(now)===day.key;
-    return `<section class="planning-day${finished(day)?' is-past':''}${day===active?' is-active':''}" data-day="${day.key}" aria-label="${esc(weekdayLong(first))} ${esc(dayMonthLong(first))}"><div class="planning-day-head"><span class="planning-day-name"><strong>${esc(weekdayLong(first))}</strong><span>${esc(dayMonthLong(first))}</span></span>${today?'<span class="planning-today">Aujourd’hui</span>':`<small>${finished(day)?'Terminé':`${day.items.length} départ${day.items.length>1?'s':''} · ${pilots} pilote${pilots>1?'s':''}`}</small>`}</div>${day.items.map(({departure,index})=>startCard(event,departure,body(departure,index),{minutes,now,open:departure.id===openId,quick:quick(departure)})).join('')}</section>`;}).join('');
+    return `<section class="planning-day${finished(day)?' is-past':''}${day===active?' is-active':''}" data-day="${day.key}" aria-label="${esc(weekdayLong(first))} ${esc(dayMonthLong(first))}"><div class="planning-day-head"><span class="planning-day-name"><strong>${esc(weekdayLong(first))}</strong><span>${esc(dayMonthLong(first))}</span></span>${today?'<span class="planning-today">Aujourd’hui</span>':`<small>${finished(day)?'Terminé':`${day.items.length} départ${day.items.length>1?'s':''} · ${pilots} pilote${pilots>1?'s':''}`}</small>`}</div>${day.items.map(({departure,index})=>cards(departure)||startCard(event,departure,body(departure,index),{minutes,now,open:departure.id===openId,quick:quick(departure)})).join('')}</section>`;}).join('');
   const total=days.reduce((sum,day)=>sum+day.items.length,0),span=planningSpan(days.length);
   // More than three days: three on screen by default, or five or seven at once (remembered on this browser).
   const spans=days.length>3?[...new Set([...SPANS.filter(count=>count<days.length),days.length])]:[];
   const spanChoice=spans.length?`<span class="planning-span" role="group" aria-label="Jours affichés">${spans.map(count=>`<button type="button" data-action="planning-span" data-span="${count}" aria-pressed="${count===span}">${count} jours</button>`).join('')}</span>`:'';
   const offset=state.planningWindow?.event===event.id?state.planningWindow.offset:days.indexOf(active);
-  return `<section class="departure-planning" style="--days:${days.length}" data-span="${span}" data-offset="${offset}" data-event="${event.id}" aria-label="Départs de la course"><div class="planning-heading"><h2>Départs</h2><small>${total} départs sur ${days.length} jours</small>${spanChoice}${actions?`<span class="planning-race-actions">${actions}</span>`:''}<span class="planning-arrows"><button type="button" data-action="planning-scroll" data-step="-1" aria-label="Jour précédent">‹</button><button type="button" data-action="planning-scroll" data-step="1" aria-label="Jour suivant">›</button></span></div><div class="planning-tabs" role="group" aria-label="Jour de course">${tabs}</div><div class="planning-scroll"><div class="planning-days">${columns}</div></div></section>`;
+  return `<section class="departure-planning" style="--days:${days.length}" data-span="${span}" data-offset="${offset}" data-event="${event.id}" aria-label="Départs de la course"><div class="planning-heading"><h2>Départs</h2><small>${total} départ${total>1?'s':''}${days.length>1?` sur ${days.length} jours`:''}</small>${spanChoice}${actions?`<span class="planning-race-actions">${actions}</span>`:''}<span class="planning-arrows"><button type="button" data-action="planning-scroll" data-step="-1" aria-label="Jour précédent">‹</button><button type="button" data-action="planning-scroll" data-step="1" aria-label="Jour suivant">›</button></span></div>${days.length>1?`<div class="planning-tabs" role="group" aria-label="Jour de course">${tabs}</div>`:''}<div class="planning-scroll"><div class="planning-days">${columns}</div></div></section>`;
 }
 
 const SPANS=[3,5,7],GAP=16;
@@ -147,11 +152,13 @@ globalThis.document?.addEventListener('click',event=>{
 },true);
 globalThis.document?.addEventListener('keydown',event=>{if(event.key==='Escape')closeQuickMenus();});
 
-// One start open at a time in a planning; the widths follow.
+// One start open at a time in a planning (the rounds of an event apart); the widths follow.
 globalThis.document?.addEventListener('toggle',event=>{
   const start=event.target;
   if(!start?.classList?.contains('planning-start'))return;
-  if(start.open)for(const other of start.closest('.departure-planning')?.querySelectorAll('.planning-start[open]')||[])if(other!==start)other.open=false;
+  // The rounds of an event stay open together.
+  if(start.dataset.roundKey){syncPlanning();return;}
+  if(start.open)for(const other of start.closest('.departure-planning')?.querySelectorAll('.planning-start[open]:not([data-round-key])')||[])if(other!==start)other.open=false;
   if(start.open)state.selectedDepartureId=start.id.replace('departure-','');
   else if(state.selectedDepartureId===start.id.replace('departure-',''))state.selectedDepartureId=null;
   syncPlanning();

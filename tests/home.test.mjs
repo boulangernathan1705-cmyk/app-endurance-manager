@@ -13,6 +13,19 @@ test('a returning pilot goes straight to the simulator they chose', async () => 
   assert.equal(response.headers.get('Cache-Control'), 'no-store');
 });
 
+test('with EVENT TDZ, the events calendar is the home page; the simulator is asked in Endurance', async () => {
+  const {homeRedirect} = await import('../server/home.mjs');
+  const events = {modules:{soloRaces:true}};
+  const go = cookie => homeRedirect(new Request('https://site.example/', {headers: cookie ? {Cookie: cookie} : {}}), events)?.headers.get('Location');
+  assert.equal(go(''), '/lmu/#solo');
+  assert.equal(go('em_sim=iracing'), '/iracing/#solo');
+  assert.equal(homeRedirect(new Request('https://site.example/?accueil'), events), null);
+  assert.equal(homeRedirect(new Request('https://site.example/'), {modules:{}}), null);
+  const context = readFileSync(new URL('../front/game-context.js', import.meta.url), 'utf8');
+  assert.match(context, /if \(chosen \|\| !\/\^#\(solo\|event=\)\/\.test\(location\.hash\)\)/);
+  assert.match(readFileSync(new URL('../front/app/actions.mjs', import.meta.url), 'utf8'), /state\.soloRaces&&!simChosen\(\)\)\{openSimChooser\(\)/);
+});
+
 test('the home page stays reachable with ?accueil, for new visitors and unknown values', async () => {
   for (const [path, cookie] of [['/?accueil', 'em_sim=lmu'], ['/', ''], ['/', 'em_sim=elsewhere']]) {
     const response = await home(path, cookie);
@@ -27,7 +40,11 @@ test('simulator spaces remember the choice and the logo leads to the chosen simu
   for (const page of ['game.html', 'members.html', 'help.html', 'about.html'])
     assert.match(readFileSync(new URL(`../${page}`, import.meta.url), 'utf8'), /class="brand-button logo" href="\/"/, page);
   const prod = JSON.parse(readFileSync(new URL('../wrangler.prod.jsonc', import.meta.url), 'utf8'));
-  assert.equal(prod.assets.run_worker_first, true, 'every page: the address says which community');
+  // Every page goes through the Worker (the address says which community); the static files are served directly
+  // (free and outside the daily quota).
+  const routes = prod.assets.run_worker_first;
+  assert.ok(routes.includes('/*'), 'every page: the address says which community');
+  for (const route of routes.filter(route => route.startsWith('!'))) assert.doesNotMatch(route, /\.html|^!\/(?:\*|api|telemetry|downloads|lmu|iracing)/, route);
   assert.equal(prod.assets.binding, 'ASSETS');
 });
 

@@ -5,18 +5,19 @@ import {
 } from './core.mjs';
 import {ingestClientError, clientErrorsApi} from './telemetry.mjs';
 import {communityRequestsApi, closeCommunityRequest} from './community-requests.mjs';
+import {trainingApi, trainingCollector, nextRace} from './training.mjs';
 import {racesPath} from './races-path.mjs';
-import {CARS} from '../shared/catalog.mjs';
+import {CARS, simForEvent, TDZ_EVENT_TYPES, TDZ_EVENTS_LABEL} from '../shared/catalog.mjs';
 import {currentCommunity, appearanceOf, allCommunities, communityUrl, communitySlug, communityById, communityFromRow} from './community.mjs';
 import {isDevelopment} from './dev-environment.mjs';
-import {communityAccess, requirePermission, displayRole, PERMISSIONS, DEFAULT_EVERYONE, normalizePermissions, discordGuild, keepDiscordLook, memberPermissions, refreshCommunityMembers} from './access.mjs';
+import {communityAccess, requirePermission, displayRole, PERMISSIONS, ALL_PERMISSIONS, DEFAULT_EVERYONE, normalizePermissions, discordGuild, keepDiscordLook, memberPermissions, refreshCommunityMembers} from './access.mjs';
 // Solo races: a module each community turns on or off (settings of the members page).
 const soloRacesEnabled = (env, community) => community?.modules?.soloRaces === true;
 import {syncIracingEvents} from './iracing-import.mjs';
 import {resetShowcase} from './demo.mjs';
 import {syncWeeklyDiscord, sendRecapTest, usesSiteRecap, WEBHOOK_URL} from './discord-weekly.mjs';
 import {notify, notificationsApi, departurePilots, eventPilots, crewPilots} from './notifications.mjs';
-import {botCanManageChannels, CREW_BOT_PERMISSIONS} from './crew-discord.mjs';
+import {botCanManageChannels, checkBot, serverCategories, CREW_BOT_PERMISSIONS} from './crew-discord.mjs';
 // Official races (iRacing's official endurances, LMU official events): common to every community (migration 0039).
 const OFFICIAL = 'official';
 // A race of the current community, or an official race: any id from another community answers "introuvable".
@@ -84,7 +85,7 @@ async function myCommunities(env, actor, community) {
   const memberships = actor.manager ? [] : (await env.DB.prepare("SELECT * FROM memberships WHERE user_id=? AND status='member'").bind(actor.user.id).all()).results || [];
   for (const entry of mine) {
     const membership = memberships.find(row => row.community_id === entry.id);
-    entry.manageCrews = actor.manager || Boolean(membership && (await memberPermissions(env, entry.item, membership)).has('manage_registrations'));
+    entry.manageCrews = actor.manager || Boolean(membership && (await memberPermissions(env, entry.item, membership)).has('crews'));
     delete entry.item;
   }
   return mine;
@@ -119,12 +120,14 @@ function botInvite(env, guildId, permissions = '0') {
   if (!env.DISCORD_CLIENT_ID) return null;
   return `https://discord.com/oauth2/authorize?client_id=${encodeURIComponent(env.DISCORD_CLIENT_ID)}&scope=bot&permissions=${permissions}${guildId ? `&guild_id=${guildId}&disable_guild_select=true` : ''}`;
 }
-// « Modules »: whether the bot may make the crews' channels, its invite link with those rights, and what last
-// stopped it.
+// « Modules »: whether the bot may make the crews' channels, its invite link with those rights, what last
+// stopped it, and where the voice channels are made (the server's categories to choose from).
 async function crewDiscordState(env, community) {
-  const saved = await env.DB.prepare('SELECT last_error, last_error_at FROM community_crew_discord WHERE community_id=?').bind(community.id).first();
-  return {botReady:await botCanManageChannels(env, community.discordGuildId), botInviteUrl:botInvite(env, community.discordGuildId, CREW_BOT_PERMISSIONS),
-    lastError:community.modules.crewChannels === true ? saved?.last_error || null : null};
+  const saved = await env.DB.prepare('SELECT last_error, last_error_at, voice_category_id FROM community_crew_discord WHERE community_id=?').bind(community.id).first();
+  const on = community.modules.crewChannels === true, bot = await checkBot(env, community.discordGuildId);
+  return {botReady:bot.ready, botProblem:bot.why, botInviteUrl:botInvite(env, community.discordGuildId, CREW_BOT_PERMISSIONS),
+    lastError:on ? saved?.last_error || null : null, voiceCategoryId:saved?.voice_category_id || null,
+    categories:on ? await serverCategories(env, community.discordGuildId) : null};
 }
 // Permissions of the actor in the current community (server/access.mjs).
 const can = (actor, permission) => Boolean(actor.permissions?.has(permission));
@@ -135,7 +138,7 @@ function canManageRegistration(reg, actor) {
   return owned(reg, actor) || isRegistrationManager(actor);
 }
 function canManageCrew(crew, actor) {
-  return can(actor, 'manage_registrations') || Boolean(actor.user && crew?.owner_user_id === actor.user.id);
+  return can(actor, 'crews') || Boolean(actor.user && crew?.owner_user_id === actor.user.id);
 }
 // `community`: the site's community. An entry of another of the player's communities (on an official race) is shown
 // with its community, and is changed on that community's site only.
@@ -177,30 +180,41 @@ function publicRegistration(reg, actor, userNames = new Map(), community = null,
 }
 // Archived = every start is in the past (same rule as front/schedule.mjs). "upcoming" keeps a
 // one-day margin so a race that just started stays visible, and undated races stay upcoming.
-const LAST_START="(SELECT max(CAST(json_extract(d.value,'$.startsAt') AS INTEGER)) FROM json_each(e.departures) d)";
+// last_start (the latest departure's start, the far future when undated; kept by triggers, migrations 0057-0058)
+// is indexed: only the races asked for are read.
 function eventScopeFilter(scope, nowMs=Date.now()) {
   const cutoff=Math.floor(nowMs);
-  if (scope==='upcoming') return `(${LAST_START} IS NULL OR ${LAST_START}>${cutoff-86400000})`;
-  if (scope==='archived') return `${LAST_START}<=${cutoff}`;
+  if (scope==='upcoming') return `e.last_start>${cutoff-86400000}`;
+  if (scope==='archived') return `e.last_start<=${cutoff}`;
   return '';
 }
 async function listEvents(env, actor, game='', scope='', community) {
-  // Filter by joining events instead of binding id lists: D1 rejects queries with more than 100 bound parameters.
   // Bound in order: the site's community (filters), then the site's community and the player (mine). The races of the community and the official races (iRacing's ones
   // where the community shows the iRacing calendar); on an official race, the entries and crews of every
   // community the player is a member of, never of the others.
   const officialRaces = community.modules?.iracingImport === true ? "e.community_id='official'" : "(e.community_id='official' AND e.circuit NOT LIKE 'iracing-%')";
-  const filters=[`(e.community_id=? OR ${officialRaces})`,game==='iracing' ? "e.circuit LIKE 'iracing-%'" : game==='lmu' ? "e.circuit NOT LIKE 'iracing-%'" : '', eventScopeFilter(scope), soloRacesEnabled(env, community) ? '' : "COALESCE(e.format,'endurance')!='solo'"].filter(Boolean);
+  const filters=[`(e.community_id=? OR ${officialRaces})`,game==='iracing' ? "(e.format='solo' OR e.circuit LIKE 'iracing-%')" : game==='lmu' ? "(e.format='solo' OR e.circuit NOT LIKE 'iracing-%')" : '', eventScopeFilter(scope), soloRacesEnabled(env, community) ? '' : "COALESCE(e.format,'endurance')!='solo'"].filter(Boolean);
   const where=filters.length ? ` WHERE ${filters.join(' AND ')}` : '';
   const player = actor.user?.id || '';
   const mine = column => `${column} IN (SELECT ? UNION SELECT community_id FROM memberships WHERE user_id=? AND status='member')`;
   const rows = (await env.DB.prepare(`SELECT e.* FROM events e${where} ORDER BY e.created_at DESC, e.id DESC`).bind(community.id).all()).results;
   if (!rows.length) return [];
-  const registrations = (await env.DB.prepare(registrationSelect+` JOIN events e ON e.id=r.event_id${where} AND ${mine('r.community_id')} ORDER BY r.created_at,r.rowid`).bind(community.id, community.id, player).all()).results;
-  const crews = (await env.DB.prepare(`SELECT c.* FROM crews c JOIN events e ON e.id=c.event_id${where} AND ${mine('c.community_id')} ORDER BY c.created_at,c.id`).bind(community.id, community.id, player).all()).results;
-  const memberships = (await env.DB.prepare(`SELECT cm.crew_id,cm.registration_id FROM crew_members cm JOIN crews c ON c.id=cm.crew_id JOIN events e ON e.id=c.event_id${where} AND ${mine('c.community_id')}`).bind(community.id, community.id, player).all()).results;
-  // Only registration creators' names are displayed (addedByName).
-  const users = (await env.DB.prepare(`SELECT DISTINCT u.id,u.name FROM users u JOIN registrations r ON r.owner_user_id=u.id JOIN events e ON e.id=r.event_id${where} AND ${mine('r.community_id')}`).bind(community.id, community.id, player).all()).results;
+  // The entries, crews and names of these races only, by race id (the events index, not the history), all at once:
+  // one wait for the database instead of one per query. By packs of 90 races (D1 takes at most 100 bound values).
+  const packs = [];
+  for (let start = 0; start < rows.length; start += 90) packs.push(rows.slice(start, start + 90).map(row => row.id));
+  const inPack = ids => ids.map(() => '?').join(',');
+  const byPacks = (sql, extra) => Promise.all(packs.map(ids => env.DB.prepare(sql(inPack(ids))).bind(...ids, ...extra).all()))
+    .then(parts => parts.flatMap(part => part.results || []));
+  const [registrations, crews, memberships, users, absenceRows] = await Promise.all([
+    byPacks(ids => registrationSelect+` WHERE r.event_id IN (${ids}) AND ${mine('r.community_id')} ORDER BY r.created_at,r.rowid`, [community.id, player]),
+    byPacks(ids => `SELECT c.* FROM crews c WHERE c.event_id IN (${ids}) AND ${mine('c.community_id')} ORDER BY c.created_at,c.id`, [community.id, player]),
+    byPacks(ids => `SELECT cm.crew_id,cm.registration_id FROM crew_members cm JOIN crews c ON c.id=cm.crew_id WHERE c.event_id IN (${ids}) AND ${mine('c.community_id')}`, [community.id, player]),
+    // Only registration creators' names are displayed (addedByName).
+    byPacks(ids => `SELECT DISTINCT u.id,u.name FROM users u JOIN registrations r ON r.owner_user_id=u.id WHERE r.event_id IN (${ids}) AND ${mine('r.community_id')}`, [community.id, player]),
+    // « Je serai absent »: the pilots of the site's community who said they will miss the event.
+    byPacks(ids => `SELECT a.event_id,a.user_id,u.name FROM event_absences a JOIN users u ON u.id=a.user_id WHERE a.event_id IN (${ids}) AND a.community_id=? ORDER BY a.created_at`, [community.id])
+  ]);
   // On official races, every entry and crew shows its community (Discord logo or short name, colour); in the
   // player's other communities, the rights of his Discord roles there apply.
   const official = new Set(rows.filter(row => row.community_id === OFFICIAL).map(row => row.id));
@@ -212,12 +226,17 @@ async function listEvents(env, actor, game='', scope='', community) {
       const item = communityFromRow(row), look = appearanceOf(item);
       names.set(row.id, {id:row.id, name:item.name, shortName:item.shortName, accent:look.accent, logoUrl:look.logoUrl});
       if (row.id === community.id || !actor.user) continue;
-      if (actor.manager) { perms.set(row.id, new Set(PERMISSIONS)); continue; }
+      if (actor.manager) { perms.set(row.id, new Set(ALL_PERMISSIONS)); continue; }
       const membership = await env.DB.prepare("SELECT * FROM memberships WHERE community_id=? AND user_id=? AND status='member'").bind(row.id, actor.user.id).first();
       if (membership) perms.set(row.id, await memberPermissions(env, item, membership));
     }
   }
   const userNames = new Map(users.map(item => [item.id,item.name]));
+  const absences = new Map();
+  for (const item of absenceRows) {
+    if (!absences.has(item.event_id)) absences.set(item.event_id, []);
+    absences.get(item.event_id).push({name:item.name, mine:item.user_id === player});
+  }
   const grouped = new Map();
   for (const reg of registrations) { const key = `${reg.event_id}:${reg.departure_id}`; if (!grouped.has(key)) grouped.set(key, []); grouped.get(key).push(publicRegistration(reg, actor, userNames, community, names, perms, official)); }
   const membersByCrew = new Map();
@@ -247,16 +266,30 @@ async function listEvents(env, actor, game='', scope='', community) {
   return rows.map(row => {
     const format=row.format||'endurance', capacity=row.capacity==null?null:Number(row.capacity);
     const durationHours=Number(row.duration_hours)||3, durationMinutes=Number(row.duration_minutes)||durationHours*60;
-    return {id:row.id, name:row.name, official:row.community_id===OFFICIAL, format, access:row.access||'open', capacity, rounds:JSON.parse(row.rounds||'[]'), circuit:row.circuit||'', durationHours, durationMinutes, driverChangeRequired:row.driver_change_required==null?null:Boolean(row.driver_change_required), eventType:row.event_type||'private', schedulePending:Boolean(row.schedule_pending), createdByMe:Boolean(actor.user && row.created_by===actor.user.id), categories:JSON.parse(row.categories), version:row.version,
-      departures:JSON.parse(row.departures).map(d => {
+    return {id:row.id, name:row.name, official:row.community_id===OFFICIAL, format, ...(format==='solo' ? {sim:simForEvent(row), details:JSON.parse(row.details||'{}')} : {}), access:row.access||'open', capacity, rounds:JSON.parse(row.rounds||'[]'), circuit:row.circuit||'', durationHours, durationMinutes, driverChangeRequired:row.driver_change_required==null?null:Boolean(row.driver_change_required), eventType:row.event_type||'private', schedulePending:Boolean(row.schedule_pending), createdByMe:Boolean(actor.user && row.created_by===actor.user.id), categories:JSON.parse(row.categories), version:row.version,
+      absences:absences.get(row.id) || [], departures:JSON.parse(row.departures).map(d => {
         const availability=grouped.get(`${row.id}:${d.id}`) || [];
         // Solo race: entries keep their order of arrival; beyond the number of places they are on the
         // waiting list, and the first one waiting moves up by itself when someone withdraws.
         if (format==='solo' && capacity) availability.forEach((reg,index)=>{ reg.waitlistPosition=index>=capacity?index-capacity+1:null; });
+        // Rounds with their own places: the same, round by round (a pilot skipping a round takes no place in it).
+        const rounds=format==='solo'?JSON.parse(row.rounds||'[]'):[];
+        if (rounds.length>1 && rounds.some(round=>round.capacity)) {
+          const counts=rounds.map(()=>0);
+          availability.forEach(reg=>{ reg.roundWaitlist=rounds.map((round,index)=>{ if(reg.roundChoices?.[index]?.skip)return null; counts[index]++; return round.capacity&&counts[index]>round.capacity?counts[index]-round.capacity:null; }); });
+        }
         // endsAt: the real finish (2 h 30 ends 30 min into the third presence slot).
         return {...d, endsAt:d.startsAt+durationMinutes*60000, availability, crews:crewsByDeparture.get(`${row.id}:${d.id}`) || []};
       })};
-  });
+  }).map(event => hidePassword(event, actor));
+}
+// The server password of an event: only for its entered pilots and for those who manage the races.
+function hidePassword(event, actor) {
+  if (!event.details?.password || can(actor, 'manage_races')) return event;
+  const entered = event.departures.some(departure => departure.availability.some(reg => reg.mine && reg.status !== 'unavailable'));
+  if (entered) return event;
+  const {password, ...details} = event.details;
+  return {...event, details};
 }
 async function oauthStart(request, env) {
   requireDiscord(env); await rateLimit(request, env, 'oauth', 20); await cleanup(env);
@@ -318,6 +351,9 @@ async function api(request, env) {
   // The main address, or a community address of the platform (BASE_DOMAIN).
   const canonical = siteOrigin(request, env);
   if (url.origin !== canonical) fail(403, 'Utilise l’adresse principale du site pour cette action.');
+  // The LMU sync program (server/training.mjs): no browser, only the pilot's own key.
+  if (path === '/api/training/collector') return trainingCollector(request, env);
+  if (path === '/api/training/live') return trainingCollector(request, env, true);
   if (!['GET','HEAD'].includes(method)) {
     if (request.headers.get('Origin') !== canonical) fail(403, 'Origine de la requête refusée.');
     await rateLimit(request, env, 'write', 80);
@@ -339,7 +375,9 @@ async function api(request, env) {
   // Requests for a new community: sent by anyone signed in with Discord, from any site (server/community-requests.mjs).
   const requests = await communityRequestsApi(path, method, request, env, actor);
   if (requests) return requests;
-  if (path === '/api/session' && method === 'GET') return json({user:actor.user, discordReady:!!(env.DISCORD_CLIENT_ID && env.DISCORD_CLIENT_SECRET), adminConfigured:administrators(env).length > 0, soloRaces:soloRacesEnabled(env, community),
+  if (path === '/api/session' && method === 'GET') return json({user:actor.user, discordReady:!!(env.DISCORD_CLIENT_ID && env.DISCORD_CLIENT_SECRET), adminConfigured:administrators(env).length > 0, soloRaces:soloRacesEnabled(env, community), soloLabel:TDZ_EVENTS_LABEL, eventTypes:TDZ_EVENT_TYPES, training:community.modules?.training === true, safeGuideUrl:community.modules?.safeGuideUrl || '',
+    // Training shows in the bar only for a pilot entered in an upcoming LMU race; the circuit memo always.
+    trainingRace:community.modules?.training === true && access.status === 'member' && !!actor.user && !!(await nextRace(env, actor.user.id)),
     community:{id:community.id, slug:community.slug, name:community.name, shortName:community.shortName, discordInviteUrl:community.discordInviteUrl, appearance:appearanceOf(community)},
     access:access.status, permissions:[...access.permissions], manager:access.manager, communities:await myCommunities(env, actor, community), openSite,
     platformDiscordUrl:/^https:\/\/(discord\.gg|discord\.com\/invite)\//.test(env.PLATFORM_DISCORD_URL || '') ? env.PLATFORM_DISCORD_URL : null});
@@ -370,6 +408,9 @@ async function api(request, env) {
   // The bell next to the account (server/notifications.mjs).
   const notifications = await notificationsApi(path, method, env, actor, community);
   if (notifications) return notifications;
+  // « Mon entraînement » (server/training.mjs).
+  const training = await trainingApi(path, method, request, env, actor, community);
+  if (training) return training;
   if (path === '/api/events' && method === 'GET') {
     const requestedGame=url.searchParams.get('game');
     const game=requestedGame==='lmu'||requestedGame==='iracing'?requestedGame:'';
@@ -410,7 +451,7 @@ async function api(request, env) {
     if (crewRoute && !crew) fail(404,'Équipage introuvable.');
     const event=await eventById(env,crew?.event_id || crewCreate[1],community);
     const {community:here, actor:who} = await actingCommunity(env, actor, community, crew ? crew.community_id : input.communityId, event);
-    if ((event.format||'endurance')==='solo') fail(409,'Les courses solo n’ont pas d’équipage.');
+    if ((event.format||'endurance')==='solo') fail(409,'Les événements n’ont pas d’équipage.');
     const departure=departureById(event,crew?.departure_id || crewCreate[2]);
     if (departure.startsAt<=Date.now()) fail(409,'Ce départ est passé. Les équipages sont verrouillés.');
     if (crew && input.version!==crew.version) fail(409,'Cet équipage a changé. Actualise avant de réessayer.');
@@ -471,7 +512,7 @@ async function api(request, env) {
       fail(404,'Action introuvable.');
     }
     if (crew) {
-      if (!canManageCrew(crew,who)) fail(403,'Seul le responsable de cet équipage ou un organisateur peut le modifier.');
+      if (!canManageCrew(crew,who)) fail(403,'Seul le responsable de cet équipage ou un pilote qui gère les équipages peut le modifier.');
       if (method==='DELETE') {
         const told = await crewPilots(env,crew.id);
         const result = await env.DB.prepare('DELETE FROM crews WHERE id=? AND version=?').bind(crew.id,input.version).run();
@@ -517,15 +558,16 @@ async function api(request, env) {
     if (!JSON.parse(event.categories).includes(input.category)) fail(400,'Choisis une catégorie de cet événement.');
     const car=crewCar(input);
     const crewId=id();
-    if (can(who,'manage_registrations')) {
+    // « Équipages »: a crew is created by whoever has that permission. Entered on this start and category, they
+    // lead it and join it; otherwise (or as an administrator) the crew starts empty, to be composed.
+    requirePermission(who,'crews','Tu n’as pas l’autorisation de créer un équipage dans cette communauté.');
+    const ownRows=can(who,'manage_registrations')?[]:(await env.DB.prepare(registrationSelect+' WHERE r.event_id=? AND r.departure_id=? AND r.category=? AND r.status!=? AND r.community_id=?').bind(event.id,departure.id,input.category,'unavailable',here.id).all()).results;
+    const selected=ownRows.find(reg=>personal(reg,actor));
+    if (!selected) {
       const result=await env.DB.prepare('INSERT INTO crews(id,event_id,departure_id,name,category,car,created_at,community_id) VALUES(?,?,?,?,?,?,?,?)').bind(crewId,event.id,departure.id,name,input.category,car,now(),here.id).run();
       if (!result.meta.changes) fail(409,'Impossible de créer cet équipage. Actualise avant de réessayer.');
       return json({id:crewId,joined:false},201);
     }
-    requirePermission(who,'endurance','Tu n’as pas l’autorisation de créer un équipage dans cette communauté.');
-    const ownRows=(await env.DB.prepare(registrationSelect+' WHERE r.event_id=? AND r.departure_id=? AND r.category=? AND r.status!=? AND r.community_id=?').bind(event.id,departure.id,input.category,'unavailable',here.id).all()).results;
-    const selected=ownRows.find(reg=>personal(reg,actor));
-    if (!selected) fail(403,'Inscris-toi d’abord sur ce départ dans cette catégorie avant de créer ton équipage.');
     const results=await env.DB.batch([
       env.DB.prepare('INSERT INTO crews(id,event_id,departure_id,name,category,car,owner_user_id,created_at,community_id) VALUES(?,?,?,?,?,?,?,?,?)').bind(crewId,event.id,departure.id,name,input.category,car,actor.user.id,now(),here.id),
       env.DB.prepare('INSERT INTO crew_members(registration_id,crew_id) SELECT ?,? WHERE changes()=1').bind(selected.id,crewId),
@@ -537,13 +579,13 @@ async function api(request, env) {
   if (path === '/api/events' && method === 'POST') {
     requirePermission(actor,'create_race','Tu n’as pas l’autorisation de créer une course dans cette communauté.');
     const input = await body(request);
-    if (input.format === 'solo' && !soloRacesEnabled(env, community)) fail(400, 'Les courses solo ne sont pas encore disponibles.');
+    if (input.format === 'solo' && !soloRacesEnabled(env, community)) fail(400, 'Les événements ne sont pas activés sur ce site.');
     const data = validateEvent(input), eventId = id();
     // « Course officielle (toutes les communautés) »: the platform managers only.
     if (input.official === true && !actor.manager) fail(403, 'Seuls les gestionnaires de la plateforme créent des courses officielles.');
     const owner = input.official === true ? OFFICIAL : community.id;
     await dropEmptyCommonStart(env, null, data);
-    await env.DB.prepare('INSERT INTO events(id,name,duration_hours,duration_minutes,event_type,circuit,schedule_pending,driver_change_required,format,access,capacity,rounds,categories,departures,created_by,created_at,community_id) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)').bind(eventId, data.name, data.durationHours, data.durationMinutes, data.eventType, data.circuit, data.schedulePending?1:0, data.driverChangeRequired==null?null:(data.driverChangeRequired?1:0), data.format, data.access, data.capacity, JSON.stringify(data.rounds), JSON.stringify(data.categories), JSON.stringify(data.departures), actor.user.id, now(), owner).run();
+    await env.DB.prepare('INSERT INTO events(id,name,duration_hours,duration_minutes,event_type,circuit,schedule_pending,driver_change_required,format,access,capacity,rounds,categories,departures,created_by,created_at,community_id,sim,details) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)').bind(eventId, data.name, data.durationHours, data.durationMinutes, data.eventType, data.circuit, data.schedulePending?1:0, data.driverChangeRequired==null?null:(data.driverChangeRequired?1:0), data.format, data.access, data.capacity, JSON.stringify(data.rounds), JSON.stringify(data.categories), JSON.stringify(data.departures), actor.user.id, now(), owner, data.sim, JSON.stringify(data.details)).run();
     return json({id:eventId}, 201);
   }
   // « Rendre officielle »: a race of the community becomes common to every community (managers); its entries and
@@ -553,7 +595,7 @@ async function api(request, env) {
     if (!actor.manager) fail(403, 'Seuls les gestionnaires de la plateforme rendent une course officielle.');
     const event = await eventById(env, officialMatch[1], community);
     if (event.community_id === OFFICIAL) return json({ok:true});
-    if ((event.format || 'endurance') === 'solo') fail(400, 'Une course solo reste dans sa communauté.');
+    if ((event.format || 'endurance') === 'solo') fail(400, 'Un événement reste dans sa communauté.');
     await env.DB.prepare('UPDATE events SET community_id=?,version=version+1 WHERE id=? AND community_id=?').bind(OFFICIAL, event.id, community.id).run();
     return json({ok:true});
   }
@@ -574,17 +616,31 @@ async function api(request, env) {
     const data = validateEvent(input, event);
     await dropEmptyCommonStart(env, event.id, data);
     const cats = JSON.stringify(data.categories), deps = JSON.stringify(data.departures);
-    const result = await env.DB.prepare(`UPDATE events SET name=?,duration_hours=?,duration_minutes=?,event_type=?,circuit=?,schedule_pending=?,driver_change_required=?,access=?,capacity=?,rounds=?,categories=?,departures=?,version=version+1 WHERE id=? AND version=?
+    const result = await env.DB.prepare(`UPDATE events SET name=?,duration_hours=?,duration_minutes=?,event_type=?,circuit=?,schedule_pending=?,driver_change_required=?,access=?,capacity=?,rounds=?,categories=?,departures=?,sim=?,details=?,version=version+1 WHERE id=? AND version=?
       AND NOT EXISTS (SELECT 1 FROM registrations r WHERE r.event_id=events.id AND
         (NOT EXISTS (SELECT 1 FROM json_each(?) d WHERE json_extract(d.value,'$.id')=r.departure_id)
       OR (r.category NOT IN ('','*') AND NOT EXISTS (SELECT 1 FROM json_each(?) c WHERE c.value=r.category))
-      OR EXISTS (SELECT 1 FROM json_each(?) h WHERE instr(',' || r.status || ',', ',' || h.value || ',') > 0)))`).bind(data.name, data.durationHours, data.durationMinutes, data.eventType, data.circuit, data.schedulePending?1:0, data.driverChangeRequired==null?null:(data.driverChangeRequired?1:0), data.access, data.capacity, JSON.stringify(data.rounds), cats, deps, event.id, input.version, deps, cats, JSON.stringify(Array.from({length:24-data.durationHours},(_,i)=>`h${data.durationHours+i+1}`))).run();
+      OR EXISTS (SELECT 1 FROM json_each(?) h WHERE instr(',' || r.status || ',', ',' || h.value || ',') > 0)))`).bind(data.name, data.durationHours, data.durationMinutes, data.eventType, data.circuit, data.schedulePending?1:0, data.driverChangeRequired==null?null:(data.driverChangeRequired?1:0), data.access, data.capacity, JSON.stringify(data.rounds), cats, deps, data.sim, JSON.stringify(data.details), event.id, input.version, deps, cats, JSON.stringify(Array.from({length:24-data.durationHours},(_,i)=>`h${data.durationHours+i+1}`))).run();
     if (!result.meta.changes) fail(409, 'Modification impossible : événement modifié ailleurs, départ supprimé avec des inscrits, catégorie encore utilisée, ou disponibilités au-delà de la nouvelle durée. Ajuste les disponibilités concernées avant de raccourcir la course.');
     // The entered pilots are told what changed for them: the starts, the track, the length or the name.
     const starts = list => JSON.stringify(JSON.parse(list).map(d => [d.id, d.startsAt, Boolean(d.tbd)]));
     const changes = [starts(event.departures) !== starts(deps) && 'starts', (event.circuit || '') !== data.circuit && 'circuit',
       (Number(event.duration_minutes) || Number(event.duration_hours) * 60) !== data.durationMinutes && 'duration', event.name !== data.name && 'name'].filter(Boolean);
     if (changes.length) await notify(env, await eventPilots(env, event.id), 'race_changed', {...event, name:data.name, circuit:data.circuit}, {skip:[actor.user?.id], changes, previousName:event.name !== data.name ? event.name : undefined});
+    return json({ok:true});
+  }
+  // « Je serai absent » on an event or an endurance, for oneself; entering the event withdraws it.
+  const absenceMatch = path.match(/^\/api\/events\/([a-f0-9-]{36})\/absence$/);
+  if (absenceMatch && ['PUT','DELETE'].includes(method)) {
+    const event = await eventById(env, absenceMatch[1], community);
+    if (!actor.user) fail(401, 'Connecte-toi avec Discord.');
+    // After the last start, nothing changes any more; « Absent » is for those who could enter.
+    if (Math.max(...JSON.parse(event.departures || '[]').map(d => Number(d.startsAt) || 0)) <= Date.now()) fail(409, 'Cet événement est passé.');
+    if (method === 'DELETE') { await env.DB.prepare('DELETE FROM event_absences WHERE event_id=? AND user_id=? AND community_id=?').bind(event.id, actor.user.id, community.id).run(); return json({ok:true}); }
+    if (!(event.format === 'solo' ? can(actor, 'solo_open') || can(actor, 'solo_safe') : can(actor, 'endurance'))) fail(403, 'Tu n’as pas l’autorisation de t’inscrire à cet événement.');
+    if (await env.DB.prepare("SELECT 1 FROM registrations WHERE event_id=? AND user_id=? AND community_id=? AND COALESCE(status,'')!='unavailable' LIMIT 1").bind(event.id, actor.user.id, community.id).first())
+      fail(409, 'Tu es inscrit à cet événement : retire d’abord ton inscription.');
+    await env.DB.prepare('INSERT OR IGNORE INTO event_absences(event_id,user_id,community_id,created_at) VALUES(?,?,?,?)').bind(event.id, actor.user.id, community.id, now()).run();
     return json({ok:true});
   }
   const departureMatch = path.match(/^\/api\/events\/([a-f0-9-]{36})\/departures\/([a-f0-9-]{36})\/registrations$/);
@@ -601,8 +657,8 @@ async function api(request, env) {
     const forOther = input.forOther === true || Boolean(input.participantUserId);
     if (forOther) requirePermission(who,'manage_registrations','Tu n’as pas l’autorisation d’inscrire un autre pilote dans cette communauté.');
     // Solo races: OPEN for "Courses solo OPEN" or "SAFE", SAFE only for "SAFE". Endurances: "Endurances".
-    else if (solo && event.access === 'safe') requirePermission(who,'solo_safe','Cette course est réservée aux pilotes SAFE. Demande à un administrateur du Discord.');
-    else if (solo) { if (!can(who,'solo_safe')) requirePermission(who,'solo_open','Tu n’as pas l’autorisation de t’inscrire aux courses solo de cette communauté.'); }
+    else if (solo && event.access === 'safe') requirePermission(who,'solo_safe','Cet événement est réservé aux pilotes SAFE. Demande à un administrateur du Discord.');
+    else if (solo) { if (!can(who,'solo_safe')) requirePermission(who,'solo_open','Tu n’as pas l’autorisation de t’inscrire aux événements de cette communauté.'); }
     else requirePermission(who,'endurance','Tu n’as pas l’autorisation de t’inscrire aux endurances de cette communauté.');
     const data = validateRegistration(input, event);
     const participant=await registrationParticipant(env,who,input,data,here);
@@ -620,6 +676,7 @@ async function api(request, env) {
     const result = await env.DB.prepare(`INSERT INTO registrations(id,event_id,departure_id,user_id,owner_user_id,guest_hash,name,name_key,category,car,car_preferences,car_any,status,preferred_pilot,created_at,participant_id,round_choices,solo_driver,community_id)
       SELECT ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,? FROM events WHERE id=? AND version=? AND (community_id=? OR community_id=?)`).bind(regId,event.id,departure.id,userId,ownerUserId,guestHash,data.name,data.nameKey,data.category,data.car,JSON.stringify(data.cars),data.carAny?1:0,data.status,data.preferredPilot,now(),participant.id,JSON.stringify(data.roundChoices||[]),data.soloDriver?1:0,here.id,event.id,event.version,community.id,OFFICIAL).run();
     if (!result.meta.changes) fail(409, 'Cet événement a changé. Actualise avant de t’inscrire.');
+    if (userId && data.status!=='unavailable') await env.DB.prepare('DELETE FROM event_absences WHERE event_id=? AND user_id=? AND community_id=?').bind(event.id, userId, here.id).run();
     if (!alreadyThere && data.status!=='unavailable') await notify(env,await departurePilots(env,event.id,departure.id,here.id),'entry',event,{departure,skip:[actor.user?.id,userId],pilot:data.name,category:data.category});
     if (forOther && userId && userId!==actor.user?.id) await notify(env,[{user_id:userId,community_id:here.id}],'entered_by',event,{departure,by:actor.user.name,category:data.category});
     return json({id:regId}, 201);
@@ -711,8 +768,8 @@ async function api(request, env) {
       administrator:role.administrator, permissions:saved.has(role.id) ? normalizePermissions(saved.get(role.id)) : (role.id === community.discordGuildId ? [...DEFAULT_EVERYONE] : [])}));
     await keepDiscordLook(env, community, discord);
     return json({community:{name:community.name, shortName:community.shortName, discordServer:discord?.name || null, ...appearanceOf(community)}, roles, permissions:PERMISSIONS,
-      modules:{iracingImport:community.modules.iracingImport === true, discordWeekly:community.modules.discordWeekly === true, soloRaces:community.modules.soloRaces === true,
-        crewChannels:community.modules.crewChannels === true, raceReminders:community.modules.raceReminders === true},
+      modules:{iracingImport:community.modules.iracingImport === true, discordWeekly:community.modules.discordWeekly === true, soloRaces:community.modules.soloRaces === true, eventsLabel:TDZ_EVENTS_LABEL, eventTypes:TDZ_EVENT_TYPES,
+        crewChannels:community.modules.crewChannels === true, raceReminders:community.modules.raceReminders === true, training:community.modules.training === true},
       crews:await crewDiscordState(env, community)});
   }
   // Banner sent by the admins: the image itself (already resized by the browser), WebP, JPEG or PNG, 600 KB at most.
@@ -761,7 +818,13 @@ async function api(request, env) {
     const input = await body(request);
     const modules = {...community.modules};
     // The Discord recap is set on the « Mise en place » page (its own webhook), not here.
-    for (const key of ['iracingImport','soloRaces','raceReminders']) if (typeof input[key] === 'boolean') modules[key] = input[key];
+    for (const key of ['iracingImport','soloRaces','raceReminders','training']) if (typeof input[key] === 'boolean') modules[key] = input[key];
+    // EVENT TDZ: the Discord channel that explains how to become SAFE (a button for the pilots who are not).
+    if (typeof input.safeGuideUrl === 'string') {
+      const url = input.safeGuideUrl.trim();
+      if (url && (url.length > 200 || !/^https:\/\/((ptb\.|canary\.)?discord\.com|discord\.gg)\//.test(url))) fail(400, 'Colle le lien d’un salon Discord (clic droit sur le salon → Copier le lien).');
+      modules.safeGuideUrl = url;
+    }
     const statements = [];
     // Crews on Discord (server/crew-discord.mjs): only once the bot has the rights to make the channels.
     if (typeof input.crewChannels === 'boolean') {
@@ -770,6 +833,13 @@ async function api(request, env) {
       modules.crewChannels = input.crewChannels;
       if (input.crewChannels) statements.push(env.DB.prepare(`INSERT INTO community_crew_discord(community_id,updated_at) VALUES(?,?)
         ON CONFLICT(community_id) DO UPDATE SET last_error=NULL,last_error_at=NULL,updated_at=excluded.updated_at`).bind(community.id, now()));
+    }
+    // Where the crews' voice channels are made: a category of the server, or '' for the top of the server.
+    if (typeof input.crewCategory === 'string') {
+      const category = input.crewCategory.trim();
+      if (category && !(await serverCategories(env, community.discordGuildId) || []).some(item => item.id === category)) fail(400, 'Cette catégorie n’existe pas sur ton serveur.');
+      statements.push(env.DB.prepare(`INSERT INTO community_crew_discord(community_id,voice_category_id,updated_at) VALUES(?,?,?)
+        ON CONFLICT(community_id) DO UPDATE SET voice_category_id=excluded.voice_category_id,last_error=NULL,last_error_at=NULL,updated_at=excluded.updated_at`).bind(community.id, category || null, now()));
     }
     statements.push(env.DB.prepare('UPDATE communities SET modules=? WHERE id=?').bind(JSON.stringify(modules), community.id));
     await env.DB.batch(statements);
