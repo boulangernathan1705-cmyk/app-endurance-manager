@@ -17,7 +17,7 @@ import {syncIracingEvents} from './iracing-import.mjs';
 import {resetShowcase} from './demo.mjs';
 import {syncWeeklyDiscord, sendRecapTest, usesSiteRecap, WEBHOOK_URL} from './discord-weekly.mjs';
 import {notify, notificationsApi, departurePilots, eventPilots, crewPilots} from './notifications.mjs';
-import {botCanManageChannels, serverCategories, CREW_BOT_PERMISSIONS} from './crew-discord.mjs';
+import {botCanManageChannels, checkBot, serverCategories, CREW_BOT_PERMISSIONS} from './crew-discord.mjs';
 // Official races (iRacing's official endurances, LMU official events): common to every community (migration 0039).
 const OFFICIAL = 'official';
 // A race of the current community, or an official race: any id from another community answers "introuvable".
@@ -124,8 +124,8 @@ function botInvite(env, guildId, permissions = '0') {
 // stopped it, and where the voice channels are made (the server's categories to choose from).
 async function crewDiscordState(env, community) {
   const saved = await env.DB.prepare('SELECT last_error, last_error_at, voice_category_id FROM community_crew_discord WHERE community_id=?').bind(community.id).first();
-  const on = community.modules.crewChannels === true;
-  return {botReady:await botCanManageChannels(env, community.discordGuildId), botInviteUrl:botInvite(env, community.discordGuildId, CREW_BOT_PERMISSIONS),
+  const on = community.modules.crewChannels === true, bot = await checkBot(env, community.discordGuildId);
+  return {botReady:bot.ready, botProblem:bot.why, botInviteUrl:botInvite(env, community.discordGuildId, CREW_BOT_PERMISSIONS),
     lastError:on ? saved?.last_error || null : null, voiceCategoryId:saved?.voice_category_id || null,
     categories:on ? await serverCategories(env, community.discordGuildId) : null};
 }

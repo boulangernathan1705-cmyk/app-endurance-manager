@@ -182,19 +182,25 @@ function crewCategory(crews) {
   const options = [{id:'', name:'En haut du serveur'}, ...list, ...(current && !list.some(item => item.id === current) ? [{id:current, name:'Catégorie actuelle'}] : [])];
   return `<label class="crew-category">Où créer les vocaux ?<select data-crew-category>${options.map(item => `<option value="${esc(item.id)}" ${item.id === current ? 'selected' : ''}>${esc(item.name)}</option>`).join('')}</select></label><span class="settings-status" aria-live="polite"></span>`;
 }
+// Why the crews' channels cannot be turned on yet (the bot's state on the server, checked by the site).
+const BOT_PROBLEMS = {
+  rights:'Avant d’activer : touche « Donner les droits au bot », valide sur Discord, puis « C’est fait ».',
+  absent:'Le bot n’est pas sur ton serveur : touche « Donner les droits au bot » pour l’ajouter avec ses droits, puis « C’est fait ».',
+  config:'Le bot du site n’est pas configuré : préviens le gérant de la plateforme.',
+  discord:'Discord ne répond pas pour l’instant : réessaie avec « C’est fait » dans un moment.'};
 function modulesMarkup(settings, setup) {
   const crews = settings.crews || {}, states = moduleStates(settings, setup);
   const toggle = (key, label, locked = false) => `<label class="admin-switch"><input type="checkbox" role="switch" data-module="${key}" aria-label="${label}" ${states[key] ? 'checked' : ''} ${locked ? 'disabled' : ''}><i aria-hidden="true"></i></label>`;
   const crewRights = crews.botReady === true ? (crews.lastError ? `<p class="setup-note setup-error">⚠️ ${esc(crews.lastError)}</p>` : '<p class="members-help">Le bot a les droits pour créer les salons.</p>')
-    : `<p class="members-help">Avant d’activer : donne au bot le droit de créer des salons sur ton serveur.</p>
+    : `<p class="members-help">${BOT_PROBLEMS[crews.botProblem] || BOT_PROBLEMS.rights}</p>
       <div class="setup-actions">${crews.botInviteUrl ? `<a class="primary-button" href="${esc(crews.botInviteUrl)}" target="_blank" rel="noopener">Donner les droits au bot</a>` : ''}<button type="button" class="secondary-button" data-modules-refresh="crewChannels">C’est fait</button></div>`;
   const crewWarn = states.crewChannels && (crews.botReady !== true || crews.lastError);
   const tiles = [
     {key:'recap', name:'Récap de la semaine sur Discord', text:'Les courses de la semaine dans un salon de ton serveur, mis à jour tout seul.',
       state:states.recap ? ['ok', (setup.recaps || []).length ? `Actif · ${(setup.recaps || []).map(item => RECAP_LABELS[item.scope]).join(', ')}` : 'Actif · salon d’origine'] : ['off', 'Éteint'],
       control:'', settings:recapForm(setup)},
-    {key:'crewChannels', name:'Salons d’équipage sur Discord', text:'Un salon vocal par équipage (« LMU-Les Tondeuz »), ouvert quelques jours avant la course.',
-      state:crewWarn ? ['warn', crews.botReady !== true ? 'Le bot n’a pas les droits' : 'Le bot est bloqué'] : states.crewChannels ? ['ok', 'Actif'] : ['off', crews.botReady === true ? 'Éteint' : 'Éteint · droits du bot à donner'],
+    {key:'crewChannels', name:'Salons d’équipage sur Discord', text:'Un salon vocal par équipage, nommé simu + nom de l’équipage, ouvert quelques jours avant la course.',
+      state:crewWarn ? ['warn', crews.botReady !== true ? 'Le bot n’a pas les droits' : 'Le bot est bloqué'] : states.crewChannels ? ['ok', 'Actif'] : ['off', crews.botReady === true ? 'Éteint' : crews.botProblem === 'rights' ? 'Éteint · droits du bot à donner' : 'Éteint · bot à vérifier'],
       control:toggle('crewChannels', 'Salons d’équipage sur Discord', crews.botReady !== true && !states.crewChannels),
       settings:`${crewRights}${states.crewChannels ? crewCategory(crews) : ''}<p class="members-help">Il est supprimé 2 h après la course.</p>`},
     {key:'raceReminders', name:'Rappels de course', text:'24&nbsp;h avant le départ dans la cloche du site, 24&nbsp;h et 1&nbsp;h avant dans le salon de l’équipage.',

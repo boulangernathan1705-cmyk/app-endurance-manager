@@ -387,16 +387,25 @@ async function bellReminders(env, timestamp, communities) {
 // Whether the bot may make the crews' channels on the server: true, false, or null when it cannot tell (bot not
 // on the server, Discord not answering).
 export async function botCanManageChannels(env, guildId) {
-  if (!guildId || !env.DISCORD_CLIENT_ID || !String(env.DISCORD_BOT_TOKEN || '').trim()) return null;
+  return (await checkBot(env, guildId)).ready;
+}
+
+// The same, with why it cannot (shown to the admins): 'rights' (rights not given yet), 'absent' (the bot is not on
+// the server), 'config' (the site has no bot), 'discord' (Discord did not answer).
+export async function checkBot(env, guildId) {
+  if (!guildId || !env.DISCORD_CLIENT_ID || !String(env.DISCORD_BOT_TOKEN || '').trim()) return {ready:null, why:'config'};
   try {
     const budget = {left:2};
     const [member, roles] = await Promise.all([discord(env, budget, 'GET', `/guilds/${guildId}/members/${env.DISCORD_CLIENT_ID}`),
       discord(env, budget, 'GET', `/guilds/${guildId}/roles`)]);
     const mine = new Set([String(guildId), ...(member?.roles || []).map(String)]);
     const rights = (Array.isArray(roles) ? roles : []).filter(role => mine.has(String(role.id))).reduce((all, role) => all | BigInt(role.permissions || '0'), 0n);
-    return (rights & ADMINISTRATOR) === ADMINISTRATOR || (rights & NEEDED) === NEEDED;
+    const ready = (rights & ADMINISTRATOR) === ADMINISTRATOR || (rights & NEEDED) === NEEDED;
+    return {ready, why:ready ? null : 'rights'};
   } catch (error) {
     if (!(error instanceof Stop)) console.error('Bot rights failed', error instanceof Error ? error.message : 'unknown');
-    return null;
+    // Not a member of the server (Unknown Member, Missing Access) or a bad token: the bot is not there for the site.
+    if ([10004, 10007, 50001].includes(error?.code) || error?.status === 401) return {ready:null, why:'absent'};
+    return {ready:null, why:'discord'};
   }
 }
