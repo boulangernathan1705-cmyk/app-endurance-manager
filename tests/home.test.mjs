@@ -40,7 +40,11 @@ test('simulator spaces remember the choice and the logo leads to the chosen simu
   for (const page of ['game.html', 'members.html', 'help.html', 'about.html'])
     assert.match(readFileSync(new URL(`../${page}`, import.meta.url), 'utf8'), /class="brand-button logo" href="\/"/, page);
   const prod = JSON.parse(readFileSync(new URL('../wrangler.prod.jsonc', import.meta.url), 'utf8'));
-  assert.equal(prod.assets.run_worker_first, true, 'every page: the address says which community');
+  // Every page goes through the Worker (the address says which community); the static files are served directly
+  // (free and outside the daily quota).
+  const routes = prod.assets.run_worker_first;
+  assert.ok(routes.includes('/*'), 'every page: the address says which community');
+  for (const route of routes.filter(route => route.startsWith('!'))) assert.doesNotMatch(route, /\.html|^!\/(?:\*|api|telemetry|downloads|lmu|iracing)/, route);
   assert.equal(prod.assets.binding, 'ASSETS');
 });
 
