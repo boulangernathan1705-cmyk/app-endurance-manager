@@ -2141,3 +2141,13 @@ body:has(.form-sheet-overlay) { overflow: hidden; }
 .round-item { min-width: 0; }
 .round-item-copy { min-width: 0; }
 .round-item-copy strong { white-space: normal; overflow-wrap: anywhere; }
+/* The type panel (SAFE, OPEN…) takes the whole height of the event header, details included. */
+@media (min-width: 601px) {
+  html[data-game] #app .race-header[class*="is-solo-"] { position: relative; padding-right: 186px !important; }
+  html[data-game] #app .race-header[class*="is-solo-"] .event-type-panel span { font-size: 26px; }
+  html[data-game] #app .race-header[class*="is-solo-"] .event-type-panel { position: absolute; top: 14px; bottom: 14px; right: 18px; width: 150px; height: auto; }
+}
+/* « Comment devenir SAFE »: a link to the Discord channel, in the SAFE colour. */
+.planning-quick-button.is-safe-guide { width: auto !important; padding: 0 12px !important; border-color: rgba(240, 192, 64, .55); color: #f0c040; text-decoration: none; }
+.settings-safe-guide { display: grid; gap: 10px; }
+.settings-safe-guide label { display: grid; gap: 6px; font-weight: 700; }

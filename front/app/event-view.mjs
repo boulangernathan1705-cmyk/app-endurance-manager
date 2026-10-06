@@ -4,7 +4,7 @@ import {durationLabel,eventMinutes} from '../../shared/duration.mjs';
 import {app,state,esc,button,canManage,isAdmin,can,canEditRace,officialBadge,communityTag,circuitLabel,eventTypeBadge,schedulePendingBadge,eventBadge,eventCategoryCount,circuitVisual,pilotCount,countdown,notifyRender} from './core.mjs';
 import {ownRegistration,renderRegistrationWorkspace,soloRounds} from './registration.mjs';
 import {renderPilots} from './crews.mjs';
-import {isSolo,accessBadge,soloCardMeta,soloCardInfo,soloEventDetails,roundTiles,roundPilots,soloEntryList,eventCircuitName,soloFill,soloEntryBlock,myWaitlistPosition,renderSoloEntries} from './solo.mjs';
+import {isSolo,accessBadge,soloCardMeta,soloCardInfo,soloEventDetails,roundTiles,roundPilots,soloEntryList,eventCircuitName,soloFill,soloEntryBlock,safeGuideLink,myWaitlistPosition,renderSoloEntries} from './solo.mjs';
 import {renderHome,raceDateBlock,raceStarts} from './home-view.mjs';
 import {planningDays,renderPlanning,syncPlanning,CHEVRON} from './planning.mjs';
 
@@ -79,7 +79,7 @@ function quickActions(event,departure){
     if(own&&!soloRounds(event).length)main={action:'delete-registration',label:'Me désinscrire',extra:`data-id="${own.id}"`,leave:true};
     else if(own)main={action:'my-registration',label:'Mon inscription',extra:''};
     else if(!blocked)main={action:'my-registration',label:'M’inscrire',extra:''};
-    if(!main&&blocked&&!can('manage_registrations'))return `<span class="planning-quick"><span class="solo-blocked">${esc(blocked)}</span></span>`;
+    if(!main&&blocked&&!can('manage_registrations'))return `<span class="planning-quick">${safeGuideLink(event)||`<span class="solo-blocked">${esc(blocked)}</span>`}</span>`;
   }else{
     const assigned=(departure.crews||[]).some(crew=>(crew.registrationIds||[]).some(id=>mine.some(reg=>reg.id===id)));
     // Entered: « Me désinscrire » in red, as on the events; the entry is changed from the « … » menu.
@@ -109,7 +109,7 @@ function roundQuick(event,departure,index){
   // Entered on this round: « Me désinscrire » (from this round only), as on every event; the category can be
   // changed from the « … » menu.
   const register=inRound?square(ICON_UNREGISTER,`Me désinscrire de la manche ${index+1}`,attrs('round-skip'),'Me désinscrire',' is-leave')
-    :blocked?'':square(ICON_REGISTER,`M’inscrire à la manche ${index+1}`,attrs('round-enter'),'M’inscrire');
+    :blocked?safeGuideLink(event):square(ICON_REGISTER,`M’inscrire à la manche ${index+1}`,attrs('round-enter'),'M’inscrire');
   const absence=inRound||own?'':absenceButton(event);
   const items=[
     inRound&&soloRounds(event)[index]?.categories.length>1?`<button type="button" role="menuitem" class="planning-quick-item" ${attrs('round-edit')}>Changer de catégorie</button>`:'',

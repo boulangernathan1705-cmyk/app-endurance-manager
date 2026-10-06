@@ -149,7 +149,11 @@ test('community admins set the permissions of each Discord role and the modules'
   assert.equal((await as(BOSS,'roles/999999999999999999','PUT',{permissions:[]})).status,404,'only roles of the server');
   assert.ok((await communityAccess(env,{user:{id:PILOT}},{...(await import('../server/community.mjs')).DEFAULT_COMMUNITY_SLUG&&{id:DEV_COMMUNITY,slug:'commu-dev',discordGuildId:GUILD,modules:{}}})).permissions.has('crews'));
   assert.equal((await as(BOSS,'modules','PATCH',{iracingImport:true,discordWeekly:false})).status,200);
-  assert.deepEqual(JSON.parse(DB.db.prepare('SELECT modules FROM communities WHERE id=?').get(DEV_COMMUNITY).modules),{iracingImport:true,discordWeekly:true},'the recap is set on the setup page, not as a module');
+  assert.equal((await as(BOSS,'modules','PATCH',{safeGuideUrl:'https://evil.example/x'})).status,400,'only a Discord link');
+  assert.equal((await as(BOSS,'modules','PATCH',{safeGuideUrl:'https://discord.com/channels/1/2'})).status,200);
+  assert.equal(JSON.parse(DB.db.prepare('SELECT modules FROM communities WHERE id=?').get(DEV_COMMUNITY).modules).safeGuideUrl,'https://discord.com/channels/1/2');
+  assert.equal((await as(BOSS,'modules','PATCH',{safeGuideUrl:''})).status,200);
+  assert.deepEqual(JSON.parse(DB.db.prepare('SELECT modules FROM communities WHERE id=?').get(DEV_COMMUNITY).modules),{iracingImport:true,discordWeekly:true,safeGuideUrl:''},'the recap is set on the setup page, not as a module');
 });
 
 test('community look: name, short name and accent by its admins, icon from its Discord server', async t => {

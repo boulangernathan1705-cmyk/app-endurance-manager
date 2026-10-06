@@ -368,7 +368,7 @@ async function api(request, env) {
   // Requests for a new community: sent by anyone signed in with Discord, from any site (server/community-requests.mjs).
   const requests = await communityRequestsApi(path, method, request, env, actor);
   if (requests) return requests;
-  if (path === '/api/session' && method === 'GET') return json({user:actor.user, discordReady:!!(env.DISCORD_CLIENT_ID && env.DISCORD_CLIENT_SECRET), adminConfigured:administrators(env).length > 0, soloRaces:soloRacesEnabled(env, community), soloLabel:eventsLabel(community), eventTypes:eventTypes(community), training:community.modules?.training === true,
+  if (path === '/api/session' && method === 'GET') return json({user:actor.user, discordReady:!!(env.DISCORD_CLIENT_ID && env.DISCORD_CLIENT_SECRET), adminConfigured:administrators(env).length > 0, soloRaces:soloRacesEnabled(env, community), soloLabel:eventsLabel(community), eventTypes:eventTypes(community), training:community.modules?.training === true, safeGuideUrl:community.modules?.safeGuideUrl || '',
     // Training shows in the bar only for a pilot entered in an upcoming LMU race; the circuit memo always.
     trainingRace:community.modules?.training === true && access.status === 'member' && !!actor.user && !!(await nextRace(env, actor.user.id)),
     community:{id:community.id, slug:community.slug, name:community.name, shortName:community.shortName, discordInviteUrl:community.discordInviteUrl, appearance:appearanceOf(community)},
@@ -809,6 +809,12 @@ async function api(request, env) {
     const modules = {...community.modules};
     // The Discord recap is set on the « Mise en place » page (its own webhook), not here.
     for (const key of ['iracingImport','soloRaces','raceReminders','training']) if (typeof input[key] === 'boolean') modules[key] = input[key];
+    // EVENT TDZ: the Discord channel that explains how to become SAFE (a button for the pilots who are not).
+    if (typeof input.safeGuideUrl === 'string') {
+      const url = input.safeGuideUrl.trim();
+      if (url && (url.length > 200 || !/^https:\/\/((ptb\.|canary\.)?discord\.com|discord\.gg)\//.test(url))) fail(400, 'Colle le lien d’un salon Discord (clic droit sur le salon → Copier le lien).');
+      modules.safeGuideUrl = url;
+    }
     const statements = [];
     // Crews on Discord (server/crew-discord.mjs): only once the bot has the rights to make the channels.
     if (typeof input.crewChannels === 'boolean') {

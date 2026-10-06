@@ -146,6 +146,12 @@ export function soloEntryBlock(event) {
   return '';
 }
 
+// A SAFE event, the pilot is not SAFE: a button to the Discord channel that explains how to become SAFE.
+export function safeGuideLink(event) {
+  if (event.access !== 'safe' || can('solo_safe') || !state.safeGuideUrl || !state.user) return '';
+  return `<a class="planning-quick-button is-labelled is-safe-guide" href="${esc(state.safeGuideUrl)}" target="_blank" rel="noopener"><span class="planning-quick-label">Comment devenir SAFE</span></a>`;
+}
+
 export function myWaitlistPosition(departure) {
   return (departure.availability || []).find(reg => reg.mine && reg.waitlistPosition)?.waitlistPosition || null;
 }
