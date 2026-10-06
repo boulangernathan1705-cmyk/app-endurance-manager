@@ -274,7 +274,15 @@ async function listEvents(env, actor, game='', scope='', community) {
         // endsAt: the real finish (2 h 30 ends 30 min into the third presence slot).
         return {...d, endsAt:d.startsAt+durationMinutes*60000, availability, crews:crewsByDeparture.get(`${row.id}:${d.id}`) || []};
       })};
-  });
+  }).map(event => hidePassword(event, actor));
+}
+// The server password of an event: only for its entered pilots and for those who manage the races.
+function hidePassword(event, actor) {
+  if (!event.details?.password || can(actor, 'manage_races')) return event;
+  const entered = event.departures.some(departure => departure.availability.some(reg => reg.mine && reg.status !== 'unavailable'));
+  if (entered) return event;
+  const {password, ...details} = event.details;
+  return {...event, details};
 }
 async function oauthStart(request, env) {
   requireDiscord(env); await rateLimit(request, env, 'oauth', 20); await cleanup(env);

@@ -472,7 +472,10 @@ test('events calendar: every simulator, typed circuit on AMS2 / ACE, no limit an
  }
  const event=(await req('/api/events','GET',null,'admin')).data.events.find(e=>e.id===created.data.id);
  const path=`/api/events/${event.id}/departures/${event.departures[0].id}/registrations`;
+ const seen=async ()=>(await req('/api/events','GET',null,'pilot')).data.events.find(e=>e.id===created.data.id).details.password;
+ assert.equal(await seen(),undefined,'the server password is for entered pilots only');
  assert.equal((await req(path,'POST',{name:'Pilote',choices:[]},'pilot')).status,201);
+ assert.equal(await seen(),'tdz');
  const reg=(await req('/api/events','GET',null,'admin')).data.events.find(e=>e.id===created.data.id).departures[0].availability[0];
  assert.equal(reg.category,'');assert.ok(!reg.waitlistPosition);
  // LMU keeps its catalog; categories must belong to the simulator; an older event follows its circuit.

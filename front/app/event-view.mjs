@@ -83,8 +83,9 @@ function quickActions(event,departure){
   }else{
     const assigned=(departure.crews||[]).some(crew=>(crew.registrationIds||[]).some(id=>mine.some(reg=>reg.id===id)));
     // Entered: « Me désinscrire » in red, as on the events; the entry is changed from the « … » menu.
-    if(own){main={action:'delete-registration',label:'Me désinscrire',extra:`data-id="${own.id}"`,leave:true};more.push({action:'my-registration',label:'Modifier mon inscription',extra:''});}
-    else if(can('endurance'))main={action:'my-registration',label:'M’inscrire',extra:''};
+    // Entered in several categories: « Mon inscription » (each one is withdrawn there).
+    if(mine.length===1){main={action:'delete-registration',label:'Me désinscrire',extra:`data-id="${mine[0].id}"`,leave:true};more.push({action:'my-registration',label:'Modifier mon inscription',extra:''});}
+    else if(mine.length||can('endurance'))main={action:'my-registration',label:mine.length?'Mon inscription':'M’inscrire',extra:''};
     if(own&&!assigned&&event.categories.some(category=>!mine.some(reg=>reg.category===category)))more.push({action:'new-registration',label:'M’inscrire dans une autre catégorie',extra:`data-mode="category" data-registration="${own.id}"`});
   }
   if(can('manage_registrations'))more.push({action:'new-registration',label:'Inscrire un autre pilote',extra:'data-mode="pilot"'});
@@ -143,7 +144,8 @@ function departureActions(event,departure){
   if(departure.startsAt<=Date.now())return '';
   const own=ownRegistration(departure),canCreateCrew=canCreateCrewOnDeparture(departure,event);
   const createCrewAction=canCreateCrew?`<button type="button" class="link-button ux-summary-create-crew" data-crew-builder-open data-departure="${departure.id}" data-tip="Choisis la voiture, compose les pilotes et verrouille l’équipage quand il est complet.">Créer un équipage</button>`:'';
-  const leave=own?button('delete-registration','Me désinscrire',`data-departure="${departure.id}" data-id="${own.id}"`,'secondary-button is-leave'):'';
+  const mine=(departure.availability||[]).filter(reg=>reg.mine&&reg.status!=='unavailable');
+  const leave=mine.length===1?button('delete-registration','Me désinscrire',`data-departure="${departure.id}" data-id="${mine[0].id}"`,'secondary-button is-leave'):'';
   return `<span class="ux-summary-registration-actions${canCreateCrew?' is-three-actions':''}">${own||can('endurance')?button('my-registration',own?'Modifier mon inscription':'S’inscrire',`data-departure="${departure.id}"`,'primary-button ux-summary-registration-toggle'):''}${leave}${can('manage_registrations')?button('new-registration','Inscrire un autre pilote',`data-departure="${departure.id}" data-mode="pilot"`,'link-button ux-summary-registration-other'):''}${createCrewAction}</span>`;
 }
 function departureFoldBody(event,departure){
