@@ -13,6 +13,19 @@ test('a returning pilot goes straight to the simulator they chose', async () => 
   assert.equal(response.headers.get('Cache-Control'), 'no-store');
 });
 
+test('with EVENT TDZ, the events calendar is the home page; the simulator is asked in Endurance', async () => {
+  const {homeRedirect} = await import('../server/home.mjs');
+  const events = {modules:{soloRaces:true}};
+  const go = cookie => homeRedirect(new Request('https://site.example/', {headers: cookie ? {Cookie: cookie} : {}}), events)?.headers.get('Location');
+  assert.equal(go(''), '/lmu/#solo');
+  assert.equal(go('em_sim=iracing'), '/iracing/#solo');
+  assert.equal(homeRedirect(new Request('https://site.example/?accueil'), events), null);
+  assert.equal(homeRedirect(new Request('https://site.example/'), {modules:{}}), null);
+  const context = readFileSync(new URL('../front/game-context.js', import.meta.url), 'utf8');
+  assert.match(context, /if \(chosen \|\| !\/\^#\(solo\|event=\)\/\.test\(location\.hash\)\)/);
+  assert.match(readFileSync(new URL('../front/app/actions.mjs', import.meta.url), 'utf8'), /state\.soloRaces&&!simChosen\(\)\)\{openSimChooser\(\)/);
+});
+
 test('the home page stays reachable with ?accueil, for new visitors and unknown values', async () => {
   for (const [path, cookie] of [['/?accueil', 'em_sim=lmu'], ['/', ''], ['/', 'em_sim=elsewhere']]) {
     const response = await home(path, cookie);

@@ -1,5 +1,5 @@
 import {app,state,api,load,loadArchive,showError,countdown,CARS,inCommunity} from './core.mjs';
-import {renderNav,renderHome,toggleRaceFilter,resetRaceFilters} from './home-view.mjs';
+import {renderNav,renderHome,toggleRaceFilter,resetRaceFilters,simChosen,openSimChooser} from './home-view.mjs';
 import {renderEvent,togglePlanningCommunity} from './event-view.mjs';
 import {showPlanningDay,scrollPlanning,goToDeparture,setPlanningSpan,toggleQuickMenu} from './planning.mjs';
 import {renderEventForm,departureFields,updateRemoveButtons,goToEventStep,formDurationMinutes,bulkPreview,shiftBulkWeek} from './event-form.mjs';
@@ -108,7 +108,7 @@ async function perform(action,target){
   const event=state.events.find(item=>item.id===state.currentEventId);
   switch(action){
     case 'dismiss-error': document.querySelector('[data-ux-error-modal]')?.remove(); break;
-    case 'home': if(target.dataset.list)state.listFormat=target.dataset.list; renderHome(); break;
+    case 'home': if(target.dataset.list==='endurance'&&state.soloRaces&&!simChosen()){openSimChooser();break;} if(target.dataset.list)state.listFormat=target.dataset.list; renderHome(); break;
     case 'planning-community': togglePlanningCommunity(target.dataset.community||''); renderEvent(); break;
     case 'race-filter-toggle': state.raceFilterOpen=!state.raceFilterOpen; renderHome(); break;
     case 'race-filter': toggleRaceFilter(target.dataset.group,target.dataset.value); renderHome(); break;
