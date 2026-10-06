@@ -106,7 +106,7 @@ const IRACING_CATEGORIES = {
 };
 
 const LMU_CARS = {
-  Hypercar: ['Alpine A424','Aston Martin Valkyrie AMR LMH','BMW M Hybrid V8','Cadillac V-Series.R','Ferrari 499P','Genesis GMR-001 LMDh','Glickenhaus SCG 007','Isotta Fraschini Tipo 6-C','Lamborghini SC63','Peugeot 9X8','Porsche 963','Toyota GR010 Hybrid','Vanwall Vandervell 680'],
+  Hypercar: ['Alpine A424','Aston Martin Valkyrie AMR LMH','BMW M Hybrid V8','Cadillac V-Series.R','Ferrari 499P','Genesis GMR-001 LMDh','Glickenhaus SCG 007','Isotta Fraschini Tipo 6-C','Lamborghini SC63','Peugeot 9X8','Peugeot 9X8 Evo','Porsche 963','Toyota GR010 Hybrid','Vanwall Vandervell 680'],
   'LMP2 ELMS': ['Oreca 07 Gibson ELMS'],
   'LMP2 WEC': ['Oreca 07 Gibson'],
   LMP3: ['Ligier JS P325','Ginetta G61-LT-P3','Duqueine D09','Adess AD25'],
