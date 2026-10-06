@@ -2167,3 +2167,10 @@ body:has(.form-sheet-overlay) { overflow: hidden; }
 .form-sheet .creation-field-grid > .form-label, .form-sheet .creation-field-grid > .format-contents > .form-label { align-self: end; margin-bottom: 0; }
 .form-sheet input:not([type="checkbox"]):not([type="radio"]):not([type="color"]):not([type="file"]), .form-sheet select { min-height: 46px; box-sizing: border-box; }
 .solo-event-form .solo-form-step > .form-label > input { margin-top: 8px; }
+/* The simulator chooser also opens from « Endurance » (game pages do not load game-hub.css). */
+.hub-sim-choice .game-badge { display: inline-grid; place-items: center; width: 46px; height: 34px; flex: none; border: 1px solid color-mix(in srgb, var(--game-accent) 72%, var(--border, #292d31)); border-radius: 8px; background: color-mix(in srgb, var(--game-accent) 16%, var(--panel2, #171a1d)); color: var(--game-accent); font-size: 14px; font-weight: 950; }
+/* Administration on a phone: the sections in two columns, all visible (no more sideways scrolling). */
+@media (max-width: 860px) {
+  .admin-rail { flex-wrap: wrap; overflow: visible; }
+  .admin-rail .admin-nav { flex: 1 1 calc(50% - 4px); justify-content: center; min-width: 0; gap: 8px; padding: 0 8px; font-size: 13.5px; white-space: nowrap; }
+}

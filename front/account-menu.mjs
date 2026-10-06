@@ -2,6 +2,7 @@
 import './tooltip.mjs?v=2';
 import {showCommunityIntro} from './community-intro.mjs';
 import {installNotifications} from './notifications.mjs?v=1';
+import {simChosen, openSimChooser} from './sim-chooser.mjs';
 const root = document.getElementById('account-menu-root');
 
 const roleLabel = role => ({admin:'Administrateur',organizer:'Organisateur',pilot:'Pilote'}[role] || 'Pilote');
@@ -161,6 +162,29 @@ function showcaseBanner(platformDiscordUrl) {
   bar.after(banner);
 }
 
+// Pages outside the races (help, administration, news…): the same sections as the race pages (EVENT TDZ,
+// ENDURANCE, Mes inscriptions), then the page's own tabs. The LMU / iRacing switch stays in Endurance.
+function unifyNav(session) {
+  const nav = document.getElementById('navigation');
+  if (!nav || document.documentElement.dataset.game || location.pathname === '/' || document.querySelector('[data-training-race]')) return;
+  if (session.access !== 'member' || session.openSite) return;
+  const sim = /(?:^|;\s*)em_sim=(lmu|iracing)(?:;|$)/.exec(document.cookie)?.[1] || 'lmu';
+  const link = (href, label, extra = '') => `<a class="nav-section-button${extra}" href="${href}">${esc(label)}</a>`;
+  const events = session.soloRaces === true;
+  const endurance = link(`/${sim}/`, 'ENDURANCE');
+  const own = [...nav.querySelectorAll('.nav-sections .nav-section-button')].map(item => item.outerHTML).join('');
+  nav.querySelector('.nav-game-switcher')?.remove();
+  for (const group of nav.querySelectorAll('.nav-sections')) group.remove();
+  const sections = document.createElement('div');
+  sections.className = 'nav-sections';
+  sections.setAttribute('role', 'group');
+  sections.setAttribute('aria-label', 'Sections');
+  sections.innerHTML = `${events ? link(`/${sim}/#solo`, session.soloLabel || 'EVENT TDZ', ' nav-events-button') : ''}${endurance}${link(`/${sim}/#inscriptions`, 'Mes inscriptions')}${own}`;
+  // Simulator not chosen yet: « Endurance » asks for it first.
+  if (events) sections.children[1].addEventListener('click', event => { if (!simChosen()) { event.preventDefault(); openSimChooser(); } });
+  nav.append(sections);
+}
+
 // Installable app (home screen): the service worker only shows an offline page, it never caches the races.
 if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('/sw.js').catch(() => {});
 
@@ -177,6 +201,7 @@ async function loadSession() {
       const game = location.pathname.startsWith('/iracing') ? '/iracing/' : '/lmu/';
       for (const link of document.querySelectorAll('a.brand-button')) link.href = `${game}#solo`;
     }
+    unifyNav(session);
     siteCommunityName = session.openSite ? '' : session.community?.name || '';
     if (session.user) {
       renderConnected(session.user, Array.isArray(session.communities) ? session.communities : []);
