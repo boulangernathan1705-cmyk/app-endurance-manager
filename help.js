@@ -6,28 +6,24 @@ import {getLocale} from './front/i18n.mjs';
 
 const HELP_PAGE_CLASS = 'help-page';
 const app = document.getElementById('app');
-// Session user given by the page ({id,name,role} or null): the help adapts to the pilot's role.
-let currentUser = null;
+// Session given by the page (/api/session: user, permissions, modules) or null: the help follows the pilot's
+// rights and the community's modules.
+let session = null;
 
 const L = (fr, en) => getLocale() === 'en' ? en : fr;
+const can = permission => (session?.permissions || []).includes(permission);
+const events = () => session?.soloRaces === true;
+const eventsLabel = () => session?.soloLabel || 'EVENT TDZ';
 
-function normalizedRole() {
-  const role = currentUser?.role;
-  return role === 'admin' || role === 'organizer' ? role : 'pilot';
-}
-
-function roleName(role) {
-  return role === 'admin' ? L('Administrateur', 'Administrator') : role === 'organizer' ? L('Organisateur', 'Organizer') : L('Pilote', 'Driver');
-}
-
-function accountLabel(role) {
-  if (!currentUser) return L('Utilisation sans connexion', 'Using the site without signing in');
-  return `${currentUser.name} · ${roleName(role)}`;
+function accountLabel() {
+  const user = session?.user;
+  if (!user) return L('Utilisation sans connexion', 'Using the site without signing in');
+  return `${user.name} · ${user.role === 'admin' ? L('Administrateur', 'Administrator') : L('Pilote', 'Driver')}`;
 }
 
 function helpScreenshot(name, alt, caption = '') {
   return `<figure class="help-screenshot">
-    <img src="/images/help/${name}.jpg?v=2" alt="${alt}" loading="lazy" decoding="async">
+    <img src="/images/help/${name}.jpg?v=3" alt="${alt}" loading="lazy" decoding="async">
     ${caption ? `<figcaption>${caption}</figcaption>` : ''}
   </figure>`;
 }
@@ -39,201 +35,143 @@ function helpItem(index, title, body, open = false) {
   </details>`;
 }
 
-const numbered = items => items.map((body, index) => helpItem(index + 1, body[0], body[1], body[2]));
+// The five permissions a Discord role can give (server/access.mjs), as set in Administration.
+const PERMISSIONS = () => [
+  ['endurance', L('Endurances', 'Endurance races'), L('s’inscrire aux endurances et rejoindre un équipage existant.', 'enter endurance races and join an existing crew.')],
+  ['solo_open', L('Événements OPEN', 'OPEN events'), L('s’inscrire aux événements OPEN.', 'enter OPEN events.')],
+  ['solo_safe', L('Événements SAFE', 'SAFE events'), L('s’inscrire aux événements SAFE (et OPEN).', 'enter SAFE (and OPEN) events.')],
+  ['crews', L('Équipages', 'Crews'), L('créer et gérer les équipages.', 'create and manage crews.')],
+  ['admin', L('Administrer', 'Administer'), L('le site de la communauté, créer et gérer les courses et les événements, inscrire n’importe quel pilote.', 'the community site, create and manage races and events, enter any driver.')],
+];
 
-// ---------- Shared sections (pilots and organizers) ----------
+// ---------- Every pilot ----------
 
-const navigationSection = () => [L('Se repérer sur le site', 'Finding your way around'), `
-  <p>${L('La même barre est en haut de toutes les pages :', 'The same bar sits at the top of every page:')}</p>
+const navigationSection = () => [L('Se repérer', 'Finding your way around'), `
   <ul>
-    <li>${L('le <strong>drapeau</strong> change la langue (français / anglais) ;', 'the <strong>flag</strong> switches the language (French / English);')}</li>
-    <li>${L('<strong>Le Mans Ultimate</strong> / <strong>iRacing</strong> choisit le simulateur ;', '<strong>Le Mans Ultimate</strong> / <strong>iRacing</strong> picks the simulator;')}</li>
-    <li>${L('<strong>Endurance</strong> liste les courses (et <strong>Courses solo</strong> si ta communauté en propose), <strong>Mes inscriptions</strong> regroupe les tiennes ;', '<strong>Endurance</strong> lists the races (and <strong>Solo races</strong> if your community has them), <strong>My entries</strong> gathers yours;')}</li>
-    <li>${L('au centre, le <strong>nom de ta communauté</strong> : si tu es membre de plusieurs communautés, il ouvre « Mes communautés » pour passer de l’une à l’autre ;', 'in the middle, your <strong>community’s name</strong>: if you belong to several communities, it opens “My communities” to switch between them;')}</li>
-    <li>${L('à droite, ton <strong>compte</strong> : connexion Discord, Aide, et pour les admins de la communauté, Administration.', 'on the right, your <strong>account</strong>: Discord sign-in, Help and, for the community’s admins, Administration.')}</li>
+    ${events() ? `<li>${L(`<strong>${eventsLabel()}</strong> : le calendrier des événements, toutes simus ;`, `<strong>${eventsLabel()}</strong>: the events calendar, every sim;`)}</li>` : ''}
+    <li>${L('<strong>ENDURANCE</strong> : les endurances, avec le choix <strong>LMU</strong> / <strong>iRacing</strong> ;', '<strong>ENDURANCE</strong>: endurance races, with the <strong>LMU</strong> / <strong>iRacing</strong> switch;')}</li>
+    <li>${L('<strong>Mes inscriptions</strong> : tout ce où tu es inscrit ;', '<strong>My entries</strong>: everything you entered;')}</li>
+    <li>${L('la <strong>cloche</strong> : ce qui te concerne (inscriptions, équipage, rappels) ;', 'the <strong>bell</strong>: what concerns you (entries, crew, reminders);')}</li>
+    <li>${L('ton <strong>compte</strong> : Aide, tes communautés et, pour les admins, Administration. Le drapeau change la langue.', 'your <strong>account</strong>: Help, your communities and, for admins, Administration. The flag switches the language.')}</li>
   </ul>
-  <p>${L('Le logo de la bannière ramène à l’accueil. Le bouton Retour du navigateur fonctionne normalement, et chaque course a sa propre adresse : <strong>Copier le lien de la course</strong> permet de la partager.', 'The banner logo takes you back home. Your browser’s Back button works as usual, and every race has its own address: <strong>Copy race link</strong> lets you share it.')}</p>
-  ${helpScreenshot('pilot-navigation', L('Barre de navigation', 'Navigation bar'))}`];
+  ${helpScreenshot('nav', L('Barre de navigation', 'Navigation bar'))}`];
 
-const raceListSection = () => [L('Lire la liste des courses', 'Reading the race list'), `
-  <p>${L('Chaque carte résume une course :', 'Each card sums up a race:')}</p>
+const enduranceListSection = () => [L('Les endurances', 'Endurance races'), `
+  <p>${L('Une carte par course, semaine par semaine : la date, les heures de départ, les catégories et leurs inscrits. Un badge montre ta situation. « Horaires à confirmer » : tu t’inscris sur un départ « à définir ».', 'One card per race, week by week: the date, start times, categories and how many entered. A badge shows where you stand. “Schedule to be confirmed”: you enter a start “to be set”.')}</p>
+  <p>${L('Au-dessus : <strong>À venir</strong>, <strong>Mes courses</strong>, <strong>Archivés</strong> et <strong>Filtres</strong>.', 'Above: <strong>Upcoming</strong>, <strong>My races</strong>, <strong>Archived</strong> and <strong>Filters</strong>.')}</p>
+  ${helpScreenshot('endurance-list', L('Liste des endurances', 'Endurance list'))}`];
+
+const enduranceEntrySection = () => [L('S’inscrire à une endurance', 'Entering an endurance race'), `
+  <p>${L('Sur la page de la course, chaque départ a ses boutons :', 'On the race page, each start has its buttons:')}</p>
   <ul>
-    <li>${L('le <strong>carré de date</strong> indique le jour du prochain départ ;', 'the <strong>date block</strong> shows the day of the next start;')}</li>
-    <li>${L('en dessous, les <strong>heures de départ</strong>, regroupées par jour ;', 'below it, the <strong>start times</strong>, grouped by day;')}</li>
-    <li>${L('un badge montre <strong>ta situation</strong> : inscrit sans équipage, ou le nom de ton équipage ;', 'a badge shows <strong>where you stand</strong>: registered without a crew, or your crew’s name;')}</li>
-    <li>${L('« <strong>Horaires à confirmer</strong> » : les heures ne sont pas encore connues. Tout le monde s’inscrit sur un départ « à définir » ; quand les horaires sont publiés, chaque équipage choisit son départ ;', '“<strong>Schedule to be confirmed</strong>”: the times are not known yet. Everyone enters a start “to be set”; once the times are out, each crew picks its start;')}</li>
-    <li>${L('les catégories affichent le nombre d’inscrits.', 'categories show how many drivers are registered.')}</li>
+    <li>${L('<strong>M’inscrire</strong> : une fenêtre en 4 étapes (catégorie, voitures, heures de présence, récapitulatif) ;', '<strong>Enter</strong>: a 4-step window (category, cars, hours present, summary);')}</li>
+    <li>${L('<strong>Absent</strong> : tu préviens que tu ne seras pas là. Ton nom va dans la liste <strong>Absents</strong>, en bas de la page ; un clic de plus l’enlève ;', '<strong>Absent</strong>: you say you won’t be there. Your name goes in the <strong>Absent</strong> list at the bottom of the page; one more click removes it;')}</li>
+    <li>${L('une fois inscrit, <strong>Me désinscrire</strong> (en rouge) ; <strong>…</strong> pour modifier ton inscription ou t’inscrire dans une autre catégorie.', 'once entered, <strong>Withdraw</strong> (in red); <strong>…</strong> to edit your entry or enter another category.')}</li>
   </ul>
-  <p>${L('Les filtres <strong>À venir</strong>, <strong>Mes courses</strong> (celles où tu es inscrit) et <strong>Archivés</strong> (courses terminées) sont au-dessus de la liste.', 'The <strong>Upcoming</strong>, <strong>My races</strong> (the ones you entered) and <strong>Archived</strong> (finished races) filters are above the list.')}</p>
-  ${helpScreenshot('pilot-events', L('Liste des courses', 'Race list'))}`];
+  <div class="help-tip">${L('<strong>Conseil :</strong> ne coche que les heures où tu es vraiment là, c’est ce qui sert à organiser les relais.', '<strong>Tip:</strong> only tick the hours you are really there; that is what relay planning relies on.')}</div>
+  ${helpScreenshot('endurance-starts', L('Les départs d’une endurance', 'Starts of an endurance race'))}
+  ${helpScreenshot('register-hours', L('Les heures de présence', 'Hours present'))}`];
 
-const racePageSection = () => [L('La page d’une course', 'A race page'), `
-  <p>${L('L’en-tête reprend la carte de la course avec le compte à rebours du prochain départ. Plus bas, chaque <strong>départ</strong> a sa ligne : sa date, son heure, le nombre de pilotes et d’équipages, et les actions possibles.', 'The header repeats the race card with a countdown to the next start. Below, each <strong>start</strong> has its own row: its date and time, how many drivers and crews it has, and what you can do.')}</p>
-  <p>${L('Les départs où tu es inscrit sont encadrés et portent un badge « ✓ Inscrit ». Ouvre un départ pour voir ses équipages et les pilotes sans équipage. Les départs déjà commencés passent dans <strong>Départs passés</strong> : ils restent consultables mais ne sont plus modifiables.', 'Starts you entered are outlined and carry a “✓ Registered” badge. Open a start to see its crews and drivers without a crew. Starts that have begun move to <strong>Past starts</strong>: you can still view them but not change them.')}</p>
-  ${helpScreenshot('pilot-race', L('En-tête d’une course', 'Race header'))}
-  ${helpScreenshot('pilot-departure', L('Un départ', 'A start'), L('Un seul bouton principal par départ ; les autres actions sont des liens.', 'One main button per start; other actions are links.'))}`];
+const crewsSection = () => [L('Les équipages', 'Crews'), `
+  <p>${L('Dans un départ, chaque équipage a sa carte : sa couleur, sa catégorie, ses pilotes et sa voiture. Ouvre-le pour voir qui roule quand ; un message rouge signale une période sans pilote.', 'In a start, each crew has its card: colour, category, drivers and car. Open it to see who drives when; a red message flags a period with no driver.')}</p>
+  <ul>
+    <li>${L('<strong>Rejoindre</strong> : un équipage de ta catégorie avec des <strong>places libres</strong> ;', '<strong>Join</strong>: a crew of your category with <strong>open seats</strong>;')}</li>
+    <li>${L('<strong>Quitter</strong> : tu restes inscrit, sans équipage ;', '<strong>Leave</strong>: you stay entered, without a crew;')}</li>
+    <li>${L('le carré <strong>Créer un équipage</strong> et <strong>Gérer</strong> : avec l’autorisation Équipages.', 'the <strong>Create a crew</strong> square and <strong>Manage</strong>: with the Crews permission.')}</li>
+  </ul>
+  <p>${L('Les inscrits encore libres sont dans <strong>Pilotes sans équipage</strong>, pratique pour trouver un coéquipier.', 'Drivers still free are under <strong>Drivers without a crew</strong>, handy to find a teammate.')}</p>
+  ${helpScreenshot('crews', L('Les équipages d’un départ', 'Crews of a start'))}`];
 
-const autoRefreshSection = () => [L('Mise à jour automatique', 'Automatic updates'), `
-  <p>${L('Les inscriptions et les équipages se mettent à jour tout seuls environ toutes les minutes, et quand tu reviens sur l’onglet. Ce qui est ouvert reste ouvert. La mise à jour attend que tu aies fini si tu es en train de remplir une fenêtre.', 'Entries and crews update by themselves about every minute, and when you come back to the tab. Whatever is open stays open. Updates wait while you are filling in a window.')}</p>`];
+const eventsSection = () => [eventsLabel(), `
+  <p>${L('Le calendrier des événements, toutes simus (LMU, iRacing, AMS2, ACE). Chaque carte montre la simu, le type et l’accès : <strong>OPEN</strong> (tous) ou <strong>SAFE</strong> (pilotes SAFE). Les <strong>Filtres</strong> trient par simu, type, dates et ta situation.', 'The events calendar, every sim (LMU, iRacing, AMS2, ACE). Each card shows the sim, the type and the access: <strong>OPEN</strong> (everyone) or <strong>SAFE</strong> (SAFE drivers). <strong>Filters</strong> sort by sim, type, dates and where you stand.')}</p>
+  <ul>
+    <li>${L('chaque manche a son <strong>M’inscrire</strong> et son <strong>Absent</strong> ; sans catégorie à choisir, un clic suffit ;', 'each round has its own <strong>Enter</strong> and <strong>Absent</strong>; with no category to pick, one click is enough;')}</li>
+    <li>${L('places limitées : une fois complet, tu passes en <strong>liste d’attente</strong> et tu montes dès qu’une place se libère ;', 'limited places: once full, you go on the <strong>waiting list</strong> and move up as soon as a place frees up;')}</li>
+    <li>${L('le mot de passe du serveur n’est visible que des inscrits ;', 'the server password is shown to entered drivers only;')}</li>
+    <li>${L('un événement SAFE sans l’accès SAFE : le bouton <strong>Comment devenir SAFE</strong> mène au salon Discord qui l’explique.', 'a SAFE event without SAFE access: the <strong>How to become SAFE</strong> button leads to the Discord channel that explains it.')}</li>
+  </ul>
+  ${helpScreenshot('event-page', L('Un événement en deux manches', 'An event in two rounds'))}`];
 
-// ---------- Pilot help ----------
+const myEntriesSection = () => [L('Mes inscriptions', 'My entries'), `
+  <p>${L('Une carte par course à venir, avec ta catégorie, ton départ et ton équipage. <strong>Voir la course</strong> ouvre sa page ; le <strong>+</strong> déplie ton équipage et les autres inscrits.', 'One card per upcoming race, with your category, start and crew. <strong>View race</strong> opens its page; the <strong>+</strong> unfolds your crew and the other drivers.')}</p>
+  ${helpScreenshot('my-entries', L('Mes inscriptions', 'My entries'))}`];
 
-function pilotHelp(role) {
-  const community = `<p>${L('Chaque communauté a son propre site, réservé aux membres de son serveur Discord. Ce que tu peux y faire (t’inscrire aux endurances, aux courses solo, créer des courses…) dépend de tes <strong>rôles sur ce serveur</strong>, réglés par ses admins. Si un rôle change sur Discord, le site le prend en compte à ta prochaine connexion ou dans la journée.', 'Each community has its own site, reserved for the members of its Discord server. What you can do there (enter endurance races, solo races, create races…) depends on your <strong>roles on that server</strong>, set by its admins. If a role changes on Discord, the site takes it into account at your next sign-in or within the day.')}</p>`;
-  const connectionBody = currentUser
-    ? `<p>${L('Tu es connecté avec Discord. Tes inscriptions sont rattachées à ton compte et tu les retrouves sur tous tes appareils dans <strong>Mes inscriptions</strong>. Une seule connexion suffit pour toutes tes communautés.', 'You are signed in with Discord. Your entries are linked to your account and you can find them on any device in <strong>My entries</strong>. One sign-in is enough for all your communities.')}</p>${community}`
-    : `<p>${L('Connecte-toi avec ton compte Discord pour voir les courses et t’inscrire. Après la connexion, tu reviens sur la page que tu consultais.', 'Sign in with your Discord account to see the races and enter them. After signing in, you come back to the page you were on.')}</p>${community}`;
+const bellSection = () => [L('La cloche', 'The bell'), `
+  <p>${L('Elle prévient quand quelqu’un s’inscrit sur ton départ, rejoint ou quitte ton équipage, change sa voiture, ou quand la course change. Si ta communauté a activé les rappels, elle te rappelle ta course 24 h avant.', 'It tells you when someone enters your start, joins or leaves your crew, changes its car, or when the race changes. If your community turned reminders on, it reminds you of your race 24 h before.')}</p>`];
 
-  const items = numbered([
-    navigationSection(),
-    raceListSection(),
-    racePageSection(),
-    [L('Connexion et communauté', 'Sign-in and community'), connectionBody],
-    [L('S’inscrire à un départ', 'Registering for a start'), `
-      <p>${L('Dans le départ choisi, clique sur <strong>S’inscrire</strong>. Une fenêtre te guide en 4 étapes : <strong>Catégorie</strong>, <strong>Voiture(s)</strong>, <strong>Heures de présence</strong>, puis <strong>Récapitulatif</strong>. <strong>Continuer</strong> passe à l’étape suivante, <strong>Retour</strong> revient en arrière.', 'In the chosen start, click <strong>Register</strong>. A window guides you through 4 steps: <strong>Category</strong>, <strong>Car(s)</strong>, <strong>Hours present</strong>, then <strong>Summary</strong>. <strong>Continue</strong> goes to the next step, <strong>Back</strong> goes back.')}</p>
-      <p>${L('<strong>Fermer</strong>, la touche Échap ou un clic à côté de la fenêtre la ferment sans rien enregistrer.', '<strong>Close</strong>, the Escape key or a click outside the window close it without saving anything.')}</p>
-      ${helpScreenshot('pilot-register-category', L('Étape 1 : la catégorie', 'Step 1: category'))}`],
-    [L('Catégorie et voitures', 'Category and cars'), `
-      <p>${L('Choisis la catégorie dans laquelle tu veux rouler, parmi celles ouvertes par les organisateurs. Tu pourras en proposer une autre ensuite : la catégorie retenue sera celle de l’équipage que tu rejoins.', 'Pick the category you want to race in, among the ones opened by the organizers. You can offer another one later: the category kept is the one of the crew you join.')}</p>
-      <p>${L('Coche ensuite une ou plusieurs voitures, ou <strong>Peu importe la voiture</strong>. Ces préférences aident à choisir la voiture de l’équipage.', 'Then tick one or more cars, or <strong>Any car</strong>. These preferences help choose the crew’s car.')}</p>
-      ${helpScreenshot('pilot-register-cars', L('Étape 2 : les voitures', 'Step 2: cars'))}`],
-    [L('Heures de présence', 'Hours present'), `
-      <p>${L('La course est découpée heure par heure, avec l’heure réelle au-dessus. Touche chaque heure où tu peux rouler, ou <strong>Toute la course</strong> si tu es là du départ à l’arrivée. Le résumé sous la frise indique les plages choisies, par exemple « 5h–8h (3 h) ».', 'The race is split hour by hour, with the real time above. Tap each hour you can drive, or <strong>Whole race</strong> if you are there from start to finish. The summary under the timeline shows the chosen ranges, for example “5h–8h (3 h)”.')}</p>
-      <div class="help-tip">${L('<strong>Conseil :</strong> ne coche que les heures où tu es vraiment disponible, c’est ce qui sert à organiser les relais.', '<strong>Tip:</strong> only tick the hours when you are really available; that is what relay planning relies on.')}</div>
-      ${helpScreenshot('pilot-register-hours', L('Étape 3 : les heures de présence', 'Step 3: hours present'))}`],
-    [L('Récapitulatif et coéquipier souhaité', 'Summary and preferred teammate'), `
-      <p>${L('Le récapitulatif reprend tes choix ; chaque ligne a un lien <strong>Modifier</strong> qui ramène à son étape. Le champ <strong>Pilote souhaité</strong> est facultatif : indique le pseudo d’un pilote avec qui tu aimerais rouler. Valide pour enregistrer.', 'The summary lists your choices; each row has an <strong>Edit</strong> link back to its step. The <strong>Preferred driver</strong> field is optional: enter the name of a driver you would like to race with. Confirm to save.')}</p>
-      ${helpScreenshot('pilot-register-summary', L('Étape 4 : le récapitulatif', 'Step 4: summary'))}`],
-    [L('Modifier ou retirer son inscription', 'Editing or withdrawing your entry'), `
-      <p>${L('Tant que le départ n’a pas commencé, <strong>Modifier mon inscription</strong> rouvre la même fenêtre. Le bouton <strong>Se désinscrire</strong> est dans le récapitulatif.', 'Until the start begins, <strong>Edit my entry</strong> reopens the same window. The <strong>Withdraw</strong> button is in the summary.')}</p>
-      <p>${L('Si tu es dans un équipage, ta catégorie est celle de l’équipage ; tes heures et tes préférences restent modifiables.', 'If you are in a crew, your category is the crew’s; your hours and preferences can still be changed.')}</p>`],
-    [L('Les équipages d’un départ', 'Crews of a start'), `
-      <p>${L('Chaque équipage est une carte avec sa couleur (la même partout sur le site), sa catégorie, ses pilotes et sa voiture. Le badge <strong>Places libres</strong> signifie qu’on peut encore le rejoindre ; <strong>Complet</strong> qu’il est fermé. Ton équipage porte le badge « Ton équipage ».', 'Each crew is a card with its own color (the same everywhere on the site), its category, drivers and car. <strong>Open seats</strong> means you can still join it; <strong>Complete</strong> means it is closed. Your crew carries the “Your crew” badge.')}</p>
-      <ul>
-        <li>${L('<strong>Rejoindre</strong> : entre dans un équipage de ta catégorie qui a des places libres ;', '<strong>Join</strong>: enter a crew of your category that has open seats;')}</li>
-        <li>${L('<strong>Quitter</strong> : sort de l’équipage, ton inscription est conservée ;', '<strong>Leave</strong>: exits the crew, your entry is kept;')}</li>
-        <li>${L('<strong>Créer un équipage</strong> (dans le départ) : tu en deviens le responsable.', '<strong>Create a crew</strong> (in the start): you become its owner.')}</li>
-      </ul>
-      ${helpScreenshot('pilot-crews', L('Les équipages d’un départ', 'Crews of a start'))}`],
-    [L('Ouvrir un équipage : qui roule quand ?', 'Opening a crew: who drives when?'), `
-      <p>${L('Clique sur un équipage pour voir la frise horaire de chaque pilote. Si personne n’est prévu sur une période, un message rouge l’indique, par exemple « Aucun pilote de 2h à 4h ».', 'Click a crew to see each driver’s timeline. If nobody is planned during a period, a red message says so, for example “No driver from 2h to 4h”.')}</p>
-      ${helpScreenshot('pilot-crew-open', L('Un équipage ouvert', 'An opened crew'))}`],
-    [L('Pilotes sans équipage', 'Drivers without a crew'), `
-      <p>${L('Sous les équipages, <strong>Pilotes sans équipage</strong> montre les inscrits encore libres, chacun sur sa carte avec sa catégorie, sa voiture et ses heures. Tant que le départ n’a aucun équipage, cette liste est ouverte d’office. Pratique pour trouver un coéquipier.', 'Below the crews, <strong>Drivers without a crew</strong> shows the drivers still free, each on a card with their category, car and hours. As long as the start has no crew, this list is open by default. Handy to find a teammate.')}</p>
-      ${helpScreenshot('pilot-unassigned', L('Pilotes sans équipage', 'Drivers without a crew'))}`],
-    [L('Mes inscriptions', 'My entries'), `
-      <p>${L('<strong>Mes inscriptions</strong> montre une carte par départ à venir. Ouvre-la pour voir en trois colonnes : <strong>Mon équipage</strong> (avec les heures de chacun), les <strong>autres équipages</strong> et les <strong>pilotes sans équipage</strong>. <strong>Voir la course</strong> ouvre la page de la course. Les courses terminées sont dans le filtre <strong>Archivés</strong>.', '<strong>My entries</strong> shows one card per upcoming start. Open it to see three columns: <strong>My crew</strong> (with everyone’s hours), the <strong>other crews</strong> and the <strong>drivers without a crew</strong>. <strong>View race</strong> opens the race page. Finished races are under the <strong>Archived</strong> filter.')}</p>
-      ${helpScreenshot('pilot-my-entries', L('Une carte de Mes inscriptions', 'A card in My entries'))}`],
-    autoRefreshSection(),
-    [L('Mes droits en tant que pilote', 'My rights as a driver'), `<div class="help-rights"><div><strong>${L('Tu peux', 'You can')}</strong><ul>
-        <li>${L('consulter les courses, les pilotes et les équipages ;', 'view races, drivers and crews;')}</li>
-        <li>${L('t’inscrire à un départ ;', 'register for a start;')}</li>
-        <li>${L('modifier tes heures et tes préférences avant le départ ;', 'change your hours and preferences before the start;')}</li>
-        <li>${L('créer ton équipage, rejoindre ou quitter un équipage de ta catégorie ;', 'create your crew, join or leave a crew of your category;')}</li>
-        <li>${L('gérer l’équipage dont tu es responsable.', 'manage the crew you own.')}</li></ul></div>
-      <div><strong>${L('Tu ne peux pas', 'You cannot')}</strong><ul>
-        <li>${L('créer ou modifier une course ;', 'create or edit a race;')}</li>
-        <li>${L('gérer un équipage dont tu n’es pas responsable ;', 'manage a crew you do not own;')}</li>
-        <li>${L('modifier une inscription après le début du départ.', 'change an entry once the start has begun.')}</li></ul></div></div>
-      <p>${L('Ces droits sont ceux d’un pilote par défaut : les admins de ta communauté peuvent en donner plus (ou moins) à chaque rôle Discord.', 'These are a driver’s default rights: your community’s admins can give more (or fewer) to each Discord role.')}</p>`],
-    [L('À quoi sert un organisateur ?', 'What is an organizer for?'), `
-      <p>${L('Les organisateurs sont les membres dont les rôles Discord permettent de créer des courses et de gérer les inscriptions. Ils suivent toutes les inscriptions et peuvent intervenir sur n’importe quel équipage. Les pilotes restent libres de former leurs équipages ; l’organisateur sert de superviseur et de recours.', 'Organizers are the members whose Discord roles allow creating races and managing entries. They follow every entry and can step in on any crew. Drivers stay free to form their crews; the organizer supervises and helps when needed.')}</p>
-      <div class="help-callout"><strong>${L('Besoin d’aide ?', 'Need help?')}</strong><p>${L('Contacte un organisateur si ton départ a commencé et que tu dois changer quelque chose, ou si une affectation semble incorrecte.', 'Contact an organizer if your start has begun and something must change, or if an assignment looks wrong.')}</p></div>`, true]
-  ]);
-
-  return `<section class="${HELP_PAGE_CLASS}">
-    <header class="help-hero">
-      <span class="help-kicker">ENDURANCE MANAGER</span>
-      <h1>${L('AIDE PILOTE', 'DRIVER HELP')}</h1>
-      <p>${L('S’inscrire à une course, indiquer ses heures et s’organiser en équipage.', 'Register for a race, give your hours and organize your crew.')}</p>
-      <span class="help-account-badge">${accountLabel(role)}</span>
-    </header>
-    <div class="help-list">${items.join('')}</div>
-  </section>`;
+function rightsSection() {
+  const mine = PERMISSIONS().filter(([key]) => can(key) && (events() || !key.startsWith('solo_')));
+  const list = PERMISSIONS().filter(([key]) => events() || !key.startsWith('solo_'));
+  const yours = !session?.user ? ''
+    : `<p>${mine.length ? `${L('Tes autorisations ici :', 'Your permissions here:')} ${mine.map(([, name]) => `<strong>${name}</strong>`).join(', ')}.` : L('Tu n’as aucune autorisation ici : tu vois les courses sans pouvoir t’inscrire.', 'You have no permission here: you can see the races but not enter them.')}</p>`;
+  return [L('Ce que tu peux faire', 'What you can do'), `
+    <p>${L('Tes droits viennent de tes <strong>rôles sur le Discord</strong> de la communauté. Ses admins choisissent ce que chaque rôle permet :', 'Your rights come from your <strong>roles on the community’s Discord</strong>. Its admins choose what each role allows:')}</p>
+    <ul>${list.map(([, name, text]) => `<li><strong>${name}</strong> : ${text}</li>`).join('')}</ul>
+    <p>${L('Sans autorisation, tu vois les courses seulement. Un rôle donné sur Discord compte ici en quelques minutes.', 'With no permission, you only see the races. A role given on Discord counts here within minutes.')}</p>
+    ${yours}`];
 }
 
-// ---------- Organizer and administrator help ----------
+// ---------- Admins ----------
 
-function organizerHelp(role) {
-  const sections = [
-    [L('Le rôle d’organisateur', 'The organizer role'), `
-      <p>${L('Tes droits d’organisateur viennent de tes rôles sur le Discord de la communauté, réglés par ses admins : <strong>Créer des courses</strong> (et gérer les tiennes), <strong>Gérer toutes les courses</strong> et <strong>Gérer les inscriptions</strong> (inscrire d’autres pilotes, composer tous les équipages). Les pilotes forment eux-mêmes leurs équipages ; tu peux corriger une composition, aider un pilote ou finaliser l’organisation.', 'Your organizer rights come from your roles on the community’s Discord, set by its admins: <strong>Create races</strong> (and manage your own), <strong>Manage all races</strong> and <strong>Manage entries</strong> (register other drivers, build every crew). Drivers form their own crews; you can fix a lineup, help a driver or finalize the organization.')}</p>`],
-    navigationSection(),
-    raceListSection(),
-    [L('Créer un événement', 'Creating an event'), `
-      <p>${L('Sur la page Événements, <strong>Ajouter un événement</strong> ouvre une fenêtre en 4 étapes : <strong>Informations générales</strong> (nom, durée, type, circuit), <strong>Catégories</strong>, <strong>Départs</strong> et <strong>Récapitulatif</strong>.', 'On the Events page, <strong>Add an event</strong> opens a 4-step window: <strong>General information</strong> (name, duration, type, circuit), <strong>Categories</strong>, <strong>Starts</strong> and <strong>Summary</strong>.')}</p>
-      <ul>
-        <li>${L('la date se choisit dans un calendrier, l’heure dans deux listes (minutes de 5 en 5), toujours à l’heure de Paris ;', 'the date is picked in a calendar, the time in two lists (5-minute steps), always in Paris time;')}</li>
-        <li>${L('<strong>+ Ajouter un départ</strong> reprend la date et l’heure du départ précédent, à ajuster ;', '<strong>+ Add a start</strong> copies the previous start’s date and time, to adjust;')}</li>
-        <li>${L('coche <strong>Horaires à confirmer</strong> si les heures ne sont pas encore connues : tu indiques seulement le jour, les pilotes s’inscrivent sur un départ « à définir », et tu ajoutes les vrais départs plus tard en modifiant la course ;', 'tick <strong>Schedule to be confirmed</strong> if the times are not known yet: you only give the day, drivers enter a start “to be set”, and you add the real starts later by editing the race;')}</li>
-        <li>${L('la durée fixe le nombre d’heures proposées aux pilotes.', 'the duration sets how many hours drivers can pick.')}</li>
-      </ul>
-      ${helpScreenshot('org-create-event', L('Étape 1 : informations générales', 'Step 1: general information'))}
-      ${helpScreenshot('org-create-departures', L('Étape 3 : les départs', 'Step 3: starts'))}`],
-    [L('Modifier, partager ou supprimer une course', 'Editing, sharing or deleting a race'), `
-      <p>${L('Les actions de la course sont dans son en-tête : <strong>Copier le lien de la course</strong>, <strong>Modifier l’événement</strong> (la même fenêtre en étapes) et <strong>Supprimer l’événement</strong> (lien rouge, avec confirmation) : pour tes propres courses, ou pour toutes avec <strong>Gérer toutes les courses</strong>. Certaines suppressions sont bloquées si elles toucheraient des inscriptions existantes.', 'Race actions are in its header: <strong>Copy race link</strong>, <strong>Edit event</strong> (the same step window) and <strong>Delete event</strong> (red link, with confirmation): for your own races, or for all of them with <strong>Manage all races</strong>. Some removals are blocked when they would affect existing entries.')}</p>
-      <div class="help-tip">${L('<strong>Important :</strong> si tu changes un horaire, préviens les pilotes concernés.', '<strong>Important:</strong> if you change a start time, tell the drivers concerned.')}</div>
-      ${helpScreenshot('org-race-actions', L('Actions de la course dans l’en-tête', 'Race actions in the header'))}`],
-    racePageSection(),
-    [L('Inscrire un autre pilote', 'Registering another driver'), `
-      <p>${L('Dans un départ, <strong>Inscrire un autre pilote</strong> ouvre la même fenêtre d’inscription, avec une première étape <strong>Pilote et catégorie</strong> : choisis son compte Discord dans la liste des membres de la communauté, sinon saisis son pseudo. Il faut l’autorisation <strong>Gérer les inscriptions</strong>.', 'In a start, <strong>Register another driver</strong> opens the same registration window, with a first <strong>Driver and category</strong> step: pick their Discord account from the community’s members, otherwise type their name. It needs the <strong>Manage entries</strong> permission.')}</p>
-      ${helpScreenshot('org-add-pilot', L('Inscrire un autre pilote', 'Registering another driver'))}`],
-    [L('Plusieurs catégories', 'Several categories'), `
-      <p>${L('Un pilote peut proposer plusieurs catégories sur un même départ. Dès qu’il entre dans un équipage, la catégorie de l’équipage est retenue et ses autres propositions pour ce départ sont retirées.', 'A driver can offer several categories on the same start. As soon as they join a crew, the crew’s category is kept and their other offers for that start are removed.')}</p>`],
-    [L('Créer un équipage', 'Creating a crew'), `
-      <p>${L('<strong>Créer un équipage</strong> ouvre une fenêtre en 3 étapes : <strong>Équipage</strong> (nom, catégorie, voiture), <strong>Pilotes</strong> (les inscrits compatibles, avec la couverture horaire prévue) et <strong>Récapitulatif</strong>. Un organisateur peut créer un équipage sans y être inscrit ; un pilote qui crée son équipage en devient responsable.', '<strong>Create a crew</strong> opens a 3-step window: <strong>Crew</strong> (name, category, car), <strong>Drivers</strong> (compatible registered drivers, with the expected coverage) and <strong>Summary</strong>. An organizer can create a crew without being registered; a driver who creates their crew becomes its owner.')}</p>
-      ${helpScreenshot('org-create-crew', L('Créer un équipage', 'Creating a crew'))}`],
-    [L('Composer et suivre les équipages', 'Building and following crews'), `
-      <p>${L('Sur la carte d’un équipage, <strong>Gérer</strong> rouvre la fenêtre pour changer le nom, la voiture ou les pilotes ; tu peux le faire sur n’importe quel équipage. Retirer un pilote conserve son inscription : il revient dans <strong>Pilotes sans équipage</strong>.', 'On a crew card, <strong>Manage</strong> reopens the window to change the name, car or drivers; you can do it on any crew. Removing a driver keeps their entry: they go back to <strong>Drivers without a crew</strong>.')}</p>
-      <p>${L('Ouvre l’équipage pour vérifier les heures de chacun : un message rouge signale les périodes sans pilote. Le sélecteur <strong>Ouvert / Complet</strong> décide si d’autres pilotes peuvent encore le rejoindre.', 'Open the crew to check everyone’s hours: a red message flags periods with no driver. The <strong>Open / Complete</strong> selector decides whether other drivers can still join.')}</p>
-      ${helpScreenshot('pilot-crew-open', L('Un équipage ouvert avec une période non couverte', 'An opened crew with an uncovered period'))}
-      ${helpScreenshot('pilot-unassigned', L('Pilotes sans équipage', 'Drivers without a crew'))}`],
-    [L('Supprimer un équipage', 'Deleting a crew'), `
-      <p>${L('<strong>Supprimer</strong> (lien rouge sur la carte) supprime l’équipage après confirmation. Les inscriptions de ses pilotes sont conservées. Une fois le départ commencé, les équipages sont figés.', '<strong>Delete</strong> (red link on the card) removes the crew after confirmation. Its drivers’ entries are kept. Once the start has begun, crews are frozen.')}</p>`],
-    [L('Inscriptions que je gère', 'Entries I manage'), `
-      <p>${L('Les inscriptions que tu as faites pour d’autres pilotes apparaissent dans <strong>Mes inscriptions</strong>, sous « Inscriptions que je gère ». Avec <strong>Gérer les inscriptions</strong>, tu peux aussi modifier les inscriptions des autres pilotes tant que le départ n’a pas commencé.', 'Entries you made for other drivers appear in <strong>My entries</strong>, under “Entries I manage”. With <strong>Manage entries</strong>, you can also edit other drivers’ entries until the start begins.')}</p>
-      ${helpScreenshot('pilot-my-entries', L('Mes inscriptions', 'My entries'))}`],
-    autoRefreshSection(),
-    [L('Mes droits en tant qu’organisateur', 'My rights as an organizer'), `<div class="help-rights"><div><strong>${L('Tu peux', 'You can')}</strong><ul>
-        <li>${L('faire tout ce qu’un pilote peut faire ;', 'do everything a driver can;')}</li>
-        <li>${L('avec <strong>Créer des courses</strong> : créer des courses, modifier et supprimer les tiennes ;', 'with <strong>Create races</strong>: create races, edit and delete your own;')}</li>
-        <li>${L('avec <strong>Gérer toutes les courses</strong> : modifier et supprimer toutes les courses, y compris celles importées d’iRacing ;', 'with <strong>Manage all races</strong>: edit and delete every race, including those imported from iRacing;')}</li>
-        <li>${L('avec <strong>Gérer les inscriptions</strong> : inscrire d’autres pilotes, modifier les inscriptions, créer, composer et fermer tous les équipages.', 'with <strong>Manage entries</strong>: register other drivers, edit entries, create, build and close every crew.')}</li></ul></div>
-      <div><strong>${L('Tu ne peux pas', 'You cannot')}</strong><ul>
-        <li>${L('donner des rôles : ils se donnent sur le serveur Discord de la communauté ;', 'give roles: they are given on the community’s Discord server;')}</li>
-        <li>${L('modifier une inscription ou un équipage après le début du départ.', 'change an entry or a crew once the start has begun.')}</li></ul></div></div>`],
-    [L('Endurances iRacing officielles', 'Official iRacing endurance races'), `
-      <p>${L('Si les admins de ta communauté activent le module <strong>Endurances iRacing officielles</strong>, les séries d’endurance en équipe et les événements spéciaux d’iRacing sont ajoutés tout seuls au calendrier, avec leurs horaires officiels. Les horaires d’un événement spécial sont complétés dès qu’iRacing les publie ; en attendant, la course est en « Horaires à confirmer ».', 'If your community’s admins turn on the <strong>Official iRacing endurance races</strong> module, iRacing’s team endurance series and special events are added to the calendar by themselves, with their official times. A special event’s times are filled in as soon as iRacing publishes them; until then, the race is “Schedule to be confirmed”.')}</p>`]
-  ];
+const createEnduranceSection = () => [L('Créer une endurance', 'Creating an endurance race'), `
+  <p>${L('<strong>Ajouter une endurance</strong> ouvre une fenêtre en 4 étapes : informations (nom, durée, type, circuit), catégories, départs, récapitulatif. Les heures sont celles de Paris. Coche <strong>Horaires à confirmer</strong> si tu ne connais que le jour.', '<strong>Add an endurance race</strong> opens a 4-step window: information (name, length, type, circuit), categories, starts, summary. Times are Paris time. Tick <strong>Schedule to be confirmed</strong> if you only know the day.')}</p>
+  <p>${L('Sur la page de la course : <strong>Copier le lien</strong>, <strong>Modifier l’événement</strong> et <strong>Supprimer l’événement</strong>. Si tu changes un horaire, préviens les pilotes.', 'On the race page: <strong>Copy link</strong>, <strong>Edit event</strong> and <strong>Delete event</strong>. If you change a start time, tell the drivers.')}</p>
+  ${helpScreenshot('admin-create-endurance', L('Créer une endurance', 'Creating an endurance race'))}`];
 
-  if (role === 'admin') {
-    sections.push([L('Administration', 'Administration'), `
-      <p>${L('Menu du compte → <strong>Administration</strong>, en trois onglets. <strong>Membres</strong> : les membres du serveur Discord qui se sont connectés, avec leurs rôles Discord et ce qu’ils permettent ici. <strong>Mise en place</strong> : les étapes pour installer ta communauté (bot Discord, rôles, récap de la semaine, lien d’invitation, annonce). <strong>Réglages</strong> : nom, couleur, bannière, modules et autorisations de chaque rôle Discord. Les rôles se donnent sur Discord : le site les relit chaque jour.', 'Account menu → <strong>Administration</strong>, in three tabs. <strong>Members</strong>: the members of the Discord server who signed in, with their Discord roles and what these allow here. <strong>Setup</strong>: the steps to set your community up (Discord bot, roles, weekly recap, invitation link, announcement). <strong>Settings</strong>: name, colour, banner, modules and permissions of each Discord role. Roles are given on Discord: the site reads them again every day.')}</p>
-      ${helpScreenshot('admin-members', L('Administration', 'Administration'))}`]);
-    sections.push([L('Diagnostics', 'Diagnostics'), `
-      <p>${L('L’onglet <strong>Diagnostics</strong>, à côté de l’administration, liste les erreurs techniques remontées automatiquement par les navigateurs (page, message, navigateur). Elles sont conservées 14 jours et servent à repérer un problème avant qu’on te le signale.', 'The <strong>Diagnostics</strong> tab, next to administration, lists technical errors reported automatically by browsers (page, message, browser). They are kept for 14 days and help spot a problem before anyone reports it.')}</p>`]);
-  }
+const createEventSection = () => [L(`Créer un événement ${eventsLabel()}`, `Creating a ${eventsLabel()} event`), `
+  <p>${L('<strong>Ajouter un événement</strong> : 5 étapes. <strong>Événement</strong> (nom, simu, type), <strong>Horaire</strong> (jour, heure, mot de passe du serveur), <strong>Manches</strong> (jusqu’à 4 : circuit, catégories, durées essais/qualifs/course, météo, carburant, pneus), <strong>Inscriptions</strong> (places, note), <strong>Récapitulatif</strong>.', '<strong>Add an event</strong>: 5 steps. <strong>Event</strong> (name, sim, type), <strong>Schedule</strong> (day, time, server password), <strong>Rounds</strong> (up to 4: circuit, categories, practice/qualifying/race lengths, weather, fuel, tyres), <strong>Entries</strong> (places, note), <strong>Summary</strong>.')}</p>
+  <p>${L('Le type SAFE ou OPEN décide qui peut s’inscrire : c’est vérifié par le site.', 'The SAFE or OPEN type decides who can enter: the site checks it.')}</p>
+  ${helpScreenshot('admin-create-event', L('Créer un événement', 'Creating an event'))}`];
 
-  const title = role === 'admin' ? L('AIDE ORGANISATEUR & ADMINISTRATION', 'ORGANIZER & ADMINISTRATION HELP') : L('AIDE ORGANISATEUR', 'ORGANIZER HELP');
-  const subtitle = role === 'admin'
-    ? L('Gérer ta communauté : courses, équipages, réglages et droits des rôles Discord.', 'Manage your community: races, crews, settings and Discord role permissions.')
-    : L('Créer les courses, suivre les inscriptions et superviser les équipages.', 'Create races, follow entries and supervise crews.');
+const otherPilotsSection = () => [L('Inscrire un pilote, gérer les équipages', 'Entering a driver, managing crews'), `
+  <p>${L('Dans un départ, le menu <strong>…</strong> → <strong>Inscrire un autre pilote</strong> : choisis son compte Discord parmi les membres. Tu peux aussi modifier son inscription tant que le départ n’a pas commencé.', 'In a start, the <strong>…</strong> menu → <strong>Enter another driver</strong>: pick their Discord account among the members. You can also edit their entry until the start begins.')}</p>
+  <p>${L('Sur chaque équipage, <strong>Gérer</strong> change le nom, la voiture et les pilotes ; <strong>Ouvert / Complet</strong> décide si on peut encore le rejoindre ; <strong>Supprimer</strong> garde les inscriptions de ses pilotes. Une fois le départ commencé, tout est figé.', 'On each crew, <strong>Manage</strong> changes the name, car and drivers; <strong>Open / Complete</strong> decides whether it can still be joined; <strong>Delete</strong> keeps its drivers’ entries. Once the start has begun, everything is frozen.')}</p>`];
 
-  return `<section class="${HELP_PAGE_CLASS}">
-    <header class="help-hero">
-      <span class="help-kicker">ENDURANCE MANAGER</span>
-      <h1>${title}</h1>
-      <p>${subtitle}</p>
-      <span class="help-account-badge">${accountLabel(role)}</span>
-    </header>
-    <div class="help-list">${numbered(sections).join('')}</div>
-  </section>`;
-}
+const administrationSection = () => [L('Administration', 'Administration'), `
+  <p>${L('Menu du compte → <strong>Administration</strong>, en 4 parties :', 'Account menu → <strong>Administration</strong>, in 4 parts:')}</p>
+  <ul>
+    <li>${L('<strong>Vue d’ensemble</strong> : l’état du serveur Discord, les étapes de démarrage et ce qui demande ton attention ;', '<strong>Overview</strong>: the Discord server’s state, the getting-started steps and what needs your attention;')}</li>
+    <li>${L('<strong>Membres et rôles</strong> : les membres venus sur le site et, dans <strong>Rôles</strong>, les 5 autorisations à cocher pour chaque rôle Discord ;', '<strong>Members and roles</strong>: the members who came to the site and, under <strong>Roles</strong>, the 5 permissions to tick for each Discord role;')}</li>
+    <li>${L('<strong>Modules</strong> : récap de la semaine sur Discord, salons d’équipage, rappels de course, endurances iRacing officielles, EVENT TDZ ;', '<strong>Modules</strong>: weekly recap on Discord, crew channels, race reminders, official iRacing endurance races, EVENT TDZ;')}</li>
+    <li>${L('<strong>Apparence</strong> : nom, couleur et bannière, avec un aperçu.', '<strong>Appearance</strong>: name, colour and banner, with a preview.')}</li>
+  </ul>
+  <p>${L('Les rôles se donnent sur Discord, jamais ici.', 'Roles are given on Discord, never here.')}</p>
+  ${helpScreenshot('admin-modules', L('Les modules', 'Modules'))}`];
 
-export function renderHelp(user = null) {
+const modulesSection = () => [L('Les modules en bref', 'Modules in short'), `
+  <ul>
+    <li>${L('<strong>Salons d’équipage</strong> : un salon texte et son vocal par équipage, ouverts quelques jours avant la course, fermés tout seuls après (le texte est gardé 30 jours dans « Archives équipages ») ;', '<strong>Crew channels</strong>: a text channel and its voice channel per crew, opened a few days before the race, closed by themselves afterwards (the text one is kept 30 days in “Crew archives”);')}</li>
+    <li>${L('<strong>Rappels de course</strong> : 24 h avant dans la cloche, 24 h et 1 h avant dans le salon de l’équipage ;', '<strong>Race reminders</strong>: 24 h before in the bell, 24 h and 1 h before in the crew channel;')}</li>
+    <li>${L('<strong>Endurances iRacing officielles</strong> : les séries en équipe et les événements spéciaux ajoutés tout seuls, horaires compris ;', '<strong>Official iRacing endurance races</strong>: team series and special events added by themselves, times included;')}</li>
+    <li>${L('<strong>Récap de la semaine</strong> : les courses de la semaine dans un salon Discord, mis à jour à chaque inscription.', '<strong>Weekly recap</strong>: the week’s races in a Discord channel, updated on every entry.')}</li>
+  </ul>`];
+
+const diagnosticsSection = () => [L('Diagnostics', 'Diagnostics'), `
+  <p>${L('L’onglet <strong>Diagnostics</strong> liste les erreurs remontées par les navigateurs pendant 14 jours : de quoi repérer un problème avant qu’on te le signale.', 'The <strong>Diagnostics</strong> tab lists errors reported by browsers over 14 days: enough to spot a problem before anyone reports it.')}</p>`];
+
+export function renderHelp(current = null) {
   if (!app) return;
-  currentUser = user;
-  const role = normalizedRole();
-  app.innerHTML = role === 'organizer' || role === 'admin' ? organizerHelp(role) : pilotHelp(role);
+  session = current;
+  const admin = session?.user?.role === 'admin';
+  const sections = [
+    navigationSection(),
+    ...(events() ? [eventsSection()] : []),
+    enduranceListSection(),
+    enduranceEntrySection(),
+    crewsSection(),
+    myEntriesSection(),
+    bellSection(),
+    rightsSection(),
+    ...(admin ? [createEnduranceSection(), ...(events() ? [createEventSection()] : []), otherPilotsSection(), administrationSection(), modulesSection(), diagnosticsSection()] : []),
+  ];
+  app.innerHTML = `<section class="${HELP_PAGE_CLASS}">
+    <header class="help-hero">
+      <span class="help-kicker">ENDURANCE MANAGER</span>
+      <h1>${admin ? L('AIDE PILOTE & ADMIN', 'DRIVER & ADMIN HELP') : L('AIDE', 'HELP')}</h1>
+      <p>${L('S’inscrire, s’organiser en équipage', 'Enter, organize your crew')}${admin ? L(' et gérer ta communauté.', ' and run your community.') : '.'}</p>
+      <span class="help-account-badge">${accountLabel()}</span>
+    </header>
+    <div class="help-list">${sections.map((item, index) => helpItem(index + 1, item[0], item[1], index === 0)).join('')}</div>
+  </section>`;
   window.scrollTo({top:0, behavior:'smooth'});
 }

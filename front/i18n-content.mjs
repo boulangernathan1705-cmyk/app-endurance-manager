@@ -23,7 +23,7 @@ const EN=new Map(Object.entries({
   'FORMATION D’ÉQUIPAGE':'CREW SETUP','Aucun départ disponible':'No start available','Ce départ est déjà passé.':'This start has already passed.',
   'Inscription nécessaire':'Entry required','Inscris-toi d’abord sur ce départ pour pouvoir créer ton équipage.':'Register for this start before creating your crew.',
   'Créer un nouvel équipage':'Create a new crew','Annuler':'Cancel','Équipage':'Crew','Départ':'Start','Nom de l’équipage':'Crew name','Voiture':'Car','Composition':'Lineup',
-  'Modifie le nom, la voiture et la composition. Les organisateurs gardent toujours un droit de supervision.':'Edit the name, car and lineup. Organizers always retain supervisory access.',
+  'Modifie le nom, la voiture et la composition.':'Edit the name, car and lineup.',
   'Crée l’équipage sur ce départ puis choisis les pilotes déjà inscrits.':'Create the crew for this start, then select drivers who are already registered.',
   'Tu deviens responsable de l’équipage et tu y es ajouté automatiquement.':'You become the crew owner and are added automatically.',
   'Cet équipage est marqué complet. Rouvre-le depuis sa carte avant de modifier sa composition.':'This crew is marked complete. Reopen it from its card before changing the lineup.',

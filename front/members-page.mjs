@@ -191,11 +191,11 @@ function modulesMarkup(settings, setup) {
       state:crewWarn ? ['warn', crews.botReady !== true ? 'Le bot n’a pas les droits' : 'Le bot est bloqué'] : states.crewChannels ? ['ok', 'Actif'] : ['off', crews.botReady === true ? 'Éteint' : 'Éteint · droits du bot à donner'],
       control:toggle('crewChannels', 'Salons d’équipage sur Discord', crews.botReady !== true && !states.crewChannels),
       settings:`${crewRights}<p class="members-help">Après la course, le vocal est supprimé et le salon texte rangé dans « Archives équipages » pendant 30 jours.</p>`},
-    {key:'raceReminders', name:'Rappels de course', text:'24 h avant le départ dans la cloche du site, 24 h et 1 h avant dans le salon de l’équipage.',
+    {key:'raceReminders', name:'Rappels de course', text:'24&nbsp;h avant le départ dans la cloche du site, 24&nbsp;h et 1&nbsp;h avant dans le salon de l’équipage.',
       state:states.raceReminders ? ['ok', 'Actif'] : ['off', 'Éteint'], control:toggle('raceReminders', 'Rappels de course'), settings:''},
     {key:'iracingImport', name:'Endurances iRacing officielles', text:'Les séries en équipe et les événements spéciaux importés automatiquement.',
       state:states.iracingImport ? ['ok', 'Actif'] : ['off', 'Éteint'], control:toggle('iracingImport', 'Endurances iRacing officielles'), settings:''},
-    {key:'soloRaces', name:'EVENT TDZ', text:'Le calendrier des Tondeuz, toutes simus : places limitées, liste d’attente, types OPEN, SAFE, Bouboule…',
+    {key:'soloRaces', name:'EVENT TDZ', text:'Le calendrier des Tondeuz, toutes simus&nbsp;: places limitées, liste d’attente, types OPEN, SAFE, Bouboule…',
       state:states.soloRaces ? ['ok', 'Actif'] : ['off', 'Éteint'], control:toggle('soloRaces', 'EVENT TDZ'),
       settings:`<form class="settings-safe-guide" data-safe-guide><label>Salon Discord « Comment devenir SAFE »<input name="url" type="url" maxlength="200" placeholder="https://discord.com/channels/…" value="${esc(settings.modules.safeGuideUrl || '')}"></label>
         <div class="settings-actions"><button class="primary-button" type="submit">Enregistrer</button><span class="settings-status" aria-live="polite"></span></div></form>`},
@@ -218,8 +218,8 @@ function lookMarkup(settings) {
       <div class="admin-stack">
         <section class="admin-card"><form class="settings-appearance" data-appearance>
           <label>Nom de la communauté<input name="name" maxlength="80" required value="${esc(look.name)}"></label>
-          <label>Nom court <small>(onglet du navigateur)</small><input name="shortName" maxlength="12" required value="${esc(look.shortName)}"></label>
-          <div class="settings-accent"><label>Couleur d’accent <span class="tip-info" data-tip="Couleur des boutons, des traits et des repères sur le site de ta communauté.">ⓘ</span><input name="accent" type="color" value="${esc(accent)}"></label>
+          <label><span>Nom court <small>(onglet du navigateur)</small></span><input name="shortName" maxlength="12" required value="${esc(look.shortName)}"></label>
+          <div class="settings-accent"><label><span>Couleur d’accent <span class="tip-info" data-tip="Couleur des boutons, des traits et des repères sur le site de ta communauté.">ⓘ</span></span><input name="accent" type="color" value="${esc(accent)}"></label>
             <label class="role-pill"><input type="checkbox" name="defaultAccent" ${look.accent ? '' : 'checked'}><span>Couleur du site</span></label></div>
           <p class="members-help">Le logo est l’icône du serveur Discord${look.discordServer ? ` « ${esc(look.discordServer)} »` : ''} : change-la sur Discord.${look.logoUrl ? '' : ' Le serveur n’a pas d’icône : le logo du site est utilisé.'}</p>
           <div class="settings-actions"><button class="primary-button" type="submit">Enregistrer</button><span class="settings-status" aria-live="polite"></span></div></form></section>
@@ -232,10 +232,10 @@ function lookMarkup(settings) {
       <div class="admin-preview-wrap"><p class="admin-preview-label">Aperçu : ce que verront tes membres</p>
         <div class="admin-preview" data-look-preview style="--preview-accent:${esc(accent)}">
           <div class="admin-preview-banner"><img src="${esc(look.bannerUrl || '/images/endurance-manager-banner.webp')}" alt=""><b data-preview-name>${esc(look.name)}</b></div>
-          <div class="admin-preview-nav"><span>Courses</span><span>Mes inscriptions</span><span>Aide</span></div>
+          <div class="admin-preview-nav"><span>Endurance</span><span>Mes inscriptions</span></div>
           <div class="admin-preview-body">
-            <div class="admin-preview-race"><span><b>6h de Spa</b><small>samedi 20:00 · LMU</small></span><span class="admin-preview-button">S’inscrire</span></div>
-            <div class="admin-preview-race"><span><b>Daytona 24h</b><small>dimanche 14:00 · iRacing</small></span><span class="admin-preview-button">S’inscrire</span></div>
+            <div class="admin-preview-race"><span><b>6h de Spa</b><small>samedi 20:00 · LMU</small></span><span class="admin-preview-button">M’inscrire</span></div>
+            <div class="admin-preview-race"><span><b>Daytona 24h</b><small>dimanche 14:00 · iRacing</small></span><span class="admin-preview-button">M’inscrire</span></div>
           </div></div></div>
     </div>`;
 }
