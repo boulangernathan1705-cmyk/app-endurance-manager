@@ -2,6 +2,12 @@
 
 Les changements du site, version par version. La plus récente est en haut.
 
+## v1.15 — 6 octobre 2026
+
+### Accès aux communautés
+- Un pilote connecté avant l'arrivée du bot sur le serveur Discord n'est plus bloqué.
+- Après avoir rejoint le serveur, l'accès s'ouvre en une minute.
+
 ## v1.14 — 6 octobre 2026
 
 ### EVENT TDZ (nouveau module)

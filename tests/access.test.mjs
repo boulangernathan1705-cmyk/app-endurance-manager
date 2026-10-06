@@ -96,6 +96,22 @@ test('memberships are checked at most once a day; leaving the server or losing a
   assert.equal(DB.db.prepare('SELECT status FROM memberships WHERE user_id=?').get(PILOT).status,'left');
 });
 
+test('bot not yet on the server: nobody is marked as gone; a player who joins gets in a minute later', async t => {
+  const {DB,env,community}=setup();
+  const realFetch=globalThis.fetch;
+  globalThis.fetch=async()=>new Response(JSON.stringify({code:10004,message:'Unknown Guild'}),{status:404});
+  t.after(()=>{globalThis.fetch=realFetch;});
+  assert.equal((await accessOf(env,community,PILOT)).status,'unavailable');
+  assert.equal(DB.db.prepare('SELECT COUNT(*) n FROM memberships WHERE user_id=?').get(PILOT).n,0,'no « left » stored');
+  // Not on the server, then joins: the next visit a minute later lets them in (not 10 minutes later).
+  const members={};
+  fakeDiscord(t,members);
+  assert.equal((await accessOf(env,community,PILOT)).status,'not-member');
+  members[PILOT]=[];
+  DB.db.prepare('UPDATE memberships SET checked_at=checked_at-61').run();
+  assert.equal((await accessOf(env,community,PILOT)).status,'member');
+});
+
 test('a community admin sets what each Discord role allows, "@everyone" included', async t => {
   const {DB,env,community}=setup();
   fakeDiscord(t,{[PILOT]:[SAFE_ROLE]});
