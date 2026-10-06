@@ -38,7 +38,7 @@ function harness(withParticipants=true){
  // The crews' owner column of migration 0016_crew_ownership (its backfill needs no data here).
  DB.db.exec('ALTER TABLE crews ADD COLUMN owner_user_id TEXT REFERENCES users(id) ON DELETE SET NULL;CREATE INDEX crews_owner_user ON crews(owner_user_id);');
  DB.db.exec(readFileSync(new URL('../migrations/0017_discord_weekly.sql',import.meta.url),'utf8'));
- if(withParticipants){DB.db.exec(readFileSync(new URL('../migrations/0034_communities.sql',import.meta.url),'utf8'));DB.db.exec(readFileSync(new URL('../migrations/0035_memberships.sql',import.meta.url),'utf8'));DB.db.exec(readFileSync(new URL('../migrations/0039_official_races.sql',import.meta.url),'utf8'));linkTestServer(DB.db);DB.db.exec(`UPDATE communities SET modules=json_set(modules,'$.soloRaces',json('true'))`);}
+ if(withParticipants){DB.db.exec(readFileSync(new URL('../migrations/0034_communities.sql',import.meta.url),'utf8'));DB.db.exec(readFileSync(new URL('../migrations/0035_memberships.sql',import.meta.url),'utf8'));DB.db.exec(readFileSync(new URL('../migrations/0039_official_races.sql',import.meta.url),'utf8'));linkTestServer(DB.db);DB.db.exec(`UPDATE communities SET modules=json_set(modules,'$.soloRaces',json('true'))`);DB.db.exec(readFileSync(new URL('../migrations/0057_event_last_start.sql',import.meta.url),'utf8'));}
  const env={DB,APP_ORIGIN:ROOT,DISCORD_CLIENT_ID:'app-id',DISCORD_CLIENT_SECRET:'test-only-secret',ADMIN_DISCORD_IDS:ADMIN,ASSETS:{fetch:async()=>new Response('static')}};
  const jars=new Map();
  async function req(path,method='GET',data,actor='guest',options={}){
