@@ -115,7 +115,7 @@ export default {
     run('Training cleanup failed', () => purgeTraining(env));
     // :45 The reference lap times of the circuit sheets: read again once a day, tried every hour until read.
     if (slot === 3) run('Laptimes import failed', () => refreshLaptimes(env));
-    // Every quarter of an hour: the crews on Discord (threads, voice channels, reminders), a few requests at a
+    // Every quarter of an hour: the crews on Discord (voice channels, reminders), a few requests at a
     // time (fewer next to the iRacing import, which makes many).
     run('Crew Discord sync failed', () => syncCrewDiscord(env, at.getTime(), {requests:slot === 1 ? 4 : 8}));
     // :00 Members and Discord roles not checked for a day are checked again by the bot, a few at a time.
