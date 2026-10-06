@@ -22,7 +22,7 @@ test('the last start of a race follows its departures, and the upcoming filter u
   db.prepare("UPDATE events SET departures=? WHERE id='e1'").run(departures([5000]));
   assert.equal(lastStart(), 5000);
   db.prepare("UPDATE events SET departures='[]' WHERE id='e1'").run();
-  assert.equal(lastStart(), null, 'undated race: stays in the upcoming list');
-  const plan = db.prepare("EXPLAIN QUERY PLAN SELECT e.* FROM events e WHERE (e.community_id=? OR e.community_id='official') AND (e.last_start IS NULL OR e.last_start>?)").all(community, 0).map(row => row.detail).join(' | ');
-  assert.match(plan, /events_community_last_start/);
+  assert.equal(lastStart(), Number.MAX_SAFE_INTEGER, 'undated race: stays in the upcoming list');
+  const plan = db.prepare("EXPLAIN QUERY PLAN SELECT e.* FROM events e WHERE (e.community_id=? OR e.community_id='official') AND e.last_start>?").all(community, 0).map(row => row.detail).join(' | ');
+  assert.match(plan, /events_community_last_start \(community_id=\? AND last_start>\?\)/);
 });
