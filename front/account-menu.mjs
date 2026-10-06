@@ -172,6 +172,11 @@ async function loadSession() {
     const session = await response.json();
     applyCommunity(session.community, Array.isArray(session.communities) ? session.communities : [], session.openSite === true);
     if (session.openSite) showcaseBanner(session.platformDiscordUrl);
+    // EVENT TDZ on: the banner leads to the events (all sims), on the current game page or LMU.
+    if (session.soloRaces === true && session.access === 'member') {
+      const game = location.pathname.startsWith('/iracing') ? '/iracing/' : '/lmu/';
+      for (const link of document.querySelectorAll('a.brand-button')) link.href = `${game}#solo`;
+    }
     siteCommunityName = session.openSite ? '' : session.community?.name || '';
     if (session.user) {
       renderConnected(session.user, Array.isArray(session.communities) ? session.communities : []);
