@@ -29,7 +29,7 @@ function fakeDiscord(){
     const body=init.body?JSON.parse(init.body):null;calls.push({method,path,body});
     if(unknownChannel.has(path))return reply(404,{code:10003});
     if(gone.has(path))return reply(404,{code:10008});
-    if(method==='GET'&&path===`/guilds/${GUILD}/members/app-id`)return reply(200,{roles:[BOT_ROLE]});
+    if(method==='GET'&&path===`/guilds/${GUILD}/members/app-id`)return state.botAbsent?reply(404,{code:10007}):reply(200,{roles:[BOT_ROLE]});
     if(method==='GET'&&path===`/guilds/${GUILD}`)return reply(200,{id:GUILD,name:'Test',owner_id:ADMIN});
     if(method==='GET'&&path===`/guilds/${GUILD}/channels`)return reply(200,[{id:'500000000000000002',name:'Courses',type:4,position:2},{id:'500000000000000003',name:'général',type:0,position:0},{id:'500000000000000001',name:'Accueil',type:4,position:1}]);
     if(method==='POST'&&body?.parent_id&&state.goneCategory===body.parent_id)return reply(400,{code:50035});
@@ -91,8 +91,12 @@ test('a crew gets a voice channel « LMU-name » outside any category, followed 
   // The admins turn the modules on in the settings, once the bot has the rights to make channels.
   discord.state.botRights=false;
   let settings=(await req('/api/community/settings','GET',null,'admin')).data;
-  assert.equal(settings.crews.botReady,false);assert.match(settings.crews.botInviteUrl,/permissions=68624&/);
+  assert.equal(settings.crews.botReady,false);assert.equal(settings.crews.botProblem,'rights');assert.match(settings.crews.botInviteUrl,/permissions=68624&/);
   assert.equal((await req('/api/community/modules','PATCH',{crewChannels:true},'admin')).status,400);
+  discord.state.botAbsent=true;
+  settings=(await req('/api/community/settings','GET',null,'admin')).data;
+  assert.equal(settings.crews.botReady,null);assert.equal(settings.crews.botProblem,'absent');
+  discord.state.botAbsent=false;
   discord.state.botRights=true;
   assert.equal((await req('/api/community/settings','GET',null,'admin')).data.crews.botReady,true);
   assert.equal((await req('/api/community/modules','PATCH',{crewChannels:true,raceReminders:true},'pilot')).status,403);

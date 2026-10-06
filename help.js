@@ -140,7 +140,7 @@ const administrationSection = () => [L('Administration', 'Administration'), `
 
 const modulesSection = () => [L('Les modules en bref', 'Modules in short'), `
   <ul>
-    <li>${L('<strong>Salons d’équipage</strong> : un salon vocal par équipage (« LMU-Les Tondeuz »), ouvert quelques jours avant la course et supprimé 2 h après la fin ;', '<strong>Crew channels</strong>: a voice channel per crew (“LMU-Les Tondeuz”), opened a few days before the race and deleted 2 h after it ends;')}</li>
+    <li>${L('<strong>Salons d’équipage</strong> : un salon vocal par équipage, nommé simu + nom de l’équipage, ouvert quelques jours avant la course et supprimé 2 h après la fin ;', '<strong>Crew channels</strong>: a voice channel per crew, named sim + crew name, opened a few days before the race and deleted 2 h after it ends;')}</li>
     <li>${L('<strong>Rappels de course</strong> : 24 h avant dans la cloche, 24 h et 1 h avant dans le salon de l’équipage ;', '<strong>Race reminders</strong>: 24 h before in the bell, 24 h and 1 h before in the crew channel;')}</li>
     <li>${L('<strong>Endurances iRacing officielles</strong> : les séries en équipe et les événements spéciaux ajoutés tout seuls, horaires compris ;', '<strong>Official iRacing endurance races</strong>: team series and special events added by themselves, times included;')}</li>
     <li>${L('<strong>Récap de la semaine</strong> : les courses de la semaine dans un salon Discord, mis à jour à chaque inscription.', '<strong>Weekly recap</strong>: the week’s races in a Discord channel, updated on every entry.')}</li>
