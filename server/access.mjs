@@ -144,7 +144,6 @@ export function requirePermission(actor, permission, message = 'Tu nâ€™as pas lâ
 // Role shown on the site (account menu), from the permissions in this community.
 export function displayRole(access) {
   if (access.permissions.has('admin')) return 'admin';
-  if (access.permissions.has('manage_races') || access.permissions.has('create_race')) return 'organizer';
   return 'pilot';
 }
 

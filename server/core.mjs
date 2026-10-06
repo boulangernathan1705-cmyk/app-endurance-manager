@@ -1,4 +1,4 @@
-import {CATEGORIES, EVENT_TYPE_IDS as EVENT_TYPES, CIRCUIT_IDS as CIRCUITS, CARS, SIM_IDS, eventCatalog, simForEvent, isRandomCircuit} from '../shared/catalog.mjs';
+import {CATEGORIES, EVENT_TYPE_IDS as EVENT_TYPES, CIRCUIT_IDS as CIRCUITS, CARS, SIM_IDS, eventCatalog, simForEvent, isRandomCircuit, TDZ_EVENT_TYPES} from '../shared/catalog.mjs';
 const LEGACY_CAR_ALIASES = new Map([
   ['BMW M Hybrid V8 Evo (2026)','BMW M Hybrid V8'],['Cadillac V-Series.R Evo (2026)','Cadillac V-Series.R'],['Peugeot 9X8 2023','Peugeot 9X8'],['Peugeot 9X8 2024','Peugeot 9X8'],['Toyota TR010 Hybrid (2026)','Toyota GR010 Hybrid'],['Ginetta G61-LT-P3 Evo','Ginetta G61-LT-P3'],['Ferrari 488 GTE Evo','Ferrari 488 GTE'],['Aston Martin Vantage AMR LMGT3 Evo','Aston Martin Vantage AMR LMGT3'],['BMW M4 LMGT3 Evo','BMW M4 LMGT3'],['Ferrari 296 LMGT3 Evo','Ferrari 296 LMGT3'],['Ford Mustang LMGT3 Evo','Ford Mustang LMGT3'],['Lamborghini Huracán LMGT3 Evo 2','Lamborghini Huracán LMGT3'],['McLaren 720S LMGT3 Evo','McLaren 720S LMGT3'],['Porsche 911 LMGT3 R (992)','Porsche 911 GT3 R LMGT3'],['Porsche 911 LMGT3 R (992) 2026','Porsche 911 GT3 R LMGT3']
 ]);
@@ -233,22 +233,19 @@ function validateSoloRace(input, existing) {
     }
     return {circuit, durationMinutes, categories:[...new Set(roundCategories)], ...extras};
   });
-  const capacity = input.capacity == null || input.capacity === '' ? null : Number(input.capacity);
-  if (capacity !== null && (!Number.isInteger(capacity) || capacity < 2 || capacity > 120)) fail(400, 'Le nombre de places doit être compris entre 2 et 120.');
-  // Event details: an end time (open sessions, « 17h-00h »), the server password and a short note.
+  // Places are set round by round; one round: they are the event's places (one waiting list).
+  const capacity = cleanRounds.length === 1 ? cleanRounds[0].capacity ?? null : null;
+  // Event details: its type (OPEN, SAFE… which sets the access), the server password and a short note.
   const raw = input.details && typeof input.details === 'object' ? input.details : {};
   const details = {};
-  if (raw.type) details.type = text(raw.type, 20, 'Type');
-  if (raw.endTime) { if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(raw.endTime)) fail(400, 'Heure de fin invalide.'); details.endTime = raw.endTime; }
+  if (raw.type) { if (!TDZ_EVENT_TYPES.includes(raw.type)) fail(400, 'Choisis un type d’événement de la liste.'); details.type = raw.type; }
   if (raw.password) details.password = text(raw.password, 30, 'Mot de passe');
   if (raw.note) details.note = text(raw.note, 120, 'Info');
-  const roundsMinutes = cleanRounds.reduce((sum, round) => sum + (round.practice || 0) + (round.qualifying || 0) + round.durationMinutes, 0);
-  const startTime = input.departures?.[0]?.time;
-  const windowMinutes = details.endTime && /^\d{2}:\d{2}$/.test(startTime || '') ? (() => { const [h1, m1] = startTime.split(':').map(Number), [h2, m2] = details.endTime.split(':').map(Number); return ((h2 * 60 + m2) - (h1 * 60 + m1) + 1440) % 1440 || 1440; })() : 0;
-  const totalMinutes = Math.max(roundsMinutes, windowMinutes);
+  const totalMinutes = cleanRounds.reduce((sum, round) => sum + (round.practice || 0) + (round.qualifying || 0) + round.durationMinutes, 0);
   if (totalMinutes > 24 * 60) fail(400, 'Un événement ne peut pas dépasser 24 heures.');
   const categories = [...new Set(cleanRounds.flatMap(round => round.categories))];
-  return {sim, access, rounds:cleanRounds, capacity, categories, details, circuit:cleanRounds[0].circuit, durationMinutes:totalMinutes};
+  const typedAccess = {OPEN:'open', SAFE:'safe'}[details.type];
+  return {sim, access:typedAccess || access, rounds:cleanRounds, capacity, categories, details, circuit:cleanRounds[0].circuit, durationMinutes:totalMinutes};
 }
 function validateEvent(input, existing = null) {
   const name = text(input.name, 100, 'Nom de l’événement');
@@ -300,17 +297,13 @@ function validateEvent(input, existing = null) {
 }
 // Discord display names are at most 32 characters: registrations accept the same length.
 const PILOT_NAME_MAX = 32;
-// Solo race entry: category and car, each of them possibly "Peu importe" (category '*'); no hours.
+// Solo race entry: a category per round, possibly "Peu importe" (category '*'); no car, no hours.
 const ANY_CATEGORY = '*';
 function validateSoloChoice(choice, allowed, index, rounds) {
   const category = choice?.category;
   const where = rounds > 1 ? ` pour la manche ${index + 1}` : '';
   if (category !== ANY_CATEGORY && !allowed.includes(category)) fail(400, `Choisis une catégorie${where}, ou « Peu importe ».`);
-  const rawCars = category === ANY_CATEGORY ? [] : Array.isArray(choice.cars) ? choice.cars : [];
-  const cars = [...new Set(rawCars.filter(car => typeof car === 'string' && car.trim()).map(car => LEGACY_CAR_ALIASES.get(car) || car))];
-  if (cars.some(car => !CARS[category]?.includes(car))) fail(400, `Choisis uniquement des voitures proposées${where}.`);
-  const carAny = category === ANY_CATEGORY || choice.carAny === true || !cars.length;
-  return {category, cars: carAny ? [] : cars, carAny};
+  return {category, cars: [], carAny: true};
 }
 function validateSoloRegistration(input, event) {
   const name = text(input.name, PILOT_NAME_MAX, 'Pseudo');

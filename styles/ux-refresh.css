@@ -1223,9 +1223,8 @@ html[data-game] .race-card .race-fill:has(.solo-fill) { display: flex; flex-wrap
 .solo-entry-rank { font-weight: 800; color: #aab3b6; text-align: center; }
 .solo-entries.is-waiting .solo-entry-rank { color: #f3b33d; }
 .solo-entry-name { font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.solo-entry .solo-category, .solo-entry .solo-any-category { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; }
+.solo-entry .solo-category { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; }
 .solo-entry .solo-category .category-logo { width: 24px; height: auto; }
-.solo-entry-car { grid-column: 2 / -1; font-size: 13px; color: #aab3b6; }
 .solo-muted { color: #8a9396; }
 .solo-any-logo { display: inline-grid; place-items: center; width: 40px; height: 28px; border: 1px solid rgba(255, 255, 255, .2); border-radius: 6px; font-size: 18px; color: #c7d0d4; flex: none; }
 .solo-wait-notice { margin: 10px 0 0; padding: 10px 12px; border-left: 3px solid #f3b33d; border-radius: 0 8px 8px 0; background: rgba(243, 179, 61, .08); color: #f1e3c4; font-size: 14px; }
@@ -1239,15 +1238,7 @@ html[data-game] .race-card .race-fill:has(.solo-fill) { display: flex; flex-wrap
   .members-panel .members-row { grid-template-columns: minmax(0, 1fr) !important; }
 }
 /* Course solo à deux manches : catégorie et voiture de chaque manche. */
-.solo-entry-rounds { grid-column: 2 / -1; display: grid; gap: 4px; }
-.solo-entry-round { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; font-size: 13px; }
-.solo-entry-round em { font-style: normal; font-weight: 800; color: #7fe3ea; min-width: 26px; }
-.solo-entry-round .solo-entry-car { grid-column: auto; }
 .solo-round-heading { margin: 0 0 4px; font-weight: 800; color: #7fe3ea; font-size: 15px; }
-.solo-round-badges { display: flex; flex-wrap: wrap; gap: 8px 18px; }
-.solo-round-badge-group { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; }
-.solo-round-badge-group em { font-style: normal; font-weight: 800; color: #7fe3ea; font-size: 13px; }
-.solo-round-badges > .solo-round-badge-group { display: inline-flex !important; flex-direction: row !important; align-items: center !important; gap: 6px !important; width: auto !important; min-height: 0 !important; padding: 0 !important; border: 0 !important; background: none !important; box-shadow: none !important; }
 
 /* ---------- Accueil : présentation, choix de la simu, étapes ---------- */
 .hub-main .hub-welcome { max-width: 760px; margin: 28px auto 8px; text-align: center; }
@@ -2021,7 +2012,6 @@ html[data-game] #app .race-header .event-type-panel span { font-size: 28px; font
 .solo-entry-name { font-size: 14.5px; font-weight: 800; color: #f4f6f5; }
 .solo-entry.is-mine { border-color: var(--community-accent, #52d3d8); background: color-mix(in srgb, var(--community-accent, #52d3d8) 10%, transparent); }
 .solo-entry.is-mine .solo-entry-rank { background: var(--community-accent, #52d3d8); color: #0b1012; }
-.solo-entry-car, .solo-entry-round { font-size: 12px; }
 @media (max-width: 600px) { .solo-entries { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); } }
 html[data-game] #app .race-header .race-header-time { display: inline-flex; align-items: center; gap: 7px; padding: 4px 12px; border: 1px solid rgba(255, 255, 255, .16); border-radius: 9px; font-size: 18px; font-weight: 800; color: #f4f6f5; }
 html[data-game] #app .race-header .race-header-time svg { width: 18px; height: 18px; fill: none; stroke: #7fe3ea; stroke-width: 2; stroke-linecap: round; }
@@ -2052,7 +2042,6 @@ html[data-game] #app .race-header .race-header-time svg { width: 18px; height: 1
 .solo-round-line { display: contents; }
 .solo-round-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 700; color: #f2f5f7; }
 .solo-round-cats { display: inline-flex; gap: 4px; align-items: center; }
-.solo-entry-round.is-skipped { opacity: .55; }
 /* Registration, several rounds: « Je la fais » / « Je ne la fais pas ». */
 .solo-round-toggle { display: inline-flex; gap: 0; margin: 4px 0 12px; border: 1px solid rgba(255, 255, 255, .14); border-radius: 10px; overflow: hidden; }
 .solo-round-toggle .secondary-button { margin: 0; border: 0; border-radius: 0; background: transparent; color: #9aa6b0; }

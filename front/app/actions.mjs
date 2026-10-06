@@ -12,6 +12,13 @@ import {installRouter,routeFromLocation,applyRoute} from './router.mjs';
 import {installAutoRefresh} from './auto-refresh.mjs';
 import {introduceCommunitiesOnce} from '../community-intro.mjs';
 
+// After an entry: the place on the waiting list when the event (or the round) is full.
+function enteredMessage(eventId,departureId,round,done){
+  const reg=state.events.find(item=>item.id===eventId)?.departures.find(item=>item.id===departureId)?.availability?.find(item=>item.mine&&item.status!=='unavailable');
+  const position=round==null?reg?.waitlistPosition:reg?.roundWaitlist?.[round]||reg?.waitlistPosition;
+  return position?`C’est complet : tu es en liste d’attente (${position}${position===1?'er':'e'}).`:done;
+}
+
 // The registration panel opens over the race: move keyboard and screen-reader focus into it.
 function revealRegistration(departureId){
   // The first entry: how communities work, explained once.
@@ -110,8 +117,8 @@ async function perform(action,target){
     case 'refresh': await refresh(); break;
     case 'open': state.currentEventId=target.dataset.id; state.selectedDepartureId=target.dataset.departure||null; state.eventSection='race'; state.drafts={}; state.pendingCrewJoin=null; state.registrationOpen.clear(); renderEvent(); break;
     case 'event-section': state.eventSection='race'; renderEvent(); break;
-    case 'my-registration': { state.pendingCrewJoin=null; state.selectedDepartureId=target.dataset.departure; const oneClick=event?.departures.find(item=>item.id===target.dataset.departure); if(oneClick&&canEnterInOneClick(event,oneClick)){await enterInOneClick(event,oneClick,api); await refreshAfterSave('Tu es inscrit.'); break;} delete state.drafts[state.selectedDepartureId]; state.registrationOpen.add(state.selectedDepartureId); renderEvent(); revealRegistration(state.selectedDepartureId); break; }
-    case 'round-enter': { const departure=event.departures.find(item=>item.id===target.dataset.departure); state.selectedDepartureId=departure.id; if(await enterRound(event,departure,Number(target.dataset.round),api)){await refreshAfterSave('Tu es inscrit à cette manche.');break;} renderEvent(); revealRegistration(departure.id); break; }
+    case 'my-registration': { state.pendingCrewJoin=null; state.selectedDepartureId=target.dataset.departure; const oneClick=event?.departures.find(item=>item.id===target.dataset.departure); if(oneClick&&canEnterInOneClick(event,oneClick)){await enterInOneClick(event,oneClick,api); await refreshAfterSave(()=>enteredMessage(event.id,oneClick.id,null,'Tu es inscrit.')); break;} delete state.drafts[state.selectedDepartureId]; state.registrationOpen.add(state.selectedDepartureId); renderEvent(); revealRegistration(state.selectedDepartureId); break; }
+    case 'round-enter': { const departure=event.departures.find(item=>item.id===target.dataset.departure); state.selectedDepartureId=departure.id; if(await enterRound(event,departure,Number(target.dataset.round),api)){await refreshAfterSave(()=>enteredMessage(event.id,departure.id,Number(target.dataset.round),'Tu es inscrit à cette manche.'));break;} renderEvent(); revealRegistration(departure.id); break; }
     case 'round-edit': { const departure=event.departures.find(item=>item.id===target.dataset.departure); state.selectedDepartureId=departure.id; editRound(event,departure,Number(target.dataset.round)); renderEvent(); revealRegistration(departure.id); break; }
     case 'round-skip': { const departure=event.departures.find(item=>item.id===target.dataset.departure); if(await skipRound(event,departure,Number(target.dataset.round),api))await refreshAfterSave('Tu es désinscrit de cette manche.'); break; }
     case 'event-absence': await api(`/api/events/${target.dataset.id}/absence`,'PUT'); await refreshAfterSave('C’est noté : tu seras absent.'); break;

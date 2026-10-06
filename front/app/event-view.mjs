@@ -4,7 +4,7 @@ import {durationLabel,eventMinutes} from '../../shared/duration.mjs';
 import {app,state,esc,button,canManage,isAdmin,can,canEditRace,officialBadge,communityTag,circuitLabel,eventTypeBadge,schedulePendingBadge,eventBadge,eventCategoryCount,circuitVisual,pilotCount,countdown,notifyRender} from './core.mjs';
 import {ownRegistration,renderRegistrationWorkspace,soloRounds} from './registration.mjs';
 import {renderPilots} from './crews.mjs';
-import {isSolo,accessBadge,soloCardMeta,soloCardInfo,soloEventDetails,roundTiles,roundPilots,soloEntryList,eventCircuitName,soloFill,soloEntryBlock,safeGuideLink,myWaitlistPosition,renderSoloEntries} from './solo.mjs';
+import {isSolo,accessBadge,soloCardMeta,soloEventDetails,roundTiles,roundPilots,soloEntryList,eventCircuitName,soloEntryBlock,safeGuideLink} from './solo.mjs';
 import {renderHome,raceDateBlock,raceStarts} from './home-view.mjs';
 import {planningDays,renderPlanning,syncPlanning,CHEVRON} from './planning.mjs';
 
@@ -27,26 +27,6 @@ function myDepartureBadge(departure){
   return `<span class="departure-mine-badge">✓ Inscrit · ${esc(regs.map(reg=>reg.category).join(' / '))}</span>`;
 }
 
-// Solo race: the start keeps its registration window, but lists participants instead of crews.
-function renderSoloDeparture(event,departure,open){
-  const locked=departure.startsAt<=Date.now(),own=ownRegistration(departure),editorOpen=state.registrationOpen.has(departure.id);
-  const blocked=soloEntryBlock(event),waiting=myWaitlistPosition(departure);
-  // Nothing to choose (no category): no form to edit, the pilot just withdraws.
-  const main=own&&!soloRounds(event).length?button('delete-registration','Me désinscrire',`data-departure="${departure.id}" data-id="${own.id}"`,'secondary-button ux-summary-registration-toggle')
-    :own?button('my-registration','Modifier mon inscription',`data-departure="${departure.id}"`,'primary-button ux-summary-registration-toggle')
-    :blocked?`<span class="solo-blocked">${esc(blocked)}</span>`
-    :button('my-registration','Je participe',`data-departure="${departure.id}"`,'primary-button ux-summary-registration-toggle');
-  const other=can('manage_registrations')?button('new-registration','Inscrire un autre pilote',`data-departure="${departure.id}" data-mode="pilot" data-tip="Inscris un coéquipier ou un autre pilote de ta communauté à sa place."`,'link-button ux-summary-registration-other'):'';
-  const actions=locked?'':`<span class="ux-summary-registration-actions">${main}${other}</span>`;
-  const mine=own?`<span class="departure-mine-badge${waiting?' is-waiting':''}">${waiting?`Liste d’attente · ${waiting}${waiting===1?'er':'e'}`:'✓ Inscrit'}</span>`:'';
-  return `<details class="departure-fold solo-departure${mine?' is-mine':''}" id="departure-${departure.id}" ${open?'open':''}><summary><span class="fold-index">01</span><span class="fold-date">${dateBlock(departure.startsAt,{compact:true})}<span class="fold-date-text"><strong class="ux-departure-title">Départ ${esc(timeLabel(departure.time))}</strong>${locked?'<span class="ux-departure-date">Départ passé</span>':''}${mine}</span></span><span class="fold-meta">${soloFill(event,departure)}</span>${actions}</summary><div class="departure-fold-body">${locked?'<p class="finished-history">Les inscriptions sont fermées.</p>':`<section class="fold-section fold-registration" ${editorOpen?'':'hidden'}>${renderRegistrationWorkspace(event,departure)}</section>`}<section class="fold-section departure-participation-section">${renderSoloEntries(event,departure)}</section></div></details>`;
-}
-
-// What an opened solo start shows: the registration panel, then the participants.
-function soloFoldBody(event,departure){
-  const locked=departure.startsAt<=Date.now(),editorOpen=state.registrationOpen.has(departure.id);
-  return `<div class="departure-fold-body">${locked?'<p class="finished-history">Les inscriptions sont fermées.</p>':`<section class="fold-section fold-registration" ${editorOpen?'':'hidden'}>${renderRegistrationWorkspace(event,departure)}</section>`}<section class="fold-section departure-participation-section">${renderSoloEntries(event,departure)}</section></div>`;
-}
 
 // Quick actions of a start in the planning, as small squares with an icon and a +: « Inscription » (me, me in
 // another category, another pilot: one menu, or the only choice straight away) and « Créer un équipage ».
@@ -155,7 +135,6 @@ function departureFoldBody(event,departure){
 }
 
 export function renderDeparturePanel(event,departure,index,open=false,{isPast=false}={}){
-  if(isSolo(event))return renderSoloDeparture(event,departure,true);
   const locked=departure.startsAt<=Date.now(),crews=departure.crews||[],available=pilotCount(departure.availability);
   const mine=myDepartureBadge(departure);
   return `<details class="departure-fold${isPast?' is-past':''}${mine?' is-mine':''}" id="departure-${departure.id}" ${open?'open':''}><summary><span class="fold-index">${String(index+1).padStart(2,'0')}</span><span class="fold-date">${dateBlock(departure.startsAt,{compact:true})}<span class="fold-date-text"><strong class="ux-departure-title">Départ ${esc(timeLabel(departure.time))}</strong>${locked?'<span class="ux-departure-date">Départ passé</span>':''}${mine}</span></span><span class="fold-meta">${available} pilote${available>1?'s':''} · ${crews.length} équipage${crews.length>1?'s':''}</span>${departureActions(event,departure)}</summary>${departureFoldBody(event,departure)}</details>`;
@@ -242,7 +221,7 @@ export function renderEvent(message=''){
   const days=planningDays(event);
   // The planning shows the crews and pilots of every start: no category summary above it, and the race
   // actions sit on its heading line.
-  const starts=days.length?renderPlanning(event,days,departure=>isSolo(event)?soloFoldBody(event,departure):departureFoldBody(event,departure),{actions:eventActions,quick:departure=>quickActions(event,departure),cards:departure=>roundCards(event,departure)})
+  const starts=days.length?renderPlanning(event,days,departure=>departureFoldBody(event,departure),{actions:eventActions,quick:departure=>quickActions(event,departure),cards:departure=>roundCards(event,departure)})
     :`<section class="departure-accordion" aria-label="Départs de la course">${upcoming}${renderPastDepartures(event,past)}</section>`;
   const myStart=days.length>1?days.flatMap(day=>day.items).map(item=>item.departure).find(departure=>Number(departure.startsAt)>now&&(departure.availability||[]).some(reg=>reg.mine&&reg.status!=='unavailable')):null;
   const myStartLink=myStart?`<span class="race-my-start"><small>Ton départ</small>${button('goto-departure',`${esc(weekdayLong(myStart.startsAt))} ${esc(dayMonthShort(myStart.startsAt))} · Départ ${esc(timeLabel(myStart.time))}`,`data-departure="${myStart.id}"`,'secondary-button')}</span>`:'';

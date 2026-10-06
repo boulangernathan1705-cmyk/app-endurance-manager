@@ -186,9 +186,7 @@ function renderSoloStepper(event,departure,stateDraft){
     if(choice.skip)return pane(n,`${n===1?communityLine(event,departure,stateDraft)+identity:''}${heading}<p class="registration-step-help">${stateDraft.forOther?'Ce pilote ne fait pas':'Tu ne fais pas'} cette manche.</p>`);
     // Random circuit and category: nothing to choose for this round.
     if(!round.categories.length)return pane(n,`${n===1?communityLine(event,departure,stateDraft)+identity:''}${heading}${round.randomCategory?'<p class="registration-step-help">Circuit et catégorie aléatoires : rien à choisir pour cette manche.</p>':''}`);
-    // Solo event: the category only, the car does not matter.
-    const cars='';
-    return pane(n,`${n===1?communityLine(event,departure,stateDraft)+identity:''}${heading}${single?`<p class="solo-single-category">${logo(round.categories[0])}<strong>${esc(round.categories[0])}</strong></p>`:`<div class="category-area"><span class="form-label">Dans quelle catégorie ${stateDraft.forOther?'ce pilote veut-il':'veux-tu'} rouler ?</span><div class="categories registration-category-list">${buttons}</div></div>`}${cars}`);
+    return pane(n,`${n===1?communityLine(event,departure,stateDraft)+identity:''}${heading}${single?`<p class="solo-single-category">${logo(round.categories[0])}<strong>${esc(round.categories[0])}</strong></p>`:`<div class="category-area"><span class="form-label">Dans quelle catégorie ${stateDraft.forOther?'ce pilote veut-il':'veux-tu'} rouler ?</span><div class="categories registration-category-list">${buttons}</div></div>`}`);
   };
   const summaryRow=(n,label,value)=>`<button type="button" class="registration-summary-row" data-action="registration-step" data-departure="${departure.id}" data-step="${n}" data-edit="true"><span>${label}</span><strong>${value}</strong><em>Modifier</em></button>`;
   const pilot=stateDraft.name||(!stateDraft.forOther?state.user?.name:'')||'';
@@ -204,17 +202,6 @@ ${pane(total,`${rounds.length?'':communityLine(event,departure,stateDraft)+ident
 <div class="registration-step-nav">${step>1?button('registration-step','Retour',`data-departure="${departure.id}" data-step="${step-1}"`,'secondary-button registration-back'):''}${next}</div>
 </form>`;
 }
-if(typeof document!=='undefined')document.addEventListener('change',event=>{
-  const field=event.target;
-  if(!field?.dataset?.soloRound)return;
-  const draft=state.drafts[field.dataset.departure],choice=draft?.choices?.[Number(field.dataset.soloRound)];
-  if(!choice)return;
-  if(field.dataset.soloField==='carAny'){
-    choice.carAny=field.checked;
-    field.closest('fieldset')?.querySelectorAll('[data-solo-field="car"]').forEach(input=>{input.disabled=field.checked;if(field.checked)input.checked=false;});
-    if(field.checked)choice.cars=[];
-  } else choice.cars=[...field.closest('fieldset').querySelectorAll('[data-solo-field="car"]:checked')].map(input=>input.value);
-});
 export function renderSteppedRegistration(event,departure,stateDraft=draftFor(departure)) {
   if(needsCommunityChoice(event,departure,stateDraft))return renderCommunityStep(departure);
   if(isSolo(event))return renderSoloStepper(event,departure,stateDraft);

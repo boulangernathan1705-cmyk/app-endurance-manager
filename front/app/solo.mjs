@@ -26,13 +26,6 @@ export function eventCircuitName(event, id) {
   return (sim !== 'lmu' && id) || 'Circuit à préciser';
 }
 
-// "Circuit de Spa-Francorchamps · 20 min + Circuit aléatoire · 20 min"
-export function soloRoundsLabel(event) {
-  const rounds = event.rounds || [];
-  if (!rounds.length) return esc(eventCircuitName(event, event.circuit));
-  return rounds.map(round => `${esc(eventCircuitName(event, round.circuit))} · ${Number(round.durationMinutes) || 0} min`).join(' + ');
-}
-
 // Line icons of the calendar card.
 const ICONS = {
   time: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
