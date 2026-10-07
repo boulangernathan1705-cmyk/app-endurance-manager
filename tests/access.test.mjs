@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {DatabaseSync} from 'node:sqlite';
 import {readFileSync, readdirSync} from 'node:fs';
-import {communityAccess, refreshMemberships, refreshCommunityMembers, PERMISSIONS, ALL_PERMISSIONS, DEFAULT_EVERYONE} from '../server/access.mjs';
+import {communityAccess, refreshMemberships, discoverMemberships, refreshCommunityMembers, PERMISSIONS, ALL_PERMISSIONS, DEFAULT_EVERYONE} from '../server/access.mjs';
 import worker from '../server/worker.mjs';
 import {GUILD, ORGA_ROLE, SAFE_ROLE, DEV_COMMUNITY, linkTestServer} from './fixtures/discord-server.mjs';
 
@@ -110,6 +110,17 @@ test('bot not yet on the server: nobody is marked as gone; a player who joins ge
   members[PILOT]=[];
   DB.db.prepare('UPDATE memberships SET checked_at=checked_at-61').run();
   assert.equal((await accessOf(env,community,PILOT)).status,'member');
+});
+
+test('at sign-in, the communities never checked are asked once, so « Mes communautés » lists them all', async t => {
+  const {DB,env,community}=setup();
+  const calls=fakeDiscord(t,{[PILOT]:[]});
+  const other={...community,id:'c-other',discordGuildId:'900000000000000099'};
+  assert.equal(await discoverMemberships(env,[community,other,{...community,id:'c-none',discordGuildId:null}],PILOT),2,'only communities with a Discord server');
+  assert.equal(DB.db.prepare('SELECT status FROM memberships WHERE user_id=? AND community_id=?').get(PILOT,DEV_COMMUNITY).status,'member');
+  const count=calls.length;
+  assert.equal(await discoverMemberships(env,[community],PILOT),0,'already known: Discord is not asked again');
+  assert.equal(calls.length,count);
 });
 
 test('a community admin sets what each Discord role allows, "@everyone" included', async t => {
