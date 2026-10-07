@@ -2,6 +2,11 @@
 
 Les changements du site, version par version. La plus récente est en haut.
 
+## v1.16 — 7 octobre 2026
+
+### Mes communautés
+- À la connexion, le site retrouve toutes les communautés du pilote : plus besoin d'ouvrir chaque site une première fois.
+
 ## v1.15 — 6 octobre 2026
 
 ### Accès aux communautés
