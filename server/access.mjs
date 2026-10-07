@@ -155,6 +155,15 @@ export function displayRole(access) {
   return 'pilot';
 }
 
+// At sign-in: the communities of the platform the player was never checked in (one bot call each, once), so
+// « Mes communautés » lists all theirs without having to open each site first.
+export async function discoverMemberships(env, communities, userId, limit = 15) {
+  const known = new Set(((await env.DB.prepare('SELECT community_id FROM memberships WHERE user_id=?').bind(userId).all()).results || []).map(row => row.community_id));
+  const unknown = communities.filter(community => community.discordGuildId && !known.has(community.id)).slice(0, limit);
+  await Promise.all(unknown.map(community => checkMembership(env, community, userId).catch(() => null)));
+  return unknown.length;
+}
+
 // Daily task: memberships not checked for a day are checked again (a few at a time).
 // Administration → Membres → « Actualiser depuis Discord »: the members of one community checked now, the
 // longest unchecked first (a request may call Discord 50 times at most).
