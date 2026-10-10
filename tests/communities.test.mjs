@@ -28,6 +28,7 @@ function harness(){
   // Each community has its Discord server; the test players are members of both.
   linkTestServer(DB.db, DEV);
   DB.db.prepare("UPDATE communities SET discord_guild_id='900000000000000009' WHERE id=?").run(TEST);
+  DB.db.prepare('INSERT INTO community_role_permissions(community_id,discord_role_id,permissions,updated_at) VALUES(?,?,?,0)').run(TEST,'900000000000000009',JSON.stringify(['access','endurance','solo_open']));
   const env={DB,APP_ORIGIN:ROOT,COMMUNITY:'commu-dev',DISCORD_CLIENT_ID:'app-id',DISCORD_CLIENT_SECRET:'test-only-secret',ADMIN_DISCORD_IDS:ADMIN,ASSETS:{fetch:async()=>new Response('static')}};
   const jars=new Map();
   async function req(path,method='GET',data,actor='guest'){
@@ -189,6 +190,13 @@ test('official races: every community enters them; a player sees the entries of 
   departure=(await req('/api/events','GET',null,'out')).data.events.find(event=>event.id===official.id).departures[0];
   assert.equal(departure.availability.length,1);assert.ok(!departure.availability[0].foreign);
   assert.equal(departure.crews.length,0);
+  // Remaining on another Discord is not enough to read its entries or crews once site access is revoked.
+  DB.db.prepare('DELETE FROM community_role_permissions WHERE community_id=?').run(TEST);
+  departure=(await req('/api/events','GET',null,'pilot')).data.events.find(event=>event.id===official.id).departures[0];
+  assert.equal(departure.availability.length,1);assert.ok(!departure.availability[0].foreign);
+  assert.equal(departure.crews.length,0,'the other community’s crew is hidden even for a Discord member');
+  assert.equal(DB.db.prepare('SELECT status FROM memberships WHERE user_id=? AND community_id=?').get(PILOT,TEST).status,'member');
+  assert.equal((await req(base+'/crews','POST',{name:'Forbidden',category:'Hypercar',communityId:TEST},'pilot')).status,403,'a direct cross-community action cannot bypass the gate');
   // An official race is changed by the managers only; « Rendre officielle » too.
   assert.equal((await req('/api/events/'+official.id,'DELETE',{version:official.version},'pilot')).status,403);
   const own=await req('/api/events','POST',{...race,name:'Privée'},'admin');

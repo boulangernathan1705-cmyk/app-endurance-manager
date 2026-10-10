@@ -3,7 +3,7 @@
 // - The platform managers (ADMIN_DISCORD_IDS) have every permission everywhere.
 // - A member's permissions = the permissions of all their Discord roles (community_role_permissions),
 //   "@everyone" included (its role id is the server id). Without any setting for "@everyone", members may
-//   enter endurances and OPEN events. Without any permission, a member only sees the races.
+//   enter endurances and OPEN events, but access to the site must be granted explicitly.
 // - The owner of the server and any role with Discord's "Administrator" permission have every permission.
 // - Membership and roles are checked by the bot (DISCORD_BOT_TOKEN) when the player comes, at most once a
 //   day, and by the daily task. The player's other servers are never looked at.
@@ -11,6 +11,7 @@
 import {administrators, fail, now} from './core.mjs';
 
 export const PERMISSIONS = Object.freeze([
+  'access',               // accéder à l’espace Endurance Manager de la communauté
   'endurance',            // s'inscrire aux endurances (et rejoindre un équipage existant)
   'solo_open',            // s'inscrire aux événements OPEN (module EVENT TDZ)
   'solo_safe',            // s'inscrire aux événements SAFE et OPEN (module EVENT TDZ)
@@ -113,7 +114,9 @@ async function rolePermissions(env, community, roles) {
   const byRole = new Map(rows.map(row => [row.discord_role_id, normalizePermissions(JSON.parse(row.permissions || '[]'))]));
   const granted = new Set(byRole.has(everyone) ? byRole.get(everyone) : DEFAULT_EVERYONE);
   for (const role of roles) for (const permission of byRole.get(role) || []) granted.add(permission);
-  return withImplied(new Set([...granted].filter(permission => PERMISSIONS.includes(permission))));
+  const permissions = withImplied(new Set([...granted].filter(permission => PERMISSIONS.includes(permission))));
+  // Action permissions alone never open the community. An admin always keeps access to configure roles.
+  return permissions.has('access') ? permissions : new Set();
 }
 
 // Permissions of a stored membership (members page).
@@ -124,7 +127,7 @@ export async function memberPermissions(env, community, membership) {
 
 // Access of the actor to the community: {status, permissions, manager}.
 //   status: 'member' (access), 'anonymous' (not signed in), 'not-member' (not on the Discord server),
-//   'unavailable' (the server or the bot cannot be checked).
+//   'forbidden' (member without site access), 'unavailable' (the server or the bot cannot be checked).
 export async function communityAccess(env, actor, community, {open = false} = {}) {
   const none = status => ({status, permissions:new Set(), manager:false});
   const manager = Boolean(actor.user) && administrators(env).includes(actor.user.id);
@@ -141,7 +144,8 @@ export async function communityAccess(env, actor, community, {open = false} = {}
   if (!membership) return none('unavailable');
   if (membership.status !== 'member') return none('not-member');
   if (membership.discord_admin) return {status:'member', permissions:new Set(ALL_PERMISSIONS), manager:false};
-  return {status:'member', permissions:await rolePermissions(env, community, JSON.parse(membership.discord_roles || '[]')), manager:false};
+  const permissions = await rolePermissions(env, community, JSON.parse(membership.discord_roles || '[]'));
+  return permissions.has('access') ? {status:'member', permissions, manager:false} : none('forbidden');
 }
 
 export function requirePermission(actor, permission, message = 'Tu n’as pas l’autorisation de faire cette action dans cette communauté.') {

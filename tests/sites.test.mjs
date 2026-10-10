@@ -81,6 +81,7 @@ test('"Mes communautés": the communities of the player, with the address of eac
   DB.db.prepare("INSERT INTO users(id,name,created_at) VALUES(?,?,0)").run(user,'Leo');
   DB.db.prepare('INSERT INTO sessions(token_hash,user_id,expires_at) VALUES(?,?,?)').run(hash,user,4102444800);
   DB.db.prepare("UPDATE communities SET discord_guild_id='900000000000000001'").run();
+  DB.db.prepare("INSERT INTO community_role_permissions(community_id,discord_role_id,permissions,updated_at) SELECT id,discord_guild_id,'[\"access\"]',0 FROM communities").run();
   const time=Math.floor(Date.now()/1000);
   const member=DB.db.prepare("INSERT INTO memberships(community_id,user_id,status,checked_at,created_at) VALUES(?,?,'member',?,?)");
   const headers={Cookie:`__Secure-em_dev_session=${raw}`};
@@ -91,6 +92,9 @@ test('"Mes communautés": the communities of the player, with the address of eac
   assert.deepEqual(mine.map(item=>[item.slug,item.url,item.current]),[['commu-dev',`${MAIN}/`,true],['commu-test',`${TEST_SITE}/`,false]]);
   assert.ok(mine.every(item=>item.manageCrews===false),'no role to manage the crews: a crew only with his own entry');
   assert.equal((await (await call(`${TEST_SITE}/api/session`,{headers})).json()).communities.length,2,'the same on every site');
+  DB.db.prepare('DELETE FROM community_role_permissions WHERE community_id=?').run('c-test');
+  assert.deepEqual((await (await call(`${MAIN}/api/session`,{headers})).json()).communities,[],'a restricted community is absent from the selector');
+  assert.equal((await (await call(`${TEST_SITE}/api/session`,{headers})).json()).access,'forbidden','Discord membership alone does not open the other site');
   // The explanation of communities, read once for the account (every device, every site).
   assert.equal((await (await call(`${MAIN}/api/session`,{headers})).json()).user.communityIntroSeen,false);
   const read=await call(`${TEST_SITE}/api/me/community-intro`,{method:'POST',headers:{...headers,Origin:TEST_SITE,'Content-Type':'application/json'},body:'{}'});

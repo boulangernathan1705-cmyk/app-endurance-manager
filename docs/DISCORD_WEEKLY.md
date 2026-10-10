@@ -35,3 +35,7 @@ La migration `0017_discord_weekly.sql` stocke uniquement l'identifiant du messag
 ## Mise à jour automatique
 
 Le Cron Trigger Cloudflare est configuré à `17 * * * *`. Il ne republie pas le message à chaque heure : il recalcule le résumé puis s'arrête immédiatement si son contenu est identique.
+
+## Pilotes absents
+
+Les pilotes qui ont indiqué leur absence sur le site figurent dans **🚫 Pilotes absents**, en bas du bloc de leur événement. La liste concerne l’événement entier, s’affiche une seule fois par bloc et ne contient que les pilotes de la communauté du récap. Sans absence déclarée, la ligne est masquée. Déclarer ou retirer une absence actualise automatiquement le message, comme une inscription.

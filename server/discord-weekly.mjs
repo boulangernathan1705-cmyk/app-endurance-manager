@@ -90,8 +90,8 @@ export async function loadWeeklyDiscordSnapshot(env, timestamp, community, scope
   // The community's races, and the official races (common to every community) where it has entries: only its
   // own entries and crews are shown.
   const events = (await env.DB.prepare(`SELECT id,name,circuit,duration_hours,duration_minutes,event_type,schedule_pending,departures
-    FROM events WHERE (community_id=? OR (community_id='official' AND EXISTS (SELECT 1 FROM registrations r WHERE r.event_id=events.id AND r.community_id=?)))
-    ${CIRCUITS[scope] ?? CIRCUITS.lmu} ORDER BY created_at,id`).bind(community.id, community.id).all()).results || [];
+    FROM events WHERE (community_id=? OR (community_id='official' AND (EXISTS (SELECT 1 FROM registrations r WHERE r.event_id=events.id AND r.community_id=?) OR EXISTS (SELECT 1 FROM event_absences a WHERE a.event_id=events.id AND a.community_id=?))))
+    ${CIRCUITS[scope] ?? CIRCUITS.lmu} ORDER BY created_at,id`).bind(community.id, community.id, community.id).all()).results || [];
   const allDepartures = flattenDepartures(events);
   const currentWeek = parisWeek(timestamp);
   // A start whose time is still to be confirmed is never announced as running (its placeholder is 0:00).
@@ -111,6 +111,16 @@ export async function loadWeeklyDiscordSnapshot(env, timestamp, community, scope
   const selectedByKey = new Map(selected.map(item => [`${item.eventId}:${item.departureId}`, item]));
   const eventIds = [...new Set(selected.map(item => item.eventId))];
   const marks = eventIds.map(() => '?').join(',');
+
+  // Absence is declared for the whole event, not for each departure. Only this community's pilots appear.
+  const absenceRows = (await env.DB.prepare(`SELECT a.event_id,u.name FROM event_absences a JOIN users u ON u.id=a.user_id
+    WHERE a.event_id IN (${marks}) AND a.community_id=? ORDER BY a.created_at,a.user_id`).bind(...eventIds, community.id).all()).results || [];
+  const absentByEvent = new Map();
+  for (const row of absenceRows) {
+    if (!absentByEvent.has(row.event_id)) absentByEvent.set(row.event_id, []);
+    absentByEvent.get(row.event_id).push(String(row.name));
+  }
+  for (const departure of selected) departure.absentPilots = absentByEvent.get(departure.eventId) || [];
 
   const registrationRows = (await env.DB.prepare(`SELECT r.id,r.event_id,r.departure_id,r.participant_id,r.category,r.status,
       COALESCE(p.name,r.name) AS pilot_name

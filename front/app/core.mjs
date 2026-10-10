@@ -200,6 +200,7 @@ function mergeEvents(...lists) {
 export async function load() {
   // The community is only open to the members of its Discord server: nothing else is loaded otherwise.
   const session = await api('/api/session');
+  const accessChanged = state.access !== session.access;
   state.access=session.access; state.permissions=session.permissions||[]; state.manager=session.manager===true; state.community=session.community||null; state.communities=Array.isArray(session.communities)?session.communities:[]; state.openSite=session.openSite===true; state.platformDiscordUrl=session.platformDiscordUrl||null;
   const member = session.access === 'member';
   const [upcoming,archived] = member ? await Promise.all([fetchEvents('upcoming'), state.archiveLoaded ? fetchEvents('archived') : []]) : [[],[]];
@@ -214,8 +215,9 @@ export async function load() {
   state.safeGuideUrl=typeof session.safeGuideUrl==='string'?session.safeGuideUrl:'';
   if (!state.soloRaces) state.listFormat='endurance';
   state.events=markUndefinedStarts(mergeEvents(upcoming,archived));
+  if (!member) { state.page='home'; state.currentEventId=null; state.drafts={}; state.registrationOpen.clear(); }
   // The members list rarely changes: fetch it once per session instead of on every refresh.
-  if (userChanged || !state.participantsLoaded) {
+  if (userChanged || accessChanged || !state.participantsLoaded) {
     state.participants=state.user && member ? (await api('/api/participants')).participants : [];
     state.participantsLoaded=true;
   }

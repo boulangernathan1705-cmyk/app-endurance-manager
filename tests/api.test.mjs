@@ -520,7 +520,7 @@ test('SAFE solo races are reserved to the Discord roles with "Courses SAFE"',asy
 test('the most demanding community: newcomers race solo OPEN only; the SAFE role opens SAFE races and endurances',async()=>{
  const {req,login}=harness();await login(ADMIN,'admin');await login(PILOT,'pilot');
  const setRole=(role,permissions)=>lastDB.db.prepare('INSERT OR REPLACE INTO community_role_permissions(community_id,discord_role_id,permissions,updated_at) VALUES(?,?,?,0)').run('e0a1c0de-0000-4000-8000-000000000001',role,JSON.stringify(permissions));
- setRole('900000000000000001',['solo_open']);setRole(SAFE_ROLE,['solo_safe','endurance']);
+ setRole('900000000000000001',['access','solo_open']);setRole(SAFE_ROLE,['solo_safe','endurance']);
  const pathOf=async input=>{const id=(await req('/api/events','POST',input,'admin')).data.id;const event=(await req('/api/events','GET',null,'admin')).data.events.find(e=>e.id===id);return '/api/events/'+id+'/departures/'+event.departures[0].id+'/registrations';};
  const open=await pathOf(soloInput),safe=await pathOf({...soloInput,access:'safe'}),endurance=await pathOf(eventInput);
  const solo={name:'Pilote',choices:[{category:'GT3',carAny:true},{category:'GT3',carAny:true}]},crewEntry={name:'Pilote',category:'Hypercar',cars:[],carAny:true,status:'whole'};

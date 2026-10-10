@@ -80,15 +80,18 @@ async function myCommunities(env, actor, community) {
   const showcase = (() => { try { return new URL(env.APP_ORIGIN).hostname === domain ? communitySlug(env, null) : ''; } catch { return ''; } })();
   const mine = list.filter(item => item.slug !== showcase).sort((x, y) => x.name.localeCompare(y.name, 'fr')).map(item => ({id:item.id, slug:item.slug, name:item.name, shortName:item.shortName,
     logoUrl:appearanceOf(item).logoUrl, accent:appearanceOf(item).accent, url:`${communityUrl(env, item)}/`, current:item.slug === community.slug, item}));
-  if (mine.length < 2) return [];
   // "Gérer tous les équipages" in each (a crew of an official race is created for any of them, whatever the site).
   const memberships = actor.manager ? [] : (await env.DB.prepare("SELECT * FROM memberships WHERE user_id=? AND status='member'").bind(actor.user.id).all()).results || [];
+  const allowed = [];
   for (const entry of mine) {
     const membership = memberships.find(row => row.community_id === entry.id);
-    entry.manageCrews = actor.manager || Boolean(membership && (await memberPermissions(env, entry.item, membership)).has('crews'));
+    const permissions = actor.manager ? new Set(ALL_PERMISSIONS) : membership ? await memberPermissions(env, entry.item, membership) : new Set();
+    if (!permissions.has('access')) continue;
+    entry.manageCrews = permissions.has('crews');
     delete entry.item;
+    allowed.push(entry);
   }
-  return mine;
+  return allowed.length < 2 ? [] : allowed;
 }
 // Body of an image upload (the banner), read up to `limit` bytes.
 async function imageBody(request, limit) {
@@ -196,9 +199,19 @@ async function listEvents(env, actor, game='', scope='', community) {
   const filters=[`(e.community_id=? OR ${officialRaces})`,game==='iracing' ? "(e.format='solo' OR e.circuit LIKE 'iracing-%')" : game==='lmu' ? "(e.format='solo' OR e.circuit NOT LIKE 'iracing-%')" : '', eventScopeFilter(scope), soloRacesEnabled(env, community) ? '' : "COALESCE(e.format,'endurance')!='solo'"].filter(Boolean);
   const where=filters.length ? ` WHERE ${filters.join(' AND ')}` : '';
   const player = actor.user?.id || '';
-  const mine = column => `${column} IN (SELECT ? UNION SELECT community_id FROM memberships WHERE user_id=? AND status='member')`;
   const rows = (await env.DB.prepare(`SELECT e.* FROM events e${where} ORDER BY e.created_at DESC, e.id DESC`).bind(community.id).all()).results;
   if (!rows.length) return [];
+  // Discord membership alone must not expose another community's crews after site access is withdrawn.
+  const otherPermissions = new Map();
+  if (player) {
+    const memberships = (await env.DB.prepare(`SELECT c.*,m.discord_roles,m.discord_admin FROM communities c JOIN memberships m ON m.community_id=c.id WHERE m.user_id=? AND m.status='member'`).bind(player).all()).results || [];
+    for (const membership of memberships) {
+      const permissions = actor.manager ? new Set(ALL_PERMISSIONS) : await memberPermissions(env, communityFromRow(membership), membership);
+      if (permissions.has('access')) otherPermissions.set(membership.id, permissions);
+    }
+  }
+  const accessible = JSON.stringify([...otherPermissions.keys()]);
+  const mine = column => `${column} IN (SELECT ? UNION SELECT value FROM json_each(?))`;
   // The entries, crews and names of these races only, by race id (the events index, not the history), all at once:
   // one wait for the database instead of one per query. By packs of 90 races (D1 takes at most 100 bound values).
   const packs = [];
@@ -207,11 +220,11 @@ async function listEvents(env, actor, game='', scope='', community) {
   const byPacks = (sql, extra) => Promise.all(packs.map(ids => env.DB.prepare(sql(inPack(ids))).bind(...ids, ...extra).all()))
     .then(parts => parts.flatMap(part => part.results || []));
   const [registrations, crews, memberships, users, absenceRows] = await Promise.all([
-    byPacks(ids => registrationSelect+` WHERE r.event_id IN (${ids}) AND ${mine('r.community_id')} ORDER BY r.created_at,r.rowid`, [community.id, player]),
-    byPacks(ids => `SELECT c.* FROM crews c WHERE c.event_id IN (${ids}) AND ${mine('c.community_id')} ORDER BY c.created_at,c.id`, [community.id, player]),
-    byPacks(ids => `SELECT cm.crew_id,cm.registration_id FROM crew_members cm JOIN crews c ON c.id=cm.crew_id WHERE c.event_id IN (${ids}) AND ${mine('c.community_id')}`, [community.id, player]),
+    byPacks(ids => registrationSelect+` WHERE r.event_id IN (${ids}) AND ${mine('r.community_id')} ORDER BY r.created_at,r.rowid`, [community.id, accessible]),
+    byPacks(ids => `SELECT c.* FROM crews c WHERE c.event_id IN (${ids}) AND ${mine('c.community_id')} ORDER BY c.created_at,c.id`, [community.id, accessible]),
+    byPacks(ids => `SELECT cm.crew_id,cm.registration_id FROM crew_members cm JOIN crews c ON c.id=cm.crew_id WHERE c.event_id IN (${ids}) AND ${mine('c.community_id')}`, [community.id, accessible]),
     // Only registration creators' names are displayed (addedByName).
-    byPacks(ids => `SELECT DISTINCT u.id,u.name FROM users u JOIN registrations r ON r.owner_user_id=u.id WHERE r.event_id IN (${ids}) AND ${mine('r.community_id')}`, [community.id, player]),
+    byPacks(ids => `SELECT DISTINCT u.id,u.name FROM users u JOIN registrations r ON r.owner_user_id=u.id WHERE r.event_id IN (${ids}) AND ${mine('r.community_id')}`, [community.id, accessible]),
     // « Je serai absent »: the pilots of the site's community who said they will miss the event.
     byPacks(ids => `SELECT a.event_id,a.user_id,u.name FROM event_absences a JOIN users u ON u.id=a.user_id WHERE a.event_id IN (${ids}) AND a.community_id=? ORDER BY a.created_at`, [community.id])
   ]);
@@ -221,14 +234,12 @@ async function listEvents(env, actor, game='', scope='', community) {
   const names = new Map(), perms = new Map();
   if (official.size) {
     const shown = new Set([...registrations.filter(reg => official.has(reg.event_id)).map(reg => reg.community_id), ...crews.filter(crew => official.has(crew.event_id)).map(crew => crew.community_id)]);
-    for (const row of (await env.DB.prepare(`SELECT * FROM communities WHERE ${mine('id')}`).bind(community.id, player).all()).results || []) {
+    for (const row of (await env.DB.prepare(`SELECT * FROM communities WHERE ${mine('id')}`).bind(community.id, accessible).all()).results || []) {
       if (!shown.has(row.id)) continue;
       const item = communityFromRow(row), look = appearanceOf(item);
       names.set(row.id, {id:row.id, name:item.name, shortName:item.shortName, accent:look.accent, logoUrl:look.logoUrl});
       if (row.id === community.id || !actor.user) continue;
-      if (actor.manager) { perms.set(row.id, new Set(ALL_PERMISSIONS)); continue; }
-      const membership = await env.DB.prepare("SELECT * FROM memberships WHERE community_id=? AND user_id=? AND status='member'").bind(row.id, actor.user.id).first();
-      if (membership) perms.set(row.id, await memberPermissions(env, item, membership));
+      if (otherPermissions.has(row.id)) perms.set(row.id, otherPermissions.get(row.id));
     }
   }
   const userNames = new Map(users.map(item => [item.id,item.name]));
@@ -403,6 +414,7 @@ async function api(request, env) {
   if (path === '/api/guest/recover' || path === '/api/guest/link') fail(410, 'Les inscriptions sans compte Discord ne sont plus possibles.');
   // Everything below needs a member of the community (or a platform manager).
   if (access.status === 'anonymous') fail(401, 'Connecte-toi avec Discord pour accéder à cette communauté.');
+  if (access.status === 'forbidden') fail(403, 'Tu n’as pas l’autorisation d’accéder à Endurance Manager dans cette communauté. Demande à un administrateur du Discord.');
   if (access.status !== 'member') fail(403, access.status === 'not-member'
     ? `Cette communauté est réservée aux membres du serveur Discord « ${community.name} ».`
     : 'L’accès à cette communauté ne peut pas être vérifié pour le moment. Réessaie plus tard.');

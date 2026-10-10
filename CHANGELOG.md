@@ -2,6 +2,14 @@
 
 Les changements du site, version par version. La plus récente est en haut.
 
+## v1.17 — 10 octobre 2026
+
+- Le récap hebdomadaire Discord affiche les pilotes ayant déclaré leur absence, en bas du bloc de chaque événement. Une déclaration ou un retrait d’absence actualise automatiquement le récap.
+
+- Nouvelle autorisation **Accès Endurance Manager** dans Administration → Membres et rôles → Rôles. Les membres ordinaires entrent seulement si au moins un de leurs rôles possède cette autorisation ; elle est décochée par défaut, y compris pour `@everyone`.
+- Sans accès, un compte connecté voit « Accès réservé » et ne peut consulter ni modifier les données de la communauté, même depuis une course officielle partagée ou un lien direct à l’API. Les administrateurs conservent leur accès pour configurer les rôles.
+- Les administrateurs doivent cocher l’accès sur les rôles choisis lors de la mise en service. Aucune migration D1 ; les inscriptions et équipages existants sont conservés.
+
 ## v1.16 — 7 octobre 2026
 
 ### Mes communautés
