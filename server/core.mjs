@@ -1,3 +1,4 @@
+import {isGrindfest, streamersOf, normalizeStreamers} from '../shared/grindfest.mjs';
 import {CATEGORIES, EVENT_TYPE_IDS as EVENT_TYPES, CIRCUIT_IDS as CIRCUITS, CARS, SIM_IDS, eventCatalog, simForEvent, isRandomCircuit, TDZ_EVENT_TYPES} from '../shared/catalog.mjs';
 const LEGACY_CAR_ALIASES = new Map([
   ['BMW M Hybrid V8 Evo (2026)','BMW M Hybrid V8'],['Cadillac V-Series.R Evo (2026)','Cadillac V-Series.R'],['Peugeot 9X8 2023','Peugeot 9X8'],['Peugeot 9X8 2024','Peugeot 9X8'],['Toyota TR010 Hybrid (2026)','Toyota GR010 Hybrid'],['Ginetta G61-LT-P3 Evo','Ginetta G61-LT-P3'],['Ferrari 488 GTE Evo','Ferrari 488 GTE'],['Aston Martin Vantage AMR LMGT3 Evo','Aston Martin Vantage AMR LMGT3'],['BMW M4 LMGT3 Evo','BMW M4 LMGT3'],['Ferrari 296 LMGT3 Evo','Ferrari 296 LMGT3'],['Ford Mustang LMGT3 Evo','Ford Mustang LMGT3'],['Lamborghini Huracán LMGT3 Evo 2','Lamborghini Huracán LMGT3'],['McLaren 720S LMGT3 Evo','McLaren 720S LMGT3'],['Porsche 911 LMGT3 R (992)','Porsche 911 GT3 R LMGT3'],['Porsche 911 LMGT3 R (992) 2026','Porsche 911 GT3 R LMGT3']
@@ -220,7 +221,7 @@ function validateSoloRace(input, existing) {
       extras[key] = value;
     }
     // Places of the round (empty = unlimited): beyond them, pilots wait for a place on that round.
-    if (round.capacity != null && round.capacity !== '') {
+    if (input.details?.type !== 'Grindfest' && round.capacity != null && round.capacity !== '') {
       const value = Number(round.capacity);
       if (!Number.isInteger(value) || value < 2 || value > 120) fail(400, `Le nombre de places${where} doit être compris entre 2 et 120.`);
       extras.capacity = value;
@@ -234,11 +235,17 @@ function validateSoloRace(input, existing) {
     return {circuit, durationMinutes, categories:[...new Set(roundCategories)], ...extras};
   });
   // Places are set round by round; one round: they are the event's places (one waiting list).
-  const capacity = cleanRounds.length === 1 ? cleanRounds[0].capacity ?? null : null;
+  let capacity = cleanRounds.length === 1 ? cleanRounds[0].capacity ?? null : null;
   // Event details: its type (OPEN, SAFE… which sets the access), the server password and a short note.
   const raw = input.details && typeof input.details === 'object' ? input.details : {};
   const details = {};
-  if (raw.type) { if (!TDZ_EVENT_TYPES.includes(raw.type)) fail(400, 'Choisis un type d’événement de la liste.'); details.type = raw.type; }
+  if (raw.type) { if (![...TDZ_EVENT_TYPES, 'Grindfest'].includes(raw.type)) fail(400, 'Choisis un type d’événement de la liste.'); details.type = raw.type; }
+  if (details.type === 'Grindfest') {
+    try { details.streamers = normalizeStreamers(raw.streamers); } catch (error) { fail(400, error.message); }
+    capacity = details.streamers.reduce((sum, streamer) => sum + streamer.capacity, 0);
+    cleanRounds.forEach(round => { delete round.capacity; });
+  }
+  if (existing && isGrindfest(existing) !== (details.type === 'Grindfest')) fail(400, 'Le format Grindfest ne peut pas changer après la création.');
   if (raw.password) details.password = text(raw.password, 30, 'Mot de passe');
   if (raw.note) details.note = text(raw.note, 120, 'Info');
   const totalMinutes = cleanRounds.reduce((sum, round) => sum + (round.practice || 0) + (round.qualifying || 0) + round.durationMinutes, 0);
@@ -307,6 +314,10 @@ function validateSoloChoice(choice, allowed, index, rounds) {
 }
 function validateSoloRegistration(input, event) {
   const name = text(input.name, PILOT_NAME_MAX, 'Pseudo');
+  const grindfest = isGrindfest(event);
+  if (grindfest && Array.isArray(input.choices) && input.choices.some(choice => choice?.skip === true)) fail(400, 'L’inscription Grindfest couvre toutes les manches.');
+  const streamerId = grindfest ? String(input.streamerId || '') : null;
+  if (isGrindfest(event) && !streamersOf(event).some(streamer => streamer.id === streamerId)) fail(400, 'Choisis le streamer que tu représentes.');
   const eventCategories = JSON.parse(event.categories);
   const rounds = JSON.parse(event.rounds || '[]');
   const roundCategories = rounds.length ? rounds.map(round => round.randomCategory ? [] : round.categories?.length ? round.categories : eventCategories) : [eventCategories];
@@ -314,13 +325,13 @@ function validateSoloRegistration(input, event) {
   const multi = roundCategories.length > 1, skips = multi && Array.isArray(input.choices) && input.choices.length === roundCategories.length ? input.choices.map(choice => choice?.skip === true) : [];
   if (skips.length && skips.every(Boolean)) fail(400, 'Choisis au moins une manche.');
   // No category offered: a simple entry (every round, unless some are skipped).
-  if (roundCategories.every(list => !list.length)) return {name, nameKey: name.normalize('NFKC').toLocaleLowerCase('fr-FR'), status: 'whole', category: '', car: '', cars: [], carAny: true, preferredPilot: '', roundChoices: skips.some(Boolean) ? skips.map(skip => skip ? {skip: true} : {category: '', cars: [], carAny: true}) : []};
+  if (roundCategories.every(list => !list.length)) return {name, streamerId, nameKey: name.normalize('NFKC').toLocaleLowerCase('fr-FR'), status: 'whole', category: '', car: '', cars: [], carAny: true, preferredPilot: '', roundChoices: skips.some(Boolean) ? skips.map(skip => skip ? {skip: true} : {category: '', cars: [], carAny: true}) : []};
   // One choice per round; a single-round entry may still send category / cars directly.
   const rawChoices = Array.isArray(input.choices) ? input.choices : [{category:input.category, cars:input.cars, carAny:input.carAny}];
   if (rawChoices.length !== roundCategories.length) fail(400, 'Choisis une catégorie pour chaque manche.');
   const choices = rawChoices.map((choice, index) => skips[index] ? {skip: true} : validateSoloChoice(choice, roundCategories[index], index, roundCategories.length));
   const first = choices.find(choice => !choice.skip);
-  return {name, nameKey: name.normalize('NFKC').toLocaleLowerCase('fr-FR'), status: 'whole', category: first.category, car: first.cars[0] || '', cars: first.cars, carAny: first.carAny, preferredPilot: '', roundChoices: choices};
+  return {name, streamerId, nameKey: name.normalize('NFKC').toLocaleLowerCase('fr-FR'), status: 'whole', category: first.category, car: first.cars[0] || '', cars: first.cars, carAny: first.carAny, preferredPilot: '', roundChoices: choices};
 }
 function validateRegistration(input, event) {
   if ((event.format || 'endurance') === 'solo') return validateSoloRegistration(input, event);

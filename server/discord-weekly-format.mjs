@@ -104,6 +104,25 @@ function groupByRace(departures){
   return [...groups.values()];
 }
 const embedSize=embed=>JSON.stringify([embed.title,embed.description,embed.author?.name,embed.footer?.text,...(embed.fields||[]).flatMap(field=>[field.name,field.value])]).length;
+// Discord's 6000-character budget applies to all embeds together, including field names.
+function fitDiscordEmbeds(embeds){
+  const size=()=>embeds.reduce((total,embed)=>total+[embed.title,embed.description,embed.author?.name,embed.footer?.text,...(embed.fields||[]).flatMap(field=>[field.name,field.value])].reduce((sum,text)=>sum+String(text||'').length,0),0);
+  let shortened=false;
+  while(size()>5900){
+    const candidates=embeds.flatMap(embed=>[
+      {object:embed,key:'description'},...(embed.fields||[]).map(field=>({object:field,key:'value'}))
+    ]).filter(item=>String(item.object[item.key]||'').length>80).sort((a,b)=>b.object[b.key].length-a.object[a.key].length);
+    if(candidates.length){const {object,key}=candidates[0];object[key]=cut(object[key],Math.max(80,Math.floor(object[key].length/2)));}
+    else{
+      const embed=embeds.filter(item=>(item.fields||[]).some(field=>field.name!=='🚫 Pilotes absents')).sort((a,b)=>b.fields.length-a.fields.length)[0];
+      if(!embed)break;
+      embed.fields.splice(embed.fields.findIndex(field=>field.name!=='🚫 Pilotes absents'),1);
+    }
+    shortened=true;
+  }
+  if(shortened)embeds[0].footer={text:'Détails complets des équipages et pilotes sur le site.'};
+  return embeds;
+}
 function footer(updatedAt){return{text:`Endurance Manager · mise à jour à ${updateTimeLabel.format(updatedAt)}`};}
 
 // The weekly message: a header with the community, one block per race (its name links to the race on the
@@ -136,7 +155,7 @@ export function buildWeeklyDiscordPayload(snapshot,site={},updatedAt=Date.now(),
   const last=embeds[embeds.length-1];
   if(site.bannerUrl)last.image={url:site.bannerUrl};
   last.footer=footer(updatedAt);
-  return{content:'',embeds:embeds.slice(0,10),allowed_mentions:{parse:[]}};
+  return{content:'',embeds:fitDiscordEmbeds(embeds.slice(0,10)),allowed_mentions:{parse:[]}};
 }
 
 export function isWeeklyDiscordMutation(request){

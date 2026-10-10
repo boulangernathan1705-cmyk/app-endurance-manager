@@ -180,7 +180,7 @@ if (!workers) {
 
 // LOCAL_HTTP=1: the browser tests run the site over http on the test machine (Safari would upgrade to https).
 await writeFile(new URL('_headers', out), `/*
-  Content-Security-Policy: default-src 'self'; script-src 'self'; script-src-attr 'none'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://commons.wikimedia.org https://upload.wikimedia.org https://cdn.discordapp.com; connect-src 'self'; font-src 'self' data:; media-src 'none'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; frame-src 'none'; form-action 'self'; worker-src 'self'; manifest-src 'self'${process.env.LOCAL_HTTP === '1' ? '' : '; upgrade-insecure-requests'}
+  Content-Security-Policy: default-src 'self'; script-src 'self'; script-src-attr 'none'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://commons.wikimedia.org https://upload.wikimedia.org https://cdn.discordapp.com https://static-cdn.jtvnw.net https://static.twitchcdn.net; connect-src 'self'; font-src 'self' data:; media-src 'none'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; frame-src 'none'; form-action 'self'; worker-src 'self'; manifest-src 'self'${process.env.LOCAL_HTTP === '1' ? '' : '; upgrade-insecure-requests'}
   Strict-Transport-Security: max-age=63072000; includeSubDomains
   X-Content-Type-Options: nosniff
   Referrer-Policy: no-referrer

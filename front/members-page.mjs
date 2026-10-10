@@ -61,6 +61,7 @@ const ICONS = {
   raceReminders:'<path d="M6 16V11a6 6 0 1 1 12 0v5l2 2H4l2-2Z"/><path d="M10 21h4"/>',
   iracingImport:'<path d="M4 21V4M4 4h13l-2 4 2 4H4"/>',
   training:'<path d="M3 12h4l3-8 4 16 3-8h4"/>',
+  grindfest:'<path d="M4 21V4M4 4h13l-2 4 2 4H4"/>',
   soloRaces:'<circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/>'
 };
 const icon = key => `<svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[key]}</svg>`;
@@ -70,8 +71,8 @@ const copyButton = target => `<button type="button" class="secondary-button setu
 // What is on, for the overview and the modules.
 function moduleStates(settings, setup) {
   const recaps = setup.recaps || [];
-  return {recap:recaps.length > 0 || Boolean(setup.legacyRecap), crewChannels:settings.modules.crewChannels === true, raceReminders:settings.modules.raceReminders === true,
-    iracingImport:settings.modules.iracingImport === true, soloRaces:settings.modules.soloRaces === true, training:settings.modules.training === true};
+  return {recap:setup.botRecap ? setup.botRecap.enabled : recaps.length > 0 || Boolean(setup.legacyRecap), crewChannels:settings.modules.crewChannels === true, raceReminders:settings.modules.raceReminders === true,
+    iracingImport:settings.modules.iracingImport === true, soloRaces:settings.modules.soloRaces === true, training:settings.modules.training === true, grindfest:settings.modules.grindfest === true};
 }
 
 // « Vue d'ensemble ».
@@ -108,7 +109,8 @@ function overviewMarkup(setup, settings, members) {
   if (states.crewChannels && crews.botReady !== true) alerts.push(['warn', 'Salons d’équipage : le bot n’a pas les droits pour créer les salons.', '<button type="button" class="link-button" data-go-tab="modules" data-go-module="crewChannels">Régler</button>']);
   else if (states.crewChannels && crews.lastError) alerts.push(['warn', `Salons d’équipage : ${esc(crews.lastError)}`, '<button type="button" class="link-button" data-go-tab="modules" data-go-module="crewChannels">Voir</button>']);
   if (setup.legacyRecap) alerts.push(['warn', 'Le récap de la semaine passe encore par le salon réglé à la création du site : règle ton propre salon.', '<button type="button" class="link-button" data-go-tab="modules" data-go-module="recap">Régler</button>']);
-  if ((setup.recaps || []).length) alerts.push(['ok', `Récap de la semaine publié sur Discord (${(setup.recaps || []).map(item => RECAP_LABELS[item.scope]).join(', ')}).`, '']);
+  if (setup.botRecap?.lastError) alerts.push(['warn', esc(setup.botRecap.lastError), '<button type="button" class="link-button" data-go-tab="modules" data-go-module="recap">Voir</button>']);
+  if (!setup.botRecap && (setup.recaps || []).length) alerts.push(['ok', `Récap de la semaine publié sur Discord (${(setup.recaps || []).map(item => RECAP_LABELS[item.scope]).join(', ')}).`, '']);
   if (states.iracingImport) alerts.push(['ok', 'Endurances iRacing officielles importées automatiquement.', '']);
   if (!alerts.some(([tone]) => tone !== 'ok')) alerts.unshift(['ok', 'Rien à signaler : tout fonctionne.', '']);
   const watch = `<section class="admin-card"><div class="admin-card-head"><h2>À surveiller</h2></div><ul class="admin-alerts">${alerts.map(([tone, text, action]) => `<li class="is-${tone}"><span>${text}</span>${action}</li>`).join('')}</ul></section>`;
@@ -146,7 +148,7 @@ function webhookField(key, label, saved) {
     placeholder="${saved ? `Déjà relié (${esc(saved)}) : laisse vide pour le garder` : 'https://discord.com/api/webhooks/…'}"></label>
     <button type="button" class="secondary-button" data-recap-test="${key}">Tester</button><span class="settings-status" aria-live="polite"></span></div>`;
 }
-function recapForm(setup) {
+function legacyRecapForm(setup) {
   const byScope = Object.fromEntries((setup.recaps || []).map(recap => [recap.scope, recap.webhook]));
   const count = (setup.recaps || []).length, layout = count === 2 ? 'two' : 'one';
   const oneScope = count === 1 ? setup.recaps[0].scope : 'all';
@@ -176,6 +178,93 @@ function recapForm(setup) {
       </div>
       <div class="setup-actions"><button class="primary-button" type="submit">Enregistrer</button><span class="settings-status" aria-live="polite"></span></div></form>`;
 }
+// A question per screen. Existing webhook settings stay available until an explicit bot activation.
+function recapForm(setup) {
+  const config = setup.botRecap, scope = config?.scope || ((setup.recaps || []).length === 1 ? setup.recaps[0].scope : setup.legacyRecap ? 'lmu' : 'all');
+  const mode = config?.mode || 'general';
+  const established = Boolean(config || setup.legacyRecap || (setup.recaps || []).length);
+  const summary = config ? `<p><strong>${config.enabled ? 'Actif' : 'Désactivé'}</strong> · ${config.mode === 'events' ? 'Une catégorie par course' : 'Récap général'} · ${esc(RECAP_LABELS[scope])}</p>
+    <p>Destination : <strong>${esc(config.destinationName)}</strong>. ${config.mode === 'events' ? 'Salons supprimés 24 h après la fin du dernier départ.' : 'Le salon général est conservé.'}</p><p><a class="secondary-button" href="https://discord.com/channels/${esc(setup.guild.id)}/${esc(config.destinationId)}" target="_blank" rel="noopener">Ouvrir la destination sur Discord</a></p>
+    ${config.lastError ? `<p class="settings-status" role="alert">${esc(config.lastError)}</p>` : ''}`
+    : `<p><strong>Récap existant conservé</strong> · ${esc(setup.legacyRecap ? 'LMU' : (setup.recaps || []).map(item => RECAP_LABELS[item.scope]).join(', '))}</p><p>Ses salons et messages restent inchangés jusqu’à une activation volontaire du nouveau mode.</p>`;
+  const choice = (value,title,help) => `<label class="recap-card"><input type="radio" name="mode" value="${value}" ${mode === value ? 'checked' : ''}><span><strong>${title}</strong><small>${help}</small></span></label>`;
+  return `<div data-recap-guide data-config="${esc(JSON.stringify(config))}">
+    ${established ? `<div data-recap-summary>${summary}<div class="setup-actions"><button type="button" class="primary-button" data-recap-edit>Modifier</button><button type="button" class="secondary-button" data-recap-view>Voir l’aperçu</button>${config?.enabled ? '<button type="button" class="secondary-button" data-recap-disable>Désactiver</button>' : ''}</div></div>` : ''}
+    <form data-recap-wizard class="setup-form recap-wizard" ${established ? 'hidden' : ''}>
+      <p data-recap-progress aria-live="polite">Étape 1 sur 4</p>
+      <fieldset data-recap-step="0"><legend>Comment présenter les courses sur Discord ?</legend>
+        <div class="recap-cards">${choice('general','Récap général','Un salon texte « récap-endurances », un message pour toutes les courses.')}${choice('events','Une catégorie par course','Chaque course a sa catégorie : son récap, puis les vocaux de ses équipages.')}</div>
+        <p>Le même message est modifié sans notification à chaque actualisation.</p></fieldset>
+      <fieldset data-recap-step="1" hidden><legend>Quelles courses inclure ?</legend><div class="recap-sims">
+        <label class="role-pill"><input type="checkbox" name="lmu" ${scope !== 'iracing' ? 'checked' : ''}><span>LMU</span></label>
+        <label class="role-pill"><input type="checkbox" name="iracing" ${scope !== 'lmu' ? 'checked' : ''}><span>iRacing</span></label></div><p>Ce choix est indépendant du mode de publication.</p></fieldset>
+      <fieldset data-recap-step="2" hidden><legend>Où publier sur votre serveur Discord ?</legend>
+        <label class="crew-category"><span data-recap-destination-label>Salon texte</span><select name="destination"><option value="${esc(config?.destinationId || '')}">${esc(config?.destinationName || 'Choisir une destination')}</option></select></label>
+        <p data-recap-rights role="status"></p>${setup.recapBotInviteUrl ? `<a class="secondary-button" href="${esc(setup.recapBotInviteUrl)}" target="_blank" rel="noopener">Donner les droits au bot</a>` : ''}
+        <button type="button" class="secondary-button" data-recap-destinations>Actualiser les destinations</button></fieldset>
+      <fieldset data-recap-step="3" hidden><legend>Vérifier puis activer le récap</legend>
+        <p>Aucun message n’est envoyé à l’ouverture de cet aperçu. Les catégories des courses seront supprimées 24 h après la fin du dernier départ ; le salon général est conservé.</p>
+        <div data-recap-preview class="recap-live-preview"></div>
+        <button type="button" class="secondary-button" data-recap-send-test>Envoyer un test sur Discord</button>
+        <button type="submit" class="primary-button">Activer le récap automatique</button></fieldset>
+      <div class="setup-actions"><button type="button" class="secondary-button" data-recap-back hidden>Retour</button><button type="button" class="primary-button" data-recap-next>Continuer</button>${established ? '<button type="button" class="secondary-button" data-recap-cancel>Fermer</button>' : ''}<span class="settings-status" role="status" aria-live="polite"></span></div>
+    </form>
+    ${!config && established ? `<details data-recap-legacy><summary>Réglages actuels par webhook</summary>${legacyRecapForm(setup)}</details>` : ''}</div>`;
+}
+const wizardData = form => {
+  const lmu = form.elements.lmu.checked, iracing = form.elements.iracing.checked;
+  if (!lmu && !iracing) throw new Error('Coche au moins un simulateur.');
+  return {mode:form.elements.mode.value,scope:lmu && iracing ? 'all' : lmu ? 'lmu' : 'iracing',destinationId:form.elements.destination.value,destinationName:form.elements.destination.selectedOptions[0]?.textContent || ''};
+};
+const recapPreviewText = value => esc(String(value || '').replace(/<t:(\d+):[A-Za-z]>/g,(_,unix) => new Date(Number(unix)*1000).toLocaleString('fr-FR',{timeZone:'Europe/Paris',dateStyle:'medium',timeStyle:'short'})).replace(/\*\*/g,''));
+function recapPreviewMarkup(previews) {
+  return previews.length ? previews.map(item => `<figure class="recap-preview"><figcaption># ${esc(item.name)}</figcaption>${item.payload.embeds.map(embed => `<div class="recap-preview-embed"><strong>${esc(embed.title || '')}</strong><span>${recapPreviewText(embed.description)}</span>${(embed.fields || []).map(field => `<b>${esc(field.name)}</b><span>${recapPreviewText(field.value)}</span>`).join('')}${embed.url ? `<a href="${esc(embed.url)}">Voir sur le site</a>` : ''}</div>`).join('')}</figure>`).join('') : '<p>Aucune course éligible pour le moment. Les nouveaux événements éligibles auront automatiquement leur salon.</p>';
+}
+async function loadRecapDestinations(form) {
+  const result = await api('/api/community/recap/destinations');
+  const type = form.elements.mode.value === 'events' ? 4 : 0;
+  const select = form.elements.destination, selected = select.value;
+  const destinations = result.destinations.filter(item => item.type === type);
+  select.innerHTML = '<option value="">Choisir une destination</option>' + destinations.map(item => `<option value="${esc(item.id)}" ${item.id === selected ? 'selected' : ''}>${esc(item.name)}${item.ready ? '' : ' · permissions manquantes'}</option>`).join('');
+  form._destinations = destinations;
+  recapRights(form);
+}
+function recapRights(form) {
+  const destination = form._destinations?.find(item => item.id === form.elements.destination.value);
+  form.querySelector('[data-recap-rights]').textContent = destination && !destination.ready ? `Dans les permissions de « ${destination.name} », autorise le bot : ${destination.missing.join(', ')}.` : 'Le bot doit voir le salon, envoyer des messages et lire les anciens messages. Pour créer et supprimer les catégories des courses, il doit aussi gérer les salons.';
+}
+async function recapStep(form, step) {
+  if (step === 3) {
+    const data = wizardData(form);
+    if (!data.destinationId) throw new Error('Choisis une destination Discord.');
+    const destination = form._destinations?.find(item => item.id === data.destinationId);
+    if (destination && !destination.ready) throw new Error(`Permissions manquantes : ${destination.missing.join(', ')}.`);
+  }
+  form.dataset.step = String(step);
+  for (const fieldset of form.querySelectorAll('[data-recap-step]')) fieldset.hidden = Number(fieldset.dataset.recapStep) !== step;
+  form.querySelector('[data-recap-progress]').textContent = `Étape ${step + 1} sur 4`;
+  form.querySelector('[data-recap-back]').hidden = step === 0;
+  form.querySelector('[data-recap-next]').hidden = step === 3;
+  form.querySelector(`[data-recap-step="${step}"] legend`).setAttribute('tabindex','-1');
+  form.querySelector(`[data-recap-step="${step}"] legend`).focus();
+  if (step === 2) {
+    form.querySelector('[data-recap-destination-label]').textContent = form.elements.mode.value === 'events' ? 'Placer les courses sous' : 'Salon texte';
+    await loadRecapDestinations(form);
+  }
+  if (step === 3) {
+    const data = wizardData(form);
+    const publishButtons = form.querySelectorAll('[type="submit"],[data-recap-send-test]');
+    for (const button of publishButtons) button.disabled = true;
+    const preview = form.querySelector('[data-recap-preview]');
+    preview.textContent = 'Chargement de l’aperçu…';
+    const result = await api('/api/community/recap/preview','POST',data);
+    // A late response must not replace a more recent selection.
+    if (JSON.stringify(wizardData(form)) === JSON.stringify(data)) {
+      preview.innerHTML = recapPreviewMarkup(result.previews);
+      for (const button of publishButtons) button.disabled = false;
+    }
+  }
+}
 // Where the crews' voice channels are made, asked as soon as the module is turned on.
 function crewCategory(crews) {
   const list = crews.categories || [], current = crews.voiceCategoryId || '';
@@ -196,8 +285,8 @@ function modulesMarkup(settings, setup) {
       <div class="setup-actions">${crews.botInviteUrl ? `<a class="primary-button" href="${esc(crews.botInviteUrl)}" target="_blank" rel="noopener">Donner les droits au bot</a>` : ''}<button type="button" class="secondary-button" data-modules-refresh="crewChannels">C’est fait</button></div>`;
   const crewWarn = states.crewChannels && (crews.botReady !== true || crews.lastError);
   const tiles = [
-    {key:'recap', name:'Récap de la semaine sur Discord', text:'Les courses de la semaine dans un salon de ton serveur, mis à jour tout seul.',
-      state:states.recap ? ['ok', (setup.recaps || []).length ? `Actif · ${(setup.recaps || []).map(item => RECAP_LABELS[item.scope]).join(', ')}` : 'Actif · salon d’origine'] : ['off', 'Éteint'],
+    {key:'recap', name:'Récap de la semaine sur Discord', text:'Un récap général ou une catégorie par course, avec un message actualisé sans notifications répétées.',
+      state:states.recap ? ['ok', setup.botRecap ? (setup.botRecap.mode === 'events' ? 'Actif · une catégorie par course' : 'Actif · récap général') : (setup.recaps || []).length ? `Actif · ${(setup.recaps || []).map(item => RECAP_LABELS[item.scope]).join(', ')}` : 'Actif · salon d’origine'] : ['off', 'Éteint'],
       control:'', settings:recapForm(setup)},
     {key:'crewChannels', name:'Salons d’équipage sur Discord', text:'Un salon vocal par équipage, nommé simu + nom de l’équipage, ouvert quelques jours avant la course.',
       state:crewWarn ? ['warn', crews.botReady !== true ? 'Le bot n’a pas les droits' : 'Le bot est bloqué'] : states.crewChannels ? ['ok', 'Actif'] : ['off', crews.botReady === true ? 'Éteint' : crews.botProblem === 'rights' ? 'Éteint · droits du bot à donner' : 'Éteint · bot à vérifier'],
@@ -211,6 +300,7 @@ function modulesMarkup(settings, setup) {
       state:states.soloRaces ? ['ok', 'Actif'] : ['off', 'Éteint'], control:toggle('soloRaces', 'EVENT TDZ'),
       settings:`<form class="settings-safe-guide" data-safe-guide><label>Salon Discord « Comment devenir SAFE »<input name="url" type="url" maxlength="200" placeholder="https://discord.com/channels/…" value="${esc(settings.modules.safeGuideUrl || '')}"></label>
         <div class="settings-actions"><button class="primary-button" type="submit">Enregistrer</button><span class="settings-status" aria-live="polite"></span></div></form>`},
+    ...(settings.modules.grindfestAvailable ? [{key:'grindfest', name:'Grindfest', text:'Événement solo : chaque pilote représente un streamer, avec ses places et sa liste d’attente.', state:states.grindfest ? ['ok','Actif'] : ['off','Éteint'], control:toggle('grindfest','Grindfest'), settings:''}] : []),
     {key:'training', name:'Entraînement', text:'Page « Mon entraînement » : programme guidé, séance du jour et conseils tirés des séances LMU de chaque pilote.',
       state:states.training ? ['ok', 'Actif'] : ['off', 'Éteint'], control:toggle('training', 'Entraînement'), settings:''}];
   const tile = item => `<article class="admin-module ${states[item.key] ? 'is-on' : ''}" data-module-tile="${item.key}">
@@ -279,7 +369,7 @@ function requestsMarkup(requests, baseDomain, testSite) {
 
 // « Plateforme » (managers of Endurance Manager): the communities, and a new one.
 async function platformMarkup() {
-  const [{communities, baseDomain, showcase, testSite}, {requests}] = await Promise.all([api('/api/platform/communities'), api('/api/platform/community-requests')]);
+  const [{communities, baseDomain, showcase, testSite, official}, {requests}] = await Promise.all([api('/api/platform/communities'), api('/api/platform/community-requests')]);
   const rows = communities.map(item => `<article class="platform-row"><div><strong>${esc(item.name)}</strong><a href="${esc(item.url)}/" target="_blank" rel="noopener">${esc(item.url.replace(/^https:\/\//, ''))}</a></div>
     <span>${item.discordServer ? `Discord « ${esc(item.discordServer)} »` : item.guildId ? `Serveur ${esc(item.guildId)}` : 'Aucun serveur'}</span>
     <span class="${item.botPresent ? 'platform-ok' : 'platform-ko'}">${item.botPresent ? '✓ Bot présent' : item.botInviteUrl ? `<a href="${esc(item.botInviteUrl)}" target="_blank" rel="noopener">Bot absent : lien d’invitation</a>` : 'Bot absent'}</span><button type="button" class="danger-link platform-delete" data-delete-community="${esc(item.slug)}" data-name="${esc(item.name)}">Supprimer</button></article>`).join('');
@@ -295,6 +385,16 @@ async function platformMarkup() {
         <input type="hidden" name="requestId">
         <div class="settings-actions"><button class="primary-button" type="submit">Créer la communauté</button><span class="settings-status" aria-live="polite"></span></div>
       </form><div data-created></div></section>`}
+    ${official ? `<section class="settings-card"><h2>Discord officiel${official.discordServer ? ` « ${esc(official.discordServer)} »` : ''}</h2>
+      <p class="members-help">Le bot crée les catégories, salons, forums et rôles qui manquent. Il ne touche pas à ce qui existe déjà. Il lui faut le rôle Administrateur le temps de la mise en place.</p>
+      ${official.botPresent ? '' : official.botInviteUrl ? `<p class="members-help"><a href="${esc(official.botInviteUrl)}" target="_blank" rel="noopener">Inviter le bot sur le serveur</a></p>` : ''}
+      <div class="settings-actions"><button type="button" class="primary-button" data-official-setup>Mettre en place le serveur</button><span class="settings-status" aria-live="polite"></span></div></section>` : ''}
+    ${showcase ? `<section class="settings-card"><h2>Site officiel</h2>
+      <p class="members-help">L’adresse principale devient la communauté officielle d’Endurance Manager, reliée au Discord officiel. Les courses et pilotes fictifs de la vitrine sont supprimés.</p>
+      <form class="settings-appearance" data-official>
+        <label>ID du serveur Discord officiel<input name="guildId" inputmode="numeric" required pattern="[0-9]{15,22}" placeholder="Ex. : 1269541162025353289"></label>
+        <label>Confirmation<input name="confirm" autocomplete="off" required placeholder="Tape OFFICIEL pour confirmer"></label>
+        <div class="settings-actions"><button class="primary-button" type="submit">Devenir le site officiel</button><span class="settings-status" aria-live="polite"></span></div></form></section>` : ''}
     ${showcase ? `<section class="settings-card showcase-reset"><h2>Vitrine de l’adresse principale</h2>
       <p class="members-help">Remplace <strong>toutes</strong> les données de ce site (courses, inscriptions, équipages, pilotes, réglages) par des courses et des pilotes fictifs, datés à partir d’aujourd’hui, et le détache de tout serveur Discord. Le calendrier iRacing officiel est ensuite réimporté. Les données actuelles sont définitivement supprimées.</p>
       <form class="setup-form setup-inline" data-showcase><input name="confirm" autocomplete="off" placeholder="Tape VITRINE pour confirmer">
@@ -432,6 +532,17 @@ app.addEventListener('click', async event => {
     return;
   }
   if (event.target.closest('[data-setup-refresh]')) { await reload('overview'); return; }
+  const officialSetup = event.target.closest('[data-official-setup]');
+  if (officialSetup) {
+    const status = officialSetup.parentElement.querySelector('.settings-status');
+    officialSetup.disabled = true; status.textContent = 'Mise en place…';
+    try {
+      const {made} = await api('/api/platform/official/setup', 'POST', {});
+      status.textContent = made.length ? `✓ Créé : ${made.join(', ')}.` : '✓ Tout était déjà en place.';
+    } catch (error) { status.textContent = error.message; }
+    officialSetup.disabled = false;
+    return;
+  }
   const modulesRefresh = event.target.closest('[data-modules-refresh]');
   if (modulesRefresh) { await reload('modules', {module:modulesRefresh.dataset.modulesRefresh}); return; }
   const view = event.target.closest('[data-view]');
@@ -497,6 +608,40 @@ app.addEventListener('click', async event => {
     try { await api('/api/community/banner', 'DELETE', {}); await reload('look'); } catch (error) { alert(error.message); }
     return;
   }
+  const guide = event.target.closest('[data-recap-guide]');
+  if (guide && event.target.closest('button[data-recap-edit],button[data-recap-view],button[data-recap-disable],button[data-recap-cancel],button[data-recap-next],button[data-recap-back],button[data-recap-destinations],button[data-recap-send-test]')) {
+    const button = event.target.closest('button'), form = guide.querySelector('[data-recap-wizard]'), status = form.querySelector('.settings-status');
+    button.disabled = true; status.textContent = '';
+    try {
+      if (button.matches('[data-recap-edit],[data-recap-view]')) {
+        const config = JSON.parse(guide.dataset.config);
+        if (button.matches('[data-recap-view]') && !config) {
+          const result = await api('/api/community/recap/legacy-preview');
+          guide.querySelector('[data-legacy-preview]')?.remove();
+          guide.querySelector('[data-recap-summary]').insertAdjacentHTML('beforeend', `<div data-legacy-preview>${recapPreviewMarkup(result.previews)}</div>`);
+        } else {
+          guide.querySelector('[data-recap-summary]').hidden = true; form.hidden = false;
+          guide.querySelector('[data-recap-legacy]')?.setAttribute('hidden','');
+          if (button.matches('[data-recap-view]')) { await loadRecapDestinations(form); await recapStep(form,3); }
+          else await recapStep(form,0);
+        }
+      } else if (button.matches('[data-recap-cancel]')) { await reload('modules',{module:'recap'}); }
+      else if (button.matches('[data-recap-disable]')) { await api('/api/community/recap','PUT',{enabled:false}); await reload('modules',{module:'recap'}); }
+      else if (button.matches('[data-recap-destinations]')) { await loadRecapDestinations(form); }
+      else if (button.matches('[data-recap-send-test]')) {
+        status.textContent = 'Envoi du récap de test…';
+        const result = await api('/api/community/recap/test','POST',wizardData(form));
+        status.textContent = result.queued ? 'Synchronisation en cours. Réessaie dans un instant.' : '✓ Récap envoyé. Ce message sera réutilisé à l’activation. Le test n’active pas l’automatisation.';
+      } else {
+        const step = Number(form.dataset.step || 0);
+        if (step === 1) wizardData(form);
+        if (step === 2 && !form.elements.destination.value) throw new Error('Choisis une destination Discord.');
+        await recapStep(form,step + (button.matches('[data-recap-back]') ? -1 : 1));
+      }
+    } catch (error) { status.textContent = error.message; }
+    finally { button.disabled = false; }
+    return;
+  }
   const testButton = event.target.closest('[data-recap-test]');
   if (testButton) {
     const form = testButton.closest('form'), key = testButton.dataset.recapTest, status = testButton.parentElement.querySelector('.settings-status');
@@ -527,12 +672,35 @@ app.addEventListener('input', event => {
 });
 
 app.addEventListener('submit', async event => {
+  const wizard = event.target.closest('form[data-recap-wizard]');
+  if (wizard) {
+    event.preventDefault();
+    if (wizard.dataset.step !== '3') return;
+    const status = wizard.querySelector('.settings-status'), button = wizard.querySelector('[type="submit"]');
+    button.disabled = true; status.textContent = 'Activation…';
+    try {
+      const result = await api('/api/community/recap','PUT',wizardData(wizard));
+      await reload('modules',{module:'recap'});
+      if (!result.published) app.querySelector('[data-recap-summary]').insertAdjacentHTML('beforeend', `<p role="alert">${esc(result.error || 'Enregistré ; synchronisation à réessayer.')}</p>`);
+    } catch (error) { status.textContent = error.message; }
+    finally { button.disabled = false; }
+    return;
+  }
   const safeGuide = event.target.closest('form[data-safe-guide]');
   if (safeGuide) {
     event.preventDefault();
     const status = safeGuide.querySelector('.settings-status');
     status.textContent = 'Enregistrement…';
     try { await api('/api/community/modules', 'PATCH', {safeGuideUrl:safeGuide.elements.url.value}); await reload('modules', {module:'soloRaces'}); }
+    catch (error) { status.textContent = error.message; }
+    return;
+  }
+  const officialForm = event.target.closest('form[data-official]');
+  if (officialForm) {
+    event.preventDefault();
+    const status = officialForm.querySelector('.settings-status');
+    status.textContent = 'Enregistrement…';
+    try { await api('/api/platform/official', 'POST', {guildId:officialForm.elements.guildId.value.trim(), confirm:officialForm.elements.confirm.value.trim()}); location.reload(); }
     catch (error) { status.textContent = error.message; }
     return;
   }
@@ -606,6 +774,8 @@ app.addEventListener('change', async event => {
     return;
   }
   if (box.matches('[data-banner-zoom]') && cropper) { setZoom(Number(box.value)); return; }
+  const wizard = box.closest('form[data-recap-wizard]');
+  if (wizard) { wizard.querySelector('[data-recap-preview]').innerHTML = ''; recapRights(wizard); return; }
   const recapForm = box.closest('form[data-recaps]');
   if (recapForm) { recapForm.dataset.mode = recapForm.elements.enabled.checked ? recapForm.elements.layout.value : 'none'; return; }
   if (box.matches('[data-crew-category]')) {

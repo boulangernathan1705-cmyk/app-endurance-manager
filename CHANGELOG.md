@@ -2,6 +2,18 @@
 
 Les changements du site, version par version. La plus récente est en haut.
 
+## v1.18 — 10 octobre 2026
+
+### Discord officiel
+- L'adresse principale peut devenir la communauté officielle d'Endurance Manager, reliée au Discord officiel (Plateforme → « Devenir le site officiel »). Tant qu'aucun serveur n'est relié, elle reste la vitrine.
+- « Mettre en place le serveur » : le bot crée les rôles, catégories, salons et forums qui manquent, sans toucher à l'existant.
+
+### Récap sur Discord
+- Récap réglé depuis Modules, sans webhook : un récap général ou **une catégorie par course** (« 🏎️ LMU · 6h de Spa ») avec son récap puis les vocaux de ses équipages. La catégorie est supprimée 24 h après la course.
+
+### Grindfest
+- Événement solo des TDZ : chaque pilote représente un streamer, plusieurs manches pour une seule inscription.
+
 ## v1.17 — 10 octobre 2026
 
 - Le récap hebdomadaire Discord affiche les pilotes ayant déclaré leur absence, en bas du bloc de chaque événement. Une déclaration ou un retrait d’absence actualise automatiquement le récap.

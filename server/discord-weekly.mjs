@@ -1,5 +1,6 @@
 import {allCommunities, communityUrl, communitySlug, appearanceOf} from './community.mjs';
 import {buildWeeklyDiscordPayload, isInParisWeek, parisWeek} from './discord-weekly-format.mjs';
+import {syncBotRecaps, botRecapSettings} from './recap-discord.mjs';
 
 // The recap messages of a community (community_recaps, set on its « Mise en place » page): one message per
 // row, for one simulator or both. Each message has its state key "<community id>:<scope>-weekly-v1"
@@ -16,6 +17,7 @@ export const usesSiteRecap = (env, community) => community.slug === communitySlu
 
 // Recap messages to keep up to date: those set on the « Mise en place » page, or else the former one.
 export async function recapTargets(env, community) {
+  if ((await botRecapSettings(env, community))?.adopted) return [];
   const rows = (await env.DB.prepare('SELECT scope, webhook_url FROM community_recaps WHERE community_id=? ORDER BY scope').bind(community.id).all()).results || [];
   if (rows.length) return rows.map(row => ({scope:row.scope, url:row.webhook_url}));
   return usesSiteRecap(env, community) ? [{scope:'lmu', url:String(env.DISCORD_WEEKLY_WEBHOOK_URL).trim()}] : [];
@@ -26,7 +28,7 @@ function parseJson(value, fallback) {
 }
 
 // The community in the message: its site (every link goes there), name, Discord icon and banner.
-function siteOf(env, community) {
+export function siteOf(env, community) {
   let url = '';
   try { url = communityUrl(env, community); } catch { return {name:community.name}; }
   const look = appearanceOf(community);
@@ -38,7 +40,7 @@ async function hashSnapshot(snapshot) {
   return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
 }
 
-function flattenDepartures(events) {
+export function flattenDepartures(events) {
   const departures = [];
   for (const event of events) {
     const eventDepartures = parseJson(event.departures, []);
@@ -86,17 +88,17 @@ function selectPlanningWeek(allDepartures, timestamp) {
   return {week, futureDepartures};
 }
 
-export async function loadWeeklyDiscordSnapshot(env, timestamp, community, scope = 'lmu') {
+export async function loadWeeklyDiscordSnapshot(env, timestamp, community, scope = 'lmu', eventId = null) {
   // The community's races, and the official races (common to every community) where it has entries: only its
   // own entries and crews are shown.
   const events = (await env.DB.prepare(`SELECT id,name,circuit,duration_hours,duration_minutes,event_type,schedule_pending,departures
     FROM events WHERE (community_id=? OR (community_id='official' AND (EXISTS (SELECT 1 FROM registrations r WHERE r.event_id=events.id AND r.community_id=?) OR EXISTS (SELECT 1 FROM event_absences a WHERE a.event_id=events.id AND a.community_id=?))))
     ${CIRCUITS[scope] ?? CIRCUITS.lmu} ORDER BY created_at,id`).bind(community.id, community.id, community.id).all()).results || [];
-  const allDepartures = flattenDepartures(events);
+  const allDepartures = flattenDepartures(eventId ? events.filter(event => event.id === eventId) : events);
   const currentWeek = parisWeek(timestamp);
   // A start whose time is still to be confirmed is never announced as running (its placeholder is 0:00).
-  const currentCandidates = allDepartures.filter(item => !item.timePending && item.startsAt <= timestamp && item.endsAt > timestamp);
-  const planning = selectPlanningWeek(allDepartures, timestamp);
+  const currentCandidates = eventId ? [] : allDepartures.filter(item => !item.timePending && item.startsAt <= timestamp && item.endsAt > timestamp);
+  const planning = eventId ? {week:parisWeek(timestamp), futureDepartures:allDepartures} : selectPlanningWeek(allDepartures, timestamp);
   const selected = [...currentCandidates, ...planning.futureDepartures];
 
   if (!selected.length) {
@@ -240,6 +242,12 @@ export async function syncWeeklyDiscord(env,timestamp=Date.now(),community=null)
   if (!env?.DB) return {ok:false,skipped:'not-configured'};
   let last={ok:false,skipped:'not-configured'}, failed=null;
   for (const target of community ? [community] : await allCommunities(env)) {
+    const botSettings = await botRecapSettings(env,target);
+    if (botSettings) {
+      try { last = await syncBotRecaps(env, timestamp, target); }
+      catch (error) { failed = {ok:false,error:error.message}; }
+      if (botSettings.adopted) continue;
+    }
     for (const recap of await recapTargets(env,target)) {
       try { last=await syncRecap(env,timestamp,target,recap.scope,recap.url); }
       // One broken webhook (deleted on Discord) never stops the other messages.
@@ -254,17 +262,26 @@ export async function syncWeeklyDiscord(env,timestamp=Date.now(),community=null)
 export async function syncDueRecaps(env,limit=3,timestamp=Date.now()) {
   if (!env?.DB) return 0;
   const communities = await allCommunities(env);
+  const botSettings = (await env.DB.prepare('SELECT community_id, checked_at, adopted FROM community_recap_settings').all()).results || [];
   const rows = (await env.DB.prepare('SELECT community_id, scope, webhook_url FROM community_recaps').all()).results || [];
   const checked = new Map(((await env.DB.prepare('SELECT key, updated_at FROM discord_weekly_state').all()).results || []).map(row => [row.key, Number(row.updated_at) || 0]));
   const targets = [];
   for (const community of communities) {
+    const bot = botSettings.find(row => row.community_id === community.id);
+    if (bot) { targets.push({community, bot:true, checked:bot.checked_at}); if (bot.adopted) continue; }
     const own = rows.filter(row => row.community_id === community.id);
     if (own.length) for (const row of own) targets.push({community, scope:row.scope, url:row.webhook_url});
     else if (usesSiteRecap(env, community)) targets.push({community, scope:'lmu', url:String(env.DISCORD_WEEKLY_WEBHOOK_URL).trim()});
   }
-  targets.sort((a, b) => (checked.get(stateKey(a.community, a.scope)) || 0) - (checked.get(stateKey(b.community, b.scope)) || 0));
+  const lastCheck = target => target.bot ? target.checked : (checked.get(stateKey(target.community,target.scope)) || 0) * 1000;
+  targets.sort((a,b) => lastCheck(a)-lastCheck(b));
   let done = 0;
   for (const target of targets.slice(0, limit)) {
+    if (target.bot) {
+      try { await syncBotRecaps(env, timestamp, target.community); done++; }
+      catch (error) { console.error('Discord recap sync failed', error.message); }
+      break; // A bot batch uses the remaining D1/Discord budget of this invocation.
+    }
     try { await syncRecap(env,timestamp,target.community,target.scope,target.url); done++; }
     catch (error) { console.error('Discord weekly sync failed', target.community.slug, target.scope, error instanceof Error ? error.message : 'unknown'); }
     // Checked now (even when nothing changed): the next run takes the others.

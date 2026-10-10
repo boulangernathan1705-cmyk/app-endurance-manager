@@ -1,3 +1,5 @@
+import {isGrindfest} from '../../shared/grindfest.mjs';
+import {streamerChoice} from './grindfest.mjs';
 import {isSolo,ANY_CATEGORY,soloCounts,eventCircuitName} from './solo.mjs';
 import {raceHourLabel,raceEndLabel} from '../timeline.mjs';
 import {shortDateLabel,timeLabel} from '../dates.mjs';
@@ -9,12 +11,12 @@ import {getLocale} from '../i18n.mjs';
 export function ownRegistrations(departure) { return departure.availability.filter(reg => reg.mine); }
 export function ownRegistration(departure) { return ownRegistrations(departure)[0]; }
 export function registrationDraft(reg) {
-  return {name:reg.name,category:reg.category,cars:reg.cars||[],carAny:!!reg.carAny,status:reg.status,preferredPilot:reg.preferredPilot||'',soloDriver:!!reg.soloDriver,id:reg.id,version:reg.version,participantId:reg.participantId,participantUserId:reg.participantUserId||null,discordLinked:!!reg.discordLinked,mine:reg.mine,forOther:!reg.mine,manualOther:!reg.mine&&!reg.participantUserId&&!reg.discordLinked,communityId:reg.community?.id||''};
+  return {name:reg.name,streamerId:reg.streamerId||'',category:reg.category,cars:reg.cars||[],carAny:!!reg.carAny,status:reg.status,preferredPilot:reg.preferredPilot||'',soloDriver:!!reg.soloDriver,id:reg.id,version:reg.version,participantId:reg.participantId,participantUserId:reg.participantUserId||null,discordLinked:!!reg.discordLinked,mine:reg.mine,forOther:!reg.mine,manualOther:!reg.mine&&!reg.participantUserId&&!reg.discordLinked,communityId:reg.community?.id||''};
 }
 // Official race: the player first chooses the community he enters with (one of his, when he has several).
 // Solo event with nothing to choose (no category): one click enters the pilot, no form.
 export function canEnterInOneClick(event,departure){
-  return Boolean(isSolo(event)&&state.user?.name&&!soloRounds(event).length&&!ownRegistrations(departure).length&&!(event.official&&entryCommunities().length>1));
+  return Boolean(isSolo(event)&&!isGrindfest(event)&&state.user?.name&&!soloRounds(event).length&&!ownRegistrations(departure).length&&!(event.official&&entryCommunities().length>1));
 }
 export async function enterInOneClick(event,departure,api){
   return api(`/api/races/${event.id}/departures/${departure.id}/registrations`,'POST',{name:state.user.name.slice(0,32),choices:[],forOther:false});
@@ -158,6 +160,14 @@ function soloChoiceLabel(choice,round){
   if(choice.category===ANY_CATEGORY)return 'Peu importe';
   return `${logo(choice.category)} ${esc(choice.category)}`;
 }
+function renderGrindfestRegistration(event,departure,stateDraft){
+  const rounds=initSoloDraft(event,departure,stateDraft),count=(event.rounds||[]).length||1;
+  const linkedOther=stateDraft.forOther&&!!(stateDraft.participantUserId||stateDraft.discordLinked);
+  const manualOther=stateDraft.forOther&&!linkedOther&&!!stateDraft.manualOther;
+  const identity=identityFields(stateDraft,departure,false,manualOther,linkedOther,false,false);
+  const choices=rounds.map((round,index)=>round.categories.length>1?`<label class="form-label">Catégorie · Manche ${index+1}<select name="grindfestCategory${index}"><option value="${ANY_CATEGORY}">Peu importe</option>${round.categories.map(category=>`<option value="${esc(category)}" ${stateDraft.choices[index]?.category===category?'selected':''}>${esc(category)}</option>`).join('')}</select></label>`:'').join('');
+  return `<form class="form-section registration-form" data-kind="registration" data-departure="${departure.id}">${communityLine(event,departure,stateDraft)}${identity}<p class="registration-step-help">Une seule inscription pour ${count>1?`les ${count} manches`:'la manche'}, avec le même streamer.</p>${streamerChoice(event,departure,stateDraft)}${choices}<div class="save-row"><button type="submit" class="save-button">${stateDraft.id?'ENREGISTRER':count>1?`JE PARTICIPE AUX ${count} MANCHES`:'JE PARTICIPE'}</button>${stateDraft.id?button('delete-registration',stateDraft.forOther?'Supprimer l’inscription':'Se désinscrire',`data-id="${stateDraft.id}" data-departure="${departure.id}"`,'danger-button'):''}</div></form>`;
+}
 function renderSoloStepper(event,departure,stateDraft){
   const rounds=initSoloDraft(event,departure,stateDraft);
   // Opened from a round (« Manche 2 »): that round only; the others are entered on their own.
@@ -191,12 +201,13 @@ function renderSoloStepper(event,departure,stateDraft){
   const summaryRow=(n,label,value)=>`<button type="button" class="registration-summary-row" data-action="registration-step" data-departure="${departure.id}" data-step="${n}" data-edit="true"><span>${label}</span><strong>${value}</strong><em>Modifier</em></button>`;
   const pilot=stateDraft.name||(!stateDraft.forOther?state.user?.name:'')||'';
   const {confirmed,waiting,capacity}=soloCounts(event,departure);
-  const waitNotice=!stateDraft.id&&capacity&&confirmed>=capacity?`<p class="solo-wait-notice">La course est complète : ${stateDraft.forOther?'ce pilote sera':'tu seras'} en liste d’attente (${waiting+1}${waiting===0?'er':'e'}). En cas de désistement, la place revient automatiquement au premier en attente.</p>`:'';
+  const waitNotice=!isGrindfest(event)&&!stateDraft.id&&capacity&&confirmed>=capacity?`<p class="solo-wait-notice">La course est complète : ${stateDraft.forOther?'ce pilote sera':'tu seras'} en liste d’attente (${waiting+1}${waiting===0?'er':'e'}). En cas de désistement, la place revient automatiquement au premier en attente.</p>`:'';
   const summary=`<div class="registration-summary">${pilot?`<div class="registration-summary-row is-static"><span>Pilote</span><strong>${esc(pilot)}</strong></div>`:''}${shown.map((index,position)=>summaryRow(position+1,rounds.length>1?`Manche ${index+1}`:'Catégorie',soloChoiceLabel(stateDraft.choices[index],rounds[index]))).join('')}</div>${waitNotice}${stateDraft.id&&!only?`<div class="registration-danger-zone">${button('delete-registration',stateDraft.forOther?'Supprimer l’inscription':'Se désinscrire',`data-id="${stateDraft.id}" data-departure="${departure.id}"`,'danger-button')}</div>`:''}`;
   const next=step<total?button('registration-step',stateDraft.returnToSummary?'Revenir au récapitulatif':'Continuer',`data-departure="${departure.id}" data-step="${stateDraft.returnToSummary?total:step+1}"`,'primary-button registration-next'):`<button type="submit" class="save-button registration-next">${stateDraft.id?'ENREGISTRER':stateDraft.forOther?'INSCRIRE LE PILOTE':'JE PARTICIPE'}</button>`;
   return `<form class="form-section registration-form registration-stepper" data-kind="registration" data-departure="${departure.id}" data-step="${step}" data-last-step="${total}">
 <div class="registration-progress" aria-hidden="true">${Array.from({length:total},(_,index)=>`<span class="${index<step?'done':''}"></span>`).join('')}</div>
 <p class="registration-step-label">Étape ${step} sur ${total} · ${step===1&&identity?(rounds.length?'Pilote et catégorie':'Pilote'):stepName(step)}</p>
+${streamerChoice(event,departure,stateDraft)}
 ${shown.map(roundPane).join('')}
 ${pane(total,`${rounds.length?'':communityLine(event,departure,stateDraft)+identity}${summary}`)}
 <div class="registration-step-nav">${step>1?button('registration-step','Retour',`data-departure="${departure.id}" data-step="${step-1}"`,'secondary-button registration-back'):''}${next}</div>
@@ -204,6 +215,7 @@ ${pane(total,`${rounds.length?'':communityLine(event,departure,stateDraft)+ident
 }
 export function renderSteppedRegistration(event,departure,stateDraft=draftFor(departure)) {
   if(needsCommunityChoice(event,departure,stateDraft))return renderCommunityStep(departure);
+  if(isGrindfest(event))return renderGrindfestRegistration(event,departure,stateDraft);
   if(isSolo(event))return renderSoloStepper(event,departure,stateDraft);
   const duration=event.durationHours||6,step=registrationStep(stateDraft);
   const {same,assigned}=registrationContext(event,departure,stateDraft);
@@ -279,7 +291,13 @@ export async function submitRegistration(form,api) {
   if(draft.soloEvent){
     // Solo race: one category / car choice per round.
     if(draft.choices.length&&draft.choices.every(choice=>choice.skip))throw Error('Choisis au moins une manche.');
-    const payload={name:draft.name,choices:draft.choices.map(choice=>choice.skip?{skip:true}:({category:choice.category,cars:[],carAny:true})),version:draft.version,participantId:draft.participantId,participantUserId:draft.participantUserId,forOther:!!draft.forOther,...entryCommunity(draft)};
+    if (isGrindfest(event)) {
+      draft.streamerId = form.elements.registrationStreamer?.value || draft.streamerId;
+      const rounds=soloRounds(event);
+      draft.choices=rounds.map((round,index)=>({category:form.elements[`grindfestCategory${index}`]?.value || (round.categories.length===1?round.categories[0]:ANY_CATEGORY),cars:[],carAny:true}));
+    }
+    if (isGrindfest(event) && !draft.streamerId) throw Error('Choisis le streamer que tu représentes.');
+    const payload={name:draft.name,streamerId:draft.streamerId,choices:draft.choices.map(choice=>choice.skip?{skip:true}:({category:choice.category,cars:[],carAny:true})),version:draft.version,participantId:draft.participantId,participantUserId:draft.participantUserId,forOther:!!draft.forOther,...entryCommunity(draft)};
     const result=await api(draft.id?`/api/registrations/${draft.id}`:`/api/races/${event.id}/departures/${departure.id}/registrations`,draft.id?'PATCH':'POST',payload);
     if(!draft.forOther){state.pilotName=draft.name;try{localStorage.setItem('em_pilot_name',state.pilotName);}catch{}}
     delete state.drafts[departureId]; state.registrationOpen.delete(departureId); return result;
@@ -307,7 +325,7 @@ function choicesOf(event,reg){
 export async function enterRound(event,departure,index,api){
   const rounds=soloRounds(event),own=ownRegistration(departure),choices=choicesOf(event,own);
   state.roundFocus={...(state.roundFocus||{}),[departure.id]:index};
-  if(rounds[index].categories.length<2&&!(event.official&&!own&&entryCommunities().length>1)){
+  if(!isGrindfest(event)&&rounds[index].categories.length<2&&!(event.official&&!own&&entryCommunities().length>1)){
     choices[index]={category:rounds[index].categories[0]||ANY_CATEGORY,cars:[],carAny:true};
     const body={name:own?.name||state.user.name.slice(0,32),choices,forOther:false,...(own?{version:own.version}:{})};
     await api(own?`/api/registrations/${own.id}`:`/api/races/${event.id}/departures/${departure.id}/registrations`,own?'PATCH':'POST',body);
