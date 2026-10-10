@@ -258,3 +258,183 @@ test('scheduled rotation compares bot and legacy timestamps in the same unit',as
   assert.equal(await syncDueRecaps(env,1,NOW),1);assert.equal(sends(calls).length,1,'the older bot recap is processed before the newer legacy recap');
   assert.ok(calls.every(call=>!call.path.includes('/webhooks/')));
 });
+
+// Both modules use the same race identity/category, but voices expire after their own start.
+async function voices(env, timestamp=NOW, community=COMMUNITY, requests=20) {
+  const {syncCrewDiscord}=await import('../server/crew-discord.mjs');
+  return syncCrewDiscord(env,timestamp,{community:{...community,modules:{...community.modules,crewChannels:true}},requests,bell:false});
+}
+function crew(DB,id,event='race-a',departure='start-a',community=DEV_COMMUNITY) {
+  DB.db.prepare('INSERT OR IGNORE INTO community_crew_discord(community_id,voice_category_id,updated_at) VALUES(?,?,0)').run(community,TEXT);
+  DB.db.prepare("INSERT INTO crews(id,event_id,departure_id,name,category,created_at,community_id) VALUES(?,?,?,?,'GT3',0,?)").run(id,event,departure,'Équipage '+id,community);
+}
+
+test('each public crew voice expires at its own finish plus 24h; the text survives until the final finish plus 24h',async t=>{
+  const {DB,env,calls}=setup(t);
+  const friday=Date.parse('2026-10-16T11:00:00+02:00'),sunday=friday+2*DAY;
+  race(DB,'race-a','Spa','spa',[{id:'friday',startsAt:friday},{id:'sunday',startsAt:sunday}]);
+  crew(DB,'friday','race-a','friday');crew(DB,'sunday','race-a','sunday');
+  await saveBotRecap(env,COMMUNITY,SETTINGS);await voices(env);
+  assert.equal(creates(calls).filter(call=>call.body.type===0).length,1);
+  const publicVoices=creates(calls).filter(call=>call.body.type===2);assert.equal(publicVoices.length,2);
+  for(const call of publicVoices){assert.equal(call.body.parent_id,CATEGORY);assert.match(call.body.name,/Spa-Équipage/);assert.deepEqual(call.body.permission_overwrites,[{id:GUILD,type:0,allow:'3146752',deny:'0'}]);}
+  const early=DB.db.prepare("SELECT * FROM crew_discord WHERE crew_id='friday'").get(),late=DB.db.prepare("SELECT * FROM crew_discord WHERE crew_id='sunday'").get();
+  const text=DB.db.prepare('SELECT * FROM discord_recap_publications').get();
+  const saturday17=Date.parse('2026-10-17T17:00:00+02:00');assert.equal(early.delete_after,saturday17);
+  calls.length=0;await voices(env,saturday17-1);assert.equal(calls.filter(call=>call.method==='DELETE').length,0);
+  await voices(env,saturday17);assert.deepEqual(calls.filter(call=>call.method==='DELETE').map(call=>call.path),[`/channels/${early.voice_id}`]);
+  assert.equal(DB.db.prepare("SELECT closed_at FROM crew_discord WHERE crew_id='sunday'").get().closed_at,null);
+  assert.equal(DB.db.prepare('SELECT closed_at FROM discord_recap_publications').get().closed_at,null);
+  const {cleanupEventRecaps}=await import('../server/recap-discord.mjs');
+  calls.length=0;await cleanupEventRecaps(env,late.delete_after-1);assert.equal(calls.length,0);
+  assert.equal(await cleanupEventRecaps(env,late.delete_after),1);
+  assert.deepEqual(calls.filter(call=>call.method==='DELETE').map(call=>call.path),[`/channels/${late.voice_id}`,`/channels/${text.channel_id}`]);
+  calls.length=0;await voices(env,late.delete_after+1);await cleanupEventRecaps(env,late.delete_after+1);assert.equal(written(calls).length,0);
+});
+
+test('empty crews get voices immediately with no recap module, including pending schedules',async t=>{
+  const {DB,env,calls}=setup(t);race(DB,'race-a','Spa','spa',[{id:'start-a',startsAt:NOW+90*DAY,tbd:true}]);crew(DB,'empty');
+  assert.equal((await voices(env)).opened,1);assert.equal(creates(calls).length,1);assert.equal(creates(calls)[0].body.parent_id,TEXT);
+  assert.equal(DB.db.prepare('SELECT delete_after FROM crew_discord').get().delete_after,null);
+  assert.match(sends(calls)[0].body.content,/Horaire à confirmer/);
+  calls.length=0;await voices(env,NOW+100*DAY);assert.equal(written(calls).length,0);
+  DB.db.prepare('UPDATE events SET departures=?').run(JSON.stringify([{id:'start-a',startsAt:NOW+110*DAY}]));
+  await voices(env,NOW+100*DAY);assert.ok(DB.db.prepare('SELECT delete_after FROM crew_discord').get().delete_after>NOW+110*DAY);
+});
+
+test('a general recap stays permanent and voices use the independent selected category',async t=>{
+  const {DB,env,calls}=setup(t);race(DB);crew(DB,'solo');await saveBotRecap(env,COMMUNITY,{...SETTINGS,mode:'general',destinationId:TEXT});
+  await syncBotRecaps(env,NOW,COMMUNITY);await voices(env);assert.equal(creates(calls).length,1);assert.equal(creates(calls)[0].body.parent_id,TEXT);
+  const voice=DB.db.prepare('SELECT * FROM crew_discord').get();calls.length=0;await voices(env,voice.delete_after);
+  assert.deepEqual(calls.filter(call=>call.method==='DELETE').map(call=>call.path),[`/channels/${voice.voice_id}`]);
+  assert.equal(DB.db.prepare('SELECT closed_at FROM discord_recap_publications').get().closed_at,null);
+});
+
+test('LMU and iRacing categories are validated, saved, and used by both texts and voices without duplicates',async t=>{
+  const {DB,env,calls,channels}=setup(t),IR='777777777777777777',NEXT='888888888888888888';
+  channels.push({id:IR,type:4,name:'Courses iRacing'},{id:NEXT,type:4,name:'Nouvelles courses iRacing'});
+  race(DB,'lmu','Spa');race(DB,'ir','Daytona','iracing-daytona');crew(DB,'lmu','lmu');crew(DB,'ir','ir');
+  assert.equal((await as(env,'/api/community/recap','PUT',{...SETTINGS,iracingDestinationId:TEXT})).status,400);
+  assert.equal((await as(env,'/api/community/recap','PUT',{...SETTINGS,iracingDestinationId:'123456789012345678'})).status,400);
+  const {validateRecapDestination}=await import('../server/recap-discord.mjs');
+  const settings=await validateRecapDestination(env,COMMUNITY,{...SETTINGS,iracingDestinationId:IR});
+  await saveBotRecap(env,COMMUNITY,settings);await voices(env);
+  const publications=DB.db.prepare('SELECT * FROM discord_recap_publications').all();
+  assert.equal(publications.find(row=>row.event_id==='lmu').category_id,CATEGORY);assert.equal(publications.find(row=>row.event_id==='ir').category_id,IR);
+  assert.equal(creates(calls).filter(call=>call.body.parent_id===IR).length,2);
+  const voice=DB.db.prepare("SELECT * FROM crew_discord WHERE crew_id='ir'").get();
+  await saveBotRecap(env,COMMUNITY,{...settings,iracingDestinationId:NEXT,iracingDestinationName:'Nouvelles courses iRacing'});
+  calls.length=0;await voices(env,NOW+1000);assert.equal(creates(calls).length,0);assert.equal(sends(calls).length,0);
+  assert.ok(calls.some(call=>call.method==='PATCH'&&call.path===`/channels/${voice.voice_id}`&&call.body.parent_id===NEXT));
+  const api=await as(env,'/api/community/setup');assert.equal(api.data.botRecap.iracingDestinationId,NEXT);
+  await assert.rejects(sendBotRecapTest(env,NOW,COMMUNITY,settings),/active d’abord/);
+});
+
+test('excluded simulations and disabled recaps leave the voice module independent',async t=>{
+  const {DB,env,calls}=setup(t);race(DB,'ir','Daytona','iracing-daytona');crew(DB,'ir','ir');
+  await saveBotRecap(env,COMMUNITY,{...SETTINGS,scope:'lmu'});await voices(env);
+  assert.equal(creates(calls).length,1);assert.equal(creates(calls)[0].body.parent_id,TEXT);
+  await saveBotRecap(env,COMMUNITY,SETTINGS);calls.length=0;await voices(env,NOW+1000);
+  assert.equal(creates(calls).filter(call=>call.body.type===0).length,1);assert.equal(creates(calls).filter(call=>call.body.type===2).length,0);
+  await saveBotRecap(env,COMMUNITY,SETTINGS,false);calls.length=0;await voices(env,NOW+2000);
+  assert.ok(calls.some(call=>call.method==='PATCH'&&call.body.parent_id===TEXT));
+});
+
+test('a postponed crew departure moves its expiry; deleting its event retains the last known expiry',async t=>{
+  const {DB,env,calls}=setup(t);race(DB);crew(DB,'solo');await voices(env);
+  const old=DB.db.prepare('SELECT * FROM crew_discord').get();
+  DB.db.prepare('UPDATE events SET departures=?').run(JSON.stringify([{id:'start-a',startsAt:NOW+5*DAY}]));
+  calls.length=0;await voices(env,old.delete_after);assert.equal(calls.filter(call=>call.method==='DELETE').length,0);
+  const moved=DB.db.prepare('SELECT * FROM crew_discord').get();assert.ok(moved.delete_after>old.delete_after);
+  DB.db.prepare('DELETE FROM events').run();calls.length=0;await voices(env,moved.delete_after-1);assert.equal(calls.length,0);
+  await voices(env,moved.delete_after);assert.deepEqual(calls.filter(call=>call.method==='DELETE').map(call=>call.path),[`/channels/${moved.voice_id}`]);
+});
+
+test('a known crew expiry is independent of another pending departure; missing duration or its own pending start blocks voice cleanup',async t=>{
+  const {crewDeletionTime,eventDeletionTime}=await import('../server/discord-course-space.mjs');
+  const event={departures:JSON.stringify([{id:'known',startsAt:NOW},{id:'pending',startsAt:NOW+DAY,tbd:true}]),duration_minutes:90};
+  assert.equal(crewDeletionTime(event,'known'),NOW+DAY+90*60000);assert.equal(eventDeletionTime(event),null);
+  for(const id of ['pending','missing'])assert.equal(crewDeletionTime(event,id),null);
+  assert.equal(crewDeletionTime({...event,duration_minutes:0},'known'),null);
+  assert.equal(crewDeletionTime({...event,schedule_pending:1},'known'),null);
+  for(const startsAt of [null,'',undefined])assert.equal(crewDeletionTime({...event,departures:JSON.stringify([{id:'known',startsAt}])},'known'),null);
+});
+
+test('cleanup retries a failed voice deletion before deleting text, honors locks, and never touches another community',async t=>{
+  const {cleanupEventRecaps}=await import('../server/recap-discord.mjs');
+  const {DB,env,calls,setFailure}=setup(t);race(DB);crew(DB,'solo');await saveBotRecap(env,COMMUNITY,SETTINGS);await voices(env);
+  const voice=DB.db.prepare('SELECT * FROM crew_discord').get(),text=DB.db.prepare('SELECT * FROM discord_recap_publications').get();
+  DB.db.prepare("INSERT INTO communities(id,slug,name,short_name,created_at) VALUES('other','other','Other','OTH',0)").run();
+  DB.db.prepare("INSERT INTO crew_discord(crew_id,community_id,event_id,guild_id,voice_id,created_at) VALUES('foreign','other','race-a',?,'123456789012345678',0)").run(GUILD);
+  DB.db.prepare('UPDATE crew_discord SET lock_until=? WHERE crew_id=?').run(Date.now()+60000,'solo');calls.length=0;
+  assert.equal(await cleanupEventRecaps(env,voice.delete_after),0);assert.equal(written(calls).length,0);
+  DB.db.prepare("UPDATE crew_discord SET lock_until=0 WHERE crew_id='solo'").run();
+  const failure=(path,method)=>path===`/channels/${voice.voice_id}`&&method==='DELETE';failure.status=429;setFailure(failure);
+  assert.equal(await cleanupEventRecaps(env,voice.delete_after),0);assert.equal(DB.db.prepare('SELECT closed_at FROM discord_recap_publications').get().closed_at,null);
+  assert.equal(DB.db.prepare("SELECT voice_id FROM crew_discord WHERE crew_id='solo'").get().voice_id,voice.voice_id);
+  setFailure(null);calls.length=0;assert.equal(await cleanupEventRecaps(env,voice.delete_after),1);
+  assert.deepEqual(calls.filter(call=>call.method==='DELETE').map(call=>call.path),[`/channels/${voice.voice_id}`,`/channels/${text.channel_id}`]);
+  assert.equal(DB.db.prepare("SELECT closed_at FROM crew_discord WHERE crew_id='foreign'").get().closed_at,null);
+});
+
+test('limited and concurrent voice synchronizations keep one text and one voice per identity',async t=>{
+  const {DB,env,calls}=setup(t);race(DB);crew(DB,'solo');await saveBotRecap(env,COMMUNITY,SETTINGS);
+  await voices(env,NOW,COMMUNITY,1);assert.ok(calls.length<=1);calls.length=0;
+  await Promise.all([voices(env),voices(env)]);
+  assert.equal(creates(calls).filter(call=>call.body.type===0).length,1);assert.equal(creates(calls).filter(call=>call.body.type===2).length,1);
+  calls.length=0;await voices(env,NOW+1000);assert.equal(written(calls).length,0);
+});
+
+test('an expired crew backlog does not prevent later crews from receiving voices',async t=>{
+  const {DB,env,calls}=setup(t);
+  race(DB,'old','Old','spa',[{id:'old-start',startsAt:NOW-30*DAY}]);
+  for(let i=0;i<20;i++)crew(DB,'old-'+i,'old','old-start');
+  race(DB,'new','New');crew(DB,'new','new');
+  await voices(env);await voices(env);
+  assert.equal(creates(calls).length,1);assert.match(creates(calls)[0].body.name,/new/);
+  assert.equal(DB.db.prepare('SELECT count(*) AS n FROM crew_discord WHERE closed_at IS NOT NULL').get().n,20);
+});
+
+test('cleanup works with both modules disabled and recreates neither text nor voices',async t=>{
+  const {DB,env,calls}=setup(t);race(DB);crew(DB,'solo');await saveBotRecap(env,COMMUNITY,SETTINGS);await voices(env);
+  const row=DB.db.prepare('SELECT * FROM crew_discord').get();
+  DB.db.prepare('UPDATE community_recap_settings SET enabled=0').run();
+  const {syncCrewDiscord}=await import('../server/crew-discord.mjs');calls.length=0;
+  await syncCrewDiscord(env,row.delete_after,{community:{...COMMUNITY,modules:{}},requests:8,bell:false});
+  await syncBotRecaps(env,row.delete_after,COMMUNITY);
+  assert.equal(calls.filter(call=>call.method==='DELETE').length,2);assert.equal(creates(calls).length,0);assert.equal(sends(calls).length,0);
+});
+
+test('an empty crew on a shared official race creates only its community’s text and voice',async t=>{
+  const {DB,env,calls}=setup(t);race(DB,'official-race','Official','spa',undefined,'official');crew(DB,'empty','official-race');
+  await saveBotRecap(env,COMMUNITY,SETTINGS);await voices(env);
+  assert.equal(creates(calls).filter(call=>call.body.type===0).length,1);assert.equal(creates(calls).filter(call=>call.body.type===2).length,1);
+  const preview=await previewBotRecap(env,NOW,COMMUNITY,SETTINGS);assert.match(JSON.stringify(preview),/Équipage empty/);
+});
+
+test('a deleted race with an unknown stored voice deadline cannot cause premature voice deletion through recap cleanup',async t=>{
+  const {DB,env,calls}=setup(t);race(DB);crew(DB,'solo');await saveBotRecap(env,COMMUNITY,SETTINGS);await voices(env);
+  const text=DB.db.prepare('SELECT * FROM discord_recap_publications').get();
+  DB.db.prepare('UPDATE crew_discord SET delete_after=NULL').run();DB.db.prepare('DELETE FROM events').run();calls.length=0;
+  const {cleanupEventRecaps}=await import('../server/recap-discord.mjs');
+  assert.equal(await cleanupEventRecaps(env,text.delete_after),0);assert.equal(written(calls).length,0);
+  assert.equal(DB.db.prepare('SELECT closed_at FROM crew_discord').get().closed_at,null);
+});
+
+test('a voice run that acquires its lock after another run finishes rereads identities instead of creating duplicates',async t=>{
+  const {DB,env,calls}=setup(t);race(DB);crew(DB,'solo');
+  const prepare=DB.prepare.bind(DB);let interleaved=false;
+  DB.prepare=sql=>{
+    const statement=prepare(sql);
+    if(sql.startsWith('UPDATE crew_discord SET lock_until=?')){
+      const run=statement.run.bind(statement);
+      statement.run=async()=>{
+        if(!interleaved){interleaved=true;await voices(env);}
+        return run();
+      };
+    }
+    return statement;
+  };
+  await voices(env);assert.equal(interleaved,true);assert.equal(creates(calls).length,1);assert.equal(sends(calls).length,1);
+  assert.ok(DB.db.prepare('SELECT voice_id FROM crew_discord').get().voice_id);
+});

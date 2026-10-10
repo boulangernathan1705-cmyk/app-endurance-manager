@@ -1,34 +1,24 @@
-// Crews on Discord (migrations 0044, 0045). Two modules, each enabled by the admins of a community:
-// - crewChannels (« Salons d'équipage »): a few days before its start, every crew with a pilot gets a voice
-//   channel named after its sim and its name (« LMU-Les Tondeuz »), made in the category the admins chose
-//   (none: at the top of the server); the bot never moves it afterwards. A recap message in the voice channel's chat follows the crew
-//   (race, time, car, pilots); a pilot who joins is welcomed there. 2 h after the planned end the voice channel
-//   is deleted with its chat, once no pilot of the crew is in it. A crew deleted before is closed at once.
-//   (The first version made a category with a text channel and archived it: what is left of it is deleted too.)
-// - raceReminders (« Rappels de course »): 24 h and 1 h before the start, a message in the crew's voice channel
-//   that mentions its pilots; 24 h before, a notification on the bell for every pilot entered on the start.
-// Everything is done by the bot (DISCORD_BOT_TOKEN) through Discord's REST API, by the scheduled task and right
-// after a change on a crew, a few requests at a time (a run of the Worker may make 50).
+// Independent crew voices, coordinated with event text recaps when both modules are enabled.
 import {allCommunities, communityUrl} from './community.mjs';
 import {notify} from './notifications.mjs';
 import {durationLabel} from '../shared/duration.mjs';
+import {crewDeletionTime, COURSE_CLOSE_AFTER, courseCategory, coordinatesCourse} from './discord-course-space.mjs';
+import {syncBotRecaps} from './recap-discord.mjs';
 
 const DISCORD_API = 'https://discord.com/api/v10';
 const HOUR = 3600_000;
-export const OPEN_BEFORE = 6 * 24 * HOUR;
-export const CLOSE_AFTER = 2 * HOUR;
-// After this, a crew whose channels cannot be closed (bot removed…) is left alone.
-const GIVE_UP_AFTER = 7 * 24 * HOUR;
+export const CLOSE_AFTER = COURSE_CLOSE_AFTER;
 const LOCK_MS = 60_000;
 // Text channels archived by the first version: deleted 30 days after their race.
 export const KEEP_ARCHIVES = 30 * 24 * HOUR;
 export const REMINDERS = [{bit:1, before:24 * HOUR}, {bit:2, before:HOUR}];
 // What the bot needs on the server for the crews (invite link of the « Modules » settings): view channels,
-// manage channels, send messages, read the history.
+// manage channels, send messages, read the history, connect and speak (to grant public voice access).
 const MANAGE_CHANNELS = 1n << 4n, SEND_MESSAGES = 1n << 11n, ADMINISTRATOR = 1n << 3n;
-const NEEDED = MANAGE_CHANNELS | (1n << 10n) | SEND_MESSAGES | (1n << 16n);
+const NEEDED = MANAGE_CHANNELS | (1n << 10n) | SEND_MESSAGES | (1n << 16n) | (1n << 20n) | (1n << 21n);
 export const CREW_BOT_PERMISSIONS = String(NEEDED);
 const VOICE = 2, CATEGORY = 4;
+const PUBLIC_VOICE = String((1n << 10n) | (1n << 20n) | (1n << 21n));
 
 class Stop extends Error {}
 
@@ -61,13 +51,13 @@ const game = circuit => String(circuit || '').startsWith('iracing-') ? 'iracing'
 // No mention or link can be slipped in through a name chosen on the site.
 const safe = value => String(value || '').replace(/[@#<>*_~`|\\[\]]/g, '').replace(/\s+/g, ' ').trim();
 
-// The start of the crew and when its race ends, or null (start gone, or its time not known yet).
+// The crew departure, with an explicit pending state when its time is not known.
 function startOf(row) {
   const departure = parse(row.departures, []).find(item => item?.id === row.departure_id);
   const startsAt = Number(departure?.startsAt);
-  if (!departure || !Number.isFinite(startsAt)) return null;
+  const known = departure?.startsAt != null && departure.startsAt !== '' && Number.isFinite(startsAt);
   const minutes = Number(row.duration_minutes) || (Number(row.duration_hours) || 0) * 60;
-  return {startsAt, endsAt:startsAt + minutes * 60_000, minutes, pending:Boolean(row.schedule_pending) || departure.tbd === true};
+  return {startsAt:known ? startsAt : null, minutes, pending:!known || Boolean(row.schedule_pending) || departure.tbd === true};
 }
 
 // The recap message of the voice channel's chat.
@@ -94,7 +84,7 @@ const discordIds = pilots => [...new Set(pilots.map(pilot => pilot.user_id).filt
 
 // The crews with their race (rows of crew_discord, or crews about to get one).
 const CREW_COLUMNS = `c.id AS crew_id, c.community_id, c.name AS crew_name, c.car, c.category, c.departure_id, c.event_id,
-  e.name AS event_name, e.departures, e.duration_hours, e.duration_minutes, e.circuit, e.schedule_pending`;
+  e.id AS current_event_id, e.name AS event_name, e.departures, e.duration_hours, e.duration_minutes, e.circuit, e.schedule_pending`;
 
 async function pilotsOf(env, crewIds) {
   const byCrew = new Map(crewIds.map(crewId => [crewId, []]));
@@ -116,17 +106,19 @@ export async function syncCrewDiscord(env, timestamp = Date.now(), {community = 
   const enabled = [...communities.values()].filter(item => item.modules?.crewChannels === true && item.discordGuildId && settings.has(item.id));
   const report = {opened:0, updated:0, closed:0, reminded:0, purged:0};
 
-  // New crews: a row for each crew with a pilot whose start comes within OPEN_BEFORE (its time known).
+  const recapSettings = new Map(((await env.DB.prepare('SELECT * FROM community_recap_settings').all()).results || []).map(row => [row.community_id,row]));
+  // New crews get their voice immediately, including empty crews and pending schedules.
   if (enabled.length) {
     const candidates = (await env.DB.prepare(`SELECT ${CREW_COLUMNS} FROM crews c JOIN events e ON e.id=c.event_id
-      WHERE c.community_id IN (${enabled.map(() => '?').join(',')}) AND e.schedule_pending=0
-        AND NOT EXISTS(SELECT 1 FROM crew_discord d WHERE d.crew_id=c.id) AND EXISTS(SELECT 1 FROM crew_members m WHERE m.crew_id=c.id)
-        AND EXISTS(SELECT 1 FROM json_each(e.departures) j WHERE json_extract(j.value,'$.id')=c.departure_id
-          AND COALESCE(json_extract(j.value,'$.tbd'),0)=0 AND json_extract(j.value,'$.startsAt') BETWEEN ? AND ?)
-      LIMIT 20`).bind(...enabled.map(item => item.id), timestamp - 2 * 24 * HOUR, timestamp + OPEN_BEFORE).all()).results || [];
-    const fresh = candidates.filter(row => { const start = startOf(row); return start && !start.pending && timestamp < start.endsAt; });
-    if (fresh.length) await env.DB.batch(fresh.map(row => env.DB.prepare('INSERT OR IGNORE INTO crew_discord(crew_id,community_id,guild_id,created_at) VALUES(?,?,?,?)')
-      .bind(row.crew_id, row.community_id, communities.get(row.community_id).discordGuildId, timestamp)));
+      WHERE c.community_id IN (${enabled.map(() => '?').join(',')})
+        AND NOT EXISTS(SELECT 1 FROM crew_discord d WHERE d.crew_id=c.id)
+      ORDER BY c.created_at,c.id LIMIT 20`).bind(...enabled.map(item => item.id)).all()).results || [];
+    // Record expired candidates as closed so an old backlog cannot starve new crews.
+    if (candidates.length) await env.DB.batch(candidates.map(row => {
+      const expiry = crewDeletionTime(row,row.departure_id);
+      return env.DB.prepare('INSERT OR IGNORE INTO crew_discord(crew_id,community_id,guild_id,created_at,event_id,delete_after,closed_at) VALUES(?,?,?,?,?,?,?)')
+        .bind(row.crew_id,row.community_id,communities.get(row.community_id).discordGuildId,timestamp,row.event_id,expiry,expiry !== null && timestamp >= expiry ? timestamp : null);
+    }));
   }
 
   // Open rows, checked longest ago first. Only those with something to do on Discord are locked and worked on
@@ -134,21 +126,28 @@ export async function syncCrewDiscord(env, timestamp = Date.now(), {community = 
   const ids = [...communities.keys()];
   if (!ids.length) return report;
   const rows = (await env.DB.prepare(`SELECT d.crew_id AS row_id, d.community_id AS row_community, d.guild_id, d.category_id, d.text_id, d.voice_id, d.message_id,
-      d.recap_hash, d.members, d.starts_at, d.reminded, d.created_at, ${CREW_COLUMNS}
-    FROM crew_discord d LEFT JOIN crews c ON c.id=d.crew_id LEFT JOIN events e ON e.id=c.event_id
-    WHERE d.closed_at IS NULL AND d.community_id IN (${ids.map(() => '?').join(',')}) AND d.lock_until<? ORDER BY d.checked_at LIMIT 40`)
-    .bind(...ids, timestamp).all()).results || [];
+      d.recap_hash, d.members, d.starts_at, d.reminded, d.created_at, d.event_id AS row_event_id, d.delete_after, d.voice_layout_hash, ${CREW_COLUMNS}
+    FROM crew_discord d LEFT JOIN crews c ON c.id=d.crew_id LEFT JOIN events e ON e.id=COALESCE(c.event_id,d.event_id)
+    WHERE d.closed_at IS NULL AND d.community_id IN (${ids.map(() => '?').join(',')}) AND d.lock_until<? ORDER BY d.checked_at LIMIT 12`)
+    .bind(...ids, Date.now()).all()).results || [];
   const pilots = await pilotsOf(env, rows.filter(row => row.crew_id).map(row => row.crew_id));
   const checked = [];
   for (const row of rows) {
     if (budget.left <= 0) break;
     const owner = communities.get(row.row_community), setting = settings.get(row.row_community), crewPilots = pilots.get(row.crew_id) || [];
     checked.push(row.row_id);
-    if (!await needsWork(env, timestamp, owner, setting, row, crewPilots)) continue;
-    const lock = await env.DB.prepare('UPDATE crew_discord SET lock_until=? WHERE crew_id=? AND lock_until<? AND closed_at IS NULL').bind(timestamp + LOCK_MS, row.row_id, timestamp).run();
+    if (row.current_event_id && (row.row_event_id !== row.current_event_id || row.delete_after !== crewDeletionTime(row,row.departure_id))) {
+      row.delete_after = crewDeletionTime(row,row.departure_id);
+      await env.DB.prepare('UPDATE crew_discord SET event_id=?,delete_after=? WHERE crew_id=?').bind(row.current_event_id,row.delete_after,row.row_id).run();
+      row.row_event_id = row.current_event_id;
+    }
+    const recap = recapSettings.get(row.row_community);
+    const layout = voiceLayout(owner,setting,recap,row);
+    if (!await needsWork(env, timestamp, owner, setting, row, crewPilots, layout)) continue;
+    const lock = await env.DB.prepare('UPDATE crew_discord SET lock_until=? WHERE crew_id=? AND lock_until<? AND closed_at IS NULL').bind(Date.now() + LOCK_MS, row.row_id, Date.now()).run();
     if (!lock.meta.changes) continue;
     try {
-      const done = await syncRow(env, budget, timestamp, owner, setting, row, crewPilots);
+      const done = await syncRow(env, budget, timestamp, owner, setting, row, crewPilots, layout, recap);
       if (done) report[done] += 1;
     } catch (error) {
       if (!(error instanceof Stop)) {
@@ -187,11 +186,23 @@ function dueReminders(community, row, start, timestamp) {
 }
 
 // Whether a row has anything to do on Discord now (most of them have not).
-async function needsWork(env, timestamp, community, setting, row, pilots) {
-  const start = row.crew_id && row.event_name ? startOf(row) : null;
-  if (!start || !community || timestamp >= start.endsAt + CLOSE_AFTER) return true;
+function voiceLayout(community, setting, recap, row) {
+  const coordinated = community?.modules?.crewChannels === true && coordinatesCourse(recap, row.guild_id, row);
+  const name = coordinated ? `${game(row.circuit) === 'iracing' ? 'iRacing' : 'LMU'}-${clip(safe(row.event_name),40)}-${clip(safe(row.crew_name),50) || 'Équipage'}`
+    : `${game(row.circuit) === 'iracing' ? 'iRacing' : 'LMU'}-${safe(row.crew_name) || 'Équipage'}`;
+  return {name:clip(name,100),type:VOICE,parent_id:coordinated ? courseCategory(recap,row) : setting?.voice_category_id || null,
+    permission_overwrites:[{id:row.guild_id,type:0,allow:PUBLIC_VOICE,deny:'0'}]};
+}
+function mustClose(row, timestamp) {
+  // A deleted crew closes immediately; a deleted event retains its last known deadline.
+  return (!row.crew_id && Boolean(row.current_event_id)) || (row.delete_after != null && timestamp >= row.delete_after);
+}
+async function needsWork(env, timestamp, community, setting, row, pilots, layout) {
+  const start = row.crew_id && row.current_event_id ? startOf(row) : null;
+  if (mustClose(row,timestamp)) return true;
+  if (!start || !community) return false;
   if (community.modules?.crewChannels !== true || !setting) return false;
-  if (!row.voice_id || !row.message_id || row.text_id || row.category_id || Number(row.starts_at) !== start.startsAt) return true;
+  if (!row.voice_id || !row.message_id || row.text_id || row.category_id || (row.starts_at == null ? null : Number(row.starts_at)) !== start.startsAt || row.voice_layout_hash !== await hash(JSON.stringify(layout))) return true;
   const current = discordIds(pilots), known = JSON.parse(row.members || '[]');
   if (current.length !== known.length || current.some(id => !known.includes(id))) return true;
   if (dueReminders(community, row, start, timestamp).length) return true;
@@ -206,15 +217,8 @@ async function remove(env, budget, channelId) {
 
 // The voice channel deleted (with its chat), then what the first version made (text channel, category). Each
 // step is saved, so a run that stops halfway goes on from there.
-async function closeRow(env, budget, timestamp, row, members, {force = false} = {}) {
+async function closeRow(env, budget, timestamp, row) {
   if (row.voice_id) {
-    // A pilot of the crew still talking in the voice channel: it stays until the next check.
-    if (!force) for (const userId of members) {
-      try {
-        const state = await discord(env, budget, 'GET', `/guilds/${row.guild_id}/voice-states/${userId}`);
-        if (state?.channel_id === row.voice_id) return false;
-      } catch (error) { if (error instanceof Stop) throw error; }
-    }
     await remove(env, budget, row.voice_id);
     await env.DB.prepare('UPDATE crew_discord SET voice_id=NULL WHERE crew_id=?').bind(row.row_id).run();
     row.voice_id = null;
@@ -248,10 +252,10 @@ async function sendInChannel(env, budget, row, method, path, body) {
 // The crew's voice channel, in the category chosen by the admins. That category deleted on Discord: the choice
 // is forgotten (the admins are told) and the channel is made at the top of the server next time.
 async function createVoice(env, budget, row, setting, body) {
-  const parent = setting.voice_category_id;
-  try { return await discord(env, budget, 'POST', `/guilds/${row.guild_id}/channels`, parent ? {...body, parent_id:parent} : body); }
+  const parent = body.parent_id;
+  try { return await discord(env, budget, 'POST', `/guilds/${row.guild_id}/channels`, body); }
   catch (error) {
-    if (!parent || (error?.status !== 400 && error?.status !== 404)) throw error;
+    if (!parent || (error?.status !== 400 && error?.status !== 404) || parent !== setting.voice_category_id) throw error;
     await env.DB.prepare('UPDATE community_crew_discord SET voice_category_id=NULL, last_error=?, last_error_at=? WHERE community_id=?')
       .bind('La catégorie choisie pour les vocaux n’existe plus : ils arrivent en haut du serveur.', Math.floor(Date.now() / 1000), row.row_community).run();
     setting.voice_category_id = null;
@@ -272,24 +276,34 @@ export async function serverCategories(env, guildId) {
   }
 }
 
-async function syncRow(env, budget, timestamp, community, setting, row, pilots) {
-  const start = row.crew_id && row.event_name ? startOf(row) : null;
-  const members = JSON.parse(row.members || '[]');
-  // Crew, race or start gone: closed now; 2 h after the planned end: closed once the voice channel is empty.
-  if (!start || !community || timestamp >= start.endsAt + CLOSE_AFTER) {
-    const deadline = start ? start.endsAt + GIVE_UP_AFTER : row.created_at + GIVE_UP_AFTER;
-    try { return await closeRow(env, budget, timestamp, row, members, {force:!start || !community}) ? 'closed' : null; }
-    catch (error) {
-      if (error instanceof Stop || timestamp < deadline) throw error;
-      await env.DB.prepare('UPDATE crew_discord SET closed_at=? WHERE crew_id=?').bind(timestamp, row.row_id).run();
-      return 'closed';
-    }
+async function syncRow(env, budget, timestamp, community, setting, row, pilots, layout, recap) {
+  // Another run may have finished between the initial snapshot and acquisition of this lock.
+  const current = await env.DB.prepare(`SELECT voice_id,message_id,recap_hash,members,starts_at,reminded,
+    text_id,category_id,voice_layout_hash,delete_after FROM crew_discord WHERE crew_id=? AND closed_at IS NULL`).bind(row.row_id).first();
+  if (!current) return null;
+  Object.assign(row,current);
+  // Recheck this crew’s departure deadline after taking the crew lock.
+  const event = row.row_event_id && await env.DB.prepare('SELECT departures,duration_hours,duration_minutes,schedule_pending FROM events WHERE id=?').bind(row.row_event_id).first();
+  if (event) {
+    Object.assign(row,event);
+    const expiry = crewDeletionTime(row,row.departure_id);
+    if (row.delete_after !== expiry) await env.DB.prepare('UPDATE crew_discord SET delete_after=? WHERE crew_id=?').bind(expiry,row.row_id).run();
+    row.delete_after = expiry;
   }
-  // Module turned off: nothing new on Discord (what exists closes at the end).
-  if (community.modules?.crewChannels !== true || !setting) return null;
+  if (mustClose(row,timestamp)) return await closeRow(env,budget,timestamp,row) ? 'closed' : null;
+  const start = row.crew_id && row.current_event_id ? startOf(row) : null;
+  if (!start || !community || community.modules?.crewChannels !== true || !setting) return null;
+  if (community.discordGuildId !== row.guild_id) throw new Error('Le serveur Discord a changé : les anciens vocaux doivent être fermés avant de les transférer.');
+  if (coordinatesCourse(recap,row.guild_id,row)) {
+    let publication = await env.DB.prepare('SELECT * FROM discord_recap_publications WHERE community_id=? AND event_id=?').bind(community.id,row.event_id).first();
+    if (!publication?.channel_id || publication.category_id !== layout.parent_id) {
+      await syncBotRecaps(env,timestamp,community,false,{eventId:row.event_id,budget});
+      publication = await env.DB.prepare('SELECT * FROM discord_recap_publications WHERE community_id=? AND event_id=?').bind(community.id,row.event_id).first();
+    }
+    if (!publication?.channel_id || publication.closed_at || publication.category_id !== layout.parent_id) throw new Stop('recap-pending');
+  }
 
-  const current = discordIds(pilots);
-  const crewName = safe(row.crew_name) || 'Équipage';
+  const memberIds = discordIds(pilots);
   let opened = false;
   if (row.text_id || row.category_id) {
     // Opened by the first version: its text channel and category go, the recap is sent again in the voice chat.
@@ -298,18 +312,24 @@ async function syncRow(env, budget, timestamp, community, setting, row, pilots) 
     await env.DB.prepare('UPDATE crew_discord SET message_id=NULL WHERE crew_id=?').bind(row.row_id).run();
   }
   if (!row.voice_id) {
-    const voice = await createVoice(env, budget, row, setting, {name:clip(`${game(row.circuit) === 'iracing' ? 'iRacing' : 'LMU'}-${crewName}`, 100), type:VOICE});
+    const voice = await createVoice(env, budget, row, setting, layout);
     Object.assign(row, {voice_id:voice.id, message_id:null});
     await env.DB.prepare('UPDATE crew_discord SET voice_id=?, message_id=NULL WHERE crew_id=?').bind(voice.id, row.row_id).run();
     await env.DB.prepare('UPDATE community_crew_discord SET last_error=NULL, last_error_at=NULL WHERE community_id=?').bind(community.id).run();
     opened = true;
   }
+  const layoutHash = await hash(JSON.stringify(layout));
+  if (!opened && row.voice_layout_hash !== layoutHash) {
+    const {type, ...changes} = layout; // Discord only allows type conversion between text and announcement channels.
+    await sendInChannel(env,budget,row,'PATCH',`/channels/${row.voice_id}`,changes);
+  }
+  if (row.voice_layout_hash !== layoutHash) await env.DB.prepare('UPDATE crew_discord SET voice_layout_hash=? WHERE crew_id=?').bind(layoutHash,row.row_id).run();
   const content = recapContent(env, community, row, start, pilots);
   const contentHash = await hash(content);
   if (!row.message_id) {
     // Mentioned in the first message: Discord tells the pilots.
-    const message = await sendInChannel(env, budget, row, 'POST', `/channels/${row.voice_id}/messages`, {content, allowed_mentions:{users:current}});
-    Object.assign(row, {message_id:message.id, recap_hash:contentHash, members:JSON.stringify(current)});
+    const message = await sendInChannel(env, budget, row, 'POST', `/channels/${row.voice_id}/messages`, {content, allowed_mentions:{users:memberIds}});
+    Object.assign(row, {message_id:message.id, recap_hash:contentHash, members:JSON.stringify(memberIds)});
     await env.DB.prepare('UPDATE crew_discord SET message_id=?, recap_hash=?, members=? WHERE crew_id=?').bind(message.id, contentHash, row.members, row.row_id).run();
   } else {
     if (row.recap_hash !== contentHash) {
@@ -317,14 +337,14 @@ async function syncRow(env, budget, timestamp, community, setting, row, pilots) 
       await env.DB.prepare('UPDATE crew_discord SET recap_hash=? WHERE crew_id=?').bind(contentHash, row.row_id).run();
     }
     // New pilots: welcomed in the voice channel's chat.
-    const before = JSON.parse(row.members || '[]'), known = new Set(before), joined = current.filter(id => !known.has(id));
+    const before = JSON.parse(row.members || '[]'), known = new Set(before), joined = memberIds.filter(id => !known.has(id));
     if (joined.length) await sendInChannel(env, budget, row, 'POST', `/channels/${row.voice_id}/messages`,
       {content:`👋 Bienvenue ${joined.map(id => `<@${id}>`).join(', ')} dans l’équipage **${safe(row.crew_name)}** !`, allowed_mentions:{users:joined}});
-    if (joined.length || current.length !== before.length) await env.DB.prepare('UPDATE crew_discord SET members=? WHERE crew_id=?').bind(JSON.stringify(current), row.row_id).run();
+    if (joined.length || memberIds.length !== before.length) await env.DB.prepare('UPDATE crew_discord SET members=? WHERE crew_id=?').bind(JSON.stringify(memberIds), row.row_id).run();
   }
 
   // Reminders (a moved start counts them again).
-  if (Number(row.starts_at) !== start.startsAt) {
+  if ((row.starts_at == null ? null : Number(row.starts_at)) !== start.startsAt) {
     Object.assign(row, {starts_at:start.startsAt, reminded:0});
     await env.DB.prepare('UPDATE crew_discord SET starts_at=?, reminded=0 WHERE crew_id=?').bind(start.startsAt, row.row_id).run();
   }
@@ -333,11 +353,11 @@ async function syncRow(env, budget, timestamp, community, setting, row, pilots) 
     let reminded = Number(row.reminded) || 0;
     // Only the closest one is sent (a crew opened 30 min before its start gets the « 1 h » one alone).
     const last = due[due.length - 1], unix = Math.floor(start.startsAt / 1000);
-    const who = current.map(id => `<@${id}>`).join(' ');
+    const who = memberIds.map(id => `<@${id}>`).join(' ');
     const content = last.before <= HOUR
       ? `⏰ ${who} Départ <t:${unix}:R> ! On se retrouve ici.`
       : `⏰ ${who} Rappel : **${safe(row.event_name)}**, départ <t:${unix}:F> (<t:${unix}:R>).`;
-    await sendInChannel(env, budget, row, 'POST', `/channels/${row.voice_id}/messages`, {content:content.replace(/ {2,}/g, ' '), allowed_mentions:{users:current}});
+    await sendInChannel(env, budget, row, 'POST', `/channels/${row.voice_id}/messages`, {content:content.replace(/ {2,}/g, ' '), allowed_mentions:{users:memberIds}});
     for (const item of due) reminded |= item.bit;
     await env.DB.prepare('UPDATE crew_discord SET reminded=? WHERE crew_id=?').bind(reminded, row.row_id).run();
   }

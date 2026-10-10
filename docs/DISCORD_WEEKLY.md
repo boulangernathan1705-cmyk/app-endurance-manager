@@ -4,11 +4,11 @@ Le récap annonce les courses, départs, équipages, catégories, voitures, pilo
 
 ## Configuration guidée
 
-Dans **Administration → Modules → Récap de la semaine sur Discord → Régler** :
+Dans **Administration → Modules → Récaps de course sur Discord → Régler** :
 
 1. Choisir **Récap général** (un salon texte existant, un message regroupant les courses) ou **Un salon par événement** (un salon texte créé par endurance).
 2. Cocher **LMU**, **iRacing**, ou les deux, indépendamment du mode. Les nouveaux réglages proposent les deux simulateurs ; les réglages existants préremplissent leur sélection.
-3. Sélectionner directement le **salon texte** en mode général ou la **catégorie** en mode par événement sur le serveur Discord de la communauté. Aucun webhook à copier pour les nouvelles configurations.
+3. Sélectionner directement le **salon texte** en mode général ou la **catégorie** en mode par événement sur le serveur Discord de la communauté. Avec les deux simulateurs en mode par événement, on peut choisir séparément la catégorie LMU et la catégorie iRacing ; « Même catégorie » conserve le rangement actuel. Aucun webhook à copier pour les nouvelles configurations.
 4. Consulter l’aperçu sur le site puis cliquer **Activer le récap automatique**. L’aperçu ne publie rien. **Envoyer un test sur Discord** est une action volontaire distincte : elle utilise le même message que l’activation, sans activer l’automatisation. Pour un récap déjà activé, tester des réglages différents demande d’abord leur activation afin de préserver la publication actuelle.
 
 Après activation, une page courte indique l’état, le mode, les simulateurs, la destination et les erreurs éventuelles. **Modifier**, **Voir l’aperçu** et **Désactiver** restent disponibles ; aucun parcours hebdomadaire n’est nécessaire.
@@ -69,3 +69,7 @@ Captures réalisées localement avec des réponses API fictives :
 - [Choix sur mobile](previews/issue-261/recap-choices-mobile.png)
 - [Aperçu sur ordinateur](previews/issue-261/recap-preview-desktop.png)
 - [Aperçu sur mobile](previews/issue-261/recap-preview-mobile.png)
+
+## Coordination avec les vocaux
+
+Le module **Vocaux d’équipage sur Discord** reste indépendant. Quand il est activé avec les récaps par course, les vocaux rejoignent la catégorie du texte de leur course et portent la course et l’équipage dans leur nom. Chaque vocal expire **24 h après la fin du départ de son équipage** ; le texte expire **24 h après la fin du dernier départ de la course**. Les détails des permissions, du nettoyage et des modes séparés sont dans [CREW_DISCORD.md](CREW_DISCORD.md).

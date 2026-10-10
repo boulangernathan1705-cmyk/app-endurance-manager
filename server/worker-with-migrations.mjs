@@ -22,7 +22,7 @@ function queueWeeklySync(env, ctx, request) {
   if (!env?.DB || !ctx?.waitUntil) return;
   ctx.waitUntil(currentCommunity(env, request).then(async community => {
     await runWeeklySync(env, community).catch(error => console.error('Discord weekly sync failed', error instanceof Error ? error.message : 'unknown'));
-    // The threads of its crews on Discord follow at once (a new pilot, another car…).
+    // Its crew voices follow at once (a new pilot, another car…).
     if (community?.modules?.crewChannels === true) await syncCrewDiscord(env, Date.now(), {community, requests:6});
   }).catch(error => {
     console.error('Discord sync failed', error instanceof Error ? error.message : 'unknown');
@@ -96,7 +96,7 @@ export default {
         return development ? markDevelopmentResponse(home, env) : home;
       }
     }
-    const weeklyMutation = isWeeklyDiscordMutation(request);
+    const weeklyMutation = isWeeklyDiscordMutation(request) || (['PUT','PATCH'].includes(request.method) && ['/api/community/modules','/api/community/recap'].includes(new URL(request.url).pathname));
     const response = await worker.fetch(request, env, ctx);
     if (weeklyMutation && response.ok) queueWeeklySync(env, ctx, request);
     return development ? markDevelopmentResponse(response, env) : response;
