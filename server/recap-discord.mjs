@@ -81,7 +81,7 @@ export function eventDeletionTime(event) {
   if (!(minutes > 0)) return null;
   return Math.max(...departures.map(item => Number(item.startsAt))) + minutes * 60000 + DAY;
 }
-// The races that get their category now: a crew with a pilot (its voice channel is made at once, server/crew-
+// The races that get their category now: a crew (its voice channel is made at once, server/crew-
 // discord.mjs) or a start within 6 days (OPEN_BEFORE), the race not over.
 export function racesOpenNow(events, scope, timestamp, crewed = new Set()) {
   return events.filter(event => {
@@ -93,8 +93,8 @@ export function racesOpenNow(events, scope, timestamp, crewed = new Set()) {
 }
 const raceEvents = (env, community) => env.DB.prepare("SELECT id,name,circuit,departures,duration_hours,duration_minutes,schedule_pending FROM events WHERE community_id=? OR community_id='official' ORDER BY created_at,id")
   .bind(community.id).all().then(result => result.results || []);
-// The races where this community has a crew with a pilot.
-const crewedRaces = (env, community) => env.DB.prepare('SELECT DISTINCT c.event_id FROM crews c WHERE c.community_id=? AND EXISTS(SELECT 1 FROM crew_members m WHERE m.crew_id=c.id)')
+// The races where this community has a crew.
+const crewedRaces = (env, community) => env.DB.prepare('SELECT DISTINCT c.event_id FROM crews c WHERE c.community_id=?')
   .bind(community.id).all().then(result => new Set((result.results || []).map(row => row.event_id)));
 export const raceCategoryName = event =>
   `${String(event?.circuit || '').startsWith('iracing-') ? '🏁 iRacing' : '🏎️ LMU'} · ${String(event?.name || 'Endurance').trim()}`.slice(0,100);
