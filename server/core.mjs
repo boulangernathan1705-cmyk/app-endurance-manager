@@ -221,7 +221,7 @@ function validateSoloRace(input, existing) {
       extras[key] = value;
     }
     // Places of the round (empty = unlimited): beyond them, pilots wait for a place on that round.
-    if (round.capacity != null && round.capacity !== '') {
+    if (input.details?.type !== 'Grindfest' && round.capacity != null && round.capacity !== '') {
       const value = Number(round.capacity);
       if (!Number.isInteger(value) || value < 2 || value > 120) fail(400, `Le nombre de places${where} doit être compris entre 2 et 120.`);
       extras.capacity = value;
@@ -241,10 +241,9 @@ function validateSoloRace(input, existing) {
   const details = {};
   if (raw.type) { if (![...TDZ_EVENT_TYPES, 'Grindfest'].includes(raw.type)) fail(400, 'Choisis un type d’événement de la liste.'); details.type = raw.type; }
   if (details.type === 'Grindfest') {
-    if (cleanRounds.length !== 1) fail(400, 'Un Grindfest a une seule manche.');
     try { details.streamers = normalizeStreamers(raw.streamers); } catch (error) { fail(400, error.message); }
     capacity = details.streamers.reduce((sum, streamer) => sum + streamer.capacity, 0);
-    cleanRounds[0].capacity = capacity;
+    cleanRounds.forEach(round => { delete round.capacity; });
   }
   if (existing && isGrindfest(existing) !== (details.type === 'Grindfest')) fail(400, 'Le format Grindfest ne peut pas changer après la création.');
   if (raw.password) details.password = text(raw.password, 30, 'Mot de passe');
@@ -315,7 +314,9 @@ function validateSoloChoice(choice, allowed, index, rounds) {
 }
 function validateSoloRegistration(input, event) {
   const name = text(input.name, PILOT_NAME_MAX, 'Pseudo');
-  const streamerId = isGrindfest(event) ? String(input.streamerId || '') : null;
+  const grindfest = isGrindfest(event);
+  if (grindfest && Array.isArray(input.choices) && input.choices.some(choice => choice?.skip === true)) fail(400, 'L’inscription Grindfest couvre toutes les manches.');
+  const streamerId = grindfest ? String(input.streamerId || '') : null;
   if (isGrindfest(event) && !streamersOf(event).some(streamer => streamer.id === streamerId)) fail(400, 'Choisis le streamer que tu représentes.');
   const eventCategories = JSON.parse(event.categories);
   const rounds = JSON.parse(event.rounds || '[]');

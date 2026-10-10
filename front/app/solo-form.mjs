@@ -56,6 +56,7 @@ function syncRounds(form){
   const rounds=[...form.querySelectorAll('.solo-round')];
   rounds.forEach((row,index)=>{row.querySelector('.solo-round-title').textContent=`Manche ${index+1}`;row.querySelector('[data-remove-round]').hidden=rounds.length<2;});
   form.querySelector('[data-add-round]').hidden=rounds.length>=MAX_ROUNDS;
+  syncStreamerFields(form);
 }
 const STEPS=['Événement','Horaire','Manches','Inscriptions','Récapitulatif'],LAST=STEPS.length;
 

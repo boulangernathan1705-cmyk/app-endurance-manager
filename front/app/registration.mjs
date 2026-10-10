@@ -160,6 +160,14 @@ function soloChoiceLabel(choice,round){
   if(choice.category===ANY_CATEGORY)return 'Peu importe';
   return `${logo(choice.category)} ${esc(choice.category)}`;
 }
+function renderGrindfestRegistration(event,departure,stateDraft){
+  const rounds=initSoloDraft(event,departure,stateDraft),count=(event.rounds||[]).length||1;
+  const linkedOther=stateDraft.forOther&&!!(stateDraft.participantUserId||stateDraft.discordLinked);
+  const manualOther=stateDraft.forOther&&!linkedOther&&!!stateDraft.manualOther;
+  const identity=identityFields(stateDraft,departure,false,manualOther,linkedOther,false,false);
+  const choices=rounds.map((round,index)=>round.categories.length>1?`<label class="form-label">Catégorie · Manche ${index+1}<select name="grindfestCategory${index}"><option value="${ANY_CATEGORY}">Peu importe</option>${round.categories.map(category=>`<option value="${esc(category)}" ${stateDraft.choices[index]?.category===category?'selected':''}>${esc(category)}</option>`).join('')}</select></label>`:'').join('');
+  return `<form class="form-section registration-form" data-kind="registration" data-departure="${departure.id}">${communityLine(event,departure,stateDraft)}${identity}<p class="registration-step-help">Une seule inscription pour ${count>1?`les ${count} manches`:'la manche'}, avec le même streamer.</p>${streamerChoice(event,departure,stateDraft)}${choices}<div class="save-row"><button type="submit" class="save-button">${stateDraft.id?'ENREGISTRER':count>1?`JE PARTICIPE AUX ${count} MANCHES`:'JE PARTICIPE'}</button>${stateDraft.id?button('delete-registration',stateDraft.forOther?'Supprimer l’inscription':'Se désinscrire',`data-id="${stateDraft.id}" data-departure="${departure.id}"`,'danger-button'):''}</div></form>`;
+}
 function renderSoloStepper(event,departure,stateDraft){
   const rounds=initSoloDraft(event,departure,stateDraft);
   // Opened from a round (« Manche 2 »): that round only; the others are entered on their own.
@@ -207,6 +215,7 @@ ${pane(total,`${rounds.length?'':communityLine(event,departure,stateDraft)+ident
 }
 export function renderSteppedRegistration(event,departure,stateDraft=draftFor(departure)) {
   if(needsCommunityChoice(event,departure,stateDraft))return renderCommunityStep(departure);
+  if(isGrindfest(event))return renderGrindfestRegistration(event,departure,stateDraft);
   if(isSolo(event))return renderSoloStepper(event,departure,stateDraft);
   const duration=event.durationHours||6,step=registrationStep(stateDraft);
   const {same,assigned}=registrationContext(event,departure,stateDraft);
@@ -282,7 +291,11 @@ export async function submitRegistration(form,api) {
   if(draft.soloEvent){
     // Solo race: one category / car choice per round.
     if(draft.choices.length&&draft.choices.every(choice=>choice.skip))throw Error('Choisis au moins une manche.');
-    if (isGrindfest(event)) draft.streamerId = form.elements.registrationStreamer?.value || draft.streamerId;
+    if (isGrindfest(event)) {
+      draft.streamerId = form.elements.registrationStreamer?.value || draft.streamerId;
+      const rounds=soloRounds(event);
+      draft.choices=rounds.map((round,index)=>({category:form.elements[`grindfestCategory${index}`]?.value || (round.categories.length===1?round.categories[0]:ANY_CATEGORY),cars:[],carAny:true}));
+    }
     if (isGrindfest(event) && !draft.streamerId) throw Error('Choisis le streamer que tu représentes.');
     const payload={name:draft.name,streamerId:draft.streamerId,choices:draft.choices.map(choice=>choice.skip?{skip:true}:({category:choice.category,cars:[],carAny:true})),version:draft.version,participantId:draft.participantId,participantUserId:draft.participantUserId,forOther:!!draft.forOther,...entryCommunity(draft)};
     const result=await api(draft.id?`/api/registrations/${draft.id}`:`/api/races/${event.id}/departures/${departure.id}/registrations`,draft.id?'PATCH':'POST',payload);
