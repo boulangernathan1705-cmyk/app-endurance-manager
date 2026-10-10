@@ -105,6 +105,8 @@ test('"Mes communautés": the communities of the player, with the address of eac
 test('the main address is a showcase: anyone looks without signing in, only the platform managers change it', async () => {
   const APEX='https://endurance-manager.app', MANAGER='111111111111111111';
   const {DB,call}=setup({APP_ORIGIN:APEX,ADMIN_DISCORD_IDS:MANAGER});
+  // A showcase as long as no Discord server is linked to it (as on the production site).
+  DB.db.prepare("UPDATE communities SET discord_guild_id=NULL WHERE slug='commu-dev'").run();
   const session=async (user,role)=>{const raw=user.slice(0,1).repeat(64);const hash=[...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(raw)))].map(b=>b.toString(16).padStart(2,'0')).join('');
     DB.db.prepare("INSERT INTO users(id,name,role,created_at) VALUES(?,?,?,0)").run(user,'Joueur',role);DB.db.prepare('INSERT INTO sessions(token_hash,user_id,expires_at) VALUES(?,?,?)').run(hash,user,4102444800);return {Cookie:`__Secure-em_dev_session=${raw}`};};
   const pilot=await session('555555555555555555','organizer'),manager=await session(MANAGER,'pilot');
@@ -134,6 +136,25 @@ test('the main address is a showcase: anyone looks without signing in, only the 
   assert.ok(races.length>=6);assert.ok(races.every(race=>race.departures.every(departure=>/^\d{4}-\d{2}-\d{2}$/.test(departure.date)&&/^\d{2}:\d{2}$/.test(departure.time))),'each start has its date and time, as shown on the cards');assert.ok(races.some(race=>race.format==='solo'));assert.ok(races.some(race=>race.schedulePending));
   assert.ok(races.some(race=>race.departures.some(departure=>departure.crews.length&&departure.crews[0].registrationIds?.length)),'crews with their pilots');
   assert.equal(DB.db.prepare("SELECT COUNT(*) n FROM registrations WHERE user_id IS NOT NULL").get().n,0,'no real person');
+});
+
+test('the showcase becomes the official community once the official Discord server is linked', async () => {
+  const APEX='https://endurance-manager.app', MANAGER='111111111111111111', GUILD='900000000000000009';
+  const {DB,call}=setup({APP_ORIGIN:APEX,ADMIN_DISCORD_IDS:MANAGER});
+  const session=async user=>{const raw=user.slice(0,1).repeat(64);const hash=[...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(raw)))].map(b=>b.toString(16).padStart(2,'0')).join('');
+    DB.db.prepare("INSERT INTO users(id,name,role,created_at) VALUES(?,?,'pilot',0)").run(user,'Joueur');DB.db.prepare('INSERT INTO sessions(token_hash,user_id,expires_at) VALUES(?,?,?)').run(hash,user,4102444800);return {Cookie:`__Secure-em_dev_session=${raw}`};};
+  const pilot=await session('555555555555555555'),manager=await session(MANAGER);
+  const write=(headers,path,body)=>call(`${APEX}${path}`,{method:'POST',headers:{...headers,Origin:APEX,'Content-Type':'application/json'},body:JSON.stringify(body)});
+  assert.equal((await write(manager,'/api/platform/showcase',{confirm:'VITRINE'})).status,200);
+  assert.equal((await write(pilot,'/api/platform/official',{guildId:GUILD,confirm:'OFFICIEL'})).status,403);
+  assert.equal((await write(manager,'/api/platform/official',{guildId:GUILD})).status,400,'confirmation needed');
+  assert.equal((await write(manager,'/api/platform/official',{guildId:GUILD,confirm:'OFFICIEL'})).status,200);
+  const community=DB.db.prepare("SELECT * FROM communities WHERE slug='commu-dev'").get();
+  assert.equal(community.discord_guild_id,GUILD);assert.equal(DB.db.prepare("SELECT COUNT(*) n FROM events WHERE community_id=?").get(community.id).n,0,'the fictional races are gone');
+  // Now a community like any other: closed to a player who is not a member of its Discord server.
+  const visitor=await (await call(`${APEX}/api/session`,{headers:pilot})).json();
+  assert.equal(visitor.openSite,false);assert.notEqual(visitor.access,'member');
+  assert.equal((await write(manager,'/api/platform/official',{guildId:'900000000000000010',confirm:'OFFICIEL'})).status,400,'only once');
 });
 
 test('installable app: the manifest has the name of the community of the address, the platform\'s own elsewhere', async () => {

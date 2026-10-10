@@ -15,7 +15,8 @@ import {communityAccess, requirePermission, displayRole, PERMISSIONS, ALL_PERMIS
 // Solo races: a module each community turns on or off (settings of the members page).
 const soloRacesEnabled = (env, community) => community?.modules?.soloRaces === true;
 import {syncIracingEvents} from './iracing-import.mjs';
-import {resetShowcase} from './demo.mjs';
+import {resetShowcase, makeOfficial} from './demo.mjs';
+import {setupOfficialServer} from './official-discord.mjs';
 import {syncWeeklyDiscord, sendRecapTest, usesSiteRecap, WEBHOOK_URL, recapTargets, loadWeeklyDiscordSnapshot, siteOf} from './discord-weekly.mjs';
 import {buildWeeklyDiscordPayload} from './discord-weekly-format.mjs';
 import {botRecapSettings, recapDestinations, recapError, recapInput, validateRecapDestination, previewBotRecap, saveBotRecap, syncBotRecaps, sendBotRecapTest, RECAP_BOT_PERMISSIONS} from './recap-discord.mjs';
@@ -82,7 +83,7 @@ async function myCommunities(env, actor, community) {
       .bind(actor.user.id).all()).results || []).map(communityFromRow);
   // The showcase (community of the main address, when that address is the platform's domain) is never one of them.
   const showcase = (() => { try { return new URL(env.APP_ORIGIN).hostname === domain ? communitySlug(env, null) : ''; } catch { return ''; } })();
-  const mine = list.filter(item => item.slug !== showcase).sort((x, y) => x.name.localeCompare(y.name, 'fr')).map(item => ({id:item.id, slug:item.slug, name:item.name, shortName:item.shortName,
+  const mine = list.filter(item => item.slug !== showcase || item.discordGuildId).sort((x, y) => x.name.localeCompare(y.name, 'fr')).map(item => ({id:item.id, slug:item.slug, name:item.name, shortName:item.shortName,
     logoUrl:appearanceOf(item).logoUrl, accent:appearanceOf(item).accent, url:`${communityUrl(env, item)}/`, current:item.slug === community.slug, item}));
   // "Gérer tous les équipages" in each (a crew of an official race is created for any of them, whatever the site).
   const memberships = actor.manager ? [] : (await env.DB.prepare("SELECT * FROM memberships WHERE user_id=? AND status='member'").bind(actor.user.id).all()).results || [];
@@ -383,7 +384,9 @@ async function api(request, env) {
   // the permissions the player's Discord roles give in it (server/access.mjs).
   const community = await currentCommunity(env, request);
   // The main address of the platform (endurance-manager.app) is a showcase: fictional races anyone can look at.
-  const openSite = Boolean(baseDomain(env)) && url.hostname === baseDomain(env);
+  // Once the official Discord server is linked to it, it is the official community, like any other.
+  const mainAddress = Boolean(baseDomain(env)) && url.hostname === baseDomain(env);
+  const openSite = mainAddress && !community.discordGuildId;
   const access = await communityAccess(env, actor, community, {open:openSite});
   actor.permissions = access.permissions;
   actor.manager = access.manager;
@@ -987,12 +990,30 @@ async function api(request, env) {
   // Showcase of the main address: its data replaced by fictional races, crews and pilots (server/demo.mjs).
   if (path === '/api/platform/showcase' && method === 'POST') {
     if (!actor.manager) fail(403, 'Réservé aux gestionnaires de la plateforme.');
-    if (!openSite) fail(400, 'La vitrine se réinitialise depuis l’adresse principale du site.');
+    if (!mainAddress) fail(400, 'La vitrine se réinitialise depuis l’adresse principale du site.');
     const input = await body(request);
     if (input.confirm !== 'VITRINE') fail(400, 'Tape VITRINE pour confirmer.');
     const result = await resetShowcase(env, community);
     // The official iRacing calendar comes back with the next scheduled import (within 15 minutes).
     return json({ok:true, ...result});
+  }
+  // The showcase becomes the official community, linked to the official Discord server (its fictional data goes).
+  if (path === '/api/platform/official' && method === 'POST') {
+    if (!actor.manager) fail(403, 'Réservé aux gestionnaires de la plateforme.');
+    if (!openSite) fail(400, 'Seule la vitrine de l’adresse principale devient la communauté officielle.');
+    const input = await body(request), guildId = String(input.guildId || '').trim();
+    if (input.confirm !== 'OFFICIEL') fail(400, 'Tape OFFICIEL pour confirmer.');
+    if (!/^\d{15,22}$/.test(guildId)) fail(400, 'L’ID du serveur Discord : un nombre de 17 à 20 chiffres (clic droit sur le serveur → Copier l’identifiant du serveur).');
+    if (await env.DB.prepare('SELECT 1 FROM communities WHERE discord_guild_id=?').bind(guildId).first()) fail(409, 'Ce serveur Discord est déjà relié à une communauté.');
+    await makeOfficial(env, community, guildId);
+    return json({ok:true, botInviteUrl:botInvite(env, guildId)});
+  }
+  // The official Discord server: the bot makes the categories, channels, forums and roles that are missing.
+  if (path === '/api/platform/official/setup' && method === 'POST') {
+    if (!actor.manager) fail(403, 'Réservé aux gestionnaires de la plateforme.');
+    if (!mainAddress || !community.discordGuildId) fail(400, 'Relie d’abord le Discord officiel à l’adresse principale.');
+    try { return json({ok:true, ...await setupOfficialServer(env, community.discordGuildId)}); }
+    catch (error) { return json({error:error.message, made:error.made || [], kept:error.kept || []}, error.status || 502); }
   }
   // A community with no race and no pilot yet (made by mistake): its settings and members go with it. Never the
   // community of the main address.
@@ -1015,7 +1036,8 @@ async function api(request, env) {
       const discord = item.discordGuildId ? await discordGuild(env, item.discordGuildId) : null;
       list.push({slug:item.slug, name:item.name, url:communityUrl(env, item), guildId:item.discordGuildId, discordServer:discord?.name || null, botPresent:Boolean(discord), botInviteUrl:botInvite(env, item.discordGuildId)});
     }
-    return json({communities:list, baseDomain:baseDomain(env) || null, showcase:openSite, testSite:isDevelopment(env)});
+    return json({communities:list, baseDomain:baseDomain(env) || null, showcase:openSite, testSite:isDevelopment(env),
+      official:mainAddress && community.discordGuildId ? list.find(item => item.guildId === community.discordGuildId) || null : null});
   }
   if (path === '/api/platform/communities' && method === 'POST') {
     if (!actor.manager) fail(403, 'Réservé aux gestionnaires de la plateforme.');

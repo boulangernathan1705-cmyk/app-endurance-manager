@@ -369,7 +369,7 @@ function requestsMarkup(requests, baseDomain, testSite) {
 
 // « Plateforme » (managers of Endurance Manager): the communities, and a new one.
 async function platformMarkup() {
-  const [{communities, baseDomain, showcase, testSite}, {requests}] = await Promise.all([api('/api/platform/communities'), api('/api/platform/community-requests')]);
+  const [{communities, baseDomain, showcase, testSite, official}, {requests}] = await Promise.all([api('/api/platform/communities'), api('/api/platform/community-requests')]);
   const rows = communities.map(item => `<article class="platform-row"><div><strong>${esc(item.name)}</strong><a href="${esc(item.url)}/" target="_blank" rel="noopener">${esc(item.url.replace(/^https:\/\//, ''))}</a></div>
     <span>${item.discordServer ? `Discord « ${esc(item.discordServer)} »` : item.guildId ? `Serveur ${esc(item.guildId)}` : 'Aucun serveur'}</span>
     <span class="${item.botPresent ? 'platform-ok' : 'platform-ko'}">${item.botPresent ? '✓ Bot présent' : item.botInviteUrl ? `<a href="${esc(item.botInviteUrl)}" target="_blank" rel="noopener">Bot absent : lien d’invitation</a>` : 'Bot absent'}</span><button type="button" class="danger-link platform-delete" data-delete-community="${esc(item.slug)}" data-name="${esc(item.name)}">Supprimer</button></article>`).join('');
@@ -385,6 +385,16 @@ async function platformMarkup() {
         <input type="hidden" name="requestId">
         <div class="settings-actions"><button class="primary-button" type="submit">Créer la communauté</button><span class="settings-status" aria-live="polite"></span></div>
       </form><div data-created></div></section>`}
+    ${official ? `<section class="settings-card"><h2>Discord officiel${official.discordServer ? ` « ${esc(official.discordServer)} »` : ''}</h2>
+      <p class="members-help">Le bot crée les catégories, salons, forums et rôles qui manquent. Il ne touche pas à ce qui existe déjà. Il lui faut le rôle Administrateur le temps de la mise en place.</p>
+      ${official.botPresent ? '' : official.botInviteUrl ? `<p class="members-help"><a href="${esc(official.botInviteUrl)}" target="_blank" rel="noopener">Inviter le bot sur le serveur</a></p>` : ''}
+      <div class="settings-actions"><button type="button" class="primary-button" data-official-setup>Mettre en place le serveur</button><span class="settings-status" aria-live="polite"></span></div></section>` : ''}
+    ${showcase ? `<section class="settings-card"><h2>Site officiel</h2>
+      <p class="members-help">L’adresse principale devient la communauté officielle d’Endurance Manager, reliée au Discord officiel. Les courses et pilotes fictifs de la vitrine sont supprimés.</p>
+      <form class="settings-appearance" data-official>
+        <label>ID du serveur Discord officiel<input name="guildId" inputmode="numeric" required pattern="[0-9]{15,22}" placeholder="Ex. : 1269541162025353289"></label>
+        <label>Confirmation<input name="confirm" autocomplete="off" required placeholder="Tape OFFICIEL pour confirmer"></label>
+        <div class="settings-actions"><button class="primary-button" type="submit">Devenir le site officiel</button><span class="settings-status" aria-live="polite"></span></div></form></section>` : ''}
     ${showcase ? `<section class="settings-card showcase-reset"><h2>Vitrine de l’adresse principale</h2>
       <p class="members-help">Remplace <strong>toutes</strong> les données de ce site (courses, inscriptions, équipages, pilotes, réglages) par des courses et des pilotes fictifs, datés à partir d’aujourd’hui, et le détache de tout serveur Discord. Le calendrier iRacing officiel est ensuite réimporté. Les données actuelles sont définitivement supprimées.</p>
       <form class="setup-form setup-inline" data-showcase><input name="confirm" autocomplete="off" placeholder="Tape VITRINE pour confirmer">
@@ -522,6 +532,17 @@ app.addEventListener('click', async event => {
     return;
   }
   if (event.target.closest('[data-setup-refresh]')) { await reload('overview'); return; }
+  const officialSetup = event.target.closest('[data-official-setup]');
+  if (officialSetup) {
+    const status = officialSetup.parentElement.querySelector('.settings-status');
+    officialSetup.disabled = true; status.textContent = 'Mise en place…';
+    try {
+      const {made} = await api('/api/platform/official/setup', 'POST', {});
+      status.textContent = made.length ? `✓ Créé : ${made.join(', ')}.` : '✓ Tout était déjà en place.';
+    } catch (error) { status.textContent = error.message; }
+    officialSetup.disabled = false;
+    return;
+  }
   const modulesRefresh = event.target.closest('[data-modules-refresh]');
   if (modulesRefresh) { await reload('modules', {module:modulesRefresh.dataset.modulesRefresh}); return; }
   const view = event.target.closest('[data-view]');
@@ -671,6 +692,15 @@ app.addEventListener('submit', async event => {
     const status = safeGuide.querySelector('.settings-status');
     status.textContent = 'Enregistrement…';
     try { await api('/api/community/modules', 'PATCH', {safeGuideUrl:safeGuide.elements.url.value}); await reload('modules', {module:'soloRaces'}); }
+    catch (error) { status.textContent = error.message; }
+    return;
+  }
+  const officialForm = event.target.closest('form[data-official]');
+  if (officialForm) {
+    event.preventDefault();
+    const status = officialForm.querySelector('.settings-status');
+    status.textContent = 'Enregistrement…';
+    try { await api('/api/platform/official', 'POST', {guildId:officialForm.elements.guildId.value.trim(), confirm:officialForm.elements.confirm.value.trim()}); location.reload(); }
     catch (error) { status.textContent = error.message; }
     return;
   }
