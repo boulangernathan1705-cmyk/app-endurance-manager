@@ -6,7 +6,7 @@ Le récap annonce les courses, départs, équipages, catégories, voitures, pilo
 
 Dans **Administration → Modules → Récap de la semaine sur Discord → Régler** :
 
-1. Choisir **Récap général** (un salon texte existant, un message regroupant les courses) ou **Un salon par événement** (un salon texte créé par endurance).
+1. Choisir **Récap général** (un salon texte existant, un message regroupant les courses) ou **Une catégorie par course** (« 🏎️ LMU · 6h de Spa » : un salon `récap`, puis les vocaux des équipages si le module Équipages est actif). Les catégories des courses se rangent sous la catégorie choisie, dans l’ordre de leur création.
 2. Cocher **LMU**, **iRacing**, ou les deux, indépendamment du mode. Les nouveaux réglages proposent les deux simulateurs ; les réglages existants préremplissent leur sélection.
 3. Sélectionner directement le **salon texte** en mode général ou la **catégorie** en mode par événement sur le serveur Discord de la communauté. Aucun webhook à copier pour les nouvelles configurations.
 4. Consulter l’aperçu sur le site puis cliquer **Activer le récap automatique**. L’aperçu ne publie rien. **Envoyer un test sur Discord** est une action volontaire distincte : elle utilise le même message que l’activation, sans activer l’automatisation. Pour un récap déjà activé, tester des réglages différents demande d’abord leur activation afin de préserver la publication actuelle.
@@ -17,7 +17,7 @@ Après activation, une page courte indique l’état, le mode, les simulateurs, 
 
 Le Worker doit disposer de `DISCORD_CLIENT_ID` et du secret `DISCORD_BOT_TOKEN`. Ne jamais placer ce secret dans le dépôt ou dans le navigateur. Utiliser **Donner les droits au bot** pour l’inviter sur le serveur concerné.
 
-Le bot doit pouvoir **Voir le salon**, **Envoyer des messages** et **Voir les anciens messages**. Le mode par événement exige aussi **Gérer les salons** pour créer et supprimer les salons texte. Les permissions du salon/de la catégorie, y compris les refus propres au bot et à ses rôles, sont vérifiées avant activation ; la page indique précisément les permissions manquantes. Les erreurs Discord sont également affichées après une synchronisation.
+Le bot doit pouvoir **Voir le salon**, **Envoyer des messages** et **Voir les anciens messages**. Le mode par événement exige aussi **Gérer les salons** pour créer, ranger et supprimer les catégories des courses. Les permissions du salon/de la catégorie, y compris les refus propres au bot et à ses rôles, sont vérifiées avant activation ; la page indique précisément les permissions manquantes. Les erreurs Discord sont également affichées après une synchronisation.
 
 ## Message unique, salons par événement
 
@@ -32,7 +32,7 @@ Le bot doit pouvoir **Voir le salon**, **Envoyer des messages** et **Voir les an
 
 ## Suppression après la course : décision confirmée
 
-**Le salon texte créé pour un événement, avec tout son contenu, est supprimé 24 heures après la fin de son dernier départ.** Le calcul utilise l’horaire de ce dernier départ et la durée de la course, en minutes lorsqu’elle est renseignée.
+**La catégorie d’une course et son salon récap, avec tout leur contenu, sont supprimés 24 heures après la fin de son dernier départ** (les vocaux d’équipage le sont déjà 2 h après la fin). La catégorie choisie par les admins n’est jamais supprimée. Un salon créé par la première version (directement dans la catégorie choisie) est déplacé dans la catégorie de sa course, message conservé. Le calcul utilise l’horaire de ce dernier départ et la durée de la course, en minutes lorsqu’elle est renseignée.
 
 Le contrôle de suppression s’exécute toutes les 15 minutes et relit les horaires avant de supprimer : le délai de 24 heures n’est jamais anticipé. Les suppressions sont traitées par petits lots ; une erreur Discord, une synchronisation en cours ou une file importante peut retarder le prochain essai. Une modification de l’horaire ou de la durée est prise en compte. Tant qu’un horaire reste à confirmer ou que la durée est inconnue, aucune suppression automatique n’est programmée.
 
@@ -56,7 +56,7 @@ Ces étapes nécessitent une destination explicitement autorisée. Les tests aut
 
 1. Inviter le bot et vérifier les refus de permissions sur un salon texte et sur une catégorie.
 2. Tester le mode général avec LMU seul, iRacing seul puis les deux. Noter l’identifiant du message ; modifier une inscription et vérifier que le même message est édité sans notification.
-3. Activer le mode par événement avec deux courses homonymes et plusieurs départs de l’une d’elles. Vérifier deux salons texte, un message par salon et l’isolation entre communautés.
+3. Activer le mode par événement avec deux courses homonymes et plusieurs départs de l’une d’elles. Vérifier deux catégories, un salon récap et un message dans chacune et l’isolation entre communautés.
 4. Déclarer puis retirer une absence. Vérifier la liste en bas du bon événement et sa disparition quand elle est vide.
 5. Sur des courses fictives, vérifier que le salon reste présent avant fin + 24 h puis disparaît au contrôle suivant. Reporter un départ et vérifier que sa nouvelle fin est utilisée. Confirmer que le salon général reste présent.
 6. Retirer temporairement une permission puis la rétablir. Vérifier l’erreur affichée et la reprise sans doublon.

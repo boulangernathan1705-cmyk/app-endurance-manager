@@ -268,3 +268,29 @@ test('the admins choose where the voice channels are made, as soon as they turn 
   assert.deepEqual(created(discord.calls,mark)[0].body,{name:'LMU-Rangés',type:2});
   assert.equal((await req('/api/community/modules','PATCH',{crewCategory:''},'admin')).status,200);
 });
+
+test('when the recap gives each race its category, the crews\' voice channels go there, named after the crew', async () => {
+  const {DB,req,login,sync,discord}=harness();
+  await login(ADMIN,'admin','Orga');await login(PILOT,'pilot','Alice');await login(MATE,'mate','Bob');
+  assert.equal((await req('/api/community/modules','PATCH',{crewChannels:true},'admin')).status,200);
+  assert.equal((await req('/api/events','POST',race,'admin')).status,201);
+  const event=(await req('/api/events','GET',null,'admin')).data.events[0];
+  const departure=event.departures[0], base=`/api/events/${event.id}/departures/${departure.id}`, at=departure.startsAt-2*24*HOUR;
+  assert.equal((await req(base+'/registrations','POST',{name:'x',category:'GT3',status:'whole'},'pilot')).status,201);
+  assert.equal((await req(base+'/crews','POST',{name:'Avant',category:'GT3'},'pilot')).status,201);
+  await sync(at);
+  const first=DB.db.prepare('SELECT * FROM crew_discord').get();assert.equal(first.parent_id,null);
+  // The recap makes the race's category (a category chosen by the admins is never taken for it).
+  DB.db.prepare("INSERT INTO community_recap_settings(community_id,mode,scope,guild_id,destination_id,destination_name) VALUES(?,'events','all',?,'500000000000000002','Courses')").run(DEV,GUILD);
+  DB.db.prepare("INSERT INTO discord_recap_publications(community_id,event_id,guild_id,category_id,marker) VALUES(?,?,?,'500000000000000002','m')").run(DEV,event.id,GUILD);
+  let mark=discord.calls.length;await sync(at+HOUR);assert.deepEqual(since(discord.calls,mark),[]);
+  DB.db.prepare("UPDATE discord_recap_publications SET category_id='600000000000000001'").run();
+  mark=discord.calls.length;await sync(at+2*HOUR);
+  assert.deepEqual(discord.calls.slice(mark).map(call=>[call.method,call.path,call.body]),[['PATCH',`/channels/${first.voice_id}`,{parent_id:'600000000000000001',name:'Avant'}]]);
+  mark=discord.calls.length;await sync(at+3*HOUR);assert.deepEqual(since(discord.calls,mark),[]);
+  // A crew made afterwards is created there directly.
+  assert.equal((await req(base+'/registrations','POST',{name:'x',category:'GT3',status:'whole'},'mate')).status,201);
+  assert.equal((await req(base+'/crews','POST',{name:'Après',category:'GT3'},'mate')).status,201);
+  mark=discord.calls.length;await sync(at+4*HOUR);
+  assert.deepEqual(created(discord.calls,mark)[0].body,{name:'Après',type:2,parent_id:'600000000000000001'});
+});

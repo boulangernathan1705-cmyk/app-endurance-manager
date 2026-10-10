@@ -80,6 +80,26 @@ export function eventDeletionTime(event) {
   if (!(minutes > 0)) return null;
   return Math.max(...departures.map(item => Number(item.startsAt))) + minutes * 60000 + DAY;
 }
+export const raceCategoryName = event =>
+  `${String(event?.circuit || '').startsWith('iracing-') ? '🏁 iRacing' : '🏎️ LMU'} · ${String(event?.name || 'Endurance').trim()}`.slice(0,100);
+// The race categories follow the chosen category, in the order they were made (one request reorders them all).
+async function placeCategory(env, community, guildId, channels, category, anchor, budget) {
+  const open = new Set(((await env.DB.prepare('SELECT category_id FROM discord_recap_publications WHERE community_id=? AND closed_at IS NULL AND category_id IS NOT NULL')
+    .bind(community.id).all()).results || []).map(item => item.category_id));
+  const categories = channels.filter(item => item.type === 4 && item.id !== category).sort((a,b) => (a.position || 0) - (b.position || 0) || (BigInt(a.id) < BigInt(b.id) ? -1 : 1));
+  let index = categories.findIndex(item => item.id === anchor);
+  if (index < 0) return;
+  while (open.has(categories[index + 1]?.id)) index++;
+  categories.splice(index + 1, 0, {id:category});
+  await discord(env,'PATCH',`/guilds/${guildId}/channels`,categories.map((item,position) => ({id:item.id,position})),budget);
+}
+// The race's text channel, then its category (never the category chosen by the admins).
+async function removeRaceChannels(env, row, anchor, budget) {
+  for (const id of [row.channel_id, row.category_id !== anchor ? row.category_id : null].filter(Boolean)) {
+    try { await discord(env,'DELETE',`/channels/${id}`,null,budget); }
+    catch (error) { if (error.status !== 404) throw error; }
+  }
+}
 async function digest(value) {
   return [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify(value))))].map(byte => byte.toString(16).padStart(2,'0')).join('');
 }
@@ -96,11 +116,11 @@ export async function previewBotRecap(env, timestamp, community, settings) {
     return [{eventId:'', name:settings.destinationName || 'Salon texte choisi', payload}];
   }
   const snapshot = await loadWeeklyDiscordSnapshot(env, timestamp, community, settings.scope);
-  const events = new Map([...snapshot.currentDepartures,...snapshot.futureDepartures].map(item => [item.eventId,item.eventName]));
+  const events = new Map([...snapshot.currentDepartures,...snapshot.futureDepartures].map(item => [item.eventId,{name:item.eventName,circuit:item.circuit}]));
   const previews = [];
-  for (const [eventId,name] of [...events].slice(0,10)) {
+  for (const eventId of [...events.keys()].slice(0,10)) {
     const {payload} = await snapshotPayload(env, timestamp, community, settings, eventId);
-    previews.push({eventId,name:eventChannelName(name,eventId),payload});
+    previews.push({eventId,name:raceCategoryName(events.get(eventId)),payload});
   }
   return previews;
 }
@@ -142,21 +162,22 @@ async function publish(env, timestamp, community, settings, row, event, budget, 
     await env.DB.prepare('UPDATE discord_recap_publications SET channel_id=?,message_id=NULL,content_hash=? WHERE community_id=? AND event_id=?')
       .bind(channel,'',community.id,'').run();
   }
-  if (isEvent) {
-    // Recover a channel created just before a timeout/crash from its exact topic marker, never its name.
-    if (!channel) {
-      const channels = await discord(env,'GET',`/guilds/${row.guild_id}/channels`,null,budget);
-      const existing = channels.find(item => item.type === 0 && item.topic === row.marker);
-      let name = eventChannelName(event.name,event.id);
-      if (channels.some(item => item.name === name && item.topic !== row.marker)) name = `${name.slice(0,62)}-${String(event.id).replace(/[^a-z0-9]/gi,'')}`.slice(0,100);
-      const created = existing || await discord(env,'POST',`/guilds/${row.guild_id}/channels`,
-        {type:0,name,parent_id:settings.destination_id,topic:row.marker},budget);
-      channel = created.id;
-      await env.DB.prepare('UPDATE discord_recap_publications SET channel_id=?,category_id=? WHERE community_id=? AND event_id=?').bind(channel,settings.destination_id,community.id,row.event_id).run();
-    } else if (row.category_id !== settings.destination_id) {
-      await discord(env,'PATCH',`/channels/${channel}`,{parent_id:settings.destination_id},budget);
-      await env.DB.prepare('UPDATE discord_recap_publications SET category_id=? WHERE community_id=? AND event_id=?').bind(settings.destination_id,community.id,row.event_id).run();
+  if (isEvent && (!channel || !row.category_id || row.category_id === settings.destination_id)) {
+    // One category per race (« 🏎️ LMU · 6h de Spa »): its recap here, the crews' voice channels below it.
+    // The first version put the text channel straight in the chosen category: it is moved into its race's.
+    const channels = await discord(env,'GET',`/guilds/${row.guild_id}/channels`,null,budget);
+    let category = row.category_id && row.category_id !== settings.destination_id ? row.category_id : null;
+    if (!category) {
+      category = (await discord(env,'POST',`/guilds/${row.guild_id}/channels`,{type:4,name:raceCategoryName(event)},budget)).id;
+      row.category_id = category;
+      await env.DB.prepare('UPDATE discord_recap_publications SET category_id=? WHERE community_id=? AND event_id=?').bind(category,community.id,row.event_id).run();
+      await placeCategory(env,community,row.guild_id,channels,category,settings.destination_id,budget);
     }
+    // Recover a channel created just before a timeout/crash from its exact topic marker, never its name.
+    const existing = channel ? channels.find(item => item.id === channel) : channels.find(item => item.type === 0 && item.topic === row.marker);
+    if (existing && existing.parent_id !== category) await discord(env,'PATCH',`/channels/${existing.id}`,{parent_id:category,name:'récap'},budget);
+    channel = existing?.id || channel || (await discord(env,'POST',`/guilds/${row.guild_id}/channels`,{type:0,name:'récap',parent_id:category,topic:row.marker},budget)).id;
+    await env.DB.prepare('UPDATE discord_recap_publications SET channel_id=? WHERE community_id=? AND event_id=?').bind(channel,community.id,row.event_id).run();
   }
   const {payload, hash} = prepared || await snapshotPayload(env,timestamp,community,settings,isEvent ? row.event_id : null);
   if (row.message_id && row.content_hash === hash) return;
@@ -176,15 +197,12 @@ async function publish(env, timestamp, community, settings, row, event, budget, 
 }
 async function syncLocked(env,timestamp,community,settings, test = false, budget = {left:12}) {
   const rows = (await env.DB.prepare('SELECT * FROM discord_recap_publications WHERE community_id=? AND closed_at IS NULL ORDER BY checked_at,event_id').bind(community.id).all()).results || [];
-  const events = (await env.DB.prepare("SELECT id,name,departures,duration_hours,duration_minutes,schedule_pending FROM events WHERE community_id=? OR community_id='official'").bind(community.id).all()).results || [];
+  const events = (await env.DB.prepare("SELECT id,name,circuit,departures,duration_hours,duration_minutes,schedule_pending FROM events WHERE community_id=? OR community_id='official'").bind(community.id).all()).results || [];
   // Cleanup is independent of mode/activation. Only bot-created event channels may be deleted.
   for (const row of rows.filter(item => item.event_id).slice(0,2)) {
     const event = events.find(item => item.id === row.event_id), deleteAt = event ? eventDeletionTime(event) : row.delete_after;
     if (deleteAt !== null && timestamp >= deleteAt) {
-      if (row.channel_id) {
-        try { await discord(env,'DELETE',`/channels/${row.channel_id}`,null,budget); }
-        catch (error) { if (error.status !== 404) throw error; }
-      }
+      await removeRaceChannels(env,row,settings.destination_id,budget);
       await env.DB.prepare('UPDATE discord_recap_publications SET closed_at=? WHERE community_id=? AND event_id=?').bind(timestamp,community.id,row.event_id).run();
       row.closed_at = timestamp;
     }
@@ -221,7 +239,7 @@ export async function syncBotRecaps(env,timestamp,community, test = false) {
   if (!lock.meta.changes) return {ok:true,queued:true};
   try {
     let result;
-    const budget = {left:12};
+    const budget = {left:16};
     for (let attempt=0;attempt<2;attempt++) {
       await env.DB.prepare('UPDATE community_recap_settings SET dirty=0 WHERE community_id=? AND lock_token=?').bind(community.id,token).run();
       result = await syncLocked(env,timestamp,community,await botRecapSettings(env,community),test,budget);
@@ -250,8 +268,8 @@ export async function sendBotRecapTest(env,timestamp,community,settings) {
 // Every 15 minutes, separately from the hourly recap rotation. Re-read race times before deleting.
 export async function cleanupEventRecaps(env, timestamp = Date.now(), limit = 2) {
   if (!env?.DB || !env.DISCORD_BOT_TOKEN) return 0;
-  const rows = (await env.DB.prepare(`SELECT p.*,e.id AS current_event_id,e.departures,e.duration_hours,e.duration_minutes,e.schedule_pending
-    FROM discord_recap_publications p LEFT JOIN events e ON e.id=p.event_id
+  const rows = (await env.DB.prepare(`SELECT p.*,s.destination_id AS anchor_id,e.id AS current_event_id,e.departures,e.duration_hours,e.duration_minutes,e.schedule_pending
+    FROM discord_recap_publications p LEFT JOIN community_recap_settings s ON s.community_id=p.community_id LEFT JOIN events e ON e.id=p.event_id
     WHERE p.event_id<>'' AND p.closed_at IS NULL`).all()).results || [];
   const due = rows.map(row => ({...row,expiry:row.current_event_id ? eventDeletionTime(row) : row.delete_after}))
     .filter(row => row.expiry !== null && timestamp >= row.expiry).sort((a,b) => a.expiry-b.expiry);
@@ -266,10 +284,7 @@ export async function cleanupEventRecaps(env, timestamp = Date.now(), limit = 2)
       const event = await env.DB.prepare('SELECT departures,duration_hours,duration_minutes,schedule_pending FROM events WHERE id=?').bind(row.event_id).first();
       const expiry = event ? eventDeletionTime(event) : row.delete_after;
       if (expiry === null || timestamp < expiry) continue;
-      if (row.channel_id) {
-        try { await discord(env,'DELETE',`/channels/${row.channel_id}`); }
-        catch (error) { if (error.status !== 404) throw error; }
-      }
+      await removeRaceChannels(env,row,row.anchor_id,{left:2});
       await env.DB.prepare('UPDATE discord_recap_publications SET closed_at=? WHERE community_id=? AND event_id=? AND closed_at IS NULL').bind(timestamp,row.community_id,row.event_id).run();
       deleted++;
     } catch (error) {

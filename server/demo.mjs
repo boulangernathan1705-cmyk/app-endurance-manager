@@ -69,6 +69,21 @@ export async function refreshShowcaseIfDue(env, at = new Date()) {
   return true;
 }
 
+// Everything of a community goes (races with their entries and crews, pilots, members, settings).
+function clearCommunity(env, cid) {
+  return ['DELETE FROM crew_members WHERE crew_id IN (SELECT id FROM crews WHERE community_id=?)',
+    ...['crews', 'registrations', 'events', 'participants', 'iracing_imports', 'memberships', 'community_role_permissions', 'community_recaps',
+      'discord_weekly_state', 'community_banners'].map(table => `DELETE FROM ${table} WHERE community_id=?`)].map(sql => env.DB.prepare(sql).bind(cid));
+}
+
+// The main address becomes the official community of Endurance Manager: the fictional data goes and the
+// official Discord server is linked (the showcase ends: it only exists while no server is linked).
+export async function makeOfficial(env, community, guildId) {
+  await env.DB.batch([...clearCommunity(env, community.id),
+    env.DB.prepare(`UPDATE communities SET name='Endurance Manager', short_name='EM', discord_guild_id=?, discord_invite_url=NULL, appearance='{}',
+      modules='{"iracingImport":true}' WHERE id=?`).bind(guildId, community.id)]);
+}
+
 // Replaces the data of the main community by the showcase, in a few statements (D1 counts every statement
 // of a request: 50 at most on the free plan). Returns what was created.
 export async function resetShowcase(env, community) {
@@ -77,13 +92,7 @@ export async function resetShowcase(env, community) {
   // Rows of each table, inserted together at the end (one statement per table).
   const rows = {participants:[], events:[], crews:[], registrations:[], crew_members:[]};
   const add = (table, ...values) => rows[table].push(`(${values.map(literal).join(',')})`);
-  // Everything of this community goes (races with their entries and crews, pilots, members, settings).
-  run('DELETE FROM crew_members WHERE crew_id IN (SELECT id FROM crews WHERE community_id=?)', cid);
-  run('DELETE FROM crews WHERE community_id=?', cid);
-  run('DELETE FROM registrations WHERE community_id=?', cid);
-  run('DELETE FROM events WHERE community_id=?', cid);
-  run('DELETE FROM participants WHERE community_id=?', cid);
-  for (const table of ['iracing_imports', 'memberships', 'community_role_permissions', 'community_recaps', 'discord_weekly_state', 'community_banners']) run(`DELETE FROM ${table} WHERE community_id=?`, cid);
+  statements.push(...clearCommunity(env, cid));
   // No Discord server, no recap; iRacing's official calendar and solo races show what the site offers.
   run(`UPDATE communities SET name='Endurance Manager', short_name='EM', discord_guild_id=NULL, discord_invite_url=NULL, appearance='{}',
     modules='{"iracingImport":true,"soloRaces":true}' WHERE id=?`, cid);
