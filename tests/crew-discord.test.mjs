@@ -111,13 +111,10 @@ test('a crew gets a voice channel « LMU-name » outside any category, followed 
   const mate=await req(base+'/registrations','POST',{name:'x',category:'GT3',status:'whole'},'mate');assert.equal(mate.status,201);
   const crew=await req(base+'/crews','POST',{name:'Les Tondeuz',category:'GT3'},'pilot');assert.equal(crew.status,201);
 
-  // Too early: nothing on Discord.
+  // As soon as the crew exists, even weeks before: one voice channel, no category (the server's owner places
+  // it), the recap in its chat.
   let mark=discord.calls.length;
-  await sync(startsAt-OPEN_BEFORE-HOUR);
-  assert.deepEqual(since(discord.calls,mark),[]);
-  // A few days before: one voice channel, no category (the server's owner places it), the recap in its chat.
-  mark=discord.calls.length;
-  assert.equal((await sync(startsAt-3*24*HOUR)).opened,1);
+  assert.equal((await sync(startsAt-OPEN_BEFORE-30*24*HOUR)).opened,1);
   const channels=created(discord.calls,mark);
   assert.equal(channels.length,1);assert.deepEqual(channels[0].body,{name:'LMU-Les Tondeuz',type:2});
   const row=DB.db.prepare('SELECT * FROM crew_discord').get();
@@ -289,8 +286,32 @@ test('when the recap gives each race its category, the crews\' voice channels go
   assert.deepEqual(discord.calls.slice(mark).map(call=>[call.method,call.path,call.body]),[['PATCH',`/channels/${first.voice_id}`,{parent_id:'600000000000000001',name:'Avant'}]]);
   mark=discord.calls.length;await sync(at+3*HOUR);assert.deepEqual(since(discord.calls,mark),[]);
   // A crew made afterwards is created there directly.
-  assert.equal((await req(base+'/registrations','POST',{name:'x',category:'GT3',status:'whole'},'mate')).status,201);
-  assert.equal((await req(base+'/crews','POST',{name:'Après',category:'GT3'},'mate')).status,201);
+  await login('444444444444444444','third','Chloé');
+  assert.equal((await req(base+'/registrations','POST',{name:'x',category:'GT3',status:'whole'},'third')).status,201);
+  assert.equal((await req(base+'/crews','POST',{name:'Après',category:'GT3'},'third')).status,201);
   mark=discord.calls.length;await sync(at+4*HOUR);
   assert.deepEqual(created(discord.calls,mark)[0].body,{name:'Après',type:2,parent_id:'600000000000000001'});
+});
+
+test('with « Une catégorie par course », a new crew\'s voice channel waits for its race\'s category, at most an hour', async () => {
+  const {DB,req,login,sync,discord}=harness();
+  await login(ADMIN,'admin','Orga');await login(PILOT,'pilot','Alice');
+  assert.equal((await req('/api/community/modules','PATCH',{crewChannels:true},'admin')).status,200);
+  assert.equal((await req('/api/events','POST',race,'admin')).status,201);
+  const event=(await req('/api/events','GET',null,'admin')).data.events[0];
+  const departure=event.departures[0], base=`/api/events/${event.id}/departures/${departure.id}`, at=departure.startsAt-40*24*HOUR;
+  DB.db.prepare("INSERT INTO community_recap_settings(community_id,enabled,mode,scope,guild_id,destination_id,destination_name) VALUES(?,1,'events','lmu',?,'500000000000000002','Courses')").run(DEV,GUILD);
+  assert.equal((await req(base+'/registrations','POST',{name:'x',category:'GT3',status:'whole'},'pilot')).status,201);
+  assert.equal((await req(base+'/crews','POST',{name:'Attente',category:'GT3'},'pilot')).status,201);
+  let mark=discord.calls.length;await sync(at);await sync(at+30*60_000);assert.deepEqual(created(discord.calls,mark),[]);
+  // Made by the recap in the meantime: the voice channel goes straight there.
+  DB.db.prepare("INSERT INTO discord_recap_publications(community_id,event_id,guild_id,category_id,marker) VALUES(?,?,?,'600000000000000001','m')").run(DEV,event.id,GUILD);
+  mark=discord.calls.length;await sync(at+40*60_000);
+  assert.deepEqual(created(discord.calls,mark)[0].body,{name:'Attente',type:2,parent_id:'600000000000000001'});
+  assert.ok(!discord.calls.slice(mark).some(call=>call.method==='PATCH'&&call.path.startsWith('/channels/')&&call.body?.parent_id),'never moved');
+  // No category after an hour (recap failing): made where the admins chose.
+  DB.db.prepare('DELETE FROM discord_recap_publications').run();DB.db.prepare('DELETE FROM crew_discord').run();
+  mark=discord.calls.length;await sync(at+2*HOUR);assert.deepEqual(created(discord.calls,mark),[]);
+  mark=discord.calls.length;await sync(at+3*HOUR+60_000);
+  assert.deepEqual(created(discord.calls,mark)[0].body,{name:'LMU-Attente',type:2});
 });
