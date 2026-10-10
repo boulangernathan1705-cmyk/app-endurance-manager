@@ -1,6 +1,7 @@
 // Text recaps configured explicitly by an admin. Legacy webhook publications remain independent.
 import {loadWeeklyDiscordSnapshot, siteOf} from './discord-weekly.mjs';
 import {buildWeeklyDiscordPayload} from './discord-weekly-format.mjs';
+import {OPEN_BEFORE} from './crew-discord.mjs';
 
 const API = 'https://discord.com/api/v10', DAY = 86400000;
 const VIEW = 1024n, SEND = 2048n, HISTORY = 65536n, MANAGE = 16n, ADMIN = 8n;
@@ -80,6 +81,18 @@ export function eventDeletionTime(event) {
   if (!(minutes > 0)) return null;
   return Math.max(...departures.map(item => Number(item.startsAt))) + minutes * 60000 + DAY;
 }
+// The races that get their category now: a start within 6 days (or running), as the crews' voice channels
+// (server/crew-discord.mjs, OPEN_BEFORE), so these are always made straight in it.
+export function racesOpenNow(events, scope, timestamp) {
+  return events.filter(event => {
+    const iracing = String(event.circuit || '').startsWith('iracing-');
+    if ((scope === 'lmu' && iracing) || (scope === 'iracing' && !iracing) || event.schedule_pending) return false;
+    const minutes = Number(event.duration_minutes) || Number(event.duration_hours) * 60 || 0;
+    return parse(event.departures).some(item => !item.tbd && Number(item.startsAt) <= timestamp + OPEN_BEFORE && Number(item.startsAt) + minutes * 60000 > timestamp);
+  }).map(event => event.id);
+}
+const raceEvents = (env, community) => env.DB.prepare("SELECT id,name,circuit,departures,duration_hours,duration_minutes,schedule_pending FROM events WHERE community_id=? OR community_id='official' ORDER BY created_at,id")
+  .bind(community.id).all().then(result => result.results || []);
 export const raceCategoryName = event =>
   `${String(event?.circuit || '').startsWith('iracing-') ? '🏁 iRacing' : '🏎️ LMU'} · ${String(event?.name || 'Endurance').trim()}`.slice(0,100);
 // The race categories follow the chosen category, in the order they were made (one request reorders them all).
@@ -115,12 +128,13 @@ export async function previewBotRecap(env, timestamp, community, settings) {
     const {payload} = await snapshotPayload(env, timestamp, community, settings);
     return [{eventId:'', name:settings.destinationName || 'Salon texte choisi', payload}];
   }
-  const snapshot = await loadWeeklyDiscordSnapshot(env, timestamp, community, settings.scope);
-  const events = new Map([...snapshot.currentDepartures,...snapshot.futureDepartures].map(item => [item.eventId,{name:item.eventName,circuit:item.circuit}]));
+  const events = await raceEvents(env, community);
   const previews = [];
-  for (const eventId of [...events.keys()].slice(0,10)) {
-    const {payload} = await snapshotPayload(env, timestamp, community, settings, eventId);
-    previews.push({eventId,name:raceCategoryName(events.get(eventId)),payload});
+  for (const eventId of racesOpenNow(events, settings.scope, timestamp)) {
+    if (previews.length === 10) break;
+    const {snapshot, payload} = await snapshotPayload(env, timestamp, community, settings, eventId);
+    // An official race without any entry of this community gets no category.
+    if (snapshot.futureDepartures.length) previews.push({eventId,name:raceCategoryName(events.find(item => item.id === eventId)),payload});
   }
   return previews;
 }
@@ -197,7 +211,7 @@ async function publish(env, timestamp, community, settings, row, event, budget, 
 }
 async function syncLocked(env,timestamp,community,settings, test = false, budget = {left:12}) {
   const rows = (await env.DB.prepare('SELECT * FROM discord_recap_publications WHERE community_id=? AND closed_at IS NULL ORDER BY checked_at,event_id').bind(community.id).all()).results || [];
-  const events = (await env.DB.prepare("SELECT id,name,circuit,departures,duration_hours,duration_minutes,schedule_pending FROM events WHERE community_id=? OR community_id='official'").bind(community.id).all()).results || [];
+  const events = await raceEvents(env, community);
   // Cleanup is independent of mode/activation. Only bot-created event channels may be deleted.
   for (const row of rows.filter(item => item.event_id).slice(0,2)) {
     const event = events.find(item => item.id === row.event_id), deleteAt = event ? eventDeletionTime(event) : row.delete_after;
@@ -214,8 +228,7 @@ async function syncLocked(env,timestamp,community,settings, test = false, budget
     const row = await ensurePublication(env,community,'',settings);
     await publish(env,timestamp,community,settings,row,null,budget);
   } else {
-    const snapshot = await loadWeeklyDiscordSnapshot(env,timestamp,community,settings.scope);
-    const eligible = [...new Set([...snapshot.currentDepartures,...snapshot.futureDepartures].map(item => item.eventId))];
+    const eligible = racesOpenNow(events,settings.scope,timestamp);
     const ids = [...new Set([...rows.filter(row => row.event_id && !row.closed_at).map(row => row.event_id),...eligible])];
     const ordered = ids.sort((a,b) => (rows.find(row => row.event_id === a)?.checked_at || 0) - (rows.find(row => row.event_id === b)?.checked_at || 0));
     for (const eventId of ordered.slice(0,2)) {

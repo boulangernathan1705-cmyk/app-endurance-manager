@@ -277,3 +277,13 @@ test('scheduled rotation compares bot and legacy timestamps in the same unit',as
   assert.equal(await syncDueRecaps(env,1,NOW),1);assert.equal(sends(calls).length,1,'the older bot recap is processed before the newer legacy recap');
   assert.ok(calls.every(call=>!call.path.includes('/webhooks/')));
 });
+
+test('a race gets its category 6 days before its start, as the crews\' voice channels, whatever the week',async t=>{
+  const {DB,env,calls}=setup(t);
+  race(DB,'sunday','Dimanche','spa',[{id:'s',startsAt:NOW+DAY}]);race(DB,'thursday','Jeudi suivant','spa',[{id:'t',startsAt:NOW+5*DAY}]);race(DB,'later','Plus tard','spa',[{id:'l',startsAt:NOW+7*DAY}]);
+  assert.deepEqual((await previewBotRecap(env,NOW,COMMUNITY,SETTINGS)).map(item=>item.name),['🏎️ LMU · Dimanche','🏎️ LMU · Jeudi suivant']);
+  await saveBotRecap(env,COMMUNITY,SETTINGS);await syncBotRecaps(env,NOW,COMMUNITY);
+  assert.deepEqual(creates(calls).filter(call=>call.body.type===4).map(call=>call.body.name),['🏎️ LMU · Dimanche','🏎️ LMU · Jeudi suivant']);
+  calls.length=0;await syncBotRecaps(env,NOW+DAY+3600000,COMMUNITY);
+  assert.deepEqual(creates(calls).filter(call=>call.body.type===4).map(call=>call.body.name),['🏎️ LMU · Plus tard']);
+});
