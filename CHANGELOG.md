@@ -2,6 +2,10 @@
 
 Les changements du site, version par version. La plus récente est en haut.
 
+## v1.20 — 10 octobre 2026
+
+- Un équipage reçoit son vocal dès sa création, même avant qu'un pilote le rejoigne. La catégorie de sa course s'ouvre en même temps.
+
 ## v1.19 — 10 octobre 2026
 
 ### Vocaux d'équipage
