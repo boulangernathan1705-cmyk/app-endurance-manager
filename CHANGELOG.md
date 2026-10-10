@@ -2,6 +2,10 @@
 
 Les changements du site, version par version. La plus récente est en haut.
 
+## v1.22 — 10 octobre 2026
+
+- Le récap Discord d'une course se met à jour dès qu'un pilote rejoint un équipage, même quand des courses officielles sans inscrit approchent.
+
 ## v1.21 — 10 octobre 2026
 
 - Récap Discord plus lisible : une ligne vide entre les équipages, un pilote par ligne.
