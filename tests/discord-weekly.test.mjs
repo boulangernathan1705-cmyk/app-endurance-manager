@@ -124,7 +124,7 @@ test('le message : un bloc par course, dont le nom mène à la course sur le sit
   // Times in each reader's own time zone.
   assert.match(silverstone.fields[0].value,/<t:1789747200:F>/);
   assert.match(silverstone.fields[0].value,/Mrt blé/);assert.match(silverstone.fields[0].value,/👤 Etienne\\_48/);
-  assert.match(silverstone.fields[0].value,/Sans équipage : Léo/);
+  assert.match(silverstone.fields[0].value,/\*\*Sans équipage\*\* : Léo/);
   assert.doesNotMatch(JSON.stringify(silverstone),/autre départ|voir la course/,'no line for the empty starts');
   assert.doesNotMatch(JSON.stringify(silverstone),/Départ \d/,'no « Départ 1, Départ 2 » headings');
   const last=payload.embeds.at(-1);
@@ -182,7 +182,7 @@ test('un événement spécial à 15 départs : seuls les départs avec des inscr
   departures[7].unassignedPilots=['Nathan'];
   const [,fuji]=buildWeeklyDiscordPayload({currentDepartures:[],futureDepartures:departures,periodLabel:'semaine'},{url:'https://fmt.endurance-manager.app'},Date.parse('2026-09-29T10:00:00Z')).embeds;
   assert.equal(fuji.fields.length,1,'the start with entries only');
-  assert.match(fuji.fields[0].value,/FMT 001/);assert.match(fuji.fields[0].value,/Sans équipage : Nathan/);
+  assert.match(fuji.fields[0].value,/FMT 001/);assert.match(fuji.fields[0].value,/\*\*Sans équipage\*\* : Nathan/);
   // Every day of the event and its start times, at the top.
   assert.match(fuji.description,/📅 \*\*ven\. 2 oct\.\*\* · 7h, 12h, 17h, 22h/);
   assert.equal((fuji.description.match(/📅/g)||[]).length,4,'four days');
@@ -233,4 +233,17 @@ test('les absences restent affichées quand le récap est compact et respectent 
   }
   const total=payload.embeds.reduce((sum,embed)=>sum+(embed.title||'').length+(embed.description||'').length+(embed.footer?.text||'').length+(embed.fields||[]).reduce((sum,field)=>sum+field.name.length+field.value.length,0),0);
   assert.ok(total<=6000);
+});
+
+test('le récap aère les équipages : une ligne vide entre chacun, un pilote par ligne', () => {
+  const at=Date.parse('2026-10-11T15:00:00Z');
+  const departure={eventId:'atl',eventName:'10h de Road Atlanta',circuit:'road-atlanta',startsAt:at,durationMinutes:600,
+    crews:[{name:'Les plots',category:'Hypercar',car:'Aston Martin Valkyrie AMR LMH',pilots:['Alice','Bob'],locked:false},
+      {name:'DDE',category:'GT3',car:'Ferrari 296 LMGT3',pilots:[],locked:false}],unassignedPilots:['Nathan']};
+  const [race]=buildWeeklyDiscordPayload({currentDepartures:[],futureDepartures:[departure],periodLabel:'semaine'},{},at-24*3600_000).embeds.slice(-1);
+  const blocks=race.fields[0].value.split('\n\n');
+  assert.equal(blocks.length,4,'start, two crews, pilots without a crew');
+  assert.match(blocks[1],/\*\*Les plots\*\* · Hypercar 🔓\n🏎️ Aston Martin Valkyrie AMR LMH\n👤 Alice\n👤 Bob$/);
+  assert.match(blocks[2],/\*\*DDE\*\* · GT3 🔓\n🏎️ Ferrari 296 LMGT3\n\*Aucun pilote\*$/);
+  assert.equal(blocks[3],'📋 **Sans équipage** : Nathan');
 });
