@@ -52,16 +52,23 @@ const simOf=departure=>String(departure.circuit||'').startsWith('iracing-')?'ira
 // Discord shows <t:…> timestamps in each reader's own time zone.
 const discordTime=(startsAt,style)=>`<t:${Math.floor(startsAt/1000)}:${style}>`;
 function departureTitle(departure){return departure.timePending?`${discordTime(departure.startsAt,'D')} — horaire à confirmer`:discordTime(departure.startsAt,'F');}
+// One crew per block, separated by a blank line: name, then its car, then one pilot per line.
+function crewBlock(crew){
+  const marker=markers.get(crew.category)||'⬜',status=crew.locked?'🔒':'🔓';
+  return [`${marker} **${clean(crew.name)}** · ${clean(crew.category)} ${status}`,crew.car&&`🏎️ ${clean(crew.car)}`,
+    ...(crew.pilots.length?crew.pilots.map(name=>`👤 ${clean(name)}`):['*Aucun pilote*'])].filter(Boolean).join('\n');
+}
 function departureValue(departure,compact=false){
-  const lines=[`🕐 **${departureTitle(departure)}**`];
-  for(const crew of departure.crews){
-    const marker=markers.get(crew.category)||'⬜',status=crew.locked?'🔒':'🔓';
-    lines.push(compact?`${marker} ${clean(crew.name)} · ${crew.pilots.length} pilote${crew.pilots.length>1?'s':''}`
-      :`${marker} **${clean(crew.name)}** · ${clean(crew.category)} ${status}\n${crew.car?`🏎️ ${clean(crew.car)}\n`:''}${crew.pilots.length?crew.pilots.map(name=>`👤 ${clean(name)}`).join(' · '):'Aucun pilote affecté'}`);
+  if(compact){
+    const lines=[`🕐 **${departureTitle(departure)}**`,...departure.crews.map(crew=>`${markers.get(crew.category)||'⬜'} ${clean(crew.name)} · ${crew.pilots.length} pilote${crew.pilots.length>1?'s':''}`)];
+    if(departure.unassignedPilots?.length)lines.push(`📋 Sans équipage : ${departure.unassignedPilots.length}`);
+    if(!departure.crews.length&&!departure.unassignedPilots?.length)lines.push('Personne d’inscrit pour l’instant.');
+    return cut(lines.join('\n'),1024);
   }
-  if(departure.unassignedPilots?.length)lines.push(`📋 Sans équipage : ${compact?departure.unassignedPilots.length:departure.unassignedPilots.map(clean).join(', ')}`);
-  if(!departure.crews.length&&!departure.unassignedPilots?.length)lines.push('Personne d’inscrit pour l’instant.');
-  return cut(lines.join('\n'),1024);
+  const blocks=[`🕐 **${departureTitle(departure)}**`,...departure.crews.map(crewBlock)];
+  if(departure.unassignedPilots?.length)blocks.push(`📋 **Sans équipage** : ${departure.unassignedPilots.map(clean).join(', ')}`);
+  if(!departure.crews.length&&!departure.unassignedPilots?.length)blocks.push('Personne d’inscrit pour l’instant.');
+  return cut(blocks.join('\n\n'),1024);
 }
 // The starts of a race: only those with entries in detail (time, crews, pilots without a crew); the empty ones
 // in one line at the end, so a special event with 15 starts stays short. A race with a single start keeps it.
