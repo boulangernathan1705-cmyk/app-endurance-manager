@@ -4,6 +4,8 @@ import {buildWeeklyDiscordPayload} from './discord-weekly-format.mjs';
 import {OPEN_BEFORE} from './crew-discord.mjs';
 
 const API = 'https://discord.com/api/v10', DAY = 86400000;
+// Layout of the recap message: raised when it changes, so the published recaps are edited once.
+const RECAP_FORMAT = 2;
 const VIEW = 1024n, SEND = 2048n, HISTORY = 65536n, MANAGE = 16n, ADMIN = 8n;
 const REQUIRED = VIEW | SEND | HISTORY;
 export const RECAP_BOT_PERMISSIONS = String(REQUIRED | MANAGE);
@@ -91,11 +93,21 @@ export function racesOpenNow(events, scope, timestamp, crewed = new Set()) {
     return parse(event.departures).some(item => !item.tbd && (crewed.has(event.id) || Number(item.startsAt) <= timestamp + OPEN_BEFORE) && Number(item.startsAt) + minutes * 60000 > timestamp);
   }).map(event => event.id);
 }
-const raceEvents = (env, community) => env.DB.prepare("SELECT id,name,circuit,departures,duration_hours,duration_minutes,schedule_pending FROM events WHERE community_id=? OR community_id='official' ORDER BY created_at,id")
+const raceEvents = (env, community) => env.DB.prepare("SELECT id,name,circuit,departures,duration_hours,duration_minutes,schedule_pending,community_id FROM events WHERE community_id=? OR community_id='official' ORDER BY created_at,id")
   .bind(community.id).all().then(result => result.results || []);
-// The races where this community has a crew.
-const crewedRaces = (env, community) => env.DB.prepare('SELECT DISTINCT c.event_id FROM crews c WHERE c.community_id=?')
-  .bind(community.id).all().then(result => new Set((result.results || []).map(row => row.event_id)));
+// The races where this community has a crew, and the official ones where it has an entry, an absence or a crew.
+async function raceEntries(env, community) {
+  const rows = (await env.DB.prepare(`SELECT event_id, 1 AS crewed FROM crews WHERE community_id=?
+    UNION SELECT event_id, 0 FROM registrations WHERE community_id=? UNION SELECT event_id, 0 FROM event_absences WHERE community_id=?`)
+    .bind(community.id,community.id,community.id).all()).results || [];
+  return {crewed:new Set(rows.filter(row => row.crewed).map(row => row.event_id)), entered:new Set(rows.map(row => row.event_id))};
+}
+// The races that get a recap now. An official race where the community has nothing never takes the turn of one
+// where it has (only two races are handled per synchronisation).
+async function openRaces(env, community, events, scope, timestamp) {
+  const {crewed, entered} = await raceEntries(env, community);
+  return racesOpenNow(events.filter(event => event.community_id !== 'official' || entered.has(event.id)), scope, timestamp, crewed);
+}
 export const raceCategoryName = event =>
   `${String(event?.circuit || '').startsWith('iracing-') ? '🏁 iRacing' : '🏎️ LMU'} · ${String(event?.name || 'Endurance').trim()}`.slice(0,100);
 // The race categories follow the chosen category, in the order they were made (one request reorders them all).
@@ -124,7 +136,8 @@ async function snapshotPayload(env, timestamp, community, settings, eventId = nu
   const payload = buildWeeklyDiscordPayload(snapshot, siteOf(env, community), timestamp, settings.scope);
   // Message edits are silent; never turn driver names into mentions.
   payload.allowed_mentions = {parse:[]};
-  return {snapshot, payload, hash:await digest(snapshot)};
+  // A new layout of the message (RECAP_FORMAT) edits the published recaps once.
+  return {snapshot, payload, hash:await digest([RECAP_FORMAT,snapshot])};
 }
 export async function previewBotRecap(env, timestamp, community, settings) {
   if (settings.mode === 'general') {
@@ -133,7 +146,7 @@ export async function previewBotRecap(env, timestamp, community, settings) {
   }
   const events = await raceEvents(env, community);
   const previews = [];
-  for (const eventId of racesOpenNow(events, settings.scope, timestamp, await crewedRaces(env, community))) {
+  for (const eventId of await openRaces(env, community, events, settings.scope, timestamp)) {
     if (previews.length === 10) break;
     const {snapshot, payload} = await snapshotPayload(env, timestamp, community, settings, eventId);
     // An official race without any entry of this community gets no category.
@@ -231,7 +244,7 @@ async function syncLocked(env,timestamp,community,settings, test = false, budget
     const row = await ensurePublication(env,community,'',settings);
     await publish(env,timestamp,community,settings,row,null,budget);
   } else {
-    const eligible = racesOpenNow(events,settings.scope,timestamp,await crewedRaces(env,community));
+    const eligible = await openRaces(env,community,events,settings.scope,timestamp);
     const ids = [...new Set([...rows.filter(row => row.event_id && !row.closed_at).map(row => row.event_id),...eligible])];
     const ordered = ids.sort((a,b) => (rows.find(row => row.event_id === a)?.checked_at || 0) - (rows.find(row => row.event_id === b)?.checked_at || 0));
     for (const eventId of ordered.slice(0,2)) {
