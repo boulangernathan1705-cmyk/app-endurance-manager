@@ -1,5 +1,5 @@
 // Crews on Discord (migrations 0044, 0045). Two modules, each enabled by the admins of a community:
-// - crewChannels (« Salons d'équipage »): as soon as it is made, every crew with a pilot gets a voice
+// - crewChannels (« Salons d'équipage »): as soon as it is made, every crew gets a voice
 //   channel named after its sim and its name (« LMU-Les Tondeuz »), made in the category the admins chose
 //   (none: at the top of the server). When the recap gives each race its category (« 🏎️ LMU · 6h de Spa »), the
 //   voice channel goes there, named after the crew alone, and is moved there once if it was made before. A recap message in the voice channel's chat follows the crew
@@ -121,11 +121,11 @@ export async function syncCrewDiscord(env, timestamp = Date.now(), {community = 
   const enabled = [...communities.values()].filter(item => item.modules?.crewChannels === true && item.discordGuildId && settings.has(item.id));
   const report = {opened:0, updated:0, closed:0, reminded:0, purged:0};
 
-  // New crews: a row for each crew with a pilot as soon as it exists, its start time known and still to come.
+  // New crews: a row for each crew as soon as it is created (even before a pilot joins), its start time known and still to come.
   if (enabled.length) {
     const candidates = (await env.DB.prepare(`SELECT ${CREW_COLUMNS} FROM crews c JOIN events e ON e.id=c.event_id
       WHERE c.community_id IN (${enabled.map(() => '?').join(',')}) AND e.schedule_pending=0
-        AND NOT EXISTS(SELECT 1 FROM crew_discord d WHERE d.crew_id=c.id) AND EXISTS(SELECT 1 FROM crew_members m WHERE m.crew_id=c.id)
+        AND NOT EXISTS(SELECT 1 FROM crew_discord d WHERE d.crew_id=c.id)
         AND EXISTS(SELECT 1 FROM json_each(e.departures) j WHERE json_extract(j.value,'$.id')=c.departure_id
           AND COALESCE(json_extract(j.value,'$.tbd'),0)=0 AND json_extract(j.value,'$.startsAt') > ?)
       LIMIT 20`).bind(...enabled.map(item => item.id), timestamp - 2 * 24 * HOUR).all()).results || [];

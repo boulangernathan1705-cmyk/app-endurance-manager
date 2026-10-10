@@ -288,14 +288,10 @@ test('a race gets its category 6 days before its start, as the crews\' voice cha
   assert.deepEqual(creates(calls).filter(call=>call.body.type===4).map(call=>call.body.name),['🏎️ LMU · Plus tard']);
 });
 
-test('a race far away gets its category as soon as it has a crew with a pilot',async t=>{
+test('a race far away gets its category as soon as it has a crew, even an empty one',async t=>{
   const {DB,env,calls}=setup(t);race(DB,'far','Dans un mois','spa',[{id:'f',startsAt:NOW+30*DAY}]);
   await saveBotRecap(env,COMMUNITY,SETTINGS);await syncBotRecaps(env,NOW,COMMUNITY);assert.equal(creates(calls).length,0);
   DB.db.prepare("INSERT INTO crews(id,event_id,departure_id,name,category,car,locked,created_at,community_id) VALUES('crew','far','f','Équipe','GT3','',0,0,?)").run(DEV_COMMUNITY);
-  await syncBotRecaps(env,NOW+1000,COMMUNITY);assert.equal(creates(calls).length,0,'a crew without any pilot is not enough');
-  DB.db.prepare("INSERT INTO participants(id,name,guest_hash,created_at,community_id) VALUES('pilot','Pilote','p',0,?)").run(DEV_COMMUNITY);
-  DB.db.prepare("INSERT INTO registrations(id,event_id,departure_id,guest_hash,name,name_key,category,status,created_at,participant_id,community_id) VALUES('reg','far','f','g','Pilote','pilote','GT3','whole',0,'pilot',?)").run(DEV_COMMUNITY);
-  DB.db.prepare("INSERT INTO crew_members(registration_id,crew_id) VALUES('reg','crew')").run();
-  await syncBotRecaps(env,NOW+2000,COMMUNITY);
+  await syncBotRecaps(env,NOW+1000,COMMUNITY);
   assert.deepEqual(creates(calls).map(call=>call.body.name),['🏎️ LMU · Dans un mois','récap']);
 });
