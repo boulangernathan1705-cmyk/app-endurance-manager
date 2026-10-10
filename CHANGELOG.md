@@ -2,6 +2,12 @@
 
 Les changements du site, version par version. La plus récente est en haut.
 
+## v1.19 — 10 octobre 2026
+
+### Vocaux d'équipage
+- Un équipage reçoit son vocal à son nom dès qu'il a un pilote, sans attendre la semaine de la course.
+- En mode « une catégorie par course », la catégorie s'ouvre dès le premier équipage (ou 6 jours avant le départ sans équipage) et les vocaux y sont créés directement.
+
 ## v1.18 — 10 octobre 2026
 
 ### Discord officiel
