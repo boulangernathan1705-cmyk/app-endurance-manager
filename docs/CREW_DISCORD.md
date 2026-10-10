@@ -22,3 +22,4 @@ Droits du bot : tant qu'il ne les a pas, l'interrupteur est grisé et le bouton 
 ## Fonctionnement
 
 Tout passe par l'API REST de Discord avec `DISCORD_BOT_TOKEN`, sans serveur supplémentaire : la tâche planifiée (toutes les 15 minutes, 8 requêtes Discord au plus par passage, 4 au passage de l'import iRacing) et, juste après un changement sur une course, une inscription ou un équipage, un passage pour la communauté concernée. Seules les lignes qui ont quelque chose à faire sur Discord sont traitées, pour rester dans les 50 appels à la base par passage de l'offre gratuite. Code : `server/crew-discord.mjs`, tables : migrations `0044_crew_discord.sql` et `0045_crew_channels.sql`.
+- Quand le récap est réglé sur **Une catégorie par course**, le vocal d’un équipage est créé dans la catégorie de sa course et porte le seul nom de l’équipage. Un vocal créé avant la catégorie y est déplacé (et renommé) une fois.

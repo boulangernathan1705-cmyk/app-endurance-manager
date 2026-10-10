@@ -1,7 +1,8 @@
 // Crews on Discord (migrations 0044, 0045). Two modules, each enabled by the admins of a community:
 // - crewChannels (« Salons d'équipage »): a few days before its start, every crew with a pilot gets a voice
 //   channel named after its sim and its name (« LMU-Les Tondeuz »), made in the category the admins chose
-//   (none: at the top of the server); the bot never moves it afterwards. A recap message in the voice channel's chat follows the crew
+//   (none: at the top of the server). When the recap gives each race its category (« 🏎️ LMU · 6h de Spa »), the
+//   voice channel goes there, named after the crew alone, and is moved there once if it was made before. A recap message in the voice channel's chat follows the crew
 //   (race, time, car, pilots); a pilot who joins is welcomed there. 2 h after the planned end the voice channel
 //   is deleted with its chat, once no pilot of the crew is in it. A crew deleted before is closed at once.
 //   (The first version made a category with a text channel and archived it: what is left of it is deleted too.)
@@ -134,8 +135,11 @@ export async function syncCrewDiscord(env, timestamp = Date.now(), {community = 
   const ids = [...communities.keys()];
   if (!ids.length) return report;
   const rows = (await env.DB.prepare(`SELECT d.crew_id AS row_id, d.community_id AS row_community, d.guild_id, d.category_id, d.text_id, d.voice_id, d.message_id,
-      d.recap_hash, d.members, d.starts_at, d.reminded, d.created_at, ${CREW_COLUMNS}
+      d.recap_hash, d.members, d.starts_at, d.reminded, d.created_at, d.parent_id, ${CREW_COLUMNS},
+      CASE WHEN p.category_id<>COALESCE(s.destination_id,'') THEN p.category_id END AS race_category
     FROM crew_discord d LEFT JOIN crews c ON c.id=d.crew_id LEFT JOIN events e ON e.id=c.event_id
+      LEFT JOIN discord_recap_publications p ON p.community_id=d.community_id AND p.event_id=c.event_id AND p.closed_at IS NULL
+      LEFT JOIN community_recap_settings s ON s.community_id=d.community_id
     WHERE d.closed_at IS NULL AND d.community_id IN (${ids.map(() => '?').join(',')}) AND d.lock_until<? ORDER BY d.checked_at LIMIT 40`)
     .bind(...ids, timestamp).all()).results || [];
   const pilots = await pilotsOf(env, rows.filter(row => row.crew_id).map(row => row.crew_id));
@@ -192,6 +196,7 @@ async function needsWork(env, timestamp, community, setting, row, pilots) {
   if (!start || !community || timestamp >= start.endsAt + CLOSE_AFTER) return true;
   if (community.modules?.crewChannels !== true || !setting) return false;
   if (!row.voice_id || !row.message_id || row.text_id || row.category_id || Number(row.starts_at) !== start.startsAt) return true;
+  if (row.race_category && row.parent_id !== row.race_category) return true;
   const current = discordIds(pilots), known = JSON.parse(row.members || '[]');
   if (current.length !== known.length || current.some(id => !known.includes(id))) return true;
   if (dueReminders(community, row, start, timestamp).length) return true;
@@ -245,9 +250,11 @@ async function sendInChannel(env, budget, row, method, path, body) {
   }
 }
 
-// The crew's voice channel, in the category chosen by the admins. That category deleted on Discord: the choice
-// is forgotten (the admins are told) and the channel is made at the top of the server next time.
+// The crew's voice channel, in its race's category when the recap made one (« 🏎️ LMU · 6h de Spa »), otherwise
+// in the category chosen by the admins. That category deleted on Discord: the choice is forgotten (the admins are
+// told) and the channel is made at the top of the server next time.
 async function createVoice(env, budget, row, setting, body) {
+  if (row.race_category) return discord(env, budget, 'POST', `/guilds/${row.guild_id}/channels`, {...body, parent_id:row.race_category});
   const parent = setting.voice_category_id;
   try { return await discord(env, budget, 'POST', `/guilds/${row.guild_id}/channels`, parent ? {...body, parent_id:parent} : body); }
   catch (error) {
@@ -271,6 +278,9 @@ export async function serverCategories(env, guildId) {
     return null;
   }
 }
+
+// In its race's category the crew's name is enough; elsewhere the sim comes first (« LMU-Les Tondeuz »).
+const voiceName = (row, crewName) => clip(row.race_category ? crewName : `${game(row.circuit) === 'iracing' ? 'iRacing' : 'LMU'}-${crewName}`, 100);
 
 async function syncRow(env, budget, timestamp, community, setting, row, pilots) {
   const start = row.crew_id && row.event_name ? startOf(row) : null;
@@ -298,11 +308,17 @@ async function syncRow(env, budget, timestamp, community, setting, row, pilots) 
     await env.DB.prepare('UPDATE crew_discord SET message_id=NULL WHERE crew_id=?').bind(row.row_id).run();
   }
   if (!row.voice_id) {
-    const voice = await createVoice(env, budget, row, setting, {name:clip(`${game(row.circuit) === 'iracing' ? 'iRacing' : 'LMU'}-${crewName}`, 100), type:VOICE});
-    Object.assign(row, {voice_id:voice.id, message_id:null});
-    await env.DB.prepare('UPDATE crew_discord SET voice_id=?, message_id=NULL WHERE crew_id=?').bind(voice.id, row.row_id).run();
+    const voice = await createVoice(env, budget, row, setting, {name:voiceName(row, crewName), type:VOICE});
+    Object.assign(row, {voice_id:voice.id, message_id:null, parent_id:row.race_category || null});
+    await env.DB.prepare('UPDATE crew_discord SET voice_id=?, message_id=NULL, parent_id=? WHERE crew_id=?').bind(voice.id, row.parent_id, row.row_id).run();
     await env.DB.prepare('UPDATE community_crew_discord SET last_error=NULL, last_error_at=NULL WHERE community_id=?').bind(community.id).run();
     opened = true;
+  }
+  if (row.race_category && row.parent_id !== row.race_category) {
+    // Opened before its race's category: moved into it once.
+    await sendInChannel(env, budget, row, 'PATCH', `/channels/${row.voice_id}`, {parent_id:row.race_category, name:voiceName(row, crewName)});
+    row.parent_id = row.race_category;
+    await env.DB.prepare('UPDATE crew_discord SET parent_id=? WHERE crew_id=?').bind(row.parent_id, row.row_id).run();
   }
   const content = recapContent(env, community, row, start, pilots);
   const contentHash = await hash(content);

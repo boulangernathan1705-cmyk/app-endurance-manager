@@ -17,7 +17,7 @@ class D1 {
   async batch(statements){this.db.exec('BEGIN');try{const results=[];for(const statement of statements)results.push(await statement.run());this.db.exec('COMMIT');return results;}catch(error){this.db.exec('ROLLBACK');throw error;}}
 }
 function setup(t,{rights='68624',overrides=[],failure=null}={}){
-  const DB=new D1(),calls=[],channels=[{id:TEXT,type:0,name:'recap',permission_overwrites:overrides},{id:CATEGORY,type:4,name:'Endurances',permission_overwrites:overrides}],messages=new Map();
+  const DB=new D1(),calls=[],channels=[{id:TEXT,type:0,name:'recap',permission_overwrites:overrides},{id:'111111111111111110',type:4,name:'Accueil',position:0},{id:CATEGORY,type:4,name:'Endurances',position:1,permission_overwrites:overrides},{id:'111111111111111112',type:4,name:'Vocaux',position:2}],messages=new Map();
   const env={DB,APP_ORIGIN:'https://site.example',DISCORD_CLIENT_ID:BOT,DISCORD_BOT_TOKEN:'fake',ADMIN_DISCORD_IDS:OWNER};
   let counter=900000000000000000n, fail=failure;
   const original=globalThis.fetch;
@@ -31,6 +31,7 @@ function setup(t,{rights='68624',overrides=[],failure=null}={}){
     if(path===`/guilds/${GUILD}/members/${OWNER}`)return Response.json({user:{id:OWNER},roles:[]});
     if(path===`/guilds/${GUILD}/channels`){
       if(method==='GET')return Response.json(channels);
+      if(method==='PATCH'){for(const item of body)Object.assign(channels.find(channel=>channel.id===item.id),{position:item.position});return new Response(null,{status:204});}
       const channel={...body,id:String(counter++)};channels.push(channel);return Response.json(channel);
     }
     if(path.includes('/api/webhooks/'))return Response.json({id:String(counter++)});
@@ -73,11 +74,15 @@ test('read-only previews preserve every departure and never send to Discord',asy
   assert.equal((await previewBotRecap(env,NOW,COMMUNITY,{...SETTINGS,mode:'general'})).length,1);
 });
 
-test('two homonymous events create two text channels; edits reuse their single silent messages',async t=>{
-  const {DB,env,calls,messages}=setup(t);race(DB,'a','Même course');race(DB,'b','Même course','iracing-spa');
+test('two homonymous events get a category each with their recap; edits reuse their single silent messages',async t=>{
+  const {DB,env,calls,messages,channels}=setup(t);race(DB,'a','Même course');race(DB,'b','Même course','iracing-spa');
   await saveBotRecap(env,COMMUNITY,SETTINGS);await syncWeeklyDiscord(env,NOW,COMMUNITY);
-  assert.equal(creates(calls).length,2);assert.ok(creates(calls).every(call=>call.body.type===0));assert.equal(sends(calls).length,2);
-  assert.notEqual(creates(calls)[0].body.name,creates(calls)[1].body.name);
+  assert.deepEqual(creates(calls).map(call=>[call.body.type,call.body.name]),[[4,'🏎️ LMU · Même course'],[0,'récap'],[4,'🏁 iRacing · Même course'],[0,'récap']]);
+  assert.equal(sends(calls).length,2);
+  const [lmu,iracing]=creates(calls).filter(call=>call.body.type===4).map(call=>channels.find(item=>item.name===call.body.name).id);
+  assert.deepEqual(creates(calls).filter(call=>call.body.type===0).map(call=>call.body.parent_id),[lmu,iracing]);
+  // Right after the chosen category, in the order they were made; the next category stays below them.
+  assert.deepEqual(channels.filter(item=>item.type===4).sort((a,b)=>a.position-b.position).map(item=>item.name),['Accueil','Endurances','🏎️ LMU · Même course','🏁 iRacing · Même course','Vocaux']);
   for(const call of sends(calls)){assert.deepEqual(call.body.allowed_mentions,{parse:[]});assert.equal(call.body.flags,4096);}
   calls.length=0;await syncWeeklyDiscord(env,NOW+1000,COMMUNITY);assert.equal(written(calls).length,0);
   DB.db.prepare("UPDATE events SET name='Spa actualisé' WHERE id='a'").run();
@@ -100,7 +105,8 @@ test('cleanup waits 24 hours after the FINAL departure, then deletes only the ev
   await saveBotRecap(env,COMMUNITY,SETTINGS);await syncBotRecaps(env,NOW,COMMUNITY);calls.length=0;
   const end=last+6*3600000;
   await syncBotRecaps(env,end+DAY-1,COMMUNITY);assert.equal(calls.filter(call=>call.method==='DELETE').length,0);
-  await syncBotRecaps(env,end+DAY,COMMUNITY);assert.equal(calls.filter(call=>call.method==='DELETE').length,1);
+  await syncBotRecaps(env,end+DAY,COMMUNITY);assert.equal(calls.filter(call=>call.method==='DELETE').length,2,'the recap, then its race category');
+  assert.ok(!calls.some(call=>call.method==='DELETE'&&call.path===`/channels/${CATEGORY}`));
   calls.length=0;await syncBotRecaps(env,end+2*DAY,COMMUNITY);assert.equal(written(calls).length,0);
   assert.ok(DB.db.prepare('SELECT closed_at FROM discord_recap_publications').get().closed_at);
 });
@@ -112,20 +118,20 @@ test('unknown schedules prevent cleanup; changes to the end are recalculated; di
   DB.db.prepare('UPDATE events SET schedule_pending=0,departures=?').run(JSON.stringify([{id:'s',startsAt:NOW+15*DAY}]));
   await syncBotRecaps(env,NOW+10*DAY,COMMUNITY);assert.equal(calls.filter(call=>call.method==='DELETE').length,0);
   DB.db.prepare('UPDATE community_recap_settings SET enabled=0').run();
-  await syncBotRecaps(env,NOW+17*DAY,COMMUNITY);assert.equal(calls.filter(call=>call.method==='DELETE').length,1);
+  await syncBotRecaps(env,NOW+17*DAY,COMMUNITY);assert.equal(calls.filter(call=>call.method==='DELETE').length,2);
 });
 
 test('channels still expire after switching back to a general recap',async t=>{
   const {DB,env,calls}=setup(t);race(DB);await saveBotRecap(env,COMMUNITY,SETTINGS);await syncBotRecaps(env,NOW,COMMUNITY);
   await saveBotRecap(env,COMMUNITY,{...SETTINGS,mode:'general',destinationId:TEXT,destinationName:'recap'});
   await syncBotRecaps(env,NOW+4*DAY,COMMUNITY);
-  assert.equal(calls.filter(call=>call.method==='DELETE').length,1);assert.equal(sends(calls).length,2);
+  assert.equal(calls.filter(call=>call.method==='DELETE').length,2);assert.equal(sends(calls).length,2);
 });
 
 test('concurrent synchronizations share a lock and recover a channel/message after lost state',async t=>{
   const {DB,env,calls}=setup(t);race(DB);await saveBotRecap(env,COMMUNITY,SETTINGS);
   await Promise.all([syncBotRecaps(env,NOW,COMMUNITY),syncBotRecaps(env,NOW,COMMUNITY)]);
-  assert.equal(creates(calls).length,1);assert.equal(sends(calls).length,1);
+  assert.equal(creates(calls).length,2);assert.equal(sends(calls).length,1);
   DB.db.prepare("UPDATE discord_recap_publications SET channel_id=NULL,message_id=NULL,content_hash=''").run();calls.length=0;
   await syncBotRecaps(env,NOW,COMMUNITY);assert.equal(creates(calls).length,0);assert.equal(sends(calls).length,0);
 });
@@ -142,7 +148,7 @@ test('Discord failures are recorded and retried without duplicates; a removed me
 test('destination selection accounts for channel overwrites and keeps communities isolated',async t=>{
   const {env}=setup(t,{overrides:[{id:BOT,type:1,deny:'16',allow:'0'}]});
   const list=await recapDestinations(env,COMMUNITY);assert.equal(list.find(item=>item.type===0).ready,true);
-  assert.deepEqual(list.find(item=>item.type===4).missing,['Gérer les salons']);
+  assert.deepEqual(list.find(item=>item.id===CATEGORY).missing,['Gérer les salons']);
   assert.equal((await as(env,'/api/community/recap','PUT',SETTINGS)).status,400);
   assert.equal((await as(env,'/api/community/recap','PUT',{...SETTINGS,mode:'general',destinationId:CATEGORY})).status,400);
   assert.equal((await as(env,'/api/community/recap','PUT',{...SETTINGS,destinationId:'999999999999999999'})).status,400);
@@ -200,7 +206,7 @@ test('quarter-hour cleanup rechecks current event times, works while disabled an
   assert.equal(await cleanupEventRecaps(env,NOW+4*DAY),0,'postponed event remains');
   DB.db.prepare('UPDATE events SET schedule_pending=1').run();assert.equal(await cleanupEventRecaps(env,NOW+20*DAY),0);
   DB.db.prepare('UPDATE events SET schedule_pending=0').run();assert.equal(await cleanupEventRecaps(env,NOW+20*DAY),1);
-  assert.equal(await cleanupEventRecaps(env,NOW+21*DAY),0);assert.equal(calls.filter(call=>call.method==='DELETE').length,1);
+  assert.equal(await cleanupEventRecaps(env,NOW+21*DAY),0);assert.equal(calls.filter(call=>call.method==='DELETE').length,2);
 });
 
 test('a manually deleted event keeps its channel until its last known end plus 24 hours',async t=>{
@@ -210,13 +216,26 @@ test('a manually deleted event keeps its channel until its last known end plus 2
   assert.equal(await cleanupEventRecaps(env,NOW),0);assert.equal(await cleanupEventRecaps(env,NOW+3*DAY),1);
 });
 
-test('new eligible races are created automatically; category changes reuse channels and messages',async t=>{
+test('new eligible races are created automatically; changing the chosen category leaves open races in place',async t=>{
   const {DB,env,calls,channels}=setup(t);race(DB);await saveBotRecap(env,COMMUNITY,SETTINGS);await syncBotRecaps(env,NOW,COMMUNITY);calls.length=0;
-  race(DB,'new-event','Nouvelle course');await syncBotRecaps(env,NOW+1000,COMMUNITY);assert.equal(creates(calls).length,1);
-  channels.push({id:'777777777777777777',type:4,name:'Nouvelle catégorie'});
+  race(DB,'new-event','Nouvelle course');await syncBotRecaps(env,NOW+1000,COMMUNITY);assert.equal(creates(calls).length,2);
+  channels.push({id:'777777777777777777',type:4,name:'Nouvelle catégorie',position:9});
   await saveBotRecap(env,COMMUNITY,{...SETTINGS,destinationId:'777777777777777777'});calls.length=0;
   await syncBotRecaps(env,NOW+2000,COMMUNITY);assert.equal(creates(calls).length,0);assert.equal(sends(calls).length,0);
-  assert.equal(calls.filter(call=>call.method==='PATCH'&&call.body.parent_id==='777777777777777777').length,2);
+  assert.equal(calls.filter(call=>call.method==='PATCH').length,0);
+});
+
+test('a recap channel made by the first version moves into its new race category, message kept',async t=>{
+  const {DB,env,calls,channels,messages}=setup(t);race(DB);await saveBotRecap(env,COMMUNITY,SETTINGS);
+  channels.push({id:'888888888888888888',type:0,name:'6h-de-spa-1234',parent_id:CATEGORY});
+  messages.set('999999999999999999',{id:'999999999999999999',channel_id:'888888888888888888',author:{id:BOT}});
+  DB.db.prepare("INSERT INTO discord_recap_publications(community_id,event_id,guild_id,category_id,channel_id,message_id,marker,content_hash) VALUES(?,?,?,?,?,?,?,?)")
+    .run(DEV_COMMUNITY,'race-a',GUILD,CATEGORY,'888888888888888888','999999999999999999','endurance-manager:old','old');
+  await syncBotRecaps(env,NOW,COMMUNITY);
+  assert.deepEqual(creates(calls).map(call=>call.body.type),[4]);
+  const category=DB.db.prepare('SELECT category_id FROM discord_recap_publications').get().category_id;
+  assert.notEqual(category,CATEGORY);assert.equal(channels.find(item=>item.id==='888888888888888888').parent_id,category);
+  assert.equal(sends(calls).length,0);
 });
 
 test('large recaps remain within every Discord embed limit and retain a link to full details',async t=>{
