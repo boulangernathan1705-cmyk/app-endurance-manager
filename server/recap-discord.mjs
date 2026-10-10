@@ -81,18 +81,21 @@ export function eventDeletionTime(event) {
   if (!(minutes > 0)) return null;
   return Math.max(...departures.map(item => Number(item.startsAt))) + minutes * 60000 + DAY;
 }
-// The races that get their category now: a start within 6 days (or running), as the crews' voice channels
-// (server/crew-discord.mjs, OPEN_BEFORE), so these are always made straight in it.
-export function racesOpenNow(events, scope, timestamp) {
+// The races that get their category now: a crew with a pilot (its voice channel is made at once, server/crew-
+// discord.mjs) or a start within 6 days (OPEN_BEFORE), the race not over.
+export function racesOpenNow(events, scope, timestamp, crewed = new Set()) {
   return events.filter(event => {
     const iracing = String(event.circuit || '').startsWith('iracing-');
     if ((scope === 'lmu' && iracing) || (scope === 'iracing' && !iracing) || event.schedule_pending) return false;
     const minutes = Number(event.duration_minutes) || Number(event.duration_hours) * 60 || 0;
-    return parse(event.departures).some(item => !item.tbd && Number(item.startsAt) <= timestamp + OPEN_BEFORE && Number(item.startsAt) + minutes * 60000 > timestamp);
+    return parse(event.departures).some(item => !item.tbd && (crewed.has(event.id) || Number(item.startsAt) <= timestamp + OPEN_BEFORE) && Number(item.startsAt) + minutes * 60000 > timestamp);
   }).map(event => event.id);
 }
 const raceEvents = (env, community) => env.DB.prepare("SELECT id,name,circuit,departures,duration_hours,duration_minutes,schedule_pending FROM events WHERE community_id=? OR community_id='official' ORDER BY created_at,id")
   .bind(community.id).all().then(result => result.results || []);
+// The races where this community has a crew with a pilot.
+const crewedRaces = (env, community) => env.DB.prepare('SELECT DISTINCT c.event_id FROM crews c WHERE c.community_id=? AND EXISTS(SELECT 1 FROM crew_members m WHERE m.crew_id=c.id)')
+  .bind(community.id).all().then(result => new Set((result.results || []).map(row => row.event_id)));
 export const raceCategoryName = event =>
   `${String(event?.circuit || '').startsWith('iracing-') ? '🏁 iRacing' : '🏎️ LMU'} · ${String(event?.name || 'Endurance').trim()}`.slice(0,100);
 // The race categories follow the chosen category, in the order they were made (one request reorders them all).
@@ -130,7 +133,7 @@ export async function previewBotRecap(env, timestamp, community, settings) {
   }
   const events = await raceEvents(env, community);
   const previews = [];
-  for (const eventId of racesOpenNow(events, settings.scope, timestamp)) {
+  for (const eventId of racesOpenNow(events, settings.scope, timestamp, await crewedRaces(env, community))) {
     if (previews.length === 10) break;
     const {snapshot, payload} = await snapshotPayload(env, timestamp, community, settings, eventId);
     // An official race without any entry of this community gets no category.
@@ -228,7 +231,7 @@ async function syncLocked(env,timestamp,community,settings, test = false, budget
     const row = await ensurePublication(env,community,'',settings);
     await publish(env,timestamp,community,settings,row,null,budget);
   } else {
-    const eligible = racesOpenNow(events,settings.scope,timestamp);
+    const eligible = racesOpenNow(events,settings.scope,timestamp,await crewedRaces(env,community));
     const ids = [...new Set([...rows.filter(row => row.event_id && !row.closed_at).map(row => row.event_id),...eligible])];
     const ordered = ids.sort((a,b) => (rows.find(row => row.event_id === a)?.checked_at || 0) - (rows.find(row => row.event_id === b)?.checked_at || 0));
     for (const eventId of ordered.slice(0,2)) {
