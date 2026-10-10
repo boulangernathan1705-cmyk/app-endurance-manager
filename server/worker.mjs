@@ -1,3 +1,4 @@
+import {previewOfficialDiscord,applyOfficialDiscord,officialSetupPage} from './official-discord-setup.mjs';
 import {grindfestAvailable, grindfestEnabled, isGrindfest, streamersOf, assignStreamerWaitlist} from '../shared/grindfest.mjs';
 import {
   LEGACY_CAR_ALIASES, COOKIE_SESSION, COOKIE_STATE, COOKIE_RETURN, DAY, HttpError, fail, now, id, token, hash, cookie,
@@ -379,6 +380,15 @@ async function api(request, env) {
   if (path === '/api/auth/discord' && method === 'GET') return oauthStart(request, env);
   if (path === '/api/auth/discord/callback' && method === 'GET') return oauthCallback(request, env);
   const actor = await identity(request, env);
+  if((path === '/api/admin/official-discord-setup' && ['GET','POST'].includes(method)) || (path === '/api/admin/official-discord-setup/page' && method === 'GET')) {
+    if(!isDevelopment(env) || env.OFFICIAL_DISCORD_SETUP_ENABLED !== 'true') fail(404,'Configuration Discord indisponible.');
+    if(!actor.user || !administrators(env).includes(actor.user.id)) fail(403,'Configuration réservée au gestionnaire de la plateforme.');
+    if(path.endsWith('/page'))return officialSetupPage();
+    try {
+      return json(method === 'GET' ? await previewOfficialDiscord(env,actor.user.id)
+        : await applyOfficialDiscord(env,actor.user.id,(await body(request)).confirmGuildId));
+    } catch(error) { fail(error.status || 502,error.message); }
+  }
   // Every request below works inside one community (separation entry point, server/community.mjs), with
   // the permissions the player's Discord roles give in it (server/access.mjs).
   const community = await currentCommunity(env, request);
