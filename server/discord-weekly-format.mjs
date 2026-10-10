@@ -68,11 +68,13 @@ function departureValue(departure,compact=false){
 const BLANK='\u200b';
 function raceFields(departures,compact){
   const hasEntries=departure=>departure.crews.length||departure.unassignedPilots?.length;
-  if(departures.length===1)return [{name:BLANK,value:departureValue(departures[0],compact),inline:false}];
+  const absentPilots=[...new Set(departures.flatMap(departure=>departure.absentPilots||[]))];
+  const absences=absentPilots.length?[{name:'🚫 Pilotes absents',value:cut(absentPilots.map(clean).join(', '),compact?300:1024),inline:false}]:[];
+  if(departures.length===1)return [{name:BLANK,value:departureValue(departures[0],compact),inline:false},...absences];
   const filled=departures.filter(hasEntries);
   const fields=filled.slice(0,23).map(departure=>({name:BLANK,value:departureValue(departure,compact),inline:false}));
   if(!filled.length)fields.push({name:BLANK,value:'Personne d’inscrit pour l’instant.',inline:false});
-  return fields;
+  return [...fields,...absences];
 }
 // At the top of a race: its days and their start times, Paris time (« 📅 **sam. 17 oct.** · 8h, 14h, 20h »).
 function hourLabel(startsAt){return recapTime.format(startsAt).replace(/^(\d+):00$/,'$1h').replace(':','h');}
@@ -138,9 +140,10 @@ export function buildWeeklyDiscordPayload(snapshot,site={},updatedAt=Date.now(),
 }
 
 export function isWeeklyDiscordMutation(request){
-  const method=String(request?.method||'').toUpperCase();if(!['POST','PATCH','DELETE'].includes(method))return false;
+  const method=String(request?.method||'').toUpperCase();if(!['POST','PUT','PATCH','DELETE'].includes(method))return false;
   let path;try{path=racesPath(new URL(request.url).pathname);}catch{return false;}
   const uuid='[a-f0-9-]{36}';
+  if(new RegExp(`^/api/events/${uuid}/absence$`).test(path))return ['PUT','DELETE'].includes(method);
   if(path==='/api/events'&&method==='POST')return true;
   if(new RegExp(`^/api/events/${uuid}$`).test(path)&&['PATCH','DELETE'].includes(method))return true;
   if(new RegExp(`^/api/events/${uuid}/departures/${uuid}/registrations$`).test(path)&&method==='POST')return true;

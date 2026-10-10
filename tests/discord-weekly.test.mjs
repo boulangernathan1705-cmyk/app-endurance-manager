@@ -1,5 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {DatabaseSync} from 'node:sqlite';
+import {readFileSync,readdirSync} from 'node:fs';
 import {
   buildWeeklyDiscordPayload,
   isInParisWeek,
@@ -19,10 +21,11 @@ const crewUuid='77777777-7777-4777-8777-777777777777';
 
 const COMMUNITY={id:'e0a1c0de-0000-4000-8000-000000000001',slug:'commu-dev',modules:{discordWeekly:true}};
 function request(path,method='POST'){return new Request(`https://endurance-manager.app${path}`,{method});}
-function dbFixture({events=[],registrations=[],crews=[]}){
+function dbFixture({events=[],registrations=[],crews=[],absences=[]}){
   return{prepare(sql){
     // Events are read for one community (its id is the bound parameter).
     if(sql.includes('FROM events'))return{bind:communityId=>({all:async()=>({results:events.filter(item=>(item.community_id||COMMUNITY.id)===communityId)})})};
+    if(sql.includes('FROM event_absences'))return{bind:(...values)=>({all:async()=>({results:absences.filter(item=>values.slice(0,-1).includes(item.event_id)&&(item.community_id||COMMUNITY.id)===values.at(-1))})})};
     if(sql.includes('FROM registrations'))return{bind:()=>({all:async()=>({results:registrations.filter(item=>item.status!=='unavailable')})})};
     if(sql.includes('FROM crews'))return{bind:()=>({all:async()=>({results:crews})})};
     throw new Error(`Requête D1 inattendue dans le test: ${sql}`);
@@ -149,6 +152,10 @@ test('les mutations qui changent le résumé déclenchent une synchronisation',(
   assert.equal(isWeeklyDiscordMutation(request(`/api/races/${uuid}/departures/${departureUuid}/registrations`)),true);
   assert.equal(isWeeklyDiscordMutation(request(`/api/registrations/${uuid}`,'DELETE')),true);
   assert.equal(isWeeklyDiscordMutation(request(`/api/crews/${uuid}/members/${departureUuid}`,'DELETE')),true);
+  assert.equal(isWeeklyDiscordMutation(request(`/api/events/${uuid}/absence`,'PUT')),true);
+  assert.equal(isWeeklyDiscordMutation(request(`/api/events/${uuid}/absence`,'DELETE')),true);
+  assert.equal(isWeeklyDiscordMutation(request(`/api/races/${uuid}/absence`,'PUT')),true);
+  assert.equal(isWeeklyDiscordMutation(request(`/api/events/${uuid}/absence`,'GET')),false);
   assert.equal(isWeeklyDiscordMutation(request('/api/auth/logout')),false);
   assert.equal(isWeeklyDiscordMutation(request('/api/events','GET')),false);
 });
@@ -181,4 +188,49 @@ test('un événement spécial à 15 départs : seuls les départs avec des inscr
   assert.equal((fuji.description.match(/📅/g)||[]).length,4,'four days');
   assert.doesNotMatch(JSON.stringify(fuji),/autres départs|voir la course/);
   assert.doesNotMatch(JSON.stringify(fuji),/Personne d’inscrit/);
+});
+
+test('les absences du site figurent une fois en bas de chaque événement, uniquement pour sa communauté',async()=>{
+  const db=new DatabaseSync(':memory:');
+  try {
+    db.exec('PRAGMA foreign_keys=ON;');
+    for(const file of readdirSync(new URL('../migrations/',import.meta.url)).filter(name=>name.endsWith('.sql')).sort())db.exec(readFileSync(new URL(`../migrations/${file}`,import.meta.url),'utf8'));
+    const now=Date.parse('2026-10-10T08:00:00Z');
+    const startsAt=now+3600000;
+    for(const [id,name] of [['one','Nathan'],['two','Etienne_48'],['three','Autre communauté']])db.prepare('INSERT INTO users(id,name,created_at) VALUES(?,?,0)').run(id,name);
+    const departures=JSON.stringify([{id:departureUuid,startsAt},{id:secondDepartureUuid,startsAt:startsAt+3600000}]);
+    // This official race has no registrations: an absence is enough to make it relevant for this community.
+    db.prepare("INSERT INTO events(id,name,circuit,categories,departures,created_by,created_at,community_id,duration_hours) VALUES(?,'6h Fuji','fuji','[\"GT3\"]',?,'one',0,'official',6)").run(uuid,departures);
+    const absence=db.prepare('INSERT INTO event_absences(event_id,user_id,community_id,created_at) VALUES(?,?,?,?)');
+    absence.run(uuid,'one',COMMUNITY.id,1);absence.run(uuid,'two',COMMUNITY.id,2);absence.run(uuid,'three','other',3);
+    const DB={prepare(sql){return{bind(...values){return{all:async()=>({results:db.prepare(sql).all(...values)})};}};}};
+    let snapshot=await loadWeeklyDiscordSnapshot({DB},now,COMMUNITY);
+    assert.equal(snapshot.futureDepartures.length,2);
+    assert.deepEqual(snapshot.futureDepartures[0].absentPilots,['Nathan','Etienne_48']);
+    let payload=buildWeeklyDiscordPayload(snapshot,{url:'https://fmt.endurance-manager.app'},now);
+    const absent=payload.embeds[1].fields.at(-1);
+    assert.equal(absent.name,'🚫 Pilotes absents');assert.equal(absent.value,'Nathan, Etienne\\_48');
+    assert.equal(payload.embeds[1].fields.filter(field=>field.name==='🚫 Pilotes absents').length,1,'not repeated for every departure');
+    assert.deepEqual(payload.allowed_mentions,{parse:[]});assert.doesNotMatch(JSON.stringify(payload),/Autre communauté/);
+    db.prepare('DELETE FROM event_absences WHERE event_id=? AND community_id=?').run(uuid,COMMUNITY.id);
+    snapshot=await loadWeeklyDiscordSnapshot({DB},now,COMMUNITY);
+    assert.equal(snapshot.futureDepartures.length,0,'an absence in another community does not include the official event');
+    // Private event without absences: its recap stays unchanged, with no empty absence heading.
+    db.prepare("INSERT INTO events(id,name,circuit,categories,departures,created_by,created_at,community_id,duration_hours) VALUES(?,'Privée','fuji','[\"GT3\"]',?,'one',0,?,6)").run(futureEventUuid,departures,COMMUNITY.id);
+    snapshot=await loadWeeklyDiscordSnapshot({DB},now,COMMUNITY);
+    payload=buildWeeklyDiscordPayload(snapshot,{},now);
+    assert.doesNotMatch(JSON.stringify(payload),/Pilotes absents|Nathan|Etienne/);
+  } finally { db.close(); }
+});
+
+test('les absences restent affichées quand le récap est compact et respectent la limite des champs Discord',()=>{
+  const departure={eventId:uuid,eventName:'6h Fuji',circuit:'fuji',durationHours:6,startsAt:Date.parse('2026-10-11T12:00:00Z'),crews:[],unassignedPilots:[],absentPilots:Array.from({length:150},(_,i)=>`Pilote ${i} très long`)};
+  const departures=Array.from({length:8},(_,i)=>({...departure,eventId:`event-${i}`,eventName:`Course ${i}`}));
+  const payload=buildWeeklyDiscordPayload({futureDepartures:departures},{});
+  for(const embed of payload.embeds.slice(1)){
+    const field=embed.fields.at(-1);assert.equal(field.name,'🚫 Pilotes absents');assert.match(field.value,/Pilote 0/);assert.ok(field.value.length<=300);
+    assert.ok(embed.fields.length<=25);assert.ok(embed.fields.every(item=>item.value.length<=1024));
+  }
+  const total=payload.embeds.reduce((sum,embed)=>sum+(embed.title||'').length+(embed.description||'').length+(embed.footer?.text||'').length+(embed.fields||[]).reduce((sum,field)=>sum+field.name.length+field.value.length,0),0);
+  assert.ok(total<=6000);
 });
