@@ -2,12 +2,14 @@
 import {loadWeeklyDiscordSnapshot, siteOf} from './discord-weekly.mjs';
 import {buildWeeklyDiscordPayload} from './discord-weekly-format.mjs';
 
-const API = 'https://discord.com/api/v10', DAY = 86400000;
+import {eventDeletionTime, courseCategory, closeCourseVoices} from './discord-course-space.mjs';
+export {eventDeletionTime} from './discord-course-space.mjs';
+
+const API = 'https://discord.com/api/v10';
 const VIEW = 1024n, SEND = 2048n, HISTORY = 65536n, MANAGE = 16n, ADMIN = 8n;
 const REQUIRED = VIEW | SEND | HISTORY;
 export const RECAP_BOT_PERMISSIONS = String(REQUIRED | MANAGE);
 export const botRecapSettings = (env, community) => env.DB.prepare('SELECT * FROM community_recap_settings WHERE community_id=?').bind(community.id).first();
-const parse = value => { try { const result = JSON.parse(value); return Array.isArray(result) ? result : []; } catch { return []; } };
 
 export function recapError(error) {
   if (error.status === 429) return 'Discord limite les requêtes. Le récap réessaiera automatiquement.';
@@ -22,6 +24,7 @@ async function discord(env, method, path, body, budget = {left:12}) {
   const response = await fetch(API + path, {method, signal:AbortSignal.timeout(8000),
     headers:{Authorization:`Bot ${env.DISCORD_BOT_TOKEN}`, ...(body ? {'Content-Type':'application/json'} : {})}, body:body ? JSON.stringify(body) : undefined});
   const data = response.status === 204 ? null : await response.json().catch(() => null);
+  if (response.status === 429) budget.left = 0;
   if (!response.ok) throw Object.assign(new Error('Discord indisponible'), {status:response.status, code:data?.code});
   return data;
 }
@@ -56,14 +59,21 @@ export async function recapDestinations(env, community) {
 export function recapInput(input) {
   if (!['general','events'].includes(input.mode) || !['all','lmu','iracing'].includes(input.scope) || !/^\d{15,22}$/.test(String(input.destinationId || '')))
     throw Object.assign(new Error('Choisis le mode, au moins un simulateur et une destination Discord.'), {status:400});
-  return {mode:input.mode, scope:input.scope, destinationId:input.destinationId,destinationName:String(input.destinationName || '').slice(0,100)};
+  const separate = input.mode === 'events' && input.scope === 'all' && input.iracingDestinationId;
+  if (separate && !/^\d{15,22}$/.test(String(input.iracingDestinationId))) throw Object.assign(new Error('Choisis une catégorie iRacing valide.'), {status:400});
+  return {mode:input.mode, scope:input.scope, destinationId:input.destinationId,destinationName:String(input.destinationName || '').slice(0,100),
+    iracingDestinationId:separate ? input.iracingDestinationId : null,iracingDestinationName:separate ? String(input.iracingDestinationName || '').slice(0,100) : null};
 }
 export async function validateRecapDestination(env, community, input) {
   const settings = recapInput(input);
-  const destination = (await recapDestinations(env, community)).find(item => item.id === settings.destinationId && item.type === (settings.mode === 'events' ? 4 : 0));
+  const destinations = await recapDestinations(env, community);
+  const destination = destinations.find(item => item.id === settings.destinationId && item.type === (settings.mode === 'events' ? 4 : 0));
   if (!destination) throw Object.assign(new Error('Choisis une destination sur le serveur Discord de cette communauté.'), {status:400});
   if (!destination.ready) throw Object.assign(new Error(`Dans les permissions de « ${destination.name} », autorise le bot : ${destination.missing.join(', ')}.`), {status:400});
-  return {...settings, destinationName:destination.name};
+  const iracing = settings.iracingDestinationId ? destinations.find(item => item.id === settings.iracingDestinationId && item.type === 4) : null;
+  if (settings.iracingDestinationId && !iracing) throw Object.assign(new Error('Choisis une catégorie iRacing sur le serveur de cette communauté.'), {status:400});
+  if (iracing && !iracing.ready) throw Object.assign(new Error(`Dans les permissions de « ${iracing.name} », autorise le bot : ${iracing.missing.join(', ')}.`), {status:400});
+  return {...settings, destinationName:destination.name,iracingDestinationName:iracing?.name || null};
 }
 export function eventChannelName(name, eventId) {
   const slug = String(name).normalize('NFKD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'') || 'endurance';
@@ -72,13 +82,6 @@ export function eventChannelName(name, eventId) {
   for (const char of String(eventId)) hash = Math.imul(hash ^ char.charCodeAt(0),16777619);
   const suffix = (hash >>> 0).toString(16).padStart(8,'0');
   return `${slug.slice(0, Math.max(1, 99 - suffix.length))}-${suffix}`.slice(0,100);
-}
-export function eventDeletionTime(event) {
-  const departures = parse(event?.departures);
-  if (!departures.length || event?.schedule_pending || departures.some(item => item.tbd || !Number.isFinite(Number(item.startsAt)))) return null;
-  const minutes = Number(event.duration_minutes) || Number(event.duration_hours) * 60;
-  if (!(minutes > 0)) return null;
-  return Math.max(...departures.map(item => Number(item.startsAt))) + minutes * 60000 + DAY;
 }
 async function digest(value) {
   return [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify(value))))].map(byte => byte.toString(16).padStart(2,'0')).join('');
@@ -118,9 +121,9 @@ export async function saveBotRecap(env, community, settings, enabled = true, ado
     .bind(token,now+180000,community.id,now).run();
   if (!result.meta.changes) throw Object.assign(new Error('Une synchronisation est en cours. Réessaie dans un instant.'), {status:409});
   try {
-    await env.DB.prepare(`UPDATE community_recap_settings SET enabled=?,adopted=?,mode=?,scope=?,guild_id=?,destination_id=?,destination_name=?,revision=revision+1,last_error=NULL
+    await env.DB.prepare(`UPDATE community_recap_settings SET enabled=?,adopted=?,mode=?,scope=?,guild_id=?,destination_id=?,destination_name=?,iracing_destination_id=?,iracing_destination_name=?,revision=revision+1,last_error=NULL
       WHERE community_id=? AND lock_token=?`)
-      .bind(Number(enabled),Number(adopted),settings.mode,settings.scope,community.discordGuildId,settings.destinationId,settings.destinationName,community.id,token).run();
+      .bind(Number(enabled),Number(adopted),settings.mode,settings.scope,community.discordGuildId,settings.destinationId,settings.destinationName,settings.iracingDestinationId || null,settings.iracingDestinationName || null,community.id,token).run();
   } finally {
     await env.DB.prepare("UPDATE community_recap_settings SET lock_token='',lock_until=0 WHERE community_id=? AND lock_token=?").bind(community.id,token).run();
   }
@@ -133,6 +136,7 @@ async function ensurePublication(env, community, eventId, settings) {
 }
 async function publish(env, timestamp, community, settings, row, event, budget, prepared = null) {
   const isEvent = row.event_id !== '';
+  const destination = isEvent ? courseCategory(settings, event) : settings.destination_id;
   if (isEvent) await env.DB.prepare('UPDATE discord_recap_publications SET delete_after=? WHERE community_id=? AND event_id=?').bind(eventDeletionTime(event),community.id,row.event_id).run();
   if (row.closed_at) return;
   let channel = row.channel_id;
@@ -150,12 +154,12 @@ async function publish(env, timestamp, community, settings, row, event, budget, 
       let name = eventChannelName(event.name,event.id);
       if (channels.some(item => item.name === name && item.topic !== row.marker)) name = `${name.slice(0,62)}-${String(event.id).replace(/[^a-z0-9]/gi,'')}`.slice(0,100);
       const created = existing || await discord(env,'POST',`/guilds/${row.guild_id}/channels`,
-        {type:0,name,parent_id:settings.destination_id,topic:row.marker},budget);
+        {type:0,name,parent_id:destination,topic:row.marker},budget);
       channel = created.id;
-      await env.DB.prepare('UPDATE discord_recap_publications SET channel_id=?,category_id=? WHERE community_id=? AND event_id=?').bind(channel,settings.destination_id,community.id,row.event_id).run();
-    } else if (row.category_id !== settings.destination_id) {
-      await discord(env,'PATCH',`/channels/${channel}`,{parent_id:settings.destination_id},budget);
-      await env.DB.prepare('UPDATE discord_recap_publications SET category_id=? WHERE community_id=? AND event_id=?').bind(settings.destination_id,community.id,row.event_id).run();
+      await env.DB.prepare('UPDATE discord_recap_publications SET channel_id=?,category_id=? WHERE community_id=? AND event_id=?').bind(channel,destination,community.id,row.event_id).run();
+    } else if (row.category_id !== destination) {
+      await discord(env,'PATCH',`/channels/${channel}`,{parent_id:destination},budget);
+      await env.DB.prepare('UPDATE discord_recap_publications SET category_id=? WHERE community_id=? AND event_id=?').bind(destination,community.id,row.event_id).run();
     }
   }
   const {payload, hash} = prepared || await snapshotPayload(env,timestamp,community,settings,isEvent ? row.event_id : null);
@@ -174,13 +178,14 @@ async function publish(env, timestamp, community, settings, row, event, budget, 
   await env.DB.prepare('UPDATE discord_recap_publications SET message_id=?,content_hash=? WHERE community_id=? AND event_id=?')
     .bind(row.message_id,hash,community.id,row.event_id).run();
 }
-async function syncLocked(env,timestamp,community,settings, test = false, budget = {left:12}) {
+async function syncLocked(env,timestamp,community,settings, test = false, budget = {left:12}, priorityEventId = null) {
   const rows = (await env.DB.prepare('SELECT * FROM discord_recap_publications WHERE community_id=? AND closed_at IS NULL ORDER BY checked_at,event_id').bind(community.id).all()).results || [];
-  const events = (await env.DB.prepare("SELECT id,name,departures,duration_hours,duration_minutes,schedule_pending FROM events WHERE community_id=? OR community_id='official'").bind(community.id).all()).results || [];
+  const events = (await env.DB.prepare("SELECT id,name,circuit,departures,duration_hours,duration_minutes,schedule_pending FROM events WHERE community_id=? OR community_id='official'").bind(community.id).all()).results || [];
   // Cleanup is independent of mode/activation. Only bot-created event channels may be deleted.
-  for (const row of rows.filter(item => item.event_id).slice(0,2)) {
+  for (const row of (priorityEventId ? [] : rows.filter(item => item.event_id).slice(0,2))) {
     const event = events.find(item => item.id === row.event_id), deleteAt = event ? eventDeletionTime(event) : row.delete_after;
     if (deleteAt !== null && timestamp >= deleteAt) {
+      if (!await closeCourseVoices(env,row,timestamp,(method,path) => discord(env,method,path,null,budget))) continue;
       if (row.channel_id) {
         try { await discord(env,'DELETE',`/channels/${row.channel_id}`,null,budget); }
         catch (error) { if (error.status !== 404) throw error; }
@@ -198,7 +203,7 @@ async function syncLocked(env,timestamp,community,settings, test = false, budget
   } else {
     const snapshot = await loadWeeklyDiscordSnapshot(env,timestamp,community,settings.scope);
     const eligible = [...new Set([...snapshot.currentDepartures,...snapshot.futureDepartures].map(item => item.eventId))];
-    const ids = [...new Set([...rows.filter(row => row.event_id && !row.closed_at).map(row => row.event_id),...eligible])];
+    const ids = priorityEventId ? [priorityEventId] : [...new Set([...rows.filter(row => row.event_id && !row.closed_at).map(row => row.event_id),...eligible])];
     const ordered = ids.sort((a,b) => (rows.find(row => row.event_id === a)?.checked_at || 0) - (rows.find(row => row.event_id === b)?.checked_at || 0));
     for (const eventId of ordered.slice(0,2)) {
       const event = events.find(item => item.id === eventId);
@@ -213,7 +218,7 @@ async function syncLocked(env,timestamp,community,settings, test = false, budget
   }
   return {ok:true};
 }
-export async function syncBotRecaps(env,timestamp,community, test = false) {
+export async function syncBotRecaps(env,timestamp,community, test = false, {eventId = null, budget = {left:12}} = {}) {
   const token = crypto.randomUUID(), now = Date.now();
   await env.DB.prepare('UPDATE community_recap_settings SET dirty=1 WHERE community_id=?').bind(community.id).run();
   const lock = await env.DB.prepare("UPDATE community_recap_settings SET lock_token=?,lock_until=? WHERE community_id=? AND lock_until<?")
@@ -221,10 +226,9 @@ export async function syncBotRecaps(env,timestamp,community, test = false) {
   if (!lock.meta.changes) return {ok:true,queued:true};
   try {
     let result;
-    const budget = {left:12};
     for (let attempt=0;attempt<2;attempt++) {
       await env.DB.prepare('UPDATE community_recap_settings SET dirty=0 WHERE community_id=? AND lock_token=?').bind(community.id,token).run();
-      result = await syncLocked(env,timestamp,community,await botRecapSettings(env,community),test,budget);
+      result = await syncLocked(env,timestamp,community,await botRecapSettings(env,community),test,budget,eventId);
       const current = await botRecapSettings(env,community);
       if (!current.dirty) break;
     }
@@ -233,7 +237,7 @@ export async function syncBotRecaps(env,timestamp,community, test = false) {
   } catch (error) {
     const message = error.message.startsWith('Discord') ? recapError(error) : error.message;
     await env.DB.prepare('UPDATE community_recap_settings SET last_error=?,dirty=1 WHERE community_id=? AND lock_token=?').bind(message,community.id,token).run();
-    throw new Error(message);
+    throw Object.assign(new Error(message), {status:error.status,code:error.code});
   } finally {
     await env.DB.prepare("UPDATE community_recap_settings SET checked_at=?,lock_token='',lock_until=0 WHERE community_id=? AND lock_token=?").bind(timestamp,community.id,token).run();
   }
@@ -241,7 +245,7 @@ export async function syncBotRecaps(env,timestamp,community, test = false) {
 export async function sendBotRecapTest(env,timestamp,community,settings) {
   // Explicit test only: same publication identities as activation, never disposable extra messages.
   const current = await botRecapSettings(env,community);
-  const unchanged = current && current.mode === settings.mode && current.scope === settings.scope && current.destination_id === settings.destinationId;
+  const unchanged = current && current.mode === settings.mode && current.scope === settings.scope && current.destination_id === settings.destinationId && (current.iracing_destination_id || null) === (settings.iracingDestinationId || null);
   if (current?.adopted && !unchanged) throw Object.assign(new Error('Pour tester une nouvelle destination, active d’abord ces réglages. Le récap existant reste inchangé.'), {status:400});
   await saveBotRecap(env,community,settings,Boolean(unchanged && current.enabled),Boolean(current?.adopted));
   return syncBotRecaps(env,timestamp,community,true);
@@ -266,8 +270,10 @@ export async function cleanupEventRecaps(env, timestamp = Date.now(), limit = 2)
       const event = await env.DB.prepare('SELECT departures,duration_hours,duration_minutes,schedule_pending FROM events WHERE id=?').bind(row.event_id).first();
       const expiry = event ? eventDeletionTime(event) : row.delete_after;
       if (expiry === null || timestamp < expiry) continue;
+      const budget = {left:12};
+      if (!await closeCourseVoices(env,row,timestamp,(method,path) => discord(env,method,path,null,budget))) continue;
       if (row.channel_id) {
-        try { await discord(env,'DELETE',`/channels/${row.channel_id}`); }
+        try { await discord(env,'DELETE',`/channels/${row.channel_id}`,null,budget); }
         catch (error) { if (error.status !== 404) throw error; }
       }
       await env.DB.prepare('UPDATE discord_recap_publications SET closed_at=? WHERE community_id=? AND event_id=? AND closed_at IS NULL').bind(timestamp,row.community_id,row.event_id).run();

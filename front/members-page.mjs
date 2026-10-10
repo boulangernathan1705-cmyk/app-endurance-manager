@@ -184,7 +184,7 @@ function recapForm(setup) {
   const mode = config?.mode || 'general';
   const established = Boolean(config || setup.legacyRecap || (setup.recaps || []).length);
   const summary = config ? `<p><strong>${config.enabled ? 'Actif' : 'Désactivé'}</strong> · ${config.mode === 'events' ? 'Un salon texte par événement' : 'Récap général'} · ${esc(RECAP_LABELS[scope])}</p>
-    <p>Destination : <strong>${esc(config.destinationName)}</strong>. ${config.mode === 'events' ? 'Salons supprimés 24 h après la fin du dernier départ.' : 'Le salon général est conservé.'}</p><p><a class="secondary-button" href="https://discord.com/channels/${esc(setup.guild.id)}/${esc(config.destinationId)}" target="_blank" rel="noopener">Ouvrir la destination sur Discord</a></p>
+    <p>Destination : <strong>${esc(config.destinationName)}</strong>${config.iracingDestinationId ? ` · iRacing : <strong>${esc(config.iracingDestinationName)}</strong>` : ''}. ${config.mode === 'events' ? 'Salons texte supprimés 24 h après la fin du dernier départ.' : 'Le salon général est conservé.'}</p><p><a class="secondary-button" href="https://discord.com/channels/${esc(setup.guild.id)}/${esc(config.destinationId)}" target="_blank" rel="noopener">Ouvrir la destination sur Discord</a></p>
     ${config.lastError ? `<p class="settings-status" role="alert">${esc(config.lastError)}</p>` : ''}`
     : `<p><strong>Récap existant conservé</strong> · ${esc(setup.legacyRecap ? 'LMU' : (setup.recaps || []).map(item => RECAP_LABELS[item.scope]).join(', '))}</p><p>Ses salons et messages restent inchangés jusqu’à une activation volontaire du nouveau mode.</p>`;
   const choice = (value,title,help) => `<label class="recap-card"><input type="radio" name="mode" value="${value}" ${mode === value ? 'checked' : ''}><span><strong>${title}</strong><small>${help}</small></span></label>`;
@@ -194,12 +194,13 @@ function recapForm(setup) {
       <p data-recap-progress aria-live="polite">Étape 1 sur 4</p>
       <fieldset data-recap-step="0"><legend>Comment présenter les courses sur Discord ?</legend>
         <div class="recap-cards">${choice('general','Récap général','Un salon texte « récap-endurances », un message pour toutes les courses.')}${choice('events','Un salon par événement','6h de Spa et 24h du Mans : deux salons texte, un message dans chacun.')}</div>
-        <p>Le même message est modifié sans notification à chaque actualisation.</p></fieldset>
+        <p>Le même message est modifié sans notification à chaque actualisation. En mode par événement, avec le module Vocaux d’équipage activé, les vocaux rejoignent la catégorie de leur course. Chaque vocal est supprimé 24 h après la fin du départ de son équipage.</p></fieldset>
       <fieldset data-recap-step="1" hidden><legend>Quelles courses inclure ?</legend><div class="recap-sims">
         <label class="role-pill"><input type="checkbox" name="lmu" ${scope !== 'iracing' ? 'checked' : ''}><span>LMU</span></label>
         <label class="role-pill"><input type="checkbox" name="iracing" ${scope !== 'lmu' ? 'checked' : ''}><span>iRacing</span></label></div><p>Ce choix est indépendant du mode de publication.</p></fieldset>
       <fieldset data-recap-step="2" hidden><legend>Où publier sur votre serveur Discord ?</legend>
         <label class="crew-category"><span data-recap-destination-label>Salon texte</span><select name="destination"><option value="${esc(config?.destinationId || '')}">${esc(config?.destinationName || 'Choisir une destination')}</option></select></label>
+        <label class="crew-category" data-recap-iracing-destination hidden>Catégorie iRacing<select name="iracingDestination"><option value="${esc(config?.iracingDestinationId || '')}">${esc(config?.iracingDestinationName || 'Même catégorie')}</option></select></label>
         <p data-recap-rights role="status"></p>${setup.recapBotInviteUrl ? `<a class="secondary-button" href="${esc(setup.recapBotInviteUrl)}" target="_blank" rel="noopener">Donner les droits au bot</a>` : ''}
         <button type="button" class="secondary-button" data-recap-destinations>Actualiser les destinations</button></fieldset>
       <fieldset data-recap-step="3" hidden><legend>Vérifier puis activer le récap</legend>
@@ -214,7 +215,9 @@ function recapForm(setup) {
 const wizardData = form => {
   const lmu = form.elements.lmu.checked, iracing = form.elements.iracing.checked;
   if (!lmu && !iracing) throw new Error('Coche au moins un simulateur.');
-  return {mode:form.elements.mode.value,scope:lmu && iracing ? 'all' : lmu ? 'lmu' : 'iracing',destinationId:form.elements.destination.value,destinationName:form.elements.destination.selectedOptions[0]?.textContent || ''};
+  return {mode:form.elements.mode.value,scope:lmu && iracing ? 'all' : lmu ? 'lmu' : 'iracing',destinationId:form.elements.destination.value,destinationName:form.elements.destination.selectedOptions[0]?.textContent || '',
+    iracingDestinationId:form.elements.mode.value === 'events' && lmu && iracing ? form.elements.iracingDestination.value || null : null,
+    iracingDestinationName:form.elements.iracingDestination.selectedOptions[0]?.textContent || ''};
 };
 const recapPreviewText = value => esc(String(value || '').replace(/<t:(\d+):[A-Za-z]>/g,(_,unix) => new Date(Number(unix)*1000).toLocaleString('fr-FR',{timeZone:'Europe/Paris',dateStyle:'medium',timeStyle:'short'})).replace(/\*\*/g,''));
 function recapPreviewMarkup(previews) {
@@ -223,21 +226,24 @@ function recapPreviewMarkup(previews) {
 async function loadRecapDestinations(form) {
   const result = await api('/api/community/recap/destinations');
   const type = form.elements.mode.value === 'events' ? 4 : 0;
-  const select = form.elements.destination, selected = select.value;
   const destinations = result.destinations.filter(item => item.type === type);
-  select.innerHTML = '<option value="">Choisir une destination</option>' + destinations.map(item => `<option value="${esc(item.id)}" ${item.id === selected ? 'selected' : ''}>${esc(item.name)}${item.ready ? '' : ' · permissions manquantes'}</option>`).join('');
+  for (const [select, placeholder] of [[form.elements.destination,'Choisir une destination'],[form.elements.iracingDestination,'Même catégorie']]) {
+    const selected = select.value;
+    select.innerHTML = `<option value="">${placeholder}</option>` + destinations.map(item => `<option value="${esc(item.id)}" ${item.id === selected ? 'selected' : ''}>${esc(item.name)}${item.ready ? '' : ' · permissions manquantes'}</option>`).join('');
+  }
   form._destinations = destinations;
   recapRights(form);
 }
 function recapRights(form) {
-  const destination = form._destinations?.find(item => item.id === form.elements.destination.value);
-  form.querySelector('[data-recap-rights]').textContent = destination && !destination.ready ? `Dans les permissions de « ${destination.name} », autorise le bot : ${destination.missing.join(', ')}.` : 'Le bot doit voir le salon, envoyer des messages et lire les anciens messages. Pour créer et supprimer les salons texte par événement, il doit aussi gérer les salons.';
+  const secondary = form.elements.mode.value === 'events' && form.elements.lmu.checked && form.elements.iracing.checked ? form.elements.iracingDestination.value : null;
+  const destination = form._destinations?.find(item => [form.elements.destination.value,secondary].includes(item.id) && !item.ready);
+  form.querySelector('[data-recap-rights]').textContent = destination ? `Dans les permissions de « ${destination.name} », autorise le bot : ${destination.missing.join(', ')}.` : 'Le bot doit voir le salon, envoyer des messages et lire les anciens messages. Pour créer et supprimer les salons texte par événement, il doit aussi gérer les salons.';
 }
 async function recapStep(form, step) {
   if (step === 3) {
     const data = wizardData(form);
     if (!data.destinationId) throw new Error('Choisis une destination Discord.');
-    const destination = form._destinations?.find(item => item.id === data.destinationId);
+    const destination = form._destinations?.find(item => [data.destinationId,data.iracingDestinationId].includes(item.id) && !item.ready);
     if (destination && !destination.ready) throw new Error(`Permissions manquantes : ${destination.missing.join(', ')}.`);
   }
   form.dataset.step = String(step);
@@ -248,7 +254,9 @@ async function recapStep(form, step) {
   form.querySelector(`[data-recap-step="${step}"] legend`).setAttribute('tabindex','-1');
   form.querySelector(`[data-recap-step="${step}"] legend`).focus();
   if (step === 2) {
-    form.querySelector('[data-recap-destination-label]').textContent = form.elements.mode.value === 'events' ? 'Catégorie des salons texte' : 'Salon texte';
+    const separate = form.elements.mode.value === 'events' && form.elements.lmu.checked && form.elements.iracing.checked;
+    form.querySelector('[data-recap-iracing-destination]').hidden = !separate;
+    form.querySelector('[data-recap-destination-label]').textContent = form.elements.mode.value === 'events' ? (separate ? 'Catégorie LMU' : 'Catégorie des salons texte') : 'Salon texte';
     await loadRecapDestinations(form);
   }
   if (step === 3) {
@@ -269,7 +277,7 @@ async function recapStep(form, step) {
 function crewCategory(crews) {
   const list = crews.categories || [], current = crews.voiceCategoryId || '';
   const options = [{id:'', name:'En haut du serveur'}, ...list, ...(current && !list.some(item => item.id === current) ? [{id:current, name:'Catégorie actuelle'}] : [])];
-  return `<label class="crew-category">Où créer les vocaux ?<select data-crew-category>${options.map(item => `<option value="${esc(item.id)}" ${item.id === current ? 'selected' : ''}>${esc(item.name)}</option>`).join('')}</select></label><span class="settings-status" aria-live="polite"></span>`;
+  return `<label class="crew-category">Catégorie des vocaux sans récap par course<select data-crew-category>${options.map(item => `<option value="${esc(item.id)}" ${item.id === current ? 'selected' : ''}>${esc(item.name)}</option>`).join('')}</select></label><span class="settings-status" aria-live="polite"></span>`;
 }
 // Why the crews' channels cannot be turned on yet (the bot's state on the server, checked by the site).
 const BOT_PROBLEMS = {
@@ -285,13 +293,13 @@ function modulesMarkup(settings, setup) {
       <div class="setup-actions">${crews.botInviteUrl ? `<a class="primary-button" href="${esc(crews.botInviteUrl)}" target="_blank" rel="noopener">Donner les droits au bot</a>` : ''}<button type="button" class="secondary-button" data-modules-refresh="crewChannels">C’est fait</button></div>`;
   const crewWarn = states.crewChannels && (crews.botReady !== true || crews.lastError);
   const tiles = [
-    {key:'recap', name:'Récap de la semaine sur Discord', text:'Un récap général ou un salon texte par événement, avec un message actualisé sans notifications répétées.',
+    {key:'recap', name:'Récaps de course sur Discord', text:'Un récap général ou un salon texte par événement, avec un message actualisé sans notifications répétées.',
       state:states.recap ? ['ok', setup.botRecap ? (setup.botRecap.mode === 'events' ? 'Actif · un salon texte par événement' : 'Actif · récap général') : (setup.recaps || []).length ? `Actif · ${(setup.recaps || []).map(item => RECAP_LABELS[item.scope]).join(', ')}` : 'Actif · salon d’origine'] : ['off', 'Éteint'],
       control:'', settings:recapForm(setup)},
-    {key:'crewChannels', name:'Salons d’équipage sur Discord', text:'Un salon vocal par équipage, nommé simu + nom de l’équipage, ouvert quelques jours avant la course.',
+    {key:'crewChannels', name:'Vocaux d’équipage sur Discord', text:'Un vocal accessible à tous les membres du serveur, créé dès la création de l’équipage sur le site.',
       state:crewWarn ? ['warn', crews.botReady !== true ? 'Le bot n’a pas les droits' : 'Le bot est bloqué'] : states.crewChannels ? ['ok', 'Actif'] : ['off', crews.botReady === true ? 'Éteint' : crews.botProblem === 'rights' ? 'Éteint · droits du bot à donner' : 'Éteint · bot à vérifier'],
-      control:toggle('crewChannels', 'Salons d’équipage sur Discord', crews.botReady !== true && !states.crewChannels),
-      settings:`${crewRights}${states.crewChannels ? crewCategory(crews) : ''}<p class="members-help">Il est supprimé 2 h après la course.</p>`},
+      control:toggle('crewChannels', 'Vocaux d’équipage sur Discord', crews.botReady !== true && !states.crewChannels),
+      settings:`${crewRights}<p class="members-help">Avec les récaps par course activés, les vocaux rejoignent automatiquement la catégorie de leur course. Le nom du vocal précise la course et l’équipage. Chaque vocal est supprimé 24 h après la fin du départ de son équipage. Le salon texte reste jusqu’à 24 h après la fin du dernier départ de la course. Si l’horaire concerné ou la durée reste à confirmer, la suppression attend.</p>${states.crewChannels ? `${setup.botRecap?.enabled && setup.botRecap.mode === 'events' ? '<p class="members-help">Organisation coordonnée avec les récaps de course. Le choix ci-dessous sert aux courses exclues du récap et lorsque les récaps par course sont désactivés.</p>' : ''}${crewCategory(crews)}` : ''}`},
     {key:'raceReminders', name:'Rappels de course', text:'24&nbsp;h avant le départ dans la cloche du site, 24&nbsp;h et 1&nbsp;h avant dans le salon de l’équipage.',
       state:states.raceReminders ? ['ok', 'Actif'] : ['off', 'Éteint'], control:toggle('raceReminders', 'Rappels de course'), settings:''},
     {key:'iracingImport', name:'Endurances iRacing officielles', text:'Les séries en équipe et les événements spéciaux importés automatiquement.',

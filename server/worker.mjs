@@ -882,7 +882,7 @@ async function api(request, env) {
     const rolesConfigured = Boolean(await env.DB.prepare('SELECT 1 FROM community_role_permissions WHERE community_id=? LIMIT 1').bind(community.id).first());
     const savedBotRecap = await botRecapSettings(env, community);
     const botRecap = savedBotRecap?.adopted ? savedBotRecap : null;
-    return json({botRecap:botRecap ? {enabled:Boolean(botRecap.enabled),mode:botRecap.mode,scope:botRecap.scope,destinationId:botRecap.destination_id,destinationName:botRecap.destination_name,lastError:botRecap.last_error} : null,
+    return json({botRecap:botRecap ? {enabled:Boolean(botRecap.enabled),mode:botRecap.mode,scope:botRecap.scope,destinationId:botRecap.destination_id,destinationName:botRecap.destination_name,iracingDestinationId:botRecap.iracing_destination_id,iracingDestinationName:botRecap.iracing_destination_name,lastError:botRecap.last_error} : null,
       recapBotInviteUrl:env.DISCORD_CLIENT_ID ? `https://discord.com/oauth2/authorize?client_id=${encodeURIComponent(env.DISCORD_CLIENT_ID)}&scope=bot&permissions=${RECAP_BOT_PERMISSIONS}&guild_id=${community.discordGuildId}&disable_guild_select=true` : null,
       community:{name:community.name, slug:community.slug}, siteUrl:communityUrl(env, community), rolesConfigured, recaps,
       // Former recap (site's webhook, LMU only) still running until the admins choose their own.
