@@ -19,8 +19,8 @@ function renderError(message) {
 }
 
 // What each permission means (server/access.mjs, PERMISSIONS).
-const PERMISSION_LABELS = {endurance:'Endurances', solo_open:'Événements OPEN', solo_safe:'Événements SAFE', crews:'Équipages', admin:'Administrer'};
-const PERMISSION_HELP = {endurance:'S’inscrire aux endurances (et rejoindre un équipage existant).',
+const PERMISSION_LABELS = {access:'Accès Endurance Manager', endurance:'Endurances', solo_open:'Événements OPEN', solo_safe:'Événements SAFE', crews:'Équipages', admin:'Administrer'};
+const PERMISSION_HELP = {access:'Accéder au site de la communauté. Sans cette autorisation sur au moins un rôle, le membre ne peut pas consulter les courses ni utiliser le site.', endurance:'S’inscrire aux endurances (et rejoindre un équipage existant).',
   solo_open:'S’inscrire aux événements OPEN.', solo_safe:'S’inscrire aux événements SAFE (et OPEN).',
   crews:'Créer et gérer les équipages.',
   admin:'Administrer le site : réglages, rôles, créer et gérer les courses et les événements, inscrire n’importe quel pilote.'};
@@ -136,7 +136,7 @@ function peopleMarkup(result, settings) {
       <div class="members-list member-grid">${members.map(member => memberCard(member, result.permissions || [])).join('')}</div>
       <p class="members-empty" hidden>Aucun membre ne correspond à cette recherche.</p></div>
     <div data-view-pane="roles" class="admin-stack" hidden>
-      <p class="members-help">Un membre cumule les autorisations de tous ses rôles ; sans aucune, il voit seulement les courses. « @everyone » s’applique à tout le serveur. Le propriétaire du serveur et les rôles « Administrateur » de Discord ont tout. Chaque case s’enregistre dès qu’on la coche.</p>
+      <p class="members-help">Coche « Accès Endurance Manager » sur les rôles autorisés à entrer. Un membre doit avoir au moins un de ces rôles ; les autres autorisations définissent ensuite ce qu’il peut faire. « @everyone » s’applique à tout le serveur : laisse son accès décoché pour réserver le site à certains rôles. Les administrateurs du site, le propriétaire du serveur et les rôles « Administrateur » de Discord conservent toutes les autorisations. Chaque case s’enregistre dès qu’on la coche.</p>
       ${roles}${legend}</div>`;
 }
 

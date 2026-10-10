@@ -194,10 +194,13 @@ export function communityGate(){
     actions=`<div class="welcome-actions">${login}<a class="secondary-button" href="/demande-communaute.html">Demander un espace pour ta communauté</a></div>${trust}`;
   }else if(state.access==='anonymous'){
     kicker=name;title=`Bienvenue sur l’espace de ${name}`;
-    lead='Cet espace est réservé aux membres de son serveur Discord. Connecte-toi pour voir les courses et t’inscrire.';actions=login+trust;
+    lead='Cet espace est réservé aux membres autorisés de son serveur Discord. Connecte-toi pour voir les courses et t’inscrire.';actions=login+trust;
   }else if(state.access==='not-member'){
     kicker=name;title=`Rejoins ${name} pour rouler avec eux`;
-    lead=`Tu n’es pas encore membre du serveur Discord de ${name}. Rejoins-le, puis reviens sur cette page : l’accès s’ouvre tout seul.`;actions=`<div class="welcome-actions">${invite}${partner}</div>`;
+    lead=`Tu n’es pas encore membre du serveur Discord de ${name}. Rejoins-le, puis demande à un administrateur un rôle autorisé à accéder à Endurance Manager.`;actions=`<div class="welcome-actions">${invite}${partner}</div>`;
+  }else if(state.access==='forbidden'){
+    kicker=name;title='Accès réservé';
+    lead='Ton compte Discord est connecté, mais aucun de tes rôles ne t’autorise à accéder à Endurance Manager. Demande l’accès à un administrateur du Discord.';actions='';
   }else{
     kicker=name;title='Accès momentanément indisponible';lead=`L’accès à ${name} ne peut pas être vérifié pour le moment. Réessaie dans quelques minutes.`;actions='';
   }

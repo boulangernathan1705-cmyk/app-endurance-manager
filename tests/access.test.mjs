@@ -52,7 +52,7 @@ test('members get the permissions of their Discord roles; others get nothing', a
   const calls=fakeDiscord(t,{[PILOT]:[],[BOSS]:[ORGA_ROLE,SAFE_ROLE]});
   assert.equal((await accessOf(env,community,null)).status,'anonymous');
   const pilot=await accessOf(env,community,PILOT);
-  assert.equal(pilot.status,'member');assert.deepEqual([...pilot.permissions].sort(),[...DEFAULT_EVERYONE].sort(),'@everyone by default: enter endurances and OPEN events');
+  assert.equal(pilot.status,'member');assert.deepEqual([...pilot.permissions].sort(),['access',...DEFAULT_EVERYONE].sort(),'@everyone explicitly grants site access');
   const boss=await accessOf(env,community,BOSS);
   assert.ok(['admin','crews','solo_safe','endurance'].every(p=>boss.permissions.has(p)),'roles add up');
   assert.ok(['create_race','manage_races','manage_registrations'].every(p=>boss.permissions.has(p)),'administering brings creating races and entering any pilot');
@@ -126,8 +126,8 @@ test('at sign-in, the communities never checked are asked once, so « Mes commun
 test('a community admin sets what each Discord role allows, "@everyone" included', async t => {
   const {DB,env,community}=setup();
   fakeDiscord(t,{[PILOT]:[SAFE_ROLE]});
-  DB.db.prepare("INSERT INTO community_role_permissions(community_id,discord_role_id,permissions,updated_at) VALUES(?,?,?,0)").run(DEV_COMMUNITY,GUILD,JSON.stringify(['register','not-a-permission']));
-  assert.deepEqual([...(await accessOf(env,community,PILOT)).permissions].sort(),['endurance','solo_open','solo_safe'],'old names keep their meaning, unknown names are ignored');
+  DB.db.prepare("INSERT OR REPLACE INTO community_role_permissions(community_id,discord_role_id,permissions,updated_at) VALUES(?,?,?,0)").run(DEV_COMMUNITY,GUILD,JSON.stringify(['access','register','not-a-permission']));
+  assert.deepEqual([...(await accessOf(env,community,PILOT)).permissions].sort(),['access','endurance','solo_open','solo_safe'],'old names keep their meaning, unknown names are ignored');
 });
 
 test('the site: nothing for visitors or non-members, the members page lists the Discord roles', async t => {
@@ -169,7 +169,7 @@ test('community admins set the permissions of each Discord role and the modules'
   };
   assert.equal((await as(PILOT,'settings')).status,403);
   const settings=await (await as(BOSS,'settings')).json();
-  assert.deepEqual(settings.roles.find(role=>role.name==='@everyone').permissions,[...DEFAULT_EVERYONE]);
+  assert.deepEqual(settings.roles.find(role=>role.name==='@everyone').permissions,['access',...DEFAULT_EVERYONE]);
   assert.equal((await as(BOSS,`roles/${SAFE_ROLE}`,'PUT',{permissions:['endurance','crews']})).status,200);
   assert.equal((await as(BOSS,`roles/${SAFE_ROLE}`,'PUT',{permissions:['create_race']})).status,400,'creating races comes with « admin » only');
   assert.equal((await as(BOSS,`roles/${SAFE_ROLE}`,'PUT',{permissions:['everything']})).status,400);
@@ -235,4 +235,51 @@ test('Discord not answering: a member already checked keeps the roles known last
   DB.db.prepare('UPDATE memberships SET checked_at=checked_at-700').run();
   const access=await accessOf(env,community,PILOT);
   assert.equal(access.status,'member');assert.ok(access.permissions.has('create_race'));
+});
+
+test('site access is explicit, cumulative and separate from action permissions; role settings revoke it immediately', async t => {
+  const {DB,env,community}=setup();
+  fakeDiscord(t,{[PILOT]:[SAFE_ROLE],[BOSS]:[SAFE_ROLE,ORGA_ROLE]});
+  DB.db.prepare('DELETE FROM community_role_permissions WHERE community_id=?').run(DEV_COMMUNITY);
+  const set=(role,permissions)=>DB.db.prepare('INSERT OR REPLACE INTO community_role_permissions(community_id,discord_role_id,permissions,updated_at) VALUES(?,?,?,0)').run(DEV_COMMUNITY,role,JSON.stringify(permissions));
+  assert.equal((await accessOf(env,community,PILOT)).status,'forbidden','no defaults grant entry');
+  set(SAFE_ROLE,['endurance','crews','solo_safe']);
+  let access=await accessOf(env,community,PILOT);
+  assert.equal(access.status,'forbidden');assert.equal(access.permissions.size,0,'action rights cannot bypass the gate');
+  set(ORGA_ROLE,['access']);
+  assert.equal((await accessOf(env,community,PILOT)).status,'forbidden','another role does not grant access to this pilot');
+  access=await accessOf(env,community,BOSS);
+  assert.equal(access.status,'member');assert.ok(access.permissions.has('access'));assert.ok(access.permissions.has('solo_safe'),'access and actions can come from separate roles');
+  set(ORGA_ROLE,[]);
+  assert.equal((await accessOf(env,community,BOSS)).status,'forbidden','unchecking access takes effect with cached Discord roles');
+  set(GUILD,['access']);
+  assert.equal((await accessOf(env,community,PILOT)).status,'member','@everyone opens the community when explicitly checked');
+  set(GUILD,[]);set(SAFE_ROLE,['access']);
+  access=await accessOf(env,community,PILOT);
+  assert.deepEqual([...access.permissions],['access'],'access alone allows consultation without granting actions');
+  DB.db.prepare("INSERT INTO communities(id,slug,name,short_name,discord_guild_id,created_at) VALUES('another-community','another','Other','O',?,0)").run(GUILD);
+  assert.equal((await accessOf(env,{...community,id:'another-community'},PILOT)).status,'forbidden','the grant is scoped to its community');
+});
+
+test('a connected Discord member without site access gets no protected API data or actions; admin can grant and revoke access', async t => {
+  const {DB,env}=setup();
+  fakeDiscord(t,{[PILOT]:[SAFE_ROLE],[BOSS]:[ADMIN_ROLE]});
+  DB.db.prepare('DELETE FROM community_role_permissions WHERE community_id=? AND discord_role_id=?').run(DEV_COMMUNITY,GUILD);
+  const call=async (userId,path,method='GET',body)=>{
+    const raw=userId.slice(0,1).repeat(64);const hash=[...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(raw)))].map(b=>b.toString(16).padStart(2,'0')).join('');
+    DB.db.prepare('INSERT OR REPLACE INTO sessions(token_hash,user_id,expires_at) VALUES(?,?,?)').run(hash,userId,4102444800);
+    return worker.fetch(new Request(ROOT+path,{method,headers:{Cookie:`__Host-em_session=${raw}`,'CF-Connecting-IP':userId,...(method==='GET'?{}:{Origin:ROOT,'Content-Type':'application/json'})},body:body?JSON.stringify(body):undefined}),env);
+  };
+  const info=await (await call(PILOT,'/api/session')).json();
+  assert.equal(info.access,'forbidden');assert.deepEqual(info.permissions,[]);
+  for(const path of ['/api/events','/api/participants','/api/members','/api/community/settings','/api/notifications','/api/training']){
+    const response=await call(PILOT,path);assert.equal(response.status,403,path);assert.match((await response.json()).error,/autorisation d’accéder à Endurance Manager/);
+  }
+  assert.equal((await call(PILOT,'/api/events','POST',{name:'Not allowed'})).status,403);
+  const change=permissions=>call(BOSS,`/api/community/roles/${SAFE_ROLE}`,'PUT',{permissions});
+  assert.equal((await change(['access','endurance'])).status,200);
+  assert.equal((await call(PILOT,'/api/events')).status,200,'admin grants access without a new login');
+  assert.equal((await change(['endurance'])).status,200);
+  assert.equal((await call(PILOT,'/api/events')).status,403,'admin revokes access without deleting membership');
+  assert.equal(DB.db.prepare('SELECT status FROM memberships WHERE user_id=?').get(PILOT).status,'member');
 });

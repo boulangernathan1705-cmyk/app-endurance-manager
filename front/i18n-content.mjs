@@ -1,6 +1,12 @@
 import {getLocale,translateTextForLocale} from './i18n.mjs';
 
 const EN=new Map(Object.entries({
+  'Accès Endurance Manager':'Endurance Manager access',
+  'Accès réservé':'Restricted access',
+  'Ton compte Discord est connecté, mais aucun de tes rôles ne t’autorise à accéder à Endurance Manager. Demande l’accès à un administrateur du Discord.':'You are signed in with Discord, but none of your roles grants access to Endurance Manager. Ask a Discord administrator for access.',
+  'Cet espace est réservé aux membres autorisés de son serveur Discord. Connecte-toi pour voir les courses et t’inscrire.':'This space is reserved for authorized members of its Discord server. Sign in to see races and register.',
+  'Accéder au site de la communauté. Sans cette autorisation sur au moins un rôle, le membre ne peut pas consulter les courses ni utiliser le site.':'Access the community site. Without this permission on at least one role, members cannot see races or use the site.',
+
   // Legal pages, 29 September 2026 (communities)
   'Dernière mise à jour : 29 septembre 2026':'Last updated: 29 September 2026',
   'Endurance Manager est un outil d’organisation de courses d’endurance simracing utilisé par des communautés. Chaque communauté a son propre site (nom.endurance-manager.app), réservé aux membres de son serveur Discord. Les données traitées servent uniquement à gérer les comptes, l’accès aux communautés, les inscriptions, les disponibilités des pilotes, les équipages et la sécurité du service.':'Endurance Manager is a tool used by communities to organize sim racing endurance races. Each community has its own site (name.endurance-manager.app), reserved for the members of its Discord server. The data processed is only used to manage accounts, access to communities, entries, drivers’ availability, crews and the security of the service.',
