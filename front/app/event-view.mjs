@@ -1,3 +1,5 @@
+import {isGrindfest} from '../../shared/grindfest.mjs';
+import {streamerColumns} from './grindfest.mjs';
 import {simForEvent} from '../../shared/catalog.mjs';
 import {dateBlock,timeLabel,weekdayLong,dayMonthShort,fullDateLabel} from '../dates.mjs';
 import {durationLabel,eventMinutes} from '../../shared/duration.mjs';
@@ -114,7 +116,7 @@ function roundCards(event,departure){
     const open=(editing&&focus===index)||!state.closedRounds?.has(`${departure.id}:${index}`);
     const editor=!locked&&editing&&focus===index?`<section class="fold-section fold-registration">${renderRegistrationWorkspace(event,departure)}</section>`:'';
     // One round: a plain frame, always open (it doesn't fold); its details stay at the top of the page.
-    if(single)return `<details class="planning-start solo-round-start is-single has-quick${mine?' is-mine':''}" open><summary><span class="planning-start-head solo-round-head"><span class="solo-subtitle">Pilotes <span class="count-pill">${pilots}${capacity?` / ${capacity}`:''}</span></span>${mine?'<span class="planning-tag is-mine">Inscrit</span>':''}</span>${quickActions(event,departure)}</summary><div class="departure-fold planning-body"><div class="departure-fold-body">${editor}${soloEntryList(event,departure,(departure.availability||[]).filter(reg=>reg.status!=='unavailable'),{capacity,waitOf:reg=>reg.waitlistPosition})}</div></div></details>`;
+    if(single)return `<details class="planning-start solo-round-start is-single has-quick${mine?' is-mine':''}" open><summary><span class="planning-start-head solo-round-head"><span class="solo-subtitle">Pilotes <span class="count-pill">${pilots}${capacity?` / ${capacity}`:''}</span></span>${mine?'<span class="planning-tag is-mine">Inscrit</span>':''}</span>${quickActions(event,departure)}</summary><div class="departure-fold planning-body"><div class="departure-fold-body">${editor}${isGrindfest(event)?streamerColumns(event,departure):soloEntryList(event,departure,(departure.availability||[]).filter(reg=>reg.status!=='unavailable'),{capacity,waitOf:reg=>reg.waitlistPosition})}</div></div></details>`;
     return `<details class="planning-start solo-round-start has-quick${mine?' is-mine':''}" data-round-key="${departure.id}:${index}" ${open?'open':''}><summary><span class="planning-start-head solo-round-head"><span class="round-start-title"><small>Manche ${index+1}</small><strong>${esc(eventCircuitName(event,round.circuit))}</strong></span>${mine?'<span class="planning-tag is-mine">Inscrit</span>':''}</span><span class="planning-row"><span class="solo-round-pilots">${capacity?`<strong>${pilots} / ${capacity}</strong> places prises`:`${pilots} pilote${pilots>1?'s':''}`}</span></span>${roundQuick(event,departure,index)}${CHEVRON}</summary><div class="departure-fold planning-body"><div class="departure-fold-body">${editor}${roundTiles(round)}${roundEntries(event,departure,index)}</div></div></details>`;
   }).join('')}</div>`;
 }

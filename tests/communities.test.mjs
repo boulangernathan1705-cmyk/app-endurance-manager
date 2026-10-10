@@ -204,3 +204,43 @@ test('official races: every community enters them; a player sees the entries of 
   assert.equal((await req(`/api/events/${own.data.id}/official`,'POST',{},'admin')).status,200);
   assert.equal(DB.db.prepare('SELECT community_id FROM events WHERE id=?').get(own.data.id).community_id,'official');
 });
+
+test('Grindfest is TDZ-only and API queues promote and reorder per streamer', async () => {
+  const {DB, req, login, inCommunity}=harness();
+  await login(ADMIN,'admin');
+  assert.equal((await req('/api/community/modules','PATCH',{grindfest:true},'admin')).status,403);
+  const tdz='90a193bc-9029-437c-a1e6-8e39f09033a3';
+  DB.db.prepare("INSERT INTO communities(id,slug,name,short_name,created_at) VALUES(?,'tdz','TDZ','TDZ',0)").run(tdz);
+  linkTestServer(DB.db,tdz);setMember(DB.db,ADMIN,[],{communityId:tdz});inCommunity('tdz');
+  const streamers=[{id:'a',name:'Alpha',capacity:1,twitchUrl:'https://twitch.tv/alpha'},{id:'b',name:'Bravo',capacity:1,twitchUrl:'https://twitch.tv/bravo'}];
+  const input={name:'Grindfest',format:'solo',sim:'lmu',details:{type:'Grindfest',streamers},rounds:[{circuit:'spa',durationMinutes:60,categories:[]}],departures:[{date:'2090-10-15',time:'20:00'}]};
+  assert.equal((await req('/api/events','POST',input,'admin')).status,400);
+  assert.equal((await req('/api/community/modules','PATCH',{grindfest:true},'admin')).status,200);
+  assert.equal((await req('/api/events','POST',{...input,official:true},'admin')).status,403);
+  assert.equal((await req('/api/events','POST',input,'admin')).status,201);
+  const list=async ()=>(await req('/api/events','GET',null,'admin')).data.events[0];
+  const event=await list(), base=`/api/events/${event.id}/departures/${event.departures[0].id}/registrations`;
+  assert.equal(event.capacity,2);
+  assert.equal((await req(base,'POST',{name:'Missing',forOther:true},'admin')).status,400);
+  const register=async(name,streamerId)=>{
+    const result=await req(base,'POST',{name,streamerId,forOther:true},'admin');
+    assert.equal(result.status,201,JSON.stringify(result.data));return result.data.id;
+  };
+  const first=await register('First','a'), second=await register('Second','a'), third=await register('Third','a');
+  await register('Bravo first','b');await register('Bravo second','b');
+  const entries=async()=>(await list()).departures[0].availability;
+  assert.deepEqual((await entries()).map(reg=>reg.waitlistPosition),[null,1,2,null,1]);
+  assert.equal((await req(`/api/registrations/${first}`,'DELETE',{version:1},'admin')).status,200);
+  assert.equal((await entries()).find(reg=>reg.id===second).waitlistPosition,null);
+  assert.equal((await req(`/api/registrations/${third}`,'PATCH',{name:'Third',streamerId:'b',version:1},'admin')).status,200);
+  assert.equal((await entries()).find(reg=>reg.id===third).waitlistPosition,2,'switching streamer joins the end of its queue, even in the same second');
+  // An admin may not delete a streamer who still has pilots.
+  const current=await list();
+  const replacement={...input,version:current.version,details:{type:'Grindfest',streamers:[streamers[0],{...streamers[1],id:'c'}]}};
+  assert.equal((await req(`/api/events/${event.id}`,'PATCH',replacement,'admin')).status,409);
+  assert.equal((await req('/api/community/modules','PATCH',{grindfest:false},'admin')).status,200);
+  assert.equal((await req('/api/events','GET',null,'admin')).data.events.length,0);
+  assert.equal((await req(base,'POST',{name:'Hidden',streamerId:'a',forOther:true},'admin')).status,404);
+  inCommunity('commu-test');
+  assert.equal((await req(base,'POST',{name:'Other community',streamerId:'a',forOther:true},'admin')).status,404);
+});
