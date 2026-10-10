@@ -104,8 +104,15 @@ function roundEntries(event,departure,index){
   const capacity=event.rounds[index]?.capacity||null;
   return soloEntryList(event,departure,(departure.availability||[]).filter(reg=>reg.status!=='unavailable'&&!reg.roundChoices?.[index]?.skip),{round:index,capacity,waitOf:capacity?reg=>reg.roundWaitlist?.[index]:reg=>reg.waitlistPosition});
 }
+function grindfestRounds(event,departure){
+  const rounds=event.rounds||[],locked=departure.startsAt<=Date.now(),mine=ownRegistration(departure),pilots=roundPilots(event,0,departure);
+  const editor=!locked&&state.registrationOpen.has(departure.id)?`<section class="fold-section fold-registration">${renderRegistrationWorkspace(event,departure)}</section>`:'';
+  const program=rounds.length>1?`<div class="grindfest-rounds">${rounds.map((round,index)=>`<section class="grindfest-round"><h3>Manche ${index+1} · ${esc(eventCircuitName(event,round.circuit))}</h3>${roundTiles(round)}</section>`).join('')}</div>`:'';
+  return `<div class="solo-round-starts" id="departure-${departure.id}">${program}<details class="planning-start solo-round-start is-single has-quick${mine?' is-mine':''}" open><summary><span class="planning-start-head solo-round-head"><span class="solo-subtitle">Pilotes <span class="count-pill">${pilots} / ${event.capacity}</span></span>${mine?'<span class="planning-tag is-mine">Inscrit</span>':''}</span>${quickActions(event,departure)}</summary><div class="departure-fold planning-body"><div class="departure-fold-body">${editor}${streamerColumns(event,departure)}</div></div></details></div>`;
+}
 function roundCards(event,departure){
   if(!isSolo(event))return '';
+  if(isGrindfest(event))return grindfestRounds(event,departure);
   // A single round: one frame, without « Manche 1 » nor the circuit (both in the header), with the event's usual buttons.
   const single=(event.rounds||[]).length<2,rounds=single?[event.rounds?.[0]||{circuit:event.circuit}]:event.rounds;
   if(single&&(event.departures||[]).length>1)return '';
@@ -116,7 +123,7 @@ function roundCards(event,departure){
     const open=(editing&&focus===index)||!state.closedRounds?.has(`${departure.id}:${index}`);
     const editor=!locked&&editing&&focus===index?`<section class="fold-section fold-registration">${renderRegistrationWorkspace(event,departure)}</section>`:'';
     // One round: a plain frame, always open (it doesn't fold); its details stay at the top of the page.
-    if(single)return `<details class="planning-start solo-round-start is-single has-quick${mine?' is-mine':''}" open><summary><span class="planning-start-head solo-round-head"><span class="solo-subtitle">Pilotes <span class="count-pill">${pilots}${capacity?` / ${capacity}`:''}</span></span>${mine?'<span class="planning-tag is-mine">Inscrit</span>':''}</span>${quickActions(event,departure)}</summary><div class="departure-fold planning-body"><div class="departure-fold-body">${editor}${isGrindfest(event)?streamerColumns(event,departure):soloEntryList(event,departure,(departure.availability||[]).filter(reg=>reg.status!=='unavailable'),{capacity,waitOf:reg=>reg.waitlistPosition})}</div></div></details>`;
+    if(single)return `<details class="planning-start solo-round-start is-single has-quick${mine?' is-mine':''}" open><summary><span class="planning-start-head solo-round-head"><span class="solo-subtitle">Pilotes <span class="count-pill">${pilots}${capacity?` / ${capacity}`:''}</span></span>${mine?'<span class="planning-tag is-mine">Inscrit</span>':''}</span>${quickActions(event,departure)}</summary><div class="departure-fold planning-body"><div class="departure-fold-body">${editor}${soloEntryList(event,departure,(departure.availability||[]).filter(reg=>reg.status!=='unavailable'),{capacity,waitOf:reg=>reg.waitlistPosition})}</div></div></details>`;
     return `<details class="planning-start solo-round-start has-quick${mine?' is-mine':''}" data-round-key="${departure.id}:${index}" ${open?'open':''}><summary><span class="planning-start-head solo-round-head"><span class="round-start-title"><small>Manche ${index+1}</small><strong>${esc(eventCircuitName(event,round.circuit))}</strong></span>${mine?'<span class="planning-tag is-mine">Inscrit</span>':''}</span><span class="planning-row"><span class="solo-round-pilots">${capacity?`<strong>${pilots} / ${capacity}</strong> places prises`:`${pilots} pilote${pilots>1?'s':''}`}</span></span>${roundQuick(event,departure,index)}${CHEVRON}</summary><div class="departure-fold planning-body"><div class="departure-fold-body">${editor}${roundTiles(round)}${roundEntries(event,departure,index)}</div></div></details>`;
   }).join('')}</div>`;
 }

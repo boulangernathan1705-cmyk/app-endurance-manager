@@ -27,7 +27,7 @@ export function syncStreamerFields(form) {
   section.querySelector('[data-add-streamer]').hidden = streamers.length >= 12;
   section.querySelectorAll('[data-remove-streamer]').forEach(button => { button.disabled = streamers.length <= 2; });
   const addRound = form.querySelector('[data-add-round]');
-  if (addRound) addRound.hidden = active || form.querySelectorAll('.solo-round').length >= 4;
+  if (addRound) addRound.hidden = form.querySelectorAll('.solo-round').length >= 4;
   form.querySelectorAll('[name="roundCapacity"]').forEach(field => { field.disabled = active; if (active) field.value = ''; });
 }
 export function streamerColumns(event, departure) {

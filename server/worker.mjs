@@ -289,7 +289,7 @@ async function listEvents(env, actor, game='', scope='', community) {
         else if (format==='solo' && capacity) availability.forEach((reg,index)=>{ reg.waitlistPosition=index>=capacity?index-capacity+1:null; });
         // Rounds with their own places: the same, round by round (a pilot skipping a round takes no place in it).
         const rounds=format==='solo'?JSON.parse(row.rounds||'[]'):[];
-        if (rounds.length>1 && rounds.some(round=>round.capacity)) {
+        if (!isGrindfest(row) && rounds.length>1 && rounds.some(round=>round.capacity)) {
           const counts=rounds.map(()=>0);
           availability.forEach(reg=>{ reg.roundWaitlist=rounds.map((round,index)=>{ if(reg.roundChoices?.[index]?.skip)return null; counts[index]++; return round.capacity&&counts[index]>round.capacity?counts[index]-round.capacity:null; }); });
         }
