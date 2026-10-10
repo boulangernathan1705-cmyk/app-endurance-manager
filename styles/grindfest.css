@@ -1,0 +1,15 @@
+.grindfest-grid {display:grid;grid-template-columns:repeat(var(--streamer-columns,4),minmax(0,1fr));gap:16px;align-items:start}
+.grindfest-column {min-width:0;border:1px solid var(--border,#39404a);border-radius:12px;padding:14px;background:var(--surface,#171c25)}
+.grindfest-streamer-head {display:flex;flex-direction:column;align-items:center;gap:8px;color:inherit;text-decoration:none;margin-bottom:18px;text-align:center}
+.grindfest-streamer-head small {opacity:.7}
+.grindfest-logo {width:64px;height:64px;object-fit:contain;border-radius:8px}
+.grindfest-column .solo-entries {display:grid;grid-template-columns:minmax(0,1fr)}
+.grindfest-streamer-form {display:grid;grid-template-columns:2fr 3fr 1fr;gap:12px;border-bottom:1px solid var(--border,#39404a);padding:16px 0}
+.grindfest-streamer-form input {min-width:0;width:100%}
+.grindfest-choice {margin-bottom:20px}
+.grindfest-choice p {font-size:.9rem;color:var(--muted,#b4bdca)}
+@media(max-width:1000px) {.grindfest-grid {grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:600px) {.grindfest-grid,.grindfest-streamer-form {grid-template-columns:1fr}}
+
+html[data-game] #app .race-header[class*="is-solo-"] .event-type-panel[data-type="Grindfest"] span {font-size:18px;letter-spacing:.02em;white-space:nowrap}
+@media(max-width:600px) {html[data-game] #app .race-header[class*="is-solo-"] .event-type-panel[data-type="Grindfest"] span {font-size:12px;padding:0 4px;letter-spacing:0}}
