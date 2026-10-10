@@ -315,3 +315,15 @@ test('with « Une catégorie par course », a new crew\'s voice channel waits fo
   mark=discord.calls.length;await sync(at+3*HOUR+60_000);
   assert.deepEqual(created(discord.calls,mark)[0].body,{name:'LMU-Attente',type:2});
 });
+
+test('an empty crew gets its voice channel as soon as it is created', async () => {
+  const {DB,req,login,sync,discord}=harness();
+  await login(ADMIN,'admin','Orga');
+  assert.equal((await req('/api/community/modules','PATCH',{crewChannels:true},'admin')).status,200);
+  assert.equal((await req('/api/events','POST',race,'admin')).status,201);
+  const event=(await req('/api/events','GET',null,'admin')).data.events[0], departure=event.departures[0];
+  DB.db.prepare("INSERT INTO crews(id,event_id,departure_id,name,category,car,locked,created_at,community_id) VALUES('empty',?,?,'Sans pilote','GT3','',0,0,?)").run(event.id,departure.id,DEV);
+  const mark=discord.calls.length;
+  assert.equal((await sync(departure.startsAt-30*24*HOUR)).opened,1);
+  assert.deepEqual(created(discord.calls,mark).map(call=>call.body.name),['LMU-Sans pilote']);
+});
