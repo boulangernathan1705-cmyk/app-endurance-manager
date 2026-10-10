@@ -26,7 +26,7 @@ async function eventById(env, eventId, community) {
   const row = await env.DB.prepare('SELECT * FROM events WHERE id=? AND (community_id=? OR community_id=?)').bind(eventId, community.id, OFFICIAL).first();
   // A solo race does not exist where solo races are off (production): no entry, edit or crew through its id.
   if (!row || (row.format === 'solo' && !soloRacesEnabled(env, community))) fail(404, 'Événement introuvable.');
-  if (isGrindfest(row) && !grindfestEnabled(community)) fail(404, 'Événement introuvable.');
+  if (isGrindfest(row) && !grindfestEnabled(community, isDevelopment(env))) fail(404, 'Événement introuvable.');
   return row;
 }
 // On an official race, a player acts for one of his communities (chosen at the first step of an entry or a crew;
@@ -199,7 +199,7 @@ async function listEvents(env, actor, game='', scope='', community) {
   // where the community shows the iRacing calendar); on an official race, the entries and crews of every
   // community the player is a member of, never of the others.
   const officialRaces = community.modules?.iracingImport === true ? "e.community_id='official'" : "(e.community_id='official' AND e.circuit NOT LIKE 'iracing-%')";
-  const filters=[`(e.community_id=? OR ${officialRaces})`,game==='iracing' ? "(e.format='solo' OR e.circuit LIKE 'iracing-%')" : game==='lmu' ? "(e.format='solo' OR e.circuit NOT LIKE 'iracing-%')" : '', eventScopeFilter(scope), soloRacesEnabled(env, community) ? '' : "COALESCE(e.format,'endurance')!='solo'", grindfestEnabled(community) ? '' : "COALESCE(json_extract(e.details,'$.type'),'')!='Grindfest'"].filter(Boolean);
+  const filters=[`(e.community_id=? OR ${officialRaces})`,game==='iracing' ? "(e.format='solo' OR e.circuit LIKE 'iracing-%')" : game==='lmu' ? "(e.format='solo' OR e.circuit NOT LIKE 'iracing-%')" : '', eventScopeFilter(scope), soloRacesEnabled(env, community) ? '' : "COALESCE(e.format,'endurance')!='solo'", grindfestEnabled(community, isDevelopment(env)) ? '' : "COALESCE(json_extract(e.details,'$.type'),'')!='Grindfest'"].filter(Boolean);
   const where=filters.length ? ` WHERE ${filters.join(' AND ')}` : '';
   const player = actor.user?.id || '';
   const rows = (await env.DB.prepare(`SELECT e.* FROM events e${where} ORDER BY e.created_at DESC, e.id DESC`).bind(community.id).all()).results;
@@ -391,7 +391,7 @@ async function api(request, env) {
   // Requests for a new community: sent by anyone signed in with Discord, from any site (server/community-requests.mjs).
   const requests = await communityRequestsApi(path, method, request, env, actor);
   if (requests) return requests;
-  if (path === '/api/session' && method === 'GET') return json({user:actor.user, discordReady:!!(env.DISCORD_CLIENT_ID && env.DISCORD_CLIENT_SECRET), adminConfigured:administrators(env).length > 0, soloRaces:soloRacesEnabled(env, community), soloLabel:TDZ_EVENTS_LABEL, eventTypes:grindfestEnabled(community) ? [...TDZ_EVENT_TYPES, 'Grindfest'] : TDZ_EVENT_TYPES, grindfest:grindfestEnabled(community), grindfestAvailable:grindfestAvailable(community), training:community.modules?.training === true, safeGuideUrl:community.modules?.safeGuideUrl || '',
+  if (path === '/api/session' && method === 'GET') return json({user:actor.user, discordReady:!!(env.DISCORD_CLIENT_ID && env.DISCORD_CLIENT_SECRET), adminConfigured:administrators(env).length > 0, soloRaces:soloRacesEnabled(env, community), soloLabel:TDZ_EVENTS_LABEL, eventTypes:grindfestEnabled(community, isDevelopment(env)) ? [...TDZ_EVENT_TYPES, 'Grindfest'] : TDZ_EVENT_TYPES, grindfest:grindfestEnabled(community, isDevelopment(env)), grindfestAvailable:grindfestAvailable(community, isDevelopment(env)), training:community.modules?.training === true, safeGuideUrl:community.modules?.safeGuideUrl || '',
     // Training shows in the bar only for a pilot entered in an upcoming LMU race; the circuit memo always.
     trainingRace:community.modules?.training === true && access.status === 'member' && !!actor.user && !!(await nextRace(env, actor.user.id)),
     community:{id:community.id, slug:community.slug, name:community.name, shortName:community.shortName, discordInviteUrl:community.discordInviteUrl, appearance:appearanceOf(community)},
@@ -598,7 +598,7 @@ async function api(request, env) {
     const input = await body(request);
     if (input.format === 'solo' && !soloRacesEnabled(env, community)) fail(400, 'Les événements ne sont pas activés sur ce site.');
     const data = validateEvent(input), eventId = id();
-    if (isGrindfest(data) && (!grindfestEnabled(community) || input.official === true)) fail(403, 'Grindfest est réservé aux TDZ et doit être activé dans les modules.');
+    if (isGrindfest(data) && (!grindfestEnabled(community, isDevelopment(env)) || input.official === true)) fail(403, 'Grindfest est réservé aux TDZ et doit être activé dans les modules.');
     // « Course officielle (toutes les communautés) »: the platform managers only.
     if (input.official === true && !actor.manager) fail(403, 'Seuls les gestionnaires de la plateforme créent des courses officielles.');
     const owner = input.official === true ? OFFICIAL : community.id;
@@ -632,7 +632,7 @@ async function api(request, env) {
       return json({ok:true});
     }
     const data = validateEvent(input, event);
-    if (isGrindfest(data) && !grindfestEnabled(community)) fail(403, 'Grindfest n’est pas activé.');
+    if (isGrindfest(data) && !grindfestEnabled(community, isDevelopment(env))) fail(403, 'Grindfest n’est pas activé.');
     await dropEmptyCommonStart(env, event.id, data);
     const cats = JSON.stringify(data.categories), deps = JSON.stringify(data.departures);
     const result = await env.DB.prepare(`UPDATE events SET name=?,duration_hours=?,duration_minutes=?,event_type=?,circuit=?,schedule_pending=?,driver_change_required=?,access=?,capacity=?,rounds=?,categories=?,departures=?,sim=?,details=?,version=version+1 WHERE id=? AND version=?
@@ -788,7 +788,7 @@ async function api(request, env) {
       administrator:role.administrator, permissions:saved.has(role.id) ? normalizePermissions(saved.get(role.id)) : (role.id === community.discordGuildId ? [...DEFAULT_EVERYONE] : [])}));
     await keepDiscordLook(env, community, discord);
     return json({community:{name:community.name, shortName:community.shortName, discordServer:discord?.name || null, ...appearanceOf(community)}, roles, permissions:PERMISSIONS,
-      modules:{iracingImport:community.modules.iracingImport === true, discordWeekly:community.modules.discordWeekly === true, soloRaces:community.modules.soloRaces === true, eventsLabel:TDZ_EVENTS_LABEL, eventTypes:grindfestEnabled(community) ? [...TDZ_EVENT_TYPES, 'Grindfest'] : TDZ_EVENT_TYPES, grindfest:grindfestEnabled(community), grindfestAvailable:grindfestAvailable(community),
+      modules:{iracingImport:community.modules.iracingImport === true, discordWeekly:community.modules.discordWeekly === true, soloRaces:community.modules.soloRaces === true, eventsLabel:TDZ_EVENTS_LABEL, eventTypes:grindfestEnabled(community, isDevelopment(env)) ? [...TDZ_EVENT_TYPES, 'Grindfest'] : TDZ_EVENT_TYPES, grindfest:grindfestEnabled(community, isDevelopment(env)), grindfestAvailable:grindfestAvailable(community, isDevelopment(env)),
         crewChannels:community.modules.crewChannels === true, raceReminders:community.modules.raceReminders === true, training:community.modules.training === true},
       crews:await crewDiscordState(env, community)});
   }
@@ -838,7 +838,7 @@ async function api(request, env) {
     const input = await body(request);
     const modules = {...community.modules};
     if (typeof input.grindfest === 'boolean') {
-      if (!grindfestAvailable(community)) fail(403, 'Le module Grindfest est réservé aux TDZ.');
+      if (!grindfestAvailable(community, isDevelopment(env))) fail(403, 'Le module Grindfest est réservé aux TDZ.');
       modules.grindfest = input.grindfest;
       if (input.grindfest) modules.soloRaces = true;
     }
