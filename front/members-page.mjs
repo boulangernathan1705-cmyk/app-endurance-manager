@@ -193,7 +193,7 @@ function recapForm(setup) {
     <form data-recap-wizard class="setup-form recap-wizard" ${established ? 'hidden' : ''}>
       <p data-recap-progress aria-live="polite">Étape 1 sur 4</p>
       <fieldset data-recap-step="0"><legend>Comment présenter les courses sur Discord ?</legend>
-        <div class="recap-cards">${choice('general','Récap général','Un salon texte « récap-endurances », un message pour toutes les courses.')}${choice('events','Une catégorie par course','Chaque course a sa catégorie : son récap, puis les vocaux de ses équipages.')}</div>
+        <div class="recap-cards">${choice('general','Récap général','Un salon texte « récap-endurances », un message pour toutes les courses.')}${choice('events','Une catégorie par course','Dès le premier équipage, ou 6 jours avant le départ : son récap, puis un vocal par équipage.')}</div>
         <p>Le même message est modifié sans notification à chaque actualisation.</p></fieldset>
       <fieldset data-recap-step="1" hidden><legend>Quelles courses inclure ?</legend><div class="recap-sims">
         <label class="role-pill"><input type="checkbox" name="lmu" ${scope !== 'iracing' ? 'checked' : ''}><span>LMU</span></label>
@@ -284,14 +284,16 @@ function modulesMarkup(settings, setup) {
     : `<p class="members-help">${BOT_PROBLEMS[crews.botProblem] || BOT_PROBLEMS.rights}</p>
       <div class="setup-actions">${crews.botInviteUrl ? `<a class="primary-button" href="${esc(crews.botInviteUrl)}" target="_blank" rel="noopener">Donner les droits au bot</a>` : ''}<button type="button" class="secondary-button" data-modules-refresh="crewChannels">C’est fait</button></div>`;
   const crewWarn = states.crewChannels && (crews.botReady !== true || crews.lastError);
+  // The recap gives each race its category: the voice channels go there, no category to choose.
+  const raceCategories = setup.botRecap?.enabled && setup.botRecap.mode === 'events';
   const tiles = [
     {key:'recap', name:'Récap de la semaine sur Discord', text:'Un récap général ou une catégorie par course, avec un message actualisé sans notifications répétées.',
       state:states.recap ? ['ok', setup.botRecap ? (setup.botRecap.mode === 'events' ? 'Actif · une catégorie par course' : 'Actif · récap général') : (setup.recaps || []).length ? `Actif · ${(setup.recaps || []).map(item => RECAP_LABELS[item.scope]).join(', ')}` : 'Actif · salon d’origine'] : ['off', 'Éteint'],
       control:'', settings:recapForm(setup)},
-    {key:'crewChannels', name:'Salons d’équipage sur Discord', text:'Un salon vocal par équipage, nommé simu + nom de l’équipage, ouvert quelques jours avant la course.',
+    {key:'crewChannels', name:'Salons d’équipage sur Discord', text:'Un salon vocal par équipage, à son nom, ouvert dès sa création.',
       state:crewWarn ? ['warn', crews.botReady !== true ? 'Le bot n’a pas les droits' : 'Le bot est bloqué'] : states.crewChannels ? ['ok', 'Actif'] : ['off', crews.botReady === true ? 'Éteint' : crews.botProblem === 'rights' ? 'Éteint · droits du bot à donner' : 'Éteint · bot à vérifier'],
       control:toggle('crewChannels', 'Salons d’équipage sur Discord', crews.botReady !== true && !states.crewChannels),
-      settings:`${crewRights}${states.crewChannels ? crewCategory(crews) : ''}<p class="members-help">Il est supprimé 2 h après la course.</p>`},
+      settings:`${crewRights}${!states.crewChannels ? '' : raceCategories ? '<p class="members-help">Chaque vocal arrive dans la catégorie de sa course.</p>' : crewCategory(crews)}<p class="members-help">Il est supprimé 2 h après la course.</p>`},
     {key:'raceReminders', name:'Rappels de course', text:'24&nbsp;h avant le départ dans la cloche du site, 24&nbsp;h et 1&nbsp;h avant dans le salon de l’équipage.',
       state:states.raceReminders ? ['ok', 'Actif'] : ['off', 'Éteint'], control:toggle('raceReminders', 'Rappels de course'), settings:''},
     {key:'iracingImport', name:'Endurances iRacing officielles', text:'Les séries en équipe et les événements spéciaux importés automatiquement.',

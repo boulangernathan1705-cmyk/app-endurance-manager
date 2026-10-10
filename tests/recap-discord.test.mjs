@@ -277,3 +277,25 @@ test('scheduled rotation compares bot and legacy timestamps in the same unit',as
   assert.equal(await syncDueRecaps(env,1,NOW),1);assert.equal(sends(calls).length,1,'the older bot recap is processed before the newer legacy recap');
   assert.ok(calls.every(call=>!call.path.includes('/webhooks/')));
 });
+
+test('a race gets its category 6 days before its start, as the crews\' voice channels, whatever the week',async t=>{
+  const {DB,env,calls}=setup(t);
+  race(DB,'sunday','Dimanche','spa',[{id:'s',startsAt:NOW+DAY}]);race(DB,'thursday','Jeudi suivant','spa',[{id:'t',startsAt:NOW+5*DAY}]);race(DB,'later','Plus tard','spa',[{id:'l',startsAt:NOW+7*DAY}]);
+  assert.deepEqual((await previewBotRecap(env,NOW,COMMUNITY,SETTINGS)).map(item=>item.name),['🏎️ LMU · Dimanche','🏎️ LMU · Jeudi suivant']);
+  await saveBotRecap(env,COMMUNITY,SETTINGS);await syncBotRecaps(env,NOW,COMMUNITY);
+  assert.deepEqual(creates(calls).filter(call=>call.body.type===4).map(call=>call.body.name),['🏎️ LMU · Dimanche','🏎️ LMU · Jeudi suivant']);
+  calls.length=0;await syncBotRecaps(env,NOW+DAY+3600000,COMMUNITY);
+  assert.deepEqual(creates(calls).filter(call=>call.body.type===4).map(call=>call.body.name),['🏎️ LMU · Plus tard']);
+});
+
+test('a race far away gets its category as soon as it has a crew with a pilot',async t=>{
+  const {DB,env,calls}=setup(t);race(DB,'far','Dans un mois','spa',[{id:'f',startsAt:NOW+30*DAY}]);
+  await saveBotRecap(env,COMMUNITY,SETTINGS);await syncBotRecaps(env,NOW,COMMUNITY);assert.equal(creates(calls).length,0);
+  DB.db.prepare("INSERT INTO crews(id,event_id,departure_id,name,category,car,locked,created_at,community_id) VALUES('crew','far','f','Équipe','GT3','',0,0,?)").run(DEV_COMMUNITY);
+  await syncBotRecaps(env,NOW+1000,COMMUNITY);assert.equal(creates(calls).length,0,'a crew without any pilot is not enough');
+  DB.db.prepare("INSERT INTO participants(id,name,guest_hash,created_at,community_id) VALUES('pilot','Pilote','p',0,?)").run(DEV_COMMUNITY);
+  DB.db.prepare("INSERT INTO registrations(id,event_id,departure_id,guest_hash,name,name_key,category,status,created_at,participant_id,community_id) VALUES('reg','far','f','g','Pilote','pilote','GT3','whole',0,'pilot',?)").run(DEV_COMMUNITY);
+  DB.db.prepare("INSERT INTO crew_members(registration_id,crew_id) VALUES('reg','crew')").run();
+  await syncBotRecaps(env,NOW+2000,COMMUNITY);
+  assert.deepEqual(creates(calls).map(call=>call.body.name),['🏎️ LMU · Dans un mois','récap']);
+});
