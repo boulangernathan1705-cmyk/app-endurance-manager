@@ -21,6 +21,9 @@ test('the entitlement belongs only to TDZ, even when another community enables t
   assert.equal(grindfestEnabled({slug:'tdz',modules:{grindfest:true}}),true);
   assert.equal(grindfestEnabled({slug:'fmt',modules:{grindfest:true}}),false);
   assert.equal(grindfestEnabled({slug:'tdz',modules:{grindfest:false}}),false);
+  assert.equal(grindfestEnabled({slug:'test',modules:{grindfest:true}}),false);
+  assert.equal(grindfestEnabled({slug:'test',modules:{grindfest:true}},true),true);
+  assert.equal(grindfestEnabled({slug:'fmt',modules:{grindfest:true}},true),false);
 });
 
 test('waiting positions are per streamer, and withdrawing promotes only the matching queue', () => {

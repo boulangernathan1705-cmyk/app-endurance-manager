@@ -1,6 +1,6 @@
 // Entitlement is tied to the immutable community slug, never to a client-supplied flag.
-export const grindfestAvailable = community => community?.slug === 'tdz';
-export const grindfestEnabled = community => grindfestAvailable(community) && community?.modules?.grindfest === true;
+export const grindfestAvailable = (community, development = false) => community?.slug === 'tdz' || (development && community?.slug === 'test');
+export const grindfestEnabled = (community, development = false) => grindfestAvailable(community, development) && community?.modules?.grindfest === true;
 export function eventDetails(event) {
   return typeof event?.details === 'string' ? JSON.parse(event.details || '{}') : event?.details || {};
 }
