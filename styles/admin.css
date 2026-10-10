@@ -134,3 +134,18 @@
 }
 @media (prefers-reduced-motion: reduce) { .admin-switch i, .admin-switch i::after { transition: none; } }
 .admin-shell a.primary-button { display: inline-flex; align-items: center; text-decoration: none; }
+
+/* Guided text recaps: one question at a time, readable previews on phones too. */
+.recap-wizard fieldset{border:0;margin:0;padding:0;min-width:0}
+.recap-wizard fieldset[hidden],.recap-wizard[hidden]{display:none}
+.recap-wizard legend{font-size:1.15rem;font-weight:700;margin-bottom:18px;max-width:100%}
+.recap-wizard .recap-cards{margin:12px 0}
+.recap-wizard .settings-status{white-space:normal;overflow-wrap:anywhere}
+.recap-live-preview{display:grid;gap:16px;margin:16px 0;min-width:0}
+.recap-live-preview .recap-preview{width:100%;max-width:100%;margin:0;box-sizing:border-box}
+.recap-live-preview .recap-preview-embed{white-space:pre-wrap;overflow-wrap:anywhere}
+.recap-live-preview figcaption{overflow-wrap:anywhere}
+.recap-wizard .setup-actions{flex-wrap:wrap}
+@media(max-width:600px){.recap-wizard .recap-cards{grid-template-columns:1fr}.recap-wizard .setup-actions button{flex:1 1 140px}}
+.recap-wizard [hidden]{display:none!important}
+.recap-live-preview a{color:#9fe8ec;text-decoration:underline}

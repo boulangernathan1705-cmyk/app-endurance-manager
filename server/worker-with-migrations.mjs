@@ -8,6 +8,7 @@ import {importNextCommunity, completeSpecialTimes} from './iracing-import.mjs';
 import {refreshShowcaseIfDue} from './demo.mjs';
 import {refreshMemberships} from './access.mjs';
 import {purgeNotifications} from './notifications.mjs';
+import {cleanupEventRecaps} from './recap-discord.mjs';
 import {syncCrewDiscord} from './crew-discord.mjs';
 import {allCommunities, currentCommunity, communitySlug, appearanceOf} from './community.mjs';
 import {isDevelopment,devRobots,markDevelopmentResponse} from './dev-environment.mjs';
@@ -118,6 +119,7 @@ export default {
     // Every quarter of an hour: the crews on Discord (voice channels, reminders), a few requests at a
     // time (fewer next to the iRacing import, which makes many).
     run('Crew Discord sync failed', () => syncCrewDiscord(env, at.getTime(), {requests:slot === 1 ? 4 : 8}));
+    run('Event recap cleanup failed', () => cleanupEventRecaps(env,at.getTime()));
     // :00 Members and Discord roles not checked for a day are checked again by the bot, a few at a time.
     if (slot === 0 && env.DISCORD_BOT_TOKEN) run('Membership check failed', async () => refreshMemberships(env, await allCommunities(env), 12));
     // :15 Official iRacing endurances of one community (a new one first, then each in turn).

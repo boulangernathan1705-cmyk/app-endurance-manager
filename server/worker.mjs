@@ -16,7 +16,9 @@ import {communityAccess, requirePermission, displayRole, PERMISSIONS, ALL_PERMIS
 const soloRacesEnabled = (env, community) => community?.modules?.soloRaces === true;
 import {syncIracingEvents} from './iracing-import.mjs';
 import {resetShowcase} from './demo.mjs';
-import {syncWeeklyDiscord, sendRecapTest, usesSiteRecap, WEBHOOK_URL} from './discord-weekly.mjs';
+import {syncWeeklyDiscord, sendRecapTest, usesSiteRecap, WEBHOOK_URL, recapTargets, loadWeeklyDiscordSnapshot, siteOf} from './discord-weekly.mjs';
+import {buildWeeklyDiscordPayload} from './discord-weekly-format.mjs';
+import {botRecapSettings, recapDestinations, recapError, recapInput, validateRecapDestination, previewBotRecap, saveBotRecap, syncBotRecaps, sendBotRecapTest, RECAP_BOT_PERMISSIONS} from './recap-discord.mjs';
 import {notify, notificationsApi, departurePilots, eventPilots, crewPilots} from './notifications.mjs';
 import {botCanManageChannels, checkBot, serverCategories, CREW_BOT_PERMISSIONS} from './crew-discord.mjs';
 // Official races (iRacing's official endurances, LMU official events): common to every community (migration 0039).
@@ -878,16 +880,67 @@ async function api(request, env) {
     const recaps = ((await env.DB.prepare('SELECT scope, webhook_url, updated_at FROM community_recaps WHERE community_id=? ORDER BY scope').bind(community.id).all()).results || [])
       .map(row => ({scope:row.scope, webhook:maskWebhook(row.webhook_url), updatedAt:row.updated_at}));
     const rolesConfigured = Boolean(await env.DB.prepare('SELECT 1 FROM community_role_permissions WHERE community_id=? LIMIT 1').bind(community.id).first());
-    return json({community:{name:community.name, slug:community.slug}, siteUrl:communityUrl(env, community), rolesConfigured, recaps,
+    const savedBotRecap = await botRecapSettings(env, community);
+    const botRecap = savedBotRecap?.adopted ? savedBotRecap : null;
+    return json({botRecap:botRecap ? {enabled:Boolean(botRecap.enabled),mode:botRecap.mode,scope:botRecap.scope,destinationId:botRecap.destination_id,destinationName:botRecap.destination_name,lastError:botRecap.last_error} : null,
+      recapBotInviteUrl:env.DISCORD_CLIENT_ID ? `https://discord.com/oauth2/authorize?client_id=${encodeURIComponent(env.DISCORD_CLIENT_ID)}&scope=bot&permissions=${RECAP_BOT_PERMISSIONS}&guild_id=${community.discordGuildId}&disable_guild_select=true` : null,
+      community:{name:community.name, slug:community.slug}, siteUrl:communityUrl(env, community), rolesConfigured, recaps,
       // Former recap (site's webhook, LMU only) still running until the admins choose their own.
-      legacyRecap:!recaps.length && usesSiteRecap(env, community),
+      legacyRecap:!botRecap && !recaps.length && usesSiteRecap(env, community),
       guild:{id:community.discordGuildId, name:discord?.name || null, botPresent:Boolean(discord)}, botInviteUrl:botInvite(env, community.discordGuildId),
       discordInviteUrl:community.discordInviteUrl});
+  }
+  // Guided bot recaps: preview is read-only; only explicit activation/test publishes.
+  if (path === '/api/community/recap/destinations' && method === 'GET') {
+    requirePermission(actor,'admin');
+    try { return json({destinations:await recapDestinations(env, community)}); }
+    catch (error) { fail(400, recapError(error)); }
+  }
+  if (path === '/api/community/recap/legacy-preview' && method === 'GET') {
+    requirePermission(actor,'admin');
+    const targets = await recapTargets(env,community);
+    const previews = [];
+    for (const target of targets) {
+      const snapshot = await loadWeeklyDiscordSnapshot(env,Date.now(),community,target.scope);
+      previews.push({name:RECAP_NAMES[target.scope],payload:buildWeeklyDiscordPayload(snapshot,siteOf(env,community),Date.now(),target.scope)});
+    }
+    return json({previews});
+  }
+  if (path === '/api/community/recap/preview' && method === 'POST') {
+    requirePermission(actor,'admin');
+    try {
+      const settings = recapInput(await body(request));
+      return json({previews:await previewBotRecap(env,Date.now(),community,settings)});
+    } catch (error) { fail(400,error.message); }
+  }
+  if (path === '/api/community/recap' && method === 'PUT') {
+    requirePermission(actor,'admin');
+    const input = await body(request);
+    if (input.enabled === false) {
+      const result = await env.DB.prepare('UPDATE community_recap_settings SET enabled=0 WHERE community_id=? AND lock_until<?').bind(community.id,Date.now()).run();
+      if (!result.meta.changes) fail(409,'Une synchronisation est en cours ou aucun récap par bot n’est configuré.');
+      return json({ok:true});
+    }
+    try {
+      const settings = await validateRecapDestination(env,community,input);
+      await saveBotRecap(env,community,settings);
+      const publication = await syncBotRecaps(env,Date.now(),community).catch(error => ({ok:false,error:error.message}));
+      return json({ok:true,published:publication.ok,error:publication.error});
+    } catch (error) { fail(error.status === 409 ? 409 : 400,error.message === 'Discord indisponible' ? recapError(error) : error.message); }
+  }
+  if (path === '/api/community/recap/test' && method === 'POST') {
+    requirePermission(actor,'admin');
+    await rateLimit(request,env,'recap-test',10);
+    try {
+      const settings = await validateRecapDestination(env,community,await body(request));
+      return json(await sendBotRecapTest(env,Date.now(),community,settings));
+    } catch (error) { fail(error.status === 409 ? 409 : 400,error.message === 'Discord indisponible' ? recapError(error) : error.message); }
   }
   // The recap messages of the community: one message (one simulator or both) or two (one per simulator,
   // e.g. in two channels). An empty address keeps the webhook already saved for that message.
   if (path === '/api/community/recaps' && method === 'PUT') {
     requirePermission(actor,'admin');
+    if ((await botRecapSettings(env,community))?.adopted) fail(409,'Ce récap se règle désormais avec le parcours guidé.');
     const input = await body(request);
     const list = Array.isArray(input.recaps) ? input.recaps : [];
     const scopes = list.map(item => item?.scope);
@@ -903,8 +956,8 @@ async function api(request, env) {
     await env.DB.batch([
       env.DB.prepare('DELETE FROM community_recaps WHERE community_id=?').bind(community.id),
       ...rows.map(row => env.DB.prepare('INSERT INTO community_recaps(community_id,scope,webhook_url,updated_at) VALUES(?,?,?,?)').bind(community.id, row.scope, row.url, now())),
-      // New settings: new messages (those already posted stay where they are).
-      env.DB.prepare('DELETE FROM discord_weekly_state WHERE community_id=?').bind(community.id),
+      // Keep the identity of an unchanged webhook message. Only changed/removed destinations reset.
+      ...[...saved.keys()].filter(scope => !rows.some(row => row.scope === scope && row.url === saved.get(scope))).map(scope => env.DB.prepare('DELETE FROM discord_weekly_state WHERE key=? AND community_id=?').bind(`${community.id}:${scope}-weekly-v1`,community.id)),
       env.DB.prepare('UPDATE communities SET modules=? WHERE id=?').bind(JSON.stringify(modules), community.id)]);
     const published = rows.length ? await syncWeeklyDiscord(env, Date.now(), {...community, modules}) : {ok:true};
     return json({ok:true, published:published.ok !== false});
