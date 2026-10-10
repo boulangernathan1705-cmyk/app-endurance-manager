@@ -295,3 +295,16 @@ test('a race far away gets its category as soon as it has a crew, even an empty 
   await syncBotRecaps(env,NOW+1000,COMMUNITY);
   assert.deepEqual(creates(calls).map(call=>call.body.name),['🏎️ LMU · Dans un mois','récap']);
 });
+
+test('official races where the community has nothing never hold back the recap of the race it has a crew in',async t=>{
+  const {DB,env,calls,messages}=setup(t);
+  for(const id of ['o1','o2','o3'])race(DB,id,'Officielle '+id,'iracing-spa',[{id:'s-'+id,startsAt:NOW+DAY}],'official');
+  race(DB,'mine','10h officielle','spa',[{id:'m',startsAt:NOW+2*DAY}],'official');
+  DB.db.prepare("INSERT INTO crews(id,event_id,departure_id,name,category,car,locked,created_at,community_id) VALUES('crew','mine','m','Les plots','GT3','',0,0,?)").run(DEV_COMMUNITY);
+  await saveBotRecap(env,COMMUNITY,SETTINGS);await syncBotRecaps(env,NOW,COMMUNITY);
+  assert.deepEqual(creates(calls).map(call=>call.body.name),['🏎️ LMU · 10h officielle','récap'],'only the race with a crew');
+  DB.db.prepare('UPDATE crews SET name=? WHERE id=?').run('Les plots 2','crew');
+  calls.length=0;await syncBotRecaps(env,NOW+1000,COMMUNITY);await syncBotRecaps(env,NOW+2000,COMMUNITY);
+  assert.equal(calls.filter(call=>call.method==='PATCH').length,1);
+  assert.match(JSON.stringify([...messages.values()]),/Les plots 2/);
+});
