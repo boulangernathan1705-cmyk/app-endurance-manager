@@ -17,7 +17,7 @@ export function normalizeStreamers(raw) {
     if (!name || name.length > 60 || names.has(key)) throw Error('Chaque streamer doit avoir un nom unique (60 caractères maximum).');
     if (!Number.isInteger(capacity) || capacity < 1 || capacity > 120) throw Error('Choisis entre 1 et 120 places par streamer.');
     const twitchUrl = String(item?.twitchUrl || '').trim();
-    if (!/^https:\/\/(www\.)?twitch\.tv\/[a-zA-Z0-9_]{1,25}\/?$/.test(twitchUrl)) throw Error('Indique le lien Twitch de chaque streamer.');
+    if (twitchUrl && !/^https:\/\/(www\.)?twitch\.tv\/[a-zA-Z0-9_]{1,25}\/?$/.test(twitchUrl)) throw Error('Indique un lien Twitch valide ou laisse le champ vide.');
     const logoUrl = String(item?.logoUrl || '').trim();
     if (logoUrl && !/^https:\/\/(cdn\.discordapp\.com|static-cdn\.jtvnw\.net|static\.twitchcdn\.net)\/[^\s]{1,400}$/.test(logoUrl) && !/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]{1,6000}$/.test(logoUrl)) throw Error('Importe un logo ou utilise un lien d’image Twitch ou Discord.');
     ids.add(id); names.add(key);

@@ -5,7 +5,7 @@ import {soloEntryList} from './solo.mjs';
 function streamerRow(streamer = {}) {
   return `<div class="grindfest-streamer-form" data-streamer-id="${esc(streamer.id || crypto.randomUUID())}">
     <label class="form-label">Streamer<input name="streamerName" maxlength="60" value="${esc(streamer.name || '')}" required></label>
-    <label class="form-label">Lien Twitch<input name="streamerTwitch" type="url" value="${esc(streamer.twitchUrl || '')}" placeholder="https://www.twitch.tv/…" required></label>
+    <label class="form-label">Lien Twitch <small>(facultatif)</small><input name="streamerTwitch" type="url" value="${esc(streamer.twitchUrl || '')}" placeholder="https://www.twitch.tv/…"></label>
     <label class="form-label">Places<input name="streamerCapacity" type="number" min="1" max="120" value="${streamer.capacity || 15}" required></label>
     <label class="form-label">Logo<input name="streamerLogo" type="hidden" value="${esc(streamer.logoUrl || '')}"><input type="file" accept="image/png,image/jpeg,image/webp" data-streamer-logo><img class="grindfest-logo" src="${esc(streamer.logoUrl || '')}" alt="" ${streamer.logoUrl ? '' : 'hidden'}><small data-logo-error role="status"></small></label>
     <button type="button" class="link-button" data-remove-streamer>Retirer</button></div>`;
@@ -35,7 +35,9 @@ export function streamerColumns(event, departure) {
   return `<div class="grindfest-grid" style="--streamer-columns:${Math.min(4, streamers.length)}">${streamers.map(streamer => {
     const entries = (departure.availability || []).filter(reg => reg.streamerId === streamer.id && reg.status !== 'unavailable');
     const confirmed = entries.filter(reg => !reg.waitlistPosition).length;
-    return `<section class="grindfest-column"><a class="grindfest-streamer-head" href="${esc(streamer.twitchUrl)}" target="_blank" rel="noopener noreferrer">${streamer.logoUrl ? `<img class="grindfest-logo" src="${esc(streamer.logoUrl)}" alt="">` : ''}<strong>${esc(streamer.name)}</strong><small>Twitch ↗</small><span>${confirmed} / ${streamer.capacity} places prises</span></a>${soloEntryList(event, departure, entries, {title:'Inscrits', capacity:streamer.capacity})}</section>`;
+    const heading = `${streamer.logoUrl ? `<img class="grindfest-logo" src="${esc(streamer.logoUrl)}" alt="">` : ''}<strong>${esc(streamer.name)}</strong>${streamer.twitchUrl ? '<small>Twitch ↗</small>' : ''}<span>${confirmed} / ${streamer.capacity} places prises</span>`;
+    const head = streamer.twitchUrl ? `<a class="grindfest-streamer-head" href="${esc(streamer.twitchUrl)}" target="_blank" rel="noopener noreferrer">${heading}</a>` : `<div class="grindfest-streamer-head">${heading}</div>`;
+    return `<section class="grindfest-column">${head}${soloEntryList(event, departure, entries, {title:'Inscrits', capacity:streamer.capacity})}</section>`;
   }).join('')}</div>`;
 }
 export function streamerChoice(event, departure, draft) {
