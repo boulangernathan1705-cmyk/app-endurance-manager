@@ -2,6 +2,10 @@
 
 Les changements du site, version par version. La plus récente est en haut.
 
+## v1.23 — 11 octobre 2026
+
+- Discord officiel : « Mettre en place le serveur » range aussi ce qui existe. Infos en haut, les courses juste dessous, puis Communauté (texte et vocaux), Aide et Équipe.
+
 ## v1.22 — 10 octobre 2026
 
 - Le récap Discord d'une course se met à jour dès qu'un pilote rejoint un équipage, même quand des courses officielles sans inscrit approchent.
