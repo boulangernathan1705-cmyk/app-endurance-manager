@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {setupOfficialServer, OFFICIAL_LAYOUT, sameName} from '../server/official-discord.mjs';
+import {setupOfficialServer, OFFICIAL_LAYOUT, OFFICIAL_ROLES, sameName} from '../server/official-discord.mjs';
 
 const GUILD='900000000000000001', BOT='444444444444444444';
 function fakeDiscord(t,{channels=[],roles=[{id:GUILD,name:'@everyone'}],features=[],refuse=null}={}){
@@ -15,6 +15,8 @@ function fakeDiscord(t,{channels=[],roles=[{id:GUILD,name:'@everyone'}],features
       if(!body.rules_channel_id||!body.public_updates_channel_id)return Response.json({code:50035},{status:400});
       guild.features=body.features;return Response.json(guild);}
     if(path===`/guilds/${GUILD}/roles`){if(method==='GET')return Response.json(roles);const role={...body,id:String(next++)};roles.push(role);return Response.json(role);}
+    const role=path.match(/^\/guilds\/\d+\/roles\/(\d+)$/);
+    if(role&&method==='PATCH'){const found=roles.find(item=>item.id===role[1]);Object.assign(found,body);return Response.json(found);}
     if(path===`/guilds/${GUILD}/channels`&&method==='PATCH'){for(const item of body)Object.assign(channels.find(channel=>channel.id===item.id),{position:item.position});return new Response(null,{status:204});}
     if(path===`/guilds/${GUILD}/channels`){
       if(method==='GET')return Response.json(channels);
@@ -52,7 +54,7 @@ test('the bot makes the whole official server: roles, categories, channels, foru
 });
 
 test('a second run, or a server made by hand, keeps what exists and only adds what is missing', async t=>{
-  const {calls,channels}=fakeDiscord(t,{features:['COMMUNITY'],roles:[{id:GUILD,name:'@everyone'},{id:'1',name:'Staff'}],
+  const {calls,channels}=fakeDiscord(t,{features:['COMMUNITY'],roles:[{id:GUILD,name:'@everyone'},{id:'1',name:'Staff',permissions:OFFICIAL_ROLES[0].permissions}],
     channels:[{id:'10',type:4,name:'📌 Infos'},{id:'11',type:0,name:'bienvenue',parent_id:'10'},{id:'12',type:0,name:'reglement',parent_id:'10'},{id:'13',type:15,name:'bugs',parent_id:'20'},{id:'20',type:4,name:'🆘 AIDE'}]});
   const {made,kept}=await setupOfficialServer(env,GUILD);
   assert.ok(kept.includes('@Staff')&&kept.includes('📌 INFOS')&&kept.includes('#bienvenue')&&kept.includes('#règlement')&&kept.includes('#bugs'));
@@ -88,4 +90,12 @@ test('the former layout is tidied up: renamed, moved, nothing deleted but the em
 test('without the rights the bot says so, and what was made stays', async t=>{
   fakeDiscord(t,{refuse:(method,path)=>method==='POST'&&path.endsWith('/channels')});
   await assert.rejects(setupOfficialServer(env,GUILD),error=>/Administrateur/.test(error.message)&&error.made.includes('@Staff'));
+});
+
+test('the setup gives the Staff and the Organisateur their rights, and @everyone, the Staff and the Organisateur their site permissions', async t=>{
+  const {roles}=fakeDiscord(t,{roles:[{id:GUILD,name:'@everyone'},{id:'1',name:'Staff',permissions:'8'},{id:'3',name:'Organisateur',permissions:'0'}]});
+  const result=await setupOfficialServer(env,GUILD);
+  assert.notEqual(roles.find(role=>role.id==='1').permissions,'8');
+  assert.ok(result.moved.includes('@Staff')&&result.kept.includes('@Organisateur'));
+  assert.deepEqual(result.site,{[GUILD]:['access','endurance','crews'],1:['access','admin'],3:['access','admin']});
 });
