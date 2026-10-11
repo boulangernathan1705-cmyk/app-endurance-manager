@@ -1017,7 +1017,12 @@ async function api(request, env) {
       // The races' categories go right under « 📌 INFOS » (anchor of the recap in « une catégorie par course »).
       if (result.anchor) await env.DB.prepare("UPDATE community_recap_settings SET destination_id=?,destination_name=?,revision=revision+1 WHERE community_id=? AND mode='events' AND guild_id=?")
         .bind(result.anchor, '📌 INFOS', community.id, community.discordGuildId).run();
-      return json({ok:true, ...result});
+      // What @everyone, the Staff and the Organisateur may do on the site.
+      await env.DB.batch(Object.entries(result.site).map(([role, permissions]) => env.DB.prepare(`INSERT INTO community_role_permissions(community_id,discord_role_id,permissions,updated_at) VALUES(?,?,?,?)
+        ON CONFLICT(community_id,discord_role_id) DO UPDATE SET permissions=excluded.permissions,updated_at=excluded.updated_at`)
+        .bind(community.id, role, JSON.stringify(permissions), now())));
+      const {site, ...shown} = result;
+      return json({ok:true, ...shown});
     }
     catch (error) { return json({error:error.message, made:error.made || [], kept:error.kept || []}, error.status || 502); }
   }

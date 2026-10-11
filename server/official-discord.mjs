@@ -10,10 +10,13 @@ const TEXT = 0, VOICE = 2, CATEGORY = 4, NEWS = 5, FORUM = 15;
 const VIEW = 1n << 10n, SEND = 1n << 11n, SEND_IN_THREADS = 1n << 38n, CREATE_THREADS = 1n << 35n;
 const STAFF_RIGHTS = (1n << 13n) | (1n << 34n) | (1n << 22n) | (1n << 23n) | (1n << 24n) | (1n << 40n); // messages, threads, mute, deafen, move, timeout
 
+// `site`: what the role may do on the site (server/access.mjs), set by the setup. The Staff moderates the server and
+// the site; the Organisateur only the site; « @Fondateur » is made by hand, above the bot's own role.
 export const OFFICIAL_ROLES = [
-  {name:'Staff', color:0x52d3d8, hoist:true, permissions:String(STAFF_RIGHTS)},
-  {name:'Organisateur', color:0xf5a524, hoist:true, permissions:'0'},
+  {name:'Staff', color:0x52d3d8, hoist:true, permissions:String(STAFF_RIGHTS), site:['access', 'admin']},
+  {name:'Organisateur', color:0xf5a524, hoist:true, permissions:'0', site:['access', 'admin']},
 ];
+export const EVERYONE_SITE = ['access', 'endurance', 'crews'];
 const tags = (...names) => names.map(name => ({name}));
 // Read-only: everyone reads, the staff writes. Team: the staff (and the bot) only. `was`: former names, renamed;
 // `existing`: moved there when it exists, never made.
@@ -61,11 +64,16 @@ export async function setupOfficialServer(env, guildId) {
     const [guild, roles, channels] = await Promise.all([discord(env, 'GET', `/guilds/${guildId}`), discord(env, 'GET', `/guilds/${guildId}/roles`),
       discord(env, 'GET', `/guilds/${guildId}/channels`)]);
     let staffId = null;
-    for (const role of OFFICIAL_ROLES) {
+    const site = {[guildId]:EVERYONE_SITE};
+    for (const {site:allowed, ...role} of OFFICIAL_ROLES) {
       let found = roles.find(item => sameName(item.name, role.name));
-      if (found) kept.push(`@${role.name}`);
-      else { found = await discord(env, 'POST', `/guilds/${guildId}/roles`, role); made.push(`@${role.name}`); }
+      if (!found) { found = await discord(env, 'POST', `/guilds/${guildId}/roles`, role); made.push(`@${role.name}`); }
+      else if (String(found.permissions) !== role.permissions) {
+        await discord(env, 'PATCH', `/guilds/${guildId}/roles/${found.id}`, {permissions:role.permissions}); moved.push(`@${role.name}`);
+      }
+      else kept.push(`@${role.name}`);
       if (role.name === 'Staff') staffId = found.id;
+      site[found.id] = allowed;
     }
     const community = (guild.features || []).includes('COMMUNITY');
     // Community mode first needs its rules channel and its updates channel: those (plain text) are made in the
@@ -126,7 +134,7 @@ export async function setupOfficialServer(env, guildId) {
     const order = [layout[0], ...categories.filter(item => !layout.includes(item)), ...layout.slice(1)].filter(Boolean);
     if (order.some((item, index) => item !== categories[index]))
       await discord(env, 'PATCH', `/guilds/${guildId}/channels`, order.map((item, position) => ({id:item.id, position})));
-    return {made, kept, moved, anchor:ids.anchor};
+    return {made, kept, moved, anchor:ids.anchor, site};
   } catch (error) {
     const reason = error?.status === 403 ? 'Le bot n’a pas les droits : donne-lui le rôle Administrateur le temps de la mise en place.'
       : error?.status === 404 ? 'Le bot n’est pas sur ce serveur.' : 'Discord n’a pas répondu. Réessaie : ce qui est fait reste fait.';
