@@ -1012,7 +1012,13 @@ async function api(request, env) {
   if (path === '/api/platform/official/setup' && method === 'POST') {
     if (!actor.manager) fail(403, 'Réservé aux gestionnaires de la plateforme.');
     if (!mainAddress || !community.discordGuildId) fail(400, 'Relie d’abord le Discord officiel à l’adresse principale.');
-    try { return json({ok:true, ...await setupOfficialServer(env, community.discordGuildId)}); }
+    try {
+      const result = await setupOfficialServer(env, community.discordGuildId);
+      // The races' categories go right under « 📌 INFOS » (anchor of the recap in « une catégorie par course »).
+      if (result.anchor) await env.DB.prepare("UPDATE community_recap_settings SET destination_id=?,destination_name=?,revision=revision+1 WHERE community_id=? AND mode='events' AND guild_id=?")
+        .bind(result.anchor, '📌 INFOS', community.id, community.discordGuildId).run();
+      return json({ok:true, ...result});
+    }
     catch (error) { return json({error:error.message, made:error.made || [], kept:error.kept || []}, error.status || 502); }
   }
   // A community with no race and no pilot yet (made by mistake): its settings and members go with it. Never the
