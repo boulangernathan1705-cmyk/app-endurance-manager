@@ -539,8 +539,9 @@ app.addEventListener('click', async event => {
     const status = officialSetup.parentElement.querySelector('.settings-status');
     officialSetup.disabled = true; status.textContent = 'Mise en place…';
     try {
-      const {made} = await api('/api/platform/official/setup', 'POST', {});
-      status.textContent = made.length ? `✓ Créé : ${made.join(', ')}.` : '✓ Tout était déjà en place.';
+      const {made, moved = []} = await api('/api/platform/official/setup', 'POST', {});
+      status.textContent = made.length || moved.length
+        ? `✓ ${[made.length && `Créé : ${made.join(', ')}.`, moved.length && `Rangé : ${moved.join(', ')}.`].filter(Boolean).join(' ')}` : '✓ Tout était déjà en place.';
     } catch (error) { status.textContent = error.message; }
     officialSetup.disabled = false;
     return;

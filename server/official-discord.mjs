@@ -1,7 +1,8 @@
 // The official Discord server of Endurance Manager, set up by the bot in one click (platform managers only).
-// Only what is missing is made: a category, channel or role that already exists (same name, emoji and accents
-// aside) is left as it is, never moved, renamed or deleted. The races' categories (« 🏎️ LMU · 6h de Spa ») are
-// made later by the recap (server/recap-discord.mjs), under « 🆘 AIDE ET RETOURS ».
+// What is missing is made; what exists (same name, emoji and accents aside, or a former name) is moved into its
+// category and renamed, never deleted with its messages. Only the former « 🔊 VOCAUX GÉNÉRAUX », once empty, goes.
+// The races' categories (« 🏎️ LMU · 6h de Spa ») are made by the recap (server/recap-discord.mjs) right under
+// « 📌 INFOS », its anchor.
 // The bot needs the Administrator right for this (taken back afterwards): channels, roles and the server's
 // Community mode (forums and the announcement channel need it).
 const API = 'https://discord.com/api/v10';
@@ -14,18 +15,20 @@ export const OFFICIAL_ROLES = [
   {name:'Organisateur', color:0xf5a524, hoist:true, permissions:'0'},
 ];
 const tags = (...names) => names.map(name => ({name}));
-// Read-only: everyone reads, the staff writes. Team: the staff (and the bot) only.
+// Read-only: everyone reads, the staff writes. Team: the staff (and the bot) only. `was`: former names, renamed;
+// `existing`: moved there when it exists, never made.
 export const OFFICIAL_LAYOUT = [
-  {name:'👋 ACCUEIL', access:'read-only', channels:[
-    {name:'bienvenue'}, {name:'règlement', rules:true}, {name:'annonces', type:NEWS}, {name:'bien-démarrer'}]},
-  {name:'💬 COMMUNAUTÉ', channels:[{name:'discussion'}]},
-  {name:'🆘 AIDE ET RETOURS', channels:[
+  {name:'📌 INFOS', was:['👋 ACCUEIL'], access:'read-only', anchor:true, channels:[
+    {name:'bienvenue'}, {name:'règlement', rules:true}, {name:'annonces', type:NEWS}]},
+  {name:'💬 COMMUNAUTÉ', channels:[{name:'discussion'}, {name:'Discussion', type:VOICE}, {name:'Détente', type:VOICE}]},
+  {name:'🆘 AIDE', was:['🆘 AIDE ET RETOURS'], channels:[
     {name:'aide', type:FORUM, tags:tags('Connexion', 'Inscription', 'Équipages', 'Bot Discord', 'SimHub', 'Résolu')},
     {name:'bugs', type:FORUM, tags:tags('Nouveau', 'En cours', 'Corrigé')},
-    {name:'fonctionnalités', type:FORUM, tags:tags('Proposée', 'Prévue', 'Faite'), reaction:'👍'}]},
-  {name:'🔊 VOCAUX GÉNÉRAUX', channels:[{name:'Discussion', type:VOICE}, {name:'Détente', type:VOICE}]},
-  {name:'🔒 ÉQUIPE', access:'team', channels:[{name:'modération', updates:true}, {name:'logs-bot'}]},
+    {name:'idées', was:['fonctionnalités'], type:FORUM, tags:tags('Proposée', 'Prévue', 'Faite'), reaction:'👍'}]},
+  {name:'🔒 ÉQUIPE', access:'team', channels:[{name:'modération', updates:true}, {name:'logs-bot'}, {name:'suivi-discord', existing:true}]},
 ];
+// Former categories: deleted once their channels have moved out.
+const RETIRED = ['🔊 VOCAUX GÉNÉRAUX'];
 
 // « 👋 ACCUEIL » and « accueil » are the same; so are « fonctionnalites » and « fonctionnalités ».
 export const sameName = (a, b) => key(a) === key(b);
@@ -53,7 +56,7 @@ function overwrites(access, guildId, staffId, botId) {
 export async function setupOfficialServer(env, guildId) {
   if (!guildId) throw Object.assign(new Error('Relie d’abord le serveur Discord à cette communauté.'), {status:400});
   if (!String(env.DISCORD_BOT_TOKEN || '').trim()) throw Object.assign(new Error('Le bot du site n’est pas configuré.'), {status:503});
-  const made = [], kept = [];
+  const made = [], kept = [], moved = [];
   try {
     const [guild, roles, channels] = await Promise.all([discord(env, 'GET', `/guilds/${guildId}`), discord(env, 'GET', `/guilds/${guildId}/roles`),
       discord(env, 'GET', `/guilds/${guildId}/channels`)]);
@@ -68,22 +71,34 @@ export async function setupOfficialServer(env, guildId) {
     // Community mode first needs its rules channel and its updates channel: those (plain text) are made in the
     // first pass, the announcement channel and the forums in the second, once the server is a Community.
     const ids = {};
+    const named = (item, entry) => [entry.name, ...(entry.was || [])].some(name => sameName(item.name, name));
     for (const pass of [1, 2]) {
       for (const [position, group] of OFFICIAL_LAYOUT.entries()) {
-        let category = channels.find(item => item.type === CATEGORY && sameName(item.name, group.name));
+        const access = overwrites(group.access, guildId, staffId, env.DISCORD_CLIENT_ID);
+        let category = channels.find(item => item.type === CATEGORY && named(item, group));
         if (!category) {
           category = await discord(env, 'POST', `/guilds/${guildId}/channels`, {name:group.name, type:CATEGORY, position,
-            ...(overwrites(group.access, guildId, staffId, env.DISCORD_CLIENT_ID) ? {permission_overwrites:overwrites(group.access, guildId, staffId, env.DISCORD_CLIENT_ID)} : {})});
+            ...(access ? {permission_overwrites:access} : {})});
           channels.push(category); made.push(group.name);
+        } else if (pass === 1 && !sameName(category.name, group.name)) {
+          Object.assign(category, await discord(env, 'PATCH', `/channels/${category.id}`, {name:group.name}));
+          moved.push(group.name);
         } else if (pass === 1) kept.push(group.name);
+        if (group.anchor) ids.anchor = category.id;
         for (const channel of group.channels) {
           const type = channel.type || TEXT;
           const needsCommunity = type === NEWS || type === FORUM;
           if (needsCommunity !== (pass === 2)) continue;
-          if (needsCommunity && !community && !ids.community) continue;
-          const found = channels.find(item => item.type !== CATEGORY && (item.type === VOICE) === (type === VOICE) && sameName(item.name, channel.name));
-          if (found) { ids[channel.name] = found.id; kept.push(`#${channel.name}`); continue; }
-          const access = overwrites(group.access, guildId, staffId, env.DISCORD_CLIENT_ID);
+          const found = channels.find(item => item.type !== CATEGORY && (item.type === VOICE) === (type === VOICE) && named(item, channel));
+          if (found) {
+            ids[channel.name] = found.id;
+            if (found.parent_id === category.id && sameName(found.name, channel.name)) { kept.push(`#${channel.name}`); continue; }
+            // Moved into its category with its rights (a channel moved into « ÉQUIPE » is hidden like the others).
+            Object.assign(found, await discord(env, 'PATCH', `/channels/${found.id}`, {parent_id:category.id,
+              ...(sameName(found.name, channel.name) ? {} : {name:channel.name}), ...(access ? {permission_overwrites:access} : {})}));
+            moved.push(`#${channel.name}`); continue;
+          }
+          if (channel.existing || (needsCommunity && !community && !ids.community)) continue;
           const created = await discord(env, 'POST', `/guilds/${guildId}/channels`, {name:channel.name, type, parent_id:category.id,
             ...(access ? {permission_overwrites:access} : {}),
             ...(channel.tags ? {available_tags:channel.tags} : {}),
@@ -99,10 +114,22 @@ export async function setupOfficialServer(env, guildId) {
         ids.community = true; made.push('Mode Communauté');
       }
     }
-    return {made, kept};
+    // A former category left empty: deleted.
+    for (const old of channels.filter(item => item.type === CATEGORY && RETIRED.some(name => sameName(item.name, name)))) {
+      if (channels.some(item => item.parent_id === old.id)) continue;
+      await discord(env, 'DELETE', `/channels/${old.id}`);
+      channels.splice(channels.indexOf(old), 1); moved.push(`${old.name} (supprimée, vide)`);
+    }
+    // The categories in order: « INFOS », the races' and any other category, then the rest of the layout.
+    const categories = channels.filter(item => item.type === CATEGORY).sort((a, b) => (a.position || 0) - (b.position || 0));
+    const layout = OFFICIAL_LAYOUT.map(group => categories.find(item => sameName(item.name, group.name))).filter(Boolean);
+    const order = [layout[0], ...categories.filter(item => !layout.includes(item)), ...layout.slice(1)].filter(Boolean);
+    if (order.some((item, index) => item !== categories[index]))
+      await discord(env, 'PATCH', `/guilds/${guildId}/channels`, order.map((item, position) => ({id:item.id, position})));
+    return {made, kept, moved, anchor:ids.anchor};
   } catch (error) {
     const reason = error?.status === 403 ? 'Le bot n’a pas les droits : donne-lui le rôle Administrateur le temps de la mise en place.'
       : error?.status === 404 ? 'Le bot n’est pas sur ce serveur.' : 'Discord n’a pas répondu. Réessaie : ce qui est fait reste fait.';
-    throw Object.assign(new Error(reason), {status:error?.status === 403 ? 403 : 502, made, kept});
+    throw Object.assign(new Error(reason), {status:error?.status === 403 ? 403 : 502, made, kept, moved});
   }
 }
