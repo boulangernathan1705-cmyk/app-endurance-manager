@@ -209,6 +209,8 @@ export async function load() {
   state.discordReady=session.discordReady;
   // Solo races and SAFE drivers only where the site enables them (dev for now).
   state.soloRaces=session.soloRaces===true;
+  // « Inscription par catégorie » (module): one entry for the race, its categories and starts; the TM makes the crews.
+  state.categoryEntry=session.categoryEntry===true;
   if (typeof session.soloLabel==='string' && session.soloLabel) state.soloLabel=session.soloLabel;
   state.eventTypes=Array.isArray(session.eventTypes)?session.eventTypes:[];
   // EVENT TDZ (types, OPEN / SAFE); elsewhere EVENT SOLO, open to the « Endurances » permission.
