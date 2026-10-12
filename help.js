@@ -147,7 +147,7 @@ const modulesSection = () => [L('Les modules en bref', 'Modules in short'), `
     <li>${L('<strong>Salons d’équipage</strong> : un salon vocal par équipage, à son nom, ouvert dès sa création et supprimé 2 h après la course ;', '<strong>Crew channels</strong>: a voice channel per crew, named after it, opened as soon as it is created and deleted 2 h after the race;')}</li>
     <li>${L('<strong>Rappels de course</strong> : 24 h avant dans la cloche, 24 h et 1 h avant dans le salon de l’équipage ;', '<strong>Race reminders</strong>: 24 h before in the bell, 24 h and 1 h before in the crew channel;')}</li>
     <li>${L('<strong>Endurances iRacing officielles</strong> : les séries en équipe et les événements spéciaux ajoutés tout seuls, horaires compris ;', '<strong>Official iRacing endurance races</strong>: team series and special events added by themselves, times included;')}</li>
-    <li>${L(`<strong>${eventsLabel()}</strong> : le calendrier des événements, toutes simus ;`, `<strong>${eventsLabel()}</strong>: the events calendar, every sim;`)}</li>
+    ${events() ? `<li>${L(`<strong>${eventsLabel()}</strong> : le calendrier des événements, toutes simus ;`, `<strong>${eventsLabel()}</strong>: the events calendar, every sim;`)}</li>` : ''}
     <li>${L('<strong>Mémo des circuits</strong> et <strong>Entraînement</strong> (LMU) : la fiche de chaque circuit pour tous, et la prépa de chaque course avec ton équipage.', '<strong>Circuit memo</strong> and <strong>Training</strong> (LMU): each circuit’s sheet for everyone, and each race’s prep with your crew.')}</li>
   </ul>`];
 

@@ -89,7 +89,7 @@ export default {
       && !(await env.DB.prepare('SELECT 1 FROM communities WHERE slug=?').bind(communityLabel(new URL(request.url), env)).first())) return communityNotFound();
     if (pathname === '/' && ['GET','HEAD'].includes(request.method)) {
       const community = env?.DB ? await currentCommunity(env, request).catch(() => null) : null;
-      const redirect = homeRedirect(request, community);
+      const redirect = homeRedirect(request, community, isDevelopment(env));
       if (redirect) return redirect;
       if (env?.ASSETS) {
         const home = await homePage(request, env);

@@ -8,12 +8,12 @@ import {ingestClientError, clientErrorsApi} from './telemetry.mjs';
 import {communityRequestsApi, closeCommunityRequest} from './community-requests.mjs';
 import {trainingApi, trainingCollector, nextRace, trainingEnabled, memoEnabled} from './training.mjs';
 import {racesPath} from './races-path.mjs';
-import {CARS, simForEvent, TDZ_EVENT_TYPES, TDZ_EVENTS_LABEL} from '../shared/catalog.mjs';
+import {CARS, simForEvent, TDZ_EVENT_TYPES, TDZ_EVENTS_LABEL, tdzOnly, eventTdzEnabled} from '../shared/catalog.mjs';
 import {currentCommunity, appearanceOf, allCommunities, communityUrl, communitySlug, communityById, communityFromRow} from './community.mjs';
 import {isDevelopment} from './dev-environment.mjs';
 import {communityAccess, requirePermission, displayRole, PERMISSIONS, ALL_PERMISSIONS, DEFAULT_EVERYONE, normalizePermissions, discordGuild, keepDiscordLook, memberPermissions, refreshCommunityMembers, discoverMemberships} from './access.mjs';
 // Solo races: a module each community turns on or off (settings of the members page).
-const soloRacesEnabled = (env, community) => community?.modules?.soloRaces === true;
+const soloRacesEnabled = (env, community) => eventTdzEnabled(community, isDevelopment(env));
 import {syncIracingEvents} from './iracing-import.mjs';
 import {resetShowcase, makeOfficial} from './demo.mjs';
 import {setupOfficialServer} from './official-discord.mjs';
@@ -789,7 +789,7 @@ async function api(request, env) {
       administrator:role.administrator, permissions:saved.has(role.id) ? normalizePermissions(saved.get(role.id)) : (role.id === community.discordGuildId ? [...DEFAULT_EVERYONE] : [])}));
     await keepDiscordLook(env, community, discord);
     return json({community:{name:community.name, shortName:community.shortName, discordServer:discord?.name || null, ...appearanceOf(community)}, roles, permissions:PERMISSIONS,
-      modules:{iracingImport:community.modules.iracingImport === true, discordWeekly:community.modules.discordWeekly === true, soloRaces:community.modules.soloRaces === true, eventsLabel:TDZ_EVENTS_LABEL, eventTypes:grindfestEnabled(community, isDevelopment(env)) ? [...TDZ_EVENT_TYPES, 'Grindfest'] : TDZ_EVENT_TYPES, grindfest:grindfestEnabled(community, isDevelopment(env)), grindfestAvailable:grindfestAvailable(community, isDevelopment(env)),
+      modules:{iracingImport:community.modules.iracingImport === true, discordWeekly:community.modules.discordWeekly === true, soloRaces:soloRacesEnabled(env, community), eventTdzAvailable:tdzOnly(community, isDevelopment(env)), eventsLabel:TDZ_EVENTS_LABEL, eventTypes:grindfestEnabled(community, isDevelopment(env)) ? [...TDZ_EVENT_TYPES, 'Grindfest'] : TDZ_EVENT_TYPES, grindfest:grindfestEnabled(community, isDevelopment(env)), grindfestAvailable:grindfestAvailable(community, isDevelopment(env)),
         crewChannels:community.modules.crewChannels === true, raceReminders:community.modules.raceReminders === true, training:trainingEnabled(community), memo:memoEnabled(community)},
       crews:await crewDiscordState(env, community)});
   }
@@ -843,6 +843,7 @@ async function api(request, env) {
       modules.grindfest = input.grindfest;
       if (input.grindfest) modules.soloRaces = true;
     }
+    if (input.soloRaces === true && !tdzOnly(community, isDevelopment(env))) fail(403, 'Le module EVENT TDZ est réservé aux TDZ.');
     if (input.soloRaces === false && modules.grindfest) fail(400, 'Éteins Grindfest avant de désactiver les événements solo.');
     // The Discord recap is configured through the guided bot module.
     // The Mémo follows « Entraînement » until set on its own: switching the training off keeps the Mémo it showed.

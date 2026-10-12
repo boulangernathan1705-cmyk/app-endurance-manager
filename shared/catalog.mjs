@@ -144,6 +144,9 @@ export function catalogForGame(game='lmu') { return GAME_CATALOGS[GAME_IDS.inclu
 export const TRACK_LIMITS = {strict:'Strictes', normal:'Normales'};
 export const TDZ_EVENT_TYPES = ['OPEN', 'SAFE', 'Bouboule'];
 export const TDZ_EVENTS_LABEL = 'EVENT TDZ';
+// EVENT TDZ and Grindfest belong to the TDZ community only (plus the « test » community on the dev site).
+export const tdzOnly = (community, development = false) => community?.slug === 'tdz' || (development && community?.slug === 'test');
+export const eventTdzEnabled = (community, development = false) => tdzOnly(community, development) && community?.modules?.soloRaces === true;
 export function isRandomCircuit(id) { return id === 'random' || id === 'iracing-random'; }
 // Default number of places of a solo race: the game server size for that track. LMU hosted servers
 // have 20, 38 or 62 slots, 62 only at Le Mans (pit garages); iRacing grids vary, 40 is a safe default.

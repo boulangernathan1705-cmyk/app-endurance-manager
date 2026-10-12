@@ -15,7 +15,7 @@ test('a returning pilot goes straight to the simulator they chose', async () => 
 
 test('with EVENT TDZ, the events calendar is the home page; the simulator is asked in Endurance', async () => {
   const {homeRedirect} = await import('../server/home.mjs');
-  const events = {modules:{soloRaces:true}};
+  const events = {slug:'tdz', modules:{soloRaces:true}};
   const go = cookie => homeRedirect(new Request('https://site.example/', {headers: cookie ? {Cookie: cookie} : {}}), events)?.headers.get('Location');
   assert.equal(go(''), '/lmu/#solo');
   assert.equal(go('em_sim=iracing'), '/iracing/#solo');
