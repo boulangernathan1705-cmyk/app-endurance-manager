@@ -2,6 +2,10 @@
 
 Les changements du site, version par version. La plus récente est en haut.
 
+## v1.28 — 12 octobre 2026
+
+- Discord : chaque course a sa catégorie et son salon « infos-de-la-course » dès sa publication, même sans équipage. Les courses officielles LMU aussi.
+
 ## v1.27 — 12 octobre 2026
 
 - Mémo des circuits et Entraînement deviennent deux modules LMU séparés. Le Mémo couvre tous les circuits dès l'activation : BoP, chronos de référence de chaque voiture et stratégie de course estimée tour par tour.
