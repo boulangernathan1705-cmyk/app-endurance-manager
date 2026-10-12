@@ -193,12 +193,14 @@ async function memo(env, user, url, canRestart = false) {
     UNION ALL SELECT circuit,track,car,car_class,NULL AS user_id FROM training_memo_cycles)
     GROUP BY circuit,car,car_class ORDER BY circuit,car`, since);
   const circuits = memoCircuits(rows);
-  const race = url.searchParams.get('circuit') ? null : await nextRace(env, user);
-  const circuit = circuits.find(item => item.key === (url.searchParams.get('circuit') || race?.circuit))
+  // Opened from the menu, the sheet starts where the pilots measured something (the figures are what it is for);
+  // from the training, on the race's circuit and class.
+  const circuit = circuits.find(item => item.key === url.searchParams.get('circuit'))
     || circuits.find(item => item.cars.some(car => car.measured)) || circuits[0];
+  const measured = [...circuit.cars].sort((a, b) => b.measured - a.measured || b.pilots - a.pilots);
   const car = circuit.cars.find(item => item.car === url.searchParams.get('car'))
-    || circuit.cars.find(item => sameClass(item.carClass, url.searchParams.get('class') || race?.category))
-    || [...circuit.cars].sort((a, b) => b.pilots - a.pilots)[0];
+    || measured.find(item => sameClass(item.carClass, url.searchParams.get('class')))
+    || measured[0];
   // Only the chosen circuit's cars travel: the list of every circuit with all the BoP's cars would weigh tens of kB.
   const names = circuits.map(item => ({key:item.key, name:item.name}));
   if (!car) return {circuits:names, cars:circuit.cars, circuit:{key:circuit.key, name:circuit.name}, car:null, canRestart};
@@ -328,8 +330,8 @@ export async function trainingApi(path, method, request, env, actor, community) 
     for (const row of sessions) if (!tracks.some(track => track.key === row.track_key)) tracks.push({key:row.track_key, venue:row.venue, course:row.course, circuit:circuitOf(row.venue)});
     for(const row of liveMeta)if(!tracks.some(track=>track.circuit===row.circuit))tracks.push({key:row.circuit,venue:row.track,course:'',circuit:row.circuit});
     const wanted = url.searchParams.get('track');
-    // With a race, its circuit only: another circuit's figures would read as the race's.
-    const track = race ? tracks.find(item => item.circuit === race.circuit) || null : tracks.find(item => item.key === wanted) || tracks[0] || null;
+    // The circuit picked, else the race's, else the first one with figures.
+    const track = tracks.find(item => item.key === wanted) || (race ? tracks.find(item => item.circuit === race.circuit) : null) || tracks[0] || null;
     const onTrack = track ? sessions.filter(row => row.track_key === track.key) : [];
     const classes = [...new Set([...onTrack.map(row => row.car_class),...liveMeta.filter(row=>row.circuit===track?.circuit).map(row=>row.car_class)])];
     const carClass = classes.includes(url.searchParams.get('class')) ? url.searchParams.get('class') : classes.find(item => sameClass(item, race?.category)) || classes[0] || race?.category || null;
