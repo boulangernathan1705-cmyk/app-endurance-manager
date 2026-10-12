@@ -26,7 +26,7 @@ import {resetShowcase, makeOfficial} from './demo.mjs';
 import {setupOfficialServer} from './official-discord.mjs';
 
 
-import {botRecapSettings, recapDestinations, recapError, recapInput, validateRecapDestination, previewBotRecap, saveBotRecap, syncBotRecaps, sendBotRecapTest, RECAP_BOT_PERMISSIONS} from './recap-discord.mjs';
+import {botRecapSettings, recapDestinations, recapError, recapInput, validateRecapDestination, previewBotRecap, saveBotRecap, syncBotRecaps, sendBotRecapTest, repairBotRecap, RECAP_BOT_PERMISSIONS} from './recap-discord.mjs';
 import {notify, notificationsApi, departurePilots, eventPilots, crewPilots} from './notifications.mjs';
 import {botCanManageChannels, checkBot, serverCategories, CREW_BOT_PERMISSIONS} from './crew-discord.mjs';
 // Official races (iRacing's official endurances, LMU official events): common to every community (migration 0039).
@@ -932,6 +932,12 @@ async function api(request, env) {
       const settings = await validateRecapDestination(env,community,await body(request));
       return json(await sendBotRecapTest(env,Date.now(),community,settings));
     } catch (error) { fail(error.status === 409 ? 409 : 400,error.message === 'Discord indisponible' ? recapError(error) : error.message); }
+  }
+  if (path === '/api/community/recap/repair' && method === 'POST') {
+    requirePermission(actor,'admin');
+    await rateLimit(request,env,'recap-repair',10);
+    try { return json(await repairBotRecap(env,Date.now(),community)); }
+    catch (error) { fail(error.status === 409 ? 409 : 400,error.message === 'Discord indisponible' ? recapError(error) : error.message); }
   }
   // Retired endpoints cannot write or publish historical webhook configurations.
   if ((path === '/api/community/recaps' && method === 'PUT') || (path === '/api/community/recaps/test' && method === 'POST') || (path === '/api/community/recap/legacy-preview' && method === 'GET')) {

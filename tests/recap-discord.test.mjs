@@ -5,7 +5,7 @@ import {readFileSync,readdirSync} from 'node:fs';
 import worker from '../server/worker.mjs';
 import {linkTestServer,DEV_COMMUNITY,GUILD} from './fixtures/discord-server.mjs';
 import {syncWeeklyDiscord} from '../server/discord-weekly.mjs';
-import {saveBotRecap,syncBotRecaps,previewBotRecap,recapDestinations,eventDeletionTime,eventChannelName,sendBotRecapTest} from '../server/recap-discord.mjs';
+import {saveBotRecap,syncBotRecaps,previewBotRecap,recapDestinations,eventDeletionTime,eventChannelName,sendBotRecapTest,recapError,repairBotRecap} from '../server/recap-discord.mjs';
 
 const OWNER='333333333333333333', BOT='444444444444444444', TEXT='555555555555555555', CATEGORY='666666666666666666';
 const NOW=Date.parse('2026-10-10T12:00:00Z'), DAY=86400000;
@@ -40,7 +40,7 @@ function setup(t,{rights='85008',overrides=[],failure=null}={}){
     const send=path.match(/^\/channels\/(\d+)\/messages$/);
     if(send){const message={...body,id:String(counter++),channel_id:send[1],author:{id:BOT}};messages.set(message.id,message);return Response.json(message);}
     const edit=path.match(/^\/channels\/(\d+)\/messages\/(\d+)$/);
-    if(edit){const message=messages.get(edit[2]);if(!message)return new Response('{}',{status:404});Object.assign(message,body);return Response.json(message);}
+    if(edit){const message=messages.get(edit[2]);if(!message)return Response.json({code:10008},{status:404});Object.assign(message,body);return Response.json(message);}
     const channel=path.match(/^\/channels\/(\d+)$/);
     if(channel){const index=channels.findIndex(item=>item.id===channel[1]);if(index<0)return new Response('{}',{status:404});if(method==='DELETE')channels.splice(index,1);else Object.assign(channels[index],body);return new Response(null,{status:204});}
     return new Response('{}',{status:404});
@@ -142,7 +142,7 @@ test('Discord failures are recorded and retried without duplicates; a removed me
   await assert.rejects(syncBotRecaps(env,NOW,COMMUNITY),/limite/);assert.match(DB.db.prepare('SELECT last_error FROM community_recap_settings').get().last_error,/limite/);
   setFailure(null);calls.length=0;await syncBotRecaps(env,NOW,COMMUNITY);assert.equal(sends(calls).length,0);assert.equal(DB.db.prepare('SELECT last_error FROM community_recap_settings').get().last_error,null);
   messages.clear();DB.db.prepare("UPDATE events SET name='Encore changé'").run();
-  await assert.rejects(syncBotRecaps(env,NOW,COMMUNITY),/introuvable/);assert.equal(sends(calls).length,0);
+  await assert.rejects(syncBotRecaps(env,NOW,COMMUNITY),/message de récap a été supprimé/);assert.equal(sends(calls).length,0);
 });
 
 test('destination selection accounts for channel overwrites and keeps communities isolated',async t=>{
@@ -355,4 +355,83 @@ test('scheduled bot rotation gives the next community its turn and disabling nev
   DB.db.prepare("INSERT INTO community_recaps(community_id,scope,webhook_url,updated_at) VALUES(?,'all','https://discord.com/api/webhooks/123456789012345678/token-aaaaaaaaaaaaaaaaaaaaaaaa',0)").run(DEV_COMMUNITY);
   await saveBotRecap(env,COMMUNITY,{...SETTINGS,mode:'general',destinationId:TEXT},false);
   calls.length=0;await syncWeeklyDiscord(env,NOW+2000,COMMUNITY);assert.equal(sends(calls).length,0);assert.ok(calls.every(call=>!call.path.includes('/webhooks/')));
+});
+
+
+test('Discord diagnostics distinguish removed messages, missing channels and missing permissions',()=>{
+  assert.match(recapError({status:404,code:10008}),/message de récap a été supprimé/);
+  assert.match(recapError({status:404,path:'/channels/123/messages/456'}),/message de récap a été supprimé/);
+  assert.match(recapError({status:404,code:10003,path:'/channels/123/messages?limit=100'}),/salon de publication/);
+  assert.match(recapError({status:404,code:10004}),/serveur Discord/);
+  assert.match(recapError({status:404}),/actualise les destinations/);
+  assert.match(recapError({status:403,code:50013}),/permissions.*Intégrer des liens/);
+});
+
+
+test('an explicit test repairs a deleted race category and channel while preserving the configured destination',async t=>{
+  const {DB,env,calls,channels,messages}=setup(t);race(DB);
+  await saveBotRecap(env,COMMUNITY,SETTINGS);await syncBotRecaps(env,NOW,COMMUNITY);
+  const old=DB.db.prepare('SELECT * FROM discord_recap_publications').get();
+  channels.splice(channels.findIndex(item=>item.id===old.channel_id),1);
+  channels.splice(channels.findIndex(item=>item.id===old.category_id),1);
+  messages.clear();
+  // Reproduce SPM's partial first publication (channel tracked, no message yet).
+  DB.db.prepare("UPDATE discord_recap_publications SET message_id=NULL,content_hash=''").run();
+  const failure=(path)=>path.startsWith(`/channels/${old.channel_id}/`);failure.status=404;
+  const original=globalThis.fetch;
+  globalThis.fetch=async(url,options)=>failure(String(url).replace('https://discord.com/api/v10',''))?Response.json({code:10003},{status:404}):original(url,options);
+  await assert.rejects(syncBotRecaps(env,NOW+1,COMMUNITY),/salon de publication/);
+  calls.length=0;
+  await sendBotRecapTest(env,NOW+2,COMMUNITY,SETTINGS);
+  const repaired=DB.db.prepare('SELECT * FROM discord_recap_publications').get();
+  assert.notEqual(repaired.category_id,old.category_id);assert.notEqual(repaired.channel_id,old.channel_id);assert.ok(repaired.message_id);
+  assert.equal(creates(calls).length,2);assert.equal(sends(calls).length,1);
+  assert.ok(channels.some(item=>item.id===CATEGORY));
+  calls.length=0;await sendBotRecapTest(env,NOW+3,COMMUNITY,SETTINGS);
+  assert.equal(creates(calls).length,0);assert.equal(sends(calls).length,0);
+});
+
+
+for(const mode of ['general','events'])test(`admin repair restores a removed ${mode} message without switching settings`,async t=>{
+  const {DB,env,calls,messages}=setup(t);race(DB);
+  const settings=mode==='general'?{...SETTINGS,mode,destinationId:TEXT}:SETTINGS;
+  await saveBotRecap(env,COMMUNITY,settings);await syncBotRecaps(env,NOW,COMMUNITY);
+  const before=DB.db.prepare('SELECT * FROM discord_recap_publications').get();messages.clear();calls.length=0;
+  await repairBotRecap(env,NOW,COMMUNITY);
+  const after=DB.db.prepare('SELECT * FROM discord_recap_publications').get();
+  assert.notEqual(after.message_id,before.message_id);assert.equal(after.channel_id,before.channel_id);assert.equal(creates(calls).length,0);assert.equal(sends(calls).length,1);
+  assert.equal(DB.db.prepare('SELECT enabled FROM community_recap_settings').get().enabled,1);
+  calls.length=0;await repairBotRecap(env,NOW,COMMUNITY);assert.equal(sends(calls).length,0);assert.equal(creates(calls).length,0);
+});
+
+test('repair refuses insufficient permissions or a missing destination; disabled recaps remain disabled',async t=>{
+  const {DB,env,calls,channels,setFailure}=setup(t);race(DB);
+  await saveBotRecap(env,COMMUNITY,SETTINGS,false);
+  channels.find(c=>c.id===CATEGORY).permission_overwrites=[{id:BOT,type:1,deny:'16384',allow:'0'}];
+  await assert.rejects(repairBotRecap(env,NOW,COMMUNITY),/Intégrer des liens/);assert.equal(creates(calls).length,0);
+  channels.find(c=>c.id===CATEGORY).permission_overwrites=[];
+  await repairBotRecap(env,NOW,COMMUNITY);assert.equal(DB.db.prepare('SELECT enabled FROM community_recap_settings').get().enabled,0);
+  const fail=(path,method)=>method==='PATCH'&&path.includes('/messages/');fail.status=403;setFailure(fail);calls.length=0;
+  await assert.rejects(repairBotRecap(env,NOW,COMMUNITY),/permissions/);assert.equal(sends(calls).length,0);
+  setFailure(null);channels.splice(channels.findIndex(c=>c.id===CATEGORY),1);calls.length=0;
+  await assert.rejects(repairBotRecap(env,NOW,COMMUNITY),/destination/);assert.equal(creates(calls).length,0);
+});
+
+test('repair endpoint is admin-only and uses saved settings instead of supplied destinations',async t=>{
+  const {DB,env,calls}=setup(t);race(DB);
+  await saveBotRecap(env,COMMUNITY,{...SETTINGS,mode:'general',destinationId:TEXT});
+  assert.equal((await as(env,'/api/community/recap/repair','POST',{},'222222222222222222')).status,403);
+  assert.equal((await as(env,'/api/community/recap/repair','POST',{destinationId:'999999999999999999'})).status,200);
+  assert.equal(sends(calls)[0].path,`/channels/${TEXT}/messages`);
+});
+
+
+test('repair of a removed category moves the surviving recap channel and keeps its message',async t=>{
+  const {DB,env,calls,channels}=setup(t);race(DB);await saveBotRecap(env,COMMUNITY,SETTINGS);await syncBotRecaps(env,NOW,COMMUNITY);
+  const before=DB.db.prepare('SELECT * FROM discord_recap_publications').get();
+  channels.splice(channels.findIndex(c=>c.id===before.category_id),1);channels.find(c=>c.id===before.channel_id).parent_id=null;
+  calls.length=0;await repairBotRecap(env,NOW,COMMUNITY);
+  const after=DB.db.prepare('SELECT * FROM discord_recap_publications').get();
+  assert.notEqual(after.category_id,before.category_id);assert.equal(after.channel_id,before.channel_id);assert.equal(after.message_id,before.message_id);
+  assert.equal(channels.find(c=>c.id===after.channel_id).parent_id,after.category_id);assert.equal(creates(calls).length,1);assert.equal(sends(calls).length,0);
 });
