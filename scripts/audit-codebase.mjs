@@ -116,13 +116,16 @@ if (!trustPage.includes('Discord OAuth') || !trustPage.includes('ne demande, ne 
 
 const wrangler = await readable(resolve(root, 'wrangler.jsonc'));
 const wranglerProd = await readable(resolve(root, 'wrangler.prod.jsonc'));
-// Production (communities platform): every page goes through the Worker, which reads the community from the
+// Production (communities platform): the site's pages go through the Worker, which reads the community from the
 // address (<slug>.endurance-manager.app, unknown one: 404 page) and serves the files through ASSETS.
 const prodRoutes = (() => { try { return JSON.parse(wranglerProd.replace(/^\s*\/\/.*$/gm, '')).assets?.run_worker_first; } catch { return null; } })();
 // The static files (scripts, styles, images) skip it: served directly, free and outside the daily quota.
 const pagesThroughWorker = routes => Array.isArray(routes) && routes.includes('/*')
   && routes.every(route => route === '/*' || /^!\/(?:front|shared|images)\/\*$|^!\/[\w-]+\.(?:js|css)$/.test(route));
-if (!pagesThroughWorker(prodRoutes)) warnings.push('En production, toutes les pages doivent passer par le Worker (sites des communautés).');
+// Production lists its pages instead of /*: an unknown address gets public/404.html without waking the Worker.
+const prodPages = Array.isArray(prodRoutes) && !prodRoutes.includes('/*') && ['/', '/api/*', '/lmu*', '/iracing*'].every(route => prodRoutes.includes(route))
+  && /"not_found_handling"\s*:\s*"404-page"/.test(wranglerProd);
+if (!prodPages) warnings.push('En production, les pages du site passent par le Worker et les adresses inconnues reçoivent 404.html sans lui.');
 if (!/"binding"\s*:\s*"ASSETS"/.test(wranglerProd)) warnings.push('En production, la page d’accueil a besoin du binding ASSETS.');
 if (!/"minify"\s*:\s*true/.test(wrangler) || !/"minify"\s*:\s*true/.test(wranglerProd)) warnings.push('Wrangler doit minifier le Worker avant déploiement.');
 // Dev: every page goes through the Worker to add the "version de test" banner and noindex.
