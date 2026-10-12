@@ -5,6 +5,7 @@ import {fail, json, now, id, token, hash, siteOrigin, rateLimit, body, DAY} from
 import {parseResults, analyse, programSteps, adviceFor, trackKey, cleanLaps, circuitOf, normal, cleanLive, analyseLive, resultsAsLive, pitTimes, memoSheet, parseLaptimes, laptimesUpdated, mainLayout, LAPTIME_SOURCE, STEPS} from '../shared/training.mjs';
 import {levelOf, levelGap, memoPilots} from '../shared/training.mjs';
 import {BOP} from '../shared/lmu-bop.mjs';
+import {strategyInputs} from '../shared/race-strategy.mjs';
 import {bopFor} from '../shared/bop.mjs';
 import {catalogForGame} from '../shared/catalog.mjs';
 import {collectMemo, collectiveMemo, restartMemo, renewMemos} from './memo-collection.mjs';
@@ -361,11 +362,12 @@ export async function trainingApi(path, method, request, env, actor, community) 
     const proofs = Object.fromEntries((preparation.crew?.pilots || []).filter(pilot => pilot.user).map(pilot => [pilot.user, pilot.proof]));
     proofs[user] = checklistEvidence(analysis, liveSessions);
     if (preparation.crew) for (const pilot of preparation.crew.pilots) { delete pilot.user; delete pilot.proof; }
-    // The relays' estimate: a full tank (or energy) at the pilot's pace, else the crew's, else the reference midpack.
-    const tank = Math.min(...[live?.tankLaps, live?.energyLaps, analysis.tankLaps].filter(value => value > 0));
+    // The race's strategy: the Mémo's figures for the crew's car (else the race's class) at the pilot's pace, else the
+    // crew's, else the reference midpack.
     const paces = (preparation.crew?.pilots || []).map(pilot => pilot.pace).filter(Boolean);
     const lap = analysis.median || manual?.best || median(paces) || preparation.reference?.pace?.[5] || null;
-    const prep = await racePrep(env, user, community.id, race, proofs, {lap, stintLaps:Number.isFinite(tank) ? tank : null});
+    const sheet = race ? await memo(env, user, new URL('https://memo/?' + new URLSearchParams({circuit:race.circuit, car:preparation.crew?.car || '', class:race.category}))) : null;
+    const prep = await racePrep(env, user, community.id, race, proofs, strategyInputs(sheet?.car ? sheet : null, lap));
     return json({race, races, prep, level, manual:manual ? {pace:manual.best, fuel:manual.fuel} : null, tracks, track, classes, carClass, analysis, live, game, checklist,...preparation, steps:programSteps(analysis, marks), advice:adviceFor(analysis, compared), comparison:compared,
       sessions:sessions.slice(0, 20).map(row => ({id:row.id, at:row.started_at, venue:row.venue, course:row.course, car:row.car, carClass:row.car_class, kind:row.kind,
         laps:row.lap_count, best:row.best})),

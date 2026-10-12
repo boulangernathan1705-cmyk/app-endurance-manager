@@ -2,7 +2,8 @@
 // the sessions when they can tell, the notes and the relay plan shared with the crew, the last race on the same
 // circuit beside it. Only the pilots of the crew see each other's; a pilot without a crew sees his own.
 import {fail, json, id, body} from './core.mjs';
-import {PREP_STEPS, PREP_STATUSES, NOTE_LIMIT, prepStatus, nextStep, estimateRelays} from '../shared/training-prep.mjs';
+import {PREP_STEPS, PREP_STATUSES, NOTE_LIMIT, prepStatus, nextStep} from '../shared/training-prep.mjs';
+import {raceStrategy, STRATEGY_DEFAULTS} from '../shared/race-strategy.mjs';
 
 const all = async (env, sql, ...params) => (await env.DB.prepare(sql).bind(...params).all()).results || [];
 const now = () => Date.now();
@@ -43,13 +44,14 @@ async function notesOf(env, race, users, viewer) {
 }
 
 // The crew's relay plan: how many relays (the crew's number, else the estimate) and the entry driving each one
-// (a pilot who left the crew is forgotten). estimate: {lap, stintLaps} from the viewer's laps.
-async function stintsOf(env, crew, race, viewer, estimate = {}) {
+// (a pilot who left the crew is forgotten). inputs: the strategy's figures (shared/race-strategy.mjs, strategyInputs).
+async function stintsOf(env, crew, race, viewer, inputs = {}) {
   const event = await env.DB.prepare('SELECT duration_hours,duration_minutes FROM events WHERE id=?').bind(race.eventId).first();
   const minutes = Number(event?.duration_minutes) || (Number(event?.duration_hours) || 3) * 60;
   const pilots = await all(env, `SELECT r.id,r.status,p.user_id,p.name FROM crew_members cm JOIN registrations r ON r.id=cm.registration_id
     JOIN participants p ON p.id=r.participant_id WHERE cm.crew_id=? ORDER BY p.name`, crew.id);
-  const guess = estimateRelays({minutes, ...estimate});
+  const strategy = raceStrategy({minutes, ...inputs});
+  const guess = {count:strategy?.relays.length || Math.max(1, Math.ceil(minutes / STRATEGY_DEFAULTS.relayMinutes - 0.15)), strategy};
   const saved = await env.DB.prepare('SELECT count FROM training_relay_counts WHERE crew_id=?').bind(crew.id).first();
   const count = saved?.count || guess.count;
   const plan = Array(count).fill(null);
@@ -61,12 +63,12 @@ async function stintsOf(env, crew, race, viewer, estimate = {}) {
 }
 
 // proofs: user id -> the exercises their sessions prove (shared/training-checklist.mjs).
-export async function racePrep(env, viewer, communityId, race, proofs = {}, estimate = {}) {
+export async function racePrep(env, viewer, communityId, race, proofs = {}, inputs = {}) {
   if (!race) return null;
   const {crew, members} = await raceCrew(env, viewer, communityId, race);
   const ids = members.map(member => member.user_id);
   // A full relay plan ticks the step for the whole crew.
-  const stints = crew ? await stintsOf(env, crew, race, viewer, estimate) : null;
+  const stints = crew ? await stintsOf(env, crew, race, viewer, inputs) : null;
   if (stints?.plan.every(Boolean)) proofs = Object.fromEntries(ids.map(user => [user, {...proofs[user], plan:'Planning complet'}]));
   const chosen = await all(env, `SELECT user_id,step,status FROM training_prep WHERE event_id=? AND departure_id=? AND user_id IN (${marks(ids, ids.length)})`,
     race.eventId, race.departureId, ...ids);

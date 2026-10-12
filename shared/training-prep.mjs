@@ -1,7 +1,7 @@
 // The preparation of each LMU race (server/training-prep.mjs, entrainement.html): a few steps in four parts, each
 // with a status the pilot gives (or the sessions prove), and notes shared with the crew. One preparation per race:
 // it starts again for the next one, and the last race on the same circuit is shown beside it. The crew plans who
-// drives each relay in the last step, the number of relays estimated from the laps and the consumption.
+// drives each relay in the last step, the number of relays estimated by the race's strategy (shared/race-strategy.mjs).
 export const PREP_STATUSES = ['done', 'rework', 'todo', 'skip'];
 export const PREP_LABELS = {done:'Fait', rework:'À retravailler', todo:'À faire', skip:'Pas besoin'};
 
@@ -31,15 +31,6 @@ export const NOTE_LIMIT = 280;
 // A registration's hours: « whole », or the hours ticked (« h1,h3 », the first hour being h1).
 export const availableAt = (status, hour) => status === 'whole' || String(status || '').split(',').includes('h' + (hour + 1));
 
-// How many relays the race takes: a full tank (or energy) of laps at the pilot's pace, with no data a relay of
-// 50 minutes. An estimate to share the race between the pilots, the race will change it.
-export const RELAY_DEFAULT_MINUTES = 50;
-export function estimateRelays({minutes, lap, stintLaps}) {
-  const stint = lap > 0 && stintLaps > 0 ? lap * stintLaps / 60 : null;
-  const length = stint || RELAY_DEFAULT_MINUTES;
-  return {count:Math.max(1, Math.min(60, Math.ceil(minutes / length - 0.15))), laps:stint ? stintLaps : null, lap:stint ? lap : null,
-    minutes:Math.round(length)};
-}
 // The hour of the race (0 = first) a relay mostly falls in, to read the pilots' ticked hours.
 export const relayHour = (index, count, minutes) => Math.floor((index + 0.5) * minutes / count / 60);
 

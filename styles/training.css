@@ -429,3 +429,13 @@ details.prep>summary::-webkit-details-marker,details.prep-last>summary::-webkit-
 .prep-crew span{font-variant-numeric:tabular-nums;color:var(--muted);font-size:14px}
 .prep-crew small{color:var(--muted);font-size:12px}
 @media (max-width:640px){.prep-step{grid-template-columns:1fr}.prep-seg{justify-self:start;max-width:100%;overflow-x:auto}}
+.strategy{grid-column:1/-1;font-size:13.5px}
+.strategy summary{cursor:pointer;color:var(--memo-you);font-size:13px}
+.strategy p{margin:8px 0 0}
+.strategy-stops{display:grid;gap:6px;margin:8px 0 0;padding:0;list-style:none}
+.strategy-stops li{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;padding:7px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg)}
+.strategy-stops b{grid-row:span 3;font-weight:700}
+.strategy-stops span:nth-of-type(1){color:var(--muted)}
+.strategy-assumed{color:var(--muted);font-size:12.5px}
+.memo-strategy-pick{display:flex;flex-wrap:wrap;gap:10px}
+.memo-strategy .strategy summary{display:none}
