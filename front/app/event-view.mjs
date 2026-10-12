@@ -1,5 +1,5 @@
 import {isGrindfest} from '../../shared/grindfest.mjs';
-import {streamerColumns} from './grindfest.mjs';
+import {streamerColumns, gridfestPasswordPanel} from './grindfest.mjs';
 import {simForEvent} from '../../shared/catalog.mjs';
 import {dateBlock,timeLabel,weekdayLong,dayMonthShort} from '../dates.mjs';
 import {durationLabel,eventMinutes} from '../../shared/duration.mjs';
@@ -109,7 +109,7 @@ function grindfestRounds(event,departure){
   const rounds=event.rounds||[],locked=departure.startsAt<=Date.now(),mine=ownRegistration(departure),pilots=roundPilots(event,0,departure);
   const editor=!locked&&state.registrationOpen.has(departure.id)?`<section class="fold-section fold-registration">${renderRegistrationWorkspace(event,departure)}</section>`:'';
   const program=rounds.length>1?`<div class="grindfest-rounds">${rounds.map((round,index)=>`<section class="grindfest-round"><h3>Manche ${index+1} · ${esc(eventCircuitName(event,round.circuit))}</h3>${roundTiles(round)}</section>`).join('')}</div>`:'';
-  return `<div class="solo-round-starts" id="departure-${departure.id}">${program}<details class="planning-start solo-round-start is-single has-quick${mine?' is-mine':''}" open><summary><span class="planning-start-head solo-round-head"><span class="solo-subtitle">Pilotes <span class="count-pill">${pilots} / ${event.capacity}</span></span>${mine?'<span class="planning-tag is-mine">Inscrit</span>':''}</span>${quickActions(event,departure)}</summary><div class="departure-fold planning-body"><div class="departure-fold-body">${editor}${streamerColumns(event,departure)}</div></div></details></div>`;
+  return `<div class="solo-round-starts" id="departure-${departure.id}">${gridfestPasswordPanel(event)}${program}<details class="planning-start solo-round-start is-single has-quick${mine?' is-mine':''}" open><summary><span class="planning-start-head solo-round-head"><span class="solo-subtitle">Pilotes <span class="count-pill">${pilots} / ${event.capacity}</span></span>${mine?'<span class="planning-tag is-mine">Inscrit</span>':''}</span>${quickActions(event,departure)}</summary><div class="departure-fold planning-body"><div class="departure-fold-body">${editor}${streamerColumns(event,departure)}</div></div></details></div>`;
 }
 function roundCards(event,departure){
   if(!isSolo(event))return '';
@@ -255,3 +255,4 @@ if(typeof document!=='undefined')document.addEventListener('click',event=>{
   const summary=event.target.closest?.('.solo-round-start.is-single > summary');
   if(summary&&!event.target.closest('button,a,input,select'))event.preventDefault();
 });
+

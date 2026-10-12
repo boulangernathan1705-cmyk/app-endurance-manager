@@ -1,5 +1,5 @@
-import {esc, state} from './core.mjs';
-import {isGrindfest, streamersOf} from '../../shared/grindfest.mjs';
+import {esc, state, api, isAdmin} from './core.mjs';
+import {isGrindfest, streamersOf, gridfestPasswordValid, generateGridfestPassword} from '../../shared/grindfest.mjs';
 import {soloEntryList} from './solo.mjs';
 
 function streamerRow(streamer = {}) {
@@ -19,13 +19,21 @@ export function streamerData(form) {
 export function syncStreamerFields(form) {
   const section = form.querySelector('[data-grindfest-fields]');
   if (!section) return;
-  const active = form.querySelector('[name="eventType"]:checked')?.value === 'Grindfest';
+  const active = isGrindfest({details:{type:form.querySelector('[name="eventType"]:checked')?.value}});
   section.hidden = !active;
   section.querySelectorAll('input').forEach(field => { field.disabled = !active; });
   const streamers = streamerData(form), total = streamers.reduce((sum, item) => sum + item.capacity, 0);
   section.querySelector('[data-grindfest-total]').textContent = `${streamers.length} streamers · ${total} places au total`;
   section.querySelector('[data-add-streamer]').hidden = streamers.length >= 12;
   section.querySelectorAll('[data-remove-streamer]').forEach(button => { button.disabled = streamers.length <= 2; });
+  const passwordTools = form.querySelector('[data-gridfest-password-tools]');
+  if (passwordTools) passwordTools.hidden = !active;
+  const password = form.elements.eventPassword;
+  if (password) {
+    password.minLength = active ? 12 : 0;
+    if (active) password.setAttribute('pattern', '[A-Za-z0-9_-]{12,30}');
+    else password.removeAttribute('pattern');
+  }
   const addRound = form.querySelector('[data-add-round]');
   if (addRound) addRound.hidden = form.querySelectorAll('.solo-round').length >= 4;
   form.querySelectorAll('[name="roundCapacity"]').forEach(field => { field.disabled = active; if (active) field.value = ''; });
@@ -58,10 +66,76 @@ function streamerWaitNotice(event, departure, streamerId, registrationId) {
   return count >= streamer.capacity ? `Liste d’attente — n° ${count - streamer.capacity + 1}. La place revient au premier en attente lors d’un désistement.` : 'Une place est disponible.';
 }
 
+export function gridfestCommunityLink() {
+  const url = state.community?.discordInviteUrl || '';
+  return state.grindfest && /^https:\/\/(discord\.gg|discord\.com\/invite)\/[\w-]{2,64}$/.test(url)
+    ? `<a class="secondary-button" href="${esc(url)}" target="_blank" rel="noopener noreferrer">Rejoindre le Discord de ${esc(state.community?.shortName || 'TDZ')}</a>` : '';
+}
+
+export function gridfestPasswordPanel(event) {
+  if (!state.grindfest || !isGrindfest(event)) return '';
+  const link = gridfestCommunityLink();
+  if (!isAdmin()) return `<div class="gridfest-discord-access">${link}<p>Le mot de passe sera envoyé par MP Discord aux pilotes confirmés quand l’admin le décidera. Autorise les MP des membres du serveur.</p></div>`;
+  const ready = gridfestPasswordValid(event.details?.password);
+  return `<section class="gridfest-password-panel" data-gridfest-password-panel="${esc(event.id)}" aria-labelledby="gridfest-password-title">
+    <h3 id="gridfest-password-title">Invitations au serveur de course</h3>${link}
+    <p>${ready ? 'Mot de passe enregistré.' : 'Génère et enregistre un mot de passe sécurisé dans « Modifier l’événement ».'} Configure le même mot de passe sur le serveur de course.</p>
+    <p>Envoi privé aux inscrits confirmés uniquement. Les listes d’attente sont exclues ; les pilotes déjà servis ne reçoivent pas de doublon.</p>
+    <div class="gridfest-password-actions"><button type="button" class="primary-button" data-gridfest-passwords="send" ${ready ? '' : 'disabled'}>Envoyer le mot de passe par MP</button><button type="button" class="secondary-button" data-gridfest-passwords="status">Vérifier les envois</button><button type="button" class="link-button" data-action="edit-event">Modifier l’événement</button></div>
+    <div data-gridfest-password-status role="status" aria-live="polite"></div>
+    <p class="creation-help">Pour retirer l’accès d’un pilote ayant déjà reçu le mot de passe, change-le aussi sur le serveur de course avant un nouvel envoi.</p>
+  </section>`;
+}
+
+function passwordResult(panel, result) {
+  const labels = {pending:'À envoyer', sending:'En cours', sent:'MP envoyé', failed:'Échec · réessaie l’envoi', incomplete:'Inscription à compléter'};
+  const sent = result.pilots.filter(pilot => pilot.status === 'sent').length;
+  panel.querySelector('[data-gridfest-password-status]').innerHTML = `<p>${sent} / ${result.pilots.length} pilote(s) confirmé(s) ont reçu le mot de passe · ${result.waiting} en attente.</p>${!result.botReady ? '<p>Le bot Discord doit être configuré pour envoyer les MP.</p>' : ''}<ul class="gridfest-delivery-list">${result.pilots.map(pilot => `<li><strong>${esc(pilot.name)}</strong>${pilot.gameName ? ` · ${esc(pilot.gameName)}` : ''}<span>${esc(labels[pilot.status] || 'À envoyer')}${pilot.error ? ` — ${esc(pilot.error)}` : ''}</span></li>`).join('')}</ul>`;
+}
+
 if (typeof document !== 'undefined') {
+  document.addEventListener('input', event => {
+    const field = event.target;
+    if (field.name === 'gridfestGameName' && state.drafts[field.dataset.departure]) state.drafts[field.dataset.departure].gameName = field.value;
+  });
+  document.addEventListener('click', async event => {
+    const target = event.target.closest?.('[data-gridfest-passwords]');
+    if (!target || target.disabled || state.busy) return;
+    const panel = target.closest('[data-gridfest-password-panel]'), race = state.events.find(item => item.id === panel?.dataset.gridfestPasswordPanel);
+    if (!race || !state.grindfest || !isGrindfest(race) || !isAdmin()) return;
+    const send = target.dataset.gridfestPasswords === 'send';
+    if (send && !confirm('Envoyer le mot de passe par MP Discord aux pilotes confirmés du Gridfest ? Les envois réussis ne seront pas répétés.')) return;
+    state.busy = true;
+    const controls = [...panel.querySelectorAll('button')], disabled = controls.map(button => button.disabled);
+    controls.forEach(button => { button.disabled = true; });
+    const status = panel.querySelector('[data-gridfest-password-status]');
+    const path = `/api/races/${race.id}/gridfest/passwords`;
+    let sent = 0;
+    try {
+      if (!send) passwordResult(panel, await api(path));
+      else {
+        let cursor = '';
+        do {
+          status.textContent = `Envoi des MP Discord… ${sent} envoyé(s).`;
+          const result = await api(path, 'POST', {version:race.version, cursor});
+          sent += result.results.filter(item => item.status === 'sent').length;
+          cursor = result.nextCursor;
+          passwordResult(panel, result);
+        } while (cursor);
+      }
+    } catch (error) {
+      status.textContent = `${error.message} Les envois déjà réussis sont conservés ; tu peux relancer l’envoi.`;
+    } finally {
+      state.busy = false;
+      controls.forEach((button,index) => { button.disabled = disabled[index]; });
+    }
+  });
   document.addEventListener('click', event => {
     const form = event.target.closest?.('form[data-kind="solo-event"]');
     if (!form) return;
+    if (event.target.closest('[data-gridfest-generate-password]') && isGrindfest({details:{type:form.querySelector('[name="eventType"]:checked')?.value}})) {
+      form.elements.eventPassword.value = generateGridfestPassword();
+    }
     if (event.target.closest('[data-add-streamer]') && streamerData(form).length < 12) form.querySelector('[data-streamers]').insertAdjacentHTML('beforeend', streamerRow());
     if (event.target.closest('[data-remove-streamer]') && streamerData(form).length > 2) event.target.closest('[data-streamer-id]').remove();
     syncStreamerFields(form);
@@ -93,3 +167,4 @@ if (typeof document !== 'undefined') {
     } catch (error) { message.textContent = error.message; }
   });
 }
+

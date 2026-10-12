@@ -225,7 +225,7 @@ test('Grindfest is TDZ-only and API queues promote and reorder per streamer', as
   assert.equal((await req(base,'POST',{name:'Partial',streamerId:'a',choices:[{}, {skip:true}],forOther:true},'admin')).status,400);
   assert.equal((await req(base,'POST',{name:'Missing',forOther:true},'admin')).status,400);
   const register=async(name,streamerId)=>{
-    const result=await req(base,'POST',{name,streamerId,forOther:true},'admin');
+    const result=await req(base,'POST',{name,gameName:name,streamerId,forOther:true},'admin');
     assert.equal(result.status,201,JSON.stringify(result.data));return result.data.id;
   };
   const first=await register('First','a'), second=await register('Second','a'), third=await register('Third','a');
@@ -233,10 +233,10 @@ test('Grindfest is TDZ-only and API queues promote and reorder per streamer', as
   const entries=async()=>(await list()).departures[0].availability;
   assert.deepEqual((await entries()).map(reg=>reg.waitlistPosition),[null,1,2,null,1]);
   assert((await entries()).every(reg=>!reg.roundWaitlist),'one global queue, shared by all rounds');
-  assert.equal((await req(base,'POST',{name:'Second',streamerId:'b',forOther:true},'admin')).status,409,'a pilot cannot enter again for another round');
+  assert.equal((await req(base,'POST',{name:'Second',gameName:'Second',streamerId:'b',forOther:true},'admin')).status,409,'a pilot cannot enter again for another round');
   assert.equal((await req(`/api/registrations/${first}`,'DELETE',{version:1},'admin')).status,200);
   assert.equal((await entries()).find(reg=>reg.id===second).waitlistPosition,null);
-  assert.equal((await req(`/api/registrations/${third}`,'PATCH',{name:'Third',streamerId:'b',version:1},'admin')).status,200);
+  assert.equal((await req(`/api/registrations/${third}`,'PATCH',{name:'Third',gameName:'Third',streamerId:'b',version:1},'admin')).status,200);
   assert.equal((await entries()).find(reg=>reg.id===third).waitlistPosition,2,'switching streamer joins the end of its queue, even in the same second');
   // Twitch information can be completed later without moving pilots or their queue positions.
   const beforeEdit=await list();
@@ -254,3 +254,4 @@ test('Grindfest is TDZ-only and API queues promote and reorder per streamer', as
   inCommunity('commu-test');
   assert.equal((await req(base,'POST',{name:'Other community',streamerId:'a',forOther:true},'admin')).status,404);
 });
+
