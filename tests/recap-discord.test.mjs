@@ -5,7 +5,7 @@ import {readFileSync,readdirSync} from 'node:fs';
 import worker from '../server/worker.mjs';
 import {linkTestServer,DEV_COMMUNITY,GUILD} from './fixtures/discord-server.mjs';
 import {syncWeeklyDiscord} from '../server/discord-weekly.mjs';
-import {saveBotRecap,syncBotRecaps,previewBotRecap,recapDestinations,eventDeletionTime,eventChannelName,sendBotRecapTest} from '../server/recap-discord.mjs';
+import {saveBotRecap,syncBotRecaps,previewBotRecap,recapDestinations,eventDeletionTime,eventChannelName,sendBotRecapTest,recapError} from '../server/recap-discord.mjs';
 
 const OWNER='333333333333333333', BOT='444444444444444444', TEXT='555555555555555555', CATEGORY='666666666666666666';
 const NOW=Date.parse('2026-10-10T12:00:00Z'), DAY=86400000;
@@ -142,7 +142,7 @@ test('Discord failures are recorded and retried without duplicates; a removed me
   await assert.rejects(syncBotRecaps(env,NOW,COMMUNITY),/limite/);assert.match(DB.db.prepare('SELECT last_error FROM community_recap_settings').get().last_error,/limite/);
   setFailure(null);calls.length=0;await syncBotRecaps(env,NOW,COMMUNITY);assert.equal(sends(calls).length,0);assert.equal(DB.db.prepare('SELECT last_error FROM community_recap_settings').get().last_error,null);
   messages.clear();DB.db.prepare("UPDATE events SET name='Encore changé'").run();
-  await assert.rejects(syncBotRecaps(env,NOW,COMMUNITY),/introuvable/);assert.equal(sends(calls).length,0);
+  await assert.rejects(syncBotRecaps(env,NOW,COMMUNITY),/message de récap a été supprimé/);assert.equal(sends(calls).length,0);
 });
 
 test('destination selection accounts for channel overwrites and keeps communities isolated',async t=>{
@@ -355,4 +355,14 @@ test('scheduled bot rotation gives the next community its turn and disabling nev
   DB.db.prepare("INSERT INTO community_recaps(community_id,scope,webhook_url,updated_at) VALUES(?,'all','https://discord.com/api/webhooks/123456789012345678/token-aaaaaaaaaaaaaaaaaaaaaaaa',0)").run(DEV_COMMUNITY);
   await saveBotRecap(env,COMMUNITY,{...SETTINGS,mode:'general',destinationId:TEXT},false);
   calls.length=0;await syncWeeklyDiscord(env,NOW+2000,COMMUNITY);assert.equal(sends(calls).length,0);assert.ok(calls.every(call=>!call.path.includes('/webhooks/')));
+});
+
+
+test('Discord diagnostics distinguish removed messages, missing channels and missing permissions',()=>{
+  assert.match(recapError({status:404,code:10008}),/message de récap a été supprimé/);
+  assert.match(recapError({status:404,path:'/channels/123/messages/456'}),/message de récap a été supprimé/);
+  assert.match(recapError({status:404,code:10003,path:'/channels/123/messages?limit=100'}),/salon de publication/);
+  assert.match(recapError({status:404,code:10004}),/serveur Discord/);
+  assert.match(recapError({status:404}),/actualise les destinations/);
+  assert.match(recapError({status:403,code:50013}),/permissions.*Intégrer des liens/);
 });

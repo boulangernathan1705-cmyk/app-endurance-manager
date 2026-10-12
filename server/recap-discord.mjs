@@ -16,7 +16,12 @@ const parse = value => { try { const result = JSON.parse(value); return Array.is
 export function recapError(error) {
   if (error.status === 429) return 'Discord limite les requêtes. Le récap réessaiera automatiquement.';
   if (error.status === 403) return 'Dans les permissions du salon ou de la catégorie, autorise le bot à Voir le salon, Envoyer des messages, Intégrer des liens et Voir les anciens messages ; en mode par événement, ajoute Gérer les salons.';
-  if (error.status === 404) return 'La destination Discord est introuvable. Choisis un salon texte ou une catégorie existante.';
+  if (error.status === 404) {
+    if (error.code === 10008 || /\/messages\/[^/?]+$/.test(error.path || '')) return 'Le message de récap a été supprimé sur Discord. Les droits du bot ne le rétabliront pas ; préviens le gestionnaire pour rétablir cette publication.';
+    if (error.code === 10004) return 'Le serveur Discord est introuvable pour le bot. Vérifie le serveur lié à cette communauté et la présence du bot.';
+    if (error.path?.startsWith('/channels/')) return 'Le salon de publication du récap est introuvable ou inaccessible au bot. Vérifie ce salon sur Discord ; changer la catégorie de destination ne rétablit pas un salon de course supprimé.';
+    return 'La catégorie ou le salon de destination est introuvable. Clique sur Modifier, actualise les destinations et sélectionne une destination existante.';
+  }
   if (error.status === 400) return `Discord a refusé le récap (code ${error.code || 'inconnu'}). Vérifie les permissions du bot et signale cette erreur au gestionnaire.`;
   if (error.status === 401) return 'Le bot du site n’est pas disponible. Préviens le gestionnaire de la plateforme.';
   return 'Discord ne répond pas. Le récap réessaiera automatiquement.';
@@ -27,7 +32,7 @@ async function discord(env, method, path, body, budget = {left:12}) {
   const response = await fetch(API + path, {method, signal:AbortSignal.timeout(8000),
     headers:{Authorization:`Bot ${env.DISCORD_BOT_TOKEN}`, ...(body ? {'Content-Type':'application/json'} : {})}, body:body ? JSON.stringify(body) : undefined});
   const data = response.status === 204 ? null : await response.json().catch(() => null);
-  if (!response.ok) throw Object.assign(new Error('Discord indisponible'), {status:response.status, code:data?.code});
+  if (!response.ok) throw Object.assign(new Error('Discord indisponible'), {status:response.status, code:data?.code, path});
   return data;
 }
 function effectivePermissions(roles, member, guildId, channel, clientId) {
@@ -202,7 +207,7 @@ async function publish(env, timestamp, community, settings, row, event, budget, 
       // Discord allows 500 channels per server: room is kept for the crews' voice channels.
       if (channels.length >= MAX_CHANNELS) return;
       const anchor = channels.find(item => item.id === settings.destination_id && item.type === 4);
-      if (!anchor) throw Object.assign(new Error('Discord indisponible'), {status:404});
+      if (!anchor) throw Object.assign(new Error('Discord indisponible'), {status:404,code:10003});
       // Categories cannot be nested: explicitly retain the chosen category's access rules.
       category = (await discord(env,'POST',`/guilds/${row.guild_id}/channels`,{type:4,name:raceCategoryName(event),permission_overwrites:anchor.permission_overwrites || []},budget)).id;
       row.category_id = category;
