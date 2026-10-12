@@ -122,20 +122,22 @@ function bop(data) {
 }
 
 const date = value => value ? new Date(value).toLocaleDateString('fr-FR') : '—';
+// The data collection of this car on this circuit, for every pilot; relaunching it is for the site's admins.
 function collectionStatus(data) {
   const c=data.collection;
-  if(!c||!data.canRestart)return '';
-  return `<details class="training-card memo-collection memo-wide"><summary>Administration · ${c.state==='stable'?'mémo stabilisé':'collecte en cours'}</summary>
+  if(!c)return '';
+  return `<section class="training-card memo-collection memo-wide" aria-label="Mise à jour du mémo">
+    <h2>${c.state==='stable'?'Mémo stabilisé':'Collecte en cours'}</h2>
     <p>${c.state==='stable'?`Moyennes stabilisées le ${date(c.publishedAt)}. Prochaine collecte le ${date(c.renewAt)}.`
       : `${c.pilots} / ${c.target.pilots} pilotes · ${c.laps} / ${c.target.laps} tours exploitables. Renouvellement le ${date(c.renewAt)}.`}</p>
     <p class="training-note">${c.previous?`Le mémo du ${date(c.publishedAt)} reste affiché jusqu’à ce que la nouvelle collecte soit suffisante. `:c.state==='collecting'?'Les valeurs disponibles sont provisoires. ':''}
       Accessible à tous les pilotes, même sans partager de données. Chaque contributeur a le même poids dans la moyenne.${c.sample?` Valeurs affichées : ${c.sample.pilots} pilotes, ${c.sample.laps} tours.`:''}</p>
     ${c.reason?`<p class="training-note">Relance : ${esc(c.reason)}.</p>`:''}
-    ${data.canRestart?`<details><summary>Relancer après une mise à jour du jeu</summary>
+    ${data.canRestart?`<details><summary>Administration · relancer après une mise à jour du jeu</summary>
       <form data-memo-restart><label>Version du jeu ou raison de la relance<input name="reason" required minlength="3" maxlength="120" placeholder="Ex. mise à jour LMU 1.5"></label>
       <p class="training-note">Relance la collecte de tous les circuits et voitures pour 15 jours. Les mémos disponibles restent visibles.</p>
       <button type="submit">Relancer la collecte du site</button><p data-restart-message role="status"></p></form></details>`:''}
-    </details>`;
+    </section>`;
 }
 
 // Every LMU circuit and car has its sheet: the reference laps and the BoP from the start, the stand, the fuel and the
@@ -195,9 +197,10 @@ function render() {
       <p class="memo-tag ${s.source === 'game' ? 'is-game' : 'is-pilots'}">${s.source === 'game' ? 'Valeurs exactes du jeu' : 'Mesuré sur les arrêts'}</p>
       <div class="memo-group"><h3>Pendant le plein <small>seul le plus long compte</small></h3><dl class="${s.source === 'game' ? 'is-game' : 'is-pilots'}">${during}</dl></div>
       <div class="memo-group"><h3>En plus du plein <small>s’ajoutent</small></h3><dl class="${s.source === 'game' ? 'is-game' : 'is-pilots'}">${added}</dl></div></section>` : '',
-    has(data.energy) || has(data.fuel) ? `<section class="training-card"><h2>Énergie et carburant</h2>
+    // The consumption is always shown once the car is collected: the pilots see what their laps bring.
+    has(data.energy) || has(data.fuel) || data.collection ? `<section class="training-card"><h2>Énergie et carburant</h2>
       ${has(data.energy) ? perLap('Énergie', data.energy, '%', 2) : ''}
-      ${has(data.fuel) ? perLap('Carburant', data.fuel, 'L', 2, data.fuel.ratio ? row('Ratio carburant conseillé', num(data.fuel.ratio, 2), source(data.fuel)) : '') : ''}</section>` : '',
+      ${has(data.fuel) || !has(data.energy) ? perLap('Carburant', data.fuel, 'L', 2, data.fuel.ratio ? row('Ratio carburant conseillé', num(data.fuel.ratio, 2), source(data.fuel)) : '') : ''}</section>` : '',
     has(tyre) ? `<section class="training-card"><h2>Pneus · ${esc(tyre.name)}</h2>
       <div class="memo-block"><p class="memo-big ${source(tyre)}">${num(tyre.median ?? tyre.you, 2)}<span>% / tour · moyenne des 4 pneus</span></p>${band(tyre, '%', 2)}
         ${tyre.wheels ? car(source(tyre), tyre.wheels.map(wheel => wheel.wear === null ? '—' : `${num(wheel.wear, 2)} %`), 'Usure par tour de chaque pneu') : ''}
@@ -213,9 +216,9 @@ function render() {
   ].filter(Boolean);
   app.innerHTML = `${head}
     ${measured ? '<p class="memo-key"><span class="is-you"><i class="dot"></i>Toi</span><span class="is-pilots"><i class="bar"></i>Les pilotes du site</span><span class="is-game"><i class="tri"></i>Le jeu</span></p>' : ''}</div>
+    ${collectionStatus(data)}
     <div class="memo-grid">${cards.join('')}</div>
     ${cards.length ? '' : '<p class="training-empty">Pas encore de données pour cette voiture.</p>'}
-    ${collectionStatus(data)}
     ${data.source && data.levels ? `<p class="memo-credit">Chronos de référence : <a href="${esc(data.source.url)}" target="_blank" rel="noopener">${esc(data.source.title)}</a> de ${esc(data.source.name)}${data.source.updated ? `, mis à jour le ${esc(data.source.updated.split('-').reverse().join('/'))}` : ''}.</p>` : ''}`;
 }
 
