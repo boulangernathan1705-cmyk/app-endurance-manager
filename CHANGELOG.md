@@ -2,6 +2,10 @@
 
 Les changements du site, version par version. La plus récente est en haut.
 
+## v1.26 — 12 octobre 2026
+
+- Page d'une endurance : les badges passent sous la date et le compte à rebours disparaît. Nouvelles infos facultatives à la création, affichées en icônes : limites de piste, pneus, grille et partage du volant.
+
 ## v1.25 — 12 octobre 2026
 
 - Discord : plus de message quand un pilote rejoint un équipage. Le salon de chaque course s'appelle « infos-de-la-course ».

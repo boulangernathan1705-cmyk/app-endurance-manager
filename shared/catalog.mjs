@@ -140,6 +140,8 @@ export const GAME_CATALOGS = {
 export function catalogForGame(game='lmu') { return GAME_CATALOGS[GAME_IDS.includes(game) ? game : 'lmu']; }
 // Circuit announced at the last minute (solo races).
 // EVENT TDZ (Tondeuz): the event types, set here (their logos will come with them).
+// Track limits of an endurance (race page icon).
+export const TRACK_LIMITS = {strict:'Strictes', normal:'Normales'};
 export const TDZ_EVENT_TYPES = ['OPEN', 'SAFE', 'Bouboule'];
 export const TDZ_EVENTS_LABEL = 'EVENT TDZ';
 export function isRandomCircuit(id) { return id === 'random' || id === 'iracing-random'; }
