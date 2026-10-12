@@ -137,7 +137,7 @@ function peopleMarkup(result, settings) {
       <div class="members-list member-grid">${members.map(member => memberCard(member, result.permissions || [])).join('')}</div>
       <p class="members-empty" hidden>Aucun membre ne correspond à cette recherche.</p></div>
     <div data-view-pane="roles" class="admin-stack" hidden>
-      <p class="members-help">Coche « Accès Endurance Manager » sur les rôles autorisés à entrer. Un membre doit avoir au moins un de ces rôles ; les autres autorisations définissent ensuite ce qu’il peut faire. « @everyone » s’applique à tout le serveur : laisse son accès décoché pour réserver le site à certains rôles. Les administrateurs du site, le propriétaire du serveur et les rôles « Administrateur » de Discord conservent toutes les autorisations. Chaque case s’enregistre dès qu’on la coche.</p>
+      <p class="members-help">Coche « Accès Endurance Manager » sur les rôles qui peuvent entrer (sur « @everyone », tout le serveur entre), puis ce que chacun peut faire. Le propriétaire du serveur et les admins Discord ont tout. Chaque case s’enregistre aussitôt.</p>
       ${roles}${legend}</div>`;
 }
 

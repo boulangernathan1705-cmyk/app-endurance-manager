@@ -27,6 +27,9 @@ for (const [user, token] of [[ADMIN, 'a'.repeat(64)], [PILOT, 'b'.repeat(64)]])
 const community = db.prepare("SELECT * FROM communities WHERE slug='commu-dev'").get();
 console.log(await resetShowcase({DB}, {id:community.id, slug:community.slug}));
 db.prepare("UPDATE communities SET name='Ma communauté', short_name='MC', discord_guild_id=? WHERE id=?").run(GUILD, community.id);
+// @everyone opens the site and can enter races, events and create crews (« Accès » is off by default since v1.17).
+db.prepare("INSERT OR REPLACE INTO community_role_permissions(community_id,discord_role_id,permissions,updated_at) VALUES(?,?,?,?)")
+  .run(community.id, GUILD, '["access","endurance","solo_open","crews"]', now);
 for (const user of [ADMIN, PILOT])
   db.prepare("INSERT OR REPLACE INTO memberships(community_id,user_id,discord_roles,status,checked_at,created_at) VALUES(?,?,'[]','member',?,?)").run(community.id, user, now, now);
 // Max rides in Apex Racing #7 at Spa (« Mes inscriptions »).
