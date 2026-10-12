@@ -93,7 +93,7 @@ export async function resetShowcase(env, community) {
   const rows = {participants:[], events:[], crews:[], registrations:[], crew_members:[]};
   const add = (table, ...values) => rows[table].push(`(${values.map(literal).join(',')})`);
   statements.push(...clearCommunity(env, cid));
-  // No Discord server, no recap; iRacing's official calendar and solo races show what the site offers.
+  // No Discord server, no recap; iRacing's official calendar and the EVENT SOLO calendar show what the site offers.
   run(`UPDATE communities SET name='Endurance Manager', short_name='EM', discord_guild_id=NULL, discord_invite_url=NULL, appearance='{}',
     modules='{"iracingImport":true,"soloRaces":true}' WHERE id=?`, cid);
   run("INSERT OR IGNORE INTO users(id,name,role,created_at) VALUES(?, 'Démo', 'organizer', 0)", DEMO_USER);

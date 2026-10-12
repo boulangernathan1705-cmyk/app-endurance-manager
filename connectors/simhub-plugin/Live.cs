@@ -138,6 +138,8 @@ namespace EnduranceManager.SimHub
         [JsonProperty("capacity")] public double FuelCapacity;
         [JsonProperty("laps")] public List<LiveLap> Laps = new List<LiveLap>();
         [JsonProperty("stops")] public List<LiveStop> Stops = new List<LiveStop>();
+        [JsonProperty("service", NullValueHandling = NullValueHandling.Ignore)] public ServiceTimes Service;
+        [JsonProperty("game", NullValueHandling = NullValueHandling.Ignore)] public GameForecast Game;
     }
 
     // Turns the samples (ten a second) into laps and stops; Done is called with each finished session.
