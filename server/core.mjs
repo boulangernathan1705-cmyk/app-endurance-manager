@@ -1,5 +1,5 @@
 import {isGrindfest, streamersOf, normalizeStreamers} from '../shared/grindfest.mjs';
-import {CATEGORIES, EVENT_TYPE_IDS as EVENT_TYPES, CIRCUIT_IDS as CIRCUITS, CARS, SIM_IDS, eventCatalog, simForEvent, isRandomCircuit, TDZ_EVENT_TYPES} from '../shared/catalog.mjs';
+import {CATEGORIES, EVENT_TYPE_IDS as EVENT_TYPES, CIRCUIT_IDS as CIRCUITS, CARS, SIM_IDS, eventCatalog, simForEvent, isRandomCircuit, TDZ_EVENT_TYPES, TRACK_LIMITS} from '../shared/catalog.mjs';
 const LEGACY_CAR_ALIASES = new Map([
   ['BMW M Hybrid V8 Evo (2026)','BMW M Hybrid V8'],['Cadillac V-Series.R Evo (2026)','Cadillac V-Series.R'],['Peugeot 9X8 2023','Peugeot 9X8'],['Peugeot 9X8 2024','Peugeot 9X8'],['Toyota TR010 Hybrid (2026)','Toyota GR010 Hybrid'],['Ginetta G61-LT-P3 Evo','Ginetta G61-LT-P3'],['Ferrari 488 GTE Evo','Ferrari 488 GTE'],['Aston Martin Vantage AMR LMGT3 Evo','Aston Martin Vantage AMR LMGT3'],['BMW M4 LMGT3 Evo','BMW M4 LMGT3'],['Ferrari 296 LMGT3 Evo','Ferrari 296 LMGT3'],['Ford Mustang LMGT3 Evo','Ford Mustang LMGT3'],['Lamborghini Huracán LMGT3 Evo 2','Lamborghini Huracán LMGT3'],['McLaren 720S LMGT3 Evo','McLaren 720S LMGT3'],['Porsche 911 LMGT3 R (992)','Porsche 911 GT3 R LMGT3'],['Porsche 911 LMGT3 R (992) 2026','Porsche 911 GT3 R LMGT3']
 ]);
@@ -254,6 +254,27 @@ function validateSoloRace(input, existing) {
   const typedAccess = {OPEN:'open', SAFE:'safe'}[details.type];
   return {sim, access:typedAccess || access, rounds:cleanRounds, capacity, categories, details, circuit:cleanRounds[0].circuit, durationMinutes:totalMinutes};
 }
+// Endurance settings shown as icons on the race page, all optional: track limits, tyres available, cars on
+// track and fair share. Left out by older pages and the import: the saved ones are kept.
+function validateRaceInfo(raw, existing) {
+  if (raw === undefined) { try { return JSON.parse(existing?.details || '{}'); } catch { return {}; } }
+  const input = raw && typeof raw === 'object' ? raw : {}, info = {};
+  if (input.trackLimits != null && input.trackLimits !== '') {
+    if (!TRACK_LIMITS[input.trackLimits]) fail(400, 'Limites de piste invalides.');
+    info.trackLimits = input.trackLimits;
+  }
+  const count = (value, max, label) => {
+    if (value == null || value === '') return undefined;
+    const number = Number(value);
+    if (!Number.isInteger(number) || number < 1 || number > max) fail(400, `${label} : entre 1 et ${max}.`);
+    return number;
+  };
+  const tyres = count(input.tyres, 99, 'Pneus disponibles'), grid = count(input.grid, 120, 'Voitures sur la piste');
+  if (tyres) info.tyres = tyres;
+  if (grid) info.grid = grid;
+  if (typeof input.fairShare === 'boolean') info.fairShare = input.fairShare;
+  return info;
+}
 function validateEvent(input, existing = null) {
   const name = text(input.name, 100, 'Nom de l’événement');
   // The format is chosen at creation and never changes (crews and solo entries do not mix).
@@ -300,7 +321,7 @@ function validateEvent(input, existing = null) {
   // Driver change required (iRacing endurances; always on LMU): true / false, or null for the site rule.
   const driverChangeRequired = solo ? null : typeof input.driverChangeRequired === 'boolean' ? input.driverChangeRequired
     : input.driverChangeRequired === undefined && existing?.driver_change_required != null ? Boolean(existing.driver_change_required) : null;
-  return {name, format, sim: solo?.sim || null, details: solo?.details || {}, access: solo?.access || 'open', capacity: solo?.capacity ?? null, rounds: solo?.rounds || [], durationHours, durationMinutes, eventType, circuit, schedulePending, driverChangeRequired, categories: [...new Set(categoriesInput)], departures};
+  return {name, format, sim: solo?.sim || null, details: solo ? solo.details : validateRaceInfo(input.details, existing), access: solo?.access || 'open', capacity: solo?.capacity ?? null, rounds: solo?.rounds || [], durationHours, durationMinutes, eventType, circuit, schedulePending, driverChangeRequired, categories: [...new Set(categoriesInput)], departures};
 }
 // Discord display names are at most 32 characters: registrations accept the same length.
 const PILOT_NAME_MAX = 32;

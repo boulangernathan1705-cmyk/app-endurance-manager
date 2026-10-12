@@ -5,6 +5,7 @@ import {showPlanningDay,scrollPlanning,goToDeparture,setPlanningSpan,toggleQuick
 import {renderEventForm,departureFields,updateRemoveButtons,goToEventStep,formDurationMinutes,bulkPreview,shiftBulkWeek} from './event-form.mjs';
 import {renderMyEntries} from './entries-view.mjs';
 import {submitSoloEvent} from './solo-form.mjs';
+import {readRaceInfo} from './race-info.mjs';
 import {refresh,refreshAfterSave} from './refresh.mjs';
 import {draftFor,registrationDraft,ownRegistrations,rerenderRegistrationSection,submitRegistration,registrationStep,canEnterInOneClick,enterInOneClick,enterRound,editRound,skipRound} from './registration.mjs';
 import {updateCrewState,pickSlot} from './crews.mjs';
@@ -60,7 +61,7 @@ function goToRegistrationStep(event,departure,target){
 }
 
 async function submitEvent(form){
-  const data={name:form.elements.eventName.value.trim(),durationMinutes:formDurationMinutes(form),...(form.elements.eventDriverChange?{driverChangeRequired:form.elements.eventDriverChange.checked}:{}),eventType:form.elements.eventType.value,circuit:form.elements.eventCircuit.value,schedulePending:form.elements.eventSchedulePending.checked,categories:[...form.querySelectorAll('[name="eventCategory"]:checked')].map(input=>input.value),departures:[...form.querySelectorAll('.departure-field')].map(row=>({id:row.dataset.id||undefined,date:row.querySelector('[name="date"]').value,time:row.querySelector('[name="time"]').value,tbd:row.dataset.tbd==='true'})),version:state.editingEvent?.version,...(!state.editingEvent&&form.elements.eventOfficial?.checked?{official:true}:{})};
+  const data={name:form.elements.eventName.value.trim(),durationMinutes:formDurationMinutes(form),...(form.elements.eventDriverChange?{driverChangeRequired:form.elements.eventDriverChange.checked}:{}),eventType:form.elements.eventType.value,circuit:form.elements.eventCircuit.value,schedulePending:form.elements.eventSchedulePending.checked,details:readRaceInfo(form),categories:[...form.querySelectorAll('[name="eventCategory"]:checked')].map(input=>input.value),departures:[...form.querySelectorAll('.departure-field')].map(row=>({id:row.dataset.id||undefined,date:row.querySelector('[name="date"]').value,time:row.querySelector('[name="time"]').value,tbd:row.dataset.tbd==='true'})),version:state.editingEvent?.version,...(!state.editingEvent&&form.elements.eventOfficial?.checked?{official:true}:{})};
   if(!data.categories.length)throw Error('Sélectionne au moins une catégorie.'); if(!data.circuit)throw Error('Sélectionne le circuit de la course.');
   const editing=!!state.editingEvent; const result=await api(editing?`/api/races/${state.editingEvent.id}`:'/api/races',editing?'PATCH':'POST',data);
   if(editing){state.currentEventId=state.editingEvent.id;state.page='event';}else{state.page='home';state.currentEventId=null;}
