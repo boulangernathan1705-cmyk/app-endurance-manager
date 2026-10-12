@@ -58,7 +58,7 @@ export async function gridfestPasswordStatus(env, community, event) {
 export async function sendGridfestPasswords(env, community, event, cursor = '') {
   if (typeof cursor !== 'string' || (cursor && !/^\d{15,22}$/.test(cursor))) fail(400, 'Reprise d’envoi invalide.');
   const password = eventDetails(event).password || '';
-  if (!gridfestPasswordValid(password)) fail(400, 'Génère et enregistre un mot de passe Gridfest de 12 à 30 caractères (lettres, chiffres, - ou _).');
+  if (!gridfestPasswordValid(password)) fail(400, 'Enregistre un mot de passe Gridfest dans « Modifier l’événement ».');
   if (!env.DISCORD_BOT_TOKEN || !community.discordGuildId) fail(503, 'Le bot Discord de la communauté doit être configuré pour envoyer les MP.');
   const digest = await hash(password);
   const current = await entries(env, community, event);
