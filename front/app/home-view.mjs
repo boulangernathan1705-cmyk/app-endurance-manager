@@ -205,9 +205,9 @@ export function communityGate(){
     kicker=name;title='Accès momentanément indisponible';lead=`L’accès à ${name} ne peut pas être vérifié pour le moment. Réessaie dans quelques minutes.`;actions='';
   }
   if (state.grindfest && !state.openSite && ['anonymous','not-member'].includes(state.access)) {
-    title=`Rejoins le Discord de ${name} pour participer au Gridfest`;
-    lead='Connecte-toi avec Discord et rejoins le serveur de la communauté pour t’inscrire au Gridfest. Les rôles autorisés restent nécessaires.';
-    actions=`<div class="welcome-actions">${invite}${state.access==='anonymous'?login:button('refresh','Vérifier mon accès','','secondary-button')}</div>${state.access==='anonymous'?trust:'<p class="welcome-trust">Après avoir rejoint Discord, attends une minute puis vérifie ton accès. Si besoin, demande le rôle autorisé à un administrateur.</p>'}`;
+    title=`Rejoins ${name} pour le Gridfest`;
+    lead=`Connecte-toi avec Discord et rejoins le serveur de ${name}.`;
+    actions=`<div class="welcome-actions">${invite}${state.access==='anonymous'?login:button('refresh','Vérifier mon accès','','secondary-button')}</div>${state.access==='anonymous'?trust:'<p class="welcome-trust">Déjà rejoint ? Attends une minute puis vérifie ton accès.</p>'}`;
   }
   const features=WELCOME_FEATURES.map(([icon,heading,text])=>`<li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="${icon}"/></svg><strong>${heading}</strong><span>${text}</span></li>`).join('');
   return `<section class="community-gate welcome${state.access==='anonymous'?' is-visitor':''}" aria-labelledby="community-gate-title">

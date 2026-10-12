@@ -24,10 +24,10 @@ sans perdre la saisie ; la validation finale enregistre une inscription pour tou
 
 ## Mot de passe et MP Discord
 
-1. Dans « Modifier l’événement », génère un mot de passe sécurisé puis enregistre l’événement.
+1. Dans « Modifier l’événement », saisis le mot de passe (30 caractères maximum, sans espace) puis enregistre l’événement.
 2. Configure ce même mot de passe sur le serveur de course.
-3. Sur la page Gridfest, clique sur « Envoyer le mot de passe par MP » quand tu le décides.
-4. « Vérifier les envois » affiche les MP envoyés, les échecs et les inscriptions à compléter.
+3. Sur la page Gridfest, clique sur « Envoyer par MP » quand tu le décides.
+4. « Suivi » affiche les MP envoyés, les échecs et les inscriptions à compléter.
 
 Le bot utilise le compte Discord du pilote inscrit. Seuls les inscrits confirmés avec un nom en jeu
 reçoivent le MP ; les listes d’attente et les inscriptions sans compte Discord sont exclues.

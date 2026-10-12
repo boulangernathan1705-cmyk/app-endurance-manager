@@ -271,7 +271,7 @@ function modulesMarkup(settings, setup) {
         <div class="settings-actions"><button class="primary-button" type="submit">Enregistrer</button><span class="settings-status" aria-live="polite"></span></div></form>`}]),
     ...(settings.modules.eventTdzAvailable ? [] : [{key:'soloRaces', name:'EVENT SOLO', text:'Un calendrier d’événements toutes simus&nbsp;: inscription en un clic, places limitées si besoin et liste d’attente.',
       state:states.soloRaces ? ['ok', 'Actif'] : ['off', 'Éteint'], control:toggle('soloRaces', 'EVENT SOLO'), settings:''}]),
-    ...(settings.modules.grindfestAvailable ? [{key:'grindfest', name:'Gridfest', text:'Réservé aux TDZ : inscription par streamer, nom en jeu obligatoire et mot de passe envoyé en MP Discord sur décision de l’admin.', state:states.grindfest ? ['ok','Actif'] : ['off','Éteint'], control:toggle('grindfest','Gridfest'), settings:''}] : []),
+    ...(settings.modules.grindfestAvailable ? [{key:'grindfest', name:'Gridfest', text:'Inscription par streamer, nom en jeu et mot de passe par MP Discord.', state:states.grindfest ? ['ok','Actif'] : ['off','Éteint'], control:toggle('grindfest','Gridfest'), settings:''}] : []),
     {key:'memo', name:'Mémo des circuits', text:'LMU. Pour chaque circuit et voiture&nbsp;: chronos par niveau, temps au stand et BoP.',
       state:states.memo ? ['ok', 'Actif'] : ['off', 'Éteint'], control:toggle('memo', 'Mémo des circuits'), settings:''},
     {key:'training', name:'Entraînement', text:'LMU. La prépa de chaque course, partagée avec l’équipage, et les chiffres de chaque pilote.',
