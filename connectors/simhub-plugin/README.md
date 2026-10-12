@@ -33,5 +33,6 @@ La DLL est dans `bin\Release\EnduranceManager.SimHub.dll`.
 4. Rouler quelques tours dans LMU avec un arrêt aux stands, revenir au menu : la séance arrive sur le site en
    une à deux minutes (pneus, carburant et arrêts dans « Mon entraînement »).
 
-Les séances en attente sont dans `%LOCALAPPDATA%\EnduranceManager\SimHub\live`. Propriétés exposées aux tableaux de
+Les séances en attente sont dans `%LOCALAPPDATA%\EnduranceManager\SimHub\live` ; celles que le site refuse sont gardées
+dans `live\refused`, avec la raison dans un fichier .txt à côté, et l'écran du plugin l'affiche. Propriétés exposées aux tableaux de
 bord SimHub : `EnduranceManagerPlugin.Status` et `EnduranceManagerPlugin.LapsRecorded`.

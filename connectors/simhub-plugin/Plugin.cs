@@ -53,6 +53,8 @@ namespace EnduranceManager.SimHub
         public LmuApi Api => api;
         // What the game is doing, for the settings screen: closed, in the menus, or on track.
         public volatile string GameState = "closed";
+        // The last session recorded live, for the settings screen.
+        public volatile string LastSession;
         public bool OtherSync => SyncRunning();
         public string Status => SyncRunning() ? "Le synchroniseur Windows tourne déjà sur ce PC : le plugin le laisse envoyer tes séances." : uploader?.Status ?? "";
 
@@ -105,6 +107,7 @@ namespace EnduranceManager.SimHub
             var recorder = new Recorder(() => DateTime.Now, session =>
             {
                 laps += session.Laps.Count;
+                LastSession = $"{DateTime.Now:dd/MM HH:mm} · {session.Track} · {session.Laps.Count} tours · {session.Stops.Count} arrêt{(session.Stops.Count > 1 ? "s" : "")}";
                 // The game's service times and forecast for this car, read while the pilot drove.
                 session.Service = api.Service;
                 session.Game = api.Game;
