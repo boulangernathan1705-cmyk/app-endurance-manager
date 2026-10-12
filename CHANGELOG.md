@@ -2,6 +2,13 @@
 
 Les changements du site, version par version. La plus récente est en haut.
 
+## v1.30 — 12 octobre 2026
+
+- Nouveau module **EVENT SOLO** pour toutes les communautés : le calendrier d'événements toutes simus, inscription en un clic, places et liste d'attente. EVENT TDZ reste réservé aux TDZ.
+- Aide à jour : accès au site, inscription (seul, coéquipiers, commentaire), infos de course, récap Discord et modules.
+- Le même pied de page sur toutes les pages.
+- Entraînement : le tuto de liaison SimHub suit les vrais boutons.
+
 ## v1.29 — 12 octobre 2026
 
 - Discord : les récaps sont entièrement gérés par le bot, en récap général ou avec une catégorie par course. Les publications par webhook sont retirées ; les communautés concernées choisissent la destination du bot dans Administration → Modules.
