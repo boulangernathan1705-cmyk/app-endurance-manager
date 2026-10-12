@@ -153,7 +153,7 @@ async function perform(action,target){
     case 'delete-registration': { state.pendingCrewJoin=null; const departure=event.departures.find(item=>item.id===target.dataset.departure),reg=departure.availability.find(item=>item.id===target.dataset.id); if(!reg)throw Error('Inscription introuvable.'); if(!confirm(`Supprimer l’inscription de ${reg.name} pour ce départ ?${inCommunity()}`))return; await api(`/api/registrations/${reg.id}`,'DELETE',{version:reg.version}); delete state.drafts[departure.id]; state.registrationOpen.delete(departure.id); await refreshAfterSave('Inscription supprimée.'); break; }
     case 'category-entry-open': openCategoryEntry(event); break;
     case 'category-entry-peek': categoryEntryAction(event,action,target); renderEvent(); break;
-    case 'category-entry-close': case 'category-entry-step': case 'category-entry-category':  case 'category-entry-day': categoryEntryAction(event,action,target); break;
+    case 'category-entry-close': case 'category-entry-step': case 'category-entry-category': case 'category-entry-mode': case 'category-entry-kind': categoryEntryAction(event,action,target); break;
     case 'category-entry-save': await saveCategoryEntry(event); await refreshAfterSave('Inscription enregistrée.'); break;
     case 'join-crew': {
       const departure=event?.departures.find(item=>item.id===target.dataset.departure);const crew=departure?.crews.find(item=>item.id===target.dataset.id);const reg=departure?.availability.find(item=>item.id===target.dataset.registration);

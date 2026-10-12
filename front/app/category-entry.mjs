@@ -1,7 +1,8 @@
 // « Inscription par catégorie » (community module): on a race with several starts, the pilot first only says
-// M'inscrire or Absent. Entering: his categories, then the hours he is free on a time line; he is entered on every
-// start those hours cover (whole race, or the hours he can do). The TM then makes the crews on a start.
-import {weekdayLong,dayMonthShort,timeLabel,timeAt} from '../dates.mjs';
+// M'inscrire or Absent. Entering is one registration for the race: his categories, then "every start suits me" or
+// his constraints per day; he is entered on every start they allow (whole race, or the hours he can do). The TM
+// then makes the crews on a start.
+import {weekdayLong,dayMonthShort,timeLabel} from '../dates.mjs';
 import {eventMinutes} from '../../shared/duration.mjs';
 import {state,esc,button,logo,categories,api,can} from './core.mjs';
 
@@ -31,102 +32,95 @@ export function categoryEntryBar(event){
   return `<section class="category-entry-bar is-entered"><div>${status}</div>${crew?'':button('category-entry-open','Modifier','','primary-button')}</section>`;
 }
 
-// Hour k of a start (1-based) is covered when every clock hour it overlaps is ticked.
+// Availability is a rule, not a list: "every start suits me", or per day "all day" / "from … to …" / "not free".
+// A start is whole when the rule covers all its race hours, partial when it covers some of them.
 const raceHours=event=>Math.ceil(eventMinutes(event)/60);
-function hourCells(from,to){const cells=[];for(let at=Math.floor(from/HOUR)*HOUR;at<to;at+=HOUR)cells.push(at);return cells;}
-function coveredHours(event,departure,hours){
-  const start=Number(departure.startsAt),end=start+eventMinutes(event)*60000,list=[];
-  for(let k=1;k<=raceHours(event);k++)if(hourCells(start+(k-1)*HOUR,Math.min(end,start+k*HOUR)).every(at=>hours.includes(at)))list.push(k);
-  return list;
-}
-function statusFor(event,departure,hours){const list=coveredHours(event,departure,hours);return !list.length?'':list.length===raceHours(event)?'whole':list.map(k=>`h${k}`).join(',');}
-function hoursOfEntry(event,departure,status){
-  const start=Number(departure.startsAt),end=start+eventMinutes(event)*60000;
-  const ks=status==='whole'?Array.from({length:raceHours(event)},(_,i)=>i+1):String(status||'').split(',').filter(part=>/^h\d+$/.test(part)).map(part=>Number(part.slice(1)));
-  return ks.flatMap(k=>hourCells(start+(k-1)*HOUR,Math.min(end,start+k*HOUR)));
-}
-// One time line per day: from the first start to the last finish of that day.
+const dayKey=at=>new Date(at).toDateString();
+const midnight=at=>{const date=new Date(at);date.setHours(0,0,0,0);return date.getTime();};
 function days(event){
   const list=new Map(),length=eventMinutes(event)*60000;
   for(const departure of future(event)){
-    const key=new Date(departure.startsAt).toDateString();
-    if(!list.has(key))list.set(key,{at:departure.startsAt,from:Infinity,to:0,items:[]});
-    const day=list.get(key);day.items.push(departure);day.from=Math.min(day.from,departure.startsAt);day.to=Math.max(day.to,departure.startsAt+length);
+    const key=dayKey(departure.startsAt);
+    if(!list.has(key))list.set(key,{key,at:departure.startsAt,first:Infinity,last:0,items:[]});
+    const day=list.get(key);day.items.push(departure);day.first=Math.min(day.first,departure.startsAt);day.last=Math.max(day.last,departure.startsAt+length);
   }
-  return [...list.values()].map(day=>({...day,cells:hourCells(day.from,day.to)}));
+  return [...list.values()].map(day=>({...day,from:new Date(day.first).getHours(),to:Math.min(24,Math.ceil((day.last-midnight(day.at))/HOUR))}));
+}
+function freeOn(event,departure){
+  if(draft.mode==='all')return ()=>true;
+  const rule=draft.days[dayKey(departure.startsAt)]||{kind:'all'},base=midnight(departure.startsAt);
+  if(rule.kind==='none')return ()=>false;
+  if(rule.kind==='all')return ()=>true;
+  return (from,to)=>from>=base+rule.from*HOUR&&to<=base+rule.to*HOUR;
+}
+function statusFor(event,departure){
+  const start=Number(departure.startsAt),end=start+eventMinutes(event)*60000,free=freeOn(event,departure),list=[];
+  for(let k=1;k<=raceHours(event);k++)if(free(start+(k-1)*HOUR,Math.min(end,start+k*HOUR)))list.push(k);
+  return !list.length?'':list.length===raceHours(event)?'whole':list.map(k=>`h${k}`).join(',');
+}
+const covered=(event,status)=>status==='whole'?raceHours(event):status?status.split(',').length:0;
+function matches(event){return future(event).map(departure=>({departure,status:statusFor(event,departure)})).filter(item=>item.status);}
+// Reopening: the rule is rebuilt from the entries (every start whole = no constraint; else each day's hours).
+function ruleFrom(event,own){
+  const list=days(event),length=eventMinutes(event)*60000;
+  const whole=future(event).every(departure=>own.some(item=>item.departure.id===departure.id&&item.reg.status==='whole'));
+  if(!own.length||whole)return {mode:'all',days:Object.fromEntries(list.map(day=>[day.key,{kind:'all',from:day.from,to:day.to}]))};
+  return {mode:'limits',days:Object.fromEntries(list.map(day=>{
+    const spans=own.filter(item=>dayKey(item.departure.startsAt)===day.key).flatMap(({departure,reg})=>{
+      const ks=reg.status==='whole'?Array.from({length:raceHours(event)},(_,i)=>i+1):String(reg.status).split(',').map(part=>Number(part.slice(1))).filter(Boolean);
+      return ks.map(k=>[departure.startsAt+(k-1)*HOUR,Math.min(departure.startsAt+length,departure.startsAt+k*HOUR)]);
+    });
+    if(!spans.length)return [day.key,{kind:'none',from:day.from,to:day.to}];
+    const base=midnight(day.at),from=Math.floor((Math.min(...spans.map(span=>span[0]))-base)/HOUR),to=Math.ceil((Math.max(...spans.map(span=>span[1]))-base)/HOUR);
+    return [day.key,from<=day.from&&to>=day.to?{kind:'all',from:day.from,to:day.to}:{kind:'range',from,to:Math.min(24,to)}];
+  }))};
 }
 
 let draft=null;
 export function openCategoryEntry(event){
   const own=mine(event);
-  draft={eventId:event.id,step:1,categories:[...new Set(own.map(item=>item.reg.category))],hours:[...new Set(own.flatMap(item=>hoursOfEntry(event,item.departure,item.reg.status)))]};
+  draft={eventId:event.id,step:1,categories:[...new Set(own.map(item=>item.reg.category))],...ruleFrom(event,own)};
   renderCategoryEntry(event);
 }
 export function closeCategoryEntry(){draft=null;document.querySelector('[data-category-entry]')?.remove();}
-// Big, visual time line: one card per day, hours to tap or slide over, each start under it with what it gives.
-function timeline(event,day){
-  const n=day.cells.length,first=day.cells[0],length=eventMinutes(event)*60000,raceH=raceHours(event);
-  const all=day.cells.every(at=>draft.hours.includes(at)),on=at=>draft.hours.includes(at);
-  const cells=day.cells.map((at,i)=>`<span class="ce-hour${on(at)?' is-on':''}${on(at)&&!on(day.cells[i-1])?' run-start':''}${on(at)&&!on(day.cells[i+1])?' run-end':''}" data-hour="${at}" role="checkbox" aria-checked="${on(at)}" aria-label="${esc(timeAt(at))}"><b>${esc(timeAt(at))}</b></span>`).join('');
-  // Starts that overlap go on separate lanes.
-  const lanes=[];
-  const bars=day.items.map(departure=>{
-    const from=Math.floor((departure.startsAt-first)/HOUR)+1,to=Math.ceil((departure.startsAt+length-first)/HOUR)+1;
-    let lane=lanes.findIndex(end=>end<=from);if(lane<0){lane=lanes.length;lanes.push(0);}lanes[lane]=to;
-    const status=statusFor(event,departure,draft.hours),covered=status==='whole'?raceH:status?status.split(',').length:0;
-    const state=status==='whole'?'is-whole':status?'is-part':'is-off';
-    const label=status==='whole'?'✓ Toute la course':status?`${covered} h sur ${raceH}`:'Pas dispo';
-    return `<div class="ce-start ${state}" style="grid-column:${from} / ${to};grid-row:${lane+2}"><strong>Départ ${esc(timeLabel(departure.time))}</strong><span class="ce-start-range">${esc(timeAt(departure.startsAt))} → ${esc(timeAt(departure.startsAt+length))}</span><em>${label}</em></div>`;
-  }).join('');
-  return `<article class="ce-day"><div class="ce-day-head"><h3>${esc(weekdayLong(day.at))} <span>${esc(dayMonthShort(day.at))}</span></h3>${button('category-entry-day',all?'Effacer':'Toute la journée',`data-value="${day.cells.join(',')}"`,`ce-day-all${all?' is-all':''}`)}</div><div class="ce-line" style="--hours:${n}">${cells}${bars}</div></article>`;
-}
-function matches(event){return future(event).map(departure=>({departure,status:statusFor(event,departure,draft.hours)})).filter(item=>item.status);}
 const startName=departure=>`${weekdayLong(departure.startsAt).slice(0,3)}. ${timeLabel(departure.time)}`;
+const hourOptions=(from,to,chosen)=>Array.from({length:to-from+1},(_,i)=>from+i).map(hour=>`<option value="${hour}" ${hour===chosen?'selected':''}>${hour===24?'minuit':`${hour} h`}</option>`).join('');
+function startChip(event,departure){
+  const status=statusFor(event,departure),n=covered(event,status),total=raceHours(event);
+  return `<span class="ce-chip ${status==='whole'?'is-whole':status?'is-part':'is-off'}"><strong>${esc(timeLabel(departure.time))}</strong><em>${status==='whole'?'✓ toute la course':status?`${n} h sur ${total}`:'pas dispo'}</em></span>`;
+}
+function dayCard(event,day){
+  const rule=draft.days[day.key];
+  const kinds=[['all','Toute la journée'],['range','Une plage horaire'],['none','Pas dispo']].map(([kind,label])=>button('category-entry-kind',label,`data-day="${esc(day.key)}" data-value="${kind}" aria-pressed="${rule.kind===kind}"`,`ce-kind${rule.kind===kind?' active':''}`)).join('');
+  const range=rule.kind==='range'?`<div class="ce-range"><label>De<select data-ce-range="from" data-day="${esc(day.key)}">${hourOptions(0,23,rule.from)}</select></label><label>À<select data-ce-range="to" data-day="${esc(day.key)}">${hourOptions(1,24,rule.to)}</select></label></div>`:'';
+  return `<article class="ce-day ${rule.kind==='none'?'is-none':''}"><div class="ce-day-head"><h3>${esc(weekdayLong(day.at))} <span>${esc(dayMonthShort(day.at))}</span></h3><span class="ce-day-count">${day.items.length} départ${day.items.length>1?'s':''}</span></div><div class="ce-kinds" role="group">${kinds}</div>${range}<div class="ce-chips">${day.items.map(departure=>startChip(event,departure)).join('')}</div></article>`;
+}
 export function renderCategoryEntry(event){
   const previous=document.querySelector('[data-category-entry] .registration-sheet');
   const keep=previous&&previous.dataset.step===String(draft?.step)?previous.scrollTop:0;
   document.querySelector('[data-category-entry]')?.remove();
   if(!draft)return;
-  const step=draft.step,steps=['Catégories','Disponibilités','Récapitulatif'];
+  const step=draft.step,steps=['Catégories','Disponibilités'],total=future(event).length,list=days(event);
   const pane=(n,content)=>`<section class="registration-step" ${n===step?'':'hidden'}>${content}</section>`;
-  const cats=event.categories.map(category=>button('category-entry-category',`${logo(category)}<span class="registration-category-copy"><strong>${esc(category)}</strong></span>`,`data-value="${esc(category)}" aria-pressed="${draft.categories.includes(category)}"`,`category-button ${categories[category]?.css||''} ${draft.categories.includes(category)?'active':''}`)).join('');
-  const found=matches(event);
-  const count=found.length?`<div class="ce-result"><strong>${found.length} départ${found.length>1?'s':''} pour toi</strong>${found.map(({departure,status})=>`<span class="${status==='whole'?'is-whole':'is-part'}">${esc(startName(departure))}</span>`).join('')}</div>`:'<div class="ce-result is-empty">Aucun départ pour l’instant : choisis tes heures.</div>';
-  const row=(n,label,value)=>`<button type="button" class="registration-summary-row" data-action="category-entry-step" data-step="${n}"><span>${label}</span><strong>${value}</strong><em>Modifier</em></button>`;
-  const startsList=found.map(({departure,status})=>`${esc(startName(departure))} · ${status==='whole'?'toute la course':`${status.split(',').length} h sur ${raceHours(event)}`}`).join('<br>');
-  const summary=`<div class="registration-summary"><div class="registration-summary-row is-static"><span>Pilote</span><strong>${esc(state.user?.name||'')}</strong></div>${row(1,'Catégories',draft.categories.map(esc).join(' · ')||'—')}${row(2,'Départs',startsList||'—')}</div>`;
-  const ready=step===1?draft.categories.length>0:step===2?found.length>0:true;
-  const next=step<3?button('category-entry-step','Continuer',`data-step="${step+1}" ${ready?'':'disabled'}`,'primary-button registration-next'):'<button type="button" class="save-button registration-next" data-action="category-entry-save">VALIDER MON INSCRIPTION</button>';
+  const cats=event.categories.map(category=>button('category-entry-category',`${logo(category)}<span class="registration-category-copy"><strong>${esc(category)}</strong><em>${draft.categories.includes(category)?'✓ Choisie':'Choisir'}</em></span>`,`data-value="${esc(category)}" aria-pressed="${draft.categories.includes(category)}"`,`category-button ${categories[category]?.css||''} ${draft.categories.includes(category)?'active':''}`)).join('');
+  const found=matches(event),partial=found.filter(item=>item.status!=='whole').length;
+  const choice=(mode,title,text)=>`<button type="button" class="ce-choice${draft.mode===mode?' active':''}" data-action="category-entry-mode" data-value="${mode}" aria-pressed="${draft.mode===mode}"><i aria-hidden="true"></i><span><strong>${title}</strong><em>${text}</em></span></button>`;
+  const concerned=`<details class="ce-concerned"><summary>Voir les ${found.length} départ${found.length>1?'s':''} concerné${found.length>1?'s':''}</summary><ul>${found.map(({departure,status})=>`<li><strong>${esc(weekdayLong(departure.startsAt))} ${esc(dayMonthShort(departure.startsAt))} · ${esc(timeLabel(departure.time))}</strong><span class="${status==='whole'?'is-whole':'is-part'}">${status==='whole'?'toute la course':`${covered(event,status)} h sur ${raceHours(event)}`}</span></li>`).join('')}</ul></details>`;
+  const tally=`<div class="ce-tally${found.length?'':' is-empty'}"><b>${found.length}</b><span><strong>départ${found.length>1?'s':''} possible${found.length>1?'s':''}</strong><em>${partial?`dont ${partial} en partie · `:''}${draft.categories.map(esc).join(' ou ')}</em></span></div>`;
+  const ready=step===1?draft.categories.length>0:found.length>0;
+  const next=step===1?button('category-entry-step','Continuer',`data-step="2" ${ready?'':'disabled'}`,'primary-button registration-next'):`<button type="button" class="primary-button registration-next" data-action="category-entry-save" ${ready?'':'disabled'}>Confirmer mon inscription</button>`;
   const overlay=document.createElement('div');
   overlay.className='crew-builder-overlay';overlay.dataset.categoryEntry='true';
-  overlay.innerHTML=`<section class="crew-builder-panel registration-sheet category-entry-sheet${step===2?' is-wide':''}" data-step="${step}" role="dialog" aria-modal="true" aria-labelledby="category-entry-title">
-    <div class="registration-workspace-head"><div class="registration-workspace-title"><h2 id="category-entry-title">Ton inscription</h2><p>${esc(event.name)}</p></div><span class="registration-workspace-actions">${button('category-entry-close','Fermer','','secondary-button registration-close-button')}</span></div>
-    <div class="registration-stepper"><div class="registration-progress" aria-hidden="true">${steps.map((_,index)=>`<span class="${index<step?'done':''}"></span>`).join('')}</div>
-      <p class="registration-step-label">Étape ${step} sur 3 · ${steps[step-1]}</p>
-      ${pane(1,`<span class="form-label">Dans quelles catégories veux-tu rouler ?</span><div class="categories category-entry-categories">${cats}</div>`)}
-      ${pane(2,`<div class="ce-intro"><h3>Quand es-tu disponible ?</h3><p>Touche ou glisse sur tes heures libres. Tu seras inscrit sur les départs qu’elles couvrent.</p><span class="ce-legend"><i class="is-on"></i>Libre<i class="is-whole"></i>Toute la course<i class="is-part"></i>Une partie</span></div><div class="category-entry-days">${days(event).map(day=>timeline(event,day)).join('')}</div>${count}`)}
-      ${pane(3,summary)}
-      <div class="registration-step-nav">${step>1?button('category-entry-step','Retour',`data-step="${step-1}"`,'secondary-button registration-back'):''}${next}</div>
+  overlay.innerHTML=`<section class="crew-builder-panel registration-sheet category-entry-sheet" data-step="${step}" role="dialog" aria-modal="true" aria-labelledby="category-entry-title">
+    <div class="registration-workspace-head"><div class="registration-workspace-title"><h2 id="category-entry-title">Ton inscription</h2><p>${esc(event.name)} · ${total} départs sur ${list.length} jour${list.length>1?'s':''}</p></div><span class="registration-workspace-actions">${button('category-entry-close','Fermer','','secondary-button registration-close-button')}</span></div>
+    <div class="registration-stepper"><div class="ce-tabs">${steps.map((label,index)=>`<span class="${index+1===step?'active':index+1<step?'done':''}">${index+1}. ${label}</span>`).join('')}</div>
+      ${pane(1,`<div class="ce-intro"><h3>Dans quelles catégories veux-tu rouler ?</h3><p>Une ou plusieurs. Ce choix vaut pour tous tes départs.</p></div><div class="categories category-entry-categories">${cats}</div>`)}
+      ${pane(2,`<div class="ce-intro"><h3>As-tu des contraintes horaires ?</h3><p>Le site trouve les départs où tu peux rouler.</p></div><div class="ce-choices">${choice('all','Tous les départs me vont',`Tu es disponible sur les ${total} départs.`)}${choice('limits','J’ai des contraintes','Tu précises tes jours et tes heures.')}</div>${draft.mode==='limits'?`<div class="category-entry-days">${list.map(day=>dayCard(event,day)).join('')}</div>`:''}${found.length?concerned:''}`)}
+      <div class="ce-footer">${step===2?tally:''}<div class="registration-step-nav">${step>1?button('category-entry-step','Retour','data-step="1"','secondary-button registration-back'):''}${next}</div>${step===2?'<p class="ce-footnote">Une seule inscription, quel que soit le nombre de départs.</p>':''}</div>
     </div></section>`;
   document.getElementById('app')?.appendChild(overlay);
   overlay.querySelector('.registration-sheet').scrollTop=keep;
-  paintHours(event,overlay);
-}
-// Press on an hour and slide: every hour crossed takes the state of the first one.
-function paintHours(event,overlay){
-  let mode=null;
-  const at=(x,y)=>document.elementFromPoint(x,y)?.closest?.('[data-hour]');
-  const paint=cell=>{
-    if(!cell||mode===null)return;
-    const hour=Number(cell.dataset.hour),has=draft.hours.includes(hour);
-    if(mode&&!has)draft.hours.push(hour);
-    if(!mode&&has)draft.hours=draft.hours.filter(item=>item!==hour);
-    cell.classList.toggle('is-on',mode);
-  };
-  overlay.addEventListener('pointerdown',ev=>{const cell=ev.target.closest('[data-hour]');if(!cell)return;ev.preventDefault();mode=!draft.hours.includes(Number(cell.dataset.hour));paint(cell);});
-  overlay.addEventListener('pointermove',ev=>{if(mode!==null)paint(at(ev.clientX,ev.clientY));});
-  const end=()=>{if(mode===null)return;mode=null;renderCategoryEntry(event);};
-  overlay.addEventListener('pointerup',end);overlay.addEventListener('pointercancel',end);overlay.addEventListener('pointerleave',end);
+  overlay.addEventListener('change',ev=>{const select=ev.target.closest('[data-ce-range]');if(!select)return;const rule=draft.days[select.dataset.day];rule[select.dataset.ceRange]=Number(select.value);if(rule.to<=rule.from){if(select.dataset.ceRange==='from')rule.to=Math.min(24,rule.from+1);else rule.from=Math.max(0,rule.to-1);}renderCategoryEntry(event);});
 }
 export function categoryEntryAction(event,action,target){
   if(action==='category-entry-peek'){state.categoryEntryPeek=event.id;return true;}
@@ -135,7 +129,8 @@ export function categoryEntryAction(event,action,target){
   if(action==='category-entry-step'){draft.step=Number(target.dataset.step)||1;renderCategoryEntry(event);return true;}
   const toggle=(list,value)=>list.includes(value)?list.filter(item=>item!==value):[...list,value];
   if(action==='category-entry-category')draft.categories=toggle(draft.categories,target.dataset.value);
-  if(action==='category-entry-day'){const cells=target.dataset.value.split(',').map(Number),all=cells.every(at=>draft.hours.includes(at));draft.hours=all?draft.hours.filter(at=>!cells.includes(at)):[...new Set([...draft.hours,...cells])];}
+  if(action==='category-entry-mode')draft.mode=target.dataset.value;
+  if(action==='category-entry-kind')draft.days[target.dataset.day].kind=target.dataset.value;
   renderCategoryEntry(event);
   return true;
 }
@@ -144,7 +139,7 @@ export async function saveCategoryEntry(event){
   const own=mine(event),name=(state.user?.name||'').slice(0,32);
   if((event.absences||[]).some(item=>item.mine))await api(`/api/events/${event.id}/absence`,'DELETE');
   for(const departure of future(event))for(const category of event.categories){
-    const status=draft.categories.includes(category)?statusFor(event,departure,draft.hours):'';
+    const status=draft.categories.includes(category)?statusFor(event,departure):'';
     const found=own.find(item=>item.departure.id===departure.id&&item.reg.category===category);
     const entry={name,category,status,cars:[],carAny:true,forOther:false};
     if(status&&!found)await api(`/api/races/${event.id}/departures/${departure.id}/registrations`,'POST',entry);
