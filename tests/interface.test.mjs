@@ -174,7 +174,7 @@ test('les cartes pilotes et équipages utilisent les vrais logos de catégorie',
   const registration=read('front/app/registration.mjs');
   const crews=read('front/app/crews.mjs');
   const css=read('styles/registration-sharing.css');
-  assert.match(registration,/pilot-category-logo[^`]*\$\{reg\.category\?logo\(reg\.category\):'—'\}/);
+  assert.match(registration,/pilot-category-logo[^`]*\$\{cats\.length\?cats\.map\(category=>logo\(category\)\)\.join\(''\):'—'\}/);
   assert.doesNotMatch(registration,/pilot-category-text/);
   assert.match(crews,/crew-compact-category[^`]*\$\{logo\(crew\.category\)\}/);
   assert.match(css,/\.pilot-main \.pilot-category-logo \.category-logo/);

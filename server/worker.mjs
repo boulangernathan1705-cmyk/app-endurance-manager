@@ -597,7 +597,7 @@ async function api(request, env) {
     const results=await env.DB.batch([
       env.DB.prepare('INSERT INTO crews(id,event_id,departure_id,name,category,car,owner_user_id,created_at,community_id) VALUES(?,?,?,?,?,?,?,?,?)').bind(crewId,event.id,departure.id,name,input.category,car,actor.user.id,now(),here.id),
       env.DB.prepare('INSERT INTO crew_members(registration_id,crew_id) SELECT ?,? WHERE changes()=1').bind(selected.id,crewId),
-      env.DB.prepare(`DELETE FROM registrations WHERE changes()=1 AND id!=? AND event_id=? AND departure_id=? AND participant_id=?`).bind(selected.id,selected.event_id,selected.departure_id,selected.participant_id)
+      env.DB.prepare(`DELETE FROM registrations WHERE changes()=1 AND id!=? AND event_id=? AND participant_id=? AND (departure_id=? OR ?=1)`).bind(selected.id,selected.event_id,selected.participant_id,selected.departure_id,here.modules?.categoryEntry===true?1:0)
     ]);
     if (!results[0].meta.changes) fail(409,'Impossible de créer cet équipage. Actualise avant de réessayer.');
     return json({id:crewId,joined:true,removedRegistrations:results[2].meta.changes},201);

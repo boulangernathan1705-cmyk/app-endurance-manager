@@ -30,7 +30,9 @@ function startCard(event,departure,body,{minutes,now,open,quick=''}){
   const pilots=pilotCount(departure.availability||[]),mine=present.some(reg=>reg.mine);
   const compact=!open&&(done||!pilots);
   const endDay=dayKey(end)!==dayKey(start)?` le ${weekdayLabel(end)}`:'';
-  const tags=compact?'':`${mine?'<span class="planning-tag is-mine">Ton départ</span>':''}${live?'<span class="planning-tag is-live">En cours</span>':''}`;
+  // « Inscription par catégorie »: before the TM places him, the pilot is only « dispo » on his possible starts.
+  const pending=mine&&state.categoryEntry&&(event.departures||[]).filter(item=>!item.tbd).length>1&&!present.some(reg=>reg.mine&&assigned.has(reg.id));
+  const tags=compact?'':`${mine?`<span class="planning-tag is-mine">${pending?'Dispo':'Ton départ'}</span>`:''}${live?'<span class="planning-tag is-live">En cours</span>':''}`;
   const head=`<span class="planning-start-head"><strong>Départ ${esc(timeLabel(departure.time))}</strong>${compact?(done?'<span class="planning-start-state">Terminé</span>':''):(isSolo(event)?'':`<span class="planning-start-end">fin ${esc(timeAt(end))}${esc(endDay)}</span>`)}${tags}</span>`;
   // Pilots without a crew, by category (« 2 GT3 » « 1 Hypercar »): where a pilot can find a crew. The crews
   // follow, by name.

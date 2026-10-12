@@ -2273,3 +2273,64 @@ html[data-game] #app .race-header .race-side .race-badges > * { box-sizing: bord
 .category-entry-categories .category-button .category-logo, .category-entry-categories .category-button img { height: 38px !important; width: auto !important; }
 .category-entry-categories .registration-category-copy strong { font-size: 17px !important; color: var(--text, #f2f5f4); }
 .category-entry-categories .registration-category-copy em { font-size: 14px !important; }
+.ce-day-step { margin: 8px 0 0 !important; font-size: 13px !important; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #4fd1c5 !important; }
+.ce-day-title { font-size: 28px !important; text-transform: capitalize; }
+.ce-day-title span { color: var(--muted, #92979c); font-weight: 600; text-transform: none; }
+.ce-dots { display: flex; gap: 6px; margin: 4px 0 2px; }
+.ce-dots span { flex: 1; padding: 6px 0; border-radius: 8px; background: #161c1d; color: var(--muted, #92979c); font-size: 12px; font-weight: 700; text-align: center; text-transform: capitalize; }
+.ce-dots span.done { background: rgba(79, 209, 197, .18); color: #4fd1c5; }
+.ce-dots span.active { background: #4fd1c5; color: #062523; }
+.registration-step .ce-range { margin-top: 12px; }
+.ce-subtitle { margin: 18px 0 8px; font-size: 15px; color: var(--text, #f2f5f4); }
+.ce-concerned-list { margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; }
+.ce-concerned-list li { display: flex; justify-content: space-between; gap: 10px; padding: 9px 12px; border-radius: 10px; background: #121718; text-transform: capitalize; font-size: 14px; }
+.ce-concerned-list li span { text-transform: none; font-weight: 700; }
+.ce-concerned-list li span.is-whole { color: #4fd1c5; } .ce-concerned-list li span.is-part { color: #f3b33d; }
+.ce-empty { color: #f3b33d; }
+.ce-cars { margin-top: 16px; }
+.ce-cars-title { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; font-size: 15px; }
+.ce-cars-title .category-logo { height: 20px; width: auto; }
+.ce-cars-title span { margin-left: auto; font-size: 13px; color: var(--muted, #92979c); }
+.ce-car-list { display: flex; flex-wrap: wrap; gap: 6px; }
+.pilot-category-logo.is-several { width: auto !important; gap: 4px; }
+.pilot-category-logo.is-several img, .pilot-category-logo.is-several .category-logo { max-width: 30px; }
+/* Tableau des disponibilités (TM). */
+.ce-board { margin: 16px 0; border: 1px solid #2b3336; border-radius: 14px; background: rgba(13, 17, 18, .88); }
+.ce-board > summary { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 14px 16px; cursor: pointer; list-style: none; }
+.ce-board > summary::-webkit-details-marker { display: none; }
+.ce-board-title { font-size: 15px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--text, #f2f5f4); }
+.ce-board-stat { padding: 3px 10px; border-radius: 999px; border: 1px solid #3a4346; font-size: 13px; font-weight: 700; color: var(--muted, #b7bfbc); }
+.ce-board-stat.is-waiting { border-color: #f3b33d; color: #f3b33d; }
+.ce-board-stat.is-done { border-color: #4fd1c5; color: #4fd1c5; }
+.ce-board-filters { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 16px 12px; }
+.ce-board-filters .category-logo { height: 16px; width: auto; margin-right: 6px; vertical-align: -3px; }
+.ce-board-scroll { overflow-x: auto; padding: 0 16px 6px; }
+.ce-board table { border-collapse: separate; border-spacing: 4px; min-width: 100%; font-size: 13px; }
+.ce-board thead th { min-width: 118px; padding: 10px 8px; border-radius: 10px; background: #121718; text-align: center; vertical-align: top; font-weight: 600; color: var(--muted, #b7bfbc); }
+.ce-board thead th.is-best { outline: 2px solid #4fd1c5; background: rgba(79, 209, 197, .1); }
+.ce-board thead th.ce-board-corner { min-width: 190px; text-align: left; vertical-align: bottom; background: transparent; }
+.ce-board-day { display: block; text-transform: capitalize; font-size: 12px; }
+.ce-board thead th strong { display: block; margin: 2px 0 6px; font-size: 18px; color: var(--text, #f2f5f4); }
+.ce-board-counts { display: flex; justify-content: center; align-items: center; gap: 4px 8px; flex-wrap: wrap; min-height: 20px; }
+.ce-board-counts .category-logo { height: 16px; width: auto; }
+.ce-board-counts b { color: var(--text, #f2f5f4); margin-left: -4px; }
+.ce-board-best { display: block; margin-top: 6px; font-size: 11px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: #4fd1c5; }
+.ce-board-create { margin-top: 8px; width: 100%; padding: 6px 4px; border: 1px solid #4fd1c5; border-radius: 8px; background: transparent; color: #4fd1c5; font-size: 12px; font-weight: 700; cursor: pointer; }
+.ce-board-create:hover { background: #4fd1c5; color: #062523; }
+.ce-board tbody th { padding: 8px 10px; border-radius: 10px; background: #121718; text-align: left; font-weight: 400; vertical-align: top; }
+.ce-board-name { display: block; font-size: 14px; font-weight: 800; color: var(--text, #f2f5f4); }
+.ce-board-cats { display: inline-flex; gap: 4px; margin: 4px 8px 0 0; vertical-align: middle; }
+.ce-board-cats .category-logo { height: 18px; width: auto; }
+.ce-board-car { font-size: 12px; color: var(--muted, #92979c); }
+.ce-board-wish { display: block; font-size: 12px; color: var(--muted, #92979c); }
+.ce-board tbody td { padding: 6px; border-radius: 10px; text-align: center; font-weight: 700; }
+.ce-board td.is-off { background: rgba(255, 255, 255, .02); }
+.ce-board td.is-whole { background: rgba(79, 209, 197, .22); color: #bff3ee; }
+.ce-board td.is-part { background: rgba(243, 179, 61, .16); color: #f3b33d; }
+.ce-board td.is-crew { background: #4fd1c5; color: #062523; }
+.ce-board td.is-crew .category-logo { height: 14px; width: auto; margin-right: 4px; vertical-align: -2px; }
+.ce-board td.is-muted { opacity: .35; }
+.ce-board tr.is-placed th { opacity: .8; }
+.ce-board-legend { display: flex; flex-wrap: wrap; gap: 12px; margin: 0; padding: 4px 16px 14px; font-size: 12px; color: var(--muted, #92979c); }
+.ce-board-legend span::before { content: ''; display: inline-block; width: 12px; height: 12px; margin-right: 6px; border-radius: 3px; vertical-align: -1px; }
+.ce-board-legend .is-whole::before { background: rgba(79, 209, 197, .4); } .ce-board-legend .is-part::before { background: rgba(243, 179, 61, .5); } .ce-board-legend .is-crew::before { background: #4fd1c5; }

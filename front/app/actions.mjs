@@ -9,7 +9,7 @@ import {readRaceInfo} from './race-info.mjs';
 import {refresh,refreshAfterSave} from './refresh.mjs';
 import {draftFor,registrationDraft,ownRegistrations,rerenderRegistrationSection,submitRegistration,registrationStep,canEnterInOneClick,enterInOneClick,enterRound,editRound,skipRound} from './registration.mjs';
 import {updateCrewState,pickSlot} from './crews.mjs';
-import {openCategoryEntry,categoryEntryAction,saveCategoryEntry} from './category-entry.mjs';
+import {openCategoryEntry,categoryEntryAction,saveCategoryEntry,categoryEntryBoardFilter} from './category-entry.mjs';
 import {installRouter,routeFromLocation,applyRoute} from './router.mjs';
 import {installAutoRefresh} from './auto-refresh.mjs';
 import {introduceCommunitiesOnce} from '../community-intro.mjs';
@@ -152,8 +152,9 @@ async function perform(action,target){
     case 'category': { const departure=event.departures.find(item=>item.id===target.dataset.departure),draft=draftFor(departure); draft.category=target.dataset.value; draft.cars=(draft.cars||[]).filter(car=>CARS[draft.category]?.includes(car)); draft.carAny=false; rerenderRegistrationSection(event,departure,'',renderEvent); break; }
     case 'delete-registration': { state.pendingCrewJoin=null; const departure=event.departures.find(item=>item.id===target.dataset.departure),reg=departure.availability.find(item=>item.id===target.dataset.id); if(!reg)throw Error('Inscription introuvable.'); if(!confirm(`Supprimer l’inscription de ${reg.name} pour ce départ ?${inCommunity()}`))return; await api(`/api/registrations/${reg.id}`,'DELETE',{version:reg.version}); delete state.drafts[departure.id]; state.registrationOpen.delete(departure.id); await refreshAfterSave('Inscription supprimée.'); break; }
     case 'category-entry-open': openCategoryEntry(event); break;
+    case 'category-entry-board': categoryEntryBoardFilter(event,target); renderEvent(); break;
     case 'category-entry-peek': categoryEntryAction(event,action,target); renderEvent(); break;
-    case 'category-entry-close': case 'category-entry-step': case 'category-entry-category': case 'category-entry-mode': case 'category-entry-kind': categoryEntryAction(event,action,target); break;
+    case 'category-entry-close': case 'category-entry-step': case 'category-entry-category': case 'category-entry-kind': case 'category-entry-car': categoryEntryAction(event,action,target); break;
     case 'category-entry-save': await saveCategoryEntry(event); await refreshAfterSave('Inscription enregistrée.'); break;
     case 'join-crew': {
       const departure=event?.departures.find(item=>item.id===target.dataset.departure);const crew=departure?.crews.find(item=>item.id===target.dataset.id);const reg=departure?.availability.find(item=>item.id===target.dataset.registration);

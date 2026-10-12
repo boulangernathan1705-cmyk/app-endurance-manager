@@ -95,13 +95,29 @@ function crewCard(event,departure,crew,index,unassigned,allCrews){
   </div>`;
 }
 
+// A pilot entered in several categories on a start shows once, with all of them (his widest hours first).
+export function groupByPilot(list,event){
+  const groups=new Map();
+  for(const reg of list){
+    const key=reg.participantId||`name:${String(reg.name).toLowerCase()}`;
+    if(!groups.has(key))groups.set(key,[]);
+    groups.get(key).push(reg);
+  }
+  return [...groups.values()].map(regs=>{
+    if(regs.length===1)return regs[0];
+    const main=regs.find(reg=>reg.status==='whole')||regs[0];
+    const cars=[...new Set(regs.flatMap(reg=>reg.carAny?[]:reg.cars||[]))];
+    return {...main,groupCategories:event.categories.filter(category=>regs.some(reg=>reg.category===category)),cars,carAny:!cars.length};
+  });
+}
+
 export function renderPilots(event,departure,options={}){
   const crews=sortedCrews(event,departure);
   const assigned=new Set(crews.flatMap(crew=>crew.registrationIds||[]));
   const unassigned=(departure.availability||[]).filter(reg=>reg.status!=='unavailable'&&!assigned.has(reg.id)).sort((a,b)=>event.categories.indexOf(a.category)-event.categories.indexOf(b.category)||String(a.name).localeCompare(String(b.name),'fr',{sensitivity:'base'}));
   const unavailable=(departure.availability||[]).filter(reg=>reg.status==='unavailable');
   const crewCards=crews.length?crews.map((crew,index)=>crewCard(event,departure,crew,index,unassigned,crews)).join(''):'<p class="empty">Aucun équipage pour ce départ.</p>';
-  const pilots=unassigned.length?`<section class="ux-unassigned-section"><div class="ux-unassigned-grid">${unassigned.map(reg=>renderRegistration(reg,departure,event.durationHours||6)+(reg.canEdit&&!startHasBegun(departure)?slotPicker(event,departure,{kind:'registration',id:reg.id,version:reg.version,label:reg.mine?'Choisir mon départ':`Choisir le départ de ${reg.name}`}):'')).join('')}</div></section>`:`<section class="ux-unassigned-section"><p class="empty">${departure.availability.length?'Tous les pilotes disponibles ont déjà un équipage.':'Aucun pilote inscrit sur ce départ.'}</p></section>`;
+  const pilots=unassigned.length?`<section class="ux-unassigned-section"><div class="ux-unassigned-grid">${groupByPilot(unassigned,event).map(reg=>renderRegistration(reg,departure,event.durationHours||6)+(reg.canEdit&&!startHasBegun(departure)?slotPicker(event,departure,{kind:'registration',id:reg.id,version:reg.version,label:reg.mine?'Choisir mon départ':`Choisir le départ de ${reg.name}`}):'')).join('')}</div></section>`:`<section class="ux-unassigned-section"><p class="empty">${departure.availability.length?'Tous les pilotes disponibles ont déjà un équipage.':'Aucun pilote inscrit sur ce départ.'}</p></section>`;
   const unavailableHtml=unavailable.length?`<details class="ux-crew-bucket ux-unavailable-bucket"><summary><span>Pilotes indisponibles</span><strong>${unavailable.length}</strong></summary><div class="ux-crew-bucket-body">${unavailable.map(reg=>renderRegistration(reg,departure,event.durationHours||6)).join('')}</div></details>`:'';
   const createCrew=options.canCreateCrew?`<button type="button" class="secondary-button crew-builder-open crew-section-create" data-crew-builder-open data-departure="${departure.id}">${esc(options.createCrewLabel||'Créer un équipage')}</button>`:'';
   const tbdNotice=departure.tbd?`<p class="tbd-notice" role="note">${pickableSlots(event,departure).length
