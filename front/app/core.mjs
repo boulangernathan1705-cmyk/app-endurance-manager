@@ -12,7 +12,7 @@ export const activeGame = globalThis.__ENDURANCE_GAME__ === 'iracing' ? 'iracing
 export const state = {
   events:[], user:null, discordReady:false, currentEventId:null, page:'home', editingEvent:null,
   access:'anonymous', permissions:[], community:null, platformDiscordUrl:null,
-  drafts:{}, busy:false, participants:[], flash:'', eventFilter:'upcoming', listFormat:'endurance', soloLabel:'EVENT TDZ', eventTypes:[], soloRaces:false, eventTdz:false, training:false, memo:false, trainingRace:false,
+  drafts:{}, busy:false, participants:[], flash:'', eventFilter:'upcoming', listFormat:'endurance', soloLabel:'EVENT TDZ', eventTypes:[], soloRaces:false, eventTdz:false, grindfest:false, training:false, memo:false, trainingRace:false,
   selectedDepartureId:null, eventSection:'race', pilotName:'', registrationOpen:new Set(), crewManagementOpen:new Set(),
   pendingCrewJoin:null, archiveLoaded:false, participantsLoaded:false
 };
@@ -215,6 +215,7 @@ export async function load() {
   state.eventTypes=Array.isArray(session.eventTypes)?session.eventTypes:[];
   // EVENT TDZ (types, OPEN / SAFE); elsewhere EVENT SOLO, open to the « Endurances » permission.
   state.eventTdz=session.eventTdz===true;
+  state.grindfest=session.grindfest===true;
   state.training=session.training===true; state.memo=session.memo===true; state.trainingRace=session.trainingRace===true;
   state.safeGuideUrl=typeof session.safeGuideUrl==='string'?session.safeGuideUrl:'';
   if (!state.soloRaces) state.listFormat='endurance';

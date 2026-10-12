@@ -1,4 +1,5 @@
 import {streamerFields, streamerData, syncStreamerFields} from './grindfest.mjs';
+import {isGrindfest} from '../../shared/grindfest.mjs';
 // Creating or editing an event of the community calendar (solo format), step by step, for every simulator.
 // The fields follow the community’s calendar: start time, server password, and per round the
 // circuit, categories, practice / qualifying / race minutes, weather, fuel and tyre multipliers.
@@ -14,6 +15,7 @@ const MAX_ROUNDS=4;
 const simChoice=(sim,selected)=>`<label class="sim-option sim-${sim.id}"><input type="radio" name="eventSim" value="${sim.id}" ${sim.id===selected?'checked':''} required><span>${esc(sim.short)}</span></label>`;
 // The community's event types; an event keeps its type even once removed from the list.
 function typeField(chosen){
+  if (chosen === 'Grindfest') chosen = 'Gridfest';
   const types=[...state.eventTypes];if(chosen&&!types.includes(chosen))types.push(chosen);
   if(!types.length)return '';
   return `<fieldset class="sim-options"><legend class="form-label">Type d’événement</legend><div class="sim-option-row">${types.map(type=>`<label class="sim-option event-type-option"><input type="radio" name="eventType" value="${esc(type)}" ${type===chosen?'checked':''} required><span>${esc(type)}</span></label>`).join('')}</div></fieldset>`;
@@ -71,7 +73,7 @@ export function renderSoloEventForm(event=null){
   ${step(1,`<label class="form-label">Nom de l’événement<input name="eventName" maxlength="100" value="${esc(event?.name||'')}" required></label>
     <fieldset class="sim-options"><legend class="form-label">Simulateur</legend><div class="sim-option-row">${SIMS.map(item=>simChoice(item,sim)).join('')}</div></fieldset>${typeField(details.type)}`)}
   ${step(2,`<div class="solo-form-start">${start}</div>
-    <div class="solo-form-row"><label class="form-label">Mot de passe du serveur <small>(facultatif)</small><input name="eventPassword" maxlength="30" value="${esc(details.password||'')}" autocomplete="off"></label></div>`)}
+    <div class="solo-form-row"><label class="form-label">Mot de passe du serveur <small>(facultatif)</small><input name="eventPassword" maxlength="30" value="${esc(details.password||'')}" autocomplete="off"></label></div><div data-gridfest-password-tools hidden><button type="button" class="secondary-button" data-gridfest-generate-password>Générer un mot de passe sécurisé</button><p class="creation-help">12 à 30 caractères : lettres, chiffres, - ou _. Configure ce mot de passe sur le serveur de course. L’admin décidera ensuite de l’envoi par MP Discord.</p></div>`)}
   ${step(3,`<div class="solo-rounds" data-rounds>${rounds.map(round=>roundField(sim,round)).join('')}</div><button type="button" class="secondary-button" data-add-round>+ Ajouter une manche</button>`)}
   ${step(4,`${streamerFields(details)}<div class="solo-form-row"><fieldset class="solo-access" ${accessType(details.type)||!state.eventTdz?'hidden':''}><legend class="form-label">Accès</legend><div class="sim-option-row">${['open','safe'].map(value=>`<label class="sim-option access-${value}"><input type="radio" name="eventAccess" value="${value}" ${access===value?'checked':''}><span>${value.toUpperCase()}</span></label>`).join('')}</div></fieldset></div>
     <label class="form-label">Info <small>(facultatif)</small><input name="eventNote" maxlength="120" value="${esc(details.note||'')}" placeholder="Special event, BoP…"></label>`)}
@@ -92,7 +94,7 @@ function formData(form){
     category:value(row,'roundCategoryText'),car:value(row,'roundCar'),practice:optional(row,'roundPractice'),qualifying:optional(row,'roundQualifying'),weather:row.querySelector('[data-weather]:checked')?.value||'',fuel:optional(row,'roundFuel'),tyres:optional(row,'roundTyres'),capacity:optional(row,'roundCapacity')}));
   const start=form.querySelector('.departure-field');
   const details={type:form.querySelector('[name="eventType"]:checked')?.value||'',password:form.elements.eventPassword.value.trim(),note:form.elements.eventNote.value.trim()};
-  if (details.type === 'Grindfest') { details.streamers = streamerData(form); rounds.forEach(round => { round.capacity = null; }); }
+  if (isGrindfest({details})) { details.streamers = streamerData(form); rounds.forEach(round => { round.capacity = null; }); }
   return {name:form.elements.eventName.value.trim(),format:'solo',sim:form.elements.eventSim.value,access:form.querySelector('[name="eventAccess"]:checked')?.value||'open',
     rounds,categories:[],details,
     departures:[{id:start.dataset.id||undefined,date:start.querySelector('[name="date"]').value,time:start.querySelector('[name="time"]').value,tbd:false}]};
@@ -106,7 +108,7 @@ function fillRecap(form){
   form.querySelector('[data-solo-recap]').innerHTML=line(1,'Événement',[data.name||'—',sim.short,data.details.type].filter(Boolean).join(' · '))
     +line(2,'Horaire',`${day} · ${time}${data.details.password?` · mdp : ${data.details.password}`:''}`)
     +data.rounds.map((round,index)=>line(3,data.rounds.length>1?`Manche ${index+1}`:'Manche',[circuitName(round.circuit),isRandomCircuit(round.circuit)&&eventCatalog(data.sim)?'catégorie aléatoire':round.categories.join(' ')||round.category,round.car,roundFormat(round),roundExtras(round)].filter(Boolean).join(' · '))).join('')
-    +line(4,'Inscriptions',[accessType(data.details.type)||!state.eventTdz?'':data.access==='safe'?'SAFE':'OPEN',data.details.type==='Grindfest'?`${data.details.streamers.length} streamers · ${data.details.streamers.reduce((sum,item)=>sum+item.capacity,0)} places`:data.rounds.some(round=>round.capacity)?data.rounds.map(round=>round.capacity?`${round.capacity} places`:'illimité').join(' / '):'places illimitées',data.details.note].filter(Boolean).join(' · '));
+    +line(4,'Inscriptions',[accessType(data.details.type)||!state.eventTdz?'':data.access==='safe'?'SAFE':'OPEN',isGrindfest(data)?`${data.details.streamers.length} streamers · ${data.details.streamers.reduce((sum,item)=>sum+item.capacity,0)} places`:data.rounds.some(round=>round.capacity)?data.rounds.map(round=>round.capacity?`${round.capacity} places`:'illimité').join(' / '):'places illimitées',data.details.note].filter(Boolean).join(' · '));
 }
 function goToStep(form,target){
   const current=Number(form.dataset.step)||1;
@@ -170,3 +172,4 @@ export async function submitSoloEvent(form){
   if(editing){state.currentEventId=editing.id;state.page='event';}else{state.page='home';state.currentEventId=null;}
   await refreshAfterSave(editing?'Événement modifié.':'Événement créé.',result.id);
 }
+

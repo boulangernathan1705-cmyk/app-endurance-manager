@@ -5,7 +5,13 @@ export const grindfestEnabled = (community, development = false) => grindfestAva
 export function eventDetails(event) {
   return typeof event?.details === 'string' ? JSON.parse(event.details || '{}') : event?.details || {};
 }
-export const isGrindfest = event => eventDetails(event).type === 'Grindfest';
+// Keep the historical type and module key readable: existing entries and queues keep their identity.
+export const isGrindfest = event => ['Gridfest', 'Grindfest'].includes(eventDetails(event).type);
+export const gridfestPasswordValid = value => typeof value === 'string' && /^[A-Za-z0-9_-]{12,30}$/.test(value);
+export function generateGridfestPassword() {
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
+  return [...crypto.getRandomValues(new Uint8Array(20))].map(byte => alphabet[byte & 63]).join('');
+}
 export const streamersOf = event => eventDetails(event).streamers || [];
 
 export function normalizeStreamers(raw) {
@@ -41,3 +47,4 @@ export function assignStreamerWaitlist(entries, streamers) {
   }
   return entries;
 }
+

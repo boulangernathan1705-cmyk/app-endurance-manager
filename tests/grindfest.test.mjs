@@ -12,13 +12,13 @@ test('Grindfest calculates total capacity and requires a real streamer on every 
   const event = {...data,details:JSON.stringify(data.details),rounds:JSON.stringify(data.rounds),categories:JSON.stringify(data.categories)};
   assert.throws(() => validateRegistration({name:'Nathan'},event), /streamer/);
   assert.throws(() => validateRegistration({name:'Nathan',streamerId:'unknown'},event), /streamer/);
-  assert.equal(validateRegistration({name:'Nathan',streamerId:'a'},event).streamerId,'a');
+  assert.equal(validateRegistration({name:'Nathan',gameName:'Nathan Racing',streamerId:'a'},event).streamerId,'a');
   const multi=validateEvent({...input,rounds:[...input.rounds,{circuit:'monza',durationMinutes:30,categories:[]}]});
   assert.equal(multi.capacity,3);
   assert.equal(multi.rounds.length,2);
   assert(multi.rounds.every(round=>round.capacity==null));
   const multiEvent={...multi,details:JSON.stringify(multi.details),rounds:JSON.stringify(multi.rounds),categories:JSON.stringify(multi.categories)};
-  assert.deepEqual(validateRegistration({name:'Nathan',streamerId:'a'},multiEvent).roundChoices,[]);
+  assert.deepEqual(validateRegistration({name:'Nathan',gameName:'Nathan Racing',streamerId:'a'},multiEvent).roundChoices,[]);
   assert.throws(()=>validateRegistration({name:'Nathan',streamerId:'a',choices:[{}, {skip:true}]},multiEvent), /toutes les manches/);
   assert.throws(() => validateEvent({...input,details:{type:'OPEN'}},event), /ne peut pas changer/);
 });
@@ -46,3 +46,4 @@ test('streamer configuration rejects duplicate identities, unsafe links and inva
     assert.throws(() => normalizeStreamers([streamers[0], {...streamers[1],...patch}]));
   }
 });
+
