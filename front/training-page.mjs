@@ -3,7 +3,7 @@
 // without it the pilot types his pace and gives each step its status himself.
 import {shortDateLabel, timeAt} from './dates.mjs';
 import {lapLabel} from '../shared/training.mjs';
-import {PREP_PHASES, PREP_STEPS, PREP_LABELS, PREP_STATUSES, NOTE_LIMIT} from '../shared/training-prep.mjs';
+import {PREP_PHASES, PREP_STEPS, PREP_LABELS, PREP_STATUSES, NOTE_LIMIT, availableAt, proposeStints} from '../shared/training-prep.mjs';
 import {turnsOf} from '../shared/circuit-turns.mjs';
 
 const app = document.getElementById('training-app');
@@ -11,7 +11,7 @@ const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;',
 const num = (value, digits = 1) => value === null || value === undefined ? '—' : Number(value).toFixed(digits).replace('.', ',');
 const stamp = ms => `${shortDateLabel(ms)} · ${timeAt(ms)}`;
 const KINDS = {Practice1:'Essais', Practice2:'Essais', Practice3:'Essais', Practice4:'Essais', Qualify:'Qualif', Warmup:'Warm-up', Race:'Course'};
-const view = {race:null, track:null, carClass:null, data:null, busy:'', simhub:'', method:'simhub', sessionsOpen:false, linkOpen:null, prepOpen:false, crewView:false, editing:null, message:''};
+const view = {brush:null, race:null, track:null, carClass:null, data:null, busy:'', simhub:'', method:'simhub', sessionsOpen:false, linkOpen:null, prepOpen:false, crewView:false, editing:null, message:''};
 let loadController;
 
 
@@ -89,17 +89,17 @@ function crewCards(data) {
     (p.last ? '<small>' + esc(relative(p.last.at)) + ' · ' + p.last.laps + ' tours</small>' : '') + '</div>').join('') + '</div></section>';
 }
 
-// « V4 » in a note, with the turn's name on hover when the circuit has one.
+// « V4 » in a note, with the turn's name beside it when the circuit has one.
 function noteText(text, turns) {
   return esc(text).replace(/\bV(\d{1,2}[ab]?)\b/gi, (match, n) => {
     const turn = turns.find(item => item.n.toLowerCase() === n.toLowerCase());
-    return '<span class="prep-turn"' + (turn?.name ? ' title="' + esc(turn.name) + '"' : '') + '>V' + esc(n) + '</span>';
+    return '<span class="prep-turn">V' + esc(n) + (turn?.name ? ' · ' + esc(turn.name) : '') + '</span>';
   });
 }
 
 function notesBlock(step, prep, turns) {
   const notes = prep.notes.filter(note => note.step === step.key);
-  let html = notes.map(note => '<p class="prep-note"><b>' + esc(note.author) + '</b>' + noteText(note.text, turns) + (note.you ? '<button type="button" class="prep-note-delete" data-note-delete="' + esc(note.id) + '" aria-label="Supprimer ma note">✕</button>' : '') + '</p>').join('');
+  let html = notes.map(note => '<p class="prep-note"><b>' + esc(note.author) + '</b><span>' + noteText(note.text, turns) + '</span>' + (note.you ? '<button type="button" class="prep-note-delete" data-note-delete="' + esc(note.id) + '" aria-label="Supprimer ma note">✕</button>' : '') + '</p>').join('');
   if (view.editing === step.key) {
     const chips = (step.turns ? turns : []).map(turn => '<button type="button" data-hint="V' + esc(turn.n) + ' :" title="' + esc(turn.name || '') + '">V' + esc(turn.n) + (turn.name ? ' <span>' + esc(turn.name) + '</span>' : '') + '</button>').join('');
     html += '<form class="prep-editor" data-note-form="' + esc(step.key) + '">' + (chips ? '<div class="prep-hints prep-turns" aria-label="Virages">' + chips + '</div>' : '') +
@@ -110,10 +110,33 @@ function notesBlock(step, prep, turns) {
   return '<div class="prep-notes">' + html + '</div>';
 }
 
-function setupBlock(prep) {
-  const setup = prep.setup;
-  return '<div class="prep-setup">' + (setup ? '<span>📎 <b>' + esc(setup.name) + '</b> · ' + esc(setup.author) + '</span><a class="secondary-button" href="/api/training/prep/setup/' + esc(setup.id) + '">Télécharger</a>' : '<span class="training-note">Pas encore de setup partagé.</span>') +
-    '<label class="secondary-button prep-upload">' + (setup ? 'Déposer un autre setup' : 'Déposer un setup') + '<input type="file" accept=".svm,.json,.txt" data-setup hidden></label></div>';
+// The relay plan: a pilot picked, then the hours touched (or swept) take his colour, like the hours ticked when
+// entering. « Proposer » fills it from everyone's hours; the crew sees the same plan.
+const initials = name => name === 'Toi' ? 'Toi' : String(name).trim().slice(0, 3);
+function stintCell(stints, hour) {
+  const id = stints.plan[hour], index = stints.pilots.findIndex(pilot => pilot.id === id), pilot = stints.pilots[index];
+  const brush = stints.pilots.find(item => item.id === view.brush);
+  const away = pilot && !availableAt(pilot.status, hour), off = brush && !availableAt(brush.status, hour);
+  const label = timeAt(stints.startsAt + hour * 3600000) + ' : ' + (pilot ? pilot.name + (away ? ' (pas dispo)' : '') : 'personne');
+  return '<button type="button" class="stint-cell' + (pilot ? ' is-p' + (index % 6) : '') + (away ? ' is-away' : '') + (off ? ' is-off' : '') + '" data-stint-hour="' + hour + '" aria-label="' + esc(label) + '" title="' + esc(label) + '">' +
+    '<small>' + esc(timeAt(stints.startsAt + hour * 3600000)) + '</small><b>' + (pilot ? esc(initials(pilot.name)) : '') + '</b></button>';
+}
+function stintPlan(prep) {
+  const stints = prep.stints;
+  if (!stints) return '<p class="training-note">Rejoins un équipage pour planifier les relais avec lui.</p>';
+  if (!stints.pilots.some(pilot => pilot.id === view.brush)) view.brush = stints.pilots.find(pilot => pilot.you)?.id || stints.pilots[0]?.id || null;
+  const count = id => stints.plan.filter(item => item === id).length;
+  const chips = stints.pilots.map((pilot, index) => '<button type="button" class="stint-pilot is-p' + (index % 6) + '" data-brush="' + esc(pilot.id) + '" aria-pressed="' + (view.brush === pilot.id) + '"><i></i>' + esc(pilot.name) + ' <span>' + count(pilot.id) + ' h</span></button>').join('');
+  const rows = [];
+  for (let start = 0; start < stints.hours; start += 12) rows.push('<div class="stint-track" style="--hours:' + Math.min(12, stints.hours - start) + '">' + Array.from({length:Math.min(12, stints.hours - start)}, (_, i) => stintCell(stints, start + i)).join('') + '</div>');
+  const empty = stints.plan.map((id, hour) => id ? null : timeAt(stints.startsAt + hour * 3600000)).filter(Boolean);
+  const away = stints.plan.map((id, hour) => { const pilot = stints.pilots.find(item => item.id === id); return pilot && !availableAt(pilot.status, hour) ? pilot.name + ' à ' + timeAt(stints.startsAt + hour * 3600000) : null; }).filter(Boolean);
+  return '<div class="stint-plan"><div class="stint-pilots" role="group" aria-label="Pilote à placer">' + chips + '</div>' +
+    '<div class="stint-tracks" data-stint-tracks>' + rows.join('') + '</div>' +
+    (empty.length ? '<p class="stint-warn">' + (empty.length === stints.hours ? 'Aucune heure attribuée.' : 'Personne à ' + esc(empty.join(', ')) + '.') + '</p>' : '<p class="stint-ok">Toutes les heures ont un pilote.</p>') +
+    (away.length ? '<p class="stint-warn">Pas disponible : ' + esc(away.join(', ')) + '.</p>' : '') +
+    '<div class="stint-actions"><button type="button" class="secondary-button" data-stint-propose>' + (empty.length === stints.hours ? 'Proposer un planning' : 'Proposer à nouveau') + '</button>' +
+    (empty.length < stints.hours ? '<button type="button" class="link-button" data-stint-clear>Tout effacer</button>' : '') + '</div></div>';
 }
 
 function prepSection(data) {
@@ -138,12 +161,12 @@ function prepSection(data) {
         return '<div class="prep-step is-' + status + (step.key === prep.next ? ' is-next' : '') + '"><span class="prep-step-title">' + esc(step.title) + '</span>' +
           '<div class="prep-seg" role="group" aria-label="' + esc('Statut : ' + step.title) + '">' + PREP_STATUSES.map(value => '<button type="button" data-status="' + value + '" data-step="' + esc(step.key) + '" aria-pressed="' + (status === value) + '">' + PREP_LABELS[value] + '</button>').join('') + '</div>' +
           '<p class="prep-tip">' + esc(step.tip) + (step.memo ? ' <a href="/stands.html?' + esc(new URLSearchParams({circuit:data.race.circuit, class:data.carClass || data.race.category})) + '">Voir le mémo</a>' : '') + (proof ? ' <span class="prep-proof">· Détecté : ' + esc(proof) + '</span>' : '') + '</p>' +
-          (step.setup ? setupBlock(prep) : '') + notesBlock(step, prep, turns) + '</div>';
+          (step.plan ? stintPlan(prep) : notesBlock(step, prep, turns)) + '</div>';
       }).join('') + '</div>';
     }).join('');
   }
   const last = prep.last?.notes.length ? '<details class="training-card prep-last"><summary><h2>La dernière fois ici</h2><span>' + esc(prep.last.name + ' · ' + shortDateLabel(prep.last.startsAt)) + '</span></summary>' +
-    prep.last.notes.map(note => '<p class="prep-note"><b>' + esc(note.author) + '</b>' + noteText(note.text, turns) + '</p>').join('') +
+    prep.last.notes.map(note => '<p class="prep-note"><b>' + esc(note.author) + '</b><span>' + noteText(note.text, turns) + '</span>' + '</p>').join('') +
     '<button type="button" class="secondary-button" data-reuse>Reprendre ces ' + prep.last.notes.length + ' notes</button></details>' : '';
   return last + '<details class="training-card prep" data-fold="prep"' + (view.prepOpen ? ' open' : '') + '><summary><div class="prep-head"><h2>' + title + '</h2><span>' + done + ' / ' + useful.length + ' faits</span></div>' +
     '<div class="prep-bar"><i style="width:' + (useful.length ? Math.round(done / useful.length * 100) : 0) + '%"></i></div>' +
@@ -198,11 +221,37 @@ async function upload(files) {
   await load();
 }
 
-async function uploadSetup(file) {
-  if (!file) return;
-  const race = view.data.race;
-  act(() => call('/api/training/prep/setup?' + new URLSearchParams({eventId:race.eventId, departureId:race.departureId, name:file.name}), {method:'POST', headers:{'Content-Type':'application/octet-stream'}, body:file}), 'message');
+// Saves the hours changed in the relay plan; the plan on screen goes back if the server refuses.
+function saveStints(changes, before) {
+  if (!Object.keys(changes).length) return;
+  view.message = ''; render();
+  prepCall('/api/training/prep/stints', {hours:changes}, 'PUT').then(load).catch(error => { view.data.prep.stints.plan = before; view.message = error.message; render(); });
 }
+// Touch or sweep the hours: they take the pilot picked, or are cleared when the first one touched already had him.
+let painting = null;
+function paint(cell) {
+  const hour = Number(cell.dataset.stintHour), stints = view.data.prep.stints;
+  if (painting.seen.has(hour)) return;
+  painting.seen.add(hour);
+  stints.plan[hour] = painting.value;
+  painting.changes[hour] = painting.value;
+  cell.outerHTML = stintCell(stints, hour);
+}
+app.addEventListener('pointerdown', event => {
+  const cell = event.target.closest('[data-stint-hour]');
+  if (!cell || event.button > 0 || !view.brush) return;
+  const stints = view.data.prep.stints, hour = Number(cell.dataset.stintHour);
+  painting = {value:stints.plan[hour] === view.brush ? null : view.brush, seen:new Set(), changes:{}, before:[...stints.plan]};
+  paint(cell);
+});
+app.addEventListener('pointermove', event => {
+  if (!painting) return;
+  const cell = document.elementFromPoint(event.clientX, event.clientY)?.closest('[data-stint-hour]');
+  if (cell && app.contains(cell)) paint(cell);
+});
+const stopPainting = () => { if (!painting) return; const {changes, before} = painting; painting = null; saveStints(changes, before); };
+window.addEventListener('pointerup', stopPainting);
+window.addEventListener('pointercancel', stopPainting);
 
 // field: where an error shows, the game link's panel (busy) or the preparation (message).
 async function act(task, field = 'busy') {
@@ -212,7 +261,6 @@ async function act(task, field = 'busy') {
 app.addEventListener('change', event => {
   const target = event.target;
   if (target.matches('[data-race]')) { view.race = target.value; view.editing = null; load(); return; }
-  if (target.matches('[data-setup]')) { uploadSetup(target.files[0]); return; }
   if (target.matches('[data-track]')) { view.track = target.value; view.carClass = null; load(); }
   else if (target.matches('[data-class]')) { view.carClass = target.value; load(); }
   else if (target.matches('[data-file]')) upload(target.files);
@@ -225,6 +273,20 @@ app.addEventListener('click', event => {
     view.data.prep.next = (PREP_STEPS.find(item => view.data.prep.statuses[item.key] === 'rework') || PREP_STEPS.find(item => view.data.prep.statuses[item.key] === 'todo'))?.key || null;
     render();
     prepCall('/api/training/prep', {step, status:value}, 'PUT').catch(error => { view.data.prep.statuses[step] = before; view.message = error.message; render(); });
+    return;
+  }
+  const brush = event.target.closest('[data-brush]');
+  if (brush) { view.brush = brush.dataset.brush; render(); return; }
+  // A cell is changed by the pointer; the keyboard (detail 0) changes it here.
+  const cell = event.target.closest('[data-stint-hour]');
+  if (cell) {
+    if (event.detail === 0 && view.brush) { const stints = view.data.prep.stints, hour = Number(cell.dataset.stintHour), before = [...stints.plan]; stints.plan[hour] = stints.plan[hour] === view.brush ? null : view.brush; saveStints({[hour]:stints.plan[hour]}, before); }
+    return;
+  }
+  if (event.target.closest('[data-stint-propose], [data-stint-clear]')) {
+    const stints = view.data.prep.stints, before = [...stints.plan];
+    stints.plan = event.target.closest('[data-stint-propose]') ? proposeStints(stints.pilots, stints.hours) : stints.plan.map(() => null);
+    saveStints(Object.fromEntries(stints.plan.map((id, hour) => [hour, id]).filter(([hour, id]) => before[hour] !== id)), before);
     return;
   }
   const add = event.target.closest('[data-note-add]');

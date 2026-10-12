@@ -532,7 +532,7 @@ test('two LMU modules: the Mémo for every pilot, the training on its own, a Mé
   assert.equal((await req('/api/training/memo','GET',null,'pilot')).status,404);
 });
 
-test('the race preparation: statuses proved by the sessions, notes and setup shared with the crew only, the last race beside it', async () => {
+test('the race preparation: statuses proved by the sessions, notes and relay plan shared with the crew only, the last race beside it', async () => {
   const {req,send,login,DB}=harness();
   await login(ADMIN,'admin','Orga');await login(PILOT,'pilot','Alice');await login(MATE,'mate','Bob');await login('444444444444444444','other','Carl');
   await req('/api/community/modules','PATCH',{training:true},'admin');
@@ -566,18 +566,23 @@ test('the race preparation: statuses proved by the sessions, notes and setup sha
   assert.equal((await req('/api/training/prep','PUT',{...race,step:'night',status:'skip'},'other')).status,200,'Carl prepares his own race');
   assert.equal((await req('/api/training/prep/notes','POST',{...race,step:'discover',text:'V4 : freiner au panneau 100'},'pilot')).status,200);
   assert.equal((await req('/api/training/prep/notes','POST',{...race,step:'discover',text:'   '},'pilot')).status,400);
-  const setup=await send(`/api/training/prep/setup?${new URLSearchParams({...race,name:'spa_course.svm'})}`,'POST','pilot',{raw:'[GENERAL]\nFuel=90',headers:{'Content-Type':'application/octet-stream'}});
-  assert.equal(setup.status,200);
-  assert.equal((await send(`/api/training/prep/setup?${new URLSearchParams({...race,name:'virus.exe'})}`,'POST','pilot',{raw:'MZ',headers:{'Content-Type':'application/octet-stream'}})).status,400);
+  // The relay plan: one pilot per hour, set by any pilot of the crew, the step done once every hour has one.
+  let stints=(await req('/api/training','GET',null,'pilot')).data.prep.stints;
+  assert.equal(stints.hours,6);assert.deepEqual(stints.plan,Array(6).fill(null));
+  const [first,second]=[stints.pilots.find(pilot=>pilot.you).id,stints.pilots.find(pilot=>!pilot.you).id];
+  assert.equal((await req('/api/training/prep/stints','PUT',{...race,hours:{0:first,1:second}},'pilot')).status,200);
+  assert.equal((await req('/api/training/prep/stints','PUT',{...race,hours:{2:'someone-else'}},'mate')).status,400);
+  assert.equal((await req('/api/training/prep/stints','PUT',{...race,hours:{6:first}},'mate')).status,400,'no seventh hour in a 6 h race');
+  assert.equal((await req('/api/training','GET',null,'mate')).data.prep.statuses.stints,'todo');
+  assert.equal((await req('/api/training/prep/stints','PUT',{...race,hours:{2:first,3:second,4:first,5:second}},'mate')).status,200);
   data=(await req('/api/training','GET',null,'mate')).data;
-  assert.equal(data.prep.notes[0].author,'Alice');assert.equal(data.prep.notes[0].you,false);assert.equal(data.prep.setup.name,'spa_course.svm');
+  assert.deepEqual(data.prep.stints.plan,[first,second,first,second,first,second]);assert.equal(data.prep.statuses.stints,'done');
+  assert.equal(data.prep.notes[0].author,'Alice');assert.equal(data.prep.notes[0].you,false);
   assert.equal(data.prep.crew.pilots.find(pilot=>pilot.name==='Alice').statuses.night,'skip');
-  const file=await send('/api/training/prep/setup/'+data.prep.setup.id,'GET','mate');
-  assert.equal(file.status,200);assert.equal(await file.text(),'[GENERAL]\nFuel=90');
   // Carl is in the race but not in the crew: nothing of theirs.
   const carl=(await req('/api/training','GET',null,'other')).data;
-  assert.equal(carl.prep.crew,null);assert.equal(carl.prep.notes.length,0);assert.equal(carl.prep.setup,null);
-  assert.equal((await send('/api/training/prep/setup/'+data.prep.setup.id,'GET','other')).status,404);
+  assert.equal(carl.prep.crew,null);assert.equal(carl.prep.notes.length,0);assert.equal(carl.prep.stints,null);
+  assert.equal((await req('/api/training/prep/stints','PUT',{...race,hours:{0:null}},'other')).status,400);
   assert.equal((await req('/api/training/prep/notes/'+data.prep.notes[0].id,'DELETE',null,'mate')).status,404,'only the author deletes a note');
   if(past){
     const alice=(await req('/api/training','GET',null,'pilot')).data;
@@ -589,4 +594,21 @@ test('the race preparation: statuses proved by the sessions, notes and setup sha
   assert.equal((await req('/api/training/manual','PUT',{...race,pace:'2:01.5',fuel:''},'other')).status,200);
   assert.equal((await req('/api/training/manual','PUT',{...race,pace:'vite'},'other')).status,400);
   assert.equal((await req('/api/training','GET',null,'other')).data.manual.pace,121.5);
+});
+
+test('a relay plan proposed from the hours each pilot ticked', async () => {
+  const {proposeStints}=await import('../shared/training-prep.mjs');
+  const plan=proposeStints([{id:'a',status:'h1,h2,h3'},{id:'b',status:'h3,h4,h5,h6'}],6);
+  assert.equal(plan.slice(0,2).join(),'a,a','only Alice is free at first');
+  assert.ok(plan.slice(3).every(id=>id==='b'),'only Bob is free at the end');
+  const even=proposeStints([{id:'a',status:'whole'},{id:'b',status:'whole'},{id:'c',status:'whole'}],6);
+  assert.deepEqual(['a','b','c'].map(id=>even.filter(item=>item===id).length),[2,2,2]);
+  assert.ok(even.every((id,hour)=>hour<2||!(even[hour-1]===id&&even[hour-2]===id)),'never three hours in a row');
+});
+
+test('the proposed plan gives the scarce pilot his hours first', async () => {
+  const {proposeStints}=await import('../shared/training-prep.mjs');
+  const plan=proposeStints([{id:'alex',status:'whole'},{id:'lea',status:'whole'},{id:'me',status:'h4,h5,h6'},{id:'tom',status:'h1,h2,h3'}],6);
+  assert.ok(['alex','lea','me','tom'].every(id=>plan.includes(id)),'everyone drives');
+  assert.ok(plan.every((id,hour)=>id!=='tom'||hour<3)&&plan.every((id,hour)=>id!=='me'||hour>=3),'each in his own hours');
 });
