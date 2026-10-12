@@ -11,7 +11,7 @@ import {getLocale} from '../i18n.mjs';
 export function ownRegistrations(departure) { return departure.availability.filter(reg => reg.mine); }
 export function ownRegistration(departure) { return ownRegistrations(departure)[0]; }
 export function registrationDraft(reg) {
-  return {name:reg.name,streamerId:reg.streamerId||'',category:reg.category,cars:reg.cars||[],carAny:!!reg.carAny,status:reg.status,preferredPilot:reg.preferredPilot||'',soloDriver:!!reg.soloDriver,id:reg.id,version:reg.version,participantId:reg.participantId,participantUserId:reg.participantUserId||null,discordLinked:!!reg.discordLinked,mine:reg.mine,forOther:!reg.mine,manualOther:!reg.mine&&!reg.participantUserId&&!reg.discordLinked,communityId:reg.community?.id||''};
+  return {name:reg.name,streamerId:reg.streamerId||'',category:reg.category,cars:reg.cars||[],carAny:!!reg.carAny,status:reg.status,preferredPilot:reg.preferredPilot||'',comment:reg.comment||'',soloDriver:!!reg.soloDriver,id:reg.id,version:reg.version,participantId:reg.participantId,participantUserId:reg.participantUserId||null,discordLinked:!!reg.discordLinked,mine:reg.mine,forOther:!reg.mine,manualOther:!reg.mine&&!reg.participantUserId&&!reg.discordLinked,communityId:reg.community?.id||''};
 }
 // Official race: the player first chooses the community he enters with (one of his, when he has several).
 // Solo event with nothing to choose (no category): one click enters the pilot, no form.
@@ -55,7 +55,7 @@ export function renderRegistration(reg,departure,duration,showCarPreference=true
   const locked=departure.startsAt<=Date.now();
   const origin=reg.addedByName?` <span class="registration-origin-info" title="Inscription ajoutée par ${esc(reg.addedByName)}" aria-label="Inscription ajoutée par ${esc(reg.addedByName)}">ⓘ</span>`:'';
   const timeline=renderAvailabilityTimeline({departure,duration,status:reg.status,label:slotLabel(reg.status)});
-  return `<div class="pilot-row${reg.mine?' ux-current-pilot':''}"><div class="pilot-main"><span class="pilot-name">${communityTag(reg)}${esc(reg.name)}${origin}</span>${reg.soloDriver?'<span class="solo-driver-badge" data-tip="Fait la course seul, sans équipier.">SOLO</span>':''}<span class="pilot-category-logo" title="${esc(reg.category||'Catégorie')}" aria-label="${esc(reg.category||'Catégorie')}">${reg.category?logo(reg.category):'—'}</span>${showCarPreference?`<span class="pilot-car">${esc(registrationCarLabel(reg))}</span>`:''}${reg.status==='unavailable'?'<span class="registration-status">Indisponible</span>':''}${reg.preferredPilot?`<span class="pilot-preference">Souhaite rouler avec : <strong>${esc(reg.preferredPilot)}</strong></span>`:''}</div>${timeline}${reg.canEdit&&!locked?button('edit-registration','Modifier',`data-id="${reg.id}" data-departure="${departure.id}"`,'edit-button ux-pilot-edit'):''}</div>`;
+  return `<div class="pilot-row${reg.mine?' ux-current-pilot':''}"><div class="pilot-main"><span class="pilot-name">${communityTag(reg)}${esc(reg.name)}${origin}</span>${reg.soloDriver?'<span class="solo-driver-badge" data-tip="Fait la course seul, sans équipier.">SOLO</span>':''}<span class="pilot-category-logo" title="${esc(reg.category||'Catégorie')}" aria-label="${esc(reg.category||'Catégorie')}">${reg.category?logo(reg.category):'—'}</span>${showCarPreference?`<span class="pilot-car">${esc(registrationCarLabel(reg))}</span>`:''}${reg.status==='unavailable'?'<span class="registration-status">Indisponible</span>':''}${reg.preferredPilot?`<span class="pilot-preference">Souhaite rouler avec : <strong>${esc(reg.preferredPilot)}</strong></span>`:''}${reg.comment?`<span class="pilot-preference pilot-comment">« ${esc(reg.comment)} »</span>`:''}</div>${timeline}${reg.canEdit&&!locked?button('edit-registration','Modifier',`data-id="${reg.id}" data-departure="${departure.id}"`,'edit-button ux-pilot-edit'):''}</div>`;
 }
 
 function identityFields(stateDraft,departure,categoryMode,manualOther,linkedOther,guestSelf,withPreferred=true) {
@@ -73,7 +73,66 @@ function identityFields(stateDraft,departure,categoryMode,manualOther,linkedOthe
   return `<div class="registration-identity-grid ${stateDraft.forOther?'is-other':'is-self'}">${fields.join('')}</div>`;
 }
 
-function preferredPilotField(stateDraft,departure){return `<label class="registration-identity-field"><span class="form-label">Pilote souhaité <span class="muted">(facultatif)</span></span><input name="preferredPilot" data-departure="${departure.id}" value="${esc(stateDraft.preferredPilot||'')}" maxlength="32" placeholder="Pseudo du pilote souhaité"></label>`;}
+// Wished team-mates ("A, B, C"): picked among the community's members or typed freely, then an optional comment.
+// Racing alone: no team-mate to wish for.
+export const PREFERRED_PILOTS_MAX=100, REGISTRATION_COMMENT_MAX=200;
+export const preferredNames=value=>String(value||'').split(',').map(name=>name.trim()).filter(Boolean);
+const preferredChip=(name,departureId)=>`<span class="preferred-pilot-chip">${esc(name)}<button type="button" data-preferred-remove="${esc(name)}" data-departure="${departureId}" aria-label="Retirer ${esc(name)}">×</button></span>`;
+function preferredOptions(chosen){
+  const taken=new Set(chosen.map(name=>name.toLocaleLowerCase('fr-FR')));
+  return state.participants.filter(participant=>participant.id!==state.user?.id&&!taken.has(String(participant.name).toLocaleLowerCase('fr-FR'))).map(participant=>`<option value="${esc(participant.name)}"></option>`).join('');
+}
+function preferredPilotField(stateDraft,departure){
+  const chosen=preferredNames(stateDraft.preferredPilot);
+  const pilots=stateDraft.soloDriver?'':`<div class="registration-identity-field preferred-pilots" data-preferred-pilots="${departure.id}"><label class="form-label" for="preferred-entry-${departure.id}">Coéquipiers souhaités <span class="muted">(facultatif)</span></label><div class="preferred-pilot-chips">${chosen.map(name=>preferredChip(name,departure.id)).join('')}</div><input id="preferred-entry-${departure.id}" name="preferredPilotEntry" data-departure="${departure.id}" list="preferred-list-${departure.id}" maxlength="32" placeholder="${state.participants.length?'Choisis un membre ou tape un pseudo':'Pseudo du coéquipier'}" autocomplete="off" enterkeyhint="done"><datalist id="preferred-list-${departure.id}">${preferredOptions(chosen)}</datalist></div>`;
+  return `${pilots}<label class="registration-identity-field registration-comment"><span class="form-label">Commentaire <span class="muted">(facultatif)</span></span><textarea name="comment" data-departure="${departure.id}" maxlength="${REGISTRATION_COMMENT_MAX}" rows="2" placeholder="Un mot pour l’équipage ou l’organisateur">${esc(stateDraft.comment||'')}</textarea></label>`;
+}
+// Adds the typed / picked name to the draft and redraws the chips in place (same in the page and in the crew builder).
+function addPreferred(field){
+  const draft=state.drafts[field.dataset.departure],name=field.value.trim();
+  if(!draft||!name)return false;
+  const chosen=preferredNames(draft.preferredPilot);
+  if(!chosen.some(item=>item.toLocaleLowerCase('fr-FR')===name.toLocaleLowerCase('fr-FR'))){
+    const next=[...chosen,name.replace(/,/g,' ').trim()].join(', ');
+    if(next.length>PREFERRED_PILOTS_MAX){field.setCustomValidity('Liste trop longue.');field.reportValidity();return false;}
+    draft.preferredPilot=next;
+  }
+  field.value='';field.setCustomValidity('');
+  redrawPreferred(field.dataset.departure);
+  return true;
+}
+function redrawPreferred(departureId){
+  const box=document.querySelector(`[data-preferred-pilots="${departureId}"]`),draft=state.drafts[departureId];
+  if(!box||!draft)return;
+  const chosen=preferredNames(draft.preferredPilot);
+  box.querySelector('.preferred-pilot-chips').innerHTML=chosen.map(name=>preferredChip(name,departureId)).join('');
+  box.querySelector('datalist').innerHTML=preferredOptions(chosen);
+}
+if(typeof document!=='undefined'){
+  document.addEventListener('keydown',event=>{
+    const field=event.target;
+    if(field?.name!=='preferredPilotEntry'||!(event.key==='Enter'||event.key===','))return;
+    event.preventDefault();addPreferred(field);
+  },true);
+  // A member picked in the list: added at once.
+  document.addEventListener('input',event=>{
+    const field=event.target;
+    if(field?.name==='comment'&&state.drafts[field.dataset?.departure])state.drafts[field.dataset.departure].comment=field.value;
+    if(field?.name!=='preferredPilotEntry')return;
+    const typed=event.inputType==='insertText'||String(event.inputType||'').startsWith('delete');
+    if(!typed&&state.participants.some(participant=>participant.name===field.value))addPreferred(field);
+  },true);
+  document.addEventListener('change',event=>{if(event.target?.name==='preferredPilotEntry')addPreferred(event.target);},true);
+  document.addEventListener('click',event=>{
+    const remove=event.target.closest?.('[data-preferred-remove]');
+    if(!remove)return;
+    event.preventDefault();event.stopPropagation();
+    const draft=state.drafts[remove.dataset.departure];
+    if(!draft)return;
+    draft.preferredPilot=preferredNames(draft.preferredPilot).filter(name=>name!==remove.dataset.preferredRemove).join(', ');
+    redrawPreferred(remove.dataset.departure);
+  },true);
+}
 
 function registrationContext(event,departure,stateDraft) {
   const selected=departure.availability.find(reg=>reg.id===stateDraft.id);
@@ -305,7 +364,9 @@ export async function submitRegistration(form,api) {
   if(!draft.status)throw Error('Choisis ta disponibilité.'); if(draft.status!=='unavailable'&&!draft.category)throw Error('Choisis ta catégorie.');
   draft.cars=[...form.querySelectorAll('[name="carPreference"]:checked')].map(input=>input.value); draft.carAny=!!form.elements.carAny?.checked;
   if(draft.status!=='unavailable'&&!draft.carAny&&!draft.cars.length)throw Error('Choisis au moins une voiture, ou coche « Peu importe la voiture ».');
-  const payload={name:draft.name,status:draft.status,category:draft.category,cars:draft.cars,carAny:draft.carAny,preferredPilot:draft.preferredPilot||'',soloDriver:!!draft.soloDriver,version:draft.version,participantId:draft.participantId,participantUserId:draft.participantUserId,forOther:!!draft.forOther,...entryCommunity(draft)};
+  const entry=form.elements.preferredPilotEntry;
+  if(entry?.value.trim()&&!addPreferred(entry))throw Error('Coéquipiers souhaités : liste trop longue.');
+  const payload={name:draft.name,status:draft.status,category:draft.category,cars:draft.cars,carAny:draft.carAny,preferredPilot:draft.soloDriver?'':draft.preferredPilot||'',comment:(draft.comment||'').trim(),soloDriver:!!draft.soloDriver,version:draft.version,participantId:draft.participantId,participantUserId:draft.participantUserId,forOther:!!draft.forOther,...entryCommunity(draft)};
   const result=await api(draft.id?`/api/registrations/${draft.id}`:`/api/races/${event.id}/departures/${departure.id}/registrations`,draft.id?'PATCH':'POST',payload);
   if(!draft.forOther){state.pilotName=draft.name;try{localStorage.setItem('em_pilot_name',state.pilotName);}catch{}}
   delete state.drafts[departureId]; state.registrationOpen.delete(departureId); return result;

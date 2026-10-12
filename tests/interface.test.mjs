@@ -183,7 +183,7 @@ test('les cartes pilotes et équipages utilisent les vrais logos de catégorie',
 test('le formulaire inscription est unique et compact',()=>{
   const registration=read('front/app/registration.mjs');
   assert.match(registration,/registration-identity-grid/);
-  assert.match(registration,/Pilote souhaité/);
+  assert.match(registration,/Coéquipiers souhaités/);
   assert.match(registration,/TOUTE LA COURSE/);
   assert.doesNotMatch(registration,/button\('availability','INDISPONIBLE'/);
   assert.match(registration,/renderAvailabilityTimeline\(\{departure,duration,status:stateDraft\.status,interactive:true/);

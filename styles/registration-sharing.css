@@ -105,3 +105,13 @@
   .departure-fold[id^="departure-"]>summary>.ux-summary-registration-actions .ux-summary-registration-toggle,
   .departure-fold[id^="departure-"]>summary>.ux-summary-registration-actions .ux-summary-registration-other{font-size:9.5px;padding-inline:5px}
 }
+
+/* Coéquipiers souhaités (pastilles) et commentaire, au récapitulatif de l'inscription. */
+.registration-stepper .registration-identity-field{margin-top:14px}
+.preferred-pilot-chips{display:flex;flex-wrap:wrap;gap:6px}
+.preferred-pilot-chips:empty{display:none}
+.preferred-pilot-chip{display:inline-flex;align-items:center;gap:4px;padding:3px 4px 3px 10px;border:1px solid rgba(82,211,216,.45);border-radius:999px;background:rgba(82,211,216,.1);font-size:13px;font-weight:700}
+.preferred-pilot-chip button{display:grid;place-items:center;width:22px;height:22px;min-height:0;padding:0;border:0;border-radius:50%;background:transparent;color:inherit;font-size:16px;line-height:1;cursor:pointer}
+.preferred-pilot-chip button:hover{background:rgba(255,255,255,.12)}
+.registration-comment textarea{width:100%;min-width:0;margin:0;padding:11px;border:1px solid var(--border);border-radius:4px;outline:none;resize:vertical;font:inherit}
+.pilot-comment{font-style:italic}
