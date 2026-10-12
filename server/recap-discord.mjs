@@ -17,9 +17,9 @@ export function recapError(error) {
   if (error.status === 429) return 'Discord limite les requêtes. Le récap réessaiera automatiquement.';
   if (error.status === 403) return 'Dans les permissions du salon ou de la catégorie, autorise le bot à Voir le salon, Envoyer des messages, Intégrer des liens et Voir les anciens messages ; en mode par événement, ajoute Gérer les salons.';
   if (error.status === 404) {
-    if (error.code === 10008 || /\/messages\/[^/?]+$/.test(error.path || '')) return 'Le message de récap a été supprimé sur Discord. Les droits du bot ne le rétabliront pas ; préviens le gestionnaire pour rétablir cette publication.';
+    if (error.code === 10008 || (!error.code && /\/messages\/[^/?]+$/.test(error.path || ''))) return 'Le message de récap a été supprimé sur Discord. Clique sur Réparer le récap pour le republier dans le salon existant.';
     if (error.code === 10004) return 'Le serveur Discord est introuvable pour le bot. Vérifie le serveur lié à cette communauté et la présence du bot.';
-    if (error.path?.startsWith('/channels/')) return 'Le salon de publication du récap est introuvable ou inaccessible au bot. Vérifie ce salon sur Discord ; changer la catégorie de destination ne rétablit pas un salon de course supprimé.';
+    if (error.path?.startsWith('/channels/')) return 'Le salon de publication du récap est introuvable ou inaccessible au bot. Clique sur Réparer le récap pour rétablir les salons de course disparus. Si la destination choisie a disparu, utilise Modifier pour en choisir une autre.';
     return 'La catégorie ou le salon de destination est introuvable. Clique sur Modifier, actualise les destinations et sélectionne une destination existante.';
   }
   if (error.status === 400) return `Discord a refusé le récap (code ${error.code || 'inconnu'}). Vérifie les permissions du bot et signale cette erreur au gestionnaire.`;
@@ -230,11 +230,19 @@ async function publish(env, timestamp, community, settings, row, event, budget, 
     await env.DB.prepare('UPDATE discord_recap_publications SET channel_id=? WHERE community_id=? AND event_id=?').bind(channel,community.id,row.event_id).run();
   }
   const {payload, hash} = prepared || await snapshotPayload(env,timestamp,community,settings,isEvent ? row.event_id : null);
-  if (row.message_id && row.content_hash === hash) return;
+  if (!repair && row.message_id && row.content_hash === hash) return;
   if (row.message_id) {
     // A removed message or channel is reported, not recreated on every update (no surprise notifications).
-    await discord(env,'PATCH',`/channels/${channel}/messages/${row.message_id}`,payload,budget);
-  } else {
+    try { await discord(env,'PATCH',`/channels/${channel}/messages/${row.message_id}`,payload,budget); }
+    catch (error) {
+      // Never treat missing access/channels, timeouts or ambiguous errors as a deleted message.
+      if (!repair || error.status !== 404 || error.code !== 10008) throw error;
+      row.message_id = null;
+      await env.DB.prepare('UPDATE discord_recap_publications SET message_id=NULL,content_hash=? WHERE community_id=? AND event_id=?')
+        .bind('',community.id,row.event_id).run();
+    }
+  }
+  if (!row.message_id) {
     // Recover a first message after a lost response. No second POST on an ambiguous first send.
     const messages = await discord(env,'GET',`/channels/${channel}/messages?limit=100`,null,budget);
     const existing = messages.find(item => item.author?.id === env.DISCORD_CLIENT_ID && item.nonce === row.marker.slice(-24));
@@ -262,7 +270,7 @@ async function syncLocked(env,timestamp,community,settings, test = false, budget
   if (settings.guild_id !== community.discordGuildId) throw new Error('Le serveur Discord a changé. Configure à nouveau la destination.');
   if (settings.mode === 'general') {
     const row = await ensurePublication(env,community,'',settings);
-    await publish(env,timestamp,community,settings,row,null,budget);
+    await publish(env,timestamp,community,settings,row,null,budget,null,test);
   } else {
     const eligible = await openRaces(env,community,events,settings.scope,timestamp);
     const ids = [...new Set([...rows.filter(row => row.event_id && !row.closed_at).map(row => row.event_id),...eligible])];
@@ -311,6 +319,15 @@ export async function sendBotRecapTest(env,timestamp,community,settings) {
   const unchanged = current && current.mode === settings.mode && current.scope === settings.scope && current.destination_id === settings.destinationId;
   if (current?.adopted && !unchanged) throw Object.assign(new Error('Pour tester une nouvelle destination, active d’abord ces réglages. Le récap existant reste inchangé.'), {status:400});
   await saveBotRecap(env,community,settings,Boolean(unchanged && current.enabled),Boolean(current?.adopted));
+  return syncBotRecaps(env,timestamp,community,true);
+}
+
+// Repair uses the saved configuration; it never switches mode, destination or activation.
+export async function repairBotRecap(env,timestamp,community) {
+  const current=await botRecapSettings(env,community);
+  if (!current) throw Object.assign(new Error('Configure d’abord le récap dans Administration → Modules.'),{status:400});
+  if (current.guild_id !== community.discordGuildId) throw Object.assign(new Error('Le serveur Discord a changé. Clique sur Modifier pour choisir la destination sur le bon serveur.'),{status:400});
+  await validateRecapDestination(env,community,{mode:current.mode,scope:current.scope,destinationId:current.destination_id});
   return syncBotRecaps(env,timestamp,community,true);
 }
 

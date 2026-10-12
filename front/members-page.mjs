@@ -146,14 +146,14 @@ function recapForm(setup) {
   const config = setup.botRecap, scope = config?.scope || setup.recapSuggestedScope || 'all';
   const mode = config?.mode || 'general';
   const established = Boolean(config);
-  const summary = config ? `<p><strong>${config.enabled ? 'Actif' : 'Désactivé'}</strong> · ${config.mode === 'events' ? 'Une catégorie par course' : 'Récap général'} · ${esc(RECAP_LABELS[scope])}</p>
+  const summary = config ? `<p><strong>${config.lastError ? 'Publication en erreur' : config.enabled ? 'Actif' : 'Désactivé'}</strong> · ${config.mode === 'events' ? 'Une catégorie par course' : 'Récap général'} · ${esc(RECAP_LABELS[scope])}</p>
     <p>Destination : <strong>${esc(config.destinationName)}</strong>. ${config.mode === 'events' ? 'Salons supprimés 24 h après la fin du dernier départ.' : 'Le salon général est conservé.'}</p><p><a class="secondary-button" href="https://discord.com/channels/${esc(setup.guild.id)}/${esc(config.destinationId)}" target="_blank" rel="noopener">Ouvrir la destination sur Discord</a></p>
     ${config.lastError ? `<p class="settings-status" role="alert">${esc(config.lastError)}</p>${setup.recapBotInviteUrl && /permissions|autorise le bot/.test(config.lastError) ? `<a class="secondary-button" href="${esc(setup.recapBotInviteUrl)}" target="_blank" rel="noopener">Donner les droits au bot</a><p>Si le salon refuse encore l’accès, vérifie aussi ses permissions sur Discord, puis clique sur Modifier pour actualiser les destinations.</p>` : ''}` : ''}`
     : '';
   const choice = (value,title,help) => `<label class="recap-card"><input type="radio" name="mode" value="${value}" ${mode === value ? 'checked' : ''}><span><strong>${title}</strong><small>${help}</small></span></label>`;
   return `<div data-recap-guide data-config="${esc(JSON.stringify(config))}">
     ${!config ? '<p>Le bot gère les récaps. Choisis une destination et active-le ; les anciennes publications par webhook sont arrêtées.</p>' : ''}
-    ${established ? `<div data-recap-summary>${summary}<div class="setup-actions"><button type="button" class="primary-button" data-recap-edit>Modifier</button><button type="button" class="secondary-button" data-recap-view>Voir l’aperçu</button>${config?.enabled ? '<button type="button" class="secondary-button" data-recap-disable>Désactiver</button>' : ''}</div></div>` : ''}
+    ${established ? `<div data-recap-summary>${summary}<div class="setup-actions"><button type="button" class="primary-button" data-recap-edit>Modifier</button><button type="button" class="secondary-button" data-recap-view>Voir l’aperçu</button><button type="button" class="secondary-button" data-recap-repair>Réparer le récap</button>${config?.enabled ? '<button type="button" class="secondary-button" data-recap-disable>Désactiver</button>' : ''}</div><p>La réparation vérifie les droits et rétablit les salons ou messages disparus. Elle conserve les réglages et les inscriptions. Si plusieurs courses sont concernées, relance-la pour traiter les suivantes.</p><p data-recap-repair-status role="status" aria-live="polite"></p></div>` : ''}
     <form data-recap-wizard class="setup-form recap-wizard" ${established ? 'hidden' : ''}>
       <p data-recap-progress aria-live="polite">Étape 1 sur 4</p>
       <fieldset data-recap-step="0"><legend>Comment présenter les courses sur Discord ?</legend>
@@ -252,7 +252,7 @@ function modulesMarkup(settings, setup) {
   const raceCategories = setup.botRecap?.enabled && setup.botRecap.mode === 'events';
   const tiles = [
     {key:'recap', name:'Récap de la semaine sur Discord', text:'Un récap général ou une catégorie par course, avec un message actualisé sans notifications répétées.',
-      state:states.recap ? ['ok', (setup.botRecap.mode === 'events' ? 'Actif · une catégorie par course' : 'Actif · récap général')] : ['off', 'Éteint'],
+      state:setup.botRecap?.lastError ? ['warn','Publication en erreur'] : states.recap ? ['ok', (setup.botRecap.mode === 'events' ? 'Actif · une catégorie par course' : 'Actif · récap général')] : ['off', 'Éteint'],
       control:'', settings:recapForm(setup)},
     {key:'crewChannels', name:'Salons d’équipage sur Discord', text:'Un salon vocal par équipage, à son nom, ouvert dès sa création.',
       state:crewWarn ? ['warn', crews.botReady !== true ? 'Le bot n’a pas les droits' : 'Le bot est bloqué'] : states.crewChannels ? ['ok', 'Actif'] : ['off', crews.botReady === true ? 'Éteint' : crews.botProblem === 'rights' ? 'Éteint · droits du bot à donner' : 'Éteint · bot à vérifier'],
@@ -576,11 +576,16 @@ app.addEventListener('click', async event => {
     return;
   }
   const guide = event.target.closest('[data-recap-guide]');
-  if (guide && event.target.closest('button[data-recap-edit],button[data-recap-view],button[data-recap-disable],button[data-recap-cancel],button[data-recap-next],button[data-recap-back],button[data-recap-destinations],button[data-recap-send-test]')) {
-    const button = event.target.closest('button'), form = guide.querySelector('[data-recap-wizard]'), status = form.querySelector('.settings-status');
+  if (guide && event.target.closest('button[data-recap-edit],button[data-recap-view],button[data-recap-disable],button[data-recap-cancel],button[data-recap-next],button[data-recap-back],button[data-recap-destinations],button[data-recap-send-test],button[data-recap-repair]')) {
+    const button = event.target.closest('button'), form = guide.querySelector('[data-recap-wizard]'), status = button.matches('[data-recap-repair]') ? guide.querySelector('[data-recap-repair-status]') : form.querySelector('.settings-status');
     button.disabled = true; status.textContent = '';
     try {
-      if (button.matches('[data-recap-edit],[data-recap-view]')) {
+      if (button.matches('[data-recap-repair]')) {
+        status.textContent = 'Vérification et réparation du récap…';
+        const result=await api('/api/community/recap/repair','POST',{});
+        await reload('modules',{module:'recap'});
+        app.querySelector('[data-recap-repair-status]').textContent=result.queued ? 'Une synchronisation est en cours. Réessaie dans un instant.' : '✓ Réparation effectuée. Les publications ont été vérifiées sans changer les réglages.';
+      } else if (button.matches('[data-recap-edit],[data-recap-view]')) {
         const config = JSON.parse(guide.dataset.config);
         guide.querySelector('[data-recap-summary]').hidden = true; form.hidden = false;
         if (button.matches('[data-recap-view]')) { await loadRecapDestinations(form); await recapStep(form,3); }
