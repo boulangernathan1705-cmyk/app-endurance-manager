@@ -16,7 +16,7 @@ class D1 {
   prepare(sql){const db=this.db;return {params:[],bind(...params){this.params=params;return this;},async first(){return db.prepare(sql).get(...this.params)||null;},async all(){return {results:db.prepare(sql).all(...this.params)};},async run(){return {meta:{changes:Number(db.prepare(sql).run(...this.params).changes)}};}};}
   async batch(statements){this.db.exec('BEGIN');try{const results=[];for(const statement of statements)results.push(await statement.run());this.db.exec('COMMIT');return results;}catch(error){this.db.exec('ROLLBACK');throw error;}}
 }
-function setup(t,{rights='68624',overrides=[],failure=null}={}){
+function setup(t,{rights='85008',overrides=[],failure=null}={}){
   const DB=new D1(),calls=[],channels=[{id:TEXT,type:0,name:'recap',permission_overwrites:overrides},{id:'111111111111111110',type:4,name:'Accueil',position:0},{id:CATEGORY,type:4,name:'Endurances',position:1,permission_overwrites:overrides},{id:'111111111111111112',type:4,name:'Vocaux',position:2}],messages=new Map();
   const env={DB,APP_ORIGIN:'https://site.example',DISCORD_CLIENT_ID:BOT,DISCORD_BOT_TOKEN:'fake',ADMIN_DISCORD_IDS:OWNER};
   let counter=900000000000000000n, fail=failure;
@@ -311,4 +311,28 @@ test('official races where the community has nothing never hold back the recap o
   calls.length=0;await syncBotRecaps(env,NOW+1000,COMMUNITY);await syncBotRecaps(env,NOW+2000,COMMUNITY);
   assert.equal(calls.filter(call=>call.method==='PATCH').length,1);
   assert.match(JSON.stringify([...messages.values()]),/Les plots 2/);
+});
+
+
+test('embed-only recaps require Embed Links in both destination modes',async t=>{
+  const {env}=setup(t,{rights:'68624'});
+  const destinations=await recapDestinations(env,COMMUNITY);
+  for(const destination of destinations){assert.equal(destination.ready,false);assert.deepEqual(destination.missing,['Intégrer des liens']);}
+  assert.equal((await as(env,'/api/community/recap','PUT',SETTINGS)).status,400);
+  assert.equal((await as(env,'/api/community/recap','PUT',{...SETTINGS,mode:'general',destinationId:TEXT})).status,400);
+});
+
+test('new race categories preserve destination access rules; failed sends resume in the same channel',async t=>{
+  const overrides=[{id:GUILD,type:0,deny:'1024',allow:'0'},{id:BOT,type:1,deny:'0',allow:'85008'}];
+  const {DB,env,calls,channels,setFailure}=setup(t,{overrides});race(DB);
+  await saveBotRecap(env,COMMUNITY,SETTINGS);
+  const failure=(path,method)=>method==='POST'&&path.endsWith('/messages');setFailure(failure);
+  await assert.rejects(syncBotRecaps(env,NOW,COMMUNITY),/permissions/);
+  const row=DB.db.prepare('SELECT * FROM discord_recap_publications').get();
+  assert.ok(row.channel_id);assert.equal(row.message_id,null);
+  assert.deepEqual(channels.find(item=>item.id===row.category_id).permission_overwrites,overrides);
+  setFailure(null);calls.length=0;await syncBotRecaps(env,NOW+1000,COMMUNITY);
+  assert.equal(creates(calls).length,0);assert.equal(sends(calls).length,1);
+  assert.equal(sends(calls)[0].path,`/channels/${row.channel_id}/messages`);
+  assert.equal(DB.db.prepare('SELECT last_error FROM community_recap_settings').get().last_error,null);
 });

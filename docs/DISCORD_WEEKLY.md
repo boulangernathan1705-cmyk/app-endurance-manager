@@ -17,7 +17,7 @@ Après activation, une page courte indique l’état, le mode, les simulateurs, 
 
 Le Worker doit disposer de `DISCORD_CLIENT_ID` et du secret `DISCORD_BOT_TOKEN`. Ne jamais placer ce secret dans le dépôt ou dans le navigateur. Utiliser **Donner les droits au bot** pour l’inviter sur le serveur concerné.
 
-Le bot doit pouvoir **Voir le salon**, **Envoyer des messages** et **Voir les anciens messages**. Le mode par événement exige aussi **Gérer les salons** pour créer, ranger et supprimer les catégories des courses. Les permissions du salon/de la catégorie, y compris les refus propres au bot et à ses rôles, sont vérifiées avant activation ; la page indique précisément les permissions manquantes. Les erreurs Discord sont également affichées après une synchronisation.
+Le bot doit pouvoir **Voir le salon**, **Envoyer des messages**, **Intégrer des liens** et **Voir les anciens messages**. Le mode par événement exige aussi **Gérer les salons** pour créer, ranger et supprimer les catégories des courses. Les permissions du salon/de la catégorie, y compris les refus propres au bot et à ses rôles, sont vérifiées avant activation ; la page indique précisément les permissions manquantes. Les erreurs Discord sont également affichées après une synchronisation. Les nouvelles catégories de course reprennent les permissions de la catégorie choisie. Les catégories déjà créées conservent leurs permissions : en cas de salon vide, vérifier les droits du bot dans cette catégorie et son salon, puis relancer le test pour publier dans le salon existant.
 
 ## Message unique, salons par événement
 

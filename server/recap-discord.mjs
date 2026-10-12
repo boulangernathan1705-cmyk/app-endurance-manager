@@ -7,16 +7,17 @@ const API = 'https://discord.com/api/v10', DAY = 86400000;
 const RECAP_FORMAT = 2;
 const MAX_CHANNELS = 450;
 const RACE_INFO_CHANNEL = 'infos-de-la-course'; // Discord writes text channel names in lowercase with dashes
-const VIEW = 1024n, SEND = 2048n, HISTORY = 65536n, MANAGE = 16n, ADMIN = 8n;
-const REQUIRED = VIEW | SEND | HISTORY;
+const VIEW = 1024n, SEND = 2048n, HISTORY = 65536n, EMBED = 16384n, MANAGE = 16n, ADMIN = 8n;
+const REQUIRED = VIEW | SEND | HISTORY | EMBED;
 export const RECAP_BOT_PERMISSIONS = String(REQUIRED | MANAGE);
 export const botRecapSettings = (env, community) => env.DB.prepare('SELECT * FROM community_recap_settings WHERE community_id=?').bind(community.id).first();
 const parse = value => { try { const result = JSON.parse(value); return Array.isArray(result) ? result : []; } catch { return []; } };
 
 export function recapError(error) {
   if (error.status === 429) return 'Discord limite les requêtes. Le récap réessaiera automatiquement.';
-  if (error.status === 403) return 'Dans les permissions du salon ou de la catégorie, autorise le bot à Voir le salon, Envoyer des messages et Voir les anciens messages ; en mode par événement, ajoute Gérer les salons.';
+  if (error.status === 403) return 'Dans les permissions du salon ou de la catégorie, autorise le bot à Voir le salon, Envoyer des messages, Intégrer des liens et Voir les anciens messages ; en mode par événement, ajoute Gérer les salons.';
   if (error.status === 404) return 'La destination Discord est introuvable. Choisis un salon texte ou une catégorie existante.';
+  if (error.status === 400) return `Discord a refusé le récap (code ${error.code || 'inconnu'}). Vérifie les permissions du bot et signale cette erreur au gestionnaire.`;
   if (error.status === 401) return 'Le bot du site n’est pas disponible. Préviens le gestionnaire de la plateforme.';
   return 'Discord ne répond pas. Le récap réessaiera automatiquement.';
 }
@@ -54,7 +55,7 @@ export async function recapDestinations(env, community) {
     const rights = effectivePermissions(roles, member, guild, channel, env.DISCORD_CLIENT_ID);
     const required = REQUIRED | (channel.type === 4 ? MANAGE : 0n);
     return {id:channel.id, name:channel.name, type:channel.type, ready:(rights & required) === required,
-      missing:[['Voir le salon',VIEW],['Envoyer des messages',SEND],['Voir les anciens messages',HISTORY], ...(channel.type === 4 ? [['Gérer les salons',MANAGE]] : [])].filter(([,bit]) => !(rights & bit)).map(([label]) => label)};
+      missing:[['Voir le salon',VIEW],['Envoyer des messages',SEND],['Voir les anciens messages',HISTORY],['Intégrer des liens',EMBED], ...(channel.type === 4 ? [['Gérer les salons',MANAGE]] : [])].filter(([,bit]) => !(rights & bit)).map(([label]) => label)};
   });
 }
 export function recapInput(input) {
@@ -200,7 +201,10 @@ async function publish(env, timestamp, community, settings, row, event, budget, 
     if (!category) {
       // Discord allows 500 channels per server: room is kept for the crews' voice channels.
       if (channels.length >= MAX_CHANNELS) return;
-      category = (await discord(env,'POST',`/guilds/${row.guild_id}/channels`,{type:4,name:raceCategoryName(event)},budget)).id;
+      const anchor = channels.find(item => item.id === settings.destination_id && item.type === 4);
+      if (!anchor) throw Object.assign(new Error('Discord indisponible'), {status:404});
+      // Categories cannot be nested: explicitly retain the chosen category's access rules.
+      category = (await discord(env,'POST',`/guilds/${row.guild_id}/channels`,{type:4,name:raceCategoryName(event),permission_overwrites:anchor.permission_overwrites || []},budget)).id;
       row.category_id = category;
       await env.DB.prepare('UPDATE discord_recap_publications SET category_id=? WHERE community_id=? AND event_id=?').bind(category,community.id,row.event_id).run();
       await placeCategory(env,community,row.guild_id,channels,category,settings.destination_id,budget);
