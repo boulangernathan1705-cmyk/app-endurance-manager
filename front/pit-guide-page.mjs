@@ -242,4 +242,5 @@ app.addEventListener('submit', async event => {
   }catch(error){message.textContent=error.message;button.disabled=false;}
 });
 
-load();
+// From the training page: the race's circuit and class.
+load(location.search);
