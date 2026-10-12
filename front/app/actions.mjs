@@ -158,7 +158,7 @@ async function perform(action,target){
     case 'category-entry-open': openCategoryEntry(event); break;
     case 'category-entry-board': categoryEntryBoardFilter(event,target); renderEvent(); break;
     case 'category-entry-peek': categoryEntryAction(event,action,target); renderEvent(); break;
-    case 'category-entry-close': case 'category-entry-step': case 'category-entry-category': case 'category-entry-kind': case 'category-entry-car': categoryEntryAction(event,action,target); break;
+    case 'category-entry-close': case 'category-entry-step': case 'category-entry-category': case 'category-entry-start': case 'category-entry-whole': case 'category-entry-hour': case 'category-entry-car': categoryEntryAction(event,action,target); break;
     case 'category-entry-save': await saveCategoryEntry(event); await refreshAfterSave('Inscription enregistrée.'); break;
     case 'join-crew': {
       const departure=event?.departures.find(item=>item.id===target.dataset.departure);const crew=departure?.crews.find(item=>item.id===target.dataset.id);const reg=departure?.availability.find(item=>item.id===target.dataset.registration);

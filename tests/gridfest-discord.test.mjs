@@ -5,7 +5,7 @@ import {readFileSync, readdirSync} from 'node:fs';
 import worker from '../server/worker.mjs';
 import {hash, now} from '../server/core.mjs';
 import {validateEvent, validateRegistration} from '../server/core.mjs';
-import {gridfestPasswordValid, generateGridfestPassword, isGrindfest} from '../shared/grindfest.mjs';
+import {gridfestPasswordValid, isGrindfest} from '../shared/grindfest.mjs';
 import {linkTestServer, setMember, GUILD, DEV_COMMUNITY} from './fixtures/discord-server.mjs';
 
 const ROOT = 'https://site.example', CID = '90a193bc-9029-437c-a1e6-8e39f09033a3';
@@ -110,9 +110,8 @@ test('the game name is mandatory only on Gridfest; legacy event types remain com
   assert.equal(validateRegistration({name:'Discord name', streamerId:'a', gameName:'  Real Game Name  '}, event).gameName, 'Real Game Name');
   const solo = {...event, details:JSON.stringify({type:'OPEN'})};
   assert.doesNotThrow(() => validateRegistration({name:'Other pilot'}, solo));
-  assert.ok(gridfestPasswordValid(generateGridfestPassword()));
-  assert.equal(generateGridfestPassword().length, 20);
-  for (const password of ['short', 'a'.repeat(31), 'password with spaces', 'abcdef\nghijkl'])
+  for (const password of ['tdz', 'Mot-de-passe_choisi']) assert.ok(gridfestPasswordValid(password));
+  for (const password of ['a'.repeat(31), 'password with spaces', 'abcdef\nghijkl'])
     assert.throws(() => validateEvent({...input, details:{...input.details, password}}), /Mot de passe/);
   assert.doesNotThrow(() => validateEvent({...input, details:{type:'OPEN', password:'tdz'}}), 'other events keep their existing password rules');
 });

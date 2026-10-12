@@ -57,11 +57,12 @@ function absenceButton(event){
 function quickActions(event,departure){
   if(departure.startsAt<=Date.now()||!state.user)return '';
   const solo=isSolo(event),own=ownRegistration(departure),mine=(departure.availability||[]).filter(reg=>reg.mine&&reg.status!=='unavailable');
-  let main=null;const more=[];
+  let main=null,leave=null;const more=[];
   if(solo){
     const blocked=soloEntryBlock(event);
     if(own&&!soloRounds(event).length)main={action:'delete-registration',label:'Me désinscrire',extra:`data-id="${own.id}"`,leave:true};
-    else if(own)main={action:'my-registration',label:'Mon inscription',extra:''};
+    // Entry in rounds: « Mon inscription » to change it, and « Me désinscrire » in red right next to it.
+    else if(own){main={action:'my-registration',label:'Mon inscription',extra:''};leave={action:'delete-registration',label:'Me désinscrire',extra:`data-id="${own.id}"`};}
     else if(!blocked)main={action:'my-registration',label:'M’inscrire',extra:''};
     if(!main&&blocked&&!can('manage_registrations'))return `<span class="planning-quick">${safeGuideLink(event)||`<span class="solo-blocked">${esc(blocked)}</span>`}</span>`;
   }else{
@@ -76,12 +77,13 @@ function quickActions(event,departure){
   if(can('manage_registrations'))more.push({action:'new-registration',label:'Inscrire un autre pilote',extra:'data-mode="pilot"'});
   const square=(icon,tip,attrs,label='',extra='')=>`<button type="button" class="planning-quick-button${label?' is-labelled':''}${extra}" ${attrs} data-tip="${esc(tip)}" aria-label="${esc(tip)}"><span class="planning-quick-icon">${icon}</span>${label?`<span class="planning-quick-label">${esc(label)}</span>`:''}</button>`;
   const register=main?square(main.leave?ICON_UNREGISTER:ICON_REGISTER,main.label,`data-action="${main.action}" data-departure="${departure.id}" ${main.extra}`,main.label,main.leave?' is-leave':''):'';
+  const unregister=leave?square(ICON_UNREGISTER,leave.label,`data-action="${leave.action}" data-departure="${departure.id}" ${leave.extra}`,leave.label,' is-leave'):'';
   const menu=!more.length?'':more.length===1&&!main?square(ICON_REGISTER,more[0].label,`data-action="${more[0].action}" data-departure="${departure.id}" ${more[0].extra}`,'Inscrire')
     :`<span class="planning-quick-menu-wrap">${square(ICON_MORE,'Autres inscriptions','data-action="quick-menu" aria-haspopup="menu" aria-expanded="false"')}<span class="planning-quick-menu" role="menu" hidden>${more.map(item=>`<button type="button" role="menuitem" class="planning-quick-item" data-action="${item.action}" data-departure="${departure.id}" ${item.extra}>${esc(item.label)}</button>`).join('')}</span></span>`;
   const crewLabel='Créer un équipage';
   const crew=!solo&&canCreateCrewOnDeparture(departure,event)?square(ICON_CREW,crewLabel,`data-crew-builder-open data-departure="${departure.id}"`):'';
   const absence=absenceButton(event);
-  return register||absence||menu||crew?`<span class="planning-quick">${register}${absence}${menu}${crew}</span>`:'';
+  return register||absence||menu||crew?`<span class="planning-quick">${register}${unregister}${absence}${menu}${crew}</span>`:'';
 }
 
 // An event in several rounds: each round is shown like a start, « Manche 1 », « Manche 2 », with its own

@@ -247,7 +247,7 @@ function validateSoloRace(input, existing) {
   }
   if (existing && isGrindfest(existing) !== isGrindfest({details})) fail(400, 'Le format Gridfest ne peut pas changer après la création.');
   if (raw.password) details.password = text(raw.password, 30, 'Mot de passe');
-  if (isGrindfest({details}) && details.password && !gridfestPasswordValid(details.password)) fail(400, 'Mot de passe Gridfest : utilise de 12 à 30 caractères (lettres, chiffres, - ou _).');
+  if (isGrindfest({details}) && details.password && !gridfestPasswordValid(details.password)) fail(400, 'Mot de passe Gridfest : 30 caractères maximum, sans espace.');
   if (raw.note) details.note = text(raw.note, 120, 'Info');
   const totalMinutes = cleanRounds.reduce((sum, round) => sum + (round.practice || 0) + (round.qualifying || 0) + round.durationMinutes, 0);
   if (totalMinutes > 24 * 60) fail(400, 'Un événement ne peut pas dépasser 24 heures.');

@@ -7,11 +7,8 @@ export function eventDetails(event) {
 }
 // Keep the historical type and module key readable: existing entries and queues keep their identity.
 export const isGrindfest = event => ['Gridfest', 'Grindfest'].includes(eventDetails(event).type);
-export const gridfestPasswordValid = value => typeof value === 'string' && /^[A-Za-z0-9_-]{12,30}$/.test(value);
-export function generateGridfestPassword() {
-  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
-  return [...crypto.getRandomValues(new Uint8Array(20))].map(byte => alphabet[byte & 63]).join('');
-}
+// The organizer picks the password: up to 30 characters, no spaces.
+export const gridfestPasswordValid = value => typeof value === 'string' && /^\S{1,30}$/.test(value);
 export const streamersOf = event => eventDetails(event).streamers || [];
 
 export function normalizeStreamers(raw) {

@@ -1,5 +1,5 @@
 import {esc, state, api, isAdmin} from './core.mjs';
-import {isGrindfest, streamersOf, gridfestPasswordValid, generateGridfestPassword} from '../../shared/grindfest.mjs';
+import {isGrindfest, streamersOf, gridfestPasswordValid} from '../../shared/grindfest.mjs';
 import {soloEntryList} from './solo.mjs';
 
 function streamerRow(streamer = {}) {
@@ -30,8 +30,7 @@ export function syncStreamerFields(form) {
   if (passwordTools) passwordTools.hidden = !active;
   const password = form.elements.eventPassword;
   if (password) {
-    password.minLength = active ? 12 : 0;
-    if (active) password.setAttribute('pattern', '[A-Za-z0-9_-]{12,30}');
+    if (active) password.setAttribute('pattern', '\\S{1,30}');
     else password.removeAttribute('pattern');
   }
   const addRound = form.querySelector('[data-add-round]');
@@ -79,7 +78,7 @@ export function gridfestPasswordPanel(event) {
   const ready = gridfestPasswordValid(event.details?.password);
   return `<section class="gridfest-password-panel" data-gridfest-password-panel="${esc(event.id)}" aria-labelledby="gridfest-password-title">
     <h3 id="gridfest-password-title">Invitations au serveur de course</h3>${link}
-    <p>${ready ? 'Mot de passe enregistré.' : 'Génère et enregistre un mot de passe sécurisé dans « Modifier l’événement ».'} Configure le même mot de passe sur le serveur de course.</p>
+    <p>${ready ? 'Mot de passe enregistré.' : 'Choisis et enregistre le mot de passe dans « Modifier l’événement ».'} Configure le même mot de passe sur le serveur de course.</p>
     <p>Envoi privé aux inscrits confirmés uniquement. Les listes d’attente sont exclues ; les pilotes déjà servis ne reçoivent pas de doublon.</p>
     <div class="gridfest-password-actions"><button type="button" class="primary-button" data-gridfest-passwords="send" ${ready ? '' : 'disabled'}>Envoyer le mot de passe par MP</button><button type="button" class="secondary-button" data-gridfest-passwords="status">Vérifier les envois</button><button type="button" class="link-button" data-action="edit-event">Modifier l’événement</button></div>
     <div data-gridfest-password-status role="status" aria-live="polite"></div>
@@ -133,9 +132,6 @@ if (typeof document !== 'undefined') {
   document.addEventListener('click', event => {
     const form = event.target.closest?.('form[data-kind="solo-event"]');
     if (!form) return;
-    if (event.target.closest('[data-gridfest-generate-password]') && isGrindfest({details:{type:form.querySelector('[name="eventType"]:checked')?.value}})) {
-      form.elements.eventPassword.value = generateGridfestPassword();
-    }
     if (event.target.closest('[data-add-streamer]') && streamerData(form).length < 12) form.querySelector('[data-streamers]').insertAdjacentHTML('beforeend', streamerRow());
     if (event.target.closest('[data-remove-streamer]') && streamerData(form).length > 2) event.target.closest('[data-streamer-id]').remove();
     syncStreamerFields(form);
