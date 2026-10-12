@@ -34,6 +34,7 @@ function harness(withParticipants=true){
  DB.db.exec(readFileSync(new URL('../migrations/0054_event_sim.sql',import.meta.url),'utf8'));
  DB.db.exec(readFileSync(new URL('../migrations/0055_event_absences.sql',import.meta.url),'utf8'));
  DB.db.exec(readFileSync(new URL('../migrations/0059_grindfest.sql',import.meta.url),'utf8'));
+ DB.db.exec(readFileSync(new URL('../migrations/0063_registration_comment.sql',import.meta.url),'utf8'));
  DB.db.exec(readFileSync(new URL('../migrations/0015_crew_lock.sql',import.meta.url),'utf8'));
  DB.db.exec(readFileSync(new URL('../migrations/0016_client_errors.sql',import.meta.url),'utf8'));
  // The crews' owner column of migration 0016_crew_ownership (its backfill needs no data here).
@@ -659,15 +660,24 @@ test('a driver can race an endurance alone; organizers set whether a driver chan
  let event=(await req('/api/events?game=iracing','GET',null,'admin')).data.events[0];
  assert.equal(event.driverChangeRequired,true);
  const base=`/api/events/${event.id}/departures/${event.departures[0].id}`;
- const reg=await req(base+'/registrations','POST',{name:'Leo',category:'GT3',status:'h1',soloDriver:true},'pilot');
+ const reg=await req(base+'/registrations','POST',{name:'Leo',category:'GT3',status:'h1',soloDriver:true,preferredPilot:'Max',comment:'Je roule de nuit'},'pilot');
  assert.equal(reg.status,201);
  event=(await req('/api/events?game=iracing','GET',null,'admin')).data.events[0];
  const saved=event.departures[0].availability[0];
  assert.equal(saved.soloDriver,true);assert.equal(saved.status,'whole','alone means the whole race');
+ assert.equal(saved.preferredPilot,'','alone: no team-mate wished');assert.equal(saved.comment,'Je roule de nuit');
  // Back to a team: the flag is cleared.
  assert.equal((await req('/api/registrations/'+reg.data.id,'PATCH',{name:'Leo',category:'GT3',status:'h1',soloDriver:false,version:saved.version},'pilot')).status,200);
  event=(await req('/api/events?game=iracing','GET',null,'admin')).data.events[0];
  assert.equal(event.departures[0].availability[0].soloDriver,false);
+ // Several wished team-mates (a 24 h): beyond a Discord name, within a sane limit.
+ let current=event.departures[0].availability[0];
+ const three='Alexandre Dupont, Maximilien Martin, Jean-Christophe Lefèvre';
+ assert.equal((await req('/api/registrations/'+reg.data.id,'PATCH',{name:'Leo',category:'GT3',status:'h1',preferredPilot:three,version:current.version},'pilot')).status,200);
+ event=(await req('/api/events?game=iracing','GET',null,'admin')).data.events[0];current=event.departures[0].availability[0];
+ assert.equal(current.preferredPilot,three);assert.equal(current.comment,'','comment cleared when left empty');
+ assert.equal((await req('/api/registrations/'+reg.data.id,'PATCH',{name:'Leo',category:'GT3',status:'h1',preferredPilot:'x'.repeat(101),version:current.version},'pilot')).status,400);
+ assert.equal((await req('/api/registrations/'+reg.data.id,'PATCH',{name:'Leo',category:'GT3',status:'h1',comment:'x'.repeat(201),version:current.version},'pilot')).status,400);
  // Editing the race without the field keeps the organizer's choice.
  const {driverChangeRequired,...rest}=event;
  assert.equal((await req('/api/events/'+event.id,'PATCH',rest,'admin')).status,200);

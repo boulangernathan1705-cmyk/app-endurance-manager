@@ -208,7 +208,7 @@ async function perform(action,target){
   }
 }
 
-document.addEventListener('input',event=>{const field=event.target;if(field.dataset.departure&&state.drafts[field.dataset.departure]){if(field.name==='pilotName')state.drafts[field.dataset.departure].name=field.value;if(field.name==='preferredPilot')state.drafts[field.dataset.departure].preferredPilot=field.value;}});
+document.addEventListener('input',event=>{const field=event.target;if(field.dataset.departure&&state.drafts[field.dataset.departure]){if(field.name==='pilotName')state.drafts[field.dataset.departure].name=field.value;}});
 document.addEventListener('change',async event=>{
   const field=event.target;
   if(field.matches?.('[data-slot-picker]')){try{if(await pickSlot(field))await refreshAfterSave('Départ choisi.');}catch(error){showError(error);}return;}

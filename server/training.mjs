@@ -3,17 +3,24 @@
 // comparison with the other pilots of the site. Only the pilot sees his own data; the others are counted, never named.
 import {fail, json, now, id, token, hash, siteOrigin, rateLimit, body, DAY} from './core.mjs';
 import {parseResults, analyse, programSteps, adviceFor, trackKey, cleanLaps, circuitOf, normal, cleanLive, analyseLive, resultsAsLive, pitTimes, memoSheet, parseLaptimes, laptimesUpdated, mainLayout, LAPTIME_SOURCE, STEPS} from '../shared/training.mjs';
-import {levelOf, memoPilots} from '../shared/training.mjs';
+import {levelOf, levelGap, memoPilots} from '../shared/training.mjs';
 import {BOP} from '../shared/lmu-bop.mjs';
+import {strategyInputs} from '../shared/race-strategy.mjs';
 import {bopFor} from '../shared/bop.mjs';
+import {catalogForGame} from '../shared/catalog.mjs';
 import {collectMemo, collectiveMemo, restartMemo, renewMemos} from './memo-collection.mjs';
 import {EXERCISES,checklistScope,checklistEvidence,analysisFromLive} from '../shared/training-checklist.mjs';
 import {sessionChecklist,getChecklist} from './training-checklist.mjs';
+import {prepApi, racePrep, upcomingRaces} from './training-prep.mjs';
+import {sameClass, classKey, parseLap} from '../shared/training-prep.mjs';
 
 const FILE_LIMIT = 3_000_000;
 const KEEP_DAYS = 120;
 const ANALYSIS_SESSIONS = 5;
-const enabled = community => community?.modules?.training === true;
+// Two modules, LMU only: « Entraînement » (the pilot's own page) and « Mémo » (the circuits' sheets, for everyone).
+// A community that had the old single module keeps the Mémo it already showed.
+export const trainingEnabled = community => community?.modules?.training === true;
+export const memoEnabled = community => typeof community?.modules?.memo === 'boolean' ? community.modules.memo : trainingEnabled(community);
 const all = async (env, sql, ...params) => (await env.DB.prepare(sql).bind(...params).all()).results || [];
 const median = values => { const list = values.filter(value => value > 0).sort((a, b) => a - b); return list.length ? (list[Math.floor((list.length - 1) / 2)] + list[Math.ceil((list.length - 1) / 2)]) / 2 : null; };
 
@@ -137,7 +144,7 @@ export async function trainingCollector(request, env, live = false) {
 }
 
 // The class LMU writes for a car, as the spreadsheet of reference lap times names it.
-const LAPTIME_CLASS = {Hyper:'Hypercar', LMP2_ELMS:'LMP2 ELMS', LMP2_WEC:'LMP2', GT3:'GT3', LMGT3:'GT3', Hypercar:'Hypercar', LMH:'Hypercar', LMDh:'Hypercar', LMP2:'LMP2', LMP3:'LMP3', GTE:'GTE', LMGTE:'GTE'};
+const LAPTIME_CLASS = {Hyper:'Hypercar', LMP2_ELMS:'LMP2 ELMS', LMP2_WEC:'LMP2', 'LMP2 ELMS':'LMP2 ELMS', 'LMP2 WEC':'LMP2', GT3:'GT3', LMGT3:'GT3', Hypercar:'Hypercar', LMH:'Hypercar', LMDh:'Hypercar', LMP2:'LMP2', LMP3:'LMP3', GTE:'GTE', LMGTE:'GTE'};
 
 // Google answers the published sheet with a redirect to a one-off address. Seen from Cloudflare, following it
 // gave another tab of the spreadsheet: each way of asking is tried until one gives the lap times.
@@ -185,19 +192,20 @@ async function memo(env, user, url, canRestart = false) {
     SELECT circuit,track,car,car_class,user_id FROM training_memo_pilots WHERE started_at>=?
     UNION ALL SELECT circuit,track,car,car_class,NULL AS user_id FROM training_memo_cycles)
     GROUP BY circuit,car,car_class ORDER BY circuit,car`, since);
-  const circuits = [];
-  for (const row of rows) {
-    let item = circuits.find(entry => entry.key === row.circuit);
-    if (!item) circuits.push(item = {key:row.circuit, name:row.track, cars:[]});
-    item.cars.push({car:row.car, carClass:row.car_class, pilots:row.pilots});
-  }
-  const circuit = circuits.find(item => item.key === url.searchParams.get('circuit')) || circuits[0];
-  if (!circuit) return {circuits, circuit:null,canRestart};
+  const circuits = memoCircuits(rows);
+  const race = url.searchParams.get('circuit') ? null : await nextRace(env, user);
+  const circuit = circuits.find(item => item.key === (url.searchParams.get('circuit') || race?.circuit))
+    || circuits.find(item => item.cars.some(car => car.measured)) || circuits[0];
   const car = circuit.cars.find(item => item.car === url.searchParams.get('car'))
-    || circuit.cars.find(item => item.carClass === url.searchParams.get('class')) || [...circuit.cars].sort((a, b) => b.pilots - a.pilots)[0];
+    || circuit.cars.find(item => sameClass(item.carClass, url.searchParams.get('class') || race?.category))
+    || [...circuit.cars].sort((a, b) => b.pilots - a.pilots)[0];
+  // Only the chosen circuit's cars travel: the list of every circuit with all the BoP's cars would weigh tens of kB.
+  const names = circuits.map(item => ({key:item.key, name:item.name}));
+  if (!car) return {circuits:names, cars:circuit.cars, circuit:{key:circuit.key, name:circuit.name}, car:null, canRestart};
   const personal = await env.DB.prepare('SELECT summary,stops FROM training_memo_pilots WHERE circuit=? AND car=? AND user_id=? AND started_at>=?')
     .bind(circuit.key,car.car,user,since).first();
-  const collective = await collectiveMemo(env,{circuit:circuit.key,car:car.car,track:circuit.name,car_class:car.carClass});
+  // A car nobody drove yet has no collection to open: its sheet is the BoP and the reference laps.
+  const collective = car.measured ? await collectiveMemo(env,{circuit:circuit.key,car:car.car,track:circuit.name,car_class:car.carClass}) : {sheet:null, collection:null};
   const stored = await env.DB.prepare('SELECT service FROM training_cars WHERE car=?').bind(car.car).first();
   const pilots=personal?[JSON.parse(personal.summary)]:[];
   const game = collective.sheet ? {fuel:collective.sheet.fuel.game,ve:collective.sheet.energy.game,ideal:collective.sheet.tyres[0]?.ideal} : pilots[0]?.game || null;
@@ -213,22 +221,33 @@ async function memo(env, user, url, canRestart = false) {
     tyres:[...common.tyres.map(tyre=>({...compare(tyre,own.tyres.find(item=>item.name===tyre.name)),youTemp:own.tyres.find(item=>item.name===tyre.name)?.youTemp??null})),
       ...own.tyres.filter(tyre=>!common.tyres.some(item=>item.name===tyre.name)).map(tyre=>({...tyre,median:null,low:null,high:null}))]
   }:{...own,energy:{...own.energy,median:null,low:null,high:null},fuel:{...own.fuel,median:null,low:null,high:null},tyres:own.tyres.map(tyre=>({...tyre,median:null,low:null,high:null}))};
-  return {circuits, circuit:{key:circuit.key, name:circuit.name}, car, ...sheet,collection:collective.collection,canRestart,
+  return {circuits:names, cars:circuit.cars, circuit:{key:circuit.key, name:circuit.name}, car, ...sheet,collection:collective.collection,canRestart,
     bop:bopFor(BOP, circuit.key, car.car, car.carClass),
     source:laptimes ? {name:LAPTIME_SOURCE.name, title:LAPTIME_SOURCE.title, url:LAPTIME_SOURCE.url, updated:laptimes.updated} : null};
 }
 
-// The next LMU race the pilot is entered in (for the program's deadline and the circuit shown first).
-export async function nextRace(env, userId) {
-  const rows = await all(env, `SELECT r.departure_id,r.category,e.id,e.name,e.circuit,e.departures FROM registrations r JOIN participants p ON p.id=r.participant_id
-    JOIN events e ON e.id=r.event_id WHERE p.user_id=? AND r.status!='unavailable' AND e.circuit NOT LIKE 'iracing-%'`, userId);
-  let next = null;
+// Every LMU circuit has its sheet from the start (BoP, reference laps); the cars the pilots drove come first, then the
+// BoP's other cars. Names come from the site's catalog, in French.
+function memoCircuits(rows) {
+  const circuits = catalogForGame('lmu').circuits.filter(item => !item.random).map(item => ({key:item.id, name:item.name, cars:[]}));
   for (const row of rows) {
-    const departure = JSON.parse(row.departures || '[]').find(item => item.id === row.departure_id);
-    if (!departure?.startsAt || departure.startsAt < Date.now()) continue;
-    if (!next || departure.startsAt < next.startsAt) next = {eventId:row.id, departureId:row.departure_id, name:row.name, circuit:row.circuit, category:row.category, startsAt:departure.startsAt};
+    let item = circuits.find(entry => entry.key === row.circuit);
+    if (!item) circuits.push(item = {key:row.circuit, name:row.track, cars:[]});
+    item.cars.push({car:row.car, carClass:row.car_class, pilots:row.pilots, measured:true});
   }
-  return next;
+  for (const item of circuits) {
+    const layout = BOP.layouts.filter(entry => circuitOf(entry.name) === item.key).sort((a, b) => a.name.length - b.name.length)[0];
+    for (const line of layout?.cars || []) {
+      const carClass = line.carClass === 'LMP2' && /ELMS/.test(line.car) ? 'LMP2_ELMS' : line.carClass;
+      if (!item.cars.some(car => bopFor(BOP, item.key, car.car, car.carClass)?.car === line.car)) item.cars.push({car:line.car, carClass, pilots:0, measured:false});
+    }
+  }
+  return circuits;
+}
+
+// The next LMU race the pilot is entered in (for the page's tab and the circuit shown first).
+export async function nextRace(env, userId) {
+  return (await upcomingRaces(env, userId))[0] || null;
 }
 
 // Where the pilot stands among the pilots of the site on this track and class: counted, never named.
@@ -248,14 +267,15 @@ async function comparison(env, userId, key, carClass) {
 
 // Named summaries are restricted to the viewer's crew in the active community and next departure.
 export async function crewPreparation(env, user, community, race, track, carClass) {
-  const circuit = track?.circuit || (track && normal(track.venue));
+  const circuit = track?.circuit || (track && normal(track.venue)) || race?.circuit;
   const stored = circuit && carClass ? await env.DB.prepare("SELECT data FROM training_reference WHERE id='laptimes'").first() : null;
   const reference = stored ? mainLayout(JSON.parse(stored.data).filter(row => row.circuit === circuit && row.carClass === LAPTIME_CLASS[carClass])) : null;
-  if (!race || !track || circuit !== race.circuit) return {crew:null, reference};
+  if (!race || circuit !== race.circuit) return {crew:null, reference};
   const crew = await env.DB.prepare(`SELECT c.id,c.name,c.car FROM crews c JOIN crew_members cm ON cm.crew_id=c.id
     JOIN registrations r ON r.id=cm.registration_id JOIN participants p ON p.id=r.participant_id
     WHERE p.user_id=? AND c.community_id=? AND c.event_id=? AND c.departure_id=? AND r.category=? LIMIT 1`)
     .bind(user, community, race.eventId, race.departureId, race.category).first();
+  track = track || {key:'', circuit};
   if (!crew) return {crew:null, reference};
   const members = await all(env, `SELECT DISTINCT p.user_id,p.name FROM crew_members cm JOIN registrations r ON r.id=cm.registration_id
     JOIN participants p ON p.id=r.participant_id WHERE cm.crew_id=? ORDER BY p.name`, crew.id);
@@ -275,7 +295,7 @@ export async function crewPreparation(env, user, community, race, track, carClas
     const telemetry = live.filter(row => member.user_id && row.user_id === member.user_id).map(row=>JSON.parse(row.summary));
     const fuel=median(telemetry.map(row=>row.fuel)), capacity=median(telemetry.map(row=>row.capacity));
     const steps = programSteps(a, marks.filter(row => member.user_id && row.user_id === member.user_id).map(row => row.step));
-    return {name:member.name, you:member.user_id === user, steps:steps.map(step => ({key:step.key,done:step.done})), best:a.best, pace:a.median,
+    return {user:member.user_id, proof:checklistEvidence(a), name:member.name, you:member.user_id === user, steps:steps.map(step => ({key:step.key,done:step.done})), best:a.best, pace:a.median,
       level:levelOf(a.median,reference), fuel:fuel ?? (capacity && a.fuelPerLap ? a.fuelPerLap*capacity/100 : null),
       energy:median(telemetry.map(row=>row.ve)) ?? a.energyPerLap,last:a.last ? {at:a.last.at,laps:a.last.laps.length} : null};
   });
@@ -293,23 +313,26 @@ async function linkDevice(env, user) {
 
 export async function trainingApi(path, method, request, env, actor, community) {
   if (!path.startsWith('/api/training')) return null;
-  if (!enabled(community)) fail(404, 'L’entraînement n’est pas activé dans cette communauté.');
+  const memoPath = path.startsWith('/api/training/memo');
+  if (memoPath ? !memoEnabled(community) : !trainingEnabled(community)) fail(404, memoPath ? 'Le mémo n’est pas activé dans cette communauté.' : 'L’entraînement n’est pas activé dans cette communauté.');
   if (!actor.user) fail(401, 'Connecte-toi avec Discord.');
   const user = actor.user.id;
   if (path === '/api/training' && method === 'GET') {
     const url = new URL(request.url);
     const sessions = await all(env, `SELECT id,started_at,track_key,venue,course,car,car_class,kind,lap_count,best FROM training_sessions
       WHERE user_id=? AND started_at>=? ORDER BY started_at DESC LIMIT 200`, user, Date.now() - KEEP_DAYS * DAY * 1000);
-    const race = await nextRace(env, user);
+    const races = await upcomingRaces(env, user);
+    const race = races.find(item => `${item.eventId}:${item.departureId}` === url.searchParams.get('race')) || races[0] || null;
     const liveMeta=await all(env,'SELECT circuit,track,car_class FROM training_live WHERE user_id=? AND started_at>=? ORDER BY started_at DESC LIMIT 200',user,Date.now()-KEEP_DAYS*DAY*1000);
     const tracks = [];
     for (const row of sessions) if (!tracks.some(track => track.key === row.track_key)) tracks.push({key:row.track_key, venue:row.venue, course:row.course, circuit:circuitOf(row.venue)});
     for(const row of liveMeta)if(!tracks.some(track=>track.circuit===row.circuit))tracks.push({key:row.circuit,venue:row.track,course:'',circuit:row.circuit});
     const wanted = url.searchParams.get('track');
-    const track = tracks.find(item => item.key === wanted) || (race && tracks.find(item => item.circuit === race.circuit)) || tracks[0] || null;
+    // With a race, its circuit only: another circuit's figures would read as the race's.
+    const track = race ? tracks.find(item => item.circuit === race.circuit) || null : tracks.find(item => item.key === wanted) || tracks[0] || null;
     const onTrack = track ? sessions.filter(row => row.track_key === track.key) : [];
     const classes = [...new Set([...onTrack.map(row => row.car_class),...liveMeta.filter(row=>row.circuit===track?.circuit).map(row=>row.car_class)])];
-    const carClass = classes.includes(url.searchParams.get('class')) ? url.searchParams.get('class') : classes[0] || race?.category || null;
+    const carClass = classes.includes(url.searchParams.get('class')) ? url.searchParams.get('class') : classes.find(item => sameClass(item, race?.category)) || classes[0] || race?.category || null;
     const chosenRows=track&&carClass ? await all(env,`SELECT started_at,car,kind,laps FROM training_sessions
       WHERE user_id=? AND track_key=? AND car_class=? AND started_at>=? ORDER BY started_at DESC LIMIT ?`,user,track.key,carClass,Date.now()-KEEP_DAYS*DAY*1000,ANALYSIS_SESSIONS):[];
     const chosen = chosenRows
@@ -333,12 +356,40 @@ export async function trainingApi(path, method, request, env, actor, community) 
     const waiting = await all(env, 'SELECT drivers FROM training_pending WHERE user_id=? ORDER BY created_at DESC', user);
     const preparation = await crewPreparation(env, user, community.id, race, track, carClass);
     const game = liveRows.map(row => row.game && JSON.parse(row.game)).find(Boolean) || null;
-    return json({race, tracks, track, classes, carClass, analysis, live, game, checklist,...preparation, steps:programSteps(analysis, marks), advice:adviceFor(analysis, compared), comparison:compared,
+    // Without the game linked, the pace the pilot typed gives the level.
+    const manual = race ? await env.DB.prepare('SELECT best,fuel FROM training_manual WHERE user_id=? AND circuit=? AND car_class=?').bind(user, race.circuit, classKey(race.category)).first() : null;
+    const level = levelGap(analysis.median || manual?.best || null, preparation.reference);
+    const proofs = Object.fromEntries((preparation.crew?.pilots || []).filter(pilot => pilot.user).map(pilot => [pilot.user, pilot.proof]));
+    proofs[user] = checklistEvidence(analysis, liveSessions);
+    if (preparation.crew) for (const pilot of preparation.crew.pilots) { delete pilot.user; delete pilot.proof; }
+    // The race's strategy: the Mémo's figures for the crew's car (else the race's class) at the pilot's pace, else the
+    // crew's, else the reference midpack.
+    const paces = (preparation.crew?.pilots || []).map(pilot => pilot.pace).filter(Boolean);
+    const lap = analysis.median || manual?.best || median(paces) || preparation.reference?.pace?.[5] || null;
+    const sheet = race ? await memo(env, user, new URL('https://memo/?' + new URLSearchParams({circuit:race.circuit, car:preparation.crew?.car || '', class:race.category}))) : null;
+    const prep = await racePrep(env, user, community.id, race, proofs, strategyInputs(sheet?.car ? sheet : null, lap));
+    return json({race, races, prep, level, manual:manual ? {pace:manual.best, fuel:manual.fuel} : null, tracks, track, classes, carClass, analysis, live, game, checklist,...preparation, steps:programSteps(analysis, marks), advice:adviceFor(analysis, compared), comparison:compared,
       sessions:sessions.slice(0, 20).map(row => ({id:row.id, at:row.started_at, venue:row.venue, course:row.course, car:row.car, carClass:row.car_class, kind:row.kind,
         laps:row.lap_count, best:row.best})),
       analysisWindow:ANALYSIS_SESSIONS,
       device:device ? {linked:true, lastSeen:device.last_seen} : {linked:false}, lmuName:profile?.lmu_name || null,
       pending:waiting.length && !profile?.lmu_name ? {files:waiting.length, drivers:[...new Set(waiting.flatMap(row => JSON.parse(row.drivers)))].sort((a, b) => a.localeCompare(b)).slice(0, 60)} : null});
+  }
+  const prep = await prepApi(path, method, request, env, user, community);
+  if (prep) return prep;
+  // The race pace and fuel a pilot types when the game is not linked, per circuit and class of a race.
+  if (path === '/api/training/manual' && method === 'PUT') {
+    const input = await body(request);
+    const race = (await upcomingRaces(env, user)).find(item => item.eventId === input.eventId && item.departureId === input.departureId);
+    if (!race) fail(404, 'Tu n’es pas inscrit à cette course.');
+    const pace = input.pace === '' || input.pace === null ? null : parseLap(input.pace);
+    if (input.pace && !pace) fail(400, 'Écris ton tour comme 1:42.3.');
+    const fuel = input.fuel === '' || input.fuel === null || input.fuel === undefined ? null : Number(String(input.fuel).replace(',', '.'));
+    if (fuel !== null && !(fuel > 0 && fuel < 50)) fail(400, 'Conso par tour invalide.');
+    await env.DB.prepare(`INSERT INTO training_manual(user_id,circuit,car_class,best,fuel,updated_at) VALUES(?,?,?,?,?,?)
+      ON CONFLICT(user_id,circuit,car_class) DO UPDATE SET best=excluded.best,fuel=excluded.fuel,updated_at=excluded.updated_at`)
+      .bind(user, race.circuit, classKey(race.category), pace, fuel, Date.now()).run();
+    return json({ok:true});
   }
   // The pit guide (stands.html): the stops measured by every pilot of the site, per class, never named.
   if (path === '/api/training/memo' && method === 'GET') return json(await memo(env, user, new URL(request.url),actor.manager===true));

@@ -2,6 +2,14 @@
 
 Les changements du site, version par version. La plus récente est en haut.
 
+## v1.27 — 12 octobre 2026
+
+- Mémo des circuits et Entraînement deviennent deux modules LMU séparés. Le Mémo couvre tous les circuits dès l'activation : BoP, chronos de référence de chaque voiture et stratégie de course estimée tour par tour.
+- Entraînement : une prépa par course, partagée avec l'équipage. Étapes à cocher, notes avec les virages du circuit, setup de l'équipage à déposer et planning des relais en quelques clics.
+- Inscription : plusieurs coéquipiers souhaités et un commentaire facultatif. Le champ disparaît quand on roule seul.
+- Les chronos de référence se lisent de nouveau.
+- Le site résiste aux robots qui essaient des milliers d'adresses au hasard.
+
 ## v1.26 — 12 octobre 2026
 
 - Page d'une endurance : les badges passent sous la date et le compte à rebours disparaît. Nouvelles infos facultatives à la création, affichées en icônes : limites de piste, pneus, grille et partage du volant.

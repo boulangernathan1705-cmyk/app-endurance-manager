@@ -405,7 +405,7 @@ export function memoSheet({laneStops = [], carStops = [], sessions = [], summari
 // track and class, the qualifying time and the race pace of each level. Its columns go from the alien's race pace to
 // the offline driver's; the levels are named, never given in percent.
 export const LAPTIME_SOURCE = {name:'Ohne Speed', title:'LMU laptimes spreadsheet', url:'https://www.youtube.com/@ohne_speed',
-  csv:'https://docs.google.com/spreadsheets/d/e/2PACX-1vTN03UvJDm99byA6vQPZHKOCYVvfxLu1zkJAzdaKyROykzEKY2-Xl1rl1q5znZEf36m88dxMKsY2eaO/pub?gid=253434982&single=true&output=csv'};
+  csv:'https://docs.google.com/spreadsheets/d/e/2PACX-1vTN03UvJDm99byA6vQPZHKOCYVvfxLu1zkJAzdaKyROykzEKY2-Xl1rl1q5znZEf36m88dxMKsY2eaO/pub?gid=1766901750&single=true&output=csv'};
 export const LEVELS = [{name:'Alien', from:0, to:0}, {name:'Competitive', from:1, to:1}, {name:'Good', from:2, to:3}, {name:'Midpack', from:4, to:5}, {name:'Tail-ender', from:6, to:6}, {name:'Offline', from:7, to:null}];
 const LAPTIME_CLASSES = {LMGT3:'GT3', LMH:'Hypercar', LMP3:'LMP3', LMP2elms:'LMP2 ELMS', LMP2wec:'LMP2', GTE:'GTE'};
 const csvRows = text => {
@@ -441,6 +441,14 @@ export const laptimesUpdated = text => { const match = String(text || '').match(
 export function levelOf(pace, reference) {
   if (!pace || !reference) return null;
   return LEVELS.find(level => level.to === null || pace <= reference.pace[level.to])?.name ?? null;
+}
+// The pilot's level and what the next one asks: its slowest race pace and the seconds to find.
+export function levelGap(pace, reference) {
+  const level = levelOf(pace, reference);
+  if (!level) return null;
+  const index = LEVELS.findIndex(item => item.name === level);
+  const next = index > 0 ? {name:LEVELS[index - 1].name, time:reference.pace[LEVELS[index - 1].to]} : null;
+  return {level, pace, next:next ? {...next, gap:Math.max(0, Math.round((pace - next.time) * 100) / 100)} : null};
 }
 // The levels shown on the sheet, end to end like levelOf: each from the previous level's last column to its own.
 export function levelBands(reference) {

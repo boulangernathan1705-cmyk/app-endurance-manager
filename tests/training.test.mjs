@@ -401,7 +401,10 @@ test('the circuit sheet on the site: every circuit driven, the car’s service t
   assert.equal((await push('mate',{...LIVE,at:1790000300000})).status,200);
   const {status,data}=await req('/api/training/memo?circuit=long-beach','GET',null,'mate');
   assert.equal(status,200);
-  assert.deepEqual(data.circuits.map(item=>item.key).sort(),['long-beach','spa']);
+  // Every LMU circuit has its sheet, driven or not; the cars driven come first, then the BoP's.
+  assert.equal(data.circuits.length,18);assert.ok(data.circuits.some(item=>item.key==='portimao'));
+  assert.equal(data.cars[0].car,'Ferrari 296 LMGT3 Evo');assert.ok(data.cars.length>20);
+  assert.ok(!data.cars.some(item=>item.car==='Ferrari 296 LMGT3'),'the BoP line of a car driven is not listed twice');
   assert.equal(data.car.car,'Ferrari 296 LMGT3 Evo');assert.equal(data.lane.through,43.3);
   assert.equal(data.service.wing,25);assert.equal(data.service.brakes,null);
   // Bob never drove there: no figure of his, and Alice's alone is not shown.
@@ -511,4 +514,130 @@ test('an online file waits for the pilot name, then is read; the sync program ca
   const key=new TextDecoder().decode(new Uint8Array(await program.arrayBuffer()).slice(4096)).match(/([a-f0-9]{64})/)[1];
   response=await send('/api/training/collector','POST','sync',{raw:recent,headers:{'Content-Type':'application/xml',Authorization:'Bearer '+key,'X-LMU-Name':'Moi%20Pilote'}});
   assert.deepEqual(await response.json(),{ok:true,created:true,venue:'Circuit de Barcelona',laps:3});
+});
+
+test('two LMU modules: the Mémo for every pilot, the training on its own, a Mémo that follows the old module', async () => {
+  const {req,login}=harness();
+  await login(ADMIN,'admin','Orga');await login(PILOT,'pilot','Alice');
+  await req('/api/community/modules','PATCH',{memo:true},'admin');
+  const memo=await req('/api/training/memo?circuit=portimao','GET',null,'pilot');
+  assert.equal(memo.status,200);assert.equal(memo.data.circuit.name,'Algarve International Circuit (Portimão)');
+  assert.ok(memo.data.car&&memo.data.bop,'a circuit nobody drove still has its cars and BoP');
+  assert.equal((await req('/api/training','GET',null,'pilot')).status,404,'the training stays off');
+  let session=(await req('/api/session','GET',null,'pilot')).data;
+  assert.deepEqual([session.memo,session.training],[true,false]);
+  await req('/api/community/modules','PATCH',{memo:false,training:true},'admin');
+  session=(await req('/api/session','GET',null,'pilot')).data;
+  assert.deepEqual([session.memo,session.training],[false,true]);
+  assert.equal((await req('/api/training/memo','GET',null,'pilot')).status,404);
+});
+
+test('the race preparation: statuses proved by the sessions, notes and relay plan shared with the crew only, the last race beside it', async () => {
+  const {req,send,login,DB}=harness();
+  await login(ADMIN,'admin','Orga');await login(PILOT,'pilot','Alice');await login(MATE,'mate','Bob');await login('444444444444444444','other','Carl');
+  await req('/api/community/modules','PATCH',{training:true},'admin');
+  for(const date of ['2090-10-15','2020-06-14'])assert.equal((await req('/api/events','POST',{name:'Spa '+date.slice(0,4),circuit:'spa',categories:['Hypercar'],departures:[{date,time:'15:00'}]},'admin')).status,201);
+  const events=(await req('/api/events?filter=all','GET',null,'pilot')).data.events;
+  const next=events.find(event=>event.name==='Spa 2090'),dep=next.departures[0],base=`/api/events/${next.id}/departures/${dep.id}`;
+  assert.equal((await req(base+'/registrations','POST',{name:'Alice',category:'Hypercar',status:'whole'},'pilot')).status,201);
+  const crew=await req(base+'/crews','POST',{name:'Spa crew',category:'Hypercar',car:'Alpine A424'},'pilot');
+  const mate=await req(base+'/registrations','POST',{name:'Bob',category:'Hypercar',status:'whole'},'mate');
+  assert.equal((await req(base+'/registrations','POST',{name:'Carl',category:'Hypercar',status:'whole'},'other')).status,201);
+  const listing=(await req('/api/events','GET',null,'pilot')).data.events.find(event=>event.id===next.id).departures[0].crews[0];
+  assert.equal((await req(`/api/crews/${crew.data.id}/members`,'POST',{registrationId:mate.data.id,version:listing.version,selfJoin:true},'mate')).status,200);
+  // A race already run on Spa, with a note of Alice's: shown as « la dernière fois ».
+  const user=DB.db.prepare('SELECT id FROM users WHERE name=?').get('Alice').id;
+  const past=events.find(event=>event.name==='Spa 2020');assert.ok(past,'the past race is listed');
+  if(past){
+    // Alice's registration, copied onto the past race (the site refuses entries to a race already run).
+    const row=DB.db.prepare('SELECT r.* FROM registrations r JOIN participants p ON p.id=r.participant_id WHERE p.user_id=?').get(user);
+    const copy={...row,id:'old-reg',event_id:past.id,departure_id:past.departures[0].id};
+    DB.db.prepare(`INSERT INTO registrations(${Object.keys(copy).join(',')}) VALUES(${Object.keys(copy).map(()=>'?').join(',')})`).run(...Object.values(copy));
+    DB.db.prepare("INSERT INTO training_prep_notes(id,event_id,departure_id,user_id,step,text,created_at) VALUES('old-note',?,?,?,'limits','V5 : rester sur le blanc',1)").run(past.id,past.departures[0].id,user);
+  }
+  await upload(send,'pilot',XML);
+  let data=(await req('/api/training','GET',null,'pilot')).data;
+  assert.equal(data.race.name,'Spa 2090');assert.equal(data.prep.crew.pilots.length,2);
+  assert.equal(data.prep.statuses.discover,'done','four laps driven prove the discovery');assert.ok(data.prep.proofs.discover);
+  assert.equal(data.prep.statuses.night,'todo');
+  const race={eventId:next.id,departureId:dep.id};
+  assert.equal((await req('/api/training/prep','PUT',{...race,step:'night',status:'skip'},'pilot')).status,200);
+  assert.equal((await req('/api/training/prep','PUT',{...race,step:'night',status:'maybe'},'pilot')).status,400);
+  assert.equal((await req('/api/training/prep','PUT',{...race,step:'night',status:'skip'},'other')).status,200,'Carl prepares his own race');
+  assert.equal((await req('/api/training/prep/notes','POST',{...race,step:'discover',text:'V4 : freiner au panneau 100'},'pilot')).status,200);
+  assert.equal((await req('/api/training/prep/notes','POST',{...race,step:'discover',text:'   '},'pilot')).status,400);
+  // The relay plan: as many relays as the strategy estimates, one pilot each, set by any
+  // pilot of the crew; the crew may change the number; the step is done once every relay has a pilot.
+  let stints=(await req('/api/training','GET',null,'pilot')).data.prep.stints;
+  assert.equal(stints.minutes,360);assert.equal(stints.count,stints.estimate.count);assert.equal(stints.plan.length,stints.count);
+  const [first,second]=[stints.pilots.find(pilot=>pilot.you).id,stints.pilots.find(pilot=>!pilot.you).id];
+  assert.equal((await req('/api/training/prep/stints','PUT',{...race,count:4,relays:{0:first,1:second}},'pilot')).status,200);
+  assert.equal((await req('/api/training/prep/stints','PUT',{...race,relays:{2:'someone-else'}},'mate')).status,400);
+  assert.equal((await req('/api/training/prep/stints','PUT',{...race,relays:{4:first}},'mate')).status,400,'no fifth relay of four');
+  assert.equal((await req('/api/training/prep/stints','PUT',{...race,count:0},'mate')).status,400);
+  assert.equal((await req('/api/training','GET',null,'mate')).data.prep.statuses.stints,'todo');
+  assert.equal((await req('/api/training/prep/stints','PUT',{...race,relays:{2:first,3:second}},'mate')).status,200);
+  data=(await req('/api/training','GET',null,'mate')).data;
+  assert.equal(data.prep.stints.count,4);assert.equal(data.prep.stints.chosen,true);
+  assert.deepEqual(data.prep.stints.plan,[first,second,first,second]);assert.equal(data.prep.statuses.stints,'done');
+  assert.equal((await req('/api/training/prep/stints','PUT',{...race,count:3},'mate')).status,200);
+  assert.deepEqual((await req('/api/training','GET',null,'mate')).data.prep.stints.plan,[first,second,first],'a relay removed takes its pilot with it');
+  assert.equal(data.prep.notes[0].author,'Alice');assert.equal(data.prep.notes[0].you,false);
+  assert.equal(data.prep.crew.pilots.find(pilot=>pilot.name==='Alice').statuses.night,'skip');
+  // Carl is in the race but not in the crew: nothing of theirs.
+  const carl=(await req('/api/training','GET',null,'other')).data;
+  assert.equal(carl.prep.crew,null);assert.equal(carl.prep.notes.length,0);assert.equal(carl.prep.stints,null);
+  assert.equal((await req('/api/training/prep/stints','PUT',{...race,relays:{0:null}},'other')).status,400);
+  assert.equal((await req('/api/training/prep/notes/'+data.prep.notes[0].id,'DELETE',null,'mate')).status,404,'only the author deletes a note');
+  if(past){
+    const alice=(await req('/api/training','GET',null,'pilot')).data;
+    assert.equal(alice.prep.last.notes[0].text,'V5 : rester sur le blanc');
+    assert.equal((await req('/api/training/prep/reuse','POST',race,'pilot')).data.added,1);
+    assert.equal((await req('/api/training/prep/reuse','POST',race,'pilot')).data.added,0,'not copied twice');
+  }
+  // Without the game: the pace typed gives the level.
+  assert.equal((await req('/api/training/manual','PUT',{...race,pace:'2:01.5',fuel:''},'other')).status,200);
+  assert.equal((await req('/api/training/manual','PUT',{...race,pace:'vite'},'other')).status,400);
+  assert.equal((await req('/api/training','GET',null,'other')).data.manual.pace,121.5);
+});
+
+test('a relay plan proposed from the hours each pilot ticked', async () => {
+  const {proposeStints,relayHour}=await import('../shared/training-prep.mjs');
+  assert.equal(relayHour(4,5,360),5,'the last of five relays of a 6 h race is in its sixth hour');
+  const plan=proposeStints([{id:'a',status:'h1,h2,h3'},{id:'b',status:'h3,h4,h5,h6'}],6);
+  assert.equal(plan.slice(0,2).join(),'a,a','only Alice is free at first');
+  assert.ok(plan.slice(3).every(id=>id==='b'),'only Bob is free at the end');
+  const even=proposeStints([{id:'a',status:'whole'},{id:'b',status:'whole'},{id:'c',status:'whole'}],6);
+  assert.deepEqual(['a','b','c'].map(id=>even.filter(item=>item===id).length),[2,2,2]);
+  assert.ok(even.every((id,hour)=>hour<2||!(even[hour-1]===id&&even[hour-2]===id)),'never three hours in a row');
+});
+
+test('the proposed plan gives the scarce pilot his hours first', async () => {
+  const {proposeStints}=await import('../shared/training-prep.mjs');
+  const plan=proposeStints([{id:'alex',status:'whole'},{id:'lea',status:'whole'},{id:'me',status:'h4,h5,h6'},{id:'tom',status:'h1,h2,h3'}],6);
+  assert.ok(['alex','lea','me','tom'].every(id=>plan.includes(id)),'everyone drives');
+  assert.ok(plan.every((id,hour)=>id!=='tom'||hour<3)&&plan.every((id,hour)=>id!=='me'||hour>=3),'each in his own hours');
+});
+
+test('the race strategy: stops with what each one refills, tyres when worn, the lap the race ends on', async () => {
+  const {raceStrategy,strategyInputs}=await import('../shared/race-strategy.mjs');
+  const service={fuelRate:2.4,connect:2,energyRate:2.5,tyres4:24,driver:12};
+  const plan=raceStrategy({minutes:360,lap:124.3,ve:4.2,fuel:3.1,capacity:90,lane:28,service,wear:1});
+  assert.equal(plan.stintLaps,23,'100 % of energy at 4.2 % a lap');
+  assert.equal(plan.tyreStints,2,'1 % a lap: two relays on a set before 60 %');
+  assert.deepEqual(plan.stops.map(stop=>stop.tyres),[false,true,false,true,false,true,false].slice(0,plan.stops.length));
+  assert.equal(plan.relays.length,plan.stops.length+1);
+  assert.equal(plan.relays.reduce((sum,relay)=>sum+relay.laps,0),plan.laps);
+  const last=plan.stops.at(-1);assert.ok(last.short&&last.energy<96,'only what the end needs at the last stop');
+  // The end: the race's time is passed on the last lap, not before.
+  const driven=plan.laps*124.3+plan.stops.reduce((sum,stop)=>sum+stop.total,0);
+  assert.ok(driven>=360*60&&driven-124.3<360*60+5,'the race ends on the first line after the time');
+  assert.ok(plan.saving.percent>0&&plan.saving.laps>23);assert.deepEqual(plan.assumed,[]);
+  // Nothing measured but the pace: 50 min relays, every assumption said.
+  const blind=raceStrategy({minutes:1440,lap:225});
+  assert.equal(blind.limit,'time');assert.equal(blind.assumed.length,4);assert.equal(blind.saving,null);
+  assert.equal(raceStrategy({minutes:360,lap:null}),null);
+  // From a Mémo sheet: the pilots' median first, the game's forecast last.
+  const inputs=strategyInputs({fuel:{median:null,you:3.2,game:3},energy:{median:4.1,you:4.4,game:4},capacity:90,lane:{through:27.5},service:{source:'game',...service},tyres:[{name:'Medium',wheels:[{wear:0.8},{wear:1.2},{wear:0.7},{wear:null}]}]},120);
+  assert.deepEqual([inputs.fuel,inputs.ve,inputs.lane,inputs.wear,inputs.lap],[3.2,4.1,27.5,1.2,120]);
 });
