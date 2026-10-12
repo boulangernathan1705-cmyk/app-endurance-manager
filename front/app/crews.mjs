@@ -1,6 +1,6 @@
 import {timeLabel} from '../dates.mjs';
 import {raceEndLabel,raceHourLabel} from '../timeline.mjs';
-import {state,esc,button,logo,registrationCarLabel,renderAvailabilityTimeline,crewColorClass,sortedCrews,coversHour,pilotCount,api,pickableSlots,communityTag} from './core.mjs';
+import {can,state,esc,button,logo,registrationCarLabel,renderAvailabilityTimeline,crewColorClass,sortedCrews,coversHour,pilotCount,api,pickableSlots,communityTag} from './core.mjs';
 import {shortDateLabel,timeLabel as clockLabel} from '../dates.mjs';
 import {renderRegistration} from './registration.mjs';
 
@@ -47,7 +47,8 @@ function crewActions(crew,departure,ownMember,joinRegistration,memberElsewhere,e
   if(startHasBegun(departure))return '';
   const actions=[];
   if(crew.canManage)actions.push(slotPicker(event,departure,{kind:'crew',id:crew.id,version:crew.version,label:'Choisir notre départ'}));
-  if(!ownMember&&!memberElsewhere&&!otherCommunity&&!crew.locked&&state.user){
+  // « Inscription par catégorie »: the TM places the pilots, they don't join by themselves.
+  if(!ownMember&&!memberElsewhere&&!otherCommunity&&!crew.locked&&state.user&&!(state.categoryEntry&&!can('crews'))){
     const registration=joinRegistration?.id||'';
     actions.push(button('join-crew','Rejoindre',`data-id="${crew.id}" data-departure="${departure.id}" data-registration="${registration}" data-version="${crew.version}" aria-label="Rejoindre l’équipage ${esc(crew.name)}"`,'primary-button crew-join-button'));
   }

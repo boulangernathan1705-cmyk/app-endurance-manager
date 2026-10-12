@@ -433,7 +433,7 @@ async function submitBuilder(form) {
     builderState.car = form.elements.builderCar?.value ?? builderState.car;
     if (!builderState.name) throw new Error('Indique le nom de l’équipage.');
     const result = mode === 'edit' ? await editCrew() : await createCrew();
-    const suffix = result.removedRegistrations ? ` ${result.removedRegistrations} autre(s) inscription(s) du même départ ont été retirées.` : '';
+    const suffix = result.removedRegistrations ? ` ${result.removedRegistrations} autre(s) inscription(s) des pilotes ont été retirées.` : '';
     pendingMessage = {error:false,text:mode === 'edit' ? `Équipage « ${builderState.name} » mis à jour.${suffix}` : `Équipage « ${builderState.name} » créé.${suffix}`};
     closeBuilder();
     await refreshMainView();
