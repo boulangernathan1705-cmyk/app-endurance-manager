@@ -1,4 +1,5 @@
 import {grindfestAvailable, grindfestEnabled, isGrindfest, streamersOf, assignStreamerWaitlist} from '../shared/grindfest.mjs';
+import {gridfestPasswordStatus, sendGridfestPasswords} from './gridfest-discord.mjs';
 import {
   LEGACY_CAR_ALIASES, COOKIE_SESSION, COOKIE_STATE, COOKIE_RETURN, DAY, HttpError, fail, now, id, token, hash, cookie,
   setCookie, cookieNames, siteOrigin, communityLabel, baseDomain, json, redirect, origin, requireDiscord, administrators, identity, owned, personal,
@@ -176,6 +177,7 @@ function publicRegistration(reg, actor, userNames = new Map(), community = null,
     carAny:Boolean(reg.car_any),
     roundChoices:JSON.parse(reg.round_choices||'[]'),
     streamerId:reg.streamer_id || null,
+    ...(reg.streamer_id ? {gameName:reg.game_name || ''} : {}),
     status:reg.status,
     preferredPilot:reg.preferred_pilot || '',
     comment:reg.comment || '',
@@ -205,7 +207,7 @@ async function listEvents(env, actor, game='', scope='', community) {
   // where the community shows the iRacing calendar); on an official race, the entries and crews of every
   // community the player is a member of, never of the others.
   const officialRaces = community.modules?.iracingImport === true ? "e.community_id='official'" : "(e.community_id='official' AND e.circuit NOT LIKE 'iracing-%')";
-  const filters=[`(e.community_id=? OR ${officialRaces})`,game==='iracing' ? "(e.format='solo' OR e.circuit LIKE 'iracing-%')" : game==='lmu' ? "(e.format='solo' OR e.circuit NOT LIKE 'iracing-%')" : '', eventScopeFilter(scope), soloRacesEnabled(env, community) ? '' : "COALESCE(e.format,'endurance')!='solo'", grindfestEnabled(community, isDevelopment(env)) ? '' : "COALESCE(json_extract(e.details,'$.type'),'')!='Grindfest'"].filter(Boolean);
+  const filters=[`(e.community_id=? OR ${officialRaces})`,game==='iracing' ? "(e.format='solo' OR e.circuit LIKE 'iracing-%')" : game==='lmu' ? "(e.format='solo' OR e.circuit NOT LIKE 'iracing-%')" : '', eventScopeFilter(scope), soloRacesEnabled(env, community) ? '' : "COALESCE(e.format,'endurance')!='solo'", grindfestEnabled(community, isDevelopment(env)) ? '' : "COALESCE(json_extract(e.details,'$.type'),'') NOT IN ('Gridfest','Grindfest')"].filter(Boolean);
   const where=filters.length ? ` WHERE ${filters.join(' AND ')}` : '';
   const player = actor.user?.id || '';
   const rows = (await env.DB.prepare(`SELECT e.* FROM events e${where} ORDER BY e.created_at DESC, e.id DESC`).bind(community.id).all()).results;
@@ -307,7 +309,7 @@ async function listEvents(env, actor, game='', scope='', community) {
 // The server password of an event: only for its entered pilots and for those who manage the races.
 function hidePassword(event, actor) {
   if (!event.details?.password || can(actor, 'manage_races')) return event;
-  const entered = event.departures.some(departure => departure.availability.some(reg => reg.mine && reg.status !== 'unavailable'));
+  const entered = !isGrindfest(event) && event.departures.some(departure => departure.availability.some(reg => reg.mine && reg.status !== 'unavailable'));
   if (entered) return event;
   const {password, ...details} = event.details;
   return {...event, details};
@@ -399,7 +401,7 @@ async function api(request, env) {
   // Requests for a new community: sent by anyone signed in with Discord, from any site (server/community-requests.mjs).
   const requests = await communityRequestsApi(path, method, request, env, actor);
   if (requests) return requests;
-  if (path === '/api/session' && method === 'GET') return json({user:actor.user, discordReady:!!(env.DISCORD_CLIENT_ID && env.DISCORD_CLIENT_SECRET), adminConfigured:administrators(env).length > 0, soloRaces:soloRacesEnabled(env, community), soloLabel:eventsLabel(community, isDevelopment(env)), eventTdz:tdzOnly(community, isDevelopment(env)), eventTypes:!tdzOnly(community, isDevelopment(env)) ? [] : grindfestEnabled(community, isDevelopment(env)) ? [...TDZ_EVENT_TYPES, 'Grindfest'] : TDZ_EVENT_TYPES, grindfest:grindfestEnabled(community, isDevelopment(env)), grindfestAvailable:grindfestAvailable(community, isDevelopment(env)), training:trainingEnabled(community), memo:memoEnabled(community), safeGuideUrl:community.modules?.safeGuideUrl || '',
+  if (path === '/api/session' && method === 'GET') return json({user:actor.user, discordReady:!!(env.DISCORD_CLIENT_ID && env.DISCORD_CLIENT_SECRET), adminConfigured:administrators(env).length > 0, soloRaces:soloRacesEnabled(env, community), soloLabel:eventsLabel(community, isDevelopment(env)), eventTdz:tdzOnly(community, isDevelopment(env)), eventTypes:!tdzOnly(community, isDevelopment(env)) ? [] : grindfestEnabled(community, isDevelopment(env)) ? [...TDZ_EVENT_TYPES, 'Gridfest'] : TDZ_EVENT_TYPES, grindfest:grindfestEnabled(community, isDevelopment(env)), grindfestAvailable:grindfestAvailable(community, isDevelopment(env)), training:trainingEnabled(community), memo:memoEnabled(community), safeGuideUrl:community.modules?.safeGuideUrl || '',
     // Training shows in the bar only for a pilot entered in an upcoming LMU race; the circuit memo always.
     trainingRace:trainingEnabled(community) && access.status === 'member' && !!actor.user && !!(await nextRace(env, actor.user.id)),
     community:{id:community.id, slug:community.slug, name:community.name, shortName:community.shortName, discordInviteUrl:community.discordInviteUrl, appearance:appearanceOf(community)},
@@ -433,6 +435,16 @@ async function api(request, env) {
   // The bell next to the account (server/notifications.mjs).
   const notifications = await notificationsApi(path, method, env, actor, community);
   if (notifications) return notifications;
+  const gridfestPasswords = path.match(/^\/api\/events\/([a-f0-9-]{36})\/gridfest\/passwords$/);
+  if (gridfestPasswords && ['GET','POST'].includes(method)) {
+    requirePermission(actor,'admin');
+    const event = await eventById(env, gridfestPasswords[1], community);
+    if (!isGrindfest(event) || event.community_id !== community.id) fail(404, 'Gridfest introuvable.');
+    if (method === 'GET') return json(await gridfestPasswordStatus(env, community, event));
+    const input = await body(request);
+    if (input.version !== event.version) fail(409, 'Le Gridfest a changé. Actualise la page avant l’envoi.');
+    return json(await sendGridfestPasswords(env, community, event, input.cursor || ''));
+  }
   // « Mon entraînement » (server/training.mjs).
   const training = await trainingApi(path, method, request, env, actor, community);
   if (training) return training;
@@ -606,7 +618,7 @@ async function api(request, env) {
     const input = plainSoloInput(env, community, await body(request));
     if (input.format === 'solo' && !soloRacesEnabled(env, community)) fail(400, 'Les événements ne sont pas activés sur ce site.');
     const data = validateEvent(input), eventId = id();
-    if (isGrindfest(data) && (!grindfestEnabled(community, isDevelopment(env)) || input.official === true)) fail(403, 'Grindfest est réservé aux TDZ et doit être activé dans les modules.');
+    if (isGrindfest(data) && (!grindfestEnabled(community, isDevelopment(env)) || input.official === true)) fail(403, 'Gridfest est réservé aux TDZ et doit être activé dans les modules.');
     // « Course officielle (toutes les communautés) »: the platform managers only.
     if (input.official === true && !actor.manager) fail(403, 'Seuls les gestionnaires de la plateforme créent des courses officielles.');
     const owner = input.official === true ? OFFICIAL : community.id;
@@ -640,7 +652,7 @@ async function api(request, env) {
       return json({ok:true});
     }
     const data = validateEvent(plainSoloInput(env, community, input), event);
-    if (isGrindfest(data) && !grindfestEnabled(community, isDevelopment(env))) fail(403, 'Grindfest n’est pas activé.');
+    if (isGrindfest(data) && !grindfestEnabled(community, isDevelopment(env))) fail(403, 'Gridfest n’est pas activé.');
     await dropEmptyCommonStart(env, event.id, data);
     const cats = JSON.stringify(data.categories), deps = JSON.stringify(data.departures);
     const result = await env.DB.prepare(`UPDATE events SET name=?,duration_hours=?,duration_minutes=?,event_type=?,circuit=?,schedule_pending=?,driver_change_required=?,access=?,capacity=?,rounds=?,categories=?,departures=?,sim=?,details=?,version=version+1 WHERE id=? AND version=?
@@ -702,8 +714,8 @@ async function api(request, env) {
     if (input.participantId) { data.name=participant.name;data.nameKey=data.name.normalize('NFKC').toLocaleLowerCase('fr-FR'); }
     // Another category on a start the pilot is already entered on: the others were told the first time.
     const alreadyThere=Boolean(await env.DB.prepare('SELECT 1 FROM registrations WHERE event_id=? AND departure_id=? AND participant_id=? LIMIT 1').bind(event.id,departure.id,participant.id).first());
-    const result = await env.DB.prepare(`INSERT INTO registrations(id,event_id,departure_id,user_id,owner_user_id,guest_hash,name,name_key,category,car,car_preferences,car_any,status,preferred_pilot,comment,created_at,participant_id,round_choices,solo_driver,community_id,streamer_id,streamer_order)
-      SELECT ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,CASE WHEN ? IS NOT NULL THEN (SELECT COALESCE(MAX(streamer_order),0)+1 FROM registrations WHERE event_id=?) ELSE NULL END FROM events WHERE id=? AND version=? AND (community_id=? OR community_id=?)`).bind(regId,event.id,departure.id,userId,ownerUserId,guestHash,data.name,data.nameKey,data.category,data.car,JSON.stringify(data.cars),data.carAny?1:0,data.status,data.preferredPilot,data.comment||'',now(),participant.id,JSON.stringify(data.roundChoices||[]),data.soloDriver?1:0,here.id,data.streamerId || null,data.streamerId || null,event.id,event.id,event.version,community.id,OFFICIAL).run();
+    const result = await env.DB.prepare(`INSERT INTO registrations(id,event_id,departure_id,user_id,owner_user_id,guest_hash,name,name_key,category,car,car_preferences,car_any,status,preferred_pilot,comment,created_at,participant_id,round_choices,solo_driver,community_id,game_name,streamer_id,streamer_order)
+      SELECT ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,CASE WHEN ? IS NOT NULL THEN (SELECT COALESCE(MAX(streamer_order),0)+1 FROM registrations WHERE event_id=?) ELSE NULL END FROM events WHERE id=? AND version=? AND (community_id=? OR community_id=?)`).bind(regId,event.id,departure.id,userId,ownerUserId,guestHash,data.name,data.nameKey,data.category,data.car,JSON.stringify(data.cars),data.carAny?1:0,data.status,data.preferredPilot,data.comment||'',now(),participant.id,JSON.stringify(data.roundChoices||[]),data.soloDriver?1:0,here.id,data.gameName || '',data.streamerId || null,data.streamerId || null,event.id,event.id,event.version,community.id,OFFICIAL).run();
     if (!result.meta.changes) fail(409, 'Cet événement a changé. Actualise avant de t’inscrire.');
     if (userId && data.status!=='unavailable') await env.DB.prepare('DELETE FROM event_absences WHERE event_id=? AND user_id=? AND community_id=?').bind(event.id, userId, here.id).run();
     if (!alreadyThere && data.status!=='unavailable') await notify(env,await departurePilots(env,event.id,departure.id,here.id),'entry',event,{departure,skip:[actor.user?.id,userId],pilot:data.name,category:data.category});
@@ -748,7 +760,7 @@ async function api(request, env) {
         data.nameKey=data.name.normalize('NFKC').toLocaleLowerCase('fr-FR');
       }
       const results=await env.DB.batch([
-        env.DB.prepare(`UPDATE registrations SET name=?,name_key=?,category=?,car=?,car_preferences=?,car_any=?,status=?,preferred_pilot=?,comment=?,round_choices=?,solo_driver=?,streamer_order=CASE WHEN COALESCE(streamer_id,'')!=COALESCE(?,'') THEN (SELECT COALESCE(MAX(streamer_order),0)+1 FROM registrations WHERE event_id=?) ELSE streamer_order END,streamer_id=?,version=version+1 WHERE id=? AND version=? AND EXISTS(SELECT 1 FROM events WHERE id=? AND version=?)`).bind(data.name,data.nameKey,data.category,data.car,JSON.stringify(data.cars),data.carAny?1:0,data.status,data.preferredPilot,data.comment||'',JSON.stringify(data.roundChoices||[]),data.soloDriver?1:0,data.streamerId || null,event.id,data.streamerId || null,reg.id,input.version,event.id,event.version),
+        env.DB.prepare(`UPDATE registrations SET name=?,name_key=?,category=?,car=?,car_preferences=?,car_any=?,status=?,preferred_pilot=?,comment=?,round_choices=?,solo_driver=?,game_name=?,streamer_order=CASE WHEN COALESCE(streamer_id,'')!=COALESCE(?,'') THEN (SELECT COALESCE(MAX(streamer_order),0)+1 FROM registrations WHERE event_id=?) ELSE streamer_order END,streamer_id=?,version=version+1 WHERE id=? AND version=? AND EXISTS(SELECT 1 FROM events WHERE id=? AND version=?)`).bind(data.name,data.nameKey,data.category,data.car,JSON.stringify(data.cars),data.carAny?1:0,data.status,data.preferredPilot,data.comment||'',JSON.stringify(data.roundChoices||[]),data.soloDriver?1:0,data.gameName || '',data.streamerId || null,event.id,data.streamerId || null,reg.id,input.version,event.id,event.version),
         env.DB.prepare('UPDATE participants SET name=? WHERE id=? AND changes()=1').bind(data.name,reg.participant_id)
       ]);
       result=results[0];
@@ -797,7 +809,7 @@ async function api(request, env) {
       administrator:role.administrator, permissions:saved.has(role.id) ? normalizePermissions(saved.get(role.id)) : (role.id === community.discordGuildId ? [...DEFAULT_EVERYONE] : [])}));
     await keepDiscordLook(env, community, discord);
     return json({community:{name:community.name, shortName:community.shortName, discordServer:discord?.name || null, ...appearanceOf(community)}, roles, permissions:PERMISSIONS,
-      modules:{iracingImport:community.modules.iracingImport === true, discordWeekly:community.modules.discordWeekly === true, soloRaces:soloRacesEnabled(env, community), eventTdzAvailable:tdzOnly(community, isDevelopment(env)), eventsLabel:eventsLabel(community, isDevelopment(env)), eventTypes:!tdzOnly(community, isDevelopment(env)) ? [] : grindfestEnabled(community, isDevelopment(env)) ? [...TDZ_EVENT_TYPES, 'Grindfest'] : TDZ_EVENT_TYPES, grindfest:grindfestEnabled(community, isDevelopment(env)), grindfestAvailable:grindfestAvailable(community, isDevelopment(env)),
+      modules:{iracingImport:community.modules.iracingImport === true, discordWeekly:community.modules.discordWeekly === true, soloRaces:soloRacesEnabled(env, community), eventTdzAvailable:tdzOnly(community, isDevelopment(env)), eventsLabel:eventsLabel(community, isDevelopment(env)), eventTypes:!tdzOnly(community, isDevelopment(env)) ? [] : grindfestEnabled(community, isDevelopment(env)) ? [...TDZ_EVENT_TYPES, 'Gridfest'] : TDZ_EVENT_TYPES, grindfest:grindfestEnabled(community, isDevelopment(env)), grindfestAvailable:grindfestAvailable(community, isDevelopment(env)),
         crewChannels:community.modules.crewChannels === true, raceReminders:community.modules.raceReminders === true, training:trainingEnabled(community), memo:memoEnabled(community)},
       crews:await crewDiscordState(env, community)});
   }
@@ -847,11 +859,11 @@ async function api(request, env) {
     const input = await body(request);
     const modules = {...community.modules};
     if (typeof input.grindfest === 'boolean') {
-      if (!grindfestAvailable(community, isDevelopment(env))) fail(403, 'Le module Grindfest est réservé aux TDZ.');
+      if (!grindfestAvailable(community, isDevelopment(env))) fail(403, 'Le module Gridfest est réservé aux TDZ.');
       modules.grindfest = input.grindfest;
       if (input.grindfest) modules.soloRaces = true;
     }
-    if (input.soloRaces === false && modules.grindfest) fail(400, 'Éteins Grindfest avant de désactiver les événements solo.');
+    if (input.soloRaces === false && modules.grindfest) fail(400, 'Éteins Gridfest avant de désactiver les événements solo.');
     // The Discord recap is configured through the guided bot module.
     // The Mémo follows « Entraînement » until set on its own: switching the training off keeps the Mémo it showed.
     if (input.training === false && typeof modules.memo !== 'boolean' && typeof input.memo !== 'boolean') modules.memo = memoEnabled(community);
@@ -1081,3 +1093,4 @@ export default {
     }
   }
 };
+
