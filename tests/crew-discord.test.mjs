@@ -124,16 +124,15 @@ test('a crew gets a voice channel « LMU-name » outside any category, followed 
   // Nothing changed: nothing sent.
   mark=discord.calls.length;await sync(startsAt-3*24*HOUR+HOUR);assert.deepEqual(since(discord.calls,mark),[]);
 
-  // Bob joins and the crew gets a car: the recap is edited (without pinging) and Bob is welcomed.
+  // Bob joins and the crew gets a car: the recap is edited (without pinging), no welcome message.
   let crewRow=(await req('/api/events','GET',null,'pilot')).data.events[0].departures[0].crews[0];
   assert.equal((await req(`/api/crews/${crew.data.id}/members`,'POST',{registrationId:mate.data.id,version:crewRow.version,selfJoin:true},'mate')).status,200);
   crewRow=(await req('/api/events','GET',null,'pilot')).data.events[0].departures[0].crews[0];
   assert.equal((await req(`/api/crews/${crew.data.id}`,'PATCH',{name:'Les Tondeuz',category:'GT3',car:'Ferrari 296 LMGT3',version:crewRow.version},'pilot')).status,200);
   mark=discord.calls.length;await sync(startsAt-2*24*HOUR);
   const changed=discord.calls.slice(mark);
-  assert.deepEqual(changed.map(call=>call.method),['PATCH','POST']);
+  assert.deepEqual(changed.map(call=>call.method),['PATCH']);
   assert.equal(changed[0].path,`/channels/${row.voice_id}/messages/${row.message_id}`);assert.match(changed[0].body.content,/Ferrari 296 LMGT3/);assert.deepEqual(changed[0].body.allowed_mentions,{parse:[]});
-  assert.match(changed[1].body.content,new RegExp(`Bienvenue <@${MATE}>`));assert.deepEqual(changed[1].body.allowed_mentions,{users:[MATE]});
 
   // 24 h before: a reminder in the voice channel's chat and on the bell (with the channel); sent once.
   mark=discord.calls.length;await sync(startsAt-23*HOUR);

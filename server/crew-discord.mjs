@@ -3,7 +3,7 @@
 //   channel named after its sim and its name (« LMU-Les Tondeuz »), made in the category the admins chose
 //   (none: at the top of the server). When the recap gives each race its category (« 🏎️ LMU · 6h de Spa »), the
 //   voice channel goes there, named after the crew alone, and is moved there once if it was made before. A recap message in the voice channel's chat follows the crew
-//   (race, time, car, pilots); a pilot who joins is welcomed there. 2 h after the planned end the voice channel
+//   (race, time, car, pilots), edited without a ping when a pilot joins. 2 h after the planned end the voice channel
 //   is deleted with its chat, once no pilot of the crew is in it. A crew deleted before is closed at once.
 //   (The first version made a category with a text channel and archived it: what is left of it is deleted too.)
 // - raceReminders (« Rappels de course »): 24 h and 1 h before the start, a message in the crew's voice channel
@@ -342,11 +342,8 @@ async function syncRow(env, budget, timestamp, community, setting, row, pilots) 
       await sendInChannel(env, budget, row, 'PATCH', `/channels/${row.voice_id}/messages/${row.message_id}`, {content, allowed_mentions:{parse:[]}});
       await env.DB.prepare('UPDATE crew_discord SET recap_hash=? WHERE crew_id=?').bind(contentHash, row.row_id).run();
     }
-    // New pilots: welcomed in the voice channel's chat.
-    const before = JSON.parse(row.members || '[]'), known = new Set(before), joined = current.filter(id => !known.has(id));
-    if (joined.length) await sendInChannel(env, budget, row, 'POST', `/channels/${row.voice_id}/messages`,
-      {content:`👋 Bienvenue ${joined.map(id => `<@${id}>`).join(', ')} dans l’équipage **${safe(row.crew_name)}** !`, allowed_mentions:{users:joined}});
-    if (joined.length || current.length !== before.length) await env.DB.prepare('UPDATE crew_discord SET members=? WHERE crew_id=?').bind(JSON.stringify(current), row.row_id).run();
+    // A pilot who joins gets no message: the edited recap is enough.
+    if (row.members !== JSON.stringify(current)) await env.DB.prepare('UPDATE crew_discord SET members=? WHERE crew_id=?').bind(JSON.stringify(current), row.row_id).run();
   }
 
   // Reminders (a moved start counts them again).

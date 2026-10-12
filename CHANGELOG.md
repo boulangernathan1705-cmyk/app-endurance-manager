@@ -2,6 +2,10 @@
 
 Les changements du site, version par version. La plus récente est en haut.
 
+## v1.25 — 12 octobre 2026
+
+- Discord : plus de message quand un pilote rejoint un équipage. Le salon de chaque course s'appelle « infos-de-la-course ».
+
 ## v1.24 — 11 octobre 2026
 
 - Discord officiel : « Mettre en place le serveur » règle aussi les rôles. Staff modère le Discord et le site, Organisateur administre le site, et tout le monde peut s'inscrire et créer son équipage.
