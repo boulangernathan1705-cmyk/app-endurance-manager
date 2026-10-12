@@ -51,11 +51,11 @@ export function streamerColumns(event, departure) {
 export function streamerChoice(event, departure, draft) {
   if (!isGrindfest(event)) return '';
   const streamers = streamersOf(event);
-  return `<div class="grindfest-choice"><label class="form-label">Je roule pour…<select name="registrationStreamer" required><option value="">Choisir un streamer</option>${streamers.map(streamer => {
+  return `<div class="registration-identity-grid"><label class="registration-identity-field"><span class="form-label">Streamer <small>(obligatoire)</small></span><select name="registrationStreamer" required><option value="">Choisir un streamer</option>${streamers.map(streamer => {
     const entries = (departure.availability || []).filter(reg => reg.streamerId === streamer.id && reg.status !== 'unavailable'), confirmed = entries.filter(reg => !reg.waitlistPosition).length;
     const label = confirmed >= streamer.capacity ? `Complet · liste d’attente` : `${streamer.capacity - confirmed} place(s) libre(s)`;
     return `<option value="${esc(streamer.id)}" ${draft.streamerId === streamer.id ? 'selected' : ''}>${esc(streamer.name)} · ${label}</option>`;
-  }).join('')}</select></label><p data-streamer-wait-notice aria-live="polite">${streamerWaitNotice(event, departure, draft.streamerId, draft.id)}</p></div>`;
+  }).join('')}</select></label><p class="registration-step-help" data-streamer-wait-notice aria-live="polite">${streamerWaitNotice(event, departure, draft.streamerId, draft.id)}</p></div>`;
 }
 function streamerWaitNotice(event, departure, streamerId, registrationId) {
   const streamer = streamersOf(event).find(item => item.id === streamerId);
