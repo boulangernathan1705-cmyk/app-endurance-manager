@@ -1,8 +1,8 @@
 // The preparation of each LMU race (migration 0062, shared/training-prep.mjs): the pilot's status per step, proved by
-// the sessions when they can tell, the notes and the setup file shared with the crew, the last race on the same
+// the sessions when they can tell, the notes and the relay plan shared with the crew, the last race on the same
 // circuit beside it. Only the pilots of the crew see each other's; a pilot without a crew sees his own.
 import {fail, json, id, body} from './core.mjs';
-import {PREP_STEPS, PREP_STATUSES, NOTE_LIMIT, SETUP_LIMIT, SETUP_FILE, prepStatus, nextStep} from '../shared/training-prep.mjs';
+import {PREP_STEPS, PREP_STATUSES, NOTE_LIMIT, prepStatus, nextStep} from '../shared/training-prep.mjs';
 
 const all = async (env, sql, ...params) => (await env.DB.prepare(sql).bind(...params).all()).results || [];
 const now = () => Date.now();
@@ -42,18 +42,33 @@ async function notesOf(env, race, users, viewer) {
     author:row.user_id === viewer ? 'Toi' : users.find(user => user.user_id === row.user_id)?.name || 'Pilote'}));
 }
 
+// The crew's relay plan: one pilot per hour of the race, among the crew's entries (a pilot who left is forgotten).
+async function stintsOf(env, crew, race, viewer) {
+  const event = await env.DB.prepare('SELECT duration_hours,duration_minutes FROM events WHERE id=?').bind(race.eventId).first();
+  const hours = Number(event?.duration_hours) || 3, minutes = Number(event?.duration_minutes) || hours * 60;
+  const pilots = await all(env, `SELECT r.id,r.status,p.user_id,p.name FROM crew_members cm JOIN registrations r ON r.id=cm.registration_id
+    JOIN participants p ON p.id=r.participant_id WHERE cm.crew_id=? ORDER BY p.name`, crew.id);
+  const plan = Array(hours).fill(null);
+  for (const row of await all(env, 'SELECT hour,registration_id FROM training_stints WHERE crew_id=?', crew.id))
+    if (row.hour >= 0 && row.hour < hours && pilots.some(pilot => pilot.id === row.registration_id)) plan[row.hour] = row.registration_id;
+  return {startsAt:race.startsAt, endsAt:race.startsAt + minutes * 60000, hours, plan,
+    pilots:pilots.map(pilot => ({id:pilot.id, name:pilot.user_id === viewer ? 'Toi' : pilot.name, you:pilot.user_id === viewer, status:pilot.status}))
+      .sort((a, b) => b.you - a.you)};
+}
+
 // proofs: user id -> the exercises their sessions prove (shared/training-checklist.mjs).
 export async function racePrep(env, viewer, communityId, race, proofs = {}) {
   if (!race) return null;
   const {crew, members} = await raceCrew(env, viewer, communityId, race);
   const ids = members.map(member => member.user_id);
+  // A full relay plan ticks the step for the whole crew.
+  const stints = crew ? await stintsOf(env, crew, race, viewer) : null;
+  if (stints?.plan.every(Boolean)) proofs = Object.fromEntries(ids.map(user => [user, {...proofs[user], plan:'Planning complet'}]));
   const chosen = await all(env, `SELECT user_id,step,status FROM training_prep WHERE event_id=? AND departure_id=? AND user_id IN (${marks(ids, ids.length)})`,
     race.eventId, race.departureId, ...ids);
   const statusesOf = user => Object.fromEntries(PREP_STEPS.map(step => [step.key,
     prepStatus(step, chosen.find(row => row.user_id === user && row.step === step.key)?.status, proofs[user])]));
   const mine = statusesOf(viewer);
-  const setup = await env.DB.prepare(`SELECT id,user_id,name,size,note,created_at FROM training_prep_setups WHERE event_id=? AND departure_id=?
-    AND user_id IN (${marks(ids, ids.length)}) ORDER BY created_at DESC LIMIT 1`).bind(race.eventId, race.departureId, ...ids).first();
   const last = await lastRaceOn(env, viewer, race);
   let previous = null;
   if (last) {
@@ -65,8 +80,7 @@ export async function racePrep(env, viewer, communityId, race, proofs = {}) {
     next:nextStep(mine)?.key || null,
     crew:crew ? {name:crew.name, pilots:members.map(member => ({name:member.user_id === viewer ? 'Toi' : member.name, you:member.user_id === viewer, statuses:statusesOf(member.user_id)}))} : null,
     notes:await notesOf(env, race, members, viewer),
-    setup:setup ? {id:setup.id, name:setup.name, size:setup.size, note:setup.note, at:setup.created_at, you:setup.user_id === viewer,
-      author:setup.user_id === viewer ? 'Toi' : members.find(member => member.user_id === setup.user_id)?.name || 'Pilote'} : null,
+    stints,
     last:previous};
 }
 
@@ -121,36 +135,25 @@ export async function prepApi(path, method, request, env, user, community) {
     if (!result.meta?.changes) fail(404, 'Note introuvable.');
     return json({ok:true});
   }
-  // The setup: a small text file from LMU's garage (.svm), sent as it is with its name in the query.
-  if (path === '/api/training/prep/setup' && method === 'POST') {
-    const url = new URL(request.url);
-    const race = await enteredRace(env, user, url.searchParams.get('eventId'), url.searchParams.get('departureId'));
-    const name = clean(url.searchParams.get('name'), 120).replace(/[\\/]/g, '');
-    if (!SETUP_FILE.test(name)) fail(400, 'Choisis un fichier de setup LMU (.svm).');
-    const declared = Number(request.headers.get('Content-Length') || 0);
-    if (declared > SETUP_LIMIT) fail(413, 'Fichier trop lourd.');
-    const bytes = new Uint8Array(await request.arrayBuffer());
-    if (!bytes.length || bytes.length > SETUP_LIMIT) fail(bytes.length ? 413 : 400, bytes.length ? 'Fichier trop lourd.' : 'Fichier vide.');
-    let binary = ''; for (const byte of bytes) binary += String.fromCharCode(byte);
-    const setupId = id();
-    await env.DB.batch([
-      env.DB.prepare('DELETE FROM training_prep_setups WHERE event_id=? AND departure_id=? AND user_id=?').bind(race.eventId, race.departureId, user),
-      env.DB.prepare('INSERT INTO training_prep_setups(id,event_id,departure_id,user_id,name,size,data,note,created_at) VALUES(?,?,?,?,?,?,?,?,?)')
-        .bind(setupId, race.eventId, race.departureId, user, name, bytes.length, btoa(binary), clean(url.searchParams.get('note'), NOTE_LIMIT), now())]);
-    return json({ok:true, id:setupId});
-  }
-  const setup = /^\/api\/training\/prep\/setup\/([\w-]+)$/.exec(path);
-  if (setup && method === 'GET') {
-    const row = await env.DB.prepare('SELECT * FROM training_prep_setups WHERE id=?').bind(setup[1]).first();
-    if (!row) fail(404, 'Setup introuvable.');
-    const race = await enteredRace(env, user, row.event_id, row.departure_id);
-    const {members} = await raceCrew(env, user, community.id, race);
-    if (!members.some(member => member.user_id === row.user_id)) fail(404, 'Setup introuvable.');
-    const bytes = Uint8Array.from(atob(row.data), char => char.charCodeAt(0));
-    return new Response(bytes, {headers:{'Content-Type':'application/octet-stream', 'Content-Disposition':`attachment; filename="${row.name.replace(/["\r\n]/g, '')}"`, 'Cache-Control':'private, no-store'}});
-  }
-  if (setup && method === 'DELETE') {
-    await env.DB.prepare('DELETE FROM training_prep_setups WHERE id=? AND user_id=?').bind(setup[1], user).run();
+  // The relay plan: hour -> the crew entry driving it (null clears the hour). Any pilot of the crew changes it.
+  if (path === '/api/training/prep/stints' && method === 'PUT') {
+    const input = await body(request);
+    const race = await enteredRace(env, user, input.eventId, input.departureId);
+    const {crew} = await raceCrew(env, user, community.id, race);
+    if (!crew) fail(400, 'Rejoins un équipage pour planifier les relais.');
+    const stints = await stintsOf(env, crew, race, user);
+    const changes = Object.entries(input.hours && typeof input.hours === 'object' ? input.hours : {});
+    if (!changes.length || changes.length > stints.hours) fail(400, 'Aucune heure à changer.');
+    const statements = changes.map(([key, pilot]) => {
+      const hour = Number(key);
+      if (!Number.isInteger(hour) || hour < 0 || hour >= stints.hours) fail(400, 'Heure inconnue.');
+      if (pilot === null) return env.DB.prepare('DELETE FROM training_stints WHERE crew_id=? AND hour=?').bind(crew.id, hour);
+      if (!stints.pilots.some(item => item.id === pilot)) fail(400, 'Ce pilote n’est pas dans l’équipage.');
+      return env.DB.prepare(`INSERT INTO training_stints(crew_id,hour,registration_id,updated_by,updated_at) VALUES(?,?,?,?,?)
+        ON CONFLICT(crew_id,hour) DO UPDATE SET registration_id=excluded.registration_id,updated_by=excluded.updated_by,updated_at=excluded.updated_at`)
+        .bind(crew.id, hour, pilot, user, now());
+    });
+    await env.DB.batch(statements);
     return json({ok:true});
   }
   return null;

@@ -1,6 +1,7 @@
 // The preparation of each LMU race (server/training-prep.mjs, entrainement.html): a few steps in four parts, each
 // with a status the pilot gives (or the sessions prove), and notes shared with the crew. One preparation per race:
-// it starts again for the next one, and the last race on the same circuit is shown beside it.
+// it starts again for the next one, and the last race on the same circuit is shown beside it. The crew plans who
+// drives each hour of the race in the last step, like the hours ticked when entering.
 export const PREP_STATUSES = ['done', 'rework', 'todo', 'skip'];
 export const PREP_LABELS = {done:'Fait', rework:'À retravailler', todo:'À faire', skip:'Pas besoin'};
 
@@ -22,13 +23,32 @@ export const PREP_PHASES = [
     {key:'traffic', title:'Gérer le trafic multiclasse', tip:'Laisser passer les plus rapides sans perdre de temps.', turns:true, hints:['Laisser passer :', 'Éviter de doubler :']},
     {key:'start', title:'Préparer le départ', tip:'Pneus froids, premier tour, départ lancé.', turns:true, hints:['Premier virage :']}]},
   {key:'race', title:'Avant la course', steps:[
-    {key:'setup', title:'Setup de l’équipage', tip:'Le fichier à charger, et deux mots dessus si besoin.', setup:true, hints:['Base stable', 'Survireur :', 'Pression pneus :']},
-    {key:'stints', title:'Valider l’ordre des relais', tip:'Qui roule quand, avec l’équipage.', hints:['Je préfère le départ', 'Disponible après :']}]}
+    {key:'stints', title:'Planifier les relais', tip:'Choisis un pilote, puis touche ses heures.', auto:'plan', plan:true}]}
 ];
 export const PREP_STEPS = PREP_PHASES.flatMap(phase => phase.steps);
 export const NOTE_LIMIT = 280;
-export const SETUP_LIMIT = 300_000;
-export const SETUP_FILE = /\.(svm|json|txt)$/i;
+
+// A registration's hours: « whole », or the hours ticked (« h1,h3 », the first hour being h1).
+export const availableAt = (status, hour) => status === 'whole' || String(status || '').split(',').includes('h' + (hour + 1));
+
+// A first relay plan from the hours each pilot ticked: everyone drives about as much, the pilot with fewest hours left
+// to give goes first, a relay goes on for a second hour when it costs nobody, never a third, and an hour nobody
+// ticked goes to the pilot who drives least. pilots: [{id, status}].
+export function proposeStints(pilots, hours) {
+  const counts = pilots.map(() => 0), plan = [];
+  let previous = -1, run = 0;
+  for (let hour = 0; hour < hours; hour++) {
+    const free = pilots.map((pilot, index) => index).filter(index => availableAt(pilots[index].status, hour));
+    const pool = (free.length ? free : pilots.map((pilot, index) => index));
+    const left = index => Array.from({length:hours - hour}, (_, i) => availableAt(pilots[index].status, hour + i)).filter(Boolean).length;
+    const score = index => index === previous && run >= 2 && pool.length > 1 ? Infinity : counts[index] * 10 + left(index) - (index === previous ? 5 : 0);
+    const pick = pool.reduce((best, index) => best < 0 || score(index) < score(best) ? index : best, -1);
+    if (pick < 0) { plan.push(null); continue; }
+    run = pick === previous ? run + 1 : 1; previous = pick; counts[pick]++;
+    plan.push(pilots[pick].id);
+  }
+  return plan;
+}
 
 // A step's status: the pilot's word first, then the sessions' proof, else still to do.
 export function prepStatus(step, chosen, proof) {
