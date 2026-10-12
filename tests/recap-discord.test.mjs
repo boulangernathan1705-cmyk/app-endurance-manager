@@ -4,7 +4,7 @@ import {DatabaseSync} from 'node:sqlite';
 import {readFileSync,readdirSync} from 'node:fs';
 import worker from '../server/worker.mjs';
 import {linkTestServer,DEV_COMMUNITY,GUILD} from './fixtures/discord-server.mjs';
-import {syncWeeklyDiscord,recapTargets} from '../server/discord-weekly.mjs';
+import {syncWeeklyDiscord} from '../server/discord-weekly.mjs';
 import {saveBotRecap,syncBotRecaps,previewBotRecap,recapDestinations,eventDeletionTime,eventChannelName,sendBotRecapTest} from '../server/recap-discord.mjs';
 
 const OWNER='333333333333333333', BOT='444444444444444444', TEXT='555555555555555555', CATEGORY='666666666666666666';
@@ -16,7 +16,7 @@ class D1 {
   prepare(sql){const db=this.db;return {params:[],bind(...params){this.params=params;return this;},async first(){return db.prepare(sql).get(...this.params)||null;},async all(){return {results:db.prepare(sql).all(...this.params)};},async run(){return {meta:{changes:Number(db.prepare(sql).run(...this.params).changes)}};}};}
   async batch(statements){this.db.exec('BEGIN');try{const results=[];for(const statement of statements)results.push(await statement.run());this.db.exec('COMMIT');return results;}catch(error){this.db.exec('ROLLBACK');throw error;}}
 }
-function setup(t,{rights='68624',overrides=[],failure=null}={}){
+function setup(t,{rights='85008',overrides=[],failure=null}={}){
   const DB=new D1(),calls=[],channels=[{id:TEXT,type:0,name:'recap',permission_overwrites:overrides},{id:'111111111111111110',type:4,name:'Accueil',position:0},{id:CATEGORY,type:4,name:'Endurances',position:1,permission_overwrites:overrides},{id:'111111111111111112',type:4,name:'Vocaux',position:2}],messages=new Map();
   const env={DB,APP_ORIGIN:'https://site.example',DISCORD_CLIENT_ID:BOT,DISCORD_BOT_TOKEN:'fake',ADMIN_DISCORD_IDS:OWNER};
   let counter=900000000000000000n, fail=failure;
@@ -156,14 +156,17 @@ test('destination selection accounts for channel overwrites and keeps communitie
   assert.equal((await as(env,'/api/community/recap/destinations','GET',null,'222222222222222222')).status,403);
 });
 
-test('an explicit test reuses publications without activating automation or disabling legacy webhooks',async t=>{
+test('an explicit test reuses publications without activating automation; historical webhooks stay inert',async t=>{
   const {DB,env,calls}=setup(t);race(DB);const hook='https://discord.com/api/webhooks/123456789012345678/token-aaaaaaaaaaaaaaaaaaaaaaaa';
   DB.db.prepare("INSERT INTO community_recaps(community_id,scope,webhook_url,updated_at) VALUES(?,'all',?,0)").run(DEV_COMMUNITY,hook);
   await sendBotRecapTest(env,NOW,COMMUNITY,SETTINGS);
   assert.deepEqual({...DB.db.prepare('SELECT enabled,adopted FROM community_recap_settings').get()},{enabled:0,adopted:0});
-  assert.equal((await recapTargets(env,COMMUNITY)).length,1);
+  const page=(await as(env,'/api/community/setup')).data;
+  assert.equal(page.botRecap.enabled,false);assert.equal(page.botRecap.mode,'events');assert.equal(page.recapSetupRequired,false);
+  assert.match(page.recapBotInviteUrl,/permissions=85008&/);
+  calls.length=0;await syncWeeklyDiscord(env,NOW,COMMUNITY);assert.equal(sends(calls).length,0);assert.ok(calls.every(call=>!call.path.includes('/webhooks/')));
   await saveBotRecap(env,COMMUNITY,SETTINGS);calls.length=0;await syncBotRecaps(env,NOW,COMMUNITY);
-  assert.equal(sends(calls).length,0);assert.deepEqual(await recapTargets(env,COMMUNITY),[]);
+  assert.equal(sends(calls).length,0);assert.ok(calls.every(call=>!call.path.includes('/webhooks/')));
 });
 
 test('API activation, preview and explicit test use the same messages; previews perform no writes',async t=>{
@@ -267,7 +270,7 @@ test('absence declarations and withdrawals edit only the existing event message'
   assert.doesNotMatch(JSON.stringify([...messages.values()]),/Pilotes absents/);assert.equal(calls.filter(call=>call.method==='PATCH').length,2);
 });
 
-test('scheduled rotation compares bot and legacy timestamps in the same unit',async t=>{
+test('scheduled rotation prioritizes bot timestamps and ignores historical webhooks',async t=>{
   const {syncDueRecaps}=await import('../server/discord-weekly.mjs');
   const {DB,env,calls}=setup(t);race(DB);await saveBotRecap(env,COMMUNITY,{...SETTINGS,mode:'general',destinationId:TEXT});
   DB.db.prepare('UPDATE community_recap_settings SET checked_at=?').run(NOW-2000);
@@ -311,4 +314,45 @@ test('official races where the community has nothing never hold back the recap o
   calls.length=0;await syncBotRecaps(env,NOW+1000,COMMUNITY);await syncBotRecaps(env,NOW+2000,COMMUNITY);
   assert.equal(calls.filter(call=>call.method==='PATCH').length,1);
   assert.match(JSON.stringify([...messages.values()]),/Les plots 2/);
+});
+
+
+test('embed-only recaps require Embed Links in both destination modes',async t=>{
+  const {env}=setup(t,{rights:'68624'});
+  const destinations=await recapDestinations(env,COMMUNITY);
+  for(const destination of destinations){assert.equal(destination.ready,false);assert.deepEqual(destination.missing,['Intégrer des liens']);}
+  assert.equal((await as(env,'/api/community/recap','PUT',SETTINGS)).status,400);
+  assert.equal((await as(env,'/api/community/recap','PUT',{...SETTINGS,mode:'general',destinationId:TEXT})).status,400);
+});
+
+test('new race categories preserve destination access rules; failed sends resume in the same channel',async t=>{
+  const overrides=[{id:GUILD,type:0,deny:'1024',allow:'0'},{id:BOT,type:1,deny:'0',allow:'85008'}];
+  const {DB,env,calls,channels,setFailure}=setup(t,{overrides});race(DB);
+  await saveBotRecap(env,COMMUNITY,SETTINGS);
+  const failure=(path,method)=>method==='POST'&&path.endsWith('/messages');setFailure(failure);
+  await assert.rejects(syncBotRecaps(env,NOW,COMMUNITY),/permissions/);
+  const row=DB.db.prepare('SELECT * FROM discord_recap_publications').get();
+  assert.ok(row.channel_id);assert.equal(row.message_id,null);
+  assert.deepEqual(channels.find(item=>item.id===row.category_id).permission_overwrites,overrides);
+  setFailure(null);calls.length=0;await syncBotRecaps(env,NOW+1000,COMMUNITY);
+  assert.equal(creates(calls).length,0);assert.equal(sends(calls).length,1);
+  assert.equal(sends(calls)[0].path,`/channels/${row.channel_id}/messages`);
+  assert.equal(DB.db.prepare('SELECT last_error FROM community_recap_settings').get().last_error,null);
+});
+
+
+test('scheduled bot rotation gives the next community its turn and disabling never falls back to a webhook',async t=>{
+  const {syncDueRecaps}=await import('../server/discord-weekly.mjs');
+  const {DB,env,calls}=setup(t);race(DB);
+  DB.db.prepare("INSERT INTO communities(id,slug,name,short_name,discord_guild_id,created_at) VALUES('other','other','Other','OTH',?,0)").run(GUILD);
+  await saveBotRecap(env,COMMUNITY,{...SETTINGS,mode:'general',destinationId:TEXT});
+  await saveBotRecap(env,{...COMMUNITY,id:'other'},{...SETTINGS,mode:'general',destinationId:TEXT});
+  DB.db.prepare("UPDATE community_recap_settings SET checked_at=? WHERE community_id='other'").run(NOW-1000);
+  assert.equal(await syncDueRecaps(env,3,NOW),1);
+  assert.ok(DB.db.prepare('SELECT message_id FROM discord_recap_publications WHERE community_id=?').get(DEV_COMMUNITY).message_id);
+  assert.equal(await syncDueRecaps(env,3,NOW+1000),1);
+  assert.ok(DB.db.prepare("SELECT message_id FROM discord_recap_publications WHERE community_id='other'").get().message_id);
+  DB.db.prepare("INSERT INTO community_recaps(community_id,scope,webhook_url,updated_at) VALUES(?,'all','https://discord.com/api/webhooks/123456789012345678/token-aaaaaaaaaaaaaaaaaaaaaaaa',0)").run(DEV_COMMUNITY);
+  await saveBotRecap(env,COMMUNITY,{...SETTINGS,mode:'general',destinationId:TEXT},false);
+  calls.length=0;await syncWeeklyDiscord(env,NOW+2000,COMMUNITY);assert.equal(sends(calls).length,0);assert.ok(calls.every(call=>!call.path.includes('/webhooks/')));
 });

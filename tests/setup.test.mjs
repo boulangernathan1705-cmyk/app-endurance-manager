@@ -65,50 +65,26 @@ test('the setup page shows each step: bot on the server, roles, recap, invitatio
   const setupPage=(await as(OWNER,'/api/community/setup')).data;
   assert.equal(setupPage.guild.botPresent,true);assert.equal(setupPage.guild.name,'Serveur test');
   assert.match(setupPage.botInviteUrl,new RegExp(`client_id=app-id&scope=bot&permissions=0&guild_id=${GUILD}&disable_guild_select=true`));
-  assert.equal(setupPage.siteUrl,ROOT);assert.deepEqual(setupPage.recaps,[]);
+  assert.equal(setupPage.siteUrl,ROOT);assert.equal(setupPage.recapSetupRequired,true);assert.equal(setupPage.botRecap,null);assert.match(setupPage.recapBotInviteUrl,/permissions=85008&/);
   assert.equal((await as(OWNER,'/api/community/invite','PATCH',{url:'https://evil.example/x'})).status,400);
   assert.equal((await as(OWNER,'/api/community/invite','PATCH',{url:'https://discord.gg/abcDEF'})).status,200);
   assert.equal((await as(OWNER,'/api/community/setup')).data.discordInviteUrl,'https://discord.gg/abcDEF');
 });
 
-test('recap: one message for both simulators, or two messages in two channels; webhooks never shown again', async t => {
-  const posts=fakeDiscord(t);
-  const {DB,env,as}=setup();
-  addRace(DB,'10000000-0000-4000-8000-000000000001','spa');addRace(DB,'10000000-0000-4000-8000-000000000002','iracing-spa');
-  assert.equal((await as(OWNER,'/api/community/recaps','PUT',{recaps:[{scope:'all',webhookUrl:'https://evil.example/api/webhooks/1/2'}]})).status,400,'Discord webhooks only');
-  assert.equal((await as(OWNER,'/api/community/recaps','PUT',{recaps:[{scope:'all',webhookUrl:HOOK_LMU},{scope:'lmu',webhookUrl:HOOK_IR}]})).status,400,'"both" is a single message');
-  // One message, LMU and iRacing together: published at once.
-  const saved=await as(OWNER,'/api/community/recaps','PUT',{recaps:[{scope:'all',webhookUrl:HOOK_LMU}]});
-  assert.equal(saved.status,200);assert.equal(saved.data.published,true);
-  assert.equal(posts.length,1);assert.match(JSON.stringify(posts[0].body),/Endurance LMU/);assert.match(JSON.stringify(posts[0].body),/Endurance iRacing/);
+test('retired recap endpoints reject webhook configuration and tests without publishing', async t => {
+  const posts=fakeDiscord(t);const {DB,env,as}=setup();
+  DB.db.prepare("INSERT INTO community_recaps(community_id,scope,webhook_url,updated_at) VALUES(?,'lmu',?,0)").run(DEV_COMMUNITY,HOOK_LMU);
+  for(const [path,method] of [['/api/community/recaps','PUT'],['/api/community/recaps/test','POST'],['/api/community/recap/legacy-preview','GET']]){
+    assert.equal((await as(PILOT,path,method,method==='GET'?undefined:{recaps:[]})).status,403);
+    const response=await as(OWNER,path,method,method==='GET'?undefined:{recaps:[{scope:'all',webhookUrl:HOOK_IR}]});
+    assert.equal(response.status,410);assert.match(response.data.error,/bot/);
+  }
+  await syncWeeklyDiscord(env);
+  assert.equal(posts.length,0);
   const page=(await as(OWNER,'/api/community/setup')).data;
-  assert.deepEqual(page.recaps.map(item=>[item.scope,item.webhook]),[['all','webhook …5678']]);
-  assert.doesNotMatch(JSON.stringify(page),/lmu-token/,'the webhook is never shown again');
-  // Two messages, one per simulator (two channels): each one only has its races.
-  posts.length=0;
-  assert.equal((await as(OWNER,'/api/community/recaps','PUT',{recaps:[{scope:'lmu',webhookUrl:HOOK_LMU},{scope:'iracing',webhookUrl:HOOK_IR}]})).status,200);
-  const lmu=posts.find(post=>post.url===HOOK_LMU),iracing=posts.find(post=>post.url===HOOK_IR);
-  assert.match(JSON.stringify(lmu.body),/Endurance LMU/);assert.doesNotMatch(JSON.stringify(lmu.body),/Endurance iRacing/);
-  assert.match(JSON.stringify(iracing.body),/Endurance iRacing/);assert.doesNotMatch(JSON.stringify(iracing.body),/Endurance LMU/);
-  assert.match(JSON.stringify(iracing.body),new RegExp(`${ROOT}/iracing/`),'the message links to the community site');
-  // An empty address keeps the saved webhook; the next update edits the messages instead of posting new ones.
-  assert.equal((await as(OWNER,'/api/community/recaps','PUT',{recaps:[{scope:'lmu',webhookUrl:''},{scope:'iracing',webhookUrl:''}]})).status,200);
-  posts.length=0;addRace(DB,'10000000-0000-4000-8000-000000000003','monza');
-  await syncWeeklyDiscord(env,Date.now());
-  assert.deepEqual(posts.map(post=>[post.url,post.method]),[[HOOK_LMU,'PATCH']],'a new LMU race: only the LMU message is edited in place');
-  // No recap: nothing is sent any more.
-  assert.equal((await as(OWNER,'/api/community/recaps','PUT',{recaps:[]})).status,200);
-  assert.equal(DB.db.prepare('SELECT COUNT(*) n FROM community_recaps').get().n,0);
-});
-
-test('« Tester » sends a message to the channel, and says when Discord refuses the webhook', async t => {
-  const posts=fakeDiscord(t);
-  const {as}=setup();
-  assert.equal((await as(OWNER,'/api/community/recaps/test','POST',{webhookUrl:HOOK_LMU})).status,200);
-  assert.match(posts[0].body.content,/bien relié/);assert.deepEqual(posts[0].body.allowed_mentions,{parse:[]});
-  const refused=await as(OWNER,'/api/community/recaps/test','POST',{webhookUrl:'https://discord.com/api/webhooks/123456789012345678/deleted-token-cccccccccccccccc'});
-  assert.equal(refused.status,400);assert.match(refused.data.error,/supprimé/);
-  assert.equal((await as(PILOT,'/api/community/recaps/test','POST',{webhookUrl:HOOK_LMU})).status,403);
+  assert.equal(page.recapSuggestedScope,'lmu');assert.equal(page.recapSetupRequired,true);
+  assert.doesNotMatch(JSON.stringify(page),/lmu-token|webhook/);
+  assert.equal(DB.db.prepare('SELECT webhook_url FROM community_recaps').get().webhook_url,HOOK_LMU);
 });
 
 test('platform managers create a community, linked to its Discord server; nobody else can', async t => {
@@ -126,17 +102,9 @@ test('platform managers create a community, linked to its Discord server; nobody
   assert.deepEqual(list.map(item=>item.slug).sort(),['commu-dev','team-rookie']);
 });
 
-test('the site\'s own recap channel is only for the community of the main address', async t => {
-  fakeDiscord(t);
-  const {DB,env,as}=setup();
-  const {recapTargets}=await import('../server/discord-weekly.mjs');
-  env.DISCORD_WEEKLY_WEBHOOK_URL=HOOK_LMU;
-  DB.db.prepare(`INSERT INTO communities(id,slug,name,short_name,modules,created_at) VALUES('c-other','autre','Autre','AUT','{"discordWeekly":true}',0)`).run();
-  assert.deepEqual(await recapTargets(env,{id:'c-other',slug:'autre',modules:{discordWeekly:true}}),[],'another community never posts into the site\'s channel');
-  assert.equal((await recapTargets(env,{id:DEV_COMMUNITY,slug:'commu-dev',modules:{discordWeekly:true}})).length,1);
-  // The module can no longer be switched on from the settings.
-  await as(OWNER,'/api/community/modules','PATCH',{discordWeekly:true,iracingImport:false});
-  assert.equal(JSON.parse(DB.db.prepare('SELECT modules FROM communities WHERE id=?').get(DEV_COMMUNITY).modules).iracingImport,false);
+test('historical site webhook secret never causes publication', async t => {
+  const posts=fakeDiscord(t);const {env}=setup();env.DISCORD_WEEKLY_WEBHOOK_URL=HOOK_LMU;
+  await syncWeeklyDiscord(env);assert.equal(posts.length,0);
 });
 
 test('community banner: sent by its admins (checked image, 600 KB at most), public, the site\'s banner without one', async t => {
@@ -173,37 +141,22 @@ test('each community\'s recap only has its own races, and every link goes to its
     VALUES(?,?,4,'spa','["GT3"]',?,?,0,?)`).run(id,name,JSON.stringify([{id:id.replace(/^1/,'2'),startsAt:future}]),OWNER,community);
   race('10000000-0000-4000-8000-00000000000a','Course du site principal',DEV_COMMUNITY);
   race('10000000-0000-4000-8000-00000000000b','Course de la commu Autre','c-autre');
-  const recap=DB.db.prepare("INSERT INTO community_recaps(community_id,scope,webhook_url,updated_at) VALUES(?,'all',?,0)");
-  recap.run(DEV_COMMUNITY,HOOK_LMU);recap.run('c-autre',HOOK_IR);
-  await syncWeeklyDiscord(platform);
-  const sites={[HOOK_LMU]:['https://endurance-manager.app/','Course du site principal','Course de la commu Autre'],[HOOK_IR]:['https://autre.endurance-manager.app/','Course de la commu Autre','Course du site principal']};
-  for(const [hook,[site,own,other]] of Object.entries(sites)){
-    const post=posts.find(item=>item.url===hook);
-    assert.ok(post,hook);
-    const text=JSON.stringify(post.body);
-    assert.match(text,new RegExp(own));assert.doesNotMatch(text,new RegExp(other),'never the races of another community');
-    const links=text.match(/https?:\/\/[^"\s)\\]+/g).filter(url=>!url.startsWith('https://cdn.discordapp.com/'));
-    assert.ok(links.length>=3);
-    for(const url of links)assert.ok(url.startsWith(site),`${url} is on ${site}`);
+  const {loadWeeklyDiscordSnapshot,siteOf}=await import('../server/discord-weekly.mjs');
+  const {buildWeeklyDiscordPayload}=await import('../server/discord-weekly-format.mjs');
+  for(const [id,slug,own,other,site] of [[DEV_COMMUNITY,'commu-dev','Course du site principal','Course de la commu Autre','https://endurance-manager.app/'],['c-autre','autre','Course de la commu Autre','Course du site principal','https://autre.endurance-manager.app/']]){
+    const community={id,slug,name:own};
+    const snapshot=await loadWeeklyDiscordSnapshot(platform,Date.now(),community,'all');
+    const text=JSON.stringify(buildWeeklyDiscordPayload(snapshot,siteOf(platform,community),Date.now(),'all'));
+    assert.match(text,new RegExp(own));assert.doesNotMatch(text,new RegExp(other));assert.ok(text.includes(site));
   }
+  assert.equal(posts.length,0);
 });
 
-test('scheduled recaps: a few per run, those checked longest ago first, every one in turn', async t => {
-  const posts=fakeDiscord(t);
-  const {DB,env}=setup();
+test('scheduled recaps ignore historical webhook configurations', async t => {
+  const posts=fakeDiscord(t);const {DB,env}=setup();
   const {syncDueRecaps}=await import('../server/discord-weekly.mjs');
-  const hooks=[];
-  for(let i=1;i<=5;i++){
-    const id=`c-${i}`,hook=`https://discord.com/api/webhooks/${'9'.repeat(17)}${i}/token-${'x'.repeat(24)}-${i}`;hooks.push(hook);
-    DB.db.prepare(`INSERT INTO communities(id,slug,name,short_name,created_at) VALUES(?,?,?,?,0)`).run(id,`commu-${i}`,`Commu ${i}`,`C${i}`);
-    DB.db.prepare("INSERT INTO community_recaps(community_id,scope,webhook_url,updated_at) VALUES(?,'all',?,0)").run(id,hook);
-  }
-  assert.equal(await syncDueRecaps(env,3),3);
-  const first=new Set(posts.map(post=>post.url));assert.equal(first.size,3);
-  posts.length=0;
-  assert.equal(await syncDueRecaps(env,3),3);
-  const second=new Set(posts.map(post=>post.url));
-  for(const hook of hooks.filter(hook=>!first.has(hook)))assert.ok(second.has(hook),'the ones not done yet come next');
+  DB.db.prepare("INSERT INTO community_recaps(community_id,scope,webhook_url,updated_at) VALUES(?,'all',?,0)").run(DEV_COMMUNITY,HOOK_LMU);
+  assert.equal(await syncDueRecaps(env,3),0);assert.equal(posts.length,0);
 });
 
 test('the showcase starts again every Monday morning, only on the production main address', async () => {

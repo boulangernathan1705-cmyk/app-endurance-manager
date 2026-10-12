@@ -37,7 +37,7 @@ async function load() {
     if(controller.signal.aborted)return;
     view.data=data;
     view.race = data.race ? `${data.race.eventId}:${data.race.departureId}` : null;
-    view.track = data.race ? null : data.track?.key || null; view.carClass = data.race ? null : data.carClass || null;
+    view.track = data.track?.key || null; view.carClass = data.carClass || null;
     render();
   } catch (error) { if(!controller.signal.aborted)renderError(error); }
 }
@@ -51,13 +51,21 @@ const daysUntil = ms => Math.max(0, Math.ceil((ms - Date.now()) / 86400000));
 const relative = at => { const days=Math.floor((Date.now()-at)/86400000); return days<=0?'aujourd’hui':days===1?'hier':'il y a '+days+' jours'; };
 const raceKey = race => race.eventId + ':' + race.departureId;
 
+// The circuit and the class of the figures: the race's by default, any other one the pilot drove.
+function trackPick(data) {
+  const tracks = data.tracks.length > 1 ? '<label class="training-select">Circuit<select data-track>' + data.tracks.map(t => '<option value="' + esc(t.key) + '"' + (t.key === data.track?.key ? ' selected' : '') + '>' + esc(t.venue) + '</option>').join('') + '</select></label>' : '';
+  const classes = data.classes.length > 1 ? '<label class="training-select">Catégorie<select data-class>' + data.classes.map(c => '<option' + (c === data.carClass ? ' selected' : '') + '>' + esc(c) + '</option>').join('') + '</select></label>' : '';
+  return tracks + classes;
+}
+
 function hero(data) {
   const race = data.race;
-  if (!race) return '<header class="preparation-head"><p class="memo-kicker">Entraînement · LMU</p><h1>Mon entraînement</h1><p class="preparation-sub">Inscris-toi à une course LMU : sa préparation s’ouvre ici.</p></header>';
+  if (!race) return '<header class="preparation-head"><p class="memo-kicker">Entraînement · LMU</p><h1>Mon entraînement</h1><p class="preparation-sub">Inscris-toi à une course LMU : sa préparation s’ouvre ici.</p>' + (trackPick(data) ? '<div class="training-filters">' + trackPick(data) + '</div>' : '') + '</header>';
   const days = daysUntil(race.startsAt);
   const pick = data.races.length > 1 ? '<label class="training-select">Course<select data-race>' + data.races.map(item => '<option value="' + esc(raceKey(item)) + '"' + (raceKey(item) === raceKey(race) ? ' selected' : '') + '>' + esc(item.name + ' · ' + shortDateLabel(item.startsAt)) + '</option>').join('') + '</select></label>' : '';
   const chips = [race.category, data.crew?.car, stamp(race.startsAt), days ? 'dans ' + days + ' jour' + (days > 1 ? 's' : '') : 'aujourd’hui'].filter(Boolean);
-  return '<header class="preparation-head"><p class="memo-kicker">Ma prochaine course</p><h1>' + esc(race.name) + '</h1><div class="prep-chips">' + chips.map(chip => '<span>' + esc(chip) + '</span>').join('') + '</div>' + (pick ? '<div class="training-filters">' + pick + '</div>' : '') + '</header>';
+  const filters = pick + trackPick(data);
+  return '<header class="preparation-head"><p class="memo-kicker">Ma prochaine course</p><h1>' + esc(race.name) + '</h1><div class="prep-chips">' + chips.map(chip => '<span>' + esc(chip) + '</span>').join('') + '</div>' + (filters ? '<div class="training-filters">' + filters + '</div>' : '') + '</header>';
 }
 
 // Four figures: the level first (with what the next one asks), then the pilot's own numbers. Without the game linked,
@@ -81,6 +89,33 @@ function figures(data) {
     '<div class="prep-stat"><small>Meilleur tour</small><strong>' + lapLabel(a.best) + '</strong><span>' + (a.last ? 'dernière séance ' + esc(relative(a.last.at)) : '') + '</span></div>' +
     '<div class="prep-stat"><small>Rythme de course</small><strong>' + lapLabel(a.median) + '</strong><span>' + (a.longestRun >= 5 && a.regularity !== null ? '± ' + num(a.regularity, 2) + ' s sur ' + a.longestRun + ' tours' : 'tour médian') + '</span></div>' +
     '<div class="prep-stat"><small>Conso / tour</small><strong>' + conso + '</strong><span>' + (laps ? 'relais de ' + laps + ' tours' : '') + '</span></div></div>';
+}
+
+// The details behind the four figures: the consumption and the tyres, then the laps (sector to gain, pace beside
+// the crew's).
+const figure = (label, value, note = '', kind = 'is-you', noteKind = '') => '<div class="memo-row"><dt>' + esc(label) + '</dt><dd class="' + kind + '">' + esc(value) + '<small class="' + noteKind + '">' + esc(note) + '</small></dd></div>';
+const average = values => { const list = values.filter(v => Number.isFinite(v)); return list.length ? list.reduce((a, b) => a + b, 0) / list.length : null; };
+function details(data) {
+  const a = data.analysis, l = data.live;
+  if (!a.totalLaps && !l) return '';
+  const energy = l?.energyPerLap ?? a.energyPerLap, litres = l?.fuelPerLap ?? a.fuelLitres;
+  const wear = average(l?.compounds?.[0]?.wear || []);
+  const team = average(data.crew?.pilots.map(p => p.energy) || []);
+  const laps = l?.energyLaps ?? l?.tankLaps ?? a.tankLaps;
+  const conso = '<section class="training-card"><h2>Conso et pneus</h2><dl>' +
+    figure('Énergie / tour', energy ? num(energy, 2) + ' %' : '—', team ? 'équipage ' + num(team, 2) + ' %' : '') +
+    figure('Carburant / tour', litres ? num(litres, 2) + ' L' : '—', data.game?.fuel ? 'jeu ' + num(data.game.fuel, 2) + ' L' : '', 'is-you', 'is-game') +
+    figure('Usure / tour', wear !== null ? num(wear, 2) + ' %' : '—', wear !== null ? 'moyenne des pneus · ' + (l.compounds[0].name || '') : '') +
+    figure('Relais', laps ? laps + ' tours' : '—', l?.energyLaps ? 'avec 100 % d’énergie' : laps ? 'avec un plein' : '') + '</dl></section>';
+  const losses = (a.sectors || []).map((v, i) => v ? {sector:i + 1, gap:v.median - v.best} : null).filter(Boolean).sort((x, y) => y.gap - x.gap);
+  const paces = [a.median, ...(data.crew?.pilots.map(p => p.pace) || [])].filter(v => Number.isFinite(v) && v > 0);
+  const low = paces.length ? Math.min(...paces) - 0.5 : 0, high = paces.length ? Math.max(...paces) + 0.5 : 0, at = value => ((value - low) / (high - low) * 100) + '%';
+  const band = high && data.crew ? '<div class="preparation-pace"><h3>Rythme de course</h3><div class="memo-band"><span class="memo-iqr" style="left:' + at(Math.min(...paces)) + ';width:' + ((Math.max(...paces) - Math.min(...paces)) / (high - low) * 100) + '%"></span>' +
+    data.crew.pilots.filter(p => !p.you && p.pace).map(p => '<span class="memo-you preparation-peer" style="left:' + at(p.pace) + '" title="' + esc(p.name + ' · ' + lapLabel(p.pace)) + '"></span>').join('') +
+    (a.median ? '<span class="memo-you" style="left:' + at(a.median) + '" title="Ton rythme"></span>' : '') + '</div><div class="memo-scale"><span>' + lapLabel(low) + '</span><span>L’équipage</span><span>' + lapLabel(high) + '</span></div></div>' : '';
+  const chronos = a.totalLaps ? '<section class="training-card"><h2>Mes chronos</h2><dl>' + figure('Meilleur tour', lapLabel(a.best)) + figure('Rythme de course', lapLabel(a.median), 'tour médian') +
+    figure('Secteur à gagner', losses.length ? 'S' + losses[0].sector + ' +' + num(losses[0].gap, 2) + ' s' : '—', losses.length ? 'sur ton meilleur S' + losses[0].sector : '') + '</dl>' + band + '</section>' : '';
+  return '<div class="prep-details">' + conso + chronos + '</div>';
 }
 
 function crewCards(data) {
@@ -211,7 +246,7 @@ function sessions(data) {
 
 function render() {
   const data=view.data;
-  app.innerHTML=hero(data)+figures(data)+prepSection(data)+crewCards(data)+sessions(data)+'<details class="training-card preparation-details" data-fold="link"'+((view.linkOpen??!data.device.linked)||data.pending||view.busy||view.simhub?' open':'')+'><summary>Relier mon jeu'+(data.device.linked?' · relié':'')+'</summary>'+sync(data)+'</details>';
+  app.innerHTML=hero(data)+figures(data)+details(data)+prepSection(data)+crewCards(data)+sessions(data)+'<details class="training-card preparation-details" data-fold="link"'+((view.linkOpen??!data.device.linked)||data.pending||view.busy||view.simhub?' open':'')+'><summary>Relier mon jeu'+(data.device.linked?' · relié':'')+'</summary>'+sync(data)+'</details>';
 }
 
 async function prepCall(path, payload, method = 'POST') {
@@ -272,7 +307,7 @@ async function act(task, field = 'busy') {
 
 app.addEventListener('change', event => {
   const target = event.target;
-  if (target.matches('[data-race]')) { view.race = target.value; view.editing = null; load(); return; }
+  if (target.matches('[data-race]')) { view.race = target.value; view.track = null; view.carClass = null; view.editing = null; load(); return; }
   if (target.matches('[data-track]')) { view.track = target.value; view.carClass = null; load(); }
   else if (target.matches('[data-class]')) { view.carClass = target.value; load(); }
   else if (target.matches('[data-file]')) upload(target.files);

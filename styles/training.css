@@ -324,15 +324,14 @@
 @media(max-width:600px){.checklist-head{display:block}.checklist-head>strong{display:block;margin-top:10px}.checklist-exercises>li{grid-template-columns:1fr;gap:10px}.checklist-picker{grid-template-columns:1fr}}
 
 /* Mémo: the stop calculator, folded under the stand. */
-.memo-calc-fold{margin-top:12px;border-top:1px solid var(--border);padding-top:10px}
-.memo-calc-fold>summary{cursor:pointer;font-weight:600}
-.memo-calc-fold[open]>summary{margin-bottom:12px}
 details.memo-collection>summary{cursor:pointer;font-weight:600}
 
 /* Entraînement: the race, four figures, the preparation shared with the crew (front/training-page.mjs). */
 .prep-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
 .prep-chips span{font-size:13px;font-weight:600;color:var(--muted);border:1px solid var(--border);border-radius:999px;padding:3px 10px}
 .prep-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,190px),1fr));gap:12px}
+.prep-details{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:12px}
+.prep-details>.training-card{margin:0}
 @media (max-width:640px){.prep-stats{grid-template-columns:1fr 1fr}.prep-stat strong{font-size:22px}}
 .prep-stat{display:grid;gap:4px;align-content:start;padding:14px 16px;border:1px solid var(--border);border-radius:14px;background:var(--panel)}
 .prep-stat small{color:var(--muted);font-size:13px}

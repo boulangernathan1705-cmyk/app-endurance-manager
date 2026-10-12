@@ -71,8 +71,7 @@ const copyButton = target => `<button type="button" class="secondary-button setu
 
 // What is on, for the overview and the modules.
 function moduleStates(settings, setup) {
-  const recaps = setup.recaps || [];
-  return {recap:setup.botRecap ? setup.botRecap.enabled : recaps.length > 0 || Boolean(setup.legacyRecap), crewChannels:settings.modules.crewChannels === true, raceReminders:settings.modules.raceReminders === true,
+  return {recap:Boolean(setup.botRecap?.enabled), crewChannels:settings.modules.crewChannels === true, raceReminders:settings.modules.raceReminders === true,
     iracingImport:settings.modules.iracingImport === true, soloRaces:settings.modules.soloRaces === true, training:settings.modules.training === true, memo:settings.modules.memo === true, grindfest:settings.modules.grindfest === true};
 }
 
@@ -109,9 +108,8 @@ function overviewMarkup(setup, settings, members) {
   if (guild.id && !guild.botPresent) alerts.push(['bad', 'Le bot n’est pas sur ton serveur Discord : personne ne peut entrer sur le site.', '']);
   if (states.crewChannels && crews.botReady !== true) alerts.push(['warn', 'Salons d’équipage : le bot n’a pas les droits pour créer les salons.', '<button type="button" class="link-button" data-go-tab="modules" data-go-module="crewChannels">Régler</button>']);
   else if (states.crewChannels && crews.lastError) alerts.push(['warn', `Salons d’équipage : ${esc(crews.lastError)}`, '<button type="button" class="link-button" data-go-tab="modules" data-go-module="crewChannels">Voir</button>']);
-  if (setup.legacyRecap) alerts.push(['warn', 'Le récap de la semaine passe encore par le salon réglé à la création du site : règle ton propre salon.', '<button type="button" class="link-button" data-go-tab="modules" data-go-module="recap">Régler</button>']);
+  if (setup.recapSetupRequired) alerts.push(['warn', 'Le récap Discord attend sa configuration : choisis une destination pour le bot.', '<button type="button" class="link-button" data-go-tab="modules" data-go-module="recap">Régler</button>']);
   if (setup.botRecap?.lastError) alerts.push(['warn', esc(setup.botRecap.lastError), '<button type="button" class="link-button" data-go-tab="modules" data-go-module="recap">Voir</button>']);
-  if (!setup.botRecap && (setup.recaps || []).length) alerts.push(['ok', `Récap de la semaine publié sur Discord (${(setup.recaps || []).map(item => RECAP_LABELS[item.scope]).join(', ')}).`, '']);
   if (states.iracingImport) alerts.push(['ok', 'Endurances iRacing officielles importées automatiquement.', '']);
   if (!alerts.some(([tone]) => tone !== 'ok')) alerts.unshift(['ok', 'Rien à signaler : tout fonctionne.', '']);
   const watch = `<section class="admin-card"><div class="admin-card-head"><h2>À surveiller</h2></div><ul class="admin-alerts">${alerts.map(([tone, text, action]) => `<li class="is-${tone}"><span>${text}</span>${action}</li>`).join('')}</ul></section>`;
@@ -144,57 +142,22 @@ function peopleMarkup(result, settings) {
 }
 
 // « Modules »: one tile each, its settings below it once opened.
-function webhookField(key, label, saved) {
-  return `<div class="setup-hook"><label>Adresse du webhook ${label ? `du salon ${label}` : 'du salon'} <span class="tip-info" data-tip="Un webhook laisse le site publier dans ce salon, et seulement là : il ne donne aucun autre accès à ton serveur.">ⓘ</span><input name="hook-${key}" type="url" inputmode="url" autocomplete="off" spellcheck="false"
-    placeholder="${saved ? `Déjà relié (${esc(saved)}) : laisse vide pour le garder` : 'https://discord.com/api/webhooks/…'}"></label>
-    <button type="button" class="secondary-button" data-recap-test="${key}">Tester</button><span class="settings-status" aria-live="polite"></span></div>`;
-}
-function legacyRecapForm(setup) {
-  const byScope = Object.fromEntries((setup.recaps || []).map(recap => [recap.scope, recap.webhook]));
-  const count = (setup.recaps || []).length, layout = count === 2 ? 'two' : 'one';
-  const oneScope = count === 1 ? setup.recaps[0].scope : 'all';
-  const guide = `<details class="setup-guide"><summary>Comment obtenir cette adresse ?</summary><ol class="setup-howto">
-      <li>Sur Discord, survole le salon choisi et clique sur la roue dentée <strong>⚙ Modifier le salon</strong>.</li>
-      <li>Ouvre <strong>Intégrations</strong> → <strong>Webhooks</strong> → <strong>Nouveau webhook</strong>.</li>
-      <li>Clique sur le webhook créé, puis sur <strong>Copier l’URL du webhook</strong>, et colle-la ici.</li></ol>
-      <p class="setup-note">Garde cette adresse pour toi : elle permet d’écrire dans le salon. Une fois enregistrée, le site ne la réaffiche plus.</p></details>`;
-  const preview = `<figure class="recap-preview" aria-label="Exemple de récap sur Discord"><figcaption>Exemple de message sur Discord</figcaption>
-      <div class="recap-preview-bot"><span class="recap-preview-avatar">EM</span><strong>Endurance Manager</strong><span class="recap-preview-tag">APP</span></div>
-      <div class="recap-preview-embed"><strong>📝 Semaine du 6 au 12 octobre</strong><b>🏁 6h de Fuji</b><span>🕐 samedi 11 octobre — 21:00</span>
-      <span>🟦 Équipe Alpha · Hypercar · 🔓 Ouvert</span><span>👤 Pilote 1 &nbsp; 👤 Pilote 2</span><em>mise à jour à 18:42</em></div></figure>`;
-  const card = (value, title, help) => `<label class="recap-card"><input type="radio" name="layout" value="${value}" ${layout === value ? 'checked' : ''}><span><strong>${title}</strong><small>${help}</small></span></label>`;
-  const sim = (key, label, checked) => `<label class="role-pill"><input type="checkbox" name="${key}" ${checked ? 'checked' : ''}><span>${label}</span></label>`;
-  return `<div class="recap-intro"><p>Un message avec <strong>les courses de la semaine</strong>, les équipages et les pilotes inscrits. Il se met à jour tout seul à chaque inscription.</p>${preview}</div>
-    ${setup.legacyRecap ? '<p class="setup-note">Le récap actuel (courses LMU) passe par le salon réglé à la création du site. Règle ton salon ci-dessous pour le reprendre en main.</p>' : ''}
-    <form class="setup-form" data-recaps data-mode="${count ? layout : 'none'}">
-      <label class="settings-switch recap-switch"><span><strong>Publier le récap sur Discord</strong><small>Si c’est désactivé, aucun message n’est publié.</small></span><input type="checkbox" role="switch" name="enabled" ${count ? 'checked' : ''}><i aria-hidden="true"></i></label>
-      <div class="recap-options">
-        <p class="recap-question">Où le publier ?</p>
-        <div class="recap-cards">${card('one', 'Dans un seul salon', 'Un message avec toutes les courses.')}${card('two', 'Un salon par simu', 'Un message LMU et un message iRacing, chacun dans son salon.')}</div>
-        <div class="setup-mode-block" data-mode-block="one">
-          <div class="recap-sims"><span>Courses à inclure</span>${sim('simLmu', 'LMU', oneScope !== 'iracing')}${sim('simIracing', 'iRacing', oneScope !== 'lmu')}</div>
-          ${webhookField('one', '', count === 1 ? setup.recaps[0].webhook : '')}</div>
-        <div class="setup-mode-block" data-mode-block="two">${webhookField('lmu', 'LMU', count === 2 ? byScope.lmu : '')}${webhookField('iracing', 'iRacing', count === 2 ? byScope.iracing : '')}</div>
-        ${guide}
-      </div>
-      <div class="setup-actions"><button class="primary-button" type="submit">Enregistrer</button><span class="settings-status" aria-live="polite"></span></div></form>`;
-}
-// A question per screen. Existing webhook settings stay available until an explicit bot activation.
 function recapForm(setup) {
-  const config = setup.botRecap, scope = config?.scope || ((setup.recaps || []).length === 1 ? setup.recaps[0].scope : setup.legacyRecap ? 'lmu' : 'all');
+  const config = setup.botRecap, scope = config?.scope || setup.recapSuggestedScope || 'all';
   const mode = config?.mode || 'general';
-  const established = Boolean(config || setup.legacyRecap || (setup.recaps || []).length);
+  const established = Boolean(config);
   const summary = config ? `<p><strong>${config.enabled ? 'Actif' : 'Désactivé'}</strong> · ${config.mode === 'events' ? 'Une catégorie par course' : 'Récap général'} · ${esc(RECAP_LABELS[scope])}</p>
     <p>Destination : <strong>${esc(config.destinationName)}</strong>. ${config.mode === 'events' ? 'Salons supprimés 24 h après la fin du dernier départ.' : 'Le salon général est conservé.'}</p><p><a class="secondary-button" href="https://discord.com/channels/${esc(setup.guild.id)}/${esc(config.destinationId)}" target="_blank" rel="noopener">Ouvrir la destination sur Discord</a></p>
-    ${config.lastError ? `<p class="settings-status" role="alert">${esc(config.lastError)}</p>` : ''}`
-    : `<p><strong>Récap existant conservé</strong> · ${esc(setup.legacyRecap ? 'LMU' : (setup.recaps || []).map(item => RECAP_LABELS[item.scope]).join(', '))}</p><p>Ses salons et messages restent inchangés jusqu’à une activation volontaire du nouveau mode.</p>`;
+    ${config.lastError ? `<p class="settings-status" role="alert">${esc(config.lastError)}</p>${setup.recapBotInviteUrl ? `<a class="secondary-button" href="${esc(setup.recapBotInviteUrl)}" target="_blank" rel="noopener">Donner les droits au bot</a><p>Si le salon refuse encore l’accès, vérifie aussi ses permissions sur Discord, puis clique sur Modifier pour actualiser les destinations.</p>` : ''}` : ''}`
+    : '';
   const choice = (value,title,help) => `<label class="recap-card"><input type="radio" name="mode" value="${value}" ${mode === value ? 'checked' : ''}><span><strong>${title}</strong><small>${help}</small></span></label>`;
   return `<div data-recap-guide data-config="${esc(JSON.stringify(config))}">
+    ${!config ? '<p>Le bot gère les récaps. Choisis une destination et active-le ; les anciennes publications par webhook sont arrêtées.</p>' : ''}
     ${established ? `<div data-recap-summary>${summary}<div class="setup-actions"><button type="button" class="primary-button" data-recap-edit>Modifier</button><button type="button" class="secondary-button" data-recap-view>Voir l’aperçu</button>${config?.enabled ? '<button type="button" class="secondary-button" data-recap-disable>Désactiver</button>' : ''}</div></div>` : ''}
     <form data-recap-wizard class="setup-form recap-wizard" ${established ? 'hidden' : ''}>
       <p data-recap-progress aria-live="polite">Étape 1 sur 4</p>
       <fieldset data-recap-step="0"><legend>Comment présenter les courses sur Discord ?</legend>
-        <div class="recap-cards">${choice('general','Récap général','Un salon texte « récap-endurances », un message pour toutes les courses.')}${choice('events','Une catégorie par course','Dès le premier équipage, ou 6 jours avant le départ : son récap, puis un vocal par équipage.')}</div>
+        <div class="recap-cards">${choice('general','Récap général','Un salon texte « récap-endurances », un message pour toutes les courses.')}${choice('events','Une catégorie par course','Dès la publication de la course : son récap, puis un vocal par équipage.')}</div>
         <p>Le même message est modifié sans notification à chaque actualisation.</p></fieldset>
       <fieldset data-recap-step="1" hidden><legend>Quelles courses inclure ?</legend><div class="recap-sims">
         <label class="role-pill"><input type="checkbox" name="lmu" ${scope !== 'iracing' ? 'checked' : ''}><span>LMU</span></label>
@@ -210,7 +173,7 @@ function recapForm(setup) {
         <button type="submit" class="primary-button">Activer le récap automatique</button></fieldset>
       <div class="setup-actions"><button type="button" class="secondary-button" data-recap-back hidden>Retour</button><button type="button" class="primary-button" data-recap-next>Continuer</button>${established ? '<button type="button" class="secondary-button" data-recap-cancel>Fermer</button>' : ''}<span class="settings-status" role="status" aria-live="polite"></span></div>
     </form>
-    ${!config && established ? `<details data-recap-legacy><summary>Réglages actuels par webhook</summary>${legacyRecapForm(setup)}</details>` : ''}</div>`;
+    </div>`;
 }
 const wizardData = form => {
   const lmu = form.elements.lmu.checked, iracing = form.elements.iracing.checked;
@@ -232,7 +195,7 @@ async function loadRecapDestinations(form) {
 }
 function recapRights(form) {
   const destination = form._destinations?.find(item => item.id === form.elements.destination.value);
-  form.querySelector('[data-recap-rights]').textContent = destination && !destination.ready ? `Dans les permissions de « ${destination.name} », autorise le bot : ${destination.missing.join(', ')}.` : 'Le bot doit voir le salon, envoyer des messages et lire les anciens messages. Pour créer et supprimer les catégories des courses, il doit aussi gérer les salons.';
+  form.querySelector('[data-recap-rights]').textContent = destination && !destination.ready ? `Dans les permissions de « ${destination.name} », autorise le bot : ${destination.missing.join(', ')}.` : 'Le bot doit voir le salon, envoyer des messages, intégrer des liens et lire les anciens messages. Pour créer et supprimer les catégories des courses, il doit aussi gérer les salons.';
 }
 async function recapStep(form, step) {
   if (step === 3) {
@@ -289,7 +252,7 @@ function modulesMarkup(settings, setup) {
   const raceCategories = setup.botRecap?.enabled && setup.botRecap.mode === 'events';
   const tiles = [
     {key:'recap', name:'Récap de la semaine sur Discord', text:'Un récap général ou une catégorie par course, avec un message actualisé sans notifications répétées.',
-      state:states.recap ? ['ok', setup.botRecap ? (setup.botRecap.mode === 'events' ? 'Actif · une catégorie par course' : 'Actif · récap général') : (setup.recaps || []).length ? `Actif · ${(setup.recaps || []).map(item => RECAP_LABELS[item.scope]).join(', ')}` : 'Actif · salon d’origine'] : ['off', 'Éteint'],
+      state:states.recap ? ['ok', (setup.botRecap.mode === 'events' ? 'Actif · une catégorie par course' : 'Actif · récap général')] : ['off', 'Éteint'],
       control:'', settings:recapForm(setup)},
     {key:'crewChannels', name:'Salons d’équipage sur Discord', text:'Un salon vocal par équipage, à son nom, ouvert dès sa création.',
       state:crewWarn ? ['warn', crews.botReady !== true ? 'Le bot n’a pas les droits' : 'Le bot est bloqué'] : states.crewChannels ? ['ok', 'Actif'] : ['off', crews.botReady === true ? 'Éteint' : crews.botProblem === 'rights' ? 'Éteint · droits du bot à donner' : 'Éteint · bot à vérifier'],
@@ -523,8 +486,6 @@ async function bannerImage(canvas) {
   }
   throw new Error('Cette image reste trop lourde : essaie une image plus simple.');
 }
-// Simulators of a single recap message: both (all), LMU or iRacing ('' when none is ticked).
-const oneScopeOf = form => form.elements.simLmu.checked && form.elements.simIracing.checked ? 'all' : form.elements.simLmu.checked ? 'lmu' : form.elements.simIracing.checked ? 'iracing' : '';
 // Reloads the page content and comes back to the same tab.
 async function reload(tab, {view = '', module = ''} = {}) { openTab = tab; openView = view; openModule = module; await load(); }
 
@@ -621,16 +582,9 @@ app.addEventListener('click', async event => {
     try {
       if (button.matches('[data-recap-edit],[data-recap-view]')) {
         const config = JSON.parse(guide.dataset.config);
-        if (button.matches('[data-recap-view]') && !config) {
-          const result = await api('/api/community/recap/legacy-preview');
-          guide.querySelector('[data-legacy-preview]')?.remove();
-          guide.querySelector('[data-recap-summary]').insertAdjacentHTML('beforeend', `<div data-legacy-preview>${recapPreviewMarkup(result.previews)}</div>`);
-        } else {
-          guide.querySelector('[data-recap-summary]').hidden = true; form.hidden = false;
-          guide.querySelector('[data-recap-legacy]')?.setAttribute('hidden','');
-          if (button.matches('[data-recap-view]')) { await loadRecapDestinations(form); await recapStep(form,3); }
-          else await recapStep(form,0);
-        }
+        guide.querySelector('[data-recap-summary]').hidden = true; form.hidden = false;
+        if (button.matches('[data-recap-view]')) { await loadRecapDestinations(form); await recapStep(form,3); }
+        else await recapStep(form,0);
       } else if (button.matches('[data-recap-cancel]')) { await reload('modules',{module:'recap'}); }
       else if (button.matches('[data-recap-disable]')) { await api('/api/community/recap','PUT',{enabled:false}); await reload('modules',{module:'recap'}); }
       else if (button.matches('[data-recap-destinations]')) { await loadRecapDestinations(form); }
@@ -646,15 +600,6 @@ app.addEventListener('click', async event => {
       }
     } catch (error) { status.textContent = error.message; }
     finally { button.disabled = false; }
-    return;
-  }
-  const testButton = event.target.closest('[data-recap-test]');
-  if (testButton) {
-    const form = testButton.closest('form'), key = testButton.dataset.recapTest, status = testButton.parentElement.querySelector('.settings-status');
-    const scope = key === 'one' ? oneScopeOf(form) : key;
-    status.textContent = 'Envoi…';
-    try { await api('/api/community/recaps/test', 'POST', {webhookUrl:form.elements[`hook-${key}`].value.trim(), scope}); status.textContent = '✓ Message de test envoyé : regarde ton salon Discord.'; }
-    catch (error) { status.textContent = error.message; }
     return;
   }
   const tab = event.target.closest('[data-tab]');
@@ -720,20 +665,13 @@ app.addEventListener('submit', async event => {
     catch (error) { status.textContent = error.message; }
     return;
   }
-  const recaps = event.target.closest('form[data-recaps]'), invite = event.target.closest('form[data-invite]'), created = event.target.closest('form[data-new-community]');
-  if (recaps || invite || created) {
+  const invite = event.target.closest('form[data-invite]'), created = event.target.closest('form[data-new-community]');
+  if (invite || created) {
     event.preventDefault();
-    const form = recaps || invite || created, status = form.querySelector('.settings-actions .settings-status, .setup-actions .settings-status, :scope > .settings-status');
+    const form = invite || created, status = form.querySelector('.settings-actions .settings-status, .setup-actions .settings-status, :scope > .settings-status');
     if (status) status.textContent = 'Enregistrement…';
     try {
-      if (recaps) {
-        const mode = form.dataset.mode, hook = key => form.elements[`hook-${key}`].value.trim();
-        if (mode === 'one' && !oneScopeOf(form)) throw new Error('Coche au moins une simu : LMU ou iRacing.');
-        const list = mode === 'one' ? [{scope:oneScopeOf(form), webhookUrl:hook('one')}] : mode === 'two' ? [{scope:'lmu', webhookUrl:hook('lmu')}, {scope:'iracing', webhookUrl:hook('iracing')}] : [];
-        const result = await api('/api/community/recaps', 'PUT', {recaps:list});
-        if (list.length && !result.published) throw new Error('Enregistré, mais Discord a refusé le message : clique sur « Tester » pour vérifier chaque webhook.');
-        await reload('modules', {module:'recap'});
-      } else if (invite) {
+      if (invite) {
         await api('/api/community/invite', 'PATCH', {url:form.elements.invite.value.trim() || null});
         await reload('overview');
       } else {
@@ -782,8 +720,6 @@ app.addEventListener('change', async event => {
   if (box.matches('[data-banner-zoom]') && cropper) { setZoom(Number(box.value)); return; }
   const wizard = box.closest('form[data-recap-wizard]');
   if (wizard) { wizard.querySelector('[data-recap-preview]').innerHTML = ''; recapRights(wizard); return; }
-  const recapForm = box.closest('form[data-recaps]');
-  if (recapForm) { recapForm.dataset.mode = recapForm.elements.enabled.checked ? recapForm.elements.layout.value : 'none'; return; }
   if (box.matches('[data-crew-category]')) {
     const status = box.closest('.admin-module-settings').querySelector('.crew-category + .settings-status');
     box.disabled = true; status.textContent = 'Enregistrement…';

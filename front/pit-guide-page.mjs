@@ -141,7 +141,7 @@ function collectionStatus(data) {
 }
 
 // Every LMU circuit and car has its sheet: the reference laps and the BoP from the start, the stand, the fuel and the
-// tyres once measured. A card with nothing to show is left out rather than filled with dashes.
+// tyres once measured.
 const CLASS_ORDER = ['Hypercar', 'LMP2', 'LMP2_ELMS', 'LMP3', 'GT3', 'GTE'];
 const CLASS_LABEL = {Hypercar:'Hypercar', LMP2:'LMP2', LMP2_ELMS:'LMP2 ELMS', LMP3:'LMP3', GT3:'LMGT3', GTE:'GTE'};
 function carOptions(cars, chosen) {
@@ -187,38 +187,40 @@ function render() {
     s.ductFront ? row('Écopes avant · arrière', `${num(s.ductFront, 0)} s · ${num(s.ductRear, 0)} s`) : '', s.brakes ? row('Freins', `${num(s.brakes, 0)} s`) : '',
     s.source === 'game' ? row('Pressions, grille', '0 s', '', 'avec des pneus') : ''].join('') : '';
   const stintKind = source(st.by === 'energy' ? data.energy : data.fuel), wearKind = source(tyre);
-  const measured = has(data.energy) || has(data.fuel) || has(tyre) || data.lane || s;
+  // Every card stays on the sheet, empty until the plugin measures it: the pilots see what their laps will bring.
   const cards = [
     levels(data),
-    data.lane || s?.source === 'game' ? `<section class="training-card"><h2>Stand</h2>
-      ${data.lane ? `<dl>${row('Traversée de la voie', `${num(data.lane.through)} s`, 'is-pilots', 'aussi le prix d’un drive-through')}</dl>` : ''}
-      ${s?.source === 'game' ? `<details class="memo-calc-fold"><summary>Calculer un arrêt</summary>${calculator(data)}<p class="training-note memo-small">Le jeu ajoute jusqu’à 3 s au hasard.</p></details>` : ''}</section>` : '',
-    s ? `<section class="training-card"><h2>Temps de service</h2>
-      <p class="memo-tag ${s.source === 'game' ? 'is-game' : 'is-pilots'}">${s.source === 'game' ? 'Valeurs exactes du jeu' : 'Mesuré sur les arrêts'}</p>
+    `<section class="training-card"><h2>Stand</h2>
+      <dl>${row('Traversée de la voie', data.lane ? `${num(data.lane.through)} s` : '—', 'is-pilots', data.lane ? 'aussi le prix d’un drive-through' : 'pas encore mesurée')}</dl>
+      ${calculator(data)}
+      ${s?.source === 'game' ? '<p class="training-note memo-small">Le jeu ajoute jusqu’à 3 s au hasard.</p>' : ''}</section>`,
+    `<section class="training-card"><h2>Temps de service</h2>
+      ${s ? `<p class="memo-tag ${s.source === 'game' ? 'is-game' : 'is-pilots'}">${s.source === 'game' ? 'Valeurs exactes du jeu' : 'Mesuré sur les arrêts'}</p>
       <div class="memo-group"><h3>Pendant le plein <small>seul le plus long compte</small></h3><dl class="${s.source === 'game' ? 'is-game' : 'is-pilots'}">${during}</dl></div>
-      <div class="memo-group"><h3>En plus du plein <small>s’ajoutent</small></h3><dl class="${s.source === 'game' ? 'is-game' : 'is-pilots'}">${added}</dl></div></section>` : '',
-    // The consumption is always shown once the car is collected: the pilots see what their laps bring.
-    has(data.energy) || has(data.fuel) || data.collection ? `<section class="training-card"><h2>Énergie et carburant</h2>
+      <div class="memo-group"><h3>En plus du plein <small>s’ajoutent</small></h3><dl class="${s.source === 'game' ? 'is-game' : 'is-pilots'}">${added}</dl></div>`
+      : '<p class="training-empty">Pas encore relevé pour cette voiture.</p>'}</section>`,
+    `<section class="training-card"><h2>Énergie et carburant</h2>
       ${has(data.energy) ? perLap('Énergie', data.energy, '%', 2) : ''}
-      ${has(data.fuel) || !has(data.energy) ? perLap('Carburant', data.fuel, 'L', 2, data.fuel.ratio ? row('Ratio carburant conseillé', num(data.fuel.ratio, 2), source(data.fuel)) : '') : ''}</section>` : '',
-    has(tyre) ? `<section class="training-card"><h2>Pneus · ${esc(tyre.name)}</h2>
-      <div class="memo-block"><p class="memo-big ${source(tyre)}">${num(tyre.median ?? tyre.you, 2)}<span>% / tour · moyenne des 4 pneus</span></p>${band(tyre, '%', 2)}
+      ${perLap('Carburant', data.fuel, 'L', 2, data.fuel.ratio ? row('Ratio carburant conseillé', num(data.fuel.ratio, 2), source(data.fuel)) : '')}</section>`,
+    `<section class="training-card"><h2>Pneus${tyre ? ` · ${esc(tyre.name)}` : ''}</h2>
+      ${has(tyre) ? `<div class="memo-block"><p class="memo-big ${source(tyre)}">${num(tyre.median ?? tyre.you, 2)}<span>% / tour · moyenne des 4 pneus</span></p>${band(tyre, '%', 2)}
         ${tyre.wheels ? car(source(tyre), tyre.wheels.map(wheel => wheel.wear === null ? '—' : `${num(wheel.wear, 2)} %`), 'Usure par tour de chaque pneu') : ''}
         <dl>${tyre.median !== null && tyre.you !== null ? row('Ton usure moyenne', `${num(tyre.you, 2)} % / tour`, 'is-you') : ''}
         ${tyre.ideal ? row('Température idéale', `${num(tyre.ideal, 0)} °C`, 'is-game') : ''}${tyre.track !== null && tyre.track !== undefined ? row('Piste pendant les mesures', `${num(tyre.track)} °C`) : ''}</dl></div>
-        ${data.tyres.length > 1 ? `<p class="training-note">Autres gommes : ${data.tyres.slice(1).map(item => `${esc(item.name)} ${num(item.median ?? item.you, 2)} %`).join(', ')}.</p>` : ''}</section>` : '',
-    st.laps ? `<section class="training-card"><h2>Relais</h2>
-      <p class="memo-big ${stintKind}">${st.laps}<span>tours ${st.by === 'energy' ? 'avec 100 % d’énergie' : 'avec un plein'}</span></p>
+        ${data.tyres.length > 1 ? `<p class="training-note">Autres gommes : ${data.tyres.slice(1).map(item => `${esc(item.name)} ${num(item.median ?? item.you, 2)} %`).join(', ')}.</p>` : ''}`
+      : '<p class="training-empty">Pas encore de tour mesuré.</p>'}</section>`,
+    `<section class="training-card"><h2>Relais</h2>
+      ${st.laps ? `<p class="memo-big ${stintKind}">${st.laps}<span>tours ${st.by === 'energy' ? 'avec 100 % d’énergie' : 'avec un plein'}</span></p>
       <dl>${st.by === 'energy' && st.fuel ? row('Carburant pour les faire', `${num(st.fuel, 1)} L`, stintKind, data.fuel.ratio ? `ratio conseillé ${num(data.fuel.ratio, 2)}` : '') : ''}</dl>
-      ${st.wear ? `<div class="memo-group"><h3>Usure des pneus sur le relais</h3>${car(wearKind, st.wear.map(value => value === null ? '—' : `−${num(value, 0)} %`), 'Usure de chaque pneu sur un relais')}</div>` : ''}</section>` : '',
+      ${st.wear ? `<div class="memo-group"><h3>Usure des pneus sur le relais</h3>${car(wearKind, st.wear.map(value => value === null ? '—' : `−${num(value, 0)} %`), 'Usure de chaque pneu sur un relais')}</div>` : ''}`
+      : '<p class="training-empty">Pas encore de tour mesuré.</p>'}</section>`,
     strategy(data),
     bop(data)
   ].filter(Boolean);
   app.innerHTML = `${head}
-    ${measured ? '<p class="memo-key"><span class="is-you"><i class="dot"></i>Toi</span><span class="is-pilots"><i class="bar"></i>Les pilotes du site</span><span class="is-game"><i class="tri"></i>Le jeu</span></p>' : ''}</div>
+    <p class="memo-key"><span class="is-you"><i class="dot"></i>Toi</span><span class="is-pilots"><i class="bar"></i>Les pilotes du site</span><span class="is-game"><i class="tri"></i>Le jeu</span></p></div>
     ${collectionStatus(data)}
     <div class="memo-grid">${cards.join('')}</div>
-    ${cards.length ? '' : '<p class="training-empty">Pas encore de données pour cette voiture.</p>'}
     ${data.source && data.levels ? `<p class="memo-credit">Chronos de référence : <a href="${esc(data.source.url)}" target="_blank" rel="noopener">${esc(data.source.title)}</a> de ${esc(data.source.name)}${data.source.updated ? `, mis à jour le ${esc(data.source.updated.split('-').reverse().join('/'))}` : ''}.</p>` : ''}`;
 }
 
