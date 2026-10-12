@@ -9,7 +9,7 @@ import {readRaceInfo} from './race-info.mjs';
 import {refresh,refreshAfterSave} from './refresh.mjs';
 import {draftFor,registrationDraft,ownRegistrations,rerenderRegistrationSection,submitRegistration,registrationStep,canEnterInOneClick,enterInOneClick,enterRound,editRound,skipRound} from './registration.mjs';
 import {updateCrewState,pickSlot} from './crews.mjs';
-import {openCategoryEntry,categoryEntryAction,saveCategoryEntry,categoryEntryBoardFilter} from './category-entry.mjs';
+import {openCategoryEntry,categoryEntryAction,saveCategoryEntry,withdrawCategoryEntry,categoryEntryBoardFilter} from './category-entry.mjs';
 import {installRouter,routeFromLocation,applyRoute} from './router.mjs';
 import {installAutoRefresh} from './auto-refresh.mjs';
 import {introduceCommunitiesOnce} from '../community-intro.mjs';
@@ -160,6 +160,7 @@ async function perform(action,target){
     case 'category-entry-peek': categoryEntryAction(event,action,target); renderEvent(); break;
     case 'category-entry-close': case 'category-entry-step': case 'category-entry-category': case 'category-entry-start': case 'category-entry-whole': case 'category-entry-hour': case 'category-entry-car': categoryEntryAction(event,action,target); break;
     case 'category-entry-save': await saveCategoryEntry(event); await refreshAfterSave('Inscription enregistrée.'); break;
+    case 'category-entry-withdraw': if(await withdrawCategoryEntry(event))await refreshAfterSave('Inscription retirée de tous les départs.'); break;
     case 'join-crew': {
       const departure=event?.departures.find(item=>item.id===target.dataset.departure);const crew=departure?.crews.find(item=>item.id===target.dataset.id);const reg=departure?.availability.find(item=>item.id===target.dataset.registration);
       if(!crew||crew.locked)throw Error('Cet équipage n’est plus disponible. Actualise la page.');
