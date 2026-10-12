@@ -2,6 +2,12 @@
 
 Les changements du site, version par version. La plus récente est en haut.
 
+## v1.29 — 12 octobre 2026
+
+- Discord : les récaps sont entièrement gérés par le bot, en récap général ou avec une catégorie par course. Les publications par webhook sont retirées ; les communautés concernées choisissent la destination du bot dans Administration → Modules.
+- Discord : le module précise les droits manquants et propose de les donner au bot, y compris « Intégrer des liens ». Les nouvelles catégories de course reprennent les règles d’accès de la catégorie choisie.
+- Mémo et Entraînement : les données et les liens vers les pages sont rétablis.
+
 ## v1.28 — 12 octobre 2026
 
 - Discord : chaque course a sa catégorie et son salon « infos-de-la-course » dès sa publication, même sans équipage. Les courses officielles LMU aussi.

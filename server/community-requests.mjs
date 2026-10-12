@@ -2,7 +2,7 @@
 // espace » (demande.html) once signed in with Discord; the platform managers read the requests in
 // « Administration → Plateforme », create the community from one, or refuse it.
 import {fail, json, now, body, rateLimit, text} from './core.mjs';
-import {WEBHOOK_URL} from './discord-weekly.mjs';
+const WEBHOOK_URL = /^https:\/\/(?:(?:ptb|canary)\.)?discord(?:app)?\.com\/api\/webhooks\/\d{15,22}\/[\w-]{20,120}$/;
 
 const GAMES = {lmu:'Le Mans Ultimate', iracing:'iRacing', both:'LMU et iRacing'};
 const MEMBERS = ['moins de 20', '20 à 50', '50 à 150', 'plus de 150'];

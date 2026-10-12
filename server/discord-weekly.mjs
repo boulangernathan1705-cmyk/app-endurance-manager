@@ -1,27 +1,9 @@
-import {allCommunities, communityUrl, communitySlug, appearanceOf} from './community.mjs';
-import {buildWeeklyDiscordPayload, isInParisWeek, parisWeek} from './discord-weekly-format.mjs';
+import {allCommunities, communityUrl, appearanceOf} from './community.mjs';
+import {isInParisWeek, parisWeek} from './discord-weekly-format.mjs';
 import {syncBotRecaps, botRecapSettings} from './recap-discord.mjs';
 
-// The recap messages of a community (community_recaps, set on its « Mise en place » page): one message per
-// row, for one simulator or both. Each message has its state key "<community id>:<scope>-weekly-v1"
-// (migration 0034 kept the existing LMU message of commu-dev under "<id>:lmu-weekly-v1").
-const stateKey = (community, scope = 'lmu') => `${community.id}:${scope}-weekly-v1`;
-const LOCK_SECONDS = 90;
-export const WEBHOOK_URL = /^https:\/\/(?:(?:ptb|canary)\.)?discord(?:app)?\.com\/api\/webhooks\/\d{15,22}\/[\w-]{20,120}$/;
+// All publications are now managed by the bot; historical webhook rows are inert.
 const CIRCUITS = {all:'', lmu:"AND circuit NOT LIKE 'iracing-%'", iracing:"AND circuit LIKE 'iracing-%'"};
-
-// The former recap (LMU races, through the site's webhook DISCORD_WEEKLY_WEBHOOK_URL) only belongs to the
-// community of the main address: no other community can ever post into that channel.
-export const usesSiteRecap = (env, community) => community.slug === communitySlug(env, null) && community.modules?.discordWeekly === true
-  && Boolean(String(env.DISCORD_WEEKLY_WEBHOOK_URL || '').trim());
-
-// Recap messages to keep up to date: those set on the « Mise en place » page, or else the former one.
-export async function recapTargets(env, community) {
-  if ((await botRecapSettings(env, community))?.adopted) return [];
-  const rows = (await env.DB.prepare('SELECT scope, webhook_url FROM community_recaps WHERE community_id=? ORDER BY scope').bind(community.id).all()).results || [];
-  if (rows.length) return rows.map(row => ({scope:row.scope, url:row.webhook_url}));
-  return usesSiteRecap(env, community) ? [{scope:'lmu', url:String(env.DISCORD_WEEKLY_WEBHOOK_URL).trim()}] : [];
-}
 
 function parseJson(value, fallback) {
   try { return JSON.parse(value); } catch { return fallback; }
@@ -33,11 +15,6 @@ export function siteOf(env, community) {
   try { url = communityUrl(env, community); } catch { return {name:community.name}; }
   const look = appearanceOf(community);
   return {url, name:community.name, logoUrl:look.logoUrl || undefined, bannerUrl:`${url}${look.bannerUrl || '/images/endurance-manager-banner.webp'}`};
-}
-
-async function hashSnapshot(snapshot) {
-  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify(snapshot)));
-  return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
 }
 
 export function flattenDepartures(events) {
@@ -203,128 +180,28 @@ export async function loadWeeklyDiscordSnapshot(env, timestamp, community, scope
   };
 }
 
-async function sendDiscord(url, method, payload) {
-  const response = await fetch(url,{method,headers:{'Content-Type':'application/json'},body:JSON.stringify(payload),signal:AbortSignal.timeout(10000)});
-  let data = null;
-  if (response.status !== 204) { try { data = await response.json(); } catch {} }
-  if (!response.ok) { const error = new Error(`Discord weekly HTTP ${response.status}`); error.status=response.status; throw error; }
-  return data;
-}
-
-async function createMessage(base,payload) {
-  const url = new URL(base);
-  url.searchParams.set('wait','true');
-  const message = await sendDiscord(url.toString(),'POST',payload);
-  if (!/^\d{15,22}$/.test(String(message?.id || ''))) throw new Error('Identifiant du message Discord absent.');
-  return String(message.id);
-}
-
-async function editMessage(base,messageId,payload) {
-  try { await sendDiscord(`${base}/messages/${encodeURIComponent(messageId)}`,'PATCH',payload); return messageId; }
-  catch (error) { if (error?.status !== 404) throw error; return createMessage(base,payload); }
-}
-
-async function syncLocked(env,base,lockToken,timestamp,community,scope) {
-  const STATE_KEY = stateKey(community, scope);
-  const snapshot = await loadWeeklyDiscordSnapshot(env,timestamp,community,scope);
-  const contentHash = await hashSnapshot(snapshot);
-  const state = await env.DB.prepare('SELECT message_id,content_hash FROM discord_weekly_state WHERE key=? AND lock_token=?').bind(STATE_KEY,lockToken).first();
-  if (!state) throw new Error('État Discord hebdomadaire indisponible.');
-  if (state.message_id && state.content_hash === contentHash) return {ok:true,changed:false};
-  const payload = buildWeeklyDiscordPayload(snapshot,siteOf(env,community),timestamp,scope);
-  const messageId = state.message_id ? await editMessage(base,state.message_id,payload) : await createMessage(base,payload);
-  await env.DB.prepare('UPDATE discord_weekly_state SET message_id=?,content_hash=?,week_key=?,updated_at=? WHERE key=? AND lock_token=?')
-    .bind(messageId,contentHash,snapshot.periodKey,Math.floor(Date.now()/1000),STATE_KEY,lockToken).run();
-  return {ok:true,changed:true,messageId};
-}
-
-// Keeps the recap messages up to date: those of one community, or of every community (scheduled task).
+// Mutations and scheduled jobs use the same bot publications in both modes.
 export async function syncWeeklyDiscord(env,timestamp=Date.now(),community=null) {
   if (!env?.DB) return {ok:false,skipped:'not-configured'};
-  let last={ok:false,skipped:'not-configured'}, failed=null;
+  let result={ok:true};
   for (const target of community ? [community] : await allCommunities(env)) {
-    const botSettings = await botRecapSettings(env,target);
-    if (botSettings) {
-      try { last = await syncBotRecaps(env, timestamp, target); }
-      catch (error) { failed = {ok:false,error:error.message}; }
-      if (botSettings.adopted) continue;
-    }
-    for (const recap of await recapTargets(env,target)) {
-      try { last=await syncRecap(env,timestamp,target,recap.scope,recap.url); }
-      // One broken webhook (deleted on Discord) never stops the other messages.
-      catch (error) { failed={ok:false,error:error?.status || 'failed'}; console.error('Discord weekly sync failed', target.slug, recap.scope, error instanceof Error ? error.message : 'unknown'); }
-    }
+    if (!await botRecapSettings(env,target)) continue;
+    try { result=await syncBotRecaps(env,timestamp,target); }
+    catch (error) { result={ok:false,error:error.message};console.error('Discord recap sync failed',target.slug,error.message); }
   }
-  return failed || last;
+  return result;
 }
 
-// Scheduled task: the recap messages checked longest ago first, a few per run (each takes about 11 calls to
-// the database; a run may make 50).
 export async function syncDueRecaps(env,limit=3,timestamp=Date.now()) {
-  if (!env?.DB) return 0;
-  const communities = await allCommunities(env);
-  const botSettings = (await env.DB.prepare('SELECT community_id, checked_at, adopted FROM community_recap_settings').all()).results || [];
-  const rows = (await env.DB.prepare('SELECT community_id, scope, webhook_url FROM community_recaps').all()).results || [];
-  const checked = new Map(((await env.DB.prepare('SELECT key, updated_at FROM discord_weekly_state').all()).results || []).map(row => [row.key, Number(row.updated_at) || 0]));
-  const targets = [];
-  for (const community of communities) {
-    const bot = botSettings.find(row => row.community_id === community.id);
-    if (bot) { targets.push({community, bot:true, checked:bot.checked_at}); if (bot.adopted) continue; }
-    const own = rows.filter(row => row.community_id === community.id);
-    if (own.length) for (const row of own) targets.push({community, scope:row.scope, url:row.webhook_url});
-    else if (usesSiteRecap(env, community)) targets.push({community, scope:'lmu', url:String(env.DISCORD_WEEKLY_WEBHOOK_URL).trim()});
+  if (!env?.DB || limit < 1) return 0;
+  const communities=await allCommunities(env);
+  const rows=(await env.DB.prepare('SELECT community_id,checked_at FROM community_recap_settings ORDER BY checked_at,community_id').all()).results || [];
+  for (const row of rows) {
+    const community=communities.find(item=>item.id===row.community_id);
+    if (!community) continue;
+    // One bot batch uses the remaining invocation budget, including channel cleanup.
+    try { await syncBotRecaps(env,timestamp,community);return 1; }
+    catch (error) { console.error('Discord recap sync failed',error.message);return 0; }
   }
-  const lastCheck = target => target.bot ? target.checked : (checked.get(stateKey(target.community,target.scope)) || 0) * 1000;
-  targets.sort((a,b) => lastCheck(a)-lastCheck(b));
-  let done = 0;
-  for (const target of targets.slice(0, limit)) {
-    if (target.bot) {
-      try { await syncBotRecaps(env, timestamp, target.community); done++; }
-      catch (error) { console.error('Discord recap sync failed', error.message); }
-      break; // A bot batch uses the remaining D1/Discord budget of this invocation.
-    }
-    try { await syncRecap(env,timestamp,target.community,target.scope,target.url); done++; }
-    catch (error) { console.error('Discord weekly sync failed', target.community.slug, target.scope, error instanceof Error ? error.message : 'unknown'); }
-    // Checked now (even when nothing changed): the next run takes the others.
-    await env.DB.prepare('UPDATE discord_weekly_state SET updated_at=? WHERE key=?').bind(Math.floor(Date.now()/1000), stateKey(target.community, target.scope)).run().catch(() => {});
-  }
-  return done;
-}
-
-async function syncRecap(env,timestamp,community,scope,base) {
-  const STATE_KEY = stateKey(community, scope);
-  const now = Math.floor(Date.now()/1000);
-  await env.DB.prepare(`INSERT OR IGNORE INTO discord_weekly_state
-    (key,message_id,content_hash,week_key,updated_at,dirty,lock_token,lock_until,community_id) VALUES(?,?,?,?,?,?,?,?,?)`)
-    .bind(STATE_KEY,'','','',0,0,'',0,community.id).run();
-  await env.DB.prepare('UPDATE discord_weekly_state SET dirty=1 WHERE key=?').bind(STATE_KEY).run();
-  const lockToken = crypto.randomUUID();
-  const lock = await env.DB.prepare("UPDATE discord_weekly_state SET lock_token=?,lock_until=? WHERE key=? AND (lock_token='' OR lock_until<?)")
-    .bind(lockToken,now+LOCK_SECONDS,STATE_KEY,now).run();
-  if (!lock.meta.changes) return {ok:true,queued:true};
-  let result={ok:true,changed:false};
-  let rerun=false;
-  try {
-    for (let attempt=0; attempt<5; attempt+=1) {
-      await env.DB.prepare('UPDATE discord_weekly_state SET dirty=0 WHERE key=? AND lock_token=?').bind(STATE_KEY,lockToken).run();
-      result=await syncLocked(env,base,lockToken,timestamp,community,scope);
-      const state=await env.DB.prepare('SELECT dirty FROM discord_weekly_state WHERE key=? AND lock_token=?').bind(STATE_KEY,lockToken).first();
-      if (!state?.dirty) break;
-      if (attempt===4) rerun=true;
-    }
-  } catch (error) {
-    await env.DB.prepare('UPDATE discord_weekly_state SET dirty=1 WHERE key=? AND lock_token=?').bind(STATE_KEY,lockToken).run().catch(()=>{});
-    throw error;
-  } finally {
-    await env.DB.prepare("UPDATE discord_weekly_state SET lock_token='',lock_until=0 WHERE key=? AND lock_token=?").bind(STATE_KEY,lockToken).run().catch(()=>{});
-  }
-  return rerun ? syncRecap(env,Date.now(),community,scope,base) : result;
-}
-
-// « Tester » on the setup page: a short message in the channel of the webhook. Throws when Discord refuses it.
-export async function sendRecapTest(url, community) {
-  if (!WEBHOOK_URL.test(url)) { const error = new Error('bad-url'); error.status = 400; throw error; }
-  const name = String(community.name || '').replace(/[^\p{L}\p{N} '’.-]/gu, '').trim() || 'ta communauté';
-  const content = '✅ Ce salon est bien relié à **' + name + '** sur Endurance Manager. Le récap des courses de la semaine sera publié ici.';
-  await sendDiscord(url, 'POST', {content, allowed_mentions:{parse:[]}});
+  return 0;
 }

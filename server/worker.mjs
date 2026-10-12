@@ -17,8 +17,8 @@ const soloRacesEnabled = (env, community) => community?.modules?.soloRaces === t
 import {syncIracingEvents} from './iracing-import.mjs';
 import {resetShowcase, makeOfficial} from './demo.mjs';
 import {setupOfficialServer} from './official-discord.mjs';
-import {syncWeeklyDiscord, sendRecapTest, usesSiteRecap, WEBHOOK_URL, recapTargets, loadWeeklyDiscordSnapshot, siteOf} from './discord-weekly.mjs';
-import {buildWeeklyDiscordPayload} from './discord-weekly-format.mjs';
+
+
 import {botRecapSettings, recapDestinations, recapError, recapInput, validateRecapDestination, previewBotRecap, saveBotRecap, syncBotRecaps, sendBotRecapTest, RECAP_BOT_PERMISSIONS} from './recap-discord.mjs';
 import {notify, notificationsApi, departurePilots, eventPilots, crewPilots} from './notifications.mjs';
 import {botCanManageChannels, checkBot, serverCategories, CREW_BOT_PERMISSIONS} from './crew-discord.mjs';
@@ -116,11 +116,6 @@ function imageType(bytes) {
   if (text(1, 4) === 'PNG' && bytes[0] === 0x89) return 'image/png';
   return null;
 }
-// Recap messages (community_recaps): one simulator or both.
-const RECAP_SCOPES = ['all', 'lmu', 'iracing'];
-const RECAP_NAMES = {all:'LMU et iRacing', lmu:'LMU', iracing:'iRacing'};
-// A saved webhook is never shown again in full: only the end of its id, to tell which one it is.
-const maskWebhook = url => `webhook …${(String(url).match(/webhooks\/(\d+)\//) || [,'????'])[1].slice(-4)}`;
 // Invitation of the bot (the site's Discord application) to a community's server: it only reads members and roles.
 // Without permissions the bot only reads the members and their roles; the crews on Discord need more
 // (server/crew-discord.mjs): the admins invite it again with them.
@@ -849,7 +844,7 @@ async function api(request, env) {
       if (input.grindfest) modules.soloRaces = true;
     }
     if (input.soloRaces === false && modules.grindfest) fail(400, 'Éteins Grindfest avant de désactiver les événements solo.');
-    // The Discord recap is set on the « Mise en place » page (its own webhook), not here.
+    // The Discord recap is configured through the guided bot module.
     // The Mémo follows « Entraînement » until set on its own: switching the training off keeps the Mémo it showed.
     if (input.training === false && typeof modules.memo !== 'boolean' && typeof input.memo !== 'boolean') modules.memo = memoEnabled(community);
     for (const key of ['iracingImport','soloRaces','raceReminders','training','memo']) if (typeof input[key] === 'boolean') modules[key] = input[key];
@@ -883,16 +878,14 @@ async function api(request, env) {
   if (path === '/api/community/setup' && method === 'GET') {
     requirePermission(actor,'admin');
     const discord = community.discordGuildId ? await discordGuild(env, community.discordGuildId) : null;
-    const recaps = ((await env.DB.prepare('SELECT scope, webhook_url, updated_at FROM community_recaps WHERE community_id=? ORDER BY scope').bind(community.id).all()).results || [])
-      .map(row => ({scope:row.scope, webhook:maskWebhook(row.webhook_url), updatedAt:row.updated_at}));
+    const legacy = await env.DB.prepare('SELECT scope FROM community_recaps WHERE community_id=? ORDER BY scope').bind(community.id).all();
+    const legacyScopes = (legacy.results || []).map(row=>row.scope);
     const rolesConfigured = Boolean(await env.DB.prepare('SELECT 1 FROM community_role_permissions WHERE community_id=? LIMIT 1').bind(community.id).first());
     const savedBotRecap = await botRecapSettings(env, community);
-    const botRecap = savedBotRecap?.adopted ? savedBotRecap : null;
+    const botRecap = savedBotRecap;
     return json({botRecap:botRecap ? {enabled:Boolean(botRecap.enabled),mode:botRecap.mode,scope:botRecap.scope,destinationId:botRecap.destination_id,destinationName:botRecap.destination_name,lastError:botRecap.last_error} : null,
       recapBotInviteUrl:env.DISCORD_CLIENT_ID ? `https://discord.com/oauth2/authorize?client_id=${encodeURIComponent(env.DISCORD_CLIENT_ID)}&scope=bot&permissions=${RECAP_BOT_PERMISSIONS}&guild_id=${community.discordGuildId}&disable_guild_select=true` : null,
-      community:{name:community.name, slug:community.slug}, siteUrl:communityUrl(env, community), rolesConfigured, recaps,
-      // Former recap (site's webhook, LMU only) still running until the admins choose their own.
-      legacyRecap:!botRecap && !recaps.length && usesSiteRecap(env, community),
+      community:{name:community.name, slug:community.slug}, siteUrl:communityUrl(env, community), rolesConfigured, recapSetupRequired:!savedBotRecap, recapSuggestedScope:legacyScopes.length === 1 ? legacyScopes[0] : 'all',
       guild:{id:community.discordGuildId, name:discord?.name || null, botPresent:Boolean(discord)}, botInviteUrl:botInvite(env, community.discordGuildId),
       discordInviteUrl:community.discordInviteUrl});
   }
@@ -901,16 +894,6 @@ async function api(request, env) {
     requirePermission(actor,'admin');
     try { return json({destinations:await recapDestinations(env, community)}); }
     catch (error) { fail(400, recapError(error)); }
-  }
-  if (path === '/api/community/recap/legacy-preview' && method === 'GET') {
-    requirePermission(actor,'admin');
-    const targets = await recapTargets(env,community);
-    const previews = [];
-    for (const target of targets) {
-      const snapshot = await loadWeeklyDiscordSnapshot(env,Date.now(),community,target.scope);
-      previews.push({name:RECAP_NAMES[target.scope],payload:buildWeeklyDiscordPayload(snapshot,siteOf(env,community),Date.now(),target.scope)});
-    }
-    return json({previews});
   }
   if (path === '/api/community/recap/preview' && method === 'POST') {
     requirePermission(actor,'admin');
@@ -942,43 +925,10 @@ async function api(request, env) {
       return json(await sendBotRecapTest(env,Date.now(),community,settings));
     } catch (error) { fail(error.status === 409 ? 409 : 400,error.message === 'Discord indisponible' ? recapError(error) : error.message); }
   }
-  // The recap messages of the community: one message (one simulator or both) or two (one per simulator,
-  // e.g. in two channels). An empty address keeps the webhook already saved for that message.
-  if (path === '/api/community/recaps' && method === 'PUT') {
+  // Retired endpoints cannot write or publish historical webhook configurations.
+  if ((path === '/api/community/recaps' && method === 'PUT') || (path === '/api/community/recaps/test' && method === 'POST') || (path === '/api/community/recap/legacy-preview' && method === 'GET')) {
     requirePermission(actor,'admin');
-    if ((await botRecapSettings(env,community))?.adopted) fail(409,'Ce récap se règle désormais avec le parcours guidé.');
-    const input = await body(request);
-    const list = Array.isArray(input.recaps) ? input.recaps : [];
-    const scopes = list.map(item => item?.scope);
-    const valid = !scopes.length || (scopes.length === 1 && RECAP_SCOPES.includes(scopes[0])) || (scopes.length === 2 && scopes.includes('lmu') && scopes.includes('iracing'));
-    if (!valid) fail(400, 'Choisis un message (une simu ou les deux) ou deux messages (un par simu).');
-    const saved = new Map(((await env.DB.prepare('SELECT scope, webhook_url FROM community_recaps WHERE community_id=?').bind(community.id).all()).results || []).map(row => [row.scope, row.webhook_url]));
-    const rows = list.map(item => {
-      const url = String(item.webhookUrl || '').trim() || saved.get(item.scope) || '';
-      if (!WEBHOOK_URL.test(url)) fail(400, `Colle l’adresse du webhook Discord pour le message ${RECAP_NAMES[item.scope]}. Elle commence par https://discord.com/api/webhooks/.`);
-      return {scope:item.scope, url};
-    });
-    const modules = {...community.modules, discordWeekly:rows.length > 0};
-    await env.DB.batch([
-      env.DB.prepare('DELETE FROM community_recaps WHERE community_id=?').bind(community.id),
-      ...rows.map(row => env.DB.prepare('INSERT INTO community_recaps(community_id,scope,webhook_url,updated_at) VALUES(?,?,?,?)').bind(community.id, row.scope, row.url, now())),
-      // Keep the identity of an unchanged webhook message. Only changed/removed destinations reset.
-      ...[...saved.keys()].filter(scope => !rows.some(row => row.scope === scope && row.url === saved.get(scope))).map(scope => env.DB.prepare('DELETE FROM discord_weekly_state WHERE key=? AND community_id=?').bind(`${community.id}:${scope}-weekly-v1`,community.id)),
-      env.DB.prepare('UPDATE communities SET modules=? WHERE id=?').bind(JSON.stringify(modules), community.id)]);
-    const published = rows.length ? await syncWeeklyDiscord(env, Date.now(), {...community, modules}) : {ok:true};
-    return json({ok:true, published:published.ok !== false});
-  }
-  if (path === '/api/community/recaps/test' && method === 'POST') {
-    requirePermission(actor,'admin');
-    await rateLimit(request, env, 'recap-test', 10);
-    const input = await body(request);
-    const url = String(input.webhookUrl || '').trim() || (await env.DB.prepare('SELECT webhook_url FROM community_recaps WHERE community_id=? AND scope=?').bind(community.id, String(input.scope || '')).first())?.webhook_url || '';
-    try { await sendRecapTest(url, community); }
-    catch (error) {
-      if (error.status === 400) fail(400, 'Cette adresse n’est pas un webhook Discord. Elle commence par https://discord.com/api/webhooks/.');
-      fail(400, 'Discord refuse ce webhook : il a peut-être été supprimé. Crée-en un nouveau dans les paramètres du salon.');
-    }
-    return json({ok:true});
+    fail(410,'Les récaps sont désormais gérés par le bot. Configure le récap dans Administration → Modules.');
   }
   // Invitation to the community's Discord server, shown to the players who are not members yet.
   if (path === '/api/community/invite' && method === 'PATCH') {
