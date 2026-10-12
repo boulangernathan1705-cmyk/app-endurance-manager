@@ -166,9 +166,9 @@ function showcaseBanner(platformDiscordUrl) {
 // ENDURANCE, Mes inscriptions), then the page's own tabs. The LMU / iRacing switch stays in Endurance.
 function unifyNav(session) {
   const nav = document.getElementById('navigation');
-  if (!nav || document.documentElement.dataset.game || location.pathname === '/' || document.querySelector('[data-training-race]')) return;
+  if (!nav || document.documentElement.dataset.game || location.pathname === '/') return;
   if (session.access !== 'member' || session.openSite) return;
-  const sim = /(?:^|;\s*)em_sim=(lmu|iracing)(?:;|$)/.exec(document.cookie)?.[1] || 'lmu';
+  const sim = document.querySelector('[data-module-link]') ? 'lmu' : /(?:^|;\s*)em_sim=(lmu|iracing)(?:;|$)/.exec(document.cookie)?.[1] || 'lmu';
   const link = (href, label, extra = '') => `<a class="nav-section-button${extra}" href="${href}">${esc(label)}</a>`;
   const events = session.soloRaces === true;
   const endurance = link(`/${sim}/`, 'ENDURANCE');
@@ -201,12 +201,13 @@ async function loadSession() {
       const game = location.pathname.startsWith('/iracing') ? '/iracing/' : '/lmu/';
       for (const link of document.querySelectorAll('a.brand-button')) link.href = `${game}#solo`;
     }
+    // The LMU modules' own tabs (entrainement.html, stands.html): Mémo when on, Entraînement for a pilot entered in an upcoming race.
+    const shown = {training:session.trainingRace === true, memo:session.memo === true};
+    for (const link of document.querySelectorAll('[data-module-link]')) link.hidden = !shown[link.dataset.moduleLink];
     unifyNav(session);
     siteCommunityName = session.openSite ? '' : session.community?.name || '';
     if (session.user) {
       renderConnected(session.user, Array.isArray(session.communities) ? session.communities : []);
-      // The training pages' own bar: Training only for a pilot entered in an upcoming race.
-      if (session.trainingRace) for (const link of document.querySelectorAll('[data-training-race]')) link.hidden = false;
       // The bell of the races the player is entered in, next to his account (members of the community only).
       if (session.access === 'member') installNotifications(root);
     }
