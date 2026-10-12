@@ -196,7 +196,7 @@ async function memo(env, user, url, canRestart = false) {
   const circuit = circuits.find(item => item.key === (url.searchParams.get('circuit') || race?.circuit))
     || circuits.find(item => item.cars.some(car => car.measured)) || circuits[0];
   const car = circuit.cars.find(item => item.car === url.searchParams.get('car'))
-    || circuit.cars.find(item => item.carClass === (url.searchParams.get('class') || race?.category))
+    || circuit.cars.find(item => sameClass(item.carClass, url.searchParams.get('class') || race?.category))
     || [...circuit.cars].sort((a, b) => b.pilots - a.pilots)[0];
   // Only the chosen circuit's cars travel: the list of every circuit with all the BoP's cars would weigh tens of kB.
   const names = circuits.map(item => ({key:item.key, name:item.name}));
