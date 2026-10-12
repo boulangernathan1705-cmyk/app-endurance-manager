@@ -34,6 +34,10 @@ function validateRegistrationStep(draft,step){
     // Solo race: steps 1..rounds are the rounds (category + car), then the summary.
     if(step===1&&draft.forOther&&!draft.id&&!draft.participantUserId&&!draft.manualOther)throw Error('Choisis un pilote.');
     if(step===1&&draft.manualOther&&!String(draft.name||'').trim())throw Error('Indique le pseudo du pilote.');
+    if(step===1&&draft.gridfest){
+      if(!String(draft.gameName||'').trim())throw Error('Indique ton nom exact dans le jeu.');
+      if(!draft.streamerId)throw Error('Choisis le streamer que tu représentes.');
+    }
     const round=draft.shownRounds?.[step-1]??step-1,choice=draft.choices?.[round];
     if(!choice||choice.skip)return;
     const where=(draft.shownRounds||[]).length>1?` pour la manche ${round+1}`:'';

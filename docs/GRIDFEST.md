@@ -17,6 +17,11 @@ Ce champ reste distinct de son identité Discord et apparaît dans les colonnes 
 Les inscriptions déjà présentes restent en place ; leur nom en jeu doit être complété avant l’envoi du MP.
 Les autres courses ne demandent pas ce champ.
 
+La fiche conserve le parcours d’inscription du site : les informations pilote et le streamer
+se choisissent à la première étape, puis le récapitulatif affiche l’identité Discord, le nom
+dans le jeu, le streamer et les catégories. « Modifier » permet de revenir sur ces choix
+sans perdre la saisie ; la validation finale enregistre une inscription pour toutes les manches.
+
 ## Mot de passe et MP Discord
 
 1. Dans « Modifier l’événement », génère un mot de passe sécurisé puis enregistre l’événement.
