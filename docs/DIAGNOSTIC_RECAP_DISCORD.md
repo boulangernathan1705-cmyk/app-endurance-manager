@@ -29,3 +29,9 @@ Pas d’accès à la configuration Discord ni à la base ou aux logs Cloudflare 
 Pour le salon existant, corriger uniquement les droits nécessaires du bot en conservant les restrictions des membres, puis utiliser le test du module avec les réglages actuels : le code reprend le channel_id existant et publie son premier message. Ne pas supprimer le salon ni effacer son marqueur. Une publication par webhook encore visible peut être un ancien message ou un test non adopté ; son aspect seul ne suffit pas à déterminer le mode actif.
 
 Aucune modification de main, aucun déploiement, aucune modification du serveur Discord.
+
+## Mise à jour demandée : bot uniquement
+
+La correction retire maintenant tous les envois de récap par webhook, leurs formulaires et leur planification. Les données historiques sont conservées, sans publication. Les anciens endpoints renvoient 410 (après contrôle des droits admin). Le bot conserve les deux modes et tous ses identifiants de publication. Une communauté encore configurée par webhook doit choisir la destination du bot et l’activer ; aucun canal ne peut être déduit sûrement d’une URL de webhook sans interroger Discord. La sélection de simulateurs historique est proposée dans le formulaire. Un test bot sauvegardé mais non activé reste désactivé et apparaît désormais dans l’administration, avec la possibilité de l’activer. Les permissions manquantes sont affichées avant activation ; le lien pour donner les droits est aussi proposé lorsqu’une erreur apparaît dans l’état du module. Le webhook de notification des demandes de communauté est indépendant du récap et conservé.
+
+Validation de cette mise à jour : 280 tests réussis, compilation Worker et audit strict réussis ; 28 tests du module bot, dont la rotation entre communautés, l’absence de repli webhook après désactivation et la visibilité des réglages après un test non activé.

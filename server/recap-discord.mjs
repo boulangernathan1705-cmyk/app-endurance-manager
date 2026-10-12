@@ -1,4 +1,4 @@
-// Text recaps configured explicitly by an admin. Legacy webhook publications remain independent.
+// Text recaps configured explicitly by an admin, published exclusively by the bot.
 import {loadWeeklyDiscordSnapshot, siteOf} from './discord-weekly.mjs';
 import {buildWeeklyDiscordPayload} from './discord-weekly-format.mjs';
 

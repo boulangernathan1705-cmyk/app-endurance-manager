@@ -44,11 +44,15 @@ Le récap général conserve la période existante : semaine en heure de Paris, 
 
 Les absents déclarés figurent en bas du bloc de leur événement, uniquement pour la communauté concernée. La liste est masquée si vide et suit les déclarations/retraits.
 
-## Compatibilité des webhooks existants
+## Transition vers le bot
 
-La migration `0060_discord_event_recaps.sql` ajoute des tables sans modifier les configurations ni les messages existants. Les webhooks communautaires `community_recaps` et le secret historique `DISCORD_WEEKLY_WEBHOOK_URL` continuent de fonctionner jusqu’à une activation volontaire du mode bot. Un test préalable du nouveau mode ne désactive pas l’ancien récap. Les réglages webhook inchangés conservent maintenant leur identifiant de message lors d’un enregistrement.
+Les publications de récap par webhook sont retirées : ni le secret historique `DISCORD_WEEKLY_WEBHOOK_URL`, ni les lignes de `community_recaps` ne déclenchent un envoi. Les anciens endpoints de configuration et de test répondent 410 et orientent vers le module bot. Leurs données historiques sont conservées sans être utilisées pour publier ; aucun ancien message Discord n’est supprimé.
 
-Le webhook historique du site reste réservé à sa communauté d’origine. Les URL des webhooks configurés par une communauté sont conservées côté serveur dans D1 et masquées dans les réponses de configuration. Ne pas les publier ni les exposer au navigateur. Après adoption explicite du mode bot, les anciennes publications restent dans leurs salons, mais ne sont plus synchronisées.
+Les deux modes, général et par course, sont gérés par le bot. Une communauté déjà configurée avec le bot garde ses réglages et identifiants de publication. Une communauté encore au webhook doit choisir une destination dans Administration → Modules, donner les droits nécessaires au bot puis activer le récap. Sa sélection de simulateurs est proposée quand elle peut être déduite des anciens réglages. Le token d’un webhook ne permet pas au bot de modifier son ancien message : le bot utilise sa propre publication.
+
+Le bouton **Donner les droits au bot** est accessible pendant le choix de destination et depuis l’état du récap en cas d’erreur. Il demande Voir le salon, Envoyer des messages, Voir les anciens messages, Intégrer des liens et Gérer les salons. Les refus propres à un salon ou une catégorie doivent aussi être corrigés dans Discord ; une invitation ne les annule pas. Actualiser les destinations vérifie à nouveau les droits effectifs avant activation. Désactiver le bot ne réactive jamais un webhook.
+
+
 
 ## Vérification sur un Discord de test
 
