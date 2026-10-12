@@ -14,6 +14,8 @@ const L = (fr, en) => getLocale() === 'en' ? en : fr;
 const can = permission => (session?.permissions || []).includes(permission);
 const events = () => session?.soloRaces === true;
 const eventsLabel = () => session?.soloLabel || 'EVENT TDZ';
+// EVENT TDZ has types and OPEN / SAFE access; EVENT SOLO (other communities) is open to the « Endurances » permission.
+const tdz = () => session?.eventTdz === true;
 
 function accountLabel() {
   const user = session?.user;
@@ -23,7 +25,7 @@ function accountLabel() {
 
 function helpScreenshot(name, alt, caption = '') {
   return `<figure class="help-screenshot">
-    <img src="/images/help/${name}.jpg?v=3" alt="${alt}" loading="lazy" decoding="async">
+    <img src="/images/help/${name}.jpg?v=4" alt="${alt}" loading="lazy" decoding="async">
     ${caption ? `<figcaption>${caption}</figcaption>` : ''}
   </figure>`;
 }
@@ -37,6 +39,7 @@ function helpItem(index, title, body, open = false) {
 
 // The five permissions a Discord role can give (server/access.mjs), as set in Administration.
 const PERMISSIONS = () => [
+  ['access', L('Accès Endurance Manager', 'Endurance Manager access'), L('entrer sur le site de la communauté. Sans elle, tu vois « Accès réservé ».', 'enter the community’s site. Without it, you see “Restricted access”.')],
   ['endurance', L('Endurances', 'Endurance races'), L('s’inscrire aux endurances et rejoindre un équipage existant.', 'enter endurance races and join an existing crew.')],
   ['solo_open', L('Événements OPEN', 'OPEN events'), L('s’inscrire aux événements OPEN.', 'enter OPEN events.')],
   ['solo_safe', L('Événements SAFE', 'SAFE events'), L('s’inscrire aux événements SAFE (et OPEN).', 'enter SAFE (and OPEN) events.')],
@@ -51,6 +54,8 @@ const navigationSection = () => [L('Se repérer', 'Finding your way around'), `
     ${events() ? `<li>${L(`<strong>${eventsLabel()}</strong> : le calendrier des événements, toutes simus ;`, `<strong>${eventsLabel()}</strong>: the events calendar, every sim;`)}</li>` : ''}
     <li>${L('<strong>ENDURANCE</strong> : les endurances, avec le choix <strong>LMU</strong> / <strong>iRacing</strong> ;', '<strong>ENDURANCE</strong>: endurance races, with the <strong>LMU</strong> / <strong>iRacing</strong> switch;')}</li>
     <li>${L('<strong>Mes inscriptions</strong> : tout ce où tu es inscrit ;', '<strong>My entries</strong>: everything you entered;')}</li>
+    ${session?.memo ? `<li>${L('<strong>Mémo</strong> : la fiche de chaque circuit LMU (chronos par niveau, stands, BoP) ;', '<strong>Memo</strong>: each LMU circuit’s sheet (lap times by level, pit stops, BoP);')}</li>` : ''}
+    ${session?.training ? `<li>${L('<strong>Entraînement</strong> : la prépa de ta prochaine course LMU, avec ton équipage ;', '<strong>Training</strong>: the prep of your next LMU race, with your crew;')}</li>` : ''}
     <li>${L('la <strong>cloche</strong> : ce qui te concerne (inscriptions, équipage, rappels) ;', 'the <strong>bell</strong>: what concerns you (entries, crew, reminders);')}</li>
     <li>${L('ton <strong>compte</strong> : Aide, tes communautés et, pour les admins, Administration. Le drapeau change la langue.', 'your <strong>account</strong>: Help, your communities and, for admins, Administration. The flag switches the language.')}</li>
   </ul>
@@ -58,13 +63,13 @@ const navigationSection = () => [L('Se repérer', 'Finding your way around'), `
 
 const enduranceListSection = () => [L('Les endurances', 'Endurance races'), `
   <p>${L('Une carte par course, semaine par semaine : la date, les heures de départ, les catégories et leurs inscrits. Un badge montre ta situation. « Horaires à confirmer » : tu t’inscris sur un départ « à définir ».', 'One card per race, week by week: the date, start times, categories and how many entered. A badge shows where you stand. “Schedule to be confirmed”: you enter a start “to be set”.')}</p>
-  <p>${L('Au-dessus : <strong>À venir</strong>, <strong>Mes courses</strong>, <strong>Archivés</strong> et <strong>Filtres</strong>.', 'Above: <strong>Upcoming</strong>, <strong>My races</strong>, <strong>Archived</strong> and <strong>Filters</strong>.')}</p>
+  <p>${L('Au-dessus : <strong>À venir</strong>, <strong>Mes courses</strong> (dès que tu es inscrit), <strong>Archivés</strong> et <strong>Filtres</strong>.', 'Above: <strong>Upcoming</strong>, <strong>My races</strong> (once you have entered), <strong>Archived</strong> and <strong>Filters</strong>.')}</p>
   ${helpScreenshot('endurance-list', L('Liste des endurances', 'Endurance list'))}`];
 
 const enduranceEntrySection = () => [L('S’inscrire à une endurance', 'Entering an endurance race'), `
   <p>${L('Sur la page de la course, chaque départ a ses boutons :', 'On the race page, each start has its buttons:')}</p>
   <ul>
-    <li>${L('<strong>M’inscrire</strong> : une fenêtre en 4 étapes (catégorie, voitures, heures de présence, récapitulatif) ;', '<strong>Enter</strong>: a 4-step window (category, cars, hours present, summary);')}</li>
+    <li>${L('<strong>M’inscrire</strong> : une fenêtre en 4 étapes (catégorie, voitures, heures de présence ou <strong>Je la fais tout seul</strong>, récapitulatif). Au récapitulatif, tes coéquipiers souhaités et un commentaire, si tu veux ;', '<strong>Enter</strong>: a 4-step window (category, cars, hours present or <strong>I’ll do it alone</strong>, summary). In the summary, the teammates you wish for and a comment, if you like;')}</li>
     <li>${L('<strong>Absent</strong> : tu préviens que tu ne seras pas là. Ton nom va dans la liste <strong>Absents</strong>, en bas de la page ; un clic de plus l’enlève ;', '<strong>Absent</strong>: you say you won’t be there. Your name goes in the <strong>Absent</strong> list at the bottom of the page; one more click removes it;')}</li>
     <li>${L('une fois inscrit, <strong>Me désinscrire</strong> (en rouge) ; <strong>…</strong> pour modifier ton inscription ou t’inscrire dans une autre catégorie.', 'once entered, <strong>Withdraw</strong> (in red); <strong>…</strong> to edit your entry or enter another category.')}</li>
   </ul>
@@ -83,12 +88,13 @@ const crewsSection = () => [L('Les équipages', 'Crews'), `
   ${helpScreenshot('crews', L('Les équipages d’un départ', 'Crews of a start'))}`];
 
 const eventsSection = () => [eventsLabel(), `
-  <p>${L('Le calendrier des événements, toutes simus (LMU, iRacing, AMS2, ACE). Chaque carte montre la simu, le type et l’accès : <strong>OPEN</strong> (tous) ou <strong>SAFE</strong> (pilotes SAFE). Les <strong>Filtres</strong> trient par simu, type, dates et ta situation.', 'The events calendar, every sim (LMU, iRacing, AMS2, ACE). Each card shows the sim, the type and the access: <strong>OPEN</strong> (everyone) or <strong>SAFE</strong> (SAFE drivers). <strong>Filters</strong> sort by sim, type, dates and where you stand.')}</p>
+  <p>${tdz() ? L('Le calendrier des événements, toutes simus (LMU, iRacing, AMS2, ACE). Chaque carte montre la simu, le type et l’accès : <strong>OPEN</strong> (tous) ou <strong>SAFE</strong> (pilotes SAFE). Les <strong>Filtres</strong> trient par simu, type, dates et ta situation.', 'The events calendar, every sim (LMU, iRacing, AMS2, ACE). Each card shows the sim, the type and the access: <strong>OPEN</strong> (everyone) or <strong>SAFE</strong> (SAFE drivers). <strong>Filters</strong> sort by sim, type, dates and where you stand.')
+    : L('Le calendrier des événements, toutes simus (LMU, iRacing, AMS2, ACE). Les <strong>Filtres</strong> trient par simu, dates et ta situation.', 'The events calendar, every sim (LMU, iRacing, AMS2, ACE). <strong>Filters</strong> sort by sim, dates and where you stand.')}</p>
   <ul>
     <li>${L('chaque manche a son <strong>M’inscrire</strong> et son <strong>Absent</strong> ; sans catégorie à choisir, un clic suffit ;', 'each round has its own <strong>Enter</strong> and <strong>Absent</strong>; with no category to pick, one click is enough;')}</li>
     <li>${L('places limitées : une fois complet, tu passes en <strong>liste d’attente</strong> et tu montes dès qu’une place se libère ;', 'limited places: once full, you go on the <strong>waiting list</strong> and move up as soon as a place frees up;')}</li>
     <li>${L('le mot de passe du serveur n’est visible que des inscrits ;', 'the server password is shown to entered drivers only;')}</li>
-    <li>${L('un événement SAFE sans l’accès SAFE : le bouton <strong>Comment devenir SAFE</strong> mène au salon Discord qui l’explique.', 'a SAFE event without SAFE access: the <strong>How to become SAFE</strong> button leads to the Discord channel that explains it.')}</li>
+    ${!tdz() ? '' : `<li>${L('un événement SAFE sans l’accès SAFE : le bouton <strong>Comment devenir SAFE</strong> mène au salon Discord qui l’explique.', 'a SAFE event without SAFE access: the <strong>How to become SAFE</strong> button leads to the Discord channel that explains it.')}</li>`}
   </ul>
   ${helpScreenshot('event-page', L('Un événement en deux manches', 'An event in two rounds'))}`];
 
@@ -100,27 +106,27 @@ const bellSection = () => [L('La cloche', 'The bell'), `
   <p>${L('Elle prévient quand quelqu’un s’inscrit sur ton départ, rejoint ou quitte ton équipage, change sa voiture, ou quand la course change. Si ta communauté a activé les rappels, elle te rappelle ta course 24 h avant.', 'It tells you when someone enters your start, joins or leaves your crew, changes its car, or when the race changes. If your community turned reminders on, it reminds you of your race 24 h before.')}</p>`];
 
 function rightsSection() {
-  const mine = PERMISSIONS().filter(([key]) => can(key) && (events() || !key.startsWith('solo_')));
-  const list = PERMISSIONS().filter(([key]) => events() || !key.startsWith('solo_'));
+  const mine = PERMISSIONS().filter(([key]) => key !== 'access' && can(key) && ((events() && tdz()) || !key.startsWith('solo_')));
+  const list = PERMISSIONS().filter(([key]) => (events() && tdz()) || !key.startsWith('solo_'));
   const yours = !session?.user ? ''
-    : `<p>${mine.length ? `${L('Tes autorisations ici :', 'Your permissions here:')} ${mine.map(([, name]) => `<strong>${name}</strong>`).join(', ')}.` : L('Tu n’as aucune autorisation ici : tu vois les courses sans pouvoir t’inscrire.', 'You have no permission here: you can see the races but not enter them.')}</p>`;
+    : `<p>${mine.length ? `${L('Tes autorisations ici :', 'Your permissions here:')} ${mine.map(([, name]) => `<strong>${name}</strong>`).join(', ')}.` : L('Tu n’as aucune autorisation ici.', 'You have no permission here.')}</p>`;
   return [L('Ce que tu peux faire', 'What you can do'), `
     <p>${L('Tes droits viennent de tes <strong>rôles sur le Discord</strong> de la communauté. Ses admins choisissent ce que chaque rôle permet :', 'Your rights come from your <strong>roles on the community’s Discord</strong>. Its admins choose what each role allows:')}</p>
     <ul>${list.map(([, name, text]) => `<li><strong>${name}</strong> : ${text}</li>`).join('')}</ul>
-    <p>${L('Sans autorisation, tu vois les courses seulement. Un rôle donné sur Discord compte ici en quelques minutes.', 'With no permission, you only see the races. A role given on Discord counts here within minutes.')}</p>
+    <p>${L('Avec l’accès seul, tu vois les courses sans pouvoir t’inscrire. Un rôle donné sur Discord compte ici en quelques minutes.', 'With access only, you see the races but cannot enter them. A role given on Discord counts here within minutes.')}</p>
     ${yours}`];
 }
 
 // ---------- Admins ----------
 
 const createEnduranceSection = () => [L('Créer une endurance', 'Creating an endurance race'), `
-  <p>${L('<strong>Ajouter une endurance</strong> ouvre une fenêtre en 4 étapes : informations (nom, durée, type, circuit), catégories, départs, récapitulatif. Les heures sont celles de Paris. Coche <strong>Horaires à confirmer</strong> si tu ne connais que le jour.', '<strong>Add an endurance race</strong> opens a 4-step window: information (name, length, type, circuit), categories, starts, summary. Times are Paris time. Tick <strong>Schedule to be confirmed</strong> if you only know the day.')}</p>
+  <p>${L('<strong>Ajouter une endurance</strong> ouvre une fenêtre en 4 étapes : informations (nom, durée, type, circuit), catégories, départs, récapitulatif. Les heures sont celles de Paris. Coche <strong>Horaires à confirmer</strong> si tu ne connais que le jour. Facultatif : limites de piste, pneus, grille et partage du volant, affichés en icônes sur la page de la course.', '<strong>Add an endurance race</strong> opens a 4-step window: information (name, length, type, circuit), categories, starts, summary. Times are Paris time. Tick <strong>Schedule to be confirmed</strong> if you only know the day. Optional: track limits, tyres, grid and fair share, shown as icons on the race page.')}</p>
   <p>${L('Sur la page de la course : <strong>Copier le lien</strong>, <strong>Modifier l’événement</strong> et <strong>Supprimer l’événement</strong>. Si tu changes un horaire, préviens les pilotes.', 'On the race page: <strong>Copy link</strong>, <strong>Edit event</strong> and <strong>Delete event</strong>. If you change a start time, tell the drivers.')}</p>
   ${helpScreenshot('admin-create-endurance', L('Créer une endurance', 'Creating an endurance race'))}`];
 
 const createEventSection = () => [L(`Créer un événement ${eventsLabel()}`, `Creating a ${eventsLabel()} event`), `
-  <p>${L('<strong>Ajouter un événement</strong> : 5 étapes. <strong>Événement</strong> (nom, simu, type), <strong>Horaire</strong> (jour, heure, mot de passe du serveur), <strong>Manches</strong> (jusqu’à 4 : circuit, catégories, durées essais/qualifs/course, météo, carburant, pneus), <strong>Inscriptions</strong> (places, note), <strong>Récapitulatif</strong>.', '<strong>Add an event</strong>: 5 steps. <strong>Event</strong> (name, sim, type), <strong>Schedule</strong> (day, time, server password), <strong>Rounds</strong> (up to 4: circuit, categories, practice/qualifying/race lengths, weather, fuel, tyres), <strong>Entries</strong> (places, note), <strong>Summary</strong>.')}</p>
-  <p>${L('Le type SAFE ou OPEN décide qui peut s’inscrire : c’est vérifié par le site.', 'The SAFE or OPEN type decides who can enter: the site checks it.')}</p>
+  <p>${L(`<strong>Ajouter un événement</strong> : 5 étapes. <strong>Événement</strong> (nom, simu${tdz() ? ', type' : ''}), <strong>Horaire</strong> (jour, heure, mot de passe du serveur), <strong>Manches</strong> (jusqu’à 4 : circuit, catégories, durées essais/qualifs/course, météo, carburant, pneus), <strong>Inscriptions</strong> (places, note), <strong>Récapitulatif</strong>.`, `<strong>Add an event</strong>: 5 steps. <strong>Event</strong> (name, sim${tdz() ? ', type' : ''}), <strong>Schedule</strong> (day, time, server password), <strong>Rounds</strong> (up to 4: circuit, categories, practice/qualifying/race lengths, weather, fuel, tyres), <strong>Entries</strong> (places, note), <strong>Summary</strong>.`)}</p>
+  <p>${tdz() ? L('Le type SAFE ou OPEN décide qui peut s’inscrire : c’est vérifié par le site.', 'The SAFE or OPEN type decides who can enter: the site checks it.') : L('Tous les pilotes avec l’autorisation Endurances peuvent s’inscrire.', 'Every driver with the Endurance races permission can enter.')}</p>
   ${helpScreenshot('admin-create-event', L('Créer un événement', 'Creating an event'))}`];
 
 const otherPilotsSection = () => [L('Inscrire un pilote, gérer les équipages', 'Entering a driver, managing crews'), `
@@ -131,8 +137,8 @@ const administrationSection = () => [L('Administration', 'Administration'), `
   <p>${L('Menu du compte → <strong>Administration</strong>, en 4 parties :', 'Account menu → <strong>Administration</strong>, in 4 parts:')}</p>
   <ul>
     <li>${L('<strong>Vue d’ensemble</strong> : l’état du serveur Discord, les étapes de démarrage et ce qui demande ton attention ;', '<strong>Overview</strong>: the Discord server’s state, the getting-started steps and what needs your attention;')}</li>
-    <li>${L('<strong>Membres et rôles</strong> : les membres venus sur le site et, dans <strong>Rôles</strong>, les 5 autorisations à cocher pour chaque rôle Discord ;', '<strong>Members and roles</strong>: the members who came to the site and, under <strong>Roles</strong>, the 5 permissions to tick for each Discord role;')}</li>
-    <li>${L('<strong>Modules</strong> : récap de la semaine sur Discord, salons d’équipage, rappels de course, endurances iRacing officielles, EVENT TDZ ;', '<strong>Modules</strong>: weekly recap on Discord, crew channels, race reminders, official iRacing endurance races, EVENT TDZ;')}</li>
+    <li>${L('<strong>Membres et rôles</strong> : les membres venus sur le site et, dans <strong>Rôles</strong>, ce que chaque rôle Discord permet. Coche <strong>Accès Endurance Manager</strong> sur les rôles qui peuvent entrer ;', '<strong>Members and roles</strong>: the members who came to the site and, under <strong>Roles</strong>, what each Discord role allows. Tick <strong>Endurance Manager access</strong> on the roles that may enter;')}</li>
+    <li>${L('<strong>Modules</strong> : ce qui s’allume ou s’éteint (voir ci-dessous) ;', '<strong>Modules</strong>: what can be switched on or off (see below);')}</li>
     <li>${L('<strong>Apparence</strong> : nom, couleur et bannière, avec un aperçu.', '<strong>Appearance</strong>: name, colour and banner, with a preview.')}</li>
   </ul>
   <p>${L('Les rôles se donnent sur Discord, jamais ici.', 'Roles are given on Discord, never here.')}</p>
@@ -140,10 +146,12 @@ const administrationSection = () => [L('Administration', 'Administration'), `
 
 const modulesSection = () => [L('Les modules en bref', 'Modules in short'), `
   <ul>
-    <li>${L('<strong>Salons d’équipage</strong> : un salon vocal par équipage, nommé simu + nom de l’équipage, ouvert quelques jours avant la course et supprimé 2 h après la fin ;', '<strong>Crew channels</strong>: a voice channel per crew, named sim + crew name, opened a few days before the race and deleted 2 h after it ends;')}</li>
+    <li>${L('<strong>Récap de la semaine sur Discord</strong> : le bot publie un récap général, ou <strong>une catégorie par course</strong> dès sa publication (salon « infos-de-la-course » et vocaux des équipages), supprimée 24 h après le dernier départ ;', '<strong>Weekly recap on Discord</strong>: the bot posts a general recap, or <strong>one category per race</strong> as soon as it is published (“infos-de-la-course” channel and crew voice channels), deleted 24 h after the last start;')}</li>
+    <li>${L('<strong>Salons d’équipage</strong> : un salon vocal par équipage, à son nom, ouvert dès sa création et supprimé 2 h après la course ;', '<strong>Crew channels</strong>: a voice channel per crew, named after it, opened as soon as it is created and deleted 2 h after the race;')}</li>
     <li>${L('<strong>Rappels de course</strong> : 24 h avant dans la cloche, 24 h et 1 h avant dans le salon de l’équipage ;', '<strong>Race reminders</strong>: 24 h before in the bell, 24 h and 1 h before in the crew channel;')}</li>
     <li>${L('<strong>Endurances iRacing officielles</strong> : les séries en équipe et les événements spéciaux ajoutés tout seuls, horaires compris ;', '<strong>Official iRacing endurance races</strong>: team series and special events added by themselves, times included;')}</li>
-    <li>${L('<strong>Récap de la semaine</strong> : les courses de la semaine dans un salon Discord, mis à jour à chaque inscription.', '<strong>Weekly recap</strong>: the week’s races in a Discord channel, updated on every entry.')}</li>
+    <li>${L(`<strong>${eventsLabel()}</strong> : le calendrier des événements, toutes simus ;`, `<strong>${eventsLabel()}</strong>: the events calendar, every sim;`)}</li>
+    <li>${L('<strong>Mémo des circuits</strong> et <strong>Entraînement</strong> (LMU) : la fiche de chaque circuit pour tous, et la prépa de chaque course avec ton équipage.', '<strong>Circuit memo</strong> and <strong>Training</strong> (LMU): each circuit’s sheet for everyone, and each race’s prep with your crew.')}</li>
   </ul>`];
 
 const diagnosticsSection = () => [L('Diagnostics', 'Diagnostics'), `
