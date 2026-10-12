@@ -6,6 +6,7 @@ import {OPEN_BEFORE} from './crew-discord.mjs';
 const API = 'https://discord.com/api/v10', DAY = 86400000;
 // Layout of the recap message: raised when it changes, so the published recaps are edited once.
 const RECAP_FORMAT = 2;
+const RACE_INFO_CHANNEL = 'infos-de-la-course'; // Discord writes text channel names in lowercase with dashes
 const VIEW = 1024n, SEND = 2048n, HISTORY = 65536n, MANAGE = 16n, ADMIN = 8n;
 const REQUIRED = VIEW | SEND | HISTORY;
 export const RECAP_BOT_PERMISSIONS = String(REQUIRED | MANAGE);
@@ -205,8 +206,8 @@ async function publish(env, timestamp, community, settings, row, event, budget, 
     }
     // Recover a channel created just before a timeout/crash from its exact topic marker, never its name.
     const existing = channel ? channels.find(item => item.id === channel) : channels.find(item => item.type === 0 && item.topic === row.marker);
-    if (existing && existing.parent_id !== category) await discord(env,'PATCH',`/channels/${existing.id}`,{parent_id:category,name:'récap'},budget);
-    channel = existing?.id || channel || (await discord(env,'POST',`/guilds/${row.guild_id}/channels`,{type:0,name:'récap',parent_id:category,topic:row.marker},budget)).id;
+    if (existing && (existing.parent_id !== category || existing.name !== RACE_INFO_CHANNEL)) await discord(env,'PATCH',`/channels/${existing.id}`,{parent_id:category,name:RACE_INFO_CHANNEL},budget);
+    channel = existing?.id || channel || (await discord(env,'POST',`/guilds/${row.guild_id}/channels`,{type:0,name:RACE_INFO_CHANNEL,parent_id:category,topic:row.marker},budget)).id;
     await env.DB.prepare('UPDATE discord_recap_publications SET channel_id=? WHERE community_id=? AND event_id=?').bind(channel,community.id,row.event_id).run();
   }
   const {payload, hash} = prepared || await snapshotPayload(env,timestamp,community,settings,isEvent ? row.event_id : null);

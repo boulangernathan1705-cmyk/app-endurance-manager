@@ -77,7 +77,7 @@ test('read-only previews preserve every departure and never send to Discord',asy
 test('two homonymous events get a category each with their recap; edits reuse their single silent messages',async t=>{
   const {DB,env,calls,messages,channels}=setup(t);race(DB,'a','Même course');race(DB,'b','Même course','iracing-spa');
   await saveBotRecap(env,COMMUNITY,SETTINGS);await syncWeeklyDiscord(env,NOW,COMMUNITY);
-  assert.deepEqual(creates(calls).map(call=>[call.body.type,call.body.name]),[[4,'🏎️ LMU · Même course'],[0,'récap'],[4,'🏁 iRacing · Même course'],[0,'récap']]);
+  assert.deepEqual(creates(calls).map(call=>[call.body.type,call.body.name]),[[4,'🏎️ LMU · Même course'],[0,'infos-de-la-course'],[4,'🏁 iRacing · Même course'],[0,'infos-de-la-course']]);
   assert.equal(sends(calls).length,2);
   const [lmu,iracing]=creates(calls).filter(call=>call.body.type===4).map(call=>channels.find(item=>item.name===call.body.name).id);
   assert.deepEqual(creates(calls).filter(call=>call.body.type===0).map(call=>call.body.parent_id),[lmu,iracing]);
@@ -293,7 +293,7 @@ test('a race far away gets its category as soon as it has a crew, even an empty 
   await saveBotRecap(env,COMMUNITY,SETTINGS);await syncBotRecaps(env,NOW,COMMUNITY);assert.equal(creates(calls).length,0);
   DB.db.prepare("INSERT INTO crews(id,event_id,departure_id,name,category,car,locked,created_at,community_id) VALUES('crew','far','f','Équipe','GT3','',0,0,?)").run(DEV_COMMUNITY);
   await syncBotRecaps(env,NOW+1000,COMMUNITY);
-  assert.deepEqual(creates(calls).map(call=>call.body.name),['🏎️ LMU · Dans un mois','récap']);
+  assert.deepEqual(creates(calls).map(call=>call.body.name),['🏎️ LMU · Dans un mois','infos-de-la-course']);
 });
 
 test('official races where the community has nothing never hold back the recap of the race it has a crew in',async t=>{
@@ -302,7 +302,7 @@ test('official races where the community has nothing never hold back the recap o
   race(DB,'mine','10h officielle','spa',[{id:'m',startsAt:NOW+2*DAY}],'official');
   DB.db.prepare("INSERT INTO crews(id,event_id,departure_id,name,category,car,locked,created_at,community_id) VALUES('crew','mine','m','Les plots','GT3','',0,0,?)").run(DEV_COMMUNITY);
   await saveBotRecap(env,COMMUNITY,SETTINGS);await syncBotRecaps(env,NOW,COMMUNITY);
-  assert.deepEqual(creates(calls).map(call=>call.body.name),['🏎️ LMU · 10h officielle','récap'],'only the race with a crew');
+  assert.deepEqual(creates(calls).map(call=>call.body.name),['🏎️ LMU · 10h officielle','infos-de-la-course'],'only the race with a crew');
   DB.db.prepare('UPDATE crews SET name=? WHERE id=?').run('Les plots 2','crew');
   calls.length=0;await syncBotRecaps(env,NOW+1000,COMMUNITY);await syncBotRecaps(env,NOW+2000,COMMUNITY);
   assert.equal(calls.filter(call=>call.method==='PATCH').length,1);
