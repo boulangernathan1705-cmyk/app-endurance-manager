@@ -3,11 +3,13 @@
 // the pilots of the site (a band and the median's line), the game (a triangle). The stop calculator applies the
 // game's rule (shared/training.mjs, stopTime) to the car's service times.
 import {stopTime,refuelAmounts} from '../shared/training.mjs';
+import {raceStrategy, strategyInputs} from '../shared/race-strategy.mjs';
+import {strategySummary, strategyDetails, lapShort} from './strategy-view.mjs';
 
 const app = document.getElementById('pit-guide');
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const num = (value, digits = 1) => value === null || value === undefined ? '—' : Number(value).toFixed(digits).replace('.', ',');
-const view = {data:null, calc:{before:50, after:100, tyres:4, driver:false, wing:false, ductFront:false, ductRear:false, brakes:false}};
+const view = {data:null, strategy:{hours:6, pace:''}, calc:{before:50, after:100, tyres:4, driver:false, wing:false, ductFront:false, ductRear:false, brakes:false}};
 let loadController;
 
 // 80.887 -> 1:20.887 (times from the spreadsheet have two decimals).
@@ -148,6 +150,24 @@ function carOptions(cars, chosen) {
 }
 const has = item => item && [item.median, item.you, item.game].some(value => value !== null && value !== undefined);
 
+// The race's strategy for this car on this circuit: a length and a pace (the pilot's, or a level's) give the relays
+// and the stops (shared/race-strategy.mjs), from the figures above.
+const STRATEGY_HOURS = [1, 2, 3, 4, 6, 8, 10, 12, 24];
+function strategy(data) {
+  const levels = data.levels, paces = [];
+  if (levels?.you?.pace) paces.push({key:'you', label:'Ton rythme', lap:levels.you.pace});
+  for (const band of levels?.bands || []) if (band.to) paces.push({key:band.name, label:band.name, lap:band.to});
+  if (!paces.length) return '';
+  const chosen = paces.find(item => item.key === view.strategy.pace) || paces.find(item => item.key === 'you') || paces.find(item => item.key === 'Midpack') || paces[0];
+  const plan = raceStrategy({minutes:view.strategy.hours * 60, ...strategyInputs(data, chosen.lap)});
+  if (!plan) return '';
+  return `<section class="training-card memo-strategy"><h2>Stratégie de course</h2>
+    <div class="memo-strategy-pick"><label class="memo-select">Durée<select data-strategy="hours">${STRATEGY_HOURS.map(hours => `<option value="${hours}"${hours === view.strategy.hours ? ' selected' : ''}>${hours} h</option>`).join('')}</select></label>
+      <label class="memo-select">Rythme<select data-strategy="pace">${paces.map(item => `<option value="${esc(item.key)}"${item === chosen ? ' selected' : ''}>${esc(item.label)} · ${lapShort(item.lap)}</option>`).join('')}</select></label></div>
+    <p class="memo-big">${plan.relays.length}<span>relais · ${esc(strategySummary(plan).split(' · ').slice(1).join(' · '))}</span></p>
+    ${strategyDetails(plan, {open:true})}</section>`;
+}
+
 function render() {
   const data = view.data;
   const head = `<div class="memo-head"><p class="memo-kicker">Mémo des circuits · LMU</p><h1>${esc(data.circuit.name)}</h1>
@@ -188,6 +208,7 @@ function render() {
       <p class="memo-big ${stintKind}">${st.laps}<span>tours ${st.by === 'energy' ? 'avec 100 % d’énergie' : 'avec un plein'}</span></p>
       <dl>${st.by === 'energy' && st.fuel ? row('Carburant pour les faire', `${num(st.fuel, 1)} L`, stintKind, data.fuel.ratio ? `ratio conseillé ${num(data.fuel.ratio, 2)}` : '') : ''}</dl>
       ${st.wear ? `<div class="memo-group"><h3>Usure des pneus sur le relais</h3>${car(wearKind, st.wear.map(value => value === null ? '—' : `−${num(value, 0)} %`), 'Usure de chaque pneu sur un relais')}</div>` : ''}</section>` : '',
+    strategy(data),
     bop(data)
   ].filter(Boolean);
   app.innerHTML = `${head}
@@ -217,6 +238,12 @@ app.addEventListener('change', event => {
     if (pick.dataset.pick === 'car') params.set('car', pick.value); else params.set('class', view.data.car.carClass);
     load(`?${params}`);
   }
+});
+app.addEventListener('change', event => {
+  const pick = event.target.closest('[data-strategy]');
+  if (!pick) return;
+  view.strategy[pick.dataset.strategy] = pick.dataset.strategy === 'hours' ? Number(pick.value) : pick.value;
+  render();
 });
 app.addEventListener('input', event => {
   const input = event.target.closest('[data-calc]');

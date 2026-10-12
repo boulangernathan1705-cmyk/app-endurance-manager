@@ -566,7 +566,7 @@ test('the race preparation: statuses proved by the sessions, notes and relay pla
   assert.equal((await req('/api/training/prep','PUT',{...race,step:'night',status:'skip'},'other')).status,200,'Carl prepares his own race');
   assert.equal((await req('/api/training/prep/notes','POST',{...race,step:'discover',text:'V4 : freiner au panneau 100'},'pilot')).status,200);
   assert.equal((await req('/api/training/prep/notes','POST',{...race,step:'discover',text:'   '},'pilot')).status,400);
-  // The relay plan: as many relays as estimated (50 min each without consumption), one pilot each, set by any
+  // The relay plan: as many relays as the strategy estimates, one pilot each, set by any
   // pilot of the crew; the crew may change the number; the step is done once every relay has a pilot.
   let stints=(await req('/api/training','GET',null,'pilot')).data.prep.stints;
   assert.equal(stints.minutes,360);assert.equal(stints.count,stints.estimate.count);assert.equal(stints.plan.length,stints.count);
@@ -602,10 +602,7 @@ test('the race preparation: statuses proved by the sessions, notes and relay pla
 });
 
 test('a relay plan proposed from the hours each pilot ticked', async () => {
-  const {proposeStints,estimateRelays,relayHour}=await import('../shared/training-prep.mjs');
-  assert.deepEqual(estimateRelays({minutes:360,lap:120,stintLaps:30}),{count:6,laps:30,lap:120,minutes:60});
-  assert.equal(estimateRelays({minutes:360}).count,8,'50 min relays without consumption: 7 would end at 5 h 50');
-  assert.equal(estimateRelays({minutes:1440,lap:225,stintLaps:13}).count,30,'Le Mans: 13 laps of 3:45');
+  const {proposeStints,relayHour}=await import('../shared/training-prep.mjs');
   assert.equal(relayHour(4,5,360),5,'the last of five relays of a 6 h race is in its sixth hour');
   const plan=proposeStints([{id:'a',status:'h1,h2,h3'},{id:'b',status:'h3,h4,h5,h6'}],6);
   assert.equal(plan.slice(0,2).join(),'a,a','only Alice is free at first');
@@ -620,4 +617,27 @@ test('the proposed plan gives the scarce pilot his hours first', async () => {
   const plan=proposeStints([{id:'alex',status:'whole'},{id:'lea',status:'whole'},{id:'me',status:'h4,h5,h6'},{id:'tom',status:'h1,h2,h3'}],6);
   assert.ok(['alex','lea','me','tom'].every(id=>plan.includes(id)),'everyone drives');
   assert.ok(plan.every((id,hour)=>id!=='tom'||hour<3)&&plan.every((id,hour)=>id!=='me'||hour>=3),'each in his own hours');
+});
+
+test('the race strategy: stops with what each one refills, tyres when worn, the lap the race ends on', async () => {
+  const {raceStrategy,strategyInputs}=await import('../shared/race-strategy.mjs');
+  const service={fuelRate:2.4,connect:2,energyRate:2.5,tyres4:24,driver:12};
+  const plan=raceStrategy({minutes:360,lap:124.3,ve:4.2,fuel:3.1,capacity:90,lane:28,service,wear:1});
+  assert.equal(plan.stintLaps,23,'100 % of energy at 4.2 % a lap');
+  assert.equal(plan.tyreStints,2,'1 % a lap: two relays on a set before 60 %');
+  assert.deepEqual(plan.stops.map(stop=>stop.tyres),[false,true,false,true,false,true,false].slice(0,plan.stops.length));
+  assert.equal(plan.relays.length,plan.stops.length+1);
+  assert.equal(plan.relays.reduce((sum,relay)=>sum+relay.laps,0),plan.laps);
+  const last=plan.stops.at(-1);assert.ok(last.short&&last.energy<96,'only what the end needs at the last stop');
+  // The end: the race's time is passed on the last lap, not before.
+  const driven=plan.laps*124.3+plan.stops.reduce((sum,stop)=>sum+stop.total,0);
+  assert.ok(driven>=360*60&&driven-124.3<360*60+5,'the race ends on the first line after the time');
+  assert.ok(plan.saving.percent>0&&plan.saving.laps>23);assert.deepEqual(plan.assumed,[]);
+  // Nothing measured but the pace: 50 min relays, every assumption said.
+  const blind=raceStrategy({minutes:1440,lap:225});
+  assert.equal(blind.limit,'time');assert.equal(blind.assumed.length,4);assert.equal(blind.saving,null);
+  assert.equal(raceStrategy({minutes:360,lap:null}),null);
+  // From a Mémo sheet: the pilots' median first, the game's forecast last.
+  const inputs=strategyInputs({fuel:{median:null,you:3.2,game:3},energy:{median:4.1,you:4.4,game:4},capacity:90,lane:{through:27.5},service:{source:'game',...service},tyres:[{name:'Medium',wheels:[{wear:0.8},{wear:1.2},{wear:0.7},{wear:null}]}]},120);
+  assert.deepEqual([inputs.fuel,inputs.ve,inputs.lane,inputs.wear,inputs.lap],[3.2,4.1,27.5,1.2,120]);
 });

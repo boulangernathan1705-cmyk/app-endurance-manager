@@ -5,13 +5,14 @@ import {shortDateLabel, timeAt} from './dates.mjs';
 import {lapLabel} from '../shared/training.mjs';
 import {PREP_PHASES, PREP_STEPS, PREP_LABELS, PREP_STATUSES, NOTE_LIMIT, availableAt, proposeStints, relayHour} from '../shared/training-prep.mjs';
 import {turnsOf} from '../shared/circuit-turns.mjs';
+import {strategySummary, strategyDetails} from './strategy-view.mjs';
 
 const app = document.getElementById('training-app');
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const num = (value, digits = 1) => value === null || value === undefined ? '—' : Number(value).toFixed(digits).replace('.', ',');
 const stamp = ms => `${shortDateLabel(ms)} · ${timeAt(ms)}`;
 const KINDS = {Practice1:'Essais', Practice2:'Essais', Practice3:'Essais', Practice4:'Essais', Qualify:'Qualif', Warmup:'Warm-up', Race:'Course'};
-const view = {brush:null, race:null, track:null, carClass:null, data:null, busy:'', simhub:'', method:'simhub', sessionsOpen:false, linkOpen:null, prepOpen:false, crewView:false, editing:null, message:''};
+const view = {strategyOpen:false, brush:null, race:null, track:null, carClass:null, data:null, busy:'', simhub:'', method:'simhub', sessionsOpen:false, linkOpen:null, prepOpen:false, crewView:false, editing:null, message:''};
 let loadController;
 
 
@@ -113,9 +114,11 @@ function notesBlock(step, prep, turns) {
 // The relay plan: a pilot picked, then the relays touched (or swept) take his colour. The number of relays comes from
 // the laps and the consumption, the crew can change it; « Proposer » shares them from the hours each pilot ticked.
 const initials = name => name === 'Toi' ? 'Toi' : String(name).trim().slice(0, 3);
-// Estimated starts, to five minutes: the race will move them anyway.
-const relayStart = (stints, relay) => stints.startsAt + Math.round(relay * stints.minutes / stints.count / 5) * 5 * 60000;
-const lapShort = seconds => Math.floor(seconds / 60) + ':' + (seconds % 60).toFixed(1).padStart(4, '0');
+// Estimated starts, to five minutes: the strategy's when the crew keeps its number of relays, else spread evenly.
+const relayStart = (stints, relay) => {
+  const plan = stints.estimate.strategy, at = plan && plan.relays.length === stints.count ? plan.relays[relay].start : relay * stints.minutes * 60 / stints.count;
+  return stints.startsAt + Math.round(at / 300) * 300000;
+};
 const relayFree = (stints, pilot, relay) => availableAt(pilot.status, relayHour(relay, stints.count, stints.minutes));
 function relayCell(stints, relay) {
   const id = stints.plan[relay], index = stints.pilots.findIndex(pilot => pilot.id === id), pilot = stints.pilots[index];
@@ -136,9 +139,9 @@ function stintPlan(prep) {
   for (let start = 0; start < stints.count; start += 6) rows.push('<div class="stint-track">' + Array.from({length:Math.min(6, stints.count - start)}, (_, i) => relayCell(stints, start + i)).join('') + '</div>');
   const empty = stints.plan.filter(id => !id).length;
   const away = stints.plan.map((id, relay) => { const pilot = stints.pilots.find(item => item.id === id); return pilot && !relayFree(stints, pilot, relay) ? pilot.name + ' (R' + (relay + 1) + ')' : null; }).filter(Boolean);
-  const basis = guess.laps ? 'environ ' + guess.minutes + ' min (' + guess.laps + ' tours en ' + lapShort(guess.lap) + ')' : 'environ ' + guess.minutes + ' min, faute de conso mesurée';
   return '<div class="stint-plan"><div class="stint-count"><button type="button" data-relay-count="-1" aria-label="Un relais de moins"' + (stints.count <= 1 ? ' disabled' : '') + '>−</button><b>' + stints.count + ' relais</b><button type="button" data-relay-count="1" aria-label="Un relais de plus"' + (stints.count >= 60 ? ' disabled' : '') + '>+</button>' +
-    '<small>Estimé : ' + guess.count + ' relais d’' + esc(basis) + '.' + (stints.count !== guess.count ? ' <button type="button" class="link-button" data-relay-reset>Reprendre l’estimation</button>' : '') + '</small></div>' +
+    '<small>Estimé : ' + esc(guess.strategy ? strategySummary(guess.strategy) : guess.count + ' relais d’environ 50 min') + '.' + (stints.count !== guess.count ? ' <button type="button" class="link-button" data-relay-reset>Reprendre l’estimation</button>' : '') + '</small></div>' +
+    (guess.strategy ? strategyDetails(guess.strategy, {startsAt:stints.startsAt, open:view.strategyOpen}) : '') +
     '<div class="stint-pilots" role="group" aria-label="Pilote à placer">' + chips + '</div>' +
     '<div class="stint-tracks">' + rows.join('') + '</div>' +
     (empty ? '<p class="stint-warn">' + (empty === stints.count ? 'Choisis un pilote puis touche ses relais, ou laisse le site proposer.' : empty + ' relais sans pilote.') + '</p>' : '<p class="stint-ok">Chaque relais a son pilote.</p>') +
@@ -352,6 +355,6 @@ app.addEventListener('dragover', event => { const zone = event.target.closest('[
 app.addEventListener('dragleave', event => event.target.closest('[data-drop]')?.classList.remove('is-over'));
 app.addEventListener('drop', event => { const zone = event.target.closest('[data-drop]'); if (zone) { event.preventDefault(); upload(event.dataTransfer.files); } });
 
-app.addEventListener('toggle',event=>{if(!app.contains(event.target))return;const fold=event.target.dataset.fold;if(fold==='sessions')view.sessionsOpen=event.target.open;if(fold==='link')view.linkOpen=event.target.open;if(fold==='prep')view.prepOpen=event.target.open;},true);
+app.addEventListener('toggle',event=>{if(!app.contains(event.target))return;const fold=event.target.dataset.fold;if(fold==='sessions')view.sessionsOpen=event.target.open;if(fold==='link')view.linkOpen=event.target.open;if(fold==='prep')view.prepOpen=event.target.open;if(event.target.matches('.strategy'))view.strategyOpen=event.target.open;},true);
 
 load();
