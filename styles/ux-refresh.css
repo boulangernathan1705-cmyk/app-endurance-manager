@@ -2198,6 +2198,9 @@ html[data-game] #app .race-header .race-side .race-badges > * { box-sizing: bord
 
 /* « Inscription par catégorie »: the pilot's entry for the whole race, above the starts. */
 .category-entry-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 16px 0; padding: 14px 16px; border: 1px solid #2b3336; border-radius: 12px; background: rgba(13, 17, 18, .82); font-size: 14px; color: var(--muted, #b7bfbc); }
+.category-entry-bar-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.category-entry-bar-actions > button { min-height: 44px; }
+.category-entry-bar-actions .danger-button { border-radius: 10px; font-weight: 700; }
 .category-entry-bar.is-entered { border-color: rgba(79, 209, 197, .6); }
 .category-entry-mine { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; color: var(--text, #f2f5f4); }
 .category-entry-mine .category-logo { height: 20px; width: auto; }
@@ -2254,7 +2257,7 @@ body:has([data-category-entry]) { overflow: hidden; }
   .category-entry-sheet { max-height: calc(100vh - 12px); max-height: calc(100dvh - 12px); }
   .ce-footer { margin: 12px -14px 0; padding: 12px 14px calc(12px + env(safe-area-inset-bottom)); }
 }
-@media (max-width: 520px) { .category-entry-bar { flex-direction: column; align-items: stretch; } .category-entry-gate > div > button { min-width: 140px; } }
+@media (max-width: 520px) { .category-entry-bar { flex-direction: column; align-items: stretch; } .category-entry-bar-actions > button { flex: 1; } .category-entry-gate > div > button { min-width: 140px; } }
 .category-entry-categories .category-button { width: 100% !important; max-width: none !important; min-height: 116px !important; padding: 14px 10px !important; }
 .category-entry-categories .category-button .category-logo, .category-entry-categories .category-button img { height: 38px !important; width: auto !important; }
 .category-entry-categories .registration-category-copy strong { font-size: 17px !important; color: var(--text, #f2f5f4); }
