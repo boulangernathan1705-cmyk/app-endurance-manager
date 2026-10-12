@@ -322,3 +322,9 @@
 .checklist-picker span{display:grid;gap:4px}
 .checklist-feedback{color:var(--muted);font-size:13px}
 @media(max-width:600px){.checklist-head{display:block}.checklist-head>strong{display:block;margin-top:10px}.checklist-exercises>li{grid-template-columns:1fr;gap:10px}.checklist-picker{grid-template-columns:1fr}}
+
+/* Mémo: the stop calculator, folded under the stand. */
+.memo-calc-fold{margin-top:12px;border-top:1px solid var(--border);padding-top:10px}
+.memo-calc-fold>summary{cursor:pointer;font-weight:600}
+.memo-calc-fold[open]>summary{margin-bottom:12px}
+details.memo-collection>summary{cursor:pointer;font-weight:600}

@@ -401,7 +401,10 @@ test('the circuit sheet on the site: every circuit driven, the car’s service t
   assert.equal((await push('mate',{...LIVE,at:1790000300000})).status,200);
   const {status,data}=await req('/api/training/memo?circuit=long-beach','GET',null,'mate');
   assert.equal(status,200);
-  assert.deepEqual(data.circuits.map(item=>item.key).sort(),['long-beach','spa']);
+  // Every LMU circuit has its sheet, driven or not; the cars driven come first, then the BoP's.
+  assert.equal(data.circuits.length,18);assert.ok(data.circuits.some(item=>item.key==='portimao'));
+  assert.equal(data.cars[0].car,'Ferrari 296 LMGT3 Evo');assert.ok(data.cars.length>20);
+  assert.ok(!data.cars.some(item=>item.car==='Ferrari 296 LMGT3'),'the BoP line of a car driven is not listed twice');
   assert.equal(data.car.car,'Ferrari 296 LMGT3 Evo');assert.equal(data.lane.through,43.3);
   assert.equal(data.service.wing,25);assert.equal(data.service.brakes,null);
   // Bob never drove there: no figure of his, and Alice's alone is not shown.
@@ -511,4 +514,20 @@ test('an online file waits for the pilot name, then is read; the sync program ca
   const key=new TextDecoder().decode(new Uint8Array(await program.arrayBuffer()).slice(4096)).match(/([a-f0-9]{64})/)[1];
   response=await send('/api/training/collector','POST','sync',{raw:recent,headers:{'Content-Type':'application/xml',Authorization:'Bearer '+key,'X-LMU-Name':'Moi%20Pilote'}});
   assert.deepEqual(await response.json(),{ok:true,created:true,venue:'Circuit de Barcelona',laps:3});
+});
+
+test('two LMU modules: the Mémo for every pilot, the training on its own, a Mémo that follows the old module', async () => {
+  const {req,login}=harness();
+  await login(ADMIN,'admin','Orga');await login(PILOT,'pilot','Alice');
+  await req('/api/community/modules','PATCH',{memo:true},'admin');
+  const memo=await req('/api/training/memo?circuit=portimao','GET',null,'pilot');
+  assert.equal(memo.status,200);assert.equal(memo.data.circuit.name,'Algarve International Circuit (Portimão)');
+  assert.ok(memo.data.car&&memo.data.bop,'a circuit nobody drove still has its cars and BoP');
+  assert.equal((await req('/api/training','GET',null,'pilot')).status,404,'the training stays off');
+  let session=(await req('/api/session','GET',null,'pilot')).data;
+  assert.deepEqual([session.memo,session.training],[true,false]);
+  await req('/api/community/modules','PATCH',{memo:false,training:true},'admin');
+  session=(await req('/api/session','GET',null,'pilot')).data;
+  assert.deepEqual([session.memo,session.training],[false,true]);
+  assert.equal((await req('/api/training/memo','GET',null,'pilot')).status,404);
 });

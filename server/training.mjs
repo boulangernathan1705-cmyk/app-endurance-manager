@@ -6,6 +6,7 @@ import {parseResults, analyse, programSteps, adviceFor, trackKey, cleanLaps, cir
 import {levelOf, memoPilots} from '../shared/training.mjs';
 import {BOP} from '../shared/lmu-bop.mjs';
 import {bopFor} from '../shared/bop.mjs';
+import {catalogForGame} from '../shared/catalog.mjs';
 import {collectMemo, collectiveMemo, restartMemo, renewMemos} from './memo-collection.mjs';
 import {EXERCISES,checklistScope,checklistEvidence,analysisFromLive} from '../shared/training-checklist.mjs';
 import {sessionChecklist,getChecklist} from './training-checklist.mjs';
@@ -13,7 +14,10 @@ import {sessionChecklist,getChecklist} from './training-checklist.mjs';
 const FILE_LIMIT = 3_000_000;
 const KEEP_DAYS = 120;
 const ANALYSIS_SESSIONS = 5;
-const enabled = community => community?.modules?.training === true;
+// Two modules, LMU only: « Entraînement » (the pilot's own page) and « Mémo » (the circuits' sheets, for everyone).
+// A community that had the old single module keeps the Mémo it already showed.
+export const trainingEnabled = community => community?.modules?.training === true;
+export const memoEnabled = community => typeof community?.modules?.memo === 'boolean' ? community.modules.memo : trainingEnabled(community);
 const all = async (env, sql, ...params) => (await env.DB.prepare(sql).bind(...params).all()).results || [];
 const median = values => { const list = values.filter(value => value > 0).sort((a, b) => a - b); return list.length ? (list[Math.floor((list.length - 1) / 2)] + list[Math.ceil((list.length - 1) / 2)]) / 2 : null; };
 
@@ -185,19 +189,20 @@ async function memo(env, user, url, canRestart = false) {
     SELECT circuit,track,car,car_class,user_id FROM training_memo_pilots WHERE started_at>=?
     UNION ALL SELECT circuit,track,car,car_class,NULL AS user_id FROM training_memo_cycles)
     GROUP BY circuit,car,car_class ORDER BY circuit,car`, since);
-  const circuits = [];
-  for (const row of rows) {
-    let item = circuits.find(entry => entry.key === row.circuit);
-    if (!item) circuits.push(item = {key:row.circuit, name:row.track, cars:[]});
-    item.cars.push({car:row.car, carClass:row.car_class, pilots:row.pilots});
-  }
-  const circuit = circuits.find(item => item.key === url.searchParams.get('circuit')) || circuits[0];
-  if (!circuit) return {circuits, circuit:null,canRestart};
+  const circuits = memoCircuits(rows);
+  const race = url.searchParams.get('circuit') ? null : await nextRace(env, user);
+  const circuit = circuits.find(item => item.key === (url.searchParams.get('circuit') || race?.circuit))
+    || circuits.find(item => item.cars.some(car => car.measured)) || circuits[0];
   const car = circuit.cars.find(item => item.car === url.searchParams.get('car'))
-    || circuit.cars.find(item => item.carClass === url.searchParams.get('class')) || [...circuit.cars].sort((a, b) => b.pilots - a.pilots)[0];
+    || circuit.cars.find(item => item.carClass === (url.searchParams.get('class') || race?.category))
+    || [...circuit.cars].sort((a, b) => b.pilots - a.pilots)[0];
+  // Only the chosen circuit's cars travel: the list of every circuit with all the BoP's cars would weigh tens of kB.
+  const names = circuits.map(item => ({key:item.key, name:item.name}));
+  if (!car) return {circuits:names, cars:circuit.cars, circuit:{key:circuit.key, name:circuit.name}, car:null, canRestart};
   const personal = await env.DB.prepare('SELECT summary,stops FROM training_memo_pilots WHERE circuit=? AND car=? AND user_id=? AND started_at>=?')
     .bind(circuit.key,car.car,user,since).first();
-  const collective = await collectiveMemo(env,{circuit:circuit.key,car:car.car,track:circuit.name,car_class:car.carClass});
+  // A car nobody drove yet has no collection to open: its sheet is the BoP and the reference laps.
+  const collective = car.measured ? await collectiveMemo(env,{circuit:circuit.key,car:car.car,track:circuit.name,car_class:car.carClass}) : {sheet:null, collection:null};
   const stored = await env.DB.prepare('SELECT service FROM training_cars WHERE car=?').bind(car.car).first();
   const pilots=personal?[JSON.parse(personal.summary)]:[];
   const game = collective.sheet ? {fuel:collective.sheet.fuel.game,ve:collective.sheet.energy.game,ideal:collective.sheet.tyres[0]?.ideal} : pilots[0]?.game || null;
@@ -213,9 +218,28 @@ async function memo(env, user, url, canRestart = false) {
     tyres:[...common.tyres.map(tyre=>({...compare(tyre,own.tyres.find(item=>item.name===tyre.name)),youTemp:own.tyres.find(item=>item.name===tyre.name)?.youTemp??null})),
       ...own.tyres.filter(tyre=>!common.tyres.some(item=>item.name===tyre.name)).map(tyre=>({...tyre,median:null,low:null,high:null}))]
   }:{...own,energy:{...own.energy,median:null,low:null,high:null},fuel:{...own.fuel,median:null,low:null,high:null},tyres:own.tyres.map(tyre=>({...tyre,median:null,low:null,high:null}))};
-  return {circuits, circuit:{key:circuit.key, name:circuit.name}, car, ...sheet,collection:collective.collection,canRestart,
+  return {circuits:names, cars:circuit.cars, circuit:{key:circuit.key, name:circuit.name}, car, ...sheet,collection:collective.collection,canRestart,
     bop:bopFor(BOP, circuit.key, car.car, car.carClass),
     source:laptimes ? {name:LAPTIME_SOURCE.name, title:LAPTIME_SOURCE.title, url:LAPTIME_SOURCE.url, updated:laptimes.updated} : null};
+}
+
+// Every LMU circuit has its sheet from the start (BoP, reference laps); the cars the pilots drove come first, then the
+// BoP's other cars. Names come from the site's catalog, in French.
+function memoCircuits(rows) {
+  const circuits = catalogForGame('lmu').circuits.filter(item => !item.random).map(item => ({key:item.id, name:item.name, cars:[]}));
+  for (const row of rows) {
+    let item = circuits.find(entry => entry.key === row.circuit);
+    if (!item) circuits.push(item = {key:row.circuit, name:row.track, cars:[]});
+    item.cars.push({car:row.car, carClass:row.car_class, pilots:row.pilots, measured:true});
+  }
+  for (const item of circuits) {
+    const layout = BOP.layouts.filter(entry => circuitOf(entry.name) === item.key).sort((a, b) => a.name.length - b.name.length)[0];
+    for (const line of layout?.cars || []) {
+      const carClass = line.carClass === 'LMP2' && /ELMS/.test(line.car) ? 'LMP2_ELMS' : line.carClass;
+      if (!item.cars.some(car => bopFor(BOP, item.key, car.car, car.carClass)?.car === line.car)) item.cars.push({car:line.car, carClass, pilots:0, measured:false});
+    }
+  }
+  return circuits;
 }
 
 // The next LMU race the pilot is entered in (for the program's deadline and the circuit shown first).
@@ -293,7 +317,8 @@ async function linkDevice(env, user) {
 
 export async function trainingApi(path, method, request, env, actor, community) {
   if (!path.startsWith('/api/training')) return null;
-  if (!enabled(community)) fail(404, 'L’entraînement n’est pas activé dans cette communauté.');
+  const memoPath = path.startsWith('/api/training/memo');
+  if (memoPath ? !memoEnabled(community) : !trainingEnabled(community)) fail(404, memoPath ? 'Le mémo n’est pas activé dans cette communauté.' : 'L’entraînement n’est pas activé dans cette communauté.');
   if (!actor.user) fail(401, 'Connecte-toi avec Discord.');
   const user = actor.user.id;
   if (path === '/api/training' && method === 'GET') {

@@ -122,30 +122,41 @@ function bop(data) {
 const date = value => value ? new Date(value).toLocaleDateString('fr-FR') : '—';
 function collectionStatus(data) {
   const c=data.collection;
-  if(!c)return '';
-  return `<section class="training-card memo-collection" aria-label="Mise à jour du mémo">
-    <h2>${c.state==='stable'?'Mémo stabilisé':'Collecte en cours'}</h2>
+  if(!c||!data.canRestart)return '';
+  return `<details class="training-card memo-collection memo-wide"><summary>Administration · ${c.state==='stable'?'mémo stabilisé':'collecte en cours'}</summary>
     <p>${c.state==='stable'?`Moyennes stabilisées le ${date(c.publishedAt)}. Prochaine collecte le ${date(c.renewAt)}.`
       : `${c.pilots} / ${c.target.pilots} pilotes · ${c.laps} / ${c.target.laps} tours exploitables. Renouvellement le ${date(c.renewAt)}.`}</p>
     <p class="training-note">${c.previous?`Le mémo du ${date(c.publishedAt)} reste affiché jusqu’à ce que la nouvelle collecte soit suffisante. `:c.state==='collecting'?'Les valeurs disponibles sont provisoires. ':''}
       Accessible à tous les pilotes, même sans partager de données. Chaque contributeur a le même poids dans la moyenne.${c.sample?` Valeurs affichées : ${c.sample.pilots} pilotes, ${c.sample.laps} tours.`:''}</p>
     ${c.reason?`<p class="training-note">Relance : ${esc(c.reason)}.</p>`:''}
-    ${data.canRestart?`<details><summary>Administration · relancer après une mise à jour du jeu</summary>
+    ${data.canRestart?`<details><summary>Relancer après une mise à jour du jeu</summary>
       <form data-memo-restart><label>Version du jeu ou raison de la relance<input name="reason" required minlength="3" maxlength="120" placeholder="Ex. mise à jour LMU 1.5"></label>
       <p class="training-note">Relance la collecte de tous les circuits et voitures pour 15 jours. Les mémos disponibles restent visibles.</p>
       <button type="submit">Relancer la collecte du site</button><p data-restart-message role="status"></p></form></details>`:''}
-    </section>`;
+    </details>`;
 }
+
+// Every LMU circuit and car has its sheet: the reference laps and the BoP from the start, the stand, the fuel and the
+// tyres once measured. A card with nothing to show is left out rather than filled with dashes.
+const CLASS_ORDER = ['Hypercar', 'LMP2', 'LMP2_ELMS', 'LMP3', 'GT3', 'GTE'];
+const CLASS_LABEL = {Hypercar:'Hypercar', LMP2:'LMP2', LMP2_ELMS:'LMP2 ELMS', LMP3:'LMP3', GT3:'LMGT3', GTE:'GTE'};
+function carOptions(cars, chosen) {
+  const groups = new Map();
+  for (const item of cars) { const key = CLASS_LABEL[item.carClass] ? item.carClass : item.carClass || 'Autres'; if (!groups.has(key)) groups.set(key, []); groups.get(key).push(item); }
+  return [...groups].sort(([a], [b]) => (CLASS_ORDER.indexOf(a) + 1 || 99) - (CLASS_ORDER.indexOf(b) + 1 || 99))
+    .map(([key, list]) => `<optgroup label="${esc(CLASS_LABEL[key] || key)}">${list.map(item => `<option value="${esc(item.car)}"${item.car === chosen ? ' selected' : ''}>${esc(item.car)}</option>`).join('')}</optgroup>`).join('');
+}
+const has = item => item && [item.median, item.you, item.game].some(value => value !== null && value !== undefined);
 
 function render() {
   const data = view.data;
-  if (!data.circuit) {
-    app.innerHTML = `<div class="memo-head"><p class="memo-kicker">Mémo officiel · commun à tous les pilotes</p><h1>Mémo des circuits</h1>
-      <p class="memo-sub">Pas encore de fiche : elles se remplissent toutes seules quand les pilotes du site roulent avec le plugin SimHub ou le synchroniseur.</p></div>`;
-    return;
-  }
-  const circuit = data.circuits.find(item => item.key === data.circuit.key);
-  const s = data.service, tyre = data.tyres[0];
+  const head = `<div class="memo-head"><p class="memo-kicker">Mémo des circuits · LMU</p><h1>${esc(data.circuit.name)}</h1>
+    <div class="memo-pick">
+      <label class="memo-select">Circuit<select data-pick="circuit">${data.circuits.map(item => `<option value="${esc(item.key)}"${item.key === data.circuit.key ? ' selected' : ''}>${esc(item.name)}</option>`).join('')}</select></label>
+      ${data.car ? `<label class="memo-select">Voiture<select data-pick="car">${carOptions(data.cars, data.car.car)}</select></label>` : ''}
+    </div>`;
+  if (!data.car) { app.innerHTML = `${head}</div>`; return; }
+  const s = data.service, tyre = data.tyres?.[0], st = data.stint || {};
   // Service times in the two groups of the game's rule: what is done during the refuel (only the longest counts)
   // and what is added to it.
   const during = s ? [row('Carburant', s.fuelRate ? `${num(s.fuelRate)} L/s` : '—', '', s.connect ? `+ ${num(s.connect, 0)} s pour brancher` : ''),
@@ -153,46 +164,38 @@ function render() {
   const added = s ? [row('4 pneus', s.tyres4 ? `${num(s.tyres4)} s` : '—'), s.tyres2 ? row('2 pneus', `${num(s.tyres2)} s`) : '',
     s.ductFront ? row('Écopes avant · arrière', `${num(s.ductFront, 0)} s · ${num(s.ductRear, 0)} s`) : '', s.brakes ? row('Freins', `${num(s.brakes, 0)} s`) : '',
     s.source === 'game' ? row('Pressions, grille', '0 s', '', 'avec des pneus') : ''].join('') : '';
-  const cars = circuit.cars;
-  const st = data.stint, stintKind = source(st.by === 'energy' ? data.energy : data.fuel), wearKind = source(data.tyres[0]);
-  app.innerHTML = `<div class="memo-head"><p class="memo-kicker">Mémo officiel · commun à tous les pilotes</p><h1>${esc(data.circuit.name)}</h1>
-    
-    <div class="memo-pick">
-      <label class="memo-select">Circuit<select data-pick="circuit">${data.circuits.map(item => `<option value="${esc(item.key)}"${item.key === data.circuit.key ? ' selected' : ''}>${esc(item.name)}</option>`).join('')}</select></label>
-      <label class="memo-select">Voiture<select data-pick="car">${cars.map(item => `<option value="${esc(item.car)}"${item.car === data.car.car ? ' selected' : ''}>${esc(item.car)}</option>`).join('')}</select></label>
-    </div>
-    <p class="memo-key"><span class="is-you"><i class="dot"></i>Toi</span><span class="is-pilots"><i class="bar"></i>Les pilotes du site</span><span class="is-game"><i class="tri"></i>Le jeu</span></p></div>
-    ${collectionStatus(data)}
-    <div class="memo-grid">
-    ${levels(data)}
-    <section class="training-card"><h2>Stand</h2>
-      <dl>${row('Traversée de la voie', data.lane ? `${num(data.lane.through)} s` : '—', 'is-pilots', data.lane ? 'aussi le prix d’un drive-through' : 'pas encore mesurée')}</dl>
-      ${calculator(data)}
-      ${s?.source === 'game' ? '<p class="training-note memo-small">Le jeu ajoute jusqu’à 3 s au hasard.</p>' : ''}</section>
-    <section class="training-card"><h2>Temps de service</h2>
-      ${s ? `<p class="memo-tag ${s.source === 'game' ? 'is-game' : 'is-pilots'}">${s.source === 'game' ? 'Valeurs exactes du jeu' : 'Mesuré sur les arrêts'}</p>
+  const stintKind = source(st.by === 'energy' ? data.energy : data.fuel), wearKind = source(tyre);
+  const measured = has(data.energy) || has(data.fuel) || has(tyre) || data.lane || s;
+  const cards = [
+    levels(data),
+    data.lane || s?.source === 'game' ? `<section class="training-card"><h2>Stand</h2>
+      ${data.lane ? `<dl>${row('Traversée de la voie', `${num(data.lane.through)} s`, 'is-pilots', 'aussi le prix d’un drive-through')}</dl>` : ''}
+      ${s?.source === 'game' ? `<details class="memo-calc-fold"><summary>Calculer un arrêt</summary>${calculator(data)}<p class="training-note memo-small">Le jeu ajoute jusqu’à 3 s au hasard.</p></details>` : ''}</section>` : '',
+    s ? `<section class="training-card"><h2>Temps de service</h2>
+      <p class="memo-tag ${s.source === 'game' ? 'is-game' : 'is-pilots'}">${s.source === 'game' ? 'Valeurs exactes du jeu' : 'Mesuré sur les arrêts'}</p>
       <div class="memo-group"><h3>Pendant le plein <small>seul le plus long compte</small></h3><dl class="${s.source === 'game' ? 'is-game' : 'is-pilots'}">${during}</dl></div>
-      <div class="memo-group"><h3>En plus du plein <small>s’ajoutent</small></h3><dl class="${s.source === 'game' ? 'is-game' : 'is-pilots'}">${added}</dl></div>`
-      : '<p class="training-empty">Pas encore relevé pour cette voiture.</p>'}</section>
-    <section class="training-card"><h2>Énergie et carburant</h2>
-      ${data.energy.median !== null || data.energy.you !== null || data.energy.game ? perLap('Énergie', data.energy, '%', 2) : ''}
-      ${perLap('Carburant', data.fuel, 'L', 2, data.fuel.ratio ? row('Ratio carburant conseillé', num(data.fuel.ratio, 2), source(data.fuel)) : '')}</section>
-    <section class="training-card"><h2>Pneus${tyre ? ` · ${esc(tyre.name)}` : ''}</h2>
-      ${tyre ? `<div class="memo-block"><p class="memo-big ${source(tyre)}">${num(tyre.median ?? tyre.you, 2)}<span>% / tour · moyenne des 4 pneus</span></p>${band(tyre, '%', 2)}
+      <div class="memo-group"><h3>En plus du plein <small>s’ajoutent</small></h3><dl class="${s.source === 'game' ? 'is-game' : 'is-pilots'}">${added}</dl></div></section>` : '',
+    has(data.energy) || has(data.fuel) ? `<section class="training-card"><h2>Énergie et carburant</h2>
+      ${has(data.energy) ? perLap('Énergie', data.energy, '%', 2) : ''}
+      ${has(data.fuel) ? perLap('Carburant', data.fuel, 'L', 2, data.fuel.ratio ? row('Ratio carburant conseillé', num(data.fuel.ratio, 2), source(data.fuel)) : '') : ''}</section>` : '',
+    has(tyre) ? `<section class="training-card"><h2>Pneus · ${esc(tyre.name)}</h2>
+      <div class="memo-block"><p class="memo-big ${source(tyre)}">${num(tyre.median ?? tyre.you, 2)}<span>% / tour · moyenne des 4 pneus</span></p>${band(tyre, '%', 2)}
         ${tyre.wheels ? car(source(tyre), tyre.wheels.map(wheel => wheel.wear === null ? '—' : `${num(wheel.wear, 2)} %`), 'Usure par tour de chaque pneu') : ''}
         <dl>${tyre.median !== null && tyre.you !== null ? row('Ton usure moyenne', `${num(tyre.you, 2)} % / tour`, 'is-you') : ''}
-        ${tyre.ideal ? row('Température idéale', `${num(tyre.ideal, 0)} °C`, 'is-game') : ''}${tyre.track !== null ? row('Piste pendant les mesures', `${num(tyre.track)} °C`) : ''}</dl></div>
-        ${data.tyres.length > 1 ? `<p class="training-note">Autres gommes : ${data.tyres.slice(1).map(item => `${esc(item.name)} ${num(item.median ?? item.you, 2)} %`).join(', ')}.</p>` : ''}`
-      : '<p class="training-empty">Pas encore de tour mesuré.</p>'}</section>
-    ${bop(data)}
-    <section class="training-card${data.bop ? '' : ' memo-wide'}"><h2>Relais</h2>
-      ${st.laps ? `<p class="memo-big ${stintKind}">${st.laps}<span>tours ${st.by === 'energy' ? 'avec 100 % d’énergie' : 'avec un plein'}</span></p>
-      <dl>${st.by === 'energy' && st.fuel ? row('Carburant pour les faire', `${num(st.fuel, 1)} L`, stintKind, data.fuel.ratio ? `ratio conseillé ${num(data.fuel.ratio, 2)}` : '') : ''}
-</dl>
-      ${st.wear ? `<div class="memo-group"><h3>Usure des pneus sur le relais</h3>${car(wearKind, st.wear.map(value => value === null ? '—' : `−${num(value, 0)} %`), 'Usure de chaque pneu sur un relais')}</div>` : ''}`
-      : '<p class="training-empty">Pas encore de tour mesuré.</p>'}</section>
-    </div>
-    ${data.source ? `<p class="memo-credit">Chronos de référence : <a href="${esc(data.source.url)}" target="_blank" rel="noopener">${esc(data.source.title)}</a> de ${esc(data.source.name)}${data.source.updated ? `, mis à jour le ${esc(data.source.updated.split('-').reverse().join('/'))}` : ''}.</p>` : ''}`;
+        ${tyre.ideal ? row('Température idéale', `${num(tyre.ideal, 0)} °C`, 'is-game') : ''}${tyre.track !== null && tyre.track !== undefined ? row('Piste pendant les mesures', `${num(tyre.track)} °C`) : ''}</dl></div>
+        ${data.tyres.length > 1 ? `<p class="training-note">Autres gommes : ${data.tyres.slice(1).map(item => `${esc(item.name)} ${num(item.median ?? item.you, 2)} %`).join(', ')}.</p>` : ''}</section>` : '',
+    st.laps ? `<section class="training-card"><h2>Relais</h2>
+      <p class="memo-big ${stintKind}">${st.laps}<span>tours ${st.by === 'energy' ? 'avec 100 % d’énergie' : 'avec un plein'}</span></p>
+      <dl>${st.by === 'energy' && st.fuel ? row('Carburant pour les faire', `${num(st.fuel, 1)} L`, stintKind, data.fuel.ratio ? `ratio conseillé ${num(data.fuel.ratio, 2)}` : '') : ''}</dl>
+      ${st.wear ? `<div class="memo-group"><h3>Usure des pneus sur le relais</h3>${car(wearKind, st.wear.map(value => value === null ? '—' : `−${num(value, 0)} %`), 'Usure de chaque pneu sur un relais')}</div>` : ''}</section>` : '',
+    bop(data)
+  ].filter(Boolean);
+  app.innerHTML = `${head}
+    ${measured ? '<p class="memo-key"><span class="is-you"><i class="dot"></i>Toi</span><span class="is-pilots"><i class="bar"></i>Les pilotes du site</span><span class="is-game"><i class="tri"></i>Le jeu</span></p>' : ''}</div>
+    <div class="memo-grid">${cards.join('')}</div>
+    ${cards.length ? '' : '<p class="training-empty">Pas encore de données pour cette voiture.</p>'}
+    ${collectionStatus(data)}
+    ${data.source && data.levels ? `<p class="memo-credit">Chronos de référence : <a href="${esc(data.source.url)}" target="_blank" rel="noopener">${esc(data.source.title)}</a> de ${esc(data.source.name)}${data.source.updated ? `, mis à jour le ${esc(data.source.updated.split('-').reverse().join('/'))}` : ''}.</p>` : ''}`;
 }
 
 async function load(params = '') {
