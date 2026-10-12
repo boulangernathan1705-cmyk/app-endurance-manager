@@ -5,7 +5,7 @@ import {dateBlock,timeLabel,weekdayLong,dayMonthShort} from '../dates.mjs';
 import {durationLabel,eventMinutes} from '../../shared/duration.mjs';
 import {app,state,esc,button,canManage,isAdmin,can,canEditRace,officialBadge,communityTag,circuitLabel,eventTypeBadge,schedulePendingBadge,eventBadge,eventCategoryCount,circuitVisual,pilotCount,notifyRender} from './core.mjs';
 import {ownRegistration,renderRegistrationWorkspace,soloRounds} from './registration.mjs';
-import {renderPilots} from './crews.mjs';
+import {renderPilots,renderLaterCrews} from './crews.mjs';
 import {isSolo,accessBadge,soloCardMeta,soloEventDetails,roundTiles,roundPilots,soloEntryList,eventCircuitName,soloEntryBlock,safeGuideLink} from './solo.mjs';
 import {renderHome,raceDateBlock,raceStarts} from './home-view.mjs';
 import {planningDays,renderPlanning,syncPlanning,CHEVRON} from './planning.mjs';
@@ -19,12 +19,16 @@ function canCreateCrewOnDeparture(departure,event=null){
   return Boolean(event?.official&&(state.communities||[]).some(item=>item.manageCrews));
 }
 
+// A race with several starts to come: its crews are created outside the starts (« Départ à choisir »), each pilot
+// joins from the start of his choice.
+export function crewsLater(event){return !isSolo(event)&&(event.departures||[]).filter(departure=>!departure.tbd&&departure.startsAt>Date.now()).length>1;}
+
 // Where the pilot stands on this start, shown in its title line: their crew, or their categories.
-function myDepartureBadge(departure){
+function myDepartureBadge(departure,event){
   const regs=(departure.availability||[]).filter(reg=>reg.mine&&reg.status!=='unavailable');
   if(!regs.length)return '';
   for(const reg of regs){
-    const crew=(departure.crews||[]).find(item=>(item.registrationIds||[]).includes(reg.id));
+    const crew=[...(departure.crews||[]),...(event?.laterCrews||[])].find(item=>(item.registrationIds||[]).includes(reg.id));
     if(crew)return `<span class="departure-mine-badge is-crew">✓ Équipage ${esc(crew.name)} · ${esc(reg.category)}</span>`;
   }
   return `<span class="departure-mine-badge">✓ Inscrit · ${esc(regs.map(reg=>reg.category).join(' / '))}</span>`;
@@ -77,7 +81,7 @@ function quickActions(event,departure){
   const menu=!more.length?'':more.length===1&&!main?square(ICON_REGISTER,more[0].label,`data-action="${more[0].action}" data-departure="${departure.id}" ${more[0].extra}`,'Inscrire')
     :`<span class="planning-quick-menu-wrap">${square(ICON_MORE,'Autres inscriptions','data-action="quick-menu" aria-haspopup="menu" aria-expanded="false"')}<span class="planning-quick-menu" role="menu" hidden>${more.map(item=>`<button type="button" role="menuitem" class="planning-quick-item" data-action="${item.action}" data-departure="${departure.id}" ${item.extra}>${esc(item.label)}</button>`).join('')}</span></span>`;
   const crewLabel='Créer un équipage';
-  const crew=!solo&&canCreateCrewOnDeparture(departure,event)?square(ICON_CREW,crewLabel,`data-crew-builder-open data-departure="${departure.id}"`):'';
+  const crew=!solo&&!crewsLater(event)&&canCreateCrewOnDeparture(departure,event)?square(ICON_CREW,crewLabel,`data-crew-builder-open data-departure="${departure.id}"`):'';
   const absence=absenceButton(event);
   return register||absence||menu||crew?`<span class="planning-quick">${register}${absence}${menu}${crew}</span>`:'';
 }
@@ -132,7 +136,7 @@ function roundCards(event,departure){
 // Buttons of a start (enter, enter another pilot, create a crew) and what an opened start shows.
 function departureActions(event,departure){
   if(departure.startsAt<=Date.now())return '';
-  const own=ownRegistration(departure),canCreateCrew=canCreateCrewOnDeparture(departure,event);
+  const own=ownRegistration(departure),canCreateCrew=!crewsLater(event)&&canCreateCrewOnDeparture(departure,event);
   const createCrewAction=canCreateCrew?`<button type="button" class="link-button ux-summary-create-crew" data-crew-builder-open data-departure="${departure.id}" data-tip="Choisis la voiture, compose les pilotes et verrouille l’équipage quand il est complet.">Créer un équipage</button>`:'';
   const mine=(departure.availability||[]).filter(reg=>reg.mine&&reg.status!=='unavailable');
   const leave=mine.length===1?button('delete-registration','Me désinscrire',`data-departure="${departure.id}" data-id="${mine[0].id}"`,'secondary-button is-leave'):'';
@@ -146,7 +150,7 @@ function departureFoldBody(event,departure){
 
 export function renderDeparturePanel(event,departure,index,open=false,{isPast=false}={}){
   const locked=departure.startsAt<=Date.now(),crews=departure.crews||[],available=pilotCount(departure.availability);
-  const mine=myDepartureBadge(departure);
+  const mine=myDepartureBadge(departure,event);
   return `<details class="departure-fold${isPast?' is-past':''}${mine?' is-mine':''}" id="departure-${departure.id}" ${open?'open':''}><summary><span class="fold-index">${String(index+1).padStart(2,'0')}</span><span class="fold-date">${dateBlock(departure.startsAt,{compact:true})}<span class="fold-date-text"><strong class="ux-departure-title">Départ ${esc(timeLabel(departure.time))}</strong>${locked?'<span class="ux-departure-date">Départ passé</span>':''}${mine}</span></span><span class="fold-meta">${available} pilote${available>1?'s':''} · ${crews.length} équipage${crews.length>1?'s':''}</span>${departureActions(event,departure)}</summary>${departureFoldBody(event,departure)}</details>`;
 }
 
@@ -182,7 +186,7 @@ function communityView(event){
   const present=raceCommunities(event),chosen=planningCommunities().filter(id=>present.has(id));
   if(!chosen.length)return {shown:event,present,chosen};
   const keep=item=>chosen.includes(item.community?.id);
-  return {shown:{...event,departures:(event.departures||[]).map(departure=>({...departure,availability:(departure.availability||[]).filter(keep),crews:(departure.crews||[]).filter(keep)}))},present,chosen};
+  return {shown:{...event,laterCrews:(event.laterCrews||[]).filter(keep),departures:(event.departures||[]).map(departure=>({...departure,availability:(departure.availability||[]).filter(keep),crews:(departure.crews||[]).filter(keep)}))},present,chosen};
 }
 function communityFilter(present,chosen){
   if(present.size<2)return '';
@@ -238,7 +242,7 @@ export function renderEvent(message=''){
   // Endurances: the badges sit under the date, the race settings (icons) under the circuit.
   const badges=`<span class="race-badges">${officialBadge(event)}${isSolo(event)?accessBadge(event):eventTypeBadge(event.eventType)}${schedulePendingBadge(event)}</span>`;
   app.eventViewData={eventId:event.id,events:state.events,message};
-  app.innerHTML=`<div class="event-header event-header-compact race-header event-type-${event.eventType||'private'}${isSolo(event)?` is-solo-${event.access||'open'} sim-${simForEvent(event)}`:''}" data-event-id="${event.id}"><div class="race-card-top">${isSolo(event)?raceDateBlock(event,!next&&!undated.length):`<div class="race-side">${raceDateBlock(event,!next&&!undated.length)}${badges}</div>`}<div class="race-head"><h1 class="event-title event-name">${esc(event.name)}</h1><span class="race-meta">${isSolo(event)?((event.rounds||[]).length>1?soloCardMeta(event):`<strong class="solo-header-circuit">${soloCardMeta(event)}</strong>`):`${esc(circuitLabel(event.circuit))} · <span class="nowrap">${durationLabel(eventMinutes(event))}</span>`}</span>${isSolo(event)?badges+soloHeaderTime(event,next):raceInfoChips(event)}</div>${myStartLink}${isSolo(event)?eventTypePanel(event):circuitVisual(event.circuit)}</div>${days.length?(isSolo(event)?(soloEventDetails(event)?`<div class="race-header-footer">${soloEventDetails(event)}</div>`:''):raceStarts(event,!next&&!undated.length)):`${isSolo(event)?'':raceStarts(event,!next&&!undated.length)}<div class="race-header-footer">${isSolo(event)?soloEventDetails(event):`<div class="event-header-stats event-category-badges">${event.categories.map(category=>eventBadge(category,eventCategoryCount(event,category))).join('')}</div>`}${eventActions}</div>`}</div><div id="crew-builder-root"></div>${message?`<p class="creation-success" role="status">${esc(message)}</p>`:''}${communityFilter(present,chosen)}${starts}${absencesSection(full,!!(next||undated.length))}`;
+  app.innerHTML=`<div class="event-header event-header-compact race-header event-type-${event.eventType||'private'}${isSolo(event)?` is-solo-${event.access||'open'} sim-${simForEvent(event)}`:''}" data-event-id="${event.id}"><div class="race-card-top">${isSolo(event)?raceDateBlock(event,!next&&!undated.length):`<div class="race-side">${raceDateBlock(event,!next&&!undated.length)}${badges}</div>`}<div class="race-head"><h1 class="event-title event-name">${esc(event.name)}</h1><span class="race-meta">${isSolo(event)?((event.rounds||[]).length>1?soloCardMeta(event):`<strong class="solo-header-circuit">${soloCardMeta(event)}</strong>`):`${esc(circuitLabel(event.circuit))} · <span class="nowrap">${durationLabel(eventMinutes(event))}</span>`}</span>${isSolo(event)?badges+soloHeaderTime(event,next):raceInfoChips(event)}</div>${myStartLink}${isSolo(event)?eventTypePanel(event):circuitVisual(event.circuit)}</div>${days.length?(isSolo(event)?(soloEventDetails(event)?`<div class="race-header-footer">${soloEventDetails(event)}</div>`:''):raceStarts(event,!next&&!undated.length)):`${isSolo(event)?'':raceStarts(event,!next&&!undated.length)}<div class="race-header-footer">${isSolo(event)?soloEventDetails(event):`<div class="event-header-stats event-category-badges">${event.categories.map(category=>eventBadge(category,eventCategoryCount(event,category))).join('')}</div>`}${eventActions}</div>`}</div><div id="crew-builder-root"></div>${message?`<p class="creation-success" role="status">${esc(message)}</p>`:''}${communityFilter(present,chosen)}${crewsLater(full)||(event.laterCrews||[]).length?renderLaterCrews(event,{canCreate:crewsLater(full)&&Boolean(next)&&canCreateCrewOnDeparture(next,event)}):''}${starts}${absencesSection(full,!!(next||undated.length))}`;
   if(days.length)syncPlanning(app);
   notifyRender();
 }

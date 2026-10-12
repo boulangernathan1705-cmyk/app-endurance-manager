@@ -72,6 +72,11 @@ async function dropEmptyCommonStart(env, eventId, data) {
     .bind(eventId, common.id, eventId, common.id).first();
   if (!used) data.departures = data.departures.filter(departure => departure !== common);
 }
+// The start that stands for a crew whose start is still to choose: the next one (none left: the last one, passed).
+function laterStart(event) {
+  const starts = JSON.parse(event.departures).filter(d => !d.tbd);
+  return starts.find(d => d.startsAt > Date.now()) || starts.at(-1) || {startsAt:0};
+}
 // An official slot for pilots leaving the common "Horaire à définir" start of the same race.
 function slotFor(event, from, departureId) {
   if (!from.tbd) fail(409, 'Ce départ a déjà son horaire.');
@@ -266,9 +271,12 @@ async function listEvents(env, actor, game='', scope='', community) {
   }
   const crewsByDeparture = new Map();
   for (const crew of crews) {
-    const key = `${crew.event_id}:${crew.departure_id}`;
+    // « Départ à choisir »: the crew is shown above the starts of its race; its pilots joined it from the start of
+    // their choice.
+    const key = crew.departure_id ? `${crew.event_id}:${crew.departure_id}` : `${crew.event_id}:later`;
     if (!crewsByDeparture.has(key)) crewsByDeparture.set(key, []);
     crewsByDeparture.get(key).push({
+      ...(crew.departure_id ? {} : {later:true}),
       id:crew.id,
       name:crew.name,
       category:crew.category,
@@ -287,7 +295,7 @@ async function listEvents(env, actor, game='', scope='', community) {
     const format=row.format||'endurance', capacity=row.capacity==null?null:Number(row.capacity);
     const durationHours=Number(row.duration_hours)||3, durationMinutes=Number(row.duration_minutes)||durationHours*60;
     return {id:row.id, name:row.name, official:row.community_id===OFFICIAL, format, ...(format==='solo' ? {sim:simForEvent(row)} : {}), details:JSON.parse(row.details||'{}'), access:row.access||'open', capacity, rounds:JSON.parse(row.rounds||'[]'), circuit:row.circuit||'', durationHours, durationMinutes, driverChangeRequired:row.driver_change_required==null?null:Boolean(row.driver_change_required), eventType:row.event_type||'private', schedulePending:Boolean(row.schedule_pending), createdByMe:Boolean(actor.user && row.created_by===actor.user.id), categories:JSON.parse(row.categories), version:row.version,
-      absences:absences.get(row.id) || [], departures:JSON.parse(row.departures).map(d => {
+      absences:absences.get(row.id) || [], laterCrews:crewsByDeparture.get(`${row.id}:later`) || [], departures:JSON.parse(row.departures).map(d => {
         const availability=grouped.get(`${row.id}:${d.id}`) || [];
         // Solo race: entries keep their order of arrival; beyond the number of places they are on the
         // waiting list, and the first one waiting moves up by itself when someone withdraws.
@@ -477,7 +485,9 @@ async function api(request, env) {
     const event=await eventById(env,crew?.event_id || crewCreate[1],community);
     const {community:here, actor:who} = await actingCommunity(env, actor, community, crew ? crew.community_id : input.communityId, event);
     if ((event.format||'endurance')==='solo') fail(409,'Les événements n’ont pas d’équipage.');
-    const departure=departureById(event,crew?.departure_id || crewCreate[2]);
+    // « Départ à choisir » (no start yet): open until the last start of its race.
+    const later=Boolean(crew && !crew.departure_id);
+    const departure=later ? laterStart(event) : departureById(event,crew?.departure_id || crewCreate[2]);
     if (departure.startsAt<=Date.now()) fail(409,'Ce départ est passé. Les équipages sont verrouillés.');
     if (crew && input.version!==crew.version) fail(409,'Cet équipage a changé. Actualise avant de réessayer.');
     const membership=crewRoute && path.includes('/members');
@@ -486,7 +496,8 @@ async function api(request, env) {
         if (crew.locked) fail(409,'Cet équipage est complet. Son responsable doit le rouvrir avant de pouvoir le rejoindre.');
         if (!/^[a-f0-9-]{36}$/.test(input.registrationId || '')) fail(400,'Sélectionne un pilote inscrit.');
         const selected=await env.DB.prepare(registrationSelect+' WHERE r.id=? AND r.community_id=?').bind(input.registrationId,here.id).first();
-        if (!selected || selected.event_id!==crew.event_id || selected.departure_id!==crew.departure_id) fail(409,'Ce pilote n’est pas inscrit sur ce départ. Actualise la page.');
+        if (!selected || selected.event_id!==crew.event_id || (!later && selected.departure_id!==crew.departure_id)) fail(409,'Ce pilote n’est pas inscrit sur ce départ. Actualise la page.');
+        if (later && departureById(event,selected.departure_id).startsAt<=Date.now()) fail(409,'Ce départ est passé. Les équipages sont verrouillés.');
         if (selected.category!==crew.category || selected.status==='unavailable') fail(409,'Cette inscription ne correspond pas à la catégorie de l’équipage.');
         const selfJoin=input.selfJoin===true && personal(selected,actor);
         if (!canManageCrew(crew,who) && !selfJoin) fail(403,'Tu peux uniquement rejoindre un équipage avec ta propre inscription.');
@@ -500,9 +511,9 @@ async function api(request, env) {
           env.DB.prepare(`DELETE FROM registrations WHERE changes()=1 AND id!=? AND event_id=? AND departure_id=? AND participant_id=?`).bind(selected.id,selected.event_id,selected.departure_id,selected.participant_id)
         ]);
         if (!results[0].meta.changes) fail(409,'Cet équipage a changé. Actualise la page.');
-        const pilot=selected.participant_name||selected.name;
-        await notify(env,await crewPilots(env,crew.id),'crew_join',event,{departure,skip:[actor.user.id,selected.participant_user_id],pilot,crewName:crew.name});
-        if (!selfJoin && selected.participant_user_id) await notify(env,[{user_id:selected.participant_user_id,community_id:here.id}],'crew_added',event,{departure,skip:[actor.user.id],crewName:crew.name,by:actor.user.name});
+        const pilot=selected.participant_name||selected.name, at=later?departureById(event,selected.departure_id):departure;
+        await notify(env,await crewPilots(env,crew.id),'crew_join',event,{departure:at,skip:[actor.user.id,selected.participant_user_id],pilot,crewName:crew.name});
+        if (!selfJoin && selected.participant_user_id) await notify(env,[{user_id:selected.participant_user_id,community_id:here.id}],'crew_added',event,{departure:at,skip:[actor.user.id],crewName:crew.name,by:actor.user.name});
         return json({ok:true,removedRegistrations:results[2].meta.changes,claimedOwnership:Boolean(claimOwner)});
       }
       if (method==='DELETE' && crewRoute[2]) {
@@ -548,6 +559,20 @@ async function api(request, env) {
       if (method!=='PATCH') fail(404,'Action introuvable.');
       // Common "Horaire à définir" start: once the official slots are known, the crew picks its start and
       // moves there with its pilots.
+      if (input.departureId!==undefined && later) {
+        // « Départ à choisir » fixed: the pilots entered on that start stay in the crew, the others leave it
+        // (their entries stay).
+        const target=departureById(event,input.departureId);
+        if (target.tbd || target.startsAt<=Date.now()) fail(400,'Choisis un des départs à venir.');
+        const results=await env.DB.batch([
+          env.DB.prepare(`DELETE FROM crew_members WHERE crew_id=? AND registration_id IN (SELECT id FROM registrations WHERE departure_id!=?)
+            AND EXISTS(SELECT 1 FROM crews WHERE id=? AND version=?)`).bind(crew.id,target.id,crew.id,input.version),
+          env.DB.prepare("UPDATE crews SET departure_id=?,version=version+1 WHERE id=? AND version=? AND departure_id=''").bind(target.id,crew.id,input.version)
+        ]);
+        if (!results[1].meta.changes) fail(409,'Cet équipage a changé. Actualise avant de réessayer.');
+        await notify(env,await crewPilots(env,crew.id),'crew_start',event,{departure:target,skip:[actor.user.id],crewName:crew.name,by:actor.user.name});
+        return json({ok:true,departureId:target.id,left:results[0].meta.changes});
+      }
       if (input.departureId!==undefined) {
         const target=slotFor(event,departure,input.departureId);
         // One atomic batch: the crew assignment guards forbid moving an assigned entry, so the members leave
@@ -586,6 +611,12 @@ async function api(request, env) {
     // « Équipages »: a crew is created by whoever has that permission. Entered on this start and category, they
     // lead it and join it; otherwise (or as an administrator) the crew starts empty, to be composed.
     requirePermission(who,'crews','Tu n’as pas l’autorisation de créer un équipage dans cette communauté.');
+    // « Départ à choisir »: created empty, without a start; its creator leads it.
+    if (input.later===true) {
+      const result=await env.DB.prepare("INSERT INTO crews(id,event_id,departure_id,name,category,car,owner_user_id,created_at,community_id) VALUES(?,?,'',?,?,?,?,?,?)").bind(crewId,event.id,name,input.category,car,actor.user.id,now(),here.id).run();
+      if (!result.meta.changes) fail(409,'Impossible de créer cet équipage. Actualise avant de réessayer.');
+      return json({id:crewId,joined:false,later:true},201);
+    }
     const ownRows=can(who,'manage_registrations')?[]:(await env.DB.prepare(registrationSelect+' WHERE r.event_id=? AND r.departure_id=? AND r.category=? AND r.status!=? AND r.community_id=?').bind(event.id,departure.id,input.category,'unavailable',here.id).all()).results;
     const selected=ownRows.find(reg=>personal(reg,actor));
     if (!selected) {

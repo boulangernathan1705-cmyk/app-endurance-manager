@@ -94,9 +94,45 @@ function crewCard(event,departure,crew,index,unassigned,allCrews){
   </div>`;
 }
 
+// « Départ à choisir »: the crews created outside the starts, above them. Each pilot joins from the start of his
+// choice, with his hours; the crew's leader then settles on the start where most of them are.
+const startLabel=departure=>`${shortDateLabel(departure.startsAt)} · ${clockLabel(departure.time)}`;
+export function laterCrewStarts(event,crew){
+  const ids=new Set(crew.registrationIds||[]);
+  return (event.departures||[]).map(departure=>({departure,regs:(departure.availability||[]).filter(reg=>ids.has(reg.id))})).filter(item=>item.regs.length);
+}
+function laterCrewCard(event,crew,index){
+  const future=(event.departures||[]).filter(departure=>!departure.tbd&&!startHasBegun(departure));
+  const starts=laterCrewStarts(event,crew).filter(item=>!startHasBegun(item.departure));
+  const otherCommunity=Boolean(event.official)&&(event.departures||[]).some(departure=>(departure.availability||[]).some(reg=>reg.mine&&(reg.community?.id||'')!==(crew.community?.id||'')));
+  const lines=starts.map(({departure,regs})=>{
+    const cov=coverage(event,departure,regs),mine=regs.find(reg=>reg.mine);
+    const leave=mine?button('leave-crew','Quitter',`data-id="${crew.id}" data-departure="${departure.id}" data-registration="${mine.id}" data-version="${crew.version}"`,'link-button'):'';
+    const fix=crew.canManage?button('fix-crew-start','Choisir ce départ',`data-id="${crew.id}" data-departure="${departure.id}" data-version="${crew.version}"`,'secondary-button'):'';
+    return `<li class="later-crew-start"><span class="later-crew-start-head"><strong>${esc(startLabel(departure))}</strong><em>${cov.covered}/${cov.duration} h</em><span class="later-crew-start-actions">${leave}${fix}</span></span><span class="later-crew-names">${regs.map(reg=>esc(reg.name)).join(' · ')}</span>${renderAvailabilityTimeline({departure,duration:cov.duration,counts:cov.counts,label:`Couverture le ${startLabel(departure)}`})}</li>`;
+  }).join('');
+  const joined=new Set(starts.filter(item=>item.regs.some(reg=>reg.mine)).map(item=>item.departure.id));
+  const open=future.filter(departure=>!joined.has(departure.id));
+  const join=state.user&&!crew.locked&&!otherCommunity&&open.length?`<label class="later-crew-join"><span class="sr-only">Rejoindre ${esc(crew.name)}</span><select data-later-join data-id="${crew.id}"><option value="">${joined.size?'Ajouter un départ…':'Rejoindre sur…'}</option>${open.map(departure=>`<option value="${departure.id}">${esc(startLabel(departure))}</option>`).join('')}</select></label>`:'';
+  const manage=crew.canManage?button('edit-crew','Gérer',`data-id="${crew.id}" aria-label="Gérer l’équipage ${esc(crew.name)}"`,'link-button crew-manage-button')
+    +button('delete-crew','<svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg><span>Supprimer</span>',`data-id="${crew.id}" data-version="${crew.version}" aria-label="Supprimer l’équipage ${esc(crew.name)}"`,'danger-link crew-delete-button'):'';
+  return `<article class="later-crew-card ${crewColorClass(crew.id,index)}${joined.size?' is-mine':''}" data-crew-id="${crew.id}">
+    <div class="later-crew-head"><span class="crew-compact-category" aria-hidden="true">${logo(crew.category)}</span><span class="later-crew-name">${communityTag(crew)}<strong>${esc(crew.name)}</strong><small>${esc(crew.car||'Voiture à choisir')}</small></span>${crew.ownedByMe?'<span class="crew-owner-badge">Responsable</span>':''}</div>
+    ${lines?`<ul class="later-crew-starts">${lines}</ul>`:'<p class="empty crew-empty-roster">Aucun pilote pour l’instant.</p>'}
+    ${join||manage?`<div class="crew-self-actions">${join}${manage}</div>`:''}
+  </article>`;
+}
+export function renderLaterCrews(event,{canCreate=false}={}){
+  const crews=[...(event.laterCrews||[])].sort((a,b)=>event.categories.indexOf(a.category)-event.categories.indexOf(b.category)||String(a.name).localeCompare(String(b.name),'fr',{sensitivity:'base',numeric:true}));
+  if(!crews.length&&!canCreate)return '';
+  const create=canCreate?`<button type="button" class="secondary-button crew-builder-open" data-crew-builder-open data-later="1">Créer un équipage</button>`:'';
+  return `<section class="later-crews" aria-label="Équipages"><div class="later-crews-head"><h2>Équipages <span>${crews.length}</span></h2>${create}</div>${crews.length?`<p class="later-crews-help">Rejoins un équipage sur le départ de ton choix. Son responsable fixe ensuite le départ.</p><div class="later-crews-list">${crews.map((crew,index)=>laterCrewCard(event,crew,index)).join('')}</div>`:''}</section>`;
+}
+
 export function renderPilots(event,departure,options={}){
   const crews=sortedCrews(event,departure);
-  const assigned=new Set(crews.flatMap(crew=>crew.registrationIds||[]));
+  // Pilots of a crew whose start is still to choose are in a crew too.
+  const assigned=new Set([...crews,...(event.laterCrews||[])].flatMap(crew=>crew.registrationIds||[]));
   const unassigned=(departure.availability||[]).filter(reg=>reg.status!=='unavailable'&&!assigned.has(reg.id)).sort((a,b)=>event.categories.indexOf(a.category)-event.categories.indexOf(b.category)||String(a.name).localeCompare(String(b.name),'fr',{sensitivity:'base'}));
   const unavailable=(departure.availability||[]).filter(reg=>reg.status==='unavailable');
   const crewCards=crews.length?crews.map((crew,index)=>crewCard(event,departure,crew,index,unassigned,crews)).join(''):'<p class="empty">Aucun équipage pour ce départ.</p>';

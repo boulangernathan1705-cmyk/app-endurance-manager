@@ -37,7 +37,7 @@ test('un pilote peut rejoindre quitter gérer et supprimer son équipage depuis 
 test('création et modification utilisent le même éditeur équipage contextualisé au départ', () => {
   const builder = read('crew-builder.js');
   const crews = read('front/app/crews.mjs');
-  assert.match(builder, /async function openBuilder\(crewId = null, preferredDepartureId = ''\)/);
+  assert.match(builder, /async function openBuilder\(crewId = null, preferredDepartureId = '', later = false\)/);
   assert.match(builder, /mode:'edit'/);
   assert.match(builder, /mode:'create'/);
   assert.match(builder, /Créer mon équipage/);

@@ -8,10 +8,11 @@ import {submitSoloEvent} from './solo-form.mjs';
 import {readRaceInfo} from './race-info.mjs';
 import {refresh,refreshAfterSave} from './refresh.mjs';
 import {draftFor,registrationDraft,ownRegistrations,rerenderRegistrationSection,submitRegistration,registrationStep,canEnterInOneClick,enterInOneClick,enterRound,editRound,skipRound} from './registration.mjs';
-import {updateCrewState,pickSlot} from './crews.mjs';
+import {updateCrewState,pickSlot,laterCrewStarts} from './crews.mjs';
 import {installRouter,routeFromLocation,applyRoute} from './router.mjs';
 import {installAutoRefresh} from './auto-refresh.mjs';
 import {introduceCommunitiesOnce} from '../community-intro.mjs';
+import {shortDateLabel,timeLabel} from '../dates.mjs';
 
 // After an entry: the place on the waiting list when the event (or the round) is full.
 function enteredMessage(eventId,departureId,round,done){
@@ -68,6 +69,8 @@ async function submitEvent(form){
   await refreshAfterSave(editing?'Événement modifié.':'Événement créé.',result.id);
 }
 
+// A crew of a start, or one whose start is still to choose (above the starts).
+const findCrew=(event,departure,id)=>departure?.crews?.find(item=>item.id===id)||event?.laterCrews?.find(item=>item.id===id)||null;
 function beginCrewJoin(event,departure,crew){
   if(!state.user)throw Error('Connecte-toi avec Discord pour rejoindre un équipage.');
   const assigned=new Set((departure.crews||[]).flatMap(item=>item.registrationIds||[]));
@@ -91,7 +94,7 @@ async function finishPendingCrewJoin(departureId,registrationId){
     await load();
     const event=state.events.find(item=>item.id===pending.eventId);
     const departure=event?.departures.find(item=>item.id===pending.departureId);
-    const crew=departure?.crews.find(item=>item.id===pending.crewId);
+    const crew=findCrew(event,departure,pending.crewId);
     if(!crew)throw Error('Cet équipage n’existe plus.');
     await api(`/api/crews/${crew.id}/members`,'POST',{registrationId,version:crew.version,selfJoin:true});
     state.crewManagementOpen.add(crew.id);
@@ -157,14 +160,21 @@ async function perform(action,target){
       const result=await api(`/api/crews/${crew.id}/members`,'POST',{registrationId:reg.id,version:crew.version,selfJoin:true});state.crewManagementOpen.add(crew.id);
       await refreshAfterSave(`Tu as rejoint « ${crew.name} ».${result.claimedOwnership?' Tu en es maintenant le responsable.':''}`);break;
     }
+    case 'fix-crew-start': {
+      const departure=event?.departures.find(item=>item.id===target.dataset.departure);const crew=findCrew(event,departure,target.dataset.id);
+      if(!crew)throw Error('Équipage introuvable. Actualise la page.');
+      const elsewhere=laterCrewStarts(event,crew).some(item=>item.departure.id!==departure.id);
+      if(!confirm(`Courir avec « ${crew.name} » le ${shortDateLabel(departure.startsAt)} à ${timeLabel(departure.time)} ?${elsewhere?' Les pilotes inscrits sur un autre départ quittent l’équipage (leur inscription est conservée).':''}${inCommunity()}`))return;
+      await api(`/api/crews/${crew.id}`,'PATCH',{departureId:departure.id,version:crew.version});state.crewManagementOpen.add(crew.id);state.selectedDepartureId=departure.id;await refreshAfterSave(`« ${crew.name} » court le ${shortDateLabel(departure.startsAt)} à ${timeLabel(departure.time)}.`);break;
+    }
     case 'leave-crew': {
-      const departure=event?.departures.find(item=>item.id===target.dataset.departure);const crew=departure?.crews.find(item=>item.id===target.dataset.id);const reg=departure?.availability.find(item=>item.id===target.dataset.registration);
+      const departure=event?.departures.find(item=>item.id===target.dataset.departure);const crew=findCrew(event,departure,target.dataset.id);const reg=departure?.availability.find(item=>item.id===target.dataset.registration);
       if(!crew||!reg)throw Error('Équipage ou inscription introuvable. Actualise la page.');
       if(!confirm(`Quitter « ${crew.name} » ? Ton inscription à la course sera conservée.${inCommunity()}`))return;
       await api(`/api/crews/${crew.id}/members/${reg.id}`,'DELETE',{version:crew.version});state.crewManagementOpen.delete(crew.id);await refreshAfterSave(`Tu as quitté « ${crew.name} ».`);break;
     }
     case 'add-crew-pilot': case 'remove-crew-pilot': case 'delete-crew': {
-      const departure=event.departures.find(item=>item.id===target.dataset.departure); const crew=departure.crews.find(item=>item.id===target.dataset.id); if(!crew)throw Error('Équipage introuvable.');
+      const departure=event.departures.find(item=>item.id===target.dataset.departure); const crew=findCrew(event,departure,target.dataset.id); if(!crew)throw Error('Équipage introuvable.');
       if(action==='delete-crew'){if(!confirm(`Supprimer « ${crew.name} » ? Les inscriptions des pilotes seront conservées.${inCommunity()}`))return; await api(`/api/crews/${crew.id}`,'DELETE',{version:crew.version});}
       else if(action==='add-crew-pilot'){const registrationId=target.dataset.registration;if(!registrationId)throw Error('Choisis un pilote.');const result=await api(`/api/crews/${crew.id}/members`,'POST',{registrationId,version:crew.version});state.crewManagementOpen.add(crew.id);await refreshAfterSave(`Pilote affecté. ${result.removedRegistrations||0} autre(s) inscription(s) retirée(s) pour ce départ.`);return;}
       else {if(!confirm(`Retirer ce pilote de l’équipage ? Son inscription sera conservée.${inCommunity()}`))return;await api(`/api/crews/${crew.id}/members/${target.dataset.registration}`,'DELETE',{version:crew.version});state.crewManagementOpen.add(crew.id);}
@@ -211,6 +221,17 @@ async function perform(action,target){
 document.addEventListener('input',event=>{const field=event.target;if(field.dataset.departure&&state.drafts[field.dataset.departure]){if(field.name==='pilotName')state.drafts[field.dataset.departure].name=field.value;}});
 document.addEventListener('change',async event=>{
   const field=event.target;
+  // « Rejoindre sur… »: a crew whose start is still to choose, joined from the chosen start (entered there first if need be).
+  if(field.matches?.('[data-later-join]')){try{
+    const event=state.events.find(item=>item.id===state.currentEventId),departure=event?.departures.find(item=>item.id===field.value),crew=findCrew(event,null,field.dataset.id);
+    if(!departure||!crew)return;
+    if(crew.locked)throw Error('Cet équipage est complet.');
+    const taken=new Set([...(departure.crews||[]),...(event.laterCrews||[])].flatMap(item=>item.registrationIds||[]));
+    const reg=(departure.availability||[]).find(item=>item.mine&&item.category===crew.category&&item.status!=='unavailable'&&!taken.has(item.id)&&(item.community?.id||'')===(crew.community?.id||''));
+    if(!reg){beginCrewJoin(event,departure,crew);return;}
+    const result=await api(`/api/crews/${crew.id}/members`,'POST',{registrationId:reg.id,version:crew.version,selfJoin:true});
+    await refreshAfterSave(`Tu as rejoint « ${crew.name} ».${result.claimedOwnership?' Tu en es maintenant le responsable.':''}`);
+  }catch(error){field.value='';showError(error);}return;}
   if(field.matches?.('[data-slot-picker]')){try{if(await pickSlot(field))await refreshAfterSave('Départ choisi.');}catch(error){showError(error);}return;}
   if(field.matches?.('[data-crew-state-select]')){try{await updateCrewState(field);await refreshAfterSave('Équipage mis à jour.');}catch(error){showError(error);}return;}
   if(field.name==='participant'){const draft=state.drafts[field.dataset.departure],participant=state.participants.find(item=>item.id===field.value);if(draft){draft.participantUserId=participant?.id||null;draft.participantId=participant?.participantId||null;draft.name=participant?.name||'';draft.category='';draft.cars=[];draft.carAny=false;state.registrationOpen.add(field.dataset.departure);renderEvent();}return;}
