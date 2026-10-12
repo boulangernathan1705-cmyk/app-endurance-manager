@@ -2207,7 +2207,9 @@ html[data-game] #app .race-header .race-side .race-badges > * { box-sizing: bord
 .category-entry-gate > div { display: flex; flex-wrap: wrap; justify-content: center; gap: 14px; }
 .category-entry-gate > div > button { min-width: 180px; min-height: 52px; font-size: 17px; }
 .category-entry-categories { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-top: 10px; }
-.category-entry-sheet { max-width: 760px; max-height: min(94vh, 980px); padding-bottom: 0; }
+body:has([data-category-entry]) { overflow: hidden; }
+[data-category-entry].crew-builder-overlay { height: 100vh; height: 100dvh; bottom: auto; }
+.category-entry-sheet { max-width: 760px; max-height: min(94vh, 980px); max-height: min(94dvh, 980px); padding-bottom: 0; -webkit-overflow-scrolling: touch; touch-action: pan-y; }
 .ce-tabs { display: flex; gap: 22px; margin: 2px 0 6px; border-bottom: 1px solid #2b3336; }
 .ce-tabs span { padding: 0 0 9px; color: var(--muted, #92979c); font-size: 14px; font-weight: 700; border-bottom: 2px solid transparent; margin-bottom: -1px; }
 .ce-tabs span.active { color: #4fd1c5; border-color: #4fd1c5; }
@@ -2264,7 +2266,8 @@ html[data-game] #app .race-header .race-side .race-badges > * { box-sizing: bord
 .ce-tally.is-empty b { color: #f3b33d; }
 .ce-footnote { margin: 8px 0 0; text-align: center; font-size: 12px; color: var(--muted, #92979c); }
 @media (max-width: 760px) {
-  .ce-footer { margin: 12px -14px 0; padding: 12px 14px 12px; }
+  .category-entry-sheet { max-height: calc(100vh - 12px); max-height: calc(100dvh - 12px); }
+  .ce-footer { margin: 12px -14px 0; padding: 12px 14px calc(12px + env(safe-area-inset-bottom)); }
   .ce-kind { font-size: 13px; padding: 6px 4px; }
   .ce-chip { min-width: 0; flex: 1 1 40%; }
 }
