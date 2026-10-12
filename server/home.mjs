@@ -2,15 +2,13 @@
 // that space) goes straight to it, from the address bar as from the logo of every page.
 // With the events module (EVENT TDZ, every sim), the events calendar is the home page for everyone: the
 // choice between LMU and iRacing is asked when the pilot opens « Endurance ».
-import {eventTdzEnabled} from '../shared/catalog.mjs';
-
 const SIMULATORS = ['lmu','iracing'];
 
-export function homeRedirect(request, community = null, development = false) {
+export function homeRedirect(request, community = null) {
   const url = new URL(request.url);
   if (url.pathname !== '/' || url.searchParams.has('accueil')) return null;
   const sim = /(?:^|;\s*)em_sim=([a-z]+)(?:;|$)/.exec(request.headers.get('Cookie') || '')?.[1];
-  const events = eventTdzEnabled(community, development);
+  const events = community?.modules?.soloRaces === true;
   if (!events && !SIMULATORS.includes(sim)) return null;
   const location = events ? `/${SIMULATORS.includes(sim) ? sim : 'lmu'}/#solo` : `/${sim}/`;
   // 302, never 301: a permanent redirect would stay in the browser cache after a change of simulator.

@@ -14,6 +14,8 @@ const L = (fr, en) => getLocale() === 'en' ? en : fr;
 const can = permission => (session?.permissions || []).includes(permission);
 const events = () => session?.soloRaces === true;
 const eventsLabel = () => session?.soloLabel || 'EVENT TDZ';
+// EVENT TDZ has types and OPEN / SAFE access; EVENT SOLO (other communities) is open to the « Endurances » permission.
+const tdz = () => session?.eventTdz === true;
 
 function accountLabel() {
   const user = session?.user;
@@ -86,12 +88,13 @@ const crewsSection = () => [L('Les équipages', 'Crews'), `
   ${helpScreenshot('crews', L('Les équipages d’un départ', 'Crews of a start'))}`];
 
 const eventsSection = () => [eventsLabel(), `
-  <p>${L('Le calendrier des événements, toutes simus (LMU, iRacing, AMS2, ACE). Chaque carte montre la simu, le type et l’accès : <strong>OPEN</strong> (tous) ou <strong>SAFE</strong> (pilotes SAFE). Les <strong>Filtres</strong> trient par simu, type, dates et ta situation.', 'The events calendar, every sim (LMU, iRacing, AMS2, ACE). Each card shows the sim, the type and the access: <strong>OPEN</strong> (everyone) or <strong>SAFE</strong> (SAFE drivers). <strong>Filters</strong> sort by sim, type, dates and where you stand.')}</p>
+  <p>${tdz() ? L('Le calendrier des événements, toutes simus (LMU, iRacing, AMS2, ACE). Chaque carte montre la simu, le type et l’accès : <strong>OPEN</strong> (tous) ou <strong>SAFE</strong> (pilotes SAFE). Les <strong>Filtres</strong> trient par simu, type, dates et ta situation.', 'The events calendar, every sim (LMU, iRacing, AMS2, ACE). Each card shows the sim, the type and the access: <strong>OPEN</strong> (everyone) or <strong>SAFE</strong> (SAFE drivers). <strong>Filters</strong> sort by sim, type, dates and where you stand.')
+    : L('Le calendrier des événements, toutes simus (LMU, iRacing, AMS2, ACE). Les <strong>Filtres</strong> trient par simu, dates et ta situation.', 'The events calendar, every sim (LMU, iRacing, AMS2, ACE). <strong>Filters</strong> sort by sim, dates and where you stand.')}</p>
   <ul>
     <li>${L('chaque manche a son <strong>M’inscrire</strong> et son <strong>Absent</strong> ; sans catégorie à choisir, un clic suffit ;', 'each round has its own <strong>Enter</strong> and <strong>Absent</strong>; with no category to pick, one click is enough;')}</li>
     <li>${L('places limitées : une fois complet, tu passes en <strong>liste d’attente</strong> et tu montes dès qu’une place se libère ;', 'limited places: once full, you go on the <strong>waiting list</strong> and move up as soon as a place frees up;')}</li>
     <li>${L('le mot de passe du serveur n’est visible que des inscrits ;', 'the server password is shown to entered drivers only;')}</li>
-    <li>${L('un événement SAFE sans l’accès SAFE : le bouton <strong>Comment devenir SAFE</strong> mène au salon Discord qui l’explique.', 'a SAFE event without SAFE access: the <strong>How to become SAFE</strong> button leads to the Discord channel that explains it.')}</li>
+    ${!tdz() ? '' : `<li>${L('un événement SAFE sans l’accès SAFE : le bouton <strong>Comment devenir SAFE</strong> mène au salon Discord qui l’explique.', 'a SAFE event without SAFE access: the <strong>How to become SAFE</strong> button leads to the Discord channel that explains it.')}</li>`}
   </ul>
   ${helpScreenshot('event-page', L('Un événement en deux manches', 'An event in two rounds'))}`];
 
@@ -103,8 +106,8 @@ const bellSection = () => [L('La cloche', 'The bell'), `
   <p>${L('Elle prévient quand quelqu’un s’inscrit sur ton départ, rejoint ou quitte ton équipage, change sa voiture, ou quand la course change. Si ta communauté a activé les rappels, elle te rappelle ta course 24 h avant.', 'It tells you when someone enters your start, joins or leaves your crew, changes its car, or when the race changes. If your community turned reminders on, it reminds you of your race 24 h before.')}</p>`];
 
 function rightsSection() {
-  const mine = PERMISSIONS().filter(([key]) => key !== 'access' && can(key) && (events() || !key.startsWith('solo_')));
-  const list = PERMISSIONS().filter(([key]) => events() || !key.startsWith('solo_'));
+  const mine = PERMISSIONS().filter(([key]) => key !== 'access' && can(key) && ((events() && tdz()) || !key.startsWith('solo_')));
+  const list = PERMISSIONS().filter(([key]) => (events() && tdz()) || !key.startsWith('solo_'));
   const yours = !session?.user ? ''
     : `<p>${mine.length ? `${L('Tes autorisations ici :', 'Your permissions here:')} ${mine.map(([, name]) => `<strong>${name}</strong>`).join(', ')}.` : L('Tu n’as aucune autorisation ici.', 'You have no permission here.')}</p>`;
   return [L('Ce que tu peux faire', 'What you can do'), `
@@ -122,8 +125,8 @@ const createEnduranceSection = () => [L('Créer une endurance', 'Creating an end
   ${helpScreenshot('admin-create-endurance', L('Créer une endurance', 'Creating an endurance race'))}`];
 
 const createEventSection = () => [L(`Créer un événement ${eventsLabel()}`, `Creating a ${eventsLabel()} event`), `
-  <p>${L('<strong>Ajouter un événement</strong> : 5 étapes. <strong>Événement</strong> (nom, simu, type), <strong>Horaire</strong> (jour, heure, mot de passe du serveur), <strong>Manches</strong> (jusqu’à 4 : circuit, catégories, durées essais/qualifs/course, météo, carburant, pneus), <strong>Inscriptions</strong> (places, note), <strong>Récapitulatif</strong>.', '<strong>Add an event</strong>: 5 steps. <strong>Event</strong> (name, sim, type), <strong>Schedule</strong> (day, time, server password), <strong>Rounds</strong> (up to 4: circuit, categories, practice/qualifying/race lengths, weather, fuel, tyres), <strong>Entries</strong> (places, note), <strong>Summary</strong>.')}</p>
-  <p>${L('Le type SAFE ou OPEN décide qui peut s’inscrire : c’est vérifié par le site.', 'The SAFE or OPEN type decides who can enter: the site checks it.')}</p>
+  <p>${L(`<strong>Ajouter un événement</strong> : 5 étapes. <strong>Événement</strong> (nom, simu${tdz() ? ', type' : ''}), <strong>Horaire</strong> (jour, heure, mot de passe du serveur), <strong>Manches</strong> (jusqu’à 4 : circuit, catégories, durées essais/qualifs/course, météo, carburant, pneus), <strong>Inscriptions</strong> (places, note), <strong>Récapitulatif</strong>.`, `<strong>Add an event</strong>: 5 steps. <strong>Event</strong> (name, sim${tdz() ? ', type' : ''}), <strong>Schedule</strong> (day, time, server password), <strong>Rounds</strong> (up to 4: circuit, categories, practice/qualifying/race lengths, weather, fuel, tyres), <strong>Entries</strong> (places, note), <strong>Summary</strong>.`)}</p>
+  <p>${tdz() ? L('Le type SAFE ou OPEN décide qui peut s’inscrire : c’est vérifié par le site.', 'The SAFE or OPEN type decides who can enter: the site checks it.') : L('Tous les pilotes avec l’autorisation Endurances peuvent s’inscrire.', 'Every driver with the Endurance races permission can enter.')}</p>
   ${helpScreenshot('admin-create-event', L('Créer un événement', 'Creating an event'))}`];
 
 const otherPilotsSection = () => [L('Inscrire un pilote, gérer les équipages', 'Entering a driver, managing crews'), `
@@ -147,7 +150,7 @@ const modulesSection = () => [L('Les modules en bref', 'Modules in short'), `
     <li>${L('<strong>Salons d’équipage</strong> : un salon vocal par équipage, à son nom, ouvert dès sa création et supprimé 2 h après la course ;', '<strong>Crew channels</strong>: a voice channel per crew, named after it, opened as soon as it is created and deleted 2 h after the race;')}</li>
     <li>${L('<strong>Rappels de course</strong> : 24 h avant dans la cloche, 24 h et 1 h avant dans le salon de l’équipage ;', '<strong>Race reminders</strong>: 24 h before in the bell, 24 h and 1 h before in the crew channel;')}</li>
     <li>${L('<strong>Endurances iRacing officielles</strong> : les séries en équipe et les événements spéciaux ajoutés tout seuls, horaires compris ;', '<strong>Official iRacing endurance races</strong>: team series and special events added by themselves, times included;')}</li>
-    ${events() ? `<li>${L(`<strong>${eventsLabel()}</strong> : le calendrier des événements, toutes simus ;`, `<strong>${eventsLabel()}</strong>: the events calendar, every sim;`)}</li>` : ''}
+    <li>${L(`<strong>${eventsLabel()}</strong> : le calendrier des événements, toutes simus ;`, `<strong>${eventsLabel()}</strong>: the events calendar, every sim;`)}</li>
     <li>${L('<strong>Mémo des circuits</strong> et <strong>Entraînement</strong> (LMU) : la fiche de chaque circuit pour tous, et la prépa de chaque course avec ton équipage.', '<strong>Circuit memo</strong> and <strong>Training</strong> (LMU): each circuit’s sheet for everyone, and each race’s prep with your crew.')}</li>
   </ul>`];
 

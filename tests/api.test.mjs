@@ -534,6 +534,22 @@ test('the most demanding community: newcomers race solo OPEN only; the SAFE role
  const entered=await req(endurance,'POST',crewEntry,'pilot');
  assert.notEqual(entered.status,403,'SAFE: endurances '+JSON.stringify(entered.data));
 });
+test('EVENT SOLO (every community but the TDZ): no type, no SAFE, open to the Endurances permission',async()=>{
+ const {req,login,env,DB}=harness();
+ DB.db.exec("UPDATE communities SET slug='commu-dev'");env.COMMUNITY='commu-dev';
+ await login(ADMIN,'admin');await login(PILOT,'pilot');
+ const setRole=(role,permissions)=>DB.db.prepare('INSERT OR REPLACE INTO community_role_permissions(community_id,discord_role_id,permissions,updated_at) VALUES(?,?,?,0)').run('e0a1c0de-0000-4000-8000-000000000001',role,JSON.stringify(permissions));
+ const session=(await req('/api/session','GET',null,'pilot')).data;
+ assert.equal(session.soloLabel,'EVENT SOLO');assert.equal(session.eventTdz,false);assert.deepEqual(session.eventTypes,[]);
+ const created=await req('/api/events','POST',{...soloInput,access:'safe',details:{type:'SAFE',note:'Sprint'}},'admin');assert.equal(created.status,201,JSON.stringify(created.data));
+ const event=(await req('/api/events','GET',null,'admin')).data.events.find(e=>e.id===created.data.id);
+ assert.equal(event.access,'open','no SAFE access');assert.equal(event.details.type,undefined,'no type');assert.equal(event.details.note,'Sprint');
+ const path=`/api/events/${event.id}/departures/${event.departures[0].id}/registrations`,solo={name:'Pilote',choices:[{category:'GT3',carAny:true},{category:'GT3',carAny:true}]};
+ setRole('900000000000000001',['access','solo_open']);
+ assert.equal((await req(path,'POST',solo,'pilot')).status,403,'the OPEN permission is EVENT TDZ only');
+ setRole('900000000000000001',['access','endurance']);
+ assert.equal((await req(path,'POST',solo,'pilot')).status,201,'Endurances is enough');
+});
 test('solo race with two rounds: categories per round, one choice per round',async()=>{
  const {req,login}=harness();await login(ADMIN,'admin');await login(PILOT,'pilot');
  const input={...soloInput,capacity:10,rounds:[{circuit:'spa',durationMinutes:20,categories:['GT3']},{circuit:'monza',durationMinutes:20,categories:['Hypercar','LMP2 ELMS']}],categories:[]};

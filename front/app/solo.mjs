@@ -13,6 +13,7 @@ export function simBadge(event) {
 }
 // The simulator, the event type, then OPEN or SAFE (unless the type already says it).
 export function accessBadge(event) {
+  if (!state.eventTdz) return `<span class="event-badge-row">${simBadge(event)}</span>`;
   const safe = event.access === 'safe', type = event.details?.type || '';
   const typeBadge = type ? `<span class="event-type-badge">${esc(type)}</span>` : '';
   if (type.toLowerCase() === (safe ? 'safe' : 'open')) return `<span class="event-badge-row">${simBadge(event)}<span class="event-access-badge ${safe ? 'is-safe' : 'is-open'}">${esc(type)}</span></span>`;
@@ -134,6 +135,7 @@ export function soloFill(event, departure = event.departures?.[0]) {
 // Why the driver cannot enter, or '' when they can.
 export function soloEntryBlock(event) {
   if (!state.user) return 'Connecte-toi avec Discord pour participer.';
+  if (!state.eventTdz) return can('endurance') ? '' : 'Tu n’as pas accès aux événements de cette communauté.';
   if (event.access === 'safe' && !can('solo_safe')) return 'Événement réservé aux pilotes SAFE.';
   if (!can('solo_safe') && !can('solo_open')) return 'Tu n’as pas accès aux événements de cette communauté.';
   return '';
