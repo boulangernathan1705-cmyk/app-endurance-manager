@@ -11,7 +11,7 @@ function streamerRow(streamer = {}) {
     <button type="button" class="link-button" data-remove-streamer>Retirer</button></div>`;
 }
 export function streamerFields(details) {
-  return `<section data-grindfest-fields hidden><h3>Streamers</h3><div data-streamers>${(details.streamers || [{}, {}]).map(streamerRow).join('')}</div><button type="button" class="secondary-button" data-add-streamer>+ Ajouter un streamer</button><p data-grindfest-total aria-live="polite"></p><p class="creation-help">Une liste d’attente par streamer. Après un désistement, le premier en attente prend automatiquement la place.</p></section>`;
+  return `<section data-grindfest-fields hidden><h3>Streamers</h3><div data-streamers>${(details.streamers || [{}, {}]).map(streamerRow).join('')}</div><button type="button" class="secondary-button" data-add-streamer>+ Ajouter un streamer</button><p data-grindfest-total aria-live="polite"></p><p class="creation-help">Une liste d’attente par streamer.</p></section>`;
 }
 export function streamerData(form) {
   return [...form.querySelectorAll('[data-streamer-id]')].map(row => ({id:row.dataset.streamerId, name:row.querySelector('[name="streamerName"]').value.trim(), twitchUrl:row.querySelector('[name="streamerTwitch"]').value.trim(), capacity:Number(row.querySelector('[name="streamerCapacity"]').value), logoUrl:row.querySelector('[name="streamerLogo"]').value}));
@@ -42,7 +42,7 @@ export function streamerColumns(event, departure) {
   return `<div class="grindfest-grid" style="--streamer-columns:${Math.min(4, streamers.length)}">${streamers.map(streamer => {
     const entries = (departure.availability || []).filter(reg => reg.streamerId === streamer.id && reg.status !== 'unavailable');
     const confirmed = entries.filter(reg => !reg.waitlistPosition).length;
-    const heading = `${streamer.logoUrl ? `<img class="grindfest-logo" src="${esc(streamer.logoUrl)}" alt="">` : ''}<strong>${esc(streamer.name)}</strong>${streamer.twitchUrl ? '<small>Twitch ↗</small>' : ''}<span>${confirmed} / ${streamer.capacity} places prises</span>`;
+    const heading = `${streamer.logoUrl ? `<img class="grindfest-logo" src="${esc(streamer.logoUrl)}" alt="">` : ''}<strong>${esc(streamer.name)}</strong>${streamer.twitchUrl ? '<small>Twitch ↗</small>' : ''}<span class="count-pill">${confirmed} / ${streamer.capacity}</span>`;
     const head = streamer.twitchUrl ? `<a class="grindfest-streamer-head" href="${esc(streamer.twitchUrl)}" target="_blank" rel="noopener noreferrer">${heading}</a>` : `<div class="grindfest-streamer-head">${heading}</div>`;
     return `<section class="grindfest-column">${head}${soloEntryList(event, departure, entries, {title:'Inscrits', capacity:streamer.capacity})}</section>`;
   }).join('')}</div>`;
@@ -62,34 +62,27 @@ function streamerWaitNotice(event, departure, streamerId, registrationId) {
   const own = (departure.availability || []).find(reg => reg.id === registrationId);
   if (own?.streamerId === streamerId) return own.waitlistPosition ? `Liste d’attente — n° ${own.waitlistPosition}` : 'Place confirmée';
   const count = (departure.availability || []).filter(reg => reg.streamerId === streamerId && reg.status !== 'unavailable').length;
-  return count >= streamer.capacity ? `Liste d’attente — n° ${count - streamer.capacity + 1}. La place revient au premier en attente lors d’un désistement.` : 'Une place est disponible.';
+  return count >= streamer.capacity ? `Liste d’attente — n° ${count - streamer.capacity + 1}` : 'Place disponible';
 }
 
-export function gridfestCommunityLink() {
-  const url = state.community?.discordInviteUrl || '';
-  return state.grindfest && /^https:\/\/(discord\.gg|discord\.com\/invite)\/[\w-]{2,64}$/.test(url)
-    ? `<a class="secondary-button" href="${esc(url)}" target="_blank" rel="noopener noreferrer">Rejoindre le Discord de ${esc(state.community?.shortName || 'TDZ')}</a>` : '';
-}
-
+const MP_ICON = path => `<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="${path}"/></svg>`;
+const mpButton = (icon, label, attrs) => `<button type="button" class="planning-quick-button is-labelled" ${attrs} data-tip="${esc(label)}"><span class="planning-quick-icon">${MP_ICON(icon)}</span><span class="planning-quick-label">${esc(label)}</span></button>`;
+// Admin only: one card, like the rounds, to send the server password to the confirmed pilots by Discord MP.
 export function gridfestPasswordPanel(event) {
-  if (!state.grindfest || !isGrindfest(event)) return '';
-  const link = gridfestCommunityLink();
-  if (!isAdmin()) return `<div class="gridfest-discord-access">${link}<p>Le mot de passe sera envoyé par MP Discord aux pilotes confirmés quand l’admin le décidera. Autorise les MP des membres du serveur.</p></div>`;
+  if (!state.grindfest || !isGrindfest(event) || !isAdmin()) return '';
   const ready = gridfestPasswordValid(event.details?.password);
-  return `<section class="gridfest-password-panel" data-gridfest-password-panel="${esc(event.id)}" aria-labelledby="gridfest-password-title">
-    <h3 id="gridfest-password-title">Invitations au serveur de course</h3>${link}
-    <p>${ready ? 'Mot de passe enregistré.' : 'Choisis et enregistre le mot de passe dans « Modifier l’événement ».'} Configure le même mot de passe sur le serveur de course.</p>
-    <p>Envoi privé aux inscrits confirmés uniquement. Les listes d’attente sont exclues ; les pilotes déjà servis ne reçoivent pas de doublon.</p>
-    <div class="gridfest-password-actions"><button type="button" class="primary-button" data-gridfest-passwords="send" ${ready ? '' : 'disabled'}>Envoyer le mot de passe par MP</button><button type="button" class="secondary-button" data-gridfest-passwords="status">Vérifier les envois</button><button type="button" class="link-button" data-action="edit-event">Modifier l’événement</button></div>
+  const main = ready ? mpButton('M22 2 11 13M22 2l-7 20-4-9-9-4z', 'Envoyer par MP', 'data-gridfest-passwords="send"')
+    : mpButton('M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z', 'Choisir le mot de passe', 'data-action="edit-event"');
+  return `<section class="grindfest-round gridfest-mp" data-gridfest-password-panel="${esc(event.id)}">
+    <div class="gridfest-mp-head"><h3>Mot de passe par MP</h3><span class="planning-quick">${main}${mpButton('M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01', 'Suivi', 'data-gridfest-passwords="status"')}</span></div>
     <div data-gridfest-password-status role="status" aria-live="polite"></div>
-    <p class="creation-help">Pour retirer l’accès d’un pilote ayant déjà reçu le mot de passe, change-le aussi sur le serveur de course avant un nouvel envoi.</p>
   </section>`;
 }
 
 function passwordResult(panel, result) {
-  const labels = {pending:'À envoyer', sending:'En cours', sent:'MP envoyé', failed:'Échec · réessaie l’envoi', incomplete:'Inscription à compléter'};
+  const labels = {pending:'À envoyer', sending:'En cours', sent:'Envoyé', failed:'Échec', incomplete:'Nom en jeu manquant'};
   const sent = result.pilots.filter(pilot => pilot.status === 'sent').length;
-  panel.querySelector('[data-gridfest-password-status]').innerHTML = `<p>${sent} / ${result.pilots.length} pilote(s) confirmé(s) ont reçu le mot de passe · ${result.waiting} en attente.</p>${!result.botReady ? '<p>Le bot Discord doit être configuré pour envoyer les MP.</p>' : ''}<ul class="gridfest-delivery-list">${result.pilots.map(pilot => `<li><strong>${esc(pilot.name)}</strong>${pilot.gameName ? ` · ${esc(pilot.gameName)}` : ''}<span>${esc(labels[pilot.status] || 'À envoyer')}${pilot.error ? ` — ${esc(pilot.error)}` : ''}</span></li>`).join('')}</ul>`;
+  panel.querySelector('[data-gridfest-password-status]').innerHTML = `<p class="gridfest-mp-count"><span class="count-pill">${sent} / ${result.pilots.length}</span> envoyés${result.waiting ? ` · ${result.waiting} en attente` : ''}${!result.botReady ? ' · bot Discord non configuré' : ''}</p>${result.pilots.length ? `<ol class="solo-entries gridfest-mp-list">${result.pilots.map((pilot, index) => `<li class="solo-entry"><span class="solo-entry-rank">${index + 1}</span><strong class="solo-entry-name">${esc(pilot.name)}${pilot.gameName ? `<small class="gridfest-game-name">${esc(pilot.gameName)}</small>` : ''}</strong><span class="gridfest-mp-tag is-${esc(pilot.status || 'pending')}"${pilot.error ? ` title="${esc(pilot.error)}"` : ''}>${esc(labels[pilot.status] || 'À envoyer')}</span></li>`).join('')}</ol>` : ''}`;
 }
 
 if (typeof document !== 'undefined') {
@@ -103,7 +96,7 @@ if (typeof document !== 'undefined') {
     const panel = target.closest('[data-gridfest-password-panel]'), race = state.events.find(item => item.id === panel?.dataset.gridfestPasswordPanel);
     if (!race || !state.grindfest || !isGrindfest(race) || !isAdmin()) return;
     const send = target.dataset.gridfestPasswords === 'send';
-    if (send && !confirm('Envoyer le mot de passe par MP Discord aux pilotes confirmés du Gridfest ? Les envois réussis ne seront pas répétés.')) return;
+    if (send && !confirm('Envoyer le mot de passe par MP Discord aux pilotes confirmés ?')) return;
     state.busy = true;
     const controls = [...panel.querySelectorAll('button')], disabled = controls.map(button => button.disabled);
     controls.forEach(button => { button.disabled = true; });
@@ -115,7 +108,7 @@ if (typeof document !== 'undefined') {
       else {
         let cursor = '';
         do {
-          status.textContent = `Envoi des MP Discord… ${sent} envoyé(s).`;
+          status.textContent = `Envoi… ${sent} envoyé(s)`;
           const result = await api(path, 'POST', {version:race.version, cursor});
           sent += result.results.filter(item => item.status === 'sent').length;
           cursor = result.nextCursor;
@@ -123,7 +116,7 @@ if (typeof document !== 'undefined') {
         } while (cursor);
       }
     } catch (error) {
-      status.textContent = `${error.message} Les envois déjà réussis sont conservés ; tu peux relancer l’envoi.`;
+      status.textContent = `${error.message} Relance l’envoi : les MP déjà partis ne sont pas renvoyés.`;
     } finally {
       state.busy = false;
       controls.forEach((button,index) => { button.disabled = disabled[index]; });
