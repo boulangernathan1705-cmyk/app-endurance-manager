@@ -442,6 +442,14 @@ export function levelOf(pace, reference) {
   if (!pace || !reference) return null;
   return LEVELS.find(level => level.to === null || pace <= reference.pace[level.to])?.name ?? null;
 }
+// The pilot's level and what the next one asks: its slowest race pace and the seconds to find.
+export function levelGap(pace, reference) {
+  const level = levelOf(pace, reference);
+  if (!level) return null;
+  const index = LEVELS.findIndex(item => item.name === level);
+  const next = index > 0 ? {name:LEVELS[index - 1].name, time:reference.pace[LEVELS[index - 1].to]} : null;
+  return {level, pace, next:next ? {...next, gap:Math.max(0, Math.round((pace - next.time) * 100) / 100)} : null};
+}
 // The levels shown on the sheet, end to end like levelOf: each from the previous level's last column to its own.
 export function levelBands(reference) {
   return LEVELS.map((level, index) => ({name:level.name, from:index ? reference.pace[LEVELS[index - 1].to] : null, to:level.to === null ? null : reference.pace[level.to]}));
