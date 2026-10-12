@@ -278,22 +278,26 @@ test('scheduled rotation compares bot and legacy timestamps in the same unit',as
   assert.ok(calls.every(call=>!call.path.includes('/webhooks/')));
 });
 
-test('a race gets its category 6 days before its start, as the crews\' voice channels, whatever the week',async t=>{
+test('a race gets its category as soon as it is published, even far away and without any crew',async t=>{
   const {DB,env,calls}=setup(t);
-  race(DB,'sunday','Dimanche','spa',[{id:'s',startsAt:NOW+DAY}]);race(DB,'thursday','Jeudi suivant','spa',[{id:'t',startsAt:NOW+5*DAY}]);race(DB,'later','Plus tard','spa',[{id:'l',startsAt:NOW+7*DAY}]);
-  assert.deepEqual((await previewBotRecap(env,NOW,COMMUNITY,SETTINGS)).map(item=>item.name),['🏎️ LMU · Dimanche','🏎️ LMU · Jeudi suivant']);
+  race(DB,'a-sunday','Dimanche','spa',[{id:'s',startsAt:NOW+DAY}]);race(DB,'b-far','Dans un mois','spa',[{id:'f',startsAt:NOW+30*DAY}]);
+  assert.deepEqual((await previewBotRecap(env,NOW,COMMUNITY,SETTINGS)).map(item=>item.name),['🏎️ LMU · Dimanche','🏎️ LMU · Dans un mois']);
   await saveBotRecap(env,COMMUNITY,SETTINGS);await syncBotRecaps(env,NOW,COMMUNITY);
-  assert.deepEqual(creates(calls).filter(call=>call.body.type===4).map(call=>call.body.name),['🏎️ LMU · Dimanche','🏎️ LMU · Jeudi suivant']);
-  calls.length=0;await syncBotRecaps(env,NOW+DAY+3600000,COMMUNITY);
-  assert.deepEqual(creates(calls).filter(call=>call.body.type===4).map(call=>call.body.name),['🏎️ LMU · Plus tard']);
+  assert.deepEqual(creates(calls).map(call=>call.body.name),['🏎️ LMU · Dimanche','infos-de-la-course','🏎️ LMU · Dans un mois','infos-de-la-course']);
 });
 
-test('a race far away gets its category as soon as it has a crew, even an empty one',async t=>{
-  const {DB,env,calls}=setup(t);race(DB,'far','Dans un mois','spa',[{id:'f',startsAt:NOW+30*DAY}]);
-  await saveBotRecap(env,COMMUNITY,SETTINGS);await syncBotRecaps(env,NOW,COMMUNITY);assert.equal(creates(calls).length,0);
-  DB.db.prepare("INSERT INTO crews(id,event_id,departure_id,name,category,car,locked,created_at,community_id) VALUES('crew','far','f','Équipe','GT3','',0,0,?)").run(DEV_COMMUNITY);
-  await syncBotRecaps(env,NOW+1000,COMMUNITY);
-  assert.deepEqual(creates(calls).map(call=>call.body.name),['🏎️ LMU · Dans un mois','infos-de-la-course']);
+test('an official LMU race gets its category without any entry; an imported official iRacing race waits for one',async t=>{
+  const {DB,env,calls}=setup(t);
+  race(DB,'lmu','4h de Portimao','portimao',[{id:'p',startsAt:NOW+3*DAY}],'official');race(DB,'ir','Officielle iRacing','iracing-spa',[{id:'i',startsAt:NOW+DAY}],'official');
+  await saveBotRecap(env,COMMUNITY,SETTINGS);await syncBotRecaps(env,NOW,COMMUNITY);
+  assert.deepEqual(creates(calls).map(call=>call.body.name),['🏎️ LMU · 4h de Portimao','infos-de-la-course']);
+});
+
+test('no new race category once the server is close to the 500 channels of Discord',async t=>{
+  const {DB,env,calls,channels}=setup(t);
+  for(let index=channels.length;index<450;index++)channels.push({id:String(700000000000000000n+BigInt(index)),type:2,name:'v'+index});
+  race(DB);await saveBotRecap(env,COMMUNITY,SETTINGS);await syncBotRecaps(env,NOW,COMMUNITY);
+  assert.equal(creates(calls).length,0);
 });
 
 test('official races where the community has nothing never hold back the recap of the race it has a crew in',async t=>{

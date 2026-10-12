@@ -1,11 +1,11 @@
 // Text recaps configured explicitly by an admin. Legacy webhook publications remain independent.
 import {loadWeeklyDiscordSnapshot, siteOf} from './discord-weekly.mjs';
 import {buildWeeklyDiscordPayload} from './discord-weekly-format.mjs';
-import {OPEN_BEFORE} from './crew-discord.mjs';
 
 const API = 'https://discord.com/api/v10', DAY = 86400000;
 // Layout of the recap message: raised when it changes, so the published recaps are edited once.
 const RECAP_FORMAT = 2;
+const MAX_CHANNELS = 450;
 const RACE_INFO_CHANNEL = 'infos-de-la-course'; // Discord writes text channel names in lowercase with dashes
 const VIEW = 1024n, SEND = 2048n, HISTORY = 65536n, MANAGE = 16n, ADMIN = 8n;
 const REQUIRED = VIEW | SEND | HISTORY;
@@ -84,30 +84,29 @@ export function eventDeletionTime(event) {
   if (!(minutes > 0)) return null;
   return Math.max(...departures.map(item => Number(item.startsAt))) + minutes * 60000 + DAY;
 }
-// The races that get their category now: a crew (its voice channel is made at once, server/crew-
-// discord.mjs) or a start within 6 days (OPEN_BEFORE), the race not over.
-export function racesOpenNow(events, scope, timestamp, crewed = new Set()) {
+// The races that get their category now: from their publication until they are over.
+export function racesOpenNow(events, scope, timestamp) {
   return events.filter(event => {
     const iracing = String(event.circuit || '').startsWith('iracing-');
     if ((scope === 'lmu' && iracing) || (scope === 'iracing' && !iracing) || event.schedule_pending) return false;
     const minutes = Number(event.duration_minutes) || Number(event.duration_hours) * 60 || 0;
-    return parse(event.departures).some(item => !item.tbd && (crewed.has(event.id) || Number(item.startsAt) <= timestamp + OPEN_BEFORE) && Number(item.startsAt) + minutes * 60000 > timestamp);
+    return parse(event.departures).some(item => !item.tbd && Number(item.startsAt) + minutes * 60000 > timestamp);
   }).map(event => event.id);
 }
 const raceEvents = (env, community) => env.DB.prepare("SELECT id,name,circuit,departures,duration_hours,duration_minutes,schedule_pending,community_id FROM events WHERE community_id=? OR community_id='official' ORDER BY created_at,id")
   .bind(community.id).all().then(result => result.results || []);
-// The races where this community has a crew, and the official ones where it has an entry, an absence or a crew.
-async function raceEntries(env, community) {
-  const rows = (await env.DB.prepare(`SELECT event_id, 1 AS crewed FROM crews WHERE community_id=?
-    UNION SELECT event_id, 0 FROM registrations WHERE community_id=? UNION SELECT event_id, 0 FROM event_absences WHERE community_id=?`)
+// The races where this community has an entry, an absence or a crew.
+async function enteredRaces(env, community) {
+  const rows = (await env.DB.prepare(`SELECT event_id FROM crews WHERE community_id=?
+    UNION SELECT event_id FROM registrations WHERE community_id=? UNION SELECT event_id FROM event_absences WHERE community_id=?`)
     .bind(community.id,community.id,community.id).all()).results || [];
-  return {crewed:new Set(rows.filter(row => row.crewed).map(row => row.event_id)), entered:new Set(rows.map(row => row.event_id))};
+  return new Set(rows.map(row => row.event_id));
 }
-// The races that get a recap now. An official race where the community has nothing never takes the turn of one
-// where it has (only two races are handled per synchronisation).
+// The races that get a recap now, even without any entry: it invites the pilots to sign up. The official iRacing
+// races are imported by the dozen (server/iracing-import.mjs): only those where the community has something.
 async function openRaces(env, community, events, scope, timestamp) {
-  const {crewed, entered} = await raceEntries(env, community);
-  return racesOpenNow(events.filter(event => event.community_id !== 'official' || entered.has(event.id)), scope, timestamp, crewed);
+  const entered = await enteredRaces(env, community);
+  return racesOpenNow(events.filter(event => event.community_id !== 'official' || !String(event.circuit || '').startsWith('iracing-') || entered.has(event.id)), scope, timestamp);
 }
 export const raceCategoryName = event =>
   `${String(event?.circuit || '').startsWith('iracing-') ? '🏁 iRacing' : '🏎️ LMU'} · ${String(event?.name || 'Endurance').trim()}`.slice(0,100);
@@ -199,6 +198,8 @@ async function publish(env, timestamp, community, settings, row, event, budget, 
     const channels = await discord(env,'GET',`/guilds/${row.guild_id}/channels`,null,budget);
     let category = row.category_id && row.category_id !== settings.destination_id ? row.category_id : null;
     if (!category) {
+      // Discord allows 500 channels per server: room is kept for the crews' voice channels.
+      if (channels.length >= MAX_CHANNELS) return;
       category = (await discord(env,'POST',`/guilds/${row.guild_id}/channels`,{type:4,name:raceCategoryName(event)},budget)).id;
       row.category_id = category;
       await env.DB.prepare('UPDATE discord_recap_publications SET category_id=? WHERE community_id=? AND event_id=?').bind(category,community.id,row.event_id).run();
