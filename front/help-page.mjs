@@ -5,7 +5,7 @@ async function renderStandaloneHelp() {
     const response = await fetch('/api/session', {credentials:'same-origin', cache:'no-store'});
     if (response.ok) session = await response.json();
   } catch {}
-  const module = await import('../help.js?v=5-aide-a-jour');
+  const module = await import('../help.js?v=6-event-tdz');
   module.renderHelp(session);
 }
 
