@@ -60,7 +60,7 @@ namespace EnduranceManager.SimHub
             var code = LinkCode.Parse(text);
             if (code == null)
             {
-                Say("Aucun code dans le presse-papiers. Copie-le sur le site (Entraînement → « Tu utilises SimHub ? » → Copier), puis reclique ici.", Orange);
+                Say("Aucun code dans le presse-papiers. Sur le site : Entraînement → « Relier mon jeu » → « Créer mon code » → « Copier le code », puis reclique ici.", Orange);
                 return;
             }
             plugin.SaveCode($"EMSYNC1 {code.Origin} {code.Token} EMSYNC1");
@@ -79,8 +79,8 @@ namespace EnduranceManager.SimHub
             open.Visibility = code == null ? Visibility.Collapsed : Visibility.Visible;
 
             if (plugin.OtherSync) Show(linkDot, Grey, linkTitle, "Le synchroniseur Windows s'en charge", linkDetail, "Il tourne déjà sur ce PC : le plugin le laisse envoyer tes séances.");
-            else if (code == null) Show(linkDot, Orange, linkTitle, "Pas encore relié", linkDetail, "Sur le site : Entraînement → « Tu utilises SimHub ? » → Copier. Puis clique sur « Coller mon code ».");
-            else if (uploader?.Revoked == true) Show(linkDot, Red, linkTitle, "Liaison retirée", linkDetail, "Demande un nouveau code sur le site, puis « Changer de code ».");
+            else if (code == null) Show(linkDot, Orange, linkTitle, "Pas encore relié", linkDetail, "Sur le site : Entraînement → « Relier mon jeu » → « Créer mon code » → « Copier le code ». Puis clique sur « Coller mon code ».");
+            else if (uploader?.Revoked == true) Show(linkDot, Red, linkTitle, "Liaison retirée", linkDetail, "Crée un nouveau code sur le site, copie-le, puis « Changer de code ».");
             else if (uploader?.Reached == false) Show(linkDot, Orange, linkTitle, "Site injoignable", linkDetail, "Nouvel essai dans une minute, rien n'est perdu.");
             else if (uploader?.Reached == true) Show(linkDot, Green, linkTitle, "Relié à " + host, linkDetail,
                 uploader.LastSent is DateTime last ? $"Dernier envoi à {last:HH:mm} · {uploader.SentToday} aujourd'hui" : "À jour, rien à envoyer pour l'instant.");

@@ -27,7 +27,8 @@ La DLL est dans `bin\Release\EnduranceManager.SimHub.dll`.
 ## Installer et tester
 
 1. Fermer SimHub, copier `EnduranceManager.SimHub.dll` dans le dossier de SimHub, relancer SimHub et accepter le plugin.
-2. Sur le site, page « Entraînement » › « Tu utilises SimHub ? » › « Obtenir mon code SimHub » › « Copier ».
+2. Sur le site, page « Entraînement » › « Relier mon jeu » › « Avec SimHub » › « Créer mon code » › « Copier le code ».
+   Le code contient l'adresse du site : un code créé sur le site de test envoie les séances au site de test.
 3. Dans SimHub, menu « Endurance Manager », cliquer sur « Coller mon code » : le code est pris dans le presse-papiers.
 4. Rouler quelques tours dans LMU avec un arrêt aux stands, revenir au menu : la séance arrive sur le site en
    une à deux minutes (pneus, carburant et arrêts dans « Mon entraînement »).
