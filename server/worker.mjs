@@ -176,6 +176,7 @@ function publicRegistration(reg, actor, userNames = new Map(), community = null,
     streamerId:reg.streamer_id || null,
     status:reg.status,
     preferredPilot:reg.preferred_pilot || '',
+    comment:reg.comment || '',
     soloDriver:Boolean(reg.solo_driver),
     version:reg.version,
     discordLinked:Boolean(reg.participant_user_id),
@@ -698,8 +699,8 @@ async function api(request, env) {
     if (input.participantId) { data.name=participant.name;data.nameKey=data.name.normalize('NFKC').toLocaleLowerCase('fr-FR'); }
     // Another category on a start the pilot is already entered on: the others were told the first time.
     const alreadyThere=Boolean(await env.DB.prepare('SELECT 1 FROM registrations WHERE event_id=? AND departure_id=? AND participant_id=? LIMIT 1').bind(event.id,departure.id,participant.id).first());
-    const result = await env.DB.prepare(`INSERT INTO registrations(id,event_id,departure_id,user_id,owner_user_id,guest_hash,name,name_key,category,car,car_preferences,car_any,status,preferred_pilot,created_at,participant_id,round_choices,solo_driver,community_id,streamer_id,streamer_order)
-      SELECT ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,CASE WHEN ? IS NOT NULL THEN (SELECT COALESCE(MAX(streamer_order),0)+1 FROM registrations WHERE event_id=?) ELSE NULL END FROM events WHERE id=? AND version=? AND (community_id=? OR community_id=?)`).bind(regId,event.id,departure.id,userId,ownerUserId,guestHash,data.name,data.nameKey,data.category,data.car,JSON.stringify(data.cars),data.carAny?1:0,data.status,data.preferredPilot,now(),participant.id,JSON.stringify(data.roundChoices||[]),data.soloDriver?1:0,here.id,data.streamerId || null,data.streamerId || null,event.id,event.id,event.version,community.id,OFFICIAL).run();
+    const result = await env.DB.prepare(`INSERT INTO registrations(id,event_id,departure_id,user_id,owner_user_id,guest_hash,name,name_key,category,car,car_preferences,car_any,status,preferred_pilot,comment,created_at,participant_id,round_choices,solo_driver,community_id,streamer_id,streamer_order)
+      SELECT ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,CASE WHEN ? IS NOT NULL THEN (SELECT COALESCE(MAX(streamer_order),0)+1 FROM registrations WHERE event_id=?) ELSE NULL END FROM events WHERE id=? AND version=? AND (community_id=? OR community_id=?)`).bind(regId,event.id,departure.id,userId,ownerUserId,guestHash,data.name,data.nameKey,data.category,data.car,JSON.stringify(data.cars),data.carAny?1:0,data.status,data.preferredPilot,data.comment||'',now(),participant.id,JSON.stringify(data.roundChoices||[]),data.soloDriver?1:0,here.id,data.streamerId || null,data.streamerId || null,event.id,event.id,event.version,community.id,OFFICIAL).run();
     if (!result.meta.changes) fail(409, 'Cet événement a changé. Actualise avant de t’inscrire.');
     if (userId && data.status!=='unavailable') await env.DB.prepare('DELETE FROM event_absences WHERE event_id=? AND user_id=? AND community_id=?').bind(event.id, userId, here.id).run();
     if (!alreadyThere && data.status!=='unavailable') await notify(env,await departurePilots(env,event.id,departure.id,here.id),'entry',event,{departure,skip:[actor.user?.id,userId],pilot:data.name,category:data.category});
@@ -744,7 +745,7 @@ async function api(request, env) {
         data.nameKey=data.name.normalize('NFKC').toLocaleLowerCase('fr-FR');
       }
       const results=await env.DB.batch([
-        env.DB.prepare(`UPDATE registrations SET name=?,name_key=?,category=?,car=?,car_preferences=?,car_any=?,status=?,preferred_pilot=?,round_choices=?,solo_driver=?,streamer_order=CASE WHEN COALESCE(streamer_id,'')!=COALESCE(?,'') THEN (SELECT COALESCE(MAX(streamer_order),0)+1 FROM registrations WHERE event_id=?) ELSE streamer_order END,streamer_id=?,version=version+1 WHERE id=? AND version=? AND EXISTS(SELECT 1 FROM events WHERE id=? AND version=?)`).bind(data.name,data.nameKey,data.category,data.car,JSON.stringify(data.cars),data.carAny?1:0,data.status,data.preferredPilot,JSON.stringify(data.roundChoices||[]),data.soloDriver?1:0,data.streamerId || null,event.id,data.streamerId || null,reg.id,input.version,event.id,event.version),
+        env.DB.prepare(`UPDATE registrations SET name=?,name_key=?,category=?,car=?,car_preferences=?,car_any=?,status=?,preferred_pilot=?,comment=?,round_choices=?,solo_driver=?,streamer_order=CASE WHEN COALESCE(streamer_id,'')!=COALESCE(?,'') THEN (SELECT COALESCE(MAX(streamer_order),0)+1 FROM registrations WHERE event_id=?) ELSE streamer_order END,streamer_id=?,version=version+1 WHERE id=? AND version=? AND EXISTS(SELECT 1 FROM events WHERE id=? AND version=?)`).bind(data.name,data.nameKey,data.category,data.car,JSON.stringify(data.cars),data.carAny?1:0,data.status,data.preferredPilot,data.comment||'',JSON.stringify(data.roundChoices||[]),data.soloDriver?1:0,data.streamerId || null,event.id,data.streamerId || null,reg.id,input.version,event.id,event.version),
         env.DB.prepare('UPDATE participants SET name=? WHERE id=? AND changes()=1').bind(data.name,reg.participant_id)
       ]);
       result=results[0];

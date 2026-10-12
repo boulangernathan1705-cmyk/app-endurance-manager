@@ -325,6 +325,10 @@ function validateEvent(input, existing = null) {
 }
 // Discord display names are at most 32 characters: registrations accept the same length.
 const PILOT_NAME_MAX = 32;
+// Preferred team-mates ("A, B, C": a few names for a 24 h) and the pilot's optional comment.
+const PREFERRED_PILOTS_MAX = 100;
+const REGISTRATION_COMMENT_MAX = 200;
+const optionalText = (value, max, label) => typeof value === 'string' && value.trim() ? text(value, max, label) : '';
 // Solo race entry: a category per round, possibly "Peu importe" (category '*'); no car, no hours.
 const ANY_CATEGORY = '*';
 function validateSoloChoice(choice, allowed, index, rounds) {
@@ -357,7 +361,7 @@ function validateSoloRegistration(input, event) {
 function validateRegistration(input, event) {
   if ((event.format || 'endurance') === 'solo') return validateSoloRegistration(input, event);
   const name = text(input.name, PILOT_NAME_MAX, 'Pseudo');
-  const preferredPilot = typeof input.preferredPilot === 'string' && input.preferredPilot.trim() ? text(input.preferredPilot, PILOT_NAME_MAX, 'Pilote souhaité') : '';
+  const comment = optionalText(input.comment, REGISTRATION_COMMENT_MAX, 'Commentaire');
   const durationHours = Number(event.duration_hours) || 3;
   const parts = typeof input.status === 'string' ? input.status.split(',').filter(Boolean) : [];
   const hourParts = parts.filter(part => /^h([1-9]|1[0-9]|2[0-4])$/.test(part));
@@ -378,7 +382,9 @@ function validateRegistration(input, event) {
   const car = cars[0] || '';
   // "Je la fais tout seul": the driver races the whole race without a team-mate.
   const soloDriver = input.status !== 'unavailable' && input.soloDriver === true;
-  return {name, nameKey: name.normalize('NFKC').toLocaleLowerCase('fr-FR'), status: soloDriver ? 'whole' : input.status, category, car, cars, carAny, preferredPilot, soloDriver};
+  // Racing alone: no team-mate to wish for.
+  const preferredPilot = soloDriver ? '' : optionalText(input.preferredPilot, PREFERRED_PILOTS_MAX, 'Coéquipier souhaité');
+  return {name, nameKey: name.normalize('NFKC').toLocaleLowerCase('fr-FR'), status: soloDriver ? 'whole' : input.status, category, car, cars, carAny, preferredPilot, soloDriver, comment};
 }
 
 export {
