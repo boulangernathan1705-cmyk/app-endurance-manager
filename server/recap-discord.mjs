@@ -187,7 +187,7 @@ async function ensurePublication(env, community, eventId, settings) {
     .bind(community.id,eventId,settings.guild_id,marker).run();
   return env.DB.prepare('SELECT * FROM discord_recap_publications WHERE community_id=? AND event_id=?').bind(community.id,eventId).first();
 }
-async function publish(env, timestamp, community, settings, row, event, budget, prepared = null) {
+async function publish(env, timestamp, community, settings, row, event, budget, prepared = null, repair = false) {
   const isEvent = row.event_id !== '';
   if (isEvent) await env.DB.prepare('UPDATE discord_recap_publications SET delete_after=? WHERE community_id=? AND event_id=?').bind(eventDeletionTime(event),community.id,row.event_id).run();
   if (row.closed_at) return;
@@ -198,10 +198,19 @@ async function publish(env, timestamp, community, settings, row, event, budget, 
     await env.DB.prepare('UPDATE discord_recap_publications SET channel_id=?,message_id=NULL,content_hash=? WHERE community_id=? AND event_id=?')
       .bind(channel,'',community.id,'').run();
   }
-  if (isEvent && (!channel || !row.category_id || row.category_id === settings.destination_id)) {
+  if (isEvent && (repair || !channel || !row.category_id || row.category_id === settings.destination_id)) {
     // One category per race (« 🏎️ LMU · 6h de Spa »): its recap here, the crews' voice channels below it.
     // The first version put the text channel straight in the chosen category: it is moved into its race's.
     const channels = await discord(env,'GET',`/guilds/${row.guild_id}/channels`,null,budget);
+    if (repair) {
+      // Only an explicit test repairs channels deleted on Discord; automatic sync never recreates them.
+      if (row.category_id && !channels.some(item => item.id === row.category_id && item.type === 4)) row.category_id = null;
+      if (channel && !channels.some(item => item.id === channel && item.type === 0)) {
+        channel = null; row.channel_id = null; row.message_id = null; row.content_hash = '';
+        await env.DB.prepare('UPDATE discord_recap_publications SET channel_id=NULL,message_id=NULL,content_hash=? WHERE community_id=? AND event_id=?')
+          .bind('',community.id,row.event_id).run();
+      }
+    }
     let category = row.category_id && row.category_id !== settings.destination_id ? row.category_id : null;
     if (!category) {
       // Discord allows 500 channels per server: room is kept for the crews' voice channels.
@@ -265,7 +274,7 @@ async function syncLocked(env,timestamp,community,settings, test = false, budget
       const prepared = await snapshotPayload(env,timestamp,community,settings,eventId);
       if (!prepared.snapshot.futureDepartures.length && !rows.some(row => row.event_id === eventId)) continue;
       const row = await ensurePublication(env,community,eventId,settings);
-      await publish(env,timestamp,community,settings,row,event,budget,prepared);
+      await publish(env,timestamp,community,settings,row,event,budget,prepared,test);
       await env.DB.prepare('UPDATE discord_recap_publications SET checked_at=? WHERE community_id=? AND event_id=?').bind(timestamp,community.id,eventId).run();
     }
   }

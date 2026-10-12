@@ -169,7 +169,7 @@ function recapForm(setup) {
       <fieldset data-recap-step="3" hidden><legend>Vérifier puis activer le récap</legend>
         <p>Aucun message n’est envoyé à l’ouverture de cet aperçu. Les catégories des courses seront supprimées 24 h après la fin du dernier départ ; le salon général est conservé.</p>
         <div data-recap-preview class="recap-live-preview"></div>
-        <button type="button" class="secondary-button" data-recap-send-test>Envoyer un test sur Discord</button>
+        <button type="button" class="secondary-button" data-recap-send-test>Envoyer un test sur Discord</button><p>Si la catégorie ou le salon d’une course a été supprimé sur Discord, ce test le rétablit. Les salons encore présents et leurs messages sont conservés.</p>
         <button type="submit" class="primary-button">Activer le récap automatique</button></fieldset>
       <div class="setup-actions"><button type="button" class="secondary-button" data-recap-back hidden>Retour</button><button type="button" class="primary-button" data-recap-next>Continuer</button>${established ? '<button type="button" class="secondary-button" data-recap-cancel>Fermer</button>' : ''}<span class="settings-status" role="status" aria-live="polite"></span></div>
     </form>

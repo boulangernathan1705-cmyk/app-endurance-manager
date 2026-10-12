@@ -366,3 +366,27 @@ test('Discord diagnostics distinguish removed messages, missing channels and mis
   assert.match(recapError({status:404}),/actualise les destinations/);
   assert.match(recapError({status:403,code:50013}),/permissions.*Intégrer des liens/);
 });
+
+
+test('an explicit test repairs a deleted race category and channel while preserving the configured destination',async t=>{
+  const {DB,env,calls,channels,messages}=setup(t);race(DB);
+  await saveBotRecap(env,COMMUNITY,SETTINGS);await syncBotRecaps(env,NOW,COMMUNITY);
+  const old=DB.db.prepare('SELECT * FROM discord_recap_publications').get();
+  channels.splice(channels.findIndex(item=>item.id===old.channel_id),1);
+  channels.splice(channels.findIndex(item=>item.id===old.category_id),1);
+  messages.clear();
+  // Reproduce SPM's partial first publication (channel tracked, no message yet).
+  DB.db.prepare("UPDATE discord_recap_publications SET message_id=NULL,content_hash=''").run();
+  const failure=(path)=>path.startsWith(`/channels/${old.channel_id}/`);failure.status=404;
+  const original=globalThis.fetch;
+  globalThis.fetch=async(url,options)=>failure(String(url).replace('https://discord.com/api/v10',''))?Response.json({code:10003},{status:404}):original(url,options);
+  await assert.rejects(syncBotRecaps(env,NOW+1,COMMUNITY),/salon de publication/);
+  calls.length=0;
+  await sendBotRecapTest(env,NOW+2,COMMUNITY,SETTINGS);
+  const repaired=DB.db.prepare('SELECT * FROM discord_recap_publications').get();
+  assert.notEqual(repaired.category_id,old.category_id);assert.notEqual(repaired.channel_id,old.channel_id);assert.ok(repaired.message_id);
+  assert.equal(creates(calls).length,2);assert.equal(sends(calls).length,1);
+  assert.ok(channels.some(item=>item.id===CATEGORY));
+  calls.length=0;await sendBotRecapTest(env,NOW+3,COMMUNITY,SETTINGS);
+  assert.equal(creates(calls).length,0);assert.equal(sends(calls).length,0);
+});
