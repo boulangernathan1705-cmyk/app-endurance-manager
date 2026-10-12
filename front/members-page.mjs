@@ -262,7 +262,7 @@ function modulesMarkup(settings, setup) {
       state:states.raceReminders ? ['ok', 'Actif'] : ['off', 'Éteint'], control:toggle('raceReminders', 'Rappels de course'), settings:''},
     {key:'iracingImport', name:'Endurances iRacing officielles', text:'Les séries en équipe et les événements spéciaux importés automatiquement.',
       state:states.iracingImport ? ['ok', 'Actif'] : ['off', 'Éteint'], control:toggle('iracingImport', 'Endurances iRacing officielles'), settings:''},
-    {key:'soloRaces', name:'EVENT TDZ', text:'Le calendrier des Tondeuz, toutes simus&nbsp;: places limitées, liste d’attente, types OPEN, SAFE, Bouboule…',
+    {key:'soloRaces', name:'EVENT TDZ', text:'Un calendrier d’événements toutes simus&nbsp;: places limitées, liste d’attente, accès OPEN ou SAFE.',
       state:states.soloRaces ? ['ok', 'Actif'] : ['off', 'Éteint'], control:toggle('soloRaces', 'EVENT TDZ'),
       settings:`<form class="settings-safe-guide" data-safe-guide><label>Salon Discord « Comment devenir SAFE »<input name="url" type="url" maxlength="200" placeholder="https://discord.com/channels/…" value="${esc(settings.modules.safeGuideUrl || '')}"></label>
         <div class="settings-actions"><button class="primary-button" type="submit">Enregistrer</button><span class="settings-status" aria-live="polite"></span></div></form>`},
