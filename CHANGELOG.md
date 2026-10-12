@@ -2,6 +2,11 @@
 
 Les changements du site, version par version. La plus récente est en haut.
 
+## v1.31 — 12 octobre 2026
+
+- Discord : bouton « Réparer le récap » pour rétablir les catégories, salons ou messages supprimés, sans changer les réglages ni les inscriptions. Les publications existantes sont conservées.
+- Administration : état « Publication en erreur », messages précis et indications pour corriger la destination ou les droits du bot.
+
 ## v1.30 — 12 octobre 2026
 
 - Nouveau module **EVENT SOLO** pour toutes les communautés : le calendrier d'événements toutes simus, inscription en un clic, places et liste d'attente. EVENT TDZ reste réservé aux TDZ.

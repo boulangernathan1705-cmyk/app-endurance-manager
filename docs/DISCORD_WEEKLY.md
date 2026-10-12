@@ -27,7 +27,7 @@ Le bot doit pouvoir **Voir le salon**, **Envoyer des messages**, **Intégrer des
 - Le nom du salon est dérivé du nom de l’endurance, avec un suffixe stable. Les événements homonymes et les collisions ne mélangent pas leurs données.
 - Les nouveaux événements éligibles obtiennent automatiquement leur salon. Le bot traite au plus deux événements par synchronisation pour rester dans son budget de requêtes ; les autres passent aux synchronisations suivantes.
 - Les synchronisations concurrentes partagent un verrou. L’empreinte du contenu évite les éditions inutiles. Un salon créé juste avant une interruption est retrouvé grâce à son marqueur de sujet ; un premier message dont la réponse a été perdue est retrouvé dans l’historique récent avec son nonce.
-- Si un message ou un salon suivi a été supprimé manuellement, une erreur est remontée, sans recréer automatiquement des publications pouvant produire des notifications inattendues.
+- Si un message ou un salon suivi a été supprimé, l’état devient **Publication en erreur**. L’administrateur clique sur **Réparer le récap** : les salons de course disparus et les messages supprimés sont rétablis, sans changer les réglages ni les inscriptions. Les publications encore présentes sont conservées. Le récap général reste dans le salon choisi ; si celui-ci a disparu, il faut choisir un autre salon via Modifier. Aucune nouvelle publication automatique après un refus de permissions ou une erreur réseau ambiguë.
 - Discord accepte au plus 10 embeds et 6000 caractères cumulés. Les longues listes sont condensées, puis abrégées si nécessaire ; les liens vers le site donnent accès aux détails complets.
 
 ## Suppression après la course : décision confirmée
@@ -73,3 +73,13 @@ Captures réalisées localement avec des réponses API fictives :
 - [Choix sur mobile](previews/issue-261/recap-choices-mobile.png)
 - [Aperçu sur ordinateur](previews/issue-261/recap-preview-desktop.png)
 - [Aperçu sur mobile](previews/issue-261/recap-preview-mobile.png)
+
+## Réparation par un administrateur
+
+Dans Administration → Modules → Récap, **Réparer le récap** vérifie les droits réels de la destination enregistrée et relance la publication. La réparation respecte le verrou de synchronisation et conserve mode, simulateurs, destination et activation. Un récap désactivé reste désactivé. Pour plusieurs courses, les lots restent limités à deux : relancer la réparation pour les suivantes.
+
+- **Salon ou catégorie de course disparu** : la réparation le rétablit avec les permissions de la destination.
+- **Message supprimé** : le bot publie un nouveau message dans le salon existant ; les messages présents sont modifiés, sans doublon ni mentions.
+- **Destination supprimée ou serveur changé** : Modifier → actualiser les destinations → choisir la destination actuelle → activer.
+- **Permissions manquantes** : donner les droits au bot et vérifier les refus propres au salon sur Discord, puis réparer. Le bot ne s’accorde aucun droit automatiquement.
+- **Discord temporairement indisponible** : l’erreur est affichée ; réessayer plus tard. Une panne réseau ne déclenche pas la création d’un deuxième message.

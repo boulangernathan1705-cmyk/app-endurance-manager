@@ -16,7 +16,12 @@ const parse = value => { try { const result = JSON.parse(value); return Array.is
 export function recapError(error) {
   if (error.status === 429) return 'Discord limite les requêtes. Le récap réessaiera automatiquement.';
   if (error.status === 403) return 'Dans les permissions du salon ou de la catégorie, autorise le bot à Voir le salon, Envoyer des messages, Intégrer des liens et Voir les anciens messages ; en mode par événement, ajoute Gérer les salons.';
-  if (error.status === 404) return 'La destination Discord est introuvable. Choisis un salon texte ou une catégorie existante.';
+  if (error.status === 404) {
+    if (error.code === 10008 || (!error.code && /\/messages\/[^/?]+$/.test(error.path || ''))) return 'Le message de récap a été supprimé sur Discord. Clique sur Réparer le récap pour le republier dans le salon existant.';
+    if (error.code === 10004) return 'Le serveur Discord est introuvable pour le bot. Vérifie le serveur lié à cette communauté et la présence du bot.';
+    if (error.path?.startsWith('/channels/')) return 'Le salon de publication du récap est introuvable ou inaccessible au bot. Clique sur Réparer le récap pour rétablir les salons de course disparus. Si la destination choisie a disparu, utilise Modifier pour en choisir une autre.';
+    return 'La catégorie ou le salon de destination est introuvable. Clique sur Modifier, actualise les destinations et sélectionne une destination existante.';
+  }
   if (error.status === 400) return `Discord a refusé le récap (code ${error.code || 'inconnu'}). Vérifie les permissions du bot et signale cette erreur au gestionnaire.`;
   if (error.status === 401) return 'Le bot du site n’est pas disponible. Préviens le gestionnaire de la plateforme.';
   return 'Discord ne répond pas. Le récap réessaiera automatiquement.';
@@ -27,7 +32,7 @@ async function discord(env, method, path, body, budget = {left:12}) {
   const response = await fetch(API + path, {method, signal:AbortSignal.timeout(8000),
     headers:{Authorization:`Bot ${env.DISCORD_BOT_TOKEN}`, ...(body ? {'Content-Type':'application/json'} : {})}, body:body ? JSON.stringify(body) : undefined});
   const data = response.status === 204 ? null : await response.json().catch(() => null);
-  if (!response.ok) throw Object.assign(new Error('Discord indisponible'), {status:response.status, code:data?.code});
+  if (!response.ok) throw Object.assign(new Error('Discord indisponible'), {status:response.status, code:data?.code, path});
   return data;
 }
 function effectivePermissions(roles, member, guildId, channel, clientId) {
@@ -182,7 +187,7 @@ async function ensurePublication(env, community, eventId, settings) {
     .bind(community.id,eventId,settings.guild_id,marker).run();
   return env.DB.prepare('SELECT * FROM discord_recap_publications WHERE community_id=? AND event_id=?').bind(community.id,eventId).first();
 }
-async function publish(env, timestamp, community, settings, row, event, budget, prepared = null) {
+async function publish(env, timestamp, community, settings, row, event, budget, prepared = null, repair = false) {
   const isEvent = row.event_id !== '';
   if (isEvent) await env.DB.prepare('UPDATE discord_recap_publications SET delete_after=? WHERE community_id=? AND event_id=?').bind(eventDeletionTime(event),community.id,row.event_id).run();
   if (row.closed_at) return;
@@ -193,16 +198,25 @@ async function publish(env, timestamp, community, settings, row, event, budget, 
     await env.DB.prepare('UPDATE discord_recap_publications SET channel_id=?,message_id=NULL,content_hash=? WHERE community_id=? AND event_id=?')
       .bind(channel,'',community.id,'').run();
   }
-  if (isEvent && (!channel || !row.category_id || row.category_id === settings.destination_id)) {
+  if (isEvent && (repair || !channel || !row.category_id || row.category_id === settings.destination_id)) {
     // One category per race (« 🏎️ LMU · 6h de Spa »): its recap here, the crews' voice channels below it.
     // The first version put the text channel straight in the chosen category: it is moved into its race's.
     const channels = await discord(env,'GET',`/guilds/${row.guild_id}/channels`,null,budget);
+    if (repair) {
+      // Only an explicit test repairs channels deleted on Discord; automatic sync never recreates them.
+      if (row.category_id && !channels.some(item => item.id === row.category_id && item.type === 4)) row.category_id = null;
+      if (channel && !channels.some(item => item.id === channel && item.type === 0)) {
+        channel = null; row.channel_id = null; row.message_id = null; row.content_hash = '';
+        await env.DB.prepare('UPDATE discord_recap_publications SET channel_id=NULL,message_id=NULL,content_hash=? WHERE community_id=? AND event_id=?')
+          .bind('',community.id,row.event_id).run();
+      }
+    }
     let category = row.category_id && row.category_id !== settings.destination_id ? row.category_id : null;
     if (!category) {
       // Discord allows 500 channels per server: room is kept for the crews' voice channels.
       if (channels.length >= MAX_CHANNELS) return;
       const anchor = channels.find(item => item.id === settings.destination_id && item.type === 4);
-      if (!anchor) throw Object.assign(new Error('Discord indisponible'), {status:404});
+      if (!anchor) throw Object.assign(new Error('Discord indisponible'), {status:404,code:10003});
       // Categories cannot be nested: explicitly retain the chosen category's access rules.
       category = (await discord(env,'POST',`/guilds/${row.guild_id}/channels`,{type:4,name:raceCategoryName(event),permission_overwrites:anchor.permission_overwrites || []},budget)).id;
       row.category_id = category;
@@ -216,11 +230,19 @@ async function publish(env, timestamp, community, settings, row, event, budget, 
     await env.DB.prepare('UPDATE discord_recap_publications SET channel_id=? WHERE community_id=? AND event_id=?').bind(channel,community.id,row.event_id).run();
   }
   const {payload, hash} = prepared || await snapshotPayload(env,timestamp,community,settings,isEvent ? row.event_id : null);
-  if (row.message_id && row.content_hash === hash) return;
+  if (!repair && row.message_id && row.content_hash === hash) return;
   if (row.message_id) {
     // A removed message or channel is reported, not recreated on every update (no surprise notifications).
-    await discord(env,'PATCH',`/channels/${channel}/messages/${row.message_id}`,payload,budget);
-  } else {
+    try { await discord(env,'PATCH',`/channels/${channel}/messages/${row.message_id}`,payload,budget); }
+    catch (error) {
+      // Never treat missing access/channels, timeouts or ambiguous errors as a deleted message.
+      if (!repair || error.status !== 404 || error.code !== 10008) throw error;
+      row.message_id = null;
+      await env.DB.prepare('UPDATE discord_recap_publications SET message_id=NULL,content_hash=? WHERE community_id=? AND event_id=?')
+        .bind('',community.id,row.event_id).run();
+    }
+  }
+  if (!row.message_id) {
     // Recover a first message after a lost response. No second POST on an ambiguous first send.
     const messages = await discord(env,'GET',`/channels/${channel}/messages?limit=100`,null,budget);
     const existing = messages.find(item => item.author?.id === env.DISCORD_CLIENT_ID && item.nonce === row.marker.slice(-24));
@@ -248,7 +270,7 @@ async function syncLocked(env,timestamp,community,settings, test = false, budget
   if (settings.guild_id !== community.discordGuildId) throw new Error('Le serveur Discord a changé. Configure à nouveau la destination.');
   if (settings.mode === 'general') {
     const row = await ensurePublication(env,community,'',settings);
-    await publish(env,timestamp,community,settings,row,null,budget);
+    await publish(env,timestamp,community,settings,row,null,budget,null,test);
   } else {
     const eligible = await openRaces(env,community,events,settings.scope,timestamp);
     const ids = [...new Set([...rows.filter(row => row.event_id && !row.closed_at).map(row => row.event_id),...eligible])];
@@ -260,7 +282,7 @@ async function syncLocked(env,timestamp,community,settings, test = false, budget
       const prepared = await snapshotPayload(env,timestamp,community,settings,eventId);
       if (!prepared.snapshot.futureDepartures.length && !rows.some(row => row.event_id === eventId)) continue;
       const row = await ensurePublication(env,community,eventId,settings);
-      await publish(env,timestamp,community,settings,row,event,budget,prepared);
+      await publish(env,timestamp,community,settings,row,event,budget,prepared,test);
       await env.DB.prepare('UPDATE discord_recap_publications SET checked_at=? WHERE community_id=? AND event_id=?').bind(timestamp,community.id,eventId).run();
     }
   }
@@ -297,6 +319,15 @@ export async function sendBotRecapTest(env,timestamp,community,settings) {
   const unchanged = current && current.mode === settings.mode && current.scope === settings.scope && current.destination_id === settings.destinationId;
   if (current?.adopted && !unchanged) throw Object.assign(new Error('Pour tester une nouvelle destination, active d’abord ces réglages. Le récap existant reste inchangé.'), {status:400});
   await saveBotRecap(env,community,settings,Boolean(unchanged && current.enabled),Boolean(current?.adopted));
+  return syncBotRecaps(env,timestamp,community,true);
+}
+
+// Repair uses the saved configuration; it never switches mode, destination or activation.
+export async function repairBotRecap(env,timestamp,community) {
+  const current=await botRecapSettings(env,community);
+  if (!current) throw Object.assign(new Error('Configure d’abord le récap dans Administration → Modules.'),{status:400});
+  if (current.guild_id !== community.discordGuildId) throw Object.assign(new Error('Le serveur Discord a changé. Clique sur Modifier pour choisir la destination sur le bon serveur.'),{status:400});
+  await validateRecapDestination(env,community,{mode:current.mode,scope:current.scope,destinationId:current.destination_id});
   return syncBotRecaps(env,timestamp,community,true);
 }
 

@@ -4,12 +4,12 @@ import {join} from 'node:path';
 
 const TEXT='555555555555555555', CATEGORY='666666666666666666';
 // This suite mocks every API request, so it never writes to a community or to a real Discord server.
-async function mockAdmin(page,{legacy=false,permission=true}={}) {
-  const calls=[];let botRecap=null;
+async function mockAdmin(page,{legacy=false,permission=true,initialRecap=null,repairError=null}={}) {
+  const calls=[];let botRecap=initialRecap;
   await page.route('**/api/**',async route=>{
     const request=route.request(),path=new URL(request.url()).pathname,method=request.method();
     calls.push({path,method,input:request.postDataJSON()});
-    let data={ok:true};
+    let data={ok:true},status=200;
     if(path==='/api/session')data={user:{id:'100000000000000001',name:'Max'},permissions:['admin','access'],manager:false,community:{name:'Ma communauté',shortName:'MC',appearance:{}},communities:[]};
     if(path==='/api/members')data={members:[],permissions:['access','admin']};
     if(path==='/api/community/settings')data={community:{name:'Ma communauté',shortName:'MC'},modules:{},permissions:['access','admin'],roles:[],crews:{}};
@@ -17,7 +17,11 @@ async function mockAdmin(page,{legacy=false,permission=true}={}) {
     if(path==='/api/community/recap/destinations')data={destinations:[{id:TEXT,type:0,name:'récap-endurances',ready:true,missing:[]},{id:CATEGORY,type:4,name:'Endurances',ready:permission,missing:permission?[]:['Intégrer des liens','Gérer les salons']}]};
     if(path==='/api/community/recap/preview')data={previews:(request.postDataJSON().mode==='events'?['6h-de-spa-12345678','24h-du-mans-87654321']:['récap-endurances']).map(name=>({name,payload:{embeds:[{title:'Préparation des endurances',description:'📍 Spa-Francorchamps · ⏱️ 6h\n📅 dimanche 11 octobre · 14h',fields:[{name:'Équipages',value:'🟪 **Apex Racing** · GT3 · 🔓 Ouvert\n👤 Nathan · 👤 Max\n📋 Sans équipage : Leo'},{name:'🚫 Pilotes absents',value:'Alex'}],url:'https://site.example/lmu/#event=spa'}]}}))};
     if(path==='/api/community/recap'&&method==='PUT'){const input=request.postDataJSON();botRecap={...input,enabled:input.enabled!==false,destinationName:input.mode==='events'?'Endurances':'récap-endurances'};data={ok:true,published:true};}
-    await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(data)});
+    if(path==='/api/community/recap/repair'){
+      if(repairError){status=400;data={error:repairError};}
+      else botRecap={...botRecap,lastError:null};
+    }
+    await route.fulfill({status,contentType:'application/json',body:JSON.stringify(data)});
   });
   await page.addInitScript(()=>localStorage.setItem('endurance_manager_locale','fr'));
   await page.goto('/members.html');
@@ -77,4 +81,28 @@ test('webhook transition opens bot setup and missing permissions block activatio
   await expect(wizard.locator('.settings-status')).toContainText('Permissions manquantes');
   await expect(wizard.locator('[data-recap-step="2"]')).toBeVisible();
   expect(calls.filter(call=>call.path==='/api/community/recap'||call.path.startsWith('/api/community/recaps'))).toHaveLength(0);
+});
+
+
+const brokenRecap={enabled:true,mode:'events',scope:'lmu',destinationId:CATEGORY,destinationName:'Endurances',lastError:'Le salon de publication du récap est introuvable ou inaccessible au bot. Clique sur Réparer le récap.'};
+test('admin can repair from the error summary without reconfiguring or reauthorizing the bot',async({page})=>{
+  const calls=await mockAdmin(page,{initialRecap:brokenRecap});
+  const summary=page.locator('[data-recap-summary]');
+  await expect(summary).toContainText('Publication en erreur');
+  await expect(summary.getByRole('link',{name:'Donner les droits au bot'})).toHaveCount(0);
+  await summary.getByRole('button',{name:'Réparer le récap',exact:true}).click();
+  await expect(page.locator('[data-recap-repair-status]')).toContainText('Réparation effectuée');
+  await expect(page.locator('[data-recap-summary]')).not.toContainText('Publication en erreur');
+  await expect(page.locator('[data-recap-summary]')).toContainText('Actif');
+  await expect(page.locator('[data-recap-wizard]')).toBeHidden();
+  expect(calls.filter(c=>c.path==='/api/community/recap/repair')).toHaveLength(1);
+  expect(calls.filter(c=>c.path==='/api/community/recap'&&c.method==='PUT')).toHaveLength(0);
+});
+
+test('repair failures are visible beside the button and leave the settings intact',async({page})=>{
+  await mockAdmin(page,{initialRecap:brokenRecap,repairError:'Dans les permissions de « Endurances », autorise le bot : Intégrer des liens.'});
+  await page.getByRole('button',{name:'Réparer le récap',exact:true}).click();
+  await expect(page.locator('[data-recap-repair-status]')).toContainText('Intégrer des liens');
+  await expect(page.getByRole('button',{name:'Réparer le récap',exact:true})).toBeEnabled();
+  await expect(page.locator('[data-recap-summary]')).toContainText('Publication en erreur');
 });
