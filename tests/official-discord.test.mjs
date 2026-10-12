@@ -70,7 +70,7 @@ test('the former layout is tidied up: renamed, moved, nothing deleted but the em
     {id:'1',type:0,name:'règlement',position:0},{id:'2',type:0,name:'suivi-discord',position:1},
     {id:'10',type:4,name:'👋 ACCUEIL',position:0},{id:'11',type:0,name:'bienvenue',parent_id:'10'},{id:'12',type:5,name:'annonces',parent_id:'10'},{id:'13',type:0,name:'bien-démarrer',parent_id:'10'},
     {id:'20',type:4,name:'💬 COMMUNAUTÉ',position:1},{id:'21',type:0,name:'discussion',parent_id:'20'},
-    {id:'30',type:4,name:'🏎️ LMU · 10h de Road Atlanta',position:2},{id:'31',type:0,name:'récap',parent_id:'30'},{id:'32',type:2,name:'Les plots',parent_id:'30'},
+    {id:'30',type:4,name:'🏎️ LMU · 10h de Road Atlanta',position:2},{id:'31',type:0,name:'infos-de-la-course',parent_id:'30'},{id:'32',type:2,name:'Les plots',parent_id:'30'},
     {id:'40',type:4,name:'🆘 AIDE ET RETOURS',position:3},{id:'41',type:15,name:'aide',parent_id:'40'},{id:'42',type:15,name:'bugs',parent_id:'40'},{id:'43',type:15,name:'fonctionnalités',parent_id:'40'},
     {id:'50',type:4,name:'🔊 VOCAUX GÉNÉRAUX',position:4},{id:'51',type:2,name:'Discussion',parent_id:'50'},{id:'52',type:2,name:'Détente',parent_id:'50'},
     {id:'60',type:4,name:'🔒 ÉQUIPE',position:5},{id:'61',type:0,name:'modération',parent_id:'60'},{id:'62',type:0,name:'logs-bot',parent_id:'60'}]});
