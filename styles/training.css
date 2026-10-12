@@ -395,14 +395,21 @@ details.prep>summary::-webkit-details-marker,details.prep-last>summary::-webkit-
 .stint-pilot span{color:var(--muted);font-weight:500}
 .stint-pilot[aria-pressed="true"]{border-color:var(--c);background:color-mix(in srgb,var(--c) 18%,var(--bg))}
 .stint-tracks{display:grid;gap:6px;touch-action:pan-y;user-select:none;-webkit-user-select:none}
-.stint-track{display:grid;grid-template-columns:repeat(var(--hours),minmax(0,1fr));gap:3px;max-width:calc(var(--hours) * 64px)}
-.stint-cell{display:grid;grid-template-rows:auto 26px;align-items:center;justify-items:center;gap:2px;min-width:0;padding:4px 0 0;font:inherit;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);cursor:pointer;overflow:hidden}
+.stint-track{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:4px;max-width:480px}
+.stint-cell{display:grid;grid-template-rows:auto auto 26px;align-items:center;justify-items:center;gap:0;min-width:0;padding:4px 0 0;font:inherit;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);cursor:pointer;overflow:hidden}
+.stint-cell small strong{color:var(--text);font-weight:700}
 .stint-cell small{font-size:10.5px;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
 .stint-cell b{align-self:stretch;justify-self:stretch;display:grid;place-items:center;font-size:11px;font-weight:700;overflow:hidden;white-space:nowrap}
 .stint-cell[class*=" is-p"] b{background:var(--c);color:#0d1418}
 .stint-cell.is-off{opacity:.45}
 .stint-cell.is-away b{background:repeating-linear-gradient(135deg,var(--c) 0 5px,color-mix(in srgb,var(--c) 45%,transparent) 5px 10px)}
 .is-p0{--c:var(--p0)}.is-p1{--c:var(--p1)}.is-p2{--c:var(--p2)}.is-p3{--c:var(--p3)}.is-p4{--c:var(--p4)}.is-p5{--c:var(--p5)}
+.stint-count{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px}
+.stint-count>button{width:34px;height:34px;border-radius:50%;border:1px solid var(--border);background:var(--bg);color:var(--text);font:inherit;font-size:18px;cursor:pointer}
+.stint-count>button:disabled{opacity:.4;cursor:default}
+.stint-count>b{font-size:16px;min-width:72px;text-align:center}
+.stint-count small{flex-basis:100%;color:var(--muted);font-size:12.5px}
+.stint-count small .link-button{font-size:12.5px}
 .stint-warn,.stint-ok{margin:0;font-size:13px}
 .stint-warn{color:#e7a43b}
 .stint-ok{color:var(--accent)}

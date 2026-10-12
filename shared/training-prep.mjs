@@ -1,7 +1,7 @@
 // The preparation of each LMU race (server/training-prep.mjs, entrainement.html): a few steps in four parts, each
 // with a status the pilot gives (or the sessions prove), and notes shared with the crew. One preparation per race:
 // it starts again for the next one, and the last race on the same circuit is shown beside it. The crew plans who
-// drives each hour of the race in the last step, like the hours ticked when entering.
+// drives each relay in the last step, the number of relays estimated from the laps and the consumption.
 export const PREP_STATUSES = ['done', 'rework', 'todo', 'skip'];
 export const PREP_LABELS = {done:'Fait', rework:'À retravailler', todo:'À faire', skip:'Pas besoin'};
 
@@ -23,7 +23,7 @@ export const PREP_PHASES = [
     {key:'traffic', title:'Gérer le trafic multiclasse', tip:'Laisser passer les plus rapides sans perdre de temps.', turns:true, hints:['Laisser passer :', 'Éviter de doubler :']},
     {key:'start', title:'Préparer le départ', tip:'Pneus froids, premier tour, départ lancé.', turns:true, hints:['Premier virage :']}]},
   {key:'race', title:'Avant la course', steps:[
-    {key:'stints', title:'Planifier les relais', tip:'Choisis un pilote, puis touche ses heures.', auto:'plan', plan:true}]}
+    {key:'stints', title:'Planifier les relais', tip:'Une estimation pour s’organiser : la course décidera.', auto:'plan', plan:true}]}
 ];
 export const PREP_STEPS = PREP_PHASES.flatMap(phase => phase.steps);
 export const NOTE_LIMIT = 280;
@@ -31,16 +31,28 @@ export const NOTE_LIMIT = 280;
 // A registration's hours: « whole », or the hours ticked (« h1,h3 », the first hour being h1).
 export const availableAt = (status, hour) => status === 'whole' || String(status || '').split(',').includes('h' + (hour + 1));
 
-// A first relay plan from the hours each pilot ticked: everyone drives about as much, the pilot with fewest hours left
-// to give goes first, a relay goes on for a second hour when it costs nobody, never a third, and an hour nobody
-// ticked goes to the pilot who drives least. pilots: [{id, status}].
-export function proposeStints(pilots, hours) {
+// How many relays the race takes: a full tank (or energy) of laps at the pilot's pace, with no data a relay of
+// 50 minutes. An estimate to share the race between the pilots, the race will change it.
+export const RELAY_DEFAULT_MINUTES = 50;
+export function estimateRelays({minutes, lap, stintLaps}) {
+  const stint = lap > 0 && stintLaps > 0 ? lap * stintLaps / 60 : null;
+  const length = stint || RELAY_DEFAULT_MINUTES;
+  return {count:Math.max(1, Math.min(60, Math.ceil(minutes / length - 0.15))), laps:stint ? stintLaps : null, lap:stint ? lap : null,
+    minutes:Math.round(length)};
+}
+// The hour of the race (0 = first) a relay mostly falls in, to read the pilots' ticked hours.
+export const relayHour = (index, count, minutes) => Math.floor((index + 0.5) * minutes / count / 60);
+
+// A first plan from the hours each pilot ticked: everyone drives about as much, the pilot with fewest relays left
+// to give goes first, a relay is doubled when it costs nobody, never tripled, and a relay nobody can drive goes to
+// the pilot who drives least. pilots: [{id, status}]; hourOf: relay -> hour of the race.
+export function proposeStints(pilots, count, hourOf = index => index) {
   const counts = pilots.map(() => 0), plan = [];
   let previous = -1, run = 0;
-  for (let hour = 0; hour < hours; hour++) {
-    const free = pilots.map((pilot, index) => index).filter(index => availableAt(pilots[index].status, hour));
-    const pool = (free.length ? free : pilots.map((pilot, index) => index));
-    const left = index => Array.from({length:hours - hour}, (_, i) => availableAt(pilots[index].status, hour + i)).filter(Boolean).length;
+  for (let relay = 0; relay < count; relay++) {
+    const free = pilots.map((pilot, index) => index).filter(index => availableAt(pilots[index].status, hourOf(relay)));
+    const pool = free.length ? free : pilots.map((pilot, index) => index);
+    const left = index => Array.from({length:count - relay}, (_, i) => availableAt(pilots[index].status, hourOf(relay + i))).filter(Boolean).length;
     const score = index => index === previous && run >= 2 && pool.length > 1 ? Infinity : counts[index] * 10 + left(index) - (index === previous ? 5 : 0);
     const pick = pool.reduce((best, index) => best < 0 || score(index) < score(best) ? index : best, -1);
     if (pick < 0) { plan.push(null); continue; }

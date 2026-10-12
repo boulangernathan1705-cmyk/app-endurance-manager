@@ -3,7 +3,7 @@
 // without it the pilot types his pace and gives each step its status himself.
 import {shortDateLabel, timeAt} from './dates.mjs';
 import {lapLabel} from '../shared/training.mjs';
-import {PREP_PHASES, PREP_STEPS, PREP_LABELS, PREP_STATUSES, NOTE_LIMIT, availableAt, proposeStints} from '../shared/training-prep.mjs';
+import {PREP_PHASES, PREP_STEPS, PREP_LABELS, PREP_STATUSES, NOTE_LIMIT, availableAt, proposeStints, relayHour} from '../shared/training-prep.mjs';
 import {turnsOf} from '../shared/circuit-turns.mjs';
 
 const app = document.getElementById('training-app');
@@ -110,33 +110,41 @@ function notesBlock(step, prep, turns) {
   return '<div class="prep-notes">' + html + '</div>';
 }
 
-// The relay plan: a pilot picked, then the hours touched (or swept) take his colour, like the hours ticked when
-// entering. « Proposer » fills it from everyone's hours; the crew sees the same plan.
+// The relay plan: a pilot picked, then the relays touched (or swept) take his colour. The number of relays comes from
+// the laps and the consumption, the crew can change it; « Proposer » shares them from the hours each pilot ticked.
 const initials = name => name === 'Toi' ? 'Toi' : String(name).trim().slice(0, 3);
-function stintCell(stints, hour) {
-  const id = stints.plan[hour], index = stints.pilots.findIndex(pilot => pilot.id === id), pilot = stints.pilots[index];
+// Estimated starts, to five minutes: the race will move them anyway.
+const relayStart = (stints, relay) => stints.startsAt + Math.round(relay * stints.minutes / stints.count / 5) * 5 * 60000;
+const lapShort = seconds => Math.floor(seconds / 60) + ':' + (seconds % 60).toFixed(1).padStart(4, '0');
+const relayFree = (stints, pilot, relay) => availableAt(pilot.status, relayHour(relay, stints.count, stints.minutes));
+function relayCell(stints, relay) {
+  const id = stints.plan[relay], index = stints.pilots.findIndex(pilot => pilot.id === id), pilot = stints.pilots[index];
   const brush = stints.pilots.find(item => item.id === view.brush);
-  const away = pilot && !availableAt(pilot.status, hour), off = brush && !availableAt(brush.status, hour);
-  const label = timeAt(stints.startsAt + hour * 3600000) + ' : ' + (pilot ? pilot.name + (away ? ' (pas dispo)' : '') : 'personne');
-  return '<button type="button" class="stint-cell' + (pilot ? ' is-p' + (index % 6) : '') + (away ? ' is-away' : '') + (off ? ' is-off' : '') + '" data-stint-hour="' + hour + '" aria-label="' + esc(label) + '" title="' + esc(label) + '">' +
-    '<small>' + esc(timeAt(stints.startsAt + hour * 3600000)) + '</small><b>' + (pilot ? esc(initials(pilot.name)) : '') + '</b></button>';
+  const away = pilot && !relayFree(stints, pilot, relay), off = brush && !relayFree(stints, brush, relay);
+  const at = timeAt(relayStart(stints, relay));
+  const label = 'Relais ' + (relay + 1) + ', vers ' + at + ' : ' + (pilot ? pilot.name + (away ? ' (pas dispo)' : '') : 'personne');
+  return '<button type="button" class="stint-cell' + (pilot ? ' is-p' + (index % 6) : '') + (away ? ' is-away' : '') + (off ? ' is-off' : '') + '" data-relay="' + relay + '" aria-label="' + esc(label) + '" title="' + esc(label) + '">' +
+    '<small><strong>R' + (relay + 1) + '</strong></small><small>' + esc(at) + '</small><b>' + (pilot ? esc(initials(pilot.name)) : '') + '</b></button>';
 }
 function stintPlan(prep) {
   const stints = prep.stints;
   if (!stints) return '<p class="training-note">Rejoins un équipage pour planifier les relais avec lui.</p>';
   if (!stints.pilots.some(pilot => pilot.id === view.brush)) view.brush = stints.pilots.find(pilot => pilot.you)?.id || stints.pilots[0]?.id || null;
-  const count = id => stints.plan.filter(item => item === id).length;
-  const chips = stints.pilots.map((pilot, index) => '<button type="button" class="stint-pilot is-p' + (index % 6) + '" data-brush="' + esc(pilot.id) + '" aria-pressed="' + (view.brush === pilot.id) + '"><i></i>' + esc(pilot.name) + ' <span>' + count(pilot.id) + ' h</span></button>').join('');
+  const count = id => stints.plan.filter(item => item === id).length, guess = stints.estimate;
+  const chips = stints.pilots.map((pilot, index) => '<button type="button" class="stint-pilot is-p' + (index % 6) + '" data-brush="' + esc(pilot.id) + '" aria-pressed="' + (view.brush === pilot.id) + '"><i></i>' + esc(pilot.name) + ' <span>' + count(pilot.id) + '</span></button>').join('');
   const rows = [];
-  for (let start = 0; start < stints.hours; start += 12) rows.push('<div class="stint-track" style="--hours:' + Math.min(12, stints.hours - start) + '">' + Array.from({length:Math.min(12, stints.hours - start)}, (_, i) => stintCell(stints, start + i)).join('') + '</div>');
-  const empty = stints.plan.map((id, hour) => id ? null : timeAt(stints.startsAt + hour * 3600000)).filter(Boolean);
-  const away = stints.plan.map((id, hour) => { const pilot = stints.pilots.find(item => item.id === id); return pilot && !availableAt(pilot.status, hour) ? pilot.name + ' à ' + timeAt(stints.startsAt + hour * 3600000) : null; }).filter(Boolean);
-  return '<div class="stint-plan"><div class="stint-pilots" role="group" aria-label="Pilote à placer">' + chips + '</div>' +
-    '<div class="stint-tracks" data-stint-tracks>' + rows.join('') + '</div>' +
-    (empty.length ? '<p class="stint-warn">' + (empty.length === stints.hours ? 'Aucune heure attribuée.' : 'Personne à ' + esc(empty.join(', ')) + '.') + '</p>' : '<p class="stint-ok">Toutes les heures ont un pilote.</p>') +
+  for (let start = 0; start < stints.count; start += 6) rows.push('<div class="stint-track">' + Array.from({length:Math.min(6, stints.count - start)}, (_, i) => relayCell(stints, start + i)).join('') + '</div>');
+  const empty = stints.plan.filter(id => !id).length;
+  const away = stints.plan.map((id, relay) => { const pilot = stints.pilots.find(item => item.id === id); return pilot && !relayFree(stints, pilot, relay) ? pilot.name + ' (R' + (relay + 1) + ')' : null; }).filter(Boolean);
+  const basis = guess.laps ? 'environ ' + guess.minutes + ' min (' + guess.laps + ' tours en ' + lapShort(guess.lap) + ')' : 'environ ' + guess.minutes + ' min, faute de conso mesurée';
+  return '<div class="stint-plan"><div class="stint-count"><button type="button" data-relay-count="-1" aria-label="Un relais de moins"' + (stints.count <= 1 ? ' disabled' : '') + '>−</button><b>' + stints.count + ' relais</b><button type="button" data-relay-count="1" aria-label="Un relais de plus"' + (stints.count >= 60 ? ' disabled' : '') + '>+</button>' +
+    '<small>Estimé : ' + guess.count + ' relais d’' + esc(basis) + '.' + (stints.count !== guess.count ? ' <button type="button" class="link-button" data-relay-reset>Reprendre l’estimation</button>' : '') + '</small></div>' +
+    '<div class="stint-pilots" role="group" aria-label="Pilote à placer">' + chips + '</div>' +
+    '<div class="stint-tracks">' + rows.join('') + '</div>' +
+    (empty ? '<p class="stint-warn">' + (empty === stints.count ? 'Choisis un pilote puis touche ses relais, ou laisse le site proposer.' : empty + ' relais sans pilote.') + '</p>' : '<p class="stint-ok">Chaque relais a son pilote.</p>') +
     (away.length ? '<p class="stint-warn">Pas disponible : ' + esc(away.join(', ')) + '.</p>' : '') +
-    '<div class="stint-actions"><button type="button" class="secondary-button" data-stint-propose>' + (empty.length === stints.hours ? 'Proposer un planning' : 'Proposer à nouveau') + '</button>' +
-    (empty.length < stints.hours ? '<button type="button" class="link-button" data-stint-clear>Tout effacer</button>' : '') + '</div></div>';
+    '<div class="stint-actions"><button type="button" class="secondary-button" data-stint-propose>' + (empty === stints.count ? 'Proposer un planning' : 'Proposer à nouveau') + '</button>' +
+    (empty < stints.count ? '<button type="button" class="link-button" data-stint-clear>Tout effacer</button>' : '') + '</div></div>';
 }
 
 function prepSection(data) {
@@ -221,32 +229,33 @@ async function upload(files) {
   await load();
 }
 
-// Saves the hours changed in the relay plan; the plan on screen goes back if the server refuses.
+// Saves the relays changed (and the number of relays); the plan on screen goes back if the server refuses.
 function saveStints(changes, before) {
-  if (!Object.keys(changes).length) return;
+  const stints = view.data.prep.stints;
   view.message = ''; render();
-  prepCall('/api/training/prep/stints', {hours:changes}, 'PUT').then(load).catch(error => { view.data.prep.stints.plan = before; view.message = error.message; render(); });
+  prepCall('/api/training/prep/stints', {count:stints.count, relays:changes}, 'PUT').then(load).catch(error => { Object.assign(stints, before); view.message = error.message; render(); });
 }
-// Touch or sweep the hours: they take the pilot picked, or are cleared when the first one touched already had him.
+const snapshot = stints => ({count:stints.count, plan:[...stints.plan]});
+// Touch or sweep the relays: they take the pilot picked, or are cleared when the first one touched already had him.
 let painting = null;
 function paint(cell) {
-  const hour = Number(cell.dataset.stintHour), stints = view.data.prep.stints;
-  if (painting.seen.has(hour)) return;
-  painting.seen.add(hour);
-  stints.plan[hour] = painting.value;
-  painting.changes[hour] = painting.value;
-  cell.outerHTML = stintCell(stints, hour);
+  const relay = Number(cell.dataset.relay), stints = view.data.prep.stints;
+  if (painting.seen.has(relay)) return;
+  painting.seen.add(relay);
+  stints.plan[relay] = painting.value;
+  painting.changes[relay] = painting.value;
+  cell.outerHTML = relayCell(stints, relay);
 }
 app.addEventListener('pointerdown', event => {
-  const cell = event.target.closest('[data-stint-hour]');
+  const cell = event.target.closest('[data-relay]');
   if (!cell || event.button > 0 || !view.brush) return;
-  const stints = view.data.prep.stints, hour = Number(cell.dataset.stintHour);
-  painting = {value:stints.plan[hour] === view.brush ? null : view.brush, seen:new Set(), changes:{}, before:[...stints.plan]};
+  const stints = view.data.prep.stints, relay = Number(cell.dataset.relay);
+  painting = {value:stints.plan[relay] === view.brush ? null : view.brush, seen:new Set(), changes:{}, before:snapshot(stints)};
   paint(cell);
 });
 app.addEventListener('pointermove', event => {
   if (!painting) return;
-  const cell = document.elementFromPoint(event.clientX, event.clientY)?.closest('[data-stint-hour]');
+  const cell = document.elementFromPoint(event.clientX, event.clientY)?.closest('[data-relay]');
   if (cell && app.contains(cell)) paint(cell);
 });
 const stopPainting = () => { if (!painting) return; const {changes, before} = painting; painting = null; saveStints(changes, before); };
@@ -277,16 +286,24 @@ app.addEventListener('click', event => {
   }
   const brush = event.target.closest('[data-brush]');
   if (brush) { view.brush = brush.dataset.brush; render(); return; }
-  // A cell is changed by the pointer; the keyboard (detail 0) changes it here.
-  const cell = event.target.closest('[data-stint-hour]');
+  // A relay is changed by the pointer; the keyboard (detail 0) changes it here.
+  const cell = event.target.closest('[data-relay]');
   if (cell) {
-    if (event.detail === 0 && view.brush) { const stints = view.data.prep.stints, hour = Number(cell.dataset.stintHour), before = [...stints.plan]; stints.plan[hour] = stints.plan[hour] === view.brush ? null : view.brush; saveStints({[hour]:stints.plan[hour]}, before); }
+    if (event.detail === 0 && view.brush) { const stints = view.data.prep.stints, relay = Number(cell.dataset.relay), before = snapshot(stints); stints.plan[relay] = stints.plan[relay] === view.brush ? null : view.brush; saveStints({[relay]:stints.plan[relay]}, before); }
+    return;
+  }
+  const more = event.target.closest('[data-relay-count], [data-relay-reset]');
+  if (more) {
+    const stints = view.data.prep.stints, before = snapshot(stints);
+    stints.count = more.dataset.relayCount ? Math.max(1, Math.min(60, stints.count + Number(more.dataset.relayCount))) : stints.estimate.count;
+    stints.plan = Array.from({length:stints.count}, (_, relay) => stints.plan[relay] || null);
+    saveStints({}, before);
     return;
   }
   if (event.target.closest('[data-stint-propose], [data-stint-clear]')) {
-    const stints = view.data.prep.stints, before = [...stints.plan];
-    stints.plan = event.target.closest('[data-stint-propose]') ? proposeStints(stints.pilots, stints.hours) : stints.plan.map(() => null);
-    saveStints(Object.fromEntries(stints.plan.map((id, hour) => [hour, id]).filter(([hour, id]) => before[hour] !== id)), before);
+    const stints = view.data.prep.stints, before = snapshot(stints);
+    stints.plan = event.target.closest('[data-stint-propose]') ? proposeStints(stints.pilots, stints.count, relay => relayHour(relay, stints.count, stints.minutes)) : stints.plan.map(() => null);
+    saveStints(Object.fromEntries(stints.plan.map((id, relay) => [relay, id]).filter(([relay, id]) => before.plan[relay] !== id)), before);
     return;
   }
   const add = event.target.closest('[data-note-add]');
