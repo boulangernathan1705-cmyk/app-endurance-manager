@@ -2175,3 +2175,23 @@ body:has(.form-sheet-overlay) { overflow: hidden; }
   .admin-rail { flex-wrap: wrap; overflow: visible; }
   .admin-rail .admin-nav { flex: 1 1 calc(50% - 4px); justify-content: center; min-width: 0; gap: 8px; padding: 0 8px; font-size: 13.5px; white-space: nowrap; }
 }
+
+/* Endurance : badges sous la date, réglages de course en icônes (nom dans l'info-bulle). */
+html[data-game] #app .race-header .race-side { flex: none; display: flex; flex-direction: column; align-items: stretch; gap: 8px; }
+html[data-game] #app .race-header .race-side .race-date { flex: 1; width: auto; }
+html[data-game] #app .race-header .race-side .race-badges { flex-direction: column; align-items: stretch; gap: 5px; max-width: 120px; }
+html[data-game] #app .race-header .race-side .race-badges > * { justify-content: center; text-align: center; white-space: normal; line-height: 1.2; font-size: 10.5px; padding: 3px 6px; }
+.race-info-chips { display: flex; flex-wrap: wrap; flex-basis: 100%; gap: 6px; margin-top: 4px; }
+.race-info-chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border: 1px solid rgba(255, 255, 255, .16); border-radius: 8px; background: rgba(255, 255, 255, .04); color: #e6ecea; font-size: 14px; cursor: help; }
+.race-info-chip svg { width: 18px; height: 18px; color: #7fe3ea; flex: none; }
+.race-info-chip b { font-weight: 700; }
+.race-info-fields { display: flex; flex-direction: column; gap: 8px; }
+.race-info-fields > .form-label small { display: inline !important; margin: 0 !important; font-weight: 400; text-transform: none; color: #8f999d; }
+.race-info-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: end; gap: 10px; }
+.race-info-grid .form-label > span:first-child { display: inline-flex; align-items: center; gap: 6px; }
+.race-info-grid svg { width: 16px; height: 16px; color: #7fe3ea; flex: none; }
+@media (max-width: 760px) {
+  html[data-game] #app .race-header .race-side .race-badges { max-width: 62px; }
+  html[data-game] #app .race-header .race-side .race-badges > * { font-size: 9px; padding: 2px 4px; letter-spacing: .02em; }
+  .race-info-chip { font-size: 13px; padding: 3px 8px; }
+}
