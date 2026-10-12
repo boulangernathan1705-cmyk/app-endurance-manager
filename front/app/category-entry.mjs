@@ -63,26 +63,35 @@ export function openCategoryEntry(event){
   renderCategoryEntry(event);
 }
 export function closeCategoryEntry(){draft=null;document.querySelector('[data-category-entry]')?.remove();}
+// Big, visual time line: one card per day, hours to tap or slide over, each start under it with what it gives.
 function timeline(event,day){
-  const n=day.cells.length,first=day.cells[0],length=eventMinutes(event)*60000;
-  const all=day.cells.every(at=>draft.hours.includes(at));
-  const cells=day.cells.map(at=>button('category-entry-hour',esc(timeAt(at)),`data-value="${at}" aria-pressed="${draft.hours.includes(at)}"`,`category-entry-hour${draft.hours.includes(at)?' active':''}`)).join('');
-  const bands=day.items.map(departure=>{
-    const from=Math.floor((departure.startsAt-first)/HOUR)+1,to=Math.ceil((departure.startsAt+length-first)/HOUR)+1,status=statusFor(event,departure,draft.hours);
-    return `<span class="category-entry-band${status==='whole'?' is-whole':status?' is-part':''}" style="grid-column:${from} / ${to}">Départ ${esc(timeLabel(departure.time))}</span>`;
+  const n=day.cells.length,first=day.cells[0],length=eventMinutes(event)*60000,raceH=raceHours(event);
+  const all=day.cells.every(at=>draft.hours.includes(at)),on=at=>draft.hours.includes(at);
+  const cells=day.cells.map((at,i)=>`<span class="ce-hour${on(at)?' is-on':''}${on(at)&&!on(day.cells[i-1])?' run-start':''}${on(at)&&!on(day.cells[i+1])?' run-end':''}" data-hour="${at}" role="checkbox" aria-checked="${on(at)}" aria-label="${esc(timeAt(at))}"><b>${esc(timeAt(at))}</b></span>`).join('');
+  // Starts that overlap go on separate lanes.
+  const lanes=[];
+  const bars=day.items.map(departure=>{
+    const from=Math.floor((departure.startsAt-first)/HOUR)+1,to=Math.ceil((departure.startsAt+length-first)/HOUR)+1;
+    let lane=lanes.findIndex(end=>end<=from);if(lane<0){lane=lanes.length;lanes.push(0);}lanes[lane]=to;
+    const status=statusFor(event,departure,draft.hours),covered=status==='whole'?raceH:status?status.split(',').length:0;
+    const state=status==='whole'?'is-whole':status?'is-part':'is-off';
+    const label=status==='whole'?'✓ Toute la course':status?`${covered} h sur ${raceH}`:'Pas dispo';
+    return `<div class="ce-start ${state}" style="grid-column:${from} / ${to};grid-row:${lane+2}"><strong>Départ ${esc(timeLabel(departure.time))}</strong><span class="ce-start-range">${esc(timeAt(departure.startsAt))} → ${esc(timeAt(departure.startsAt+length))}</span><em>${label}</em></div>`;
   }).join('');
-  return `<div class="category-entry-day"><div class="category-entry-day-head"><span>${esc(weekdayLong(day.at))} ${esc(dayMonthShort(day.at))}</span>${button('category-entry-day',all?'Rien':'Toute la journée',`data-value="${day.cells.join(',')}"`,'link-button')}</div><div class="category-entry-line" style="--hours:${n}">${cells}${bands}</div></div>`;
+  return `<article class="ce-day"><div class="ce-day-head"><h3>${esc(weekdayLong(day.at))} <span>${esc(dayMonthShort(day.at))}</span></h3>${button('category-entry-day',all?'Effacer':'Toute la journée',`data-value="${day.cells.join(',')}"`,`ce-day-all${all?' is-all':''}`)}</div><div class="ce-line" style="--hours:${n}">${cells}${bars}</div></article>`;
 }
 function matches(event){return future(event).map(departure=>({departure,status:statusFor(event,departure,draft.hours)})).filter(item=>item.status);}
 const startName=departure=>`${weekdayLong(departure.startsAt).slice(0,3)}. ${timeLabel(departure.time)}`;
 export function renderCategoryEntry(event){
+  const previous=document.querySelector('[data-category-entry] .registration-sheet');
+  const keep=previous&&previous.dataset.step===String(draft?.step)?previous.scrollTop:0;
   document.querySelector('[data-category-entry]')?.remove();
   if(!draft)return;
   const step=draft.step,steps=['Catégories','Disponibilités','Récapitulatif'];
   const pane=(n,content)=>`<section class="registration-step" ${n===step?'':'hidden'}>${content}</section>`;
   const cats=event.categories.map(category=>button('category-entry-category',`${logo(category)}<span class="registration-category-copy"><strong>${esc(category)}</strong></span>`,`data-value="${esc(category)}" aria-pressed="${draft.categories.includes(category)}"`,`category-button ${categories[category]?.css||''} ${draft.categories.includes(category)?'active':''}`)).join('');
   const found=matches(event);
-  const count=found.length?`<p class="category-entry-count">${found.length} départ${found.length>1?'s':''} correspond${found.length>1?'ent':''} à tes dispos.</p>`:'<p class="category-entry-count is-empty">Touche les heures où tu es libre.</p>';
+  const count=found.length?`<div class="ce-result"><strong>${found.length} départ${found.length>1?'s':''} pour toi</strong>${found.map(({departure,status})=>`<span class="${status==='whole'?'is-whole':'is-part'}">${esc(startName(departure))}</span>`).join('')}</div>`:'<div class="ce-result is-empty">Aucun départ pour l’instant : choisis tes heures.</div>';
   const row=(n,label,value)=>`<button type="button" class="registration-summary-row" data-action="category-entry-step" data-step="${n}"><span>${label}</span><strong>${value}</strong><em>Modifier</em></button>`;
   const startsList=found.map(({departure,status})=>`${esc(startName(departure))} · ${status==='whole'?'toute la course':`${status.split(',').length} h sur ${raceHours(event)}`}`).join('<br>');
   const summary=`<div class="registration-summary"><div class="registration-summary-row is-static"><span>Pilote</span><strong>${esc(state.user?.name||'')}</strong></div>${row(1,'Catégories',draft.categories.map(esc).join(' · ')||'—')}${row(2,'Départs',startsList||'—')}</div>`;
@@ -90,16 +99,34 @@ export function renderCategoryEntry(event){
   const next=step<3?button('category-entry-step','Continuer',`data-step="${step+1}" ${ready?'':'disabled'}`,'primary-button registration-next'):'<button type="button" class="save-button registration-next" data-action="category-entry-save">VALIDER MON INSCRIPTION</button>';
   const overlay=document.createElement('div');
   overlay.className='crew-builder-overlay';overlay.dataset.categoryEntry='true';
-  overlay.innerHTML=`<section class="crew-builder-panel registration-sheet" role="dialog" aria-modal="true" aria-labelledby="category-entry-title">
+  overlay.innerHTML=`<section class="crew-builder-panel registration-sheet category-entry-sheet${step===2?' is-wide':''}" data-step="${step}" role="dialog" aria-modal="true" aria-labelledby="category-entry-title">
     <div class="registration-workspace-head"><div class="registration-workspace-title"><h2 id="category-entry-title">Ton inscription</h2><p>${esc(event.name)}</p></div><span class="registration-workspace-actions">${button('category-entry-close','Fermer','','secondary-button registration-close-button')}</span></div>
     <div class="registration-stepper"><div class="registration-progress" aria-hidden="true">${steps.map((_,index)=>`<span class="${index<step?'done':''}"></span>`).join('')}</div>
       <p class="registration-step-label">Étape ${step} sur 3 · ${steps[step-1]}</p>
       ${pane(1,`<span class="form-label">Dans quelles catégories veux-tu rouler ?</span><div class="categories category-entry-categories">${cats}</div>`)}
-      ${pane(2,`<span class="form-label">Quand es-tu disponible ?</span><div class="category-entry-days">${days(event).map(day=>timeline(event,day)).join('')}</div>${count}`)}
+      ${pane(2,`<div class="ce-intro"><h3>Quand es-tu disponible ?</h3><p>Touche ou glisse sur tes heures libres. Tu seras inscrit sur les départs qu’elles couvrent.</p><span class="ce-legend"><i class="is-on"></i>Libre<i class="is-whole"></i>Toute la course<i class="is-part"></i>Une partie</span></div><div class="category-entry-days">${days(event).map(day=>timeline(event,day)).join('')}</div>${count}`)}
       ${pane(3,summary)}
       <div class="registration-step-nav">${step>1?button('category-entry-step','Retour',`data-step="${step-1}"`,'secondary-button registration-back'):''}${next}</div>
     </div></section>`;
   document.getElementById('app')?.appendChild(overlay);
+  overlay.querySelector('.registration-sheet').scrollTop=keep;
+  paintHours(event,overlay);
+}
+// Press on an hour and slide: every hour crossed takes the state of the first one.
+function paintHours(event,overlay){
+  let mode=null;
+  const at=(x,y)=>document.elementFromPoint(x,y)?.closest?.('[data-hour]');
+  const paint=cell=>{
+    if(!cell||mode===null)return;
+    const hour=Number(cell.dataset.hour),has=draft.hours.includes(hour);
+    if(mode&&!has)draft.hours.push(hour);
+    if(!mode&&has)draft.hours=draft.hours.filter(item=>item!==hour);
+    cell.classList.toggle('is-on',mode);
+  };
+  overlay.addEventListener('pointerdown',ev=>{const cell=ev.target.closest('[data-hour]');if(!cell)return;ev.preventDefault();mode=!draft.hours.includes(Number(cell.dataset.hour));paint(cell);});
+  overlay.addEventListener('pointermove',ev=>{if(mode!==null)paint(at(ev.clientX,ev.clientY));});
+  const end=()=>{if(mode===null)return;mode=null;renderCategoryEntry(event);};
+  overlay.addEventListener('pointerup',end);overlay.addEventListener('pointercancel',end);overlay.addEventListener('pointerleave',end);
 }
 export function categoryEntryAction(event,action,target){
   if(action==='category-entry-peek'){state.categoryEntryPeek=event.id;return true;}
@@ -108,7 +135,6 @@ export function categoryEntryAction(event,action,target){
   if(action==='category-entry-step'){draft.step=Number(target.dataset.step)||1;renderCategoryEntry(event);return true;}
   const toggle=(list,value)=>list.includes(value)?list.filter(item=>item!==value):[...list,value];
   if(action==='category-entry-category')draft.categories=toggle(draft.categories,target.dataset.value);
-  if(action==='category-entry-hour')draft.hours=toggle(draft.hours,Number(target.dataset.value));
   if(action==='category-entry-day'){const cells=target.dataset.value.split(',').map(Number),all=cells.every(at=>draft.hours.includes(at));draft.hours=all?draft.hours.filter(at=>!cells.includes(at)):[...new Set([...draft.hours,...cells])];}
   renderCategoryEntry(event);
   return true;
