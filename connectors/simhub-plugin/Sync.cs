@@ -40,6 +40,9 @@ namespace EnduranceManager.SimHub
         public bool? Reached { get; private set; }
         public DateTime? LastSent { get; private set; }
         public int SentToday { get; private set; }
+        // The last live session the site refused, and why: the file is kept in live\refused instead of being lost.
+        public string LastRefusal { get; private set; }
+        string refusal;
         DateTime sentDay = DateTime.Today;
 
         public Uploader(string home)
@@ -102,7 +105,16 @@ namespace EnduranceManager.SimHub
                 }
                 foreach (var path in Directory.GetFiles(LiveFolder, "*.json").OrderBy(path => path))
                 {
-                    if (Send(code, path, "/api/training/live", "application/json")) { File.Delete(path); Count(); }
+                    if (!Send(code, path, "/api/training/live", "application/json")) continue;
+                    if (refusal == null) { File.Delete(path); Count(); continue; }
+                    // Refused (4xx): kept aside with its reason, never sent again on its own.
+                    string refused = Path.Combine(LiveFolder, "refused");
+                    Directory.CreateDirectory(refused);
+                    string target = Path.Combine(refused, Path.GetFileName(path));
+                    if (File.Exists(target)) File.Delete(target);
+                    File.Move(path, target);
+                    File.WriteAllText(target + ".txt", refusal);
+                    LastRefusal = "le " + DateTime.Now.ToString("dd/MM à HH:mm") + " (" + refusal + ")";
                 }
                 Revoked = false;
                 Reached = true;
@@ -137,6 +149,16 @@ namespace EnduranceManager.SimHub
             {
                 if (response.StatusCode == HttpStatusCode.Unauthorized) throw new UnauthorizedAccessException();
                 if ((int)response.StatusCode >= 500 || response.StatusCode == (HttpStatusCode)429) throw new HttpRequestException("erreur " + (int)response.StatusCode);
+                refusal = null;
+                if (!response.IsSuccessStatusCode)
+                {
+                    // The site's reason, e.g. {"error":"Aucun tour roulé dans cette séance."}.
+                    string body = "";
+                    try { body = response.Content.ReadAsStringAsync().GetAwaiter().GetResult(); } catch { }
+                    string reason = null;
+                    try { reason = (string)Newtonsoft.Json.Linq.JObject.Parse(body)["error"]; } catch { }
+                    refusal = "erreur " + (int)response.StatusCode + (string.IsNullOrEmpty(reason) ? "" : " : " + reason);
+                }
                 return true;
             }
         }
