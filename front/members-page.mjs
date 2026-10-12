@@ -121,7 +121,7 @@ function peopleMarkup(result, settings) {
   const members = Array.isArray(result.members) ? result.members : [];
   const server = result.community?.discordServer ? ` « ${esc(result.community.discordServer)} »` : '';
   // The solo races permissions only matter with the solo races module.
-  const shown = settings.permissions.filter(permission => settings.modules.soloRaces || !permission.startsWith('solo_'));
+  const shown = settings.permissions.filter(permission => (settings.modules.soloRaces && settings.modules.eventTdzAvailable) || !permission.startsWith('solo_'));
   const legend = `<details class="role-legend-wrap"><summary>Que permet chaque autorisation ?</summary><dl class="role-legend">${shown.map(permission => `<div><dt>${esc(PERMISSION_LABELS[permission])}</dt><dd>${esc(PERMISSION_HELP[permission])}</dd></div>`).join('')}</dl></details>`;
   const row = item => `<tr data-role="${esc(item.id)}" data-kept="${esc(JSON.stringify(item.permissions.filter(permission => !shown.includes(permission))))}">
     <th scope="row"><strong>${esc(item.name)}</strong>${item.administrator ? '<small>Admin Discord : tout</small>' : ''}<span class="settings-status" aria-live="polite"></span></th>
@@ -266,6 +266,8 @@ function modulesMarkup(settings, setup) {
       state:states.soloRaces ? ['ok', 'Actif'] : ['off', 'Éteint'], control:toggle('soloRaces', 'EVENT TDZ'),
       settings:`<form class="settings-safe-guide" data-safe-guide><label>Salon Discord « Comment devenir SAFE »<input name="url" type="url" maxlength="200" placeholder="https://discord.com/channels/…" value="${esc(settings.modules.safeGuideUrl || '')}"></label>
         <div class="settings-actions"><button class="primary-button" type="submit">Enregistrer</button><span class="settings-status" aria-live="polite"></span></div></form>`}]),
+    ...(settings.modules.eventTdzAvailable ? [] : [{key:'soloRaces', name:'EVENT SOLO', text:'Un calendrier d’événements toutes simus&nbsp;: inscription en un clic, places limitées si besoin et liste d’attente.',
+      state:states.soloRaces ? ['ok', 'Actif'] : ['off', 'Éteint'], control:toggle('soloRaces', 'EVENT SOLO'), settings:''}]),
     ...(settings.modules.grindfestAvailable ? [{key:'grindfest', name:'Grindfest', text:'Événement solo : chaque pilote représente un streamer, avec ses places et sa liste d’attente.', state:states.grindfest ? ['ok','Actif'] : ['off','Éteint'], control:toggle('grindfest','Grindfest'), settings:''}] : []),
     {key:'memo', name:'Mémo des circuits', text:'LMU. Pour chaque circuit et voiture&nbsp;: chronos par niveau, temps au stand et BoP.',
       state:states.memo ? ['ok', 'Actif'] : ['off', 'Éteint'], control:toggle('memo', 'Mémo des circuits'), settings:''},

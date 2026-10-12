@@ -8,12 +8,19 @@ import {ingestClientError, clientErrorsApi} from './telemetry.mjs';
 import {communityRequestsApi, closeCommunityRequest} from './community-requests.mjs';
 import {trainingApi, trainingCollector, nextRace, trainingEnabled, memoEnabled} from './training.mjs';
 import {racesPath} from './races-path.mjs';
-import {CARS, simForEvent, TDZ_EVENT_TYPES, TDZ_EVENTS_LABEL, tdzOnly, eventTdzEnabled} from '../shared/catalog.mjs';
+import {CARS, simForEvent, TDZ_EVENT_TYPES, tdzOnly, eventsLabel} from '../shared/catalog.mjs';
 import {currentCommunity, appearanceOf, allCommunities, communityUrl, communitySlug, communityById, communityFromRow} from './community.mjs';
 import {isDevelopment} from './dev-environment.mjs';
 import {communityAccess, requirePermission, displayRole, PERMISSIONS, ALL_PERMISSIONS, DEFAULT_EVERYONE, normalizePermissions, discordGuild, keepDiscordLook, memberPermissions, refreshCommunityMembers, discoverMemberships} from './access.mjs';
 // Solo races: a module each community turns on or off (settings of the members page).
-const soloRacesEnabled = (env, community) => eventTdzEnabled(community, isDevelopment(env));
+const soloRacesEnabled = (env, community) => community?.modules?.soloRaces === true;
+// « EVENT SOLO » (every community but the TDZ): no type, no SAFE access.
+const plainSoloInput = (env, community, input) => {
+  if (input?.format !== 'solo' || tdzOnly(community, isDevelopment(env))) return input;
+  const details = input.details && typeof input.details === 'object' ? {...input.details} : {};
+  delete details.type;
+  return {...input, access:'open', details};
+};
 import {syncIracingEvents} from './iracing-import.mjs';
 import {resetShowcase, makeOfficial} from './demo.mjs';
 import {setupOfficialServer} from './official-discord.mjs';
@@ -392,7 +399,7 @@ async function api(request, env) {
   // Requests for a new community: sent by anyone signed in with Discord, from any site (server/community-requests.mjs).
   const requests = await communityRequestsApi(path, method, request, env, actor);
   if (requests) return requests;
-  if (path === '/api/session' && method === 'GET') return json({user:actor.user, discordReady:!!(env.DISCORD_CLIENT_ID && env.DISCORD_CLIENT_SECRET), adminConfigured:administrators(env).length > 0, soloRaces:soloRacesEnabled(env, community), soloLabel:TDZ_EVENTS_LABEL, eventTypes:grindfestEnabled(community, isDevelopment(env)) ? [...TDZ_EVENT_TYPES, 'Grindfest'] : TDZ_EVENT_TYPES, grindfest:grindfestEnabled(community, isDevelopment(env)), grindfestAvailable:grindfestAvailable(community, isDevelopment(env)), training:trainingEnabled(community), memo:memoEnabled(community), safeGuideUrl:community.modules?.safeGuideUrl || '',
+  if (path === '/api/session' && method === 'GET') return json({user:actor.user, discordReady:!!(env.DISCORD_CLIENT_ID && env.DISCORD_CLIENT_SECRET), adminConfigured:administrators(env).length > 0, soloRaces:soloRacesEnabled(env, community), soloLabel:eventsLabel(community, isDevelopment(env)), eventTdz:tdzOnly(community, isDevelopment(env)), eventTypes:!tdzOnly(community, isDevelopment(env)) ? [] : grindfestEnabled(community, isDevelopment(env)) ? [...TDZ_EVENT_TYPES, 'Grindfest'] : TDZ_EVENT_TYPES, grindfest:grindfestEnabled(community, isDevelopment(env)), grindfestAvailable:grindfestAvailable(community, isDevelopment(env)), training:trainingEnabled(community), memo:memoEnabled(community), safeGuideUrl:community.modules?.safeGuideUrl || '',
     // Training shows in the bar only for a pilot entered in an upcoming LMU race; the circuit memo always.
     trainingRace:trainingEnabled(community) && access.status === 'member' && !!actor.user && !!(await nextRace(env, actor.user.id)),
     community:{id:community.id, slug:community.slug, name:community.name, shortName:community.shortName, discordInviteUrl:community.discordInviteUrl, appearance:appearanceOf(community)},
@@ -596,7 +603,7 @@ async function api(request, env) {
   }
   if (path === '/api/events' && method === 'POST') {
     requirePermission(actor,'create_race','Tu n’as pas l’autorisation de créer une course dans cette communauté.');
-    const input = await body(request);
+    const input = plainSoloInput(env, community, await body(request));
     if (input.format === 'solo' && !soloRacesEnabled(env, community)) fail(400, 'Les événements ne sont pas activés sur ce site.');
     const data = validateEvent(input), eventId = id();
     if (isGrindfest(data) && (!grindfestEnabled(community, isDevelopment(env)) || input.official === true)) fail(403, 'Grindfest est réservé aux TDZ et doit être activé dans les modules.');
@@ -632,7 +639,7 @@ async function api(request, env) {
       await notify(env, told, 'race_deleted', event, {skip:[actor.user?.id]});
       return json({ok:true});
     }
-    const data = validateEvent(input, event);
+    const data = validateEvent(plainSoloInput(env, community, input), event);
     if (isGrindfest(data) && !grindfestEnabled(community, isDevelopment(env))) fail(403, 'Grindfest n’est pas activé.');
     await dropEmptyCommonStart(env, event.id, data);
     const cats = JSON.stringify(data.categories), deps = JSON.stringify(data.departures);
@@ -658,7 +665,7 @@ async function api(request, env) {
     // After the last start, nothing changes any more; « Absent » is for those who could enter.
     if (Math.max(...JSON.parse(event.departures || '[]').map(d => Number(d.startsAt) || 0)) <= Date.now()) fail(409, 'Cet événement est passé.');
     if (method === 'DELETE') { await env.DB.prepare('DELETE FROM event_absences WHERE event_id=? AND user_id=? AND community_id=?').bind(event.id, actor.user.id, community.id).run(); return json({ok:true}); }
-    if (!(event.format === 'solo' ? can(actor, 'solo_open') || can(actor, 'solo_safe') : can(actor, 'endurance'))) fail(403, 'Tu n’as pas l’autorisation de t’inscrire à cet événement.');
+    if (!(event.format === 'solo' && tdzOnly(community, isDevelopment(env)) ? can(actor, 'solo_open') || can(actor, 'solo_safe') : can(actor, 'endurance'))) fail(403, 'Tu n’as pas l’autorisation de t’inscrire à cet événement.');
     if (await env.DB.prepare("SELECT 1 FROM registrations WHERE event_id=? AND user_id=? AND community_id=? AND COALESCE(status,'')!='unavailable' LIMIT 1").bind(event.id, actor.user.id, community.id).first())
       fail(409, 'Tu es inscrit à cet événement : retire d’abord ton inscription.');
     await env.DB.prepare('INSERT OR IGNORE INTO event_absences(event_id,user_id,community_id,created_at) VALUES(?,?,?,?)').bind(event.id, actor.user.id, community.id, now()).run();
@@ -678,6 +685,7 @@ async function api(request, env) {
     const forOther = input.forOther === true || Boolean(input.participantUserId);
     if (forOther) requirePermission(who,'manage_registrations','Tu n’as pas l’autorisation d’inscrire un autre pilote dans cette communauté.');
     // Solo races: OPEN for "Courses solo OPEN" or "SAFE", SAFE only for "SAFE". Endurances: "Endurances".
+    else if (solo && !tdzOnly(community, isDevelopment(env))) requirePermission(who,'endurance','Tu n’as pas l’autorisation de t’inscrire aux événements de cette communauté.');
     else if (solo && event.access === 'safe') requirePermission(who,'solo_safe','Cet événement est réservé aux pilotes SAFE. Demande à un administrateur du Discord.');
     else if (solo) { if (!can(who,'solo_safe')) requirePermission(who,'solo_open','Tu n’as pas l’autorisation de t’inscrire aux événements de cette communauté.'); }
     else requirePermission(who,'endurance','Tu n’as pas l’autorisation de t’inscrire aux endurances de cette communauté.');
@@ -789,7 +797,7 @@ async function api(request, env) {
       administrator:role.administrator, permissions:saved.has(role.id) ? normalizePermissions(saved.get(role.id)) : (role.id === community.discordGuildId ? [...DEFAULT_EVERYONE] : [])}));
     await keepDiscordLook(env, community, discord);
     return json({community:{name:community.name, shortName:community.shortName, discordServer:discord?.name || null, ...appearanceOf(community)}, roles, permissions:PERMISSIONS,
-      modules:{iracingImport:community.modules.iracingImport === true, discordWeekly:community.modules.discordWeekly === true, soloRaces:soloRacesEnabled(env, community), eventTdzAvailable:tdzOnly(community, isDevelopment(env)), eventsLabel:TDZ_EVENTS_LABEL, eventTypes:grindfestEnabled(community, isDevelopment(env)) ? [...TDZ_EVENT_TYPES, 'Grindfest'] : TDZ_EVENT_TYPES, grindfest:grindfestEnabled(community, isDevelopment(env)), grindfestAvailable:grindfestAvailable(community, isDevelopment(env)),
+      modules:{iracingImport:community.modules.iracingImport === true, discordWeekly:community.modules.discordWeekly === true, soloRaces:soloRacesEnabled(env, community), eventTdzAvailable:tdzOnly(community, isDevelopment(env)), eventsLabel:eventsLabel(community, isDevelopment(env)), eventTypes:!tdzOnly(community, isDevelopment(env)) ? [] : grindfestEnabled(community, isDevelopment(env)) ? [...TDZ_EVENT_TYPES, 'Grindfest'] : TDZ_EVENT_TYPES, grindfest:grindfestEnabled(community, isDevelopment(env)), grindfestAvailable:grindfestAvailable(community, isDevelopment(env)),
         crewChannels:community.modules.crewChannels === true, raceReminders:community.modules.raceReminders === true, training:trainingEnabled(community), memo:memoEnabled(community)},
       crews:await crewDiscordState(env, community)});
   }
@@ -843,7 +851,6 @@ async function api(request, env) {
       modules.grindfest = input.grindfest;
       if (input.grindfest) modules.soloRaces = true;
     }
-    if (input.soloRaces === true && !tdzOnly(community, isDevelopment(env))) fail(403, 'Le module EVENT TDZ est réservé aux TDZ.');
     if (input.soloRaces === false && modules.grindfest) fail(400, 'Éteins Grindfest avant de désactiver les événements solo.');
     // The Discord recap is configured through the guided bot module.
     // The Mémo follows « Entraînement » until set on its own: switching the training off keeps the Mémo it showed.
