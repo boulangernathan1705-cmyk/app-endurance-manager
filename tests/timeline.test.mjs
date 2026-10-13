@@ -58,3 +58,9 @@ test('timeline attributes escape untrusted labels and departure identifiers', ()
   assert(html.includes('&quot;'));
   assert(!html.includes('<img'));
 });
+test('half-hour starts show fewer labels so a 24 h bar never glues them together', () => {
+  const half={...departure,startsAt:Date.parse('2026-10-17T13:30:00Z'),endsAt:Date.parse('2026-10-18T13:30:00Z')};
+  const html=renderAvailabilityTimeline({departure:half,duration:24});
+  const narrow=[...html.matchAll(/<span class="presence-time ([^"]*)">([^<]*)</g)].filter(m=>m[1].split(' ').includes('ticks-4')).map(m=>m[2]);
+  assert.deepEqual(narrow,['15h30','23h30','7h30','15h30']);
+});

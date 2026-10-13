@@ -29,8 +29,11 @@ export function renderAvailabilityTimeline({departure, duration, status = '', co
   // A race of 2 h 30 has 3 slots; its finish is the real end, not the end of the third hour.
   const endsAt = Number(departure.endsAt);
   if (endsAt > departure.startsAt + (duration - 1) * 3600000 && endsAt < departure.startsAt + duration * 3600000) hours[duration] = raceEndLabel(departure);
+  // ticks-N classes are width tiers (see timeline.css). Wide labels such as "15h30" get fewer per tier so they never touch.
+  const tiers = [4,6,10,16,24];
+  const capacities = hours.some(hour => /[h:]\d/.test(hour)) ? [3,5,8,12,20] : tiers;
   const boundaries = hours.map((hour, i) => {
-    const density = [4,6,10,16,24].filter(capacity => timelineLabelVisible(i, duration, capacity)).map(capacity => `ticks-${capacity}`).join(' ');
+    const density = tiers.filter((tier, t) => timelineLabelVisible(i, duration, capacities[t])).map(tier => `ticks-${tier}`).join(' ');
     return `<span class="presence-boundary boundary-${i} ${i===duration?'is-finish':''}"><span class="presence-time ${density}">${hour}</span></span>`;
   }).join('');
   const segments = Array.from({length:duration}, (_, i) => {
