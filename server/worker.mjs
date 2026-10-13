@@ -3,7 +3,7 @@ import {gridfestPasswordStatus, sendGridfestPasswords} from './gridfest-discord.
 import {
   LEGACY_CAR_ALIASES, COOKIE_SESSION, COOKIE_STATE, COOKIE_RETURN, DAY, HttpError, fail, now, id, token, hash, cookie,
   setCookie, cookieNames, siteOrigin, communityLabel, baseDomain, json, redirect, origin, requireDiscord, administrators, identity, owned, personal,
-  registrationSelect, registrationParticipant, body, rateLimit, cleanup, returnPath, text, validateEvent, validateRegistration, ANY_CATEGORY
+  registrationSelect, registrationParticipant, NAME_IN_COMMUNITY, communityName, body, rateLimit, cleanup, returnPath, text, validateEvent, validateRegistration, ANY_CATEGORY
 } from './core.mjs';
 import {ingestClientError, clientErrorsApi} from './telemetry.mjs';
 import {communityRequestsApi, closeCommunityRequest} from './community-requests.mjs';
@@ -236,9 +236,9 @@ async function listEvents(env, actor, game='', scope='', community) {
     byPacks(ids => `SELECT c.* FROM crews c WHERE c.event_id IN (${ids}) AND ${mine('c.community_id')} ORDER BY c.created_at,c.id`, [community.id, accessible]),
     byPacks(ids => `SELECT cm.crew_id,cm.registration_id FROM crew_members cm JOIN crews c ON c.id=cm.crew_id WHERE c.event_id IN (${ids}) AND ${mine('c.community_id')}`, [community.id, accessible]),
     // Only registration creators' names are displayed (addedByName).
-    byPacks(ids => `SELECT DISTINCT u.id,u.name FROM users u JOIN registrations r ON r.owner_user_id=u.id WHERE r.event_id IN (${ids}) AND ${mine('r.community_id')}`, [community.id, accessible]),
+    byPacks(ids => `SELECT DISTINCT u.id,${NAME_IN_COMMUNITY.replace('?', 'r.community_id')} AS name FROM users u JOIN registrations r ON r.owner_user_id=u.id WHERE r.event_id IN (${ids}) AND ${mine('r.community_id')}`, [community.id, accessible]),
     // « Je serai absent »: the pilots of the site's community who said they will miss the event.
-    byPacks(ids => `SELECT a.event_id,a.user_id,u.name FROM event_absences a JOIN users u ON u.id=a.user_id WHERE a.event_id IN (${ids}) AND a.community_id=? ORDER BY a.created_at`, [community.id])
+    byPacks(ids => `SELECT a.event_id,a.user_id,${NAME_IN_COMMUNITY.replace('?', 'a.community_id')} AS name FROM event_absences a JOIN users u ON u.id=a.user_id WHERE a.event_id IN (${ids}) AND a.community_id=? ORDER BY a.created_at`, [community.id])
   ]);
   // On official races, every entry and crew shows its community (Discord logo or short name, colour); in the
   // player's other communities, the rights of his Discord roles there apply.
@@ -469,15 +469,15 @@ async function api(request, env) {
     // The members of this community only (its Discord server), with their pilot entry here.
     // The main address has no members (anyone signed in only looks): the players with a pilot entry here, never
     // every account of the platform (the other communities' players stay out of sight).
-    if (openSite) return json({participants:(await env.DB.prepare(`SELECT u.id,u.name,p.id AS participantId
+    if (openSite) return json({participants:(await env.DB.prepare(`SELECT u.id,p.name,p.id AS participantId
       FROM participants p JOIN users u ON u.id=p.user_id
       WHERE p.community_id=? AND u.id NOT LIKE 'system:%'
-      ORDER BY lower(u.name),u.id`).bind(community.id).all()).results});
-    return json({participants:(await env.DB.prepare(`SELECT u.id,u.name,p.id AS participantId
+      ORDER BY lower(p.name),u.id`).bind(community.id).all()).results});
+    return json({participants:(await env.DB.prepare(`SELECT u.id,COALESCE(NULLIF(m.nickname,''),u.name) AS name,p.id AS participantId
       FROM memberships m JOIN users u ON u.id=m.user_id
       LEFT JOIN participants p ON p.user_id=u.id AND p.community_id=m.community_id
       WHERE m.community_id=? AND m.status='member'
-      ORDER BY lower(u.name),u.id`).bind(community.id).all()).results});
+      ORDER BY lower(COALESCE(NULLIF(m.nickname,''),u.name)),u.id`).bind(community.id).all()).results});
   }
   const crewCreate = path.match(/^\/api\/events\/([a-f0-9-]{36})\/departures\/([a-f0-9-]{36})\/crews$/);
   const crewRoute = path.match(/^\/api\/crews\/([a-f0-9-]{36})(?:\/members(?:\/([a-f0-9-]{36}))?)?$/);
@@ -759,7 +759,7 @@ async function api(request, env) {
       const data = validateRegistration(input,event);
       // A pilot linked to Discord keeps his Discord name: an edit cannot show him as another member.
       if (reg.participant_user_id) {
-        data.name=(await env.DB.prepare('SELECT name FROM users WHERE id=?').bind(reg.participant_user_id).first())?.name || reg.participant_name || data.name;
+        data.name=await communityName(env, reg.participant_user_id, reg.community_id) || reg.participant_name || data.name;
         data.nameKey=data.name.normalize('NFKC').toLocaleLowerCase('fr-FR');
       }
       const results=await env.DB.batch([

@@ -87,6 +87,11 @@ function personal(reg, actor) {
 }
 const registrationSelect = `SELECT r.*,p.user_id AS participant_user_id,p.guest_hash AS participant_guest_hash,
  p.created_by AS participant_created_by,p.name AS participant_name FROM registrations r JOIN participants p ON p.id=r.participant_id`;
+// The name a Discord pilot shows in a community: his nickname on its Discord server, else his Discord name.
+const NAME_IN_COMMUNITY = `COALESCE(NULLIF((SELECT m.nickname FROM memberships m WHERE m.user_id=u.id AND m.community_id=?),''),u.name)`;
+async function communityName(env, userId, communityId) {
+  return (await env.DB.prepare(`SELECT ${NAME_IN_COMMUNITY} AS name FROM users u WHERE u.id=?`).bind(communityId, userId).first())?.name || '';
+}
 // Pilot entries (participants) belong to the community of the race: every lookup and creation is scoped to it.
 async function registrationParticipant(env, actor, input, data, community) {
   const cid = community.id;
@@ -97,10 +102,10 @@ async function registrationParticipant(env, actor, input, data, community) {
     if (!/^\d{15,22}$/.test(input.participantUserId)) fail(400,'Compte Discord invalide.');
     const discordUser=await env.DB.prepare('SELECT id,name FROM users WHERE id=?').bind(input.participantUserId).first();
     if (!discordUser) fail(404,'Ce pilote Discord est introuvable. Actualise la page.');
-    data.name=discordUser.name;
+    data.name=await communityName(env,discordUser.id,cid)||discordUser.name;
     data.nameKey=data.name.normalize('NFKC').toLocaleLowerCase('fr-FR');
     await env.DB.prepare(`INSERT INTO participants(id,name,user_id,created_by,created_at,community_id) VALUES(?,?,?,?,?,?)
-      ON CONFLICT(community_id,user_id) WHERE user_id IS NOT NULL DO UPDATE SET name=excluded.name`).bind(id(),discordUser.name,discordUser.id,actor.user.id,now(),cid).run();
+      ON CONFLICT(community_id,user_id) WHERE user_id IS NOT NULL DO UPDATE SET name=excluded.name`).bind(id(),data.name,discordUser.id,actor.user.id,now(),cid).run();
     return env.DB.prepare('SELECT * FROM participants WHERE user_id=? AND community_id=?').bind(discordUser.id,cid).first();
   }
   if (input.participantId) {
@@ -126,10 +131,10 @@ async function registrationParticipant(env, actor, input, data, community) {
     return participant;
   }
   if (!actor.user) fail(401, 'Connecte-toi avec Discord pour t’inscrire.');
-  // An own entry always shows the player's Discord name: never a pseudo typed in the form (another member's name).
-  data.name=actor.user.name||data.name;
+  // An own entry always shows the player's Discord name here: never a pseudo typed in the form (another member's name).
+  data.name=await communityName(env,actor.user.id,cid)||actor.user.name||data.name;
   data.nameKey=data.name.normalize('NFKC').toLocaleLowerCase('fr-FR');
-  await env.DB.prepare('INSERT INTO participants(id,name,user_id,created_by,created_at,community_id) VALUES(?,?,?,?,?,?) ON CONFLICT(community_id,user_id) WHERE user_id IS NOT NULL DO NOTHING').bind(id(),data.name,actor.user.id,actor.user.id,now(),cid).run();
+  await env.DB.prepare('INSERT INTO participants(id,name,user_id,created_by,created_at,community_id) VALUES(?,?,?,?,?,?) ON CONFLICT(community_id,user_id) WHERE user_id IS NOT NULL DO UPDATE SET name=excluded.name').bind(id(),data.name,actor.user.id,actor.user.id,now(),cid).run();
   return env.DB.prepare('SELECT * FROM participants WHERE user_id=? AND community_id=?').bind(actor.user.id,cid).first();
 }
 async function body(request) {
@@ -393,6 +398,6 @@ function validateRegistration(input, event) {
 export {
   LEGACY_CAR_ALIASES, COOKIE_SESSION, COOKIE_STATE, COOKIE_RETURN, DAY, HttpError, fail, now, id, token, hash, cookie,
   setCookie, cookieNames, siteOrigin, communityLabel, baseDomain, json, redirect, origin, requireDiscord, administrators, identity, owned, personal,
-  registrationSelect, registrationParticipant, body, rateLimit, cleanup, returnPath, text, parisTimestamp, validateEvent, validateRegistration, ANY_CATEGORY
+  registrationSelect, registrationParticipant, NAME_IN_COMMUNITY, communityName, body, rateLimit, cleanup, returnPath, text, parisTimestamp, validateEvent, validateRegistration, ANY_CATEGORY
 };
 
