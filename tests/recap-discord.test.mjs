@@ -441,3 +441,9 @@ test('a race opens 7 days before a start, a 24 h race 15 days before',()=>{
   const events=[ev('6h-8d',6,8),ev('6h-7d',6,7),ev('24h-16d',24,16),ev('24h-15d',24,15)];
   assert.deepEqual(racesOpenNow(events,'all',NOW),['6h-7d','24h-15d']);
 });
+
+test('a race channel is titled with the week of the race, not the current week',async t=>{
+  const {DB,env}=setup(t);race(DB,'a','Spa','spa',[{id:'s',startsAt:NOW+5*DAY}]);
+  const [preview]=await previewBotRecap(env,NOW,COMMUNITY,SETTINGS);
+  assert.match(preview.payload.embeds[0].title,/semaine du 12 octobre au 18 octobre/i);
+});
