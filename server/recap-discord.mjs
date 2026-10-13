@@ -90,13 +90,14 @@ export function eventDeletionTime(event) {
   if (!(minutes > 0)) return null;
   return Math.max(...departures.map(item => Number(item.startsAt))) + minutes * 60000 + DAY;
 }
-// The races that get their category now: from their publication until they are over.
+// The races that get their category now: 7 days before a start (15 for a 24 h race) until they are over.
+export const openBefore = minutes => (minutes >= 1440 ? 15 : 7) * DAY;
 export function racesOpenNow(events, scope, timestamp) {
   return events.filter(event => {
     const iracing = String(event.circuit || '').startsWith('iracing-');
     if ((scope === 'lmu' && iracing) || (scope === 'iracing' && !iracing) || event.schedule_pending) return false;
     const minutes = Number(event.duration_minutes) || Number(event.duration_hours) * 60 || 0;
-    return parse(event.departures).some(item => !item.tbd && Number(item.startsAt) + minutes * 60000 > timestamp);
+    return parse(event.departures).some(item => !item.tbd && Number(item.startsAt) + minutes * 60000 > timestamp && Number(item.startsAt) - openBefore(minutes) <= timestamp);
   }).map(event => event.id);
 }
 const raceEvents = (env, community) => env.DB.prepare("SELECT id,name,circuit,departures,duration_hours,duration_minutes,schedule_pending,community_id FROM events WHERE community_id=? OR community_id='official' ORDER BY created_at,id")

@@ -76,7 +76,9 @@ export async function loadWeeklyDiscordSnapshot(env, timestamp, community, scope
   const currentWeek = parisWeek(timestamp);
   // A start whose time is still to be confirmed is never announced as running (its placeholder is 0:00).
   const currentCandidates = eventId ? [] : allDepartures.filter(item => !item.timePending && item.startsAt <= timestamp && item.endsAt > timestamp);
-  const planning = eventId ? {week:parisWeek(timestamp), futureDepartures:allDepartures} : selectPlanningWeek(allDepartures, timestamp);
+  // A race channel is titled with the week of the race's next start, not the current week.
+  const raceStart = (allDepartures.find(item => item.startsAt > timestamp) || allDepartures[0])?.startsAt ?? timestamp;
+  const planning = eventId ? {week:parisWeek(raceStart), futureDepartures:allDepartures} : selectPlanningWeek(allDepartures, timestamp);
   const selected = [...currentCandidates, ...planning.futureDepartures];
 
   if (!selected.length) {
