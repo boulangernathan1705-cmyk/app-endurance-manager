@@ -2,6 +2,10 @@
 
 Les changements du site, version par version. La plus récente est en haut.
 
+## v1.41 — 14 octobre 2026
+
+- Barre de présence : sur une 24h ou un départ à la demie (ex. 15h30), les heures ne se chevauchent plus.
+
 ## v1.40 — 13 octobre 2026
 
 - Accès : sur une communauté où tu n'as pas accès, le site affiche « Tes communautés » avec un lien vers chacune.
