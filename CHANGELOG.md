@@ -2,6 +2,10 @@
 
 Les changements du site, version par version. La plus récente est en haut.
 
+## v1.33 — 13 octobre 2026
+
+- Inscription par catégorie : chaque départ garde son « Me désinscrire » pour ce créneau seul, et un bouton rouge « Me désinscrire de tous les créneaux » en haut de la course retire tout d'un coup.
+
 ## v1.32 — 13 octobre 2026
 
 - Nouveau module **Inscription par catégorie** (éteint par défaut) : le pilote choisit ses catégories, ses voitures et les départs possibles ; le TM voit le tableau des dispos, le meilleur départ par catégorie et forme les équipages depuis là.
