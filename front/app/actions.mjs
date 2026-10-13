@@ -7,7 +7,7 @@ import {renderMyEntries} from './entries-view.mjs';
 import {submitSoloEvent} from './solo-form.mjs';
 import {readRaceInfo} from './race-info.mjs';
 import {refresh,refreshAfterSave} from './refresh.mjs';
-import {draftFor,registrationDraft,ownRegistrations,rerenderRegistrationSection,submitRegistration,registrationStep,canEnterInOneClick,enterInOneClick,enterRound,editRound,skipRound} from './registration.mjs';
+import {draftFor,registrationDraft,ownRegistrations,rerenderRegistrationSection,submitRegistration,registrationStep,lastRegistrationStep,canEnterInOneClick,enterInOneClick,enterRound,editRound,skipRound} from './registration.mjs';
 import {updateCrewState,pickSlot} from './crews.mjs';
 import {openCategoryEntry,categoryEntryAction,saveCategoryEntry,withdrawCategoryEntry,categoryEntryBoardFilter} from './category-entry.mjs';
 import {installRouter,routeFromLocation,applyRoute} from './router.mjs';
@@ -53,11 +53,11 @@ function validateRegistrationStep(draft,step){
   if(step===3&&!draft.status)throw Error('Choisis au moins une heure de présence.');
 }
 function goToRegistrationStep(event,departure,target){
-  const draft=draftFor(departure),current=registrationStep(draft),wanted=Number(target.dataset.step);
+  const draft=draftFor(departure),last=lastRegistrationStep(event,departure,draft),current=registrationStep(draft,last),wanted=Number(target.dataset.step);
   const solo=draft.solo,soloCurrent=solo?Math.min(Math.max(Number(draft.step)||(draft.id?solo+1:1),1),solo+1):current;
-  if(wanted>soloCurrent)for(let step=soloCurrent;step<Math.min(wanted,solo?solo+1:4);step++)validateRegistrationStep(draft,step);
+  if(wanted>soloCurrent)for(let step=soloCurrent;step<Math.min(wanted,solo?solo+1:last);step++)validateRegistrationStep(draft,step);
   if(target.dataset.edit)draft.returnToSummary=true;
-  else if(wanted===(solo?solo+1:4)||wanted<soloCurrent)draft.returnToSummary=false;
+  else if(wanted===(solo?solo+1:last)||wanted<soloCurrent)draft.returnToSummary=false;
   draft.step=wanted;
   rerenderRegistrationSection(event,departure,'',renderEvent);
   const section=document.getElementById(`departure-${departure.id}`)?.querySelector('.fold-registration');

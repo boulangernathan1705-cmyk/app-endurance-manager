@@ -98,4 +98,7 @@ test('the summary offers the same entry on the other starts of the race', () => 
   assert.match(registration,/!\(item\.availability\|\|\[\]\)\.some\(reg=>reg\.mine&&reg\.category===stateDraft\.category\)/);
   assert.match(registration,/await api\(`\/api\/races\/\$\{event\.id\}\/departures\/\$\{other\.id\}\/registrations`,'POST',\{\.\.\.payload,version:undefined\}\)/);
   assert.match(actions,/refreshAfterSave\(result\.notice\|\|'Inscription enregistrée\.'\)/);
+  // Its own step before the summary (4 other starts, 5 summary); Enter only submits on the last step.
+  assert.match(registration,/\['Catégorie','Voiture\(s\)','Heures de présence','Autres horaires','Récapitulatif'\]/);
+  assert.match(registration,/data-last-step="\$\{last\}"/);
 });
