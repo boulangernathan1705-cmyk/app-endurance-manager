@@ -2,6 +2,10 @@
 
 Les changements du site, version par version. La plus récente est en haut.
 
+## v1.36 — 13 octobre 2026
+
+- Discord : dans infos-de-la-course, chaque équipage a le logo de sa catégorie et chaque pilote sans équipage apparaît avec les logos de ses catégories (emojis du bot, sans Nitro).
+
 ## v1.35 — 13 octobre 2026
 
 - Discord : la catégorie d'une course s'ouvre 7 jours avant son départ, 15 jours avant pour une course de 24 h ou plus.
