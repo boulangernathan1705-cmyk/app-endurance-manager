@@ -213,6 +213,9 @@ export function communityGate(){
     lead=`Connecte-toi avec Discord et rejoins le serveur de ${name}.`;
     actions=`<div class="welcome-actions">${invite}${state.access==='anonymous'?login:button('refresh','Vérifier mon accès','','secondary-button')}</div>${state.access==='anonymous'?trust:'<p class="welcome-trust">Déjà rejoint ? Attends une minute puis vérifie ton accès.</p>'}`;
   }
+  // Signed in but without access here: the communities he can enter, one click each.
+  const elsewhere=['not-member','forbidden'].includes(state.access)?(state.elsewhere||[]):[];
+  if(elsewhere.length)actions+=`<div class="welcome-elsewhere"><p>Tes communautés</p><div class="welcome-actions">${elsewhere.map(item=>`<a class="secondary-button" href="${esc(item.url)}">${item.logoUrl?`<img src="${esc(item.logoUrl)}" alt="" width="20" height="20">`:''}<span>${esc(item.name)} →</span></a>`).join('')}</div></div>`;
   const features=WELCOME_FEATURES.map(([icon,heading,text])=>`<li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="${icon}"/></svg><strong>${heading}</strong><span>${text}</span></li>`).join('');
   return `<section class="community-gate welcome${state.access==='anonymous'?' is-visitor':''}" aria-labelledby="community-gate-title">
     <div class="welcome-hero"><p class="welcome-kicker">${kicker}</p><h1 id="community-gate-title">${title}</h1><p class="welcome-lead">${lead}</p>${actions}</div>

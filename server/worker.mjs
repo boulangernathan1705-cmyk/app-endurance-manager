@@ -83,7 +83,7 @@ function slotFor(event, from, departureId) {
 }
 // "Mes communautés": the communities where the player is a member (managers: all of them), with the address of
 // each site. A feature of the platform (not a community module): empty unless the player has several communities.
-async function myCommunities(env, actor, community) {
+async function myCommunities(env, actor, community, all = false) {
   const domain = baseDomain(env);
   if (!domain || !actor.user) return [];
   const list = actor.manager ? await allCommunities(env)
@@ -104,7 +104,8 @@ async function myCommunities(env, actor, community) {
     delete entry.item;
     allowed.push(entry);
   }
-  return allowed.length < 2 ? [] : allowed;
+  // all: every one (a visitor without access here is shown where he can go).
+  return all || allowed.length >= 2 ? allowed : [];
 }
 // Body of an image upload (the banner), read up to `limit` bytes.
 async function imageBody(request, limit) {
@@ -405,7 +406,8 @@ async function api(request, env) {
     // Training shows in the bar only for a pilot entered in an upcoming LMU race; the circuit memo always.
     trainingRace:trainingEnabled(community) && access.status === 'member' && !!actor.user && !!(await nextRace(env, actor.user.id)),
     community:{id:community.id, slug:community.slug, name:community.name, shortName:community.shortName, discordInviteUrl:community.discordInviteUrl, appearance:appearanceOf(community)},
-    access:access.status, permissions:[...access.permissions], manager:access.manager, communities:await myCommunities(env, actor, community), openSite,
+    access:access.status, permissions:[...access.permissions], manager:access.manager, communities:await myCommunities(env, actor, community),
+    elsewhere:['not-member','forbidden'].includes(access.status) ? (await myCommunities(env, actor, community, true)).filter(item => !item.current).map(({name, url, logoUrl}) => ({name, url, logoUrl})) : [], openSite,
     platformDiscordUrl:/^https:\/\/(discord\.gg|discord\.com\/invite)\//.test(env.PLATFORM_DISCORD_URL || '') ? env.PLATFORM_DISCORD_URL : null});
   // The explanation of communities has been read: not shown again, on any device.
   if (path === '/api/me/community-intro' && method === 'POST') {
