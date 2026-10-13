@@ -361,7 +361,8 @@ body:has(.fold-registration:not([hidden])) { overflow: hidden; }
   border-radius: 999px;
   font-size: 12px;
   font-weight: 800;
-  white-space: nowrap;
+  max-width: 100%;
+  line-height: 1.35;
   border: 1px solid rgba(49, 184, 107, .7);
   background: rgba(49, 184, 107, .14);
   color: #8ff0b6;
@@ -2048,7 +2049,7 @@ html[data-game] #app .race-header .race-header-time svg { width: 18px; height: 1
 .solo-round-toggle .secondary-button + .secondary-button { border-left: 1px solid rgba(255, 255, 255, .14); }
 .solo-round-toggle .secondary-button.active { background: var(--community-accent, #7fe3ea); color: #061014; }
 /* EVENT TDZ in rounds: the rounds as starts (« Manche 1 »), opened on their details and pilots. */
-.solo-round-starts { display: grid; gap: 10px; min-width: 0; }
+.solo-round-starts { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; min-width: 0; }
 .solo-round-start .solo-detail-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); margin-bottom: 12px; }
 .solo-round-pilots { font-size: 13px; color: #9aa6b0; }
 .solo-round-label { font-size: 11px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: var(--community-accent, #7fe3ea); white-space: nowrap; }
@@ -2291,6 +2292,16 @@ body:has([data-category-entry]) { overflow: hidden; }
 .ce-car-list { display: flex; flex-wrap: wrap; gap: 6px; }
 .pilot-category-logo.is-several { width: auto !important; gap: 4px; }
 .pilot-category-logo.is-several img, .pilot-category-logo.is-several .category-logo { max-width: 30px; }
+/* A driver without a crew entered in several categories: the logos side by side, the logo column as wide as them. */
+html[data-game] #app .ux-unassigned-grid > .pilot-row > .pilot-main:has(> .pilot-category-logo.is-several) { grid-template-columns: auto minmax(0, 1fr) !important; }
+html[data-game] #app .ux-unassigned-grid .pilot-main > .pilot-category-logo.is-several { width: auto !important; max-width: none !important; justify-self: start !important; gap: 4px; }
+html[data-game] #app .ux-unassigned-grid .pilot-main > .pilot-category-logo.is-several img { width: 30px !important; max-width: 30px !important; height: auto !important; max-height: 30px !important; object-fit: contain; }
+/* In the narrow cards of the computer grid, the logos take their own line above the name. */
+@media (min-width: 761px) {
+  html[data-game] #app .ux-unassigned-grid > .pilot-row > .pilot-main:has(> .pilot-category-logo.is-several) { grid-template-columns: minmax(0, 1fr) !important; }
+  html[data-game] #app .ux-unassigned-grid .pilot-main > .pilot-category-logo.is-several { grid-row: auto !important; order: -1; }
+  html[data-game] #app .ux-unassigned-grid .pilot-main:has(> .pilot-category-logo.is-several) > * { grid-column: 1 !important; }
+}
 /* Tableau des disponibilités (TM). */
 .ce-board { margin: 16px 0; border: 1px solid #2b3336; border-radius: 14px; background: rgba(13, 17, 18, .88); }
 .ce-board > summary { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 14px 16px; cursor: pointer; list-style: none; }
@@ -2336,3 +2347,12 @@ body:has([data-category-entry]) { overflow: hidden; }
   .planning-start[open] .planning-quick { gap: 6px; flex-basis: calc(100% + 30px); max-width: none; margin-right: -30px; }
   .planning-start[open] .planning-quick-button.is-labelled { gap: 6px; padding: 0 10px 0 8px !important; }
 }
+
+/* Error pages (access, training, diagnostics): the button stays inside its card. */
+.members-error > a { display: inline-flex; align-items: center; justify-content: center; margin: 4px 0 6px; }
+/* Race page: the race type under the date fits its narrow column. */
+html[data-game] #app .race-header .race-side .event-type-badge { padding: 4px 3px !important; font-size: 10px !important; letter-spacing: 0 !important; line-height: 1.2; text-align: center; border-radius: 10px; }
+/* Race list on a computer: three categories stay on one line next to the circuit drawing. */
+html[data-game] .race-card .race-fill .event-category-badge { min-width: 120px; }
+/* Administration: links inside help texts in the site colour, not the browser's blue. */
+.members-help a:not([class]) { color: var(--accent, #52d3d8); }

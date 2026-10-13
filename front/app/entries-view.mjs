@@ -16,7 +16,7 @@ import {
   categories,
   circuitVisual
 } from './core.mjs';
-import {crewAvailability,pilotLines} from './crews.mjs';
+import {crewAvailability,pilotLines,groupByPilot} from './crews.mjs';
 import {getLocale,localeTag} from '../i18n.mjs';
 
 
@@ -83,6 +83,7 @@ function card({event,departure,reg}) {
   const unassigned = (departure.availability||[])
     .filter(pilot => pilot.status !== 'unavailable' && !assigned.has(String(pilot.id)))
     .sort(pilotSort(event));
+  const freePilots = groupByPilot(unassigned, event);
   const members = crew
     ? (crew.registrationIds||[]).map(id => departure.availability.find(pilot => String(pilot.id) === String(id))).filter(Boolean)
     : [];
@@ -104,7 +105,7 @@ function card({event,departure,reg}) {
     : '<p class="muted">Aucun autre équipage sur ce départ.</p>';
 
   const unassignedBody = unassigned.length
-    ? `<section class="crew-pilot-lines">${pilotLines(departure,event.durationHours||6,unassigned,{editable:false})}</section>`
+    ? `<section class="crew-pilot-lines">${pilotLines(departure,event.durationHours||6,freePilots,{editable:false})}</section>`
     : '<p class="empty">Tous les pilotes disponibles sont déjà affectés.</p>';
 
   const situation = crew
@@ -117,14 +118,14 @@ function card({event,departure,reg}) {
         ${reg.managed?`<strong class="ux-managed-entry-name">${esc(reg.name)}</strong>`:''}
         <h2 class="event-name">${esc(event.name)}</h2>
         <span class="race-meta">${esc(circuitLabel(event.circuit))} · <span class="nowrap">${durationLabel(eventMinutes(event))}</span></span>
-        <span class="race-badges">${eventTypeBadge(event.eventType)}${badge(reg.category)}<span class="race-start">Départ ${esc(timeLabel(departure.time))}</span>${situation}</span>
+        <span class="race-badges">${eventTypeBadge(event.eventType)}${(reg.groupCategories||[reg.category]).map(badge).join('')}<span class="race-start">Départ ${esc(timeLabel(departure.time))}</span>${situation}</span>
       </span>${circuitVisual(event.circuit,true)}</span>
       <button type="button" class="primary-button native-my-entry-open-event" data-action="open" data-id="${event.id}" data-departure="${departure.id}">Voir la course</button>
     </summary>
     <div class="native-my-entry-body my-entry-columns">
       ${column('Mon équipage',members.length,ownCrewBody)}
       ${column('Autres équipages',otherCrews.length,otherCrewsBody)}
-      ${column('Pilotes sans équipage',unassigned.length,unassignedBody)}
+      ${column('Pilotes sans équipage',freePilots.length,unassignedBody)}
     </div>
   </details>`;
 }
@@ -138,12 +139,21 @@ export function renderMyEntries() {
     .filter(reg=>reg.mine||reg.managed)
     .map(reg=>({event,departure,reg}))))
     .sort((a,b)=>Number(a.departure.startsAt)-Number(b.departure.startsAt));
+  // A pilot entered in several categories on a start, still without a crew: one card with all of them.
+  const inCrew=({departure,reg})=>(departure.crews||[]).some(crew=>(crew.registrationIds||[]).some(id=>String(id)===String(reg.id)));
+  const groups=new Map();
+  for(const item of entries){
+    const key=isSolo(item.event)||inCrew(item)?item.reg.id:`${item.departure.id}|${item.reg.participantId||String(item.reg.name).toLowerCase()}`;
+    if(!groups.has(key))groups.set(key,[]);
+    groups.get(key).push(item);
+  }
+  const cards=[...groups.values()].map(list=>list.length===1?list[0]:{...list[0],reg:groupByPilot(list.map(item=>item.reg),list[0].event)[0]});
   const section=(title,list)=>`<section class="native-my-entries-group">
     <div class="native-my-entries-group-heading"><h2>${title}</h2><span>${list.length} inscription${list.length>1?'s':''}</span></div>
     ${list.length?`<div class="native-my-entry-list">${list.map(card).join('')}</div>`:'<p class="empty">Aucune inscription.</p>'}
   </section>`;
   app.innerHTML=`<div class="native-my-entries-heading"><span class="creation-kicker">ESPACE PILOTE</span><h1 class="page-title">MES INSCRIPTIONS</h1><p>Tes événements et tes endurances, avec ton équipage.</p></div>
-    ${section('Mes inscriptions personnelles',entries.filter(item=>item.reg.mine))}
-    ${entries.some(item=>item.reg.managed)?section('Inscriptions que je gère',entries.filter(item=>item.reg.managed)):''}`;
+    ${section('Mes inscriptions personnelles',cards.filter(item=>item.reg.mine))}
+    ${cards.some(item=>item.reg.managed)?section('Inscriptions que je gère',cards.filter(item=>item.reg.managed)):''}`;
   notifyRender();
 }

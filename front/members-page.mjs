@@ -307,8 +307,8 @@ function lookMarkup(settings) {
       </div>
       <div class="admin-preview-wrap"><p class="admin-preview-label">Aperçu : ce que verront tes membres</p>
         <div class="admin-preview" data-look-preview style="--preview-accent:${esc(accent)}">
-          <div class="admin-preview-banner"><img src="${esc(look.bannerUrl || '/images/endurance-manager-banner.webp')}" alt=""><b data-preview-name>${esc(look.name)}</b></div>
-          <div class="admin-preview-nav"><span>Endurance</span><span>Mes inscriptions</span></div>
+          <div class="admin-preview-banner"><img src="${esc(look.bannerUrl || '/images/endurance-manager-banner.webp')}" alt=""></div>
+          <div class="admin-preview-nav">${look.logoUrl ? `<img class="admin-preview-badge" src="${esc(look.logoUrl)}" alt="">` : `<b class="admin-preview-badge" data-preview-short>${esc(String(look.shortName || look.name).slice(0, 4))}</b>`}<span>EVENT SOLO</span><span class="is-active">ENDURANCE</span><span>Mes inscriptions</span></div>
           <div class="admin-preview-body">
             <div class="admin-preview-race"><span><b>6h de Spa</b><small>samedi 20:00 · LMU</small></span><span class="admin-preview-button">M’inscrire</span></div>
             <div class="admin-preview-race"><span><b>Daytona 24h</b><small>dimanche 14:00 · iRacing</small></span><span class="admin-preview-button">M’inscrire</span></div>
@@ -712,7 +712,8 @@ app.addEventListener('submit', async event => {
 function updatePreview(form) {
   const preview = app.querySelector('[data-look-preview]');
   if (!preview) return;
-  preview.querySelector('[data-preview-name]').textContent = form.elements.name.value || 'Ta communauté';
+  const short = preview.querySelector('[data-preview-short]');
+  if (short) short.textContent = (form.elements.shortName.value || form.elements.name.value || 'MC').slice(0, 4);
   preview.style.setProperty('--preview-accent', form.elements.defaultAccent.checked ? '#52d3d8' : form.elements.accent.value);
 }
 
