@@ -2253,6 +2253,7 @@ body:has([data-category-entry]) { overflow: hidden; }
 .ce-concerned li strong { color: var(--text, #f2f5f4); font-weight: 600; }
 .ce-concerned li span { text-transform: none; font-weight: 700; }
 .ce-concerned li span.is-whole { color: #4fd1c5; } .ce-concerned li span.is-part { color: #f3b33d; }
+.category-entry-sheet .registration-workspace-head { position: sticky; top: 0; z-index: 3; margin: -18px -20px 0; padding: 16px 20px 10px; background: #111315; align-items: center; }
 .ce-footer { position: sticky; bottom: 0; margin: 12px -20px 0; padding: 14px 20px 12px; border-top: 1px solid #2b3336; background: var(--panel, #111315); }
 .ce-footer .registration-step-nav { margin: 0; padding: 0; position: static; border: 0; background: none; }
 .ce-tally { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
@@ -2263,6 +2264,7 @@ body:has([data-category-entry]) { overflow: hidden; }
 .ce-footnote { margin: 8px 0 0; text-align: center; font-size: 12px; color: var(--muted, #92979c); }
 @media (max-width: 760px) {
   .category-entry-sheet { max-height: calc(100vh - 12px); max-height: calc(100dvh - 12px); }
+  .category-entry-sheet .registration-workspace-head { margin: -14px -14px 0; padding: 12px 14px 8px; }
   .ce-footer { margin: 12px -14px 0; padding: 12px 14px calc(12px + env(safe-area-inset-bottom)); }
 }
 @media (max-width: 520px) { .category-entry-bar { flex-direction: column; align-items: stretch; } .category-entry-bar-actions > button { flex: 1; } .category-entry-gate > div > button { min-width: 140px; } }
