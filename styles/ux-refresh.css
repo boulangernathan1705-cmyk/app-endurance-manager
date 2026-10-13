@@ -2291,6 +2291,16 @@ body:has([data-category-entry]) { overflow: hidden; }
 .ce-car-list { display: flex; flex-wrap: wrap; gap: 6px; }
 .pilot-category-logo.is-several { width: auto !important; gap: 4px; }
 .pilot-category-logo.is-several img, .pilot-category-logo.is-several .category-logo { max-width: 30px; }
+/* A driver without a crew entered in several categories: the logos side by side, the logo column as wide as them. */
+html[data-game] #app .ux-unassigned-grid > .pilot-row > .pilot-main:has(> .pilot-category-logo.is-several) { grid-template-columns: auto minmax(0, 1fr) !important; }
+html[data-game] #app .ux-unassigned-grid .pilot-main > .pilot-category-logo.is-several { width: auto !important; max-width: none !important; justify-self: start !important; gap: 4px; }
+html[data-game] #app .ux-unassigned-grid .pilot-main > .pilot-category-logo.is-several img { width: 30px !important; max-width: 30px !important; height: auto !important; max-height: 30px !important; object-fit: contain; }
+/* In the narrow cards of the computer grid, the logos take their own line above the name. */
+@media (min-width: 761px) {
+  html[data-game] #app .ux-unassigned-grid > .pilot-row > .pilot-main:has(> .pilot-category-logo.is-several) { grid-template-columns: minmax(0, 1fr) !important; }
+  html[data-game] #app .ux-unassigned-grid .pilot-main > .pilot-category-logo.is-several { grid-row: auto !important; order: -1; }
+  html[data-game] #app .ux-unassigned-grid .pilot-main:has(> .pilot-category-logo.is-several) > * { grid-column: 1 !important; }
+}
 /* Tableau des disponibilités (TM). */
 .ce-board { margin: 16px 0; border: 1px solid #2b3336; border-radius: 14px; background: rgba(13, 17, 18, .88); }
 .ce-board > summary { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 14px 16px; cursor: pointer; list-style: none; }
