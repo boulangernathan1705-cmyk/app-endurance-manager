@@ -117,15 +117,20 @@ async function openRaces(env, community, events, scope, timestamp) {
 }
 export const raceCategoryName = event =>
   `${String(event?.circuit || '').startsWith('iracing-') ? '🏁 iRacing' : '🏎️ LMU'} · ${String(event?.name || 'Endurance').trim()}`.slice(0,100);
-// The race categories follow the chosen category, in the order they were made (one request reorders them all).
+// The race categories follow the chosen category: LMU first, then iRacing, each by date of its first start (one
+// request reorders them all).
 async function placeCategory(env, community, guildId, channels, category, anchor, budget) {
-  const open = new Set(((await env.DB.prepare('SELECT category_id FROM discord_recap_publications WHERE community_id=? AND closed_at IS NULL AND category_id IS NOT NULL')
-    .bind(community.id).all()).results || []).map(item => item.category_id));
+  const open = new Map(((await env.DB.prepare(`SELECT p.category_id,e.circuit,e.departures FROM discord_recap_publications p LEFT JOIN events e ON e.id=p.event_id
+    WHERE p.community_id=? AND p.closed_at IS NULL AND p.category_id IS NOT NULL`).bind(community.id).all()).results || [])
+    .map(item => [item.category_id,[String(item.circuit || '').startsWith('iracing-') ? 1 : 0,Math.min(...parse(item.departures).map(start => Number(start.startsAt)).filter(Number.isFinite))]]));
   const categories = channels.filter(item => item.type === 4 && item.id !== category).sort((a,b) => (a.position || 0) - (b.position || 0) || (BigInt(a.id) < BigInt(b.id) ? -1 : 1));
-  let index = categories.findIndex(item => item.id === anchor);
+  const index = categories.findIndex(item => item.id === anchor);
   if (index < 0) return;
-  while (open.has(categories[index + 1]?.id)) index++;
-  categories.splice(index + 1, 0, {id:category});
+  let last = index;
+  while (open.has(categories[last + 1]?.id)) last++;
+  const key = item => open.get(item.id) || [2,Infinity];
+  const races = [...categories.slice(index + 1,last + 1),{id:category}].sort((a,b) => key(a)[0] - key(b)[0] || key(a)[1] - key(b)[1]);
+  categories.splice(index + 1,last - index,...races);
   await discord(env,'PATCH',`/guilds/${guildId}/channels`,categories.map((item,position) => ({id:item.id,position})),budget);
 }
 // The race's text channel, then its category (never the category chosen by the admins).
