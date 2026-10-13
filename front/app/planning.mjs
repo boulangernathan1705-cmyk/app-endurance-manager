@@ -12,9 +12,16 @@ const LOCKED_ICON='<span class="planning-crew-lock is-locked" data-tip="Complet 
 const OPEN_ICON='<span class="planning-crew-lock is-open" data-tip="Places libres : tu peux le rejoindre" aria-label="Places libres"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" d="M5 13a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2zM8 11V7a4 4 0 0 1 8 0"/></svg></span>';
 export const CHEVRON='<svg class="planning-chevron" viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6"/></svg>';
 
-// The race days with their starts: every race and event uses the planning, over one day or several (a start
-// still to define keeps the list of starts).
-export function planningDays(event){return raceDays(event.departures||[],{minDays:1});}
+// The race days with their starts: every race and event uses the planning, over one day or several. A start
+// still to define (« Horaires à confirmer ») sits on its day like the others, without its end time.
+export function planningDays(event){
+  const departures=event.departures||[];
+  if(!departures.some(departure=>departure.tbd))return raceDays(departures,{minDays:1});
+  if(!departures.every(departure=>Number.isFinite(Number(departure.startsAt))))return [];
+  const days=new Map();
+  departures.forEach((departure,index)=>{const key=dayKey(departure.startsAt);if(!days.has(key))days.set(key,[]);days.get(key).push({departure,index});});
+  return [...days.entries()].sort(([a],[b])=>a.localeCompare(b)).map(([key,items])=>({key,items}));
+}
 
 // Date block of a race: the span of its days when it runs over several days.
 export function raceRangeBlock(event){
@@ -24,7 +31,7 @@ export function raceRangeBlock(event){
 }
 
 function startCard(event,departure,body,{minutes,now,open,quick=''}){
-  const start=Number(departure.startsAt),end=start+minutes*60000,done=end<=now,live=start<=now&&!done;
+  const start=Number(departure.startsAt),end=start+minutes*60000,done=end<=now,live=!departure.tbd&&start<=now&&!done;
   const crews=sortedCrews(event,departure),assigned=new Set(crews.flatMap(crew=>crew.registrationIds||[]));
   const present=(departure.availability||[]).filter(reg=>reg.status!=='unavailable');
   const pilots=pilotCount(departure.availability||[]),mine=present.some(reg=>reg.mine);
@@ -33,7 +40,7 @@ function startCard(event,departure,body,{minutes,now,open,quick=''}){
   // « Inscription par catégorie »: before the TM places him, the pilot is only « dispo » on his possible starts.
   const pending=mine&&state.categoryEntry&&(event.departures||[]).filter(item=>!item.tbd).length>1&&!present.some(reg=>reg.mine&&assigned.has(reg.id));
   const tags=compact?'':`${mine?`<span class="planning-tag is-mine">${pending?'Dispo':'Ton départ'}</span>`:''}${live?'<span class="planning-tag is-live">En cours</span>':''}`;
-  const head=`<span class="planning-start-head"><strong>Départ ${esc(timeLabel(departure.time))}</strong>${compact?(done?'<span class="planning-start-state">Terminé</span>':''):(isSolo(event)?'':`<span class="planning-start-end">fin ${esc(timeAt(end))}${esc(endDay)}</span>`)}${tags}</span>`;
+  const head=`<span class="planning-start-head"><strong>Départ ${esc(timeLabel(departure.time))}</strong>${compact?(done?'<span class="planning-start-state">Terminé</span>':''):(isSolo(event)||departure.tbd?'':`<span class="planning-start-end">fin ${esc(timeAt(end))}${esc(endDay)}</span>`)}${tags}</span>`;
   // Pilots without a crew, by category (« 2 GT3 » « 1 Hypercar »): where a pilot can find a crew. The crews
   // follow, by name.
   const free=event.categories.map(category=>{const regs=present.filter(reg=>!assigned.has(reg.id)&&reg.category===category);return [category,regs.length,regs.map(reg=>communityPrefix(reg)+reg.name)];}).filter(([,count])=>count);
