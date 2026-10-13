@@ -2,6 +2,11 @@
 
 Les changements du site, version par version. La plus récente est en haut.
 
+## v1.34 — 13 octobre 2026
+
+- Inscription par catégorie : les départs se présentent comme sur la page de la course (heure, fin, pilotes déjà là, M'inscrire / Absent), sur une ligne chacun pour en voir plus sur un téléphone ; « Toute la course » devient une pastille et « Fermer » reste en haut.
+- Le site se met à jour tout seul sur une page restée ouverte quand une nouvelle version est en ligne.
+
 ## v1.33 — 13 octobre 2026
 
 - Inscription par catégorie : chaque départ garde son « Me désinscrire » pour ce créneau seul, et un bouton rouge « Me désinscrire de tous les créneaux » en haut de la course retire tout d'un coup.
