@@ -87,6 +87,12 @@ test('"Mes communautés": the communities of the player, with the address of eac
   const headers={Cookie:`__Secure-em_dev_session=${raw}`};
   member.run('e0a1c0de-0000-4000-8000-000000000001',user,time,time);
   assert.deepEqual((await (await call(`${MAIN}/api/session`,{headers})).json()).communities,[],'a single community: no selector');
+  DB.db.prepare("INSERT INTO memberships(community_id,user_id,status,checked_at,created_at) VALUES('c-test',?,'left',?,?)").run(user,time,time);
+  const outside=await (await call(`${TEST_SITE}/api/session`,{headers})).json();
+  assert.equal(outside.access,'not-member');
+  assert.deepEqual(outside.elsewhere.map(item=>item.url),[`${MAIN}/`],'not a member here: his communities, one link each');
+  assert.deepEqual((await (await call(`${MAIN}/api/session`,{headers})).json()).elsewhere,[],'a member sees no such list');
+  DB.db.prepare("DELETE FROM memberships WHERE community_id='c-test'").run();
   member.run('c-test',user,time,time);
   const mine=(await (await call(`${MAIN}/api/session`,{headers})).json()).communities;
   assert.deepEqual(mine.map(item=>[item.slug,item.url,item.current]),[['commu-dev',`${MAIN}/`,true],['commu-test',`${TEST_SITE}/`,false]]);
@@ -95,6 +101,7 @@ test('"Mes communautés": the communities of the player, with the address of eac
   DB.db.prepare('DELETE FROM community_role_permissions WHERE community_id=?').run('c-test');
   assert.deepEqual((await (await call(`${MAIN}/api/session`,{headers})).json()).communities,[],'a restricted community is absent from the selector');
   assert.equal((await (await call(`${TEST_SITE}/api/session`,{headers})).json()).access,'forbidden','Discord membership alone does not open the other site');
+  assert.deepEqual((await (await call(`${TEST_SITE}/api/session`,{headers})).json()).elsewhere.map(item=>item.url),[`${MAIN}/`],'no access here: where he can go');
   // The explanation of communities, read once for the account (every device, every site).
   assert.equal((await (await call(`${MAIN}/api/session`,{headers})).json()).user.communityIntroSeen,false);
   const read=await call(`${TEST_SITE}/api/me/community-intro`,{method:'POST',headers:{...headers,Origin:TEST_SITE,'Content-Type':'application/json'},body:'{}'});
