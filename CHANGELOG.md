@@ -2,6 +2,11 @@
 
 Les changements du site, version par version. La plus récente est en haut.
 
+## v1.35 — 13 octobre 2026
+
+- Discord : la catégorie d'une course s'ouvre 7 jours avant son départ, 15 jours avant pour une course de 24 h ou plus.
+- Discord : le salon infos-de-la-course affiche la semaine de la course, plus la semaine en cours.
+
 ## v1.34 — 13 octobre 2026
 
 - Inscription par catégorie : les départs se présentent comme sur la page de la course (heure, fin, pilotes déjà là, M'inscrire / Absent), sur une ligne chacun pour en voir plus sur un téléphone ; « Toute la course » devient une pastille et « Fermer » reste en haut.
