@@ -29,7 +29,7 @@ export function categoryEntryBar(event){
   const crew=(event.departures||[]).flatMap(departure=>departure.crews||[]).find(crew=>own.some(item=>(crew.registrationIds||[]).includes(item.reg.id)));
   const status=crew?`<span class="category-entry-mine">${logo(crew.category)}<strong>${esc(crew.name)}</strong><em>Ton équipage</em></span>`
     :`<span class="category-entry-mine">${cats.map(category=>`${logo(category)}<strong>${esc(category)}</strong>`).join('')}<em>${starts} départ${starts>1?'s':''} possible${starts>1?'s':''}</em><em class="is-waiting">En attente d’équipage</em></span>`;
-  return `<section class="category-entry-bar is-entered"><div>${status}</div>${crew?'':`<span class="category-entry-bar-actions">${button('category-entry-open','Modifier','','primary-button')}${button('category-entry-withdraw','Me désinscrire','','danger-button')}</span>`}</section>`;
+  return `<section class="category-entry-bar is-entered"><div>${status}</div>${crew?'':`<span class="category-entry-bar-actions">${button('category-entry-open','Modifier','','primary-button')}${button('category-entry-withdraw','Me désinscrire de tous les créneaux','','danger-button')}</span>`}</section>`;
 }
 
 // Availability, as on a usual entry: the pilot ticks the starts he can do, then on each one says "whole race"
@@ -122,7 +122,7 @@ export async function saveCategoryEntry(event){
   closeCategoryEntry();
 }
 
-// « Me désinscrire »: every entry of the pilot on the race goes at once (an entry already in a crew stays).
+// « Me désinscrire de tous les créneaux »: every entry of the pilot on the race goes at once (an entry already in a crew stays).
 export async function withdrawCategoryEntry(event){
   const own=mine(event).filter(item=>!placed(event,item.reg));
   if(!own.length||!confirm(`Retirer ton inscription sur les ${new Set(own.map(item=>item.departure.id)).size} départ(s) de ${event.name} ?`))return false;
