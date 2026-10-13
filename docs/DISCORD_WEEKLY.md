@@ -1,6 +1,6 @@
 # Récap de préparation sur Discord
 
-Le récap annonce les courses, départs, équipages, catégories, voitures, pilotes, places ouvertes/completes et pilotes sans équipage. Il ne constitue pas un bilan des résultats sportifs. Chaque communauté ne publie que ses propres inscriptions, équipages et absences, y compris sur les courses officielles partagées.
+Le récap annonce les courses, départs, équipages, catégories, voitures, pilotes, places ouvertes/completes et pilotes sans équipage (un par ligne, avec les logos de ses catégories). Les logos de catégorie sont les emojis du bot lui-même (`images/discord-emojis`, envoyés une fois par le bot, sans Nitro) ; tant qu’ils manquent, la catégorie garde sa couleur. Il ne constitue pas un bilan des résultats sportifs. Chaque communauté ne publie que ses propres inscriptions, équipages et absences, y compris sur les courses officielles partagées.
 
 ## Configuration guidée
 
