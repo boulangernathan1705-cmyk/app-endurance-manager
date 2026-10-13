@@ -5,7 +5,7 @@ import {readFileSync,readdirSync} from 'node:fs';
 import worker from '../server/worker.mjs';
 import {linkTestServer,DEV_COMMUNITY,GUILD} from './fixtures/discord-server.mjs';
 import {syncWeeklyDiscord} from '../server/discord-weekly.mjs';
-import {saveBotRecap,syncBotRecaps,previewBotRecap,recapDestinations,eventDeletionTime,eventChannelName,sendBotRecapTest,recapError,repairBotRecap} from '../server/recap-discord.mjs';
+import {saveBotRecap,syncBotRecaps,previewBotRecap,recapDestinations,eventDeletionTime,eventChannelName,sendBotRecapTest,recapError,repairBotRecap,racesOpenNow} from '../server/recap-discord.mjs';
 
 const OWNER='333333333333333333', BOT='444444444444444444', TEXT='555555555555555555', CATEGORY='666666666666666666';
 const NOW=Date.parse('2026-10-10T12:00:00Z'), DAY=86400000;
@@ -281,12 +281,12 @@ test('scheduled rotation prioritizes bot timestamps and ignores historical webho
   assert.ok(calls.every(call=>!call.path.includes('/webhooks/')));
 });
 
-test('a race gets its category as soon as it is published, even far away and without any crew',async t=>{
+test('a race gets its category 7 days before its start, even without any crew',async t=>{
   const {DB,env,calls}=setup(t);
-  race(DB,'a-sunday','Dimanche','spa',[{id:'s',startsAt:NOW+DAY}]);race(DB,'b-far','Dans un mois','spa',[{id:'f',startsAt:NOW+30*DAY}]);
-  assert.deepEqual((await previewBotRecap(env,NOW,COMMUNITY,SETTINGS)).map(item=>item.name),['🏎️ LMU · Dimanche','🏎️ LMU · Dans un mois']);
+  race(DB,'a-sunday','Dimanche','spa',[{id:'s',startsAt:NOW+DAY}]);race(DB,'b-week','Dans six jours','spa',[{id:'w',startsAt:NOW+6*DAY}]);race(DB,'c-far','Dans un mois','spa',[{id:'f',startsAt:NOW+30*DAY}]);
+  assert.deepEqual((await previewBotRecap(env,NOW,COMMUNITY,SETTINGS)).map(item=>item.name),['🏎️ LMU · Dimanche','🏎️ LMU · Dans six jours']);
   await saveBotRecap(env,COMMUNITY,SETTINGS);await syncBotRecaps(env,NOW,COMMUNITY);
-  assert.deepEqual(creates(calls).map(call=>call.body.name),['🏎️ LMU · Dimanche','infos-de-la-course','🏎️ LMU · Dans un mois','infos-de-la-course']);
+  assert.deepEqual(creates(calls).map(call=>call.body.name),['🏎️ LMU · Dimanche','infos-de-la-course','🏎️ LMU · Dans six jours','infos-de-la-course']);
 });
 
 test('an official LMU race gets its category without any entry; an imported official iRacing race waits for one',async t=>{
@@ -434,4 +434,10 @@ test('repair of a removed category moves the surviving recap channel and keeps i
   const after=DB.db.prepare('SELECT * FROM discord_recap_publications').get();
   assert.notEqual(after.category_id,before.category_id);assert.equal(after.channel_id,before.channel_id);assert.equal(after.message_id,before.message_id);
   assert.equal(channels.find(c=>c.id===after.channel_id).parent_id,after.category_id);assert.equal(creates(calls).length,1);assert.equal(sends(calls).length,0);
+});
+
+test('a race opens 7 days before a start, a 24 h race 15 days before',()=>{
+  const ev=(id,hours,days)=>({id,circuit:'spa',duration_hours:hours,departures:JSON.stringify([{id:'s',startsAt:NOW+days*DAY}])});
+  const events=[ev('6h-8d',6,8),ev('6h-7d',6,7),ev('24h-16d',24,16),ev('24h-15d',24,15)];
+  assert.deepEqual(racesOpenNow(events,'all',NOW),['6h-7d','24h-15d']);
 });
