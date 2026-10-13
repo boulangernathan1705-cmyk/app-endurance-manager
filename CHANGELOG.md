@@ -2,6 +2,10 @@
 
 Les changements du site, version par version. La plus récente est en haut.
 
+## v1.39 — 13 octobre 2026
+
+- iRacing : les horaires des special events sont repris même quand iRacing donne à la course un autre nom dans son article (ex. « Indy 8 Hour »).
+
 ## v1.38 — 13 octobre 2026
 
 - Inscription : nouvelle étape « Autres horaires » avant le récapitulatif, pour copier la même inscription sur d'autres départs de la course.
