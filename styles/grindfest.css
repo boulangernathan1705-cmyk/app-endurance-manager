@@ -30,3 +30,54 @@ html[data-game] #app .race-header[class*="is-solo-"] .event-type-panel:is([data-
 .gridfest-mp-tag.is-sent {background:#2f6e3f;color:#e6ffec}
 .gridfest-mp-tag.is-failed,.gridfest-mp-tag.is-incomplete {background:#6e2f2f;color:#ffe6e6}
 .grindfest-streamer-head .count-pill {font-size:.85rem}
+
+/* Gridfest: a festive look of its own (streamers gathering), on its page and its card only. */
+/* TDZ colours: its orange accent (Réglages → Apparence), with gold and a deep orange. */
+:root {--gf-pink:#ff3d00;--gf-violet:var(--community-accent,#ff7b00);--gf-cyan:#ffc400;--gf-gold:#fff1c2;--gf-grad:linear-gradient(100deg,var(--gf-pink),var(--gf-violet) 45%,var(--gf-cyan))}
+.gridfest-avatar {flex:none;display:grid;place-items:center;width:56px;height:56px;border-radius:14px;object-fit:cover;background:#10151a;box-shadow:0 0 0 2px rgba(255,255,255,.08)}
+.gridfest-avatar.is-initial {background:linear-gradient(135deg,hsl(var(--hue) 85% 58%),hsl(calc(var(--hue) + 40) 85% 45%));color:#fff;font-weight:900;font-size:26px}
+.gridfest-streamer-copy {display:flex;flex-direction:column;align-items:flex-start;gap:4px;min-width:0}
+.gridfest-streamer-copy strong {font-size:1.05rem;overflow-wrap:anywhere}
+.gridfest-streamer-copy small {color:var(--muted,#b4bdca);font-size:.82rem}
+
+.grindfest-streamer-head {flex-direction:row;align-items:center;justify-content:flex-start;gap:14px;text-align:left;margin-bottom:14px}
+.grindfest-streamer-head .gridfest-avatar {width:72px;height:72px;border-radius:18px}
+
+.gridfest-streamers {border:0;padding:0;margin:0}
+.gridfest-streamer-cards {display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin-top:8px}
+.gridfest-streamer-card {position:relative;display:flex;align-items:center;gap:12px;padding:12px;border:1px solid #3a4548;border-radius:14px;background:#151b1d;cursor:pointer;transition:border-color .15s,background .15s,transform .15s}
+.gridfest-streamer-card input {position:absolute;opacity:0;pointer-events:none}
+.gridfest-streamer-card:hover {border-color:var(--gf-violet);transform:translateY(-1px)}
+.gridfest-streamer-card:has(input:checked) {border-color:transparent;background:linear-gradient(#22170c,#22170c) padding-box,var(--gf-grad) border-box;box-shadow:0 0 18px rgba(255,123,0,.35)}
+.gridfest-streamer-card:has(input:focus-visible) {outline:2px solid var(--gf-cyan);outline-offset:2px}
+
+/* Event page */
+html[data-game] #app .race-header.is-gridfest {position:relative;border:1px solid transparent;background:radial-gradient(circle at 12% 20%,rgba(255,61,0,.18),transparent 40%),radial-gradient(circle at 88% 30%,rgba(255,196,0,.16),transparent 42%),linear-gradient(#17120c,#17120c) padding-box,var(--gf-grad) border-box;box-shadow:0 0 30px rgba(255,123,0,.25)}
+html[data-game] #app .race-header.is-gridfest .event-title {border-left-style:solid;border-image:linear-gradient(180deg,var(--gf-pink),var(--gf-violet),var(--gf-cyan)) 1}
+html[data-game] #app .race-header.is-gridfest::after {content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;opacity:.55;background:radial-gradient(circle,var(--gf-pink) 1.5px,transparent 2px) 0 0/46px 46px,radial-gradient(circle,var(--gf-cyan) 1.5px,transparent 2px) 23px 17px/52px 52px,radial-gradient(circle,var(--gf-gold) 1.2px,transparent 1.8px) 11px 31px/61px 61px;-webkit-mask:linear-gradient(90deg,transparent 30%,#000 75%);mask:linear-gradient(90deg,transparent 30%,#000 75%)}
+html[data-game] #app .race-header.is-gridfest > * {position:relative;z-index:1}
+html[data-game] #app .race-header.is-gridfest .event-type-panel {border:0;background:radial-gradient(circle,rgba(255,123,0,.35),transparent 70%)}
+html[data-game] #app .race-header.is-gridfest .event-type-panel span {font-size:30px}
+html[data-game] #app .race-header.is-gridfest .event-type-panel span,.gridfest-wordmark {background:var(--gf-grad);-webkit-background-clip:text;background-clip:text;color:transparent;font-weight:900;font-style:italic;letter-spacing:.06em;filter:drop-shadow(0 0 10px rgba(255,61,0,.45))}
+.solo-round-starts.is-gridfest .grindfest-column {border-color:rgba(255,123,0,.45);background:linear-gradient(180deg,rgba(255,123,0,.12),transparent 120px),var(--surface,#171c25)}
+.solo-round-starts.is-gridfest .grindfest-column:nth-child(3n+2) {border-color:rgba(255,61,0,.45);background:linear-gradient(180deg,rgba(255,61,0,.12),transparent 120px),var(--surface,#171c25)}
+.solo-round-starts.is-gridfest .grindfest-column:nth-child(3n) {border-color:rgba(255,196,0,.45);background:linear-gradient(180deg,rgba(255,196,0,.12),transparent 120px),var(--surface,#171c25)}
+.solo-round-starts.is-gridfest .solo-round-start.is-single {border-color:rgba(255,123,0,.6)}
+
+/* Card in the list */
+html[data-game] #app .race-card.is-gridfest .event-name {background:var(--gf-grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+html[data-game] #app .race-card.is-gridfest {border:1px solid transparent;background:radial-gradient(circle at 85% 50%,rgba(255,123,0,.22),transparent 45%),linear-gradient(#17120c,#17120c) padding-box,var(--gf-grad) border-box}
+html[data-game] #app .race-card .gridfest-card-panel {display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px}
+.gridfest-card-panel .gridfest-wordmark {font-size:24px}
+.gridfest-avatars {display:flex;justify-content:center}
+.gridfest-avatars .gridfest-avatar {width:38px;height:38px;border-radius:50%;font-size:16px;margin-left:-8px;box-shadow:0 0 0 2px #17120c}
+.gridfest-avatars .gridfest-avatar:first-child {margin-left:0}
+@media(max-width:600px) {
+  .grindfest-streamer-head .gridfest-avatar {width:60px;height:60px}
+  .gridfest-streamer-cards {grid-template-columns:1fr}
+  html[data-game] #app .race-card .race-card-type-logo.gridfest-card-panel {display:flex}
+  .gridfest-card-panel .gridfest-wordmark {font-size:15px}
+  .gridfest-avatars .gridfest-avatar {width:28px;height:28px;font-size:12px}
+}
+@media(prefers-reduced-motion:no-preference) {.gridfest-wordmark,html[data-game] #app .race-header.is-gridfest .event-type-panel span {background-size:200% 100%;animation:gf-shine 6s ease-in-out infinite alternate}}
+@keyframes gf-shine {to {background-position:100% 0}}

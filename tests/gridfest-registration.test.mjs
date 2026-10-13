@@ -29,8 +29,8 @@ for(const type of ['Grindfest','Gridfest'])test(`${type} keeps the original step
   assert.match(first,/registration-form registration-stepper/);
   assert.match(first,/Étape 1 sur 2/);
   assert.match(first,/name="gridfestGameName"[^>]*required/);
-  assert.match(first,/name="registrationStreamer" required/);
-  assert.match(first,/class="registration-identity-field"><span class="form-label">Streamer/);
+  assert.match(first,/type="radio" name="registrationStreamer" value="bravo"\s+required/);
+  assert.match(first,/class="gridfest-streamers"><legend class="form-label">Streamer/);
   assert.doesNotMatch(first,/class="grindfest-choice"/,'the streamer field uses the existing site styles');
   assert.match(first,/data-action="registration-step"[^>]*data-step="2"/);
   assert.match(first,/registration-summary/);
