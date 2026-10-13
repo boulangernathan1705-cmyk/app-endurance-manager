@@ -2,7 +2,7 @@
 // M'inscrire or Absent. Entering is one registration for the race: his categories, then the starts he can do, each
 // for the whole race or some hours; he is entered on each of them. The TM
 // then makes the crews on a start.
-import {weekdayLong,dayMonthShort,timeLabel} from '../dates.mjs';
+import {weekdayLong,weekdayLabel,dayMonthShort,timeLabel,timeAt} from '../dates.mjs';
 import {eventMinutes} from '../../shared/duration.mjs';
 import {state,esc,button,logo,categories,api,can,CARS,communityTag,registrationCarLabel,renderAvailabilityTimeline} from './core.mjs';
 import {groupByPilot} from './crews.mjs';
@@ -36,7 +36,8 @@ export function categoryEntryBar(event){
 // or unticks the hours he is not there.
 const raceHours=event=>Math.ceil(eventMinutes(event)/60);
 const covered=(event,status)=>status==='whole'?raceHours(event):status?status.split(',').length:0;
-const statusOf=departure=>draft.starts[departure.id]||'';
+// 'no': the pilot said « Absent » on this start (shown, never saved).
+const statusOf=departure=>{const value=draft.starts[departure.id]||'';return value==='no'?'':value;};
 function matches(event){return future(event).map(departure=>({departure,status:statusOf(departure)})).filter(item=>item.status);}
 const dayKey=at=>new Date(at).toDateString();
 function days(event){
@@ -53,14 +54,26 @@ export function openCategoryEntry(event){
 }
 export function closeCategoryEntry(){draft=null;document.querySelector('[data-category-entry]')?.remove();}
 const hoursText=(event,status)=>status==='whole'?'toute la course':`${covered(event,status)} h sur ${raceHours(event)}`;
-// One start: ticked or not; once ticked, « Toute la course » and the hour line (a click removes an hour).
+// One start, as on the race page: its end, who is already there (pilots without a crew by category, crews), and
+// « M'inscrire » / « Absent ». Once entered, « Toute la course » and the hour line (a click removes an hour).
+const ICON=path=>`<span class="planning-quick-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="${path}"/></svg></span>`;
+const ICON_REGISTER=ICON('M8 7a4 4 0 1 0 8 0a4 4 0 0 0-8 0M6 21v-2a4 4 0 0 1 4-4h4M16 19h6M19 16v6');
+const ICON_ABSENT=ICON('M8 7a4 4 0 1 0 8 0a4 4 0 0 0-8 0M6 21v-2a4 4 0 0 1 4-4h3M17 16l4 4M21 16l-4 4');
 function startCard(event,departure){
-  const status=statusOf(departure),on=Boolean(status);
+  const status=statusOf(departure),on=Boolean(status),absent=draft.starts[departure.id]==='no';
+  const start=Number(departure.startsAt),end=start+eventMinutes(event)*60000;
+  const endDay=dayKey(end)!==dayKey(start)?` le ${weekdayLabel(end)}`:'';
+  const crews=departure.crews||[],assigned=new Set(crews.flatMap(crew=>crew.registrationIds||[]));
+  const others=(departure.availability||[]).filter(reg=>!reg.mine&&reg.status!=='unavailable');
+  const free=event.categories.map(category=>[category,others.filter(reg=>reg.category===category&&!assigned.has(reg.id)).length]).filter(([,count])=>count);
+  const info=[...free.map(([category,count])=>`<span class="planning-free-pill ${categories[category]?.css||''}">${count} ${esc(category)}</span>`),crews.length?`<span class="ce-start-crews">${crews.length} équipage${crews.length>1?'s':''}</span>`:''].join('');
+  const choice=`<button type="button" class="planning-quick-button is-labelled${on?' is-active':''}" data-action="category-entry-start" data-value="yes" data-departure="${departure.id}" aria-pressed="${on}">${ICON_REGISTER}<span class="planning-quick-label">${on?'Inscrit':'M’inscrire'}</span></button><button type="button" class="planning-quick-button is-labelled is-absence${absent?' is-active':''}" data-action="category-entry-start" data-value="no" data-departure="${departure.id}" aria-pressed="${absent}">${ICON_ABSENT}<span class="planning-quick-label">Absent</span></button>`;
   const line=on?renderAvailabilityTimeline({departure,duration:raceHours(event),status,interactive:true,label:'Heures de présence'}).replaceAll('data-action="availability"','data-action="category-entry-hour"'):'';
-  return `<div class="ce-start${on?' is-on':''}"><button type="button" class="ce-start-pick" data-action="category-entry-start" data-departure="${departure.id}" aria-pressed="${on}"><i aria-hidden="true"></i><strong>${esc(timeLabel(departure.time))}</strong><em class="${status==='whole'?'is-whole':on?'is-part':''}">${on?hoursText(event,status):'Je ne peux pas'}</em></button>${on?`<div class="ce-start-hours"><div class="special-availability">${button('category-entry-whole','TOUTE LA COURSE',`data-departure="${departure.id}" aria-pressed="${status==='whole'}"`,`special-button whole ${status==='whole'?'active':''}`)}</div>${line}<p class="availability-hint">Retire les heures où tu n’es pas là.</p></div>`:''}</div>`;
+  const hours=on?`<div class="ce-start-hours"><div class="ce-start-hours-head"><span>Heures de présence${status==='whole'?'':` · <b class="is-part">${hoursText(event,status)}</b>`}</span>${button('category-entry-whole','Toute la course',`data-departure="${departure.id}" aria-pressed="${status==='whole'}"`,`ce-whole${status==='whole'?' active':''}`)}</div>${line}</div>`:'';
+  return `<div class="ce-start${on?' is-on':''}${absent?' is-absent':''}"><div class="ce-start-top"><strong>${esc(timeLabel(departure.time))}</strong><span class="planning-start-end">→ ${esc(timeAt(end))}${esc(endDay)}</span>${info?`<span class="ce-start-info">${info}</span>`:''}</div><div class="ce-start-choice">${choice}</div>${hours}</div>`;
 }
 function startsPane(event){
-  return `<div class="ce-intro"><h3>Quels départs peux-tu faire ?</h3><p>Coche tes départs possibles. Pour chacun, toute la course ou seulement certaines heures.</p></div><div class="ce-start-days">${days(event).map(day=>`<section class="ce-start-day"><h4>${esc(weekdayLong(day.at))} <span>${esc(dayMonthShort(day.at))}</span></h4><div class="ce-start-list">${day.items.map(departure=>startCard(event,departure)).join('')}</div></section>`).join('')}</div>`;
+  return `<div class="ce-intro"><h3>Quels départs peux-tu faire ?</h3></div><div class="ce-start-days">${days(event).map(day=>`<section class="ce-start-day"><h4>${esc(weekdayLong(day.at))} <span>${esc(dayMonthShort(day.at))}</span></h4><div class="ce-start-list">${day.items.map(departure=>startCard(event,departure)).join('')}</div></section>`).join('')}</div>`;
 }
 export function renderCategoryEntry(event){
   const previous=document.querySelector('[data-category-entry] .registration-sheet');
@@ -70,7 +83,7 @@ export function renderCategoryEntry(event){
   const list=days(event),step=draft.step,total=future(event).length;
   const cats=event.categories.map(category=>button('category-entry-category',`${logo(category)}<span class="registration-category-copy"><strong>${esc(category)}</strong><em>${draft.categories.includes(category)?'✓ Choisie':'Choisir'}</em></span>`,`data-value="${esc(category)}" aria-pressed="${draft.categories.includes(category)}"`,`category-button ${categories[category]?.css||''} ${draft.categories.includes(category)?'active':''}`)).join('');
   const found=matches(event),partial=found.filter(item=>item.status!=='whole').length;
-  const concerned=found.length?`<ul class="ce-concerned-list">${found.map(({departure,status})=>`<li><strong>${esc(weekdayLong(departure.startsAt))} ${esc(dayMonthShort(departure.startsAt))} · ${esc(timeLabel(departure.time))}</strong><span class="${status==='whole'?'is-whole':'is-part'}">${hoursText(event,status)}</span></li>`).join('')}</ul>`:'<p class="ce-empty">Aucun départ choisi.</p>';
+  const concerned=found.length?`<ul class="ce-concerned-list">${found.map(({departure,status})=>`<li><strong>${esc(weekdayLong(departure.startsAt))} ${esc(dayMonthShort(departure.startsAt))} · ${esc(timeLabel(departure.time))}</strong><span>Heures de présence${status==='whole'?'':` · <b class="is-part">${hoursText(event,status)}</b>`}</span></li>`).join('')}</ul>`:'<p class="ce-empty">Aucun départ choisi.</p>';
   const summary=`<div class="ce-intro"><h3>Ton inscription</h3><p>Vérifie avant de confirmer.</p></div><div class="registration-summary"><div class="registration-summary-row is-static"><span>Pilote</span><strong>${esc(state.user?.name||'')}</strong></div><button type="button" class="registration-summary-row" data-action="category-entry-step" data-step="1"><span>Catégories</span><strong>${draft.categories.map(category=>`${esc(category)}${draft.cars[category].length?` (${draft.cars[category].map(esc).join(', ')})`:''}`).join(' ou ')}</strong><em>Modifier</em></button><button type="button" class="registration-summary-row" data-action="category-entry-step" data-step="2"><span>Départs</span><strong>${found.length} départ${found.length>1?'s':''}</strong><em>Modifier</em></button></div><h4 class="ce-subtitle">Tes départs possibles</h4>${concerned}`;
   const tally=`<div class="ce-tally${found.length?'':' is-empty'}"><b>${found.length}</b><span><strong>départ${found.length>1?'s':''} possible${found.length>1?'s':''}</strong><em>${partial?`dont ${partial} en partie · `:''}${draft.categories.map(esc).join(' ou ')}</em></span></div>`;
   const ready=step===1?draft.categories.length>0:found.length>0;
@@ -95,10 +108,10 @@ export function categoryEntryAction(event,action,target){
   if(action==='category-entry-step'){draft.step=Number(target.dataset.step)||1;renderCategoryEntry(event);return true;}
   const toggle=(list,value)=>list.includes(value)?list.filter(item=>item!==value):[...list,value];
   if(action==='category-entry-category')draft.categories=toggle(draft.categories,target.dataset.value);
-  if(action==='category-entry-start'){const id=target.dataset.departure;draft.starts[id]=draft.starts[id]?'':'whole';}
+  if(action==='category-entry-start'){const id=target.dataset.departure,yes=target.dataset.value==='yes',on=statusOf({id});draft.starts[id]=yes?(on||'whole'):(draft.starts[id]==='no'?'':'no');}
   if(action==='category-entry-whole')draft.starts[target.dataset.departure]='whole';
   if(action==='category-entry-hour'){
-    const id=target.dataset.departure,total=raceHours(event),status=draft.starts[id]||'';
+    const id=target.dataset.departure,total=raceHours(event),status=statusOf({id});
     const parts=new Set(status==='whole'?Array.from({length:total},(_,i)=>`h${i+1}`):status.split(',').filter(Boolean));
     parts.has(target.dataset.value)?parts.delete(target.dataset.value):parts.add(target.dataset.value);
     draft.starts[id]=parts.size===total?'whole':[...parts].sort((a,b)=>Number(a.slice(1))-Number(b.slice(1))).join(',');
