@@ -465,3 +465,15 @@ test('le bot envoie une fois les logos de catégorie manquants comme ses propres
   // Kept for a few hours: no new request.
   uploads.length=0;assert.deepEqual(await botCategoryEmojis({DISCORD_CLIENT_ID:BOT,DISCORD_BOT_TOKEN:'fake',ASSETS},NOW+60000),ids);assert.equal(uploads.length,0);
 });
+
+test('après un changement, la course modifiée est mise à jour en premier', async t => {
+  const {DB,env,calls}=setup(t);
+  for(const id of ['race-a','race-b','race-c'])race(DB,id,'Course '+id,'spa',[{id:'start-'+id,startsAt:NOW+DAY}]);
+  await saveBotRecap(env,COMMUNITY,SETTINGS);
+  for(let i=0;i<3;i++)await syncBotRecaps(env,NOW+i,COMMUNITY);
+  assert.equal(DB.db.prepare('SELECT count(*) n FROM discord_recap_publications WHERE message_id IS NOT NULL').get().n,3);
+  // Only two races per pass: the one just changed goes first, whatever its last check.
+  DB.db.prepare("UPDATE discord_recap_publications SET checked_at=CASE event_id WHEN 'race-c' THEN 99 ELSE 1 END").run();
+  calls.length=0;await syncBotRecaps(env,NOW+10,COMMUNITY,false,'race-c');
+  assert.equal(DB.db.prepare("SELECT checked_at FROM discord_recap_publications WHERE event_id='race-c'").get().checked_at,NOW+10);
+});

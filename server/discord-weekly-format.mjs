@@ -217,6 +217,12 @@ export function buildWeeklyDiscordPayload(snapshot,site={},updatedAt=Date.now(),
   return{content:'',embeds:fitDiscordEmbeds(embeds.slice(0,10)),allowed_mentions:{parse:[]}};
 }
 
+// The race a change is about: its id in the address, or the entry / crew to look up (null when unknown).
+export function mutationTarget(request){
+  let path;try{path=racesPath(new URL(request.url).pathname);}catch{return null;}
+  const match=path.match(/^\/api\/(events|registrations|crews)\/([a-f0-9-]{36})/);
+  return match?{kind:match[1],id:match[2]}:null;
+}
 export function isWeeklyDiscordMutation(request){
   const method=String(request?.method||'').toUpperCase();if(!['POST','PUT','PATCH','DELETE'].includes(method))return false;
   let path;try{path=racesPath(new URL(request.url).pathname);}catch{return false;}

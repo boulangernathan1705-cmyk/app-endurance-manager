@@ -280,7 +280,7 @@ async function publish(env, timestamp, community, settings, row, event, budget, 
   await env.DB.prepare('UPDATE discord_recap_publications SET message_id=?,content_hash=? WHERE community_id=? AND event_id=?')
     .bind(row.message_id,hash,community.id,row.event_id).run();
 }
-async function syncLocked(env,timestamp,community,settings, test = false, budget = {left:12}) {
+async function syncLocked(env,timestamp,community,settings, test = false, budget = {left:12}, priority = null) {
   const rows = (await env.DB.prepare('SELECT * FROM discord_recap_publications WHERE community_id=? AND closed_at IS NULL ORDER BY checked_at,event_id').bind(community.id).all()).results || [];
   const events = await raceEvents(env, community);
   // Cleanup is independent of mode/activation. Only bot-created event channels may be deleted.
@@ -301,7 +301,8 @@ async function syncLocked(env,timestamp,community,settings, test = false, budget
   } else {
     const eligible = await openRaces(env,community,events,settings.scope,timestamp);
     const ids = [...new Set([...rows.filter(row => row.event_id && !row.closed_at).map(row => row.event_id),...eligible])];
-    const ordered = ids.sort((a,b) => (rows.find(row => row.event_id === a)?.checked_at || 0) - (rows.find(row => row.event_id === b)?.checked_at || 0));
+    // The race just changed first, then the ones checked longest ago.
+    const ordered = ids.sort((a,b) => (b === priority) - (a === priority) || (rows.find(row => row.event_id === a)?.checked_at || 0) - (rows.find(row => row.event_id === b)?.checked_at || 0));
     for (const eventId of ordered.slice(0,2)) {
       const event = events.find(item => item.id === eventId);
       if (!event || (eventDeletionTime(event) !== null && timestamp >= eventDeletionTime(event))) continue;
@@ -315,7 +316,7 @@ async function syncLocked(env,timestamp,community,settings, test = false, budget
   }
   return {ok:true};
 }
-export async function syncBotRecaps(env,timestamp,community, test = false) {
+export async function syncBotRecaps(env,timestamp,community, test = false, priority = null) {
   const token = crypto.randomUUID(), now = Date.now();
   await env.DB.prepare('UPDATE community_recap_settings SET dirty=1 WHERE community_id=?').bind(community.id).run();
   const lock = await env.DB.prepare("UPDATE community_recap_settings SET lock_token=?,lock_until=? WHERE community_id=? AND lock_until<?")
@@ -326,7 +327,7 @@ export async function syncBotRecaps(env,timestamp,community, test = false) {
     const budget = {left:16};
     for (let attempt=0;attempt<2;attempt++) {
       await env.DB.prepare('UPDATE community_recap_settings SET dirty=0 WHERE community_id=? AND lock_token=?').bind(community.id,token).run();
-      result = await syncLocked(env,timestamp,community,await botRecapSettings(env,community),test,budget);
+      result = await syncLocked(env,timestamp,community,await botRecapSettings(env,community),test,budget,priority);
       const current = await botRecapSettings(env,community);
       if (!current.dirty) break;
     }
