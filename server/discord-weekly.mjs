@@ -158,15 +158,18 @@ export async function loadWeeklyDiscordSnapshot(env, timestamp, community, scope
 
   for (const departure of selected) {
     const key = `${departure.eventId}:${departure.departureId}`;
+    // One pilot per participant, with every category they entered.
     const uniquePilots = new Map();
     for (const registration of departure.registrations) {
-      if (!uniquePilots.has(registration.participantId)) uniquePilots.set(registration.participantId, registration.name);
+      if (!uniquePilots.has(registration.participantId)) uniquePilots.set(registration.participantId, {name:registration.name,categories:[]});
+      const pilot = uniquePilots.get(registration.participantId);
+      if (registration.category && !pilot.categories.includes(registration.category)) pilot.categories.push(registration.category);
     }
     const assigned = assignedParticipantsByDeparture.get(key) || new Set();
     departure.pilotCount = uniquePilots.size;
     departure.unassignedPilots = [...uniquePilots.entries()]
       .filter(([participantId]) => !assigned.has(participantId))
-      .map(([,name]) => name);
+      .map(([,pilot]) => pilot);
     delete departure.registrations;
   }
 

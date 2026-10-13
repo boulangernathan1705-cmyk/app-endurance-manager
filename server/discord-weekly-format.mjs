@@ -49,37 +49,57 @@ export function raceUrl(siteUrl,departure){
 const SIM_COLORS={lmu:0xd8322c,iracing:0x2f6fd6};
 const TYPE_LABELS={special:'Événement spécial',lmu:'Championnat',private:'Championnat privé'};
 const simOf=departure=>String(departure.circuit||'').startsWith('iracing-')?'iracing':'lmu';
+// The category logos of the site, uploaded as the bot's own emojis (images/discord-emojis, « em_gt3 »).
+export function categoryEmojiName(sim,category){
+  const image=catalogForGame(sim).categories?.[category]?.image;
+  if(!image)return '';
+  const file=image.replace(/\.[a-z]+$/,'');
+  return 'em_'+({HC:'hypercar',LMP2:'lmp2',P3:'lmp3',GT3:'gt3',GTE:'gte'}[file]||file.replace('iracing-','ir_').replaceAll('-','_'));
+}
+export const CATEGORY_EMOJI_NAMES=[...new Set(['lmu','iracing'].flatMap(sim=>Object.keys(catalogForGame(sim).categories).map(category=>categoryEmojiName(sim,category))))];
+// Its logo when the bot has it, otherwise its colour.
+function categoryMark(category,sim,emojis={}){
+  const name=categoryEmojiName(sim,category),id=emojis[name];
+  return id?`<:${name}:${id}>`:markers.get(category)||'⬜';
+}
 // Discord shows <t:…> timestamps in each reader's own time zone.
 const discordTime=(startsAt,style)=>`<t:${Math.floor(startsAt/1000)}:${style}>`;
 function departureTitle(departure){return departure.timePending?`${discordTime(departure.startsAt,'D')} — horaire à confirmer`:discordTime(departure.startsAt,'F');}
 // One crew per block, separated by a blank line: name, then its car, then one pilot per line.
-function crewBlock(crew){
-  const marker=markers.get(crew.category)||'⬜',status=crew.locked?'🔒':'🔓';
+function crewBlock(crew,sim,emojis){
+  const marker=categoryMark(crew.category,sim,emojis),status=crew.locked?'🔒':'🔓';
   return [`${marker} **${clean(crew.name)}** · ${clean(crew.category)} ${status}`,crew.car&&`🏎️ ${clean(crew.car)}`,
     ...(crew.pilots.length?crew.pilots.map(name=>`👤 ${clean(name)}`):['*Aucun pilote*'])].filter(Boolean).join('\n');
 }
-function departureValue(departure,compact=false){
+// Pilots without a crew: one per line with the logos of their categories.
+function unassignedBlock(pilots,sim,emojis){
+  const list=pilots.map(pilot=>typeof pilot==='string'?{name:pilot,categories:[]}:pilot);
+  if(!list.some(pilot=>pilot.categories?.length))return `📋 **Sans équipage** : ${list.map(pilot=>clean(pilot.name)).join(', ')}`;
+  return ['📋 **Sans équipage**',...list.map(pilot=>[`👤 ${clean(pilot.name)}`,...(pilot.categories||[]).map(category=>emojis[categoryEmojiName(sim,category)]?categoryMark(category,sim,emojis):`${categoryMark(category,sim,emojis)} ${clean(category)}`)].join(' '))].join('\n');
+}
+function departureValue(departure,compact=false,emojis={}){
+  const sim=simOf(departure);
   if(compact){
-    const lines=[`🕐 **${departureTitle(departure)}**`,...departure.crews.map(crew=>`${markers.get(crew.category)||'⬜'} ${clean(crew.name)} · ${crew.pilots.length} pilote${crew.pilots.length>1?'s':''}`)];
+    const lines=[`🕐 **${departureTitle(departure)}**`,...departure.crews.map(crew=>`${categoryMark(crew.category,sim,emojis)} ${clean(crew.name)} · ${crew.pilots.length} pilote${crew.pilots.length>1?'s':''}`)];
     if(departure.unassignedPilots?.length)lines.push(`📋 Sans équipage : ${departure.unassignedPilots.length}`);
     if(!departure.crews.length&&!departure.unassignedPilots?.length)lines.push('Personne d’inscrit pour l’instant.');
     return cut(lines.join('\n'),1024);
   }
-  const blocks=[`🕐 **${departureTitle(departure)}**`,...departure.crews.map(crewBlock)];
-  if(departure.unassignedPilots?.length)blocks.push(`📋 **Sans équipage** : ${departure.unassignedPilots.map(clean).join(', ')}`);
+  const blocks=[`🕐 **${departureTitle(departure)}**`,...departure.crews.map(crew=>crewBlock(crew,sim,emojis))];
+  if(departure.unassignedPilots?.length)blocks.push(unassignedBlock(departure.unassignedPilots,sim,emojis));
   if(!departure.crews.length&&!departure.unassignedPilots?.length)blocks.push('Personne d’inscrit pour l’instant.');
   return cut(blocks.join('\n\n'),1024);
 }
 // The starts of a race: only those with entries in detail (time, crews, pilots without a crew); the empty ones
 // in one line at the end, so a special event with 15 starts stays short. A race with a single start keeps it.
 const BLANK='\u200b';
-function raceFields(departures,compact){
+function raceFields(departures,compact,emojis){
   const hasEntries=departure=>departure.crews.length||departure.unassignedPilots?.length;
   const absentPilots=[...new Set(departures.flatMap(departure=>departure.absentPilots||[]))];
   const absences=absentPilots.length?[{name:'🚫 Pilotes absents',value:cut(absentPilots.map(clean).join(', '),compact?300:1024),inline:false}]:[];
-  if(departures.length===1)return [{name:BLANK,value:departureValue(departures[0],compact),inline:false},...absences];
+  if(departures.length===1)return [{name:BLANK,value:departureValue(departures[0],compact,emojis),inline:false},...absences];
   const filled=departures.filter(hasEntries);
-  const fields=filled.slice(0,23).map(departure=>({name:BLANK,value:departureValue(departure,compact),inline:false}));
+  const fields=filled.slice(0,23).map(departure=>({name:BLANK,value:departureValue(departure,compact,emojis),inline:false}));
   if(!filled.length)fields.push({name:BLANK,value:'Personne d’inscrit pour l’instant.',inline:false});
   return [...fields,...absences];
 }
@@ -95,13 +115,13 @@ function startsRecap(departures){
   return [...days].map(([day,times])=>`📅 **${day}** · ${[...new Set(times)].join(', ')}`).join('\n');
 }
 // One block per race: its name is the link to the race, the bar has the colour of its simulator.
-function raceEmbed(departures,siteUrl,compact=false,current=false){
+function raceEmbed(departures,siteUrl,compact=false,current=false,emojis={}){
   const first=departures[0],{title,note}=eventTitleAndNote(first.eventName);
   const circuit=circuitNames.get(first.circuit)||first.circuit||'Circuit à préciser';
   const duration=first.durationMinutes||first.durationHours?durationLabel(first.durationMinutes||first.durationHours*60):'';
   const details=[`📍 ${clean(circuit)}`,duration&&`⏱️ ${duration}`,TYPE_LABELS[first.eventType]&&`🏷️ ${TYPE_LABELS[first.eventType]}`].filter(Boolean).join(' · ');
   const embed={title:cut(`${current?'🔴 En cours — ':'🏁 '}${title}`,256),description:cut([details,note,startsRecap(departures)].filter(Boolean).join('\n'),4096),color:current?0xd71920:SIM_COLORS[simOf(first)],
-    fields:raceFields(departures,compact)};
+    fields:raceFields(departures,compact,emojis)};
   const url=raceUrl(siteUrl,first);if(url)embed.url=url;
   return embed;
 }
@@ -135,7 +155,8 @@ function footer(updatedAt){return{text:`Endurance Manager · mise à jour à ${u
 // The weekly message: a header with the community, one block per race (its name links to the race on the
 // community's site), the community's banner at the bottom. Discord allows 10 blocks and 6000 characters.
 // `site`: {url, name, logoUrl, bannerUrl} of the community (url: address of its site).
-export function buildWeeklyDiscordPayload(snapshot,site={},updatedAt=Date.now(),scope='lmu'){
+// `emojis`: ids of the bot's category emojis by name; without them the categories keep their colour.
+export function buildWeeklyDiscordPayload(snapshot,site={},updatedAt=Date.now(),scope='lmu',emojis={}){
   const siteUrl=typeof site==='string'?(()=>{try{return new URL(site).origin;}catch{return '';}})():String(site.url||'');
   const sim=SCOPE_LABELS[scope]??' LMU',simPage=scope==='iracing'?'/iracing/':scope==='all'?'/':'/lmu/';
   const current=Array.isArray(snapshot.currentDepartures)?snapshot.currentDepartures:[],future=Array.isArray(snapshot.futureDepartures)?snapshot.futureDepartures:[];
@@ -148,7 +169,7 @@ export function buildWeeklyDiscordPayload(snapshot,site={},updatedAt=Date.now(),
     return{content:'',embeds:[header],allowed_mentions:{parse:[]}};
   }
   const build=compact=>{
-    const blocks=[...groupByRace(current).map(group=>raceEmbed(group,siteUrl,compact,true)),...groupByRace(future).map(group=>raceEmbed(group,siteUrl,compact))];
+    const blocks=[...groupByRace(current).map(group=>raceEmbed(group,siteUrl,compact,true,emojis)),...groupByRace(future).map(group=>raceEmbed(group,siteUrl,compact,false,emojis))];
     // 10 blocks at most: beyond 8 races, the others are listed (linked) in one last block.
     if(blocks.length>8){
       const rest=groupByRace([...current,...future]).slice(8);

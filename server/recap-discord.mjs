@@ -1,10 +1,10 @@
 // Text recaps configured explicitly by an admin, published exclusively by the bot.
 import {loadWeeklyDiscordSnapshot, siteOf} from './discord-weekly.mjs';
-import {buildWeeklyDiscordPayload} from './discord-weekly-format.mjs';
+import {buildWeeklyDiscordPayload, CATEGORY_EMOJI_NAMES} from './discord-weekly-format.mjs';
 
 const API = 'https://discord.com/api/v10', DAY = 86400000;
 // Layout of the recap message: raised when it changes, so the published recaps are edited once.
-const RECAP_FORMAT = 2;
+const RECAP_FORMAT = 3;
 const MAX_CHANNELS = 450;
 const RACE_INFO_CHANNEL = 'infos-de-la-course'; // Discord writes text channel names in lowercase with dashes
 const VIEW = 1024n, SEND = 2048n, HISTORY = 65536n, EMBED = 16384n, MANAGE = 16n, ADMIN = 8n;
@@ -138,13 +138,39 @@ async function removeRaceChannels(env, row, anchor, budget) {
 async function digest(value) {
   return [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify(value))))].map(byte => byte.toString(16).padStart(2,'0')).join('');
 }
+// The category logos are the bot's own emojis (application emojis: usable on every server, no Nitro).
+// The missing ones are uploaded once from images/discord-emojis; kept a few hours per instance.
+let categoryEmojis = {at:0, ids:{}};
+export async function botCategoryEmojis(env, timestamp = Date.now()) {
+  if (timestamp - categoryEmojis.at < 6 * 3600000) return categoryEmojis.ids;
+  const ids = {};
+  try {
+    const app = env.DISCORD_CLIENT_ID, budget = {left:1 + CATEGORY_EMOJI_NAMES.length};
+    if (!app || !env.ASSETS) return ids;
+    const list = await discord(env,'GET',`/applications/${app}/emojis`,null,budget);
+    for (const emoji of list?.items || []) ids[emoji.name] = emoji.id;
+    for (const name of CATEGORY_EMOJI_NAMES.filter(name => !ids[name])) {
+      const file = await env.ASSETS.fetch(new Request(`${env.APP_ORIGIN || 'https://endurance-manager.app'}/images/discord-emojis/${name.slice(3)}.png`));
+      if (!file.ok) continue;
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      let binary = ''; for (const byte of bytes) binary += String.fromCharCode(byte);
+      ids[name] = (await discord(env,'POST',`/applications/${app}/emojis`,{name,image:`data:image/png;base64,${btoa(binary)}`},budget)).id;
+    }
+    categoryEmojis = {at:timestamp, ids};
+  } catch {
+    // Without them the categories keep their colour; retried half an hour later.
+    categoryEmojis = {at:timestamp - 5.5 * 3600000, ids};
+  }
+  return ids;
+}
 async function snapshotPayload(env, timestamp, community, settings, eventId = null) {
   const snapshot = await loadWeeklyDiscordSnapshot(env, timestamp, community, settings.scope, eventId);
-  const payload = buildWeeklyDiscordPayload(snapshot, siteOf(env, community), timestamp, settings.scope);
+  const emojis = await botCategoryEmojis(env, timestamp);
+  const payload = buildWeeklyDiscordPayload(snapshot, siteOf(env, community), timestamp, settings.scope, emojis);
   // Message edits are silent; never turn driver names into mentions.
   payload.allowed_mentions = {parse:[]};
   // A new layout of the message (RECAP_FORMAT) edits the published recaps once.
-  return {snapshot, payload, hash:await digest([RECAP_FORMAT,snapshot])};
+  return {snapshot, payload, hash:await digest([RECAP_FORMAT,snapshot,emojis])};
 }
 export async function previewBotRecap(env, timestamp, community, settings) {
   if (settings.mode === 'general') {

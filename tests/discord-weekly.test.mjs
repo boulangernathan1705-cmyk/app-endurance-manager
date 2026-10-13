@@ -1,9 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {DatabaseSync} from 'node:sqlite';
-import {readFileSync,readdirSync} from 'node:fs';
+import {existsSync,readFileSync,readdirSync} from 'node:fs';
 import {
   buildWeeklyDiscordPayload,
+  CATEGORY_EMOJI_NAMES,
+  categoryEmojiName,
   isInParisWeek,
   isWeeklyDiscordMutation,
   nextParisWeek,
@@ -246,4 +248,29 @@ test('le récap aère les équipages : une ligne vide entre chacun, un pilote pa
   assert.match(blocks[1],/\*\*Les plots\*\* · Hypercar 🔓\n🏎️ Aston Martin Valkyrie AMR LMH\n👤 Alice\n👤 Bob$/);
   assert.match(blocks[2],/\*\*DDE\*\* · GT3 🔓\n🏎️ Ferrari 296 LMGT3\n\*Aucun pilote\*$/);
   assert.equal(blocks[3],'📋 **Sans équipage** : Nathan');
+});
+
+test('les pilotes sans équipage ont les logos de leurs catégories (emojis du bot)', () => {
+  const at=Date.parse('2026-10-11T15:00:00Z');
+  const departure={eventId:'spa',eventName:'6h de Spa',circuit:'spa',startsAt:at,durationMinutes:360,
+    crews:[{name:'Les plots',category:'Hypercar',car:'',pilots:['Alice'],locked:false}],
+    unassignedPilots:[{name:'Paul',categories:['Hypercar','GT3']},{name:'Léo',categories:['GT3']}]};
+  const snapshot={currentDepartures:[],futureDepartures:[departure],periodLabel:'semaine'};
+  const emojis={em_hypercar:'111',em_gt3:'222'};
+  const blocks=buildWeeklyDiscordPayload(snapshot,{},at-86400000,'lmu',emojis).embeds.at(-1).fields[0].value.split('\n\n');
+  assert.match(blocks[1],/^<:em_hypercar:111> \*\*Les plots\*\*/);
+  assert.equal(blocks[2],'📋 **Sans équipage**\n👤 Paul <:em_hypercar:111> <:em_gt3:222>\n👤 Léo <:em_gt3:222>');
+  // Without the emojis (not uploaded yet), the colour and the name of the category.
+  const plain=buildWeeklyDiscordPayload(snapshot,{},at-86400000,'lmu').embeds.at(-1).fields[0].value.split('\n\n');
+  assert.equal(plain[2],'📋 **Sans équipage**\n👤 Paul 🟦 Hypercar 🟪 GT3\n👤 Léo 🟪 GT3');
+});
+
+test('chaque catégorie LMU et iRacing a son image d’emoji', () => {
+  assert.ok(CATEGORY_EMOJI_NAMES.length>=15);
+  for(const name of CATEGORY_EMOJI_NAMES){
+    assert.match(name,/^em_[a-z0-9_]{2,29}$/);
+    assert.ok(existsSync(new URL(`../images/discord-emojis/${name.slice(3)}.png`,import.meta.url)),name);
+  }
+  assert.equal(categoryEmojiName('iracing','GT3'),'em_ir_gt3');
+  assert.equal(categoryEmojiName('lmu','LMP2 WEC'),'em_lmp2');
 });
