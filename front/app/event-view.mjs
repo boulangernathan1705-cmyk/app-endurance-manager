@@ -69,7 +69,9 @@ function quickActions(event,departure){
     const assigned=(departure.crews||[]).some(crew=>(crew.registrationIds||[]).some(id=>mine.some(reg=>reg.id===id)));
     // Entered: « Me désinscrire » in red, as on the events; the entry is changed from the « … » menu.
     // Entered in several categories: « Mon inscription » (each one is withdrawn there).
-    if(mine.length===1){main={action:'delete-registration',label:'Me désinscrire',extra:`data-id="${mine[0].id}"`,leave:true};more.push({action:'my-registration',label:'Modifier mon inscription',extra:''});}
+    // « Inscription par catégorie »: one entry for the race, so « Me désinscrire » withdraws it from every start.
+    if(mine.length&&!assigned&&categoryEntryOn(event))main={action:'category-entry-withdraw',label:'Me désinscrire',extra:'',leave:true};
+    else if(mine.length===1){main={action:'delete-registration',label:'Me désinscrire',extra:`data-id="${mine[0].id}"`,leave:true};more.push({action:'my-registration',label:'Modifier mon inscription',extra:''});}
     // « Inscription par catégorie »: entering is done once, above the starts.
     else if(mine.length||(can('endurance')&&!categoryEntryOn(event)))main={action:'my-registration',label:mine.length?'Mon inscription':'M’inscrire',extra:''};
     if(own&&!assigned&&event.categories.some(category=>!mine.some(reg=>reg.category===category)))more.push({action:'new-registration',label:'M’inscrire dans une autre catégorie',extra:`data-mode="category" data-registration="${own.id}"`});
