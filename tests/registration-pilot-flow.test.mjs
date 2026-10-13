@@ -90,3 +90,12 @@ test('crew assignment still locks extra categories',()=>{
   const migration=fs.readFileSync('migrations/0014_lock_categories_after_crew_assignment.sql','utf8');
   assert.match(migration,/CREATE TRIGGER participant_assigned_insert BEFORE INSERT ON registrations/);
 });
+
+test('the summary offers the same entry on the other starts of the race', () => {
+  assert.match(registration,/Ajouter d’autres horaires \?/);
+  // Only a new entry of one's own, on future starts where this category is not entered yet.
+  assert.match(registration,/if\(stateDraft\.id\|\|stateDraft\.forOther\|\|stateDraft\.mode==='category'\|\|stateDraft\.status==='unavailable'\|\|!stateDraft\.category\)return \[\];/);
+  assert.match(registration,/!\(item\.availability\|\|\[\]\)\.some\(reg=>reg\.mine&&reg\.category===stateDraft\.category\)/);
+  assert.match(registration,/await api\(`\/api\/races\/\$\{event\.id\}\/departures\/\$\{other\.id\}\/registrations`,'POST',\{\.\.\.payload,version:undefined\}\)/);
+  assert.match(actions,/refreshAfterSave\(result\.notice\|\|'Inscription enregistrée\.'\)/);
+});

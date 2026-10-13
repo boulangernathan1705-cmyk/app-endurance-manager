@@ -2,7 +2,7 @@ import {isGrindfest,streamersOf} from '../../shared/grindfest.mjs';
 import {streamerChoice} from './grindfest.mjs';
 import {isSolo,ANY_CATEGORY,soloCounts,eventCircuitName} from './solo.mjs';
 import {raceHourLabel,raceEndLabel} from '../timeline.mjs';
-import {shortDateLabel,timeLabel} from '../dates.mjs';
+import {shortDateLabel,timeLabel,weekdayLabel} from '../dates.mjs';
 import {durationLabel,eventMinutes,driverChangeRequired} from '../../shared/duration.mjs';
 import {app,state,esc,button,carPreferenceChoices,registrationCarLabel,renderAvailabilityTimeline,notifyRender,logo,categories,CARS,circuitLabel,communityTag,entryCommunities,communityChoice} from './core.mjs';
 import {getLocale} from '../i18n.mjs';
@@ -274,6 +274,20 @@ ${pane(total,`${rounds.length||gridfest?'':communityLine(event,departure,stateDr
 <div class="registration-step-nav">${step>1?button('registration-step','Retour',`data-departure="${departure.id}" data-step="${step-1}"`,'secondary-button registration-back'):''}${next}</div>
 </form>`;
 }
+// A new entry of one's own on a race with several starts: the same entry can be added to other starts.
+export function otherStartsFor(event,departure,stateDraft){
+  if(stateDraft.id||stateDraft.forOther||stateDraft.mode==='category'||stateDraft.status==='unavailable'||!stateDraft.category)return [];
+  return (event.departures||[]).filter(item=>item.id!==departure.id&&!item.tbd&&Number(item.startsAt)>Date.now()
+    &&!(item.availability||[]).some(reg=>reg.mine&&reg.category===stateDraft.category))
+    .sort((a,b)=>Number(a.startsAt)-Number(b.startsAt));
+}
+const startLabel=item=>`${weekdayLabel(item.startsAt)} ${String(item.time||'').replace(/^0?(\d+):00$/,'$1h').replace(':','h')}`;
+function otherStartsField(event,departure,stateDraft){
+  const starts=otherStartsFor(event,departure,stateDraft);
+  if(!starts.length)return '';
+  const chosen=new Set(stateDraft.copyDepartures||[]);
+  return `<fieldset class="registration-other-starts"><legend class="form-label">Ajouter d’autres horaires ?</legend><div class="registration-other-starts-list">${starts.map(item=>`<label class="registration-other-start"><input type="checkbox" name="copyDeparture" value="${item.id}" data-departure="${departure.id}" ${chosen.has(item.id)?'checked':''}><span>${esc(startLabel(item))}</span></label>`).join('')}</div></fieldset>`;
+}
 export function renderSteppedRegistration(event,departure,stateDraft=draftFor(departure)) {
   if(needsCommunityChoice(event,departure,stateDraft))return renderCommunityStep(departure);
   if(isSolo(event))return renderSoloStepper(event,departure,stateDraft);
@@ -299,7 +313,7 @@ export function renderSteppedRegistration(event,departure,stateDraft=draftFor(de
 ${pane(1,`${communityLine(event,departure,stateDraft)}${identity}<div class="category-area"><span class="form-label">Dans quelle catégorie ${stateDraft.forOther?'ce pilote veut-il':'veux-tu'} rouler ?</span><div class="categories registration-category-list">${categoryButtons}</div>${categoryMode?'':'<p class="registration-step-help">Tu pourras ajouter une autre catégorie ensuite : celle de ton équipage sera retenue.</p>'}</div>`)}
 ${pane(2,stateDraft.category?carPreferenceChoices(stateDraft.category,stateDraft.cars,stateDraft.carAny):'<p class="registration-step-help">Choisis d’abord une catégorie.</p>')}
 ${pane(3,`<div class="registration-choices"><span class="form-label">Heures de présence (${durationLabel(eventMinutes(event))})</span><p class="availability-hint">Touche les heures où tu seras là.</p>${renderAvailabilityTimeline({departure,duration,status:stateDraft.status,interactive:true,label:'Heures de présence'})}<div class="special-availability">${button('availability','TOUTE LA COURSE',`data-departure="${departure.id}" data-value="whole" aria-pressed="${stateDraft.status==='whole'}"`,`special-button whole ${stateDraft.status==='whole'&&!stateDraft.soloDriver?'active':''}`)}${button('solo-driver','JE LA FAIS TOUT SEUL',`data-departure="${departure.id}" aria-pressed="${!!stateDraft.soloDriver}"`,`special-button solo-driver ${stateDraft.soloDriver?'active':''}`)}</div><p class="registration-step-help">${esc(hoursSummary(stateDraft.status,departure,duration))}${stateDraft.soloDriver?'<span class="solo-driver-tag">en solo</span>':''}</p>${soloDriverNotice(event,stateDraft)}</div>`)}
-${pane(4,`<div class="registration-summary">${pilot?`<div class="registration-summary-row is-static"><span>Pilote</span><strong>${esc(pilot)}</strong></div>`:''}${summaryRow(1,'Catégorie',stateDraft.category?`${logo(stateDraft.category)} ${esc(stateDraft.category)}`:'—')}${summaryRow(2,'Voiture(s)',cars)}${summaryRow(3,'Présence',esc(hoursSummary(stateDraft.status,departure,duration))+(stateDraft.soloDriver?'<span class="solo-driver-tag">en solo</span>':''))}</div>${soloDriverNotice(event,stateDraft)}${preferredPilotField(stateDraft,departure)}${stateDraft.id?`<div class="registration-danger-zone">${button('delete-registration',stateDraft.forOther?'Supprimer l’inscription':'Se désinscrire',`data-id="${stateDraft.id}" data-departure="${departure.id}"`,'danger-button')}</div>`:''}`)}
+${pane(4,`<div class="registration-summary">${pilot?`<div class="registration-summary-row is-static"><span>Pilote</span><strong>${esc(pilot)}</strong></div>`:''}${summaryRow(1,'Catégorie',stateDraft.category?`${logo(stateDraft.category)} ${esc(stateDraft.category)}`:'—')}${summaryRow(2,'Voiture(s)',cars)}${summaryRow(3,'Présence',esc(hoursSummary(stateDraft.status,departure,duration))+(stateDraft.soloDriver?'<span class="solo-driver-tag">en solo</span>':''))}</div>${soloDriverNotice(event,stateDraft)}${preferredPilotField(stateDraft,departure)}${otherStartsField(event,departure,stateDraft)}${stateDraft.id?`<div class="registration-danger-zone">${button('delete-registration',stateDraft.forOther?'Supprimer l’inscription':'Se désinscrire',`data-id="${stateDraft.id}" data-departure="${departure.id}"`,'danger-button')}</div>`:''}`)}
 <div class="registration-step-nav">${step>1?button('registration-step','Retour',`data-departure="${departure.id}" data-step="${step-1}"`,'secondary-button registration-back'):''}${next}</div>
 </form>`;
 }
@@ -336,6 +350,11 @@ export function rerenderRegistrationSection(event,departure,focusSelector='',fal
 
 if(typeof document!=='undefined')document.addEventListener('change',event=>{
   const field=event.target;
+  if(field?.name==='copyDeparture'&&field.dataset?.departure){
+    const draft=state.drafts[field.dataset.departure];
+    if(draft)draft.copyDepartures=[...field.form.querySelectorAll('[name="copyDeparture"]:checked')].map(input=>input.value);
+    return;
+  }
   if(field?.name!=='participant'||!field.dataset?.departure)return;
   const draft=state.drafts[field.dataset.departure];
   if(draft)draft.manualOther=field.value==='__manual__';
@@ -370,9 +389,19 @@ export async function submitRegistration(form,api) {
   const entry=form.elements.preferredPilotEntry;
   if(entry?.value.trim()&&!addPreferred(entry))throw Error('Coéquipiers souhaités : liste trop longue.');
   const payload={name:draft.name,status:draft.status,category:draft.category,cars:draft.cars,carAny:draft.carAny,preferredPilot:draft.soloDriver?'':draft.preferredPilot||'',comment:(draft.comment||'').trim(),soloDriver:!!draft.soloDriver,version:draft.version,participantId:draft.participantId,participantUserId:draft.participantUserId,forOther:!!draft.forOther,...entryCommunity(draft)};
+  const copies=new Set([...form.querySelectorAll('[name="copyDeparture"]:checked')].map(input=>input.value));
+  const others=otherStartsFor(event,departure,draft).filter(item=>copies.has(item.id));
   const result=await api(draft.id?`/api/registrations/${draft.id}`:`/api/races/${event.id}/departures/${departure.id}/registrations`,draft.id?'PATCH':'POST',payload);
   if(!draft.forOther){state.pilotName=draft.name;try{localStorage.setItem('em_pilot_name',state.pilotName);}catch{}}
-  delete state.drafts[departureId]; state.registrationOpen.delete(departureId); return result;
+  delete state.drafts[departureId]; state.registrationOpen.delete(departureId);
+  // The same entry on the other starts ticked in the summary.
+  const failed=[];
+  for(const other of others){
+    try{await api(`/api/races/${event.id}/departures/${other.id}/registrations`,'POST',{...payload,version:undefined});}
+    catch{failed.push(timeLabel(other.time));}
+  }
+  if(others.length)result.notice=failed.length?`Inscription enregistrée, sauf sur ${failed.length>1?'les départs':'le départ'} de ${failed.join(', ')}.`:`Inscription enregistrée sur ${others.length+1} départs.`;
+  return result;
 }
 
 // An event in several rounds: entering one round, or leaving it. A round with nothing to choose is done in one
