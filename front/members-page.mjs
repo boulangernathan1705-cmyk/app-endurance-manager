@@ -181,7 +181,8 @@ const wizardData = form => {
   if (!lmu && !iracing) throw new Error('Coche au moins un simulateur.');
   return {mode:form.elements.mode.value,scope:lmu && iracing ? 'all' : lmu ? 'lmu' : 'iracing',destinationId:form.elements.destination.value,destinationName:form.elements.destination.selectedOptions[0]?.textContent || ''};
 };
-const recapPreviewText = value => esc(String(value || '').replace(/<t:(\d+):[A-Za-z]>/g,(_,unix) => new Date(Number(unix)*1000).toLocaleString('fr-FR',{timeZone:'Europe/Paris',dateStyle:'medium',timeStyle:'short'})).replace(/\*\*/g,''));
+const recapPreviewText = value => esc(String(value || '').replace(/<t:(\d+):[A-Za-z]>/g,(_,unix) => new Date(Number(unix)*1000).toLocaleString('fr-FR',{timeZone:'Europe/Paris',dateStyle:'medium',timeStyle:'short'})).replace(/\*\*/g,''))
+  .replace(/&lt;:em_([a-z0-9_]+):\d+&gt;/g,'<img src="/images/discord-emojis/$1.png" width="18" height="18" alt="">');
 function recapPreviewMarkup(previews) {
   return previews.length ? previews.map(item => `<figure class="recap-preview"><figcaption># ${esc(item.name)}</figcaption>${item.payload.embeds.map(embed => `<div class="recap-preview-embed"><strong>${esc(embed.title || '')}</strong><span>${recapPreviewText(embed.description)}</span>${(embed.fields || []).map(field => `<b>${esc(field.name)}</b><span>${recapPreviewText(field.value)}</span>`).join('')}${embed.url ? `<a href="${esc(embed.url)}">Voir sur le site</a>` : ''}</div>`).join('')}</figure>`).join('') : '<p>Aucune course éligible pour le moment. Les nouveaux événements éligibles auront automatiquement leur salon.</p>';
 }

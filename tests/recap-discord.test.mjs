@@ -5,7 +5,7 @@ import {readFileSync,readdirSync} from 'node:fs';
 import worker from '../server/worker.mjs';
 import {linkTestServer,DEV_COMMUNITY,GUILD} from './fixtures/discord-server.mjs';
 import {syncWeeklyDiscord} from '../server/discord-weekly.mjs';
-import {saveBotRecap,syncBotRecaps,previewBotRecap,recapDestinations,eventDeletionTime,eventChannelName,sendBotRecapTest,recapError,repairBotRecap,racesOpenNow} from '../server/recap-discord.mjs';
+import {botCategoryEmojis,saveBotRecap,syncBotRecaps,previewBotRecap,recapDestinations,eventDeletionTime,eventChannelName,sendBotRecapTest,recapError,repairBotRecap,racesOpenNow} from '../server/recap-discord.mjs';
 
 const OWNER='333333333333333333', BOT='444444444444444444', TEXT='555555555555555555', CATEGORY='666666666666666666';
 const NOW=Date.parse('2026-10-10T12:00:00Z'), DAY=86400000;
@@ -446,4 +446,22 @@ test('a race channel is titled with the week of the race, not the current week',
   const {DB,env}=setup(t);race(DB,'a','Spa','spa',[{id:'s',startsAt:NOW+5*DAY}]);
   const [preview]=await previewBotRecap(env,NOW,COMMUNITY,SETTINGS);
   assert.match(preview.payload.embeds[0].title,/semaine du 12 octobre au 18 octobre/i);
+});
+
+test('le bot envoie une fois les logos de catégorie manquants comme ses propres emojis', async t => {
+  const original=globalThis.fetch,uploads=[];
+  globalThis.fetch=async(url,options={})=>{
+    const path=String(url).replace('https://discord.com/api/v10','');
+    if(path===`/applications/${BOT}/emojis`&&(options.method||'GET')==='GET')return Response.json({items:[{id:'1',name:'em_gt3'}]});
+    if(path===`/applications/${BOT}/emojis`){const body=JSON.parse(options.body);uploads.push(body);return Response.json({id:String(100+uploads.length),name:body.name});}
+    return new Response('{}',{status:404});
+  };
+  t.after(()=>globalThis.fetch=original);
+  const ASSETS={fetch:async request=>new Response(readFileSync(new URL('..'+new URL(request.url).pathname,import.meta.url)))};
+  const ids=await botCategoryEmojis({DISCORD_CLIENT_ID:BOT,DISCORD_BOT_TOKEN:'fake',ASSETS},NOW);
+  assert.equal(ids.em_gt3,'1');
+  assert.ok(ids.em_hypercar&&ids.em_ir_gtp);
+  assert.ok(uploads.every(item=>item.name!=='em_gt3'&&item.image.startsWith('data:image/png;base64,')));
+  // Kept for a few hours: no new request.
+  uploads.length=0;assert.deepEqual(await botCategoryEmojis({DISCORD_CLIENT_ID:BOT,DISCORD_BOT_TOKEN:'fake',ASSETS},NOW+60000),ids);assert.equal(uploads.length,0);
 });
