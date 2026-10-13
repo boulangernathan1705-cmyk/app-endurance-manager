@@ -11,6 +11,7 @@ const startLabel=new Intl.DateTimeFormat('fr-FR',{timeZone:'UTC',day:'numeric',m
 const endLabel=new Intl.DateTimeFormat('fr-FR',{timeZone:'UTC',day:'numeric',month:'long',year:'numeric'});
 const updateTimeLabel=new Intl.DateTimeFormat('fr-FR',{timeZone:TIME_ZONE,hour:'2-digit',minute:'2-digit',hourCycle:'h23'});
 const recapDay=new Intl.DateTimeFormat('fr-FR',{timeZone:TIME_ZONE,weekday:'short',day:'numeric',month:'short'});
+const recapWeekday=new Intl.DateTimeFormat('fr-FR',{timeZone:TIME_ZONE,weekday:'short'});
 const recapTime=new Intl.DateTimeFormat('fr-FR',{timeZone:TIME_ZONE,hour:'numeric',minute:'2-digit',hourCycle:'h23'});
 const markers=new Map([['Hypercar','🟦'],['LMP2 ELMS','🟨'],['LMP2 WEC','🟨'],['LMP3','🟩'],['GT3','🟪'],['GTE','🟥']]);
 
@@ -71,11 +72,39 @@ function crewBlock(crew,sim,emojis){
   return [`${marker} **${clean(crew.name)}** · ${clean(crew.category)} ${status}`,crew.car&&`🏎️ ${clean(crew.car)}`,
     ...(crew.pilots.length?crew.pilots.map(name=>`👤 ${clean(name)}`):['*Aucun pilote*'])].filter(Boolean).join('\n');
 }
+const asPilot=pilot=>typeof pilot==='string'?{name:pilot,categories:[]}:pilot;
+function pilotLine(pilot,sim,emojis){
+  return [`👤 ${clean(pilot.name)}`,...(pilot.categories||[]).map(category=>emojis[categoryEmojiName(sim,category)]?categoryMark(category,sim,emojis):`${categoryMark(category,sim,emojis)} ${clean(category)}`)].join(' ');
+}
 // Pilots without a crew: one per line with the logos of their categories.
 function unassignedBlock(pilots,sim,emojis){
-  const list=pilots.map(pilot=>typeof pilot==='string'?{name:pilot,categories:[]}:pilot);
+  const list=pilots.map(asPilot);
   if(!list.some(pilot=>pilot.categories?.length))return `📋 **Sans équipage** : ${list.map(pilot=>clean(pilot.name)).join(', ')}`;
-  return ['📋 **Sans équipage**',...list.map(pilot=>[`👤 ${clean(pilot.name)}`,...(pilot.categories||[]).map(category=>emojis[categoryEmojiName(sim,category)]?categoryMark(category,sim,emojis):`${categoryMark(category,sim,emojis)} ${clean(category)}`)].join(' '))].join('\n');
+  return ['📋 **Sans équipage**',...list.map(pilot=>pilotLine(pilot,sim,emojis))].join('\n');
+}
+// Several starts: each pilot without a crew once, with their starts (« ven. 0h, 4h · sam. 9h »).
+function unassignedField(departures,compact,emojis){
+  const sim=simOf(departures[0]),pilots=new Map();
+  for(const departure of departures)for(const pilot of (departure.unassignedPilots||[]).map(asPilot)){
+    if(!pilots.has(pilot.name))pilots.set(pilot.name,{name:pilot.name,categories:[],starts:[]});
+    const entry=pilots.get(pilot.name);
+    for(const category of pilot.categories||[])if(!entry.categories.includes(category))entry.categories.push(category);
+    entry.starts.push(departure);
+  }
+  if(!pilots.size)return [];
+  const startsLabel=starts=>{
+    if(starts.length===departures.length)return 'tous les départs';
+    if(compact)return `${starts.length} départ${starts.length>1?'s':''}`;
+    const days=new Map();
+    for(const departure of [...starts].sort((a,b)=>a.startsAt-b.startsAt)){
+      const day=recapWeekday.format(departure.startsAt);
+      if(!days.has(day))days.set(day,[]);
+      days.get(day).push(departure.timePending?'horaire à confirmer':hourLabel(departure.startsAt));
+    }
+    return [...days].map(([day,times])=>`${day} ${times.join(', ')}`).join(' · ');
+  };
+  const value=[...pilots.values()].map(pilot=>`${pilotLine(pilot,sim,emojis)} · ${startsLabel(pilot.starts)}`).join('\n');
+  return [{name:'📋 Sans équipage',value:cut(value,1024),inline:false}];
 }
 function departureValue(departure,compact=false,emojis={}){
   const sim=simOf(departure);
@@ -98,9 +127,11 @@ function raceFields(departures,compact,emojis){
   const absentPilots=[...new Set(departures.flatMap(departure=>departure.absentPilots||[]))];
   const absences=absentPilots.length?[{name:'🚫 Pilotes absents',value:cut(absentPilots.map(clean).join(', '),compact?300:1024),inline:false}]:[];
   if(departures.length===1)return [{name:BLANK,value:departureValue(departures[0],compact,emojis),inline:false},...absences];
-  const filled=departures.filter(hasEntries);
-  const fields=filled.slice(0,23).map(departure=>({name:BLANK,value:departureValue(departure,compact,emojis),inline:false}));
-  if(!filled.length)fields.push({name:BLANK,value:'Personne d’inscrit pour l’instant.',inline:false});
+  // Starts with crews in detail, a blank line after each; the pilots without a crew once, below.
+  const filled=departures.filter(departure=>departure.crews.length);
+  const fields=filled.slice(0,22).map(departure=>({name:BLANK,value:cut(departureValue({...departure,unassignedPilots:[]},compact,emojis)+'\n'+BLANK,1024),inline:false}));
+  fields.push(...unassignedField(departures,compact,emojis));
+  if(!departures.some(hasEntries))fields.push({name:BLANK,value:'Personne d’inscrit pour l’instant.',inline:false});
   return [...fields,...absences];
 }
 // At the top of a race: its days and their start times, Paris time (« 📅 **sam. 17 oct.** · 8h, 14h, 20h »).

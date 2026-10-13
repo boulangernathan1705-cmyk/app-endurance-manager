@@ -119,14 +119,14 @@ test('le message : un bloc par course, dont le nom mène à la course sur le sit
   assert.equal(imsa.url,`${site.url}/iracing/#event=99999999-9999-4999-8999-999999999999`);
   assert.notEqual(silverstone.color,imsa.color,'the bar has the colour of the simulator');
   assert.equal((JSON.stringify(payload).match(/4h SILVERSTONE/g)||[]).length,1,'one block for the race and its two starts');
-  assert.equal(silverstone.fields.length,1,'only the start with entries');
+  assert.equal(silverstone.fields.length,2,'the start with a crew, then the pilots without a crew');
   // At the top: the days of the race and their start times (Paris time).
   assert.match(silverstone.description,/📅 \*\*ven\. 18 sept\.\*\* · 14h, 18h/);
   assert.match(silverstone.description,/Horaires non définis par LMU/);
   // Times in each reader's own time zone.
   assert.match(silverstone.fields[0].value,/<t:1789747200:F>/);
   assert.match(silverstone.fields[0].value,/Mrt blé/);assert.match(silverstone.fields[0].value,/👤 Etienne\\_48/);
-  assert.match(silverstone.fields[0].value,/\*\*Sans équipage\*\* : Léo/);
+  assert.equal(silverstone.fields[1].name,'📋 Sans équipage');assert.equal(silverstone.fields[1].value,'👤 Léo · ven. 18h');
   assert.doesNotMatch(JSON.stringify(silverstone),/autre départ|voir la course/,'no line for the empty starts');
   assert.doesNotMatch(JSON.stringify(silverstone),/Départ \d/,'no « Départ 1, Départ 2 » headings');
   const last=payload.embeds.at(-1);
@@ -183,8 +183,9 @@ test('un événement spécial à 15 départs : seuls les départs avec des inscr
   departures[7].crews=[{id:'56565656-5656-4565-8565-565656565656',name:'FMT 001',category:'GT3',car:'',locked:false,pilots:['Etienne_48']}];
   departures[7].unassignedPilots=['Nathan'];
   const [,fuji]=buildWeeklyDiscordPayload({currentDepartures:[],futureDepartures:departures,periodLabel:'semaine'},{url:'https://fmt.endurance-manager.app'},Date.parse('2026-09-29T10:00:00Z')).embeds;
-  assert.equal(fuji.fields.length,1,'the start with entries only');
-  assert.match(fuji.fields[0].value,/FMT 001/);assert.match(fuji.fields[0].value,/\*\*Sans équipage\*\* : Nathan/);
+  assert.equal(fuji.fields.length,2,'the start with a crew, then the pilots without a crew');
+  assert.match(fuji.fields[0].value,/FMT 001/);assert.match(fuji.fields[0].value,/\n\u200b$/,'a blank line after each start');
+  assert.equal(fuji.fields[1].value,'👤 Nathan · sam. 18h');
   // Every day of the event and its start times, at the top.
   assert.match(fuji.description,/📅 \*\*ven\. 2 oct\.\*\* · 7h, 12h, 17h, 22h/);
   assert.equal((fuji.description.match(/📅/g)||[]).length,4,'four days');
@@ -273,4 +274,18 @@ test('chaque catégorie LMU et iRacing a son image d’emoji', () => {
   }
   assert.equal(categoryEmojiName('iracing','GT3'),'em_ir_gt3');
   assert.equal(categoryEmojiName('lmu','LMP2 WEC'),'em_lmp2');
+});
+
+test('plusieurs départs : chaque pilote sans équipage une seule fois, avec ses départs', () => {
+  const base={eventId:'por',eventName:'4h de Portimao',circuit:'portimao',durationHours:4,crews:[],absentPilots:[]};
+  const starts=[0,4,9].map(hour=>({...base,departureId:'d'+hour,startsAt:Date.parse('2026-10-15T22:00:00Z')+hour*3600000,
+    unassignedPilots:[{name:'Nathan',categories:['LMP2 ELMS']}]}));
+  starts.push({...base,departureId:'d24',startsAt:Date.parse('2026-10-16T22:00:00Z'),unassignedPilots:[{name:'Léo',categories:['GT3']}]});
+  const [,race]=buildWeeklyDiscordPayload({currentDepartures:[],futureDepartures:starts,periodLabel:'semaine'},{},Date.parse('2026-10-13T10:00:00Z'),'lmu',{em_lmp2:'1'}).embeds;
+  assert.equal(race.fields.length,1);
+  assert.equal(race.fields[0].value,'👤 Nathan <:em_lmp2:1> · ven. 0h, 4h, 9h\n👤 Léo 🟪 GT3 · sam. 0h');
+  // Registered on every start: one word.
+  starts[3].unassignedPilots.push({name:'Nathan',categories:['LMP2 ELMS']});
+  const [,all]=buildWeeklyDiscordPayload({currentDepartures:[],futureDepartures:starts,periodLabel:'semaine'},{},Date.parse('2026-10-13T10:00:00Z'),'lmu',{em_lmp2:'1'}).embeds;
+  assert.match(all.fields[0].value,/^👤 Nathan <:em_lmp2:1> · tous les départs$/m);
 });
