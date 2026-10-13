@@ -23,7 +23,7 @@ test('all logged in pilots can use the Discord pilot picker',()=>{
 });
 
 test('Discord identity is authoritative when another pilot is selected',()=>{
-  assert.match(core,/data\.name=discordUser\.name/);
+  assert.match(core,/data\.name=await communityName\(env,discordUser\.id,cid\)\|\|discordUser\.name/);
   assert.match(core,/data\.nameKey=data\.name\.normalize/);
   assert.match(core,/Ce pseudo correspond à un pilote Discord\. Sélectionne son compte dans la liste\./);
 });
