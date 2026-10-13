@@ -282,17 +282,19 @@ export function specialStarts(text, dateStart, dateEnd) {
 // The article of a special event: "THIS WEEK: iRacing Bathurst 1000 presented by … | Special Event",
 // published in the ten days before the event. The article may use the short name of the schedule slug
 // ("8 Hours of Indianapolis", slug "indy-8hr" → "THIS WEEK: iRacing Indy 8 Hour …"): either name matches.
+// If iRacing names it otherwise again, the only "Special Event" article of the race week (published in the
+// six days before the event) is taken: there is one special event a weekend.
 export function articleFor(posts, special) {
   const significant = text => normalize(text).split(/[^a-z0-9]+/).filter(word => word.length >= 4 && !/\d/.test(word) && !GENERIC_WORDS.includes(word));
   const eventWords = significant(special.name), slugWords = significant(special.slug);
   const start = Date.parse(`${special.dateStart}T00:00:00Z`);
-  return posts.find(post => {
-    const title = normalize(decode(post?.title?.rendered));
-    const published = Date.parse(post?.date);
-    const named = (eventWords.length ? eventWords.every(word => title.includes(word)) : title.includes(normalize(special.name)))
-      || (slugWords.length > 0 && slugWords.every(word => title.includes(word)));
-    return title.includes('special event') && named && published > start - 10 * DAY_MS && published < start + DAY_MS;
-  }) || null;
+  const title = post => normalize(decode(post?.title?.rendered));
+  const publishedWithin = (post, days) => Date.parse(post?.date) > start - days * DAY_MS && Date.parse(post?.date) < start + DAY_MS;
+  const articles = posts.filter(post => title(post).includes('special event') && publishedWithin(post, 10));
+  const named = articles.find(post => (eventWords.length ? eventWords.every(word => title(post).includes(word)) : title(post).includes(normalize(special.name)))
+    || (slugWords.length > 0 && slugWords.every(word => title(post).includes(word))));
+  const ofTheWeek = articles.filter(post => publishedWithin(post, 6));
+  return named || (ofTheWeek.length === 1 ? ofTheWeek[0] : null);
 }
 
 // Imported special events still waiting for their times (a single "Horaire à définir" start, unless an

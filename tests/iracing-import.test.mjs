@@ -90,7 +90,18 @@ test('a special event article using the short name of the slug is found (Indy 8 
   const article = articleFor(posts, special);
   assert.ok(article);
   assert.equal(specialStarts(article.content.rendered, special.dateStart, special.dateEnd).length, 5);
-  assert.equal(articleFor(posts, {name:'Bathurst 1000', slug:'bathurst-1000', dateStart:'2099-10-16', dateEnd:'2099-10-18'}), null);
+  const two = [...posts, {date:'2099-10-12T10:00:00', title:{rendered:'THIS WEEK: iRacing Bathurst 1000 | Special Event'}, content:{rendered:''}}];
+  assert.match(articleFor(two, special).title.rendered, /Indy/);
+  assert.match(articleFor(two, {name:'Bathurst 1000', slug:'bathurst-1000', dateStart:'2099-10-16', dateEnd:'2099-10-18'}).title.rendered, /Bathurst/);
+});
+
+test('a special event article with another name is still found when it is the only one of the race week', async () => {
+  const {articleFor} = await import('../server/iracing-import.mjs');
+  const posts = [{date:'2099-10-12T09:00:00', title:{rendered:'THIS WEEK: iRacing Brickyard Sprint presented by Someone | Special Event'}, content:{rendered:''}}];
+  const special = {name:'8 Hours of Indianapolis', slug:'indy-8hr', dateStart:'2099-10-16', dateEnd:'2099-10-18'};
+  assert.ok(articleFor(posts, special));
+  assert.equal(articleFor([...posts, {...posts[0], title:{rendered:'THIS WEEK: Other Race | Special Event'}}], special), null, 'two articles: no guess');
+  assert.equal(articleFor([{...posts[0], date:'2099-10-08T09:00:00'}], special), null, 'last week article is not taken');
 });
 
 test('a lap race whose schedule entry gives a few minutes keeps a real duration (Bathurst 1000)', () => {
