@@ -2,6 +2,11 @@ import {esc, state, api, isAdmin} from './core.mjs';
 import {isGrindfest, streamersOf, gridfestPasswordValid} from '../../shared/grindfest.mjs';
 import {soloEntryList} from './solo.mjs';
 
+// The streamer's logo, or its initial on a coloured tile when it has none.
+export function streamerLogo(streamer, extra = '') {
+  return streamer.logoUrl ? `<img class="gridfest-avatar${extra}" src="${esc(streamer.logoUrl)}" alt="">`
+    : `<span class="gridfest-avatar is-initial${extra}" style="--hue:${[...String(streamer.name || '?')].reduce((sum, char) => sum + char.charCodeAt(0), 0) * 47 % 360}" aria-hidden="true">${esc(String(streamer.name || '?').trim().charAt(0).toUpperCase())}</span>`;
+}
 function streamerRow(streamer = {}) {
   return `<div class="grindfest-streamer-form" data-streamer-id="${esc(streamer.id || crypto.randomUUID())}">
     <label class="form-label">Streamer<input name="streamerName" maxlength="60" value="${esc(streamer.name || '')}" required></label>
@@ -42,7 +47,7 @@ export function streamerColumns(event, departure) {
   return `<div class="grindfest-grid" style="--streamer-columns:${Math.min(4, streamers.length)}">${streamers.map(streamer => {
     const entries = (departure.availability || []).filter(reg => reg.streamerId === streamer.id && reg.status !== 'unavailable');
     const confirmed = entries.filter(reg => !reg.waitlistPosition).length;
-    const heading = `${streamer.logoUrl ? `<img class="grindfest-logo" src="${esc(streamer.logoUrl)}" alt="">` : ''}<strong>${esc(streamer.name)}</strong>${streamer.twitchUrl ? '<small>Twitch ↗</small>' : ''}<span class="count-pill">${confirmed} / ${streamer.capacity}</span>`;
+    const heading = `${streamerLogo(streamer)}<span class="gridfest-streamer-copy"><strong>${esc(streamer.name)}</strong>${streamer.twitchUrl ? '<small>Twitch ↗</small>' : ''}<span class="count-pill">${confirmed} / ${streamer.capacity}</span></span>`;
     const head = streamer.twitchUrl ? `<a class="grindfest-streamer-head" href="${esc(streamer.twitchUrl)}" target="_blank" rel="noopener noreferrer">${heading}</a>` : `<div class="grindfest-streamer-head">${heading}</div>`;
     return `<section class="grindfest-column">${head}${soloEntryList(event, departure, entries, {title:'Inscrits', capacity:streamer.capacity})}</section>`;
   }).join('')}</div>`;
@@ -50,19 +55,19 @@ export function streamerColumns(event, departure) {
 export function streamerChoice(event, departure, draft) {
   if (!isGrindfest(event)) return '';
   const streamers = streamersOf(event);
-  return `<div class="registration-identity-grid"><label class="registration-identity-field"><span class="form-label">Streamer <small>(obligatoire)</small></span><select name="registrationStreamer" required><option value="">Choisir un streamer</option>${streamers.map(streamer => {
+  return `<fieldset class="gridfest-streamers"><legend class="form-label">Streamer <small>(obligatoire)</small></legend><div class="gridfest-streamer-cards">${streamers.map(streamer => {
     const entries = (departure.availability || []).filter(reg => reg.streamerId === streamer.id && reg.status !== 'unavailable'), confirmed = entries.filter(reg => !reg.waitlistPosition).length;
-    const label = confirmed >= streamer.capacity ? `Complet · liste d’attente` : `${streamer.capacity - confirmed} place(s) libre(s)`;
-    return `<option value="${esc(streamer.id)}" ${draft.streamerId === streamer.id ? 'selected' : ''}>${esc(streamer.name)} · ${label}</option>`;
-  }).join('')}</select></label><p class="registration-step-help" data-streamer-wait-notice aria-live="polite">${streamerWaitNotice(event, departure, draft.streamerId, draft.id)}</p></div>`;
+    const label = confirmed >= streamer.capacity ? 'Complet · liste d’attente' : `${streamer.capacity - confirmed} place${streamer.capacity - confirmed > 1 ? 's' : ''} libre${streamer.capacity - confirmed > 1 ? 's' : ''}`;
+    return `<label class="gridfest-streamer-card"><input type="radio" name="registrationStreamer" value="${esc(streamer.id)}" ${draft.streamerId === streamer.id ? 'checked' : ''} required>${streamerLogo(streamer)}<span class="gridfest-streamer-copy"><strong>${esc(streamer.name)}</strong><small>${label}</small></span></label>`;
+  }).join('')}</div><p class="registration-step-help" data-streamer-wait-notice aria-live="polite">${streamerWaitNotice(event, departure, draft.streamerId, draft.id)}</p></fieldset>`;
 }
 function streamerWaitNotice(event, departure, streamerId, registrationId) {
   const streamer = streamersOf(event).find(item => item.id === streamerId);
   if (!streamer) return '';
   const own = (departure.availability || []).find(reg => reg.id === registrationId);
-  if (own?.streamerId === streamerId) return own.waitlistPosition ? `Liste d’attente — n° ${own.waitlistPosition}` : 'Place confirmée';
+  if (own?.streamerId === streamerId) return own.waitlistPosition ? `Liste d’attente — n° ${own.waitlistPosition}` : '';
   const count = (departure.availability || []).filter(reg => reg.streamerId === streamerId && reg.status !== 'unavailable').length;
-  return count >= streamer.capacity ? `Liste d’attente — n° ${count - streamer.capacity + 1}` : 'Place disponible';
+  return count >= streamer.capacity ? `Liste d’attente — n° ${count - streamer.capacity + 1}` : '';
 }
 
 const MP_ICON = path => `<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="${path}"/></svg>`;

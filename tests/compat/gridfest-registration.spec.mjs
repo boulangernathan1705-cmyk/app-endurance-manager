@@ -31,9 +31,9 @@ for(const type of ['Grindfest','Gridfest'])test(`${type}: LMU name and streamer 
   await expect(form).toHaveClass(/registration-stepper/);
   await expect(form.locator('[name="gridfestGameName"]')).toBeVisible();
   await expect(form.locator('[name="gridfestGameName"]')).toHaveAttribute('required','');
-  await expect(form.locator('[name="registrationStreamer"]')).toBeVisible();
+  await expect(form.locator('.gridfest-streamer-card')).toHaveCount(2);
   await form.locator('[name="gridfestGameName"]').fill('Nathan LMU');
-  await form.locator('[name="registrationStreamer"]').selectOption('bravo');
+  await form.locator('.gridfest-streamer-card').filter({hasText:'Bravo'}).click();
   await form.getByRole('button',{name:'Continuer',exact:true}).click();
   await expect(form.locator('.registration-step-label')).toContainText('Étape 2 sur 2');
   const summary=form.locator('.registration-summary');
@@ -43,7 +43,7 @@ for(const type of ['Grindfest','Gridfest'])test(`${type}: LMU name and streamer 
   await expect(summary).toContainText('Hypercar');
   await summary.locator('.registration-summary-row').filter({hasText:'Nom sur LMU'}).click();
   await expect(form.locator('[name="gridfestGameName"]')).toHaveValue('Nathan LMU');
-  await expect(form.locator('[name="registrationStreamer"]')).toHaveValue('bravo');
+  await expect(form.locator('[name="registrationStreamer"][value="bravo"]')).toBeChecked();
   await form.getByRole('button',{name:'Revenir au récapitulatif',exact:true}).click();
   await form.getByRole('button',{name:'JE PARTICIPE',exact:true}).click();
   await expect.poll(()=>saved).toMatchObject({name:'Nathan Boulanger',gameName:'Nathan LMU',streamerId:'bravo'});
