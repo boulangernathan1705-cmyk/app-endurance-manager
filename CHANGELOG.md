@@ -2,6 +2,12 @@
 
 Les changements du site, version par version. La plus récente est en haut.
 
+## v1.38 — 13 octobre 2026
+
+- Inscription : nouvelle étape « Autres horaires » avant le récapitulatif, pour copier la même inscription sur d'autres départs de la course.
+- Discord : après une inscription, une désinscription ou un changement d'équipage, la course concernée est mise à jour en premier dans infos-de-la-course.
+- Discord : les catégories des courses se rangent par simu (LMU puis iRacing), puis par date.
+
 ## v1.37 — 13 octobre 2026
 
 - Discord : dans infos-de-la-course, un pilote sans équipage n'apparaît qu'une fois, et une ligne vide sépare les départs.

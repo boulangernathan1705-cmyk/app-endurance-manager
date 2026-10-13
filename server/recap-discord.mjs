@@ -117,15 +117,20 @@ async function openRaces(env, community, events, scope, timestamp) {
 }
 export const raceCategoryName = event =>
   `${String(event?.circuit || '').startsWith('iracing-') ? '🏁 iRacing' : '🏎️ LMU'} · ${String(event?.name || 'Endurance').trim()}`.slice(0,100);
-// The race categories follow the chosen category, in the order they were made (one request reorders them all).
+// The race categories follow the chosen category: LMU first, then iRacing, each by date of its first start (one
+// request reorders them all).
 async function placeCategory(env, community, guildId, channels, category, anchor, budget) {
-  const open = new Set(((await env.DB.prepare('SELECT category_id FROM discord_recap_publications WHERE community_id=? AND closed_at IS NULL AND category_id IS NOT NULL')
-    .bind(community.id).all()).results || []).map(item => item.category_id));
+  const open = new Map(((await env.DB.prepare(`SELECT p.category_id,e.circuit,e.departures FROM discord_recap_publications p LEFT JOIN events e ON e.id=p.event_id
+    WHERE p.community_id=? AND p.closed_at IS NULL AND p.category_id IS NOT NULL`).bind(community.id).all()).results || [])
+    .map(item => [item.category_id,[String(item.circuit || '').startsWith('iracing-') ? 1 : 0,Math.min(...parse(item.departures).map(start => Number(start.startsAt)).filter(Number.isFinite))]]));
   const categories = channels.filter(item => item.type === 4 && item.id !== category).sort((a,b) => (a.position || 0) - (b.position || 0) || (BigInt(a.id) < BigInt(b.id) ? -1 : 1));
-  let index = categories.findIndex(item => item.id === anchor);
+  const index = categories.findIndex(item => item.id === anchor);
   if (index < 0) return;
-  while (open.has(categories[index + 1]?.id)) index++;
-  categories.splice(index + 1, 0, {id:category});
+  let last = index;
+  while (open.has(categories[last + 1]?.id)) last++;
+  const key = item => open.get(item.id) || [2,Infinity];
+  const races = [...categories.slice(index + 1,last + 1),{id:category}].sort((a,b) => key(a)[0] - key(b)[0] || key(a)[1] - key(b)[1]);
+  categories.splice(index + 1,last - index,...races);
   await discord(env,'PATCH',`/guilds/${guildId}/channels`,categories.map((item,position) => ({id:item.id,position})),budget);
 }
 // The race's text channel, then its category (never the category chosen by the admins).
@@ -280,7 +285,7 @@ async function publish(env, timestamp, community, settings, row, event, budget, 
   await env.DB.prepare('UPDATE discord_recap_publications SET message_id=?,content_hash=? WHERE community_id=? AND event_id=?')
     .bind(row.message_id,hash,community.id,row.event_id).run();
 }
-async function syncLocked(env,timestamp,community,settings, test = false, budget = {left:12}) {
+async function syncLocked(env,timestamp,community,settings, test = false, budget = {left:12}, priority = null) {
   const rows = (await env.DB.prepare('SELECT * FROM discord_recap_publications WHERE community_id=? AND closed_at IS NULL ORDER BY checked_at,event_id').bind(community.id).all()).results || [];
   const events = await raceEvents(env, community);
   // Cleanup is independent of mode/activation. Only bot-created event channels may be deleted.
@@ -301,7 +306,8 @@ async function syncLocked(env,timestamp,community,settings, test = false, budget
   } else {
     const eligible = await openRaces(env,community,events,settings.scope,timestamp);
     const ids = [...new Set([...rows.filter(row => row.event_id && !row.closed_at).map(row => row.event_id),...eligible])];
-    const ordered = ids.sort((a,b) => (rows.find(row => row.event_id === a)?.checked_at || 0) - (rows.find(row => row.event_id === b)?.checked_at || 0));
+    // The race just changed first, then the ones checked longest ago.
+    const ordered = ids.sort((a,b) => (b === priority) - (a === priority) || (rows.find(row => row.event_id === a)?.checked_at || 0) - (rows.find(row => row.event_id === b)?.checked_at || 0));
     for (const eventId of ordered.slice(0,2)) {
       const event = events.find(item => item.id === eventId);
       if (!event || (eventDeletionTime(event) !== null && timestamp >= eventDeletionTime(event))) continue;
@@ -315,7 +321,7 @@ async function syncLocked(env,timestamp,community,settings, test = false, budget
   }
   return {ok:true};
 }
-export async function syncBotRecaps(env,timestamp,community, test = false) {
+export async function syncBotRecaps(env,timestamp,community, test = false, priority = null) {
   const token = crypto.randomUUID(), now = Date.now();
   await env.DB.prepare('UPDATE community_recap_settings SET dirty=1 WHERE community_id=?').bind(community.id).run();
   const lock = await env.DB.prepare("UPDATE community_recap_settings SET lock_token=?,lock_until=? WHERE community_id=? AND lock_until<?")
@@ -326,7 +332,7 @@ export async function syncBotRecaps(env,timestamp,community, test = false) {
     const budget = {left:16};
     for (let attempt=0;attempt<2;attempt++) {
       await env.DB.prepare('UPDATE community_recap_settings SET dirty=0 WHERE community_id=? AND lock_token=?').bind(community.id,token).run();
-      result = await syncLocked(env,timestamp,community,await botRecapSettings(env,community),test,budget);
+      result = await syncLocked(env,timestamp,community,await botRecapSettings(env,community),test,budget,priority);
       const current = await botRecapSettings(env,community);
       if (!current.dirty) break;
     }

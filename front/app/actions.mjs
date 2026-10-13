@@ -7,7 +7,7 @@ import {renderMyEntries} from './entries-view.mjs';
 import {submitSoloEvent} from './solo-form.mjs';
 import {readRaceInfo} from './race-info.mjs';
 import {refresh,refreshAfterSave} from './refresh.mjs';
-import {draftFor,registrationDraft,ownRegistrations,rerenderRegistrationSection,submitRegistration,registrationStep,canEnterInOneClick,enterInOneClick,enterRound,editRound,skipRound} from './registration.mjs';
+import {draftFor,registrationDraft,ownRegistrations,rerenderRegistrationSection,submitRegistration,registrationStep,lastRegistrationStep,canEnterInOneClick,enterInOneClick,enterRound,editRound,skipRound} from './registration.mjs';
 import {updateCrewState,pickSlot} from './crews.mjs';
 import {openCategoryEntry,categoryEntryAction,saveCategoryEntry,withdrawCategoryEntry,categoryEntryBoardFilter} from './category-entry.mjs';
 import {installRouter,routeFromLocation,applyRoute} from './router.mjs';
@@ -53,11 +53,11 @@ function validateRegistrationStep(draft,step){
   if(step===3&&!draft.status)throw Error('Choisis au moins une heure de présence.');
 }
 function goToRegistrationStep(event,departure,target){
-  const draft=draftFor(departure),current=registrationStep(draft),wanted=Number(target.dataset.step);
+  const draft=draftFor(departure),last=lastRegistrationStep(event,departure,draft),current=registrationStep(draft,last),wanted=Number(target.dataset.step);
   const solo=draft.solo,soloCurrent=solo?Math.min(Math.max(Number(draft.step)||(draft.id?solo+1:1),1),solo+1):current;
-  if(wanted>soloCurrent)for(let step=soloCurrent;step<Math.min(wanted,solo?solo+1:4);step++)validateRegistrationStep(draft,step);
+  if(wanted>soloCurrent)for(let step=soloCurrent;step<Math.min(wanted,solo?solo+1:last);step++)validateRegistrationStep(draft,step);
   if(target.dataset.edit)draft.returnToSummary=true;
-  else if(wanted===(solo?solo+1:4)||wanted<soloCurrent)draft.returnToSummary=false;
+  else if(wanted===(solo?solo+1:last)||wanted<soloCurrent)draft.returnToSummary=false;
   draft.step=wanted;
   rerenderRegistrationSection(event,departure,'',renderEvent);
   const section=document.getElementById(`departure-${departure.id}`)?.querySelector('.fold-registration');
@@ -234,7 +234,7 @@ document.addEventListener('click',event=>{if(event.target.matches?.('.fold-regis
 document.addEventListener('keydown',event=>{if(event.key!=='Escape'||document.querySelector('[data-ux-error-modal]'))return;document.querySelector('.fold-registration:not([hidden]) .registration-close-button, .form-sheet [data-action="close-form"]')?.click();});
 document.addEventListener('toggle',event=>{const details=event.target;if(details instanceof HTMLDetailsElement&&details.matches('.crew-unified-card[data-crew],.crew-management-accordion[data-crew]'))details.open?state.crewManagementOpen.add(details.dataset.crew):state.crewManagementOpen.delete(details.dataset.crew);},true);
 document.addEventListener('click',async event=>{const target=event.target.closest?.('[data-action]');if(!target||target.disabled)return;if(target.dataset.action==='edit-crew')return;event.preventDefault();if(state.busy&&target.dataset.action!=='dismiss-error')return;state.busy=true;target.disabled=true;try{await perform(target.dataset.action,target);}catch(error){showError(error);}finally{state.busy=false;if(target.isConnected)target.disabled=false;updateRemoveButtons();}});
-document.addEventListener('submit',async event=>{const form=event.target;if(!form.dataset.kind)return;event.preventDefault();if(state.busy)return;state.busy=true;const submit=form.querySelector('[type="submit"]');if(submit)submit.disabled=true;try{if(form.dataset.kind==='event')await submitEvent(form);else if(form.dataset.kind==='solo-event')await submitSoloEvent(form);else if(form.dataset.kind==='registration'){const departureId=form.dataset.departure;const result=await submitRegistration(form,api);if(!(await finishPendingCrewJoin(departureId,result.id)))await refreshAfterSave('Inscription enregistrée.');}}catch(error){showError(error);}finally{state.busy=false;if(submit?.isConnected)submit.disabled=false;}});
+document.addEventListener('submit',async event=>{const form=event.target;if(!form.dataset.kind)return;event.preventDefault();if(state.busy)return;state.busy=true;const submit=form.querySelector('[type="submit"]');if(submit)submit.disabled=true;try{if(form.dataset.kind==='event')await submitEvent(form);else if(form.dataset.kind==='solo-event')await submitSoloEvent(form);else if(form.dataset.kind==='registration'){const departureId=form.dataset.departure;const result=await submitRegistration(form,api);if(!(await finishPendingCrewJoin(departureId,result.id)))await refreshAfterSave(result.notice||'Inscription enregistrée.');}}catch(error){showError(error);}finally{state.busy=false;if(submit?.isConnected)submit.disabled=false;}});
 document.addEventListener('error',event=>{const image=event.target;if(image instanceof HTMLImageElement&&image.matches('.circuit-visual img'))image.remove();},true);
 setInterval(()=>document.querySelectorAll('[data-countdown]').forEach(element=>{element.textContent=countdown(Number(element.dataset.countdown));}),1000);
 

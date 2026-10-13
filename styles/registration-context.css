@@ -15,3 +15,11 @@
 .selected-discord-pilot{display:flex;align-items:center;gap:10px;margin:4px 0 14px;padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:rgba(255,255,255,.02)}
 .selected-discord-pilot span{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.7px}.selected-discord-pilot strong{font-size:15px}
 @media(max-width:700px){.form-title{align-items:flex-start}.registration-form-actions{width:100%;justify-content:flex-start;margin-top:8px}.registration-nav-button{flex:1 1 auto}.registration-context-banner{margin-top:8px;padding:11px 12px}.registration-context-banner strong{font-size:15px}}
+.registration-other-starts{margin:14px 0 0;padding:0;border:0;min-width:0}
+.registration-other-starts legend{margin-bottom:8px}
+.registration-other-starts-list{display:flex;flex-wrap:wrap;gap:8px}
+.registration-other-start{position:relative;display:inline-flex;align-items:center;padding:8px 14px;border:1px solid var(--border);border-radius:999px;cursor:pointer;font-size:14px;font-weight:600;white-space:nowrap}
+.registration-other-start input{position:absolute;opacity:0;width:1px;height:1px;margin:0}
+.registration-other-start:has(input:checked){border-color:var(--accent);color:var(--accent);background:rgba(126,227,143,.1)}
+.registration-other-start:has(input:checked) span::before{content:'✓ '}
+.registration-other-start:has(input:focus-visible){outline:2px solid var(--accent);outline-offset:2px}

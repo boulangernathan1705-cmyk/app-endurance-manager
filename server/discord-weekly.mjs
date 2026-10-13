@@ -186,12 +186,13 @@ export async function loadWeeklyDiscordSnapshot(env, timestamp, community, scope
 }
 
 // Mutations and scheduled jobs use the same bot publications in both modes.
-export async function syncWeeklyDiscord(env,timestamp=Date.now(),community=null) {
+// eventId: the race just changed, published first.
+export async function syncWeeklyDiscord(env,timestamp=Date.now(),community=null,eventId=null) {
   if (!env?.DB) return {ok:false,skipped:'not-configured'};
   let result={ok:true};
   for (const target of community ? [community] : await allCommunities(env)) {
     if (!await botRecapSettings(env,target)) continue;
-    try { result=await syncBotRecaps(env,timestamp,target); }
+    try { result=await syncBotRecaps(env,timestamp,target,false,eventId); }
     catch (error) { result={ok:false,error:error.message};console.error('Discord recap sync failed',target.slug,error.message); }
   }
   return result;
