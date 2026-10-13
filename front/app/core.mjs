@@ -201,7 +201,7 @@ export async function load() {
   // The community is only open to the members of its Discord server: nothing else is loaded otherwise.
   const session = await api('/api/session');
   const accessChanged = state.access !== session.access;
-  state.access=session.access; state.permissions=session.permissions||[]; state.manager=session.manager===true; state.community=session.community||null; state.communities=Array.isArray(session.communities)?session.communities:[]; state.openSite=session.openSite===true; state.platformDiscordUrl=session.platformDiscordUrl||null;
+  state.access=session.access; state.permissions=session.permissions||[]; state.manager=session.manager===true; state.community=session.community||null; state.communities=Array.isArray(session.communities)?session.communities:[]; state.openSite=session.openSite===true; state.platformDiscordUrl=session.platformDiscordUrl||null; state.elsewhere=Array.isArray(session.elsewhere)?session.elsewhere:[];
   const member = session.access === 'member';
   const [upcoming,archived] = member ? await Promise.all([fetchEvents('upcoming'), state.archiveLoaded ? fetchEvents('archived') : []]) : [[],[]];
   const userChanged=(session.user?.id||null)!==(state.user?.id||null);

@@ -2,6 +2,11 @@
 
 Les changements du site, version par version. La plus récente est en haut.
 
+## v1.40 — 13 octobre 2026
+
+- Accès : sur une communauté où tu n'as pas accès, le site affiche « Tes communautés » avec un lien vers chacune.
+- Site de test : le bandeau ne renvoie plus vers le site officiel.
+
 ## v1.39 — 13 octobre 2026
 
 - iRacing : les horaires des special events sont repris même quand iRacing donne à la course un autre nom dans son article (ex. « Indy 8 Hour »).

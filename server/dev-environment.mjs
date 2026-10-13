@@ -1,7 +1,6 @@
 // The dev site (wrangler.jsonc sets SITE_ENV=development) is public: keep search engines away
 // and tell visitors that registrations made here do not count. Production is never touched.
-const PRODUCTION_URL='https://endurance-manager.app';
-const BANNER=`<div class="dev-site-banner" role="note" style="position:relative;z-index:1000;padding:8px 16px;background:#f3b33d;color:#1a1204;font:700 14px/1.35 Barlow,system-ui,sans-serif;text-align:center">Version de test : les inscriptions faites ici ne comptent pas. <a href="${PRODUCTION_URL}" style="color:inherit;text-decoration:underline">Aller sur le site officiel</a></div>`;
+const BANNER=`<div class="dev-site-banner" role="note" style="position:relative;z-index:1000;padding:8px 16px;background:#f3b33d;color:#1a1204;font:700 14px/1.35 Barlow,system-ui,sans-serif;text-align:center">Version de test : les inscriptions faites ici ne comptent pas.</div>`;
 
 export function isDevelopment(env) {
   return env?.SITE_ENV==='development';
