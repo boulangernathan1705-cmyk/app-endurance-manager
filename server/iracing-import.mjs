@@ -280,14 +280,17 @@ export function specialStarts(text, dateStart, dateEnd) {
 }
 
 // The article of a special event: "THIS WEEK: iRacing Bathurst 1000 presented by … | Special Event",
-// published in the ten days before the event.
+// published in the ten days before the event. The article may use the short name of the schedule slug
+// ("8 Hours of Indianapolis", slug "indy-8hr" → "THIS WEEK: iRacing Indy 8 Hour …"): either name matches.
 export function articleFor(posts, special) {
-  const eventWords = normalize(special.name).split(/[^a-z0-9]+/).filter(word => word.length >= 4 && !/\d/.test(word) && !GENERIC_WORDS.includes(word));
+  const significant = text => normalize(text).split(/[^a-z0-9]+/).filter(word => word.length >= 4 && !/\d/.test(word) && !GENERIC_WORDS.includes(word));
+  const eventWords = significant(special.name), slugWords = significant(special.slug);
   const start = Date.parse(`${special.dateStart}T00:00:00Z`);
   return posts.find(post => {
     const title = normalize(decode(post?.title?.rendered));
     const published = Date.parse(post?.date);
-    const named = eventWords.length ? eventWords.every(word => title.includes(word)) : title.includes(normalize(special.name));
+    const named = (eventWords.length ? eventWords.every(word => title.includes(word)) : title.includes(normalize(special.name)))
+      || (slugWords.length > 0 && slugWords.every(word => title.includes(word)));
     return title.includes('special event') && named && published > start - 10 * DAY_MS && published < start + DAY_MS;
   }) || null;
 }
@@ -303,9 +306,9 @@ export async function completeSpecialTimes(env, {timestamp = Date.now(), fetchIm
     JOIN events e ON e.id=i.event_id AND e.community_id=i.community_id
     WHERE i.external_id LIKE 'special:%' AND e.schedule_pending=1 AND (? IS NULL OR i.community_id=?)`).bind(community?.id ?? null, community?.id ?? null).all()).results || [];
   const candidates = waiting.map(row => {
-    const dateStart = /:(\d{4}-\d{2}-\d{2})$/.exec(row.external_id)?.[1];
+    const [, slug, dateStart] = /^special:(.*):(\d{4}-\d{2}-\d{2})$/.exec(row.external_id) || [];
     const first = Date.parse(`${dateStart}T00:00:00Z`);
-    return {row, plan:{special:{name:row.name, dateStart, dateEnd:new Date(first + 2 * DAY_MS).toISOString().slice(0, 10)}}, first};
+    return {row, plan:{special:{name:row.name, slug, dateStart, dateEnd:new Date(first + 2 * DAY_MS).toISOString().slice(0, 10)}}, first};
   }).filter(({row, first}) => {
     const departures = JSON.parse(row.departures || '[]');
     // (races imported before the flag existed: their placeholder time)
