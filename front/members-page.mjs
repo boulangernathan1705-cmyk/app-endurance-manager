@@ -147,7 +147,7 @@ function recapForm(setup) {
   const config = setup.botRecap, scope = config?.scope || setup.recapSuggestedScope || 'all';
   const mode = config?.mode || 'general';
   const established = Boolean(config);
-  const summary = config ? `<p><strong>${config.lastError ? 'Publication en erreur' : config.enabled ? 'Actif' : 'Désactivé'}</strong> · ${config.mode === 'events' ? 'Une catégorie par course' : 'Récap général'} · ${esc(RECAP_LABELS[scope])}</p>
+  const summary = config ? `<p><strong>${config.lastError ? 'Publication en erreur' : config.enabled ? 'Actif' : 'Désactivé'}</strong> · ${config.mode === 'events' ? (scope === 'all' ? 'Une catégorie par simu' : 'Une catégorie par course') : 'Récap général'} · ${esc(RECAP_LABELS[scope])}</p>
     <p>Destination : <strong>${esc(config.destinationName)}</strong>. ${config.mode === 'events' ? 'Salons supprimés 24 h après la fin du dernier départ.' : 'Le salon général est conservé.'}</p><p><a class="secondary-button" href="https://discord.com/channels/${esc(setup.guild.id)}/${esc(config.destinationId)}" target="_blank" rel="noopener">Ouvrir la destination sur Discord</a></p>
     ${config.lastError ? `<p class="settings-status" role="alert">${esc(config.lastError)}</p>${setup.recapBotInviteUrl && /permissions|autorise le bot/.test(config.lastError) ? `<a class="secondary-button" href="${esc(setup.recapBotInviteUrl)}" target="_blank" rel="noopener">Donner les droits au bot</a><p>Si le salon refuse encore l’accès, vérifie aussi ses permissions sur Discord, puis clique sur Modifier pour actualiser les destinations.</p>` : ''}` : ''}`
     : '';
@@ -158,7 +158,7 @@ function recapForm(setup) {
     <form data-recap-wizard class="setup-form recap-wizard" ${established ? 'hidden' : ''}>
       <p data-recap-progress aria-live="polite">Étape 1 sur 4</p>
       <fieldset data-recap-step="0"><legend>Comment présenter les courses sur Discord ?</legend>
-        <div class="recap-cards">${choice('general','Récap général','Un salon texte « récap-endurances », un message pour toutes les courses.')}${choice('events','Une catégorie par course','Dès la publication de la course : son récap, puis un vocal par équipage.')}</div>
+        <div class="recap-cards">${choice('general','Récap général','Un salon texte « récap-endurances », un message pour toutes les courses.')}${choice('events','Salons par course','Un salon par course avec son récap, puis un vocal par équipage. Une catégorie par course, ou une par simu avec LMU et iRacing.')}</div>
         <p>Le même message est modifié sans notification à chaque actualisation.</p></fieldset>
       <fieldset data-recap-step="1" hidden><legend>Quelles courses inclure ?</legend><div class="recap-sims">
         <label class="role-pill"><input type="checkbox" name="lmu" ${scope !== 'iracing' ? 'checked' : ''}><span>LMU</span></label>
@@ -253,8 +253,8 @@ function modulesMarkup(settings, setup) {
   // The recap gives each race its category: the voice channels go there, no category to choose.
   const raceCategories = setup.botRecap?.enabled && setup.botRecap.mode === 'events';
   const tiles = [
-    {key:'recap', name:'Récap de la semaine sur Discord', text:'Un récap général ou une catégorie par course, avec un message actualisé sans notifications répétées.',
-      state:setup.botRecap?.lastError ? ['warn','Publication en erreur'] : states.recap ? ['ok', (setup.botRecap.mode === 'events' ? 'Actif · une catégorie par course' : 'Actif · récap général')] : ['off', 'Éteint'],
+    {key:'recap', name:'Récap de la semaine sur Discord', text:'Un récap général ou un salon par course, avec un message actualisé sans notifications répétées.',
+      state:setup.botRecap?.lastError ? ['warn','Publication en erreur'] : states.recap ? ['ok', (setup.botRecap.mode === 'events' ? (setup.botRecap.scope === 'all' ? 'Actif · une catégorie par simu' : 'Actif · une catégorie par course') : 'Actif · récap général')] : ['off', 'Éteint'],
       control:'', settings:recapForm(setup)},
     {key:'crewChannels', name:'Salons d’équipage sur Discord', text:'Un salon vocal par équipage, à son nom, ouvert dès sa création.',
       state:crewWarn ? ['warn', crews.botReady !== true ? 'Le bot n’a pas les droits' : 'Le bot est bloqué'] : states.crewChannels ? ['ok', 'Actif'] : ['off', crews.botReady === true ? 'Éteint' : crews.botProblem === 'rights' ? 'Éteint · droits du bot à donner' : 'Éteint · bot à vérifier'],

@@ -74,15 +74,15 @@ test('read-only previews preserve every departure and never send to Discord',asy
   assert.equal((await previewBotRecap(env,NOW,COMMUNITY,{...SETTINGS,mode:'general'})).length,1);
 });
 
-test('two homonymous events get a category each with their recap; edits reuse their single silent messages',async t=>{
+test('with both sims, races share a category per sim, a text channel each; edits reuse their single silent messages',async t=>{
   const {DB,env,calls,messages,channels}=setup(t);race(DB,'a','Même course');race(DB,'b','Même course','iracing-spa');
   await saveBotRecap(env,COMMUNITY,SETTINGS);await syncWeeklyDiscord(env,NOW,COMMUNITY);
-  assert.deepEqual(creates(calls).map(call=>[call.body.type,call.body.name]),[[4,'🏎️ LMU · Même course'],[0,'infos-de-la-course'],[4,'🏁 iRacing · Même course'],[0,'infos-de-la-course']]);
+  assert.deepEqual(creates(calls).map(call=>[call.body.type,call.body.name]),[[4,'🏎️ LMU'],[0,'meme-course'],[4,'🏁 iRacing'],[0,'meme-course']]);
   assert.equal(sends(calls).length,2);
   const [lmu,iracing]=creates(calls).filter(call=>call.body.type===4).map(call=>channels.find(item=>item.name===call.body.name).id);
   assert.deepEqual(creates(calls).filter(call=>call.body.type===0).map(call=>call.body.parent_id),[lmu,iracing]);
   // Right after the chosen category, in the order they were made; the next category stays below them.
-  assert.deepEqual(channels.filter(item=>item.type===4).sort((a,b)=>a.position-b.position).map(item=>item.name),['Accueil','Endurances','🏎️ LMU · Même course','🏁 iRacing · Même course','Vocaux']);
+  assert.deepEqual(channels.filter(item=>item.type===4).sort((a,b)=>a.position-b.position).map(item=>item.name),['Accueil','Endurances','🏎️ LMU','🏁 iRacing','Vocaux']);
   for(const call of sends(calls)){assert.deepEqual(call.body.allowed_mentions,{parse:[]});assert.equal(call.body.flags,4096);}
   calls.length=0;await syncWeeklyDiscord(env,NOW+1000,COMMUNITY);assert.equal(written(calls).length,0);
   DB.db.prepare("UPDATE events SET name='Spa actualisé' WHERE id='a'").run();
@@ -221,7 +221,7 @@ test('a manually deleted event keeps its channel until its last known end plus 2
 
 test('new eligible races are created automatically; changing the chosen category leaves open races in place',async t=>{
   const {DB,env,calls,channels}=setup(t);race(DB);await saveBotRecap(env,COMMUNITY,SETTINGS);await syncBotRecaps(env,NOW,COMMUNITY);calls.length=0;
-  race(DB,'new-event','Nouvelle course');await syncBotRecaps(env,NOW+1000,COMMUNITY);assert.equal(creates(calls).length,2);
+  race(DB,'new-event','Nouvelle course');await syncBotRecaps(env,NOW+1000,COMMUNITY);assert.deepEqual(creates(calls).map(call=>call.body.name),['nouvelle-course'],'in the LMU category already there');
   channels.push({id:'777777777777777777',type:4,name:'Nouvelle catégorie',position:9});
   await saveBotRecap(env,COMMUNITY,{...SETTINGS,destinationId:'777777777777777777'});calls.length=0;
   await syncBotRecaps(env,NOW+2000,COMMUNITY);assert.equal(creates(calls).length,0);assert.equal(sends(calls).length,0);
@@ -286,14 +286,14 @@ test('a race gets its category 7 days before its start, even without any crew',a
   race(DB,'a-sunday','Dimanche','spa',[{id:'s',startsAt:NOW+DAY}]);race(DB,'b-week','Dans six jours','spa',[{id:'w',startsAt:NOW+6*DAY}]);race(DB,'c-far','Dans un mois','spa',[{id:'f',startsAt:NOW+30*DAY}]);
   assert.deepEqual((await previewBotRecap(env,NOW,COMMUNITY,SETTINGS)).map(item=>item.name),['🏎️ LMU · Dimanche','🏎️ LMU · Dans six jours']);
   await saveBotRecap(env,COMMUNITY,SETTINGS);await syncBotRecaps(env,NOW,COMMUNITY);
-  assert.deepEqual(creates(calls).map(call=>call.body.name),['🏎️ LMU · Dimanche','infos-de-la-course','🏎️ LMU · Dans six jours','infos-de-la-course']);
+  assert.deepEqual(creates(calls).map(call=>call.body.name),['🏎️ LMU','dimanche','dans-six-jours']);
 });
 
 test('an official LMU race gets its category without any entry; an imported official iRacing race waits for one',async t=>{
   const {DB,env,calls}=setup(t);
   race(DB,'lmu','4h de Portimao','portimao',[{id:'p',startsAt:NOW+3*DAY}],'official');race(DB,'ir','Officielle iRacing','iracing-spa',[{id:'i',startsAt:NOW+DAY}],'official');
   await saveBotRecap(env,COMMUNITY,SETTINGS);await syncBotRecaps(env,NOW,COMMUNITY);
-  assert.deepEqual(creates(calls).map(call=>call.body.name),['🏎️ LMU · 4h de Portimao','infos-de-la-course']);
+  assert.deepEqual(creates(calls).map(call=>call.body.name),['🏎️ LMU','4h-de-portimao']);
 });
 
 test('no new race category once the server is close to the 500 channels of Discord',async t=>{
@@ -309,7 +309,7 @@ test('official races where the community has nothing never hold back the recap o
   race(DB,'mine','10h officielle','spa',[{id:'m',startsAt:NOW+2*DAY}],'official');
   DB.db.prepare("INSERT INTO crews(id,event_id,departure_id,name,category,car,locked,created_at,community_id) VALUES('crew','mine','m','Les plots','GT3','',0,0,?)").run(DEV_COMMUNITY);
   await saveBotRecap(env,COMMUNITY,SETTINGS);await syncBotRecaps(env,NOW,COMMUNITY);
-  assert.deepEqual(creates(calls).map(call=>call.body.name),['🏎️ LMU · 10h officielle','infos-de-la-course'],'only the race with a crew');
+  assert.deepEqual(creates(calls).map(call=>call.body.name),['🏎️ LMU','10h-officielle'],'only the race with a crew');
   DB.db.prepare('UPDATE crews SET name=? WHERE id=?').run('Les plots 2','crew');
   calls.length=0;await syncBotRecaps(env,NOW+1000,COMMUNITY);await syncBotRecaps(env,NOW+2000,COMMUNITY);
   assert.equal(calls.filter(call=>call.method==='PATCH').length,1);
@@ -476,4 +476,43 @@ test('après un changement, la course modifiée est mise à jour en premier', as
   DB.db.prepare("UPDATE discord_recap_publications SET checked_at=CASE event_id WHEN 'race-c' THEN 99 ELSE 1 END").run();
   calls.length=0;await syncBotRecaps(env,NOW+10,COMMUNITY,false,'race-c');
   assert.equal(DB.db.prepare("SELECT checked_at FROM discord_recap_publications WHERE event_id='race-c'").get().checked_at,NOW+10);
+});
+
+test('une seule simu cochée : une catégorie par course, comme avant',async t=>{
+  const {DB,env,calls}=setup(t);race(DB,'a','6h de Spa');race(DB,'b','4h de Monza','monza');
+  await saveBotRecap(env,COMMUNITY,{...SETTINGS,scope:'lmu'});await syncBotRecaps(env,NOW,COMMUNITY);
+  assert.deepEqual(creates(calls).map(call=>call.body.name),['🏎️ LMU · 6h de Spa','infos-de-la-course','🏎️ LMU · 4h de Monza','infos-de-la-course']);
+});
+
+test('les deux simus : les salons de la catégorie LMU sont rangés par date, la catégorie part avec la dernière course',async t=>{
+  const {DB,env,calls,channels}=setup(t);
+  race(DB,'late','Course tardive','spa',[{id:'l',startsAt:NOW+3*DAY}]);race(DB,'soon','Course proche','monza',[{id:'s',startsAt:NOW+DAY}]);
+  await saveBotRecap(env,COMMUNITY,SETTINGS);await syncBotRecaps(env,NOW,COMMUNITY);
+  const category=channels.find(item=>item.name==='🏎️ LMU').id;
+  const order=()=>channels.filter(item=>item.parent_id===category).sort((a,b)=>(a.position||0)-(b.position||0)||(BigInt(a.id)<BigInt(b.id)?-1:1)).map(item=>item.name);
+  assert.deepEqual(order(),['course-proche','course-tardive']);
+  calls.length=0;
+  // The first race over (+24 h): its channel goes, the category stays for the other one.
+  await syncBotRecaps(env,NOW+DAY+6*3600000+DAY,COMMUNITY);
+  assert.deepEqual(calls.filter(call=>call.method==='DELETE').length,1);assert.ok(channels.some(item=>item.id===category));
+  await syncBotRecaps(env,NOW+3*DAY+6*3600000+DAY,COMMUNITY);
+  assert.ok(!channels.some(item=>item.id===category),'deleted with its last race');
+});
+
+test('passage aux catégories par simu : le salon d’une course quitte sa catégorie, supprimée une fois vide',async t=>{
+  const {DB,env,channels,messages}=setup(t);race(DB);
+  await saveBotRecap(env,COMMUNITY,{...SETTINGS,scope:'lmu'});await syncBotRecaps(env,NOW,COMMUNITY);
+  const before=DB.db.prepare('SELECT * FROM discord_recap_publications').get();
+  channels.push({id:'777777777777777001',type:2,name:'Les Tondeuz',parent_id:before.category_id});
+  await saveBotRecap(env,COMMUNITY,SETTINGS);await syncBotRecaps(env,NOW+1000,COMMUNITY);
+  const after=DB.db.prepare('SELECT * FROM discord_recap_publications').get();
+  assert.equal(after.shared,1);assert.equal(after.channel_id,before.channel_id);assert.equal(after.message_id,before.message_id);
+  assert.equal(channels.find(item=>item.id===after.channel_id).parent_id,after.category_id);
+  assert.equal(channels.find(item=>item.id===after.channel_id).name,'6h-de-spa');
+  assert.ok(channels.some(item=>item.id===before.category_id),'kept while a crew voice channel is in it');
+  channels.find(item=>item.id==='777777777777777001').parent_id=after.category_id;
+  await syncBotRecaps(env,NOW+2000,COMMUNITY);
+  assert.ok(!channels.some(item=>item.id===before.category_id));
+  assert.equal(DB.db.prepare('SELECT old_category_id FROM discord_recap_publications').get().old_category_id,null);
+  assert.equal(messages.size,1);
 });

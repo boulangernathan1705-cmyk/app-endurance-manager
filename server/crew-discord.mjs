@@ -13,6 +13,7 @@
 import {allCommunities, communityUrl} from './community.mjs';
 import {notify} from './notifications.mjs';
 import {durationLabel} from '../shared/duration.mjs';
+import {orderCategory} from './recap-discord.mjs';
 
 const DISCORD_API = 'https://discord.com/api/v10';
 const HOUR = 3600_000;
@@ -140,7 +141,7 @@ export async function syncCrewDiscord(env, timestamp = Date.now(), {community = 
   if (!ids.length) return report;
   const rows = (await env.DB.prepare(`SELECT d.crew_id AS row_id, d.community_id AS row_community, d.guild_id, d.category_id, d.text_id, d.voice_id, d.message_id,
       d.recap_hash, d.members, d.starts_at, d.reminded, d.created_at, d.parent_id, ${CREW_COLUMNS},
-      CASE WHEN p.category_id<>COALESCE(s.destination_id,'') THEN p.category_id END AS race_category,
+      CASE WHEN p.category_id<>COALESCE(s.destination_id,'') THEN p.category_id END AS race_category, p.shared AS race_shared,
       CASE WHEN s.enabled=1 AND s.mode='events' THEN s.scope END AS race_scope
     FROM crew_discord d LEFT JOIN crews c ON c.id=d.crew_id LEFT JOIN events e ON e.id=c.event_id
       LEFT JOIN discord_recap_publications p ON p.community_id=d.community_id AND p.event_id=c.event_id AND p.closed_at IS NULL
@@ -288,8 +289,19 @@ export async function serverCategories(env, guildId) {
 const waitsForCategory = (row, timestamp) => !row.race_category && timestamp - Number(row.created_at) < WAIT_CATEGORY
   && (row.race_scope === 'all' || row.race_scope === game(row.circuit));
 
-// In its race's category the crew's name is enough; elsewhere the sim comes first (« LMU-Les Tondeuz »).
-const voiceName = (row, crewName) => clip(row.race_category ? crewName : `${game(row.circuit) === 'iracing' ? 'iRacing' : 'LMU'}-${crewName}`, 100);
+// In its race's category the crew's name is enough, in its sim's category the race comes first (« 6h de Spa ·
+// Les Tondeuz »); elsewhere the sim comes first (« LMU-Les Tondeuz »).
+const voiceName = (row, crewName) => clip(row.race_category ? (row.race_shared ? `${clip(safe(row.event_name), 50)} · ${crewName}` : crewName)
+  : `${game(row.circuit) === 'iracing' ? 'iRacing' : 'LMU'}-${crewName}`, 100);
+
+// A voice channel arrived in its sim's category: the category is put back in date order.
+async function sortSimCategory(env, budget, row) {
+  if (!row.race_shared || budget.left < 2) return;
+  try {
+    const channels = await discord(env, budget, 'GET', `/guilds/${row.guild_id}/channels`);
+    await orderCategory(env, row.row_community, row.guild_id, row.race_category, channels, (method, path, body) => discord(env, budget, method, path, body));
+  } catch (error) { if (error instanceof Stop) throw error; }
+}
 
 async function syncRow(env, budget, timestamp, community, setting, row, pilots) {
   const start = row.crew_id && row.event_name ? startOf(row) : null;
@@ -323,12 +335,14 @@ async function syncRow(env, budget, timestamp, community, setting, row, pilots) 
     await env.DB.prepare('UPDATE crew_discord SET voice_id=?, message_id=NULL, parent_id=? WHERE crew_id=?').bind(voice.id, row.parent_id, row.row_id).run();
     await env.DB.prepare('UPDATE community_crew_discord SET last_error=NULL, last_error_at=NULL WHERE community_id=?').bind(community.id).run();
     opened = true;
+    if (row.race_category) await sortSimCategory(env, budget, row);
   }
   if (row.race_category && row.parent_id !== row.race_category) {
     // Opened before its race's category: moved into it once.
     await sendInChannel(env, budget, row, 'PATCH', `/channels/${row.voice_id}`, {parent_id:row.race_category, name:voiceName(row, crewName)});
     row.parent_id = row.race_category;
     await env.DB.prepare('UPDATE crew_discord SET parent_id=? WHERE crew_id=?').bind(row.parent_id, row.row_id).run();
+    await sortSimCategory(env, budget, row);
   }
   const content = recapContent(env, community, row, start, pilots);
   const contentHash = await hash(content);

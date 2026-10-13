@@ -290,6 +290,11 @@ test('when the recap gives each race its category, the crews\' voice channels go
   assert.equal((await req(base+'/crews','POST',{name:'Après',category:'GT3'},'third')).status,201);
   mark=discord.calls.length;await sync(at+4*HOUR);
   assert.deepEqual(created(discord.calls,mark)[0].body,{name:'Après',type:2,parent_id:'600000000000000001'});
+  // With both sims, the race's category becomes its sim's: the voice channel moves there, the race's name first.
+  DB.db.prepare("UPDATE discord_recap_publications SET category_id='600000000000000009',shared=1").run();
+  mark=discord.calls.length;await sync(at+5*HOUR);
+  const move=discord.calls.slice(mark).find(call=>call.method==='PATCH'&&call.path===`/channels/${first.voice_id}`);
+  assert.deepEqual(move.body,{parent_id:'600000000000000009',name:`${race.name} · Avant`});
 });
 
 test('with « Une catégorie par course », a new crew\'s voice channel waits for its race\'s category, at most an hour', async () => {

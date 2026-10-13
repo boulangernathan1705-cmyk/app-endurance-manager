@@ -7,6 +7,8 @@ const API = 'https://discord.com/api/v10', DAY = 86400000;
 const RECAP_FORMAT = 4;
 const MAX_CHANNELS = 450;
 const RACE_INFO_CHANNEL = 'infos-de-la-course'; // Discord writes text channel names in lowercase with dashes
+// Discord allows 50 channels in a category: a sim's category takes a new race while room is left for its crews.
+const CATEGORY_ROOM = 40;
 const VIEW = 1024n, SEND = 2048n, HISTORY = 65536n, EMBED = 16384n, MANAGE = 16n, ADMIN = 8n;
 const REQUIRED = VIEW | SEND | HISTORY | EMBED;
 export const RECAP_BOT_PERMISSIONS = String(REQUIRED | MANAGE);
@@ -117,6 +119,51 @@ async function openRaces(env, community, events, scope, timestamp) {
 }
 export const raceCategoryName = event =>
   `${String(event?.circuit || '').startsWith('iracing-') ? '🏁 iRacing' : '🏎️ LMU'} · ${String(event?.name || 'Endurance').trim()}`.slice(0,100);
+const simOf = event => String(event?.circuit || '').startsWith('iracing-') ? 'iracing' : 'lmu';
+export const simCategoryName = sim => sim === 'iracing' ? '🏁 iRacing' : '🏎️ LMU';
+// In its sim's category, a race's text channel is named after it (« 6h-de-spa »).
+export const raceChannelName = event =>
+  String(event?.name || '').normalize('NFKD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,100) || 'endurance';
+// LMU and iRacing both published: one category per sim. A single sim keeps one category per race.
+const bySim = settings => settings.scope === 'all';
+const firstStart = event => Math.min(...parse(event?.departures).map(item => Number(item.startsAt)).filter(Number.isFinite));
+// The channels of a sim's category by date: the races' text channels, then the crews' voice channels race by race
+// (Discord always lists text channels first). One request, only when the order changes.
+export async function orderCategory(env, communityId, guildId, category, channels, call) {
+  const children = channels.filter(item => item.parent_id === category);
+  if (children.length < 2) return;
+  const races = (await env.DB.prepare(`SELECT p.channel_id,p.event_id,e.departures FROM discord_recap_publications p LEFT JOIN events e ON e.id=p.event_id
+    WHERE p.community_id=? AND p.category_id=? AND p.closed_at IS NULL`).bind(communityId,category).all()).results || [];
+  const voices = (await env.DB.prepare(`SELECT d.voice_id,c.event_id,c.departure_id,c.name,e.departures FROM crew_discord d JOIN crews c ON c.id=d.crew_id JOIN events e ON e.id=c.event_id
+    WHERE d.community_id=? AND d.voice_id IS NOT NULL AND d.closed_at IS NULL`).bind(communityId).all()).results || [];
+  const keys = new Map();
+  for (const row of races) if (row.channel_id) keys.set(row.channel_id,[firstStart(row),row.event_id,0,'']);
+  for (const row of voices) keys.set(row.voice_id,[firstStart(row),row.event_id,Number(parse(row.departures).find(item => item.id === row.departure_id)?.startsAt) || 0,String(row.name || '')]);
+  const key = item => keys.get(item.id) || [Infinity,'',0,item.name || ''];
+  const compare = (a,b) => { const x = key(a), y = key(b); for (let i = 0; i < 4; i++) if (x[i] !== y[i]) return x[i] < y[i] ? -1 : 1; return 0; };
+  const current = (a,b) => (a.position || 0) - (b.position || 0) || (BigInt(a.id) < BigInt(b.id) ? -1 : 1);
+  const changes = [];
+  for (const group of [children.filter(item => item.type !== 2 && item.type !== 13), children.filter(item => item.type === 2 || item.type === 13)]) {
+    const wanted = [...group].sort(compare);
+    if (wanted.some((item,index) => item.id !== [...group].sort(current)[index].id)) changes.push(...wanted.map((item,position) => ({id:item.id,position})));
+  }
+  if (changes.length) await call('PATCH',`/guilds/${guildId}/channels`,changes);
+}
+// The sim's category with room left, or a new one under the category chosen by the admins.
+async function simCategory(env, community, row, sim, channels, settings, budget) {
+  const shared = (await env.DB.prepare(`SELECT DISTINCT p.category_id FROM discord_recap_publications p LEFT JOIN events e ON e.id=p.event_id
+    WHERE p.community_id=? AND p.shared=1 AND p.closed_at IS NULL AND p.category_id IS NOT NULL AND (COALESCE(e.circuit,'') LIKE 'iracing-%')=?`)
+    .bind(community.id,sim === 'iracing' ? 1 : 0).all()).results || [];
+  for (const {category_id} of shared)
+    if (channels.some(item => item.id === category_id && item.type === 4) && channels.filter(item => item.parent_id === category_id).length < CATEGORY_ROOM) return category_id;
+  if (channels.length >= MAX_CHANNELS) return null;
+  const anchor = channels.find(item => item.id === settings.destination_id && item.type === 4);
+  if (!anchor) throw Object.assign(new Error('Discord indisponible'), {status:404,code:10003});
+  const id = (await discord(env,'POST',`/guilds/${row.guild_id}/channels`,{type:4,name:simCategoryName(sim),permission_overwrites:anchor.permission_overwrites || []},budget)).id;
+  channels.push({id,type:4,name:simCategoryName(sim)});
+  await placeCategory(env,community,row.guild_id,channels,id,settings.destination_id,budget);
+  return id;
+}
 // The race categories follow the chosen category, in the order they were made (one request reorders them all).
 async function placeCategory(env, community, guildId, channels, category, anchor, budget) {
   const open = new Set(((await env.DB.prepare('SELECT category_id FROM discord_recap_publications WHERE community_id=? AND closed_at IS NULL AND category_id IS NOT NULL')
@@ -128,9 +175,13 @@ async function placeCategory(env, community, guildId, channels, category, anchor
   categories.splice(index + 1, 0, {id:category});
   await discord(env,'PATCH',`/guilds/${guildId}/channels`,categories.map((item,position) => ({id:item.id,position})),budget);
 }
-// The race's text channel, then its category (never the category chosen by the admins).
+// The race's text channel, then its category (never the category chosen by the admins; a sim's category with
+// its last race only).
 async function removeRaceChannels(env, row, anchor, budget) {
-  for (const id of [row.channel_id, row.category_id !== anchor ? row.category_id : null].filter(Boolean)) {
+  let category = row.category_id !== anchor ? row.category_id : null;
+  if (category && row.shared && await env.DB.prepare('SELECT 1 FROM discord_recap_publications WHERE community_id=? AND category_id=? AND closed_at IS NULL AND event_id<>?')
+    .bind(row.community_id,category,row.event_id).first()) category = null;
+  for (const id of [row.channel_id, row.old_category_id, category].filter(Boolean)) {
     try { await discord(env,'DELETE',`/channels/${id}`,null,budget); }
     catch (error) { if (error.status !== 404) throw error; }
   }
@@ -225,8 +276,10 @@ async function publish(env, timestamp, community, settings, row, event, budget, 
     await env.DB.prepare('UPDATE discord_recap_publications SET channel_id=?,message_id=NULL,content_hash=? WHERE community_id=? AND event_id=?')
       .bind(channel,'',community.id,'').run();
   }
-  if (isEvent && (repair || !channel || !row.category_id || row.category_id === settings.destination_id)) {
-    // One category per race (« 🏎️ LMU · 6h de Spa »): its recap here, the crews' voice channels below it.
+  const grouped = isEvent && bySim(settings);
+  if (isEvent && (repair || !channel || !row.category_id || row.category_id === settings.destination_id || (grouped && !row.shared))) {
+    // One category per race (« 🏎️ LMU · 6h de Spa »): its recap here, the crews' voice channels below it. With
+    // both sims, one category per sim (« 🏎️ LMU »): a text channel per race, then the crews' voice channels.
     // The first version put the text channel straight in the chosen category: it is moved into its race's.
     const channels = await discord(env,'GET',`/guilds/${row.guild_id}/channels`,null,budget);
     if (repair) {
@@ -238,7 +291,16 @@ async function publish(env, timestamp, community, settings, row, event, budget, 
           .bind('',community.id,row.event_id).run();
       }
     }
-    let category = row.category_id && row.category_id !== settings.destination_id ? row.category_id : null;
+    let category = row.category_id && row.category_id !== settings.destination_id && (!grouped || row.shared) ? row.category_id : null;
+    if (!category && grouped) {
+      // A race's own category from before is emptied (its voice channels follow), then deleted.
+      const old = row.category_id && row.category_id !== settings.destination_id && channels.some(item => item.id === row.category_id && item.type === 4) ? row.category_id : null;
+      category = await simCategory(env,community,row,simOf(event),channels,settings,budget);
+      if (!category) return;
+      Object.assign(row,{category_id:category,shared:1,old_category_id:old || row.old_category_id});
+      await env.DB.prepare('UPDATE discord_recap_publications SET category_id=?,shared=1,old_category_id=? WHERE community_id=? AND event_id=?')
+        .bind(category,row.old_category_id || null,community.id,row.event_id).run();
+    }
     if (!category) {
       // Discord allows 500 channels per server: room is kept for the crews' voice channels.
       if (channels.length >= MAX_CHANNELS) return;
@@ -246,15 +308,23 @@ async function publish(env, timestamp, community, settings, row, event, budget, 
       if (!anchor) throw Object.assign(new Error('Discord indisponible'), {status:404,code:10003});
       // Categories cannot be nested: explicitly retain the chosen category's access rules.
       category = (await discord(env,'POST',`/guilds/${row.guild_id}/channels`,{type:4,name:raceCategoryName(event),permission_overwrites:anchor.permission_overwrites || []},budget)).id;
-      row.category_id = category;
-      await env.DB.prepare('UPDATE discord_recap_publications SET category_id=? WHERE community_id=? AND event_id=?').bind(category,community.id,row.event_id).run();
+      row.category_id = category; row.shared = 0;
+      await env.DB.prepare('UPDATE discord_recap_publications SET category_id=?,shared=0 WHERE community_id=? AND event_id=?').bind(category,community.id,row.event_id).run();
       await placeCategory(env,community,row.guild_id,channels,category,settings.destination_id,budget);
     }
     // Recover a channel created just before a timeout/crash from its exact topic marker, never its name.
     const existing = channel ? channels.find(item => item.id === channel) : channels.find(item => item.type === 0 && item.topic === row.marker);
-    if (existing && (existing.parent_id !== category || existing.name !== RACE_INFO_CHANNEL)) await discord(env,'PATCH',`/channels/${existing.id}`,{parent_id:category,name:RACE_INFO_CHANNEL},budget);
-    channel = existing?.id || channel || (await discord(env,'POST',`/guilds/${row.guild_id}/channels`,{type:0,name:RACE_INFO_CHANNEL,parent_id:category,topic:row.marker},budget)).id;
+    const name = row.shared ? raceChannelName(event) : RACE_INFO_CHANNEL;
+    const moved = existing && (existing.parent_id !== category || existing.name !== name);
+    if (moved) { await discord(env,'PATCH',`/channels/${existing.id}`,{parent_id:category,name},budget); Object.assign(existing,{parent_id:category,name}); }
+    if (!existing && !channel) {
+      const made = await discord(env,'POST',`/guilds/${row.guild_id}/channels`,{type:0,name,parent_id:category,topic:row.marker},budget);
+      channels.push({id:made.id,type:0,name,parent_id:category});
+    }
+    channel = existing?.id || channel || channels[channels.length - 1].id;
     await env.DB.prepare('UPDATE discord_recap_publications SET channel_id=? WHERE community_id=? AND event_id=?').bind(channel,community.id,row.event_id).run();
+    row.channel_id = channel;
+    if (row.shared) await orderCategory(env,community.id,row.guild_id,category,channels,(method,path,body) => discord(env,method,path,body,budget));
   }
   const {payload, hash} = prepared || await snapshotPayload(env,timestamp,community,settings,isEvent ? row.event_id : null);
   if (!repair && row.message_id && row.content_hash === hash) return;
@@ -279,6 +349,20 @@ async function publish(env, timestamp, community, settings, row, event, budget, 
   }
   await env.DB.prepare('UPDATE discord_recap_publications SET message_id=?,content_hash=? WHERE community_id=? AND event_id=?')
     .bind(row.message_id,hash,community.id,row.event_id).run();
+}
+// The races' own categories from before the sims' categories: deleted once their voice channels have left.
+async function removeEmptiedCategories(env, community, budget) {
+  const rows = (await env.DB.prepare('SELECT event_id,guild_id,old_category_id FROM discord_recap_publications WHERE community_id=? AND old_category_id IS NOT NULL').bind(community.id).all()).results || [];
+  if (!rows.length || budget.left < 2) return;
+  const channels = await discord(env,'GET',`/guilds/${rows[0].guild_id}/channels`,null,budget);
+  for (const row of rows) {
+    if (channels.some(item => item.parent_id === row.old_category_id) || budget.left < 1) continue;
+    if (channels.some(item => item.id === row.old_category_id)) {
+      try { await discord(env,'DELETE',`/channels/${row.old_category_id}`,null,budget); }
+      catch (error) { if (error.status !== 404) throw error; }
+    }
+    await env.DB.prepare('UPDATE discord_recap_publications SET old_category_id=NULL WHERE community_id=? AND event_id=?').bind(community.id,row.event_id).run();
+  }
 }
 async function syncLocked(env,timestamp,community,settings, test = false, budget = {left:12}, priority = null) {
   const rows = (await env.DB.prepare('SELECT * FROM discord_recap_publications WHERE community_id=? AND closed_at IS NULL ORDER BY checked_at,event_id').bind(community.id).all()).results || [];
@@ -313,6 +397,7 @@ async function syncLocked(env,timestamp,community,settings, test = false, budget
       await publish(env,timestamp,community,settings,row,event,budget,prepared,test);
       await env.DB.prepare('UPDATE discord_recap_publications SET checked_at=? WHERE community_id=? AND event_id=?').bind(timestamp,community.id,eventId).run();
     }
+    await removeEmptiedCategories(env,community,budget);
   }
   return {ok:true};
 }
@@ -378,7 +463,7 @@ export async function cleanupEventRecaps(env, timestamp = Date.now(), limit = 2)
       const event = await env.DB.prepare('SELECT departures,duration_hours,duration_minutes,schedule_pending FROM events WHERE id=?').bind(row.event_id).first();
       const expiry = event ? eventDeletionTime(event) : row.delete_after;
       if (expiry === null || timestamp < expiry) continue;
-      await removeRaceChannels(env,row,row.anchor_id,{left:2});
+      await removeRaceChannels(env,row,row.anchor_id,{left:3});
       await env.DB.prepare('UPDATE discord_recap_publications SET closed_at=? WHERE community_id=? AND event_id=? AND closed_at IS NULL').bind(timestamp,row.community_id,row.event_id).run();
       deleted++;
     } catch (error) {
