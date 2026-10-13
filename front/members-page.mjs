@@ -63,7 +63,8 @@ const ICONS = {
   training:'<path d="M3 12h4l3-8 4 16 3-8h4"/>',
   memo:'<path d="M5 4h11l3 3v13H5Z"/><path d="M9 10h6M9 14h6"/>',
   grindfest:'<path d="M4 21V4M4 4h13l-2 4 2 4H4"/>',
-  soloRaces:'<circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/>'
+  soloRaces:'<circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/>',
+  categoryEntry:'<path d="M4 6h16M4 12h10M4 18h7"/><path d="m15 17 2 2 4-4"/>'
 };
 const icon = key => `<svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[key]}</svg>`;
 const RECAP_LABELS = {all:'LMU et iRacing', lmu:'LMU', iracing:'iRacing'};
@@ -72,7 +73,7 @@ const copyButton = target => `<button type="button" class="secondary-button setu
 // What is on, for the overview and the modules.
 function moduleStates(settings, setup) {
   return {recap:Boolean(setup.botRecap?.enabled), crewChannels:settings.modules.crewChannels === true, raceReminders:settings.modules.raceReminders === true,
-    iracingImport:settings.modules.iracingImport === true, soloRaces:settings.modules.soloRaces === true, training:settings.modules.training === true, memo:settings.modules.memo === true, grindfest:settings.modules.grindfest === true};
+    iracingImport:settings.modules.iracingImport === true, soloRaces:settings.modules.soloRaces === true, training:settings.modules.training === true, memo:settings.modules.memo === true, grindfest:settings.modules.grindfest === true, categoryEntry:settings.modules.categoryEntry === true};
 }
 
 // « Vue d'ensemble ».
@@ -258,6 +259,8 @@ function modulesMarkup(settings, setup) {
       state:crewWarn ? ['warn', crews.botReady !== true ? 'Le bot n’a pas les droits' : 'Le bot est bloqué'] : states.crewChannels ? ['ok', 'Actif'] : ['off', crews.botReady === true ? 'Éteint' : crews.botProblem === 'rights' ? 'Éteint · droits du bot à donner' : 'Éteint · bot à vérifier'],
       control:toggle('crewChannels', 'Salons d’équipage sur Discord', crews.botReady !== true && !states.crewChannels),
       settings:`${crewRights}${!states.crewChannels ? '' : raceCategories ? '<p class="members-help">Chaque vocal arrive dans la catégorie de sa course.</p>' : crewCategory(crews)}<p class="members-help">Il est supprimé 2 h après la course.</p>`},
+    {key:'categoryEntry', name:'Inscription par catégorie', text:'Sur une course à plusieurs départs, le pilote choisit ses catégories et ses départs possibles. Seuls les TM forment les équipages.',
+      state:states.categoryEntry ? ['ok', 'Actif'] : ['off', 'Éteint'], control:toggle('categoryEntry', 'Inscription par catégorie'), settings:''},
     {key:'raceReminders', name:'Rappels de course', text:'24&nbsp;h avant le départ dans la cloche du site, 24&nbsp;h et 1&nbsp;h avant dans le salon de l’équipage.',
       state:states.raceReminders ? ['ok', 'Actif'] : ['off', 'Éteint'], control:toggle('raceReminders', 'Rappels de course'), settings:''},
     {key:'iracingImport', name:'Endurances iRacing officielles', text:'Les séries en équipe et les événements spéciaux importés automatiquement.',
@@ -268,7 +271,7 @@ function modulesMarkup(settings, setup) {
         <div class="settings-actions"><button class="primary-button" type="submit">Enregistrer</button><span class="settings-status" aria-live="polite"></span></div></form>`}]),
     ...(settings.modules.eventTdzAvailable ? [] : [{key:'soloRaces', name:'EVENT SOLO', text:'Un calendrier d’événements toutes simus&nbsp;: inscription en un clic, places limitées si besoin et liste d’attente.',
       state:states.soloRaces ? ['ok', 'Actif'] : ['off', 'Éteint'], control:toggle('soloRaces', 'EVENT SOLO'), settings:''}]),
-    ...(settings.modules.grindfestAvailable ? [{key:'grindfest', name:'Grindfest', text:'Événement solo : chaque pilote représente un streamer, avec ses places et sa liste d’attente.', state:states.grindfest ? ['ok','Actif'] : ['off','Éteint'], control:toggle('grindfest','Grindfest'), settings:''}] : []),
+    ...(settings.modules.grindfestAvailable ? [{key:'grindfest', name:'Gridfest', text:'Inscription par streamer, nom en jeu et mot de passe par MP Discord.', state:states.grindfest ? ['ok','Actif'] : ['off','Éteint'], control:toggle('grindfest','Gridfest'), settings:''}] : []),
     {key:'memo', name:'Mémo des circuits', text:'LMU. Pour chaque circuit et voiture&nbsp;: chronos par niveau, temps au stand et BoP.',
       state:states.memo ? ['ok', 'Actif'] : ['off', 'Éteint'], control:toggle('memo', 'Mémo des circuits'), settings:''},
     {key:'training', name:'Entraînement', text:'LMU. La prépa de chaque course, partagée avec l’équipage, et les chiffres de chaque pilote.',
@@ -755,3 +758,4 @@ app.addEventListener('change', async event => {
 });
 
 void load();
+

@@ -35,6 +35,7 @@ function harness(withParticipants=true){
  DB.db.exec(readFileSync(new URL('../migrations/0055_event_absences.sql',import.meta.url),'utf8'));
  DB.db.exec(readFileSync(new URL('../migrations/0059_grindfest.sql',import.meta.url),'utf8'));
  DB.db.exec(readFileSync(new URL('../migrations/0063_registration_comment.sql',import.meta.url),'utf8'));
+ DB.db.exec(readFileSync(new URL('../migrations/0065_gridfest_registration.sql',import.meta.url),'utf8'));
  DB.db.exec(readFileSync(new URL('../migrations/0015_crew_lock.sql',import.meta.url),'utf8'));
  DB.db.exec(readFileSync(new URL('../migrations/0016_client_errors.sql',import.meta.url),'utf8'));
  // The crews' owner column of migration 0016_crew_ownership (its backfill needs no data here).
@@ -772,3 +773,4 @@ test('a pilot linked to Discord always shows his Discord name, never another mem
  assert.equal((await req('/api/registrations/'+reg.data.id,'PATCH',{name:'Pilote '+ADMIN,category:'Hypercar',status:'whole',version:(await shown()).version},'pilot')).status,200);
  assert.equal((await shown()).name,'Pilote '+PILOT);
 });
+

@@ -2,6 +2,13 @@
 
 Les changements du site, version par version. La plus récente est en haut.
 
+## v1.32 — 13 octobre 2026
+
+- Nouveau module **Inscription par catégorie** (éteint par défaut) : le pilote choisit ses catégories, ses voitures et les départs possibles ; le TM voit le tableau des dispos, le meilleur départ par catégorie et forme les équipages depuis là.
+- Gridfest (TDZ) : nom en jeu obligatoire, mot de passe choisi par l'organisateur et envoyé en MP Discord aux pilotes confirmés.
+- Gridfest : choix du streamer par carte avec son logo, page et carte de l'événement aux couleurs de la TDZ.
+- Event solo : « Me désinscrire » en rouge à côté de « Mon inscription ».
+
 ## v1.31 — 12 octobre 2026
 
 - Discord : bouton « Réparer le récap » pour rétablir les catégories, salons ou messages supprimés, sans changer les réglages ni les inscriptions. Les publications existantes sont conservées.

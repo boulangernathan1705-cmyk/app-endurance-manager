@@ -5,7 +5,10 @@ export const grindfestEnabled = (community, development = false) => grindfestAva
 export function eventDetails(event) {
   return typeof event?.details === 'string' ? JSON.parse(event.details || '{}') : event?.details || {};
 }
-export const isGrindfest = event => eventDetails(event).type === 'Grindfest';
+// Keep the historical type and module key readable: existing entries and queues keep their identity.
+export const isGrindfest = event => ['Gridfest', 'Grindfest'].includes(eventDetails(event).type);
+// The organizer picks the password: up to 30 characters, no spaces.
+export const gridfestPasswordValid = value => typeof value === 'string' && /^\S{1,30}$/.test(value);
 export const streamersOf = event => eventDetails(event).streamers || [];
 
 export function normalizeStreamers(raw) {
@@ -41,3 +44,4 @@ export function assignStreamerWaitlist(entries, streamers) {
   }
   return entries;
 }
+

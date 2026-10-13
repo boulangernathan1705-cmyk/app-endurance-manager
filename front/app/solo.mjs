@@ -3,6 +3,7 @@
 // only holds what differs from endurance events.
 import {state,esc,button,canManage,can,logo,badge,categories} from './core.mjs';
 import {SIMS,simCatalog,simForEvent} from '../../shared/catalog.mjs';
+import {isGrindfest} from '../../shared/grindfest.mjs';
 
 export const ANY_CATEGORY = '*';
 export const isSolo = event => event?.format === 'solo';
@@ -79,7 +80,7 @@ const TILE_ICONS = {
 };
 // The server password: for the pilots entered (and whoever manages the event).
 export function canSeePassword(event) {
-  return canManage() || (event.departures || []).some(departure => (departure.availability || []).some(reg => reg.mine && reg.status !== 'unavailable'));
+  return canManage() || (!isGrindfest(event) && (event.departures || []).some(departure => (departure.availability || []).some(reg => reg.mine && reg.status !== 'unavailable')));
 }
 const detailSvg = path => `<svg viewBox="0 0 24 24" aria-hidden="true">${path}</svg>`;
 const detailTile = (icon, label, value, extra = '') => value ? `<div class="solo-detail${extra}"><span class="solo-detail-icon">${icon}</span><span class="solo-detail-copy"><span class="solo-detail-label">${esc(label)}</span><strong>${value}</strong></span></div>` : '';
@@ -107,7 +108,9 @@ export function roundTiles(round) {
 // Then the note, and the password for the pilots entered.
 export function soloEventDetails(event) {
   const details = event.details || {}, rounds = event.rounds?.length ? event.rounds : [{circuit: event.circuit, durationMinutes: event.durationMinutes}];
-  const extra = `${canSeePassword(event) ? detailTile(detailSvg(ICONS.lock), 'Mot de passe', esc(details.password || '')) : ''}${detailTile(detailSvg(ICONS.info), 'Info', esc(details.note || ''), ' is-wide')}`;
+  // Gridfest: the pilots entered get the password by Discord MP, not on the page.
+  const mpOnly = isGrindfest(event) && !canManage() && (event.departures || []).some(departure => (departure.availability || []).some(reg => reg.mine && reg.status !== 'unavailable'));
+  const extra = `${canSeePassword(event) ? detailTile(detailSvg(ICONS.lock), 'Mot de passe', esc(details.password || '')) : mpOnly ? detailTile(detailSvg(ICONS.lock), 'Mot de passe', 'Par MP Discord') : ''}${detailTile(detailSvg(ICONS.info), 'Info', esc(details.note || ''), ' is-wide')}`;
   const tiles = rounds.length > 1 ? '' : roundTiles(rounds[0]);
   return tiles || extra ? `<div class="solo-event-details">${tiles}${extra ? `<div class="solo-detail-grid solo-detail-extra">${extra}</div>` : ''}</div>` : '';
 }
@@ -164,7 +167,7 @@ export function soloEntryList(event, departure, entries, {round = 0, title = 'Pi
   const current = (event.rounds || [])[round] || {}, order = current.randomCategory ? [] : current.categories?.length ? current.categories : event.categories || [];
   const categoryOf = reg => current.randomCategory ? '' : (reg.roundChoices?.[round]?.category ?? reg.category) || '';
   const edit = reg => reg.canEdit && departure.startsAt > Date.now() && reg.managed ? `<button type="button" class="solo-entry-edit" data-action="edit-registration" data-id="${reg.id}" data-departure="${departure.id}" data-tip="Modifier" aria-label="Modifier l’inscription de ${esc(reg.name)}">${EDIT_ICON}</button>` : '';
-  const pill = (reg, rank, withLogo) => `<li class="solo-entry${reg.mine ? ' is-mine' : ''}"><span class="solo-entry-rank">${rank}</span><strong class="solo-entry-name">${esc(reg.name)}</strong>${!withLogo || !categoryOf(reg) ? '' : categoryOf(reg) === ANY_CATEGORY ? '<span class="solo-entry-logo is-any" title="Peu importe">✱</span>' : `<span class="solo-entry-logo" title="${esc(categoryOf(reg))}">${logo(categoryOf(reg))}</span>`}${edit(reg)}</li>`;
+  const pill = (reg, rank, withLogo) => `<li class="solo-entry${reg.mine ? ' is-mine' : ''}"><span class="solo-entry-rank">${rank}</span><strong class="solo-entry-name">${esc(reg.name)}${isGrindfest(event)?`<small class="gridfest-game-name">${reg.gameName?esc(reg.gameName):'Nom en jeu manquant'}</small>`:''}</strong>${!withLogo || !categoryOf(reg) ? '' : categoryOf(reg) === ANY_CATEGORY ? '<span class="solo-entry-logo is-any" title="Peu importe">✱</span>' : `<span class="solo-entry-logo" title="${esc(categoryOf(reg))}">${logo(categoryOf(reg))}</span>`}${edit(reg)}</li>`;
   const grid = entries.filter(reg => !waitOf(reg)), waiting = entries.filter(reg => waitOf(reg)).sort((a, b) => waitOf(a) - waitOf(b));
   // One list, sorted by category (each pilot with its logo), then by order of entry.
   const keys = [...order, ANY_CATEGORY, ''], rankOf = reg => { const index = keys.indexOf(categoryOf(reg)); return index < 0 ? keys.length : index; };
@@ -183,3 +186,4 @@ export function roundExtras(round) {
   const weather = WEATHERS.find(([value]) => value === round.weather)?.[1];
   return [weather, round.fuel != null ? `carburant ×${round.fuel}` : '', round.tyres != null ? `usure pneus ×${round.tyres}` : ''].filter(Boolean).join(' · ');
 }
+

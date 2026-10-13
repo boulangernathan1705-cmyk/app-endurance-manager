@@ -1,5 +1,5 @@
 import {isGrindfest} from '../../shared/grindfest.mjs';
-import {streamerColumns} from './grindfest.mjs';
+import {streamerColumns, gridfestPasswordPanel} from './grindfest.mjs';
 import {simForEvent} from '../../shared/catalog.mjs';
 import {dateBlock,timeLabel,weekdayLong,dayMonthShort} from '../dates.mjs';
 import {durationLabel,eventMinutes} from '../../shared/duration.mjs';
@@ -10,6 +10,7 @@ import {isSolo,accessBadge,soloCardMeta,soloEventDetails,roundTiles,roundPilots,
 import {renderHome,raceDateBlock,raceStarts} from './home-view.mjs';
 import {planningDays,renderPlanning,syncPlanning,CHEVRON} from './planning.mjs';
 import {raceInfoChips} from './race-info.mjs';
+import {categoryEntryOn,categoryEntryBar,categoryEntryGate,categoryEntryBoard} from './category-entry.mjs';
 
 function canCreateCrewOnDeparture(departure,event=null){
   if(!state.user||departure.startsAt<=Date.now())return false;
@@ -56,11 +57,12 @@ function absenceButton(event){
 function quickActions(event,departure){
   if(departure.startsAt<=Date.now()||!state.user)return '';
   const solo=isSolo(event),own=ownRegistration(departure),mine=(departure.availability||[]).filter(reg=>reg.mine&&reg.status!=='unavailable');
-  let main=null;const more=[];
+  let main=null,leave=null;const more=[];
   if(solo){
     const blocked=soloEntryBlock(event);
     if(own&&!soloRounds(event).length)main={action:'delete-registration',label:'Me désinscrire',extra:`data-id="${own.id}"`,leave:true};
-    else if(own)main={action:'my-registration',label:'Mon inscription',extra:''};
+    // Entry in rounds: « Mon inscription » to change it, and « Me désinscrire » in red right next to it.
+    else if(own){main={action:'my-registration',label:'Mon inscription',extra:''};leave={action:'delete-registration',label:'Me désinscrire',extra:`data-id="${own.id}"`};}
     else if(!blocked)main={action:'my-registration',label:'M’inscrire',extra:''};
     if(!main&&blocked&&!can('manage_registrations'))return `<span class="planning-quick">${safeGuideLink(event)||`<span class="solo-blocked">${esc(blocked)}</span>`}</span>`;
   }else{
@@ -68,18 +70,20 @@ function quickActions(event,departure){
     // Entered: « Me désinscrire » in red, as on the events; the entry is changed from the « … » menu.
     // Entered in several categories: « Mon inscription » (each one is withdrawn there).
     if(mine.length===1){main={action:'delete-registration',label:'Me désinscrire',extra:`data-id="${mine[0].id}"`,leave:true};more.push({action:'my-registration',label:'Modifier mon inscription',extra:''});}
-    else if(mine.length||can('endurance'))main={action:'my-registration',label:mine.length?'Mon inscription':'M’inscrire',extra:''};
+    // « Inscription par catégorie »: entering is done once, above the starts.
+    else if(mine.length||(can('endurance')&&!categoryEntryOn(event)))main={action:'my-registration',label:mine.length?'Mon inscription':'M’inscrire',extra:''};
     if(own&&!assigned&&event.categories.some(category=>!mine.some(reg=>reg.category===category)))more.push({action:'new-registration',label:'M’inscrire dans une autre catégorie',extra:`data-mode="category" data-registration="${own.id}"`});
   }
   if(can('manage_registrations'))more.push({action:'new-registration',label:'Inscrire un autre pilote',extra:'data-mode="pilot"'});
   const square=(icon,tip,attrs,label='',extra='')=>`<button type="button" class="planning-quick-button${label?' is-labelled':''}${extra}" ${attrs} data-tip="${esc(tip)}" aria-label="${esc(tip)}"><span class="planning-quick-icon">${icon}</span>${label?`<span class="planning-quick-label">${esc(label)}</span>`:''}</button>`;
   const register=main?square(main.leave?ICON_UNREGISTER:ICON_REGISTER,main.label,`data-action="${main.action}" data-departure="${departure.id}" ${main.extra}`,main.label,main.leave?' is-leave':''):'';
+  const unregister=leave?square(ICON_UNREGISTER,leave.label,`data-action="${leave.action}" data-departure="${departure.id}" ${leave.extra}`,leave.label,' is-leave'):'';
   const menu=!more.length?'':more.length===1&&!main?square(ICON_REGISTER,more[0].label,`data-action="${more[0].action}" data-departure="${departure.id}" ${more[0].extra}`,'Inscrire')
     :`<span class="planning-quick-menu-wrap">${square(ICON_MORE,'Autres inscriptions','data-action="quick-menu" aria-haspopup="menu" aria-expanded="false"')}<span class="planning-quick-menu" role="menu" hidden>${more.map(item=>`<button type="button" role="menuitem" class="planning-quick-item" data-action="${item.action}" data-departure="${departure.id}" ${item.extra}>${esc(item.label)}</button>`).join('')}</span></span>`;
   const crewLabel='Créer un équipage';
   const crew=!solo&&canCreateCrewOnDeparture(departure,event)?square(ICON_CREW,crewLabel,`data-crew-builder-open data-departure="${departure.id}"`):'';
   const absence=absenceButton(event);
-  return register||absence||menu||crew?`<span class="planning-quick">${register}${absence}${menu}${crew}</span>`:'';
+  return register||absence||menu||crew?`<span class="planning-quick">${register}${unregister}${absence}${menu}${crew}</span>`:'';
 }
 
 // An event in several rounds: each round is shown like a start, « Manche 1 », « Manche 2 », with its own
@@ -109,7 +113,7 @@ function grindfestRounds(event,departure){
   const rounds=event.rounds||[],locked=departure.startsAt<=Date.now(),mine=ownRegistration(departure),pilots=roundPilots(event,0,departure);
   const editor=!locked&&state.registrationOpen.has(departure.id)?`<section class="fold-section fold-registration">${renderRegistrationWorkspace(event,departure)}</section>`:'';
   const program=rounds.length>1?`<div class="grindfest-rounds">${rounds.map((round,index)=>`<section class="grindfest-round"><h3>Manche ${index+1} · ${esc(eventCircuitName(event,round.circuit))}</h3>${roundTiles(round)}</section>`).join('')}</div>`:'';
-  return `<div class="solo-round-starts" id="departure-${departure.id}">${program}<details class="planning-start solo-round-start is-single has-quick${mine?' is-mine':''}" open><summary><span class="planning-start-head solo-round-head"><span class="solo-subtitle">Pilotes <span class="count-pill">${pilots} / ${event.capacity}</span></span>${mine?'<span class="planning-tag is-mine">Inscrit</span>':''}</span>${quickActions(event,departure)}</summary><div class="departure-fold planning-body"><div class="departure-fold-body">${editor}${streamerColumns(event,departure)}</div></div></details></div>`;
+  return `<div class="solo-round-starts is-gridfest" id="departure-${departure.id}">${gridfestPasswordPanel(event)}${program}<details class="planning-start solo-round-start is-single has-quick${mine?' is-mine':''}" open><summary><span class="planning-start-head solo-round-head"><span class="solo-subtitle">Pilotes <span class="count-pill">${pilots} / ${event.capacity}</span></span>${mine?'<span class="planning-tag is-mine">Inscrit</span>':''}</span>${quickActions(event,departure)}</summary><div class="departure-fold planning-body"><div class="departure-fold-body">${editor}${streamerColumns(event,departure)}</div></div></details></div>`;
 }
 function roundCards(event,departure){
   if(!isSolo(event))return '';
@@ -136,7 +140,7 @@ function departureActions(event,departure){
   const createCrewAction=canCreateCrew?`<button type="button" class="link-button ux-summary-create-crew" data-crew-builder-open data-departure="${departure.id}" data-tip="Choisis la voiture, compose les pilotes et verrouille l’équipage quand il est complet.">Créer un équipage</button>`:'';
   const mine=(departure.availability||[]).filter(reg=>reg.mine&&reg.status!=='unavailable');
   const leave=mine.length===1?button('delete-registration','Me désinscrire',`data-departure="${departure.id}" data-id="${mine[0].id}"`,'secondary-button is-leave'):'';
-  return `<span class="ux-summary-registration-actions${canCreateCrew?' is-three-actions':''}">${own||can('endurance')?button('my-registration',own?'Modifier mon inscription':'S’inscrire',`data-departure="${departure.id}"`,'primary-button ux-summary-registration-toggle'):''}${leave}${can('manage_registrations')?button('new-registration','Inscrire un autre pilote',`data-departure="${departure.id}" data-mode="pilot"`,'link-button ux-summary-registration-other'):''}${createCrewAction}</span>`;
+  return `<span class="ux-summary-registration-actions${canCreateCrew?' is-three-actions':''}">${own||(can('endurance')&&!categoryEntryOn(event))?button('my-registration',own?'Modifier mon inscription':'S’inscrire',`data-departure="${departure.id}"`,'primary-button ux-summary-registration-toggle'):''}${leave}${can('manage_registrations')?button('new-registration','Inscrire un autre pilote',`data-departure="${departure.id}" data-mode="pilot"`,'link-button ux-summary-registration-other'):''}${createCrewAction}</span>`;
 }
 function departureFoldBody(event,departure){
   const locked=departure.startsAt<=Date.now(),editorOpen=state.registrationOpen.has(departure.id);
@@ -233,12 +237,15 @@ export function renderEvent(message=''){
   // actions sit on its heading line.
   const starts=days.length?renderPlanning(event,days,departure=>departureFoldBody(event,departure),{actions:eventActions,quick:departure=>quickActions(event,departure),cards:departure=>roundCards(event,departure)})
     :`<section class="departure-accordion" aria-label="Départs de la course">${upcoming}${renderPastDepartures(event,past)}</section>`;
-  const myStart=days.length>1?days.flatMap(day=>day.items).map(item=>item.departure).find(departure=>Number(departure.startsAt)>now&&(departure.availability||[]).some(reg=>reg.mine&&reg.status!=='unavailable')):null;
+  // « Inscription par catégorie »: entered on several starts, the pilot only has « his » start once in a crew.
+  const placedOn=departure=>(departure.crews||[]).some(crew=>(departure.availability||[]).some(reg=>reg.mine&&(crew.registrationIds||[]).includes(reg.id)));
+  const myStart=days.length>1?days.flatMap(day=>day.items).map(item=>item.departure).find(departure=>Number(departure.startsAt)>now&&(departure.availability||[]).some(reg=>reg.mine&&reg.status!=='unavailable')&&(!categoryEntryOn(full)||placedOn(departure))):null;
   const myStartLink=myStart?`<span class="race-my-start"><small>Ton départ</small>${button('goto-departure',`${esc(weekdayLong(myStart.startsAt))} ${esc(dayMonthShort(myStart.startsAt))} · Départ ${esc(timeLabel(myStart.time))}`,`data-departure="${myStart.id}"`,'secondary-button')}</span>`:'';
   // Endurances: the badges sit under the date, the race settings (icons) under the circuit.
   const badges=`<span class="race-badges">${officialBadge(event)}${isSolo(event)?accessBadge(event):eventTypeBadge(event.eventType)}${schedulePendingBadge(event)}</span>`;
   app.eventViewData={eventId:event.id,events:state.events,message};
-  app.innerHTML=`<div class="event-header event-header-compact race-header event-type-${event.eventType||'private'}${isSolo(event)?` is-solo-${event.access||'open'} sim-${simForEvent(event)}`:''}" data-event-id="${event.id}"><div class="race-card-top">${isSolo(event)?raceDateBlock(event,!next&&!undated.length):`<div class="race-side">${raceDateBlock(event,!next&&!undated.length)}${badges}</div>`}<div class="race-head"><h1 class="event-title event-name">${esc(event.name)}</h1><span class="race-meta">${isSolo(event)?((event.rounds||[]).length>1?soloCardMeta(event):`<strong class="solo-header-circuit">${soloCardMeta(event)}</strong>`):`${esc(circuitLabel(event.circuit))} · <span class="nowrap">${durationLabel(eventMinutes(event))}</span>`}</span>${isSolo(event)?badges+soloHeaderTime(event,next):raceInfoChips(event)}</div>${myStartLink}${isSolo(event)?eventTypePanel(event):circuitVisual(event.circuit)}</div>${days.length?(isSolo(event)?(soloEventDetails(event)?`<div class="race-header-footer">${soloEventDetails(event)}</div>`:''):raceStarts(event,!next&&!undated.length)):`${isSolo(event)?'':raceStarts(event,!next&&!undated.length)}<div class="race-header-footer">${isSolo(event)?soloEventDetails(event):`<div class="event-header-stats event-category-badges">${event.categories.map(category=>eventBadge(category,eventCategoryCount(event,category))).join('')}</div>`}${eventActions}</div>`}</div><div id="crew-builder-root"></div>${message?`<p class="creation-success" role="status">${esc(message)}</p>`:''}${communityFilter(present,chosen)}${starts}${absencesSection(full,!!(next||undated.length))}`;
+  const gate=categoryEntryGate(full);
+  app.innerHTML=`<div class="event-header event-header-compact race-header event-type-${event.eventType||'private'}${isSolo(event)?` is-solo-${event.access||'open'} sim-${simForEvent(event)}`:''}${isGrindfest(event)?' is-gridfest':''}" data-event-id="${event.id}"><div class="race-card-top">${isSolo(event)?raceDateBlock(event,!next&&!undated.length):`<div class="race-side">${raceDateBlock(event,!next&&!undated.length)}${badges}</div>`}<div class="race-head"><h1 class="event-title event-name">${esc(event.name)}</h1><span class="race-meta">${isSolo(event)?((event.rounds||[]).length>1?soloCardMeta(event):`<strong class="solo-header-circuit">${soloCardMeta(event)}</strong>`):`${esc(circuitLabel(event.circuit))} · <span class="nowrap">${durationLabel(eventMinutes(event))}</span>`}</span>${isSolo(event)?badges+soloHeaderTime(event,next):raceInfoChips(event)}</div>${myStartLink}${isSolo(event)?eventTypePanel(event):circuitVisual(event.circuit)}</div>${days.length?(isSolo(event)?(soloEventDetails(event)?`<div class="race-header-footer">${soloEventDetails(event)}</div>`:''):gate?'':raceStarts(event,!next&&!undated.length)):`${isSolo(event)?'':raceStarts(event,!next&&!undated.length)}<div class="race-header-footer">${isSolo(event)?soloEventDetails(event):`<div class="event-header-stats event-category-badges">${event.categories.map(category=>eventBadge(category,eventCategoryCount(event,category))).join('')}</div>`}${eventActions}</div>`}</div><div id="crew-builder-root"></div>${message?`<p class="creation-success" role="status">${esc(message)}</p>`:''}${communityFilter(present,chosen)}${gate||`${categoryEntryBar(full)}${categoryEntryBoard(full)}${starts}${absencesSection(full,!!(next||undated.length))}`}`;
   if(days.length)syncPlanning(app);
   notifyRender();
 }
@@ -255,3 +262,4 @@ if(typeof document!=='undefined')document.addEventListener('click',event=>{
   const summary=event.target.closest?.('.solo-round-start.is-single > summary');
   if(summary&&!event.target.closest('button,a,input,select'))event.preventDefault();
 });
+
