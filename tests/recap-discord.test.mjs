@@ -477,3 +477,13 @@ test('après un changement, la course modifiée est mise à jour en premier', as
   calls.length=0;await syncBotRecaps(env,NOW+10,COMMUNITY,false,'race-c');
   assert.equal(DB.db.prepare("SELECT checked_at FROM discord_recap_publications WHERE event_id='race-c'").get().checked_at,NOW+10);
 });
+
+test('les catégories des courses se rangent par simu, LMU puis iRacing, chacune par date',async t=>{
+  const {DB,env,channels}=setup(t);
+  race(DB,'ir-soon','iRacing proche','iracing-spa',[{id:'a',startsAt:NOW+DAY}]);race(DB,'lmu-late','LMU tardive','spa',[{id:'b',startsAt:NOW+3*DAY}]);
+  race(DB,'lmu-soon','LMU proche','monza',[{id:'c',startsAt:NOW+2*DAY}]);race(DB,'ir-late','iRacing tardive','iracing-monza',[{id:'d',startsAt:NOW+4*DAY}]);
+  await saveBotRecap(env,COMMUNITY,SETTINGS);
+  for(let pass=0;pass<2;pass++)await syncBotRecaps(env,NOW+pass,COMMUNITY);
+  assert.deepEqual(channels.filter(item=>item.type===4).sort((a,b)=>a.position-b.position).map(item=>item.name),
+    ['Accueil','Endurances','🏎️ LMU · LMU proche','🏎️ LMU · LMU tardive','🏁 iRacing · iRacing proche','🏁 iRacing · iRacing tardive','Vocaux']);
+});
