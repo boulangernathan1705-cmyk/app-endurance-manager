@@ -107,6 +107,20 @@ test('0012 preserves populated registrations, ownership and crew membership',()=
  for(let i=0;i<before.length;i++){const {participant_id,...rest}=after[i];assert.deepEqual(rest,{...before[i]});}
  assert.equal(db.prepare('SELECT COUNT(*) n FROM crew_members').get().n,1);assert.equal(db.prepare('PRAGMA foreign_key_check').all().length,0);
 });
+test('a pilot shows under his nickname on the community Discord server, else his Discord name',async()=>{
+ const {DB,req,login}=harness();
+ await login(ADMIN,'admin');await login(PILOT,'pilot');await login(OTHER,'other');
+ DB.db.prepare('UPDATE memberships SET nickname=? WHERE user_id=?').run('SPM | Jordi',PILOT);
+ const created=await req('/api/events','POST',{...eventInput,name:'Pseudo serveur'},'admin');
+ const event=(await req('/api/events','GET',null,'admin')).data.events[0],departure=event.departures[0];
+ const path=`/api/events/${created.data.id}/departures/${departure.id}/registrations`;
+ assert.equal((await req(path,'POST',{name:'x',category:'Hypercar',status:'whole'},'pilot')).status,201);
+ assert.equal((await req(path,'POST',{name:'x',category:'Hypercar',status:'whole'},'other')).status,201);
+ const names=(await req('/api/events','GET',null,'pilot')).data.events.find(e=>e.id===created.data.id).departures[0].availability.map(r=>r.name).sort();
+ assert.deepEqual(names,['Pilote '+OTHER,'SPM | Jordi']);
+ const picker=(await req('/api/participants','GET',null,'admin')).data.participants.find(p=>p.id===PILOT);
+ assert.equal(picker.name,'SPM | Jordi');
+});
 test('one pilot may register in multiple categories until an organizer assigns one to a crew',async()=>{
  const {req,login}=harness();
  await login(ADMIN,'admin');await login(PILOT,'pilot');

@@ -2,6 +2,10 @@
 
 Les changements du site, version par version. La plus récente est en haut.
 
+## v1.42 — 14 octobre 2026
+
+- Pilotes : sur le site d'une communauté, chaque pilote apparaît sous son pseudo sur le serveur Discord de cette communauté (sinon son nom Discord).
+
 ## v1.41 — 14 octobre 2026
 
 - Barre de présence : sur une 24h ou un départ à la demie (ex. 15h30), les heures ne se chevauchent plus.

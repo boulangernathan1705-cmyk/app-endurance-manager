@@ -105,6 +105,9 @@ export async function checkMembership(env, community, userId) {
       ON CONFLICT(community_id,user_id) DO UPDATE SET discord_roles=excluded.discord_roles,nickname=excluded.nickname,
         discord_admin=excluded.discord_admin,status='member',checked_at=excluded.checked_at`)
     .bind(community.id, userId, JSON.stringify(roles), nickname, discordAdmin, time, time).run();
+  // His pilot entry here follows his name on this server (nickname, else Discord name).
+  await env.DB.prepare(`UPDATE participants SET name=COALESCE(NULLIF(?,''),(SELECT name FROM users WHERE id=?)) WHERE community_id=? AND user_id=?`)
+    .bind(nickname, userId, community.id, userId).run();
   return {status:'member', discord_roles:JSON.stringify(roles), discord_admin:discordAdmin, checked_at:time};
 }
 
