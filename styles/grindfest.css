@@ -59,10 +59,6 @@ html[data-game] #app .race-header.is-gridfest > * {position:relative;z-index:1}
 html[data-game] #app .race-header.is-gridfest .event-type-panel {border:0;background:radial-gradient(circle,rgba(255,123,0,.35),transparent 70%)}
 html[data-game] #app .race-header.is-gridfest .event-type-panel span {font-size:30px}
 html[data-game] #app .race-header.is-gridfest .event-type-panel span,.gridfest-wordmark {background:var(--gf-grad);-webkit-background-clip:text;background-clip:text;color:transparent;font-weight:900;font-style:italic;letter-spacing:.06em;filter:drop-shadow(0 0 10px rgba(255,61,0,.45))}
-.solo-round-starts.is-gridfest .grindfest-column {border-color:rgba(255,123,0,.45);background:linear-gradient(180deg,rgba(255,123,0,.12),transparent 120px),var(--surface,#171c25)}
-.solo-round-starts.is-gridfest .grindfest-column:nth-child(3n+2) {border-color:rgba(255,61,0,.45);background:linear-gradient(180deg,rgba(255,61,0,.12),transparent 120px),var(--surface,#171c25)}
-.solo-round-starts.is-gridfest .grindfest-column:nth-child(3n) {border-color:rgba(255,196,0,.45);background:linear-gradient(180deg,rgba(255,196,0,.12),transparent 120px),var(--surface,#171c25)}
-.solo-round-starts.is-gridfest .solo-round-start.is-single {border-color:rgba(255,123,0,.6)}
 
 /* Card in the list */
 html[data-game] #app .race-card.is-gridfest .event-name {background:var(--gf-grad);-webkit-background-clip:text;background-clip:text;color:transparent}
