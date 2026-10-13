@@ -82,6 +82,28 @@ test('special event time slots are read from the iracing.com article of the race
     ['2099-10-03T03:00:00.000Z','2099-10-03T07:00:00.000Z','2099-10-04T00:00:00.000Z']);
 });
 
+test('a special event article using the short name of the slug is found (Indy 8 Hour)', async () => {
+  const {articleFor, specialStarts} = await import('../server/iracing-import.mjs');
+  const posts = [{date:'2099-10-12T09:00:00', title:{rendered:'THIS WEEK: iRacing Indy 8 Hour presented by PC&#8217;s by THOMAS | Special Event'},
+    content:{rendered:'<li>Timeslot #1: Friday at 22:00 GMT (6:00 p.m. ET)</li><li>Timeslot #2: Saturday at 07:00 GMT (3:00 a.m. ET)</li><li>Timeslot #3: Saturday at 12:00 GMT (8:00 a.m. ET)</li><li>Timeslot #4: Saturday at 16:00 GMT (12:00 p.m. ET)</li><li>Timeslot #5: Sunday at 00:00 GMT (8:00 p.m. ET Saturday)</li>'}}];
+  const special = {name:'8 Hours of Indianapolis', slug:'indy-8hr', dateStart:'2099-10-16', dateEnd:'2099-10-18'};
+  const article = articleFor(posts, special);
+  assert.ok(article);
+  assert.equal(specialStarts(article.content.rendered, special.dateStart, special.dateEnd).length, 5);
+  const two = [...posts, {date:'2099-10-12T10:00:00', title:{rendered:'THIS WEEK: iRacing Bathurst 1000 | Special Event'}, content:{rendered:''}}];
+  assert.match(articleFor(two, special).title.rendered, /Indy/);
+  assert.match(articleFor(two, {name:'Bathurst 1000', slug:'bathurst-1000', dateStart:'2099-10-16', dateEnd:'2099-10-18'}).title.rendered, /Bathurst/);
+});
+
+test('a special event article with another name is still found when it is the only one of the race week', async () => {
+  const {articleFor} = await import('../server/iracing-import.mjs');
+  const posts = [{date:'2099-10-12T09:00:00', title:{rendered:'THIS WEEK: iRacing Brickyard Sprint presented by Someone | Special Event'}, content:{rendered:''}}];
+  const special = {name:'8 Hours of Indianapolis', slug:'indy-8hr', dateStart:'2099-10-16', dateEnd:'2099-10-18'};
+  assert.ok(articleFor(posts, special));
+  assert.equal(articleFor([...posts, {...posts[0], title:{rendered:'THIS WEEK: Other Race | Special Event'}}], special), null, 'two articles: no guess');
+  assert.equal(articleFor([{...posts[0], date:'2099-10-08T09:00:00'}], special), null, 'last week article is not taken');
+});
+
 test('a lap race whose schedule entry gives a few minutes keeps a real duration (Bathurst 1000)', () => {
   const HALF_HOURS = Array.from({length:48}, (_, i) => `${String(Math.floor(i / 2)).padStart(2, '0')}:${i % 2 ? '30' : '00'}`);
   const plans = planIracingEvents({
