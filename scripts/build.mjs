@@ -66,6 +66,9 @@ function injectI18n(source) {
   return source.replace('</head>', `${i18nScriptTag}\n</head>`);
 }
 
+// Each deployment gets its own id: an open page compares it with /front/version.json and reloads itself once
+// a newer version is online (front/app/auto-refresh.mjs).
+const BUILD_ID = (process.env.WORKERS_CI_COMMIT_SHA || '').slice(0, 12) || Date.now().toString(36);
 function productionHtml(source) {
   let firstStylesheet = true;
   const bundled = source.replace(new RegExp(stylesheetTagPattern.source, stylesheetTagPattern.flags), () => {
@@ -73,7 +76,7 @@ function productionHtml(source) {
     firstStylesheet = false;
     return '<link rel="stylesheet" href="/app.css">';
   });
-  return injectI18n(bundled);
+  return injectI18n(bundled).replace('</head>', `<meta name="em-build" content="${BUILD_ID}">\n</head>`);
 }
 
 await rm(out, {recursive: true, force: true});
@@ -137,6 +140,7 @@ for (const file of ['app.js', 'crew-builder.js', 'help.js', 'privacy.css', 'sw.j
 await copyFile(root + 'help.css', new URL('help.css', out));
 await cp(root + 'images', new URL('images/', out), {recursive: true});
 await cp(root + 'front', new URL('front/', out), {recursive: true});
+await writeFile(new URL('front/version.json', out), JSON.stringify({build: BUILD_ID}) + '\n');
 await cp(root + 'shared', new URL('shared/', out), {recursive: true});
 // The LMU sync program (connectors/lmu-sync, built with `npm run build:sync`): the server adds the pilot's key at download.
 await cp(root + 'downloads', new URL('downloads/', out), {recursive: true});
