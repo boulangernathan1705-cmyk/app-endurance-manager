@@ -2,6 +2,14 @@
 
 Les changements du site, version par version. La plus récente est en haut.
 
+## v1.37 — 13 octobre 2026
+
+- Discord : dans infos-de-la-course, un pilote sans équipage n'apparaît qu'une fois, et une ligne vide sépare les départs.
+- Pilotes sans équipage : les logos de plusieurs catégories ne se chevauchent plus.
+- Mes inscriptions : une seule carte quand tu es inscrit dans plusieurs catégories sur un départ.
+- Course aux horaires à confirmer : le départ « à définir » se présente comme les autres (M'inscrire / Absent).
+- Affichage corrigé sur téléphone et ordinateur : pastille « Inscrit », type de course sous la date, manches d'EVENT SOLO, boutons des pages d'erreur, liens et aperçu dans l'Administration.
+
 ## v1.36 — 13 octobre 2026
 
 - Discord : dans infos-de-la-course, chaque équipage a le logo de sa catégorie et chaque pilote sans équipage apparaît avec les logos de ses catégories (emojis du bot, sans Nitro).
