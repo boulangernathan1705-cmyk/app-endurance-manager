@@ -10,27 +10,36 @@ import {refreshMemberships} from './access.mjs';
 import {purgeNotifications} from './notifications.mjs';
 import {cleanupEventRecaps} from './recap-discord.mjs';
 import {syncCrewDiscord} from './crew-discord.mjs';
-import {allCommunities, currentCommunity, communitySlug, appearanceOf} from './community.mjs';
+import {allCommunities, currentCommunity, communityById, communitySlug, appearanceOf} from './community.mjs';
 import {isDevelopment,devRobots,markDevelopmentResponse} from './dev-environment.mjs';
 
 async function runWeeklySync(env, community = null, eventId = null) {
   return syncWeeklyDiscord(env, Date.now(), community, eventId);
 }
 // The race changed by a request, read before it runs (a deleted entry or crew can no longer be looked up).
-async function changedEvent(env, request) {
-  const target = mutationTarget(request);
-  if (!target) return null;
-  if (target.kind === 'events') return target.id;
-  try {
-    const row = await env.DB.prepare(`SELECT event_id FROM ${target.kind} WHERE id=?`).bind(target.id).first();
-    return row?.event_id || null;
-  } catch { return null; }
+export async function discordMutationTarget(env, request) {
+  const target=mutationTarget(request);
+  if(!target)return null;
+  if(target.kind==='events'){
+    // Official race entries can belong to a different community than the current site.
+    let communityId=null;
+    if(request.method==='POST'&&/\/(registrations|crews)$/.test(new URL(request.url).pathname)){
+      try{communityId=(await request.clone().json()).communityId||null;}catch{}
+    }
+    return {eventId:target.id,communityId};
+  }
+  try{
+    // Read before deletion; the registration/crew determines which Discord must be updated.
+    const row=await env.DB.prepare(`SELECT event_id,community_id FROM ${target.kind} WHERE id=?`).bind(target.id).first();
+    return row?{eventId:row.event_id,communityId:row.community_id}:null;
+  }catch{return null;}
 }
 
 // After a change of races or entries: the recap messages of this community only.
-function queueWeeklySync(env, ctx, request, eventId = null) {
+function queueWeeklySync(env, ctx, request, eventId = null, communityId = null) {
   if (!env?.DB || !ctx?.waitUntil) return;
-  ctx.waitUntil(currentCommunity(env, request).then(async community => {
+  ctx.waitUntil((communityId?communityById(env,communityId):currentCommunity(env,request)).then(async community => {
+    if(!community)return;
     await runWeeklySync(env, community, eventId).catch(error => console.error('Discord weekly sync failed', error instanceof Error ? error.message : 'unknown'));
     // The threads of its crews on Discord follow at once (a new pilot, another car…).
     if (community?.modules?.crewChannels === true) await syncCrewDiscord(env, Date.now(), {community, requests:6});
@@ -107,9 +116,9 @@ export default {
       }
     }
     const weeklyMutation = isWeeklyDiscordMutation(request);
-    const eventId = weeklyMutation && env?.DB ? await changedEvent(env, request) : null;
+    const target = weeklyMutation && env?.DB ? await discordMutationTarget(env, request) : null;
     const response = await worker.fetch(request, env, ctx);
-    if (weeklyMutation && response.ok) queueWeeklySync(env, ctx, request, eventId);
+    if (weeklyMutation && response.ok) queueWeeklySync(env, ctx, request, target?.eventId, target?.communityId);
     return development ? markDevelopmentResponse(response, env) : response;
   },
 

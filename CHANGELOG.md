@@ -2,6 +2,12 @@
 
 Les changements du site, version par version. La plus récente est en haut.
 
+## v1.45 — 14 octobre 2026
+
+- Discord : une inscription ou désinscription faite depuis le site d’une autre communauté actualise le récap de la communauté concernée.
+- Récaps existants : recalcul au prochain passage pour appliquer le tri par catégorie.
+- Disponibilités : même couleur de frise pour tous les pilotes ; seul le cadre de son inscription est mis en évidence.
+
 ## v1.44 — 14 octobre 2026
 
 - Gridfest : logos officiels sur la carte de l’événement et dans son bandeau.
