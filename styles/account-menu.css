@@ -345,6 +345,7 @@
   min-height: 40px;
   display: grid;
   place-items: center;
+  padding: 0;
   border: 1px solid rgba(88,113,118,.72);
   border-radius: 11px;
   background: rgba(12,18,21,.92);
@@ -360,6 +361,7 @@
 }
 
 .notif-bell svg {
+  display: block;
   width: 20px;
   height: 20px;
 }
