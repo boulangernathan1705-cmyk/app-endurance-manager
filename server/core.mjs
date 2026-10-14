@@ -86,9 +86,10 @@ function personal(reg, actor) {
   return !!(actor.user && (reg.participant_user_id === actor.user.id || reg.user_id === actor.user.id));
 }
 const registrationSelect = `SELECT r.*,p.user_id AS participant_user_id,p.guest_hash AS participant_guest_hash,
- p.created_by AS participant_created_by,p.name AS participant_name FROM registrations r JOIN participants p ON p.id=r.participant_id`;
+ p.created_by AS participant_created_by,p.name AS participant_name,
+ (SELECT name FROM users WHERE id=p.user_id) AS participant_global_name FROM registrations r JOIN participants p ON p.id=r.participant_id`;
 // The name a Discord pilot shows in a community: his nickname on its Discord server, else his Discord name.
-const NAME_IN_COMMUNITY = `COALESCE(NULLIF((SELECT m.nickname FROM memberships m WHERE m.user_id=u.id AND m.community_id=?),''),u.name)`;
+const NAME_IN_COMMUNITY = `COALESCE(NULLIF((SELECT m.nickname FROM memberships m WHERE m.user_id=u.id AND m.community_id=? AND m.status='member'),''),u.name)`;
 async function communityName(env, userId, communityId) {
   return (await env.DB.prepare(`SELECT ${NAME_IN_COMMUNITY} AS name FROM users u WHERE u.id=?`).bind(communityId, userId).first())?.name || '';
 }

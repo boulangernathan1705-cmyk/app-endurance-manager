@@ -4,7 +4,7 @@
 // then makes the crews on a start.
 import {weekdayLong,weekdayLabel,dayMonthShort,timeLabel,timeAt} from '../dates.mjs';
 import {eventMinutes} from '../../shared/duration.mjs';
-import {state,esc,button,logo,categories,api,can,CARS,communityTag,registrationCarLabel,renderAvailabilityTimeline} from './core.mjs';
+import {state,esc,pilotNameTip,button,logo,categories,api,can,CARS,communityTag,registrationCarLabel,renderAvailabilityTimeline} from './core.mjs';
 import {groupByPilot} from './crews.mjs';
 
 const future=event=>(event.departures||[]).filter(departure=>!departure.tbd&&Number(departure.startsAt)>Date.now());
@@ -182,7 +182,7 @@ export function categoryEntryBoard(event){
       const n=hoursOf(cell.reg.status);
       return `<td class="${n>=total?'is-whole':'is-part'}${placedIn?' is-muted':''}"><span>${n>=total?'✓ Toute':`${n} h / ${total}`}</span></td>`;
     }).join('');
-    return `<tr class="${placedIn?'is-placed':''}"><th><span class="ce-board-name">${communityTag(reg)}${esc(reg.name)}</span><span class="ce-board-cats">${[...pilot.cats].map(category=>logo(category)).join('')}</span><span class="ce-board-car">${esc(registrationCarLabel(reg))}</span>${reg.preferredPilot?`<span class="ce-board-wish">Avec ${esc(reg.preferredPilot)}</span>`:''}</th>${cells}</tr>`;
+    return `<tr class="${placedIn?'is-placed':''}"><th><span class="ce-board-name" ${pilotNameTip(reg)}>${communityTag(reg)}${esc(reg.name)}</span><span class="ce-board-cats">${[...pilot.cats].map(category=>logo(category)).join('')}</span><span class="ce-board-car">${esc(registrationCarLabel(reg))}</span>${reg.preferredPilot?`<span class="ce-board-wish">Avec ${esc(reg.preferredPilot)}</span>`:''}</th>${cells}</tr>`;
   }).join('');
   const chips=[['','Toutes'],...event.categories.map(category=>[category,category])].map(([value,label])=>button('category-entry-board',value?`${logo(value)}${esc(label)}`:esc(label),`data-value="${esc(value)}" aria-pressed="${filter===value}"`,`race-filter-chip${filter===value?' active':''}`)).join('');
   return `<details class="ce-board" open><summary><span class="ce-board-title">Tableau des disponibilités</span><span class="ce-board-stat">${rows.length} pilote${rows.length>1?'s':''}</span>${waiting?`<span class="ce-board-stat is-waiting">${waiting} sans équipage</span>`:'<span class="ce-board-stat is-done">Tout le monde est placé</span>'}</summary>

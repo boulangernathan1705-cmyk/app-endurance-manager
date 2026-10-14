@@ -4,7 +4,7 @@ import {isSolo,ANY_CATEGORY,soloCounts,eventCircuitName} from './solo.mjs';
 import {raceHourLabel,raceEndLabel} from '../timeline.mjs';
 import {shortDateLabel,timeLabel,weekdayLabel} from '../dates.mjs';
 import {durationLabel,eventMinutes,driverChangeRequired} from '../../shared/duration.mjs';
-import {app,state,esc,button,carPreferenceChoices,registrationCarLabel,renderAvailabilityTimeline,notifyRender,logo,categories,CARS,circuitLabel,communityTag,entryCommunities,communityChoice} from './core.mjs';
+import {app,state,esc,pilotNameTip,button,carPreferenceChoices,registrationCarLabel,renderAvailabilityTimeline,notifyRender,logo,categories,CARS,circuitLabel,communityTag,entryCommunities,communityChoice} from './core.mjs';
 import {getLocale} from '../i18n.mjs';
 
 // The player's own entries (on an official race, possibly made with another of his communities).
@@ -57,7 +57,7 @@ export function renderRegistration(reg,departure,duration,showCarPreference=true
   const timeline=renderAvailabilityTimeline({departure,duration,status:reg.status,label:slotLabel(reg.status)});
   // One card per pilot: his entries in several categories on this start show together.
   const cats=reg.groupCategories||(reg.category?[reg.category]:[]);
-  return `<div class="pilot-row${reg.mine?' ux-current-pilot':''}"><div class="pilot-main"><span class="pilot-name">${communityTag(reg)}${esc(reg.name)}${origin}</span>${reg.soloDriver?'<span class="solo-driver-badge" data-tip="Fait la course seul, sans équipier.">SOLO</span>':''}<span class="pilot-category-logo${cats.length>1?' is-several':''}" title="${esc(cats.join(' ou ')||'Catégorie')}" aria-label="${esc(cats.join(' ou ')||'Catégorie')}">${cats.length?cats.map(category=>logo(category)).join(''):'—'}</span>${showCarPreference?`<span class="pilot-car">${esc(registrationCarLabel(reg))}</span>`:''}${reg.status==='unavailable'?'<span class="registration-status">Indisponible</span>':''}${reg.preferredPilot?`<span class="pilot-preference">Souhaite rouler avec : <strong>${esc(reg.preferredPilot)}</strong></span>`:''}${reg.comment?`<span class="pilot-preference pilot-comment">« ${esc(reg.comment)} »</span>`:''}</div>${timeline}${reg.canEdit&&!locked?button('edit-registration','Modifier',`data-id="${reg.id}" data-departure="${departure.id}"`,'edit-button ux-pilot-edit'):''}</div>`;
+  return `<div class="pilot-row${reg.mine?' ux-current-pilot':''}"><div class="pilot-main"><span class="pilot-name" ${pilotNameTip(reg)}>${communityTag(reg)}${esc(reg.name)}${origin}</span>${reg.soloDriver?'<span class="solo-driver-badge" data-tip="Fait la course seul, sans équipier.">SOLO</span>':''}<span class="pilot-category-logo${cats.length>1?' is-several':''}" title="${esc(cats.join(' ou ')||'Catégorie')}" aria-label="${esc(cats.join(' ou ')||'Catégorie')}">${cats.length?cats.map(category=>logo(category)).join(''):'—'}</span>${showCarPreference?`<span class="pilot-car">${esc(registrationCarLabel(reg))}</span>`:''}${reg.status==='unavailable'?'<span class="registration-status">Indisponible</span>':''}${reg.preferredPilot?`<span class="pilot-preference">Souhaite rouler avec : <strong>${esc(reg.preferredPilot)}</strong></span>`:''}${reg.comment?`<span class="pilot-preference pilot-comment">« ${esc(reg.comment)} »</span>`:''}</div>${timeline}${reg.canEdit&&!locked?button('edit-registration','Modifier',`data-id="${reg.id}" data-departure="${departure.id}"`,'edit-button ux-pilot-edit'):''}</div>`;
 }
 
 function identityFields(stateDraft,departure,categoryMode,manualOther,linkedOther,guestSelf,withPreferred=true) {
