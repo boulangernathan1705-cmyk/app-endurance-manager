@@ -7,6 +7,9 @@ for(const count of [1,2])for(const tdz of [false,true])test(`solo header ${tdz?'
  await page.goto('/lmu/');await page.waitForFunction(async()=>{const {state}=await import('/front/app/core.mjs');return Boolean(state.user);});
  await page.evaluate(async({race,tdz})=>{const {state}=await import('/front/app/core.mjs');state.eventTdz=tdz;state.manager=true;state.events=[race];state.currentEventId=race.id;const {renderEvent}=await import('/front/app/event-view.mjs');renderEvent();},{race,tdz});
  await expect(page.locator('.race-header .event-access-logo')).toBeVisible();
+ await expect(page.locator('.race-side .event-sim-badge')).toBeVisible();
+ if(tdz)await expect(page.locator('.race-side .event-access-badge')).toBeVisible();
+ const title=await page.locator('.race-head h1').boundingBox(),date=await page.locator('.race-date').boundingBox();expect(Math.abs(title.y-date.y)).toBeLessThan(15);
  await expect(page.locator('.race-header')).not.toContainText('test-password');
  await expect(page.locator('.race-controls [data-action="share-event"]')).toBeVisible();
  if(count===1)for(const chip of await page.locator('.race-header .round-item').all())expect((await chip.boundingBox()).height).toBeLessThan(45);

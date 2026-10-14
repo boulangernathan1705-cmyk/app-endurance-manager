@@ -2147,12 +2147,6 @@ body:has(.form-sheet-overlay) { overflow: hidden; }
 .round-item { min-width: 0; }
 .round-item-copy { min-width: 0; }
 .round-item-copy strong { white-space: normal; overflow-wrap: anywhere; }
-/* The type panel (SAFE, OPEN…) takes the whole height of the event header, details included. */
-@media (min-width: 601px) {
-  html[data-game] #app .race-header[class*="is-solo-"] { position: relative; padding-right: 186px !important; }
-  html[data-game] #app .race-header[class*="is-solo-"] .event-type-panel span { font-size: 26px; }
-  html[data-game] #app .race-header[class*="is-solo-"] .event-type-panel { position: absolute; top: 14px; bottom: 14px; right: 18px; width: 150px; height: auto; }
-}
 /* « Comment devenir SAFE »: a link to the Discord channel, in the SAFE colour. */
 .planning-quick-button.is-safe-guide { width: auto !important; padding: 0 12px !important; border-color: rgba(240, 192, 64, .55); color: #f0c040; text-decoration: none; }
 .settings-safe-guide { display: grid; gap: 10px; }
@@ -2441,7 +2435,7 @@ html[data-game] #app .race-header .race-card-top > .circuit-visual { align-self:
 .race-controls { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 14px 0; }
 .race-controls .race-community-filter { margin: 0; }
 .race-controls > .link-button { margin-left: auto; flex: none; }
-html[data-game] #app .race-header .race-head { justify-content: center !important; }
+html[data-game] #app .race-header .race-head { justify-content: flex-start !important; }
 html[data-game] #app .race-header .race-side .race-header-actions { margin-top: 2px !important; }
 
 .race-controls-actions { display: flex; align-items: center; gap: 12px; margin-left: auto; }
@@ -2469,3 +2463,17 @@ html[data-game] #app .race-header .round-item-categories .category-logo { height
 html[data-game] #app .race-header .solo-header-circuit { font-size: 16px; font-weight: 400; color: #c7d0d4; }
 .solo-header-summary { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
 html[data-game] #app .race-header .solo-header-summary .race-header-time { margin: 0; font-size: 15px; padding: 5px 10px; }
+
+/* Shared endurance / SOLO header positions and dimensions. */
+html[data-game] #app .race-header .race-side .event-badge-row { display: flex; flex-direction: column; align-items: stretch; gap: 5px; padding: 0; border: 0; background: none; }
+html[data-game] #app .race-header .race-side .event-badge-row > * { box-sizing: border-box; width: 100%; justify-content: center; text-align: center; }
+.solo-header-settings { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+html[data-game] #app .race-header .solo-header-settings .race-header-time { margin: 0; padding: 5px 10px; font-size: 14px; line-height: 1.2; }
+html[data-game] #app .race-header .solo-header-settings .race-header-time svg { width: 18px; height: 18px; }
+html[data-game] #app .race-header .solo-header-settings .round-info { display: contents; }
+html[data-game] #app .race-header .race-card-top > .event-type-panel.has-access-logo { display: flex; justify-content: flex-end; height: 145px !important; }
+html[data-game] #app .race-header .event-type-panel.has-access-logo .event-access-logo { width: auto; height: 145px; max-height: 145px; max-width: 100%; }
+@media(max-width:760px){
+ html[data-game] #app .race-header .race-card-top > .event-type-panel.has-access-logo { height: 115px !important; justify-content: center; }
+ html[data-game] #app .race-header .event-type-panel.has-access-logo .event-access-logo { height: 115px; max-height: 115px; }
+}
