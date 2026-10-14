@@ -4,7 +4,7 @@ import {isSolo,ANY_CATEGORY,soloCounts,eventCircuitName} from './solo.mjs';
 import {raceHourLabel,raceEndLabel} from '../timeline.mjs';
 import {shortDateLabel,timeLabel,weekdayLabel} from '../dates.mjs';
 import {durationLabel,eventMinutes,driverChangeRequired} from '../../shared/duration.mjs';
-import {app,state,esc,button,carPreferenceChoices,registrationCarLabel,renderAvailabilityTimeline,notifyRender,logo,categories,CARS,circuitLabel,communityTag,entryCommunities,communityChoice} from './core.mjs';
+import {app,state,esc,pilotNameTip,button,carPreferenceChoices,registrationCarLabel,renderAvailabilityTimeline,notifyRender,logo,categories,CARS,circuitLabel,communityTag,entryCommunities,communityChoice} from './core.mjs';
 import {getLocale} from '../i18n.mjs';
 
 // The player's own entries (on an official race, possibly made with another of his communities).
@@ -28,6 +28,7 @@ function renderCommunityStep(departure){
   return `<form class="form-section registration-form registration-stepper" data-kind="registration" data-departure="${departure.id}" data-step="0">
 <p class="registration-step-label">Étape 1 · Communauté</p>
 ${communityChoice(entryCommunities(),{action:'registration-community',attrs:`data-departure="${departure.id}"`,help:'Course officielle : chaque pilote y court avec l’une de ses communautés, et rejoint les équipages de celle-ci.'})}
+<div class="registration-step-nav">${button('registration-community-confirm','Continuer',`data-departure="${departure.id}" disabled`,'primary-button registration-next')}</div>
 </form>`;
 }
 // Community of the entry, above its first step (changeable until it is saved).
@@ -57,7 +58,7 @@ export function renderRegistration(reg,departure,duration,showCarPreference=true
   const timeline=renderAvailabilityTimeline({departure,duration,status:reg.status,label:slotLabel(reg.status)});
   // One card per pilot: his entries in several categories on this start show together.
   const cats=reg.groupCategories||(reg.category?[reg.category]:[]);
-  return `<div class="pilot-row${reg.mine?' ux-current-pilot':''}"><div class="pilot-main"><span class="pilot-name">${communityTag(reg)}${esc(reg.name)}${origin}</span>${reg.soloDriver?'<span class="solo-driver-badge" data-tip="Fait la course seul, sans équipier.">SOLO</span>':''}<span class="pilot-category-logo${cats.length>1?' is-several':''}" title="${esc(cats.join(' ou ')||'Catégorie')}" aria-label="${esc(cats.join(' ou ')||'Catégorie')}">${cats.length?cats.map(category=>logo(category)).join(''):'—'}</span>${showCarPreference?`<span class="pilot-car">${esc(registrationCarLabel(reg))}</span>`:''}${reg.status==='unavailable'?'<span class="registration-status">Indisponible</span>':''}${reg.preferredPilot?`<span class="pilot-preference">Souhaite rouler avec : <strong>${esc(reg.preferredPilot)}</strong></span>`:''}${reg.comment?`<span class="pilot-preference pilot-comment">« ${esc(reg.comment)} »</span>`:''}</div>${timeline}${reg.canEdit&&!locked?button('edit-registration','Modifier',`data-id="${reg.id}" data-departure="${departure.id}"`,'edit-button ux-pilot-edit'):''}</div>`;
+  return `<div class="pilot-row${reg.mine?' ux-current-pilot':''}"><div class="pilot-main"><span class="pilot-name" ${pilotNameTip(reg)}>${communityTag(reg)}${esc(reg.name)}${origin}</span>${reg.soloDriver?'<span class="solo-driver-badge" data-tip="Fait la course seul, sans équipier.">SOLO</span>':''}<span class="pilot-category-logo${cats.length>1?' is-several':''}" title="${esc(cats.join(' ou ')||'Catégorie')}" aria-label="${esc(cats.join(' ou ')||'Catégorie')}">${cats.length?cats.map(category=>logo(category)).join(''):'—'}</span>${showCarPreference?`<span class="pilot-car">${esc(registrationCarLabel(reg))}</span>`:''}${reg.status==='unavailable'?'<span class="registration-status">Indisponible</span>':''}${reg.preferredPilot?`<span class="pilot-preference">Souhaite rouler avec : <strong>${esc(reg.preferredPilot)}</strong></span>`:''}${reg.comment?`<span class="pilot-preference pilot-comment">« ${esc(reg.comment)} »</span>`:''}</div>${timeline}${reg.canEdit&&!locked?button('edit-registration','Modifier',`data-id="${reg.id}" data-departure="${departure.id}"`,'edit-button ux-pilot-edit'):''}</div>`;
 }
 
 function identityFields(stateDraft,departure,categoryMode,manualOther,linkedOther,guestSelf,withPreferred=true) {
@@ -86,7 +87,7 @@ function preferredOptions(chosen){
 }
 function preferredPilotField(stateDraft,departure){
   const chosen=preferredNames(stateDraft.preferredPilot);
-  const pilots=stateDraft.soloDriver?'':`<div class="registration-identity-field preferred-pilots" data-preferred-pilots="${departure.id}"><label class="form-label" for="preferred-entry-${departure.id}">Coéquipiers souhaités <span class="muted">(facultatif)</span></label><div class="preferred-pilot-chips">${chosen.map(name=>preferredChip(name,departure.id)).join('')}</div><input id="preferred-entry-${departure.id}" name="preferredPilotEntry" data-departure="${departure.id}" list="preferred-list-${departure.id}" maxlength="32" placeholder="${state.participants.length?'Choisis un membre ou tape un pseudo':'Pseudo du coéquipier'}" autocomplete="off" enterkeyhint="done"><datalist id="preferred-list-${departure.id}">${preferredOptions(chosen)}</datalist></div>`;
+  const pilots=stateDraft.soloDriver?'':`<div class="registration-identity-field preferred-pilots" data-preferred-pilots="${departure.id}"><label class="form-label" for="preferred-entry-${departure.id}">Coéquipiers souhaités <span class="muted">(facultatif)</span></label><div class="preferred-pilot-chips">${chosen.map(name=>preferredChip(name,departure.id)).join('')}</div><div class="preferred-pilot-entry"><input id="preferred-entry-${departure.id}" name="preferredPilotEntry" data-departure="${departure.id}" list="preferred-list-${departure.id}" maxlength="32" placeholder="${state.participants.length?'Choisis un membre ou tape un pseudo':'Pseudo du coéquipier'}" autocomplete="off" enterkeyhint="done"><button type="button" class="secondary-button" data-preferred-add>Ajouter</button></div><datalist id="preferred-list-${departure.id}">${preferredOptions(chosen)}</datalist></div>`;
   return `${pilots}<label class="registration-identity-field registration-comment"><span class="form-label">Commentaire <span class="muted">(facultatif)</span></span><textarea name="comment" data-departure="${departure.id}" maxlength="${REGISTRATION_COMMENT_MAX}" rows="2" placeholder="Un mot pour l’équipage ou l’organisateur">${esc(stateDraft.comment||'')}</textarea></label>`;
 }
 // Adds the typed / picked name to the draft and redraws the chips in place (same in the page and in the crew builder).
@@ -104,11 +105,13 @@ function addPreferred(field){
   return true;
 }
 function redrawPreferred(departureId){
-  const box=document.querySelector(`[data-preferred-pilots="${departureId}"]`),draft=state.drafts[departureId];
-  if(!box||!draft)return;
+  const boxes=document.querySelectorAll(`[data-preferred-pilots="${departureId}"]`),draft=state.drafts[departureId];
+  if(!draft)return;
   const chosen=preferredNames(draft.preferredPilot);
-  box.querySelector('.preferred-pilot-chips').innerHTML=chosen.map(name=>preferredChip(name,departureId)).join('');
-  box.querySelector('datalist').innerHTML=preferredOptions(chosen);
+  for(const box of boxes){
+    box.querySelector('.preferred-pilot-chips').innerHTML=chosen.map(name=>preferredChip(name,departureId)).join('');
+    box.querySelector('datalist').innerHTML=preferredOptions(chosen);
+  }
 }
 if(typeof document!=='undefined'){
   document.addEventListener('keydown',event=>{
@@ -126,6 +129,13 @@ if(typeof document!=='undefined'){
   },true);
   document.addEventListener('change',event=>{if(event.target?.name==='preferredPilotEntry')addPreferred(event.target);},true);
   document.addEventListener('click',event=>{
+    const add=event.target.closest?.('[data-preferred-add]');
+    if(add){
+      event.preventDefault();event.stopPropagation();
+      const field=add.closest('[data-preferred-pilots]')?.querySelector('[name="preferredPilotEntry"]');
+      if(field){addPreferred(field);field.focus();}
+      return;
+    }
     const remove=event.target.closest?.('[data-preferred-remove]');
     if(!remove)return;
     event.preventDefault();event.stopPropagation();

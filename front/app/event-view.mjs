@@ -6,7 +6,7 @@ import {durationLabel,eventMinutes} from '../../shared/duration.mjs';
 import {app,state,esc,button,canManage,isAdmin,can,canEditRace,officialBadge,communityTag,circuitLabel,eventTypeBadge,schedulePendingBadge,eventBadge,eventCategoryCount,circuitVisual,pilotCount,notifyRender} from './core.mjs';
 import {ownRegistration,renderRegistrationWorkspace,soloRounds} from './registration.mjs';
 import {renderPilots} from './crews.mjs';
-import {isSolo,accessBadge,soloCardMeta,soloEventDetails,roundTiles,roundPilots,soloEntryList,eventCircuitName,soloEntryBlock,safeGuideLink} from './solo.mjs';
+import {isSolo,eventAccessLogo,accessBadge,soloCardMeta,soloEventDetails,roundTiles,roundPilots,soloEntryList,eventCircuitName,soloEntryBlock,safeGuideLink} from './solo.mjs';
 import {renderHome,raceDateBlock,raceStarts} from './home-view.mjs';
 import {planningDays,renderPlanning,syncPlanning,CHEVRON} from './planning.mjs';
 import {raceInfoChips} from './race-info.mjs';
@@ -214,6 +214,8 @@ function soloHeaderTime(event,next){
   return `<span class="race-header-time"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>${esc(timeLabel(departure.time))}</span>`;
 }
 function eventTypePanel(event){
+  const logo=eventAccessLogo(event);
+  if(logo)return `<span class="event-type-panel has-access-logo">${logo}</span>`;
   const type=event.details?.type;
   return type?`<span class="event-type-panel" data-type="${esc(type)}"><span>${esc(type)}</span></span>`:'';
 }

@@ -38,6 +38,7 @@
   grid-area: account;
   justify-self: end;
   margin: 0 !important;
+  padding: 0 !important;
   width: auto !important;
 }
 
@@ -662,6 +663,9 @@ body:has([data-crew-builder-overlay]) { overflow: hidden; }
 .crew-builder-step { display: flex; flex-direction: column; gap: 12px; }
 .crew-builder-overlay .crew-builder-fields { display: grid; gap: 12px; grid-template-columns: minmax(0, 1fr); }
 .crew-builder-overlay .crew-builder-fields label { display: grid; gap: 6px; font-weight: 600; }
+.crew-builder-fields .category-area { display: grid !important; grid-template-columns: minmax(0, 1fr); gap: 8px; }
+.crew-builder-overlay .crew-builder-fields .car-preference-option { display: flex; align-items: center; gap: 9px; }
+.crew-builder-fields .car-preference-option input { width: 17px; min-width: 17px; max-width: 17px; }
 .crew-builder-overlay .crew-builder-pilots { display: grid; gap: 8px; }
 @media (max-width: 760px) {
   .crew-builder-overlay { align-items: flex-end; padding: 0; }
@@ -1156,7 +1160,7 @@ html[data-game] #app .race-header-actions > .danger-link { width: auto !importan
 /* Simulateur d'un événement : LMU, iRacing, AMS2, ACE. */
 .event-badge-row { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .event-sim-badge { --sim: #8a949a; display: inline-flex; align-items: center; padding: 2px 9px; border-radius: 999px; background: var(--sim); color: #fff; font-size: 10.5px; font-weight: 800; letter-spacing: .06em; }
-.sim-lmu { --sim: #d8322c; } .sim-iracing { --sim: #2f6fd6; } .sim-ams2 { --sim: #e07a1f; } .sim-ace { --sim: #1f9d63; }
+.sim-lmu { --sim: #d8322c; } .sim-iracing { --sim: #2f6fd6; } .sim-ams2 { --sim: #e07a1f; } .sim-ace { --sim: #1f9d63; } .sim-acrally { --sim: #bf18ce; }
 .access-open { --sim: #52d3d8; } .access-safe { --sim: #f3b33d; }
 
 /* Création d'un événement : étapes courtes, choix en pastilles. */
@@ -1993,6 +1997,12 @@ html[data-game] .race-card.is-solo .solo-card-foot .solo-fill { flex: 1; min-wid
 html[data-game] .race-card.is-solo .solo-card-foot .race-situation { margin-left: auto; }
 /* Panel kept for the event type logo (to come); on a phone an empty one takes no room. */
 @media (max-width: 600px) { html[data-game] .race-card .race-card-type-logo:empty { display: none; } }
+.event-access-logo { display: block; width: 100%; height: 100%; object-fit: contain; }
+html[data-game] .race-card .race-card-type-logo:has(.event-access-logo) { padding: 8px; background: none; border: 0; }
+html[data-game] #app .my-entry-race .race-card-top > .event-access-logo { flex: none; align-self: center; width: 80px; height: 80px; margin-left: auto; }
+@media (max-width: 600px) {
+  html[data-game] #app .my-entry-race .race-card-top > .event-access-logo { width: 48px; height: 48px; }
+}
 html[data-game] #app .race-header .event-type-panel { flex: none; display: flex; align-items: center; justify-content: center; width: 220px; height: 150px; border: 1px solid rgba(255, 255, 255, .12); border-radius: 12px; background: rgba(255, 255, 255, .03); }
 html[data-game] #app .race-header .event-type-panel span { font-size: 28px; font-weight: 900; letter-spacing: .06em; text-transform: uppercase; color: var(--sim, #7fe3ea); text-align: center; padding: 0 10px; overflow-wrap: anywhere; }
 @media (max-width: 600px) { html[data-game] #app .race-header .event-type-panel { width: 90px; height: 70px; } html[data-game] #app .race-header .event-type-panel span { font-size: 15px; } }
@@ -2118,6 +2128,8 @@ html[data-game] #app .race-header .race-header-time svg { width: 18px; height: 1
 /* Header of an event: the type panel the size of an endurance's circuit, the title and its line kept together. */
 html[data-game] #app .race-header .race-head { align-content: center; }
 html[data-game] #app .race-header .event-type-panel { width: 150px; height: 84px; }
+html[data-game] #app .race-header .event-type-panel.has-access-logo { background: none; border: 0; }
+html[data-game] #app .race-header .event-type-panel.has-access-logo .event-access-logo { max-height: 150px; }
 html[data-game] #app .race-header .event-type-panel span { font-size: 22px; }
 @media (max-width: 600px) { html[data-game] #app .race-header .event-type-panel { width: 90px; height: 70px; } html[data-game] #app .race-header .event-type-panel span { font-size: 15px; } }
 /* Creating or editing a race or an event: the same step-by-step window as entering a race. */
@@ -2265,6 +2277,7 @@ body:has([data-category-entry]) { overflow: hidden; }
 .ce-concerned li span.is-whole { color: #4fd1c5; } .ce-concerned li span.is-part { color: #f3b33d; }
 .category-entry-sheet .registration-workspace-head { position: sticky; top: -18px; z-index: 3; margin: -18px -20px 0; padding: 16px 20px 10px; background: #111315; align-items: center; }
 .ce-footer { position: sticky; bottom: 0; margin: 12px -20px 0; padding: 14px 20px 12px; border-top: 1px solid #2b3336; background: var(--panel, #111315); }
+.category-entry-sheet[data-step="3"] .ce-footer { position: static; }
 .ce-footer .registration-step-nav { margin: 0; padding: 0; position: static; border: 0; background: none; }
 .ce-tally { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
 .ce-tally b { font-size: 34px; line-height: 1; color: #4fd1c5; }
@@ -2284,10 +2297,34 @@ body:has([data-category-entry]) { overflow: hidden; }
 .category-entry-categories .registration-category-copy em { font-size: 14px !important; }
 .registration-step .ce-range { margin-top: 12px; }
 .ce-subtitle { margin: 18px 0 8px; font-size: 15px; color: var(--text, #f2f5f4); }
-.ce-concerned-list { margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; }
-.ce-concerned-list li { display: flex; justify-content: space-between; gap: 10px; padding: 9px 12px; border-radius: 10px; background: #121718; text-transform: capitalize; font-size: 14px; }
-.ce-concerned-list li span { text-transform: none; font-weight: 700; }
+.ce-concerned-list { margin: 0; padding: 0; list-style: none; display: grid; gap: 3px; }
+.ce-concerned-list li { display: grid; grid-template-columns: minmax(130px, 210px) minmax(0, 1fr); align-items: center; gap: 12px; min-width: 0; padding: 5px 10px; border-radius: 6px; background: #121718; font-size: 12px; }
+.ce-concerned-heading { display: grid; gap: 2px; }
+.ce-concerned-heading strong { text-transform: capitalize; }
+.ce-concerned-heading span { font-weight: 700; }
 .ce-concerned-list li span.is-whole { color: #4fd1c5; } .ce-concerned-list li span.is-part { color: #f3b33d; }
+/* Compact final check: ten starts stay readable alongside their availability. */
+.category-entry-sheet[data-step="3"] .registration-stepper,
+.category-entry-sheet[data-step="3"] .registration-step { gap: 6px; }
+.category-entry-sheet[data-step="3"] .registration-summary-row { min-height: 30px; padding: 5px 10px; grid-template-columns: 74px minmax(0, 1fr) auto; gap: 6px; font-size: 13px; }
+.category-entry-sheet[data-step="3"] .registration-summary-row > span,
+.category-entry-sheet[data-step="3"] .registration-summary-row > strong,
+.category-entry-sheet[data-step="3"] .registration-summary-row > em { font-size: 12px; }
+.category-entry-sheet[data-step="3"] .ce-subtitle { margin: 8px 0 2px; font-size: 13px; }
+.category-entry-sheet[data-step="3"] .ce-tabs { display: none; }
+.category-entry-sheet[data-step="3"] .ce-footer { margin-top: 8px; padding-top: 8px; padding-bottom: 8px; }
+.category-entry-sheet[data-step="3"] .ce-tally { margin-bottom: 6px; gap: 8px; }
+.category-entry-sheet[data-step="3"] .ce-tally b { font-size: 24px; }
+.category-entry-sheet[data-step="3"] .ce-tally strong { font-size: 13px; }
+.category-entry-sheet[data-step="3"] .ce-tally em { font-size: 11px; }
+.ce-concerned-list .presence-timeline { margin-top: 0; }
+.ce-concerned-list .presence-scale { height: 18px; }
+.registration-sheet .ce-concerned-list .presence-time { font-size: 10px !important; line-height: 12px; }
+.ce-concerned-list .presence-track > .presence-segment { height: 10px; }
+.ce-concerned-list .presence-edges { display: none; }
+@media (max-width: 520px) {
+  .ce-concerned-list li { grid-template-columns: 120px minmax(0, 1fr); gap: 8px; padding: 5px 8px; font-size: 11px; }
+}
 .ce-empty { color: #f3b33d; }
 .ce-cars { margin-top: 16px; }
 .ce-cars-title { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; font-size: 15px; }
@@ -2360,3 +2397,11 @@ html[data-game] #app .race-header .race-side .event-type-badge { padding: 4px 3p
 html[data-game] .race-card .race-fill .event-category-badge { min-width: 120px; }
 /* Administration: links inside help texts in the site colour, not the browser's blue. */
 .members-help a:not([class]) { color: var(--accent, #52d3d8); }
+
+.rally-choice { flex: 1 1 180px; --sim: #bf18ce; }
+.rally-choice > span { width: 100%; min-height: 92px; display: flex; flex-direction: column; gap: 8px; align-items: flex-start; padding: 18px; letter-spacing: normal; }
+.rally-choice small { font-weight: 400; color: #c7d0d4; }
+.rally-event-form [hidden] { display: none !important; }
+.rally-event-form [data-rally-stages] { display: grid; gap: 14px; }
+.rally-stage { align-items: end; }
+.rally-stage > button { justify-self: end; }

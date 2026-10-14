@@ -709,6 +709,9 @@ test('a driver can race an endurance alone; organizers set whether a driver chan
  assert.equal(current.preferredPilot,three);assert.equal(current.comment,'','comment cleared when left empty');
  assert.equal((await req('/api/registrations/'+reg.data.id,'PATCH',{name:'Leo',category:'GT3',status:'h1',preferredPilot:'x'.repeat(101),version:current.version},'pilot')).status,400);
  assert.equal((await req('/api/registrations/'+reg.data.id,'PATCH',{name:'Leo',category:'GT3',status:'h1',comment:'x'.repeat(201),version:current.version},'pilot')).status,400);
+ assert.equal((await req('/api/registrations/'+reg.data.id,'PATCH',{name:'Leo',category:'GT3',status:'h1',preferredPilot:'',version:current.version},'pilot')).status,200);
+ event=(await req('/api/events?game=iracing','GET',null,'admin')).data.events[0];
+ assert.equal(event.departures[0].availability[0].preferredPilot,'','removing the last wished team-mate persists after reloading');
  // Editing the race without the field keeps the organizer's choice.
  const {driverChangeRequired,...rest}=event;
  assert.equal((await req('/api/events/'+event.id,'PATCH',rest,'admin')).status,200);

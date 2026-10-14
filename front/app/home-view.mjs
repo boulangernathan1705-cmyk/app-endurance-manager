@@ -5,7 +5,7 @@ import {dateBlock,dayLabel,timeLabel} from '../dates.mjs';
 import {durationLabel,eventMinutes} from '../../shared/duration.mjs';
 import {isGrindfest,streamersOf} from '../../shared/grindfest.mjs';
 import {streamerLogo} from './grindfest.mjs';
-import {isSolo,accessBadge,soloCardMeta,soloCardInfo,soloFill,ANY_CATEGORY} from './solo.mjs';
+import {isSolo,eventAccessLogo,accessBadge,soloCardMeta,soloCardInfo,soloFill,ANY_CATEGORY} from './solo.mjs';
 
 const dayKeyFormatter=new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Paris',year:'numeric',month:'2-digit',day:'2-digit'});
 function datedDepartures(event){return (event.departures||[]).filter(d=>Number.isFinite(Number(d.startsAt))).sort((a,b)=>Number(a.startsAt)-Number(b.startsAt));}
@@ -82,11 +82,11 @@ function soloCardFoot(event,archived,situation){
   return `<span class="solo-card-foot">${start}${soloFill(event,shown)}${situation?`<span class="race-situation">${situation}</span>`:''}</span>`;
 }
 // EVENT TDZ card: no circuit map; the panel is kept for the logo of the event type (OPEN, SAFE, Bouboule…),
-// which will come later.
+// using the simulator-specific OPEN/SAFE artwork.
 function soloCircuit(event){
   // Gridfest: its own wordmark and the streamers' logos.
   if(isGrindfest(event))return `<span class="race-card-circuit race-card-type-logo gridfest-card-panel" aria-hidden="true"><span class="gridfest-wordmark">GRIDFEST</span><span class="gridfest-avatars">${streamersOf(event).slice(0,6).map(streamer=>streamerLogo(streamer)).join('')}</span></span>`;
-  return `<span class="race-card-circuit race-card-type-logo" data-type="${esc(event.details?.type||'')}" aria-hidden="true"></span>`;
+  return `<span class="race-card-circuit race-card-type-logo" data-type="${esc(event.details?.type||'')}" aria-hidden="true">${eventAccessLogo(event)}</span>`;
 }
 function eventCard({event,next,archived,end}){
   const registered=registeredRaceStatus(event);const displayNext=registered.next;

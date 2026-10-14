@@ -86,9 +86,10 @@ function personal(reg, actor) {
   return !!(actor.user && (reg.participant_user_id === actor.user.id || reg.user_id === actor.user.id));
 }
 const registrationSelect = `SELECT r.*,p.user_id AS participant_user_id,p.guest_hash AS participant_guest_hash,
- p.created_by AS participant_created_by,p.name AS participant_name FROM registrations r JOIN participants p ON p.id=r.participant_id`;
+ p.created_by AS participant_created_by,p.name AS participant_name,
+ (SELECT name FROM users WHERE id=p.user_id) AS participant_global_name FROM registrations r JOIN participants p ON p.id=r.participant_id`;
 // The name a Discord pilot shows in a community: his nickname on its Discord server, else his Discord name.
-const NAME_IN_COMMUNITY = `COALESCE(NULLIF((SELECT m.nickname FROM memberships m WHERE m.user_id=u.id AND m.community_id=?),''),u.name)`;
+const NAME_IN_COMMUNITY = `COALESCE(NULLIF((SELECT m.nickname FROM memberships m WHERE m.user_id=u.id AND m.community_id=? AND m.status='member'),''),u.name)`;
 async function communityName(env, userId, communityId) {
   return (await env.DB.prepare(`SELECT ${NAME_IN_COMMUNITY} AS name FROM users u WHERE u.id=?`).bind(communityId, userId).first())?.name || '';
 }
@@ -200,10 +201,11 @@ function validateSoloRace(input, existing) {
   if (!Array.isArray(rounds) || rounds.length < 1 || rounds.length > 4) fail(400, 'Un événement a de une à quatre manches.');
   const sim = input.sim == null ? (existing ? simForEvent(existing) : simForEvent({circuit:rounds[0]?.circuit})) : input.sim;
   if (!SIM_IDS.includes(sim)) fail(400, 'Choisis le simulateur.');
-  const catalog = eventCatalog(sim);
+  const catalog = eventCatalog(sim), rally = sim === 'acrally';
+  if(rally && rounds.length !== 1 && input.details?.rallyCarMode) fail(400, 'Une soirée rallye utilise un seul lobby.');
   const cleanRounds = rounds.map((round, index) => {
     const where = rounds.length > 1 ? ` de la manche ${index + 1}` : '';
-    const circuit = catalog ? (typeof round?.circuit === 'string' ? round.circuit : '') : text(round?.circuit, 60, `Circuit${where}`);
+    const circuit = catalog ? (typeof round?.circuit === 'string' ? round.circuit : '') : rally && !round?.circuit ? '' : text(round?.circuit, 60, `Circuit${where}`);
     if (catalog && (!CIRCUITS.includes(circuit) || circuit.startsWith('iracing-') !== (sim === 'iracing'))) fail(400, `Choisis le circuit${where}.`);
     const durationMinutes = Number(round.durationMinutes);
     if (!Number.isInteger(durationMinutes) || durationMinutes < 5 || durationMinutes > 600) fail(400, `La durée${where} doit être comprise entre 5 et 600 minutes.`);
@@ -228,7 +230,7 @@ function validateSoloRace(input, existing) {
     // Places of the round (empty = unlimited): beyond them, pilots wait for a place on that round.
     if (!isGrindfest(input) && round.capacity != null && round.capacity !== '') {
       const value = Number(round.capacity);
-      if (!Number.isInteger(value) || value < 2 || value > 120) fail(400, `Le nombre de places${where} doit être compris entre 2 et 120.`);
+      if (!Number.isInteger(value) || value < 2 || value > (rally ? 16 : 120)) fail(400, `Le nombre de places${where} doit être compris entre 2 et ${rally ? 16 : 120}.`);
       extras.capacity = value;
     }
     if (round.weather) { if (!WEATHERS.includes(round.weather)) fail(400, `Météo${where} invalide.`); extras.weather = round.weather; }
@@ -254,6 +256,29 @@ function validateSoloRace(input, existing) {
   if (raw.password) details.password = text(raw.password, 30, 'Mot de passe');
   if (isGrindfest({details}) && details.password && !gridfestPasswordValid(details.password)) fail(400, 'Mot de passe Gridfest : 30 caractères maximum, sans espace.');
   if (raw.note) details.note = text(raw.note, 120, 'Info');
+  if(rally){
+    if(isGrindfest({details})) fail(400, 'Le format Gridfest ne correspond pas à une soirée rallye.');
+    if(raw.rallyHost) details.rallyHost=text(raw.rallyHost,60,'Hôte');
+    if(raw.rallyCarMode){
+      if(!['all','category','car'].includes(raw.rallyCarMode)) fail(400,'Choisis les voitures autorisées.');
+      details.rallyCarMode=raw.rallyCarMode;
+      if(raw.rallyCarMode==='category'&&!cleanRounds[0].category) fail(400,'Indique la catégorie imposée.');
+      if(raw.rallyCarMode==='car'&&!cleanRounds[0].car) fail(400,'Indique la voiture imposée.');
+      cleanRounds.forEach(round=>{delete round.practice;delete round.qualifying;delete round.fuel;delete round.tyres;if(raw.rallyCarMode!=='category')delete round.category;if(raw.rallyCarMode!=='car')delete round.car;});
+    }
+    if(raw.rallyStages!=null){
+      if(!Array.isArray(raw.rallyStages)||raw.rallyStages.length>20) fail(400,'Indique au maximum 20 spéciales.');
+      details.rallyStages=raw.rallyStages.map(stage=>text(stage,60,'Spéciale'));
+      cleanRounds[0].circuit=details.rallyStages[0]||'';
+    }
+    if(raw.rallyEstimatedMinutes!=null){
+      const minutes=Number(raw.rallyEstimatedMinutes);
+      if(!Number.isInteger(minutes)||minutes<5||minutes>600) fail(400,'La durée estimée doit être comprise entre 5 et 600 minutes.');
+      details.rallyEstimatedMinutes=minutes;
+    }
+    cleanRounds.forEach(round=>{round.capacity=round.capacity||16;});capacity=cleanRounds[0].capacity;
+    if(({OPEN:'open',SAFE:'safe'}[details.type]||access)==='open')delete details.password;
+  }
   const totalMinutes = cleanRounds.reduce((sum, round) => sum + (round.practice || 0) + (round.qualifying || 0) + round.durationMinutes, 0);
   if (totalMinutes > 24 * 60) fail(400, 'Un événement ne peut pas dépasser 24 heures.');
   const categories = [...new Set(cleanRounds.flatMap(round => round.categories))];

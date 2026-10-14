@@ -1,6 +1,6 @@
 import {timeLabel} from '../dates.mjs';
 import {raceEndLabel,raceHourLabel} from '../timeline.mjs';
-import {can,state,esc,button,logo,registrationCarLabel,renderAvailabilityTimeline,crewColorClass,sortedCrews,coversHour,pilotCount,api,pickableSlots,communityTag} from './core.mjs';
+import {can,state,esc,pilotNameTip,button,logo,registrationCarLabel,renderAvailabilityTimeline,crewColorClass,sortedCrews,coversHour,pilotCount,api,pickableSlots,communityTag} from './core.mjs';
 import {shortDateLabel,timeLabel as clockLabel} from '../dates.mjs';
 import {renderRegistration} from './registration.mjs';
 
@@ -21,7 +21,7 @@ export function pilotLines(departure,duration,regs,{editable=true}={}){
   return regs.map(reg=>{
     const origin=reg.addedByName?`<span class="registration-origin-info" data-tip="Inscription ajoutée par ${esc(reg.addedByName)}" aria-label="Inscription ajoutée par ${esc(reg.addedByName)}">ⓘ</span>`:'';
     const edit=editable&&reg.canEdit&&!locked?button('edit-registration','Modifier',`data-id="${reg.id}" data-departure="${departure.id}" aria-label="Modifier l’inscription de ${esc(reg.name)}"`,'link-button crew-planning-edit'):'';
-    return `<div class="crew-planning-row crew-pilot-line pilot-row${reg.mine?' ux-current-pilot':''}"><span class="crew-planning-label">${communityTag(reg)}<span class="pilot-name">${esc(reg.name)}</span>${reg.soloDriver?'<span class="solo-driver-badge" data-tip="Fait la course seul, sans équipier.">SOLO</span>':''}${origin}${edit}</span>${renderAvailabilityTimeline({departure,duration,status:reg.status,label:`Disponibilités de ${reg.name}`})}</div>`;
+    return `<div class="crew-planning-row crew-pilot-line pilot-row${reg.mine?' ux-current-pilot':''}"><span class="crew-planning-label">${communityTag(reg)}<span class="pilot-name" ${pilotNameTip(reg)}>${esc(reg.name)}</span>${reg.soloDriver?'<span class="solo-driver-badge" data-tip="Fait la course seul, sans équipier.">SOLO</span>':''}${origin}${edit}</span>${renderAvailabilityTimeline({departure,duration,status:reg.status,label:`Disponibilités de ${reg.name}`})}</div>`;
   }).join('');
 }
 // A crew's availability: the pilots' timelines, with a warning listing the hours nobody covers.
@@ -83,7 +83,7 @@ function crewCard(event,departure,crew,index,unassigned,allCrews){
       <summary class="crew-pilot-accordion-summary crew-tile-summary" aria-label="${esc(crew.name)} · ${esc(names)} · ${esc(crew.car||'Voiture à choisir')}">
         <span class="crew-tile-head"><span class="crew-compact-category" aria-hidden="true">${logo(crew.category)}</span><span class="crew-compact-team">${communityTag(crew)}<strong>${esc(crew.name)}</strong></span><span class="crew-compact-chevron" aria-hidden="true">›</span></span>
         ${ownMember||ownerBadge?`<span class="crew-tile-badges">${ownMember?'<span class="crew-mine-badge">Ton équipage</span>':''}${ownerBadge}</span>`:''}
-        <span class="crew-compact-pilots">${regs.length?regs.map(reg=>`<span>${esc(reg.name)}</span>`).join(''):'<span class="is-empty">Aucun pilote</span>'}</span>
+        <span class="crew-compact-pilots">${regs.length?regs.map(reg=>`<span ${pilotNameTip(reg)}>${esc(reg.name)}</span>`).join(''):'<span class="is-empty">Aucun pilote</span>'}</span>
         <span class="crew-tile-foot"><span class="crew-compact-car"${crew.car?'':' data-tip="Le responsable choisit la voiture dans « Gérer »."'}>${esc(crew.car||'Voiture à choisir')}</span>${statusPill(crew)}</span>
       </summary>
       <div class="crew-pilot-accordion-body crew-unified-body">

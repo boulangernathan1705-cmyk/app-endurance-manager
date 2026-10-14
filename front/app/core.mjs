@@ -19,6 +19,10 @@ export const state = {
 try { state.pilotName = localStorage.getItem('em_pilot_name') || ''; } catch {}
 
 export const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+// The API only supplies alternate nicknames from the reader's accessible communities.
+export const pilotNameTip = reg => reg.otherNames?.length
+  ? `data-tip="${esc(reg.otherNames.map(item => `${item.name} · ${item.communityName}`).join('\n'))}"`
+  : '';
 // Permissions of the player in this community (their Discord roles, server/access.mjs).
 export const can = permission => Boolean(state.permissions?.includes(permission));
 export const canManage = () => can('create_race') || can('manage_races');

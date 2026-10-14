@@ -289,3 +289,29 @@ test('plusieurs départs : chaque pilote sans équipage une seule fois, avec ses
   const [,all]=buildWeeklyDiscordPayload({currentDepartures:[],futureDepartures:starts,periodLabel:'semaine'},{},Date.parse('2026-10-13T10:00:00Z'),'lmu',{em_lmp2:'1'}).embeds;
   assert.match(all.fields[0].value,/^👤 Nathan <:em_lmp2:1> · tous les départs$/m);
 });
+
+test('deux départs et beaucoup de pilotes : le récap choisit automatiquement la vue par créneau',()=>{
+  const base={eventId:'mans',eventName:'24H du Mans',circuit:'lemans',durationHours:24,crews:[]};
+  const etienne={name:'[FMT] Etienne',categories:['Hypercar']};
+  const starts=[
+    {...base,startsAt:Date.parse('2026-10-23T11:00:00Z'),unassignedPilots:[etienne]},
+    {...base,startsAt:Date.parse('2026-10-24T13:30:00Z'),unassignedPilots:[etienne,...['[FMT] LoorZ','Rico Orus','[FMT] D-Joss','[FMT] McFly','Hyns','[FMT] Nathan'].map(name=>({name,categories:['GT3']}))]},
+    {...base,startsAt:Date.parse('2026-10-25T13:30:00Z'),unassignedPilots:[]}
+  ];
+  const [,race]=buildWeeklyDiscordPayload({futureDepartures:starts},{},Date.parse('2026-10-14T07:00:00Z')).embeds;
+  const value=race.fields[0].value;
+  assert.match(value,/ven\. 23 oct\. · 13h\*\* — 1 pilote/);
+  assert.match(value,/sam\. 24 oct\. · 15h30\*\* — 7 pilotes/);
+  assert.equal(value.split('👤 [FMT] Etienne').length-1,2);
+  assert.doesNotMatch(value,/dim\./);
+});
+
+test('quinze créneaux et un pilote : le récap conserve automatiquement la vue par pilote',()=>{
+  const starts=Array.from({length:15},(_,i)=>({eventId:'por',eventName:'Portimao',circuit:'portimao',durationHours:4,crews:[],
+    startsAt:Date.parse('2026-10-16T07:00:00Z')+i*3600000,
+    unassignedPilots:i<4?[{name:'Nathan',categories:['LMP2 ELMS']}]:[]}));
+  const [,race]=buildWeeklyDiscordPayload({futureDepartures:starts}).embeds;
+  assert.match(race.fields[0].value,/^👤 Nathan/);
+  assert.doesNotMatch(race.fields[0].value,/📅/);
+  assert.equal(race.fields[0].value.split('👤').length-1,1);
+});

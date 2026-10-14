@@ -54,6 +54,46 @@ function harness(){
 }
 const race={name:'6h SPA',circuit:'spa',categories:['Hypercar'],departures:[{date:'2090-10-15',time:'20:00'}]};
 
+test('pilot names follow the reader’s site and expose alternate nicknames only in accessible communities', async () => {
+  const {DB,req,login,inCommunity}=harness();
+  const SUBJECT='333333333333333333';
+  await login(ADMIN,'admin');await login(PILOT,'reader');await login(SUBJECT,'subject');
+  const nick=(community,name)=>DB.db.prepare('UPDATE memberships SET nickname=? WHERE user_id=? AND community_id=?').run(name,SUBJECT,community);
+  nick(DEV,'Nathan FMT');nick(TEST,'Nathan TDZ');
+  const created=await req('/api/events','POST',{...race,official:true},'admin');
+  assert.equal(created.status,201);
+  const event=(await req('/api/events','GET',null,'reader')).data.events.find(item=>item.id===created.data.id);
+  inCommunity('commu-test');
+  assert.equal((await req(`/api/events/${event.id}/departures/${event.departures[0].id}/registrations`,'POST',
+    {name:'Ignored typed name',category:'Hypercar',status:'whole'},'subject')).status,201);
+  const entries=async()=> (await req('/api/events','GET',null,'reader')).data.events.find(item=>item.id===event.id).departures[0].availability;
+  let pilot=(await entries())[0];
+  assert.equal(pilot.name,'Nathan TDZ');
+  assert.deepEqual(pilot.otherNames.map(item=>item.name),['Nathan FMT']);
+  assert.equal((await req('/api/session','GET',null,'subject')).data.user.name,'Nathan TDZ','profile and recap use the site nickname too');
+  inCommunity('commu-dev');pilot=(await entries())[0];
+  assert.equal(pilot.name,'Nathan FMT');
+  assert.equal(pilot.community.id,TEST,'the entry badge retains the represented community');
+  assert.deepEqual(pilot.otherNames.map(item=>item.name),['Nathan TDZ']);
+  const originalId=pilot.id, originalParticipant=pilot.participantId;
+  nick(DEV,'Nathan FMT renamed');
+  const renamed=(await entries())[0];
+  assert.equal(renamed.name,'Nathan FMT renamed','renaming does not require re-registering');
+  assert.equal(renamed.id,originalId);assert.equal(renamed.participantId,originalParticipant,'display names never change the pilot identity');
+  DB.db.prepare("UPDATE memberships SET status='left' WHERE user_id=? AND community_id=?").run(SUBJECT,DEV);
+  assert.equal((await entries())[0].name,'Nathan TDZ','only a shared active membership supplies a nickname');
+  DB.db.prepare("UPDATE memberships SET status='member' WHERE user_id=? AND community_id=?").run(SUBJECT,DEV);
+  DB.db.prepare("UPDATE memberships SET status='left' WHERE user_id=? AND community_id=?").run(PILOT,DEV);
+  inCommunity('commu-test');pilot=(await entries())[0];
+  assert.equal(pilot.name,'Nathan TDZ');
+  assert.equal(pilot.otherNames,undefined,'a TDZ-only reader cannot see the FMT nickname');
+  nick(TEST,'');
+  assert.equal((await entries())[0].name,`Pilot ${SUBJECT}`,'missing server nickname falls back to the global Discord name');
+  DB.db.prepare("UPDATE memberships SET status='member' WHERE user_id=? AND community_id=?").run(PILOT,DEV);
+  DB.db.prepare('DELETE FROM community_role_permissions WHERE community_id=?').run(DEV);
+  assert.equal((await entries())[0].otherNames,undefined,'revoked site access also hides alternate nicknames');
+});
+
 test('migration 0034: existing data goes to commu-dev, community addresses follow the rules', () => {
   const DB=new D1();DB.migrate('0034_communities.sql');
   const db=DB.db;

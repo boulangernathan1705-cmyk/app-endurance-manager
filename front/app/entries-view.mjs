@@ -1,6 +1,6 @@
 import {simForEvent} from '../../shared/catalog.mjs';
 import {renderHome} from './home-view.mjs';
-import {isSolo,accessBadge,soloCardMeta,renderSoloEntries,ANY_CATEGORY} from './solo.mjs';
+import {isSolo,eventAccessLogo,accessBadge,soloCardMeta,renderSoloEntries,ANY_CATEGORY} from './solo.mjs';
 import {dateBlock,timeLabel} from '../dates.mjs';
 import {durationLabel,eventMinutes} from '../../shared/duration.mjs';
 import {eventSchedule} from '../schedule.mjs';
@@ -69,7 +69,7 @@ function soloCard({event,departure,reg}) {
         <h2 class="event-name">${esc(event.name)}</h2>
         <span class="race-meta">${soloCardMeta(event)}</span>
         <span class="race-badges">${accessBadge(event)}${category}<span class="race-start">Départ ${esc(timeLabel(departure.time))}</span>${situation}</span>
-      </span>${circuitVisual(event.circuit,true)}</span>
+      </span>${eventAccessLogo(event)||circuitVisual(event.circuit,true)}</span>
       <button type="button" class="primary-button native-my-entry-open-event" data-action="open" data-id="${event.id}" data-departure="${departure.id}">Voir l’événement</button>
     </summary>
     <div class="native-my-entry-body">${renderSoloEntries(event,departure)}</div>
@@ -80,8 +80,9 @@ function card({event,departure,reg}) {
   if (isSolo(event)) return soloCard({event,departure,reg});
   const crew = (departure.crews||[]).find(item => (item.registrationIds||[]).some(id => String(id) === String(reg.id)));
   const assigned = new Set((departure.crews||[]).flatMap(item => (item.registrationIds||[]).map(String)));
+  const pilotKey = pilot => pilot.participantId || `name:${String(pilot.name).toLowerCase()}`;
   const unassigned = (departure.availability||[])
-    .filter(pilot => pilot.status !== 'unavailable' && !assigned.has(String(pilot.id)))
+    .filter(pilot => pilot.status !== 'unavailable' && !assigned.has(String(pilot.id)) && pilotKey(pilot) !== pilotKey(reg))
     .sort(pilotSort(event));
   const freePilots = groupByPilot(unassigned, event);
   const members = crew
@@ -106,7 +107,7 @@ function card({event,departure,reg}) {
 
   const unassignedBody = unassigned.length
     ? `<section class="crew-pilot-lines">${pilotLines(departure,event.durationHours||6,freePilots,{editable:false})}</section>`
-    : '<p class="empty">Tous les pilotes disponibles sont déjà affectés.</p>';
+    : '<p class="empty">Aucun autre pilote sans équipage sur ce départ.</p>';
 
   const situation = crew
     ? `<span class="departure-mine-badge is-crew">✓ Équipage ${esc(crew.name)}</span>`

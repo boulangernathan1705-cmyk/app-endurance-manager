@@ -55,7 +55,9 @@ function renderModalForm({focusSelector='',preserveScroll=true}={}){
   if(!root||!content||!event||!departure||!draft)return;
   const scrollTop=preserveScroll?content.scrollTop:0;
   const timelineOffsets=[...content.querySelectorAll('.presence-timeline')].map(timeline=>timeline.scrollLeft);
-  content.innerHTML=renderRegistrationForm(event,departure,draft);
+  content.innerHTML=renderRegistrationForm(event,departure,draft)
+    .replaceAll(`preferred-entry-${departure.id}`,`preferred-modal-entry-${departure.id}`)
+    .replaceAll(`preferred-list-${departure.id}`,`preferred-modal-list-${departure.id}`);
   content.scrollTop=scrollTop;
   content.querySelectorAll('.presence-timeline').forEach((timeline,index)=>{if(Number.isFinite(timelineOffsets[index]))timeline.scrollLeft=timelineOffsets[index];});
   if(focusSelector)content.querySelector(focusSelector)?.focus({preventScroll:true});
@@ -201,6 +203,7 @@ document.addEventListener('change',event=>{
     const departure=currentDeparture(),draft=departure?state.drafts[departure.id]:null;
     if(!draft)return;
     if(field.name==='participant'){
+      draft.manualOther=field.value==='__manual__';
       const participant=state.participants.find(item=>item.id===field.value);
       draft.participantUserId=participant?.id||null;
       draft.participantId=participant?.participantId||null;

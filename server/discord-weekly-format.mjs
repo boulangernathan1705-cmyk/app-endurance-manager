@@ -82,7 +82,7 @@ function unassignedBlock(pilots,sim,emojis){
   if(!list.some(pilot=>pilot.categories?.length))return `📋 **Sans équipage** : ${list.map(pilot=>clean(pilot.name)).join(', ')}`;
   return ['📋 **Sans équipage**',...list.map(pilot=>pilotLine(pilot,sim,emojis))].join('\n');
 }
-// Several starts: each pilot without a crew once, with their starts (« ven. 0h, 4h · sam. 9h »).
+// Compare both readings before truncating: repeated schedules versus repeated pilots.
 function unassignedField(departures,compact,emojis){
   const sim=simOf(departures[0]),pilots=new Map();
   for(const departure of departures)for(const pilot of (departure.unassignedPilots||[]).map(asPilot)){
@@ -103,7 +103,18 @@ function unassignedField(departures,compact,emojis){
     }
     return [...days].map(([day,times])=>`${day} ${times.join(', ')}`).join(' · ');
   };
-  const value=[...pilots.values()].map(pilot=>`${pilotLine(pilot,sim,emojis)} · ${startsLabel(pilot.starts)}`).join('\n');
+  const byPilot=[...pilots.values()].map(pilot=>`${pilotLine(pilot,sim,emojis)} · ${startsLabel(pilot.starts)}`).join('\n');
+  const byDeparture=[...departures].sort((a,b)=>a.startsAt-b.startsAt)
+    .filter(departure=>departure.unassignedPilots?.length)
+    .map(departure=>{
+      const list=departure.unassignedPilots.map(asPilot);
+      const time=departure.timePending?'horaire à confirmer':hourLabel(departure.startsAt);
+      return [`📅 **${recapDay.format(departure.startsAt)} · ${time}** — ${list.length} pilote${list.length>1?'s':''}`,
+        ...list.map(pilot=>pilotLine(pilot,sim,emojis))].join('\n');
+    }).join('\n\n');
+  // A small line penalty estimates vertical space; within 20%, favour reading by start.
+  const readingSize=value=>value.length+8*value.split('\n').length;
+  const value=!compact&&readingSize(byDeparture)<=readingSize(byPilot)*1.2?byDeparture:byPilot;
   return [{name:'📋 Sans équipage',value:cut(value,1024),inline:false}];
 }
 function departureValue(departure,compact=false,emojis={}){

@@ -41,6 +41,7 @@ const EN=new Map(Object.entries({
   'Voiture à choisir':'Car to be chosen','Voiture à définir':'Car to be decided','En attente d’affectation':'Waiting for crew assignment','Aucune inscription.':'No entries.',
   'Aucun pilote n’a encore rejoint cet équipage.':'No driver has joined this crew yet.','Tous les pilotes disponibles ont déjà un équipage.':'All available drivers already have a crew.',
   'Aucun autre équipage sur ce départ.':'No other crew for this start.','Tous les pilotes disponibles sont déjà affectés.':'All available drivers are already assigned.',
+  'Aucun autre pilote sans équipage sur ce départ.':'No other driver without a crew for this start.',
   'Cette inscription n’est pas encore rattachée à un équipage.':'This entry is not assigned to a crew yet.',
   'Voir l’événement complet':'View full event','Mon équipage':'My crew','Autres équipages':'Other crews','S’inscrire':'Register','Modifier mon inscription':'Edit my entry',
   'Inscrire un autre pilote':'Register another driver','Ajouter une catégorie':'Add a category','TON INSCRIPTION':'YOUR ENTRY','AUTRE PILOTE':'OTHER DRIVER','AJOUT D’UNE CATÉGORIE':'ADD A CATEGORY','INSCRIPTION GÉRÉE':'MANAGED ENTRY',

@@ -2,6 +2,12 @@
 
 Les changements du site, version par version. La plus récente est en haut.
 
+## v1.43 — 14 octobre 2026
+
+- Discord : les disponibilités des pilotes sans équipage se présentent automatiquement par départ ou par pilote selon la place occupée, avec les logos de catégorie conservés.
+- Inscriptions : choix de communauté confirmé avec « Continuer », récapitulatif plus compact, cartes de catégorie pour les équipages et corrections des inscriptions pour un autre pilote et des souhaits de coéquipiers.
+- Événements : logos OPEN et SAFE propres à chaque simulateur et formulaire dédié aux soirées AC Rally (lobby, voitures, spéciales et accès).
+
 ## v1.42 — 14 octobre 2026
 
 - Pilotes : sur le site d'une communauté, chaque pilote apparaît sous son pseudo sur le serveur Discord de cette communauté (sinon son nom Discord).
