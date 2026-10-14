@@ -44,7 +44,7 @@ export function syncStreamerFields(form) {
 }
 export function streamerColumns(event, departure) {
   const streamers = streamersOf(event);
-  return `<div class="gridfest-module-brand"><img src="/images/event-access/gridfest-horizontal.png" alt="Gridfest" width="1280" height="720"></div><div class="grindfest-grid" style="--streamer-columns:${Math.min(4, streamers.length)}">${streamers.map(streamer => {
+  return `<div class="grindfest-grid" style="--streamer-columns:${Math.min(4, streamers.length)}">${streamers.map(streamer => {
     const entries = (departure.availability || []).filter(reg => reg.streamerId === streamer.id && reg.status !== 'unavailable');
     const confirmed = entries.filter(reg => !reg.waitlistPosition).length;
     const heading = `${streamerLogo(streamer)}<span class="gridfest-streamer-copy"><strong>${esc(streamer.name)}</strong>${streamer.twitchUrl ? '<small>Twitch ↗</small>' : ''}<span class="count-pill">${confirmed} / ${streamer.capacity}</span></span>`;
