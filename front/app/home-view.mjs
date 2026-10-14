@@ -85,7 +85,7 @@ function soloCardFoot(event,archived,situation){
 // using the simulator-specific OPEN/SAFE artwork.
 function soloCircuit(event){
   // Gridfest: its own wordmark and the streamers' logos.
-  if(isGrindfest(event))return `<span class="race-card-circuit race-card-type-logo gridfest-card-panel" aria-hidden="true"><span class="gridfest-wordmark">GRIDFEST</span><span class="gridfest-avatars">${streamersOf(event).slice(0,6).map(streamer=>streamerLogo(streamer)).join('')}</span></span>`;
+  if(isGrindfest(event))return `<span class="race-card-circuit race-card-type-logo gridfest-card-panel" aria-hidden="true"><img class="gridfest-card-logo" src="/images/event-access/gridfest-stacked.png" alt="Gridfest" width="1248" height="1252"><span class="gridfest-avatars">${streamersOf(event).slice(0,6).map(streamer=>streamerLogo(streamer)).join('')}</span></span>`;
   return `<span class="race-card-circuit race-card-type-logo" data-type="${esc(event.details?.type||'')}" aria-hidden="true">${eventAccessLogo(event)}</span>`;
 }
 function eventCard({event,next,archived,end}){

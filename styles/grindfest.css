@@ -81,3 +81,15 @@ html[data-game] #app .race-card .gridfest-card-panel {display:flex;flex-directio
 }
 @media(prefers-reduced-motion:no-preference) {.gridfest-wordmark,html[data-game] #app .race-header.is-gridfest .event-type-panel span {background-size:200% 100%;animation:gf-shine 6s ease-in-out infinite alternate}}
 @keyframes gf-shine {to {background-position:100% 0}}
+
+/* Official Gridfest artwork, preserving each logo's proportions. */
+html[data-game] #app .race-card .gridfest-card-panel {gap:6px}
+.gridfest-card-panel .gridfest-card-logo {display:block;width:100%;height:90px;object-fit:contain}
+html[data-game] #app .race-header .event-type-panel .gridfest-header-logo {display:block;width:100%;height:100%;object-fit:contain}
+.gridfest-module-brand {display:flex;justify-content:center;margin:0 0 18px}
+.gridfest-module-brand img {display:block;width:min(100%,420px);height:auto;object-fit:contain}
+@media(max-width:600px) {
+  .gridfest-card-panel .gridfest-card-logo {height:60px}
+  .gridfest-module-brand {margin-bottom:12px}
+  .gridfest-module-brand img {width:min(100%,300px)}
+}

@@ -216,6 +216,7 @@ function soloHeaderTime(event,next){
   return `<span class="race-header-time"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>${esc(timeLabel(departure.time))}</span>`;
 }
 function eventTypePanel(event){
+  if(isGrindfest(event))return `<span class="event-type-panel has-gridfest-logo"><img class="gridfest-header-logo" src="/images/event-access/gridfest-horizontal.png" alt="Gridfest" width="1280" height="720"></span>`;
   const logo=eventAccessLogo(event);
   if(logo)return `<span class="event-type-panel has-access-logo">${logo}</span>`;
   const type=event.details?.type;
