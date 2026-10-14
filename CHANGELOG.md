@@ -1,6 +1,6 @@
 # Nouveautés d'Endurance Manager
 
-Les changements du site, version par version. La plus récente est en haut.
+Les changements du site, regroupés par jour. Les plus récents sont en haut.
 
 ## v1.45 — 14 octobre 2026
 

@@ -12,12 +12,33 @@ function inline(text) {
     .replace(/\[([^\]]+)\]\(((?:https:\/\/|\/)[^)\s]+)\)/g, '<a href="$2">$1</a>');
 }
 
+// Releases keep their version history in Markdown; the page combines their notes by day.
+function dailyNotes(markdown) {
+  const intro = [], groups = [], days = new Map();
+  let current;
+  for (const line of String(markdown).split('\n')) {
+    if (line.startsWith('## ')) {
+      const heading = line.slice(3).trim();
+      const date = heading.match(/ — (\d{1,2} [^\d]+ \d{4})$/)?.[1];
+      const key = date?.normalize('NFC').toLocaleLowerCase('fr-FR').replace(/^0(?=\d)/, '');
+      current = key ? days.get(key) : null;
+      if (!current) {
+        current = {title: date || heading, lines: []};
+        groups.push(current);
+        if (key) days.set(key, current);
+      }
+    } else if (current) current.lines.push(line);
+    else intro.push(line);
+  }
+  return [...intro, ...groups.flatMap(group => [`## ${group.title}`, ...group.lines])].join('\n');
+}
+
 export function changelogHtml(markdown) {
   const out = [];
   let list = false, section = false;
   const closeList = () => { if (list) { out.push('</ul>'); list = false; } };
   const closeSection = () => { closeList(); if (section) { out.push('</section>'); section = false; } };
-  for (const raw of String(markdown).split('\n')) {
+  for (const raw of dailyNotes(markdown).split('\n')) {
     const line = raw.trimEnd();
     if (!line.trim()) { closeList(); continue; }
     if (line.startsWith('# ')) { closeSection(); out.push(`<h1>${inline(line.slice(2))}</h1>`); continue; }
