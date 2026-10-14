@@ -663,6 +663,9 @@ body:has([data-crew-builder-overlay]) { overflow: hidden; }
 .crew-builder-step { display: flex; flex-direction: column; gap: 12px; }
 .crew-builder-overlay .crew-builder-fields { display: grid; gap: 12px; grid-template-columns: minmax(0, 1fr); }
 .crew-builder-overlay .crew-builder-fields label { display: grid; gap: 6px; font-weight: 600; }
+.crew-builder-fields .category-area { display: grid !important; grid-template-columns: minmax(0, 1fr); gap: 8px; }
+.crew-builder-overlay .crew-builder-fields .car-preference-option { display: flex; align-items: center; gap: 9px; }
+.crew-builder-fields .car-preference-option input { width: 17px; min-width: 17px; max-width: 17px; }
 .crew-builder-overlay .crew-builder-pilots { display: grid; gap: 8px; }
 @media (max-width: 760px) {
   .crew-builder-overlay { align-items: flex-end; padding: 0; }

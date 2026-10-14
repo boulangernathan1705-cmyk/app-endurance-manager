@@ -1,4 +1,4 @@
-import {CARS} from './shared/catalog.mjs';
+import {CARS,categories as categoryCatalog} from './shared/catalog.mjs';
 import {shortDateLabel,timeLabel} from './front/dates.mjs';
 import {renderAvailabilityTimeline} from './front/timeline.mjs';
 import {introduceCommunitiesOnce} from './front/community-intro.mjs';
@@ -200,6 +200,10 @@ function panelMarkup(event) {
   if (ownerRegistration) builderState.ownerRegistrationId = ownerRegistration.id;
   if (!builderState.locked) {
     builderState.registrationIds = builderState.registrationIds.filter(id => candidates.some(candidate => candidate.id === id));
+    if(builderState.pendingRegistrationId&&candidates.some(candidate=>candidate.id===builderState.pendingRegistrationId)){
+      if(!builderState.registrationIds.includes(builderState.pendingRegistrationId))builderState.registrationIds.push(builderState.pendingRegistrationId);
+      builderState.pendingRegistrationId=null;
+    }
     if (builderState.ownerRegistrationId && candidates.some(candidate => candidate.id === builderState.ownerRegistrationId) && !builderState.registrationIds.includes(builderState.ownerRegistrationId)) builderState.registrationIds.unshift(builderState.ownerRegistrationId);
   }
   const memberCategoryLocked = editMode && builderState.originalRegistrationIds.length > 0;
@@ -221,6 +225,12 @@ function panelMarkup(event) {
   const nav = `<div class="registration-step-nav">${step > 1 ? `<button type="button" class="secondary-button registration-back" data-crew-builder-step="${step - 1}">Retour</button>` : ''}${step < 3 ? `<button type="button" class="primary-button registration-next" data-crew-builder-step="${step + 1}">Continuer</button>` : `<button type="submit" class="primary-button registration-next" data-crew-builder-submit>${submitLabel()}</button>`}</div>`;
   const steps = ['Équipage', 'Pilotes', 'Récapitulatif'];
   const foreign = Boolean(builderState.communityId && builderState.communityId !== (sessionCache?.community?.id || ''));
+  const categoryCards=categories.map(category=>{
+    const config=categoryCatalog[category],image=config?.image?`<img class="category-logo" src="/images/${esc(config.image)}" alt="">`:'';
+    const count=availableCandidates(event,departure,category,editMode?builderState.crewId:null).length;
+    return `<button type="button" class="category-button ${config?.css||''} ${category===builderState.category?'active':''}" data-crew-builder-category="${esc(category)}" aria-pressed="${category===builderState.category}" ${categoryDisabled?'disabled':''}>${image}<span class="registration-category-copy"><strong>${esc(category)}</strong><small>${count} pilote${count>1?'s':''} disponible${count>1?'s':''}</small></span></button>`;
+  }).join('');
+  const carCards=['',...(CARS[builderState.category]||[])].map(car=>`<label class="car-preference-option"><input type="radio" name="builderCar" value="${esc(car)}" ${car===builderState.car?'checked':''}><span>${esc(car||'Voiture à définir')}</span></label>`).join('');
   return `<div class="crew-builder-overlay" data-crew-builder-overlay><section class="crew-builder-panel registration-sheet" data-crew-builder-panel data-crew-foreign="${foreign}" role="dialog" aria-modal="true" aria-labelledby="crew-builder-title">
     <div class="registration-workspace-head"><div class="registration-workspace-title"><h2 id="crew-builder-title" tabindex="-1">${title}</h2><p>${esc(event.name)} · ${esc(shortDateLabel(departure.startsAt))} · ${esc(timeLabel(departure.time))}</p></div><span class="registration-workspace-actions"><button type="button" class="secondary-button registration-close-button" data-crew-builder-cancel>Fermer</button></span></div>
     <form class="crew-builder-form registration-stepper" data-crew-builder-form data-step="${step}">
@@ -228,9 +238,9 @@ function panelMarkup(event) {
       <p class="registration-step-label">Étape ${step} sur 3 · ${steps[step - 1]}</p>
       ${pane(1, `<p class="registration-step-help">${description}</p>
         <div class="crew-builder-fields">
-          <label>Catégorie<select name="builderCategory" ${categoryDisabled?'disabled':''}>${categories.map(category => `<option value="${esc(category)}" ${category === builderState.category ? 'selected' : ''}>${esc(category)}</option>`).join('')}</select></label>
+          <div class="category-area"><span class="form-label">Catégorie</span><input type="hidden" name="builderCategory" value="${esc(builderState.category)}"><div class="categories registration-category-list">${categoryCards}</div></div>
           <label>Nom de l’équipage<input name="builderName" maxlength="60" required value="${esc(builderState.name)}" placeholder="Ex. Équipage Alpha"></label>
-          <label>Voiture<select name="builderCar"><option value="">Voiture à définir</option>${(CARS[builderState.category] || []).map(car => `<option value="${esc(car)}" ${car === builderState.car ? 'selected' : ''}>${esc(car)}</option>`).join('')}</select></label>
+          <fieldset class="car-preference-panel"><legend class="form-label">Voiture</legend><div class="car-preference-grid">${carCards}</div></fieldset>
         </div>${categoryNote}`)}
       ${pane(2, `${lockedNote}<p class="registration-step-help">${editMode ? 'Coche ou décoche les pilotes que tu veux dans cet équipage.' : 'Choisis les pilotes inscrits en ' + esc(builderState.category) + ' sur ce départ. Tu peux aussi le faire plus tard.'}</p>
         <div class="crew-builder-pilots">${candidates.length ? candidates.map(registration => pilotCard(event,departure,registration,builderState.locked,registration.id===builderState.ownerRegistrationId)).join('') : '<p class="crew-builder-empty">Aucun pilote disponible dans cette catégorie.</p>'}</div>
@@ -251,6 +261,17 @@ function renderPanel(event, {scroll = false} = {}) {
   builderPanel = root.querySelector('[data-crew-builder-panel]');
   document.dispatchEvent(new CustomEvent('crew-builder:rendered'));
   if (scroll) builderPanel?.querySelector('#crew-builder-title')?.focus({preventScroll:true});
+}
+
+function selectBuilderCategory(event,category){
+  if(!builderState||builderState.locked||(builderState.mode==='edit'&&builderState.originalRegistrationIds.length))return;
+  const departure=event.departures.find(item=>item.id===builderState.departureId);
+  if(!departure||!event.categories.includes(category))return;
+  builderState.category=category;
+  builderState.car='';
+  builderState.ownerRegistrationId=!builderState.manager&&builderState.mode==='create'?ownAvailableRegistrations(departure).find(reg=>reg.category===category)?.id||null:null;
+  builderState.registrationIds=builderState.ownerRegistrationId?[builderState.ownerRegistrationId]:[];
+  renderPanel(event);
 }
 
 function updateCoverage(event) {
@@ -476,6 +497,17 @@ document.addEventListener('click', event => {
     }).catch(() => {});
     return;
   }
+  const categoryButton=event.target.closest('[data-crew-builder-category]');
+  if(categoryButton&&builderState){
+    event.preventDefault();
+    if(categoryButton.disabled)return;
+    const category=categoryButton.dataset.crewBuilderCategory;
+    loadEvents().then(events=>{
+      const current=events.find(item=>item.id===builderState?.eventId);
+      if(current)selectBuilderCategory(current,category);
+    }).catch(()=>{});
+    return;
+  }
   const stepButton = event.target.closest('[data-crew-builder-step]');
   if (stepButton && builderState) {
     event.preventDefault();
@@ -512,12 +544,7 @@ document.addEventListener('change', async event => {
   const currentEvent = events.find(item => item.id === builderState.eventId);
   if (!currentEvent) return;
   if (field.name === 'builderCategory' && !builderState.locked) {
-    builderState.category = field.value;
-    builderState.car = '';
-    const departure=currentEvent.departures.find(item=>item.id===builderState.departureId);
-    builderState.ownerRegistrationId=!builderState.manager&&builderState.mode==='create'?ownAvailableRegistrations(departure).find(reg=>reg.category===field.value)?.id||null:null;
-    builderState.registrationIds=builderState.ownerRegistrationId?[builderState.ownerRegistrationId]:[];
-    renderPanel(currentEvent);
+    selectBuilderCategory(currentEvent,field.value);
     return;
   }
   if (field.name === 'builderCar') {
@@ -543,4 +570,9 @@ document.addEventListener('submit', event => {
 });
 
 document.addEventListener('endurance:render', decorateEventView);
+document.addEventListener('crew-builder:pilot-registered',event=>{
+  if(!builderState||builderState.departureId!==event.detail?.departureId)return;
+  builderState.pendingRegistrationId=event.detail.registrationId;
+  eventsCache=null;
+});
 if (app) queueMicrotask(decorateEventView);

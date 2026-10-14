@@ -110,6 +110,9 @@
 .registration-stepper .registration-identity-field{margin-top:14px}
 .preferred-pilot-chips{display:flex;flex-wrap:wrap;gap:6px}
 .preferred-pilot-chips:empty{display:none}
+.preferred-pilot-entry{display:flex;align-items:center;gap:8px;min-width:0}
+.preferred-pilot-entry input{flex:1;min-width:0}
+.preferred-pilot-entry button{flex:none;min-height:40px;padding:6px 12px}
 .preferred-pilot-chip{display:inline-flex;align-items:center;gap:4px;padding:3px 4px 3px 10px;border:1px solid rgba(82,211,216,.45);border-radius:999px;background:rgba(82,211,216,.1);font-size:13px;font-weight:700}
 .preferred-pilot-chip button{display:grid;place-items:center;width:22px;height:22px;min-height:0;padding:0;border:0;border-radius:50%;background:transparent;color:inherit;font-size:16px;line-height:1;cursor:pointer}
 .preferred-pilot-chip button:hover{background:rgba(255,255,255,.12)}
