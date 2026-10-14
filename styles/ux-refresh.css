@@ -38,6 +38,7 @@
   grid-area: account;
   justify-self: end;
   margin: 0 !important;
+  padding: 0 !important;
   width: auto !important;
 }
 
@@ -2265,6 +2266,7 @@ body:has([data-category-entry]) { overflow: hidden; }
 .ce-concerned li span.is-whole { color: #4fd1c5; } .ce-concerned li span.is-part { color: #f3b33d; }
 .category-entry-sheet .registration-workspace-head { position: sticky; top: -18px; z-index: 3; margin: -18px -20px 0; padding: 16px 20px 10px; background: #111315; align-items: center; }
 .ce-footer { position: sticky; bottom: 0; margin: 12px -20px 0; padding: 14px 20px 12px; border-top: 1px solid #2b3336; background: var(--panel, #111315); }
+.category-entry-sheet[data-step="3"] .ce-footer { position: static; }
 .ce-footer .registration-step-nav { margin: 0; padding: 0; position: static; border: 0; background: none; }
 .ce-tally { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
 .ce-tally b { font-size: 34px; line-height: 1; color: #4fd1c5; }
@@ -2284,10 +2286,34 @@ body:has([data-category-entry]) { overflow: hidden; }
 .category-entry-categories .registration-category-copy em { font-size: 14px !important; }
 .registration-step .ce-range { margin-top: 12px; }
 .ce-subtitle { margin: 18px 0 8px; font-size: 15px; color: var(--text, #f2f5f4); }
-.ce-concerned-list { margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; }
-.ce-concerned-list li { display: flex; justify-content: space-between; gap: 10px; padding: 9px 12px; border-radius: 10px; background: #121718; text-transform: capitalize; font-size: 14px; }
-.ce-concerned-list li span { text-transform: none; font-weight: 700; }
+.ce-concerned-list { margin: 0; padding: 0; list-style: none; display: grid; gap: 3px; }
+.ce-concerned-list li { display: grid; grid-template-columns: minmax(130px, 210px) minmax(0, 1fr); align-items: center; gap: 12px; min-width: 0; padding: 5px 10px; border-radius: 6px; background: #121718; font-size: 12px; }
+.ce-concerned-heading { display: grid; gap: 2px; }
+.ce-concerned-heading strong { text-transform: capitalize; }
+.ce-concerned-heading span { font-weight: 700; }
 .ce-concerned-list li span.is-whole { color: #4fd1c5; } .ce-concerned-list li span.is-part { color: #f3b33d; }
+/* Compact final check: ten starts stay readable alongside their availability. */
+.category-entry-sheet[data-step="3"] .registration-stepper,
+.category-entry-sheet[data-step="3"] .registration-step { gap: 6px; }
+.category-entry-sheet[data-step="3"] .registration-summary-row { min-height: 30px; padding: 5px 10px; grid-template-columns: 74px minmax(0, 1fr) auto; gap: 6px; font-size: 13px; }
+.category-entry-sheet[data-step="3"] .registration-summary-row > span,
+.category-entry-sheet[data-step="3"] .registration-summary-row > strong,
+.category-entry-sheet[data-step="3"] .registration-summary-row > em { font-size: 12px; }
+.category-entry-sheet[data-step="3"] .ce-subtitle { margin: 8px 0 2px; font-size: 13px; }
+.category-entry-sheet[data-step="3"] .ce-tabs { display: none; }
+.category-entry-sheet[data-step="3"] .ce-footer { margin-top: 8px; padding-top: 8px; padding-bottom: 8px; }
+.category-entry-sheet[data-step="3"] .ce-tally { margin-bottom: 6px; gap: 8px; }
+.category-entry-sheet[data-step="3"] .ce-tally b { font-size: 24px; }
+.category-entry-sheet[data-step="3"] .ce-tally strong { font-size: 13px; }
+.category-entry-sheet[data-step="3"] .ce-tally em { font-size: 11px; }
+.ce-concerned-list .presence-timeline { margin-top: 0; }
+.ce-concerned-list .presence-scale { height: 18px; }
+.registration-sheet .ce-concerned-list .presence-time { font-size: 10px !important; line-height: 12px; }
+.ce-concerned-list .presence-track > .presence-segment { height: 10px; }
+.ce-concerned-list .presence-edges { display: none; }
+@media (max-width: 520px) {
+  .ce-concerned-list li { grid-template-columns: 120px minmax(0, 1fr); gap: 8px; padding: 5px 8px; font-size: 11px; }
+}
 .ce-empty { color: #f3b33d; }
 .ce-cars { margin-top: 16px; }
 .ce-cars-title { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; font-size: 15px; }

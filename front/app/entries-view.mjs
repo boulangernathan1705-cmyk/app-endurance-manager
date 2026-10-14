@@ -80,8 +80,9 @@ function card({event,departure,reg}) {
   if (isSolo(event)) return soloCard({event,departure,reg});
   const crew = (departure.crews||[]).find(item => (item.registrationIds||[]).some(id => String(id) === String(reg.id)));
   const assigned = new Set((departure.crews||[]).flatMap(item => (item.registrationIds||[]).map(String)));
+  const pilotKey = pilot => pilot.participantId || `name:${String(pilot.name).toLowerCase()}`;
   const unassigned = (departure.availability||[])
-    .filter(pilot => pilot.status !== 'unavailable' && !assigned.has(String(pilot.id)))
+    .filter(pilot => pilot.status !== 'unavailable' && !assigned.has(String(pilot.id)) && pilotKey(pilot) !== pilotKey(reg))
     .sort(pilotSort(event));
   const freePilots = groupByPilot(unassigned, event);
   const members = crew
@@ -106,7 +107,7 @@ function card({event,departure,reg}) {
 
   const unassignedBody = unassigned.length
     ? `<section class="crew-pilot-lines">${pilotLines(departure,event.durationHours||6,freePilots,{editable:false})}</section>`
-    : '<p class="empty">Tous les pilotes disponibles sont déjà affectés.</p>';
+    : '<p class="empty">Aucun autre pilote sans équipage sur ce départ.</p>';
 
   const situation = crew
     ? `<span class="departure-mine-badge is-crew">✓ Équipage ${esc(crew.name)}</span>`
