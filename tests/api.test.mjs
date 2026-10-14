@@ -504,12 +504,15 @@ test('events calendar: every simulator, typed circuit on AMS2 / ACE, no limit an
  assert.equal((await req('/api/events','GET',null,'admin')).data.events.find(e=>e.id===typed.data.id).access,'safe');
  for(const bad of [{...input,sim:'lmu'},{...input,sim:'xbox'},{...input,sim:'ace',categories:['GT3']},{...input,sim:'iracing',rounds:[{circuit:'Daytona',durationMinutes:20,categories:['GT3']}]},{...input,rounds:Array(5).fill({circuit:'Spa',durationMinutes:20})},{...input,details:{type:'Inconnu'}},{...input,rounds:[{circuit:'Spa',durationMinutes:20,weather:'snow'}]},{...input,rounds:[{circuit:'Spa',durationMinutes:20,fuel:11}]}])
   assert.equal((await req('/api/events','POST',bad,'admin')).status,400,JSON.stringify(bad));
+ const training=await req('/api/events','POST',{...input,details:{type:'TONDEUZ TRAINING'}},'admin');
+ assert.equal(training.status,201,JSON.stringify(training.data));
+ assert.equal((await req('/api/events','GET',null,'admin')).data.events.find(e=>e.id===training.data.id).details.type,'TONDEUZ TRAINING');
  const iracing=await req('/api/events','POST',{...input,sim:'iracing',rounds:[{circuit:'Indianapolis',durationMinutes:40,category:'GT3',car:'Ferrari 296 GT3'}]},'admin');assert.equal(iracing.status,201,'iRacing circuits and categories are typed');
  const lmu=await req('/api/events','POST',{...soloInput,sim:undefined},'admin');assert.equal(lmu.status,201);
  assert.equal((await req('/api/events','GET',null,'admin')).data.events.find(e=>e.id===lmu.data.id).sim,'lmu');
  // EVENT TDZ: its name and its event types are fixed (offered in the creation form).
  const session=(await req('/api/session','GET',null,'pilot')).data;
- assert.deepEqual(session.eventTypes,['OPEN','SAFE','Bouboule']);assert.equal(session.soloLabel,'EVENT TDZ');
+ assert.deepEqual(session.eventTypes,['OPEN','SAFE','Bouboule','TONDEUZ TRAINING']);assert.equal(session.soloLabel,'EVENT TDZ');
 });
 test('a pilot says he will miss an event, and entering it withdraws the absence',async()=>{
  const {req,login}=harness();await login(ADMIN,'admin');await login(PILOT,'pilot');
