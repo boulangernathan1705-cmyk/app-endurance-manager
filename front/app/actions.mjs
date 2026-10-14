@@ -1,3 +1,5 @@
+import {entryCommunities} from './core.mjs';
+import {submitRallyEvent} from './rally-form.mjs';
 import {app,state,api,load,loadArchive,showError,countdown,CARS,inCommunity} from './core.mjs';
 import {renderNav,renderHome,toggleRaceFilter,resetRaceFilters,simChosen,openSimChooser} from './home-view.mjs';
 import {renderEvent,togglePlanningCommunity} from './event-view.mjs';
@@ -130,7 +132,21 @@ async function perform(action,target){
     case 'event-absence': await api(`/api/events/${target.dataset.id}/absence`,'PUT'); await refreshAfterSave('C’est noté : tu seras absent.'); break;
     case 'event-absence-cancel': await api(`/api/events/${target.dataset.id}/absence`,'DELETE'); await refreshAfterSave('Tu n’es plus noté absent.'); break;
     case 'make-official': { if(!event||!state.manager)break; if(!confirm(`Rendre « ${event.name} » officielle ?\n\nElle sera commune à toutes les communautés : chacune pourra s’y inscrire. Ses inscriptions et équipages restent dans ta communauté. Impossible de revenir en arrière.`))return; await api(`/api/races/${event.id}/official`,'POST',{version:event.version}); await refreshAfterSave('Course rendue officielle.'); break; }
-    case 'registration-community': { const departure=event.departures.find(item=>item.id===target.dataset.departure),draft=draftFor(departure); draft.communityId=target.dataset.community||''; state.registrationOpen.add(departure.id); rerenderRegistrationSection(event,departure,'',renderEvent); break; }
+    case 'registration-community': {
+      const departure=event.departures.find(item=>item.id===target.dataset.departure),draft=draftFor(departure),communityId=target.dataset.community||'';
+      if(!communityId){draft.communityId='';state.registrationOpen.add(departure.id);rerenderRegistrationSection(event,departure,'',renderEvent);break;}
+      const form=target.closest('form');if(!form)break;
+      form.dataset.selectedCommunity=communityId;
+      form.querySelectorAll('[data-action="registration-community"]').forEach(choice=>{const selected=choice.dataset.community===communityId;choice.classList.toggle('active',selected);choice.setAttribute('aria-pressed',String(selected));});
+      form.querySelector('[data-action="registration-community-confirm"]').disabled=false;
+      break;
+    }
+    case 'registration-community-confirm': {
+      const form=target.closest('form'),communityId=form?.dataset.selectedCommunity;
+      if(!entryCommunities().some(item=>item.id===communityId))throw Error('Choisis une communauté.');
+      const departure=event.departures.find(item=>item.id===target.dataset.departure);draftFor(departure).communityId=communityId;
+      state.registrationOpen.add(departure.id);rerenderRegistrationSection(event,departure,'',renderEvent);break;
+    }
     case 'registration-step': { const departure=event.departures.find(item=>item.id===target.dataset.departure); goToRegistrationStep(event,departure,target); break; }
     case 'event-step': goToEventStep(target.closest('form'),target.dataset.step); break;
     case 'close-registration': if(state.pendingCrewJoin?.departureId===target.dataset.departure)state.pendingCrewJoin=null;state.registrationOpen.delete(target.dataset.departure); renderEvent(); break;
@@ -229,12 +245,12 @@ document.addEventListener('change',async event=>{
 });
 document.addEventListener('endurance:refresh',()=>{refresh().catch(showError);});
 // Registration panel: Enter moves to the next step, Escape or a click beside the panel closes it.
-document.addEventListener('submit',event=>{const form=event.target;if(form.matches?.('[data-kind="registration"].registration-stepper,[data-kind="event"].event-stepper')&&form.dataset.step!==(form.dataset.lastStep||'4')){event.preventDefault();event.stopImmediatePropagation();form.querySelector('.registration-next')?.click();}},true);
+document.addEventListener('submit',event=>{const form=event.target;if(form.dataset.kind==='rally-event'&&form.dataset.step!=='4'){event.preventDefault();event.stopImmediatePropagation();form.querySelector('[data-rally-step="next"]')?.click();return;}if(form.matches?.('[data-kind="registration"].registration-stepper,[data-kind="event"].event-stepper')&&form.dataset.step!==(form.dataset.lastStep||'4')){event.preventDefault();event.stopImmediatePropagation();form.querySelector('.registration-next')?.click();}},true);
 document.addEventListener('click',event=>{if(event.target.matches?.('.fold-registration'))event.target.querySelector('.registration-close-button')?.click();});
 document.addEventListener('keydown',event=>{if(event.key!=='Escape'||document.querySelector('[data-ux-error-modal]'))return;document.querySelector('.fold-registration:not([hidden]) .registration-close-button, .form-sheet [data-action="close-form"]')?.click();});
 document.addEventListener('toggle',event=>{const details=event.target;if(details instanceof HTMLDetailsElement&&details.matches('.crew-unified-card[data-crew],.crew-management-accordion[data-crew]'))details.open?state.crewManagementOpen.add(details.dataset.crew):state.crewManagementOpen.delete(details.dataset.crew);},true);
 document.addEventListener('click',async event=>{const target=event.target.closest?.('[data-action]');if(!target||target.disabled)return;if(target.dataset.action==='edit-crew')return;event.preventDefault();if(state.busy&&target.dataset.action!=='dismiss-error')return;state.busy=true;target.disabled=true;try{await perform(target.dataset.action,target);}catch(error){showError(error);}finally{state.busy=false;if(target.isConnected)target.disabled=false;updateRemoveButtons();}});
-document.addEventListener('submit',async event=>{const form=event.target;if(!form.dataset.kind)return;event.preventDefault();if(state.busy)return;state.busy=true;const submit=form.querySelector('[type="submit"]');if(submit)submit.disabled=true;try{if(form.dataset.kind==='event')await submitEvent(form);else if(form.dataset.kind==='solo-event')await submitSoloEvent(form);else if(form.dataset.kind==='registration'){const departureId=form.dataset.departure;const result=await submitRegistration(form,api);if(!(await finishPendingCrewJoin(departureId,result.id)))await refreshAfterSave(result.notice||'Inscription enregistrée.');}}catch(error){showError(error);}finally{state.busy=false;if(submit?.isConnected)submit.disabled=false;}});
+document.addEventListener('submit',async event=>{const form=event.target;if(!form.dataset.kind)return;event.preventDefault();if(state.busy)return;state.busy=true;const submit=form.querySelector('[type="submit"]');if(submit)submit.disabled=true;try{if(form.dataset.kind==='event')await submitEvent(form);else if(form.dataset.kind==='rally-event')await submitRallyEvent(form);else if(form.dataset.kind==='solo-event')await submitSoloEvent(form);else if(form.dataset.kind==='registration'){const departureId=form.dataset.departure;const result=await submitRegistration(form,api);if(!(await finishPendingCrewJoin(departureId,result.id)))await refreshAfterSave(result.notice||'Inscription enregistrée.');}}catch(error){showError(error);}finally{state.busy=false;if(submit?.isConnected)submit.disabled=false;}});
 document.addEventListener('error',event=>{const image=event.target;if(image instanceof HTMLImageElement&&image.matches('.circuit-visual img'))image.remove();},true);
 setInterval(()=>document.querySelectorAll('[data-countdown]').forEach(element=>{element.textContent=countdown(Number(element.dataset.countdown));}),1000);
 

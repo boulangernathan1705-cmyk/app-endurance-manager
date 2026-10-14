@@ -1,3 +1,4 @@
+import {renderRallyEventForm} from './rally-form.mjs';
 import {streamerFields, streamerData, syncStreamerFields} from './grindfest.mjs';
 import {isGrindfest} from '../../shared/grindfest.mjs';
 // Creating or editing an event of the community calendar (solo format), step by step, for every simulator.
@@ -14,7 +15,7 @@ import {WEATHERS,roundFormat,roundExtras} from './solo.mjs';
 const MAX_ROUNDS=4;
 const simChoice=(sim,selected)=>`<label class="sim-option sim-${sim.id}"><input type="radio" name="eventSim" value="${sim.id}" ${sim.id===selected?'checked':''} required><span>${esc(sim.short)}</span></label>`;
 // The community's event types; an event keeps its type even once removed from the list.
-function typeField(chosen){
+export function typeField(chosen){
   if (chosen === 'Grindfest') chosen = 'Gridfest';
   const types=[...state.eventTypes];if(chosen&&!types.includes(chosen))types.push(chosen);
   if(!types.length)return '';
@@ -63,6 +64,7 @@ function syncRounds(form){
 const STEPS=['Événement','Horaire','Manches','Inscriptions','Récapitulatif'],LAST=STEPS.length;
 
 export function renderSoloEventForm(event=null){
+  if(event&&simForEvent(event)==='acrally')return renderRallyEventForm(event);
   const sim=event?simForEvent(event):'lmu',rounds=(event?.rounds?.length?event.rounds:[{circuit:event?.circuit,durationMinutes:event?.durationMinutes}]).map((round,index,list)=>list.length===1&&!round.capacity&&event?.capacity?{...round,capacity:event.capacity}:round);
   const details=event?.details||{},access=event?.access||'open',departure=event?.departures?.[0]||{time:'21:00'},first=event?LAST:1;
   const start=departureFields(departure).replace(/<button[^>]*data-action="remove-departure"[^>]*>.*?<\/button>/,'');
@@ -117,6 +119,10 @@ function goToStep(form,target){
   // Moving forward checks the steps in between.
   for(let n=current;n<wanted;n++)for(const field of form.querySelectorAll(`[data-solo-step-pane="${n}"] input,[data-solo-step-pane="${n}"] select`))if(!field.checkValidity()){
     form.dataset.step=String(n);showStep(form,n);field.reportValidity();return;
+  }
+  if(current===1&&wanted>1&&form.elements.eventSim.value==='acrally'){
+    const start=form.querySelector('.departure-field');
+    renderRallyEventForm(state.editingEvent,{name:form.elements.eventName.value,type:form.querySelector('[name="eventType"]:checked')?.value||'',access:form.querySelector('[name="eventAccess"]:checked')?.value,departure:{date:start.querySelector('[name="date"]').value,time:start.querySelector('[name="time"]').value}});return;
   }
   form.dataset.step=String(wanted);showStep(form,wanted);
 }

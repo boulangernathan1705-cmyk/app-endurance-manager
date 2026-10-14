@@ -32,6 +32,7 @@ export function accessBadge(event) {
 // Circuit of an event: from the catalog (LMU, older iRacing events), or as typed (AMS2, iRacing, ACE).
 export function eventCircuitName(event, id) {
   const sim = simForEvent(event), circuit = simCatalog(sim)?.circuits.find(item => item.id === id);
+  if(sim==='acrally'&&!id)return 'Spéciales à définir';
   if (circuit) return circuit.random ? 'Circuit aléatoire' : circuit.name;
   return (sim !== 'lmu' && id) || 'Circuit à préciser';
 }
@@ -50,6 +51,10 @@ const infoChip = (icon, value, title) => `<span class="solo-info-chip" title="${
 // The event's details on the calendar card: per round its sessions, weather, multipliers and car, then the
 // schedule of an open session, the server password and the note.
 export function soloCardInfo(event) {
+  if(simForEvent(event)==='acrally'){
+    const round=event.rounds?.[0]||{},details=event.details||{};
+    return `<span class="solo-card-info"><span class="solo-info-row">${infoChip('car',round.car||round.category||'Voitures libres','Voitures autorisées')}${details.rallyEstimatedMinutes?infoChip('time',`Environ ${details.rallyEstimatedMinutes} min`,'Durée estimée de la soirée'):''}${details.note?infoChip('info',details.note,'Consignes'):''}</span></span>`;
+  }
   const details = event.details || {}, rounds = event.rounds?.length ? event.rounds : [{circuit: event.circuit, durationMinutes: event.durationMinutes}];
   const roundRow = round => {
     const weather = WEATHERS.find(([value]) => value === round.weather);
@@ -115,6 +120,11 @@ export function roundTiles(round) {
 // Event page header: a single round shows its tiles; several rounds show theirs in their own cards, below.
 // Then the note, and the password for the pilots entered.
 export function soloEventDetails(event) {
+  if(simForEvent(event)==='acrally'){
+    const details=event.details||{},round=event.rounds?.[0]||{},stages=details.rallyStages||event.rounds?.map(r=>r.circuit).filter(Boolean)||[];
+    const weather=WEATHERS.find(([value])=>value===round.weather);
+    return `<div class="solo-event-details"><div class="solo-detail-grid">${detailTile(detailSvg(ICONS.lock),'Lobby',event.access==='safe'?'SAFE · Privé':'OPEN · Public')}${detailTile(detailSvg(ICONS.car),'Voitures',esc(round.car||round.category||'Choix libre'))}${detailTile(detailSvg(ICONS.info),'Hôte',esc(details.rallyHost||''))}${detailTile(detailSvg(ICONS.time),'Durée estimée',details.rallyEstimatedMinutes?`Environ ${details.rallyEstimatedMinutes} min`:'')}${detailTile('☁️','Météo',esc(weather?.[2]||''))}${event.access==='safe'&&canSeePassword(event)?detailTile(detailSvg(ICONS.lock),'Mot de passe',esc(details.password||'À définir')):''}${detailTile(detailSvg(ICONS.info),'Consignes',esc(details.note||''),' is-wide')}</div><div class="creation-card"><h3>Programme des spéciales</h3>${stages.length?`<ol>${stages.map(stage=>`<li>${esc(stage)}</li>`).join('')}</ol>`:'<p>Les spéciales seront choisies pendant la soirée.</p>'}</div></div>`;
+  }
   const details = event.details || {}, rounds = event.rounds?.length ? event.rounds : [{circuit: event.circuit, durationMinutes: event.durationMinutes}];
   // Gridfest: the pilots entered get the password by Discord MP, not on the page.
   const mpOnly = isGrindfest(event) && !canManage() && (event.departures || []).some(departure => (departure.availability || []).some(reg => reg.mine && reg.status !== 'unavailable'));
@@ -125,6 +135,7 @@ export function soloEventDetails(event) {
 // Above the card's details: the circuit, or the number of rounds.
 export function soloCardMeta(event) {
   const rounds = event.rounds || [];
+  if(simForEvent(event)==='acrally'){const stages=event.details?.rallyStages||rounds.map(r=>r.circuit).filter(Boolean);return stages.length>1?`${stages.length} spéciales prévues`:esc(stages[0]||'Spéciales à définir');}
   return rounds.length > 1 ? `${rounds.length} manches` : esc(eventCircuitName(event, rounds[0]?.circuit ?? event.circuit));
 }
 

@@ -74,3 +74,18 @@ test('les identifiants iRacing ne peuvent pas entrer en collision avec les circu
     assert(!lmuIds.has(circuit.id));
   }
 });
+
+test('soirée ACRally : programme facultatif, lobby commun et accès lié', () => {
+  const input={name:'Soirée rallye',format:'solo',sim:'acrally',access:'safe',
+    rounds:[{circuit:'',durationMinutes:60,categories:[],capacity:12}],
+    details:{type:'OPEN',password:'secret',rallyCarMode:'all',rallyHost:'Nathan',rallyStages:[]},
+    departures:[{date:'2090-10-15',time:'21:00'}]};
+  const event=validateEvent(input);
+  assert.equal(event.circuit,'');assert.equal(event.capacity,12);assert.equal(event.access,'open');
+  assert.equal(event.details.password,undefined);assert.deepEqual(event.details.rallyStages,[]);
+  const safe=validateEvent({...input,details:{...input.details,type:'SAFE',rallyStages:['Saverne · reverse','Munster'],rallyCarMode:'car',rallyEstimatedMinutes:90},rounds:[{...input.rounds[0],car:'Peugeot 206 WRC'}]});
+  assert.equal(safe.access,'safe');assert.equal(safe.details.password,'secret');assert.equal(safe.rounds.length,1);assert.equal(safe.circuit,'Saverne · reverse');assert.equal(safe.details.rallyEstimatedMinutes,90);
+  assert.throws(()=>validateEvent({...input,rounds:[{...input.rounds[0],capacity:17}]}),/16/);
+  assert.throws(()=>validateEvent({...input,details:{...input.details,rallyCarMode:'car'}}),/voiture imposée/);
+  assert.throws(()=>validateEvent({...input,details:{...input.details,rallyStages:Array(21).fill('Saverne')}}),/20 spéciales/);
+});

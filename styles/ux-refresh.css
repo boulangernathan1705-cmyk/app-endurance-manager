@@ -2397,3 +2397,11 @@ html[data-game] #app .race-header .race-side .event-type-badge { padding: 4px 3p
 html[data-game] .race-card .race-fill .event-category-badge { min-width: 120px; }
 /* Administration: links inside help texts in the site colour, not the browser's blue. */
 .members-help a:not([class]) { color: var(--accent, #52d3d8); }
+
+.rally-choice { flex: 1 1 180px; --sim: #bf18ce; }
+.rally-choice > span { width: 100%; min-height: 92px; display: flex; flex-direction: column; gap: 8px; align-items: flex-start; padding: 18px; letter-spacing: normal; }
+.rally-choice small { font-weight: 400; color: #c7d0d4; }
+.rally-event-form [hidden] { display: none !important; }
+.rally-event-form [data-rally-stages] { display: grid; gap: 14px; }
+.rally-stage { align-items: end; }
+.rally-stage > button { justify-self: end; }

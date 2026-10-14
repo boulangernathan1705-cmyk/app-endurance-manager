@@ -28,6 +28,7 @@ function renderCommunityStep(departure){
   return `<form class="form-section registration-form registration-stepper" data-kind="registration" data-departure="${departure.id}" data-step="0">
 <p class="registration-step-label">Étape 1 · Communauté</p>
 ${communityChoice(entryCommunities(),{action:'registration-community',attrs:`data-departure="${departure.id}"`,help:'Course officielle : chaque pilote y court avec l’une de ses communautés, et rejoint les équipages de celle-ci.'})}
+<div class="registration-step-nav">${button('registration-community-confirm','Continuer',`data-departure="${departure.id}" disabled`,'primary-button registration-next')}</div>
 </form>`;
 }
 // Community of the entry, above its first step (changeable until it is saved).
