@@ -63,10 +63,10 @@ function syncRounds(form){
 }
 const STEPS=['Événement','Horaire','Manches','Inscriptions','Récapitulatif'],LAST=STEPS.length;
 
-export function renderSoloEventForm(event=null){
+export function renderSoloEventForm(event=null,{focusPassword=false}={}){
   if(event&&simForEvent(event)==='acrally')return renderRallyEventForm(event);
   const sim=event?simForEvent(event):'lmu',rounds=(event?.rounds?.length?event.rounds:[{circuit:event?.circuit,durationMinutes:event?.durationMinutes}]).map((round,index,list)=>list.length===1&&!round.capacity&&event?.capacity?{...round,capacity:event.capacity}:round);
-  const details=event?.details||{},access=event?.access||'open',departure=event?.departures?.[0]||{time:'21:00'},first=event?LAST:1;
+  const details=event?.details||{},access=event?.access||'open',departure=event?.departures?.[0]||{time:'21:00'},first=event?(focusPassword?2:LAST):1;
   const start=departureFields(departure).replace(/<button[^>]*data-action="remove-departure"[^>]*>.*?<\/button>/,'');
   const step=(n,content)=>`<section class="creation-card solo-form-step" data-solo-step-pane="${n}" ${n===first?'':'hidden'}>${content}</section>`;
   formSheet(event,event?'Modifier l’événement':'Nouvel événement').innerHTML=`<form class="form-panel event-creation solo-event-form" data-kind="solo-event" data-step="${first}">
@@ -85,6 +85,7 @@ export function renderSoloEventForm(event=null){
   const form=app.querySelector('form[data-kind="solo-event"]');
   syncRounds(form);syncStreamerFields(form);if(first===LAST)fillRecap(form);
   notifyRender();
+  if(focusPassword)requestAnimationFrame(()=>form.elements.eventPassword.focus());
 }
 
 // The form as the API wants it.

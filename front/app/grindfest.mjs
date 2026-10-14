@@ -76,7 +76,7 @@ const mpButton = (icon, label, attrs) => `<button type="button" class="planning-
 export function gridfestPasswordPanel(event) {
   if (!state.grindfest || !isGrindfest(event) || !isAdmin()) return '';
   const main=mpButton('M22 2 11 13M22 2l-7 20-4-9-9-4z','Envoyer le mot de passe','data-gridfest-passwords="send"');
-  const configure=mpButton('M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z','Configurer le mot de passe',`data-action="edit-event" data-id="${esc(event.id)}"`);
+  const configure=mpButton('M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z','Configurer le mot de passe',`data-action="edit-event" data-id="${esc(event.id)}" data-focus-password`);
   return `<section class="grindfest-round gridfest-mp" data-gridfest-password-panel="${esc(event.id)}">
     <div class="gridfest-mp-head"><h3>Mot de passe par MP</h3><span class="planning-quick">${configure}${main}${mpButton('M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01', 'Suivi', 'data-gridfest-passwords="status"')}</span></div>
     <div data-gridfest-password-status role="status" aria-live="polite"></div>
