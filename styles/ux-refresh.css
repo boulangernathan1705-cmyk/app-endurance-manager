@@ -2477,3 +2477,10 @@ html[data-game] #app .race-header .event-type-panel.has-access-logo .event-acces
  html[data-game] #app .race-header .race-card-top > .event-type-panel.has-access-logo { height: 115px !important; justify-content: center; }
  html[data-game] #app .race-header .event-type-panel.has-access-logo .event-access-logo { height: 115px; max-height: 115px; }
 }
+
+/* Explicit session labels, grouped in two compact rows at the left. */
+html[data-game] #app .race-header .race-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+html[data-game] #app .race-header .race-meta .race-header-time { margin: 0; padding: 4px 8px; font-size: 13px; line-height: 1.2; }
+.solo-session-chips { display: grid; gap: 6px; justify-items: start; max-width: 100%; }
+.solo-session-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.solo-session-pill { flex: none; width: auto; padding: 5px 8px; border: 1px solid rgba(255,255,255,.16); border-radius: 7px; background: rgba(255,255,255,.04); color: #dbe3e4; font-size: 12px; line-height: 1.2; }

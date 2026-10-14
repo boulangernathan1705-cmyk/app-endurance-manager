@@ -138,7 +138,13 @@ export function soloPasswordBlock(event){
 }
 export function soloHeaderChips(event){
   if(isGrindfest(event)||simForEvent(event)==='acrally'||event.rounds?.length>1)return '';
-  return roundTiles(event.rounds?.[0]||{circuit:event.circuit,durationMinutes:event.durationMinutes});
+  const round=event.rounds?.[0]||{durationMinutes:event.durationMinutes},weather=WEATHERS.find(([value])=>value===round.weather);
+  const chip=(label,value)=>value?`<span class="solo-session-pill">${esc(label)} · ${esc(value)}</span>`:'';
+  const minutes=value=>Number(value)>0?`${Number(value)} min`:'';
+  const session=[chip('Essais',minutes(round.practice)),chip('Qualifs',minutes(round.qualifying)),chip('Course',minutes(round.durationMinutes))].join('');
+  const conditions=[chip('Météo',weather?.[2]),chip('Carburant',round.fuel!=null?`×${round.fuel}`:''),chip('Pneus',round.tyres!=null?`×${round.tyres}`:'')].join('');
+  const cars=chip('Voiture',round.car)||chip('Catégorie',round.randomCategory?'Aléatoire':(round.categories||[]).join(' / ')||round.category);
+  return `<div class="solo-session-chips">${[session,conditions,cars].filter(Boolean).map(row=>`<div class="solo-session-row">${row}</div>`).join('')}</div>`;
 }
 // Above the card's details: the circuit, or the number of rounds.
 export function soloCardMeta(event) {
