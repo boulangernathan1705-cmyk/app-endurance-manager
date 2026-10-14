@@ -15,12 +15,13 @@ await page.locator('label').filter({has:page.locator('[name="eventType"][value="
 await page.locator('[data-action="close-form"]').click();
 await page.evaluate(async({race,communities})=>{const {state}=await import('/front/app/core.mjs');state.events=[race];state.communities=communities;state.currentEventId=race.id;state.drafts={};state.registrationOpen.add(race.departures[0].id);const {renderEvent}=await import('/front/app/event-view.mjs');renderEvent();},{race,communities});
 assert.equal(await page.locator('[data-step="0"][data-kind="registration"]').count(),0);assert.equal(await page.evaluate(async(id)=>{const {state}=await import('/front/app/core.mjs');return state.drafts[id].communityId;},departure.id),'alpha');await page.locator('[data-action="registration-community"][data-community=""]').first().click();const chooser=page.locator('[data-step="0"][data-kind="registration"]');await chooser.waitFor();await chooser.locator('[data-community="alpha"]').click();assert.equal(await chooser.count(),1);assert.equal(await page.evaluate(async(id)=>{const {state}=await import('/front/app/core.mjs');return state.drafts[id].communityId||'';},departure.id),'');await chooser.locator('[data-community="beta"]').click();assert.equal(await chooser.locator('[data-community="beta"]').getAttribute('aria-pressed'),'true');await chooser.locator('[data-action="registration-community-confirm"]').click();assert.equal(await page.evaluate(async(id)=>{const {state}=await import('/front/app/core.mjs');return state.drafts[id].communityId;},departure.id),'beta');assert.equal(await page.locator('[data-step="0"][data-kind="registration"]').count(),0);
-assert.equal(await page.locator('.planning-heading h2').count(),0);assert.equal(await page.locator('.race-header [data-action="share-event"]').count(),1);assert.equal(await page.locator('.race-community-filter [data-community="alpha"]').count(),1);
+assert.equal(await page.locator('.planning-heading h2').count(),0);assert.equal(await page.locator('.race-controls [data-action="share-event"]').count(),1);assert.equal(await page.locator('.race-community-filter [data-community="alpha"]').count(),1);
 assert.equal(await page.locator('.race-community-filter [data-community="beta"]').count(),1);
-assert.equal(await page.locator('.race-header .race-starts').count(),1);
+assert.equal(await page.locator('.race-header .race-starts').count(),0);
 assert.equal(await page.locator('.race-info-chip').count(),4);
 for(const chip of await page.locator('.race-info-chip').all())assert.ok((await chip.boundingBox()).height<50);
-assert.equal(await page.locator('.race-head > .race-starts .race-day').count(),3);
+assert.equal(await page.locator('.race-header .race-my-start').count(),0);
+assert.equal(await page.locator('.race-header .race-side .race-header-actions').count(),1);
 assert.deepEqual(errors,[]);
 
 });

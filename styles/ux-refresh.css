@@ -2407,10 +2407,10 @@ html[data-game] .race-card .race-fill .event-category-badge { min-width: 120px; 
 .rally-stage > button { justify-self: end; }
 
 /* Race overview: identity and personal start together, with a readable circuit. */
-html[data-game] #app .race-header .race-card-top { display: grid; grid-template-columns: 120px minmax(0, 1fr) clamp(200px, 22vw, 320px); gap: 24px; }
+html[data-game] #app .race-header .race-card-top { display: grid; grid-template-columns: 120px minmax(0, 1fr) clamp(260px, 30vw, 440px); gap: 24px; }
 html[data-game] #app .race-header .race-head { display: flex !important; flex-direction: column !important; flex-wrap: nowrap !important; align-items: flex-start !important; gap: 8px; }
 html[data-game] #app .race-header .event-title { flex-basis: auto; }
-html[data-game] #app .race-header .race-card-top > .circuit-visual { width: 100% !important; height: 160px !important; }
+html[data-game] #app .race-header .race-card-top > .circuit-visual { width: 100% !important; height: 145px !important; }
 html[data-game] #app .race-header .race-my-start { margin: 2px 0 0; text-align: left; justify-items: start; }
 html[data-game] #app .race-header .race-my-start small { display: none; }
 html[data-game] #app .race-header .race-header-actions { display: flex; align-self: flex-start; align-items: center; justify-content: flex-start; gap: 12px; flex-wrap: wrap; }
@@ -2436,3 +2436,10 @@ html[data-game] #app .race-header .race-head { justify-content: flex-start !impo
 html[data-game] #app .race-header .race-head > .race-starts { margin: 2px 0 0 !important; padding: 0 !important; border: 0 !important; align-self: flex-start; width: auto; }
 html[data-game] #app .race-header .race-header-actions { margin: 0 !important; align-self: flex-start !important; }
 html[data-game] #app .race-header .race-card-top > .circuit-visual { align-self: center; }
+
+/* Share belongs to the filter row; the header contains only race identity. */
+.race-controls { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 14px 0; }
+.race-controls .race-community-filter { margin: 0; }
+.race-controls > .link-button { margin-left: auto; flex: none; }
+html[data-game] #app .race-header .race-head { justify-content: center !important; }
+html[data-game] #app .race-header .race-side .race-header-actions { margin-top: 2px !important; }

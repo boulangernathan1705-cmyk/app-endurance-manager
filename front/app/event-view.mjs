@@ -7,7 +7,7 @@ import {app,state,esc,button,canManage,isAdmin,can,canEditRace,officialBadge,com
 import {ownRegistration,renderRegistrationWorkspace,soloRounds} from './registration.mjs';
 import {renderPilots} from './crews.mjs';
 import {isSolo,eventAccessLogo,accessBadge,soloCardMeta,soloEventDetails,roundTiles,roundPilots,soloEntryList,eventCircuitName,soloEntryBlock,safeGuideLink} from './solo.mjs';
-import {renderHome,raceDateBlock,raceStarts} from './home-view.mjs';
+import {renderHome,raceDateBlock} from './home-view.mjs';
 import {planningDays,renderPlanning,syncPlanning,CHEVRON} from './planning.mjs';
 import {raceInfoChips} from './race-info.mjs';
 import {categoryEntryOn,categoryEntryBar,categoryEntryGate,categoryEntryBoard} from './category-entry.mjs';
@@ -233,7 +233,8 @@ export function renderEvent(message=''){
   // secondary button, deletion as a discreet red link (it still asks for confirmation).
   const trash='<svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg>';
   const manageActions=`${canEditRace(event)?button('edit-event','Modifier l’événement',`data-id="${event.id}"`,'secondary-button'):''}${state.manager&&!event.official&&!isSolo(event)?button('make-official','Rendre officielle',`data-id="${event.id}"`,'link-button'):''}${canEditRace(event)?button('delete-event',`${trash}<span>Supprimer l’événement</span>`,`data-id="${event.id}"`,'danger-link'):''}`;
-  const eventActions=`<span class="race-header-actions">${button('share-event','Copier le lien',`data-id="${event.id}"`,'link-button')}${manageActions?`<details class="race-actions-menu"><summary aria-label="Actions de la course">⋯</summary><div class="race-actions-popover">${manageActions}</div></details>`:''}</span>`;
+  const shareAction=button('share-event','Copier le lien',`data-id="${event.id}"`,'link-button');
+  const eventActions=`<span class="race-header-actions">${manageActions?`<details class="race-actions-menu"><summary aria-label="Actions de la course">⋯</summary><div class="race-actions-popover">${manageActions}</div></details>`:''}</span>`;
   const visible=[...future,...undated];
   const upcoming=visible.map(({departure,index})=>renderDeparturePanel(event,departure,index,departure.id===state.selectedDepartureId||state.registrationOpen.has(departure.id))).join('');
   // A race over several days shows its starts as a planning, one column per day.
@@ -242,15 +243,11 @@ export function renderEvent(message=''){
   // actions sit on its heading line.
   const starts=days.length?renderPlanning(event,days,departure=>departureFoldBody(event,departure),{quick:departure=>quickActions(event,departure),cards:departure=>roundCards(event,departure)})
     :`<section class="departure-accordion" aria-label="Départs de la course">${upcoming}${renderPastDepartures(event,past)}</section>`;
-  // « Inscription par catégorie »: entered on several starts, the pilot only has « his » start once in a crew.
-  const placedOn=departure=>(departure.crews||[]).some(crew=>(departure.availability||[]).some(reg=>reg.mine&&(crew.registrationIds||[]).includes(reg.id)));
-  const myStart=days.length>1?days.flatMap(day=>day.items).map(item=>item.departure).find(departure=>Number(departure.startsAt)>now&&(departure.availability||[]).some(reg=>reg.mine&&reg.status!=='unavailable')&&(!categoryEntryOn(full)||placedOn(departure))):null;
-  const myStartLink=myStart?`<span class="race-my-start"><small>Ton départ</small>${button('goto-departure',`${esc(weekdayLong(myStart.startsAt))} ${esc(dayMonthShort(myStart.startsAt))} · Départ ${esc(timeLabel(myStart.time))}`,`data-departure="${myStart.id}"`,'secondary-button')}</span>`:'';
   // Endurances: the badges sit under the date, the race settings (icons) under the circuit.
   const badges=`<span class="race-badges">${officialBadge(event)}${isSolo(event)?accessBadge(event):eventTypeBadge(event.eventType)}${schedulePendingBadge(event)}</span>`;
   app.eventViewData={eventId:event.id,events:state.events,message};
   const gate=categoryEntryGate(full);
-  app.innerHTML=`<div class="event-header event-header-compact race-header event-type-${event.eventType||'private'}${isSolo(event)?` is-solo-${event.access||'open'} sim-${simForEvent(event)}`:''}${isGrindfest(event)?' is-gridfest':''}" data-event-id="${event.id}"><div class="race-card-top">${isSolo(event)?raceDateBlock(event,!next&&!undated.length):`<div class="race-side">${raceDateBlock(event,!next&&!undated.length)}${badges}</div>`}<div class="race-head"><h1 class="event-title event-name">${esc(event.name)}</h1><span class="race-meta">${isSolo(event)?((event.rounds||[]).length>1?soloCardMeta(event):`<strong class="solo-header-circuit">${soloCardMeta(event)}</strong>`):`${esc(circuitLabel(event.circuit))} · <span class="nowrap">${durationLabel(eventMinutes(event))}</span>`}</span>${isSolo(event)?badges+soloHeaderTime(event,next):raceInfoChips(event)}${myStartLink}${isSolo(event)?'':raceStarts(full,!next&&!undated.length)}${eventActions}</div>${isSolo(event)?eventTypePanel(event):circuitVisual(event.circuit)}</div>${isSolo(event)&&soloEventDetails(event)?`<div class="race-header-footer">${soloEventDetails(event)}</div>`:''}</div><div id="crew-builder-root"></div>${message?`<p class="creation-success" role="status">${esc(message)}</p>`:''}${communityFilter(present,chosen)}${gate||`${categoryEntryBar(full)}${categoryEntryBoard(full)}${starts}${absencesSection(full,!!(next||undated.length))}`}`;
+  app.innerHTML=`<div class="event-header event-header-compact race-header event-type-${event.eventType||'private'}${isSolo(event)?` is-solo-${event.access||'open'} sim-${simForEvent(event)}`:''}${isGrindfest(event)?' is-gridfest':''}" data-event-id="${event.id}"><div class="race-card-top">${isSolo(event)?raceDateBlock(event,!next&&!undated.length):`<div class="race-side">${raceDateBlock(event,!next&&!undated.length)}${badges}${eventActions}</div>`}<div class="race-head"><h1 class="event-title event-name">${esc(event.name)}</h1><span class="race-meta">${isSolo(event)?((event.rounds||[]).length>1?soloCardMeta(event):`<strong class="solo-header-circuit">${soloCardMeta(event)}</strong>`):`${esc(circuitLabel(event.circuit))} · <span class="nowrap">${durationLabel(eventMinutes(event))}</span>`}</span>${isSolo(event)?badges+soloHeaderTime(event,next):raceInfoChips(event)}${isSolo(event)?eventActions:''}</div>${isSolo(event)?eventTypePanel(event):circuitVisual(event.circuit)}</div>${isSolo(event)&&soloEventDetails(event)?`<div class="race-header-footer">${soloEventDetails(event)}</div>`:''}</div><div id="crew-builder-root"></div>${message?`<p class="creation-success" role="status">${esc(message)}</p>`:''}<div class="race-controls">${communityFilter(present,chosen)}${shareAction}</div>${gate||`${categoryEntryBar(full)}${categoryEntryBoard(full)}${starts}${absencesSection(full,!!(next||undated.length))}`}`;
   if(days.length)syncPlanning(app);
   notifyRender();
 }
