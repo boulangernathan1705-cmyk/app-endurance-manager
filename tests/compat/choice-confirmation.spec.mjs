@@ -21,7 +21,7 @@ assert.equal(await page.locator('.race-header .race-starts').count(),0);
 assert.equal(await page.locator('.race-info-chip').count(),4);
 for(const chip of await page.locator('.race-info-chip').all())assert.ok((await chip.boundingBox()).height<50);
 assert.equal(await page.locator('.race-header .race-my-start').count(),0);
-assert.equal(await page.locator('.race-header .race-side .race-header-actions').count(),1);
+assert.equal(await page.locator('.race-controls-actions .race-header-actions').count(),1);
 assert.deepEqual(errors,[]);
 
 });

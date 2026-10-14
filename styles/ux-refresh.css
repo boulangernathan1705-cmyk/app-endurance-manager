@@ -2443,3 +2443,7 @@ html[data-game] #app .race-header .race-card-top > .circuit-visual { align-self:
 .race-controls > .link-button { margin-left: auto; flex: none; }
 html[data-game] #app .race-header .race-head { justify-content: center !important; }
 html[data-game] #app .race-header .race-side .race-header-actions { margin-top: 2px !important; }
+
+.race-controls-actions { display: flex; align-items: center; gap: 12px; margin-left: auto; }
+.race-controls-actions .race-header-actions { display: flex; margin: 0; }
+.race-controls-actions .race-actions-popover { left: auto; right: 0; }
