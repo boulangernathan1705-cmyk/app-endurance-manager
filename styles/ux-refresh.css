@@ -2447,3 +2447,25 @@ html[data-game] #app .race-header .race-side .race-header-actions { margin-top: 
 .race-controls-actions { display: flex; align-items: center; gap: 12px; margin-left: auto; }
 .race-controls-actions .race-header-actions { display: flex; margin: 0; }
 .race-controls-actions .race-actions-popover { left: auto; right: 0; }
+
+/* SOLO / TDZ logos occupy the same visual space as endurance circuits. */
+html[data-game] #app .race-header .race-card-top > .event-type-panel { position: static !important; width: 100% !important; height: 175px !important; margin: 0 !important; align-self: center; flex: none; }
+html[data-game] #app .race-header .event-type-panel.has-access-logo .event-access-logo { width: 100%; height: 100%; max-height: 175px; object-fit: contain; }
+@media (max-width:760px) {
+  html[data-game] #app .race-header .race-card-top > .event-type-panel { height: 115px !important; }
+  html[data-game] #app .race-header .event-type-panel.has-access-logo .event-access-logo { max-height: 115px; }
+}
+
+/* Single-session settings use the endurance header's small icon pills. */
+html[data-game] #app .race-header .round-info { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; border: 0; }
+html[data-game] #app .race-header .round-item { display: inline-flex; flex: none; align-items: center; gap: 7px; min-height: 0; height: auto; padding: 5px 10px; border: 1px solid rgba(255,255,255,.16); border-radius: 8px; background: rgba(255,255,255,.04); }
+html[data-game] #app .race-header .round-item-icon { width: 18px; height: 18px; padding: 0; background: none; border: 0; color: #7fe3ea; }
+html[data-game] #app .race-header .round-item-icon svg { width: 18px; height: 18px; }
+html[data-game] #app .race-header .round-item-copy small { display: none; }
+html[data-game] #app .race-header .round-item-copy strong { font-size: 14px; line-height: 1.2; }
+html[data-game] #app .race-header .round-item-categories .category-logo { height: 20px; }
+.solo-password-near-entry { display: flex; margin: 8px 0 12px; }
+
+html[data-game] #app .race-header .solo-header-circuit { font-size: 16px; font-weight: 400; color: #c7d0d4; }
+.solo-header-summary { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+html[data-game] #app .race-header .solo-header-summary .race-header-time { margin: 0; font-size: 15px; padding: 5px 10px; }

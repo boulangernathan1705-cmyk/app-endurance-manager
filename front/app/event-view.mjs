@@ -6,7 +6,7 @@ import {durationLabel,eventMinutes} from '../../shared/duration.mjs';
 import {app,state,esc,button,canManage,isAdmin,can,canEditRace,officialBadge,communityTag,circuitLabel,eventTypeBadge,schedulePendingBadge,eventBadge,eventCategoryCount,circuitVisual,pilotCount,notifyRender} from './core.mjs';
 import {ownRegistration,renderRegistrationWorkspace,soloRounds} from './registration.mjs';
 import {renderPilots} from './crews.mjs';
-import {isSolo,eventAccessLogo,accessBadge,soloCardMeta,soloEventDetails,roundTiles,roundPilots,soloEntryList,eventCircuitName,soloEntryBlock,safeGuideLink} from './solo.mjs';
+import {isSolo,eventAccessLogo,accessBadge,soloCardMeta,soloEventDetails,soloPasswordBlock,soloHeaderChips,roundTiles,roundPilots,soloEntryList,eventCircuitName,soloEntryBlock,safeGuideLink} from './solo.mjs';
 import {renderHome,raceDateBlock} from './home-view.mjs';
 import {planningDays,renderPlanning,syncPlanning,CHEVRON} from './planning.mjs';
 import {raceInfoChips} from './race-info.mjs';
@@ -217,7 +217,7 @@ function soloHeaderTime(event,next){
 }
 function eventTypePanel(event){
   if(isGrindfest(event))return `<span class="event-type-panel has-gridfest-logo"><img class="gridfest-header-logo" src="/images/event-access/gridfest-horizontal.png" alt="Gridfest" width="1280" height="720"></span>`;
-  const logo=eventAccessLogo(event);
+  const logo=eventAccessLogo(event,{header:true});
   if(logo)return `<span class="event-type-panel has-access-logo">${logo}</span>`;
   const type=event.details?.type;
   return type?`<span class="event-type-panel" data-type="${esc(type)}"><span>${esc(type)}</span></span>`:'';
@@ -248,7 +248,7 @@ export function renderEvent(message=''){
   const badges=`<span class="race-badges">${officialBadge(event)}${isSolo(event)?accessBadge(event):eventTypeBadge(event.eventType)}${schedulePendingBadge(event)}</span>`;
   app.eventViewData={eventId:event.id,events:state.events,message};
   const gate=categoryEntryGate(full);
-  app.innerHTML=`<div class="event-header event-header-compact race-header event-type-${event.eventType||'private'}${isSolo(event)?` is-solo-${event.access||'open'} sim-${simForEvent(event)}`:''}${isGrindfest(event)?' is-gridfest':''}" data-event-id="${event.id}"><div class="race-card-top">${isSolo(event)?raceDateBlock(event,!next&&!undated.length):`<div class="race-side">${raceDateBlock(event,!next&&!undated.length)}${badges}</div>`}<div class="race-head"><h1 class="event-title event-name">${esc(event.name)}</h1><span class="race-meta">${isSolo(event)?((event.rounds||[]).length>1?soloCardMeta(event):`<strong class="solo-header-circuit">${soloCardMeta(event)}</strong>`):`${esc(circuitLabel(event.circuit))} · <span class="nowrap">${durationLabel(eventMinutes(event))}</span>`}</span>${isSolo(event)?badges+soloHeaderTime(event,next):raceInfoChips(event)}</div>${isSolo(event)?eventTypePanel(event):circuitVisual(event.circuit)}</div>${isSolo(event)&&soloEventDetails(event)?`<div class="race-header-footer">${soloEventDetails(event)}</div>`:''}</div><div id="crew-builder-root"></div>${message?`<p class="creation-success" role="status">${esc(message)}</p>`:''}<div class="race-controls">${communityFilter(present,chosen)}<span class="race-controls-actions">${shareAction}${eventActions}</span></div>${gate||`${categoryEntryBar(full)}${categoryEntryBoard(full)}${starts}${absencesSection(full,!!(next||undated.length))}`}`;
+  app.innerHTML=`<div class="event-header event-header-compact race-header event-type-${event.eventType||'private'}${isSolo(event)?` is-solo-${event.access||'open'} sim-${simForEvent(event)}`:''}${isGrindfest(event)?' is-gridfest':''}" data-event-id="${event.id}"><div class="race-card-top">${isSolo(event)?`<div class="race-side">${raceDateBlock(event,!next&&!undated.length)}</div>`:`<div class="race-side">${raceDateBlock(event,!next&&!undated.length)}${badges}</div>`}<div class="race-head"><h1 class="event-title event-name">${esc(event.name)}</h1><span class="race-meta">${isSolo(event)?((event.rounds||[]).length>1?soloCardMeta(event):`<strong class="solo-header-circuit">${soloCardMeta(event)}</strong>`):`${esc(circuitLabel(event.circuit))} · <span class="nowrap">${durationLabel(eventMinutes(event))}</span>`}</span>${isSolo(event)?`<span class="solo-header-summary">${badges}${soloHeaderTime(event,next)}</span>`+soloHeaderChips(event):raceInfoChips(event)}</div>${isSolo(event)?eventTypePanel(event):circuitVisual(event.circuit)}</div>${isSolo(event)&&soloEventDetails(event)?`<div class="race-header-footer">${soloEventDetails(event)}</div>`:''}</div><div id="crew-builder-root"></div>${message?`<p class="creation-success" role="status">${esc(message)}</p>`:''}<div class="race-controls">${communityFilter(present,chosen)}<span class="race-controls-actions">${shareAction}${eventActions}</span></div>${gate||`${categoryEntryBar(full)}${categoryEntryBoard(full)}${soloPasswordBlock(full)}${starts}${absencesSection(full,!!(next||undated.length))}`}`;
   if(days.length)syncPlanning(app);
   notifyRender();
 }

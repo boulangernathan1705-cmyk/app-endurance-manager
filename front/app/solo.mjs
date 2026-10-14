@@ -9,8 +9,8 @@ export const ANY_CATEGORY = '*';
 export const isSolo = event => event?.format === 'solo';
 
 // Supplied OPEN/SAFE artwork, shared by the calendar, event and personal entries.
-export function eventAccessLogo(event) {
-  if (!state.eventTdz || !isSolo(event) || isGrindfest(event)) return '';
+export function eventAccessLogo(event,{header=false}={}) {
+  if ((!state.eventTdz&&!header) || !isSolo(event) || isGrindfest(event)) return '';
   const sim = SIMS.find(item => item.id === simForEvent(event));
   const access = event.access === 'safe' ? 'safe' : 'open';
   return `<img class="event-access-logo" src="/images/event-access/${access}-${sim.id}.png" alt="${access.toUpperCase()} · ${esc(sim.name)}" width="300" height="300" loading="lazy" decoding="async">`;
@@ -91,9 +91,9 @@ const TILE_ICONS = {
   qualifying: '<circle cx="12" cy="14" r="7"/><path d="M12 10.5V14l2 1.5M10 3h4M12 3v4M18.5 7.5l1.5-1.5"/>',
   race: '<path d="M5 21V3"/><path d="M5 4h14v10H5z" fill="none"/><path d="M5 4h3.5v3.33H5zM12 4h3.5v3.33H12zM8.5 7.33H12v3.33H8.5zM15.5 7.33H19v3.33h-3.5zM5 10.67h3.5V14H5zM12 10.67h3.5V14H12z" fill="currentColor" stroke="none"/>',
 };
-// The server password: for the pilots entered (and whoever manages the event).
+// The race page shows the password only to its entered pilots.
 export function canSeePassword(event) {
-  return canManage() || (!isGrindfest(event) && (event.departures || []).some(departure => (departure.availability || []).some(reg => reg.mine && reg.status !== 'unavailable')));
+  return (!isGrindfest(event) && (event.departures || []).some(departure => (departure.availability || []).some(reg => reg.mine && reg.status !== 'unavailable')));
 }
 const detailSvg = path => `<svg viewBox="0 0 24 24" aria-hidden="true">${path}</svg>`;
 const detailTile = (icon, label, value, extra = '') => value ? `<div class="solo-detail${extra}"><span class="solo-detail-icon">${icon}</span><span class="solo-detail-copy"><span class="solo-detail-label">${esc(label)}</span><strong>${value}</strong></span></div>` : '';
@@ -101,7 +101,7 @@ const detailTile = (icon, label, value, extra = '') => value ? `<div class="solo
 // categories; an icon, a small label and the value each.
 export function roundTiles(round) {
   const weather = WEATHERS.find(([value]) => value === round.weather);
-  const item = (icon, label, value) => `<span class="round-item"><span class="round-item-icon">${icon}</span><span class="round-item-copy"><small>${esc(label)}</small><strong>${value}</strong></span></span>`;
+  const item = (icon, label, value) => `<span class="round-item" data-tip="${esc(label)}"><span class="round-item-icon">${icon}</span><span class="round-item-copy"><small>${esc(label)}</small><strong>${value}</strong></span></span>`;
   const minutes = value => Number(value) > 0 ? `${Number(value)} min` : '';
   const items = [
     minutes(round.practice) && item(detailSvg(TILE_ICONS.practice), 'Essais', minutes(round.practice)),
@@ -123,14 +123,22 @@ export function soloEventDetails(event) {
   if(simForEvent(event)==='acrally'){
     const details=event.details||{},round=event.rounds?.[0]||{},stages=details.rallyStages||event.rounds?.map(r=>r.circuit).filter(Boolean)||[];
     const weather=WEATHERS.find(([value])=>value===round.weather);
-    return `<div class="solo-event-details"><div class="solo-detail-grid">${detailTile(detailSvg(ICONS.lock),'Lobby',event.access==='safe'?'SAFE · Privé':'OPEN · Public')}${detailTile(detailSvg(ICONS.car),'Voitures',esc(round.car||round.category||'Choix libre'))}${detailTile(detailSvg(ICONS.info),'Hôte',esc(details.rallyHost||''))}${detailTile(detailSvg(ICONS.time),'Durée estimée',details.rallyEstimatedMinutes?`Environ ${details.rallyEstimatedMinutes} min`:'')}${detailTile('☁️','Météo',esc(weather?.[2]||''))}${event.access==='safe'&&canSeePassword(event)?detailTile(detailSvg(ICONS.lock),'Mot de passe',esc(details.password||'À définir')):''}${detailTile(detailSvg(ICONS.info),'Consignes',esc(details.note||''),' is-wide')}</div><div class="creation-card"><h3>Programme des spéciales</h3>${stages.length?`<ol>${stages.map(stage=>`<li>${esc(stage)}</li>`).join('')}</ol>`:'<p>Les spéciales seront choisies pendant la soirée.</p>'}</div></div>`;
+    return `<div class="solo-event-details"><div class="solo-detail-grid">${detailTile(detailSvg(ICONS.lock),'Lobby',event.access==='safe'?'SAFE · Privé':'OPEN · Public')}${detailTile(detailSvg(ICONS.car),'Voitures',esc(round.car||round.category||'Choix libre'))}${detailTile(detailSvg(ICONS.info),'Hôte',esc(details.rallyHost||''))}${detailTile(detailSvg(ICONS.time),'Durée estimée',details.rallyEstimatedMinutes?`Environ ${details.rallyEstimatedMinutes} min`:'')}${detailTile('☁️','Météo',esc(weather?.[2]||''))}${detailTile(detailSvg(ICONS.info),'Consignes',esc(details.note||''),' is-wide')}</div><div class="creation-card"><h3>Programme des spéciales</h3>${stages.length?`<ol>${stages.map(stage=>`<li>${esc(stage)}</li>`).join('')}</ol>`:'<p>Les spéciales seront choisies pendant la soirée.</p>'}</div></div>`;
   }
   const details = event.details || {}, rounds = event.rounds?.length ? event.rounds : [{circuit: event.circuit, durationMinutes: event.durationMinutes}];
   // Gridfest: the pilots entered get the password by Discord MP, not on the page.
-  const mpOnly = isGrindfest(event) && !canManage() && (event.departures || []).some(departure => (departure.availability || []).some(reg => reg.mine && reg.status !== 'unavailable'));
-  const extra = `${canSeePassword(event) ? detailTile(detailSvg(ICONS.lock), 'Mot de passe', esc(details.password || '')) : mpOnly ? detailTile(detailSvg(ICONS.lock), 'Mot de passe', 'Par MP Discord') : ''}${detailTile(detailSvg(ICONS.info), 'Info', esc(details.note || ''), ' is-wide')}`;
-  const tiles = rounds.length > 1 ? '' : roundTiles(rounds[0]);
-  return tiles || extra ? `<div class="solo-event-details">${tiles}${extra ? `<div class="solo-detail-grid solo-detail-extra">${extra}</div>` : ''}</div>` : '';
+  const extra=detailTile(detailSvg(ICONS.info),'Info',esc(details.note||''),' is-wide');
+  return extra?`<div class="solo-event-details"><div class="solo-detail-grid solo-detail-extra">${extra}</div></div>`:'';
+}
+export function soloPasswordBlock(event){
+  if(!isSolo(event))return '';
+  const entered=(event.departures||[]).some(departure=>(departure.availability||[]).some(reg=>reg.mine&&reg.status!=='unavailable'));
+  const password=canSeePassword(event)?event.details?.password:isGrindfest(event)&&entered?'Par MP Discord':'';
+  return password?`<div class="solo-password-near-entry">${detailTile(detailSvg(ICONS.lock),'Mot de passe',esc(password))}</div>`:'';
+}
+export function soloHeaderChips(event){
+  if(isGrindfest(event)||simForEvent(event)==='acrally'||event.rounds?.length>1)return '';
+  return roundTiles(event.rounds?.[0]||{circuit:event.circuit,durationMinutes:event.durationMinutes});
 }
 // Above the card's details: the circuit, or the number of rounds.
 export function soloCardMeta(event) {

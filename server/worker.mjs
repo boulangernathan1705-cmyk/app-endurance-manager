@@ -331,9 +331,9 @@ async function listEvents(env, actor, game='', scope='', community) {
       })};
   }).map(event => hidePassword(event, actor));
 }
-// The server password of an event: only for its entered pilots and for those who manage the races.
+// Event lists expose the password only to entered pilots; editors fetch it explicitly.
 function hidePassword(event, actor) {
-  if (!event.details?.password || can(actor, 'manage_races')) return event;
+  if (!event.details?.password) return event;
   const entered = !isGrindfest(event) && event.departures.some(departure => departure.availability.some(reg => reg.mine && reg.status !== 'unavailable'));
   if (entered) return event;
   const {password, ...details} = event.details;
@@ -664,6 +664,13 @@ async function api(request, env) {
     if ((event.format || 'endurance') === 'solo') fail(400, 'Un événement reste dans sa communauté.');
     await env.DB.prepare('UPDATE events SET community_id=?,version=version+1 WHERE id=? AND community_id=?').bind(OFFICIAL, event.id, community.id).run();
     return json({ok:true});
+  }
+  const editDetails = path.match(/^\/api\/events\/([a-f0-9-]{36})\/edit-details$/);
+  if (editDetails && method === 'GET') {
+    const event=await eventById(env,editDetails[1],community);
+    if(event.community_id===OFFICIAL&&!actor.manager)fail(403,'Une course officielle se modifie par les gestionnaires de la plateforme.');
+    if(!can(actor,'manage_races')&&!(can(actor,'create_race')&&event.created_by===actor.user?.id))requirePermission(actor,'manage_races');
+    return json({details:JSON.parse(event.details||'{}')});
   }
   const eventMatch = path.match(/^\/api\/events\/([a-f0-9-]{36})$/);
   if (eventMatch && ['PATCH','DELETE'].includes(method)) {
