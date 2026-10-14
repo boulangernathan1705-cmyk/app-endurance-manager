@@ -8,6 +8,14 @@ import {isGrindfest} from '../../shared/grindfest.mjs';
 export const ANY_CATEGORY = '*';
 export const isSolo = event => event?.format === 'solo';
 
+// Supplied OPEN/SAFE artwork, shared by the calendar, event and personal entries.
+export function eventAccessLogo(event) {
+  if (!state.eventTdz || !isSolo(event) || isGrindfest(event)) return '';
+  const sim = SIMS.find(item => item.id === simForEvent(event));
+  const access = event.access === 'safe' ? 'safe' : 'open';
+  return `<img class="event-access-logo" src="/images/event-access/${access}-${sim.id}.png" alt="${access.toUpperCase()} · ${esc(sim.name)}" width="300" height="300" loading="lazy" decoding="async">`;
+}
+
 export function simBadge(event) {
   const sim = SIMS.find(item => item.id === simForEvent(event));
   return `<span class="event-sim-badge sim-${sim.id}" title="${esc(sim.name)}">${esc(sim.short)}</span>`;

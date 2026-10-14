@@ -1,6 +1,6 @@
 import {simForEvent} from '../../shared/catalog.mjs';
 import {renderHome} from './home-view.mjs';
-import {isSolo,accessBadge,soloCardMeta,renderSoloEntries,ANY_CATEGORY} from './solo.mjs';
+import {isSolo,eventAccessLogo,accessBadge,soloCardMeta,renderSoloEntries,ANY_CATEGORY} from './solo.mjs';
 import {dateBlock,timeLabel} from '../dates.mjs';
 import {durationLabel,eventMinutes} from '../../shared/duration.mjs';
 import {eventSchedule} from '../schedule.mjs';
@@ -69,7 +69,7 @@ function soloCard({event,departure,reg}) {
         <h2 class="event-name">${esc(event.name)}</h2>
         <span class="race-meta">${soloCardMeta(event)}</span>
         <span class="race-badges">${accessBadge(event)}${category}<span class="race-start">Départ ${esc(timeLabel(departure.time))}</span>${situation}</span>
-      </span>${circuitVisual(event.circuit,true)}</span>
+      </span>${eventAccessLogo(event)||circuitVisual(event.circuit,true)}</span>
       <button type="button" class="primary-button native-my-entry-open-event" data-action="open" data-id="${event.id}" data-departure="${departure.id}">Voir l’événement</button>
     </summary>
     <div class="native-my-entry-body">${renderSoloEntries(event,departure)}</div>

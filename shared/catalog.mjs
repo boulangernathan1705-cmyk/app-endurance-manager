@@ -163,7 +163,8 @@ export const SIMS = [
   {id:'lmu',name:'Le Mans Ultimate',short:'LMU'},
   {id:'iracing',name:'iRacing',short:'iRacing'},
   {id:'ams2',name:'Automobilista 2',short:'AMS2'},
-  {id:'ace',name:'Assetto Corsa EVO',short:'ACE'}
+  {id:'ace',name:'Assetto Corsa EVO',short:'ACE'},
+  {id:'acrally',name:'Assetto Corsa Rally',short:'AC Rally'}
 ];
 export const SIM_IDS = SIMS.map(sim => sim.id);
 // Older events have no simulator saved: it follows their circuit.

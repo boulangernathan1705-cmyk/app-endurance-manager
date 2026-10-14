@@ -4,6 +4,18 @@ import {readFileSync} from 'node:fs';
 import {GAME_CATALOGS, catalogForGame, gameForEvent} from '../shared/catalog.mjs';
 import {validateEvent, validateRegistration} from '../server/core.mjs';
 
+test('AC Rally events accept OPEN and SAFE with a typed stage and car', () => {
+  for (const access of ['open','safe']) {
+    const event=validateEvent({name:'Rally test',format:'solo',sim:'acrally',access,
+      rounds:[{circuit:'Spéciale Alsace',durationMinutes:20,category:'Rally',car:'Lancia Delta'}],
+      departures:[{date:'2090-10-15',time:'21:00'}]});
+    assert.equal(event.sim,'acrally');
+    assert.equal(event.access,access);
+    assert.equal(event.rounds[0].circuit,'Spéciale Alsace');
+    assert.equal(event.rounds[0].car,'Lancia Delta');
+  }
+});
+
 test('LMU et iRacing utilisent deux catalogues distincts', () => {
   const lmu = catalogForGame('lmu');
   const iracing = catalogForGame('iracing');
