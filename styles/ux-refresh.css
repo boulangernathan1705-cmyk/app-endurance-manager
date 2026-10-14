@@ -2405,3 +2405,24 @@ html[data-game] .race-card .race-fill .event-category-badge { min-width: 120px; 
 .rally-event-form [data-rally-stages] { display: grid; gap: 14px; }
 .rally-stage { align-items: end; }
 .rally-stage > button { justify-self: end; }
+
+/* Race overview: identity and personal start together, with a readable circuit. */
+html[data-game] #app .race-header .race-card-top { display: grid; grid-template-columns: 120px minmax(0, 1fr) clamp(200px, 22vw, 320px); gap: 24px; }
+html[data-game] #app .race-header .race-head { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+html[data-game] #app .race-header .event-title { flex-basis: auto; }
+html[data-game] #app .race-header .race-card-top > .circuit-visual { width: 100% !important; height: 160px !important; }
+html[data-game] #app .race-header .race-my-start { margin: 2px 0 0; text-align: left; justify-items: start; }
+html[data-game] #app .race-header .race-my-start small { display: none; }
+html[data-game] #app .race-header .race-header-actions { display: flex; align-self: flex-start; align-items: center; justify-content: flex-start; gap: 12px; flex-wrap: wrap; }
+.race-actions-menu { position: relative; }
+.race-actions-menu > summary { display: grid; place-items: center; width: 36px; height: 30px; border: 1px solid #343c3f; border-radius: 8px; cursor: pointer; list-style: none; font-size: 24px; }
+.race-actions-menu > summary::-webkit-details-marker { display: none; }
+.race-actions-popover { position: absolute; left: 0; top: calc(100% + 6px); z-index: 30; display: grid; gap: 8px; padding: 12px; min-width: 210px; background: #151c1e; border: 1px solid #343c3f; border-radius: 10px; box-shadow: 0 8px 24px #0008; }
+.planning-heading[hidden] { display: none !important; }
+@media (max-width: 760px) {
+  html[data-game] #app .race-header .race-card-top { grid-template-columns: 88px minmax(0, 1fr); gap: 12px; }
+  html[data-game] #app .race-header .race-card-top > .circuit-visual { grid-column: 1 / -1; width: 100% !important; height: 115px !important; }
+  html[data-game] #app .race-header .race-card-top > .event-type-panel { grid-column: 1 / -1; }
+  html[data-game] #app .race-header .race-my-start { flex: none; order: initial; }
+  html[data-game] #app .race-header .race-my-start .secondary-button { white-space: normal; text-align: left; }
+}
