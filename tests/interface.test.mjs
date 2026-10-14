@@ -54,9 +54,9 @@ test('agenda handles Paris midnight, Sunday to Monday, DST and new year',()=>{
 test('Course produit directement l’interface finale',()=>{
   const eventView=read('front/app/event-view.mjs');
   const crews=read('front/app/crews.mjs');
-  assert.match(eventView,/event-header-stats/);
+  assert.match(eventView,/race-head/);
   assert.match(eventView,/raceDateBlock\(event/);
-  assert.match(eventView,/raceStarts\(event/);
+  assert.match(eventView,/renderPlanning\(event/);
   assert.doesNotMatch(eventView,/renderMyRace/);
   assert.match(eventView,/departure-fold/);
   assert.match(eventView,/Modifier mon inscription/);
@@ -80,7 +80,8 @@ test('la page événement garde les actions événement séparées des actions �
   const remove=eventView.indexOf("button('delete-event',`${trash}<span>Supprimer l’événement</span>`");
   // Deletion is a discreet red link, not a button with the same weight as the others.
   assert.match(eventView,/<span>Supprimer l’événement<\/span>`,`data-id="\$\{event\.id\}"`,'danger-link'\)/);
-  assert.ok(share>=0&&share<edit&&edit<remove);
+  assert.ok(share>=0&&edit>=0&&remove>edit);
+  assert.match(eventView,/race-actions-menu/);
   assert.doesNotMatch(eventView,/event-create-crew/);
 });
 

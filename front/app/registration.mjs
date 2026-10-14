@@ -43,6 +43,7 @@ export function draftFor(departure) {
   if (!state.drafts[departure.id]) {
     const mine=ownRegistration(departure);
     state.drafts[departure.id]=mine ? registrationDraft(mine) : {name:state.user?.name?.slice(0,32)||state.pilotName,category:'',cars:[],carAny:false,status:'',preferredPilot:'',soloDriver:false,id:null,version:null,forOther:false};
+    if(!mine&&state.user&&entryCommunities().some(community=>community.id===state.community?.id))state.drafts[departure.id].communityId=state.community.id;
   }
   return state.drafts[departure.id];
 }

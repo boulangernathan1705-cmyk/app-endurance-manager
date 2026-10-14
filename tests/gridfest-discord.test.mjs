@@ -145,7 +145,8 @@ test('Gridfest keeps Discord identity, hides passwords even from entrants, and g
   assert.equal(seen.departures[0].availability[0].name, `Discord ${FIRST}`);
   assert.equal(seen.departures[0].availability[0].gameName, 'Nathan in game');
   assert.equal(seen.details.password, undefined);
-  assert.equal((await req('/api/events')).data.events[0].details.password, PASSWORD);
+  assert.equal((await req('/api/events')).data.events[0].details.password, undefined);
+  assert.equal((await req(`/api/events/${event.id}/edit-details`)).data.details.password, PASSWORD);
   assert.equal((await req(sendPath, 'GET', null, FIRST)).status, 403);
   assert.equal((await req(sendPath, 'POST', {version:event.version}, FIRST)).status, 403);
   assert.equal((await req(sendPath, 'POST', {version:999})).status, 409);

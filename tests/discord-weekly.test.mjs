@@ -315,3 +315,26 @@ test('quinze créneaux et un pilote : le récap conserve automatiquement la vue 
   assert.doesNotMatch(race.fields[0].value,/📅/);
   assert.equal(race.fields[0].value.split('👤').length-1,1);
 });
+
+
+test('Discord orders crews, unassigned pilots and their category logos by LMU class without duplicating pilots',()=>{
+ const at=Date.parse('2026-10-11T15:00:00Z');
+ const order=['Hypercar','LMP2 ELMS','LMP2 WEC','LMP3','GTE','GT3'];
+ const pilots=order.map((category,index)=>({name:`Pilot-${index}`,categories:[category]})).reverse();
+ pilots.push({name:'Multi',categories:['GT3','Hypercar','GTE']},{name:'Other',categories:['Unknown']},{name:'NoClass',categories:[]});
+ const departure={eventId:'spa',eventName:'6h de Spa',circuit:'spa',startsAt:at,durationMinutes:360,
+  crews:order.map((category,index)=>({name:`Crew-${index}`,category,pilots:['Driver'],locked:false})).reverse(),unassignedPilots:pilots};
+ const render=departures=>buildWeeklyDiscordPayload({currentDepartures:[],futureDepartures:departures,periodLabel:'semaine'},{},at-86400000,'lmu').embeds.at(-1).fields.map(field=>field.value).join('\n');
+ for(const departures of [[departure],[departure,{...departure,startsAt:at+86400000}]]){
+  const text=render(departures);
+  for(let index=1;index<order.length;index++){
+   assert.ok(text.indexOf(`👤 Pilot-${index-1}`)<text.indexOf(`👤 Pilot-${index}`));
+   assert.ok(text.indexOf(`**Crew-${index-1}**`)<text.indexOf(`**Crew-${index}**`));
+  }
+  assert.ok(text.indexOf('👤 Multi')<text.indexOf('👤 Pilot-1'));
+  assert.ok(text.indexOf('👤 Pilot-5')<text.indexOf('👤 Other'));
+  assert.equal(text.match(/👤 Multi/g).length,1);
+  assert.match(text,/👤 Multi 🟦 Hypercar 🟥 GTE 🟪 GT3/);
+ }
+ assert.equal(pilots[0].name,'Pilot-5','formatting preserves the snapshot order');
+});

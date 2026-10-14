@@ -2,6 +2,12 @@
 
 Les changements du site, version par version. La plus récente est en haut.
 
+## v1.44 — 14 octobre 2026
+
+- Gridfest : logos officiels sur la carte de l’événement et dans son bandeau.
+- Événements : bandeaux compacts, mêmes alignements pour SOLO, TDZ et endurance, partage à côté du filtre de communauté.
+- Inscriptions : confirmations de choix et affichage du mot de passe près de l’inscription, réservé aux pilotes inscrits.
+
 ## v1.43 — 14 octobre 2026
 
 - Discord : les disponibilités des pilotes sans équipage se présentent automatiquement par départ ou par pilote selon la place occupée, avec les logos de catégorie conservés.

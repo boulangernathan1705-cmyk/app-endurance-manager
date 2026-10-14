@@ -15,6 +15,13 @@ const recapWeekday=new Intl.DateTimeFormat('fr-FR',{timeZone:TIME_ZONE,weekday:'
 const recapTime=new Intl.DateTimeFormat('fr-FR',{timeZone:TIME_ZONE,hour:'numeric',minute:'2-digit',hourCycle:'h23'});
 const markers=new Map([['Hypercar','🟦'],['LMP2 ELMS','🟨'],['LMP2 WEC','🟨'],['LMP3','🟩'],['GT3','🟪'],['GTE','🟥']]);
 
+// A pilot entered in several classes appears under their first class in this order.
+const PILOT_CATEGORY_ORDER=['Hypercar','LMP2 ELMS','LMP2 WEC','LMP3','GTE','GT3'];
+const categoryRank=category=>{const rank=PILOT_CATEGORY_ORDER.indexOf(category);return rank<0?PILOT_CATEGORY_ORDER.length:rank;};
+const orderedCategories=categories=>[...categories].sort((a,b)=>categoryRank(a)-categoryRank(b));
+const entryRank=entry=>Math.min(...(entry.categories||[entry.category]).map(categoryRank),PILOT_CATEGORY_ORDER.length);
+const orderedEntries=entries=>[...entries].sort((a,b)=>entryRank(a)-entryRank(b));
+
 function localDay(timestamp){
   const parts=Object.fromEntries(ymd.formatToParts(timestamp).map(p=>[p.type,p.value]));
   return Math.floor(Date.UTC(+parts.year,+parts.month-1,+parts.day)/DAY_MS);
@@ -74,11 +81,11 @@ function crewBlock(crew,sim,emojis){
 }
 const asPilot=pilot=>typeof pilot==='string'?{name:pilot,categories:[]}:pilot;
 function pilotLine(pilot,sim,emojis){
-  return [`👤 ${clean(pilot.name)}`,...(pilot.categories||[]).map(category=>emojis[categoryEmojiName(sim,category)]?categoryMark(category,sim,emojis):`${categoryMark(category,sim,emojis)} ${clean(category)}`)].join(' ');
+  return [`👤 ${clean(pilot.name)}`,...orderedCategories(pilot.categories||[]).map(category=>emojis[categoryEmojiName(sim,category)]?categoryMark(category,sim,emojis):`${categoryMark(category,sim,emojis)} ${clean(category)}`)].join(' ');
 }
 // Pilots without a crew: one per line with the logos of their categories.
 function unassignedBlock(pilots,sim,emojis){
-  const list=pilots.map(asPilot);
+  const list=orderedEntries(pilots.map(asPilot));
   if(!list.some(pilot=>pilot.categories?.length))return `📋 **Sans équipage** : ${list.map(pilot=>clean(pilot.name)).join(', ')}`;
   return ['📋 **Sans équipage**',...list.map(pilot=>pilotLine(pilot,sim,emojis))].join('\n');
 }
@@ -103,11 +110,11 @@ function unassignedField(departures,compact,emojis){
     }
     return [...days].map(([day,times])=>`${day} ${times.join(', ')}`).join(' · ');
   };
-  const byPilot=[...pilots.values()].map(pilot=>`${pilotLine(pilot,sim,emojis)} · ${startsLabel(pilot.starts)}`).join('\n');
+  const byPilot=orderedEntries([...pilots.values()]).map(pilot=>`${pilotLine(pilot,sim,emojis)} · ${startsLabel(pilot.starts)}`).join('\n');
   const byDeparture=[...departures].sort((a,b)=>a.startsAt-b.startsAt)
     .filter(departure=>departure.unassignedPilots?.length)
     .map(departure=>{
-      const list=departure.unassignedPilots.map(asPilot);
+      const list=orderedEntries(departure.unassignedPilots.map(asPilot));
       const time=departure.timePending?'horaire à confirmer':hourLabel(departure.startsAt);
       return [`📅 **${recapDay.format(departure.startsAt)} · ${time}** — ${list.length} pilote${list.length>1?'s':''}`,
         ...list.map(pilot=>pilotLine(pilot,sim,emojis))].join('\n');
@@ -120,12 +127,12 @@ function unassignedField(departures,compact,emojis){
 function departureValue(departure,compact=false,emojis={}){
   const sim=simOf(departure);
   if(compact){
-    const lines=[`🕐 **${departureTitle(departure)}**`,...departure.crews.map(crew=>`${categoryMark(crew.category,sim,emojis)} ${clean(crew.name)} · ${crew.pilots.length} pilote${crew.pilots.length>1?'s':''}`)];
+    const lines=[`🕐 **${departureTitle(departure)}**`,...orderedEntries(departure.crews).map(crew=>`${categoryMark(crew.category,sim,emojis)} ${clean(crew.name)} · ${crew.pilots.length} pilote${crew.pilots.length>1?'s':''}`)];
     if(departure.unassignedPilots?.length)lines.push(`📋 Sans équipage : ${departure.unassignedPilots.length}`);
     if(!departure.crews.length&&!departure.unassignedPilots?.length)lines.push('Personne d’inscrit pour l’instant.');
     return cut(lines.join('\n'),1024);
   }
-  const blocks=[`🕐 **${departureTitle(departure)}**`,...departure.crews.map(crew=>crewBlock(crew,sim,emojis))];
+  const blocks=[`🕐 **${departureTitle(departure)}**`,...orderedEntries(departure.crews).map(crew=>crewBlock(crew,sim,emojis))];
   if(departure.unassignedPilots?.length)blocks.push(unassignedBlock(departure.unassignedPilots,sim,emojis));
   if(!departure.crews.length&&!departure.unassignedPilots?.length)blocks.push('Personne d’inscrit pour l’instant.');
   return cut(blocks.join('\n\n'),1024);

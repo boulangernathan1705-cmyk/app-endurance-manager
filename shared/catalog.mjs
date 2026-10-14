@@ -142,7 +142,7 @@ export function catalogForGame(game='lmu') { return GAME_CATALOGS[GAME_IDS.inclu
 // EVENT TDZ (Tondeuz): the event types, set here (their logos will come with them).
 // Track limits of an endurance (race page icon).
 export const TRACK_LIMITS = {strict:'Strictes', normal:'Normales'};
-export const TDZ_EVENT_TYPES = ['OPEN', 'SAFE', 'Bouboule'];
+export const TDZ_EVENT_TYPES = ['OPEN', 'SAFE', 'Bouboule', 'TONDEUZ TRAINING'];
 export const TDZ_EVENTS_LABEL = 'EVENT TDZ';
 // The events module (modules.soloRaces) is « EVENT TDZ » for the TDZ community (plus « test » on the dev site),
 // with its types and OPEN / SAFE access; everywhere else it is « EVENT SOLO »: no type, open to the « Endurances » permission.

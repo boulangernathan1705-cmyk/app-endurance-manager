@@ -2147,12 +2147,6 @@ body:has(.form-sheet-overlay) { overflow: hidden; }
 .round-item { min-width: 0; }
 .round-item-copy { min-width: 0; }
 .round-item-copy strong { white-space: normal; overflow-wrap: anywhere; }
-/* The type panel (SAFE, OPEN…) takes the whole height of the event header, details included. */
-@media (min-width: 601px) {
-  html[data-game] #app .race-header[class*="is-solo-"] { position: relative; padding-right: 186px !important; }
-  html[data-game] #app .race-header[class*="is-solo-"] .event-type-panel span { font-size: 26px; }
-  html[data-game] #app .race-header[class*="is-solo-"] .event-type-panel { position: absolute; top: 14px; bottom: 14px; right: 18px; width: 150px; height: auto; }
-}
 /* « Comment devenir SAFE »: a link to the Discord channel, in the SAFE colour. */
 .planning-quick-button.is-safe-guide { width: auto !important; padding: 0 12px !important; border-color: rgba(240, 192, 64, .55); color: #f0c040; text-decoration: none; }
 .settings-safe-guide { display: grid; gap: 10px; }
@@ -2405,3 +2399,88 @@ html[data-game] .race-card .race-fill .event-category-badge { min-width: 120px; 
 .rally-event-form [data-rally-stages] { display: grid; gap: 14px; }
 .rally-stage { align-items: end; }
 .rally-stage > button { justify-self: end; }
+
+/* Race overview: identity and personal start together, with a readable circuit. */
+html[data-game] #app .race-header .race-card-top { display: grid; grid-template-columns: 120px minmax(0, 1fr) clamp(260px, 30vw, 440px); gap: 24px; }
+html[data-game] #app .race-header .race-head { display: flex !important; flex-direction: column !important; flex-wrap: nowrap !important; align-items: flex-start !important; gap: 8px; }
+html[data-game] #app .race-header .event-title { flex-basis: auto; }
+html[data-game] #app .race-header .race-card-top > .circuit-visual { width: 100% !important; height: 145px !important; }
+html[data-game] #app .race-header .race-my-start { margin: 2px 0 0; text-align: left; justify-items: start; }
+html[data-game] #app .race-header .race-my-start small { display: none; }
+html[data-game] #app .race-header .race-header-actions { display: flex; align-self: flex-start; align-items: center; justify-content: flex-start; gap: 12px; flex-wrap: wrap; }
+.race-actions-menu { position: relative; }
+.race-actions-menu > summary { display: grid; place-items: center; width: 36px; height: 30px; border: 1px solid #343c3f; border-radius: 8px; cursor: pointer; list-style: none; font-size: 24px; }
+.race-actions-menu > summary::-webkit-details-marker { display: none; }
+.race-actions-popover { position: absolute; left: 0; top: calc(100% + 6px); z-index: 30; display: grid; gap: 8px; padding: 12px; min-width: 210px; background: #151c1e; border: 1px solid #343c3f; border-radius: 10px; box-shadow: 0 8px 24px #0008; }
+.planning-heading[hidden] { display: none !important; }
+@media (max-width: 760px) {
+  html[data-game] #app .race-header .race-card-top { grid-template-columns: 88px minmax(0, 1fr); gap: 12px; }
+  html[data-game] #app .race-header .race-card-top > .circuit-visual { grid-column: 1 / -1; width: 100% !important; height: 115px !important; }
+  html[data-game] #app .race-header .race-card-top > .event-type-panel { grid-column: 1 / -1; }
+  html[data-game] #app .race-header .race-my-start { flex: none; order: initial; }
+  html[data-game] #app .race-header .race-my-start .secondary-button { white-space: normal; text-align: left; }
+}
+
+html[data-game] #app .race-header .race-info-chips { display: flex; flex-wrap: wrap; align-items: center; align-self: flex-start; gap: 6px; }
+html[data-game] #app .race-header .race-info-chip { flex: none; align-self: flex-start; height: auto !important; min-height: 0; padding: 5px 10px; }
+html[data-game] #app .race-header > .race-starts { align-self: flex-start; width: auto; text-align: left; margin-top: 8px; }
+
+/* Keep schedules in the information column, alongside the circuit. */
+html[data-game] #app .race-header .race-head { justify-content: flex-start !important; align-content: flex-start; }
+html[data-game] #app .race-header .race-head > .race-starts { margin: 2px 0 0 !important; padding: 0 !important; border: 0 !important; align-self: flex-start; width: auto; }
+html[data-game] #app .race-header .race-header-actions { margin: 0 !important; align-self: flex-start !important; }
+html[data-game] #app .race-header .race-card-top > .circuit-visual { align-self: center; }
+
+/* Share belongs to the filter row; the header contains only race identity. */
+.race-controls { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 14px 0; }
+.race-controls .race-community-filter { margin: 0; }
+.race-controls > .link-button { margin-left: auto; flex: none; }
+html[data-game] #app .race-header .race-head { justify-content: flex-start !important; }
+html[data-game] #app .race-header .race-side .race-header-actions { margin-top: 2px !important; }
+
+.race-controls-actions { display: flex; align-items: center; gap: 12px; margin-left: auto; }
+.race-controls-actions .race-header-actions { display: flex; margin: 0; }
+.race-controls-actions .race-actions-popover { left: auto; right: 0; }
+
+/* SOLO / TDZ logos occupy the same visual space as endurance circuits. */
+html[data-game] #app .race-header .race-card-top > .event-type-panel { position: static !important; width: 100% !important; height: 175px !important; margin: 0 !important; align-self: center; flex: none; }
+html[data-game] #app .race-header .event-type-panel.has-access-logo .event-access-logo { width: 100%; height: 100%; max-height: 175px; object-fit: contain; }
+@media (max-width:760px) {
+  html[data-game] #app .race-header .race-card-top > .event-type-panel { height: 115px !important; }
+  html[data-game] #app .race-header .event-type-panel.has-access-logo .event-access-logo { max-height: 115px; }
+}
+
+/* Single-session settings use the endurance header's small icon pills. */
+html[data-game] #app .race-header .round-info { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; border: 0; }
+html[data-game] #app .race-header .round-item { display: inline-flex; flex: none; align-items: center; gap: 7px; min-height: 0; height: auto; padding: 5px 10px; border: 1px solid rgba(255,255,255,.16); border-radius: 8px; background: rgba(255,255,255,.04); }
+html[data-game] #app .race-header .round-item-icon { width: 18px; height: 18px; padding: 0; background: none; border: 0; color: #7fe3ea; }
+html[data-game] #app .race-header .round-item-icon svg { width: 18px; height: 18px; }
+html[data-game] #app .race-header .round-item-copy small { display: none; }
+html[data-game] #app .race-header .round-item-copy strong { font-size: 14px; line-height: 1.2; }
+html[data-game] #app .race-header .round-item-categories .category-logo { height: 20px; }
+.solo-password-near-entry { display: flex; margin: 8px 0 12px; }
+
+html[data-game] #app .race-header .solo-header-circuit { font-size: 16px; font-weight: 400; color: #c7d0d4; }
+.solo-header-summary { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+html[data-game] #app .race-header .solo-header-summary .race-header-time { margin: 0; font-size: 15px; padding: 5px 10px; }
+
+/* Shared endurance / SOLO header positions and dimensions. */
+html[data-game] #app .race-header .race-side .event-badge-row { display: flex; flex-direction: column; align-items: stretch; gap: 5px; padding: 0; border: 0; background: none; }
+html[data-game] #app .race-header .race-side .event-badge-row > * { box-sizing: border-box; width: 100%; justify-content: center; text-align: center; }
+.solo-header-settings { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+html[data-game] #app .race-header .solo-header-settings .race-header-time { margin: 0; padding: 5px 10px; font-size: 14px; line-height: 1.2; }
+html[data-game] #app .race-header .solo-header-settings .race-header-time svg { width: 18px; height: 18px; }
+html[data-game] #app .race-header .solo-header-settings .round-info { display: contents; }
+html[data-game] #app .race-header .race-card-top > .event-type-panel.has-access-logo { display: flex; justify-content: flex-end; height: 145px !important; }
+html[data-game] #app .race-header .event-type-panel.has-access-logo .event-access-logo { width: auto; height: 145px; max-height: 145px; max-width: 100%; }
+@media(max-width:760px){
+ html[data-game] #app .race-header .race-card-top > .event-type-panel.has-access-logo { height: 115px !important; justify-content: center; }
+ html[data-game] #app .race-header .event-type-panel.has-access-logo .event-access-logo { height: 115px; max-height: 115px; }
+}
+
+/* Explicit session labels, grouped in two compact rows at the left. */
+html[data-game] #app .race-header .race-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+html[data-game] #app .race-header .race-meta .race-header-time { margin: 0; padding: 4px 8px; font-size: 13px; line-height: 1.2; }
+.solo-session-chips { display: grid; gap: 6px; justify-items: start; max-width: 100%; }
+.solo-session-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.solo-session-pill { flex: none; width: auto; padding: 5px 8px; border: 1px solid rgba(255,255,255,.16); border-radius: 7px; background: rgba(255,255,255,.04); color: #dbe3e4; font-size: 12px; line-height: 1.2; }
