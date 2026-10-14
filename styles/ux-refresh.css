@@ -2430,3 +2430,9 @@ html[data-game] #app .race-header .race-header-actions { display: flex; align-se
 html[data-game] #app .race-header .race-info-chips { display: flex; flex-wrap: wrap; align-items: center; align-self: flex-start; gap: 6px; }
 html[data-game] #app .race-header .race-info-chip { flex: none; align-self: flex-start; height: auto !important; min-height: 0; padding: 5px 10px; }
 html[data-game] #app .race-header > .race-starts { align-self: flex-start; width: auto; text-align: left; margin-top: 8px; }
+
+/* Keep schedules in the information column, alongside the circuit. */
+html[data-game] #app .race-header .race-head { justify-content: flex-start !important; align-content: flex-start; }
+html[data-game] #app .race-header .race-head > .race-starts { margin: 2px 0 0 !important; padding: 0 !important; border: 0 !important; align-self: flex-start; width: auto; }
+html[data-game] #app .race-header .race-header-actions { margin: 0 !important; align-self: flex-start !important; }
+html[data-game] #app .race-header .race-card-top > .circuit-visual { align-self: center; }
