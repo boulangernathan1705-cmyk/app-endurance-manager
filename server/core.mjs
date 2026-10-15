@@ -1,5 +1,5 @@
 import {isGrindfest, streamersOf, normalizeStreamers, gridfestPasswordValid} from '../shared/grindfest.mjs';
-import {CATEGORIES, EVENT_TYPE_IDS as EVENT_TYPES, CIRCUIT_IDS as CIRCUITS, CARS, SIM_IDS, eventCatalog, simForEvent, isRandomCircuit, TDZ_EVENT_TYPES, TRACK_LIMITS} from '../shared/catalog.mjs';
+import {catalogForGame, gameForEvent, CATEGORIES, EVENT_TYPE_IDS as EVENT_TYPES, CIRCUIT_IDS as CIRCUITS, CARS, SIM_IDS, eventCatalog, simForEvent, isRandomCircuit, TDZ_EVENT_TYPES, TRACK_LIMITS} from '../shared/catalog.mjs';
 const LEGACY_CAR_ALIASES = new Map([
   ['BMW M Hybrid V8 Evo (2026)','BMW M Hybrid V8'],['Cadillac V-Series.R Evo (2026)','Cadillac V-Series.R'],['Peugeot 9X8 2023','Peugeot 9X8'],['Peugeot 9X8 2024','Peugeot 9X8'],['Toyota TR010 Hybrid (2026)','Toyota GR010 Hybrid'],['Ginetta G61-LT-P3 Evo','Ginetta G61-LT-P3'],['Ferrari 488 GTE Evo','Ferrari 488 GTE'],['Aston Martin Vantage AMR LMGT3 Evo','Aston Martin Vantage AMR LMGT3'],['BMW M4 LMGT3 Evo','BMW M4 LMGT3'],['Ferrari 296 LMGT3 Evo','Ferrari 296 LMGT3'],['Ford Mustang LMGT3 Evo','Ford Mustang LMGT3'],['Lamborghini Huracán LMGT3 Evo 2','Lamborghini Huracán LMGT3'],['McLaren 720S LMGT3 Evo','McLaren 720S LMGT3'],['Porsche 911 LMGT3 R (992)','Porsche 911 GT3 R LMGT3'],['Porsche 911 LMGT3 R (992) 2026','Porsche 911 GT3 R LMGT3']
 ]);
@@ -322,6 +322,7 @@ function validateEvent(input, existing = null) {
   const circuit = solo ? solo.circuit : input.circuit == null ? (existing?.circuit || '') : (input.circuit === '' ? '' : text(input.circuit, 40, 'Circuit'));
   if (!solo && circuit && !CIRCUITS.includes(circuit)) fail(400, 'Choisis un circuit proposé.');
   const categoriesInput = solo ? solo.categories : input.categories;
+  if (!solo && circuit && Array.isArray(categoriesInput) && categoriesInput.some(category=>!catalogForGame(gameForEvent({circuit})).categories[category])) fail(400, 'Choisis une catégorie de ce simulateur.');
   if (!solo && (!Array.isArray(categoriesInput) || !categoriesInput.length || categoriesInput.some(c => !CATEGORIES.includes(c)))) fail(400, 'Choisis au moins une catégorie autorisée.');
   if (!Array.isArray(input.departures) || !input.departures.length || input.departures.length > 30) fail(400, 'Ajoute entre 1 et 30 départs.');
   if (solo && input.departures.length !== 1) fail(400, 'Un événement a un seul départ.');
@@ -409,7 +410,8 @@ function validateRegistration(input, event) {
   const cars = [...new Set(rawCars.filter(car => typeof car === 'string' && car.trim()).map(car => text(car, 100, 'Voiture')))];
   const carAny = input.status !== 'unavailable' && input.carAny === true;
   const normalizedCars = cars.map(car => LEGACY_CAR_ALIASES.get(car) || car);
-  if (normalizedCars.some(car => !CARS[category]?.includes(car))) fail(400, 'Choisis uniquement des voitures proposées pour cette catégorie.');
+  const allowedCars=event.circuit?catalogForGame(gameForEvent(event)).cars:CARS;
+  if (normalizedCars.some(car => !allowedCars[category]?.includes(car))) fail(400, 'Choisis uniquement des voitures proposées pour cette catégorie.');
   cars.splice(0, cars.length, ...normalizedCars);
   if (carAny) cars.length = 0;
   const car = cars[0] || '';
@@ -425,4 +427,5 @@ export {
   setCookie, cookieNames, siteOrigin, communityLabel, baseDomain, json, redirect, origin, requireDiscord, administrators, identity, owned, personal,
   registrationSelect, registrationParticipant, NAME_IN_COMMUNITY, communityName, body, rateLimit, cleanup, returnPath, text, parisTimestamp, validateEvent, validateRegistration, ANY_CATEGORY
 };
+
 

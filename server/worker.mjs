@@ -9,7 +9,7 @@ import {ingestClientError, clientErrorsApi} from './telemetry.mjs';
 import {communityRequestsApi, closeCommunityRequest} from './community-requests.mjs';
 import {trainingApi, trainingCollector, nextRace, trainingEnabled, memoEnabled} from './training.mjs';
 import {racesPath} from './races-path.mjs';
-import {CARS, simForEvent, TDZ_EVENT_TYPES, tdzOnly, eventsLabel} from '../shared/catalog.mjs';
+import {catalogForGame, gameForEvent, simForEvent, TDZ_EVENT_TYPES, tdzOnly, eventsLabel} from '../shared/catalog.mjs';
 import {currentCommunity, appearanceOf, allCommunities, communityUrl, communitySlug, communityById, communityFromRow} from './community.mjs';
 import {isDevelopment} from './dev-environment.mjs';
 import {communityAccess, requirePermission, displayRole, PERMISSIONS, ALL_PERMISSIONS, DEFAULT_EVERYONE, normalizePermissions, discordGuild, keepDiscordLook, memberPermissions, refreshCommunityMembers, discoverMemberships} from './access.mjs';
@@ -53,10 +53,10 @@ async function actingCommunity(env, actor, site, communityId, event = null) {
   return {community:target, actor:{...actor, permissions:access.permissions, manager:access.manager}};
 }
 // Car of a crew: none, or one of the catalog's cars of its category (older names accepted and renamed).
-function crewCar(input) {
+function crewCar(input,event) {
   if (input.car==null || input.car==='') return '';
   const car=LEGACY_CAR_ALIASES.get(input.car) || text(input.car,100,'Voiture');
-  if (!CARS[input.category]?.includes(car)) fail(400,'Choisis une voiture proposée pour cette catégorie.');
+  if (!catalogForGame(gameForEvent(event)).cars[input.category]?.includes(car)) fail(400,'Choisis une voiture proposée pour cette catégorie.');
   return car;
 }
 function departureById(event, departureId) {
@@ -613,7 +613,7 @@ async function api(request, env) {
       }
       const name=text(input.name,60,'Nom de l’équipage');
       if (!JSON.parse(event.categories).includes(input.category)) fail(400,'Choisis une catégorie de cet événement.');
-      const car=crewCar(input);
+      const car=crewCar(input,event);
       const result=await env.DB.prepare('UPDATE crews SET name=?,category=?,car=?,version=version+1 WHERE id=? AND version=?').bind(name,input.category,car,crew.id,input.version).run();
       if (!result.meta.changes) fail(409,'Cet équipage a changé. Actualise avant de réessayer.');
       // A new car: the crew's pilots are told (not a change of name or category alone).
@@ -622,7 +622,7 @@ async function api(request, env) {
     }
     const name=text(input.name,60,'Nom de l’équipage');
     if (!JSON.parse(event.categories).includes(input.category)) fail(400,'Choisis une catégorie de cet événement.');
-    const car=crewCar(input);
+    const car=crewCar(input,event);
     const crewId=id();
     // « Équipages »: a crew is created by whoever has that permission. Entered on this start and category, they
     // lead it and join it; otherwise (or as an administrator) the crew starts empty, to be composed.
@@ -1129,4 +1129,5 @@ export default {
     }
   }
 };
+
 

@@ -70,7 +70,7 @@ export function logo(category) {
 }
 export function badge(category) { return `<span class="event-category-badge ${categories[category]?.css || ''}">${logo(category)}<span>${esc(category)}</span></span>`; }
 // Info bubbles (data-tip, see front/tooltip.mjs) of the race badges.
-const EVENT_TYPE_TIPS = {special:'Course officielle ponctuelle, souvent sur un week-end, avec ses propres créneaux de départ.', lmu:'Manche du championnat officiel de Le Mans Ultimate.', private:'Course organisée par ta communauté.'};
+const EVENT_TYPE_TIPS = {special:'Course officielle ponctuelle, souvent sur un week-end, avec ses propres créneaux de départ.', lmu:`Manche du championnat officiel de ${activeGame==='iracing'?'iRacing':'Le Mans Ultimate'}.`, private:'Course organisée par ta communauté.'};
 export function eventTypeBadge(type) { const key = EVENT_TYPES[type] ? type : 'private', item = EVENT_TYPES[key]; return `<span class="event-type-badge ${item.css}" data-tip="${esc(EVENT_TYPE_TIPS[key] || '')}">${esc(item.label)}</span>`; }
 export function schedulePendingBadge(event) { return event?.schedulePending ? '<span class="event-schedule-badge" data-tip="Les horaires officiels ne sont pas encore connus : inscris-toi et forme ton équipage, chacun choisira son départ quand ils seront publiés.">Horaires à confirmer</span>' : ''; }
 // Pilots of a category on the whole race: a pilot entered on several starts counts once.
@@ -252,3 +252,4 @@ export function showError(error) {
 
 addEventListener('error',event=>{if(event.error||event.message)reportClientError({kind:'javascript',message:event.message||event.error?.message||'Erreur JavaScript',detail:event.error?.stack||`${event.filename||''}:${event.lineno||0}:${event.colno||0}`});});
 addEventListener('unhandledrejection',event=>{const reason=event.reason;reportClientError({kind:'promise',message:reason?.message||String(reason||'Promise rejetée'),detail:reason?.stack||''});});
+
