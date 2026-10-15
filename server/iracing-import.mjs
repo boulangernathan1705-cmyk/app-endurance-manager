@@ -4,7 +4,7 @@
 // BSD 3-Clause, © PMSoftwareDevs), built every day from iRacing's own public pages and schedule PDF.
 // iRacing's Data API needs an OAuth client, whose creation iRacing has paused.
 //
-// Only races run in teams with driver changes are imported (TEAM_SERIES).
+// Team races go to Endurance; the two solo endurance series go to EVENT SOLO.
 // - Endurance series: one race per series and per race week, with every official start of the week
 //   (times published in GMT, converted to Paris time).
 // - Special events (Petit Le Mans, Bathurst 1000…): their start times are not in the schedule, so the race
@@ -14,7 +14,7 @@
 // A race is imported once for the whole platform, as an official race (community 'official', migration 0039;
 // table iracing_imports): editing or deleting it is never undone. Module "iracingImport": the communities that
 // enable it show these races, each with its own entries and crews on them.
-import {validateEvent, parisTimestamp, id, now} from './core.mjs';
+import {validateEvent, id, now} from './core.mjs';
 
 const OFFICIAL = {id:'official'};
 
@@ -23,9 +23,12 @@ export const IMPORT_AUTHOR = 'system:iracing';
 const DAY_MS = 86_400_000;
 // Official series raced in teams with driver changes ("Min 1/2 drivers, Max 16 drivers" in iRacing's
 // season schedule PDF, members-assets.iracing.com/public/schedulepdf/SeasonSchedule.pdf, checked for
-// 2026 S4). Long solo series (IMSA Michelin Pilot Challenge, IMSA Sportscar Endurance Challenge) are left out.
+// 2026 S4). Solo series are kept in SOLO_SERIES below.
 // A new team series must be added here after checking the PDF.
 const TEAM_SERIES = /imsa endurance series|global endurance tour|gt endurance series|nurburgring endurance|creventic|production endurance challenge|britcar|petit le mans|road america|daytona 24|sebring 12|watkins glen 6|spa 24|bathurst|nurburgring 24|suzuka 1000|indianapolis|portimao 1000|thruxton/;
+// Only these verified sports-car solo endurance series; sprint series stay out.
+export const SOLO_ENDURANCE_MINUTES=90;
+const SOLO_SERIES = /imsa michelin pilot challenge|imsa sportscar endurance challenge/;
 // More start times than this a day: the schedule says "see the event page" (special events), not real times.
 const MAX_TIMES_PER_DAY = 8;
 const MAX_DEPARTURES = 30;
@@ -90,9 +93,11 @@ export function circuitFor(...texts) {
 
 // Car classes of each series (the schedule does not list them), then the classes named by special events.
 const SERIES_CATEGORIES = [
+  [/imsa michelin pilot challenge/, ['GT4','TCR']],
+  [/imsa sportscar endurance challenge/, ['LMP3 P320','GT4']],
   [/imsa endurance series|global endurance tour|petit le mans|road america|daytona 24|sebring|watkins glen/, ['GTP','LMP2 P217','GT3']],
   [/nurburgring endurance|nurburgring 24/, ['GT3','Porsche Cup','GT4','TCR','M2']],
-  [/creventic/, ['GT3','Porsche Cup','GT4','TCR']],
+  [/creventic/, ['GT3','Porsche Cup','GT4']],
   [/britcar/, ['GT3','GT4']],
   [/production/, ['Production']],
   [/gt endurance|bathurst 12|spa 24|suzuka|indianapolis|8 hours/, ['GT3']]
@@ -119,12 +124,8 @@ export function parisDateTime(timestamp) {
   return {date:`${p.year}-${p.month}-${p.day}`, time:`${p.hour}:${p.minute}`};
 }
 
-// A start the site can store: its Paris time exists and is not ambiguous (the night of the autumn clock
-// change repeats 2:00–2:59; such a start is left out, the other starts of the week stay).
-function representable(start) {
-  const {date, time} = parisDateTime(start);
-  try { return parisTimestamp(date, time) === start; } catch { return false; }
-}
+// Keep the source UTC instant: Paris repeats 02:00–02:59 at the autumn clock change.
+const importDeparture = start => ({...parisDateTime(start),startsAt:start});
 
 // Every start of a race week: the week runs from date_start to date_end, the times are given per weekday
 // (0 = Monday … 6 = Sunday) in GMT.
@@ -134,11 +135,12 @@ export function weekStarts(week, timesByDay) {
   for (let day = first; day <= last; day += DAY_MS) {
     const weekday = (new Date(day).getUTCDay() + 6) % 7;
     for (const time of timesByDay[String(weekday)] || []) {
+      if(!/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(String(time)))continue;
       const [hours, minutes] = String(time).split(':').map(Number);
       if (Number.isFinite(hours) && Number.isFinite(minutes)) starts.push(day + (hours * 60 + minutes) * 60_000);
     }
   }
-  return starts.sort((a, b) => a - b);
+  return [...new Set(starts)].sort((a, b) => a - b);
 }
 
 const hasRealTimes = timesByDay => Object.values(timesByDay || {}).every(times => times.length <= MAX_TIMES_PER_DAY) && Object.values(timesByDay || {}).some(times => times.length);
@@ -147,7 +149,7 @@ const EXCLUDED_SPECIALS = /roar|festival|runoffs|showdown|nascar/i;
 // Special events announced on iracing.com/special-events but missing from the schedule data, and durations
 // the data does not give (name without "N Hours"). Checked on the official page on 2026-09-28.
 const EXTRA_SPECIALS = [
-  {slug:'992-endurance-cup', name:'992 Endurance Cup', date_start:'2026-11-27', date_end:'2026-11-29', track_name:null, car_class:'Porsche Cup'}
+  {slug:'992-endurance-cup', name:'992 Endurance Cup', date_start:'2026-11-27', date_end:'2026-11-29', track_name:'Circuit de Spa-Francorchamps', car_class:'Porsche Cup'}
 ];
 const SPECIAL_MINUTES = [[/992 endurance cup/, 720], [/production car challenge/, 240]];
 
@@ -175,7 +177,8 @@ export function planIracingEvents(season, timestamp = Date.now()) {
 
   for (const series of season?.championships || []) {
     const duration = Number(series.typical_session_duration_minutes) || 0;
-    if (series.category !== 'SPORTS CAR' || !TEAM_SERIES.test(normalize(series.name))) continue;
+    const solo=SOLO_SERIES.test(normalize(series.name));
+    if (series.category !== 'SPORTS CAR' || (!solo&&!TEAM_SERIES.test(normalize(series.name)))) continue;
     const special = specialFor(series);
     // A special event listed as a series ("2026 Bathurst 1000 AU", "… US"): only its track and duration are
     // used, the race comes from the special event list (one race, whatever the number of entries).
@@ -186,12 +189,13 @@ export function planIracingEvents(season, timestamp = Date.now()) {
     if (!hasRealTimes(series.session_times_by_day)) continue;
     const name = cleanName(series.name);
     for (const week of series.weeks || []) {
-      const starts = weekStarts(week, series.session_times_by_day).filter(start => start > timestamp && representable(start));
+      if(solo&&(Number(week.duration_minutes)||duration)<SOLO_ENDURANCE_MINUTES)continue;
+      const starts = weekStarts(week, series.session_times_by_day).filter(start => start > timestamp);
       if (!starts.length || starts.length > MAX_DEPARTURES) continue;
       plans.push({
-        externalId:`series:${slug(name)}:${week.date_start}`,
-        input:{name, format:'endurance', durationMinutes:Math.min(1440, Number(week.duration_minutes) || duration), eventType:'lmu', circuit:circuitFor(week.track_name),
-          schedulePending:false, categories:categoriesFor(name), departures:starts.map(parisDateTime)}
+        externalId:`${solo?'solo-series':'series'}:${slug(name)}:${week.date_start}`,
+        input:{name, format:solo?'solo':'endurance', ...(solo?{sim:'iracing',access:'open',rounds:[{circuit:circuitFor(week.track_name),durationMinutes:Number(week.duration_minutes)||duration,categories:categoriesFor(name)}]}:{}), durationMinutes:Math.min(1440, Number(week.duration_minutes) || duration), eventType:'lmu', circuit:circuitFor(week.track_name),
+          schedulePending:false, categories:categoriesFor(name), departures:starts.map(importDeparture)}
       });
     }
   }
@@ -226,7 +230,7 @@ async function fetchJson(url, fetchImpl) {
 export async function syncIracingEvents(env, {timestamp = Date.now(), fetchImpl = fetch} = {}) {
   const manifest = await fetchJson(IRACING_FEED + 'manifest.json', fetchImpl);
   // The current season, and the next one as soon as the schedule publishes it.
-  const codes = [manifest?.current, manifest?.next].map(String).filter(code => /^\d{4}S[1-4]$/.test(code));
+  const codes = [...new Set([manifest?.current, manifest?.next].map(String).filter(code => /^\d{4}S[1-4]$/.test(code)))];
   if (!codes.length) throw new Error('iRacing schedule: unknown season');
   const plans = [];
   for (const code of codes) plans.push(...planIracingEvents(await fetchJson(`${IRACING_FEED}${code.slice(0, 4)}_s${code.slice(5)}.json`, fetchImpl), timestamp));
@@ -241,26 +245,38 @@ export async function importNextCommunity(env, at = new Date(), {fetchImpl = fet
 
 async function importOfficial(env, plans, {timestamp, fetchImpl}) {
   const community = OFFICIAL;
-  const known = new Set((await env.DB.prepare('SELECT external_id FROM iracing_imports WHERE community_id=?').bind(community.id).all()).results.map(row => row.external_id));
-  let created = 0, pending = [];
+  const rows=(await env.DB.prepare('SELECT i.external_id,e.id,e.circuit,e.version,e.created_by FROM iracing_imports i LEFT JOIN events e ON e.id=i.event_id WHERE i.community_id=?').bind(community.id).all()).results;
+  const known=new Map(rows.map(row=>[row.external_id,row]));
+  let created=0,repaired=0,skipped=0,pending=[],kinds=[];
   // New races are written 10 at a time: each batch is one call to the database (at most 50 per run).
-  const flush = async () => { if (pending.length) await env.DB.batch(pending); pending = []; };
+  const flush = async () => {
+    if(pending.length){const results=await env.DB.batch(pending);results.forEach((result,index)=>{if(kinds[index]==='create')created+=Number(result.meta.changes)||0;if(kinds[index]==='repair')repaired+=Number(result.meta.changes)||0;});}
+    pending=[];kinds=[];
+  };
   for (const plan of plans) {
-    if (known.has(plan.externalId)) continue;
+    if(known.has(plan.externalId)){
+      const saved=known.get(plan.externalId);
+      // Fill an unknown circuit only on an untouched system import. Deleted or manually changed races stay as they are.
+      if(saved?.id&&saved.circuit==='iracing-tbd'&&saved.version===1&&saved.created_by===IMPORT_AUTHOR&&plan.input.circuit!=='iracing-tbd'){
+        pending.push(env.DB.prepare("UPDATE events SET circuit=?,version=version+1 WHERE id=? AND circuit='iracing-tbd' AND version=1 AND created_by=?").bind(plan.input.circuit,saved.id,IMPORT_AUTHOR));kinds.push('repair');
+        if(pending.length>=20)await flush();
+      }
+      continue;
+    }
     let data;
-    // A start that does not exist in Paris time (clock change) or any invalid entry: that race is skipped.
-    try { data = validateEvent(plan.input); } catch { continue; }
+    try { data = validateEvent(plan.input,null,{officialImport:true}); } catch(error) { skipped++;console.warn('iRacing race skipped',plan.externalId,error.message);continue; }
     const eventId = id();
     pending.push(
-      env.DB.prepare('INSERT INTO events(id,name,duration_hours,duration_minutes,event_type,circuit,schedule_pending,driver_change_required,format,access,capacity,rounds,categories,departures,created_by,created_at,community_id) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
-        .bind(eventId, data.name, data.durationHours, data.durationMinutes, data.eventType, data.circuit, data.schedulePending ? 1 : 0, data.driverChangeRequired==null?null:(data.driverChangeRequired?1:0), data.format, data.access, data.capacity, JSON.stringify(data.rounds), JSON.stringify(data.categories), JSON.stringify(data.departures), IMPORT_AUTHOR, now(), community.id),
-      env.DB.prepare('INSERT OR IGNORE INTO iracing_imports(community_id,external_id,event_id,created_at) VALUES(?,?,?,?)').bind(community.id, plan.externalId, eventId, now()));
-    created++;
+      env.DB.prepare('INSERT INTO events(id,name,duration_hours,duration_minutes,event_type,circuit,schedule_pending,driver_change_required,format,access,capacity,rounds,categories,departures,created_by,created_at,community_id,sim,details) SELECT ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,? WHERE NOT EXISTS (SELECT 1 FROM iracing_imports WHERE community_id=? AND external_id=?)')
+        .bind(eventId, data.name, data.durationHours, data.durationMinutes, data.eventType, data.circuit, data.schedulePending ? 1 : 0, data.driverChangeRequired==null?null:(data.driverChangeRequired?1:0), data.format, data.access, data.capacity, JSON.stringify(data.rounds), JSON.stringify(data.categories), JSON.stringify(data.departures), IMPORT_AUTHOR, now(), community.id, data.sim, JSON.stringify(data.details), community.id, plan.externalId),
+      env.DB.prepare('INSERT OR IGNORE INTO iracing_imports(community_id,external_id,event_id,created_at) SELECT ?,?,?,? WHERE EXISTS (SELECT 1 FROM events WHERE id=?)').bind(community.id, plan.externalId, eventId, now(), eventId));
+    kinds.push('create','marker');
+    known.set(plan.externalId,null);
     if (pending.length >= 20) await flush();
   }
   await flush();
   const completed = await completeSpecialTimes(env, {timestamp, fetchImpl, community});
-  return {created, completed};
+  return {created,completed,...(repaired?{repaired}:{}),...(skipped?{skipped}:{})};
 }
 
 export const IRACING_NEWS = 'https://www.iracing.com/wp-json/wp/v2/posts?search=THIS%20WEEK&per_page=20&_fields=date,title,content';
@@ -328,7 +344,7 @@ export async function completeSpecialTimes(env, {timestamp = Date.now(), fetchIm
   let completed = 0;
   for (const {row, plan} of candidates) {
     const article = articleFor(Array.isArray(posts) ? posts : [], plan.special);
-    const starts = article ? specialStarts(article.content?.rendered, plan.special.dateStart, plan.special.dateEnd).filter(start => start > timestamp && representable(start)) : [];
+    const starts = article ? specialStarts(article.content?.rendered, plan.special.dateStart, plan.special.dateEnd).filter(start => start > timestamp) : [];
     if (!starts.length || starts.length > MAX_DEPARTURES) continue;
     const common = JSON.parse(row.departures)[0];
     const slots = starts.map(start => ({id:id(), ...parisDateTime(start), startsAt:start}));

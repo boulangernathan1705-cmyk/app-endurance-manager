@@ -46,8 +46,8 @@ export const communityTag = item => {
 // Short label of a community in a text (tooltip): « [FMT] Leo ».
 export const communityPrefix = item => item?.community ? `[${String(item.community.shortName || item.community.name).slice(0, 4)}] ` : '';
 // Communities the player may enter an official race with (the site's first).
-export const entryCommunities = () => {
-  const list = (state.communities || []).filter(item => item.id);
+export const entryCommunities = (event=state.events.find(item=>item.id===state.currentEventId)) => {
+  const list = (state.communities || []).filter(item => item.id && (!(event?.official&&event?.format==='solo'&&gameForEvent(event)==='iracing') || item.iracingSolo!==false));
   const here = list.find(item => item.id === state.community?.id);
   return here ? [here, ...list.filter(item => item !== here)] : list;
 };
@@ -214,7 +214,7 @@ export async function load() {
   state.user=session.user;
   state.discordReady=session.discordReady;
   // Solo races and SAFE drivers only where the site enables them (dev for now).
-  state.soloRaces=session.soloRaces===true;
+  state.soloRaces=session.soloRaces===true;state.iracingImport=session.iracingImport===true;
   // « Inscription par catégorie » (module): one entry for the race, its categories and starts; the TM makes the crews.
   state.categoryEntry=session.categoryEntry===true;
   if (typeof session.soloLabel==='string' && session.soloLabel) state.soloLabel=session.soloLabel;

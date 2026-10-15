@@ -201,7 +201,7 @@ function validateSoloRace(input, existing) {
   if (!Array.isArray(rounds) || rounds.length < 1 || rounds.length > 4) fail(400, 'Un événement a de une à quatre manches.');
   const sim = input.sim == null ? (existing ? simForEvent(existing) : simForEvent({circuit:rounds[0]?.circuit})) : input.sim;
   if (!SIM_IDS.includes(sim)) fail(400, 'Choisis le simulateur.');
-  const catalog = eventCatalog(sim), rally = sim === 'acrally';
+  const catalog = sim==='iracing' && rounds.every(round=>catalogForGame('iracing').circuits.some(circuit=>circuit.id===round?.circuit)) ? catalogForGame('iracing') : eventCatalog(sim), rally = sim === 'acrally';
   if(rally && rounds.length !== 1 && input.details?.rallyCarMode) fail(400, 'Une soirée rallye utilise un seul lobby.');
   const cleanRounds = rounds.map((round, index) => {
     const where = rounds.length > 1 ? ` de la manche ${index + 1}` : '';
@@ -306,7 +306,7 @@ function validateRaceInfo(raw, existing) {
   if (typeof input.fairShare === 'boolean') info.fairShare = input.fairShare;
   return info;
 }
-function validateEvent(input, existing = null) {
+function validateEvent(input, existing = null, {officialImport=false}={}) {
   const name = text(input.name, 100, 'Nom de l’événement');
   // The format is chosen at creation and never changes (crews and solo entries do not mix).
   const format = existing ? (existing.format || 'endurance') : (input.format == null ? 'endurance' : input.format);
@@ -325,13 +325,20 @@ function validateEvent(input, existing = null) {
   if (!solo && circuit && Array.isArray(categoriesInput) && categoriesInput.some(category=>!catalogForGame(gameForEvent({circuit})).categories[category])) fail(400, 'Choisis une catégorie de ce simulateur.');
   if (!solo && (!Array.isArray(categoriesInput) || !categoriesInput.length || categoriesInput.some(c => !CATEGORIES.includes(c)))) fail(400, 'Choisis au moins une catégorie autorisée.');
   if (!Array.isArray(input.departures) || !input.departures.length || input.departures.length > 30) fail(400, 'Ajoute entre 1 et 30 départs.');
-  if (solo && input.departures.length !== 1) fail(400, 'Un événement a un seul départ.');
+  const importedSolo=solo?.sim==='iracing'&&(officialImport||(existing?.community_id==='official'&&existing?.created_by==='system:iracing'));
+  if (solo && !importedSolo && input.departures.length !== 1) fail(400, 'Un événement a un seul départ.');
   const known = existing ? JSON.parse(existing.departures) : [];
   const seen = new Set(), ids = new Set();
   const departures = input.departures.map(item => {
     if (!item || typeof item !== 'object') fail(400, 'Départ invalide.');
-    const startsAt = parisTimestamp(item.date, item.time);
     const previous = item.id ? known.find(d => d.id === item.id) : null;
+    let startsAt;
+    const exact=officialImport?item.startsAt:previous?.date===item.date&&previous?.time===item.time?previous.startsAt:null;
+    if(Number.isFinite(exact)){
+      const parts=Object.fromEntries(new Intl.DateTimeFormat('en-GB',{timeZone:'Europe/Paris',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(new Date(exact)).map(part=>[part.type,part.value]));
+      if(`${parts.year}-${parts.month}-${parts.day}`!==item.date||`${parts.hour}:${parts.minute}`!==item.time)fail(400,'La date et l’heure ne correspondent pas au départ officiel.');
+      startsAt=exact;
+    }else startsAt=parisTimestamp(item.date,item.time);
     // "Horaire à définir": a common start where everyone enters and forms crews until the real times are
     // known (both simulators). Kept as long as its date and time are unchanged, or when sent as such.
     // The event form always says it (true / false); older pages and the import may leave it out.

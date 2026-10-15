@@ -1,3 +1,4 @@
+import {iracingSoloSql} from './iracing-visibility.mjs';
 // Text recaps configured explicitly by an admin, published exclusively by the bot.
 import {loadWeeklyDiscordSnapshot, siteOf} from './discord-weekly.mjs';
 import {buildWeeklyDiscordPayload, CATEGORY_EMOJI_NAMES} from './discord-weekly-format.mjs';
@@ -100,7 +101,7 @@ export function racesOpenNow(events, scope, timestamp) {
     return parse(event.departures).some(item => !item.tbd && Number(item.startsAt) + minutes * 60000 > timestamp && Number(item.startsAt) - openBefore(minutes) <= timestamp);
   }).map(event => event.id);
 }
-const raceEvents = (env, community) => env.DB.prepare("SELECT id,name,circuit,departures,duration_hours,duration_minutes,schedule_pending,community_id FROM events WHERE community_id=? OR community_id='official' ORDER BY created_at,id")
+const raceEvents = (env, community) => env.DB.prepare(`SELECT id,name,circuit,departures,duration_hours,duration_minutes,schedule_pending,community_id FROM events WHERE (community_id=? OR community_id='official') AND ${iracingSoloSql(env,community)} ORDER BY created_at,id`)
   .bind(community.id).all().then(result => result.results || []);
 // The races where this community has an entry, an absence or a crew.
 async function enteredRaces(env, community) {
@@ -394,3 +395,4 @@ export async function cleanupEventRecaps(env, timestamp = Date.now(), limit = 2)
   }
   return deleted;
 }
+
