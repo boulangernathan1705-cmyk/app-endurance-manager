@@ -50,7 +50,7 @@ const TRACKS = [
   [/long beach/, 'iracing-long-beach'],
   [/charlotte/, 'iracing-charlotte'],
   [/summit point/, 'iracing-summit-point'],
-  [/gilles villeneuve|montreal/, 'iracing-montreal'],
+  [/gilles[\s-]+villeneuve|montreal/, 'iracing-montreal'],
   [/hermanos rodriguez|mexico/, 'iracing-mexico'],
   [/jose carlos pace|interlagos/, 'iracing-interlagos'],
   [/24 heures du mans|le mans/, 'iracing-le-mans'],
@@ -81,8 +81,11 @@ const TRACKS = [
   [/adelaide/, 'iracing-adelaide']
 ];
 export function circuitFor(...texts) {
-  const text = normalize(texts.filter(Boolean).join(' '));
-  return TRACKS.find(([pattern]) => pattern.test(text))?.[1] || 'iracing-tbd';
+  for (const value of texts.filter(Boolean)) {
+    const match=TRACKS.find(([pattern]) => pattern.test(normalize(value)));
+    if(match)return match[1];
+  }
+  return 'iracing-tbd';
 }
 
 // Car classes of each series (the schedule does not list them), then the classes named by special events.
@@ -339,3 +342,4 @@ export async function completeSpecialTimes(env, {timestamp = Date.now(), fetchIm
   }
   return completed;
 }
+

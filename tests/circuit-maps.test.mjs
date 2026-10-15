@@ -19,3 +19,13 @@ test('LMU offers Long Beach and Road Atlanta; Road Atlanta shares its map with i
   assert.ok(ids.includes('road-atlanta'));
   assert.equal(circuitMapConfig('iracing-road-atlanta').file, circuitMapConfig('road-atlanta').file);
 });
+
+
+test('every named iRacing circuit has a map and a source credit, including Gilles-Villeneuve',()=>{
+  const credits=readFileSync(new URL('../circuit-credits.html',import.meta.url),'utf8');
+  for(const circuit of GAME_CATALOGS.iracing.circuits.filter(item=>!item.random&&item.id!=='iracing-tbd')){
+    const map=circuitMapConfig(circuit.id);
+    assert.ok(map,`${circuit.id} has no map`);
+    assert.ok(credits.includes(`File:${map.file.replaceAll(' ','_')}`.replace(/[^\x00-\x7F]/g,c=>encodeURIComponent(c))),`${map.file} is not credited`);
+  }
+});

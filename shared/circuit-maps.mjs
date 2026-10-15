@@ -24,6 +24,17 @@ export const CIRCUIT_MAPS = Object.freeze({
   sebring:{file:'Sebring International Raceway.svg',scale:0.84,mobileScale:1.10},
   silverstone:{file:'Circuit Silverstone.svg',scale:0.88,mobileScale:1.08},
   spa:{file:'Spa-Francorchamps of Belgium.svg',scale:0.88,mobileScale:1.08},
+  'iracing-montreal':{file:'F1 circuits 2014-2018 - Circuit Gilles Villeneuve (version 2).svg',scale:0.84,mobileScale:1.08},
+  'iracing-brands-hatch':{file:'Brands Hatch.svg',scale:0.84,mobileScale:1.08},
+  'iracing-charlotte':{file:'Charlotte Motor Speedway Roval 2024.svg',scale:0.84,mobileScale:1.08},
+  'iracing-navarra':{file:'Circuito de Navarra.svg',scale:0.84,mobileScale:1.08},
+  'iracing-zolder':{file:'Zolder.svg',scale:0.84,mobileScale:1.08},
+  'iracing-motegi':{file:'Twin Ring Motegi road course map.svg',scale:0.84,mobileScale:1.08},
+  'iracing-oschersleben':{file:'Motorsport Arena Oschersleben.svg',scale:0.84,mobileScale:1.08},
+  'iracing-oulton-park':{file:'Oulton Park Circuit Map 2013.svg',scale:0.84,mobileScale:1.08},
+  'iracing-snetterton':{file:'Snetterton 300 Layout.svg',scale:0.84,mobileScale:1.08},
+  'iracing-summit-point':{file:'Summit Point - Original Track.svg',scale:0.84,mobileScale:1.08},
+  'iracing-the-bend':{file:'The Bend Motorsport Park layout (International).svg',scale:0.84,mobileScale:1.08},
   'iracing-adelaide':{file:'Adelaide Street Circuit - short.svg',scale:0.86,mobileScale:1.08},
   'iracing-mexico':{file:'Autódromo Hermanos Rodríguez 2015.svg',scale:0.84,mobileScale:1.08},
   'iracing-mugello':{file:'Mugello Racing Circuit track map.svg',scale:0.82,mobileScale:1.10},
@@ -72,3 +83,4 @@ export function circuitMapConfig(id) {
 export function circuitMapSource(file) {
   return file ? COMMONS + encodeURIComponent(file).replace(/%2F/g,'/') : '';
 }
+
