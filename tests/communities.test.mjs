@@ -5,6 +5,7 @@ import {readFileSync, readdirSync} from 'node:fs';
 import worker from '../server/worker.mjs';
 import {syncIracingEvents, importNextCommunity} from '../server/iracing-import.mjs';
 import {SEASON} from './fixtures/iracing-season.mjs';
+import {SEASON_S4} from './fixtures/iracing-s4-import.mjs';
 import {linkTestServer, setMember} from './fixtures/discord-server.mjs';
 
 // Separation between communities, with every migration applied in order (as in production) and two
@@ -295,3 +296,64 @@ test('Grindfest is TDZ-only and API queues promote and reorder per streamer', as
   assert.equal((await req(base,'POST',{name:'Other community',streamerId:'a',forOther:true},'admin')).status,404);
 });
 
+
+
+test('official solo iRacing import is grouped, idempotent, and only visible with both modules outside TDZ',async()=>{
+  const {DB,env,req,login,inCommunity}=harness();await login(ADMIN,'admin');await login(PILOT,'pilot');
+  const future=JSON.parse(JSON.stringify(SEASON).replaceAll('2026-','2099-'));
+  const fetchImpl=async url=>new Response(JSON.stringify(String(url).includes('wp-json')?[]:String(url).endsWith('manifest.json')?{current:'2099S4',next:'2099S4'}:future));
+  const imported=await syncIracingEvents(env,{fetchImpl});assert.ok(imported.created>0);
+  const rows=DB.db.prepare("SELECT * FROM events WHERE format='solo'").all();assert.equal(rows.length,1);
+  const row=rows[0];assert.equal(row.sim,'iracing');assert.equal(row.community_id,'official');
+  assert.deepEqual(JSON.parse(row.categories),['LMP3 P320','GT4']);
+  assert.deepEqual(JSON.parse(row.rounds)[0].categories,['LMP3 P320','GT4']);
+  assert.equal((await syncIracingEvents(env,{fetchImpl})).created,0);
+  assert.equal(DB.db.prepare('SELECT COUNT(*) n FROM events').get().n,imported.created,'no orphan or duplicate events');
+  const visible=async()=> (await req('/api/races?game=iracing','GET',null,'pilot')).data.events.some(event=>event.id===row.id);
+  assert.equal(await visible(),false);
+  DB.db.prepare("UPDATE communities SET modules=json_set(modules,'$.iracingImport',json('true'),'$.soloRaces',json('true')) WHERE id=?").run(DEV);
+  assert.equal(await visible(),true);
+  const event=(await req('/api/races?game=iracing','GET',null,'pilot')).data.events.find(event=>event.id===row.id);
+  const start=event.departures[0];const path=`/api/events/${row.id}/departures/${start.id}/registrations`;
+  assert.equal((await req(path,'POST',{name:'Pilot',choices:[{category:'GT4'}]},'pilot')).status,201);
+  assert.equal((await req(path,'POST',{name:'Pilot',choices:[{category:'GT4'}]},'pilot')).status,409,'one entry per pilot and start');
+  DB.db.prepare("UPDATE communities SET modules=json_set(modules,'$.soloRaces',json('false')) WHERE id=?").run(DEV);
+  assert.equal(await visible(),false);assert.equal((await req(path,'POST',{name:'Pilot',choices:[{category:'GT4'}]},'pilot')).status,404);
+  DB.db.prepare("UPDATE communities SET modules=json_set(modules,'$.soloRaces',json('true'),'$.iracingImport',json('false')) WHERE id=?").run(DEV);
+  assert.equal(await visible(),false);assert.equal((await req(path,'POST',{name:'Pilot',choices:[{category:'GT4'}]},'pilot')).status,404);
+  DB.db.prepare("UPDATE communities SET modules=json_set(modules,'$.iracingImport',json('true'),'$.soloRaces',json('true')) WHERE id=?").run(TEST);
+  DB.db.exec('DROP TRIGGER community_slug_fixed');DB.db.prepare("UPDATE communities SET slug='tdz' WHERE id=?").run(TEST);inCommunity('tdz');
+  assert.equal(await visible(),false);assert.equal((await req(path,'POST',{name:'Pilot',choices:[{category:'GT4'}]},'pilot')).status,404);
+  inCommunity('commu-dev');DB.db.prepare("UPDATE communities SET modules=json_set(modules,'$.iracingImport',json('true')) WHERE id=?").run(DEV);
+  assert.equal((await req(path,'POST',{name:'Pilot',communityId:TEST,choices:[{category:'GT4'}]},'admin')).status,404,'cannot register on behalf of TDZ from another community');
+});
+
+
+test('the real 2026 S4 snapshot imports every future race once within the D1 budget',async()=>{
+  const {DB,env}=harness(),counter=countCalls(DB);
+  const fetchImpl=async url=>new Response(JSON.stringify(String(url).includes('wp-json')?[]:String(url).endsWith('manifest.json')?{current:'2026S4'}:SEASON_S4));
+  const timestamp=Date.parse('2026-10-15T15:00:00Z');
+  const result=await syncIracingEvents(env,{timestamp,fetchImpl});
+  assert.equal(result.created,36);
+  assert.ok(counter.calls<30,`${counter.calls} database calls`);
+  const rows=DB.db.prepare('SELECT * FROM events').all();
+  assert.equal(rows.filter(row=>row.format==='solo').length,8);
+  assert.equal(rows.reduce((sum,row)=>sum+JSON.parse(row.departures).length,0),115);
+  assert.ok(rows.every(row=>row.circuit!=='iracing-tbd'),'all future circuits are identified');
+  assert.equal((await syncIracingEvents(env,{timestamp,fetchImpl})).created,0);
+  assert.equal(DB.db.prepare('SELECT COUNT(*) n FROM events').get().n,36);
+});
+
+
+test('a missing circuit is repaired only on untouched system imports',async()=>{
+  const {DB,env}=harness();const future=JSON.parse(JSON.stringify(SEASON).replaceAll('2026-','2099-'));
+  const fetchImpl=async url=>new Response(JSON.stringify(String(url).includes('wp-json')?[]:String(url).endsWith('manifest.json')?{current:'2099S4'}:future));
+  await syncIracingEvents(env,{fetchImpl});
+  const event=DB.db.prepare("SELECT id FROM events WHERE name='992 Endurance Cup'").get();
+  DB.db.prepare("UPDATE events SET circuit='iracing-tbd',version=1 WHERE id=?").run(event.id);
+  const result=await syncIracingEvents(env,{fetchImpl});assert.equal(result.repaired,1);
+  assert.equal(DB.db.prepare('SELECT circuit FROM events WHERE id=?').get(event.id).circuit,'iracing-spa');
+  DB.db.prepare("UPDATE events SET circuit='iracing-tbd',version=3 WHERE id=?").run(event.id);
+  assert.equal((await syncIracingEvents(env,{fetchImpl})).repaired,undefined);
+  assert.equal(DB.db.prepare('SELECT circuit FROM events WHERE id=?').get(event.id).circuit,'iracing-tbd','manual edit is retained');
+});

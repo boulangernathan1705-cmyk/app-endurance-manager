@@ -17,16 +17,18 @@ test('endurance series become one race per week with every official start, in Pa
   assert.equal(race.schedulePending, false);
   assert.deepEqual(race.categories, ['GTP','LMP2 P217','GT3']);
   // Saturday 2, 7, 18 GMT and Sunday 14 GMT = 4, 9, 20 and 16 in Paris (summer time).
-  assert.deepEqual(race.departures, [{date:'2026-10-17',time:'04:00'},{date:'2026-10-17',time:'09:00'},{date:'2026-10-17',time:'20:00'},{date:'2026-10-18',time:'16:00'}]);
+  assert.deepEqual(race.departures.map(({date,time})=>({date,time})), [{date:'2026-10-17',time:'04:00'},{date:'2026-10-17',time:'09:00'},{date:'2026-10-17',time:'20:00'},{date:'2026-10-18',time:'16:00'}]);
   assert.ok(validateEvent(race));
   assert.ok(!plans.some(plan => plan.input.name.startsWith('Formula')), 'sprints are not endurances');
-  assert.ok(!plans.some(plan => plan.input.name.startsWith('IMSA Sportscar')), 'long races without driver changes are not imported');
+  assert.ok(plans.some(plan => plan.input.name.startsWith('IMSA Sportscar')&&plan.input.format==='solo'), 'solo endurances use the solo calendar');
 });
 
-test('a start in the repeated hour of the clock change is left out, not the whole race', () => {
+test('official UTC starts survive the repeated Paris hour without guessing a manual time', () => {
   const race = planIracingEvents(SEASON, NOW).find(plan => plan.externalId.includes('production-endurance')).input;
-  assert.deepEqual(race.departures.map(d => `${d.date} ${d.time}`), ['2026-10-24 06:00','2026-10-24 17:00','2026-10-25 21:00']);
-  assert.ok(validateEvent(race));
+  assert.deepEqual(race.departures.map(d => `${d.date} ${d.time}`), ['2026-10-24 06:00','2026-10-24 17:00','2026-10-25 02:00','2026-10-25 21:00']);
+  const imported=validateEvent(race,null,{officialImport:true});
+  assert.equal(imported.departures[2].startsAt,Date.parse('2026-10-25T00:00:00Z'));
+  assert.throws(()=>validateEvent(race),/ambiguë/);
 });
 
 test('special events are created with "Horaires à confirmer"; placeholder times of the schedule are ignored', () => {
@@ -42,7 +44,7 @@ test('special events are created with "Horaires à confirmer"; placeholder times
   assert.equal(indy.circuit, 'iracing-indianapolis');
   assert.equal(indy.durationMinutes, 480);
   assert.ok(!plans.some(plan => plan.externalId.includes('daytona-500')), 'NASCAR is not an endurance');
-  for (const plan of plans) assert.ok(validateEvent(plan.input), plan.externalId);
+  for (const plan of plans) assert.ok(validateEvent(plan.input,null,{officialImport:true}), plan.externalId);
 });
 
 test('names, tracks and classes of the schedule match the site catalog', () => {
@@ -155,4 +157,41 @@ test('Gilles-Villeneuve accepts the hyphenated name and track data wins over the
   assert.equal(circuitFor('Circuit Gilles Villeneuve'),'iracing-montreal');
   assert.equal(circuitFor('Circuit Gilles-Villeneuve','Road America special'),'iracing-montreal');
   assert.equal(circuitFor(null,'Circuit de Spa-Francorchamps','Road America special'),'iracing-spa');
+});
+
+test('solo endurance series keep the four starts together, with their own categories',()=>{
+  const series={category:'SPORTS CAR',typical_session_duration_minutes:120,session_times_by_day:{'5':['04:00','15:00'],'6':['00:00','20:00']},weeks:[{date_start:'2099-10-17',date_end:'2099-10-23',track_name:'Summit Point Raceway',duration_minutes:120}]};
+  const plans=planIracingEvents({championships:[{...series,name:'IMSA Michelin Pilot Challenge'},{...series,name:'IMSA Sportscar Endurance Challenge'}]},NOW).filter(plan=>plan.input.format==='solo');
+  assert.equal(plans.length,2);
+  for(const plan of plans){
+    assert.ok(plan.externalId.startsWith('solo-series:'));
+    assert.equal(plan.input.departures.length,4);
+    assert.equal(plan.input.rounds.length,1);
+    assert.equal(plan.input.sim,'iracing');
+    assert.ok(validateEvent(plan.input,null,{officialImport:true}));
+    assert.throws(()=>validateEvent(plan.input),/seul départ/,'community solo events retain the one-start rule');
+  }
+  assert.deepEqual(plans[0].input.rounds[0].categories,['GT4','TCR']);
+  assert.deepEqual(plans[1].input.rounds[0].categories,['LMP3 P320','GT4']);
+});
+
+test('invalid source clock values are ignored and duplicate slots do not drop a race',()=>{
+  const starts=weekStarts({date_start:'2099-10-17',date_end:'2099-10-17'},{'5':['04:00','04:00','24:00','12:99','oops']});
+  assert.deepEqual(starts,[Date.parse('2099-10-17T04:00:00Z')]);
+});
+
+test('992 Endurance Cup uses the officially announced Spa circuit and Creventic classes omit TCR',()=>{
+  const plan=planIracingEvents({championships:[],special_events:[]},NOW).find(p=>p.input.name==='992 Endurance Cup');
+  assert.equal(plan.input.circuit,'iracing-spa');
+  assert.deepEqual(categoriesFor('Creventic Endurance Series'),['GT3','Porsche Cup','GT4']);
+});
+
+
+test('solo import requires a verified endurance series and at least 90 minutes of racing',()=>{
+  const base={name:'IMSA Michelin Pilot Challenge',category:'SPORTS CAR',session_times_by_day:{'5':['04:00']},weeks:[{date_start:'2099-10-17',date_end:'2099-10-23',track_name:'Spa'}]};
+  const solo=series=>planIracingEvents({championships:[series]},NOW).filter(plan=>plan.input.format==='solo');
+  for(const minutes of [30,60,89])assert.equal(solo({...base,typical_session_duration_minutes:minutes}).length,0);
+  for(const minutes of [90,120])assert.equal(solo({...base,typical_session_duration_minutes:minutes}).length,1);
+  assert.equal(solo({...base,name:'GT Sprint Championship',typical_session_duration_minutes:180}).length,0);
+  assert.equal(solo({...base,typical_session_duration_minutes:120,weeks:[{...base.weeks[0],duration_minutes:60}]}).length,0,'race duration wins over the typical session length');
 });
