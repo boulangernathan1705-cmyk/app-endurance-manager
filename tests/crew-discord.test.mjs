@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {DatabaseSync} from 'node:sqlite';
 import {readFileSync, readdirSync} from 'node:fs';
 import worker from '../server/worker.mjs';
-import {syncCrewDiscord, OPEN_BEFORE, CLOSE_AFTER, KEEP_ARCHIVES} from '../server/crew-discord.mjs';
+import {syncCrewDiscord, closeDeletedCrewDiscord, OPEN_BEFORE, CLOSE_AFTER, KEEP_ARCHIVES} from '../server/crew-discord.mjs';
 import {linkTestServer, allowCrews, setMember, ORGA_ROLE, GUILD} from './fixtures/discord-server.mjs';
 
 // Crews on Discord and race reminders (migrations 0044, 0045): the bot is a fake Discord that records each request.
@@ -27,6 +27,7 @@ function fakeDiscord(){
   async function handler(url,init={}){
     const path=String(url).replace('https://discord.com/api/v10','');const method=init.method||'GET';
     const body=init.body?JSON.parse(init.body):null;calls.push({method,path,body});
+    if(method==='DELETE'&&state.deleteStatus)return reply(state.deleteStatus,{code:50013});
     if(unknownChannel.has(path))return reply(404,{code:10003});
     if(gone.has(path))return reply(404,{code:10008});
     if(method==='GET'&&path===`/guilds/${GUILD}/members/app-id`)return state.botAbsent?reply(404,{code:10007}):reply(200,{roles:[BOT_ROLE]});
@@ -197,9 +198,16 @@ test('a deleted crew is closed at once, and nothing happens without the module',
   assert.equal((await sync(departure.startsAt-2*HOUR)).opened,1);
   const row=DB.db.prepare('SELECT * FROM crew_discord').get();
   const crewRow=(await req('/api/events','GET',null,'pilot')).data.events[0].departures[0].crews[0];
-  assert.equal((await req(`/api/crews/${crew.data.id}`,'DELETE',{version:crewRow.version},'pilot')).status,200);
-  const mark=discord.calls.length;assert.equal((await sync(departure.startsAt-HOUR)).closed,1);
+  // A stale version cannot delete either the crew or its voice channel.
+  let mark=discord.calls.length;
+  assert.equal((await req(`/api/crews/${crew.data.id}`,'DELETE',{version:crewRow.version+1},'admin')).status,409);
+  assert.deepEqual(since(discord.calls,mark),[]);
+  discord.voiceStates.set(PILOT,row.voice_id);
+  mark=discord.calls.length;
+  assert.equal((await req(`/api/crews/${crew.data.id}`,'DELETE',{version:crewRow.version},'admin')).status,200);
   assert.deepEqual(since(discord.calls,mark),[`DELETE /channels/${row.voice_id}`]);
+  mark=discord.calls.length;assert.equal((await sync(departure.startsAt-HOUR)).closed,0);
+  assert.deepEqual(since(discord.calls,mark),[]);
   const closed=DB.db.prepare('SELECT * FROM crew_discord').get();
   assert.ok(closed.closed_at);
 });
@@ -325,4 +333,27 @@ test('an empty crew gets its voice channel as soon as it is created', async () =
   const mark=discord.calls.length;
   assert.equal((await sync(departure.startsAt-30*24*HOUR)).opened,1);
   assert.deepEqual(created(discord.calls,mark).map(call=>call.body.name),['LMU-Sans pilote']);
+});
+
+ test('Discord deletion failures keep the tracking row for a scheduled retry', async () => {
+  const {DB,env,req,login,sync,discord}=harness();
+  await login(ADMIN,'admin','Orga');
+  assert.equal((await req('/api/community/modules','PATCH',{crewChannels:true},'admin')).status,200);
+  assert.equal((await req('/api/events','POST',race,'admin')).status,201);
+  const event=(await req('/api/events','GET',null,'admin')).data.events[0], departure=event.departures[0];
+  const crew=await req(`/api/events/${event.id}/departures/${departure.id}/crews`,'POST',{name:'Retry',category:'GT3'},'admin');
+  await sync(Date.now());
+  const row=DB.db.prepare('SELECT * FROM crew_discord').get();
+  // A live crew cannot be cleaned up through the targeted helper.
+  await closeDeletedCrewDiscord(env,crew.data.id);
+  assert.equal(DB.db.prepare('SELECT voice_id FROM crew_discord').get().voice_id,row.voice_id);
+  const crewRow=DB.db.prepare('SELECT * FROM crews WHERE id=?').get(crew.data.id);
+  discord.state.deleteStatus=403;
+  assert.equal((await req(`/api/crews/${crew.data.id}`,'DELETE',{version:crewRow.version},'admin')).status,200);
+  const pending=DB.db.prepare('SELECT * FROM crew_discord').get();
+  assert.equal(pending.closed_at,null);assert.equal(pending.voice_id,row.voice_id);assert.equal(pending.lock_until,0);
+  discord.state.deleteStatus=null;
+  const mark=discord.calls.length;
+  assert.equal((await sync(Date.now()+60_000)).closed,1);
+  assert.deepEqual(since(discord.calls,mark),[`DELETE /channels/${row.voice_id}`]);
 });
