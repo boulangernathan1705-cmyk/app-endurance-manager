@@ -1840,7 +1840,8 @@ html[data-game] #app .departure-planning { margin-top: 12px; }
   /* Race card: the circuit drawing small at the top right, next to the title (no empty band above). */
   html[data-game] #app .race-card-body { position: relative; }
   html[data-game] #app .race-card-circuit { position: absolute !important; top: 10px; right: 10px; width: 64px !important; height: 56px !important; min-height: 0 !important; margin: 0 !important; padding: 0 !important; border: 0 !important; background: none !important; }
-  html[data-game] #app .race-card-circuit .circuit-visual { width: 64px !important; height: 56px !important; }
+  /* Reset the legacy 96px minimum: it otherwise overflows the 64px panel. */
+  html[data-game] #app .race-card-circuit .circuit-visual { position: relative !important; inset: auto !important; width: 100% !important; height: 100% !important; min-width: 0 !important; max-width: 100% !important; min-height: 0 !important; max-height: 100% !important; flex: 0 1 auto !important; transform: none !important; }
   html[data-game] #app .race-card-circuit img { width: 100% !important; height: 100% !important; object-fit: contain; }
   html[data-game] #app .race-card .race-head { padding-right: 68px; min-width: 0; }
   html[data-game] #app .race-card .race-date { min-width: 52px; }
@@ -2489,3 +2490,4 @@ html[data-game] #app .race-header .race-meta .race-header-time { margin: 0; padd
 html[data-game] #app .my-entry-slot + .my-entry-slot { border-top: 1px solid var(--border, #39404a); }
 html[data-game] #app .my-entry-slot-heading { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin: 0; padding: 14px 16px; font-size: 15px; }
 html[data-game] #app .my-entry-slot-heading .race-badges { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+

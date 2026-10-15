@@ -17,6 +17,33 @@ async function boot(page,game,events){
   await page.waitForFunction(async()=>{const {state}=await import('/front/app/core.mjs');return state.access==='member'&&state.events.length>0;});
 }
 
+for(const game of ['lmu','iracing'])test(`${game}: mobile circuit drawings fit inside their cards`,async({page})=>{
+  // Use a deterministic wide SVG; remote availability must not affect layout checks.
+  const svgNamespace=['http:','','www.w3.org','2000','svg'].join('/');
+  await page.route('https://upload.wikimedia.org/**',route=>route.fulfill({contentType:'image/svg+xml',body:`<svg xmlns="${svgNamespace}" viewBox="0 0 800 200"><path d="M1 1H799V199H1Z" fill="none" stroke="black"/></svg>`}));
+  const circuits=game==='iracing'?['iracing-indianapolis','iracing-nurburgring-gp','iracing-montreal']:['spa','le-mans'];
+  await boot(page,game,circuits.map((circuit,index)=>race(game,{id:`mobile-${index}`,circuit})));
+  for(const width of [320,390,430,760]){
+    await page.setViewportSize({width,height:844});
+    const cards=page.locator('.race-card');
+    await expect(cards).toHaveCount(circuits.length);
+    for(const card of await cards.all()){
+      const panel=card.locator('.race-card-circuit'),visual=panel.locator('.circuit-visual'),img=visual.locator('img');
+      await expect(img).toHaveCount(1);
+      const [outer,box,drawing,picture]=await Promise.all([card.boundingBox(),panel.boundingBox(),visual.boundingBox(),img.boundingBox()]);
+      for(const rect of [box,drawing,picture]){
+        expect(rect.width).toBeGreaterThan(0);
+        expect(rect.x).toBeGreaterThanOrEqual(outer.x-1);
+        expect(rect.x+rect.width).toBeLessThanOrEqual(outer.x+outer.width+1);
+      }
+      expect(drawing.width).toBeLessThanOrEqual(box.width+1);
+      expect(drawing.height).toBeLessThanOrEqual(box.height+1);
+      expect(picture.width).toBeLessThanOrEqual(drawing.width+1);
+      expect(await img.evaluate(node=>getComputedStyle(node).transform)).toBe('none');
+    }
+  }
+});
+
 for(const game of ['lmu','iracing'])test(`${game}: official special filter, reset, and corrupt saved filters`,async({page})=>{
   const errors=[];page.on('pageerror',error=>errors.push(error.message));
   const events=[race(game),race(game,{id:'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',name:'Regular series',eventType:'lmu'}),race(game,{id:'cccccccc-cccc-4ccc-8ccc-cccccccccccc',name:'Community race',official:false,eventType:'private'})];
