@@ -1,4 +1,4 @@
-import {contextHelpButton as helpButton} from './core.mjs';
+import {contextHelpMarker as helpContext} from './core.mjs';
 import {isGrindfest,streamersOf} from '../../shared/grindfest.mjs';
 import {streamerChoice} from './grindfest.mjs';
 import {isSolo,ANY_CATEGORY,soloCounts,eventCircuitName} from './solo.mjs';
@@ -358,7 +358,7 @@ export function renderRegistrationWorkspace(event,departure) {
   const last=lastRegistrationStep(event,departure,stateDraft),step=registrationStep(stateDraft,last);
   const helpTopic=isGrindfest(event)?'grindfest':event.sim==='acrally'?'rally':isSolo(event)?'solo':step===last?'entry-summary':['entry-category','entry-cars','entry-hours','entry-other-starts'][step-1];
   const when=`${esc(event.name)} · ${esc(shortDateLabel(departure.startsAt))} · ${esc(timeLabel(departure.time))}`;
-  return `<div class="registration-sheet" role="dialog" aria-modal="true" aria-labelledby="registration-title-${departure.id}"><div class="registration-workspace-head"><div class="registration-workspace-title"><h2 id="registration-title-${departure.id}" tabindex="-1">${registrationTitle(event,departure,stateDraft)}</h2><p>${when}</p></div><span class="registration-workspace-actions">${helpButton(helpTopic)}${addCategory}${button('close-registration','Fermer',`data-departure="${departure.id}" aria-label="Fermer l’inscription"`,'secondary-button registration-close-button')}</span></div>${renderSteppedRegistration(event,departure,stateDraft)}</div>`;
+  return `<div class="registration-sheet" role="dialog" aria-modal="true" aria-labelledby="registration-title-${departure.id}"><div class="registration-workspace-head"><div class="registration-workspace-title"><h2 id="registration-title-${departure.id}" tabindex="-1">${registrationTitle(event,departure,stateDraft)}</h2><p>${when}</p></div><span class="registration-workspace-actions">${helpContext(helpTopic)}${addCategory}${button('close-registration','Fermer',`data-departure="${departure.id}" aria-label="Fermer l’inscription"`,'secondary-button registration-close-button')}</span></div>${renderSteppedRegistration(event,departure,stateDraft)}</div>`;
 }
 
 export function rerenderRegistrationSection(event,departure,focusSelector='',fallback=()=>{}) {

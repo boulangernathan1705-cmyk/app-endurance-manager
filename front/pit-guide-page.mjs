@@ -1,4 +1,4 @@
-import {helpButton} from './context-help.mjs';
+import {helpContext} from './context-help.mjs';
 // Mémo des circuits (stands.html): one sheet per circuit and car, the same for every pilot of the site
 // (server/training.mjs, /api/training/memo). Three sources, each with its colour and its shape: the viewer (a dot),
 // the pilots of the site (a band and the median's line), the game (a triangle). The stop calculator applies the
@@ -173,7 +173,7 @@ function strategy(data) {
 
 function render() {
   const data = view.data;
-  const head = `<div class="memo-head"><p class="memo-kicker">Mémo des circuits · LMU</p><div class="context-help-heading"><h1>${esc(data.circuit.name)}</h1>${helpButton('memo')}</div>
+  const head = `<div class="memo-head"><p class="memo-kicker">Mémo des circuits · LMU</p><h1>${esc(data.circuit.name)}</h1>${helpContext('memo')}
     <div class="memo-pick">
       <label class="memo-select">Circuit<select data-pick="circuit">${data.circuits.map(item => `<option value="${esc(item.key)}"${item.key === data.circuit.key ? ' selected' : ''}>${esc(item.name)}</option>`).join('')}</select></label>
       ${data.car ? `<label class="memo-select">Voiture<select data-pick="car">${carOptions(data.cars, data.car.car)}</select></label>` : ''}

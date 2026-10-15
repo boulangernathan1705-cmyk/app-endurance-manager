@@ -1,3 +1,4 @@
+import {installContextHelp} from './context-help.mjs';
 // Info bubbles on every page (data-tip).
 import './tooltip.mjs?v=2';
 import {showCommunityIntro} from './community-intro.mjs';
@@ -76,7 +77,6 @@ function closeMenu() {
 
 function renderDisconnected(discordReady) {
   root.innerHTML = `<div class="account-disconnected-wrap"><div class="account-disconnected-actions">
-    <a class="account-menu-item account-help-link" href="/help.html">Aide</a>
     ${discordReady
       ? `<a class="account-discord-login" href="/api/auth/discord">${discordMark()}<span class="login-long">Se connecter avec Discord</span><span class="login-short">Connexion</span></a>`
       : `<span class="account-discord-unavailable">${discordMark()}<span>Connexion Discord indisponible</span></span>`}
@@ -96,7 +96,6 @@ function communitiesMarkup(communities) {
 
 function renderConnected(user, communities = []) {
   const manage = user.role === 'admin' ? `<a class="account-menu-item" href="/members.html">Administration</a>` : '';
-  const help = `<a class="account-menu-item" href="/help.html"${isHelp ? ' aria-current="page"' : ''}>Aide</a>`;
 
   root.innerHTML = `<div class="account-menu">
     <button type="button" class="account-trigger" aria-haspopup="menu" aria-expanded="false">
@@ -106,7 +105,7 @@ function renderConnected(user, communities = []) {
     </button>
     <div class="account-popover" role="menu" hidden>
       <div class="account-popover-profile">${avatarMarkup(user)}<span><strong>${esc(user.name)}</strong><small>${roleLabel(user.role)}</small></span></div>
-      ${help}${manage}${communitiesMarkup(communities)}
+      ${manage}${communitiesMarkup(communities)}
       <span class="account-menu-separator" aria-hidden="true"></span>
       <button type="button" class="account-menu-item account-menu-logout" data-account-logout>Déconnexion</button>
     </div>
@@ -194,6 +193,7 @@ async function loadSession() {
     const response = await fetch('/api/session', {credentials:'same-origin',cache:'no-store'});
     if (!response.ok) throw new Error('session');
     const session = await response.json();
+    installContextHelp(session);
     applyCommunity(session.community, Array.isArray(session.communities) ? session.communities : [], session.openSite === true);
     if (session.openSite) showcaseBanner(session.platformDiscordUrl);
     // EVENT TDZ on: the banner leads to the events (all sims), on the current game page or LMU.
@@ -272,5 +272,6 @@ document.addEventListener('keydown', event => {
   if (event.key === 'Escape') closeMenu();
 });
 
+installContextHelp();
 void loadSession();
 activateLegacyHashAction();

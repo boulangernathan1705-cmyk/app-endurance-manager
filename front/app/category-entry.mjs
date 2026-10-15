@@ -1,4 +1,4 @@
-import {contextHelpButton as helpButton} from './core.mjs';
+import {contextHelpMarker as helpContext} from './core.mjs';
 // « Inscription par catégorie » (community module): on a race with several starts, the pilot first only says
 // M'inscrire or Absent. Entering is one registration for the race: his categories, then the starts he can do, each
 // for the whole race or some hours; he is entered on each of them. The TM
@@ -94,7 +94,7 @@ export function renderCategoryEntry(event){
   const overlay=document.createElement('div');
   overlay.className='crew-builder-overlay';overlay.dataset.categoryEntry='true';
   overlay.innerHTML=`<section class="crew-builder-panel registration-sheet category-entry-sheet" data-step="${step}" role="dialog" aria-modal="true" aria-labelledby="category-entry-title">
-    <div class="registration-workspace-head"><div class="registration-workspace-title"><h2 id="category-entry-title">Ton inscription</h2><p>${esc(event.name)} · ${total} départs sur ${list.length} jour${list.length>1?'s':''}</p></div><span class="registration-workspace-actions">${helpButton(['category-cars','category-starts','entry-summary'][step-1])}${button('category-entry-close','Fermer','','secondary-button registration-close-button')}</span></div>
+    <div class="registration-workspace-head"><div class="registration-workspace-title"><h2 id="category-entry-title">Ton inscription</h2><p>${esc(event.name)} · ${total} départs sur ${list.length} jour${list.length>1?'s':''}</p></div><span class="registration-workspace-actions">${helpContext(['category-cars','category-starts','entry-summary'][step-1])}${button('category-entry-close','Fermer','','secondary-button registration-close-button')}</span></div>
     <div class="registration-stepper"><div class="ce-tabs">${['Catégories','Départs','Récapitulatif'].map((name,index)=>`<span class="${index+1===step?'active':index+1<step?'done':''}">${index+1}. ${name}</span>`).join('')}</div>
       <section class="registration-step">${body}</section>
       <div class="ce-footer">${step>1?tally:''}<div class="registration-step-nav">${step>1?button('category-entry-step','Retour',`data-step="${step-1}"`,'secondary-button registration-back'):''}${next}</div>${step===3?'<p class="ce-footnote">Une seule inscription, quel que soit le nombre de départs.</p>':''}</div>

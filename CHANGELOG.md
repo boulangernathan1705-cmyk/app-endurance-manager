@@ -6,7 +6,7 @@ Les nouveautés utiles aux pilotes, avec les corrections regroupées par sujet.
 
 ### ✨ Nouvelles fonctionnalités
 
-- **Aide sur chaque écran** : un bouton « ? Aide » explique les choix utiles à cet endroit, notamment pendant ton inscription.
+- **Aide sur chaque écran** : un petit « ? » près des notifications explique les choix de la page ; les inscriptions et créations sont guidées étape par étape.
 
 ## v1.47 — 15 octobre 2026
 

@@ -1,5 +1,8 @@
+import {guidedHelp} from './context-help-steps.mjs';
 // One small answer per screen. Text stays here, outside the race and administration logic.
 export function contextHelp(topic, permissions = [], locale = 'fr') {
+  const guided = guidedHelp(topic, locale);
+  if (guided) return guided;
   const en = locale === 'en';
   const t = (fr, english) => en ? english : fr;
   const can = key => permissions.includes(key) || permissions.includes('admin');
