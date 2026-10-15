@@ -149,7 +149,7 @@ export async function withdrawCategoryEntry(event){
 // each category stands out, and a start opens the crew builder there.
 export function categoryEntryBoard(event){
   if(!categoryEntryOn(event)||!can('crews'))return '';
-  const starts=future(event),filter=state.categoryEntryBoard?.[event.id]||'';
+  const starts=future(event),saved=state.categoryEntryBoard?.[event.id]||'',filter=event.categories.includes(saved)?saved:'';
   const crewOf=(departure,reg)=>(departure.crews||[]).find(crew=>(crew.registrationIds||[]).includes(reg.id));
   const pilots=new Map();
   for(const departure of starts)for(const reg of groupByPilot((departure.availability||[]).filter(reg=>reg.status!=='unavailable'&&(!filter||reg.category===filter)),event)){
@@ -191,4 +191,5 @@ export function categoryEntryBoard(event){
     ${rows.length?`<div class="ce-board-scroll"><table><thead><tr><th class="ce-board-corner">Pilote</th>${head}</tr></thead><tbody>${body}</tbody></table></div>`:'<p class="empty">Aucun pilote inscrit pour l’instant.</p>'}
     <p class="ce-board-legend"><span class="is-whole">✓ Toute la course</span><span class="is-part">Une partie</span><span class="is-crew">Dans un équipage</span></p></details>`;
 }
-export function categoryEntryBoardFilter(event,target){state.categoryEntryBoard={...(state.categoryEntryBoard||{}),[event.id]:target.dataset.value||''};}
+export function categoryEntryBoardFilter(event,target){const value=target.dataset.value;state.categoryEntryBoard={...(state.categoryEntryBoard||{}),[event.id]:event.categories.includes(value)?value:''};}
+
