@@ -241,7 +241,7 @@ app.addEventListener('change', event => {
   const pick = event.target.closest('[data-pick]');
   if (pick) {
     const params = new URLSearchParams({circuit:pick.dataset.pick === 'circuit' ? pick.value : view.data.circuit.key});
-    if (pick.dataset.pick === 'car') params.set('car', pick.value); else params.set('class', view.data.car.carClass);
+    if (pick.dataset.pick === 'car') params.set('car', pick.value); else if(view.data.car?.carClass) params.set('class', view.data.car.carClass);
     load(`?${params}`);
   }
 });
@@ -277,3 +277,4 @@ app.addEventListener('submit', async event => {
 
 // From the training page: the race's circuit and class.
 load(location.search);
+

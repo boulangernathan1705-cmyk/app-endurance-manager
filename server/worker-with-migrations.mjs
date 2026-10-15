@@ -142,7 +142,7 @@ export default {
     run('Event recap cleanup failed', () => cleanupEventRecaps(env,at.getTime()));
     // :00 Members and Discord roles not checked for a day are checked again by the bot, a few at a time.
     if (slot === 0 && env.DISCORD_BOT_TOKEN) run('Membership check failed', async () => refreshMemberships(env, await allCommunities(env), 12));
-    // :15 Official iRacing endurances of one community (a new one first, then each in turn).
+    // :15 Official team and solo iRacing endurances, once for the whole platform.
     if (slot === 1 && env.IRACING_IMPORT !== 'off') run('iRacing import failed', () => importNextCommunity(env, at));
     // :30 The weekly Discord recaps checked longest ago.
     if (slot === 2) run('Discord weekly scheduled sync failed', () => syncDueRecaps(env, 3));
@@ -153,3 +153,4 @@ export default {
     });
   }
 };
+

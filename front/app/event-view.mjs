@@ -4,7 +4,9 @@ import {streamerColumns, gridfestPasswordPanel} from './grindfest.mjs';
 import {simForEvent} from '../../shared/catalog.mjs';
 import {dateBlock,timeLabel,weekdayLong,dayMonthShort} from '../dates.mjs';
 import {durationLabel,eventMinutes} from '../../shared/duration.mjs';
-import {app,state,esc,button,canManage,isAdmin,can,canEditRace,officialBadge,communityTag,circuitLabel,eventTypeBadge,schedulePendingBadge,eventBadge,eventCategoryCount,circuitVisual,pilotCount,notifyRender} from './core.mjs';
+import {app,state,activeGame,esc,button,canManage,isAdmin,can,canEditRace,officialBadge,communityTag,circuitLabel,eventTypeBadge,schedulePendingBadge,eventBadge,eventCategoryCount,circuitVisual,pilotCount,notifyRender} from './core.mjs';
+import {filterStorageKey,filterSelection,readFilterState,writeFilterState} from '../filter-state.mjs';
+import {eventCommunities,filterEventCommunities} from '../community-filters.mjs';
 import {ownRegistration,renderRegistrationWorkspace,soloRounds} from './registration.mjs';
 import {renderPilots} from './crews.mjs';
 import {isSolo,eventAccessLogo,accessBadge,soloCardMeta,soloEventDetails,soloPasswordBlock,soloHeaderChips,roundTiles,roundPilots,soloEntryList,eventCircuitName,soloEntryBlock,safeGuideLink} from './solo.mjs';
@@ -162,34 +164,25 @@ function renderPastDepartures(event,items){
 
 // Official race: the player may show the pilots and crews of some of his communities only (chips above the
 // starts, kept in the browser for every race). Nothing chosen, or none of them on this race: all of them.
-const PLANNING_COMMUNITIES_KEY='em_planning_communities_v1';
-function planningCommunities(){
-  if(!Array.isArray(state.planningCommunities)){let saved=null;try{saved=JSON.parse(localStorage.getItem(PLANNING_COMMUNITIES_KEY)||'null');}catch{}state.planningCommunities=Array.isArray(saved)?saved:(state.community?.id?[state.community.id]:[]);}
-  return state.planningCommunities;
+const planningKey=()=>filterStorageKey('planning',{game:simForEvent(state.events.find(event=>event.id===state.currentEventId))||activeGame,communityId:state.community?.id,userId:state.user?.id});
+function planningCommunities(present){
+  const key=planningKey();state.planningCommunitiesBy??={};
+  const saved=state.planningCommunitiesBy[key]??readFilterState(key,state.community?.id?[state.community.id]:[]);
+  state.planningCommunitiesBy[key]=filterSelection(saved,[...present.keys()]);
+  return state.planningCommunitiesBy[key];
 }
 export function togglePlanningCommunity(id){
-  const list=planningCommunities();
-  state.planningCommunities=!id?[]:list.includes(id)?list.filter(item=>item!==id):[...list,id];
-  try{localStorage.setItem(PLANNING_COMMUNITIES_KEY,JSON.stringify(state.planningCommunities));}catch{}
-}
-// The communities entered on the race, with their number of pilots (each pilot once).
-function raceCommunities(event){
-  const found=new Map();
-  for(const departure of event.departures||[])for(const item of [...(departure.availability||[]),...(departure.crews||[])]){
-    if(!item.community?.id)continue;
-    if(!found.has(item.community.id))found.set(item.community.id,{community:item.community,pilots:new Set()});
-    if(item.status!==undefined&&item.status!=='unavailable')found.get(item.community.id).pilots.add(item.participantId||item.id);
-  }
-  return found;
+  const event=state.events.find(item=>item.id===state.currentEventId);
+  if(!event?.official)return;
+  const present=eventCommunities(event,state.communities,state.community),list=planningCommunities(present);
+  if(id&&!present.has(id))return;
+  const chosen=!id?[]:list.includes(id)?list.filter(item=>item!==id):[...list,id];
+  state.planningCommunitiesBy[planningKey()]=chosen;writeFilterState(planningKey(),chosen);
 }
 function communityView(event){
-  const present=raceCommunities(event);
-  for(const community of state.communities||[])if(community.id&&!present.has(community.id))present.set(community.id,{community,pilots:new Set()});
-  if(state.community?.id&&!present.has(state.community.id))present.set(state.community.id,{community:state.community,pilots:new Set()});
-  const chosen=planningCommunities().filter(id=>present.has(id));
-  if(!chosen.length)return {shown:event,present,chosen};
-  const keep=item=>chosen.includes(item.community?.id||event.community?.id||state.community?.id);
-  return {shown:{...event,departures:(event.departures||[]).map(departure=>({...departure,availability:(departure.availability||[]).filter(keep),crews:(departure.crews||[]).filter(keep)}))},present,chosen};
+  const present=eventCommunities(event,state.communities,state.community);
+  const chosen=event.official?planningCommunities(present):[];
+  return {shown:filterEventCommunities(event,chosen,state.community?.id),present,chosen};
 }
 function communityFilter(present,chosen){
   if(present.size<2)return '';
@@ -249,7 +242,7 @@ export function renderEvent(message=''){
   const badges=`<span class="race-badges">${officialBadge(event)}${isSolo(event)?accessBadge(event):eventTypeBadge(event.eventType)}${schedulePendingBadge(event)}</span>`;
   app.eventViewData={eventId:event.id,events:state.events,message};
   const gate=categoryEntryGate(full);
-  app.innerHTML=`<div class="event-header event-header-compact race-header event-type-${event.eventType||'private'}${isSolo(event)?` is-solo-${event.access||'open'} sim-${simForEvent(event)}`:''}${isGrindfest(event)?' is-gridfest':''}" data-event-id="${event.id}"><div class="race-card-top"><div class="race-side">${raceDateBlock(event,!next&&!undated.length)}${badges}</div><div class="race-head"><h1 class="event-title event-name">${esc(event.name)}</h1><span class="race-meta">${isSolo(event)?((event.rounds||[]).length>1?soloCardMeta(event):`<strong class="solo-header-circuit">${soloCardMeta(event)}</strong>`):`${esc(circuitLabel(event.circuit))} · <span class="nowrap">${durationLabel(eventMinutes(event))}</span>`}${isSolo(event)?soloHeaderTime(event,next):''}</span>${isSolo(event)?soloHeaderChips(event):raceInfoChips(event)}</div>${isSolo(event)?eventTypePanel(event):circuitVisual(event.circuit)}</div>${isSolo(event)&&soloEventDetails(event)?`<div class="race-header-footer">${soloEventDetails(event)}</div>`:''}</div><div id="crew-builder-root"></div>${message?`<p class="creation-success" role="status">${esc(message)}</p>`:''}<div class="race-controls">${communityFilter(present,chosen)}<span class="race-controls-actions">${helpContext(isGrindfest(event)?'grindfest':simForEvent(event)==='acrally'?'rally':isSolo(event)?'solo':'race')}${shareAction}${eventActions}</span></div>${gate||`${categoryEntryBar(full)}${categoryEntryBoard(full)}${soloPasswordBlock(full)}${starts}${absencesSection(full,!!(next||undated.length))}`}`;
+  app.innerHTML=`<div class="event-header event-header-compact race-header event-type-${event.eventType||'private'}${isSolo(event)?` is-solo-${event.access||'open'} sim-${simForEvent(event)}`:''}${isGrindfest(event)?' is-gridfest':''}" data-event-id="${event.id}"><div class="race-card-top"><div class="race-side">${raceDateBlock(event,!next&&!undated.length)}${badges}</div><div class="race-head"><h1 class="event-title event-name">${esc(event.name)}</h1><span class="race-meta">${isSolo(event)?((event.rounds||[]).length>1?soloCardMeta(event):`<strong class="solo-header-circuit">${soloCardMeta(event)}</strong>`):`${esc(circuitLabel(event.circuit))} · <span class="nowrap">${durationLabel(eventMinutes(event))}</span>`}${isSolo(event)?soloHeaderTime(event,next):''}</span>${isSolo(event)?soloHeaderChips(event):raceInfoChips(event)}</div>${isSolo(event)?eventTypePanel(event):circuitVisual(event.circuit)}</div>${isSolo(event)&&soloEventDetails(event)?`<div class="race-header-footer">${soloEventDetails(event)}</div>`:''}</div><div id="crew-builder-root"></div>${message?`<p class="creation-success" role="status">${esc(message)}</p>`:''}<div class="race-controls">${communityFilter(present,chosen)}<span class="race-controls-actions">${helpContext(isGrindfest(event)?'grindfest':simForEvent(event)==='acrally'?'rally':isSolo(event)?'solo':'race')}${shareAction}${eventActions}</span></div>${gate||`${categoryEntryBar(full)}${categoryEntryBoard(event)}${soloPasswordBlock(full)}${starts}${absencesSection(event,!!(next||undated.length))}`}`;
   if(days.length)syncPlanning(app);
   notifyRender();
 }
@@ -266,4 +259,5 @@ if(typeof document!=='undefined')document.addEventListener('click',event=>{
   const summary=event.target.closest?.('.solo-round-start.is-single > summary');
   if(summary&&!event.target.closest('button,a,input,select'))event.preventDefault();
 });
+
 

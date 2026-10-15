@@ -198,11 +198,11 @@ async function perform(action,target){
       await refreshAfterSave('Équipages mis à jour.'); break;
     }
     case 'iracing-import': {
-      // Admins: official iRacing calendar updated at once (the nightly import does it too).
+      // Admins: official iRacing calendars updated at once (also synchronized hourly).
       const label=target.textContent;target.disabled=true;target.textContent='Mise à jour…';
       let result;
       try{result=await api('/api/admin/iracing-import','POST',{});}finally{target.disabled=false;target.textContent=label;}
-      const parts=[result.created?`${result.created} course${result.created>1?'s':''} ajoutée${result.created>1?'s':''}`:'',result.completed?`${result.completed} horaire${result.completed>1?'s':''} complété${result.completed>1?'s':''}`:''].filter(Boolean);
+      const parts=[result.repaired?`${result.repaired} circuit${result.repaired>1?'s':''} complété${result.repaired>1?'s':''}`:'',result.skipped?`${result.skipped} course${result.skipped>1?'s':''} à vérifier`:'',result.created?`${result.created} course${result.created>1?'s':''} ajoutée${result.created>1?'s':''}`:'',result.completed?`${result.completed} horaire${result.completed>1?'s':''} complété${result.completed>1?'s':''}`:''].filter(Boolean);
       await refreshAfterSave(parts.length?`Calendrier iRacing mis à jour : ${parts.join(', ')}.`:'Calendrier iRacing déjà à jour.');
       break;
     }
@@ -258,3 +258,4 @@ async function start(){
   try{const authError=new URLSearchParams(location.search).get('auth');if(authError){history.replaceState(null,'',location.pathname);state.flash='La connexion Discord n’a pas abouti. Tu peux réessayer.';}await load();renderNav();installRouter({renderHome,renderEvent,renderMyEntries});await applyRoute(routeFromLocation(),state.flash);installAutoRefresh(refresh);}catch(error){app.innerHTML='<h1 class="page-title">ENDURANCE MANAGER</h1>';showError(error);}
 }
 start();
+

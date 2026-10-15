@@ -640,7 +640,7 @@ test('official iRacing endurances are imported once, by the daily task or by an 
  const first=await req('/api/admin/iracing-import','POST',{},'admin');
  assert.equal(first.status,200);assert.ok(first.data.created>=4);assert.equal(typeof first.data.completed,'number');
  const events=(await req('/api/races?game=iracing','GET',null,'admin')).data.events;
- assert.equal(events.length,first.data.created);
+ assert.equal(events.length,DB.db.prepare("SELECT COUNT(*) n FROM events WHERE format='endurance'").get().n);
  const imsa=events.find(event=>event.name==='IMSA Endurance Series'&&event.circuit==='iracing-long-beach');
  assert.equal(imsa.departures.length,4);assert.equal(imsa.durationMinutes,160);
  assert.ok(events.some(event=>event.schedulePending&&event.eventType==='special'));
@@ -796,4 +796,5 @@ test('a pilot linked to Discord always shows his Discord name, never another mem
  assert.equal((await req('/api/registrations/'+reg.data.id,'PATCH',{name:'Pilote '+ADMIN,category:'Hypercar',status:'whole',version:(await shown()).version},'pilot')).status,200);
  assert.equal((await shown()).name,'Pilote '+PILOT);
 });
+
 

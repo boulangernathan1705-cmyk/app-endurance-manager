@@ -1,3 +1,4 @@
+import {iracingSoloSql} from './iracing-visibility.mjs';
 import {allCommunities, communityUrl, appearanceOf} from './community.mjs';
 import {isInParisWeek, parisWeek} from './discord-weekly-format.mjs';
 import {syncBotRecaps, botRecapSettings} from './recap-discord.mjs';
@@ -71,7 +72,7 @@ export async function loadWeeklyDiscordSnapshot(env, timestamp, community, scope
   const events = (await env.DB.prepare(`SELECT id,name,circuit,duration_hours,duration_minutes,event_type,schedule_pending,departures
     FROM events WHERE (community_id=? OR (community_id='official' AND (EXISTS (SELECT 1 FROM registrations r WHERE r.event_id=events.id AND r.community_id=?) OR EXISTS (SELECT 1 FROM event_absences a WHERE a.event_id=events.id AND a.community_id=?)
       OR EXISTS (SELECT 1 FROM crews c WHERE c.event_id=events.id AND c.community_id=?)) OR (community_id='official' AND id=?)))
-    ${CIRCUITS[scope] ?? CIRCUITS.lmu} ORDER BY created_at,id`).bind(community.id, community.id, community.id, community.id, eventId).all()).results || [];
+    AND ${iracingSoloSql(env,community)} ${CIRCUITS[scope] ?? CIRCUITS.lmu} ORDER BY created_at,id`).bind(community.id, community.id, community.id, community.id, eventId).all()).results || [];
   const allDepartures = flattenDepartures(eventId ? events.filter(event => event.id === eventId) : events);
   const currentWeek = parisWeek(timestamp);
   // A start whose time is still to be confirmed is never announced as running (its placeholder is 0:00).
@@ -211,3 +212,4 @@ export async function syncDueRecaps(env,limit=3,timestamp=Date.now()) {
   }
   return 0;
 }
+

@@ -265,7 +265,7 @@ function modulesMarkup(settings, setup) {
       state:states.categoryEntry ? ['ok', 'Actif'] : ['off', 'Éteint'], control:toggle('categoryEntry', 'Inscription par catégorie'), settings:''},
     {key:'raceReminders', name:'Rappels de course', text:'24&nbsp;h avant le départ dans la cloche du site, 24&nbsp;h et 1&nbsp;h avant dans le salon de l’équipage.',
       state:states.raceReminders ? ['ok', 'Actif'] : ['off', 'Éteint'], control:toggle('raceReminders', 'Rappels de course'), settings:''},
-    {key:'iracingImport', name:'Endurances iRacing officielles', text:'Les séries en équipe et les événements spéciaux importés automatiquement.',
+    {key:'iracingImport', name:'Endurances iRacing officielles', text:settings.modules.eventTdzAvailable?'Les séries en équipe et les événements spéciaux importés automatiquement.':'Les séries en équipe et les événements spéciaux importés automatiquement. Avec EVENT SOLO activé, les endurances solo apparaissent aussi dans son calendrier.',
       state:states.iracingImport ? ['ok', 'Actif'] : ['off', 'Éteint'], control:toggle('iracingImport', 'Endurances iRacing officielles'), settings:''},
     ...(!settings.modules.eventTdzAvailable ? [] : [{key:'soloRaces', name:'EVENT TDZ', text:'Un calendrier d’événements toutes simus&nbsp;: places limitées, liste d’attente, accès OPEN ou SAFE.',
       state:states.soloRaces ? ['ok', 'Actif'] : ['off', 'Éteint'], control:toggle('soloRaces', 'EVENT TDZ'),
@@ -761,4 +761,5 @@ app.addEventListener('change', async event => {
 });
 
 void load();
+
 

@@ -14,6 +14,7 @@ import {currentCommunity, appearanceOf, allCommunities, communityUrl, communityS
 import {isDevelopment} from './dev-environment.mjs';
 import {communityAccess, requirePermission, displayRole, PERMISSIONS, ALL_PERMISSIONS, DEFAULT_EVERYONE, normalizePermissions, discordGuild, keepDiscordLook, memberPermissions, refreshCommunityMembers, discoverMemberships} from './access.mjs';
 // Solo races: a module each community turns on or off (settings of the members page).
+import {iracingSoloEnabled,importedIracingSolo,iracingSoloSql} from './iracing-visibility.mjs';
 const soloRacesEnabled = (env, community) => community?.modules?.soloRaces === true;
 // « EVENT SOLO » (every community but the TDZ): no type, no SAFE access.
 const plainSoloInput = (env, community, input) => {
@@ -37,6 +38,7 @@ async function eventById(env, eventId, community) {
   const row = await env.DB.prepare('SELECT * FROM events WHERE id=? AND (community_id=? OR community_id=?)').bind(eventId, community.id, OFFICIAL).first();
   // A solo race does not exist where solo races are off (production): no entry, edit or crew through its id.
   if (!row || (row.format === 'solo' && !soloRacesEnabled(env, community))) fail(404, 'Événement introuvable.');
+  if (importedIracingSolo(row) && !iracingSoloEnabled(env,community)) fail(404, 'Événement introuvable.');
   if (isGrindfest(row) && !grindfestEnabled(community, isDevelopment(env))) fail(404, 'Événement introuvable.');
   return row;
 }
@@ -44,10 +46,12 @@ async function eventById(env, eventId, community) {
 // the one of an existing entry or crew), not only for the site's one: his membership and the rights of his
 // Discord roles there are checked. Returns that community and the actor with his permissions in it.
 async function actingCommunity(env, actor, site, communityId, event = null) {
+  if (importedIracingSolo(event) && !iracingSoloEnabled(env,site)) fail(404, 'Événement introuvable.');
   if (!communityId || communityId === site.id) return {community:site, actor};
   if (event && event.community_id !== OFFICIAL) fail(404, 'Événement introuvable.');
   const target = await communityById(env, communityId);
   if (!target) fail(404, 'Communauté introuvable.');
+  if (importedIracingSolo(event) && !iracingSoloEnabled(env,target)) fail(404, 'Événement introuvable.');
   const access = await communityAccess(env, actor, target);
   if (access.status !== 'member') fail(403, `Tu n’es pas membre de la communauté ${target.name}.`);
   return {community:target, actor:{...actor, permissions:access.permissions, manager:access.manager}};
@@ -100,6 +104,7 @@ async function myCommunities(env, actor, community, all = false) {
     const membership = memberships.find(row => row.community_id === entry.id);
     const permissions = actor.manager ? new Set(ALL_PERMISSIONS) : membership ? await memberPermissions(env, entry.item, membership) : new Set();
     if (!permissions.has('access')) continue;
+    entry.iracingSolo = iracingSoloEnabled(env,entry.item);
     entry.manageCrews = permissions.has('crews');
     delete entry.item;
     allowed.push(entry);
@@ -216,7 +221,7 @@ async function listEvents(env, actor, game='', scope='', community) {
   // where the community shows the iRacing calendar); on an official race, the entries and crews of every
   // community the player is a member of, never of the others.
   const officialRaces = community.modules?.iracingImport === true ? "e.community_id='official'" : "(e.community_id='official' AND e.circuit NOT LIKE 'iracing-%')";
-  const filters=[`(e.community_id=? OR ${officialRaces})`,game==='iracing' ? "(e.format='solo' OR e.circuit LIKE 'iracing-%')" : game==='lmu' ? "(e.format='solo' OR e.circuit NOT LIKE 'iracing-%')" : '', eventScopeFilter(scope), soloRacesEnabled(env, community) ? '' : "COALESCE(e.format,'endurance')!='solo'", grindfestEnabled(community, isDevelopment(env)) ? '' : "COALESCE(json_extract(e.details,'$.type'),'') NOT IN ('Gridfest','Grindfest')"].filter(Boolean);
+  const filters=[`(e.community_id=? OR ${officialRaces})`, iracingSoloSql(env,community,'e.'),game==='iracing' ? "(e.format='solo' OR e.circuit LIKE 'iracing-%')" : game==='lmu' ? "(e.format='solo' OR e.circuit NOT LIKE 'iracing-%')" : '', eventScopeFilter(scope), soloRacesEnabled(env, community) ? '' : "COALESCE(e.format,'endurance')!='solo'", grindfestEnabled(community, isDevelopment(env)) ? '' : "COALESCE(json_extract(e.details,'$.type'),'') NOT IN ('Gridfest','Grindfest')"].filter(Boolean);
   const where=filters.length ? ` WHERE ${filters.join(' AND ')}` : '';
   const player = actor.user?.id || '';
   const rows = (await env.DB.prepare(`SELECT e.* FROM events e${where} ORDER BY e.created_at DESC, e.id DESC`).bind(community.id).all()).results;
@@ -427,7 +432,7 @@ async function api(request, env) {
   // Requests for a new community: sent by anyone signed in with Discord, from any site (server/community-requests.mjs).
   const requests = await communityRequestsApi(path, method, request, env, actor);
   if (requests) return requests;
-  if (path === '/api/session' && method === 'GET') return json({user:actor.user, discordReady:!!(env.DISCORD_CLIENT_ID && env.DISCORD_CLIENT_SECRET), adminConfigured:administrators(env).length > 0, soloRaces:soloRacesEnabled(env, community), categoryEntry:community.modules?.categoryEntry === true, soloLabel:eventsLabel(community, isDevelopment(env)), eventTdz:tdzOnly(community, isDevelopment(env)), eventTypes:!tdzOnly(community, isDevelopment(env)) ? [] : grindfestEnabled(community, isDevelopment(env)) ? [...TDZ_EVENT_TYPES, 'Gridfest'] : TDZ_EVENT_TYPES, grindfest:grindfestEnabled(community, isDevelopment(env)), grindfestAvailable:grindfestAvailable(community, isDevelopment(env)), training:trainingEnabled(community), memo:memoEnabled(community), safeGuideUrl:community.modules?.safeGuideUrl || '',
+  if (path === '/api/session' && method === 'GET') return json({user:actor.user, discordReady:!!(env.DISCORD_CLIENT_ID && env.DISCORD_CLIENT_SECRET), adminConfigured:administrators(env).length > 0, soloRaces:soloRacesEnabled(env, community), iracingImport:community.modules?.iracingImport===true, categoryEntry:community.modules?.categoryEntry === true, soloLabel:eventsLabel(community, isDevelopment(env)), eventTdz:tdzOnly(community, isDevelopment(env)), eventTypes:!tdzOnly(community, isDevelopment(env)) ? [] : grindfestEnabled(community, isDevelopment(env)) ? [...TDZ_EVENT_TYPES, 'Gridfest'] : TDZ_EVENT_TYPES, grindfest:grindfestEnabled(community, isDevelopment(env)), grindfestAvailable:grindfestAvailable(community, isDevelopment(env)), training:trainingEnabled(community), memo:memoEnabled(community), safeGuideUrl:community.modules?.safeGuideUrl || '',
     // Training shows in the bar only for a pilot entered in an upcoming LMU race; the circuit memo always.
     trainingRace:trainingEnabled(community) && access.status === 'member' && !!actor.user && !!(await nextRace(env, actor.user.id)),
     community:{id:community.id, slug:community.slug, name:community.name, shortName:community.shortName, discordInviteUrl:community.discordInviteUrl, appearance:appearanceOf(community)},
