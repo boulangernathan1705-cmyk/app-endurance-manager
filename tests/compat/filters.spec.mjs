@@ -9,6 +9,7 @@ async function boot(page,game,events){
     let data={ok:true};
     if(path==='/api/session')data={user:{id:'111111111111111111',name:'Nathan',communityIntroSeen:true},access:'member',permissions:['access','endurance','crews','solo_open'],community:alpha,communities:[alpha,beta],soloRaces:true,eventTypes:['OPEN','SAFE'],eventTdz:true};
     else if(['/api/events','/api/races'].includes(path))data={events};
+    else if(path==='/api/participants')data={participants:[]};
     else if(path.includes('notifications'))data={notifications:[],unread:0};
     await route.fulfill({contentType:'application/json',body:JSON.stringify(data)});
   });
