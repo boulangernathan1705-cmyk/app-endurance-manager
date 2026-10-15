@@ -2,6 +2,18 @@
 
 Les nouveautés utiles aux pilotes, avec les corrections regroupées par sujet.
 
+## v1.50 — 15 octobre 2026
+
+### ✨ Nouvelles fonctionnalités
+
+- **Endurances solo iRacing** : retrouve les séries officielles compatibles dans EVENT SOLO, à partir de 1 h 30 de course, hors événements TDZ.
+
+### 🔧 Corrections et améliorations
+
+- **Filtres** : communautés, catégories, dates et inscriptions sont filtrées de façon cohérente sur toutes les pages, avec des choix mémorisés séparément.
+- **Calendrier iRacing** : import des courses et horaires fiabilisé.
+- **Téléphone** : les tracés des circuits restent entièrement dans les cartes de course.
+
 ## v1.49 — 15 octobre 2026
 
 ### 🔧 Corrections et améliorations
@@ -118,3 +130,4 @@ Changements du 12 au 15 octobre.
 - **Inscriptions et équipages** : indique tes disponibilités, crée ou rejoins un équipage et retrouve tes engagements dans Mes inscriptions.
 - **Discord** : connecte-toi avec ton compte et consulte les récaps de course sur le serveur de ta communauté.
 - **Sur tous tes appareils** : site en français et en anglais, avec des inscriptions actualisées automatiquement.
+
