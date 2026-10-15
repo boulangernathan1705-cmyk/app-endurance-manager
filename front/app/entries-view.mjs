@@ -4,7 +4,7 @@ import {renderHome} from './home-view.mjs';
 import {isSolo,eventAccessLogo,accessBadge,soloCardMeta,renderSoloEntries,ANY_CATEGORY} from './solo.mjs';
 import {dateBlock,timeLabel} from '../dates.mjs';
 import {durationLabel,eventMinutes} from '../../shared/duration.mjs';
-import {eventSchedule} from '../schedule.mjs';
+import {upcomingEntries} from '../race-filters.mjs';
 import {
   app,
   state,
@@ -175,9 +175,7 @@ export function renderMyEntries() {
   state.page='my-entries';
   // Past races live in the Archivés list; this page is about what is coming up.
   const now=Date.now();
-  const entries=state.events.filter(event=>!eventSchedule(event,now).archived).flatMap(event=>event.departures.flatMap(departure=>departure.availability
-    .filter(reg=>reg.mine||reg.managed)
-    .map(reg=>({event,departure,reg}))))
+  const entries=upcomingEntries(state.events,now)
     .sort((a,b)=>Number(a.departure.startsAt)-Number(b.departure.startsAt));
   // A pilot entered in several categories on a start, still without a crew: one card with all of them.
   const inCrew=({departure,reg})=>(departure.crews||[]).some(crew=>(crew.registrationIds||[]).some(id=>String(id)===String(reg.id)));
@@ -197,3 +195,4 @@ export function renderMyEntries() {
     ${cards.some(item=>item.reg.managed)?section('Inscriptions que je gère',cards.filter(item=>item.reg.managed)):''}`;
   notifyRender();
 }
+
