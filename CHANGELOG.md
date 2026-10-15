@@ -2,6 +2,12 @@
 
 Les nouveautés utiles aux pilotes, avec les corrections regroupées par sujet.
 
+## v1.49 — 15 octobre 2026
+
+### 🔧 Corrections et améliorations
+
+- **iRacing** : seule la Porsche Cup 992.2 est proposée à l’inscription ; l’ancienne 992 a été retirée.
+
 ## v1.48 — 15 octobre 2026
 
 ### ✨ Nouvelles fonctionnalités
