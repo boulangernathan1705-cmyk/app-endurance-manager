@@ -2,6 +2,12 @@
 
 Les nouveautés utiles aux pilotes, avec les corrections regroupées par sujet.
 
+## v1.48 — 15 octobre 2026
+
+### ✨ Nouvelles fonctionnalités
+
+- **Aide sur chaque écran** : un bouton « ? Aide » explique les choix utiles à cet endroit, notamment pendant ton inscription.
+
 ## v1.47 — 15 octobre 2026
 
 Changements du 12 au 15 octobre.

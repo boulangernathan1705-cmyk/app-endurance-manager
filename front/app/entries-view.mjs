@@ -1,3 +1,4 @@
+import {contextHelpButton as helpButton} from './core.mjs';
 import {simForEvent} from '../../shared/catalog.mjs';
 import {renderHome} from './home-view.mjs';
 import {isSolo,eventAccessLogo,accessBadge,soloCardMeta,renderSoloEntries,ANY_CATEGORY} from './solo.mjs';
@@ -191,7 +192,7 @@ export function renderMyEntries() {
     <div class="native-my-entries-group-heading"><h2>${title}</h2><span>${list.length} inscription${list.length>1?'s':''}</span></div>
     ${list.length?`<div class="native-my-entry-list">${raceCards(list)}</div>`:'<p class="empty">Aucune inscription.</p>'}
   </section>`;
-  app.innerHTML=`<div class="native-my-entries-heading"><span class="creation-kicker">ESPACE PILOTE</span><h1 class="page-title">MES INSCRIPTIONS</h1><p>Tes événements et tes endurances, avec ton équipage.</p></div>
+  app.innerHTML=`<div class="native-my-entries-heading"><span class="creation-kicker">ESPACE PILOTE</span><div class="context-help-heading"><h1 class="page-title">MES INSCRIPTIONS</h1>${helpButton('entries')}</div><p>Tes événements et tes endurances, avec ton équipage.</p></div>
     ${section('Mes inscriptions personnelles',cards.filter(item=>item.reg.mine))}
     ${cards.some(item=>item.reg.managed)?section('Inscriptions que je gère',cards.filter(item=>item.reg.managed)):''}`;
   notifyRender();
