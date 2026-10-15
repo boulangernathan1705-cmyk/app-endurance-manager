@@ -1,3 +1,4 @@
+import {helpContext} from './context-help.mjs';
 // « Entraînement » (server/training.mjs, server/training-prep.mjs): the next LMU race the pilot is entered in, his
 // level and figures there, and the race's preparation shared with the crew. SimHub sends the sessions on its own;
 // without it the pilot types his pace and gives each step its status himself.
@@ -60,12 +61,12 @@ function trackPick(data) {
 
 function hero(data) {
   const race = data.race;
-  if (!race) return '<header class="preparation-head"><p class="memo-kicker">Entraînement · LMU</p><h1>Mon entraînement</h1><p class="preparation-sub">Inscris-toi à une course LMU : sa préparation s’ouvre ici.</p>' + (trackPick(data) ? '<div class="training-filters">' + trackPick(data) + '</div>' : '') + '</header>';
+  if (!race) return '<header class="preparation-head"><p class="memo-kicker">Entraînement · LMU</p><h1>Mon entraînement</h1>' + helpContext('training') + '<p class="preparation-sub">Inscris-toi à une course LMU : sa préparation s’ouvre ici.</p>' + (trackPick(data) ? '<div class="training-filters">' + trackPick(data) + '</div>' : '') + '</header>';
   const days = daysUntil(race.startsAt);
   const pick = data.races.length > 1 ? '<label class="training-select">Course<select data-race>' + data.races.map(item => '<option value="' + esc(raceKey(item)) + '"' + (raceKey(item) === raceKey(race) ? ' selected' : '') + '>' + esc(item.name + ' · ' + shortDateLabel(item.startsAt)) + '</option>').join('') + '</select></label>' : '';
   const chips = [race.category, data.crew?.car, stamp(race.startsAt), days ? 'dans ' + days + ' jour' + (days > 1 ? 's' : '') : 'aujourd’hui'].filter(Boolean);
   const filters = pick + trackPick(data);
-  return '<header class="preparation-head"><p class="memo-kicker">Ma prochaine course</p><h1>' + esc(race.name) + '</h1><div class="prep-chips">' + chips.map(chip => '<span>' + esc(chip) + '</span>').join('') + '</div>' + (filters ? '<div class="training-filters">' + filters + '</div>' : '') + '</header>';
+  return '<header class="preparation-head"><p class="memo-kicker">Ma prochaine course</p><h1>' + esc(race.name) + '</h1>' + helpContext('training') + '<div class="prep-chips">' + chips.map(chip => '<span>' + esc(chip) + '</span>').join('') + '</div>' + (filters ? '<div class="training-filters">' + filters + '</div>' : '') + '</header>';
 }
 
 // Four figures: the level first (with what the next one asks), then the pilot's own numbers. Without the game linked,

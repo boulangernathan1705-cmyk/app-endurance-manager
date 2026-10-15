@@ -1,3 +1,4 @@
+import {helpContext} from './context-help.mjs';
 const app = document.getElementById('members-app');
 const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
 
@@ -153,7 +154,7 @@ function recapForm(setup) {
     : '';
   const choice = (value,title,help) => `<label class="recap-card"><input type="radio" name="mode" value="${value}" ${mode === value ? 'checked' : ''}><span><strong>${title}</strong><small>${help}</small></span></label>`;
   return `<div data-recap-guide data-config="${esc(JSON.stringify(config))}">
-    ${!config ? '<p>Le bot gère les récaps. Choisis une destination et active-le ; les anciennes publications par webhook sont arrêtées.</p>' : ''}
+    ${helpContext('recap')}${!config ? '<p>Le bot gère les récaps. Choisis une destination et active-le ; les anciennes publications par webhook sont arrêtées.</p>' : ''}
     ${established ? `<div data-recap-summary>${summary}<div class="setup-actions"><button type="button" class="primary-button" data-recap-edit>Modifier</button><button type="button" class="secondary-button" data-recap-view>Voir l’aperçu</button><button type="button" class="secondary-button" data-recap-repair>Réparer le récap</button>${config?.enabled ? '<button type="button" class="secondary-button" data-recap-disable>Désactiver</button>' : ''}</div><p>La réparation vérifie les droits et rétablit les salons ou messages disparus. Elle conserve les réglages et les inscriptions. Si plusieurs courses sont concernées, relance-la pour traiter les suivantes.</p><p data-recap-repair-status role="status" aria-live="polite"></p></div>` : ''}
     <form data-recap-wizard class="setup-form recap-wizard" ${established ? 'hidden' : ''}>
       <p data-recap-progress aria-live="polite">Étape 1 sur 4</p>
@@ -398,7 +399,7 @@ async function load() {
         <div class="admin-brand">${brand}<div><strong>${esc(settings.community?.name || '')}</strong><small>Administration</small></div></div>
         ${sections.map(([key, label]) => `<button type="button" role="tab" class="admin-nav${key === 'platform' ? ' is-platform' : ''}" data-tab="${key}" aria-selected="${key === current}">${icon(key)}<span>${label}</span>${key === 'overview' && overview.todo ? `<b class="admin-count">${overview.todo}</b>` : ''}</button>`).join('')}
       </nav>
-      <div class="admin-main">${sections.map(([key]) => `<section class="admin-panel${key === 'platform' ? ' community-settings' : ''}" data-panel="${key}" role="tabpanel" ${key === current ? '' : 'hidden'}>${panels[key]}</section>`).join('')}</div></div>`;
+      <div class="admin-main">${sections.map(([key]) => `<section class="admin-panel${key === 'platform' ? ' community-settings' : ''}" data-panel="${key}" role="tabpanel" ${key === current ? '' : 'hidden'}>${helpContext('admin-'+key)}${panels[key]}</section>`).join('')}</div></div>`;
     if (openView) showView(openView);
     if (openModule) openModuleSettings(openModule);
     openView = ''; openModule = '';

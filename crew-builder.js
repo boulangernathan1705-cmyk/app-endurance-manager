@@ -1,3 +1,4 @@
+import {helpContext} from './front/context-help.mjs';
 import {CARS,categories as categoryCatalog} from './shared/catalog.mjs';
 import {shortDateLabel,timeLabel} from './front/dates.mjs';
 import {renderAvailabilityTimeline} from './front/timeline.mjs';
@@ -178,7 +179,7 @@ function chooseCommunity(event, departure, id) {
 function communityMarkup(event, departure) {
   const options = builderState.communityOptions || [];
   return `<div class="crew-builder-overlay" data-crew-builder-overlay><section class="crew-builder-panel registration-sheet" data-crew-builder-panel role="dialog" aria-modal="true" aria-labelledby="crew-builder-title">
-    <div class="registration-workspace-head"><div class="registration-workspace-title"><h2 id="crew-builder-title" tabindex="-1">${builderState.siteManager ? 'Créer un nouvel équipage' : 'Créer mon équipage'}</h2><p>${esc(event.name)} · ${esc(shortDateLabel(departure.startsAt))} · ${esc(timeLabel(departure.time))}</p></div><span class="registration-workspace-actions"><button type="button" class="secondary-button registration-close-button" data-crew-builder-cancel>Fermer</button></span></div>
+    <div class="registration-workspace-head"><div class="registration-workspace-title"><h2 id="crew-builder-title" tabindex="-1">${builderState.siteManager ? 'Créer un nouvel équipage' : 'Créer mon équipage'}</h2><p>${esc(event.name)} · ${esc(shortDateLabel(departure.startsAt))} · ${esc(timeLabel(departure.time))}</p></div><span class="registration-workspace-actions">${helpContext('crew')}<button type="button" class="secondary-button registration-close-button" data-crew-builder-cancel>Fermer</button></span></div>
     <div class="registration-stepper"><p class="registration-step-label">Étape 1 · Communauté</p>
       <div class="community-choice"><span class="form-label">Pour quelle communauté ?</span><p class="registration-step-help">Course officielle : un équipage réunit les pilotes d’une seule communauté.</p>
       <div class="community-choice-list">${options.map(item => `<button type="button" class="community-choice-button" data-crew-builder-community="${esc(item.id)}">${item.logoUrl ? `<img src="${esc(item.logoUrl)}" alt="">` : `<span class="community-choice-short" style="--tag:${esc(item.accent || '#8e9996')}">${esc(String(item.shortName || item.name).slice(0, 4))}</span>`}<strong>${esc(item.name)}</strong></button>`).join('')}</div></div>
@@ -232,7 +233,7 @@ function panelMarkup(event) {
   }).join('');
   const carCards=['',...(CARS[builderState.category]||[])].map(car=>`<label class="car-preference-option"><input type="radio" name="builderCar" value="${esc(car)}" ${car===builderState.car?'checked':''}><span>${esc(car||'Voiture à définir')}</span></label>`).join('');
   return `<div class="crew-builder-overlay" data-crew-builder-overlay><section class="crew-builder-panel registration-sheet" data-crew-builder-panel data-crew-foreign="${foreign}" role="dialog" aria-modal="true" aria-labelledby="crew-builder-title">
-    <div class="registration-workspace-head"><div class="registration-workspace-title"><h2 id="crew-builder-title" tabindex="-1">${title}</h2><p>${esc(event.name)} · ${esc(shortDateLabel(departure.startsAt))} · ${esc(timeLabel(departure.time))}</p></div><span class="registration-workspace-actions"><button type="button" class="secondary-button registration-close-button" data-crew-builder-cancel>Fermer</button></span></div>
+    <div class="registration-workspace-head"><div class="registration-workspace-title"><h2 id="crew-builder-title" tabindex="-1">${title}</h2><p>${esc(event.name)} · ${esc(shortDateLabel(departure.startsAt))} · ${esc(timeLabel(departure.time))}</p></div><span class="registration-workspace-actions">${helpContext('crew')}<button type="button" class="secondary-button registration-close-button" data-crew-builder-cancel>Fermer</button></span></div>
     <form class="crew-builder-form registration-stepper" data-crew-builder-form data-step="${step}">
       <div class="registration-progress" aria-hidden="true">${steps.map((_, index) => `<span class="${index < step ? 'done' : ''}"></span>`).join('')}</div>
       <p class="registration-step-label">Étape ${step} sur 3 · ${steps[step - 1]}</p>

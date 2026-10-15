@@ -1,3 +1,4 @@
+import {helpContext} from '../context-help.mjs';
 import {CATEGORIES, EVENT_TYPES, CIRCUITS, categories, CARS, gameForEvent} from '../../shared/catalog.mjs';
 import {countdown, dateLabel, groupEvents} from '../schedule.mjs';
 import {renderAvailabilityTimeline} from '../timeline.mjs';
@@ -24,6 +25,7 @@ export const pilotNameTip = reg => reg.otherNames?.length
   ? `data-tip="${esc(reg.otherNames.map(item => `${item.name} · ${item.communityName}`).join('\n'))}"`
   : '';
 // Permissions of the player in this community (their Discord roles, server/access.mjs).
+export const contextHelpMarker = topic => helpContext(topic, state.permissions);
 export const can = permission => Boolean(state.permissions?.includes(permission));
 export const canManage = () => can('create_race') || can('manage_races');
 export const isAdmin = () => can('admin');
