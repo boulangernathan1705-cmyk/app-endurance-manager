@@ -148,3 +148,11 @@ test('a regular series is never taken for a special event with a similar name', 
   assert.equal(plans.filter(plan => plan.externalId.startsWith('series:production-endurance-challenge')).length, 2);
   assert.equal(plans.filter(plan => plan.externalId.startsWith('special:pcc-vir')).length, 1);
 });
+
+
+test('Gilles-Villeneuve accepts the hyphenated name and track data wins over the event name',()=>{
+  assert.equal(circuitFor('Circuit Gilles-Villeneuve'),'iracing-montreal');
+  assert.equal(circuitFor('Circuit Gilles Villeneuve'),'iracing-montreal');
+  assert.equal(circuitFor('Circuit Gilles-Villeneuve','Road America special'),'iracing-montreal');
+  assert.equal(circuitFor(null,'Circuit de Spa-Francorchamps','Road America special'),'iracing-spa');
+});

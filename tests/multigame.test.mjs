@@ -89,3 +89,14 @@ test('soirée ACRally : programme facultatif, lobby commun et accès lié', () =
   assert.throws(()=>validateEvent({...input,details:{...input.details,rallyCarMode:'car'}}),/voiture imposée/);
   assert.throws(()=>validateEvent({...input,details:{...input.details,rallyStages:Array(21).fill('Saverne')}}),/20 spéciales/);
 });
+
+
+test('endurance categories and GT3 cars belong to the race simulator',()=>{
+  const base={name:'Test',durationHours:6,eventType:'special',departures:[{date:'2090-01-15',time:'14:00'}]};
+  assert.throws(()=>validateEvent({...base,circuit:'iracing-daytona',categories:['Hypercar']}),/simulateur/);
+  assert.throws(()=>validateEvent({...base,circuit:'daytona',categories:['GTP']}),/simulateur/);
+  const event={circuit:'iracing-daytona',duration_hours:6,categories:JSON.stringify(['GT3'])};
+  const reg={name:'Pilote',category:'GT3',status:'whole'};
+  assert.throws(()=>validateRegistration({...reg,cars:['Ferrari 296 LMGT3']},event),/voitures/);
+  assert.deepEqual(validateRegistration({...reg,cars:['Ferrari 296 GT3']},event).cars,['Ferrari 296 GT3']);
+});
