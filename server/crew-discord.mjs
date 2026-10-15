@@ -214,6 +214,23 @@ async function remove(env, budget, channelId) {
   catch (error) { if (error?.status !== 404) throw error; }
 }
 
+// A successful crew deletion must not wait behind recap updates or other crews.
+// Keep the tracking row on failure so the scheduled sync can retry the cleanup.
+export async function closeDeletedCrewDiscord(env, crewId, timestamp = Date.now()) {
+  if (!env?.DB || !String(env.DISCORD_BOT_TOKEN || '').trim()) return;
+  const lock = await env.DB.prepare(`UPDATE crew_discord SET lock_until=?
+    WHERE crew_id=? AND closed_at IS NULL AND lock_until<?
+      AND NOT EXISTS(SELECT 1 FROM crews WHERE id=?)`)
+    .bind(timestamp + LOCK_MS, crewId, timestamp, crewId).run();
+  if (!lock.meta.changes) return;
+  try {
+    const row = await env.DB.prepare('SELECT *, crew_id AS row_id FROM crew_discord WHERE crew_id=?').bind(crewId).first();
+    await closeRow(env, {left:3}, timestamp, row, [], {force:true});
+  } finally {
+    await env.DB.prepare('UPDATE crew_discord SET lock_until=0 WHERE crew_id=?').bind(crewId).run();
+  }
+}
+
 // The voice channel deleted (with its chat), then what the first version made (text channel, category). Each
 // step is saved, so a run that stops halfway goes on from there.
 async function closeRow(env, budget, timestamp, row, members, {force = false} = {}) {

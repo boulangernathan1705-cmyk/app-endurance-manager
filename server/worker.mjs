@@ -29,7 +29,7 @@ import {setupOfficialServer} from './official-discord.mjs';
 
 import {botRecapSettings, recapDestinations, recapError, recapInput, validateRecapDestination, previewBotRecap, saveBotRecap, syncBotRecaps, sendBotRecapTest, repairBotRecap, RECAP_BOT_PERMISSIONS} from './recap-discord.mjs';
 import {notify, notificationsApi, departurePilots, eventPilots, crewPilots} from './notifications.mjs';
-import {botCanManageChannels, checkBot, serverCategories, CREW_BOT_PERMISSIONS} from './crew-discord.mjs';
+import {botCanManageChannels, checkBot, serverCategories, closeDeletedCrewDiscord, CREW_BOT_PERMISSIONS} from './crew-discord.mjs';
 // Official races (iRacing's official endurances, LMU official events): common to every community (migration 0039).
 const OFFICIAL = 'official';
 // A race of the current community, or an official race: any id from another community answers "introuvable".
@@ -582,6 +582,7 @@ async function api(request, env) {
         const told = await crewPilots(env,crew.id);
         const result = await env.DB.prepare('DELETE FROM crews WHERE id=? AND version=?').bind(crew.id,input.version).run();
         if (!result.meta.changes) fail(409,'Cet équipage a changé. Actualise avant de réessayer.');
+        await closeDeletedCrewDiscord(env,crew.id).catch(error => console.error('Deleted crew Discord cleanup failed', error instanceof Error ? error.message : 'unknown'));
         await notify(env,told,'crew_deleted',event,{departure,skip:[actor.user.id],crewName:crew.name,by:actor.user.name});
         return json({ok:true});
       }
