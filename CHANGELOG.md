@@ -2,6 +2,10 @@
 
 Les changements du site, regroupés par jour. Les plus récents sont en haut.
 
+## v1.46 — 15 octobre 2026
+
+- Discord : supprimer un équipage avant le départ supprime immédiatement son vocal, quelle que soit la personne autorisée qui le supprime. Le bot réessaie automatiquement si Discord ne répond pas.
+
 ## v1.45 — 14 octobre 2026
 
 - Discord : une inscription ou désinscription faite depuis le site d’une autre communauté actualise le récap de la communauté concernée.
