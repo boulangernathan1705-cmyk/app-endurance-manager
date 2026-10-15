@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {raceMatches,raceFilterKey,mySituation,normalizeRaceFilters,raceFilterView,upcomingEntries} from '../front/race-filters.mjs';
+import {raceMatches,raceFilterKey,mySituation,normalizeRaceFilters,raceFilterView,upcomingEntries,filteredCalendarEvents} from '../front/race-filters.mjs';
 import {filterStorageKey,filterDate,setFilterDate} from '../front/filter-state.mjs';
 import {filterEventCommunities,eventCommunities} from '../front/community-filters.mjs';
 
@@ -85,4 +85,12 @@ test('community filters scope the cards, crews, counts, absences and my situatio
 test('Mes inscriptions excludes past starts and unavailable registrations even on a future race',()=>{
   const event={...indy,departures:[departure('old',50,[{id:'past',mine:true,status:'whole'}]),departure('next',200,[{id:'mine',mine:true,status:'whole'},{id:'managed',managed:true,status:'whole'},{id:'no',mine:true,status:'unavailable'}])]};
   assert.deepEqual(upcomingEntries([event],100).map(item=>item.reg.id),['mine','managed']);
+});
+
+test('a date slice cannot move a race with a later start into archives',()=>{
+  const event={...indy,departures:[{...departure('old',50),date:'2026-10-16'},{...departure('next',200),date:'2026-10-17'}]};
+  const selected=filters({from:'2026-10-16',to:'2026-10-16'});
+  assert.deepEqual(filteredCalendarEvents([event],selected,{...options,archived:true}),[]);
+  assert.deepEqual(filteredCalendarEvents([event],selected,options),[]);
+  assert.equal(filteredCalendarEvents([event],filters({from:'2026-10-17'}),options).length,1);
 });

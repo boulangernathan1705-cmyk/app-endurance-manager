@@ -1,6 +1,7 @@
 import {simForEvent,GAME_CATALOGS,EVENT_TYPE_IDS,SIM_IDS} from '../shared/catalog.mjs';
 import {filterStorageKey,filterSelection,filterValue,filterDate} from './filter-state.mjs';
 import {filterEventCommunities,entryCommunityId} from './community-filters.mjs';
+import {eventSchedule} from './schedule.mjs';
 
 export const raceFilterKey=(game,format='endurance',context={})=>filterStorageKey(format==='solo'?'events':'endurance',{...context,game:format==='solo'?'all':game});
 export const emptyRaceFilters=()=>({communities:[],types:[],categories:[],sims:[],kinds:[],from:'',to:'',situation:''});
@@ -20,6 +21,12 @@ const inDateRange=(departure,filters)=>(!filters.from||departure.date>=filters.f
 export function raceFilterView(event,filters,{communityId=''}={}){
   const shown=filterEventCommunities(event,filters.communities,communityId);
   return filters.from||filters.to?{...shown,departures:(shown.departures||[]).filter(departure=>inDateRange(departure,filters))}:shown;
+}
+export function filteredCalendarEvents(events,filters,options={}){
+  const now=options.now??Date.now(),archived=options.archived===true;
+  // A date-filtered view must never turn a still-upcoming race into an archived race.
+  return events.filter(event=>eventSchedule(event,now).archived===archived&&raceMatches(event,filters,{...options,now,archived}))
+    .map(event=>raceFilterView(event,filters,options));
 }
 
 export function raceMatches(event,filters,{communityId='',now=Date.now(),archived=false}={}){
