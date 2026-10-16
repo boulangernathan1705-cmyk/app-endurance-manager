@@ -17,7 +17,7 @@ async function setup(page,{contributing=false,empty=false}={}) {
   return errors;
 }
 
-test('memo stop calculator handles concurrent swap, tabs and light/dark mobile layout',async({page})=>{
+test('memo stop calculator handles concurrent swap, tabs and mobile layout',async({page})=>{
   const errors=await setup(page,{contributing:true});
   await page.locator('#memo-pit-form input[name="quantity"]').fill('5');
   await page.locator('#memo-pit-form select[name="tyres"]').selectOption('tyres4');
@@ -31,8 +31,6 @@ test('memo stop calculator handles concurrent swap, tabs and light/dark mobile l
   await page.locator('#memo-autonomy-form input[name="energy"]').fill('100');
   await expect(page.locator('#memo-autonomy-result')).toContainText('23');
   await expect(page.locator('#memo-autonomy-result')).toContainText('46 min');
-  await page.getByRole('button',{name:'Passer en mode clair',exact:true}).click();
-  await expect(page.locator('html')).toHaveAttribute('data-theme','light');
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBeTruthy();
   await page.getByRole('tab',{name:'Relais',exact:true}).press('ArrowLeft');
   await expect(page.getByRole('tab',{name:'Stands',exact:true})).toBeFocused();

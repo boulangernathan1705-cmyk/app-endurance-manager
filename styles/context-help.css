@@ -1,18 +1,18 @@
-.context-help-button { display:inline-flex; align-items:center; justify-content:center; flex:0 0 32px; width:32px; height:32px; min-width:32px; min-height:32px; margin:0 6px 0 0; padding:0; border:1px solid var(--border); border-radius:50%; background:var(--panel); color:var(--text); font:inherit; font-size:16px; font-weight:600; line-height:1; cursor:pointer; align-self:center; }
+.context-help-button { display:inline-flex; align-items:center; justify-content:center; flex:0 0 32px; width:32px; height:32px; min-width:32px; min-height:32px; margin:0 6px 0 0; padding:0; border:1px solid #485357; border-radius:50%; background:#171d20; color:#d4dfe2; font:inherit; font-size:16px; font-weight:600; line-height:1; cursor:pointer; align-self:center; }
 .context-help-button>span { pointer-events:none; }
-.context-help-button:hover { background:var(--panel3); border-color:#82cdd2; }
+.context-help-button:hover { background:#263237; border-color:#82cdd2; }
 .context-help-button:focus-visible,.context-help-close:focus-visible { outline:2px solid #82cdd2; outline-offset:3px; }
-.context-help-dialog { box-sizing:border-box; width:min(520px,calc(100vw - 24px)); max-height:calc(100dvh - 32px); margin:auto; padding:0; border:1px solid var(--border); border-radius:16px; background:var(--panel); color:var(--text); box-shadow:0 20px 80px #0009; overflow:auto; overscroll-behavior:contain; text-align:left; }
-.context-help-dialog::backdrop { background:color-mix(in srgb, var(--panel) 65%, transparent); }
-.context-help-dialog>header { display:flex; align-items:center; justify-content:space-between; gap:12px; position:sticky; top:0; padding:16px 18px; background:var(--panel); border-bottom:1px solid var(--border); }
+.context-help-dialog { box-sizing:border-box; width:min(520px,calc(100vw - 24px)); max-height:calc(100dvh - 32px); margin:auto; padding:0; border:1px solid #485357; border-radius:16px; background:#141a1d; color:#f0f4f5; box-shadow:0 20px 80px #0009; overflow:auto; overscroll-behavior:contain; text-align:left; }
+.context-help-dialog::backdrop { background:rgba(0,0,0,.65); }
+.context-help-dialog>header { display:flex; align-items:center; justify-content:space-between; gap:12px; position:sticky; top:0; padding:16px 18px; background:#141a1d; border-bottom:1px solid #344044; }
 .context-help-dialog h2 { margin:0; font-size:19px; line-height:1.3; }
-.context-help-close { display:flex; align-items:center; justify-content:center; flex:0 0 44px; height:44px; border:1px solid var(--border); border-radius:9px; background:var(--panel2); color:var(--text); font-size:26px; cursor:pointer; }
+.context-help-close { display:flex; align-items:center; justify-content:center; flex:0 0 44px; height:44px; border:1px solid #485357; border-radius:9px; background:#202a2e; color:#fff; font-size:26px; cursor:pointer; }
 .context-help-body { display:grid; gap:20px; padding:20px; }
 .context-help-dialog h3 { margin:0 0 7px; font-size:15px; line-height:1.4; }
-.context-help-dialog p { margin:0; color:var(--text); font-size:15px; line-height:1.6; overflow-wrap:anywhere; }
+.context-help-dialog p { margin:0; color:#c6d1d5; font-size:15px; line-height:1.6; overflow-wrap:anywhere; }
 @media(max-width:600px) { .context-help-dialog>header { padding:12px 14px; } .context-help-body { padding:16px; } }
 
-.context-help-dialog ol { margin:0; padding-left:24px; color:var(--text); font-size:15px; line-height:1.6; }
+.context-help-dialog ol { margin:0; padding-left:24px; color:#d5dfe2; font-size:15px; line-height:1.6; }
 .context-help-dialog li+li { margin-top:12px; }
-.context-help-dialog li::marker { color:light-dark(#27686d, #82cdd2); font-weight:700; }
+.context-help-dialog li::marker { color:#82cdd2; font-weight:700; }
 .registration-workspace-head>.context-help-button { margin:0; }

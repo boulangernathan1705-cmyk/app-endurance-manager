@@ -1,4 +1,3 @@
-import {paletteFor} from '../shared/appearance.mjs';
 // The community of a request: every piece of data belongs to exactly one community, and every query is
 // scoped to the community resolved here (the single entry point of the separation).
 //
@@ -57,9 +56,10 @@ export function communityUrl(env, community) {
 // (kept by the settings page) on Discord's CDN (allowed by the site's CSP).
 export function appearanceOf(community) {
   const appearance = community.appearance || {}, guild = community.discordGuildId;
-  const palette = paletteFor(appearance), accent = palette.dark;
+  // Colours saved by the discarded theme experiment must not change the original site look.
+  const accent = !appearance.palette && /^#[0-9a-f]{6}$/i.test(appearance.accent || '') ? appearance.accent : null;
   const logoUrl = guild && appearance.discordIcon ? `https://cdn.discordapp.com/icons/${guild}/${appearance.discordIcon}.png?size=256` : null;
   // The banner sent by the admins (Réglages → Apparence); without one, the site's banner.
   const bannerUrl = Number.isInteger(appearance.bannerVersion) ? `/api/community/banner?v=${appearance.bannerVersion}` : null;
-  return {accent, palette:palette.id, defaultMode:appearance.defaultMode === 'light' ? 'light' : 'dark', logoUrl, bannerUrl};
+  return {accent, logoUrl, bannerUrl};
 }

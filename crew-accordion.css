@@ -26,7 +26,7 @@
 }
 
 .crew-pilot-accordion.is-complete .crew-pilot-accordion-summary {
-  background: color-mix(in srgb, #7d8589 8%, var(--panel));
+  background: color-mix(in srgb, #7d8589 8%, #151c1f);
 }
 
 .crew-pilot-accordion-summary:hover {
@@ -85,11 +85,11 @@
 }
 
 .crew-compact-pilots {
-  color: var(--text);
+  color: #eef4f4;
 }
 
 .crew-compact-car {
-  color: var(--text);
+  color: #c4d0d0;
   text-align: right;
 }
 
@@ -111,16 +111,16 @@
 
 .crew-compact-status.is-open,
 .crew-card-status.is-open {
-  color: light-dark(#128238, #a9f3c2);
+  color: #a9f3c2;
   border-color: #3e9b63;
-  background: var(--panel2);
+  background: #173624;
 }
 
 .crew-compact-status.is-complete,
 .crew-card-status.is-complete {
-  color: var(--text);
-  border-color: var(--border);
-  background: var(--panel3);
+  color: #c1c7ca;
+  border-color: #586166;
+  background: #292e31;
 }
 
 .crew-compact-chevron {
@@ -150,11 +150,11 @@
 .crew-capacity-message {
   margin: 10px 0 4px;
   padding: 10px 12px;
-  border: 1px solid var(--border);
-  border-left: 4px solid var(--border);
+  border: 1px solid #384246;
+  border-left: 4px solid #68747a;
   border-radius: 7px;
-  background: var(--panel);
-  color: var(--text);
+  background: #171c1f;
+  color: #c5ced1;
   font-size: 12px;
   font-weight: 700;
   line-height: 1.45;
@@ -165,15 +165,15 @@
 }
 
 .crew-capacity-message.needs-pilots {
-  border-color: var(--border);
+  border-color: #376e4b;
   border-left-color: #5fd687;
-  background: var(--panel);
-  color: var(--text);
+  background: #14251b;
+  color: #d7f4e0;
 }
 
 .crew-capacity-message.is-complete {
   border-left-color: #7a8489;
-  color: var(--muted);
+  color: #adb5b8;
 }
 
 .crew-card-header {

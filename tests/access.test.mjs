@@ -4,11 +4,17 @@ import {DatabaseSync} from 'node:sqlite';
 import {readFileSync, readdirSync} from 'node:fs';
 import {communityAccess, refreshMemberships, discoverMemberships, refreshCommunityMembers, PERMISSIONS, ALL_PERMISSIONS, DEFAULT_EVERYONE} from '../server/access.mjs';
 import worker from '../server/worker.mjs';
+import {appearanceOf} from '../server/community.mjs';
 import {GUILD, ORGA_ROLE, SAFE_ROLE, DEV_COMMUNITY, linkTestServer} from './fixtures/discord-server.mjs';
 
 // Access through the community's Discord server, with a fake Discord answering the bot like the real one.
 const ROOT='https://site.example', MANAGER='111111111111111111', PILOT='222222222222222222', OWNER='333333333333333333', BOSS='444444444444444444';
 const ADMIN_ROLE='900000000000000010';
+test('retired themes do not affect the original appearance; pre-existing custom accents remain valid', () => {
+  assert.equal(appearanceOf({appearance:{palette:'ferrari',accent:'#d92a27',defaultMode:'light'}}).accent,null);
+  assert.equal(appearanceOf({appearance:{accent:'#ff8800'}}).accent,'#ff8800');
+  assert.equal(appearanceOf({appearance:{}}).accent,null);
+});
 const MIGRATIONS=readdirSync(new URL('../migrations/',import.meta.url)).filter(name=>name.endsWith('.sql')).sort();
 class D1 {
   constructor(){this.db=new DatabaseSync(':memory:');this.db.exec('PRAGMA foreign_keys=ON;');for(const file of MIGRATIONS)this.db.exec(readFileSync(new URL(`../migrations/${file}`,import.meta.url),'utf8'));}
@@ -193,12 +199,10 @@ test('community look: name, short name and accent by its admins, icon from its D
   assert.match(settings.community.logoUrl,/^https:\/\/cdn\.discordapp\.com\/icons\/\d+\/0123456789abcdef0123456789abcdef\.png/);
   assert.equal(settings.community.bannerUrl,null);
   assert.equal((await call('/api/community/appearance','PATCH',{name:'Commu Dev',shortName:'DEV',accent:'javascript:x'})).status,400);
-  assert.equal((await call('/api/community/appearance','PATCH',{name:'Ma Commu',shortName:'MC',palette:'mclaren',defaultMode:'light'})).status,200);
-  assert.equal((await call('/api/community/appearance','PATCH',{name:'Ma Commu',shortName:'MC',palette:'custom',defaultMode:'light'})).status,400);
-  assert.equal((await call('/api/community/appearance','PATCH',{name:'Ma Commu',shortName:'MC',palette:'blue',defaultMode:'invalid'})).status,400);
+  assert.equal((await call('/api/community/appearance','PATCH',{name:'Ma Commu',shortName:'MC',accent:'#ff8800'})).status,200);
   const session=await (await call('/api/session')).json();
   assert.equal(session.community.name,'Ma Commu');assert.equal(session.community.shortName,'MC');
-  assert.equal(session.community.appearance.accent,'#ff9e33');assert.equal(session.community.appearance.palette,'mclaren');assert.equal(session.community.appearance.defaultMode,'light');assert.ok(session.community.appearance.logoUrl);
+  assert.equal(session.community.appearance.accent,'#ff8800');assert.ok(session.community.appearance.logoUrl);
 });
 
 test('a new icon on the Discord server becomes the community logo when a member is checked; the rest of the appearance stays', async t => {

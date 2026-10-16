@@ -60,26 +60,26 @@ html[data-game="iracing"] .game-space-bar strong {
 }
 
 .nav-game-switcher-lmu {
-  color: light-dark(#940009, #ff5660);
+  color: #ff5660;
   background: rgba(227,6,19,.16);
   border-color: rgba(255,86,96,.82);
 }
 
 .nav-game-switcher-iracing {
-  color: light-dark(#003494, #6ca0ff);
+  color: #6ca0ff;
   background: rgba(37,65,133,.24);
   border-color: rgba(108,160,255,.82);
 }
 
 html[data-game="lmu"] .nav-game-switcher-lmu {
-  color: var(--text);
+  color: #fff;
   background: #d90b18;
   border-color: #ff6068;
   box-shadow: 0 0 0 2px rgba(227,6,19,.18), 0 7px 20px rgba(227,6,19,.28);
 }
 
 html[data-game="iracing"] .nav-game-switcher-iracing {
-  color: var(--text);
+  color: #fff;
   background: #2a4f9f;
   border-color: #70a2ff;
   box-shadow: 0 0 0 2px rgba(58,99,190,.2), 0 7px 20px rgba(37,65,133,.28);

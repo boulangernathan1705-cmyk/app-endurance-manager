@@ -13,13 +13,6 @@ const FR_NORMALIZE=new Map(Object.entries({
 }));
 
 const EN=new Map(Object.entries({
-  'Vert pastel':'Pastel green',
-  'Thème de la communauté':'Community theme',
-  'Couleur de la communauté':'Community colour','Affichage par défaut':'Default display',
-  '☾ Sombre':'☾ Dark','☀ Clair':'☀ Light','Passer en mode sombre':'Switch to dark mode','Passer en mode clair':'Switch to light mode',
-  'Chaque pilote peut changer l’affichage avec le bouton Clair / Sombre.':'Each driver can switch the display using the Light / Dark button.',
-  '✓ Apparence enregistrée.':'✓ Appearance saved.','Choisis une des couleurs proposées.':'Choose one of the available colours.','Choisis le mode clair ou sombre.':'Choose light or dark mode.',
-  'Émeraude':'Emerald','Bleu':'Blue','Violet':'Purple','Orange':'Orange','Rouge':'Red','Rose':'Pink','Or':'Gold','Ardoise':'Slate',
   'Accueil':'Home','Aide':'Help','Événements':'Events','ÉVÉNEMENTS':'EVENTS','Mes inscriptions':'My entries','MES INSCRIPTIONS':'MY ENTRIES',
   'Mon inscription':'My entry','Inscriptions':'Entries','Mes inscriptions personnelles':'My personal entries','Inscriptions que je gère':'Entries I manage',
   'Gestion des membres':'Member management','GESTION DES MEMBRES':'MEMBER MANAGEMENT','Administration':'Administration','Membres':'Members','Diagnostics':'Diagnostics','DIAGNOSTICS':'DIAGNOSTICS',

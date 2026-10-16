@@ -21,16 +21,16 @@ body {
 .top-stripes {
   height: 4px;
   grid-template-columns: 1fr 2.2fr 1fr;
-  background: var(--bg);
+  background: #0b0d0e;
 }
-.top-stripes div:nth-child(1) { background: var(--panel2); }
-.top-stripes div:nth-child(2) { background: linear-gradient(90deg,var(--panel2),#2aa36a,var(--panel2)); }
-.top-stripes div:nth-child(3) { background: var(--panel2); }
+.top-stripes div:nth-child(1) { background: #202527; }
+.top-stripes div:nth-child(2) { background: linear-gradient(90deg,#18372a,#2aa36a,#18372a); }
+.top-stripes div:nth-child(3) { background: #202527; }
 .top-stripes div:nth-child(4) { display: none; }
 
 header {
-  background: linear-gradient(180deg,var(--panel) 0%,var(--panel) 100%);
-  border-bottom-color: var(--border);
+  background: linear-gradient(180deg,#151719 0%,#0f1112 100%);
+  border-bottom-color: #29312f;
   box-shadow: 0 8px 28px rgba(0,0,0,.22);
 }
 
@@ -52,7 +52,7 @@ header {
   flex: 0 0 112px;
   overflow: hidden;
   border-radius: 50%;
-  background: var(--panel);
+  background: #111415;
 }
 .brand-mark {
   position: absolute;
@@ -80,20 +80,20 @@ header {
 
 .primary-button {
   background: linear-gradient(180deg,#2ba56b,#218654);
-  color: var(--text);
+  color: #f5fff9;
   box-shadow: inset 0 1px rgba(255,255,255,.12);
 }
 .secondary-button {
-  border-color: var(--border);
-  background: linear-gradient(180deg,var(--panel),var(--panel));
+  border-color: #343a3c;
+  background: linear-gradient(180deg,#1a1d1f,#151719);
 }
-.secondary-button:hover { border-color: var(--border); }
+.secondary-button:hover { border-color: #46504d; }
 
 .event-card,
 .form-panel,
 .departure,
 .empty {
-  border-color: var(--border);
+  border-color: #303638;
 }
 
 /* Event page: make the visual useful and keep the whole header dense on desktop. */

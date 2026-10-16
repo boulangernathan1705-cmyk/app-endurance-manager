@@ -66,7 +66,7 @@
   line-height: 18px;
   font-weight: 800;
   white-space: nowrap;
-  color: var(--text);
+  color: #c8d0ce;
 }
 .presence-time.ticks-4 { display: block; }
 .presence-boundary:first-child .presence-time { transform: none; }
@@ -76,9 +76,9 @@
   grid-template-columns: repeat(var(--duration), minmax(0, 1fr));
   gap: 0;
   width: 100%;
-  border: 1px solid var(--border);
+  border: 1px solid #617074;
   border-radius: 6px;
-  background-color: var(--panel2);
+  background-color: #262e32;
   background-image: linear-gradient(to right, transparent calc(100% - 1px), #617074 calc(100% - 1px));
   background-size: calc(100% / var(--duration)) 100%;
   background-origin: padding-box;
@@ -95,7 +95,7 @@
   border: 0;
   border-radius: 0;
   background: transparent;
-  color: var(--muted);
+  color: #b0babc;
   font-family: inherit;
   font-size: 12px;
   font-weight: 800;
@@ -106,7 +106,7 @@
 .presence-segment:first-child { border-radius: 5px 0 0 5px; }
 .presence-track > .presence-segment:last-child { border-radius: 0 5px 5px 0; }
 .presence-track > .presence-segment:only-child { border-radius: 5px; }
-.presence-track > .presence-segment.is-present { background: var(--pilot-timeline-color, #8fb6c9); color: var(--on-accent); }
+.presence-track > .presence-segment.is-present { background: var(--pilot-timeline-color, #8fb6c9); color: #101416; }
 
 /* Pilot availability is communicated by colour: no check/dot markers are needed. */
 .presence-timeline:not(.is-coverage) .presence-track > .presence-segment > span {
@@ -145,7 +145,7 @@
 
 /* Organizer crew coverage: 2+ pilots = green, 1 pilot = yellow, nobody = neutral. */
 .presence-timeline.is-coverage .presence-segment {
-  border-right: 1px solid var(--border);
+  border-right: 1px solid #617074;
 }
 .presence-timeline.is-coverage .presence-segment:last-child {
   border-right: 0;
@@ -160,7 +160,7 @@
 }
 .presence-timeline.is-coverage .presence-segment.coverage-none {
   background: transparent;
-  color: var(--muted);
+  color: #899598;
 }
 .presence-timeline.is-coverage .presence-segment.coverage-none > span {
   visibility: hidden;

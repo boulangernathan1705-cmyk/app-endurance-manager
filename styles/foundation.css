@@ -80,7 +80,7 @@ button {
 ========================================================= */
 
 header {
-  background: var(--bg);
+  background: #0d0f10;
   border-bottom: 1px solid var(--border);
   padding: 18px 20px;
 }
@@ -137,7 +137,7 @@ main {
 .primary-button {
   border: 0;
   background: var(--green);
-  color: var(--on-accent);
+  color: #07100a;
 
   font-weight: 900;
 
@@ -182,9 +182,9 @@ main {
 
 .event-agenda { display: grid; gap: 30px; }
 .event-period { min-width: 0; }
-.event-period-heading { display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px 14px; margin: 4px 0 14px; padding-bottom: 10px; border-bottom: 1px solid var(--border); color: var(--text); font-size: 19px; line-height: 1.4; }
+.event-period-heading { display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px 14px; margin: 4px 0 14px; padding-bottom: 10px; border-bottom: 1px solid #344147; color: #eef5f3; font-size: 19px; line-height: 1.4; }
 .event-period-heading > span::first-letter { text-transform: uppercase; }
-.event-period-heading small { color: var(--muted); font-size: 13px; font-weight: 500; }
+.event-period-heading small { color: #aababb; font-size: 13px; font-weight: 500; }
 
 .event-card {
   position: relative;
@@ -207,7 +207,7 @@ main {
 .event-card:hover {
   background: var(--panel2);
 
-  border-color: var(--border);
+  border-color: #3a4045;
 
   transform: translateX(2px);
 }
@@ -239,9 +239,9 @@ main {
 .event-card-status { display: grid; gap: 4px; margin-top: 15px; }
 .event-card.archived { opacity: .58; filter: saturate(.55); }
 .event-card.archived:hover { opacity: .82; filter: saturate(.8); }
-.event-filter { display: inline-flex; gap: 5px; margin: 2px 0 16px; padding: 4px; border: 1px solid var(--border); border-radius: 9px; background: var(--panel); }
-.event-filter-button { min-height: 36px; padding: 7px 13px; border: 1px solid transparent; border-radius: 6px; color: var(--muted); background: transparent; font-size: 13px; font-weight: 800; }
-.event-filter-button[aria-pressed="true"] { color: var(--text); border-color: #438768; background: var(--panel3); }
+.event-filter { display: inline-flex; gap: 5px; margin: 2px 0 16px; padding: 4px; border: 1px solid #303a3f; border-radius: 9px; background: #111719; }
+.event-filter-button { min-height: 36px; padding: 7px 13px; border: 1px solid transparent; border-radius: 6px; color: #aebcbe; background: transparent; font-size: 13px; font-weight: 800; }
+.event-filter-button[aria-pressed="true"] { color: #edfff3; border-color: #438768; background: #1c4032; }
 
 .event-name {
   font-size: 17px;
@@ -264,7 +264,7 @@ main {
 
 .event-countdown:empty { display: none; }
 .event-countdown.upcoming { color: var(--green); }
-.event-countdown.soon { color: light-dark(#89530a, #f0a23a); }
+.event-countdown.soon { color: #f0a23a; }
 .event-countdown.running { color: var(--red); }
 .event-countdown.finished { color: var(--muted); }
 .event-countdown-primary {
@@ -367,7 +367,7 @@ input:focus {
 
   border: 1px solid var(--border);
 
-  background: var(--panel);
+  background: #211719;
 
   color: var(--red);
 
@@ -445,7 +445,7 @@ input:focus {
 .departure.finished {
   opacity: .62;
 
-  border-color: var(--border);
+  border-color: #222528;
 }
 
 .departure.finished:hover {
@@ -468,7 +468,7 @@ input:focus {
 }
 
 .departure.finished .departure-header {
-  background: var(--panel);
+  background: #101214;
 
   border-bottom: 0;
 }
@@ -528,7 +528,7 @@ input:focus {
 .departure-toggle {
   border: 1px solid var(--border);
 
-  background: var(--panel2);
+  background: #1c1f22;
 
   color: var(--muted);
 
@@ -542,7 +542,7 @@ input:focus {
 }
 
 .departure-toggle:hover {
-  background: var(--panel2);
+  background: #25292c;
 
   color: var(--text);
 }
@@ -598,7 +598,7 @@ input:focus {
 
   margin-bottom: 4px;
 
-  background: var(--bg);
+  background: #0e1011;
 
   border-left: 3px solid var(--border);
 
@@ -637,7 +637,7 @@ input:focus {
 .category-count {
   margin-left: auto;
 
-  color: var(--muted);
+  color: #656a6f;
 
   font-size: 8px;
 }
@@ -720,7 +720,7 @@ input:focus {
 }
 
 .availability-segment {
-  background: var(--panel3);
+  background: #292d31;
 
   border-radius: 2px;
 }
@@ -748,7 +748,7 @@ input:focus {
 .availability-unavailable {
   grid-column: 1 / 4;
 
-  background: var(--panel3);
+  background: #35383b;
 
   border-radius: 2px;
 }
@@ -766,7 +766,7 @@ input:focus {
 
   border-radius: 3px;
 
-  background: var(--panel2);
+  background: #25282b;
 
   color: var(--muted);
 
@@ -776,7 +776,7 @@ input:focus {
 .edit-button:hover {
   color: var(--text);
 
-  background: var(--panel3);
+  background: #303438;
 }
 
 
@@ -789,7 +789,7 @@ input:focus {
 
   border-top: 1px solid var(--border);
 
-  background: var(--panel);
+  background: #0f1112;
 }
 
 .form-section.editing {
@@ -827,7 +827,7 @@ input:focus {
 
   gap: 3px;
 
-  background: var(--bg);
+  background: #0a0c0d;
 
   padding: 3px;
 
@@ -841,9 +841,9 @@ input:focus {
 .relay-button {
   border: 0;
 
-  background: var(--panel2);
+  background: #202427;
 
-  color: var(--muted);
+  color: #777d82;
 
   font-size: 9px;
 
@@ -865,27 +865,27 @@ input:focus {
 }
 
 .relay-button:hover {
-  background: var(--panel3);
+  background: #292d31;
 
-  color: var(--text);
+  color: white;
 }
 
 .relay-button.active.beginning {
   background: var(--green);
 
-  color: var(--on-accent);
+  color: #07100a;
 }
 
 .relay-button.active.middle {
   background: var(--yellow);
 
-  color: var(--on-accent);
+  color: #151200;
 }
 
 .relay-button.active.end {
   background: var(--red);
 
-  color: var(--text);
+  color: white;
 }
 
 
@@ -930,15 +930,15 @@ input:focus {
 
   border-color: var(--green);
 
-  color: var(--on-accent);
+  color: #07100a;
 }
 
 .special-button.active.unavailable {
-  background: var(--panel3);
+  background: #3b3e41;
 
-  border-color: var(--border);
+  border-color: #555a5e;
 
-  color: var(--text);
+  color: white;
 }
 
 
@@ -1025,7 +1025,7 @@ input:focus {
 
   border-color: var(--blue);
 
-  color: var(--on-accent);
+  color: #071017;
 }
 
 .category-button.active.lmp2 {
@@ -1033,7 +1033,7 @@ input:focus {
 
   border-color: var(--green);
 
-  color: var(--on-accent);
+  color: #07100a;
 }
 
 .category-button.active.lmp3 {
@@ -1041,7 +1041,7 @@ input:focus {
 
   border-color: var(--yellow);
 
-  color: var(--on-accent);
+  color: #151200;
 }
 
 .category-button.active.gt3 {
@@ -1049,7 +1049,7 @@ input:focus {
 
   border-color: var(--red);
 
-  color: var(--text);
+  color: white;
 }
 
 
@@ -1070,7 +1070,7 @@ input:focus {
 
   background: var(--accent);
 
-  color: var(--on-accent);
+  color: #07100a;
 
   font-size: 10px;
 

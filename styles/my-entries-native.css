@@ -2,7 +2,7 @@
 .ux-managed-entry-name {
   display: block;
   margin-bottom: 2px;
-  color: var(--text);
+  color: #f4ead9;
   font-size: 18px;
   font-weight: 900;
   line-height: 1.15;
@@ -10,7 +10,7 @@
 
 .ux-my-entry-departure {
   display: block;
-  color: light-dark(#157e35, #9beeb4);
+  color: #9beeb4;
   font-size: 16px;
   font-weight: 900;
   line-height: 1.15;
@@ -18,7 +18,7 @@
 
 .ux-my-entry-date {
   display: block;
-  color: var(--text);
+  color: #c3cdcf;
   font-size: 13px;
   font-weight: 650;
   line-height: 1.2;
@@ -28,7 +28,7 @@
   overflow: hidden;
   border: 1px solid rgba(73,118,123,.5);
   border-radius: 10px;
-  background: var(--panel);
+  background: rgba(18,25,28,.88);
 }
 
 .ux-my-entry-accordion-summary {
@@ -47,7 +47,7 @@
 }
 
 .ux-my-entry-accordion-summary > span:first-child {
-  color: var(--text);
+  color: #f1e9da;
   font-size: 19px;
   font-weight: 900;
   line-height: 1.2;
@@ -62,7 +62,7 @@
   border: 1px solid rgba(73,118,123,.65);
   border-radius: 999px;
   background: rgba(255,255,255,.025);
-  color: var(--text);
+  color: #f1e9da;
   font-size: 13px;
   font-weight: 900;
 }
@@ -70,7 +70,7 @@
 .ux-my-entry-chevron {
   display: grid;
   place-items: center;
-  color: var(--muted);
+  color: #8ea0a3;
   font-size: 25px;
   line-height: 1;
   transition: transform .15s ease;
@@ -131,7 +131,7 @@
 }
 
 .ux-my-own-crew-identity strong {
-  color: var(--text);
+  color: #f4ead9;
   font-size: 18px;
   font-weight: 900;
 }
@@ -139,7 +139,7 @@
 .ux-my-own-crew-identity span,
 .ux-my-other-crew-main span {
   min-width: 0;
-  color: var(--muted);
+  color: #aebbbc;
   overflow-wrap: anywhere;
 }
 
@@ -148,7 +148,7 @@
   padding: 5px 9px;
   border: 1px solid rgba(141,157,160,.5);
   border-radius: 999px;
-  color: var(--text);
+  color: #bfc9ca;
   font-size: 10px;
   font-weight: 900;
   letter-spacing: .45px;
@@ -176,12 +176,12 @@
   padding: 12px !important;
   border: 1px solid rgba(73,118,123,.55) !important;
   border-radius: 10px;
-  background: color-mix(in srgb, var(--panel) 82%, transparent);
+  background: rgba(12,18,20,.82);
 }
 
 .ux-my-entry-pilot-card.is-own-pilot {
-  border-color: color-mix(in srgb, var(--community-accent) 80%, transparent) !important;
-  background: color-mix(in srgb, var(--community-accent) 7%, transparent);
+  border-color: rgba(82,207,212,.8) !important;
+  background: rgba(82,207,212,.07);
   box-shadow: inset 3px 0 0 var(--brand-cyan, #52cfd4);
 }
 
@@ -193,7 +193,7 @@
 }
 
 .ux-my-entry-pilot-card .pilot-name {
-  color: var(--text);
+  color: #f4ead9;
   font-weight: 900;
 }
 
@@ -207,7 +207,7 @@
 
 .ux-my-entry-pilot-card .pilot-car {
   min-width: 0;
-  color: var(--text);
+  color: #b7c3c4;
   overflow-wrap: anywhere;
 }
 
@@ -233,12 +233,12 @@
 }
 
 .ux-my-awaiting-copy strong {
-  color: light-dark(#816213, #f0d89b);
+  color: #f0d89b;
   font-size: 15px;
 }
 
 .ux-my-awaiting-copy span {
-  color: var(--muted);
+  color: #aeb9ba;
   font-size: 12px;
 }
 
@@ -255,14 +255,14 @@
 }
 
 .ux-my-other-crews-heading strong {
-  color: var(--text);
+  color: #bdc8c9;
   font-size: 12px;
   letter-spacing: .5px;
   text-transform: uppercase;
 }
 
 .ux-my-other-crews-heading span {
-  color: var(--muted);
+  color: #8fa0a2;
   font-size: 11px;
   font-weight: 800;
 }
@@ -296,14 +296,14 @@
 }
 
 .ux-my-other-crew-main strong {
-  color: var(--text);
+  color: #d9e0df;
   font-size: 12px;
   font-weight: 900;
 }
 
 .ux-my-other-crew-main span,
 .ux-my-other-crew small {
-  color: var(--muted);
+  color: #8f9d9f;
   font-size: 10px;
   line-height: 1.25;
 }
@@ -336,7 +336,7 @@
 
 .native-my-entries-group-heading h2 {
   margin: 0;
-  color: var(--text);
+  color: #f1e9da;
   font-size: 20px;
 }
 
@@ -355,7 +355,7 @@
   overflow: hidden;
   border: 1px solid rgba(73,118,123,.52);
   border-radius: 12px;
-  background: var(--panel);
+  background: rgba(12,18,20,.9);
 }
 
 .native-my-entry-header {
@@ -378,7 +378,7 @@
   height: 34px;
   border: 1px solid rgba(126,153,158,.55);
   border-radius: 999px;
-  color: var(--text);
+  color: #c7d0d1;
   font-size: 24px;
   line-height: 1;
 }
@@ -395,7 +395,7 @@
 
 .native-my-entry-title h2 {
   margin: 0;
-  color: var(--text);
+  color: #f4ead9;
   font-size: 21px;
   line-height: 1.1;
 }
@@ -406,7 +406,7 @@
   flex-wrap: wrap;
   gap: 6px 8px;
   margin-top: 5px;
-  color: var(--muted);
+  color: #9eacad;
   font-size: 12px;
 }
 

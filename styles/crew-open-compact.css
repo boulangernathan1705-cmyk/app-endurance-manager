@@ -61,21 +61,21 @@
   align-items:center;
   min-height:26px;
   padding:3px 9px;
-  border:1px solid var(--border);
+  border:1px solid #4b6569;
   border-radius:999px;
-  background:var(--panel2);
-  color:var(--text);
+  background:#172124;
+  color:#dce8e5;
   font-size:10.5px;
   font-weight:900;
 }
 .crew-unified-card[open] .crew-state-readonly.is-open{
   border-color:#2aa960;
   background:rgba(27,112,65,.18);
-  color:light-dark(#177d3b, #9cedb9);
+  color:#9cedb9;
 }
 .crew-unified-card[open] .crew-state-readonly.is-complete{
-  border-color:var(--border);
-  color:var(--text);
+  border-color:#718086;
+  color:#cbd5d5;
 }
 
 .crew-unified-card[open] .coverage-summary{
@@ -90,7 +90,7 @@
   border-radius:0!important;
   background:transparent!important;
   box-shadow:none!important;
-  color:var(--muted)!important;
+  color:#aebcbd!important;
   font-size:10.5px!important;
   font-weight:850!important;
   line-height:1.2!important;

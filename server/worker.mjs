@@ -1,4 +1,3 @@
-import {appearanceInput} from '../shared/appearance.mjs';
 import {grindfestAvailable, grindfestEnabled, isGrindfest, streamersOf, assignStreamerWaitlist} from '../shared/grindfest.mjs';
 import {gridfestPasswordStatus, sendGridfestPasswords} from './gridfest-discord.mjs';
 import {
@@ -875,9 +874,10 @@ async function api(request, env) {
     requirePermission(actor,'admin');
     const input = await body(request);
     const name = text(input.name, 80, 'Nom de la communauté'), shortName = text(input.shortName, 12, 'Nom court');
-    let appearance;
-    try { appearance = appearanceInput(input, community.appearance); }
-    catch (error) { fail(400, error.message); }
+    if (input.accent !== null && !/^#[0-9a-f]{6}$/i.test(input.accent || '')) fail(400, 'Choisis une couleur valide.');
+    const appearance = {...community.appearance, accent:input.accent || null};
+    delete appearance.palette;
+    delete appearance.defaultMode;
     await env.DB.prepare('UPDATE communities SET name=?, short_name=?, appearance=? WHERE id=?').bind(name, shortName, JSON.stringify(appearance), community.id).run();
     return json({ok:true});
   }

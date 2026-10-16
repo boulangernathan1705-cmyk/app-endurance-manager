@@ -1,7 +1,7 @@
 /* Historique secondaire des départs déjà lancés dans un événement. */
 .past-departures-fold {
   margin-top: 4px;
-  border-top: 1px solid var(--border);
+  border-top: 1px solid #354245;
 }
 
 .past-departures-fold > summary {
@@ -10,7 +10,7 @@
   gap: 9px;
   min-height: 46px;
   padding: 10px 6px 8px;
-  color: var(--muted);
+  color: #aab8b9;
   cursor: pointer;
   list-style: none;
   font-size: 15px;
@@ -22,7 +22,7 @@
 .past-departures-fold > summary::before {
   content: '›';
   display: inline-block;
-  color: var(--muted);
+  color: #869698;
   font-size: 19px;
   line-height: 1;
   transform-origin: center;
@@ -30,7 +30,7 @@
 }
 .past-departures-fold[open] > summary::before { transform: rotate(90deg); }
 .past-departures-fold > summary small {
-  color: var(--muted);
+  color: #839193;
   font-size: 11.5px;
   font-weight: 800;
 }
@@ -42,8 +42,8 @@
 }
 
 .departure-fold.is-past {
-  border-color: var(--border);
-  background: var(--panel);
+  border-color: #303b3f;
+  background: #101618;
 }
 .departure-fold.is-past > summary { opacity: .92; }
 

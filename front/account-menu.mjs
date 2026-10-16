@@ -1,4 +1,3 @@
-import {applyAppearance, installDisplayMode} from './appearance.mjs';
 import {installContextHelp} from './context-help.mjs';
 // Info bubbles on every page (data-tip).
 import './tooltip.mjs?v=2';
@@ -119,11 +118,10 @@ function renderConnected(user, communities = []) {
 function applyCommunity(community, communities = [], openSite = false) {
   if (!community) return;
   // The main address keeps the look of the site, without community name ("Mes communautés" is in the account menu).
-  applyAppearance(community.appearance);
   if (openSite) return;
   const look = community.appearance || {};
   document.documentElement.dataset.community = community.slug;
-
+  if (look.accent) { document.documentElement.style.setProperty('--community-accent', look.accent); document.documentElement.dataset.communityAccent = 'true'; }
   if (community.shortName && !document.title.startsWith(`${community.shortName} · `)) document.title = `${community.shortName} · ${document.title}`;
   if (look.logoUrl) {
     for (const image of document.querySelectorAll('.brand-mark')) image.src = look.logoUrl;
@@ -272,6 +270,5 @@ document.addEventListener('keydown', event => {
 });
 
 installContextHelp();
-installDisplayMode();
 void loadSession();
 activateLegacyHashAction();
