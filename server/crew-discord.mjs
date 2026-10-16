@@ -143,6 +143,11 @@ export async function syncCrewDiscord(env, timestamp = Date.now(), {community = 
   // (a run of the Worker may also make only 50 calls to the database).
   const ids = [...communities.keys()];
   if (!ids.length) return report;
+  // Older deployments marked failed deletions closed. Recover them even when the repair
+  // migration has not run: a closed row must never retain active channel ids.
+  await env.DB.prepare(`UPDATE crew_discord SET closed_at=NULL, lock_until=0, checked_at=0
+    WHERE closed_at IS NOT NULL AND (voice_id IS NOT NULL OR text_id IS NOT NULL OR category_id IS NOT NULL)
+      AND community_id IN (${ids.map(() => '?').join(',')})`).bind(...ids).run();
   const rows = (await env.DB.prepare(`${TRACKED_CREWS}
     WHERE d.closed_at IS NULL AND d.community_id IN (${ids.map(() => '?').join(',')}) AND d.lock_until<?
     ORDER BY c.id IS NOT NULL, d.checked_at LIMIT 40`)
@@ -222,12 +227,19 @@ async function remove(env, budget, channelId) {
 // Only inspect race categories managed by this site, and require the bot's own original recap.
 export async function cleanupOrphanCrewDiscord(env, timestamp = Date.now()) {
   if (!env?.DB || !env.DISCORD_BOT_TOKEN || !env.DISCORD_CLIENT_ID) return 0;
-  const setting = await env.DB.prepare(`SELECT s.* FROM community_crew_discord s JOIN communities c ON c.id=s.community_id
+  // A Worker deployment does not necessarily apply D1 migrations. Recovery also works
+  // on the previous schema, using the cron slot to rotate without the optional cursors.
+  const settings = (await env.DB.prepare(`SELECT s.* FROM community_crew_discord s JOIN communities c ON c.id=s.community_id
     WHERE c.discord_guild_id IS NOT NULL AND EXISTS(SELECT 1 FROM discord_recap_publications p
       WHERE p.community_id=s.community_id AND p.category_id IS NOT NULL AND p.event_id<>'')
-    ORDER BY s.orphan_checked_at,s.community_id LIMIT 1`).first();
-  if (!setting) return 0;
-  await env.DB.prepare('UPDATE community_crew_discord SET orphan_checked_at=? WHERE community_id=?').bind(timestamp,setting.community_id).run();
+    ORDER BY s.community_id`).all()).results || [];
+  if (!settings.length) return 0;
+  const slot = Math.floor(timestamp / (15 * 60_000));
+  const persistentCursor = Object.hasOwn(settings[0], 'orphan_checked_at');
+  const setting = persistentCursor
+    ? settings.sort((a,b) => a.orphan_checked_at - b.orphan_checked_at)[0]
+    : settings[slot % settings.length];
+  if (persistentCursor) await env.DB.prepare('UPDATE community_crew_discord SET orphan_checked_at=? WHERE community_id=?').bind(timestamp,setting.community_id).run();
   const community = await communityById(env,setting.community_id);
   const budget = {left:3};
   const publications = (await env.DB.prepare(`SELECT event_id,category_id FROM discord_recap_publications
@@ -241,7 +253,9 @@ export async function cleanupOrphanCrewDiscord(env, timestamp = Date.now()) {
     && races.has(channel.parent_id) && !known.has(channel.id) && /^\d{15,22}$/.test(channel.id)
     && Number((BigInt(channel.id) >> 22n) + 1420070400000n) < timestamp - 5 * 60_000)
     .sort((a,b) => BigInt(a.id) < BigInt(b.id) ? -1 : 1);
-  const channel = candidates.find(item => !setting.orphan_cursor || BigInt(item.id) > BigInt(setting.orphan_cursor)) || candidates[0];
+  const channel = persistentCursor
+    ? candidates.find(item => !setting.orphan_cursor || BigInt(item.id) > BigInt(setting.orphan_cursor)) || candidates[0]
+    : candidates[Math.floor(slot / settings.length) % candidates.length];
   if (!channel) return 0;
   try {
     const eventId = races.get(channel.parent_id);
@@ -260,7 +274,7 @@ export async function cleanupOrphanCrewDiscord(env, timestamp = Date.now()) {
     await remove(env,budget,channel.id);
     return 1;
   } finally {
-    await env.DB.prepare('UPDATE community_crew_discord SET orphan_cursor=? WHERE community_id=?')
+    if (persistentCursor) await env.DB.prepare('UPDATE community_crew_discord SET orphan_cursor=? WHERE community_id=?')
       .bind(channel.id,community.id).run();
   }
 }

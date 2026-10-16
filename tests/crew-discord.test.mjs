@@ -380,6 +380,16 @@ test('migration resumes abandoned cleanup without reopening successfully closed 
   assert.equal(DB.db.prepare("SELECT voice_id FROM crew_discord WHERE crew_id='orphan'").get().voice_id,null);
 });
 
+test('scheduled cleanup recovers rows closed by older code without requiring the repair migration', async () => {
+  const {DB,sync,discord}=harness();
+  const at=Date.now(), voice='700000000000000099';
+  DB.db.prepare(`INSERT INTO crew_discord(crew_id,community_id,guild_id,voice_id,created_at,closed_at)
+    VALUES('abandoned',?,?,?,?,?)`).run(DEV,GUILD,voice,at-10*24*HOUR,at-HOUR);
+  assert.equal((await sync(at)).closed,1);
+  assert.deepEqual(since(discord.calls,0),[`DELETE /channels/${voice}`]);
+  assert.equal(DB.db.prepare("SELECT voice_id FROM crew_discord WHERE crew_id='abandoned'").get().voice_id,null);
+});
+
 test('overlapping syncs do not create a second voice channel from an outdated snapshot', async () => {
   const {DB,env,req,login,discord}=harness();
   await login(ADMIN,'admin','Orga');
@@ -417,8 +427,9 @@ test('overlapping syncs do not create a second voice channel from an outdated sn
   assert.deepEqual(since(discord.calls,mark),[`DELETE /channels/${voice}`]);
 });
 
-test('automatic recovery deletes a proven orphan and protects live crews and unrelated Discord channels', async () => {
+for (const previousSchema of [false,true]) test(`automatic recovery protects live crews and unrelated channels (previous schema: ${previousSchema})`, async () => {
   const {DB,env,req,login,discord}=harness();
+  if(previousSchema) DB.db.exec('ALTER TABLE community_crew_discord DROP COLUMN orphan_checked_at; ALTER TABLE community_crew_discord DROP COLUMN orphan_cursor;');
   await login(ADMIN,'admin','Orga');
   await req('/api/community/modules','PATCH',{crewChannels:true},'admin');
   await req('/api/events','POST',race,'admin');
