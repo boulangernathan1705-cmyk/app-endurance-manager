@@ -1,11 +1,12 @@
 /* Shared neutral surfaces. Availability, category and simulator colours remain semantic. */
+:root { --pastel: #c4deda; }
 :root, html[data-theme="dark"], [data-preview-mode="dark"] {
   color-scheme: dark;
-  --bg: #111820;
-  --panel: #1b2530;
-  --panel2: #25323f;
-  --panel3: #344453;
-  --border: #536576;
+  --bg: color-mix(in srgb, var(--pastel) 5%, #161a1e);
+  --panel: color-mix(in srgb, var(--pastel) 8%, #202529);
+  --panel2: color-mix(in srgb, var(--pastel) 12%, #282e32);
+  --panel3: color-mix(in srgb, var(--pastel) 18%, #343c41);
+  --border: color-mix(in srgb, var(--pastel) 28%, #485257);
   --text: #f2f5f8;
   --muted: #b3c0cc;
   --on-accent: #101820;
@@ -17,11 +18,11 @@
 }
 html[data-theme="light"], [data-preview-mode="light"] {
   color-scheme: light;
-  --bg: #eef2f6;
-  --panel: #ffffff;
-  --panel2: #e4eaf1;
-  --panel3: #d8e1eb;
-  --border: #93a3b4;
+  --bg: color-mix(in srgb, var(--pastel) 18%, #f6f7f8);
+  --panel: color-mix(in srgb, var(--pastel) 6%, white);
+  --panel2: color-mix(in srgb, var(--pastel) 28%, white);
+  --panel3: color-mix(in srgb, var(--pastel) 48%, white);
+  --border: color-mix(in srgb, var(--pastel) 32%, #879397);
   --text: #172634;
   --muted: #4d6173;
   --on-accent: #ffffff;
@@ -37,7 +38,7 @@ html[data-theme] .primary-button,
 html[data-theme] .save-button,
 html[data-theme] .hub-login-button,
 html[data-theme] .game-hub-enter {
-  background: var(--community-accent); color: var(--on-accent); border-color: var(--community-accent);
+  background: var(--pastel); color: #27343a; border-color: color-mix(in srgb, var(--pastel) 70%, #65767b);
 }
 html[data-theme] .secondary-button { background: var(--panel2); color: var(--text); border-color: var(--border); }
 html[data-theme] :is(input,select,textarea) { color: var(--text); background-color: var(--panel); border-color: var(--border); accent-color: var(--community-accent); }
@@ -68,7 +69,7 @@ html[data-theme="light"] .circuit-visual img { filter: brightness(.3); }
 .admin-preview[data-preview-mode] { background: var(--bg); color: var(--text); }
 .admin-preview[data-preview-mode] .admin-preview-nav { background: var(--panel); color: var(--muted); }
 .admin-preview[data-preview-mode] .admin-preview-nav .is-active { color: var(--preview-accent); }
-.admin-preview[data-preview-mode] .admin-preview-button { color: var(--on-accent); }
+.admin-preview[data-preview-mode] .admin-preview-button { background: var(--pastel); color: #27343a; }
 .admin-preview[data-preview-mode] .admin-preview-race { background: var(--panel); }
 @media(max-width:700px) { .display-mode-button { padding: 6px 8px; font-size: 11px; } }
 /* Filled controls retain their own contrast, including the simulator selector. */
@@ -77,3 +78,54 @@ html[data-theme] .site-nav-shell .nav-game-switcher-lmu:hover,
 html[data-theme] .site-nav-shell .nav-game-switcher-iracing:hover { color: var(--text) !important; background: var(--panel3) !important; }
 html[data-theme] .site-nav-shell .nav-section-button.active,
 html[data-theme] .site-nav-shell .nav-section-button[aria-current="page"] { border-color: var(--community-accent) !important; color: var(--community-accent) !important; background: color-mix(in srgb, var(--community-accent) 12%, var(--panel)) !important; }
+
+/* One community palette across race cards. Only availability retains status colours.
+   Paint only: preserve the existing course geometry, badges, dates and information. */
+html[data-theme] :is(.event-card, .race-header) {
+  --sim: var(--community-accent);
+  --event-accent: var(--pastel) !important;
+}
+html[data-theme] #app :is(.event-card.race-card, .race-header),
+html[data-theme] #app .race-card.is-gridfest,
+html[data-theme] #app .race-header.is-gridfest {
+  background: var(--panel) !important;
+  color: var(--text);
+  border-color: var(--border) !important;
+  box-shadow: 0 3px 10px rgba(0,0,0,.05);
+}
+html[data-theme] #app :is(.event-card, .race-header)::before {
+  background: var(--pastel) !important;
+  box-shadow: none;
+}
+html[data-theme] #app :is(.event-card, .race-header)::after { background: none; }
+html[data-theme] #app .race-card.is-gridfest .event-name {
+  background: none; -webkit-text-fill-color: var(--text); color: var(--text) !important;
+}
+html[data-theme] .event-sim-badge,
+html[data-theme] .event-type-badge {
+  background: var(--panel2); color: var(--text); border-color: var(--border);
+}
+html[data-theme] .event-access-badge:is(.is-open,.is-safe) {
+  background: var(--panel2); color: var(--text); border-color: var(--border);
+}
+html[data-theme] #app :is(.race-date, .solo-card-start, .solo-card-free-cars, .solo-card-chip),
+html[data-theme] #app .race-card .race-date {
+  background: var(--panel2); border-color: var(--border); color: var(--text);
+}
+html[data-theme] .event-period-heading::after { background: var(--border); }
+html[data-theme] #app .solo-fill-bar { background: var(--panel3); }
+html[data-theme] #app .solo-fill-bar > span { background: var(--community-accent); }
+html[data-theme] .site-nav-shell #navigation .nav-game-switcher-button[aria-current="page"],
+html[data-theme][data-community-accent] .primary-button {
+  background: var(--pastel) !important; color: #27343a !important; border-color: var(--pastel) !important;
+}
+html[data-theme] .site-nav-shell #navigation .nav-game-switcher-button[aria-current="page"] { box-shadow: none !important; }
+html[data-theme] .event-filter-button[aria-pressed="true"] { background: var(--panel3); color: var(--text); border-color: var(--border); }
+.palette-choice input, .mode-choices input { padding: 0; box-shadow: none; }
+html[data-theme] :is(.primary-button, .save-button, .secondary-button) { box-shadow: none; }
+html[data-theme] .event-category-badge { color: var(--text); background: var(--panel2); border-color: var(--border); }
+html[data-theme] .gridfest-avatar.is-initial { background: var(--pastel); color: #27343a; }
+html[data-theme] .top-stripes > div { background: var(--pastel) !important; }
+html[data-theme] #app :is(.event-card, .race-header) :is(.event-access-badge, .event-type-badge) { color: var(--text); background: var(--panel2); border-color: var(--border); }
+html[data-theme] .grindfest-column { background: var(--panel); }
+html[data-theme] #app :is(.solo-info-chip, .solo-info-category) { background: var(--panel2); border-color: var(--border); color: var(--text); }

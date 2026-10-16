@@ -293,7 +293,7 @@ function lookMarkup(settings) {
         <section class="admin-card"><form class="settings-appearance" data-appearance>
           <label>Nom de la communauté<input name="name" maxlength="80" required value="${esc(look.name)}"></label>
           <label><span>Nom court <small>(onglet du navigateur)</small></span><input name="shortName" maxlength="12" required value="${esc(look.shortName)}"></label>
-          <fieldset class="appearance-options"><legend>Couleur de la communauté</legend><div class="palette-choices">${PALETTES.map(palette => `<label class="palette-choice"><input type="radio" name="palette" value="${palette.id}" ${palette.id === selected.id ? 'checked' : ''}><span class="palette-dot" style="--swatch:${palette.light}"></span><span>${palette.name}</span></label>`).join('')}</div></fieldset>
+          <fieldset class="appearance-options"><legend>Thème de la communauté</legend><div class="palette-choices">${PALETTES.map(palette => `<label class="palette-choice"><input type="radio" name="palette" value="${palette.id}" ${palette.id === selected.id ? 'checked' : ''}><span class="palette-dot" style="--swatch:${palette.pastel}"></span><span>${palette.name}</span></label>`).join('')}</div></fieldset>
           <fieldset class="appearance-options"><legend>Affichage par défaut</legend><div class="mode-choices"><label><input type="radio" name="defaultMode" value="light" ${mode === 'light' ? 'checked' : ''}>☀ Clair</label><label><input type="radio" name="defaultMode" value="dark" ${mode === 'dark' ? 'checked' : ''}>☾ Sombre</label></div><p class="members-help">Chaque pilote peut changer l’affichage avec le bouton Clair / Sombre.</p></fieldset>
           <p class="members-help">Le logo est l’icône du serveur Discord${look.discordServer ? ` « ${esc(look.discordServer)} »` : ''} : change-la sur Discord.${look.logoUrl ? '' : ' Le serveur n’a pas d’icône : le logo du site est utilisé.'}</p>
           <div class="settings-actions"><button class="primary-button" type="submit">Enregistrer</button><span class="settings-status" aria-live="polite"></span></div></form></section>
@@ -304,7 +304,7 @@ function lookMarkup(settings) {
           <p class="members-help">Format conseillé : 2048 × 512 (4 fois plus large que haute). Tu la cadres et la zoomes avant de l’enregistrer ; elle est allégée automatiquement.</p></div></section>
       </div>
       <div class="admin-preview-wrap"><p class="admin-preview-label">Aperçu : ce que verront tes membres</p>
-        <div class="admin-preview" data-look-preview data-preview-mode="${mode}" style="--preview-accent:${esc(accent)}">
+        <div class="admin-preview" data-look-preview data-preview-mode="${mode}" style="--preview-accent:${esc(accent)};--pastel:${selected.pastel}">
           <div class="admin-preview-banner"><img src="${esc(look.bannerUrl || '/images/endurance-manager-banner.webp')}" alt=""></div>
           <div class="admin-preview-nav">${look.logoUrl ? `<img class="admin-preview-badge" src="${esc(look.logoUrl)}" alt="">` : `<b class="admin-preview-badge" data-preview-short>${esc(String(look.shortName || look.name).slice(0, 4))}</b>`}<span>EVENT SOLO</span><span class="is-active">ENDURANCE</span><span>Mes inscriptions</span></div>
           <div class="admin-preview-body">
@@ -715,7 +715,9 @@ function updatePreview(form) {
   if (short) short.textContent = (form.elements.shortName.value || form.elements.name.value || 'MC').slice(0, 4);
   const mode = form.elements.defaultMode.value;
   preview.dataset.previewMode = mode;
-  preview.style.setProperty('--preview-accent', paletteFor({palette:form.elements.palette.value})[mode]);
+  const palette = paletteFor({palette:form.elements.palette.value});
+  preview.style.setProperty('--preview-accent', palette[mode]);
+  preview.style.setProperty('--pastel', palette.pastel);
 }
 
 app.addEventListener('change', async event => {

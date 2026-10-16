@@ -13,6 +13,7 @@ const FR_NORMALIZE=new Map(Object.entries({
 }));
 
 const EN=new Map(Object.entries({
+  'Thème de la communauté':'Community theme',
   'Couleur de la communauté':'Community colour','Affichage par défaut':'Default display',
   '☾ Sombre':'☾ Dark','☀ Clair':'☀ Light','Passer en mode sombre':'Switch to dark mode','Passer en mode clair':'Switch to light mode',
   'Chaque pilote peut changer l’affichage avec le bouton Clair / Sombre.':'Each driver can switch the display using the Light / Dark button.',
