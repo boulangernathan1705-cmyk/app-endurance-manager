@@ -201,9 +201,6 @@ async function loadSession() {
       const game = location.pathname.startsWith('/iracing') ? '/iracing/' : '/lmu/';
       for (const link of document.querySelectorAll('a.brand-button')) link.href = `${game}#solo`;
     }
-    // The LMU modules' own tabs (entrainement.html, stands.html): Mémo when on, Entraînement for a pilot entered in an upcoming race.
-    const shown = {training:session.trainingRace === true, memo:session.memo === true};
-    for (const link of document.querySelectorAll('[data-module-link]')) link.hidden = !shown[link.dataset.moduleLink];
     unifyNav(session);
     siteCommunityName = session.openSite ? '' : session.community?.name || '';
     if (session.user) {

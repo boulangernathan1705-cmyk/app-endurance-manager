@@ -9,5 +9,3 @@ public/
 *.sqlite
 .DS_Store
 npm-debug.log*
-connectors/simhub-plugin/bin/
-connectors/simhub-plugin/obj/

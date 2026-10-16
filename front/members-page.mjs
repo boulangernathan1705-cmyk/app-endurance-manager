@@ -61,8 +61,6 @@ const ICONS = {
   crewChannels:'<path d="M4 5h16v10H9l-5 4V5Z"/><path d="M14 19h1l4 3v-3"/>',
   raceReminders:'<path d="M6 16V11a6 6 0 1 1 12 0v5l2 2H4l2-2Z"/><path d="M10 21h4"/>',
   iracingImport:'<path d="M4 21V4M4 4h13l-2 4 2 4H4"/>',
-  training:'<path d="M3 12h4l3-8 4 16 3-8h4"/>',
-  memo:'<path d="M5 4h11l3 3v13H5Z"/><path d="M9 10h6M9 14h6"/>',
   grindfest:'<path d="M4 21V4M4 4h13l-2 4 2 4H4"/>',
   soloRaces:'<circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/>',
   categoryEntry:'<path d="M4 6h16M4 12h10M4 18h7"/><path d="m15 17 2 2 4-4"/>'
@@ -74,7 +72,7 @@ const copyButton = target => `<button type="button" class="secondary-button setu
 // What is on, for the overview and the modules.
 function moduleStates(settings, setup) {
   return {recap:Boolean(setup.botRecap?.enabled), crewChannels:settings.modules.crewChannels === true, raceReminders:settings.modules.raceReminders === true,
-    iracingImport:settings.modules.iracingImport === true, soloRaces:settings.modules.soloRaces === true, training:settings.modules.training === true, memo:settings.modules.memo === true, grindfest:settings.modules.grindfest === true, categoryEntry:settings.modules.categoryEntry === true};
+    iracingImport:settings.modules.iracingImport === true, soloRaces:settings.modules.soloRaces === true, grindfest:settings.modules.grindfest === true, categoryEntry:settings.modules.categoryEntry === true};
 }
 
 // « Vue d'ensemble ».
@@ -274,10 +272,7 @@ function modulesMarkup(settings, setup) {
     ...(settings.modules.eventTdzAvailable ? [] : [{key:'soloRaces', name:'EVENT SOLO', text:'Un calendrier d’événements toutes simus&nbsp;: inscription en un clic, places limitées si besoin et liste d’attente.',
       state:states.soloRaces ? ['ok', 'Actif'] : ['off', 'Éteint'], control:toggle('soloRaces', 'EVENT SOLO'), settings:''}]),
     ...(settings.modules.grindfestAvailable ? [{key:'grindfest', name:'Gridfest', text:'Inscription par streamer, nom en jeu et mot de passe par MP Discord.', state:states.grindfest ? ['ok','Actif'] : ['off','Éteint'], control:toggle('grindfest','Gridfest'), settings:''}] : []),
-    {key:'memo', name:'Mémo des circuits', text:'LMU. Pour chaque circuit et voiture&nbsp;: chronos par niveau, temps au stand et BoP.',
-      state:states.memo ? ['ok', 'Actif'] : ['off', 'Éteint'], control:toggle('memo', 'Mémo des circuits'), settings:''},
-    {key:'training', name:'Entraînement', text:'LMU. La prépa de chaque course, partagée avec l’équipage, et les chiffres de chaque pilote.',
-      state:states.training ? ['ok', 'Actif'] : ['off', 'Éteint'], control:toggle('training', 'Entraînement'), settings:''}];
+  ];
   const tile = item => `<article class="admin-module ${states[item.key] ? 'is-on' : ''}" data-module-tile="${item.key}">
     <div class="admin-module-top"><span class="admin-module-icon">${icon(item.key)}</span><strong>${item.name}</strong>${item.control}</div>
     <p>${item.text}</p>
