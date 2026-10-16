@@ -2384,7 +2384,7 @@ html[data-game] #app .ux-unassigned-grid .pilot-main > .pilot-category-logo.is-s
   .planning-start[open] .planning-quick-button.is-labelled { gap: 6px; padding: 0 10px 0 8px !important; }
 }
 
-/* Error pages (access, training, diagnostics): the button stays inside its card. */
+/* Error pages (access, diagnostics): the button stays inside its card. */
 .members-error > a { display: inline-flex; align-items: center; justify-content: center; margin: 4px 0 6px; }
 /* Race page: the race type under the date fits its narrow column. */
 html[data-game] #app .race-header .race-side .event-type-badge { padding: 4px 3px !important; font-size: 10px !important; letter-spacing: 0 !important; line-height: 1.2; text-align: center; border-radius: 10px; }

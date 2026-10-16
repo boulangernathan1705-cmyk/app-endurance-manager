@@ -48,7 +48,7 @@ test('simulator spaces remember the choice and the logo leads to the chosen simu
   assert.equal(prod.assets.not_found_handling, '404-page');
   for (const route of ['/', '/api/*', '/telemetry/*', '/manifest.webmanifest', '/app-icon.png', '/lmu*', '/iracing*'])
     assert.ok(routes.includes(route), route);
-  for (const page of ['members', 'help', 'about', 'legal', 'privacy', 'changelog', 'circuit-credits', 'demande-communaute', 'diagnostics', 'entrainement', 'stands'])
+  for (const page of ['members', 'help', 'about', 'legal', 'privacy', 'changelog', 'circuit-credits', 'demande-communaute', 'diagnostics'])
     assert.ok(routes.includes(`/${page}*`), page);
   for (const route of routes.filter(route => route.startsWith('!'))) assert.doesNotMatch(route, /\.html|^!\/(?:\*|api|telemetry|downloads|lmu|iracing)/, route);
   assert.match(readFileSync(new URL('../404.html', import.meta.url), 'utf8'), /Page introuvable/);

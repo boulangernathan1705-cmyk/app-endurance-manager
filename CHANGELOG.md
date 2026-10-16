@@ -1,5 +1,12 @@
 # Nouveautés d'Endurance Manager
 
+## v1.51 — 16 octobre 2026
+
+### Changements
+
+- Retrait des modules **Entraînement** et **Mémo des circuits** pour préparer leur refonte.
+
+
 Les nouveautés utiles aux pilotes, avec les corrections regroupées par sujet.
 
 ## v1.50 — 15 octobre 2026

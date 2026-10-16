@@ -54,8 +54,6 @@ const navigationSection = () => [L('Se repérer', 'Finding your way around'), `
     ${events() ? `<li>${L(`<strong>${eventsLabel()}</strong> : le calendrier des événements, toutes simus ;`, `<strong>${eventsLabel()}</strong>: the events calendar, every sim;`)}</li>` : ''}
     <li>${L('<strong>ENDURANCE</strong> : les endurances, avec le choix <strong>LMU</strong> / <strong>iRacing</strong> ;', '<strong>ENDURANCE</strong>: endurance races, with the <strong>LMU</strong> / <strong>iRacing</strong> switch;')}</li>
     <li>${L('<strong>Mes inscriptions</strong> : tout ce où tu es inscrit ;', '<strong>My entries</strong>: everything you entered;')}</li>
-    ${session?.memo ? `<li>${L('<strong>Mémo</strong> : la fiche de chaque circuit LMU (chronos par niveau, stands, BoP) ;', '<strong>Memo</strong>: each LMU circuit’s sheet (lap times by level, pit stops, BoP);')}</li>` : ''}
-    ${session?.training ? `<li>${L('<strong>Entraînement</strong> : la prépa de ta prochaine course LMU, avec ton équipage ;', '<strong>Training</strong>: the prep of your next LMU race, with your crew;')}</li>` : ''}
     <li>${L('la <strong>cloche</strong> : ce qui te concerne (inscriptions, équipage, rappels) ;', 'the <strong>bell</strong>: what concerns you (entries, crew, reminders);')}</li>
     <li>${L('ton <strong>compte</strong> : Aide, tes communautés et, pour les admins, Administration. Le drapeau change la langue.', 'your <strong>account</strong>: Help, your communities and, for admins, Administration. The flag switches the language.')}</li>
   </ul>
@@ -151,7 +149,6 @@ const modulesSection = () => [L('Les modules en bref', 'Modules in short'), `
     <li>${L('<strong>Rappels de course</strong> : 24 h avant dans la cloche, 24 h et 1 h avant dans le salon de l’équipage ;', '<strong>Race reminders</strong>: 24 h before in the bell, 24 h and 1 h before in the crew channel;')}</li>
     <li>${L('<strong>Endurances iRacing officielles</strong> : les séries en équipe et les événements spéciaux ajoutés tout seuls, horaires compris ;', '<strong>Official iRacing endurance races</strong>: team series and special events added by themselves, times included;')}</li>
     <li>${L(`<strong>${eventsLabel()}</strong> : le calendrier des événements, toutes simus ;`, `<strong>${eventsLabel()}</strong>: the events calendar, every sim;`)}</li>
-    <li>${L('<strong>Mémo des circuits</strong> et <strong>Entraînement</strong> (LMU) : la fiche de chaque circuit pour tous, et la prépa de chaque course avec ton équipage.', '<strong>Circuit memo</strong> and <strong>Training</strong> (LMU): each circuit’s sheet for everyone, and each race’s prep with your crew.')}</li>
   </ul>`];
 
 const diagnosticsSection = () => [L('Diagnostics', 'Diagnostics'), `
