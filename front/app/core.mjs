@@ -222,7 +222,6 @@ export async function load() {
   // EVENT TDZ (types, OPEN / SAFE); elsewhere EVENT SOLO, open to the « Endurances » permission.
   state.eventTdz=session.eventTdz===true;
   state.grindfest=session.grindfest===true;
-  state.memo=session.memo===true;
   state.safeGuideUrl=typeof session.safeGuideUrl==='string'?session.safeGuideUrl:'';
   if (!state.soloRaces) state.listFormat='endurance';
   state.events=markUndefinedStarts(mergeEvents(upcoming,archived));

@@ -167,7 +167,7 @@ function unifyNav(session) {
   const nav = document.getElementById('navigation');
   if (!nav || document.documentElement.dataset.game || location.pathname === '/') return;
   if (session.access !== 'member' || session.openSite) return;
-  const sim = location.pathname.startsWith('/memo') ? 'lmu' : /(?:^|;\s*)em_sim=(lmu|iracing)(?:;|$)/.exec(document.cookie)?.[1] || 'lmu';
+  const sim = document.querySelector('[data-module-link]') ? 'lmu' : /(?:^|;\s*)em_sim=(lmu|iracing)(?:;|$)/.exec(document.cookie)?.[1] || 'lmu';
   const link = (href, label, extra = '') => `<a class="nav-section-button${extra}" href="${href}">${esc(label)}</a>`;
   const events = session.soloRaces === true;
   const endurance = link(`/${sim}/`, 'ENDURANCE');
@@ -178,7 +178,7 @@ function unifyNav(session) {
   sections.className = 'nav-sections';
   sections.setAttribute('role', 'group');
   sections.setAttribute('aria-label', 'Sections');
-  sections.innerHTML = `${events ? link(`/${sim}/#solo`, session.soloLabel || 'EVENT TDZ', ' nav-events-button') : ''}${endurance}${link(`/${sim}/#inscriptions`, 'Mes inscriptions')}${sim==='lmu'&&session.memo&&!location.pathname.startsWith('/memo')?link('/memo.html','Mémo'):''}${own}`;
+  sections.innerHTML = `${events ? link(`/${sim}/#solo`, session.soloLabel || 'EVENT TDZ', ' nav-events-button') : ''}${endurance}${link(`/${sim}/#inscriptions`, 'Mes inscriptions')}${own}`;
   // Simulator not chosen yet: « Endurance » asks for it first.
   if (events) sections.children[1].addEventListener('click', event => { if (!simChosen()) { event.preventDefault(); openSimChooser(); } });
   nav.append(sections);
