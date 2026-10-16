@@ -1,4 +1,5 @@
 import worker from './worker.mjs';
+import {refreshMemoReference, purgeMemo} from './memo.mjs';
 import {homeRedirect, homePage} from './home.mjs';
 import {isWeeklyDiscordMutation, mutationTarget} from './discord-weekly-format.mjs';
 import {syncWeeklyDiscord, syncDueRecaps} from './discord-weekly.mjs';
@@ -117,6 +118,8 @@ export default {
     const weeklyMutation = isWeeklyDiscordMutation(request);
     const target = weeklyMutation && env?.DB ? await discordMutationTarget(env, request) : null;
     const response = await worker.fetch(request, env, ctx);
+    // First import need not wait for the hourly slot; never delays the page or replaces a valid cache on error.
+    if (pathname==='/api/memo' && request.method==='GET' && response.ok && ctx?.waitUntil) ctx.waitUntil(refreshMemoReference(env).catch(error=>console.error('Memo reference refresh failed',error.message)));
     if (weeklyMutation && response.ok) queueWeeklySync(env, ctx, request, target?.eventId, target?.communityId);
     return development ? markDevelopmentResponse(response, env) : response;
   },
@@ -132,6 +135,7 @@ export default {
     run('Scheduled cleanup failed', () => cleanup(env));
     // Notifications of the bell older than 30 days.
     run('Notifications cleanup failed', () => purgeNotifications(env));
+    run('Memo cleanup failed', () => purgeMemo(env));
     // Every quarter of an hour: the crews on Discord (voice channels, reminders), a few requests at a
     // time (fewer next to the iRacing import, which makes many).
     run('Crew Discord sync failed', () => syncCrewDiscord(env, at.getTime(), {requests:slot === 1 ? 4 : 8}));
@@ -146,6 +150,7 @@ export default {
     if (slot === 3) run('Special times or showcase failed', async () => {
       if (env.IRACING_IMPORT !== 'off') await completeSpecialTimes(env, {withinDays:10});
       await refreshShowcaseIfDue(env, at);
+      await refreshMemoReference(env);
     });
   }
 };
