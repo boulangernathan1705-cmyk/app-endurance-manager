@@ -198,7 +198,7 @@ test('community look: name, short name and accent by its admins, icon from its D
   assert.equal((await call('/api/community/appearance','PATCH',{name:'Ma Commu',shortName:'MC',palette:'blue',defaultMode:'invalid'})).status,400);
   const session=await (await call('/api/session')).json();
   assert.equal(session.community.name,'Ma Commu');assert.equal(session.community.shortName,'MC');
-  assert.equal(session.community.appearance.accent,'#ecd2bc');assert.equal(session.community.appearance.palette,'mclaren');assert.equal(session.community.appearance.defaultMode,'light');assert.ok(session.community.appearance.logoUrl);
+  assert.equal(session.community.appearance.accent,'#ff9e33');assert.equal(session.community.appearance.palette,'mclaren');assert.equal(session.community.appearance.defaultMode,'light');assert.ok(session.community.appearance.logoUrl);
 });
 
 test('a new icon on the Discord server becomes the community logo when a member is checked; the rest of the appearance stays', async t => {

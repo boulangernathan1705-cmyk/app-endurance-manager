@@ -23,7 +23,10 @@ test('curated racing themes, independent live preview, save and personal mode pe
   await page.locator('.mode-choices label').filter({hasText:'Clair'}).click();
   await expect(page.locator('[data-look-preview]')).toHaveAttribute('data-preview-mode','light');
   await expect(page.locator('html')).toHaveAttribute('data-theme','dark');
-  await expect(page.locator('[data-look-preview]')).toHaveCSS('--preview-accent','#465372');
+  await expect(page.locator('[data-look-preview]')).toHaveCSS('--preview-accent','#203d88');
+  await expect(page.locator('[data-look-preview]')).toHaveAttribute('data-palette','redbull');
+  await expect(page.locator('.admin-preview-button').first()).toHaveCSS('background-color','rgb(22, 43, 96)');
+  await expect(page.locator('.admin-preview-button').first()).toHaveCSS('color','rgb(255, 255, 255)');
   await page.locator('form[data-appearance]').getByRole('button',{name:'Enregistrer',exact:true}).click();
   await expect(page.locator('form[data-appearance] .settings-status')).toContainText('enregistrée');
   expect(calls).toEqual([{name:'Ma communauté',shortName:'MC',palette:'redbull',defaultMode:'light'}]);
@@ -40,7 +43,7 @@ test('curated racing themes, independent live preview, save and personal mode pe
 });
 
 // Use the actual event renderer: a light page must never retain a dark Gridfest background.
-for (const mode of ['light','dark']) test(`pastel ${mode}: rally and Gridfest keep the same readable race surfaces`,async({page})=>{
+for (const mode of ['light','dark']) test(`racing ${mode}: rally and Gridfest keep the same readable race surfaces`,async({page})=>{
   const base={format:'solo',sim:'lmu',eventType:'private',access:'open',capacity:30,categories:['Hypercar'],circuit:'lemans',durationMinutes:60,durationHours:1,version:1,
     rounds:[{circuit:'lemans',durationMinutes:60,categories:['Hypercar']}],departures:[{id:'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',date:'2090-10-15',time:'21:00',startsAt:Date.now()+86400000,availability:[],crews:[]}]};
   const events=[{...base,id:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',name:'Gridfest',details:{type:'Gridfest',streamers:[{id:'alpha',name:'Alpha',capacity:30}]}},

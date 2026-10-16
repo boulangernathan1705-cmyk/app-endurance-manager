@@ -9,7 +9,9 @@ function render() {
   const palette = paletteFor(look);
   html.style.setProperty('--community-accent', palette[mode]);
   html.style.setProperty('--accent', palette[mode]);
-  html.style.setProperty('--pastel', palette.pastel);
+  html.style.setProperty('--theme-fill', palette.fill);
+  html.style.setProperty('--theme-ink', palette.ink);
+  html.dataset.palette = palette.id;
   html.dataset.communityAccent = 'true';
   document.querySelector('meta[name="theme-color"]')?.setAttribute('content', mode === 'light' ? '#eef2f6' : '#111820');
   for (const button of document.querySelectorAll('[data-display-mode]')) {

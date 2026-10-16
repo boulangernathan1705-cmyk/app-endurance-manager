@@ -1,12 +1,12 @@
 /* Shared neutral surfaces. Availability, category and simulator colours remain semantic. */
-:root { --pastel: #c4deda; }
+:root { --theme-fill: #c4d8c8; --theme-ink: #27343a; }
 :root, html[data-theme="dark"], [data-preview-mode="dark"] {
   color-scheme: dark;
-  --bg: color-mix(in srgb, var(--pastel) 5%, #161a1e);
-  --panel: color-mix(in srgb, var(--pastel) 8%, #202529);
-  --panel2: color-mix(in srgb, var(--pastel) 12%, #282e32);
-  --panel3: color-mix(in srgb, var(--pastel) 18%, #343c41);
-  --border: color-mix(in srgb, var(--pastel) 28%, #485257);
+  --bg: #111820;
+  --panel: #1b2530;
+  --panel2: #25323f;
+  --panel3: #344453;
+  --border: #536576;
   --text: #f2f5f8;
   --muted: #b3c0cc;
   --on-accent: #101820;
@@ -18,11 +18,11 @@
 }
 html[data-theme="light"], [data-preview-mode="light"] {
   color-scheme: light;
-  --bg: color-mix(in srgb, var(--pastel) 18%, #f6f7f8);
-  --panel: color-mix(in srgb, var(--pastel) 6%, white);
-  --panel2: color-mix(in srgb, var(--pastel) 28%, white);
-  --panel3: color-mix(in srgb, var(--pastel) 48%, white);
-  --border: color-mix(in srgb, var(--pastel) 32%, #879397);
+  --bg: #f2f3f5;
+  --panel: #ffffff;
+  --panel2: #e7ebef;
+  --panel3: #dce2e8;
+  --border: #93a3b4;
   --text: #172634;
   --muted: #4d6173;
   --on-accent: #ffffff;
@@ -38,7 +38,7 @@ html[data-theme] .primary-button,
 html[data-theme] .save-button,
 html[data-theme] .hub-login-button,
 html[data-theme] .game-hub-enter {
-  background: var(--pastel); color: #27343a; border-color: color-mix(in srgb, var(--pastel) 70%, #65767b);
+  background: var(--theme-fill); color: var(--theme-ink); border-color: var(--community-accent);
 }
 html[data-theme] .secondary-button { background: var(--panel2); color: var(--text); border-color: var(--border); }
 html[data-theme] :is(input,select,textarea) { color: var(--text); background-color: var(--panel); border-color: var(--border); accent-color: var(--community-accent); }
@@ -69,7 +69,7 @@ html[data-theme="light"] .circuit-visual img { filter: brightness(.3); }
 .admin-preview[data-preview-mode] { background: var(--bg); color: var(--text); }
 .admin-preview[data-preview-mode] .admin-preview-nav { background: var(--panel); color: var(--muted); }
 .admin-preview[data-preview-mode] .admin-preview-nav .is-active { color: var(--preview-accent); }
-.admin-preview[data-preview-mode] .admin-preview-button { background: var(--pastel); color: #27343a; }
+.admin-preview[data-preview-mode] .admin-preview-button { background: var(--theme-fill); color: var(--theme-ink); }
 .admin-preview[data-preview-mode] .admin-preview-race { background: var(--panel); }
 @media(max-width:700px) { .display-mode-button { padding: 6px 8px; font-size: 11px; } }
 /* Filled controls retain their own contrast, including the simulator selector. */
@@ -83,7 +83,7 @@ html[data-theme] .site-nav-shell .nav-section-button[aria-current="page"] { bord
    Paint only: preserve the existing course geometry, badges, dates and information. */
 html[data-theme] :is(.event-card, .race-header) {
   --sim: var(--community-accent);
-  --event-accent: var(--pastel) !important;
+  --event-accent: var(--theme-fill) !important;
 }
 html[data-theme] #app :is(.event-card.race-card, .race-header),
 html[data-theme] #app .race-card.is-gridfest,
@@ -94,7 +94,7 @@ html[data-theme] #app .race-header.is-gridfest {
   box-shadow: 0 3px 10px rgba(0,0,0,.05);
 }
 html[data-theme] #app :is(.event-card, .race-header)::before {
-  background: var(--pastel) !important;
+  background: var(--theme-fill) !important;
   box-shadow: none;
 }
 html[data-theme] #app :is(.event-card, .race-header)::after { background: none; }
@@ -117,15 +117,23 @@ html[data-theme] #app .solo-fill-bar { background: var(--panel3); }
 html[data-theme] #app .solo-fill-bar > span { background: var(--community-accent); }
 html[data-theme] .site-nav-shell #navigation .nav-game-switcher-button[aria-current="page"],
 html[data-theme][data-community-accent] .primary-button {
-  background: var(--pastel) !important; color: #27343a !important; border-color: var(--pastel) !important;
+  background: var(--theme-fill) !important; color: var(--theme-ink) !important; border-color: var(--theme-fill) !important;
 }
 html[data-theme] .site-nav-shell #navigation .nav-game-switcher-button[aria-current="page"] { box-shadow: none !important; }
 html[data-theme] .event-filter-button[aria-pressed="true"] { background: var(--panel3); color: var(--text); border-color: var(--border); }
 .palette-choice input, .mode-choices input { padding: 0; box-shadow: none; }
 html[data-theme] :is(.primary-button, .save-button, .secondary-button) { box-shadow: none; }
 html[data-theme] .event-category-badge { color: var(--text); background: var(--panel2); border-color: var(--border); }
-html[data-theme] .gridfest-avatar.is-initial { background: var(--pastel); color: #27343a; }
-html[data-theme] .top-stripes > div { background: var(--pastel) !important; }
+html[data-theme] .gridfest-avatar.is-initial { background: var(--theme-fill); color: var(--theme-ink); }
+html[data-theme] .top-stripes > div { background: var(--theme-fill) !important; }
 html[data-theme] #app :is(.event-card, .race-header) :is(.event-access-badge, .event-type-badge) { color: var(--text); background: var(--panel2); border-color: var(--border); }
 html[data-theme] .grindfest-column { background: var(--panel); }
 html[data-theme] #app :is(.solo-info-chip, .solo-info-category) { background: var(--panel2); border-color: var(--border); color: var(--text); }
+
+/* Only the explicit green pastel theme tints the surfaces; racing themes use neutral panels. */
+html[data-palette="endurance"][data-theme="light"], [data-palette="endurance"][data-preview-mode="light"] {
+  --bg: #f0f5f1; --panel: #fcfefd; --panel2: #e7efe9; --panel3: #d8e6db; --border: #8fa596;
+}
+html[data-palette="endurance"][data-theme="dark"], [data-palette="endurance"][data-preview-mode="dark"] {
+  --bg: #161c19; --panel: #232c27; --panel2: #303b34; --panel3: #3c4a41; --border: #5e7265;
+}

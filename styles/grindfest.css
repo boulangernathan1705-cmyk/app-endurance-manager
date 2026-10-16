@@ -34,7 +34,7 @@ html[data-game] #app .race-header[class*="is-solo-"] .event-type-panel:is([data-
 /* Gridfest follows the community palette; its official artwork identifies the event. */
 :root {--gf-violet:var(--community-accent);--gf-cyan:var(--community-accent)}
 .gridfest-avatar {flex:none;display:grid;place-items:center;width:56px;height:56px;border-radius:14px;object-fit:cover;background:var(--panel);box-shadow:0 0 0 2px rgba(255,255,255,.08)}
-.gridfest-avatar.is-initial {background:var(--pastel);color:#27343a;font-weight:900;font-size:26px}
+.gridfest-avatar.is-initial {background:var(--theme-fill);color:var(--theme-ink);font-weight:900;font-size:26px}
 .gridfest-streamer-copy {display:flex;flex-direction:column;align-items:flex-start;gap:4px;min-width:0}
 .gridfest-streamer-copy strong {font-size:1.05rem;overflow-wrap:anywhere}
 .gridfest-streamer-copy small {color:var(--muted,#b4bdca);font-size:.82rem}
@@ -52,7 +52,7 @@ html[data-game] #app .race-header[class*="is-solo-"] .event-type-panel:is([data-
 
 /* The event page and list use the same surfaces in both display modes. */
 html[data-game] #app .race-header.is-gridfest {position:relative;border:1px solid var(--border);background:var(--panel)}
-html[data-game] #app .race-header.is-gridfest .event-title {border-left-style:solid;border-image:none;border-color:var(--pastel)}
+html[data-game] #app .race-header.is-gridfest .event-title {border-left-style:solid;border-image:none;border-color:var(--theme-fill)}
 html[data-game] #app .race-header.is-gridfest::after {display:none}
 html[data-game] #app .race-header.is-gridfest > * {position:relative;z-index:1}
 html[data-game] #app .race-header.is-gridfest .event-type-panel {border:0;background:transparent}

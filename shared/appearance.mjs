@@ -1,16 +1,16 @@
 // Curated pairs: readable accents on each surface, never used for availability statuses.
 export const PALETTES = [
-  {id:'endurance', name:'Endurance Manager', pastel:'#c4deda', dark:'#c4deda', light:'#34635e'},
-  {id:'ferrari', name:'Ferrari', pastel:'#e5c5c3', dark:'#e5c5c3', light:'#7a4341'},
-  {id:'redbull', name:'Red Bull', pastel:'#cad0e1', dark:'#cad0e1', light:'#465372'},
-  {id:'mclaren', name:'McLaren', pastel:'#ecd2bc', dark:'#ecd2bc', light:'#79533a'},
-  {id:'porsche', name:'Porsche', pastel:'#e4d9be', dark:'#e4d9be', light:'#6c5f3e'},
-  {id:'bmw', name:'BMW', pastel:'#c6d7e2', dark:'#c6d7e2', light:'#3d5c72'},
-  {id:'toyota', name:'Toyota', pastel:'#e4cccd', dark:'#e4cccd', light:'#754e53'},
-  {id:'astonmartin', name:'Aston Martin', pastel:'#c7d9cf', dark:'#c7d9cf', light:'#3a604d'},
-  {id:'lmu', name:'Le Mans Ultimate', pastel:'#e5d3bd', dark:'#e5d3bd', light:'#715638'},
-  {id:'assettocorsa', name:'Assetto Corsa', pastel:'#ddc4c9', dark:'#ddc4c9', light:'#724650'},
-  {id:'iracing', name:'iRacing', pastel:'#c5d3e7', dark:'#c5d3e7', light:'#405a7b'},
+  {id:'endurance', name:'Vert pastel', fill:'#c4d8c8', ink:'#27343a', dark:'#c4d8c8', light:'#386047', soft:true},
+  {id:'ferrari', name:'Ferrari', fill:'#d92a27', ink:'#ffffff', dark:'#ff8583', light:'#b5201d'},
+  {id:'redbull', name:'Red Bull', fill:'#162b60', ink:'#ffffff', dark:'#93acfa', light:'#203d88'},
+  {id:'mclaren', name:'McLaren', fill:'#ff8700', ink:'#1c2027', dark:'#ff9e33', light:'#9c4c00'},
+  {id:'porsche', name:'Porsche', fill:'#b49049', ink:'#101820', dark:'#dab56a', light:'#7a5e21'},
+  {id:'bmw', name:'BMW', fill:'#1675d1', ink:'#ffffff', dark:'#74b6ff', light:'#155db0'},
+  {id:'toyota', name:'Toyota', fill:'#d1082a', ink:'#ffffff', dark:'#ff879e', light:'#b30926'},
+  {id:'astonmartin', name:'Aston Martin', fill:'#006b52', ink:'#ffffff', dark:'#6fd2b4', light:'#006b52'},
+  {id:'lmu', name:'Le Mans Ultimate', fill:'#ef6c22', ink:'#17202c', dark:'#ffac70', light:'#a94b13'},
+  {id:'assettocorsa', name:'Assetto Corsa', fill:'#cf233c', ink:'#ffffff', dark:'#ff8596', light:'#b51c35'},
+  {id:'iracing', name:'iRacing', fill:'#1e4cb1', ink:'#ffffff', dark:'#8faaff', light:'#1e4cb1'},
 ];
 export const DEFAULT_PALETTE = 'endurance';
 // Existing community choices remain valid when moving from generic colours to racing themes.
