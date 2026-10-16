@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {DatabaseSync} from 'node:sqlite';
 import {readFileSync, readdirSync} from 'node:fs';
 import worker from '../server/worker.mjs';
-import {syncCrewDiscord, closeDeletedCrewDiscord, OPEN_BEFORE, CLOSE_AFTER, KEEP_ARCHIVES} from '../server/crew-discord.mjs';
+import {syncCrewDiscord, closeDeletedCrewDiscord, cleanupOrphanCrewDiscord, OPEN_BEFORE, CLOSE_AFTER, KEEP_ARCHIVES} from '../server/crew-discord.mjs';
 import {linkTestServer, allowCrews, setMember, ORGA_ROLE, GUILD} from './fixtures/discord-server.mjs';
 
 // Crews on Discord and race reminders (migrations 0044, 0045): the bot is a fake Discord that records each request.
@@ -32,7 +32,8 @@ function fakeDiscord(){
     if(gone.has(path))return reply(404,{code:10008});
     if(method==='GET'&&path===`/guilds/${GUILD}/members/app-id`)return state.botAbsent?reply(404,{code:10007}):reply(200,{roles:[BOT_ROLE]});
     if(method==='GET'&&path===`/guilds/${GUILD}`)return reply(200,{id:GUILD,name:'Test',owner_id:ADMIN});
-    if(method==='GET'&&path===`/guilds/${GUILD}/channels`)return reply(200,[{id:'500000000000000002',name:'Courses',type:4,position:2},{id:'500000000000000003',name:'général',type:0,position:0},{id:'500000000000000001',name:'Accueil',type:4,position:1}]);
+    if(method==='GET'&&path===`/guilds/${GUILD}/channels`)return reply(200,state.channels || [{id:'500000000000000002',name:'Courses',type:4,position:2},{id:'500000000000000003',name:'général',type:0,position:0},{id:'500000000000000001',name:'Accueil',type:4,position:1}]);
+    if(method==='GET'&&path.includes('/messages?after=0'))return reply(200,state.messages || []);
     if(method==='POST'&&body?.parent_id&&state.goneCategory===body.parent_id)return reply(400,{code:50035});
     if(method==='GET'&&path===`/guilds/${GUILD}/roles`)return reply(200,[{id:GUILD,name:'@everyone',permissions:'0',position:0},{id:BOT_ROLE,name:'Endurance Manager',permissions:state.botRights?'68624':'0',position:1}]);
     const voice=path.match(/^\/guilds\/\d+\/voice-states\/(\d+)$/);
@@ -349,11 +350,102 @@ test('an empty crew gets its voice channel as soon as it is created', async () =
   assert.equal(DB.db.prepare('SELECT voice_id FROM crew_discord').get().voice_id,row.voice_id);
   const crewRow=DB.db.prepare('SELECT * FROM crews WHERE id=?').get(crew.data.id);
   discord.state.deleteStatus=403;
+  // A crew made more than a week ago must still be retried until Discord confirms deletion.
+  DB.db.prepare('UPDATE crew_discord SET created_at=? WHERE crew_id=?').run(Date.now()-10*24*HOUR,crew.data.id);
   assert.equal((await req(`/api/crews/${crew.data.id}`,'DELETE',{version:crewRow.version},'admin')).status,200);
   const pending=DB.db.prepare('SELECT * FROM crew_discord').get();
   assert.equal(pending.closed_at,null);assert.equal(pending.voice_id,row.voice_id);assert.equal(pending.lock_until,0);
+  assert.match(DB.db.prepare('SELECT last_error FROM community_crew_discord WHERE community_id=?').get(DEV).last_error,/droits/);
+  assert.equal((await sync(Date.now()+30_000)).closed,0);
+  assert.equal(DB.db.prepare('SELECT closed_at FROM crew_discord').get().closed_at,null);
   discord.state.deleteStatus=null;
   const mark=discord.calls.length;
   assert.equal((await sync(Date.now()+60_000)).closed,1);
   assert.deepEqual(since(discord.calls,mark),[`DELETE /channels/${row.voice_id}`]);
+});
+
+test('migration resumes abandoned cleanup without reopening successfully closed channels or archives', async () => {
+  const {DB,sync,discord}=harness();
+  const at=Date.now(), voice='700000000000000099';
+  const insert=DB.db.prepare(`INSERT INTO crew_discord(crew_id,community_id,guild_id,voice_id,created_at,closed_at,archived_id)
+    VALUES(?,?,?,?,?,?,?)`);
+  insert.run('orphan',DEV,GUILD,voice,at-10*24*HOUR,at-HOUR,null);
+  insert.run('finished',DEV,GUILD,null,at-10*24*HOUR,at-HOUR,null);
+  insert.run('archived',DEV,GUILD,null,at-10*24*HOUR,at-HOUR,'700000000000000098');
+  DB.db.exec(readFileSync(new URL('../migrations/0071_retry_crew_channel_cleanup.sql',import.meta.url),'utf8'));
+  assert.equal(DB.db.prepare("SELECT closed_at FROM crew_discord WHERE crew_id='orphan'").get().closed_at,null);
+  for(const id of ['finished','archived'])assert.equal(DB.db.prepare('SELECT closed_at FROM crew_discord WHERE crew_id=?').get(id).closed_at,at-HOUR);
+  assert.equal((await sync(at)).closed,1);
+  assert.deepEqual(since(discord.calls,0),[`DELETE /channels/${voice}`]);
+  assert.equal(DB.db.prepare("SELECT voice_id FROM crew_discord WHERE crew_id='orphan'").get().voice_id,null);
+});
+
+test('overlapping syncs do not create a second voice channel from an outdated snapshot', async () => {
+  const {DB,env,req,login,discord}=harness();
+  await login(ADMIN,'admin','Orga');
+  await req('/api/community/modules','PATCH',{crewChannels:true},'admin');
+  await req('/api/events','POST',race,'admin');
+  const event=(await req('/api/events','GET',null,'admin')).data.events[0], departure=event.departures[0];
+  const crew=await req(`/api/events/${event.id}/departures/${departure.id}/crews`,'POST',{name:'SPM RED',category:'GT3'},'admin');
+  // One sync has read the row, but pauses before locking it. Another sync finishes first.
+  const prepare=DB.prepare.bind(DB);
+  let release, captured;
+  const gate=new Promise(resolve=>{release=resolve;});
+  const ready=new Promise(resolve=>{captured=resolve;});
+  let pause=true;
+  DB.prepare=sql=>{
+    const statement=prepare(sql);
+    if(sql.includes('SELECT d.crew_id AS row_id')&&pause){
+      pause=false;
+      const all=statement.all.bind(statement);
+      statement.all=async()=>{const snapshot=await all();captured();await gate;return snapshot;};
+    }
+    return statement;
+  };
+  const realFetch=globalThis.fetch;globalThis.fetch=discord.handler;
+  try{
+    const delayed=syncCrewDiscord(env,Date.now(),{requests:20});
+    await ready;
+    await syncCrewDiscord(env,Date.now(),{requests:20});
+    release();await delayed;
+  }finally{release();DB.prepare=prepare;globalThis.fetch=realFetch;}
+  assert.equal(created(discord.calls,0).length,1,'only one voice channel may exist for the crew');
+  const row=DB.db.prepare('SELECT * FROM crews WHERE id=?').get(crew.data.id);
+  const voice=DB.db.prepare('SELECT voice_id FROM crew_discord WHERE crew_id=?').get(crew.data.id).voice_id;
+  const mark=discord.calls.length;
+  assert.equal((await req(`/api/crews/${crew.data.id}`,'DELETE',{version:row.version},'admin')).status,200);
+  assert.deepEqual(since(discord.calls,mark),[`DELETE /channels/${voice}`]);
+});
+
+test('automatic recovery deletes a proven orphan and protects live crews and unrelated Discord channels', async () => {
+  const {DB,env,req,login,discord}=harness();
+  await login(ADMIN,'admin','Orga');
+  await req('/api/community/modules','PATCH',{crewChannels:true},'admin');
+  await req('/api/events','POST',race,'admin');
+  const event=(await req('/api/events','GET',null,'admin')).data.events[0], departure=event.departures[0];
+  const crew=await req(`/api/events/${event.id}/departures/${departure.id}/crews`,'POST',{name:'SPM RED',category:'GT3'},'admin');
+  const category='600000000000000001', voice='700000000000000099';
+  DB.db.prepare("INSERT INTO discord_recap_publications(community_id,event_id,guild_id,category_id,marker) VALUES(?,?,?,?,'m')").run(DEV,event.id,GUILD,category);
+  discord.state.channels=[{id:voice,type:2,name:'SPM RED',parent_id:category}];
+  const content=`🏁 **6h SPA** · LMU\n👥 Équipage **SPM RED** : personne pour l’instant\n🔗 Inscriptions et équipage : ${ROOT}/lmu/#event=${event.id}`;
+  discord.state.messages=[{author:{id:env.DISCORD_CLIENT_ID,bot:true},content}];
+  const realFetch=globalThis.fetch;globalThis.fetch=discord.handler;
+  try{
+    assert.equal(await cleanupOrphanCrewDiscord(env),0,'an existing crew protects its channel');
+    DB.db.prepare('DELETE FROM crews WHERE id=?').run(crew.data.id);
+    discord.state.messages[0].author.id='other-bot';
+    assert.equal(await cleanupOrphanCrewDiscord(env),0,'a different bot is never evidence of ownership');
+    discord.state.messages[0].author.id=env.DISCORD_CLIENT_ID;
+    discord.state.messages[0].content=content.replace(event.id,'another-event');
+    assert.equal(await cleanupOrphanCrewDiscord(env),0,'a recap for another race is ignored');
+    discord.state.messages[0].content=content;
+    DB.db.prepare('INSERT INTO crew_discord(crew_id,community_id,guild_id,voice_id,created_at) VALUES(?,?,?,?,?)').run('tracked',DEV,GUILD,voice,Date.now());
+    assert.equal(await cleanupOrphanCrewDiscord(env),0,'tracked channels follow the normal cleanup');
+    DB.db.prepare("DELETE FROM crew_discord WHERE crew_id='tracked'").run();
+    discord.state.deleteStatus=403;
+    await assert.rejects(cleanupOrphanCrewDiscord(env),/403/);
+    discord.state.deleteStatus=null;
+    assert.equal(await cleanupOrphanCrewDiscord(env),1,'a failed deletion is retried without admin action');
+    assert.equal(discord.calls.filter(call=>call.method==='DELETE').at(-1).path,`/channels/${voice}`);
+  }finally{globalThis.fetch=realFetch;}
 });
