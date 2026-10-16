@@ -10,7 +10,7 @@
 //   that mentions its pilots; 24 h before, a notification on the bell for every pilot entered on the start.
 // Everything is done by the bot (DISCORD_BOT_TOKEN) through Discord's REST API, by the scheduled task and right
 // after a change on a crew, a few requests at a time (a run of the Worker may make 50).
-import {allCommunities, communityUrl} from './community.mjs';
+import {allCommunities, communityById, communityUrl} from './community.mjs';
 import {notify} from './notifications.mjs';
 import {durationLabel} from '../shared/duration.mjs';
 
@@ -22,8 +22,6 @@ export const OPEN_BEFORE = 6 * 24 * HOUR;
 // most this long, then is made in the admins' category (and moved later).
 const WAIT_CATEGORY = HOUR;
 export const CLOSE_AFTER = 2 * HOUR;
-// After this, a crew whose channels cannot be closed (bot removed…) is left alone.
-const GIVE_UP_AFTER = 7 * 24 * HOUR;
 const LOCK_MS = 60_000;
 // Text channels archived by the first version: deleted 30 days after their race.
 export const KEEP_ARCHIVES = 30 * 24 * HOUR;
@@ -100,6 +98,13 @@ const discordIds = pilots => [...new Set(pilots.map(pilot => pilot.user_id).filt
 // The crews with their race (rows of crew_discord, or crews about to get one).
 const CREW_COLUMNS = `c.id AS crew_id, c.community_id, c.name AS crew_name, c.car, c.category, c.departure_id, c.event_id,
   e.name AS event_name, e.departures, e.duration_hours, e.duration_minutes, e.circuit, e.schedule_pending`;
+const TRACKED_CREWS = `SELECT d.crew_id AS row_id, d.community_id AS row_community, d.guild_id, d.category_id, d.text_id, d.voice_id, d.message_id,
+  d.recap_hash, d.members, d.starts_at, d.reminded, d.created_at, d.parent_id, ${CREW_COLUMNS},
+  CASE WHEN p.category_id<>COALESCE(s.destination_id,'') THEN p.category_id END AS race_category,
+  CASE WHEN s.enabled=1 AND s.mode='events' THEN s.scope END AS race_scope
+  FROM crew_discord d LEFT JOIN crews c ON c.id=d.crew_id LEFT JOIN events e ON e.id=c.event_id
+    LEFT JOIN discord_recap_publications p ON p.community_id=d.community_id AND p.event_id=c.event_id AND p.closed_at IS NULL
+    LEFT JOIN community_recap_settings s ON s.community_id=d.community_id`;
 
 async function pilotsOf(env, crewIds) {
   const byCrew = new Map(crewIds.map(crewId => [crewId, []]));
@@ -138,14 +143,9 @@ export async function syncCrewDiscord(env, timestamp = Date.now(), {community = 
   // (a run of the Worker may also make only 50 calls to the database).
   const ids = [...communities.keys()];
   if (!ids.length) return report;
-  const rows = (await env.DB.prepare(`SELECT d.crew_id AS row_id, d.community_id AS row_community, d.guild_id, d.category_id, d.text_id, d.voice_id, d.message_id,
-      d.recap_hash, d.members, d.starts_at, d.reminded, d.created_at, d.parent_id, ${CREW_COLUMNS},
-      CASE WHEN p.category_id<>COALESCE(s.destination_id,'') THEN p.category_id END AS race_category,
-      CASE WHEN s.enabled=1 AND s.mode='events' THEN s.scope END AS race_scope
-    FROM crew_discord d LEFT JOIN crews c ON c.id=d.crew_id LEFT JOIN events e ON e.id=c.event_id
-      LEFT JOIN discord_recap_publications p ON p.community_id=d.community_id AND p.event_id=c.event_id AND p.closed_at IS NULL
-      LEFT JOIN community_recap_settings s ON s.community_id=d.community_id
-    WHERE d.closed_at IS NULL AND d.community_id IN (${ids.map(() => '?').join(',')}) AND d.lock_until<? ORDER BY d.checked_at LIMIT 40`)
+  const rows = (await env.DB.prepare(`${TRACKED_CREWS}
+    WHERE d.closed_at IS NULL AND d.community_id IN (${ids.map(() => '?').join(',')}) AND d.lock_until<?
+    ORDER BY c.id IS NOT NULL, d.checked_at LIMIT 40`)
     .bind(...ids, timestamp).all()).results || [];
   const pilots = await pilotsOf(env, rows.filter(row => row.crew_id).map(row => row.crew_id));
   const checked = [];
@@ -157,7 +157,11 @@ export async function syncCrewDiscord(env, timestamp = Date.now(), {community = 
     const lock = await env.DB.prepare('UPDATE crew_discord SET lock_until=? WHERE crew_id=? AND lock_until<? AND closed_at IS NULL').bind(timestamp + LOCK_MS, row.row_id, timestamp).run();
     if (!lock.meta.changes) continue;
     try {
-      const done = await syncRow(env, budget, timestamp, owner, setting, row, crewPilots);
+      // Another sync may have created the channel since the initial read, or the crew may be gone.
+      // Read again under the lock so an outdated snapshot cannot create an untracked duplicate.
+      const current = await env.DB.prepare(`${TRACKED_CREWS} WHERE d.crew_id=? AND d.closed_at IS NULL`).bind(row.row_id).first();
+      if (!current) continue;
+      const done = await syncRow(env, budget, timestamp, owner, setting, current, crewPilots);
       if (done) report[done] += 1;
     } catch (error) {
       if (!(error instanceof Stop)) {
@@ -214,6 +218,53 @@ async function remove(env, budget, channelId) {
   catch (error) { if (error?.status !== 404) throw error; }
 }
 
+// Recover duplicates whose ids were overwritten by overlapping syncs in older versions.
+// Only inspect race categories managed by this site, and require the bot's own original recap.
+export async function cleanupOrphanCrewDiscord(env, timestamp = Date.now()) {
+  if (!env?.DB || !env.DISCORD_BOT_TOKEN || !env.DISCORD_CLIENT_ID) return 0;
+  const setting = await env.DB.prepare(`SELECT s.* FROM community_crew_discord s JOIN communities c ON c.id=s.community_id
+    WHERE c.discord_guild_id IS NOT NULL AND EXISTS(SELECT 1 FROM discord_recap_publications p
+      WHERE p.community_id=s.community_id AND p.category_id IS NOT NULL AND p.event_id<>'')
+    ORDER BY s.orphan_checked_at,s.community_id LIMIT 1`).first();
+  if (!setting) return 0;
+  await env.DB.prepare('UPDATE community_crew_discord SET orphan_checked_at=? WHERE community_id=?').bind(timestamp,setting.community_id).run();
+  const community = await communityById(env,setting.community_id);
+  const budget = {left:3};
+  const publications = (await env.DB.prepare(`SELECT event_id,category_id FROM discord_recap_publications
+    WHERE community_id=? AND category_id IS NOT NULL AND event_id<>''`).bind(community.id).all()).results || [];
+  const races = new Map(publications.map(row => [row.category_id,row.event_id]));
+  const tracked = (await env.DB.prepare('SELECT voice_id FROM crew_discord WHERE guild_id=? AND voice_id IS NOT NULL')
+    .bind(community.discordGuildId).all()).results || [];
+  const known = new Set(tracked.map(row => row.voice_id));
+  const channels = await discord(env,budget,'GET',`/guilds/${community.discordGuildId}/channels`);
+  const candidates = (Array.isArray(channels) ? channels : []).filter(channel => channel.type === VOICE
+    && races.has(channel.parent_id) && !known.has(channel.id) && /^\d{15,22}$/.test(channel.id)
+    && Number((BigInt(channel.id) >> 22n) + 1420070400000n) < timestamp - 5 * 60_000)
+    .sort((a,b) => BigInt(a.id) < BigInt(b.id) ? -1 : 1);
+  const channel = candidates.find(item => !setting.orphan_cursor || BigInt(item.id) > BigInt(setting.orphan_cursor)) || candidates[0];
+  if (!channel) return 0;
+  try {
+    const eventId = races.get(channel.parent_id);
+    const messages = await discord(env,budget,'GET',`/channels/${channel.id}/messages?after=0&limit=100`);
+    const recap = (Array.isArray(messages) ? messages : []).find(message => message.author?.bot === true
+      && message.author.id === env.DISCORD_CLIENT_ID && ['lmu','iracing'].some(sim =>
+        String(message.content || '').split('\n').includes(`🔗 Inscriptions et équipage : ${communityUrl(env,community)}/${sim}/#event=${eventId}`)));
+    const name = recap?.content?.match(/^👥 Équipage \*\*([^\n]+)\*\* : /m)?.[1];
+    if (!name || channel.name !== clip(name,100)) return 0;
+    // Re-read immediately before deletion: a creation still in flight or another live crew is protected.
+    if (await env.DB.prepare('SELECT 1 FROM crew_discord WHERE guild_id=? AND voice_id=?')
+      .bind(community.discordGuildId,channel.id).first()) return 0;
+    const crews = (await env.DB.prepare('SELECT name FROM crews WHERE community_id=? AND event_id=?')
+      .bind(community.id,eventId).all()).results || [];
+    if (crews.some(crew => safe(crew.name) === name)) return 0;
+    await remove(env,budget,channel.id);
+    return 1;
+  } finally {
+    await env.DB.prepare('UPDATE community_crew_discord SET orphan_cursor=? WHERE community_id=?')
+      .bind(channel.id,community.id).run();
+  }
+}
+
 // A successful crew deletion must not wait behind recap updates or other crews.
 // Keep the tracking row on failure so the scheduled sync can retry the cleanup.
 export async function closeDeletedCrewDiscord(env, crewId, timestamp = Date.now()) {
@@ -226,6 +277,11 @@ export async function closeDeletedCrewDiscord(env, crewId, timestamp = Date.now(
   try {
     const row = await env.DB.prepare('SELECT *, crew_id AS row_id FROM crew_discord WHERE crew_id=?').bind(crewId).first();
     await closeRow(env, {left:3}, timestamp, row, [], {force:true});
+  } catch (error) {
+    await env.DB.prepare(`UPDATE community_crew_discord SET last_error=?, last_error_at=?
+      WHERE community_id=(SELECT community_id FROM crew_discord WHERE crew_id=?)`)
+      .bind(errorText(error), Math.floor(timestamp / 1000), crewId).run().catch(() => {});
+    throw error;
   } finally {
     await env.DB.prepare('UPDATE crew_discord SET lock_until=0 WHERE crew_id=?').bind(crewId).run();
   }
@@ -313,13 +369,8 @@ async function syncRow(env, budget, timestamp, community, setting, row, pilots) 
   const members = JSON.parse(row.members || '[]');
   // Crew, race or start gone: closed now; 2 h after the planned end: closed once the voice channel is empty.
   if (!start || !community || timestamp >= start.endsAt + CLOSE_AFTER) {
-    const deadline = start ? start.endsAt + GIVE_UP_AFTER : row.created_at + GIVE_UP_AFTER;
-    try { return await closeRow(env, budget, timestamp, row, members, {force:!start || !community}) ? 'closed' : null; }
-    catch (error) {
-      if (error instanceof Stop || timestamp < deadline) throw error;
-      await env.DB.prepare('UPDATE crew_discord SET closed_at=? WHERE crew_id=?').bind(timestamp, row.row_id).run();
-      return 'closed';
-    }
+    // A failed DELETE is still pending, regardless of the age of the crew or race.
+    return await closeRow(env, budget, timestamp, row, members, {force:!start || !community}) ? 'closed' : null;
   }
   // Module turned off: nothing new on Discord (what exists closes at the end).
   if (community.modules?.crewChannels !== true || !setting) return null;

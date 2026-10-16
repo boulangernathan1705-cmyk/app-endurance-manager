@@ -56,7 +56,8 @@ export function communityUrl(env, community) {
 // (kept by the settings page) on Discord's CDN (allowed by the site's CSP).
 export function appearanceOf(community) {
   const appearance = community.appearance || {}, guild = community.discordGuildId;
-  const accent = /^#[0-9a-f]{6}$/i.test(appearance.accent || '') ? appearance.accent : null;
+  // Colours saved by the discarded theme experiment must not change the original site look.
+  const accent = !appearance.palette && /^#[0-9a-f]{6}$/i.test(appearance.accent || '') ? appearance.accent : null;
   const logoUrl = guild && appearance.discordIcon ? `https://cdn.discordapp.com/icons/${guild}/${appearance.discordIcon}.png?size=256` : null;
   // The banner sent by the admins (Réglages → Apparence); without one, the site's banner.
   const bannerUrl = Number.isInteger(appearance.bannerVersion) ? `/api/community/banner?v=${appearance.bannerVersion}` : null;

@@ -1,5 +1,11 @@
 # Nouveautés d'Endurance Manager
 
+## v1.52 — 16 octobre 2026
+
+### 🔧 Corrections et améliorations
+
+- **Vocaux Discord** : suppression fiabilisée lorsqu’un équipage est supprimé et nettoyage automatique des anciens salons restés après suppression.
+
 ## v1.51 — 16 octobre 2026
 
 ### Changements

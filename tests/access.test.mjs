@@ -4,11 +4,17 @@ import {DatabaseSync} from 'node:sqlite';
 import {readFileSync, readdirSync} from 'node:fs';
 import {communityAccess, refreshMemberships, discoverMemberships, refreshCommunityMembers, PERMISSIONS, ALL_PERMISSIONS, DEFAULT_EVERYONE} from '../server/access.mjs';
 import worker from '../server/worker.mjs';
+import {appearanceOf} from '../server/community.mjs';
 import {GUILD, ORGA_ROLE, SAFE_ROLE, DEV_COMMUNITY, linkTestServer} from './fixtures/discord-server.mjs';
 
 // Access through the community's Discord server, with a fake Discord answering the bot like the real one.
 const ROOT='https://site.example', MANAGER='111111111111111111', PILOT='222222222222222222', OWNER='333333333333333333', BOSS='444444444444444444';
 const ADMIN_ROLE='900000000000000010';
+test('retired themes do not affect the original appearance; pre-existing custom accents remain valid', () => {
+  assert.equal(appearanceOf({appearance:{palette:'ferrari',accent:'#d92a27',defaultMode:'light'}}).accent,null);
+  assert.equal(appearanceOf({appearance:{accent:'#ff8800'}}).accent,'#ff8800');
+  assert.equal(appearanceOf({appearance:{}}).accent,null);
+});
 const MIGRATIONS=readdirSync(new URL('../migrations/',import.meta.url)).filter(name=>name.endsWith('.sql')).sort();
 class D1 {
   constructor(){this.db=new DatabaseSync(':memory:');this.db.exec('PRAGMA foreign_keys=ON;');for(const file of MIGRATIONS)this.db.exec(readFileSync(new URL(`../migrations/${file}`,import.meta.url),'utf8'));}
