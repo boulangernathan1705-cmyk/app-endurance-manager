@@ -9,6 +9,7 @@ import {
 import {ingestClientError, clientErrorsApi} from './telemetry.mjs';
 import {communityRequestsApi, closeCommunityRequest} from './community-requests.mjs';
 import {racesPath} from './races-path.mjs';
+import {memoApi, memoCollector, memoEnabled} from './memo.mjs';
 import {catalogForGame, gameForEvent, simForEvent, TDZ_EVENT_TYPES, tdzOnly, eventsLabel} from '../shared/catalog.mjs';
 import {currentCommunity, appearanceOf, allCommunities, communityUrl, communitySlug, communityById, communityFromRow} from './community.mjs';
 import {isDevelopment} from './dev-environment.mjs';
@@ -405,6 +406,7 @@ async function api(request, env) {
   // The main address, or a community address of the platform (BASE_DOMAIN).
   const canonical = siteOrigin(request, env);
   if (url.origin !== canonical) fail(403, 'Utilise l’adresse principale du site pour cette action.');
+  if (path === '/api/memo/collector') return memoCollector(request,env);
   if (!['GET','HEAD'].includes(method)) {
     if (request.headers.get('Origin') !== canonical) fail(403, 'Origine de la requête refusée.');
     await rateLimit(request, env, 'write', 80);
@@ -430,6 +432,7 @@ async function api(request, env) {
   const requests = await communityRequestsApi(path, method, request, env, actor);
   if (requests) return requests;
   if (path === '/api/session' && method === 'GET') return json({user:actor.user, discordReady:!!(env.DISCORD_CLIENT_ID && env.DISCORD_CLIENT_SECRET), adminConfigured:administrators(env).length > 0, soloRaces:soloRacesEnabled(env, community), iracingImport:community.modules?.iracingImport===true, categoryEntry:community.modules?.categoryEntry === true, soloLabel:eventsLabel(community, isDevelopment(env)), eventTdz:tdzOnly(community, isDevelopment(env)), eventTypes:!tdzOnly(community, isDevelopment(env)) ? [] : grindfestEnabled(community, isDevelopment(env)) ? [...TDZ_EVENT_TYPES, 'Gridfest'] : TDZ_EVENT_TYPES, grindfest:grindfestEnabled(community, isDevelopment(env)), grindfestAvailable:grindfestAvailable(community, isDevelopment(env)), safeGuideUrl:community.modules?.safeGuideUrl || '',
+    memo:memoEnabled(env,community),
     community:{id:community.id, slug:community.slug, name:community.name, shortName:community.shortName, discordInviteUrl:community.discordInviteUrl, appearance:appearanceOf(community)},
     access:access.status, permissions:[...access.permissions], manager:access.manager, communities:await myCommunities(env, actor, community),
     elsewhere:['not-member','forbidden'].includes(access.status) ? (await myCommunities(env, actor, community, true)).filter(item => !item.current).map(({name, url, logoUrl}) => ({name, url, logoUrl})) : [], openSite,
@@ -462,6 +465,8 @@ async function api(request, env) {
   // The bell next to the account (server/notifications.mjs).
   const notifications = await notificationsApi(path, method, env, actor, community);
   if (notifications) return notifications;
+  const memo = await memoApi(path,method,request,env,actor,community);
+  if (memo) return memo;
   const gridfestPasswords = path.match(/^\/api\/events\/([a-f0-9-]{36})\/gridfest\/passwords$/);
   if (gridfestPasswords && ['GET','POST'].includes(method)) {
     requirePermission(actor,'admin');
@@ -843,7 +848,7 @@ async function api(request, env) {
     await keepDiscordLook(env, community, discord);
     return json({community:{name:community.name, shortName:community.shortName, discordServer:discord?.name || null, ...appearanceOf(community)}, roles, permissions:PERMISSIONS,
       modules:{iracingImport:community.modules.iracingImport === true, discordWeekly:community.modules.discordWeekly === true, soloRaces:soloRacesEnabled(env, community), eventTdzAvailable:tdzOnly(community, isDevelopment(env)), eventsLabel:eventsLabel(community, isDevelopment(env)), eventTypes:!tdzOnly(community, isDevelopment(env)) ? [] : grindfestEnabled(community, isDevelopment(env)) ? [...TDZ_EVENT_TYPES, 'Gridfest'] : TDZ_EVENT_TYPES, grindfest:grindfestEnabled(community, isDevelopment(env)), grindfestAvailable:grindfestAvailable(community, isDevelopment(env)),
-        crewChannels:community.modules.crewChannels === true, raceReminders:community.modules.raceReminders === true, categoryEntry:community.modules.categoryEntry === true},
+        crewChannels:community.modules.crewChannels === true, raceReminders:community.modules.raceReminders === true, categoryEntry:community.modules.categoryEntry === true, memo:memoEnabled(env,community)},
       crews:await crewDiscordState(env, community)});
   }
   // Banner sent by the admins: the image itself (already resized by the browser), WebP, JPEG or PNG, 600 KB at most.
@@ -899,7 +904,7 @@ async function api(request, env) {
     }
     if (input.soloRaces === false && modules.grindfest) fail(400, 'Éteins Gridfest avant de désactiver les événements solo.');
     // The Discord recap is configured through the guided bot module.
-    for (const key of ['iracingImport','soloRaces','raceReminders','categoryEntry']) if (typeof input[key] === 'boolean') modules[key] = input[key];
+    for (const key of ['iracingImport','soloRaces','raceReminders','categoryEntry','memo']) if (typeof input[key] === 'boolean') modules[key] = input[key];
     // EVENT TDZ: the Discord channel that explains how to become SAFE (a button for the pilots who are not).
     if (typeof input.safeGuideUrl === 'string') {
       const url = input.safeGuideUrl.trim();
