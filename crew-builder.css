@@ -7,9 +7,9 @@
   min-width:0;
   margin: 18px 0 22px;
   padding: 18px;
-  border: 1px solid #344147;
+  border: 1px solid var(--border);
   border-radius: 12px;
-  background: linear-gradient(180deg, #171e21, #101416);
+  background: linear-gradient(180deg, var(--panel), var(--panel));
   box-shadow: 0 14px 32px rgba(0,0,0,.22);
   overflow:hidden;
 }
@@ -99,15 +99,15 @@
   gap: 8px;
   min-width:0;
   padding: 12px;
-  border: 1px solid #344147;
+  border: 1px solid var(--border);
   border-radius: 10px;
-  background: #101416;
+  background: var(--panel);
   cursor: pointer;
   overflow:hidden;
   transition: border-color .16s ease, background .16s ease, box-shadow .16s ease;
 }
 
-.crew-builder-pilot:hover { border-color: #587269; }
+.crew-builder-pilot:hover { border-color: var(--border); }
 .crew-builder-pilot.is-selected {
   border-color: var(--green);
   background: rgba(36,132,79,.16);
@@ -132,10 +132,10 @@
 
 .crew-builder-pilot-head > span { display: grid; gap: 2px; min-width: 0; }
 .crew-builder-pilot-head strong { color: var(--text); overflow-wrap:anywhere; }
-.crew-builder-pilot-head em{width:max-content;max-width:100%;padding:2px 6px;border:1px solid #3e9b63;border-radius:999px;color:#a9f3c2;background:#173624;font-size:8px;font-style:normal;font-weight:900;letter-spacing:.45px;line-height:1.2}
+.crew-builder-pilot-head em{width:max-content;max-width:100%;padding:2px 6px;border:1px solid #3e9b63;border-radius:999px;color:light-dark(#128238, #a9f3c2);background:var(--panel2);font-size:8px;font-style:normal;font-weight:900;letter-spacing:.45px;line-height:1.2}
 .crew-builder-pilot-head small { color: var(--muted); overflow-wrap: anywhere; }
 .crew-builder-pilot-wish { color: var(--muted); font-size: 12px; overflow-wrap:anywhere; }
-.crew-builder-pilot-wish strong { color: #dcefe5; }
+.crew-builder-pilot-wish strong { color: var(--text); }
 .crew-builder-pilot .presence-timeline,.crew-builder-coverage .presence-timeline{width:100%;min-width:0;max-width:100%;overflow-x:auto;overscroll-behavior-inline:contain}
 
 .crew-builder-warning {
@@ -143,7 +143,7 @@
   padding: 10px 12px;
   border-left: 3px solid #d6a63b;
   background: rgba(214,166,59,.08);
-  color: #d8c89f;
+  color: var(--text);
   font-size: 12px;
   line-height: 1.5;
 }
@@ -170,7 +170,7 @@
   font-size: 13px;
 }
 
-.crew-builder-coverage-message.needs-pilots { color: #9ce1b4; }
+.crew-builder-coverage-message.needs-pilots { color: light-dark(#22723e, #9ce1b4); }
 
 .crew-builder-actions {
   display: flex;

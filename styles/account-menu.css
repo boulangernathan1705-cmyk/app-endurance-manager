@@ -33,7 +33,7 @@
 .account-oauth-trust {
   margin: 0;
   max-width: 390px;
-  color: #8fa2a5;
+  color: var(--muted);
   font-size: 9.5px;
   line-height: 1.25;
   text-align: right;
@@ -41,7 +41,7 @@
 }
 
 .account-oauth-trust a {
-  color: #9edce0;
+  color: light-dark(#246b70, #9edce0);
   text-decoration: none;
 }
 
@@ -57,8 +57,8 @@
   padding: 7px 11px;
   border: 1px solid rgba(88,113,118,.72);
   border-radius: 11px;
-  background: rgba(12,18,21,.92);
-  color: #eef3f2;
+  background: var(--panel);
+  color: var(--text);
   box-shadow: 0 8px 22px rgba(0,0,0,.18);
 }
 
@@ -99,8 +99,8 @@
   gap: 9px;
   border: 1px solid rgba(88,113,118,.72);
   border-radius: 11px;
-  background: rgba(12,18,21,.92);
-  color: #f4f7f6;
+  background: var(--panel);
+  color: var(--text);
   text-decoration: none;
   box-shadow: 0 8px 22px rgba(0,0,0,.18);
 }
@@ -122,7 +122,7 @@
 }
 
 .account-discord-login {
-  color: #dfe6ff;
+  color: var(--text);
   border-color: rgba(114,137,218,.8);
   background: rgba(88,101,242,.14);
 }
@@ -142,7 +142,7 @@
   display: grid;
   place-items: center;
   flex: 0 0 31px;
-  color: #fff;
+  color: var(--text);
   background: #5865f2;
   border: 1px solid rgba(255,255,255,.16);
 }
@@ -183,14 +183,14 @@
 
 .account-trigger-copy small,
 .account-popover-profile small {
-  color: #8fcfd2;
+  color: light-dark(#2a676a, #8fcfd2);
   font-size: 10px;
   line-height: 1.15;
 }
 
 .account-chevron {
   margin-left: 3px;
-  color: #9fb0b1;
+  color: var(--muted);
   font-size: 14px;
   transition: transform .16s ease;
 }
@@ -207,7 +207,7 @@
   padding: 8px;
   border: 1px solid rgba(82,116,121,.72);
   border-radius: 12px;
-  background: rgba(7,12,15,.98);
+  background: var(--panel);
   box-shadow: 0 18px 42px rgba(0,0,0,.42);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
@@ -241,7 +241,7 @@
   border: 0;
   border-radius: 8px;
   background: transparent;
-  color: #eef3f2;
+  color: var(--text);
   font: inherit;
   font-size: 13px;
   font-weight: 800;
@@ -252,11 +252,11 @@
 
 .account-menu-item:hover,
 .account-menu-item:focus-visible {
-  background: rgba(89,211,216,.09);
+  background: color-mix(in srgb, var(--community-accent) 9%, transparent);
 }
 
 .account-menu-logout {
-  color: #ff7c83;
+  color: light-dark(#940008, #ff7c83);
 }
 
 .account-menu-separator {
@@ -348,8 +348,8 @@
   padding: 0;
   border: 1px solid rgba(88,113,118,.72);
   border-radius: 11px;
-  background: rgba(12,18,21,.92);
-  color: #eef3f2;
+  background: var(--panel);
+  color: var(--text);
   box-shadow: 0 8px 22px rgba(0,0,0,.18);
   cursor: pointer;
 }
@@ -377,7 +377,7 @@
   place-items: center;
   border-radius: 10px;
   background: #e5484d;
-  color: #fff;
+  color: var(--text);
   font-size: 11px;
   font-weight: 800;
   line-height: 1;
@@ -399,13 +399,13 @@
   padding: 6px;
   border: 1px solid rgba(82,116,121,.72);
   border-radius: 12px;
-  background: rgba(7,12,15,.98);
+  background: var(--panel);
   box-shadow: 0 18px 42px rgba(0,0,0,.42);
 }
 
 .notif-head {
   padding: 6px 8px 8px;
-  color: #99a3a0;
+  color: var(--muted);
   font-size: 11px;
   font-weight: 800;
   letter-spacing: .08em;
@@ -418,7 +418,7 @@
   padding: 8px 10px 8px 14px;
   position: relative;
   border-radius: 8px;
-  color: #c7d0d4;
+  color: var(--text);
   text-decoration: none;
   font-size: 13px;
   line-height: 1.35;
@@ -426,12 +426,12 @@
 
 a.notif-item:hover,
 a.notif-item:focus-visible {
-  background: rgba(89,211,216,.09);
+  background: color-mix(in srgb, var(--community-accent) 9%, transparent);
 }
 
 .notif-item.is-unread {
-  color: #f4f7f6;
-  background: rgba(89,211,216,.05);
+  color: var(--text);
+  background: color-mix(in srgb, var(--community-accent) 5%, transparent);
 }
 
 .notif-item.is-unread::before {
@@ -446,23 +446,23 @@ a.notif-item:focus-visible {
 }
 
 .notif-text strong {
-  color: #fff;
+  color: var(--text);
 }
 
 .notif-meta {
-  color: #8fcfd2;
+  color: light-dark(#2a676a, #8fcfd2);
   font-size: 11.5px;
 }
 
 .notif-time {
-  color: #7f8b8d;
+  color: var(--muted);
   font-size: 11px;
 }
 
 .notif-empty {
   margin: 0;
   padding: 6px 10px 10px;
-  color: #a9b4b6;
+  color: var(--muted);
   font-size: 13px;
   line-height: 1.45;
 }

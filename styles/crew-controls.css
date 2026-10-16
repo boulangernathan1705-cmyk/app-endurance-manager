@@ -4,7 +4,7 @@
 .ux-course-crews-block{display:grid;gap:7px;min-width:0}
 .ux-course-crews-heading{display:flex;align-items:center;justify-content:space-between;gap:10px;min-width:0;padding:0 2px 2px}
 .ux-course-crews-title{display:inline-flex;align-items:center;gap:8px;color:var(--text);font-size:15px;font-weight:900}
-.ux-course-crews-title strong{display:inline-grid;place-items:center;min-width:26px;height:26px;padding:0 7px;border:1px solid #35545b;border-radius:999px;background:#142024;color:#dce8e5;font-size:11px}
+.ux-course-crews-title strong{display:inline-grid;place-items:center;min-width:26px;height:26px;padding:0 7px;border:1px solid var(--border);border-radius:999px;background:var(--panel2);color:var(--text);font-size:11px}
 .crew-section-create{width:auto!important;min-width:0!important;min-height:32px!important;margin:0!important;padding:6px 10px!important;border-radius:7px!important;font-size:10.5px!important;font-weight:900!important;line-height:1.1!important;white-space:nowrap!important}
 
 /* Give each crew shell the same palette used by the historic crew cards. */
@@ -32,7 +32,7 @@
   background:color-mix(in srgb,var(--crew-color) 5%,#101617);
   box-shadow:0 0 0 1px color-mix(in srgb,var(--crew-color) 12%,transparent), inset 0 1px color-mix(in srgb,var(--crew-color) 8%,transparent);
 }
-.crew-card-shell.is-complete{border-color:color-mix(in srgb,#7a8489 60%,#3e4a4e);border-left-color:var(--crew-color)}
+.crew-card-shell.is-complete{border-color:color-mix(in srgb,var(--border) 60%,var(--border));border-left-color:var(--crew-color)}
 .crew-unified-card{
   width:100%;
   min-width:0;
@@ -79,13 +79,13 @@
 .crew-inline-management.is-readonly{justify-content:flex-end}
 .crew-inline-management .coverage-summary{margin-left:auto;color:var(--muted);font-size:11px;font-weight:800;white-space:nowrap}
 .crew-state-control{display:flex;align-items:center;flex-wrap:wrap;gap:7px;margin:0}
-.crew-state-label{display:inline-flex;align-items:center;gap:5px;color:#dce8e5;font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.5px}
+.crew-state-label{display:inline-flex;align-items:center;gap:5px;color:var(--text);font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.5px}
 .crew-state-lock{display:inline-grid;place-items:center;width:18px;height:18px;font-size:13px;line-height:1}
 .crew-state-select-wrap{position:relative;display:inline-flex;align-items:center;min-width:0}
-.crew-state-select{appearance:none;-webkit-appearance:none;min-height:32px;max-width:100%;padding:5px 30px 5px 10px;border:1px solid #46565c;border-radius:7px;background:#111719;color:var(--text);font:inherit;font-size:11px;font-weight:850;cursor:pointer;outline:none}
+.crew-state-select{appearance:none;-webkit-appearance:none;min-height:32px;max-width:100%;padding:5px 30px 5px 10px;border:1px solid var(--border);border-radius:7px;background:var(--panel);color:var(--text);font:inherit;font-size:11px;font-weight:850;cursor:pointer;outline:none}
 .crew-state-select:hover,.crew-state-select:focus{border-color:var(--green)}
 .crew-state-select:disabled{cursor:wait;opacity:.65}
-.crew-state-chevron{position:absolute;right:10px;top:50%;transform:translateY(-52%);pointer-events:none;color:#9feab0;font-size:14px;font-weight:900}
+.crew-state-chevron{position:absolute;right:10px;top:50%;transform:translateY(-52%);pointer-events:none;color:light-dark(#1b7930, #9feab0);font-size:14px;font-weight:900}
 
 .crew-owner-badge{
   display:inline-flex;
@@ -94,7 +94,7 @@
   padding:2px 5px;
   border:1px solid color-mix(in srgb,var(--crew-color) 62%,#5d6a6d);
   border-radius:999px;
-  color:#dff9e7;
+  color:var(--text);
   background:color-mix(in srgb,var(--crew-color) 15%,rgba(17,28,22,.55));
   font-size:7.5px;
   font-weight:900;
@@ -148,14 +148,14 @@
 .crew-self-actions .crew-join-button{
   border:1px solid color-mix(in srgb,var(--crew-color) 85%,#7ef0f3)!important;
   background:linear-gradient(180deg,color-mix(in srgb,var(--crew-color) 58%,#35c7ce),color-mix(in srgb,var(--crew-color) 38%,#176d73))!important;
-  color:#f7ffff!important;
+  color:var(--text)!important;
   box-shadow:inset 0 1px rgba(255,255,255,.16),0 0 0 1px color-mix(in srgb,var(--crew-color) 18%,transparent)!important;
 }
 .crew-self-actions .crew-manage-button,
 .crew-self-actions .crew-leave-button{
   border-color:color-mix(in srgb,var(--crew-color) 60%,#56676d)!important;
   background:color-mix(in srgb,var(--crew-color) 11%,#172124)!important;
-  color:#eef7f5!important;
+  color:var(--text)!important;
 }
 .crew-self-actions .crew-delete-button{
   margin-left:auto!important;

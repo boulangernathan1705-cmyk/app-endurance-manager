@@ -21,7 +21,7 @@
   display: block !important;
   width: fit-content;
   margin-top: 8px;
-  color: #b8c6c7;
+  color: var(--text);
   font-size: 13px;
   font-weight: 700;
   line-height: 1.25;
@@ -29,7 +29,7 @@
 }
 
 .event-heading-copy > .event-header-countdown strong {
-  color: #9beeb4;
+  color: light-dark(#157e35, #9beeb4);
   font-size: 14px;
   font-weight: 900;
 }
@@ -73,7 +73,7 @@
 .departure-fold > summary > .fold-date .ux-departure-title {
   display: block;
   margin: 0;
-  color: #9beeb4;
+  color: light-dark(#157e35, #9beeb4);
   font-size: 19px;
   font-weight: 900;
   line-height: 1.15;
@@ -83,7 +83,7 @@
 .departure-fold > summary > .fold-date .ux-departure-date {
   display: block;
   margin-top: 5px;
-  color: #c3cdcf;
+  color: var(--text);
   font-size: 15px;
   font-weight: 650;
   line-height: 1.2;
@@ -175,7 +175,7 @@
 
 .ux-content-accordion-title {
   min-width: 0;
-  color: #f1e9da;
+  color: var(--text);
   font-size: 20px;
   font-weight: 900;
   line-height: 1.2;
@@ -190,7 +190,7 @@
   border: 1px solid var(--border);
   border-radius: 999px;
   background: var(--panel3);
-  color: #f1e9da;
+  color: var(--text);
   font-size: 14px;
   font-weight: 900;
 }
@@ -198,7 +198,7 @@
 .ux-content-accordion-chevron {
   display: grid;
   place-items: center;
-  color: #8ea0a3;
+  color: var(--muted);
   font-size: 25px;
   line-height: 1;
   transform: rotate(0deg);

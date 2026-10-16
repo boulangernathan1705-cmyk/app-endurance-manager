@@ -16,7 +16,7 @@
     column-gap: 20px !important;
     border: 1px solid rgba(70,108,113,.5) !important;
     border-radius: 14px !important;
-    background: rgba(8,12,14,.94) !important;
+    background: var(--panel) !important;
     box-shadow: 0 10px 28px rgba(0,0,0,.2) !important;
   }
 

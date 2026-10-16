@@ -29,7 +29,7 @@
 .my-entry-card {
   border-radius: 12px;
   border-color: rgba(73,118,123,.58);
-  background: rgba(12,17,19,.95);
+  background: var(--panel);
   box-shadow: 0 10px 26px rgba(0,0,0,.16);
 }
 
@@ -41,12 +41,12 @@
   min-height: 76px;
   padding: 11px 14px;
   border-bottom: 0;
-  background: linear-gradient(180deg,rgba(25,34,37,.96),rgba(15,21,23,.96));
+  background: linear-gradient(180deg,var(--panel),var(--panel));
 }
 
 .my-entry-accordion[open] > .my-entry-header {
   border-bottom: 1px solid rgba(73,118,123,.5);
-  background: linear-gradient(180deg,rgba(29,42,45,.98),rgba(17,25,27,.98));
+  background: linear-gradient(180deg,var(--panel),var(--panel));
 }
 
 .my-entry-toggle {
@@ -55,9 +55,9 @@
   flex-basis: 36px;
   margin: 0;
   border-radius: 9px;
-  border-color: rgba(82,207,212,.4);
-  background: #243337;
-  color: #dce9e8;
+  border-color: color-mix(in srgb, var(--community-accent) 40%, transparent);
+  background: var(--panel3);
+  color: var(--text);
   font-size: 0;
   transform: none !important;
 }
@@ -85,7 +85,7 @@
 }
 
 .my-entry-title .my-entry-kicker {
-  color: #a8b9bb;
+  color: var(--muted);
   font-size: 11px;
   letter-spacing: .75px;
 }
@@ -152,7 +152,7 @@
   padding: 14px;
   border: 1px solid rgba(73,118,123,.5);
   border-radius: 10px;
-  background: rgba(18,25,28,.88);
+  background: var(--panel);
 }
 
 .my-entry-section-heading {
@@ -193,8 +193,8 @@
 .my-entry-pilot.is-me {
   order: -1;
   grid-column: 1 / -1;
-  border-color: rgba(82,207,212,.68);
-  background: rgba(82,207,212,.055);
+  border-color: color-mix(in srgb, var(--community-accent) 68%, transparent);
+  background: color-mix(in srgb, var(--community-accent) 6%, transparent);
   box-shadow: inset 3px 0 0 var(--brand-cyan, var(--accent));
 }
 
@@ -233,8 +233,8 @@
 }
 
 .my-entry-crew {
-  border-left: 3px solid rgba(82,207,212,.68);
-  background: rgba(82,207,212,.035);
+  border-left: 3px solid color-mix(in srgb, var(--community-accent) 68%, transparent);
+  background: color-mix(in srgb, var(--community-accent) 4%, transparent);
 }
 
 .my-entry-waiting {

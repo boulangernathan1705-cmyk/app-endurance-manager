@@ -1,7 +1,7 @@
 /* Mes inscriptions : Mon équipage reste prioritaire, les deux sections secondaires sont plus compactes. */
 .ux-my-entry-content-accordion.is-compact {
   border-radius: 8px;
-  background: rgba(15,22,24,.78);
+  background: color-mix(in srgb, var(--panel) 78%, transparent);
 }
 
 .ux-my-entry-content-accordion.is-compact > .ux-my-entry-accordion-summary {

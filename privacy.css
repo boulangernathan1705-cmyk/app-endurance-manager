@@ -5,7 +5,7 @@
 .legal-page {
   width: min(920px, calc(100% - 32px));
   margin: 22px auto 48px;
-  color: #e6ecea;
+  color: var(--text);
 }
 
 .legal-page h1 {
@@ -13,7 +13,7 @@
   font-size: clamp(28px, 4vw, 40px);
   line-height: 1.1;
   font-weight: 800;
-  color: #f4f6f5;
+  color: var(--text);
 }
 
 .legal-page .updated {
@@ -37,13 +37,13 @@
   border: 1px solid rgba(255, 255, 255, .14);
   border-radius: 8px;
   background: rgba(255, 255, 255, .04);
-  color: #c7d0d4;
+  color: var(--text);
   font-size: 14px;
   font-weight: 700;
   text-decoration: none;
 }
 .legal-page .legal-summary a:hover,
-.legal-page .legal-summary a:focus-visible { color: #ffffff; border-color: rgba(82, 211, 216, .6); background: rgba(82, 211, 216, .1); }
+.legal-page .legal-summary a:focus-visible { color: var(--text); border-color: rgba(82, 211, 216, .6); background: rgba(82, 211, 216, .1); }
 
 /* Each section is a panel, like the cards of the site. */
 .legal-page section {
@@ -56,15 +56,15 @@
 .legal-page h2 {
   margin: 0 0 10px;
   font-size: 19px;
-  color: #52d3d8;
+  color: light-dark(#1b7579, #52d3d8);
 }
 .legal-page p,
-.legal-page li { line-height: 1.65; color: #d6dcda; font-size: 15px; }
+.legal-page li { line-height: 1.65; color: var(--text); font-size: 15px; }
 .legal-page p { margin: 8px 0; }
 .legal-page ul { margin: 8px 0 0; padding-left: 22px; }
 .legal-page li + li { margin-top: 6px; }
-.legal-page a { color: #7fe3ea; }
-.legal-page a:hover { color: #ffffff; }
+.legal-page a { color: light-dark(#15787f, #7fe3ea); }
+.legal-page a:hover { color: var(--text); }
 
 .legal-page .legal-note {
   margin-top: 14px;
@@ -78,7 +78,7 @@
   padding: .1em .38em;
   border-radius: 5px;
   background: rgba(255, 255, 255, .08);
-  color: #ffffff;
+  color: var(--text);
   font-size: .92em;
 }
 
@@ -95,5 +95,5 @@
 
 /* Page « Nouveautés » (générée depuis CHANGELOG.md). */
 .changelog-page .changelog-version h2 { font-size: 21px; }
-.changelog-page .changelog-version h3 { margin: 16px 0 4px; font-size: 16px; color: #f4f6f5; }
+.changelog-page .changelog-version h3 { margin: 16px 0 4px; font-size: 16px; color: var(--text); }
 .changelog-page .changelog-version:first-of-type { border-color: rgba(82, 211, 216, .45); }

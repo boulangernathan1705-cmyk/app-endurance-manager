@@ -2,8 +2,8 @@
 .registration-workspace-head h2{margin:0}
 .registration-workspace-actions{display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-wrap:wrap}
 .registration-workspace-actions .category-add-button,.registration-close-button{flex:0 0 auto;margin:0!important}
-.registration-origin-info{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border:1px solid #566267;border-radius:50%;color:#aebabe;font-size:10px;font-weight:900;line-height:1;cursor:help;vertical-align:middle;opacity:.72}
-.registration-origin-info:hover,.registration-origin-info:focus{opacity:1;border-color:var(--green);color:#dfffe7}
+.registration-origin-info{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border:1px solid var(--border);border-radius:50%;color:var(--muted);font-size:10px;font-weight:900;line-height:1;cursor:help;vertical-align:middle;opacity:.72}
+.registration-origin-info:hover,.registration-origin-info:focus{opacity:1;border-color:var(--green);color:var(--text)}
 .pilot-name .registration-origin-info{margin-left:3px}
 
 /* Les cartes pilotes utilisent un nom et un logo visuellement équilibrés. */
@@ -50,12 +50,12 @@
 .departure-fold[id^="departure-"]>summary>.ux-summary-registration-actions .ux-summary-registration-toggle{
   border:1px solid #71e0e5;
   background:linear-gradient(180deg,#68dce1,#3bbbc2);
-  color:#061416;
+  color:var(--on-accent);
 }
 .departure-fold[id^="departure-"]>summary>.ux-summary-registration-actions .ux-summary-registration-other{
   border:1px solid #4fb7bd;
-  background:linear-gradient(180deg,#2c666a,#214f53);
-  color:#e8fbfb;
+  background:linear-gradient(180deg,#2c666a,var(--panel3));
+  color:var(--text);
 }
 .departure-fold[id^="departure-"]>summary>.ux-summary-registration-actions .ux-summary-registration-toggle:hover,
 .departure-fold[id^="departure-"]>summary>.ux-summary-registration-actions .ux-summary-registration-other:hover{filter:brightness(1.08)}
@@ -113,7 +113,7 @@
 .preferred-pilot-entry{display:flex;align-items:center;gap:8px;min-width:0}
 .preferred-pilot-entry input{flex:1;min-width:0}
 .preferred-pilot-entry button{flex:none;min-height:40px;padding:6px 12px}
-.preferred-pilot-chip{display:inline-flex;align-items:center;gap:4px;padding:3px 4px 3px 10px;border:1px solid rgba(82,211,216,.45);border-radius:999px;background:rgba(82,211,216,.1);font-size:13px;font-weight:700}
+.preferred-pilot-chip{display:inline-flex;align-items:center;gap:4px;padding:3px 4px 3px 10px;border:1px solid color-mix(in srgb, var(--community-accent) 45%, transparent);border-radius:999px;background:color-mix(in srgb, var(--community-accent) 10%, transparent);font-size:13px;font-weight:700}
 .preferred-pilot-chip button{display:grid;place-items:center;width:22px;height:22px;min-height:0;padding:0;border:0;border-radius:50%;background:transparent;color:inherit;font-size:16px;line-height:1;cursor:pointer}
 .preferred-pilot-chip button:hover{background:rgba(255,255,255,.12)}
 .registration-comment textarea{width:100%;min-width:0;margin:0;padding:11px;border:1px solid var(--border);border-radius:4px;outline:none;resize:vertical;font:inherit}

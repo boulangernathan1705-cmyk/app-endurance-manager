@@ -193,10 +193,12 @@ test('community look: name, short name and accent by its admins, icon from its D
   assert.match(settings.community.logoUrl,/^https:\/\/cdn\.discordapp\.com\/icons\/\d+\/0123456789abcdef0123456789abcdef\.png/);
   assert.equal(settings.community.bannerUrl,null);
   assert.equal((await call('/api/community/appearance','PATCH',{name:'Commu Dev',shortName:'DEV',accent:'javascript:x'})).status,400);
-  assert.equal((await call('/api/community/appearance','PATCH',{name:'Ma Commu',shortName:'MC',accent:'#ff8800'})).status,200);
+  assert.equal((await call('/api/community/appearance','PATCH',{name:'Ma Commu',shortName:'MC',palette:'orange',defaultMode:'light'})).status,200);
+  assert.equal((await call('/api/community/appearance','PATCH',{name:'Ma Commu',shortName:'MC',palette:'custom',defaultMode:'light'})).status,400);
+  assert.equal((await call('/api/community/appearance','PATCH',{name:'Ma Commu',shortName:'MC',palette:'blue',defaultMode:'invalid'})).status,400);
   const session=await (await call('/api/session')).json();
   assert.equal(session.community.name,'Ma Commu');assert.equal(session.community.shortName,'MC');
-  assert.equal(session.community.appearance.accent,'#ff8800');assert.ok(session.community.appearance.logoUrl);
+  assert.equal(session.community.appearance.accent,'#ffb36b');assert.equal(session.community.appearance.palette,'orange');assert.equal(session.community.appearance.defaultMode,'light');assert.ok(session.community.appearance.logoUrl);
 });
 
 test('a new icon on the Discord server becomes the community logo when a member is checked; the rest of the appearance stays', async t => {

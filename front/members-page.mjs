@@ -1,3 +1,5 @@
+import {PALETTES, paletteFor} from '../shared/appearance.mjs';
+import {applyAppearance} from './appearance.mjs';
 import {helpContext} from './context-help.mjs';
 const app = document.getElementById('members-app');
 const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
@@ -284,15 +286,15 @@ function modulesMarkup(settings, setup) {
 // « Apparence »: the form on the left, the preview of the site on the right.
 function lookMarkup(settings) {
   const look = settings.community;
-  const accent = look.accent || '#52d3d8';
+  const selected = paletteFor(look), mode = look.defaultMode === 'light' ? 'light' : 'dark', accent = selected[mode];
   return `<div class="admin-head"><h2>Apparence</h2><p>L’aperçu montre tout de suite ce que verront tes membres.</p></div>
     <div class="admin-look">
       <div class="admin-stack">
         <section class="admin-card"><form class="settings-appearance" data-appearance>
           <label>Nom de la communauté<input name="name" maxlength="80" required value="${esc(look.name)}"></label>
           <label><span>Nom court <small>(onglet du navigateur)</small></span><input name="shortName" maxlength="12" required value="${esc(look.shortName)}"></label>
-          <div class="settings-accent"><label><span>Couleur d’accent <span class="tip-info" data-tip="Couleur des boutons, des traits et des repères sur le site de ta communauté.">ⓘ</span></span><input name="accent" type="color" value="${esc(accent)}"></label>
-            <label class="role-pill"><input type="checkbox" name="defaultAccent" ${look.accent ? '' : 'checked'}><span>Couleur du site</span></label></div>
+          <fieldset class="appearance-options"><legend>Couleur de la communauté</legend><div class="palette-choices">${PALETTES.map(palette => `<label class="palette-choice"><input type="radio" name="palette" value="${palette.id}" ${palette.id === selected.id ? 'checked' : ''}><span class="palette-dot" style="--swatch:${palette.light}"></span><span>${palette.name}</span></label>`).join('')}</div></fieldset>
+          <fieldset class="appearance-options"><legend>Affichage par défaut</legend><div class="mode-choices"><label><input type="radio" name="defaultMode" value="light" ${mode === 'light' ? 'checked' : ''}>☀ Clair</label><label><input type="radio" name="defaultMode" value="dark" ${mode === 'dark' ? 'checked' : ''}>☾ Sombre</label></div><p class="members-help">Chaque pilote peut changer l’affichage avec le bouton Clair / Sombre.</p></fieldset>
           <p class="members-help">Le logo est l’icône du serveur Discord${look.discordServer ? ` « ${esc(look.discordServer)} »` : ''} : change-la sur Discord.${look.logoUrl ? '' : ' Le serveur n’a pas d’icône : le logo du site est utilisé.'}</p>
           <div class="settings-actions"><button class="primary-button" type="submit">Enregistrer</button><span class="settings-status" aria-live="polite"></span></div></form></section>
         <section class="admin-card settings-banner-card"><h3>Bannière</h3><div class="settings-banner">
@@ -302,7 +304,7 @@ function lookMarkup(settings) {
           <p class="members-help">Format conseillé : 2048 × 512 (4 fois plus large que haute). Tu la cadres et la zoomes avant de l’enregistrer ; elle est allégée automatiquement.</p></div></section>
       </div>
       <div class="admin-preview-wrap"><p class="admin-preview-label">Aperçu : ce que verront tes membres</p>
-        <div class="admin-preview" data-look-preview style="--preview-accent:${esc(accent)}">
+        <div class="admin-preview" data-look-preview data-preview-mode="${mode}" style="--preview-accent:${esc(accent)}">
           <div class="admin-preview-banner"><img src="${esc(look.bannerUrl || '/images/endurance-manager-banner.webp')}" alt=""></div>
           <div class="admin-preview-nav">${look.logoUrl ? `<img class="admin-preview-badge" src="${esc(look.logoUrl)}" alt="">` : `<b class="admin-preview-badge" data-preview-short>${esc(String(look.shortName || look.name).slice(0, 4))}</b>`}<span>EVENT SOLO</span><span class="is-active">ENDURANCE</span><span>Mes inscriptions</span></div>
           <div class="admin-preview-body">
@@ -699,8 +701,9 @@ app.addEventListener('submit', async event => {
   const status = form.querySelector('.settings-status');
   status.textContent = 'Enregistrement…';
   try {
-    await api('/api/community/appearance', 'PATCH', {name:form.elements.name.value, shortName:form.elements.shortName.value, accent:form.elements.defaultAccent.checked ? null : form.elements.accent.value});
-    status.textContent = '✓ Enregistré. Recharge la page pour voir le résultat.';
+    await api('/api/community/appearance', 'PATCH', {name:form.elements.name.value, shortName:form.elements.shortName.value, palette:form.elements.palette.value, defaultMode:form.elements.defaultMode.value});
+    applyAppearance({palette:form.elements.palette.value, defaultMode:form.elements.defaultMode.value});
+    status.textContent = '✓ Apparence enregistrée.';
   } catch (error) { status.textContent = error.message; }
 });
 
@@ -710,13 +713,15 @@ function updatePreview(form) {
   if (!preview) return;
   const short = preview.querySelector('[data-preview-short]');
   if (short) short.textContent = (form.elements.shortName.value || form.elements.name.value || 'MC').slice(0, 4);
-  preview.style.setProperty('--preview-accent', form.elements.defaultAccent.checked ? '#52d3d8' : form.elements.accent.value);
+  const mode = form.elements.defaultMode.value;
+  preview.dataset.previewMode = mode;
+  preview.style.setProperty('--preview-accent', paletteFor({palette:form.elements.palette.value})[mode]);
 }
 
 app.addEventListener('change', async event => {
   const box = event.target;
   const look = box.closest('form[data-appearance]');
-  if (look) { if (box.name === 'accent') look.elements.defaultAccent.checked = false; updatePreview(look); return; }
+  if (look) { updatePreview(look); return; }
   // Recap: the fields of the chosen kind of recap.
   if (box.matches('[data-banner-file]') && box.files?.[0]) {
     const container = box.closest('.settings-banner'), status = container.querySelector('.settings-status');

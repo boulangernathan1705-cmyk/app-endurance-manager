@@ -61,6 +61,7 @@ function stylesheetPaths(source, sourceName) {
 }
 
 function injectI18n(source) {
+  source = source.replaceAll('/styles/appearance.css', '/appearance.css');
   if (source.includes('/front/i18n.mjs') && source.includes('/front/i18n-content.mjs') && source.includes('/front/language-toggle-layout.mjs')) return source;
   if (!source.includes('</head>')) throw new Error('Document HTML sans balise </head> pour le sélecteur de langue.');
   return source.replace('</head>', `${i18nScriptTag}\n</head>`);
@@ -102,10 +103,12 @@ const paths = [
 // styles/ux-refresh.css is the final layer that replaces older rules: keep it last in the
 // shared bundle whichever page lists it first.
 const FINAL_LAYER = 'styles/ux-refresh.css';
-const uniqueStylesheetPaths = [...new Set(paths)].sort((a, b) => (a === FINAL_LAYER) - (b === FINAL_LAYER));
+const uniqueStylesheetPaths = [...new Set(paths)].filter(path => path !== 'styles/appearance.css').sort((a, b) => (a === FINAL_LAYER) - (b === FINAL_LAYER));
 
 const cssParts = [];
 for (const path of uniqueStylesheetPaths) cssParts.push(`/* ${path} */\n${await inlineCss(path)}`);
+// The appearance layer must override every legacy page layer.
+cssParts.push(await readFile(root + 'styles/appearance.css', 'utf8'));
 const bundledCss = cssParts.join('\n\n') + '\n';
 if (/^\s*@import\s+url\(/mi.test(bundledCss)) throw new Error('Le bundle CSS contient encore un @import après compilation.');
 await writeFile(new URL('app.css', out), bundledCss);
@@ -132,6 +135,7 @@ for (const file of ['app.js', 'crew-builder.js', 'help.js', 'privacy.css', 'sw.j
   await copyFile(root + file, new URL(file, out));
 }
 await copyFile(root + 'help.css', new URL('help.css', out));
+await copyFile(root + 'styles/appearance.css', new URL('appearance.css', out));
 await cp(root + 'images', new URL('images/', out), {recursive: true});
 await cp(root + 'front', new URL('front/', out), {recursive: true});
 await writeFile(new URL('front/version.json', out), JSON.stringify({build: BUILD_ID}) + '\n');

@@ -72,7 +72,7 @@
 }
 
 .help-item[open] {
-  border-color: #3b474c;
+  border-color: var(--border);
   background: var(--panel2);
 }
 
@@ -115,7 +115,7 @@
 
 .help-item-body {
   padding: 0 18px 20px 56px;
-  color: #d9dddf;
+  color: var(--text);
   line-height: 1.6;
 }
 
@@ -177,7 +177,7 @@
 .help-demo-hours .is-on {
   border-color: rgba(49,184,107,.55);
   background: rgba(49,184,107,.14);
-  color: #d9ffe4;
+  color: var(--text);
 }
 
 .help-status-grid,
@@ -226,9 +226,9 @@
 
 .help-screenshot {
   overflow: hidden;
-  border: 1px solid #394147;
+  border: 1px solid var(--border);
   border-radius: 10px;
-  background: #0d1012;
+  background: var(--bg);
   box-shadow: 0 12px 30px rgba(0,0,0,.18);
 }
 
@@ -246,15 +246,15 @@
   max-height: 720px;
   object-fit: contain;
   object-position: top center;
-  background: #0d1012;
+  background: var(--bg);
 }
 
 .help-screenshot figcaption {
   margin: 0;
   padding: 11px 14px;
-  border-top: 1px solid #293035;
-  background: #15191b;
-  color: #cbd3d6;
+  border-top: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--text);
   font-size: 12px;
   line-height: 1.45;
 }

@@ -1,0 +1,79 @@
+/* Shared neutral surfaces. Availability, category and simulator colours remain semantic. */
+:root, html[data-theme="dark"], [data-preview-mode="dark"] {
+  color-scheme: dark;
+  --bg: #111820;
+  --panel: #1b2530;
+  --panel2: #25323f;
+  --panel3: #344453;
+  --border: #536576;
+  --text: #f2f5f8;
+  --muted: #b3c0cc;
+  --on-accent: #101820;
+  --brand-cyan: var(--community-accent);
+  --brand-cream: var(--text);
+  --green: #45c884;
+  --red: #ff929a;
+  --yellow: #e9ca70;
+}
+html[data-theme="light"], [data-preview-mode="light"] {
+  color-scheme: light;
+  --bg: #eef2f6;
+  --panel: #ffffff;
+  --panel2: #e4eaf1;
+  --panel3: #d8e1eb;
+  --border: #93a3b4;
+  --text: #172634;
+  --muted: #4d6173;
+  --on-accent: #ffffff;
+  --green: #147849;
+  --red: #b52d40;
+  --yellow: #806008;
+}
+html[data-theme] { background: var(--bg); }
+html[data-theme] body { background: var(--bg); color: var(--text); }
+html[data-theme] body::before, html[data-theme] body::after { display: none; }
+html[data-theme] .site-nav-shell { background: var(--panel); border-color: var(--border); }
+html[data-theme] .primary-button,
+html[data-theme] .save-button,
+html[data-theme] .hub-login-button,
+html[data-theme] .game-hub-enter {
+  background: var(--community-accent); color: var(--on-accent); border-color: var(--community-accent);
+}
+html[data-theme] .secondary-button { background: var(--panel2); color: var(--text); border-color: var(--border); }
+html[data-theme] :is(input,select,textarea) { color: var(--text); background-color: var(--panel); border-color: var(--border); accent-color: var(--community-accent); }
+html[data-theme] :is(input,textarea)::placeholder { color: var(--muted); opacity: 1; }
+html[data-theme] :focus-visible { outline: 3px solid var(--community-accent); outline-offset: 3px; }
+html[data-theme] a:not([class]) { color: var(--community-accent); }
+html[data-theme] .top-stripes div:nth-child(1), html[data-theme] .top-stripes div:nth-child(2) { background: var(--community-accent); }
+html[data-theme] header.site-hero::after { background: var(--community-accent); }
+html[data-theme] .brand-copy span { color: var(--community-accent); }
+html[data-theme="light"] .circuit-visual img { filter: brightness(.3); }
+.account-bar { gap: 8px; }
+.display-mode-button {
+  flex: none; padding: 7px 10px; min-height: 34px; border: 1px solid var(--border); border-radius: 8px;
+  background: var(--panel2); color: var(--text); font: inherit; font-size: 12px; font-weight: 700; white-space: nowrap;
+}
+.appearance-options { min-width: 0; margin: 8px 0; padding: 0; border: 0; }
+.appearance-options legend { margin-bottom: 10px; color: var(--text); font-weight: 800; }
+.palette-choices { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; }
+.palette-choice, .mode-choices label {
+  display: flex !important; align-items: center; gap: 8px; margin: 0; padding: 10px;
+  border: 1px solid var(--border); border-radius: 10px; background: var(--panel); color: var(--text); cursor: pointer;
+}
+.palette-choice:has(input:checked), .mode-choices label:has(input:checked) { border-color: var(--community-accent); box-shadow: inset 0 0 0 1px var(--community-accent); }
+.palette-choice input, .mode-choices input { width: 16px; min-width: 16px; height: 16px; margin: 0; }
+.palette-dot { width: 20px; height: 20px; flex: none; border-radius: 50%; background: var(--swatch); box-shadow: 0 0 0 1px rgba(0,0,0,.15); }
+.mode-choices { display: flex; gap: 8px; }
+.mode-choices label { flex: 1; }
+.admin-preview[data-preview-mode] { background: var(--bg); color: var(--text); }
+.admin-preview[data-preview-mode] .admin-preview-nav { background: var(--panel); color: var(--muted); }
+.admin-preview[data-preview-mode] .admin-preview-nav .is-active { color: var(--preview-accent); }
+.admin-preview[data-preview-mode] .admin-preview-button { color: var(--on-accent); }
+.admin-preview[data-preview-mode] .admin-preview-race { background: var(--panel); }
+@media(max-width:700px) { .display-mode-button { padding: 6px 8px; font-size: 11px; } }
+/* Filled controls retain their own contrast, including the simulator selector. */
+html[data-theme] .site-nav-shell #navigation .nav-game-switcher-button[aria-current="page"] { color: #fff !important; }
+html[data-theme] .site-nav-shell .nav-game-switcher-lmu:hover,
+html[data-theme] .site-nav-shell .nav-game-switcher-iracing:hover { color: var(--text) !important; background: var(--panel3) !important; }
+html[data-theme] .site-nav-shell .nav-section-button.active,
+html[data-theme] .site-nav-shell .nav-section-button[aria-current="page"] { border-color: var(--community-accent) !important; color: var(--community-accent) !important; background: color-mix(in srgb, var(--community-accent) 12%, var(--panel)) !important; }

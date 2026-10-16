@@ -1,6 +1,6 @@
 /* Layout des cartes d'événements sur les accueils LMU et iRacing. */
 .event-card.event-card-harmonized .event-compact-date {
-  color: #aebbbc;
+  color: var(--muted);
   font-size: 12px;
   font-weight: 800;
   white-space: nowrap;
@@ -19,7 +19,7 @@
 
 .event-card.event-card-harmonized .event-pilot-count {
   display: block;
-  color: #b6c3c5;
+  color: var(--text);
   font-size: 12px;
   font-weight: 800;
   line-height: 1.2;
@@ -55,7 +55,7 @@
 
   .event-card.event-card-harmonized .event-name {
     margin: 0 !important;
-    color: #f4ead9;
+    color: var(--text);
     font-size: 18px;
     font-weight: 900;
     line-height: 1.15;

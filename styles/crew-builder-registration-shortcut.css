@@ -22,7 +22,7 @@ body.registration-modal-open {
   justify-content: center;
   padding: clamp(12px, 3vh, 28px) 12px;
   overflow-y: auto;
-  background: rgba(3, 8, 11, .82);
+  background: color-mix(in srgb, var(--panel) 82%, transparent);
   backdrop-filter: blur(5px);
   -webkit-backdrop-filter: blur(5px);
 }
@@ -35,7 +35,7 @@ body.registration-modal-open {
   overflow: hidden;
   border: 1px solid rgba(93, 142, 148, .72);
   border-radius: 16px;
-  background: linear-gradient(180deg, #151d20, #0c1113);
+  background: linear-gradient(180deg, var(--panel), var(--panel));
   box-shadow: 0 28px 70px rgba(0, 0, 0, .58);
 }
 
@@ -47,7 +47,7 @@ body.registration-modal-open {
   gap: 18px;
   padding: 16px 18px 14px;
   border-bottom: 1px solid rgba(86, 117, 122, .45);
-  background: rgba(12, 18, 21, .97);
+  background: var(--panel);
 }
 
 .registration-modal-header > div {

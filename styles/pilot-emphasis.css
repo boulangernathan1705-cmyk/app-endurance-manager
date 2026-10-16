@@ -8,14 +8,14 @@
 .pilot-section .pilot-row .edit-button.ux-pilot-edit {
   border-color: rgba(236, 188, 144, .58);
   background: rgba(236, 188, 144, .16);
-  color: #f1d4b9;
+  color: var(--text);
 }
 
 .pilot-section .pilot-row .edit-button.ux-pilot-edit:hover,
 .pilot-section .pilot-row .edit-button.ux-pilot-edit:focus-visible {
   border-color: rgba(236, 188, 144, .8);
   background: rgba(236, 188, 144, .24);
-  color: #ffe7d1;
+  color: var(--text);
 }
 
 /* Course: les pilotes d’un équipage utilisent les mêmes cartes lisibles que les inscrits. */
