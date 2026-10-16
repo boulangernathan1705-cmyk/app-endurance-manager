@@ -1,5 +1,4 @@
 import worker from './worker.mjs';
-import {purgeTraining, refreshLaptimes} from './training.mjs';
 import {homeRedirect, homePage} from './home.mjs';
 import {isWeeklyDiscordMutation, mutationTarget} from './discord-weekly-format.mjs';
 import {syncWeeklyDiscord, syncDueRecaps} from './discord-weekly.mjs';
@@ -133,9 +132,6 @@ export default {
     run('Scheduled cleanup failed', () => cleanup(env));
     // Notifications of the bell older than 30 days.
     run('Notifications cleanup failed', () => purgeNotifications(env));
-    run('Training cleanup failed', () => purgeTraining(env));
-    // :45 The reference lap times of the circuit sheets: read again once a day, tried every hour until read.
-    if (slot === 3) run('Laptimes import failed', () => refreshLaptimes(env));
     // Every quarter of an hour: the crews on Discord (voice channels, reminders), a few requests at a
     // time (fewer next to the iRacing import, which makes many).
     run('Crew Discord sync failed', () => syncCrewDiscord(env, at.getTime(), {requests:slot === 1 ? 4 : 8}));
