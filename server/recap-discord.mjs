@@ -1,3 +1,4 @@
+import {effectivePermissions,withBotAccess,VOICE_ACCESS} from './discord-permissions.mjs';
 import {iracingSoloSql} from './iracing-visibility.mjs';
 // Text recaps configured explicitly by an admin, published exclusively by the bot.
 import {loadWeeklyDiscordSnapshot, siteOf} from './discord-weekly.mjs';
@@ -36,20 +37,6 @@ async function discord(env, method, path, body, budget = {left:12}) {
   if (!response.ok) throw Object.assign(new Error('Discord indisponible'), {status:response.status, code:data?.code, path});
   return data;
 }
-function effectivePermissions(roles, member, guildId, channel, clientId) {
-  const ids = new Set([guildId, ...(member.roles || [])]);
-  let rights = roles.filter(role => ids.has(role.id)).reduce((all, role) => all | BigInt(role.permissions || 0), 0n);
-  if (rights & ADMIN) return ~0n;
-  const overrides = channel.permission_overwrites || [];
-  const apply = override => { if (override) rights = (rights & ~BigInt(override.deny || 0)) | BigInt(override.allow || 0); };
-  apply(overrides.find(item => item.id === guildId));
-  const roleOverrides = overrides.filter(item => item.type === 0 && item.id !== guildId && ids.has(item.id));
-  const deny = roleOverrides.reduce((all, item) => all | BigInt(item.deny || 0), 0n);
-  const allow = roleOverrides.reduce((all, item) => all | BigInt(item.allow || 0), 0n);
-  rights = (rights & ~deny) | allow;
-  apply(overrides.find(item => item.type === 1 && item.id === clientId));
-  return rights;
-}
 export async function recapDestinations(env, community) {
   if (!community.discordGuildId || !env.DISCORD_CLIENT_ID) throw Object.assign(new Error('Relie le serveur de la communauté au bot.'), {status:401});
   const guild = community.discordGuildId;
@@ -59,9 +46,10 @@ export async function recapDestinations(env, community) {
   if (!Array.isArray(channels) || !Array.isArray(roles) || !member) throw new Error('Réponse Discord invalide.');
   return channels.filter(channel => [0,4].includes(channel.type)).map(channel => {
     const rights = effectivePermissions(roles, member, guild, channel, env.DISCORD_CLIENT_ID);
-    const required = REQUIRED | (channel.type === 4 ? MANAGE : 0n);
+    const voiceRequired = channel.type === 4 && community.modules?.crewChannels === true;
+    const required = REQUIRED | (channel.type === 4 ? MANAGE : 0n) | (voiceRequired ? VOICE_ACCESS : 0n);
     return {id:channel.id, name:channel.name, type:channel.type, ready:(rights & required) === required,
-      missing:[['Voir le salon',VIEW],['Envoyer des messages',SEND],['Voir les anciens messages',HISTORY],['Intégrer des liens',EMBED], ...(channel.type === 4 ? [['Gérer les salons',MANAGE]] : [])].filter(([,bit]) => !(rights & bit)).map(([label]) => label)};
+      missing:[['Voir le salon',VIEW],['Envoyer des messages',SEND],['Voir les anciens messages',HISTORY],['Intégrer des liens',EMBED], ...(channel.type === 4 ? [['Gérer les salons',MANAGE]] : []),...(voiceRequired ? [['Se connecter',1n << 20n]] : [])].filter(([,bit]) => !(rights & bit)).map(([label]) => label)};
   });
 }
 export function recapInput(input) {
@@ -255,7 +243,7 @@ async function publish(env, timestamp, community, settings, row, event, budget, 
       const anchor = channels.find(item => item.id === settings.destination_id && item.type === 4);
       if (!anchor) throw Object.assign(new Error('Discord indisponible'), {status:404,code:10003});
       // Categories cannot be nested: explicitly retain the chosen category's access rules.
-      category = (await discord(env,'POST',`/guilds/${row.guild_id}/channels`,{type:4,name:raceCategoryName(event),permission_overwrites:anchor.permission_overwrites || []},budget)).id;
+      category = (await discord(env,'POST',`/guilds/${row.guild_id}/channels`,{type:4,name:raceCategoryName(event),permission_overwrites:withBotAccess(anchor.permission_overwrites,env.DISCORD_CLIENT_ID,REQUIRED | MANAGE | (community.modules?.crewChannels === true ? VOICE_ACCESS : 0n))},budget)).id;
       row.category_id = category;
       await env.DB.prepare('UPDATE discord_recap_publications SET category_id=? WHERE community_id=? AND event_id=?').bind(category,community.id,row.event_id).run();
       await placeCategory(env,community,row.guild_id,channels,category,settings.destination_id,budget);

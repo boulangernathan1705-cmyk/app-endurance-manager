@@ -508,3 +508,18 @@ test('automatic recap sync regroups scattered existing race categories and then 
   calls.length=0;await syncBotRecaps(env,NOW+2000,COMMUNITY);
   assert.equal(calls.filter(call=>call.method==='PATCH').length,0,'already grouped categories do not generate writes');
 });
+
+
+test('recap setup validates voice access when crew channels are on and new race categories retain private pilot rules',async t=>{
+  const overrides=[{id:GUILD,type:0,allow:'0',deny:'1049600'},{id:'777777777777777770',type:0,allow:'1049600',deny:'0'},{id:BOT,type:1,allow:'85008',deny:'0'}];
+  const {env,DB,channels}=setup(t,{rights:'1133584',overrides});
+  const community={...COMMUNITY,modules:{...COMMUNITY.modules,crewChannels:true}};
+  const before=(await recapDestinations(env,community)).find(item=>item.id===CATEGORY);
+  assert.equal(before.ready,false);assert.deepEqual(before.missing,['Se connecter']);
+  overrides.find(item=>item.id===BOT).allow='1133584';
+  assert.equal((await recapDestinations(env,community)).find(item=>item.id===CATEGORY).ready,true);
+  race(DB);await saveBotRecap(env,community,SETTINGS);await syncBotRecaps(env,NOW,community);
+  const createdCategory=channels.find(item=>item.type===4&&item.name.startsWith('🏎️'));
+  assert.deepEqual(createdCategory.permission_overwrites.slice(0,2),overrides.slice(0,2));
+  assert.equal(createdCategory.permission_overwrites.find(item=>item.id===BOT).allow,'1133584');
+});

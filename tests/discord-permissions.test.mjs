@@ -1,0 +1,28 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {effectivePermissions,withBotAccess,VOICE_ACCESS,VIEW,CONNECT,ADMIN} from '../server/discord-permissions.mjs';
+const guild='100000000000000001',bot='100000000000000002',pilots='100000000000000003';
+
+test('a private category denies a globally capable bot until its member exception is allowed',()=>{
+  const roles=[{id:guild,permissions:String(VOICE_ACCESS)}], member={roles:[]};
+  const overwrites=[{id:guild,type:0,allow:'0',deny:String(VIEW|CONNECT)},{id:pilots,type:0,allow:String(VIEW|CONNECT),deny:'0'}];
+  const before=structuredClone(overwrites);
+  assert.equal(effectivePermissions(roles,member,guild,{permission_overwrites:overwrites},bot)&VIEW,0n);
+  const protectedRules=withBotAccess(overwrites,bot,VOICE_ACCESS);
+  assert.deepEqual(overwrites,before,'input is immutable');
+  assert.deepEqual(protectedRules.slice(0,2),before,'private member/role rules are retained');
+  assert.equal(effectivePermissions(roles,member,guild,{permission_overwrites:protectedRules},bot)&VOICE_ACCESS,VOICE_ACCESS);
+  assert.equal(effectivePermissions(roles,{roles:[]},guild,{permission_overwrites:protectedRules},'other')&VIEW,0n,'non-pilots still cannot see');
+  assert.equal(effectivePermissions(roles,{roles:[pilots]},guild,{permission_overwrites:protectedRules},'pilot')&VIEW,VIEW);
+});
+
+test('bot access merges an existing member exception without losing unrelated denied bits or duplicating it',()=>{
+  const rules=[{id:bot,type:1,allow:'0',deny:String(CONNECT|(1n<<21n))}];
+  const protectedRules=withBotAccess(rules,bot,VOICE_ACCESS);
+  assert.equal(protectedRules.length,1);
+  assert.equal(protectedRules[0].allow,String(VOICE_ACCESS));
+  assert.equal(protectedRules[0].deny,String(1n<<21n));
+  assert.deepEqual(withBotAccess(protectedRules,bot,VOICE_ACCESS),protectedRules);
+  const rights=effectivePermissions([{id:guild,permissions:String(ADMIN)}],{roles:[]},guild,{permission_overwrites:rules},bot);
+  assert.equal(rights&VOICE_ACCESS,VOICE_ACCESS,'administrator bypasses local denies');
+});

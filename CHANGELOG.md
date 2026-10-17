@@ -4,7 +4,7 @@
 
 ### 🔧 Corrections et améliorations
 
-- **Discord** : catégories de course regroupées au même endroit ; droits manquants et erreurs des vocaux affichés plus précisément.
+- **Discord** : catégories de course regroupées ; accès vérifié dans les catégories privées avant activation et protégé pour le bot dans les nouveaux salons. Les erreurs indiquent le salon et les droits à corriger.
 
 ## v1.52 — 16 octobre 2026
 

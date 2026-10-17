@@ -29,7 +29,7 @@ import {setupOfficialServer} from './official-discord.mjs';
 
 import {botRecapSettings, recapDestinations, recapError, recapInput, validateRecapDestination, previewBotRecap, saveBotRecap, syncBotRecaps, sendBotRecapTest, repairBotRecap, RECAP_BOT_PERMISSIONS} from './recap-discord.mjs';
 import {notify, notificationsApi, departurePilots, eventPilots, crewPilots} from './notifications.mjs';
-import {botCanManageChannels, checkBot, serverCategories, closeDeletedCrewDiscord, CREW_BOT_PERMISSIONS} from './crew-discord.mjs';
+import {checkCrewAccess, validateCrewAccess, serverCategories, closeDeletedCrewDiscord, CREW_BOT_PERMISSIONS} from './crew-discord.mjs';
 // Official races (iRacing's official endurances, LMU official events): common to every community (migration 0039).
 const OFFICIAL = 'official';
 // A race of the current community, or an official race: any id from another community answers "introuvable".
@@ -140,10 +140,16 @@ function botInvite(env, guildId, permissions = '0') {
 // stopped it, and where the voice channels are made (the server's categories to choose from).
 async function crewDiscordState(env, community) {
   const saved = await env.DB.prepare('SELECT last_error, last_error_at, voice_category_id FROM community_crew_discord WHERE community_id=?').bind(community.id).first();
-  const on = community.modules.crewChannels === true, bot = await checkBot(env, community.discordGuildId);
-  return {botReady:bot.ready, botProblem:bot.why, botMissing:bot.missing || [], botInviteUrl:botInvite(env, community.discordGuildId, CREW_BOT_PERMISSIONS),
+  const on = community.modules.crewChannels === true;
+  const failedChannelId = saved?.last_error?.match(/salon (\d{15,22})/)?.[1] || null;
+  const bot = await checkCrewAccess(env,community,{includeCategories:on,failedChannelId});
+  return {botReady:bot.ready, botProblem:bot.why, botMissing:bot.missing || [], botChannelName:bot.channelName || null, botInviteUrl:botInvite(env, community.discordGuildId, CREW_BOT_PERMISSIONS),
     lastError:on ? saved?.last_error || null : null, voiceCategoryId:saved?.voice_category_id || null,
-    categories:on ? await serverCategories(env, community.discordGuildId) : null};
+    categories:on ? bot.categories || null : null};
+}
+async function assertCrewAccess(env,community,options) {
+  try { return await validateCrewAccess(env,community,options); }
+  catch (error) { if (error.status === 400) fail(400,error.message); throw error; }
 }
 // Permissions of the actor in the current community (server/access.mjs).
 const can = (actor, permission) => Boolean(actor.permissions?.has(permission));
@@ -909,8 +915,7 @@ async function api(request, env) {
     const statements = [];
     // Crews on Discord (server/crew-discord.mjs): only once the bot has the rights to make the channels.
     if (typeof input.crewChannels === 'boolean') {
-      if (input.crewChannels && await botCanManageChannels(env, community.discordGuildId) !== true)
-        fail(400, 'Le bot n’a pas encore les droits pour créer les salons : clique sur « Donner les droits au bot », puis réessaie.');
+      if (input.crewChannels) await assertCrewAccess(env,community,{categoryId:typeof input.crewCategory === 'string' ? input.crewCategory.trim() : undefined});
       modules.crewChannels = input.crewChannels;
       if (input.crewChannels) statements.push(env.DB.prepare(`INSERT INTO community_crew_discord(community_id,updated_at) VALUES(?,?)
         ON CONFLICT(community_id) DO UPDATE SET last_error=NULL,last_error_at=NULL,updated_at=excluded.updated_at`).bind(community.id, now()));
@@ -918,6 +923,7 @@ async function api(request, env) {
     // Where the crews' voice channels are made: a category of the server, or '' for the top of the server.
     if (typeof input.crewCategory === 'string') {
       const category = input.crewCategory.trim();
+      await assertCrewAccess(env,community,{categoryId:category});
       if (category && !(await serverCategories(env, community.discordGuildId) || []).some(item => item.id === category)) fail(400, 'Cette catégorie n’existe pas sur ton serveur.');
       statements.push(env.DB.prepare(`INSERT INTO community_crew_discord(community_id,voice_category_id,updated_at) VALUES(?,?,?)
         ON CONFLICT(community_id) DO UPDATE SET voice_category_id=excluded.voice_category_id,last_error=NULL,last_error_at=NULL,updated_at=excluded.updated_at`).bind(community.id, category || null, now()));
