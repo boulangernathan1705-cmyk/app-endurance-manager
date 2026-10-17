@@ -140,7 +140,8 @@ test('a crew gets a voice channel « LMU-name » outside any category, followed 
   const row=DB.db.prepare('SELECT * FROM crew_discord').get();
   assert.ok(row.voice_id&&row.message_id);assert.equal(row.text_id,null);assert.equal(row.category_id,null);
   const recap=discord.calls.slice(mark).find(call=>call.path===`/channels/${row.voice_id}/messages`);
-  assert.match(recap.body.content,new RegExp(`<@${PILOT}>`));assert.deepEqual(recap.body.allowed_mentions,{users:[PILOT]});
+  assert.match(recap.body.content,/Alice/);assert.doesNotMatch(recap.body.content,/@/);
+  assert.deepEqual(recap.body.allowed_mentions,{parse:[]});assert.equal(recap.body.flags,4096);
   // Nothing changed: nothing sent.
   mark=discord.calls.length;await sync(startsAt-3*24*HOUR+HOUR);assert.deepEqual(since(discord.calls,mark),[]);
 
@@ -158,7 +159,8 @@ test('a crew gets a voice channel « LMU-name » outside any category, followed 
   mark=discord.calls.length;await sync(startsAt-23*HOUR);
   const reminder=discord.calls.slice(mark).filter(call=>call.method==='POST');
   assert.equal(reminder.length,1);assert.equal(reminder[0].path,`/channels/${row.voice_id}/messages`);assert.match(reminder[0].body.content,/⏰ .*Rappel/);
-  assert.deepEqual(reminder[0].body.allowed_mentions.users.sort(),[PILOT,MATE].sort());
+  assert.match(reminder[0].body.content,/Alice, Bob|Bob, Alice/);assert.doesNotMatch(reminder[0].body.content,/@/);
+  assert.deepEqual(reminder[0].body.allowed_mentions,{parse:[]});assert.equal(reminder[0].body.flags,4096);
   for(const actor of ['pilot','mate']){const item=(await notifications(req,actor)).find(item=>item.kind==='race_reminder');assert.ok(item,actor);assert.equal(item.crewName,'Les Tondeuz');assert.equal(item.channelUrl,`https://discord.com/channels/${GUILD}/${row.voice_id}`);}
   mark=discord.calls.length;await sync(startsAt-22*HOUR);assert.deepEqual(since(discord.calls,mark),[]);
   assert.equal((await notifications(req,'pilot')).filter(item=>item.kind==='race_reminder').length,1);
@@ -166,6 +168,8 @@ test('a crew gets a voice channel « LMU-name » outside any category, followed 
   mark=discord.calls.length;await sync(startsAt-30*60_000);
   const last=discord.calls.slice(mark).find(call=>call.method==='POST');
   assert.equal(last.path,`/channels/${row.voice_id}/messages`);assert.match(last.body.content,/On se retrouve ici/);
+  assert.match(last.body.content,/Alice, Bob|Bob, Alice/);assert.doesNotMatch(last.body.content,/@/);
+  assert.deepEqual(last.body.allowed_mentions,{parse:[]});assert.equal(last.body.flags,4096);
 
   // 2 h after the end: still a pilot in the voice channel, so it waits; then it is deleted with its chat.
   const endsAt=startsAt+6*HOUR;
@@ -178,6 +182,25 @@ test('a crew gets a voice channel « LMU-name » outside any category, followed 
   mark=discord.calls.length;assert.equal((await sync(endsAt+CLOSE_AFTER+2*HOUR)).closed,1);
   assert.deepEqual(discord.calls.slice(mark).filter(call=>call.method!=='GET').map(call=>`${call.method} ${call.path}`),[`DELETE /channels/${row.voice_id}`]);
   mark=discord.calls.length;await sync(endsAt+CLOSE_AFTER+3*HOUR);assert.deepEqual(since(discord.calls,mark),[]);
+});
+
+test('existing crew recaps are silently updated to plain community nicknames', async () => {
+  const {DB,req,login,sync,discord}=harness();
+  await login(ADMIN,'admin','Orga');await login(PILOT,'pilot','Alice');
+  await req('/api/community/modules','PATCH',{crewChannels:true},'admin');
+  await req('/api/events','POST',race,'admin');
+  const event=(await req('/api/events','GET',null,'admin')).data.events[0], departure=event.departures[0];
+  const base=`/api/events/${event.id}/departures/${departure.id}`;
+  await req(base+'/registrations','POST',{name:'x',category:'GT3',status:'whole'},'pilot');
+  await req(base+'/crews','POST',{name:'Sans ping',category:'GT3'},'pilot');
+  await sync(Date.now());
+  DB.db.prepare("UPDATE memberships SET nickname='Alice FMT @everyone' WHERE community_id=? AND user_id=?").run(DEV,PILOT);
+  DB.db.prepare("UPDATE crew_discord SET recap_hash='old-mentioned-recap'").run();
+  const mark=discord.calls.length;await sync(Date.now()+60_000);
+  const messages=discord.calls.slice(mark).filter(call=>call.path.includes('/messages'));
+  assert.equal(messages.length,1);assert.equal(messages[0].method,'PATCH');
+  assert.match(messages[0].body.content,/Alice FMT everyone/);assert.doesNotMatch(messages[0].body.content,/@/);
+  assert.deepEqual(messages[0].body.allowed_mentions,{parse:[]});
 });
 
 test('a crew opened by the first version loses its text channel and category, and old archives are deleted', async () => {
