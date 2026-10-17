@@ -7,8 +7,8 @@ import {effectivePermissions,guildPermissions,missingVoicePermissions,withBotAcc
 //   (race, time, car, pilots), edited without a ping when a pilot joins. 2 h after the planned end the voice channel
 //   is deleted with its chat, once no pilot of the crew is in it. A crew deleted before is closed at once.
 //   (The first version made a category with a text channel and archived it: what is left of it is deleted too.)
-// - raceReminders (« Rappels de course »): 24 h and 1 h before the start, a message in the crew's voice channel
-//   that mentions its pilots; 24 h before, a notification on the bell for every pilot entered on the start.
+// - raceReminders (« Rappels de course »): 24 h and 1 h before the start, a silent message in the crew's voice channel
+//   that names its pilots without mentions; 24 h before, a notification on the site's bell for every pilot entered on the start.
 // Everything is done by the bot (DISCORD_BOT_TOKEN) through Discord's REST API, by the scheduled task and right
 // after a change on a crew, a few requests at a time (a run of the Worker may make 50).
 import {allCommunities, communityById, communityUrl} from './community.mjs';
@@ -83,7 +83,7 @@ function startOf(row) {
 // The recap message of the voice channel's chat.
 function recapContent(env, community, row, start, pilots) {
   const unix = Math.floor(start.startsAt / 1000);
-  const names = pilots.map(pilot => pilot.user_id && /^\d{15,22}$/.test(pilot.user_id) ? `<@${pilot.user_id}>` : safe(pilot.name)).filter(Boolean);
+  const names = pilots.map(pilot => safe(pilot.name)).filter(Boolean);
   let link = '';
   try { link = `${communityUrl(env, community)}/${game(row.circuit)}/#event=${row.event_id}`; } catch {}
   return [
@@ -116,8 +116,9 @@ const TRACKED_CREWS = `SELECT d.crew_id AS row_id, d.community_id AS row_communi
 async function pilotsOf(env, crewIds) {
   const byCrew = new Map(crewIds.map(crewId => [crewId, []]));
   if (!crewIds.length) return byCrew;
-  const rows = (await env.DB.prepare(`SELECT cm.crew_id, p.user_id, COALESCE(p.name, r.name) AS name FROM crew_members cm
+  const rows = (await env.DB.prepare(`SELECT cm.crew_id, p.user_id, COALESCE(NULLIF(m.nickname,''), p.name, r.name) AS name FROM crew_members cm
     JOIN registrations r ON r.id=cm.registration_id JOIN participants p ON p.id=r.participant_id
+    LEFT JOIN memberships m ON m.user_id=p.user_id AND m.community_id=r.community_id AND m.status='member'
     WHERE cm.crew_id IN (${crewIds.map(() => '?').join(',')}) ORDER BY r.created_at, r.id`).bind(...crewIds).all()).results || [];
   for (const row of rows) byCrew.get(row.crew_id)?.push(row);
   return byCrew;
@@ -440,8 +441,8 @@ async function syncRow(env, budget, timestamp, community, setting, row, pilots) 
   const content = recapContent(env, community, row, start, pilots);
   const contentHash = await hash(content);
   if (!row.message_id) {
-    // Mentioned in the first message: Discord tells the pilots.
-    const message = await sendInChannel(env, budget, row, 'POST', `/channels/${row.voice_id}/messages`, {content, allowed_mentions:{users:current}});
+    // Plain names only: even the first message must not notify or ping the pilots.
+    const message = await sendInChannel(env, budget, row, 'POST', `/channels/${row.voice_id}/messages`, {content, allowed_mentions:{parse:[]}, flags:4096});
     Object.assign(row, {message_id:message.id, recap_hash:contentHash, members:JSON.stringify(current)});
     await env.DB.prepare('UPDATE crew_discord SET message_id=?, recap_hash=?, members=? WHERE crew_id=?').bind(message.id, contentHash, row.members, row.row_id).run();
   } else {
@@ -463,11 +464,11 @@ async function syncRow(env, budget, timestamp, community, setting, row, pilots) 
     let reminded = Number(row.reminded) || 0;
     // Only the closest one is sent (a crew opened 30 min before its start gets the « 1 h » one alone).
     const last = due[due.length - 1], unix = Math.floor(start.startsAt / 1000);
-    const who = current.map(id => `<@${id}>`).join(' ');
+    const who = pilots.map(pilot => safe(pilot.name)).filter(Boolean).join(', ');
     const content = last.before <= HOUR
       ? `⏰ ${who} Départ <t:${unix}:R> ! On se retrouve ici.`
       : `⏰ ${who} Rappel : **${safe(row.event_name)}**, départ <t:${unix}:F> (<t:${unix}:R>).`;
-    await sendInChannel(env, budget, row, 'POST', `/channels/${row.voice_id}/messages`, {content:content.replace(/ {2,}/g, ' '), allowed_mentions:{users:current}});
+    await sendInChannel(env, budget, row, 'POST', `/channels/${row.voice_id}/messages`, {content:content.replace(/ {2,}/g, ' '), allowed_mentions:{parse:[]}, flags:4096});
     for (const item of due) reminded |= item.bit;
     await env.DB.prepare('UPDATE crew_discord SET reminded=? WHERE crew_id=?').bind(reminded, row.row_id).run();
   }

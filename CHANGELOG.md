@@ -5,6 +5,7 @@
 ### 🔧 Corrections et améliorations
 
 - **Discord** : catégories de course regroupées ; accès vérifié dans les catégories privées avant activation et protégé pour le bot dans les nouveaux salons. Les erreurs indiquent le salon et les droits à corriger.
+- **Vocaux d’équipage** : noms des pilotes affichés sans mention, avec des messages et rappels silencieux.
 
 ## v1.52 — 16 octobre 2026
 
