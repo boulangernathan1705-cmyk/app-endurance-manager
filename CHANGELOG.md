@@ -1,5 +1,11 @@
 # Nouveautés d'Endurance Manager
 
+## v1.53 — 17 octobre 2026
+
+### 🔧 Corrections et améliorations
+
+- **Discord** : catégories de course regroupées au même endroit ; droits manquants et erreurs des vocaux affichés plus précisément.
+
 ## v1.52 — 16 octobre 2026
 
 ### 🔧 Corrections et améliorations

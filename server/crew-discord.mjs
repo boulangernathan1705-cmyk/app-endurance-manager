@@ -27,9 +27,9 @@ const LOCK_MS = 60_000;
 export const KEEP_ARCHIVES = 30 * 24 * HOUR;
 export const REMINDERS = [{bit:1, before:24 * HOUR}, {bit:2, before:HOUR}];
 // What the bot needs on the server for the crews (invite link of the « Modules » settings): view channels,
-// manage channels, send messages, read the history.
+// manage channels, connect to voice channels, send messages, read the history.
 const MANAGE_CHANNELS = 1n << 4n, SEND_MESSAGES = 1n << 11n, ADMINISTRATOR = 1n << 3n;
-const NEEDED = MANAGE_CHANNELS | (1n << 10n) | SEND_MESSAGES | (1n << 16n);
+const NEEDED = MANAGE_CHANNELS | (1n << 10n) | SEND_MESSAGES | (1n << 16n) | (1n << 20n);
 export const CREW_BOT_PERMISSIONS = String(NEEDED);
 const VOICE = 2, CATEGORY = 4;
 
@@ -46,7 +46,7 @@ async function discord(env, budget, method, path, body) {
   const data = response.status === 204 ? null : await response.json().catch(() => null);
   if (!response.ok) {
     const error = new Error(`Discord ${response.status}${data?.code ? ` (${data.code})` : ''}`);
-    error.status = response.status; error.code = data?.code;
+    error.status = response.status; error.code = data?.code; error.method = method; error.path = path;
     throw error;
   }
   return data;
@@ -54,7 +54,13 @@ async function discord(env, budget, method, path, body) {
 
 // What an admin can do when the bot is refused.
 function errorText(error) {
-  if (error?.status === 403) return 'Le bot n’a pas les droits nécessaires : clique sur « Donner les droits au bot ».';
+  if (error?.status === 403) {
+    const channelId = error.path?.match(/^\/channels\/(\d+)/)?.[1];
+    const action = error.method === 'DELETE' ? 'la suppression du salon'
+      : error.path?.includes('/messages') ? 'le message dans le vocal'
+      : error.method === 'PATCH' ? 'la modification du salon' : 'la création du salon';
+    return `Discord refuse ${action}${channelId ? ` (salon ${channelId})` : ''} : vérifie les droits du bot dans ce salon et sa catégorie, notamment « Voir le salon », « Gérer les salons » et « Se connecter ».`;
+  }
   return 'Discord n’a pas répondu : le bot réessaiera tout seul.';
 }
 
@@ -153,7 +159,7 @@ export async function syncCrewDiscord(env, timestamp = Date.now(), {community = 
     ORDER BY c.id IS NOT NULL, d.checked_at LIMIT 40`)
     .bind(...ids, timestamp).all()).results || [];
   const pilots = await pilotsOf(env, rows.filter(row => row.crew_id).map(row => row.crew_id));
-  const checked = [];
+  const checked = [], failed = new Set(), succeeded = new Set();
   for (const row of rows) {
     if (budget.left <= 0) break;
     const owner = communities.get(row.row_community), setting = settings.get(row.row_community), crewPilots = pilots.get(row.crew_id) || [];
@@ -167,16 +173,23 @@ export async function syncCrewDiscord(env, timestamp = Date.now(), {community = 
       const current = await env.DB.prepare(`${TRACKED_CREWS} WHERE d.crew_id=? AND d.closed_at IS NULL`).bind(row.row_id).first();
       if (!current) continue;
       const done = await syncRow(env, budget, timestamp, owner, setting, current, crewPilots);
-      if (done) report[done] += 1;
+      if (done) { report[done] += 1; succeeded.add(row.row_community); }
     } catch (error) {
       if (!(error instanceof Stop)) {
-        console.error('Crew Discord sync failed', owner?.slug, error instanceof Error ? error.message : 'unknown');
+        failed.add(row.row_community);
+        console.error('Crew Discord sync failed', owner?.slug, error instanceof Error ? error.message : 'unknown', error.method || '', error.path || '');
         if (error?.status === 403 || error?.status === 404) await env.DB.prepare('UPDATE community_crew_discord SET last_error=?, last_error_at=? WHERE community_id=?')
           .bind(errorText(error), Math.floor(timestamp / 1000), row.row_community).run().catch(() => {});
       }
     } finally {
       await env.DB.prepare('UPDATE crew_discord SET lock_until=0 WHERE crew_id=?').bind(row.row_id).run().catch(() => {});
     }
+  }
+  // A successful retry must not leave a historical warning displayed forever. Do not
+  // clear a refusal encountered elsewhere in this same pass or a more recent sync.
+  for (const communityId of succeeded) if (!failed.has(communityId)) {
+    await env.DB.prepare('UPDATE community_crew_discord SET last_error=NULL,last_error_at=NULL WHERE community_id=? AND last_error_at<=?')
+      .bind(communityId,Math.floor(timestamp / 1000)).run();
   }
   if (checked.length) await env.DB.prepare(`UPDATE crew_discord SET checked_at=? WHERE crew_id IN (${checked.map(() => '?').join(',')})`).bind(timestamp, ...checked).run();
 
@@ -291,6 +304,8 @@ export async function closeDeletedCrewDiscord(env, crewId, timestamp = Date.now(
   try {
     const row = await env.DB.prepare('SELECT *, crew_id AS row_id FROM crew_discord WHERE crew_id=?').bind(crewId).first();
     await closeRow(env, {left:3}, timestamp, row, [], {force:true});
+    await env.DB.prepare('UPDATE community_crew_discord SET last_error=NULL,last_error_at=NULL WHERE community_id=? AND last_error_at<=?')
+      .bind(row.community_id,Math.floor(timestamp / 1000)).run();
   } catch (error) {
     await env.DB.prepare(`UPDATE community_crew_discord SET last_error=?, last_error_at=?
       WHERE community_id=(SELECT community_id FROM crew_discord WHERE crew_id=?)`)
@@ -403,7 +418,6 @@ async function syncRow(env, budget, timestamp, community, setting, row, pilots) 
     const voice = await createVoice(env, budget, row, setting, {name:voiceName(row, crewName), type:VOICE});
     Object.assign(row, {voice_id:voice.id, message_id:null, parent_id:row.race_category || null});
     await env.DB.prepare('UPDATE crew_discord SET voice_id=?, message_id=NULL, parent_id=? WHERE crew_id=?').bind(voice.id, row.parent_id, row.row_id).run();
-    await env.DB.prepare('UPDATE community_crew_discord SET last_error=NULL, last_error_at=NULL WHERE community_id=?').bind(community.id).run();
     opened = true;
   }
   if (row.race_category && row.parent_id !== row.race_category) {
@@ -506,7 +520,9 @@ export async function checkBot(env, guildId) {
     const mine = new Set([String(guildId), ...(member?.roles || []).map(String)]);
     const rights = (Array.isArray(roles) ? roles : []).filter(role => mine.has(String(role.id))).reduce((all, role) => all | BigInt(role.permissions || '0'), 0n);
     const ready = (rights & ADMINISTRATOR) === ADMINISTRATOR || (rights & NEEDED) === NEEDED;
-    return {ready, why:ready ? null : 'rights'};
+    const missing = ready ? [] : [['Voir les salons',1n << 10n],['Gérer les salons',MANAGE_CHANNELS],['Envoyer des messages',SEND_MESSAGES],['Voir les anciens messages',1n << 16n],['Se connecter',1n << 20n]]
+      .filter(([,bit]) => !(rights & bit)).map(([label]) => label);
+    return {ready, why:ready ? null : 'rights', missing};
   } catch (error) {
     if (!(error instanceof Stop)) console.error('Bot rights failed', error instanceof Error ? error.message : 'unknown');
     // Not a member of the server (Unknown Member, Missing Access) or a bad token: the bot is not there for the site.

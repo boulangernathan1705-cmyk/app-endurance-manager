@@ -219,13 +219,14 @@ test('a manually deleted event keeps its channel until its last known end plus 2
   assert.equal(await cleanupEventRecaps(env,NOW),0);assert.equal(await cleanupEventRecaps(env,NOW+3*DAY),1);
 });
 
-test('new eligible races are created automatically; changing the chosen category leaves open races in place',async t=>{
+test('new eligible races are created automatically; changing the anchor reorders without recreating channels',async t=>{
   const {DB,env,calls,channels}=setup(t);race(DB);await saveBotRecap(env,COMMUNITY,SETTINGS);await syncBotRecaps(env,NOW,COMMUNITY);calls.length=0;
   race(DB,'new-event','Nouvelle course');await syncBotRecaps(env,NOW+1000,COMMUNITY);assert.equal(creates(calls).length,2);
   channels.push({id:'777777777777777777',type:4,name:'Nouvelle catégorie',position:9});
   await saveBotRecap(env,COMMUNITY,{...SETTINGS,destinationId:'777777777777777777'});calls.length=0;
   await syncBotRecaps(env,NOW+2000,COMMUNITY);assert.equal(creates(calls).length,0);assert.equal(sends(calls).length,0);
-  assert.equal(calls.filter(call=>call.method==='PATCH').length,0);
+  assert.equal(calls.filter(call=>call.method==='PATCH'&&call.path===`/guilds/${GUILD}/channels`).length,1);
+  assert.equal(calls.filter(call=>call.method==='PATCH'&&call.path.startsWith('/channels/')).length,0);
 });
 
 test('a recap channel made by the first version moves into its new race category, message kept',async t=>{
@@ -486,4 +487,24 @@ test('les catégories des courses se rangent par simu, LMU puis iRacing, chacune
   for(let pass=0;pass<2;pass++)await syncBotRecaps(env,NOW+pass,COMMUNITY);
   assert.deepEqual(channels.filter(item=>item.type===4).sort((a,b)=>a.position-b.position).map(item=>item.name),
     ['Accueil','Endurances','🏎️ LMU · LMU proche','🏎️ LMU · LMU tardive','🏁 iRacing · iRacing proche','🏁 iRacing · iRacing tardive','Vocaux']);
+});
+
+
+test('automatic recap sync regroups scattered existing race categories and then leaves the order stable',async t=>{
+  const {DB,env,channels,calls}=setup(t);
+  race(DB,'portimao','4h de Portimao','portimao',[{id:'a',startsAt:NOW+DAY}]);
+  race(DB,'lemans','24H du Mans','le-mans',[{id:'b',startsAt:NOW+2*DAY}]);
+  await saveBotRecap(env,COMMUNITY,SETTINGS);await syncBotRecaps(env,NOW,COMMUNITY);
+  const categories=channels.filter(item=>item.type===4);
+  categories.find(item=>item.name.includes('du Mans')).position=-1;
+  categories.find(item=>item.name.includes('Portimao')).position=20;
+  // An unrelated category with a racing name is never adopted.
+  channels.push({id:'777777777777777779',type:4,name:'🏎️ LMU · autre communauté',position:10});
+  calls.length=0;await syncBotRecaps(env,NOW+1000,COMMUNITY);
+  assert.deepEqual(channels.filter(item=>item.type===4).sort((a,b)=>a.position-b.position).map(item=>item.name),
+    ['Accueil','Endurances','🏎️ LMU · 4h de Portimao','🏎️ LMU · 24H du Mans','Vocaux','🏎️ LMU · autre communauté']);
+  assert.equal(creates(calls).length,0);assert.equal(sends(calls).length,0);
+  assert.equal(calls.filter(call=>call.method==='PATCH'&&call.path===`/guilds/${GUILD}/channels`).length,1);
+  calls.length=0;await syncBotRecaps(env,NOW+2000,COMMUNITY);
+  assert.equal(calls.filter(call=>call.method==='PATCH').length,0,'already grouped categories do not generate writes');
 });
