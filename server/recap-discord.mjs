@@ -124,15 +124,19 @@ async function placeCategory(env, community, guildId, channels, category, anchor
   const open = new Map(((await env.DB.prepare(`SELECT p.category_id,e.circuit,e.departures FROM discord_recap_publications p LEFT JOIN events e ON e.id=p.event_id
     WHERE p.community_id=? AND p.closed_at IS NULL AND p.category_id IS NOT NULL`).bind(community.id).all()).results || [])
     .map(item => [item.category_id,[String(item.circuit || '').startsWith('iracing-') ? 1 : 0,Math.min(...parse(item.departures).map(start => Number(start.startsAt)).filter(Number.isFinite))]]));
-  const categories = channels.filter(item => item.type === 4 && item.id !== category).sort((a,b) => (a.position || 0) - (b.position || 0) || (BigInt(a.id) < BigInt(b.id) ? -1 : 1));
-  const index = categories.findIndex(item => item.id === anchor);
-  if (index < 0) return;
-  let last = index;
-  while (open.has(categories[last + 1]?.id)) last++;
+  // Existing race categories may be scattered anywhere in the server (old placements or
+  // a previous reorder interrupted after creation). Gather every managed category.
+  const categories = channels.filter(item => item.type === 4).sort((a,b) => (a.position || 0) - (b.position || 0) || (BigInt(a.id) < BigInt(b.id) ? -1 : 1));
+  if (category && !categories.some(item => item.id === category)) categories.push({id:category});
   const key = item => open.get(item.id) || [2,Infinity];
-  const races = [...categories.slice(index + 1,last + 1),{id:category}].sort((a,b) => key(a)[0] - key(b)[0] || key(a)[1] - key(b)[1]);
-  categories.splice(index + 1,last - index,...races);
-  await discord(env,'PATCH',`/guilds/${guildId}/channels`,categories.map((item,position) => ({id:item.id,position})),budget);
+  const races = categories.filter(item => item.id !== anchor && open.has(item.id))
+    .sort((a,b) => key(a)[0] - key(b)[0] || key(a)[1] - key(b)[1]);
+  const remaining = categories.filter(item => !races.some(race => race.id === item.id));
+  const index = remaining.findIndex(item => item.id === anchor);
+  if (index < 0 || !races.length) return;
+  remaining.splice(index + 1,0,...races);
+  if (remaining.every((item,index) => item.id === categories[index]?.id)) return;
+  await discord(env,'PATCH',`/guilds/${guildId}/channels`,remaining.map((item,position) => ({id:item.id,position})),budget);
 }
 // The race's text channel, then its category (never the category chosen by the admins).
 async function removeRaceChannels(env, row, anchor, budget) {
@@ -309,6 +313,12 @@ async function syncLocked(env,timestamp,community,settings, test = false, budget
     const ids = [...new Set([...rows.filter(row => row.event_id && !row.closed_at).map(row => row.event_id),...eligible])];
     // The race just changed first, then the ones checked longest ago.
     const ordered = ids.sort((a,b) => (b === priority) - (a === priority) || (rows.find(row => row.event_id === a)?.checked_at || 0) - (rows.find(row => row.event_id === b)?.checked_at || 0));
+    // Repair scattered existing categories even when all recap messages are unchanged.
+    // The normal creation path already orders newly created categories.
+    if (rows.some(row => row.category_id && !row.closed_at)) {
+      const channels = await discord(env,'GET',`/guilds/${settings.guild_id}/channels`,null,budget);
+      await placeCategory(env,community,settings.guild_id,channels,null,settings.destination_id,budget);
+    }
     for (const eventId of ordered.slice(0,2)) {
       const event = events.find(item => item.id === eventId);
       if (!event || (eventDeletionTime(event) !== null && timestamp >= eventDeletionTime(event))) continue;

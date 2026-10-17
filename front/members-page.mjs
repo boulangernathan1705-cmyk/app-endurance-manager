@@ -246,7 +246,7 @@ function modulesMarkup(settings, setup) {
   const crews = settings.crews || {}, states = moduleStates(settings, setup);
   const toggle = (key, label, locked = false) => `<label class="admin-switch"><input type="checkbox" role="switch" data-module="${key}" aria-label="${label}" ${states[key] ? 'checked' : ''} ${locked ? 'disabled' : ''}><i aria-hidden="true"></i></label>`;
   const crewRights = crews.botReady === true ? (crews.lastError ? `<p class="setup-note setup-error">⚠️ ${esc(crews.lastError)}</p>` : '<p class="members-help">Le bot a les droits pour créer les salons.</p>')
-    : `<p class="members-help">${BOT_PROBLEMS[crews.botProblem] || BOT_PROBLEMS.rights}</p>
+    : `<p class="members-help">${crews.botProblem === 'rights' && crews.botMissing?.length ? `Droits manquants pour le bot : ${esc(crews.botMissing.join(', '))}.` : BOT_PROBLEMS[crews.botProblem] || BOT_PROBLEMS.rights}</p>
       <div class="setup-actions">${crews.botInviteUrl ? `<a class="primary-button" href="${esc(crews.botInviteUrl)}" target="_blank" rel="noopener">Donner les droits au bot</a>` : ''}<button type="button" class="secondary-button" data-modules-refresh="crewChannels">C’est fait</button></div>`;
   const crewWarn = states.crewChannels && (crews.botReady !== true || crews.lastError);
   // The recap gives each race its category: the voice channels go there, no category to choose.
@@ -256,7 +256,7 @@ function modulesMarkup(settings, setup) {
       state:setup.botRecap?.lastError ? ['warn','Publication en erreur'] : states.recap ? ['ok', (setup.botRecap.mode === 'events' ? 'Actif · une catégorie par course' : 'Actif · récap général')] : ['off', 'Éteint'],
       control:'', settings:recapForm(setup)},
     {key:'crewChannels', name:'Salons d’équipage sur Discord', text:'Un salon vocal par équipage, à son nom, ouvert dès sa création.',
-      state:crewWarn ? ['warn', crews.botReady !== true ? 'Le bot n’a pas les droits' : 'Le bot est bloqué'] : states.crewChannels ? ['ok', 'Actif'] : ['off', crews.botReady === true ? 'Éteint' : crews.botProblem === 'rights' ? 'Éteint · droits du bot à donner' : 'Éteint · bot à vérifier'],
+      state:crewWarn ? ['warn', crews.botReady !== true ? 'Le bot n’a pas les droits' : 'Action Discord en échec'] : states.crewChannels ? ['ok', 'Actif'] : ['off', crews.botReady === true ? 'Éteint' : crews.botProblem === 'rights' ? 'Éteint · droits du bot à donner' : 'Éteint · bot à vérifier'],
       control:toggle('crewChannels', 'Salons d’équipage sur Discord', crews.botReady !== true && !states.crewChannels),
       settings:`${crewRights}${!states.crewChannels ? '' : raceCategories ? '<p class="members-help">Chaque vocal arrive dans la catégorie de sa course.</p>' : crewCategory(crews)}<p class="members-help">Il est supprimé 2 h après la course.</p>`},
     {key:'categoryEntry', name:'Inscription par catégorie', text:'Sur une course à plusieurs départs, le pilote choisit ses catégories et ses départs possibles. Seuls les TM forment les équipages.',

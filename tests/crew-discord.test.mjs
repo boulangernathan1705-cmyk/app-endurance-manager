@@ -35,7 +35,7 @@ function fakeDiscord(){
     if(method==='GET'&&path===`/guilds/${GUILD}/channels`)return reply(200,state.channels || [{id:'500000000000000002',name:'Courses',type:4,position:2},{id:'500000000000000003',name:'général',type:0,position:0},{id:'500000000000000001',name:'Accueil',type:4,position:1}]);
     if(method==='GET'&&path.includes('/messages?after=0'))return reply(200,state.messages || []);
     if(method==='POST'&&body?.parent_id&&state.goneCategory===body.parent_id)return reply(400,{code:50035});
-    if(method==='GET'&&path===`/guilds/${GUILD}/roles`)return reply(200,[{id:GUILD,name:'@everyone',permissions:'0',position:0},{id:BOT_ROLE,name:'Endurance Manager',permissions:state.botRights?'68624':'0',position:1}]);
+    if(method==='GET'&&path===`/guilds/${GUILD}/roles`)return reply(200,[{id:GUILD,name:'@everyone',permissions:'0',position:0},{id:BOT_ROLE,name:'Endurance Manager',permissions:state.botRights?(state.botPermissions||'1117200'):'0',position:1}]);
     const voice=path.match(/^\/guilds\/\d+\/voice-states\/(\d+)$/);
     if(voice)return voiceStates.has(voice[1])?reply(200,{channel_id:voiceStates.get(voice[1])}):reply(404,{code:10065});
     if(method==='POST'||(method==='GET'))return reply(200,{id:String(next++)});
@@ -87,13 +87,27 @@ const since=(calls,from)=>calls.slice(from).map(call=>`${call.method} ${call.pat
 const notifications=async (req,actor)=>(await req('/api/notifications','GET',null,actor)).data.notifications;
 const created=(calls,from)=>calls.slice(from).filter(call=>call.method==='POST'&&call.path===`/guilds/${GUILD}/channels`);
 
+test('voice channel setup detects missing Connect even when the bot can manage text channels', async () => {
+  const {req,login,discord}=harness();
+  await login(ADMIN,'admin','Orga');
+  discord.state.botPermissions='68624';
+  let settings=(await req('/api/community/settings','GET',null,'admin')).data;
+  assert.equal(settings.crews.botReady,false);
+  assert.deepEqual(settings.crews.botMissing,['Se connecter']);
+  assert.match(settings.crews.botInviteUrl,/permissions=1117200&/);
+  discord.state.botPermissions='1117200';
+  settings=(await req('/api/community/settings','GET',null,'admin')).data;
+  assert.equal(settings.crews.botReady,true);
+  assert.deepEqual(settings.crews.botMissing,[]);
+});
+
 test('a crew gets a voice channel « LMU-name » outside any category, followed until 2 h after its race', async () => {
   const {DB,req,login,sync,discord}=harness();
   await login(ADMIN,'admin','Orga');await login(PILOT,'pilot','Alice');await login(MATE,'mate','Bob');
   // The admins turn the modules on in the settings, once the bot has the rights to make channels.
   discord.state.botRights=false;
   let settings=(await req('/api/community/settings','GET',null,'admin')).data;
-  assert.equal(settings.crews.botReady,false);assert.equal(settings.crews.botProblem,'rights');assert.match(settings.crews.botInviteUrl,/permissions=68624&/);
+  assert.equal(settings.crews.botReady,false);assert.equal(settings.crews.botProblem,'rights');assert.match(settings.crews.botInviteUrl,/permissions=1117200&/);
   assert.equal((await req('/api/community/modules','PATCH',{crewChannels:true},'admin')).status,400);
   discord.state.botAbsent=true;
   settings=(await req('/api/community/settings','GET',null,'admin')).data;
@@ -355,13 +369,14 @@ test('an empty crew gets its voice channel as soon as it is created', async () =
   assert.equal((await req(`/api/crews/${crew.data.id}`,'DELETE',{version:crewRow.version},'admin')).status,200);
   const pending=DB.db.prepare('SELECT * FROM crew_discord').get();
   assert.equal(pending.closed_at,null);assert.equal(pending.voice_id,row.voice_id);assert.equal(pending.lock_until,0);
-  assert.match(DB.db.prepare('SELECT last_error FROM community_crew_discord WHERE community_id=?').get(DEV).last_error,/droits/);
+  assert.match(DB.db.prepare('SELECT last_error FROM community_crew_discord WHERE community_id=?').get(DEV).last_error,/suppression du salon.*Se connecter/);
   assert.equal((await sync(Date.now()+30_000)).closed,0);
   assert.equal(DB.db.prepare('SELECT closed_at FROM crew_discord').get().closed_at,null);
   discord.state.deleteStatus=null;
   const mark=discord.calls.length;
   assert.equal((await sync(Date.now()+60_000)).closed,1);
   assert.deepEqual(since(discord.calls,mark),[`DELETE /channels/${row.voice_id}`]);
+  assert.equal(DB.db.prepare('SELECT last_error FROM community_crew_discord WHERE community_id=?').get(DEV).last_error,null);
 });
 
 test('migration resumes abandoned cleanup without reopening successfully closed channels or archives', async () => {
