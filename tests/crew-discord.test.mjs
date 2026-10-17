@@ -12,6 +12,7 @@ const ADMIN='111111111111111111', PILOT='222222222222222222', MATE='333333333333
 const DEV='e0a1c0de-0000-4000-8000-000000000001';
 const BOT_ROLE='900000000000000009';
 const HOUR=3600_000;
+const BOT_ACCESS=[{id:'app-id',type:1,allow:'1117200',deny:'0'}];
 const MIGRATIONS=readdirSync(new URL('../migrations/',import.meta.url)).filter(name=>name.endsWith('.sql')).sort();
 
 class D1 {
@@ -22,7 +23,7 @@ class D1 {
 
 // Fake Discord: every request is kept; new channels, threads and messages get new ids.
 function fakeDiscord(){
-  const calls=[];const state={botRights:true};let next=700000000000000000n;const voiceStates=new Map();const gone=new Set();const unknownChannel=new Set();
+  const calls=[];const state={botRights:true,channels:[{id:'500000000000000002',name:'Courses',type:4,position:2},{id:'500000000000000003',name:'général',type:0,position:0},{id:'500000000000000001',name:'Accueil',type:4,position:1}]};let next=700000000000000000n;const voiceStates=new Map();const gone=new Set();const unknownChannel=new Set();
   const reply=(status,data)=>new Response(status===204?null:JSON.stringify(data),{status,headers:{'Content-Type':'application/json'}});
   async function handler(url,init={}){
     const path=String(url).replace('https://discord.com/api/v10','');const method=init.method||'GET';
@@ -34,10 +35,13 @@ function fakeDiscord(){
     if(method==='GET'&&path===`/guilds/${GUILD}`)return reply(200,{id:GUILD,name:'Test',owner_id:ADMIN});
     if(method==='GET'&&path===`/guilds/${GUILD}/channels`)return reply(200,state.channels || [{id:'500000000000000002',name:'Courses',type:4,position:2},{id:'500000000000000003',name:'général',type:0,position:0},{id:'500000000000000001',name:'Accueil',type:4,position:1}]);
     if(method==='GET'&&path.includes('/messages?after=0'))return reply(200,state.messages || []);
-    if(method==='POST'&&body?.parent_id&&state.goneCategory===body.parent_id)return reply(400,{code:50035});
+    if(method==='POST'&&body?.parent_id&&state.goneCategory===body.parent_id)return reply(400,{code:50035,errors:{parent_id:{_errors:[{message:'Unknown channel'}]}}});
     if(method==='GET'&&path===`/guilds/${GUILD}/roles`)return reply(200,[{id:GUILD,name:'@everyone',permissions:'0',position:0},{id:BOT_ROLE,name:'Endurance Manager',permissions:state.botRights?(state.botPermissions||'1117200'):'0',position:1}]);
     const voice=path.match(/^\/guilds\/\d+\/voice-states\/(\d+)$/);
     if(voice)return voiceStates.has(voice[1])?reply(200,{channel_id:voiceStates.get(voice[1])}):reply(404,{code:10065});
+    if(method==='POST'&&path===`/guilds/${GUILD}/channels`){const channel={...body,id:String(next++)};state.channels.push(channel);return reply(200,channel);}
+    const channelPath=path.match(/^\/channels\/(\d+)$/);
+    if(channelPath){const channel=state.channels.find(item=>item.id===channelPath[1]);if(method==='GET')return channel?reply(200,channel):reply(404,{code:10003});if(method==='DELETE')state.channels=state.channels.filter(item=>item.id!==channelPath[1]);else if(method==='PATCH'&&channel)Object.assign(channel,body);}
     if(method==='POST'||(method==='GET'))return reply(200,{id:String(next++)});
     return reply(method==='DELETE'?204:200,{});
   }
@@ -132,7 +136,7 @@ test('a crew gets a voice channel « LMU-name » outside any category, followed 
   let mark=discord.calls.length;
   assert.equal((await sync(startsAt-OPEN_BEFORE-30*24*HOUR)).opened,1);
   const channels=created(discord.calls,mark);
-  assert.equal(channels.length,1);assert.deepEqual(channels[0].body,{name:'LMU-Les Tondeuz',type:2});
+  assert.equal(channels.length,1);assert.deepEqual(channels[0].body,{name:'LMU-Les Tondeuz',type:2,permission_overwrites:BOT_ACCESS});
   const row=DB.db.prepare('SELECT * FROM crew_discord').get();
   assert.ok(row.voice_id&&row.message_id);assert.equal(row.text_id,null);assert.equal(row.category_id,null);
   const recap=discord.calls.slice(mark).find(call=>call.path===`/channels/${row.voice_id}/messages`);
@@ -253,7 +257,7 @@ test('a recap or a voice channel deleted on Discord is made again', async () => 
   assert.equal(DB.db.prepare('SELECT voice_id FROM crew_discord').get().voice_id,null);
   mark=discord.calls.length;await sync(at+4*HOUR);
   const again=discord.calls.slice(mark);
-  assert.deepEqual(again[0].body,{name:'LMU-Retour',type:2});
+  assert.deepEqual(again[0].body,{name:'LMU-Retour',type:2,permission_overwrites:BOT_ACCESS});
   assert.equal(again[1].method,'POST');assert.match(again[1].path,/\/messages$/);
 });
 
@@ -274,7 +278,7 @@ test('the admins choose where the voice channels are made, as soon as they turn 
   assert.equal((await req(base+'/registrations','POST',{name:'x',category:'GT3',status:'whole'},'pilot')).status,201);
   assert.equal((await req(base+'/crews','POST',{name:'Rangés',category:'GT3'},'pilot')).status,201);
   let mark=discord.calls.length;await sync(at);
-  assert.deepEqual(created(discord.calls,mark)[0].body,{name:'LMU-Rangés',type:2,parent_id:'500000000000000002'});
+  assert.deepEqual(created(discord.calls,mark)[0].body,{name:'LMU-Rangés',type:2,parent_id:'500000000000000002',permission_overwrites:BOT_ACCESS});
   // The category is deleted on Discord: the choice is forgotten, the admins are told, the next one goes on top.
   const row=DB.db.prepare('SELECT * FROM crew_discord').get();
   discord.state.goneCategory='500000000000000002';
@@ -284,7 +288,7 @@ test('the admins choose where the voice channels are made, as soon as they turn 
   const setting=DB.db.prepare('SELECT * FROM community_crew_discord').get();
   assert.equal(setting.voice_category_id,null);assert.match(setting.last_error,/n’existe plus/);
   mark=discord.calls.length;await sync(at+3*HOUR);
-  assert.deepEqual(created(discord.calls,mark)[0].body,{name:'LMU-Rangés',type:2});
+  assert.deepEqual(created(discord.calls,mark)[0].body,{name:'LMU-Rangés',type:2,permission_overwrites:BOT_ACCESS});
   assert.equal((await req('/api/community/modules','PATCH',{crewCategory:''},'admin')).status,200);
 });
 
@@ -303,16 +307,17 @@ test('when the recap gives each race its category, the crews\' voice channels go
   DB.db.prepare("INSERT INTO community_recap_settings(community_id,mode,scope,guild_id,destination_id,destination_name) VALUES(?,'events','all',?,'500000000000000002','Courses')").run(DEV,GUILD);
   DB.db.prepare("INSERT INTO discord_recap_publications(community_id,event_id,guild_id,category_id,marker) VALUES(?,?,?,'500000000000000002','m')").run(DEV,event.id,GUILD);
   let mark=discord.calls.length;await sync(at+HOUR);assert.deepEqual(since(discord.calls,mark),[]);
+  discord.state.channels.push({id:'600000000000000001',type:4,name:'Course'});
   DB.db.prepare("UPDATE discord_recap_publications SET category_id='600000000000000001'").run();
   mark=discord.calls.length;await sync(at+2*HOUR);
-  assert.deepEqual(discord.calls.slice(mark).map(call=>[call.method,call.path,call.body]),[['PATCH',`/channels/${first.voice_id}`,{parent_id:'600000000000000001',name:'Avant'}]]);
+  assert.deepEqual(discord.calls.slice(mark).filter(call=>call.method==='PATCH').map(call=>[call.method,call.path,call.body]),[['PATCH',`/channels/${first.voice_id}`,{parent_id:'600000000000000001',name:'Avant',permission_overwrites:BOT_ACCESS}]]);
   mark=discord.calls.length;await sync(at+3*HOUR);assert.deepEqual(since(discord.calls,mark),[]);
   // A crew made afterwards is created there directly.
   await login('444444444444444444','third','Chloé');
   assert.equal((await req(base+'/registrations','POST',{name:'x',category:'GT3',status:'whole'},'third')).status,201);
   assert.equal((await req(base+'/crews','POST',{name:'Après',category:'GT3'},'third')).status,201);
   mark=discord.calls.length;await sync(at+4*HOUR);
-  assert.deepEqual(created(discord.calls,mark)[0].body,{name:'Après',type:2,parent_id:'600000000000000001'});
+  assert.deepEqual(created(discord.calls,mark)[0].body,{name:'Après',type:2,parent_id:'600000000000000001',permission_overwrites:BOT_ACCESS});
 });
 
 test('with « Une catégorie par course », a new crew\'s voice channel waits for its race\'s category, at most an hour', async () => {
@@ -327,15 +332,16 @@ test('with « Une catégorie par course », a new crew\'s voice channel waits fo
   assert.equal((await req(base+'/crews','POST',{name:'Attente',category:'GT3'},'pilot')).status,201);
   let mark=discord.calls.length;await sync(at);await sync(at+30*60_000);assert.deepEqual(created(discord.calls,mark),[]);
   // Made by the recap in the meantime: the voice channel goes straight there.
+  discord.state.channels.push({id:'600000000000000001',type:4,name:'Course'});
   DB.db.prepare("INSERT INTO discord_recap_publications(community_id,event_id,guild_id,category_id,marker) VALUES(?,?,?,'600000000000000001','m')").run(DEV,event.id,GUILD);
   mark=discord.calls.length;await sync(at+40*60_000);
-  assert.deepEqual(created(discord.calls,mark)[0].body,{name:'Attente',type:2,parent_id:'600000000000000001'});
+  assert.deepEqual(created(discord.calls,mark)[0].body,{name:'Attente',type:2,parent_id:'600000000000000001',permission_overwrites:BOT_ACCESS});
   assert.ok(!discord.calls.slice(mark).some(call=>call.method==='PATCH'&&call.path.startsWith('/channels/')&&call.body?.parent_id),'never moved');
   // No category after an hour (recap failing): made where the admins chose.
   DB.db.prepare('DELETE FROM discord_recap_publications').run();DB.db.prepare('DELETE FROM crew_discord').run();
   mark=discord.calls.length;await sync(at+2*HOUR);assert.deepEqual(created(discord.calls,mark),[]);
   mark=discord.calls.length;await sync(at+3*HOUR+60_000);
-  assert.deepEqual(created(discord.calls,mark)[0].body,{name:'LMU-Attente',type:2});
+  assert.deepEqual(created(discord.calls,mark)[0].body,{name:'LMU-Attente',type:2,permission_overwrites:BOT_ACCESS});
 });
 
 test('an empty crew gets its voice channel as soon as it is created', async () => {
@@ -474,4 +480,48 @@ for (const previousSchema of [false,true]) test(`automatic recovery protects liv
     assert.equal(await cleanupOrphanCrewDiscord(env),1,'a failed deletion is retried without admin action');
     assert.equal(discord.calls.filter(call=>call.method==='DELETE').at(-1).path,`/channels/${voice}`);
   }finally{globalThis.fetch=realFetch;}
+});
+
+
+test('private voice destination blocks activation before writes; an admin exception preserves privacy on creation',async()=>{
+  const {DB,req,login,discord,sync}=harness();
+  await login(ADMIN,'admin','Orga');
+  const category=discord.state.channels.find(item=>item.name==='Courses');
+  category.permission_overwrites=[{id:GUILD,type:0,allow:'0',deny:'1049600'},{id:ORGA_ROLE,type:0,allow:'1049600',deny:'0'}];
+  let result=await req('/api/community/modules','PATCH',{crewChannels:true,crewCategory:category.id},'admin');
+  assert.equal(result.status,400);assert.match(result.data.error,/Courses.*Voir le salon.*Se connecter/);
+  assert.equal(DB.db.prepare('SELECT count(*) n FROM community_crew_discord').get().n,0,'refused configuration is not saved');
+  const original=structuredClone(category.permission_overwrites);
+  category.permission_overwrites.push(...BOT_ACCESS);
+  assert.equal((await req('/api/community/modules','PATCH',{crewChannels:true,crewCategory:category.id},'admin')).status,200);
+  await req('/api/events','POST',race,'admin');
+  const event=(await req('/api/events','GET',null,'admin')).data.events[0],departure=event.departures[0];
+  await req(`/api/events/${event.id}/departures/${departure.id}/crews`,'POST',{name:'Pilotes privés',category:'GT3'},'admin');
+  assert.equal((await sync(Date.now())).opened,1);
+  const voice=discord.state.channels.find(item=>item.name==='LMU-Pilotes privés');
+  assert.deepEqual(voice.permission_overwrites.slice(0,2),original);
+  assert.deepEqual(voice.permission_overwrites.at(-1),BOT_ACCESS[0]);
+  // The destination remains accessible, but an existing vocal gets a local restriction later.
+  voice.permission_overwrites.find(item=>item.id==='app-id').allow='68624';
+  const state=(await req('/api/community/settings','GET',null,'admin')).data.crews;
+  assert.equal(state.botReady,false);assert.equal(state.botProblem,'channel');
+  assert.equal(state.botChannelName,voice.name);assert.deepEqual(state.botMissing,['Se connecter']);
+});
+
+
+test('moving a root fallback vocal into a private race category retains the target pilot restrictions',async()=>{
+  const {DB,req,login,discord,sync}=harness();
+  await login(ADMIN,'admin','Orga');await req('/api/community/modules','PATCH',{crewChannels:true},'admin');
+  await req('/api/events','POST',race,'admin');
+  const event=(await req('/api/events','GET',null,'admin')).data.events[0],departure=event.departures[0];
+  await req(`/api/events/${event.id}/departures/${departure.id}/crews`,'POST',{name:'Déplacé',category:'GT3'},'admin');
+  await sync(Date.now());
+  const tracked=DB.db.prepare('SELECT * FROM crew_discord').get();
+  const parent='600000000000000001',rules=[{id:GUILD,type:0,allow:'0',deny:'1049600'},{id:ORGA_ROLE,type:0,allow:'1049600',deny:'0'}];
+  discord.state.channels.push({id:parent,type:4,name:'Course privée',permission_overwrites:structuredClone(rules)});
+  DB.db.prepare("INSERT INTO discord_recap_publications(community_id,event_id,guild_id,category_id,marker) VALUES(?,?,?,?,'p')").run(DEV,event.id,GUILD,parent);
+  await sync(Date.now()+60_000);
+  const voice=discord.state.channels.find(item=>item.id===tracked.voice_id);
+  assert.equal(voice.parent_id,parent);
+  assert.deepEqual(voice.permission_overwrites,[...rules,...BOT_ACCESS]);
 });

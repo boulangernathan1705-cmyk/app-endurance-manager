@@ -1,3 +1,4 @@
+import {effectivePermissions,guildPermissions,missingVoicePermissions,withBotAccess,VOICE_ACCESS} from './discord-permissions.mjs';
 // Crews on Discord (migrations 0044, 0045). Two modules, each enabled by the admins of a community:
 // - crewChannels (« Salons d'équipage »): as soon as it is made, every crew gets a voice
 //   channel named after its sim and its name (« LMU-Les Tondeuz »), made in the category the admins chose
@@ -28,8 +29,7 @@ export const KEEP_ARCHIVES = 30 * 24 * HOUR;
 export const REMINDERS = [{bit:1, before:24 * HOUR}, {bit:2, before:HOUR}];
 // What the bot needs on the server for the crews (invite link of the « Modules » settings): view channels,
 // manage channels, connect to voice channels, send messages, read the history.
-const MANAGE_CHANNELS = 1n << 4n, SEND_MESSAGES = 1n << 11n, ADMINISTRATOR = 1n << 3n;
-const NEEDED = MANAGE_CHANNELS | (1n << 10n) | SEND_MESSAGES | (1n << 16n) | (1n << 20n);
+const ADMINISTRATOR = 1n << 3n, NEEDED = VOICE_ACCESS;
 export const CREW_BOT_PERMISSIONS = String(NEEDED);
 const VOICE = 2, CATEGORY = 4;
 
@@ -46,7 +46,7 @@ async function discord(env, budget, method, path, body) {
   const data = response.status === 204 ? null : await response.json().catch(() => null);
   if (!response.ok) {
     const error = new Error(`Discord ${response.status}${data?.code ? ` (${data.code})` : ''}`);
-    error.status = response.status; error.code = data?.code; error.method = method; error.path = path;
+    error.status = response.status; error.code = data?.code; error.method = method; error.path = path; error.errors = data?.errors;
     throw error;
   }
   return data;
@@ -61,6 +61,7 @@ function errorText(error) {
       : error.method === 'PATCH' ? 'la modification du salon' : 'la création du salon';
     return `Discord refuse ${action}${channelId ? ` (salon ${channelId})` : ''} : vérifie les droits du bot dans ce salon et sa catégorie, notamment « Voir le salon », « Gérer les salons » et « Se connecter ».`;
   }
+  if (error?.status === 400) return `Discord a refusé les réglages du salon (code ${error.code || 'inconnu'}). Vérifie les permissions du bot et de la catégorie ; le bot réessaiera automatiquement.`;
   return 'Discord n’a pas répondu : le bot réessaiera tout seul.';
 }
 
@@ -178,7 +179,7 @@ export async function syncCrewDiscord(env, timestamp = Date.now(), {community = 
       if (!(error instanceof Stop)) {
         failed.add(row.row_community);
         console.error('Crew Discord sync failed', owner?.slug, error instanceof Error ? error.message : 'unknown', error.method || '', error.path || '');
-        if (error?.status === 403 || error?.status === 404) await env.DB.prepare('UPDATE community_crew_discord SET last_error=?, last_error_at=? WHERE community_id=?')
+        if ([400,403,404].includes(error?.status)) await env.DB.prepare('UPDATE community_crew_discord SET last_error=?, last_error_at=? WHERE community_id=?')
           .bind(errorText(error), Math.floor(timestamp / 1000), row.row_community).run().catch(() => {});
       }
     } finally {
@@ -361,11 +362,14 @@ async function sendInChannel(env, budget, row, method, path, body) {
 // in the category chosen by the admins. That category deleted on Discord: the choice is forgotten (the admins are
 // told) and the channel is made at the top of the server next time.
 async function createVoice(env, budget, row, setting, body) {
-  if (row.race_category) return discord(env, budget, 'POST', `/guilds/${row.guild_id}/channels`, {...body, parent_id:row.race_category});
-  const parent = setting.voice_category_id;
-  try { return await discord(env, budget, 'POST', `/guilds/${row.guild_id}/channels`, parent ? {...body, parent_id:parent} : body); }
-  catch (error) {
-    if (!parent || (error?.status !== 400 && error?.status !== 404)) throw error;
+  const parent = row.race_category || setting.voice_category_id;
+  try {
+    const category = parent ? await discord(env,budget,'GET',`/channels/${parent}`) : null;
+    return await discord(env,budget,'POST',`/guilds/${row.guild_id}/channels`,{...body,
+      ...(parent ? {parent_id:parent} : {}),permission_overwrites:withBotAccess(category?.permission_overwrites,env.DISCORD_CLIENT_ID,VOICE_ACCESS)});
+  } catch (error) {
+    const parentGone = error?.status === 404 && error?.code === 10003 || error?.status === 400 && error?.errors?.parent_id;
+    if (row.race_category || !parent || !parentGone) throw error;
     await env.DB.prepare('UPDATE community_crew_discord SET voice_category_id=NULL, last_error=?, last_error_at=? WHERE community_id=?')
       .bind('La catégorie choisie pour les vocaux n’existe plus : ils arrivent en haut du serveur.', Math.floor(Date.now() / 1000), row.row_community).run();
     setting.voice_category_id = null;
@@ -422,7 +426,14 @@ async function syncRow(env, budget, timestamp, community, setting, row, pilots) 
   }
   if (row.race_category && row.parent_id !== row.race_category) {
     // Opened before its race's category: moved into it once.
-    await sendInChannel(env, budget, row, 'PATCH', `/channels/${row.voice_id}`, {parent_id:row.race_category, name:voiceName(row, crewName)});
+    const target = await discord(env,budget,'GET',`/channels/${row.race_category}`);
+    const voice = await discord(env,budget,'GET',`/channels/${row.voice_id}`);
+    // A fallback vocal created at server root has only the bot exception: take the
+    // private destination rules when moving it. Preserve any existing non-bot rules.
+    const hasMemberRules = (voice.permission_overwrites || []).some(item => !(String(item.id) === String(env.DISCORD_CLIENT_ID) && Number(item.type) === 1));
+    const rules = hasMemberRules ? voice.permission_overwrites : target.permission_overwrites;
+    await sendInChannel(env, budget, row, 'PATCH', `/channels/${row.voice_id}`, {parent_id:row.race_category, name:voiceName(row, crewName),
+      permission_overwrites:withBotAccess(rules,env.DISCORD_CLIENT_ID,VOICE_ACCESS)});
     row.parent_id = row.race_category;
     await env.DB.prepare('UPDATE crew_discord SET parent_id=? WHERE crew_id=?').bind(row.parent_id, row.row_id).run();
   }
@@ -511,22 +522,51 @@ export async function botCanManageChannels(env, guildId) {
 
 // The same, with why it cannot (shown to the admins): 'rights' (rights not given yet), 'absent' (the bot is not on
 // the server), 'config' (the site has no bot), 'discord' (Discord did not answer).
-export async function checkBot(env, guildId) {
+export async function checkBot(env, guildId, {channelIds = [], includeCategories = false} = {}) {
   if (!guildId || !env.DISCORD_CLIENT_ID || !String(env.DISCORD_BOT_TOKEN || '').trim()) return {ready:null, why:'config'};
   try {
-    const budget = {left:2};
-    const [member, roles] = await Promise.all([discord(env, budget, 'GET', `/guilds/${guildId}/members/${env.DISCORD_CLIENT_ID}`),
-      discord(env, budget, 'GET', `/guilds/${guildId}/roles`)]);
-    const mine = new Set([String(guildId), ...(member?.roles || []).map(String)]);
-    const rights = (Array.isArray(roles) ? roles : []).filter(role => mine.has(String(role.id))).reduce((all, role) => all | BigInt(role.permissions || '0'), 0n);
+    const budget = {left:3};
+    const [member, roles, channels] = await Promise.all([discord(env, budget, 'GET', `/guilds/${guildId}/members/${env.DISCORD_CLIENT_ID}`),
+      discord(env, budget, 'GET', `/guilds/${guildId}/roles`),
+      channelIds.length || includeCategories ? discord(env,budget,'GET',`/guilds/${guildId}/channels`) : []]);
+    if (!member || !Array.isArray(roles) || !Array.isArray(channels)) throw new Error('Réponse Discord invalide.');
+    const rights = guildPermissions(roles,member,guildId);
     const ready = (rights & ADMINISTRATOR) === ADMINISTRATOR || (rights & NEEDED) === NEEDED;
-    const missing = ready ? [] : [['Voir les salons',1n << 10n],['Gérer les salons',MANAGE_CHANNELS],['Envoyer des messages',SEND_MESSAGES],['Voir les anciens messages',1n << 16n],['Se connecter',1n << 20n]]
-      .filter(([,bit]) => !(rights & bit)).map(([label]) => label);
-    return {ready, why:ready ? null : 'rights', missing};
+    const missing = ready ? [] : missingVoicePermissions(rights);
+    const categories = channels.filter(item => item.type === CATEGORY).sort((a,b) => (a.position || 0) - (b.position || 0))
+      .map(item => ({id:String(item.id),name:String(item.name || '')}));
+    if (!ready) return {ready:false,why:'rights',missing,categories};
+    for (const channelId of [...new Set(channelIds.filter(Boolean))]) {
+      const channel = channels.find(item => String(item.id) === String(channelId));
+      const missing = channel ? missingVoicePermissions(effectivePermissions(roles,member,guildId,channel,env.DISCORD_CLIENT_ID)) : ['Voir le salon'];
+      if (missing.length) return {ready:false,why:'channel',missing,channelId,channelName:channel?.name || channelId,categories};
+    }
+    return {ready:true,why:null,missing:[],categories};
   } catch (error) {
     if (!(error instanceof Stop)) console.error('Bot rights failed', error instanceof Error ? error.message : 'unknown');
     // Not a member of the server (Unknown Member, Missing Access) or a bad token: the bot is not there for the site.
     if ([10004, 10007, 50001].includes(error?.code) || error?.status === 401) return {ready:null, why:'absent'};
     return {ready:null, why:'discord'};
   }
+}
+
+
+export async function checkCrewAccess(env, community, {categoryId, includeCategories = false, failedChannelId = null} = {}) {
+  const recap = await env.DB.prepare('SELECT enabled,mode,destination_id FROM community_recap_settings WHERE community_id=?').bind(community.id).first();
+  const saved = categoryId === undefined ? await env.DB.prepare('SELECT voice_category_id FROM community_crew_discord WHERE community_id=?').bind(community.id).first() : null;
+  const destination = recap?.enabled && recap.mode === 'events' ? recap.destination_id : categoryId ?? saved?.voice_category_id;
+  const tracked = (await env.DB.prepare(`SELECT category_id AS id FROM discord_recap_publications WHERE community_id=? AND closed_at IS NULL AND category_id IS NOT NULL
+    UNION SELECT voice_id AS id FROM crew_discord WHERE community_id=? AND closed_at IS NULL AND voice_id IS NOT NULL`).bind(community.id,community.id).all()).results || [];
+  return checkBot(env,community.discordGuildId,{channelIds:[destination,...tracked.map(row => row.id),failedChannelId].filter(Boolean),includeCategories});
+}
+export async function validateCrewAccess(env,community,options = {}) {
+  const result = await checkCrewAccess(env,community,options);
+  if (result.ready !== true) {
+    const message = result.why === 'channel'
+      ? `Dans les permissions de « ${result.channelName} », un administrateur Discord doit autoriser Endurance Manager : ${result.missing.join(', ')}. Les autres accès restent privés.`
+      : result.missing?.length ? `Droits manquants pour le bot : ${result.missing.join(', ')}. Clique sur « Donner les droits au bot ».`
+      : 'Impossible de vérifier les droits du bot. Vérifie sa présence sur le serveur, puis réessaie.';
+    throw Object.assign(new Error(message),{status:400});
+  }
+  return result;
 }
