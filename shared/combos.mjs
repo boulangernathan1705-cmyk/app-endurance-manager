@@ -50,6 +50,39 @@ export function cleanGame(input) {
   return Object.values(out).some(value => value !== null) ? out : null;
 }
 
+// The session wheel by wheel (FL, FR, RL, RR) as the plugin measures it on track: °C, kPa, mm, percent.
+const EXPERT_WHEELS = {tyreTemp:[-50, 250], tyreTempMax:[-50, 250], kpa:[0, 1000], kpaMax:[0, 1000], spread:[-100, 100], spreadMin:[-100, 100],
+  brake:[-50, 1500], brakeMax:[-50, 1500], ride:[-200, 500], rideMin:[-200, 500], tyreLeft:[0, 100]};
+export function cleanExpert(input) {
+  const out = {samples:finite(input.samples, 0, 10_000_000) ?? 0};
+  for (const [key, [min, max]] of Object.entries(EXPERT_WHEELS)) out[key] = four(input[key], min, max);
+  for (const key of ['oil', 'oilMax', 'water', 'waterMax']) out[key] = finite(input[key], -50, 250);
+  return out.samples ? out : null;
+}
+
+// The best clean lap point by point: one list per measure, all as long as the clock. Seconds, metres (dist: from the line),
+// km/h, 0 to 1, °C, mm.
+export const TRACE_MAX = 12_000;
+const TRACE_SERIES = {time:[0, 3600], dist:[0, 1e5], x:[-1e5, 1e5], z:[-1e5, 1e5], speed:[0, 500], throttle:[0, 1], brake:[0, 1], steer:[-1, 1], gear:[-1, 12],
+  rideF:[-200, 500], rideR:[-200, 500]};
+export function cleanTrace(input) {
+  const n = finite(input.n, 1, 10000), t = finite(input.t, 1, 3600);
+  const length = Array.isArray(input.time) ? input.time.length : 0;
+  if (!n || !t || length < 50 || length > TRACE_MAX) return null;
+  const series = (list, [min, max]) => Array.isArray(list) && list.length === length ? list.map(value => finite(value, min, max) ?? 0) : null;
+  const out = {n, t};
+  for (const [key, range] of Object.entries(TRACE_SERIES)) {
+    out[key] = series(input[key], range);
+    if (!out[key]) return null;
+  }
+  for (const key of ['temp', 'slip']) {
+    const range = key === 'temp' ? [-50, 250] : [-1, 1];
+    out[key] = Array.isArray(input[key]) && input[key].length === 4 ? input[key].map(list => series(list, range)) : null;
+    if (!out[key] || out[key].some(list => !list)) return null;
+  }
+  return out;
+}
+
 // LMU names a setup with its track folder (« Lemans\HYMO 1.4.1 9X8EVO LM ER »): the sheet is already per track.
 const setupName = value => label(String(value ?? '').split(/[\\/]/).pop(), SETUP_MAX);
 
@@ -79,7 +112,8 @@ export function cleanSession(input) {
     stopped:finite(stop?.stopped, 0, 600), fuel:finite(stop?.fuel, 0, 200) ?? 0, ve:finite(stop?.ve, 0, 100) ?? 0,
     tyres:finite(stop?.tyres, 0, 4) ?? 0, repair:stop?.repair === true})).filter(stop => stop.lane && stop.stopped !== null);
   return {at, track, car, carClass:label(input.class, 60), driver:label(input.driver, 60), capacity:finite(input.capacity, 1, 300),
-    laps, stops, service:optional(input.service, cleanService), game:optional(input.game, cleanGame)};
+    laps, stops, service:optional(input.service, cleanService), game:optional(input.game, cleanGame),
+    expert:optional(input.expert, cleanExpert), trace:optional(input.trace, cleanTrace)};
 }
 
 // The plugin's installer as the site hands it out (page and plugin alike): the site written in, so it downloads the

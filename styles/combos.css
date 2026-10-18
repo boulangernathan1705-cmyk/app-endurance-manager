@@ -201,3 +201,68 @@ tr.cb-crew td { font-weight: 700; background: var(--cb-panel2); }
   .cb-tyres { grid-template-columns: minmax(0, 1fr); }
   .cb-meta { position: static; }
 }
+
+/* Tabs: the team's sheet and « Mon analyse ». */
+.cb-tabs { display: flex; gap: 4px; margin-top: -8px; border-bottom: 1px solid var(--cb-line); }
+.cb-tabs button { background: none; border: 0; border-bottom: 3px solid transparent; color: var(--muted); padding: 8px 14px; font: inherit; font-weight: 600; font-size: 15px; cursor: pointer; margin-bottom: -1px; }
+.cb-tabs button[aria-pressed="true"] { color: var(--text); border-bottom-color: var(--text); }
+
+/* « Mon analyse » (front/combos-analysis.mjs) */
+.an-choices { display: flex; flex-wrap: wrap; gap: 10px 16px; }
+.an-choices label { display: grid; gap: 4px; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .07em; flex: 1 1 280px; max-width: 460px; }
+.an-choices select { font-size: 14px; padding: 6px 8px; text-transform: none; letter-spacing: 0; }
+.an-body { display: grid; gap: 28px; min-width: 0; }
+.an-body.is-loading { opacity: .55; }
+.an-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 520px), 1fr)); gap: 10px; }
+.an-side { border: 1px solid var(--cb-line); border-left: 4px solid var(--dc); border-radius: 8px; background: var(--cb-panel); padding: 10px 12px; display: grid; gap: 8px; min-width: 0; }
+.an-side-name { font-weight: 600; color: var(--dc); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.an-figures { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 8px 12px; }
+.an-figures span { display: block; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+.an-figures b { font-variant-numeric: tabular-nums; font-size: 15px; }
+.an-metrics, .an-picks { display: flex; flex-wrap: wrap; gap: 6px; }
+.an-metrics button, .an-picks button { background: var(--cb-panel); color: var(--muted); border: 1px solid var(--cb-line); border-radius: 999px; padding: 5px 12px; font: inherit; font-weight: 600; font-size: 13px; cursor: pointer; }
+.an-metrics button[aria-pressed="true"], .an-picks button[aria-pressed="true"] { color: var(--text); border-color: var(--text); }
+.an-picks button { border-radius: 6px; padding: 3px 10px; font-size: 12px; }
+.an-lap { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+.an-map-box { border: 1px solid var(--cb-line); border-radius: 8px; background: var(--cb-panel); padding: 10px; display: grid; gap: 8px; min-width: 0; }
+.an-map { width: 100%; height: auto; max-height: 560px; touch-action: none; }
+.an-map polyline { fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.an-map .an-shadow { stroke: rgba(0,0,0,.55); stroke-width: 22; }
+.an-map .an-lines polyline { stroke-width: 11; }
+.an-map .an-line { fill: #f0f3f2; }
+.an-zone circle { fill: var(--cb-panel2); stroke: var(--muted); stroke-width: 2; }
+.an-zone text { fill: var(--text); font-size: 16px; font-weight: 700; text-anchor: middle; }
+.an-zone text.is-small { font-size: 12px; }
+.an-zone.is-slow circle { stroke: #ef4444; }
+.an-zone.is-fast circle { stroke: #22c55e; }
+.an-cursor { fill: none; stroke: #fff; stroke-width: 4; }
+.an-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; font-size: 12px; color: var(--muted); }
+.an-legend i { display: inline-block; width: 14px; height: 6px; border-radius: 3px; margin-right: 5px; vertical-align: middle; }
+.an-legend .an-ramp { width: 140px; height: 8px; margin: 0; }
+.an-readout { margin: 0; font-size: 13px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 4px 14px; min-height: 2.6em; }
+.an-readout b { color: var(--text); }
+.an-readout span[style] { color: var(--dc); }
+.an-readout i, th.an-who i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--dc); margin-right: 5px; }
+th.an-who { color: var(--dc) !important; }
+.an-zones td.an-slow { color: #ef6b6b; }
+.an-zones td.an-fast { color: #4ade80; }
+.an-charts { display: grid; gap: 10px; border: 1px solid var(--cb-line); border-radius: 8px; background: var(--cb-panel); padding: 10px 12px; }
+.an-chart { display: grid; gap: 2px; }
+.an-chart-head { display: flex; justify-content: space-between; gap: 10px; font-size: 12px; color: var(--muted); }
+.an-chart-head b { color: var(--text); font-weight: 600; }
+.an-chart svg { width: 100%; height: auto; display: block; touch-action: none; }
+.an-chart polyline { fill: none; stroke-width: 2; vector-effect: non-scaling-stroke; stroke-linejoin: round; }
+.an-chart .an-tick { stroke: var(--cb-line); vector-effect: non-scaling-stroke; }
+.an-chart .an-zero { stroke: var(--muted); stroke-dasharray: 4 4; vector-effect: non-scaling-stroke; }
+.an-chart .an-cursor-line { stroke: #fff; stroke-width: 1; vector-effect: non-scaling-stroke; }
+.an-axis { position: relative; height: 14px; font-size: 11px; color: var(--muted); }
+.an-axis span { position: absolute; transform: translateX(-50%); }
+.an-wheels { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 400px), 1fr)); gap: 8px; }
+.an-wheels small { color: var(--muted); font-size: 11px; }
+.an-wheels tr.an-sub th { font-size: 10px; padding-top: 0; }
+@media (max-width: 999px) {
+  .an-lap { grid-template-columns: minmax(0, 1fr); }
+}
+.combos-page .an-zones th, .combos-page .an-zones td { padding: 4px 8px; font-size: 13px; }
+.an-size { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); }
+.combos-page .an-size select { width: auto; font-size: 13px; padding: 3px 6px; }

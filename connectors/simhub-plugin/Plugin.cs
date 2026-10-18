@@ -165,7 +165,14 @@ namespace EnduranceManager.SimHub
                                 ThreadPool.QueueUserWorkItem(_ => api.Read(compound));
                             }
                             else if (driving && tick % 600 == 0 && !api.Busy) ThreadPool.QueueUserWorkItem(_ => api.ReadLight());
-                            else if (!driving && tick % 50 == 0 && !api.Busy) ThreadPool.QueueUserWorkItem(_ => api.Read(null, true));
+                            // The pit screens answer in the garage too: read there while the service times are still
+                            // missing (a short stop or a drive straight back to the garage can fall between two reads).
+                            else if (!driving && tick % 50 == 0 && !api.Busy)
+                            {
+                                string compound = ok ? sample.FrontCompound : null;
+                                bool setupOnly = api.Service != null;
+                                ThreadPool.QueueUserWorkItem(_ => api.Read(compound, setupOnly));
+                            }
                             Thread.Sleep(100);
                         }
                     }
