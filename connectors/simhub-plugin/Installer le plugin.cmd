@@ -18,7 +18,13 @@ $copyOnly = $env:EM_MODE -eq 'copie'
 # Started by the plugin's « Mettre à jour » button: the window closes by itself when all went well.
 $update = $env:EM_MODE -eq 'maj'
 
-function Done($text) { Write-Host ''; Write-Host $text; if (-not $copyOnly) { Read-Host 'Appuie sur Entrée pour fermer' | Out-Null } }
+function Done($text) {
+    Write-Host ''; Write-Host $text
+    # Started by the plugin, SimHub has already closed: it comes back even when the update could not be done.
+    $exe = Join-Path $simhub 'SimHubWPF.exe'
+    if ($update -and (Test-Path $exe) -and -not (Get-Process SimHubWPF -ErrorAction SilentlyContinue)) { Start-Process $exe -WorkingDirectory $simhub }
+    if (-not $copyOnly) { Read-Host 'Appuie sur Entrée pour fermer' | Out-Null }
+}
 
 # The latest build from the site, checked against the size and fingerprint the site gives, next to this file.
 if (-not $copyOnly -and $site -match '^https://') {
@@ -48,9 +54,16 @@ if ($copyOnly) { Copy-Plugin; return }
 Write-Host 'Installation du plugin Fiches combo dans SimHub'
 $running = Get-Process SimHubWPF -ErrorAction SilentlyContinue
 if ($running) {
+    # Asked politely first (the plugin's button already closes SimHub itself); SimHub can stay in the tray or wait on a
+    # question, so after 15 s it is stopped: its settings are saved as it goes.
     Write-Host 'Fermeture de SimHub...'
     $running | ForEach-Object { $null = $_.CloseMainWindow() }
-    $running | ForEach-Object { $null = $_.WaitForExit(20000) }
+    $running | ForEach-Object { $null = $_.WaitForExit(15000) }
+    if (Get-Process SimHubWPF -ErrorAction SilentlyContinue) {
+        Write-Host 'SimHub ne se ferme pas tout seul : arrêt forcé.'
+        Get-Process SimHubWPF -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+        Start-Sleep 2
+    }
     while (Get-Process SimHubWPF -ErrorAction SilentlyContinue) { Read-Host 'SimHub est encore ouvert : ferme-le, puis appuie sur Entrée' | Out-Null }
 }
 
