@@ -296,9 +296,12 @@ function conditions() {
     <div class="cb-moments" role="group" aria-label="Jour ou nuit"${measured ? '' : ' title="Jour et nuit notés à partir du plugin 1.1"'}>${[['', 'Jour et nuit', null], ['day', 'Jour', moments.day], ['night', 'Nuit', moments.night]].map(([value, label, laps]) => `<button type="button" data-moment="${value}" aria-pressed="${value === view.moment}">${label}${laps === null ? '' : ` <small>${laps}</small>`}</button>`).join('')}</div></div>`;
 }
 
+// The game's FUEL RATIO for these laps: litres of fuel per percent of virtual energy (0.86 = 86 L for a full energy).
+const ratio = row => known(row.ve) && row.ve > 0 && known(row.fuel) && row.fuel > 0 ? row.fuel / row.ve : null;
+
 function energy(rows) {
-  const table = `<thead><tr><th>Pilote</th><th>Tours</th><th>Énergie / tour (%)</th><th>Tours / relais</th><th>Carburant / tour (L)</th></tr></thead><tbody>${rows.length ? rows.map(row =>
-    `<tr${rowClass(row)}>${nameCell(row)}<td>${row.laps}</td><td>${fr(row.ve)}${delta(row, 've', 2, ' %')}</td><td>${known(row.ve) && row.ve > 0 ? fr(100 / row.ve, 1) : '—'}</td><td>${fr(row.fuel)}</td></tr>`).join('') : none(5)}</tbody>`;
+  const table = `<thead><tr><th>Pilote</th><th>Tours</th><th>Énergie / tour (%)</th><th>Tours / relais</th><th>Carbu / tour (L)</th><th title="Litres de carburant par % d'énergie virtuelle : le FUEL RATIO du menu des stands">Ratio carbu</th></tr></thead><tbody>${rows.length ? rows.map(row =>
+    `<tr${rowClass(row)}>${nameCell(row)}<td>${row.laps}</td><td>${fr(row.ve)}${delta(row, 've', 2, ' %')}</td><td>${known(row.ve) && row.ve > 0 ? fr(100 / row.ve, 1) : '—'}</td><td>${fr(row.fuel)}</td><td>${fr(ratio(row))}</td></tr>`).join('') : none(6)}</tbody>`;
   // How much energy a lap may use for a stint of N laps, and which pilots stay under it.
   const pilots = rows.filter(row => !row.crew && known(row.ve) && row.ve > 0);
   const worst = pilots.length ? Math.max(...pilots.map(row => row.ve)) : null;
