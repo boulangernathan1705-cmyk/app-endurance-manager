@@ -172,8 +172,8 @@ function linkCard() {
 function header() {
   const sheet = view.sheet, combo = view.combo;
   const choices = view.combos.length > 1 ? `<label class="cb-crumb">Combo <select data-field="combo">${view.combos.map(item => `<option value="${esc(comboKey(item))}"${comboKey(item) === comboKey(combo) ? ' selected' : ''}>${esc(item.car)} · ${esc(item.track)}</option>`).join('')}</select></label>` : '';
-  return `<div class="cb-topline"><div><div class="cb-crumb">Fiches combo · Le Mans Ultimate</div><h1>${esc(combo.car)} · ${esc(combo.track)}</h1></div>
-    <div class="cb-actions">${sheet?.combo.carClass ? `<span class="cb-crumb">${esc(sheet.combo.carClass)}</span>` : ''}${choices}<button type="button" class="cb-btn" data-action="export">Exporter la fiche</button></div></div>`;
+  return `<div class="cb-topline"><div><div class="cb-crumb">Fiches combo · Le Mans Ultimate${sheet?.combo.carClass ? ` · ${esc(sheet.combo.carClass)}` : ''}</div><h1>${esc(combo.car)} · ${esc(combo.track)}</h1>${sheet ? sample() : ''}</div>
+    <div class="cb-actions">${choices}<button type="button" class="cb-btn" data-action="export">Exporter la fiche</button></div></div>`;
 }
 
 function filters() {
@@ -190,17 +190,18 @@ function filters() {
 
 function sample() {
   const s = view.sheet.sample;
-  if (!s.laps) return '<p class="cb-empty">Aucune séance sur ces dates.</p>';
-  return `<div class="cb-sample"><span><b>${s.laps}</b> tours mesurés</span><span><b>${s.drivers}</b> pilote${s.drivers > 1 ? 's' : ''}</span><span><b>${s.sessions}</b> séance${s.sessions > 1 ? 's' : ''}</span>
-    <span>du <b>${esc(day(s.from))}</b> au <b>${esc(day(s.to))}</b></span>${view.compare ? `<span>comparé à <b>${esc(compareName())}</b></span>` : ''}</div>`;
+  if (!s.laps) return '<div class="cb-sample">Aucune séance sur ces dates.</div>';
+  const span = day(s.from) === day(s.to) ? `le <b>${esc(day(s.from))}</b>` : `du <b>${esc(day(s.from))}</b> au <b>${esc(day(s.to))}</b>`;
+  return `<div class="cb-sample"><span><b>${s.laps}</b> tours</span><span><b>${s.drivers}</b> pilote${s.drivers > 1 ? 's' : ''}</span><span><b>${s.sessions}</b> séance${s.sessions > 1 ? 's' : ''}</span>
+    <span>${span}</span>${view.compare ? `<span>comparé à <b>${esc(compareName())}</b></span>` : ''}</div>`;
 }
 
 function drivers() {
   const list = [...people().values()];
   if (!list.length) return '';
   const me = list.find(item => item.me);
-  const swatches = me ? `<div class="cb-colors"><span>Ma couleur</span>${COLORS.map(color => `<button type="button" class="cb-swatch" style="--dc:${color}" data-color="${color}" aria-label="Couleur ${color}" aria-pressed="${color === me.color}"></button>`).join('')}</div>` : '';
-  return `<div class="cb-drivers" role="group" aria-label="Pilotes affichés"><span>Pilotes affichés</span>${list.map(item => `<button type="button" class="cb-chip" style="--dc:${esc(item.color)}" data-driver="${esc(item.id)}" aria-pressed="${!view.hidden.has(item.id)}"><i></i>${esc(item.name)}${item.me ? ' (moi)' : ''}</button>`).join('')}</div>${swatches}`;
+  const swatches = me ? `<div class="cb-side-group"><span class="cb-side-label">Ma couleur</span><div class="cb-colors">${COLORS.map(color => `<button type="button" class="cb-swatch" style="--dc:${color}" data-color="${color}" aria-label="Couleur ${color}" aria-pressed="${color === me.color}"></button>`).join('')}</div></div>` : '';
+  return `<div class="cb-side-group"><span class="cb-side-label">Pilotes affichés</span><div class="cb-drivers" role="group" aria-label="Pilotes affichés">${list.map(item => `<button type="button" class="cb-chip" style="--dc:${esc(item.color)}" data-driver="${esc(item.id)}" aria-pressed="${!view.hidden.has(item.id)}"><i></i>${esc(item.name)}${item.me ? ' (moi)' : ''}</button>`).join('')}</div></div>${swatches}`;
 }
 
 function conditions() {
@@ -208,8 +209,8 @@ function conditions() {
   const moments = conds[view.cond].moments;
   // Day and night: laps driven with a plugin that reads the daylight. Older laps count only in « Jour et nuit ».
   const measured = moments.day + moments.night;
-  return `<div class="cb-conds" role="group" aria-label="Conditions de piste">${CONDITIONS.map(cond => `<button type="button" class="cb-cond ${COND[cond][1]}" data-cond="${cond}" aria-pressed="${cond === view.cond}"><b>${COND[cond][0]}</b>${conds[cond].laps} tours</button>`).join('')}</div>
-    <div class="cb-moments" role="group" aria-label="Jour ou nuit">${[['', 'Jour et nuit', null], ['day', 'Jour', moments.day], ['night', 'Nuit', moments.night]].map(([value, label, laps]) => `<button type="button" class="cb-pill" data-moment="${value}" aria-pressed="${value === view.moment}">${label}${laps === null ? '' : `<small>${laps} tours</small>`}</button>`).join('')}${measured ? '' : '<span class="cb-src">jour et nuit notés à partir de la nouvelle version du plugin</span>'}</div>`;
+  return `<div class="cb-condbar"><div class="cb-conds" role="group" aria-label="Conditions de piste">${CONDITIONS.map(cond => `<button type="button" class="cb-cond ${COND[cond][1]}" data-cond="${cond}" aria-pressed="${cond === view.cond}"><b>${COND[cond][0]}</b><small>${conds[cond].laps} tours</small></button>`).join('')}</div>
+    <div class="cb-moments" role="group" aria-label="Jour ou nuit"${measured ? '' : ' title="Jour et nuit notés à partir du plugin 1.1"'}>${[['', 'Jour et nuit', null], ['day', 'Jour', moments.day], ['night', 'Nuit', moments.night]].map(([value, label, laps]) => `<button type="button" data-moment="${value}" aria-pressed="${value === view.moment}">${label}${laps === null ? '' : ` <small>${laps}</small>`}</button>`).join('')}</div></div>`;
 }
 
 function energy(rows) {
@@ -336,7 +337,7 @@ function pitStop() {
 
 function notes() {
   const list = view.sheet.notes;
-  return `<section style="max-width:760px"><div class="cb-head"><h2>Notes de l’équipe</h2></div>
+  return `<section class="cb-card"><div class="cb-head"><h2>Notes de l’équipe</h2></div>
     <form class="cb-form" data-note-form><textarea maxlength="1000" placeholder="Une info utile sur ce combo (pressions, limites de piste, sortie des stands…)" data-note-body aria-label="Nouvelle note"></textarea><div><button type="submit" class="cb-btn">Ajouter la note</button></div></form>
     <div class="cb-notes">${list.map(note => view.editing === note.id
       ? `<form class="cb-note cb-form" data-note-edit="${esc(note.id)}"><textarea maxlength="1000" aria-label="Modifier la note">${esc(note.body)}</textarea><div class="cb-actions"><button type="submit" class="cb-btn">Enregistrer</button><button type="button" class="cb-btn is-quiet" data-action="cancel-note">Annuler</button></div></form>`
@@ -372,10 +373,22 @@ function render() {
   const rows = paceRows(view.cond);
   const c = view.sheet.conditions[view.cond];
   const track = c.trackTemp ? ` · piste ${fr(c.trackTemp[0], 0)} à ${fr(c.trackTemp[1], 0)} °C` : '';
-  app.innerHTML = `${header()}${message}${view.error ? `<p class="cb-message is-error">${esc(view.error)}</p>` : ''}${linkCard()}${filters()}${sample()}${drivers()}${conditions()}
+  // Linked, the SimHub block goes to the foot of the page; not yet, it leads.
+  const linked = Boolean(view.link?.linked);
+  view.sideOpen ??= matchMedia('(min-width: 1000px)').matches;
+  app.innerHTML = `${header()}${message}${view.error ? `<p class="cb-message is-error">${esc(view.error)}</p>` : ''}${linked ? '' : linkCard()}
+    <div class="cb-layout"><details class="cb-side" data-fold="side"${view.sideOpen ? ' open' : ''}><summary>Filtres et pilotes<span>${esc(activeFilters())}</span></summary><div class="cb-side-body">${filters()}${drivers()}</div></details>
+    <div class="cb-main">${conditions()}
     <div class="cb-frame ${COND[view.cond][1]}"><span class="cb-tag">${COND[view.cond][0]}${view.moment ? ` · ${view.moment === 'night' ? 'nuit' : 'jour'}` : ''}</span><span class="cb-meta">${c.laps} tours${track}</span>
       ${c.laps ? energy(rows) + tyres() + pace(rows) : `<p class="cb-empty">Pas encore de tour propre dans cette condition${view.moment ? (view.moment === 'night' ? ' de nuit' : ' de jour') : ''}${view.trackMin !== '' || view.trackMax !== '' ? ' avec cette température de piste' : ''}.</p>`}</div>
-    ${pitStop()}${notes()}${periodsCard()}`;
+    ${pitStop()}${notes()}</div></div>
+    <div class="cb-foot">${periodsCard()}${linked ? linkCard() : ''}</div>`;
+}
+
+// The filters in use, for the folded panel's title.
+function activeFilters() {
+  const count = [view.event, view.version, view.compareEvent, view.setup, view.trackMin, view.trackMax].filter(value => value !== '').length + view.hidden.size;
+  return count ? `${count} actif${count > 1 ? 's' : ''}` : 'aucun filtre';
 }
 
 // ---------- Actions ----------
@@ -534,6 +547,7 @@ app.addEventListener('toggle', event => {
   const fold = event.target.dataset?.fold;
   if (fold === 'pit') view.pitOpen = event.target.open;
   if (fold === 'periods') view.periodsOpen = event.target.open;
+  if (fold === 'side') view.sideOpen = event.target.open;
   if (fold === 'link') view.linkOpen = event.target.open;
 }, true);
 
