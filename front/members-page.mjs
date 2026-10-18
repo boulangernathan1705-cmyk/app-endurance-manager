@@ -20,10 +20,11 @@ function renderError(message) {
 }
 
 // What each permission means (server/access.mjs, PERMISSIONS).
-const PERMISSION_LABELS = {access:'Accès Endurance Manager', endurance:'Endurances', solo_open:'Événements OPEN', solo_safe:'Événements SAFE', crews:'Équipages', admin:'Administrer'};
+const PERMISSION_LABELS = {access:'Accès Endurance Manager', endurance:'Endurances', solo_open:'Événements OPEN', solo_safe:'Événements SAFE', crews:'Équipages', combos:'Fiches combo', admin:'Administrer'};
 const PERMISSION_HELP = {access:'Accéder au site de la communauté. Sans cette autorisation sur au moins un rôle, le membre ne peut pas consulter les courses ni utiliser le site.', endurance:'S’inscrire aux endurances (et rejoindre un équipage existant).',
   solo_open:'S’inscrire aux événements OPEN.', solo_safe:'S’inscrire aux événements SAFE (et OPEN).',
   crews:'Créer et gérer les équipages.',
+  combos:'Consulter les fiches combo de l’équipe et y envoyer ses séances avec le plugin SimHub.',
   admin:'Administrer le site : réglages, rôles, créer et gérer les courses et les événements, inscrire n’importe quel pilote.'};
 
 // Members of the community: found on its Discord server by the bot. Roles are managed on Discord; this page
@@ -63,7 +64,8 @@ const ICONS = {
   iracingImport:'<path d="M4 21V4M4 4h13l-2 4 2 4H4"/>',
   grindfest:'<path d="M4 21V4M4 4h13l-2 4 2 4H4"/>',
   soloRaces:'<circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/>',
-  categoryEntry:'<path d="M4 6h16M4 12h10M4 18h7"/><path d="m15 17 2 2 4-4"/>'
+  categoryEntry:'<path d="M4 6h16M4 12h10M4 18h7"/><path d="m15 17 2 2 4-4"/>',
+  combos:'<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="3.5"/><path d="M12 3.5v5M12 15.5v5M3.5 12h5M15.5 12h5"/>'
 };
 const icon = key => `<svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[key]}</svg>`;
 const RECAP_LABELS = {all:'LMU et iRacing', lmu:'LMU', iracing:'iRacing'};
@@ -72,7 +74,7 @@ const copyButton = target => `<button type="button" class="secondary-button setu
 // What is on, for the overview and the modules.
 function moduleStates(settings, setup) {
   return {recap:Boolean(setup.botRecap?.enabled), crewChannels:settings.modules.crewChannels === true, raceReminders:settings.modules.raceReminders === true,
-    iracingImport:settings.modules.iracingImport === true, soloRaces:settings.modules.soloRaces === true, grindfest:settings.modules.grindfest === true, categoryEntry:settings.modules.categoryEntry === true};
+    iracingImport:settings.modules.iracingImport === true, soloRaces:settings.modules.soloRaces === true, grindfest:settings.modules.grindfest === true, categoryEntry:settings.modules.categoryEntry === true, combos:settings.modules.combos === true};
 }
 
 // « Vue d'ensemble ».
@@ -120,8 +122,9 @@ function overviewMarkup(setup, settings, members) {
 function peopleMarkup(result, settings) {
   const members = Array.isArray(result.members) ? result.members : [];
   const server = result.community?.discordServer ? ` « ${esc(result.community.discordServer)} »` : '';
-  // The solo races permissions only matter with the solo races module.
-  const shown = settings.permissions.filter(permission => (settings.modules.soloRaces && settings.modules.eventTdzAvailable) || !permission.startsWith('solo_'));
+  // The solo races permissions only matter with the solo races module, the fiches combo one with its module.
+  const shown = settings.permissions.filter(permission => ((settings.modules.soloRaces && settings.modules.eventTdzAvailable) || !permission.startsWith('solo_'))
+    && (permission !== 'combos' || settings.modules.combos));
   const legend = `<details class="role-legend-wrap"><summary>Que permet chaque autorisation ?</summary><dl class="role-legend">${shown.map(permission => `<div><dt>${esc(PERMISSION_LABELS[permission])}</dt><dd>${esc(PERMISSION_HELP[permission])}</dd></div>`).join('')}</dl></details>`;
   const row = item => `<tr data-role="${esc(item.id)}" data-kept="${esc(JSON.stringify(item.permissions.filter(permission => !shown.includes(permission))))}">
     <th scope="row"><strong>${esc(item.name)}</strong>${item.administrator ? '<small>Admin Discord : tout</small>' : ''}<span class="settings-status" aria-live="polite"></span></th>
@@ -134,7 +137,7 @@ function peopleMarkup(result, settings) {
     <div data-view-pane="members" class="admin-stack">
       <div class="members-toolbar"><label class="members-search"><span class="sr-only">Rechercher un membre</span><input type="search" name="memberSearch" placeholder="Rechercher un pilote ou un rôle…" autocomplete="off"></label><button type="button" class="secondary-button" data-members-refresh data-tip="Relit tout de suite sur Discord les rôles de chaque membre et le nom des rôles. Sinon, c’est fait chaque jour.">Actualiser depuis Discord</button></div>
       <p class="members-help">Les membres du serveur Discord${server} qui se sont connectés au site. Leurs rôles se donnent sur Discord.</p>
-      <div class="members-list member-grid">${members.map(member => memberCard(member, result.permissions || [])).join('')}</div>
+      <div class="members-list member-grid">${members.map(member => memberCard(member, (result.permissions || []).filter(permission => permission !== 'combos' || settings.modules.combos))).join('')}</div>
       <p class="members-empty" hidden>Aucun membre ne correspond à cette recherche.</p></div>
     <div data-view-pane="roles" class="admin-stack" hidden>
       <p class="members-help">Coche « Accès Endurance Manager » sur les rôles qui peuvent entrer (sur « @everyone », tout le serveur entre), puis ce que chacun peut faire. Le propriétaire du serveur et les admins Discord ont tout. Chaque case s’enregistre aussitôt.</p>
@@ -272,6 +275,9 @@ function modulesMarkup(settings, setup) {
         <div class="settings-actions"><button class="primary-button" type="submit">Enregistrer</button><span class="settings-status" aria-live="polite"></span></div></form>`}]),
     ...(settings.modules.eventTdzAvailable ? [] : [{key:'soloRaces', name:'EVENT SOLO', text:'Un calendrier d’événements toutes simus&nbsp;: inscription en un clic, places limitées si besoin et liste d’attente.',
       state:states.soloRaces ? ['ok', 'Actif'] : ['off', 'Éteint'], control:toggle('soloRaces', 'EVENT SOLO'), settings:''}]),
+    // Private module: opened for a team by the platform managers, shown to the community's admins once open.
+    ...(settings.modules.combosManager || states.combos ? [{key:'combos', name:'Fiches combo', text:'Module privé de l’équipe&nbsp;: les données de practice par voiture et circuit (énergie, pneus, rythme, arrêts), envoyées par le plugin SimHub de chaque pilote. Visible des rôles qui ont l’autorisation « Fiches combo ».',
+      state:states.combos ? ['ok', 'Actif'] : ['off', 'Éteint'], control:toggle('combos', 'Fiches combo', !settings.modules.combosManager), settings:''}] : []),
     ...(settings.modules.grindfestAvailable ? [{key:'grindfest', name:'Gridfest', text:'Inscription par streamer, nom en jeu et mot de passe par MP Discord.', state:states.grindfest ? ['ok','Actif'] : ['off','Éteint'], control:toggle('grindfest','Gridfest'), settings:''}] : []),
   ];
   const tile = item => `<article class="admin-module ${states[item.key] ? 'is-on' : ''}" data-module-tile="${item.key}">
