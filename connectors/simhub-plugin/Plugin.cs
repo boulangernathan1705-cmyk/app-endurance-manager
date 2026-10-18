@@ -1,0 +1,148 @@
+// Endurance Manager · plugin SimHub des fiches combo.
+//
+// Pendant que le pilote roule dans Le Mans Ultimate, il lit ce que le jeu publie dans sa mémoire partagée (pneus,
+// énergie, carburant, vitesse, pluie, arrêts aux stands) et l'API locale du jeu (temps de service de la voiture),
+// puis envoie chaque séance aux fiches combo de son équipe avec sa clé de pilote.
+// Il ne fait que lire : il ne modifie rien dans le jeu ni dans SimHub.
+using System;
+using System.IO;
+using System.IO.MemoryMappedFiles;
+using System.Threading;
+using System.Windows.Media;
+using GameReaderCommon;
+using SimHub.Plugins;
+
+namespace EnduranceManager.SimHub
+{
+    public class Settings
+    {
+        public string Code { get; set; } = "";
+    }
+
+    [PluginDescription("Envoie tes séances Le Mans Ultimate aux fiches combo de ton équipe sur Endurance Manager.")]
+    [PluginAuthor("Endurance Manager")]
+    [PluginName("Endurance Manager · Fiches combo")]
+    public class EnduranceManagerPlugin : IPlugin, IDataPlugin, IWPFSettingsV2
+    {
+        public Settings Settings;
+        public PluginManager PluginManager { get; set; }
+        public ImageSource PictureIcon => Icon;
+
+        // The menu icon: a stopwatch, drawn rather than shipped as a file.
+        static readonly ImageSource Icon = MakeIcon();
+        static ImageSource MakeIcon()
+        {
+            var pen = new Pen(Brushes.White, 2.2) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round };
+            var group = new DrawingGroup();
+            group.Children.Add(new GeometryDrawing(null, pen, new EllipseGeometry(new System.Windows.Point(12, 13.5), 8, 8)));
+            group.Children.Add(new GeometryDrawing(null, pen, Geometry.Parse("M12,13.5 L15.5,10 M10,3 L14,3 M12,3 L12,5.5")));
+            var image = new DrawingImage(group);
+            image.Freeze();
+            return image;
+        }
+        public string LeftMenuTitle => "Fiches combo";
+
+        Uploader uploader;
+        readonly LmuApi api = new LmuApi();
+        Thread reader, sender;
+        volatile bool running;
+        int laps;
+
+        public Uploader Uploader => uploader;
+        public LmuApi Api => api;
+        // What the game is doing, for the settings screen: closed, in the menus, or on track.
+        public volatile string GameState = "closed";
+        // The last session recorded, for the settings screen.
+        public volatile string LastSession;
+        public string Status => uploader?.Status ?? "";
+
+        public void Init(PluginManager pluginManager)
+        {
+            Settings = this.ReadCommonSettings("GeneralSettings", () => new Settings());
+            string home = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "EnduranceManager", "Combos");
+            Directory.CreateDirectory(home);
+            uploader = new Uploader(home);
+            this.AttachDelegate("Status", () => Status);
+            this.AttachDelegate("LapsRecorded", () => laps);
+            running = true;
+            reader = new Thread(ReadGame) { IsBackground = true, Name = "EnduranceManager.Read" };
+            sender = new Thread(SendLoop) { IsBackground = true, Name = "EnduranceManager.Send" };
+            reader.Start();
+            sender.Start();
+        }
+
+        public void End(PluginManager pluginManager)
+        {
+            running = false;
+            this.SaveCommonSettings("GeneralSettings", Settings);
+        }
+
+        // SimHub calls this sixty times a second; the plugin reads the game on its own thread, ten times a second.
+        public void DataUpdate(PluginManager pluginManager, ref GameData data) { }
+
+        public System.Windows.Controls.Control GetWPFSettingsControl(PluginManager pluginManager) => new SettingsControl(this);
+
+        public void SaveCode(string code)
+        {
+            Settings.Code = code?.Trim() ?? "";
+            this.SaveCommonSettings("GeneralSettings", Settings);
+            uploader.Reset();
+        }
+
+        void ReadGame()
+        {
+            var recorder = new Recorder(() => DateTime.Now, session =>
+            {
+                laps += session.Laps.Count;
+                LastSession = $"{DateTime.Now:dd/MM HH:mm} · {session.Track} · {session.Laps.Count} tours · {session.Stops.Count} arrêt{(session.Stops.Count > 1 ? "s" : "")}";
+                // The game's service times and forecast for this car, read while the pilot drove.
+                session.Service = api.Service;
+                session.Game = api.Game;
+                try { uploader.Save(session); } catch { }
+            });
+            var buffer = new byte[LmuMemory.Size];
+            while (running)
+            {
+                MemoryMappedFile memory = null;
+                try { memory = MemoryMappedFile.OpenExisting(LmuMemory.Name, MemoryMappedFileRights.Read); } catch { }
+                if (memory == null)
+                {
+                    // The game is closed: the session is over, send it now.
+                    GameState = "closed";
+                    recorder.Flush();
+                    Thread.Sleep(5000);
+                    continue;
+                }
+                using (memory)
+                using (var view = memory.CreateViewAccessor(0, LmuMemory.Size, MemoryMappedFileAccess.Read))
+                {
+                    for (int misses = 0, tick = 0; running && misses < 600; tick++)
+                    {
+                        view.ReadArray(0, buffer, 0, buffer.Length);
+                        bool ok = LmuMemory.Read(buffer, out var sample);
+                        recorder.Feed(sample, ok);
+                        bool driving = ok && sample.Realtime;
+                        GameState = driving ? "track" : "menu";
+                        misses = driving ? 0 : misses + 1;
+                        // The game's API, every 30 s on track: its tables do not change during a session.
+                        // Read aside, so a slow answer never holds up the samples.
+                        if (driving && tick % 300 == 0) { string compound = sample.FrontCompound; ThreadPool.QueueUserWorkItem(_ => api.Read(compound)); }
+                        Thread.Sleep(100);
+                    }
+                }
+                // A minute without driving: the session is over, and the memory is let go so the game can close cleanly.
+                recorder.Flush();
+            }
+        }
+
+        void SendLoop()
+        {
+            Thread.Sleep(10000);
+            while (running)
+            {
+                uploader.SendAll(LinkCode.Parse(Settings.Code));
+                for (int i = 0; running && i < 60; i++) Thread.Sleep(1000);
+            }
+        }
+    }
+}
