@@ -1,7 +1,7 @@
 // Données en direct : pendant que le pilote roule, LMU publie son état dans la mémoire partagée « LMU_Data »
 // (offsets de pyLMUSharedMemory, repris de l'ancien plugin retiré en v1.51) : par tour, l'usure, les températures
 // et les pressions des pneus, la gomme, les freins, la vitesse max, le carburant en litres, l'énergie virtuelle,
-// la pluie et l'humidité de la piste ; et chaque arrêt aux stands décomposé. Le site les lit dans
+// la pluie et l'humidité de la piste, les temps des trois secteurs ; et chaque arrêt aux stands décomposé. Le site les lit dans
 // cleanSession (shared/combos.mjs).
 using System;
 using System.Collections.Generic;
@@ -24,7 +24,7 @@ namespace EnduranceManager.SimHub
         public string Track, Car, Class, Driver;
         public double TrackTemp, AirTemp, Rain, Wet;
         public short LapsDone;
-        public double LastLap;
+        public double LastLap, LastSector1, LastSector2;
         public bool InPits;
         public byte PitState;
         public double Speed, Fuel, FuelCapacity, Energy;
@@ -76,7 +76,9 @@ namespace EnduranceManager.SimHub
                 // How wet the racing line is, between its driest and wettest point (mMinPathWetness, mMaxPathWetness,
                 // right after the wind). To check in game: 0 on a dry track, close to 1 after heavy rain.
                 Wet = (F64(b, ScoringInfo + 268) + F64(b, ScoringInfo + 276)) / 2,
-                LapsDone = I16(b, v + 100), LastLap = F64(b, v + 168), InPits = b[v + 198] != 0, PitState = b[v + 457],
+                LapsDone = I16(b, v + 100), LastLap = F64(b, v + 168),
+                // Where the last lap's first and second sectors ended (mLastSector1, mLastSector2: from the line, -1 when unknown).
+                LastSector1 = F64(b, v + 152), LastSector2 = F64(b, v + 160), InPits = b[v + 198] != 0, PitState = b[v + 457],
                 Speed = Math.Sqrt(vx * vx + vy * vy + vz * vz) * 3.6,
                 Fuel = F64(b, t + 524), FuelCapacity = F64(b, t + 608), Energy = F32(b, t + 776) * 100,
                 Invalid = b[t + 745] != 0, FrontCompound = Text(b, t + 620, 18), RearCompound = Text(b, t + 638, 18),
@@ -104,6 +106,9 @@ namespace EnduranceManager.SimHub
     {
         [JsonProperty("n")] public int N;
         [JsonProperty("t")] public double Time;
+        [JsonProperty("s1", NullValueHandling = NullValueHandling.Ignore)] public double? S1;
+        [JsonProperty("s2", NullValueHandling = NullValueHandling.Ignore)] public double? S2;
+        [JsonProperty("s3", NullValueHandling = NullValueHandling.Ignore)] public double? S3;
         [JsonProperty("top")] public double Top;
         [JsonProperty("fuel")] public double Fuel;
         [JsonProperty("ve")] public double Energy;
@@ -118,6 +123,8 @@ namespace EnduranceManager.SimHub
         [JsonProperty("wet")] public double Wet;
         [JsonProperty("invalid")] public bool Invalid;
         [JsonProperty("pit")] public bool Pit;
+        // The setup the game had loaded when the lap ended (LMU's garage), when known.
+        [JsonProperty("setup", NullValueHandling = NullValueHandling.Ignore)] public string Setup;
     }
 
     public class LiveStop
@@ -174,7 +181,9 @@ namespace EnduranceManager.SimHub
         int idle;
         bool onTrack; // out of the pit lane at least once in this session
 
-        public Recorder(Func<DateTime> now, Action<LiveSession> done) { this.now = now; this.done = done; }
+        readonly Func<string> setup;
+
+        public Recorder(Func<DateTime> now, Action<LiveSession> done, Func<string> setup = null) { this.now = now; this.done = done; this.setup = setup; }
 
         public void Flush()
         {
@@ -223,8 +232,15 @@ namespace EnduranceManager.SimHub
             var output = new LiveLap
             {
                 N = s.LapsDone, Time = Round(s.LastLap, 3), Top = Round(lap.Top, 1), Compound = s.FrontCompound, Rain = Round(s.Rain, 2),
-                AirTemp = Round(s.AirTemp, 1), Invalid = s.Invalid, Pit = lap.Pit
+                AirTemp = Round(s.AirTemp, 1), Invalid = s.Invalid, Pit = lap.Pit, Setup = setup?.Invoke()
             };
+            // The three sectors, only when the game gave all of them for this lap.
+            if (s.LastSector1 > 0 && s.LastSector2 > s.LastSector1 && s.LastLap > s.LastSector2)
+            {
+                output.S1 = Round(s.LastSector1, 3);
+                output.S2 = Round(s.LastSector2 - s.LastSector1, 3);
+                output.S3 = Round(s.LastLap - s.LastSector2, 3);
+            }
             if (!string.IsNullOrEmpty(s.RearCompound) && s.RearCompound != s.FrontCompound) output.Compound += " / " + s.RearCompound;
             if (lap.TrackCount > 0)
             {

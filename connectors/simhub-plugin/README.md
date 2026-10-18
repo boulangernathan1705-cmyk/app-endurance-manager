@@ -5,10 +5,11 @@ Envoie les séances Le Mans Ultimate d'un pilote aux fiches combo de son équipe
 
 - lit la mémoire partagée de LMU (`LMU_Data`) pendant que le pilote roule : usure, températures et pressions des
   pneus, gomme, freins, vitesse max, carburant en litres, énergie virtuelle, température de piste, pluie et humidité
-  de la trajectoire, arrêts aux stands décomposés (`Live.cs`) ;
+  de la trajectoire, temps des trois secteurs, arrêts aux stands décomposés (`Live.cs`) ;
 - lit l'API locale du jeu (`http://localhost:6397`, en lecture seule, voiture arrêtée aux stands) : temps de service de
   la voiture (`RepairAndRefuel` › `pitStopTimes`), prévision de conso et température idéale de la gomme
-  (`TireManagement`), envoyés avec la séance (`service`, `game`, `LmuApi.cs`) ;
+  (`TireManagement`), envoyés avec la séance (`service`, `game`, `LmuApi.cs`) ; et le nom du réglage chargé au garage
+  (`summary` › `activeSetup`), noté sur chaque tour (`setup`) ;
 - garde chaque séance en fichier jusqu'à ce que le site l'ait reçue (`Sync.cs`).
 
 Il ne fait que lire : il ne modifie rien dans le jeu ni dans SimHub. Il n'envoie plus les fichiers de résultats XML.
@@ -17,7 +18,8 @@ Il ne fait que lire : il ne modifie rien dans le jeu ni dans SimHub. Il n'envoie
 
 - Rien dans la boucle de SimHub (`DataUpdate` est vide) : la lecture tourne sur son propre fil, en priorité basse,
   dix fois par seconde, et dort le reste du temps. Chaque lecture est une seule copie de la mémoire du jeu (325 Ko).
-- L'API locale du jeu n'est appelée que voiture arrêtée aux stands ou au garage, jamais en roulant, une lecture à la fois.
+- L'API locale du jeu n'est appelée que voiture arrêtée aux stands, ou au garage et dans les menus (le nom du réglage,
+  toutes les 5 s), jamais en roulant, une lecture à la fois.
 - Les séances partent quand le pilote n'est pas en piste (menus, jeu fermé), sur un fil en priorité minimale.
 - Aucune erreur de lecture ne peut fermer SimHub : la lecture reprend quelques secondes plus tard.
 - Jeu planté ou fermé en piste : l'horloge du jeu ne bouge plus, la séance est écrite sur le disque au bout d'une minute.
@@ -26,6 +28,10 @@ Il ne fait que lire : il ne modifie rien dans le jeu ni dans SimHub. Il n'envoie
 À vérifier en jeu : l'humidité de la trajectoire (`Wet` dans `Live.cs`) est lue juste après le vent dans la mémoire
 partagée. Elle doit valoir 0 sur piste sèche et monter vers 1 sous la pluie. La condition d'un tour (sec, humide,
 pluie) en dépend : seuils `DAMP_FROM` et `RAIN_FROM` dans `shared/combos.mjs`.
+
+À vérifier aussi : le nom du réglage affiché sur l'écran du plugin (« Réglage chargé ») doit changer quand on charge un
+autre réglage au garage. Un réglage modifié sans être enregistré garde le nom de celui dont il part. Les secteurs
+d'un tour ne sont envoyés que si le jeu a donné les trois.
 
 ## Compiler (sur un PC Windows avec SimHub)
 
@@ -68,9 +74,10 @@ Propriétés exposées aux tableaux de bord SimHub : `EnduranceManagerPlugin.Sta
 ```json
 {"at": 1790000000000, "track": "Circuit de la Sarthe", "car": "Ferrari 499P", "class": "Hypercar",
  "driver": "N. Boulanger", "session": 2, "capacity": 90,
- "laps": [{"n": 3, "t": 209.4, "top": 331.2, "fuel": 6.9, "ve": 8.42, "wear": [1.7, 2.0, 1.3, 1.4],
+ "laps": [{"n": 3, "t": 209.4, "s1": 62.8, "s2": 83.9, "s3": 62.7, "top": 331.2, "fuel": 6.9, "ve": 8.42, "wear": [1.7, 2.0, 1.3, 1.4],
            "temp": [92, 95, 89, 90], "brake": [480, 495, 410, 405], "kpa": [171, 172, 166, 167],
-           "compound": "Medium", "track": 31.2, "air": 22.4, "rain": 0, "wet": 0, "invalid": false, "pit": false}],
+           "compound": "Medium", "track": 31.2, "air": 22.4, "rain": 0, "wet": 0, "invalid": false, "pit": false,
+           "setup": "Course v2"}],
  "stops": [{"lap": 4, "lane": 62.5, "stopped": 27.3, "fuel": 40, "ve": 60, "tyres": 4, "repair": false}],
  "service": {"fuelRate": 2.4, "energyRate": 3.1, "connect": 2, "tyres4": 22, "tyres2": 12, "wing": 6, "brakes": 95, "driver": 18},
  "game": {"fuel": 6.9, "ve": 8.4, "ideal": 90}}

@@ -19,6 +19,7 @@ export const CLEAN_RATIO = 1.07;
 export const WHEELS = Object.freeze(['fl', 'fr', 'rl', 'rr']);
 export const MAX_LAPS = 600;
 export const MAX_STOPS = 60;
+export const SETUP_MAX = 80;
 
 const finite = (value, min, max) => { const parsed = Number(value); return value !== null && value !== '' && Number.isFinite(parsed) && parsed >= min && parsed <= max ? parsed : null; };
 const four = (value, min, max) => Array.isArray(value) && value.length === 4 ? value.map(item => finite(item, min, max)) : [null, null, null, null];
@@ -40,6 +41,13 @@ export function cleanGame(input) {
   return Object.values(out).some(value => value !== null) ? out : null;
 }
 
+// The three sectors of a lap (seconds), all or none.
+function sectors(lap) {
+  const values = [lap?.s1, lap?.s2, lap?.s3].map(value => finite(value, 0.5, 1800));
+  const [s1, s2, s3] = values.every(value => value !== null) ? values : [null, null, null];
+  return {s1, s2, s3};
+}
+
 // One session as the plugin sends it (connectors/simhub-plugin/Live.cs): bounded numbers, short texts, nothing else.
 export function cleanSession(input) {
   if (!input || typeof input !== 'object' || !Array.isArray(input.laps) || !Array.isArray(input.stops)) throw Error('Séance illisible.');
@@ -47,10 +55,11 @@ export function cleanSession(input) {
   const track = label(input.track, 120), car = label(input.car, 120);
   if (!at || !track || !car) throw Error('Séance incomplète : date, circuit ou voiture manquant.');
   const seen = new Set();
-  const laps = input.laps.slice(0, MAX_LAPS).map(lap => ({n:finite(lap?.n, 0, 10000), t:finite(lap?.t, 1, 3600), top:finite(lap?.top, 0, 500),
+  const laps = input.laps.slice(0, MAX_LAPS).map(lap => ({n:finite(lap?.n, 0, 10000), t:finite(lap?.t, 1, 3600), ...sectors(lap), top:finite(lap?.top, 0, 500),
     fuel:finite(lap?.fuel, 0, 200), ve:finite(lap?.ve, 0, 100), wear:four(lap?.wear, 0, 100), temp:four(lap?.temp, -50, 250),
     brake:four(lap?.brake, -50, 1500), kpa:four(lap?.kpa, 0, 1000), compound:label(lap?.compound, 40), track:finite(lap?.track, -30, 80),
-    air:finite(lap?.air, -30, 60), rain:finite(lap?.rain, 0, 1), wet:finite(lap?.wet, 0, 1), invalid:lap?.invalid === true, pit:lap?.pit === true}))
+    air:finite(lap?.air, -30, 60), rain:finite(lap?.rain, 0, 1), wet:finite(lap?.wet, 0, 1), invalid:lap?.invalid === true, pit:lap?.pit === true,
+    setup:label(lap?.setup, SETUP_MAX)}))
     // A lap LMU counted without a time still tells its fuel and tyres; the same lap number twice is kept once.
     .filter(lap => lap.n !== null && !seen.has(lap.n) && seen.add(lap.n) && (lap.t || lap.fuel || lap.ve || lap.wear.some(value => value > 0)));
   if (!laps.length) throw Error('Aucun tour roulé dans cette séance.');

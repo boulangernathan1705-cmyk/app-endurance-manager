@@ -96,6 +96,7 @@ namespace EnduranceManager.SimHub
 
             var api = plugin.Api;
             string service = api.ReadAt is DateTime read ? $"Temps de service de la voiture lus à {read:HH:mm}." : "Les temps de service seront lus dès que tu rouleras.";
+            if (api.Setup is string setup) service += "\nRéglage chargé : " + setup;
             service += "\n" + (plugin.LastSession is string recorded ? "Dernière séance enregistrée : " + recorded : "Aucune séance enregistrée depuis le lancement de SimHub.");
             if (uploader?.LastRefusal is string refusal) service += "\nUne séance a été refusée par le site " + refusal + ". Elle est gardée dans le dossier sessions\\refused.";
             if (!plugin.Settings.Enabled)

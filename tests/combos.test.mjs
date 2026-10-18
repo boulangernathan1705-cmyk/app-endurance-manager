@@ -67,12 +67,14 @@ const sha256 = value => createHash('sha256').update(value).digest('hex');
 const keyOf = code => code.split(' ')[2];
 const wheel = (base, step = 0.1) => [base, base + step * 3, base - step * 4, base - step * 3].map(value => Math.round(value * 1000) / 1000);
 // A session of `count` timed laps from `from`, with a stop after the in-lap `pitAt` and one slow lap.
-function session({at, laps = 8, ve = 8.4, wear = 1.7, t = 210, rain = 0, compound = 'Medium', pitAt = null, slowLap = null}) {
+function session({at, laps = 8, ve = 8.4, wear = 1.7, t = 210, rain = 0, compound = 'Medium', pitAt = null, slowLap = null, setup, sectors = false}) {
   const list = [];
   for (let n = 1; n <= laps; n++) {
     const pit = n === 1 || n === pitAt || n === pitAt + 1;
     list.push({n, t:n === slowLap ? t * 1.2 : t + n * 0.05, top:330, fuel:ve * 0.82, ve, wear:wheel(wear), temp:[92, 95, 89, 90], brake:[480, 495, 410, 405],
-      kpa:[171, 172, 166, 167], compound, track:30 + n * 0.1, air:22, rain, wet:rain, invalid:false, pit});
+      kpa:[171, 172, 166, 167], compound, track:30 + n * 0.1, air:22, rain, wet:rain, invalid:false, pit, setup});
+    // Sectors that add up to the lap: 30 %, 40 % and the rest.
+    if (sectors) { const lap = list.at(-1); lap.s1 = Math.round(lap.t * 300) / 1000; lap.s2 = Math.round(lap.t * 400) / 1000; lap.s3 = Math.round((lap.t - lap.s1 - lap.s2) * 1000) / 1000; }
   }
   return {at, track:TRACK, car:CAR, class:'Hypercar', driver:'N. Boulanger', session:2, capacity:90, laps:list,
     stops:pitAt ? [{lap:pitAt, lane:62.5, stopped:27.3, fuel:40, ve:60, tyres:4, repair:false}] : [],
@@ -187,6 +189,43 @@ test('the sheet gives each pilot his own numbers, per condition and compound, fr
   assert.equal(sheet.conditions.damp.laps, 0);
   assert.deepEqual(sheet.pit, {stops:1, laneThrough:35.2, service:{fuelRate:2.4, energyRate:3.1, connect:2, tyres4:22, tyres2:12, wing:6, brakes:95, driver:18}, game:{fuel:6.9, ve:8.4, ideal:90}});
   assert.equal((await req('/api/combos/sheet?track=x', 'GET', null, NATHAN)).status, 400);
+});
+
+test('each lap keeps its sectors and setup: the sheet gives each pilot\'s sectors and narrows to one setup', async () => {
+  const clean = cleanSession({...session({at:1_790_000_000_000}), laps:[{n:1, t:200, s1:60, s2:80, s3:60, setup:' Course\u0007 v2 '}, {n:2, t:200, s1:60, s2:80}]});
+  assert.deepEqual(clean.laps.map(({s1, s2, s3, setup}) => [s1, s2, s3, setup]), [[60, 80, 60, 'Course v2'], [null, null, null, '']], 'all three sectors or none');
+
+  const {req, signIn, plugin} = harness();
+  signIn(NATHAN, 'Nathan', [TEAM_ROLE]);
+  signIn(LUCAS, 'Lucas', [TEAM_ROLE]);
+  const nathan = keyOf((await req('/api/combos/link', 'POST', {}, NATHAN)).data.code);
+  const lucas = keyOf((await req('/api/combos/link', 'POST', {}, LUCAS)).data.code);
+  await plugin('/api/combos/plugin/session', nathan, 'POST', session({at:1_790_000_000_000, setup:'Course v2', sectors:true}));
+  await plugin('/api/combos/plugin/session', lucas, 'POST', session({at:1_790_100_000_000, t:209, ve:8.1, setup:'Qualif', sectors:true}));
+  await plugin('/api/combos/plugin/session', lucas, 'POST', session({at:1_790_200_000_000, t:211, ve:8.6, setup:'Course v2'}));
+
+  const base = `/api/combos/sheet?track=${encodeURIComponent(TRACK)}&car=${encodeURIComponent(CAR)}`;
+  const sheet = (await req(base, 'GET', null, NATHAN)).data;
+  assert.equal(sheet.filters.setup, null);
+  assert.deepEqual(sheet.setups.map(({name, laps, drivers}) => [name, laps, drivers.sort()]), [['Course v2', 16, [NATHAN, LUCAS].sort()], ['Qualif', 8, [LUCAS]]]);
+  const mine = sheet.conditions.dry.drivers.find(item => item.id === NATHAN);
+  // Clean laps 2 to 8: 210.1 to 210.4 s, sectors at 30 % and 40 %.
+  assert.equal(mine.sectors.laps, 7);
+  assert.deepEqual(mine.sectors.best, [63.03, 84.04, 63.03]);
+  assert.equal(mine.sectors.avg[0], 63.075);
+  // Lucas drove one session without sectors: only the laps that have them count.
+  assert.equal(sheet.conditions.dry.drivers.find(item => item.id === LUCAS).sectors.laps, 7);
+
+  const course = (await req(`${base}&setup=${encodeURIComponent('Course v2')}`, 'GET', null, NATHAN)).data;
+  assert.equal(course.filters.setup, 'Course v2');
+  assert.equal(course.setups.length, 2, 'every setup stays offered');
+  const lucasCourse = course.conditions.dry.drivers.find(item => item.id === LUCAS);
+  assert.equal(lucasCourse.ve, 8.6);
+  assert.equal(lucasCourse.sectors, null);
+  assert.equal((await req(`${base}&setup=Inconnu`, 'GET', null, NATHAN)).data.conditions.dry.laps, 0);
+
+  const exported = (await req(`/api/combos/export?track=${encodeURIComponent(TRACK)}&car=${encodeURIComponent(CAR)}`, 'GET', null, NATHAN)).data;
+  assert.deepEqual(Object.values((({s1, s2, s3, setup}) => ({s1, s2, s3, setup}))(exported.sessions[0].laps[1])), [63.03, 84.04, 63.03, 'Course v2']);
 });
 
 test('races being prepared and game versions sort the sessions by their dates', async () => {

@@ -1,5 +1,5 @@
 // Ce que LMU dit de la voiture dans son API locale (http://localhost:6397, en lecture seule) : ses temps de service,
-// les mêmes pour tous ceux qui la conduisent, et sa prévision pour un tour. Envoyés avec chaque séance ;
+// les mêmes pour tous ceux qui la conduisent, sa prévision pour un tour et le nom du réglage chargé. Envoyés avec chaque séance ;
 // le site les lit dans cleanService / cleanGame (shared/combos.mjs). Rien ici ne modifie le jeu.
 using System;
 using System.Linq;
@@ -32,37 +32,49 @@ namespace EnduranceManager.SimHub
 
     public class LmuApi
     {
-        const string Root = "http://localhost:6397/rest/garage/UIScreen/";
+        const string Root = "http://localhost:6397/rest/garage/";
         readonly HttpClient client = new HttpClient { Timeout = TimeSpan.FromSeconds(3) };
 
         public ServiceTimes Service { get; private set; }
         public GameForecast Game { get; private set; }
+        // The setup loaded in the garage (garage › summary › activeSetup), as the pilot named it.
+        public string Setup { get; private set; }
         public DateTime? ReadAt { get; private set; }
         // One read at a time: a slow answer never piles up calls to the game.
         public bool Busy => busy != 0;
         int busy;
 
-        JObject Get(string screen)
+        JObject Get(string path)
         {
-            try { return JObject.Parse(client.GetStringAsync(Root + screen).GetAwaiter().GetResult()); }
+            try { return JObject.Parse(client.GetStringAsync(Root + path).GetAwaiter().GetResult()); }
             catch { return null; }
         }
 
         static double? Number(JToken token) => token != null && token.Type != JTokenType.Null && double.TryParse(token.ToString(), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var value) ? value : (double?)null;
 
-        // One read of the two screens; what is missing keeps its last value. Never throws: it runs on a pool thread,
-        // where an error would close SimHub.
-        public void Read(string compound)
+        // One read of the setup and, with the car in the pits, of the two screens; what is missing keeps its last value.
+        // Never throws: it runs on a pool thread, where an error would close SimHub.
+        public void Read(string compound, bool setupOnly = false)
         {
             if (System.Threading.Interlocked.Exchange(ref busy, 1) == 1) return;
-            try { ReadScreens(compound); }
+            try
+            {
+                ReadSetup();
+                if (!setupOnly) ReadScreens(compound);
+            }
             catch { }
             finally { busy = 0; }
         }
 
+        void ReadSetup()
+        {
+            var name = Get("summary")?["activeSetup"];
+            if (name != null && name.Type == JTokenType.String && ((string)name).Trim() != "") Setup = ((string)name).Trim();
+        }
+
         void ReadScreens(string compound)
         {
-            var refuel = Get("RepairAndRefuel");
+            var refuel = Get("UIScreen/RepairAndRefuel");
             var times = refuel?["pitStopTimes"]?["times"];
             if (times != null)
             {
@@ -76,7 +88,7 @@ namespace EnduranceManager.SimHub
                 };
                 ReadAt = DateTime.Now;
             }
-            var tyres = Get("TireManagement");
+            var tyres = Get("UIScreen/TireManagement");
             var usage = tyres?["expectedUsage"];
             if (usage != null)
             {

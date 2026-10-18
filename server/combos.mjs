@@ -1,13 +1,14 @@
 // Fiches combo (migration 0073, module "combos"): a team's practice data on one car and one track, kept from one
 // race to the next. Each pilot's SimHub plugin sends his sessions with his own key; the sheet shows each pilot's
-// own numbers (no advice, no ranking), sorted by track condition, race being prepared and game version / BoP.
+// own numbers (no advice, no ranking), sorted by track condition, race being prepared and game version / BoP, and
+// optionally narrowed to one setup.
 //
 // Private to the communities where a platform manager turned the module on, and there to the Discord roles given
 // the « combos » permission (server/access.mjs). The plugin's key is checked against those rights at every call.
 import {fail, json, now, id, token, hash, rateLimit, body, siteOrigin} from './core.mjs';
 import {communityAccess, requirePermission} from './access.mjs';
 import {communityById} from './community.mjs';
-import {cleanSession, CONDITIONS, CONDITION_SQL, CLEAN_RATIO, WHEELS, linkCode} from '../shared/combos.mjs';
+import {cleanSession, CONDITIONS, CONDITION_SQL, CLEAN_RATIO, WHEELS, SETUP_MAX, linkCode} from '../shared/combos.mjs';
 
 export const combosEnabled = community => community?.modules?.combos === true;
 
@@ -48,9 +49,9 @@ async function largeBody(request) {
 
 // ---------- Sessions sent by the plugin ----------
 
-const LAP_COLUMNS = ['session_id', 'community_id', 'user_id', 'track', 'car', 'started_at', 'n', 't', 'fuel', 've',
+const LAP_COLUMNS = ['session_id', 'community_id', 'user_id', 'track', 'car', 'started_at', 'n', 't', 's1', 's2', 's3', 'fuel', 've',
   ...['wear', 'temp', 'kpa', 'brake'].flatMap(kind => WHEELS.map(wheel => `${kind}_${wheel}`)),
-  'compound', 'track_temp', 'air_temp', 'rain', 'wet', 'top', 'invalid', 'pit'];
+  'compound', 'track_temp', 'air_temp', 'rain', 'wet', 'top', 'invalid', 'pit', 'setup'];
 const LAP_INSERT = `INSERT INTO combo_laps(${LAP_COLUMNS.join(',')}) VALUES(${LAP_COLUMNS.map(() => '?').join(',')})`;
 const STOP_INSERT = `INSERT INTO combo_stops(session_id,community_id,user_id,track,car,started_at,idx,lap,lane,stopped,fuel,ve,tyres,repair)
   VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)`;
@@ -68,8 +69,8 @@ export async function saveSession(env, link, input) {
     VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).bind(sessionId, link.community_id, link.user_id, fingerprint, session.at, session.track, session.car,
     session.carClass, session.driver, session.capacity, session.service && JSON.stringify(session.service), session.game && JSON.stringify(session.game),
     session.laps.length, now())];
-  for (const lap of session.laps) statements.push(env.DB.prepare(LAP_INSERT).bind(...scope, lap.n, lap.t, lap.fuel, lap.ve,
-    ...lap.wear, ...lap.temp, ...lap.kpa, ...lap.brake, lap.compound, lap.track, lap.air, lap.rain, lap.wet, lap.top, lap.invalid ? 1 : 0, lap.pit ? 1 : 0));
+  for (const lap of session.laps) statements.push(env.DB.prepare(LAP_INSERT).bind(...scope, lap.n, lap.t, lap.s1, lap.s2, lap.s3, lap.fuel, lap.ve,
+    ...lap.wear, ...lap.temp, ...lap.kpa, ...lap.brake, lap.compound, lap.track, lap.air, lap.rain, lap.wet, lap.top, lap.invalid ? 1 : 0, lap.pit ? 1 : 0, lap.setup));
   session.stops.forEach((stop, index) => statements.push(env.DB.prepare(STOP_INSERT).bind(...scope, index, stop.lap, stop.lane, stop.stopped,
     stop.fuel, stop.ve, stop.tyres, stop.repair ? 1 : 0)));
   try { await env.DB.batch(statements); }
@@ -120,10 +121,10 @@ function periodInput(input, kind) {
 
 // ---------- The sheet ----------
 
-// Laps that count: timed, valid, away from the pits, within CLEAN_RATIO of the pilot's best in that condition.
-// A stint is the run of laps between two laps that touched the pits.
+// Laps that count: timed, valid, away from the pits, within CLEAN_RATIO of the pilot's best in that condition, on
+// the chosen setup (NULL: any). A stint is the run of laps between two laps that touched the pits.
 const CLEAN = `WITH base AS (SELECT *, ${CONDITION_SQL} AS cond, SUM(pit) OVER (PARTITION BY session_id ORDER BY n ROWS UNBOUNDED PRECEDING) AS stint
-    FROM combo_laps WHERE community_id=? AND track=? AND car=? AND started_at BETWEEN ? AND ?),
+    FROM combo_laps WHERE community_id=? AND track=? AND car=? AND started_at BETWEEN ? AND ? AND (? IS NULL OR setup=?)),
   timed AS (SELECT * FROM base WHERE pit=0 AND invalid=0 AND t>0),
   best AS (SELECT user_id, cond, MIN(t) AS best FROM timed GROUP BY user_id, cond),
   clean AS (SELECT timed.* FROM timed JOIN best ON best.user_id=timed.user_id AND best.cond=timed.cond WHERE timed.t<=best.best*${CLEAN_RATIO})`;
@@ -132,18 +133,23 @@ const wheels = (row, kind, digits) => WHEELS.map(wheel => round(row[`${kind}_${w
 
 export async function sheet(env, community, userId, combo, url, current = false) {
   const list = await periods(env, community);
-  const filters = selection(list, url, combo.track, current);
+  const filters = {...selection(list, url, combo.track, current), setup:label(url.searchParams.get('setup'), SETUP_MAX) || null};
   const scope = [community.id, combo.track, combo.car, filters.from, filters.to];
+  const lapScope = [...scope, filters.setup, filters.setup];
   const where = 'community_id=? AND track=? AND car=? AND started_at BETWEEN ? AND ?';
-  const [drivers, slopes, tyres, conditions, sample, stops, service, game, notes] = await Promise.all([
+  const [drivers, slopes, tyres, conditions, setups, sample, stops, service, game, notes] = await Promise.all([
     all(env, `${CLEAN} SELECT user_id, cond, COUNT(*) AS laps, AVG(NULLIF(ve,0)) AS ve, COUNT(NULLIF(ve,0)) AS ve_laps, AVG(NULLIF(fuel,0)) AS fuel,
-      AVG(t) AS avg, MIN(t) AS best FROM clean GROUP BY user_id, cond`, ...scope),
+      AVG(t) AS avg, MIN(t) AS best, COUNT(s1) AS sector_laps, AVG(s1) AS s1, AVG(s2) AS s2, AVG(s3) AS s3, MIN(s1) AS best1, MIN(s2) AS best2, MIN(s3) AS best3
+      FROM clean GROUP BY user_id, cond`, ...lapScope),
     // Time lost per lap along a stint: the slope of lap time over lap number, each stint centred on its own mean.
     all(env, `${CLEAN}, centred AS (SELECT user_id, cond, n-AVG(n) OVER w AS x, t-AVG(t) OVER w AS y FROM clean WINDOW w AS (PARTITION BY session_id, stint))
-      SELECT user_id, cond, SUM(x*y)/NULLIF(SUM(x*x),0) AS slope FROM centred GROUP BY user_id, cond`, ...scope),
+      SELECT user_id, cond, SUM(x*y)/NULLIF(SUM(x*x),0) AS slope FROM centred GROUP BY user_id, cond`, ...lapScope),
     all(env, `${CLEAN} SELECT user_id, cond, compound, COUNT(*) AS laps, ${wheelAverages('wear')}, ${wheelAverages('temp')}, ${wheelAverages('kpa')}, ${wheelAverages('brake')}
-      FROM clean GROUP BY user_id, cond, compound`, ...scope),
-    all(env, `${CLEAN} SELECT cond, COUNT(*) AS laps, MIN(track_temp) AS tmin, MAX(track_temp) AS tmax FROM clean GROUP BY cond`, ...scope),
+      FROM clean GROUP BY user_id, cond, compound`, ...lapScope),
+    all(env, `${CLEAN} SELECT cond, COUNT(*) AS laps, MIN(track_temp) AS tmin, MAX(track_temp) AS tmax FROM clean GROUP BY cond`, ...lapScope),
+    // The setups driven in the period, whichever is chosen: the sheet's setup filter.
+    all(env, `SELECT setup, COUNT(*) AS laps, json_group_array(DISTINCT user_id) AS drivers, MAX(started_at) AS last FROM combo_laps
+      WHERE ${where} AND setup<>'' GROUP BY setup ORDER BY last DESC LIMIT 50`, ...scope),
     env.DB.prepare(`SELECT COUNT(*) AS sessions, COUNT(DISTINCT user_id) AS drivers, COALESCE(SUM(lap_count),0) AS laps, MIN(started_at) AS first,
       MAX(started_at) AS last, MAX(car_class) AS car_class FROM combo_sessions WHERE ${where}`).bind(...scope).first(),
     env.DB.prepare(`SELECT COUNT(*) AS stops, AVG(lane-stopped) AS lane_through FROM combo_stops WHERE ${where} AND lane>stopped`).bind(...scope).first(),
@@ -173,13 +179,15 @@ export async function sheet(env, community, userId, combo, url, current = false)
     }
     return [cond, {laps:summary?.laps || 0, trackTemp:summary ? [round(summary.tmin, 1), round(summary.tmax, 1)] : null,
       drivers:drivers.filter(row => row.cond === cond).sort((a, b) => b.laps - a.laps).map(row => ({id:row.user_id, laps:row.laps, ve:round(row.ve),
-        veLaps:row.ve_laps, fuel:round(row.fuel), avg:round(row.avg), best:round(row.best), slope:round(slopeOf.get(`${row.user_id}|${cond}`) ?? null, 4)})),
+        veLaps:row.ve_laps, fuel:round(row.fuel), avg:round(row.avg), best:round(row.best), slope:round(slopeOf.get(`${row.user_id}|${cond}`) ?? null, 4),
+        sectors:row.sector_laps ? {laps:row.sector_laps, avg:[row.s1, row.s2, row.s3].map(value => round(value)), best:[row.best1, row.best2, row.best3].map(value => round(value))} : null})),
       compounds}];
   }));
 
   return {
     combo:{...combo, carClass:sample?.car_class || ''},
     filters, periods:{events:list.events.filter(item => !item.track || item.track === combo.track), versions:list.versions},
+    setups:setups.map(row => ({name:row.setup, laps:row.laps, drivers:parsed(row.drivers) || [], last:row.last})),
     sample:{laps:sample?.laps || 0, sessions:sample?.sessions || 0, drivers:sample?.drivers || 0, from:sample?.first ?? null, to:sample?.last ?? null},
     drivers:people.map(row => ({id:row.id, name:row.name, color:row.color || null, me:row.id === userId}))
       .sort((a, b) => lapsOf.get(b.id) - lapsOf.get(a.id) || a.name.localeCompare(b.name, 'fr')),
@@ -212,9 +220,9 @@ async function exportPage(env, community, combo, url) {
   const four = (row, kind) => WHEELS.map(wheel => row[`${kind}_${wheel}`]);
   const out = page.map(row => ({id:row.id, pilot:row.pilot || 'Ancien pilote', startedAt:row.started_at, track:row.track, car:row.car, carClass:row.car_class,
     driver:row.driver, capacity:row.capacity, service:parsed(row.service), game:parsed(row.game),
-    laps:laps.filter(lap => lap.session_id === row.id).map(lap => ({n:lap.n, t:lap.t, fuel:lap.fuel, ve:lap.ve, wear:four(lap, 'wear'), temp:four(lap, 'temp'),
+    laps:laps.filter(lap => lap.session_id === row.id).map(lap => ({n:lap.n, t:lap.t, s1:lap.s1, s2:lap.s2, s3:lap.s3, fuel:lap.fuel, ve:lap.ve, wear:four(lap, 'wear'), temp:four(lap, 'temp'),
       kpa:four(lap, 'kpa'), brake:four(lap, 'brake'), compound:lap.compound, track:lap.track_temp, air:lap.air_temp, rain:lap.rain, wet:lap.wet, top:lap.top,
-      invalid:lap.invalid === 1, pit:lap.pit === 1})),
+      invalid:lap.invalid === 1, pit:lap.pit === 1, setup:lap.setup})),
     stops:stops.filter(stop => stop.session_id === row.id).map(stop => ({lap:stop.lap, lane:stop.lane, stopped:stop.stopped, fuel:stop.fuel, ve:stop.ve,
       tyres:stop.tyres, repair:stop.repair === 1}))}));
   const last = page.at(-1);

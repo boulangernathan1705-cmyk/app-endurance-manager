@@ -32,6 +32,7 @@ CREATE TABLE combo_sessions (
 CREATE INDEX combo_sessions_combo ON combo_sessions(community_id, track, car, started_at);
 
 -- One lap. Percent of tyre worn, °C, kPa, litres, percent of virtual energy, seconds; rain and wet from 0 to 1.
+-- The three sectors when the game gave them, and the setup loaded in the garage ('' when unknown).
 CREATE TABLE combo_laps (
   session_id TEXT NOT NULL REFERENCES combo_sessions(id) ON DELETE CASCADE,
   community_id TEXT NOT NULL,
@@ -41,6 +42,7 @@ CREATE TABLE combo_laps (
   started_at INTEGER NOT NULL,
   n INTEGER NOT NULL,
   t REAL,
+  s1 REAL, s2 REAL, s3 REAL,
   fuel REAL,
   ve REAL,
   wear_fl REAL, wear_fr REAL, wear_rl REAL, wear_rr REAL,
@@ -55,6 +57,7 @@ CREATE TABLE combo_laps (
   top REAL,
   invalid INTEGER NOT NULL DEFAULT 0,
   pit INTEGER NOT NULL DEFAULT 0,
+  setup TEXT NOT NULL DEFAULT '',
   PRIMARY KEY(session_id, n)
 );
 CREATE INDEX combo_laps_combo ON combo_laps(community_id, track, car, started_at);
