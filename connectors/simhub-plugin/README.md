@@ -49,6 +49,10 @@ La DLL est dans `bin\Release\EnduranceManager.SimHub.dll`.
 3. Copier le code, puis dans SimHub, menu « Fiches combo », cliquer sur « Coller mon code ».
 4. Rouler quelques tours dans LMU avec un arrêt aux stands, revenir au menu : la séance part dans la minute.
 
+La case « Plugin activé », en haut de l'écran du plugin, le met en pause : il ne lit plus rien du jeu et n'envoie
+plus rien, les séances en attente restent sur le PC. Décochée en roulant, les tours déjà faits sont gardés. Propriété
+`EnduranceManagerPlugin.Enabled` pour l'afficher dans un tableau de bord.
+
 Les séances en attente sont dans `%LOCALAPPDATA%\EnduranceManager\Combos\sessions` ; celles que le site refuse sont
 gardées dans `sessions\refused`, avec la raison dans un fichier .txt à côté, et l'écran du plugin l'affiche. Si la
 clé est retirée ou si le pilote n'a plus l'autorisation « Fiches combo », plus rien ne part et les séances attendent

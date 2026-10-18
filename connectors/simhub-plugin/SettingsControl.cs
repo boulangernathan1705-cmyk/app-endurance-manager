@@ -22,6 +22,7 @@ namespace EnduranceManager.SimHub
         readonly TextBlock linkTitle = Title(), linkDetail = Detail(), gameTitle = Title(), gameDetail = Detail();
         readonly TextBlock message = new TextBlock { TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 10, 0, 0), Visibility = Visibility.Collapsed };
         readonly Button paste = Action("Coller mon code", true), open = Action("Ouvrir le site", false);
+        readonly CheckBox enabled = new CheckBox { Content = "Plugin activé : enregistrer et envoyer mes séances", FontSize = 14, Margin = new Thickness(0, 0, 0, 14), Cursor = System.Windows.Input.Cursors.Hand };
 
         public SettingsControl(EnduranceManagerPlugin plugin)
         {
@@ -29,6 +30,12 @@ namespace EnduranceManager.SimHub
             var page = new StackPanel { Margin = new Thickness(20), Width = 600, HorizontalAlignment = HorizontalAlignment.Left };
             page.Children.Add(new TextBlock { Text = "Fiches combo", FontSize = 22, FontWeight = FontWeights.SemiBold });
             page.Children.Add(new TextBlock { Text = "Tes séances Le Mans Ultimate arrivent toutes seules dans les fiches combo de ton équipe.", Opacity = 0.7, Margin = new Thickness(0, 2, 0, 16), TextWrapping = TextWrapping.Wrap });
+
+            // The on/off switch: off, the plugin reads nothing from the game and sends nothing.
+            enabled.IsChecked = plugin.Settings.Enabled;
+            enabled.Checked += (sender, args) => { plugin.SetEnabled(true); Refresh(); };
+            enabled.Unchecked += (sender, args) => { plugin.SetEnabled(false); Refresh(); };
+            page.Children.Add(enabled);
 
             var buttons = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 14, 0, 0) };
             buttons.Children.Add(paste);
@@ -91,6 +98,11 @@ namespace EnduranceManager.SimHub
             string service = api.ReadAt is DateTime read ? $"Temps de service de la voiture lus à {read:HH:mm}." : "Les temps de service seront lus dès que tu rouleras.";
             service += "\n" + (plugin.LastSession is string recorded ? "Dernière séance enregistrée : " + recorded : "Aucune séance enregistrée depuis le lancement de SimHub.");
             if (uploader?.LastRefusal is string refusal) service += "\nUne séance a été refusée par le site " + refusal + ". Elle est gardée dans le dossier sessions\\refused.";
+            if (!plugin.Settings.Enabled)
+            {
+                Show(gameDot, Grey, gameTitle, "En pause", gameDetail, "Le plugin ne lit rien du jeu et n'envoie rien. Les séances déjà enregistrées attendent sur le PC. Coche « Plugin activé » pour reprendre.");
+                return;
+            }
             switch (plugin.GameState)
             {
                 case "track": Show(gameDot, Green, gameTitle, "En piste · séance enregistrée", gameDetail, service); break;

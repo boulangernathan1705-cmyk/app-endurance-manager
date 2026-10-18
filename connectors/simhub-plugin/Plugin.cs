@@ -18,6 +18,8 @@ namespace EnduranceManager.SimHub
     public class Settings
     {
         public string Code { get; set; } = "";
+        // Off: nothing is read from the game and nothing is sent; the sessions waiting stay on the disk.
+        public bool Enabled { get; set; } = true;
     }
 
     [PluginDescription("Envoie tes séances Le Mans Ultimate aux fiches combo de ton équipe sur Endurance Manager.")]
@@ -55,7 +57,7 @@ namespace EnduranceManager.SimHub
         public volatile string GameState = "closed";
         // The last session recorded, for the settings screen.
         public volatile string LastSession;
-        public string Status => uploader?.Status ?? "";
+        public string Status => !Settings.Enabled ? "En pause" : uploader?.Status ?? "";
 
         public void Init(PluginManager pluginManager)
         {
@@ -65,6 +67,7 @@ namespace EnduranceManager.SimHub
             uploader = new Uploader(home);
             this.AttachDelegate("Status", () => Status);
             this.AttachDelegate("LapsRecorded", () => laps);
+            this.AttachDelegate("Enabled", () => Settings.Enabled);
             running = true;
             // Below the game and SimHub: when the PC is busy, these threads wait, never the game.
             reader = new Thread(ReadGame) { IsBackground = true, Name = "EnduranceManager.Read", Priority = ThreadPriority.BelowNormal };
@@ -93,6 +96,13 @@ namespace EnduranceManager.SimHub
             uploader.Reset();
         }
 
+        // The switch on the plugin's screen. Turned off while driving, the laps already done are kept.
+        public void SetEnabled(bool enabled)
+        {
+            Settings.Enabled = enabled;
+            this.SaveCommonSettings("GeneralSettings", Settings);
+        }
+
         void ReadGame()
         {
             var recorder = new Recorder(() => DateTime.Now, session =>
@@ -107,6 +117,13 @@ namespace EnduranceManager.SimHub
             var buffer = new byte[LmuMemory.Size];
             while (running)
             {
+                if (!Settings.Enabled)
+                {
+                    GameState = "paused";
+                    recorder.Flush();
+                    Thread.Sleep(1000);
+                    continue;
+                }
                 MemoryMappedFile memory = null;
                 try { memory = MemoryMappedFile.OpenExisting(LmuMemory.Name, MemoryMappedFileRights.Read); } catch { }
                 if (memory == null)
@@ -123,7 +140,7 @@ namespace EnduranceManager.SimHub
                     using (var view = memory.CreateViewAccessor(0, LmuMemory.Size, MemoryMappedFileAccess.Read))
                     {
                         double lastEt = -1;
-                        for (int misses = 0, frozen = 0, tick = 0; running && misses < 600; tick++)
+                        for (int misses = 0, frozen = 0, tick = 0; running && Settings.Enabled && misses < 600; tick++)
                         {
                             Copy(view, buffer);
                             bool ok = LmuMemory.Read(buffer, out var sample);
@@ -172,7 +189,7 @@ namespace EnduranceManager.SimHub
             Thread.Sleep(10000);
             while (running)
             {
-                if (GameState != "track") try { uploader.SendAll(LinkCode.Parse(Settings.Code)); } catch { }
+                if (Settings.Enabled && GameState != "track") try { uploader.SendAll(LinkCode.Parse(Settings.Code)); } catch { }
                 for (int i = 0; running && i < 60; i++) Thread.Sleep(1000);
             }
         }
