@@ -65,4 +65,6 @@ if (-not $installed -or $installed.Length -ne (Get-Item $dll).Length) { Done "La
 Write-Host 'Plugin copié, SimHub redémarre.'
 Start-Process (Join-Path $simhub 'SimHubWPF.exe') -WorkingDirectory $simhub
 if ($update) { Write-Host "C'est fait, ta liaison est gardée."; Start-Sleep 3; return }
+# A first install: the fiches combo page of the same site opens, for the code.
+if ($site -match '^https://') { Start-Process "$site/fiches-combo.html" }
 Done "C'est fait. Dans SimHub, accepte le nouveau plugin « Fiches combo » s'il te le demande. Ensuite, sur le site : Fiches combo → « Relier SimHub » → « Créer mon code », et ouvre le menu « Fiches combo » de SimHub : il trouve le code tout seul."
