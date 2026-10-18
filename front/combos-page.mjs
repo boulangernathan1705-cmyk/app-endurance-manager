@@ -77,11 +77,11 @@ async function start() {
   if (view.combo) await loadSheet(); else render();
 }
 
-async function loadSheet() {
+async function loadSheet(fresh = false) {
   try {
     const [sheet, compare] = await Promise.all([call(`/api/combos/sheet?${sheetQuery()}`),
       view.compareEvent && view.compareEvent !== view.event ? call(`/api/combos/sheet?${sheetQuery(view.compareEvent)}`) : null]);
-    view.sheet = sheet; view.compare = compare; view.error = '';
+    view.sheet = sheet; view.compare = compare; view.error = ''; view.loadedAt = Date.now();
   } catch (error) {
     if (error.status === 401 || error.status === 403) { renderError(error); return; }
     view.error = error.message;
@@ -93,7 +93,20 @@ async function loadSheet() {
     if (!view.cond || (!narrowed && !conditions[view.cond]?.laps)) view.cond = CONDITIONS.find(cond => conditions[cond].laps) || 'dry';
     remember();
   }
-  if (view.tab === 'analysis') await loadAnalysis(); else render();
+  if (view.tab === 'analysis') await loadAnalysis(fresh); else render();
+}
+
+// The new sessions without reloading the page: the list of combos, the plugin's link, then the sheet or the analysis
+// as they are, filters and choices kept.
+async function refresh() {
+  view.refreshing = true; render();
+  try {
+    const [list, link] = await Promise.all([call('/api/combos'), call('/api/combos/link')]);
+    view.combos = list.combos; view.link = link;
+    if (!view.combo) view.combo = view.combos[0] || null;
+  } catch (error) { view.message = error.message; }
+  if (view.combo) await loadSheet(true);
+  view.refreshing = false; render();
 }
 
 function remember() {
@@ -105,13 +118,11 @@ function remember() {
 // ---------- « Mon analyse » ----------
 
 // The combo's sessions once, then the two looked at (each kept once loaded: a trace weighs a few hundred kB).
-async function loadAnalysis() {
+async function loadAnalysis(fresh = false) {
   const a = view.analysis, key = comboKey(view.combo);
   try {
-    if (a.key !== key) {
-      Object.assign(a, {list:null, key, mine:'', other:'', sessions:new Map()});
-      a.list = (await call(`/api/combos/analysis?${new URLSearchParams({track:view.combo.track, car:view.combo.car})}`)).sessions;
-    }
+    if (a.key !== key) Object.assign(a, {list:null, key, mine:'', other:'', sessions:new Map()});
+    if (!a.list || fresh) a.list = (await call(`/api/combos/analysis?${new URLSearchParams({track:view.combo.track, car:view.combo.car})}`)).sessions;
     const list = a.list;
     const useful = item => item.trace || item.expert;
     if (!list.some(item => item.id === a.mine)) a.mine = (list.find(item => item.mine && useful(item)) || list.find(item => item.mine) || list.find(useful) || list[0])?.id || '';
@@ -255,7 +266,7 @@ function header() {
   const sheet = view.sheet, combo = view.combo;
   const choices = view.combos.length > 1 ? `<label class="cb-crumb">Combo <select data-field="combo">${view.combos.map(item => `<option value="${esc(comboKey(item))}"${comboKey(item) === comboKey(combo) ? ' selected' : ''}>${esc(item.car)} · ${esc(item.track)}</option>`).join('')}</select></label>` : '';
   return `<div class="cb-topline"><div><div class="cb-crumb">Fiches combo · Le Mans Ultimate${sheet?.combo.carClass ? ` · ${esc(sheet.combo.carClass)}` : ''}</div><h1>${esc(combo.car)} · ${esc(combo.track)}</h1>${sheet ? sample() : ''}</div>
-    <div class="cb-actions">${choices}${view.tab === 'sheet' ? '<button type="button" class="cb-btn" data-action="export">Exporter la fiche</button>' : ''}</div></div>
+    <div class="cb-actions">${choices}<button type="button" class="cb-btn is-quiet cb-refresh" data-action="refresh"${view.refreshing ? ' disabled' : ''} title="${view.loadedAt ? `À jour à ${esc(new Date(view.loadedAt).toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'}))}` : ''}">${view.refreshing ? 'Actualisation…' : '↻ Actualiser'}</button>${view.tab === 'sheet' ? '<button type="button" class="cb-btn" data-action="export">Exporter la fiche</button>' : ''}</div></div>
     <nav class="cb-tabs" aria-label="Vue">${[['sheet', 'Fiche de l’équipe'], ['analysis', 'Mon analyse']].map(([tab, label]) => `<button type="button" data-tab="${tab}" aria-pressed="${tab === view.tab}">${label}</button>`).join('')}</nav>`;
 }
 
@@ -575,6 +586,7 @@ app.addEventListener('click', async event => {
       await act(async () => { await call('/api/combos/link', 'DELETE', {}); view.link = await call('/api/combos/link'); view.code = ''; }, 'Liaison retirée.');
       render(); break;
     case 'export': await exportSheet(); break;
+    case 'refresh': await refresh(); break;
     case 'download-plugin': await downloadPlugin(); break;
     case 'edit-note': view.editing = target.dataset.id; render(); break;
     case 'cancel-note': view.editing = null; render(); break;
