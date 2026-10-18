@@ -105,7 +105,9 @@ namespace EnduranceManager.SimHub
                 Dispatcher.BeginInvoke(new Action(() =>
                 {
                     update.IsEnabled = true;
-                    updateText.Text = error ?? "L'installeur s'ouvre : il ferme SimHub, installe la nouvelle version et relance SimHub. Ta liaison est gardée.";
+                    updateText.Text = error ?? "SimHub se ferme : l'installeur met la nouvelle version et le relance. Ta liaison est gardée.";
+                    // SimHub closes itself, as from its own menu (settings saved), so the installer has nothing to wait for.
+                    if (error == null) Dispatcher.BeginInvoke(new Action(() => Application.Current?.Shutdown()), System.Windows.Threading.DispatcherPriority.Background);
                 }));
             });
         }

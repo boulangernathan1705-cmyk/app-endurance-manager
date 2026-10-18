@@ -7,7 +7,7 @@
     <UseWPF>true</UseWPF>
     <AssemblyName>EnduranceManager.SimHub</AssemblyName>
     <!-- The plugin's version: raised for each new build given to the pilots (release/plugin.json, README.md). -->
-    <Version>1.2.0</Version>
+    <Version>1.2.1</Version>
     <RootNamespace>EnduranceManager.SimHub</RootNamespace>
     <LangVersion>latest</LangVersion>
     <Nullable>disable</Nullable>
