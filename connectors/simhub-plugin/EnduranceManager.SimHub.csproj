@@ -22,5 +22,6 @@
   <ItemGroup>
     <!-- L'installeur en double-clic, à donner aux pilotes avec la DLL. -->
     <None Update="Installer le plugin.cmd" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="Diagnostic.cmd" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

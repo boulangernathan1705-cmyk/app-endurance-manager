@@ -44,4 +44,10 @@ if (-not $installed -or $installed.Length -ne (Get-Item $dll).Length) { Done "La
 
 Write-Host 'Plugin copié, SimHub redémarre.'
 Start-Process (Join-Path $simhub 'SimHubWPF.exe') -WorkingDirectory $simhub
-Done "C'est fait. Dans SimHub, accepte le nouveau plugin « Fiches combo » s'il te le demande. Ensuite, sur le site : Fiches combo → « Relier SimHub » → « Copier le code », et ouvre le menu « Fiches combo » de SimHub : il trouve le code tout seul."
+# The fiches combo page opens by itself: the pilot only has to create his code there (the site the plugin is already
+# linked to, else the team's site).
+$site = 'https://dev.endurance-manager.app'
+$settings = Join-Path $simhub 'PluginsData\Common\EnduranceManagerPlugin.GeneralSettings.json'
+try { if ((Get-Content $settings -Raw | ConvertFrom-Json).Code -match ' (https://[A-Za-z0-9.:-]+) ') { $site = $Matches[1] } } catch { }
+try { Start-Process "$site/fiches-combo.html" } catch { }
+Done "C'est fait. Dans SimHub, accepte le nouveau plugin « Fiches combo » s'il te le demande. Sur la page Fiches combo qui vient de s'ouvrir, clique sur « Créer mon code », puis ouvre le menu « Fiches combo » de SimHub : il trouve le code tout seul."
