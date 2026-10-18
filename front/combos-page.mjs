@@ -2,7 +2,7 @@
 // track, sent by each pilot's SimHub plugin. Raw numbers only, no advice: each pilot in his colour, the white
 // « Équipage » row is the plain mean of the pilots shown (each counts once). Conditions are framed blocks.
 import {COLORS, CONDITIONS, installerFor} from '../shared/combos.mjs';
-import {analysisBody, distanceUnder, prepare, showCursor} from './combos-analysis.mjs?v=2';
+import {analysisBody, distanceUnder, prepare, showCursor} from './combos-analysis.mjs?v=3';
 
 const app = document.getElementById('combos-app');
 const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
@@ -24,7 +24,7 @@ const view = {
   pit:{before:8, after:100, tyres:4, pressure:false, driver:true, wing:'', frontWing:'', radiator:false, brakes:false, repair:''}, pitOpen:false, periodsOpen:false, linkOpen:null,
   editing:null, message:'', error:'',
   // « Mon analyse »: the combo's sessions, the one looked at and the one it is compared with, the map's colouring.
-  tab:'sheet', analysis:{list:null, key:'', mine:'', other:'', metric:'speed', pick:0, sessions:new Map(), loading:false, error:''}
+  tab:'sheet', analysis:{list:null, key:'', mine:'', other:'', metric:'speed', pick:0, size:450, sessions:new Map(), loading:false, error:''}
 };
 try { view.hidden = new Set(JSON.parse(localStorage.getItem(STORE) || '[]')); } catch {}
 const saveHidden = () => { try { localStorage.setItem(STORE, JSON.stringify([...view.hidden])); } catch {} };
@@ -171,7 +171,7 @@ function analysis() {
   if (!a.list) return '<p class="cb-empty">Chargement…</p>';
   if (!a.list.length) return '<p class="cb-empty">Aucune séance sur ce combo pour l’instant.</p>';
   const sides = analysisSides();
-  const body = sides.length ? analysisBody(sides, a.metric, a.pick) : '<p class="cb-empty">Chargement…</p>';
+  const body = sides.length ? analysisBody(sides, a.metric, a.pick, a.size) : '<p class="cb-empty">Chargement…</p>';
   return `${analysisChoices()}<div class="an-body${a.loading ? ' is-loading' : ''}">${body}</div>`;
 }
 
@@ -591,6 +591,7 @@ app.addEventListener('click', async event => {
 
 app.addEventListener('change', async event => {
   const field = event.target.dataset.field;
+  if (field === 'an-size') { view.analysis.size = Number(event.target.value) || 450; render(); return; }
   if (field === 'an-mine' || field === 'an-other') {
     view.analysis[field === 'an-mine' ? 'mine' : 'other'] = event.target.value;
     await loadAnalysis(); return;

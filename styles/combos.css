@@ -264,3 +264,5 @@ th.an-who { color: var(--dc) !important; }
   .an-lap { grid-template-columns: minmax(0, 1fr); }
 }
 .combos-page .an-zones th, .combos-page .an-zones td { padding: 4px 8px; font-size: 13px; }
+.an-size { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); }
+.combos-page .an-size select { width: auto; font-size: 13px; padding: 3px 6px; }

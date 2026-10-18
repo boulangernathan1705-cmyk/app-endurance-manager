@@ -11,9 +11,10 @@ const signed = (value, digits = 2) => known(value) ? `${value > 0 ? '+' : value 
 export const METRICS = {speed:'Vitesse', brake:'Freinage', throttle:'Accélérateur', gear:'Rapport', temp:'Temp. pneus', lock:'Blocages', ride:'Hauteur', delta:'Écart'};
 const WHEEL_NAMES = ['Avant gauche', 'Avant droit', 'Arrière gauche', 'Arrière droit'];
 const WHEEL_SHORT = ['AVG', 'AVD', 'ARG', 'ARD'];
-// The lap in stretches of 450 m (the last one shorter): small enough to show where a corner is won or lost.
-const ZONE = 450;
-const zoneCount = length => Math.max(1, Math.ceil(length / ZONE));
+// The lap in stretches of the same length (the last one shorter), 450 m unless chosen: short enough to show where a
+// corner is won or lost. The right length depends on the track.
+export const PORTIONS = [200, 300, 450, 600];
+const zoneCount = (length, size) => Math.max(1, Math.ceil(length / size));
 // A wheel turning 15 % slower than the ground under it is locking; 15 % faster, spinning.
 const LOCK = -0.15, SPIN = 0.15;
 
@@ -49,10 +50,10 @@ const timeAt = (trace, d) => valueAt(trace, trace.time, d);
 function gapAt(a, b, d) { return timeAt(a, d) - timeAt(b, d); }
 
 // The lap stretch by stretch: time in each for both, and the lowest speed.
-export function zones(a, b) {
+export function zones(a, b, size = 450) {
   const length = b ? Math.min(a.length, b.length) : a.length;
-  return Array.from({length:zoneCount(length)}, (_, k) => {
-    const from = k * ZONE, to = Math.min(length, (k + 1) * ZONE);
+  return Array.from({length:zoneCount(length, size)}, (_, k) => {
+    const from = k * size, to = Math.min(length, (k + 1) * size);
     const lowest = trace => { let min = Infinity; for (let i = 0; i < trace.dist.length; i++) if (trace.dist[i] >= from && trace.dist[i] <= to) min = Math.min(min, trace.speed[i]); return Number.isFinite(min) ? min : null; };
     const timeA = timeAt(a, to) - timeAt(a, from), timeB = b ? timeAt(b, to) - timeAt(b, from) : null;
     return {n:k + 1, from, to, timeA, timeB, gap:b ? timeA - timeB : null, minA:lowest(a), minB:b ? lowest(b) : null};
@@ -148,30 +149,30 @@ function legendHtml(legend) {
 }
 
 // One chart along the lap: one line per pilot (or per series), a 1000 × height box stretched to the width.
-function chart(title, unit, length, series, height, {min, max, zero} = {}) {
+function chart(title, unit, length, series, height, size, {min, max, zero} = {}) {
   const all = series.flatMap(s => s.values.filter(Number.isFinite));
   const low = min ?? Math.min(...all), high = max ?? Math.max(...all), span = high - low || 1;
   const y = v => (height - 4 - (v - low) / span * (height - 8)).toFixed(1);
   const lines = series.map(s => `<polyline points="${s.dist.map((d, i) => `${(d / length * 1000).toFixed(1)},${y(s.values[i])}`).join(' ')}" stroke="${s.color}"${s.dashed ? ' stroke-dasharray="6 4"' : ''}/>`).join('');
   const base = zero ? `<line class="an-zero" x1="0" x2="1000" y1="${y(0)}" y2="${y(0)}"/>` : '';
-  const ticks = Array.from({length:zoneCount(length) - 1}, (_, k) => { const x = ((k + 1) * ZONE / length * 1000).toFixed(1); return `<line class="an-tick" x1="${x}" x2="${x}" y1="0" y2="${height}"/>`; }).join('');
+  const ticks = Array.from({length:zoneCount(length, size) - 1}, (_, k) => { const x = ((k + 1) * size / length * 1000).toFixed(1); return `<line class="an-tick" x1="${x}" x2="${x}" y1="0" y2="${height}"/>`; }).join('');
   return `<div class="an-chart"><div class="an-chart-head"><b>${esc(title)}</b><span>${esc(fr(high, unit === 's' ? 2 : 0))} ${esc(unit)} / ${esc(fr(low, unit === 's' ? 2 : 0))} ${esc(unit)}</span></div>
     <svg viewBox="0 0 1000 ${height}" preserveAspectRatio="none" data-chart="${length}">${ticks}${base}<g class="an-plot">${lines}</g><line class="an-cursor-line" x1="0" x2="0" y1="0" y2="${height}" data-cursor-line hidden/></svg></div>`;
 }
 
-function charts(a, b, colorA, colorB) {
+function charts(a, b, colorA, colorB, size) {
   const length = b ? Math.min(a.length, b.length) : a.length;
   const both = (key, extra = {}) => [{dist:a.dist, values:a[key], color:colorA, ...extra}, ...(b ? [{dist:b.dist, values:b[key], color:colorB, dashed:true}] : [])];
   let gap = '';
   if (b) {
     const dist = [], values = [];
     for (let d = 0; d <= length; d += 10) { dist.push(d); values.push(gapAt(a, b, d)); }
-    gap = chart('Écart cumulé', 's', length, [{dist, values, color:colorA}], 110, {zero:true});
+    gap = chart('Écart cumulé', 's', length, [{dist, values, color:colorA}], 110, size, {zero:true});
   }
-  return `${chart('Vitesse', 'km/h', length, both('speed'), 170)}${gap}
-    ${chart('Accélérateur', '%', length, both('throttle').map(s => ({...s, values:s.values.map(v => v * 100)})), 70, {min:0, max:100})}
-    ${chart('Frein', '%', length, both('brake').map(s => ({...s, values:s.values.map(v => v * 100)})), 70, {min:0, max:100})}
-    <div class="an-axis">${Array.from({length:zoneCount(length)}, (_, k) => k % 5 === 0 ? `<span style="left:${((k + 0.5) * ZONE / length * 100).toFixed(2)}%">${k + 1}</span>` : '').join('')}</div>`;
+  return `${chart('Vitesse', 'km/h', length, both('speed'), 170, size)}${gap}
+    ${chart('Accélérateur', '%', length, both('throttle').map(s => ({...s, values:s.values.map(v => v * 100)})), 70, size, {min:0, max:100})}
+    ${chart('Frein', '%', length, both('brake').map(s => ({...s, values:s.values.map(v => v * 100)})), 70, size, {min:0, max:100})}
+    <div class="an-axis">${Array.from({length:zoneCount(length, size)}, (_, k) => k % 5 === 0 ? `<span style="left:${((k + 0.5) * size / length * 100).toFixed(2)}%">${k + 1}</span>` : '').join('')}</div>`;
 }
 
 // ---------- The session in figures ----------
@@ -213,19 +214,19 @@ function zoneTable(legs, sides) {
 }
 
 // The whole tab below its choices. sides: [mine, other?], each {data, trace (prepared), color, label, short}.
-export function analysisBody(sides, metric, pick) {
+export function analysisBody(sides, metric, pick, size = 450) {
   const [a, b] = sides;
   const lap = a.trace ? (() => {
-    const legs = zones(a.trace, b?.trace || null);
+    const legs = zones(a.trace, b?.trace || null, size);
     const usable = metric === 'delta' && !b?.trace ? 'speed' : metric;
     const map = trackMap(a.trace, b?.trace || null, usable, pick, legs);
     const picks = usable === 'temp' ? WHEEL_SHORT.map((label, i) => [i, label]) : usable === 'ride' ? [[0, 'Avant'], [2, 'Arrière']] : [];
-    return `<section><div class="cb-head"><h2>Analyse du tour</h2><span class="cb-src">meilleur tour propre de chaque séance · portions de 450 m</span></div>
+    return `<section><div class="cb-head"><h2>Analyse du tour</h2><label class="an-size">Portions de <select data-field="an-size">${PORTIONS.map(value => `<option value="${value}"${value === size ? ' selected' : ''}>${value} m</option>`).join('')}</select></label></div>
       <div class="an-metrics" role="group" aria-label="Couleur du tracé">${Object.entries(METRICS).filter(([key]) => key !== 'delta' || b?.trace).map(([key, label]) => `<button type="button" data-metric="${key}" aria-pressed="${key === usable}">${esc(label)}${key === 'delta' ? ` avec ${esc(b.short)}` : ''}</button>`).join('')}</div>
       ${picks.length ? `<div class="an-picks" role="group" aria-label="Roue">${picks.map(([value, label]) => `<button type="button" data-pick="${value}" aria-pressed="${value === pick || (usable === 'ride' && value === (pick >= 2 ? 2 : 0))}">${label}</button>`).join('')}</div>` : ''}
       <div class="an-lap"><div class="an-map-box">${map.svg}${legendHtml(map.legend)}<p class="an-readout" data-readout>Survole le tracé ou les courbes pour lire chaque point.</p></div>
       <div>${zoneTable(legs, b?.trace ? sides : [a])}</div></div>
-      <div class="an-charts">${charts(a.trace, b?.trace || null, a.color, b?.color)}</div></section>`;
+      <div class="an-charts">${charts(a.trace, b?.trace || null, a.color, b?.color, size)}</div></section>`;
   })() : `<section><div class="cb-head"><h2>Analyse du tour</h2></div><p class="cb-empty">Pas de tracé pour cette séance : le plugin 1.2 enregistre le meilleur tour propre de chaque séance.</p></section>`;
   return `${summary(sides)}${lap}${expert(sides)}`;
 }
