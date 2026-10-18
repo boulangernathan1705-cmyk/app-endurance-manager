@@ -1,0 +1,17 @@
+name: probe-sources
+on: push
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          curl -sL "https://guide.lemansultimate.com/hc/en-gb/search?query=fair+share" | grep -o 'href="[^"]*articles/[^"]*"' | sort -u | head -20
+          URL=$(curl -sL "https://guide.lemansultimate.com/hc/en-gb/articles/15769340934031-Event-Eligibility-and-SR-Requirements" | grep -io 'href="[^"]*fair[^"]*"' | head -1 | sed 's/href="//;s/"$//')
+          echo "FAIRURL=$URL"
+          [ -n "$URL" ] && curl -sL "https://guide.lemansultimate.com$URL" | python3 -c "import sys,re,html;t=sys.stdin.read();t=re.sub(r'(?s)<(script|style).*?</\1>','',t);t=re.sub(r'<[^>]+>','\n',t);print(re.sub(r'\n\s*\n+','\n',html.unescape(t))[:6000])"
+          echo ===== OHNE TABS
+          curl -sL "https://docs.google.com/spreadsheets/d/e/2PACX-1vTN03UvJDm99byA6vQPZHKOCYVvfxLu1zkJAzdaKyROykzEKY2-Xl1rl1q5znZEf36m88dxMKsY2eaO/pubhtml" | grep -o 'name: "[^"]*", [^}]*gid: "[0-9]*"' | head -60
+          echo ===== LAPTIMES HEAD
+          curl -sL "https://docs.google.com/spreadsheets/d/e/2PACX-1vTN03UvJDm99byA6vQPZHKOCYVvfxLu1zkJAzdaKyROykzEKY2-Xl1rl1q5znZEf36m88dxMKsY2eaO/pub?gid=1766901750&single=true&output=csv" | head -15
+          echo ===== SPA TAB HEAD
+          curl -sL "https://docs.google.com/spreadsheets/d/e/2PACX-1vTN03UvJDm99byA6vQPZHKOCYVvfxLu1zkJAzdaKyROykzEKY2-Xl1rl1q5znZEf36m88dxMKsY2eaO/pub?gid=253434982&single=true&output=csv" | head -40
