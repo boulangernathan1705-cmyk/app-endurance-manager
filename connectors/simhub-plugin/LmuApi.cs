@@ -38,6 +38,9 @@ namespace EnduranceManager.SimHub
         public ServiceTimes Service { get; private set; }
         public GameForecast Game { get; private set; }
         public DateTime? ReadAt { get; private set; }
+        // One read at a time: a slow answer never piles up calls to the game.
+        public bool Busy => busy != 0;
+        int busy;
 
         JObject Get(string screen)
         {
@@ -47,8 +50,17 @@ namespace EnduranceManager.SimHub
 
         static double? Number(JToken token) => token != null && token.Type != JTokenType.Null && double.TryParse(token.ToString(), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var value) ? value : (double?)null;
 
-        // One read of the two screens; what is missing keeps its last value.
+        // One read of the two screens; what is missing keeps its last value. Never throws: it runs on a pool thread,
+        // where an error would close SimHub.
         public void Read(string compound)
+        {
+            if (System.Threading.Interlocked.Exchange(ref busy, 1) == 1) return;
+            try { ReadScreens(compound); }
+            catch { }
+            finally { busy = 0; }
+        }
+
+        void ReadScreens(string compound)
         {
             var refuel = Get("RepairAndRefuel");
             var times = refuel?["pitStopTimes"]?["times"];

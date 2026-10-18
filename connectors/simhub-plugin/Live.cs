@@ -55,7 +55,8 @@ namespace EnduranceManager.SimHub
         public static bool Read(byte[] b, out Sample s)
         {
             s = default;
-            if (b.Length < Size || b[TelemetryOff + 2] == 0) return false;
+            // While the game loads, the player's slot can hold anything: never read outside the copy.
+            if (b.Length < Size || b[TelemetryOff + 2] == 0 || b[TelemetryOff + 1] >= MaxVehicles) return false;
             int t = TelemInfo + b[TelemetryOff + 1] * TelemSize;
             int id = I32(b, t);
             int count = I32(b, ScoringInfo + 104);

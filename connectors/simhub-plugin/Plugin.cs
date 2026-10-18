@@ -7,6 +7,7 @@
 using System;
 using System.IO;
 using System.IO.MemoryMappedFiles;
+using System.Runtime.InteropServices;
 using System.Threading;
 using System.Windows.Media;
 using GameReaderCommon;
@@ -65,8 +66,9 @@ namespace EnduranceManager.SimHub
             this.AttachDelegate("Status", () => Status);
             this.AttachDelegate("LapsRecorded", () => laps);
             running = true;
-            reader = new Thread(ReadGame) { IsBackground = true, Name = "EnduranceManager.Read" };
-            sender = new Thread(SendLoop) { IsBackground = true, Name = "EnduranceManager.Send" };
+            // Below the game and SimHub: when the PC is busy, these threads wait, never the game.
+            reader = new Thread(ReadGame) { IsBackground = true, Name = "EnduranceManager.Read", Priority = ThreadPriority.BelowNormal };
+            sender = new Thread(SendLoop) { IsBackground = true, Name = "EnduranceManager.Send", Priority = ThreadPriority.Lowest };
             reader.Start();
             sender.Start();
         }
@@ -75,6 +77,8 @@ namespace EnduranceManager.SimHub
         {
             running = false;
             this.SaveCommonSettings("GeneralSettings", Settings);
+            // SimHub closes: the session being driven is written to disk before the process goes.
+            reader?.Join(3000);
         }
 
         // SimHub calls this sixty times a second; the plugin reads the game on its own thread, ten times a second.
@@ -113,34 +117,62 @@ namespace EnduranceManager.SimHub
                     Thread.Sleep(5000);
                     continue;
                 }
-                using (memory)
-                using (var view = memory.CreateViewAccessor(0, LmuMemory.Size, MemoryMappedFileAccess.Read))
+                try
                 {
-                    for (int misses = 0, tick = 0; running && misses < 600; tick++)
+                    using (memory)
+                    using (var view = memory.CreateViewAccessor(0, LmuMemory.Size, MemoryMappedFileAccess.Read))
                     {
-                        view.ReadArray(0, buffer, 0, buffer.Length);
-                        bool ok = LmuMemory.Read(buffer, out var sample);
-                        recorder.Feed(sample, ok);
-                        bool driving = ok && sample.Realtime;
-                        GameState = driving ? "track" : "menu";
-                        misses = driving ? 0 : misses + 1;
-                        // The game's API, every 30 s on track: its tables do not change during a session.
-                        // Read aside, so a slow answer never holds up the samples.
-                        if (driving && tick % 300 == 0) { string compound = sample.FrontCompound; ThreadPool.QueueUserWorkItem(_ => api.Read(compound)); }
-                        Thread.Sleep(100);
+                        double lastEt = -1;
+                        for (int misses = 0, frozen = 0, tick = 0; running && misses < 600; tick++)
+                        {
+                            Copy(view, buffer);
+                            bool ok = LmuMemory.Read(buffer, out var sample);
+                            // The game's clock stopped (paused, crashed or closed while on track): not driving. After a
+                            // minute the memory is let go and the session written, so nothing is lost on a crash.
+                            frozen = ok && sample.Realtime && sample.ET == lastEt ? frozen + 1 : 0;
+                            lastEt = sample.ET;
+                            bool driving = ok && sample.Realtime && frozen < 50;
+                            recorder.Feed(sample, driving);
+                            GameState = driving ? "track" : "menu";
+                            misses = driving ? 0 : misses + 1;
+                            // The game's API only when the car stands in the pits or the garage, at most every 30 s: never
+                            // while driving. Read aside, so a slow answer never holds up the samples.
+                            if (driving && sample.InPits && sample.Speed < 1 && tick % 300 == 0 && !api.Busy)
+                            {
+                                string compound = sample.FrontCompound;
+                                ThreadPool.QueueUserWorkItem(_ => api.Read(compound));
+                            }
+                            Thread.Sleep(100);
+                        }
                     }
                 }
+                // An error here must never close SimHub: the reading starts again a few seconds later.
+                catch { Thread.Sleep(5000); }
                 // A minute without driving: the session is over, and the memory is let go so the game can close cleanly.
                 recorder.Flush();
             }
         }
 
+        // One copy of the game's memory: a single block copy (ReadArray copies byte by byte on .NET Framework).
+        static void Copy(MemoryMappedViewAccessor view, byte[] buffer)
+        {
+            var handle = view.SafeMemoryMappedViewHandle;
+            bool added = false;
+            try
+            {
+                handle.DangerousAddRef(ref added);
+                Marshal.Copy(IntPtr.Add(handle.DangerousGetHandle(), (int)view.PointerOffset), buffer, 0, buffer.Length);
+            }
+            finally { if (added) handle.DangerousRelease(); }
+        }
+
+        // Sessions leave when the pilot is not on track (menus, garage screen, game closed): nothing goes out while he drives.
         void SendLoop()
         {
             Thread.Sleep(10000);
             while (running)
             {
-                uploader.SendAll(LinkCode.Parse(Settings.Code));
+                if (GameState != "track") try { uploader.SendAll(LinkCode.Parse(Settings.Code)); } catch { }
                 for (int i = 0; running && i < 60; i++) Thread.Sleep(1000);
             }
         }
