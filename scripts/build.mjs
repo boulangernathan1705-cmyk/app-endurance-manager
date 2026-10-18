@@ -218,7 +218,6 @@ await writeFile(new URL('_headers', out), `/*
 
 /downloads/*
   X-Robots-Tag: noindex, nofollow
-  Cache-Control: no-cache
 
 https://app.endurance-manager.workers.dev/*
   X-Robots-Tag: noindex, nofollow
