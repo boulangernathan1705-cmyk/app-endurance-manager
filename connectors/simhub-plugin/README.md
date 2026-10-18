@@ -20,8 +20,8 @@ Il ne fait que lire : il ne modifie rien dans le jeu ni dans SimHub. Il n'envoie
 - Rien dans la boucle de SimHub (`DataUpdate` est vide) : la lecture tourne sur son propre fil, en priorité basse,
   dix fois par seconde, et dort le reste du temps. Chaque lecture est une seule copie de la mémoire du jeu (325 Ko).
 - L'API locale du jeu est appelée voiture arrêtée aux stands, au garage et dans les menus (le nom du réglage, toutes
-  les 5 s) et, en roulant, une fois par minute pour la seule lumière du jour (`sessions/GetGameState`), une lecture à la
-  fois.
+  les 5 s) et, en roulant, une fois par minute pour la seule lumière du jour (`RepairAndRefuel`, environ 15 Ko), une lecture
+  à la fois.
 - Les séances partent quand le pilote n'est pas en piste (menus, jeu fermé), sur un fil en priorité minimale.
 - Aucune erreur de lecture ne peut fermer SimHub : la lecture reprend quelques secondes plus tard.
 - Jeu planté ou fermé en piste : l'horloge du jeu ne bouge plus, la séance est écrite sur le disque au bout d'une minute.
@@ -35,8 +35,7 @@ pluie) en dépend : seuils `DAMP_FROM` et `RAIN_FROM` dans `shared/combos.mjs`.
 autre réglage au garage. Un réglage modifié sans être enregistré garde le nom de celui dont il part. Les secteurs
 d'un tour ne sont envoyés que si le jeu a donné les trois.
 
-À vérifier enfin : la lumière du jour. Un tour compte de nuit sous `NIGHT_BELOW` (0,5, dans `shared/combos.mjs`). Si
-`GetGameState` ne la donne pas, le plugin la lit dans `RepairAndRefuel`.
+À vérifier enfin : la lumière du jour. Un tour compte de nuit sous `NIGHT_BELOW` (0,5, dans `shared/combos.mjs`).
 
 ## Compiler (sur un PC Windows avec SimHub)
 
@@ -73,6 +72,22 @@ un nouveau code.
 
 Propriétés exposées aux tableaux de bord SimHub : `EnduranceManagerPlugin.Status` et
 `EnduranceManagerPlugin.LapsRecorded`.
+
+## Donner le plugin aux pilotes et le mettre à jour
+
+Le site sert la version rangée dans `release/` (`scripts/build.mjs` la copie dans `public/downloads/simhub/` avec
+`plugin.json` : version, taille et empreinte SHA-256). Sur la page « Fiches combo », « Télécharger l'installeur » donne
+`Installer le plugin.cmd` avec l'adresse du site écrite dedans : au double-clic, il télécharge la DLL de ce site, la
+vérifie, ferme SimHub, l'installe et relance SimHub. Le plugin regarde `plugin.json` une fois par heure sur le site de
+son code ; quand une version plus récente y est, son écran propose « Mettre à jour », qui lance le même installeur
+(jamais en roulant). La liaison est gardée.
+
+Publier une nouvelle version :
+
+1. Monter `<Version>` dans `EnduranceManager.SimHub.csproj` et `version` dans `release/plugin.json` (même numéro).
+2. `dotnet build -c Release`, puis copier `bin\Release\EnduranceManager.SimHub.dll` dans `release/`.
+3. Committer les deux fichiers et la DLL : une fois fusionnée dans `dev`, le site de test la propose ; dans `main`, le
+   site principal.
 
 ## Ce que le site reçoit
 

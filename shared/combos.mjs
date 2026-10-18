@@ -82,6 +82,14 @@ export function cleanSession(input) {
     laps, stops, service:optional(input.service, cleanService), game:optional(input.game, cleanGame)};
 }
 
+// The plugin's installer as the site hands it out (page and plugin alike): the site written in, so it downloads the
+// latest build from there, and Windows line endings for cmd.exe.
+export const INSTALLER_SITE = '@@SITE@@';
+export function installerFor(script, origin) {
+  if (!String(script).includes(INSTALLER_SITE) || !/^https?:\/\/[\w.:-]+$/.test(origin)) throw Error('Installeur indisponible.');
+  return String(script).replaceAll(INSTALLER_SITE, origin).replace(/\r?\n/g, '\r\n');
+}
+
 // The code the site gives a pilot for his plugin: the site's address and his key.
 export const LINK_PREFIX = 'EMCOMBO1';
 export const linkCode = (origin, key) => `${LINK_PREFIX} ${origin} ${key} ${LINK_PREFIX}`;

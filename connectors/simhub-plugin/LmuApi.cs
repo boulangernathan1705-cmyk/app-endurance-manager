@@ -59,7 +59,6 @@ namespace EnduranceManager.SimHub
         // Daylight from the game's weather (currentWeather › lightLevel: 0 at night, 1 in full day), and when it was read.
         public double? Light { get; private set; }
         public DateTime LightAt { get; private set; }
-        string lightPath = "sessions/GetGameState";
         public DateTime? ReadAt { get; private set; }
         // One read at a time: a slow answer never piles up calls to the game.
         public bool Busy => busy != 0;
@@ -87,15 +86,12 @@ namespace EnduranceManager.SimHub
             finally { busy = 0; }
         }
 
-        // Only the daylight, a small answer, read while driving (every minute) so night laps are told from day laps.
-        // Looked for anywhere in the answer; when the game state lacks it, the pit screen is asked instead.
+        // Only the daylight, read while driving (every minute) so night laps are told from day laps. The game gives it
+        // on the pit screen (currentWeather › lightLevel, about 15 KB), not in the smaller game state.
         public void ReadLight()
         {
             if (System.Threading.Interlocked.Exchange(ref busy, 1) == 1) return;
-            try
-            {
-                if (!TakeLight(Get(lightPath)) && lightPath != "garage/UIScreen/RepairAndRefuel") lightPath = "garage/UIScreen/RepairAndRefuel";
-            }
+            try { TakeLight(Get("garage/UIScreen/RepairAndRefuel")); }
             catch { }
             finally { busy = 0; }
         }
