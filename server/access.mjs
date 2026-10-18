@@ -16,6 +16,7 @@ export const PERMISSIONS = Object.freeze([
   'solo_open',            // s'inscrire aux événements OPEN (module EVENT TDZ)
   'solo_safe',            // s'inscrire aux événements SAFE et OPEN (module EVENT TDZ)
   'crews',                // créer et gérer les équipages (tous)
+  'combos',               // consulter et alimenter les fiches combo (module privé « combos », server/combos.mjs)
   'admin'                 // administrer le site de la communauté : réglages, rôles, courses, inscriptions
 ]);
 // What « admin » brings besides the administration (never ticked on their own): enter any pilot, create races
