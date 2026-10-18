@@ -2,7 +2,7 @@
 // track, sent by each pilot's SimHub plugin. Raw numbers only, no advice: each pilot in his colour, the white
 // « Équipage » row is the plain mean of the pilots shown (each counts once). Conditions are framed blocks.
 import {COLORS, CONDITIONS, installerFor} from '../shared/combos.mjs';
-import {analysisBody, distanceUnder, prepare, showCursor} from './combos-analysis.mjs?v=3';
+import {analysisBody, distanceUnder, prepare, showCursor} from './combos-analysis.mjs?v=4';
 
 const app = document.getElementById('combos-app');
 const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
@@ -143,6 +143,17 @@ async function loadAnalysis(fresh = false) {
   render();
 }
 
+// Laps taken out of the sheet by their pilot, or put back: the session, the list and the sheet are read again.
+async function ignoreLaps(which, ignored) {
+  const a = view.analysis, data = a.sessions.get(a.mine);
+  if (!data) return;
+  const laps = which === 'all' ? data.list.map(lap => lap.n) : [Number(which)];
+  if (which === 'all' && ignored && !confirm('Retirer tous les tours de cette séance des fiches ? Tu pourras les remettre.')) return;
+  await act(() => call('/api/combos/laps', 'PATCH', {session:a.mine, laps, ignored}), ignored ? 'Tour retiré des fiches.' : 'Tour remis dans les fiches.');
+  a.sessions.delete(a.mine);
+  await loadSheet(true);
+}
+
 // Each pilot in his sheet colour; a second session of the same pilot in white.
 const prepared = new WeakMap();
 const traceOf = data => { if (!prepared.has(data)) prepared.set(data, prepare(data.trace)); return prepared.get(data); };
@@ -152,7 +163,7 @@ function analysisSides() {
     const data = a.sessions.get(id), item = a.list?.find(entry => entry.id === id);
     if (!data || !item) return null;
     const color = colour.get(item.userId)?.color || item.color || fallback;
-    return {data, item, trace:traceOf(data), color, label:`${item.name}${item.mine ? ' (moi)' : ''} · ${dayTime(item.startedAt)}`, short:item.name};
+    return {data, item, trace:traceOf(data), lapsOpen:a.lapsOpen, color, label:`${item.name}${item.mine ? ' (moi)' : ''} · ${dayTime(item.startedAt)}`, short:item.name};
   };
   const mine = side(a.mine, COLORS[0]);
   let other = a.other !== 'none' ? side(a.other, COLORS[1]) : null;
@@ -570,6 +581,7 @@ app.addEventListener('click', async event => {
     if (view.tab === 'analysis') await loadAnalysis(); else render();
     return;
   }
+  if (target.dataset.ignore) { await ignoreLaps(target.dataset.ignore, !target.dataset.back); return; }
   if (target.dataset.metric) { view.analysis.metric = target.dataset.metric; render(); return; }
   if (target.dataset.pick) { view.analysis.pick = Number(target.dataset.pick); render(); return; }
   if (target.dataset.compound) { view.compound = target.dataset.compound; render(); return; }
@@ -669,6 +681,7 @@ app.addEventListener('toggle', event => {
   if (fold === 'pit') view.pitOpen = event.target.open;
   if (fold === 'periods') view.periodsOpen = event.target.open;
   if (fold === 'side') view.sideOpen = event.target.open;
+  if (fold === 'laps') view.analysis.lapsOpen = event.target.open;
   if (fold === 'link') view.linkOpen = event.target.open;
 }, true);
 

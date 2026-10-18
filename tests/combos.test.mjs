@@ -333,6 +333,34 @@ test('« Mon analyse »: each session wheel by wheel and its best lap on the map
   assert.equal((await plugin('/api/combos/plugin/session', nathan, 'POST', {...session({at:1_790_000_000_000}), expert:EXPERT, trace:trace(5, 210.2)})).data.created, false);
 });
 
+test('a pilot takes a test lap out of the sheet and puts it back; only he or an admin can', async () => {
+  const {req, signIn, plugin} = harness();
+  signIn(NATHAN, 'Nathan', [TEAM_ROLE]);
+  signIn(LUCAS, 'Lucas', [TEAM_ROLE]);
+  const nathan = keyOf((await req('/api/combos/link', 'POST', {}, NATHAN)).data.code);
+  await plugin('/api/combos/plugin/session', nathan, 'POST', session({at:1_790_000_000_000, laps:5}));
+  const query = `track=${encodeURIComponent(TRACK)}&car=${encodeURIComponent(CAR)}`;
+  const sheetLaps = async () => (await req(`/api/combos/sheet?${query}`, 'GET', null, NATHAN)).data.conditions.dry.drivers[0]?.laps ?? 0;
+  const id = (await req(`/api/combos/analysis?${query}`, 'GET', null, NATHAN)).data.sessions[0].id;
+  assert.equal(await sheetLaps(), 4, 'laps 2 to 5: the first one leaves the pits');
+  const before = (await req(`/api/combos/analysis/session?id=${id}`, 'GET', null, NATHAN)).data.list;
+  assert.deepEqual(before.map(lap => lap.out), ['pit', '', '', '', '']);
+
+  assert.equal((await req('/api/combos/laps', 'PATCH', {session:id, laps:[5], ignored:true}, LUCAS)).status, 403, 'not his session');
+  assert.equal((await req('/api/combos/laps', 'PATCH', {session:id, laps:[5], ignored:true}, NATHAN)).status, 200);
+  assert.equal(await sheetLaps(), 3);
+  const after = (await req(`/api/combos/analysis/session?id=${id}`, 'GET', null, NATHAN)).data;
+  assert.equal(after.list[4].out, 'ignored');
+  assert.equal(after.laps.count, 3);
+  const exported = (await req(`/api/combos/export?${query}`, 'GET', null, NATHAN)).data;
+  assert.equal(exported.sessions[0].laps[4].ignored, true, 'the export keeps the lap, marked');
+
+  await req('/api/combos/laps', 'PATCH', {session:id, laps:[5], ignored:false}, NATHAN);
+  assert.equal(await sheetLaps(), 4);
+  assert.equal((await req('/api/combos/laps', 'PATCH', {session:'nope', laps:[1], ignored:true}, NATHAN)).status, 404);
+  assert.equal((await req('/api/combos/laps', 'PATCH', {session:id, laps:[], ignored:true}, NATHAN)).status, 400);
+});
+
 test('the plugin installer is handed out with the site written in and Windows line endings', async () => {
   const script = readFileSync(new URL('../connectors/simhub-plugin/Installer le plugin.cmd', import.meta.url), 'utf8');
   assert.equal(script.split('@@SITE@@').length, 2, 'one place for the site');
