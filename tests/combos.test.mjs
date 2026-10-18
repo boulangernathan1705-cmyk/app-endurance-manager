@@ -5,7 +5,7 @@ import {readFileSync, readdirSync} from 'node:fs';
 import {createHash} from 'node:crypto';
 import worker from '../server/worker.mjs';
 import {linkTestServer, setMember, ORGA_ROLE, DEV_COMMUNITY} from './fixtures/discord-server.mjs';
-import {cleanSession, conditionOf, LINK_PREFIX} from '../shared/combos.mjs';
+import {cleanSession, cleanService, conditionOf, LINK_PREFIX} from '../shared/combos.mjs';
 
 const ROOT = 'https://site.example';
 const MANAGER = '111111111111111111', NATHAN = '222222222222222222', LUCAS = '333333333333333333', GUEST = '444444444444444444';
@@ -67,12 +67,12 @@ const sha256 = value => createHash('sha256').update(value).digest('hex');
 const keyOf = code => code.split(' ')[2];
 const wheel = (base, step = 0.1) => [base, base + step * 3, base - step * 4, base - step * 3].map(value => Math.round(value * 1000) / 1000);
 // A session of `count` timed laps from `from`, with a stop after the in-lap `pitAt` and one slow lap.
-function session({at, laps = 8, ve = 8.4, wear = 1.7, t = 210, rain = 0, compound = 'Medium', pitAt = null, slowLap = null, setup, sectors = false}) {
+function session({at, laps = 8, ve = 8.4, wear = 1.7, t = 210, rain = 0, compound = 'Medium', pitAt = null, slowLap = null, setup, sectors = false, light, track = 30}) {
   const list = [];
   for (let n = 1; n <= laps; n++) {
     const pit = n === 1 || n === pitAt || n === pitAt + 1;
     list.push({n, t:n === slowLap ? t * 1.2 : t + n * 0.05, top:330, fuel:ve * 0.82, ve, wear:wheel(wear), temp:[92, 95, 89, 90], brake:[480, 495, 410, 405],
-      kpa:[171, 172, 166, 167], compound, track:30 + n * 0.1, air:22, rain, wet:rain, invalid:false, pit, setup});
+      kpa:[171, 172, 166, 167], compound, track:track + n * 0.1, air:22, rain, wet:rain, invalid:false, pit, setup, light});
     // Sectors that add up to the lap: 30 %, 40 % and the rest.
     if (sectors) { const lap = list.at(-1); lap.s1 = Math.round(lap.t * 300) / 1000; lap.s2 = Math.round(lap.t * 400) / 1000; lap.s3 = Math.round((lap.t - lap.s1 - lap.s2) * 1000) / 1000; }
   }
@@ -226,6 +226,43 @@ test('each lap keeps its sectors and setup: the sheet gives each pilot\'s sector
 
   const exported = (await req(`/api/combos/export?track=${encodeURIComponent(TRACK)}&car=${encodeURIComponent(CAR)}`, 'GET', null, NATHAN)).data;
   assert.deepEqual(Object.values((({s1, s2, s3, setup}) => ({s1, s2, s3, setup}))(exported.sessions[0].laps[1])), [63.03, 84.04, 63.03, 'Course v2']);
+});
+
+test('the sheet tells day laps from night laps and narrows to a track temperature', async () => {
+  const clean = cleanSession({...session({at:1_790_000_000_000}), laps:[{n:1, t:200, light:0.42}, {n:2, t:200, light:1.5}, {n:3, t:200}]});
+  assert.deepEqual(clean.laps.map(lap => lap.light), [0.42, null, null], 'daylight between 0 and 1, else unknown');
+  assert.deepEqual(cleanService({repair:25, tyresAlong:0, driverRandom:2, bogus:3}), {repair:25, tyresAlong:0, driverRandom:2}, 'the game\'s other service times are kept');
+
+  const {req, signIn, plugin} = harness();
+  signIn(NATHAN, 'Nathan', [TEAM_ROLE]);
+  signIn(LUCAS, 'Lucas', [TEAM_ROLE]);
+  const nathan = keyOf((await req('/api/combos/link', 'POST', {}, NATHAN)).data.code);
+  const lucas = keyOf((await req('/api/combos/link', 'POST', {}, LUCAS)).data.code);
+  await plugin('/api/combos/plugin/session', nathan, 'POST', session({at:1_790_000_000_000, light:0.93}));
+  await plugin('/api/combos/plugin/session', lucas, 'POST', session({at:1_790_100_000_000, light:0.08, track:20}));
+  // An older plugin: no daylight.
+  await plugin('/api/combos/plugin/session', nathan, 'POST', session({at:1_790_200_000_000}));
+
+  const base = `/api/combos/sheet?track=${encodeURIComponent(TRACK)}&car=${encodeURIComponent(CAR)}`;
+  const ids = sheet => sheet.conditions.dry.drivers.map(item => item.id).sort();
+  const all = (await req(base, 'GET', null, NATHAN)).data;
+  assert.deepEqual(all.conditions.dry.moments, {day:7, night:7}, 'laps without daylight are neither');
+  assert.equal(all.conditions.dry.laps, 21);
+  assert.deepEqual(all.conditions.dry.compounds.Medium.trackTemp, [20.2, 30.8]);
+  const night = (await req(`${base}&moment=night`, 'GET', null, NATHAN)).data;
+  assert.equal(night.filters.moment, 'night');
+  assert.deepEqual(ids(night), [LUCAS]);
+  assert.deepEqual(night.conditions.dry.moments, {day:7, night:7}, 'the switch keeps both counts');
+  assert.deepEqual(ids((await req(`${base}&moment=day`, 'GET', null, NATHAN)).data), [NATHAN]);
+  assert.equal((await req(`${base}&moment=dusk`, 'GET', null, NATHAN)).data.filters.moment, null);
+  const warm = (await req(`${base}&tmin=25`, 'GET', null, NATHAN)).data;
+  assert.deepEqual([warm.filters.trackMin, warm.filters.trackMax, warm.conditions.dry.laps], [25, null, 14]);
+  assert.deepEqual(ids(warm), [NATHAN]);
+  assert.deepEqual(ids((await req(`${base}&tmin=15&tmax=25`, 'GET', null, NATHAN)).data), [LUCAS]);
+  assert.equal((await req(`${base}&tmax=abc`, 'GET', null, NATHAN)).data.filters.trackMax, null);
+
+  const exported = (await req(`/api/combos/export?track=${encodeURIComponent(TRACK)}&car=${encodeURIComponent(CAR)}`, 'GET', null, NATHAN)).data;
+  assert.deepEqual(exported.sessions.map(item => item.laps[1].light), [0.93, 0.08, null]);
 });
 
 test('races being prepared and game versions sort the sessions by their dates', async () => {

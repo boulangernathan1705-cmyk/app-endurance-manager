@@ -19,8 +19,8 @@ const STORE = 'em-combos-hidden';
 
 const view = {
   combos:[], combo:null, sheet:null, compare:null, link:null, code:'', copied:false, linkBusy:false,
-  event:'', version:'', setup:'', compareEvent:'', cond:null, compound:null, stint:12, hidden:new Set(),
-  pit:{before:8, after:100, tyres:4, driver:true, wing:false, brakes:false}, pitOpen:false, periodsOpen:false, linkOpen:null,
+  event:'', version:'', setup:'', moment:'', trackMin:'', trackMax:'', compareEvent:'', cond:null, compound:null, stint:12, hidden:new Set(),
+  pit:{before:8, after:100, tyres:4, pressure:false, driver:true, wing:'', frontWing:'', radiator:false, brakes:false, repair:''}, pitOpen:false, periodsOpen:false, linkOpen:null,
   editing:null, message:'', error:''
 };
 try { view.hidden = new Set(JSON.parse(localStorage.getItem(STORE) || '[]')); } catch {}
@@ -51,12 +51,17 @@ const sheetQuery = (event = view.event) => {
   if (event) query.set('event', event);
   if (view.version) query.set('version', view.version);
   if (view.setup) query.set('setup', view.setup);
+  if (view.moment) query.set('moment', view.moment);
+  if (view.trackMin !== '') query.set('tmin', view.trackMin);
+  if (view.trackMax !== '') query.set('tmax', view.trackMax);
   return query;
 };
 
 async function start() {
   const params = new URLSearchParams(location.search);
   view.event = params.get('event') || ''; view.version = params.get('version') || ''; view.setup = params.get('setup') || '';
+  view.moment = ['day', 'night'].includes(params.get('moment')) ? params.get('moment') : '';
+  view.trackMin = params.get('tmin') || ''; view.trackMax = params.get('tmax') || '';
   try {
     const [list, link] = await Promise.all([call('/api/combos'), call('/api/combos/link')]);
     view.combos = list.combos; view.link = link;
@@ -77,7 +82,9 @@ async function loadSheet() {
   }
   if (view.sheet) {
     const conditions = view.sheet.conditions;
-    if (!view.cond || !conditions[view.cond]?.laps) view.cond = CONDITIONS.find(cond => conditions[cond].laps) || 'dry';
+    // A condition left empty by the day/night or track temperature choice stays chosen: its frame says why it is empty.
+    const narrowed = view.moment || view.trackMin !== '' || view.trackMax !== '';
+    if (!view.cond || (!narrowed && !conditions[view.cond]?.laps)) view.cond = CONDITIONS.find(cond => conditions[cond].laps) || 'dry';
     const query = sheetQuery();
     history.replaceState(null, '', `${location.pathname}?${query}`);
   }
@@ -174,6 +181,7 @@ function filters() {
     <label>Version / BoP<select data-field="version">${option('', 'Toutes les versions', view.version)}${periods.versions.map(item => option(item.id, item.name, view.version)).join('')}</select></label>
     <label>Comparer avec<select data-field="compare">${option('', 'Rien', view.compareEvent)}${periods.events.filter(item => item.id !== view.event).map(item => option(item.id, item.name, view.compareEvent)).join('')}</select></label>
     <label>Réglage<select data-field="setup">${option('', 'Tous les réglages', view.setup)}${setups.map(item => option(item.name, `${item.name} · ${item.laps} tours`, view.setup)).join('')}${view.setup && !setups.some(item => item.name === view.setup) ? option(view.setup, view.setup, view.setup) : ''}</select></label>
+    <div class="cb-range"><span>Piste (°C)</span><div><input type="number" inputmode="numeric" min="-30" max="80" step="1" placeholder="de" value="${esc(view.trackMin)}" data-field="trackMin" aria-label="Température de piste minimale"><input type="number" inputmode="numeric" min="-30" max="80" step="1" placeholder="à" value="${esc(view.trackMax)}" data-field="trackMax" aria-label="Température de piste maximale"></div></div>
   </div>`;
 }
 
@@ -194,22 +202,26 @@ function drivers() {
 
 function conditions() {
   const conds = view.sheet.conditions;
-  return `<div class="cb-conds" role="group" aria-label="Conditions de piste">${CONDITIONS.map(cond => `<button type="button" class="cb-cond ${COND[cond][1]}" data-cond="${cond}" aria-pressed="${cond === view.cond}"><b>${COND[cond][0]}</b>${conds[cond].laps} tours</button>`).join('')}</div>`;
+  const moments = conds[view.cond].moments;
+  // Day and night: laps driven with a plugin that reads the daylight. Older laps count only in « Jour et nuit ».
+  const measured = moments.day + moments.night;
+  return `<div class="cb-conds" role="group" aria-label="Conditions de piste">${CONDITIONS.map(cond => `<button type="button" class="cb-cond ${COND[cond][1]}" data-cond="${cond}" aria-pressed="${cond === view.cond}"><b>${COND[cond][0]}</b>${conds[cond].laps} tours</button>`).join('')}</div>
+    <div class="cb-moments" role="group" aria-label="Jour ou nuit">${[['', 'Jour et nuit', null], ['day', 'Jour', moments.day], ['night', 'Nuit', moments.night]].map(([value, label, laps]) => `<button type="button" class="cb-pill" data-moment="${value}" aria-pressed="${value === view.moment}">${label}${laps === null ? '' : `<small>${laps} tours</small>`}</button>`).join('')}${measured ? '' : '<span class="cb-src">jour et nuit notés à partir de la nouvelle version du plugin</span>'}</div>`;
 }
 
 function energy(rows) {
-  const table = `<thead><tr><th>Pilote</th><th>Tours</th><th>Énergie / tour</th><th>Tours / relais</th><th>Carburant / tour</th></tr></thead><tbody>${rows.length ? rows.map(row =>
-    `<tr${rowClass(row)}>${nameCell(row)}<td>${row.laps}</td><td>${known(row.ve) ? `${fr(row.ve)} %` : '—'}${delta(row, 've', 2, ' %')}</td><td>${known(row.ve) && row.ve > 0 ? fr(100 / row.ve, 1) : '—'}</td><td>${known(row.fuel) ? `${fr(row.fuel)} L` : '—'}</td></tr>`).join('') : none(5)}</tbody>`;
+  const table = `<thead><tr><th>Pilote</th><th>Tours</th><th>Énergie / tour (%)</th><th>Tours / relais</th><th>Carburant / tour (L)</th></tr></thead><tbody>${rows.length ? rows.map(row =>
+    `<tr${rowClass(row)}>${nameCell(row)}<td>${row.laps}</td><td>${fr(row.ve)}${delta(row, 've', 2, ' %')}</td><td>${known(row.ve) && row.ve > 0 ? fr(100 / row.ve, 1) : '—'}</td><td>${fr(row.fuel)}</td></tr>`).join('') : none(5)}</tbody>`;
   // How much energy a lap may use for a stint of N laps, and which pilots stay under it.
   const pilots = rows.filter(row => !row.crew && known(row.ve) && row.ve > 0);
   const worst = pilots.length ? Math.max(...pilots.map(row => row.ve)) : null;
   const whole = worst ? Math.max(2, Math.floor(100 / worst)) : null;
-  const stints = whole ? `<div class="cb-wrap"><table><thead><tr><th>Relais de</th><th>Énergie / tour à tenir</th><th style="text-align:left">Pilotes en dessous</th></tr></thead><tbody>${[whole - 1, whole, whole + 1, whole + 2].map(laps => {
+  const stints = whole ? `<div class="cb-wrap"><table><thead><tr><th>Relais de</th><th>Énergie / tour à tenir (%)</th><th style="text-align:left">Pilotes en dessous</th></tr></thead><tbody>${[whole - 1, whole, whole + 1, whole + 2].map(laps => {
     const under = pilots.filter(row => row.ve <= 100 / laps);
-    return `<tr><td>${laps} tours</td><td>${fr(100 / laps)} %</td><td><div class="cb-dots">${under.map(row => `<span class="cb-dot" style="--dc:${esc(row.color)}" title="${esc(row.name)}"></span>`).join('') || '<span class="cb-src">aucun</span>'}</div></td></tr>`;
+    return `<tr><td>${laps} tours</td><td>${fr(100 / laps)}</td><td><div class="cb-dots">${under.map(row => `<span class="cb-dot" style="--dc:${esc(row.color)}" title="${esc(row.name)}"></span>`).join('') || '<span class="cb-src">aucun</span>'}</div></td></tr>`;
   }).join('')}</tbody></table></div>` : '';
   return `<section><div class="cb-head"><h2>Énergie virtuelle</h2><span class="cb-src">tours propres, hors tours de stand</span></div>
-    <div class="cb-tables"><div class="cb-wrap"><table>${table}</table></div>${stints ? `<div>${stints}</div>` : ''}</div></section>`;
+    <div class="cb-tables"><div class="cb-wrap"><table>${table}</table></div>${stints}</div></section>`;
 }
 
 function tyres() {
@@ -218,34 +230,54 @@ function tyres() {
   if (!names.length) return '<section><div class="cb-head"><h2>Pneus</h2></div><p class="cb-empty">Pas encore de tour propre dans cette condition.</p></section>';
   if (!names.includes(view.compound)) view.compound = names.sort((a, b) => compounds[b].laps - compounds[a].laps)[0];
   return `<section><div class="cb-head"><h2>Pneus</h2><span class="cb-src">usure en % de la gomme par tour</span></div>
-    <div class="cb-compounds" role="group" aria-label="Gomme">${names.map(name => `<button type="button" class="cb-pill" data-compound="${esc(name)}" aria-pressed="${name === view.compound}">${esc(name)}<small>${compounds[name].laps} tours</small></button>`).join('')}</div>
+    <div class="cb-compounds" role="group" aria-label="Gomme">${names.map(name => `<button type="button" class="cb-pill" data-compound="${esc(name)}" aria-pressed="${name === view.compound}">${esc(name)}<small>${compounds[name].laps} tours${compounds[name].trackTemp ? ` · piste ${fr(compounds[name].trackTemp[0], 0)}–${fr(compounds[name].trackTemp[1], 0)} °C` : ''}</small></button>`).join('')}</div>
     <div class="cb-stint"><label for="cb-stint">Usure affichée pour un relais de</label><input type="number" id="cb-stint" min="1" max="60" value="${view.stint}" data-field="stint"><span>tours</span></div>
     <div class="cb-tyres" data-tyres>${tyreCards()}</div></section>`;
 }
 
 function tyreCards() {
   const rows = tyreRows(view.cond, view.compound);
-  return WHEELS.map((wheel, index) => `<div class="cb-tyre"><div class="cb-tyre-name">${wheel}</div><table class="cb-mini"><thead><tr><th></th><th>% / tour</th><th>Sur ${view.stint} t.</th><th>Carcasse</th><th>Pression</th><th>Frein</th></tr></thead><tbody>${rows.length ? rows.map(row =>
-    `<tr${rowClass(row)}>${nameCell(row, true)}<td>${fr(row.wear[index])}</td><td>${known(row.wear[index]) ? `${fr(row.wear[index] * view.stint, 1)} %` : '—'}</td><td>${known(row.temp[index]) ? `${fr(row.temp[index], 0)} °C` : '—'}</td><td>${known(row.kpa[index]) ? `${fr(row.kpa[index], 0)} kPa` : '—'}</td><td>${known(row.brake[index]) ? `${fr(row.brake[index], 0)} °C` : '—'}</td></tr>`).join('') : none(6)}</tbody></table></div>`).join('');
+  return WHEELS.map((wheel, index) => `<div class="cb-tyre"><div class="cb-tyre-name">${wheel}</div><table class="cb-mini"><thead><tr><th></th><th>% / tour</th><th>% sur ${view.stint} t.</th><th>Carcasse °C</th><th>Pression kPa</th><th>Frein °C</th></tr></thead><tbody>${rows.length ? rows.map(row =>
+    `<tr${rowClass(row)}>${nameCell(row, true)}<td>${fr(row.wear[index])}</td><td>${known(row.wear[index]) ? fr(row.wear[index] * view.stint, 1) : '—'}</td><td>${fr(row.temp[index], 0)}</td><td>${fr(row.kpa[index], 0)}</td><td>${fr(row.brake[index], 0)}</td></tr>`).join('') : none(6)}</tbody></table></div>`).join('');
 }
 
 function pace(rows) {
-  const slope = value => known(value) ? `${value > 0 ? '+' : value < 0 ? '−' : ''}${fr(Math.abs(value), 3)} s` : '—';
-  const table = `<thead><tr><th>Pilote</th><th>Tours</th><th>Moyenne</th><th>Meilleur</th><th>Perte / tour en relais</th></tr></thead><tbody>${rows.length ? rows.map(row =>
+  const slope = value => known(value) ? `${value > 0 ? '+' : value < 0 ? '−' : ''}${fr(Math.abs(value), 3)}` : '—';
+  const table = `<thead><tr><th>Pilote</th><th>Tours</th><th>Moyenne</th><th>Meilleur</th><th>Perte / tour en relais (s)</th></tr></thead><tbody>${rows.length ? rows.map(row =>
     `<tr${rowClass(row)}>${nameCell(row)}<td>${row.laps}</td><td>${lapTime(row.avg)}${delta(row, 'avg', 2, ' s')}</td><td>${lapTime(row.best)}</td><td>${slope(row.slope)}</td></tr>`).join('') : none(5)}</tbody>`;
   // Sectors: the mean, with the best below; the ideal lap adds up the best three.
   const sectorRows = rows.filter(row => row.sectors);
   const seconds = value => known(value) ? fr(value, 3) : '—';
-  const sectors = sectorRows.length ? `<div class="cb-wrap" style="max-width:760px"><table><thead><tr><th>Pilote</th><th>Secteur 1</th><th>Secteur 2</th><th>Secteur 3</th><th>Tour idéal</th></tr></thead><tbody>${sectorRows.map(row => {
+  const sectors = sectorRows.length ? `<div class="cb-wrap cb-narrow"><table><thead><tr><th>Pilote</th><th>Secteur 1</th><th>Secteur 2</th><th>Secteur 3</th><th>Tour idéal</th></tr></thead><tbody>${sectorRows.map(row => {
     const ideal = row.sectors.best.every(known) ? row.sectors.best.reduce((a, b) => a + b, 0) : null;
-    return `<tr${rowClass(row)}>${nameCell(row)}${[0, 1, 2].map(index => `<td>${seconds(row.sectors.avg[index])}<span class="cb-sub">meilleur ${seconds(row.sectors.best[index])}</span></td>`).join('')}<td>${lapTime(ideal)}<span class="cb-sub">${row.sectors.laps} tours</span></td></tr>`;
+    return `<tr${rowClass(row)}>${nameCell(row)}${[0, 1, 2].map(index => `<td>${seconds(row.sectors.avg[index])}<span class="cb-sub"><span class="cb-word">meilleur </span>${seconds(row.sectors.best[index])}</span></td>`).join('')}<td>${lapTime(ideal)}<span class="cb-sub">${row.sectors.laps} tours</span></td></tr>`;
   }).join('')}</tbody></table></div>` : '';
-  return `<section><div class="cb-head"><h2>Rythme</h2><span class="cb-src">tours propres, hors tours de stand</span></div><div class="cb-wrap" style="max-width:760px"><table>${table}</table></div>
+  return `<section><div class="cb-head"><h2>Rythme</h2><span class="cb-src">tours propres, hors tours de stand</span></div><div class="cb-wrap cb-narrow"><table>${table}</table></div>
     ${sectors ? `<div class="cb-head"><h2>Secteurs</h2><span class="cb-src">moyenne, et meilleur temps en dessous</span></div>${sectors}` : ''}</section>`;
 }
 
-// The game's rule, as in the old pit guide: fuel, energy, wing and driver change run together; tyres and
-// brakes come after. Service times are the game's own for this car.
+// The game's own service times and order for this car: a job the game marks "concurrent" runs during the refuelling
+// (the longest of them counts), the others come after it one by one. Without the game's mark, the old pit guide's rule:
+// driver change and wings during, tyres, brakes and repairs after.
+const along = (service, key, fallback) => known(service?.[key]) ? service[key] === 1 : fallback;
+const WINGS = {'':'Rien', adjust:'Réglage', new:'Remplacement'};
+const REPAIRS = {'':'Aucune', aero:'Aéro', all:'Tout'};
+
+function pitJobs() {
+  const service = view.sheet.pit.service || {}, p = view.pit;
+  const tyres = p.tyres >= 3 ? service.tyres4 : p.tyres >= 1 ? service.tyres2 : p.pressure ? service.pressure : 0;
+  const jobs = [
+    [p.tyres ? `${p.tyres} pneus` : 'Pressions', tyres, along(service, 'tyresAlong', false), p.tyres ? service.tyresRandom : 0],
+    ['Pilote', p.driver ? service.driver : 0, along(service, 'driverAlong', true), p.driver ? service.driverRandom : 0],
+    ['Aileron arrière', p.wing === 'new' ? service.wingNew : p.wing === 'adjust' ? service.wing : 0, true, 0],
+    ['Aileron avant', p.frontWing === 'new' ? service.frontWingNew : p.frontWing === 'adjust' ? service.frontWing : 0, true, 0],
+    ['Grille de radiateur', p.radiator ? service.radiator : 0, true, 0],
+    ['Freins', p.brakes ? service.brakes : 0, along(service, 'brakesAlong', false), 0],
+    ['Réparation', p.repair === 'all' ? service.repair : p.repair === 'aero' ? service.aeroRepair : 0, along(service, 'repairAlong', false), p.repair ? service.repairRandom : 0]
+  ];
+  return jobs.filter(([, time]) => known(time) && time > 0).map(([name, time, during, random]) => ({name, time, during, random:known(random) ? random : 0}));
+}
+
 function pitNumbers() {
   const {service, laneThrough} = view.sheet.pit;
   const crew = paceRows(view.cond)[0];
@@ -253,19 +285,24 @@ function pitNumbers() {
   const fuel = crew && known(crew.ve) && crew.ve > 0 && known(crew.fuel) ? energyAdded / crew.ve * crew.fuel : null;
   const fill = fuel > 0 && known(service?.fuelRate) && service.fuelRate > 0 ? (service.connect || 0) + fuel / service.fuelRate : 0;
   const charge = known(service?.energyRate) && service.energyRate > 0 ? energyAdded / service.energyRate : 0;
-  const along = Math.max(fill, charge, p.wing ? service?.wing || 0 : 0, p.driver ? service?.driver || 0 : 0);
-  const after = (p.tyres === 4 ? service?.tyres4 || 0 : p.tyres === 2 ? service?.tyres2 || 0 : 0) + (p.brakes ? service?.brakes || 0 : 0);
-  const stopped = along + after;
-  return {energyAdded, fuel, charge, after, stopped, laneThrough, total:known(laneThrough) ? stopped + laneThrough : null};
+  const refuel = Math.max(fill, charge);
+  const jobs = pitJobs();
+  const during = Math.max(0, ...jobs.filter(job => job.during).map(job => job.time));
+  const after = jobs.filter(job => !job.during).reduce((sum, job) => sum + job.time, 0);
+  const stopped = Math.max(refuel, during) + after;
+  const random = jobs.reduce((sum, job) => sum + job.random, energyAdded > 0 && known(service?.fuelRandom) ? service.fuelRandom : 0);
+  return {energyAdded, fuel, refuel, during, after, stopped, random, laneThrough, total:known(laneThrough) ? stopped + laneThrough : null};
 }
 
 function pitResult() {
   const n = pitNumbers(), pit = view.sheet.pit;
-  return `<div><span>Énergie ajoutée</span><b>${n.energyAdded} %</b></div><div><span>Carburant ajouté</span><b>${known(n.fuel) ? `${fr(n.fuel, 1)} L` : '—'}</b></div>
-    <div><span>Ravitaillement (énergie)</span><b>${fr(n.charge, 1)} s</b></div><div><span>Pneus et freins</span><b>${fr(n.after, 1)} s</b></div>
-    <div><span>Temps arrêté</span><b>${fr(n.stopped, 1)} s</b></div><div><span>Traversée de la voie des stands</span><b>${known(n.laneThrough) ? `${fr(n.laneThrough, 1)} s` : '—'}</b></div>
+  const row = (label, value) => `<div><span>${label}</span><b>${value}</b></div>`;
+  return `${row('Énergie ajoutée', `${n.energyAdded} %`)}${row('Carburant ajouté', known(n.fuel) ? `${fr(n.fuel, 1)} L` : '—')}
+    ${row('Ravitaillement', `${fr(n.refuel, 1)} s`)}${row('En même temps', `${fr(n.during, 1)} s`)}${row('Après le ravitaillement', `${fr(n.after, 1)} s`)}
+    ${row('Temps arrêté', `${fr(n.stopped, 1)} s`)}${row('Traversée de la voie des stands', known(n.laneThrough) ? `${fr(n.laneThrough, 1)} s` : '—')}
     <div class="cb-total"><span>Temps total au stand</span><b>${known(n.total) ? `${fr(n.total, 1)} s` : '—'}</b></div>
-    <p>Temps de service lus dans le jeu pour cette voiture. ${pit.stops ? `Traversée mesurée sur ${pit.stops} arrêt${pit.stops > 1 ? 's' : ''} de l’équipe.` : 'Traversée : pas encore d’arrêt mesuré.'}</p>`;
+    ${n.random ? `<p>Le jeu peut ajouter jusqu’à ${fr(n.random, 0)} s au hasard.</p>` : ''}
+    <p>Temps de service lus dans le jeu pour cette voiture. ${pit.stops ? `Traversée mesurée sur ${pit.stops} arrêt${pit.stops > 1 ? 's' : ''} de l’équipe.` : 'Traversée : pas encore d’arrêt mesuré.'} Les écopes de frein n’ont pas de temps dans le jeu.</p>`;
 }
 
 function pitSummary() {
@@ -276,14 +313,21 @@ function pitSummary() {
 function pitStop() {
   const service = view.sheet.pit.service;
   if (!service) return '<details class="cb-fold"><summary><h2>Simulateur d’arrêt au stand</h2><span>temps de service pas encore lus</span></summary><div class="cb-fold-body"><p class="cb-empty">Le plugin lit les temps de service de la voiture quand elle est arrêtée aux stands. Ils apparaîtront après une séance avec un passage au stand.</p></div></details>';
-  const p = view.pit, s = value => known(value) ? `<small>${fr(value, 1)} s</small>` : '';
+  const p = view.pit;
+  // A job's time as the game gives it; « pas lu » until a plugin that reads it has stopped in the pits.
+  const s = value => `<small>${known(value) ? `${fr(value, 1)} s` : 'pas lu'}</small>`;
+  const check = (field, label, time) => `<label class="cb-toggle"><input type="checkbox" data-pit-field="${field}"${p[field] ? ' checked' : ''}> ${label} ${s(time)}</label>`;
+  const radios = (field, labels, times) => Object.entries(labels).map(([value, label]) => `<label class="cb-toggle"><input type="radio" name="cb-${field}" value="${value}" data-pit-field="${field}"${String(p[field]) === value ? ' checked' : ''}> ${label}${value === '' || value === '0' ? '' : ` ${s(times[value])}`}</label>`).join('');
   return `<details class="cb-fold" data-fold="pit"${view.pitOpen ? ' open' : ''}><summary><h2>Simulateur d’arrêt au stand</h2><span data-pit-summary>${esc(pitSummary())}</span></summary><div class="cb-fold-body">
     <form class="cb-form" data-pit>
       <div class="cb-ctrl"><label for="cb-before">Énergie dans la voiture à l’arrivée <output data-out="before">${p.before} %</output></label><input type="range" id="cb-before" min="0" max="100" value="${p.before}" data-pit-field="before"></div>
       <div class="cb-ctrl"><label for="cb-after">Énergie au départ du stand <output data-out="after">${p.after} %</output></label><input type="range" id="cb-after" min="0" max="100" value="${p.after}" data-pit-field="after"></div>
-      <fieldset><legend>Pneus</legend>${[[0, 'Aucun', null], [2, '2 pneus', service.tyres2], [4, '4 pneus', service.tyres4]].map(([value, label, time]) => `<label class="cb-toggle"><input type="radio" name="cb-tyres" value="${value}" data-pit-field="tyres"${p.tyres === value ? ' checked' : ''}> ${label} ${s(time)}</label>`).join('')}</fieldset>
-      <fieldset><legend>Pendant le ravitaillement</legend><label class="cb-toggle"><input type="checkbox" data-pit-field="driver"${p.driver ? ' checked' : ''}> Changement de pilote ${s(service.driver)}</label><label class="cb-toggle"><input type="checkbox" data-pit-field="wing"${p.wing ? ' checked' : ''}> Aileron ${s(service.wing)}</label></fieldset>
-      <fieldset><legend>Après le ravitaillement</legend><label class="cb-toggle"><input type="checkbox" data-pit-field="brakes"${p.brakes ? ' checked' : ''}> Freins ${s(service.brakes)}</label></fieldset>
+      <fieldset><legend>Pneus</legend>${radios('tyres', {0:'Aucun', 2:'1 ou 2 pneus', 4:'3 ou 4 pneus'}, {2:service.tyres2, 4:service.tyres4})}${p.tyres ? '' : check('pressure', 'Pressions seules', service.pressure)}</fieldset>
+      <fieldset><legend>Pilote</legend>${check('driver', 'Changement de pilote', service.driver)}</fieldset>
+      <fieldset><legend>Aileron arrière</legend>${radios('wing', WINGS, {adjust:service.wing, new:service.wingNew})}</fieldset>
+      ${known(service.frontWing) || known(service.frontWingNew) ? `<fieldset><legend>Aileron avant (si la voiture en a un)</legend>${radios('frontWing', WINGS, {adjust:service.frontWing, new:service.frontWingNew})}</fieldset>` : ''}
+      <fieldset><legend>Freins et radiateur</legend>${check('brakes', 'Changer les freins', service.brakes)}${check('radiator', 'Grille de radiateur', service.radiator)}</fieldset>
+      <fieldset><legend>Réparation des dégâts (temps de base)</legend>${radios('repair', REPAIRS, {aero:service.aeroRepair, all:service.repair})}</fieldset>
     </form><div class="cb-result" aria-live="polite" data-pit-result>${pitResult()}</div></div></details>`;
 }
 
@@ -326,8 +370,8 @@ function render() {
   const c = view.sheet.conditions[view.cond];
   const track = c.trackTemp ? ` · piste ${fr(c.trackTemp[0], 0)} à ${fr(c.trackTemp[1], 0)} °C` : '';
   app.innerHTML = `${header()}${message}${view.error ? `<p class="cb-message is-error">${esc(view.error)}</p>` : ''}${linkCard()}${filters()}${sample()}${drivers()}${conditions()}
-    <div class="cb-frame ${COND[view.cond][1]}"><span class="cb-tag">${COND[view.cond][0]}</span><span class="cb-meta">${c.laps} tours${track}</span>
-      ${c.laps ? energy(rows) + tyres() + pace(rows) : '<p class="cb-empty">Pas encore de tour propre dans cette condition.</p>'}</div>
+    <div class="cb-frame ${COND[view.cond][1]}"><span class="cb-tag">${COND[view.cond][0]}${view.moment ? ` · ${view.moment === 'night' ? 'nuit' : 'jour'}` : ''}</span><span class="cb-meta">${c.laps} tours${track}</span>
+      ${c.laps ? energy(rows) + tyres() + pace(rows) : `<p class="cb-empty">Pas encore de tour propre dans cette condition${view.moment ? (view.moment === 'night' ? ' de nuit' : ' de jour') : ''}${view.trackMin !== '' || view.trackMax !== '' ? ' avec cette température de piste' : ''}.</p>`}</div>
     ${pitStop()}${notes()}${periodsCard()}`;
 }
 
@@ -392,6 +436,7 @@ app.addEventListener('click', async event => {
   }
   if (target.dataset.cond) { view.cond = target.dataset.cond; render(); return; }
   if (target.dataset.compound) { view.compound = target.dataset.compound; render(); return; }
+  if (target.dataset.moment !== undefined) { view.moment = target.dataset.moment; await loadSheet(); return; }
   if (target.dataset.color) {
     await act(() => call('/api/combos/color', 'PUT', {color:target.dataset.color}));
     await loadSheet(); return;
@@ -431,6 +476,11 @@ app.addEventListener('change', async event => {
     if (field === 'event' && view.compareEvent === view.event) view.compareEvent = '';
     await loadSheet();
   } else if (field === 'compare') { view.compareEvent = event.target.value; await loadSheet(); }
+  else if (field === 'trackMin' || field === 'trackMax') {
+    const value = event.target.value.trim();
+    view[field] = value !== '' && Number.isFinite(Number(value)) ? String(Math.round(Number(value))) : '';
+    await loadSheet();
+  }
 });
 
 app.addEventListener('input', event => {
@@ -443,9 +493,14 @@ app.addEventListener('input', event => {
   }
   const pitField = target.dataset.pitField;
   if (!pitField) return;
-  if (pitField === 'tyres') view.pit.tyres = Number(target.value);
-  else if (target.type === 'checkbox') view.pit[pitField] = target.checked;
+  if (target.type === 'checkbox') view.pit[pitField] = target.checked;
+  else if (target.type === 'radio' && pitField !== 'tyres') view.pit[pitField] = target.value;
   else view.pit[pitField] = Number(target.value);
+  // The pressures alone only make sense without new tyres: the choice is shown or hidden.
+  if (pitField === 'tyres') {
+    const form = app.querySelector('[data-pit]'), open = view.pitOpen;
+    if (form) { app.querySelector('[data-fold="pit"]').outerHTML = pitStop(); view.pitOpen = open; }
+  }
   if (pitField === 'before' && view.pit.after < view.pit.before) view.pit.after = view.pit.before;
   for (const key of ['before', 'after']) {
     const output = app.querySelector(`[data-out="${key}"]`);
