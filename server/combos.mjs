@@ -8,7 +8,7 @@
 import {fail, json, now, id, token, hash, rateLimit, body, siteOrigin} from './core.mjs';
 import {communityAccess, requirePermission} from './access.mjs';
 import {communityById} from './community.mjs';
-import {cleanSession, CONDITIONS, CONDITION_SQL, CLEAN_RATIO, WHEELS, SETUP_MAX, NIGHT_BELOW, linkCode} from '../shared/combos.mjs';
+import {cleanSession, CONDITIONS, CONDITION_SQL, CLEAN_RATIO, STINT_MIN, WHEELS, SETUP_MAX, NIGHT_BELOW, linkCode} from '../shared/combos.mjs';
 
 export const combosEnabled = community => community?.modules?.combos === true;
 
@@ -126,15 +126,24 @@ function periodInput(input, kind) {
 
 // ---------- The sheet ----------
 
+// A new stint starts on a lap that touched the pits, or after a gap in the lap numbers: the plugin leaves out an
+// untimed lap in the pits (the drive out of the garage).
+const CUT = 'CASE WHEN pit=1 OR n-LAG(n) OVER (PARTITION BY session_id ORDER BY n)<>1 THEN 1 ELSE 0 END';
+
 // Laps that count: timed, valid, away from the pits, not taken out by their pilot, within CLEAN_RATIO of the pilot's best in that condition, on
 // the chosen setup, by day or by night, between two track temperatures (NULL: any). A stint is the run of laps between
-// two laps that touched the pits.
-const CLEAN = `WITH base AS (SELECT *, ${CONDITION_SQL} AS cond, SUM(pit) OVER (PARTITION BY session_id ORDER BY n ROWS UNBOUNDED PRECEDING) AS stint
-    FROM combo_laps WHERE community_id=? AND track=? AND car=? AND started_at BETWEEN ? AND ? AND (? IS NULL OR setup=?)
+// two laps that touched the pits (CUT); one shorter than STINT_MIN timed laps keeps only the pilot's best lap. Stints are cut
+// before the filters, so a stint crossing dusk or a track temperature bound keeps its length.
+const CLEAN = `WITH raw AS (SELECT *, ${CONDITION_SQL} AS cond, ${CUT} AS cut
+    FROM combo_laps WHERE community_id=? AND track=? AND car=? AND started_at BETWEEN ? AND ?),
+  stints AS (SELECT *, SUM(cut) OVER (PARTITION BY session_id ORDER BY n ROWS UNBOUNDED PRECEDING) AS stint FROM raw),
+  runs AS (SELECT *, SUM(pit=0 AND ignored=0 AND t>0) OVER (PARTITION BY session_id, stint) AS run FROM stints),
+  base AS (SELECT * FROM runs WHERE (? IS NULL OR setup=?)
       AND (? IS NULL OR (light IS NOT NULL AND (light<${NIGHT_BELOW})=(?='night'))) AND (? IS NULL OR track_temp>=?) AND (? IS NULL OR track_temp<=?)),
   timed AS (SELECT * FROM base WHERE pit=0 AND invalid=0 AND ignored=0 AND t>0),
   best AS (SELECT user_id, cond, MIN(t) AS best FROM timed GROUP BY user_id, cond),
-  clean AS (SELECT timed.* FROM timed JOIN best ON best.user_id=timed.user_id AND best.cond=timed.cond WHERE timed.t<=best.best*${CLEAN_RATIO})`;
+  clean AS (SELECT timed.* FROM timed JOIN best ON best.user_id=timed.user_id AND best.cond=timed.cond
+    WHERE timed.t<=best.best*${CLEAN_RATIO} AND (timed.run>=${STINT_MIN} OR timed.t=best.best))`;
 const wheelAverages = kind => WHEELS.map(wheel => `AVG(NULLIF(${kind}_${wheel},0)) AS ${kind}_${wheel}`).join(',');
 const wheels = (row, kind, digits) => WHEELS.map(wheel => round(row[`${kind}_${wheel}`], digits));
 
@@ -239,17 +248,26 @@ async function analysisSession(env, community, userId, sessionId) {
     WHERE s.id=? AND s.community_id=?`).bind(String(sessionId || ''), community.id).first();
   if (!session) notFound();
   // Clean laps as on the sheet: timed, valid, away from the pits, kept, within CLEAN_RATIO of the session's best.
-  const [laps, trace, list] = await Promise.all([
+  const [laps, trace, list, records] = await Promise.all([
     env.DB.prepare(`WITH timed AS (SELECT * FROM combo_laps WHERE session_id=? AND pit=0 AND invalid=0 AND ignored=0 AND t>0),
         clean AS (SELECT * FROM timed WHERE t<=(SELECT MIN(t) FROM timed)*${CLEAN_RATIO})
       SELECT COUNT(*) AS laps, MIN(t) AS best, AVG(t) AS avg, MAX(t)-MIN(t) AS spread, AVG(NULLIF(fuel,0)) AS fuel, AVG(NULLIF(ve,0)) AS ve,
         (SELECT MAX(top) FROM combo_laps WHERE session_id=?) AS top, ${wheelAverages('wear')} FROM clean`).bind(session.id, session.id).first(),
     env.DB.prepare('SELECT lap, lap_time, data FROM combo_traces WHERE session_id=?').bind(session.id).first(),
-    all(env, 'SELECT n, t, s1, s2, s3, ve, fuel, compound, pit, invalid, ignored FROM combo_laps WHERE session_id=? ORDER BY n', session.id)
+    // Each lap with its condition and the length of its stint, as the sheet cuts them.
+    all(env, `WITH raw AS (SELECT *, ${CONDITION_SQL} AS cond, ${CUT} AS cut FROM combo_laps WHERE session_id=?),
+        stints AS (SELECT *, SUM(cut) OVER (ORDER BY n ROWS UNBOUNDED PRECEDING) AS stint FROM raw)
+      SELECT n, t, s1, s2, s3, ve, fuel, compound, pit, invalid, ignored, cond, SUM(pit=0 AND ignored=0 AND t>0) OVER (PARTITION BY stint) AS run
+      FROM stints ORDER BY n`, session.id),
+    // The pilot's best lap on this combo in each condition: a short stint keeps it.
+    all(env, `SELECT cond, MIN(t) AS best FROM (SELECT t, ${CONDITION_SQL} AS cond FROM combo_laps WHERE community_id=? AND track=? AND car=? AND user_id=?
+      AND pit=0 AND invalid=0 AND ignored=0 AND t>0) GROUP BY cond`, community.id, session.track, session.car, session.user_id)
   ]);
   // Every lap of the session and why it counts or not, the slow ones against the session's best kept lap.
   const best = Math.min(...list.filter(lap => !lap.pit && !lap.invalid && !lap.ignored && lap.t > 0).map(lap => lap.t));
-  const why = lap => lap.ignored ? 'ignored' : lap.pit ? 'pit' : lap.invalid ? 'invalid' : !(lap.t > 0) ? 'untimed' : lap.t > best * CLEAN_RATIO ? 'slow' : '';
+  const record = new Map(records.map(row => [row.cond, row.best]));
+  const why = lap => lap.ignored ? 'ignored' : lap.pit ? 'pit' : lap.invalid ? 'invalid' : !(lap.t > 0) ? 'untimed'
+    : lap.run < STINT_MIN && lap.t !== record.get(lap.cond) ? 'short' : lap.t > best * CLEAN_RATIO ? 'slow' : '';
   return {
     session:{id:session.id, userId:session.user_id, name:session.name || 'Ancien pilote', mine:session.user_id === userId, startedAt:session.started_at,
       track:session.track, car:session.car},

@@ -214,7 +214,7 @@ function zoneTable(legs, sides) {
 }
 
 // Every lap of the session looked at and whether it counts: its pilot takes a test lap out, or puts it back.
-const OUT = {'':'compté', slow:'trop lent', pit:'stand', invalid:'invalide', untimed:'sans chrono', ignored:'retiré'};
+const OUT = {'':'compté', slow:'trop lent', pit:'stand', invalid:'invalide', untimed:'sans chrono', ignored:'retiré', short:'relais court'};
 function lapList(side) {
   const list = side.data.list || [];
   if (!list.length) return '';
@@ -222,7 +222,7 @@ function lapList(side) {
   const action = lap => !mine ? '' : `<td><button type="button" class="cb-btn is-quiet an-ignore" data-ignore="${lap.n}" data-back="${lap.out === 'ignored' ? '1' : ''}">${lap.out === 'ignored' ? 'Remettre' : 'Retirer'}</button></td>`;
   const all = mine ? `<div class="cb-actions">${list.some(lap => lap.out !== 'ignored') ? '<button type="button" class="cb-btn is-quiet" data-ignore="all">Retirer toute la séance</button>' : ''}${list.some(lap => lap.out === 'ignored') ? '<button type="button" class="cb-btn is-quiet" data-ignore="all" data-back="1">Tout remettre</button>' : ''}</div>` : '';
   return `<details class="cb-card an-laps" data-fold="laps"${side.lapsOpen === false ? '' : ' open'}><summary>Tours de la séance<span>${counted} compté${counted > 1 ? 's' : ''} sur ${list.length}</span></summary>
-    <p class="cb-src">${mine ? 'Un tour de test ou pas roulé pour de vrai : retire-le, il reste enregistré mais ne compte plus dans les fiches ni dans l’analyse.' : 'Seul le pilote de la séance peut retirer ses tours.'}</p>
+    <p class="cb-src">${mine ? 'Un relais de moins de 3 tours chronométrés ne compte pas, sauf ton meilleur tour. Un autre tour de test ou pas roulé pour de vrai : retire-le, il reste enregistré mais ne compte plus dans les fiches ni dans l’analyse.' : 'Seul le pilote de la séance peut retirer ses tours.'}</p>
     <div class="cb-wrap"><table><thead><tr><th>Tour</th><th>Temps</th><th>S1</th><th>S2</th><th>S3</th><th>Énergie (%)</th><th>Carbu (L)</th><th>Gomme</th><th>État</th>${mine ? '<th></th>' : ''}</tr></thead>
     <tbody>${list.map(lap => `<tr class="${lap.out ? 'an-out' : ''}"><td>${lap.n}</td><td>${lapTime(lap.t)}</td><td>${fr(lap.s1, 3)}</td><td>${fr(lap.s2, 3)}</td><td>${fr(lap.s3, 3)}</td><td>${fr(lap.ve, 2)}</td><td>${fr(lap.fuel, 2)}</td><td>${esc(lap.compound || '')}</td><td>${OUT[lap.out] ?? esc(lap.out)}</td>${action(lap)}</tr>`).join('')}</tbody></table></div>${all}</details>`;
 }

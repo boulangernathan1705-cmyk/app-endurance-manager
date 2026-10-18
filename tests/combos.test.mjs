@@ -174,14 +174,15 @@ test('the sheet gives each pilot his own numbers, per condition and compound, fr
   assert.deepEqual(sheet.drivers.map(({name, color, me}) => [name, color, me]), [['Lucas', null, false], ['Nathan', '#b98cff', true]]);
   assert.deepEqual(sheet.sample, {laps:20, sessions:3, drivers:2, from:1_790_000_000_000, to:1_790_200_000_000});
   const dry = sheet.conditions.dry;
-  // Nathan: 8 laps, minus the out-lap, the in-lap and the out-lap of his stop, minus the slow lap.
+  // Nathan: 8 laps, minus the out-lap, the in-lap and the out-lap of his stop, minus the slow lap, minus lap 3: laps 2
+  // and 3 make a stint too short to count, which keeps only its best lap, his best.
   const nathanDry = dry.drivers.find(item => item.id === NATHAN);
-  assert.equal(nathanDry.laps, 4);
+  assert.equal(nathanDry.laps, 3);
   assert.equal(nathanDry.ve, 8.5);
   assert.equal(nathanDry.fuel, 6.97);
   assert.ok(nathanDry.slope > 0, 'laps get slower along the stint');
   assert.equal(dry.drivers.find(item => item.id === LUCAS).laps, 7);
-  assert.equal(dry.laps, 11);
+  assert.equal(dry.laps, 10);
   assert.deepEqual(Object.keys(dry.compounds), ['Medium']);
   assert.deepEqual(dry.compounds.Medium.drivers.find(item => item.id === NATHAN).wear, [1.8, 2.1, 1.4, 1.5]);
   assert.deepEqual(dry.compounds.Medium.drivers.find(item => item.id === NATHAN).temp, [92, 95, 89, 90]);
@@ -359,6 +360,31 @@ test('a pilot takes a test lap out of the sheet and puts it back; only he or an 
   assert.equal(await sheetLaps(), 4);
   assert.equal((await req('/api/combos/laps', 'PATCH', {session:'nope', laps:[1], ignored:true}, NATHAN)).status, 404);
   assert.equal((await req('/api/combos/laps', 'PATCH', {session:id, laps:[], ignored:true}, NATHAN)).status, 400);
+});
+
+test('a stint of fewer than 3 timed laps keeps only the pilot\'s best lap', async () => {
+  const {req, signIn, plugin} = harness();
+  signIn(NATHAN, 'Nathan', [TEAM_ROLE]);
+  const nathan = keyOf((await req('/api/combos/link', 'POST', {}, NATHAN)).data.code);
+  // As the plugin sends them: the untimed drive out of the garage is left out, so a stint can start on lap 2.
+  const sent = (at, numbers, times = {}) => {
+    const base = session({at, laps:Math.max(...numbers)});
+    return {...base, laps:base.laps.filter(lap => numbers.includes(lap.n)).map(lap => ({...lap, pit:false, t:times[lap.n] ?? lap.t}))};
+  };
+  await plugin('/api/combos/plugin/session', nathan, 'POST', sent(1_790_000_000_000, [2, 3, 4]));
+  // A lap to try things: alone, not the best, it does not count.
+  await plugin('/api/combos/plugin/session', nathan, 'POST', sent(1_790_100_000_000, [3], {3:211.3}));
+  // Three laps, back to the garage, two more: the second run is short, its best lap is his best and stays.
+  await plugin('/api/combos/plugin/session', nathan, 'POST', sent(1_790_200_000_000, [2, 3, 4, 8, 9], {8:206.8, 9:209}));
+  const query = `track=${encodeURIComponent(TRACK)}&car=${encodeURIComponent(CAR)}`;
+  const dry = (await req(`/api/combos/sheet?${query}`, 'GET', null, NATHAN)).data.conditions.dry.drivers[0];
+  assert.equal(dry.laps, 7, '3 + 3 + the best lap of the short run');
+  assert.equal(dry.best, 206.8);
+  const sessions = (await req(`/api/combos/analysis?${query}`, 'GET', null, NATHAN)).data.sessions;
+  const outs = async index => (await req(`/api/combos/analysis/session?id=${sessions[index].id}`, 'GET', null, NATHAN)).data.list.map(lap => lap.out);
+  assert.deepEqual(await outs(0), ['', '', '', '', 'short']);
+  assert.deepEqual(await outs(1), ['short']);
+  assert.deepEqual(await outs(2), ['', '', '']);
 });
 
 test('the plugin installer is handed out with the site written in and Windows line endings', async () => {
