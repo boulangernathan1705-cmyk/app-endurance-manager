@@ -249,6 +249,15 @@ function tyreRows(condition, compound) {
 
 const nameCell = (row, dot = false) => `<td class="cb-name" style="--dc:${esc(row.color)}">${dot ? '<span class="cb-dot"></span>' : ''}${esc(row.name)}${row.me ? ' (moi)' : ''}</td>`;
 const rowClass = row => row.crew ? ' class="cb-crew"' : '';
+// The best pilot of a column, in violet as on a timing screen: the lowest (or highest) value among the pilots shown,
+// two pilots at least and not all level; the crew row is never marked.
+function bestOf(rows, get, lower = true) {
+  const values = rows.filter(row => !row.crew).map(get).filter(known).map(Number);
+  if (values.length < 2 || Math.min(...values) === Math.max(...values)) return null;
+  return lower ? Math.min(...values) : Math.max(...values);
+}
+const isBest = (row, value, best) => !row.crew && known(value) && known(best) && Math.abs(Number(value) - best) < 1e-9;
+const cell = (row, value, best, html) => `<td${isBest(row, value, best) ? ' class="cb-best"' : ''}>${html}</td>`;
 const none = columns => `<tr><td colspan="${columns}" class="cb-empty">Aucun pilote affiché dans cette condition.</td></tr>`;
 const compareName = () => view.sheet.periods.events.find(item => item.id === view.compareEvent)?.name || '';
 
@@ -341,8 +350,9 @@ function conditions() {
 const ratio = row => known(row.ve) && row.ve > 0 && known(row.fuel) && row.fuel > 0 ? row.fuel / row.ve : null;
 
 function energy(rows) {
+  const bestVe = bestOf(rows, row => row.ve > 0 ? row.ve : null), bestFuel = bestOf(rows, row => row.fuel > 0 ? row.fuel : null);
   const table = `<thead><tr><th>Pilote</th><th>Tours</th><th>Énergie / tour (%)</th><th>Tours avec 100 %</th><th>Carbu / tour (L)</th><th title="Litres de carburant par % d'énergie virtuelle : le FUEL RATIO du menu des stands">Ratio carbu (L / %)</th></tr></thead><tbody>${rows.length ? rows.map(row =>
-    `<tr${rowClass(row)}>${nameCell(row)}<td>${row.laps}</td><td>${fr(row.ve)}${delta(row, 've', 2, ' %')}</td><td>${known(row.ve) && row.ve > 0 ? fr(100 / row.ve, 1) : '—'}</td><td>${fr(row.fuel)}</td><td>${fr(ratio(row))}</td></tr>`).join('') : none(6)}</tbody>`;
+    `<tr${rowClass(row)}>${nameCell(row)}<td>${row.laps}</td>${cell(row, row.ve, bestVe, `${fr(row.ve)}${delta(row, 've', 2, ' %')}`)}${cell(row, row.ve, bestVe, known(row.ve) && row.ve > 0 ? fr(100 / row.ve, 1) : '—')}${cell(row, row.fuel, bestFuel, fr(row.fuel))}<td>${fr(ratio(row))}</td></tr>`).join('') : none(6)}</tbody>`;
   // How much energy a lap may use for a stint of N laps, and which pilots stay under it.
   const pilots = rows.filter(row => !row.crew && known(row.ve) && row.ve > 0);
   const worst = pilots.length ? Math.max(...pilots.map(row => row.ve)) : null;
@@ -379,20 +389,28 @@ function tyres() {
 
 function tyreCards() {
   const rows = tyreRows(view.cond, view.compound);
-  return WHEELS.map((wheel, index) => `<div class="cb-tyre"><div class="cb-tyre-name">${wheel}</div><table class="cb-mini"><thead><tr><th></th><th><span class="cb-word">Usure </span>/ tour (%)</th><th><span class="cb-word">Usure </span>sur ${stintLaps()} t. (%)</th><th>Carcasse (°C)</th><th>Pression (kPa)</th><th>Frein (°C)</th></tr></thead><tbody>${rows.length ? rows.map(row =>
-    `<tr${rowClass(row)}>${nameCell(row, true)}<td>${fr(row.wear[index])}</td><td>${known(row.wear[index]) ? fr(row.wear[index] * stintLaps(), 1) : '—'}</td><td>${fr(row.temp[index], 0)}</td><td>${fr(row.kpa[index], 0)}</td><td>${fr(row.brake[index], 0)}</td></tr>`).join('') : none(6)}</tbody></table></div>`).join('');
+  // Least worn tyre at each corner; its tread left after the stint is the highest.
+  const best = [0, 1, 2, 3].map(index => bestOf(rows, row => row.wear[index]));
+  return WHEELS.map((wheel, index) => `<div class="cb-tyre"><div class="cb-tyre-name">${wheel}</div><table class="cb-mini"><thead><tr><th></th><th><span class="cb-word">Usure </span>/ tour (%)</th><th><span class="cb-word">Restant après ${stintLaps()} t.</span><span class="cb-short">Reste</span> (%)</th><th>Carcasse (°C)</th><th>Pression (kPa)</th><th>Frein (°C)</th></tr></thead><tbody>${rows.length ? rows.map(row =>
+    `<tr${rowClass(row)}>${nameCell(row, true)}${cell(row, row.wear[index], best[index], fr(row.wear[index]))}${cell(row, row.wear[index], best[index], known(row.wear[index]) ? fr(Math.max(0, 100 - row.wear[index] * stintLaps()), 1) : '—')}<td>${fr(row.temp[index], 0)}</td><td>${fr(row.kpa[index], 0)}</td><td>${fr(row.brake[index], 0)}</td></tr>`).join('') : none(6)}</tbody></table></div>`).join('');
 }
 
 function pace(rows) {
+  const top = {avg:bestOf(rows, row => row.avg), best:bestOf(rows, row => row.best), slope:bestOf(rows, row => row.slope)};
   const slope = value => known(value) ? `${value > 0 ? '+' : value < 0 ? '−' : ''}${fr(Math.abs(value), 3)}` : '—';
   const table = `<thead><tr><th>Pilote</th><th>Tours</th><th>Moyenne</th><th>Meilleur</th><th>Évolution / tour (s)</th></tr></thead><tbody>${rows.length ? rows.map(row =>
-    `<tr${rowClass(row)}>${nameCell(row)}<td>${row.laps}</td><td>${lapTime(row.avg)}${delta(row, 'avg', 2, ' s')}</td><td>${lapTime(row.best)}</td><td>${slope(row.slope)}</td></tr>`).join('') : none(5)}</tbody>`;
+    `<tr${rowClass(row)}>${nameCell(row)}<td>${row.laps}</td>${cell(row, row.avg, top.avg, `${lapTime(row.avg)}${delta(row, 'avg', 2, ' s')}`)}${cell(row, row.best, top.best, lapTime(row.best))}${cell(row, row.slope, top.slope, slope(row.slope))}</tr>`).join('') : none(5)}</tbody>`;
   // Sectors: the mean, with the best below; the ideal lap adds up the best three.
   const sectorRows = rows.filter(row => row.sectors);
   const seconds = value => known(value) ? fr(value, 3) : '—';
+  const idealOf = row => row.sectors.best.every(known) ? row.sectors.best.reduce((a, b) => a + b, 0) : null;
+  const topAvg = [0, 1, 2].map(index => bestOf(sectorRows, row => row.sectors.avg[index]));
+  const topBest = [0, 1, 2].map(index => bestOf(sectorRows, row => row.sectors.best[index]));
+  const topIdeal = bestOf(sectorRows, idealOf);
   const sectors = sectorRows.length ? `<div class="cb-wrap"><table><thead><tr><th>Pilote</th><th>Secteur 1</th><th>Secteur 2</th><th>Secteur 3</th><th>Tour idéal</th></tr></thead><tbody>${sectorRows.map(row => {
-    const ideal = row.sectors.best.every(known) ? row.sectors.best.reduce((a, b) => a + b, 0) : null;
-    return `<tr${rowClass(row)}>${nameCell(row)}${[0, 1, 2].map(index => `<td>${seconds(row.sectors.avg[index])}<span class="cb-sub"><span class="cb-word">meilleur </span>${seconds(row.sectors.best[index])}</span></td>`).join('')}<td>${lapTime(ideal)}<span class="cb-sub">sur ${row.sectors.laps} tours</span></td></tr>`;
+    const ideal = idealOf(row);
+    const sub = index => `<span class="cb-sub${isBest(row, row.sectors.best[index], topBest[index]) ? ' cb-best-sub' : ''}"><span class="cb-word">meilleur </span>${seconds(row.sectors.best[index])}</span>`;
+    return `<tr${rowClass(row)}>${nameCell(row)}${[0, 1, 2].map(index => cell(row, row.sectors.avg[index], topAvg[index], `${seconds(row.sectors.avg[index])}${sub(index)}`)).join('')}${cell(row, ideal, topIdeal, `${lapTime(ideal)}<span class="cb-sub"><span class="cb-word">sur </span>${row.sectors.laps} t<span class="cb-word">ours</span></span>`)}</tr>`;
   }).join('')}</tbody></table></div>` : '';
   return `<section><div class="cb-head"><h2>Rythme</h2></div><div class="cb-wrap"><table>${table}</table></div>
     <p class="cb-src">Évolution / tour : ce que le chrono gagne (−) ou perd (+) à chaque tour au fil d’un relais.</p>
@@ -521,7 +539,7 @@ function render() {
   app.innerHTML = `${header()}${message}${view.error ? `<p class="cb-message is-error">${esc(view.error)}</p>` : ''}${linked ? '' : linkCard()}
     ${toolbar()}${conditions()}
     <div class="cb-frame ${COND[view.cond][1]}"><span class="cb-tag">${COND[view.cond][0]}${view.moment ? ` · ${view.moment === 'night' ? 'nuit' : 'jour'}` : ''}</span><span class="cb-meta">${c.laps} tours${track}</span>
-      <p class="cb-src cb-rule">Tours comptés : chronométrés, valides, hors stands, à moins de 7 % du meilleur tour du pilote, dans un relais d’au moins 3 tours. Équipage = moyenne des pilotes affichés.</p>
+      <p class="cb-src cb-rule">Tours comptés : chronométrés, valides, hors stands, à moins de 7 % du meilleur tour du pilote, dans un relais d’au moins 3 tours. Équipage = moyenne des pilotes affichés. <span class="cb-best-key">En violet</span> : le meilleur pilote de la colonne.</p>
       ${c.laps ? `<div class="cb-pair">${energy(rows)}${pace(rows)}</div>${tyres()}` : `<p class="cb-empty">Pas encore de tour propre dans cette condition${view.moment ? (view.moment === 'night' ? ' de nuit' : ' de jour') : ''}${view.trackMin !== '' || view.trackMax !== '' ? ' avec cette température de piste' : ''}.</p>`}</div>
     ${pitStop()}${notes()}
     <div class="cb-foot">${periodsCard()}${linked ? linkCard() : ''}</div>`;
