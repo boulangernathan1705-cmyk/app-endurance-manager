@@ -139,7 +139,9 @@ tr.cb-crew td { font-weight: 700; background: var(--cb-panel2); }
 .cb-pill small { font-weight: 400; color: var(--muted); margin-left: 4px; }
 .cb-stint { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 14px; color: var(--muted); }
 .combos-page .cb-stint input { width: 72px; }
-.cb-tyres { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 400px), 1fr)); gap: 8px; }
+/* The four tyres as on the car: fronts above, rears below. */
+.cb-tyres { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+@media (max-width: 859px) { .cb-tyres { grid-template-columns: minmax(0, 1fr); } }
 .cb-tyre { background: var(--cb-panel); border: 1px solid var(--cb-line); border-radius: 6px; padding: 8px 4px 4px; display: grid; gap: 2px; min-width: 0; overflow: hidden; }
 .cb-tyre-name { font-size: 13px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); padding: 0 8px; }
 .combos-page .cb-mini { font-size: 13px; }
@@ -274,3 +276,24 @@ th.an-who { color: var(--dc) !important; }
 .an-laps > summary { cursor: pointer; font-weight: 600; display: flex; justify-content: space-between; gap: 10px; }
 .an-laps > summary span { color: var(--muted); font-weight: 400; font-size: 13px; }
 .an-laps .cb-src { margin: 0; }
+
+/* The sheet over the whole width: pilots and folded filters above it, energy and pace side by side when there is room. */
+.members-main.combos-page { width: min(1360px, calc(100% - 32px)); }
+.cb-toolbar { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 10px 16px; }
+.cb-toolbar .cb-drivers { flex: 1 1 auto; padding-top: 3px; }
+.cb-filterbox { flex: 0 1 auto; margin-left: auto; }
+.cb-filterbox[open] { flex: 1 1 100%; background: var(--cb-panel); border: 1px solid var(--cb-line); border-radius: 10px; }
+.cb-filterbox > summary { list-style: none; cursor: pointer; display: inline-flex; align-items: baseline; gap: 8px; padding: 7px 12px; border: 1px solid var(--cb-line); border-radius: 8px; background: var(--cb-panel); font-weight: 600; font-size: 14px; }
+.cb-filterbox[open] > summary { border: 0; background: none; display: flex; padding: 10px 14px 0; }
+.cb-filterbox > summary::-webkit-details-marker { display: none; }
+.cb-filterbox > summary::after { content: '▾'; color: var(--muted); font-size: 12px; }
+.cb-filterbox[open] > summary::after { content: '▴'; margin-left: auto; }
+.cb-filterbox > summary span { color: var(--muted); font-weight: 400; font-size: 12px; }
+.cb-filterbox-body { padding: 10px 14px 14px; display: grid; gap: 12px; }
+.cb-filterbox .cb-filters { grid-template-columns: repeat(auto-fill, minmax(min(100%, 150px), 1fr)); align-items: end; }
+.combos-page .cb-filterbox select, .combos-page .cb-filterbox input { height: 38px; min-height: 0; }
+.cb-pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 520px), 1fr)); gap: 24px 28px; align-items: start; }
+.cb-rule { margin: -12px 0 0; }
+.cb-names { display: flex; flex-wrap: wrap; gap: 2px 10px; }
+.cb-names span { color: var(--dc); font-weight: 600; font-size: 13px; }
+.combos-page .cb-stints th:last-child, .combos-page .cb-stints td:last-child { text-align: left; }
