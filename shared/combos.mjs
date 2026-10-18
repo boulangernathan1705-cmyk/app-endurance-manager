@@ -20,6 +20,9 @@ export const momentOf = light => light === null || light === undefined || light 
 // A lap counts on the sheet when it is timed, valid, away from the pits and within this ratio of the pilot's best
 // in the same condition (no lap behind a slower car, no spin).
 export const CLEAN_RATIO = 1.07;
+// A stint (laps between two stops) counts from this many timed laps: a lap or two out of the garage to try something
+// does not. Its lap stays when it is the pilot's best in that condition.
+export const STINT_MIN = 3;
 
 export const WHEELS = Object.freeze(['fl', 'fr', 'rl', 'rr']);
 export const MAX_LAPS = 600;
