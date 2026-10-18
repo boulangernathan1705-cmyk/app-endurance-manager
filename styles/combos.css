@@ -267,3 +267,10 @@ th.an-who { color: var(--dc) !important; }
 .an-size { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); }
 .combos-page .an-size select { width: auto; font-size: 13px; padding: 3px 6px; }
 .combos-page .cb-refresh { padding: 5px 10px; font-size: 13px; }
+.an-laps { display: grid; gap: 10px; }
+.an-laps tr.an-out td { color: var(--muted); }
+.combos-page .an-laps .cb-btn.an-ignore { padding: 2px 8px; min-height: 0; font-size: 12px; line-height: 1.3; }
+.combos-page .an-laps td { padding-top: 5px; padding-bottom: 5px; }
+.an-laps > summary { cursor: pointer; font-weight: 600; display: flex; justify-content: space-between; gap: 10px; }
+.an-laps > summary span { color: var(--muted); font-weight: 400; font-size: 13px; }
+.an-laps .cb-src { margin: 0; }

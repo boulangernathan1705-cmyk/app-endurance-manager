@@ -126,13 +126,13 @@ function periodInput(input, kind) {
 
 // ---------- The sheet ----------
 
-// Laps that count: timed, valid, away from the pits, within CLEAN_RATIO of the pilot's best in that condition, on
+// Laps that count: timed, valid, away from the pits, not taken out by their pilot, within CLEAN_RATIO of the pilot's best in that condition, on
 // the chosen setup, by day or by night, between two track temperatures (NULL: any). A stint is the run of laps between
 // two laps that touched the pits.
 const CLEAN = `WITH base AS (SELECT *, ${CONDITION_SQL} AS cond, SUM(pit) OVER (PARTITION BY session_id ORDER BY n ROWS UNBOUNDED PRECEDING) AS stint
     FROM combo_laps WHERE community_id=? AND track=? AND car=? AND started_at BETWEEN ? AND ? AND (? IS NULL OR setup=?)
       AND (? IS NULL OR (light IS NOT NULL AND (light<${NIGHT_BELOW})=(?='night'))) AND (? IS NULL OR track_temp>=?) AND (? IS NULL OR track_temp<=?)),
-  timed AS (SELECT * FROM base WHERE pit=0 AND invalid=0 AND t>0),
+  timed AS (SELECT * FROM base WHERE pit=0 AND invalid=0 AND ignored=0 AND t>0),
   best AS (SELECT user_id, cond, MIN(t) AS best FROM timed GROUP BY user_id, cond),
   clean AS (SELECT timed.* FROM timed JOIN best ON best.user_id=timed.user_id AND best.cond=timed.cond WHERE timed.t<=best.best*${CLEAN_RATIO})`;
 const wheelAverages = kind => WHEELS.map(wheel => `AVG(NULLIF(${kind}_${wheel},0)) AS ${kind}_${wheel}`).join(',');
@@ -159,7 +159,7 @@ export async function sheet(env, community, userId, combo, url, current = false)
     all(env, `${CLEAN} SELECT cond, COUNT(*) AS laps, MIN(track_temp) AS tmin, MAX(track_temp) AS tmax FROM clean GROUP BY cond`, ...lapScope),
     // Laps driven by day and by night in each condition, whatever the day/night choice: the sheet's day/night switch.
     all(env, `SELECT ${CONDITION_SQL} AS cond, SUM(light>=${NIGHT_BELOW}) AS day, SUM(light<${NIGHT_BELOW}) AS night FROM combo_laps
-      WHERE ${where} AND pit=0 AND t>0 GROUP BY cond`, ...scope),
+      WHERE ${where} AND pit=0 AND ignored=0 AND t>0 GROUP BY cond`, ...scope),
     // The setups driven in the period, whichever is chosen: the sheet's setup filter.
     all(env, `SELECT setup, COUNT(*) AS laps, json_group_array(DISTINCT user_id) AS drivers, MAX(started_at) AS last FROM combo_laps
       WHERE ${where} AND setup<>'' GROUP BY setup ORDER BY last DESC LIMIT 50`, ...scope),
@@ -224,7 +224,7 @@ export async function sheet(env, community, userId, combo, url, current = false)
 async function analysisList(env, community, userId, combo) {
   const rows = await all(env, `SELECT s.id, s.user_id, s.started_at, s.lap_count, s.expert IS NOT NULL AS expert, t.lap, t.lap_time,
       COALESCE(NULLIF(m.nickname,''), u.name) AS name, c.color,
-      (SELECT MIN(l.t) FROM combo_laps l WHERE l.session_id=s.id AND l.pit=0 AND l.invalid=0 AND l.t>0) AS best
+      (SELECT MIN(l.t) FROM combo_laps l WHERE l.session_id=s.id AND l.pit=0 AND l.invalid=0 AND l.ignored=0 AND l.t>0) AS best
     FROM combo_sessions s LEFT JOIN combo_traces t ON t.session_id=s.id LEFT JOIN users u ON u.id=s.user_id
     LEFT JOIN memberships m ON m.user_id=s.user_id AND m.community_id=s.community_id LEFT JOIN combo_colors c ON c.user_id=s.user_id AND c.community_id=s.community_id
     WHERE s.community_id=? AND s.track=? AND s.car=? ORDER BY s.started_at DESC LIMIT 300`, community.id, combo.track, combo.car);
@@ -238,19 +238,24 @@ async function analysisSession(env, community, userId, sessionId) {
     LEFT JOIN users u ON u.id=s.user_id LEFT JOIN memberships m ON m.user_id=s.user_id AND m.community_id=s.community_id
     WHERE s.id=? AND s.community_id=?`).bind(String(sessionId || ''), community.id).first();
   if (!session) notFound();
-  // Clean laps as on the sheet: timed, valid, away from the pits, within CLEAN_RATIO of the session's best.
-  const [laps, trace] = await Promise.all([
-    env.DB.prepare(`WITH timed AS (SELECT * FROM combo_laps WHERE session_id=? AND pit=0 AND invalid=0 AND t>0),
+  // Clean laps as on the sheet: timed, valid, away from the pits, kept, within CLEAN_RATIO of the session's best.
+  const [laps, trace, list] = await Promise.all([
+    env.DB.prepare(`WITH timed AS (SELECT * FROM combo_laps WHERE session_id=? AND pit=0 AND invalid=0 AND ignored=0 AND t>0),
         clean AS (SELECT * FROM timed WHERE t<=(SELECT MIN(t) FROM timed)*${CLEAN_RATIO})
       SELECT COUNT(*) AS laps, MIN(t) AS best, AVG(t) AS avg, MAX(t)-MIN(t) AS spread, AVG(NULLIF(fuel,0)) AS fuel, AVG(NULLIF(ve,0)) AS ve,
         (SELECT MAX(top) FROM combo_laps WHERE session_id=?) AS top, ${wheelAverages('wear')} FROM clean`).bind(session.id, session.id).first(),
-    env.DB.prepare('SELECT lap, lap_time, data FROM combo_traces WHERE session_id=?').bind(session.id).first()
+    env.DB.prepare('SELECT lap, lap_time, data FROM combo_traces WHERE session_id=?').bind(session.id).first(),
+    all(env, 'SELECT n, t, s1, s2, s3, ve, fuel, compound, pit, invalid, ignored FROM combo_laps WHERE session_id=? ORDER BY n', session.id)
   ]);
+  // Every lap of the session and why it counts or not, the slow ones against the session's best kept lap.
+  const best = Math.min(...list.filter(lap => !lap.pit && !lap.invalid && !lap.ignored && lap.t > 0).map(lap => lap.t));
+  const why = lap => lap.ignored ? 'ignored' : lap.pit ? 'pit' : lap.invalid ? 'invalid' : !(lap.t > 0) ? 'untimed' : lap.t > best * CLEAN_RATIO ? 'slow' : '';
   return {
     session:{id:session.id, userId:session.user_id, name:session.name || 'Ancien pilote', mine:session.user_id === userId, startedAt:session.started_at,
       track:session.track, car:session.car},
     laps:{count:laps?.laps || 0, best:round(laps?.best ?? null), avg:round(laps?.avg ?? null), spread:round(laps?.spread ?? null), fuel:round(laps?.fuel ?? null),
       ve:round(laps?.ve ?? null), top:round(laps?.top ?? null, 1), wear:laps ? wheels(laps, 'wear', 3) : [null, null, null, null]},
+    list:list.map(lap => ({n:lap.n, t:lap.t > 0 ? lap.t : null, s1:lap.s1, s2:lap.s2, s3:lap.s3, ve:lap.ve, fuel:lap.fuel, compound:lap.compound, out:why(lap)})),
     expert:parsed(session.expert),
     trace:trace ? {...parsed(trace.data), lap:trace.lap, lapTime:trace.lap_time} : null
   };
@@ -281,7 +286,7 @@ async function exportPage(env, community, combo, url) {
     driver:row.driver, capacity:row.capacity, service:parsed(row.service), game:parsed(row.game), expert:parsed(row.expert),
     laps:laps.filter(lap => lap.session_id === row.id).map(lap => ({n:lap.n, t:lap.t, s1:lap.s1, s2:lap.s2, s3:lap.s3, fuel:lap.fuel, ve:lap.ve, wear:four(lap, 'wear'), temp:four(lap, 'temp'),
       kpa:four(lap, 'kpa'), brake:four(lap, 'brake'), compound:lap.compound, track:lap.track_temp, air:lap.air_temp, rain:lap.rain, wet:lap.wet, top:lap.top,
-      invalid:lap.invalid === 1, pit:lap.pit === 1, setup:lap.setup, light:lap.light})),
+      invalid:lap.invalid === 1, pit:lap.pit === 1, ignored:lap.ignored === 1, setup:lap.setup, light:lap.light})),
     stops:stops.filter(stop => stop.session_id === row.id).map(stop => ({lap:stop.lap, lane:stop.lane, stopped:stop.stopped, fuel:stop.fuel, ve:stop.ve,
       tyres:stop.tyres, repair:stop.repair === 1}))}));
   const last = page.at(-1);
@@ -397,6 +402,19 @@ export async function combosApi(path, method, request, env, actor, community) {
       await env.DB.prepare('DELETE FROM combo_periods WHERE id=?').bind(row.id).run();
       return json({ok:true});
     }
+  }
+
+  // A pilot takes his own laps out of the sheet, or puts them back (a test lap, a lap not driven for real); an admin too.
+  if (path === '/api/combos/laps' && method === 'PATCH') {
+    const input = await body(request);
+    const row = await env.DB.prepare('SELECT id, user_id FROM combo_sessions WHERE id=? AND community_id=?').bind(String(input.session ?? ''), community.id).first();
+    if (!row) fail(404, 'Séance introuvable.');
+    if (row.user_id !== userId) requirePermission(actor, 'admin', 'Seul le pilote de la séance ou un administrateur peut retirer ses tours.');
+    const laps = Array.isArray(input.laps) ? input.laps.map(Number).filter(Number.isInteger).slice(0, 2000) : [];
+    if (!laps.length) fail(400, 'Aucun tour choisi.');
+    await env.DB.prepare('UPDATE combo_laps SET ignored=? WHERE session_id=? AND n IN (SELECT value FROM json_each(?))')
+      .bind(input.ignored ? 1 : 0, row.id, JSON.stringify(laps)).run();
+    return json({ok:true});
   }
 
   // Notes: anyone of the team writes; the author or an admin changes or removes.
