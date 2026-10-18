@@ -192,8 +192,8 @@ test('the sheet gives each pilot his own numbers, per condition and compound, fr
 });
 
 test('each lap keeps its sectors and setup: the sheet gives each pilot\'s sectors and narrows to one setup', async () => {
-  const clean = cleanSession({...session({at:1_790_000_000_000}), laps:[{n:1, t:200, s1:60, s2:80, s3:60, setup:' Course\u0007 v2 '}, {n:2, t:200, s1:60, s2:80}]});
-  assert.deepEqual(clean.laps.map(({s1, s2, s3, setup}) => [s1, s2, s3, setup]), [[60, 80, 60, 'Course v2'], [null, null, null, '']], 'all three sectors or none');
+  const clean = cleanSession({...session({at:1_790_000_000_000}), laps:[{n:1, t:200, s1:60, s2:80, s3:60, setup:' Course\u0007 v2 '}, {n:2, t:200, s1:60, s2:80}, {n:3, t:200, setup:'Lemans\\HYMO 1.4.1 9X8EVO LM ER'}]});
+  assert.deepEqual(clean.laps.map(({s1, s2, s3, setup}) => [s1, s2, s3, setup]), [[60, 80, 60, 'Course v2'], [null, null, null, ''], [null, null, null, 'HYMO 1.4.1 9X8EVO LM ER']], 'all three sectors or none, the setup without its folder');
 
   const {req, signIn, plugin} = harness();
   signIn(NATHAN, 'Nathan', [TEAM_ROLE]);

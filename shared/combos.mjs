@@ -41,6 +41,9 @@ export function cleanGame(input) {
   return Object.values(out).some(value => value !== null) ? out : null;
 }
 
+// LMU names a setup with its track folder (« Lemans\HYMO 1.4.1 9X8EVO LM ER »): the sheet is already per track.
+const setupName = value => label(String(value ?? '').split(/[\\/]/).pop(), SETUP_MAX);
+
 // The three sectors of a lap (seconds), all or none.
 function sectors(lap) {
   const values = [lap?.s1, lap?.s2, lap?.s3].map(value => finite(value, 0.5, 1800));
@@ -59,7 +62,7 @@ export function cleanSession(input) {
     fuel:finite(lap?.fuel, 0, 200), ve:finite(lap?.ve, 0, 100), wear:four(lap?.wear, 0, 100), temp:four(lap?.temp, -50, 250),
     brake:four(lap?.brake, -50, 1500), kpa:four(lap?.kpa, 0, 1000), compound:label(lap?.compound, 40), track:finite(lap?.track, -30, 80),
     air:finite(lap?.air, -30, 60), rain:finite(lap?.rain, 0, 1), wet:finite(lap?.wet, 0, 1), invalid:lap?.invalid === true, pit:lap?.pit === true,
-    setup:label(lap?.setup, SETUP_MAX)}))
+    setup:setupName(lap?.setup)}))
     // A lap LMU counted without a time still tells its fuel and tyres; the same lap number twice is kept once.
     .filter(lap => lap.n !== null && !seen.has(lap.n) && seen.add(lap.n) && (lap.t || lap.fuel || lap.ve || lap.wear.some(value => value > 0)));
   if (!laps.length) throw Error('Aucun tour roulé dans cette séance.');
