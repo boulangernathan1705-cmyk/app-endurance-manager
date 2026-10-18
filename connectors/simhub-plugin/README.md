@@ -6,7 +6,7 @@ Envoie les séances Le Mans Ultimate d'un pilote aux fiches combo de son équipe
 - lit la mémoire partagée de LMU (`LMU_Data`) pendant que le pilote roule : usure, températures et pressions des
   pneus, gomme, freins, vitesse max, carburant en litres, énergie virtuelle, température de piste, pluie et humidité
   de la trajectoire, arrêts aux stands décomposés (`Live.cs`) ;
-- lit l'API locale du jeu (`http://localhost:6397`, en lecture seule, toutes les 30 s en piste) : temps de service de
+- lit l'API locale du jeu (`http://localhost:6397`, en lecture seule, voiture arrêtée aux stands) : temps de service de
   la voiture (`RepairAndRefuel` › `pitStopTimes`), prévision de conso et température idéale de la gomme
   (`TireManagement`), envoyés avec la séance (`service`, `game`, `LmuApi.cs`) ;
 - garde chaque séance en fichier jusqu'à ce que le site l'ait reçue (`Sync.cs`).
