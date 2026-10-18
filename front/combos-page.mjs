@@ -2,6 +2,7 @@
 // track, sent by each pilot's SimHub plugin. Raw numbers only, no advice: each pilot in his colour, the white
 // « Équipage » row is the plain mean of the pilots shown (each counts once). Conditions are framed blocks.
 import {COLORS, CONDITIONS, installerFor} from '../shared/combos.mjs';
+import {analysisBody, distanceUnder, prepare, showCursor} from './combos-analysis.mjs?v=1';
 
 const app = document.getElementById('combos-app');
 const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
@@ -21,7 +22,9 @@ const view = {
   combos:[], combo:null, sheet:null, compare:null, link:null, code:'', copied:false, linkBusy:false,
   event:'', version:'', setup:'', moment:'', trackMin:'', trackMax:'', compareEvent:'', cond:null, compound:null, stint:12, hidden:new Set(),
   pit:{before:8, after:100, tyres:4, pressure:false, driver:true, wing:'', frontWing:'', radiator:false, brakes:false, repair:''}, pitOpen:false, periodsOpen:false, linkOpen:null,
-  editing:null, message:'', error:''
+  editing:null, message:'', error:'',
+  // « Mon analyse »: the combo's sessions, the one looked at and the one it is compared with, the map's colouring.
+  tab:'sheet', analysis:{list:null, key:'', mine:'', other:'', metric:'speed', pick:0, sessions:new Map(), loading:false, error:''}
 };
 try { view.hidden = new Set(JSON.parse(localStorage.getItem(STORE) || '[]')); } catch {}
 const saveHidden = () => { try { localStorage.setItem(STORE, JSON.stringify([...view.hidden])); } catch {} };
@@ -62,6 +65,7 @@ async function start() {
   view.event = params.get('event') || ''; view.version = params.get('version') || ''; view.setup = params.get('setup') || '';
   view.moment = ['day', 'night'].includes(params.get('moment')) ? params.get('moment') : '';
   view.trackMin = params.get('tmin') || ''; view.trackMax = params.get('tmax') || '';
+  if (params.get('tab') === 'analyse') view.tab = 'analysis';
   try {
     // The plugin build this site hands out, when there is one (scripts/build.mjs).
     const plugin = fetch('/downloads/simhub/plugin.json', {cache:'no-store'}).then(response => response.ok ? response.json() : null).catch(() => null);
@@ -87,10 +91,88 @@ async function loadSheet() {
     // A condition left empty by the day/night or track temperature choice stays chosen: its frame says why it is empty.
     const narrowed = view.moment || view.trackMin !== '' || view.trackMax !== '';
     if (!view.cond || (!narrowed && !conditions[view.cond]?.laps)) view.cond = CONDITIONS.find(cond => conditions[cond].laps) || 'dry';
-    const query = sheetQuery();
-    history.replaceState(null, '', `${location.pathname}?${query}`);
+    remember();
   }
+  if (view.tab === 'analysis') await loadAnalysis(); else render();
+}
+
+function remember() {
+  const query = sheetQuery();
+  if (view.tab === 'analysis') query.set('tab', 'analyse');
+  history.replaceState(null, '', `${location.pathname}?${query}`);
+}
+
+// ---------- « Mon analyse » ----------
+
+// The combo's sessions once, then the two looked at (each kept once loaded: a trace weighs a few hundred kB).
+async function loadAnalysis() {
+  const a = view.analysis, key = comboKey(view.combo);
+  try {
+    if (a.key !== key) {
+      Object.assign(a, {list:null, key, mine:'', other:'', sessions:new Map()});
+      a.list = (await call(`/api/combos/analysis?${new URLSearchParams({track:view.combo.track, car:view.combo.car})}`)).sessions;
+    }
+    const list = a.list;
+    const useful = item => item.trace || item.expert;
+    if (!list.some(item => item.id === a.mine)) a.mine = (list.find(item => item.mine && useful(item)) || list.find(item => item.mine) || list.find(useful) || list[0])?.id || '';
+    const mine = list.find(item => item.id === a.mine);
+    // Compared by default with the fastest traced lap of a teammate.
+    if (a.other !== 'none' && !list.some(item => item.id === a.other && item.id !== a.mine)) {
+      const others = list.filter(item => item.trace && item.userId !== mine?.userId).sort((x, y) => x.trace.time - y.trace.time);
+      a.other = others[0]?.id || 'none';
+    }
+    a.loading = true; render();
+    await Promise.all([a.mine, a.other].filter(id => id && id !== 'none' && !a.sessions.has(id)).map(async id => a.sessions.set(id, await call(`/api/combos/analysis/session?id=${encodeURIComponent(id)}`))));
+    a.error = '';
+  } catch (error) {
+    if (error.status === 401 || error.status === 403) { renderError(error); return; }
+    a.error = error.message;
+  }
+  a.loading = false;
   render();
+}
+
+// Each pilot in his sheet colour; a second session of the same pilot in white.
+const prepared = new WeakMap();
+const traceOf = data => { if (!prepared.has(data)) prepared.set(data, prepare(data.trace)); return prepared.get(data); };
+function analysisSides() {
+  const a = view.analysis, colour = people();
+  const side = (id, fallback) => {
+    const data = a.sessions.get(id), item = a.list?.find(entry => entry.id === id);
+    if (!data || !item) return null;
+    const color = colour.get(item.userId)?.color || item.color || fallback;
+    return {data, item, trace:traceOf(data), color, label:`${item.name}${item.mine ? ' (moi)' : ''} · ${dayTime(item.startedAt)}`, short:item.name};
+  };
+  const mine = side(a.mine, COLORS[0]);
+  let other = a.other !== 'none' ? side(a.other, COLORS[1]) : null;
+  if (mine && other && other.item.userId === mine.item.userId) other = {...other, color:'#f0f3f2', short:`${other.short} (${dayTime(other.item.startedAt)})`};
+  return mine ? [mine, ...(other ? [other] : [])] : [];
+}
+
+function analysisChoices() {
+  const a = view.analysis, list = a.list || [];
+  const label = item => `${dayTime(item.startedAt)} · ${item.laps} tours · ${lapTime(item.best)}${item.trace ? '' : ' · sans tracé'}`;
+  const option = (item, current, withName) => `<option value="${esc(item.id)}"${item.id === current ? ' selected' : ''}>${withName ? `${esc(item.name)} · ` : ''}${esc(label(item))}</option>`;
+  const mineList = list.filter(item => item.mine);
+  const mine = list.find(item => item.id === a.mine);
+  const teammates = list.filter(item => item.trace && item.userId !== mine?.userId).sort((x, y) => x.trace.time - y.trace.time);
+  const own = list.filter(item => item.trace && item.userId === mine?.userId && item.id !== a.mine);
+  return `<div class="an-choices">
+    <label>Séance<select data-field="an-mine">${mineList.length ? `<optgroup label="Mes séances">${mineList.map(item => option(item, a.mine)).join('')}</optgroup>` : ''}
+      ${list.some(item => !item.mine) ? `<optgroup label="${mineList.length ? 'Coéquipiers' : 'Séances de l’équipe'}">${list.filter(item => !item.mine).map(item => option(item, a.mine, true)).join('')}</optgroup>` : ''}</select></label>
+    <label>Comparer avec<select data-field="an-other"><option value="none"${a.other === 'none' ? ' selected' : ''}>Personne</option>
+      ${teammates.length ? `<optgroup label="Coéquipiers, meilleur tour tracé">${teammates.map(item => option(item, a.other, true)).join('')}</optgroup>` : ''}
+      ${own.length ? `<optgroup label="Autres séances du même pilote">${own.map(item => option(item, a.other, true)).join('')}</optgroup>` : ''}</select></label></div>`;
+}
+
+function analysis() {
+  const a = view.analysis;
+  if (a.error) return `<p class="cb-message is-error">${esc(a.error)}</p>`;
+  if (!a.list) return '<p class="cb-empty">Chargement…</p>';
+  if (!a.list.length) return '<p class="cb-empty">Aucune séance sur ce combo pour l’instant.</p>';
+  const sides = analysisSides();
+  const body = sides.length ? analysisBody(sides, a.metric, a.pick) : '<p class="cb-empty">Chargement…</p>';
+  return `${analysisChoices()}<div class="an-body${a.loading ? ' is-loading' : ''}">${body}</div>`;
 }
 
 // Each pilot's colour: his own choice, else the first colour nobody took, in the order of the sheet.
@@ -173,7 +255,8 @@ function header() {
   const sheet = view.sheet, combo = view.combo;
   const choices = view.combos.length > 1 ? `<label class="cb-crumb">Combo <select data-field="combo">${view.combos.map(item => `<option value="${esc(comboKey(item))}"${comboKey(item) === comboKey(combo) ? ' selected' : ''}>${esc(item.car)} · ${esc(item.track)}</option>`).join('')}</select></label>` : '';
   return `<div class="cb-topline"><div><div class="cb-crumb">Fiches combo · Le Mans Ultimate${sheet?.combo.carClass ? ` · ${esc(sheet.combo.carClass)}` : ''}</div><h1>${esc(combo.car)} · ${esc(combo.track)}</h1>${sheet ? sample() : ''}</div>
-    <div class="cb-actions">${choices}<button type="button" class="cb-btn" data-action="export">Exporter la fiche</button></div></div>`;
+    <div class="cb-actions">${choices}${view.tab === 'sheet' ? '<button type="button" class="cb-btn" data-action="export">Exporter la fiche</button>' : ''}</div></div>
+    <nav class="cb-tabs" aria-label="Vue">${[['sheet', 'Fiche de l’équipe'], ['analysis', 'Mon analyse']].map(([tab, label]) => `<button type="button" data-tab="${tab}" aria-pressed="${tab === view.tab}">${label}</button>`).join('')}</nav>`;
 }
 
 function filters() {
@@ -370,11 +453,15 @@ function render() {
     app.innerHTML = `${header()}${message}<p class="cb-message is-error">${esc(view.error || 'Fiche indisponible.')}</p>${linkCard()}`;
     return;
   }
+  const linked = Boolean(view.link?.linked);
+  if (view.tab === 'analysis') {
+    app.innerHTML = `${header()}${message}${linked ? '' : linkCard()}${analysis()}`;
+    return;
+  }
   const rows = paceRows(view.cond);
   const c = view.sheet.conditions[view.cond];
   const track = c.trackTemp ? ` · piste ${fr(c.trackTemp[0], 0)} à ${fr(c.trackTemp[1], 0)} °C` : '';
   // Linked, the SimHub block goes to the foot of the page; not yet, it leads.
-  const linked = Boolean(view.link?.linked);
   view.sideOpen ??= matchMedia('(min-width: 1000px)').matches;
   app.innerHTML = `${header()}${message}${view.error ? `<p class="cb-message is-error">${esc(view.error)}</p>` : ''}${linked ? '' : linkCard()}
     <div class="cb-layout"><details class="cb-side" data-fold="side"${view.sideOpen ? ' open' : ''}><summary>Filtres et pilotes<span>${esc(activeFilters())}</span></summary><div class="cb-side-body">${filters()}${drivers()}</div></details>
@@ -464,6 +551,13 @@ app.addEventListener('click', async event => {
     saveHidden(); render(); return;
   }
   if (target.dataset.cond) { view.cond = target.dataset.cond; render(); return; }
+  if (target.dataset.tab) {
+    view.tab = target.dataset.tab; remember();
+    if (view.tab === 'analysis') await loadAnalysis(); else render();
+    return;
+  }
+  if (target.dataset.metric) { view.analysis.metric = target.dataset.metric; render(); return; }
+  if (target.dataset.pick) { view.analysis.pick = Number(target.dataset.pick); render(); return; }
   if (target.dataset.compound) { view.compound = target.dataset.compound; render(); return; }
   if (target.dataset.moment !== undefined) { view.moment = target.dataset.moment; await loadSheet(); return; }
   if (target.dataset.color) {
@@ -497,6 +591,10 @@ app.addEventListener('click', async event => {
 
 app.addEventListener('change', async event => {
   const field = event.target.dataset.field;
+  if (field === 'an-mine' || field === 'an-other') {
+    view.analysis[field === 'an-mine' ? 'mine' : 'other'] = event.target.value;
+    await loadAnalysis(); return;
+  }
   if (field === 'combo') {
     view.combo = view.combos.find(item => comboKey(item) === event.target.value) || view.combo;
     view.setup = ''; view.compareEvent = ''; view.cond = null; view.compound = null;
@@ -540,6 +638,13 @@ app.addEventListener('input', event => {
   if (after && Number(after.value) !== view.pit.after) after.value = view.pit.after;
   app.querySelector('[data-pit-result]').innerHTML = pitResult();
   app.querySelector('[data-pit-summary]').textContent = pitSummary();
+});
+
+// « Mon analyse »: the point under the pointer, on the map and along the lap.
+app.addEventListener('pointermove', event => {
+  if (view.tab !== 'analysis' || !event.target.closest?.('[data-chart], [data-map]')) return;
+  const sides = analysisSides(), d = distanceUnder(event, sides);
+  if (d !== null) showCursor(app, sides, d);
 });
 
 // The folds keep their state when the page is drawn again.

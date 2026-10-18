@@ -5,7 +5,7 @@ import {readFileSync, readdirSync} from 'node:fs';
 import {createHash} from 'node:crypto';
 import worker from '../server/worker.mjs';
 import {linkTestServer, setMember, ORGA_ROLE, DEV_COMMUNITY} from './fixtures/discord-server.mjs';
-import {cleanSession, cleanService, conditionOf, installerFor, LINK_PREFIX} from '../shared/combos.mjs';
+import {cleanSession, cleanService, cleanTrace, conditionOf, installerFor, LINK_PREFIX} from '../shared/combos.mjs';
 
 const ROOT = 'https://site.example';
 const MANAGER = '111111111111111111', NATHAN = '222222222222222222', LUCAS = '333333333333333333', GUEST = '444444444444444444';
@@ -263,6 +263,62 @@ test('the sheet tells day laps from night laps and narrows to a track temperatur
 
   const exported = (await req(`/api/combos/export?track=${encodeURIComponent(TRACK)}&car=${encodeURIComponent(CAR)}`, 'GET', null, NATHAN)).data;
   assert.deepEqual(exported.sessions.map(item => item.laps[1].light), [0.93, 0.08, null]);
+});
+
+// A best lap point by point, as the plugin sends it: `points` samples, `speed` km/h all the way.
+function trace(n, t, points = 100, speed = 200) {
+  const list = (f) => Array.from({length:points}, (_, i) => f(i));
+  return {n, t, time:list(i => i * t / points), dist:list(i => i * 40), x:list(i => Math.cos(i / points * 6.28) * 600), z:list(i => Math.sin(i / points * 6.28) * 600),
+    speed:list(() => speed), throttle:list(() => 1), brake:list(() => 0), steer:list(() => 0), gear:list(() => 6), rideF:list(() => 30), rideR:list(() => 45),
+    temp:[0, 1, 2, 3].map(() => list(() => 90)), slip:[0, 1, 2, 3].map(() => list(() => 0))};
+}
+const EXPERT = {samples:3000, tyreTemp:[88, 91, 86, 87], tyreTempMax:[104, 109, 99, 101], kpa:[171, 172, 166, 167], kpaMax:[176, 178, 170, 171], spread:[6, 5, 4, 3],
+  spreadMin:[1, 0, 0, -1], brake:[420, 431, 360, 352], brakeMax:[812, 826, 690, 675], ride:[31, 32, 45, 46], rideMin:[18, 19, 33, 34], tyreLeft:[84, 83, 88, 89],
+  oil:98, oilMax:104, water:84, waterMax:89};
+
+test('a lap trace is kept only whole: every measure as long as the clock, within bounds', () => {
+  assert.equal(cleanTrace(trace(5, 210)).speed.length, 100);
+  assert.equal(cleanTrace({...trace(5, 210), speed:[1, 2, 3]}), null);
+  assert.equal(cleanTrace({...trace(5, 210), slip:[[0]]}), null);
+  assert.equal(cleanTrace(trace(5, 210, 20)), null, 'too short to be a lap');
+  assert.equal(cleanTrace({...trace(5, 210), speed:Array(100).fill(900)}).speed[0], 0, 'an impossible speed is not kept');
+});
+
+test('« Mon analyse »: each session wheel by wheel and its best lap on the map, for the whole team', async () => {
+  const {req, signIn, plugin} = harness();
+  signIn(NATHAN, 'Nathan', [TEAM_ROLE]);
+  signIn(LUCAS, 'Lucas', [TEAM_ROLE]);
+  const nathan = keyOf((await req('/api/combos/link', 'POST', {}, NATHAN)).data.code);
+  const lucas = keyOf((await req('/api/combos/link', 'POST', {}, LUCAS)).data.code);
+  await plugin('/api/combos/plugin/session', nathan, 'POST', {...session({at:1_790_000_000_000}), expert:EXPERT, trace:trace(5, 210.2)});
+  await plugin('/api/combos/plugin/session', lucas, 'POST', {...session({at:1_790_100_000_000, t:209}), trace:trace(4, 209.1, 120, 210)});
+  // An older plugin: no measures, no trace.
+  await plugin('/api/combos/plugin/session', lucas, 'POST', session({at:1_790_200_000_000}));
+
+  const query = `track=${encodeURIComponent(TRACK)}&car=${encodeURIComponent(CAR)}`;
+  const list = (await req(`/api/combos/analysis?${query}`, 'GET', null, NATHAN)).data.sessions;
+  assert.deepEqual(list.map(item => [item.name, item.mine, item.expert, item.trace]),
+    [['Lucas', false, false, null], ['Lucas', false, false, {lap:4, time:209.1}], ['Nathan', true, true, {lap:5, time:210.2}]]);
+
+  const mine = (await req(`/api/combos/analysis/session?id=${list[2].id}`, 'GET', null, NATHAN)).data;
+  assert.equal(mine.session.name, 'Nathan');
+  assert.deepEqual(mine.expert.tyreTemp, [88, 91, 86, 87]);
+  assert.equal(mine.expert.oilMax, 104);
+  assert.equal(mine.laps.count, 7);
+  assert.equal(mine.trace.lap, 5);
+  assert.equal(mine.trace.lapTime, 210.2);
+  assert.equal(mine.trace.time.length, 100);
+  assert.equal(mine.trace.dist[99], 3960);
+  // A teammate's session opens too: the comparison is the point.
+  const his = (await req(`/api/combos/analysis/session?id=${list[1].id}`, 'GET', null, NATHAN)).data;
+  assert.equal(his.expert, null);
+  assert.equal(his.trace.speed[0], 210);
+  assert.equal((await req('/api/combos/analysis/session?id=nope', 'GET', null, NATHAN)).status, 404);
+  assert.equal((await req(`/api/combos/analysis?${query}`, 'GET', null, null)).status, 401);
+  // The export carries the measures; a session sent twice keeps one trace.
+  const exported = (await req(`/api/combos/export?${query}`, 'GET', null, NATHAN)).data;
+  assert.deepEqual(exported.sessions.find(item => item.pilot === 'Nathan').expert.kpaMax, [176, 178, 170, 171]);
+  assert.equal((await plugin('/api/combos/plugin/session', nathan, 'POST', {...session({at:1_790_000_000_000}), expert:EXPERT, trace:trace(5, 210.2)})).data.created, false);
 });
 
 test('the plugin installer is handed out with the site written in and Windows line endings', async () => {

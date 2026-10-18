@@ -65,14 +65,19 @@ export async function saveSession(env, link, input) {
   if (await env.DB.prepare('SELECT 1 FROM combo_sessions WHERE user_id=? AND fingerprint=?').bind(link.user_id, fingerprint).first()) return {...result, created:false};
   const sessionId = id();
   const scope = [sessionId, link.community_id, link.user_id, session.track, session.car, session.at];
-  const statements = [env.DB.prepare(`INSERT INTO combo_sessions(id,community_id,user_id,fingerprint,started_at,track,car,car_class,driver,capacity,service,game,lap_count,received_at)
-    VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).bind(sessionId, link.community_id, link.user_id, fingerprint, session.at, session.track, session.car,
+  const statements = [env.DB.prepare(`INSERT INTO combo_sessions(id,community_id,user_id,fingerprint,started_at,track,car,car_class,driver,capacity,service,game,expert,lap_count,received_at)
+    VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).bind(sessionId, link.community_id, link.user_id, fingerprint, session.at, session.track, session.car,
     session.carClass, session.driver, session.capacity, session.service && JSON.stringify(session.service), session.game && JSON.stringify(session.game),
-    session.laps.length, now())];
+    session.expert && JSON.stringify(session.expert), session.laps.length, now())];
   for (const lap of session.laps) statements.push(env.DB.prepare(LAP_INSERT).bind(...scope, lap.n, lap.t, lap.s1, lap.s2, lap.s3, lap.fuel, lap.ve,
     ...lap.wear, ...lap.temp, ...lap.kpa, ...lap.brake, lap.compound, lap.track, lap.air, lap.rain, lap.wet, lap.top, lap.invalid ? 1 : 0, lap.pit ? 1 : 0, lap.setup, lap.light));
   session.stops.forEach((stop, index) => statements.push(env.DB.prepare(STOP_INSERT).bind(...scope, index, stop.lap, stop.lane, stop.stopped,
     stop.fuel, stop.ve, stop.tyres, stop.repair ? 1 : 0)));
+  if (session.trace) {
+    const {n, t, ...points} = session.trace;
+    statements.push(env.DB.prepare('INSERT INTO combo_traces(session_id,community_id,user_id,track,car,started_at,lap,lap_time,data) VALUES(?,?,?,?,?,?,?,?,?)')
+      .bind(...scope, n, t, JSON.stringify(points)));
+  }
   try { await env.DB.batch(statements); }
   catch (error) { if (/UNIQUE/i.test(String(error?.message))) return {...result, created:false}; throw error; }
   return {...result, created:true};
@@ -212,6 +217,45 @@ export async function sheet(env, community, userId, combo, url, current = false)
   };
 }
 
+// ---------- « Mon analyse »: one session, wheel by wheel, and its best lap on the map ----------
+
+// The sessions on a combo, the most recent first, each with its pilot and its best lap's trace when the plugin sent it:
+// the page opens on the pilot's own and offers the others for the comparison.
+async function analysisList(env, community, userId, combo) {
+  const rows = await all(env, `SELECT s.id, s.user_id, s.started_at, s.lap_count, s.expert IS NOT NULL AS expert, t.lap, t.lap_time,
+      COALESCE(NULLIF(m.nickname,''), u.name) AS name, c.color,
+      (SELECT MIN(l.t) FROM combo_laps l WHERE l.session_id=s.id AND l.pit=0 AND l.invalid=0 AND l.t>0) AS best
+    FROM combo_sessions s LEFT JOIN combo_traces t ON t.session_id=s.id LEFT JOIN users u ON u.id=s.user_id
+    LEFT JOIN memberships m ON m.user_id=s.user_id AND m.community_id=s.community_id LEFT JOIN combo_colors c ON c.user_id=s.user_id AND c.community_id=s.community_id
+    WHERE s.community_id=? AND s.track=? AND s.car=? ORDER BY s.started_at DESC LIMIT 300`, community.id, combo.track, combo.car);
+  return {combo, sessions:rows.map(row => ({id:row.id, userId:row.user_id, name:row.name || 'Ancien pilote', color:row.color || null, mine:row.user_id === userId,
+    startedAt:row.started_at, laps:row.lap_count, best:round(row.best), expert:row.expert === 1, trace:row.lap ? {lap:row.lap, time:row.lap_time} : null}))};
+}
+
+// One session of the community: what the plugin measured wheel by wheel, the laps in figures and the best lap's trace.
+async function analysisSession(env, community, userId, sessionId) {
+  const session = await env.DB.prepare(`SELECT s.id, s.user_id, s.started_at, s.track, s.car, s.expert, COALESCE(NULLIF(m.nickname,''), u.name) AS name FROM combo_sessions s
+    LEFT JOIN users u ON u.id=s.user_id LEFT JOIN memberships m ON m.user_id=s.user_id AND m.community_id=s.community_id
+    WHERE s.id=? AND s.community_id=?`).bind(String(sessionId || ''), community.id).first();
+  if (!session) notFound();
+  // Clean laps as on the sheet: timed, valid, away from the pits, within CLEAN_RATIO of the session's best.
+  const [laps, trace] = await Promise.all([
+    env.DB.prepare(`WITH timed AS (SELECT * FROM combo_laps WHERE session_id=? AND pit=0 AND invalid=0 AND t>0),
+        clean AS (SELECT * FROM timed WHERE t<=(SELECT MIN(t) FROM timed)*${CLEAN_RATIO})
+      SELECT COUNT(*) AS laps, MIN(t) AS best, AVG(t) AS avg, MAX(t)-MIN(t) AS spread, AVG(NULLIF(fuel,0)) AS fuel, AVG(NULLIF(ve,0)) AS ve,
+        (SELECT MAX(top) FROM combo_laps WHERE session_id=?) AS top, ${wheelAverages('wear')} FROM clean`).bind(session.id, session.id).first(),
+    env.DB.prepare('SELECT lap, lap_time, data FROM combo_traces WHERE session_id=?').bind(session.id).first()
+  ]);
+  return {
+    session:{id:session.id, userId:session.user_id, name:session.name || 'Ancien pilote', mine:session.user_id === userId, startedAt:session.started_at,
+      track:session.track, car:session.car},
+    laps:{count:laps?.laps || 0, best:round(laps?.best ?? null), avg:round(laps?.avg ?? null), spread:round(laps?.spread ?? null), fuel:round(laps?.fuel ?? null),
+      ve:round(laps?.ve ?? null), top:round(laps?.top ?? null, 1), wear:laps ? wheels(laps, 'wear', 3) : [null, null, null, null]},
+    expert:parsed(session.expert),
+    trace:trace ? {...parsed(trace.data), lap:trace.lap, lapTime:trace.lap_time} : null
+  };
+}
+
 // Every combo of the community with data, the most recent first.
 async function combos(env, community) {
   const rows = await all(env, `SELECT track, car, MAX(car_class) AS car_class, SUM(lap_count) AS laps, COUNT(*) AS sessions, COUNT(DISTINCT user_id) AS drivers,
@@ -234,7 +278,7 @@ async function exportPage(env, community, combo, url) {
   ]) : [[], []];
   const four = (row, kind) => WHEELS.map(wheel => row[`${kind}_${wheel}`]);
   const out = page.map(row => ({id:row.id, pilot:row.pilot || 'Ancien pilote', startedAt:row.started_at, track:row.track, car:row.car, carClass:row.car_class,
-    driver:row.driver, capacity:row.capacity, service:parsed(row.service), game:parsed(row.game),
+    driver:row.driver, capacity:row.capacity, service:parsed(row.service), game:parsed(row.game), expert:parsed(row.expert),
     laps:laps.filter(lap => lap.session_id === row.id).map(lap => ({n:lap.n, t:lap.t, s1:lap.s1, s2:lap.s2, s3:lap.s3, fuel:lap.fuel, ve:lap.ve, wear:four(lap, 'wear'), temp:four(lap, 'temp'),
       kpa:four(lap, 'kpa'), brake:four(lap, 'brake'), compound:lap.compound, track:lap.track_temp, air:lap.air_temp, rain:lap.rain, wet:lap.wet, top:lap.top,
       invalid:lap.invalid === 1, pit:lap.pit === 1, setup:lap.setup, light:lap.light})),
@@ -297,6 +341,8 @@ export async function combosApi(path, method, request, env, actor, community) {
   if (path === '/api/combos' && method === 'GET') return json({combos:await combos(env, community)});
   if (path === '/api/combos/sheet' && method === 'GET') return json(await sheet(env, community, userId, comboOf(url), url));
   if (path === '/api/combos/export' && method === 'GET') return json(await exportPage(env, community, comboOf(url), url));
+  if (path === '/api/combos/analysis' && method === 'GET') return json(await analysisList(env, community, userId, comboOf(url)));
+  if (path === '/api/combos/analysis/session' && method === 'GET') return json(await analysisSession(env, community, userId, url.searchParams.get('id')));
 
   // His plugin: one code at a time, shown once; a new code replaces the previous one.
   if (path === '/api/combos/link') {
