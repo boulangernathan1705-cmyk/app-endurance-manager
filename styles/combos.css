@@ -69,6 +69,10 @@
 
 /* Conditions */
 .cb-conds { display: flex; flex-wrap: wrap; gap: 8px; }
+.cb-moments { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: -4px; }
+.cb-range { display: grid; gap: 4px; font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+.cb-range > div { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.combos-page .cb-range input { width: 100%; min-width: 0; }
 .cb-cond { --c: var(--cb-dry); display: grid; text-align: left; background: var(--cb-panel); color: var(--muted); border: 1px solid var(--cb-line); border-radius: 8px; padding: 8px 16px 8px 14px; cursor: pointer; font-size: 14px; font-family: inherit; min-width: 130px; }
 .cb-cond b { font-size: 19px; line-height: 1.1; letter-spacing: .08em; text-transform: uppercase; color: var(--text); }
 .cb-cond[aria-pressed="true"] { border-color: var(--c); box-shadow: inset 4px 0 0 var(--c); background: var(--cb-panel2); }
@@ -84,16 +88,17 @@
 .cb-empty { color: var(--muted); }
 
 /* Tables */
-.cb-tables { display: flex; flex-wrap: wrap; gap: 16px; align-items: start; }
-.cb-tables > div { flex: 1 1 340px; min-width: 0; }
-.cb-tables > .cb-wrap:first-child { flex: 1.4 1 480px; }
-.cb-wrap { overflow-x: auto; border: 1px solid var(--cb-line); border-radius: 8px; background: var(--cb-panel); }
+/* Every table fits its frame: units sit in the headers, headers wrap, long names end with an ellipsis. No scrollbar. */
+.cb-tables { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 500px), 1fr)); gap: 16px; align-items: start; }
+.cb-wrap { overflow: hidden; border: 1px solid var(--cb-line); border-radius: 8px; background: var(--cb-panel); }
+.cb-narrow { max-width: 760px; }
 .combos-page table { border-collapse: collapse; width: 100%; font-size: 14px; }
 .combos-page th, .combos-page td { padding: 8px 10px; text-align: right; white-space: nowrap; border-bottom: 1px solid var(--cb-line); }
+.combos-page thead th { white-space: normal; vertical-align: bottom; line-height: 1.25; }
 .combos-page th:first-child, .combos-page td:first-child { text-align: left; }
 .combos-page thead th { font-weight: 500; color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .05em; background: var(--cb-panel2); }
 .combos-page tbody tr:last-child td { border-bottom: 0; }
-td.cb-name { color: var(--dc); font-weight: 600; box-shadow: inset 3px 0 0 var(--dc); }
+td.cb-name { color: var(--dc); font-weight: 600; box-shadow: inset 3px 0 0 var(--dc); max-width: 11em; overflow: hidden; text-overflow: ellipsis; }
 tr.cb-crew td { font-weight: 700; background: var(--cb-panel2); }
 .cb-sub { display: block; font-size: 12px; color: var(--muted); font-weight: 400; }
 .cb-delta { display: block; font-size: 12px; }
@@ -109,11 +114,12 @@ tr.cb-crew td { font-weight: 700; background: var(--cb-panel2); }
 .cb-pill small { font-weight: 400; color: var(--muted); margin-left: 4px; }
 .cb-stint { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 14px; color: var(--muted); }
 .combos-page .cb-stint input { width: 72px; }
-.cb-tyres { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-.cb-tyre { background: var(--cb-panel); border: 1px solid var(--cb-line); border-radius: 6px; padding: 8px 4px 4px; display: grid; gap: 2px; min-width: 0; overflow-x: auto; }
+.cb-tyres { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr)); gap: 8px; }
+.cb-tyre { background: var(--cb-panel); border: 1px solid var(--cb-line); border-radius: 6px; padding: 8px 4px 4px; display: grid; gap: 2px; min-width: 0; overflow: hidden; }
 .cb-tyre-name { font-size: 13px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); padding: 0 8px; }
 .combos-page .cb-mini { font-size: 13px; }
-.combos-page .cb-mini th, .combos-page .cb-mini td { padding: 3px 8px; border: 0; }
+.combos-page .cb-mini th, .combos-page .cb-mini td { padding: 3px 6px; border: 0; }
+.cb-mini td.cb-name { max-width: 9em; }
 .combos-page .cb-mini thead th { background: none; font-size: 11px; }
 .cb-mini td.cb-name { box-shadow: none; }
 .cb-mini td.cb-name .cb-dot { margin-right: 6px; vertical-align: -1px; }
@@ -157,6 +163,16 @@ tr.cb-crew td { font-weight: 700; background: var(--cb-panel2); }
 
 @media (max-width: 620px) {
   .combos-page h1 { font-size: 23px; }
+  .combos-page { padding-inline: 12px; }
+  .cb-frame { padding: 34px 8px 12px; }
+  .combos-page table { font-size: 13px; }
+  .combos-page th, .combos-page td { padding: 6px 5px; }
+  .combos-page thead th { font-size: 10px; letter-spacing: .02em; }
+  .combos-page .cb-mini { font-size: 12px; }
+  .combos-page .cb-mini th, .combos-page .cb-mini td { padding: 3px 3px; }
+  td.cb-name { max-width: 6.5em; }
+  .cb-mini td.cb-name { max-width: 5.5em; }
+  .cb-word { display: none; }
   .cb-tyres { grid-template-columns: minmax(0, 1fr); }
   .cb-meta { position: static; }
 }

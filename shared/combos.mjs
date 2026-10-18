@@ -12,6 +12,11 @@ export const conditionOf = (rain, wet) => {
 };
 export const CONDITION_SQL = `CASE WHEN MAX(COALESCE(rain,0),COALESCE(wet,0))>=${RAIN_FROM} THEN 'rain' WHEN MAX(COALESCE(rain,0),COALESCE(wet,0))>=${DAMP_FROM} THEN 'damp' ELSE 'dry' END`;
 
+// Day or night, from the game's daylight when the lap ended (0 night, 1 full day). To be adjusted like the conditions.
+export const MOMENTS = Object.freeze(['day', 'night']);
+export const NIGHT_BELOW = 0.5;
+export const momentOf = light => light === null || light === undefined || light === '' || !Number.isFinite(Number(light)) ? null : Number(light) < NIGHT_BELOW ? 'night' : 'day';
+
 // A lap counts on the sheet when it is timed, valid, away from the pits and within this ratio of the pilot's best
 // in the same condition (no lap behind a slower car, no spin).
 export const CLEAN_RATIO = 1.07;
@@ -26,10 +31,14 @@ const four = (value, min, max) => Array.isArray(value) && value.length === 4 ? v
 const label = (value, size) => String(value ?? '').replace(/[\u0000-\u001f]/g, '').trim().slice(0, size);
 const optional = (value, check) => value && typeof value === 'object' && !Array.isArray(value) ? check(value) : null;
 
-// The game's service times for the car (seconds, litres and percent of energy per second).
+// The game's service times for the car (seconds, litres and percent of energy per second). The "…Along" ones are 1 when
+// the job runs during the refuelling, 0 when it comes after; the "…Random" ones the game's random extra seconds.
+export const SERVICE_KEYS = Object.freeze(['fuelRate', 'energyRate', 'connect', 'tyres4', 'tyres2', 'wing', 'brakes', 'driver', 'wingNew', 'frontWing',
+  'frontWingNew', 'repair', 'aeroRepair', 'pressure', 'radiator', 'tyresAlong', 'brakesAlong', 'driverAlong', 'repairAlong', 'fuelRandom', 'tyresRandom',
+  'driverRandom', 'repairRandom']);
 export function cleanService(input) {
   const out = {};
-  for (const key of ['fuelRate', 'energyRate', 'connect', 'tyres4', 'tyres2', 'wing', 'brakes', 'driver']) {
+  for (const key of SERVICE_KEYS) {
     const value = finite(input[key], 0, 600);
     if (value !== null) out[key] = value;
   }
@@ -62,7 +71,7 @@ export function cleanSession(input) {
     fuel:finite(lap?.fuel, 0, 200), ve:finite(lap?.ve, 0, 100), wear:four(lap?.wear, 0, 100), temp:four(lap?.temp, -50, 250),
     brake:four(lap?.brake, -50, 1500), kpa:four(lap?.kpa, 0, 1000), compound:label(lap?.compound, 40), track:finite(lap?.track, -30, 80),
     air:finite(lap?.air, -30, 60), rain:finite(lap?.rain, 0, 1), wet:finite(lap?.wet, 0, 1), invalid:lap?.invalid === true, pit:lap?.pit === true,
-    setup:setupName(lap?.setup)}))
+    setup:setupName(lap?.setup), light:finite(lap?.light, 0, 1)}))
     // A lap LMU counted without a time still tells its fuel and tyres; the same lap number twice is kept once.
     .filter(lap => lap.n !== null && !seen.has(lap.n) && seen.add(lap.n) && (lap.t || lap.fuel || lap.ve || lap.wear.some(value => value > 0)));
   if (!laps.length) throw Error('Aucun tour roulé dans cette séance.');

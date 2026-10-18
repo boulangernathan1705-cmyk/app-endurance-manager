@@ -114,7 +114,7 @@ namespace EnduranceManager.SimHub
                 session.Service = api.Service;
                 session.Game = api.Game;
                 try { uploader.Save(session); } catch { }
-            }, () => api.Setup);
+            }, () => api.Setup, api.CurrentLight);
             var buffer = new byte[LmuMemory.Size];
             while (running)
             {
@@ -153,14 +153,15 @@ namespace EnduranceManager.SimHub
                             recorder.Feed(sample, driving);
                             GameState = driving ? "track" : "menu";
                             misses = driving ? 0 : misses + 1;
-                            // The game's API only when the car stands in the pits, at most every 30 s, or in the garage and
-                            // menus, every 5 s for the setup being loaded: never while driving. Read aside, so a slow answer
-                            // never holds up the samples.
+                            // The game's API when the car stands in the pits, at most every 30 s, or in the garage and
+                            // menus, every 5 s for the setup being loaded; on track only the daylight, once a minute. Read
+                            // aside, so a slow answer never holds up the samples.
                             if (driving && sample.InPits && sample.Speed < 1 && tick % 300 == 0 && !api.Busy)
                             {
                                 string compound = sample.FrontCompound;
                                 ThreadPool.QueueUserWorkItem(_ => api.Read(compound));
                             }
+                            else if (driving && tick % 600 == 0 && !api.Busy) ThreadPool.QueueUserWorkItem(_ => api.ReadLight());
                             else if (!driving && tick % 50 == 0 && !api.Busy) ThreadPool.QueueUserWorkItem(_ => api.Read(null, true));
                             Thread.Sleep(100);
                         }

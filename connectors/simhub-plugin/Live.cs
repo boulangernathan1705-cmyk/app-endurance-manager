@@ -125,6 +125,8 @@ namespace EnduranceManager.SimHub
         [JsonProperty("pit")] public bool Pit;
         // The setup the game had loaded when the lap ended (LMU's garage), when known.
         [JsonProperty("setup", NullValueHandling = NullValueHandling.Ignore)] public string Setup;
+        // Daylight when the lap ended (0 night, 1 full day), when the game told it in the last minutes.
+        [JsonProperty("light", NullValueHandling = NullValueHandling.Ignore)] public double? Light;
     }
 
     public class LiveStop
@@ -182,8 +184,9 @@ namespace EnduranceManager.SimHub
         bool onTrack; // out of the pit lane at least once in this session
 
         readonly Func<string> setup;
+        readonly Func<double?> light;
 
-        public Recorder(Func<DateTime> now, Action<LiveSession> done, Func<string> setup = null) { this.now = now; this.done = done; this.setup = setup; }
+        public Recorder(Func<DateTime> now, Action<LiveSession> done, Func<string> setup = null, Func<double?> light = null) { this.now = now; this.done = done; this.setup = setup; this.light = light; }
 
         public void Flush()
         {
@@ -232,7 +235,7 @@ namespace EnduranceManager.SimHub
             var output = new LiveLap
             {
                 N = s.LapsDone, Time = Round(s.LastLap, 3), Top = Round(lap.Top, 1), Compound = s.FrontCompound, Rain = Round(s.Rain, 2),
-                AirTemp = Round(s.AirTemp, 1), Invalid = s.Invalid, Pit = lap.Pit, Setup = setup?.Invoke()
+                AirTemp = Round(s.AirTemp, 1), Invalid = s.Invalid, Pit = lap.Pit, Setup = setup?.Invoke(), Light = light?.Invoke()
             };
             // The three sectors, only when the game gave all of them for this lap.
             if (s.LastSector1 > 0 && s.LastSector2 > s.LastSector1 && s.LastLap > s.LastSector2)
