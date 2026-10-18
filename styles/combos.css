@@ -26,6 +26,47 @@
 .cb-topline h1 { margin: 2px 0 6px; }
 .cb-topline .cb-actions select { width: auto; max-width: 340px; font-size: 14px; padding: 6px 8px; }
 
+/* Header: the combo looked at is a button that opens the list of circuits and cars. */
+.cb-hero { display: grid; gap: 10px; }
+.cb-hero-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 34px; }
+.cb-hero-top .cb-crumb { font-size: 12px; }
+.cb-tools { display: flex; gap: 6px; flex: none; }
+.cb-tools .cb-btn { padding: 6px 11px; font-size: 13px; }
+.cb-picker { background: var(--cb-panel); border: 1px solid var(--cb-line); border-radius: 12px; }
+.cb-picker[open] { border-color: rgba(255,255,255,.22); }
+.cb-picker > summary { list-style: none; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; }
+.cb-picker > summary::-webkit-details-marker { display: none; }
+.cb-picker > summary:hover { background: rgba(255,255,255,.03); border-radius: 12px; }
+.cb-picker-what { display: grid; gap: 2px; min-width: 0; }
+.cb-picker-track { font-size: 26px; font-weight: 800; line-height: 1.15; text-wrap: balance; }
+.cb-picker-car { color: var(--muted); font-size: 15px; font-weight: 600; }
+.cb-picker-change { display: grid; justify-items: end; gap: 4px; flex: none; color: var(--muted); font-size: 12px; }
+.cb-picker-change b { color: var(--text); font-size: 14px; border: 1px solid var(--cb-line); border-radius: 999px; padding: 6px 12px; background: var(--cb-panel2); white-space: nowrap; }
+.cb-picker-change b::after { content: " ▾"; color: var(--muted); }
+.cb-picker[open] .cb-picker-change b::after { content: " ▴"; }
+.cb-picker-body { border-top: 1px solid var(--cb-line); padding: 6px 16px 14px; }
+.cb-picker-body ul { list-style: none; margin: 0; padding: 0; display: grid; }
+.cb-picker-body li { display: grid; grid-template-columns: minmax(0, 220px) minmax(0, 1fr); gap: 8px 16px; align-items: start; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,.05); }
+.cb-pick-track { font-weight: 700; font-size: 15px; padding-top: 8px; }
+.cb-pick-cars { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr)); gap: 8px; }
+.cb-pick { display: grid; gap: 2px; text-align: left; background: var(--cb-panel2); color: var(--text); border: 1px solid var(--cb-line); border-radius: 8px; padding: 8px 12px; font: inherit; cursor: pointer; }
+.cb-pick:hover { border-color: var(--muted); }
+.cb-pick b { font-size: 14px; }
+.cb-pick span { color: var(--muted); font-size: 12px; }
+.cb-pick[aria-pressed="true"] { border-color: var(--cb-dry); box-shadow: inset 0 0 0 1px var(--cb-dry); }
+.cb-picker-body .cb-src { margin: 10px 0 0; }
+.cb-hero .cb-sample { margin: 0; }
+@media (max-width: 620px) {
+  .cb-picker > summary { padding: 10px 12px; }
+  .cb-picker-track { font-size: 21px; }
+  .cb-picker-car { font-size: 14px; }
+  .cb-picker-change { font-size: 0; gap: 0; }
+  .cb-picker-change b { font-size: 13px; padding: 6px 10px; }
+  .cb-picker-body { padding: 4px 12px 12px; }
+  .cb-picker-body li { grid-template-columns: minmax(0, 1fr); gap: 6px; }
+  .cb-pick-track { padding-top: 0; }
+}
+
 /* Layout: filters and pilots on the side, the sheet in the middle, team settings and SimHub at the foot. */
 .cb-layout { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 20px; align-items: start; }
 .cb-main { display: grid; gap: 18px; min-width: 0; }
@@ -279,7 +320,6 @@ th.an-who { color: var(--dc) !important; }
 .combos-page .an-zones th, .combos-page .an-zones td { padding: 4px 8px; font-size: 13px; }
 .an-size { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); }
 .combos-page .an-size select { width: auto; font-size: 13px; padding: 3px 6px; }
-.combos-page .cb-refresh { padding: 5px 10px; font-size: 13px; }
 .an-laps { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
 .an-laps tr.an-out td { color: var(--muted); }
 .combos-page .an-laps .cb-btn.an-ignore { padding: 2px 8px; min-height: 0; font-size: 12px; line-height: 1.3; }
