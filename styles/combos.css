@@ -118,19 +118,28 @@
 .cb-wrap { overflow: hidden; border: 1px solid var(--cb-line); border-radius: 8px; background: var(--cb-panel); }
 .cb-narrow { max-width: 760px; }
 .combos-page table { border-collapse: collapse; width: 100%; font-size: 14px; }
-.combos-page th, .combos-page td { padding: 8px 10px; text-align: right; white-space: nowrap; border-bottom: 1px solid var(--cb-line); }
+.combos-page th, .combos-page td { padding: 9px 12px; text-align: right; white-space: nowrap; border-bottom: 1px solid rgba(255,255,255,.05); }
 .combos-page thead th { white-space: normal; vertical-align: bottom; line-height: 1.25; }
 .combos-page th:first-child, .combos-page td:first-child { text-align: left; }
-.combos-page thead th { font-weight: 500; color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .05em; background: var(--cb-panel2); }
+.combos-page thead th { font-weight: 500; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .06em; background: var(--cb-panel2); border-bottom: 1px solid var(--cb-line); padding-top: 8px; padding-bottom: 8px; }
 .combos-page tbody tr:last-child td { border-bottom: 0; }
 td.cb-name { color: var(--dc); font-weight: 600; box-shadow: inset 3px 0 0 var(--dc); max-width: 11em; overflow: hidden; text-overflow: ellipsis; }
-tr.cb-crew td { font-weight: 700; background: var(--cb-panel2); }
+tr.cb-crew td { font-weight: 700; background: rgba(255,255,255,.035); border-bottom: 1px solid var(--cb-line); }
+/* Lines easy to follow: a faint band every other row, the row under the pointer lit. */
+.combos-page tbody tr:not(.cb-crew):nth-child(even) td { background: rgba(255,255,255,.018); }
+.combos-page tbody tr:hover td { background: rgba(255,255,255,.05); }
+/* The best pilot of a column, violet as on a timing screen. */
+.combos-page td.cb-best, .combos-page tbody tr:nth-child(even) td.cb-best { color: #e9d5ff; font-weight: 700; background: rgba(168,85,247,.22); box-shadow: inset 0 0 0 1px rgba(192,132,252,.35); }
+.combos-page td.cb-best .cb-sub { color: #d8b4fe; }
+.combos-page .cb-sub.cb-best-sub { color: #c084fc; font-weight: 700; }
+.cb-best-key { color: #c084fc; font-weight: 700; }
 .cb-sub { display: block; font-size: 12px; color: var(--muted); font-weight: 400; }
 .cb-delta { display: block; font-size: 12px; }
 .cb-delta.up { color: var(--cb-up); }
 .cb-delta.down { color: var(--cb-down); }
 .cb-delta.same { color: var(--muted); }
 .cb-dots { display: flex; flex-wrap: wrap; gap: 4px; }
+.cb-short { display: none; }
 
 /* Tyres */
 .cb-compounds { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -145,7 +154,7 @@ tr.cb-crew td { font-weight: 700; background: var(--cb-panel2); }
 .cb-tyre { background: var(--cb-panel); border: 1px solid var(--cb-line); border-radius: 6px; padding: 8px 4px 4px; display: grid; gap: 2px; min-width: 0; overflow: hidden; }
 .cb-tyre-name { font-size: 13px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); padding: 0 8px; }
 .combos-page .cb-mini { font-size: 13px; }
-.combos-page .cb-mini th, .combos-page .cb-mini td { padding: 3px 6px; border: 0; }
+.combos-page .cb-mini th, .combos-page .cb-mini td { padding: 4px 8px; border: 0; }
 .cb-mini td.cb-name { max-width: 9em; }
 .combos-page .cb-mini thead th { background: none; font-size: 11px; }
 .cb-mini td.cb-name { box-shadow: none; }
@@ -200,6 +209,8 @@ tr.cb-crew td { font-weight: 700; background: var(--cb-panel2); }
   td.cb-name { max-width: 6.5em; }
   .cb-mini td.cb-name { max-width: 5.5em; }
   .cb-word { display: none; }
+  .cb-short { display: inline; }
+  .combos-page td.cb-best { box-shadow: none; }
   .cb-tyres { grid-template-columns: minmax(0, 1fr); }
   .cb-meta { position: static; }
 }
