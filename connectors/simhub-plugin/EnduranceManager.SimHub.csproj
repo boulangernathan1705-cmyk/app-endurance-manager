@@ -19,4 +19,8 @@
     <Reference Include="System.Net.Http" />
     <Reference Include="System.Windows.Forms" />
   </ItemGroup>
+  <ItemGroup>
+    <!-- L'installeur en double-clic, à donner aux pilotes avec la DLL. -->
+    <None Update="Installer le plugin.cmd" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>

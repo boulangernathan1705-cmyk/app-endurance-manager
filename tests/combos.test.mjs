@@ -300,3 +300,15 @@ test('notes: the team writes, only the author or an admin changes them; the expo
 
   assert.equal((await req(`/api/combos/notes/${note.id}`, 'DELETE', {}, GUEST)).status, 200);
 });
+
+test('the fiches combo page: its own tab for the roles that see them, nothing run from the page text', () => {
+  const page = readFileSync(new URL('../fiches-combo.html', import.meta.url), 'utf8');
+  assert.match(page, /<main id="combos-app"/);
+  assert.match(page, /src="\/front\/combos-page\.mjs/);
+  assert.match(page, /data-module-link="combos"/);
+  assert.doesNotMatch(page, /<script>|\son[a-z]+=/i, 'no inline script nor handler (CSP)');
+  const front = readFileSync(new URL('../front/combos-page.mjs', import.meta.url), 'utf8');
+  assert.doesNotMatch(front, /\son[a-z]+="/i, 'no inline handler (CSP)');
+  assert.match(readFileSync(new URL('../front/account-menu.mjs', import.meta.url), 'utf8'), /link\.dataset\.moduleLink === 'combos' && session\.combos !== true/);
+  assert.match(readFileSync(new URL('../front/app/home-view.mjs', import.meta.url), 'utf8'), /state\.combos\?'<a class="nav-section-button" href="\/fiches-combo\.html">Fiches combo<\/a>'/);
+});
