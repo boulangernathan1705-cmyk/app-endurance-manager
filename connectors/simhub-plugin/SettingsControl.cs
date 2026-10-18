@@ -44,7 +44,7 @@ namespace EnduranceManager.SimHub
             page.Children.Add(Box("Le Mans Ultimate", gameDot, gameTitle, gameDetail));
             page.Children.Add(new TextBlock { Text = "Le plugin ne fait que lire : il ne change rien dans le jeu ni dans SimHub.", Opacity = 0.5, FontSize = 11, Margin = new Thickness(2, 4, 0, 0), TextWrapping = TextWrapping.Wrap });
 
-            paste.Click += (sender, args) => PasteCode();
+            paste.Click += (sender, args) => PasteCode(false);
             open.Click += (sender, args) =>
             {
                 var code = LinkCode.Parse(plugin.Settings.Code);
@@ -59,18 +59,18 @@ namespace EnduranceManager.SimHub
             Content = new ScrollViewer { Content = page, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
         }
 
-        // The code copied on the site, taken from the clipboard: nothing to type.
-        void PasteCode()
+        // The code copied on the site, taken from the clipboard: nothing to type. Not linked yet, the screen looks
+        // by itself every two seconds (automatic): the pilot only clicks « Copier le code » on the site.
+        void PasteCode(bool automatic)
         {
             string text = "";
             try { text = Clipboard.GetText(); } catch { }
             var code = LinkCode.Parse(text);
             if (code == null)
             {
-                Say("Aucun code dans le presse-papiers. Sur le site : Fiches combo → « Relier SimHub » → « Copier le code », puis reclique ici.", Orange);
+                if (!automatic) Say("Aucun code dans le presse-papiers. Sur le site : Fiches combo → « Relier SimHub » → « Copier le code », puis reclique ici.", Orange);
                 return;
-            }
-            plugin.SaveCode(code.ToString());
+            }            plugin.SaveCode(code.ToString());
             Say("Code enregistré. Tes séances partiront dans la minute.", Green);
             Refresh();
         }
@@ -79,6 +79,7 @@ namespace EnduranceManager.SimHub
 
         void Refresh()
         {
+            if (LinkCode.Parse(plugin.Settings.Code) == null) PasteCode(true);
             var code = LinkCode.Parse(plugin.Settings.Code);
             var uploader = plugin.Uploader;
             string host = code == null ? "" : new Uri(code.Origin).Host;
@@ -87,7 +88,7 @@ namespace EnduranceManager.SimHub
 
             int waiting = uploader?.Waiting ?? 0;
             string kept = waiting > 0 ? $" {waiting} séance{(waiting > 1 ? "s" : "")} en attente, rien n'est perdu." : "";
-            if (code == null) Show(linkDot, Orange, linkTitle, "Pas encore relié", linkDetail, "Sur le site : Fiches combo → « Relier SimHub » → « Copier le code ». Puis clique sur « Coller mon code ».");
+            if (code == null) Show(linkDot, Orange, linkTitle, "Pas encore relié", linkDetail, "Sur le site : Fiches combo → « Relier SimHub » → « Copier le code ». Le plugin le trouve tout seul ici.");
             else if (uploader?.Refused is string refused) Show(linkDot, Red, linkTitle, "Liaison refusée", linkDetail, refused + kept);
             else if (uploader?.Reached == false) Show(linkDot, Orange, linkTitle, "Site injoignable", linkDetail, "Nouvel essai dans une minute." + kept);
             else if (uploader?.Reached == true) Show(linkDot, Green, linkTitle, "Relié à " + host, linkDetail,
