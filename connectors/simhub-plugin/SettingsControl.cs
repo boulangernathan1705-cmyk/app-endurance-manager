@@ -25,7 +25,8 @@ namespace EnduranceManager.SimHub
         readonly TextBlock version = new TextBlock { Opacity = 0.5, FontSize = 11, Margin = new Thickness(2, 4, 0, 0), TextWrapping = TextWrapping.Wrap };
         readonly Border updateBox;
         readonly TextBlock updateText = new TextBlock { TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 10) };
-        readonly CheckBox enabled = new CheckBox { Content = "Plugin activé : enregistrer et envoyer mes séances", FontSize = 14, Margin = new Thickness(0, 0, 0, 14), Cursor = System.Windows.Input.Cursors.Hand };
+        readonly CheckBox enabled = new CheckBox { Content = "Plugin activé : enregistrer et envoyer mes séances", FontSize = 14, Margin = new Thickness(0, 0, 0, 6), Cursor = System.Windows.Input.Cursors.Hand };
+        readonly CheckBox share = new CheckBox { Content = "Partager ma voiture en direct avec l'équipe (mur des stands)", FontSize = 14, Margin = new Thickness(0, 0, 0, 14), Cursor = System.Windows.Input.Cursors.Hand };
 
         public SettingsControl(EnduranceManagerPlugin plugin)
         {
@@ -39,6 +40,11 @@ namespace EnduranceManager.SimHub
             enabled.Checked += (sender, args) => { plugin.SetEnabled(true); Refresh(); };
             enabled.Unchecked += (sender, args) => { plugin.SetEnabled(false); Refresh(); };
             page.Children.Add(enabled);
+            // Live sharing: on by default, the teammates follow the car on the site's mur des stands.
+            share.IsChecked = plugin.Settings.Share;
+            share.Checked += (sender, args) => { plugin.SetShare(true); Refresh(); };
+            share.Unchecked += (sender, args) => { plugin.SetShare(false); Refresh(); };
+            page.Children.Add(share);
 
             // A newer version on the site: one button, the installer does the rest.
             var updatePanel = new StackPanel();
@@ -144,6 +150,8 @@ namespace EnduranceManager.SimHub
             string service = api.ReadAt is DateTime read ? $"Temps de service de la voiture lus à {read:HH:mm}." : "Les temps de service seront lus dès que tu rouleras.";
             if (api.Setup is string setup) service += "\nRéglage chargé : " + setup;
             service += "\n" + (plugin.LastSession is string recorded ? "Dernière séance enregistrée : " + recorded : "Aucune séance enregistrée depuis le lancement de SimHub.");
+            service += "\n" + (!plugin.Settings.Share ? "Partage en direct coupé." : "Mur des stands : " + plugin.Live.Status
+                + (plugin.Live.SentAt is DateTime sent ? $" (dernier envoi à {sent:HH:mm:ss})" : ""));
             if (uploader?.LastRefusal is string refusal) service += "\nUne séance a été refusée par le site " + refusal + ". Elle est gardée dans le dossier sessions\\refused.";
             if (!plugin.Settings.Enabled)
             {

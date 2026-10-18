@@ -8,6 +8,7 @@
 import {fail, json, now, id, token, hash, rateLimit, body, siteOrigin} from './core.mjs';
 import {communityAccess, requirePermission} from './access.mjs';
 import {communityById} from './community.mjs';
+import {openLive} from './live.mjs';
 import {cleanSession, CONDITIONS, CONDITION_SQL, CLEAN_RATIO, STINT_MIN, WHEELS, SETUP_MAX, NIGHT_BELOW, linkCode} from '../shared/combos.mjs';
 
 export const combosEnabled = community => community?.modules?.combos === true;
@@ -346,6 +347,13 @@ export async function combosPlugin(path, request, env) {
     const name = await env.DB.prepare('SELECT nickname FROM memberships WHERE community_id=? AND user_id=?').bind(community.id, user.id).first();
     return json({pilot:name?.nickname || user.name, community:community.name});
   }
+  // Mur des stands: the pilot at the wheel shares his car live with the team (server/live.mjs).
+  if (path === '/api/combos/plugin/live') {
+    const {community, user} = await pluginAccess(request, env);
+    const row = await env.DB.prepare(`SELECT NULLIF(m.nickname,'') AS nickname, c.color FROM users u LEFT JOIN memberships m ON m.user_id=u.id AND m.community_id=?
+      LEFT JOIN combo_colors c ON c.user_id=u.id AND c.community_id=? WHERE u.id=?`).bind(community.id, community.id, user.id).first();
+    return openLive(request, env, community.id, {Role:'driver', User:user.id, Name:row?.nickname || user.name, Color:row?.color || ''});
+  }
   if (path === '/api/combos/plugin/sheet' && method === 'GET') {
     const {community, user} = await pluginAccess(request, env);
     const url = new URL(request.url);
@@ -362,6 +370,12 @@ export async function combosApi(path, method, request, env, actor, community) {
   requirePermission(actor, 'combos', 'Les fiches combo sont réservées aux pilotes de l’équipe.');
   const url = new URL(request.url), userId = actor.user.id;
   if (path === '/api/combos' && method === 'GET') return json({combos:await combos(env, community)});
+  // Mur des stands: a page of the site watching the team's cars live. A GET skips the site's origin check: done here,
+  // so no other site can open it with the member's cookie.
+  if (path === '/api/combos/live') {
+    if (request.headers.get('Origin') !== siteOrigin(request, env)) fail(403, 'Origine de la requête refusée.');
+    return openLive(request, env, community.id, {Role:'viewer', User:userId});
+  }
   if (path === '/api/combos/sheet' && method === 'GET') return json(await sheet(env, community, userId, comboOf(url), url));
   if (path === '/api/combos/export' && method === 'GET') return json(await exportPage(env, community, comboOf(url), url));
   if (path === '/api/combos/analysis' && method === 'GET') return json(await analysisList(env, community, userId, comboOf(url)));

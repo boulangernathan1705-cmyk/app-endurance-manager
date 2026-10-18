@@ -11,7 +11,12 @@ Envoie les séances Le Mans Ultimate d'un pilote aux fiches combo de son équipe
   (`TireManagement`), envoyés avec la séance (`service`, `game`, `LmuApi.cs`) ; et le nom du réglage chargé au garage
   (`summary` › `activeSetup`), noté sur chaque tour (`setup`) ; et la lumière du jour (`lightLevel`, 0 la nuit, 1 en
   plein jour), notée sur chaque tour (`light`) pour séparer les tours de nuit ;
-- garde chaque séance en fichier jusqu'à ce que le site l'ait reçue (`Sync.cs`).
+- garde chaque séance en fichier jusqu'à ce que le site l'ait reçue (`Sync.cs`) ;
+- partage la voiture en direct avec l'équipe pendant qu'elle roule (`LiveShare.cs`, depuis la 1.3.0) : une fois par
+  seconde, par WebSocket (`/api/combos/plugin/live`), la voiture et tout le classement lus dans la même copie de la
+  mémoire du jeu, pour la page « Mur des stands » du site (`server/live.mjs`, `shared/live.mjs`). Activé par défaut,
+  case « Partager ma voiture en direct » pour le couper. Lit aussi `watch/standings` toutes les 20 s (numéros des
+  voitures) et `watch/trackmap` une fois par circuit (tracé, gardé seulement s'il passe à moins de 25 m de la voiture).
 
 Il ne fait que lire : il ne modifie rien dans le jeu ni dans SimHub. Il n'envoie plus les fichiers de résultats XML.
 
@@ -34,6 +39,11 @@ pluie) en dépend : seuils `DAMP_FROM` et `RAIN_FROM` dans `shared/combos.mjs`.
 À vérifier aussi : le nom du réglage affiché sur l'écran du plugin (« Réglage chargé ») doit changer quand on charge un
 autre réglage au garage. Un réglage modifié sans être enregistré garde le nom de celui dont il part. Les secteurs
 d'un tour ne sont envoyés que si le jeu a donné les trois.
+
+À vérifier pour le mur des stands : les champs du classement lus dans la mémoire (écarts au leader et à la voiture
+devant, temps dans le tour, garage, position x/z de chaque voiture) sont aux offsets rF2 ; le contrôle de la voiture
+(`mControl`) doit valoir 0 pour le pilote au volant (un coéquipier qui regarde ne partage pas) ; le tracé du jeu doit
+se superposer aux voitures sur la carte.
 
 À vérifier enfin : la lumière du jour. Un tour compte de nuit sous `NIGHT_BELOW` (0,5, dans `shared/combos.mjs`).
 
