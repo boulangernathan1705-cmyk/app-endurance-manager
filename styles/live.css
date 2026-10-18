@@ -49,9 +49,10 @@
 .lw-tabs button { background: none; border: 0; border-bottom: 2px solid transparent; padding: 8px 12px; font-weight: 700; font-size: 14px; color: var(--muted); cursor: pointer; }
 .lw-tabs button[aria-pressed="true"] { color: var(--text); border-bottom-color: var(--text); }
 
-.lw-wall { display: grid; grid-template-columns: minmax(0, 1.9fr) minmax(0, 1fr); grid-template-areas: "board map" "car race"; gap: 14px; align-items: start; }
-.lw-wall.practice { grid-template-areas: "board map" "car car"; }
-#lw-board { grid-area: board; } #lw-map { grid-area: map; } #lw-carpanel { grid-area: car; } #lw-race { grid-area: race; }
+/* Wide screens: two columns that each stack their panels (standings then car | map then race), so the right column
+   never waits for the end of the standings. */
+.lw-wall { display: grid; grid-template-columns: minmax(0, 1.9fr) minmax(0, 1fr); gap: 14px; align-items: start; }
+.lw-col { display: grid; gap: 14px; min-width: 0; align-content: start; }
 .lw-panel { background: var(--lw-panel); border: 1px solid var(--lw-line); border-radius: 10px; padding: 14px 16px; display: grid; gap: 12px; align-content: start; min-width: 0; }
 .lw-panel > h2 { margin: 0; font-size: 20px; display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
 .lw-panel > h2 small { font-size: 13px; font-weight: 500; color: var(--muted); }
@@ -64,13 +65,15 @@
 .lw-empty { color: var(--muted); }
 /* Mid-size screens: the standings take the whole width, the rest below. */
 @media (min-width: 1180px) and (max-width: 1499px) {
+  .lw-col { display: contents; }
   .lw-wall { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-areas: "board board" "car car" "map race"; }
   .lw-wall.practice { grid-template-areas: "board board" "car car" "map map"; }
+  #lw-board { grid-area: board; } #lw-map { grid-area: map; } #lw-carpanel { grid-area: car; } #lw-race { grid-area: race; }
 }
 @media (max-width: 1179px) {
   .lw-tabs { display: flex; }
-  .lw-wall, .lw-wall.practice { grid-template-columns: minmax(0, 1fr); grid-template-areas: none; }
-  #lw-board, #lw-map, #lw-carpanel, #lw-race { grid-area: auto; }
+  .lw-col { display: contents; }
+  .lw-wall, .lw-wall.practice { grid-template-columns: minmax(0, 1fr); }
   .lw-panel:not(.on) { display: none; }
 }
 

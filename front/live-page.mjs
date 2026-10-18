@@ -368,7 +368,8 @@ function render() {
   const panel = (id, tab, html) => `<section class="lw-panel${view.tab === tab ? ' on' : ''}" id="${id}">${html}</section>`;
   // The open row and the scroll stay where they are: the panels are redrawn in place every second.
   app.innerHTML = `${header(feed)}${carsStrip()}${tabs(race)}<div class="lw-wall${race ? '' : ' practice'}">
-    ${panel('lw-board', 'board', board(feed))}${panel('lw-map', 'map', mapPanel(feed))}${panel('lw-carpanel', 'car', carPanel(feed))}${race ? panel('lw-race', 'race', racePanel(feed)) : ''}</div>`;
+    <div class="lw-col">${panel('lw-board', 'board', board(feed))}${panel('lw-carpanel', 'car', carPanel(feed))}</div>
+    <div class="lw-col">${panel('lw-map', 'map', mapPanel(feed))}${race ? panel('lw-race', 'race', racePanel(feed)) : ''}</div></div>`;
 }
 
 app.addEventListener('click', event => {
