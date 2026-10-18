@@ -109,6 +109,15 @@ async function refresh() {
   view.refreshing = false; render();
 }
 
+// Another car or circuit: its own sheet, without the choices that belong to the previous one.
+async function openCombo(track, car) {
+  const combo = view.combos.find(item => item.track === track && item.car === car);
+  if (!combo || comboKey(combo) === comboKey(view.combo)) { render(); return; }
+  Object.assign(view, {combo, setup:'', compareEvent:'', cond:null, compound:null, stint:null});
+  view.analysis.zone = null;
+  await loadSheet();
+}
+
 function remember() {
   const query = sheetQuery();
   if (view.tab === 'analysis') query.set('tab', 'analyse');
@@ -293,11 +302,28 @@ function linkCard() {
 }
 
 function header() {
-  const sheet = view.sheet, combo = view.combo;
-  const choices = view.combos.length > 1 ? `<label class="cb-crumb">Combo <select data-field="combo">${view.combos.map(item => `<option value="${esc(comboKey(item))}"${comboKey(item) === comboKey(combo) ? ' selected' : ''}>${esc(item.car)} · ${esc(item.track)}</option>`).join('')}</select></label>` : '';
-  return `<div class="cb-topline"><div><div class="cb-crumb">Fiches combo · Le Mans Ultimate${sheet?.combo.carClass ? ` · ${esc(sheet.combo.carClass)}` : ''}</div><h1>${esc(combo.car)} · ${esc(combo.track)}</h1>${sheet ? sample() : ''}</div>
-    <div class="cb-actions">${choices}<button type="button" class="cb-btn is-quiet cb-refresh" data-action="refresh"${view.refreshing ? ' disabled' : ''} title="${view.loadedAt ? `À jour à ${esc(new Date(view.loadedAt).toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'}))}` : ''}">${view.refreshing ? 'Actualisation…' : '↻ Actualiser'}</button>${view.tab === 'sheet' ? '<button type="button" class="cb-btn" data-action="export">Exporter la fiche</button>' : ''}</div></div>
+  const sheet = view.sheet;
+  const time = view.loadedAt ? `À jour à ${new Date(view.loadedAt).toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'})}` : 'Actualiser';
+  return `<div class="cb-hero"><div class="cb-hero-top"><span class="cb-crumb">Fiches combo · <span class="cb-word">Le Mans Ultimate</span><span class="cb-short">LMU</span></span>
+      <div class="cb-tools"><button type="button" class="cb-btn is-quiet" data-action="refresh"${view.refreshing ? ' disabled' : ''} title="${esc(time)}" aria-label="Actualiser">↻<span class="cb-word"> ${view.refreshing ? 'Actualisation…' : 'Actualiser'}</span></button>${view.tab === 'sheet' ? '<button type="button" class="cb-btn is-quiet" data-action="export" title="Exporter la fiche (JSON)">Exporter</button>' : ''}</div></div>
+    ${picker()}${sheet ? sample() : ''}</div>
     <nav class="cb-tabs" aria-label="Vue">${[['sheet', 'Fiche de l’équipe'], ['analysis', 'Mon analyse']].map(([tab, label]) => `<button type="button" data-tab="${tab}" aria-pressed="${tab === view.tab}">${label}</button>`).join('')}</nav>`;
+}
+
+// The combo looked at, and the way to change it: every circuit the team drove (alphabetical), each with its cars,
+// the most recent first. Clicking one opens its sheet.
+function picker() {
+  const combo = view.combo, current = comboKey(combo);
+  const carClass = view.sheet?.combo.carClass || combo.carClass;
+  const tracks = new Map();
+  for (const item of view.combos) tracks.set(item.track, [...(tracks.get(item.track) || []), item]);
+  const list = [...tracks].sort(([a], [b]) => a.localeCompare(b, 'fr')).map(([track, cars]) => `<li><span class="cb-pick-track">${esc(track)}</span>
+    <div class="cb-pick-cars">${cars.map(item => `<button type="button" class="cb-pick" data-combo data-track="${esc(item.track)}" data-car="${esc(item.car)}" aria-pressed="${comboKey(item) === current}">
+      <b>${esc(item.car)}</b><span>${[item.carClass, `${item.laps} tours`, `${item.drivers} pilote${item.drivers > 1 ? 's' : ''}`, item.last ? day(item.last) : ''].filter(Boolean).map(esc).join(' · ')}</span></button>`).join('')}</div></li>`).join('');
+  return `<details class="cb-picker" data-fold="picker"${view.pickerOpen ? ' open' : ''}>
+    <summary><span class="cb-picker-what"><span class="cb-picker-track">${esc(combo.track)}</span><span class="cb-picker-car">${esc(combo.car)}${carClass ? ` · ${esc(carClass)}` : ''}</span></span>
+      <span class="cb-picker-change">${tracks.size} circuit${tracks.size > 1 ? 's' : ''}<b>Changer</b></span></summary>
+    <div class="cb-picker-body"><ul>${list}</ul><p class="cb-src">Un circuit ou une voiture apparaît ici dès qu’un pilote y a roulé avec le plugin.</p></div></details>`;
 }
 
 function filters() {
@@ -639,6 +665,7 @@ app.addEventListener('click', async event => {
     saveHidden(); render(); return;
   }
   if (target.dataset.cond) { view.cond = target.dataset.cond; render(); return; }
+  if (target.dataset.combo !== undefined) { view.pickerOpen = false; await openCombo(target.dataset.track, target.dataset.car); return; }
   if (target.dataset.tab) {
     view.tab = target.dataset.tab; remember();
     if (view.tab === 'analysis') await loadAnalysis(); else render();
@@ -690,11 +717,7 @@ app.addEventListener('change', async event => {
     view.analysis.zone = null;
     await loadAnalysis(); return;
   }
-  if (field === 'combo') {
-    view.combo = view.combos.find(item => comboKey(item) === event.target.value) || view.combo;
-    view.setup = ''; view.compareEvent = ''; view.cond = null; view.compound = null;
-    await loadSheet();
-  } else if (['event', 'version', 'setup'].includes(field)) {
+  if (['event', 'version', 'setup'].includes(field)) {
     view[field] = event.target.value;
     if (field === 'event' && view.compareEvent === view.event) view.compareEvent = '';
     await loadSheet();
@@ -750,6 +773,7 @@ app.addEventListener('toggle', event => {
   if (fold === 'side') view.sideOpen = event.target.open;
   if (fold === 'laps') view.analysis.lapsOpen = event.target.open;
   if (fold === 'link') view.linkOpen = event.target.open;
+  if (fold === 'picker') view.pickerOpen = event.target.open;
 }, true);
 
 app.addEventListener('submit', async event => {
