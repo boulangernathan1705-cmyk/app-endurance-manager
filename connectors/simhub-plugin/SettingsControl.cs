@@ -21,7 +21,10 @@ namespace EnduranceManager.SimHub
         readonly Ellipse linkDot = Dot(), gameDot = Dot();
         readonly TextBlock linkTitle = Title(), linkDetail = Detail(), gameTitle = Title(), gameDetail = Detail();
         readonly TextBlock message = new TextBlock { TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 10, 0, 0), Visibility = Visibility.Collapsed };
-        readonly Button paste = Action("Coller mon code", true), open = Action("Ouvrir le site", false);
+        readonly Button paste = Action("Coller mon code", true), open = Action("Ouvrir le site", false), update = Action("Mettre à jour", true);
+        readonly TextBlock version = new TextBlock { Opacity = 0.5, FontSize = 11, Margin = new Thickness(2, 4, 0, 0), TextWrapping = TextWrapping.Wrap };
+        readonly Border updateBox;
+        readonly TextBlock updateText = new TextBlock { TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 10) };
         readonly CheckBox enabled = new CheckBox { Content = "Plugin activé : enregistrer et envoyer mes séances", FontSize = 14, Margin = new Thickness(0, 0, 0, 14), Cursor = System.Windows.Input.Cursors.Hand };
 
         public SettingsControl(EnduranceManagerPlugin plugin)
@@ -37,14 +40,24 @@ namespace EnduranceManager.SimHub
             enabled.Unchecked += (sender, args) => { plugin.SetEnabled(false); Refresh(); };
             page.Children.Add(enabled);
 
+            // A newer version on the site: one button, the installer does the rest.
+            var updatePanel = new StackPanel();
+            updatePanel.Children.Add(updateText);
+            update.HorizontalAlignment = HorizontalAlignment.Left;
+            updatePanel.Children.Add(update);
+            updateBox = new Border { Background = Card, BorderBrush = Accent, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(8), Padding = new Thickness(16), Margin = new Thickness(0, 0, 0, 12), Child = updatePanel, Visibility = Visibility.Collapsed };
+            page.Children.Add(updateBox);
+
             var buttons = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 14, 0, 0) };
             buttons.Children.Add(paste);
             buttons.Children.Add(open);
             page.Children.Add(Box("Liaison avec le site", linkDot, linkTitle, linkDetail, buttons, message));
             page.Children.Add(Box("Le Mans Ultimate", gameDot, gameTitle, gameDetail));
             page.Children.Add(new TextBlock { Text = "Le plugin ne fait que lire : il ne change rien dans le jeu ni dans SimHub.", Opacity = 0.5, FontSize = 11, Margin = new Thickness(2, 4, 0, 0), TextWrapping = TextWrapping.Wrap });
+            page.Children.Add(version);
 
             paste.Click += (sender, args) => PasteCode(false);
+            update.Click += (sender, args) => StartUpdate();
             open.Click += (sender, args) =>
             {
                 var code = LinkCode.Parse(plugin.Settings.Code);
@@ -60,7 +73,7 @@ namespace EnduranceManager.SimHub
         }
 
         // The code copied on the site, taken from the clipboard: nothing to type. Not linked yet, the screen looks
-        // by itself every two seconds (automatic): the pilot only clicks « Copier le code » on the site.
+        // by itself every two seconds (automatic): the pilot only clicks « Créer mon code » on the site.
         void PasteCode(bool automatic)
         {
             string text = "";
@@ -68,7 +81,7 @@ namespace EnduranceManager.SimHub
             var code = LinkCode.Parse(text);
             if (code == null)
             {
-                if (!automatic) Say("Aucun code dans le presse-papiers. Sur le site : Fiches combo → « Relier SimHub » → « Copier le code », puis reclique ici.", Orange);
+                if (!automatic) Say("Aucun code dans le presse-papiers. Sur le site : Fiches combo → « Relier SimHub » → « Créer mon code », puis reclique ici.", Orange);
                 return;
             }
             plugin.SaveCode(code.ToString());
@@ -77,6 +90,25 @@ namespace EnduranceManager.SimHub
         }
 
         void Say(string text, Brush color) { message.Text = text; message.Foreground = color; message.Visibility = Visibility.Visible; }
+
+        // Never while driving: the installer closes SimHub. Fetched aside, so the screen never freezes.
+        void StartUpdate()
+        {
+            var code = LinkCode.Parse(plugin.Settings.Code);
+            if (code == null) return;
+            if (plugin.GameState == "track") { updateText.Text = "Termine d'abord ta séance : la mise à jour ferme et relance SimHub."; return; }
+            update.IsEnabled = false;
+            updateText.Text = "Téléchargement de l'installeur…";
+            System.Threading.ThreadPool.QueueUserWorkItem(_ =>
+            {
+                string error = plugin.Updater.Start(code);
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    update.IsEnabled = true;
+                    updateText.Text = error ?? "L'installeur s'ouvre : il ferme SimHub, installe la nouvelle version et relance SimHub. Ta liaison est gardée.";
+                }));
+            });
+        }
 
         void Refresh()
         {
@@ -89,12 +121,22 @@ namespace EnduranceManager.SimHub
 
             int waiting = uploader?.Waiting ?? 0;
             string kept = waiting > 0 ? $" {waiting} séance{(waiting > 1 ? "s" : "")} en attente, rien n'est perdu." : "";
-            if (code == null) Show(linkDot, Orange, linkTitle, "Pas encore relié", linkDetail, "Sur le site : Fiches combo → « Relier SimHub » → « Copier le code ». Le plugin le trouve tout seul ici.");
+            if (code == null) Show(linkDot, Orange, linkTitle, "Pas encore relié", linkDetail, "Sur le site : Fiches combo → « Relier SimHub » → « Créer mon code ». Le plugin le trouve tout seul ici.");
             else if (uploader?.Refused is string refused) Show(linkDot, Red, linkTitle, "Liaison refusée", linkDetail, refused + kept);
             else if (uploader?.Reached == false) Show(linkDot, Orange, linkTitle, "Site injoignable", linkDetail, "Nouvel essai dans une minute." + kept);
             else if (uploader?.Reached == true) Show(linkDot, Green, linkTitle, "Relié à " + host, linkDetail,
                 uploader.LastSent is DateTime last ? $"Dernier envoi à {last:HH:mm} · {uploader.SentToday} aujourd'hui" : "À jour, rien à envoyer pour l'instant.");
             else Show(linkDot, Grey, linkTitle, "Relié à " + host, linkDetail, "Premier envoi dans la minute.");
+
+            var available = plugin.Updater.Available;
+            version.Text = "Version " + Updater.Current.ToString(3);
+            plugin.Updater.Check(code);
+            if (available != null && code != null)
+            {
+                if (updateBox.Visibility != Visibility.Visible) updateText.Text = "Une nouvelle version du plugin est prête (" + available.ToString(3) + ", tu as la " + Updater.Current.ToString(3) + ").";
+                updateBox.Visibility = Visibility.Visible;
+            }
+            else updateBox.Visibility = Visibility.Collapsed;
 
             var api = plugin.Api;
             string service = api.ReadAt is DateTime read ? $"Temps de service de la voiture lus à {read:HH:mm}." : "Les temps de service seront lus dès que tu rouleras.";

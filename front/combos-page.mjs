@@ -1,7 +1,7 @@
 // « Fiches combo » (server/combos.mjs, module "combos"): what the team measured in practice on one car and one
 // track, sent by each pilot's SimHub plugin. Raw numbers only, no advice: each pilot in his colour, the white
 // « Équipage » row is the plain mean of the pilots shown (each counts once). Conditions are framed blocks.
-import {COLORS, CONDITIONS} from '../shared/combos.mjs';
+import {COLORS, CONDITIONS, installerFor} from '../shared/combos.mjs';
 
 const app = document.getElementById('combos-app');
 const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
@@ -63,8 +63,10 @@ async function start() {
   view.moment = ['day', 'night'].includes(params.get('moment')) ? params.get('moment') : '';
   view.trackMin = params.get('tmin') || ''; view.trackMax = params.get('tmax') || '';
   try {
+    // The plugin build this site hands out, when there is one (scripts/build.mjs).
+    const plugin = fetch('/downloads/simhub/plugin.json', {cache:'no-store'}).then(response => response.ok ? response.json() : null).catch(() => null);
     const [list, link] = await Promise.all([call('/api/combos'), call('/api/combos/link')]);
-    view.combos = list.combos; view.link = link;
+    view.combos = list.combos; view.link = link; view.plugin = await plugin;
   } catch (error) { renderError(error); return; }
   const wanted = view.combos.find(item => item.track === params.get('track') && item.car === params.get('car'));
   view.combo = wanted || view.combos[0] || null;
@@ -157,7 +159,8 @@ function linkCard() {
     <p class="${view.copied ? 'cb-ok' : 'cb-src'}">${view.copied ? 'Code copié. Ouvre le menu « Fiches combo » de SimHub : il le trouve tout seul.' : 'Copie ce code, puis colle-le dans SimHub.'} Il ne s’affiche qu’une fois : un nouveau code remplace l’ancien.</p>` : '';
   return `<details class="cb-link" data-fold="link"${open ? ' open' : ''}><summary>${state}</summary><div class="cb-link-body">
     <ol class="cb-steps">
-      <li><b>Installe le plugin</b> : double-clique sur « Installer le plugin », livré avec <code>EnduranceManager.SimHub.dll</code>. Il ferme et relance SimHub ; accepte le nouveau plugin.</li>
+      <li>${view.plugin ? `<b>Installe le plugin</b> : <button type="button" class="cb-btn" data-action="download-plugin">Télécharger l’installeur</button> (version ${esc(view.plugin.version)}), puis double-clique dessus. Il télécharge le plugin, ferme et relance SimHub ; accepte le nouveau plugin. Si Windows te prévient, clique sur « Informations complémentaires » puis « Exécuter quand même ». Les mises à jour se font ensuite depuis SimHub.`
+        : '<b>Installe le plugin</b> : double-clique sur « Installer le plugin », livré avec <code>EnduranceManager.SimHub.dll</code>. Il ferme et relance SimHub ; accepte le nouveau plugin.'}</li>
       <li><b>Crée ton code</b> avec le bouton ci-dessous : il est copié tout seul.</li>
       <li><b>Ouvre le menu « Fiches combo » de SimHub</b> : il trouve le code tout seul. Ensuite, roule : chaque séance part toute seule quand tu reviens au menu.</li>
     </ol>
@@ -408,6 +411,19 @@ async function newCode() {
 
 const dateOf = (value, endOfDay = false) => { const [y, m, d] = String(value).split('-').map(Number); return y ? new Date(y, m - 1, d, endOfDay ? 23 : 0, endOfDay ? 59 : 0, endOfDay ? 59 : 0).getTime() : null; };
 
+// The installer with this site written in: it fetches the latest plugin from here when double-clicked.
+async function downloadPlugin() {
+  await act(async () => {
+    const response = await fetch('/downloads/simhub/installer.cmd', {cache:'no-store'});
+    if (!response.ok) throw Error('Installeur indisponible pour l’instant.');
+    const url = URL.createObjectURL(new Blob([installerFor(await response.text(), location.origin)], {type:'application/octet-stream'}));
+    const link = Object.assign(document.createElement('a'), {href:url, download:'Installer le plugin Fiches combo.cmd'});
+    document.body.append(link); link.click(); link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  });
+  render();
+}
+
 async function exportSheet() {
   await act(async () => {
     const base = new URLSearchParams({track:view.combo.track, car:view.combo.car});
@@ -449,6 +465,7 @@ app.addEventListener('click', async event => {
       await act(async () => { await call('/api/combos/link', 'DELETE', {}); view.link = await call('/api/combos/link'); view.code = ''; }, 'Liaison retirée.');
       render(); break;
     case 'export': await exportSheet(); break;
+    case 'download-plugin': await downloadPlugin(); break;
     case 'edit-note': view.editing = target.dataset.id; render(); break;
     case 'cancel-note': view.editing = null; render(); break;
     case 'delete-note':

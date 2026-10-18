@@ -3,7 +3,7 @@
 // Pendant que le pilote roule dans Le Mans Ultimate, il lit ce que le jeu publie dans sa mémoire partagée (pneus,
 // énergie, carburant, vitesse, pluie, secteurs, arrêts aux stands) et l'API locale du jeu (temps de service de la
 // voiture, nom du réglage chargé),
-// puis envoie chaque séance aux fiches combo de son équipe avec sa clé de pilote.
+// puis envoie chaque séance aux fiches combo de son équipe avec sa clé de pilote. Il se met à jour depuis le même site.
 // Il ne fait que lire : il ne modifie rien dans le jeu ni dans SimHub.
 using System;
 using System.IO;
@@ -47,12 +47,14 @@ namespace EnduranceManager.SimHub
         public string LeftMenuTitle => "Fiches combo";
 
         Uploader uploader;
+        Updater updater;
         readonly LmuApi api = new LmuApi();
         Thread reader, sender;
         volatile bool running;
         int laps;
 
         public Uploader Uploader => uploader;
+        public Updater Updater => updater;
         public LmuApi Api => api;
         // What the game is doing, for the settings screen: closed, in the menus, or on track.
         public volatile string GameState = "closed";
@@ -66,6 +68,7 @@ namespace EnduranceManager.SimHub
             string home = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "EnduranceManager", "Combos");
             Directory.CreateDirectory(home);
             uploader = new Uploader(home);
+            updater = new Updater(home);
             this.AttachDelegate("Status", () => Status);
             this.AttachDelegate("LapsRecorded", () => laps);
             this.AttachDelegate("Enabled", () => Settings.Enabled);
@@ -194,6 +197,8 @@ namespace EnduranceManager.SimHub
             while (running)
             {
                 if (Settings.Enabled && GameState != "track") try { uploader.SendAll(LinkCode.Parse(Settings.Code)); } catch { }
+                // A newer version on the site, looked for once an hour: offered on the plugin's screen.
+                updater.Check(LinkCode.Parse(Settings.Code));
                 for (int i = 0; running && i < 60; i++) Thread.Sleep(1000);
             }
         }

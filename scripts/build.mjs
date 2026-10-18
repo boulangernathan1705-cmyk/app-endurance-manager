@@ -1,5 +1,6 @@
 import './validate-image-assets.mjs';
-import {mkdir, copyFile, cp, writeFile, rm, readFile} from 'node:fs/promises';
+import {mkdir, copyFile, cp, writeFile, rm, readFile, access} from 'node:fs/promises';
+import {createHash} from 'node:crypto';
 import {posix} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {changelogHtml} from './changelog.mjs';
@@ -140,6 +141,22 @@ await cp(root + 'front', new URL('front/', out), {recursive: true});
 await writeFile(new URL('front/version.json', out), JSON.stringify({build: BUILD_ID}) + '\n');
 await cp(root + 'shared', new URL('shared/', out), {recursive: true});
 
+// The SimHub plugin for the fiches combo, when a build sits in connectors/simhub-plugin/release: the DLL, the installer
+// (the page and the plugin write the site's address into it) and plugin.json, which the installer checks the download
+// against and the plugin reads to offer an update.
+const pluginRelease = root + 'connectors/simhub-plugin/';
+if (await access(pluginRelease + 'release/EnduranceManager.SimHub.dll').then(() => true, () => false)) {
+  const {version} = JSON.parse(await readFile(pluginRelease + 'release/plugin.json', 'utf8'));
+  if (!/^\d+\.\d+\.\d+$/.test(version || '')) throw new Error('connectors/simhub-plugin/release/plugin.json : version attendue au format 1.2.3.');
+  const dll = await readFile(pluginRelease + 'release/EnduranceManager.SimHub.dll');
+  const installer = await readFile(pluginRelease + 'Installer le plugin.cmd', 'utf8');
+  if (!installer.includes('@@SITE@@')) throw new Error('L’installeur du plugin doit garder l’emplacement @@SITE@@.');
+  await mkdir(new URL('downloads/simhub/', out), {recursive: true});
+  await writeFile(new URL('downloads/simhub/EnduranceManager.SimHub.dll', out), dll);
+  await writeFile(new URL('downloads/simhub/installer.cmd', out), installer);
+  await writeFile(new URL('downloads/simhub/plugin.json', out), JSON.stringify({version, size:dll.length, sha256:createHash('sha256').update(dll).digest('hex')}) + '\n');
+}
+
 // Module preloads: each page lists every module its scripts import (and their own imports), so the browser
 // fetches them all at once instead of discovering them one level at a time.
 const staticImportPattern = /(?:^|[;\n])\s*(?:import|export)\s*(?:[\w*{}\s,$]+\s*from\s*)?['"]([^'"]+)['"]/g;
@@ -199,6 +216,10 @@ await writeFile(new URL('_headers', out), `/*
 /fiches-combo.html
   X-Robots-Tag: noindex, nofollow
 
+/downloads/*
+  X-Robots-Tag: noindex, nofollow
+  Cache-Control: no-cache
+
 https://app.endurance-manager.workers.dev/*
   X-Robots-Tag: noindex, nofollow
 `);
@@ -210,6 +231,7 @@ Disallow: /telemetry/
 Disallow: /members.html
 Disallow: /diagnostics.html
 Disallow: /fiches-combo.html
+Disallow: /downloads/
 Sitemap: https://endurance-manager.app/sitemap.xml
 `);
 

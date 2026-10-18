@@ -5,7 +5,7 @@ import {readFileSync, readdirSync} from 'node:fs';
 import {createHash} from 'node:crypto';
 import worker from '../server/worker.mjs';
 import {linkTestServer, setMember, ORGA_ROLE, DEV_COMMUNITY} from './fixtures/discord-server.mjs';
-import {cleanSession, cleanService, conditionOf, LINK_PREFIX} from '../shared/combos.mjs';
+import {cleanSession, cleanService, conditionOf, installerFor, LINK_PREFIX} from '../shared/combos.mjs';
 
 const ROOT = 'https://site.example';
 const MANAGER = '111111111111111111', NATHAN = '222222222222222222', LUCAS = '333333333333333333', GUEST = '444444444444444444';
@@ -263,6 +263,16 @@ test('the sheet tells day laps from night laps and narrows to a track temperatur
 
   const exported = (await req(`/api/combos/export?track=${encodeURIComponent(TRACK)}&car=${encodeURIComponent(CAR)}`, 'GET', null, NATHAN)).data;
   assert.deepEqual(exported.sessions.map(item => item.laps[1].light), [0.93, 0.08, null]);
+});
+
+test('the plugin installer is handed out with the site written in and Windows line endings', async () => {
+  const script = readFileSync(new URL('../connectors/simhub-plugin/Installer le plugin.cmd', import.meta.url), 'utf8');
+  assert.equal(script.split('@@SITE@@').length, 2, 'one place for the site');
+  const out = installerFor(script, 'https://dev.endurance-manager.app');
+  assert.ok(out.includes("$site = 'https://dev.endurance-manager.app'"));
+  assert.ok(!/[^\r]\n/.test(out), 'every line ends with CRLF');
+  assert.throws(() => installerFor(script, "https://x.app'; Remove-Item C:\\"), /Installeur/);
+  assert.throws(() => installerFor('@echo off', 'https://x.app'), /Installeur/);
 });
 
 test('races being prepared and game versions sort the sessions by their dates', async () => {
