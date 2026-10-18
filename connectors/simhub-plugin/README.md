@@ -50,8 +50,8 @@ La DLL est dans `bin\Release\EnduranceManager.SimHub.dll`.
 1. Double-cliquer sur `Installer le plugin.cmd`, posé à côté de la DLL dans `bin\Release` : il ferme SimHub, copie
    la DLL dans le dossier de SimHub (lu dans le registre), la débloque et relance SimHub. Il demande les droits
    administrateur seulement si le dossier de SimHub l'exige. Dans SimHub, accepter le nouveau plugin.
-2. Sur le site de l'équipe, créer son code de liaison : `POST /api/combos/link` (la page « Fiches combo » avec son
-   bouton « Relier SimHub » arrive avec l'interface). Le code ressemble à `EMCOMBO1 https://… <clé> EMCOMBO1` et
+2. Sur le site de l'équipe, page « Fiches combo » (`fiches-combo.html`), bloc « Relier SimHub » : « Créer mon code »
+   le crée et le copie (`POST /api/combos/link`). Le code ressemble à `EMCOMBO1 https://… <clé> EMCOMBO1` et
    contient l'adresse du site : un code créé sur le site de test envoie les séances au site de test.
 3. Copier le code, puis ouvrir le menu « Fiches combo » de SimHub : tant qu'il n'est pas relié, il trouve tout seul
    le code dans le presse-papiers. Le bouton « Coller mon code » reste là pour changer de code.

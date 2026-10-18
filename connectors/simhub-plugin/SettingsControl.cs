@@ -70,7 +70,8 @@ namespace EnduranceManager.SimHub
             {
                 if (!automatic) Say("Aucun code dans le presse-papiers. Sur le site : Fiches combo → « Relier SimHub » → « Copier le code », puis reclique ici.", Orange);
                 return;
-            }            plugin.SaveCode(code.ToString());
+            }
+            plugin.SaveCode(code.ToString());
             Say("Code enregistré. Tes séances partiront dans la minute.", Green);
             Refresh();
         }
