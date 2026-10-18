@@ -118,7 +118,7 @@ function frame(a) {
   return {width, height, x:v => 30 + (v - minX) * k, y:v => 30 + (v - minZ) * k};
 }
 
-function trackMap(a, b, metric, pick, legs) {
+function trackMap(a, b, metric, pick, legs, picked) {
   const f = frame(a), {keys, colour, legend} = colouring(a, b, metric, pick);
   const point = i => `${f.x(a.x[i]).toFixed(1)},${f.y(a.z[i]).toFixed(1)}`;
   const lines = [];
@@ -131,8 +131,8 @@ function trackMap(a, b, metric, pick, legs) {
   }
   const marks = legs.map(zone => {
     const [i] = at(a, (zone.from + zone.to) / 2);
-    const tone = zone.gap === null ? '' : zone.gap > 0.005 ? ' is-slow' : zone.gap < -0.005 ? ' is-fast' : '';
-    return `<g class="an-zone${tone}" transform="translate(${point(i)})"><circle r="${legs.length > 15 ? 11 : 15}"/><text dy="4"${legs.length > 15 ? ' class="is-small"' : ''}>${zone.n}</text></g>`;
+    const tone = (zone.gap === null ? '' : zone.gap > 0.005 ? ' is-slow' : zone.gap < -0.005 ? ' is-fast' : '') + (zone.n === picked ? ' is-picked' : '');
+    return `<g class="an-zone${tone}" transform="translate(${point(i)})" data-zone-pick="${zone.n}"><circle r="${legs.length > 15 ? 11 : 15}"/><text dy="4"${legs.length > 15 ? ' class="is-small"' : ''}>${zone.n}</text></g>`;
   }).join('');
   const [first] = at(a, 0);
   return {svg:`<svg class="an-map" viewBox="0 0 ${f.width.toFixed(0)} ${f.height.toFixed(0)}" role="img" aria-label="Tracé du tour : ${esc(METRICS[metric])}" data-map>
@@ -148,43 +148,75 @@ function legendHtml(legend) {
   return `<div class="an-legend">${legend.items.map(([color, label]) => `<span><i style="background:${color}"></i>${esc(label)}</span>`).join('')}</div>`;
 }
 
-// One chart along the lap: one line per pilot (or per series), a 1000 × height box stretched to the width.
-function chart(title, unit, length, series, height, size, {min, max, zero} = {}) {
-  const all = series.flatMap(s => s.values.filter(Number.isFinite));
-  const low = min ?? Math.min(...all), high = max ?? Math.max(...all), span = high - low || 1;
-  const y = v => (height - 4 - (v - low) / span * (height - 8)).toFixed(1);
-  const lines = series.map(s => `<polyline points="${s.dist.map((d, i) => `${(d / length * 1000).toFixed(1)},${y(s.values[i])}`).join(' ')}" stroke="${s.color}"${s.dashed ? ' stroke-dasharray="6 4"' : ''}/>`).join('');
-  const base = zero ? `<line class="an-zero" x1="0" x2="1000" y1="${y(0)}" y2="${y(0)}"/>` : '';
-  const ticks = Array.from({length:zoneCount(length, size) - 1}, (_, k) => { const x = ((k + 1) * size / length * 1000).toFixed(1); return `<line class="an-tick" x1="${x}" x2="${x}" y1="0" y2="${height}"/>`; }).join('');
-  return `<div class="an-chart"><div class="an-chart-head"><b>${esc(title)}</b><span>${esc(fr(high, unit === 's' ? 2 : 0))} ${esc(unit)} / ${esc(fr(low, unit === 's' ? 2 : 0))} ${esc(unit)}</span></div>
-    <svg viewBox="0 0 1000 ${height}" preserveAspectRatio="none" data-chart="${length}">${ticks}${base}<g class="an-plot">${lines}</g><line class="an-cursor-line" x1="0" x2="0" y1="0" y2="${height}" data-cursor-line hidden/></svg></div>`;
+// One chart along the lap, or along the part of it in view (win: from, to in metres): one line per pilot (or per
+// series), a 1000 × height box stretched to the width, the scale fitted to what is in view.
+function chart(title, unit, win, series, height, size, {min, max, zero} = {}) {
+  const span = win.to - win.from || 1, x = d => ((d - win.from) / span * 1000).toFixed(1);
+  const shown = series.map(s => { const keep = []; s.dist.forEach((d, i) => { if (d >= win.from - 40 && d <= win.to + 40 && Number.isFinite(s.values[i])) keep.push(i); }); return {...s, keep}; });
+  const all = shown.flatMap(s => s.keep.map(i => s.values[i]));
+  const low = min ?? Math.min(...all), high = max ?? Math.max(...all), range = high - low || 1;
+  const y = v => (height - 4 - (v - low) / range * (height - 8)).toFixed(1);
+  const lines = shown.map(s => `<polyline points="${s.keep.map(i => `${x(s.dist[i])},${y(s.values[i])}`).join(' ')}" stroke="${s.color}"${s.dashed ? ' stroke-dasharray="6 4"' : ''}/>`).join('');
+  const base = zero && low < 0 && high > 0 ? `<line class="an-zero" x1="0" x2="1000" y1="${y(0)}" y2="${y(0)}"/>` : '';
+  const ticks = [];
+  for (let d = Math.ceil((win.from + 1) / size) * size; d < win.to; d += size) ticks.push(`<line class="an-tick" x1="${x(d)}" x2="${x(d)}" y1="0" y2="${height}"/>`);
+  const digits = unit === 's' ? 2 : 0;
+  return `<div class="an-chart"><div class="an-chart-head"><b>${esc(title)}</b><span>${esc(fr(high, digits))} ${esc(unit)} / ${esc(fr(low, digits))} ${esc(unit)}</span></div>
+    <svg viewBox="0 0 1000 ${height}" preserveAspectRatio="none" data-chart data-from="${win.from}" data-to="${win.to}">${ticks.join('')}${base}<g class="an-plot">${lines}</g><line class="an-cursor-line" x1="0" x2="0" y1="0" y2="${height}" data-cursor-line hidden/></svg></div>`;
 }
 
-function charts(a, b, colorA, colorB, size) {
-  const length = b ? Math.min(a.length, b.length) : a.length;
+// The part of the lap in view: the whole lap, or the portion picked with 150 m either side.
+function windowOf(length, size, picked) {
+  if (!picked) return {from:0, to:length};
+  const from = (picked - 1) * size, to = Math.min(length, picked * size);
+  return {from:Math.max(0, from - 150), to:Math.min(length, to + 150), portion:[from, to]};
+}
+
+function charts(a, b, colorA, colorB, size, picked) {
+  const length = b ? Math.min(a.length, b.length) : a.length, win = windowOf(length, size, picked);
   const both = (key, extra = {}) => [{dist:a.dist, values:a[key], color:colorA, ...extra}, ...(b ? [{dist:b.dist, values:b[key], color:colorB, dashed:true}] : [])];
   let gap = '';
   if (b) {
-    const dist = [], values = [];
-    for (let d = 0; d <= length; d += 10) { dist.push(d); values.push(gapAt(a, b, d)); }
-    gap = chart('Écart cumulé', 's', length, [{dist, values, color:colorA}], 110, size, {zero:true});
+    const dist = [], values = [], step = picked ? 2 : 10;
+    for (let d = win.from; d <= win.to; d += step) { dist.push(d); values.push(gapAt(a, b, d)); }
+    gap = chart(picked ? 'Écart sur la portion' : 'Écart cumulé', 's', win, [{dist, values: picked ? values.map(v => v - values[0]) : values, color:colorA}], 110, size, {zero:true});
   }
-  return `${chart('Vitesse', 'km/h', length, both('speed'), 170, size)}${gap}
-    ${chart('Accélérateur', '%', length, both('throttle').map(s => ({...s, values:s.values.map(v => v * 100)})), 70, size, {min:0, max:100})}
-    ${chart('Frein', '%', length, both('brake').map(s => ({...s, values:s.values.map(v => v * 100)})), 70, size, {min:0, max:100})}
-    <div class="an-axis">${Array.from({length:zoneCount(length, size)}, (_, k) => k % 5 === 0 ? `<span style="left:${((k + 0.5) * size / length * 100).toFixed(2)}%">${k + 1}</span>` : '').join('')}</div>`;
+  const axis = picked
+    ? `<div class="an-axis is-metres">${[win.from, (win.from + win.to) / 2, win.to].map((d, k) => `<span style="left:${k * 50}%">${fr(d, 0)} m</span>`).join('')}</div>`
+    : `<div class="an-axis">${Array.from({length:zoneCount(length, size)}, (_, k) => k % 5 === 0 ? `<span style="left:${((k + 0.5) * size / length * 100).toFixed(2)}%">${k + 1}</span>` : '').join('')}</div>`;
+  const head = picked ? `<div class="an-zoom"><span>Portion ${picked} · ${fr(win.portion[0], 0)} à ${fr(win.portion[1], 0)} m</span><button type="button" class="cb-btn is-quiet" data-zone-pick="${picked}">Tour complet</button></div>` : '';
+  return `${head}${chart('Vitesse', 'km/h', win, both('speed'), 170, size)}${gap}
+    ${chart('Accélérateur', '%', win, both('throttle').map(s => ({...s, values:s.values.map(v => v * 100)})), 70, size, {min:0, max:100})}
+    ${chart('Frein', '%', win, both('brake').map(s => ({...s, values:s.values.map(v => v * 100)})), 70, size, {min:0, max:100})}
+    ${picked ? chart('Rapport', '', win, both('gear'), 60, size) : ''}${axis}`;
 }
 
 // ---------- The session in figures ----------
 
-function summary(sides) {
-  const cell = (label, value) => `<div><span>${esc(label)}</span><b>${value}</b></div>`;
-  return `<div class="an-summary">${sides.map(side => {
-    const l = side.data.laps;
-    return `<div class="an-side" style="--dc:${esc(side.color)}"><div class="an-side-name"><i></i>${esc(side.label)}</div><div class="an-figures">
-      ${cell('Tours propres', l.count)}${cell('Meilleur', lapTime(l.best))}${cell('Moyenne', lapTime(l.avg))}${cell('Écart', `${fr(l.spread, 3)} s`)}
-      ${cell('Énergie / tour', `${fr(l.ve, 2)} %`)}${cell('Vitesse max', `${fr(l.top, 0)} km/h`)}${cell('Tour tracé', side.trace ? `n° ${side.data.trace.lap} · ${lapTime(side.data.trace.lapTime)}` : 'aucun')}</div></div>`;
-  }).join('')}</div>`;
+// The two sessions face to face: the laps compared, their sectors, then the session as a whole. The gap is the first
+// minus the second; on times, red when the first is slower.
+function headToHead(sides) {
+  const [a, b] = sides;
+  const traced = side => side.trace ? (side.data.list || []).find(lap => lap.n === side.data.trace.lap) : null;
+  const ROWS = [
+    ['Tour comparé', '', side => side.trace ? side.data.trace.lapTime : null, 'lap'],
+    ['Secteur 1', 's', side => traced(side)?.s1, 'time'], ['Secteur 2', 's', side => traced(side)?.s2, 'time'], ['Secteur 3', 's', side => traced(side)?.s3, 'time'],
+    ['Meilleur tour', '', side => side.data.laps.best, 'lap'], ['Moyenne', '', side => side.data.laps.avg, 'lap'],
+    ['Écart entre tours', 's', side => side.data.laps.spread, 'time'], ['Tours propres', '', side => side.data.laps.count, 'count'],
+    ['Énergie / tour', '%', side => side.data.laps.ve, 'fig'], ['Carbu / tour', 'L', side => side.data.laps.fuel, 'fig'], ['Vitesse max', 'km/h', side => side.data.laps.top, 'speed']];
+  const show = (value, kind) => !known(value) ? '—' : kind === 'lap' ? lapTime(value) : kind === 'time' ? fr(value, 3) : kind === 'count' ? String(value)
+    : kind === 'speed' ? fr(value, 0) : fr(value, 2);
+  const gap = (x, y, kind) => {
+    if (!known(x) || !known(y)) return '<td></td>';
+    const d = x - y, timed = kind === 'lap' || kind === 'time';
+    return `<td class="${timed && d > 0.0005 ? 'an-slow' : timed && d < -0.0005 ? 'an-fast' : ''}">${signed(d, timed ? 3 : kind === 'fig' ? 2 : 0)}</td>`;
+  };
+  const rows = ROWS.filter(([, , get]) => sides.some(side => known(get(side)))).map(([label, unit, get, kind]) =>
+    `<tr${label === 'Tour comparé' ? ' class="an-key"' : ''}><td>${esc(label)}${unit ? ` <small>${esc(unit)}</small>` : ''}</td>${sides.map(side => `<td>${show(get(side), kind)}</td>`).join('')}${b ? gap(get(a), get(b), kind) : ''}</tr>`).join('');
+  const who = side => `<th class="an-who" style="--dc:${esc(side.color)}"><i></i>${esc(side.short)}</th>`;
+  const when = side => `<span style="--dc:${esc(side.color)}"><i></i>${esc(side.label)}${side.trace ? ` · tour n° ${side.data.trace.lap}` : ''}</span>`;
+  return `<section class="cb-card an-h2h"><div class="cb-wrap"><table><thead><tr><th></th>${sides.map(who).join('')}${b ? '<th>Écart</th>' : ''}</tr></thead><tbody>${rows}</tbody></table></div>
+    <p class="an-when">${sides.map(when).join('')}</p></section>`;
 }
 
 const EXPERT_ROWS = [['Temp. bande', 'tyreTemp', 'tyreTempMax', '°C', 1, 'max'], ['Pression', 'kpa', 'kpaMax', 'kPa', 1, 'max'],
@@ -205,12 +237,28 @@ function expert(sides) {
     <div class="an-wheels">${[0, 1, 2, 3].map(wheel).join('')}${engine}</div></section>`;
 }
 
-function zoneTable(legs, sides) {
+// The lap portion by portion. Compared, each portion's gap as a bar (right: the first loses time, left: he gains),
+// in the order of the lap or the biggest losses first. A portion picked zooms the charts on it.
+function gapList(legs, sides, picked, sort) {
   const [a, b] = sides;
-  return `<div class="cb-wrap"><table class="an-zones"><thead><tr><th>Portion</th><th class="an-who" style="--dc:${esc(a.color)}"><i></i>${esc(a.short)}</th>${b ? `<th class="an-who" style="--dc:${esc(b.color)}"><i></i>${esc(b.short)}</th><th>Écart</th>` : ''}<th>V. mini</th></tr></thead>
-    <tbody>${legs.map(zone => `<tr data-zone="${zone.from}"><td>${zone.n}</td><td>${fr(zone.timeA, 2)} s</td>${b ? `<td>${fr(zone.timeB, 2)} s</td><td class="${zone.gap > 0.005 ? 'an-slow' : zone.gap < -0.005 ? 'an-fast' : ''}">${signed(zone.gap)} s</td>` : ''}
-      <td>${fr(zone.minA, 0)}${b ? ` / ${fr(zone.minB, 0)}` : ''}</td></tr>`).join('')}
-    ${b ? `<tr class="cb-crew"><td>Tour</td><td>${lapTime(a.trace.lapTime)}</td><td>${lapTime(b.trace.lapTime)}</td><td class="${legs.reduce((s, z) => s + z.gap, 0) > 0 ? 'an-slow' : 'an-fast'}">${signed(legs.reduce((s, z) => s + z.gap, 0))} s</td><td></td></tr>` : ''}</tbody></table></div>`;
+  const max = Math.max(0.02, ...legs.map(zone => Math.abs(zone.gap || 0)));
+  const order = b && sort === 'gap' ? [...legs].sort((x, y) => y.gap - x.gap) : legs;
+  const km = metres => fr(metres / 1000, metres % 1000 ? 2 : 1);
+  const row = zone => {
+    const tone = !b ? '' : zone.gap > 0.005 ? 'an-slow' : zone.gap < -0.005 ? 'an-fast' : '';
+    const bar = b ? `<span class="an-bar"><i class="${zone.gap > 0 ? 'is-slow' : 'is-fast'}" style="${zone.gap > 0 ? 'left' : 'right'}:50%;width:${(Math.abs(zone.gap) / max * 50).toFixed(1)}%"></i></span>` : '';
+    return `<button type="button" class="an-gap${zone.n === picked ? ' is-picked' : ''}" data-zone-pick="${zone.n}" aria-pressed="${zone.n === picked}">
+      <span class="an-gap-n">${zone.n}</span><span class="an-gap-at">${km(zone.from)}–${km(zone.to)} km</span>${bar}
+      <b class="${tone}">${b ? `${signed(zone.gap)} s` : `${fr(zone.timeA, 2)} s`}</b><small>${fr(zone.minA, 0)}${b ? ` / ${fr(zone.minB, 0)}` : ''}</small></button>`;
+  };
+  const total = b ? legs.reduce((sum, zone) => sum + zone.gap, 0) : null;
+  const sorts = b ? `<div class="an-sorts" role="group" aria-label="Ordre">${[['lap', 'Ordre du tour'], ['gap', 'Plus gros écarts']].map(([key, label]) => `<button type="button" data-zone-sort="${key}" aria-pressed="${key === sort}">${label}</button>`).join('')}</div>` : '';
+  const legend = b ? `<div class="an-gap-legend"><span class="an-fast">◀ ${esc(a.short)} plus rapide</span><span class="an-slow">${esc(b.short)} plus rapide ▶</span></div>` : '';
+  const head = `<div class="an-gap is-head"><span>n°</span><span class="an-gap-at">km</span>${b ? '<span></span>' : ''}<span>${b ? 'Écart' : 'Temps'}</span><span>V. mini</span></div>`;
+  return `<div class="an-gaps"><div class="an-gaps-head"><b>Portions</b>${sorts}</div>${legend}
+    <div class="an-gaps-list" data-gaps>${head}${order.map(row).join('')}</div>
+    <div class="an-gaps-foot"><span>Tour</span>${b ? `<b class="${total > 0 ? 'an-slow' : 'an-fast'}">${signed(total)} s</b>` : `<b>${lapTime(a.trace.lapTime)}</b>`}</div>
+    <p class="cb-src">Touche une portion, ici ou sur le tracé, pour zoomer les courbes dessus.</p></div>`;
 }
 
 // Every lap of the session looked at and whether it counts: its pilot takes a test lap out, or puts it back.
@@ -221,28 +269,29 @@ function lapList(side) {
   const mine = side.data.session.mine, counted = list.filter(lap => !lap.out).length;
   const action = lap => !mine ? '' : `<td><button type="button" class="cb-btn is-quiet an-ignore" data-ignore="${lap.n}" data-back="${lap.out === 'ignored' ? '1' : ''}">${lap.out === 'ignored' ? 'Remettre' : 'Retirer'}</button></td>`;
   const all = mine ? `<div class="cb-actions">${list.some(lap => lap.out !== 'ignored') ? '<button type="button" class="cb-btn is-quiet" data-ignore="all">Retirer toute la séance</button>' : ''}${list.some(lap => lap.out === 'ignored') ? '<button type="button" class="cb-btn is-quiet" data-ignore="all" data-back="1">Tout remettre</button>' : ''}</div>` : '';
-  return `<details class="cb-card an-laps" data-fold="laps"${side.lapsOpen === false ? '' : ' open'}><summary>Tours de la séance<span>${counted} compté${counted > 1 ? 's' : ''} sur ${list.length}</span></summary>
+  return `<details class="cb-card an-laps" data-fold="laps"${side.lapsOpen ? ' open' : ''}><summary>Tours de la séance<span>${counted} compté${counted > 1 ? 's' : ''} sur ${list.length}</span></summary>
     <p class="cb-src">${mine ? 'Un relais de moins de 3 tours chronométrés ne compte pas, sauf ton meilleur tour. Un autre tour de test ou pas roulé pour de vrai : retire-le, il reste enregistré mais ne compte plus dans les fiches ni dans l’analyse.' : 'Seul le pilote de la séance peut retirer ses tours.'}</p>
     <div class="cb-wrap"><table><thead><tr><th>Tour</th><th>Temps</th><th>S1</th><th>S2</th><th>S3</th><th>Énergie (%)</th><th>Carbu (L)</th><th>Gomme</th><th>État</th>${mine ? '<th></th>' : ''}</tr></thead>
     <tbody>${list.map(lap => `<tr class="${lap.out ? 'an-out' : ''}"><td>${lap.n}</td><td>${lapTime(lap.t)}</td><td>${fr(lap.s1, 3)}</td><td>${fr(lap.s2, 3)}</td><td>${fr(lap.s3, 3)}</td><td>${fr(lap.ve, 2)}</td><td>${fr(lap.fuel, 2)}</td><td>${esc(lap.compound || '')}</td><td>${OUT[lap.out] ?? esc(lap.out)}</td>${action(lap)}</tr>`).join('')}</tbody></table></div>${all}</details>`;
 }
 
 // The whole tab below its choices. sides: [mine, other?], each {data, trace (prepared), color, label, short}.
-export function analysisBody(sides, metric, pick, size = 450) {
+export function analysisBody(sides, metric, pick, size = 450, picked = null, sort = 'lap') {
   const [a, b] = sides;
   const lap = a.trace ? (() => {
     const legs = zones(a.trace, b?.trace || null, size);
+    if (!legs.some(zone => zone.n === picked)) picked = null;
     const usable = metric === 'delta' && !b?.trace ? 'speed' : metric;
-    const map = trackMap(a.trace, b?.trace || null, usable, pick, legs);
+    const map = trackMap(a.trace, b?.trace || null, usable, pick, legs, picked);
     const picks = usable === 'temp' ? WHEEL_SHORT.map((label, i) => [i, label]) : usable === 'ride' ? [[0, 'Avant'], [2, 'Arrière']] : [];
     return `<section><div class="cb-head"><h2>Analyse du tour</h2><label class="an-size">Portions de <select data-field="an-size">${PORTIONS.map(value => `<option value="${value}"${value === size ? ' selected' : ''}>${value} m</option>`).join('')}</select></label></div>
       <div class="an-metrics" role="group" aria-label="Couleur du tracé">${Object.entries(METRICS).filter(([key]) => key !== 'delta' || b?.trace).map(([key, label]) => `<button type="button" data-metric="${key}" aria-pressed="${key === usable}">${esc(label)}${key === 'delta' ? ` avec ${esc(b.short)}` : ''}</button>`).join('')}</div>
       ${picks.length ? `<div class="an-picks" role="group" aria-label="Roue">${picks.map(([value, label]) => `<button type="button" data-pick="${value}" aria-pressed="${value === pick || (usable === 'ride' && value === (pick >= 2 ? 2 : 0))}">${label}</button>`).join('')}</div>` : ''}
       <div class="an-lap"><div class="an-map-box">${map.svg}${legendHtml(map.legend)}<p class="an-readout" data-readout>Survole le tracé ou les courbes pour lire chaque point.</p></div>
-      <div>${zoneTable(legs, b?.trace ? sides : [a])}</div></div>
-      <div class="an-charts">${charts(a.trace, b?.trace || null, a.color, b?.color, size)}</div></section>`;
+      ${gapList(legs, b?.trace ? sides : [a], picked, sort)}</div>
+      <div class="an-charts">${charts(a.trace, b?.trace || null, a.color, b?.color, size, picked)}</div></section>`;
   })() : `<section><div class="cb-head"><h2>Analyse du tour</h2></div><p class="cb-empty">Pas de tracé pour cette séance : le plugin 1.2 enregistre le meilleur tour propre de chaque séance.</p></section>`;
-  return `${summary(sides)}${lapList(a)}${lap}${expert(sides)}`;
+  return `${headToHead(sides)}${lap}${lapList(a)}${expert(sides)}`;
 }
 
 // ---------- Following the pointer ----------
@@ -260,7 +309,12 @@ export function showCursor(root, sides, d) {
     cursor.setAttribute('cy', f.y(valueAt(a.trace, a.trace.z, d)).toFixed(1));
     cursor.removeAttribute('hidden');
   }
-  for (const line of root.querySelectorAll('[data-cursor-line]')) { line.setAttribute('x1', d / length * 1000); line.setAttribute('x2', d / length * 1000); line.removeAttribute('hidden'); }
+  for (const line of root.querySelectorAll('[data-cursor-line]')) {
+    const box = line.closest('[data-chart]'), from = Number(box.dataset.from), to = Number(box.dataset.to);
+    const x = (d - from) / (to - from || 1) * 1000;
+    line.setAttribute('x1', x); line.setAttribute('x2', x);
+    x >= 0 && x <= 1000 ? line.removeAttribute('hidden') : line.setAttribute('hidden', '');
+  }
   const readout = root.querySelector('[data-readout]');
   if (!readout) return;
   const [i] = at(a.trace, d);
@@ -279,7 +333,8 @@ export function distanceUnder(event, sides) {
   const chartBox = event.target.closest('[data-chart]');
   if (chartBox) {
     const box = chartBox.getBoundingClientRect();
-    return (event.clientX - box.left) / box.width * Number(chartBox.dataset.chart);
+    const from = Number(chartBox.dataset.from), to = Number(chartBox.dataset.to);
+    return from + (event.clientX - box.left) / box.width * (to - from);
   }
   const map = event.target.closest('[data-map]');
   if (!map) return null;

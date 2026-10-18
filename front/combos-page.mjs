@@ -2,7 +2,7 @@
 // track, sent by each pilot's SimHub plugin. Raw numbers only, no advice: each pilot in his colour, the white
 // « Équipage » row is the plain mean of the pilots shown (each counts once). Conditions are framed blocks.
 import {COLORS, CONDITIONS, installerFor} from '../shared/combos.mjs';
-import {analysisBody, distanceUnder, prepare, showCursor} from './combos-analysis.mjs?v=5';
+import {analysisBody, distanceUnder, prepare, showCursor} from './combos-analysis.mjs?v=6';
 
 const app = document.getElementById('combos-app');
 const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
@@ -24,7 +24,7 @@ const view = {
   pit:{before:8, after:100, tyres:4, pressure:false, driver:true, wing:'', frontWing:'', radiator:false, brakes:false, repair:''}, pitOpen:false, periodsOpen:false, linkOpen:null,
   editing:null, message:'', error:'',
   // « Mon analyse »: the combo's sessions, the one looked at and the one it is compared with, the map's colouring.
-  tab:'sheet', analysis:{list:null, key:'', mine:'', other:'', metric:'speed', pick:0, size:450, sessions:new Map(), loading:false, error:''}
+  tab:'sheet', analysis:{list:null, key:'', mine:'', other:'', metric:'speed', pick:0, size:450, zone:null, sort:'lap', sessions:new Map(), loading:false, error:''}
 };
 try { view.hidden = new Set(JSON.parse(localStorage.getItem(STORE) || '[]')); } catch {}
 const saveHidden = () => { try { localStorage.setItem(STORE, JSON.stringify([...view.hidden])); } catch {} };
@@ -171,20 +171,30 @@ function analysisSides() {
   return mine ? [mine, ...(other ? [other] : [])] : [];
 }
 
+// The session looked at, then who it is compared with: each teammate's best traced lap and the pilot's own best other
+// session one tap away, any other session in the list below.
 function analysisChoices() {
-  const a = view.analysis, list = a.list || [];
+  const a = view.analysis, list = a.list || [], colour = people();
   const label = item => `${dayTime(item.startedAt)} · ${item.laps} tours · ${lapTime(item.best)}${item.trace ? '' : ' · sans tracé'}`;
   const option = (item, current, withName) => `<option value="${esc(item.id)}"${item.id === current ? ' selected' : ''}>${withName ? `${esc(item.name)} · ` : ''}${esc(label(item))}</option>`;
   const mineList = list.filter(item => item.mine);
   const mine = list.find(item => item.id === a.mine);
-  const teammates = list.filter(item => item.trace && item.userId !== mine?.userId).sort((x, y) => x.trace.time - y.trace.time);
-  const own = list.filter(item => item.trace && item.userId === mine?.userId && item.id !== a.mine);
+  const traced = list.filter(item => item.trace && item.id !== a.mine).sort((x, y) => x.trace.time - y.trace.time);
+  // The fastest traced lap of each pilot, the pilot of the session first.
+  const best = new Map();
+  for (const item of traced) if (!best.has(item.userId)) best.set(item.userId, item);
+  const chips = [...best.values()].sort((x, y) => (y.userId === mine?.userId) - (x.userId === mine?.userId));
+  const chip = item => {
+    const own = item.userId === mine?.userId;
+    return `<button type="button" class="an-chip" data-other="${esc(item.id)}" aria-pressed="${item.id === a.other}" style="--dc:${esc(own ? '#f0f3f2' : colour.get(item.userId)?.color || item.color || COLORS[1])}">
+      <i></i><span>${own ? 'Ma meilleure autre séance' : esc(item.name)}</span><b>${lapTime(item.trace.time)}</b></button>`;
+  };
+  const rest = traced.filter(item => !chips.includes(item));
   return `<div class="an-choices">
     <label>Séance<select data-field="an-mine">${mineList.length ? `<optgroup label="Mes séances">${mineList.map(item => option(item, a.mine)).join('')}</optgroup>` : ''}
       ${list.some(item => !item.mine) ? `<optgroup label="${mineList.length ? 'Coéquipiers' : 'Séances de l’équipe'}">${list.filter(item => !item.mine).map(item => option(item, a.mine, true)).join('')}</optgroup>` : ''}</select></label>
-    <label>Comparer avec<select data-field="an-other"><option value="none"${a.other === 'none' ? ' selected' : ''}>Personne</option>
-      ${teammates.length ? `<optgroup label="Coéquipiers, meilleur tour tracé">${teammates.map(item => option(item, a.other, true)).join('')}</optgroup>` : ''}
-      ${own.length ? `<optgroup label="Autres séances du même pilote">${own.map(item => option(item, a.other, true)).join('')}</optgroup>` : ''}</select></label></div>`;
+    <div class="an-compare"><span>Comparer avec</span><div class="an-chips">${chips.map(chip).join('')}<button type="button" class="an-chip" data-other="none" aria-pressed="${a.other === 'none'}"><span>Personne</span></button></div>
+      ${rest.length ? `<select data-field="an-other" aria-label="Une autre séance"><option value="">Une autre séance…</option>${rest.map(item => option(item, a.other, true)).join('')}</select>` : ''}</div></div>`;
 }
 
 function analysis() {
@@ -193,7 +203,7 @@ function analysis() {
   if (!a.list) return '<p class="cb-empty">Chargement…</p>';
   if (!a.list.length) return '<p class="cb-empty">Aucune séance sur ce combo pour l’instant.</p>';
   const sides = analysisSides();
-  const body = sides.length ? analysisBody(sides, a.metric, a.pick, a.size) : '<p class="cb-empty">Chargement…</p>';
+  const body = sides.length ? analysisBody(sides, a.metric, a.pick, a.size, a.zone, a.sort) : '<p class="cb-empty">Chargement…</p>';
   return `${analysisChoices()}<div class="an-body${a.loading ? ' is-loading' : ''}">${body}</div>`;
 }
 
@@ -567,7 +577,22 @@ async function exportSheet() {
   render();
 }
 
+// Drawn again without losing the place in the list of portions.
+function renderKeepingGaps() {
+  const top = app.querySelector('[data-gaps]')?.scrollTop || 0;
+  render();
+  const list = app.querySelector('[data-gaps]');
+  if (list) list.scrollTop = top;
+}
+
 app.addEventListener('click', async event => {
+  // A portion, in the list or on the map: the charts zoom on it; again, the whole lap.
+  const zone = event.target.closest?.('[data-zone-pick]');
+  if (zone && app.contains(zone)) {
+    const n = Number(zone.dataset.zonePick);
+    view.analysis.zone = view.analysis.zone === n ? null : n;
+    renderKeepingGaps(); return;
+  }
   const target = event.target.closest('button');
   if (!target || !app.contains(target)) return;
   if (target.dataset.driver) {
@@ -582,7 +607,9 @@ app.addEventListener('click', async event => {
     return;
   }
   if (target.dataset.ignore) { await ignoreLaps(target.dataset.ignore, !target.dataset.back); return; }
-  if (target.dataset.metric) { view.analysis.metric = target.dataset.metric; render(); return; }
+  if (target.dataset.metric) { view.analysis.metric = target.dataset.metric; renderKeepingGaps(); return; }
+  if (target.dataset.zoneSort) { view.analysis.sort = target.dataset.zoneSort; render(); return; }
+  if (target.dataset.other) { Object.assign(view.analysis, {other:target.dataset.other, zone:null}); await loadAnalysis(); return; }
   if (target.dataset.pick) { view.analysis.pick = Number(target.dataset.pick); render(); return; }
   if (target.dataset.compound) { view.compound = target.dataset.compound; render(); return; }
   if (target.dataset.moment !== undefined) { view.moment = target.dataset.moment; await loadSheet(); return; }
@@ -618,9 +645,11 @@ app.addEventListener('click', async event => {
 
 app.addEventListener('change', async event => {
   const field = event.target.dataset.field;
-  if (field === 'an-size') { view.analysis.size = Number(event.target.value) || 450; render(); return; }
+  if (field === 'an-size') { Object.assign(view.analysis, {size:Number(event.target.value) || 450, zone:null}); render(); return; }
   if (field === 'an-mine' || field === 'an-other') {
+    if (!event.target.value) return;
     view.analysis[field === 'an-mine' ? 'mine' : 'other'] = event.target.value;
+    view.analysis.zone = null;
     await loadAnalysis(); return;
   }
   if (field === 'combo') {
