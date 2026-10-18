@@ -5,6 +5,7 @@ import {readFileSync, readdirSync} from 'node:fs';
 import {createHash} from 'node:crypto';
 import worker from '../server/worker.mjs';
 import {linkTestServer, setMember, ORGA_ROLE, DEV_COMMUNITY} from './fixtures/discord-server.mjs';
+import {prepare, zones} from '../front/combos-analysis.mjs';
 import {cleanSession, cleanService, cleanTrace, conditionOf, installerFor, LINK_PREFIX} from '../shared/combos.mjs';
 
 const ROOT = 'https://site.example';
@@ -282,6 +283,17 @@ test('a lap trace is kept only whole: every measure as long as the clock, within
   assert.equal(cleanTrace({...trace(5, 210), slip:[[0]]}), null);
   assert.equal(cleanTrace(trace(5, 210, 20)), null, 'too short to be a lap');
   assert.equal(cleanTrace({...trace(5, 210), speed:Array(100).fill(900)}).speed[0], 0, 'an impossible speed is not kept');
+});
+
+test('the lap is compared stretch by stretch, 450 m each, the last one shorter', () => {
+  // 100 points 40 m apart: 3960 m, so 8 stretches of 450 m and one of 360 m.
+  const mine = prepare(trace(5, 99)), his = prepare({...trace(4, 99), time:trace(4, 99).time.map(t => t * 0.99)});
+  const legs = zones(mine, his);
+  assert.deepEqual(legs.map(leg => leg.to - leg.from), [450, 450, 450, 450, 450, 450, 450, 450, 360]);
+  assert.ok(legs.every(leg => leg.gap > 0), 'slower everywhere');
+  assert.equal(Math.round(legs.reduce((sum, leg) => sum + leg.gap, 0) * 100) / 100, 0.98);
+  // The first samples can still read the end of the previous lap: they count from the line.
+  assert.equal(prepare({...trace(5, 99), dist:[3990, ...trace(5, 99).dist.slice(1)]}).dist[0], 0);
 });
 
 test('« Mon analyse »: each session wheel by wheel and its best lap on the map, for the whole team', async () => {

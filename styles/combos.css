@@ -232,6 +232,7 @@ tr.cb-crew td { font-weight: 700; background: var(--cb-panel2); }
 .an-map .an-line { fill: #f0f3f2; }
 .an-zone circle { fill: var(--cb-panel2); stroke: var(--muted); stroke-width: 2; }
 .an-zone text { fill: var(--text); font-size: 16px; font-weight: 700; text-anchor: middle; }
+.an-zone text.is-small { font-size: 12px; }
 .an-zone.is-slow circle { stroke: #ef4444; }
 .an-zone.is-fast circle { stroke: #22c55e; }
 .an-cursor { fill: none; stroke: #fff; stroke-width: 4; }
@@ -254,10 +255,12 @@ th.an-who { color: var(--dc) !important; }
 .an-chart .an-tick { stroke: var(--cb-line); vector-effect: non-scaling-stroke; }
 .an-chart .an-zero { stroke: var(--muted); stroke-dasharray: 4 4; vector-effect: non-scaling-stroke; }
 .an-chart .an-cursor-line { stroke: #fff; stroke-width: 1; vector-effect: non-scaling-stroke; }
-.an-axis { display: grid; grid-template-columns: repeat(10, 1fr); font-size: 11px; color: var(--muted); text-align: center; }
+.an-axis { position: relative; height: 14px; font-size: 11px; color: var(--muted); }
+.an-axis span { position: absolute; transform: translateX(-50%); }
 .an-wheels { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 400px), 1fr)); gap: 8px; }
 .an-wheels small { color: var(--muted); font-size: 11px; }
 .an-wheels tr.an-sub th { font-size: 10px; padding-top: 0; }
 @media (max-width: 999px) {
   .an-lap { grid-template-columns: minmax(0, 1fr); }
 }
+.combos-page .an-zones th, .combos-page .an-zones td { padding: 4px 8px; font-size: 13px; }
