@@ -121,6 +121,7 @@ namespace EnduranceManager.SimHub
 
         void Refresh()
         {
+            if (stint != null && (int)Math.Round(stint.Value) != plugin.Settings.StintLaps) stint.Value = plugin.Settings.StintLaps;
             if (LinkCode.Parse(plugin.Settings.Code) == null) PasteCode(true);
             var code = LinkCode.Parse(plugin.Settings.Code);
             var uploader = plugin.Uploader;
@@ -193,17 +194,20 @@ namespace EnduranceManager.SimHub
                     + "Dans SimHub › Dash Studio › Overlays : « Endurance Manager · Bandeau » ou « Endurance Manager · Colonne ». Ils s'affichent en essais et en course, voiture en piste. "
                     + "En roulant, les tours par relais se changent avec les boutons A (+1) et B (−1) des dashs, s'ils sont reliés à ton volant, "
                     + "ou avec les actions « ToursParRelaisPlus » et « ToursParRelaisMoins » du plugin, dans Contrôles et événements." });
-            inside.Children.Add(Setting("Tours par relais", 1, 60, 1, plugin.Settings.StintLaps, value => $"{value:0} tours", value => plugin.SetStintLaps((int)Math.Round(value))));
+            inside.Children.Add(Setting("Tours par relais", 1, 60, 1, plugin.Settings.StintLaps, value => $"{value:0} tours", value => plugin.SetStintLaps((int)Math.Round(value)), out stint));
             return new Border { Background = Card, BorderBrush = Edge, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(8), Padding = new Thickness(16), Margin = new Thickness(0, 0, 0, 12), Child = inside };
         }
 
         // One slider line: its name, the slider, its value.
-        static FrameworkElement Setting(string name, double min, double max, double step, double value, Func<double, string> format, Action<double> save)
+        // Changed from the wheel too (dash buttons A and B): the slider follows at each refresh.
+        Slider stint;
+
+        static FrameworkElement Setting(string name, double min, double max, double step, double value, Func<double, string> format, Action<double> save, out Slider slider)
         {
             var line = new DockPanel { Margin = new Thickness(0, 4, 0, 4) };
             var label = new TextBlock { Text = name, Width = 120, VerticalAlignment = VerticalAlignment.Center };
             var shown = new TextBlock { Width = 70, TextAlignment = TextAlignment.Right, VerticalAlignment = VerticalAlignment.Center };
-            var slider = new Slider { Minimum = min, Maximum = max, SmallChange = step, LargeChange = step * 5, TickFrequency = step, IsSnapToTickEnabled = true,
+            slider = new Slider { Minimum = min, Maximum = max, SmallChange = step, LargeChange = step * 5, TickFrequency = step, IsSnapToTickEnabled = true,
                 Value = Math.Max(min, Math.Min(max, value)), VerticalAlignment = VerticalAlignment.Center };
             shown.Text = format(slider.Value);
             slider.ValueChanged += (sender, args) => { shown.Text = format(args.NewValue); save(args.NewValue); };
