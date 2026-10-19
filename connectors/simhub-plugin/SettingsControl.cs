@@ -74,7 +74,7 @@ namespace EnduranceManager.SimHub
             var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
             timer.Tick += (sender, args) => Refresh();
             timer.Start();
-            Unloaded += (sender, args) => { timer.Stop(); StopPlacing(); };
+            Unloaded += (sender, args) => timer.Stop();
             Refresh();
             Content = new ScrollViewer { Content = page, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
         }
@@ -183,43 +183,16 @@ namespace EnduranceManager.SimHub
             return button;
         }
 
-        readonly Button place = Action("Placer le bandeau", false);
-        readonly TextBlock placeHint = new TextBlock { Opacity = 0.7, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 8, 0, 0), Visibility = Visibility.Collapsed,
-            Text = "Le bandeau est affiché : fais-le glisser à la souris où tu veux, puis clique sur « Terminé »." };
-
-        void StopPlacing()
-        {
-            plugin.Placing = false;
-            place.Content = "Placer le bandeau";
-            placeHint.Visibility = Visibility.Collapsed;
-        }
-
-        // The practice banner: on or off, its size, its background, the stint length, and its place on the screen.
+        // The overlays: where to find them in Dash Studio, and the stint length that sets the energy aimed at.
         Border BannerBox()
         {
-            var settings = plugin.Settings;
             var inside = new StackPanel();
-            inside.Children.Add(new TextBlock { Text = "BANDEAU DES ESSAIS", FontSize = 11, Opacity = 0.5, Margin = new Thickness(0, 0, 0, 8) });
-            var show = new CheckBox { Content = "Afficher le bandeau pendant les essais", FontSize = 14, IsChecked = settings.Banner, Cursor = System.Windows.Input.Cursors.Hand };
-            show.Checked += (sender, args) => plugin.SaveBanner(s => s.Banner = true);
-            show.Unchecked += (sender, args) => plugin.SaveBanner(s => s.Banner = false);
-            inside.Children.Add(show);
-            inside.Children.Add(new TextBlock { Opacity = 0.7, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 4, 0, 10),
-                Text = "Ton dernier tour (temps, énergie, usure des 4 pneus) face à ta moyenne et à celle de l'équipe sur ce circuit avec cette voiture. LMU doit être en fenêtré sans bordure pour que le bandeau passe par-dessus le jeu." });
-            inside.Children.Add(Setting("Taille", 0.5, 2, 0.05, settings.BannerScale, value => $"{value:P0}", value => plugin.SaveBanner(s => s.BannerScale = value)));
-            inside.Children.Add(Setting("Fond", 0.3, 1, 0.01, settings.BannerOpacity, value => $"{value:P0}", value => plugin.SaveBanner(s => s.BannerOpacity = value)));
-            inside.Children.Add(Setting("Tours par relais", 4, 40, 1, settings.StintLaps, value => $"{value:0} tours", value => plugin.SaveBanner(s => s.StintLaps = (int)Math.Round(value))));
-            place.HorizontalAlignment = HorizontalAlignment.Left;
-            place.Margin = new Thickness(0, 10, 0, 0);
-            place.Click += (sender, args) =>
-            {
-                if (plugin.Placing) { StopPlacing(); return; }
-                plugin.Placing = true;
-                place.Content = "Terminé";
-                placeHint.Visibility = Visibility.Visible;
-            };
-            inside.Children.Add(place);
-            inside.Children.Add(placeHint);
+            inside.Children.Add(new TextBlock { Text = "OVERLAYS ESSAIS ET COURSE", FontSize = 11, Opacity = 0.5, Margin = new Thickness(0, 0, 0, 8) });
+            inside.Children.Add(new TextBlock { Opacity = 0.7, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 10),
+                Text = "Ton dernier tour (temps, énergie, usure des 4 pneus) face à la valeur visée, avec ta moyenne, celle de l'équipe et la meilleure. "
+                    + "Dans SimHub › Dash Studio › Overlays : « Endurance Manager · Bandeau » ou « Endurance Manager · Colonne ». Ils s'affichent en essais et en course, voiture en piste. "
+                    + "En roulant, les tours par relais se changent avec deux boutons du volant : actions « ToursParRelaisPlus » et « ToursParRelaisMoins » du plugin, dans Contrôles et événements." });
+            inside.Children.Add(Setting("Tours par relais", 1, 60, 1, plugin.Settings.StintLaps, value => $"{value:0} tours", value => plugin.SetStintLaps((int)Math.Round(value))));
             return new Border { Background = Card, BorderBrush = Edge, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(8), Padding = new Thickness(16), Margin = new Thickness(0, 0, 0, 12), Child = inside };
         }
 
