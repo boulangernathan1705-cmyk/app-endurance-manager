@@ -27,8 +27,10 @@ Envoie les séances Le Mans Ultimate d'un pilote aux fiches combo de son équipe
   / (2 × tours par relais), plafonné à 1. Propriétés `EnduranceManagerPlugin.Essais.*` (`EnEssais`, `EnCourse`,
   `NonCompte`, `Couleur`, `ToursParRelais`, puis pour `Tour`, `Energie` et `Usure` : `Titre`, `Valeur`, `Ecart`,
   `EcartCouleur`, `Vise`, `Moi`, `MoiCouleur`, `Equipe`, `Meilleur`, `MeilleurCouleur`, `Nombre`, `ViseNombre`). Les
-  tours par relais se changent sur l'écran du plugin ou en roulant, avec les actions `ToursParRelaisPlus` et
-  `ToursParRelaisMoins` à relier à des boutons du volant.
+  tours par relais se changent sur l'écran du plugin ou en roulant : boutons A (+1) et B (−1) des dashs SimHub
+  (`GraphicalDashPlugin.ActionA` et `ActionB`, souvent déjà reliés au volant ; pris seulement en essais et en course,
+  voiture en piste), ou actions `ToursParRelaisPlus` et `ToursParRelaisMoins` du plugin. Les flèches restent à la
+  navigation entre écrans des dashs.
 - écrit deux overlays dans les modèles de Dash Studio à son lancement (`Dashes.cs`) : « Endurance Manager · Bandeau »
   et « Endurance Manager · Colonne », affichés en essais et en course voiture en piste (formule du calque à changer
   dans Dash Studio pour d'autres séances). Un overlay modifié dans Dash Studio n'est plus réécrit.

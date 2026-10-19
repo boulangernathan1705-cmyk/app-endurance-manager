@@ -91,6 +91,9 @@ namespace EnduranceManager.SimHub
             this.AttachDelegate("Essais.ToursParRelais", () => Settings.StintLaps);
             this.AddAction("ToursParRelaisPlus", (manager, button) => SetStintLaps(Settings.StintLaps + 1));
             this.AddAction("ToursParRelaisMoins", (manager, button) => SetStintLaps(Settings.StintLaps - 1));
+            // The dashes' own buttons A and B, that pilots already have on their wheel, do the same while the overlays show
+            // (practice or race, car on track): A one lap more, B one lap less.
+            pluginManager.InputToActionTriggered += DashButton;
             foreach (var (name, block) in new (string, Func<PracticeView, PracticeView.Block>)[] { ("Tour", view => view.Lap), ("Energie", view => view.Energy), ("Usure", view => view.Wear) })
             {
                 string at = "Essais." + name + ".";
@@ -121,6 +124,7 @@ namespace EnduranceManager.SimHub
         {
             running = false;
             live?.Stop();
+            pluginManager.InputToActionTriggered -= DashButton;
             this.SaveCommonSettings("GeneralSettings", Settings);
             // SimHub closes: the session being driven is written to disk before the process goes.
             reader?.Join(3000);
@@ -143,6 +147,13 @@ namespace EnduranceManager.SimHub
         {
             Settings.Share = share;
             this.SaveCommonSettings("GeneralSettings", Settings);
+        }
+
+        void DashButton(string input, string action)
+        {
+            if (!Practice.InPractice && !Practice.InRace) return;
+            if (action == "GraphicalDashPlugin.ActionA") SetStintLaps(Settings.StintLaps + 1);
+            else if (action == "GraphicalDashPlugin.ActionB") SetStintLaps(Settings.StintLaps - 1);
         }
 
         // The overlays' stint length, from the plugin's screen.
