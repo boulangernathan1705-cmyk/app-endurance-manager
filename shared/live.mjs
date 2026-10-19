@@ -167,18 +167,9 @@ export function ingest(feeds, snap, at, pilot = null) {
   }
   ours.stops.sort((a, b) => a.lap - b.lap);
   if (ours.stops.length > STOPS_KEPT) ours.stops.splice(0, ours.stops.length - STOPS_KEPT);
-  // The track's outline: the game's map when the plugin sent it, else the path the whole field drives, one point per
-  // stretch of the lap (by distance into it), so it is whole after a lap of any car, ours or not.
+  // The track's outline: the game's map when the plugin sent it, else the path the whole field drives.
   if (snap.map) { feed.outline = snap.map; feed.mapFromGame = true; }
-  else if (!feed.mapFromGame && snap.length) {
-    const step = Math.max(25, snap.length / 600), size = Math.ceil(snap.length / step);
-    if (!Array.isArray(feed.path) || feed.path.length !== size) feed.path = Array(size).fill(null);
-    for (const car of snap.field) {
-      if (car.pit || !finite(car.x) || !finite(car.z) || !finite(car.dist) || car.dist < 0 || car.dist > snap.length) continue;
-      const index = Math.min(size - 1, Math.floor(car.dist / step));
-      feed.path[index] ||= [round(car.x, 1), round(car.z, 1)];
-    }
-  }
+  else if (!feed.mapFromGame) feed.path = addToPath(feed.path, snap);
   feed.snap = {...snap, map:null};
   return feed;
 }
@@ -195,11 +186,45 @@ const cleanLaps = laps => laps.filter(lap => lap.t && !lap.pit);
 
 // The feed for the page: the last snapshot, and per car its 5-lap average and spread, last stop, laps since it,
 // best sectors; for our car the 5-lap averages (time, sectors, energy, fuel, wear), the stint, stints, stops, drivers.
-// The outline once there is a whole one: the game's, or the field's path once nine tenths of the lap are known.
-export function outlineOf(feed) {
-  if (feed.mapFromGame) return feed.outline;
-  const path = feed.path || [], known = path.filter(Boolean);
-  return path.length && known.length >= path.length * 0.9 ? known : [];
+// The outline: the game's map, or the field's path as far as it is known (null where no car was seen yet).
+export const outlineOf = feed => feed.mapFromGame ? feed.outline : feed.path || [];
+// What the pages already have of it: sent again when the game's map comes, or with each tenth more of the lap known.
+export const outlineShape = feed => feed.mapFromGame ? `g${feed.outline.length}`
+  : `p${feed.path?.length ? Math.floor(feed.path.filter(Boolean).length / feed.path.length * 10) : 0}`;
+
+// The path the field drives, one point per stretch of the lap (by distance into it), set by the first car seen there.
+// Kept by the room, and by the page from the positions it receives, so it fills while the page is open too.
+export function addToPath(path, snap) {
+  if (!snap.length) return path || null;
+  const step = Math.max(25, snap.length / 600), size = Math.ceil(snap.length / step);
+  if (!Array.isArray(path) || path.length !== size) path = Array(size).fill(null);
+  for (const car of snap.field) {
+    if (car.pit || !finite(car.x) || !finite(car.z) || !finite(car.dist) || car.dist < 0 || car.dist > snap.length) continue;
+    const index = Math.min(size - 1, Math.floor(car.dist / step));
+    path[index] ||= [round(car.x, 1), round(car.z, 1)];
+  }
+  return path;
+}
+
+// The outline as lines to draw. The game's map: one closed line. The field's path: its known points in lap order,
+// cut where more than 150 m of the lap is unknown, joined over the start line when both ends are known.
+export function outlineLines(outline, length = null) {
+  if (!Array.isArray(outline)) return [];
+  if (!length) return outline.length > 20 ? [{points:outline, closed:true}] : [];
+  const gap = Math.max(1, Math.ceil(150 / (length / outline.length)));
+  const lines = [];
+  let firstIndex = null, lastIndex = null;
+  outline.forEach((point, index) => {
+    if (!point) return;
+    if (lastIndex === null || index - lastIndex > gap) lines.push([]);
+    lines.at(-1).push(point);
+    firstIndex ??= index;
+    lastIndex = index;
+  });
+  const wraps = lines.length && firstIndex + outline.length - lastIndex <= gap;
+  if (wraps && lines.length === 1) return lines[0].length > 20 ? [{points:lines[0], closed:true}] : [];
+  if (wraps) lines[0] = [...lines.pop(), ...lines[0]];
+  return lines.filter(points => points.length >= 2).map(points => ({points, closed:false}));
 }
 
 // shape=false leaves out what rarely changes (the track's outline, our lap's profile): the page keeps the last ones.

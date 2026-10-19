@@ -3,7 +3,7 @@
 // the standings (session times in practice), the map, our car, and in a race the race panel (time and energy to the
 // flag, where we would rejoin after a stop, LMU's fair share, stints and stops). Raw numbers only, no advice.
 import {COLORS, conditionOf} from '../shared/combos.mjs';
-import {fairShare, isRace, lapsLeft, median, readFeed, rejoin, stationary, LIVE_FOR} from '../shared/live.mjs';
+import {addToPath, fairShare, isRace, lapsLeft, median, outlineLines, readFeed, rejoin, stationary, LIVE_FOR} from '../shared/live.mjs';
 
 const app = document.getElementById('live-app');
 const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
@@ -42,10 +42,9 @@ function connect() {
     let message;
     try { message = JSON.parse(event.data); } catch { return; }
     if (known(message.now)) view.offset = Date.now() - message.now;
-    if (message.type === 'hello') for (const feed of message.feeds || []) view.feeds.set(feed.key, readFeed(feed));
-    if (message.type === 'feed' && message.feed?.key) view.feeds.set(message.feed.key, readFeed(message.feed, view.feeds.get(message.feed.key)));
+    if (message.type === 'hello') for (const feed of message.feeds || []) record(view.feeds.set(feed.key, readFeed(feed)).get(feed.key));
+    if (message.type === 'feed' && message.feed?.key) record(view.feeds.set(message.feed.key, readFeed(message.feed, view.feeds.get(message.feed.key))).get(message.feed.key));
     pick();
-    move(current());
     render();
   });
   socket.addEventListener('close', () => {
@@ -260,48 +259,77 @@ function carPanel(feed) {
 }
 
 // Seen from above, x to the right and z down (as the lap analysis of the fiches), from the game's map of the track or
-// the path the field drives. The cars glide from one position to the next (the plugin sends one a second).
-// Not with « reduce motion »: the cars then jump as they come.
-const motion = {key:null, cars:new Map(), still:matchMedia('(prefers-reduced-motion: reduce)').matches}, GLIDE_MAX = 2500;
+// the path the field drives (the room's, completed with what this page sees).
+//
+// The cars glide: each one is drawn where it was PLAYBACK_DELAY seconds ago in the game's time, between the two
+// positions around that moment, so a message coming late or two coming together does not make it stop or jump. A
+// step longer than JUMP metres (the pits, back on track) is not drawn as a glide. Not with « reduce motion ».
+const PLAYBACK_DELAY = 1.8, JUMP = 400, KEPT = 6;
+const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const motions = new Map();
 let frame = null;
-// A new snapshot: each car leaves from where it is drawn now towards its new position, over the time between two
-// messages; it jumps instead when the step is too long to be driving (the line, the pits, a new session).
-function move(feed) {
+function record(feed) {
   if (!feed) return;
-  if (motion.key !== feed.key) { motion.key = feed.key; motion.cars.clear(); }
-  const now = performance.now(), size = frame?.size || 1;
-  for (const car of feed.snap.field) {
+  let motion = motions.get(feed.key);
+  const snap = feed.snap, seen = performance.now() / 1000;
+  // A new session or a restart: from scratch.
+  if (motion && snap.et < motion.et - 30) { motions.delete(feed.key); motion = null; }
+  if (!motion) motions.set(feed.key, motion = {cars:new Map(), offset:null, et:-Infinity, path:null, box:null});
+  motion.path = addToPath(motion.path, snap);
+  if (snap.et <= motion.et) return;
+  motion.et = snap.et;
+  // The game's clock against the page's: smoothed, so one late message does not move every car back.
+  const offset = snap.et - seen;
+  motion.offset = motion.offset === null || Math.abs(offset - motion.offset) > 3 ? offset : motion.offset + (offset - motion.offset) * 0.1;
+  for (const car of snap.field) {
     if (!known(car.x) || !known(car.z)) continue;
-    const old = motion.cars.get(car.id), to = [car.x, car.z];
-    if (old && old.to[0] === to[0] && old.to[1] === to[1]) continue;
-    const from = old ? where(old, now) : to;
-    const jump = motion.still || !old || Math.hypot(to[0] - from[0], to[1] - from[1]) > size * 0.1 || Boolean(old.pit) !== Boolean(car.pit);
-    motion.cars.set(car.id, {from:jump ? to : from, to, at:now, span:old ? Math.min(GLIDE_MAX, Math.max(400, now - old.at)) : 1000, pit:car.pit});
+    // Every place a car was seen on track: the map's frame only grows, so it does not move with the cars.
+    if (car.pit !== 2) { const box = motion.box ||= [car.x, car.x, car.z, car.z]; box[0] = Math.min(box[0], car.x); box[1] = Math.max(box[1], car.x); box[2] = Math.min(box[2], car.z); box[3] = Math.max(box[3], car.z); }
+    const list = motion.cars.get(car.id) || [];
+    list.push({et:snap.et, x:car.x, z:car.z, pit:car.pit});
+    if (list.length > KEPT) list.shift();
+    motion.cars.set(car.id, list);
   }
 }
-function where(item, now) {
-  const f = Math.min(1, (now - item.at) / item.span);
-  return [item.from[0] + (item.to[0] - item.from[0]) * f, item.from[1] + (item.to[1] - item.from[1]) * f];
+// Where a car is drawn now, in the game's metres.
+function placed(feed, car) {
+  const motion = motions.get(feed.key), list = motion?.cars.get(car.id);
+  if (!list?.length || still) return [car.x, car.z];
+  const at = performance.now() / 1000 + motion.offset - PLAYBACK_DELAY;
+  const next = list.findIndex(item => item.et > at);
+  if (next === -1) return [list.at(-1).x, list.at(-1).z];
+  if (next === 0) return [list[0].x, list[0].z];
+  const a = list[next - 1], b = list[next];
+  if (Math.hypot(b.x - a.x, b.z - a.z) > JUMP || Boolean(a.pit) !== Boolean(b.pit)) return [a.x, a.z];
+  const f = (at - a.et) / (b.et - a.et);
+  return [a.x + (b.x - a.x) * f, a.z + (b.z - a.z) * f];
 }
-const placed = car => { const item = motion.cars.get(car.id); return item ? where(item, performance.now()) : [car.x, car.z]; };
+// The outline to draw: the game's map, else the room's path with the gaps this page has seen filled.
+function outlineFor(feed) {
+  if (feed.mapFromGame) return outlineLines(feed.outline);
+  const room = feed.outline || [], mine = motions.get(feed.key)?.path || [];
+  const merged = mine.length === room.length || !room.length ? mine.map((point, index) => room[index] || point) : room;
+  return outlineLines(merged, feed.snap.length);
+}
 
 function mapPanel(feed) {
-  const snap = feed.snap, outline = feed.outline || [];
+  const snap = feed.snap, lines = outlineFor(feed), outline = lines.flatMap(line => line.points);
   const cars = snap.field.filter(car => known(car.x) && known(car.z) && car.pit !== 2);
-  // The frame from the track alone once it is known (cars moving do not rescale it).
-  const points = outline.length > 20 ? outline : [...outline, ...cars.map(car => [car.x, car.z])];
+  // The frame: the game's map, else every place a car was seen (it only grows, the map does not move with the cars).
+  const box = feed.mapFromGame ? null : motions.get(feed.key)?.box;
+  const points = [...outline, ...(box ? [[box[0], box[2]], [box[1], box[3]]] : feed.mapFromGame ? [] : cars.map(car => [car.x, car.z]))];
   if (!points.length) { frame = null; return `<h2>Carte</h2><p class="lw-empty">Les positions arrivent dès que la voiture roule.</p>`; }
   const xs = points.map(p => p[0]), zs = points.map(p => p[1]);
   const minX = Math.min(...xs), maxX = Math.max(...xs), minZ = Math.min(...zs), maxZ = Math.max(...zs);
   const size = Math.max(maxX - minX, maxZ - minZ) || 1, k = 940 / size;
-  frame = {minX, minZ, k, size};
+  frame = {feed, minX, minZ, k};
   const width = (maxX - minX) * k + 60, height = (maxZ - minZ) * k + 60;
   const px = v => (30 + (v - minX) * k).toFixed(1), pz = v => (30 + (v - minZ) * k).toFixed(1);
-  const path = outline.length > 20 ? `M${outline.map(([x, z]) => `${px(x)},${pz(z)}`).join('L')}Z` : '';
+  const path = lines.map(line => `M${line.points.map(([x, z]) => `${px(x)},${pz(z)}`).join('L')}${line.closed ? 'Z' : ''}`).join('');
   const mates = new Set([...view.feeds.values()].filter(item => item.key !== feed.key && item.snap.track === snap.track && item.snap.session === snap.session).map(item => item.snap.me.vehicle));
-  const others = cars.filter(car => car.id !== snap.me.id).map(car => { const [x, z] = placed(car);
+  const others = cars.filter(car => car.id !== snap.me.id).map(car => { const [x, z] = placed(feed, car);
     return `<circle data-car="${car.id}" cx="${px(x)}" cy="${pz(z)}" r="${mates.has(car.vehicle) ? 13 : 10}" fill="${classColor(car.cls)}" stroke="var(--bg, #0a0b0c)" stroke-width="2.5"/>`; }).join('');
-  const me = cars.find(car => car.id === snap.me.id), [mx, mz] = me ? placed(me) : [0, 0];
+  const me = cars.find(car => car.id === snap.me.id), [mx, mz] = me ? placed(feed, me) : [0, 0];
   const us = me ? `<g data-car="${me.id}" transform="translate(${px(mx)},${pz(mz)})"><circle r="17" fill="${esc(feedColor(feed))}" stroke="var(--text)" stroke-width="4"/><text x="24" y="8">${me.place ? `P${me.place}` : 'Nous'}</text></g>` : '';
   const classes = [...new Set(snap.field.map(car => car.cls).filter(Boolean))];
   return `<h2>Carte <small>${esc(snap.track)}</small></h2>
@@ -312,14 +340,14 @@ function mapPanel(feed) {
 // Between two redraws, only the cars move (nothing while the page is hidden or the map not shown).
 function glide() {
   requestAnimationFrame(glide);
-  if (document.hidden || !frame) return;
+  if (still || document.hidden || !frame) return;
   const box = document.querySelector('#lw-map .lw-mapbox');
   if (!box || !box.getClientRects().length) return;
-  const now = performance.now(), {minX, minZ, k} = frame;
+  const {feed, minX, minZ, k} = frame, field = new Map(feed.snap.field.map(car => [car.id, car]));
   for (const node of box.querySelectorAll('[data-car]')) {
-    const item = motion.cars.get(Number(node.dataset.car));
-    if (!item) continue;
-    const [x, z] = where(item, now), cx = (30 + (x - minX) * k).toFixed(1), cy = (30 + (z - minZ) * k).toFixed(1);
+    const car = field.get(Number(node.dataset.car));
+    if (!car) continue;
+    const [x, z] = placed(feed, car), cx = (30 + (x - minX) * k).toFixed(1), cy = (30 + (z - minZ) * k).toFixed(1);
     if (node.tagName === 'g') node.setAttribute('transform', `translate(${cx},${cy})`);
     else { node.setAttribute('cx', cx); node.setAttribute('cy', cy); }
   }
@@ -413,7 +441,7 @@ app.addEventListener('click', event => {
   if (button.dataset.tab) view.tab = button.dataset.tab;
   else if (button.dataset.stop) view.stop = button.dataset.stop;
   else if (button.dataset.cls) view.cls = button.dataset.cls;
-  else if (button.dataset.feed) { view.key = button.dataset.feed; view.open = null; move(current()); }
+  else if (button.dataset.feed) { view.key = button.dataset.feed; view.open = null; }
   else return;
   render();
 });

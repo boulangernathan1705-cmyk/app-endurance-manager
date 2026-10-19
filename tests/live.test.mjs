@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {cleanSnapshot, ingest, publicFeed, readFeed, fairShare, rejoin, stationary, lapsLeft, timeAt, FIELD, prune, STALE_DROP} from '../shared/live.mjs';
+import {addToPath, cleanSnapshot, ingest, outlineLines, publicFeed, readFeed, fairShare, rejoin, stationary, lapsLeft, timeAt, FIELD, prune, STALE_DROP} from '../shared/live.mjs';
 import {LiveRoom} from '../server/live.mjs';
 
 const TRACK = 'Circuit de la Sarthe';
@@ -188,9 +188,9 @@ test('the plugin and the pages reach the room only through their checks', async 
   assert.doesNotMatch(readFileSync(new URL('../front/live-page.mjs', import.meta.url), 'utf8'), /\son[a-z]+="/i);
 });
 
-test('without the game\'s map, the outline is the path the field drives, once nine tenths of the lap are known', () => {
+test('without the game\'s map, the outline is the path the field drives, drawn as far as it is known', () => {
   const feeds = {};
-  // 12 rivals spread over the lap, moving 300 m a second: their points cover the lap after a few dozen messages.
+  // 12 rivals spread over the lap, moving 300 m a second; our car in the pit lane.
   const send = et => ingest(feeds, cleanSnapshot(snap({et, me:{row:{pit:1, x:1, z:1}},
     field:Array.from({length:12}, (_, index) => {
       const dist = (et * 300 + index * 1135) % 13626, angle = dist / 13626 * 2 * Math.PI;
@@ -198,9 +198,27 @@ test('without the game\'s map, the outline is the path the field drives, once ni
     })})), et * 1000);
   send(1000);
   const feed = feeds[Object.keys(feeds)[0]];
-  assert.deepEqual(publicFeed(feed).outline, [], 'not shown while most of the lap is missing');
+  let outline = publicFeed(feed).outline;
+  assert.equal(outline.length, 546, 'one place per 25 m of the lap');
+  assert.equal(outline.filter(Boolean).length, 11, 'one point per car on track, none for the one in the pit lane');
+  assert.equal(outlineLines(outline, 13626).length, 0, 'lone points are not drawn');
   for (let et = 1001; et < 1200; et++) send(et);
-  const outline = publicFeed(feed).outline;
-  assert.ok(outline.length >= feed.path.length * 0.9 && outline.length <= 600);
-  assert.ok(outline.every(([x, z]) => Math.abs(Math.hypot(x, z) - 2000) < 1), 'only cars on track, never the one in the pit lane');
+  outline = publicFeed(feed).outline;
+  assert.ok(outline.every(point => !point || Math.abs(Math.hypot(...point) - 2000) < 1), 'only cars on track, never the one in the pit lane');
+  const lines = outlineLines(outline, 13626);
+  assert.equal(lines.length, 1);
+  assert.ok(lines[0].closed && lines[0].points.length === outline.filter(Boolean).length);
+  // The page fills the room's gaps with its own: an addToPath of the same snapshots gives the same places.
+  const mine = addToPath(null, cleanSnapshot(snap({et:1300, field:[{id:2, dist:100, x:5, z:6}]})));
+  assert.deepEqual(mine[4], [5, 6]);
+});
+
+test('the outline is cut where a stretch of the lap is unknown, and joined over the line', () => {
+  const path = Array(100).fill(null).map((_, index) => index < 40 || index > 60 ? [index, 0] : null);
+  const lines = outlineLines(path, 10000);
+  assert.equal(lines.length, 1, 'the two ends meet over the line: one open line from index 61 round to 39');
+  assert.equal(lines[0].closed, false);
+  assert.deepEqual(lines[0].points[0], [61, 0]);
+  assert.deepEqual(lines[0].points.at(-1), [39, 0]);
+  assert.deepEqual(outlineLines(Array.from({length:30}, (_, index) => [index, 1])), [{points:Array.from({length:30}, (_, index) => [index, 1]), closed:true}], 'the game\'s map is one closed line');
 });
