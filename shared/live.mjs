@@ -98,7 +98,7 @@ export const feedKey = snap => `${snap.track}|${snap.session}|${snap.me.vehicle 
 
 export function newFeed(snap, at) {
   return {key:feedKey(snap), track:snap.track, session:snap.session, vehicle:snap.me.vehicle, cls:snap.me.cls, startEt:snap.et, updated:at,
-    pilot:null, snap:null, cars:{}, ours:{laps:[], stops:[], stints:[], drivers:{}, start:null}, outline:[]};
+    pilot:null, snap:null, cars:{}, ours:{laps:[], stops:[], stints:[], drivers:{}, start:null}, outline:[], path:null};
 }
 
 const sectorsOf = car => {
@@ -167,11 +167,17 @@ export function ingest(feeds, snap, at, pilot = null) {
   }
   ours.stops.sort((a, b) => a.lap - b.lap);
   if (ours.stops.length > STOPS_KEPT) ours.stops.splice(0, ours.stops.length - STOPS_KEPT);
-  // The track's outline: the game's map when the plugin sent it, else our own path over one whole lap, a point a second.
+  // The track's outline: the game's map when the plugin sent it, else the path the whole field drives, one point per
+  // stretch of the lap (by distance into it), so it is whole after a lap of any car, ours or not.
   if (snap.map) { feed.outline = snap.map; feed.mapFromGame = true; }
-  else if (!feed.mapFromGame && finite(me.x) && finite(me.z)) {
-    if (feed.outlineLap === undefined && me.laps >= 1 && !me.pit) { feed.outlineLap = me.laps; feed.outline = []; }
-    if (me.laps === feed.outlineLap && feed.outline.length < 900) feed.outline.push([round(me.x, 1), round(me.z, 1)]);
+  else if (!feed.mapFromGame && snap.length) {
+    const step = Math.max(25, snap.length / 600), size = Math.ceil(snap.length / step);
+    if (!Array.isArray(feed.path) || feed.path.length !== size) feed.path = Array(size).fill(null);
+    for (const car of snap.field) {
+      if (car.pit || !finite(car.x) || !finite(car.z) || !finite(car.dist) || car.dist < 0 || car.dist > snap.length) continue;
+      const index = Math.min(size - 1, Math.floor(car.dist / step));
+      feed.path[index] ||= [round(car.x, 1), round(car.z, 1)];
+    }
   }
   feed.snap = {...snap, map:null};
   return feed;
@@ -189,8 +195,12 @@ const cleanLaps = laps => laps.filter(lap => lap.t && !lap.pit);
 
 // The feed for the page: the last snapshot, and per car its 5-lap average and spread, last stop, laps since it,
 // best sectors; for our car the 5-lap averages (time, sectors, energy, fuel, wear), the stint, stints, stops, drivers.
-// The outline once there is a whole one: the game's, or our path once its lap is over.
-export const outlineOf = feed => feed.mapFromGame || (feed.outlineLap !== undefined && feed.snap.field.find(car => car.id === feed.snap.me.id)?.laps > feed.outlineLap) ? feed.outline : [];
+// The outline once there is a whole one: the game's, or the field's path once nine tenths of the lap are known.
+export function outlineOf(feed) {
+  if (feed.mapFromGame) return feed.outline;
+  const path = feed.path || [], known = path.filter(Boolean);
+  return path.length && known.length >= path.length * 0.9 ? known : [];
+}
 
 // shape=false leaves out what rarely changes (the track's outline, our lap's profile): the page keeps the last ones.
 // The field goes as rows (FIELD order), as it came: a 60-car field stays near 10 KB a message.

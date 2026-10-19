@@ -187,3 +187,20 @@ test('the plugin and the pages reach the room only through their checks', async 
   assert.doesNotMatch(page, /<script>|\son[a-z]+=/i, 'no inline script nor handler (CSP)');
   assert.doesNotMatch(readFileSync(new URL('../front/live-page.mjs', import.meta.url), 'utf8'), /\son[a-z]+="/i);
 });
+
+test('without the game\'s map, the outline is the path the field drives, once nine tenths of the lap are known', () => {
+  const feeds = {};
+  // 12 rivals spread over the lap, moving 300 m a second: their points cover the lap after a few dozen messages.
+  const send = et => ingest(feeds, cleanSnapshot(snap({et, me:{row:{pit:1, x:1, z:1}},
+    field:Array.from({length:12}, (_, index) => {
+      const dist = (et * 300 + index * 1135) % 13626, angle = dist / 13626 * 2 * Math.PI;
+      return {id:index + 2, dist, x:Math.cos(angle) * 2000, z:Math.sin(angle) * 2000, pit:index === 11 ? 1 : 0};
+    })})), et * 1000);
+  send(1000);
+  const feed = feeds[Object.keys(feeds)[0]];
+  assert.deepEqual(publicFeed(feed).outline, [], 'not shown while most of the lap is missing');
+  for (let et = 1001; et < 1200; et++) send(et);
+  const outline = publicFeed(feed).outline;
+  assert.ok(outline.length >= feed.path.length * 0.9 && outline.length <= 600);
+  assert.ok(outline.every(([x, z]) => Math.abs(Math.hypot(x, z) - 2000) < 1), 'only cars on track, never the one in the pit lane');
+});
