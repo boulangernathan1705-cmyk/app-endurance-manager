@@ -159,7 +159,7 @@ export async function sheet(env, community, userId, combo, url, current = false)
   const where = 'community_id=? AND track=? AND car=? AND started_at BETWEEN ? AND ?';
   const [drivers, slopes, tyres, conditions, moments, setups, sample, stops, service, game, notes] = await Promise.all([
     all(env, `${CLEAN} SELECT user_id, cond, COUNT(*) AS laps, AVG(NULLIF(ve,0)) AS ve, COUNT(NULLIF(ve,0)) AS ve_laps, AVG(NULLIF(fuel,0)) AS fuel,
-      AVG(t) AS avg, MIN(t) AS best, COUNT(s1) AS sector_laps, AVG(s1) AS s1, AVG(s2) AS s2, AVG(s3) AS s3, MIN(s1) AS best1, MIN(s2) AS best2, MIN(s3) AS best3
+      AVG(t) AS avg, MIN(t) AS best, AVG(NULLIF((wear_fl+wear_fr+wear_rl+wear_rr)/4.0,0)) AS wear, COUNT(s1) AS sector_laps, AVG(s1) AS s1, AVG(s2) AS s2, AVG(s3) AS s3, MIN(s1) AS best1, MIN(s2) AS best2, MIN(s3) AS best3
       FROM clean GROUP BY user_id, cond`, ...lapScope),
     // Time lost per lap along a stint: the slope of lap time over lap number, each stint centred on its own mean.
     all(env, `${CLEAN}, centred AS (SELECT user_id, cond, n-AVG(n) OVER w AS x, t-AVG(t) OVER w AS y FROM clean WINDOW w AS (PARTITION BY session_id, stint))
@@ -209,7 +209,7 @@ export async function sheet(env, community, userId, combo, url, current = false)
     return [cond, {laps:summary?.laps || 0, trackTemp:summary ? [round(summary.tmin, 1), round(summary.tmax, 1)] : null,
       moments:{day:moment?.day || 0, night:moment?.night || 0},
       drivers:drivers.filter(row => row.cond === cond).sort((a, b) => b.laps - a.laps).map(row => ({id:row.user_id, laps:row.laps, ve:round(row.ve),
-        veLaps:row.ve_laps, fuel:round(row.fuel), avg:round(row.avg), best:round(row.best), slope:round(slopeOf.get(`${row.user_id}|${cond}`) ?? null, 4),
+        veLaps:row.ve_laps, fuel:round(row.fuel), wear:round(row.wear), avg:round(row.avg), best:round(row.best), slope:round(slopeOf.get(`${row.user_id}|${cond}`) ?? null, 4),
         sectors:row.sector_laps ? {laps:row.sector_laps, avg:[row.s1, row.s2, row.s3].map(value => round(value)), best:[row.best1, row.best2, row.best3].map(value => round(value))} : null})),
       compounds}];
   }));

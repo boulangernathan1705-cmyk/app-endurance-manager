@@ -59,6 +59,7 @@ namespace EnduranceManager.SimHub
             buttons.Children.Add(open);
             page.Children.Add(Box("Liaison avec le site", linkDot, linkTitle, linkDetail, buttons, message));
             page.Children.Add(Box("Le Mans Ultimate", gameDot, gameTitle, gameDetail));
+            page.Children.Add(BannerBox());
             page.Children.Add(new TextBlock { Text = "Le plugin ne fait que lire : il ne change rien dans le jeu ni dans SimHub.", Opacity = 0.5, FontSize = 11, Margin = new Thickness(2, 4, 0, 0), TextWrapping = TextWrapping.Wrap });
             page.Children.Add(version);
 
@@ -73,7 +74,7 @@ namespace EnduranceManager.SimHub
             var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
             timer.Tick += (sender, args) => Refresh();
             timer.Start();
-            Unloaded += (sender, args) => timer.Stop();
+            Unloaded += (sender, args) => { timer.Stop(); StopPlacing(); };
             Refresh();
             Content = new ScrollViewer { Content = page, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
         }
@@ -180,6 +181,64 @@ namespace EnduranceManager.SimHub
             var button = new Button { Content = text, Padding = new Thickness(16, 6, 16, 6), Margin = new Thickness(0, 0, 8, 0), Cursor = System.Windows.Input.Cursors.Hand };
             if (main) { button.Background = Accent; button.BorderBrush = Accent; button.Foreground = Brushes.White; }
             return button;
+        }
+
+        readonly Button place = Action("Placer le bandeau", false);
+        readonly TextBlock placeHint = new TextBlock { Opacity = 0.7, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 8, 0, 0), Visibility = Visibility.Collapsed,
+            Text = "Le bandeau est affiché : fais-le glisser à la souris où tu veux, puis clique sur « Terminé »." };
+
+        void StopPlacing()
+        {
+            plugin.Placing = false;
+            place.Content = "Placer le bandeau";
+            placeHint.Visibility = Visibility.Collapsed;
+        }
+
+        // The practice banner: on or off, its size, its background, the stint length, and its place on the screen.
+        Border BannerBox()
+        {
+            var settings = plugin.Settings;
+            var inside = new StackPanel();
+            inside.Children.Add(new TextBlock { Text = "BANDEAU DES ESSAIS", FontSize = 11, Opacity = 0.5, Margin = new Thickness(0, 0, 0, 8) });
+            var show = new CheckBox { Content = "Afficher le bandeau pendant les essais", FontSize = 14, IsChecked = settings.Banner, Cursor = System.Windows.Input.Cursors.Hand };
+            show.Checked += (sender, args) => plugin.SaveBanner(s => s.Banner = true);
+            show.Unchecked += (sender, args) => plugin.SaveBanner(s => s.Banner = false);
+            inside.Children.Add(show);
+            inside.Children.Add(new TextBlock { Opacity = 0.7, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 4, 0, 10),
+                Text = "Ton dernier tour (temps, énergie, usure des 4 pneus) face à ta moyenne et à celle de l'équipe sur ce circuit avec cette voiture. LMU doit être en fenêtré sans bordure pour que le bandeau passe par-dessus le jeu." });
+            inside.Children.Add(Setting("Taille", 0.5, 2, 0.05, settings.BannerScale, value => $"{value:P0}", value => plugin.SaveBanner(s => s.BannerScale = value)));
+            inside.Children.Add(Setting("Fond", 0.3, 1, 0.01, settings.BannerOpacity, value => $"{value:P0}", value => plugin.SaveBanner(s => s.BannerOpacity = value)));
+            inside.Children.Add(Setting("Tours par relais", 4, 40, 1, settings.StintLaps, value => $"{value:0} tours", value => plugin.SaveBanner(s => s.StintLaps = (int)Math.Round(value))));
+            place.HorizontalAlignment = HorizontalAlignment.Left;
+            place.Margin = new Thickness(0, 10, 0, 0);
+            place.Click += (sender, args) =>
+            {
+                if (plugin.Placing) { StopPlacing(); return; }
+                plugin.Placing = true;
+                place.Content = "Terminé";
+                placeHint.Visibility = Visibility.Visible;
+            };
+            inside.Children.Add(place);
+            inside.Children.Add(placeHint);
+            return new Border { Background = Card, BorderBrush = Edge, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(8), Padding = new Thickness(16), Margin = new Thickness(0, 0, 0, 12), Child = inside };
+        }
+
+        // One slider line: its name, the slider, its value.
+        static FrameworkElement Setting(string name, double min, double max, double step, double value, Func<double, string> format, Action<double> save)
+        {
+            var line = new DockPanel { Margin = new Thickness(0, 4, 0, 4) };
+            var label = new TextBlock { Text = name, Width = 120, VerticalAlignment = VerticalAlignment.Center };
+            var shown = new TextBlock { Width = 70, TextAlignment = TextAlignment.Right, VerticalAlignment = VerticalAlignment.Center };
+            var slider = new Slider { Minimum = min, Maximum = max, SmallChange = step, LargeChange = step * 5, TickFrequency = step, IsSnapToTickEnabled = true,
+                Value = Math.Max(min, Math.Min(max, value)), VerticalAlignment = VerticalAlignment.Center };
+            shown.Text = format(slider.Value);
+            slider.ValueChanged += (sender, args) => { shown.Text = format(args.NewValue); save(args.NewValue); };
+            DockPanel.SetDock(label, Dock.Left);
+            DockPanel.SetDock(shown, Dock.Right);
+            line.Children.Add(label);
+            line.Children.Add(shown);
+            line.Children.Add(slider);
+            return line;
         }
 
         // A card: a small heading, then the state line (coloured dot, title, detail) and what goes below it.

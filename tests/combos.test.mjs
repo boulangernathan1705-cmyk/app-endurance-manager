@@ -180,6 +180,8 @@ test('the sheet gives each pilot his own numbers, per condition and compound, fr
   assert.equal(nathanDry.laps, 3);
   assert.equal(nathanDry.ve, 8.5);
   assert.equal(nathanDry.fuel, 6.97);
+  // The four tyres' wear per lap, averaged: what the plugin's practice banner compares.
+  assert.equal(nathanDry.wear, 1.7);
   assert.ok(nathanDry.slope > 0, 'laps get slower along the stint');
   assert.equal(dry.drivers.find(item => item.id === LUCAS).laps, 7);
   assert.equal(dry.laps, 10);

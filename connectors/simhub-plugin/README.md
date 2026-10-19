@@ -18,6 +18,14 @@ Envoie les séances Le Mans Ultimate d'un pilote aux fiches combo de son équipe
   case « Partager ma voiture en direct » pour le couper. Lit aussi `watch/standings` toutes les 20 s (numéros des
   voitures) et `watch/trackmap` une fois par circuit (tracé, gardé seulement s'il passe à moins de 25 m de la voiture).
 
+- affiche un bandeau pendant les essais (`Practice.cs`, `Banner.cs`, depuis la 1.4.0) : le dernier tour (temps,
+  énergie ou carburant, usure moyenne des 4 pneus) face à la valeur visée, la moyenne de l'équipe et celle de chaque
+  coéquipier, lues sur la fiche combo (`/api/combos/plugin/sheet`, au début de chaque séance puis toutes les 3 minutes)
+  et complétées par les tours de la séance en cours, comptés avec les règles de la fiche. Énergie visée : 100 % / tours
+  par relais (carburant : réservoir / tours par relais). Temps et usure visés : w × ma moyenne + (1 − w) × moyenne de
+  l'équipe, avec w = mes tours comptés / (2 × tours par relais), plafonné à 1. Fenêtre au premier plan que les clics
+  traversent (LMU en fenêtré sans bordure) ; taille, fond, tours par relais et place réglés sur l'écran du plugin.
+
 Il ne fait que lire : il ne modifie rien dans le jeu ni dans SimHub. Il n'envoie plus les fichiers de résultats XML.
 
 ## Ressources et stabilité
