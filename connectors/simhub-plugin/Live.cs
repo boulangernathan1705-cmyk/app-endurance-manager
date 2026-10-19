@@ -45,6 +45,13 @@ namespace EnduranceManager.SimHub
         // How far into the lap (metres from the line, mLapDist): lines two laps up point by point.
         public double LapDist;
         public double Water, Oil;
+        // For the mur des stands (LiveShare.cs): the car's id and full name in the scoring (number included), who
+        // controls it (0 the player, 1 the game's AI, 2 someone else online, 3 a replay), time into the lap, garage.
+        public int Id;
+        public string Vehicle;
+        public int Control;
+        public double IntoLap;
+        public bool Garage;
     }
 
     public static class LmuMemory
@@ -103,7 +110,8 @@ namespace EnduranceManager.SimHub
                 // mPos, the driver's unfiltered inputs and mGear (rF2 telemetry layout, as above).
                 X = F64(b, t + 160), Z = F64(b, t + 176), Throttle = F64(b, t + 388), BrakePedal = F64(b, t + 396), Steer = F64(b, t + 404),
                 Gear = I32(b, t + 352),
-                Water = F64(b, t + 364), Oil = F64(b, t + 372), LapDist = F64(b, v + 104)
+                Water = F64(b, t + 364), Oil = F64(b, t + 372), LapDist = F64(b, v + 104),
+                Id = I32(b, v), Vehicle = Text(b, v + 36, 64), Control = (sbyte)b[v + 197], IntoLap = F64(b, v + 464), Garage = b[v + 507] != 0
             };
             string model = Text(b, t + 796, 30);
             if (model != "") s.Car = model;
@@ -283,6 +291,9 @@ namespace EnduranceManager.SimHub
         [JsonProperty("ve")] public double Energy;
         [JsonProperty("tyres")] public int Tyres;
         [JsonProperty("repair")] public bool Repair;
+        // Where the lane was entered and left (metres into the lap) and who drove: for the mur des stands only.
+        [JsonIgnore] public double EntryDist, ExitDist;
+        [JsonIgnore] public string Driver;
     }
 
     public class LiveSession
@@ -336,6 +347,9 @@ namespace EnduranceManager.SimHub
         readonly Func<double?> light;
 
         public Recorder(Func<DateTime> now, Action<LiveSession> done, Func<string> setup = null, Func<double?> light = null) { this.now = now; this.done = done; this.setup = setup; this.light = light; }
+
+        // The session being driven (its stops and best lap), read by the mur des stands on the same thread.
+        public LiveSession Current => session;
 
         public void Flush()
         {
@@ -458,6 +472,7 @@ namespace EnduranceManager.SimHub
                     Lap = s.LapsDone, Lane = Round(s.ET - finished.Enter, 2), Stationary = Round(finished.StopEnd - finished.StopStart, 2),
                     Fuel = Round(Math.Max(0, finished.After.Fuel - finished.Before.Fuel), 2), Energy = Round(Math.Max(0, finished.After.Energy - finished.Before.Energy), 2),
                     Repair = finished.After.Damage < finished.Before.Damage,
+                    EntryDist = finished.Before.LapDist, ExitDist = s.LapDist, Driver = s.Driver,
                     Tyres = Enumerable.Range(0, 4).Count(i => finished.After.Wheels[i].Wear > finished.Before.Wheels[i].Wear + 0.01)
                 };
                 session.Stops.Add(output);

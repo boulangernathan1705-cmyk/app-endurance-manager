@@ -93,6 +93,7 @@ const sourceDiagnostics = await readFile(root + 'diagnostics.html', 'utf8');
 const sourceHelp = await readFile(root + 'help.html', 'utf8');
 const sourceRequest = await readFile(root + 'demande-communaute.html', 'utf8');
 const sourceCombos = await readFile(root + 'fiches-combo.html', 'utf8');
+const sourceLive = await readFile(root + 'mur-des-stands.html', 'utf8');
 const paths = [
   ...stylesheetPaths(sourceIndex,'index.html'),
   ...stylesheetPaths(sourceGame,'game.html'),
@@ -101,6 +102,7 @@ const paths = [
   ...stylesheetPaths(sourceHelp,'help.html'),
   ...stylesheetPaths(sourceRequest,'demande-communaute.html'),
   ...stylesheetPaths(sourceCombos,'fiches-combo.html'),
+  ...stylesheetPaths(sourceLive,'mur-des-stands.html'),
 ];
 // styles/ux-refresh.css is the final layer that replaces older rules: keep it last in the
 // shared bundle whichever page lists it first.
@@ -119,6 +121,7 @@ await writeFile(new URL('diagnostics.html', out), productionHtml(sourceDiagnosti
 await writeFile(new URL('help.html', out), productionHtml(sourceHelp));
 await writeFile(new URL('demande-communaute.html', out), productionHtml(sourceRequest));
 await writeFile(new URL('fiches-combo.html', out), productionHtml(sourceCombos));
+await writeFile(new URL('mur-des-stands.html', out), productionHtml(sourceLive));
 const gameHtml = productionHtml(sourceGame);
 await writeFile(new URL('lmu/index.html', out), gameHtml);
 await writeFile(new URL('iracing/index.html', out), gameHtml);
@@ -186,7 +189,7 @@ async function addModulePreloads(file) {
   const links = modules.map(url => `<link rel="modulepreload" href="${url}">`).join('\n');
   await writeFile(target, html.replace('</head>', `${links}\n</head>`));
 }
-for (const file of ['index.html', 'members.html', 'diagnostics.html', 'help.html', 'demande-communaute.html', 'fiches-combo.html',
+for (const file of ['index.html', 'members.html', 'diagnostics.html', 'help.html', 'demande-communaute.html', 'fiches-combo.html', 'mur-des-stands.html',
   'lmu/index.html', 'iracing/index.html', 'privacy.html', 'legal.html', 'about.html', 'circuit-credits.html', 'changelog.html']) await addModulePreloads(file);
 
 if (!workers) {
@@ -216,6 +219,9 @@ await writeFile(new URL('_headers', out), `/*
 /fiches-combo.html
   X-Robots-Tag: noindex, nofollow
 
+/mur-des-stands.html
+  X-Robots-Tag: noindex, nofollow
+
 /downloads/*
   X-Robots-Tag: noindex, nofollow
 
@@ -230,6 +236,7 @@ Disallow: /telemetry/
 Disallow: /members.html
 Disallow: /diagnostics.html
 Disallow: /fiches-combo.html
+Disallow: /mur-des-stands.html
 Disallow: /downloads/
 Sitemap: https://endurance-manager.app/sitemap.xml
 `);

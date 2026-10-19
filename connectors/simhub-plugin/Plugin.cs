@@ -21,6 +21,8 @@ namespace EnduranceManager.SimHub
         public string Code { get; set; } = "";
         // Off: nothing is read from the game and nothing is sent; the sessions waiting stay on the disk.
         public bool Enabled { get; set; } = true;
+        // Mur des stands: the car shared live with the team while driving (LiveShare.cs). On unless the pilot turns it off.
+        public bool Share { get; set; } = true;
     }
 
     [PluginDescription("Envoie tes séances Le Mans Ultimate aux fiches combo de ton équipe sur Endurance Manager.")]
@@ -48,6 +50,7 @@ namespace EnduranceManager.SimHub
 
         Uploader uploader;
         Updater updater;
+        LiveShare live;
         readonly LmuApi api = new LmuApi();
         Thread reader, sender;
         volatile bool running;
@@ -56,6 +59,7 @@ namespace EnduranceManager.SimHub
         public Uploader Uploader => uploader;
         public Updater Updater => updater;
         public LmuApi Api => api;
+        public LiveShare Live => live;
         // What the game is doing, for the settings screen: closed, in the menus, or on track.
         public volatile string GameState = "closed";
         // The last session recorded, for the settings screen.
@@ -69,6 +73,7 @@ namespace EnduranceManager.SimHub
             Directory.CreateDirectory(home);
             uploader = new Uploader(home);
             updater = new Updater(home);
+            live = new LiveShare(() => LinkCode.Parse(Settings.Code));
             this.AttachDelegate("Status", () => Status);
             this.AttachDelegate("LapsRecorded", () => laps);
             this.AttachDelegate("Enabled", () => Settings.Enabled);
@@ -83,6 +88,7 @@ namespace EnduranceManager.SimHub
         public void End(PluginManager pluginManager)
         {
             running = false;
+            live?.Stop();
             this.SaveCommonSettings("GeneralSettings", Settings);
             // SimHub closes: the session being driven is written to disk before the process goes.
             reader?.Join(3000);
@@ -98,6 +104,13 @@ namespace EnduranceManager.SimHub
             Settings.Code = code?.Trim() ?? "";
             this.SaveCommonSettings("GeneralSettings", Settings);
             uploader.Reset();
+        }
+
+        // The live sharing switch (mur des stands): off, nothing more leaves for the team's pit wall.
+        public void SetShare(bool share)
+        {
+            Settings.Share = share;
+            this.SaveCommonSettings("GeneralSettings", Settings);
         }
 
         // The switch on the plugin's screen. Turned off while driving, the laps already done are kept.
@@ -155,6 +168,8 @@ namespace EnduranceManager.SimHub
                             bool driving = ok && sample.Realtime && frozen < 50;
                             recorder.Feed(sample, driving);
                             GameState = driving ? "track" : "menu";
+                            // Once a second, the car and the field for the team's mur des stands.
+                            if (driving && Settings.Share && tick % 10 == 0) live.Offer(buffer, sample, recorder, api);
                             misses = driving ? 0 : misses + 1;
                             // The game's API when the car stands in the pits, at most every 30 s, or in the garage and
                             // menus, every 5 s for the setup being loaded; on track only the daylight, once a minute. Read

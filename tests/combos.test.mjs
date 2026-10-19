@@ -479,5 +479,35 @@ test('the fiches combo page: its own tab for the roles that see them, nothing ru
   const front = readFileSync(new URL('../front/combos-page.mjs', import.meta.url), 'utf8');
   assert.doesNotMatch(front, /\son[a-z]+="/i, 'no inline handler (CSP)');
   assert.match(readFileSync(new URL('../front/account-menu.mjs', import.meta.url), 'utf8'), /link\.dataset\.moduleLink === 'combos' && session\.combos !== true/);
-  assert.match(readFileSync(new URL('../front/app/home-view.mjs', import.meta.url), 'utf8'), /state\.combos\?'<a class="nav-section-button" href="\/fiches-combo\.html">Fiches combo<\/a>'/);
+  assert.match(readFileSync(new URL('../front/app/home-view.mjs', import.meta.url), 'utf8'), /state\.combos\?'<a class="nav-section-button" href="\/fiches-combo\.html">Fiches combo<\/a><a class="nav-section-button" href="\/mur-des-stands\.html">Mur des stands<\/a>'/);
+});
+
+test('mur des stands: the plugin opens the team\'s room with its key, a page with the member\'s cookie from the site only', async () => {
+  const {req, signIn, env} = harness();
+  signIn(NATHAN, 'Nathan', [TEAM_ROLE]);
+  signIn(GUEST, 'Invité', []);
+  const key = keyOf((await req('/api/combos/link', 'POST', {}, NATHAN)).data.code);
+  const opened = [];
+  env.LIVE = {idFromName:name => `room:${name}`, get:roomId => ({fetch:async (url, init) => {
+    const headers = new Headers(init.headers);
+    opened.push({roomId, role:headers.get('X-Live-Role'), user:headers.get('X-Live-User'), name:decodeURIComponent(headers.get('X-Live-Name') || ''), upgrade:headers.get('Upgrade')});
+    return new Response('room', {status:200});
+  }})};
+  const open = (path, headers) => worker.fetch(new Request(ROOT + path, {headers:{'CF-Connecting-IP':'x', ...headers}}), env);
+  assert.equal((await open('/api/combos/plugin/live', {Authorization:`Bearer ${key}`})).status, 426, 'a WebSocket only');
+  assert.equal((await open('/api/combos/plugin/live', {Authorization:`Bearer ${'0'.repeat(64)}`, Upgrade:'websocket'})).status, 401);
+  assert.equal((await open('/api/combos/plugin/live', {Authorization:`Bearer ${key}`, Upgrade:'websocket'})).status, 200);
+  assert.deepEqual(opened.pop(), {roomId:`room:${DEV_COMMUNITY}`, role:'driver', user:NATHAN, name:'Nathan', upgrade:'websocket'});
+
+  const page = (userId, headers = {}) => req('/api/combos/live', 'GET', null, userId, {Upgrade:'websocket', ...headers});
+  assert.equal((await page(NATHAN)).status, 403, 'no Origin: another site could open it with the cookie');
+  assert.equal((await page(NATHAN, {Origin:'https://evil.example'})).status, 403);
+  assert.equal((await page(GUEST, {Origin:ROOT})).status, 403, 'only the roles of the fiches combo');
+  assert.equal((await page(null, {Origin:ROOT})).status, 401);
+  const watching = await worker.fetch(new Request(ROOT + '/api/combos/live', {headers:{'CF-Connecting-IP':'x', Upgrade:'websocket', Origin:ROOT,
+    Cookie:(await (async () => { const rows = env.DB.db.prepare('SELECT token_hash FROM sessions WHERE user_id=?').all(NATHAN); return rows.length; })()) && `__Host-em_session=${NATHAN.padEnd(64, 'a').slice(0, 64).replace(/[^a-f0-9]/g, 'b')}`}}), env);
+  assert.equal(watching.status, 200);
+  assert.equal(opened.pop().role, 'viewer');
+  delete env.LIVE;
+  assert.equal((await open('/api/combos/plugin/live', {Authorization:`Bearer ${key}`, Upgrade:'websocket'})).status, 503);
 });

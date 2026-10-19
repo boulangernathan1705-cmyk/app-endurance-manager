@@ -15,13 +15,15 @@
     "not_found_handling": "404-page",
     "run_worker_first": ["/", "/index*", "/api/*", "/telemetry/*", "/manifest.webmanifest", "/app-icon.png",
       "/lmu*", "/iracing*", "/members*", "/help*", "/about*", "/legal*", "/privacy*", "/changelog*", "/circuit-credits*",
-      "/demande-communaute*", "/diagnostics*", "/fiches-combo*",
+      "/demande-communaute*", "/diagnostics*", "/fiches-combo*", "/mur-des-stands*",
       "!/front/*", "!/shared/*", "!/images/*", "!/app.css", "!/app.js", "!/crew-builder.js", "!/help.js", "!/help.css", "!/privacy.css", "!/sw.js"]
   },
   "routes": [
     { "pattern": "endurance-manager.app", "custom_domain": true },
     { "pattern": "*.endurance-manager.app/*", "zone_name": "endurance-manager.app" }
   ],
+  "durable_objects": { "bindings": [{ "name": "LIVE", "class_name": "LiveRoom" }] },
+  "migrations": [{ "tag": "v1-live-room", "new_sqlite_classes": ["LiveRoom"] }],
   "d1_databases": [
     {
       "binding": "DB",

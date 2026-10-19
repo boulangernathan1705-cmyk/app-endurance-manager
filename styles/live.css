@@ -1,0 +1,184 @@
+/* Mur des stands (mur-des-stands.html, front/live-page.mjs): the team's cars live, for the teammates watching.
+   On a wide screen everything at once (standings and map on top, our car and the race below); narrower, one tab at a
+   time. Tables fit the width at 390 px: columns drop, never a horizontal scrollbar. */
+.live-page {
+  --lw-line: var(--border, #292d31);
+  --lw-panel: var(--panel, #111315);
+  --lw-panel2: var(--panel2, #17191c);
+  --lw-live: #35b978; --lw-warn: #d9a640; --lw-best: #b98cff; --lw-up: #e4a341; --lw-down: #5fb7e8;
+  --lw-hyper: #ff5d5d; --lw-lmp2: #5fa3ff; --lw-gt3: #f0a640; --lw-other: #9aa3a7;
+  max-width: 1560px;
+  margin: 0 auto;
+  padding: 16px 16px 48px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 14px;
+}
+.members-main.live-page { width: min(1560px, calc(100% - 32px)); }
+.live-page [hidden] { display: none !important; }
+.live-page td, .lw-num { font-variant-numeric: tabular-nums; }
+.live-page button { font: inherit; color: inherit; }
+.live-page button:focus-visible { outline: 2px solid var(--lw-live); outline-offset: 2px; }
+.lw-flag { margin: 0; font-size: 12px; color: var(--muted); }
+.lw-flag b { color: var(--text); font-weight: 600; }
+
+.lw-top { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: end; gap: 10px 20px; padding-bottom: 12px; border-bottom: 1px solid var(--lw-line); }
+.lw-crumb { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .09em; }
+.live-page h1 { margin: 2px 0 0; font-size: 28px; line-height: 1.15; }
+.lw-facts { display: flex; flex-wrap: wrap; gap: 8px 22px; align-items: end; }
+.lw-fact { display: grid; }
+.lw-fact span { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
+.lw-fact b { font-size: 22px; font-weight: 700; line-height: 1.15; }
+.lw-link { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+.lw-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); flex: none; }
+.lw-dot.on { background: var(--lw-live); animation: lw-pulse 2s infinite; }
+.lw-dot.late { background: var(--lw-warn); }
+@keyframes lw-pulse { 0% { box-shadow: 0 0 0 0 rgba(53,185,120,.55); } 70% { box-shadow: 0 0 0 7px rgba(53,185,120,0); } 100% { box-shadow: 0 0 0 0 rgba(53,185,120,0); } }
+@media (prefers-reduced-motion: reduce) { .lw-dot.on { animation: none; } }
+
+.lw-cars { display: flex; flex-wrap: wrap; gap: 8px; }
+.lw-car { display: inline-flex; align-items: center; gap: 8px; background: var(--lw-panel); border: 1px solid var(--lw-line); border-radius: 99px; padding: 5px 12px 5px 6px; cursor: pointer; max-width: 100%; }
+.lw-car[aria-pressed="true"] { border-color: var(--muted); background: var(--lw-panel2); }
+.lw-car i { width: 18px; height: 18px; border-radius: 50%; flex: none; }
+.lw-car b { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lw-car span { font-size: 12px; color: var(--muted); white-space: nowrap; }
+.lw-pill { font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .07em; padding: 1px 7px; border-radius: 99px; border: 1px solid currentColor; white-space: nowrap; }
+.lw-pill.track { color: var(--lw-live); } .lw-pill.pits { color: var(--lw-warn); } .lw-pill.off { color: var(--muted); }
+
+.lw-tabs { display: none; gap: 4px; border-bottom: 1px solid var(--lw-line); position: sticky; top: 0; background: var(--bg, #0a0b0c); z-index: 5; padding-top: 4px; }
+.lw-tabs button { background: none; border: 0; border-bottom: 2px solid transparent; padding: 8px 12px; font-weight: 700; font-size: 14px; color: var(--muted); cursor: pointer; }
+.lw-tabs button[aria-pressed="true"] { color: var(--text); border-bottom-color: var(--text); }
+
+/* Wide screens: two columns that each stack their panels (standings then car | map then race), so the right column
+   never waits for the end of the standings. */
+.lw-wall { display: grid; grid-template-columns: minmax(0, 1.9fr) minmax(0, 1fr); gap: 14px; align-items: start; }
+.lw-col { display: grid; gap: 14px; min-width: 0; align-content: start; }
+.lw-panel { background: var(--lw-panel); border: 1px solid var(--lw-line); border-radius: 10px; padding: 14px 16px; display: grid; gap: 12px; align-content: start; min-width: 0; }
+.lw-panel > h2 { margin: 0; font-size: 20px; display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.lw-panel > h2 small { font-size: 13px; font-weight: 500; color: var(--muted); }
+.lw-sub { display: grid; gap: 10px; padding-top: 12px; border-top: 1px solid var(--lw-line); min-width: 0; }
+.lw-sub.first { border-top: 0; padding-top: 0; }
+.lw-sub h3 { margin: 0; font-weight: 600; font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .09em; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 4px 8px; }
+.lw-sub h3 span { text-transform: none; letter-spacing: 0; font-weight: 500; }
+.lw-carbody { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 330px), 1fr)); gap: 12px 24px; align-items: start; }
+.lw-stack { display: grid; gap: 12px; min-width: 0; }
+.lw-empty { color: var(--muted); }
+/* Mid-size screens: the standings take the whole width, the rest below. */
+@media (min-width: 1180px) and (max-width: 1499px) {
+  .lw-col { display: contents; }
+  .lw-wall { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-areas: "board board" "car car" "map race"; }
+  .lw-wall.practice { grid-template-areas: "board board" "car car" "map map"; }
+  #lw-board { grid-area: board; } #lw-map { grid-area: map; } #lw-carpanel { grid-area: car; } #lw-race { grid-area: race; }
+}
+@media (max-width: 1179px) {
+  .lw-tabs { display: flex; }
+  .lw-col { display: contents; }
+  .lw-wall, .lw-wall.practice { grid-template-columns: minmax(0, 1fr); }
+  .lw-panel:not(.on) { display: none; }
+}
+
+/* Standings */
+.lw-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.lw-chips button { background: var(--lw-panel2); border: 1px solid var(--lw-line); border-radius: 99px; padding: 3px 10px; font-size: 12px; font-weight: 600; color: var(--muted); cursor: pointer; }
+.lw-chips button[aria-pressed="true"] { color: var(--text); border-color: var(--muted); }
+.lw-board { width: 100%; border-collapse: collapse; font-size: 13.5px; table-layout: fixed; }
+.lw-board th { font-weight: 600; font-size: 10.5px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; text-align: right; padding: 0 3px 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lw-board td { padding: 6px 3px; border-top: 1px solid var(--lw-line); text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lw-board .c-pos { width: 44px; text-align: left; } .lw-board .c-num { width: 34px; text-align: left; } .lw-board .c-car { text-align: left; }
+.lw-board .c-laps { width: 38px; } .lw-board .c-gap { width: 60px; } .lw-board .c-int { width: 54px; } .lw-board .c-d5 { width: 52px; }
+.lw-board .c-last, .lw-board .c-avg, .lw-board .c-best { width: 66px; } .lw-board .c-stint { width: 46px; } .lw-board .c-pit { width: 48px; } .lw-board .c-stops { width: 36px; } .lw-board .c-pen { width: 36px; }
+.lw-board td.c-pos { box-shadow: inset 3px 0 0 var(--cls); padding-left: 8px; font-weight: 700; }
+.lw-board td.c-pos small { display: block; font-weight: 500; font-size: 11px; color: var(--muted); line-height: 1; }
+.lw-board .car { font-weight: 600; }
+.lw-board .car small { display: block; color: var(--muted); font-weight: 400; font-size: 12px; overflow: hidden; text-overflow: ellipsis; }
+.lw-board tbody tr.row { cursor: pointer; }
+.lw-board tbody tr.row:hover td { background: var(--lw-panel2); }
+.lw-board tr.us td { background: var(--lw-panel2); }
+.lw-board tr.us .car { color: var(--us); }
+.lw-board tr.mate .car { color: var(--us); }
+.live-page .best { color: var(--lw-best); } .live-page .pb { color: var(--lw-live); }
+.lw-board tr.detail td { background: var(--bg, #0a0b0c); text-align: left; white-space: normal; padding: 10px 12px; }
+.lw-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 8px 14px; margin: 0; }
+.lw-grid div { display: grid; gap: 1px; min-width: 0; }
+.lw-grid dt { font-size: 10.5px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+.lw-grid dd { margin: 0; font-weight: 600; font-variant-numeric: tabular-nums; }
+.lw-grid .wide { grid-column: 1 / -1; }
+@media (max-width: 899px) { .lw-board .w2, .lw-board .w3 { display: none; } .lw-board { table-layout: auto; } .lw-board .c-car { width: 100%; max-width: 0; } }
+@media (max-width: 520px) { .lw-board .w1 { display: none; } }
+
+/* Our car */
+.lw-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
+.lw-who { font-size: 22px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+.lw-who i { width: 12px; height: 12px; border-radius: 3px; }
+.lw-meta { color: var(--muted); font-size: 14px; }
+.lw-age { margin-left: auto; color: var(--muted); font-size: 12px; }
+.lw-big { font-size: 50px; font-weight: 700; line-height: 1; }
+.lw-big small { font-size: 22px; color: var(--muted); font-weight: 600; margin-left: 2px; }
+.lw-meter { height: 10px; border-radius: 6px; background: var(--lw-panel2); border: 1px solid var(--lw-line); overflow: hidden; position: relative; }
+.lw-meter i { position: absolute; inset: 0 auto 0 0; background: var(--lw-live); transition: width .6s; }
+.lw-meter.grey i { background: var(--muted); }
+.lw-row2 { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 16px; align-items: center; }
+.lw-kv { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 10px 14px; margin: 0; }
+.lw-kv div { display: grid; gap: 1px; }
+.lw-kv dt { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .07em; }
+.lw-kv dd { margin: 0; font-size: 20px; font-weight: 600; }
+.lw-kv dd em { font-style: normal; font-size: 13px; font-weight: 600; margin-left: 4px; }
+.live-page .up { color: var(--lw-up); } .live-page .down { color: var(--lw-down); } .live-page .same { color: var(--muted); }
+.lw-target { font-size: 13px; color: var(--muted); }
+.lw-target b { color: var(--text); font-weight: 600; }
+.lw-lap { font-size: 40px; font-weight: 700; line-height: 1; }
+.lw-sectors, .lw-drive, .lw-stops { width: 100%; border-collapse: collapse; font-size: 14px; }
+.lw-sectors th, .lw-drive th, .lw-stops th { font-weight: 600; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; text-align: right; padding: 0 0 6px; }
+.lw-sectors td, .lw-drive td, .lw-stops td { text-align: right; padding: 5px 0; border-top: 1px solid var(--lw-line); }
+.lw-sectors td { font-weight: 600; }
+.lw-sectors th:first-child, .lw-sectors td:first-child { text-align: left; }
+.lw-sectors td:first-child { color: var(--muted); font-weight: 500; }
+.lw-tyres { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 22px; position: relative; }
+.lw-tyres::before { content: ""; position: absolute; left: 50%; top: 8px; bottom: 8px; border-left: 1px dashed var(--lw-line); }
+.lw-tyre { background: var(--lw-panel2); border: 1px solid var(--lw-line); border-radius: 8px; padding: 8px 10px; display: grid; gap: 6px; min-width: 0; }
+.lw-tyre .t { display: flex; justify-content: space-between; align-items: baseline; gap: 6px; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+.lw-tyre .left { font-size: 26px; font-weight: 700; line-height: 1; color: var(--text); letter-spacing: 0; text-transform: none; }
+.lw-tyre .left small { font-size: 14px; color: var(--muted); }
+.lw-tyre dl { margin: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 8px; }
+.lw-tyre dt { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+.lw-tyre dd { margin: 0; font-weight: 600; font-size: 14px; }
+.lw-wear { height: 4px; border-radius: 3px; background: var(--bg, #0a0b0c); overflow: hidden; }
+.lw-wear i { display: block; height: 100%; background: var(--text); opacity: .75; }
+.lw-cond { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin: 0; }
+.lw-cond div { display: grid; gap: 1px; }
+.lw-cond dt { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .07em; }
+.lw-cond dd { margin: 0; font-size: 19px; font-weight: 600; }
+.lw-stint { display: flex; flex-wrap: wrap; gap: 6px 20px; font-size: 14px; color: var(--muted); }
+.lw-stint b { color: var(--text); font-size: 18px; margin-right: 4px; }
+@media (max-width: 520px) { .lw-cond { grid-template-columns: repeat(2, minmax(0, 1fr)); } .lw-big { font-size: 42px; } .lw-lap { font-size: 34px; } .lw-age { margin-left: 0; width: 100%; } .lw-tyres { gap: 8px 12px; } }
+
+/* Map */
+.lw-mapbox { width: 100%; display: block; max-height: 560px; }
+.lw-mapbox .road { fill: none; stroke: #3a4045; stroke-width: 22; stroke-linecap: round; stroke-linejoin: round; }
+.lw-mapbox .edge { fill: none; stroke: var(--lw-panel2); stroke-width: 12; stroke-linejoin: round; }
+.lw-mapbox text { font-size: 13px; font-weight: 700; fill: var(--text); }
+.lw-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12px; color: var(--muted); }
+.lw-legend span { display: inline-flex; align-items: center; gap: 5px; }
+.lw-legend i { width: 9px; height: 9px; border-radius: 50%; }
+
+/* Race */
+.lw-clock { font-size: 44px; font-weight: 700; line-height: 1; }
+.lw-rel { display: grid; gap: 3px; }
+.lw-rel div { display: grid; grid-template-columns: 96px 10px minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 5px 8px; border-radius: 6px; background: var(--lw-panel2); font-size: 14px; }
+.lw-rel div i { width: 10px; height: 10px; border-radius: 50%; }
+.lw-rel div span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lw-rel div small { color: var(--muted); font-size: 12px; }
+.lw-rel div b { font-weight: 700; text-align: right; }
+.lw-rel .me { background: none; border: 1px dashed var(--text); font-weight: 700; }
+.lw-drive th:first-child, .lw-drive td:first-child { text-align: left; width: 42%; padding-right: 12px; }
+.lw-bar { position: relative; height: 6px; border-radius: 4px; background: var(--lw-panel2); margin-top: 4px; }
+.lw-bar i { position: absolute; inset: 0 auto 0 0; border-radius: 4px; }
+.lw-bar s { position: absolute; top: -3px; bottom: -3px; border-left: 1.5px solid var(--muted); }
+.lw-ok { color: var(--lw-live); }
+.lw-stops { font-size: 13px; }
+.lw-stops th:first-child, .lw-stops td:first-child { text-align: left; }
+.lw-stops .lw-pin { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; vertical-align: 1px; }
+.lw-stops td small { display: block; font-size: 11px; color: var(--muted); }
+.lw-stops tr.now td { font-weight: 600; }
+.lw-stops th + th, .lw-stops td + td { padding-left: 8px; }
+.lw-stops td:first-child { overflow-wrap: anywhere; }
