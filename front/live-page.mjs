@@ -265,7 +265,8 @@ function carPanel(feed) {
 
 // Seen from above, x to the right and z down (as the lap analysis of the fiches), from the game's map of the track or
 // the path the field drives. The cars glide from one position to the next (the plugin sends one a second).
-const motion = {key:null, cars:new Map()}, GLIDE_MAX = 2500;
+// Not with « reduce motion »: the cars then jump as they come.
+const motion = {key:null, cars:new Map(), still:matchMedia('(prefers-reduced-motion: reduce)').matches}, GLIDE_MAX = 2500;
 let frame = null;
 // A new snapshot: each car leaves from where it is drawn now towards its new position, over the time between two
 // messages; it jumps instead when the step is too long to be driving (the line, the pits, a new session).
@@ -278,7 +279,7 @@ function move(feed) {
     const old = motion.cars.get(car.id), to = [car.x, car.z];
     if (old && old.to[0] === to[0] && old.to[1] === to[1]) continue;
     const from = old ? where(old, now) : to;
-    const jump = !old || Math.hypot(to[0] - from[0], to[1] - from[1]) > size * 0.1 || Boolean(old.pit) !== Boolean(car.pit);
+    const jump = motion.still || !old || Math.hypot(to[0] - from[0], to[1] - from[1]) > size * 0.1 || Boolean(old.pit) !== Boolean(car.pit);
     motion.cars.set(car.id, {from:jump ? to : from, to, at:now, span:old ? Math.min(GLIDE_MAX, Math.max(400, now - old.at)) : 1000, pit:car.pit});
   }
 }
