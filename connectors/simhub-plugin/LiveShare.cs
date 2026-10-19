@@ -27,6 +27,9 @@ namespace EnduranceManager.SimHub
 
         readonly Func<LinkCode> code;
         readonly HttpClient client = new HttpClient { Timeout = TimeSpan.FromSeconds(3) };
+        // The track's map is big (250 Ko at Le Mans) and the game is slow to give it while driving: more time, and it is
+        // asked again 20 s later when it did not come.
+        readonly HttpClient mapClient = new HttpClient { Timeout = TimeSpan.FromSeconds(20) };
         readonly AutoResetEvent wake = new AutoResetEvent(false);
         readonly object gate = new object();
         string pending;
@@ -229,7 +232,7 @@ namespace EnduranceManager.SimHub
             if (mapTrack != track) { mapTrack = track; mapRaw = null; mapPoints = null; }
             if (mapRaw == null && mapPoints == null)
             {
-                var answer = Get(client, "watch/trackmap");
+                var answer = Get(mapClient, "watch/trackmap");
                 var points = answer as JArray ?? answer?.Children<JProperty>().Select(p => p.Value).OfType<JArray>().FirstOrDefault();
                 var items = points?.OfType<JObject>().Where(p => Value(p["x"]).HasValue && Value(p["z"]).HasValue).ToList();
                 if (items != null && items.Count >= 100)
@@ -238,7 +241,8 @@ namespace EnduranceManager.SimHub
                     var main = items.GroupBy(p => p["type"]?.ToString() ?? "").OrderByDescending(g => g.Count()).First().ToList();
                     mapRaw = main.Select(p => new[] { Value(p["x"]).Value, Value(p["y"]) ?? 0, Value(p["z"]).Value }).ToList();
                 }
-                else mapRaw = new List<double[]>();
+                // No answer (too slow, game busy): asked again at the next read. A game that answers without points has no map.
+                else if (answer != null) mapRaw = new List<double[]>();
             }
             // Which of the map's axes match the car's (x, z) seen from above: the one passing within 25 m of the car.
             if (mapPoints == null && mapRaw != null && mapRaw.Count >= 100 && onTrack)
