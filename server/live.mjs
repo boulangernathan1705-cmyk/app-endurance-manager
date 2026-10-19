@@ -8,7 +8,7 @@
 // Rights are checked when a socket opens and again by making it reconnect after RECHECK. The object is never
 // reachable from outside: only these two routes forward to it, with who is connecting in X-Live-* headers.
 import {fail} from './core.mjs';
-import {cleanSnapshot, ingest, outlineOf, prune, publicFeed, LIVE_FOR} from '../shared/live.mjs';
+import {cleanSnapshot, ingest, outlineShape, prune, publicFeed, LIVE_FOR} from '../shared/live.mjs';
 
 const MESSAGE_LIMIT = 256_000;
 const RECHECK = 4 * 3600_000;
@@ -72,7 +72,7 @@ export class LiveRoom {
     const feeds = await this.load(), at = Date.now();
     const feed = ingest(feeds, snap, at, {id:info.user, name:info.name, color:info.color});
     this.dirty.add(feed.key);
-    const shape = `${outlineOf(feed).length}|${feed.mapFromGame}|${snap.me.profile?.[100] ?? ''}`, changed = this.shapes.get(feed.key) !== shape;
+    const shape = `${outlineShape(feed)}|${snap.me.profile?.[100] ?? ''}`, changed = this.shapes.get(feed.key) !== shape;
     this.shapes.set(feed.key, shape);
     const out = JSON.stringify({type:'feed', now:at, feed:publicFeed(feed, changed)});
     for (const viewer of this.state.getWebSockets('viewer')) {
