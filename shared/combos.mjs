@@ -132,4 +132,4 @@ export const LINK_PREFIX = 'EMCOMBO1';
 export const linkCode = (origin, key) => `${LINK_PREFIX} ${origin} ${key} ${LINK_PREFIX}`;
 
 // Colours offered to the pilots; a pilot who has not chosen gets one by his place on the sheet.
-export const COLORS = Object.freeze(['#b98cff', '#ff9a3d', '#45d4d0', '#ff6ad5', '#f2e35c', '#ff5d5d', '#9be15d', '#c9a27a', '#8fa8ff', '#e0e0e0']);
+export const COLORS = Object.freeze(['#ff9a3d', '#45d4d0', '#ff6ad5', '#f2e35c', '#ff5d5d', '#9be15d', '#c9a27a', '#8fa8ff', '#e0e0e0']);
