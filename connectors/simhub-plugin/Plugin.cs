@@ -23,6 +23,14 @@ namespace EnduranceManager.SimHub
         public bool Enabled { get; set; } = true;
         // Mur des stands: the car shared live with the team while driving (LiveShare.cs). On unless the pilot turns it off.
         public bool Share { get; set; } = true;
+        // The practice banner (Practice.cs, Banner.cs): shown in practice, its size, its background's opacity, its place
+        // on the screen (none: top centre) and the stint length in laps, which sets the energy per lap aimed at.
+        public bool Banner { get; set; } = true;
+        public double BannerScale { get; set; } = 1;
+        public double BannerOpacity { get; set; } = 0.88;
+        public double? BannerLeft { get; set; }
+        public double? BannerTop { get; set; }
+        public int StintLaps { get; set; } = 12;
     }
 
     [PluginDescription("Envoie tes séances Le Mans Ultimate aux fiches combo de ton équipe sur Endurance Manager.")]
@@ -60,6 +68,10 @@ namespace EnduranceManager.SimHub
         public Updater Updater => updater;
         public LmuApi Api => api;
         public LiveShare Live => live;
+        public Practice Practice { get; } = new Practice();
+        // « Placer le bandeau » on the plugin's screen: the banner shows and follows the mouse.
+        public volatile bool Placing;
+        public Action StopBanner;
         // What the game is doing, for the settings screen: closed, in the menus, or on track.
         public volatile string GameState = "closed";
         // The last session recorded, for the settings screen.
@@ -83,12 +95,14 @@ namespace EnduranceManager.SimHub
             sender = new Thread(SendLoop) { IsBackground = true, Name = "EnduranceManager.Send", Priority = ThreadPriority.Lowest };
             reader.Start();
             sender.Start();
+            Banner.Start(this);
         }
 
         public void End(PluginManager pluginManager)
         {
             running = false;
             live?.Stop();
+            StopBanner?.Invoke();
             this.SaveCommonSettings("GeneralSettings", Settings);
             // SimHub closes: the session being driven is written to disk before the process goes.
             reader?.Join(3000);
@@ -112,6 +126,15 @@ namespace EnduranceManager.SimHub
             Settings.Share = share;
             this.SaveCommonSettings("GeneralSettings", Settings);
         }
+
+        // The banner's settings, from the plugin's screen.
+        public void SaveBanner(Action<Settings> change)
+        {
+            change(Settings);
+            this.SaveCommonSettings("GeneralSettings", Settings);
+        }
+
+        public void SaveBannerPlace(double left, double top) => SaveBanner(settings => { settings.BannerLeft = left; settings.BannerTop = top; });
 
         // The switch on the plugin's screen. Turned off while driving, the laps already done are kept.
         public void SetEnabled(bool enabled)
@@ -137,6 +160,7 @@ namespace EnduranceManager.SimHub
                 if (!Settings.Enabled)
                 {
                     GameState = "paused";
+                    Practice.Hide();
                     recorder.Flush();
                     Thread.Sleep(1000);
                     continue;
@@ -147,6 +171,7 @@ namespace EnduranceManager.SimHub
                 {
                     // The game is closed: the session is over, send it now.
                     GameState = "closed";
+                    Practice.Hide();
                     recorder.Flush();
                     Thread.Sleep(5000);
                     continue;
@@ -170,6 +195,13 @@ namespace EnduranceManager.SimHub
                             GameState = driving ? "track" : "menu";
                             // Once a second, the car and the field for the team's mur des stands.
                             if (driving && Settings.Share && tick % 10 == 0) live.Offer(buffer, sample, recorder, api);
+                            // Once a second, the practice banner: practice and warm-up only (rF2 sessions 0 to 4, 9), out of the garage.
+                            if (tick % 10 == 0)
+                            {
+                                if (driving && Settings.Banner && !sample.Garage && (sample.Session <= 4 || sample.Session == 9))
+                                    try { Practice.Update(sample, recorder.Current, LinkCode.Parse(Settings.Code), Settings.StintLaps); } catch { Practice.Hide(); }
+                                else Practice.Hide();
+                            }
                             misses = driving ? 0 : misses + 1;
                             // The game's API when the car stands in the pits, at most every 30 s, or in the garage and
                             // menus, every 5 s for the setup being loaded; on track only the daylight, once a minute. Read
@@ -193,7 +225,7 @@ namespace EnduranceManager.SimHub
                     }
                 }
                 // An error here must never close SimHub: the reading starts again a few seconds later.
-                catch { Thread.Sleep(5000); }
+                catch { Practice.Hide(); Thread.Sleep(5000); }
                 // A minute without driving: the session is over, and the memory is let go so the game can close cleanly.
                 recorder.Flush();
             }
