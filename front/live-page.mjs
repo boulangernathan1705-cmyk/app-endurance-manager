@@ -264,6 +264,52 @@ function carPanel(feed) {
     </div></div></div>`;
 }
 
+// The cars glide on the map from one position to the next instead of jumping once a second: each new position is
+// reached in the time the previous one took to come, from wherever the dot is drawn then. A car that moved more than
+// JUMP metres (to the pits, back on track after a reset) is put there at once. Not with « reduce motion ».
+const JUMP = 400;
+const glide = {
+  cars:new Map(), feed:null, scale:null, frame:0,
+  still:matchMedia('(prefers-reduced-motion: reduce)').matches,
+  // Where a car is drawn now, in the game's metres; a new target starts a glide.
+  at(feedKey, car) {
+    const now = performance.now();
+    if (feedKey !== this.feed) { this.feed = feedKey; this.cars.clear(); }
+    let item = this.cars.get(car.id);
+    if (!item) { item = {from:[car.x, car.z], to:[car.x, car.z], start:now, length:1000, seen:now}; this.cars.set(car.id, item); }
+    if (item.to[0] !== car.x || item.to[1] !== car.z) {
+      const here = this.position(item, now);
+      const far = Math.hypot(car.x - here[0], car.z - here[1]) > JUMP;
+      item.length = Math.max(300, Math.min(2000, now - item.seen));
+      item.from = this.still || far ? [car.x, car.z] : here;
+      item.to = [car.x, car.z]; item.start = now; item.seen = now;
+    }
+    if (!this.still && !this.frame) this.frame = requestAnimationFrame(() => this.step());
+    return this.position(item, now);
+  },
+  position(item, now) {
+    const t = Math.min(1, (now - item.start) / item.length);
+    return [item.from[0] + (item.to[0] - item.from[0]) * t, item.from[1] + (item.to[1] - item.from[1]) * t];
+  },
+  // Each frame, the dots of the map drawn on the page move along; it stops once every car has arrived.
+  step() {
+    this.frame = 0;
+    const now = performance.now(), scale = this.scale;
+    if (!scale) return;
+    let moving = false;
+    for (const node of app.querySelectorAll('[data-glide]')) {
+      const item = this.cars.get(Number(node.dataset.glide));
+      if (!item) continue;
+      if (now - item.start < item.length) moving = true;
+      const [x, z] = this.position(item, now);
+      const sx = 30 + (x - scale.minX) * scale.k + Number(node.dataset.dx || 0), sz = 30 + (z - scale.minZ) * scale.k + Number(node.dataset.dy || 0);
+      node.setAttribute(node.tagName === 'circle' ? 'cx' : 'x', sx.toFixed(1));
+      node.setAttribute(node.tagName === 'circle' ? 'cy' : 'y', sz.toFixed(1));
+    }
+    if (moving) this.frame = requestAnimationFrame(() => this.step());
+  }
+};
+
 // Seen from above, x to the right and z down (as the lap analysis of the fiches), from the game's map of the track or
 // the path our car drove.
 function mapPanel(feed) {
@@ -278,9 +324,12 @@ function mapPanel(feed) {
   const px = v => (30 + (v - minX) * k).toFixed(1), pz = v => (30 + (v - minZ) * k).toFixed(1);
   const path = outline.length > 20 ? `M${outline.map(([x, z]) => `${px(x)},${pz(z)}`).join('L')}Z` : '';
   const mates = new Set([...view.feeds.values()].filter(item => item.key !== feed.key && item.snap.track === snap.track && item.snap.session === snap.session).map(item => item.snap.me.vehicle));
-  const others = cars.filter(car => car.id !== snap.me.id).map(car => `<circle cx="${px(car.x)}" cy="${pz(car.z)}" r="${mates.has(car.vehicle) ? 11 : 8}" fill="${classColor(car.cls)}" stroke="var(--bg, #0a0b0c)" stroke-width="2"/>`).join('');
-  const me = cars.find(car => car.id === snap.me.id);
-  const us = me ? `<circle cx="${px(me.x)}" cy="${pz(me.z)}" r="15" fill="${esc(feedColor(feed))}" stroke="var(--text)" stroke-width="3.5"/><text x="${(Number(px(me.x)) + 20).toFixed(1)}" y="${(Number(pz(me.z)) + 5).toFixed(1)}">${me.place ? `P${me.place}` : 'Nous'}</text>` : '';
+  glide.scale = {minX, minZ, k};
+  const at = car => glide.at(feed.key, car);
+  const others = cars.filter(car => car.id !== snap.me.id).map(car => { const [x, z] = at(car);
+    return `<circle data-glide="${car.id}" cx="${px(x)}" cy="${pz(z)}" r="${mates.has(car.vehicle) ? 11 : 8}" fill="${classColor(car.cls)}" stroke="var(--bg, #0a0b0c)" stroke-width="2"/>`; }).join('');
+  const me = cars.find(car => car.id === snap.me.id), [meX, meZ] = me ? at(me) : [0, 0];
+  const us = me ? `<circle data-glide="${me.id}" cx="${px(meX)}" cy="${pz(meZ)}" r="15" fill="${esc(feedColor(feed))}" stroke="var(--text)" stroke-width="3.5"/><text data-glide="${me.id}" data-dx="20" data-dy="5" x="${(Number(px(meX)) + 20).toFixed(1)}" y="${(Number(pz(meZ)) + 5).toFixed(1)}">${me.place ? `P${me.place}` : 'Nous'}</text>` : '';
   const classes = [...new Set(snap.field.map(car => car.cls).filter(Boolean))];
   return `<h2>Carte <small>${esc(snap.track)}</small></h2>
     <svg class="lw-mapbox" viewBox="0 0 ${width.toFixed(0)} ${height.toFixed(0)}" role="img" aria-label="Position des voitures sur le circuit">${path ? `<path class="road" d="${path}"/><path class="edge" d="${path}"/>` : ''}${others}${us}</svg>
