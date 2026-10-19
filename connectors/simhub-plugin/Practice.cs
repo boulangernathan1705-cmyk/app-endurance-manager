@@ -1,7 +1,7 @@
 // Bandeau des essais : pendant les essais, le dernier tour du pilote (temps, énergie ou carburant, usure moyenne des
 // quatre pneus) face à ce qu'il vise, avec la moyenne de l'équipe et celle de chaque coéquipier. Les chiffres de
 // l'équipe viennent de la fiche combo du site (GET /api/combos/plugin/sheet, server/combos.mjs), relue au début de
-// chaque séance puis toutes les 3 minutes ; ceux de la séance en cours sont comptés ici, tour par tour, avec les règles
+// chaque séance puis toutes les 15 minutes (ils ne changent que quand un coéquipier rentre et que sa séance part) ; ceux de la séance en cours sont comptés ici, tour par tour, avec les règles
 // de la fiche (shared/combos.mjs). Des chiffres bruts, aucun conseil. La fenêtre est dans Banner.cs.
 using System;
 using System.Collections.Generic;
@@ -92,7 +92,8 @@ namespace EnduranceManager.SimHub
             Last = view;
         }
 
-        // The sheet again at the start of each session, then every 3 minutes, one read at a time.
+        // The sheet again at the start of each session, then every 15 minutes, one read at a time: a sheet reads every
+        // lap of the combo several times, the site's daily database reads stay well under the free plan's.
         void Fetch(LinkCode code, string track, string car, long at)
         {
             if (code == null) return;
@@ -101,7 +102,7 @@ namespace EnduranceManager.SimHub
             if (key != teamFor) team = null;
             if ((run == wanted && DateTime.Now < fetchAt) || Interlocked.Exchange(ref fetching, 1) == 1) return;
             wanted = run;
-            fetchAt = DateTime.Now.AddMinutes(3);
+            fetchAt = DateTime.Now.AddMinutes(15);
             ThreadPool.QueueUserWorkItem(_ =>
             {
                 try
