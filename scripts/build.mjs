@@ -4,6 +4,7 @@ import {createHash} from 'node:crypto';
 import {posix} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {changelogHtml} from './changelog.mjs';
+import {zip} from './zip.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const out = new URL('../public/', import.meta.url);
@@ -158,6 +159,36 @@ if (await access(pluginRelease + 'release/EnduranceManager.SimHub.dll').then(() 
   await writeFile(new URL('downloads/simhub/EnduranceManager.SimHub.dll', out), dll);
   await writeFile(new URL('downloads/simhub/installer.cmd', out), installer);
   await writeFile(new URL('downloads/simhub/plugin.json', out), JSON.stringify({version, size:dll.length, sha256:createHash('sha256').update(dll).digest('hex')}) + '\n');
+}
+
+// Every SimHub plugin that has a build, in one zip: a folder per plugin with its DLL and its installer, so a pilot
+// downloads everything at once and installs only the ones he wants. The plugins stay separate and independent.
+const simhubPlugins = [
+  {folder: 'Fiches combo (Endurance Manager)', dir: 'connectors/simhub-plugin/', dll: 'EnduranceManager.SimHub.dll',
+    about: 'envoie tes séances aux fiches combo de ton équipe, partage ta voiture sur le mur des stands et publie les chiffres des overlays d’essais. Se relie au site avec ton code (page Fiches combo).'},
+  {folder: 'LMU Endurance Prep', dir: 'connectors/lmu-endurance-prep/', dll: 'LmuEndurancePrep.dll',
+    about: 'écrit tout ce que SimHub lit de LMU à chaque début de séance et à chaque tour, pour préparer les endurances.'},
+];
+const packed = [];
+for (const plugin of simhubPlugins) {
+  const release = root + plugin.dir + 'release/';
+  if (!await access(release + plugin.dll).then(() => true, () => false)) continue;
+  const {version} = JSON.parse(await readFile(release + 'plugin.json', 'utf8'));
+  if (!/^\d+\.\d+\.\d+$/.test(version || '')) throw new Error(plugin.dir + 'release/plugin.json : version attendue au format 1.2.3.');
+  packed.push({...plugin, version, dll: {name: plugin.dll, data: await readFile(release + plugin.dll)}, installer: await readFile(root + plugin.dir + 'Installer le plugin.cmd')});
+}
+if (packed.length) {
+  const readme = ['Plugins SimHub d’Endurance Manager', '',
+    'Chaque dossier est un plugin à part : installe seulement ceux que tu veux. Dans le dossier du plugin, double-clique',
+    'sur « Installer le plugin.cmd » : il ferme SimHub, copie le plugin et relance SimHub. Accepte ensuite le nouveau',
+    'plugin dans SimHub. Si Windows te prévient, clique sur « Informations complémentaires » puis « Exécuter quand même ».', '',
+    ...packed.map(plugin => `- ${plugin.folder} (version ${plugin.version}) : ${plugin.about}`), ''].join('\r\n');
+  const files = [{name: 'LISEZ-MOI.txt', data: Buffer.from(readme, 'utf8')}];
+  for (const plugin of packed) files.push({name: `${plugin.folder}/${plugin.dll.name}`, data: plugin.dll.data}, {name: `${plugin.folder}/Installer le plugin.cmd`, data: plugin.installer});
+  const pack = zip(files);
+  await mkdir(new URL('downloads/simhub/', out), {recursive: true});
+  await writeFile(new URL('downloads/simhub/plugins-simhub.zip', out), pack);
+  await writeFile(new URL('downloads/simhub/plugins.json', out), JSON.stringify({size: pack.length, plugins: packed.map(({folder, version}) => ({name: folder, version}))}) + '\n');
 }
 
 // Module preloads: each page lists every module its scripts import (and their own imports), so the browser

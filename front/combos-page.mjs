@@ -69,8 +69,10 @@ async function start() {
   try {
     // The plugin build this site hands out, when there is one (scripts/build.mjs).
     const plugin = fetch('/downloads/simhub/plugin.json', {cache:'no-store'}).then(response => response.ok ? response.json() : null).catch(() => null);
+    // Every SimHub plugin in one zip, each in its own folder (scripts/build.mjs).
+    const pack = fetch('/downloads/simhub/plugins.json', {cache:'no-store'}).then(response => response.ok ? response.json() : null).catch(() => null);
     const [list, link] = await Promise.all([call('/api/combos'), call('/api/combos/link')]);
-    view.combos = list.combos; view.link = link; view.plugin = await plugin;
+    view.combos = list.combos; view.link = link; view.plugin = await plugin; view.pack = await pack;
   } catch (error) { renderError(error); return; }
   const wanted = view.combos.find(item => item.track === params.get('track') && item.car === params.get('car'));
   view.combo = wanted || view.combos[0] || null;
@@ -292,7 +294,7 @@ function linkCard() {
   return `<details class="cb-link" data-fold="link"${open ? ' open' : ''}><summary>${state}</summary><div class="cb-link-body">
     <ol class="cb-steps">
       <li>${view.plugin ? `<b>Installe le plugin</b> : <button type="button" class="cb-btn" data-action="download-plugin">Télécharger l’installeur</button> (version ${esc(view.plugin.version)}), puis double-clique dessus. Il télécharge le plugin, ferme et relance SimHub ; accepte le nouveau plugin. Si Windows te prévient, clique sur « Informations complémentaires » puis « Exécuter quand même ». Les mises à jour se font ensuite depuis SimHub.`
-        : '<b>Installe le plugin</b> : double-clique sur « Installer le plugin », livré avec <code>EnduranceManager.SimHub.dll</code>. Il ferme et relance SimHub ; accepte le nouveau plugin.'}</li>
+        : '<b>Installe le plugin</b> : double-clique sur « Installer le plugin », livré avec <code>EnduranceManager.SimHub.dll</code>. Il ferme et relance SimHub ; accepte le nouveau plugin.'}${view.pack?.plugins?.length ? ` Ou télécharge <a href="/downloads/simhub/plugins-simhub.zip" download>tous les plugins SimHub en un zip</a> (${view.pack.plugins.map(item => esc(item.name)).join(', ')}) : un dossier par plugin, installe seulement ceux que tu veux.` : ''}</li>
       <li><b>Crée ton code</b> avec le bouton ci-dessous : il est copié tout seul.</li>
       <li><b>Ouvre le menu « Fiches combo » de SimHub</b> : il trouve le code tout seul. Ensuite, roule : chaque séance part toute seule quand tu reviens au menu.</li>
     </ol>
