@@ -23,13 +23,7 @@ namespace EnduranceManager.SimHub
         public bool Enabled { get; set; } = true;
         // Mur des stands: the car shared live with the team while driving (LiveShare.cs). On unless the pilot turns it off.
         public bool Share { get; set; } = true;
-        // The practice banner (Practice.cs, Banner.cs): shown in practice, its size, its background's opacity, its place
-        // on the screen (none: top centre) and the stint length in laps, which sets the energy per lap aimed at.
-        public bool Banner { get; set; } = true;
-        public double BannerScale { get; set; } = 1;
-        public double BannerOpacity { get; set; } = 0.88;
-        public double? BannerLeft { get; set; }
-        public double? BannerTop { get; set; }
+        // The overlays' stint length in laps (Practice.cs): it sets the energy per lap aimed at.
         public int StintLaps { get; set; } = 12;
     }
 
@@ -69,9 +63,6 @@ namespace EnduranceManager.SimHub
         public LmuApi Api => api;
         public LiveShare Live => live;
         public Practice Practice { get; } = new Practice();
-        // « Placer le bandeau » on the plugin's screen: the banner shows and follows the mouse.
-        public volatile bool Placing;
-        public Action StopBanner;
         // What the game is doing, for the settings screen: closed, in the menus, or on track.
         public volatile string GameState = "closed";
         // The last session recorded, for the settings screen.
@@ -89,20 +80,51 @@ namespace EnduranceManager.SimHub
             this.AttachDelegate("Status", () => Status);
             this.AttachDelegate("LapsRecorded", () => laps);
             this.AttachDelegate("Enabled", () => Settings.Enabled);
+            // The overlays' figures (Practice.cs), for the Dash Studio overlays (Dashes.cs) and any dashboard.
+            this.AttachDelegate("Essais.EnPiste", () => Practice.OnTrack);
+            this.AttachDelegate("Essais.EnEssais", () => Practice.InPractice);
+            this.AttachDelegate("Essais.EnCourse", () => Practice.InRace);
+            this.AttachDelegate("Essais.NonCompte", () => Practice.View.NotCounted);
+            this.AttachDelegate("Essais.Couleur", () => Practice.View.Color);
+            // The stint length changes while driving (a new strategy): two actions to map to wheel buttons in SimHub
+            // (Contrôles et événements), shown in the overlays as « vs 8,33 % (12 t.) ».
+            this.AttachDelegate("Essais.ToursParRelais", () => Settings.StintLaps);
+            this.AddAction("ToursParRelaisPlus", (manager, button) => SetStintLaps(Settings.StintLaps + 1));
+            this.AddAction("ToursParRelaisMoins", (manager, button) => SetStintLaps(Settings.StintLaps - 1));
+            // The dashes' own buttons A and B, that pilots already have on their wheel, do the same while the overlays show
+            // (practice or race, car on track): A one lap more, B one lap less.
+            pluginManager.InputToActionTriggered += DashButton;
+            foreach (var (name, block) in new (string, Func<PracticeView, PracticeView.Block>)[] { ("Tour", view => view.Lap), ("Energie", view => view.Energy), ("Usure", view => view.Wear) })
+            {
+                string at = "Essais." + name + ".";
+                this.AttachDelegate(at + "Titre", () => block(Practice.View).Title);
+                this.AttachDelegate(at + "Valeur", () => block(Practice.View).Value);
+                this.AttachDelegate(at + "Ecart", () => block(Practice.View).Delta);
+                this.AttachDelegate(at + "EcartCouleur", () => block(Practice.View).DeltaColor);
+                this.AttachDelegate(at + "Vise", () => block(Practice.View).Target);
+                this.AttachDelegate(at + "Moi", () => block(Practice.View).Me);
+                this.AttachDelegate(at + "MoiCouleur", () => block(Practice.View).MeColor);
+                this.AttachDelegate(at + "Equipe", () => block(Practice.View).Team);
+                this.AttachDelegate(at + "Meilleur", () => block(Practice.View).Best);
+                this.AttachDelegate(at + "MeilleurCouleur", () => Practice.Violet);
+                this.AttachDelegate(at + "Nombre", () => block(Practice.View).Number);
+                this.AttachDelegate(at + "ViseNombre", () => block(Practice.View).TargetNumber);
+            }
             running = true;
             // Below the game and SimHub: when the PC is busy, these threads wait, never the game.
             reader = new Thread(ReadGame) { IsBackground = true, Name = "EnduranceManager.Read", Priority = ThreadPriority.BelowNormal };
             sender = new Thread(SendLoop) { IsBackground = true, Name = "EnduranceManager.Send", Priority = ThreadPriority.Lowest };
             reader.Start();
             sender.Start();
-            Banner.Start(this);
+            // The overlays « Endurance Manager · Bandeau » and « · Colonne » in Dash Studio's templates.
+            ThreadPool.QueueUserWorkItem(_ => Dashes.Install(home));
         }
 
         public void End(PluginManager pluginManager)
         {
             running = false;
             live?.Stop();
-            StopBanner?.Invoke();
+            pluginManager.InputToActionTriggered -= DashButton;
             this.SaveCommonSettings("GeneralSettings", Settings);
             // SimHub closes: the session being driven is written to disk before the process goes.
             reader?.Join(3000);
@@ -127,14 +149,19 @@ namespace EnduranceManager.SimHub
             this.SaveCommonSettings("GeneralSettings", Settings);
         }
 
-        // The banner's settings, from the plugin's screen.
-        public void SaveBanner(Action<Settings> change)
+        void DashButton(string input, string action)
         {
-            change(Settings);
-            this.SaveCommonSettings("GeneralSettings", Settings);
+            if (!Practice.InPractice && !Practice.InRace) return;
+            if (action == "GraphicalDashPlugin.ActionA") SetStintLaps(Settings.StintLaps + 1);
+            else if (action == "GraphicalDashPlugin.ActionB") SetStintLaps(Settings.StintLaps - 1);
         }
 
-        public void SaveBannerPlace(double left, double top) => SaveBanner(settings => { settings.BannerLeft = left; settings.BannerTop = top; });
+        // The overlays' stint length, from the plugin's screen.
+        public void SetStintLaps(int laps)
+        {
+            Settings.StintLaps = Math.Max(1, Math.Min(60, laps));
+            this.SaveCommonSettings("GeneralSettings", Settings);
+        }
 
         // The switch on the plugin's screen. Turned off while driving, the laps already done are kept.
         public void SetEnabled(bool enabled)
@@ -195,11 +222,10 @@ namespace EnduranceManager.SimHub
                             GameState = driving ? "track" : "menu";
                             // Once a second, the car and the field for the team's mur des stands.
                             if (driving && Settings.Share && tick % 10 == 0) live.Offer(buffer, sample, recorder, api);
-                            // Once a second, the practice banner: practice and warm-up only (rF2 sessions 0 to 4, 9), out of the garage.
+                            // Once a second, the overlays' figures, in every session.
                             if (tick % 10 == 0)
                             {
-                                if (driving && Settings.Banner && !sample.Garage && (sample.Session <= 4 || sample.Session == 9))
-                                    try { Practice.Update(sample, recorder.Current, LinkCode.Parse(Settings.Code), Settings.StintLaps); } catch { Practice.Hide(); }
+                                if (driving) try { Practice.Update(sample, recorder.Current, LinkCode.Parse(Settings.Code), Settings.StintLaps); } catch { Practice.Hide(); }
                                 else Practice.Hide();
                             }
                             misses = driving ? 0 : misses + 1;
