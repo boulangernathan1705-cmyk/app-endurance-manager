@@ -45,6 +45,7 @@ function connect() {
     if (message.type === 'hello') for (const feed of message.feeds || []) view.feeds.set(feed.key, readFeed(feed));
     if (message.type === 'feed' && message.feed?.key) view.feeds.set(message.feed.key, readFeed(message.feed, view.feeds.get(message.feed.key)));
     pick();
+    move(current());
     render();
   });
   socket.addEventListener('close', () => {
@@ -138,9 +139,8 @@ function header(feed) {
 function linkState(feed) {
   if (!view.connected) return '<div class="lw-link"><span class="lw-dot late"></span><span>Reconnexion au site…</span></div>';
   if (!feed) return '<div class="lw-link"><span class="lw-dot"></span><span>Relié, en attente d’un pilote</span></div>';
-  const seconds = age(feed);
-  return isLive(feed) ? `<div class="lw-link"><span class="lw-dot on"></span><span>En direct · il y a ${fr(seconds, 0)} s</span></div>`
-    : `<div class="lw-link"><span class="lw-dot"></span><span>Plus de nouvelles depuis ${fr(seconds / 60, 0)} min</span></div>`;
+  return isLive(feed) ? '<div class="lw-link"><span class="lw-dot on"></span><span>En direct</span></div>'
+    : '<div class="lw-link"><span class="lw-dot"></span><span>Hors ligne</span></div>';
 }
 
 function carsStrip() {
@@ -190,12 +190,12 @@ function board(feed) {
     const who = mate ? feedName(mate) : car.driver;
     const row = `<tr class="row ${car.id === us ? 'us' : mate ? 'mate' : ''}" data-car="${car.id}" style="--cls:${classColor(car.cls)};--us:${esc(mate ? feedColor(mate) : 'inherit')}" aria-expanded="${view.open === car.id}">
       <td class="c-pos">${race ? car.place || index + 1 : index + 1}<small>${esc(classShort(car.cls))}${classPos(car)}</small></td><td class="c-num w2">${esc(car.num)}</td>
-      <td class="c-car car">${esc(who)}<small>${car.num ? `#${esc(car.num)} · ` : ''}${esc(model(car))}</small></td>
+      <td class="c-car car">${car.pit ? `<span class="lw-pill pits">${car.pit === 2 ? 'Garage' : 'Stands'}</span> ` : ''}${esc(who)}<small>${car.num ? `#${esc(car.num)} · ` : ''}${esc(model(car))}</small></td>
       <td class="c-laps w3">${car.laps}</td>
       <td class="c-gap">${race ? (car === leader ? '—' : gapRace(car.behind, car.lapsBehind)) : gapBest(car, leader)}</td>
       <td class="c-int w2">${ahead ? (race ? gapRace(car.next, car.lapsNext) : gapBest(car, ahead)) : '—'}</td>
       <td class="c-d5 w2">${d5(car)}</td>
-      <td class="c-last ${main > 0 && main === bestOfAll ? 'best' : ''}">${car.pit ? `<span class="lw-pill pits">${car.pit === 2 ? 'Garage' : 'Stands'}</span>` : lapTime(main)}</td>
+      <td class="c-last ${main > 0 && main === bestOfAll ? 'best' : ''}">${lapTime(main)}</td>
       <td class="c-avg w2">${lapTime(info.avg5)}</td><td class="c-best w3 ${other > 0 && other === bestOfAll ? 'best' : ''}">${lapTime(other)}</td>
       <td class="c-stint">${car.pit ? 0 : info.sinceStop ?? '—'}</td><td class="c-pit w2">${known(info.stop) ? fr(info.stop, 1) : '—'}</td><td class="c-stops w1">${car.stops ?? '—'}</td><td class="c-pen w2">${car.pen || '—'}</td></tr>`;
     if (view.open !== car.id) return row;
@@ -208,10 +208,9 @@ function board(feed) {
       <div><dt>Arrêts</dt><dd>${car.stops ?? '—'}</dd></div><div><dt>Pénalités</dt><dd>${car.pen || 'aucune'}</dd></div>
       <div class="wide"><dt>Secteurs du dernier tour</dt><dd>${sectors}</dd></div></dl></td></tr>`;
   }).join('');
-  return `<h2>${race ? 'Classement' : 'Temps de la séance'} <small>${sorted.length} voitures · appuie sur une ligne pour le détail</small></h2>
+  return `<h2>${race ? 'Classement' : 'Temps de la séance'} <small>${sorted.length} voitures</small></h2>
     ${classes.length > 1 ? `<div class="lw-chips" role="group" aria-label="Classe">${[['all', 'Toutes'], ...classes.map(name => [name, name])].map(([key, name]) => `<button type="button" data-cls="${esc(key)}" aria-pressed="${key === view.cls}">${esc(name)}</button>`).join('')}</div>` : ''}
-    <table class="lw-board"><thead>${head}</thead><tbody>${body}</tbody></table>
-    <p class="lw-flag">Violet : meilleur de la séance. Vert : meilleur personnel. Δ 5 t. : moyenne de leurs 5 derniers tours moins la nôtre, en secondes. Relais et arrêt : comptés depuis que le mur des stands suit la séance.</p>`;
+    <table class="lw-board"><thead>${head}</thead><tbody>${body}</tbody></table>`;
 }
 
 function carPanel(feed) {
@@ -226,15 +225,12 @@ function carPanel(feed) {
   const cur = known(me.cur) ? me.cur + (isLive(feed) && !me.pit ? age(feed) : 0) : null;
   const sectors = info.lastSectors;
   const best = ours.bestSectors;
-  const wheel = (index, w) => `<div class="lw-tyre"><div class="t"><span>${WHEELS[index]}</span><span class="left lw-num">${fr(w.left, 0)}<small> %</small></span></div>
+  const wheel = (index, w) => `<div class="lw-tyre"><div class="t">${WHEELS[index]}</div>
+    <div class="lw-tyre-main lw-num"><span>${fr(w.left, 0)}<small> %</small></span><span>${fr(w.carcass, 0)}<small> °C</small></span></div>
     <div class="lw-wear" aria-hidden="true"><i style="width:${known(w.left) ? Math.max(0, Math.min(100, w.left)) : 0}%"></i></div>
-    <dl><div><dt>Usure / t. (5 t.)</dt><dd class="lw-num">${known(ours.wear5[index]) ? `${fr(ours.wear5[index], 2)} %` : '—'}</dd></div><div><dt>Carcasse</dt><dd class="lw-num">${fr(w.carcass, 0)} °C</dd></div>
+    <dl><div><dt>Usure / t.</dt><dd class="lw-num">${known(ours.wear5[index]) ? `${fr(ours.wear5[index], 2)} %` : '—'}</dd></div>
       <div><dt>Pression</dt><dd class="lw-num">${fr(w.kpa, 0)} kPa</dd></div><div><dt>Frein</dt><dd class="lw-num">${fr(w.brake, 0)} °C</dd></div></dl></div>`;
-  const control = me.control;
-  const settings = [control && known(control.tc) && ['TC', fr(control.tc, 0)], control && known(control.abs) && ['ABS', fr(control.abs, 0)],
-    control && known(control.bias) && ['Frein', `${fr(control.bias, 1)} %`], control && known(control.map) && ['Carto', fr(control.map, 0)],
-    known(me.damage) && ['Dégâts', `${fr(me.damage, 0)} %`], known(me.limits) && ['Track limits', fr(me.limits, 0)]].filter(Boolean);
-  return `<div class="lw-head"><span class="lw-who"><i style="background:${esc(feedColor(feed))}"></i>${esc(me.driver || feedName(feed))}</span>
+  return `<div class="lw-head"><span class="lw-who"><i style="background:${esc(feedColor(feed))}"></i>${esc(feedName(feed))}</span>
       <span class="lw-meta">${row.num ? `#${esc(row.num)} · ` : ''}${esc(me.car || me.vehicle)}${me.compound ? ` · ${esc(me.compound)}` : ''}</span>
       <span class="lw-pill ${isLive(feed) ? PIT[me.pit] : 'off'}">${isLive(feed) ? PIT_LABEL[me.pit] : 'Hors ligne'}</span></div>
     <div class="lw-carbody"><div class="lw-stack">
@@ -257,7 +253,6 @@ function carPanel(feed) {
     <div class="lw-sub"><h3>Pneus <span>${esc(me.compound)}</span></h3>
       <div class="lw-tyres">${me.wheels.map((w, index) => wheel(index, w)).join('')}</div>
     </div>
-    ${settings.length ? `<div class="lw-sub"><h3>Réglages et dégâts</h3><dl class="lw-cond">${settings.map(([name, value]) => `<div><dt>${name}</dt><dd class="lw-num">${value}</dd></div>`).join('')}</dl></div>` : ''}
     <div class="lw-sub"><h3>Conditions</h3>
       <dl class="lw-cond"><div><dt>Piste</dt><dd class="lw-num">${fr(snap.trackTemp, 1)} °C</dd></div><div><dt>Air</dt><dd class="lw-num">${fr(snap.air, 1)} °C</dd></div>
         <div><dt>Pluie</dt><dd class="lw-num">${known(snap.rain) ? `${fr(snap.rain * 100, 0)} %` : '—'}</dd></div><div><dt>Piste mouillée</dt><dd class="lw-num">${known(snap.wet) ? `${fr(snap.wet * 100, 0)} %` : '—'}</dd></div></dl>
@@ -265,27 +260,69 @@ function carPanel(feed) {
 }
 
 // Seen from above, x to the right and z down (as the lap analysis of the fiches), from the game's map of the track or
-// the path our car drove.
+// the path the field drives. The cars glide from one position to the next (the plugin sends one a second).
+// Not with « reduce motion »: the cars then jump as they come.
+const motion = {key:null, cars:new Map(), still:matchMedia('(prefers-reduced-motion: reduce)').matches}, GLIDE_MAX = 2500;
+let frame = null;
+// A new snapshot: each car leaves from where it is drawn now towards its new position, over the time between two
+// messages; it jumps instead when the step is too long to be driving (the line, the pits, a new session).
+function move(feed) {
+  if (!feed) return;
+  if (motion.key !== feed.key) { motion.key = feed.key; motion.cars.clear(); }
+  const now = performance.now(), size = frame?.size || 1;
+  for (const car of feed.snap.field) {
+    if (!known(car.x) || !known(car.z)) continue;
+    const old = motion.cars.get(car.id), to = [car.x, car.z];
+    if (old && old.to[0] === to[0] && old.to[1] === to[1]) continue;
+    const from = old ? where(old, now) : to;
+    const jump = motion.still || !old || Math.hypot(to[0] - from[0], to[1] - from[1]) > size * 0.1 || Boolean(old.pit) !== Boolean(car.pit);
+    motion.cars.set(car.id, {from:jump ? to : from, to, at:now, span:old ? Math.min(GLIDE_MAX, Math.max(400, now - old.at)) : 1000, pit:car.pit});
+  }
+}
+function where(item, now) {
+  const f = Math.min(1, (now - item.at) / item.span);
+  return [item.from[0] + (item.to[0] - item.from[0]) * f, item.from[1] + (item.to[1] - item.from[1]) * f];
+}
+const placed = car => { const item = motion.cars.get(car.id); return item ? where(item, performance.now()) : [car.x, car.z]; };
+
 function mapPanel(feed) {
   const snap = feed.snap, outline = feed.outline || [];
   const cars = snap.field.filter(car => known(car.x) && known(car.z) && car.pit !== 2);
-  const points = [...outline, ...cars.map(car => [car.x, car.z])];
-  if (!points.length) return `<h2>Carte</h2><p class="lw-empty">Les positions arrivent dès que la voiture roule.</p>`;
+  // The frame from the track alone once it is known (cars moving do not rescale it).
+  const points = outline.length > 20 ? outline : [...outline, ...cars.map(car => [car.x, car.z])];
+  if (!points.length) { frame = null; return `<h2>Carte</h2><p class="lw-empty">Les positions arrivent dès que la voiture roule.</p>`; }
   const xs = points.map(p => p[0]), zs = points.map(p => p[1]);
   const minX = Math.min(...xs), maxX = Math.max(...xs), minZ = Math.min(...zs), maxZ = Math.max(...zs);
   const size = Math.max(maxX - minX, maxZ - minZ) || 1, k = 940 / size;
+  frame = {minX, minZ, k, size};
   const width = (maxX - minX) * k + 60, height = (maxZ - minZ) * k + 60;
   const px = v => (30 + (v - minX) * k).toFixed(1), pz = v => (30 + (v - minZ) * k).toFixed(1);
   const path = outline.length > 20 ? `M${outline.map(([x, z]) => `${px(x)},${pz(z)}`).join('L')}Z` : '';
   const mates = new Set([...view.feeds.values()].filter(item => item.key !== feed.key && item.snap.track === snap.track && item.snap.session === snap.session).map(item => item.snap.me.vehicle));
-  const others = cars.filter(car => car.id !== snap.me.id).map(car => `<circle cx="${px(car.x)}" cy="${pz(car.z)}" r="${mates.has(car.vehicle) ? 11 : 8}" fill="${classColor(car.cls)}" stroke="var(--bg, #0a0b0c)" stroke-width="2"/>`).join('');
-  const me = cars.find(car => car.id === snap.me.id);
-  const us = me ? `<circle cx="${px(me.x)}" cy="${pz(me.z)}" r="15" fill="${esc(feedColor(feed))}" stroke="var(--text)" stroke-width="3.5"/><text x="${(Number(px(me.x)) + 20).toFixed(1)}" y="${(Number(pz(me.z)) + 5).toFixed(1)}">${me.place ? `P${me.place}` : 'Nous'}</text>` : '';
+  const others = cars.filter(car => car.id !== snap.me.id).map(car => { const [x, z] = placed(car);
+    return `<circle data-car="${car.id}" cx="${px(x)}" cy="${pz(z)}" r="${mates.has(car.vehicle) ? 13 : 10}" fill="${classColor(car.cls)}" stroke="var(--bg, #0a0b0c)" stroke-width="2.5"/>`; }).join('');
+  const me = cars.find(car => car.id === snap.me.id), [mx, mz] = me ? placed(me) : [0, 0];
+  const us = me ? `<g data-car="${me.id}" transform="translate(${px(mx)},${pz(mz)})"><circle r="17" fill="${esc(feedColor(feed))}" stroke="var(--text)" stroke-width="4"/><text x="24" y="8">${me.place ? `P${me.place}` : 'Nous'}</text></g>` : '';
   const classes = [...new Set(snap.field.map(car => car.cls).filter(Boolean))];
   return `<h2>Carte <small>${esc(snap.track)}</small></h2>
     <svg class="lw-mapbox" viewBox="0 0 ${width.toFixed(0)} ${height.toFixed(0)}" role="img" aria-label="Position des voitures sur le circuit">${path ? `<path class="road" d="${path}"/><path class="edge" d="${path}"/>` : ''}${others}${us}</svg>
-    <div class="lw-legend">${classes.map(name => `<span><i style="background:${classColor(name)}"></i>${esc(name)}</span>`).join('')}<span><i style="background:${esc(feedColor(feed))};outline:2px solid var(--text)"></i>Nous</span></div>
-    ${feed.mapFromGame ? '' : '<p class="lw-flag">Tracé dessiné par notre voiture sur un tour (le jeu n’a pas donné le sien).</p>'}`;
+    <div class="lw-legend">${classes.map(name => `<span><i style="background:${classColor(name)}"></i>${esc(name)}</span>`).join('')}<span><i style="background:${esc(feedColor(feed))};outline:2px solid var(--text)"></i>Nous</span></div>`;
+}
+
+// Between two redraws, only the cars move (nothing while the page is hidden or the map not shown).
+function glide() {
+  requestAnimationFrame(glide);
+  if (document.hidden || !frame) return;
+  const box = document.querySelector('#lw-map .lw-mapbox');
+  if (!box || !box.getClientRects().length) return;
+  const now = performance.now(), {minX, minZ, k} = frame;
+  for (const node of box.querySelectorAll('[data-car]')) {
+    const item = motion.cars.get(Number(node.dataset.car));
+    if (!item) continue;
+    const [x, z] = where(item, now), cx = (30 + (x - minX) * k).toFixed(1), cy = (30 + (z - minZ) * k).toFixed(1);
+    if (node.tagName === 'g') node.setAttribute('transform', `translate(${cx},${cy})`);
+    else { node.setAttribute('cx', cx); node.setAttribute('cy', cy); }
+  }
 }
 
 // What a stop of this kind costs: the lane on top of the same stretch of track (our stops this session, measured by
@@ -376,7 +413,7 @@ app.addEventListener('click', event => {
   if (button.dataset.tab) view.tab = button.dataset.tab;
   else if (button.dataset.stop) view.stop = button.dataset.stop;
   else if (button.dataset.cls) view.cls = button.dataset.cls;
-  else if (button.dataset.feed) { view.key = button.dataset.feed; view.open = null; }
+  else if (button.dataset.feed) { view.key = button.dataset.feed; view.open = null; move(current()); }
   else return;
   render();
 });
@@ -389,5 +426,6 @@ async function start() {
   connect();
   // Clocks and ages move between two messages too.
   setInterval(render, 1000);
+  requestAnimationFrame(glide);
 }
 start();
