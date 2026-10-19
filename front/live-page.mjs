@@ -225,14 +225,11 @@ function carPanel(feed) {
   const cur = known(me.cur) ? me.cur + (isLive(feed) && !me.pit ? age(feed) : 0) : null;
   const sectors = info.lastSectors;
   const best = ours.bestSectors;
-  const wheel = (index, w) => `<div class="lw-tyre"><div class="t"><span>${WHEELS[index]}</span><span class="left lw-num">${fr(w.left, 0)}<small> %</small></span></div>
+  const wheel = (index, w) => `<div class="lw-tyre"><div class="t">${WHEELS[index]}</div>
+    <div class="lw-tyre-main lw-num"><span>${fr(w.left, 0)}<small> %</small></span><span>${fr(w.carcass, 0)}<small> °C</small></span></div>
     <div class="lw-wear" aria-hidden="true"><i style="width:${known(w.left) ? Math.max(0, Math.min(100, w.left)) : 0}%"></i></div>
-    <dl><div><dt>Usure / t. (5 t.)</dt><dd class="lw-num">${known(ours.wear5[index]) ? `${fr(ours.wear5[index], 2)} %` : '—'}</dd></div><div><dt>Carcasse</dt><dd class="lw-num">${fr(w.carcass, 0)} °C</dd></div>
+    <dl><div><dt>Usure / t.</dt><dd class="lw-num">${known(ours.wear5[index]) ? `${fr(ours.wear5[index], 2)} %` : '—'}</dd></div>
       <div><dt>Pression</dt><dd class="lw-num">${fr(w.kpa, 0)} kPa</dd></div><div><dt>Frein</dt><dd class="lw-num">${fr(w.brake, 0)} °C</dd></div></dl></div>`;
-  const control = me.control;
-  const settings = [control && known(control.tc) && ['TC', fr(control.tc, 0)], control && known(control.abs) && ['ABS', fr(control.abs, 0)],
-    control && known(control.bias) && ['Frein', `${fr(control.bias, 1)} %`], control && known(control.map) && ['Carto', fr(control.map, 0)],
-    known(me.damage) && ['Dégâts', `${fr(me.damage, 0)} %`], known(me.limits) && ['Track limits', fr(me.limits, 0)]].filter(Boolean);
   return `<div class="lw-head"><span class="lw-who"><i style="background:${esc(feedColor(feed))}"></i>${esc(feedName(feed))}</span>
       <span class="lw-meta">${row.num ? `#${esc(row.num)} · ` : ''}${esc(me.car || me.vehicle)}${me.compound ? ` · ${esc(me.compound)}` : ''}</span>
       <span class="lw-pill ${isLive(feed) ? PIT[me.pit] : 'off'}">${isLive(feed) ? PIT_LABEL[me.pit] : 'Hors ligne'}</span></div>
@@ -256,7 +253,6 @@ function carPanel(feed) {
     <div class="lw-sub"><h3>Pneus <span>${esc(me.compound)}</span></h3>
       <div class="lw-tyres">${me.wheels.map((w, index) => wheel(index, w)).join('')}</div>
     </div>
-    ${settings.length ? `<div class="lw-sub"><h3>Réglages et dégâts</h3><dl class="lw-cond">${settings.map(([name, value]) => `<div><dt>${name}</dt><dd class="lw-num">${value}</dd></div>`).join('')}</dl></div>` : ''}
     <div class="lw-sub"><h3>Conditions</h3>
       <dl class="lw-cond"><div><dt>Piste</dt><dd class="lw-num">${fr(snap.trackTemp, 1)} °C</dd></div><div><dt>Air</dt><dd class="lw-num">${fr(snap.air, 1)} °C</dd></div>
         <div><dt>Pluie</dt><dd class="lw-num">${known(snap.rain) ? `${fr(snap.rain * 100, 0)} %` : '—'}</dd></div><div><dt>Piste mouillée</dt><dd class="lw-num">${known(snap.wet) ? `${fr(snap.wet * 100, 0)} %` : '—'}</dd></div></dl>
