@@ -57,6 +57,10 @@ const LAP_INSERT = `INSERT INTO combo_laps(${LAP_COLUMNS.join(',')}) VALUES(${LA
 const STOP_INSERT = `INSERT INTO combo_stops(session_id,community_id,user_id,track,car,started_at,idx,lap,lane,stopped,fuel,ve,tyres,repair)
   VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)`;
 
+// A change to a combo's data: its sheet cached for the plugin is read again (pluginSheet).
+const BUMP = `INSERT INTO combo_revisions(community_id,track,car,rev) VALUES(?,?,?,1)
+  ON CONFLICT(community_id,track,car) DO UPDATE SET rev=rev+1`;
+
 // One session → kept once (the same session sent twice is ignored), with its laps and stops in one batch.
 export async function saveSession(env, link, input) {
   let session;
@@ -74,6 +78,7 @@ export async function saveSession(env, link, input) {
     ...lap.wear, ...lap.temp, ...lap.kpa, ...lap.brake, lap.compound, lap.track, lap.air, lap.rain, lap.wet, lap.top, lap.invalid ? 1 : 0, lap.pit ? 1 : 0, lap.setup, lap.light));
   session.stops.forEach((stop, index) => statements.push(env.DB.prepare(STOP_INSERT).bind(...scope, index, stop.lap, stop.lane, stop.stopped,
     stop.fuel, stop.ve, stop.tyres, stop.repair ? 1 : 0)));
+  statements.push(env.DB.prepare(BUMP).bind(link.community_id, session.track, session.car));
   if (session.trace) {
     const {n, t, ...points} = session.trace;
     statements.push(env.DB.prepare('INSERT INTO combo_traces(session_id,community_id,user_id,track,car,started_at,lap,lap_time,data) VALUES(?,?,?,?,?,?,?,?,?)')
@@ -334,6 +339,24 @@ async function pluginAccess(request, env) {
   return {link, community, user};
 }
 
+// The practice banner reads the sheet at each session start and every few minutes, and a sheet goes through the
+// combo's laps several times: kept in the data centre's cache until the combo changes (its revision), at most
+// SHEET_CACHE seconds (the current race or game version can move on). Without a cache (tests), computed each time.
+const SHEET_CACHE = 1800;
+async function pluginSheet(env, community, userId, url) {
+  const combo = comboOf(url), cache = globalThis.caches?.default;
+  if (!cache) return json(await sheet(env, community, userId, combo, url, true));
+  const rev = await env.DB.prepare('SELECT rev FROM combo_revisions WHERE community_id=? AND track=? AND car=?').bind(community.id, combo.track, combo.car).first();
+  const key = new Request(`https://combo-sheet.invalid/${[community.id, combo.track, combo.car, rev?.rev ?? 0, userId].map(encodeURIComponent).join('/')}`);
+  const hit = await cache.match(key);
+  if (hit) return hit;
+  const response = json(await sheet(env, community, userId, combo, url, true));
+  const headers = new Headers(response.headers);
+  headers.set('Cache-Control', `max-age=${SHEET_CACHE}`);
+  await cache.put(key, new Response(await response.clone().arrayBuffer(), {status:response.status, headers}));
+  return response;
+}
+
 export async function combosPlugin(path, request, env) {
   const method = request.method;
   if (path === '/api/combos/plugin/session') {
@@ -356,8 +379,7 @@ export async function combosPlugin(path, request, env) {
   }
   if (path === '/api/combos/plugin/sheet' && method === 'GET') {
     const {community, user} = await pluginAccess(request, env);
-    const url = new URL(request.url);
-    return json(await sheet(env, community, user.id, comboOf(url), url, true));
+    return pluginSheet(env, community, user.id, new URL(request.url));
   }
   notFound();
 }
@@ -439,13 +461,13 @@ export async function combosApi(path, method, request, env, actor, community) {
   // A pilot takes his own laps out of the sheet, or puts them back (a test lap, a lap not driven for real); an admin too.
   if (path === '/api/combos/laps' && method === 'PATCH') {
     const input = await body(request);
-    const row = await env.DB.prepare('SELECT id, user_id FROM combo_sessions WHERE id=? AND community_id=?').bind(String(input.session ?? ''), community.id).first();
+    const row = await env.DB.prepare('SELECT id, user_id, track, car FROM combo_sessions WHERE id=? AND community_id=?').bind(String(input.session ?? ''), community.id).first();
     if (!row) fail(404, 'Séance introuvable.');
     if (row.user_id !== userId) requirePermission(actor, 'admin', 'Seul le pilote de la séance ou un administrateur peut retirer ses tours.');
     const laps = Array.isArray(input.laps) ? input.laps.map(Number).filter(Number.isInteger).slice(0, 2000) : [];
     if (!laps.length) fail(400, 'Aucun tour choisi.');
-    await env.DB.prepare('UPDATE combo_laps SET ignored=? WHERE session_id=? AND n IN (SELECT value FROM json_each(?))')
-      .bind(input.ignored ? 1 : 0, row.id, JSON.stringify(laps)).run();
+    await env.DB.batch([env.DB.prepare('UPDATE combo_laps SET ignored=? WHERE session_id=? AND n IN (SELECT value FROM json_each(?))')
+      .bind(input.ignored ? 1 : 0, row.id, JSON.stringify(laps)), env.DB.prepare(BUMP).bind(community.id, row.track, row.car)]);
     return json({ok:true});
   }
 

@@ -513,3 +513,27 @@ test('mur des stands: the plugin opens the team\'s room with its key, a page wit
   delete env.LIVE;
   assert.equal((await open('/api/combos/plugin/live', {Authorization:`Bearer ${key}`, Upgrade:'websocket'})).status, 503);
 });
+
+test('the plugin\'s sheet stays in the cache until the combo changes: a new session, laps taken out', async () => {
+  const {req, signIn, plugin} = harness();
+  signIn(NATHAN, 'Nathan', [TEAM_ROLE]);
+  const store = new Map(), counts = {hits:0, puts:0};
+  globalThis.caches = {default:{
+    match:async key => { const hit = store.get(key.url); if (hit) counts.hits++; return hit?.clone(); },
+    put:async (key, response) => { counts.puts++; store.set(key.url, response); }
+  }};
+  try {
+    const key = keyOf((await req('/api/combos/link', 'POST', {}, NATHAN)).data.code);
+    const read = async () => (await plugin(`/api/combos/plugin/sheet?track=${encodeURIComponent(TRACK)}&car=${encodeURIComponent(CAR)}`, key)).data;
+    await plugin('/api/combos/plugin/session', key, 'POST', session({at:Date.now() - 86_400_000}));
+    assert.equal((await read()).sample.sessions, 1);
+    assert.equal((await read()).sample.sessions, 1);
+    assert.deepEqual(counts, {hits:1, puts:1}, 'the second read comes from the cache');
+    await plugin('/api/combos/plugin/session', key, 'POST', session({at:Date.now() - 3_600_000}));
+    assert.equal((await read()).sample.sessions, 2, 'a new session: computed again');
+    const id = (await req(`/api/combos/analysis?track=${encodeURIComponent(TRACK)}&car=${encodeURIComponent(CAR)}`, 'GET', null, NATHAN)).data.sessions[0].id;
+    await req('/api/combos/laps', 'PATCH', {session:id, laps:[5], ignored:true}, NATHAN);
+    await read();
+    assert.equal(counts.puts, 3, 'laps taken out: computed again');
+  } finally { delete globalThis.caches; }
+});
