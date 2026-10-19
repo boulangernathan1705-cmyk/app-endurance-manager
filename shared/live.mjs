@@ -220,7 +220,13 @@ export function publicFeed(feed, shape = true) {
       lastVe:ours.laps.at(-1)?.ve ?? null, lastFuel:ours.laps.at(-1)?.fuel ?? null,
       stintVe:avgOf(stintLaps, lap => lap.ve), stintFuel:avgOf(stintLaps, lap => lap.fuel), stintAvg:avgOf(cleanLaps(stintLaps), lap => lap.t),
       bestSectors:[0, 1, 2].map(index => { const values = laps.filter(lap => lap.s).map(lap => lap.s[index]); return values.length ? Math.min(...values) : null; }),
-      stints:ours.stints, stops:ours.stops, drivers:ours.drivers
+      stints:ours.stints.map((item, index) => {
+        // A stint's summary: its timed laps, what it used per lap, and the stop that ended it.
+        const next = ours.stints[index + 1], mine = ours.laps.filter(lap => lap.n > item.from && lap.n <= item.from + item.laps);
+        const stop = next ? ours.stops.findLast(entry => entry.lap > item.from && entry.lap <= next.from + 1) : null;
+        return {...item, avg:avgOf(cleanLaps(mine), lap => lap.t), ve:avgOf(mine, lap => lap.ve), fuel:avgOf(mine, lap => lap.fuel), stop:stop || null};
+      }),
+      stops:ours.stops, drivers:ours.drivers
     }
   };
 }

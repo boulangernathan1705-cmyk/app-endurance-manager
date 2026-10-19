@@ -236,10 +236,10 @@ function carPanel(feed) {
     known(me.damage) && ['Dégâts', `${fr(me.damage, 0)} %`], known(me.limits) && ['Track limits', fr(me.limits, 0)]].filter(Boolean);
   return `<div class="lw-head"><span class="lw-who"><i style="background:${esc(feedColor(feed))}"></i>${esc(me.driver || feedName(feed))}</span>
       <span class="lw-meta">${row.num ? `#${esc(row.num)} · ` : ''}${esc(me.car || me.vehicle)}${me.compound ? ` · ${esc(me.compound)}` : ''}</span>
-      <span class="lw-pill ${isLive(feed) ? PIT[me.pit] : 'off'}">${isLive(feed) ? PIT_LABEL[me.pit] : 'Hors ligne'}</span><span class="lw-age lw-num">Mis à jour il y a ${fr(age(feed), 0)} s</span></div>
+      <span class="lw-pill ${isLive(feed) ? PIT[me.pit] : 'off'}">${isLive(feed) ? PIT_LABEL[me.pit] : 'Hors ligne'}</span></div>
     <div class="lw-carbody"><div class="lw-stack">
     <div class="lw-sub first">
-      <h3>${energy ? 'Énergie virtuelle' : 'Carburant'} <span>${energy ? '' : 'voiture sans énergie virtuelle'}</span></h3>
+      <h3>${energy ? 'Énergie virtuelle' : 'Carburant'}</h3>
       <div class="lw-row2"><div class="lw-big lw-num">${fr(amount, 1)}<small>${unit}</small></div><div class="lw-meter${energy ? '' : ' grey'}" aria-hidden="true"><i style="width:${Math.max(0, Math.min(100, fill || 0))}%"></i></div></div>
       <dl class="lw-kv"><div><dt>Dernier tour</dt><dd class="lw-num">${fr(energy ? ours.lastVe : ours.lastFuel, 2)} ${unit}${delta(energy ? ours.lastVe : ours.lastFuel, ref)}</dd></div>
         <div><dt>Moy. 5 tours</dt><dd class="lw-num">${fr(energy ? ours.ve5 : ours.fuel5, 2)} ${unit}${delta(energy ? ours.ve5 : ours.fuel5, ref)}</dd></div>
@@ -280,7 +280,7 @@ function mapPanel(feed) {
   const mates = new Set([...view.feeds.values()].filter(item => item.key !== feed.key && item.snap.track === snap.track && item.snap.session === snap.session).map(item => item.snap.me.vehicle));
   const others = cars.filter(car => car.id !== snap.me.id).map(car => `<circle cx="${px(car.x)}" cy="${pz(car.z)}" r="${mates.has(car.vehicle) ? 11 : 8}" fill="${classColor(car.cls)}" stroke="var(--bg, #0a0b0c)" stroke-width="2"/>`).join('');
   const me = cars.find(car => car.id === snap.me.id);
-  const us = me ? `<circle cx="${px(me.x)}" cy="${pz(me.z)}" r="15" fill="${esc(feedColor(feed))}" stroke="var(--text)" stroke-width="3.5"/><text x="${(Number(px(me.x)) + 20).toFixed(1)}" y="${(Number(pz(me.z)) + 5).toFixed(1)}">${esc(snap.field.find(car => car.id === snap.me.id)?.num || 'Nous')}</text>` : '';
+  const us = me ? `<circle cx="${px(me.x)}" cy="${pz(me.z)}" r="15" fill="${esc(feedColor(feed))}" stroke="var(--text)" stroke-width="3.5"/><text x="${(Number(px(me.x)) + 20).toFixed(1)}" y="${(Number(pz(me.z)) + 5).toFixed(1)}">${me.place ? `P${me.place}` : 'Nous'}</text>` : '';
   const classes = [...new Set(snap.field.map(car => car.cls).filter(Boolean))];
   return `<h2>Carte <small>${esc(snap.track)}</small></h2>
     <svg class="lw-mapbox" viewBox="0 0 ${width.toFixed(0)} ${height.toFixed(0)}" role="img" aria-label="Position des voitures sur le circuit">${path ? `<path class="road" d="${path}"/><path class="edge" d="${path}"/>` : ''}${others}${us}</svg>
@@ -311,9 +311,7 @@ function rejoinBlock(feed) {
     <span>${item.car.num ? `#${esc(item.car.num)} ` : ''}${esc(model(item.car))} <small>${esc(item.car.cls)}${item.pits ? ' · aux stands' : ''}</small></span><small class="lw-num">P${item.car.place || '—'}</small></div>`;
   return `<div class="lw-sub"><h3>Ressortie si arrêt à la fin du tour</h3>${chips}
     <div class="lw-rel">${result.ahead.map(line).join('')}<div class="me"><b class="lw-num">0</b><i style="background:${esc(feedColor(feed))}"></i><span>Nous</span><small class="lw-num">P${result.place} · ${esc(feed.snap.me.cls)} P${result.classPlace}</small></div>${result.behind.map(line).join('')}</div>
-    <p class="lw-flag">Écarts sur la piste au moment où on ressort des stands, toutes classes (+ devant nous). Arrêt compté <b class="lw-num">${fr(result.loss, 1)} s</b> :
-      voie ${fr(cost.drive, 1)} s de plus que le même bout de piste${cost.measured ? ' (nos arrêts de la séance)' : ' (moyenne de la fiche combo, à affiner au premier arrêt)'}, et ${fr(cost.still, 1)} s à l’arrêt.
-      Chaque voiture avance à son rythme des 5 derniers tours ; ± selon la régularité de chacun. Une voiture qui s’arrête en même temps ne peut pas être prévue.</p></div>`;
+    <p class="lw-flag">+ = devant nous à la sortie des stands. Arrêt compté <b class="lw-num">${fr(result.loss, 1)} s</b>.</p></div>`;
 }
 
 function fairBlock(feed, left) {
@@ -323,8 +321,7 @@ function fairBlock(feed, left) {
       <div class="lw-bar" aria-hidden="true"><i style="width:${fair.end ? Math.min(100, row.laps / (fair.end * 1.6) * 100) : 100}%;background:${esc(driverColor(feed, row.name))}"></i><s style="left:${100 / 1.6}%"></s></div></td>
       <td class="lw-num">${row.laps}</td><td class="lw-num">${row.missingNow ? row.missingNow : '<span class="lw-ok">ok</span>'}</td><td class="lw-num">${row.missingEnd ? row.missingEnd : '<span class="lw-ok">ok</span>'}</td></tr>`).join('');
   return `<div class="lw-sub"><h3>Fair share <span>trait = minimum estimé à l’arrivée</span></h3>
-    <p class="lw-flag">Règle LMU : avec ${fair.rows.length} pilote${fair.rows.length > 1 ? 's' : ''}, chacun doit faire au moins ${fr(fair.share * 100, 1)} % des tours de l’équipe, sinon l’équipage ne gagne pas de DR/SR et le pilote en perd.
-      Aujourd’hui <b class="lw-num">${fair.now} tours</b>, à l’arrivée ≈ <b class="lw-num">${fair.end} tours</b> (${fair.team} tours comptés depuis que le mur des stands suit la course${known(left) ? `, ≈ ${fr(left, 0)} à venir` : ''}).</p>
+    <p class="lw-flag">Minimum ${fr(fair.share * 100, 1)} % des tours chacun : <b class="lw-num">${fair.now} t.</b> aujourd’hui, ≈ <b class="lw-num">${fair.end} t.</b> à l’arrivée.</p>
     <table class="lw-drive"><thead><tr><th>Pilote</th><th>Tours</th><th>Manque (auj.)</th><th>Manque (arrivée)</th></tr></thead><tbody>${rows}</tbody></table></div>`;
 }
 
@@ -342,17 +339,16 @@ function racePanel(feed) {
     <div class="lw-row2"><div class="lw-clock lw-num">${clock(leftTime)}</div><div class="lw-meter grey" aria-hidden="true"><i style="width:${snap.end ? Math.min(100, snap.et / snap.end * 100) : 0}%"></i></div></div>
     <dl class="lw-kv"><div><dt>Tours restants</dt><dd class="lw-num">${known(left) ? `≈ ${fr(left, 0)}` : '—'}</dd></div><div><dt>${energy ? 'Énergie' : 'Carburant'} pour finir</dt><dd class="lw-num">${known(need) ? `${fr(Math.max(0, need), 0)} ${energy ? '%' : 'L'}` : '—'}</dd></div>
       <div><dt>Arrêts restants</dt><dd class="lw-num">${stopsLeft ?? '—'}</dd></div></dl>
-    <p class="lw-flag">Calculés avec la moyenne du relais (${fr(perLap, 2)} ${energy ? '%' : 'L'} par tour) et le temps restant au rythme des 5 derniers tours.</p>
     ${rejoinBlock(feed)}
     ${fairBlock(feed, left)}
-    ${stints.length ? `<div class="lw-sub"><h3>Relais <span>${stints.length} suivis</span></h3><div class="lw-timeline">${stints.map((stint, index) => {
-      const now = stint === ours.stints.at(-1);
-      return `<span class="${now ? 'now' : ''}"><i style="background:${esc(driverColor(feed, stint.driver))}"></i>${index + 1}. ${esc(stint.driver || '?')} <b class="lw-num">${stint.laps} t.</b>${now ? ' en cours' : ` · ${Math.round((stint.end - stint.start) / 60)} min`}</span>`;
-    }).join('')}</div></div>` : ''}
-    ${ours.stops.length ? `<div class="lw-sub"><h3>Derniers arrêts</h3>
-      <table class="lw-stops lw-num"><thead><tr><th>Tour</th><th>Pilote</th><th>Voie</th><th>Arrêté</th><th>${energy ? 'Énergie' : 'Carbu'}</th><th>Pneus</th></tr></thead><tbody>
-      ${ours.stops.slice(-6).reverse().map(stop => `<tr><td>${stop.lap}</td><td style="color:${esc(driverColor(feed, stop.driver))}">${esc(stop.driver || '—')}</td><td>${fr(stop.lane, 1)} s</td><td>${fr(stop.stopped, 1)} s</td>
-        <td>${energy ? `+${fr(stop.ve, 0)} %` : `+${fr(stop.fuel, 0)} L`}</td><td>${stop.tyres || '—'}</td></tr>`).join('')}</tbody></table></div>` : ''}`;
+    ${stints.length ? `<div class="lw-sub"><h3>Relais</h3>
+      <table class="lw-stops lw-num"><thead><tr><th>Pilote</th><th>Tours</th><th>Moyenne</th><th>${energy ? 'Énergie' : 'Carbu'}</th><th>Arrêt</th></tr></thead><tbody>
+      ${stints.map((stint, index) => [stint, index]).reverse().map(([stint, index]) => {
+        const now = stint === ours.stints.at(-1), stop = stint.stop;
+        return `<tr class="${now ? 'now' : ''}"><td><i class="lw-pin" style="background:${esc(driverColor(feed, stint.driver))}"></i>${esc(stint.driver || '?')}<small>Relais ${index + 1}${now ? ' · en cours' : ''}</small></td>
+          <td>${stint.laps}<small>${Math.round((stint.end - stint.start) / 60)} min</small></td><td>${lapTime(stint.avg)}</td><td>${fr(energy ? stint.ve : stint.fuel, 2)}${energy ? ' %' : ' L'}<small>par tour</small></td>
+          <td>${stop ? `${fr(stop.lane, 1)} s<small>${stop.tyres || 0} pneu${stop.tyres > 1 ? 's' : ''}</small>` : '—'}</td></tr>`;
+      }).join('')}</tbody></table></div>` : ''}`;
 }
 
 function render() {

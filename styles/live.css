@@ -175,9 +175,10 @@
 .lw-bar i { position: absolute; inset: 0 auto 0 0; border-radius: 4px; }
 .lw-bar s { position: absolute; top: -3px; bottom: -3px; border-left: 1.5px solid var(--muted); }
 .lw-ok { color: var(--lw-live); }
-.lw-timeline { display: flex; flex-wrap: wrap; gap: 6px; }
-.lw-timeline span { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--lw-line); border-radius: 6px; padding: 3px 8px; font-size: 13px; background: var(--lw-panel2); }
-.lw-timeline span i { width: 8px; height: 8px; border-radius: 50%; }
-.lw-timeline .now { border-color: var(--text); }
 .lw-stops { font-size: 13px; }
-.lw-stops th:nth-child(-n+2), .lw-stops td:nth-child(-n+2) { text-align: left; }
+.lw-stops th:first-child, .lw-stops td:first-child { text-align: left; }
+.lw-stops .lw-pin { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; vertical-align: 1px; }
+.lw-stops td small { display: block; font-size: 11px; color: var(--muted); }
+.lw-stops tr.now td { font-weight: 600; }
+.lw-stops th + th, .lw-stops td + td { padding-left: 8px; }
+.lw-stops td:first-child { overflow-wrap: anywhere; }

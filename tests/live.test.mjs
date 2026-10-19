@@ -66,6 +66,10 @@ test('the room keeps each car\'s laps and stops, our energy and tyres per lap, s
   assert.deepEqual(feed.ours.stints.map(stint => [stint.driver, stint.laps]), [['N. Boulanger', 6], ['L. Martin', 3]]);
   assert.equal(feed.ours.stops.length, 1);
   assert.equal(feed.ours.stops[0].drive, 21.2);
+  // Each stint sums itself up: energy per lap and the stop that ended it.
+  assert.equal(feed.ours.stints[0].ve, 7);
+  assert.equal(feed.ours.stints[0].stop.lane, 62.5);
+  assert.equal(feed.ours.stints[1].stop, null);
 
   // The session starts again: history from scratch.
   et = 10; send();
