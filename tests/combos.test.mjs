@@ -421,6 +421,11 @@ test('races being prepared and game versions sort the sessions by their dates', 
   assert.equal((await req(`${base}&version=${old.id}`, 'GET', null, NATHAN)).data.conditions.dry.drivers[0].ve, 8.4);
   assert.equal((await req(`${base}&event=${event.id}&version=${old.id}`, 'GET', null, NATHAN)).data.sample.sessions, 0);
   assert.equal((await req(`${base}&version=nope`, 'GET', null, NATHAN)).status, 404);
+  // Days picked by hand narrow the sheet, alone or within a race.
+  assert.equal((await req(`${base}&from=1795000000000`, 'GET', null, NATHAN)).data.conditions.dry.drivers[0].ve, 8.1);
+  assert.equal((await req(`${base}&to=1795000000000`, 'GET', null, NATHAN)).data.conditions.dry.drivers[0].ve, 8.4);
+  assert.equal((await req(`${base}&event=${event.id}&to=1795000000000`, 'GET', null, NATHAN)).data.sample.sessions, 0);
+  assert.equal((await req(`${base}&from=abc`, 'GET', null, NATHAN)).data.sample.sessions, 2, 'a bad date is left out');
 
   // Moving a version's date sorts the data again.
   await req(`/api/combos/periods/${latest.id}`, 'PATCH', {name:'BoP d’octobre', startsAt:1_810_000_000_000}, NATHAN);

@@ -139,6 +139,9 @@
 .cb-range { display: grid; gap: 4px; }
 .cb-range > div { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
 .combos-page .cb-range input { width: 100%; min-width: 0; }
+/* Two dates side by side need two filter cells. */
+.cb-filterbox .cb-dates { grid-column: span 2; }
+@media (max-width: 340px) { .cb-filterbox .cb-dates { grid-column: auto; } .cb-dates > div { grid-template-columns: 1fr; } }
 .cb-cond { --c: var(--cb-dry); display: inline-flex; align-items: baseline; gap: 8px; background: var(--cb-panel); color: var(--muted); border: 1px solid var(--cb-line); border-radius: 8px; padding: 7px 14px; cursor: pointer; font-size: 13px; font-family: inherit; }
 .cb-cond b { font-size: 15px; line-height: 1.2; letter-spacing: .08em; text-transform: uppercase; color: var(--text); }
 .cb-cond[aria-pressed="true"] { border-color: var(--c); box-shadow: inset 0 -3px 0 var(--c); background: var(--cb-panel2); }

@@ -20,7 +20,7 @@ const STORE = 'em-combos-hidden';
 
 const view = {
   combos:[], combo:null, sheet:null, compare:null, link:null, code:'', copied:false, linkBusy:false,
-  event:'', version:'', setup:'', moment:'', trackMin:'', trackMax:'', compareEvent:'', cond:null, compound:null, stint:null, hidden:new Set(),
+  event:'', version:'', since:'', until:'', setup:'', moment:'', trackMin:'', trackMax:'', compareEvent:'', cond:null, compound:null, stint:null, hidden:new Set(),
   pit:{before:8, after:100, tyres:4, pressure:false, driver:true, wing:'', frontWing:'', radiator:false, brakes:false, repair:''}, pitOpen:false, periodsOpen:false, linkOpen:null,
   editing:null, message:'', error:'',
   // « Mon analyse »: the combo's sessions, the one looked at and the one it is compared with, the map's colouring.
@@ -49,9 +49,16 @@ function renderError(error) {
 // ---------- Loading ----------
 
 const comboKey = combo => `${combo.car}\u0000${combo.track}`;
-const sheetQuery = (event = view.event) => {
+// A day picked in the filters (YYYY-MM-DD) → its local midnight in ms, and back; « to » runs to the end of its day.
+const dayStart = text => { const [y, m, d] = text.split('-').map(Number); return new Date(y, m - 1, d).getTime(); };
+const dayText = ms => { const date = new Date(ms); return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`; };
+const dayParam = value => /^\d+$/.test(value || '') ? dayText(Number(value)) : '';
+// The comparison reads another race's dates: the days picked by hand only narrow the sheet itself.
+const sheetQuery = (event = view.event, compare = false) => {
   const query = new URLSearchParams({track:view.combo.track, car:view.combo.car});
   if (event) query.set('event', event);
+  if (view.since && !compare) query.set('from', dayStart(view.since));
+  if (view.until && !compare) query.set('to', dayStart(view.until) + 86_399_999);
   if (view.version) query.set('version', view.version);
   if (view.setup) query.set('setup', view.setup);
   if (view.moment) query.set('moment', view.moment);
@@ -65,6 +72,7 @@ async function start() {
   view.event = params.get('event') || ''; view.version = params.get('version') || ''; view.setup = params.get('setup') || '';
   view.moment = ['day', 'night'].includes(params.get('moment')) ? params.get('moment') : '';
   view.trackMin = params.get('tmin') || ''; view.trackMax = params.get('tmax') || '';
+  view.since = dayParam(params.get('from')); view.until = dayParam(params.get('to'));
   if (params.get('tab') === 'analyse') view.tab = 'analysis';
   try {
     // The plugin build this site hands out, when there is one (scripts/build.mjs).
@@ -80,7 +88,7 @@ async function start() {
 async function loadSheet(fresh = false) {
   try {
     const [sheet, compare] = await Promise.all([call(`/api/combos/sheet?${sheetQuery()}`),
-      view.compareEvent && view.compareEvent !== view.event ? call(`/api/combos/sheet?${sheetQuery(view.compareEvent)}`) : null]);
+      view.compareEvent && view.compareEvent !== view.event ? call(`/api/combos/sheet?${sheetQuery(view.compareEvent, true)}`) : null]);
     view.sheet = sheet; view.compare = compare; view.error = ''; view.loadedAt = Date.now();
   } catch (error) {
     if (error.status === 401 || error.status === 403) { renderError(error); return; }
@@ -334,6 +342,7 @@ function filters() {
     <label>Version / BoP<select data-field="version">${option('', 'Toutes les versions', view.version)}${periods.versions.map(item => option(item.id, item.name, view.version)).join('')}</select></label>
     <label>Comparer à l’épreuve<select data-field="compare">${option('', 'Aucune', view.compareEvent)}${periods.events.filter(item => item.id !== view.event).map(item => option(item.id, item.name, view.compareEvent)).join('')}</select></label>
     <label>Réglage<select data-field="setup">${option('', 'Tous les réglages', view.setup)}${setups.map(item => option(item.name, `${item.name} · ${item.laps} tours`, view.setup)).join('')}${view.setup && !setups.some(item => item.name === view.setup) ? option(view.setup, view.setup, view.setup) : ''}</select></label>
+    <div class="cb-range cb-dates"><span>Dates</span><div><input type="date" value="${esc(view.since)}" max="${esc(view.until)}" data-field="since" aria-label="Du"><input type="date" value="${esc(view.until)}" min="${esc(view.since)}" data-field="until" aria-label="Au"></div></div>
     <div class="cb-range"><span>Piste (°C)</span><div><input type="number" inputmode="numeric" min="-30" max="80" step="1" placeholder="de" value="${esc(view.trackMin)}" data-field="trackMin" aria-label="Température de piste minimale"><input type="number" inputmode="numeric" min="-30" max="80" step="1" placeholder="à" value="${esc(view.trackMax)}" data-field="trackMax" aria-label="Température de piste maximale"></div></div>
   </div>`;
 }
@@ -573,7 +582,7 @@ function render() {
 
 // The filters in use, for the folded panel's title.
 function activeFilters() {
-  const count = [view.event, view.version, view.compareEvent, view.setup, view.trackMin, view.trackMax].filter(value => value !== '').length + view.hidden.size;
+  const count = [view.event, view.version, view.since, view.until, view.compareEvent, view.setup, view.trackMin, view.trackMax].filter(value => value !== '').length + view.hidden.size;
   return count ? `${count} actif${count > 1 ? 's' : ''}` : 'aucun filtre';
 }
 
@@ -722,6 +731,10 @@ app.addEventListener('change', async event => {
     if (field === 'event' && view.compareEvent === view.event) view.compareEvent = '';
     await loadSheet();
   } else if (field === 'compare') { view.compareEvent = event.target.value; await loadSheet(); }
+  else if (field === 'since' || field === 'until') {
+    view[field] = /^\d{4}-\d{2}-\d{2}$/.test(event.target.value) ? event.target.value : '';
+    await loadSheet();
+  }
   else if (field === 'trackMin' || field === 'trackMax') {
     const value = event.target.value.trim();
     view[field] = value !== '' && Number.isFinite(Number(value)) ? String(Math.round(Number(value))) : '';

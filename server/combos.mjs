@@ -101,8 +101,8 @@ async function periods(env, community) {
   };
 }
 
-// The dates the sheet reads: the chosen race and version (an id, « all » or nothing for every date). The plugin
-// reads the race and version going on now.
+// The dates the sheet reads: the chosen race and version (an id, « all » or nothing for every date), narrowed to the
+// days chosen by hand (from / to, in ms: the page sends its own midnights). The plugin reads the race and version going on now.
 function selection(list, url, track, current) {
   const at = Date.now();
   const pick = (items, key) => {
@@ -113,9 +113,11 @@ function selection(list, url, track, current) {
   };
   const event = pick(list.events.filter(item => !item.track || item.track === track), 'event');
   const version = pick(list.versions, 'version');
-  const from = Math.max(event?.startsAt ?? 0, version?.startsAt ?? 0);
-  const to = Math.min(event?.endsAt ?? FOREVER, version?.endsAt ?? FOREVER);
-  return {event:event?.id || null, version:version?.id || null, from, to};
+  const bound = key => { const value = Number(url.searchParams.get(key) || NaN); return Number.isInteger(value) && value >= 0 && value < FOREVER ? value : null; };
+  const since = bound('from'), until = bound('to');
+  const from = Math.max(event?.startsAt ?? 0, version?.startsAt ?? 0, since ?? 0);
+  const to = Math.min(event?.endsAt ?? FOREVER, version?.endsAt ?? FOREVER, until ?? FOREVER);
+  return {event:event?.id || null, version:version?.id || null, since, until, from, to};
 }
 
 function periodInput(input, kind) {
