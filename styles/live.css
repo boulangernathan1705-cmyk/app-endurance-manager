@@ -162,7 +162,11 @@ body.live-body .site-nav-shell #navigation { top: 9px; }
 .lw-mapbox { width: 100%; display: block; max-height: 78vh; }
 .lw-mapbox .road { fill: none; stroke: #3a4045; stroke-width: 22; stroke-linecap: round; stroke-linejoin: round; }
 .lw-mapbox .edge { fill: none; stroke: var(--lw-panel2); stroke-width: 12; stroke-linejoin: round; }
-.lw-mapbox text { font-size: 24px; font-weight: 700; fill: var(--text); }
+/* Each car: its place in the dot. Ours ringed and on top. */
+.lw-mapbox circle { stroke: var(--bg, #0a0b0c); stroke-width: 2.5; }
+.lw-mapbox text { font-size: 19px; font-weight: 800; fill: #0a0b0c; text-anchor: middle; font-variant-numeric: tabular-nums; pointer-events: none; }
+.lw-mapbox .us circle { stroke: var(--text); stroke-width: 4; }
+.lw-mapbox .us text { font-size: 23px; }
 .lw-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 14px; color: var(--muted); }
 .lw-legend span { display: inline-flex; align-items: center; gap: 5px; }
 .lw-legend i { width: 9px; height: 9px; border-radius: 50%; }

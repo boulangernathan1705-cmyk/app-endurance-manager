@@ -42,8 +42,8 @@ function connect() {
     let message;
     try { message = JSON.parse(event.data); } catch { return; }
     if (known(message.now)) view.offset = Date.now() - message.now;
-    if (message.type === 'hello') for (const feed of message.feeds || []) record(view.feeds.set(feed.key, readFeed(feed)).get(feed.key));
-    if (message.type === 'feed' && message.feed?.key) record(view.feeds.set(message.feed.key, readFeed(message.feed, view.feeds.get(message.feed.key))).get(message.feed.key));
+    if (message.type === 'hello') for (const feed of message.feeds || []) keep(feed);
+    if (message.type === 'feed' && message.feed?.key) keep(message.feed);
     pick();
     render();
   });
@@ -54,6 +54,21 @@ function connect() {
     setTimeout(connect, retry);
     retry = Math.min(retry * 2, 30000);
   });
+}
+
+// Only the session under way: a car's feed in a new session replaces its earlier ones (and is shown in their place).
+function keep(input) {
+  const feed = readFeed(input, view.feeds.get(input.key));
+  for (const [key, other] of view.feeds) {
+    if (key === feed.key || other.snap.me.vehicle !== feed.snap.me.vehicle) continue;
+    if (other.updated > feed.updated) return;
+    view.feeds.delete(key);
+    motions.delete(key);
+    if (view.key === key) view.key = feed.key;
+  }
+  view.feeds.set(feed.key, feed);
+  record(feed);
+  loadLap(feed.snap.track);
 }
 
 const age = feed => Math.max(0, (Date.now() - view.offset - feed.updated) / 1000);
@@ -258,8 +273,10 @@ function carPanel(feed) {
     </div></div></div>`;
 }
 
-// Seen from above, x to the right and z down (as the lap analysis of the fiches), from the game's map of the track or
-// the path the field drives (the room's, completed with what this page sees).
+// Seen from above, north up: x to the right and z up (LMU's world, checked on Le Mans driven clockwise), as the lap
+// analysis of the fiches. The outline: a lap the team recorded on this track (the fiches' trace), else the game's map
+// of the track, else the path the field drives (the room's, kept from one session to the next, completed with what
+// this page sees).
 //
 // The cars glide: each one is drawn where it was PLAYBACK_DELAY seconds ago in the game's time, between the two
 // positions around that moment, so a message coming late or two coming together does not make it stop or jump. A
@@ -273,8 +290,8 @@ function record(feed) {
   let motion = motions.get(feed.key);
   const snap = feed.snap, seen = performance.now() / 1000;
   // A new session or a restart: from scratch.
-  if (motion && snap.et < motion.et - 30) { motions.delete(feed.key); motion = null; }
-  if (!motion) motions.set(feed.key, motion = {cars:new Map(), offset:null, et:-Infinity, path:null, box:null});
+  if (motion && (motion.since !== feed.since || snap.et < motion.et - 5)) { motions.delete(feed.key); motion = null; }
+  if (!motion) motions.set(feed.key, motion = {since:feed.since, cars:new Map(), offset:null, et:-Infinity, path:null, box:null});
   motion.path = addToPath(motion.path, snap);
   if (snap.et <= motion.et) return;
   motion.et = snap.et;
@@ -304,8 +321,20 @@ function placed(feed, car) {
   const f = (at - a.et) / (b.et - a.et);
   return [a.x + (b.x - a.x) * f, a.z + (b.z - a.z) * f];
 }
-// The outline to draw: the game's map, else the room's path with the gaps this page has seen filled.
+// A lap recorded on the track by one of us (any car), once per track and page: the whole outline from the start.
+const laps = new Map();
+async function loadLap(track) {
+  if (!track || laps.has(track)) return;
+  laps.set(track, null);
+  try {
+    const result = await call(`/api/combos/outline?${new URLSearchParams({track})}`);
+    if (Array.isArray(result.points) && result.points.length > 20) { laps.set(track, result.points); render(); }
+  } catch { laps.delete(track); }
+}
+// The outline to draw: our recorded lap, the game's map, else the room's path with the gaps this page has seen filled.
 function outlineFor(feed) {
+  const lap = laps.get(feed.snap.track);
+  if (lap) return outlineLines(lap);
   if (feed.mapFromGame) return outlineLines(feed.outline);
   const room = feed.outline || [], mine = motions.get(feed.key)?.path || [];
   const merged = mine.length === room.length || !room.length ? mine.map((point, index) => room[index] || point) : room;
@@ -316,21 +345,24 @@ function mapPanel(feed) {
   const snap = feed.snap, lines = outlineFor(feed), outline = lines.flatMap(line => line.points);
   const cars = snap.field.filter(car => known(car.x) && known(car.z) && car.pit !== 2);
   // The frame: the game's map, else every place a car was seen (it only grows, the map does not move with the cars).
-  const box = feed.mapFromGame ? null : motions.get(feed.key)?.box;
-  const points = [...outline, ...(box ? [[box[0], box[2]], [box[1], box[3]]] : feed.mapFromGame ? [] : cars.map(car => [car.x, car.z]))];
+  const whole = feed.mapFromGame || laps.get(snap.track), box = whole ? null : motions.get(feed.key)?.box;
+  const points = [...outline, ...(box ? [[box[0], box[2]], [box[1], box[3]]] : whole ? [] : cars.map(car => [car.x, car.z]))];
   if (!points.length) { frame = null; return `<h2>Carte</h2><p class="lw-empty">Les positions arrivent dès que la voiture roule.</p>`; }
   const xs = points.map(p => p[0]), zs = points.map(p => p[1]);
   const minX = Math.min(...xs), maxX = Math.max(...xs), minZ = Math.min(...zs), maxZ = Math.max(...zs);
   const size = Math.max(maxX - minX, maxZ - minZ) || 1, k = 940 / size;
-  frame = {feed, minX, minZ, k};
+  frame = {feed, minX, maxZ, k};
   const width = (maxX - minX) * k + 60, height = (maxZ - minZ) * k + 60;
-  const px = v => (30 + (v - minX) * k).toFixed(1), pz = v => (30 + (v - minZ) * k).toFixed(1);
+  const px = v => (30 + (v - minX) * k).toFixed(1), pz = v => (30 + (maxZ - v) * k).toFixed(1);
   const path = lines.map(line => `M${line.points.map(([x, z]) => `${px(x)},${pz(z)}`).join('L')}${line.closed ? 'Z' : ''}`).join('');
   const mates = new Set([...view.feeds.values()].filter(item => item.key !== feed.key && item.snap.track === snap.track && item.snap.session === snap.session).map(item => item.snap.me.vehicle));
-  const others = cars.filter(car => car.id !== snap.me.id).map(car => { const [x, z] = placed(feed, car);
-    return `<circle data-car="${car.id}" cx="${px(x)}" cy="${pz(z)}" r="${mates.has(car.vehicle) ? 13 : 10}" fill="${classColor(car.cls)}" stroke="var(--bg, #0a0b0c)" stroke-width="2.5"/>`; }).join('');
-  const me = cars.find(car => car.id === snap.me.id), [mx, mz] = me ? placed(feed, me) : [0, 0];
-  const us = me ? `<g data-car="${me.id}" transform="translate(${px(mx)},${pz(mz)})"><circle r="17" fill="${esc(feedColor(feed))}" stroke="var(--text)" stroke-width="4"/><text x="24" y="8">${me.place ? `P${me.place}` : 'Nous'}</text></g>` : '';
+  // Every car with its place in the standings (in practice, by best lap), ours on top of the others.
+  const sorted = order(feed), placeOf = car => (isRace(snap.session) && car.place) || sorted.indexOf(car) + 1;
+  const dot = (car, fill, r, ours = false) => { const [x, z] = placed(feed, car);
+    return `<g data-car="${car.id}"${ours ? ' class="us"' : ''} transform="translate(${px(x)},${pz(z)})"><circle r="${r}" fill="${fill}"/><text dy="0.36em">${placeOf(car)}</text></g>`; };
+  const others = cars.filter(car => car.id !== snap.me.id).map(car => dot(car, classColor(car.cls), mates.has(car.vehicle) ? 22 : 18)).join('');
+  const me = cars.find(car => car.id === snap.me.id);
+  const us = me ? dot(me, esc(feedColor(feed)), 25, true) : '';
   const classes = [...new Set(snap.field.map(car => car.cls).filter(Boolean))];
   return `<h2>Carte <small>${esc(snap.track)}</small></h2>
     <svg class="lw-mapbox" viewBox="0 0 ${width.toFixed(0)} ${height.toFixed(0)}" role="img" aria-label="Position des voitures sur le circuit">${path ? `<path class="road" d="${path}"/><path class="edge" d="${path}"/>` : ''}${others}${us}</svg>
@@ -343,13 +375,12 @@ function glide() {
   if (still || document.hidden || !frame) return;
   const box = document.querySelector('#lw-map .lw-mapbox');
   if (!box || !box.getClientRects().length) return;
-  const {feed, minX, minZ, k} = frame, field = new Map(feed.snap.field.map(car => [car.id, car]));
+  const {feed, minX, maxZ, k} = frame, field = new Map(feed.snap.field.map(car => [car.id, car]));
   for (const node of box.querySelectorAll('[data-car]')) {
     const car = field.get(Number(node.dataset.car));
     if (!car) continue;
-    const [x, z] = placed(feed, car), cx = (30 + (x - minX) * k).toFixed(1), cy = (30 + (z - minZ) * k).toFixed(1);
-    if (node.tagName === 'g') node.setAttribute('transform', `translate(${cx},${cy})`);
-    else { node.setAttribute('cx', cx); node.setAttribute('cy', cy); }
+    const [x, z] = placed(feed, car);
+    node.setAttribute('transform', `translate(${(30 + (x - minX) * k).toFixed(1)},${(30 + (maxZ - z) * k).toFixed(1)})`);
   }
 }
 

@@ -110,12 +110,12 @@ function colouring(a, b, metric, pick) {
 
 // ---------- Drawing ----------
 
-// Seen from above, x to the right and z down, scaled into a 1000-wide box.
+// Seen from above, north up: x to the right and z up (LMU's world, checked on Le Mans driven clockwise), scaled into a 1000-wide box.
 function frame(a) {
   const [minX, maxX] = range(a.x), [minZ, maxZ] = range(a.z);
   const size = Math.max(maxX - minX, maxZ - minZ) || 1, k = 940 / size;
   const width = (maxX - minX) * k + 60, height = (maxZ - minZ) * k + 60;
-  return {width, height, x:v => 30 + (v - minX) * k, y:v => 30 + (v - minZ) * k};
+  return {width, height, x:v => 30 + (v - minX) * k, y:v => 30 + (maxZ - v) * k};
 }
 
 function trackMap(a, b, metric, pick, legs, picked) {
