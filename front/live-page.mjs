@@ -177,17 +177,28 @@ function board(feed) {
   const snap = feed.snap, race = isRace(snap.session), sorted = order(feed), us = snap.me.id;
   const classes = [...new Set(sorted.map(car => car.cls).filter(Boolean))];
   if (view.cls !== 'all' && !classes.includes(view.cls)) view.cls = 'all';
-  const rows = sorted.filter(car => view.cls === 'all' || car.cls === view.cls);
-  const classPos = car => sorted.filter(other => other.cls === car.cls).indexOf(car) + 1;
+  // One block per class, each with its own places and gaps (LMU runs the classes together on track).
+  const groups = [...new Set(sorted.map(car => car.cls))].filter(name => view.cls === 'all' || name === view.cls).map(name => sorted.filter(car => car.cls === name));
+  const split = classes.length > 1;
+  const inClass = car => sorted.filter(other => other.cls === car.cls);
+  const classPos = car => inClass(car).indexOf(car) + 1;
   const extra = id => feed.cars[id] || {};
-  const leader = sorted[0];
   const ours = sorted.find(car => car.id === us), ourAvg = feed.ours.avg5 ?? extra(us).avg5;
   // Our feeds' other cars in this session (practice: teammates on track at the same time).
   const mates = new Map([...view.feeds.values()].filter(item => item.key !== feed.key && item.snap.track === snap.track && item.snap.session === snap.session)
     .map(item => [item.snap.me.vehicle, item]));
   const bestOfAll = Math.min(...sorted.map(car => car.best > 0 ? car.best : 1e9));
-  const gapRace = (seconds, laps) => laps > 0 ? `+${laps} t` : seconds > 0 ? `+${fr(seconds, 1)}` : '—';
-  const gapBest = (car, ref) => car === ref || !(car.best > 0) || !(ref?.best > 0) ? '—' : `+${fr(car.best - ref.best, 3)}`;
+  // Race: time behind a car of the same class from the game's gaps to the overall leader, in laps once a whole lap down
+  // (counted on distance run). Practice: best lap against theirs.
+  const gapRace = (car, ref) => {
+    if (!ref || car === ref) return '—';
+    const down = snap.length > 0 ? Math.floor(ref.laps - car.laps + ((ref.dist || 0) - (car.dist || 0)) / snap.length) : (car.lapsBehind || 0) - (ref.lapsBehind || 0);
+    if (down > 0) return `+${down} t`;
+    const seconds = (car.behind || 0) - (ref.behind || 0);
+    return seconds > 0 ? `+${fr(seconds, 1)}` : '—';
+  };
+  const gapBest = (car, ref) => !ref || car === ref || !(car.best > 0) || !(ref.best > 0) ? '—' : `+${fr(car.best - ref.best, 3)}`;
+  const gap = race ? gapRace : gapBest;
   const d5 = car => {
     const avg = extra(car.id).avg5;
     if (car.id === us || car.cls !== ours?.cls || !known(avg) || !known(ourAvg)) return '—';
@@ -195,33 +206,34 @@ function board(feed) {
   };
   const sessionBest = [0, 1, 2].map(index => Math.min(...Object.values(feed.cars).map(item => item.best?.[index]).filter(known)));
   const head = `<tr><th class="c-pos">Pos</th><th class="c-num w2">#</th><th class="c-car">Voiture · pilote</th><th class="c-laps w3">Tours</th>
-    <th class="c-gap">Écart</th><th class="c-int w2" title="Écart avec la voiture devant">Int.</th><th class="c-d5 w2" title="Moyenne de leurs 5 derniers tours moins la nôtre (même classe)">Δ 5 t.</th>
+    <th class="c-gap" title="Écart avec le premier de la classe">Leader</th><th class="c-int" title="Écart avec la voiture devant, même classe">Devant</th><th class="c-d5 w2" title="Moyenne de leurs 5 derniers tours moins la nôtre (même classe)">Δ 5 t.</th>
     <th class="c-last">${race ? 'Dernier' : 'Meilleur'}</th><th class="c-avg w2">Moy. 5 t.</th><th class="c-best w3">${race ? 'Meilleur' : 'Dernier'}</th>
-    <th class="c-stint" title="Tours depuis leur dernier arrêt">Relais</th><th class="c-pit w2" title="Durée de leur dernier arrêt, voie comprise">Arrêt</th><th class="c-stops w1" title="Nombre d'arrêts">Arr.</th><th class="c-pen w2" title="Pénalités">Pén.</th></tr>`;
-  const body = rows.map(car => {
-    const index = sorted.indexOf(car), ahead = sorted[index - 1], info = extra(car.id), mate = car.id === us ? feed : mates.get(car.vehicle);
+    <th class="c-stint w1" title="Tours depuis leur dernier arrêt">Relais</th><th class="c-pit w2" title="Durée de leur dernier arrêt, voie comprise">Arrêt</th><th class="c-stops w1" title="Nombre d'arrêts">Arr.</th><th class="c-pen w2" title="Pénalités">Pén.</th></tr>`;
+  const line = car => {
+    const index = sorted.indexOf(car), mine = inClass(car), ahead = mine[mine.indexOf(car) - 1], info = extra(car.id), mate = car.id === us ? feed : mates.get(car.vehicle);
     const main = race ? car.last : car.best, other = race ? car.best : car.last;
     const who = mate ? feedName(mate) : car.driver;
     const row = `<tr class="row ${car.id === us ? 'us' : mate ? 'mate' : ''}" data-car="${car.id}" style="--cls:${classColor(car.cls)};--us:${esc(mate ? feedColor(mate) : 'inherit')}" aria-expanded="${view.open === car.id}">
-      <td class="c-pos">${race ? car.place || index + 1 : index + 1}<small>${esc(classShort(car.cls))}${classPos(car)}</small></td><td class="c-num w2">${esc(car.num)}</td>
+      <td class="c-pos">${split ? classPos(car) : race ? car.place || index + 1 : index + 1}<small>${split ? `${race ? car.place || index + 1 : index + 1}e` : esc(classShort(car.cls)) + classPos(car)}</small></td><td class="c-num w2">${esc(car.num)}</td>
       <td class="c-car car">${car.pit ? `<span class="lw-pill pits">${car.pit === 2 ? 'Garage' : 'Stands'}</span> ` : ''}${esc(who)}<small>${car.num ? `#${esc(car.num)} · ` : ''}${esc(model(car))}</small></td>
       <td class="c-laps w3">${car.laps}</td>
-      <td class="c-gap">${race ? (car === leader ? '—' : gapRace(car.behind, car.lapsBehind)) : gapBest(car, leader)}</td>
-      <td class="c-int w2">${ahead ? (race ? gapRace(car.next, car.lapsNext) : gapBest(car, ahead)) : '—'}</td>
+      <td class="c-gap">${gap(car, mine[0])}</td>
+      <td class="c-int">${gap(car, ahead)}</td>
       <td class="c-d5 w2">${d5(car)}</td>
       <td class="c-last ${main > 0 && main === bestOfAll ? 'best' : ''}">${lapTime(main)}</td>
       <td class="c-avg w2">${lapTime(info.avg5)}</td><td class="c-best w3 ${other > 0 && other === bestOfAll ? 'best' : ''}">${lapTime(other)}</td>
-      <td class="c-stint">${car.pit ? 0 : info.sinceStop ?? '—'}</td><td class="c-pit w2">${known(info.stop) ? fr(info.stop, 1) : '—'}</td><td class="c-stops w1">${car.stops ?? '—'}</td><td class="c-pen w2">${car.pen || '—'}</td></tr>`;
+      <td class="c-stint w1">${car.pit ? 0 : info.sinceStop ?? '—'}</td><td class="c-pit w2">${known(info.stop) ? fr(info.stop, 1) : '—'}</td><td class="c-stops w1">${car.stops ?? '—'}</td><td class="c-pen w2">${car.pen || '—'}</td></tr>`;
     if (view.open !== car.id) return row;
     const sectors = info.lastSectors ? info.lastSectors.map((value, k) => `<span class="${value <= sessionBest[k] ? 'best' : value <= info.best?.[k] ? 'pb' : ''}">S${k + 1} ${fr(value, 3)}</span>`).join(' · ') : '—';
     return row + `<tr class="detail"><td colspan="14"><dl class="lw-grid">
       <div><dt>Pilote</dt><dd>${esc(who)}</dd></div><div><dt>Tours</dt><dd>${car.laps}</dd></div>
-      <div><dt>Intervalle</dt><dd>${ahead ? (race ? gapRace(car.next, car.lapsNext) : gapBest(car, ahead)) : '—'}</dd></div><div><dt>Δ 5 t. vs nous</dt><dd>${d5(car)}</dd></div>
+      <div><dt>Écart avec celle devant</dt><dd>${gap(car, ahead)}</dd></div><div><dt>Δ 5 t. vs nous</dt><dd>${d5(car)}</dd></div>
       <div><dt>Moy. 5 tours</dt><dd>${lapTime(info.avg5)}</dd></div><div><dt>Meilleur</dt><dd>${lapTime(car.best)}</dd></div>
       <div><dt>Relais</dt><dd>${info.sinceStop ?? '—'} tours</dd></div><div><dt>Dernier arrêt</dt><dd>${known(info.stop) ? `${fr(info.stop, 1)} s` : '—'}</dd></div>
       <div><dt>Arrêts</dt><dd>${car.stops ?? '—'}</dd></div><div><dt>Pénalités</dt><dd>${car.pen || 'aucune'}</dd></div>
       <div class="wide"><dt>Secteurs du dernier tour</dt><dd>${sectors}</dd></div></dl></td></tr>`;
-  }).join('');
+  };
+  const body = groups.map(cars => (split ? `<tr class="cls-row" style="--cls:${classColor(cars[0].cls)}"><td colspan="14">${esc(cars[0].cls)} <small>${cars.length} voiture${cars.length > 1 ? 's' : ''}</small></td></tr>` : '') + cars.map(line).join('')).join('');
   return `<h2>${race ? 'Classement' : 'Temps de la séance'} <small>${sorted.length} voitures</small></h2>
     ${classes.length > 1 ? `<div class="lw-chips" role="group" aria-label="Classe">${[['all', 'Toutes'], ...classes.map(name => [name, name])].map(([key, name]) => `<button type="button" data-cls="${esc(key)}" aria-pressed="${key === view.cls}">${esc(name)}</button>`).join('')}</div>` : ''}
     <table class="lw-board"><thead>${head}</thead><tbody>${body}</tbody></table>`;

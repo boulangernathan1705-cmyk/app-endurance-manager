@@ -90,7 +90,7 @@ body.live-body .site-nav-shell #navigation { top: 9px; }
 .lw-board th { font-weight: 600; font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; text-align: right; padding: 0 3px 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .lw-board td { padding: 7px 4px; border-top: 1px solid var(--lw-line); text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .lw-board .c-pos { width: 54px; text-align: left; } .lw-board .c-num { width: 46px; text-align: left; } .lw-board .c-car { text-align: left; }
-.lw-board .c-laps { width: 58px; } .lw-board .c-gap { width: 78px; } .lw-board .c-int { width: 72px; } .lw-board .c-d5 { width: 66px; }
+.lw-board .c-laps { width: 58px; } .lw-board .c-gap { width: 78px; } .lw-board .c-int { width: 78px; } .lw-board .c-d5 { width: 66px; }
 .lw-board .c-last, .lw-board .c-avg, .lw-board .c-best { width: 88px; } .lw-board .c-stint { width: 62px; } .lw-board .c-pit { width: 62px; } .lw-board .c-stops { width: 48px; } .lw-board .c-pen { width: 46px; }
 .lw-board td.c-pos { box-shadow: inset 3px 0 0 var(--cls); padding-left: 8px; font-weight: 700; }
 .lw-board td.c-pos small { display: block; font-weight: 500; font-size: 12px; color: var(--muted); line-height: 1; }
@@ -103,6 +103,8 @@ body.live-body .site-nav-shell #navigation { top: 9px; }
 .lw-board tr.us .car { color: var(--us); }
 .lw-board tr.mate .car { color: var(--us); }
 .live-page .best { color: var(--lw-best); } .live-page .pb { color: var(--lw-live); }
+.lw-board tr.cls-row td { text-align: left; font-weight: 700; font-size: 13px; text-transform: uppercase; letter-spacing: .05em; color: var(--cls); padding: 14px 8px 6px; border-top: 0; box-shadow: inset 0 -2px 0 var(--cls); }
+.lw-board tr.cls-row small { color: var(--muted); font-weight: 500; text-transform: none; letter-spacing: 0; margin-left: 6px; }
 .lw-board tr.detail td { background: var(--bg, #0a0b0c); text-align: left; white-space: normal; padding: 10px 12px; }
 .lw-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 8px 14px; margin: 0; }
 .lw-grid div { display: grid; gap: 1px; min-width: 0; }
