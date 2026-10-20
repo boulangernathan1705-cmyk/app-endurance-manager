@@ -249,3 +249,23 @@ test('the outline is cut where a stretch of the lap is unknown, and joined over 
   assert.deepEqual(lines[0].points.at(-1), [39, 0]);
   assert.deepEqual(outlineLines(Array.from({length:30}, (_, index) => [index, 1])), [{points:Array.from({length:30}, (_, index) => [index, 1]), closed:true}], 'the game\'s map is one closed line');
 });
+
+test('gaps on track: seconds since the car ahead was here, laps once a whole lap down', async () => {
+  const {addToTrail, trackGap, runOf} = await import('../shared/live.mjs');
+  const L = 10000, trail = [];
+  // The car ahead runs 50 m/s: at et 100 it is 500 m in lap 3.
+  for (let et = 0; et <= 100; et++) addToTrail(trail, et, 2 * L + et * 50 - 4500 + 4500);
+  const ref = {laps:2, dist:5000}, car = {laps:2, dist:4000};
+  assert.equal(runOf(ref, L), 25000);
+  assert.deepEqual(trackGap(car, ref, L, 100, trail), {seconds:20});
+  assert.deepEqual(trackGap({laps:1, dist:4000}, ref, L, 100, trail), {laps:1}, 'lapped: the game gives no seconds, we give laps');
+  assert.deepEqual(trackGap(car, ref, L, 100, [], 200), {seconds:20}, 'no trail yet: the distance at their pace');
+  assert.equal(trackGap(car, ref, L, 100, []), null);
+  assert.deepEqual(trackGap(ref, car, L, 100, trail), {seconds:0});
+  // One reading behind at the line is skipped, a car sent back to the garage starts over.
+  const odd = [{et:0, d:9990}];
+  addToTrail(odd, 1, 0); assert.equal(odd.length, 1);
+  addToTrail(odd, 2, 10040); assert.equal(odd.length, 2);
+  for (let et = 3; et < 8; et++) addToTrail(odd, et, 100);
+  assert.equal(odd.length, 1);
+});
