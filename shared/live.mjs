@@ -375,3 +375,36 @@ export function lapsLeft(snap, lap) {
   if (left <= 0) return round(rest, 1);
   return round(rest + Math.ceil(Math.max(0, left - rest * lap) / lap), 1);
 }
+
+// Gaps between two cars measured on track (the page keeps each car's distance run, once a second), not taken from the
+// game's gaps to the leader: those are 0 for a car a lap down, so a class lapped by the Hypercars had no gap at all.
+// total: laps + metres into the lap, in metres. A trail: [{et, d}] with d the total, oldest first.
+export const runOf = (car, length) => (car.laps || 0) * length + Math.max(0, car.dist || 0);
+const TRAIL_KEPT = 400;
+export function addToTrail(trail, et, d) {
+  if (trail.length && et <= trail.at(-1).et) return trail;
+  // Going backwards: one odd reading at the line is skipped, a car sent back to the garage (several in a row) starts over.
+  if (trail.length && d < trail.at(-1).d - 50) {
+    trail.back = (trail.back || 0) + 1;
+    if (trail.back < 5) return trail;
+    trail.length = 0;
+  }
+  trail.back = 0;
+  trail.push({et, d:Math.max(d, trail.at(-1)?.d ?? d)});
+  if (trail.length > TRAIL_KEPT) trail.shift();
+  return trail;
+}
+// How far `car` is behind `ref`: {laps} once a whole lap down, else {seconds}: the time since `ref` was where `car` is now
+// (from ref's trail), or before that is known the distance between them at car's pace (lap time in seconds).
+export function trackGap(car, ref, length, now, trail = [], pace = null) {
+  if (!(length > 0) || !car || !ref || car === ref) return null;
+  const mine = runOf(car, length), theirs = runOf(ref, length), apart = theirs - mine;
+  if (apart <= 0) return {seconds:0};
+  if (apart >= length) return {laps:Math.floor(apart / length)};
+  const next = trail.findIndex(point => point.d >= mine);
+  if (next > 0) {
+    const a = trail[next - 1], b = trail[next], at = b.d > a.d ? a.et + (b.et - a.et) * (mine - a.d) / (b.d - a.d) : b.et;
+    return {seconds:Math.max(0, now - at)};
+  }
+  return pace > 0 ? {seconds:apart / length * pace} : null;
+}

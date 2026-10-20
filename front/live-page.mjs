@@ -3,7 +3,7 @@
 // the standings (session times in practice), the map, our car, and in a race the race panel (time and energy to the
 // flag, where we would rejoin after a stop, LMU's fair share, stints and stops). Raw numbers only, no advice.
 import {COLORS, conditionOf} from '../shared/combos.mjs';
-import {addToPath, fairShare, isRace, lapsLeft, median, outlineLines, readFeed, rejoin, stationary, LIVE_FOR} from '../shared/live.mjs';
+import {addToPath, addToTrail, fairShare, isRace, lapsLeft, median, outlineLines, readFeed, rejoin, runOf, stationary, trackGap, LIVE_FOR} from '../shared/live.mjs';
 
 const app = document.getElementById('live-app');
 const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
@@ -188,14 +188,12 @@ function board(feed) {
   const mates = new Map([...view.feeds.values()].filter(item => item.key !== feed.key && item.snap.track === snap.track && item.snap.session === snap.session)
     .map(item => [item.snap.me.vehicle, item]));
   const bestOfAll = Math.min(...sorted.map(car => car.best > 0 ? car.best : 1e9));
-  // Race: time behind a car of the same class from the game's gaps to the overall leader, in laps once a whole lap down
-  // (counted on distance run). Practice: best lap against theirs.
+  // Race: measured on track between the two cars, in laps once a whole lap down. Practice: best lap against theirs.
+  const trails = motions.get(feed.key)?.trails;
   const gapRace = (car, ref) => {
-    if (!ref || car === ref) return '—';
-    const down = snap.length > 0 ? Math.floor(ref.laps - car.laps + ((ref.dist || 0) - (car.dist || 0)) / snap.length) : (car.lapsBehind || 0) - (ref.lapsBehind || 0);
-    if (down > 0) return `+${down} t`;
-    const seconds = (car.behind || 0) - (ref.behind || 0);
-    return seconds > 0 ? `+${fr(seconds, 1)}` : '—';
+    const found = trackGap(car, ref, snap.length, snap.et, trails?.get(ref?.id), extra(car.id).avg5 || (car.last > 0 ? car.last : car.best));
+    if (!found) return '—';
+    return found.laps ? `+${found.laps} t` : found.seconds > 0 ? `+${fr(found.seconds, 1)}` : '—';
   };
   const gapBest = (car, ref) => !ref || car === ref || !(car.best > 0) || !(ref.best > 0) ? '—' : `+${fr(car.best - ref.best, 3)}`;
   const gap = race ? gapRace : gapBest;
@@ -303,7 +301,7 @@ function record(feed) {
   const snap = feed.snap, seen = performance.now() / 1000;
   // A new session or a restart: from scratch.
   if (motion && (motion.since !== feed.since || snap.et < motion.et - 5)) { motions.delete(feed.key); motion = null; }
-  if (!motion) motions.set(feed.key, motion = {since:feed.since, cars:new Map(), offset:null, et:-Infinity, path:null, box:null});
+  if (!motion) motions.set(feed.key, motion = {since:feed.since, cars:new Map(), trails:new Map(), offset:null, et:-Infinity, path:null, box:null});
   motion.path = addToPath(motion.path, snap);
   if (snap.et <= motion.et) return;
   motion.et = snap.et;
@@ -311,6 +309,7 @@ function record(feed) {
   const offset = snap.et - seen;
   motion.offset = motion.offset === null || Math.abs(offset - motion.offset) > 3 ? offset : motion.offset + (offset - motion.offset) * 0.1;
   for (const car of snap.field) {
+    if (snap.length > 0) motion.trails.set(car.id, addToTrail(motion.trails.get(car.id) || [], snap.et, runOf(car, snap.length)));
     if (!known(car.x) || !known(car.z)) continue;
     // Every place a car was seen on track: the map's frame only grows, so it does not move with the cars.
     if (car.pit !== 2) { const box = motion.box ||= [car.x, car.x, car.z, car.z]; box[0] = Math.min(box[0], car.x); box[1] = Math.max(box[1], car.x); box[2] = Math.min(box[2], car.z); box[3] = Math.max(box[3], car.z); }
