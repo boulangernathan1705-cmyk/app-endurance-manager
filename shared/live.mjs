@@ -96,8 +96,9 @@ export function cleanSnapshot(input) {
 // The feed of one of our cars in one session: same track, same session, same car (a driver swap stays in it).
 export const feedKey = snap => `${snap.track}|${snap.session}|${snap.me.vehicle || snap.me.id}`;
 
+// since: when this session's feed began, so the pages start it over when it changes.
 export function newFeed(snap, at) {
-  return {key:feedKey(snap), track:snap.track, session:snap.session, vehicle:snap.me.vehicle, cls:snap.me.cls, startEt:snap.et, updated:at,
+  return {key:feedKey(snap), since:at, track:snap.track, session:snap.session, vehicle:snap.me.vehicle, cls:snap.me.cls, startEt:snap.et, updated:at,
     pilot:null, snap:null, cars:{}, ours:{laps:[], stops:[], stints:[], drivers:{}, start:null}, outline:[], path:null};
 }
 
@@ -106,14 +107,30 @@ const sectorsOf = car => {
   return s1 && s12 && t && s12 > s1 && t > s12 ? [round(s1), round(s12 - s1), round(t - s12)] : null;
 };
 
-// One snapshot into the feed (a fresh one when the session restarted): each car's laps and stops, our laps (energy,
-// tyres, driver), our stints and stops. pilot: who sent it (name and colour on the site).
-export function ingest(feeds, snap, at, pilot = null) {
+// Another session than the feed's, though on the same track, of the same kind and in the same car: the game's clock
+// went back (restart, next event), ran ahead of the real one (a server joined while its session was under way) or the
+// session's planned end changed.
+export function otherSession(feed, snap, at) {
+  const before = feed?.snap;
+  if (!before) return false;
+  return snap.et + 5 < before.et || snap.et - before.et > (at - feed.updated) / 1000 + 60
+    || (finite(snap.end) && finite(before.end) && Math.abs(snap.end - before.end) > 1);
+}
+
+// One snapshot into the feed (a fresh one for a new session): each car's laps and stops, our laps (energy, tyres,
+// driver), our stints and stops. pilot: who sent it (name and colour on the site). Only the session under way counts:
+// a new one drops the feeds of the same car in earlier sessions. paths: the field's path per track, kept by the room
+// from one session to the next, so the outline does not start over.
+export function ingest(feeds, snap, at, pilot = null, paths = null) {
   const key = feedKey(snap);
   let feed = feeds[key];
-  // The same session again from its start (restart, or a new event on the same track): history from scratch.
-  if (feed && snap.et + 30 < (feed.snap?.et ?? 0)) feed = null;
-  if (!feed) feed = feeds[key] = newFeed(snap, at);
+  if (otherSession(feed, snap, at)) feed = null;
+  if (!feed) {
+    feed = feeds[key] = newFeed(snap, at);
+    for (const [other, item] of Object.entries(feeds)) if (other !== key && item.vehicle === feed.vehicle) delete feeds[other];
+    const known = paths?.[snap.track];
+    if (Array.isArray(known)) feed.path = known.slice();
+  }
   const before = feed.snap;
   feed.updated = at;
   if (pilot) feed.pilot = pilot;
@@ -169,7 +186,10 @@ export function ingest(feeds, snap, at, pilot = null) {
   if (ours.stops.length > STOPS_KEPT) ours.stops.splice(0, ours.stops.length - STOPS_KEPT);
   // The track's outline: the game's map when the plugin sent it, else the path the whole field drives.
   if (snap.map) { feed.outline = snap.map; feed.mapFromGame = true; }
-  else if (!feed.mapFromGame) feed.path = addToPath(feed.path, snap);
+  else if (!feed.mapFromGame) {
+    feed.path = addToPath(feed.path, snap);
+    if (paths && feed.path) paths[snap.track] = feed.path;
+  }
   feed.snap = {...snap, map:null};
   return feed;
 }
@@ -245,7 +265,7 @@ export function publicFeed(feed, shape = true) {
   const avgOf = (list, pick) => { const values = list.map(pick).filter(value => finite(value) && value > 0); return values.length ? round(mean(values)) : null; };
   const me = shape ? snap.me : {...snap.me, profile:undefined};
   return {
-    key:feed.key, updated:feed.updated, pilot:feed.pilot, snap:{...snap, me, field:snap.field.map(car => FIELD.map(key => car[key]))},
+    key:feed.key, since:feed.since ?? null, updated:feed.updated, pilot:feed.pilot, snap:{...snap, me, field:snap.field.map(car => FIELD.map(key => car[key]))},
     ...(shape ? {outline:outlineOf(feed), mapFromGame:Boolean(feed.mapFromGame)} : {}), cars,
     ours:{
       avg5:avgOf(five, lap => lap.t), sd5:round(spread(five.map(lap => lap.t))),

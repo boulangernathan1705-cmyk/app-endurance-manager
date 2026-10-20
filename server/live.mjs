@@ -33,6 +33,9 @@ export class LiveRoom {
     this.state = state;
     this.env = env;
     this.feeds = null;
+    // The field's path per track, kept from one session to the next (storage path:<track>).
+    this.paths = null;
+    this.stored = new Set();
     this.savedAt = Date.now();
     this.dirty = new Set();
     // Per feed, the outline and profile last sent: sent again only when they change.
@@ -41,9 +44,11 @@ export class LiveRoom {
 
   async load() {
     if (this.feeds) return this.feeds;
-    const stored = await this.state.storage.list({prefix:'feed:'});
+    const [stored, paths] = await Promise.all([this.state.storage.list({prefix:'feed:'}), this.state.storage.list({prefix:'path:'})]);
     this.feeds = {};
     for (const feed of stored.values()) if (feed?.key) this.feeds[feed.key] = feed;
+    this.stored = new Set(Object.keys(this.feeds));
+    this.paths = Object.fromEntries([...paths].map(([key, path]) => [key.slice(5), path]));
     return this.feeds;
   }
 
@@ -70,7 +75,7 @@ export class LiveRoom {
     let snap;
     try { snap = cleanSnapshot(JSON.parse(message)); } catch { return; }
     const feeds = await this.load(), at = Date.now();
-    const feed = ingest(feeds, snap, at, {id:info.user, name:info.name, color:info.color});
+    const feed = ingest(feeds, snap, at, {id:info.user, name:info.name, color:info.color}, this.paths);
     this.dirty.add(feed.key);
     const shape = `${outlineShape(feed)}|${snap.me.profile?.[100] ?? ''}`, changed = this.shapes.get(feed.key) !== shape;
     this.shapes.set(feed.key, shape);
@@ -84,11 +89,14 @@ export class LiveRoom {
 
   async save(at = Date.now()) {
     this.savedAt = at;
-    const feeds = await this.load(), before = new Set(Object.keys(feeds));
+    const feeds = await this.load();
     prune(feeds, at);
-    const gone = [...before].filter(key => !feeds[key]).map(key => `feed:${key}`);
+    // Gone: too old, or an earlier session of a car now in a new one.
+    const gone = [...this.stored].filter(key => !feeds[key]).map(key => `feed:${key}`);
     const changed = Object.fromEntries([...this.dirty].filter(key => feeds[key]).map(key => [`feed:${key}`, feeds[key]]));
+    for (const key of this.dirty) { const feed = feeds[key]; if (feed?.path && this.paths[feed.track] === feed.path) changed[`path:${feed.track}`] = feed.path; }
     this.dirty.clear();
+    this.stored = new Set(Object.keys(feeds));
     if (gone.length) await this.state.storage.delete(gone);
     if (Object.keys(changed).length) await this.state.storage.put(changed);
   }

@@ -287,6 +287,17 @@ async function analysisSession(env, community, userId, sessionId) {
   };
 }
 
+// The track's outline for the pit wall: the most recent lap one of us recorded there (any car), at most 600 points.
+async function outline(env, community, track) {
+  const row = await env.DB.prepare('SELECT data FROM combo_traces WHERE community_id=? AND track=? ORDER BY started_at DESC LIMIT 1')
+    .bind(community.id, String(track || '').slice(0, 80)).first();
+  const data = row ? parsed(row.data) : null;
+  const xs = Array.isArray(data?.x) ? data.x : [], zs = Array.isArray(data?.z) ? data.z : [];
+  const count = Math.min(xs.length, zs.length), step = Math.max(1, Math.ceil(count / 600)), points = [];
+  for (let i = 0; i < count; i += step) if (Number.isFinite(xs[i]) && Number.isFinite(zs[i])) points.push([xs[i], zs[i]]);
+  return {track, points:points.length > 20 ? points : []};
+}
+
 // Every combo of the community with data, the most recent first.
 async function combos(env, community) {
   const rows = await all(env, `SELECT track, car, MAX(car_class) AS car_class, SUM(lap_count) AS laps, COUNT(*) AS sessions, COUNT(DISTINCT user_id) AS drivers,
@@ -402,6 +413,7 @@ export async function combosApi(path, method, request, env, actor, community) {
   }
   if (path === '/api/combos/sheet' && method === 'GET') return json(await sheet(env, community, userId, comboOf(url), url));
   if (path === '/api/combos/export' && method === 'GET') return json(await exportPage(env, community, comboOf(url), url));
+  if (path === '/api/combos/outline' && method === 'GET') return json(await outline(env, community, url.searchParams.get('track')));
   if (path === '/api/combos/analysis' && method === 'GET') return json(await analysisList(env, community, userId, comboOf(url)));
   if (path === '/api/combos/analysis/session' && method === 'GET') return json(await analysisSession(env, community, userId, url.searchParams.get('id')));
 

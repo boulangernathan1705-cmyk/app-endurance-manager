@@ -2,7 +2,7 @@
 // track, sent by each pilot's SimHub plugin. Raw numbers only, no advice: each pilot in his colour, the white
 // « Équipage » row is the plain mean of the pilots shown (each counts once). Conditions are framed blocks.
 import {COLORS, CONDITIONS, installerFor} from '../shared/combos.mjs';
-import {analysisBody, distanceUnder, prepare, showCursor} from './combos-analysis.mjs?v=6';
+import {analysisBody, distanceUnder, prepare, showCursor} from './combos-analysis.mjs?v=7';
 
 const app = document.getElementById('combos-app');
 const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));

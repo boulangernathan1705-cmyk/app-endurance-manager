@@ -164,8 +164,35 @@ test('the room passes a pilot\'s snapshot to every page watching, ignores the re
   assert.equal(readFeed(light).snap.field[0].vehicle, 'FMT #17', 'the field comes as rows, read back into cars');
   room.savedAt = 0;
   await room.webSocketMessage(driver, JSON.stringify(snap({et:1001})));
-  assert.equal(stored.size, 1);
-  assert.equal([...stored.values()][0].snap.et, 1001);
+  assert.deepEqual([...stored.keys()].sort(), [`feed:${TRACK}|10|FMT #17`, `path:${TRACK}`]);
+  assert.equal(stored.get(`feed:${TRACK}|10|FMT #17`).snap.et, 1001);
+
+  // The car goes on to the qualifying: only that session is shown and kept, the field's path carries on.
+  await room.webSocketMessage(driver, JSON.stringify(snap({et:20, session:6})));
+  room.savedAt = 0;
+  await room.webSocketMessage(driver, JSON.stringify(snap({et:21, session:6})));
+  assert.deepEqual([...stored.keys()].sort(), [`feed:${TRACK}|6|FMT #17`, `path:${TRACK}`]);
+  assert.ok(stored.get(`feed:${TRACK}|6|FMT #17`).path.some(Boolean));
+});
+
+test('only the session under way counts: a restart, a server joined mid-session or another end starts the feed over', () => {
+  const feeds = {}, paths = {};
+  const send = (et, at, extra = {}) => ingest(feeds, cleanSnapshot(snap({et, session:1, ...extra})), at * 1000, null, paths);
+  const first = send(1000, 0);
+  send(1100, 100);
+  assert.equal(send(1200, 200), first, 'the same session goes on');
+  assert.equal(send(1300, 2000), first, 'a long drop (paused game, PC changed for a swap) keeps it');
+  const joined = send(5000, 2100);
+  assert.notEqual(joined, first, 'the game\'s clock ran ahead of the real one: another server');
+  assert.notEqual(send(4990, 2101), joined, 'the clock went back: a restart');
+  const now = Object.values(feeds)[0];
+  assert.notEqual(send(5000, 2110, {end:7200}), now, 'another planned end');
+  assert.equal(Object.keys(feeds).length, 1);
+  assert.ok(paths[TRACK].some(Boolean), 'the field\'s path is kept for the next session on the track');
+  const other = send(10, 2120, {session:2});
+  assert.deepEqual(Object.keys(feeds), [other.key], 'a new session of the same car drops its earlier ones');
+  assert.deepEqual(other.path, paths[TRACK]);
+  assert.ok(publicFeed(other).since > publicFeed(first).since);
 });
 
 test('the plugin and the pages reach the room only through their checks', async () => {
