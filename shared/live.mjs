@@ -6,6 +6,8 @@
 // of the shared memory LMU_Data). The field is sent as rows in the order of FIELD, to keep each message small.
 
 export const LIVE_VERSION = 1;
+// Plugin 1.6 and later (version 2): a complete snapshot when the connection opens, then only what changed (mergeSnapshot).
+export const DELTA_VERSION = 2;
 // One row per car of the field (connectors/simhub-plugin/LiveShare.cs writes them in this order).
 // dist: metres into the lap; pit: 0 on track, 1 in the pit lane, 2 in the garage; ls1/ls2, bs1/bs2, cs1/cs2: the game's
 // sector times, the second one counted from the line (S1 + S2); behind/next: seconds behind the leader / the car ahead,
@@ -60,7 +62,7 @@ const SERVICE = ['connect', 'energyRate', 'fuelRate', 'tyres4', 'tyresAlong', 'd
 
 // Throws on a message that is not a snapshot; anything odd inside is dropped, never trusted.
 export function cleanSnapshot(input) {
-  if (!input || typeof input !== 'object' || input.v !== LIVE_VERSION) throw Error('Format inconnu.');
+  if (!input || typeof input !== 'object' || (input.v !== LIVE_VERSION && input.v !== DELTA_VERSION)) throw Error('Format inconnu.');
   const track = text(input.track, 80), session = num(input.session, 0, 20), et = num(input.et, 0, 1e7);
   const me = input.me && typeof input.me === 'object' ? input.me : null;
   if (!track || session === null || et === null || !me) throw Error('Séance incomplète.');
@@ -89,6 +91,28 @@ export function cleanSnapshot(input) {
       stops:(Array.isArray(me.stops) ? me.stops : []).slice(-STOPS_KEPT).map(cleanStop).filter(Boolean), service, profile},
     field, map:map && map.length >= 50 ? map : null
   };
+}
+
+// What plugin 1.6 sends after its first snapshot: only the keys that changed (`me` by key too) and, per car, only the
+// values that changed, as [id, index in FIELD, value, index, value…] in `fd`; `field` again in full when the list of cars
+// changed. `full` marks a complete snapshot. While nobody watches, it sends only what the history needs (laps, stops…);
+// without a page on the map, no positions (x, z as null). base: the last snapshot merged for this connection (changed in
+// place). Null when the message cannot be read without the snapshot it builds on: the room then asks for a complete one.
+export function mergeSnapshot(base, input) {
+  if (!input || typeof input !== 'object' || input.v !== DELTA_VERSION) return null;
+  if (input.full) { const {full, ...snap} = input; return snap; }
+  if (!base || typeof base !== 'object' || !Array.isArray(base.field)) return null;
+  for (const [key, value] of Object.entries(input)) if (key !== 'me' && key !== 'fd') base[key] = value;
+  if (input.me && typeof input.me === 'object') base.me = {...base.me, ...input.me};
+  if (Array.isArray(input.fd)) {
+    const rows = new Map(base.field.filter(Array.isArray).map(row => [row[0], row]));
+    for (const change of input.fd) {
+      const row = Array.isArray(change) ? rows.get(change[0]) : null;
+      if (!row) return null;
+      for (let k = 1; k + 1 < change.length; k += 2) if (Number.isInteger(change[k]) && change[k] > 0 && change[k] < FIELD.length) row[change[k]] = change[k + 1];
+    }
+  }
+  return base;
 }
 
 // ---------- The team's room keeps the history ----------
@@ -208,9 +232,6 @@ const cleanLaps = laps => laps.filter(lap => lap.t && !lap.pit);
 // best sectors; for our car the 5-lap averages (time, sectors, energy, fuel, wear), the stint, stints, stops, drivers.
 // The outline: the game's map, or the field's path as far as it is known (null where no car was seen yet).
 export const outlineOf = feed => feed.mapFromGame ? feed.outline : feed.path || [];
-// What the pages already have of it: sent again when the game's map comes, or with each tenth more of the lap known.
-export const outlineShape = feed => feed.mapFromGame ? `g${feed.outline.length}`
-  : `p${feed.path?.length ? Math.floor(feed.path.filter(Boolean).length / feed.path.length * 10) : 0}`;
 
 // The path the field drives, one point per stretch of the lap (by distance into it), set by the first car seen there.
 // Kept by the room, and by the page from the positions it receives, so it fills while the page is open too.
@@ -247,9 +268,11 @@ export function outlineLines(outline, length = null) {
   return lines.filter(points => points.length >= 2).map(points => ({points, closed:false}));
 }
 
-// shape=false leaves out what rarely changes (the track's outline, our lap's profile): the page keeps the last ones.
-// The field goes as rows (FIELD order), as it came: a 60-car field stays near 10 KB a message.
-export function publicFeed(feed, shape = true) {
+// The field goes as rows (FIELD order), without the positions (positionsOf, only for the pages showing the map) nor the
+// game's gaps (raceGaps measures them on track): the room sends the pages only what changed since (diff).
+// gaps: raceGaps' result, each car's gap to its class leader and to the car ahead in its class.
+const NOT_SHOWN = new Set(['behind', 'lapsBehind', 'next', 'lapsNext', 'x', 'z']);
+export function publicFeed(feed, gaps = null) {
   const snap = feed.snap;
   const cars = {};
   for (const car of snap.field) {
@@ -257,16 +280,16 @@ export function publicFeed(feed, shape = true) {
     const five = cleanLaps(state?.laps || []).slice(-5).map(lap => lap.t);
     cars[car.id] = {avg5:round(five.length >= 3 ? mean(five) : null), sd5:round(spread(five)), stop:state?.stop ?? null,
       sinceStop:state?.stopLap !== null && state?.stopLap !== undefined ? car.laps - state.stopLap : car.stops ? null : car.laps,
-      lastSectors:sectorsOf(car), best:state?.best || [null, null, null]};
+      lastSectors:sectorsOf(car), best:state?.best || [null, null, null], ...gaps?.[car.id]};
   }
   const ours = feed.ours, laps = cleanLaps(ours.laps), five = laps.slice(-5);
   const stint = ours.stints.at(-1);
   const stintLaps = stint ? ours.laps.filter(lap => lap.n > stint.from) : [];
   const avgOf = (list, pick) => { const values = list.map(pick).filter(value => finite(value) && value > 0); return values.length ? round(mean(values)) : null; };
-  const me = shape ? snap.me : {...snap.me, profile:undefined};
+  const field = snap.field.map(car => FIELD.map(key => NOT_SHOWN.has(key) ? null : key === 'dist' ? round(car.dist, 0) : car[key]));
   return {
-    key:feed.key, since:feed.since ?? null, updated:feed.updated, pilot:feed.pilot, snap:{...snap, me, field:snap.field.map(car => FIELD.map(key => car[key]))},
-    ...(shape ? {outline:outlineOf(feed), mapFromGame:Boolean(feed.mapFromGame)} : {}), cars,
+    key:feed.key, since:feed.since ?? null, updated:feed.updated, pilot:feed.pilot, snap:{...snap, field},
+    outline:outlineOf(feed), mapFromGame:Boolean(feed.mapFromGame), cars,
     ours:{
       avg5:avgOf(five, lap => lap.t), sd5:round(spread(five.map(lap => lap.t))),
       sectors5:[0, 1, 2].map(index => avgOf(five.filter(lap => lap.s), lap => lap.s[index])),
@@ -407,4 +430,71 @@ export function trackGap(car, ref, length, now, trail = [], pace = null) {
     return {seconds:Math.max(0, now - at)};
   }
   return pace > 0 ? {seconds:apart / length * pace} : null;
+}
+
+// The room measures the gaps of a race (the pages then get only the gaps, not every car's position each second): each
+// car's to its class leader (lead) and to the car ahead in its class (ahead), in seconds, or in laps once a whole lap
+// down (leadLaps, aheadLaps). trails: the room's distance trail per car for this feed, kept up to date here.
+export function raceGaps(feed, trails) {
+  const snap = feed.snap, length = snap.length;
+  if (!(length > 0)) return {};
+  for (const car of snap.field) {
+    let trail = trails.get(car.id);
+    // A hole (a pause, nobody watching): the old trail would put the cars where they no longer are.
+    if (!trail || (trail.length && snap.et - trail.at(-1).et > 5)) trails.set(car.id, trail = []);
+    addToTrail(trail, snap.et, runOf(car, length));
+  }
+  if (!isRace(snap.session)) return {};
+  const sorted = [...snap.field].sort((a, b) => (a.place || 999) - (b.place || 999)), gaps = {};
+  const pace = car => { const five = cleanLaps(feed.cars[car.id]?.laps || []).slice(-5).map(lap => lap.t); return five.length >= 3 ? mean(five) : time(car.last) || time(car.best); };
+  const put = (car, ref, name) => {
+    const found = trackGap(car, ref, length, snap.et, trails.get(ref?.id), pace(car));
+    return found?.laps ? {[`${name}Laps`]:found.laps} : found ? {[name]:round(found.seconds, 1)} : {};
+  };
+  for (const cls of new Set(sorted.map(car => car.cls))) {
+    const mine = sorted.filter(car => car.cls === cls);
+    mine.forEach((car, index) => { if (index) gaps[car.id] = {...put(car, mine[0], 'lead'), ...put(car, mine[index - 1], 'ahead')}; });
+  }
+  return gaps;
+}
+
+// Where the cars are, for the pages showing the map: [id, x, z] to the metre, cars without a position left out.
+export const positionsOf = feed => feed.snap.field.filter(car => finite(car.x) && finite(car.z)).map(car => [car.id, Math.round(car.x), Math.round(car.z)]);
+
+// What the room sends the pages after the first message: only what changed. A patch of an object (or array) is an object
+// of its changed keys (indexes); a key gone is listed under GONE, an array's new length under SIZE, and a whole value
+// replacing another under WHOLE. Control characters never appear in the keys: text() takes them out of names.
+const SIZE = '\u0001n', GONE = '\u0001d', WHOLE = '\u0001w';
+const container = value => value !== null && typeof value === 'object';
+export function diff(before, after) {
+  if (before === after) return undefined;
+  if (!container(after)) return Object.is(before, after) ? undefined : after;
+  if (!container(before) || Array.isArray(before) !== Array.isArray(after)) return {[WHOLE]:after};
+  const patch = {};
+  let changed = false;
+  if (Array.isArray(after)) {
+    if (after.length !== before.length) { patch[SIZE] = after.length; changed = true; }
+    after.forEach((value, index) => { const part = diff(before[index], value); if (part !== undefined) { patch[index] = part; changed = true; } });
+  } else {
+    for (const key of Object.keys(after)) { const part = diff(before[key], after[key]); if (part !== undefined) { patch[key] = part; changed = true; } }
+    const gone = Object.keys(before).filter(key => !(key in after));
+    if (gone.length) { patch[GONE] = gone; changed = true; }
+  }
+  return changed ? patch : undefined;
+}
+// The patch applied (a new value; `before` is left as it was).
+export function patch(before, change) {
+  if (!container(change)) return change;
+  if (WHOLE in change) return change[WHOLE];
+  if (!container(before)) return before;
+  if (Array.isArray(before)) {
+    const after = before.slice(0, change[SIZE] ?? before.length);
+    while (after.length < (change[SIZE] ?? 0)) after.push(null);
+    for (const [key, value] of Object.entries(change)) if (key !== SIZE) after[Number(key)] = patch(before[Number(key)], value);
+    return after;
+  }
+  const after = {...before};
+  for (const key of change[GONE] || []) delete after[key];
+  for (const [key, value] of Object.entries(change)) if (key !== GONE) after[key] = patch(before[key], value);
+  return after;
 }

@@ -3,7 +3,7 @@
 // the standings (session times in practice), the map, our car, and in a race the race panel (time and energy to the
 // flag, where we would rejoin after a stop, LMU's fair share, stints and stops). Raw numbers only, no advice.
 import {COLORS, conditionOf} from '../shared/combos.mjs';
-import {addToPath, addToTrail, fairShare, isRace, lapsLeft, median, outlineLines, readFeed, rejoin, runOf, stationary, trackGap, LIVE_FOR} from '../shared/live.mjs';
+import {addToPath, fairShare, isRace, lapsLeft, median, outlineLines, patch, readFeed, rejoin, stationary, LIVE_FOR} from '../shared/live.mjs';
 
 const app = document.getElementById('live-app');
 const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
@@ -15,7 +15,7 @@ const WHEELS = ['Avant gauche', 'Avant droit', 'Arrière gauche', 'Arrière droi
 const PIT = ['track', 'pits', 'pits'], PIT_LABEL = ['En piste', 'Aux stands', 'Au garage'];
 const STOP_KINDS = [['energy', 'Énergie seule'], ['tyres', 'Énergie + 4 pneus']];
 
-const view = {feeds:new Map(), key:null, tab:'car', cls:'all', open:null, stop:'tyres', offset:0, connected:false, error:'', targets:new Map(), started:false};
+const view = {raw:new Map(), feeds:new Map(), key:null, tab:'car', cls:'all', open:null, stop:'tyres', offset:0, connected:false, error:'', targets:new Map(), started:false};
 
 async function call(path) {
   let response;
@@ -37,13 +37,19 @@ let socket = null, retry = 2000;
 function connect() {
   const url = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/api/combos/live`;
   socket = new WebSocket(url);
-  socket.addEventListener('open', () => { view.connected = true; retry = 2000; render(); });
+  socket.addEventListener('open', () => { view.connected = true; retry = 2000; viewSent = null; tellView(); render(); });
   socket.addEventListener('message', event => {
     let message;
     try { message = JSON.parse(event.data); } catch { return; }
     if (known(message.now)) view.offset = Date.now() - message.now;
-    if (message.type === 'hello') for (const feed of message.feeds || []) keep(feed);
-    if (message.type === 'feed' && message.feed?.key) keep(message.feed);
+    if (message.type === 'hello') { view.raw.clear(); for (const feed of message.feeds || []) keep(feed, message.pos?.[feed.key]); }
+    if (message.type === 'feed' && message.feed?.key) keep(message.feed, message.pos);
+    // Only what changed since the last message: onto our copy, else everything again.
+    if (message.type === 'patch' && message.key) {
+      const before = view.raw.get(message.key);
+      if (before) keep(patch(before, message.patch), message.pos);
+      else tellView(true);
+    }
     pick();
     render();
   });
@@ -56,13 +62,34 @@ function connect() {
   });
 }
 
+// The room sends only to a page on screen, and the cars' positions only while it shows the map.
+// Wide screens show every panel side by side (styles/live.css), the map included.
+let viewSent = null;
+const wide = matchMedia('(min-width: 1180px)');
+wide.addEventListener('change', () => tellView());
+function tellView(again = false) {
+  const state = {type:'view', watch:document.visibilityState !== 'hidden', map:view.tab === 'map' || wide.matches};
+  const text = JSON.stringify(state);
+  if (!socket || socket.readyState !== WebSocket.OPEN || (text === viewSent && !again)) return;
+  socket.send(JSON.stringify(again ? {...state, again:true} : state));
+  viewSent = text;
+}
+document.addEventListener('visibilitychange', () => tellView());
+
 // Only the session under way: a car's feed in a new session replaces its earlier ones (and is shown in their place).
-function keep(input) {
+// pos: [id, x, z] of the cars, when the map is shown.
+function keep(input, pos = null) {
+  view.raw.set(input.key, input);
   const feed = readFeed(input, view.feeds.get(input.key));
+  if (Array.isArray(pos)) {
+    const at = new Map(pos.map(([id, x, z]) => [id, [x, z]]));
+    for (const car of feed.snap.field) [car.x, car.z] = at.get(car.id) || [null, null];
+  }
   for (const [key, other] of view.feeds) {
     if (key === feed.key || other.snap.me.vehicle !== feed.snap.me.vehicle) continue;
     if (other.updated > feed.updated) return;
     view.feeds.delete(key);
+    view.raw.delete(key);
     motions.delete(key);
     if (view.key === key) view.key = feed.key;
   }
@@ -188,12 +215,11 @@ function board(feed) {
   const mates = new Map([...view.feeds.values()].filter(item => item.key !== feed.key && item.snap.track === snap.track && item.snap.session === snap.session)
     .map(item => [item.snap.me.vehicle, item]));
   const bestOfAll = Math.min(...sorted.map(car => car.best > 0 ? car.best : 1e9));
-  // Race: measured on track between the two cars, in laps once a whole lap down. Practice: best lap against theirs.
-  const trails = motions.get(feed.key)?.trails;
-  const gapRace = (car, ref) => {
-    const found = trackGap(car, ref, snap.length, snap.et, trails?.get(ref?.id), extra(car.id).avg5 || (car.last > 0 ? car.last : car.best));
-    if (!found) return '—';
-    return found.laps ? `+${found.laps} t` : found.seconds > 0 ? `+${fr(found.seconds, 1)}` : '—';
+  // Race: measured on track by the room (to the class leader, to the car ahead), in laps once a whole lap down.
+  // Practice: best lap against theirs.
+  const gapRace = (car, ref, name) => {
+    const info = extra(car.id);
+    return !ref || car === ref ? '—' : info[`${name}Laps`] ? `+${info[`${name}Laps`]} t` : info[name] > 0 ? `+${fr(info[name], 1)}` : '—';
   };
   const gapBest = (car, ref) => !ref || car === ref || !(car.best > 0) || !(ref.best > 0) ? '—' : `+${fr(car.best - ref.best, 3)}`;
   const gap = race ? gapRace : gapBest;
@@ -215,8 +241,8 @@ function board(feed) {
       <td class="c-pos">${split ? classPos(car) : race ? car.place || index + 1 : index + 1}<small>${split ? `${race ? car.place || index + 1 : index + 1}e` : esc(classShort(car.cls)) + classPos(car)}</small></td><td class="c-num w2">${esc(car.num)}</td>
       <td class="c-car car">${car.pit ? `<span class="lw-pill pits">${car.pit === 2 ? 'Garage' : 'Stands'}</span> ` : ''}${esc(who)}<small>${car.num ? `#${esc(car.num)} · ` : ''}${esc(model(car))}</small></td>
       <td class="c-laps w3">${car.laps}</td>
-      <td class="c-gap">${gap(car, mine[0])}</td>
-      <td class="c-int">${gap(car, ahead)}</td>
+      <td class="c-gap">${gap(car, mine[0], 'lead')}</td>
+      <td class="c-int">${gap(car, ahead, 'ahead')}</td>
       <td class="c-d5 w2">${d5(car)}</td>
       <td class="c-last ${main > 0 && main === bestOfAll ? 'best' : ''}">${lapTime(main)}</td>
       <td class="c-avg w2">${lapTime(info.avg5)}</td><td class="c-best w3 ${other > 0 && other === bestOfAll ? 'best' : ''}">${lapTime(other)}</td>
@@ -225,7 +251,7 @@ function board(feed) {
     const sectors = info.lastSectors ? info.lastSectors.map((value, k) => `<span class="${value <= sessionBest[k] ? 'best' : value <= info.best?.[k] ? 'pb' : ''}">S${k + 1} ${fr(value, 3)}</span>`).join(' · ') : '—';
     return row + `<tr class="detail"><td colspan="14"><dl class="lw-grid">
       <div><dt>Pilote</dt><dd>${esc(who)}</dd></div><div><dt>Tours</dt><dd>${car.laps}</dd></div>
-      <div><dt>Écart avec celle devant</dt><dd>${gap(car, ahead)}</dd></div><div><dt>Δ 5 t. vs nous</dt><dd>${d5(car)}</dd></div>
+      <div><dt>Écart avec celle devant</dt><dd>${gap(car, ahead, 'ahead')}</dd></div><div><dt>Δ 5 t. vs nous</dt><dd>${d5(car)}</dd></div>
       <div><dt>Moy. 5 tours</dt><dd>${lapTime(info.avg5)}</dd></div><div><dt>Meilleur</dt><dd>${lapTime(car.best)}</dd></div>
       <div><dt>Relais</dt><dd>${info.sinceStop ?? '—'} tours</dd></div><div><dt>Dernier arrêt</dt><dd>${known(info.stop) ? `${fr(info.stop, 1)} s` : '—'}</dd></div>
       <div><dt>Arrêts</dt><dd>${car.stops ?? '—'}</dd></div><div><dt>Pénalités</dt><dd>${car.pen || 'aucune'}</dd></div>
@@ -301,7 +327,7 @@ function record(feed) {
   const snap = feed.snap, seen = performance.now() / 1000;
   // A new session or a restart: from scratch.
   if (motion && (motion.since !== feed.since || snap.et < motion.et - 5)) { motions.delete(feed.key); motion = null; }
-  if (!motion) motions.set(feed.key, motion = {since:feed.since, cars:new Map(), trails:new Map(), offset:null, et:-Infinity, path:null, box:null});
+  if (!motion) motions.set(feed.key, motion = {since:feed.since, cars:new Map(), offset:null, et:-Infinity, path:null, box:null});
   motion.path = addToPath(motion.path, snap);
   if (snap.et <= motion.et) return;
   motion.et = snap.et;
@@ -309,7 +335,6 @@ function record(feed) {
   const offset = snap.et - seen;
   motion.offset = motion.offset === null || Math.abs(offset - motion.offset) > 3 ? offset : motion.offset + (offset - motion.offset) * 0.1;
   for (const car of snap.field) {
-    if (snap.length > 0) motion.trails.set(car.id, addToTrail(motion.trails.get(car.id) || [], snap.et, runOf(car, snap.length)));
     if (!known(car.x) || !known(car.z)) continue;
     // Every place a car was seen on track: the map's frame only grows, so it does not move with the cars.
     if (car.pit !== 2) { const box = motion.box ||= [car.x, car.x, car.z, car.z]; box[0] = Math.min(box[0], car.x); box[1] = Math.max(box[1], car.x); box[2] = Math.min(box[2], car.z); box[3] = Math.max(box[3], car.z); }
@@ -480,7 +505,7 @@ app.addEventListener('click', event => {
   if (row) { const id = Number(row.dataset.car); view.open = view.open === id ? null : id; render(); return; }
   const button = event.target.closest('button');
   if (!button) return;
-  if (button.dataset.tab) view.tab = button.dataset.tab;
+  if (button.dataset.tab) { view.tab = button.dataset.tab; tellView(); }
   else if (button.dataset.stop) view.stop = button.dataset.stop;
   else if (button.dataset.cls) view.cls = button.dataset.cls;
   else if (button.dataset.feed) { view.key = button.dataset.feed; view.open = null; }
