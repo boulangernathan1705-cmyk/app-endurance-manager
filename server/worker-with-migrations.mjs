@@ -12,8 +12,6 @@ import {syncCrewDiscord, cleanupOrphanCrewDiscord} from './crew-discord.mjs';
 import {allCommunities, currentCommunity, communityById, communitySlug, appearanceOf} from './community.mjs';
 import {isDevelopment,devRobots,markDevelopmentResponse} from './dev-environment.mjs';
 import {isCommunityPage, freshPageRequest, withCommunityLook} from './community-look.mjs';
-// The team's live room of the mur des stands (Durable Object, binding LIVE in the wrangler files).
-export {LiveRoom} from './live.mjs';
 
 async function runWeeklySync(env, community = null, eventId = null) {
   return syncWeeklyDiscord(env, Date.now(), community, eventId);
