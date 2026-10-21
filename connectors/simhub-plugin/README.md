@@ -36,7 +36,11 @@ Envoie les séances Le Mans Ultimate d'un pilote aux fiches combo de son équipe
   navigation entre écrans des dashs.
 - écrit deux overlays dans les modèles de Dash Studio à son lancement (`Dashes.cs`) : « Endurance Manager · Bandeau »
   et « Endurance Manager · Colonne », affichés en essais et en course voiture en piste (formule du calque à changer
-  dans Dash Studio pour d'autres séances). Un overlay modifié dans Dash Studio n'est plus réécrit.
+  dans Dash Studio pour d'autres séances). L'affichage conserve le dernier tour (temps, énergie ou carburant,
+  usure) et la cible « vs » sur une ligne dédiée, avec des chiffres plus grands ; les moyennes personnelles,
+  d'équipe et du meilleur pilote, et le doublon d'écart chiffré, sont masqués. Les calculs des cibles et les
+  propriétés publiées ne changent pas : les données de l'équipe continuent d'alimenter le rythme et l'usure visés.
+  Un overlay modifié dans Dash Studio n'est plus réécrit.
 
 Il ne fait que lire : il ne modifie rien dans le jeu ni dans SimHub. Il n'envoie plus les fichiers de résultats XML.
 

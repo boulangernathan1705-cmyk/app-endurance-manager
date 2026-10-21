@@ -1,5 +1,7 @@
-// Les overlays de Dash Studio : « Endurance Manager · Bandeau » (les trois chiffres côte à côte, comme la maquette A) et
-// « Endurance Manager · Colonne » (les mêmes, les uns sous les autres). Ils n'affichent que les propriétés du plugin
+// Les overlays de Dash Studio : « Endurance Manager · Bandeau » (les trois chiffres côte à côte) et
+// « Endurance Manager · Colonne » (les mêmes, les uns sous les autres). Dernier tour et cible « vs » uniquement :
+// les moyennes de l'équipe continuent d'alimenter les cibles dans Practice.cs sans encombrer l'affichage.
+// Ils n'affichent que les propriétés du plugin
 // (EnduranceManagerPlugin.Essais.*, Practice.cs) : rien à calculer, couleurs comprises. Le plugin les écrit dans les
 // modèles de SimHub (DashTemplates) à son lancement ; un overlay que le pilote a modifié dans Dash Studio est laissé tel quel.
 using System;
@@ -19,7 +21,7 @@ namespace EnduranceManager.SimHub
         const string Rectangle = "SimHub.Plugins.OutputPlugins.GraphicalDash.Models.RectangleItem, SimHub.Plugins";
         const string Layer = "SimHub.Plugins.OutputPlugins.GraphicalDash.Models.Layer, SimHub.Plugins";
         const string Grey = "#FF9AA3AB", Body = "Bahnschrift", Digits = "Bahnschrift SemiCondensed";
-        // A block: its width, its height (title, figures, Moi · Équipe · Meilleur).
+        // A block: title, large last-lap figure, then the calculated target on its own line.
         const int BlockWidth = 296, BlockHeight = 84, Pad = 16, Gap = 20;
 
         static string P(string name) => "[EnduranceManagerPlugin.Essais." + name + "]";
@@ -48,14 +50,10 @@ namespace EnduranceManager.SimHub
         static IEnumerable<JObject> Block(string name, double x, double y)
         {
             string at = name + ".";
-            yield return Label(name + "Titre", x, y, BlockWidth - 84, 16, Body, 11, "SemiBold", P(at + "Titre"), Grey);
+            yield return Label(name + "Titre", x, y, BlockWidth - 84, 16, Body, 12, "SemiBold", P(at + "Titre"), Grey);
             if (name == "Tour") yield return Label("NonCompte", x + BlockWidth - 84, y, 84, 16, Body, 11, "Normal", "'non compté'", Grey, 2, P("NonCompte"), true);
-            yield return Label(name + "Valeur", x, y + 18, 136, 40, Digits, 34, "Bold", P(at + "Valeur"), P("Couleur"));
-            yield return Label(name + "Ecart", x + 138, y + 30, 58, 26, Digits, 18, "SemiBold", P(at + "Ecart"), P(at + "EcartCouleur"));
-            yield return Label(name + "Vise", x + 198, y + 33, BlockWidth - 198, 22, Body, 13, "Normal", P(at + "Vise"), Grey);
-            yield return Label(name + "Moi", x, y + 64, 96, 20, Body, 13, "SemiBold", P(at + "Moi"), P(at + "MoiCouleur"));
-            yield return Label(name + "Equipe", x + 98, y + 64, 100, 20, Body, 13, "SemiBold", P(at + "Equipe"), "#FFFFFFFF");
-            yield return Label(name + "Meilleur", x + 200, y + 64, BlockWidth - 200, 20, Body, 13, "SemiBold", P(at + "Meilleur"), P(at + "MeilleurCouleur"));
+            yield return Label(name + "Valeur", x, y + 16, BlockWidth, 46, Digits, 38, "Bold", P(at + "Valeur"), "#FFFFFFFF");
+            yield return Label(name + "Vise", x, y + 64, BlockWidth, 20, Body, 16, "Normal", P(at + "Vise"), Grey);
         }
 
         static readonly string[] Names = { "Tour", "Energie", "Usure" };
@@ -87,7 +85,7 @@ namespace EnduranceManager.SimHub
             var metadata = new JObject
             {
                 ["Category"] = "Endurance Manager", ["Title"] = title, ["Author"] = "Endurance Manager",
-                ["Description"] = "Le dernier tour (temps, énergie, usure des 4 pneus) face à la valeur visée, avec ma moyenne, celle de l'équipe et la meilleure. Plugin « Fiches combo » requis.",
+                ["Description"] = "Dernier tour : temps, énergie et usure des 4 pneus, avec chaque cible calculée affichée sous la valeur (« vs »). Plugin « Fiches combo » requis.",
                 ["ScreenCount"] = 1.0, ["InGameScreensIndexs"] = new JArray(0), ["IdleScreensIndexs"] = new JArray(), ["MainPreviewIndex"] = 0, ["IsOverlay"] = true,
                 ["Width"] = (double)width, ["Height"] = (double)height, ["OverlaySizeWarning"] = false, ["MetadataVersion"] = 2.0, ["EnableOnDashboardMessaging"] = true,
                 ["PitScreensIndexs"] = new JArray()
