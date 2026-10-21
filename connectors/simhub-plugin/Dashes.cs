@@ -1,5 +1,5 @@
 // Les overlays de Dash Studio : « Endurance Manager · Bandeau » (les trois chiffres côte à côte) et
-// « Endurance Manager · Colonne » (les mêmes, les uns sous les autres). Dernier tour et cible « vs » uniquement :
+// « Endurance Manager · Colonne » (les mêmes, les uns sous les autres). Dernier tour, écart signé et cible « vs » :
 // les moyennes de l'équipe continuent d'alimenter les cibles dans Practice.cs sans encombrer l'affichage.
 // Ils n'affichent que les propriétés du plugin
 // (EnduranceManagerPlugin.Essais.*, Practice.cs) : rien à calculer, couleurs comprises. Le plugin les écrit dans les
@@ -20,9 +20,9 @@ namespace EnduranceManager.SimHub
         const string Text = "SimHub.Plugins.OutputPlugins.GraphicalDash.Models.TextItem, SimHub.Plugins";
         const string Rectangle = "SimHub.Plugins.OutputPlugins.GraphicalDash.Models.RectangleItem, SimHub.Plugins";
         const string Layer = "SimHub.Plugins.OutputPlugins.GraphicalDash.Models.Layer, SimHub.Plugins";
-        const string Grey = "#FF9AA3AB", Body = "Bahnschrift", Digits = "Bahnschrift SemiCondensed";
-        // A block: title, large last-lap figure, then the calculated target on its own line.
-        const int BlockWidth = 296, BlockHeight = 84, Pad = 16, Gap = 20;
+        const string Grey = "#FF9CAABD", Body = "Bahnschrift", Digits = "Bahnschrift";
+        // Full-width cards: a large figure, signed delta on the right, and the target below.
+        const int BlockWidth = 485, BlockHeight = 140, Gap = 8, RowGap = 5;
 
         static string P(string name) => "[EnduranceManagerPlugin.Essais." + name + "]";
 
@@ -46,14 +46,31 @@ namespace EnduranceManager.SimHub
             return item;
         }
 
-        // One figure (Tour, Energie, Usure) at (x, y).
+        static JObject Box(string name, double x, double y, double width, double height, string color, string border, int radius) =>
+            new JObject
+            {
+                ["$type"] = Rectangle, ["IsRectangleItem"] = true, ["Name"] = name,
+                ["Left"] = x, ["Top"] = y, ["Width"] = width, ["Height"] = height, ["Visible"] = true,
+                ["BackgroundColor"] = color,
+                ["BorderStyle"] = new JObject
+                {
+                    ["BorderColor"] = border, ["BorderTop"] = 1, ["BorderBottom"] = 1, ["BorderLeft"] = 1, ["BorderRight"] = 1,
+                    ["RadiusTopLeft"] = radius, ["RadiusTopRight"] = radius, ["RadiusBottomLeft"] = radius, ["RadiusBottomRight"] = radius
+                }
+            };
+
+        // One figure (Tour, Energie, Usure) at the card's top-left corner (x, y).
         static IEnumerable<JObject> Block(string name, double x, double y)
         {
             string at = name + ".";
-            yield return Label(name + "Titre", x, y, BlockWidth - 84, 16, Body, 12, "SemiBold", P(at + "Titre"), Grey);
-            if (name == "Tour") yield return Label("NonCompte", x + BlockWidth - 84, y, 84, 16, Body, 11, "Normal", "'non compté'", Grey, 2, P("NonCompte"), true);
-            yield return Label(name + "Valeur", x, y + 16, BlockWidth, 46, Digits, 38, "Bold", P(at + "Valeur"), "#FFFFFFFF");
-            yield return Label(name + "Vise", x, y + 64, BlockWidth, 20, Body, 16, "Normal", P(at + "Vise"), Grey);
+            yield return Box(name + "Fond", x, y, BlockWidth, BlockHeight, "#FF0F151E", "#FF253140", 8);
+            yield return Box(name + "Accent", x, y + 6, 4, 128, "#FF4B9FFF", "#FF4B9FFF", 2);
+            yield return Box(name + "EcartFond", x + 330, y + 42, 139, 64, "#FF172230", "#FF2A3747", 8);
+            yield return Label(name + "Titre", x + 16, y + 4, 325, 22, Body, 18, "SemiBold", P(at + "Titre"), "#FFCAD5E2");
+            if (name == "Tour") yield return Label("NonCompte", x + 341, y + 4, 128, 22, Body, 13, "Normal", "'non compté'", Grey, 2, P("NonCompte"), true);
+            yield return Label(name + "Valeur", x + 16, y + 26, 306, 84, Digits, 76, "Bold", P(at + "Valeur"), "#FFFFFFFF");
+            yield return Label(name + "Ecart", x + 334, y + 44, 131, 60, Digits, 44, "SemiBold", P(at + "Ecart"), P(at + "EcartCouleur"), 1);
+            yield return Label(name + "Vise", x + 16, y + 110, 453, 28, Body, 24, "Normal", P(at + "Vise"), Grey);
         }
 
         static readonly string[] Names = { "Tour", "Energie", "Usure" };
@@ -61,20 +78,11 @@ namespace EnduranceManager.SimHub
         // The whole dashboard: a dark translucent card, the three blocks side by side (banner) or stacked (column).
         static (JObject dash, JObject metadata) Make(string title, string id, string screen, bool column)
         {
-            int width = column ? BlockWidth + 2 * Pad : 3 * BlockWidth + 2 * Gap + 2 * Pad;
-            int height = column ? 3 * BlockHeight + 2 * 12 + 2 * 12 : BlockHeight + 2 * 14;
-            var children = new JArray
-            {
-                new JObject
-                {
-                    ["$type"] = Rectangle, ["IsRectangleItem"] = true, ["BackgroundColor"] = "#E00C0E11",
-                    ["BorderStyle"] = new JObject { ["BorderColor"] = "#FF2C3238", ["BorderTop"] = 1, ["BorderBottom"] = 1, ["BorderLeft"] = 1, ["BorderRight"] = 1,
-                        ["RadiusTopLeft"] = 10, ["RadiusTopRight"] = 10, ["RadiusBottomLeft"] = 10, ["RadiusBottomRight"] = 10 },
-                    ["Height"] = height, ["Left"] = 0, ["Top"] = 0, ["Visible"] = true, ["Width"] = width, ["Name"] = "Fond"
-                }
-            };
+            int width = column ? BlockWidth : 3 * BlockWidth + 2 * Gap;
+            int height = column ? 3 * BlockHeight + 2 * RowGap : BlockHeight;
+            var children = new JArray();
             for (int i = 0; i < 3; i++)
-                foreach (var item in column ? Block(Names[i], Pad, 12 + i * (BlockHeight + 12)) : Block(Names[i], Pad + i * (BlockWidth + Gap), 14)) children.Add(item);
+                foreach (var item in column ? Block(Names[i], 0, i * (BlockHeight + RowGap)) : Block(Names[i], i * (BlockWidth + Gap), 0)) children.Add(item);
             // Shown in practice and in a race, car on track: change the formula in Dash Studio for other sessions.
             var layer = new JObject
             {
@@ -85,7 +93,7 @@ namespace EnduranceManager.SimHub
             var metadata = new JObject
             {
                 ["Category"] = "Endurance Manager", ["Title"] = title, ["Author"] = "Endurance Manager",
-                ["Description"] = "Dernier tour : temps, énergie et usure des 4 pneus, avec chaque cible calculée affichée sous la valeur (« vs »). Plugin « Fiches combo » requis.",
+                ["Description"] = "Temps, énergie et usure du dernier tour en grands chiffres, écart signé coloré et cible « vs ». Plugin « Fiches combo » requis.",
                 ["ScreenCount"] = 1.0, ["InGameScreensIndexs"] = new JArray(0), ["IdleScreensIndexs"] = new JArray(), ["MainPreviewIndex"] = 0, ["IsOverlay"] = true,
                 ["Width"] = (double)width, ["Height"] = (double)height, ["OverlaySizeWarning"] = false, ["MetadataVersion"] = 2.0, ["EnableOnDashboardMessaging"] = true,
                 ["PitScreensIndexs"] = new JArray()
