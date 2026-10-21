@@ -1,5 +1,12 @@
 # Nouveautés d'Endurance Manager
 
+## v1.54 — 21 octobre 2026
+
+### 🔧 Corrections et améliorations
+
+- **Connexion Discord** : valable 30 jours et prolongée à chaque visite.
+- **Bannière** : chaque communauté s’affiche directement avec sa bannière et son logo, sans passer par ceux du site.
+
 ## v1.53 — 17 octobre 2026
 
 ### 🔧 Corrections et améliorations
