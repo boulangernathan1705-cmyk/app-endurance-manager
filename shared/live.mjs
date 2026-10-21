@@ -120,9 +120,10 @@ export function mergeSnapshot(base, input) {
 // The feed of one of our cars in one session: same track, same session, same car (a driver swap stays in it).
 export const feedKey = snap => `${snap.track}|${snap.session}|${snap.me.vehicle || snap.me.id}`;
 
-// since: when this session's feed began, so the pages start it over when it changes.
-export function newFeed(snap, at) {
-  return {key:feedKey(snap), since:at, track:snap.track, session:snap.session, vehicle:snap.me.vehicle, cls:snap.me.cls, startEt:snap.et, updated:at,
+// since: when this session's feed began, so the pages start it over when it changes. base: the key without the pilot
+// told apart (feedKey), the same for two of us in the same car on the same track in sessions of their own.
+export function newFeed(snap, at, key = feedKey(snap)) {
+  return {key, base:feedKey(snap), since:at, track:snap.track, session:snap.session, vehicle:snap.me.vehicle, cls:snap.me.cls, startEt:snap.et, updated:at,
     pilot:null, snap:null, cars:{}, ours:{laps:[], stops:[], stints:[], drivers:{}, start:null}, outline:[], path:null};
 }
 
@@ -141,17 +142,38 @@ export function otherSession(feed, snap, at) {
     || (finite(snap.end) && finite(before.end) && Math.abs(snap.end - before.end) > 1);
 }
 
+// The same session as a feed another of us is still sending to (a driver swap, two of us in it): the game's clocks
+// agree within a few seconds, real time apart. Two sessions of their own (each in practice on his PC) seldom do.
+export function sameClock(feed, snap, at) {
+  const before = feed?.snap;
+  return Boolean(before) && !otherSession(feed, snap, at) && Math.abs(snap.et - before.et - (at - feed.updated) / 1000) < 5;
+}
+
+// A feed another pilot is still sending to: kept apart from ours, never replaced by it.
+const heldByOther = (feed, pilot, at) => Boolean(pilot?.id) && Boolean(feed.pilot?.id) && feed.pilot.id !== pilot.id && at - feed.updated < LIVE_FOR;
+
+// The feed this snapshot goes to: the sender's own in the same session, else the one of a teammate in the same
+// session (driver swap), else a new one. Two of us in the same car on the same track but each in a session of his own
+// (practice on his PC) get a feed each, the second keyed by his name too, so the page never swaps between the two.
+function feedFor(feeds, snap, at, pilot) {
+  const base = feedKey(snap), same = Object.values(feeds).filter(feed => (feed.base ?? feed.key) === base);
+  const mine = same.find(feed => feed.pilot?.id && feed.pilot.id === pilot?.id && !otherSession(feed, snap, at));
+  if (mine) return mine;
+  const shared = same.find(feed => heldByOther(feed, pilot, at) ? sameClock(feed, snap, at) : !otherSession(feed, snap, at));
+  if (shared) return shared;
+  const taken = feeds[base] && heldByOther(feeds[base], pilot, at);
+  return newFeed(snap, at, taken ? `${base}|${pilot.id}` : base);
+}
+
 // One snapshot into the feed (a fresh one for a new session): each car's laps and stops, our laps (energy, tyres,
 // driver), our stints and stops. pilot: who sent it (name and colour on the site). Only the session under way counts:
-// a new one drops the feeds of the same car in earlier sessions. paths: the field's path per track, kept by the room
-// from one session to the next, so the outline does not start over.
+// a new one drops the feeds of the same car in earlier sessions, but not those another of us is sending to. paths:
+// the field's path per track, kept by the room from one session to the next, so the outline does not start over.
 export function ingest(feeds, snap, at, pilot = null, paths = null) {
-  const key = feedKey(snap);
-  let feed = feeds[key];
-  if (otherSession(feed, snap, at)) feed = null;
-  if (!feed) {
-    feed = feeds[key] = newFeed(snap, at);
-    for (const [other, item] of Object.entries(feeds)) if (other !== key && item.vehicle === feed.vehicle) delete feeds[other];
+  let feed = feedFor(feeds, snap, at, pilot);
+  if (feeds[feed.key] !== feed) {
+    for (const [other, item] of Object.entries(feeds)) if (item.vehicle === feed.vehicle && !heldByOther(item, pilot, at)) delete feeds[other];
+    feeds[feed.key] = feed;
     const known = paths?.[snap.track];
     if (Array.isArray(known)) feed.path = known.slice();
   }
