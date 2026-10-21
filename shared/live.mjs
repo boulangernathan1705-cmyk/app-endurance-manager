@@ -142,11 +142,12 @@ export function otherSession(feed, snap, at) {
     || (finite(snap.end) && finite(before.end) && Math.abs(snap.end - before.end) > 1);
 }
 
-// The same session as a feed another of us is still sending to (a driver swap, two of us in it): the game's clocks
-// agree within a few seconds, real time apart. Two sessions of their own (each in practice on his PC) seldom do.
+// The same car in the same session as a feed another of us is still sending to (a driver swap): the same entry, and
+// the game's clocks agree within a few seconds, real time apart. Two sessions of their own (each in practice on his
+// PC) seldom do; two of our cars in one session are two entries.
 export function sameClock(feed, snap, at) {
   const before = feed?.snap;
-  return Boolean(before) && !otherSession(feed, snap, at) && Math.abs(snap.et - before.et - (at - feed.updated) / 1000) < 5;
+  return Boolean(before) && before.me.id === snap.me.id && !otherSession(feed, snap, at) && Math.abs(snap.et - before.et - (at - feed.updated) / 1000) < 5;
 }
 
 // A feed another pilot is still sending to: kept apart from ours, never replaced by it.

@@ -301,6 +301,10 @@ test('two of us in the same car, each in a session of his own, keep a feed each;
   into(nathan, 5010, 10);
   assert.equal(into(hugo, 5012, 12), race, 'the same session: one feed');
   assert.equal(Object.keys(swap).length, 1);
+  // Two of our cars in that session, even under the same name: two feeds.
+  const other = ingest(swap, cleanSnapshot(snap({et:5013, me:{id:2, row:{id:2}}, field:[{id:1}]})), 13_000, {id:'u3', name:'Léo'});
+  assert.notEqual(other, race);
+  assert.equal(Object.keys(swap).length, 2);
 });
 
 test('the plugin and the pages reach the room only through their checks', async () => {
