@@ -278,7 +278,7 @@ export function publicFeed(feed, gaps = null) {
   for (const car of snap.field) {
     const state = feed.cars[car.id];
     const five = cleanLaps(state?.laps || []).slice(-5).map(lap => lap.t);
-    cars[car.id] = {avg5:round(five.length >= 3 ? mean(five) : null), sd5:round(spread(five)), stop:state?.stop ?? null,
+    cars[car.id] = {avg5:round(five.length >= 2 ? mean(five) : null), sd5:round(spread(five)), stop:state?.stop ?? null,
       sinceStop:state?.stopLap !== null && state?.stopLap !== undefined ? car.laps - state.stopLap : car.stops ? null : car.laps,
       lastSectors:sectorsOf(car), best:state?.best || [null, null, null], ...gaps?.[car.id]};
   }
