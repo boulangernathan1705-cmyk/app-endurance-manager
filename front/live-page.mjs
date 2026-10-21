@@ -102,7 +102,8 @@ function keep(input, pos = null) {
 
 const age = feed => Math.max(0, (Date.now() - view.offset - feed.updated) / 1000);
 const isLive = feed => age(feed) * 1000 < LIVE_FOR;
-const feedList = () => [...view.feeds.values()].sort((a, b) => isLive(b) - isLive(a) || b.updated - a.updated);
+// In a steady order (live ones first, then by name), so the strip of cars does not swap as each sends.
+const feedList = () => [...view.feeds.values()].sort((a, b) => isLive(b) - isLive(a) || feedName(a).localeCompare(feedName(b)) || a.key.localeCompare(b.key));
 // The car shown: the one picked, else the live race car, else the most recent.
 function pick() {
   const list = feedList();
@@ -113,6 +114,11 @@ const current = () => view.feeds.get(view.key) || null;
 // Two of our feeds in the same session (teammates on track together): same track and kind, the game's clocks agree.
 const sameRun = (a, b) => a.snap.track === b.snap.track && a.snap.session === b.snap.session
   && Math.abs(a.snap.et - b.snap.et - (a.updated - b.updated) / 1000) < 10;
+// A car of the field told by its entry and its driver: several cars can share an entry's name (the same livery).
+const carTag = car => `${car.vehicle}\u0001${car.driver}`;
+// Our other feeds in the same session as this one, by the tag of their car in the field.
+const matesOf = feed => new Map([...view.feeds.values()].filter(item => item.key !== feed.key && sameRun(item, feed))
+  .map(item => [carTag({vehicle:item.snap.me.vehicle, driver:item.snap.me.driver}), item]));
 
 // Each pilot's colour on the site, else one of the fiches' colours by name.
 const nameColor = name => COLORS[[...String(name || '')].reduce((sum, char) => sum + char.charCodeAt(0), 0) % COLORS.length];
@@ -213,8 +219,7 @@ function board(feed) {
   const split = classes.length > 1;
   const extra = id => feed.cars[id] || {};
   // Our feeds' other cars in this session (practice: teammates on track at the same time).
-  const mates = new Map([...view.feeds.values()].filter(item => item.key !== feed.key && sameRun(item, feed))
-    .map(item => [item.snap.me.vehicle, item]));
+  const mates = matesOf(feed);
   const bestOfAll = Math.min(...sorted.map(car => car.best > 0 ? car.best : 1e9));
   // Race: measured on track by the room (to the class leader, to the car ahead), in laps once a whole lap down.
   // Practice: best lap against theirs. Nothing rather than a dash when a value is not known.
@@ -226,7 +231,7 @@ function board(feed) {
   const sessionBest = [0, 1, 2].map(index => Math.min(...Object.values(feed.cars).map(item => item.best?.[index]).filter(known)));
   const timeOf = value => value > 0 ? `<span class="${value === bestOfAll ? 'best' : ''}">${lapTime(value)}</span>` : '';
   const line = (car, index, mine) => {
-    const info = extra(car.id), mate = car.id === us ? feed : mates.get(car.vehicle), open = view.open === car.id;
+    const info = extra(car.id), mate = car.id === us ? feed : mates.get(carTag(car)), open = view.open === car.id;
     const who = mate ? feedName(mate) : car.driver, overall = race ? car.place || sorted.indexOf(car) + 1 : sorted.indexOf(car) + 1;
     const ahead = index ? (race ? gapRace(car, mine[index - 1], 'ahead') : gapBest(mine[index - 1])(car)) : '';
     const lead = index ? (race ? gapRace(car, mine[0], 'lead') : gapBest(mine[0])(car)) : '';
@@ -269,7 +274,7 @@ function board(feed) {
     ['Pén.', 't-n', () => any(car => car.pen > 0), car => car.pen > 0 ? car.pen : ''],
   ].filter(([, , shown]) => shown());
   const tableRow = (car, index, mine) => {
-    const mate = car.id === us ? feed : mates.get(car.vehicle), who = mate ? feedName(mate) : car.driver;
+    const mate = car.id === us ? feed : mates.get(carTag(car)), who = mate ? feedName(mate) : car.driver;
     const overall = race ? car.place || sorted.indexOf(car) + 1 : sorted.indexOf(car) + 1;
     return `<tr class="${car.id === us ? 'us' : mate ? 'mate' : ''}" style="--us:${esc(mate ? feedColor(mate) : 'inherit')}">
       <td class="t-pos">${split ? index + 1 : overall}${split ? `<small>${overall}e</small>` : ''}</td><td><span class="t-num">${esc(car.num)}</span></td>
@@ -412,12 +417,12 @@ function mapPanel(feed) {
   const width = (maxX - minX) * k + 60, height = (maxZ - minZ) * k + 60;
   const px = v => (30 + (v - minX) * k).toFixed(1), pz = v => (30 + (maxZ - v) * k).toFixed(1);
   const path = lines.map(line => `M${line.points.map(([x, z]) => `${px(x)},${pz(z)}`).join('L')}${line.closed ? 'Z' : ''}`).join('');
-  const mates = new Set([...view.feeds.values()].filter(item => item.key !== feed.key && sameRun(item, feed)).map(item => item.snap.me.vehicle));
+  const mates = matesOf(feed);
   // Every car with its place in the standings (in practice, by best lap), ours on top of the others.
   const sorted = order(feed), placeOf = car => (isRace(snap.session) && car.place) || sorted.indexOf(car) + 1;
   const dot = (car, fill, r, ours = false) => { const [x, z] = placed(feed, car);
     return `<g data-car="${car.id}"${ours ? ' class="us"' : ''} transform="translate(${px(x)},${pz(z)})"><circle r="${r}" fill="${fill}"/><text dy="0.36em">${placeOf(car)}</text></g>`; };
-  const others = cars.filter(car => car.id !== snap.me.id).map(car => dot(car, classColor(car.cls), mates.has(car.vehicle) ? 22 : 18)).join('');
+  const others = cars.filter(car => car.id !== snap.me.id).map(car => dot(car, classColor(car.cls), mates.has(carTag(car)) ? 22 : 18)).join('');
   const me = cars.find(car => car.id === snap.me.id);
   const us = me ? dot(me, esc(feedColor(feed)), 25, true) : '';
   const classes = [...new Set(snap.field.map(car => car.cls).filter(Boolean))];
