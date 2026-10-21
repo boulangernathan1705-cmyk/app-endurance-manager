@@ -7,6 +7,8 @@ const COOKIE_SESSION = '__Host-em_session';
 const COOKIE_STATE = '__Host-em_oauth';
 const COOKIE_RETURN = '__Host-em_return';
 const DAY = 86400;
+// A sign-in lasts 30 days and is renewed (at most once a day) by every visit: a pilot who comes back is never asked again.
+const SESSION_DAYS = 30;
 class HttpError extends Error { constructor(status, message) { super(message); this.status = status; } }
 const fail = (status, message) => { throw new HttpError(status, message); };
 const now = () => Math.floor(Date.now() / 1000);
@@ -72,12 +74,23 @@ async function identity(request, env) {
   const raw = cookie(request, cookieNames(env).session);
   let user = null;
   if (/^[a-f0-9]{64}$/.test(raw)) {
-    const row = await env.DB.prepare('SELECT u.* FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=? AND s.expires_at>?').bind(await hash(raw), now()).first();
+    const tokenHash = await hash(raw);
+    const row = await env.DB.prepare('SELECT u.*, s.expires_at AS session_expires_at FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=? AND s.expires_at>?').bind(tokenHash, now()).first();
     user = publicUser(row);
     // The explanation of communities, already read by this account (migration 0041).
     if (user) user.communityIntroSeen = Boolean(row.community_intro_seen);
+    if (row && row.session_expires_at < now() + (SESSION_DAYS - 1) * DAY) return {user, renew:() => renewSession(request, env, tokenHash, raw)};
   }
   return {user};
+}
+// Pushes the end of the sign-in back to 30 days from now: in the database and in the browser (avatar cookie too).
+async function renewSession(request, env, tokenHash, raw) {
+  const names = cookieNames(env), age = SESSION_DAYS * DAY;
+  await env.DB.prepare('UPDATE sessions SET expires_at=? WHERE token_hash=?').bind(now() + age, tokenHash).run();
+  const cookies = [setCookie(names.session, raw, age, names.domain)];
+  const avatar = cookie(request, 'em_discord_avatar');
+  if (avatar) cookies.push(`em_discord_avatar=${avatar}; Path=/;${names.domain ? ` Domain=${names.domain};` : ''} Secure; SameSite=Lax; Max-Age=${age}`);
+  return cookies;
 }
 function owned(reg, actor) {
   return !!(actor.user && (reg.participant_user_id === actor.user.id || reg.user_id === actor.user.id || reg.owner_user_id === actor.user.id));
@@ -431,7 +444,7 @@ function validateRegistration(input, event) {
 
 export {
   LEGACY_CAR_ALIASES, COOKIE_SESSION, COOKIE_STATE, COOKIE_RETURN, DAY, HttpError, fail, now, id, token, hash, cookie,
-  setCookie, cookieNames, siteOrigin, communityLabel, baseDomain, json, redirect, origin, requireDiscord, administrators, identity, owned, personal,
+  SESSION_DAYS, setCookie, cookieNames, siteOrigin, communityLabel, baseDomain, json, redirect, origin, requireDiscord, administrators, identity, owned, personal,
   registrationSelect, registrationParticipant, NAME_IN_COMMUNITY, communityName, body, rateLimit, cleanup, returnPath, text, parisTimestamp, validateEvent, validateRegistration, ANY_CATEGORY
 };
 
