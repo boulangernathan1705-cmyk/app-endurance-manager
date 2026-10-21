@@ -203,7 +203,7 @@ function board(feed) {
   const classes = [...new Set(sorted.map(car => car.cls).filter(Boolean))];
   if (view.cls !== 'all' && !classes.includes(view.cls)) view.cls = 'all';
   // One tower per class, like the WEC's TV timing tower, each with its own places and gaps (LMU runs the classes
-  // together on track). Side by side when there is room.
+  // together on track): on a phone. A wide panel shows the full table below instead (styles/live.css).
   const groups = [...new Set(sorted.map(car => car.cls))].filter(name => view.cls === 'all' || name === view.cls).map(name => sorted.filter(car => car.cls === name));
   const split = classes.length > 1;
   const extra = id => feed.cars[id] || {};
@@ -243,9 +243,40 @@ function board(feed) {
   const towers = groups.map(cars => `<section class="lw-tower" style="--cls:${classColor(cars[0].cls)}">
     <h3>${esc(cars[0].cls || 'Classement')}<small>${cars.length} voiture${cars.length > 1 ? 's' : ''}</small></h3>
     ${cars.map((car, index) => line(car, index, cars)).join('')}</section>`).join('');
+  // A wide panel (computer): the same standings as a full table, one block per class. A column nobody has a value for
+  // yet is left out; a single unknown value stays blank.
+  const rows = groups.flat(), any = test => rows.some(test);
+  const stintOf = car => car.pit ? 0 : extra(car.id).sinceStop;
+  const cols = [
+    ['Tours', 't-n', () => true, car => car.laps],
+    [race ? 'Devant' : 'Écart préc.', 't-g', () => true, (car, index, mine) => index ? `<b>${race ? gapRace(car, mine[index - 1], 'ahead') : gapBest(mine[index - 1])(car)}</b>` : '<b>Leader</b>'],
+    ['Leader', 't-g', () => true, (car, index, mine) => index ? (race ? gapRace(car, mine[0], 'lead') : gapBest(mine[0])(car)) : ''],
+    ['Dernier', 't-t', () => any(car => car.last > 0), car => car.pit && race ? '<span class="t-muted">aux stands</span>' : timeOf(car.last)],
+    ['Meilleur', 't-t', () => any(car => car.best > 0), car => timeOf(car.best)],
+    ['Moy. 5 t.', 't-t w-md', () => any(car => known(extra(car.id).avg5)), car => known(extra(car.id).avg5) ? lapTime(extra(car.id).avg5) : ''],
+    ...[0, 1, 2].map(k => [`S${k + 1}`, 't-s w-lg', () => any(car => known(extra(car.id).lastSectors?.[k])), car => {
+      const info = extra(car.id), value = info.lastSectors?.[k];
+      return known(value) ? `<span class="${value <= sessionBest[k] ? 'best' : value <= info.best?.[k] ? 'pb' : ''}">${fr(value, 3)}</span>` : '';
+    }]),
+    ['Relais', 't-n', () => any(car => known(stintOf(car))), car => known(stintOf(car)) ? `${stintOf(car)} t` : ''],
+    ['Arrêt', 't-n w-md', () => any(car => known(extra(car.id).stop)), car => known(extra(car.id).stop) ? `${fr(extra(car.id).stop, 1)} s` : ''],
+    ['Arr.', 't-n', () => any(car => known(car.stops)), car => car.stops ?? ''],
+    ['Pén.', 't-n', () => any(car => car.pen > 0), car => car.pen > 0 ? car.pen : ''],
+  ].filter(([, , shown]) => shown());
+  const tableRow = (car, index, mine) => {
+    const mate = car.id === us ? feed : mates.get(car.vehicle), who = mate ? feedName(mate) : car.driver;
+    const overall = race ? car.place || sorted.indexOf(car) + 1 : sorted.indexOf(car) + 1;
+    return `<tr class="${car.id === us ? 'us' : mate ? 'mate' : ''}" style="--us:${esc(mate ? feedColor(mate) : 'inherit')}">
+      <td class="t-pos">${split ? index + 1 : overall}${split ? `<small>${overall}e</small>` : ''}</td><td><span class="t-num">${esc(car.num)}</span></td>
+      <td class="t-who"><b>${car.pit ? `<span class="lw-pill pits">${car.pit === 2 ? 'Garage' : 'Stands'}</span> ` : ''}${esc(who)}</b><small>${esc(model(car))}</small></td>
+      ${cols.map(([, cls, , cell]) => `<td class="${cls}">${cell(car, index, mine)}</td>`).join('')}</tr>`;
+  };
+  const table = `<table class="lw-wide"><thead><tr><th class="t-pos">Pos</th><th class="t-numh">#</th><th class="t-who">Pilote · voiture</th>${cols.map(([name, cls]) => `<th class="${cls}">${name}</th>`).join('')}</tr></thead>
+    ${groups.map(cars => `<tbody style="--cls:${classColor(cars[0].cls)}"><tr class="t-cls"><th colspan="${cols.length + 3}">${esc(cars[0].cls || 'Classement')}<small>${cars.length} voiture${cars.length > 1 ? 's' : ''}</small></th></tr>
+      ${cars.map((car, index) => tableRow(car, index, cars)).join('')}</tbody>`).join('')}</table>`;
   return `<h2>${race ? 'Classement' : 'Temps de la séance'} <small>${sorted.length} voitures</small></h2>
     ${classes.length > 1 ? `<div class="lw-chips" role="group" aria-label="Classe">${[['all', 'Toutes'], ...classes.map(name => [name, name])].map(([key, name]) => `<button type="button" data-cls="${esc(key)}" aria-pressed="${key === view.cls}">${esc(name)}</button>`).join('')}</div>` : ''}
-    <div class="lw-towers">${towers}</div>`;
+    <div class="lw-towers">${towers}</div>${table}`;
 }
 
 function carPanel(feed) {
