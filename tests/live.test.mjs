@@ -279,6 +279,34 @@ test('only the session under way counts: a restart, a server joined mid-session 
   assert.ok(publicFeed(other).since > publicFeed(first).since);
 });
 
+test('two of us in the same car, each in a session of his own, keep a feed each; a driver swap stays in one', () => {
+  const feeds = {}, nathan = {id:'u1', name:'Nathan'}, hugo = {id:'u2', name:'Hugo'};
+  const send = (who, et, at, extra = {}) => ingest(feeds, cleanSnapshot(snap({et, session:1, ...extra})), at * 1000, who);
+  const mine = send(nathan, 1000, 0), his = send(hugo, 300, 0.5);
+  assert.notEqual(his, mine);
+  for (let at = 1; at < 30; at++) {
+    assert.equal(send(nathan, 1000 + at, at), mine, 'no swapping back and forth');
+    assert.equal(send(hugo, 300 + at, at + 0.5), his);
+  }
+  assert.equal(Object.keys(feeds).length, 2);
+  assert.equal(his.pilot.name, 'Hugo');
+  assert.equal(mine.ours.laps.length + his.ours.laps.length, 0);
+  // Hugo stops; later Nathan restarts his session: Hugo's old feed goes with the earlier sessions.
+  const again = send(nathan, 10, 200);
+  assert.deepEqual(Object.keys(feeds), [again.key]);
+  // A driver swap: Nathan hands the car to Hugo in the same session, a second apart.
+  const swap = {};
+  const into = (who, et, at) => ingest(swap, cleanSnapshot(snap({et})), at * 1000, who);
+  const race = into(nathan, 5000, 0);
+  into(nathan, 5010, 10);
+  assert.equal(into(hugo, 5012, 12), race, 'the same session: one feed');
+  assert.equal(Object.keys(swap).length, 1);
+  // Two of our cars in that session, even under the same name: two feeds.
+  const other = ingest(swap, cleanSnapshot(snap({et:5013, me:{id:2, row:{id:2}}, field:[{id:1}]})), 13_000, {id:'u3', name:'Léo'});
+  assert.notEqual(other, race);
+  assert.equal(Object.keys(swap).length, 2);
+});
+
 test('the plugin and the pages reach the room only through their checks', async () => {
   const live = readFileSync(new URL('../server/live.mjs', import.meta.url), 'utf8');
   const combos = readFileSync(new URL('../server/combos.mjs', import.meta.url), 'utf8');
