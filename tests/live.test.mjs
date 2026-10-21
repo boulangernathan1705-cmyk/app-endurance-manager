@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {addToPath, cleanSnapshot, ingest, outlineLines, publicFeed, readFeed, fairShare, rejoin, stationary, lapsLeft, timeAt, FIELD, prune, STALE_DROP} from '../shared/live.mjs';
+import {addToPath, cleanSnapshot, diff, ingest, mergeSnapshot, outlineLines, patch, publicFeed, raceGaps, readFeed, fairShare, rejoin, stationary, lapsLeft, timeAt, FIELD, prune, STALE_DROP} from '../shared/live.mjs';
 import {LiveRoom} from '../server/live.mjs';
 
 const TRACK = 'Circuit de la Sarthe';
@@ -21,7 +21,7 @@ function snap({et = 1000, me = {}, field = [], session = 10, ...rest} = {}) {
 }
 
 test('a snapshot is checked: our car must be in the field, numbers bounded, anything odd dropped', () => {
-  assert.throws(() => cleanSnapshot({v:2}), /Format/);
+  assert.throws(() => cleanSnapshot({v:3}), /Format/);
   assert.throws(() => cleanSnapshot({...snap(), track:''}), /incomplète/);
   assert.throws(() => cleanSnapshot(snap({me:{id:99}})), /Notre voiture/);
   const clean = cleanSnapshot(snap({field:[{id:2, driver:'<b>x</b>\u0007', last:-1}, {id:3, laps:'12'}], me:{ve:400, profile:[1, 2, 3]}, map:[[1, 2]]}));
@@ -133,35 +133,57 @@ function fakeRoom() {
     getWebSockets:tag => sockets.filter(socket => socket.tag === tag)
   };
   const socket = (tag, attachment) => {
-    const item = {tag, sent:[], closed:null, attachment, deserializeAttachment:() => item.attachment, send:message => item.sent.push(message), close:code => { item.closed = code; }};
+    const item = {tag, sent:[], closed:null, attachment, deserializeAttachment:() => item.attachment, serializeAttachment:value => { item.attachment = value; },
+      send:message => item.sent.push(message), close:code => { item.closed = code; }};
     sockets.push(item);
     return item;
   };
   return {room:new LiveRoom(state, {}), stored, socket};
 }
 
-test('the room passes a pilot\'s snapshot to every page watching, ignores the rest and writes the history aside', async () => {
+test('the room passes a pilot\'s snapshot to every page watching, then only what changed, and writes the history aside', async () => {
   const {room, stored, socket} = fakeRoom();
   const until = Date.now() + 60_000;
   const driver = socket('driver', {role:'driver', user:'u1', name:'Nathan', color:'#b98cff', until});
   const viewer = socket('viewer', {role:'viewer', user:'u2', until});
   const late = socket('viewer', {role:'viewer', user:'u3', until:Date.now() - 1});
-  await room.webSocketMessage(driver, JSON.stringify(snap()));
+  await room.webSocketMessage(driver, JSON.stringify(snap({field:[{id:2, x:120.4, z:-30.6}]})));
   assert.equal(viewer.sent.length, 1);
   const message = JSON.parse(viewer.sent[0]);
-  assert.equal(message.type, 'feed');
+  assert.equal(message.type, 'feed', 'the room has no copy yet: the whole feed');
   assert.equal(message.feed.pilot.name, 'Nathan');
   assert.equal(late.closed, 4001, 'a page past its time reconnects, so its rights are checked again');
+  assert.equal(driver.sent.length, 0, 'plugin 1.5 never hears from the room (it would close)');
   await room.webSocketMessage(viewer, JSON.stringify(snap()));
   await room.webSocketMessage(driver, '{"v":1}');
   await room.webSocketMessage(driver, 'x'.repeat(300_000));
   assert.equal(viewer.sent.length, 1, 'only a pilot\'s valid snapshot is passed on');
-  // The outline and our lap's profile go again only when they change; the page keeps the previous ones.
-  await room.webSocketMessage(driver, JSON.stringify(snap({et:1000.5})));
-  const light = JSON.parse(viewer.sent[1]).feed;
-  assert.ok(!('outline' in light) && light.snap.me.profile === undefined);
-  assert.deepEqual(readFeed(light, readFeed(message.feed)).outline, readFeed(message.feed).outline);
-  assert.equal(readFeed(light).snap.field[0].vehicle, 'FMT #17', 'the field comes as rows, read back into cars');
+  // Then only what changed; the page rebuilds the same feed from its copy.
+  await room.webSocketMessage(driver, JSON.stringify(snap({et:1000.5, field:[{id:2, x:125, z:-30.6, dist:50}]})));
+  const second = JSON.parse(viewer.sent[1]);
+  assert.equal(second.type, 'patch');
+  assert.ok(viewer.sent[1].length < viewer.sent[0].length / 4, `${viewer.sent[1].length} vs ${viewer.sent[0].length}`);
+  const rebuilt = patch(message.feed, second.patch);
+  assert.deepEqual(rebuilt, room.sent.get(`${TRACK}|10|FMT #17`));
+  assert.equal(readFeed(rebuilt).snap.field[1].dist, 50);
+  assert.equal(readFeed(rebuilt).snap.field[0].vehicle, 'FMT #17', 'the field comes as rows, read back into cars');
+  assert.equal(readFeed(rebuilt).snap.field[1].x, null, 'no positions for a page without the map');
+  assert.equal(second.pos, undefined);
+  // The map shown: the positions too, to the metre.
+  await room.webSocketMessage(viewer, JSON.stringify({type:'view', watch:true, map:true}));
+  await room.webSocketMessage(driver, JSON.stringify(snap({et:1000.8, field:[{id:2, x:125, z:-30.6, dist:60}]})));
+  assert.deepEqual(JSON.parse(viewer.sent.at(-1)).pos, [[1, 0, 0], [2, 125, -31]]);
+  // Hidden: nothing; shown again: everything.
+  await room.webSocketMessage(viewer, JSON.stringify({type:'view', watch:false}));
+  const count = viewer.sent.length;
+  await room.webSocketMessage(driver, JSON.stringify(snap({et:1000.9})));
+  assert.equal(viewer.sent.length, count);
+  assert.equal(room.sent.size, 0, 'nobody watching: no copy kept');
+  await room.webSocketMessage(viewer, JSON.stringify({type:'view', watch:true}));
+  const hello = JSON.parse(viewer.sent.at(-1));
+  assert.equal(hello.type, 'hello');
+  assert.equal(hello.feeds[0].snap.et, 1000.9);
+  assert.deepEqual(hello.pos[`${TRACK}|10|FMT #17`][0], [1, 0, 0]);
   room.savedAt = 0;
   await room.webSocketMessage(driver, JSON.stringify(snap({et:1001})));
   assert.deepEqual([...stored.keys()].sort(), [`feed:${TRACK}|10|FMT #17`, `path:${TRACK}`]);
@@ -173,6 +195,68 @@ test('the room passes a pilot\'s snapshot to every page watching, ignores the re
   await room.webSocketMessage(driver, JSON.stringify(snap({et:21, session:6})));
   assert.deepEqual([...stored.keys()].sort(), [`feed:${TRACK}|6|FMT #17`, `path:${TRACK}`]);
   assert.ok(stored.get(`feed:${TRACK}|6|FMT #17`).path.some(Boolean));
+  assert.deepEqual([...room.sent.keys()], [`${TRACK}|6|FMT #17`], 'the earlier session\'s copy is dropped');
+});
+
+test('plugin 1.6 sends only what changed; the room asks for everything when it lost the snapshot, and says who watches', async () => {
+  const {room, socket} = fakeRoom();
+  const until = Date.now() + 60_000;
+  const driver = socket('driver', {role:'driver', user:'u1', name:'Nathan', until, conn:'c1'});
+  const full = {...snap(), v:2, full:true};
+  await room.webSocketMessage(driver, JSON.stringify({v:2, et:1001, fd:[[1, 7, 6100]]}));
+  assert.deepEqual(JSON.parse(driver.sent.at(-1)), {type:'full'}, 'changes with nothing to build on: everything is asked for');
+  await room.webSocketMessage(driver, JSON.stringify(full));
+  assert.deepEqual(JSON.parse(driver.sent.at(-1)), {type:'mode', watch:false, map:false}, 'nobody watching: the plugin is told');
+  const feed = () => Object.values(room.feeds)[0];
+  await room.webSocketMessage(driver, JSON.stringify({v:2, et:1001, me:{ve:58}, fd:[[1, 7, 6100, 6, 11, 11, 211.5]]}));
+  assert.equal(feed().snap.et, 1001);
+  assert.equal(feed().snap.me.ve, 58);
+  assert.equal(feed().snap.me.driver, 'N. Boulanger', 'what did not change stays');
+  const me = feed().snap.field.find(car => car.id === 1);
+  assert.deepEqual([me.dist, me.laps, me.last], [6100, 11, 211.5]);
+  assert.equal(feed().ours.laps.at(-1).ve, 2, 'the history goes on from the changes');
+  await room.webSocketMessage(driver, JSON.stringify({v:2, et:1002, fd:[[99, 7, 10]]}));
+  assert.deepEqual(JSON.parse(driver.sent.at(-1)), {type:'full'}, 'a car the room does not know: everything again');
+  const sentBefore = driver.sent.length;
+  const viewer = socket('viewer', {role:'viewer', user:'u2', until, watch:true, map:false});
+  await room.tellDrivers();
+  assert.deepEqual(JSON.parse(driver.sent.at(-1)), {type:'mode', watch:true, map:false});
+  await room.webSocketMessage(viewer, JSON.stringify({type:'view', watch:true, map:true}));
+  assert.deepEqual(JSON.parse(driver.sent.at(-1)), {type:'mode', watch:true, map:true});
+  await room.webSocketMessage(viewer, JSON.stringify({type:'view', watch:true, map:true}));
+  assert.equal(driver.sent.length, sentBefore + 2, 'told only when it changes');
+  await room.webSocketClose(viewer, 1000);
+  assert.deepEqual(JSON.parse(driver.sent.at(-1)), {type:'mode', watch:false, map:false}, 'the last page gone');
+  assert.equal(mergeSnapshot(null, {v:1}), null);
+});
+
+test('only what changed, and the same value back once applied', () => {
+  const before = {a:1, list:[1, 2, {x:1}], gone:true, keep:{deep:[1, 2]}, swap:[1]};
+  const after = {a:2, list:[1, 3, {x:1, y:null}, 4], keep:{deep:[1, 2]}, swap:{n:1}, fresh:'é'};
+  const change = diff(before, after);
+  assert.equal(change.keep, undefined, 'nothing about what stays');
+  assert.deepEqual(patch(before, change), after);
+  assert.deepEqual(before.list, [1, 2, {x:1}], 'the copy it builds on is left as it was');
+  assert.deepEqual(patch([1, 2, 3], diff([1, 2, 3], [1])), [1]);
+  assert.equal(diff({a:[1]}, {a:[1]}), undefined);
+});
+
+test('the room measures the race gaps by class: seconds to the class leader and to the car ahead, laps once lapped', () => {
+  const feeds = {}, trails = new Map();
+  let feed;
+  // Cars 1 (ours, P2) and 3 (P1) Hypercars, 1 runs 100 m behind 3; car 2 a GT3 two laps down.
+  for (let et = 1000; et <= 1010; et++) {
+    feed = ingest(feeds, cleanSnapshot(snap({et, me:{row:{place:2, dist:5000 + (et - 1000) * 50}},
+      field:[{id:3, place:1, dist:5100 + (et - 1000) * 50, laps:10}, {id:2, place:3, cls:'GT3', laps:8, dist:1000}]})), et * 1000);
+    var gaps = raceGaps(feed, trails);
+  }
+  assert.deepEqual(gaps[1], {lead:2, ahead:2}, '100 m at 50 m/s');
+  assert.equal(gaps[3], undefined, 'the class leader has none');
+  assert.equal(gaps[2], undefined, 'alone in its class');
+  feed = ingest(feeds, cleanSnapshot(snap({et:1011, me:{row:{place:2, laps:8, dist:5000}}, field:[{id:3, place:1, dist:5100, laps:10}]})), 1011_000);
+  assert.deepEqual(raceGaps(feed, trails)[1], {leadLaps:2, aheadLaps:2});
+  assert.deepEqual(publicFeed(feed, {1:{leadLaps:2}}).cars[1].leadLaps, 2);
+  assert.deepEqual(raceGaps(ingest(feeds, cleanSnapshot(snap({et:1011, session:1})), 1012_000), trails), {}, 'practice: the page compares best laps');
 });
 
 test('only the session under way counts: a restart, a server joined mid-session or another end starts the feed over', () => {

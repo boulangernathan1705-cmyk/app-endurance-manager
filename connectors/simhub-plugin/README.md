@@ -17,6 +17,9 @@ Envoie les séances Le Mans Ultimate d'un pilote aux fiches combo de son équipe
   mémoire du jeu, pour la page « Mur des stands » du site (`server/live.mjs`, `shared/live.mjs`). Activé par défaut,
   case « Partager ma voiture en direct » pour le couper. Lit aussi `watch/standings` toutes les 20 s (numéros des
   voitures) et `watch/trackmap` une fois par circuit (tracé, gardé seulement s'il passe à moins de 25 m de la voiture).
+  Depuis la 1.6.0, tout à l'ouverture de la connexion puis seulement ce qui a changé ; le site dit si quelqu'un
+  regarde : personne, seulement ce que l'historique demande (tours, arrêts, pilotes), et les positions des voitures
+  seulement quand une page montre la carte. Le site doit être à jour avant de donner la 1.6.0 aux pilotes.
 
 - publie les chiffres des overlays d'essais et de course (`Practice.cs`, depuis la 1.4.0, en propriétés depuis la
   1.5.0) : le dernier tour (temps, énergie ou carburant, usure moyenne des 4 pneus) face à la valeur visée, et sous
