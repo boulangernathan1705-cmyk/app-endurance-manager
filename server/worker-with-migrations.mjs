@@ -11,6 +11,7 @@ import {cleanupEventRecaps} from './recap-discord.mjs';
 import {syncCrewDiscord, cleanupOrphanCrewDiscord} from './crew-discord.mjs';
 import {allCommunities, currentCommunity, communityById, communitySlug, appearanceOf} from './community.mjs';
 import {isDevelopment,devRobots,markDevelopmentResponse} from './dev-environment.mjs';
+import {isCommunityPage, freshPageRequest, withCommunityLook} from './community-look.mjs';
 // The team's live room of the mur des stands (Durable Object, binding LIVE in the wrangler files).
 export {LiveRoom} from './live.mjs';
 
@@ -98,6 +99,9 @@ export default {
   async fetch(request, env, ctx) {
     const pathname = new URL(request.url).pathname;
     const development = isDevelopment(env);
+    // A page of a community's site: its look is put in the page itself (server/community-look.mjs).
+    const lookOf = env?.DB && isCommunityPage(request, communityLabel(new URL(request.url), env)) ? await currentCommunity(env, request).catch(() => null) : null;
+    if (lookOf) request = freshPageRequest(request);
     if (development && pathname === '/robots.txt') return devRobots();
     if (pathname === '/manifest.webmanifest' && env?.DB) return appManifest(request, env);
     if (pathname === '/app-icon.png' && env?.DB && env?.ASSETS) return appIcon(request, env);
@@ -106,19 +110,19 @@ export default {
     if (env?.DB && communityLabel(new URL(request.url), env) === communitySlug(env, null) && new URL(request.url).hostname !== new URL(origin(env)).hostname) return communityNotFound();
     // A page of <slug>.BASE_DOMAIN for a community that does not exist: a plain "not found" page.
     if (env?.DB && communityLabel(new URL(request.url), env) && !pathname.startsWith('/api/') && (request.headers.get('Accept') || '').includes('text/html')
-      && !(await env.DB.prepare('SELECT 1 FROM communities WHERE slug=?').bind(communityLabel(new URL(request.url), env)).first())) return communityNotFound();
+      && !lookOf && !(await env.DB.prepare('SELECT 1 FROM communities WHERE slug=?').bind(communityLabel(new URL(request.url), env)).first())) return communityNotFound();
     if (pathname === '/' && ['GET','HEAD'].includes(request.method)) {
-      const community = env?.DB ? await currentCommunity(env, request).catch(() => null) : null;
+      const community = lookOf || (env?.DB ? await currentCommunity(env, request).catch(() => null) : null);
       const redirect = homeRedirect(request, community);
       if (redirect) return redirect;
       if (env?.ASSETS) {
-        const home = await homePage(request, env);
+        const home = withCommunityLook(await homePage(request, env), lookOf);
         return development ? markDevelopmentResponse(home, env) : home;
       }
     }
     const weeklyMutation = isWeeklyDiscordMutation(request);
     const target = weeklyMutation && env?.DB ? await discordMutationTarget(env, request) : null;
-    const response = await worker.fetch(request, env, ctx);
+    const response = withCommunityLook(await worker.fetch(request, env, ctx), lookOf);
     if (weeklyMutation && response.ok) queueWeeklySync(env, ctx, request, target?.eventId, target?.communityId);
     // A WebSocket opening (mur des stands) goes back untouched: a copied response would lose its socket.
     if (response.status === 101) return response;

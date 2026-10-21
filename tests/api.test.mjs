@@ -299,6 +299,16 @@ test('OAuth state is bound to browser, single-use, and profile cannot grant admi
  assert(!JSON.stringify(h.DB.db.prepare('SELECT * FROM sessions').all()).includes(cookie));
  h.DB.db.exec('UPDATE sessions SET expires_at=1');assert.equal((await h.req('/api/session','GET',null,'pilot')).data.user,null);
 });
+test('a sign-in lasts 30 days and each visit (once a day) pushes it back',async()=>{
+ const h=harness();await h.login(PILOT,'pilot');
+ const at=Math.floor(Date.now()/1000),expires=()=>h.DB.db.prepare('SELECT expires_at FROM sessions').get().expires_at;
+ assert.ok(expires()>=at+30*86400-5);
+ const fresh=await h.req('/api/session','GET',null,'pilot');assert.equal(fresh.response.headers.get('Set-Cookie'),null,'not renewed twice a day');
+ h.DB.db.exec(`UPDATE sessions SET expires_at=${at+3*86400}`);
+ const renewed=await h.req('/api/session','GET',null,'pilot');
+ assert.ok(renewed.data.user);assert.match(renewed.response.headers.get('Set-Cookie'),/__Host-em_session=[a-f0-9]{64};.*Max-Age=2592000/);
+ assert.ok(expires()>=at+30*86400-5);
+});
 test('validation, closed departures, guest link rejection and free-tier rate limiting',async()=>{
  const h=harness();await h.login(ADMIN,'admin');
  for(const data of [{...eventInput,name:' '},{...eventInput,categories:['LMP2']},{...eventInput,departures:[{date:'2090-02-30',time:'14:00'}]},{...eventInput,departures:[eventInput.departures[0],eventInput.departures[0]]}])assert.equal((await h.req('/api/events','POST',data,'admin')).status,400);
