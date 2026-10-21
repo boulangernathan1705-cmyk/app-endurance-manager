@@ -76,10 +76,10 @@
     <h2>4. Cookies et accès</h2>
     <p>Endurance Manager utilise uniquement des cookies nécessaires au fonctionnement du service :</p>
     <ul>
-      <li><code>__Secure-em_session</code> : session de connexion, valable jusqu’à 7 jours, commune à tous les sites des communautés pour ne te connecter qu’une fois ;</li>
+      <li><code>__Secure-em_session</code> : session de connexion, valable 30 jours et prolongée à chaque visite, commune à tous les sites des communautés pour ne te connecter qu’une fois ;</li>
       <li><code>__Secure-em_oauth</code> : sécurise temporairement la connexion Discord, valable environ 10 minutes ;</li>
       <li><code>__Secure-em_return</code> : retient la page à rouvrir après la connexion Discord (sur le site de la communauté d’où tu viens), valable environ 10 minutes ;</li>
-      <li><code>em_discord_avatar</code> : identifiant de ton avatar Discord pour l’afficher dans le menu du compte, valable jusqu’à 7 jours ;</li>
+      <li><code>em_discord_avatar</code> : identifiant de ton avatar Discord pour l’afficher dans le menu du compte, valable 30 jours ;</li>
       <li><code>em_sim</code> : retient le simulateur que tu as choisi (LMU ou iRacing) pour t’y amener directement depuis l’accueil, valable jusqu’à 1 an.</li>
     </ul>
     <p>Ces cookies sont configurés avec les protections Secure et SameSite=Lax. Ceux de la connexion sont aussi HttpOnly, donc inaccessibles aux scripts de la page, et ne sont envoyés qu’à endurance-manager.app et aux sites de ses communautés. Le cookie d’avatar ne contient aucune donnée de connexion.</p>
@@ -90,7 +90,7 @@
   <section>
     <h2>5. Durée de conservation</h2>
     <ul>
-      <li>les sessions de connexion expirent au plus tard après 7 jours ;</li>
+      <li>les sessions de connexion expirent après 30 jours sans visite ;</li>
       <li>les données temporaires de connexion Discord expirent après environ 10 minutes ;</li>
       <li>les données anti-abus sont organisées par périodes de 10 minutes et sont supprimées automatiquement, au plus tard dans le quart d’heure qui suit leur expiration ;</li>
       <li>les rapports d’erreur technique sont supprimés après 14 jours ;</li>

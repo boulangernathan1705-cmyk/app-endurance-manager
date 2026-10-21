@@ -2,7 +2,7 @@ import {grindfestAvailable, grindfestEnabled, isGrindfest, streamersOf, assignSt
 import {gridfestPasswordStatus, sendGridfestPasswords} from './gridfest-discord.mjs';
 import {
   LEGACY_CAR_ALIASES, COOKIE_SESSION, COOKIE_STATE, COOKIE_RETURN, DAY, HttpError, fail, now, id, token, hash, cookie,
-  setCookie, cookieNames, siteOrigin, communityLabel, baseDomain, json, redirect, origin, requireDiscord, administrators, identity, owned, personal,
+  SESSION_DAYS, setCookie, cookieNames, siteOrigin, communityLabel, baseDomain, json, redirect, origin, requireDiscord, administrators, identity, owned, personal,
   registrationSelect, registrationParticipant, NAME_IN_COMMUNITY, communityName, body, rateLimit, cleanup, returnPath, text, validateEvent, validateRegistration, ANY_CATEGORY
 } from './core.mjs';
 import {ingestClientError, clientErrorsApi} from './telemetry.mjs';
@@ -390,15 +390,15 @@ async function oauthCallback(request, env) {
     const session = token();
     await env.DB.batch([
       env.DB.prepare('INSERT INTO users(id,name,created_at) VALUES(?,?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name').bind(profile.id, display, now()),
-      env.DB.prepare('INSERT INTO sessions(token_hash,user_id,expires_at) VALUES(?,?,?)').bind(await hash(session), profile.id, now() + 7 * DAY)
+      env.DB.prepare('INSERT INTO sessions(token_hash,user_id,expires_at) VALUES(?,?,?)').bind(await hash(session), profile.id, now() + SESSION_DAYS * DAY)
     ]);
     await discoverMemberships(env, await allCommunities(env), profile.id).catch(error => console.error('Memberships at sign-in:', String(error?.message || '').slice(0, 80)));
     const old = cookie(request, names.session);
     if (old) await env.DB.prepare('DELETE FROM sessions WHERE token_hash=?').bind(await hash(old)).run();
     const avatarCookie = avatarHash
-      ? `em_discord_avatar=${encodeURIComponent(`${profile.id}:${avatarHash}`)}; Path=/;${names.domain ? ` Domain=${names.domain};` : ''} Secure; SameSite=Lax; Max-Age=${7 * DAY}`
+      ? `em_discord_avatar=${encodeURIComponent(`${profile.id}:${avatarHash}`)}; Path=/;${names.domain ? ` Domain=${names.domain};` : ''} Secure; SameSite=Lax; Max-Age=${SESSION_DAYS * DAY}`
       : `em_discord_avatar=; Path=/;${names.domain ? ` Domain=${names.domain};` : ''} Secure; SameSite=Lax; Max-Age=0`;
-    return redirect(back, [clear, clearReturn, setCookie(names.session, session, 7 * DAY, names.domain), avatarCookie]);
+    return redirect(back, [clear, clearReturn, setCookie(names.session, session, SESSION_DAYS * DAY, names.domain), avatarCookie]);
   } catch (error) {
     console.error('Discord sign-in failed:', String(error?.message || 'unknown').slice(0, 80));
     return failed();
@@ -416,6 +416,13 @@ async function api(request, env) {
   }
   if (path === '/api/auth/discord' && method === 'GET') return oauthStart(request, env);
   if (path === '/api/auth/discord/callback' && method === 'GET') return oauthCallback(request, env);
+  // Banner of the community: public (shown on the welcome screen too), cached for good (its address changes with it),
+  // answered before the sign-in and access checks it does not need.
+  if (path === '/api/community/banner' && method === 'GET') {
+    const row = await env.DB.prepare('SELECT b.image, b.content_type FROM community_banners b JOIN communities c ON c.id=b.community_id WHERE c.slug=?').bind(communitySlug(env, request)).first();
+    if (!row) fail(404, 'Aucune bannière.');
+    return new Response(new Uint8Array(row.image), {headers:{'Content-Type':row.content_type, 'Cache-Control':'public, max-age=31536000, immutable', 'X-Content-Type-Options':'nosniff'}});
+  }
   const actor = await identity(request, env);
   // Every request below works inside one community (separation entry point, server/community.mjs), with
   // the permissions the player's Discord roles give in it (server/access.mjs).
@@ -434,11 +441,12 @@ async function api(request, env) {
   // Requests for a new community: sent by anyone signed in with Discord, from any site (server/community-requests.mjs).
   const requests = await communityRequestsApi(path, method, request, env, actor);
   if (requests) return requests;
+  // Each opening of the site renews the sign-in (once a day at most), so it never runs out for a pilot who comes back.
   if (path === '/api/session' && method === 'GET') return json({user:actor.user, discordReady:!!(env.DISCORD_CLIENT_ID && env.DISCORD_CLIENT_SECRET), adminConfigured:administrators(env).length > 0, soloRaces:soloRacesEnabled(env, community), iracingImport:community.modules?.iracingImport===true, categoryEntry:community.modules?.categoryEntry === true, soloLabel:eventsLabel(community, isDevelopment(env)), eventTdz:tdzOnly(community, isDevelopment(env)), eventTypes:!tdzOnly(community, isDevelopment(env)) ? [] : grindfestEnabled(community, isDevelopment(env)) ? [...TDZ_EVENT_TYPES, 'Gridfest'] : TDZ_EVENT_TYPES, grindfest:grindfestEnabled(community, isDevelopment(env)), grindfestAvailable:grindfestAvailable(community, isDevelopment(env)), safeGuideUrl:community.modules?.safeGuideUrl || '',
     community:{id:community.id, slug:community.slug, name:community.name, shortName:community.shortName, discordInviteUrl:community.discordInviteUrl, appearance:appearanceOf(community)},
     access:access.status, permissions:[...access.permissions], manager:access.manager, communities:await myCommunities(env, actor, community),
     elsewhere:['not-member','forbidden'].includes(access.status) ? (await myCommunities(env, actor, community, true)).filter(item => !item.current).map(({name, url, logoUrl}) => ({name, url, logoUrl})) : [], openSite,
-    platformDiscordUrl:/^https:\/\/(discord\.gg|discord\.com\/invite)\//.test(env.PLATFORM_DISCORD_URL || '') ? env.PLATFORM_DISCORD_URL : null});
+    platformDiscordUrl:/^https:\/\/(discord\.gg|discord\.com\/invite)\//.test(env.PLATFORM_DISCORD_URL || '') ? env.PLATFORM_DISCORD_URL : null}, 200, actor.user && actor.renew ? await actor.renew().catch(() => []) : []);
   // The explanation of communities has been read: not shown again, on any device.
   if (path === '/api/me/community-intro' && method === 'POST') {
     if (!actor.user) fail(401, 'Connecte-toi avec Discord.');
@@ -449,12 +457,6 @@ async function api(request, env) {
     const names = cookieNames(env), raw = cookie(request, names.session);
     if (raw) await env.DB.prepare('DELETE FROM sessions WHERE token_hash=?').bind(await hash(raw)).run();
     return json({ok:true}, 200, [setCookie(names.session, '', 0, names.domain), `em_discord_avatar=; Path=/;${names.domain ? ` Domain=${names.domain};` : ''} Secure; SameSite=Lax; Max-Age=0`]);
-  }
-  // Banner of the community: public (shown on the welcome screen too), cached for good (its address changes with it).
-  if (path === '/api/community/banner' && method === 'GET') {
-    const row = await env.DB.prepare('SELECT image, content_type FROM community_banners WHERE community_id=?').bind(community.id).first();
-    if (!row) fail(404, 'Aucune bannière.');
-    return new Response(new Uint8Array(row.image), {headers:{'Content-Type':row.content_type, 'Cache-Control':'public, max-age=31536000, immutable', 'X-Content-Type-Options':'nosniff'}});
   }
   // Entries without an account are gone: a community is only open to the members of its Discord server.
   if (path === '/api/guest/recover' || path === '/api/guest/link') fail(410, 'Les inscriptions sans compte Discord ne sont plus possibles.');
