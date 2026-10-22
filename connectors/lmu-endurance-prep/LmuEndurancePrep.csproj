@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    SimHub plugins target .NET Framework 4.8 and reference the DLLs shipped with SimHub.
+    Set SIMHUB_INSTALL_PATH (environment variable) if SimHub is not installed in the default folder.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <AssemblyName>LmuEndurancePrep</AssemblyName>
+    <!-- The plugin's version: raised for each new build put in release/ (release/plugin.json, same number). -->
+    <Version>0.1.0</Version>
+    <RootNamespace>LmuEndurancePrep</RootNamespace>
+    <LangVersion>latest</LangVersion>
+    <SimHubPath Condition="'$(SIMHUB_INSTALL_PATH)' != ''">$(SIMHUB_INSTALL_PATH)</SimHubPath>
+    <SimHubPath Condition="'$(SimHubPath)' == ''">C:\Program Files (x86)\SimHub\</SimHubPath>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="SimHub.Plugins">
+      <HintPath>$(SimHubPath)SimHub.Plugins.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="GameReaderCommon">
+      <HintPath>$(SimHubPath)GameReaderCommon.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="Newtonsoft.Json">
+      <HintPath>$(SimHubPath)Newtonsoft.Json.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+  </ItemGroup>
+
+  <!-- Copies the plugin next to SimHubWPF.exe after a build. Writing to Program Files may need Visual Studio run as administrator. -->
+  <Target Name="CopyToSimHub" AfterTargets="Build" Condition="Exists('$(SimHubPath)SimHubWPF.exe')">
+    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(SimHubPath)" ContinueOnError="true" />
+  </Target>
+
+</Project>
