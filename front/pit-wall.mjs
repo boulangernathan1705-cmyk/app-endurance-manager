@@ -604,7 +604,17 @@ function render() {
   app.innerHTML = `${header(feed)}${driverCard(feed)}${carsStrip()}${tabs()}<div class="pw-panel-wrap pw-${view.tab}" role="tabpanel">${PANELS[view.tab](feed)}</div>`;
   if (scroll) window.scrollTo(0, scroll);
   if (view.tab === 'tele') drawCurves(feed);
+  if (view.tab === 'map') fitMap();
 }
+
+// The map fills what is left of the window under the header and tabs, never more: no scrolling to see the track.
+function fitMap() {
+  const svg = app.querySelector('.pw-map');
+  if (!svg) return;
+  const top = svg.getBoundingClientRect().top + window.scrollY;
+  svg.style.setProperty('--fit', `${Math.max(240, window.innerHeight - top - 52)}px`);
+}
+window.addEventListener('resize', () => { if (view.tab === 'map') fitMap(); });
 
 function showTab(tab) {
   view.tab = tab;
