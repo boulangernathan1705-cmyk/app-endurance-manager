@@ -145,6 +145,8 @@
 .pw-body .pw-stand { text-align: right; }
 .pw-body .pw-stand > b { font-family: var(--pw-mono); }
 .pw-body .pw-cls { display: inline-block; padding: 3px 8px; border-radius: 3px; font-family: var(--pw-mono); font-size: 12px; font-weight: 700; color: var(--cls); border: 1px solid color-mix(in srgb, var(--cls) 60%, transparent); background: color-mix(in srgb, var(--cls) 12%, transparent); }
+.pw-body .pw-compound { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; border: 3px solid var(--tone, var(--pw-text2)); color: var(--tone, var(--pw-text2)); background: #0a0c10; font-family: var(--pw-mono); font-size: 12px; font-weight: 700; }
+.pw-body .pw-compound.S { --tone: var(--pw-red); } .pw-body .pw-compound.M { --tone: var(--pw-yellow); } .pw-body .pw-compound.H { --tone: var(--pw-text); } .pw-body .pw-compound.W { --tone: var(--pw-blue); }
 .pw-body .pw-tank { display: inline-flex; align-items: center; gap: 8px; }
 .pw-body .pw-tank b { color: var(--bar); min-width: 38px; }
 .pw-body .pw-tank i { width: 40px; height: 6px; border-radius: 3px; background: linear-gradient(90deg, var(--bar) var(--tank), var(--pw-accent) var(--tank)); }

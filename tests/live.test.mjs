@@ -417,3 +417,22 @@ test('gaps on track: seconds since the car ahead was here, laps once a whole lap
   for (let et = 3; et < 8; et++) addToTrail(odd, et, 100);
   assert.equal(odd.length, 1);
 });
+
+test('every car\'s tyres, damage and energy per lap: the game\'s figures kept, bounded, averaged over 5 laps', () => {
+  const clean = cleanSnapshot(snap({field:[{id:2, cmp:'Medium', dmg:140, veLap:6.5}, {id:3}]}));
+  const rival = clean.field.find(car => car.id === 2), old = clean.field.find(car => car.id === 3);
+  assert.equal(rival.cmp, 'Medium');
+  assert.equal(rival.dmg, null, 'damage is 0 to 100');
+  assert.equal(rival.veLap, 6.5);
+  assert.deepEqual([old.cmp, old.dmg, old.veLap], [null, null, null], 'a row from an older plugin has none');
+
+  // Car 2 gives its energy per lap, car 3 only its tank: what each lap used comes from the drop of the tank.
+  const feeds = {};
+  let et = 1000, laps = 10, tank2 = 80, tank3 = 90;
+  const send = () => ingest(feeds, cleanSnapshot(snap({et, me:{row:{laps, dist:100}}, field:[{id:2, laps, tank:tank2, veLap:7.2, place:1}, {id:3, laps, tank:tank3, place:3}]})), et * 1000);
+  send();
+  for (let lap = 0; lap < 3; lap++) { et += 210; laps++; tank2 -= 7; tank3 -= 6; send(); }
+  const feed = publicFeed(feeds[Object.keys(feeds)[0]]);
+  assert.equal(feed.cars[2].use5, 7.2, 'the game\'s figure first');
+  assert.equal(feed.cars[3].use5, 6, 'the first lap seen has no start, the next two used 6 each');
+});

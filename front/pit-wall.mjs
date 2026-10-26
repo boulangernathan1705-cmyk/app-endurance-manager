@@ -297,7 +297,18 @@ function relative(feed) {
     <p class="pw-note">Secondes sur la piste à notre rythme : + devant nous, − derrière. <span class="pw-blue">Bleu</span> : on lui prend un tour, <span class="pw-orange">orange</span> : il nous prend un tour.</p>`;
 }
 
-// Our class only: each car's gap to us in the race, its pace over 5 laps and its stint.
+// Our class only, to read each car's strategy: its gap to us, its pace over 5 laps, the tyres it has on, its damage, what
+// is left in its tank, what a lap uses (5-lap average) and how many laps that lasts. Raw figures, no advice.
+const COMPOUNDS = [[/wet|rain|pluie/i, 'W'], [/soft|tendre/i, 'S'], [/hard|dur/i, 'H'], [/med/i, 'M']];
+function tyreCell(name) {
+  if (!name) return '<span class="pw-dim">—</span>';
+  const letter = COMPOUNDS.find(([test]) => test.test(name))?.[1] || name[0].toUpperCase();
+  return `<span class="pw-compound ${letter}" title="${esc(name)}">${esc(letter)}</span>`;
+}
+function damageCell(value) {
+  if (!known(value)) return '<span class="pw-dim">—</span>';
+  return value <= 0 ? chip('AUCUN', 'good') : value < 30 ? chip('LÉGERS', 'warn') : value < 65 ? chip('MOYENS', 'bad') : chip('GRAVES', 'bad');
+}
 function opponents(feed) {
   const snap = feed.snap, me = meOf(feed), race = isRace(snap.session);
   if (!me) return '';
@@ -305,21 +316,27 @@ function opponents(feed) {
   const lead = car => car === mine[0] ? {s:0, laps:0} : {s:feed.cars[car.id]?.lead ?? null, laps:feed.cars[car.id]?.leadLaps ?? 0};
   const us = lead(me);
   const rows = mine.map((car, index) => {
-    const info = feed.cars[car.id] || {}, them = lead(car);
+    const info = feed.cars[car.id] || {}, them = lead(car), ours = car === me;
     // In a race + ahead of us; in practice, the best lap's difference (+ slower than ours).
     const laps = us.laps - them.laps;
-    const value = car === me ? null : race && (them.laps || us.laps) ? laps ? `${laps > 0 ? '+' : '−'}${Math.abs(laps)} T` : '—'
+    const value = ours ? null : race && (them.laps || us.laps) ? laps ? `${laps > 0 ? '+' : '−'}${Math.abs(laps)} T` : '—'
       : race && known(them.s) && known(us.s) ? `${signed(us.s - them.s, 1)}s` : car.best > 0 && me.best > 0 ? `${signed(car.best - me.best, 3)}s` : '—';
     const gap = value === null ? '' : `<span class="${/^\+/.test(value) ? 'pw-red' : /^−/.test(value) ? 'pw-green' : ''}">${value}</span>`;
-    const diff = known(info.avg5) && known(our.avg5) && car !== me ? info.avg5 - our.avg5 : null;
+    const diff = known(info.avg5) && known(our.avg5) && !ours ? info.avg5 - our.avg5 : null;
     const pace = known(diff) ? ` <small class="${diff < 0 ? 'pw-red' : 'pw-green'}">${signed(diff, 2)}</small>` : '';
-    return `<tr class="${car === me ? 'us' : ''}"><td class="pw-pos">P${index + 1}</td>${numCell(car)}${nameCell(car)}<td class="pw-n pw-big">${gap}</td>
-      <td class="pw-n">${lapTime(info.avg5)}${pace}</td><td class="pw-n pw-opt">${lapTime(car.last)}</td><td class="pw-n pw-opt">${lapTime(car.best)}</td>
-      <td class="pw-n pw-opt">${tankCell(car)}</td><td class="pw-n pw-opt">${known(info.sinceStop) ? info.sinceStop : '—'}</td><td class="pw-n pw-stand">${pitCell(feed, car)}</td></tr>`;
+    // Our own car: what our plugin reads of it when the field's row has nothing.
+    const compound = car.cmp || (ours ? snap.me.compound : null), damage = car.dmg ?? (ours ? snap.me.damage : null);
+    const use = info.use5, left = known(use) && use > 0 && known(car.tank) && car.tank > 0 ? car.tank / use : null;
+    const leftTone = !known(left) ? '' : left < 4 ? 'pw-red' : left < 8 ? 'pw-yellow' : 'pw-green';
+    return `<tr class="${ours ? 'us' : ''}"><td class="pw-pos">P${index + 1}</td>${numCell(car)}${nameCell(car)}<td class="pw-n pw-big">${gap}</td>
+      <td class="pw-n">${lapTime(info.avg5)}${pace}</td><td>${tyreCell(compound)}</td><td class="pw-opt">${damageCell(damage)}</td>
+      <td class="pw-n">${tankCell(car)}</td><td class="pw-n pw-opt">${known(use) ? `${fr(use, 1)} %` : '—'}</td><td class="pw-n"><b class="${leftTone}">${known(left) ? `${fr(left, 1)} t` : '—'}</b></td>
+      <td class="pw-n pw-opt">${known(info.sinceStop) ? info.sinceStop : '—'}</td><td class="pw-n pw-stand">${pitCell(feed, car)}</td></tr>`;
   }).join('');
   return `<div class="pw-table"><table><thead><tr><th>Pos</th><th class="pw-yellow">#</th><th>Pilote / équipe</th><th class="pw-n">${race ? 'Sur nous' : 'Meilleur / nous'}</th><th class="pw-n">Moy. 5 tours</th>
-    <th class="pw-n pw-opt">Dernier tour</th><th class="pw-n pw-opt">Meilleur tour</th><th class="pw-n pw-opt">Énergie virt.</th><th class="pw-n pw-opt" title="Tours depuis son dernier arrêt">Relais</th><th class="pw-n">Stands / arrêt</th></tr></thead><tbody>${rows}</tbody></table></div>
-    <p class="pw-note">${race ? 'Écart en course : + devant nous, − derrière.' : 'Meilleur tour comparé au nôtre : + plus lent.'} Rythme sur 5 tours comparé au nôtre : <span class="pw-red">rouge</span> plus rapide que nous.</p>`;
+    <th>Pneus</th><th class="pw-opt">Dégâts</th><th class="pw-n">Énergie</th><th class="pw-n pw-opt">Conso / tour</th><th class="pw-n" title="Énergie restante ÷ conso moyenne sur 5 tours">Tours restants</th>
+    <th class="pw-n pw-opt" title="Tours depuis son dernier arrêt">Relais</th><th class="pw-n">Stands / arrêt</th></tr></thead><tbody>${rows}</tbody></table></div>
+    <p class="pw-note">${race ? 'Écart en course : + devant nous, − derrière.' : 'Meilleur tour comparé au nôtre : + plus lent.'} Rythme sur 5 tours : <span class="pw-red">rouge</span> plus rapide que nous. Tours restants : énergie ÷ conso moyenne sur 5 tours.</p>`;
 }
 
 function chrono(feed) {
