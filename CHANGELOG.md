@@ -1,5 +1,12 @@
 # Nouveautés d'Endurance Manager
 
+## v1.56 — 26 octobre 2026
+
+### ✨ Nouveautés
+
+- **Discord** : un seul réglage pour ranger les courses sur ton serveur (une catégorie par course, ou un récap de la semaine avec tous les vocaux d'équipage dans une catégorie de ton choix). Chaque récap (Endurances LMU, Endurances iRacing, Calendrier de la semaine) se publie dans le salon que tu choisis.
+- **Météo prévue** : se renseigne en 5 créneaux, comme dans LMU, avec le ciel de chaque créneau.
+
 ## v1.55 — 26 octobre 2026
 
 ### ✨ Nouveautés
