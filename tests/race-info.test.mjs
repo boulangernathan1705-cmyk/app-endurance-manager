@@ -15,6 +15,10 @@ test('endurance race settings are optional, checked and kept when an older page 
   assert.deepEqual(validateEvent({...base, details:{weather:'', weatherNote:''}}).details, {});
   assert.throws(() => validateEvent({...base, details:{weather:'neige'}}), /Météo/);
   assert.throws(() => validateEvent({...base, details:{weatherNote:'x'.repeat(61)}}), /Précision météo/);
+  assert.deepEqual(validateEvent({...base, details:{weatherSlots:['clear', '', 'overcastRain', '', '']}}).details, {weatherSlots:['clear', '', 'overcastRain', '', '']});
+  assert.deepEqual(validateEvent({...base, details:{weatherSlots:['', '', '', '', '']}}).details, {});
+  assert.throws(() => validateEvent({...base, details:{weatherSlots:['neige']}}), /créneaux/);
+  assert.throws(() => validateEvent({...base, details:{weatherSlots:['clear', 'clear', 'clear', 'clear', 'clear', 'clear']}}), /créneaux/);
   const existing = {format:'endurance', departures:'[]', details:JSON.stringify({tyres:6})};
   assert.deepEqual(validateEvent(base, existing).details, {tyres:6});
 });

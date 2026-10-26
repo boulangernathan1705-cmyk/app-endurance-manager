@@ -142,6 +142,9 @@ export function catalogForGame(game='lmu') { return GAME_CATALOGS[GAME_IDS.inclu
 // EVENT TDZ (Tondeuz): the event types, set here (their logos will come with them).
 // Track limits of an endurance (race page icon).
 export const TRACK_LIMITS = {strict:'Strictes', normal:'Normales'};
+// Forecast sky of each of LMU's 5 weather slots (RaceControl's list); the old single forecast is still shown.
+export const RACE_SKIES = {clear:'Dégagé', lightClouds:'Quelques nuages', partlyCloudy:'Partiellement nuageux', mostlyCloudy:'Très nuageux', overcast:'Couvert', cloudyDrizzle:'Nuageux, bruine', cloudyLightRain:'Nuageux, pluie légère', overcastLightRain:'Couvert, pluie légère', overcastRain:'Couvert, pluie', overcastHeavyRain:'Couvert, forte pluie', overcastStorm:'Couvert, orage'};
+export const WEATHER_SLOTS = 5;
 export const RACE_WEATHERS = {dry:'Sec', mixed:'Variable', rain:'Pluie'};
 export const TDZ_EVENT_TYPES = ['OPEN', 'SAFE', 'Bouboule', 'TONDEUZ TRAINING'];
 export const TDZ_EVENTS_LABEL = 'EVENT TDZ';
