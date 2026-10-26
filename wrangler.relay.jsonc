@@ -2,7 +2,7 @@
 // Déployer : npx wrangler deploy --config wrangler.relay.jsonc
 // Secret partagé avec le site (le même dans les deux) : npx wrangler secret put RELAY_SECRET --config wrangler.relay.jsonc
 {
-  "name": "endurance-manager-relais",
+  "name": "app-endurance-manager-relais",
   "main": "relay/worker.mjs",
   "compatibility_date": "2026-09-07",
   "minify": true,
