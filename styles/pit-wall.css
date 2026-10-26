@@ -199,6 +199,8 @@
 .pw-body .pw-tank-card .pw-box { background: var(--pw-card); }
 .pw-body .pw-tank-card .pw-box > b { font-size: 18px; }
 .pw-body .pw-tanks { align-items: start; }
+.pw-body .pw-tanks.single { grid-template-columns: 1fr; }
+.pw-body .pw-tanks.single .pw-tank-card .pw-row2 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .pw-body .pw-wheels { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .pw-body .pw-wheel { display: grid; gap: 12px; padding: 14px; border-radius: 6px; border: 1px solid rgba(0,230,118,.3); background: var(--pw-inset); }
 .pw-body .pw-wheel .pw-wheel-head { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
