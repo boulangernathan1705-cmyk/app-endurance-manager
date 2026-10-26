@@ -63,6 +63,10 @@ namespace EnduranceManager.SimHub
         public LmuApi Api => api;
         public LiveShare Live => live;
         public Practice Practice { get; } = new Practice();
+        // The race figures a dashboard reads (Course.cs), and the game's pit menu they come with.
+        public Course Course { get; } = new Course();
+        public PitMenu Menu { get; } = new PitMenu();
+        string home;
         // What the game is doing, for the settings screen: closed, in the menus, or on track.
         public volatile string GameState = "closed";
         // The last session recorded, for the settings screen.
@@ -72,7 +76,7 @@ namespace EnduranceManager.SimHub
         public void Init(PluginManager pluginManager)
         {
             Settings = this.ReadCommonSettings("GeneralSettings", () => new Settings());
-            string home = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "EnduranceManager", "Combos");
+            home = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "EnduranceManager", "Combos");
             Directory.CreateDirectory(home);
             uploader = new Uploader(home);
             updater = new Updater(home);
@@ -110,6 +114,8 @@ namespace EnduranceManager.SimHub
                 this.AttachDelegate(at + "Nombre", () => block(Practice.View).Number);
                 this.AttachDelegate(at + "ViseNombre", () => block(Practice.View).TargetNumber);
             }
+            // The race figures under NeoRed's names (EnduranceManagerPlugin.Energy.VE.Current_%…), for any dashboard.
+            foreach (var (name, get) in Course.Properties) this.AttachDelegate(name, () => get(Course.View));
             running = true;
             // Below the game and SimHub: when the PC is busy, these threads wait, never the game.
             reader = new Thread(ReadGame) { IsBackground = true, Name = "EnduranceManager.Read", Priority = ThreadPriority.BelowNormal };
@@ -221,7 +227,14 @@ namespace EnduranceManager.SimHub
                             recorder.Feed(sample, driving);
                             GameState = driving ? "track" : "menu";
                             // Once a second, the car and the field for the team's mur des stands.
+                            if (driving && Settings.Share) live.Frame(sample);
                             if (driving && Settings.Share && tick % 10 == 0) live.Offer(buffer, sample, recorder, api);
+                            // Once a second, the race figures for the dashboards; the pit menu every 2 s, read aside.
+                            if (driving && tick % 10 == 0) try { Course.Update(buffer, sample, recorder.Current, api.Service, Menu); } catch { }
+                            if (driving && tick % 20 == 5 && !Menu.Busy) ThreadPool.QueueUserWorkItem(_ => Menu.Read());
+                            // The game's answers not used yet, kept once per SimHub run on track and stopped in the pits.
+                            if (driving && tick % 600 == 300) ThreadPool.QueueUserWorkItem(_ => ApiSamples.Take(home, "piste"));
+                            if (driving && sample.InPits && sample.Speed < 1 && tick % 50 == 25) ThreadPool.QueueUserWorkItem(_ => ApiSamples.Take(home, "stands"));
                             // Once a second, the overlays' figures, in every session.
                             if (tick % 10 == 0)
                             {

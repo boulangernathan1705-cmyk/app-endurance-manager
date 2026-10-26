@@ -34,8 +34,18 @@ function renderError(error) {
 // ---------- Live connection ----------
 
 let socket = null, retry = 2000;
-function connect() {
-  const url = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/api/combos/live`;
+// The relay's address with a fresh pass when the site has one (a second Cloudflare account, relay/worker.mjs), else the
+// site itself.
+async function liveUrl() {
+  try {
+    const response = await fetch('/api/combos/live/pass', {credentials:'same-origin', cache:'no-store'});
+    if (response.ok) { const {url} = await response.json(); if (url) return url; }
+  } catch {}
+  return `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/api/combos/live`;
+}
+
+async function connect() {
+  const url = await liveUrl();
   socket = new WebSocket(url);
   socket.addEventListener('open', () => { view.connected = true; retry = 2000; viewSent = null; tellView(); render(); });
   socket.addEventListener('message', event => {

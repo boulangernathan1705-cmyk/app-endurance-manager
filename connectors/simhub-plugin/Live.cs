@@ -52,6 +52,12 @@ namespace EnduranceManager.SimHub
         public int Control;
         public double IntoLap;
         public bool Garage;
+        // The settings in the car (levels as the game counts them, with their number of steps), the rear brake share
+        // (0 to 1), the hybrid battery (0 to 1) and regeneration (kW), the track limits steps, the gaps to the cars around
+        // (seconds) and the delta to the best lap: LMU's own telemetry, after rF2's (pyLMUSharedMemory, lmu_data.py).
+        public int TC, TCMax, TCSlip, TCSlipMax, TCCut, TCCutMax, ABS, ABSMax, MotorMap, MotorMapMax, Migration, MigrationMax;
+        public int AntiSwayFront, AntiSwayFrontMax, AntiSwayRear, AntiSwayRearMax, TrackLimitsSteps;
+        public double RearBrakeBias, Battery, Regen, GapAhead, GapBehind, DeltaBest;
     }
 
     public static class LmuMemory
@@ -113,6 +119,11 @@ namespace EnduranceManager.SimHub
                 Water = F64(b, t + 364), Oil = F64(b, t + 372), LapDist = F64(b, v + 104),
                 Id = I32(b, v), Vehicle = Text(b, v + 36, 64), Control = (sbyte)b[v + 197], IntoLap = F64(b, v + 464), Garage = b[v + 507] != 0
             };
+            s.RearBrakeBias = F64(b, t + 664); s.DeltaBest = F64(b, t + 696); s.Battery = F64(b, t + 704);
+            s.TC = b[t + 750]; s.TCMax = b[t + 751]; s.TCSlip = b[t + 752]; s.TCSlipMax = b[t + 753]; s.TCCut = b[t + 754]; s.TCCutMax = b[t + 755];
+            s.ABS = b[t + 756]; s.ABSMax = b[t + 757]; s.MotorMap = b[t + 758]; s.MotorMapMax = b[t + 759]; s.Migration = b[t + 760]; s.MigrationMax = b[t + 761];
+            s.AntiSwayFront = b[t + 762]; s.AntiSwayFrontMax = b[t + 763]; s.AntiSwayRear = b[t + 764]; s.AntiSwayRearMax = b[t + 765];
+            s.TrackLimitsSteps = b[t + 767]; s.Regen = F32(b, t + 768); s.GapAhead = F32(b, t + 780); s.GapBehind = F32(b, t + 784);
             string model = Text(b, t + 796, 30);
             if (model != "") s.Car = model;
             if (s.Car != radiusCar) { radiusCar = s.Car; radius = new double[4]; }

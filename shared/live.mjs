@@ -11,9 +11,10 @@ export const DELTA_VERSION = 2;
 // One row per car of the field (connectors/simhub-plugin/LiveShare.cs writes them in this order).
 // dist: metres into the lap; pit: 0 on track, 1 in the pit lane, 2 in the garage; ls1/ls2, bs1/bs2, cs1/cs2: the game's
 // sector times, the second one counted from the line (S1 + S2); behind/next: seconds behind the leader / the car ahead,
-// lapsBehind/lapsNext: laps behind them; finish: 0 racing, 1 finished, 2 out, 3 disqualified; x, z: position seen from above.
+// lapsBehind/lapsNext: laps behind them; finish: 0 racing, 1 finished, 2 out, 3 disqualified; x, z: position seen from above;
+// tank: percent of fuel (or virtual energy) the game says each car has left (plugin 2.0).
 export const FIELD = ['id', 'place', 'cls', 'driver', 'vehicle', 'num', 'laps', 'dist', 'pit', 'stops', 'pen', 'last', 'best',
-  'ls1', 'ls2', 'bs1', 'bs2', 'cs1', 'cs2', 'behind', 'lapsBehind', 'next', 'lapsNext', 'finish', 'x', 'z'];
+  'ls1', 'ls2', 'bs1', 'bs2', 'cs1', 'cs2', 'behind', 'lapsBehind', 'next', 'lapsNext', 'finish', 'x', 'z', 'tank'];
 const TEXT = new Set(['cls', 'driver', 'vehicle', 'num']);
 export const MAX_CARS = 104;
 // LMU's session numbers (rF2): 0 test day, 1–4 practice, 5–8 qualifying, 9 warm-up, 10–13 race.
@@ -58,6 +59,7 @@ function cleanStop(input) {
     drive:num(input.drive, -30, 300), driver:text(input.driver, 40)};
 }
 
+const CONTROL = ['tc', 'cut', 'slip', 'abs', 'map', 'mig', 'arbF', 'arbR', 'bias'];
 const SERVICE = ['connect', 'energyRate', 'fuelRate', 'tyres4', 'tyresAlong', 'driver', 'driverAlong'];
 
 // Throws on a message that is not a snapshot; anything odd inside is dropped, never trusted.
@@ -78,7 +80,9 @@ export function cleanSnapshot(input) {
   const profile = Array.isArray(me.profile) && me.profile.length === 101 && me.profile.every((value, index) => finite(value) && value >= 0 && (index === 0 || value >= me.profile[index - 1]))
     && me.profile[100] > 20 ? me.profile.map(value => round(value, 2)) : null;
   const map = Array.isArray(input.map) ? input.map.slice(0, MAP_POINTS).filter(point => Array.isArray(point) && finite(point[0]) && finite(point[1])).map(([x, z]) => [round(x, 1), round(z, 1)]) : null;
-  const control = me.control && typeof me.control === 'object' ? {tc:num(me.control.tc, 0, 50), abs:num(me.control.abs, 0, 50), bias:num(me.control.bias, 0, 100), map:num(me.control.map, 0, 50)} : null;
+  // The settings in the car (plugin 2.0 adds TC cut and slip, migration, anti-roll bars): levels, bias as % front.
+  const control = me.control && typeof me.control === 'object'
+    ? Object.fromEntries(CONTROL.map(key => [key, num(me.control[key], 0, key === 'bias' ? 100 : 50)])) : null;
   return {
     v:LIVE_VERSION, track, session, et, end:num(input.end, 0, 1e7), maxLaps:num(input.maxLaps, 0, 100000), length:num(input.length, 100, 100000),
     phase:num(input.phase, 0, 20), yellow:num(input.yellow, -1, 20), air:num(input.air, -50, 80), trackTemp:num(input.trackTemp, -50, 100),
@@ -87,10 +91,22 @@ export function cleanSnapshot(input) {
     me:{id, driver:text(me.driver, 40), car:text(me.car, 120), vehicle:text(me.vehicle, 80), cls:text(me.cls, 40), compound:text(me.compound, 40),
       cur:num(me.cur, -10, 3600), pit:num(me.pit, 0, 2) ?? 0, ve:num(me.ve, -1, 100), fuel:num(me.fuel, 0, 500), capacity:num(me.capacity, 0, 500),
       wheels:[0, 1, 2, 3].map(index => cleanWheel(me.wheels?.[index])), damage:num(me.damage, 0, 100),
-      limits:num(me.limits, 0, 1000), control:control && Object.values(control).some(value => value !== null) ? control : null,
+      limits:num(me.limits, 0, 1000), battery:num(me.battery, 0, 100), regen:num(me.regen, -1000, 1000), delta:num(me.delta, -600, 600),
+      water:num(me.water, -50, 250), oil:num(me.oil, -50, 250), control:control && Object.values(control).some(value => value !== null) ? control : null,
       stops:(Array.isArray(me.stops) ? me.stops : []).slice(-STOPS_KEPT).map(cleanStop).filter(Boolean), service, profile},
     field, map:map && map.length >= 50 ? map : null
   };
+}
+
+// Plugin 2.0, while a page watches: our car ten times a second, the frames of the last second grouped in one message
+// (`tm`), so the room is billed one message a second. Each frame: [metres into the lap, km/h, throttle %, brake %,
+// steering % (left negative), gear]. Passed on to the pages as they come, never kept.
+export const FRAMES_MAX = 30;
+export function cleanFrames(input) {
+  if (!Array.isArray(input)) return [];
+  return input.slice(-FRAMES_MAX).filter(Array.isArray).map(([d, v, throttle, brake, steer, gear]) =>
+    [round(num(d, -1000, 100000), 0), round(num(v, 0, 500), 1), round(num(throttle, 0, 100), 0), round(num(brake, 0, 100), 0),
+      round(num(steer, -100, 100), 0), num(gear, -1, 12)]).filter(frame => frame[0] !== null && frame[1] !== null);
 }
 
 // What plugin 1.6 sends after its first snapshot: only the keys that changed (`me` by key too) and, per car, only the
@@ -327,7 +343,9 @@ export function publicFeed(feed, gaps = null) {
         const stop = next ? ours.stops.findLast(entry => entry.lap > item.from && entry.lap <= next.from + 1) : null;
         return {...item, avg:avgOf(cleanLaps(mine), lap => lap.t), ve:avgOf(mine, lap => lap.ve), fuel:avgOf(mine, lap => lap.fuel), stop:stop || null};
       }),
-      stops:ours.stops, drivers:ours.drivers
+      stops:ours.stops, drivers:ours.drivers,
+      // Every lap of ours this session (the mur's lap history and graphs): sent once, then only the new ones.
+      laps:ours.laps.map(({n, t, s, pit, driver, ve, fuel}) => ({n, t, s, pit, driver, ve, fuel}))
     }
   };
 }

@@ -3,6 +3,9 @@
 // coéquipiers le suivent sur la page « Mur des stands ». Le format est celui de shared/live.mjs (FIELD pour les lignes
 // du classement, mergeSnapshot pour les changements). Activé par défaut, un interrupteur de l'écran du plugin le coupe.
 //
+// Quand une page regarde, la voiture est aussi lue dix fois par seconde (vitesse, pédales, volant, rapport) et ces
+// instants partent groupés avec l'envoi de chaque seconde : un seul message par seconde pour le relais.
+//
 // Pour envoyer le moins possible : tout à l'ouverture de la connexion, puis seulement ce qui a changé. Le site dit si
 // quelqu'un regarde (message « mode ») : personne, seulement ce que l'historique demande (tours, arrêts, pilotes…), et
 // les positions des voitures seulement quand une page montre la carte.
@@ -37,6 +40,9 @@ namespace EnduranceManager.SimHub
         readonly AutoResetEvent wake = new AutoResetEvent(false);
         readonly object gate = new object();
         Snapshot pending;
+        // Our car ten times a second while someone watches, sent grouped with the next snapshot (the room counts one
+        // message a second). Each: metres into the lap, km/h, throttle %, brake %, steering %, gear.
+        List<object[]> frames = new List<object[]>();
         DateTime offeredAt, retryAt;
         int backoff = 5;
         ClientWebSocket socket;
@@ -98,6 +104,14 @@ namespace EnduranceManager.SimHub
             public List<object[]> Field;
         }
 
+        // Called on every reading of the game (ten a second): kept only while a page watches, at most 3 s of them.
+        public void Frame(Sample s)
+        {
+            if (!watching) return;
+            var frame = new object[] { R(s.LapDist, 0), R(s.Speed, 1), R(s.Throttle * 100, 0), R(s.BrakePedal * 100, 0), R(s.Steer * 100, 0), s.Gear };
+            lock (gate) { frames.Add(frame); if (frames.Count > 30) frames.RemoveAt(0); }
+        }
+
         // One snapshot from the copy of the game's memory, handed to the sending thread; the previous one, if not
         // sent yet, is replaced (only the latest state matters).
         public void Offer(byte[] b, Sample s, Recorder recorder, LmuApi api)
@@ -133,7 +147,9 @@ namespace EnduranceManager.SimHub
                     b[at + 507] != 0 ? 2 : b[at + 198] != 0 ? 1 : 0, I16(b, at + 192), I16(b, at + 194), T(F64(b, at + 168)), T(F64(b, at + 144)),
                     T(F64(b, at + 152)), T(F64(b, at + 160)), T(F64(b, at + 128)), T(F64(b, at + 136)), T(F64(b, at + 176)), T(F64(b, at + 184)),
                     // The game's gaps are not sent: the site measures them on track (0 for a lapped car in LMU).
-                    null, null, null, null, (sbyte)b[at + 103], positions ? R(F64(b, at + 264), 1) : null, positions ? R(F64(b, at + 280), 1) : null
+                    null, null, null, null, (sbyte)b[at + 103], positions ? R(F64(b, at + 264), 1) : null, positions ? R(F64(b, at + 280), 1) : null,
+                    // What the game says the car has left in its tank (or of its virtual energy), 0 to 255.
+                    R(b[at + 578] / 2.55, 1)
                 });
             }
             // A car without virtual energy (LMP2) shows its fuel instead: energy counts once the game gave some.
@@ -174,12 +190,25 @@ namespace EnduranceManager.SimHub
                     ["connect"] = service.Connect, ["energyRate"] = service.EnergyRate, ["fuelRate"] = service.FuelRate, ["tyres4"] = service.Tyres4,
                     ["tyresAlong"] = service.TyresAlong, ["driver"] = service.Driver, ["driverAlong"] = service.DriverAlong
                 },
-                ["profile"] = profile
+                ["profile"] = profile,
+                // The settings in the car (levels, 0 steps: the car has none), the hybrid and the track limits.
+                ["control"] = new Dictionary<string, object>
+                {
+                    ["tc"] = Level(s.TC, s.TCMax), ["cut"] = Level(s.TCCut, s.TCCutMax), ["slip"] = Level(s.TCSlip, s.TCSlipMax), ["abs"] = Level(s.ABS, s.ABSMax),
+                    ["map"] = Level(s.MotorMap, s.MotorMapMax), ["mig"] = Level(s.Migration, s.MigrationMax),
+                    ["arbF"] = Level(s.AntiSwayFront, s.AntiSwayFrontMax), ["arbR"] = Level(s.AntiSwayRear, s.AntiSwayRearMax),
+                    ["bias"] = s.RearBrakeBias > 0 && s.RearBrakeBias < 1 ? R((1 - s.RearBrakeBias) * 100, 1) : null
+                },
+                ["limits"] = b[ScoringInfo + 352] > 0 ? R((double)s.TrackLimitsSteps / b[ScoringInfo + 352], 2) : null,
+                ["battery"] = s.Battery > 0 ? R(s.Battery * 100, 1) : null, ["regen"] = R(s.Regen, 1), ["delta"] = R(s.DeltaBest, 2),
+                ["water"] = R(s.Water, 1), ["oil"] = R(s.Oil, 1)
             };
             // The outline once per connection (the room keeps it).
             if (needMap && mapPoints != null && mapTrack == s.Track) { top["map"] = mapPoints; needMap = false; }
             return new Snapshot { Top = top, Me = me, Field = field };
         }
+
+        static int? Level(int level, int max) => max > 0 ? level : (int?)null;
 
         // ---------- Only what changed ----------
 
@@ -189,9 +218,10 @@ namespace EnduranceManager.SimHub
         static readonly HashSet<string> SteadyMe = new HashSet<string> { "id", "driver", "car", "vehicle", "cls", "compound", "pit", "stops", "service", "profile" };
 
         // The message for the site: everything (version 2, full), or only what changed since the last one (null when
-        // nothing worth sending changed: then a sign of life every 15 s).
-        string Encode(Snapshot snap)
+        // nothing worth sending changed: then a sign of life every 15 s). Our car's last second goes with it while watched.
+        string Encode(Snapshot snap, List<object[]> moments)
         {
+            bool withFrames = moments != null && moments.Count > 0;
             var now = DateTime.Now;
             if (needFull || sentRows == null || now - sentFullAt > TimeSpan.FromMinutes(5))
             {
@@ -201,6 +231,7 @@ namespace EnduranceManager.SimHub
                 sentMe = snap.Me.ToDictionary(kv => kv.Key, kv => JsonConvert.SerializeObject(kv.Value));
                 sentRows = snap.Field.ToDictionary(row => (int)row[0], row => (object[])row.Clone());
                 var all = new Dictionary<string, object>(snap.Top) { ["v"] = 2, ["full"] = true, ["me"] = snap.Me, ["field"] = snap.Field };
+                if (withFrames) all["tm"] = moments;
                 return JsonConvert.SerializeObject(all);
             }
             bool watched = watching, changed = false;
@@ -255,6 +286,7 @@ namespace EnduranceManager.SimHub
             }
             if (me.Count > 0) { message["me"] = me; changed = true; }
             // Watched: every second (the game's clock moves the page's). Else only when something changed.
+            if (withFrames) message["tm"] = moments;
             if (!watched && !changed && now - lastSentAt < TimeSpan.FromSeconds(15)) return null;
             lastSentAt = now;
             return JsonConvert.SerializeObject(message);
@@ -381,7 +413,8 @@ namespace EnduranceManager.SimHub
             {
                 wake.WaitOne(2000);
                 Snapshot snap;
-                lock (gate) { snap = pending; pending = null; }
+                List<object[]> last;
+                lock (gate) { snap = pending; pending = null; last = frames; frames = new List<object[]>(); }
                 if (snap == null)
                 {
                     // Nothing to send for a minute (out of the car, game closed): the connection is let go.
@@ -391,7 +424,7 @@ namespace EnduranceManager.SimHub
                 try
                 {
                     if (!Open()) continue;
-                    string message = Encode(snap);
+                    string message = Encode(snap, watching ? last : null);
                     if (message == null) continue;
                     var bytes = Encoding.UTF8.GetBytes(message);
                     if (!socket.SendAsync(new ArraySegment<byte>(bytes), WebSocketMessageType.Text, true, CancellationToken.None).Wait(5000)) throw new TimeoutException();
@@ -414,13 +447,31 @@ namespace EnduranceManager.SimHub
             var opened = new ClientWebSocket();
             opened.Options.SetRequestHeader("Authorization", "Bearer " + link.Token);
             opened.Options.KeepAliveInterval = TimeSpan.FromSeconds(20);
-            var uri = new Uri(Regex.Replace(link.Origin, "^https://", "wss://") + "/api/combos/plugin/live");
+            var uri = new Uri(RelayUrl(link) ?? Regex.Replace(link.Origin, "^https://", "wss://") + "/api/combos/plugin/live");
             if (!opened.ConnectAsync(uri, CancellationToken.None).Wait(10000) || opened.State != WebSocketState.Open) { opened.Dispose(); throw new TimeoutException(); }
             socket = opened;
             // A new connection: everything again, as if watched with the map until the site says otherwise.
             needMap = needFull = watching = mapShown = true;
             ThreadPool.QueueUserWorkItem(_ => Listen(opened));
             return true;
+        }
+
+        // The relay's address with a pass from the site, when the site has a relay (a second Cloudflare account, so the
+        // live never weighs on the site); null otherwise, and the plugin connects to the site itself.
+        string RelayUrl(LinkCode link)
+        {
+            try
+            {
+                using (var request = new HttpRequestMessage(HttpMethod.Get, link.Origin + "/api/combos/plugin/live/pass"))
+                {
+                    request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", link.Token);
+                    var response = client.SendAsync(request).GetAwaiter().GetResult();
+                    if (!response.IsSuccessStatusCode) return null;
+                    string url = (string)JObject.Parse(response.Content.ReadAsStringAsync().GetAwaiter().GetResult())["url"];
+                    return url != null && url.StartsWith("wss://") ? url : null;
+                }
+            }
+            catch { return null; }
         }
 
         // The site's messages, until it closes the connection (then it is let go, and opened again at the next snapshot).

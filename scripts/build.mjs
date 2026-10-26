@@ -4,6 +4,7 @@ import {createHash} from 'node:crypto';
 import {posix} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {changelogHtml} from './changelog.mjs';
+import {relaySocketOrigin} from '../shared/relay-pass.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const out = new URL('../public/', import.meta.url);
@@ -94,6 +95,7 @@ const sourceHelp = await readFile(root + 'help.html', 'utf8');
 const sourceRequest = await readFile(root + 'demande-communaute.html', 'utf8');
 const sourceCombos = await readFile(root + 'fiches-combo.html', 'utf8');
 const sourceLive = await readFile(root + 'mur-des-stands.html', 'utf8');
+const sourceWall = await readFile(root + 'mur.html', 'utf8');
 const paths = [
   ...stylesheetPaths(sourceIndex,'index.html'),
   ...stylesheetPaths(sourceGame,'game.html'),
@@ -103,6 +105,7 @@ const paths = [
   ...stylesheetPaths(sourceRequest,'demande-communaute.html'),
   ...stylesheetPaths(sourceCombos,'fiches-combo.html'),
   ...stylesheetPaths(sourceLive,'mur-des-stands.html'),
+  ...stylesheetPaths(sourceWall,'mur.html'),
 ];
 // styles/ux-refresh.css is the final layer that replaces older rules: keep it last in the
 // shared bundle whichever page lists it first.
@@ -122,6 +125,7 @@ await writeFile(new URL('help.html', out), productionHtml(sourceHelp));
 await writeFile(new URL('demande-communaute.html', out), productionHtml(sourceRequest));
 await writeFile(new URL('fiches-combo.html', out), productionHtml(sourceCombos));
 await writeFile(new URL('mur-des-stands.html', out), productionHtml(sourceLive));
+await writeFile(new URL('mur.html', out), productionHtml(sourceWall));
 const gameHtml = productionHtml(sourceGame);
 await writeFile(new URL('lmu/index.html', out), gameHtml);
 await writeFile(new URL('iracing/index.html', out), gameHtml);
@@ -189,7 +193,7 @@ async function addModulePreloads(file) {
   const links = modules.map(url => `<link rel="modulepreload" href="${url}">`).join('\n');
   await writeFile(target, html.replace('</head>', `${links}\n</head>`));
 }
-for (const file of ['index.html', 'members.html', 'diagnostics.html', 'help.html', 'demande-communaute.html', 'fiches-combo.html', 'mur-des-stands.html',
+for (const file of ['index.html', 'members.html', 'diagnostics.html', 'help.html', 'demande-communaute.html', 'fiches-combo.html', 'mur-des-stands.html', 'mur.html',
   'lmu/index.html', 'iracing/index.html', 'privacy.html', 'legal.html', 'about.html', 'circuit-credits.html', 'changelog.html']) await addModulePreloads(file);
 
 if (!workers) {
@@ -199,7 +203,7 @@ if (!workers) {
 
 // LOCAL_HTTP=1: the browser tests run the site over http on the test machine (Safari would upgrade to https).
 await writeFile(new URL('_headers', out), `/*
-  Content-Security-Policy: default-src 'self'; script-src 'self'; script-src-attr 'none'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://commons.wikimedia.org https://upload.wikimedia.org https://cdn.discordapp.com https://static-cdn.jtvnw.net https://static.twitchcdn.net; connect-src 'self'; font-src 'self' data:; media-src 'none'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; frame-src 'none'; form-action 'self'; worker-src 'self'; manifest-src 'self'${process.env.LOCAL_HTTP === '1' ? '' : '; upgrade-insecure-requests'}
+  Content-Security-Policy: default-src 'self'; script-src 'self'; script-src-attr 'none'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://commons.wikimedia.org https://upload.wikimedia.org https://cdn.discordapp.com https://static-cdn.jtvnw.net https://static.twitchcdn.net; connect-src 'self'${relaySocketOrigin() ? ' ' + relaySocketOrigin() : ''}; font-src 'self' data:; media-src 'none'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; frame-src 'none'; form-action 'self'; worker-src 'self'; manifest-src 'self'${process.env.LOCAL_HTTP === '1' ? '' : '; upgrade-insecure-requests'}
   Strict-Transport-Security: max-age=63072000; includeSubDomains
   X-Content-Type-Options: nosniff
   Referrer-Policy: no-referrer
@@ -222,6 +226,12 @@ await writeFile(new URL('_headers', out), `/*
 /mur-des-stands.html
   X-Robots-Tag: noindex, nofollow
 
+/mur.html
+  X-Robots-Tag: noindex, nofollow
+
+/mur
+  X-Robots-Tag: noindex, nofollow
+
 /downloads/*
   X-Robots-Tag: noindex, nofollow
 
@@ -237,6 +247,8 @@ Disallow: /members.html
 Disallow: /diagnostics.html
 Disallow: /fiches-combo.html
 Disallow: /mur-des-stands.html
+Disallow: /mur.html
+Disallow: /mur
 Disallow: /downloads/
 Sitemap: https://endurance-manager.app/sitemap.xml
 `);

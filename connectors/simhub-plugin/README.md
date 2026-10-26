@@ -43,6 +43,18 @@ Envoie les séances Le Mans Ultimate d'un pilote aux fiches combo de son équipe
   propriétés publiées ne changent pas : les données de l'équipe continuent d'alimenter le rythme et l'usure visés.
   Un overlay modifié dans Dash Studio n'est plus réécrit.
 
+- publie, depuis la 2.0.0, les chiffres de course qu'un dash LMU prend d'habitude au plugin NeoRed (`Course.cs`), sous
+  les mêmes noms que lui avec notre préfixe (`EnduranceManagerPlugin.Energy.VE.Current_%`…) : énergie et carburant
+  (dernier tour, moyenne des 5 derniers, tours restants, besoin jusqu'à l'arrivée, à remettre, avec un tour de marge),
+  tours et temps restants, moyenne des 10 derniers tours, position générale et dans la classe, écarts dans la classe,
+  arrêts, pénalités, points de track limits, réglages en voiture (TC, ABS, répartition, migration, map moteur, barres),
+  batterie, écarts avec les voitures autour, menu des stands tel que réglé (lu toutes les 2 s, `garage/PitMenu/receivePitMenu`), durée de
+  l'arrêt qu'il demande (temps de service du jeu : les travaux faits pendant le ravitaillement se chevauchent, les
+  autres s'ajoutent), pneus, freins, état de la voiture et météo. `Convertir un dash NeoRed.ps1` passe un dash de
+  NeoRed à ces propriétés et liste celles qu'il lit encore sur NeoRed. Les réponses de l'API du jeu pas encore lues
+  (estimation d'arrêt, état de la voiture, prévision météo…) sont gardées une fois par lancement de SimHub dans
+  `%LOCALAPPDATA%\EnduranceManager\Combos\api`, pour en connaître le format exact.
+
 Il ne fait que lire : il ne modifie rien dans le jeu ni dans SimHub. Il n'envoie plus les fichiers de résultats XML.
 
 ## Ressources et stabilité
@@ -69,6 +81,10 @@ d'un tour ne sont envoyés que si le jeu a donné les trois.
 devant, temps dans le tour, garage, position x/z de chaque voiture) sont aux offsets rF2 ; le contrôle de la voiture
 (`mControl`) doit valoir 0 pour le pilote au volant (un coéquipier qui regarde ne partage pas) ; le tracé du jeu doit
 se superposer aux voitures sur la carte.
+
+À vérifier pour les chiffres de course : les noms des lignes du menu des stands (« VIRTUAL ENERGY », « FL TIRE »,
+« DRIVER », « REPLACE BRAKES », « DAMAGE »…) et le premier choix d'une roue, qui doit être « pas de changement » ; la
+durée d'arrêt calculée face à celle du jeu.
 
 À vérifier enfin : la lumière du jour. Un tour compte de nuit sous `NIGHT_BELOW` (0,5, dans `shared/combos.mjs`).
 

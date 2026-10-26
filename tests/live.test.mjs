@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {addToPath, cleanSnapshot, diff, ingest, mergeSnapshot, outlineLines, patch, publicFeed, raceGaps, readFeed, fairShare, rejoin, stationary, lapsLeft, timeAt, FIELD, prune, STALE_DROP} from '../shared/live.mjs';
+import {addToPath, cleanFrames, cleanSnapshot, diff, ingest, mergeSnapshot, outlineLines, patch, publicFeed, raceGaps, readFeed, fairShare, rejoin, stationary, lapsLeft, timeAt, FIELD, prune, STALE_DROP} from '../shared/live.mjs';
 import {LiveRoom} from '../server/live.mjs';
 
 const TRACK = 'Circuit de la Sarthe';
@@ -230,6 +230,31 @@ test('plugin 1.6 sends only what changed; the room asks for everything when it l
   assert.equal(mergeSnapshot(null, {v:1}), null);
 });
 
+test('plugin 2.0: the last second of our car goes to the pages watching with the snapshot, never into the history', async () => {
+  const {room, socket} = fakeRoom();
+  const until = Date.now() + 60_000;
+  const driver = socket('driver', {role:'driver', user:'u1', name:'Nathan', until, conn:'c1'});
+  const viewer = socket('viewer', {role:'viewer', user:'u2', until, watch:true, map:false});
+  const frames = Array.from({length:10}, (_, k) => [6000 + k * 7.4, 266.4, 100, 0, -3, 6]);
+  const settings = {control:{tc:4, cut:3, slip:5, abs:7, map:2, mig:1, arbF:3, arbR:4, bias:54.2, odd:9}, limits:1.5, battery:62, regen:180, delta:-0.21, water:88, oil:102};
+  await room.webSocketMessage(driver, JSON.stringify({...snap({me:settings}), v:2, full:true, tm:frames}));
+  const shown = JSON.parse(viewer.sent.at(-1)).feed;
+  assert.deepEqual(shown.snap.me.control, {tc:4, cut:3, slip:5, abs:7, map:2, mig:1, arbF:3, arbR:4, bias:54.2}, 'the settings in the car, nothing else');
+  assert.deepEqual([shown.snap.me.battery, shown.snap.me.delta, shown.snap.me.water], [62, -0.21, 88]);
+  assert.ok(Array.isArray(shown.ours.laps), 'our laps for the lap history');
+  assert.deepEqual(JSON.parse(viewer.sent.at(-1)).tm, cleanFrames(frames));
+  await room.webSocketMessage(driver, JSON.stringify({v:2, et:1001, me:{ve:58}, tm:frames.slice(0, 3)}));
+  assert.equal(JSON.parse(viewer.sent.at(-1)).tm.length, 3, 'with the changes too');
+  const feed = Object.values(room.feeds)[0];
+  assert.equal(feed.snap.tm, undefined);
+  assert.equal(room.bases.get('c1').tm, undefined, 'the next changes do not carry old frames');
+  await room.webSocketMessage(driver, JSON.stringify({v:2, et:1002, me:{ve:57}}));
+  assert.equal(JSON.parse(viewer.sent.at(-1)).tm, undefined);
+  assert.deepEqual(cleanFrames([[10.4, 120.06, 140, -5, -150, 3], ['x', 1], [null, 2], 'odd']), [[10, 120.1, null, null, null, 3]]);
+  assert.equal(cleanFrames(Array.from({length:50}, () => [1, 1, 1, 1, 1, 1])).length, 30);
+  assert.equal(cleanFrames(null).length, 0);
+});
+
 test('only what changed, and the same value back once applied', () => {
   const before = {a:1, list:[1, 2, {x:1}], gone:true, keep:{deep:[1, 2]}, swap:[1]};
   const after = {a:2, list:[1, 3, {x:1, y:null}, 4], keep:{deep:[1, 2]}, swap:{n:1}, fresh:'é'};
@@ -310,13 +335,17 @@ test('two of us in the same car, each in a session of his own, keep a feed each;
 test('the plugin and the pages reach the room only through their checks', async () => {
   const live = readFileSync(new URL('../server/live.mjs', import.meta.url), 'utf8');
   const combos = readFileSync(new URL('../server/combos.mjs', import.meta.url), 'utf8');
-  assert.match(combos, /path === '\/api\/combos\/plugin\/live'\) \{\n\s+const \{community, user\} = await pluginAccess\(request, env\);/);
+  assert.match(combos, /path === '\/api\/combos\/plugin\/live' \|\| path === '\/api\/combos\/plugin\/live\/pass'\) \{\n\s+const \{community, user\} = await pluginAccess\(request, env\);/);
+  // The relay (second Cloudflare account) opens a room only with a pass the site signed after those same checks.
+  const relay = readFileSync(new URL('../relay/worker.mjs', import.meta.url), 'utf8');
+  assert.match(relay, /const pass = await readPass\(env\.RELAY_SECRET, url\.searchParams\.get\('pass'\)\);\n\s+if \(!pass\) return text\(/);
+  assert.match(relay, /openLive\(request, env, pass\.c, \{Role:pass\.r/);
   assert.match(combos, /path === '\/api\/combos\/live'\) \{\n\s+if \(request\.headers\.get\('Origin'\) !== siteOrigin\(request, env\)\) fail\(403/);
   assert.match(live, /env\.LIVE\.idFromName\(communityId\)/);
   const entry = readFileSync(new URL('../server/worker-with-migrations.mjs', import.meta.url), 'utf8');
   assert.match(entry, /export \{LiveRoom\} from '\.\/live\.mjs';/);
   assert.match(entry, /if \(response\.status === 101\) return response;\n\s+return development \? markDevelopmentResponse/);
-  for (const file of ['wrangler.jsonc', 'wrangler.dev.jsonc', 'wrangler.prod.jsonc']) {
+  for (const file of ['wrangler.jsonc', 'wrangler.dev.jsonc', 'wrangler.prod.jsonc', 'wrangler.relay.jsonc']) {
     const config = readFileSync(new URL(`../${file}`, import.meta.url), 'utf8');
     assert.match(config, /"durable_objects": \{ "bindings": \[\{ "name": "LIVE", "class_name": "LiveRoom" \}\] \}/, file);
     assert.match(config, /"new_sqlite_classes": \["LiveRoom"\]/, file);
@@ -325,6 +354,13 @@ test('the plugin and the pages reach the room only through their checks', async 
   assert.match(page, /<main id="live-app"/);
   assert.doesNotMatch(page, /<script>|\son[a-z]+=/i, 'no inline script nor handler (CSP)');
   assert.doesNotMatch(readFileSync(new URL('../front/live-page.mjs', import.meta.url), 'utf8'), /\son[a-z]+="/i);
+  // The new mur (PitData's organisation): full screen, five tabs, the same checks.
+  const wall = readFileSync(new URL('../mur.html', import.meta.url), 'utf8');
+  assert.match(wall, /<main id="pw-app"/);
+  assert.doesNotMatch(wall, /<script>|\son[a-z]+=/i);
+  const wallCode = readFileSync(new URL('../front/pit-wall.mjs', import.meta.url), 'utf8');
+  assert.doesNotMatch(wallCode, /\son[a-z]+="/i);
+  for (const tab of ['board', 'chrono', 'car', 'tele', 'map']) assert.match(wallCode, new RegExp(`\\['${tab}', '`));
 });
 
 test('without the game\'s map, the outline is the path the field drives, drawn as far as it is known', () => {
