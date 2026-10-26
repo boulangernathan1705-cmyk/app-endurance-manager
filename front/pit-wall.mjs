@@ -166,8 +166,10 @@ function energyOf(feed) {
   const room = ve ? 100 - me.ve : known(me.capacity) && known(me.fuel) ? me.capacity - me.fuel : null;
   const left = lapsLeft(feed.snap, ourPace(feed));
   const need = known(left) && known(perLap) ? left * perLap : null;
-  const add = known(need) && known(have) ? Math.max(0, Math.min(need - have, room ?? Infinity)) : null;
-  return {ve, unit:ve ? '%' : 'L', have, perLap, last, room, left, need, add, laps:known(have) && perLap > 0 ? have / perLap : null};
+  // What is missing to reach the flag, and how many full refills that takes (a stop refills one tank at most).
+  const missing = known(need) && known(have) ? Math.max(0, need - have) : null, full = ve ? 100 : me.capacity;
+  const stops = known(missing) && full > 0 ? Math.ceil(missing / full - 1e-9) : null;
+  return {ve, unit:ve ? '%' : 'L', have, perLap, last, room, left, need, missing, stops, laps:known(have) && perLap > 0 ? have / perLap : null};
 }
 
 // ---------- Drawing ----------
@@ -291,7 +293,7 @@ const tile = (label, value, extra = '', cls = '') => `<div class="pw-tile${cls ?
 function chrono(feed) {
   const snap = feed.snap, me = meOf(feed), ours = feed.ours, info = feed.cars[me.id] || {};
   const running = known(snap.me.cur) ? snap.me.cur + (isLive(feed) && !snap.me.pit ? age(feed) : 0) : null;
-  const delta = snap.me.delta, deltaCls = known(delta) ? delta < 0 ? 'good' : delta > 0 ? 'bad' : '' : '';
+  const delta = snap.me.pit ? null : snap.me.delta, deltaCls = known(delta) ? delta < 0 ? 'good' : delta > 0 ? 'bad' : '' : '';
   const lastS = info.lastSectors || [null, null, null], bestS = ours.bestSectors || [null, null, null], avgS = ours.sectors5 || [null, null, null];
   const sum = list => list.every(known) ? list.reduce((a, b) => a + b, 0) : null;
   const sector = (value, index) => `<td class="pw-n${known(value) && value === bestS[index] ? ' best' : ''}">${known(value) ? fr(value, 3) : '—'}</td>`;
@@ -342,7 +344,8 @@ function car(feed) {
     <h2>Ravitaillement</h2>
     <div class="pw-tiles">
       ${tile('Pour finir', known(energy.need) ? `${fr(energy.need, 1)} ${u}` : '—', 'à notre moyenne')}
-      ${tile('À remettre', known(energy.add) ? `${fr(energy.add, 1)} ${u}` : '—', 'pour aller au bout')}
+      ${tile('Il manque', known(energy.missing) ? `${fr(energy.missing, 1)} ${u}` : '—', 'en plus de ce qu’il reste')}
+      ${tile('Arrêts', known(energy.stops) ? energy.stops : '—', energy.stops ? `plein${energy.stops > 1 ? 's' : ''} pour aller au bout` : 'pour aller au bout')}
       ${tile('Plein', known(energy.room) ? `${fr(energy.room, 1)} ${u}` : '—', 'place libre')}
       ${tile('Arrêt énergie', known(stopFor('energy')) ? `${fr(stopFor('energy'), 1)} s` : '—', 'à l’arrêt, plein')}
       ${tile('Arrêt + 4 pneus', known(stopFor('tyres')) ? `${fr(stopFor('tyres'), 1)} s` : '—', 'à l’arrêt, plein')}
