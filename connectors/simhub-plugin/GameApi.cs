@@ -22,6 +22,9 @@ namespace EnduranceManager.SimHub
         public volatile JObject Condition, Info;
         // Once per session: forecast, session settings, car and track, tyres (optimal temperatures, inventory).
         public volatile JObject Weather, Settings, Loading, Tyres;
+        // The setup screen (about 45 KB), once per session with the car standing in the pits or the garage.
+        public volatile JObject Setup;
+        string setupKey;
 
         public bool Busy => busy != 0;
 
@@ -31,8 +34,9 @@ namespace EnduranceManager.SimHub
             catch { return null; }
         }
 
-        // Once a second while driving: what is due, one read after the other. Never throws: it runs on a pool thread.
-        public void Read()
+        // Once a second while driving: what is due, one read after the other. standing: the car stands in the pits, the
+        // setup screen can be read. Never throws: it runs on a pool thread.
+        public void Read(bool standing = false)
         {
             if (System.Threading.Interlocked.Exchange(ref busy, 1) == 1) return;
             try
@@ -67,6 +71,11 @@ namespace EnduranceManager.SimHub
                     Settings = Settings ?? Get("rest/sessions");
                     Loading = Loading ?? Get("navigation/GetLoadingScreen");
                     Tyres = Tyres ?? Get("rest/garage/UIScreen/TireManagement");
+                }
+                if (standing && key != null && key != setupKey)
+                {
+                    var setup = Get("rest/garage/UIScreen/CarSetupOverview");
+                    if (setup != null) { Setup = setup; setupKey = key; }
                 }
             }
             catch { }

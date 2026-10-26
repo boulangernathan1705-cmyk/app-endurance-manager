@@ -67,6 +67,9 @@ namespace EnduranceManager.SimHub
         public Course Course { get; } = new Course();
         public PitMenu Menu { get; } = new PitMenu();
         public GameApi Game { get; } = new GameApi();
+        // The game's live standings (penalties by kind, finish status) and Lovely's track and car files.
+        Standings standings;
+        Lovely lovely;
         string home;
         // What the game is doing, for the settings screen: closed, in the menus, or on track.
         public volatile string GameState = "closed";
@@ -82,6 +85,9 @@ namespace EnduranceManager.SimHub
             uploader = new Uploader(home);
             updater = new Updater(home);
             live = new LiveShare(() => LinkCode.Parse(Settings.Code));
+            lovely = new Lovely(home);
+            standings = new Standings(() => Settings.Enabled && GameState == "track", Path.Combine(home, "api", "ws-LiveStandings.json"));
+            standings.Start();
             this.AttachDelegate("Status", () => Status);
             this.AttachDelegate("LapsRecorded", () => laps);
             this.AttachDelegate("Enabled", () => Settings.Enabled);
@@ -131,6 +137,7 @@ namespace EnduranceManager.SimHub
         {
             running = false;
             live?.Stop();
+            standings?.Stop();
             pluginManager.InputToActionTriggered -= DashButton;
             this.SaveCommonSettings("GeneralSettings", Settings);
             // SimHub closes: the session being driven is written to disk before the process goes.
@@ -231,10 +238,20 @@ namespace EnduranceManager.SimHub
                             if (driving && Settings.Share) live.Frame(sample);
                             if (driving && Settings.Share && tick % 10 == 0) live.Offer(buffer, sample, recorder, api);
                             // Once a second, the race figures for the dashboards; the pit menu every 2 s, read aside.
-                            if (driving && tick % 10 == 0) try { Course.Update(buffer, sample, recorder.Current, api.Service, Menu, Game, api.Refuel); } catch { }
+                            if (driving && tick % 10 == 0) try { Course.Update(buffer, sample, recorder.Current, api.Service, Menu, Game, api.Refuel, standings, lovely); } catch { }
                             if (driving && tick % 20 == 5 && !Menu.Busy) ThreadPool.QueueUserWorkItem(_ => Menu.Read());
                             // The game's state, its estimate of the stop and the car's condition, what is due each second.
-                            if (driving && tick % 10 == 7 && !Game.Busy) ThreadPool.QueueUserWorkItem(_ => Game.Read());
+                            if (driving && tick % 10 == 7 && !Game.Busy)
+                            {
+                                bool standing = sample.InPits && sample.Speed < 1;
+                                ThreadPool.QueueUserWorkItem(_ => Game.Read(standing));
+                            }
+                            // Lovely's track and car files for the ones being driven, looked at every 30 s (downloaded once).
+                            if (driving && tick % 300 == 150 && !lovely.Busy)
+                            {
+                                string trackId = Text("DataCorePlugin.GameData.TrackId"), carId = Text("DataCorePlugin.GameData.CarId"), track = sample.Track;
+                                ThreadPool.QueueUserWorkItem(_ => lovely.Load(trackId, track, carId));
+                            }
                             // The game's answers not used yet, kept once per SimHub run on track and stopped in the pits.
                             if (driving && tick % 600 == 300) ThreadPool.QueueUserWorkItem(_ => ApiSamples.Take(home, "piste"));
                             if (driving && sample.InPits && sample.Speed < 1 && tick % 50 == 25) ThreadPool.QueueUserWorkItem(_ => ApiSamples.Take(home, "stands"));
@@ -271,6 +288,13 @@ namespace EnduranceManager.SimHub
                 // A minute without driving: the session is over, and the memory is let go so the game can close cleanly.
                 recorder.Flush();
             }
+        }
+
+        // A SimHub property as text, null when it has none.
+        string Text(string name)
+        {
+            try { string text = PluginManager?.GetPropertyValue(name)?.ToString(); return string.IsNullOrWhiteSpace(text) ? null : text; }
+            catch { return null; }
         }
 
         // One copy of the game's memory: a single block copy (ReadArray copies byte by byte on .NET Framework).
