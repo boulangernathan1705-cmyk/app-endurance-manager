@@ -605,3 +605,33 @@ test('migration 0079 keeps the existing recap of each community',()=>{
   assert.deepEqual(row('c'),{destination_id:'30',iracing_destination_id:''});
   assert.deepEqual(db.prepare('SELECT community_id,event_id FROM discord_recap_publications ORDER BY community_id').all().map(item=>[item.community_id,item.event_id]),[['a','race'],['b','week:iracing'],['c','week:lmu']]);
 });
+
+test('in a category, the bot makes its own week channels with its rights: endurances share one, the calendar has its own',async t=>{
+  const {DB,env,calls,channels,messages}=setup(t);race(DB);race(DB,'ir','Course iRacing','iracing-spa');solo(DB,'s','Sprint',NOW+DAY/4);
+  const community={...COMMUNITY,modules:{...COMMUNITY.modules,soloRaces:true}};
+  await saveBotRecap(env,community,settingsRow('general',ENDURANCES,ENDURANCES,ENDURANCES));await syncBotRecaps(env,NOW,community);
+  const made=creates(calls).map(call=>call.body);
+  assert.deepEqual(made.map(body=>[body.type,body.name,body.parent_id]),[[0,'récap-de-la-semaine',CATEGORY],[0,'calendrier-de-la-semaine',CATEGORY]]);
+  assert.ok(made.every(body=>body.permission_overwrites.some(item=>item.id===BOT&&item.type===1)),'the bot gives itself its rights');
+  const recap=channels.find(item=>item.name==='récap-de-la-semaine').id,calendar=channels.find(item=>item.name==='calendrier-de-la-semaine').id;
+  assert.deepEqual(sends(calls).map(call=>call.path),[`/channels/${recap}/messages`,`/channels/${recap}/messages`,`/channels/${calendar}/messages`]);
+  calls.length=0;await syncBotRecaps(env,NOW+1000,community);assert.equal(creates(calls).length,0);assert.equal(sends(calls).length,0);
+  // Moved to another category: new channels there, the old ones go once no recap uses them.
+  const VOICES='111111111111111112';
+  await saveBotRecap(env,community,settingsRow('general',{id:VOICES,name:'Vocaux'},{id:VOICES,name:'Vocaux'},{id:VOICES,name:'Vocaux'}));
+  calls.length=0;await syncBotRecaps(env,NOW+2000,community);
+  assert.deepEqual(calls.filter(call=>call.method==='DELETE'&&/^\/channels\/\d+$/.test(call.path)).map(call=>call.path).sort(),[`/channels/${recap}`,`/channels/${calendar}`].sort());
+  assert.deepEqual(creates(calls).map(call=>call.body.parent_id),[VOICES,VOICES]);
+  assert.equal(messages.size,3);
+});
+
+test('switching to « récap de la semaine » removes the race categories at once; switching back makes them again',async t=>{
+  const {DB,env,calls,channels}=setup(t);race(DB);
+  await saveBotRecap(env,COMMUNITY,SETTINGS);await syncBotRecaps(env,NOW,COMMUNITY);
+  assert.ok(channels.some(item=>item.name==='🏎️ LMU · 6h de Spa'));
+  await saveBotRecap(env,COMMUNITY,settingsRow('general',ENDURANCES));calls.length=0;await syncBotRecaps(env,NOW+1000,COMMUNITY);
+  assert.ok(!channels.some(item=>item.name==='🏎️ LMU · 6h de Spa'||item.name==='infos-de-la-course'));
+  assert.ok(channels.some(item=>item.id===CATEGORY),'the chosen category stays');
+  await saveBotRecap(env,COMMUNITY,SETTINGS);calls.length=0;await syncBotRecaps(env,NOW+2000,COMMUNITY);
+  assert.ok(channels.some(item=>item.name==='🏎️ LMU · 6h de Spa'));
+});

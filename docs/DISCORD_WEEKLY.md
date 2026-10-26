@@ -11,12 +11,13 @@ Dans **Administration → Modules → Discord → Régler**, une seule page remp
    - **Récap de la semaine + pit walk** : un message par semaine dans un salon texte existant, et tous les vocaux d’équipage dans une catégorie choisie (« pit walk »).
 2. **Où publier sur ton serveur ?** Une ligne par récap, chacune avec « Ne pas publier » :
    - par course : **Courses LMU** et **Courses iRacing** (la catégorie sous laquelle se rangent les catégories des courses) ;
-   - récap de la semaine : **Endurances LMU** et **Endurances iRacing** (un salon texte chacun) et **Vocaux d’équipage** (catégorie) ;
-   - dans les deux modes, si le module EVENT SOLO / EVENT TDZ est actif : **Calendrier de la semaine** (un salon texte).
+   - récap de la semaine : **Endurances LMU** et **Endurances iRacing** (une catégorie chacune ; le bot y crée lui-même `# récap-de-la-semaine`, partagé si les deux simus visent la même catégorie) et **Vocaux d’équipage** (catégorie) ;
+   - dans les deux modes, si le module EVENT SOLO / EVENT TDZ est actif : **Calendrier de la semaine** (une catégorie ; le bot y crée `# calendrier-de-la-semaine`).
+   Le bot crée ces salons avec les règles de la catégorie plus ses propres droits : seul « Gérer les salons » est demandé. Un salon texte choisi avant cette version reste utilisé tel quel. Quand une catégorie change, le bot crée ses salons dans la nouvelle et supprime les anciens.
    Chaque récap est **un message à part**, avec ses propres limites Discord ; plusieurs récaps peuvent partager un salon. Chez TDZ le calendrier passe en premier, ailleurs les endurances d’abord.
 3. **Vocaux et rappels** : « Créer un vocal par équipage » et « Rappels avant le départ » (cloche du site 24 h avant, chat du vocal 24 h et 1 h avant).
 
-Un croquis « Sur ton serveur » suit les choix ; **Voir les messages** montre ce que le bot écrira sans rien envoyer. Rien n’est publié avant **Activer**. Un récap qu’on ne publie plus voit son message supprimé.
+Un croquis « Sur ton serveur » suit les choix ; **Voir les messages** montre ce que le bot écrira sans rien envoyer. Rien n’est publié avant **Activer**. Un récap qu’on ne publie plus voit son message supprimé. Passer à « Récap de la semaine » (ou ne plus publier une simu) retire aussitôt les catégories de course déjà créées ; les vocaux d’équipage rejoignent la catégorie choisie pour eux, renommés.
 
 ## Calendrier de la semaine
 

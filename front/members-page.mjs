@@ -150,10 +150,10 @@ const DISCORD_MODES = {
 function discordRows(form) {
   const race = form.elements.mode.value === 'events', voices = form.elements.crewChannels.checked;
   return [
-    {name:'lmu', title:race ? 'Courses LMU' : 'Endurances LMU', sub:race ? 'Une catégorie par course' : 'Récap de la semaine', type:race ? 4 : 0},
-    {name:'iracing', title:race ? 'Courses iRacing' : 'Endurances iRacing', sub:race ? 'Une catégorie par course' : 'Récap de la semaine', type:race ? 4 : 0},
-    ...(form.dataset.solo === 'true' ? [{name:'calendar', title:'Calendrier de la semaine', sub:'Les events, toutes simus', type:0}] : []),
-    ...(!race && voices ? [{name:'crewCategory', title:'Vocaux d’équipage', sub:'Dans la catégorie', type:4, empty:'En haut du serveur'}] : [])];
+    {name:'lmu', title:race ? 'Courses LMU' : 'Endurances LMU', sub:race ? 'Une catégorie par course, sous' : 'Le bot crée # récap-de-la-semaine dans'},
+    {name:'iracing', title:race ? 'Courses iRacing' : 'Endurances iRacing', sub:race ? 'Une catégorie par course, sous' : 'Le bot crée # récap-de-la-semaine dans'},
+    ...(form.dataset.solo === 'true' ? [{name:'calendar', title:'Calendrier de la semaine', sub:'Le bot crée # calendrier-de-la-semaine dans'}] : []),
+    ...(!race && voices ? [{name:'crewCategory', title:'Vocaux d’équipage', sub:'Le bot les crée dans', empty:'En haut du serveur'}] : [])];
 }
 function discordForm(setup, settings) {
   const config = setup.botRecap, crews = settings.crews || {}, mode = config?.mode || 'events';
@@ -172,7 +172,7 @@ function discordForm(setup, settings) {
       <label class="discord-check"><input type="checkbox" name="crewChannels" ${voices ? 'checked' : ''}><span><strong>Créer un vocal par équipage</strong><small data-discord-voice-help></small></span></label>
       <label class="discord-check"><input type="checkbox" name="raceReminders" ${settings.modules.raceReminders === true ? 'checked' : ''}><span><strong>Rappels avant le départ</strong><small data-discord-reminder-help></small></span></label></fieldset>
     <div class="discord-sketch" data-discord-sketch></div>
-    <p class="members-help">Le bot doit voir les salons choisis, y écrire, intégrer des liens et lire l’historique. Pour les catégories et les vocaux, il doit aussi gérer les salons.${invite ? ` <a href="${esc(invite)}" target="_blank" rel="noopener">Donner les droits au bot</a>` : ''}</p>
+    <p class="members-help">Le bot crée lui-même ses salons et ses vocaux dans les catégories choisies : il lui faut le droit « Gérer les salons » sur ton serveur.${invite ? ` <a href="${esc(invite)}" target="_blank" rel="noopener">Inviter le bot avec ses droits</a>` : ''} Si une catégorie lui est fermée, sa ligne te dit quoi cocher.</p>
     <div class="setup-actions"><button type="submit" class="primary-button">${config?.enabled ? 'Enregistrer' : 'Activer'}</button><button type="button" class="secondary-button" data-discord-preview>Voir les messages</button><button type="button" class="secondary-button" data-discord-destinations>Actualiser les salons</button>${config?.lastError ? '<button type="button" class="secondary-button" data-discord-repair>Réparer</button>' : ''}${config?.enabled ? '<button type="button" class="secondary-button" data-discord-disable>Désactiver</button>' : ''}<span class="settings-status" role="status" aria-live="polite"></span></div>
     <p class="members-help">${config?.enabled ? 'Les messages sont modifiés sans notification à chaque changement.' : 'Rien n’est publié avant « Activer ».'}</p>
     <div data-recap-preview class="recap-live-preview"></div>
@@ -186,15 +186,23 @@ function discordRefresh(form) {
   const rows = discordRows(form), list = form._destinations, race = mode === 'events', voices = form.elements.crewChannels.checked;
   form.querySelector('[data-discord-rows]').innerHTML = rows.map(row => {
     const [current = '', currentName = ''] = saved[mode]?.[row.name] || [];
-    const options = list ? list.filter(item => item.type === row.type) : current ? [{id:current, name:currentName || 'Salon actuel', ready:true}] : [];
-    if (current && !options.some(item => item.id === current)) options.push({id:current, name:currentName || 'Salon introuvable', ready:true});
+    // Categories only; a text channel chosen before stays in the list while it is the choice.
+    const options = list ? list.filter(item => item.type === 4 || (item.id === current && row.name !== 'crewCategory')) : current ? [{id:current, name:currentName || 'Catégorie actuelle', type:4, ready:true}] : [];
+    if (current && !options.some(item => item.id === current)) options.push({id:current, name:currentName || 'Catégorie introuvable', type:4, ready:true});
+    const chosen = options.find(item => item.id === current);
     return `<label class="discord-row"><span><strong>${row.title}</strong><small>${row.sub}</small></span><select name="${row.name}" data-mode="${mode}">
-      <option value="" data-name="">${row.empty || 'Ne pas publier'}</option>${options.map(item => `<option value="${esc(item.id)}" data-name="${esc(item.name)}" ${item.id === current ? 'selected' : ''}>${row.type === 4 ? '' : '# '}${esc(item.name)}${item.ready === false ? ' · droits du bot à donner' : ''}</option>`).join('')}</select></label>`;
+      <option value="" data-name="">${row.empty || 'Ne pas publier'}</option>${options.map(item => `<option value="${esc(item.id)}" data-name="${esc(item.name)}" data-type="${item.type}" ${item.id === current ? 'selected' : ''}>${item.type === 0 ? '# ' : ''}${esc(item.name)}${item.ready === false ? ' · le bot n’a pas ses droits' : ''}</option>`).join('')}</select></label>
+      ${row.name !== 'crewCategory' && chosen?.ready === false ? discordRightsHelp(chosen) : ''}`;
   }).join('');
-  form.querySelector('[data-discord-rows-help]').textContent = race ? 'Les deux simus sous la même catégorie : les courses LMU d’abord, puis iRacing, chacune par date.' : 'Chaque récap est un message à part : plusieurs récaps peuvent partager le même salon.';
+  form.querySelector('[data-discord-rows-help]').textContent = race ? 'Les deux simus sous la même catégorie : les courses LMU d’abord, puis iRacing, chacune par date.' : 'Chaque récap est un message à part. LMU et iRacing dans la même catégorie partagent # récap-de-la-semaine.';
   form.querySelector('[data-discord-voice-help]').textContent = race ? 'Dans la catégorie de sa course, dès la création de l’équipage. Supprimé 2 h après la course.' : 'Nommé « LMU · 6h de Spa · Équipage A », LMU puis iRacing, par date. Supprimé 2 h après la course.';
   form.querySelector('[data-discord-reminder-help]').textContent = voices ? '24 h avant dans la cloche du site, puis 24 h et 1 h avant dans le chat du vocal.' : '24 h avant dans la cloche du site. Avec les vocaux, aussi 24 h et 1 h avant dans leur chat.';
   discordSketch(form);
+}
+// What to tick on Discord when the bot cannot work in the chosen place (the invitation only gives server-wide rights).
+function discordRightsHelp(destination) {
+  const where = destination.type === 4 ? `clic droit sur la catégorie « ${esc(destination.name)} » › Modifier la catégorie` : `clic droit sur le salon # ${esc(destination.name)} › Modifier le salon`;
+  return `<p class="setup-note setup-error discord-rights">Le bot n’a pas ses droits ici. Sur Discord : ${where} › Permissions › « + » › Endurance Manager, puis coche ${esc((destination.missing || []).join(', '))}. Reviens ensuite sur « Actualiser les salons ».</p>`;
 }
 // A sketch of the server with these choices (example race and crews).
 function discordSketch(form) {
@@ -211,14 +219,18 @@ function discordSketch(form) {
       for (const [, sim, emoji] of group)
         lines.push(category(`${emoji} ${sim} · 6h de Spa`), text('infos-de-la-course'), ...(voices ? [voice(`${sim} · Équipage A`)] : []));
     }
-  } else {
-    const kinds = [['lmu','📝 Endurances LMU'],['iracing','📝 Endurances iRacing'],['calendar','📅 Calendrier de la semaine']];
-    if (form.dataset.tdz === 'true') kinds.unshift(kinds.pop());
-    for (const channel of [...new Set(kinds.map(([key]) => value(key)).filter(Boolean))])
-      lines.push(text(label(kinds.find(([key]) => value(key) === channel)[0]), kinds.filter(([key]) => value(key) === channel).map(([, title]) => title).join(' · '), true));
-    if (voices) lines.push(category(label('crewCategory') || 'En haut du serveur'), ...sims.map(([, sim]) => voice(`${sim} · 6h de Spa · Équipage A`)));
   }
-  if (race && value('calendar')) lines.push(text(label('calendar'), '📅 Calendrier de la semaine', true));
+  // The bot's channels, grouped under each chosen category: the endurances share # récap-de-la-semaine.
+  const places = new Map(), add = (place, item) => places.set(place, [...(places.get(place) || []), item]);
+  const week = [...(race ? [] : [['lmu','📝 Endurances LMU','récap-de-la-semaine'],['iracing','📝 Endurances iRacing','récap-de-la-semaine']]), ['calendar','📅 Calendrier de la semaine','calendrier-de-la-semaine']];
+  for (const channel of ['récap-de-la-semaine','calendrier-de-la-semaine']) for (const place of new Set(week.filter(([key, , name]) => name === channel && value(key)).map(([key]) => value(key)))) {
+    const here = week.filter(([key, , name]) => name === channel && value(key) === place), notes = here.map(([, title]) => title).join(' · ');
+    // A text channel chosen before: the messages go straight in it.
+    if (form.elements[here[0][0]].selectedOptions[0]?.dataset.type === '0') lines.push(text(label(here[0][0]), notes, true));
+    else add(label(here[0][0]), text(channel, notes));
+  }
+  if (!race && voices) for (const [, sim] of sims) add(label('crewCategory') || 'En haut du serveur', voice(`${sim} · 6h de Spa · Équipage A`));
+  for (const [place, items] of places) lines.push(category(place), ...items);
   form.querySelector('[data-discord-sketch]').innerHTML = lines.length ? `<strong>Sur ton serveur</strong><ul>${lines.join('')}</ul>` : '<p class="members-help">Choisis au moins un endroit où publier.</p>';
 }
 async function loadDiscordDestinations(form) {
@@ -717,7 +729,7 @@ app.addEventListener('change', async event => {
   if (box.matches('[data-banner-zoom]') && cropper) { setZoom(Number(box.value)); return; }
   // Discord: the rows and the sketch follow the choices; nothing is saved before « Activer ».
   const discord = box.closest('form[data-discord-form]');
-  if (discord) { discord.querySelector('[data-recap-preview]').innerHTML = ''; if (box.name === 'mode' || box.name === 'crewChannels') discordRefresh(discord); else discordSketch(discord); return; }
+  if (discord) { discord.querySelector('[data-recap-preview]').innerHTML = ''; if (box.name === 'raceReminders') discordSketch(discord); else discordRefresh(discord); return; }
   if (box.dataset.module) {
     box.disabled = true;
     try {
