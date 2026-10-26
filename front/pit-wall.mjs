@@ -204,6 +204,8 @@ const tabs = () => `<nav class="pw-tabs" role="tablist">${TABS.map(([id, label, 
 
 // A gap as PitData shows it: seconds, or laps once a lap down.
 const gapText = (seconds, laps) => known(laps) && laps > 0 ? `+${laps} T` : known(seconds) ? `+${fr(seconds, 1)}` : '—';
+// The game counts stops only in some sessions (0 in practice): our own are the ones the plugin measured.
+const stopsOf = (feed, car) => car.id === feed.snap.me.id ? Math.max(car.stops || 0, (feed.ours.stops || []).length) : car.stops ?? 0;
 const pitText = car => car.pit === 2 ? '<b class="pw-pit">GAR</b>' : car.pit ? '<b class="pw-pit">STAND</b>' : '';
 const clsPill = cls => `<span class="pw-cls" style="--cls:${classColor(cls)}">${esc(String(cls || '—').replace(/hypercar/i, 'HY'))}</span>`;
 // The game gives 0 for a car whose tank it does not share (other players online): shown as unknown.
@@ -235,7 +237,7 @@ function general(feed, race) {
       <td class="pw-name"><b>${esc(car.driver)}</b><small>${esc(car.vehicle)}</small></td><td class="pw-opt2">${esc(model(car))}</td>
       <td class="pw-n">${gap}</td><td class="pw-n pw-opt">${car.laps ?? '—'}</td><td class="pw-n pw-opt">${lapTime(car.last)}</td>
       <td class="pw-n${car.best > 0 && car.best === bestOf.get(car.cls) ? ' best' : ''}">${lapTime(car.best)}</td>
-      <td class="pw-n">${tankText(car)}</td><td class="pw-n">${car.stops ?? 0} ${pitText(car)}</td></tr>`;
+      <td class="pw-n">${tankText(car)}</td><td class="pw-n">${stopsOf(feed, car)} ${pitText(car)}</td></tr>`;
   }).join('');
   return `<div class="pw-table"><table><thead><tr><th>Pos</th><th class="pw-opt">#</th><th class="pw-opt">Cat</th><th>Pilote / équipe</th><th class="pw-opt2">Voiture</th><th class="pw-n">Écart</th>
     <th class="pw-n pw-opt">Tours</th><th class="pw-n pw-opt">Dernier</th><th class="pw-n">Meilleur</th><th class="pw-n" title="Réservoir ou énergie virtuelle restante, en %">VE</th><th class="pw-n">Stands</th></tr></thead><tbody>${rows}</tbody></table></div>`;
@@ -281,7 +283,7 @@ function opponents(feed) {
     return `<tr class="${car === me ? 'us' : ''}" style="--cls:${classColor(car.cls)}"><td class="pw-pos">${index + 1}</td><td class="pw-num pw-opt">${esc(car.num || '')}</td>
       <td class="pw-name"><b>${esc(car.driver)}</b><small>${esc(car.vehicle)}</small></td><td class="pw-n">${gap}</td>
       <td class="pw-n">${lapTime(info.avg5)}${pace}</td><td class="pw-n pw-opt">${lapTime(car.last)}</td><td class="pw-n pw-opt">${lapTime(car.best)}</td>
-      <td class="pw-n">${tankText(car)}</td><td class="pw-n pw-opt">${known(info.sinceStop) ? info.sinceStop : '—'}</td><td class="pw-n">${car.stops ?? 0} ${pitText(car)}</td></tr>`;
+      <td class="pw-n">${tankText(car)}</td><td class="pw-n pw-opt">${known(info.sinceStop) ? info.sinceStop : '—'}</td><td class="pw-n">${stopsOf(feed, car)} ${pitText(car)}</td></tr>`;
   }).join('');
   return `<div class="pw-table"><table><thead><tr><th>Pos</th><th class="pw-opt">#</th><th>Pilote / équipe</th><th class="pw-n">${race ? 'Sur nous' : 'Meilleur / nous'}</th><th class="pw-n">Moy. 5 tours</th>
     <th class="pw-n pw-opt">Dernier</th><th class="pw-n pw-opt">Meilleur</th><th class="pw-n">VE</th><th class="pw-n pw-opt" title="Tours depuis son dernier arrêt">Relais</th><th class="pw-n">Stands</th></tr></thead><tbody>${rows}</tbody></table></div>
