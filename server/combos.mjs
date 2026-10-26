@@ -9,6 +9,7 @@ import {fail, json, now, id, token, hash, rateLimit, body, siteOrigin} from './c
 import {communityAccess, requirePermission} from './access.mjs';
 import {communityById} from './community.mjs';
 import {openLive} from './live.mjs';
+import {signPass, relaySocketUrl} from '../shared/relay-pass.mjs';
 import {cleanSession, CONDITIONS, CONDITION_SQL, CLEAN_RATIO, STINT_MIN, WHEELS, SETUP_MAX, NIGHT_BELOW, linkCode} from '../shared/combos.mjs';
 
 export const combosEnabled = community => community?.modules?.combos === true;
@@ -383,18 +384,29 @@ export async function combosPlugin(path, request, env) {
     const name = await env.DB.prepare('SELECT nickname FROM memberships WHERE community_id=? AND user_id=?').bind(community.id, user.id).first();
     return json({pilot:name?.nickname || user.name, community:community.name});
   }
-  // Mur des stands: the pilot at the wheel shares his car live with the team (server/live.mjs).
-  if (path === '/api/combos/plugin/live') {
+  // Mur des stands: the pilot at the wheel shares his car live with the team (server/live.mjs). With a relay (a second
+  // Cloudflare account, relay/worker.mjs), the plugin asks here for a pass and connects there; else straight here.
+  if (path === '/api/combos/plugin/live' || path === '/api/combos/plugin/live/pass') {
     const {community, user} = await pluginAccess(request, env);
     const row = await env.DB.prepare(`SELECT NULLIF(m.nickname,'') AS nickname, c.color FROM users u LEFT JOIN memberships m ON m.user_id=u.id AND m.community_id=?
       LEFT JOIN combo_colors c ON c.user_id=u.id AND c.community_id=? WHERE u.id=?`).bind(community.id, community.id, user.id).first();
-    return openLive(request, env, community.id, {Role:'driver', User:user.id, Name:row?.nickname || user.name, Color:row?.color || ''});
+    const who = {Role:'driver', User:user.id, Name:row?.nickname || user.name, Color:row?.color || ''};
+    if (path.endsWith('/pass')) return relayPass(env, community.id, who);
+    return openLive(request, env, community.id, who);
   }
   if (path === '/api/combos/plugin/sheet' && method === 'GET') {
     const {community, user} = await pluginAccess(request, env);
     return pluginSheet(env, community, user.id, new URL(request.url));
   }
   notFound();
+}
+
+// A pass for the live relay, valid a few minutes: where to connect, or 404 while the site has no relay (the plugin and
+// the page then connect to the site itself).
+async function relayPass(env, communityId, who) {
+  if (!env.RELAY_URL || !env.RELAY_SECRET) fail(404, 'Pas de relais en direct sur ce site.');
+  const pass = await signPass(env.RELAY_SECRET, {c:communityId, r:who.Role, u:who.User, n:who.Name || '', col:who.Color || ''});
+  return json({url:relaySocketUrl(env.RELAY_URL, pass)});
 }
 
 // ---------- The site (signed in, « combos » permission) ----------
@@ -411,6 +423,7 @@ export async function combosApi(path, method, request, env, actor, community) {
     if (request.headers.get('Origin') !== siteOrigin(request, env)) fail(403, 'Origine de la requête refusée.');
     return openLive(request, env, community.id, {Role:'viewer', User:userId});
   }
+  if (path === '/api/combos/live/pass' && method === 'GET') return relayPass(env, community.id, {Role:'viewer', User:userId});
   if (path === '/api/combos/sheet' && method === 'GET') return json(await sheet(env, community, userId, comboOf(url), url));
   if (path === '/api/combos/export' && method === 'GET') return json(await exportPage(env, community, comboOf(url), url));
   if (path === '/api/combos/outline' && method === 'GET') return json(await outline(env, community, url.searchParams.get('track')));

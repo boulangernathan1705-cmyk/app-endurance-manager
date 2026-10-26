@@ -310,13 +310,17 @@ test('two of us in the same car, each in a session of his own, keep a feed each;
 test('the plugin and the pages reach the room only through their checks', async () => {
   const live = readFileSync(new URL('../server/live.mjs', import.meta.url), 'utf8');
   const combos = readFileSync(new URL('../server/combos.mjs', import.meta.url), 'utf8');
-  assert.match(combos, /path === '\/api\/combos\/plugin\/live'\) \{\n\s+const \{community, user\} = await pluginAccess\(request, env\);/);
+  assert.match(combos, /path === '\/api\/combos\/plugin\/live' \|\| path === '\/api\/combos\/plugin\/live\/pass'\) \{\n\s+const \{community, user\} = await pluginAccess\(request, env\);/);
+  // The relay (second Cloudflare account) opens a room only with a pass the site signed after those same checks.
+  const relay = readFileSync(new URL('../relay/worker.mjs', import.meta.url), 'utf8');
+  assert.match(relay, /const pass = await readPass\(env\.RELAY_SECRET, url\.searchParams\.get\('pass'\)\);\n\s+if \(!pass\) return text\(/);
+  assert.match(relay, /openLive\(request, env, pass\.c, \{Role:pass\.r/);
   assert.match(combos, /path === '\/api\/combos\/live'\) \{\n\s+if \(request\.headers\.get\('Origin'\) !== siteOrigin\(request, env\)\) fail\(403/);
   assert.match(live, /env\.LIVE\.idFromName\(communityId\)/);
   const entry = readFileSync(new URL('../server/worker-with-migrations.mjs', import.meta.url), 'utf8');
   assert.match(entry, /export \{LiveRoom\} from '\.\/live\.mjs';/);
   assert.match(entry, /if \(response\.status === 101\) return response;\n\s+return development \? markDevelopmentResponse/);
-  for (const file of ['wrangler.jsonc', 'wrangler.dev.jsonc', 'wrangler.prod.jsonc']) {
+  for (const file of ['wrangler.jsonc', 'wrangler.dev.jsonc', 'wrangler.prod.jsonc', 'wrangler.relay.jsonc']) {
     const config = readFileSync(new URL(`../${file}`, import.meta.url), 'utf8');
     assert.match(config, /"durable_objects": \{ "bindings": \[\{ "name": "LIVE", "class_name": "LiveRoom" \}\] \}/, file);
     assert.match(config, /"new_sqlite_classes": \["LiveRoom"\]/, file);

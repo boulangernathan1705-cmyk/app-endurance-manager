@@ -414,13 +414,31 @@ namespace EnduranceManager.SimHub
             var opened = new ClientWebSocket();
             opened.Options.SetRequestHeader("Authorization", "Bearer " + link.Token);
             opened.Options.KeepAliveInterval = TimeSpan.FromSeconds(20);
-            var uri = new Uri(Regex.Replace(link.Origin, "^https://", "wss://") + "/api/combos/plugin/live");
+            var uri = new Uri(RelayUrl(link) ?? Regex.Replace(link.Origin, "^https://", "wss://") + "/api/combos/plugin/live");
             if (!opened.ConnectAsync(uri, CancellationToken.None).Wait(10000) || opened.State != WebSocketState.Open) { opened.Dispose(); throw new TimeoutException(); }
             socket = opened;
             // A new connection: everything again, as if watched with the map until the site says otherwise.
             needMap = needFull = watching = mapShown = true;
             ThreadPool.QueueUserWorkItem(_ => Listen(opened));
             return true;
+        }
+
+        // The relay's address with a pass from the site, when the site has a relay (a second Cloudflare account, so the
+        // live never weighs on the site); null otherwise, and the plugin connects to the site itself.
+        string RelayUrl(LinkCode link)
+        {
+            try
+            {
+                using (var request = new HttpRequestMessage(HttpMethod.Get, link.Origin + "/api/combos/plugin/live/pass"))
+                {
+                    request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", link.Token);
+                    var response = client.SendAsync(request).GetAwaiter().GetResult();
+                    if (!response.IsSuccessStatusCode) return null;
+                    string url = (string)JObject.Parse(response.Content.ReadAsStringAsync().GetAwaiter().GetResult())["url"];
+                    return url != null && url.StartsWith("wss://") ? url : null;
+                }
+            }
+            catch { return null; }
         }
 
         // The site's messages, until it closes the connection (then it is let go, and opened again at the next snapshot).
