@@ -2200,7 +2200,7 @@ html[data-game] #app .race-header .race-side .race-badges > * { box-sizing: bord
 .race-info-fields { display: flex; flex-direction: column; gap: 8px; }
 .race-info-fields > .form-label small { display: inline !important; margin: 0 !important; font-weight: 400; text-transform: none; color: #8f999d; }
 .race-info-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: end; gap: 10px; }
-.race-info-grid .form-label > span:first-child { display: inline-flex; align-items: center; gap: 6px; }
+.race-info-grid .form-label > span:first-child { display: inline-flex; align-items: center; gap: 6px; min-height: 18px; }
 .race-info-grid svg { width: 16px; height: 16px; color: #7fe3ea; flex: none; }
 @media (max-width: 760px) {
   html[data-game] #app .race-header .race-side { width: 88px; }
