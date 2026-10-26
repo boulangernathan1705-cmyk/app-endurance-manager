@@ -13,9 +13,12 @@ export const DELTA_VERSION = 2;
 // sector times, the second one counted from the line (S1 + S2); behind/next: seconds behind the leader / the car ahead,
 // lapsBehind/lapsNext: laps behind them; finish: 0 racing, 1 finished, 2 out, 3 disqualified; x, z: position seen from above;
 // tank: percent of fuel (or virtual energy) the game says each car has left (plugin 2.0).
+// cmp, dmg, veLap: the compound each car has on, its bodywork damage (0-100, mean of the 8 zones) and the percent of its
+// energy (or fuel) its last lap used, as the game shows them of every car (later plugins; null from older ones).
 export const FIELD = ['id', 'place', 'cls', 'driver', 'vehicle', 'num', 'laps', 'dist', 'pit', 'stops', 'pen', 'last', 'best',
-  'ls1', 'ls2', 'bs1', 'bs2', 'cs1', 'cs2', 'behind', 'lapsBehind', 'next', 'lapsNext', 'finish', 'x', 'z', 'tank'];
-const TEXT = new Set(['cls', 'driver', 'vehicle', 'num']);
+  'ls1', 'ls2', 'bs1', 'bs2', 'cs1', 'cs2', 'behind', 'lapsBehind', 'next', 'lapsNext', 'finish', 'x', 'z', 'tank', 'cmp', 'dmg', 'veLap'];
+const TEXT = new Set(['cls', 'driver', 'vehicle', 'num', 'cmp']);
+const PERCENT = new Set(['tank', 'dmg', 'veLap']);
 export const MAX_CARS = 104;
 // LMU's session numbers (rF2): 0 test day, 1–4 practice, 5–8 qualifying, 9 warm-up, 10–13 race.
 export const isRace = session => session >= 10 && session <= 13;
@@ -71,7 +74,7 @@ export function cleanSnapshot(input) {
   const field = (Array.isArray(input.field) ? input.field : []).slice(0, MAX_CARS).map(row => {
     if (!Array.isArray(row)) return null;
     const car = {};
-    FIELD.forEach((key, index) => { car[key] = TEXT.has(key) ? text(row[index], key === 'vehicle' ? 80 : 40) : num(row[index]); });
+    FIELD.forEach((key, index) => { car[key] = TEXT.has(key) ? text(row[index], key === 'vehicle' ? 80 : 40) || (key === 'cmp' ? null : '') : PERCENT.has(key) ? num(row[index], 0, 100) : num(row[index]); });
     return car.id === null || car.laps === null ? null : car;
   }).filter(Boolean);
   const id = num(me.id);
@@ -198,17 +201,21 @@ export function ingest(feeds, snap, at, pilot = null, paths = null) {
   feed.updated = at;
   if (pilot) feed.pilot = pilot;
   for (const car of snap.field) {
-    const state = feed.cars[car.id] ||= {laps:[], pitIn:null, stop:null, stopLap:null, lapPit:false, best:[null, null, null]};
+    const state = feed.cars[car.id] ||= {laps:[], pitIn:null, stop:null, stopLap:null, lapPit:false, best:[null, null, null], lapTank:null};
     const old = before?.field.find(item => item.id === car.id);
     if (car.pit) state.lapPit = true;
     if (old && car.laps > old.laps) {
       const t = time(car.last), sectors = sectorsOf(car);
+      // What the lap used, for a lap without a stop: the game's figure, else the drop of the car's tank.
+      const used = state.lapPit ? null : finite(car.veLap) && car.veLap > 0 ? round(car.veLap, 2)
+        : finite(state.lapTank) && finite(car.tank) && car.tank > 0 && state.lapTank - car.tank > 0 ? round(state.lapTank - car.tank, 2) : null;
       if (t && car.laps - old.laps === 1) {
-        state.laps.push({n:car.laps, t:round(t), s:sectors, pit:state.lapPit});
+        state.laps.push({n:car.laps, t:round(t), s:sectors, pit:state.lapPit, e:used});
         if (state.laps.length > RIVAL_LAPS) state.laps.shift();
         if (sectors && !state.lapPit) sectors.forEach((value, index) => { if (state.best[index] === null || value < state.best[index]) state.best[index] = value; });
       }
       state.lapPit = Boolean(car.pit);
+      state.lapTank = finite(car.tank) && car.tank > 0 ? car.tank : null;
     }
     // In and out of the pit lane: how long the stop took, lane included, and from which lap the stint counts.
     if (old && !old.pit && car.pit === 1) state.pitIn = snap.et;
@@ -317,7 +324,8 @@ export function publicFeed(feed, gaps = null) {
   for (const car of snap.field) {
     const state = feed.cars[car.id];
     const five = cleanLaps(state?.laps || []).slice(-5).map(lap => lap.t);
-    cars[car.id] = {avg5:round(five.length >= 2 ? mean(five) : null), sd5:round(spread(five)), stop:state?.stop ?? null,
+    const uses = (state?.laps || []).map(lap => lap.e).filter(value => finite(value) && value > 0).slice(-5);
+    cars[car.id] = {avg5:round(five.length >= 2 ? mean(five) : null), sd5:round(spread(five)), stop:state?.stop ?? null, use5:uses.length ? round(mean(uses), 2) : null,
       sinceStop:state?.stopLap !== null && state?.stopLap !== undefined ? car.laps - state.stopLap : car.stops ? null : car.laps,
       lastSectors:sectorsOf(car), best:state?.best || [null, null, null], ...gaps?.[car.id]};
   }
