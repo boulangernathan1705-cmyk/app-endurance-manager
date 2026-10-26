@@ -22,7 +22,7 @@ export function raceInfoChips(event){
   if(TRACK_LIMITS[info.trackLimits])chip('trackLimits',TRACK_SHORT[info.trackLimits],`Limites de piste : ${TRACK_LIMITS[info.trackLimits].toLowerCase()}`);
   if(info.tyres)chip('tyres',info.tyres,`Pneus disponibles pour la course : ${info.tyres}`);
   if(info.grid)chip('grid',info.grid,`Voitures sur la piste : ${info.grid}`);
-  if(RACE_WEATHERS[info.weather]||info.weatherNote)chip(RACE_WEATHERS[info.weather]?info.weather:'weather',RACE_WEATHERS[info.weather]||'Météo',['Météo prévue',RACE_WEATHERS[info.weather]&&`: ${RACE_WEATHERS[info.weather].toLowerCase()}`,info.weatherNote&&`${RACE_WEATHERS[info.weather]?'.':' :'} ${info.weatherNote}`].filter(Boolean).join(''));
+  if(RACE_WEATHERS[info.weather]||info.weatherNote)chip(RACE_WEATHERS[info.weather]?info.weather:'weather',RACE_WEATHERS[info.weather]||'Météo',['Météo prévue',RACE_WEATHERS[info.weather]&&` : ${RACE_WEATHERS[info.weather].toLowerCase()}`,info.weatherNote&&`${RACE_WEATHERS[info.weather]?'.':' :'} ${info.weatherNote}`].filter(Boolean).join(''));
   if(typeof info.fairShare==='boolean')chip('fairShare',info.fairShare?'Oui':'Non',`Partage du volant : ${info.fairShare?'activé':'désactivé'}`);
   return chips.length?`<span class="race-info-chips">${chips.join('')}</span>`:'';
 }
