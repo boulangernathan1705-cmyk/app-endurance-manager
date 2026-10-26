@@ -204,7 +204,8 @@ const tabs = () => `<nav class="pw-tabs" role="tablist">${TABS.map(([id, label, 
 const gapText = (seconds, laps) => known(laps) && laps > 0 ? `+${laps} T` : known(seconds) ? `+${fr(seconds, 1)}` : '—';
 const pitText = car => car.pit === 2 ? '<b class="pw-pit">GAR</b>' : car.pit ? '<b class="pw-pit">STAND</b>' : '';
 const clsPill = cls => `<span class="pw-cls" style="--cls:${classColor(cls)}">${esc(String(cls || '—').replace(/hypercar/i, 'HY'))}</span>`;
-const tankText = car => known(car.tank) ? `<span class="pw-tank" style="--tank:${Math.max(0, Math.min(100, car.tank))}%">${fr(car.tank, 0)}</span>` : '—';
+// The game gives 0 for a car whose tank it does not share (other players online): shown as unknown.
+const tankText = car => known(car.tank) && car.tank > 0 ? `<span class="pw-tank" style="--tank:${Math.max(0, Math.min(100, car.tank))}%">${fr(car.tank, 0)}</span>` : '—';
 
 function board(feed) {
   const snap = feed.snap, race = isRace(snap.session);
