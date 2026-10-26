@@ -155,6 +155,10 @@ function order(feed) {
   return isRace(feed.snap.session) ? field.sort((a, b) => (a.place || 999) - (b.place || 999))
     : field.sort((a, b) => (a.best > 0 ? a.best : 1e9) - (b.best > 0 ? b.best : 1e9));
 }
+// The place shown everywhere: the race's order in a race, the best laps' otherwise (the game's own differs in practice).
+const placeOf = (feed, car) => (isRace(feed.snap.session) && car.place) || order(feed).indexOf(car) + 1;
+// LMU's class names, as read: LMP2_ELMS → LMP2 ELMS.
+const clsName = cls => String(cls || '').replace(/_/g, ' ').toUpperCase();
 const sessionName = session => isRace(session) ? 'Course' : session >= 5 && session <= 8 ? 'Qualifications' : session === 9 ? 'Warm-up' : 'Essais';
 // Seconds left on the session's clock, moved on with the page's own since the last message.
 const timeLeft = feed => feed.snap.end ? feed.snap.end - feed.snap.et - (isLive(feed) ? age(feed) : 0) : null;
@@ -200,8 +204,8 @@ function driverCard(feed) {
     <div class="pw-carnum">#${esc(me.num || '--')}</div>
     <div class="pw-who"><b>${esc(snap.me.driver || feedName(feed))}</b><span>${esc(snap.me.car || model(me))}</span></div>
     <div class="pw-facts">
-      <div><span>Position</span><b>P${me.place || sorted.indexOf(me) + 1}</b></div>
-      <div><span>${esc(me.cls || 'Catégorie')}</span><b style="color:${classColor(me.cls)}">P${classPlace}</b></div>
+      <div><span>Position</span><b>P${placeOf(feed, me)}</b></div>
+      <div><span>${esc(clsName(me.cls) || 'Catégorie')}</span><b style="color:${classColor(me.cls)}">P${classPlace}</b></div>
       <div><span>Tour</span><b>${(me.laps || 0) + 1}</b></div>
     </div>
     <div class="pw-track">📍 ${esc(snap.track)}</div></div>`;
@@ -228,7 +232,7 @@ function pitCell(feed, car) {
   const last = lastStopOf(feed, car);
   return `<b>${stopsOf(feed, car)}</b>${known(last) ? chip(`${fr(last, 1)}s`, 'stop') : ''}`;
 }
-const clsPill = cls => `<span class="pw-cls" style="--cls:${classColor(cls)}">${esc(String(cls || '—').toUpperCase())}</span>`;
+const clsPill = cls => `<span class="pw-cls" style="--cls:${classColor(cls)}">${esc(clsName(cls) || '—')}</span>`;
 // The game gives 0 for a car whose tank it does not share (other players online): shown as unknown.
 function tankCell(car) {
   if (!(known(car.tank) && car.tank > 0)) return '<span class="pw-dim">—</span>';
@@ -243,7 +247,7 @@ function board(feed) {
   const classes = [...new Set(snap.field.map(car => car.cls).filter(Boolean))];
   if (view.cls !== 'all' && !classes.includes(view.cls)) view.cls = 'all';
   const modes = `<div class="pw-seg" role="group" aria-label="Vue">${MODES.map(([id, label, icon]) => `<button type="button" data-mode="${id}" aria-pressed="${view.mode === id}">${icon} ${label}</button>`).join('')}</div>`;
-  const chips = view.mode === 'all' && classes.length > 1 ? `<div class="pw-filters" role="group" aria-label="Catégorie"><button type="button" data-cls="all" aria-pressed="${view.cls === 'all'}">Toutes les classes</button>${classes.map(cls => `<button type="button" data-cls="${esc(cls)}" aria-pressed="${view.cls === cls}" style="--cls:${classColor(cls)}">${esc(cls.toUpperCase())}</button>`).join('')}</div>` : '';
+  const chips = view.mode === 'all' && classes.length > 1 ? `<div class="pw-filters" role="group" aria-label="Catégorie"><button type="button" data-cls="all" aria-pressed="${view.cls === 'all'}">Toutes les classes</button>${classes.map(cls => `<button type="button" data-cls="${esc(cls)}" aria-pressed="${view.cls === cls}" style="--cls:${classColor(cls)}">${esc(clsName(cls))}</button>`).join('')}</div>` : '';
   const body = view.mode === 'rel' ? relative(feed) : view.mode === 'opp' ? opponents(feed) : general(feed, race);
   const title = view.mode === 'rel' ? 'Relatif sur la piste' : view.mode === 'opp' ? `Opposants ${esc(meOf(feed)?.cls || '')}` : 'Classement en direct';
   return card(`🏆 ${title} <small>${snap.field.length} concurrents</small>`, `${chips}${body}`, modes);
@@ -262,7 +266,7 @@ function general(feed, race) {
       : car.best > 0 && bestOf.get(car.cls) ? place === 1 ? '<span class="pw-green">MEILLEUR</span>' : `+${fr(car.best - bestOf.get(car.cls), 3)}s` : '—';
     const best = car.best > 0 ? `<span class="${car.best === bestOf.get(car.cls) ? 'pw-purple' : 'pw-green'}">${lapTime(car.best)}</span>` : '—';
     return `<tr class="${ours ? 'us' : ''}">
-      <td class="pw-pos">P${race ? car.place || '—' : order(feed).indexOf(car) + 1}</td>${numCell(car)}<td class="pw-opt">${clsPill(car.cls)}</td>
+      <td class="pw-pos">P${placeOf(feed, car)}</td>${numCell(car)}<td class="pw-opt">${clsPill(car.cls)}</td>
       ${nameCell(car)}<td class="pw-team pw-opt2">${esc(model(car))}</td>
       <td class="pw-n">${gap}</td><td class="pw-n pw-opt">${car.laps ?? '—'}</td><td class="pw-n pw-opt">${lapTime(car.last)}</td>
       <td class="pw-n">${best}</td><td class="pw-n pw-opt">${tankCell(car)}</td><td class="pw-n pw-stand">${pitCell(feed, car)}</td></tr>`;
@@ -286,7 +290,7 @@ function relative(feed) {
   const index = list.findIndex(item => item.car.id === me.id);
   const shown = list.slice(Math.max(0, index - 6), index + 7);
   const rows = shown.map(({car, gap, laps}) => `<tr class="${car.id === me.id ? 'us' : laps < 0 ? 'down' : laps > 0 ? 'up' : ''}">
-    <td class="pw-pos">P${car.place || '—'}</td>${numCell(car)}<td class="pw-opt">${clsPill(car.cls)}</td>${nameCell(car)}
+    <td class="pw-pos">P${placeOf(feed, car)}</td>${numCell(car)}<td class="pw-opt">${clsPill(car.cls)}</td>${nameCell(car)}
     <td class="pw-n pw-big">${car.id === me.id ? '' : `${signed(gap, 1)}s`}</td><td class="pw-n pw-opt">${laps ? `${laps > 0 ? '+' : '−'}${Math.abs(laps)} T` : ''}</td>
     <td class="pw-n">${lapTime(car.last)}</td><td class="pw-n pw-stand">${car.pit ? chip(car.pit === 2 ? 'GARAGE' : 'PIT IN', 'warn') : ''}</td></tr>`).join('');
   return `<div class="pw-table"><table><thead><tr><th>Pos</th><th class="pw-yellow">#</th><th class="pw-opt">Cat</th><th>Pilote / équipe</th><th class="pw-n">Sur nous</th><th class="pw-n pw-opt">Tours</th><th class="pw-n">Dernier tour</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>
@@ -391,7 +395,7 @@ function car(feed) {
         ${box('Tours estimés', known(laps) ? `${fr(laps, 1)} t` : '—')}${box('Temps restant', known(laps) && pace ? clock(laps * pace) : '—')}</div></div>`;
   };
   const ours = feed.ours, ve = known(me.ve);
-  const energyCard = card('⚡ Énergie et consommation', `<div class="pw-row2 pw-tanks">
+  const energyCard = card('⚡ Énergie et consommation', `<div class="pw-row2 pw-tanks${ve ? '' : ' single'}">
       ${tank('Carburant', '⛽', me.fuel, 'L', me.capacity, ours.lastFuel, ours.fuel5, 'fuel')}
       ${ve ? tank('Énergie virtuelle', '⚡', me.ve, '%', 100, ours.lastVe, ours.ve5, 've') : ''}
     </div>
@@ -554,7 +558,7 @@ function map(feed) {
   const points = [...outline, ...(box ? [[box[0], box[2]], [box[1], box[3]]] : whole ? [] : cars.map(car => [car.x, car.z]))];
   const classes = [...new Set(snap.field.map(car => car.cls).filter(Boolean))];
   const head = `${chip(esc(snap.track.toUpperCase()), 'line cyan')}${known(snap.length) ? chip(`${fr(snap.length / 1000, 2)} km`) : ''}${chip(`${cars.length} voitures`)}
-    <div class="pw-legend">${classes.map(name => `<span><i style="background:${classColor(name)}"></i>${esc(name.toUpperCase())}</span>`).join('')}<span><i class="us"></i>NOUS</span></div>`;
+    <div class="pw-legend">${classes.map(name => `<span><i style="background:${classColor(name)}"></i>${esc(clsName(name))}</span>`).join('')}<span><i class="us"></i>NOUS</span></div>`;
   if (!points.length) { frame = null; return card('🗺️ Carte du circuit en direct', '<p class="pw-note">Les positions arrivent dès que la voiture roule.</p>', head); }
   const xs = points.map(p => p[0]), zs = points.map(p => p[1]);
   const minX = Math.min(...xs), maxX = Math.max(...xs), minZ = Math.min(...zs), maxZ = Math.max(...zs);
@@ -563,9 +567,8 @@ function map(feed) {
   const width = (maxX - minX) * k + 60, height = (maxZ - minZ) * k + 60;
   const px = v => (30 + (v - minX) * k).toFixed(1), pz = v => (30 + (maxZ - v) * k).toFixed(1);
   const path = lines.map(line => `M${line.points.map(([x, z]) => `${px(x)},${pz(z)}`).join('L')}${line.closed ? 'Z' : ''}`).join('');
-  const sorted = order(feed), placeOf = car => (isRace(snap.session) && car.place) || sorted.indexOf(car) + 1;
-  const dot = (car, fill, r, ours = false) => { const [x, z] = placed(feed, car);
-    return `<g data-car="${car.id}"${ours ? ' class="us"' : ''} transform="translate(${px(x)},${pz(z)})"><circle r="${r}" fill="${fill}"/><text dy="0.36em">${placeOf(car)}</text></g>`; };
+    const dot = (car, fill, r, ours = false) => { const [x, z] = placed(feed, car);
+    return `<g data-car="${car.id}"${ours ? ' class="us"' : ''} transform="translate(${px(x)},${pz(z)})"><circle r="${r}" fill="${fill}"/><text dy="0.36em">${placeOf(feed, car)}</text></g>`; };
   const others = cars.filter(car => car.id !== snap.me.id).map(car => dot(car, classColor(car.cls), 11)).join('');
   const me = cars.find(car => car.id === snap.me.id);
   return card('🗺️ Carte du circuit en direct', `<div class="pw-map-box"><svg class="pw-map" viewBox="0 0 ${width.toFixed(0)} ${height.toFixed(0)}" role="img" aria-label="Position des voitures sur le circuit">
