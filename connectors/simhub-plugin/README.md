@@ -55,6 +55,15 @@ Envoie les séances Le Mans Ultimate d'un pilote aux fiches combo de son équipe
   (estimation d'arrêt, état de la voiture, prévision météo…) sont gardées une fois par lancement de SimHub dans
   `%LOCALAPPDATA%\EnduranceManager\Combos\api`, pour en connaître le format exact.
 
+- complète, depuis la 2.1.0, les noms de NeoRed avec l'API du jeu lue en roulant (`GameApi.cs`, une lecture à la
+  fois, hors du fil de SimHub) : état du jeu et estimation de l'arrêt par le jeu (toutes les 2 s, `PitStopEstimate.*`,
+  notre calcul reste en secours), état de la voiture et infos de la séance (toutes les 5 s), et une fois par séance la
+  météo prévue (`Weather.*`, nœuds et nœud en cours), les réglages de la séance (`Session.*`), voiture, circuit et
+  pneus (`VehicleInfos.*`, `TrackInfos.*`, `Tyre.OptimalCompoundTemp_*`). Le menu des stands a tous ses noms NeoRed
+  (chiffres, textes, type de pneu, pressions en kPa, bar et psi). `GameInfos.PitState` est le texte du jeu (`EXITING`…).
+  Pas encore repris : pénalités par type et statut d'arrivée (WebSocket du jeu), `Track.*` et `Redline.PerGear`
+  (données Lovely), `VM_BRAKE_PRESSURE`, `VM_REGEN_LEVEL`, `Pit.StopAndGo`.
+
 Il ne fait que lire : il ne modifie rien dans le jeu ni dans SimHub. Il n'envoie plus les fichiers de résultats XML.
 
 ## Ressources et stabilité
