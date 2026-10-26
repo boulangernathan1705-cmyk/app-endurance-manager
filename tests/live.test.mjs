@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {addToPath, cleanSnapshot, diff, ingest, mergeSnapshot, outlineLines, patch, publicFeed, raceGaps, readFeed, fairShare, rejoin, stationary, lapsLeft, timeAt, FIELD, prune, STALE_DROP} from '../shared/live.mjs';
+import {addToPath, cleanFrames, cleanSnapshot, diff, ingest, mergeSnapshot, outlineLines, patch, publicFeed, raceGaps, readFeed, fairShare, rejoin, stationary, lapsLeft, timeAt, FIELD, prune, STALE_DROP} from '../shared/live.mjs';
 import {LiveRoom} from '../server/live.mjs';
 
 const TRACK = 'Circuit de la Sarthe';
@@ -228,6 +228,26 @@ test('plugin 1.6 sends only what changed; the room asks for everything when it l
   await room.webSocketClose(viewer, 1000);
   assert.deepEqual(JSON.parse(driver.sent.at(-1)), {type:'mode', watch:false, map:false}, 'the last page gone');
   assert.equal(mergeSnapshot(null, {v:1}), null);
+});
+
+test('plugin 2.0: the last second of our car goes to the pages watching with the snapshot, never into the history', async () => {
+  const {room, socket} = fakeRoom();
+  const until = Date.now() + 60_000;
+  const driver = socket('driver', {role:'driver', user:'u1', name:'Nathan', until, conn:'c1'});
+  const viewer = socket('viewer', {role:'viewer', user:'u2', until, watch:true, map:false});
+  const frames = Array.from({length:10}, (_, k) => [6000 + k * 7.4, 266.4, 100, 0, -3, 6]);
+  await room.webSocketMessage(driver, JSON.stringify({...snap(), v:2, full:true, tm:frames}));
+  assert.deepEqual(JSON.parse(viewer.sent.at(-1)).tm, cleanFrames(frames));
+  await room.webSocketMessage(driver, JSON.stringify({v:2, et:1001, me:{ve:58}, tm:frames.slice(0, 3)}));
+  assert.equal(JSON.parse(viewer.sent.at(-1)).tm.length, 3, 'with the changes too');
+  const feed = Object.values(room.feeds)[0];
+  assert.equal(feed.snap.tm, undefined);
+  assert.equal(room.bases.get('c1').tm, undefined, 'the next changes do not carry old frames');
+  await room.webSocketMessage(driver, JSON.stringify({v:2, et:1002, me:{ve:57}}));
+  assert.equal(JSON.parse(viewer.sent.at(-1)).tm, undefined);
+  assert.deepEqual(cleanFrames([[10.4, 120.06, 140, -5, -150, 3], ['x', 1], [null, 2], 'odd']), [[10, 120.1, null, null, null, 3]]);
+  assert.equal(cleanFrames(Array.from({length:50}, () => [1, 1, 1, 1, 1, 1])).length, 30);
+  assert.equal(cleanFrames(null).length, 0);
 });
 
 test('only what changed, and the same value back once applied', () => {

@@ -227,6 +227,7 @@ namespace EnduranceManager.SimHub
                             recorder.Feed(sample, driving);
                             GameState = driving ? "track" : "menu";
                             // Once a second, the car and the field for the team's mur des stands.
+                            if (driving && Settings.Share) live.Frame(sample);
                             if (driving && Settings.Share && tick % 10 == 0) live.Offer(buffer, sample, recorder, api);
                             // Once a second, the race figures for the dashboards; the pit menu every 2 s, read aside.
                             if (driving && tick % 10 == 0) try { Course.Update(buffer, sample, recorder.Current, api.Service, Menu); } catch { }

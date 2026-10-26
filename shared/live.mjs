@@ -11,9 +11,10 @@ export const DELTA_VERSION = 2;
 // One row per car of the field (connectors/simhub-plugin/LiveShare.cs writes them in this order).
 // dist: metres into the lap; pit: 0 on track, 1 in the pit lane, 2 in the garage; ls1/ls2, bs1/bs2, cs1/cs2: the game's
 // sector times, the second one counted from the line (S1 + S2); behind/next: seconds behind the leader / the car ahead,
-// lapsBehind/lapsNext: laps behind them; finish: 0 racing, 1 finished, 2 out, 3 disqualified; x, z: position seen from above.
+// lapsBehind/lapsNext: laps behind them; finish: 0 racing, 1 finished, 2 out, 3 disqualified; x, z: position seen from above;
+// tank: percent of fuel (or virtual energy) the game says each car has left (plugin 2.0).
 export const FIELD = ['id', 'place', 'cls', 'driver', 'vehicle', 'num', 'laps', 'dist', 'pit', 'stops', 'pen', 'last', 'best',
-  'ls1', 'ls2', 'bs1', 'bs2', 'cs1', 'cs2', 'behind', 'lapsBehind', 'next', 'lapsNext', 'finish', 'x', 'z'];
+  'ls1', 'ls2', 'bs1', 'bs2', 'cs1', 'cs2', 'behind', 'lapsBehind', 'next', 'lapsNext', 'finish', 'x', 'z', 'tank'];
 const TEXT = new Set(['cls', 'driver', 'vehicle', 'num']);
 export const MAX_CARS = 104;
 // LMU's session numbers (rF2): 0 test day, 1–4 practice, 5–8 qualifying, 9 warm-up, 10–13 race.
@@ -91,6 +92,17 @@ export function cleanSnapshot(input) {
       stops:(Array.isArray(me.stops) ? me.stops : []).slice(-STOPS_KEPT).map(cleanStop).filter(Boolean), service, profile},
     field, map:map && map.length >= 50 ? map : null
   };
+}
+
+// Plugin 2.0, while a page watches: our car ten times a second, the frames of the last second grouped in one message
+// (`tm`), so the room is billed one message a second. Each frame: [metres into the lap, km/h, throttle %, brake %,
+// steering % (left negative), gear]. Passed on to the pages as they come, never kept.
+export const FRAMES_MAX = 30;
+export function cleanFrames(input) {
+  if (!Array.isArray(input)) return [];
+  return input.slice(-FRAMES_MAX).filter(Array.isArray).map(([d, v, throttle, brake, steer, gear]) =>
+    [round(num(d, -1000, 100000), 0), round(num(v, 0, 500), 1), round(num(throttle, 0, 100), 0), round(num(brake, 0, 100), 0),
+      round(num(steer, -100, 100), 0), num(gear, -1, 12)]).filter(frame => frame[0] !== null && frame[1] !== null);
 }
 
 // What plugin 1.6 sends after its first snapshot: only the keys that changed (`me` by key too) and, per car, only the

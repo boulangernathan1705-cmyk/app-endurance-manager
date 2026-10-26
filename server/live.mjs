@@ -13,7 +13,7 @@
 // Rights are checked when a socket opens and again by making it reconnect after RECHECK. The object is never
 // reachable from outside: only these two routes forward to it, with who is connecting in X-Live-* headers.
 import {fail} from './core.mjs';
-import {cleanSnapshot, diff, ingest, mergeSnapshot, positionsOf, prune, publicFeed, raceGaps, DELTA_VERSION, LIVE_FOR} from '../shared/live.mjs';
+import {cleanFrames, cleanSnapshot, diff, ingest, mergeSnapshot, positionsOf, prune, publicFeed, raceGaps, DELTA_VERSION, LIVE_FOR} from '../shared/live.mjs';
 
 const MESSAGE_LIMIT = 256_000;
 const RECHECK = 4 * 3600_000;
@@ -122,6 +122,9 @@ export class LiveRoom {
     if (info.role !== 'driver') return;
     let input;
     try { input = JSON.parse(message); } catch { return; }
+    // Plugin 2.0: the last second of our car, passed on as it is and never merged into the snapshot.
+    const frames = cleanFrames(input?.tm);
+    if (input && typeof input === 'object') delete input.tm;
     // Plugin 1.6: its changes onto the last snapshot of this connection; without it, a complete one is asked for.
     if (input?.v === DELTA_VERSION) {
       const merged = mergeSnapshot(this.bases.get(info.conn), input);
@@ -136,19 +139,21 @@ export class LiveRoom {
     const feeds = await this.load(), at = Date.now();
     const feed = ingest(feeds, snap, at, {id:info.user, name:info.name, color:info.color}, this.paths);
     this.dirty.add(feed.key);
-    this.broadcast(feed, at);
+    this.broadcast(feed, at, frames);
     if (at - this.savedAt > SAVE_EVERY) await this.save(at);
   }
 
   // To every page shown: what changed in this car's feed (all of it when the room has no copy), with the positions for
-  // those showing the map. Nobody watching: nothing, and the copy is dropped (the next page gets it complete).
-  broadcast(feed, at) {
+  // those showing the map, and the last second of our car (frames). Nobody watching: nothing, and the copy is dropped
+  // (the next page gets it complete).
+  broadcast(feed, at, frames = []) {
     const watching = this.viewers(at).filter(item => item.info.watch !== false);
     const before = this.sent.get(feed.key);
     if (!watching.length) { this.sent.delete(feed.key); return; }
     const after = this.publish(feed);
     this.sent.set(feed.key, after);
     const out = before ? {type:'patch', now:at, key:feed.key, patch:diff(before, after) ?? {}} : {type:'feed', now:at, feed:after};
+    if (frames.length) out.tm = frames;
     const plain = JSON.stringify(out);
     let withMap = null;
     for (const {socket, info} of watching) {
