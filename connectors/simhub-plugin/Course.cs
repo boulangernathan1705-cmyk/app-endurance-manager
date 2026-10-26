@@ -83,6 +83,9 @@ namespace EnduranceManager.SimHub
         public double? Damage, Water, Oil;
         public double? AirTemp, TrackTemp, Rain, Wetness;
         public string Car, Class, Track, Driver;
+        public int? TC, TCSlip, TCCut, ABS, MotorMap, Migration, AntiSwayFront, AntiSwayRear;
+        public string TCText, ABSText, MotorMapText, MigrationText;
+        public double? BrakeBiasFront, Battery, Regen, GapAhead, GapBehind, DeltaBest, TrackLimitsPoints, TimeOfDay, CloudCoverage;
     }
 
     public class Course
@@ -168,6 +171,27 @@ namespace EnduranceManager.SimHub
                 ("WeatherInfos.Track.Temp", v => v.TrackTemp),
                 ("WeatherInfos.Current.RainIntensity_%", v => v.Rain),
                 ("WeatherInfos.Track.Wetness_%", v => v.Wetness),
+                ("Extended.VM_BRAKE_BALANCE", v => v.BrakeBiasFront),
+                ("Extended.VM_TRACTIONCONTROLMAP", v => v.TC),
+                ("Extended.VM_TRACTIONCONTROLSLIPANGLEMAP", v => v.TCSlip),
+                ("Extended.VM_TRACTIONCONTROLPOWERCUTMAP", v => v.TCCut),
+                ("Extended.VM_ANTILOCKBRAKESYSTEMMAP", v => v.ABS),
+                ("Extended.VM_ELECTRIC_MOTOR_MAP", v => v.MotorMap),
+                ("Extended.VM_BRAKE_MIGRATION", v => v.Migration),
+                ("Extended.VM_FRONT_ANTISWAY", v => v.AntiSwayFront),
+                ("Extended.VM_REAR_ANTISWAY", v => v.AntiSwayRear),
+                ("Extended.TC_Text", v => v.TCText),
+                ("Extended.ABS_Text", v => v.ABSText),
+                ("Extended.MotorMap_Text", v => v.MotorMapText),
+                ("Extended.Migration_Text", v => v.MigrationText),
+                ("Energy.Batt.Current_%", v => v.Battery),
+                ("Energy.Regen_kW", v => v.Regen),
+                ("GameInfos.GapCarAhead", v => v.GapAhead),
+                ("GameInfos.GapCarBehind", v => v.GapBehind),
+                ("GameInfos.DeltaBest", v => v.DeltaBest),
+                ("GameInfos.TimeOfDay", v => v.TimeOfDay),
+                ("Race.Player.TrackLimitsPoints", v => v.TrackLimitsPoints),
+                ("WeatherInfos.Current.CloudCoverage_%", v => v.CloudCoverage),
                 ("VehicleInfos.Name", v => v.Car),
                 ("VehicleInfos.Class", v => v.Class),
                 ("TrackInfos.Name", v => v.Track),
@@ -209,6 +233,26 @@ namespace EnduranceManager.SimHub
                 view.TyreLeft[i] = R(w.Wear * 100, 1);
                 view.BrakeTemp[i] = R(w.Brake, 0);
             }
+
+            // The settings in the car: levels, and « 3/9 » when the car has such a setting (0 steps: none).
+            string Level(int level, int max) => max > 0 ? $"{level}/{max}" : null;
+            view.TC = s.TC; view.TCSlip = s.TCSlip; view.TCCut = s.TCCut; view.ABS = s.ABS; view.MotorMap = s.MotorMap; view.Migration = s.Migration;
+            view.AntiSwayFront = s.AntiSwayFront; view.AntiSwayRear = s.AntiSwayRear;
+            view.TCText = Level(s.TC, s.TCMax); view.ABSText = Level(s.ABS, s.ABSMax); view.MotorMapText = Level(s.MotorMap, s.MotorMapMax);
+            view.MigrationText = Level(s.Migration, s.MigrationMax);
+            view.BrakeBiasFront = s.RearBrakeBias > 0 && s.RearBrakeBias < 1 ? R((1 - s.RearBrakeBias) * 100, 1) : null;
+            view.Battery = s.Battery > 0 ? R(s.Battery * 100, 1) : null;
+            view.Regen = R(s.Regen, 1);
+            view.GapAhead = s.GapAhead > 0 ? R(s.GapAhead, 2) : null;
+            view.GapBehind = s.GapBehind > 0 ? R(s.GapBehind, 2) : null;
+            view.DeltaBest = R(s.DeltaBest, 2);
+            // LMU's own lines after rF2's in the scoring: the time of day (seconds since midnight), the clouds (0-255?) and
+            // how many track limits steps make a point.
+            double tod = BitConverter.ToSingle(b, ScoringInfo + 344);
+            view.TimeOfDay = tod >= 0 && tod <= 86400 ? R(tod, 0) : null;
+            view.CloudCoverage = R(b[ScoringInfo + 350], 0);
+            int perPoint = b[ScoringInfo + 352];
+            view.TrackLimitsPoints = perPoint > 0 ? R((double)s.TrackLimitsSteps / perPoint, 2) : null;
 
             // The player in the scoring, and the field of his class.
             int count = Math.Min(I32(b, ScoringInfo + 104), MaxVehicles), me = -1;

@@ -47,7 +47,8 @@ Envoie les séances Le Mans Ultimate d'un pilote aux fiches combo de son équipe
   les mêmes noms que lui avec notre préfixe (`EnduranceManagerPlugin.Energy.VE.Current_%`…) : énergie et carburant
   (dernier tour, moyenne des 5 derniers, tours restants, besoin jusqu'à l'arrivée, à remettre, avec un tour de marge),
   tours et temps restants, moyenne des 10 derniers tours, position générale et dans la classe, écarts dans la classe,
-  arrêts, pénalités, menu des stands tel que réglé (lu toutes les 2 s, `garage/PitMenu/receivePitMenu`), durée de
+  arrêts, pénalités, points de track limits, réglages en voiture (TC, ABS, répartition, migration, map moteur, barres),
+  batterie, écarts avec les voitures autour, menu des stands tel que réglé (lu toutes les 2 s, `garage/PitMenu/receivePitMenu`), durée de
   l'arrêt qu'il demande (temps de service du jeu : les travaux faits pendant le ravitaillement se chevauchent, les
   autres s'ajoutent), pneus, freins, état de la voiture et météo. `Convertir un dash NeoRed.ps1` passe un dash de
   NeoRed à ces propriétés et liste celles qu'il lit encore sur NeoRed. Les réponses de l'API du jeu pas encore lues
