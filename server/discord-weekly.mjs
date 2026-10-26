@@ -1,6 +1,9 @@
 import {iracingSoloSql} from './iracing-visibility.mjs';
 import {allCommunities, communityUrl, appearanceOf} from './community.mjs';
 import {isInParisWeek, parisWeek} from './discord-weekly-format.mjs';
+import {simForEvent} from '../shared/catalog.mjs';
+import {grindfestEnabled} from '../shared/grindfest.mjs';
+import {isDevelopment} from './dev-environment.mjs';
 import {syncBotRecaps, botRecapSettings} from './recap-discord.mjs';
 
 // All publications are now managed by the bot; historical webhook rows are inert.
@@ -72,7 +75,7 @@ export async function loadWeeklyDiscordSnapshot(env, timestamp, community, scope
   const events = (await env.DB.prepare(`SELECT id,name,circuit,duration_hours,duration_minutes,event_type,schedule_pending,departures
     FROM events WHERE (community_id=? OR (community_id='official' AND (EXISTS (SELECT 1 FROM registrations r WHERE r.event_id=events.id AND r.community_id=?) OR EXISTS (SELECT 1 FROM event_absences a WHERE a.event_id=events.id AND a.community_id=?)
       OR EXISTS (SELECT 1 FROM crews c WHERE c.event_id=events.id AND c.community_id=?)) OR (community_id='official' AND id=?)))
-    AND ${iracingSoloSql(env,community)} ${CIRCUITS[scope] ?? CIRCUITS.lmu} ORDER BY created_at,id`).bind(community.id, community.id, community.id, community.id, eventId).all()).results || [];
+    AND COALESCE(format,'endurance')<>'solo' AND ${iracingSoloSql(env,community)} ${CIRCUITS[scope] ?? CIRCUITS.lmu} ORDER BY created_at,id`).bind(community.id, community.id, community.id, community.id, eventId).all()).results || [];
   const allDepartures = flattenDepartures(eventId ? events.filter(event => event.id === eventId) : events);
   const currentWeek = parisWeek(timestamp);
   // A start whose time is still to be confirmed is never announced as running (its placeholder is 0:00).
@@ -184,6 +187,37 @@ export async function loadWeeklyDiscordSnapshot(env, timestamp, community, scope
     periodKey: planning.futureDepartures.length ? planning.week.key : currentWeek.key,
     periodLabel: planning.futureDepartures.length ? planning.week.label : currentWeek.label
   };
+}
+
+// The calendar's events (EVENT SOLO / EVENT TDZ) of the week, with their places taken by this community's pilots.
+export async function loadCalendarSnapshot(env, timestamp, community) {
+  const rows = (await env.DB.prepare(`SELECT id,name,sim,circuit,rounds,capacity,departures,schedule_pending FROM events
+    WHERE (community_id=? OR community_id='official') AND format='solo' AND ${iracingSoloSql(env,community)}
+    ${grindfestEnabled(community, isDevelopment(env)) ? '' : "AND COALESCE(json_extract(details,'$.type'),'') NOT IN ('Gridfest','Grindfest')"}
+    ORDER BY created_at,id`).bind(community.id).all()).results || [];
+  const starts = rows.flatMap(row => parseJson(row.departures, []).filter(start => Number.isFinite(Number(start?.startsAt)))
+    .map(start => ({row, start, startsAt:Number(start.startsAt)})));
+  const currentWeek = parisWeek(timestamp);
+  let week = currentWeek, selected = starts.filter(item => item.startsAt > timestamp && isInParisWeek(item.startsAt, week));
+  if (!selected.length) {
+    const next = starts.filter(item => item.startsAt > timestamp).sort((a,b) => a.startsAt - b.startsAt)[0];
+    if (next) { week = parisWeek(next.startsAt); selected = starts.filter(item => item.startsAt > timestamp && isInParisWeek(item.startsAt, week)); }
+  }
+  selected.sort((a,b) => a.startsAt - b.startsAt || String(a.row.name).localeCompare(String(b.row.name),'fr'));
+  const ids = [...new Set(selected.map(item => item.row.id))];
+  const counts = new Map();
+  if (ids.length) {
+    const result = (await env.DB.prepare(`SELECT event_id,departure_id,COUNT(DISTINCT COALESCE(participant_id,id)) AS entered FROM registrations
+      WHERE event_id IN (${ids.map(() => '?').join(',')}) AND community_id=? AND COALESCE(status,'')<>'unavailable' GROUP BY event_id,departure_id`)
+      .bind(...ids, community.id).all()).results || [];
+    for (const row of result) counts.set(`${row.event_id}:${row.departure_id}`, Number(row.entered) || 0);
+  }
+  return {periodKey:week.key, periodLabel:week.label, events:selected.map(({row, start, startsAt}) => {
+    const rounds = parseJson(row.rounds, []);
+    return {id:row.id, name:row.name, sim:simForEvent(row), circuits:rounds.length ? rounds.map(round => round?.circuit) : [row.circuit],
+      startsAt, timePending:Boolean(row.schedule_pending) || start.tbd === true, capacity:row.capacity == null ? null : Number(row.capacity),
+      entered:counts.get(`${row.id}:${start.id}`) || 0};
+  })};
 }
 
 // Mutations and scheduled jobs use the same bot publications in both modes.

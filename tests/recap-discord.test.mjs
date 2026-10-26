@@ -5,12 +5,14 @@ import {readFileSync,readdirSync} from 'node:fs';
 import worker from '../server/worker.mjs';
 import {linkTestServer,DEV_COMMUNITY,GUILD} from './fixtures/discord-server.mjs';
 import {syncWeeklyDiscord} from '../server/discord-weekly.mjs';
-import {botCategoryEmojis,saveBotRecap,syncBotRecaps,previewBotRecap,recapDestinations,eventDeletionTime,eventChannelName,sendBotRecapTest,recapError,repairBotRecap,racesOpenNow} from '../server/recap-discord.mjs';
+import {botCategoryEmojis,saveBotRecap,syncBotRecaps,previewBotRecap,recapDestinations,eventDeletionTime,eventChannelName,settingsRow,recapError,repairBotRecap,racesOpenNow} from '../server/recap-discord.mjs';
 
 const OWNER='333333333333333333', BOT='444444444444444444', TEXT='555555555555555555', CATEGORY='666666666666666666';
 const NOW=Date.parse('2026-10-10T12:00:00Z'), DAY=86400000;
 const COMMUNITY={id:DEV_COMMUNITY,slug:'commu-dev',name:'Test',discordGuildId:GUILD,modules:{discordWeekly:true}};
-const SETTINGS={mode:'events',scope:'all',destinationId:CATEGORY,destinationName:'Endurances'};
+const ENDURANCES={id:CATEGORY,name:'Endurances'}, RECAP={id:TEXT,name:'recap'};
+const SETTINGS=settingsRow('events',ENDURANCES,ENDURANCES), GENERAL=settingsRow('general',RECAP);
+const INPUT={mode:'events',lmuId:CATEGORY,iracingId:CATEGORY};
 class D1 {
   constructor(){this.db=new DatabaseSync(':memory:');this.db.exec('PRAGMA foreign_keys=ON');for(const file of readdirSync(new URL('../migrations/',import.meta.url)).filter(file=>file.endsWith('.sql')).sort())this.db.exec(readFileSync(new URL('../migrations/'+file,import.meta.url),'utf8'));linkTestServer(this.db);this.db.prepare('INSERT INTO users(id,name,created_at) VALUES(?,?,0)').run(OWNER,'Admin');}
   prepare(sql){const db=this.db;return {params:[],bind(...params){this.params=params;return this;},async first(){return db.prepare(sql).get(...this.params)||null;},async all(){return {results:db.prepare(sql).all(...this.params)};},async run(){return {meta:{changes:Number(db.prepare(sql).run(...this.params).changes)}};}};}
@@ -40,7 +42,7 @@ function setup(t,{rights='85008',overrides=[],failure=null}={}){
     const send=path.match(/^\/channels\/(\d+)\/messages$/);
     if(send){const message={...body,id:String(counter++),channel_id:send[1],author:{id:BOT}};messages.set(message.id,message);return Response.json(message);}
     const edit=path.match(/^\/channels\/(\d+)\/messages\/(\d+)$/);
-    if(edit){const message=messages.get(edit[2]);if(!message)return Response.json({code:10008},{status:404});Object.assign(message,body);return Response.json(message);}
+    if(edit){const message=messages.get(edit[2]);if(!message)return Response.json({code:10008},{status:404});if(method==='DELETE'){messages.delete(edit[2]);return new Response(null,{status:204});}Object.assign(message,body);return Response.json(message);}
     const channel=path.match(/^\/channels\/(\d+)$/);
     if(channel){const index=channels.findIndex(item=>item.id===channel[1]);if(index<0)return new Response('{}',{status:404});if(method==='DELETE')channels.splice(index,1);else Object.assign(channels[index],body);return new Response(null,{status:204});}
     return new Response('{}',{status:404});
@@ -69,9 +71,11 @@ test('read-only previews preserve every departure and never send to Discord',asy
   assert.equal(previews.length,2);assert.notEqual(previews[0].name,previews[1].name);
   assert.match(JSON.stringify(previews[0].payload),/18 oct/,'also keeps the later departure of the same race');
   assert.equal(calls.length,0);
-  assert.equal((await previewBotRecap(env,NOW,COMMUNITY,{...SETTINGS,scope:'lmu'})).length,1);
-  assert.equal((await previewBotRecap(env,NOW,COMMUNITY,{...SETTINGS,scope:'iracing'})).length,1);
-  assert.equal((await previewBotRecap(env,NOW,COMMUNITY,{...SETTINGS,mode:'general'})).length,1);
+  assert.equal((await previewBotRecap(env,NOW,COMMUNITY,settingsRow('events',ENDURANCES))).length,1);
+  assert.equal((await previewBotRecap(env,NOW,COMMUNITY,settingsRow('events',{},ENDURANCES))).length,1);
+  const weekly=await previewBotRecap(env,NOW,COMMUNITY,settingsRow('general',RECAP,RECAP));
+  assert.deepEqual(weekly.map(item=>item.name),['recap · Endurances LMU','recap · Endurances iRacing'],'one message per sim');
+  assert.equal(calls.length,0);
 });
 
 test('two homonymous events get a category each with their recap; edits reuse their single silent messages',async t=>{
@@ -90,14 +94,17 @@ test('two homonymous events get a category each with their recap; edits reuse th
   assert.equal(calls.filter(call=>call.method==='PATCH').length,1);assert.equal(messages.size,2);
 });
 
-test('general mode uses an existing text channel and retains the message when filters/settings change',async t=>{
-  const {DB,env,calls}=setup(t);race(DB);race(DB,'ir','iRacing','iracing-spa');
-  const settings={...SETTINGS,mode:'general',destinationId:TEXT,destinationName:'recap'};
-  await saveBotRecap(env,COMMUNITY,settings);await syncBotRecaps(env,NOW,COMMUNITY);
-  assert.equal(creates(calls).length,0);assert.equal(sends(calls).length,1);assert.match(JSON.stringify(sends(calls)[0].body),/iRacing/);
-  calls.length=0;await saveBotRecap(env,COMMUNITY,{...settings,scope:'lmu'});await syncBotRecaps(env,NOW,COMMUNITY);
-  assert.equal(sends(calls).length,0);const patch=calls.find(call=>call.method==='PATCH');assert.ok(patch);assert.doesNotMatch(JSON.stringify(patch.body),/iRacing/);
-  await syncBotRecaps(env,NOW+20*DAY,COMMUNITY);assert.equal(calls.filter(call=>call.method==='DELETE').length,0);
+test('general mode posts one message per sim in existing text channels and takes down the one no longer wanted',async t=>{
+  const {DB,env,calls,messages}=setup(t);race(DB);race(DB,'ir','iRacing','iracing-spa');
+  await saveBotRecap(env,COMMUNITY,settingsRow('general',RECAP,RECAP));await syncBotRecaps(env,NOW,COMMUNITY);
+  assert.equal(creates(calls).length,0);assert.equal(sends(calls).length,2);
+  assert.ok(sends(calls).every(call=>call.path===`/channels/${TEXT}/messages`));
+  assert.match(JSON.stringify(sends(calls)[0].body),/Endurances LMU/);assert.doesNotMatch(JSON.stringify(sends(calls)[0].body),/iRacing ·/);
+  assert.match(JSON.stringify(sends(calls)[1].body),/Endurances iRacing/);
+  calls.length=0;await saveBotRecap(env,COMMUNITY,GENERAL);await syncBotRecaps(env,NOW,COMMUNITY);
+  assert.equal(sends(calls).length,0);assert.equal(calls.filter(call=>call.method==='DELETE').length,1,'the iRacing message goes');
+  assert.equal(messages.size,1);
+  calls.length=0;await syncBotRecaps(env,NOW+20*DAY,COMMUNITY);assert.equal(calls.filter(call=>call.method==='DELETE').length,0);
 });
 
 test('cleanup waits 24 hours after the FINAL departure, then deletes only the event text channel',async t=>{
@@ -123,7 +130,7 @@ test('unknown schedules prevent cleanup; changes to the end are recalculated; di
 
 test('channels still expire after switching back to a general recap',async t=>{
   const {DB,env,calls}=setup(t);race(DB);await saveBotRecap(env,COMMUNITY,SETTINGS);await syncBotRecaps(env,NOW,COMMUNITY);
-  await saveBotRecap(env,COMMUNITY,{...SETTINGS,mode:'general',destinationId:TEXT,destinationName:'recap'});
+  await saveBotRecap(env,COMMUNITY,GENERAL);
   await syncBotRecaps(env,NOW+4*DAY,COMMUNITY);
   assert.equal(calls.filter(call=>call.method==='DELETE').length,2);assert.equal(sends(calls).length,2);
 });
@@ -149,33 +156,30 @@ test('destination selection accounts for channel overwrites and keeps communitie
   const {env}=setup(t,{overrides:[{id:BOT,type:1,deny:'16',allow:'0'}]});
   const list=await recapDestinations(env,COMMUNITY);assert.equal(list.find(item=>item.type===0).ready,true);
   assert.deepEqual(list.find(item=>item.id===CATEGORY).missing,['Gérer les salons']);
-  assert.equal((await as(env,'/api/community/recap','PUT',SETTINGS)).status,400);
-  assert.equal((await as(env,'/api/community/recap','PUT',{...SETTINGS,mode:'general',destinationId:CATEGORY})).status,400);
-  assert.equal((await as(env,'/api/community/recap','PUT',{...SETTINGS,destinationId:'999999999999999999'})).status,400);
-  assert.equal((await as(env,'/api/community/recap/preview','POST',{...SETTINGS,scope:'none'})).status,400);
+  assert.equal((await as(env,'/api/community/discord','PUT',INPUT)).status,400);
+  assert.equal((await as(env,'/api/community/discord','PUT',{mode:'general',lmuId:CATEGORY})).status,400);
+  assert.equal((await as(env,'/api/community/discord','PUT',{...INPUT,lmuId:'999999999999999999'})).status,400);
+  assert.equal((await as(env,'/api/community/recap/preview','POST',{mode:'events'})).status,400);
   assert.equal((await as(env,'/api/community/recap/destinations','GET',null,'222222222222222222')).status,403);
 });
 
-test('an explicit test reuses publications without activating automation; historical webhooks stay inert',async t=>{
+test('historical webhooks stay inert; a community without setup sees the recap off',async t=>{
   const {DB,env,calls}=setup(t);race(DB);const hook='https://discord.com/api/webhooks/123456789012345678/token-aaaaaaaaaaaaaaaaaaaaaaaa';
   DB.db.prepare("INSERT INTO community_recaps(community_id,scope,webhook_url,updated_at) VALUES(?,'all',?,0)").run(DEV_COMMUNITY,hook);
-  await sendBotRecapTest(env,NOW,COMMUNITY,SETTINGS);
-  assert.deepEqual({...DB.db.prepare('SELECT enabled,adopted FROM community_recap_settings').get()},{enabled:0,adopted:0});
   const page=(await as(env,'/api/community/setup')).data;
-  assert.equal(page.botRecap.enabled,false);assert.equal(page.botRecap.mode,'events');assert.equal(page.recapSetupRequired,false);
+  assert.equal(page.botRecap,null);assert.equal(page.recapSetupRequired,true);
   assert.match(page.recapBotInviteUrl,/permissions=85008&/);
   calls.length=0;await syncWeeklyDiscord(env,NOW,COMMUNITY);assert.equal(sends(calls).length,0);assert.ok(calls.every(call=>!call.path.includes('/webhooks/')));
-  await saveBotRecap(env,COMMUNITY,SETTINGS);calls.length=0;await syncBotRecaps(env,NOW,COMMUNITY);
+  await saveBotRecap(env,COMMUNITY,SETTINGS,false);calls.length=0;await syncBotRecaps(env,NOW,COMMUNITY);
   assert.equal(sends(calls).length,0);assert.ok(calls.every(call=>!call.path.includes('/webhooks/')));
 });
 
-test('API activation, preview and explicit test use the same messages; previews perform no writes',async t=>{
+test('API activation and preview use the same messages; previews perform no writes',async t=>{
   const {DB,env,calls}=setup(t);race(DB,'a','Spa','spa',[{id:'s',startsAt:Date.now()+DAY}]);
-  const preview=await as(env,'/api/community/recap/preview','POST',SETTINGS);assert.equal(preview.status,200);assert.equal(written(calls).length,0);
-  const active=await as(env,'/api/community/recap','PUT',SETTINGS);assert.equal(active.status,200);assert.equal(active.data.published,true);
-  const first=sends(calls).length;assert.equal((await as(env,'/api/community/recap/test','POST',SETTINGS)).status,200);assert.equal(sends(calls).length,first);
+  const preview=await as(env,'/api/community/recap/preview','POST',INPUT);assert.equal(preview.status,200);assert.equal(written(calls).length,0);
+  const active=await as(env,'/api/community/discord','PUT',INPUT);assert.equal(active.status,200);assert.equal(active.data.published,true);
   const page=await as(env,'/api/community/setup');assert.equal(page.data.botRecap.mode,'events');assert.equal(page.data.botRecap.enabled,true);
-  assert.equal((await as(env,'/api/community/recap','PUT',{enabled:false})).status,200);
+  assert.equal((await as(env,'/api/community/discord','PUT',{enabled:false})).status,200);
 });
 
 test('event channels contain only this community’s crews and absences even on shared official races',async t=>{
@@ -223,7 +227,7 @@ test('new eligible races are created automatically; changing the anchor reorders
   const {DB,env,calls,channels}=setup(t);race(DB);await saveBotRecap(env,COMMUNITY,SETTINGS);await syncBotRecaps(env,NOW,COMMUNITY);calls.length=0;
   race(DB,'new-event','Nouvelle course');await syncBotRecaps(env,NOW+1000,COMMUNITY);assert.equal(creates(calls).length,2);
   channels.push({id:'777777777777777777',type:4,name:'Nouvelle catégorie',position:9});
-  await saveBotRecap(env,COMMUNITY,{...SETTINGS,destinationId:'777777777777777777'});calls.length=0;
+  await saveBotRecap(env,COMMUNITY,settingsRow('events',{id:'777777777777777777',name:'Nouvelle catégorie'},{id:'777777777777777777',name:'Nouvelle catégorie'}));calls.length=0;
   await syncBotRecaps(env,NOW+2000,COMMUNITY);assert.equal(creates(calls).length,0);assert.equal(sends(calls).length,0);
   assert.equal(calls.filter(call=>call.method==='PATCH'&&call.path===`/guilds/${GUILD}/channels`).length,1);
   assert.equal(calls.filter(call=>call.method==='PATCH'&&call.path.startsWith('/channels/')).length,0);
@@ -256,11 +260,11 @@ test('large recaps remain within every Discord embed limit and retain a link to 
 
 test('configuration changes use the publication lock even on first setup',async t=>{
   const {DB,env}=setup(t);
-  const results=await Promise.allSettled([saveBotRecap(env,COMMUNITY,SETTINGS),saveBotRecap(env,COMMUNITY,{...SETTINGS,scope:'lmu'})]);
+  const results=await Promise.allSettled([saveBotRecap(env,COMMUNITY,SETTINGS),saveBotRecap(env,COMMUNITY,settingsRow('events',ENDURANCES))]);
   assert.equal(results.filter(result=>result.status==='fulfilled').length,1);
   assert.equal(results.find(result=>result.status==='rejected').reason.status,409);
   DB.db.prepare('UPDATE community_recap_settings SET lock_until=?').run(Date.now()+60000);
-  assert.equal((await as(env,'/api/community/recap','PUT',SETTINGS)).status,409);
+  assert.equal((await as(env,'/api/community/discord','PUT',INPUT)).status,409);
 });
 
 test('absence declarations and withdrawals edit only the existing event message',async t=>{
@@ -273,7 +277,7 @@ test('absence declarations and withdrawals edit only the existing event message'
 
 test('scheduled rotation prioritizes bot timestamps and ignores historical webhooks',async t=>{
   const {syncDueRecaps}=await import('../server/discord-weekly.mjs');
-  const {DB,env,calls}=setup(t);race(DB);await saveBotRecap(env,COMMUNITY,{...SETTINGS,mode:'general',destinationId:TEXT});
+  const {DB,env,calls}=setup(t);race(DB);await saveBotRecap(env,COMMUNITY,GENERAL);
   DB.db.prepare('UPDATE community_recap_settings SET checked_at=?').run(NOW-2000);
   DB.db.prepare("INSERT INTO communities(id,slug,name,short_name,created_at) VALUES('legacy','legacy','Legacy','LEG',0)").run();
   DB.db.prepare("INSERT INTO community_recaps(community_id,scope,webhook_url,updated_at) VALUES('legacy','all','https://discord.com/api/webhooks/123456789012345678/token-aaaaaaaaaaaaaaaaaaaaaaaa',0)").run();
@@ -322,8 +326,8 @@ test('embed-only recaps require Embed Links in both destination modes',async t=>
   const {env}=setup(t,{rights:'68624'});
   const destinations=await recapDestinations(env,COMMUNITY);
   for(const destination of destinations){assert.equal(destination.ready,false);assert.deepEqual(destination.missing,['Intégrer des liens']);}
-  assert.equal((await as(env,'/api/community/recap','PUT',SETTINGS)).status,400);
-  assert.equal((await as(env,'/api/community/recap','PUT',{...SETTINGS,mode:'general',destinationId:TEXT})).status,400);
+  assert.equal((await as(env,'/api/community/discord','PUT',INPUT)).status,400);
+  assert.equal((await as(env,'/api/community/discord','PUT',{mode:'general',lmuId:TEXT})).status,400);
 });
 
 test('new race categories preserve destination access rules; failed sends resume in the same channel',async t=>{
@@ -346,15 +350,15 @@ test('scheduled bot rotation gives the next community its turn and disabling nev
   const {syncDueRecaps}=await import('../server/discord-weekly.mjs');
   const {DB,env,calls}=setup(t);race(DB);
   DB.db.prepare("INSERT INTO communities(id,slug,name,short_name,discord_guild_id,created_at) VALUES('other','other','Other','OTH',?,0)").run(GUILD);
-  await saveBotRecap(env,COMMUNITY,{...SETTINGS,mode:'general',destinationId:TEXT});
-  await saveBotRecap(env,{...COMMUNITY,id:'other'},{...SETTINGS,mode:'general',destinationId:TEXT});
+  await saveBotRecap(env,COMMUNITY,GENERAL);
+  await saveBotRecap(env,{...COMMUNITY,id:'other'},GENERAL);
   DB.db.prepare("UPDATE community_recap_settings SET checked_at=? WHERE community_id='other'").run(NOW-1000);
   assert.equal(await syncDueRecaps(env,3,NOW),1);
   assert.ok(DB.db.prepare('SELECT message_id FROM discord_recap_publications WHERE community_id=?').get(DEV_COMMUNITY).message_id);
   assert.equal(await syncDueRecaps(env,3,NOW+1000),1);
   assert.ok(DB.db.prepare("SELECT message_id FROM discord_recap_publications WHERE community_id='other'").get().message_id);
   DB.db.prepare("INSERT INTO community_recaps(community_id,scope,webhook_url,updated_at) VALUES(?,'all','https://discord.com/api/webhooks/123456789012345678/token-aaaaaaaaaaaaaaaaaaaaaaaa',0)").run(DEV_COMMUNITY);
-  await saveBotRecap(env,COMMUNITY,{...SETTINGS,mode:'general',destinationId:TEXT},false);
+  await saveBotRecap(env,COMMUNITY,GENERAL,false);
   calls.length=0;await syncWeeklyDiscord(env,NOW+2000,COMMUNITY);assert.equal(sends(calls).length,0);assert.ok(calls.every(call=>!call.path.includes('/webhooks/')));
 });
 
@@ -369,7 +373,7 @@ test('Discord diagnostics distinguish removed messages, missing channels and mis
 });
 
 
-test('an explicit test repairs a deleted race category and channel while preserving the configured destination',async t=>{
+test('repair rebuilds a deleted race category and channel while preserving the configured destination',async t=>{
   const {DB,env,calls,channels,messages}=setup(t);race(DB);
   await saveBotRecap(env,COMMUNITY,SETTINGS);await syncBotRecaps(env,NOW,COMMUNITY);
   const old=DB.db.prepare('SELECT * FROM discord_recap_publications').get();
@@ -383,19 +387,19 @@ test('an explicit test repairs a deleted race category and channel while preserv
   globalThis.fetch=async(url,options)=>failure(String(url).replace('https://discord.com/api/v10',''))?Response.json({code:10003},{status:404}):original(url,options);
   await assert.rejects(syncBotRecaps(env,NOW+1,COMMUNITY),/salon de publication/);
   calls.length=0;
-  await sendBotRecapTest(env,NOW+2,COMMUNITY,SETTINGS);
+  globalThis.fetch=original;await repairBotRecap(env,NOW+2,COMMUNITY);
   const repaired=DB.db.prepare('SELECT * FROM discord_recap_publications').get();
   assert.notEqual(repaired.category_id,old.category_id);assert.notEqual(repaired.channel_id,old.channel_id);assert.ok(repaired.message_id);
   assert.equal(creates(calls).length,2);assert.equal(sends(calls).length,1);
   assert.ok(channels.some(item=>item.id===CATEGORY));
-  calls.length=0;await sendBotRecapTest(env,NOW+3,COMMUNITY,SETTINGS);
+  calls.length=0;await repairBotRecap(env,NOW+3,COMMUNITY);
   assert.equal(creates(calls).length,0);assert.equal(sends(calls).length,0);
 });
 
 
 for(const mode of ['general','events'])test(`admin repair restores a removed ${mode} message without switching settings`,async t=>{
   const {DB,env,calls,messages}=setup(t);race(DB);
-  const settings=mode==='general'?{...SETTINGS,mode,destinationId:TEXT}:SETTINGS;
+  const settings=mode==='general'?GENERAL:SETTINGS;
   await saveBotRecap(env,COMMUNITY,settings);await syncBotRecaps(env,NOW,COMMUNITY);
   const before=DB.db.prepare('SELECT * FROM discord_recap_publications').get();messages.clear();calls.length=0;
   await repairBotRecap(env,NOW,COMMUNITY);
@@ -420,7 +424,7 @@ test('repair refuses insufficient permissions or a missing destination; disabled
 
 test('repair endpoint is admin-only and uses saved settings instead of supplied destinations',async t=>{
   const {DB,env,calls}=setup(t);race(DB);
-  await saveBotRecap(env,COMMUNITY,{...SETTINGS,mode:'general',destinationId:TEXT});
+  await saveBotRecap(env,COMMUNITY,GENERAL);
   assert.equal((await as(env,'/api/community/recap/repair','POST',{},'222222222222222222')).status,403);
   assert.equal((await as(env,'/api/community/recap/repair','POST',{destinationId:'999999999999999999'})).status,200);
   assert.equal(sends(calls)[0].path,`/channels/${TEXT}/messages`);
@@ -522,4 +526,82 @@ test('recap setup validates voice access when crew channels are on and new race 
   const createdCategory=channels.find(item=>item.type===4&&item.name.startsWith('🏎️'));
   assert.deepEqual(createdCategory.permission_overwrites.slice(0,2),overrides.slice(0,2));
   assert.equal(createdCategory.permission_overwrites.find(item=>item.id===BOT).allow,'1133584');
+});
+
+function solo(DB,id,name,startsAt,capacity=null,community=DEV_COMMUNITY){
+  DB.db.prepare(`INSERT INTO events(id,name,circuit,duration_hours,categories,departures,created_by,created_at,community_id,format,capacity) VALUES(?,?,'monza',1,'["GT3"]',?,?,0,?,'solo',?)`)
+    .run(id,name,JSON.stringify([{id:'d-'+id,startsAt}]),OWNER,community,capacity);
+}
+
+test('the week calendar is its own message, never mixed with the endurances',async t=>{
+  const {DB,env,calls,messages}=setup(t);race(DB);solo(DB,'sprint','Sprint du mardi',NOW+DAY,2);solo(DB,'cup','Coupe du jeudi',NOW+DAY/4);
+  const participant=DB.db.prepare("INSERT INTO participants(id,name,user_id,created_by,created_at,community_id) VALUES(?,?,?,?,0,?)");
+  participant.run('p1','Admin',OWNER,OWNER,DEV_COMMUNITY);DB.db.prepare("INSERT INTO users(id,name,created_at) VALUES('222222222222222229','Pilote 2',0)").run();participant.run('p2','Pilote 2','222222222222222229',OWNER,DEV_COMMUNITY);
+  const insert=DB.db.prepare("INSERT INTO registrations(id,event_id,departure_id,user_id,name,name_key,category,status,created_at,participant_id,community_id) VALUES(?,?,?,?,?,?,'GT3','whole',0,?,?)");
+  insert.run('r1','sprint','d-sprint',OWNER,'Admin','admin','p1',DEV_COMMUNITY);insert.run('r2','sprint','d-sprint','222222222222222229','Pilote 2','pilote 2','p2',DEV_COMMUNITY);
+  const community={...COMMUNITY,modules:{...COMMUNITY.modules,soloRaces:true}};
+  await saveBotRecap(env,community,settingsRow('events',ENDURANCES,ENDURANCES,RECAP));await syncBotRecaps(env,NOW,community);
+  const calendar=sends(calls).find(call=>call.path===`/channels/${TEXT}/messages`);assert.ok(calendar,'posted in the chosen channel');
+  const text=JSON.stringify(calendar.body);
+  assert.match(text,/📅 Calendrier de la semaine/);assert.match(text,/Sprint du mardi/);assert.match(text,/Coupe du jeudi/);
+  assert.match(text,/2\/2 places · complet/);assert.doesNotMatch(text,/6h de Spa/,'the endurances stay in their category');
+  assert.doesNotMatch(JSON.stringify(sends(calls).filter(call=>call!==calendar).map(call=>call.body)),/Sprint du mardi/,'events never get a race category');
+  assert.ok(!creates(calls).some(call=>/Sprint/.test(call.body.name)));
+  // Events module off: the calendar message goes.
+  calls.length=0;await syncBotRecaps(env,NOW+1000,COMMUNITY);
+  assert.equal(calls.filter(call=>call.method==='DELETE'&&call.path.startsWith(`/channels/${TEXT}/messages/`)).length,1);
+  assert.ok(![...messages.values()].some(item=>/Calendrier/.test(JSON.stringify(item))));
+});
+
+test('LMU and iRacing races go under their own chosen category; the order of the week messages follows the community',async t=>{
+  const {DB,env,calls,channels}=setup(t);race(DB);race(DB,'ir','Course iRacing','iracing-spa');
+  const VOICES='111111111111111112';
+  await saveBotRecap(env,COMMUNITY,settingsRow('events',ENDURANCES,{id:VOICES,name:'Vocaux'}));await syncBotRecaps(env,NOW,COMMUNITY);
+  const parent=name=>channels.find(item=>item.type===4&&item.name===name);
+  const sorted=channels.filter(item=>item.type===4).sort((a,b)=>a.position-b.position).map(item=>item.name);
+  assert.deepEqual(sorted,['Accueil','Endurances','🏎️ LMU · 6h de Spa','Vocaux','🏁 iRacing · Course iRacing']);
+  assert.ok(parent('🏎️ LMU · 6h de Spa')&&parent('🏁 iRacing · Course iRacing'));
+  // Only LMU published from now on: the iRacing race keeps its channels until they expire, no new one appears.
+  race(DB,'ir2','Autre iRacing','iracing-monza');
+  await saveBotRecap(env,COMMUNITY,SETTINGS_LMU());calls.length=0;await syncBotRecaps(env,NOW+1000,COMMUNITY);
+  assert.ok(!creates(calls).some(call=>/Autre iRacing/.test(call.body.name)));
+  // Week messages: endurances first, the calendar first at TDZ.
+  const tdz={...COMMUNITY,slug:'tdz',modules:{...COMMUNITY.modules,soloRaces:true}},other={...COMMUNITY,modules:{...COMMUNITY.modules,soloRaces:true}};
+  solo(DB,'s','Sprint',NOW+DAY);const both=settingsRow('general',RECAP,RECAP,RECAP);
+  assert.deepEqual((await previewBotRecap(env,NOW,other,both)).map(item=>item.name),['recap · Endurances LMU','recap · Endurances iRacing','recap · Calendrier de la semaine']);
+  assert.deepEqual((await previewBotRecap(env,NOW,tdz,both)).map(item=>item.name),['recap · Calendrier de la semaine','recap · Endurances LMU','recap · Endurances iRacing']);
+});
+const SETTINGS_LMU=()=>settingsRow('events',ENDURANCES);
+
+test('the Discord setting saves the recap, the crew voices and the reminders together',async t=>{
+  const {DB,env}=setup(t,{rights:'1133584'});
+  const saved=await as(env,'/api/community/discord','PUT',{mode:'general',lmuId:TEXT,crewChannels:true,crewCategory:'111111111111111112',raceReminders:true});
+  assert.equal(saved.status,200,JSON.stringify(saved.data));
+  const modules=JSON.parse(DB.db.prepare('SELECT modules FROM communities WHERE id=?').get(DEV_COMMUNITY).modules);
+  assert.equal(modules.crewChannels,true);assert.equal(modules.raceReminders,true);
+  assert.equal(DB.db.prepare('SELECT voice_category_id FROM community_crew_discord WHERE community_id=?').get(DEV_COMMUNITY)?.voice_category_id,'111111111111111112');
+  const page=(await as(env,'/api/community/setup')).data.botRecap;
+  assert.deepEqual([page.enabled,page.mode,page.lmuId,page.iracingId],[true,'general',TEXT,'']);
+  assert.equal((await as(env,'/api/community/discord','PUT',{mode:'general'})).status,400,'at least one place');
+  assert.equal((await as(env,'/api/community/discord','PUT',{enabled:false})).status,200);
+  const off=JSON.parse(DB.db.prepare('SELECT modules FROM communities WHERE id=?').get(DEV_COMMUNITY).modules);
+  assert.equal(off.crewChannels,false);assert.equal(off.raceReminders,false);
+  assert.equal(DB.db.prepare('SELECT enabled FROM community_recap_settings').get().enabled,0);
+});
+
+test('migration 0079 keeps the existing recap of each community',()=>{
+  const db=new DatabaseSync(':memory:');
+  const files=readdirSync(new URL('../migrations/',import.meta.url)).filter(file=>file.endsWith('.sql')).sort();
+  for(const file of files.filter(file=>file<'0079'))db.exec(readFileSync(new URL('../migrations/'+file,import.meta.url),'utf8'));
+  db.exec("INSERT INTO communities(id,slug,name,short_name,created_at) VALUES('a','aa','A','A',0),('b','bb','B','B',0),('c','cc','C','C',0)");
+  const insert=db.prepare("INSERT INTO community_recap_settings(community_id,enabled,mode,scope,guild_id,destination_id,destination_name) VALUES(?,1,?,?,'1',?,?)");
+  insert.run('a','events','all','10','Endurances');insert.run('b','general','iracing','20','recap');insert.run('c','general','lmu','30','recap');
+  const publication=db.prepare("INSERT INTO discord_recap_publications(community_id,event_id,guild_id,marker) VALUES(?,?,'1',?)");
+  publication.run('b','','mb');publication.run('c','','mc');publication.run('a','race','ma');
+  db.exec(readFileSync(new URL('../migrations/'+files.find(file=>file.startsWith('0079')),import.meta.url),'utf8'));
+  const row=id=>({...db.prepare('SELECT destination_id,iracing_destination_id FROM community_recap_settings WHERE community_id=?').get(id)});
+  assert.deepEqual(row('a'),{destination_id:'10',iracing_destination_id:'10'});
+  assert.deepEqual(row('b'),{destination_id:'',iracing_destination_id:'20'});
+  assert.deepEqual(row('c'),{destination_id:'30',iracing_destination_id:''});
+  assert.deepEqual(db.prepare('SELECT community_id,event_id FROM discord_recap_publications ORDER BY community_id').all().map(item=>[item.community_id,item.event_id]),[['a','race'],['b','week:iracing'],['c','week:lmu']]);
 });

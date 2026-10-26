@@ -107,8 +107,9 @@ const CREW_COLUMNS = `c.id AS crew_id, c.community_id, c.name AS crew_name, c.ca
   e.name AS event_name, e.departures, e.duration_hours, e.duration_minutes, e.circuit, e.schedule_pending`;
 const TRACKED_CREWS = `SELECT d.crew_id AS row_id, d.community_id AS row_community, d.guild_id, d.category_id, d.text_id, d.voice_id, d.message_id,
   d.recap_hash, d.members, d.starts_at, d.reminded, d.created_at, d.parent_id, ${CREW_COLUMNS},
-  CASE WHEN p.category_id<>COALESCE(s.destination_id,'') THEN p.category_id END AS race_category,
-  CASE WHEN s.enabled=1 AND s.mode='events' THEN s.scope END AS race_scope
+  CASE WHEN p.category_id NOT IN (COALESCE(s.destination_id,''),COALESCE(s.iracing_destination_id,'')) THEN p.category_id END AS race_category,
+  CASE WHEN s.enabled=1 AND s.mode='events' THEN CASE WHEN s.destination_id<>'' AND s.iracing_destination_id<>'' THEN 'all'
+    WHEN s.destination_id<>'' THEN 'lmu' WHEN s.iracing_destination_id<>'' THEN 'iracing' END END AS race_scope
   FROM crew_discord d LEFT JOIN crews c ON c.id=d.crew_id LEFT JOIN events e ON e.id=c.event_id
     LEFT JOIN discord_recap_publications p ON p.community_id=d.community_id AND p.event_id=c.event_id AND p.closed_at IS NULL
     LEFT JOIN community_recap_settings s ON s.community_id=d.community_id`;
@@ -395,8 +396,19 @@ export async function serverCategories(env, guildId) {
 const waitsForCategory = (row, timestamp) => !row.race_category && timestamp - Number(row.created_at) < WAIT_CATEGORY
   && (row.race_scope === 'all' || row.race_scope === game(row.circuit));
 
-// In its race's category the crew's name is enough; elsewhere the sim comes first (« LMU-Les Tondeuz »).
-const voiceName = (row, crewName) => clip(row.race_category ? crewName : `${game(row.circuit) === 'iracing' ? 'iRacing' : 'LMU'}-${crewName}`, 100);
+// In its race's category the crew's name is enough; elsewhere the sim and the race come first (« LMU · 6h de Spa · Équipage A »).
+const voiceName = (row, crewName) => clip(row.race_category ? crewName : `${game(row.circuit) === 'iracing' ? 'iRacing' : 'LMU'} · ${safe(row.event_name) || 'Endurance'} · ${crewName}`, 100);
+// In the admins' category the voice channels follow the races: LMU first, then iRacing, each by start (one request).
+async function sortVoices(env, budget, row) {
+  const rows = (await env.DB.prepare(`SELECT d.voice_id, d.created_at, c.departure_id, e.circuit, e.departures FROM crew_discord d
+    JOIN crews c ON c.id=d.crew_id JOIN events e ON e.id=c.event_id
+    WHERE d.community_id=? AND d.closed_at IS NULL AND d.voice_id IS NOT NULL AND d.parent_id IS NULL`).bind(row.row_community).all()).results || [];
+  if (rows.length < 2) return;
+  const startOfRow = item => Number((JSON.parse(item.departures || '[]').find(start => start?.id === item.departure_id) || {}).startsAt) || Infinity;
+  const key = item => [game(item.circuit) === 'iracing' ? 1 : 0, startOfRow(item), Number(item.created_at) || 0];
+  rows.sort((a, b) => { const x = key(a), y = key(b); return x[0] - y[0] || x[1] - y[1] || x[2] - y[2]; });
+  await discord(env, budget, 'PATCH', `/guilds/${row.guild_id}/channels`, rows.map((item, position) => ({id:item.voice_id, position})));
+}
 
 async function syncRow(env, budget, timestamp, community, setting, row, pilots) {
   const start = row.crew_id && row.event_name ? startOf(row) : null;
@@ -423,6 +435,7 @@ async function syncRow(env, budget, timestamp, community, setting, row, pilots) 
     const voice = await createVoice(env, budget, row, setting, {name:voiceName(row, crewName), type:VOICE});
     Object.assign(row, {voice_id:voice.id, message_id:null, parent_id:row.race_category || null});
     await env.DB.prepare('UPDATE crew_discord SET voice_id=?, message_id=NULL, parent_id=? WHERE crew_id=?').bind(voice.id, row.parent_id, row.row_id).run();
+    if (!row.race_category && setting.voice_category_id) await sortVoices(env, budget, row);
     opened = true;
   }
   if (row.race_category && row.parent_id !== row.race_category) {
@@ -553,12 +566,12 @@ export async function checkBot(env, guildId, {channelIds = [], includeCategories
 
 
 export async function checkCrewAccess(env, community, {categoryId, includeCategories = false, failedChannelId = null} = {}) {
-  const recap = await env.DB.prepare('SELECT enabled,mode,destination_id FROM community_recap_settings WHERE community_id=?').bind(community.id).first();
+  const recap = await env.DB.prepare('SELECT enabled,mode,destination_id,iracing_destination_id FROM community_recap_settings WHERE community_id=?').bind(community.id).first();
   const saved = categoryId === undefined ? await env.DB.prepare('SELECT voice_category_id FROM community_crew_discord WHERE community_id=?').bind(community.id).first() : null;
-  const destination = recap?.enabled && recap.mode === 'events' ? recap.destination_id : categoryId ?? saved?.voice_category_id;
+  const destinations = recap?.enabled && recap.mode === 'events' ? [recap.destination_id, recap.iracing_destination_id] : [categoryId ?? saved?.voice_category_id];
   const tracked = (await env.DB.prepare(`SELECT category_id AS id FROM discord_recap_publications WHERE community_id=? AND closed_at IS NULL AND category_id IS NOT NULL
     UNION SELECT voice_id AS id FROM crew_discord WHERE community_id=? AND closed_at IS NULL AND voice_id IS NOT NULL`).bind(community.id,community.id).all()).results || [];
-  return checkBot(env,community.discordGuildId,{channelIds:[destination,...tracked.map(row => row.id),failedChannelId].filter(Boolean),includeCategories});
+  return checkBot(env,community.discordGuildId,{channelIds:[...destinations,...tracked.map(row => row.id),failedChannelId].filter(Boolean),includeCategories});
 }
 export async function validateCrewAccess(env,community,options = {}) {
   const result = await checkCrewAccess(env,community,options);
