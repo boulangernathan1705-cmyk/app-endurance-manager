@@ -1,5 +1,14 @@
 # Nouveautés d'Endurance Manager
 
+## v1.55 — 26 octobre 2026
+
+### ✨ Nouveautés
+
+- **Fiches combo** : la fiche de l’équipe pour chaque circuit et voiture (tours, relais, carburant et énergie, pneus) alimentée par le plugin SimHub, avec l’onglet « Mon analyse ».
+- **Mur des stands** : nouvelle présentation en 5 onglets (classement, chrono, véhicule et énergie, télémétrie, carte), plein écran, avec pneus, dégâts et consommation des opposants.
+- **Plugin SimHub 2.2** : installé et mis à jour depuis le site ; reprend les données des dashs NeoRed.
+- **Météo prévue** : facultative à la création d’une endurance (sec, variable ou pluie, avec une précision), affichée sur la page de la course.
+
 ## v1.54 — 21 octobre 2026
 
 ### 🔧 Corrections et améliorations
