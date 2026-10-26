@@ -1,8 +1,10 @@
 import './validate-image-assets.mjs';
-import {mkdir, copyFile, cp, writeFile, rm, readFile} from 'node:fs/promises';
+import {mkdir, copyFile, cp, writeFile, rm, readFile, access} from 'node:fs/promises';
+import {createHash} from 'node:crypto';
 import {posix} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {changelogHtml} from './changelog.mjs';
+import {relaySocketOrigin} from '../shared/relay-pass.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const out = new URL('../public/', import.meta.url);
@@ -91,6 +93,9 @@ const sourceMembers = await readFile(root + 'members.html', 'utf8');
 const sourceDiagnostics = await readFile(root + 'diagnostics.html', 'utf8');
 const sourceHelp = await readFile(root + 'help.html', 'utf8');
 const sourceRequest = await readFile(root + 'demande-communaute.html', 'utf8');
+const sourceCombos = await readFile(root + 'fiches-combo.html', 'utf8');
+const sourceLive = await readFile(root + 'mur-des-stands.html', 'utf8');
+const sourceWall = await readFile(root + 'mur.html', 'utf8');
 const paths = [
   ...stylesheetPaths(sourceIndex,'index.html'),
   ...stylesheetPaths(sourceGame,'game.html'),
@@ -98,6 +103,9 @@ const paths = [
   ...stylesheetPaths(sourceDiagnostics,'diagnostics.html'),
   ...stylesheetPaths(sourceHelp,'help.html'),
   ...stylesheetPaths(sourceRequest,'demande-communaute.html'),
+  ...stylesheetPaths(sourceCombos,'fiches-combo.html'),
+  ...stylesheetPaths(sourceLive,'mur-des-stands.html'),
+  ...stylesheetPaths(sourceWall,'mur.html'),
 ];
 // styles/ux-refresh.css is the final layer that replaces older rules: keep it last in the
 // shared bundle whichever page lists it first.
@@ -115,6 +123,9 @@ await writeFile(new URL('members.html', out), productionHtml(sourceMembers));
 await writeFile(new URL('diagnostics.html', out), productionHtml(sourceDiagnostics));
 await writeFile(new URL('help.html', out), productionHtml(sourceHelp));
 await writeFile(new URL('demande-communaute.html', out), productionHtml(sourceRequest));
+await writeFile(new URL('fiches-combo.html', out), productionHtml(sourceCombos));
+await writeFile(new URL('mur-des-stands.html', out), productionHtml(sourceLive));
+await writeFile(new URL('mur.html', out), productionHtml(sourceWall));
 const gameHtml = productionHtml(sourceGame);
 await writeFile(new URL('lmu/index.html', out), gameHtml);
 await writeFile(new URL('iracing/index.html', out), gameHtml);
@@ -136,6 +147,22 @@ await cp(root + 'images', new URL('images/', out), {recursive: true});
 await cp(root + 'front', new URL('front/', out), {recursive: true});
 await writeFile(new URL('front/version.json', out), JSON.stringify({build: BUILD_ID}) + '\n');
 await cp(root + 'shared', new URL('shared/', out), {recursive: true});
+
+// The SimHub plugin for the fiches combo, when a build sits in connectors/simhub-plugin/release: the DLL, the installer
+// (the page and the plugin write the site's address into it) and plugin.json, which the installer checks the download
+// against and the plugin reads to offer an update.
+const pluginRelease = root + 'connectors/simhub-plugin/';
+if (await access(pluginRelease + 'release/EnduranceManager.SimHub.dll').then(() => true, () => false)) {
+  const {version} = JSON.parse(await readFile(pluginRelease + 'release/plugin.json', 'utf8'));
+  if (!/^\d+\.\d+\.\d+$/.test(version || '')) throw new Error('connectors/simhub-plugin/release/plugin.json : version attendue au format 1.2.3.');
+  const dll = await readFile(pluginRelease + 'release/EnduranceManager.SimHub.dll');
+  const installer = await readFile(pluginRelease + 'Installer le plugin.cmd', 'utf8');
+  if (!installer.includes('@@SITE@@')) throw new Error('L’installeur du plugin doit garder l’emplacement @@SITE@@.');
+  await mkdir(new URL('downloads/simhub/', out), {recursive: true});
+  await writeFile(new URL('downloads/simhub/EnduranceManager.SimHub.dll', out), dll);
+  await writeFile(new URL('downloads/simhub/installer.cmd', out), installer);
+  await writeFile(new URL('downloads/simhub/plugin.json', out), JSON.stringify({version, size:dll.length, sha256:createHash('sha256').update(dll).digest('hex')}) + '\n');
+}
 
 // Module preloads: each page lists every module its scripts import (and their own imports), so the browser
 // fetches them all at once instead of discovering them one level at a time.
@@ -166,7 +193,7 @@ async function addModulePreloads(file) {
   const links = modules.map(url => `<link rel="modulepreload" href="${url}">`).join('\n');
   await writeFile(target, html.replace('</head>', `${links}\n</head>`));
 }
-for (const file of ['index.html', 'members.html', 'diagnostics.html', 'help.html', 'demande-communaute.html',
+for (const file of ['index.html', 'members.html', 'diagnostics.html', 'help.html', 'demande-communaute.html', 'fiches-combo.html', 'mur-des-stands.html', 'mur.html',
   'lmu/index.html', 'iracing/index.html', 'privacy.html', 'legal.html', 'about.html', 'circuit-credits.html', 'changelog.html']) await addModulePreloads(file);
 
 if (!workers) {
@@ -176,7 +203,7 @@ if (!workers) {
 
 // LOCAL_HTTP=1: the browser tests run the site over http on the test machine (Safari would upgrade to https).
 await writeFile(new URL('_headers', out), `/*
-  Content-Security-Policy: default-src 'self'; script-src 'self'; script-src-attr 'none'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://commons.wikimedia.org https://upload.wikimedia.org https://cdn.discordapp.com https://static-cdn.jtvnw.net https://static.twitchcdn.net; connect-src 'self'; font-src 'self' data:; media-src 'none'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; frame-src 'none'; form-action 'self'; worker-src 'self'; manifest-src 'self'${process.env.LOCAL_HTTP === '1' ? '' : '; upgrade-insecure-requests'}
+  Content-Security-Policy: default-src 'self'; script-src 'self'; script-src-attr 'none'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://commons.wikimedia.org https://upload.wikimedia.org https://cdn.discordapp.com https://static-cdn.jtvnw.net https://static.twitchcdn.net; connect-src 'self'${relaySocketOrigin() ? ' ' + relaySocketOrigin() : ''}; font-src 'self' data:; media-src 'none'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; frame-src 'none'; form-action 'self'; worker-src 'self'; manifest-src 'self'${process.env.LOCAL_HTTP === '1' ? '' : '; upgrade-insecure-requests'}
   Strict-Transport-Security: max-age=63072000; includeSubDomains
   X-Content-Type-Options: nosniff
   Referrer-Policy: no-referrer
@@ -193,6 +220,21 @@ await writeFile(new URL('_headers', out), `/*
 /diagnostics.html
   X-Robots-Tag: noindex, nofollow
 
+/fiches-combo.html
+  X-Robots-Tag: noindex, nofollow
+
+/mur-des-stands.html
+  X-Robots-Tag: noindex, nofollow
+
+/mur.html
+  X-Robots-Tag: noindex, nofollow
+
+/mur
+  X-Robots-Tag: noindex, nofollow
+
+/downloads/*
+  X-Robots-Tag: noindex, nofollow
+
 https://app.endurance-manager.workers.dev/*
   X-Robots-Tag: noindex, nofollow
 `);
@@ -203,6 +245,11 @@ Disallow: /api/
 Disallow: /telemetry/
 Disallow: /members.html
 Disallow: /diagnostics.html
+Disallow: /fiches-combo.html
+Disallow: /mur-des-stands.html
+Disallow: /mur.html
+Disallow: /mur
+Disallow: /downloads/
 Sitemap: https://endurance-manager.app/sitemap.xml
 `);
 

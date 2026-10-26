@@ -35,6 +35,26 @@ Configuration : `wrangler.prod.jsonc`
 
 La base D1 PROD est `endurance-manager-prod` et `APP_ORIGIN=https://endurance-manager.app`.
 
+## Relais du mur des stands (second compte Cloudflare)
+
+Le direct du mur des stands (plugin SimHub du pilote au volant, pages des coéquipiers) passe par un relais déployé seul,
+sur un **second compte Cloudflare gratuit**, pour ne jamais consommer le quota du site : `relay/worker.mjs`,
+configuration `wrangler.relay.jsonc`. Il ne garde que les salons (`LiveRoom`, `server/live.mjs`) et n'ouvre la porte
+qu'avec un laissez-passer de quelques minutes signé par le site (`shared/relay-pass.mjs`).
+
+1. Créer le second compte Cloudflare, puis y importer le dépôt (Workers Builds) : Worker `app-endurance-manager-relais`,
+   build vide, déploiement `npx wrangler deploy --config wrangler.relay.jsonc`, **branche de production `dev`** (Paramètres
+   → Build → Contrôle des branches ; seul un envoi sur la branche lance un build, relancer un build refait le même commit).
+2. Choisir un secret d'au moins 32 caractères et le poser des deux côtés :
+   `npx wrangler secret put RELAY_SECRET --config wrangler.relay.jsonc` (relais), puis sur le Worker du site (dev ou
+   prod) la variable secrète `RELAY_SECRET` avec la même valeur.
+3. L'adresse du relais (`https://app-endurance-manager-relais.<compte>.workers.dev`) s'écrit dans `RELAY_ORIGIN`
+   (`shared/relay-pass.mjs`) : le site la donne avec les laissez-passer et l'autorise aux pages (`connect-src`). Une
+   variable `RELAY_URL` sur le Worker la remplace au besoin.
+
+Le site de test a ses propres salons sur le même relais (`dev:<communauté>`). Sans adresse ou sans `RELAY_SECRET`, rien
+ne change : le plugin et les pages se connectent au site comme avant.
+
 ## Données
 
 Ne jamais copier automatiquement la base DEV vers PROD. Les migrations de schéma sont partagées dans `migrations/`, mais les données utilisateur restent propres à chaque environnement.

@@ -11,6 +11,10 @@ test('endurance race settings are optional, checked and kept when an older page 
   assert.throws(() => validateEvent({...base, details:{trackLimits:'souple'}}), /Limites de piste/);
   assert.throws(() => validateEvent({...base, details:{tyres:0}}), /Pneus/);
   assert.throws(() => validateEvent({...base, details:{grid:1.5}}), /Voitures/);
+  assert.deepEqual(validateEvent({...base, details:{weather:'mixed', weatherNote:'  Pluie possible la nuit '}}).details, {weather:'mixed', weatherNote:'Pluie possible la nuit'});
+  assert.deepEqual(validateEvent({...base, details:{weather:'', weatherNote:''}}).details, {});
+  assert.throws(() => validateEvent({...base, details:{weather:'neige'}}), /Météo/);
+  assert.throws(() => validateEvent({...base, details:{weatherNote:'x'.repeat(61)}}), /Précision météo/);
   const existing = {format:'endurance', departures:'[]', details:JSON.stringify({tyres:6})};
   assert.deepEqual(validateEvent(base, existing).details, {tyres:6});
 });

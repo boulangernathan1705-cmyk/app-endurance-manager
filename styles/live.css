@@ -1,0 +1,223 @@
+/* Mur des stands (mur-des-stands.html, front/live-page.mjs): the team's cars live, for the teammates watching.
+   On a wide screen everything at once (standings and map on top, our car and the race below); narrower, one tab at a
+   time. Tables fit the width at 390 px: columns drop, never a horizontal scrollbar. */
+.live-page {
+  --lw-line: var(--border, #292d31);
+  --lw-panel: var(--panel, #111315);
+  --lw-panel2: var(--panel2, #17191c);
+  --lw-live: #35b978; --lw-warn: #d9a640; --lw-best: #b98cff; --lw-up: #e4a341; --lw-down: #5fb7e8;
+  --lw-hyper: #e4002b; --lw-lmp2: #2a7de1; --lw-gt3: #f28c00; --lw-other: #9aa3a7;
+  margin: 0 auto;
+  padding: 16px 16px 48px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 14px;
+}
+.members-main.live-page { width: calc(100% - 32px); max-width: none; margin-top: 10px; }
+/* The banner as a thin band: the wall takes the screen. */
+body.live-body header.site-hero .hero-picture { aspect-ratio: auto; height: 54px; }
+body.live-body header.site-hero .hero-banner { object-fit: cover; object-position: 72% 55%; }
+body.live-body .site-nav-shell { width: calc(100% - 32px); max-width: none; }
+body.live-body .site-nav-shell #navigation { top: 9px; }
+@media (max-width: 700px) { body.live-body header.site-hero .hero-picture { height: 40px; } }
+.live-page [hidden] { display: none !important; }
+.live-page td, .lw-num { font-variant-numeric: tabular-nums; }
+.live-page button { font: inherit; color: inherit; }
+.live-page button:focus-visible { outline: 2px solid var(--lw-live); outline-offset: 2px; }
+.lw-flag { margin: 0; font-size: 13px; color: var(--muted); }
+.lw-flag b { color: var(--text); font-weight: 600; }
+
+.lw-top { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: end; gap: 10px 20px; padding-bottom: 12px; border-bottom: 1px solid var(--lw-line); }
+.lw-crumb { color: var(--muted); font-size: 13px; text-transform: uppercase; letter-spacing: .09em; }
+.live-page h1 { margin: 2px 0 0; font-size: 28px; line-height: 1.15; }
+.lw-facts { display: flex; flex-wrap: wrap; gap: 8px 22px; align-items: end; }
+.lw-fact { display: grid; }
+.lw-fact span { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
+.lw-fact b { font-size: 28px; font-weight: 700; line-height: 1.15; }
+.lw-link { display: inline-flex; align-items: center; gap: 8px; font-size: 15px; color: var(--muted); }
+.lw-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); flex: none; }
+.lw-dot.on { background: var(--lw-live); animation: lw-pulse 2s infinite; }
+.lw-dot.late { background: var(--lw-warn); }
+@keyframes lw-pulse { 0% { box-shadow: 0 0 0 0 rgba(53,185,120,.55); } 70% { box-shadow: 0 0 0 7px rgba(53,185,120,0); } 100% { box-shadow: 0 0 0 0 rgba(53,185,120,0); } }
+@media (prefers-reduced-motion: reduce) { .lw-dot.on { animation: none; } }
+
+.lw-cars { display: flex; flex-wrap: wrap; gap: 8px; }
+.lw-car { display: inline-flex; align-items: center; gap: 8px; background: var(--lw-panel); border: 1px solid var(--lw-line); border-radius: 99px; padding: 5px 12px 5px 6px; cursor: pointer; max-width: 100%; }
+.lw-car[aria-pressed="true"] { border-color: var(--muted); background: var(--lw-panel2); }
+.lw-car i { width: 18px; height: 18px; border-radius: 50%; flex: none; }
+.lw-car b { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lw-car span { font-size: 12px; color: var(--muted); white-space: nowrap; }
+.lw-pill { font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .07em; padding: 1px 7px; border-radius: 99px; border: 1px solid currentColor; white-space: nowrap; }
+.lw-pill.track { color: var(--lw-live); } .lw-pill.pits { color: var(--lw-warn); } .lw-pill.off { color: var(--muted); }
+
+.lw-tabs { display: none; gap: 4px; border-bottom: 1px solid var(--lw-line); position: sticky; top: 0; background: var(--bg, #0a0b0c); z-index: 5; padding-top: 4px; }
+.lw-tabs button { background: none; border: 0; border-bottom: 2px solid transparent; padding: 8px 12px; font-weight: 700; font-size: 14px; color: var(--muted); cursor: pointer; }
+.lw-tabs button[aria-pressed="true"] { color: var(--text); border-bottom-color: var(--text); }
+
+/* Wide screens: two columns that each stack their panels (standings then car | map then race), so the right column
+   never waits for the end of the standings. */
+.lw-wall { display: grid; grid-template-columns: minmax(0, 1.9fr) minmax(0, 1fr); gap: 14px; align-items: start; }
+.lw-col { display: grid; gap: 14px; min-width: 0; align-content: start; }
+.lw-panel { background: var(--lw-panel); border: 1px solid var(--lw-line); border-radius: 10px; padding: 14px 16px; display: grid; gap: 12px; align-content: start; min-width: 0; }
+.lw-panel > h2 { margin: 0; font-size: 22px; display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.lw-panel > h2 small { font-size: 13px; font-weight: 500; color: var(--muted); }
+.lw-sub { display: grid; gap: 10px; padding-top: 12px; border-top: 1px solid var(--lw-line); min-width: 0; }
+.lw-sub.first { border-top: 0; padding-top: 0; }
+.lw-sub h3 { margin: 0; font-weight: 600; font-size: 13.5px; color: var(--muted); text-transform: uppercase; letter-spacing: .09em; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 4px 8px; }
+.lw-sub h3 span { text-transform: none; letter-spacing: 0; font-weight: 500; }
+.lw-carbody { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr)); gap: 12px 24px; align-items: start; }
+.lw-stack { display: grid; gap: 12px; min-width: 0; }
+.lw-empty { color: var(--muted); }
+/* Mid-size screens: the standings take the whole width, the rest below. */
+@media (min-width: 1180px) and (max-width: 1499px) {
+  .lw-col { display: contents; }
+  .lw-wall { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-areas: "board board" "car car" "map race"; }
+  .lw-wall.practice { grid-template-areas: "board board" "car car" "map map"; }
+  #lw-board { grid-area: board; } #lw-map { grid-area: map; } #lw-carpanel { grid-area: car; } #lw-race { grid-area: race; }
+}
+@media (max-width: 1179px) {
+  .lw-tabs { display: flex; }
+  .lw-col { display: contents; }
+  .lw-wall, .lw-wall.practice { grid-template-columns: minmax(0, 1fr); }
+  .lw-panel:not(.on) { display: none; }
+}
+
+/* Standings */
+.lw-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.lw-chips button { background: var(--lw-panel2); border: 1px solid var(--lw-line); border-radius: 99px; padding: 4px 12px; font-size: 13.5px; font-weight: 600; color: var(--muted); cursor: pointer; }
+.lw-chips button[aria-pressed="true"] { color: var(--text); border-color: var(--muted); }
+/* One tower per class (WEC TV timing tower): place, number in the class colour, driver and car, last and best lap,
+   gap to the car ahead (big) and to the class leader (small). A tap opens the car's details under its line. */
+.lw-towers { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 330px), 1fr)); gap: 12px; align-items: start; }
+.lw-tower { background: var(--bg, #0a0b0c); border: 1px solid var(--lw-line); border-radius: 8px; overflow: hidden; min-width: 0; }
+.lw-tower h3 { margin: 0; background: var(--cls); color: #fff; font-size: 15px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; padding: 6px 10px; display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.lw-tower h3 small { font-size: 12px; font-weight: 500; text-transform: none; letter-spacing: 0; opacity: .9; }
+.lw-trow { display: grid; grid-template-columns: 38px 36px minmax(0, 1fr) auto auto; align-items: center; gap: 8px; padding: 6px 10px 6px 0; border-top: 1px solid var(--lw-line); cursor: pointer; font-variant-numeric: tabular-nums; }
+.lw-trow:first-of-type { border-top: 0; }
+.lw-trow:nth-of-type(even) { background: var(--lw-panel); }
+.lw-trow:hover { background: var(--lw-panel2); }
+.lw-trow.us { background: var(--lw-panel2); box-shadow: inset 3px 0 0 var(--us); }
+.lw-trow.us .t-who b, .lw-trow.mate .t-who b { color: var(--us); }
+.lw-trow small { display: block; font-size: 12.5px; color: var(--muted); font-weight: 500; line-height: 1.15; }
+.t-pos { font-size: 23px; font-weight: 700; text-align: center; line-height: 1; }
+.t-pos small { font-size: 11px; margin-top: 2px; }
+.t-num { font-size: 14px; font-weight: 700; text-align: center; border: 1.5px solid var(--cls); border-radius: 4px; padding: 1px 0; }
+.t-who { min-width: 0; }
+.t-who b { display: block; font-size: 16px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.t-who small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.t-who .lw-pill { font-size: 10px; vertical-align: 2px; }
+.t-times { text-align: right; font-size: 16px; line-height: 1.15; min-width: 70px; }
+.t-muted { color: var(--muted); font-size: 13px; }
+.t-gap { text-align: right; min-width: 62px; line-height: 1.1; }
+.t-gap b { font-size: 21px; font-weight: 700; }
+.t-more { grid-column: 2 / -1; display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 4px 0 2px; font-size: 13.5px; }
+.t-more div { display: flex; gap: 5px; align-items: baseline; }
+.t-more dt { color: var(--muted); }
+.t-more dd { margin: 0; font-weight: 600; }
+/* The whole table when the standings panel is wide (computer), the towers otherwise. */
+#lw-board { container-type: inline-size; }
+.lw-wide { display: none; width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; font-size: 16px; }
+@container (min-width: 760px) { .lw-towers { display: none; } .lw-wide { display: table; } }
+@container (max-width: 1099px) { .lw-wide .w-lg { display: none; } }
+@container (max-width: 899px) { .lw-wide .w-md { display: none; } }
+.lw-wide thead th { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; text-align: right; padding: 0 8px 6px; white-space: nowrap; }
+.lw-wide th.t-pos, .lw-wide th.t-numh, .lw-wide th.t-who { text-align: left; }
+.lw-wide td { padding: 6px 8px; text-align: right; white-space: nowrap; border-top: 1px solid var(--lw-line); }
+.lw-wide tbody tr:nth-child(odd) td { background: var(--lw-panel2); }
+.lw-wide tr.t-cls th { text-align: left; background: var(--cls); color: #fff; font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; padding: 5px 10px; }
+.lw-wide tr.t-cls th small { display: inline; color: inherit; opacity: .9; margin-left: 8px; font-size: 12px; font-weight: 500; text-transform: none; letter-spacing: 0; }
+.lw-wide tbody + tbody tr.t-cls th { border-top: 12px solid var(--lw-panel); }
+.lw-wide td.t-pos { text-align: center; width: 44px; box-shadow: inset 3px 0 0 var(--cls); }
+.lw-wide td:nth-child(2) { width: 46px; text-align: left; }
+.lw-wide .t-num { display: inline-block; min-width: 34px; }
+.lw-wide td.t-who { text-align: left; width: 100%; max-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.lw-wide td.t-who b, .lw-wide td.t-who small { overflow: hidden; text-overflow: ellipsis; }
+.lw-wide tr.us td { background: #221c2e; }
+.lw-wide tr.us td.t-pos { box-shadow: inset 3px 0 0 var(--us); }
+.lw-wide tr.us .t-who b, .lw-wide tr.mate .t-who b { color: var(--us); }
+.lw-wide small { display: block; font-size: 12.5px; color: var(--muted); font-weight: 500; line-height: 1.15; }
+.lw-wide td.t-g b { font-size: 19px; }
+.lw-wide td.t-g:not(:has(b)) { color: var(--muted); }
+.lw-wide td.t-s { font-size: 14.5px; }
+@media (max-width: 520px) { .t-times { display: none; } .lw-trow { grid-template-columns: 34px 34px minmax(0, 1fr) auto; } .lw-panel { padding: 12px 10px; } }
+
+/* Our car */
+.lw-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
+.lw-who { font-size: 26px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+.lw-who i { width: 12px; height: 12px; border-radius: 3px; }
+.lw-meta { color: var(--muted); font-size: 16px; }
+.lw-age { margin-left: auto; color: var(--muted); font-size: 12px; }
+.lw-big { font-size: 62px; font-weight: 700; line-height: 1; }
+.lw-big small { font-size: 26px; color: var(--muted); font-weight: 600; margin-left: 2px; }
+.lw-meter { height: 10px; border-radius: 6px; background: var(--lw-panel2); border: 1px solid var(--lw-line); overflow: hidden; position: relative; }
+.lw-meter i { position: absolute; inset: 0 auto 0 0; background: var(--lw-live); transition: width .6s; }
+.lw-meter.grey i { background: var(--muted); }
+.lw-row2 { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 16px; align-items: center; }
+.lw-kv { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px 14px; margin: 0; }
+.lw-kv div { display: grid; gap: 1px; }
+.lw-kv dt { font-size: 12.5px; color: var(--muted); text-transform: uppercase; letter-spacing: .07em; }
+.lw-kv dd { margin: 0; font-size: 25px; font-weight: 600; }
+.lw-kv dd em { font-style: normal; font-size: 15px; font-weight: 600; margin-left: 4px; }
+.live-page .up { color: var(--lw-up); } .live-page .down { color: var(--lw-down); } .live-page .same { color: var(--muted); }
+.lw-target { font-size: 15px; color: var(--muted); }
+.lw-target b { color: var(--text); font-weight: 600; }
+.lw-lap { font-size: 50px; font-weight: 700; line-height: 1; }
+.lw-sectors, .lw-drive, .lw-stops { width: 100%; border-collapse: collapse; font-size: 17px; }
+.lw-sectors th, .lw-drive th, .lw-stops th { font-weight: 600; font-size: 12.5px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; text-align: right; padding: 0 0 6px; }
+.lw-sectors td, .lw-drive td, .lw-stops td { text-align: right; padding: 5px 0; border-top: 1px solid var(--lw-line); }
+.lw-sectors td { font-weight: 600; }
+.lw-sectors th:first-child, .lw-sectors td:first-child { text-align: left; }
+.lw-sectors td:first-child { color: var(--muted); font-weight: 500; }
+.lw-tyres { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 22px; position: relative; }
+.lw-tyres::before { content: ""; position: absolute; left: 50%; top: 8px; bottom: 8px; border-left: 1px dashed var(--lw-line); }
+.lw-tyre { background: var(--lw-panel2); border: 1px solid var(--lw-line); border-radius: 8px; padding: 10px 12px; display: grid; gap: 6px; min-width: 0; }
+.lw-tyre .t { display: flex; justify-content: space-between; align-items: baseline; gap: 6px; font-size: 12.5px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+.lw-tyre-main { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 40px; font-weight: 700; line-height: 1; }
+.lw-tyre-main small { font-size: 18px; color: var(--muted); font-weight: 600; }
+.lw-tyre dl { margin: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px 8px; }
+.lw-tyre dt { font-size: 11.5px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+.lw-tyre dd { margin: 0; font-weight: 600; font-size: 18px; }
+.lw-wear { height: 4px; border-radius: 3px; background: var(--bg, #0a0b0c); overflow: hidden; }
+.lw-wear i { display: block; height: 100%; background: var(--text); opacity: .75; }
+.lw-cond { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin: 0; }
+.lw-cond div { display: grid; gap: 1px; }
+.lw-cond dt { font-size: 12.5px; color: var(--muted); text-transform: uppercase; letter-spacing: .07em; }
+.lw-cond dd { margin: 0; font-size: 24px; font-weight: 600; }
+.lw-stint { display: flex; flex-wrap: wrap; gap: 6px 20px; font-size: 16px; color: var(--muted); }
+.lw-stint b { color: var(--text); font-size: 22px; margin-right: 4px; }
+@media (max-width: 520px) { .lw-cond { grid-template-columns: repeat(2, minmax(0, 1fr)); } .lw-big { font-size: 48px; } .lw-lap { font-size: 40px; } .lw-tyre-main { font-size: 26px; } .lw-tyre-main small { font-size: 13px; } .lw-tyre dl { grid-template-columns: repeat(2, minmax(0, 1fr)); } .lw-tyre dd { font-size: 16px; } .lw-kv dd { font-size: 21px; } .lw-age { margin-left: 0; width: 100%; } .lw-tyres { gap: 8px 12px; } .lw-tyre { padding: 8px; } .lw-tyre dt { font-size: 10px; letter-spacing: .02em; } .lw-tyre dd { font-size: 15px; white-space: nowrap; } }
+
+/* Map */
+.lw-mapbox { width: 100%; display: block; max-height: 78vh; }
+.lw-mapbox .road { fill: none; stroke: #3a4045; stroke-width: 22; stroke-linecap: round; stroke-linejoin: round; }
+.lw-mapbox .edge { fill: none; stroke: var(--lw-panel2); stroke-width: 12; stroke-linejoin: round; }
+/* Each car: its place in the dot. Ours ringed and on top. */
+.lw-mapbox circle { stroke: var(--bg, #0a0b0c); stroke-width: 2.5; }
+.lw-mapbox text { font-size: 19px; font-weight: 800; fill: #0a0b0c; text-anchor: middle; font-variant-numeric: tabular-nums; pointer-events: none; }
+.lw-mapbox .us circle { stroke: var(--text); stroke-width: 4; }
+.lw-mapbox .us text { font-size: 23px; }
+.lw-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 14px; color: var(--muted); }
+.lw-legend span { display: inline-flex; align-items: center; gap: 5px; }
+.lw-legend i { width: 9px; height: 9px; border-radius: 50%; }
+
+/* Race */
+.lw-clock { font-size: 54px; font-weight: 700; line-height: 1; }
+.lw-rel { display: grid; gap: 3px; }
+.lw-rel div { display: grid; grid-template-columns: 96px 10px minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 6px 10px; border-radius: 6px; background: var(--lw-panel2); font-size: 16px; }
+.lw-rel div i { width: 10px; height: 10px; border-radius: 50%; }
+.lw-rel div span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lw-rel div small { color: var(--muted); font-size: 13px; }
+.lw-rel div b { font-weight: 700; text-align: right; }
+.lw-rel .me { background: none; border: 1px dashed var(--text); font-weight: 700; }
+.lw-drive th:first-child, .lw-drive td:first-child { text-align: left; width: 42%; padding-right: 12px; }
+.lw-bar { position: relative; height: 6px; border-radius: 4px; background: var(--lw-panel2); margin-top: 4px; }
+.lw-bar i { position: absolute; inset: 0 auto 0 0; border-radius: 4px; }
+.lw-bar s { position: absolute; top: -3px; bottom: -3px; border-left: 1.5px solid var(--muted); }
+.lw-ok { color: var(--lw-live); }
+.lw-stops { font-size: 16px; }
+.lw-stops th:first-child, .lw-stops td:first-child { text-align: left; }
+.lw-stops .lw-pin { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; vertical-align: 1px; }
+.lw-stops td small { display: block; font-size: 12.5px; color: var(--muted); }
+.lw-stops tr.now td { font-weight: 600; }
+.lw-stops th + th, .lw-stops td + td { padding-left: 8px; }
+.lw-stops td:first-child { overflow-wrap: anywhere; }

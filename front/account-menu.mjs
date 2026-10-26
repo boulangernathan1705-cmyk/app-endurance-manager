@@ -201,6 +201,8 @@ async function loadSession() {
       const game = location.pathname.startsWith('/iracing') ? '/iracing/' : '/lmu/';
       for (const link of document.querySelectorAll('a.brand-button')) link.href = `${game}#solo`;
     }
+    // The LMU module's own tab (fiches-combo.html): only for the roles that see the fiches combo.
+    for (const link of document.querySelectorAll('[data-module-link]')) link.hidden = link.dataset.moduleLink === 'combos' && session.combos !== true;
     unifyNav(session);
     siteCommunityName = session.openSite ? '' : session.community?.name || '';
     if (session.user) {

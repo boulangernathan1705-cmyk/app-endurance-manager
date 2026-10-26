@@ -1,0 +1,11 @@
+// Relais du mur des stands (relay/worker.mjs), sur un second compte Cloudflare gratuit, séparé du site.
+// Déployer : npx wrangler deploy --config wrangler.relay.jsonc
+// Secret partagé avec le site (le même dans les deux) : npx wrangler secret put RELAY_SECRET --config wrangler.relay.jsonc
+{
+  "name": "app-endurance-manager-relais",
+  "main": "relay/worker.mjs",
+  "compatibility_date": "2026-09-07",
+  "minify": true,
+  "durable_objects": { "bindings": [{ "name": "LIVE", "class_name": "LiveRoom" }] },
+  "migrations": [{ "tag": "v1-live-room", "new_sqlite_classes": ["LiveRoom"] }]
+}
