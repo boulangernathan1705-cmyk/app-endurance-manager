@@ -2,22 +2,31 @@
 
 Le récap annonce les courses, départs, équipages, catégories, voitures, pilotes, places ouvertes/completes et pilotes sans équipage (un par ligne, avec les logos de ses catégories). Les logos de catégorie sont les emojis du bot lui-même (`images/discord-emojis`, envoyés une fois par le bot, sans Nitro) ; tant qu’ils manquent, la catégorie garde sa couleur. Il ne constitue pas un bilan des résultats sportifs. Chaque communauté ne publie que ses propres inscriptions, équipages et absences, y compris sur les courses officielles partagées.
 
-## Configuration guidée
+## Réglage « Discord »
 
-Dans **Administration → Modules → Récap de la semaine sur Discord → Régler** :
+Dans **Administration → Modules → Discord → Régler**, une seule page remplace les anciens réglages du récap, des salons d’équipage et des rappels :
 
-1. Choisir **Récap général** (un salon texte existant, un message regroupant les courses) ou **Une catégorie par course** (« 🏎️ LMU · 6h de Spa » : un salon `infos-de-la-course`, puis les vocaux des équipages si le module Équipages est actif). Une course a sa catégorie 7 jours avant son départ (15 jours pour une course de 24 h ou plus), même sans inscrit (les courses officielles iRacing importées attendent un inscrit de la communauté) : les vocaux d’équipage y sont créés directement. Plus de nouvelle catégorie quand le serveur approche les 500 salons de Discord. Les catégories des courses se rangent sous la catégorie choisie : LMU d’abord, puis iRacing, chacune par date de premier départ (rangement refait à chaque nouvelle catégorie).
-2. Cocher **LMU**, **iRacing**, ou les deux, indépendamment du mode. Les nouveaux réglages proposent les deux simulateurs ; les réglages existants préremplissent leur sélection.
-3. Sélectionner directement le **salon texte** en mode général ou la **catégorie** en mode par événement sur le serveur Discord de la communauté. Aucun webhook à copier pour les nouvelles configurations.
-4. Consulter l’aperçu sur le site puis cliquer **Activer le récap automatique**. L’aperçu ne publie rien. **Envoyer un test sur Discord** est une action volontaire distincte : elle utilise le même message que l’activation, sans activer l’automatisation. Pour un récap déjà activé, tester des réglages différents demande d’abord leur activation afin de préserver la publication actuelle.
+1. **Comment ranger les courses ?**
+   - **Une catégorie par course** (« 🏎️ LMU · 6h de Spa » : un salon `infos-de-la-course`, puis les vocaux de ses équipages). Une course a sa catégorie 7 jours avant son départ (15 jours pour une course de 24 h ou plus), même sans inscrit (les courses officielles iRacing importées attendent un inscrit de la communauté). Plus de nouvelle catégorie quand le serveur approche les 500 salons de Discord. Les catégories des courses se rangent juste après la catégorie choisie pour leur simu : LMU d’abord, puis iRacing, chacune par date de premier départ.
+   - **Récap de la semaine + pit walk** : un message par semaine dans un salon texte existant, et tous les vocaux d’équipage dans une catégorie choisie (« pit walk »).
+2. **Où publier sur ton serveur ?** Une ligne par récap, chacune avec « Ne pas publier » :
+   - par course : **Courses LMU** et **Courses iRacing** (la catégorie sous laquelle se rangent les catégories des courses) ;
+   - récap de la semaine : **Endurances LMU** et **Endurances iRacing** (un salon texte chacun) et **Vocaux d’équipage** (catégorie) ;
+   - dans les deux modes, si le module EVENT SOLO / EVENT TDZ est actif : **Calendrier de la semaine** (un salon texte).
+   Chaque récap est **un message à part**, avec ses propres limites Discord ; plusieurs récaps peuvent partager un salon. Chez TDZ le calendrier passe en premier, ailleurs les endurances d’abord.
+3. **Vocaux et rappels** : « Créer un vocal par équipage » et « Rappels avant le départ » (cloche du site 24 h avant, chat du vocal 24 h et 1 h avant).
 
-Après activation, une page courte indique l’état, le mode, les simulateurs, la destination et les erreurs éventuelles. **Modifier**, **Voir l’aperçu** et **Désactiver** restent disponibles ; aucun parcours hebdomadaire n’est nécessaire.
+Un croquis « Sur ton serveur » suit les choix ; **Voir les messages** montre ce que le bot écrira sans rien envoyer. Rien n’est publié avant **Activer**. Un récap qu’on ne publie plus voit son message supprimé.
+
+## Calendrier de la semaine
+
+Le message « 📅 Calendrier de la semaine du … » liste les events (format solo) de la semaine en heure de Paris (ou de la prochaine semaine qui en a), un paragraphe par event : nom (lien vers le site), simu, circuit, départ, puis places (« 14/20 places », « complet · 3 en attente ») ou nombre d’inscrits de la communauté. Les events ne sont jamais dans les récaps d’endurance ni dans les catégories de course.
 
 ## Bot et permissions
 
 Le Worker doit disposer de `DISCORD_CLIENT_ID` et du secret `DISCORD_BOT_TOKEN`. Ne jamais placer ce secret dans le dépôt ou dans le navigateur. Utiliser **Donner les droits au bot** pour l’inviter sur le serveur concerné.
 
-Le bot doit pouvoir **Voir le salon**, **Envoyer des messages**, **Intégrer des liens** et **Voir les anciens messages**. Le mode par événement exige aussi **Gérer les salons** pour créer, ranger et supprimer les catégories des courses. Les permissions du salon/de la catégorie, y compris les refus propres au bot et à ses rôles, sont vérifiées avant activation ; la page indique précisément les permissions manquantes. Les erreurs Discord sont également affichées après une synchronisation. Les nouvelles catégories de course reprennent les permissions de la catégorie choisie. Les catégories déjà créées conservent leurs permissions : en cas de salon vide, vérifier les droits du bot dans cette catégorie et son salon, puis relancer le test pour publier dans le salon existant.
+Le bot doit pouvoir **Voir le salon**, **Envoyer des messages**, **Intégrer des liens** et **Voir les anciens messages**. Le mode par événement exige aussi **Gérer les salons** pour créer, ranger et supprimer les catégories des courses. Les permissions du salon/de la catégorie, y compris les refus propres au bot et à ses rôles, sont vérifiées avant activation ; la page indique précisément les permissions manquantes. Les erreurs Discord sont également affichées après une synchronisation. Les nouvelles catégories de course reprennent les permissions de la catégorie choisie. Les catégories déjà créées conservent leurs permissions : en cas de salon vide, vérifier les droits du bot dans cette catégorie et son salon, puis cliquer sur **Réparer** pour publier dans le salon existant.
 
 ## Message unique, salons par événement
 
@@ -27,7 +36,7 @@ Le bot doit pouvoir **Voir le salon**, **Envoyer des messages**, **Intégrer des
 - Le nom du salon est dérivé du nom de l’endurance, avec un suffixe stable. Les événements homonymes et les collisions ne mélangent pas leurs données.
 - Les nouveaux événements éligibles obtiennent automatiquement leur salon. Le bot traite au plus deux événements par synchronisation pour rester dans son budget de requêtes ; les autres passent aux synchronisations suivantes.
 - Les synchronisations concurrentes partagent un verrou. L’empreinte du contenu évite les éditions inutiles. Un salon créé juste avant une interruption est retrouvé grâce à son marqueur de sujet ; un premier message dont la réponse a été perdue est retrouvé dans l’historique récent avec son nonce.
-- Si un message ou un salon suivi a été supprimé, l’état devient **Publication en erreur**. L’administrateur clique sur **Réparer le récap** : les salons de course disparus et les messages supprimés sont rétablis, sans changer les réglages ni les inscriptions. Les publications encore présentes sont conservées. Le récap général reste dans le salon choisi ; si celui-ci a disparu, il faut choisir un autre salon via Modifier. Aucune nouvelle publication automatique après un refus de permissions ou une erreur réseau ambiguë.
+- Si un message ou un salon suivi a été supprimé, l’état devient **Publication en erreur**. L’administrateur clique sur **Réparer le récap** : les salons de course disparus et les messages supprimés sont rétablis, sans changer les réglages ni les inscriptions. Les publications encore présentes sont conservées. Le récap de la semaine reste dans le salon choisi ; si celui-ci a disparu, il faut en choisir un autre. Aucune nouvelle publication automatique après un refus de permissions ou une erreur réseau ambiguë.
 - Discord accepte au plus 10 embeds et 6000 caractères cumulés. Les longues listes sont condensées, puis abrégées si nécessaire ; les liens vers le site donnent accès aux détails complets.
 
 ## Suppression après la course : décision confirmée
