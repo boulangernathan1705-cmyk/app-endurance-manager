@@ -61,8 +61,15 @@ Envoie les séances Le Mans Ultimate d'un pilote aux fiches combo de son équipe
   météo prévue (`Weather.*`, nœuds et nœud en cours), les réglages de la séance (`Session.*`), voiture, circuit et
   pneus (`VehicleInfos.*`, `TrackInfos.*`, `Tyre.OptimalCompoundTemp_*`). Le menu des stands a tous ses noms NeoRed
   (chiffres, textes, type de pneu, pressions en kPa, bar et psi). `GameInfos.PitState` est le texte du jeu (`EXITING`…).
-  Pas encore repris : pénalités par type et statut d'arrivée (WebSocket du jeu), `Track.*` et `Redline.PerGear`
-  (données Lovely), `VM_BRAKE_PRESSURE`, `VM_REGEN_LEVEL`, `Pit.StopAndGo`.
+- reprend, depuis la 2.2.0, tous les noms de NeoRed qu'un dash lit : pénalités par type et statut d'arrivée
+  (`Race.Player.*`, `GameInfos.isDNF`/`isDQ`), lus sur le classement en direct du jeu (`Standings.cs`, WebSocket
+  `localhost:6398`, son propre fil, une réponse toutes les 2 s) ; virage en cours, nombre de virages, temps de
+  drive-through, de stop-and-go et d'arrêt (`Track.*`) et régime de passage du rapport engagé (`Redline.PerGear`), pris
+  dans les fiches circuit et voiture de Lovely sur GitHub (`Lovely.cs`, téléchargées une fois, gardées dans
+  `Combos\lovely`) ; pression de frein, mélange et régénération du réglage (`Extended.VM_*`, écran de setup lu une
+  fois par séance voiture arrêtée) ; ligne stop-and-go du menu (`Pit.StopAndGo`) et les anciens noms (`FuelRatio`,
+  `Energy.Fuel.LiterPerLap`, `PitMenu.ReplaceBrakes`). `Pit.StopLength` est désormais, comme chez NeoRed, la durée
+  de l'arrêt réglé selon le jeu.
 
 Il ne fait que lire : il ne modifie rien dans le jeu ni dans SimHub. Il n'envoie plus les fichiers de résultats XML.
 

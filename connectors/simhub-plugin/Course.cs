@@ -92,6 +92,13 @@ namespace EnduranceManager.SimHub
         public double? TrackLength;
         public double? Humidity, Light, Raining, RainChance;
         public string WetnessText;
+        public string FinishStatus, PlayerCar, MenuStopGo;
+        public int? PenaltiesDT, PenaltiesSG, PenaltiesTime, MenuStopGoIndex;
+        public bool? DNF, DQ;
+        public string TrackFileName, SegmentName, SegmentNumber;
+        public int? Corners;
+        public double? TimeDriveThrough, TimeStopGo, TimePitStop, Redline;
+        public int? BrakePressure, Mixture, RegenLevel;
         // Weather.* (forecast nodes of the session, the current one, time until each) and Session.* (its settings).
         public Dictionary<string, object> Weather = new Dictionary<string, object>(), Session = new Dictionary<string, object>();
         public bool InPits, InGarage;
@@ -230,6 +237,30 @@ namespace EnduranceManager.SimHub
                 ("WeatherInfos.RainChance_%", v => v.RainChance),
                 ("WeatherInfos.Track.Wetness_Text", v => v.WetnessText),
                 ("PluginVersion", v => Version),
+                ("Race.Player.FinishStatus", v => v.FinishStatus),
+                ("Race.Player.Penalties.DT", v => v.PenaltiesDT),
+                ("Race.Player.Penalties.SG", v => v.PenaltiesSG),
+                ("Race.Player.Penalties.TIME", v => v.PenaltiesTime),
+                ("Race.Player.vehicleName", v => v.PlayerCar),
+                ("GameInfos.isDNF", v => v.DNF),
+                ("GameInfos.isDQ", v => v.DQ),
+                ("Pit.StopAndGo", v => v.MenuStopGo),
+                ("Pit.StopAndGo_Value", v => v.MenuStopGoIndex),
+                ("Track.Name", v => v.TrackFileName),
+                ("Track.Corners", v => v.Corners),
+                ("Track.SegmentName", v => v.SegmentName),
+                ("Track.SegmentNumber", v => v.SegmentNumber),
+                ("Track.Time.DriveThrough", v => v.TimeDriveThrough),
+                ("Track.Time.StopAndGo", v => v.TimeStopGo),
+                ("Track.Time.PitStop", v => v.TimePitStop),
+                ("Redline.PerGear", v => v.Redline),
+                ("Extended.VM_BRAKE_PRESSURE", v => v.BrakePressure),
+                ("Extended.VM_ENGINE_MIXTURE", v => v.Mixture),
+                ("Extended.VM_REGEN_LEVEL", v => v.RegenLevel),
+                // Names of older NeoRed versions that dashes still read.
+                ("FuelRatio", v => v.MenuRatioNumber),
+                ("Energy.Fuel.LiterPerLap", v => v.FuelLastLap),
+                ("PitMenu.ReplaceBrakes", v => v.MenuBrakesIndex),
                 ("GameInfos.InPits", v => v.InPits),
                 ("GameInfos.InGarage", v => v.InGarage),
                 ("Pit.Stops", v => v.Stops),
@@ -318,7 +349,8 @@ namespace EnduranceManager.SimHub
 
         // Once a second while driving: everything from the same copy of the game's memory, the session recorded so far
         // (its laps and stops), the game's service times and the pit menu.
-        public void Update(byte[] b, Sample s, LiveSession session, ServiceTimes service, PitMenu menu, GameApi game, JObject refuel)
+        public void Update(byte[] b, Sample s, LiveSession session, ServiceTimes service, PitMenu menu, GameApi game, JObject refuel,
+            Standings standings, Lovely lovely)
         {
             var view = new CourseView
             {
@@ -454,6 +486,7 @@ namespace EnduranceManager.SimHub
 
             ReadMenu(view, menu, s, service);
             try { ReadApi(view, game, refuel, s); } catch { }
+            try { ReadMore(view, game, refuel, s, standings, lovely, fraction); } catch { }
             View = view;
         }
 
@@ -594,6 +627,59 @@ namespace EnduranceManager.SimHub
             }
         }
 
+        // The game's live standings (penalties by kind, finish status), the setup screen, Lovely's track and car files,
+        // and the stop's length as NeoRed gives it (the game's estimate of the stop as set).
+        static void ReadMore(CourseView view, GameApi game, JObject refuel, Sample s, Standings standings, Lovely lovely, double fraction)
+        {
+            view.PlayerCar = standings?.Player?.VehicleName ?? s.Car;
+            if (standings?.Player is Standings.Line me)
+            {
+                view.FinishStatus = me.FinishStatus;
+                view.PenaltiesDT = me.DT;
+                view.PenaltiesSG = me.SG;
+                view.PenaltiesTime = me.Time;
+                if (view.FinishStatus != null)
+                {
+                    view.DNF = view.FinishStatus == "FSTAT_DNF";
+                    view.DQ = view.FinishStatus == "FSTAT_DQ";
+                }
+            }
+            view.LastStop = view.EstimateTotal ?? R(N(refuel?["pitStopLength"]?["timeInSeconds"]), 1) ?? view.LastStop;
+
+            var values = game?.Setup?["carSetup"]?["garageValues"];
+            int? Value(string key) => values?[key] is JObject item && (bool?)item["available"] != false ? (int?)N(item["value"]) : null;
+            view.BrakePressure = Value("VM_BRAKE_PRESSURE");
+            view.Mixture = Value("VM_ENGINE_MIXTURE");
+            view.RegenLevel = Value("VM_REGEN_LEVEL");
+
+            // The track: the turn or straight the car is in (by the share of the lap), and the times lost to a penalty
+            // or a stop for the car's category (« hyper », « lmp2 », « gt3 »…).
+            var track = lovely?.Track;
+            if (track != null)
+            {
+                view.TrackFileName = (string)track["name"];
+                var turns = (track["turn"] as JArray)?.OfType<JObject>().ToList() ?? new List<JObject>();
+                view.Corners = turns.Count;
+                bool In(JObject part) => N(part["start"]) is double from && N(part["end"]) is double to
+                    && (from <= to ? fraction >= from && fraction < to : fraction >= from || fraction < to);
+                var turn = turns.FirstOrDefault(In);
+                var straight = (track["straight"] as JArray)?.OfType<JObject>().FirstOrDefault(In);
+                view.SegmentNumber = turn != null ? (string)turn["number"] : "Unknown";
+                view.SegmentName = (string)turn?["name"] ?? (turn != null ? "Turn " + (string)turn["number"] : (string)straight?["name"] ?? "Unknown");
+                string cls = (s.Class ?? "").ToLowerInvariant();
+                var times = (track["time"] as JArray)?.OfType<JObject>().FirstOrDefault()?.Properties()
+                    .FirstOrDefault(p => cls.StartsWith(p.Name) || cls.Contains(p.Name))?.Value as JArray;
+                double? Time(params string[] names) => N(times?.OfType<JObject>().FirstOrDefault(t => names.Contains((string)t["name"]))?["time"]);
+                view.TimeDriveThrough = Time("dt");
+                view.TimeStopGo = Time("sng10", "sg30", "sng");
+                view.TimePitStop = Time("pit");
+            }
+            // The car: the shift light's last step for the gear engaged (« R », « N », « 1 »…).
+            var gears = (lovely?.Car?["ledRpm"] as JArray)?.FirstOrDefault() as JObject;
+            string gear = s.Gear < 0 ? "R" : s.Gear == 0 ? "N" : s.Gear.ToString();
+            view.Redline = (gears?[gear] as JArray)?.Select(N).LastOrDefault(rpm => rpm > 0);
+        }
+
         // The pit menu as set, and how long the stop it asks would last with the game's service times: the jobs done
         // during the refuelling (« …Along » = 1) overlap, the others add up.
         static void ReadMenu(CourseView view, PitMenu menu, Sample s, ServiceTimes service)
@@ -624,6 +710,9 @@ namespace EnduranceManager.SimHub
             view.MenuBrakesIndex = brakesItem?.Index;
             view.MenuFrontDuct = Find(n => n.StartsWith("F") && n.Contains("DUCT"))?.Text;
             view.MenuRearDuct = Find(n => n.StartsWith("R") && n.Contains("DUCT"))?.Text;
+            var stopGo = Find(n => n.Contains("STOP"));
+            view.MenuStopGo = stopGo?.Text;
+            view.MenuStopGoIndex = stopGo?.Index;
             int changed = 0;
             for (int i = 0; i < 4; i++)
             {
