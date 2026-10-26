@@ -765,7 +765,7 @@ namespace EnduranceManager.SimHub
         static readonly string[] Paths =
         {
             "strategy/pitstop-estimate", "strategy/usage", "garage/getVehicleCondition", "sessions/weather", "sessions/GetGameState",
-            "garage/PitMenu/receivePitMenu", "garage/UIScreen/CarSetupOverview", "watch/sessionInfo"
+            "garage/PitMenu/receivePitMenu", "garage/UIScreen/CarSetupOverview", "watch/sessionInfo", "watch/standings"
         };
         static readonly HashSet<string> done = new HashSet<string>();
         static int busy;

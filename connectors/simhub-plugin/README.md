@@ -71,6 +71,12 @@ Envoie les séances Le Mans Ultimate d'un pilote aux fiches combo de son équipe
   `Energy.Fuel.LiterPerLap`, `PitMenu.ReplaceBrakes`). `Pit.StopLength` est désormais, comme chez NeoRed, la durée
   de l'arrêt réglé selon le jeu.
 
+- envoie au mur des stands, depuis la 2.3.0, pour chaque voiture du classement : la gomme montée et les dégâts de
+  carrosserie (mémoire du jeu, emplacement de télémétrie de la voiture) et l'énergie ou le carburant utilisé au dernier
+  tour (`strategy/usage`, lu toutes les 20 s), en fin de rangée (`cmp`, `dmg`, `veLap` dans `shared/live.mjs`). À
+  vérifier en ligne : que le jeu remplit la gomme et les dégâts des autres pilotes. `watch/standings` est gardé avec les
+  autres réponses du jeu dans `api`.
+
 Il ne fait que lire : il ne modifie rien dans le jeu ni dans SimHub. Il n'envoie plus les fichiers de résultats XML.
 
 ## Ressources et stabilité

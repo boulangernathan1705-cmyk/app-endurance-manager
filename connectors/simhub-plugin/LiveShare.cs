@@ -29,7 +29,8 @@ namespace EnduranceManager.SimHub
 {
     public class LiveShare
     {
-        const int ScoringInfo = 1632, VehScoring = 2192, VehSize = 584, MaxVehicles = 104;
+        const int ScoringInfo = 1632, VehScoring = 2192, VehSize = 584, MaxVehicles = 104,
+            TelemetryOff = 128464, TelemInfo = 128468, TelemSize = 1888;
         const string Api = "http://localhost:6397/rest/";
 
         readonly Func<LinkCode> code;
@@ -61,6 +62,9 @@ namespace EnduranceManager.SimHub
 
         // Car numbers from the game's standings (slot → number), refreshed aside every 20 s.
         Dictionary<int, string> numbers = new Dictionary<int, string>();
+        // Each driver's energy (or fuel) used on his last lap, % of the tank, from the game's strategy screen
+        // (strategy/usage keeps every driver's level lap by lap, the other cars' too), read with the numbers.
+        Dictionary<string, double> usage = new Dictionary<string, double>();
         DateTime numbersAt;
         int reading;
         // The track's outline from the game (watch/trackmap), once per track, kept when it matches the car's position.
@@ -137,10 +141,25 @@ namespace EnduranceManager.SimHub
             double length = F64(b, ScoringInfo + 88);
             bool positions = mapShown;
             var field = new List<object[]>(count);
+            // Each car's telemetry slot, by id: the compound it runs and its body damage (8 zones, 0 to 2 each), as the
+            // game shows them on track. To check online: whether LMU fills them for the other drivers' cars.
+            var telemetry = new Dictionary<int, int>();
+            for (int k = 0, active = Math.Min((int)b[TelemetryOff], MaxVehicles); k < active; k++) telemetry[I32(b, TelemInfo + k * TelemSize)] = TelemInfo + k * TelemSize;
+            var used = usage;
             for (int i = 0; i < count; i++)
             {
                 int at = VehScoring + i * VehSize, id = I32(b, at);
-                string vehicle = Text(b, at + 36, 64);
+                string vehicle = Text(b, at + 36, 64), driver = Text(b, at + 4, 32);
+                string compound = null;
+                double? damage = null;
+                if (telemetry.TryGetValue(id, out int t))
+                {
+                    string front = Text(b, t + 620, 18), rear = Text(b, t + 638, 18);
+                    compound = front == "" ? null : rear == "" || rear == front ? front : front + " / " + rear;
+                    int dents = 0;
+                    for (int d = 0; d < 8; d++) dents += b[t + 544 + d];
+                    damage = R(dents / 16.0 * 100, 0);
+                }
                 field.Add(new object[]
                 {
                     id, b[at + 199], Text(b, at + 200, 32), Text(b, at + 4, 32), vehicle, Number(id, vehicle), I16(b, at + 100), R(F64(b, at + 104), 1),
@@ -149,7 +168,8 @@ namespace EnduranceManager.SimHub
                     // The game's gaps are not sent: the site measures them on track (0 for a lapped car in LMU).
                     null, null, null, null, (sbyte)b[at + 103], positions ? R(F64(b, at + 264), 1) : null, positions ? R(F64(b, at + 280), 1) : null,
                     // What the game says the car has left in its tank (or of its virtual energy), 0 to 255.
-                    R(b[at + 578] / 2.55, 1)
+                    R(b[at + 578] / 2.55, 1),
+                    compound, damage, used.TryGetValue(DriverKey(driver), out double lap) ? R(lap, 2) : null
                 });
             }
             // A car without virtual energy (LMP2) shows its fuel instead: energy counts once the game gave some.
@@ -214,7 +234,7 @@ namespace EnduranceManager.SimHub
 
         // While nobody watches: the field's values the history needs (place, names, laps, pit, stops, penalties, lap
         // and sector times, finish), not where the cars are; our car's in full only when its lap or pit state changes.
-        static readonly HashSet<int> HistoryValues = new HashSet<int> { 1, 2, 3, 4, 5, 6, 8, 9, 10, 11, 12, 13, 14, 15, 16, 23 };
+        static readonly HashSet<int> HistoryValues = new HashSet<int> { 1, 2, 3, 4, 5, 6, 8, 9, 10, 11, 12, 13, 14, 15, 16, 23, 27, 28, 29 };
         static readonly HashSet<string> SteadyMe = new HashSet<string> { "id", "driver", "car", "vehicle", "cls", "compound", "pit", "stops", "service", "profile" };
 
         // The message for the site: everything (version 2, full), or only what changed since the last one (null when
@@ -358,7 +378,14 @@ namespace EnduranceManager.SimHub
 
         static double? Value(JToken token) => token != null && (token.Type == JTokenType.Float || token.Type == JTokenType.Integer) ? (double)token : (double?)null;
 
-        // The game's standings for the car numbers, and its map of the track once per track.
+        // A driver's name as both the scoring and the strategy screen give it (« Lewis Evans#2652 » there).
+        static string DriverKey(string name)
+        {
+            int hash = (name ?? "").IndexOf('#');
+            return (hash < 0 ? name ?? "" : name.Substring(0, hash)).Trim().ToLowerInvariant();
+        }
+
+        // The game's standings for the car numbers, every driver's last lap from the strategy screen, and its map of the track once per track.
         void ReadGame(string track, double x, double z, bool onTrack)
         {
             var standings = Get(client, "watch/standings");
@@ -373,6 +400,22 @@ namespace EnduranceManager.SimHub
                     if (slot.HasValue && number != null && number.Type != JTokenType.Null && number.ToString().Trim() != "") found[(int)slot.Value] = number.ToString().Trim();
                 }
                 if (found.Count > 0) numbers = found;
+            }
+            var levels = Get(client, "strategy/usage") as JObject;
+            if (levels != null)
+            {
+                var found = new Dictionary<string, double>();
+                foreach (var driver in levels.Properties())
+                {
+                    // The last two laps in a row, the second away from the pits: the drop of the level between them.
+                    var laps = (driver.Value as JArray)?.OfType<JObject>().Where(l => Value(l["lap"]).HasValue && Value(l["ve"]).HasValue)
+                        .OrderBy(l => Value(l["lap"]).Value).ToList();
+                    if (laps == null || laps.Count < 2) continue;
+                    JObject before = laps[laps.Count - 2], last = laps[laps.Count - 1];
+                    double drop = (Value(before["ve"]).Value - Value(last["ve"]).Value) * 100;
+                    if (Value(last["lap"]) - Value(before["lap"]) == 1 && (bool?)last["pit"] != true && drop > 0 && drop < 50) found[DriverKey(driver.Name)] = drop;
+                }
+                usage = found;
             }
             if (mapTrack != track) { mapTrack = track; mapRaw = null; mapPoints = null; }
             if (mapRaw == null && mapPoints == null)
