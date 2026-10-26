@@ -14,8 +14,8 @@ const lapTime = seconds => known(seconds) && seconds > 0 ? `${Math.floor(seconds
 const clock = value => { if (!known(value)) return '—'; const s = Math.max(0, Math.round(value)); return `${Math.floor(s / 3600)}:${String(Math.floor(s / 60) % 60).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`; };
 const signed = (value, digits = 1) => known(value) ? `${value > 0 ? '+' : value < 0 ? '−' : '±'}${fr(Math.abs(value), digits)}` : '—';
 const WHEELS = ['AVG', 'AVD', 'ARG', 'ARD'];
-const TABS = [['board', 'Classement', 'Class.'], ['chrono', 'Chrono', 'Chrono'], ['car', 'Véhicule & énergie', 'Voiture'], ['tele', 'Télémétrie & graphes', 'Télém.'], ['map', 'Carte en direct', 'Carte']];
-const MODES = [['all', 'Général'], ['rel', 'Relatif'], ['opp', 'Opposants']];
+const TABS = [['board', 'Classement', 'Class.', '🏆'], ['chrono', 'Chronométrage', 'Chrono', '⏱️'], ['car', 'Véhicule & énergie', 'Voiture', '🏎️'], ['tele', 'Télémétrie & graphes', 'Télém.', '📊'], ['map', 'Carte en direct', 'Carte', '🗺️']];
+const MODES = [['all', 'Général', '🏆'], ['rel', 'Relatif', '⏱️'], ['opp', 'Opposants', '⚔️']];
 // The last minute of our car, ten times a second.
 const TELE_KEPT = 600;
 
@@ -35,7 +35,7 @@ async function call(path) {
 
 function renderError(error) {
   const action = error.status === 401 ? `<a class="pw-button" href="/api/auth/discord?return=${encodeURIComponent('/mur.html')}">Se connecter avec Discord</a>` : '<a class="pw-button" href="/lmu/">Retour aux courses</a>';
-  app.innerHTML = `<section class="pw-empty"><h1>Mur des stands</h1><p>${esc(error.message)}</p>${action}</section>`;
+  app.innerHTML = `<div class="pw-card pw-empty"><h1>Mur des stands</h1><p>${esc(error.message)}</p>${action}</div>`;
 }
 
 // ---------- Live connection ----------
@@ -173,24 +173,38 @@ function energyOf(feed) {
 }
 
 // ---------- Drawing ----------
+// PitData's look: dark framed cards, one title bar each, bright colours for what counts (cyan: us and the live lap,
+// purple: the class's best, green: our best and what is fine, yellow: car numbers and fuel, red: what is wrong).
+
+const card = (title, body, extra = '', cls = '') => `<div class="pw-card${cls ? ` ${cls}` : ''}"><div class="pw-card-head"><h2>${title}</h2>${extra}</div>${body}</div>`;
+const box = (label, value, sub = '', cls = '') => `<div class="pw-box${cls ? ` ${cls}` : ''}"><span>${label}</span><b>${value}</b>${sub ? `<small>${sub}</small>` : ''}</div>`;
+const chip = (text, cls = '') => `<span class="pw-chip${cls ? ` ${cls}` : ''}">${text}</span>`;
+const lastFrame = feed => { const list = teles.get(feed.key) || [], last = list.at(-1); return last && performance.now() / 1000 - last.t < 3 ? last : null; };
+const gearText = gear => gear === 0 ? 'N' : gear < 0 ? 'R' : gear;
 
 function header(feed) {
-  const link = !view.connected ? '<span class="pw-dot late"></span>Reconnexion…'
-    : !feed ? '<span class="pw-dot"></span>En attente'
-      : isLive(feed) ? `<span class="pw-dot on"></span>Direct${view.rate >= 2 ? ` · ${fr(view.rate, 0)} Hz` : ''}` : `<span class="pw-dot late"></span>Il y a ${clock(age(feed))}`;
-  const logo = '<a class="pw-logo" href="/" aria-label="Retour à l’accueil Endurance Manager"><img src="/images/endurance-manager-logo.webp" alt="" width="34" height="34"></a>';
+  const link = !view.connected ? `<span class="pw-pill late"><i></i>Reconnexion…</span>`
+    : !feed ? `<span class="pw-pill off"><i></i>En attente pilote</span>`
+      : isLive(feed) ? `<span class="pw-pill on"><i></i>Pilote en direct</span>` : `<span class="pw-pill late"><i></i>Il y a ${clock(age(feed))}</span>`;
+  const rate = feed && isLive(feed) && view.rate >= 2 ? `<span class="pw-hz">⚡ ${fr(view.rate, 0)} Hz</span>` : '';
   const full = document.fullscreenEnabled ? `<button class="pw-icon" type="button" data-full aria-label="${document.fullscreenElement ? 'Quitter le plein écran' : 'Plein écran'}">${document.fullscreenElement ? '🗗' : '⛶'}</button>` : '';
-  if (!feed) return `<div class="pw-head">${logo}<div class="pw-id"><b>Mur des stands</b></div><div class="pw-link">${link}</div>${full}</div>`;
+  const session = feed ? `<div class="pw-session"><span>${esc(sessionName(feed.snap.session))}</span><b>${clock(timeLeft(feed))}</b></div>` : '';
+  return `<div class="pw-top pw-card">
+    <a class="pw-brand" href="/" aria-label="Retour à l’accueil Endurance Manager"><img src="/images/endurance-manager-logo.webp" alt="" width="30" height="30"><b>Mur des stands</b></a>
+    ${session}<div class="pw-status">${link}${rate}${full}</div></div>`;
+}
+
+function driverCard(feed) {
   const snap = feed.snap, me = meOf(feed), sorted = order(feed), classPlace = sorted.filter(car => car.cls === me.cls).indexOf(me) + 1;
-  const num = me.num ? `#${esc(me.num)} ` : '';
-  return `<div class="pw-head">${logo}
-    <div class="pw-id"><b>${num}${esc(model(me))}</b><span>${esc(snap.me.driver)} · ${esc(snap.me.car || model(me))} · ${esc(snap.track)}</span></div>
+  return `<div class="pw-driver pw-card">
+    <div class="pw-carnum">#${esc(me.num || '--')}</div>
+    <div class="pw-who"><b>${esc(snap.me.driver || feedName(feed))}</b><span>${esc(snap.me.car || model(me))}</span></div>
     <div class="pw-facts">
-      <div><span>${esc(sessionName(snap.session))}</span><b>${clock(timeLeft(feed))}</b></div>
-      <div><span>Position</span><b>P${me.place || sorted.indexOf(me) + 1}<small> · ${esc(me.cls)} P${classPlace}</small></b></div>
+      <div><span>Position</span><b>P${me.place || sorted.indexOf(me) + 1}</b></div>
+      <div><span>${esc(me.cls || 'Catégorie')}</span><b style="color:${classColor(me.cls)}">P${classPlace}</b></div>
       <div><span>Tour</span><b>${(me.laps || 0) + 1}</b></div>
     </div>
-    <div class="pw-link">${link}</div>${full}</div>`;
+    <div class="pw-track">📍 ${esc(snap.track)}</div></div>`;
 }
 
 function carsStrip() {
@@ -200,25 +214,39 @@ function carsStrip() {
     <i style="background:${esc(feedColor(feed))}"></i>${esc(feedName(feed))}<small>${esc(feed.snap.me.vehicle)}${isLive(feed) ? '' : ' · hors ligne'}</small></button>`).join('')}</div>`;
 }
 
-const tabs = () => `<nav class="pw-tabs" role="tablist">${TABS.map(([id, label, short]) => `<button type="button" role="tab" data-tab="${id}" aria-selected="${view.tab === id}"><span class="pw-long">${label}</span><span class="pw-short">${short}</span></button>`).join('')}</nav>`;
+const tabs = () => `<nav class="pw-tabs pw-card" role="tablist">${TABS.map(([id, label, short, icon], index) => `<button type="button" role="tab" data-tab="${id}" aria-selected="${view.tab === id}">
+  <span class="pw-tab-icon" aria-hidden="true">${icon}</span><span class="pw-long">${label}</span><span class="pw-short">${short}</span><kbd>${index + 1}</kbd></button>`).join('')}</nav>`;
 
 // A gap as PitData shows it: seconds, or laps once a lap down.
-const gapText = (seconds, laps) => known(laps) && laps > 0 ? `+${laps} T` : known(seconds) ? `+${fr(seconds, 1)}` : '—';
+const gapText = (seconds, laps) => known(laps) && laps > 0 ? `+${laps} T` : known(seconds) ? `+${fr(seconds, 3)}s` : '—';
 // The game counts stops only in some sessions (0 in practice): our own are the ones the plugin measured.
 const stopsOf = (feed, car) => car.id === feed.snap.me.id ? Math.max(car.stops || 0, (feed.ours.stops || []).length) : car.stops ?? 0;
-const pitText = car => car.pit === 2 ? '<b class="pw-pit">GAR</b>' : car.pit ? '<b class="pw-pit">STAND</b>' : '';
-const clsPill = cls => `<span class="pw-cls" style="--cls:${classColor(cls)}">${esc(String(cls || '—').replace(/hypercar/i, 'HY'))}</span>`;
+const lastStopOf = (feed, car) => car.id === feed.snap.me.id ? feed.ours.stops?.at(-1)?.lane ?? feed.cars[car.id]?.stop : feed.cars[car.id]?.stop;
+function pitCell(feed, car) {
+  if (car.pit === 2) return chip('GARAGE', 'warn');
+  if (car.pit) return chip('PIT IN', 'warn');
+  const last = lastStopOf(feed, car);
+  return `<b>${stopsOf(feed, car)}</b>${known(last) ? chip(`${fr(last, 1)}s`, 'stop') : ''}`;
+}
+const clsPill = cls => `<span class="pw-cls" style="--cls:${classColor(cls)}">${esc(String(cls || '—').toUpperCase())}</span>`;
 // The game gives 0 for a car whose tank it does not share (other players online): shown as unknown.
-const tankText = car => known(car.tank) && car.tank > 0 ? `<span class="pw-tank" style="--tank:${Math.max(0, Math.min(100, car.tank))}%">${fr(car.tank, 0)}</span>` : '—';
+function tankCell(car) {
+  if (!(known(car.tank) && car.tank > 0)) return '<span class="pw-dim">—</span>';
+  const level = Math.max(0, Math.min(100, car.tank)), color = level < 15 ? 'var(--pw-red)' : level < 35 ? 'var(--pw-yellow)' : 'var(--pw-green)';
+  return `<span class="pw-tank" style="--tank:${level}%;--bar:${color}"><b>${fr(level, 0)}%</b><i></i></span>`;
+}
+const numCell = car => `<td class="pw-num">#${esc(car.num || '')}</td>`;
+const nameCell = car => `<td class="pw-name"><b>${esc(car.driver)}</b></td>`;
 
 function board(feed) {
   const snap = feed.snap, race = isRace(snap.session);
   const classes = [...new Set(snap.field.map(car => car.cls).filter(Boolean))];
   if (view.cls !== 'all' && !classes.includes(view.cls)) view.cls = 'all';
-  const modes = `<div class="pw-switch" role="group" aria-label="Vue">${MODES.map(([id, label]) => `<button type="button" data-mode="${id}" aria-pressed="${view.mode === id}">${label}</button>`).join('')}</div>`;
-  const chips = view.mode === 'all' && classes.length > 1 ? `<div class="pw-switch" role="group" aria-label="Catégorie"><button type="button" data-cls="all" aria-pressed="${view.cls === 'all'}">Toutes</button>${classes.map(cls => `<button type="button" data-cls="${esc(cls)}" aria-pressed="${view.cls === cls}" style="--cls:${classColor(cls)}">${esc(cls)}</button>`).join('')}</div>` : '';
+  const modes = `<div class="pw-seg" role="group" aria-label="Vue">${MODES.map(([id, label, icon]) => `<button type="button" data-mode="${id}" aria-pressed="${view.mode === id}">${icon} ${label}</button>`).join('')}</div>`;
+  const chips = view.mode === 'all' && classes.length > 1 ? `<div class="pw-filters" role="group" aria-label="Catégorie"><button type="button" data-cls="all" aria-pressed="${view.cls === 'all'}">Toutes les classes</button>${classes.map(cls => `<button type="button" data-cls="${esc(cls)}" aria-pressed="${view.cls === cls}" style="--cls:${classColor(cls)}">${esc(cls.toUpperCase())}</button>`).join('')}</div>` : '';
   const body = view.mode === 'rel' ? relative(feed) : view.mode === 'opp' ? opponents(feed) : general(feed, race);
-  return `<div class="pw-bar">${modes}${chips}</div>${body}`;
+  const title = view.mode === 'rel' ? 'Relatif sur la piste' : view.mode === 'opp' ? `Opposants ${esc(meOf(feed)?.cls || '')}` : 'Classement en direct';
+  return card(`🏆 ${title} <small>${snap.field.length} concurrents</small>`, `${chips}${body}`, modes);
 }
 
 function general(feed, race) {
@@ -230,17 +258,17 @@ function general(feed, race) {
     const place = (classPlaces.get(car.cls) || 0) + 1;
     classPlaces.set(car.cls, place);
     const info = feed.cars[car.id] || {}, ours = car.id === snap.me.id;
-    const gap = race ? place === 1 ? 'Leader' : gapText(info.lead, info.leadLaps)
-      : car.best > 0 && bestOf.get(car.cls) ? place === 1 ? '—' : `+${fr(car.best - bestOf.get(car.cls), 3)}` : '—';
-    return `<tr class="${ours ? 'us' : ''}" style="--cls:${classColor(car.cls)}">
-      <td class="pw-pos">${race ? car.place || '—' : order(feed).indexOf(car) + 1}</td><td class="pw-num pw-opt">${esc(car.num || '')}</td><td class="pw-opt">${clsPill(car.cls)}</td>
-      <td class="pw-name"><b>${esc(car.driver)}</b><small>${esc(car.vehicle)}</small></td><td class="pw-opt2">${esc(model(car))}</td>
+    const gap = race ? place === 1 ? '<span class="pw-green">LEADER</span>' : gapText(info.lead, info.leadLaps)
+      : car.best > 0 && bestOf.get(car.cls) ? place === 1 ? '<span class="pw-green">MEILLEUR</span>' : `+${fr(car.best - bestOf.get(car.cls), 3)}s` : '—';
+    const best = car.best > 0 ? `<span class="${car.best === bestOf.get(car.cls) ? 'pw-purple' : 'pw-green'}">${lapTime(car.best)}</span>` : '—';
+    return `<tr class="${ours ? 'us' : ''}">
+      <td class="pw-pos">P${race ? car.place || '—' : order(feed).indexOf(car) + 1}</td>${numCell(car)}<td class="pw-opt">${clsPill(car.cls)}</td>
+      ${nameCell(car)}<td class="pw-team pw-opt2">${esc(model(car))}</td>
       <td class="pw-n">${gap}</td><td class="pw-n pw-opt">${car.laps ?? '—'}</td><td class="pw-n pw-opt">${lapTime(car.last)}</td>
-      <td class="pw-n${car.best > 0 && car.best === bestOf.get(car.cls) ? ' best' : ''}">${lapTime(car.best)}</td>
-      <td class="pw-n">${tankText(car)}</td><td class="pw-n">${stopsOf(feed, car)} ${pitText(car)}</td></tr>`;
+      <td class="pw-n">${best}</td><td class="pw-n pw-opt">${tankCell(car)}</td><td class="pw-n pw-stand">${pitCell(feed, car)}</td></tr>`;
   }).join('');
-  return `<div class="pw-table"><table><thead><tr><th>Pos</th><th class="pw-opt">#</th><th class="pw-opt">Cat</th><th>Pilote / équipe</th><th class="pw-opt2">Voiture</th><th class="pw-n">Écart</th>
-    <th class="pw-n pw-opt">Tours</th><th class="pw-n pw-opt">Dernier</th><th class="pw-n">Meilleur</th><th class="pw-n" title="Réservoir ou énergie virtuelle restante, en %">VE</th><th class="pw-n">Stands</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  return `<div class="pw-table"><table><thead><tr><th>Pos</th><th class="pw-yellow">#</th><th class="pw-opt">Cat</th><th>Pilote / équipe</th><th class="pw-opt2">Équipe</th><th class="pw-n">${race ? 'Écart leader' : 'Écart'}</th>
+    <th class="pw-n pw-opt">Tours</th><th class="pw-n pw-opt">Dernier tour</th><th class="pw-n">Meilleur tour</th><th class="pw-n pw-opt" title="Réservoir ou énergie virtuelle restante">Énergie virt.</th><th class="pw-n">Stands / arrêt</th></tr></thead><tbody>${rows}</tbody></table></div>`;
 }
 
 // Every car around us on track, seconds ahead or behind at our pace, whatever its class: who we are about to catch,
@@ -257,13 +285,12 @@ function relative(feed) {
   }).sort((a, b) => b.gap - a.gap);
   const index = list.findIndex(item => item.car.id === me.id);
   const shown = list.slice(Math.max(0, index - 6), index + 7);
-  const rows = shown.map(({car, gap, laps}) => `<tr class="${car.id === me.id ? 'us' : laps < 0 ? 'down' : laps > 0 ? 'up' : ''}" style="--cls:${classColor(car.cls)}">
-    <td class="pw-pos">${car.place || '—'}</td><td class="pw-num pw-opt">${esc(car.num || '')}</td><td class="pw-opt">${clsPill(car.cls)}</td>
-    <td class="pw-name"><b>${esc(car.driver)}</b><small>${esc(car.vehicle)}</small></td>
-    <td class="pw-n">${car.id === me.id ? '' : signed(gap, 1)}</td><td class="pw-n pw-opt">${laps ? `${laps > 0 ? '+' : '−'}${Math.abs(laps)} T` : ''}</td>
-    <td class="pw-n">${lapTime(car.last)}</td><td class="pw-n">${pitText(car)}</td></tr>`).join('');
-  return `<div class="pw-table"><table><thead><tr><th>Pos</th><th class="pw-opt">#</th><th class="pw-opt">Cat</th><th>Pilote / équipe</th><th class="pw-n">Sur nous</th><th class="pw-n pw-opt">Tours</th><th class="pw-n">Dernier</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>
-    <p class="pw-note">En secondes sur la piste, à notre rythme : + devant nous, − derrière.</p>`;
+  const rows = shown.map(({car, gap, laps}) => `<tr class="${car.id === me.id ? 'us' : laps < 0 ? 'down' : laps > 0 ? 'up' : ''}">
+    <td class="pw-pos">P${car.place || '—'}</td>${numCell(car)}<td class="pw-opt">${clsPill(car.cls)}</td>${nameCell(car)}
+    <td class="pw-n pw-big">${car.id === me.id ? '' : `${signed(gap, 1)}s`}</td><td class="pw-n pw-opt">${laps ? `${laps > 0 ? '+' : '−'}${Math.abs(laps)} T` : ''}</td>
+    <td class="pw-n">${lapTime(car.last)}</td><td class="pw-n pw-stand">${car.pit ? chip(car.pit === 2 ? 'GARAGE' : 'PIT IN', 'warn') : ''}</td></tr>`).join('');
+  return `<div class="pw-table"><table><thead><tr><th>Pos</th><th class="pw-yellow">#</th><th class="pw-opt">Cat</th><th>Pilote / équipe</th><th class="pw-n">Sur nous</th><th class="pw-n pw-opt">Tours</th><th class="pw-n">Dernier tour</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>
+    <p class="pw-note">Secondes sur la piste à notre rythme : + devant nous, − derrière. <span class="pw-blue">Bleu</span> : on lui prend un tour, <span class="pw-orange">orange</span> : il nous prend un tour.</p>`;
 }
 
 // Our class only: each car's gap to us in the race, its pace over 5 laps and its stint.
@@ -277,107 +304,136 @@ function opponents(feed) {
     const info = feed.cars[car.id] || {}, them = lead(car);
     // In a race + ahead of us; in practice, the best lap's difference (+ slower than ours).
     const laps = us.laps - them.laps;
-    const gap = car === me ? '' : race && (them.laps || us.laps) ? laps ? `${laps > 0 ? '+' : '−'}${Math.abs(laps)} T` : '—'
-      : race && known(them.s) && known(us.s) ? signed(us.s - them.s, 1) : car.best > 0 && me.best > 0 ? signed(car.best - me.best, 3) : '—';
-    const pace = known(info.avg5) && known(our.avg5) && car !== me ? ` <small>${signed(info.avg5 - our.avg5, 2)}</small>` : '';
-    return `<tr class="${car === me ? 'us' : ''}" style="--cls:${classColor(car.cls)}"><td class="pw-pos">${index + 1}</td><td class="pw-num pw-opt">${esc(car.num || '')}</td>
-      <td class="pw-name"><b>${esc(car.driver)}</b><small>${esc(car.vehicle)}</small></td><td class="pw-n">${gap}</td>
+    const value = car === me ? null : race && (them.laps || us.laps) ? laps ? `${laps > 0 ? '+' : '−'}${Math.abs(laps)} T` : '—'
+      : race && known(them.s) && known(us.s) ? `${signed(us.s - them.s, 1)}s` : car.best > 0 && me.best > 0 ? `${signed(car.best - me.best, 3)}s` : '—';
+    const gap = value === null ? '' : `<span class="${/^\+/.test(value) ? 'pw-red' : /^−/.test(value) ? 'pw-green' : ''}">${value}</span>`;
+    const diff = known(info.avg5) && known(our.avg5) && car !== me ? info.avg5 - our.avg5 : null;
+    const pace = known(diff) ? ` <small class="${diff < 0 ? 'pw-red' : 'pw-green'}">${signed(diff, 2)}</small>` : '';
+    return `<tr class="${car === me ? 'us' : ''}"><td class="pw-pos">P${index + 1}</td>${numCell(car)}${nameCell(car)}<td class="pw-n pw-big">${gap}</td>
       <td class="pw-n">${lapTime(info.avg5)}${pace}</td><td class="pw-n pw-opt">${lapTime(car.last)}</td><td class="pw-n pw-opt">${lapTime(car.best)}</td>
-      <td class="pw-n">${tankText(car)}</td><td class="pw-n pw-opt">${known(info.sinceStop) ? info.sinceStop : '—'}</td><td class="pw-n">${stopsOf(feed, car)} ${pitText(car)}</td></tr>`;
+      <td class="pw-n pw-opt">${tankCell(car)}</td><td class="pw-n pw-opt">${known(info.sinceStop) ? info.sinceStop : '—'}</td><td class="pw-n pw-stand">${pitCell(feed, car)}</td></tr>`;
   }).join('');
-  return `<div class="pw-table"><table><thead><tr><th>Pos</th><th class="pw-opt">#</th><th>Pilote / équipe</th><th class="pw-n">${race ? 'Sur nous' : 'Meilleur / nous'}</th><th class="pw-n">Moy. 5 tours</th>
-    <th class="pw-n pw-opt">Dernier</th><th class="pw-n pw-opt">Meilleur</th><th class="pw-n">VE</th><th class="pw-n pw-opt" title="Tours depuis son dernier arrêt">Relais</th><th class="pw-n">Stands</th></tr></thead><tbody>${rows}</tbody></table></div>
-    <p class="pw-note">${esc(me.cls)} : ${race ? 'écart en course (+ devant nous)' : 'meilleur tour comparé au nôtre (+ plus lent)'}, rythme sur 5 tours comparé au nôtre (+ plus lent).</p>`;
+  return `<div class="pw-table"><table><thead><tr><th>Pos</th><th class="pw-yellow">#</th><th>Pilote / équipe</th><th class="pw-n">${race ? 'Sur nous' : 'Meilleur / nous'}</th><th class="pw-n">Moy. 5 tours</th>
+    <th class="pw-n pw-opt">Dernier tour</th><th class="pw-n pw-opt">Meilleur tour</th><th class="pw-n pw-opt">Énergie virt.</th><th class="pw-n pw-opt" title="Tours depuis son dernier arrêt">Relais</th><th class="pw-n">Stands / arrêt</th></tr></thead><tbody>${rows}</tbody></table></div>
+    <p class="pw-note">${race ? 'Écart en course : + devant nous, − derrière.' : 'Meilleur tour comparé au nôtre : + plus lent.'} Rythme sur 5 tours comparé au nôtre : <span class="pw-red">rouge</span> plus rapide que nous.</p>`;
 }
-
-const tile = (label, value, extra = '', cls = '') => `<div class="pw-tile${cls ? ` ${cls}` : ''}"><span>${label}</span><b>${value}</b>${extra ? `<small>${extra}</small>` : ''}</div>`;
 
 function chrono(feed) {
   const snap = feed.snap, me = meOf(feed), ours = feed.ours, info = feed.cars[me.id] || {};
   const running = known(snap.me.cur) ? snap.me.cur + (isLive(feed) && !snap.me.pit ? age(feed) : 0) : null;
-  const delta = snap.me.pit ? null : snap.me.delta, deltaCls = known(delta) ? delta < 0 ? 'good' : delta > 0 ? 'bad' : '' : '';
+  const delta = snap.me.pit ? null : snap.me.delta;
   const lastS = info.lastSectors || [null, null, null], bestS = ours.bestSectors || [null, null, null], avgS = ours.sectors5 || [null, null, null];
+  // The class's best sectors: the best each car of our class did.
+  const classS = [0, 1, 2].map(index => { const values = snap.field.filter(car => car.cls === me.cls).map(car => feed.cars[car.id]?.best?.[index]).filter(value => known(value) && value > 0); return values.length ? Math.min(...values) : null; });
   const sum = list => list.every(known) ? list.reduce((a, b) => a + b, 0) : null;
-  const sector = (value, index) => `<td class="pw-n${known(value) && value === bestS[index] ? ' best' : ''}">${known(value) ? fr(value, 3) : '—'}</td>`;
+  const sec = value => known(value) ? fr(value, 3) : '--.---';
+  const colour = (value, index) => !known(value) ? '' : known(classS[index]) && value <= classS[index] + 0.001 ? 'pw-purple' : known(bestS[index]) && value <= bestS[index] + 0.001 ? 'pw-green' : '';
+  const sectors = [0, 1, 2].map(index => `<div class="pw-sector"><span class="pw-sec">S${index + 1}</span>
+    <b class="${colour(lastS[index], index)}">${sec(lastS[index])}</b><b>${sec(avgS[index])}</b><b class="pw-green">${sec(bestS[index])}</b><b class="pw-purple">${sec(classS[index])}</b></div>`).join('');
+  const classBest = Math.min(...snap.field.filter(car => car.cls === me.cls && car.best > 0).map(car => car.best));
+  const record = me.best > 0 && me.best <= classBest + 0.001;
   const laps = [...(ours.laps || [])].reverse();
   const timed = laps.filter(lap => lap.t > 0 && !lap.pit).map(lap => lap.t), best = timed.length ? Math.min(...timed) : null;
-  const history = laps.length ? laps.map(lap => `<tr class="${lap.t && lap.t === best ? 'top' : ''}"><td class="pw-pos">${lap.n}</td><td class="pw-n${lap.t && lap.t === best ? ' best' : ''}">${lapTime(lap.t)}</td>
+  const history = laps.length ? laps.map(lap => `<tr><td class="pw-pos">T${lap.n}</td><td class="pw-n${lap.t && lap.t === best ? ' pw-green' : ''}">${lapTime(lap.t)}</td>
+    <td class="pw-n">${lap.t && lap.t === best ? chip('RECORD', 'good') : known(best) && lap.t > 0 ? `+${fr(lap.t - best, 3)}s` : '—'}</td>
     ${[0, 1, 2].map(index => `<td class="pw-n pw-opt">${known(lap.s?.[index]) ? fr(lap.s[index], 3) : '—'}</td>`).join('')}
-    <td class="pw-n">${known(lap.ve) ? fr(lap.ve, 2) : known(lap.fuel) ? `${fr(lap.fuel, 2)} L` : '—'}</td><td class="pw-name pw-opt">${esc(lap.driver || '')}</td><td>${lap.pit ? '<b class="pw-pit">STAND</b>' : ''}</td></tr>`).join('')
-    : '<tr><td colspan="8" class="pw-note">Les tours s’ajoutent ici à chaque passage sur la ligne.</td></tr>';
-  return `<div class="pw-tiles big">
-      ${tile('Tour en cours', lapTime(running))}
-      ${tile('Delta meilleur', known(delta) ? signed(delta, 2) : '—', '', deltaCls)}
-      ${tile('Dernier', lapTime(me.last))}
-      ${tile('Meilleur', lapTime(me.best), '', 'purple')}
-      ${tile('Limites de piste', known(snap.me.limits) ? fr(snap.me.limits, snap.me.limits % 1 ? 1 : 0) : '—', 'points')}
-      ${tile('Pénalités', me.pen ?? 0)}
-    </div>
-    <h2>Secteurs</h2>
-    <div class="pw-table"><table><thead><tr><th></th><th class="pw-n">S1</th><th class="pw-n">S2</th><th class="pw-n">S3</th><th class="pw-n">Tour</th></tr></thead><tbody>
-      <tr><th>Dernier tour</th>${lastS.map(sector).join('')}<td class="pw-n">${lapTime(me.last)}</td></tr>
-      <tr><th>Moyenne 5 tours</th>${avgS.map(sector).join('')}<td class="pw-n">${lapTime(ours.avg5)}</td></tr>
-      <tr><th>Meilleurs</th>${bestS.map(sector).join('')}<td class="pw-n">${lapTime(sum(bestS))}<small> idéal</small></td></tr>
-    </tbody></table></div>
-    <h2>Historique des tours</h2>
-    <div class="pw-table"><table><thead><tr><th class="pw-n">Tour</th><th class="pw-n">Temps</th><th class="pw-n pw-opt">S1</th><th class="pw-n pw-opt">S2</th><th class="pw-n pw-opt">S3</th><th class="pw-n">Conso</th><th class="pw-opt">Pilote</th><th></th></tr></thead><tbody>${history}</tbody></table></div>`;
+    <td class="pw-n pw-yellow">${known(lap.fuel) ? `${fr(lap.fuel, 2)} L` : '—'}</td><td class="pw-n pw-cyan">${known(lap.ve) ? `${fr(lap.ve, 2)} %` : '—'}</td>
+    <td class="pw-name pw-opt">${esc(lap.driver || '')}</td><td class="pw-stand">${lap.pit ? chip('STAND', 'warn') : ''}</td></tr>`).join('')
+    : '<tr><td colspan="10" class="pw-note">Les tours s’ajoutent ici à chaque passage sur la ligne.</td></tr>';
+  const limits = known(snap.me.limits) ? snap.me.limits : 0, pen = me.pen ?? 0, clean = !limits && !pen;
+  return `<div class="pw-grid pw-chrono-grid">
+    ${card('⏱️ Chronométrage', `<div class="pw-session-pill">Temps restant <b>${clock(timeLeft(feed))}</b></div>
+      <div class="pw-hero"><div class="pw-box pw-lapno"><span>Tour actuel</span><b>T ${(me.laps || 0) + 1}</b></div>
+        <div class="pw-box pw-live"><span>Temps au tour en direct</span><b>${lapTime(running)}</b></div></div>
+      <div class="pw-row3">
+        ${box('Delta meilleur', known(delta) ? `${signed(delta, 3)}s` : '—', known(delta) ? delta < 0 ? 'plus rapide que notre meilleur' : 'plus lent que notre meilleur' : '', known(delta) ? delta < 0 ? 'good' : 'bad' : '')}
+        ${box('Dernier tour', lapTime(me.last), 'tour précédent')}
+        ${box('Meilleur tour', lapTime(me.best), record ? 'meilleur de la catégorie' : 'record perso de séance', record ? 'purple' : 'good')}
+      </div>`)}
+    ${card('🚩 Secteurs du tour', `<div class="pw-sector pw-sector-head"><span></span><span>Dernier</span><span>Moy. 5</span><span>Perso</span><span>Catégorie</span></div>${sectors}
+      <div class="pw-sector pw-sector-foot"><span class="pw-sec">Σ</span><b>${lapTime(me.last)}</b><b>${lapTime(ours.avg5)}</b><b class="pw-green">${lapTime(sum(bestS))}</b><b class="pw-purple">${lapTime(sum(classS))}</b></div>`)}
+    ${card('🚫 Limites de piste', `<div class="pw-row2">${box('Points', fr(limits, limits % 1 ? 1 : 0), 'cette séance', limits ? 'warn' : 'good')}${box('Pénalités', pen, '', pen ? 'bad' : 'good')}</div>`,
+      chip(clean ? 'CONFORME' : 'ATTENTION', clean ? 'good' : 'warn'))}
+  </div>
+  ${card(`📜 Historique des tours <small>${laps.length} tours</small>`, `<div class="pw-table"><table><thead><tr><th>Tour</th><th class="pw-n">Temps</th><th class="pw-n">Écart</th><th class="pw-n pw-opt">S1</th><th class="pw-n pw-opt">S2</th><th class="pw-n pw-opt">S3</th>
+    <th class="pw-n">Carburant</th><th class="pw-n">Énergie</th><th class="pw-opt">Pilote</th><th></th></tr></thead><tbody>${history}</tbody></table></div>`)}`;
 }
 
+// Colours of temperatures: blue cold, green in its window, yellow then red too hot.
+const tyreColor = value => !known(value) ? 'var(--pw-muted)' : value < 60 ? 'var(--pw-blue)' : value < 75 ? 'var(--pw-cyan)' : value <= 100 ? 'var(--pw-green)' : value <= 110 ? 'var(--pw-yellow)' : 'var(--pw-red)';
+const brakeColor = value => !known(value) ? 'var(--pw-muted)' : value < 250 ? 'var(--pw-blue)' : value <= 650 ? 'var(--pw-green)' : value <= 850 ? 'var(--pw-orange)' : 'var(--pw-red)';
+const wearColor = value => !known(value) ? 'var(--pw-muted)' : value > 60 ? 'var(--pw-green)' : value > 35 ? 'var(--pw-yellow)' : 'var(--pw-red)';
+
 function car(feed) {
-  const snap = feed.snap, me = snap.me, control = me.control || {}, energy = energyOf(feed), u = energy.unit;
-  const level = (label, value) => known(value) ? tile(label, value) : '';
-  const electronics = [level('TC', control.tc), level('TC Cut', control.cut), level('TC Slip', control.slip), level('ABS', control.abs), level('Carto moteur', control.map),
-    known(control.bias) ? tile('Freins', `${fr(control.bias, 1)} %`, 'à l’avant') : '', level('Migration', control.mig), level('Barre AV', control.arbF), level('Barre AR', control.arbR)].join('');
+  const snap = feed.snap, me = snap.me, control = me.control || {}, energy = energyOf(feed), pace = ourPace(feed), now = lastFrame(feed);
   const service = me.service, stops = feed.ours.stops || [];
   const stopFor = kind => stationary(kind, {service, energy:known(me.ve) ? me.ve : null, fuel:me.fuel, capacity:me.capacity, stops});
-  const wheel = (w, index) => `<div class="pw-wheel"><span>${WHEELS[index]}</span>
-    <b>${known(w.left) ? `${fr(w.left, 0)} %` : '—'}</b><small>usure restante</small>
-    <dl><div><dt>Carcasse</dt><dd>${known(w.carcass) ? `${fr(w.carcass, 0)} °C` : '—'}</dd></div><div><dt>Pression</dt><dd>${known(w.kpa) ? `${fr(w.kpa, 1)} kPa` : '—'}</dd></div><div><dt>Frein</dt><dd>${known(w.brake) ? `${fr(w.brake, 0)} °C` : '—'}</dd></div></dl></div>`;
-  return `${electronics ? `<h2>Électronique</h2><div class="pw-tiles">${electronics}</div>` : ''}
-    <h2>${energy.ve ? 'Énergie virtuelle' : 'Carburant'}</h2>
-    <div class="pw-tiles big">
-      ${tile(energy.ve ? 'VE' : 'Carburant', known(energy.have) ? `${fr(energy.have, 1)} ${u}` : '—', energy.ve && known(me.fuel) ? `${fr(me.fuel, 1)} L de carburant` : known(me.capacity) ? `sur ${fr(me.capacity, 0)} L` : '')}
-      ${tile('Dernier tour', known(energy.last) ? `${fr(energy.last, 2)} ${u}` : '—')}
-      ${tile('Moyenne 5 tours', known(energy.perLap) ? `${fr(energy.perLap, 2)} ${u}` : '—')}
-      ${tile('Tours possibles', known(energy.laps) ? fr(energy.laps, 1) : '—')}
-      ${tile('Tours jusqu’à l’arrivée', known(energy.left) ? fr(energy.left, 1) : '—')}
-      ${known(me.battery) ? tile('Batterie', `${fr(me.battery, 0)} %`, known(me.regen) && me.regen ? `régén. ${fr(me.regen, 0)} kW` : '') : ''}
+  const gauge = (icon, label, value, max) => `<div class="pw-gauge"><span>${icon} ${label}</span><i style="--level:${known(value) ? Math.max(0, Math.min(100, value / max * 100)) : 0}%"></i><b>${known(value) ? `${fr(value, 0)}°C` : '—'}</b></div>`;
+  const setting = (label, value, tone, text = value) => known(value) ? `<div class="pw-set ${tone}"><span>${label}</span><b>${text}</b></div>` : '';
+  const settings = [setting('ABS', control.abs, 'red'), setting('Répartition', control.bias, 'red', `${fr(control.bias, 1)}%`),
+    setting('TC', control.tc, 'blue'), setting('TC Cut', control.cut, 'blue'), setting('TC Slip', control.slip, 'blue'),
+    setting('Carto moteur', control.map, 'yellow'), setting('Migration', control.mig, 'yellow'), setting('Barre AV', control.arbF, 'grey'), setting('Barre AR', control.arbR, 'grey')].join('');
+  const cockpit = card('🎛️ Poste de pilotage', `<div class="pw-cockpit">
+      <div class="pw-gauges">${gauge('💧', 'Eau', me.water, 130)}${gauge('🛢️', 'Huile', me.oil, 150)}</div>
+      <div class="pw-speedo"><b class="pw-gear">${now ? gearText(now.gear) : '–'}</b><div><b class="pw-speed">${now ? fr(now.v, 0) : '—'}</b><span>km/h</span></div></div>
+      <div class="pw-pitstate">${box('Stands', me.pit === 2 ? 'GARAGE' : me.pit ? 'PIT LANE' : 'PISTE', '', me.pit ? 'warn' : 'good')}${box('Météo', known(snap.rain) ? `${fr(snap.rain * 100, 0)}% pluie` : '—', known(snap.trackTemp) ? `piste ${fr(snap.trackTemp, 0)}°C · air ${fr(snap.air, 0)}°C` : '')}</div>
+    </div>${settings ? `<div class="pw-settings">${settings}</div>` : ''}`);
+  const damage = known(me.damage) ? me.damage : null;
+  const damageCard = card('🛠️ Dégâts', `<div class="pw-damage" style="--level:${damage || 0}%;--bar:${!damage ? 'var(--pw-green)' : damage < 30 ? 'var(--pw-yellow)' : damage < 65 ? 'var(--pw-orange)' : 'var(--pw-red)'}">
+      <b>${known(damage) ? `${fr(damage, 0)}%` : '—'}</b><i></i></div>`,
+    known(damage) ? chip(!damage ? 'AUCUN DÉGÂT' : damage < 30 ? 'DÉGÂTS MINEURS' : damage < 65 ? 'DÉGÂTS MOYENS' : 'DÉGÂTS GRAVES', !damage ? 'good' : damage < 65 ? 'warn' : 'bad') : '', 'pw-damage-card');
+  // Fuel and virtual energy side by side, each with what it lasts at the 5-lap average.
+  const tank = (title, icon, value, unit, full, last, perLap, cls) => {
+    const laps = known(value) && perLap > 0 ? value / perLap : null;
+    return `<div class="pw-tank-card ${cls}"><div class="pw-tank-head"><span>${icon} ${title}</span><b>${known(value) ? `${fr(value, 1)} ${unit}` : '—'}</b></div>
+      <i class="pw-level" style="--level:${known(value) && full > 0 ? Math.max(0, Math.min(100, value / full * 100)) : 0}%"></i>
+      <div class="pw-row2">${box('Dernier tour', known(last) ? `${fr(last, 2)} ${unit}` : '—')}${box('Moyenne 5 tours', known(perLap) ? `${fr(perLap, 2)} ${unit}/t` : '—')}
+        ${box('Tours estimés', known(laps) ? `${fr(laps, 1)} t` : '—')}${box('Temps restant', known(laps) && pace ? clock(laps * pace) : '—')}</div></div>`;
+  };
+  const ours = feed.ours, ve = known(me.ve);
+  const energyCard = card('⚡ Énergie et consommation', `<div class="pw-row2 pw-tanks">
+      ${tank('Carburant', '⛽', me.fuel, 'L', me.capacity, ours.lastFuel, ours.fuel5, 'fuel')}
+      ${ve ? tank('Énergie virtuelle', '⚡', me.ve, '%', 100, ours.lastVe, ours.ve5, 've') : ''}
     </div>
-    <h2>Ravitaillement</h2>
-    <div class="pw-tiles">
-      ${tile('Pour finir', known(energy.need) ? `${fr(energy.need, 1)} ${u}` : '—', 'à notre moyenne')}
-      ${tile('Il manque', known(energy.missing) ? `${fr(energy.missing, 1)} ${u}` : '—', 'en plus de ce qu’il reste')}
-      ${tile('Arrêts', known(energy.stops) ? energy.stops : '—', energy.stops ? `plein${energy.stops > 1 ? 's' : ''} pour aller au bout` : 'pour aller au bout')}
-      ${tile('Plein', known(energy.room) ? `${fr(energy.room, 1)} ${u}` : '—', 'place libre')}
-      ${tile('Arrêt énergie', known(stopFor('energy')) ? `${fr(stopFor('energy'), 1)} s` : '—', 'à l’arrêt, plein')}
-      ${tile('Arrêt + 4 pneus', known(stopFor('tyres')) ? `${fr(stopFor('tyres'), 1)} s` : '—', 'à l’arrêt, plein')}
-    </div>
-    <h2>Pneus et freins <small>${esc(me.compound || '')}</small></h2>
-    <div class="pw-wheels">${me.wheels.map(wheel).join('')}</div>
-    <h2>État</h2>
-    <div class="pw-tiles">
-      ${tile('Dégâts', known(me.damage) ? `${fr(me.damage, 0)} %` : '—', '', me.damage > 0 ? 'bad' : '')}
-      ${tile('Eau', known(me.water) ? `${fr(me.water, 0)} °C` : '—')}
-      ${tile('Huile', known(me.oil) ? `${fr(me.oil, 0)} °C` : '—')}
-      ${tile('Piste', known(snap.trackTemp) ? `${fr(snap.trackTemp, 0)} °C` : '—', known(snap.air) ? `air ${fr(snap.air, 0)} °C` : '')}
-      ${tile('Pluie', known(snap.rain) ? `${fr(snap.rain * 100, 0)} %` : '—', known(snap.wet) ? `piste mouillée ${fr(snap.wet * 100, 0)} %` : '')}
-    </div>`;
+    <h3>🧮 Ravitaillement</h3>
+    <div class="pw-row3">
+      ${box('Pour finir', known(energy.need) ? `${fr(energy.need, 1)} ${energy.unit}` : '—', known(energy.left) ? `${fr(energy.left, 1)} tours à notre moyenne` : 'à notre moyenne')}
+      ${box('Il manque', known(energy.missing) ? `${fr(energy.missing, 1)} ${energy.unit}` : '—', 'en plus de ce qu’il reste', energy.missing > 0 ? 'warn' : 'good')}
+      ${box('Arrêts', known(energy.stops) ? energy.stops : '—', 'pleins pour aller au bout')}
+      ${box('Plein', known(energy.room) ? `${fr(energy.room, 1)} ${energy.unit}` : '—', 'place libre')}
+      ${box('Arrêt plein', known(stopFor('energy')) ? `${fr(stopFor('energy'), 1)} s` : '—', 'immobile')}
+      ${box('Plein + 4 pneus', known(stopFor('tyres')) ? `${fr(stopFor('tyres'), 1)} s` : '—', 'immobile')}
+    </div>`);
+  const wheel = (w, index) => {
+    const wear5 = ours.wear5?.[index], lastWear = ours.laps?.at(-1)?.wear?.[index];
+    return `<div class="pw-wheel"><div class="pw-wheel-head"><b>${WHEELS[index]}</b>${me.compound ? chip(esc(me.compound.toUpperCase()), 'compound') : ''}<span>Pression <b class="pw-cyan">${known(w.kpa) ? fr(w.kpa, 0) : '—'}</b> kPa</span></div>
+      <div class="pw-wheel-body${index % 2 ? ' right' : ''}">
+        <div class="pw-tyre" style="--temp:${tyreColor(w.carcass)}"><b>${known(w.carcass) ? `${fr(w.carcass, 0)}°C` : '—'}</b><small>carcasse</small></div>
+        <div class="pw-brake" style="--temp:${brakeColor(w.brake)}"><i></i><b>${known(w.brake) ? `${fr(w.brake, 0)}°C` : '—'}</b><small>frein</small></div>
+      </div>
+      <div class="pw-row3">${box('Restante', `<span style="color:${wearColor(w.left)}">${known(w.left) ? `${fr(w.left, 1)}%` : '—'}</span>`)}${box('Moyenne', known(wear5) ? `${fr(wear5, 2)}%/t` : '—')}${box('Dernier tour', known(lastWear) ? `${fr(lastWear, 2)}%` : '—')}</div></div>`;
+  };
+  const tyres = card('🛞 Pneus et freins', `<div class="pw-wheels">${me.wheels.map(wheel).join('')}</div>`);
+  return `<div class="pw-grid pw-car-top">${cockpit}${damageCard}</div><div class="pw-grid pw-car-bottom">${energyCard}${tyres}</div>`;
 }
 
 // The last minute of our car as curves (drawn into the canvases after each redraw), and our laps as graphs.
-const CURVES = [['v', 'Vitesse', 'km/h'], ['pedals', 'Gaz et frein', '%'], ['steer', 'Volant', '%']];
+const CURVES = [['pedals', [['Accélérateur', 'green'], ['Frein', 'red']], now => now ? `Accél. <b class="pw-green">${fr(now.throttle, 0)}%</b> Frein <b class="pw-red">${fr(now.brake, 0)}%</b>` : ''],
+  ['v', [['Vitesse (km/h)', 'cyan'], ['Rapport', 'purple']], now => now ? `Vitesse <b class="pw-cyan">${fr(now.v, 0)} km/h</b> Rapport <b class="pw-purple">${gearText(now.gear)}</b>` : ''],
+  ['steer', [['Volant (%)', 'yellow']], now => now ? `Volant <b class="pw-yellow">${signed(now.steer, 0)}%</b>` : '']];
 function tele(feed) {
-  const list = teles.get(feed.key) || [], last = list.at(-1);
-  const now = last && performance.now() / 1000 - last.t < 3 ? last : null;
-  const bar = (label, value, cls) => `<div class="pw-pedal ${cls}"><span>${label}</span><i style="--level:${known(value) ? Math.max(0, Math.min(100, value)) : 0}%"></i><b>${known(value) ? fr(value, 0) : '—'}</b></div>`;
-  const live = `<div class="pw-tiles big">
-      ${tile('Vitesse', now ? `${fr(now.v, 0)}` : '—', 'km/h')}
-      ${tile('Rapport', now ? now.gear === 0 ? 'N' : now.gear < 0 ? 'R' : now.gear : '—')}
-      ${tile('Volant', now ? signed(now.steer, 0) : '—', '% à droite')}
-    </div><div class="pw-pedals">${bar('Gaz', now?.throttle, 'gas')}${bar('Frein', now?.brake, 'brake')}</div>`;
-  const curves = list.length ? CURVES.map(([id, label, unit]) => `<figure class="pw-curve"><figcaption>${label} <small>${unit} · dernière minute</small></figcaption><canvas data-curve="${id}" height="120"></canvas></figure>`).join('')
+  const list = teles.get(feed.key) || [], now = lastFrame(feed);
+  const pedal = (label, value, cls) => `<div class="pw-pedal ${cls}"><i style="--level:${known(value) ? Math.max(0, Math.min(100, value)) : 0}%"></i><b>${known(value) ? `${fr(value, 0)}%` : '—'}</b><span>${label}</span></div>`;
+  const steer = known(now?.steer) ? Math.max(-100, Math.min(100, now.steer)) : 0;
+  const live = card('🕹️ Pédales et volant', `<div class="pw-tele-live">
+      <div class="pw-panel pw-pedals">${pedal('Frein', now?.brake, 'brake')}${pedal('Accél.', now?.throttle, 'gas')}</div>
+      <div class="pw-panel pw-wheelbar"><span>Direction (volant) <b>${now ? `${signed(now.steer, 0)}%` : '—'}</b></span><div class="pw-steer"><i style="left:${50 + steer / 2}%"></i></div></div>
+      <div class="pw-panel pw-speedo small"><b class="pw-gear">${now ? gearText(now.gear) : '–'}</b><div><b class="pw-speed">${now ? fr(now.v, 0) : '—'}</b><span>km/h</span></div></div>
+    </div>`);
+  const status = `<div class="pw-acq pw-card"><span class="pw-pill ${now ? 'on' : 'off'}"><i></i>${now ? 'Acquisition en direct' : 'En attente des données'}</span><small>Fenêtre glissante : 60 secondes</small></div>`;
+  const curves = list.length ? CURVES.map(([id, legend, values]) => `<div class="pw-card pw-curve"><div class="pw-card-head">${legend.map(([label, tone]) => chip(label.toUpperCase(), `line ${tone}`)).join('')}<span class="pw-curve-now">${values(now)}</span></div><canvas data-curve="${id}" height="150"></canvas></div>`).join('')
     : '<p class="pw-note">Les courbes arrivent quand le pilote roule avec le plugin 2.0 et que cette page est ouverte.</p>';
-  return `${live}<h2>En direct</h2>${curves}<h2>Nos tours</h2>${lapGraphs(feed)}`;
+  return `${live}${status}${curves}${card('📊 Nos tours', lapGraphs(feed))}`;
 }
 
 // One bar per lap: its time (pit laps faded) and what it used.
@@ -385,7 +441,7 @@ function lapGraphs(feed) {
   const laps = (feed.ours.laps || []).slice(-40);
   const timed = laps.filter(lap => lap.t > 0 && !lap.pit).map(lap => lap.t);
   if (timed.length < 2) return '<p class="pw-note">Les graphes s’affichent après deux tours chronométrés.</p>';
-  const graph = (title, pick, digits, unit) => {
+  const graph = (title, pick, digits, unit, tone) => {
     const values = laps.map(pick), shown = values.filter(known);
     if (shown.length < 2) return '';
     const sorted = [...shown].sort((a, b) => a - b), low = sorted[0], high = sorted[Math.floor(sorted.length * 0.9)] || sorted.at(-1);
@@ -396,11 +452,11 @@ function lapGraphs(feed) {
       const h = 12 + Math.min(1, (value - low) / span) * 88;
       return `<rect x="${(index * width + width * 0.12).toFixed(2)}" y="${(100 - h).toFixed(2)}" width="${(width * 0.76).toFixed(2)}" height="${h.toFixed(2)}"${lap.pit ? ' class="pit"' : value === low ? ' class="low"' : ''}><title>Tour ${lap.n} : ${digits === 'lap' ? lapTime(value) : `${fr(value, digits)} ${unit}`}</title></rect>`;
     }).join('');
-    return `<figure class="pw-graph"><figcaption>${title} <small>tours ${laps[0].n} à ${laps.at(-1).n} · ${digits === 'lap' ? `${lapTime(low)} à ${lapTime(high)}` : `${fr(low, digits)} à ${fr(high, digits)} ${unit}`}</small></figcaption>
+    return `<figure class="pw-graph ${tone}"><figcaption>${chip(title.toUpperCase(), `line ${tone}`)} <small>tours ${laps[0].n} à ${laps.at(-1).n} · ${digits === 'lap' ? `${lapTime(low)} à ${lapTime(high)}` : `${fr(low, digits)} à ${fr(high, digits)} ${unit}`}</small></figcaption>
       <svg viewBox="0 0 100 100" preserveAspectRatio="none" role="img" aria-label="${title} par tour">${bars}</svg></figure>`;
   };
   const ve = laps.some(lap => known(lap.ve));
-  return `${graph('Temps au tour', lap => lap.t > 0 ? lap.t : null, 'lap')}${graph(ve ? 'VE par tour' : 'Carburant par tour', lap => ve ? lap.ve : lap.fuel, 2, ve ? '%' : 'L')}`;
+  return `${graph('Temps au tour', lap => lap.t > 0 ? lap.t : null, 'lap', '', 'cyan')}${graph(ve ? 'Énergie par tour' : 'Carburant par tour', lap => ve ? lap.ve : lap.fuel, 2, ve ? '%' : 'L', ve ? 'cyan' : 'yellow')}`;
 }
 
 function drawCurves(feed) {
@@ -413,10 +469,11 @@ function drawCurves(feed) {
     canvas.width = width * ratio; canvas.height = height * ratio;
     const ctx = canvas.getContext('2d');
     ctx.scale(ratio, ratio);
-    ctx.strokeStyle = style.getPropertyValue('--pw-line'); ctx.lineWidth = 1;
+    ctx.strokeStyle = style.getPropertyValue('--pw-grid'); ctx.lineWidth = 1;
     for (const y of [0.25, 0.5, 0.75]) { ctx.beginPath(); ctx.moveTo(0, y * height); ctx.lineTo(width, y * height); ctx.stroke(); }
+    for (const x of [0.25, 0.5, 0.75]) { ctx.beginPath(); ctx.moveTo(x * width, 0); ctx.lineTo(x * width, height); ctx.stroke(); }
     const line = (pick, color, min, max) => {
-      ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.beginPath();
+      ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.shadowColor = color; ctx.shadowBlur = 6; ctx.beginPath();
       let open = false, before = null;
       for (const item of list) {
         const value = pick(item);
@@ -426,11 +483,12 @@ function drawCurves(feed) {
         before = item;
       }
       ctx.stroke();
+      ctx.shadowBlur = 0;
     };
-    const kind = canvas.dataset.curve;
-    if (kind === 'v') line(item => item.v, style.getPropertyValue('--pw-speed'), 0, Math.max(100, ...list.map(item => item.v || 0)));
-    if (kind === 'pedals') { line(item => item.throttle, style.getPropertyValue('--pw-gas'), 0, 100); line(item => item.brake, style.getPropertyValue('--pw-brake'), 0, 100); }
-    if (kind === 'steer') line(item => item.steer, style.getPropertyValue('--pw-steer'), -100, 100);
+    const kind = canvas.dataset.curve, color = name => style.getPropertyValue(`--pw-${name}`);
+    if (kind === 'v') { line(item => item.v, color('cyan'), 0, Math.max(100, ...list.map(item => item.v || 0))); line(item => item.gear, color('purple'), 0, Math.max(6, ...list.map(item => item.gear || 0))); }
+    if (kind === 'pedals') { line(item => item.throttle, color('green'), 0, 100); line(item => item.brake, color('red'), 0, 100); }
+    if (kind === 'steer') line(item => item.steer, color('yellow'), -100, 100);
   }
 }
 
@@ -494,7 +552,10 @@ function map(feed) {
   const cars = snap.field.filter(car => known(car.x) && known(car.z) && car.pit !== 2);
   const whole = feed.mapFromGame || trackLaps.get(snap.track), box = whole ? null : motions.get(feed.key)?.box;
   const points = [...outline, ...(box ? [[box[0], box[2]], [box[1], box[3]]] : whole ? [] : cars.map(car => [car.x, car.z]))];
-  if (!points.length) { frame = null; return '<p class="pw-note">Les positions arrivent dès que la voiture roule.</p>'; }
+  const classes = [...new Set(snap.field.map(car => car.cls).filter(Boolean))];
+  const head = `${chip(esc(snap.track.toUpperCase()), 'line cyan')}${known(snap.length) ? chip(`${fr(snap.length / 1000, 2)} km`) : ''}${chip(`${cars.length} voitures`)}
+    <div class="pw-legend">${classes.map(name => `<span><i style="background:${classColor(name)}"></i>${esc(name.toUpperCase())}</span>`).join('')}<span><i class="us"></i>NOUS</span></div>`;
+  if (!points.length) { frame = null; return card('🗺️ Carte du circuit en direct', '<p class="pw-note">Les positions arrivent dès que la voiture roule.</p>', head); }
   const xs = points.map(p => p[0]), zs = points.map(p => p[1]);
   const minX = Math.min(...xs), maxX = Math.max(...xs), minZ = Math.min(...zs), maxZ = Math.max(...zs);
   const k = 940 / (Math.max(maxX - minX, maxZ - minZ) || 1);
@@ -505,20 +566,19 @@ function map(feed) {
   const sorted = order(feed), placeOf = car => (isRace(snap.session) && car.place) || sorted.indexOf(car) + 1;
   const dot = (car, fill, r, ours = false) => { const [x, z] = placed(feed, car);
     return `<g data-car="${car.id}"${ours ? ' class="us"' : ''} transform="translate(${px(x)},${pz(z)})"><circle r="${r}" fill="${fill}"/><text dy="0.36em">${placeOf(car)}</text></g>`; };
-  const others = cars.filter(car => car.id !== snap.me.id).map(car => dot(car, classColor(car.cls), 18)).join('');
+  const others = cars.filter(car => car.id !== snap.me.id).map(car => dot(car, classColor(car.cls), 11)).join('');
   const me = cars.find(car => car.id === snap.me.id);
-  const classes = [...new Set(snap.field.map(car => car.cls).filter(Boolean))];
-  return `<svg class="pw-map" viewBox="0 0 ${width.toFixed(0)} ${height.toFixed(0)}" role="img" aria-label="Position des voitures sur le circuit">${path ? `<path class="road" d="${path}"/><path class="edge" d="${path}"/>` : ''}${others}${me ? dot(me, esc(feedColor(feed)), 25, true) : ''}</svg>
-    <div class="pw-legend">${classes.map(name => `<span><i style="background:${classColor(name)}"></i>${esc(name)}</span>`).join('')}<span><i class="us" style="background:${esc(feedColor(feed))}"></i>Nous</span></div>`;
+  return card('🗺️ Carte du circuit en direct', `<div class="pw-map-box"><svg class="pw-map" viewBox="0 0 ${width.toFixed(0)} ${height.toFixed(0)}" role="img" aria-label="Position des voitures sur le circuit">
+    ${path ? `<path class="road" d="${path}"/><path class="line" d="${path}"/>` : ''}${others}${me ? dot(me, 'var(--pw-cyan)', 15, true) : ''}</svg></div>`, head, 'pw-map-card');
 }
 
 function glide() {
   requestAnimationFrame(glide);
   if (still || document.hidden || !frame || view.tab !== 'map') return;
-  const box = app.querySelector('.pw-map');
-  if (!box) return;
+  const svg = app.querySelector('.pw-map');
+  if (!svg) return;
   const {feed, minX, maxZ, k} = frame, field = new Map(feed.snap.field.map(car => [car.id, car]));
-  for (const node of box.querySelectorAll('[data-car]')) {
+  for (const node of svg.querySelectorAll('[data-car]')) {
     const car = field.get(Number(node.dataset.car));
     if (!car) continue;
     const [x, z] = placed(feed, car);
@@ -533,21 +593,29 @@ function render() {
   if (!view.started) return;
   const feed = current();
   if (!feed) {
-    app.innerHTML = `${header(null)}<section class="pw-empty"><h1>Personne ne roule en ce moment</h1>
-      <p>Le mur s’allume dès qu’un pilote de l’équipe roule avec le plugin SimHub, « Partager ma voiture en direct » coché. Cette page se met à jour toute seule.</p></section>`;
+    app.innerHTML = `${header(null)}<div class="pw-card pw-empty"><h1>Personne ne roule en ce moment</h1>
+      <p>Le mur s’allume dès qu’un pilote de l’équipe roule avec le plugin SimHub, « Partager ma voiture en direct » coché. Cette page se met à jour toute seule.</p></div>`;
     return;
   }
-  const scroll = app.querySelector('.pw-panel')?.scrollTop;
-  app.innerHTML = `${header(feed)}${carsStrip()}${tabs()}<section class="pw-panel pw-${view.tab}" role="tabpanel">${PANELS[view.tab](feed)}</section>`;
-  if (scroll) app.querySelector('.pw-panel').scrollTop = scroll;
+  const scroll = window.scrollY;
+  app.innerHTML = `${header(feed)}${driverCard(feed)}${carsStrip()}${tabs()}<div class="pw-panel-wrap pw-${view.tab}" role="tabpanel">${PANELS[view.tab](feed)}</div>`;
+  if (scroll) window.scrollTo(0, scroll);
   if (view.tab === 'tele') drawCurves(feed);
 }
 
+function showTab(tab) {
+  view.tab = tab;
+  history.replaceState(null, '', `#${view.tab}`);
+  remember();
+  tellView();
+  window.scrollTo(0, 0);
+  render();
+}
 app.addEventListener('click', event => {
   const button = event.target.closest('button');
   if (!button) return;
-  if (button.dataset.tab) { view.tab = button.dataset.tab; history.replaceState(null, '', `#${view.tab}`); remember(); tellView(); window.scrollTo(0, 0); }
-  else if (button.dataset.mode) { view.mode = button.dataset.mode; remember(); }
+  if (button.dataset.tab) return showTab(button.dataset.tab);
+  if (button.dataset.mode) { view.mode = button.dataset.mode; remember(); }
   else if (button.dataset.cls) view.cls = button.dataset.cls;
   else if (button.dataset.feed) view.key = button.dataset.feed;
   else if ('full' in button.dataset) {
@@ -556,6 +624,12 @@ app.addEventListener('click', event => {
     return;
   } else return;
   render();
+});
+// Keys 1 to 5 open the tabs, as on PitData.
+document.addEventListener('keydown', event => {
+  if (event.ctrlKey || event.metaKey || event.altKey || /input|textarea|select/i.test(event.target.tagName)) return;
+  const tab = TABS[Number(event.key) - 1];
+  if (tab) showTab(tab[0]);
 });
 document.addEventListener('fullscreenchange', render);
 
