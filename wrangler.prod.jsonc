@@ -15,7 +15,7 @@
     "not_found_handling": "404-page",
     "run_worker_first": ["/", "/index*", "/api/*", "/telemetry/*", "/manifest.webmanifest", "/app-icon.png",
       "/lmu*", "/iracing*", "/members*", "/help*", "/about*", "/legal*", "/privacy*", "/changelog*", "/circuit-credits*",
-      "/demande-communaute*", "/diagnostics*", "/fiches-combo*", "/mur-des-stands*", "/mur*",
+      "/demande-communaute*", "/diagnostics*", "/fiches-combo*", "/mur*",
       "!/front/*", "!/shared/*", "!/images/*", "!/app.css", "!/app.js", "!/crew-builder.js", "!/help.js", "!/help.css", "!/privacy.css", "!/sw.js"]
   },
   "routes": [
