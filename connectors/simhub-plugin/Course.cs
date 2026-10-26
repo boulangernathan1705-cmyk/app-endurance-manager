@@ -19,7 +19,7 @@ namespace EnduranceManager.SimHub
     // One line of the game's pit menu (garage/PitMenu/receivePitMenu): its name, the choice made and its text.
     public class MenuItem
     {
-        public string Name, Text;
+        public string Name, Text, Type;
         public int Index;
     }
 
@@ -46,8 +46,9 @@ namespace EnduranceManager.SimHub
                     string name = ((string)line["name"] ?? "").Replace(":", "").Trim().ToUpperInvariant();
                     int index = (int?)line["currentSetting"] ?? 0;
                     var settings = line["settings"] as JArray;
-                    string text = settings != null && index >= 0 && index < settings.Count ? ((string)settings[index]?["text"] ?? "").Trim() : "";
-                    if (name != "") items.Add(new MenuItem { Name = name, Index = index, Text = text });
+                    var setting = settings != null && index >= 0 && index < settings.Count ? settings[index] as JObject : null;
+                    string text = ((string)setting?["text"] ?? "").Trim();
+                    if (name != "") items.Add(new MenuItem { Name = name, Index = index, Text = text, Type = (string)setting?["type"] });
                 }
                 Items = items;
             }
@@ -70,9 +71,29 @@ namespace EnduranceManager.SimHub
         public double? FuelCurrent, FuelMax, FuelLastLap, FuelAvg5, FuelLapsLeft, FuelNeeded, FuelToRefill, FuelToRefillSafe;
         public double? RatioLastLap, RatioAvg5;
         public double? LapsLeft, TimeLeft, LapTimeAvg10, LastLap, BestLap;
-        public int? PosOverall, PosInClass, CarsInClass, Stops, Penalties, PitState;
-        public double? GapToFirstInClassTime, GapAheadInClassTime;
-        public int? GapToFirstInClassLaps;
+        public int? PosOverall, PosInClass, CarsInClass, Stops, Penalties;
+        public string PitState, MultiStintState;
+        public double? PitEntryDist, LengthTime;
+        public bool? RaceFinished, Replay;
+        public double? GapToFirstInClassTime, GapAheadInClassTime, GapToLastInClassTime;
+        public int? GapToFirstInClassLaps, GapToLastInClassLaps;
+        public double? VeRaw, VeMax, BatteryRaw, BatteryMax, FuelFraction, VeLastLapRaw, VeAvg5Clear;
+        public double? MenuFuelNumber, MenuVeNumber, MenuRatioNumber;
+        public int? MenuRepairIndex, MenuBrakesIndex;
+        public string MenuFrontDuct, MenuRearDuct;
+        public string[] MenuTyreType = new string[4];
+        public double?[] MenuPressureKpa = new double?[4];
+        public double? EstimatePenalties;
+        public double?[] BrakeCondition = new double?[4], SuspensionDamage = new double?[4];
+        public double? AeroDamage;
+        public double? OptimalSoft, OptimalMedium, OptimalHard, OptimalWet;
+        public int? MaxTyres, NewTyres;
+        public string GrandPrix, Location, OpeningYear, TrackId, Layout, Engine, CarId, Livery, Manufacturer, Number, Team, TeamHeadquarters, TeamFounded;
+        public double? TrackLength;
+        public double? Humidity, Light, Raining, RainChance;
+        public string WetnessText;
+        // Weather.* (forecast nodes of the session, the current one, time until each) and Session.* (its settings).
+        public Dictionary<string, object> Weather = new Dictionary<string, object>(), Session = new Dictionary<string, object>();
         public bool InPits, InGarage;
         public double? LastStop;
         public string MenuFuel, MenuVe, MenuRatio, MenuRepair, MenuBrakes, MenuDriver, MenuWing, MenuGrille, MenuAll;
@@ -105,6 +126,24 @@ namespace EnduranceManager.SimHub
         }
         static double? R(double? value, int digits) => value == null || double.IsNaN(value.Value) || double.IsInfinity(value.Value) ? null : Math.Round(value.Value, digits, MidpointRounding.AwayFromZero);
         static double? Mean(IEnumerable<double> values) { var list = values.ToList(); return list.Count > 0 ? list.Average() : (double?)null; }
+
+        const double KpaToPsi = 0.1450377;
+        static readonly string Version = typeof(Course).Assembly.GetName().Version.ToString(3);
+        static readonly string[] Nodes = { "START", "NODE_25", "NODE_50", "NODE_75", "FINISH" };
+        static readonly string[] Measures = { "WNV_TEMPERATURE", "WNV_RAIN_CHANCE", "WNV_SKY", "WNV_HUMIDITY", "WNV_WINDSPEED", "WNV_WINDDIRECTION" };
+        static readonly string[] PitStates = { "NONE", "REQUEST", "ENTERING", "STOPPED", "EXITING" };
+        // NeoRed's names for the session settings (rest/sessions): the game's setting, and its number rather than its text.
+        static readonly (string Name, string Setting, bool Number)[] SessionSettings =
+        {
+            ("TrackSurface.Practice", "SESSSET_pract1_realroad_init", false), ("TrackSurface.Quali", "SESSSET_qual1_realroad_init", false),
+            ("TrackSurface.Race", "SESSSET_race_realroad_init", false), ("TrackSurface.Practice.TimeScale", "SESSSET_realroad_timescale_practice", false),
+            ("TrackSurface.Quali.TimeScale", "SESSSET_realroad_timescale_qualify", false), ("TrackSurface.Race.TimeScale", "SESSSET_realroad_timescale_race", false),
+            ("TimeScale", "SESSSET_race_timescale", false), ("TireWarmers", "SESSSET_tire_warmers", false), ("TireWear", "SESSSET_Tire_Wear", false),
+            ("FuelUsage", "SESSSET_Fuel_Usage", false), ("TrackLimits.PointsAllowed", "SESSSET_cuts_allowed", true),
+            ("TrackLimits.Rules", "SESSSET_cut_rules", false), ("DamageSimulation", "SESSSET_Damage_Multi", false),
+            ("MechanicalFailures", "SESSSET_Mech_Failures", false), ("FlagRules", "SESSSET_flag_rules", false), ("Weather", "SESSSET_weather", false),
+            ("Weather.TimeScale", "SESSSET_timescaled_weather", false), ("TiresAvailable", "SESSSET_tires_available_in_garage", true)
+        };
 
         // Every property, its name (as NeoRed's) and how it reads the view. Plugin.cs attaches them all.
         public static readonly (string Name, Func<CourseView, object> Get)[] Properties = BuildProperties();
@@ -143,6 +182,54 @@ namespace EnduranceManager.SimHub
                 ("GameInfos.GapToFirstInClassLaps", v => v.GapToFirstInClassLaps),
                 ("GameInfos.GapToAheadInClassTime", v => v.GapAheadInClassTime),
                 ("GameInfos.PitState", v => v.PitState),
+                ("GameInfos.MultiStintState", v => v.MultiStintState),
+                ("GameInfos.PitEntryDist", v => v.PitEntryDist),
+                ("GameInfos.RaceFinished", v => v.RaceFinished),
+                ("GameInfos.isReplayActive", v => v.Replay),
+                ("GameInfos.LengthTime", v => v.LengthTime),
+                ("GameInfos.GapToLastInClassLaps", v => v.GapToLastInClassLaps),
+                ("GameInfos.GapToLastInClassTime", v => v.GapToLastInClassTime),
+                ("Pit.MaxAvailableTires", v => v.MaxTyres),
+                ("Pit.NewTires", v => v.NewTyres),
+                ("Energy.VE.Current", v => v.VeRaw),
+                ("Energy.VE.Max", v => v.VeMax),
+                ("Energy.VE.PerLastLap", v => v.VeLastLapRaw),
+                ("Energy.VE.PerLast5ClearLap_%", v => v.VeAvg5Clear),
+                ("Energy.Batt.Current", v => v.BatteryRaw),
+                ("Energy.Batt.Max", v => v.BatteryMax),
+                ("Energy.Fuel.FractionPerLap_%", v => v.FuelFraction),
+                ("PitMenu.Fuel", v => v.MenuFuelNumber),
+                ("PitMenu.Virtual_Energy", v => v.MenuVeNumber),
+                ("PitMenu.RepairDamage", v => v.MenuRepairIndex),
+                ("PitMenu.BrakesReplace", v => v.MenuBrakesIndex),
+                ("PitMenu.BrakesFrontDuct", v => v.MenuFrontDuct),
+                ("PitMenu.BrakesRearDuct", v => v.MenuRearDuct),
+                ("PitStopEstimate.Penalties", v => v.EstimatePenalties),
+                ("VehicleCondition.VehicleDamage_(Aero)", v => v.AeroDamage),
+                ("Tyre.OptimalCompoundTemp_Soft", v => v.OptimalSoft),
+                ("Tyre.OptimalCompoundTemp_Medium", v => v.OptimalMedium),
+                ("Tyre.OptimalCompoundTemp_Hard", v => v.OptimalHard),
+                ("Tyre.OptimalCompoundTemp_Wet", v => v.OptimalWet),
+                ("TrackInfos.GrandPrixName", v => v.GrandPrix),
+                ("TrackInfos.Location", v => v.Location),
+                ("TrackInfos.OpeningYear", v => v.OpeningYear),
+                ("TrackInfos.Length", v => v.TrackLength),
+                ("TrackInfos.Id", v => v.TrackId),
+                ("TrackInfos.Layout", v => v.Layout),
+                ("VehicleInfos.Engine", v => v.Engine),
+                ("VehicleInfos.Id", v => v.CarId),
+                ("VehicleInfos.LiveryName", v => v.Livery),
+                ("VehicleInfos.Manufacturer", v => v.Manufacturer),
+                ("VehicleInfos.Number", v => v.Number),
+                ("TeamInfos.TeamName", v => v.Team),
+                ("TeamInfos.TeamHeadquarters", v => v.TeamHeadquarters),
+                ("TeamInfos.TeamFounded", v => v.TeamFounded),
+                ("WeatherInfos.Current.Humidity_%", v => v.Humidity),
+                ("WeatherInfos.Current.LightLevel_%", v => v.Light),
+                ("WeatherInfos.Current.Raining_%", v => v.Raining),
+                ("WeatherInfos.RainChance_%", v => v.RainChance),
+                ("WeatherInfos.Track.Wetness_Text", v => v.WetnessText),
+                ("PluginVersion", v => Version),
                 ("GameInfos.InPits", v => v.InPits),
                 ("GameInfos.InGarage", v => v.InGarage),
                 ("Pit.Stops", v => v.Stops),
@@ -150,7 +237,7 @@ namespace EnduranceManager.SimHub
                 ("Race.Player.Penalties", v => v.Penalties),
                 ("PitMenu.Fuel_Text", v => v.MenuFuel),
                 ("PitMenu.Virtual_Energy_Text", v => v.MenuVe),
-                ("PitMenu.FuelRatio", v => v.MenuRatio),
+                ("PitMenu.FuelRatio", v => v.MenuRatioNumber),
                 ("PitMenu.RepairDamage_Text", v => v.MenuRepair),
                 ("PitMenu.BrakesReplace_Text", v => v.MenuBrakes),
                 ("PitMenu.Driver_Text", v => v.MenuDriver),
@@ -205,16 +292,33 @@ namespace EnduranceManager.SimHub
                 list.Add(($"PitMenu.Tyre.{c}_Tyre_NewPressure_kPa_Text", v => v.MenuPressure[w]));
                 list.Add(($"Tyre.{c}_TyreCompound_Name", v => v.Compound[w]));
                 list.Add(($"Tyre.{c}_TyrePressure_kPa", v => v.Pressure[w]));
+                list.Add(($"Tyre.{c}_TyrePressure_Bar", v => R(v.Pressure[w] / 100, 3)));
+                list.Add(($"Tyre.{c}_TyrePressure_Psi", v => R(v.Pressure[w] * KpaToPsi, 1)));
+                list.Add(($"PitMenu.Tyre.{c}_TyreChange_Type", v => v.MenuTyreType[w]));
+                list.Add(($"PitMenu.Tyre.{c}_Tyre_NewPressure_kPa", v => v.MenuPressureKpa[w]));
+                list.Add(($"PitMenu.Tyre.{c}_Tyre_NewPressure_Bar", v => R(v.MenuPressureKpa[w] / 100, 3)));
+                list.Add(($"PitMenu.Tyre.{c}_Tyre_NewPressure_Psi", v => R(v.MenuPressureKpa[w] * KpaToPsi, 1)));
+                list.Add(($"VehicleCondition.{c}_BrakeCondition", v => v.BrakeCondition[w]));
+                list.Add(($"VehicleCondition.{c}_SuspensionDamage", v => v.SuspensionDamage[w]));
                 list.Add(($"Tyre.{c}_TyreTemp_C", v => v.TyreTemp[w]));
                 list.Add(($"Tyre.{c}_TyreLeft_%", v => v.TyreLeft[w]));
                 list.Add(($"VehicleCondition.{c}_BrakeTemp_C", v => v.BrakeTemp[w]));
             }
+            foreach (string node in Nodes.Concat(new[] { "CURRENTNODE" }))
+                foreach (string measure in Measures)
+                    foreach (string name in new[] { $"Weather.{node}_{measure}", $"Weather.{node}_{measure}Str" })
+                        list.Add((name, v => v.Weather.TryGetValue(name, out var value) ? value : null));
+            foreach (string name in new[] { "Weather.CurrentSessionLengthMinutes", "Weather.CurrentNodeDurationMinutes", "Weather.CurrentNodeName" }
+                .Concat(Nodes.Skip(1).Select(node => "Weather.TimeUntil_" + node)))
+                list.Add((name, v => v.Weather.TryGetValue(name, out var value) ? value : null));
+            foreach (var (name, _, _) in SessionSettings)
+                list.Add(("Session." + name, v => v.Session.TryGetValue(name, out var value) ? value : null));
             return list.ToArray();
         }
 
         // Once a second while driving: everything from the same copy of the game's memory, the session recorded so far
         // (its laps and stops), the game's service times and the pit menu.
-        public void Update(byte[] b, Sample s, LiveSession session, ServiceTimes service, PitMenu menu)
+        public void Update(byte[] b, Sample s, LiveSession session, ServiceTimes service, PitMenu menu, GameApi game, JObject refuel)
         {
             var view = new CourseView
             {
@@ -265,7 +369,8 @@ namespace EnduranceManager.SimHub
                 view.PosOverall = b[me + 199];
                 view.Stops = I16(b, me + 192);
                 view.Penalties = I16(b, me + 194);
-                view.PitState = b[me + 457];
+                int pit = b[me + 457];
+                view.PitState = pit < PitStates.Length ? PitStates[pit] : null;
                 double best = F64(b, me + 144);
                 view.BestLap = best > 0 ? R(best, 3) : null;
                 // The class, best placed first: places, laps and the game's time behind the leader.
@@ -284,6 +389,8 @@ namespace EnduranceManager.SimHub
                     view.GapToFirstInClassLaps = cls[0].Laps - cls[mine].Laps;
                     view.GapToFirstInClassTime = R(cls[mine].Behind - cls[0].Behind, 3);
                     if (mine > 0) view.GapAheadInClassTime = R(cls[mine].Behind - cls[mine - 1].Behind, 3);
+                    view.GapToLastInClassLaps = cls[mine].Laps - cls[cls.Count - 1].Laps;
+                    view.GapToLastInClassTime = R(cls[cls.Count - 1].Behind - cls[mine].Behind, 3);
                 }
             }
 
@@ -300,6 +407,9 @@ namespace EnduranceManager.SimHub
             view.VeAvg5 = R(Mean(ve.Skip(Math.Max(0, ve.Count - 5))), 2);
             view.FuelLastLap = fuel.Count > 0 ? R(fuel.Last(), 2) : null;
             view.FuelAvg5 = R(Mean(fuel.Skip(Math.Max(0, fuel.Count - 5))), 2);
+            var veClear = laps.Where(l => !l.Pit && !l.Invalid && l.Energy > 0).Select(l => l.Energy).ToList();
+            view.VeAvg5Clear = R(Mean(veClear.Skip(Math.Max(0, veClear.Count - 5))), 2);
+            if (view.FuelAvg5 > 0 && s.FuelCapacity > 0) view.FuelFraction = R(view.FuelAvg5 / s.FuelCapacity * 100, 2);
             if (view.VeLastLap > 0 && view.FuelLastLap > 0) view.RatioLastLap = R(view.FuelLastLap / view.VeLastLap, 3);
             if (view.VeAvg5 > 0 && view.FuelAvg5 > 0) view.RatioAvg5 = R(view.FuelAvg5 / view.VeAvg5, 3);
 
@@ -343,7 +453,145 @@ namespace EnduranceManager.SimHub
             view.LastStop = stop != null ? R(stop.Stationary, 1) : null;
 
             ReadMenu(view, menu, s, service);
+            try { ReadApi(view, game, refuel, s); } catch { }
             View = view;
+        }
+
+        static double? N(JToken token) => token != null && (token.Type == JTokenType.Float || token.Type == JTokenType.Integer) ? (double)token : (double?)null;
+        static string S(JToken token) { string text = token != null && token.Type != JTokenType.Null ? token.ToString().Trim() : ""; return text == "" ? null : text; }
+        static double? Percent(JToken token) => R(N(token) * 100, 1);
+
+        // What the game's API answered last (GameApi.cs, and the pit screen read once a minute): states, the game's
+        // estimate of the stop, car condition, forecast, session settings, car, track and team.
+        static void ReadApi(CourseView view, GameApi game, JObject refuel, Sample s)
+        {
+            var state = game?.State;
+            if (state != null)
+            {
+                view.PitState = S(state["PitState"]) ?? view.PitState;
+                view.MultiStintState = S(state["MultiStintState"]);
+                view.PitEntryDist = R(N(state["PitEntryDist"]), 1);
+                view.RaceFinished = (bool?)state["raceFinished"];
+                view.Replay = (bool?)state["isReplayActive"];
+                view.RainChance = N(state["closeestWeatherNode"]?["RainChance"]);
+            }
+
+            // The game's own estimate of the stop as set: ours stays when the game gives none.
+            var estimate = game?.Estimate;
+            if (estimate != null)
+            {
+                view.EstimateTotal = R(N(estimate["total"]), 1) ?? view.EstimateTotal;
+                view.EstimateTyres = R(N(estimate["tires"]), 1);
+                view.EstimateFuel = R(N(estimate["fuel"]), 1);
+                view.EstimateVe = R(N(estimate["ve"]), 1);
+                view.EstimateDriver = R(N(estimate["driverSwap"]), 1);
+                view.EstimateBrakes = R(N(estimate["brakes"]), 1);
+                view.EstimateDamage = R(N(estimate["damage"]), 1);
+                view.EstimatePenalties = R(N(estimate["penalties"]), 1);
+            }
+
+            var condition = game?.Condition;
+            if (condition != null)
+            {
+                for (int i = 0; i < 4; i++)
+                {
+                    view.BrakeCondition[i] = Percent(condition["brakeCondition"]?[i]);
+                    view.SuspensionDamage[i] = Percent(condition["suspensionDamage"]?[i]);
+                }
+                view.AeroDamage = Percent(condition["vehicleDamage"]);
+            }
+
+            // The pit screen, read once a minute: energy in the game's units, battery, team, weather now.
+            var fuel = refuel?["fuelInfo"];
+            if (fuel != null)
+            {
+                view.VeRaw = N(fuel["currentVirtualEnergy"]);
+                view.VeMax = N(fuel["maxVirtualEnergy"]);
+                view.BatteryRaw = N(fuel["currentBattery"]);
+                view.BatteryMax = N(fuel["maxBattery"]) > 0 ? N(fuel["maxBattery"]) : null;
+                if (view.VeMax > 0 && view.VeLastLap > 0) view.VeLastLapRaw = R(view.VeLastLap / 100 * view.VeMax, 2);
+            }
+            view.Team = S(refuel?["teamInfo"]?["teamName"]);
+            var weather = refuel?["currentWeather"];
+            view.Humidity = Percent(weather?["humidity"]);
+            view.Light = Percent(weather?["lightLevel"]);
+            view.Raining = Percent(weather?["raining"]);
+            // NeoRed's words for the wetness of the racing line.
+            if (view.Wetness is double wet)
+                view.WetnessText = wet < 1 ? "Dry" : wet < 10 ? "Damp" : wet < 30 ? "Slightly wet" : wet < 60 ? "Very wet" : "Extremely wet";
+
+            var tyres = game?.Tyres;
+            foreach (var compound in (tyres?["optimalCompoundConditions"]?["compounds"] as JArray) ?? new JArray())
+            {
+                double? ideal = N(compound["optimalTemperature"]);
+                switch (((string)compound["type"] ?? "").ToLowerInvariant())
+                {
+                    case "soft": view.OptimalSoft = ideal; break;
+                    case "medium": view.OptimalMedium = ideal; break;
+                    case "hard": view.OptimalHard = ideal; break;
+                    case "wet": view.OptimalWet = ideal; break;
+                }
+            }
+            view.MaxTyres = (int?)N(tyres?["tireInventory"]?["maxAvailableTires"]);
+            view.NewTyres = (int?)N(tyres?["tireInventory"]?["newTires"]);
+
+            var car = game?.Loading?["selectedCar"];
+            var track = game?.Loading?["trackInfo"];
+            view.Engine = S(car?["engine"]);
+            view.CarId = S(car?["id"]);
+            view.Livery = S(car?["liveryName"]);
+            view.Manufacturer = S(car?["manufacturer"]);
+            view.Number = S(car?["number"]);
+            view.Team = view.Team ?? S(car?["fullTeam"]);
+            view.TeamHeadquarters = S(car?["teamHeadquarters"]);
+            view.TeamFounded = S(car?["teamFounded"]);
+            view.GrandPrix = S(track?["grandPrixName"]);
+            view.Location = S(track?["location"]);
+            view.OpeningYear = S(track?["openingYear"]);
+            view.TrackLength = PitMenu.Number(S(track?["trackLength"]));
+            view.TrackId = S(track?["id"]);
+            view.Layout = S(track?["layoutName"]) ?? S(track?["sceneDesc"]);
+
+            foreach (var (name, setting, number) in SessionSettings)
+            {
+                var value = game?.Settings?[setting];
+                if (value != null) view.Session[name] = number ? (object)N(value["currentValue"]) : S(value["stringValue"]);
+            }
+
+            // The forecast of the session being driven: five nodes, at its start, 25, 50 and 75 % of it and its end. The
+            // current one is the last passed.
+            var info = game?.Info;
+            string session = ((string)info?["session"] ?? "").ToUpperInvariant();
+            string type = session.StartsWith("PRACTICE") ? "PRACTICE" : session.StartsWith("QUALIFY") ? "QUALIFY" : session.StartsWith("RACE") ? "RACE" : null;
+            double? length = N(info?["maxTime"]), now = N(info?["currentEventTime"]) - (N(info?["startEventTime"]) ?? 0);
+            if (length > 0 && length < 1e6)
+            {
+                view.LengthTime = R(length / 60, 0);
+                view.Weather["Weather.CurrentSessionLengthMinutes"] = R(length / 60, 0);
+                view.Weather["Weather.CurrentNodeDurationMinutes"] = R(length / 60 / 4, 0);
+            }
+            var nodes = type != null ? game?.Weather?[type] : null;
+            if (nodes == null) return;
+            foreach (string node in Nodes)
+                foreach (string measure in Measures)
+                {
+                    view.Weather[$"Weather.{node}_{measure}"] = N(nodes[node]?[measure]?["currentValue"]);
+                    view.Weather[$"Weather.{node}_{measure}Str"] = S(nodes[node]?[measure]?["stringValue"]);
+                }
+            if (!(length > 0 && length < 1e6 && now >= 0)) return;
+            double progress = Math.Min(1, now.Value / length.Value);
+            string current = Nodes[Math.Min(4, (int)(progress * 4))];
+            view.Weather["Weather.CurrentNodeName"] = current;
+            foreach (string measure in Measures)
+            {
+                view.Weather[$"Weather.CURRENTNODE_{measure}"] = view.Weather[$"Weather.{current}_{measure}"];
+                view.Weather[$"Weather.CURRENTNODE_{measure}Str"] = view.Weather[$"Weather.{current}_{measure}Str"];
+            }
+            for (int i = 1; i < Nodes.Length; i++)
+            {
+                var left = TimeSpan.FromSeconds(Math.Max(0, length.Value * i / 4 - now.Value));
+                view.Weather["Weather.TimeUntil_" + Nodes[i]] = $"{(int)left.TotalHours:00}:{left.Minutes:00}";
+            }
         }
 
         // The pit menu as set, and how long the stop it asks would last with the game's service times: the jobs done
@@ -368,13 +616,24 @@ namespace EnduranceManager.SimHub
             view.MenuWing = Find(n => n.Contains("WING"))?.Text;
             view.MenuGrille = Find(n => n.Contains("GRILLE"))?.Text;
             view.MenuAll = string.Join(" · ", items.Select(item => item.Name + " " + item.Text));
+            // The same as numbers (« 75l/36 laps » → 75, « 55% » → 55), and the choice made where it is yes or no.
+            view.MenuFuelNumber = PitMenu.Number(fuelItem?.Text);
+            view.MenuVeNumber = PitMenu.Number(veItem?.Text);
+            view.MenuRatioNumber = PitMenu.Number(ratioItem?.Text);
+            view.MenuRepairIndex = repairItem?.Index;
+            view.MenuBrakesIndex = brakesItem?.Index;
+            view.MenuFrontDuct = Find(n => n.StartsWith("F") && n.Contains("DUCT"))?.Text;
+            view.MenuRearDuct = Find(n => n.StartsWith("R") && n.Contains("DUCT"))?.Text;
             int changed = 0;
             for (int i = 0; i < 4; i++)
             {
                 string c = Corners[i];
                 var tyre = Find(n => n.StartsWith(c + " TIRE") || n.StartsWith(c + " TYRE"));
                 view.MenuTyre[i] = tyre?.Text;
+                // NeoRed's « NoChange », else the compound the game names (« Medium », « Wet »).
+                view.MenuTyreType[i] = tyre == null ? null : tyre.Index == 0 ? "NoChange" : tyre.Type ?? tyre.Text;
                 view.MenuPressure[i] = Find(n => n.StartsWith(c) && n.Contains("PRESS"))?.Text;
+                view.MenuPressureKpa[i] = PitMenu.Number(view.MenuPressure[i]);
                 // To check in game: the first choice of a wheel's line is « no change ».
                 if (tyre != null && tyre.Index > 0) changed++;
             }

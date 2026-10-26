@@ -66,6 +66,7 @@ namespace EnduranceManager.SimHub
         // The race figures a dashboard reads (Course.cs), and the game's pit menu they come with.
         public Course Course { get; } = new Course();
         public PitMenu Menu { get; } = new PitMenu();
+        public GameApi Game { get; } = new GameApi();
         string home;
         // What the game is doing, for the settings screen: closed, in the menus, or on track.
         public volatile string GameState = "closed";
@@ -230,8 +231,10 @@ namespace EnduranceManager.SimHub
                             if (driving && Settings.Share) live.Frame(sample);
                             if (driving && Settings.Share && tick % 10 == 0) live.Offer(buffer, sample, recorder, api);
                             // Once a second, the race figures for the dashboards; the pit menu every 2 s, read aside.
-                            if (driving && tick % 10 == 0) try { Course.Update(buffer, sample, recorder.Current, api.Service, Menu); } catch { }
+                            if (driving && tick % 10 == 0) try { Course.Update(buffer, sample, recorder.Current, api.Service, Menu, Game, api.Refuel); } catch { }
                             if (driving && tick % 20 == 5 && !Menu.Busy) ThreadPool.QueueUserWorkItem(_ => Menu.Read());
+                            // The game's state, its estimate of the stop and the car's condition, what is due each second.
+                            if (driving && tick % 10 == 7 && !Game.Busy) ThreadPool.QueueUserWorkItem(_ => Game.Read());
                             // The game's answers not used yet, kept once per SimHub run on track and stopped in the pits.
                             if (driving && tick % 600 == 300) ThreadPool.QueueUserWorkItem(_ => ApiSamples.Take(home, "piste"));
                             if (driving && sample.InPits && sample.Speed < 1 && tick % 50 == 25) ThreadPool.QueueUserWorkItem(_ => ApiSamples.Take(home, "stands"));

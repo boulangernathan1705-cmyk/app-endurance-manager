@@ -60,6 +60,8 @@ namespace EnduranceManager.SimHub
         public double? Light { get; private set; }
         public DateTime LightAt { get; private set; }
         public DateTime? ReadAt { get; private set; }
+        // The whole pit screen last read (fuelInfo, wearables, currentWeather, teamInfo…), for the race figures (Course.cs).
+        public volatile JObject Refuel;
         // One read at a time: a slow answer never piles up calls to the game.
         public bool Busy => busy != 0;
         int busy;
@@ -98,6 +100,7 @@ namespace EnduranceManager.SimHub
 
         bool TakeLight(JObject answer)
         {
+            if (answer != null) Refuel = answer;
             double? light = Number(answer?.SelectToken("$..lightLevel"));
             if (light == null || light < 0 || light > 1) return false;
             Light = light;
