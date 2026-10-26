@@ -1,6 +1,6 @@
 import {racesPath} from './races-path.mjs';
 import {durationLabel} from '../shared/duration.mjs';
-import {catalogForGame} from '../shared/catalog.mjs';
+import {catalogForGame,SIMS} from '../shared/catalog.mjs';
 
 const DAY_MS=86_400_000,HOUR_MS=3_600_000,TIME_ZONE='Europe/Paris';
 const circuitNames=new Map([...catalogForGame('lmu').circuits,...catalogForGame('iracing').circuits].map(c=>[c.id,c.name]));
@@ -205,11 +205,13 @@ function footer(updatedAt){return{text:`Endurance Manager · mise à jour à ${u
 // community's site), the community's banner at the bottom. Discord allows 10 blocks and 6000 characters.
 // `site`: {url, name, logoUrl, bannerUrl} of the community (url: address of its site).
 // `emojis`: ids of the bot's category emojis by name; without them the categories keep their colour.
-export function buildWeeklyDiscordPayload(snapshot,site={},updatedAt=Date.now(),scope='lmu',emojis={}){
+// `weekly`: the week's message of one sim (« 📝 Endurances LMU · semaine du … »), not a race's channel.
+export function buildWeeklyDiscordPayload(snapshot,site={},updatedAt=Date.now(),scope='lmu',emojis={},{weekly=false}={}){
   const siteUrl=typeof site==='string'?(()=>{try{return new URL(site).origin;}catch{return '';}})():String(site.url||'');
   const sim=SCOPE_LABELS[scope]??' LMU',simPage=scope==='iracing'?'/iracing/':scope==='all'?'/':'/lmu/';
   const current=Array.isArray(snapshot.currentDepartures)?snapshot.currentDepartures:[],future=Array.isArray(snapshot.futureDepartures)?snapshot.futureDepartures:[];
-  const header={title:cut(`📝 ${cap(snapshot.periodLabel||'semaine à venir')}`,256),color:0x52d3d8};
+  const period=snapshot.periodLabel||'semaine à venir';
+  const header={title:cut(weekly?`📝 Endurances${sim} · ${period}`:`📝 ${cap(period)}`,256),color:0x52d3d8};
   if(siteUrl)header.url=`${siteUrl}${simPage}`;
   if(site.name){header.author={name:cut(site.name,256)};if(siteUrl)header.author.url=`${siteUrl}/`;if(site.logoUrl)header.author.icon_url=site.logoUrl;}
   if(!current.length&&!future.length){
@@ -233,6 +235,30 @@ export function buildWeeklyDiscordPayload(snapshot,site={},updatedAt=Date.now(),
   if(site.bannerUrl)last.image={url:site.bannerUrl};
   last.footer=footer(updatedAt);
   return{content:'',embeds:fitDiscordEmbeds(embeds.slice(0,10)),allowed_mentions:{parse:[]}};
+}
+
+const SIM_SHORT=Object.fromEntries(SIMS.map(sim=>[sim.id,sim.short]));
+// One event of the calendar: its name (link to it), sim, circuits and start, then its places.
+function calendarBlock(event,siteUrl){
+  const name=clean(event.name),url=siteUrl?`${siteUrl}/lmu/#event=${encodeURIComponent(event.id)}`:'';
+  const circuits=[...new Set(event.circuits.map(circuit=>circuitNames.get(circuit)||circuit).filter(Boolean))].map(clean).join(', ');
+  const when=event.timePending?`${discordTime(event.startsAt,'D')} — horaire à confirmer`:discordTime(event.startsAt,'f');
+  const places=event.capacity
+    ?`👥 ${Math.min(event.entered,event.capacity)}/${event.capacity} places${event.entered>=event.capacity?' · complet':''}${event.entered>event.capacity?` · ${event.entered-event.capacity} en attente`:''}`
+    :event.entered?`👥 ${event.entered} inscrit${event.entered>1?'s':''}`:'👥 Personne d’inscrit pour l’instant.';
+  return [`**${url?`[${name}](${url})`:name}**`,[`🎮 ${SIM_SHORT[event.sim]||clean(event.sim)}`,circuits&&`📍 ${circuits}`,`🕐 ${when}`].filter(Boolean).join(' · '),places].join('\n');
+}
+// The week's events (« EVENT SOLO », « EVENT TDZ »): one block, one paragraph per event.
+// `snapshot`: {periodLabel, events:[{id,name,sim,circuits,startsAt,timePending,capacity,entered}]}.
+export function buildCalendarPayload(snapshot,site={},updatedAt=Date.now()){
+  const siteUrl=String(site.url||''),events=Array.isArray(snapshot.events)?snapshot.events:[];
+  const embed={title:cut(`📅 Calendrier de la ${snapshot.periodLabel||'semaine à venir'}`,256),color:events.length?0xe7b653:0x6b7280,
+    description:events.length?cut(events.map(event=>calendarBlock(event,siteUrl)).join('\n\n'),4096):'Aucun événement de prévu pour l’instant.'};
+  if(siteUrl)embed.url=`${siteUrl}/lmu/#solo`;
+  if(site.name){embed.author={name:cut(site.name,256)};if(siteUrl)embed.author.url=`${siteUrl}/`;if(site.logoUrl)embed.author.icon_url=site.logoUrl;}
+  if(site.bannerUrl)embed.image={url:site.bannerUrl};
+  embed.footer=footer(updatedAt);
+  return{content:'',embeds:[embed],allowed_mentions:{parse:[]}};
 }
 
 // The race a change is about: its id in the address, or the entry / crew to look up (null when unknown).

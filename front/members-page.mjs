@@ -58,9 +58,7 @@ const ICONS = {
   modules:'<rect x="3" y="3" width="7.5" height="7.5" rx="2"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="2"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="2"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="2"/>',
   look:'<path d="M12 3a9 9 0 1 0 0 18c1.4 0 2-1 2-2 0-1.6-1.3-2-1.3-3.3 0-1 .8-1.7 1.8-1.7H17a4 4 0 0 0 4-4c0-3.9-4-7-9-7Z"/><circle cx="7.5" cy="11" r="1.2"/><circle cx="10.5" cy="7.5" r="1.2"/><circle cx="15" cy="7.5" r="1.2"/>',
   platform:'<path d="M12 3 3 8l9 5 9-5-9-5Z"/><path d="m3 13 9 5 9-5"/>',
-  recap:'<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/>',
-  crewChannels:'<path d="M4 5h16v10H9l-5 4V5Z"/><path d="M14 19h1l4 3v-3"/>',
-  raceReminders:'<path d="M6 16V11a6 6 0 1 1 12 0v5l2 2H4l2-2Z"/><path d="M10 21h4"/>',
+  discord:'<path d="M4 5h16v10H9l-5 4V5Z"/><path d="M14 19h1l4 3v-3"/>',
   iracingImport:'<path d="M4 21V4M4 4h13l-2 4 2 4H4"/>',
   grindfest:'<path d="M4 21V4M4 4h13l-2 4 2 4H4"/>',
   soloRaces:'<circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/>',
@@ -68,12 +66,11 @@ const ICONS = {
   combos:'<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="3.5"/><path d="M12 3.5v5M12 15.5v5M3.5 12h5M15.5 12h5"/>'
 };
 const icon = key => `<svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[key]}</svg>`;
-const RECAP_LABELS = {all:'LMU et iRacing', lmu:'LMU', iracing:'iRacing'};
 const copyButton = target => `<button type="button" class="secondary-button setup-copy" data-copy="${target}">Copier</button>`;
 
 // What is on, for the overview and the modules.
 function moduleStates(settings, setup) {
-  return {recap:Boolean(setup.botRecap?.enabled), crewChannels:settings.modules.crewChannels === true, raceReminders:settings.modules.raceReminders === true,
+  return {discord:Boolean(setup.botRecap?.enabled),
     iracingImport:settings.modules.iracingImport === true, soloRaces:settings.modules.soloRaces === true, grindfest:settings.modules.grindfest === true, categoryEntry:settings.modules.categoryEntry === true, combos:settings.modules.combos === true};
 }
 
@@ -82,7 +79,7 @@ function overviewMarkup(setup, settings, members) {
   const guild = setup.guild || {}, crews = settings.crews || {};
   const server = guild.name ? `« ${esc(guild.name)} »` : 'de la communauté';
   const states = moduleStates(settings, setup), active = Object.values(states).filter(Boolean).length;
-  const recapDone = states.recap;
+  const recapDone = states.discord, voices = settings.modules.crewChannels === true;
   const tile = (label, value, sub, tone = '') => `<div class="admin-tile"><span class="admin-tile-label">${label}</span><strong class="admin-tile-value ${tone}">${value}</strong><span class="admin-tile-sub">${sub}</span></div>`;
   const tiles = `<div class="admin-tiles">
     ${tile('Serveur Discord', !guild.id ? '<i class="admin-dot is-bad"></i>Aucun' : guild.botPresent ? '<i class="admin-dot is-ok"></i>Relié' : '<i class="admin-dot is-bad"></i>Bot absent', guild.botPresent ? `Bot présent sur ${server}` : 'Personne ne peut entrer sur le site', 'is-small')}
@@ -93,7 +90,7 @@ function overviewMarkup(setup, settings, members) {
     {done:Boolean(guild.botPresent), title:'Inviter le bot sur ton serveur Discord', action:!guild.id ? '<small>Demande à un gestionnaire de relier ton serveur.</small>'
       : `${setup.botInviteUrl ? `<a class="primary-button" href="${esc(setup.botInviteUrl)}" target="_blank" rel="noopener">Inviter le bot</a>` : ''}<button type="button" class="secondary-button" data-setup-refresh>Vérifier</button>`},
     {done:Boolean(setup.rolesConfigured), title:'Choisir ce que chaque rôle peut faire', action:'<button type="button" class="secondary-button" data-go-tab="people" data-go-view="roles">Ouvrir les rôles</button>'},
-    {done:recapDone, title:'Publier le récap de la semaine sur Discord', action:'<button type="button" class="secondary-button" data-go-tab="modules" data-go-module="recap">Régler le récap</button>'},
+    {done:recapDone, title:'Afficher les courses sur Discord', action:'<button type="button" class="secondary-button" data-go-tab="modules" data-go-module="discord">Régler Discord</button>'},
     {done:Boolean(setup.discordInviteUrl), title:'Ajouter le lien d’invitation de ton serveur', action:`<form class="admin-inline-form" data-invite><input name="invite" type="url" placeholder="https://discord.gg/…" aria-label="Lien d’invitation Discord" value="${esc(setup.discordInviteUrl || '')}"><button class="primary-button" type="submit">Ajouter</button><span class="settings-status" aria-live="polite"></span></form>`}];
   const left = steps.filter(item => !item.done).length;
   const message = `🏁 Nos courses d’endurance s’organisent maintenant sur Endurance Manager !\n👉 ${setup.siteUrl}/\n\nConnecte-toi avec ton compte Discord : tu y retrouves les courses LMU et iRacing, tu t’inscris avec tes disponibilités et tu crées ou rejoins un équipage.`;
@@ -108,10 +105,10 @@ function overviewMarkup(setup, settings, members) {
   // What needs a look: problems first, then what works.
   const alerts = [];
   if (guild.id && !guild.botPresent) alerts.push(['bad', 'Le bot n’est pas sur ton serveur Discord : personne ne peut entrer sur le site.', '']);
-  if (states.crewChannels && crews.botReady !== true) alerts.push(['warn', 'Salons d’équipage : le bot n’a pas les droits pour créer les salons.', '<button type="button" class="link-button" data-go-tab="modules" data-go-module="crewChannels">Régler</button>']);
-  else if (states.crewChannels && crews.lastError) alerts.push(['warn', `Salons d’équipage : ${esc(crews.lastError)}`, '<button type="button" class="link-button" data-go-tab="modules" data-go-module="crewChannels">Voir</button>']);
-  if (setup.recapSetupRequired) alerts.push(['warn', 'Le récap Discord attend sa configuration : choisis une destination pour le bot.', '<button type="button" class="link-button" data-go-tab="modules" data-go-module="recap">Régler</button>']);
-  if (setup.botRecap?.lastError) alerts.push(['warn', esc(setup.botRecap.lastError), '<button type="button" class="link-button" data-go-tab="modules" data-go-module="recap">Voir</button>']);
+  if (voices && crews.botReady !== true) alerts.push(['warn', 'Vocaux d’équipage : le bot n’a pas les droits pour créer les salons.', '<button type="button" class="link-button" data-go-tab="modules" data-go-module="discord">Régler</button>']);
+  else if (voices && crews.lastError) alerts.push(['warn', `Vocaux d’équipage : ${esc(crews.lastError)}`, '<button type="button" class="link-button" data-go-tab="modules" data-go-module="discord">Voir</button>']);
+  if (setup.recapSetupRequired) alerts.push(['warn', 'Discord attend son réglage : choisis où le bot publie les courses.', '<button type="button" class="link-button" data-go-tab="modules" data-go-module="discord">Régler</button>']);
+  if (setup.botRecap?.lastError) alerts.push(['warn', esc(setup.botRecap.lastError), '<button type="button" class="link-button" data-go-tab="modules" data-go-module="discord">Voir</button>']);
   if (states.iracingImport) alerts.push(['ok', 'Endurances iRacing officielles importées automatiquement.', '']);
   if (!alerts.some(([tone]) => tone !== 'ok')) alerts.unshift(['ok', 'Rien à signaler : tout fonctionne.', '']);
   const watch = `<section class="admin-card"><div class="admin-card-head"><h2>À surveiller</h2></div><ul class="admin-alerts">${alerts.map(([tone, text, action]) => `<li class="is-${tone}"><span>${text}</span>${action}</li>`).join('')}</ul></section>`;
@@ -145,99 +142,95 @@ function peopleMarkup(result, settings) {
 }
 
 // « Modules »: one tile each, its settings below it once opened.
-function recapForm(setup) {
-  const config = setup.botRecap, scope = config?.scope || setup.recapSuggestedScope || 'all';
-  const mode = config?.mode || 'general';
-  const established = Boolean(config);
-  const summary = config ? `<p><strong>${config.lastError ? 'Publication en erreur' : config.enabled ? 'Actif' : 'Désactivé'}</strong> · ${config.mode === 'events' ? 'Une catégorie par course' : 'Récap général'} · ${esc(RECAP_LABELS[scope])}</p>
-    <p>Destination : <strong>${esc(config.destinationName)}</strong>. ${config.mode === 'events' ? 'Salons supprimés 24 h après la fin du dernier départ.' : 'Le salon général est conservé.'}</p><p><a class="secondary-button" href="https://discord.com/channels/${esc(setup.guild.id)}/${esc(config.destinationId)}" target="_blank" rel="noopener">Ouvrir la destination sur Discord</a></p>
-    ${config.lastError ? `<p class="settings-status" role="alert">${esc(config.lastError)}</p>${setup.recapBotInviteUrl && /permissions|autorise le bot/.test(config.lastError) ? `<a class="secondary-button" href="${esc(setup.recapBotInviteUrl)}" target="_blank" rel="noopener">Donner les droits au bot</a><p>Si le salon refuse encore l’accès, vérifie aussi ses permissions sur Discord, puis clique sur Modifier pour actualiser les destinations.</p>` : ''}` : ''}`
-    : '';
-  const choice = (value,title,help) => `<label class="recap-card"><input type="radio" name="mode" value="${value}" ${mode === value ? 'checked' : ''}><span><strong>${title}</strong><small>${help}</small></span></label>`;
-  return `<div data-recap-guide data-config="${esc(JSON.stringify(config))}">
-    ${helpContext('recap')}${!config ? '<p>Le bot gère les récaps. Choisis une destination et active-le ; les anciennes publications par webhook sont arrêtées.</p>' : ''}
-    ${established ? `<div data-recap-summary>${summary}<div class="setup-actions"><button type="button" class="primary-button" data-recap-edit>Modifier</button><button type="button" class="secondary-button" data-recap-view>Voir l’aperçu</button><button type="button" class="secondary-button" data-recap-repair>Réparer le récap</button>${config?.enabled ? '<button type="button" class="secondary-button" data-recap-disable>Désactiver</button>' : ''}</div><p>La réparation vérifie les droits et rétablit les salons ou messages disparus. Elle conserve les réglages et les inscriptions. Si plusieurs courses sont concernées, relance-la pour traiter les suivantes.</p><p data-recap-repair-status role="status" aria-live="polite"></p></div>` : ''}
-    <form data-recap-wizard class="setup-form recap-wizard" ${established ? 'hidden' : ''}>
-      <p data-recap-progress aria-live="polite">Étape 1 sur 4</p>
-      <fieldset data-recap-step="0"><legend>Comment présenter les courses sur Discord ?</legend>
-        <div class="recap-cards">${choice('general','Récap général','Un salon texte « récap-endurances », un message pour toutes les courses.')}${choice('events','Une catégorie par course','Dès la publication de la course : son récap, puis un vocal par équipage.')}</div>
-        <p>Le même message est modifié sans notification à chaque actualisation.</p></fieldset>
-      <fieldset data-recap-step="1" hidden><legend>Quelles courses inclure ?</legend><div class="recap-sims">
-        <label class="role-pill"><input type="checkbox" name="lmu" ${scope !== 'iracing' ? 'checked' : ''}><span>LMU</span></label>
-        <label class="role-pill"><input type="checkbox" name="iracing" ${scope !== 'lmu' ? 'checked' : ''}><span>iRacing</span></label></div><p>Ce choix est indépendant du mode de publication.</p></fieldset>
-      <fieldset data-recap-step="2" hidden><legend>Où publier sur votre serveur Discord ?</legend>
-        <label class="crew-category"><span data-recap-destination-label>Salon texte</span><select name="destination"><option value="${esc(config?.destinationId || '')}">${esc(config?.destinationName || 'Choisir une destination')}</option></select></label>
-        <p data-recap-rights role="status"></p>${setup.recapBotInviteUrl ? `<a class="secondary-button" href="${esc(setup.recapBotInviteUrl)}" target="_blank" rel="noopener">Donner les droits au bot</a>` : ''}
-        <button type="button" class="secondary-button" data-recap-destinations>Actualiser les destinations</button></fieldset>
-      <fieldset data-recap-step="3" hidden><legend>Vérifier puis activer le récap</legend>
-        <p>Aucun message n’est envoyé à l’ouverture de cet aperçu. Les catégories des courses seront supprimées 24 h après la fin du dernier départ ; le salon général est conservé.</p>
-        <div data-recap-preview class="recap-live-preview"></div>
-        <button type="button" class="secondary-button" data-recap-send-test>Envoyer un test sur Discord</button><p>Si la catégorie ou le salon d’une course a été supprimé sur Discord, ce test le rétablit. Les salons encore présents et leurs messages sont conservés.</p>
-        <button type="submit" class="primary-button">Activer le récap automatique</button></fieldset>
-      <div class="setup-actions"><button type="button" class="secondary-button" data-recap-back hidden>Retour</button><button type="button" class="primary-button" data-recap-next>Continuer</button>${established ? '<button type="button" class="secondary-button" data-recap-cancel>Fermer</button>' : ''}<span class="settings-status" role="status" aria-live="polite"></span></div>
-    </form>
-    </div>`;
+// « Discord »: where the bot shows the races, the crews' voice channels and the reminders, on one page.
+const DISCORD_MODES = {
+  events:['Une catégorie par course', 'Chaque course a sa catégorie : ses infos, puis les vocaux de ses équipages.'],
+  general:['Récap de la semaine + pit walk', 'Un récap de la semaine dans un salon, tous les vocaux d’équipage dans une catégorie.']};
+// The rows of « Où publier ? »: races under categories (one per race) or week messages in text channels.
+function discordRows(form) {
+  const race = form.elements.mode.value === 'events', voices = form.elements.crewChannels.checked;
+  return [
+    {name:'lmu', title:race ? 'Courses LMU' : 'Endurances LMU', sub:race ? 'Une catégorie par course' : 'Récap de la semaine', type:race ? 4 : 0},
+    {name:'iracing', title:race ? 'Courses iRacing' : 'Endurances iRacing', sub:race ? 'Une catégorie par course' : 'Récap de la semaine', type:race ? 4 : 0},
+    ...(form.dataset.solo === 'true' ? [{name:'calendar', title:'Calendrier de la semaine', sub:'Les events, toutes simus', type:0}] : []),
+    ...(!race && voices ? [{name:'crewCategory', title:'Vocaux d’équipage', sub:'Dans la catégorie', type:4, empty:'En haut du serveur'}] : [])];
 }
-const wizardData = form => {
-  const lmu = form.elements.lmu.checked, iracing = form.elements.iracing.checked;
-  if (!lmu && !iracing) throw new Error('Coche au moins un simulateur.');
-  return {mode:form.elements.mode.value,scope:lmu && iracing ? 'all' : lmu ? 'lmu' : 'iracing',destinationId:form.elements.destination.value,destinationName:form.elements.destination.selectedOptions[0]?.textContent || ''};
-};
+function discordForm(setup, settings) {
+  const config = setup.botRecap, crews = settings.crews || {}, mode = config?.mode || 'events';
+  // The saved choice of each mode; the other mode starts empty.
+  const saved = {[mode]:{lmu:[config?.lmuId, config?.lmuName], iracing:[config?.iracingId, config?.iracingName], calendar:[config?.calendarId, config?.calendarName]}};
+  saved.general = {...saved.general, crewCategory:[crews.voiceCategoryId || '', (crews.categories || []).find(item => item.id === crews.voiceCategoryId)?.name || '']};
+  const choice = value => `<label class="recap-card"><input type="radio" name="mode" value="${value}" ${mode === value ? 'checked' : ''}><span><strong>${DISCORD_MODES[value][0]}</strong><small>${DISCORD_MODES[value][1]}</small></span></label>`;
+  const voices = settings.modules.crewChannels === true, invite = crews.botInviteUrl || setup.recapBotInviteUrl;
+  const state = !config ? '' : `<p class="discord-state"><strong>${config.lastError ? 'Publication en erreur' : config.enabled ? 'Actif' : 'Désactivé'}</strong> · ${DISCORD_MODES[config.mode][0]}</p>
+    ${config.lastError ? `<p class="settings-status" role="alert">${esc(config.lastError)}</p>` : ''}`;
+  return `<form class="setup-form discord-form" data-discord-form data-solo="${settings.modules.soloRaces === true}" data-tdz="${settings.modules.eventTdzAvailable === true}" data-saved="${esc(JSON.stringify(saved))}">
+    ${helpContext('recap')}${state}
+    <fieldset><legend>1. Comment ranger les courses ?</legend><div class="recap-cards">${choice('events')}${choice('general')}</div></fieldset>
+    <fieldset><legend>2. Où publier sur ton serveur ?</legend><div class="discord-rows" data-discord-rows></div><p class="members-help" data-discord-rows-help></p></fieldset>
+    <fieldset><legend>3. Vocaux et rappels</legend>
+      <label class="discord-check"><input type="checkbox" name="crewChannels" ${voices ? 'checked' : ''}><span><strong>Créer un vocal par équipage</strong><small data-discord-voice-help></small></span></label>
+      <label class="discord-check"><input type="checkbox" name="raceReminders" ${settings.modules.raceReminders === true ? 'checked' : ''}><span><strong>Rappels avant le départ</strong><small data-discord-reminder-help></small></span></label></fieldset>
+    <div class="discord-sketch" data-discord-sketch></div>
+    <p class="members-help">Le bot doit voir les salons choisis, y écrire, intégrer des liens et lire l’historique. Pour les catégories et les vocaux, il doit aussi gérer les salons.${invite ? ` <a href="${esc(invite)}" target="_blank" rel="noopener">Donner les droits au bot</a>` : ''}</p>
+    <div class="setup-actions"><button type="submit" class="primary-button">${config?.enabled ? 'Enregistrer' : 'Activer'}</button><button type="button" class="secondary-button" data-discord-preview>Voir les messages</button><button type="button" class="secondary-button" data-discord-destinations>Actualiser les salons</button>${config?.lastError ? '<button type="button" class="secondary-button" data-discord-repair>Réparer</button>' : ''}${config?.enabled ? '<button type="button" class="secondary-button" data-discord-disable>Désactiver</button>' : ''}<span class="settings-status" role="status" aria-live="polite"></span></div>
+    <p class="members-help">${config?.enabled ? 'Les messages sont modifiés sans notification à chaque changement.' : 'Rien n’est publié avant « Activer ».'}</p>
+    <div data-recap-preview class="recap-live-preview"></div>
+  </form>`;
+}
+// The rows follow the chosen mode; each mode keeps what was picked for it.
+function discordRefresh(form) {
+  const mode = form.elements.mode.value, saved = form._saved ||= JSON.parse(form.dataset.saved || '{}');
+  // What was just picked in the rows is kept for this mode before they are redrawn.
+  for (const select of form.querySelectorAll('[data-discord-rows] select')) (saved[select.dataset.mode] ||= {})[select.name] = [select.value, select.selectedOptions[0]?.dataset.name || ''];
+  const rows = discordRows(form), list = form._destinations, race = mode === 'events', voices = form.elements.crewChannels.checked;
+  form.querySelector('[data-discord-rows]').innerHTML = rows.map(row => {
+    const [current = '', currentName = ''] = saved[mode]?.[row.name] || [];
+    const options = list ? list.filter(item => item.type === row.type) : current ? [{id:current, name:currentName || 'Salon actuel', ready:true}] : [];
+    if (current && !options.some(item => item.id === current)) options.push({id:current, name:currentName || 'Salon introuvable', ready:true});
+    return `<label class="discord-row"><span><strong>${row.title}</strong><small>${row.sub}</small></span><select name="${row.name}" data-mode="${mode}">
+      <option value="" data-name="">${row.empty || 'Ne pas publier'}</option>${options.map(item => `<option value="${esc(item.id)}" data-name="${esc(item.name)}" ${item.id === current ? 'selected' : ''}>${row.type === 4 ? '' : '# '}${esc(item.name)}${item.ready === false ? ' · droits du bot à donner' : ''}</option>`).join('')}</select></label>`;
+  }).join('');
+  form.querySelector('[data-discord-rows-help]').textContent = race ? 'Les deux simus sous la même catégorie : les courses LMU d’abord, puis iRacing, chacune par date.' : 'Chaque récap est un message à part : plusieurs récaps peuvent partager le même salon.';
+  form.querySelector('[data-discord-voice-help]').textContent = race ? 'Dans la catégorie de sa course, dès la création de l’équipage. Supprimé 2 h après la course.' : 'Nommé « LMU · 6h de Spa · Équipage A », LMU puis iRacing, par date. Supprimé 2 h après la course.';
+  form.querySelector('[data-discord-reminder-help]').textContent = voices ? '24 h avant dans la cloche du site, puis 24 h et 1 h avant dans le chat du vocal.' : '24 h avant dans la cloche du site. Avec les vocaux, aussi 24 h et 1 h avant dans leur chat.';
+  discordSketch(form);
+}
+// A sketch of the server with these choices (example race and crews).
+function discordSketch(form) {
+  const value = name => form.elements[name]?.value || '', label = name => form.elements[name]?.selectedOptions[0]?.dataset.name || '';
+  const race = form.elements.mode.value === 'events', voices = form.elements.crewChannels.checked;
+  const category = text => `<li class="is-category">${esc(text)}</li>`, text = (name, note = '', top = false) => `<li class="is-text${top ? ' is-top' : ''}"># ${esc(name)}${note ? ` <small>${esc(note)}</small>` : ''}</li>`, voice = name => `<li class="is-voice">🔊 ${esc(name)}</li>`;
+  const sims = [['lmu','LMU','🏎️'],['iracing','iRacing','🏁']].filter(([key]) => value(key));
+  const lines = [];
+  if (race) {
+    // Each anchor category, then its races: LMU first, then iRacing.
+    for (const anchor of [...new Set(sims.map(([key]) => value(key)))]) {
+      const group = sims.filter(([key]) => value(key) === anchor);
+      lines.push(category(label(group[0][0])));
+      for (const [, sim, emoji] of group)
+        lines.push(category(`${emoji} ${sim} · 6h de Spa`), text('infos-de-la-course'), ...(voices ? [voice(`${sim} · Équipage A`)] : []));
+    }
+  } else {
+    const kinds = [['lmu','📝 Endurances LMU'],['iracing','📝 Endurances iRacing'],['calendar','📅 Calendrier de la semaine']];
+    if (form.dataset.tdz === 'true') kinds.unshift(kinds.pop());
+    for (const channel of [...new Set(kinds.map(([key]) => value(key)).filter(Boolean))])
+      lines.push(text(label(kinds.find(([key]) => value(key) === channel)[0]), kinds.filter(([key]) => value(key) === channel).map(([, title]) => title).join(' · '), true));
+    if (voices) lines.push(category(label('crewCategory') || 'En haut du serveur'), ...sims.map(([, sim]) => voice(`${sim} · 6h de Spa · Équipage A`)));
+  }
+  if (race && value('calendar')) lines.push(text(label('calendar'), '📅 Calendrier de la semaine', true));
+  form.querySelector('[data-discord-sketch]').innerHTML = lines.length ? `<strong>Sur ton serveur</strong><ul>${lines.join('')}</ul>` : '<p class="members-help">Choisis au moins un endroit où publier.</p>';
+}
+async function loadDiscordDestinations(form) {
+  const result = await api('/api/community/recap/destinations');
+  form._destinations = result.destinations || [];
+  discordRefresh(form);
+}
+const discordInput = form => ({mode:form.elements.mode.value, lmuId:form.elements.lmu?.value || '', iracingId:form.elements.iracing?.value || '', calendarId:form.elements.calendar?.value || ''});
 const recapPreviewText = value => esc(String(value || '').replace(/<t:(\d+):[A-Za-z]>/g,(_,unix) => new Date(Number(unix)*1000).toLocaleString('fr-FR',{timeZone:'Europe/Paris',dateStyle:'medium',timeStyle:'short'})).replace(/\*\*/g,''))
   .replace(/&lt;:em_([a-z0-9_]+):\d+&gt;/g,'<img src="/images/discord-emojis/$1.png" width="18" height="18" alt="">');
 function recapPreviewMarkup(previews) {
-  return previews.length ? previews.map(item => `<figure class="recap-preview"><figcaption># ${esc(item.name)}</figcaption>${item.payload.embeds.map(embed => `<div class="recap-preview-embed"><strong>${esc(embed.title || '')}</strong><span>${recapPreviewText(embed.description)}</span>${(embed.fields || []).map(field => `<b>${esc(field.name)}</b><span>${recapPreviewText(field.value)}</span>`).join('')}${embed.url ? `<a href="${esc(embed.url)}">Voir sur le site</a>` : ''}</div>`).join('')}</figure>`).join('') : '<p>Aucune course éligible pour le moment. Les nouveaux événements éligibles auront automatiquement leur salon.</p>';
-}
-async function loadRecapDestinations(form) {
-  const result = await api('/api/community/recap/destinations');
-  const type = form.elements.mode.value === 'events' ? 4 : 0;
-  const select = form.elements.destination, selected = select.value;
-  const destinations = result.destinations.filter(item => item.type === type);
-  select.innerHTML = '<option value="">Choisir une destination</option>' + destinations.map(item => `<option value="${esc(item.id)}" ${item.id === selected ? 'selected' : ''}>${esc(item.name)}${item.ready ? '' : ' · permissions manquantes'}</option>`).join('');
-  form._destinations = destinations;
-  recapRights(form);
-}
-function recapRights(form) {
-  const destination = form._destinations?.find(item => item.id === form.elements.destination.value);
-  form.querySelector('[data-recap-rights]').textContent = destination && !destination.ready ? `Dans les permissions de « ${destination.name} », autorise le bot : ${destination.missing.join(', ')}.` : 'Le bot doit voir le salon, envoyer des messages, intégrer des liens et lire les anciens messages. Pour créer et supprimer les catégories des courses, il doit aussi gérer les salons.';
-}
-async function recapStep(form, step) {
-  if (step === 3) {
-    const data = wizardData(form);
-    if (!data.destinationId) throw new Error('Choisis une destination Discord.');
-    const destination = form._destinations?.find(item => item.id === data.destinationId);
-    if (destination && !destination.ready) throw new Error(`Permissions manquantes : ${destination.missing.join(', ')}.`);
-  }
-  form.dataset.step = String(step);
-  for (const fieldset of form.querySelectorAll('[data-recap-step]')) fieldset.hidden = Number(fieldset.dataset.recapStep) !== step;
-  form.querySelector('[data-recap-progress]').textContent = `Étape ${step + 1} sur 4`;
-  form.querySelector('[data-recap-back]').hidden = step === 0;
-  form.querySelector('[data-recap-next]').hidden = step === 3;
-  form.querySelector(`[data-recap-step="${step}"] legend`).setAttribute('tabindex','-1');
-  form.querySelector(`[data-recap-step="${step}"] legend`).focus();
-  if (step === 2) {
-    form.querySelector('[data-recap-destination-label]').textContent = form.elements.mode.value === 'events' ? 'Placer les courses sous' : 'Salon texte';
-    await loadRecapDestinations(form);
-  }
-  if (step === 3) {
-    const data = wizardData(form);
-    const publishButtons = form.querySelectorAll('[type="submit"],[data-recap-send-test]');
-    for (const button of publishButtons) button.disabled = true;
-    const preview = form.querySelector('[data-recap-preview]');
-    preview.textContent = 'Chargement de l’aperçu…';
-    const result = await api('/api/community/recap/preview','POST',data);
-    // A late response must not replace a more recent selection.
-    if (JSON.stringify(wizardData(form)) === JSON.stringify(data)) {
-      preview.innerHTML = recapPreviewMarkup(result.previews);
-      for (const button of publishButtons) button.disabled = false;
-    }
-  }
-}
-// Where the crews' voice channels are made, asked as soon as the module is turned on.
-function crewCategory(crews) {
-  const list = crews.categories || [], current = crews.voiceCategoryId || '';
-  const options = [{id:'', name:'En haut du serveur'}, ...list, ...(current && !list.some(item => item.id === current) ? [{id:current, name:'Catégorie actuelle'}] : [])];
-  return `<label class="crew-category">Où créer les vocaux ?<select data-crew-category>${options.map(item => `<option value="${esc(item.id)}" ${item.id === current ? 'selected' : ''}>${esc(item.name)}</option>`).join('')}</select></label><span class="settings-status" aria-live="polite"></span>`;
+  return previews.length ? previews.map(item => `<figure class="recap-preview"><figcaption># ${esc(item.name)}</figcaption>${item.payload.embeds.map(embed => `<div class="recap-preview-embed"><strong>${esc(embed.title || '')}</strong><span>${recapPreviewText(embed.description)}</span>${(embed.fields || []).map(field => `<b>${esc(field.name)}</b><span>${recapPreviewText(field.value)}</span>`).join('')}${embed.url ? `<a href="${esc(embed.url)}">Voir sur le site</a>` : ''}</div>`).join('')}</figure>`).join('') : '<p>Rien à publier pour le moment. Les prochaines courses apparaîtront toutes seules.</p>';
 }
 // Why the crews' channels cannot be turned on yet (the bot's state on the server, checked by the site).
 const BOT_PROBLEMS = {
@@ -251,22 +244,15 @@ function modulesMarkup(settings, setup) {
   const toggle = (key, label, locked = false) => `<label class="admin-switch"><input type="checkbox" role="switch" data-module="${key}" aria-label="${label}" ${states[key] ? 'checked' : ''} ${locked ? 'disabled' : ''}><i aria-hidden="true"></i></label>`;
   const crewRights = crews.botReady === true ? (crews.lastError ? `<p class="setup-note setup-error">⚠️ ${esc(crews.lastError)}</p>` : '<p class="members-help">Le bot a les droits pour créer les salons.</p>')
     : `<p class="members-help">${crews.botProblem === 'channel' ? `Dans « ${esc(crews.botChannelName || 'le salon')} », un administrateur Discord doit autoriser Endurance Manager : ${esc((crews.botMissing || []).join(', '))}. Les autres accès restent privés.` : crews.botProblem === 'rights' && crews.botMissing?.length ? `Droits manquants pour le bot : ${esc(crews.botMissing.join(', '))}.` : BOT_PROBLEMS[crews.botProblem] || BOT_PROBLEMS.rights}</p>
-      <div class="setup-actions">${crews.botInviteUrl && crews.botProblem !== 'channel' ? `<a class="primary-button" href="${esc(crews.botInviteUrl)}" target="_blank" rel="noopener">Donner les droits au bot</a>` : ''}<button type="button" class="secondary-button" data-modules-refresh="crewChannels">C’est fait</button></div>`;
-  const crewWarn = states.crewChannels && (crews.botReady !== true || crews.lastError);
-  // The recap gives each race its category: the voice channels go there, no category to choose.
-  const raceCategories = setup.botRecap?.enabled && setup.botRecap.mode === 'events';
+      <div class="setup-actions">${crews.botInviteUrl && crews.botProblem !== 'channel' ? `<a class="primary-button" href="${esc(crews.botInviteUrl)}" target="_blank" rel="noopener">Donner les droits au bot</a>` : ''}<button type="button" class="secondary-button" data-modules-refresh="discord">C’est fait</button></div>`;
+  const voices = settings.modules.crewChannels === true, crewWarn = voices && (crews.botReady !== true || crews.lastError);
   const tiles = [
-    {key:'recap', name:'Récap de la semaine sur Discord', text:'Un récap général ou une catégorie par course, avec un message actualisé sans notifications répétées.',
-      state:setup.botRecap?.lastError ? ['warn','Publication en erreur'] : states.recap ? ['ok', (setup.botRecap.mode === 'events' ? 'Actif · une catégorie par course' : 'Actif · récap général')] : ['off', 'Éteint'],
-      control:'', settings:recapForm(setup)},
-    {key:'crewChannels', name:'Salons d’équipage sur Discord', text:'Un salon vocal par équipage, à son nom, ouvert dès sa création.',
-      state:crewWarn ? ['warn', crews.botProblem === 'channel' ? 'Accès au salon à corriger' : crews.botReady !== true ? 'Le bot n’a pas les droits' : 'Action Discord en échec'] : states.crewChannels ? ['ok', 'Actif'] : ['off', crews.botReady === true ? 'Éteint' : crews.botProblem === 'rights' ? 'Éteint · droits du bot à donner' : 'Éteint · bot à vérifier'],
-      control:toggle('crewChannels', 'Salons d’équipage sur Discord', crews.botReady !== true && !states.crewChannels),
-      settings:`${crewRights}${!states.crewChannels ? '' : raceCategories ? '<p class="members-help">Chaque vocal arrive dans la catégorie de sa course.</p>' : crewCategory(crews)}<p class="members-help">Il est supprimé 2 h après la course.</p>`},
+    {key:'discord', name:'Discord', text:'Le bot affiche tes courses et crée les vocaux des équipages sur ton serveur.',
+      state:setup.botRecap?.lastError ? ['warn','Publication en erreur'] : crewWarn ? ['warn', crews.botProblem === 'channel' ? 'Accès au salon à corriger' : crews.botReady !== true ? 'Le bot n’a pas les droits' : 'Vocaux en échec']
+        : states.discord ? ['ok', setup.botRecap.mode === 'events' ? 'Actif · une catégorie par course' : 'Actif · récap de la semaine'] : ['off', 'Éteint'],
+      control:'', settings:`${crewWarn ? crewRights : ''}${discordForm(setup, settings)}`},
     {key:'categoryEntry', name:'Inscription par catégorie', text:'Sur une course à plusieurs départs, le pilote choisit ses catégories et ses départs possibles. Seuls les TM forment les équipages.',
       state:states.categoryEntry ? ['ok', 'Actif'] : ['off', 'Éteint'], control:toggle('categoryEntry', 'Inscription par catégorie'), settings:''},
-    {key:'raceReminders', name:'Rappels de course', text:'24&nbsp;h avant le départ dans la cloche du site, 24&nbsp;h et 1&nbsp;h avant dans le salon de l’équipage.',
-      state:states.raceReminders ? ['ok', 'Actif'] : ['off', 'Éteint'], control:toggle('raceReminders', 'Rappels de course'), settings:''},
     {key:'iracingImport', name:'Endurances iRacing officielles', text:settings.modules.eventTdzAvailable?'Les séries en équipe et les événements spéciaux importés automatiquement.':'Les séries en équipe et les événements spéciaux importés automatiquement. Avec EVENT SOLO activé, les endurances solo apparaissent aussi dans son calendrier.',
       state:states.iracingImport ? ['ok', 'Actif'] : ['off', 'Éteint'], control:toggle('iracingImport', 'Endurances iRacing officielles'), settings:''},
     ...(!settings.modules.eventTdzAvailable ? [] : [{key:'soloRaces', name:'EVENT TDZ', text:'Un calendrier d’événements toutes simus&nbsp;: places limitées, liste d’attente, accès OPEN ou SAFE.',
@@ -402,6 +388,7 @@ async function load() {
         ${sections.map(([key, label]) => `<button type="button" role="tab" class="admin-nav${key === 'platform' ? ' is-platform' : ''}" data-tab="${key}" aria-selected="${key === current}">${icon(key)}<span>${label}</span>${key === 'overview' && overview.todo ? `<b class="admin-count">${overview.todo}</b>` : ''}</button>`).join('')}
       </nav>
       <div class="admin-main">${sections.map(([key]) => `<section class="admin-panel${key === 'platform' ? ' community-settings' : ''}" data-panel="${key}" role="tabpanel" ${key === current ? '' : 'hidden'}>${helpContext('admin-'+key)}${panels[key]}</section>`).join('')}</div></div>`;
+    for (const form of app.querySelectorAll('[data-discord-form]')) discordRefresh(form);
     if (openView) showView(openView);
     if (openModule) openModuleSettings(openModule);
     openView = ''; openModule = '';
@@ -421,6 +408,9 @@ function openModuleSettings(key, open = true) {
   const button = tile.querySelector('[data-module-open]');
   if (button) button.textContent = open ? 'Fermer' : 'Régler';
   if (open) tile.scrollIntoView({behavior:'smooth', block:'nearest'});
+  // The server's channels are read once the setting is opened.
+  const form = settings.querySelector('[data-discord-form]');
+  if (open && form && !form._destinations) loadDiscordDestinations(form).catch(error => { form.querySelector('.setup-actions .settings-status').textContent = error.message; });
 }
 function selectTab(key) {
   for (const button of app.querySelectorAll('[data-tab]')) button.setAttribute('aria-selected', String(button.dataset.tab === key));
@@ -584,36 +574,29 @@ app.addEventListener('click', async event => {
     try { await api('/api/community/banner', 'DELETE', {}); await reload('look'); } catch (error) { alert(error.message); }
     return;
   }
-  const guide = event.target.closest('[data-recap-guide]');
-  if (guide && event.target.closest('button[data-recap-edit],button[data-recap-view],button[data-recap-disable],button[data-recap-cancel],button[data-recap-next],button[data-recap-back],button[data-recap-destinations],button[data-recap-send-test],button[data-recap-repair]')) {
-    const button = event.target.closest('button'), form = guide.querySelector('[data-recap-wizard]'), status = button.matches('[data-recap-repair]') ? guide.querySelector('[data-recap-repair-status]') : form.querySelector('.settings-status');
-    button.disabled = true; status.textContent = '';
+  const discordButton = event.target.closest('[data-discord-form] button[type="button"]');
+  if (discordButton && !discordButton.matches('[data-modules-refresh]')) {
+    const form = discordButton.closest('[data-discord-form]'), status = form.querySelector('.setup-actions .settings-status');
+    discordButton.disabled = true; status.textContent = '';
     try {
-      if (button.matches('[data-recap-repair]')) {
-        status.textContent = 'Vérification et réparation du récap…';
-        const result=await api('/api/community/recap/repair','POST',{});
-        await reload('modules',{module:'recap'});
-        app.querySelector('[data-recap-repair-status]').textContent=result.queued ? 'Une synchronisation est en cours. Réessaie dans un instant.' : '✓ Réparation effectuée. Les publications ont été vérifiées sans changer les réglages.';
-      } else if (button.matches('[data-recap-edit],[data-recap-view]')) {
-        const config = JSON.parse(guide.dataset.config);
-        guide.querySelector('[data-recap-summary]').hidden = true; form.hidden = false;
-        if (button.matches('[data-recap-view]')) { await loadRecapDestinations(form); await recapStep(form,3); }
-        else await recapStep(form,0);
-      } else if (button.matches('[data-recap-cancel]')) { await reload('modules',{module:'recap'}); }
-      else if (button.matches('[data-recap-disable]')) { await api('/api/community/recap','PUT',{enabled:false}); await reload('modules',{module:'recap'}); }
-      else if (button.matches('[data-recap-destinations]')) { await loadRecapDestinations(form); }
-      else if (button.matches('[data-recap-send-test]')) {
-        status.textContent = 'Envoi du récap de test…';
-        const result = await api('/api/community/recap/test','POST',wizardData(form));
-        status.textContent = result.queued ? 'Synchronisation en cours. Réessaie dans un instant.' : '✓ Récap envoyé. Ce message sera réutilisé à l’activation. Le test n’active pas l’automatisation.';
-      } else {
-        const step = Number(form.dataset.step || 0);
-        if (step === 1) wizardData(form);
-        if (step === 2 && !form.elements.destination.value) throw new Error('Choisis une destination Discord.');
-        await recapStep(form,step + (button.matches('[data-recap-back]') ? -1 : 1));
+      if (discordButton.matches('[data-discord-destinations]')) { await loadDiscordDestinations(form); status.textContent = '✓'; }
+      else if (discordButton.matches('[data-discord-preview]')) {
+        const preview = form.querySelector('[data-recap-preview]'), input = discordInput(form);
+        preview.textContent = 'Chargement de l’aperçu…';
+        const result = await api('/api/community/recap/preview','POST',input);
+        // A late answer never replaces a newer choice.
+        if (JSON.stringify(discordInput(form)) === JSON.stringify(input)) preview.innerHTML = recapPreviewMarkup(result.previews);
+      } else if (discordButton.matches('[data-discord-repair]')) {
+        status.textContent = 'Réparation…';
+        const result = await api('/api/community/recap/repair','POST',{});
+        await reload('modules',{module:'discord'});
+        app.querySelector('[data-discord-form] .setup-actions .settings-status').textContent = result.queued ? 'Une synchronisation est en cours. Réessaie dans un instant.' : '✓ Salons et messages vérifiés, réglages conservés.';
+      } else if (discordButton.matches('[data-discord-disable]')) {
+        if (!confirm('Arrêter le bot sur Discord ? Les salons déjà créés sont supprimés après leur course.')) return;
+        await api('/api/community/discord','PUT',{enabled:false}); await reload('modules',{module:'discord'});
       }
     } catch (error) { status.textContent = error.message; }
-    finally { button.disabled = false; }
+    finally { discordButton.disabled = false; }
     return;
   }
   const tab = event.target.closest('[data-tab]');
@@ -637,16 +620,16 @@ app.addEventListener('input', event => {
 });
 
 app.addEventListener('submit', async event => {
-  const wizard = event.target.closest('form[data-recap-wizard]');
-  if (wizard) {
+  const discord = event.target.closest('form[data-discord-form]');
+  if (discord) {
     event.preventDefault();
-    if (wizard.dataset.step !== '3') return;
-    const status = wizard.querySelector('.settings-status'), button = wizard.querySelector('[type="submit"]');
-    button.disabled = true; status.textContent = 'Activation…';
+    const status = discord.querySelector('.setup-actions .settings-status'), button = discord.querySelector('[type="submit"]');
+    button.disabled = true; status.textContent = 'Enregistrement…';
     try {
-      const result = await api('/api/community/recap','PUT',wizardData(wizard));
-      await reload('modules',{module:'recap'});
-      if (!result.published) app.querySelector('[data-recap-summary]').insertAdjacentHTML('beforeend', `<p role="alert">${esc(result.error || 'Enregistré ; synchronisation à réessayer.')}</p>`);
+      const result = await api('/api/community/discord','PUT',{...discordInput(discord), crewChannels:discord.elements.crewChannels.checked,
+        crewCategory:discord.elements.crewCategory?.value || '', raceReminders:discord.elements.raceReminders.checked});
+      await reload('modules',{module:'discord'});
+      app.querySelector('[data-discord-form] .setup-actions .settings-status').textContent = result.published ? '✓ Enregistré.' : result.error || 'Enregistré ; la publication sera réessayée.';
     } catch (error) { status.textContent = error.message; }
     finally { button.disabled = false; }
     return;
@@ -724,7 +707,6 @@ app.addEventListener('change', async event => {
   const box = event.target;
   const look = box.closest('form[data-appearance]');
   if (look) { if (box.name === 'accent') look.elements.defaultAccent.checked = false; updatePreview(look); return; }
-  // Recap: the fields of the chosen kind of recap.
   if (box.matches('[data-banner-file]') && box.files?.[0]) {
     const container = box.closest('.settings-banner'), status = container.querySelector('.settings-status');
     status.textContent = '';
@@ -733,21 +715,15 @@ app.addEventListener('change', async event => {
     return;
   }
   if (box.matches('[data-banner-zoom]') && cropper) { setZoom(Number(box.value)); return; }
-  const wizard = box.closest('form[data-recap-wizard]');
-  if (wizard) { wizard.querySelector('[data-recap-preview]').innerHTML = ''; recapRights(wizard); return; }
-  if (box.matches('[data-crew-category]')) {
-    const status = box.closest('.admin-module-settings').querySelector('.crew-category + .settings-status');
-    box.disabled = true; status.textContent = 'Enregistrement…';
-    try { await api('/api/community/modules', 'PATCH', {crewCategory:box.value}); status.textContent = '✓'; }
-    catch (error) { status.textContent = error.message; } finally { box.disabled = false; }
-    return;
-  }
+  // Discord: the rows and the sketch follow the choices; nothing is saved before « Activer ».
+  const discord = box.closest('form[data-discord-form]');
+  if (discord) { discord.querySelector('[data-recap-preview]').innerHTML = ''; if (box.name === 'mode' || box.name === 'crewChannels') discordRefresh(discord); else discordSketch(discord); return; }
   if (box.dataset.module) {
     box.disabled = true;
     try {
       await api('/api/community/modules', 'PATCH', {[box.dataset.module]:box.checked});
-      // The solo races permissions appear or disappear with the module; the crews' channels ask where to go.
-      await reload('modules', {module:box.dataset.module === 'crewChannels' && box.checked ? 'crewChannels' : ''});
+      // The solo races permissions appear or disappear with the module.
+      await reload('modules');
       return;
     } catch (error) { box.checked = !box.checked; alert(error.message); } finally { box.disabled = false; }
     return;

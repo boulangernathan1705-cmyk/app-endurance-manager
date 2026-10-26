@@ -2041,7 +2041,7 @@ html[data-game] #app .race-header .race-header-time svg { width: 18px; height: 1
 .solo-detail-round-head strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15px; font-weight: 800; color: #f2f5f7; }
 .solo-detail-round-head em { margin-left: auto; flex: none; font-style: normal; font-size: 12px; font-weight: 700; color: #9aa6b0; }
 .solo-round-index { display: inline-grid; place-items: center; flex: none; width: 22px; height: 22px; border-radius: 50%; background: var(--community-accent, #7fe3ea); color: #061014; font-size: 12px; font-weight: 900; }
-.solo-detail-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.solo-detail-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; }
 .solo-detail { display: flex; align-items: center; gap: 10px; min-width: 0; padding: 8px 10px; border: 1px solid rgba(255, 255, 255, .1); border-radius: 10px; background: rgba(255, 255, 255, .03); }
 .solo-detail.is-wide { grid-column: 1 / -1; }
 .solo-detail-icon { display: inline-grid; place-items: center; flex: none; width: 32px; height: 32px; border-radius: 8px; background: rgba(127, 227, 234, .1); }
@@ -2202,6 +2202,13 @@ html[data-game] #app .race-header .race-side .race-badges > * { box-sizing: bord
 .race-info-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: end; gap: 10px; }
 .race-info-grid .form-label > span:first-child { display: inline-flex; align-items: center; gap: 6px; min-height: 18px; }
 .race-info-grid svg { width: 16px; height: 16px; color: #7fe3ea; flex: none; }
+.race-weather-fields { grid-column: 1 / -1; display: flex; flex-direction: column; gap: 8px; }
+.race-weather-slots { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; }
+.race-weather-slot { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.race-weather-slot small { flex: none; width: 12px; color: #8f999d; font-weight: 700; }
+.race-weather-slot select { flex: 1; min-width: 0; }
+.race-weather-chip { gap: 4px; }
+.race-weather-chip i { font-style: normal; color: #8f999d; width: 18px; text-align: center; }
 @media (max-width: 760px) {
   html[data-game] #app .race-header .race-side { width: 88px; }
   html[data-game] #app .race-header .race-side .race-badges > * { font-size: 8.5px; padding: 3px 2px; letter-spacing: 0; }

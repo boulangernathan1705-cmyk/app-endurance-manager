@@ -136,17 +136,29 @@ img.admin-preview-badge { width: 22px; min-width: 0; padding: 0; border: 0; bord
 @media (prefers-reduced-motion: reduce) { .admin-switch i, .admin-switch i::after { transition: none; } }
 .admin-shell a.primary-button { display: inline-flex; align-items: center; text-decoration: none; }
 
-/* Guided text recaps: one question at a time, readable previews on phones too. */
-.recap-wizard fieldset{border:0;margin:0;padding:0;min-width:0}
-.recap-wizard fieldset[hidden],.recap-wizard[hidden]{display:none}
-.recap-wizard legend{font-size:1.15rem;font-weight:700;margin-bottom:18px;max-width:100%}
-.recap-wizard .recap-cards{margin:12px 0}
-.recap-wizard .settings-status{white-space:normal;overflow-wrap:anywhere}
-.recap-live-preview{display:grid;gap:16px;margin:16px 0;min-width:0}
+/* « Discord »: three questions on one page, the server sketch and the messages below. */
+.discord-form fieldset{border:0;margin:0;padding:8px 0 0;min-width:0}
+.discord-form legend{font-size:1.05rem;font-weight:700;margin-bottom:12px;color:#f4f6f5}
+.discord-form .recap-cards{margin:0}
+.discord-row{display:grid!important;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px;align-items:center;padding:8px 0}
+.discord-row span,.discord-check span{display:grid;gap:2px}
+.discord-row strong,.discord-check strong{color:#f4f6f5;font-size:14.5px}
+.discord-row small,.discord-check small{color:#99a3a0;font-weight:400;font-size:13px}
+.discord-form .discord-check{display:flex!important;align-items:flex-start;gap:10px;padding:8px 0}
+.discord-form .discord-check input{flex:0 0 auto;width:20px!important;min-height:0!important;height:20px;margin:2px 0 0;accent-color:var(--community-accent,#52d3d8)}
+.discord-sketch{padding:12px 14px;border-radius:10px;background:#2b2d31;color:#dbdee1;font-size:13.5px}
+.discord-sketch ul{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:3px}
+.discord-sketch .is-category{margin-top:6px;color:#b5bac1;font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.03em}
+.discord-sketch .is-text,.discord-sketch .is-voice{padding-left:10px;overflow-wrap:anywhere}
+.discord-sketch small{color:#949ba4}
+.discord-sketch .is-top{margin-top:6px;padding-left:0}
+.discord-form .settings-status{white-space:normal;overflow-wrap:anywhere}
+.discord-form .setup-actions{flex-wrap:wrap}
+.discord-state{margin:0}
+.recap-live-preview{display:grid;gap:16px;min-width:0}
+.recap-live-preview:empty{display:none}
 .recap-live-preview .recap-preview{width:100%;max-width:100%;margin:0;box-sizing:border-box}
 .recap-live-preview .recap-preview-embed{white-space:pre-wrap;overflow-wrap:anywhere}
 .recap-live-preview figcaption{overflow-wrap:anywhere}
-.recap-wizard .setup-actions{flex-wrap:wrap}
-@media(max-width:600px){.recap-wizard .recap-cards{grid-template-columns:1fr}.recap-wizard .setup-actions button{flex:1 1 140px}}
-.recap-wizard [hidden]{display:none!important}
+@media(max-width:600px){.discord-form .recap-cards,.discord-row{grid-template-columns:1fr}.discord-form .setup-actions button{flex:1 1 140px}}
 .recap-live-preview a{color:#9fe8ec;text-decoration:underline}

@@ -28,7 +28,7 @@ import {resetShowcase, makeOfficial} from './demo.mjs';
 import {setupOfficialServer} from './official-discord.mjs';
 
 
-import {botRecapSettings, recapDestinations, recapError, recapInput, validateRecapDestination, previewBotRecap, saveBotRecap, syncBotRecaps, sendBotRecapTest, repairBotRecap, RECAP_BOT_PERMISSIONS} from './recap-discord.mjs';
+import {botRecapSettings, recapDestinations, recapError, validateRecapDestinations, previewBotRecap, saveBotRecap, syncBotRecaps, repairBotRecap, RECAP_BOT_PERMISSIONS} from './recap-discord.mjs';
 import {notify, notificationsApi, departurePilots, eventPilots, crewPilots} from './notifications.mjs';
 import {checkCrewAccess, validateCrewAccess, serverCategories, closeDeletedCrewDiscord, CREW_BOT_PERMISSIONS} from './crew-discord.mjs';
 // Official races (iRacing's official endurances, LMU official events): common to every community (migration 0039).
@@ -147,6 +147,25 @@ async function crewDiscordState(env, community) {
   return {botReady:bot.ready, botProblem:bot.why, botMissing:bot.missing || [], botChannelName:bot.channelName || null, botInviteUrl:botInvite(env, community.discordGuildId, CREW_BOT_PERMISSIONS),
     lastError:on ? saved?.last_error || null : null, voiceCategoryId:saved?.voice_category_id || null,
     categories:on ? bot.categories || null : null};
+}
+// Crews on Discord (server/crew-discord.mjs): turned on only once the bot has the rights to make the channels;
+// crewCategory: where their voice channels are made, a category of the server or '' for the top of the server.
+async function crewModuleStatements(env, community, modules, input) {
+  const statements = [];
+  if (typeof input.crewChannels === 'boolean') {
+    if (input.crewChannels) await assertCrewAccess(env,community,{categoryId:typeof input.crewCategory === 'string' ? input.crewCategory.trim() : undefined});
+    modules.crewChannels = input.crewChannels;
+    if (input.crewChannels) statements.push(env.DB.prepare(`INSERT INTO community_crew_discord(community_id,updated_at) VALUES(?,?)
+      ON CONFLICT(community_id) DO UPDATE SET last_error=NULL,last_error_at=NULL,updated_at=excluded.updated_at`).bind(community.id, now()));
+  }
+  if (typeof input.crewCategory === 'string') {
+    const category = input.crewCategory.trim();
+    await assertCrewAccess(env,community,{categoryId:category});
+    if (category && !(await serverCategories(env, community.discordGuildId) || []).some(item => item.id === category)) fail(400, 'Cette catégorie n’existe pas sur ton serveur.');
+    statements.push(env.DB.prepare(`INSERT INTO community_crew_discord(community_id,voice_category_id,updated_at) VALUES(?,?,?)
+      ON CONFLICT(community_id) DO UPDATE SET voice_category_id=excluded.voice_category_id,last_error=NULL,last_error_at=NULL,updated_at=excluded.updated_at`).bind(community.id, category || null, now()));
+  }
+  return statements;
 }
 async function assertCrewAccess(env,community,options) {
   try { return await validateCrewAccess(env,community,options); }
@@ -926,22 +945,7 @@ async function api(request, env) {
       if (url && (url.length > 200 || !/^https:\/\/((ptb\.|canary\.)?discord\.com|discord\.gg)\//.test(url))) fail(400, 'Colle le lien d’un salon Discord (clic droit sur le salon → Copier le lien).');
       modules.safeGuideUrl = url;
     }
-    const statements = [];
-    // Crews on Discord (server/crew-discord.mjs): only once the bot has the rights to make the channels.
-    if (typeof input.crewChannels === 'boolean') {
-      if (input.crewChannels) await assertCrewAccess(env,community,{categoryId:typeof input.crewCategory === 'string' ? input.crewCategory.trim() : undefined});
-      modules.crewChannels = input.crewChannels;
-      if (input.crewChannels) statements.push(env.DB.prepare(`INSERT INTO community_crew_discord(community_id,updated_at) VALUES(?,?)
-        ON CONFLICT(community_id) DO UPDATE SET last_error=NULL,last_error_at=NULL,updated_at=excluded.updated_at`).bind(community.id, now()));
-    }
-    // Where the crews' voice channels are made: a category of the server, or '' for the top of the server.
-    if (typeof input.crewCategory === 'string') {
-      const category = input.crewCategory.trim();
-      await assertCrewAccess(env,community,{categoryId:category});
-      if (category && !(await serverCategories(env, community.discordGuildId) || []).some(item => item.id === category)) fail(400, 'Cette catégorie n’existe pas sur ton serveur.');
-      statements.push(env.DB.prepare(`INSERT INTO community_crew_discord(community_id,voice_category_id,updated_at) VALUES(?,?,?)
-        ON CONFLICT(community_id) DO UPDATE SET voice_category_id=excluded.voice_category_id,last_error=NULL,last_error_at=NULL,updated_at=excluded.updated_at`).bind(community.id, category || null, now()));
-    }
+    const statements = await crewModuleStatements(env, community, modules, input);
     statements.push(env.DB.prepare('UPDATE communities SET modules=? WHERE id=?').bind(JSON.stringify(modules), community.id));
     await env.DB.batch(statements);
     return json({ok:true, modules});
@@ -955,7 +959,8 @@ async function api(request, env) {
     const rolesConfigured = Boolean(await env.DB.prepare('SELECT 1 FROM community_role_permissions WHERE community_id=? LIMIT 1').bind(community.id).first());
     const savedBotRecap = await botRecapSettings(env, community);
     const botRecap = savedBotRecap;
-    return json({botRecap:botRecap ? {enabled:Boolean(botRecap.enabled),mode:botRecap.mode,scope:botRecap.scope,destinationId:botRecap.destination_id,destinationName:botRecap.destination_name,lastError:botRecap.last_error} : null,
+    return json({botRecap:botRecap ? {enabled:Boolean(botRecap.enabled),mode:botRecap.mode,lmuId:botRecap.destination_id,lmuName:botRecap.destination_name,
+        iracingId:botRecap.iracing_destination_id,iracingName:botRecap.iracing_destination_name,calendarId:botRecap.calendar_destination_id,calendarName:botRecap.calendar_destination_name,lastError:botRecap.last_error} : null,
       recapBotInviteUrl:env.DISCORD_CLIENT_ID ? `https://discord.com/oauth2/authorize?client_id=${encodeURIComponent(env.DISCORD_CLIENT_ID)}&scope=bot&permissions=${RECAP_BOT_PERMISSIONS}&guild_id=${community.discordGuildId}&disable_guild_select=true` : null,
       community:{name:community.name, slug:community.slug}, siteUrl:communityUrl(env, community), rolesConfigured, recapSetupRequired:!savedBotRecap, recapSuggestedScope:legacyScopes.length === 1 ? legacyScopes[0] : 'all',
       guild:{id:community.discordGuildId, name:discord?.name || null, botPresent:Boolean(discord)}, botInviteUrl:botInvite(env, community.discordGuildId),
@@ -970,32 +975,38 @@ async function api(request, env) {
   if (path === '/api/community/recap/preview' && method === 'POST') {
     requirePermission(actor,'admin');
     try {
-      const settings = recapInput(await body(request));
+      const settings = await validateRecapDestinations(env,community,await body(request));
       return json({previews:await previewBotRecap(env,Date.now(),community,settings)});
-    } catch (error) { fail(400,error.message); }
+    } catch (error) { fail(400,error.message === 'Discord indisponible' ? recapError(error) : error.message); }
   }
-  if (path === '/api/community/recap' && method === 'PUT') {
+  // « Discord » (Modules): the recaps, the crews' voice channels and the reminders, saved together.
+  if (path === '/api/community/discord' && method === 'PUT') {
     requirePermission(actor,'admin');
     const input = await body(request);
+    const modules = {...community.modules};
     if (input.enabled === false) {
       const result = await env.DB.prepare('UPDATE community_recap_settings SET enabled=0 WHERE community_id=? AND lock_until<?').bind(community.id,Date.now()).run();
-      if (!result.meta.changes) fail(409,'Une synchronisation est en cours ou aucun récap par bot n’est configuré.');
+      if (!result.meta.changes && await botRecapSettings(env, community)) fail(409,'Une synchronisation est en cours. Réessaie dans un instant.');
+      Object.assign(modules, {crewChannels:false, raceReminders:false});
+      await env.DB.prepare('UPDATE communities SET modules=? WHERE id=?').bind(JSON.stringify(modules), community.id).run();
       return json({ok:true});
     }
     try {
-      const settings = await validateRecapDestination(env,community,input);
+      const settings = await validateRecapDestinations(env,community,input);
+      if (typeof input.raceReminders === 'boolean') modules.raceReminders = input.raceReminders;
+      const voices = input.crewChannels === true;
+      // « Récap de la semaine »: the voice channels go to the category chosen for them; « une catégorie par course »: to the race's.
+      const crewInput = {crewChannels:voices, ...(voices && settings.mode === 'general' && typeof input.crewCategory === 'string' ? {crewCategory:input.crewCategory} : {})};
+      const statements = await crewModuleStatements(env, community, modules, crewInput);
       await saveBotRecap(env,community,settings);
+      await env.DB.batch([...statements, env.DB.prepare('UPDATE communities SET modules=? WHERE id=?').bind(JSON.stringify(modules), community.id)]);
+      community.modules = modules;
       const publication = await syncBotRecaps(env,Date.now(),community).catch(error => ({ok:false,error:error.message}));
       return json({ok:true,published:publication.ok,error:publication.error});
-    } catch (error) { fail(error.status === 409 ? 409 : 400,error.message === 'Discord indisponible' ? recapError(error) : error.message); }
-  }
-  if (path === '/api/community/recap/test' && method === 'POST') {
-    requirePermission(actor,'admin');
-    await rateLimit(request,env,'recap-test',10);
-    try {
-      const settings = await validateRecapDestination(env,community,await body(request));
-      return json(await sendBotRecapTest(env,Date.now(),community,settings));
-    } catch (error) { fail(error.status === 409 ? 409 : 400,error.message === 'Discord indisponible' ? recapError(error) : error.message); }
+    } catch (error) {
+      if (error instanceof HttpError) throw error;
+      fail(error.status === 409 ? 409 : 400,error.message === 'Discord indisponible' ? recapError(error) : error.message);
+    }
   }
   if (path === '/api/community/recap/repair' && method === 'POST') {
     requirePermission(actor,'admin');
@@ -1046,7 +1057,9 @@ async function api(request, env) {
     try {
       const result = await setupOfficialServer(env, community.discordGuildId);
       // The races' categories go right under « 📌 INFOS » (anchor of the recap in « une catégorie par course »).
-      if (result.anchor) await env.DB.prepare("UPDATE community_recap_settings SET destination_id=?,destination_name=?,revision=revision+1 WHERE community_id=? AND mode='events' AND guild_id=?")
+      if (result.anchor) await env.DB.prepare(`UPDATE community_recap_settings SET destination_id=CASE WHEN destination_id<>'' THEN ?1 ELSE '' END,
+        destination_name=CASE WHEN destination_id<>'' THEN ?2 ELSE '' END,iracing_destination_id=CASE WHEN iracing_destination_id<>'' THEN ?1 ELSE '' END,
+        iracing_destination_name=CASE WHEN iracing_destination_id<>'' THEN ?2 ELSE '' END,revision=revision+1 WHERE community_id=?3 AND mode='events' AND guild_id=?4`)
         .bind(result.anchor, '📌 INFOS', community.id, community.discordGuildId).run();
       // What @everyone, the Staff and the Organisateur may do on the site.
       await env.DB.batch(Object.entries(result.site).map(([role, permissions]) => env.DB.prepare(`INSERT INTO community_role_permissions(community_id,discord_role_id,permissions,updated_at) VALUES(?,?,?,?)

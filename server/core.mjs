@@ -1,5 +1,5 @@
 import {isGrindfest, streamersOf, normalizeStreamers, gridfestPasswordValid} from '../shared/grindfest.mjs';
-import {catalogForGame, gameForEvent, CATEGORIES, EVENT_TYPE_IDS as EVENT_TYPES, CIRCUIT_IDS as CIRCUITS, CARS, SIM_IDS, eventCatalog, simForEvent, isRandomCircuit, TDZ_EVENT_TYPES, TRACK_LIMITS, RACE_WEATHERS} from '../shared/catalog.mjs';
+import {catalogForGame, gameForEvent, CATEGORIES, EVENT_TYPE_IDS as EVENT_TYPES, CIRCUIT_IDS as CIRCUITS, CARS, SIM_IDS, eventCatalog, simForEvent, isRandomCircuit, TDZ_EVENT_TYPES, TRACK_LIMITS, RACE_WEATHERS, RACE_SKIES, WEATHER_SLOTS} from '../shared/catalog.mjs';
 const LEGACY_CAR_ALIASES = new Map([
   ['BMW M Hybrid V8 Evo (2026)','BMW M Hybrid V8'],['Cadillac V-Series.R Evo (2026)','Cadillac V-Series.R'],['Peugeot 9X8 2023','Peugeot 9X8'],['Peugeot 9X8 2024','Peugeot 9X8'],['Toyota TR010 Hybrid (2026)','Toyota GR010 Hybrid'],['Ginetta G61-LT-P3 Evo','Ginetta G61-LT-P3'],['Ferrari 488 GTE Evo','Ferrari 488 GTE'],['Aston Martin Vantage AMR LMGT3 Evo','Aston Martin Vantage AMR LMGT3'],['BMW M4 LMGT3 Evo','BMW M4 LMGT3'],['Ferrari 296 LMGT3 Evo','Ferrari 296 LMGT3'],['Ford Mustang LMGT3 Evo','Ford Mustang LMGT3'],['Lamborghini Huracán LMGT3 Evo 2','Lamborghini Huracán LMGT3'],['McLaren 720S LMGT3 Evo','McLaren 720S LMGT3'],['Porsche 911 LMGT3 R (992)','Porsche 911 GT3 R LMGT3'],['Porsche 911 LMGT3 R (992) 2026','Porsche 911 GT3 R LMGT3']
 ]);
@@ -320,6 +320,12 @@ function validateRaceInfo(raw, existing) {
   if (input.weather != null && input.weather !== '') {
     if (!RACE_WEATHERS[input.weather]) fail(400, 'Météo invalide.');
     info.weather = input.weather;
+  }
+  // LMU's 5 weather slots, each optional ('' when unknown); kept only when at least one is given.
+  if (input.weatherSlots != null) {
+    if (!Array.isArray(input.weatherSlots) || input.weatherSlots.length > WEATHER_SLOTS || input.weatherSlots.some(sky => sky && !RACE_SKIES[sky])) fail(400, 'Météo des créneaux invalide.');
+    const slots = Array.from({length:WEATHER_SLOTS}, (_, index) => input.weatherSlots[index] || '');
+    if (slots.some(Boolean)) info.weatherSlots = slots;
   }
   const weatherNote = optionalText(input.weatherNote, 60, 'Précision météo');
   if (weatherNote) info.weatherNote = weatherNote;
