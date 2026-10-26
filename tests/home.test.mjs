@@ -49,7 +49,9 @@ test('simulator spaces remember the choice and the logo leads to the chosen simu
   for (const route of ['/', '/api/*', '/telemetry/*', '/manifest.webmanifest', '/app-icon.png', '/lmu*', '/iracing*'])
     assert.ok(routes.includes(route), route);
   for (const page of ['members', 'help', 'about', 'legal', 'privacy', 'changelog', 'circuit-credits', 'demande-communaute', 'diagnostics', 'fiches-combo', 'mur-des-stands', 'mur'])
-    assert.ok(routes.includes(`/${page}*`), page);
+    assert.ok(routes.some(route => route.endsWith('*') && `/${page}`.startsWith(route.slice(0, -1))), page);
+  // Wrangler refuses the deploy when a route is already covered by a shorter one ('/mur*' covers '/mur-des-stands*').
+  for (const route of routes) assert.ok(!routes.some(other => other !== route && other.endsWith('*') && !other.startsWith('!') && !route.startsWith('!') && route.startsWith(other.slice(0, -1))), `${route} is redundant`);
   for (const route of routes.filter(route => route.startsWith('!'))) assert.doesNotMatch(route, /\.html|^!\/(?:\*|api|telemetry|downloads|lmu|iracing)/, route);
   assert.match(readFileSync(new URL('../404.html', import.meta.url), 'utf8'), /Page introuvable/);
   assert.equal(prod.assets.binding, 'ASSETS');
