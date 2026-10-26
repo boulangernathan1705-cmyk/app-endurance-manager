@@ -46,9 +46,12 @@ qu'avec un laissez-passer de quelques minutes signé par le site (`shared/relay-
 2. Choisir un secret d'au moins 32 caractères et le poser des deux côtés :
    `npx wrangler secret put RELAY_SECRET --config wrangler.relay.jsonc` (relais), puis sur le Worker du site (dev ou
    prod) la variable secrète `RELAY_SECRET` avec la même valeur.
-3. Sur le Worker du site, la variable `RELAY_URL` = l'adresse du relais (`https://endurance-manager-relais.<compte>.workers.dev`).
+3. L'adresse du relais (`https://endurance-manager-relais.<compte>.workers.dev`) s'écrit dans `RELAY_ORIGIN`
+   (`shared/relay-pass.mjs`) : le site la donne avec les laissez-passer et l'autorise aux pages (`connect-src`). Une
+   variable `RELAY_URL` sur le Worker la remplace au besoin.
 
-Sans `RELAY_URL` ni `RELAY_SECRET`, rien ne change : le plugin et les pages se connectent au site comme avant.
+Le site de test a ses propres salons sur le même relais (`dev:<communauté>`). Sans adresse ou sans `RELAY_SECRET`, rien
+ne change : le plugin et les pages se connectent au site comme avant.
 
 ## Données
 

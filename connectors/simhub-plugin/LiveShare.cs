@@ -190,12 +190,25 @@ namespace EnduranceManager.SimHub
                     ["connect"] = service.Connect, ["energyRate"] = service.EnergyRate, ["fuelRate"] = service.FuelRate, ["tyres4"] = service.Tyres4,
                     ["tyresAlong"] = service.TyresAlong, ["driver"] = service.Driver, ["driverAlong"] = service.DriverAlong
                 },
-                ["profile"] = profile
+                ["profile"] = profile,
+                // The settings in the car (levels, 0 steps: the car has none), the hybrid and the track limits.
+                ["control"] = new Dictionary<string, object>
+                {
+                    ["tc"] = Level(s.TC, s.TCMax), ["cut"] = Level(s.TCCut, s.TCCutMax), ["slip"] = Level(s.TCSlip, s.TCSlipMax), ["abs"] = Level(s.ABS, s.ABSMax),
+                    ["map"] = Level(s.MotorMap, s.MotorMapMax), ["mig"] = Level(s.Migration, s.MigrationMax),
+                    ["arbF"] = Level(s.AntiSwayFront, s.AntiSwayFrontMax), ["arbR"] = Level(s.AntiSwayRear, s.AntiSwayRearMax),
+                    ["bias"] = s.RearBrakeBias > 0 && s.RearBrakeBias < 1 ? R((1 - s.RearBrakeBias) * 100, 1) : null
+                },
+                ["limits"] = b[ScoringInfo + 352] > 0 ? R((double)s.TrackLimitsSteps / b[ScoringInfo + 352], 2) : null,
+                ["battery"] = s.Battery > 0 ? R(s.Battery * 100, 1) : null, ["regen"] = R(s.Regen, 1), ["delta"] = R(s.DeltaBest, 2),
+                ["water"] = R(s.Water, 1), ["oil"] = R(s.Oil, 1)
             };
             // The outline once per connection (the room keeps it).
             if (needMap && mapPoints != null && mapTrack == s.Track) { top["map"] = mapPoints; needMap = false; }
             return new Snapshot { Top = top, Me = me, Field = field };
         }
+
+        static int? Level(int level, int max) => max > 0 ? level : (int?)null;
 
         // ---------- Only what changed ----------
 

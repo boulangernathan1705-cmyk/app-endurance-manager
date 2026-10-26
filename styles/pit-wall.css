@@ -1,0 +1,156 @@
+/* Mur des stands (mur.html, front/pit-wall.mjs): full screen, PitData's organisation in five tabs. The whole screen
+   for the figures: no site banner or menu, a thin header, the tabs, one panel. Fits 360 px: columns drop, never a
+   horizontal page scroll (wide tables scroll inside their box). Scoped to .pw-body: app.css holds every page. */
+.pw-body {
+  --pw-line: var(--border, #303638);
+  --pw-panel: var(--panel, #121416);
+  --pw-panel2: var(--panel2, #181b1d);
+  --pw-text: var(--text, #f0f3f2);
+  --pw-muted: var(--muted, #99a3a0);
+  --pw-live: #35b978; --pw-warn: #d9a640; --pw-bad: #e5484d; --pw-best: #b98cff; --pw-lap: #5fb7e8; --pw-up: #e4a341;
+  --pw-hyper: #e4002b; --pw-lmp2: #2a7de1; --pw-gt3: #f28c00; --pw-other: #9aa3a7;
+  --pw-speed: #5fb7e8; --pw-gas: #35b978; --pw-brake: #e5484d; --pw-steer: #d9a640;
+  margin: 0;
+  min-height: 100vh;
+  background: var(--bg, #0a0b0c);
+  color: var(--pw-text);
+}
+.pw-body .pw-app { max-width: 1500px; margin: 0 auto; padding: 0 max(16px, env(safe-area-inset-right)) 40px max(16px, env(safe-area-inset-left)); }
+.pw-body button { font: inherit; color: inherit; cursor: pointer; }
+.pw-body button:focus-visible, .pw-body a:focus-visible { outline: 2px solid var(--pw-live); outline-offset: 2px; }
+.pw-body .pw-loading, .pw-body .pw-note { color: var(--pw-muted); font-size: 13px; margin: 10px 0; }
+.pw-body h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: var(--pw-muted); margin: 22px 0 8px; font-weight: 600; }
+.pw-body h2 small { text-transform: none; letter-spacing: 0; margin-left: 6px; color: var(--pw-text); }
+.pw-body small { color: var(--pw-muted); font-weight: 400; }
+
+/* Header */
+.pw-body .pw-head { position: sticky; top: 0; z-index: 3; display: flex; align-items: center; gap: 10px 18px; flex-wrap: wrap; padding: 10px 52px 10px 0; background: var(--bg, #0a0b0c); border-bottom: 1px solid var(--pw-line); }
+.pw-body .pw-logo img { display: block; width: 34px; height: 34px; border-radius: 8px; }
+.pw-body .pw-id { min-width: 0; flex: 1 1 220px; display: grid; }
+.pw-body .pw-id b { font-size: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pw-body .pw-id span { font-size: 12px; color: var(--pw-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pw-body .pw-facts { display: flex; gap: 18px; }
+.pw-body .pw-facts div { display: grid; }
+.pw-body .pw-facts span { font-size: 11px; color: var(--pw-muted); text-transform: uppercase; letter-spacing: .06em; }
+.pw-body .pw-facts b { font-size: 18px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.pw-body .pw-link { display: flex; align-items: center; gap: 7px; font-size: 13px; color: var(--pw-muted); white-space: nowrap; }
+.pw-body .pw-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--pw-muted); }
+.pw-body .pw-dot.on { background: var(--pw-live); box-shadow: 0 0 0 3px rgba(53,185,120,.2); }
+.pw-body .pw-dot.late { background: var(--pw-warn); }
+.pw-body .pw-icon { background: var(--pw-panel); border: 1px solid var(--pw-line); border-radius: 8px; width: 36px; height: 36px; font-size: 17px; line-height: 1; }
+
+/* Cars of the team, then the tabs */
+.pw-body .pw-cars { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.pw-body .pw-cars button { display: inline-flex; align-items: center; gap: 7px; background: var(--pw-panel); border: 1px solid var(--pw-line); border-radius: 99px; padding: 5px 12px 5px 8px; font-size: 13px; }
+.pw-body .pw-cars button[aria-pressed="true"] { border-color: var(--pw-live); }
+.pw-body .pw-cars i { width: 10px; height: 10px; border-radius: 50%; }
+.pw-body .pw-tabs { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; margin: 10px 0 4px; background: var(--pw-panel); border: 1px solid var(--pw-line); border-radius: 10px; padding: 4px; }
+.pw-body .pw-tabs button { background: none; border: 0; border-radius: 7px; padding: 9px 4px; font-size: 14px; font-weight: 600; color: var(--pw-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pw-body .pw-tabs button[aria-selected="true"] { background: var(--pw-panel2); color: var(--pw-text); box-shadow: inset 0 -2px 0 var(--pw-live); }
+.pw-body .pw-short { display: none; }
+
+/* Switches (Général / Relatif / Opposants, classes) */
+.pw-body .pw-bar { display: flex; flex-wrap: wrap; gap: 8px 14px; margin: 12px 0 10px; }
+.pw-body .pw-switch { display: flex; flex-wrap: wrap; gap: 4px; }
+.pw-body .pw-switch button { background: var(--pw-panel); border: 1px solid var(--pw-line); border-radius: 7px; padding: 6px 12px; font-size: 13px; }
+.pw-body .pw-switch button[aria-pressed="true"] { border-color: var(--cls, var(--pw-live)); background: var(--pw-panel2); box-shadow: inset 3px 0 0 var(--cls, var(--pw-live)); }
+
+/* Tables */
+.pw-body .pw-table { overflow-x: auto; border: 1px solid var(--pw-line); border-radius: 10px; background: var(--pw-panel); }
+.pw-body .pw-table table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.pw-body .pw-table th { text-align: left; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--pw-muted); padding: 8px; border-bottom: 1px solid var(--pw-line); white-space: nowrap; }
+.pw-body .pw-table tbody th { text-transform: none; letter-spacing: 0; font-size: 13px; color: var(--pw-text); border-bottom: 1px solid var(--pw-line); }
+.pw-body .pw-table td { padding: 7px 8px; border-bottom: 1px solid var(--pw-line); vertical-align: middle; }
+.pw-body .pw-table tr:last-child td, .pw-body .pw-table tr:last-child th { border-bottom: 0; }
+.pw-body .pw-table tbody tr { box-shadow: inset 3px 0 0 var(--cls, transparent); }
+.pw-body .pw-table tr.us { background: rgba(53,185,120,.12); }
+.pw-body .pw-table tr.us .pw-name b { color: var(--pw-live); }
+.pw-body .pw-table tr.down td { color: var(--pw-lap); }
+.pw-body .pw-table tr.up td { color: var(--pw-up); }
+.pw-body .pw-n { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.pw-body .pw-table th.pw-n { text-align: right; }
+.pw-body .pw-pos { font-weight: 700; font-variant-numeric: tabular-nums; width: 1%; }
+.pw-body .pw-num { color: var(--pw-muted); font-variant-numeric: tabular-nums; width: 1%; }
+.pw-body .pw-name { min-width: 0; max-width: 260px; }
+.pw-body .pw-name b, .pw-body .pw-name small { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 600; }
+.pw-body .pw-name small { font-size: 12px; }
+.pw-body .best { color: var(--pw-best); font-weight: 700; }
+.pw-body .pw-cls { display: inline-block; min-width: 34px; text-align: center; padding: 2px 6px; border-radius: 5px; font-size: 11px; font-weight: 700; background: var(--cls); color: #fff; white-space: nowrap; }
+.pw-body .pw-pit { display: inline-block; font-size: 10px; padding: 1px 5px; border-radius: 4px; background: var(--pw-warn); color: #111; font-weight: 700; }
+.pw-body .pw-tank { display: inline-block; min-width: 38px; padding: 1px 6px; border-radius: 4px; background: linear-gradient(90deg, rgba(53,185,120,.35) var(--tank), rgba(255,255,255,.06) var(--tank)); }
+
+/* Tiles */
+.pw-body .pw-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.pw-body .pw-tiles.big { grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); margin-top: 14px; }
+.pw-body .pw-tile { background: var(--pw-panel); border: 1px solid var(--pw-line); border-radius: 10px; padding: 10px 12px; display: grid; gap: 2px; min-width: 0; }
+.pw-body .pw-tile span { font-size: 11px; color: var(--pw-muted); text-transform: uppercase; letter-spacing: .05em; }
+.pw-body .pw-tile b { font-size: 22px; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pw-body .pw-tiles.big .pw-tile b { font-size: 28px; }
+.pw-body .pw-tile small { font-size: 12px; }
+.pw-body .pw-tile.good b { color: var(--pw-live); }
+.pw-body .pw-tile.bad b { color: var(--pw-bad); }
+.pw-body .pw-tile.purple b { color: var(--pw-best); }
+
+/* Tyres and brakes, as on the car */
+.pw-body .pw-wheels { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; max-width: 640px; }
+.pw-body .pw-wheel { background: var(--pw-panel); border: 1px solid var(--pw-line); border-radius: 10px; padding: 10px 12px; }
+.pw-body .pw-wheel span { font-size: 11px; color: var(--pw-muted); font-weight: 700; }
+.pw-body .pw-wheel > b { display: block; font-size: 24px; font-variant-numeric: tabular-nums; }
+.pw-body .pw-wheel dl { display: grid; gap: 2px; margin: 8px 0 0; font-size: 13px; }
+.pw-body .pw-wheel dl div { display: flex; justify-content: space-between; gap: 8px; }
+.pw-body .pw-wheel dt { color: var(--pw-muted); }
+.pw-body .pw-wheel dd { margin: 0; font-variant-numeric: tabular-nums; }
+
+/* Telemetry */
+.pw-body .pw-pedals { display: grid; gap: 8px; margin-top: 8px; max-width: 640px; }
+.pw-body .pw-pedal { display: grid; grid-template-columns: 54px 1fr 42px; align-items: center; gap: 10px; font-size: 13px; }
+.pw-body .pw-pedal span { color: var(--pw-muted); }
+.pw-body .pw-pedal i { height: 14px; border-radius: 4px; background: linear-gradient(90deg, var(--bar) var(--level), var(--pw-panel2) var(--level)); border: 1px solid var(--pw-line); }
+.pw-body .pw-pedal.gas { --bar: var(--pw-gas); }
+.pw-body .pw-pedal.brake { --bar: var(--pw-brake); }
+.pw-body .pw-pedal b { text-align: right; font-variant-numeric: tabular-nums; }
+.pw-body .pw-curve, .pw-body .pw-graph { margin: 0 0 10px; background: var(--pw-panel); border: 1px solid var(--pw-line); border-radius: 10px; padding: 10px 12px; }
+.pw-body .pw-curve figcaption, .pw-body .pw-graph figcaption { font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+.pw-body .pw-curve canvas { display: block; width: 100%; height: 120px; }
+.pw-body .pw-graph svg { display: block; width: 100%; height: 130px; }
+.pw-body .pw-graph rect { fill: var(--pw-lap); }
+.pw-body .pw-graph rect.low { fill: var(--pw-best); }
+.pw-body .pw-graph rect.pit { fill: var(--pw-muted); opacity: .45; }
+
+/* Map */
+.pw-body .pw-map { display: block; width: 100%; max-height: calc(100vh - 190px); margin-top: 12px; }
+.pw-body .pw-map .road { fill: none; stroke: #2b3033; stroke-width: 22; stroke-linejoin: round; stroke-linecap: round; }
+.pw-body .pw-map .edge { fill: none; stroke: #4a5257; stroke-width: 2; }
+.pw-body .pw-map circle { stroke: #0a0b0c; stroke-width: 3; }
+.pw-body .pw-map text { font-size: 18px; font-weight: 700; fill: #fff; text-anchor: middle; pointer-events: none; }
+.pw-body .pw-map .us circle { stroke: #fff; stroke-width: 4; }
+.pw-body .pw-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12px; color: var(--pw-muted); margin-top: 6px; }
+.pw-body .pw-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; vertical-align: -1px; }
+.pw-body .pw-legend i.us { outline: 2px solid var(--pw-text); }
+
+/* Nobody on track, errors */
+.pw-body .pw-empty { max-width: 560px; margin: 12vh auto 0; text-align: center; }
+.pw-body .pw-empty h1 { font-size: 22px; }
+.pw-body .pw-empty p { color: var(--pw-muted); line-height: 1.5; }
+.pw-body .pw-button { display: inline-block; margin-top: 10px; padding: 10px 16px; border-radius: 8px; background: var(--pw-live); color: #06140d; font-weight: 700; text-decoration: none; }
+
+@media (max-width: 900px) {
+  .pw-body .pw-opt2 { display: none; }
+  .pw-body .pw-facts { order: 3; width: 100%; justify-content: space-between; }
+}
+@media (max-width: 640px) {
+  .pw-body .pw-long { display: none; }
+  .pw-body .pw-short { display: inline; }
+  .pw-body .pw-opt { display: none; }
+  .pw-body .pw-tabs button { font-size: 13px; padding: 9px 2px; }
+  .pw-body .pw-table table { font-size: 13px; }
+  .pw-body .pw-table td, .pw-body .pw-table th { padding: 6px 4px; }
+  .pw-body .pw-name { max-width: 108px; }
+  .pw-body .pw-tank { min-width: 30px; padding: 1px 4px; }
+  .pw-body .pw-id { flex: 1 1 0; }
+  .pw-body .pw-link { order: 4; }
+  .pw-body .pw-icon { display: none; }
+  .pw-body .pw-tiles.big .pw-tile b { font-size: 22px; }
+  .pw-body .pw-tiles, .pw-body .pw-tiles.big { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .pw-body .pw-facts b { font-size: 16px; }
+}

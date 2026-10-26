@@ -6,6 +6,11 @@ const encoder = new TextEncoder();
 const base64url = bytes => btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 const unbase64url = text => Uint8Array.from(atob(text.replace(/-/g, '+').replace(/_/g, '/')), char => char.charCodeAt(0));
 
+// The relay's address (its workers.dev on the second Cloudflare account), written here once it is deployed: the site
+// hands it out with the passes and lets the pages connect to it (connect-src, scripts/build.mjs). Empty: no relay.
+export const RELAY_ORIGIN = '';
+export const relaySocketOrigin = (origin = RELAY_ORIGIN) => origin ? origin.replace(/^http/, 'ws').replace(/\/+$/, '') : '';
+
 // How long a pass opens a connection: the time to connect. The room then asks to reconnect every few hours.
 export const PASS_FOR = 5 * 60_000;
 

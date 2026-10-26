@@ -236,7 +236,12 @@ test('plugin 2.0: the last second of our car goes to the pages watching with the
   const driver = socket('driver', {role:'driver', user:'u1', name:'Nathan', until, conn:'c1'});
   const viewer = socket('viewer', {role:'viewer', user:'u2', until, watch:true, map:false});
   const frames = Array.from({length:10}, (_, k) => [6000 + k * 7.4, 266.4, 100, 0, -3, 6]);
-  await room.webSocketMessage(driver, JSON.stringify({...snap(), v:2, full:true, tm:frames}));
+  const settings = {control:{tc:4, cut:3, slip:5, abs:7, map:2, mig:1, arbF:3, arbR:4, bias:54.2, odd:9}, limits:1.5, battery:62, regen:180, delta:-0.21, water:88, oil:102};
+  await room.webSocketMessage(driver, JSON.stringify({...snap({me:settings}), v:2, full:true, tm:frames}));
+  const shown = JSON.parse(viewer.sent.at(-1)).feed;
+  assert.deepEqual(shown.snap.me.control, {tc:4, cut:3, slip:5, abs:7, map:2, mig:1, arbF:3, arbR:4, bias:54.2}, 'the settings in the car, nothing else');
+  assert.deepEqual([shown.snap.me.battery, shown.snap.me.delta, shown.snap.me.water], [62, -0.21, 88]);
+  assert.ok(Array.isArray(shown.ours.laps), 'our laps for the lap history');
   assert.deepEqual(JSON.parse(viewer.sent.at(-1)).tm, cleanFrames(frames));
   await room.webSocketMessage(driver, JSON.stringify({v:2, et:1001, me:{ve:58}, tm:frames.slice(0, 3)}));
   assert.equal(JSON.parse(viewer.sent.at(-1)).tm.length, 3, 'with the changes too');
@@ -349,6 +354,13 @@ test('the plugin and the pages reach the room only through their checks', async 
   assert.match(page, /<main id="live-app"/);
   assert.doesNotMatch(page, /<script>|\son[a-z]+=/i, 'no inline script nor handler (CSP)');
   assert.doesNotMatch(readFileSync(new URL('../front/live-page.mjs', import.meta.url), 'utf8'), /\son[a-z]+="/i);
+  // The new mur (PitData's organisation): full screen, five tabs, the same checks.
+  const wall = readFileSync(new URL('../mur.html', import.meta.url), 'utf8');
+  assert.match(wall, /<main id="pw-app"/);
+  assert.doesNotMatch(wall, /<script>|\son[a-z]+=/i);
+  const wallCode = readFileSync(new URL('../front/pit-wall.mjs', import.meta.url), 'utf8');
+  assert.doesNotMatch(wallCode, /\son[a-z]+="/i);
+  for (const tab of ['board', 'chrono', 'car', 'tele', 'map']) assert.match(wallCode, new RegExp(`\\['${tab}', '`));
 });
 
 test('without the game\'s map, the outline is the path the field drives, drawn as far as it is known', () => {

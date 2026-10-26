@@ -9,7 +9,7 @@ import {fail, json, now, id, token, hash, rateLimit, body, siteOrigin} from './c
 import {communityAccess, requirePermission} from './access.mjs';
 import {communityById} from './community.mjs';
 import {openLive} from './live.mjs';
-import {signPass, relaySocketUrl} from '../shared/relay-pass.mjs';
+import {signPass, relaySocketUrl, RELAY_ORIGIN} from '../shared/relay-pass.mjs';
 import {cleanSession, CONDITIONS, CONDITION_SQL, CLEAN_RATIO, STINT_MIN, WHEELS, SETUP_MAX, NIGHT_BELOW, linkCode} from '../shared/combos.mjs';
 
 export const combosEnabled = community => community?.modules?.combos === true;
@@ -403,10 +403,13 @@ export async function combosPlugin(path, request, env) {
 
 // A pass for the live relay, valid a few minutes: where to connect, or 404 while the site has no relay (the plugin and
 // the page then connect to the site itself).
+// The dev site (a copy of production's data, same communities) gets rooms of its own on the same relay.
 async function relayPass(env, communityId, who) {
-  if (!env.RELAY_URL || !env.RELAY_SECRET) fail(404, 'Pas de relais en direct sur ce site.');
-  const pass = await signPass(env.RELAY_SECRET, {c:communityId, r:who.Role, u:who.User, n:who.Name || '', col:who.Color || ''});
-  return json({url:relaySocketUrl(env.RELAY_URL, pass)});
+  const relay = env.RELAY_URL || RELAY_ORIGIN;
+  if (!relay || !env.RELAY_SECRET) fail(404, 'Pas de relais en direct sur ce site.');
+  const room = env.SITE_ENV === 'development' ? `dev:${communityId}` : communityId;
+  const pass = await signPass(env.RELAY_SECRET, {c:room, r:who.Role, u:who.User, n:who.Name || '', col:who.Color || ''});
+  return json({url:relaySocketUrl(relay, pass)});
 }
 
 // ---------- The site (signed in, « combos » permission) ----------
