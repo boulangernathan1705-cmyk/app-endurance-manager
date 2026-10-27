@@ -97,6 +97,8 @@ export async function spaceOut(response) {
 async function discord(env, method, path, body, budget = {left:12}) {
   if (!String(env.DISCORD_BOT_TOKEN || '').trim()) throw Object.assign(new Error('Le bot du site n’est pas configuré.'), {status:401});
   if (--budget.left < 0) throw Object.assign(new Error('Lot terminé ; les autres événements seront traités au prochain passage.'), {budget:true});
+  // Something made, moved or deleted on the server (not a message): its list of channels is read again.
+  if (method !== 'GET' && !path.includes('/messages')) budget.moved = true;
   const call = () => fetch(API + path, {method, signal:AbortSignal.timeout(8000),
     headers:{Authorization:`Bot ${env.DISCORD_BOT_TOKEN}`, ...(body ? {'Content-Type':'application/json'} : {})}, body:body ? JSON.stringify(body) : undefined});
   let response = await call();
@@ -662,6 +664,7 @@ async function syncLocked(env,timestamp,community,settings, test = false, budget
   const events = await raceEvents(env, community);
   const layout = parseLayout(settings.layout), sameServer = settings.guild_id === community.discordGuildId;
   let channels = null, wanted = [];
+  budget.moved = false;
   if (layout && sameServer) {
     // The bot's own categories first: the races, the week's channels and the voices go in them.
     channels = await discord(env,'GET',`/guilds/${settings.guild_id}/channels`,null,budget);
@@ -751,7 +754,8 @@ async function syncLocked(env,timestamp,community,settings, test = false, budget
   }
   if (layout) {
     // The server as it is now: the categories in their place, the bot's empty ones no longer wanted deleted.
-    const current = await discord(env,'GET',`/guilds/${settings.guild_id}/channels`,null,budget);
+    // Nothing changed on the server since the list read at the start: the same list (one request less per pass).
+    const current = channels && !budget.moved ? channels : await discord(env,'GET',`/guilds/${settings.guild_id}/channels`,null,budget);
     await placeCategories(env,community,settings.guild_id,current,null,settings,budget);
     if (await removeCategories(env,community,settings,current,wanted,budget)) more = true;
   }
