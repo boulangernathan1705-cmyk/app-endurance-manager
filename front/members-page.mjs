@@ -173,7 +173,7 @@ function discordForm(setup, settings) {
     <div data-discord-questions></div>
     <div class="discord-end">
       <div class="discord-sketch" data-discord-sketch></div>
-      <p class="members-help">Le bot crée lui-même ses catégories, salons et vocaux : il lui faut le droit « Gérer les salons » sur ton serveur.${invite ? ` <a href="${esc(invite)}" target="_blank" rel="noopener">Inviter le bot avec ses droits</a>` : ''}</p>
+      <p class="members-help">Le bot crée lui-même ses catégories, salons et vocaux.${invite ? ` <a href="${esc(invite)}" target="_blank" rel="noopener">Inviter le bot avec ses droits</a> : il a tout ce qu’il faut, sans être administrateur.` : ''} Dans une catégorie privée, ajoute en plus une exception pour lui (le rôle « Endurance Manager ») : les autres accès restent privés.</p>
       <div class="setup-actions"><button type="submit" class="primary-button">${config?.enabled ? 'Enregistrer' : 'Activer'}</button><button type="button" class="secondary-button" data-discord-preview>Voir les messages</button><button type="button" class="secondary-button" data-discord-destinations>Actualiser les salons</button>${config?.lastError ? '<button type="button" class="secondary-button" data-discord-repair>Réparer</button>' : ''}${config?.enabled || leaving ? '<button type="button" class="danger-button" data-discord-remove>Tout retirer</button>' : ''}<span class="settings-status" role="status" aria-live="polite"></span></div>
       <p class="members-help">${config?.enabled ? 'Si tu changes d’avis, le bot retire ce qu’il avait créé et refait selon tes nouveaux choix. Les messages sont modifiés sans notification.' : 'Rien n’est publié avant « Activer ».'}</p>
       <div data-recap-preview class="recap-live-preview"></div>
@@ -190,6 +190,8 @@ function discordRead(form) {
   if (radio('split')) answers.split = radio('split') === 'apart';
   if (radio('voices')) answers.voices = radio('voices') === 'yes';
   if (radio('pit')) answers.pit = radio('pit');
+  if (radio('copy')) answers.copy = radio('copy') === 'private';
+  if (radio('pitCopy')) answers.pitCopy = radio('pitCopy') === 'private';
   for (const name of ['showWeek','showEvents','reminders']) if (field(name)) answers[name] = field(name).checked;
   for (const name of ['under','events','pitAt']) if (field(name)) answers[name] = field(name).value;
   answers.week ||= {};
@@ -198,19 +200,43 @@ function discordRead(form) {
 }
 const discordSims = answers => answers.sims === 'all' ? ['lmu','iracing'] : [answers.sims];
 const discordApart = answers => answers.sims === 'all' && answers.split;
-const discordUsesBot = answers => answers.mode === 'events' || [...(discordApart(answers) ? discordSims(answers).map(sim => answers.week?.[sim]) : [answers.week?.all]), answers.events].includes('bot');
+const SIM_NAMES = {lmu:'LMU', iracing:'iRacing'};
+// Where the events go: apart, the bot's category is the one of a sim (« LMU » or « iRacing »).
+const discordEvents = answers => discordApart(answers) && answers.events === 'bot' ? `bot-${discordSims(answers).find(sim => answers.week?.[sim] === 'bot') || 'lmu'}`
+  : !discordApart(answers) && answers.events?.startsWith('bot-') ? 'bot' : answers.events || '';
+// The categories the bot makes for the races and the week's channels (as server/discord-layout.mjs).
+function discordBotCategories(answers) {
+  if (answers.mode === 'events') return discordApart(answers) ? ['LMU','iRacing'] : ['Endurance Manager'];
+  if (discordApart(answers)) return discordSims(answers).filter(sim => answers.week?.[sim] === 'bot' || discordEvents(answers) === `bot-${sim}`).map(sim => SIM_NAMES[sim]);
+  return [answers.week?.all, discordEvents(answers)].includes('bot') ? ['Endurance Manager'] : [];
+}
+const discordUsesBot = answers => discordBotCategories(answers).length > 0;
+// Apart, each sim's channel is « endurances-de-la-semaine »; both just below the same place, they need their own names.
+const discordWeekChannel = (answers, sim) => {
+  const here = answers.week?.[sim], other = answers.week?.[sim === 'lmu' ? 'iracing' : 'lmu'];
+  return here && here !== 'bot' && here === other ? `endurances-${sim}-de-la-semaine` : 'endurances-de-la-semaine';
+};
+const quoted = names => names.map(name => `« ${name} »`).join(' et ');
 // The questions these answers need, in order.
 function discordQuestions(form, answers) {
   const list = form._destinations, solo = form.dataset.solo === 'true', race = answers.mode === 'events', apart = discordApart(answers);
   const places = list ? discordPlaces(list) : [];
   const radio = (name, value, label, checked) => `<label class="discord-pill"><input type="radio" name="${name}" value="${value}" ${checked ? 'checked' : ''}> ${label}</label>`;
-  const known = (value, label) => value && !['top','bot','same'].includes(value) && !places.some(item => item.id === value) ? `<option value="${esc(value)}" selected>${esc(label || 'Choix actuel')}</option>` : '';
-  const option = (item, value, inside = false) => `<option value="${esc(item.id)}" ${item.id === value ? 'selected' : ''}>${item.type === 0 ? `${inside && item.parentId ? '   ' : ''}# ` : '📁 '}${esc(item.name)}${item.ready === false ? ' · le bot n’a pas ses droits' : ''}</option>`;
-  // A place for a recap: not shown, the bot's category, or just below a channel or category of the server.
-  const place = (name, value, extra = '') => `<select name="${name}"><option value="" ${!value ? 'selected' : ''}>Ne pas afficher</option>${extra}
-    <option value="bot" ${value === 'bot' ? 'selected' : ''}>Dans la catégorie du bot</option><optgroup label="Ou juste sous…">${places.map(item => option(item, value, true)).join('')}${known(value)}</optgroup></select>`;
-  const category = (name, value) => `<select name="${name}"><option value="top" ${value === 'top' ? 'selected' : ''}>Le haut du serveur</option>${places.filter(item => item.type === 4).map(item => option(item, value)).join('')}${known(value)}</select>`;
+  const known = (value, label) => value && !['top','bot','same','bot-lmu','bot-iracing'].includes(value) && !places.some(item => item.id === value) ? `<option value="${esc(value)}" selected>${esc(label || 'Choix actuel')}</option>` : '';
+  const option = (item, value, inside = false, rights = true) => `<option value="${esc(item.id)}" ${item.id === value ? 'selected' : ''}>${item.type === 0 ? `${inside && item.parentId ? '   ' : ''}# ` : '📁 '}${esc(item.name)}${item.type === 4 && item.private ? ' · privée' : ''}${rights && item.ready === false ? ' · le bot n’a pas ses droits' : ''}</option>`;
+  // A place for a recap: not shown, a category the bot makes, or just below a channel or category of the server.
+  const place = (name, value, extra = '', bots = [['bot', apart && name.startsWith('week-') ? SIM_NAMES[name.slice(5)] : 'Endurance Manager']]) => `<select name="${name}"><option value="" ${!value ? 'selected' : ''}>Ne pas afficher</option>${extra}
+    ${bots.map(([key, label]) => `<option value="${key}" ${value === key ? 'selected' : ''}>Dans « ${label} », créée par le bot</option>`).join('')}<optgroup label="Ou juste sous…">${places.map(item => option(item, value, true)).join('')}${known(value)}</optgroup></select>`;
+  // rights: only where the bot writes inside; placing its own category just below needs no rights there.
+  const category = (name, value, rights = false) => `<select name="${name}"><option value="top" ${value === 'top' ? 'selected' : ''}>Le haut du serveur</option>${places.filter(item => item.type === 4).map(item => option(item, value, false, rights)).join('')}${known(value)}</select>`;
   const help = value => { const chosen = places.find(item => item.id === value); return chosen?.ready === false ? discordRightsHelp(chosen) : ''; };
+  // Below a private category, the bot's own one is private like it (its rights copied) or open to all: the admins choose.
+  const privacy = (name, at, label, value) => {
+    const chosen = places.find(item => item.id === at && item.type === 4);
+    if (!chosen?.private) return '';
+    return `<div class="discord-pills">${radio(name,'private',`Privée comme « ${esc(chosen.name)} »`,value !== false)}${radio(name,'public','Publique',value === false)}</div>
+      <p class="members-help">${value !== false ? `Seuls ceux qui voient « ${esc(chosen.name)} » verront ${label}.` : `Tout le serveur verra ${label}.`}</p>`;
+  };
   const row = (title, sub, control, after = '') => `<label class="discord-row"><span><strong>${title}</strong>${sub ? `<small>${sub}</small>` : ''}</span>${control}</label>${after}`;
   const questions = [
     ['Comment ranger les courses ?', `<div class="recap-cards">${Object.entries(DISCORD_MODES).map(([value, [title, text]]) => `<label class="recap-card"><input type="radio" name="mode" value="${value}" ${answers.mode === value ? 'checked' : ''}><span><strong>${title}</strong><small>${text}</small></span></label>`).join('')}</div>`],
@@ -218,18 +244,24 @@ function discordQuestions(form, answers) {
   if (answers.sims === 'all') questions.push([race ? 'LMU et iRacing dans la même catégorie ?' : 'LMU et iRacing dans le même salon ?',
     `<div class="discord-pills">${radio('split','together','Ensemble',!answers.split)}${radio('split','apart','Séparés',answers.split)}</div>
     <p class="members-help">${race ? (answers.split ? 'Le bot crée « LMU » et « iRacing », chacune suivie de ses courses.' : 'Le bot crée « Endurance Manager », suivie des courses : LMU d’abord, puis iRacing, chacune par date.') : (answers.split ? 'Chaque simu a son salon.' : 'Un message par simu dans le même salon.')}</p>`]);
-  if (race) questions.push(['Qu’afficher dans la catégorie du bot ?',
+  if (race) questions.push([apart ? 'Qu’afficher dans « LMU » et « iRacing » ?' : 'Qu’afficher dans « Endurance Manager » ?',
     `<label class="discord-check"><input type="checkbox" name="showWeek" ${answers.showWeek ? 'checked' : ''}><span><strong># endurances-de-la-semaine</strong><small>Les courses de la semaine, un message par simu.</small></span></label>
     ${solo ? `<label class="discord-check"><input type="checkbox" name="showEvents" ${answers.showEvents ? 'checked' : ''}><span><strong># ${discordEventChannel(form)}</strong><small>Les events de la semaine.</small></span></label>` : ''}`]);
   else {
-    questions.push(['Où mettre les endurances de la semaine ?', (apart ? discordSims(answers).map(sim => row(`# ${sim}-de-la-semaine`, '', place(`week-${sim}`, answers.week?.[sim] || ''), help(answers.week?.[sim])))
-      : [row('# endurances-de-la-semaine', discordSims(answers).length > 1 ? 'LMU puis iRacing, un message chacun.' : '', place('week-all', answers.week?.all || ''), help(answers.week?.all))]).join('')]);
-    if (solo) questions.push(['Où mettre les events de la semaine ?', row(`# ${discordEventChannel(form)}`, '', place('events', answers.events || '', `<option value="same" ${answers.events === 'same' ? 'selected' : ''}>Avec les endurances</option>`), help(answers.events))]);
+    questions.push(['Où mettre les endurances de la semaine ?', (apart ? discordSims(answers).map(sim => row(SIM_NAMES[sim], `# ${discordWeekChannel(answers, sim)}`, place(`week-${sim}`, answers.week?.[sim] || ''), help(answers.week?.[sim])))
+      : [row('# endurances-de-la-semaine', discordSims(answers).length > 1 ? 'LMU puis iRacing, un message chacun.' : '', place('week-all', answers.week?.all || ''), help(answers.week?.all))]).join('')
+      + `<p class="members-help">${apart ? 'Dans « LMU » ou « iRacing » : le bot crée cette catégorie pour la simu, tu choisis ensuite où la placer.' : 'Dans « Endurance Manager » : le bot crée sa catégorie, tu choisis ensuite où la placer.'} Juste sous un salon : le bot crée le sien juste après, dans la même catégorie. Sous une catégorie : en tête de celle-ci, avec ses droits.</p>`]);
+    const events = discordEvents(answers);
+    if (solo) questions.push(['Où mettre les events de la semaine ?', row(`# ${discordEventChannel(form)}`, '', place('events', events, `<option value="same" ${events === 'same' ? 'selected' : ''}>Avec les endurances</option>`, apart ? discordSims(answers).map(sim => [`bot-${sim}`, SIM_NAMES[sim]]) : undefined), help(events))]);
   }
-  if (discordUsesBot(answers)) questions.push(['Où placer la catégorie du bot ?', row(race && apart ? '« LMU » et « iRacing »' : '« Endurance Manager »', race ? 'Juste sous cette catégorie, puis les catégories des courses.' : 'Juste sous cette catégorie.', category('under', answers.under || 'top'))]);
+  const made = quoted(discordBotCategories(answers)), several = discordBotCategories(answers).length > 1;
+  if (discordUsesBot(answers)) questions.push([several ? 'Où placer les catégories du bot ?' : 'Où placer la catégorie du bot ?', row(made, race ? 'Juste sous cette catégorie, puis les catégories des courses.' : 'Juste sous cette catégorie.', category('under', answers.under || 'top'))
+    + privacy('copy', answers.under, made, answers.copy)
+    + `<p class="members-help">Le bot n’a pas besoin de droits sur la catégorie choisie : il se place juste en dessous. Une catégorie privée est signalée « privée » : tu choisis alors si ${several ? 'les siennes restent publiques ou deviennent privées' : 'la sienne reste publique ou devient privée'} comme elle.</p>`]);
   questions.push(['Des vocaux d’équipage ?', `<div class="discord-pills">${radio('voices','yes','Oui',answers.voices)}${radio('voices','no','Non',!answers.voices)}</div>
     ${answers.voices && !race ? `<div class="discord-pills">${radio('pit','bot','Le bot crée « 🎙️ Pit talk »',answers.pit !== 'existing')}${radio('pit','existing','Dans une catégorie existante',answers.pit === 'existing')}</div>
-      ${row(answers.pit === 'existing' ? 'Vocaux d’équipage' : '🎙️ Pit talk', answers.pit === 'existing' ? 'Le bot les crée dans' : 'Le bot la crée juste sous', category('pitAt', answers.pitAt || 'top'), answers.pit === 'existing' ? help(answers.pitAt) : '')}` : ''}
+      ${row(answers.pit === 'existing' ? 'Vocaux d’équipage' : '🎙️ Pit talk', answers.pit === 'existing' ? 'Le bot les crée dans' : 'Le bot la crée juste sous', category('pitAt', answers.pitAt || 'top', answers.pit === 'existing'), answers.pit === 'existing' ? help(answers.pitAt) : privacy('pitCopy', answers.pitAt, '« 🎙️ Pit talk »', answers.pitCopy))}` : ''}
+    ${answers.voices && !race && answers.pit === 'existing' ? '<p class="members-help">Si cette catégorie est privée, ajoute sur Discord une exception pour le bot (le rôle « Endurance Manager ») : les vocaux qu’il y crée restent privés comme elle.</p>' : ''}
     <p class="members-help">${!answers.voices ? 'Pas de vocal : les équipages s’organisent ailleurs.' : race ? 'Dans la catégorie de sa course, nommé « Équipage A ». Supprimé 2 h après la course.' : 'Nommés « LMU · 6h de Spa · Équipage A », LMU puis iRacing, par date. Supprimés 2 h après la course.'}</p>
     <label class="discord-check"><input type="checkbox" name="reminders" ${answers.reminders ? 'checked' : ''}><span><strong>Rappels avant le départ</strong><small>${answers.voices ? '24 h avant dans la cloche du site, puis 24 h et 1 h avant dans le chat du vocal.' : '24 h avant dans la cloche du site.'}</small></span></label>`]);
   return questions;
@@ -258,7 +290,8 @@ function discordRightsHelp(destination) {
   // Below a channel, the bot makes its own in that channel's category: the rights count there.
   const category = destination.type === 4 ? destination.name : destination.parentName;
   const where = category ? `clic droit sur la catégorie « ${esc(category)} » › Modifier la catégorie › Permissions › « + » › Endurance Manager` : 'Paramètres du serveur › Rôles › Endurance Manager';
-  return `<p class="setup-note setup-error discord-rights">Le bot n’a pas ses droits ici. Sur Discord : ${where}, puis coche ${esc((destination.missing || []).join(', '))}. Reviens ensuite sur « Actualiser les salons ».</p>`;
+  const why = category && destination.private ? `« ${esc(category)} » est privée : ajoute une exception pour le bot, les autres accès restent privés.` : 'Le bot n’a pas ses droits ici.';
+  return `<p class="setup-note setup-error discord-rights">${why} Sur Discord : ${where}, puis coche ${esc((destination.missing || []).join(', '))}. Reviens ensuite sur « Actualiser les salons ».</p>`;
 }
 // A sketch of the server with these answers (example races and crews); what the bot makes is highlighted.
 function discordSketch(form, answers = discordRead(form)) {
@@ -272,27 +305,33 @@ function discordSketch(form, answers = discordRead(form)) {
   const bot = name => ({name, bot:true});
   const raceGroup = sim => ({name:RACES[sim][0], bot:true, items:[bot('# infos-de-la-course'), ...(answers.voices ? RACES[sim][1].map(crew => bot(`🔊 ${crew}`)) : [])]});
   const eventName = `# ${discordEventChannel(form)}`;
-  const botCat = {name:'Endurance Manager', bot:true, items:[]};
+  const isPrivate = id => list.some(item => item.id === id && item.type === 4 && item.private);
+  const lock = (copy, at) => copy !== false && isPrivate(at) ? ' 🔒' : '';
+  const botCat = {name:`Endurance Manager${lock(answers.copy, answers.under)}`, bot:true, items:[]};
+  const simCats = Object.fromEntries(sims.map(sim => [sim, {name:`${SIM_NAMES[sim]}${lock(answers.copy, answers.under)}`, bot:true, items:[]}]));
   if (race) {
-    const blocks = apart ? sims.map(sim => ({name:sim === 'lmu' ? 'LMU' : 'iRacing', bot:true, items:[...(answers.showWeek ? [bot('# endurances-de-la-semaine')] : []), ...(solo && answers.showEvents ? [bot(eventName)] : [])]}))
+    const blocks = apart ? sims.map(sim => ({name:`${sim === 'lmu' ? 'LMU' : 'iRacing'}${lock(answers.copy, answers.under)}`, bot:true, items:[...(answers.showWeek ? [bot('# endurances-de-la-semaine')] : []), ...(solo && answers.showEvents ? [bot(eventName)] : [])]}))
       : [{...botCat, items:[...(answers.showWeek ? [bot('# endurances-de-la-semaine')] : []), ...(solo && answers.showEvents ? [bot(eventName)] : [])]}];
     after(answers.under || 'top', ...(apart ? blocks.flatMap((block, index) => [block, raceGroup(sims[index])]) : [blocks[0], ...sims.map(raceGroup)]));
   } else {
-    const placeIn = (value, name) => {
+    const placeIn = (value, name, sim = null) => {
       if (!value) return;
-      if (value === 'bot') { botCat.items.push(bot(name)); return; }
+      if (value === 'bot') { (apart && sim ? simCats[sim] : botCat).items.push(bot(name)); return; }
+      if (value.startsWith('bot-')) { simCats[value.slice(4)]?.items.push(bot(name)); return; }
       const group = groups[at(value)];
       if (group) { group.items.unshift(bot(name)); return; }
       for (const item of groups) { const index = item.items.findIndex(text => text.id === value); if (index >= 0) { item.items.splice(index + 1, 0, bot(name)); return; } }
     };
-    const channels = apart ? sims.map(sim => [answers.week?.[sim], `# ${sim}-de-la-semaine`]) : [[answers.week?.all, '# endurances-de-la-semaine']];
-    for (const [value, name] of channels) placeIn(value, name);
-    if (solo && answers.events && answers.events !== 'same') placeIn(answers.events, eventName);
-    if (botCat.items.length) after(answers.under || 'top', botCat);
+    const channels = apart ? sims.map(sim => [answers.week?.[sim], `# ${discordWeekChannel(answers, sim)}`, sim]) : [[answers.week?.all, '# endurances-de-la-semaine']];
+    for (const [value, name, sim] of channels) placeIn(value, name, sim);
+    const events = discordEvents(answers);
+    if (solo && events && events !== 'same') placeIn(events, eventName);
+    const made = [botCat, ...Object.values(simCats)].filter(group => group.items.length);
+    if (made.length) after(answers.under || 'top', ...made);
     if (answers.voices) {
       const voices = sims.flatMap(sim => RACES[sim][1].map(crew => bot(`🔊 ${sim === 'lmu' ? 'LMU · 6h de Spa' : 'iRacing · 8h de Watkins Glen'} · ${crew}`)));
       if (answers.pit === 'existing') (groups[at(answers.pitAt || 'top')] || groups[0]).items.push(...voices);
-      else after(answers.pitAt || 'top', {name:'🎙️ Pit talk', bot:true, items:voices});
+      else after(answers.pitAt || 'top', {name:`🎙️ Pit talk${lock(answers.pitCopy, answers.pitAt)}`, bot:true, items:voices});
     }
   }
   const lines = groups.flatMap(group => [...(group.name ? [`<li class="is-category${group.bot ? ' is-bot' : ''}">${esc(group.name)}</li>`] : []), ...group.items.map(item => `<li class="${item.name.startsWith('🔊') ? 'is-voice' : 'is-text'}${item.bot ? ' is-bot' : ''}">${esc(item.name)}</li>`)]);
@@ -305,7 +344,12 @@ async function loadDiscordDestinations(form) {
   form._server = result.server || null;
   discordRefresh(form);
 }
-const discordInput = form => ({layout:discordRead(form)});
+// Copying the rights only means something below a private category.
+function discordInput(form) {
+  const answers = discordRead(form), list = form._destinations || [];
+  const isPrivate = id => list.some(item => item.id === id && item.type === 4 && item.private);
+  return {layout:{...answers, events:discordEvents(answers), copy:answers.copy !== false && isPrivate(answers.under), pitCopy:answers.pitCopy !== false && isPrivate(answers.pitAt)}};
+}
 const recapPreviewText = value => esc(String(value || '').replace(/<t:(\d+):[A-Za-z]>/g,(_,unix) => new Date(Number(unix)*1000).toLocaleString('fr-FR',{timeZone:'Europe/Paris',dateStyle:'medium',timeStyle:'short'})).replace(/\*\*/g,''))
   .replace(/&lt;:em_([a-z0-9_]+):\d+&gt;/g,'<img src="/images/discord-emojis/$1.png" width="18" height="18" alt="">');
 function recapPreviewMarkup(previews) {

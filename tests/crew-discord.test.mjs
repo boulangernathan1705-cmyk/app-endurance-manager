@@ -98,7 +98,7 @@ test('voice channel setup detects missing Connect even when the bot can manage t
   let settings=(await req('/api/community/settings','GET',null,'admin')).data;
   assert.equal(settings.crews.botReady,false);
   assert.deepEqual(settings.crews.botMissing,['Se connecter']);
-  assert.match(settings.crews.botInviteUrl,/permissions=1117200&/);
+  assert.match(settings.crews.botInviteUrl,/permissions=269569040&/);
   discord.state.botPermissions='1117200';
   settings=(await req('/api/community/settings','GET',null,'admin')).data;
   assert.equal(settings.crews.botReady,true);
@@ -111,7 +111,7 @@ test('a crew gets a voice channel « LMU · race · name » outside any category
   // The admins turn the modules on in the settings, once the bot has the rights to make channels.
   discord.state.botRights=false;
   let settings=(await req('/api/community/settings','GET',null,'admin')).data;
-  assert.equal(settings.crews.botReady,false);assert.equal(settings.crews.botProblem,'rights');assert.match(settings.crews.botInviteUrl,/permissions=1117200&/);
+  assert.equal(settings.crews.botReady,false);assert.equal(settings.crews.botProblem,'rights');assert.match(settings.crews.botInviteUrl,/permissions=269569040&/);
   assert.equal((await req('/api/community/modules','PATCH',{crewChannels:true},'admin')).status,400);
   discord.state.botAbsent=true;
   settings=(await req('/api/community/settings','GET',null,'admin')).data;
@@ -612,4 +612,15 @@ test('voices turned off: the voice channel goes, and comes back if they are turn
   assert.equal((await req('/api/community/modules','PATCH',{crewChannels:true},'admin')).status,200);
   await sync(at+2*HOUR);
   assert.ok(DB.db.prepare('SELECT voice_id FROM crew_discord').get().voice_id,'made again');
+});
+
+test('a channel the bot tracked but that is gone from the server does not block the setting',async()=>{
+  const {DB,req,login,discord}=harness();
+  await login(ADMIN,'admin','Orga');
+  const category=discord.state.channels.find(item=>item.name==='Courses');
+  DB.db.prepare('INSERT INTO crew_discord(crew_id,community_id,guild_id,voice_id,created_at) VALUES(?,?,?,?,?)').run('gone',DEV,GUILD,'700000000000000555',Date.now());
+  DB.db.prepare("INSERT INTO discord_recap_publications(community_id,event_id,guild_id,category_id,marker) VALUES(?,?,?,?,'m')").run(DEV,'week:lmu',GUILD,'600000000000000555#lmu-de-la-semaine');
+  assert.equal((await req('/api/community/modules','PATCH',{crewChannels:true,crewCategory:category.id},'admin')).status,200);
+  const result=await req('/api/community/modules','PATCH',{crewCategory:'600000000000000556'},'admin');
+  assert.equal(result.status,400,'a category the admin just chose must still exist');
 });

@@ -57,6 +57,7 @@ function weekPlan(env, community, settings, cats = parseCategories(settings.bot_
 const parse = value => { try { const result = JSON.parse(value); return Array.isArray(result) ? result : []; } catch { return []; } };
 
 export function recapError(error) {
+  if (error.rights) return error.message;
   if (error.status === 429) return 'Discord limite les requêtes. Le récap réessaiera automatiquement.';
   if (error.status === 403) return 'Dans les permissions du salon ou de la catégorie, autorise le bot à Voir le salon, Envoyer des messages, Intégrer des liens et Voir les anciens messages ; en mode par événement, ajoute Gérer les salons.';
   if (error.status === 404) {
@@ -78,6 +79,8 @@ async function discord(env, method, path, body, budget = {left:12}) {
   if (!response.ok) throw Object.assign(new Error('Discord indisponible'), {status:response.status, code:data?.code, path});
   return data;
 }
+// Closed to @everyone (« Voir le salon » refused): only the roles allowed there see it.
+const isPrivate = (channel, guildId) => (channel.permission_overwrites || []).some(item => String(item.id) === String(guildId) && Number(item.type) === 0 && (BigInt(item.deny || 0) & VIEW));
 export async function recapDestinations(env, community) {
   if (!community.discordGuildId || !env.DISCORD_CLIENT_ID) throw Object.assign(new Error('Relie le serveur de la communauté au bot.'), {status:401});
   const guild = community.discordGuildId;
@@ -92,6 +95,7 @@ export async function recapDestinations(env, community) {
     const voiceRequired = channel.type === 4 && community.modules?.crewChannels === true;
     const required = REQUIRED | MANAGE | (voiceRequired ? VOICE_ACCESS : 0n);
     return {id:channel.id, name:channel.name, type:channel.type, position:channel.position || 0, parentId:channel.parent_id || null, parentName:parent?.name || null, ready:(rights & required) === required,
+      private:isPrivate(channel.type === 0 ? parent || channel : channel, guild),
       missing:[['Voir le salon',VIEW],['Envoyer des messages',SEND],['Voir les anciens messages',HISTORY],['Intégrer des liens',EMBED],['Gérer les salons',MANAGE],...(voiceRequired ? [['Se connecter',1n << 20n]] : [])].filter(([,bit]) => !(rights & bit)).map(([label]) => label)};
   });
 }
@@ -260,6 +264,42 @@ async function placeCategories(env, community, guildId, channels, category, sett
   if (order.every((item,index) => item.id === categories[index]?.id)) return;
   await discord(env,'PATCH',`/guilds/${guildId}/channels`,order.map((item,position) => ({id:item.id,position})),budget);
 }
+const categoryAccess = community => REQUIRED | MANAGE | (community.modules?.crewChannels === true ? VOICE_ACCESS : 0n);
+// What the bot may copy (it can only give rights it has): seeing, writing, joining.
+const SHARED = VIEW | SEND | HISTORY | EMBED | (1n << 20n);
+// The rights of a channel without the bot's own, in a stable order (to compare them).
+function othersRules(env, overwrites) {
+  return (overwrites || []).filter(item => !(Number(item.type) === 1 && String(item.id) === String(env.DISCORD_CLIENT_ID)))
+    .map(item => ({id:String(item.id), type:Number(item.type), allow:String(BigInt(item.allow || 0) & SHARED), deny:String(BigInt(item.deny || 0) & SHARED)}))
+    .filter(item => item.allow !== '0' || item.deny !== '0').sort((a,b) => a.id.localeCompare(b.id));
+}
+// The rights a bot category should have: those of the category it sits under when the admins chose so, else none (open to all).
+function categoryRules(env, layout, key, channels) {
+  const [copy, at] = key === 'pit' ? [layout?.pitCopy, layout?.pitAt] : [layout?.copy, layout?.under];
+  return copy && at && at !== 'top' ? othersRules(env, channels.find(item => item.id === at)?.permission_overwrites) : [];
+}
+// The bot's categories kept private or open as chosen, and what the bot made in them (their channels, voices and the races'
+// categories): changed only where they differ. Discord needs « Gérer les rôles » for it.
+async function shareRights(env, community, settings, rows, channels, budget) {
+  const layout = parseLayout(settings.layout), cats = parseCategories(settings.bot_categories);
+  const races = rows.filter(row => isRaceRow(row) && row.category_id && !row.closed_at).map(row => row.category_id);
+  for (const [key, id] of Object.entries(cats)) {
+    const rules = categoryRules(env, layout, key, channels), wanted = JSON.stringify(rules);
+    const below = key === 'pit' ? [] : channels.filter(item => races.includes(item.id) && [settings.destination_id, settings.iracing_destination_id].includes(id));
+    const targets = [id, ...below.map(item => item.id)].flatMap(parent => [channels.find(item => item.id === parent), ...channels.filter(item => item.parent_id === parent)]).filter(Boolean);
+    for (const channel of targets) {
+      if (JSON.stringify(othersRules(env, channel.permission_overwrites)) === wanted) continue;
+      const mine = (channel.permission_overwrites || []).filter(item => Number(item.type) === 1 && String(item.id) === String(env.DISCORD_CLIENT_ID));
+      const access = channel.type === 4 ? categoryAccess(community) : channel.type === 2 ? VOICE_ACCESS : REQUIRED;
+      const permission_overwrites = withBotAccess([...rules, ...mine], env.DISCORD_CLIENT_ID, access);
+      await discord(env,'PATCH',`/channels/${channel.id}`,{permission_overwrites},budget).catch(error => {
+        if ([403].includes(error.status) || error.code === 50013) throw Object.assign(new Error('Pour rendre la catégorie du bot privée ou publique, il lui faut « Gérer les rôles » : invite-le à nouveau avec ses droits.'), {rights:true});
+        throw error;
+      });
+      channel.permission_overwrites = permission_overwrites;
+    }
+  }
+}
 // The bot's own categories: the missing ones made (with its rights), then their ids kept. channels: the server's, updated.
 async function makeCategories(env, community, settings, channels, budget) {
   const layout = parseLayout(settings.layout), cats = parseCategories(settings.bot_categories);
@@ -269,7 +309,7 @@ async function makeCategories(env, community, settings, channels, budget) {
     if (cats[key] && channels.some(item => item.id === cats[key] && item.type === 4)) continue;
     // Taken back if the bot made it already (a lost answer), never a category of the admins with the same name.
     const created = await discord(env,'POST',`/guilds/${settings.guild_id}/channels`,{type:4,name:CATEGORY_NAMES[key],
-      permission_overwrites:withBotAccess([],env.DISCORD_CLIENT_ID,REQUIRED | MANAGE | (community.modules?.crewChannels === true ? VOICE_ACCESS : 0n))},budget);
+      permission_overwrites:withBotAccess(categoryRules(env, layout, key, channels),env.DISCORD_CLIENT_ID,categoryAccess(community))},budget);
     channels.push(created);
     cats[key] = created.id; changed = true;
   }
@@ -517,6 +557,7 @@ async function syncLocked(env,timestamp,community,settings, test = false, budget
     channels = await discord(env,'GET',`/guilds/${settings.guild_id}/channels`,null,budget);
     ({wanted} = await makeCategories(env, community, settings, channels, budget));
     if (settings.enabled !== 0) {
+      await shareRights(env, community, settings, rows, channels, budget);
       const cats = parseCategories(settings.bot_categories), anchors = layoutAnchors(layout, cats);
       if (Object.entries(anchors).some(([column, value]) => settings[column] !== value)) {
         await env.DB.prepare(`UPDATE community_recap_settings SET mode=?,scope=?,destination_id=?,iracing_destination_id=?,calendar_destination_id='' WHERE community_id=?`)
