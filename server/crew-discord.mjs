@@ -555,7 +555,8 @@ export async function botCanManageChannels(env, guildId) {
 
 // The same, with why it cannot (shown to the admins): 'rights' (rights not given yet), 'absent' (the bot is not on
 // the server), 'config' (the site has no bot), 'discord' (Discord did not answer).
-export async function checkBot(env, guildId, {channelIds = [], includeCategories = false} = {}) {
+// required: channels that must exist (the category an admin just chose); the others may be gone, the bot makes them again.
+export async function checkBot(env, guildId, {channelIds = [], required = [], includeCategories = false} = {}) {
   if (!guildId || !env.DISCORD_CLIENT_ID || !String(env.DISCORD_BOT_TOKEN || '').trim()) return {ready:null, why:'config'};
   try {
     const budget = {left:3};
@@ -571,6 +572,7 @@ export async function checkBot(env, guildId, {channelIds = [], includeCategories
     if (!ready) return {ready:false,why:'rights',missing,categories};
     for (const channelId of [...new Set(channelIds.filter(Boolean))]) {
       const channel = channels.find(item => String(item.id) === String(channelId));
+      if (!channel && !required.includes(channelId)) continue;
       const missing = channel ? missingVoicePermissions(effectivePermissions(roles,member,guildId,channel,env.DISCORD_CLIENT_ID)) : ['Voir le salon'];
       if (missing.length) return {ready:false,why:'channel',missing,channelId,channelName:channel?.name || channelId,categories};
     }
@@ -590,7 +592,9 @@ export async function checkCrewAccess(env, community, {categoryId, includeCatego
   const destinations = recap?.enabled && recap.mode === 'events' ? [recap.destination_id, recap.iracing_destination_id] : [categoryId ?? saved?.voice_category_id];
   const tracked = (await env.DB.prepare(`SELECT category_id AS id FROM discord_recap_publications WHERE community_id=? AND closed_at IS NULL AND category_id IS NOT NULL
     UNION SELECT voice_id AS id FROM crew_discord WHERE community_id=? AND closed_at IS NULL AND voice_id IS NOT NULL`).bind(community.id,community.id).all()).results || [];
-  return checkBot(env,community.discordGuildId,{channelIds:[...destinations,...tracked.map(row => row.id),failedChannelId].filter(Boolean),includeCategories});
+  // A week message's key is « destination#salon »: the destination is what the bot needs to reach.
+  const ids = [...destinations,...tracked.map(row => String(row.id).split('#')[0]),failedChannelId].filter(Boolean);
+  return checkBot(env,community.discordGuildId,{channelIds:ids,required:categoryId ? [String(categoryId)] : [],includeCategories});
 }
 export async function validateCrewAccess(env,community,options = {}) {
   const result = await checkCrewAccess(env,community,options);

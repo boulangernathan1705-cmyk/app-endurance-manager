@@ -613,3 +613,14 @@ test('voices turned off: the voice channel goes, and comes back if they are turn
   await sync(at+2*HOUR);
   assert.ok(DB.db.prepare('SELECT voice_id FROM crew_discord').get().voice_id,'made again');
 });
+
+test('a channel the bot tracked but that is gone from the server does not block the setting',async()=>{
+  const {DB,req,login,discord}=harness();
+  await login(ADMIN,'admin','Orga');
+  const category=discord.state.channels.find(item=>item.name==='Courses');
+  DB.db.prepare('INSERT INTO crew_discord(crew_id,community_id,guild_id,voice_id,created_at) VALUES(?,?,?,?,?)').run('gone',DEV,GUILD,'700000000000000555',Date.now());
+  DB.db.prepare("INSERT INTO discord_recap_publications(community_id,event_id,guild_id,category_id,marker) VALUES(?,?,?,?,'m')").run(DEV,'week:lmu',GUILD,'600000000000000555#lmu-de-la-semaine');
+  assert.equal((await req('/api/community/modules','PATCH',{crewChannels:true,crewCategory:category.id},'admin')).status,200);
+  const result=await req('/api/community/modules','PATCH',{crewCategory:'600000000000000556'},'admin');
+  assert.equal(result.status,400,'a category the admin just chose must still exist');
+});

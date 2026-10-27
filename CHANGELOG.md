@@ -1,5 +1,11 @@
 # Nouveautés d'Endurance Manager
 
+## v1.59 — 27 octobre 2026
+
+### 🔧 Corrections
+
+- **Discord** : un salon ou un vocal du bot supprimé à la main sur le serveur ne bloque plus l'activation du réglage ; le bot le recrée si besoin.
+
 ## v1.58 — 27 octobre 2026
 
 ### ✨ Nouveautés
