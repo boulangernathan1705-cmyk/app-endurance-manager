@@ -548,3 +548,25 @@ test('moving a root fallback vocal into a private race category retains the targ
   assert.equal(voice.parent_id,parent);
   assert.deepEqual(voice.permission_overwrites,[...rules,...BOT_ACCESS]);
 });
+
+test('a voice channel made before the admins chose « Vocaux d’équipage » moves there once, with its new name', async () => {
+  const {DB,req,login,sync,discord}=harness();
+  await login(ADMIN,'admin','Orga');await login(PILOT,'pilot','Alice');
+  assert.equal((await req('/api/community/modules','PATCH',{crewChannels:true},'admin')).status,200);
+  assert.equal((await req('/api/events','POST',race,'admin')).status,201);
+  const event=(await req('/api/events','GET',null,'admin')).data.events[0];
+  const departure=event.departures[0], base=`/api/events/${event.id}/departures/${departure.id}`, at=departure.startsAt-2*24*HOUR;
+  assert.equal((await req(base+'/registrations','POST',{name:'x',category:'GT3',status:'whole'},'pilot')).status,201);
+  assert.equal((await req(base+'/crews','POST',{name:'Anciens',category:'GT3'},'pilot')).status,201);
+  await sync(at);
+  const row=DB.db.prepare('SELECT * FROM crew_discord').get();
+  // Named and placed by an older version, at the top of the server.
+  Object.assign(discord.state.channels.find(item=>item.id===row.voice_id),{name:'LMU-Anciens'});
+  assert.equal((await req('/api/community/modules','PATCH',{crewCategory:'500000000000000002'},'admin')).status,200);
+  const mark=discord.calls.length;await sync(at+HOUR);
+  const moves=discord.calls.slice(mark).filter(call=>call.method==='PATCH'&&call.path===`/channels/${row.voice_id}`);
+  assert.equal(moves.length,1);assert.equal(moves[0].body.parent_id,'500000000000000002');assert.equal(moves[0].body.name,'LMU · 6h SPA · Anciens');
+  assert.equal(DB.db.prepare('SELECT parent_id FROM crew_discord').get().parent_id,'500000000000000002');
+  const again=discord.calls.length;await sync(at+2*HOUR);
+  assert.equal(discord.calls.slice(again).filter(call=>call.method==='PATCH'&&call.path===`/channels/${row.voice_id}`).length,0,'moved once');
+});

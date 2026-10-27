@@ -8,15 +8,16 @@ Dans **Administration → Modules → Discord → Régler**, une seule page remp
 
 1. **Comment ranger les courses ?**
    - **Une catégorie par course** (« 🏎️ LMU · 6h de Spa » : un salon `infos-de-la-course`, puis les vocaux de ses équipages). Une course a sa catégorie 7 jours avant son départ (15 jours pour une course de 24 h ou plus), même sans inscrit (les courses officielles iRacing importées attendent un inscrit de la communauté). Plus de nouvelle catégorie quand le serveur approche les 500 salons de Discord. Les catégories des courses se rangent juste après la catégorie choisie pour leur simu : LMU d’abord, puis iRacing, chacune par date de premier départ.
-   - **Récap de la semaine + pit walk** : un message par semaine dans un salon texte existant, et tous les vocaux d’équipage dans une catégorie choisie (« pit walk »).
+   - **Récap de la semaine + pit walk** : un message par semaine dans un salon que le bot crée lui-même, et tous les vocaux d’équipage dans une catégorie choisie (« pit walk »).
 2. **Où publier sur ton serveur ?** Une ligne par récap, chacune avec « Ne pas publier » :
    - par course : **Courses LMU** et **Courses iRacing** (la catégorie sous laquelle se rangent les catégories des courses) ;
-   - récap de la semaine : **Endurances LMU** et **Endurances iRacing** (un salon texte chacun) et **Vocaux d’équipage** (catégorie) ;
-   - dans les deux modes, si le module EVENT SOLO / EVENT TDZ est actif : **Calendrier de la semaine** (un salon texte).
+   - récap de la semaine : **Endurances LMU** et **Endurances iRacing** (un salon ou une catégorie au choix ; le bot crée `# récap-de-la-semaine` juste en dessous, partagé si les deux simus visent le même endroit) et **Vocaux d’équipage** (catégorie) ;
+   - dans les deux modes, si le module EVENT SOLO / EVENT TDZ est actif : **Calendrier de la semaine** (un salon ou une catégorie ; le bot crée `# calendrier-de-la-semaine` juste en dessous).
+   Sous un salon, le bot crée le sien dans la même catégorie, juste après lui ; sous une catégorie, en tête de celle-ci. Il reprend les règles de la catégorie plus ses propres droits : seul « Gérer les salons » est demandé. Un récap qu’une version précédente écrivait directement dans un salon passe dans le salon du bot, créé juste en dessous. Quand le choix change, le bot crée son salon au nouvel endroit et supprime l’ancien.
    Chaque récap est **un message à part**, avec ses propres limites Discord ; plusieurs récaps peuvent partager un salon. Chez TDZ le calendrier passe en premier, ailleurs les endurances d’abord.
 3. **Vocaux et rappels** : « Créer un vocal par équipage » et « Rappels avant le départ » (cloche du site 24 h avant, chat du vocal 24 h et 1 h avant).
 
-Un croquis « Sur ton serveur » suit les choix ; **Voir les messages** montre ce que le bot écrira sans rien envoyer. Rien n’est publié avant **Activer**. Un récap qu’on ne publie plus voit son message supprimé.
+Un croquis « Sur ton serveur » suit les choix ; **Voir les messages** montre ce que le bot écrira sans rien envoyer. Rien n’est publié avant **Activer**. Un récap qu’on ne publie plus voit son message supprimé. Passer à « Récap de la semaine » (ou ne plus publier une simu) retire aussitôt les catégories de course déjà créées ; les vocaux d’équipage rejoignent la catégorie choisie pour eux, renommés.
 
 ## Calendrier de la semaine
 

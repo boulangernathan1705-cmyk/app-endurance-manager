@@ -272,6 +272,8 @@ export function isWeeklyDiscordMutation(request){
   let path;try{path=racesPath(new URL(request.url).pathname);}catch{return false;}
   const uuid='[a-f0-9-]{36}';
   if(new RegExp(`^/api/events/${uuid}/absence$`).test(path))return ['PUT','DELETE'].includes(method);
+  // The Discord setting: the crews' voice channels follow at once.
+  if(path==='/api/community/discord'&&method==='PUT')return true;
   if(path==='/api/events'&&method==='POST')return true;
   if(new RegExp(`^/api/events/${uuid}$`).test(path)&&['PATCH','DELETE'].includes(method))return true;
   if(new RegExp(`^/api/events/${uuid}/departures/${uuid}/registrations$`).test(path)&&method==='POST')return true;
