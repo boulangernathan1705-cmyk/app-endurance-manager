@@ -1,5 +1,13 @@
 # Nouveautés d'Endurance Manager
 
+## v1.66 — 27 octobre 2026
+
+### ✨ Nouveautés
+
+- **Discord** : en « Un fil par course », les vocaux des équipages sont juste sous les fils, dans la catégorie du bot ; plus de catégorie par course.
+- **Discord** : pas de vocal pour une course d'une simu que le serveur n'affiche pas (LMU seulement : pas de vocal iRacing).
+- **Discord** : les pilotes ajoutés au fil d'une course ne reçoivent plus de notification.
+
 ## v1.65 — 27 octobre 2026
 
 ### 🔧 Corrections
