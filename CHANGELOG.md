@@ -1,5 +1,11 @@
 # Nouveautés d'Endurance Manager
 
+## v1.68 — 27 octobre 2026
+
+### 🔧 Corrections
+
+- **Discord** : les pilotes sont remis dans les fils des courses déjà ouvertes, sans notification.
+
 ## v1.67 — 27 octobre 2026
 
 ### ✨ Nouveautés
