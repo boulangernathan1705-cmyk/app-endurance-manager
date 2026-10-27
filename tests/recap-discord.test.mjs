@@ -757,3 +757,13 @@ test('below a private category, the bot\'s own is private like it when chosen, a
   calls.length=0;await syncBotRecaps(env,NOW,COMMUNITY);
   assert.equal(calls.filter(call=>call.method==='PATCH'&&call.path===`/channels/${bot.id}`).length,0,'nothing to change: no write');
 });
+
+test('a week message deleted on Discord is put back by the next sync, without « Réparer »',async t=>{
+  const {DB,env,messages}=setup(t);race(DB);
+  await layout(env,COMMUNITY,{mode:'general',sims:'lmu',week:{all:CATEGORY},events:''});
+  assert.equal(messages.size,1);
+  messages.clear();DB.db.prepare("UPDATE discord_recap_publications SET content_hash='old'").run();
+  const result=await syncBotRecaps(env,NOW+1000,COMMUNITY);
+  assert.equal(messages.size,1);assert.ok(!result?.error);
+  assert.equal(DB.db.prepare('SELECT last_error FROM community_recap_settings').get().last_error,null);
+});
