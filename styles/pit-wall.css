@@ -207,6 +207,9 @@
 .pw-body .pw-wheel { display: grid; gap: 8px; padding: 10px 12px; border-radius: 6px; border: 1px solid rgba(0,230,118,.3); background: var(--pw-inset); }
 .pw-body .pw-wheel .pw-wheel-head { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
 .pw-body .pw-wheel .pw-wheel-head > b { font-size: 16px; }
+.pw-body .pw-wheel .pw-wheel-head > .pw-chip { margin-left: auto; }
+.pw-body .pw-wheel .pw-wheel-head.right { flex-direction: row-reverse; }
+.pw-body .pw-wheel .pw-wheel-head.right > .pw-chip { margin-left: 0; margin-right: auto; }
 .pw-body .pw-wheel .pw-wheel-head > span { margin-left: auto; font-size: 13px; color: var(--pw-text2); }
 .pw-body .pw-wheel .pw-wheel-head > span b { font-family: var(--pw-mono); font-size: 16px; }
 .pw-body .pw-wheel-body { display: flex; align-items: center; justify-content: center; gap: 16px; padding: 4px 0; }

@@ -460,7 +460,7 @@ function car(feed) {
     const gauge = `<div class="pw-wear" style="--wear:${known(worn) ? Math.max(0, Math.min(100, worn)) : 0}%;--bar:${color}"><b>${known(worn) ? `${fr(worn, 1)}%` : '—'}</b><i></i><small>usure</small></div>`;
     const boxes = [box('Pression', known(w.kpa) ? `<span class="pw-cyan">${fr(w.kpa, 0)}</span> kPa` : '—'), box('Moyenne', known(wear5) ? `${fr(wear5, 2)}%/t` : '—'),
       box('Dernier tour', known(lastWear) ? `${fr(lastWear, 2)}%` : '—')];
-    return `<div class="pw-wheel"><div class="pw-wheel-head"><b>${WHEELS[index]}</b>${me.compound ? chip(esc(me.compound.toUpperCase()), 'compound') : ''}</div>
+    return `<div class="pw-wheel"><div class="pw-wheel-head${index % 2 ? ' right' : ''}"><b>${WHEELS[index]}</b>${me.compound ? chip(esc(me.compound.toUpperCase()), 'compound') : ''}</div>
       <div class="pw-wheel-body${index % 2 ? ' right' : ''}">
         ${gauge}${tyreTemps(w, index)}
         <div class="pw-brake" style="--temp:${brakeColor(w.brake)}"><i></i><b>${known(w.brake) ? `${fr(w.brake, 0)}°C` : '—'}</b><small>frein</small></div>
