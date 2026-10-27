@@ -206,7 +206,8 @@ function footer(updatedAt){return{text:`Endurance Manager · mise à jour à ${u
 // `site`: {url, name, logoUrl, bannerUrl} of the community (url: address of its site).
 // `emojis`: ids of the bot's category emojis by name; without them the categories keep their colour.
 // `weekly`: the week's message of one sim (« 📝 Endurances LMU · semaine du … »), not a race's channel.
-export function buildWeeklyDiscordPayload(snapshot,site={},updatedAt=Date.now(),scope='lmu',emojis={},{weekly=false}={}){
+// `alone`: a race's thread, its block only (the week is already in the channel's message).
+export function buildWeeklyDiscordPayload(snapshot,site={},updatedAt=Date.now(),scope='lmu',emojis={},{weekly=false,alone=false}={}){
   const siteUrl=typeof site==='string'?(()=>{try{return new URL(site).origin;}catch{return '';}})():String(site.url||'');
   const sim=SCOPE_LABELS[scope]??' LMU',simPage=scope==='iracing'?'/iracing/':scope==='all'?'/':'/lmu/';
   const current=Array.isArray(snapshot.currentDepartures)?snapshot.currentDepartures:[],future=Array.isArray(snapshot.futureDepartures)?snapshot.futureDepartures:[];
@@ -227,7 +228,7 @@ export function buildWeeklyDiscordPayload(snapshot,site={},updatedAt=Date.now(),
       blocks.length=8;
       blocks.push({title:'Autres courses de la semaine',color:0x52d3d8,description:cut(rest.map(group=>{const url=raceUrl(siteUrl,group[0]),name=clean(eventTitleAndNote(group[0].eventName).title);return `🏁 ${url?`[${name}](${url})`:name} — ${departureTitle(group[0])}`;}).join('\n'),4096)});
     }
-    return [header,...blocks];
+    return alone&&blocks.length?blocks:[header,...blocks];
   };
   let embeds=build(false);
   if(embeds.reduce((total,embed)=>total+embedSize(embed),0)>5600)embeds=build(true);

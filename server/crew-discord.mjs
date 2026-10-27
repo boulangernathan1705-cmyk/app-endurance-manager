@@ -32,8 +32,9 @@ export const REMINDERS = [{bit:1, before:24 * HOUR}, {bit:2, before:HOUR}];
 // manage channels, connect to voice channels, send messages, read the history.
 const ADMINISTRATOR = 1n << 3n, NEEDED = VOICE_ACCESS;
 // One invite for the whole « Discord » setting: the voices, the bot's own categories and messages (embeds), and making
-// its categories private or open again (« Gérer les rôles »: Discord asks it to change a channel's rights).
-export const CREW_BOT_PERMISSIONS = String(NEEDED | EMBED | (1n << 28n));
+// its categories private or open again (« Gérer les rôles »: Discord asks it to change a channel's rights), the races'
+// threads (make, write in, delete).
+export const CREW_BOT_PERMISSIONS = String(NEEDED | EMBED | (1n << 28n) | (1n << 34n) | (1n << 35n) | (1n << 38n));
 const VOICE = 2, CATEGORY = 4;
 
 class Stop extends Error {}

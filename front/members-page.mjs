@@ -145,7 +145,7 @@ function peopleMarkup(result, settings) {
 // « Discord »: the setting asked question by question (server/discord-layout.mjs): each answer shows the questions it
 // needs; on a phone, one question per screen, the server's sketch last.
 const DISCORD_MODES = {
-  events:['Une catégorie par course', 'Chaque course a sa catégorie : ses infos, puis les vocaux de ses équipages.'],
+  events:['Un fil par course', 'Chaque course a son fil dans # endurances-de-la-semaine, et sa catégorie pour les vocaux de ses équipages.'],
   general:['Récap de la semaine + pit talk', 'Les récaps à un endroit, les vocaux d’équipage dans « Pit talk ».']};
 // The answers as saved, or those of a setting made before.
 function discordAnswers(setup, settings) {
@@ -244,9 +244,9 @@ function discordQuestions(form, answers) {
   if (answers.sims === 'all') questions.push([race ? 'LMU et iRacing dans la même catégorie ?' : 'LMU et iRacing dans le même salon ?',
     `<div class="discord-pills">${radio('split','together','Ensemble',!answers.split)}${radio('split','apart','Séparés',answers.split)}</div>
     <p class="members-help">${race ? (answers.split ? 'Le bot crée « LMU » et « iRacing », chacune suivie de ses courses.' : 'Le bot crée « Endurance Manager », suivie des courses : LMU d’abord, puis iRacing, chacune par date.') : (answers.split ? 'Chaque simu a son salon.' : 'Un message par simu dans le même salon.')}</p>`]);
-  if (race) questions.push([apart ? 'Qu’afficher dans « LMU » et « iRacing » ?' : 'Qu’afficher dans « Endurance Manager » ?',
-    `<label class="discord-check"><input type="checkbox" name="showWeek" ${answers.showWeek ? 'checked' : ''}><span><strong># endurances-de-la-semaine</strong><small>Les courses de la semaine, un message par simu.</small></span></label>
-    ${solo ? `<label class="discord-check"><input type="checkbox" name="showEvents" ${answers.showEvents ? 'checked' : ''}><span><strong># ${discordEventChannel(form)}</strong><small>Les events de la semaine.</small></span></label>` : ''}`]);
+  // « Un fil par course »: # endurances-de-la-semaine is always there (the races' threads are in it).
+  if (race) { if (solo) questions.push([apart ? 'Afficher aussi les events dans « LMU » et « iRacing » ?' : 'Afficher aussi les events dans « Endurance Manager » ?',
+    `<label class="discord-check"><input type="checkbox" name="showEvents" ${answers.showEvents ? 'checked' : ''}><span><strong># ${discordEventChannel(form)}</strong><small>Les events de la semaine.</small></span></label>`]); }
   else {
     questions.push(['Où mettre les endurances de la semaine ?', (apart ? discordSims(answers).map(sim => row(SIM_NAMES[sim], `# ${discordWeekChannel(answers, sim)}`, place(`week-${sim}`, answers.week?.[sim] || ''), help(answers.week?.[sim])))
       : [row('# endurances-de-la-semaine', discordSims(answers).length > 1 ? 'LMU puis iRacing, un message chacun.' : '', place('week-all', answers.week?.all || ''), help(answers.week?.all))]).join('')
@@ -303,16 +303,19 @@ function discordSketch(form, answers = discordRead(form)) {
   const after = (id, ...added) => { const index = id === 'top' ? 0 : at(id); groups.splice(index < 0 ? groups.length : index + 1, 0, ...added); };
   const RACES = {lmu:['🏎️ LMU · 6h de Spa', ['Équipage A','Équipage B']], iracing:['🏁 iRacing · 8h de Watkins Glen', ['Équipage A']]};
   const bot = name => ({name, bot:true});
-  const raceGroup = sim => ({name:RACES[sim][0], bot:true, items:[bot('# infos-de-la-course'), ...(answers.voices ? RACES[sim][1].map(crew => bot(`🔊 ${crew}`)) : [])]});
+  // Each race: its thread in # endurances-de-la-semaine, its category for the crews' voices.
+  const raceGroup = sim => ({name:RACES[sim][0], bot:true, items:RACES[sim][1].map(crew => bot(`🔊 ${crew}`))});
+  const week = list => [bot('# endurances-de-la-semaine'), ...list.map(sim => bot(`　🧵 ${RACES[sim][0]}`))];
   const eventName = `# ${discordEventChannel(form)}`;
   const isPrivate = id => list.some(item => item.id === id && item.type === 4 && item.private);
   const lock = (copy, at) => copy !== false && isPrivate(at) ? ' 🔒' : '';
   const botCat = {name:`Endurance Manager${lock(answers.copy, answers.under)}`, bot:true, items:[]};
   const simCats = Object.fromEntries(sims.map(sim => [sim, {name:`${SIM_NAMES[sim]}${lock(answers.copy, answers.under)}`, bot:true, items:[]}]));
   if (race) {
-    const blocks = apart ? sims.map(sim => ({name:`${sim === 'lmu' ? 'LMU' : 'iRacing'}${lock(answers.copy, answers.under)}`, bot:true, items:[...(answers.showWeek ? [bot('# endurances-de-la-semaine')] : []), ...(solo && answers.showEvents ? [bot(eventName)] : [])]}))
-      : [{...botCat, items:[...(answers.showWeek ? [bot('# endurances-de-la-semaine')] : []), ...(solo && answers.showEvents ? [bot(eventName)] : [])]}];
-    after(answers.under || 'top', ...(apart ? blocks.flatMap((block, index) => [block, raceGroup(sims[index])]) : [blocks[0], ...sims.map(raceGroup)]));
+    const blocks = apart ? sims.map(sim => ({name:`${sim === 'lmu' ? 'LMU' : 'iRacing'}${lock(answers.copy, answers.under)}`, bot:true, items:[...week([sim]), ...(solo && answers.showEvents ? [bot(eventName)] : [])]}))
+      : [{...botCat, items:[...week(sims), ...(solo && answers.showEvents ? [bot(eventName)] : [])]}];
+    const races = index => answers.voices ? [raceGroup(sims[index])] : [];
+    after(answers.under || 'top', ...(apart ? blocks.flatMap((block, index) => [block, ...races(index)]) : [blocks[0], ...sims.flatMap((sim, index) => races(index))]));
   } else {
     const placeIn = (value, name, sim = null) => {
       if (!value) return;
