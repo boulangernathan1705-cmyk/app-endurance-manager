@@ -789,7 +789,7 @@ export async function removeBotDiscord(env,timestamp,community) {
 }
 
 // Every 2 minutes: the pilots with access to the site added to the races' threads, so each thread stays in their list on
-// Discord (no notification). Those of the race first; each added once (one who leaves it stays out). limit: requests.
+// Discord, 50 at a time per thread. Those of the race first; each added once (one who leaves it stays out). limit: requests.
 // A thread with nobody left to add is looked at again an hour later (a pilot given access meanwhile).
 export async function addThreadMembers(env, timestamp = Date.now(), limit = 25) {
   if (!env?.DB || !env.DISCORD_BOT_TOKEN) return 0;
@@ -805,25 +805,26 @@ export async function addThreadMembers(env, timestamp = Date.now(), limit = 25) 
       AND (m.discord_admin=1 OR EXISTS (SELECT 1 FROM community_role_permissions r WHERE r.community_id=m.community_id
         AND (r.discord_role_id=? OR r.discord_role_id IN (SELECT value FROM json_each(m.discord_roles)))
         AND EXISTS (SELECT 1 FROM json_each(r.permissions) WHERE value='access')))
-      ORDER BY EXISTS (SELECT 1 FROM registrations g WHERE g.event_id=? AND g.user_id=m.user_id) DESC, m.user_id LIMIT ?`)
-      .bind(thread.community_id,thread.event_id,thread.guild_id,thread.event_id,budget.left).all()).results || [];
+      ORDER BY EXISTS (SELECT 1 FROM registrations g WHERE g.event_id=? AND g.user_id=m.user_id) DESC, m.user_id LIMIT 50`)
+      .bind(thread.community_id,thread.event_id,thread.guild_id,thread.event_id).all()).results || [];
     if (!pilots.length) {
       await env.DB.prepare('UPDATE discord_recap_publications SET members_checked_at=? WHERE community_id=? AND event_id=?').bind(timestamp,thread.community_id,thread.event_id).run();
       continue;
     }
-    for (const {user_id} of pilots) {
-      // Slowly, never while the recap works on this server (Réparer, a new setting): Discord limits the bot's requests.
-      if (added) await pause(400);
-      try { await discord(env,'PUT',`/channels/${thread.channel_id}/thread-members/${user_id}`,null,budget); }
-      catch (error) {
-        if (error.budget || error.status === 429) return added;
-        // No longer on the server: nothing to add. Anything else (archived thread, rights): this thread waits for next time.
-        if (error.code !== 10007) break;
-      }
-      await env.DB.prepare('INSERT OR IGNORE INTO discord_thread_members(community_id,event_id,user_id,added_at) VALUES(?,?,?,?)')
-        .bind(thread.community_id,thread.event_id,user_id,timestamp).run();
-      added++;
+    // Added by a silent mention (no push notification), deleted at once: adding them one by one notifies them.
+    const ids = pilots.map(pilot => pilot.user_id);
+    try {
+      const message = await discord(env,'POST',`/channels/${thread.channel_id}/messages`,{content:ids.map(id => `<@${id}>`).join(' '),
+        allowed_mentions:{users:ids},flags:4096},budget);
+      await discord(env,'DELETE',`/channels/${thread.channel_id}/messages/${message.id}`,null,budget);
+    } catch (error) {
+      // Discord limits the bot's requests, or the thread is archived or gone: next time.
+      if (error.budget || error.status === 429) return added;
+      continue;
     }
+    for (const id of ids) await env.DB.prepare('INSERT OR IGNORE INTO discord_thread_members(community_id,event_id,user_id,added_at) VALUES(?,?,?,?)')
+      .bind(thread.community_id,thread.event_id,id,timestamp).run();
+    added += ids.length;
     if (budget.left <= 0) break;
   }
   return added;

@@ -835,8 +835,10 @@ test('the pilots with access are added to the race\'s thread once each, those of
   DB.db.prepare("INSERT INTO participants(id,name,user_id,created_by,created_at,community_id) VALUES('p2','P2','100000000000000002',?,0,?)").run(OWNER,DEV_COMMUNITY);
   DB.db.prepare("INSERT INTO registrations(id,event_id,departure_id,user_id,name,name_key,category,status,created_at,participant_id,community_id) VALUES('r','race-a','start-a','100000000000000002','P2','p2','GT3','whole',0,'p2',?)").run(DEV_COMMUNITY);
   calls.length=0;
-  assert.equal(await addThreadMembers(env,NOW,1),1);
-  assert.deepEqual(calls.map(call=>call.path),[`/channels/${thread.id}/thread-members/100000000000000002`],'the race\'s pilot first');
-  assert.equal(await addThreadMembers(env,NOW,12),1,'then the other one with access, not the one without, nor one gone');
-  calls.length=0;assert.equal(await addThreadMembers(env,NOW,12),0);assert.equal(calls.length,0,'each once');
+  assert.equal(await addThreadMembers(env,NOW,12),2,'the two with access, not the one without, nor one gone');
+  const [post,remove]=calls;
+  assert.equal(post.path,`/channels/${thread.id}/messages`);assert.equal(post.body.flags,4096,'silent');
+  assert.deepEqual(post.body.allowed_mentions.users,['100000000000000002','100000000000000001'],'the race\'s pilot first');
+  assert.equal(remove.method,'DELETE');assert.match(remove.path,new RegExp(`^/channels/${thread.id}/messages/`));
+  calls.length=0;assert.equal(await addThreadMembers(env,NOW,12),0);assert.ok(!calls.some(call=>call.method==='POST'),'each once');
 });
