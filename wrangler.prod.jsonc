@@ -6,7 +6,7 @@
   "minify": true,
   "build": { "command": "npm run build:workers" },
   "triggers": {
-    "crons": ["*/15 * * * *", "*/2 * * * *"]
+    "crons": ["*/15 * * * *"]
   },
   "assets": {
     "directory": "./public",
