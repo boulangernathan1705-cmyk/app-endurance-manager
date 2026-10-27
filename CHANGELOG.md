@@ -1,5 +1,11 @@
 # Nouveautés d'Endurance Manager
 
+## v1.64 — 27 octobre 2026
+
+### ✨ Nouveautés
+
+- **Discord** : le bot ajoute au fil de chaque course les pilotes qui ont accès au site, pour qu'il reste dans leur liste de salons. Chacun n'est ajouté qu'une fois.
+
 ## v1.63 — 27 octobre 2026
 
 ### ✨ Nouveautés
