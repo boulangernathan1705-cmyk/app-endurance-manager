@@ -1,5 +1,15 @@
 # Nouveautés d'Endurance Manager
 
+## v1.58 — 27 octobre 2026
+
+### ✨ Nouveautés
+
+- **Discord** : le réglage se fait question par question (une par écran sur téléphone). Le bot crée sa propre catégorie « Endurance Manager » (ou « LMU » et « iRacing » si tu les sépares) et, en récap de la semaine, la catégorie « 🎙️ Pit talk » pour les vocaux, ou les met dans une catégorie existante. Si tu changes d'avis, le bot retire ce qu'il avait fait et range selon les nouveaux choix. Le bouton « Tout retirer » enlève tout ce que le bot a créé.
+
+### 🔧 Corrections
+
+- **Vocaux d'équipage** : ils ne remontent plus en haut du serveur quand on passe au récap de la semaine.
+
 ## v1.57 — 27 octobre 2026
 
 ### 🔧 Corrections
