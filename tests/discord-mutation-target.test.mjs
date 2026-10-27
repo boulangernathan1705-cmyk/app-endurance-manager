@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {discordMutationTarget} from '../server/worker-with-migrations.mjs';
+import {discordMutationTarget,flushDiscord} from '../server/worker-with-migrations.mjs';
 const event='11111111-1111-4111-8111-111111111111',registration='22222222-2222-4222-8222-222222222222';
 test('official entry from another community syncs that community without consuming the body',async()=>{
  const request=new Request(`https://tdz.example/api/races/${event}/departures/${registration}/registrations`,{method:'POST',body:JSON.stringify({communityId:'fmt'})});
@@ -14,4 +14,13 @@ test('deleting an entry uses its community, read before the row disappears',asyn
 test('entries without explicit community keep the current site fallback',async()=>{
  const request=new Request(`https://fmt.example/api/races/${event}/departures/${registration}/registrations`,{method:'POST',body:'{}'});
  assert.deepEqual(await discordMutationTarget({},request),{eventId:event,communityId:null});
+});
+test('changes are gathered: each community noted is done once per pass, taken off the list first',async()=>{
+ const done=[];
+ const env={DB:{prepare(sql){return{bind(...params){return{
+  async all(){assert.match(sql,/FROM discord_pending ORDER BY queued_at LIMIT/);return{results:[{community_id:'fmt',event_id:event}]};},
+  async run(){done.push([sql.split(' ')[0],...params]);return{meta:{changes:1}};},
+  async first(){return null;}};}};}}};
+ assert.equal(await flushDiscord(env),1);
+ assert.deepEqual(done[0],['DELETE','fmt']);
 });

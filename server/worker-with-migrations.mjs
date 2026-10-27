@@ -37,17 +37,32 @@ export async function discordMutationTarget(env, request) {
   }catch{return null;}
 }
 
-// After a change of races or entries: the recap messages of this community only.
+// After a change of races or entries: this community's Discord is noted, and followed within 2 minutes (flushDiscord).
 function queueWeeklySync(env, ctx, request, eventId = null, communityId = null) {
   if (!env?.DB || !ctx?.waitUntil) return;
   ctx.waitUntil((communityId?communityById(env,communityId):currentCommunity(env,request)).then(async community => {
     if(!community)return;
-    await runWeeklySync(env, community, eventId).catch(error => console.error('Discord weekly sync failed', error instanceof Error ? error.message : 'unknown'));
-    // The threads of its crews on Discord follow at once (a new pilot, another car…).
-    if (community?.modules?.crewChannels === true) await syncCrewDiscord(env, Date.now(), {community, requests:6});
+    await env.DB.prepare('INSERT INTO discord_pending(community_id,event_id,queued_at) VALUES(?,?,?) ON CONFLICT(community_id) DO UPDATE SET event_id=excluded.event_id')
+      .bind(community.id,eventId,Date.now()).run();
   }).catch(error => {
     console.error('Discord sync failed', error instanceof Error ? error.message : 'unknown');
   }));
+}
+// The communities noted since the last pass, the oldest first: one recap pass and one crews pass each, whatever the
+// number of changes (several entries in a minute make one edit on Discord).
+export async function flushDiscord(env, limit = 3) {
+  const rows = (await env.DB.prepare('SELECT community_id,event_id FROM discord_pending ORDER BY queued_at LIMIT ?').bind(limit).all()).results || [];
+  for (const row of rows) {
+    // Taken off first: a change during the pass notes it again for the next one.
+    await env.DB.prepare('DELETE FROM discord_pending WHERE community_id=?').bind(row.community_id).run();
+    const community = await communityById(env, row.community_id);
+    if (!community) continue;
+    await runWeeklySync(env, community, row.event_id).catch(error => console.error('Discord weekly sync failed', error instanceof Error ? error.message : 'unknown'));
+    // The voices of its crews on Discord follow (a new pilot, another car…).
+    if (community.modules?.crewChannels === true) await syncCrewDiscord(env, Date.now(), {community, requests:6})
+      .catch(error => console.error('Crew Discord sync failed', error instanceof Error ? error.message : 'unknown'));
+  }
+  return rows.length;
 }
 
 // Logo of the community whose site this is (the icon of its Discord server), or null on the main site.
@@ -134,9 +149,10 @@ export default {
   async scheduled(controller, env, ctx) {
     if (!env?.DB) return;
     const at = new Date(controller?.scheduledTime || Date.now());
-    // Every 2 minutes: only the pilots added to the races' threads, a batch at a time.
+    // Every 2 minutes: Discord follows the changes on the site, then the pilots are added to the races' threads.
     if (controller?.cron === '*/2 * * * *') {
-      if (env.DISCORD_BOT_TOKEN) ctx.waitUntil(addThreadMembers(env, at.getTime(), 25).catch(error => console.error('Thread members failed', error instanceof Error ? error.message : 'unknown')));
+      if (env.DISCORD_BOT_TOKEN) ctx.waitUntil(flushDiscord(env).then(() => addThreadMembers(env, at.getTime(), 25))
+        .catch(error => console.error('Discord pass failed', error instanceof Error ? error.message : 'unknown')));
       return;
     }
     const slot = Math.floor(at.getUTCMinutes() / 15);
