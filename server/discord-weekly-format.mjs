@@ -260,12 +260,10 @@ function calendarBlock(event,siteUrl){
   const places=event.capacity
     ?`👥 ${Math.min(event.entered,event.capacity)}/${event.capacity} places${event.entered>=event.capacity?' · complet':''}${event.entered>event.capacity?` · ${event.entered-event.capacity} en attente`:''}`
     :event.entered?`👥 ${event.entered} inscrit${event.entered>1?'s':''}`:'👥 Personne d’inscrit pour l’instant.';
-  // « Event commenté »: the stream link; a commentary only has no places.
-  const stream=event.commentary?`🎙 ${event.commentary.mode==='watch'?'Commentary':'Commenté en direct'} · [Regarder le stream](${event.commentary.stream})`:'';
-  return [`**${event.commentary?'🎙 ':''}${url?`[${name}](${url})`:name}**`,[`🎮 ${SIM_SHORT[event.sim]||clean(event.sim)}`,circuits&&`📍 ${circuits}`,`🕐 ${when}`].filter(Boolean).join(' · '),event.commentary?.mode==='watch'?'':places,stream].filter(Boolean).join('\n');
+  return [`**${url?`[${name}](${url})`:name}**`,[`🎮 ${SIM_SHORT[event.sim]||clean(event.sim)}`,circuits&&`📍 ${circuits}`,`🕐 ${when}`].filter(Boolean).join(' · '),places].join('\n');
 }
 // The week's events (« EVENT SOLO », « EVENT TDZ »): one block, one paragraph per event.
-// `snapshot`: {periodLabel, events:[{id,name,sim,circuits,startsAt,timePending,capacity,entered,commentary}]}.
+// `snapshot`: {periodLabel, events:[{id,name,sim,circuits,startsAt,timePending,capacity,entered}]}.
 export function buildCalendarPayload(snapshot,site={},updatedAt=Date.now()){
   const siteUrl=String(site.url||''),events=Array.isArray(snapshot.events)?snapshot.events:[];
   const embed={title:cut(`📅 Calendrier de la ${snapshot.periodLabel||'semaine à venir'}`,256),color:events.length?0xe7b653:0x6b7280,

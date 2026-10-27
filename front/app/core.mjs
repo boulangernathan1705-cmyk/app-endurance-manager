@@ -224,7 +224,6 @@ export async function load() {
   state.grindfest=session.grindfest===true;
   state.combos=session.combos===true;
   state.safeGuideUrl=typeof session.safeGuideUrl==='string'?session.safeGuideUrl:'';
-  state.streamChannel=typeof session.streamChannel==='string'?session.streamChannel:'';
   if (!state.soloRaces) state.listFormat='endurance';
   state.events=markUndefinedStarts(mergeEvents(upcoming,archived));
   if (!member) { state.page='home'; state.currentEventId=null; state.drafts={}; state.registrationOpen.clear(); }

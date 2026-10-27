@@ -8,8 +8,7 @@ import {dateBlock,dayLabel,timeLabel} from '../dates.mjs';
 import {durationLabel,eventMinutes} from '../../shared/duration.mjs';
 import {isGrindfest,streamersOf} from '../../shared/grindfest.mjs';
 import {streamerLogo} from './grindfest.mjs';
-import {isSolo,eventAccessLogo,accessBadge,soloCardMeta,soloCardInfo,soloFill,watchPanel,ANY_CATEGORY} from './solo.mjs';
-import {isWatchOnly} from '../../shared/commentary.mjs';
+import {isSolo,eventAccessLogo,accessBadge,soloCardMeta,soloCardInfo,soloFill,ANY_CATEGORY} from './solo.mjs';
 
 const dayKeyFormatter=new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Paris',year:'numeric',month:'2-digit',day:'2-digit'});
 function datedDepartures(event){return (event.departures||[]).filter(d=>Number.isFinite(Number(d.startsAt))).sort((a,b)=>Number(a.startsAt)-Number(b.startsAt));}
@@ -70,14 +69,14 @@ document.addEventListener('endurance:render',event=>syncNavSection(event.detail?
 function soloCardFoot(event,archived,situation){
   const dated=datedDepartures(event),shown=archived?dated.at(-1):dated.find(d=>Number(d.startsAt)>Date.now())||dated.at(-1);
   const start=shown?`<span class="solo-card-start"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>${esc(timeLabel(shown.time))}</span>`:'';
-  return `<span class="solo-card-foot">${start}${event.official&&(event.departures||[]).length>1?raceStarts(event,archived):''}${isWatchOnly(event)?'':soloFill(event,shown)}${situation?`<span class="race-situation">${situation}</span>`:''}</span>`;
+  return `<span class="solo-card-foot">${start}${event.official&&(event.departures||[]).length>1?raceStarts(event,archived):''}${soloFill(event,shown)}${situation?`<span class="race-situation">${situation}</span>`:''}</span>`;
 }
 // EVENT TDZ card: no circuit map; the panel is kept for the logo of the event type (OPEN, SAFE, Bouboule…),
 // using the simulator-specific OPEN/SAFE artwork.
 function soloCircuit(event){
   // Gridfest: its own wordmark and the streamers' logos.
   if(isGrindfest(event))return `<span class="race-card-circuit race-card-type-logo gridfest-card-panel" aria-hidden="true"><img class="gridfest-card-logo" src="/images/event-access/gridfest-stacked.png" alt="Gridfest" width="1248" height="1252"><span class="gridfest-avatars">${streamersOf(event).slice(0,6).map(streamer=>streamerLogo(streamer)).join('')}</span></span>`;
-  return `<span class="race-card-circuit race-card-type-logo" data-type="${esc(event.details?.type||'')}" aria-hidden="true">${isWatchOnly(event)&&state.eventTdz?watchPanel():eventAccessLogo(event)}</span>`;
+  return `<span class="race-card-circuit race-card-type-logo" data-type="${esc(event.details?.type||'')}" aria-hidden="true">${eventAccessLogo(event)}</span>`;
 }
 function eventCard({event,next,archived,end}){
   const registered=registeredRaceStatus(event);const displayNext=registered.next;
