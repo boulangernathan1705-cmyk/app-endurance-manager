@@ -788,6 +788,40 @@ export async function removeBotDiscord(env,timestamp,community) {
   return result.meta.changes ? syncBotRecaps(env,timestamp,community) : {ok:true};
 }
 
+// Every quarter of an hour: the pilots with access to the site added to the races' threads, so each thread stays in their
+// list on Discord (no notification). Those of the race first; each added once (one who leaves it stays out). limit: requests.
+export async function addThreadMembers(env, timestamp = Date.now(), limit = 12) {
+  if (!env?.DB || !env.DISCORD_BOT_TOKEN) return 0;
+  const threads = (await env.DB.prepare(`SELECT p.community_id,p.event_id,p.channel_id,p.guild_id FROM discord_recap_publications p
+    JOIN community_recap_settings s ON s.community_id=p.community_id AND s.enabled=1 AND s.guild_id=p.guild_id
+    WHERE p.in_thread=1 AND p.channel_id IS NOT NULL AND p.closed_at IS NULL ORDER BY p.checked_at`).all()).results || [];
+  const budget = {left:limit};
+  let added = 0;
+  for (const thread of threads) {
+    // On the server, with « Accès Endurance Manager » (a role, @everyone, or a Discord admin).
+    const pilots = (await env.DB.prepare(`SELECT m.user_id FROM memberships m WHERE m.community_id=? AND m.status='member'
+      AND NOT EXISTS (SELECT 1 FROM discord_thread_members t WHERE t.community_id=m.community_id AND t.event_id=? AND t.user_id=m.user_id)
+      AND (m.discord_admin=1 OR EXISTS (SELECT 1 FROM community_role_permissions r WHERE r.community_id=m.community_id
+        AND (r.discord_role_id=? OR r.discord_role_id IN (SELECT value FROM json_each(m.discord_roles)))
+        AND EXISTS (SELECT 1 FROM json_each(r.permissions) WHERE value='access')))
+      ORDER BY EXISTS (SELECT 1 FROM registrations g WHERE g.event_id=? AND g.user_id=m.user_id) DESC, m.user_id LIMIT ?`)
+      .bind(thread.community_id,thread.event_id,thread.guild_id,thread.event_id,budget.left).all()).results || [];
+    for (const {user_id} of pilots) {
+      try { await discord(env,'PUT',`/channels/${thread.channel_id}/thread-members/${user_id}`,null,budget); }
+      catch (error) {
+        if (error.budget) return added;
+        // No longer on the server: nothing to add. Anything else (archived thread, rights): this thread waits for next time.
+        if (error.code !== 10007) break;
+      }
+      await env.DB.prepare('INSERT OR IGNORE INTO discord_thread_members(community_id,event_id,user_id,added_at) VALUES(?,?,?,?)')
+        .bind(thread.community_id,thread.event_id,user_id,timestamp).run();
+      added++;
+    }
+    if (budget.left <= 0) break;
+  }
+  return added;
+}
+
 // Every 15 minutes, separately from the hourly recap rotation. Re-read race times before deleting.
 export async function cleanupEventRecaps(env, timestamp = Date.now(), limit = 2) {
   if (!env?.DB || !env.DISCORD_BOT_TOKEN) return 0;
