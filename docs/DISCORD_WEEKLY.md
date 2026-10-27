@@ -18,7 +18,7 @@ Chaque récap est **un message à part**, avec ses propres limites Discord ; plu
 
 Un croquis « Sur ton serveur » suit les choix ; **Voir les messages** montre ce que le bot écrira sans rien envoyer. Rien n’est publié avant **Activer**.
 
-**Changer d’avis** : le bot met le nouveau réglage en place puis retire ce qu’il avait créé pour l’ancien (messages, salons, catégories de course). Ses catégories (« Endurance Manager », « LMU », « iRacing », « Pit talk ») ne sont supprimées qu’une fois vides ; une catégorie de course attend que ses vocaux en soient partis. Les vocaux rejoignent leur nouvel endroit, renommés. **Tout retirer** supprime tout ce que le bot a créé (les vocaux occupés attendent d’être vides) ; les réponses restent pour la prochaine fois. Ce qui ne tient pas en une fois continue tous les quarts d’heure.
+**Changer d’avis** : le bot met le nouveau réglage en place puis retire ce qu’il avait créé pour l’ancien (messages, salons, catégories de course). Ses catégories (« Endurance Manager », « LMU », « iRacing », « Pit talk ») ne sont supprimées qu’une fois vides ; une catégorie de course attend que ses vocaux en soient partis. Les vocaux rejoignent leur nouvel endroit, renommés. **Tout retirer** supprime tout ce que le bot a créé (les vocaux occupés attendent d’être vides) ; les réponses restent pour la prochaine fois. Ce qui ne tient pas en une fois continue toutes les 2 minutes.
 
 Un réglage fait avant ce questionnaire continue tel quel (catégories et salons choisis à l’époque, `# récap-de-la-semaine`, `# calendrier-de-la-semaine`) jusqu’au prochain enregistrement.
 
