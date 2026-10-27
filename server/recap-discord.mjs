@@ -30,8 +30,18 @@ const anchorOf = (settings, event) => settings.enabled === 0 || settings.mode !=
 // The admins' categories and channels: never deleted.
 const anchorIds = settings => [settings.destination_id, settings.iracing_destination_id, settings.calendar_destination_id].filter(Boolean);
 // The races that get a category: 'all', 'lmu', 'iracing', or null.
-export const scopeOf = settings => settings.enabled === 0 || settings.mode !== 'events' ? null : settings.destination_id && settings.iracing_destination_id ? 'all'
-  : settings.destination_id ? 'lmu' : settings.iracing_destination_id ? 'iracing' : null;
+// With the setting asked question by question, every race of the sims shown gets its thread, in both modes.
+export const scopeOf = settings => {
+  const layout = parseLayout(settings.layout);
+  if (layout) return settings.enabled === 0 ? null : layout.sims || 'all';
+  return settings.enabled === 0 || settings.mode !== 'events' ? null : settings.destination_id && settings.iracing_destination_id ? 'all'
+    : settings.destination_id ? 'lmu' : settings.iracing_destination_id ? 'iracing' : null;
+};
+// Whether a race gets its own place (its thread, or its category before the setting asked question by question).
+const raceOn = (settings, event) => {
+  const scope = scopeOf(settings);
+  return Boolean(event) && (parseLayout(settings.layout) ? scope === 'all' || scope === (isIracing(event) ? 'iracing' : 'lmu') : Boolean(anchorOf(settings, event)));
+};
 function weekDestination(settings, kind, community) {
   if (kind === 'calendar') return community.modules?.soloRaces === true ? settings.calendar_destination_id || '' : '';
   return settings.mode === 'general' ? (kind === 'iracing' ? settings.iracing_destination_id : settings.destination_id) || '' : '';
@@ -77,7 +87,12 @@ export const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
 export async function retryAfter(response) {
   if (response.status !== 429) return null;
   const data = await response.clone().json().catch(() => null), seconds = Number(data?.retry_after ?? response.headers.get('retry-after'));
-  return Number.isFinite(seconds) && seconds <= 2 ? Math.ceil(seconds * 1000) + 50 : null;
+  return Number.isFinite(seconds) && seconds <= 5 ? Math.ceil(seconds * 1000) + 50 : null;
+}
+// The last request allowed on this route for now (Discord says so in its answer): wait for the next one, rather than be refused.
+export async function spaceOut(response) {
+  const seconds = Number(response.headers?.get?.('x-ratelimit-reset-after'));
+  if (response.headers?.get?.('x-ratelimit-remaining') === '0' && Number.isFinite(seconds) && seconds > 0) await pause(Math.min(seconds, 5) * 1000 + 50);
 }
 async function discord(env, method, path, body, budget = {left:12}) {
   if (!String(env.DISCORD_BOT_TOKEN || '').trim()) throw Object.assign(new Error('Le bot du site n’est pas configuré.'), {status:401});
@@ -88,6 +103,7 @@ async function discord(env, method, path, body, budget = {left:12}) {
   // A short wait asked by Discord (several requests at once on the same server): one more try, the first was not done.
   const wait = await retryAfter(response);
   if (wait !== null) response = await (await pause(wait), call());
+  await spaceOut(response);
   const data = response.status === 204 ? null : await response.json().catch(() => null);
   if (!response.ok) throw Object.assign(new Error('Discord indisponible'), {status:response.status, code:data?.code, path});
   return data;
@@ -412,7 +428,7 @@ export async function previewBotRecap(env, timestamp, community, settings) {
   // The bot's categories not made yet stand in for themselves.
   const cats = layout ? Object.fromEntries(wantedCategories(layout).map(key => [key, parseCategories(settings.bot_categories)[key] || `new-${key}`])) : undefined;
   for (const entry of weekPlan(env, community, settings, cats)) {
-    const {payload} = await snapshotPayload(env, timestamp, community, null, entry.kind, entry.sim, false, layout?.mode === 'events' && !entry.kind.startsWith('calendar') ? {} : null);
+    const {payload} = await snapshotPayload(env, timestamp, community, null, entry.kind, entry.sim, false, layout && !entry.kind.startsWith('calendar') ? {} : null);
     const name = layout ? `# ${entry.channel}` : entry.kind === 'calendar' ? settings.calendar_destination_name : entry.kind === 'iracing' ? settings.iracing_destination_name : settings.destination_name;
     previews.push({eventId:'week:' + entry.kind, name:`${name} · ${MESSAGE_NAMES[entry.kind.split(':')[0]]}`, payload});
   }
@@ -422,7 +438,7 @@ export async function previewBotRecap(env, timestamp, community, settings) {
   const events = await raceEvents(env, community);
   for (const eventId of await openRaces(env, community, events, scope, timestamp)) {
     if (previews.length === 10) break;
-    const {snapshot, payload} = await snapshotPayload(env, timestamp, community, eventId, null, null, layout?.mode === 'events');
+    const {snapshot, payload} = await snapshotPayload(env, timestamp, community, eventId, null, null, Boolean(layout));
     // An official race without any entry of this community gets no category.
     if (snapshot.futureDepartures.length) previews.push({eventId,name:raceCategoryName(events.find(item => item.id === eventId)),payload});
   }
@@ -482,7 +498,7 @@ async function publish(env, timestamp, community, settings, row, event, budget, 
     }
   }
   const anchors = anchorIds(settings), anchorId = isEvent ? anchorOf(settings, event) : '';
-  const layout = parseLayout(settings.layout), threaded = isEvent && layout?.mode === 'events';
+  const layout = parseLayout(settings.layout), threaded = isEvent && Boolean(layout);
   if (threaded) {
     channel = await raceThread(env, community, settings, layout, row, event, budget, repair);
     if (!channel) return;
@@ -517,7 +533,7 @@ async function publish(env, timestamp, community, settings, row, event, budget, 
     channel = existing?.id || channel || (await discord(env,'POST',`/guilds/${row.guild_id}/channels`,{type:0,name:RACE_INFO_CHANNEL,parent_id:category,topic:row.marker},budget)).id;
     await env.DB.prepare('UPDATE discord_recap_publications SET channel_id=? WHERE community_id=? AND event_id=?').bind(channel,community.id,row.event_id).run();
   }
-  const threads = !isEvent && layout?.mode === 'events' && !kind.startsWith('calendar') ? await raceThreads(env, community) : null;
+  const threads = !isEvent && layout && !kind.startsWith('calendar') ? await raceThreads(env, community) : null;
   const {payload, hash} = prepared || await snapshotPayload(env,timestamp,community,isEvent ? row.event_id : null,kind,entry?.sim,threaded,threads);
   if (!repair && row.message_id && row.content_hash === hash) return;
   if (row.message_id) {
@@ -605,6 +621,9 @@ async function raceThread(env, community, settings, layout, row, event, budget, 
     });
     Object.assign(row, {channel_id:thread.id, message_id:null, content_hash:'', in_thread:1, thread_parent:week.channel_id});
     await save();
+    // A new thread has nobody in it: everyone is added again, soon.
+    await env.DB.prepare('DELETE FROM discord_thread_members WHERE community_id=? AND event_id=?').bind(community.id,row.event_id).run();
+    await env.DB.prepare('UPDATE discord_recap_publications SET members_checked_at=0 WHERE community_id=? AND event_id=?').bind(community.id,row.event_id).run();
   }
   return row.channel_id;
 }
@@ -665,7 +684,7 @@ async function syncLocked(env,timestamp,community,settings, test = false, budget
   const races = rows.filter(isRaceRow).map(row => {
     const event = events.find(item => item.id === row.event_id), deleteAt = event ? eventDeletionTime(event) : row.delete_after;
     // A race no longer given a category (« récap de la semaine », its sim not published, or all taken off) loses its channels.
-    const unwanted = Boolean(event) && !anchorOf(settings, event);
+    const unwanted = Boolean(event) && !raceOn(settings, event);
     return {row, deleteAt, unwanted, due:(deleteAt !== null && timestamp >= deleteAt) || (unwanted && Boolean(row.category_id || row.channel_id))};
   });
   const due = races.filter(item => item.due);
@@ -712,18 +731,18 @@ async function syncLocked(env,timestamp,community,settings, test = false, budget
       const channels = await discord(env,'GET',`/guilds/${settings.guild_id}/channels`,null,budget);
       await placeCategory(env,community,settings.guild_id,channels,null,settings,budget);
     }
-    for (const eventId of ordered.filter(id => anchorOf(settings, events.find(item => item.id === id))).slice(0,2)) {
+    for (const eventId of ordered.filter(id => raceOn(settings, events.find(item => item.id === id))).slice(0,2)) {
       const event = events.find(item => item.id === eventId);
       if (!event || (eventDeletionTime(event) !== null && timestamp >= eventDeletionTime(event))) continue;
       // Reuse the eligibility/isolation query even for previously published official races.
-      const prepared = await snapshotPayload(env,timestamp,community,eventId,null,null,layout?.mode === 'events');
+      const prepared = await snapshotPayload(env,timestamp,community,eventId,null,null,Boolean(layout));
       if (!prepared.snapshot.futureDepartures.length && !rows.some(row => row.event_id === eventId)) continue;
       const row = await ensurePublication(env,community,eventId,settings);
       await publish(env,timestamp,community,settings,row,event,budget,prepared,test);
       await env.DB.prepare('UPDATE discord_recap_publications SET checked_at=? WHERE community_id=? AND event_id=?').bind(timestamp,community.id,eventId).run();
     }
   }
-  if (layout?.mode === 'events' && settings.enabled !== 0) {
+  if (layout && settings.enabled !== 0) {
     // A thread just opened: the week's message links to it now (nothing sent when unchanged).
     for (const entry of plan.filter(item => !item.kind.startsWith('calendar'))) {
       const row = await ensurePublication(env,community,'week:' + entry.kind,settings);
@@ -788,14 +807,15 @@ export async function removeBotDiscord(env,timestamp,community) {
   return result.meta.changes ? syncBotRecaps(env,timestamp,community) : {ok:true};
 }
 
+
 // Every 2 minutes: the pilots with access to the site added to the races' threads, so each thread stays in their list on
 // Discord, 50 at a time per thread. Those of the race first; each added once (one who leaves it stays out). limit: requests.
 // A thread with nobody left to add is looked at again an hour later (a pilot given access meanwhile).
 export async function addThreadMembers(env, timestamp = Date.now(), limit = 25) {
   if (!env?.DB || !env.DISCORD_BOT_TOKEN) return 0;
-  const threads = (await env.DB.prepare(`SELECT p.community_id,p.event_id,p.channel_id,p.guild_id FROM discord_recap_publications p
+  const threads = (await env.DB.prepare(`SELECT p.community_id,p.event_id,p.channel_id,p.guild_id,p.message_id FROM discord_recap_publications p
     JOIN community_recap_settings s ON s.community_id=p.community_id AND s.enabled=1 AND s.guild_id=p.guild_id AND s.lock_until<?
-    WHERE p.in_thread=1 AND p.channel_id IS NOT NULL AND p.closed_at IS NULL AND p.members_checked_at<? ORDER BY p.members_checked_at`).bind(Date.now(), timestamp - 3600000).all()).results || [];
+    WHERE p.in_thread=1 AND p.channel_id IS NOT NULL AND p.message_id IS NOT NULL AND p.closed_at IS NULL AND p.members_checked_at<? ORDER BY p.members_checked_at`).bind(Date.now(), timestamp - 3600000).all()).results || [];
   const budget = {left:limit};
   let added = 0;
   for (const thread of threads) {
@@ -811,12 +831,18 @@ export async function addThreadMembers(env, timestamp = Date.now(), limit = 25) 
       await env.DB.prepare('UPDATE discord_recap_publications SET members_checked_at=? WHERE community_id=? AND event_id=?').bind(timestamp,thread.community_id,thread.event_id).run();
       continue;
     }
-    // Added by a silent mention (no push notification), deleted at once: adding them one by one notifies them.
-    const ids = pilots.map(pilot => pilot.user_id);
+    // Added by mentioning them in an EDIT of the race's message, then taken off: an edit notifies nobody (no badge), while a
+    // new message with mentions or adding them one by one does.
+    const ids = pilots.map(pilot => pilot.user_id), path = `/channels/${thread.channel_id}/messages/${thread.message_id}`;
     try {
-      const message = await discord(env,'POST',`/channels/${thread.channel_id}/messages`,{content:ids.map(id => `<@${id}>`).join(' '),
-        allowed_mentions:{users:ids},flags:4096},budget);
-      await discord(env,'DELETE',`/channels/${thread.channel_id}/messages/${message.id}`,null,budget);
+      const mention = () => discord(env,'PATCH',path,{content:ids.map(id => `<@${id}>`).join(' '),allowed_mentions:{users:ids}},budget);
+      // A thread quiet for a week is archived by Discord: opened again first.
+      await mention().catch(async error => {
+        if (error.code !== 50083) throw error;
+        await discord(env,'PATCH',`/channels/${thread.channel_id}`,{archived:false},budget);
+        await mention();
+      });
+      await discord(env,'PATCH',path,{content:'',allowed_mentions:{parse:[]}},budget);
     } catch (error) {
       // Discord limits the bot's requests, or the thread is archived or gone: next time.
       if (error.budget || error.status === 429) return added;

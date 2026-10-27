@@ -1,4 +1,4 @@
-import {pause,retryAfter} from './recap-discord.mjs';
+import {pause,retryAfter,spaceOut} from './recap-discord.mjs';
 import {effectivePermissions,guildPermissions,missingVoicePermissions,withBotAccess,VOICE_ACCESS,EMBED} from './discord-permissions.mjs';
 // Crews on Discord (migrations 0044, 0045). Two modules, each enabled by the admins of a community:
 // - crewChannels (« Salons d'équipage »): as soon as it is made, every crew gets a voice
@@ -50,6 +50,7 @@ async function discord(env, budget, method, path, body) {
   const wait = await retryAfter(response);
   if (wait !== null) response = await (await pause(wait), call());
   if (response.status === 429) { budget.left = 0; throw new Stop('rate-limited'); }
+  await spaceOut(response);
   const data = response.status === 204 ? null : await response.json().catch(() => null);
   if (!response.ok) {
     const error = new Error(`Discord ${response.status}${data?.code ? ` (${data.code})` : ''}`);
@@ -116,7 +117,7 @@ const TRACKED_CREWS = `SELECT d.crew_id AS row_id, d.community_id AS row_communi
   d.recap_hash, d.members, d.starts_at, d.reminded, d.created_at, d.parent_id, ${CREW_COLUMNS},
   -- A race's category only counts while « Une catégorie par course » is on: otherwise the voices leave it before it goes.
   -- « Un fil par course » (the setting asked question by question) has none: the voices go just below the threads.
-  s.layout AS recap_layout,
+  s.layout AS recap_layout, CASE WHEN s.enabled=1 THEN s.bot_categories END AS recap_cats,
   CASE WHEN s.enabled=1 AND s.mode='events' AND COALESCE(s.layout,'')='' AND p.category_id NOT IN (COALESCE(s.destination_id,''),COALESCE(s.iracing_destination_id,'')) THEN p.category_id END AS race_category,
   CASE WHEN s.enabled=1 AND s.mode='events' AND COALESCE(s.layout,'')='' THEN CASE WHEN s.destination_id<>'' AND s.iracing_destination_id<>'' THEN 'all'
     WHEN s.destination_id<>'' THEN 'lmu' WHEN s.iracing_destination_id<>'' THEN 'iracing' END END AS race_scope
@@ -230,6 +231,16 @@ function dueReminders(community, row, start, timestamp) {
   return REMINDERS.filter(item => !(reminded & item.bit) && start.startsAt - timestamp <= item.before);
 }
 
+// Where a crew's voice goes: its race's category, else, in « Un fil par course » with the sims apart, its sim's category of
+// the bot (« LMU » or « iRacing »), else the category chosen for the voices.
+function voiceParent(row, setting) {
+  if (row.race_category) return row.race_category;
+  try {
+    const layout = JSON.parse(row.recap_layout || 'null'), cats = JSON.parse(row.recap_cats || 'null');
+    if (layout?.mode === 'events' && layout.split && cats?.[game(row.circuit)]) return cats[game(row.circuit)];
+  } catch { /* an unreadable setting: the voices' category */ }
+  return setting.voice_category_id || null;
+}
 // Whether a row has anything to do on Discord now (most of them have not).
 async function needsWork(env, timestamp, community, setting, row, pilots) {
   const start = row.crew_id && row.event_name ? startOf(row) : null;
@@ -237,7 +248,7 @@ async function needsWork(env, timestamp, community, setting, row, pilots) {
   // Voices turned off (or everything taken off): the voice channel goes.
   if (community.modules?.crewChannels !== true || !setting) return Boolean(row.voice_id);
   if (!row.voice_id || !row.message_id || row.text_id || row.category_id || Number(row.starts_at) !== start.startsAt) return true;
-  if ((row.parent_id || null) !== (row.race_category || setting.voice_category_id || null)) return true;
+  if ((row.parent_id || null) !== voiceParent(row, setting)) return true;
   const current = discordIds(pilots), known = JSON.parse(row.members || '[]');
   if (current.length !== known.length || current.some(id => !known.includes(id))) return true;
   if (dueReminders(community, row, start, timestamp).length) return true;
@@ -383,7 +394,7 @@ async function raceCategoryGone(env, row) {
   throw new Stop('gone');
 }
 async function createVoice(env, budget, row, setting, body) {
-  const parent = row.race_category || setting.voice_category_id;
+  const parent = voiceParent(row, setting);
   try {
     const category = parent ? await discord(env,budget,'GET',`/channels/${parent}`) : null;
     return await discord(env,budget,'POST',`/guilds/${row.guild_id}/channels`,{...body,
@@ -465,7 +476,7 @@ async function syncRow(env, budget, timestamp, community, setting, row, pilots) 
     if (!row.race_category && row.parent_id) await sortVoices(env, budget, row, row.parent_id);
     opened = true;
   }
-  const parent = row.race_category || setting.voice_category_id || null;
+  const parent = voiceParent(row, setting);
   if (!opened && (row.parent_id || null) !== parent) {
     // Opened elsewhere (before its race's category, or before the admins chose where the voices go): moved there once,
     // and named for that place.
