@@ -5,6 +5,7 @@
 ### 🔧 Corrections
 
 - **Discord** : un salon ou un vocal du bot supprimé à la main sur le serveur ne bloque plus l'activation du réglage ; le bot le recrée si besoin.
+- **Discord** : le lien « Inviter le bot avec ses droits » donne tout ce qu'il faut sans le mettre administrateur, et la catégorie sous laquelle le bot se place n'affiche plus « le bot n'a pas ses droits ».
 
 ## v1.58 — 27 octobre 2026
 

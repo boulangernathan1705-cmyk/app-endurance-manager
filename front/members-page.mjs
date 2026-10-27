@@ -205,11 +205,12 @@ function discordQuestions(form, answers) {
   const places = list ? discordPlaces(list) : [];
   const radio = (name, value, label, checked) => `<label class="discord-pill"><input type="radio" name="${name}" value="${value}" ${checked ? 'checked' : ''}> ${label}</label>`;
   const known = (value, label) => value && !['top','bot','same'].includes(value) && !places.some(item => item.id === value) ? `<option value="${esc(value)}" selected>${esc(label || 'Choix actuel')}</option>` : '';
-  const option = (item, value, inside = false) => `<option value="${esc(item.id)}" ${item.id === value ? 'selected' : ''}>${item.type === 0 ? `${inside && item.parentId ? '   ' : ''}# ` : '📁 '}${esc(item.name)}${item.ready === false ? ' · le bot n’a pas ses droits' : ''}</option>`;
+  const option = (item, value, inside = false, rights = true) => `<option value="${esc(item.id)}" ${item.id === value ? 'selected' : ''}>${item.type === 0 ? `${inside && item.parentId ? '   ' : ''}# ` : '📁 '}${esc(item.name)}${rights && item.ready === false ? ' · le bot n’a pas ses droits' : ''}</option>`;
   // A place for a recap: not shown, the bot's category, or just below a channel or category of the server.
   const place = (name, value, extra = '') => `<select name="${name}"><option value="" ${!value ? 'selected' : ''}>Ne pas afficher</option>${extra}
     <option value="bot" ${value === 'bot' ? 'selected' : ''}>Dans la catégorie du bot</option><optgroup label="Ou juste sous…">${places.map(item => option(item, value, true)).join('')}${known(value)}</optgroup></select>`;
-  const category = (name, value) => `<select name="${name}"><option value="top" ${value === 'top' ? 'selected' : ''}>Le haut du serveur</option>${places.filter(item => item.type === 4).map(item => option(item, value)).join('')}${known(value)}</select>`;
+  // rights: only where the bot writes inside; placing its own category just below needs no rights there.
+  const category = (name, value, rights = false) => `<select name="${name}"><option value="top" ${value === 'top' ? 'selected' : ''}>Le haut du serveur</option>${places.filter(item => item.type === 4).map(item => option(item, value, false, rights)).join('')}${known(value)}</select>`;
   const help = value => { const chosen = places.find(item => item.id === value); return chosen?.ready === false ? discordRightsHelp(chosen) : ''; };
   const row = (title, sub, control, after = '') => `<label class="discord-row"><span><strong>${title}</strong>${sub ? `<small>${sub}</small>` : ''}</span>${control}</label>${after}`;
   const questions = [
@@ -229,7 +230,7 @@ function discordQuestions(form, answers) {
   if (discordUsesBot(answers)) questions.push(['Où placer la catégorie du bot ?', row(race && apart ? '« LMU » et « iRacing »' : '« Endurance Manager »', race ? 'Juste sous cette catégorie, puis les catégories des courses.' : 'Juste sous cette catégorie.', category('under', answers.under || 'top'))]);
   questions.push(['Des vocaux d’équipage ?', `<div class="discord-pills">${radio('voices','yes','Oui',answers.voices)}${radio('voices','no','Non',!answers.voices)}</div>
     ${answers.voices && !race ? `<div class="discord-pills">${radio('pit','bot','Le bot crée « 🎙️ Pit talk »',answers.pit !== 'existing')}${radio('pit','existing','Dans une catégorie existante',answers.pit === 'existing')}</div>
-      ${row(answers.pit === 'existing' ? 'Vocaux d’équipage' : '🎙️ Pit talk', answers.pit === 'existing' ? 'Le bot les crée dans' : 'Le bot la crée juste sous', category('pitAt', answers.pitAt || 'top'), answers.pit === 'existing' ? help(answers.pitAt) : '')}` : ''}
+      ${row(answers.pit === 'existing' ? 'Vocaux d’équipage' : '🎙️ Pit talk', answers.pit === 'existing' ? 'Le bot les crée dans' : 'Le bot la crée juste sous', category('pitAt', answers.pitAt || 'top', answers.pit === 'existing'), answers.pit === 'existing' ? help(answers.pitAt) : '')}` : ''}
     <p class="members-help">${!answers.voices ? 'Pas de vocal : les équipages s’organisent ailleurs.' : race ? 'Dans la catégorie de sa course, nommé « Équipage A ». Supprimé 2 h après la course.' : 'Nommés « LMU · 6h de Spa · Équipage A », LMU puis iRacing, par date. Supprimés 2 h après la course.'}</p>
     <label class="discord-check"><input type="checkbox" name="reminders" ${answers.reminders ? 'checked' : ''}><span><strong>Rappels avant le départ</strong><small>${answers.voices ? '24 h avant dans la cloche du site, puis 24 h et 1 h avant dans le chat du vocal.' : '24 h avant dans la cloche du site.'}</small></span></label>`]);
   return questions;

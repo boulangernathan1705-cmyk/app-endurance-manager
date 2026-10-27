@@ -1,4 +1,4 @@
-import {effectivePermissions,guildPermissions,missingVoicePermissions,withBotAccess,VOICE_ACCESS} from './discord-permissions.mjs';
+import {effectivePermissions,guildPermissions,missingVoicePermissions,withBotAccess,VOICE_ACCESS,EMBED} from './discord-permissions.mjs';
 // Crews on Discord (migrations 0044, 0045). Two modules, each enabled by the admins of a community:
 // - crewChannels (« Salons d'équipage »): as soon as it is made, every crew gets a voice
 //   channel named after its sim and its name (« LMU-Les Tondeuz »), made in the category the admins chose
@@ -30,7 +30,8 @@ export const REMINDERS = [{bit:1, before:24 * HOUR}, {bit:2, before:HOUR}];
 // What the bot needs on the server for the crews (invite link of the « Modules » settings): view channels,
 // manage channels, connect to voice channels, send messages, read the history.
 const ADMINISTRATOR = 1n << 3n, NEEDED = VOICE_ACCESS;
-export const CREW_BOT_PERMISSIONS = String(NEEDED);
+// One invite for the whole « Discord » setting: the voices, and the bot's own categories and messages (embeds).
+export const CREW_BOT_PERMISSIONS = String(NEEDED | EMBED);
 const VOICE = 2, CATEGORY = 4;
 
 class Stop extends Error {}
