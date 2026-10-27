@@ -47,9 +47,13 @@ export const median = list => {
 
 // ---------- What the plugin sends ----------
 
+// Per wheel: wear left %, carcass °C, kPa, brake °C and (plugin 2.4) the tread's inner, middle and outer °C, the
+// temperatures the game's tyre screen shows (null from older plugins).
 function cleanWheel(input) {
-  const [left, carcass, kpa, brake] = Array.isArray(input) ? input : [];
-  return {left:num(left, 0, 100), carcass:num(carcass, -50, 400), kpa:num(kpa, 0, 1000), brake:num(brake, -50, 2000)};
+  const [left, carcass, kpa, brake, tread] = Array.isArray(input) ? input : [];
+  const three = Array.isArray(tread) ? [0, 1, 2].map(index => num(tread[index], -50, 400)) : null;
+  return {left:num(left, 0, 100), carcass:num(carcass, -50, 400), kpa:num(kpa, 0, 1000), brake:num(brake, -50, 2000),
+    tread:three && three.every(value => value !== null) ? three : null};
 }
 
 function cleanStop(input) {

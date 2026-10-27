@@ -288,6 +288,13 @@ test('plugin 2.4: quick messages pass our car\'s frames to every page shown and 
   assert.equal(cleanPositions(Array.from({length:200}, (_, k) => [k, 1, 1])).length, 120);
 });
 
+test('plugin 2.4: the tread\'s three temperatures per wheel, as the game shows them; none from older plugins', () => {
+  const wheels = [[90, 85, 170, 500, [92, 88, 81]], [90, 85, 170, 500], [90, 85, 170, 500, [92, 'x', 81]], [90, 85, 170, 500, [92, 88, 900]]];
+  const read = cleanSnapshot(snap({me:{wheels}})).me.wheels;
+  assert.deepEqual(read.map(wheel => wheel.tread), [[92, 88, 81], null, null, null]);
+  assert.equal(read[0].carcass, 85);
+});
+
 test('only what changed, and the same value back once applied', () => {
   const before = {a:1, list:[1, 2, {x:1}], gone:true, keep:{deep:[1, 2]}, swap:[1]};
   const after = {a:2, list:[1, 3, {x:1, y:null}, 4], keep:{deep:[1, 2]}, swap:{n:1}, fresh:'é'};

@@ -244,11 +244,14 @@ function pitCell(feed, car) {
   return `<b>${stopsOf(feed, car)}</b>${known(last) ? chip(`${fr(last, 1)}s`, 'stop') : ''}`;
 }
 const clsPill = cls => `<span class="pw-cls" style="--cls:${classColor(cls)}">${esc(clsName(cls) || '—')}</span>`;
+// The game gives each car's tank in %: of its virtual energy, or of its fuel for a car without (LMP2). Fuel cars of our
+// class have our tank, so their % reads in litres (null: shown in %).
+const litresPer = (feed, car) => !known(feed.snap.me.ve) && car.cls === feed.snap.me.cls && feed.snap.me.capacity > 0 ? feed.snap.me.capacity / 100 : null;
 // The game gives 0 for a car whose tank it does not share (other players online): shown as unknown.
-function tankCell(car) {
+function tankCell(car, perCent = null) {
   if (!(known(car.tank) && car.tank > 0)) return '<span class="pw-dim">—</span>';
   const level = Math.max(0, Math.min(100, car.tank)), color = level < 15 ? 'var(--pw-red)' : level < 35 ? 'var(--pw-yellow)' : 'var(--pw-green)';
-  return `<span class="pw-tank" style="--tank:${level}%;--bar:${color}"><b>${fr(level, 0)}%</b><i></i></span>`;
+  return `<span class="pw-tank" style="--tank:${level}%;--bar:${color}"><b>${perCent ? `${fr(level * perCent, 1)} L` : `${fr(level, 0)}%`}</b><i></i></span>`;
 }
 const numCell = car => `<td class="pw-num">#${esc(car.num || '')}</td>`;
 const nameCell = car => `<td class="pw-name"><b>${esc(car.driver)}</b></td>`;
@@ -280,10 +283,10 @@ function general(feed, race) {
       <td class="pw-pos">P${placeOf(feed, car)}</td>${numCell(car)}<td class="pw-opt">${clsPill(car.cls)}</td>
       ${nameCell(car)}<td class="pw-team pw-opt2">${esc(model(car))}</td>
       <td class="pw-n">${gap}</td><td class="pw-n pw-opt">${car.laps ?? '—'}</td><td class="pw-n pw-opt">${lapTime(car.last)}</td>
-      <td class="pw-n">${best}</td><td class="pw-n pw-opt">${tankCell(car)}</td><td class="pw-n pw-stand">${pitCell(feed, car)}</td></tr>`;
+      <td class="pw-n">${best}</td><td class="pw-n pw-opt">${tankCell(car, litresPer(feed, car))}</td><td class="pw-n pw-stand">${pitCell(feed, car)}</td></tr>`;
   }).join('');
   return `<div class="pw-table"><table><thead><tr><th>Pos</th><th class="pw-yellow">#</th><th class="pw-opt">Cat</th><th>Pilote / équipe</th><th class="pw-opt2">Équipe</th><th class="pw-n">${race ? 'Écart leader' : 'Écart'}</th>
-    <th class="pw-n pw-opt">Tours</th><th class="pw-n pw-opt">Dernier tour</th><th class="pw-n">Meilleur tour</th><th class="pw-n pw-opt" title="Réservoir ou énergie virtuelle restante">Énergie virt.</th><th class="pw-n">Stands / arrêt</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+    <th class="pw-n pw-opt">Tours</th><th class="pw-n pw-opt">Dernier tour</th><th class="pw-n">Meilleur tour</th><th class="pw-n pw-opt" title="Réservoir ou énergie virtuelle restante">${known(snap.me.ve) ? 'Énergie virt.' : 'Carburant'}</th><th class="pw-n">Stands / arrêt</th></tr></thead><tbody>${rows}</tbody></table></div>`;
 }
 
 // Every car around us on track, seconds ahead or behind at our pace, whatever its class: who we are about to catch,
@@ -337,15 +340,15 @@ function opponents(feed) {
     const pace = known(diff) ? ` <small class="${diff < 0 ? 'pw-red' : 'pw-green'}">${signed(diff, 2)}</small>` : '';
     // Our own car: what our plugin reads of it when the field's row has nothing.
     const compound = car.cmp || (ours ? snap.me.compound : null), damage = car.dmg ?? (ours ? snap.me.damage : null);
-    const use = info.use5, left = known(use) && use > 0 && known(car.tank) && car.tank > 0 ? car.tank / use : null;
+    const use = info.use5, perCent = litresPer(feed, car), left = known(use) && use > 0 && known(car.tank) && car.tank > 0 ? car.tank / use : null;
     const leftTone = !known(left) ? '' : left < 4 ? 'pw-red' : left < 8 ? 'pw-yellow' : 'pw-green';
     return `<tr class="${ours ? 'us' : ''}"><td class="pw-pos">P${index + 1}</td>${numCell(car)}${nameCell(car)}<td class="pw-n pw-big">${gap}</td>
       <td class="pw-n">${lapTime(info.avg5)}${pace}</td><td>${tyreCell(compound)}</td><td class="pw-opt">${damageCell(damage)}</td>
-      <td class="pw-n">${tankCell(car)}</td><td class="pw-n pw-opt">${known(use) ? `${fr(use, 1)} %` : '—'}</td><td class="pw-n"><b class="${leftTone}">${known(left) ? `${fr(left, 1)} t` : '—'}</b></td>
+      <td class="pw-n">${tankCell(car, perCent)}</td><td class="pw-n pw-opt">${known(use) ? perCent ? `${fr(use * perCent, 2)} L` : `${fr(use, 1)} %` : '—'}</td><td class="pw-n"><b class="${leftTone}">${known(left) ? `${fr(left, 1)} t` : '—'}</b></td>
       <td class="pw-n pw-opt">${known(info.sinceStop) ? info.sinceStop : '—'}</td><td class="pw-n pw-stand">${pitCell(feed, car)}</td></tr>`;
   }).join('');
   return `<div class="pw-table"><table><thead><tr><th>Pos</th><th class="pw-yellow">#</th><th>Pilote / équipe</th><th class="pw-n">${race ? 'Sur nous' : 'Meilleur / nous'}</th><th class="pw-n">Moy. 5 tours</th>
-    <th>Pneus</th><th class="pw-opt">Dégâts</th><th class="pw-n">Énergie</th><th class="pw-n pw-opt">Conso / tour</th><th class="pw-n" title="Énergie restante ÷ conso moyenne sur 5 tours">Tours restants</th>
+    <th>Pneus</th><th class="pw-opt">Dégâts</th><th class="pw-n">${known(snap.me.ve) ? 'Énergie' : 'Carburant'}</th><th class="pw-n pw-opt">Conso / tour</th><th class="pw-n" title="Réserve ÷ conso moyenne sur 5 tours">Tours restants</th>
     <th class="pw-n pw-opt" title="Tours depuis son dernier arrêt">Relais</th><th class="pw-n">Stands / arrêt</th></tr></thead><tbody>${rows}</tbody></table></div>
     <p class="pw-note">${race ? 'Écart en course : + devant nous, − derrière.' : 'Meilleur tour comparé au nôtre : + plus lent.'} Rythme sur 5 tours : <span class="pw-red">rouge</span> plus rapide que nous. Tours restants : énergie ÷ conso moyenne sur 5 tours.</p>`;
 }
@@ -436,11 +439,18 @@ function car(feed) {
       ${box('Arrêt plein', known(stopFor('energy')) ? `${fr(stopFor('energy'), 1)} s` : '—', 'immobile')}
       ${box('Plein + 4 pneus', known(stopFor('tyres')) ? `${fr(stopFor('tyres'), 1)} s` : '—', 'immobile')}
     </div>`);
+  // The tread's three temperatures as the game shows them (plugin 2.4), laid out as on the car (outer side out), their
+  // mean in big; older plugins give only the carcass.
+  const tyreTemps = (w, index) => {
+    if (!w.tread) return `<div class="pw-tyre" style="--temp:${tyreColor(w.carcass)}"><b>${known(w.carcass) ? `${fr(w.carcass, 0)}°C` : '—'}</b><small>carcasse</small></div>`;
+    const [inner, middle, outer] = w.tread, mean = (inner + middle + outer) / 3, row = index % 2 ? [inner, middle, outer] : [outer, middle, inner];
+    return `<div class="pw-tyre" style="--temp:${tyreColor(mean)}"><b>${fr(mean, 0)}°C</b><span class="pw-tread">${row.map(value => `<i style="--temp:${tyreColor(value)}">${fr(value, 0)}</i>`).join('')}</span></div>`;
+  };
   const wheel = (w, index) => {
     const wear5 = ours.wear5?.[index], lastWear = ours.laps?.at(-1)?.wear?.[index];
     return `<div class="pw-wheel"><div class="pw-wheel-head"><b>${WHEELS[index]}</b>${me.compound ? chip(esc(me.compound.toUpperCase()), 'compound') : ''}<span>Pression <b class="pw-cyan">${known(w.kpa) ? fr(w.kpa, 0) : '—'}</b> kPa</span></div>
       <div class="pw-wheel-body${index % 2 ? ' right' : ''}">
-        <div class="pw-tyre" style="--temp:${tyreColor(w.carcass)}"><b>${known(w.carcass) ? `${fr(w.carcass, 0)}°C` : '—'}</b><small>carcasse</small></div>
+        ${tyreTemps(w, index)}
         <div class="pw-brake" style="--temp:${brakeColor(w.brake)}"><i></i><b>${known(w.brake) ? `${fr(w.brake, 0)}°C` : '—'}</b><small>frein</small></div>
       </div>
       <div class="pw-row3">${box('Restante', `<span style="color:${wearColor(w.left)}">${known(w.left) ? `${fr(w.left, 1)}%` : '—'}</span>`)}${box('Moyenne', known(wear5) ? `${fr(wear5, 2)}%/t` : '—')}${box('Dernier tour', known(lastWear) ? `${fr(lastWear, 2)}%` : '—')}</div></div>`;
