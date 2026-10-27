@@ -191,7 +191,14 @@
 .pw-body .pw-damage-sum { display: grid; gap: 14px; justify-items: center; width: 100%; }
 .pw-body .pw-damage.with-car { grid-template-columns: auto 1fr; align-items: center; gap: 18px; padding: 10px 0; }
 .pw-body .pw-damage.with-car b { font-size: 36px; }
-.pw-body .pw-car-dents { width: 104px; height: auto; }
+.pw-body .pw-car-dents { width: 128px; height: auto; }
+.pw-body .pw-car-dents path, .pw-body .pw-car-dents rect { fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.pw-body .pw-car-dents .pw-dent-zone { stroke-width: 6; }
+.pw-body .pw-car-dents .pw-dent-arms path, .pw-body .pw-car-dents .pw-dent-pillar { stroke: var(--pw-muted); stroke-width: 2.5; }
+.pw-body .pw-car-dents .pw-dent-wheel { fill: var(--pw-accent); stroke: var(--pw-muted); stroke-width: 2; }
+.pw-body .pw-car-dents .pw-dent-cockpit { stroke: var(--pw-line); stroke-width: 3; }
+.pw-body .pw-car-dents .pw-dent-wing { stroke: var(--pw-text2); stroke-width: 4; }
+.pw-body .pw-car-dents .pw-dent-wing.off { stroke: var(--pw-red); stroke-dasharray: 6 5; }
 .pw-body .pw-wing { display: grid; justify-items: center; gap: 2px; }
 .pw-body .pw-wing span { font-size: 12px; color: var(--pw-muted); text-transform: uppercase; }
 .pw-body .pw-damage .pw-wing b { font-size: 18px; font-family: inherit; }

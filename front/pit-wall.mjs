@@ -421,13 +421,18 @@ function car(feed) {
     </div>${settings ? `<div class="pw-settings">${settings}</div>` : ''}`);
   const damage = known(me.damage) ? me.damage : null;
   // The car from above (front up) in the game's eight dent zones, and the rear wing (the only part that comes off in LMU).
-  const dents = me.dents, zone = level => ['var(--pw-green)', 'var(--pw-orange)', 'var(--pw-red)'][level] || 'var(--pw-muted)';
-  const part = (index, x, y, w, h) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="4" fill="${zone(dents[index])}"/>`;
-  const drawing = dents ? `<svg class="pw-car-dents" viewBox="0 0 120 226" role="img" aria-label="Dégâts par zone">
-      ${part(0, 40, 6, 40, 30)}${part(1, 14, 14, 24, 44)}${part(7, 82, 14, 24, 44)}${part(2, 14, 62, 24, 92)}${part(6, 82, 62, 24, 92)}
-      ${part(3, 14, 158, 24, 44)}${part(5, 82, 158, 24, 44)}${part(4, 40, 172, 40, 30)}
-      <rect x="42" y="42" width="36" height="124" rx="10" fill="var(--pw-accent)"/>
-      <rect x="18" y="210" width="84" height="10" rx="3" fill="${me.detached ? 'none' : 'var(--pw-green)'}" stroke="${me.detached ? 'var(--pw-red)' : 'none'}" stroke-width="2" stroke-dasharray="${me.detached ? '5 4' : '0'}"/>
+  const dents = me.dents, zone = level => ['var(--pw-text2)', 'var(--pw-yellow)', 'var(--pw-red)'][level] || 'var(--pw-muted)';
+  // The outline in the game's eight zones (0 front, then round by the left), each stroke coloured by its dents.
+  const outline = ['M52 16H88', 'M52 16Q32 18 30 42V64', 'M30 64Q34 117 30 170', 'M30 170V194Q30 212 48 214', 'M48 214H92',
+    'M92 214Q110 212 110 194V170', 'M110 170Q106 117 110 64', 'M110 64V42Q108 18 88 16'];
+  const hub = (x, y) => `<rect x="${x}" y="${y}" width="14" height="30" rx="4" class="pw-dent-wheel"/>`;
+  const drawing = dents ? `<svg class="pw-car-dents" viewBox="0 0 140 240" role="img" aria-label="Dégâts par zone">
+      <g class="pw-dent-arms"><path d="M26 44L36 40M26 58L36 60M26 52H32M114 44L104 40M114 58L104 60M114 52H108M26 176L36 172M26 190L36 192M114 176L104 172M114 190L104 192"/></g>
+      ${hub(12, 36)}${hub(114, 36)}${hub(12, 168)}${hub(114, 168)}
+      <rect x="50" y="78" width="40" height="70" rx="16" class="pw-dent-cockpit"/>
+      ${outline.map((d, index) => `<path d="${d}" stroke="${zone(dents[index])}" class="pw-dent-zone"/>`).join('')}
+      <path d="M56 214V222M84 214V222" class="pw-dent-pillar"/>
+      <rect x="34" y="222" width="72" height="9" rx="2" class="pw-dent-wing${me.detached ? ' off' : ''}"/>
     </svg>` : '';
   const damageCard = card('🛠️ Dégâts', `<div class="pw-damage${dents ? ' with-car' : ''}" style="--level:${damage || 0}%;--bar:${!damage ? 'var(--pw-green)' : damage < 30 ? 'var(--pw-yellow)' : damage < 65 ? 'var(--pw-orange)' : 'var(--pw-red)'}">
       ${drawing}<div class="pw-damage-sum"><b>${known(damage) ? `${fr(damage, 0)}%` : '—'}</b><i></i>
