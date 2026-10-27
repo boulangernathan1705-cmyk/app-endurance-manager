@@ -5,6 +5,7 @@
 ### 🔧 Corrections
 
 - **Discord** : plus de message « Endurance Manager a commencé un fil » dans # endurances-de-la-semaine ; le message de la semaine donne déjà le lien de chaque fil.
+- **Discord** : la première mise en place et la nouvelle semaine du lundi se terminent en quelques minutes (un passage toutes les 2 minutes au lieu de tous les quarts d'heure).
 
 ## v1.69 — 27 octobre 2026
 
