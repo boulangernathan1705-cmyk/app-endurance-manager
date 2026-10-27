@@ -1,5 +1,12 @@
 # Nouveautés d'Endurance Manager
 
+## v1.71 — 27 octobre 2026
+
+### 🔧 Corrections
+
+- **Discord** : quand LMU et iRacing sont dans le même # endurances-de-la-semaine, le titre « semaine du … » n'apparaît qu'une fois.
+- **Discord** : les vocaux d'équipage sont rangés LMU d'abord, puis iRacing, chacun par heure de départ.
+
 ## v1.70 — 27 octobre 2026
 
 ### 🔧 Corrections

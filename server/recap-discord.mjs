@@ -64,7 +64,13 @@ function weekPlan(env, community, settings, cats = parseCategories(settings.bot_
     // A setting made before: its channels as they were (« récap-de-la-semaine », « calendrier-de-la-semaine »).
     : order.map(kind => ({kind, destination:weekDestination(settings, kind, community), channel:WEEK_CHANNELS[weekGroup(kind)], topic:weekGroup(kind), sim:null}))
       .filter(entry => entry.destination).map(entry => ({...entry, key:entry.destination}));
-  return week.sort((a,b) => rank(a.kind) - rank(b.kind));
+  week.sort((a,b) => rank(a.kind) - rank(b.kind));
+  // Several sims' messages in the same channel read as one: see buildWeeklyDiscordPayload's `part`.
+  if (layout) for (const entry of week.filter(item => !item.kind.startsWith('calendar'))) {
+    const same = week.filter(item => !item.kind.startsWith('calendar') && item.key === entry.key), index = same.indexOf(entry);
+    if (same.length > 1) entry.part = index === 0 ? 'first' : index === same.length - 1 ? 'last' : 'middle';
+  }
+  return week;
 }
 const parse = value => { try { const result = JSON.parse(value); return Array.isArray(result) ? result : []; } catch { return []; } };
 
@@ -295,6 +301,25 @@ async function placeCategories(env, community, guildId, channels, category, sett
   if (order.every((item,index) => item.id === categories[index]?.id)) return;
   await discord(env,'PATCH',`/guilds/${guildId}/channels`,order.map((item,position) => ({id:item.id,position})),budget);
 }
+// The crews' voices in each category: LMU first, then iRacing, each by its start (server/crew-discord.mjs sorts them when one
+// is made, a pass that can stop on the way). Other voices stay first, as they are. One request, only when out of order.
+async function placeVoices(env, community, guildId, channels, budget) {
+  const rows = (await env.DB.prepare(`SELECT d.voice_id, d.created_at, c.departure_id, e.circuit, e.departures FROM crew_discord d
+    JOIN crews c ON c.id=d.crew_id JOIN events e ON e.id=c.event_id WHERE d.community_id=? AND d.closed_at IS NULL AND d.voice_id IS NOT NULL`).bind(community.id).all()).results || [];
+  if (rows.length < 2) return;
+  const crews = new Map(rows.map(item => [item.voice_id, [isIracing(item) ? 1 : 0,
+    Number((parse(item.departures).find(start => start?.id === item.departure_id) || {}).startsAt) || Infinity, Number(item.created_at) || 0]]));
+  const byPosition = (a,b) => (a.position || 0) - (b.position || 0) || (BigInt(a.id) < BigInt(b.id) ? -1 : 1);
+  for (const parent of new Set(channels.filter(item => item.type === 2 && crews.has(item.id)).map(item => item.parent_id || null))) {
+    const voices = channels.filter(item => item.type === 2 && (item.parent_id || null) === parent).sort(byPosition);
+    const key = item => crews.get(item.id);
+    const wanted = [...voices.filter(item => !crews.has(item.id)), ...voices.filter(item => crews.has(item.id))
+      .sort((a,b) => key(a)[0] - key(b)[0] || key(a)[1] - key(b)[1] || key(a)[2] - key(b)[2])];
+    if (wanted.every((item,index) => item === voices[index])) continue;
+    await discord(env,'PATCH',`/guilds/${guildId}/channels`,wanted.map((item,position) => ({id:item.id,position})),budget);
+    wanted.forEach((item,position) => { item.position = position; });
+  }
+}
 const categoryAccess = community => REQUIRED | MANAGE | (community.modules?.crewChannels === true ? VOICE_ACCESS : 0n);
 // What the bot may copy (it can only give rights it has): seeing, writing, joining.
 const SHARED = VIEW | SEND | HISTORY | EMBED | (1n << 20n);
@@ -409,7 +434,7 @@ export async function botCategoryEmojis(env, timestamp = Date.now()) {
 // A race's message (eventId), or a week's message: kind 'lmu', 'iracing' or 'calendar'.
 // alone: a race's thread (its block only).
 // threads: « un fil par course », the week's message lists the races with a link to their threads ({eventId: thread}).
-async function snapshotPayload(env, timestamp, community, eventId = null, kind = null, sim = null, alone = false, threads = null) {
+async function snapshotPayload(env, timestamp, community, eventId = null, kind = null, sim = null, alone = false, threads = null, part = null) {
   if (kind?.startsWith('calendar')) {
     const snapshot = await loadCalendarSnapshot(env, timestamp, community, sim);
     const payload = buildCalendarPayload(snapshot, siteOf(env, community), timestamp);
@@ -418,11 +443,11 @@ async function snapshotPayload(env, timestamp, community, eventId = null, kind =
   const scope = eventId ? 'all' : kind;
   const snapshot = await loadWeeklyDiscordSnapshot(env, timestamp, community, scope, eventId);
   const emojis = await botCategoryEmojis(env, timestamp);
-  const payload = buildWeeklyDiscordPayload(snapshot, siteOf(env, community), timestamp, scope, emojis, {weekly:!eventId, alone:Boolean(eventId) && alone, threads:eventId ? null : threads});
+  const payload = buildWeeklyDiscordPayload(snapshot, siteOf(env, community), timestamp, scope, emojis, {weekly:!eventId, alone:Boolean(eventId) && alone, threads:eventId ? null : threads, part:eventId || !threads ? null : part});
   // Message edits are silent; never turn driver names into mentions.
   payload.allowed_mentions = {parse:[]};
   // A new layout of the message (RECAP_FORMAT) edits the published recaps once.
-  return {snapshot, payload, hash:await digest([RECAP_FORMAT,snapshot,emojis,...(eventId && alone ? ['alone'] : []),...(!eventId && threads ? [threads] : [])])};
+  return {snapshot, payload, hash:await digest([RECAP_FORMAT,snapshot,emojis,...(eventId && alone ? ['alone'] : []),...(!eventId && threads ? [threads, part] : [])])};
 }
 // What the bot would publish with these settings (a settings row), without publishing anything.
 export async function previewBotRecap(env, timestamp, community, settings) {
@@ -430,7 +455,7 @@ export async function previewBotRecap(env, timestamp, community, settings) {
   // The bot's categories not made yet stand in for themselves.
   const cats = layout ? Object.fromEntries(wantedCategories(layout).map(key => [key, parseCategories(settings.bot_categories)[key] || `new-${key}`])) : undefined;
   for (const entry of weekPlan(env, community, settings, cats)) {
-    const {payload} = await snapshotPayload(env, timestamp, community, null, entry.kind, entry.sim, false, layout && !entry.kind.startsWith('calendar') ? {} : null);
+    const {payload} = await snapshotPayload(env, timestamp, community, null, entry.kind, entry.sim, false, layout && !entry.kind.startsWith('calendar') ? {} : null, entry.part);
     const name = layout ? `# ${entry.channel}` : entry.kind === 'calendar' ? settings.calendar_destination_name : entry.kind === 'iracing' ? settings.iracing_destination_name : settings.destination_name;
     previews.push({eventId:'week:' + entry.kind, name:`${name} · ${MESSAGE_NAMES[entry.kind.split(':')[0]]}`, payload});
   }
@@ -536,7 +561,7 @@ async function publish(env, timestamp, community, settings, row, event, budget, 
     await env.DB.prepare('UPDATE discord_recap_publications SET channel_id=? WHERE community_id=? AND event_id=?').bind(channel,community.id,row.event_id).run();
   }
   const threads = !isEvent && layout && !kind.startsWith('calendar') ? await raceThreads(env, community) : null;
-  const {payload, hash} = prepared || await snapshotPayload(env,timestamp,community,isEvent ? row.event_id : null,kind,entry?.sim,threaded,threads);
+  const {payload, hash} = prepared || await snapshotPayload(env,timestamp,community,isEvent ? row.event_id : null,kind,entry?.sim,threaded,threads,entry?.part);
   if (!repair && row.message_id && row.content_hash === hash) return;
   if (row.message_id) {
     // A removed message or channel is reported, not recreated on every update (no surprise notifications).
@@ -769,6 +794,7 @@ async function syncLocked(env,timestamp,community,settings, test = false, budget
     // Nothing changed on the server since the list read at the start: the same list (one request less per pass).
     const current = channels && !budget.moved ? channels : await discord(env,'GET',`/guilds/${settings.guild_id}/channels`,null,budget);
     await placeCategories(env,community,settings.guild_id,current,null,settings,budget);
+    if (community.modules?.crewChannels === true) await placeVoices(env,community,settings.guild_id,current,budget);
     if (await removeCategories(env,community,settings,current,wanted,budget)) more = true;
   }
   return {ok:true, ...(settings.enabled === 0 && !test ? {disabled:true} : {}), ...(more ? {more:true} : {})};
