@@ -486,7 +486,7 @@ test('the fiches combo page: its own tab for the roles that see them, nothing ru
   const front = readFileSync(new URL('../front/combos-page.mjs', import.meta.url), 'utf8');
   assert.doesNotMatch(front, /\son[a-z]+="/i, 'no inline handler (CSP)');
   assert.match(readFileSync(new URL('../front/account-menu.mjs', import.meta.url), 'utf8'), /link\.dataset\.moduleLink === 'combos' && session\.combos !== true/);
-  assert.match(readFileSync(new URL('../front/app/home-view.mjs', import.meta.url), 'utf8'), /state\.combos\?'<a class="nav-section-button" href="\/fiches-combo\.html">Fiches combo<\/a><a class="nav-section-button" href="\/mur-des-stands\.html">Mur des stands<\/a>'/);
+  assert.match(readFileSync(new URL('../front/app/home-view.mjs', import.meta.url), 'utf8'), /state\.combos\?'<a class="nav-section-button" href="\/fiches-combo\.html">Fiches combo<\/a><a class="nav-section-button" href="\/mur\.html">Mur des stands<\/a>'/);
 });
 
 test('mur des stands: the plugin opens the team\'s room with its key, a page with the member\'s cookie from the site only', async () => {
