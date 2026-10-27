@@ -97,3 +97,4 @@
 .changelog-page .changelog-version h2 { font-size: 21px; }
 .changelog-page .changelog-version h3 { margin: 16px 0 4px; font-size: 16px; color: #f4f6f5; }
 .changelog-page .changelog-version:first-of-type { border-color: rgba(82, 211, 216, .45); }
+.changelog-page :is(li[data-admin], li[data-community]):not(.shown) { display: none; }

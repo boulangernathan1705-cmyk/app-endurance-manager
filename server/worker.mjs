@@ -471,6 +471,18 @@ async function api(request, env) {
     access:access.status, permissions:[...access.permissions], manager:access.manager, communities:await myCommunities(env, actor, community),
     elsewhere:['not-member','forbidden'].includes(access.status) ? (await myCommunities(env, actor, community, true)).filter(item => !item.current).map(({name, url, logoUrl}) => ({name, url, logoUrl})) : [], openSite,
     platformDiscordUrl:/^https:\/\/(discord\.gg|discord\.com\/invite)\//.test(env.PLATFORM_DISCORD_URL || '') ? env.PLATFORM_DISCORD_URL : null}, 200, actor.user && actor.renew ? await actor.renew().catch(() => []) : []);
+  // « Nouveautés » page: the pilot's communities and whether he administers each one (front/changelog.mjs).
+  if (path === '/api/changelog-audience' && method === 'GET') {
+    if (!actor.user || actor.manager) return json({all:Boolean(actor.manager), communities:[]});
+    const memberships = (await env.DB.prepare("SELECT * FROM memberships WHERE user_id=? AND status='member'").bind(actor.user.id).all()).results || [];
+    const communities = [];
+    for (const membership of memberships) {
+      const item = await communityById(env, membership.community_id);
+      const permissions = item ? await memberPermissions(env, item, membership) : new Set();
+      if (permissions.has('access')) communities.push({names:[item.slug, item.shortName, item.name].filter(Boolean), admin:permissions.has('admin')});
+    }
+    return json({all:false, communities});
+  }
   // The explanation of communities has been read: not shown again, on any device.
   if (path === '/api/me/community-intro' && method === 'POST') {
     if (!actor.user) fail(401, 'Connecte-toi avec Discord.');
