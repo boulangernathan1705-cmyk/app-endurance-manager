@@ -14,7 +14,7 @@ async function mockAdmin(page,{permission=true,initialRecap=null,repairError=nul
     if(path==='/api/members')data={members:[],permissions:['access','admin']};
     if(path==='/api/community/settings')data={community:{name:'Ma communauté',shortName:'MC'},modules:{soloRaces:solo},permissions:['access','admin'],roles:[],crews:{botReady:true,categories:[{id:PIT,name:'PIT WALK'}]}};
     if(path==='/api/community/setup')data={community:{name:'Ma communauté'},siteUrl:'https://site.example',guild:{id:'900000000000000001',name:'Ma communauté',botPresent:true},rolesConfigured:true,recapSetupRequired:!botRecap,botRecap,recapBotInviteUrl:'https://discord.com/oauth2/authorize?client_id=123&scope=bot&permissions=85008',discordInviteUrl:'https://discord.gg/example'};
-    if(path==='/api/community/recap/destinations')data={destinations:[{id:TEXT,type:0,name:'récap-de-la-semaine',ready:true,missing:[]},{id:CATEGORY,type:4,name:'Endurances',ready:permission,missing:permission?[]:['Intégrer des liens','Gérer les salons']},{id:PIT,type:4,name:'PIT WALK',ready:true,missing:[]}]};
+    if(path==='/api/community/recap/destinations')data={destinations:[{id:TEXT,type:0,name:'annonces',position:0,parentId:CATEGORY,parentName:'Endurances',ready:true,missing:[]},{id:CATEGORY,type:4,name:'Endurances',ready:permission,missing:permission?[]:['Intégrer des liens','Gérer les salons']},{id:PIT,type:4,name:'PIT WALK',ready:true,missing:[]}]};
     if(path==='/api/community/recap/preview')data={previews:(request.postDataJSON().mode==='events'?['🏎️ LMU · 6h de Spa','🏎️ LMU · 24h du Mans']:['récap-de-la-semaine · Endurances LMU']).map(name=>({name,payload:{embeds:[{title:'📝 Endurances LMU',description:'📍 Spa-Francorchamps · ⏱️ 6h\n📅 dimanche 11 octobre · 14h',fields:[{name:'Équipages',value:'🟪 **Équipage A** · GT3 · 🔓 Ouvert\n👤 Pilote 1 · 👤 Pilote 2'}],url:'https://site.example/lmu/#event=spa'}]}}))};
     if(path==='/api/community/discord'&&method==='PUT'){
       const input=request.postDataJSON();
@@ -44,8 +44,11 @@ const saves=calls=>calls.filter(call=>call.path==='/api/community/discord');
 for(const mode of ['events','general'])test(`Discord setting, ${mode}: rows follow the choice, read-only preview, then activation`,async({page},testInfo)=>{
   const calls=await mockAdmin(page),form=page.locator('[data-discord-form]');
   await form.locator(`input[name="mode"][value="${mode}"]`).check();
-  const target=mode==='events'?CATEGORY:TEXT;
-  await expect(form.locator('select[name="lmu"] option',{hasText:'Endurances'})).toHaveCount(mode==='events'?1:0);
+  const target=CATEGORY;
+  // Race categories go in categories; a week's recap goes below a channel or a category.
+  await expect(form.locator('select[name="lmu"] option',{hasText:'annonces'})).toHaveCount(mode==='events'?0:1);
+  await expect(form.locator('select[name="calendar"] option',{hasText:'annonces'})).toHaveCount(1);
+  await expect(form.locator('select[name="lmu"] option',{hasText:'Endurances'})).toHaveCount(1);
   await expect(form.locator('select[name="calendar"]')).toBeVisible();
   await expect(form.locator('select[name="crewCategory"]')).toHaveCount(0);
   // Nothing chosen yet: the server refuses, nothing is published.
@@ -72,11 +75,21 @@ for(const mode of ['events','general'])test(`Discord setting, ${mode}: rows foll
   if(mode==='general')expect(activation.input).toMatchObject({crewChannels:true,crewCategory:PIT});
 });
 
+test('below a chosen channel, the sketch shows the bot channel right after it',async({page})=>{
+  await mockAdmin(page);
+  const form=page.locator('[data-discord-form]');
+  await form.locator('input[name="mode"][value="general"]').check();
+  await form.locator('select[name="lmu"]').selectOption(TEXT);
+  await expect(form.locator('[data-discord-sketch] li')).toHaveText(['Endurances','# annonces',/# récap-de-la-semaine/]);
+});
+
 test('missing bot permissions are named in the destination list',async({page})=>{
   await mockAdmin(page,{permission:false});
   const form=page.locator('[data-discord-form]');
-  await expect(form.locator('select[name="lmu"] option',{hasText:'droits du bot à donner'})).toHaveCount(1);
-  await expect(form.getByRole('link',{name:'Donner les droits au bot'})).toHaveAttribute('href',/permissions=85008/);
+  await expect(form.locator('select[name="lmu"] option',{hasText:'le bot n’a pas ses droits'})).toHaveCount(1);
+  await form.locator('select[name="lmu"]').selectOption(CATEGORY);
+  await expect(form.locator('.discord-rights')).toContainText('Gérer les salons');
+  await expect(form.getByRole('link',{name:'Inviter le bot avec ses droits'})).toHaveAttribute('href',/permissions=85008/);
 });
 
 test('no calendar row without the events module',async({page})=>{

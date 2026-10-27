@@ -226,7 +226,7 @@ async function needsWork(env, timestamp, community, setting, row, pilots) {
   if (!start || !community || timestamp >= start.endsAt + CLOSE_AFTER) return true;
   if (community.modules?.crewChannels !== true || !setting) return false;
   if (!row.voice_id || !row.message_id || row.text_id || row.category_id || Number(row.starts_at) !== start.startsAt) return true;
-  if (row.race_category && row.parent_id !== row.race_category) return true;
+  if ((row.parent_id || null) !== (row.race_category || setting.voice_category_id || null)) return true;
   const current = discordIds(pilots), known = JSON.parse(row.members || '[]');
   if (current.length !== known.length || current.some(id => !known.includes(id))) return true;
   if (dueReminders(community, row, start, timestamp).length) return true;
@@ -399,10 +399,10 @@ const waitsForCategory = (row, timestamp) => !row.race_category && timestamp - N
 // In its race's category the crew's name is enough; elsewhere the sim and the race come first (« LMU · 6h de Spa · Équipage A »).
 const voiceName = (row, crewName) => clip(row.race_category ? crewName : `${game(row.circuit) === 'iracing' ? 'iRacing' : 'LMU'} · ${safe(row.event_name) || 'Endurance'} · ${crewName}`, 100);
 // In the admins' category the voice channels follow the races: LMU first, then iRacing, each by start (one request).
-async function sortVoices(env, budget, row) {
+async function sortVoices(env, budget, row, parent) {
   const rows = (await env.DB.prepare(`SELECT d.voice_id, d.created_at, c.departure_id, e.circuit, e.departures FROM crew_discord d
     JOIN crews c ON c.id=d.crew_id JOIN events e ON e.id=c.event_id
-    WHERE d.community_id=? AND d.closed_at IS NULL AND d.voice_id IS NOT NULL AND d.parent_id IS NULL`).bind(row.row_community).all()).results || [];
+    WHERE d.community_id=? AND d.closed_at IS NULL AND d.voice_id IS NOT NULL AND d.parent_id=?`).bind(row.row_community, parent).all()).results || [];
   if (rows.length < 2) return;
   const startOfRow = item => Number((JSON.parse(item.departures || '[]').find(start => start?.id === item.departure_id) || {}).startsAt) || Infinity;
   const key = item => [game(item.circuit) === 'iracing' ? 1 : 0, startOfRow(item), Number(item.created_at) || 0];
@@ -433,23 +433,34 @@ async function syncRow(env, budget, timestamp, community, setting, row, pilots) 
   if (!row.voice_id && waitsForCategory(row, timestamp)) return null;
   if (!row.voice_id) {
     const voice = await createVoice(env, budget, row, setting, {name:voiceName(row, crewName), type:VOICE});
-    Object.assign(row, {voice_id:voice.id, message_id:null, parent_id:row.race_category || null});
+    Object.assign(row, {voice_id:voice.id, message_id:null, parent_id:voice.parent_id || null});
     await env.DB.prepare('UPDATE crew_discord SET voice_id=?, message_id=NULL, parent_id=? WHERE crew_id=?').bind(voice.id, row.parent_id, row.row_id).run();
-    if (!row.race_category && setting.voice_category_id) await sortVoices(env, budget, row);
+    if (!row.race_category && row.parent_id) await sortVoices(env, budget, row, row.parent_id);
     opened = true;
   }
-  if (row.race_category && row.parent_id !== row.race_category) {
-    // Opened before its race's category: moved into it once.
-    const target = await discord(env,budget,'GET',`/channels/${row.race_category}`);
+  const parent = row.race_category || setting.voice_category_id || null;
+  if (!opened && (row.parent_id || null) !== parent) {
+    // Opened elsewhere (before its race's category, or before the admins chose where the voices go): moved there once,
+    // and named for that place.
+    let target = {permission_overwrites:[]};
+    if (parent) try { target = await discord(env,budget,'GET',`/channels/${parent}`); }
+    catch (error) {
+      if (error instanceof Stop || row.race_category || error?.status !== 404) throw error;
+      await env.DB.prepare('UPDATE community_crew_discord SET voice_category_id=NULL, last_error=?, last_error_at=? WHERE community_id=?')
+        .bind('La catégorie choisie pour les vocaux n’existe plus : ils arrivent en haut du serveur.', Math.floor(Date.now() / 1000), row.row_community).run();
+      setting.voice_category_id = null;
+      throw new Stop('gone');
+    }
     const voice = await discord(env,budget,'GET',`/channels/${row.voice_id}`);
     // A fallback vocal created at server root has only the bot exception: take the
     // private destination rules when moving it. Preserve any existing non-bot rules.
     const hasMemberRules = (voice.permission_overwrites || []).some(item => !(String(item.id) === String(env.DISCORD_CLIENT_ID) && Number(item.type) === 1));
     const rules = hasMemberRules ? voice.permission_overwrites : target.permission_overwrites;
-    await sendInChannel(env, budget, row, 'PATCH', `/channels/${row.voice_id}`, {parent_id:row.race_category, name:voiceName(row, crewName),
+    await sendInChannel(env, budget, row, 'PATCH', `/channels/${row.voice_id}`, {parent_id:parent, name:voiceName(row, crewName),
       permission_overwrites:withBotAccess(rules,env.DISCORD_CLIENT_ID,VOICE_ACCESS)});
-    row.parent_id = row.race_category;
+    row.parent_id = parent;
     await env.DB.prepare('UPDATE crew_discord SET parent_id=? WHERE crew_id=?').bind(row.parent_id, row.row_id).run();
+    if (!row.race_category && parent) await sortVoices(env, budget, row, parent);
   }
   const content = recapContent(env, community, row, start, pilots);
   const contentHash = await hash(content);
