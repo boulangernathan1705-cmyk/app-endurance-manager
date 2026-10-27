@@ -4,7 +4,7 @@
 // one), the same as the old page front/live-page.mjs; plugin 2.0 adds the car ten times a second (tm), its settings and
 // every car's tank. Raw numbers only, no advice.
 import {COLORS} from '../shared/combos.mjs';
-import {addToPath, isRace, lapsLeft, outlineLines, patch, readFeed, stationary, timeAt, LIVE_FOR} from '../shared/live.mjs';
+import {addToPath, isRace, lapsLeft, median, outlineLines, patch, readFeed, stationary, timeAt, LIVE_FOR} from '../shared/live.mjs';
 
 const app = document.getElementById('pw-app');
 const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
@@ -432,6 +432,12 @@ function car(feed) {
         ${box('Tours estimés', known(laps) ? `${fr(laps, 1)} t` : '—')}${box('Temps restant', known(laps) && pace ? clock(laps * pace) : '—')}</div></div>`;
   };
   const ours = feed.ours, ve = known(me.ve);
+  // From our own stops: the pit lane without the time stopped, and what a stop costs on top of the same stretch at racing
+  // speed (drive, measured by the plugin) once the car is filled up and on 4 new tyres. The deadline is the last lap the
+  // tank still covers at our 5-lap average.
+  const recent = stops.slice(-5), traverse = recent.length ? median(recent.map(stop => stop.lane - stop.stopped)) : null;
+  const drives = recent.map(stop => stop.drive).filter(known), lost = drives.length && known(stopFor('tyres')) ? median(drives) + stopFor('tyres') : null;
+  const before = known(energy.laps) ? Math.floor(energy.laps) : null, finish = known(energy.missing) && energy.missing <= 0;
   const energyCard = card('⚡ Énergie et consommation', `<div class="pw-row2 pw-tanks${ve ? '' : ' single'}">
       ${tank('Carburant', '⛽', me.fuel, 'L', me.capacity, ours.lastFuel, ours.fuel5, 'fuel')}
       ${ve ? tank('Énergie virtuelle', '⚡', me.ve, '%', 100, ours.lastVe, ours.ve5, 've') : ''}
@@ -439,11 +445,11 @@ function car(feed) {
     <h3>🧮 Ravitaillement</h3>
     <div class="pw-row3">
       ${box('Pour finir', known(energy.need) ? `${fr(energy.need, 1)} ${energy.unit}` : '—', known(energy.left) ? `${fr(energy.left, 1)} tours à notre moyenne` : 'à notre moyenne')}
-      ${box('Il manque', known(energy.missing) ? `${fr(energy.missing, 1)} ${energy.unit}` : '—', 'en plus de ce qu’il reste', energy.missing > 0 ? 'warn' : 'good')}
-      ${box('Arrêts', known(energy.stops) ? energy.stops : '—', 'pleins pour aller au bout')}
-      ${box('Plein', known(energy.room) ? `${fr(energy.room, 1)} ${energy.unit}` : '—', 'place libre')}
       ${box('Arrêt plein', known(stopFor('energy')) ? `${fr(stopFor('energy'), 1)} s` : '—', 'immobile')}
       ${box('Plein + 4 pneus', known(stopFor('tyres')) ? `${fr(stopFor('tyres'), 1)} s` : '—', 'immobile')}
+      ${box('Traversée des stands', known(traverse) ? `${fr(traverse, 1)} s` : '—', known(traverse) ? 'voie des stands, sans l’arrêt' : 'après notre 1er arrêt')}
+      ${box('Temps perdu par arrêt', known(lost) ? `${fr(lost, 1)} s` : '—', known(lost) ? 'plein + 4 pneus, contre un tour normal' : 'après notre 1er arrêt')}
+      ${box('Rentrer au plus tard', finish ? 'Pas besoin' : known(before) ? `T ${(meOf(feed)?.laps || 0) + before}` : '—', finish ? 'assez pour finir' : known(before) ? `dans ${before} tour${before > 1 ? 's' : ''}` : 'à notre moyenne', finish ? 'good' : known(before) && before <= 2 ? 'warn' : '')}
     </div>`);
   // The tread's three temperatures as the game shows them (plugin 2.4), laid out as on the car (outer side out), their
   // mean in big; older plugins give only the carcass.
