@@ -621,6 +621,9 @@ async function raceThread(env, community, settings, layout, row, event, budget, 
     });
     Object.assign(row, {channel_id:thread.id, message_id:null, content_hash:'', in_thread:1, thread_parent:week.channel_id});
     await save();
+    // A new thread has nobody in it: everyone is added again, soon.
+    await env.DB.prepare('DELETE FROM discord_thread_members WHERE community_id=? AND event_id=?').bind(community.id,row.event_id).run();
+    await env.DB.prepare('UPDATE discord_recap_publications SET members_checked_at=0 WHERE community_id=? AND event_id=?').bind(community.id,row.event_id).run();
   }
   return row.channel_id;
 }
@@ -802,6 +805,55 @@ export async function removeBotDiscord(env,timestamp,community) {
   const result = await env.DB.prepare('UPDATE community_recap_settings SET enabled=0 WHERE community_id=? AND lock_until<?').bind(community.id,Date.now()).run();
   if (!result.meta.changes && await botRecapSettings(env,community)) throw Object.assign(new Error('Une synchronisation est en cours. Réessaie dans un instant.'),{status:409});
   return result.meta.changes ? syncBotRecaps(env,timestamp,community) : {ok:true};
+}
+
+
+// Every 2 minutes: the pilots with access to the site added to the races' threads, so each thread stays in their list on
+// Discord, 50 at a time per thread. Those of the race first; each added once (one who leaves it stays out). limit: requests.
+// A thread with nobody left to add is looked at again an hour later (a pilot given access meanwhile).
+export async function addThreadMembers(env, timestamp = Date.now(), limit = 25) {
+  if (!env?.DB || !env.DISCORD_BOT_TOKEN) return 0;
+  const threads = (await env.DB.prepare(`SELECT p.community_id,p.event_id,p.channel_id,p.guild_id,p.message_id FROM discord_recap_publications p
+    JOIN community_recap_settings s ON s.community_id=p.community_id AND s.enabled=1 AND s.guild_id=p.guild_id AND s.lock_until<?
+    WHERE p.in_thread=1 AND p.channel_id IS NOT NULL AND p.message_id IS NOT NULL AND p.closed_at IS NULL AND p.members_checked_at<? ORDER BY p.members_checked_at`).bind(Date.now(), timestamp - 3600000).all()).results || [];
+  const budget = {left:limit};
+  let added = 0;
+  for (const thread of threads) {
+    // On the server, with « Accès Endurance Manager » (a role, @everyone, or a Discord admin).
+    const pilots = (await env.DB.prepare(`SELECT m.user_id FROM memberships m WHERE m.community_id=? AND m.status='member'
+      AND NOT EXISTS (SELECT 1 FROM discord_thread_members t WHERE t.community_id=m.community_id AND t.event_id=? AND t.user_id=m.user_id)
+      AND (m.discord_admin=1 OR EXISTS (SELECT 1 FROM community_role_permissions r WHERE r.community_id=m.community_id
+        AND (r.discord_role_id=? OR r.discord_role_id IN (SELECT value FROM json_each(m.discord_roles)))
+        AND EXISTS (SELECT 1 FROM json_each(r.permissions) WHERE value='access')))
+      ORDER BY EXISTS (SELECT 1 FROM registrations g WHERE g.event_id=? AND g.user_id=m.user_id) DESC, m.user_id LIMIT 50`)
+      .bind(thread.community_id,thread.event_id,thread.guild_id,thread.event_id).all()).results || [];
+    if (!pilots.length) {
+      await env.DB.prepare('UPDATE discord_recap_publications SET members_checked_at=? WHERE community_id=? AND event_id=?').bind(timestamp,thread.community_id,thread.event_id).run();
+      continue;
+    }
+    // Added by mentioning them in an EDIT of the race's message, then taken off: an edit notifies nobody (no badge), while a
+    // new message with mentions or adding them one by one does.
+    const ids = pilots.map(pilot => pilot.user_id), path = `/channels/${thread.channel_id}/messages/${thread.message_id}`;
+    try {
+      const mention = () => discord(env,'PATCH',path,{content:ids.map(id => `<@${id}>`).join(' '),allowed_mentions:{users:ids}},budget);
+      // A thread quiet for a week is archived by Discord: opened again first.
+      await mention().catch(async error => {
+        if (error.code !== 50083) throw error;
+        await discord(env,'PATCH',`/channels/${thread.channel_id}`,{archived:false},budget);
+        await mention();
+      });
+      await discord(env,'PATCH',path,{content:'',allowed_mentions:{parse:[]}},budget);
+    } catch (error) {
+      // Discord limits the bot's requests, or the thread is archived or gone: next time.
+      if (error.budget || error.status === 429) return added;
+      continue;
+    }
+    for (const id of ids) await env.DB.prepare('INSERT OR IGNORE INTO discord_thread_members(community_id,event_id,user_id,added_at) VALUES(?,?,?,?)')
+      .bind(thread.community_id,thread.event_id,id,timestamp).run();
+    added += ids.length;
+    if (budget.left <= 0) break;
+  }
+  return added;
 }
 
 // Every 15 minutes, separately from the hourly recap rotation. Re-read race times before deleting.

@@ -5,7 +5,7 @@ import {readFileSync,readdirSync} from 'node:fs';
 import worker from '../server/worker.mjs';
 import {linkTestServer,DEV_COMMUNITY,GUILD} from './fixtures/discord-server.mjs';
 import {syncWeeklyDiscord} from '../server/discord-weekly.mjs';
-import {botCategoryEmojis,saveBotRecap,validateDiscordLayout,syncBotRecaps,previewBotRecap,recapDestinations,eventDeletionTime,eventChannelName,settingsRow,recapError,repairBotRecap,racesOpenNow} from '../server/recap-discord.mjs';
+import {addThreadMembers,botCategoryEmojis,saveBotRecap,validateDiscordLayout,syncBotRecaps,previewBotRecap,recapDestinations,eventDeletionTime,eventChannelName,settingsRow,recapError,repairBotRecap,racesOpenNow} from '../server/recap-discord.mjs';
 
 const OWNER='333333333333333333', BOT='444444444444444444', TEXT='555555555555555555', CATEGORY='666666666666666666';
 const NOW=Date.parse('2026-10-10T12:00:00Z'), DAY=86400000;
@@ -829,3 +829,30 @@ test('saving the setting with voices does not ask for rights in the places of th
   assert.equal(JSON.parse(DB.db.prepare('SELECT modules FROM communities WHERE id=?').get(DEV_COMMUNITY).modules).crewChannels,true);
 });
 
+test('the pilots with access are added to the race\'s thread once each, those of the race first',async t=>{
+  const {DB,env,calls,channels}=setup(t);race(DB);
+  await layout(env,COMMUNITY,{mode:'events',sims:'lmu',under:ACCUEIL});
+  const thread=channels.find(item=>item.type===11);
+  const ROLE='777777777777777001';
+  DB.db.prepare("UPDATE community_role_permissions SET permissions='[]' WHERE discord_role_id=?").run(GUILD);
+  DB.db.prepare("INSERT INTO community_role_permissions(community_id,discord_role_id,permissions,updated_at) VALUES(?,?,'[\"access\"]',0)").run(DEV_COMMUNITY,ROLE);
+  const pilot=(id,roles,status='member')=>{DB.db.prepare('INSERT OR IGNORE INTO users(id,name,created_at) VALUES(?,?,0)').run(id,id);
+    DB.db.prepare('INSERT INTO memberships(community_id,user_id,discord_roles,status,checked_at,created_at) VALUES(?,?,?,?,0,0)').run(DEV_COMMUNITY,id,JSON.stringify(roles),status);};
+  pilot('100000000000000001',[ROLE]);pilot('100000000000000002',[ROLE]);pilot('100000000000000003',[]);pilot('100000000000000004',[ROLE],'left');
+  DB.db.prepare("INSERT INTO participants(id,name,user_id,created_by,created_at,community_id) VALUES('p2','P2','100000000000000002',?,0,?)").run(OWNER,DEV_COMMUNITY);
+  DB.db.prepare("INSERT INTO registrations(id,event_id,departure_id,user_id,name,name_key,category,status,created_at,participant_id,community_id) VALUES('r','race-a','start-a','100000000000000002','P2','p2','GT3','whole',0,'p2',?)").run(DEV_COMMUNITY);
+  calls.length=0;
+  assert.equal(await addThreadMembers(env,NOW,12),2,'the two with access, not the one without, nor one gone');
+  const message=DB.db.prepare("SELECT message_id FROM discord_recap_publications WHERE event_id='race-a'").get().message_id;
+  const [mention,back]=calls;
+  assert.equal(mention.method,'PATCH');assert.equal(mention.path,`/channels/${thread.id}/messages/${message}`,'an edit of the race\'s message: no badge');
+  assert.equal(mention.body.content,'<@100000000000000002> <@100000000000000001>');
+  assert.deepEqual(mention.body.allowed_mentions.users,['100000000000000002','100000000000000001'],'the race\'s pilot first');
+  assert.equal(back.path,mention.path);assert.equal(back.body.content,'');
+  assert.ok(!calls.some(call=>call.method==='POST'),'no new message');
+  calls.length=0;assert.equal(await addThreadMembers(env,NOW,12),0);assert.equal(calls.length,0,'each once');
+  // The thread made again (deleted on Discord): everyone added to the new one.
+  DB.db.prepare("UPDATE discord_recap_publications SET thread_parent='1' WHERE event_id='race-a'").run();
+  await syncBotRecaps(env,NOW+1000,COMMUNITY);
+  calls.length=0;assert.equal(await addThreadMembers(env,NOW+2000,12),2);
+});
