@@ -1,5 +1,11 @@
 # Nouveautés d'Endurance Manager
 
+## v1.70 — 27 octobre 2026
+
+### 🔧 Corrections
+
+- **Discord** : plus de message « Endurance Manager a commencé un fil » dans # endurances-de-la-semaine ; le message de la semaine donne déjà le lien de chaque fil.
+
 ## v1.69 — 27 octobre 2026
 
 ### 🔧 Corrections
