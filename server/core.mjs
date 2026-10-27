@@ -1,4 +1,5 @@
 import {isGrindfest, streamersOf, normalizeStreamers, gridfestPasswordValid} from '../shared/grindfest.mjs';
+import {COMMENTARY_MODES, streamUrl} from '../shared/commentary.mjs';
 import {catalogForGame, gameForEvent, CATEGORIES, EVENT_TYPE_IDS as EVENT_TYPES, CIRCUIT_IDS as CIRCUITS, CARS, SIM_IDS, eventCatalog, simForEvent, isRandomCircuit, TDZ_EVENT_TYPES, TRACK_LIMITS, RACE_WEATHERS, RACE_SKIES, WEATHER_SLOTS} from '../shared/catalog.mjs';
 const LEGACY_CAR_ALIASES = new Map([
   ['BMW M Hybrid V8 Evo (2026)','BMW M Hybrid V8'],['Cadillac V-Series.R Evo (2026)','Cadillac V-Series.R'],['Peugeot 9X8 2023','Peugeot 9X8'],['Peugeot 9X8 2024','Peugeot 9X8'],['Toyota TR010 Hybrid (2026)','Toyota GR010 Hybrid'],['Ginetta G61-LT-P3 Evo','Ginetta G61-LT-P3'],['Ferrari 488 GTE Evo','Ferrari 488 GTE'],['Aston Martin Vantage AMR LMGT3 Evo','Aston Martin Vantage AMR LMGT3'],['BMW M4 LMGT3 Evo','BMW M4 LMGT3'],['Ferrari 296 LMGT3 Evo','Ferrari 296 LMGT3'],['Ford Mustang LMGT3 Evo','Ford Mustang LMGT3'],['Lamborghini Huracán LMGT3 Evo 2','Lamborghini Huracán LMGT3'],['McLaren 720S LMGT3 Evo','McLaren 720S LMGT3'],['Porsche 911 LMGT3 R (992)','Porsche 911 GT3 R LMGT3'],['Porsche 911 LMGT3 R (992) 2026','Porsche 911 GT3 R LMGT3']
@@ -269,6 +270,15 @@ function validateSoloRace(input, existing) {
   if (raw.password) details.password = text(raw.password, 30, 'Mot de passe');
   if (isGrindfest({details}) && details.password && !gridfestPasswordValid(details.password)) fail(400, 'Mot de passe Gridfest : 30 caractères maximum, sans espace.');
   if (raw.note) details.note = text(raw.note, 120, 'Info');
+  // « Event commenté »: the pilots race it too, or it is only a commentary (no entry, no places).
+  if (raw.commentary) {
+    if (rally || isGrindfest({details})) fail(400, 'Ce format ne peut pas être commenté.');
+    if (!COMMENTARY_MODES.includes(raw.commentary.mode)) fail(400, 'Choisis si les pilotes roulent ou si c’est un commentary seulement.');
+    const stream = streamUrl(raw.commentary.stream);
+    if (!stream) fail(400, 'Indique la chaîne du stream : son nom Twitch ou l’adresse de la chaîne.');
+    details.commentary = {mode:raw.commentary.mode, stream};
+    if (details.commentary.mode === 'watch') { cleanRounds.forEach(round => { delete round.capacity; }); capacity = null; delete details.password; }
+  }
   if(rally){
     if(isGrindfest({details})) fail(400, 'Le format Gridfest ne correspond pas à une soirée rallye.');
     if(raw.rallyHost) details.rallyHost=text(raw.rallyHost,60,'Hôte');

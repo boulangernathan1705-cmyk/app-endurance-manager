@@ -11,6 +11,7 @@ import {racesPath} from './races-path.mjs';
 import {catalogForGame, gameForEvent, simForEvent, TDZ_EVENT_TYPES, tdzOnly, eventsLabel} from '../shared/catalog.mjs';
 import {currentCommunity, appearanceOf, allCommunities, communityUrl, communitySlug, communityById, communityFromRow} from './community.mjs';
 import {isDevelopment} from './dev-environment.mjs';
+import {isWatchOnly} from '../shared/commentary.mjs';
 import {communityAccess, requirePermission, displayRole, PERMISSIONS, ALL_PERMISSIONS, DEFAULT_EVERYONE, normalizePermissions, discordGuild, keepDiscordLook, memberPermissions, refreshCommunityMembers, discoverMemberships} from './access.mjs';
 // Solo races: a module each community turns on or off (settings of the members page).
 import {iracingSoloEnabled,importedIracingSolo,iracingSoloSql} from './iracing-visibility.mjs';
@@ -20,8 +21,16 @@ const plainSoloInput = (env, community, input) => {
   if (input?.format !== 'solo' || tdzOnly(community, isDevelopment(env))) return input;
   const details = input.details && typeof input.details === 'object' ? {...input.details} : {};
   delete details.type;
+  delete details.commentary;
   return {...input, access:'open', details};
 };
+// « Event commenté »: the stream channel is remembered for the community's next events.
+async function rememberStream(env, community, data) {
+  const stream = data.details?.commentary?.stream;
+  if (!stream || community.modules?.streamChannel === stream) return;
+  const modules = {...(community.modules || {}), streamChannel:stream};
+  await env.DB.prepare('UPDATE communities SET modules=? WHERE id=?').bind(JSON.stringify(modules), community.id).run();
+}
 import {syncIracingEvents} from './iracing-import.mjs';
 import {combosApi, combosPlugin, combosEnabled} from './combos.mjs';
 import {resetShowcase, makeOfficial} from './demo.mjs';
@@ -465,7 +474,7 @@ async function api(request, env) {
   const requests = await communityRequestsApi(path, method, request, env, actor);
   if (requests) return requests;
   // Each opening of the site renews the sign-in (once a day at most), so it never runs out for a pilot who comes back.
-  if (path === '/api/session' && method === 'GET') return json({user:actor.user, discordReady:!!(env.DISCORD_CLIENT_ID && env.DISCORD_CLIENT_SECRET), adminConfigured:administrators(env).length > 0, soloRaces:soloRacesEnabled(env, community), iracingImport:community.modules?.iracingImport===true, categoryEntry:community.modules?.categoryEntry === true, soloLabel:eventsLabel(community, isDevelopment(env)), eventTdz:tdzOnly(community, isDevelopment(env)), eventTypes:!tdzOnly(community, isDevelopment(env)) ? [] : grindfestEnabled(community, isDevelopment(env)) ? [...TDZ_EVENT_TYPES, 'Gridfest'] : TDZ_EVENT_TYPES, grindfest:grindfestEnabled(community, isDevelopment(env)), grindfestAvailable:grindfestAvailable(community, isDevelopment(env)), safeGuideUrl:community.modules?.safeGuideUrl || '',
+  if (path === '/api/session' && method === 'GET') return json({user:actor.user, discordReady:!!(env.DISCORD_CLIENT_ID && env.DISCORD_CLIENT_SECRET), adminConfigured:administrators(env).length > 0, soloRaces:soloRacesEnabled(env, community), iracingImport:community.modules?.iracingImport===true, categoryEntry:community.modules?.categoryEntry === true, soloLabel:eventsLabel(community, isDevelopment(env)), eventTdz:tdzOnly(community, isDevelopment(env)), eventTypes:!tdzOnly(community, isDevelopment(env)) ? [] : grindfestEnabled(community, isDevelopment(env)) ? [...TDZ_EVENT_TYPES, 'Gridfest'] : TDZ_EVENT_TYPES, grindfest:grindfestEnabled(community, isDevelopment(env)), grindfestAvailable:grindfestAvailable(community, isDevelopment(env)), safeGuideUrl:community.modules?.safeGuideUrl || '', streamChannel:tdzOnly(community, isDevelopment(env)) ? community.modules?.streamChannel || '' : '',
     combos:combosEnabled(community) && access.permissions.has('combos'),
     community:{id:community.id, slug:community.slug, name:community.name, shortName:community.shortName, discordInviteUrl:community.discordInviteUrl, appearance:appearanceOf(community)},
     access:access.status, permissions:[...access.permissions], manager:access.manager, communities:await myCommunities(env, actor, community),
@@ -694,7 +703,9 @@ async function api(request, env) {
     // « Course officielle (toutes les communautés) »: the platform managers only.
     if (input.official === true && !actor.manager) fail(403, 'Seuls les gestionnaires de la plateforme créent des courses officielles.');
     const owner = input.official === true ? OFFICIAL : community.id;
+    if (data.details.commentary && input.official === true) fail(400, 'Un event commenté reste dans sa communauté.');
     await dropEmptyCommonStart(env, null, data);
+    await rememberStream(env, community, data);
     await env.DB.prepare('INSERT INTO events(id,name,duration_hours,duration_minutes,event_type,circuit,schedule_pending,driver_change_required,format,access,capacity,rounds,categories,departures,created_by,created_at,community_id,sim,details) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)').bind(eventId, data.name, data.durationHours, data.durationMinutes, data.eventType, data.circuit, data.schedulePending?1:0, data.driverChangeRequired==null?null:(data.driverChangeRequired?1:0), data.format, data.access, data.capacity, JSON.stringify(data.rounds), JSON.stringify(data.categories), JSON.stringify(data.departures), actor.user.id, now(), owner, data.sim, JSON.stringify(data.details)).run();
     return json({id:eventId}, 201);
   }
@@ -732,7 +743,10 @@ async function api(request, env) {
     }
     const data = validateEvent(plainSoloInput(env, community, input), event);
     if (isGrindfest(data) && !grindfestEnabled(community, isDevelopment(env))) fail(403, 'Gridfest n’est pas activé.');
+    if (isWatchOnly(data) && !isWatchOnly({details:JSON.parse(event.details || '{}')}) && await env.DB.prepare("SELECT 1 FROM registrations WHERE event_id=? AND COALESCE(status,'')!='unavailable' LIMIT 1").bind(event.id).first())
+      fail(409, 'Des pilotes sont inscrits : retire leurs inscriptions avant de passer en commentary seulement.');
     await dropEmptyCommonStart(env, event.id, data);
+    await rememberStream(env, community, data);
     const cats = JSON.stringify(data.categories), deps = JSON.stringify(data.departures);
     const result = await env.DB.prepare(`UPDATE events SET name=?,duration_hours=?,duration_minutes=?,event_type=?,circuit=?,schedule_pending=?,driver_change_required=?,access=?,capacity=?,rounds=?,categories=?,departures=?,sim=?,details=?,version=version+1 WHERE id=? AND version=?
       AND NOT EXISTS (SELECT 1 FROM registrations r WHERE r.event_id=events.id AND
@@ -756,6 +770,7 @@ async function api(request, env) {
     // After the last start, nothing changes any more; « Absent » is for those who could enter.
     if (Math.max(...JSON.parse(event.departures || '[]').map(d => Number(d.startsAt) || 0)) <= Date.now()) fail(409, 'Cet événement est passé.');
     if (method === 'DELETE') { await env.DB.prepare('DELETE FROM event_absences WHERE event_id=? AND user_id=? AND community_id=?').bind(event.id, actor.user.id, community.id).run(); return json({ok:true}); }
+    if (isWatchOnly({details:JSON.parse(event.details || '{}')})) fail(409, 'Commentary seulement : pas d’inscription sur cet event.');
     if (!(event.format === 'solo' && tdzOnly(community, isDevelopment(env)) ? can(actor, 'solo_open') || can(actor, 'solo_safe') : can(actor, 'endurance'))) fail(403, 'Tu n’as pas l’autorisation de t’inscrire à cet événement.');
     if (await env.DB.prepare("SELECT 1 FROM registrations WHERE event_id=? AND user_id=? AND community_id=? AND COALESCE(status,'')!='unavailable' LIMIT 1").bind(event.id, actor.user.id, community.id).first())
       fail(409, 'Tu es inscrit à cet événement : retire d’abord ton inscription.');
@@ -767,6 +782,7 @@ async function api(request, env) {
     const event = await eventById(env, departureMatch[1], community);
     const departure = departureById(event, departureMatch[2]);
     if (departure.startsAt <= Date.now()) fail(409, 'Ce départ est passé. Les inscriptions sont fermées.');
+    if (isWatchOnly({details:JSON.parse(event.details || '{}')})) fail(409, 'Commentary seulement : pas d’inscription sur cet event.');
     const input = await body(request);
     // Official race: an own entry is made for the community chosen at its first step (another pilot: the site's).
     if (input.communityId && input.communityId !== community.id && (input.forOther === true || input.participantUserId || input.participantId)) fail(400, 'Un autre pilote s’inscrit dans la communauté du site.');

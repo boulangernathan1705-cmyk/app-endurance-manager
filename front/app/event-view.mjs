@@ -9,7 +9,8 @@ import {filterStorageKey,filterSelection,readFilterState,writeFilterState} from 
 import {eventCommunities,filterEventCommunities} from '../community-filters.mjs';
 import {ownRegistration,renderRegistrationWorkspace,soloRounds} from './registration.mjs';
 import {renderPilots} from './crews.mjs';
-import {isSolo,eventAccessLogo,accessBadge,soloCardMeta,soloEventDetails,soloPasswordBlock,soloHeaderChips,roundTiles,roundPilots,soloEntryList,eventCircuitName,soloEntryBlock,safeGuideLink} from './solo.mjs';
+import {isSolo,eventAccessLogo,accessBadge,soloCardMeta,soloEventDetails,soloPasswordBlock,soloHeaderChips,roundTiles,roundPilots,soloEntryList,eventCircuitName,soloEntryBlock,safeGuideLink,streamBlock,watchCard,watchPanel} from './solo.mjs';
+import {isWatchOnly} from '../../shared/commentary.mjs';
 import {renderHome,raceDateBlock} from './home-view.mjs';
 import {planningDays,renderPlanning,syncPlanning,CHEVRON} from './planning.mjs';
 import {raceInfoChips} from './race-info.mjs';
@@ -58,7 +59,7 @@ function absenceButton(event){
 // The pilot's own entry, always unfolded: one click enters him (or opens his entry). The other choices
 // (another category, another pilot) sit in a small « … » menu, the crew in its own square.
 function quickActions(event,departure){
-  if(departure.startsAt<=Date.now()||!state.user)return '';
+  if(departure.startsAt<=Date.now()||!state.user||isWatchOnly(event))return '';
   const solo=isSolo(event),own=ownRegistration(departure),mine=(departure.availability||[]).filter(reg=>reg.mine&&reg.status!=='unavailable');
   let main=null,leave=null;const more=[];
   if(solo){
@@ -121,6 +122,8 @@ function grindfestRounds(event,departure){
 function roundCards(event,departure){
   if(!isSolo(event))return '';
   if(isGrindfest(event))return grindfestRounds(event,departure);
+  // A commentary only: the rounds' details and the stream, no entry.
+  if(isWatchOnly(event))return `<div class="solo-round-starts" id="departure-${departure.id}">${(event.rounds||[]).length>1?`<div class="grindfest-rounds">${event.rounds.map((round,index)=>`<section class="grindfest-round"><h3>Manche ${index+1} · ${esc(eventCircuitName(event,round.circuit))}</h3>${roundTiles(round)}</section>`).join('')}</div>`:''}${watchCard(event)}</div>`;
   // A single round: one frame, without « Manche 1 » nor the circuit (both in the header), with the event's usual buttons.
   const single=(event.rounds||[]).length<2,rounds=single?[event.rounds?.[0]||{circuit:event.circuit}]:event.rounds;
   if(single&&(event.departures||[]).length>1)return '';
@@ -211,6 +214,7 @@ function soloHeaderTime(event,next){
 }
 function eventTypePanel(event){
   if(isGrindfest(event))return `<span class="event-type-panel has-gridfest-logo"><img class="gridfest-header-logo" src="/images/event-access/gridfest-horizontal.png" alt="Gridfest" width="1280" height="720"></span>`;
+  if(isWatchOnly(event))return `<span class="event-type-panel has-access-logo">${watchPanel()}</span>`;
   const logo=eventAccessLogo(event,{header:true});
   if(logo)return `<span class="event-type-panel has-access-logo">${logo}</span>`;
   const type=event.details?.type;
@@ -242,7 +246,7 @@ export function renderEvent(message=''){
   const badges=`<span class="race-badges">${officialBadge(event)}${isSolo(event)?accessBadge(event):eventTypeBadge(event.eventType)}${schedulePendingBadge(event)}</span>`;
   app.eventViewData={eventId:event.id,events:state.events,message};
   const gate=categoryEntryGate(full);
-  app.innerHTML=`<div class="event-header event-header-compact race-header event-type-${event.eventType||'private'}${isSolo(event)?` is-solo-${event.access||'open'} sim-${simForEvent(event)}`:''}${isGrindfest(event)?' is-gridfest':''}" data-event-id="${event.id}"><div class="race-card-top"><div class="race-side">${raceDateBlock(event,!next&&!undated.length)}${badges}</div><div class="race-head"><h1 class="event-title event-name">${esc(event.name)}</h1><span class="race-meta">${isSolo(event)?((event.rounds||[]).length>1?soloCardMeta(event):`<strong class="solo-header-circuit">${soloCardMeta(event)}</strong>`):`${esc(circuitLabel(event.circuit))} · <span class="nowrap">${durationLabel(eventMinutes(event))}</span>`}${isSolo(event)?soloHeaderTime(event,next):''}</span>${isSolo(event)?soloHeaderChips(event):raceInfoChips(event)}</div>${isSolo(event)?eventTypePanel(event):circuitVisual(event.circuit)}</div>${isSolo(event)&&soloEventDetails(event)?`<div class="race-header-footer">${soloEventDetails(event)}</div>`:''}</div><div id="crew-builder-root"></div>${message?`<p class="creation-success" role="status">${esc(message)}</p>`:''}<div class="race-controls">${communityFilter(present,chosen)}<span class="race-controls-actions">${helpContext(isGrindfest(event)?'grindfest':simForEvent(event)==='acrally'?'rally':isSolo(event)?'solo':'race')}${shareAction}${eventActions}</span></div>${gate||`${categoryEntryBar(full)}${categoryEntryBoard(event)}${soloPasswordBlock(full)}${starts}${absencesSection(event,!!(next||undated.length))}`}`;
+  app.innerHTML=`<div class="event-header event-header-compact race-header event-type-${event.eventType||'private'}${isSolo(event)?` is-solo-${event.access||'open'} sim-${simForEvent(event)}`:''}${isGrindfest(event)?' is-gridfest':''}" data-event-id="${event.id}"><div class="race-card-top"><div class="race-side">${raceDateBlock(event,!next&&!undated.length)}${badges}</div><div class="race-head"><h1 class="event-title event-name">${esc(event.name)}</h1><span class="race-meta">${isSolo(event)?((event.rounds||[]).length>1?soloCardMeta(event):`<strong class="solo-header-circuit">${soloCardMeta(event)}</strong>`):`${esc(circuitLabel(event.circuit))} · <span class="nowrap">${durationLabel(eventMinutes(event))}</span>`}${isSolo(event)?soloHeaderTime(event,next):''}</span>${isSolo(event)?soloHeaderChips(event):raceInfoChips(event)}</div>${isSolo(event)?eventTypePanel(event):circuitVisual(event.circuit)}</div>${isSolo(event)&&soloEventDetails(event)?`<div class="race-header-footer">${soloEventDetails(event)}</div>`:''}</div><div id="crew-builder-root"></div>${message?`<p class="creation-success" role="status">${esc(message)}</p>`:''}<div class="race-controls">${communityFilter(present,chosen)}<span class="race-controls-actions">${helpContext(isGrindfest(event)?'grindfest':simForEvent(event)==='acrally'?'rally':isSolo(event)?'solo':'race')}${shareAction}${eventActions}</span></div>${gate||`${categoryEntryBar(full)}${categoryEntryBoard(event)}${soloPasswordBlock(full)}${streamBlock(full)}${starts}${absencesSection(event,!!(next||undated.length))}`}`;
   if(days.length)syncPlanning(app);
   notifyRender();
 }
