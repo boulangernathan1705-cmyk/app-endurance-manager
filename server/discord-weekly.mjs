@@ -70,10 +70,11 @@ function selectPlanningWeek(allDepartures, timestamp) {
 }
 
 export async function loadWeeklyDiscordSnapshot(env, timestamp, community, scope = 'lmu', eventId = null) {
-  // The community's races, and the official races (common to every community) where it has entries or a crew, or the
-  // one asked for (its race channel): only its own entries and crews are shown.
+  // The community's races, the official LMU races (each has its category on the server, as server/recap-discord.mjs
+  // openRaces), the official iRacing ones where it has entries or a crew, or the one asked for (its race channel): only its
+  // own entries and crews are shown.
   const events = (await env.DB.prepare(`SELECT id,name,circuit,duration_hours,duration_minutes,event_type,schedule_pending,departures
-    FROM events WHERE (community_id=? OR (community_id='official' AND (EXISTS (SELECT 1 FROM registrations r WHERE r.event_id=events.id AND r.community_id=?) OR EXISTS (SELECT 1 FROM event_absences a WHERE a.event_id=events.id AND a.community_id=?)
+    FROM events WHERE (community_id=? OR (community_id='official' AND (circuit NOT LIKE 'iracing-%' OR EXISTS (SELECT 1 FROM registrations r WHERE r.event_id=events.id AND r.community_id=?) OR EXISTS (SELECT 1 FROM event_absences a WHERE a.event_id=events.id AND a.community_id=?)
       OR EXISTS (SELECT 1 FROM crews c WHERE c.event_id=events.id AND c.community_id=?)) OR (community_id='official' AND id=?)))
     AND COALESCE(format,'endurance')<>'solo' AND ${iracingSoloSql(env,community)} ${CIRCUITS[scope] ?? CIRCUITS.lmu} ORDER BY created_at,id`).bind(community.id, community.id, community.id, community.id, eventId).all()).results || [];
   const allDepartures = flattenDepartures(eventId ? events.filter(event => event.id === eventId) : events);

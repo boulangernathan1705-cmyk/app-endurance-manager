@@ -217,7 +217,9 @@ test('les absences du site figurent une fois en bas de chaque événement, uniqu
     assert.deepEqual(payload.allowed_mentions,{parse:[]});assert.doesNotMatch(JSON.stringify(payload),/Autre communauté/);
     db.prepare('DELETE FROM event_absences WHERE event_id=? AND community_id=?').run(uuid,COMMUNITY.id);
     snapshot=await loadWeeklyDiscordSnapshot({DB},now,COMMUNITY);
-    assert.equal(snapshot.futureDepartures.length,0,'an absence in another community does not include the official event');
+    // An official LMU race has its category on every server: its week's message lists it too, without the other community's absences.
+    assert.equal(snapshot.futureDepartures.length,2,'an official LMU race is listed like its category');
+    assert.deepEqual(snapshot.futureDepartures[0].absentPilots,[],'an absence in another community is not shown');
     // Private event without absences: its recap stays unchanged, with no empty absence heading.
     db.prepare("INSERT INTO events(id,name,circuit,categories,departures,created_by,created_at,community_id,duration_hours) VALUES(?,'Privée','fuji','[\"GT3\"]',?,'one',0,?,6)").run(futureEventUuid,departures,COMMUNITY.id);
     snapshot=await loadWeeklyDiscordSnapshot({DB},now,COMMUNITY);
