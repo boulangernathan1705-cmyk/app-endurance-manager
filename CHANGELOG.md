@@ -1,5 +1,11 @@
 # Nouveautés d'Endurance Manager
 
+## v1.73 — 27 octobre 2026
+
+### 🔧 Corrections
+
+- **Mur des stands** : le bouton « Mur des stands » du menu ouvre le nouveau mur.
+
 ## v1.72 — 27 octobre 2026
 
 ### 🔧 Corrections
