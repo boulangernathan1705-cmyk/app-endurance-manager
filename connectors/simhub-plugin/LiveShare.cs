@@ -234,7 +234,9 @@ namespace EnduranceManager.SimHub
                 ["compound"] = string.IsNullOrEmpty(s.RearCompound) || s.RearCompound == s.FrontCompound ? s.FrontCompound : s.FrontCompound + " / " + s.RearCompound,
                 ["cur"] = R(s.IntoLap, 2), ["pit"] = s.Garage ? 2 : s.InPits ? 1 : 0, ["ve"] = hasEnergy ? R(s.Energy, 2) : null,
                 ["fuel"] = R(s.Fuel, 2), ["capacity"] = R(s.FuelCapacity, 1),
-                ["wheels"] = s.Wheels.Select(w => new[] { R(w.Wear * 100, 1), R(w.Temp, 0), R(w.Pressure, 1), R(w.Brake, 0) }).ToArray(),
+                // Per wheel: wear, carcass, pressure, brake and (2.4.0) the tread's inner, middle and outer temperatures.
+                ["wheels"] = s.Wheels.Select(w => new object[] { R(w.Wear * 100, 1), R(w.Temp, 0), R(w.Pressure, 1), R(w.Brake, 0),
+                    new[] { R(w.TreadIn, 0), R(w.TreadMid, 0), R(w.TreadOut, 0) } }).ToArray(),
                 // The eight dent zones, 0 to 2 each.
                 ["damage"] = R(s.Damage / 16.0 * 100, 0),
                 ["stops"] = (session?.Stops ?? new List<LiveStop>()).Select(stop => new Dictionary<string, object>

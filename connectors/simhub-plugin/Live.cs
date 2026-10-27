@@ -20,6 +20,8 @@ namespace EnduranceManager.SimHub
         public double Surface, Slip;
         // The tread's inner side minus its outer side (°C) and the ride height at that corner (metres).
         public double Spread, Ride;
+        // The tread's three temperatures as the game's tyre screen shows them (°C): inner, middle, outer side.
+        public double TreadIn, TreadMid, TreadOut;
     }
 
     public struct Sample
@@ -146,7 +148,8 @@ namespace EnduranceManager.SimHub
                     Temp = F64(b, w + 204) - 273.15, Wear = F64(b, w + 152),
                     Pressure = F64(b, w + 120), Brake = F64(b, w + 24) - 273.15,
                     Surface = F64(b, w + 136) - 273.15, Slip = ground > 5 ? Math.Max(-1, Math.Min(1, (turning - ground) / ground)) : 0,
-                    Spread = i % 2 == 0 ? right - left : left - right, Ride = F64(b, w + 8)
+                    Spread = i % 2 == 0 ? right - left : left - right, Ride = F64(b, w + 8),
+                    TreadIn = (i % 2 == 0 ? right : left) - 273.15, TreadMid = F64(b, w + 136) - 273.15, TreadOut = (i % 2 == 0 ? left : right) - 273.15
                 };
             }
             // LMU leaves mFrontRideHeight and mRearRideHeight at 0: the axle's height is its two wheels' (checked on track).

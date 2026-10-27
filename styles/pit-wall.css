@@ -214,6 +214,8 @@
 .pw-body .pw-tyre { display: grid; place-content: center; justify-items: center; width: 88px; height: 92px; border-radius: 12px; border: 3px solid #2b3245; background: linear-gradient(180deg, color-mix(in srgb, var(--temp) 85%, #000), color-mix(in srgb, var(--temp) 45%, #000)); box-shadow: 0 0 18px color-mix(in srgb, var(--temp) 30%, transparent); }
 .pw-body .pw-tyre b { font-family: var(--pw-mono); font-size: 18px; color: #fff; text-shadow: 0 1px 3px #000; }
 .pw-body .pw-tyre small { color: rgba(255,255,255,.75); font-weight: 600; }
+.pw-body .pw-tread { display: flex; gap: 3px; margin-top: 4px; }
+.pw-body .pw-tread i { font-style: normal; font-family: var(--pw-mono); font-size: 11px; color: #fff; padding: 1px 3px; border-radius: 4px; background: color-mix(in srgb, var(--temp) 70%, #000); }
 .pw-body .pw-brake { display: grid; justify-items: center; gap: 6px; }
 .pw-body .pw-brake i { width: 10px; height: 54px; border-radius: 6px; background: linear-gradient(180deg, var(--temp), color-mix(in srgb, var(--temp) 40%, #000)); box-shadow: 0 0 10px color-mix(in srgb, var(--temp) 40%, transparent); }
 .pw-body .pw-brake b { font-family: var(--pw-mono); font-size: 18px; }
