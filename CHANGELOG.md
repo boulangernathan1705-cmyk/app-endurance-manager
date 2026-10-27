@@ -2,6 +2,10 @@
 
 ## v1.63 — 27 octobre 2026
 
+### ✨ Nouveautés
+
+- **Discord** : en mode « Un fil par course », chaque course a son fil dans # endurances-de-la-semaine avec ses infos. Sa catégorie ne garde que les vocaux de ses équipages ; plus de salon infos-de-la-course.
+
 ### 🔧 Corrections
 
 - **Discord** : l'activation du réglage ne demande plus de droits dans l'endroit de l'ancien réglage. Le bot crée sa propre catégorie avec ses droits.
