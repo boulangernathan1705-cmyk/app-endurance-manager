@@ -45,7 +45,10 @@ function setup(t,{rights='85008',overrides=[],failure=null}={}){
     if(edit){const message=messages.get(edit[2]);if(!message)return Response.json({code:10008},{status:404});if(method==='DELETE'){messages.delete(edit[2]);return new Response(null,{status:204});}Object.assign(message,body);return Response.json(message);}
     if(/^\/channels\/\d+\/thread-members\/\d+$/.test(path))return new Response(null,{status:204});
     const thread=path.match(/^\/channels\/(\d+)\/threads$/);
-    if(thread&&method==='POST'){const created={...body,id:String(counter++),parent_id:thread[1]};channels.push(created);return Response.json(created);}
+    if(thread&&method==='POST'){const created={...body,id:String(counter++),parent_id:thread[1]};channels.push(created);
+      // Discord's notice in the parent channel: « … a commencé un fil ».
+      const notice={id:String(counter++),type:18,channel_id:thread[1],content:body.name,message_reference:{channel_id:created.id},author:{id:BOT}};messages.set(notice.id,notice);
+      return Response.json(created);}
     const channel=path.match(/^\/channels\/(\d+)$/);
     if(channel){const index=channels.findIndex(item=>item.id===channel[1]);if(index<0)return Response.json({code:10003},{status:404});if(method==='GET')return Response.json(channels[index]);
       // A channel deleted takes its threads with it.
@@ -866,4 +869,13 @@ test('a pass with nothing to change makes one request; a changed race only its e
   DB.db.prepare("UPDATE discord_recap_publications SET content_hash='x' WHERE event_id='race-a'").run();
   calls.length=0;await syncBotRecaps(env,NOW+6000,COMMUNITY);
   assert.deepEqual(calls.map(call=>call.method),['GET','PATCH']);
+});
+
+test('Discord\'s « a commencé un fil » notice is deleted once from # endurances-de-la-semaine',async t=>{
+  const {DB,env,messages,calls}=setup(t);race(DB);
+  await layout(env,COMMUNITY,{mode:'events',sims:'lmu',under:'111111111111111110'});
+  assert.equal([...messages.values()].filter(item=>item.type===18).length,0);
+  assert.equal(DB.db.prepare("SELECT thread_notice_gone FROM discord_recap_publications WHERE event_id='race-a'").get().thread_notice_gone,1);
+  calls.length=0;await syncBotRecaps(env,NOW+1000,COMMUNITY);
+  assert.ok(!calls.some(call=>call.path.includes('messages?limit')),'once');
 });
