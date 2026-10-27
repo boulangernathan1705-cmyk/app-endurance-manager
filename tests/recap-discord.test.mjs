@@ -879,3 +879,31 @@ test('Discord\'s « a commencé un fil » notice is deleted once from # enduranc
   calls.length=0;await syncBotRecaps(env,NOW+1000,COMMUNITY);
   assert.ok(!calls.some(call=>call.path.includes('messages?limit')),'once');
 });
+
+test('the crews\' voices: LMU first, then iRacing, each by its start; other voices first as they are',async t=>{
+  const {DB,env,channels,calls}=setup(t);
+  race(DB,'race-a','6h de Spa','spa',[{id:'start-a',startsAt:NOW+2*DAY}]);race(DB,'race-c','4h de Monza','monza',[{id:'start-c',startsAt:NOW+DAY}]);
+  race(DB,'race-b','8h de Watkins Glen','iracing-watkins',[{id:'start-b',startsAt:NOW+DAY/2}]);
+  const community={...COMMUNITY,modules:{...COMMUNITY.modules,crewChannels:true}};
+  await layout(env,community,{mode:'events',sims:'all',under:'111111111111111110',voices:true});
+  const bot=named(channels,'Endurance Manager');
+  const voice=(crew,eventId,start,id,position)=>{
+    DB.db.prepare("INSERT INTO crews(id,event_id,departure_id,name,category,car,locked,created_at,community_id) VALUES(?,?,?,?,'GT3','',0,0,?)").run(crew,eventId,start,crew,DEV_COMMUNITY);
+    DB.db.prepare("INSERT INTO crew_discord(crew_id,community_id,guild_id,voice_id,parent_id,created_at) VALUES(?,?,?,?,?,0)").run(crew,DEV_COMMUNITY,GUILD,id,bot.id);
+    channels.push({id,type:2,name:crew,parent_id:bot.id,position});};
+  channels.push({id:'777777777777777700',type:2,name:'Général',parent_id:bot.id,position:5});
+  voice('iracing','race-b','start-b','777777777777777701',0);voice('spa','race-a','start-a','777777777777777702',1);voice('monza','race-c','start-c','777777777777777703',2);
+  calls.length=0;await syncBotRecaps(env,NOW+1000,community);
+  const order=channels.filter(item=>item.type===2&&item.parent_id===bot.id).sort((a,b)=>a.position-b.position).map(item=>item.name);
+  assert.deepEqual(order,['Général','monza','spa','iracing']);
+  calls.length=0;await syncBotRecaps(env,NOW+2000,community);
+  assert.ok(!calls.some(call=>call.method==='PATCH'&&call.path===`/guilds/${GUILD}/channels`),'in order: nothing sent');
+});
+
+test('LMU and iRacing in the same channel read as one message: the title on the first, the banner on the last',async t=>{
+  const {DB,env,messages}=setup(t);race(DB);race(DB,'race-b','8h de Watkins Glen','iracing-watkins',[{id:'start-b',startsAt:NOW+2*DAY}]);
+  await layout(env,COMMUNITY,{mode:'events',sims:'all',under:'111111111111111110'});
+  const week=id=>messages.get(DB.db.prepare('SELECT message_id FROM discord_recap_publications WHERE event_id=?').get(id).message_id).embeds[0];
+  assert.match(week('week:lmu').title,/semaine/);assert.equal(week('week:lmu').image,undefined);
+  assert.equal(week('week:iracing').title,undefined);assert.equal(week('week:iracing').author,undefined);
+});

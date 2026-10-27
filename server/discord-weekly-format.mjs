@@ -208,7 +208,9 @@ function footer(updatedAt){return{text:`Endurance Manager · mise à jour à ${u
 // `weekly`: the week's message of one sim (« 📝 Endurances LMU · semaine du … »), not a race's channel.
 // `alone`: a race's thread, its block only (the week is already in the channel's message).
 // `threads`: « un fil par course », the week's message lists the races only, each a link to its thread ({eventId: thread id}).
-export function buildWeeklyDiscordPayload(snapshot,site={},updatedAt=Date.now(),scope='lmu',emojis={},{weekly=false,alone=false,threads=null}={}){
+// `part`: with threads, this sim's message among those of the same channel ('first', 'middle', 'last'): the title and its
+// link on the first only, the banner and the time of update on the last only.
+export function buildWeeklyDiscordPayload(snapshot,site={},updatedAt=Date.now(),scope='lmu',emojis={},{weekly=false,alone=false,threads=null,part=null}={}){
   const siteUrl=typeof site==='string'?(()=>{try{return new URL(site).origin;}catch{return '';}})():String(site.url||'');
   const sim=SCOPE_LABELS[scope]??' LMU',simPage=scope==='iracing'?'/iracing/':scope==='all'?'/':'/lmu/';
   const current=Array.isArray(snapshot.currentDepartures)?snapshot.currentDepartures:[],future=Array.isArray(snapshot.futureDepartures)?snapshot.futureDepartures:[];
@@ -227,8 +229,8 @@ export function buildWeeklyDiscordPayload(snapshot,site={},updatedAt=Date.now(),
       const more=group.length>1?` · ${group.length} départs`:'';
       return `${thread?`<#${thread}>`:url?`🏁 [${name}](${url})`:`🏁 ${name}`} — ${departureTitle(first)}${more}`;};
     header.description=cut([...groupByRace(current),...groupByRace(future)].map(line).join('\n'),4096);
-    if(site.bannerUrl)header.image={url:site.bannerUrl};
-    header.footer=footer(updatedAt);
+    if(part==='middle'||part==='last'){delete header.title;delete header.url;delete header.author;}
+    if(part!=='first'&&part!=='middle'){if(site.bannerUrl)header.image={url:site.bannerUrl};header.footer=footer(updatedAt);}
     return{content:'',embeds:[header],allowed_mentions:{parse:[]}};
   }
   const build=compact=>{
