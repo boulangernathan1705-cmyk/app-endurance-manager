@@ -36,6 +36,7 @@ Ne pas recréer la base ni rejouer manuellement la migration initiale sur une ba
 
 1. Les changements arrivent sur `dev` (version de test `https://app.endurance-manager.workers.dev`).
 2. `CHANGELOG.md` reçoit la nouvelle version en haut (`## vX.Y — date`), sur `dev`.
+   Les lignes qui ne concernent que les admins vont sous `### 🛠️ Pour les admins` ; une ligne propre à une communauté commence par son nom court (`- **FMT** · …`). La page Nouveautés ne montre à chacun que ce qui le concerne.
 3. Une PR `dev` → `main` est ouverte, titrée `vX.Y : …`. Le ruleset « Protect production » exige les checks `check` et `Release must come from dev`, et une fusion en squash.
 4. Après la fusion, Cloudflare déploie `https://endurance-manager.app` et le workflow `Sync dev after release` remet `main` dans `dev` (commit « Synchronisation avec main après vX.Y »), sans quoi la release suivante serait refusée.
 

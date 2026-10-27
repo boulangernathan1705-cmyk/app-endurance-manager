@@ -45,5 +45,30 @@ test('the published history has exactly one entry per date', () => {
   const dates = [...markdown.matchAll(/^## .* — (.+)$/gm)].map(match => match[1]);
   const html = changelogHtml(markdown);
   assert.equal((html.match(/<section /g) || []).length, new Set(dates).size);
-  assert.equal((html.match(/<li>/g) || []).length, (markdown.match(/^- /gm) || []).length);
+  assert.equal((html.match(/<li[ >]/g) || []).length, (markdown.match(/^- /gm) || []).length);
+});
+
+test('admin and community lines are marked for the page to filter', () => {
+  const html = changelogHtml(`# Nouveautés
+## v1.2 — 14 octobre 2026
+### 🔧 Corrections
+- **Liens** : pour tous
+- **FMT** · **Planning** : pour la FMT
+### 🛠️ Pour les admins
+- **Discord** : réglage
+## v1.1 — 14 octobre 2026
+### 🛠️ Pour les admins
+- **TDZ** · **Discord** : réglage TDZ`);
+  assert.match(html, /<li><strong>Liens<\/strong>/);
+  assert.match(html, /<li data-community="FMT"><strong>FMT<\/strong> · /);
+  assert.match(html, /<h3 data-admin>🛠️ Pour les admins<\/h3>/);
+  assert.match(html, /<li data-admin><strong>Discord<\/strong> : réglage<\/li>/);
+  assert.match(html, /<li data-admin data-community="TDZ">/);
+  assert.equal((html.match(/Pour les admins/g) || []).length, 1, 'one admin title per day');
+});
+
+test('the page asks who is viewing and the server answers with the communities of the pilot', () => {
+  assert.match(readFileSync(new URL('../changelog.html', import.meta.url), 'utf8'), /src="\/front\/changelog\.mjs/);
+  assert.match(readFileSync(new URL('../front/changelog.mjs', import.meta.url), 'utf8'), /\/api\/changelog-audience/);
+  assert.match(readFileSync(new URL('../server/worker.mjs', import.meta.url), 'utf8'), /path === '\/api\/changelog-audience'/);
 });

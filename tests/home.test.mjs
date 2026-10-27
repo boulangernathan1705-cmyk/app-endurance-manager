@@ -17,14 +17,17 @@ test('with EVENT TDZ, the events calendar is the home page; the simulator is ask
   const {homeRedirect} = await import('../server/home.mjs');
   const events = {slug:'tdz', modules:{soloRaces:true}};
   const go = cookie => homeRedirect(new Request('https://site.example/', {headers: cookie ? {Cookie: cookie} : {}}), events)?.headers.get('Location');
-  assert.equal(go(''), '/lmu/#solo');
-  assert.equal(go('em_sim=iracing'), '/iracing/#solo');
+  assert.equal(go(''), '/events/');
+  assert.equal(go('em_sim=iracing'), '/events/');
   assert.equal(homeRedirect(new Request('https://site.example/?accueil'), events), null);
   assert.equal(homeRedirect(new Request('https://site.example/'), {modules:{}}), null);
   const context = readFileSync(new URL('../front/game-context.js', import.meta.url), 'utf8');
-  assert.match(context, /if \(chosen \|\| !\/\^#\(solo\|event=\)\/i\.test\(location\.hash\)\)/);
-  // A link typed by hand (/lmu/#SOLO) still opens the events calendar.
-  assert.match(readFileSync(new URL('../front/app/router.mjs', import.meta.url), 'utf8'), /const hash=location\.hash\.toLowerCase\(\);[\s\S]*if\(hash===SOLO_HASH\)return \{page:'home',list:'solo'\}/);
+  assert.match(context, /if \(!events && \(chosen \|\| !\/\^#\(solo\|event=\)\/i\.test\(location\.hash\)\)\)/);
+  // The calendar has its own address (/events/); older links, even typed by hand (/lmu/#SOLO), lead there.
+  const router = readFileSync(new URL('../front/app/router.mjs', import.meta.url), 'utf8');
+  assert.match(router, /const hash=location\.hash\.toLowerCase\(\);[\s\S]*if\(hash===SOLO_HASH\)\{history\.replaceState\(null,'',EVENTS_PATH\+location\.search\);return \{page:'home',list:'solo'\};\}/);
+  assert.match(router, /if\(onEvents\(\)\)return \{page:'home',list:'solo'\}/);
+  assert.match(context, /const game = events \? remembered \|\| 'lmu'/);
   assert.match(readFileSync(new URL('../front/app/actions.mjs', import.meta.url), 'utf8'), /state\.soloRaces&&!simChosen\(\)\)\{openSimChooser\(\)/);
 });
 
@@ -48,7 +51,7 @@ test('simulator spaces remember the choice and the logo leads to the chosen simu
   const routes = prod.assets.run_worker_first;
   assert.ok(!routes.includes('/*'), 'unknown addresses must not wake the Worker');
   assert.equal(prod.assets.not_found_handling, '404-page');
-  for (const route of ['/', '/api/*', '/telemetry/*', '/manifest.webmanifest', '/app-icon.png', '/lmu*', '/iracing*'])
+  for (const route of ['/', '/api/*', '/telemetry/*', '/manifest.webmanifest', '/app-icon.png', '/lmu*', '/iracing*', '/events*'])
     assert.ok(routes.includes(route), route);
   for (const page of ['members', 'help', 'about', 'legal', 'privacy', 'changelog', 'circuit-credits', 'demande-communaute', 'diagnostics', 'fiches-combo', 'mur-des-stands', 'mur'])
     assert.ok(routes.some(route => route.endsWith('*') && `/${page}`.startsWith(route.slice(0, -1))), page);

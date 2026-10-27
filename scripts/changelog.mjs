@@ -2,6 +2,8 @@
 // CHANGELOG.md stays the single source: its sections paste as-is into Discord, which reads Markdown.
 // Only what the changelog uses is supported: # / ## / ### titles, "- " lists, paragraphs, **bold**,
 // `code` and [links](https://…). Every other character is escaped.
+// Who sees a line: under a "### … Pour les admins" title, admins only; a line starting with "**FMT** · ", only the
+// pilots of that community. The page hides the others (front/changelog.mjs).
 
 const escape = value => String(value).replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
 
@@ -35,16 +37,28 @@ function dailyNotes(markdown) {
 
 export function changelogHtml(markdown) {
   const out = [];
-  let list = false, section = false;
+  let list = false, section = false, admin = false, heading = '';
   const closeList = () => { if (list) { out.push('</ul>'); list = false; } };
   const closeSection = () => { closeList(); if (section) { out.push('</section>'); section = false; } };
   for (const raw of dailyNotes(markdown).split('\n')) {
     const line = raw.trimEnd();
     if (!line.trim()) { closeList(); continue; }
+    if (line.startsWith('#')) admin = false;
     if (line.startsWith('# ')) { closeSection(); out.push(`<h1>${inline(line.slice(2))}</h1>`); continue; }
-    if (line.startsWith('## ')) { closeSection(); out.push(`<section class="changelog-version"><h2>${inline(line.slice(3))}</h2>`); section = true; continue; }
-    if (line.startsWith('### ')) { closeList(); out.push(`<h3>${inline(line.slice(4))}</h3>`); continue; }
-    if (line.startsWith('- ')) { if (!list) { out.push('<ul>'); list = true; } out.push(`<li>${inline(line.slice(2))}</li>`); continue; }
+    if (line.startsWith('## ')) { closeSection(); heading = ''; out.push(`<section class="changelog-version"><h2>${inline(line.slice(3))}</h2>`); section = true; continue; }
+    if (line.startsWith('### ')) {
+      closeList(); admin = /pour les admins/i.test(line);
+      // Releases of the same day: one title for each kind of change.
+      if (line !== heading) out.push(`<h3${admin ? ' data-admin' : ''}>${inline(line.slice(4))}</h3>`);
+      heading = line;
+      continue;
+    }
+    if (line.startsWith('- ')) {
+      if (!list) { out.push('<ul>'); list = true; }
+      const community = line.match(/^- \*\*([^*]+)\*\* · /)?.[1];
+      out.push(`<li${admin ? ' data-admin' : ''}${community ? ` data-community="${escape(community)}"` : ''}>${inline(line.slice(2))}</li>`);
+      continue;
+    }
     closeList();
     out.push(`<p${section ? '' : ' class="updated"'}>${inline(line)}</p>`);
   }

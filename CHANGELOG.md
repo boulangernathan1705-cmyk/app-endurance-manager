@@ -1,5 +1,12 @@
 # Nouveautés d'Endurance Manager
 
+## v1.62 — 27 octobre 2026
+
+### ✨ Nouveautés
+
+- **Calendrier des events** : il a sa propre adresse, `/events/`, la même quel que soit le simu. Un lien copié depuis le calendrier y ramène toujours, même depuis l'aperçu de Discord.
+- **Nouveautés** : chacun ne voit que ce qui le concerne. Les lignes pour les admins ne s'affichent qu'aux admins, et celles d'une communauté qu'à ses pilotes.
+
 ## v1.61 — 27 octobre 2026
 
 ### 🔧 Corrections
@@ -8,7 +15,7 @@
 
 ## v1.60 — 27 octobre 2026
 
-### 🔧 Corrections
+### 🛠️ Pour les admins
 
 - **Discord** : quand Discord demande au bot d'attendre un instant, le bot attend et réessaie au lieu d'afficher « Discord ne répond pas ».
 - **Discord** : la liste de tes salons se relit toute seule si elle échoue après un enregistrement. Sinon, un message le dit et tes choix restent gardés.
@@ -16,35 +23,29 @@
 
 ## v1.59 — 27 octobre 2026
 
-### ✨ Nouveautés
+### 🛠️ Pour les admins
 
 - **Discord** : en récap de la semaine avec LMU et iRacing séparés, le bot crée les catégories « LMU » et « iRacing », chacune avec son # endurances-de-la-semaine, là où tu les places.
 - **Discord** : les catégories privées sont signalées. Sous une catégorie privée, tu choisis si celles du bot deviennent privées comme elle ou restent publiques, et le réglage explique l'exception à ajouter pour le bot.
-
-### 🔧 Corrections
-
 - **Discord** : un salon ou un vocal du bot supprimé à la main sur le serveur ne bloque plus l'activation du réglage ; le bot le recrée si besoin.
 - **Discord** : le lien « Inviter le bot avec ses droits » donne tout ce qu'il faut sans le mettre administrateur, et la catégorie sous laquelle le bot se place n'affiche plus « le bot n'a pas ses droits ».
 
 ## v1.58 — 27 octobre 2026
 
-### ✨ Nouveautés
+### 🛠️ Pour les admins
 
 - **Discord** : le réglage se fait question par question (une par écran sur téléphone). Le bot crée sa propre catégorie « Endurance Manager » (ou « LMU » et « iRacing » si tu les sépares) et, en récap de la semaine, la catégorie « 🎙️ Pit talk » pour les vocaux, ou les met dans une catégorie existante. Si tu changes d'avis, le bot retire ce qu'il avait fait et range selon les nouveaux choix. Le bouton « Tout retirer » enlève tout ce que le bot a créé.
-
-### 🔧 Corrections
-
 - **Vocaux d'équipage** : ils ne remontent plus en haut du serveur quand on passe au récap de la semaine.
 
 ## v1.57 — 27 octobre 2026
 
-### 🔧 Corrections
+### 🛠️ Pour les admins
 
 - **Discord** : pour le récap de la semaine et le calendrier, choisis un salon ou une catégorie : le bot crée son propre salon juste en dessous, avec ses droits. Si un endroit est fermé au bot, la ligne dit quoi cocher. Les vocaux d'équipage déjà créés rejoignent la catégorie choisie avec leur nouveau nom, et les catégories de course disparaissent dès qu'on passe au récap de la semaine.
 
 ## v1.56 — 26 octobre 2026
 
-### ✨ Nouveautés
+### 🛠️ Pour les admins
 
 - **Discord** : un seul réglage pour ranger les courses sur ton serveur (une catégorie par course, ou un récap de la semaine avec tous les vocaux d'équipage dans une catégorie de ton choix). Chaque récap (Endurances LMU, Endurances iRacing, Calendrier de la semaine) se publie dans le salon que tu choisis.
 - **Météo prévue** : se renseigne en 5 créneaux, comme dans LMU, avec le ciel de chaque créneau.
@@ -69,8 +70,11 @@
 
 ### 🔧 Corrections et améliorations
 
-- **Discord** : catégories de course regroupées ; accès vérifié dans les catégories privées avant activation et protégé pour le bot dans les nouveaux salons. Les erreurs indiquent le salon et les droits à corriger.
 - **Vocaux d’équipage** : noms des pilotes affichés sans mention, avec des messages et rappels silencieux.
+
+### 🛠️ Pour les admins
+
+- **Discord** : catégories de course regroupées ; accès vérifié dans les catégories privées avant activation et protégé pour le bot dans les nouveaux salons. Les erreurs indiquent le salon et les droits à corriger.
 
 ## v1.52 — 16 octobre 2026
 

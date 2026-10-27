@@ -65,6 +65,7 @@ test('le portail expose les deux espaces et le contexte charge avant l’applica
   assert(game.indexOf('/front/game-context.js') < game.indexOf('/app.js'));
   assert(build.includes("new URL('lmu/index.html', out)"));
   assert(build.includes("new URL('iracing/index.html', out)"));
+  assert(build.includes("new URL('events/index.html', out)"), 'the events calendar has its own address');
 });
 
 test('les identifiants iRacing ne peuvent pas entrer en collision avec les circuits LMU', () => {

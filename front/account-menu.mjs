@@ -178,7 +178,7 @@ function unifyNav(session) {
   sections.className = 'nav-sections';
   sections.setAttribute('role', 'group');
   sections.setAttribute('aria-label', 'Sections');
-  sections.innerHTML = `${events ? link(`/${sim}/#solo`, session.soloLabel || 'EVENT TDZ', ' nav-events-button') : ''}${endurance}${link(`/${sim}/#inscriptions`, 'Mes inscriptions')}${own}`;
+  sections.innerHTML = `${events ? link('/events/', session.soloLabel || 'EVENT TDZ', ' nav-events-button') : ''}${endurance}${link(`/${sim}/#inscriptions`, 'Mes inscriptions')}${own}`;
   // Simulator not chosen yet: « Endurance » asks for it first.
   if (events) sections.children[1].addEventListener('click', event => { if (!simChosen()) { event.preventDefault(); openSimChooser(); } });
   nav.append(sections);
@@ -196,11 +196,9 @@ async function loadSession() {
     installContextHelp(session);
     applyCommunity(session.community, Array.isArray(session.communities) ? session.communities : [], session.openSite === true);
     if (session.openSite) showcaseBanner(session.platformDiscordUrl);
-    // EVENT TDZ on: the banner leads to the events (all sims), on the current game page or LMU.
-    if (session.soloRaces === true && session.access === 'member') {
-      const game = location.pathname.startsWith('/iracing') ? '/iracing/' : '/lmu/';
-      for (const link of document.querySelectorAll('a.brand-button')) link.href = `${game}#solo`;
-    }
+    // EVENT TDZ on: the banner leads to the events (all sims).
+    if (session.soloRaces === true && session.access === 'member')
+      for (const link of document.querySelectorAll('a.brand-button')) link.href = '/events/';
     // The LMU module's own tab (fiches-combo.html): only for the roles that see the fiches combo.
     for (const link of document.querySelectorAll('[data-module-link]')) link.hidden = link.dataset.moduleLink === 'combos' && session.combos !== true;
     unifyNav(session);
