@@ -219,6 +219,10 @@
 .pw-body .pw-brake { display: grid; justify-items: center; gap: 6px; }
 .pw-body .pw-brake i { width: 10px; height: 54px; border-radius: 6px; background: linear-gradient(180deg, var(--temp), color-mix(in srgb, var(--temp) 40%, #000)); box-shadow: 0 0 10px color-mix(in srgb, var(--temp) 40%, transparent); }
 .pw-body .pw-brake b { font-family: var(--pw-mono); font-size: 18px; }
+.pw-body .pw-wear { display: grid; justify-items: center; gap: 6px; }
+.pw-body .pw-wear i { position: relative; width: 14px; height: 70px; border-radius: 7px; background: #1b2131; overflow: hidden; }
+.pw-body .pw-wear i::after { content: ''; position: absolute; inset: auto 0 0; height: var(--wear); background: var(--bar); box-shadow: 0 0 10px color-mix(in srgb, var(--bar) 50%, transparent); }
+.pw-body .pw-wear b { font-family: var(--pw-mono); font-size: 15px; color: var(--bar); }
 .pw-body .pw-wheel .pw-box { background: var(--pw-card); padding: 8px; }
 .pw-body .pw-wheel .pw-box > span { font-size: 11px; }
 .pw-body .pw-wheel .pw-box > b { font-size: 15px; }

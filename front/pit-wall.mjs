@@ -397,7 +397,6 @@ function chrono(feed) {
 // Colours of temperatures: blue cold, green in its window, yellow then red too hot.
 const tyreColor = value => !known(value) ? 'var(--pw-muted)' : value < 60 ? 'var(--pw-blue)' : value < 75 ? 'var(--pw-cyan)' : value <= 100 ? 'var(--pw-green)' : value <= 110 ? 'var(--pw-yellow)' : 'var(--pw-red)';
 const brakeColor = value => !known(value) ? 'var(--pw-muted)' : value < 250 ? 'var(--pw-blue)' : value <= 650 ? 'var(--pw-green)' : value <= 850 ? 'var(--pw-orange)' : 'var(--pw-red)';
-const wearColor = value => !known(value) ? 'var(--pw-muted)' : value > 60 ? 'var(--pw-green)' : value > 35 ? 'var(--pw-yellow)' : 'var(--pw-red)';
 
 function car(feed) {
   const snap = feed.snap, me = snap.me, control = me.control || {}, energy = energyOf(feed), pace = ourPace(feed), now = lastFrame(feed);
@@ -446,14 +445,20 @@ function car(feed) {
     const [inner, middle, outer] = w.tread, mean = (inner + middle + outer) / 3, row = index % 2 ? [inner, middle, outer] : [outer, middle, inner];
     return `<div class="pw-tyre" style="--temp:${tyreColor(mean)}"><b>${fr(mean, 0)}°C</b><span class="pw-tread">${row.map(value => `<i style="--temp:${tyreColor(value)}">${fr(value, 0)}</i>`).join('')}</span></div>`;
   };
+  // Laid out as on the car, left wheels mirrored by right ones: wear gauge and wear on the outer side, the last lap's
+  // wear on the inner side, by the brake. Wear is what the tyre has lost (100 − what the game says is left).
   const wheel = (w, index) => {
-    const wear5 = ours.wear5?.[index], lastWear = ours.laps?.at(-1)?.wear?.[index];
+    const wear5 = ours.wear5?.[index], lastWear = ours.laps?.at(-1)?.wear?.[index], worn = known(w.left) ? 100 - w.left : null;
+    const color = !known(worn) ? 'var(--pw-muted)' : worn < 40 ? 'var(--pw-green)' : worn < 65 ? 'var(--pw-yellow)' : 'var(--pw-red)';
+    const gauge = `<div class="pw-wear" style="--wear:${known(worn) ? Math.max(0, Math.min(100, worn)) : 0}%;--bar:${color}"><b>${known(worn) ? `${fr(worn, 1)}%` : '—'}</b><i></i><small>usure</small></div>`;
+    const boxes = [box('Usure', `<span style="color:${color}">${known(worn) ? `${fr(worn, 1)}%` : '—'}</span>`), box('Moyenne', known(wear5) ? `${fr(wear5, 2)}%/t` : '—'),
+      box('Dernier tour', known(lastWear) ? `${fr(lastWear, 2)}%` : '—')];
     return `<div class="pw-wheel"><div class="pw-wheel-head"><b>${WHEELS[index]}</b>${me.compound ? chip(esc(me.compound.toUpperCase()), 'compound') : ''}<span>Pression <b class="pw-cyan">${known(w.kpa) ? fr(w.kpa, 0) : '—'}</b> kPa</span></div>
       <div class="pw-wheel-body${index % 2 ? ' right' : ''}">
-        ${tyreTemps(w, index)}
+        ${gauge}${tyreTemps(w, index)}
         <div class="pw-brake" style="--temp:${brakeColor(w.brake)}"><i></i><b>${known(w.brake) ? `${fr(w.brake, 0)}°C` : '—'}</b><small>frein</small></div>
       </div>
-      <div class="pw-row3">${box('Restante', `<span style="color:${wearColor(w.left)}">${known(w.left) ? `${fr(w.left, 1)}%` : '—'}</span>`)}${box('Moyenne', known(wear5) ? `${fr(wear5, 2)}%/t` : '—')}${box('Dernier tour', known(lastWear) ? `${fr(lastWear, 2)}%` : '—')}</div></div>`;
+      <div class="pw-row3">${(index % 2 ? boxes.reverse() : boxes).join('')}</div></div>`;
   };
   const tyres = card('🛞 Pneus et freins', `<div class="pw-wheels">${me.wheels.map(wheel).join('')}</div>`);
   return `<div class="pw-grid pw-car-top">${cockpit}${damageCard}</div><div class="pw-grid pw-car-bottom">${energyCard}${tyres}</div>`;
