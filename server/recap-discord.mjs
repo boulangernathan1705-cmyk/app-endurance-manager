@@ -563,8 +563,8 @@ async function publish(env, timestamp, community, settings, row, event, budget, 
 // The races' threads now open: {eventId: thread}.
 const raceThreads = async (env, community) => Object.fromEntries(((await env.DB.prepare("SELECT event_id,channel_id FROM discord_recap_publications WHERE community_id=? AND in_thread=1 AND channel_id IS NOT NULL AND closed_at IS NULL")
   .bind(community.id).all()).results || []).map(row => [row.event_id, row.channel_id]));
-// « Une catégorie par course »: the race's infos in its own thread of # endurances-de-la-semaine (its sim's), and its category
-// only for its crews' voices (made once it has a crew). Returns the thread, or null while the week's channel is not there yet.
+// « Un fil par course »: the race's infos in its own thread of # endurances-de-la-semaine (its sim's); its crews' voices in the
+// same category, just below (server/crew-discord.mjs). Returns the thread, or null while the week's channel is not there yet.
 async function raceThread(env, community, settings, layout, row, event, budget, repair) {
   const gone = error => { if (error.status !== 404) throw error; };
   const week = await env.DB.prepare('SELECT channel_id FROM discord_recap_publications WHERE community_id=? AND event_id=?')
@@ -586,22 +586,10 @@ async function raceThread(env, community, settings, layout, row, event, budget, 
     Object.assign(row, {channel_id:null, message_id:null, content_hash:''});
     await save();
   }
-  const anchors = anchorIds(settings), anchorId = anchorOf(settings, event);
-  const voices = layout.voices === true && Boolean(await env.DB.prepare('SELECT 1 FROM crews WHERE community_id=? AND event_id=? LIMIT 1').bind(community.id,row.event_id).first());
-  const category = row.category_id && !anchors.includes(row.category_id) ? row.category_id : null;
-  if (voices && (!category || repair)) {
-    const channels = await discord(env,'GET',`/guilds/${row.guild_id}/channels`,null,budget);
-    if (!category || !channels.some(item => item.id === category && item.type === 4)) {
-      // Discord allows 500 channels per server: room is kept for the crews' voice channels.
-      const anchor = channels.find(item => item.id === anchorId && item.type === 4);
-      if (anchor && channels.length < MAX_CHANNELS) {
-        row.category_id = (await discord(env,'POST',`/guilds/${row.guild_id}/channels`,{type:4,name:raceCategoryName(event),permission_overwrites:withBotAccess(anchor.permission_overwrites,env.DISCORD_CLIENT_ID,categoryAccess(community))},budget)).id;
-        await save();
-        await placeCategories(env,community,row.guild_id,channels,row.category_id,settings,budget);
-      }
-    }
-  } else if (!voices && category) {
-    // No crew voice here (any more): its category goes once empty.
+  // A race category made before (its voices now go just below the threads, server/crew-discord.mjs): deleted once its voices
+  // have left it.
+  const anchors = anchorIds(settings), category = row.category_id && !anchors.includes(row.category_id) ? row.category_id : null;
+  if (category) {
     const channels = await discord(env,'GET',`/guilds/${row.guild_id}/channels`,null,budget);
     if (!channels.some(item => item.parent_id === category)) {
       await discord(env,'DELETE',`/channels/${category}`,null,budget).catch(gone);
