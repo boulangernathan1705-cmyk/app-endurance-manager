@@ -6,8 +6,10 @@
 //   events mode: showWeek / showEvents, the channels of the bot's category (« Endurance Manager », or « LMU » and « iRacing »)
 //   general mode: week.all (together) or week.lmu / week.iracing (apart), events: where each goes, a place being
 //     '' (not shown), 'bot' (in the bot's category) or a channel / category of the server (the bot's channel goes just below);
-//     events may also be 'same' (with the endurances)
+//     events may also be 'same' (with the endurances); apart, 'bot' means the sim's own category (« LMU » or « iRacing »),
+//     and the events go in one of them ('bot-lmu' / 'bot-iracing')
 //   voices, pit ('bot': the bot makes « Pit talk » just below pitAt, 'existing': in the category pitAt), reminders
+//   copy / pitCopy: the bot's categories / « Pit talk » take the rights of the category they sit under (private like it)
 export const CATEGORY_NAMES = {main:'Endurance Manager', lmu:'LMU', iracing:'iRacing', pit:'🎙️ Pit talk'};
 const SIMS = {all:['lmu','iracing'], lmu:['lmu'], iracing:['iracing']};
 const ID = /^\d{15,22}$/;
@@ -42,25 +44,41 @@ export function layoutInput(input) {
   if (mode === 'events') Object.assign(layout, {showWeek:input.showWeek === true, showEvents:input.showEvents === true});
   else {
     layout.week = split ? {lmu:place(input.week?.lmu), iracing:place(input.week?.iracing)} : {all:place(input.week?.all)};
-    layout.events = place(input.events, ['same']);
+    layout.events = place(input.events, ['same','bot-lmu','bot-iracing']);
+    // Apart, the bot makes one category per sim: the events go in one of them; together, in « Endurance Manager ».
+    layout.events = eventsPlace(layout);
     if (layout.voices) {
       layout.pit = input.pit === 'existing' ? 'existing' : 'bot';
       layout.pitAt = category(input.pitAt, layout.pit === 'bot' ? 'sous quelle catégorie créer « Pit talk »' : 'la catégorie des vocaux');
     }
   }
   if (wantedCategories(layout).some(key => key !== 'pit')) layout.under = category(input.under, 'où placer la catégorie du bot');
+  // Private like the category they sit under (its rights copied), or open to all.
+  if (layout.under && layout.under !== 'top' && input.copy === true) layout.copy = true;
+  if (layout.pit === 'bot' && layout.pitAt !== 'top' && input.pitCopy === true) layout.pitCopy = true;
   return layout;
 }
 
-const usesBot = layout => [...Object.values(layout.week || {}), layout.events].includes('bot');
+const eventsPlace = layout => layout.split && layout.events === 'bot' ? `bot-${SIMS.all.find(sim => layout.week?.[sim] === 'bot') || 'lmu'}`
+  : !layout.split && layout.events?.startsWith('bot-') ? 'bot' : layout.events || '';
+// The bot's categories for the week's channels: « Endurance Manager », or « LMU » and « iRacing » when the sims are apart.
+const weekCategories = layout => layout.split
+  ? SIMS.all.filter(sim => layout.week?.[sim] === 'bot' || eventsPlace(layout) === `bot-${sim}`)
+  : [...Object.values(layout.week || {}), eventsPlace(layout)].includes('bot') ? ['main'] : [];
 // The categories the bot makes for these answers.
 export function wantedCategories(layout) {
   if (!layout) return [];
-  const keys = layout.mode === 'events' ? (layout.split ? [...SIMS.all] : ['main']) : usesBot(layout) ? ['main'] : [];
+  const keys = layout.mode === 'events' ? (layout.split ? [...SIMS.all] : ['main']) : weekCategories(layout);
   if (layout.mode === 'general' && layout.voices && layout.pit === 'bot') keys.push('pit');
   return keys;
 }
 
+// Apart, each sim's channel is « endurances-de-la-semaine » in its place; both in the same place, « endurances-lmu-de-la-semaine »
+// and « endurances-iracing-de-la-semaine ».
+function weekChannel(layout, sim) {
+  const here = layout.week?.[sim], other = layout.week?.[sim === 'lmu' ? 'iracing' : 'lmu'];
+  return here && here !== 'bot' && here === other ? `endurances-${sim}-de-la-semaine` : 'endurances-de-la-semaine';
+}
 // What goes where: the week's messages (kind, the channel's place and name), the category each sim's races go under,
 // and the category of the voices. eventChannel: the name of the events' channel (after the community's module).
 export function layoutPlan(layout, cats, {eventChannel = 'event-solo-de-la-semaine', calendar = true} = {}) {
@@ -76,12 +94,12 @@ export function layoutPlan(layout, cats, {eventChannel = 'event-solo-de-la-semai
       if (layout.showEvents) layout.split ? add(`calendar:${group.sims[0]}`, group.cat, eventChannel, group.sims[0]) : add('calendar', group.cat, eventChannel, filter);
     }
   } else {
-    const at = value => value === 'bot' ? cats.main || '' : value || '';
-    const races = layout.split ? sims.map(sim => ({sims:[sim], at:at(layout.week?.[sim]), channel:`${sim}-de-la-semaine`}))
+    const at = (value, sim = null) => value === 'bot' ? (sim ? cats[sim] : cats.main) || '' : value?.startsWith('bot-') ? cats[value.slice(4)] || '' : value || '';
+    const races = layout.split ? sims.map(sim => ({sims:[sim], at:at(layout.week?.[sim], sim), channel:weekChannel(layout, sim)}))
       : [{sims, at:at(layout.week?.all), channel:'endurances-de-la-semaine'}];
     for (const group of races) for (const sim of group.sims) add(sim, group.at, group.channel);
     if (layout.events === 'same') for (const group of races) layout.split ? add(`calendar:${group.sims[0]}`, group.at, group.channel, group.sims[0]) : add('calendar', group.at, group.channel, filter);
-    else add('calendar', at(layout.events), eventChannel, filter);
+    else add('calendar', at(eventsPlace(layout)), eventChannel, filter);
   }
   const voiceCategory = layout.mode === 'events' ? cats.main || cats.lmu || cats.iracing || null
     : !layout.voices ? null : layout.pit === 'bot' ? cats.pit || null : layout.pitAt === 'top' ? null : layout.pitAt || null;
