@@ -4,7 +4,8 @@
 
 ### ✨ Nouveautés
 
-- **Discord** : le bot ajoute au fil de chaque course les pilotes qui ont accès au site, pour qu'il reste dans leur liste de salons. Chacun n'est ajouté qu'une fois.
+- **Discord** : le bot ajoute au fil de chaque course les pilotes qui ont accès au site, pour qu'il reste dans leur liste de salons. Chacun n'est ajouté qu'une fois, toutes les 2 minutes par petits lots.
+- **Discord** : # endurances-de-la-semaine ne garde qu'un message court, une ligne par course avec le lien vers son fil ; les horaires sont dans le fil.
 
 ## v1.63 — 27 octobre 2026
 
