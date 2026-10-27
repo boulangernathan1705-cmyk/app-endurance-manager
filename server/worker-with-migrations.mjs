@@ -149,10 +149,16 @@ export default {
   async scheduled(controller, env, ctx) {
     if (!env?.DB) return;
     const at = new Date(controller?.scheduledTime || Date.now());
-    // Every 2 minutes: Discord follows the changes on the site, then the pilots are added to the races' threads.
+    // Every 2 minutes, one Discord task (a run may make 50 requests and 50 calls to the database): the changes on the
+    // site, else a setting still being put in place (the first one, or Monday's new week, takes several passes), else
+    // the pilots added to the races' threads.
     if (controller?.cron === '*/2 * * * *') {
-      if (env.DISCORD_BOT_TOKEN) ctx.waitUntil(flushDiscord(env).then(() => addThreadMembers(env, at.getTime(), 25))
-        .catch(error => console.error('Discord pass failed', error instanceof Error ? error.message : 'unknown')));
+      // The setting and the threads take turns first, so that neither waits on the other.
+      const tasks = [() => syncDueRecaps(env, 1, at.getTime(), {pending:true}), () => addThreadMembers(env, at.getTime(), 25)];
+      if (Math.floor(at.getUTCMinutes() / 2) % 2) tasks.reverse();
+      if (env.DISCORD_BOT_TOKEN) ctx.waitUntil((async () => {
+        for (const task of [() => flushDiscord(env, 1), ...tasks]) if (await task()) return;
+      })().catch(error => console.error('Discord pass failed', error instanceof Error ? error.message : 'unknown')));
       return;
     }
     const slot = Math.floor(at.getUTCMinutes() / 15);
