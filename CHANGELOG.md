@@ -1,5 +1,11 @@
 # Nouveautés d'Endurance Manager
 
+## v1.72 — 27 octobre 2026
+
+### 🔧 Corrections
+
+- **Discord** : « Tout retirer » et la mise en place se terminent en quelques minutes, vocaux compris (avant, les vocaux attendaient le quart d'heure suivant).
+
 ## v1.71 — 27 octobre 2026
 
 ### 🔧 Corrections
