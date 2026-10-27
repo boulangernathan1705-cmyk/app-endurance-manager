@@ -222,7 +222,7 @@ function discordQuestions(form, answers) {
   const list = form._destinations, solo = form.dataset.solo === 'true', race = answers.mode === 'events', apart = discordApart(answers);
   const places = list ? discordPlaces(list) : [];
   const radio = (name, value, label, checked) => `<label class="discord-pill"><input type="radio" name="${name}" value="${value}" ${checked ? 'checked' : ''}> ${label}</label>`;
-  const known = (value, label) => value && !['top','bot','same','bot-lmu','bot-iracing'].includes(value) && !places.some(item => item.id === value) ? `<option value="${esc(value)}" selected>${esc(label || 'Choix actuel')}</option>` : '';
+  const known = (value, label) => value && !['top','bot','same','bot-lmu','bot-iracing'].includes(value) && !places.some(item => item.id === value) ? `<option value="${esc(value)}" selected>${esc(label || 'Choix enregistré')}</option>` : '';
   const option = (item, value, inside = false, rights = true) => `<option value="${esc(item.id)}" ${item.id === value ? 'selected' : ''}>${item.type === 0 ? `${inside && item.parentId ? '   ' : ''}# ` : '📁 '}${esc(item.name)}${item.type === 4 && item.private ? ' · privée' : ''}${rights && item.ready === false ? ' · le bot n’a pas ses droits' : ''}</option>`;
   // A place for a recap: not shown, a category the bot makes, or just below a channel or category of the server.
   const place = (name, value, extra = '', bots = [['bot', apart && name.startsWith('week-') ? SIM_NAMES[name.slice(5)] : 'Endurance Manager']]) => `<select name="${name}"><option value="" ${!value ? 'selected' : ''}>Ne pas afficher</option>${extra}
@@ -336,10 +336,15 @@ function discordSketch(form, answers = discordRead(form)) {
   }
   const lines = groups.flatMap(group => [...(group.name ? [`<li class="is-category${group.bot ? ' is-bot' : ''}">${esc(group.name)}</li>`] : []), ...group.items.map(item => `<li class="${item.name.startsWith('🔊') ? 'is-voice' : 'is-text'}${item.bot ? ' is-bot' : ''}">${esc(item.name)}</li>`)]);
   const server = form._server && !form._server.ready && discordUsesBot(answers) ? `<p class="setup-note setup-error discord-rights">Pour créer ses catégories, le bot a besoin sur ton serveur de : ${esc(form._server.missing.join(', '))}.</p>` : '';
-  form.querySelector('[data-discord-sketch]').innerHTML = `<strong>Sur ton serveur</strong>${list.length ? '' : ' <small>(touche « Actualiser les salons » pour voir les tiens)</small>'}<ul>${lines.join('')}</ul><small>En surligné : ce que crée le bot.</small>${server}`;
+  form.querySelector('[data-discord-sketch]').innerHTML = `<strong>Sur ton serveur</strong>${list.length ? '' : ' <small>(touche « Actualiser les salons » pour voir les tiens)</small>'}${form._destinationsError ? `<p class="setup-note setup-error">Tes salons n’ont pas pu être lus sur Discord (${esc(form._destinationsError)}). Tes choix sont gardés : réessaie dans un moment avec « Actualiser les salons ».</p>` : ''}<ul>${lines.join('')}</ul><small>En surligné : ce que crée le bot.</small>${server}`;
 }
 async function loadDiscordDestinations(form) {
-  const result = await api('/api/community/recap/destinations');
+  // Just after a change the bot is busy on Discord: one more try before saying so.
+  const read = () => api('/api/community/recap/destinations');
+  let result;
+  try { result = await read().catch(async () => { await new Promise(resolve => setTimeout(resolve, 3000)); return read(); }); }
+  catch (error) { form._destinationsError = error.message; discordRefresh(form); throw error; }
+  form._destinationsError = null;
   form._destinations = result.destinations || [];
   form._server = result.server || null;
   discordRefresh(form);

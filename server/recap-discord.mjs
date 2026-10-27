@@ -70,11 +70,22 @@ export function recapError(error) {
   if (error.status === 401) return 'Le bot du site n’est pas disponible. Préviens le gestionnaire de la plateforme.';
   return 'Discord ne répond pas. Le récap réessaiera automatiquement.';
 }
+export const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
+// Discord's « try again in … » when it is short enough to wait for (in ms), else null.
+export async function retryAfter(response) {
+  if (response.status !== 429) return null;
+  const data = await response.clone().json().catch(() => null), seconds = Number(data?.retry_after ?? response.headers.get('retry-after'));
+  return Number.isFinite(seconds) && seconds <= 2 ? Math.ceil(seconds * 1000) + 50 : null;
+}
 async function discord(env, method, path, body, budget = {left:12}) {
   if (!String(env.DISCORD_BOT_TOKEN || '').trim()) throw Object.assign(new Error('Le bot du site n’est pas configuré.'), {status:401});
   if (--budget.left < 0) throw Object.assign(new Error('Lot terminé ; les autres événements seront traités au prochain passage.'), {budget:true});
-  const response = await fetch(API + path, {method, signal:AbortSignal.timeout(8000),
+  const call = () => fetch(API + path, {method, signal:AbortSignal.timeout(8000),
     headers:{Authorization:`Bot ${env.DISCORD_BOT_TOKEN}`, ...(body ? {'Content-Type':'application/json'} : {})}, body:body ? JSON.stringify(body) : undefined});
+  let response = await call();
+  // A short wait asked by Discord (several requests at once on the same server): one more try, the first was not done.
+  const wait = await retryAfter(response);
+  if (wait !== null) response = await (await pause(wait), call());
   const data = response.status === 204 ? null : await response.json().catch(() => null);
   if (!response.ok) throw Object.assign(new Error('Discord indisponible'), {status:response.status, code:data?.code, path});
   return data;
@@ -499,6 +510,15 @@ async function publish(env, timestamp, community, settings, row, event, budget, 
     // A removed message or channel is reported, not recreated on every update (no surprise notifications).
     try { await discord(env,'PATCH',`/channels/${channel}/messages/${row.message_id}`,payload,budget); }
     catch (error) {
+      // The week's channels are the bot's own: a message or channel gone there is put back (silently, flags 4096).
+      if (!isEvent && !row.retried && error.status === 404 && [10003,10008].includes(error.code)) {
+        if (error.code === 10003) {
+          await env.DB.prepare("UPDATE discord_recap_publications SET channel_id=NULL,category_id=NULL,message_id=NULL,content_hash='' WHERE community_id=? AND event_id=?").bind(community.id,row.event_id).run();
+          Object.assign(row, {channel_id:null, category_id:null, message_id:null, content_hash:'', retried:true});
+          return publish(env, timestamp, community, settings, row, event, budget, prepared, repair, entry);
+        }
+        error.status = 404; error.code = 10008; repair = true;
+      }
       // Never treat missing access/channels, timeouts or ambiguous errors as a deleted message.
       if (!repair || error.status !== 404 || error.code !== 10008) throw error;
       row.message_id = null;
