@@ -1,5 +1,11 @@
 # Nouveautés d'Endurance Manager
 
+## v1.61 — 27 octobre 2026
+
+### 🔧 Corrections
+
+- **Liens** : un lien écrit en majuscules (`/lmu/#SOLO`, `#INSCRIPTIONS`) ouvre bien la bonne page au lieu d'Endurance.
+
 ## v1.60 — 27 octobre 2026
 
 ### 🔧 Corrections
