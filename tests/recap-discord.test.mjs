@@ -32,7 +32,7 @@ function setup(t,{rights='85008',overrides=[],failure=null}={}){
     if(path===`/guilds/${GUILD}/members/${BOT}`)return Response.json({roles:[]});
     if(path===`/guilds/${GUILD}/members/${OWNER}`)return Response.json({user:{id:OWNER},roles:[]});
     if(path===`/guilds/${GUILD}/channels`){
-      if(method==='GET')return Response.json(channels);
+      if(method==='GET')return Response.json(channels.filter(item=>item.type!==11));
       if(method==='PATCH'){for(const item of body)Object.assign(channels.find(channel=>channel.id===item.id),{position:item.position});return new Response(null,{status:204});}
       const channel={...body,id:String(counter++)};channels.push(channel);return Response.json(channel);
     }
@@ -43,8 +43,12 @@ function setup(t,{rights='85008',overrides=[],failure=null}={}){
     if(send){const message={...body,id:String(counter++),channel_id:send[1],author:{id:BOT}};messages.set(message.id,message);return Response.json(message);}
     const edit=path.match(/^\/channels\/(\d+)\/messages\/(\d+)$/);
     if(edit){const message=messages.get(edit[2]);if(!message)return Response.json({code:10008},{status:404});if(method==='DELETE'){messages.delete(edit[2]);return new Response(null,{status:204});}Object.assign(message,body);return Response.json(message);}
+    const thread=path.match(/^\/channels\/(\d+)\/threads$/);
+    if(thread&&method==='POST'){const created={...body,id:String(counter++),parent_id:thread[1]};channels.push(created);return Response.json(created);}
     const channel=path.match(/^\/channels\/(\d+)$/);
-    if(channel){const index=channels.findIndex(item=>item.id===channel[1]);if(index<0)return new Response('{}',{status:404});if(method==='DELETE')channels.splice(index,1);else Object.assign(channels[index],body);return new Response(null,{status:204});}
+    if(channel){const index=channels.findIndex(item=>item.id===channel[1]);if(index<0)return Response.json({code:10003},{status:404});if(method==='GET')return Response.json(channels[index]);
+      // A channel deleted takes its threads with it.
+      if(method==='DELETE'){const gone=channels.filter(item=>item.id===channel[1]||(item.type===11&&item.parent_id===channel[1]));for(const item of gone)channels.splice(channels.indexOf(item),1);}else Object.assign(channels[index],body);return new Response(null,{status:204});}
     return new Response('{}',{status:404});
   };
   t.after(()=>globalThis.fetch=original);
@@ -181,7 +185,7 @@ test('historical webhooks stay inert; a community without setup sees the recap o
   DB.db.prepare("INSERT INTO community_recaps(community_id,scope,webhook_url,updated_at) VALUES(?,'all',?,0)").run(DEV_COMMUNITY,hook);
   const page=(await as(env,'/api/community/setup')).data;
   assert.equal(page.botRecap,null);assert.equal(page.recapSetupRequired,true);
-  assert.match(page.recapBotInviteUrl,/permissions=85008&/);
+  assert.match(page.recapBotInviteUrl,/permissions=326417599504&/);
   calls.length=0;await syncWeeklyDiscord(env,NOW,COMMUNITY);assert.equal(sends(calls).length,0);assert.ok(calls.every(call=>!call.path.includes('/webhooks/')));
   await saveBotRecap(env,COMMUNITY,SETTINGS,false);calls.length=0;await syncBotRecaps(env,NOW,COMMUNITY);
   assert.equal(sends(calls).length,0);assert.ok(calls.every(call=>!call.path.includes('/webhooks/')));
@@ -662,24 +666,62 @@ async function layout(env,community,answers){
 const named=(channels,name)=>channels.find(item=>item.name===name);
 const categoriesInOrder=channels=>channels.filter(item=>item.type===4).sort((a,b)=>(a.position||0)-(b.position||0)).map(item=>item.name);
 
-test('« une catégorie par course »: the bot makes « Endurance Manager » under the chosen category, its channels, then the races',async t=>{
-  const {DB,env,channels}=setup(t);race(DB);race(DB,'race-b','8h de Watkins Glen','iracing-watkins',[{id:'start-b',startsAt:NOW+2*DAY}]);
+test('« un fil par course »: the bot makes « Endurance Manager » under the chosen category, its channels, and one thread per race',async t=>{
+  const {DB,env,channels,messages}=setup(t);race(DB);race(DB,'race-b','8h de Watkins Glen','iracing-watkins',[{id:'start-b',startsAt:NOW+2*DAY}]);
   const community={...COMMUNITY,modules:{...COMMUNITY.modules,soloRaces:true}};
-  await layout(env,community,{mode:'events',sims:'all',split:false,showWeek:true,showEvents:true,under:ACCUEIL});
+  await layout(env,community,{mode:'events',sims:'all',split:false,showWeek:false,showEvents:true,under:ACCUEIL});
   const bot=named(channels,'Endurance Manager');assert.equal(bot.type,4);
-  assert.deepEqual(channels.filter(item=>item.parent_id===bot.id).map(item=>item.name).sort(),['endurances-de-la-semaine','event-solo-de-la-semaine']);
+  const week=channels.find(item=>item.parent_id===bot.id&&item.name==='endurances-de-la-semaine');
+  assert.deepEqual(channels.filter(item=>item.parent_id===bot.id&&item.type===0).map(item=>item.name).sort(),['endurances-de-la-semaine','event-solo-de-la-semaine'],'the week\'s channel is always there');
   const settings=DB.db.prepare('SELECT * FROM community_recap_settings').get();
   assert.equal(settings.destination_id,bot.id);assert.equal(settings.iracing_destination_id,bot.id);
   await syncBotRecaps(env,NOW,community);
-  assert.deepEqual(categoriesInOrder(channels),['Accueil','Endurance Manager','🏎️ LMU · 6h de Spa','🏁 iRacing · 8h de Watkins Glen','Endurances','Vocaux']);
+  const threads=channels.filter(item=>item.type===11);
+  assert.deepEqual(threads.map(item=>[item.name,item.parent_id,item.auto_archive_duration]).sort(),[['🏁 iRacing · 8h de Watkins Glen',week.id,10080],['🏎️ LMU · 6h de Spa',week.id,10080]]);
+  assert.deepEqual(categoriesInOrder(channels),['Accueil','Endurance Manager','Endurances','Vocaux'],'no crew voice: no race category');
+  assert.equal(channels.filter(item=>item.name==='infos-de-la-course').length,0);
+  // In the thread, the race only: no week header.
+  const inThread=[...messages.values()].find(item=>item.channel_id===threads.find(thread=>thread.name.includes('Spa')).id);
+  assert.ok(inThread);assert.ok(!inThread.embeds.some(embed=>embed.title?.startsWith('📝')),JSON.stringify(inThread.embeds.map(embed=>embed.title)));
+  assert.match(inThread.embeds[0].title,/6h de Spa/);
 });
 
-test('LMU and iRacing apart: one category each, with their own channels and races',async t=>{
+test('LMU and iRacing apart: one category each, each race its thread in its sim\'s channel',async t=>{
   const {DB,env,channels}=setup(t);race(DB);race(DB,'race-b','8h de Watkins Glen','iracing-watkins',[{id:'start-b',startsAt:NOW+2*DAY}]);
-  await layout(env,COMMUNITY,{mode:'events',sims:'all',split:true,showWeek:true,showEvents:false,under:'top'});
+  await layout(env,COMMUNITY,{mode:'events',sims:'all',split:true,showEvents:false,under:'top'});
   await syncBotRecaps(env,NOW,COMMUNITY);
-  assert.deepEqual(categoriesInOrder(channels).slice(0,4),['LMU','🏎️ LMU · 6h de Spa','iRacing','🏁 iRacing · 8h de Watkins Glen']);
-  assert.equal(channels.filter(item=>item.name==='endurances-de-la-semaine').length,2);
+  assert.deepEqual(categoriesInOrder(channels).slice(0,2),['LMU','iRacing']);
+  const parent=name=>channels.find(item=>item.id===channels.find(thread=>thread.type===11&&thread.name===name).parent_id).parent_id;
+  assert.equal(parent('🏎️ LMU · 6h de Spa'),named(channels,'LMU').id);
+  assert.equal(parent('🏁 iRacing · 8h de Watkins Glen'),named(channels,'iRacing').id);
+});
+
+test('a race with a crew gets its category for the voices; the old infos-de-la-course channel gives way to the thread; all goes after the race',async t=>{
+  const {DB,env,channels,calls}=setup(t);race(DB);
+  const community={...COMMUNITY,modules:{...COMMUNITY.modules,crewChannels:true}};
+  DB.db.prepare("INSERT INTO community_crew_discord(community_id,updated_at) VALUES(?,0)").run(DEV_COMMUNITY);
+  DB.db.prepare("INSERT INTO crews(id,event_id,departure_id,name,category,car,locked,created_at,community_id) VALUES('crew','race-a','start-a','Équipage A','GT3','',0,0,?)").run(DEV_COMMUNITY);
+  // Set up before: a race category with its infos-de-la-course channel.
+  await layout(env,community,{mode:'events',sims:'lmu',under:ACCUEIL,voices:true});
+  const made=named(channels,'🏎️ LMU · 6h de Spa');assert.equal(made?.type,4,'a crew: its category for the voices');
+  channels.splice(channels.indexOf(made),1);
+  const old={id:'777777777777777770',type:0,name:'infos-de-la-course',parent_id:'777777777777777771'};
+  channels.push({id:'777777777777777771',type:4,name:'🏎️ LMU · 6h de Spa'},old);
+  DB.db.prepare("UPDATE discord_recap_publications SET channel_id=?,category_id=?,message_id='1',in_thread=0,thread_parent=NULL,content_hash='x' WHERE event_id='race-a'").run(old.id,'777777777777777771');
+  for(const item of channels.filter(item=>item.type===11))channels.splice(channels.indexOf(item),1);
+  await syncBotRecaps(env,NOW+1000,community);
+  assert.equal(channels.find(item=>item.id===old.id),undefined,'old channel deleted');
+  assert.ok(channels.some(item=>item.id==='777777777777777771'),'its category kept for the voices');
+  const thread=channels.find(item=>item.type===11);assert.equal(thread.name,'🏎️ LMU · 6h de Spa');
+  assert.equal(DB.db.prepare("SELECT in_thread FROM discord_recap_publications WHERE event_id='race-a'").get().in_thread,1);
+  // An archived thread is opened again to be edited.
+  DB.db.prepare("UPDATE discord_recap_publications SET content_hash='changed' WHERE event_id='race-a'").run();
+  calls.length=0;await syncBotRecaps(env,NOW+2000,community);
+  assert.ok(calls.some(call=>call.method==='PATCH'&&call.path.startsWith(`/channels/${thread.id}/messages/`)));
+  // After the race: thread and category gone.
+  await syncBotRecaps(env,NOW+3*DAY,community);
+  assert.equal(channels.find(item=>item.id===thread.id),undefined);
+  assert.equal(channels.find(item=>item.id==='777777777777777771'),undefined);
 });
 
 test('« récap de la semaine »: just below a channel, the events with the endurances, voices in « Pit talk » made by the bot',async t=>{
@@ -766,4 +808,13 @@ test('a week message deleted on Discord is put back by the next sync, without «
   const result=await syncBotRecaps(env,NOW+1000,COMMUNITY);
   assert.equal(messages.size,1);assert.ok(!result?.error);
   assert.equal(DB.db.prepare('SELECT last_error FROM community_recap_settings').get().last_error,null);
+});
+
+test('saving the setting with voices does not ask for rights in the places of the setting before',async t=>{
+  // The old destination is closed to all (no « Se connecter » for the bot there); the bot now makes its own category.
+  const {DB,env}=setup(t,{rights:'269569040',overrides:[{id:GUILD,type:0,allow:'0',deny:'1049600'}]});
+  await saveBotRecap(env,COMMUNITY,SETTINGS);
+  const result=await as(env,'/api/community/discord','PUT',{layout:{mode:'events',sims:'lmu',showWeek:true,under:ACCUEIL,voices:true}});
+  assert.equal(result.status,200,JSON.stringify(result.data));
+  assert.equal(JSON.parse(DB.db.prepare('SELECT modules FROM communities WHERE id=?').get(DEV_COMMUNITY).modules).crewChannels,true);
 });
