@@ -814,7 +814,7 @@ export async function syncBotRecaps(env,timestamp,community, test = false, prior
       const current = await botRecapSettings(env,community);
       if (!current.dirty) break;
     }
-    // Something left for a next pass (a category still holding voice channels…): the next quarter of an hour goes on.
+    // Something left for a next pass (a category still holding voice channels…): the next pass, 2 minutes later, goes on.
     if (result?.more) await env.DB.prepare('UPDATE community_recap_settings SET dirty=1 WHERE community_id=? AND lock_token=?').bind(community.id,token).run();
     await env.DB.prepare('UPDATE community_recap_settings SET last_error=NULL WHERE community_id=? AND lock_token=?').bind(community.id,token).run();
     return result;

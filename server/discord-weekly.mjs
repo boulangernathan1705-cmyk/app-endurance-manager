@@ -237,7 +237,8 @@ export async function syncWeeklyDiscord(env,timestamp=Date.now(),community=null,
 }
 
 // pending: only a community with work left from its last pass (a new setting takes several), never one in error.
-export async function syncDueRecaps(env,limit=3,timestamp=Date.now(),{pending=false}={}) {
+// then: what follows the pass for that community (its crews' voices).
+export async function syncDueRecaps(env,limit=3,timestamp=Date.now(),{pending=false,then=null}={}) {
   if (!env?.DB || limit < 1) return 0;
   const rows=(await env.DB.prepare(`SELECT community_id,checked_at FROM community_recap_settings ${pending ? 'WHERE dirty=1 AND last_error IS NULL' : ''} ORDER BY checked_at,community_id`).all()).results || [];
   if (!rows.length) return 0;
@@ -246,7 +247,7 @@ export async function syncDueRecaps(env,limit=3,timestamp=Date.now(),{pending=fa
     const community=communities.find(item=>item.id===row.community_id);
     if (!community) continue;
     // One bot batch uses the remaining invocation budget, including channel cleanup.
-    try { await syncBotRecaps(env,timestamp,community);return 1; }
+    try { await syncBotRecaps(env,timestamp,community);if(then)await then(community);return 1; }
     catch (error) { console.error('Discord recap sync failed',error.message);return 0; }
   }
   return 0;
