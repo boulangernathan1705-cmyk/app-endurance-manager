@@ -14,7 +14,9 @@ const MAX_CHANNELS = 450;
 const RACE_INFO_CHANNEL = 'infos-de-la-course'; // Discord writes text channel names in lowercase with dashes
 const VIEW = 1024n, SEND = 2048n, HISTORY = 65536n, EMBED = 16384n, MANAGE = 16n, ADMIN = 8n;
 const REQUIRED = VIEW | SEND | HISTORY | EMBED;
-export const RECAP_BOT_PERMISSIONS = String(REQUIRED | MANAGE);
+// The races' threads: making them, writing in them, deleting them once the race is over.
+export const THREADS = (1n << 34n) | (1n << 35n) | (1n << 38n);
+export const RECAP_BOT_PERMISSIONS = String(REQUIRED | MANAGE | THREADS);
 export const botRecapSettings = (env, community) => env.DB.prepare('SELECT * FROM community_recap_settings WHERE community_id=?').bind(community.id).first();
 // Each recap has its own place (migration 0079): destination_id for the LMU races, iracing_destination_id for the iRacing
 // ones (a category in « une catégorie par course », a text channel in « récap de la semaine »), calendar_destination_id for
@@ -346,11 +348,16 @@ async function removeCategories(env, community, settings, channels, wanted, budg
   }
   return waiting;
 }
-// The race's text channel, then its category (never a category chosen by the admins).
+// The race's text channel or thread, then its category (never a category chosen by the admins).
 async function removeRaceChannels(env, row, anchors, budget) {
   for (const id of [row.channel_id, !anchors.includes(row.category_id) ? row.category_id : null].filter(Boolean)) {
     try { await discord(env,'DELETE',`/channels/${id}`,null,budget); }
-    catch (error) { if (error.status !== 404) throw error; }
+    catch (error) {
+      if (error.status === 404) continue;
+      // Deleting a thread asks for « Gérer les fils » (a bot invited before it): archived instead, out of the list.
+      if (error.status === 403 && row.in_thread && id === row.channel_id) { await discord(env,'PATCH',`/channels/${id}`,{archived:true},budget).catch(() => {}); continue; }
+      throw error;
+    }
   }
 }
 async function digest(value) {
@@ -382,7 +389,8 @@ export async function botCategoryEmojis(env, timestamp = Date.now()) {
   return ids;
 }
 // A race's message (eventId), or a week's message: kind 'lmu', 'iracing' or 'calendar'.
-async function snapshotPayload(env, timestamp, community, eventId = null, kind = null, sim = null) {
+// alone: a race's thread (its block only).
+async function snapshotPayload(env, timestamp, community, eventId = null, kind = null, sim = null, alone = false) {
   if (kind?.startsWith('calendar')) {
     const snapshot = await loadCalendarSnapshot(env, timestamp, community, sim);
     const payload = buildCalendarPayload(snapshot, siteOf(env, community), timestamp);
@@ -391,11 +399,11 @@ async function snapshotPayload(env, timestamp, community, eventId = null, kind =
   const scope = eventId ? 'all' : kind;
   const snapshot = await loadWeeklyDiscordSnapshot(env, timestamp, community, scope, eventId);
   const emojis = await botCategoryEmojis(env, timestamp);
-  const payload = buildWeeklyDiscordPayload(snapshot, siteOf(env, community), timestamp, scope, emojis, {weekly:!eventId});
+  const payload = buildWeeklyDiscordPayload(snapshot, siteOf(env, community), timestamp, scope, emojis, {weekly:!eventId, alone:Boolean(eventId) && alone});
   // Message edits are silent; never turn driver names into mentions.
   payload.allowed_mentions = {parse:[]};
   // A new layout of the message (RECAP_FORMAT) edits the published recaps once.
-  return {snapshot, payload, hash:await digest([RECAP_FORMAT,snapshot,emojis])};
+  return {snapshot, payload, hash:await digest([RECAP_FORMAT,snapshot,emojis,...(eventId && alone ? ['alone'] : [])])};
 }
 // What the bot would publish with these settings (a settings row), without publishing anything.
 export async function previewBotRecap(env, timestamp, community, settings) {
@@ -413,7 +421,7 @@ export async function previewBotRecap(env, timestamp, community, settings) {
   const events = await raceEvents(env, community);
   for (const eventId of await openRaces(env, community, events, scope, timestamp)) {
     if (previews.length === 10) break;
-    const {snapshot, payload} = await snapshotPayload(env, timestamp, community, eventId);
+    const {snapshot, payload} = await snapshotPayload(env, timestamp, community, eventId, null, null, layout?.mode === 'events');
     // An official race without any entry of this community gets no category.
     if (snapshot.futureDepartures.length) previews.push({eventId,name:raceCategoryName(events.find(item => item.id === eventId)),payload});
   }
@@ -473,7 +481,11 @@ async function publish(env, timestamp, community, settings, row, event, budget, 
     }
   }
   const anchors = anchorIds(settings), anchorId = isEvent ? anchorOf(settings, event) : '';
-  if (isEvent && (repair || !channel || !row.category_id || anchors.includes(row.category_id))) {
+  const layout = parseLayout(settings.layout), threaded = isEvent && layout?.mode === 'events';
+  if (threaded) {
+    channel = await raceThread(env, community, settings, layout, row, event, budget, repair);
+    if (!channel) return;
+  } else if (isEvent && (repair || !channel || !row.category_id || anchors.includes(row.category_id))) {
     // One category per race (« 🏎️ LMU · 6h de Spa »): its recap here, the crews' voice channels below it.
     // The first version put the text channel straight in the chosen category: it is moved into its race's.
     const channels = await discord(env,'GET',`/guilds/${row.guild_id}/channels`,null,budget);
@@ -504,17 +516,26 @@ async function publish(env, timestamp, community, settings, row, event, budget, 
     channel = existing?.id || channel || (await discord(env,'POST',`/guilds/${row.guild_id}/channels`,{type:0,name:RACE_INFO_CHANNEL,parent_id:category,topic:row.marker},budget)).id;
     await env.DB.prepare('UPDATE discord_recap_publications SET channel_id=? WHERE community_id=? AND event_id=?').bind(channel,community.id,row.event_id).run();
   }
-  const {payload, hash} = prepared || await snapshotPayload(env,timestamp,community,isEvent ? row.event_id : null,kind,entry?.sim);
+  const {payload, hash} = prepared || await snapshotPayload(env,timestamp,community,isEvent ? row.event_id : null,kind,entry?.sim,threaded);
   if (!repair && row.message_id && row.content_hash === hash) return;
   if (row.message_id) {
     // A removed message or channel is reported, not recreated on every update (no surprise notifications).
-    try { await discord(env,'PATCH',`/channels/${channel}/messages/${row.message_id}`,payload,budget); }
+    const edit = () => discord(env,'PATCH',`/channels/${channel}/messages/${row.message_id}`,payload,budget);
+    try {
+      // A thread quiet for a week is archived by Discord: opened again to be edited.
+      await edit().catch(async error => {
+        if (!threaded || error.code !== 50083) throw error;
+        await discord(env,'PATCH',`/channels/${channel}`,{archived:false},budget);
+        await edit();
+      });
+    }
     catch (error) {
-      // The week's channels are the bot's own: a message or channel gone there is put back (silently, flags 4096).
-      if (!isEvent && !row.retried && error.status === 404 && [10003,10008].includes(error.code)) {
+      // The week's channels and the races' threads are the bot's own: a message or channel gone there is put back (silently, flags 4096).
+      if ((!isEvent || threaded) && !row.retried && error.status === 404 && [10003,10008].includes(error.code)) {
         if (error.code === 10003) {
-          await env.DB.prepare("UPDATE discord_recap_publications SET channel_id=NULL,category_id=NULL,message_id=NULL,content_hash='' WHERE community_id=? AND event_id=?").bind(community.id,row.event_id).run();
-          Object.assign(row, {channel_id:null, category_id:null, message_id:null, content_hash:'', retried:true});
+          const kept = threaded ? row.category_id : null;
+          await env.DB.prepare("UPDATE discord_recap_publications SET channel_id=NULL,category_id=?,message_id=NULL,content_hash='' WHERE community_id=? AND event_id=?").bind(kept,community.id,row.event_id).run();
+          Object.assign(row, {channel_id:null, category_id:kept, message_id:null, content_hash:'', retried:true});
           return publish(env, timestamp, community, settings, row, event, budget, prepared, repair, entry);
         }
         error.status = 404; error.code = 10008; repair = true;
@@ -536,6 +557,63 @@ async function publish(env, timestamp, community, settings, row, event, budget, 
   }
   await env.DB.prepare('UPDATE discord_recap_publications SET message_id=?,content_hash=? WHERE community_id=? AND event_id=?')
     .bind(row.message_id,hash,community.id,row.event_id).run();
+}
+// « Une catégorie par course »: the race's infos in its own thread of # endurances-de-la-semaine (its sim's), and its category
+// only for its crews' voices (made once it has a crew). Returns the thread, or null while the week's channel is not there yet.
+async function raceThread(env, community, settings, layout, row, event, budget, repair) {
+  const gone = error => { if (error.status !== 404) throw error; };
+  const week = await env.DB.prepare('SELECT channel_id FROM discord_recap_publications WHERE community_id=? AND event_id=?')
+    .bind(community.id, isIracing(event) ? WEEK.iracing : WEEK.lmu).first();
+  if (!week?.channel_id) return null;
+  const save = () => env.DB.prepare('UPDATE discord_recap_publications SET channel_id=?,category_id=?,message_id=?,content_hash=?,in_thread=?,thread_parent=? WHERE community_id=? AND event_id=?')
+    .bind(row.channel_id,row.category_id,row.message_id,row.content_hash,row.in_thread,row.thread_parent || null,community.id,row.event_id).run();
+  // A race set up before: its infos-de-la-course channel goes, the thread takes its place.
+  if (!row.in_thread && row.channel_id) {
+    await discord(env,'DELETE',`/channels/${row.channel_id}`,null,budget).catch(gone);
+    Object.assign(row, {channel_id:null, message_id:null, content_hash:''});
+    await save();
+  }
+  // The week's channel made again elsewhere (its threads went with the old one), or « Réparer » on a thread deleted on Discord:
+  // the thread is opened again.
+  const moved = row.channel_id && row.thread_parent !== week.channel_id;
+  if (row.channel_id && (moved || (repair && !await discord(env,'GET',`/channels/${row.channel_id}`,null,budget).catch(error => { gone(error); return null; })))) {
+    if (moved) await discord(env,'DELETE',`/channels/${row.channel_id}`,null,budget).catch(gone);
+    Object.assign(row, {channel_id:null, message_id:null, content_hash:''});
+    await save();
+  }
+  const anchors = anchorIds(settings), anchorId = anchorOf(settings, event);
+  const voices = layout.voices === true && Boolean(await env.DB.prepare('SELECT 1 FROM crews WHERE community_id=? AND event_id=? LIMIT 1').bind(community.id,row.event_id).first());
+  const category = row.category_id && !anchors.includes(row.category_id) ? row.category_id : null;
+  if (voices && (!category || repair)) {
+    const channels = await discord(env,'GET',`/guilds/${row.guild_id}/channels`,null,budget);
+    if (!category || !channels.some(item => item.id === category && item.type === 4)) {
+      // Discord allows 500 channels per server: room is kept for the crews' voice channels.
+      const anchor = channels.find(item => item.id === anchorId && item.type === 4);
+      if (anchor && channels.length < MAX_CHANNELS) {
+        row.category_id = (await discord(env,'POST',`/guilds/${row.guild_id}/channels`,{type:4,name:raceCategoryName(event),permission_overwrites:withBotAccess(anchor.permission_overwrites,env.DISCORD_CLIENT_ID,categoryAccess(community))},budget)).id;
+        await save();
+        await placeCategories(env,community,row.guild_id,channels,row.category_id,settings,budget);
+      }
+    }
+  } else if (!voices && category) {
+    // No crew voice here (any more): its category goes once empty.
+    const channels = await discord(env,'GET',`/guilds/${row.guild_id}/channels`,null,budget);
+    if (!channels.some(item => item.parent_id === category)) {
+      await discord(env,'DELETE',`/channels/${category}`,null,budget).catch(gone);
+      row.category_id = null;
+      await save();
+    }
+  }
+  if (!row.channel_id || !row.in_thread) {
+    // Open a week (Discord's longest): a quiet thread is archived, opened again on its next change.
+    const thread = await discord(env,'POST',`/channels/${week.channel_id}/threads`,{name:raceCategoryName(event),type:11,auto_archive_duration:10080},budget).catch(error => {
+      if (error.status === 403) throw Object.assign(new Error('Pour ouvrir le fil de chaque course, le bot doit pouvoir « Créer des fils publics » et « Envoyer des messages dans les fils » dans # endurances-de-la-semaine : invite-le à nouveau avec ses droits.'), {rights:true});
+      throw error;
+    });
+    Object.assign(row, {channel_id:thread.id, message_id:null, content_hash:'', in_thread:1, thread_parent:week.channel_id});
+    await save();
+  }
+  return row.channel_id;
 }
 // The week's channel, made by the bot (with its rights) just below the chosen channel, or at the top of the chosen category,
 // and found again by its topic. category_id keeps the place chosen for it.
@@ -645,7 +723,7 @@ async function syncLocked(env,timestamp,community,settings, test = false, budget
       const event = events.find(item => item.id === eventId);
       if (!event || (eventDeletionTime(event) !== null && timestamp >= eventDeletionTime(event))) continue;
       // Reuse the eligibility/isolation query even for previously published official races.
-      const prepared = await snapshotPayload(env,timestamp,community,eventId);
+      const prepared = await snapshotPayload(env,timestamp,community,eventId,null,null,layout?.mode === 'events');
       if (!prepared.snapshot.futureDepartures.length && !rows.some(row => row.event_id === eventId)) continue;
       const row = await ensurePublication(env,community,eventId,settings);
       await publish(env,timestamp,community,settings,row,event,budget,prepared,test);

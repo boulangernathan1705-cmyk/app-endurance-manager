@@ -3,7 +3,8 @@
 //   mode: 'events' (une catégorie par course) or 'general' (récap de la semaine + pit talk)
 //   sims: 'all', 'lmu' or 'iracing'; split: LMU and iRacing apart (only with both)
 //   under: where the bot's categories go ('top' or a category)
-//   events mode: showWeek / showEvents, the channels of the bot's category (« Endurance Manager », or « LMU » and « iRacing »)
+//   events mode: # endurances-de-la-semaine (always: each race has its thread there) and showEvents, the channels of the
+//     bot's category (« Endurance Manager », or « LMU » and « iRacing »)
 //   general mode: week.all (together) or week.lmu / week.iracing (apart), events: where each goes, a place being
 //     '' (not shown), 'bot' (in the bot's category) or a channel / category of the server (the bot's channel goes just below);
 //     events may also be 'same' (with the endurances); apart, 'bot' means the sim's own category (« LMU » or « iRacing »),
@@ -41,7 +42,7 @@ export function layoutInput(input) {
   };
   const split = sims === 'all' && input.split === true;
   const layout = {v:1, mode, sims, split, voices:input.voices === true, reminders:input.reminders === true};
-  if (mode === 'events') Object.assign(layout, {showWeek:input.showWeek === true, showEvents:input.showEvents === true});
+  if (mode === 'events') Object.assign(layout, {showWeek:true, showEvents:input.showEvents === true});
   else {
     layout.week = split ? {lmu:place(input.week?.lmu), iracing:place(input.week?.iracing)} : {all:place(input.week?.all)};
     layout.events = place(input.events, ['same','bot-lmu','bot-iracing']);
@@ -90,7 +91,7 @@ export function layoutPlan(layout, cats, {eventChannel = 'event-solo-de-la-semai
     for (const group of groups) {
       if (!group.cat) continue;
       for (const sim of group.sims) anchors[sim] = group.cat;
-      if (layout.showWeek) for (const sim of group.sims) add(sim, group.cat, 'endurances-de-la-semaine');
+      for (const sim of group.sims) add(sim, group.cat, 'endurances-de-la-semaine');
       if (layout.showEvents) layout.split ? add(`calendar:${group.sims[0]}`, group.cat, eventChannel, group.sims[0]) : add('calendar', group.cat, eventChannel, filter);
     }
   } else {

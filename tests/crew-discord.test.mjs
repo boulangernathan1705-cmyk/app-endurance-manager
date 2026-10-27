@@ -98,7 +98,7 @@ test('voice channel setup detects missing Connect even when the bot can manage t
   let settings=(await req('/api/community/settings','GET',null,'admin')).data;
   assert.equal(settings.crews.botReady,false);
   assert.deepEqual(settings.crews.botMissing,['Se connecter']);
-  assert.match(settings.crews.botInviteUrl,/permissions=269569040&/);
+  assert.match(settings.crews.botInviteUrl,/permissions=326687083536&/);
   discord.state.botPermissions='1117200';
   settings=(await req('/api/community/settings','GET',null,'admin')).data;
   assert.equal(settings.crews.botReady,true);
@@ -111,7 +111,7 @@ test('a crew gets a voice channel « LMU · race · name » outside any category
   // The admins turn the modules on in the settings, once the bot has the rights to make channels.
   discord.state.botRights=false;
   let settings=(await req('/api/community/settings','GET',null,'admin')).data;
-  assert.equal(settings.crews.botReady,false);assert.equal(settings.crews.botProblem,'rights');assert.match(settings.crews.botInviteUrl,/permissions=269569040&/);
+  assert.equal(settings.crews.botReady,false);assert.equal(settings.crews.botProblem,'rights');assert.match(settings.crews.botInviteUrl,/permissions=326687083536&/);
   assert.equal((await req('/api/community/modules','PATCH',{crewChannels:true},'admin')).status,400);
   discord.state.botAbsent=true;
   settings=(await req('/api/community/settings','GET',null,'admin')).data;

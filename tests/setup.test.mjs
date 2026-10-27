@@ -65,7 +65,7 @@ test('the setup page shows each step: bot on the server, roles, recap, invitatio
   const setupPage=(await as(OWNER,'/api/community/setup')).data;
   assert.equal(setupPage.guild.botPresent,true);assert.equal(setupPage.guild.name,'Serveur test');
   assert.match(setupPage.botInviteUrl,new RegExp(`client_id=app-id&scope=bot&permissions=0&guild_id=${GUILD}&disable_guild_select=true`));
-  assert.equal(setupPage.siteUrl,ROOT);assert.equal(setupPage.recapSetupRequired,true);assert.equal(setupPage.botRecap,null);assert.match(setupPage.recapBotInviteUrl,/permissions=85008&/);
+  assert.equal(setupPage.siteUrl,ROOT);assert.equal(setupPage.recapSetupRequired,true);assert.equal(setupPage.botRecap,null);assert.match(setupPage.recapBotInviteUrl,/permissions=326417599504&/);
   assert.equal((await as(OWNER,'/api/community/invite','PATCH',{url:'https://evil.example/x'})).status,400);
   assert.equal((await as(OWNER,'/api/community/invite','PATCH',{url:'https://discord.gg/abcDEF'})).status,200);
   assert.equal((await as(OWNER,'/api/community/setup')).data.discordInviteUrl,'https://discord.gg/abcDEF');
