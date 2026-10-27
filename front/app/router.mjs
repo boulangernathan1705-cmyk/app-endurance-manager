@@ -1,10 +1,13 @@
 // Keeps the address bar in sync with the page, so a race can be shared as a link
 // (/lmu/#event=<id>) and the browser Back button returns to the previous page.
-import {app,state,loadArchive,showError} from './core.mjs';
+// The events calendar (every sim) has its own address, /events/, so a copied link never names a sim.
+import {app,state,activeGame,loadArchive,showError} from './core.mjs';
 
 const EVENT_HASH=/^#event=([a-f0-9-]{36})$/;
 const ENTRIES_HASH='#inscriptions';
 const SOLO_HASH='#solo';
+const EVENTS_PATH='/events/';
+const onEvents=()=>/^\/events\/?$/i.test(location.pathname);
 let views=null;
 let homeScroll=0;
 
@@ -13,16 +16,19 @@ export function routeFromLocation(){
   if(match)return {page:'event',eventId:match[1]};
   // Shared links are often typed by hand (#SOLO, #Inscriptions): the case does not matter.
   const hash=location.hash.toLowerCase();
-  if(hash!==location.hash&&[ENTRIES_HASH,SOLO_HASH].includes(hash))history.replaceState(null,'',location.pathname+location.search+hash);
+  // Older links to the calendar (/lmu/#solo) show its own address.
+  if(hash===SOLO_HASH){history.replaceState(null,'',EVENTS_PATH+location.search);return {page:'home',list:'solo'};}
+  if(hash!==location.hash&&hash===ENTRIES_HASH)history.replaceState(null,'',location.pathname+location.search+hash);
   if(hash===ENTRIES_HASH)return {page:'my-entries'};
-  if(hash===SOLO_HASH)return {page:'home',list:'solo'};
+  if(onEvents())return {page:'home',list:'solo'};
   return {page:'home',list:'endurance'};
 }
 
-function hashFor(detail){
-  if(detail.page==='event'&&detail.eventId)return `#event=${detail.eventId}`;
-  if(detail.page==='my-entries')return ENTRIES_HASH;
-  if(detail.page==='home')return detail.list==='solo'?SOLO_HASH:'';
+function addressFor(detail){
+  const here=location.pathname+location.search;
+  if(detail.page==='event'&&detail.eventId)return `${here}#event=${detail.eventId}`;
+  if(detail.page==='my-entries')return `${here}${ENTRIES_HASH}`;
+  if(detail.page==='home')return detail.list==='solo'?EVENTS_PATH+location.search:onEvents()?`/${activeGame}/${location.search}`:here;
   return null; // Event form: keep the current address.
 }
 
@@ -57,9 +63,9 @@ export function installRouter(renderers){
     if(currentPage==='home'&&detail.page!=='home')homeScroll=scrollY;
     const changedPage=detail.page!==currentPage;
     currentPage=detail.page;
-    const wanted=hashFor(detail);
-    if(wanted===null||location.hash===wanted)return;
-    history.pushState(null,'',location.pathname+location.search+wanted);
+    const wanted=addressFor(detail);
+    if(wanted===null||location.pathname+location.search+location.hash===wanted)return;
+    history.pushState(null,'',wanted);
     if(changedPage||detail.page==='event')bringPageIntoView();
   });
   addEventListener('popstate',()=>{

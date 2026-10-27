@@ -254,7 +254,7 @@ export function buildCalendarPayload(snapshot,site={},updatedAt=Date.now()){
   const siteUrl=String(site.url||''),events=Array.isArray(snapshot.events)?snapshot.events:[];
   const embed={title:cut(`📅 Calendrier de la ${snapshot.periodLabel||'semaine à venir'}`,256),color:events.length?0xe7b653:0x6b7280,
     description:events.length?cut(events.map(event=>calendarBlock(event,siteUrl)).join('\n\n'),4096):'Aucun événement de prévu pour l’instant.'};
-  if(siteUrl)embed.url=`${siteUrl}/lmu/#solo`;
+  if(siteUrl)embed.url=`${siteUrl}/events/`;
   if(site.name){embed.author={name:cut(site.name,256)};if(siteUrl)embed.author.url=`${siteUrl}/`;if(site.logoUrl)embed.author.icon_url=site.logoUrl;}
   if(site.bannerUrl)embed.image={url:site.bannerUrl};
   embed.footer=footer(updatedAt);

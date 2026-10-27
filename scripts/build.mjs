@@ -85,6 +85,7 @@ await rm(out, {recursive: true, force: true});
 await mkdir(out, {recursive: true});
 await mkdir(new URL('lmu/', out), {recursive: true});
 await mkdir(new URL('iracing/', out), {recursive: true});
+await mkdir(new URL('events/', out), {recursive: true});
 await mkdir(new URL('.well-known/', out), {recursive: true});
 
 const sourceIndex = await readFile(root + 'index.html', 'utf8');
@@ -129,6 +130,7 @@ await writeFile(new URL('mur.html', out), productionHtml(sourceWall));
 const gameHtml = productionHtml(sourceGame);
 await writeFile(new URL('lmu/index.html', out), gameHtml);
 await writeFile(new URL('iracing/index.html', out), gameHtml);
+await writeFile(new URL('events/index.html', out), gameHtml);
 
 for (const file of ['privacy.html', 'legal.html', 'about.html', 'circuit-credits.html']) {
   const source = await readFile(root + file, 'utf8');
@@ -194,7 +196,7 @@ async function addModulePreloads(file) {
   await writeFile(target, html.replace('</head>', `${links}\n</head>`));
 }
 for (const file of ['index.html', 'members.html', 'diagnostics.html', 'help.html', 'demande-communaute.html', 'fiches-combo.html', 'mur-des-stands.html', 'mur.html',
-  'lmu/index.html', 'iracing/index.html', 'privacy.html', 'legal.html', 'about.html', 'circuit-credits.html', 'changelog.html']) await addModulePreloads(file);
+  'lmu/index.html', 'iracing/index.html', 'events/index.html', 'privacy.html', 'legal.html', 'about.html', 'circuit-credits.html', 'changelog.html']) await addModulePreloads(file);
 
 if (!workers) {
   await copyFile(root + 'server/worker.mjs', new URL('_worker.js', out));
