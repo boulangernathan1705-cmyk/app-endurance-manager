@@ -625,7 +625,19 @@ async function raceThread(env, community, settings, layout, row, event, budget, 
     await save();
     // A new thread has nobody in it: everyone is added again, soon.
     await env.DB.prepare('DELETE FROM discord_thread_members WHERE community_id=? AND event_id=?').bind(community.id,row.event_id).run();
-    await env.DB.prepare('UPDATE discord_recap_publications SET members_checked_at=0 WHERE community_id=? AND event_id=?').bind(community.id,row.event_id).run();
+    await env.DB.prepare('UPDATE discord_recap_publications SET members_checked_at=0,thread_notice_gone=0 WHERE community_id=? AND event_id=?').bind(community.id,row.event_id).run();
+    row.thread_notice_gone = 0;
+  }
+  // Discord's « Endurance Manager a commencé un fil » in # endurances-de-la-semaine: deleted once (the week's message links the
+  // threads already). Not found, or not allowed: left as it is.
+  if (!row.thread_notice_gone) {
+    const later = error => { if (error.budget || error.status === 429) throw error; return null; };
+    const recent = await discord(env,'GET',`/channels/${week.channel_id}/messages?limit=100`,null,budget).catch(later);
+    for (const item of (recent || []).filter(item => Number(item.type) === 18 && item.author?.id === env.DISCORD_CLIENT_ID
+      && (item.message_reference?.channel_id === row.channel_id || item.content === raceCategoryName(event))))
+      await discord(env,'DELETE',`/channels/${week.channel_id}/messages/${item.id}`,null,budget).catch(later);
+    row.thread_notice_gone = 1;
+    await env.DB.prepare('UPDATE discord_recap_publications SET thread_notice_gone=1 WHERE community_id=? AND event_id=?').bind(community.id,row.event_id).run();
   }
   return row.channel_id;
 }
