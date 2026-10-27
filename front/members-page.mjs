@@ -146,7 +146,7 @@ function peopleMarkup(result, settings) {
 // needs; on a phone, one question per screen, the server's sketch last.
 const DISCORD_MODES = {
   events:['Un fil par course', 'Chaque course a son fil dans # endurances-de-la-semaine, les vocaux de ses équipages juste en dessous.'],
-  general:['Récap de la semaine + pit talk', 'Les récaps à un endroit, les vocaux d’équipage dans « Pit talk ».']};
+  general:['Récap de la semaine + pit talk', 'Un fil par course dans # endurances-de-la-semaine, les vocaux d’équipage dans « Pit talk ».']};
 // The answers as saved, or those of a setting made before.
 function discordAnswers(setup, settings) {
   const config = setup.botRecap, crews = settings.crews || {};
@@ -312,20 +312,22 @@ function discordSketch(form, answers = discordRead(form)) {
   const botCat = {name:`Endurance Manager${lock(answers.copy, answers.under)}`, bot:true, items:[]};
   const simCats = Object.fromEntries(sims.map(sim => [sim, {name:`${SIM_NAMES[sim]}${lock(answers.copy, answers.under)}`, bot:true, items:[]}]));
   if (race) {
-    const blocks = apart ? sims.map((sim, index) => ({name:`${sim === 'lmu' ? 'LMU' : 'iRacing'}${lock(answers.copy, answers.under)}`, bot:true, items:[...week([sim]), ...(solo && answers.showEvents ? [bot(eventName)] : []), ...(index ? [] : voices(sims))]}))
+    const blocks = apart ? sims.map((sim, index) => ({name:`${sim === 'lmu' ? 'LMU' : 'iRacing'}${lock(answers.copy, answers.under)}`, bot:true, items:[...week([sim]), ...(solo && answers.showEvents ? [bot(eventName)] : []), ...voices([sim])]}))
       : [{...botCat, items:[...week(sims), ...(solo && answers.showEvents ? [bot(eventName)] : []), ...voices(sims)]}];
     after(answers.under || 'top', ...blocks);
   } else {
-    const placeIn = (value, name, sim = null) => {
+    // A week's channel with its races' threads.
+    const placeIn = (value, name, sim = null, threads = []) => {
       if (!value) return;
-      if (value === 'bot') { (apart && sim ? simCats[sim] : botCat).items.push(bot(name)); return; }
-      if (value.startsWith('bot-')) { simCats[value.slice(4)]?.items.push(bot(name)); return; }
+      const items = [bot(name), ...threads.map(item => bot(`　🧵 ${RACES[item][0]}`))];
+      if (value === 'bot') { (apart && sim ? simCats[sim] : botCat).items.push(...items); return; }
+      if (value.startsWith('bot-')) { simCats[value.slice(4)]?.items.push(...items); return; }
       const group = groups[at(value)];
-      if (group) { group.items.unshift(bot(name)); return; }
-      for (const item of groups) { const index = item.items.findIndex(text => text.id === value); if (index >= 0) { item.items.splice(index + 1, 0, bot(name)); return; } }
+      if (group) { group.items.unshift(...items); return; }
+      for (const item of groups) { const index = item.items.findIndex(text => text.id === value); if (index >= 0) { item.items.splice(index + 1, 0, ...items); return; } }
     };
-    const channels = apart ? sims.map(sim => [answers.week?.[sim], `# ${discordWeekChannel(answers, sim)}`, sim]) : [[answers.week?.all, '# endurances-de-la-semaine']];
-    for (const [value, name, sim] of channels) placeIn(value, name, sim);
+    const channels = apart ? sims.map(sim => [answers.week?.[sim], `# ${discordWeekChannel(answers, sim)}`, sim, [sim]]) : [[answers.week?.all, '# endurances-de-la-semaine', null, sims]];
+    for (const [value, name, sim, threads] of channels) placeIn(value, name, sim, threads);
     const events = discordEvents(answers);
     if (solo && events && events !== 'same') placeIn(events, eventName);
     const made = [botCat, ...Object.values(simCats)].filter(group => group.items.length);
