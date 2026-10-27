@@ -563,8 +563,8 @@ async function publish(env, timestamp, community, settings, row, event, budget, 
 // The races' threads now open: {eventId: thread}.
 const raceThreads = async (env, community) => Object.fromEntries(((await env.DB.prepare("SELECT event_id,channel_id FROM discord_recap_publications WHERE community_id=? AND in_thread=1 AND channel_id IS NOT NULL AND closed_at IS NULL")
   .bind(community.id).all()).results || []).map(row => [row.event_id, row.channel_id]));
-// « Une catégorie par course »: the race's infos in its own thread of # endurances-de-la-semaine (its sim's), and its category
-// only for its crews' voices (made once it has a crew). Returns the thread, or null while the week's channel is not there yet.
+// « Un fil par course »: the race's infos in its own thread of # endurances-de-la-semaine (its sim's); its crews' voices in the
+// same category, just below (server/crew-discord.mjs). Returns the thread, or null while the week's channel is not there yet.
 async function raceThread(env, community, settings, layout, row, event, budget, repair) {
   const gone = error => { if (error.status !== 404) throw error; };
   const week = await env.DB.prepare('SELECT channel_id FROM discord_recap_publications WHERE community_id=? AND event_id=?')
@@ -586,22 +586,10 @@ async function raceThread(env, community, settings, layout, row, event, budget, 
     Object.assign(row, {channel_id:null, message_id:null, content_hash:''});
     await save();
   }
-  const anchors = anchorIds(settings), anchorId = anchorOf(settings, event);
-  const voices = layout.voices === true && Boolean(await env.DB.prepare('SELECT 1 FROM crews WHERE community_id=? AND event_id=? LIMIT 1').bind(community.id,row.event_id).first());
-  const category = row.category_id && !anchors.includes(row.category_id) ? row.category_id : null;
-  if (voices && (!category || repair)) {
-    const channels = await discord(env,'GET',`/guilds/${row.guild_id}/channels`,null,budget);
-    if (!category || !channels.some(item => item.id === category && item.type === 4)) {
-      // Discord allows 500 channels per server: room is kept for the crews' voice channels.
-      const anchor = channels.find(item => item.id === anchorId && item.type === 4);
-      if (anchor && channels.length < MAX_CHANNELS) {
-        row.category_id = (await discord(env,'POST',`/guilds/${row.guild_id}/channels`,{type:4,name:raceCategoryName(event),permission_overwrites:withBotAccess(anchor.permission_overwrites,env.DISCORD_CLIENT_ID,categoryAccess(community))},budget)).id;
-        await save();
-        await placeCategories(env,community,row.guild_id,channels,row.category_id,settings,budget);
-      }
-    }
-  } else if (!voices && category) {
-    // No crew voice here (any more): its category goes once empty.
+  // A race category made before (its voices now go just below the threads, server/crew-discord.mjs): deleted once its voices
+  // have left it.
+  const anchors = anchorIds(settings), category = row.category_id && !anchors.includes(row.category_id) ? row.category_id : null;
+  if (category) {
     const channels = await discord(env,'GET',`/guilds/${row.guild_id}/channels`,null,budget);
     if (!channels.some(item => item.parent_id === category)) {
       await discord(env,'DELETE',`/channels/${category}`,null,budget).catch(gone);
@@ -801,7 +789,7 @@ export async function removeBotDiscord(env,timestamp,community) {
 }
 
 // Every 2 minutes: the pilots with access to the site added to the races' threads, so each thread stays in their list on
-// Discord (no notification). Those of the race first; each added once (one who leaves it stays out). limit: requests.
+// Discord, 50 at a time per thread. Those of the race first; each added once (one who leaves it stays out). limit: requests.
 // A thread with nobody left to add is looked at again an hour later (a pilot given access meanwhile).
 export async function addThreadMembers(env, timestamp = Date.now(), limit = 25) {
   if (!env?.DB || !env.DISCORD_BOT_TOKEN) return 0;
@@ -817,25 +805,26 @@ export async function addThreadMembers(env, timestamp = Date.now(), limit = 25) 
       AND (m.discord_admin=1 OR EXISTS (SELECT 1 FROM community_role_permissions r WHERE r.community_id=m.community_id
         AND (r.discord_role_id=? OR r.discord_role_id IN (SELECT value FROM json_each(m.discord_roles)))
         AND EXISTS (SELECT 1 FROM json_each(r.permissions) WHERE value='access')))
-      ORDER BY EXISTS (SELECT 1 FROM registrations g WHERE g.event_id=? AND g.user_id=m.user_id) DESC, m.user_id LIMIT ?`)
-      .bind(thread.community_id,thread.event_id,thread.guild_id,thread.event_id,budget.left).all()).results || [];
+      ORDER BY EXISTS (SELECT 1 FROM registrations g WHERE g.event_id=? AND g.user_id=m.user_id) DESC, m.user_id LIMIT 50`)
+      .bind(thread.community_id,thread.event_id,thread.guild_id,thread.event_id).all()).results || [];
     if (!pilots.length) {
       await env.DB.prepare('UPDATE discord_recap_publications SET members_checked_at=? WHERE community_id=? AND event_id=?').bind(timestamp,thread.community_id,thread.event_id).run();
       continue;
     }
-    for (const {user_id} of pilots) {
-      // Slowly, never while the recap works on this server (Réparer, a new setting): Discord limits the bot's requests.
-      if (added) await pause(400);
-      try { await discord(env,'PUT',`/channels/${thread.channel_id}/thread-members/${user_id}`,null,budget); }
-      catch (error) {
-        if (error.budget || error.status === 429) return added;
-        // No longer on the server: nothing to add. Anything else (archived thread, rights): this thread waits for next time.
-        if (error.code !== 10007) break;
-      }
-      await env.DB.prepare('INSERT OR IGNORE INTO discord_thread_members(community_id,event_id,user_id,added_at) VALUES(?,?,?,?)')
-        .bind(thread.community_id,thread.event_id,user_id,timestamp).run();
-      added++;
+    // Added by a silent mention (no push notification), deleted at once: adding them one by one notifies them.
+    const ids = pilots.map(pilot => pilot.user_id);
+    try {
+      const message = await discord(env,'POST',`/channels/${thread.channel_id}/messages`,{content:ids.map(id => `<@${id}>`).join(' '),
+        allowed_mentions:{users:ids},flags:4096},budget);
+      await discord(env,'DELETE',`/channels/${thread.channel_id}/messages/${message.id}`,null,budget);
+    } catch (error) {
+      // Discord limits the bot's requests, or the thread is archived or gone: next time.
+      if (error.budget || error.status === 429) return added;
+      continue;
     }
+    for (const id of ids) await env.DB.prepare('INSERT OR IGNORE INTO discord_thread_members(community_id,event_id,user_id,added_at) VALUES(?,?,?,?)')
+      .bind(thread.community_id,thread.event_id,id,timestamp).run();
+    added += ids.length;
     if (budget.left <= 0) break;
   }
   return added;

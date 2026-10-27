@@ -115,8 +115,10 @@ const CREW_COLUMNS = `c.id AS crew_id, c.community_id, c.name AS crew_name, c.ca
 const TRACKED_CREWS = `SELECT d.crew_id AS row_id, d.community_id AS row_community, d.guild_id, d.category_id, d.text_id, d.voice_id, d.message_id,
   d.recap_hash, d.members, d.starts_at, d.reminded, d.created_at, d.parent_id, ${CREW_COLUMNS},
   -- A race's category only counts while « Une catégorie par course » is on: otherwise the voices leave it before it goes.
-  CASE WHEN s.enabled=1 AND s.mode='events' AND p.category_id NOT IN (COALESCE(s.destination_id,''),COALESCE(s.iracing_destination_id,'')) THEN p.category_id END AS race_category,
-  CASE WHEN s.enabled=1 AND s.mode='events' THEN CASE WHEN s.destination_id<>'' AND s.iracing_destination_id<>'' THEN 'all'
+  -- « Un fil par course » (the setting asked question by question) has none: the voices go just below the threads.
+  s.layout AS recap_layout,
+  CASE WHEN s.enabled=1 AND s.mode='events' AND COALESCE(s.layout,'')='' AND p.category_id NOT IN (COALESCE(s.destination_id,''),COALESCE(s.iracing_destination_id,'')) THEN p.category_id END AS race_category,
+  CASE WHEN s.enabled=1 AND s.mode='events' AND COALESCE(s.layout,'')='' THEN CASE WHEN s.destination_id<>'' AND s.iracing_destination_id<>'' THEN 'all'
     WHEN s.destination_id<>'' THEN 'lmu' WHEN s.iracing_destination_id<>'' THEN 'iracing' END END AS race_scope
   FROM crew_discord d LEFT JOIN crews c ON c.id=d.crew_id LEFT JOIN events e ON e.id=c.event_id
     LEFT JOIN discord_recap_publications p ON p.community_id=d.community_id AND p.event_id=c.event_id AND p.closed_at IS NULL
@@ -438,7 +440,9 @@ async function syncRow(env, budget, timestamp, community, setting, row, pilots) 
   }
   // Voices turned off: the voice channel goes once nobody of the crew talks in it; the row stays open, so the voice comes
   // back if the admins turn them on again before the race.
-  if (community.modules?.crewChannels !== true || !setting) {
+  // Voices turned off, or the race's sim not shown on Discord (« LMU » only: no voice for an iRacing race).
+  const sims = (() => { try { return JSON.parse(row.recap_layout || 'null')?.sims; } catch { return null; } })();
+  if (community.modules?.crewChannels !== true || !setting || (sims && sims !== 'all' && sims !== game(row.circuit))) {
     if (!row.voice_id) return null;
     const removed = await closeRow(env, budget, timestamp, {...row, text_id:null, category_id:null}, members, {keepOpen:true});
     return removed ? 'closed' : null;

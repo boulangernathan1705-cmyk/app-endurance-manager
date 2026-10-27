@@ -701,32 +701,30 @@ test('LMU and iRacing apart: one category each, each race its thread in its sim\
   assert.equal(parent('🏁 iRacing · 8h de Watkins Glen'),named(channels,'iRacing').id);
 });
 
-test('a race with a crew gets its category for the voices; the old infos-de-la-course channel gives way to the thread; all goes after the race',async t=>{
+test('no race category any more, even with a crew; the old infos-de-la-course channel gives way to the thread, its empty category goes',async t=>{
   const {DB,env,channels,calls}=setup(t);race(DB);
   const community={...COMMUNITY,modules:{...COMMUNITY.modules,crewChannels:true}};
   DB.db.prepare("INSERT INTO community_crew_discord(community_id,updated_at) VALUES(?,0)").run(DEV_COMMUNITY);
   DB.db.prepare("INSERT INTO crews(id,event_id,departure_id,name,category,car,locked,created_at,community_id) VALUES('crew','race-a','start-a','Équipage A','GT3','',0,0,?)").run(DEV_COMMUNITY);
   // Set up before: a race category with its infos-de-la-course channel.
   await layout(env,community,{mode:'events',sims:'lmu',under:ACCUEIL,voices:true});
-  const made=named(channels,'🏎️ LMU · 6h de Spa');assert.equal(made?.type,4,'a crew: its category for the voices');
-  channels.splice(channels.indexOf(made),1);
+  assert.ok(!channels.some(item=>item.type===4&&item.name==='🏎️ LMU · 6h de Spa'),'the voices go just below the threads');
   const old={id:'777777777777777770',type:0,name:'infos-de-la-course',parent_id:'777777777777777771'};
   channels.push({id:'777777777777777771',type:4,name:'🏎️ LMU · 6h de Spa'},old);
   DB.db.prepare("UPDATE discord_recap_publications SET channel_id=?,category_id=?,message_id='1',in_thread=0,thread_parent=NULL,content_hash='x' WHERE event_id='race-a'").run(old.id,'777777777777777771');
   for(const item of channels.filter(item=>item.type===11))channels.splice(channels.indexOf(item),1);
   await syncBotRecaps(env,NOW+1000,community);
   assert.equal(channels.find(item=>item.id===old.id),undefined,'old channel deleted');
-  assert.ok(channels.some(item=>item.id==='777777777777777771'),'its category kept for the voices');
+  assert.equal(channels.find(item=>item.id==='777777777777777771'),undefined,'its empty category deleted');
   const thread=channels.find(item=>item.type===11);assert.equal(thread.name,'🏎️ LMU · 6h de Spa');
   assert.equal(DB.db.prepare("SELECT in_thread FROM discord_recap_publications WHERE event_id='race-a'").get().in_thread,1);
   // An archived thread is opened again to be edited.
   DB.db.prepare("UPDATE discord_recap_publications SET content_hash='changed' WHERE event_id='race-a'").run();
   calls.length=0;await syncBotRecaps(env,NOW+2000,community);
   assert.ok(calls.some(call=>call.method==='PATCH'&&call.path.startsWith(`/channels/${thread.id}/messages/`)));
-  // After the race: thread and category gone.
+  // After the race: the thread goes.
   await syncBotRecaps(env,NOW+3*DAY,community);
   assert.equal(channels.find(item=>item.id===thread.id),undefined);
-  assert.equal(channels.find(item=>item.id==='777777777777777771'),undefined);
 });
 
 test('« récap de la semaine »: just below a channel, the events with the endurances, voices in « Pit talk » made by the bot',async t=>{
@@ -837,8 +835,10 @@ test('the pilots with access are added to the race\'s thread once each, those of
   DB.db.prepare("INSERT INTO participants(id,name,user_id,created_by,created_at,community_id) VALUES('p2','P2','100000000000000002',?,0,?)").run(OWNER,DEV_COMMUNITY);
   DB.db.prepare("INSERT INTO registrations(id,event_id,departure_id,user_id,name,name_key,category,status,created_at,participant_id,community_id) VALUES('r','race-a','start-a','100000000000000002','P2','p2','GT3','whole',0,'p2',?)").run(DEV_COMMUNITY);
   calls.length=0;
-  assert.equal(await addThreadMembers(env,NOW,1),1);
-  assert.deepEqual(calls.map(call=>call.path),[`/channels/${thread.id}/thread-members/100000000000000002`],'the race\'s pilot first');
-  assert.equal(await addThreadMembers(env,NOW,12),1,'then the other one with access, not the one without, nor one gone');
-  calls.length=0;assert.equal(await addThreadMembers(env,NOW,12),0);assert.equal(calls.length,0,'each once');
+  assert.equal(await addThreadMembers(env,NOW,12),2,'the two with access, not the one without, nor one gone');
+  const [post,remove]=calls;
+  assert.equal(post.path,`/channels/${thread.id}/messages`);assert.equal(post.body.flags,4096,'silent');
+  assert.deepEqual(post.body.allowed_mentions.users,['100000000000000002','100000000000000001'],'the race\'s pilot first');
+  assert.equal(remove.method,'DELETE');assert.match(remove.path,new RegExp(`^/channels/${thread.id}/messages/`));
+  calls.length=0;assert.equal(await addThreadMembers(env,NOW,12),0);assert.ok(!calls.some(call=>call.method==='POST'),'each once');
 });
