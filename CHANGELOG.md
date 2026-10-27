@@ -1,5 +1,17 @@
 # Nouveautés d'Endurance Manager
 
+## v1.67 — 27 octobre 2026
+
+### ✨ Nouveautés
+
+- **Discord** : en « Récap de la semaine + pit talk » aussi, un message court pour la semaine et un fil par course dans # endurances-de-la-semaine.
+
+### 🔧 Corrections
+
+- **Discord** : en « Un fil par course » avec LMU et iRacing séparés, les vocaux iRacing vont dans « iRacing ».
+- **Discord** : le bot n'ajoute plus les pilotes aux fils (Discord le signalait toujours) ; chacun ouvre le fil depuis # endurances-de-la-semaine.
+- **Discord** : le bot attend quand Discord lui demande de ralentir, au lieu d'échouer (« Discord limite les requêtes »).
+
 ## v1.66 — 27 octobre 2026
 
 ### ✨ Nouveautés
