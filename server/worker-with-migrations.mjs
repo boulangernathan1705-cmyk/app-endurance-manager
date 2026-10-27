@@ -134,6 +134,11 @@ export default {
   async scheduled(controller, env, ctx) {
     if (!env?.DB) return;
     const at = new Date(controller?.scheduledTime || Date.now());
+    // Every 2 minutes: only the pilots added to the races' threads, a batch at a time.
+    if (controller?.cron === '*/2 * * * *') {
+      if (env.DISCORD_BOT_TOKEN) ctx.waitUntil(addThreadMembers(env, at.getTime(), 40).catch(error => console.error('Thread members failed', error instanceof Error ? error.message : 'unknown')));
+      return;
+    }
     const slot = Math.floor(at.getUTCMinutes() / 15);
     const run = (label, task) => ctx.waitUntil(task().catch(error => console.error(label, error instanceof Error ? error.message : 'unknown')));
     // Expired sessions, OAuth states and rate-limit counters are purged here too, not only on Discord login.
@@ -145,8 +150,6 @@ export default {
     run('Crew Discord sync failed', () => syncCrewDiscord(env, at.getTime(), {requests:slot === 1 ? 4 : 8}));
     run('Orphan crew Discord cleanup failed', () => cleanupOrphanCrewDiscord(env, at.getTime()));
     run('Event recap cleanup failed', () => cleanupEventRecaps(env,at.getTime()));
-    // The pilots added to the races' threads, a few at a time (not next to the iRacing import).
-    if (slot !== 1) run('Thread members failed', () => addThreadMembers(env,at.getTime()));
     // :00 Members and Discord roles not checked for a day are checked again by the bot, a few at a time.
     if (slot === 0 && env.DISCORD_BOT_TOKEN) run('Membership check failed', async () => refreshMemberships(env, await allCommunities(env), 12));
     // :15 Official team and solo iRacing endurances, once for the whole platform.
