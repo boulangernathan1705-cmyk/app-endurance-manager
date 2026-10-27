@@ -592,7 +592,10 @@ export async function checkBot(env, guildId, {channelIds = [], required = [], in
 }
 
 
-export async function checkCrewAccess(env, community, {categoryId, includeCategories = false, failedChannelId = null} = {}) {
+// layout: the setting asked question by question is being saved: the bot makes its own categories (with its rights, from
+// those it has on the server), so only a category of the admins chosen for the voices is checked, not the places of before.
+export async function checkCrewAccess(env, community, {categoryId, includeCategories = false, failedChannelId = null, layout = false} = {}) {
+  if (layout) return checkBot(env,community.discordGuildId,{channelIds:categoryId ? [String(categoryId)] : [],required:categoryId ? [String(categoryId)] : [],includeCategories});
   const recap = await env.DB.prepare('SELECT enabled,mode,destination_id,iracing_destination_id FROM community_recap_settings WHERE community_id=?').bind(community.id).first();
   const saved = categoryId === undefined ? await env.DB.prepare('SELECT voice_category_id FROM community_crew_discord WHERE community_id=?').bind(community.id).first() : null;
   const destinations = recap?.enabled && recap.mode === 'events' ? [recap.destination_id, recap.iracing_destination_id] : [categoryId ?? saved?.voice_category_id];

@@ -163,14 +163,14 @@ async function crewDiscordState(env, community) {
 async function crewModuleStatements(env, community, modules, input) {
   const statements = [];
   if (typeof input.crewChannels === 'boolean') {
-    if (input.crewChannels) await assertCrewAccess(env,community,{categoryId:typeof input.crewCategory === 'string' ? input.crewCategory.trim() : undefined});
+    if (input.crewChannels) await assertCrewAccess(env,community,{categoryId:typeof input.crewCategory === 'string' ? input.crewCategory.trim() : undefined, layout:input.layout === true});
     modules.crewChannels = input.crewChannels;
     if (input.crewChannels) statements.push(env.DB.prepare(`INSERT INTO community_crew_discord(community_id,updated_at) VALUES(?,?)
       ON CONFLICT(community_id) DO UPDATE SET last_error=NULL,last_error_at=NULL,updated_at=excluded.updated_at`).bind(community.id, now()));
   }
   if (typeof input.crewCategory === 'string') {
     const category = input.crewCategory.trim();
-    await assertCrewAccess(env,community,{categoryId:category});
+    await assertCrewAccess(env,community,{categoryId:category, layout:input.layout === true});
     if (category && !(await serverCategories(env, community.discordGuildId) || []).some(item => item.id === category)) fail(400, 'Cette catégorie n’existe pas sur ton serveur.');
     statements.push(env.DB.prepare(`INSERT INTO community_crew_discord(community_id,voice_category_id,updated_at) VALUES(?,?,?)
       ON CONFLICT(community_id) DO UPDATE SET voice_category_id=excluded.voice_category_id,last_error=NULL,last_error_at=NULL,updated_at=excluded.updated_at`).bind(community.id, category || null, now()));
@@ -974,7 +974,7 @@ async function api(request, env) {
       if (url && (url.length > 200 || !/^https:\/\/((ptb\.|canary\.)?discord\.com|discord\.gg)\//.test(url))) fail(400, 'Colle le lien d’un salon Discord (clic droit sur le salon → Copier le lien).');
       modules.safeGuideUrl = url;
     }
-    const statements = await crewModuleStatements(env, community, modules, input);
+    const statements = await crewModuleStatements(env, community, modules, {...input, layout:false});
     statements.push(env.DB.prepare('UPDATE communities SET modules=? WHERE id=?').bind(JSON.stringify(modules), community.id));
     await env.DB.batch(statements);
     return json({ok:true, modules});
@@ -1039,7 +1039,7 @@ async function api(request, env) {
       // its id at the sync); « une catégorie par course »: to the race's.
       const crewCategory = layout ? (voices && layout.mode === 'general' && layout.pit === 'existing' ? (layout.pitAt === 'top' ? '' : layout.pitAt) : undefined)
         : voices && settings.mode === 'general' && typeof input.crewCategory === 'string' ? input.crewCategory : undefined;
-      const crewInput = {crewChannels:voices, ...(crewCategory !== undefined ? {crewCategory} : {})};
+      const crewInput = {crewChannels:voices, layout:Boolean(layout), ...(crewCategory !== undefined ? {crewCategory} : {})};
       const statements = await crewModuleStatements(env, community, modules, crewInput);
       await saveBotRecap(env,community,settings);
       await env.DB.batch([...statements, env.DB.prepare('UPDATE communities SET modules=? WHERE id=?').bind(JSON.stringify(modules), community.id)]);
