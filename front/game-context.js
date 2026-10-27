@@ -7,7 +7,7 @@
   // (the logo also leads there; the navigation bar switches between simulators).
   // The events calendar (every sim) and a shared event are not a choice: « Endurance » asks for it then.
   const chosen = /(?:^|;\s*)em_sim=/.test(document.cookie);
-  if (chosen || !/^#(solo|event=)/.test(location.hash)) {
+  if (chosen || !/^#(solo|event=)/i.test(location.hash)) {
     try { document.cookie = `em_sim=${game}; path=/; max-age=31536000; SameSite=Lax${location.protocol === 'https:' ? '; Secure' : ''}`; } catch {}
   }
 

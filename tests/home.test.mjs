@@ -22,7 +22,9 @@ test('with EVENT TDZ, the events calendar is the home page; the simulator is ask
   assert.equal(homeRedirect(new Request('https://site.example/?accueil'), events), null);
   assert.equal(homeRedirect(new Request('https://site.example/'), {modules:{}}), null);
   const context = readFileSync(new URL('../front/game-context.js', import.meta.url), 'utf8');
-  assert.match(context, /if \(chosen \|\| !\/\^#\(solo\|event=\)\/\.test\(location\.hash\)\)/);
+  assert.match(context, /if \(chosen \|\| !\/\^#\(solo\|event=\)\/i\.test\(location\.hash\)\)/);
+  // A link typed by hand (/lmu/#SOLO) still opens the events calendar.
+  assert.match(readFileSync(new URL('../front/app/router.mjs', import.meta.url), 'utf8'), /const hash=location\.hash\.toLowerCase\(\);[\s\S]*if\(hash===SOLO_HASH\)return \{page:'home',list:'solo'\}/);
   assert.match(readFileSync(new URL('../front/app/actions.mjs', import.meta.url), 'utf8'), /state\.soloRaces&&!simChosen\(\)\)\{openSimChooser\(\)/);
 });
 
