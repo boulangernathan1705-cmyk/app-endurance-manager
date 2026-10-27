@@ -238,7 +238,7 @@ namespace EnduranceManager.SimHub
                 ["wheels"] = s.Wheels.Select(w => new object[] { R(w.Wear * 100, 1), R(w.Temp, 0), R(w.Pressure, 1), R(w.Brake, 0),
                     new[] { R(w.TreadIn, 0), R(w.TreadMid, 0), R(w.TreadOut, 0) } }).ToArray(),
                 // The eight dent zones, 0 to 2 each.
-                ["damage"] = R(s.Damage / 16.0 * 100, 0),
+                ["damage"] = R(s.Damage / 16.0 * 100, 0), ["dents"] = s.Dents, ["detached"] = s.Detached,
                 ["stops"] = (session?.Stops ?? new List<LiveStop>()).Select(stop => new Dictionary<string, object>
                 {
                     ["lap"] = stop.Lap, ["lane"] = stop.Lane, ["stopped"] = stop.Stationary, ["ve"] = stop.Energy, ["fuel"] = stop.Fuel,

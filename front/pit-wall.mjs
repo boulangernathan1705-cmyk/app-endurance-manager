@@ -420,8 +420,18 @@ function car(feed) {
       <div class="pw-pitstate">${box('Stands', me.pit === 2 ? 'GARAGE' : me.pit ? 'PIT LANE' : 'PISTE', '', me.pit ? 'warn' : 'good')}${box('Météo', known(snap.rain) ? `${fr(snap.rain * 100, 0)}% pluie` : '—', known(snap.trackTemp) ? `piste ${fr(snap.trackTemp, 0)}°C · air ${fr(snap.air, 0)}°C` : '')}</div>
     </div>${settings ? `<div class="pw-settings">${settings}</div>` : ''}`);
   const damage = known(me.damage) ? me.damage : null;
-  const damageCard = card('🛠️ Dégâts', `<div class="pw-damage" style="--level:${damage || 0}%;--bar:${!damage ? 'var(--pw-green)' : damage < 30 ? 'var(--pw-yellow)' : damage < 65 ? 'var(--pw-orange)' : 'var(--pw-red)'}">
-      <b>${known(damage) ? `${fr(damage, 0)}%` : '—'}</b><i></i></div>`,
+  // The car from above (front up) in the game's eight dent zones, and the rear wing (the only part that comes off in LMU).
+  const dents = me.dents, zone = level => ['var(--pw-green)', 'var(--pw-orange)', 'var(--pw-red)'][level] || 'var(--pw-muted)';
+  const part = (index, x, y, w, h) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="4" fill="${zone(dents[index])}"/>`;
+  const drawing = dents ? `<svg class="pw-car-dents" viewBox="0 0 120 226" role="img" aria-label="Dégâts par zone">
+      ${part(0, 40, 6, 40, 30)}${part(1, 14, 14, 24, 44)}${part(7, 82, 14, 24, 44)}${part(2, 14, 62, 24, 92)}${part(6, 82, 62, 24, 92)}
+      ${part(3, 14, 158, 24, 44)}${part(5, 82, 158, 24, 44)}${part(4, 40, 172, 40, 30)}
+      <rect x="42" y="42" width="36" height="124" rx="10" fill="var(--pw-accent)"/>
+      <rect x="18" y="210" width="84" height="10" rx="3" fill="${me.detached ? 'none' : 'var(--pw-green)'}" stroke="${me.detached ? 'var(--pw-red)' : 'none'}" stroke-width="2" stroke-dasharray="${me.detached ? '5 4' : '0'}"/>
+    </svg>` : '';
+  const damageCard = card('🛠️ Dégâts', `<div class="pw-damage${dents ? ' with-car' : ''}" style="--level:${damage || 0}%;--bar:${!damage ? 'var(--pw-green)' : damage < 30 ? 'var(--pw-yellow)' : damage < 65 ? 'var(--pw-orange)' : 'var(--pw-red)'}">
+      ${drawing}<div class="pw-damage-sum"><b>${known(damage) ? `${fr(damage, 0)}%` : '—'}</b><i></i>
+      ${dents ? `<div class="pw-wing ${me.detached ? 'bad' : 'good'}"><span>Aileron arrière</span><b>${me.detached ? 'ARRACHÉ' : 'En place'}</b></div>` : ''}</div></div>`,
     known(damage) ? chip(!damage ? 'AUCUN DÉGÂT' : damage < 30 ? 'DÉGÂTS MINEURS' : damage < 65 ? 'DÉGÂTS MOYENS' : 'DÉGÂTS GRAVES', !damage ? 'good' : damage < 65 ? 'warn' : 'bad') : '', 'pw-damage-card');
   // Fuel and virtual energy side by side, each with what it lasts at the 5-lap average.
   const tank = (title, icon, value, unit, full, last, perLap, cls) => {

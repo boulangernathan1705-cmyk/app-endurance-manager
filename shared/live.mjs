@@ -56,6 +56,13 @@ function cleanWheel(input) {
     tread:three && three.every(value => value !== null) ? three : null};
 }
 
+// The eight dent zones (plugin 2.4: 0 front, then round by the left to 7 front right), 0 to 2 each; null before.
+function cleanDents(input) {
+  if (!Array.isArray(input) || input.length !== 8) return null;
+  const list = input.map(value => num(value, 0, 2));
+  return list.every(value => value !== null) ? list.map(Math.round) : null;
+}
+
 function cleanStop(input) {
   if (!input || typeof input !== 'object') return null;
   const lap = num(input.lap, 0, 10000), lane = num(input.lane, 0, 900), stopped = num(input.stopped, 0, 900);
@@ -97,7 +104,7 @@ export function cleanSnapshot(input) {
     // car: the model as the fiches combo name it (their track + car), vehicle: the entry's full name in the scoring.
     me:{id, driver:text(me.driver, 40), car:text(me.car, 120), vehicle:text(me.vehicle, 80), cls:text(me.cls, 40), compound:text(me.compound, 40),
       cur:num(me.cur, -10, 3600), pit:num(me.pit, 0, 2) ?? 0, ve:num(me.ve, -1, 100), fuel:num(me.fuel, 0, 500), capacity:num(me.capacity, 0, 500),
-      wheels:[0, 1, 2, 3].map(index => cleanWheel(me.wheels?.[index])), damage:num(me.damage, 0, 100),
+      wheels:[0, 1, 2, 3].map(index => cleanWheel(me.wheels?.[index])), damage:num(me.damage, 0, 100), dents:cleanDents(me.dents), detached:me.detached === true,
       limits:num(me.limits, 0, 1000), battery:num(me.battery, 0, 100), regen:num(me.regen, -1000, 1000), delta:num(me.delta, -600, 600),
       water:num(me.water, -50, 250), oil:num(me.oil, -50, 250), control:control && Object.values(control).some(value => value !== null) ? control : null,
       stops:(Array.isArray(me.stops) ? me.stops : []).slice(-STOPS_KEPT).map(cleanStop).filter(Boolean), service, profile},
