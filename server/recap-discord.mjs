@@ -5,6 +5,7 @@ import {loadWeeklyDiscordSnapshot, loadCalendarSnapshot, siteOf} from './discord
 import {buildWeeklyDiscordPayload, buildCalendarPayload, CATEGORY_EMOJI_NAMES} from './discord-weekly-format.mjs';
 import {tdzOnly} from '../shared/catalog.mjs';
 import {isDevelopment} from './dev-environment.mjs';
+import {CATEGORY_NAMES,parseLayout,parseCategories,layoutInput,layoutPlan,wantedCategories,chosenPlaces} from './discord-layout.mjs';
 
 const API = 'https://discord.com/api/v10', DAY = 86400000;
 // Layout of the recap message: raised when it changes, so the published recaps are edited once.
@@ -21,12 +22,13 @@ export const botRecapSettings = (env, community) => env.DB.prepare('SELECT * FRO
 const WEEK = {lmu:'week:lmu', iracing:'week:iracing', calendar:'week:calendar'};
 const isRaceRow = row => Boolean(row?.event_id) && !String(row.event_id).startsWith('week:');
 const isIracing = event => String(event?.circuit || '').startsWith('iracing-');
-// The category a race goes under; none in « récap de la semaine ».
-const anchorOf = (settings, event) => settings.mode !== 'events' ? '' : (isIracing(event) ? settings.iracing_destination_id : settings.destination_id) || '';
+// The category a race goes under; none in « récap de la semaine », nor once everything is taken off (enabled 0).
+// With the setting asked question by question, the sync keeps destination_id / iracing_destination_id on the bot's categories.
+const anchorOf = (settings, event) => settings.enabled === 0 || settings.mode !== 'events' ? '' : (isIracing(event) ? settings.iracing_destination_id : settings.destination_id) || '';
 // The admins' categories and channels: never deleted.
 const anchorIds = settings => [settings.destination_id, settings.iracing_destination_id, settings.calendar_destination_id].filter(Boolean);
 // The races that get a category: 'all', 'lmu', 'iracing', or null.
-export const scopeOf = settings => settings.mode !== 'events' ? null : settings.destination_id && settings.iracing_destination_id ? 'all'
+export const scopeOf = settings => settings.enabled === 0 || settings.mode !== 'events' ? null : settings.destination_id && settings.iracing_destination_id ? 'all'
   : settings.destination_id ? 'lmu' : settings.iracing_destination_id ? 'iracing' : null;
 function weekDestination(settings, kind, community) {
   if (kind === 'calendar') return community.modules?.soloRaces === true ? settings.calendar_destination_id || '' : '';
@@ -37,7 +39,21 @@ const messageOrder = (env, community) => tdzOnly(community, isDevelopment(env)) 
 const MESSAGE_NAMES = {lmu:'Endurances LMU', iracing:'Endurances iRacing', calendar:'Calendrier de la semaine'};
 // In the category chosen for a week's recap, the bot makes its own text channel (with its rights): the endurances share one.
 export const WEEK_CHANNELS = {races:'récap-de-la-semaine', calendar:'calendrier-de-la-semaine'};
-const weekGroup = kind => kind === 'calendar' ? 'calendar' : 'races';
+const weekGroup = kind => kind.startsWith('calendar') ? 'calendar' : 'races';
+const eventChannelOf = (env, community) => tdzOnly(community, isDevelopment(env)) ? 'event-tdz-de-la-semaine' : 'event-solo-de-la-semaine';
+// The week's messages wanted now, in the order they are sent: {kind, destination, channel (its name), topic, sim (calendar
+// filter), key (kept in category_id: a change of place or of channel moves the message)}. cats: the bot's categories.
+function weekPlan(env, community, settings, cats = parseCategories(settings.bot_categories)) {
+  if (settings.enabled === 0) return [];
+  const order = messageOrder(env, community), rank = kind => order.indexOf(kind.split(':')[0]);
+  const layout = parseLayout(settings.layout);
+  const week = layout
+    ? layoutPlan(layout, cats, {eventChannel:eventChannelOf(env, community), calendar:community.modules?.soloRaces === true}).week.map(entry => ({...entry, key:`${entry.destination}#${entry.channel}`}))
+    // A setting made before: its channels as they were (« récap-de-la-semaine », « calendrier-de-la-semaine »).
+    : order.map(kind => ({kind, destination:weekDestination(settings, kind, community), channel:WEEK_CHANNELS[weekGroup(kind)], topic:weekGroup(kind), sim:null}))
+      .filter(entry => entry.destination).map(entry => ({...entry, key:entry.destination}));
+  return week.sort((a,b) => rank(a.kind) - rank(b.kind));
+}
 const parse = value => { try { const result = JSON.parse(value); return Array.isArray(result) ? result : []; } catch { return []; } };
 
 export function recapError(error) {
@@ -94,6 +110,38 @@ export function settingsRow(mode, lmu = {}, iracing = {}, calendar = {}) {
   return {mode, scope:lmu.id && iracing.id ? 'all' : iracing.id ? 'iracing' : 'lmu',
     destination_id:lmu.id || '', destination_name:lmu.name || '', iracing_destination_id:iracing.id || '', iracing_destination_name:iracing.name || '',
     calendar_destination_id:calendar.id || '', calendar_destination_name:calendar.name || ''};
+}
+// The columns the rest of the code reads (the races' categories), from the answers and the bot's categories.
+function layoutAnchors(layout, cats) {
+  const {anchors} = layoutPlan(layout, cats);
+  return {mode:layout.mode, scope:anchors.lmu && anchors.iracing ? 'all' : anchors.iracing ? 'iracing' : 'lmu',
+    destination_id:anchors.lmu, iracing_destination_id:anchors.iracing};
+}
+// The answers of the setting asked question by question, checked against the server: the places chosen exist and the bot
+// has its rights there, and on the server itself when it makes its own categories. A settings row to save.
+export async function validateDiscordLayout(env, community, input) {
+  const layout = layoutInput(input);
+  const destinations = await recapDestinations(env, community);
+  for (const id of chosenPlaces(layout)) {
+    const place = destinations.find(item => item.id === id);
+    const category = id === layout.under || id === layout.pitAt;
+    if (!place || (category && place.type !== 4)) throw Object.assign(new Error('Choisis un endroit qui existe sur le serveur Discord de cette communauté.'), {status:400});
+    if (!place.ready && !(id === layout.pitAt && layout.pit === 'bot') && id !== layout.under) throw Object.assign(new Error(`Dans les permissions de « ${place.name} », autorise le bot : ${place.missing.join(', ')}.`), {status:400});
+  }
+  if (wantedCategories(layout).length) {
+    const server = await serverRights(env, community);
+    if (server.missing.length) throw Object.assign(new Error(`Pour créer ses catégories, le bot a besoin sur le serveur de : ${server.missing.join(', ')}. Invite-le à nouveau avec ses droits.`), {status:400});
+  }
+  return {...settingsRow(layout.mode), layout:JSON.stringify(layout)};
+}
+// The bot's rights on the whole server (what its own categories need).
+export async function serverRights(env, community) {
+  const guild = community.discordGuildId;
+  const [roles, member] = await Promise.all([discord(env, 'GET', `/guilds/${guild}/roles`), discord(env, 'GET', `/guilds/${guild}/members/${env.DISCORD_CLIENT_ID}`)]);
+  const rights = effectivePermissions(roles, member, guild, {id:'',permission_overwrites:[]}, env.DISCORD_CLIENT_ID);
+  const missing = [['Voir les salons',VIEW],['Envoyer des messages',SEND],['Voir les anciens messages',HISTORY],['Intégrer des liens',EMBED],['Gérer les salons',MANAGE]]
+    .filter(([,bit]) => !(rights & bit)).map(([label]) => label);
+  return {ready:!missing.length, missing};
 }
 // The races go under categories (« une catégorie par course ») or in text channels (« récap de la semaine »), the calendar in a
 // text channel; the bot must have its rights there.
@@ -186,6 +234,67 @@ async function placeCategory(env, community, guildId, channels, category, settin
   if (remaining.every((item,index) => item.id === categories[index]?.id)) return;
   await discord(env,'PATCH',`/guilds/${guildId}/channels`,remaining.map((item,position) => ({id:item.id,position})),budget);
 }
+// The categories in their place: the bot's own (each followed by its races) just below the category chosen for them,
+// « Pit talk » just below its own; a setting made before: the races after the category chosen for their sim.
+async function placeCategories(env, community, guildId, channels, category, settings, budget) {
+  const layout = parseLayout(settings.layout);
+  if (!layout) return placeCategory(env, community, guildId, channels, category, settings, budget);
+  const cats = parseCategories(settings.bot_categories), keys = wantedCategories(layout).filter(key => cats[key]);
+  const open = new Map(((await env.DB.prepare(`SELECT p.category_id,e.circuit,e.departures FROM discord_recap_publications p LEFT JOIN events e ON e.id=p.event_id
+    WHERE p.community_id=? AND p.closed_at IS NULL AND p.category_id IS NOT NULL AND p.event_id NOT LIKE 'week:%'`).bind(community.id).all()).results || [])
+    .map(item => [item.category_id,[String(item.circuit || '').startsWith('iracing-') ? 1 : 0,Math.min(...parse(item.departures).map(start => Number(start.startsAt)).filter(Number.isFinite))]]));
+  const categories = channels.filter(item => item.type === 4).sort((a,b) => (a.position || 0) - (b.position || 0) || (BigInt(a.id) < BigInt(b.id) ? -1 : 1));
+  if (category && !categories.some(item => item.id === category)) categories.push({id:category});
+  const bots = keys.map(key => cats[key]), key = item => open.get(item.id);
+  const races = categories.filter(item => open.has(item.id) && !bots.includes(item.id)).sort((a,b) => key(a)[0] - key(b)[0] || key(a)[1] - key(b)[1]);
+  const order = categories.filter(item => !bots.includes(item.id) && !races.includes(item));
+  const after = (at, items) => {
+    if (!items.length) return;
+    const index = at === 'top' ? -1 : order.findIndex(item => item.id === at);
+    if (at !== 'top' && index < 0) order.push(...items); else order.splice(index + 1, 0, ...items);
+  };
+  const raceOf = id => races.filter(item => (key(item)[0] === 1 ? settings.iracing_destination_id : settings.destination_id) === id);
+  after(layout.under, keys.filter(key => key !== 'pit').flatMap(key => [{id:cats[key]}, ...raceOf(cats[key])]));
+  if (keys.includes('pit')) after(layout.pitAt, [{id:cats.pit}]);
+  order.push(...races.filter(item => !order.includes(item)));
+  if (order.every((item,index) => item.id === categories[index]?.id)) return;
+  await discord(env,'PATCH',`/guilds/${guildId}/channels`,order.map((item,position) => ({id:item.id,position})),budget);
+}
+// The bot's own categories: the missing ones made (with its rights), then their ids kept. channels: the server's, updated.
+async function makeCategories(env, community, settings, channels, budget) {
+  const layout = parseLayout(settings.layout), cats = parseCategories(settings.bot_categories);
+  const wanted = settings.enabled === 0 ? [] : wantedCategories(layout);
+  let changed = false;
+  for (const key of wanted) {
+    if (cats[key] && channels.some(item => item.id === cats[key] && item.type === 4)) continue;
+    // Taken back if the bot made it already (a lost answer), never a category of the admins with the same name.
+    const created = await discord(env,'POST',`/guilds/${settings.guild_id}/channels`,{type:4,name:CATEGORY_NAMES[key],
+      permission_overwrites:withBotAccess([],env.DISCORD_CLIENT_ID,REQUIRED | MANAGE | (community.modules?.crewChannels === true ? VOICE_ACCESS : 0n))},budget);
+    channels.push(created);
+    cats[key] = created.id; changed = true;
+  }
+  if (changed) {
+    settings.bot_categories = JSON.stringify(cats);
+    await env.DB.prepare('UPDATE community_recap_settings SET bot_categories=? WHERE community_id=?').bind(settings.bot_categories,community.id).run();
+  }
+  return {cats, wanted};
+}
+// The bot's categories no longer wanted: deleted once empty (Discord would put what is left in them at the top of the server).
+async function removeCategories(env, community, settings, channels, wanted, budget) {
+  const cats = parseCategories(settings.bot_categories);
+  let changed = false, waiting = false;
+  for (const [key, id] of Object.entries(cats)) {
+    if (wanted.includes(key) && (settings.enabled !== 0)) continue;
+    if (channels.some(item => item.parent_id === id)) { waiting = true; continue; }
+    if (channels.some(item => item.id === id)) await discord(env,'DELETE',`/channels/${id}`,null,budget).catch(error => { if (error.status !== 404) throw error; });
+    delete cats[key]; changed = true;
+  }
+  if (changed) {
+    settings.bot_categories = JSON.stringify(cats);
+    await env.DB.prepare('UPDATE community_recap_settings SET bot_categories=? WHERE community_id=?').bind(settings.bot_categories,community.id).run();
+  }
+  return waiting;
+}
 // The race's text channel, then its category (never a category chosen by the admins).
 async function removeRaceChannels(env, row, anchors, budget) {
   for (const id of [row.channel_id, !anchors.includes(row.category_id) ? row.category_id : null].filter(Boolean)) {
@@ -222,9 +331,9 @@ export async function botCategoryEmojis(env, timestamp = Date.now()) {
   return ids;
 }
 // A race's message (eventId), or a week's message: kind 'lmu', 'iracing' or 'calendar'.
-async function snapshotPayload(env, timestamp, community, eventId = null, kind = null) {
-  if (kind === 'calendar') {
-    const snapshot = await loadCalendarSnapshot(env, timestamp, community);
+async function snapshotPayload(env, timestamp, community, eventId = null, kind = null, sim = null) {
+  if (kind?.startsWith('calendar')) {
+    const snapshot = await loadCalendarSnapshot(env, timestamp, community, sim);
     const payload = buildCalendarPayload(snapshot, siteOf(env, community), timestamp);
     return {snapshot, payload, hash:await digest([RECAP_FORMAT,'calendar',snapshot])};
   }
@@ -239,13 +348,15 @@ async function snapshotPayload(env, timestamp, community, eventId = null, kind =
 }
 // What the bot would publish with these settings (a settings row), without publishing anything.
 export async function previewBotRecap(env, timestamp, community, settings) {
-  const previews = [];
-  for (const kind of messageOrder(env, community)) {
-    if (!weekDestination(settings, kind, community)) continue;
-    const {payload} = await snapshotPayload(env, timestamp, community, null, kind);
-    const name = kind === 'calendar' ? settings.calendar_destination_name : kind === 'iracing' ? settings.iracing_destination_name : settings.destination_name;
-    previews.push({eventId:WEEK[kind], name:`${name} · ${MESSAGE_NAMES[kind]}`, payload});
+  const previews = [], layout = parseLayout(settings.layout);
+  // The bot's categories not made yet stand in for themselves.
+  const cats = layout ? Object.fromEntries(wantedCategories(layout).map(key => [key, parseCategories(settings.bot_categories)[key] || `new-${key}`])) : undefined;
+  for (const entry of weekPlan(env, community, settings, cats)) {
+    const {payload} = await snapshotPayload(env, timestamp, community, null, entry.kind, entry.sim);
+    const name = layout ? `# ${entry.channel}` : entry.kind === 'calendar' ? settings.calendar_destination_name : entry.kind === 'iracing' ? settings.iracing_destination_name : settings.destination_name;
+    previews.push({eventId:'week:' + entry.kind, name:`${name} · ${MESSAGE_NAMES[entry.kind.split(':')[0]]}`, payload});
   }
+  if (layout) Object.assign(settings, layoutAnchors(layout, cats));
   const scope = scopeOf(settings);
   if (!scope) return previews;
   const events = await raceEvents(env, community);
@@ -272,10 +383,10 @@ export async function saveBotRecap(env, community, settings, enabled = true, ado
   if (!result.meta.changes) throw Object.assign(new Error('Une synchronisation est en cours. Réessaie dans un instant.'), {status:409});
   try {
     await env.DB.prepare(`UPDATE community_recap_settings SET enabled=?,adopted=?,mode=?,scope=?,guild_id=?,destination_id=?,destination_name=?,
-      iracing_destination_id=?,iracing_destination_name=?,calendar_destination_id=?,calendar_destination_name=?,revision=revision+1,last_error=NULL
+      iracing_destination_id=?,iracing_destination_name=?,calendar_destination_id=?,calendar_destination_name=?,layout=?,revision=revision+1,last_error=NULL
       WHERE community_id=? AND lock_token=?`)
       .bind(Number(enabled),Number(adopted),settings.mode,settings.scope,community.discordGuildId,settings.destination_id,settings.destination_name,
-        settings.iracing_destination_id,settings.iracing_destination_name,settings.calendar_destination_id,settings.calendar_destination_name,community.id,token).run();
+        settings.iracing_destination_id,settings.iracing_destination_name,settings.calendar_destination_id,settings.calendar_destination_name,settings.layout || '',community.id,token).run();
   } finally {
     await env.DB.prepare("UPDATE community_recap_settings SET lock_token='',lock_until=0 WHERE community_id=? AND lock_token=?").bind(community.id,token).run();
   }
@@ -286,23 +397,22 @@ async function ensurePublication(env, community, eventId, settings) {
     .bind(community.id,eventId,settings.guild_id,marker).run();
   return env.DB.prepare('SELECT * FROM discord_recap_publications WHERE community_id=? AND event_id=?').bind(community.id,eventId).first();
 }
-async function publish(env, timestamp, community, settings, row, event, budget, prepared = null, repair = false) {
+async function publish(env, timestamp, community, settings, row, event, budget, prepared = null, repair = false, entry = null) {
   const isEvent = isRaceRow(row);
   if (isEvent) await env.DB.prepare('UPDATE discord_recap_publications SET delete_after=? WHERE community_id=? AND event_id=?').bind(eventDeletionTime(event),community.id,row.event_id).run();
   if (row.closed_at) return;
   let channel = row.channel_id;
   const kind = isEvent ? null : row.event_id.slice(5);
   if (!isEvent) {
-    const destination = weekDestination(settings, kind, community);
-    // Set up for this destination (a recap posted straight into a channel by an older version is moved to its own).
-    const placed = Boolean(row.category_id) && row.category_id === destination;
+    // Set up for this place (a recap posted straight into a channel by an older version is moved to its own).
+    const placed = Boolean(row.category_id) && row.category_id === entry.key;
     let channels = null;
     if (placed && repair && row.category_id) {
       channels = await discord(env,'GET',`/guilds/${row.guild_id}/channels`,null,budget);
       if (!channels.some(item => item.id === channel)) channel = null;
     }
     if (!placed || !channel) {
-      const next = await weekChannel(env, community, row, kind, destination, budget);
+      const next = await weekChannel(env, community, row, entry, budget);
       if (row.channel_id !== next.channel) await takeDown(env, community, row, budget);
       channel = next.channel;
       if (row.channel_id !== channel) { row.message_id = null; row.content_hash = ''; }
@@ -335,7 +445,7 @@ async function publish(env, timestamp, community, settings, row, event, budget, 
       category = (await discord(env,'POST',`/guilds/${row.guild_id}/channels`,{type:4,name:raceCategoryName(event),permission_overwrites:withBotAccess(anchor.permission_overwrites,env.DISCORD_CLIENT_ID,REQUIRED | MANAGE | (community.modules?.crewChannels === true ? VOICE_ACCESS : 0n))},budget)).id;
       row.category_id = category;
       await env.DB.prepare('UPDATE discord_recap_publications SET category_id=? WHERE community_id=? AND event_id=?').bind(category,community.id,row.event_id).run();
-      await placeCategory(env,community,row.guild_id,channels,category,settings,budget);
+      await placeCategories(env,community,row.guild_id,channels,category,settings,budget);
     }
     // Recover a channel created just before a timeout/crash from its exact topic marker, never its name.
     const existing = channel ? channels.find(item => item.id === channel) : channels.find(item => item.type === 0 && item.topic === row.marker);
@@ -343,7 +453,7 @@ async function publish(env, timestamp, community, settings, row, event, budget, 
     channel = existing?.id || channel || (await discord(env,'POST',`/guilds/${row.guild_id}/channels`,{type:0,name:RACE_INFO_CHANNEL,parent_id:category,topic:row.marker},budget)).id;
     await env.DB.prepare('UPDATE discord_recap_publications SET channel_id=? WHERE community_id=? AND event_id=?').bind(channel,community.id,row.event_id).run();
   }
-  const {payload, hash} = prepared || await snapshotPayload(env,timestamp,community,isEvent ? row.event_id : null,kind);
+  const {payload, hash} = prepared || await snapshotPayload(env,timestamp,community,isEvent ? row.event_id : null,kind,entry?.sim);
   if (!repair && row.message_id && row.content_hash === hash) return;
   if (row.message_id) {
     // A removed message or channel is reported, not recreated on every update (no surprise notifications).
@@ -369,22 +479,23 @@ async function publish(env, timestamp, community, settings, row, event, budget, 
 }
 // The week's channel, made by the bot (with its rights) just below the chosen channel, or at the top of the chosen category,
 // and found again by its topic. category_id keeps the place chosen for it.
-async function weekChannel(env, community, row, kind, destination, budget) {
+async function weekChannel(env, community, row, entry, budget) {
+  const {destination} = entry;
   const channels = await discord(env,'GET',`/guilds/${row.guild_id}/channels`,null,budget);
   const target = channels.find(item => item.id === destination);
   if (!target) throw Object.assign(new Error('Discord indisponible'), {status:404,code:10003,path:`/channels/${destination}`});
   const parent = target.type === 4 ? target.id : target.parent_id || null, category = channels.find(item => item.id === parent);
-  const group = weekGroup(kind), topic = 'endurance-manager:' + (await digest([community.id,'week',destination,group])).slice(0,24);
+  const topic = 'endurance-manager:' + (await digest([community.id,'week',destination,entry.topic])).slice(0,24);
   const existing = channels.find(item => item.type === 0 && item.topic === topic);
-  if (existing) return {channel:existing.id, category:destination};
-  const created = await discord(env,'POST',`/guilds/${row.guild_id}/channels`,{type:0,name:WEEK_CHANNELS[group],topic,...(parent ? {parent_id:parent} : {}),
+  if (existing) return {channel:existing.id, category:entry.key};
+  const created = await discord(env,'POST',`/guilds/${row.guild_id}/channels`,{type:0,name:entry.channel,topic,...(parent ? {parent_id:parent} : {}),
     permission_overwrites:withBotAccess(category?.permission_overwrites,env.DISCORD_CLIENT_ID,REQUIRED)},budget);
   // Its place among the channels of that category: first, or right after the chosen channel (one request).
   const siblings = channels.filter(item => item.type !== 4 && (item.parent_id || null) === parent)
     .sort((a,b) => (a.position || 0) - (b.position || 0) || (BigInt(a.id) < BigInt(b.id) ? -1 : 1));
   siblings.splice(target.type === 4 ? 0 : siblings.findIndex(item => item.id === target.id) + 1, 0, created);
   if (siblings.length > 1) await discord(env,'PATCH',`/guilds/${row.guild_id}/channels`,siblings.map((item,position) => ({id:item.id,position})),budget);
-  return {channel:created.id, category:destination};
+  return {channel:created.id, category:entry.key};
 }
 // A week's message the admins no longer want (or no longer there): deleted on Discord, with the bot's channel once no recap
 // uses it. Already gone: forgotten.
@@ -399,16 +510,44 @@ async function takeDown(env, community, row, budget) {
 async function syncLocked(env,timestamp,community,settings, test = false, budget = {left:12}, priority = null) {
   const rows = (await env.DB.prepare('SELECT * FROM discord_recap_publications WHERE community_id=? AND closed_at IS NULL ORDER BY checked_at,event_id').bind(community.id).all()).results || [];
   const events = await raceEvents(env, community);
-  // Cleanup is independent of mode/activation. Only bot-created event channels may be deleted.
-  for (const row of rows.filter(isRaceRow).slice(0,2)) {
+  const layout = parseLayout(settings.layout), sameServer = settings.guild_id === community.discordGuildId;
+  let channels = null, wanted = [];
+  if (layout && sameServer) {
+    // The bot's own categories first: the races, the week's channels and the voices go in them.
+    channels = await discord(env,'GET',`/guilds/${settings.guild_id}/channels`,null,budget);
+    ({wanted} = await makeCategories(env, community, settings, channels, budget));
+    if (settings.enabled !== 0) {
+      const cats = parseCategories(settings.bot_categories), anchors = layoutAnchors(layout, cats);
+      if (Object.entries(anchors).some(([column, value]) => settings[column] !== value)) {
+        await env.DB.prepare(`UPDATE community_recap_settings SET mode=?,scope=?,destination_id=?,iracing_destination_id=?,calendar_destination_id='' WHERE community_id=?`)
+          .bind(anchors.mode,anchors.scope,anchors.destination_id,anchors.iracing_destination_id,community.id).run();
+        Object.assign(settings, anchors);
+      }
+      const {voiceCategory} = layoutPlan(layout, cats);
+      await env.DB.prepare("UPDATE community_crew_discord SET voice_category_id=? WHERE community_id=? AND COALESCE(voice_category_id,'')<>?")
+        .bind(voiceCategory || null,community.id,voiceCategory || '').run();
+    }
+  }
+  // Cleanup is independent of mode/activation. Only bot-created event channels may be deleted: those with something to do
+  // first, two per pass (more: another pass soon).
+  const races = rows.filter(isRaceRow).map(row => {
     const event = events.find(item => item.id === row.event_id), deleteAt = event ? eventDeletionTime(event) : row.delete_after;
-    // A race no longer given a category (« récap de la semaine », or its sim not published) loses its channels at once.
-    const unwanted = settings.enabled && event && !anchorOf(settings, event);
+    // A race no longer given a category (« récap de la semaine », its sim not published, or all taken off) loses its channels.
+    const unwanted = Boolean(event) && !anchorOf(settings, event);
+    return {row, deleteAt, unwanted, due:(deleteAt !== null && timestamp >= deleteAt) || (unwanted && Boolean(row.category_id || row.channel_id))};
+  });
+  const due = races.filter(item => item.due);
+  let more = due.length > 2;
+  for (const {row, deleteAt, unwanted} of (due.length ? due : races).slice(0,2)) {
     if (deleteAt !== null && timestamp >= deleteAt) {
       await removeRaceChannels(env,row,anchorIds(settings),budget);
       await env.DB.prepare('UPDATE discord_recap_publications SET closed_at=? WHERE community_id=? AND event_id=?').bind(timestamp,community.id,row.event_id).run();
       row.closed_at = timestamp;
-    } else if (unwanted && (row.category_id || row.channel_id)) {
+    } else if (unwanted && (row.category_id || row.channel_id) && sameServer) {
+      // Its crews' voice channels leave it first (server/crew-discord.mjs): deleted with them inside, Discord would put
+      // them at the top of the server.
+      channels ||= await discord(env,'GET',`/guilds/${settings.guild_id}/channels`,null,budget);
+      if (row.category_id && channels.some(item => item.parent_id === row.category_id && item.type === 2)) { more = true; continue; }
       // Forgotten, not closed: back to « une catégorie par course », the race gets its category again.
       await removeRaceChannels(env,row,anchorIds(settings),budget);
       await env.DB.prepare("UPDATE discord_recap_publications SET category_id=NULL,channel_id=NULL,message_id=NULL,content_hash='' WHERE community_id=? AND event_id=?").bind(community.id,row.event_id).run();
@@ -416,17 +555,18 @@ async function syncLocked(env,timestamp,community,settings, test = false, budget
     }
     await env.DB.prepare('UPDATE discord_recap_publications SET checked_at=? WHERE community_id=? AND event_id=?').bind(timestamp,community.id,row.event_id).run();
   }
-  if (!settings.enabled && !test) return {ok:true,disabled:true};
-  if (settings.guild_id !== community.discordGuildId) throw new Error('Le serveur Discord a changé. Configure à nouveau la destination.');
-  // The week's messages, each in its channel; one no longer wanted is taken down.
-  for (const kind of messageOrder(env, community)) {
-    if (!weekDestination(settings, kind, community)) {
-      const row = rows.find(item => item.event_id === WEEK[kind]);
-      if (row?.message_id) await takeDown(env, community, row, budget);
-      continue;
-    }
-    const row = await ensurePublication(env,community,WEEK[kind],settings);
-    await publish(env,timestamp,community,settings,row,null,budget,null,test);
+  if (!sameServer) {
+    if (!settings.enabled && !test) return {ok:true,disabled:true};
+    throw new Error('Le serveur Discord a changé. Configure à nouveau la destination.');
+  }
+  // The week's messages, each in its channel; then those no longer wanted are taken down (with their channel once empty).
+  const plan = weekPlan(env, community, settings);
+  for (const entry of plan) {
+    const row = await ensurePublication(env,community,'week:' + entry.kind,settings);
+    await publish(env,timestamp,community,settings,row,null,budget,null,test,entry);
+  }
+  for (const row of rows.filter(item => !isRaceRow(item) && !plan.some(entry => 'week:' + entry.kind === item.event_id))) {
+    if (row.channel_id || row.message_id) await takeDown(env, community, row, budget);
   }
   const scope = scopeOf(settings);
   if (scope) {
@@ -436,7 +576,7 @@ async function syncLocked(env,timestamp,community,settings, test = false, budget
     const ordered = ids.sort((a,b) => (b === priority) - (a === priority) || (rows.find(row => row.event_id === a)?.checked_at || 0) - (rows.find(row => row.event_id === b)?.checked_at || 0));
     // Repair scattered existing categories even when all recap messages are unchanged.
     // The normal creation path already orders newly created categories.
-    if (rows.some(row => isRaceRow(row) && row.category_id && !row.closed_at)) {
+    if (!layout && rows.some(row => isRaceRow(row) && row.category_id && !row.closed_at)) {
       const channels = await discord(env,'GET',`/guilds/${settings.guild_id}/channels`,null,budget);
       await placeCategory(env,community,settings.guild_id,channels,null,settings,budget);
     }
@@ -451,7 +591,13 @@ async function syncLocked(env,timestamp,community,settings, test = false, budget
       await env.DB.prepare('UPDATE discord_recap_publications SET checked_at=? WHERE community_id=? AND event_id=?').bind(timestamp,community.id,eventId).run();
     }
   }
-  return {ok:true};
+  if (layout) {
+    // The server as it is now: the categories in their place, the bot's empty ones no longer wanted deleted.
+    const current = await discord(env,'GET',`/guilds/${settings.guild_id}/channels`,null,budget);
+    await placeCategories(env,community,settings.guild_id,current,null,settings,budget);
+    if (await removeCategories(env,community,settings,current,wanted,budget)) more = true;
+  }
+  return {ok:true, ...(settings.enabled === 0 && !test ? {disabled:true} : {}), ...(more ? {more:true} : {})};
 }
 export async function syncBotRecaps(env,timestamp,community, test = false, priority = null) {
   const token = crypto.randomUUID(), now = Date.now();
@@ -468,6 +614,8 @@ export async function syncBotRecaps(env,timestamp,community, test = false, prior
       const current = await botRecapSettings(env,community);
       if (!current.dirty) break;
     }
+    // Something left for a next pass (a category still holding voice channels…): the next quarter of an hour goes on.
+    if (result?.more) await env.DB.prepare('UPDATE community_recap_settings SET dirty=1 WHERE community_id=? AND lock_token=?').bind(community.id,token).run();
     await env.DB.prepare('UPDATE community_recap_settings SET last_error=NULL WHERE community_id=? AND lock_token=?').bind(community.id,token).run();
     return result;
   } catch (error) {
@@ -488,8 +636,17 @@ export async function repairBotRecap(env,timestamp,community) {
   const current=await botRecapSettings(env,community);
   if (!current) throw Object.assign(new Error('Configure d’abord le récap dans Administration → Modules.'),{status:400});
   if (current.guild_id !== community.discordGuildId) throw Object.assign(new Error('Le serveur Discord a changé. Clique sur Modifier pour choisir la destination sur le bon serveur.'),{status:400});
-  await validateRecapDestinations(env,community,{mode:current.mode,lmuId:current.destination_id,iracingId:current.iracing_destination_id,calendarId:current.calendar_destination_id});
+  const layout = parseLayout(current.layout);
+  if (layout) await validateDiscordLayout(env,community,layout);
+  else await validateRecapDestinations(env,community,{mode:current.mode,lmuId:current.destination_id,iracingId:current.iracing_destination_id,calendarId:current.calendar_destination_id});
   return syncBotRecaps(env,timestamp,community,true);
+}
+// « Tout retirer »: the bot takes off everything it made for the setting (messages, channels, the races' and its own
+// categories), a few requests per pass; the answers stay for next time.
+export async function removeBotDiscord(env,timestamp,community) {
+  const result = await env.DB.prepare('UPDATE community_recap_settings SET enabled=0 WHERE community_id=? AND lock_until<?').bind(community.id,Date.now()).run();
+  if (!result.meta.changes && await botRecapSettings(env,community)) throw Object.assign(new Error('Une synchronisation est en cours. Réessaie dans un instant.'),{status:409});
+  return result.meta.changes ? syncBotRecaps(env,timestamp,community) : {ok:true};
 }
 
 // Every 15 minutes, separately from the hourly recap rotation. Re-read race times before deleting.

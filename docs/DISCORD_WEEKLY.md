@@ -4,20 +4,23 @@ Le récap annonce les courses, départs, équipages, catégories, voitures, pilo
 
 ## Réglage « Discord »
 
-Dans **Administration → Modules → Discord → Régler**, une seule page remplace les anciens réglages du récap, des salons d’équipage et des rappels :
+Dans **Administration → Modules → Discord → Régler**, le réglage se fait question par question (`server/discord-layout.mjs`) : chaque réponse fait apparaître les questions qui en dépendent. Sur téléphone, une question par écran, le croquis du serveur à la fin.
 
 1. **Comment ranger les courses ?**
-   - **Une catégorie par course** (« 🏎️ LMU · 6h de Spa » : un salon `infos-de-la-course`, puis les vocaux de ses équipages). Une course a sa catégorie 7 jours avant son départ (15 jours pour une course de 24 h ou plus), même sans inscrit (les courses officielles iRacing importées attendent un inscrit de la communauté). Plus de nouvelle catégorie quand le serveur approche les 500 salons de Discord. Les catégories des courses se rangent juste après la catégorie choisie pour leur simu : LMU d’abord, puis iRacing, chacune par date de premier départ.
-   - **Récap de la semaine + pit walk** : un message par semaine dans un salon que le bot crée lui-même, et tous les vocaux d’équipage dans une catégorie choisie (« pit walk »).
-2. **Où publier sur ton serveur ?** Une ligne par récap, chacune avec « Ne pas publier » :
-   - par course : **Courses LMU** et **Courses iRacing** (la catégorie sous laquelle se rangent les catégories des courses) ;
-   - récap de la semaine : **Endurances LMU** et **Endurances iRacing** (un salon ou une catégorie au choix ; le bot crée `# récap-de-la-semaine` juste en dessous, partagé si les deux simus visent le même endroit) et **Vocaux d’équipage** (catégorie) ;
-   - dans les deux modes, si le module EVENT SOLO / EVENT TDZ est actif : **Calendrier de la semaine** (un salon ou une catégorie ; le bot crée `# calendrier-de-la-semaine` juste en dessous).
-   Sous un salon, le bot crée le sien dans la même catégorie, juste après lui ; sous une catégorie, en tête de celle-ci. Il reprend les règles de la catégorie plus ses propres droits : seul « Gérer les salons » est demandé. Un récap qu’une version précédente écrivait directement dans un salon passe dans le salon du bot, créé juste en dessous. Quand le choix change, le bot crée son salon au nouvel endroit et supprime l’ancien.
-   Chaque récap est **un message à part**, avec ses propres limites Discord ; plusieurs récaps peuvent partager un salon. Chez TDZ le calendrier passe en premier, ailleurs les endurances d’abord.
-3. **Vocaux et rappels** : « Créer un vocal par équipage » et « Rappels avant le départ » (cloche du site 24 h avant, chat du vocal 24 h et 1 h avant).
+   - **Une catégorie par course** (« 🏎️ LMU · 6h de Spa » : un salon `infos-de-la-course`, puis les vocaux de ses équipages). Une course a sa catégorie 7 jours avant son départ (15 jours pour une course de 24 h ou plus), même sans inscrit (les courses officielles iRacing importées attendent un inscrit de la communauté). Plus de nouvelle catégorie quand le serveur approche les 500 salons de Discord.
+   - **Récap de la semaine + pit talk** : les récaps de la semaine à un endroit, les vocaux d’équipage dans « Pit talk ».
+2. **Quelles simus ?** LMU, iRacing ou les deux ; avec les deux : **ensemble ou séparés**.
+3. Par course : le bot crée sa catégorie **« Endurance Manager »** (ou **« LMU »** et **« iRacing »** séparées) juste sous la catégorie choisie, chacune suivie de ses courses (LMU d’abord, puis iRacing, chacune par date). Dedans, au choix : `# endurances-de-la-semaine` et `# event-solo-de-la-semaine` (`# event-tdz-de-la-semaine` avec EVENT TDZ).
+4. Récap de la semaine : où mettre les endurances (`# endurances-de-la-semaine`, ou `# lmu-de-la-semaine` et `# iracing-de-la-semaine` séparés) et les events (avec les endurances, ailleurs, ou pas). Chaque endroit : **ne pas afficher**, **dans la catégorie du bot** (« Endurance Manager », placée juste sous la catégorie choisie), ou **juste sous** un salon ou une catégorie du serveur : sous un salon, le bot crée le sien dans la même catégorie, juste après ; sous une catégorie, en tête de celle-ci.
+5. **Des vocaux d’équipage ?** Par course : dans la catégorie de la course, nommés « Équipage A ». Récap de la semaine : le bot crée **« 🎙️ Pit talk »** juste sous la catégorie choisie, ou les met dans une catégorie existante ; nommés « LMU · 6h de Spa · Équipage A ». Puis **Rappels avant le départ** (cloche du site 24 h avant, chat du vocal 24 h et 1 h avant).
 
-Un croquis « Sur ton serveur » suit les choix ; **Voir les messages** montre ce que le bot écrira sans rien envoyer. Rien n’est publié avant **Activer**. Un récap qu’on ne publie plus voit son message supprimé. Passer à « Récap de la semaine » (ou ne plus publier une simu) retire aussitôt les catégories de course déjà créées ; les vocaux d’équipage rejoignent la catégorie choisie pour eux, renommés.
+Chaque récap est **un message à part**, avec ses propres limites Discord ; plusieurs récaps peuvent partager un salon. Chez TDZ le calendrier passe en premier, ailleurs les endurances d’abord. Séparés, chaque simu a ses events (iRacing d’un côté, les autres simus de l’autre).
+
+Un croquis « Sur ton serveur » suit les choix ; **Voir les messages** montre ce que le bot écrira sans rien envoyer. Rien n’est publié avant **Activer**.
+
+**Changer d’avis** : le bot met le nouveau réglage en place puis retire ce qu’il avait créé pour l’ancien (messages, salons, catégories de course). Ses catégories (« Endurance Manager », « LMU », « iRacing », « Pit talk ») ne sont supprimées qu’une fois vides ; une catégorie de course attend que ses vocaux en soient partis. Les vocaux rejoignent leur nouvel endroit, renommés. **Tout retirer** supprime tout ce que le bot a créé (les vocaux occupés attendent d’être vides) ; les réponses restent pour la prochaine fois. Ce qui ne tient pas en une fois continue tous les quarts d’heure.
+
+Un réglage fait avant ce questionnaire continue tel quel (catégories et salons choisis à l’époque, `# récap-de-la-semaine`, `# calendrier-de-la-semaine`) jusqu’au prochain enregistrement.
 
 ## Calendrier de la semaine
 

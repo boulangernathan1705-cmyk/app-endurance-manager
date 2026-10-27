@@ -593,3 +593,23 @@ test('switching to « récap de la semaine » takes the voices out of their race
   const moves=discord.calls.slice(mark).filter(call=>call.method==='PATCH'&&call.path===`/channels/${row.voice_id}`);
   assert.equal(moves.length,1);assert.equal(moves[0].body.parent_id,'500000000000000002');assert.equal(moves[0].body.name,'LMU · 6h SPA · Équipage A');
 });
+
+test('voices turned off: the voice channel goes, and comes back if they are turned on again before the race', async () => {
+  const {DB,req,login,sync,discord}=harness();
+  await login(ADMIN,'admin','Orga');await login(PILOT,'pilot','Alice');
+  assert.equal((await req('/api/community/modules','PATCH',{crewChannels:true},'admin')).status,200);
+  assert.equal((await req('/api/events','POST',race,'admin')).status,201);
+  const event=(await req('/api/events','GET',null,'admin')).data.events[0];
+  const departure=event.departures[0], base=`/api/events/${event.id}/departures/${departure.id}`, at=departure.startsAt-2*24*HOUR;
+  assert.equal((await req(base+'/registrations','POST',{name:'x',category:'GT3',status:'whole'},'pilot')).status,201);
+  assert.equal((await req(base+'/crews','POST',{name:'Équipage A',category:'GT3'},'pilot')).status,201);
+  await sync(at);
+  const voice=DB.db.prepare('SELECT voice_id FROM crew_discord').get().voice_id;assert.ok(voice);
+  assert.equal((await req('/api/community/modules','PATCH',{crewChannels:false},'admin')).status,200);
+  await sync(at+HOUR);
+  assert.equal(discord.state.channels.some(item=>item.id===voice),false,'deleted');
+  const row=DB.db.prepare('SELECT voice_id,closed_at FROM crew_discord').get();assert.equal(row.voice_id,null);assert.equal(row.closed_at,null);
+  assert.equal((await req('/api/community/modules','PATCH',{crewChannels:true},'admin')).status,200);
+  await sync(at+2*HOUR);
+  assert.ok(DB.db.prepare('SELECT voice_id FROM crew_discord').get().voice_id,'made again');
+});

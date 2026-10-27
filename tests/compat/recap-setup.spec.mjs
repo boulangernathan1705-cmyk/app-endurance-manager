@@ -14,13 +14,12 @@ async function mockAdmin(page,{permission=true,initialRecap=null,repairError=nul
     if(path==='/api/members')data={members:[],permissions:['access','admin']};
     if(path==='/api/community/settings')data={community:{name:'Ma communauté',shortName:'MC'},modules:{soloRaces:solo},permissions:['access','admin'],roles:[],crews:{botReady:true,categories:[{id:PIT,name:'PIT WALK'}]}};
     if(path==='/api/community/setup')data={community:{name:'Ma communauté'},siteUrl:'https://site.example',guild:{id:'900000000000000001',name:'Ma communauté',botPresent:true},rolesConfigured:true,recapSetupRequired:!botRecap,botRecap,recapBotInviteUrl:'https://discord.com/oauth2/authorize?client_id=123&scope=bot&permissions=85008',discordInviteUrl:'https://discord.gg/example'};
-    if(path==='/api/community/recap/destinations')data={destinations:[{id:TEXT,type:0,name:'annonces',position:0,parentId:CATEGORY,parentName:'Endurances',ready:true,missing:[]},{id:CATEGORY,type:4,name:'Endurances',ready:permission,missing:permission?[]:['Intégrer des liens','Gérer les salons']},{id:PIT,type:4,name:'PIT WALK',ready:true,missing:[]}]};
+    if(path==='/api/community/recap/destinations')data={server:{ready:true,missing:[]},destinations:[{id:TEXT,type:0,name:'annonces',position:0,parentId:CATEGORY,parentName:'Endurances',ready:true,missing:[]},{id:CATEGORY,type:4,name:'Endurances',ready:permission,missing:permission?[]:['Intégrer des liens','Gérer les salons']},{id:PIT,type:4,name:'PIT WALK',ready:true,missing:[]}]};
     if(path==='/api/community/recap/preview')data={previews:(request.postDataJSON().mode==='events'?['🏎️ LMU · 6h de Spa','🏎️ LMU · 24h du Mans']:['récap-de-la-semaine · Endurances LMU']).map(name=>({name,payload:{embeds:[{title:'📝 Endurances LMU',description:'📍 Spa-Francorchamps · ⏱️ 6h\n📅 dimanche 11 octobre · 14h',fields:[{name:'Équipages',value:'🟪 **Équipage A** · GT3 · 🔓 Ouvert\n👤 Pilote 1 · 👤 Pilote 2'}],url:'https://site.example/lmu/#event=spa'}]}}))};
+    if(path==='/api/community/discord'&&method==='DELETE'){botRecap={...botRecap,enabled:false};data={ok:true,done:true};}
     if(path==='/api/community/discord'&&method==='PUT'){
       const input=request.postDataJSON();
-      if(input.enabled===false)botRecap={...botRecap,enabled:false};
-      else if(!input.lmuId&&!input.iracingId&&!input.calendarId){status=400;data={error:'Choisis au moins un endroit où publier.'};}
-      else {botRecap={enabled:true,mode:input.mode,lmuId:input.lmuId,lmuName:input.lmuId===TEXT?'récap-de-la-semaine':'Endurances',iracingId:input.iracingId,iracingName:'',calendarId:input.calendarId,calendarName:'',lastError:null};data={ok:true,published:true};}
+      botRecap={enabled:true,mode:input.layout.mode,lmuId:'',lmuName:'',iracingId:'',iracingName:'',calendarId:'',calendarName:'',lastError:null,layout:input.layout};data={ok:true,published:true};
     }
     if(path==='/api/community/recap/repair'){
       if(repairError){status=400;data={error:repairError};}
@@ -39,70 +38,103 @@ async function screenshot(page,name){
   await mkdir(process.env.RECAP_SCREENSHOT_DIR,{recursive:true});
   await page.locator('[data-module-tile="discord"]').screenshot({path:join(process.env.RECAP_SCREENSHOT_DIR,name+'.png')});
 }
+// On a phone the questions come one per screen: « Suivant » / « Retour » until the control shows.
+async function reach(page,locator){
+  const form=page.locator('[data-discord-form]');
+  for(const step of ['-1','1'])for(let i=0;i<12&&!(await locator.first().isVisible());i++){
+    const button=form.locator(`[data-discord-step="${step}"]`);
+    if(!(await button.isVisible())||await button.isDisabled())break;
+    await button.click();
+  }
+  return locator;
+}
 const saves=calls=>calls.filter(call=>call.path==='/api/community/discord');
 
-for(const mode of ['events','general'])test(`Discord setting, ${mode}: rows follow the choice, read-only preview, then activation`,async({page},testInfo)=>{
+test('« une catégorie par course »: the questions follow the answers, the bot\'s category in the sketch, then activation',async({page})=>{
   const calls=await mockAdmin(page),form=page.locator('[data-discord-form]');
-  await form.locator(`input[name="mode"][value="${mode}"]`).check();
-  const target=CATEGORY;
-  // Race categories go in categories; a week's recap goes below a channel or a category.
-  await expect(form.locator('select[name="lmu"] option',{hasText:'annonces'})).toHaveCount(mode==='events'?0:1);
-  await expect(form.locator('select[name="calendar"] option',{hasText:'annonces'})).toHaveCount(1);
-  await expect(form.locator('select[name="lmu"] option',{hasText:'Endurances'})).toHaveCount(1);
-  await expect(form.locator('select[name="calendar"]')).toBeVisible();
-  await expect(form.locator('select[name="crewCategory"]')).toHaveCount(0);
-  // Nothing chosen yet: the server refuses, nothing is published.
-  await form.getByRole('button',{name:'Activer',exact:true}).click();
-  await expect(form.locator('.setup-actions .settings-status')).toContainText('au moins un endroit');
-  await form.locator('select[name="lmu"]').selectOption(target);
-  await form.locator('select[name="iracing"]').selectOption(target);
-  await expect(form.locator('[data-discord-sketch]')).toContainText(mode==='events'?'6h de Spa':'Endurances iRacing');
-  if(mode==='general'){
-    await form.locator('input[name="crewChannels"]').check();
-    await form.locator('select[name="crewCategory"]').selectOption(PIT);
-    await expect(form.locator('[data-discord-sketch]')).toContainText('LMU · 6h de Spa · Équipage A');
-  }
-  await screenshot(page,`discord-${mode}-${testInfo.project.name}`);
-  await form.getByRole('button',{name:'Voir les messages',exact:true}).click();
-  await expect(form.locator('[data-recap-preview]')).toContainText('Équipage A');
-  await expect(form.locator('.recap-preview')).toHaveCount(mode==='events'?2:1);
-  expect(saves(calls)).toHaveLength(1);
+  await (await reach(page,form.locator('input[name="mode"][value="events"]'))).check();
+  await (await reach(page,form.locator('input[name="sims"][value="all"]'))).check();
+  await (await reach(page,form.locator('input[name="split"][value="apart"]'))).check();
+  await expect(form.locator('[data-discord-sketch]')).toContainText('LMU');
+  await expect(form.locator('[data-discord-sketch]')).toContainText('iRacing · 8h de Watkins Glen');
+  await (await reach(page,form.locator('input[name="split"][value="together"]'))).check();
+  await (await reach(page,form.locator('select[name="under"]'))).selectOption(CATEGORY);
+  await expect(form.locator('[data-discord-sketch] li').filter({hasText:'Endurance Manager'})).toHaveCount(1);
+  await expect(form.locator('select[name="week-all"]')).toHaveCount(0);
   expect(await page.evaluate(()=>document.documentElement.scrollWidth-document.documentElement.clientWidth)).toBeLessThanOrEqual(1);
-  await form.getByRole('button',{name:'Activer',exact:true}).click();
+  await (await reach(page,form.getByRole('button',{name:'Activer',exact:true}))).click();
   await expect(page.locator('[data-module-tile="discord"] .admin-state')).toContainText('Actif');
-  const activation=saves(calls).at(-1);
-  expect(activation.input).toMatchObject({mode,lmuId:target,iracingId:target,calendarId:''});
-  if(mode==='general')expect(activation.input).toMatchObject({crewChannels:true,crewCategory:PIT});
+  expect(saves(calls).at(-1).input.layout).toMatchObject({mode:'events',sims:'all',split:false,under:CATEGORY,showWeek:true});
 });
 
-test('below a chosen channel, the sketch shows the bot channel right after it',async({page})=>{
+test('« récap de la semaine »: just below a channel, voices in « Pit talk » made by the bot',async({page},testInfo)=>{
+  const calls=await mockAdmin(page),form=page.locator('[data-discord-form]');
+  await (await reach(page,form.locator('input[name="mode"][value="general"]'))).check();
+  await (await reach(page,form.locator('input[name="sims"][value="all"]'))).check();
+  await (await reach(page,form.locator('select[name="week-all"]'))).selectOption(TEXT);
+  await (await reach(page,form.locator('select[name="events"]'))).selectOption('same');
+  await expect(form.locator('select[name="under"]')).toHaveCount(0,{timeout:2000});
+  await (await reach(page,form.locator('input[name="voices"][value="yes"]'))).check();
+  await (await reach(page,form.locator('input[name="pit"][value="bot"]'))).check();
+  await (await reach(page,form.locator('select[name="pitAt"]'))).selectOption(PIT);
+  const sketch=await form.locator('[data-discord-sketch] li').allInnerTexts();
+  expect(sketch.indexOf('# annonces')).toBeLessThan(sketch.indexOf('# endurances-de-la-semaine'));
+  expect(sketch.indexOf('PIT WALK')+1).toBe(sketch.findIndex(item=>/Pit talk/i.test(item)));
+  await screenshot(page,`discord-general-${testInfo.project.name}`);
+  await (await reach(page,form.getByRole('button',{name:'Voir les messages',exact:true}))).click();
+  await expect(form.locator('[data-recap-preview]')).toContainText('Équipage A');
+  await (await reach(page,form.getByRole('button',{name:'Activer',exact:true}))).click();
+  await expect(page.locator('[data-module-tile="discord"] .admin-state')).toContainText('Actif');
+  expect(saves(calls).at(-1).input.layout).toMatchObject({mode:'general',week:{all:TEXT},events:'same',voices:true,pit:'bot',pitAt:PIT});
+});
+
+test('on a phone, one question per screen and the sketch last',async({page},testInfo)=>{
+  test.skip(testInfo.project.name!=='android-chrome','phone layout');
   await mockAdmin(page);
   const form=page.locator('[data-discord-form]');
-  await form.locator('input[name="mode"][value="general"]').check();
-  await form.locator('select[name="lmu"]').selectOption(TEXT);
-  await expect(form.locator('[data-discord-sketch] li')).toHaveText(['Endurances','# annonces',/# récap-de-la-semaine/]);
+  await expect(form.locator('.discord-q:visible')).toHaveCount(1);
+  await expect(form.locator('[data-discord-sketch]')).toBeHidden();
+  const count=Number((await form.locator('[data-discord-count]').innerText()).split('/')[1]);
+  for(let i=0;i<count;i++)await form.locator('[data-discord-step="1"]').click();
+  await expect(form.locator('[data-discord-sketch]')).toBeVisible();
+  await expect(form.locator('[data-discord-count]')).toHaveText('Aperçu');
 });
 
 test('missing bot permissions are named in the destination list',async({page})=>{
   await mockAdmin(page,{permission:false});
   const form=page.locator('[data-discord-form]');
-  await expect(form.locator('select[name="lmu"] option',{hasText:'le bot n’a pas ses droits'})).toHaveCount(1);
-  await form.locator('select[name="lmu"]').selectOption(CATEGORY);
+  await (await reach(page,form.locator('input[name="mode"][value="general"]'))).check();
+  await expect(form.locator('select[name="week-all"] option',{hasText:'le bot n’a pas ses droits'})).toHaveCount(1);
+  await (await reach(page,form.locator('select[name="week-all"]'))).selectOption(CATEGORY);
   await expect(form.locator('.discord-rights')).toContainText('Gérer les salons');
-  await expect(form.getByRole('link',{name:'Inviter le bot avec ses droits'})).toHaveAttribute('href',/permissions=85008/);
+  await expect(await reach(page,form.getByRole('link',{name:'Inviter le bot avec ses droits'}))).toHaveAttribute('href',/permissions=85008/);
+});
+
+test('« Tout retirer » asks once more on the button itself',async({page})=>{
+  const calls=await mockAdmin(page,{initialRecap:{enabled:true,mode:'events',lmuId:CATEGORY,lmuName:'Endurances',iracingId:'',iracingName:'',calendarId:'',calendarName:'',lastError:null,layout:{mode:'events',sims:'all',split:false,showWeek:true,showEvents:true,under:'top',voices:false,reminders:false}}});
+  const remove=page.getByRole('button',{name:'Tout retirer',exact:true});
+  await (await reach(page,remove)).click();
+  await expect(page.getByRole('button',{name:'Confirmer : tout retirer'})).toBeVisible();
+  expect(calls.filter(call=>call.method==='DELETE')).toHaveLength(0);
+  await page.getByRole('button',{name:'Confirmer : tout retirer'}).click();
+  await expect.poll(()=>calls.filter(call=>call.method==='DELETE'&&call.path==='/api/community/discord').length).toBe(1);
 });
 
 test('no calendar row without the events module',async({page})=>{
   await mockAdmin(page,{solo:false});
-  await expect(page.locator('[data-discord-form] select[name="calendar"]')).toHaveCount(0);
+  const form=page.locator('[data-discord-form]');
+  await (await reach(page,form.locator('input[name="mode"][value="general"]'))).check();
+  await expect(form.locator('select[name="events"]')).toHaveCount(0);
+  await (await reach(page,form.locator('input[name="mode"][value="events"]'))).check();
+  await expect(form.locator('input[name="showEvents"]')).toHaveCount(0);
 });
 
-const brokenRecap={enabled:true,mode:'events',lmuId:CATEGORY,lmuName:'Endurances',iracingId:'',iracingName:'',calendarId:'',calendarName:'',lastError:'Le salon de publication du récap est introuvable ou inaccessible au bot. Clique sur Réparer le récap.'};
+const brokenRecap={enabled:true,mode:'events',layout:{mode:'events',sims:'all',split:false,showWeek:true,showEvents:true,under:CATEGORY,voices:false,reminders:false},lmuId:CATEGORY,lmuName:'Endurances',iracingId:'',iracingName:'',calendarId:'',calendarName:'',lastError:'Le salon de publication du récap est introuvable ou inaccessible au bot. Clique sur Réparer le récap.'};
 test('admin can repair from the error without reconfiguring',async({page})=>{
   const calls=await mockAdmin(page,{initialRecap:brokenRecap});
   const form=page.locator('[data-discord-form]');
   await expect(form).toContainText('Publication en erreur');
-  await form.getByRole('button',{name:'Réparer',exact:true}).click();
+  await (await reach(page,form.getByRole('button',{name:'Réparer',exact:true}))).click();
   await expect(page.locator('[data-discord-form] .setup-actions .settings-status')).toContainText('vérifiés');
   await expect(page.locator('[data-discord-form]')).not.toContainText('Publication en erreur');
   expect(calls.filter(c=>c.path==='/api/community/recap/repair')).toHaveLength(1);
@@ -111,7 +143,7 @@ test('admin can repair from the error without reconfiguring',async({page})=>{
 
 test('repair failures are visible beside the button and leave the settings intact',async({page})=>{
   await mockAdmin(page,{initialRecap:brokenRecap,repairError:'Dans les permissions de « Endurances », autorise le bot : Intégrer des liens.'});
-  await page.getByRole('button',{name:'Réparer',exact:true}).click();
+  await (await reach(page,page.getByRole('button',{name:'Réparer',exact:true}))).click();
   await expect(page.locator('[data-discord-form] .setup-actions .settings-status')).toContainText('Intégrer des liens');
   await expect(page.getByRole('button',{name:'Réparer',exact:true})).toBeEnabled();
   await expect(page.locator('[data-discord-form]')).toContainText('Publication en erreur');
