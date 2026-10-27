@@ -104,12 +104,19 @@ export function cleanSnapshot(input) {
 // Plugin 2.0, while a page watches: our car ten times a second, the frames of the last second grouped in one message
 // (`tm`), so the room is billed one message a second. Each frame: [metres into the lap, km/h, throttle %, brake %,
 // steering % (left negative), gear]. Passed on to the pages as they come, never kept.
-export const FRAMES_MAX = 30;
+export const FRAMES_MAX = 60;
 export function cleanFrames(input) {
   if (!Array.isArray(input)) return [];
   return input.slice(-FRAMES_MAX).filter(Array.isArray).map(([d, v, throttle, brake, steer, gear]) =>
     [round(num(d, -1000, 100000), 0), round(num(v, 0, 500), 1), round(num(throttle, 0, 100), 0), round(num(brake, 0, 100), 0),
       round(num(steer, -100, 100), 0), num(gear, -1, 12)]).filter(frame => frame[0] !== null && frame[1] !== null);
+}
+
+// Plugin 2.4: where the cars are, nine times a second between two snapshots ([id, x, z] to the metre).
+export function cleanPositions(input) {
+  if (!Array.isArray(input)) return null;
+  return input.slice(0, 120).filter(item => Array.isArray(item) && Number.isInteger(item[0]) && finite(item[1]) && finite(item[2]))
+    .map(([id, x, z]) => [id, Math.round(x), Math.round(z)]);
 }
 
 // What plugin 1.6 sends after its first snapshot: only the keys that changed (`me` by key too) and, per car, only the
