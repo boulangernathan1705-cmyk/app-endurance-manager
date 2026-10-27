@@ -295,6 +295,14 @@ test('plugin 2.4: the tread\'s three temperatures per wheel, as the game shows t
   assert.equal(read[0].carcass, 85);
 });
 
+test('plugin 2.4: the eight dent zones and the rear wing come off; none from older plugins', () => {
+  const read = dents => cleanSnapshot(snap({me:{dents, detached:true}})).me;
+  assert.deepEqual(read([0, 1, 0, 0, 2, 0, 0, 0]).dents, [0, 1, 0, 0, 2, 0, 0, 0]);
+  assert.equal(read([0, 1, 0, 0, 2, 0, 0, 0]).detached, true);
+  for (const bad of [undefined, [0, 1], [0, 1, 0, 0, 3, 0, 0, 0], 'x']) assert.equal(read(bad).dents, null);
+  assert.equal(cleanSnapshot(snap({me:{detached:1}})).me.detached, false);
+});
+
 test('only what changed, and the same value back once applied', () => {
   const before = {a:1, list:[1, 2, {x:1}], gone:true, keep:{deep:[1, 2]}, swap:[1]};
   const after = {a:2, list:[1, 3, {x:1, y:null}, 4], keep:{deep:[1, 2]}, swap:{n:1}, fresh:'é'};

@@ -188,6 +188,15 @@
 .pw-body .pw-set.red { --tone: var(--pw-red); } .pw-body .pw-set.blue { --tone: var(--pw-blue); } .pw-body .pw-set.yellow { --tone: var(--pw-yellow); }
 .pw-body .pw-damage { display: grid; gap: 14px; justify-items: center; padding: 18px 0; }
 .pw-body .pw-damage b { font-family: var(--pw-mono); font-size: 44px; color: var(--bar); }
+.pw-body .pw-damage-sum { display: grid; gap: 14px; justify-items: center; width: 100%; }
+.pw-body .pw-damage.with-car { grid-template-columns: auto 1fr; align-items: center; gap: 18px; padding: 10px 0; }
+.pw-body .pw-damage.with-car b { font-size: 36px; }
+.pw-body .pw-car-dents { width: 104px; height: auto; }
+.pw-body .pw-wing { display: grid; justify-items: center; gap: 2px; }
+.pw-body .pw-wing span { font-size: 12px; color: var(--pw-muted); text-transform: uppercase; }
+.pw-body .pw-damage .pw-wing b { font-size: 18px; font-family: inherit; }
+.pw-body .pw-wing.good b { color: var(--pw-green); }
+.pw-body .pw-wing.bad b { color: var(--pw-red); }
 .pw-body .pw-damage i { width: 100%; height: 10px; border-radius: 5px; background: linear-gradient(90deg, var(--bar) var(--level), var(--pw-accent) var(--level)); }
 .pw-body .pw-tank-card { background: var(--pw-inset); border: 1px solid var(--pw-line); border-radius: 6px; padding: 12px; display: grid; gap: 8px; align-content: start; }
 .pw-body .pw-tank-card .pw-tank-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }

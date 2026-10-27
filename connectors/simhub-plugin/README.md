@@ -83,6 +83,8 @@ Envoie les séances Le Mans Ultimate d'un pilote aux fiches combo de son équipe
   toujours une fois par seconde. Personne ne regarde : rien de plus qu'avant.
 - envoie aussi au mur, depuis la 2.4.0, les trois températures de bande de roulement de chaque pneu (intérieur, milieu,
   extérieur), celles de l'écran pneus du jeu, en plus de la carcasse (5e valeur de `wheels`).
+- envoie aussi au mur, depuis la 2.4.0, les dégâts des huit zones de carrosserie (`dents`, 0 à 2 chacune) et si une
+  pièce s'est détachée (`detached` : dans LMU, seul l'aileron arrière peut s'arracher).
 
 Il ne fait que lire : il ne modifie rien dans le jeu ni dans SimHub. Il n'envoie plus les fichiers de résultats XML.
 
