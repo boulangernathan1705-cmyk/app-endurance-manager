@@ -1,5 +1,16 @@
 # Nouveautés d'Endurance Manager
 
+## v1.64 — 27 octobre 2026
+
+### ✨ Nouveautés
+
+- **Discord** : le bot ajoute au fil de chaque course les pilotes qui ont accès au site, pour qu'il reste dans leur liste de salons. Chacun n'est ajouté qu'une fois, toutes les 2 minutes par petits lots.
+- **Discord** : # endurances-de-la-semaine ne garde qu'un message court, une ligne par course avec le lien vers son fil ; les horaires sont dans le fil.
+
+### 🔧 Corrections
+
+- **Vocaux** : une catégorie de course ou un vocal supprimés à la main sur Discord ne bloquent plus les vocaux (« Vocaux en échec ») ; le bot les recrée.
+
 ## v1.63 — 27 octobre 2026
 
 ### ✨ Nouveautés
