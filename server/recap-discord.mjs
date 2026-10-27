@@ -55,7 +55,7 @@ export function recapError(error) {
 }
 async function discord(env, method, path, body, budget = {left:12}) {
   if (!String(env.DISCORD_BOT_TOKEN || '').trim()) throw Object.assign(new Error('Le bot du site n’est pas configuré.'), {status:401});
-  if (--budget.left < 0) throw new Error('Lot terminé ; les autres événements seront traités au prochain passage.');
+  if (--budget.left < 0) throw Object.assign(new Error('Lot terminé ; les autres événements seront traités au prochain passage.'), {budget:true});
   const response = await fetch(API + path, {method, signal:AbortSignal.timeout(8000),
     headers:{Authorization:`Bot ${env.DISCORD_BOT_TOKEN}`, ...(body ? {'Content-Type':'application/json'} : {})}, body:body ? JSON.stringify(body) : undefined});
   const data = response.status === 204 ? null : await response.json().catch(() => null);
@@ -70,11 +70,13 @@ export async function recapDestinations(env, community) {
     discord(env, 'GET', `/guilds/${guild}/members/${env.DISCORD_CLIENT_ID}`)]);
   if (!Array.isArray(channels) || !Array.isArray(roles) || !member) throw new Error('Réponse Discord invalide.');
   return channels.filter(channel => [0,4].includes(channel.type)).map(channel => {
-    const rights = effectivePermissions(roles, member, guild, channel, env.DISCORD_CLIENT_ID);
+    // Below a text channel the bot makes its own: what counts is its category (or the server).
+    const parent = channel.type === 0 ? channels.find(item => item.id === channel.parent_id && item.type === 4) : null;
+    const rights = effectivePermissions(roles, member, guild, channel.type === 0 ? parent || {id:'',permission_overwrites:[]} : channel, env.DISCORD_CLIENT_ID);
     const voiceRequired = channel.type === 4 && community.modules?.crewChannels === true;
-    const required = REQUIRED | (channel.type === 4 ? MANAGE : 0n) | (voiceRequired ? VOICE_ACCESS : 0n);
-    return {id:channel.id, name:channel.name, type:channel.type, ready:(rights & required) === required,
-      missing:[['Voir le salon',VIEW],['Envoyer des messages',SEND],['Voir les anciens messages',HISTORY],['Intégrer des liens',EMBED], ...(channel.type === 4 ? [['Gérer les salons',MANAGE]] : []),...(voiceRequired ? [['Se connecter',1n << 20n]] : [])].filter(([,bit]) => !(rights & bit)).map(([label]) => label)};
+    const required = REQUIRED | MANAGE | (voiceRequired ? VOICE_ACCESS : 0n);
+    return {id:channel.id, name:channel.name, type:channel.type, position:channel.position || 0, parentId:channel.parent_id || null, parentName:parent?.name || null, ready:(rights & required) === required,
+      missing:[['Voir le salon',VIEW],['Envoyer des messages',SEND],['Voir les anciens messages',HISTORY],['Intégrer des liens',EMBED],['Gérer les salons',MANAGE],...(voiceRequired ? [['Se connecter',1n << 20n]] : [])].filter(([,bit]) => !(rights & bit)).map(([label]) => label)};
   });
 }
 // The admins' choice: the mode, then where each recap goes (an id, or '' for « Ne pas publier »).
@@ -292,8 +294,8 @@ async function publish(env, timestamp, community, settings, row, event, budget, 
   const kind = isEvent ? null : row.event_id.slice(5);
   if (!isEvent) {
     const destination = weekDestination(settings, kind, community);
-    // Set up for this destination: the category it was made in, or the text channel chosen before.
-    const placed = row.category_id ? row.category_id === destination : Boolean(channel) && channel === destination;
+    // Set up for this destination (a recap posted straight into a channel by an older version is moved to its own).
+    const placed = Boolean(row.category_id) && row.category_id === destination;
     let channels = null;
     if (placed && repair && row.category_id) {
       channels = await discord(env,'GET',`/guilds/${row.guild_id}/channels`,null,budget);
@@ -365,18 +367,23 @@ async function publish(env, timestamp, community, settings, row, event, budget, 
   await env.DB.prepare('UPDATE discord_recap_publications SET message_id=?,content_hash=? WHERE community_id=? AND event_id=?')
     .bind(row.message_id,hash,community.id,row.event_id).run();
 }
-// The week's channel in the chosen category, made by the bot with its rights and found again by its topic. A text channel
-// chosen before (no category) is used as it is.
+// The week's channel, made by the bot (with its rights) just below the chosen channel, or at the top of the chosen category,
+// and found again by its topic. category_id keeps the place chosen for it.
 async function weekChannel(env, community, row, kind, destination, budget) {
   const channels = await discord(env,'GET',`/guilds/${row.guild_id}/channels`,null,budget);
   const target = channels.find(item => item.id === destination);
   if (!target) throw Object.assign(new Error('Discord indisponible'), {status:404,code:10003,path:`/channels/${destination}`});
-  if (target.type !== 4) return {channel:target.id, category:null};
+  const parent = target.type === 4 ? target.id : target.parent_id || null, category = channels.find(item => item.id === parent);
   const group = weekGroup(kind), topic = 'endurance-manager:' + (await digest([community.id,'week',destination,group])).slice(0,24);
   const existing = channels.find(item => item.type === 0 && item.topic === topic);
   if (existing) return {channel:existing.id, category:destination};
-  const created = await discord(env,'POST',`/guilds/${row.guild_id}/channels`,{type:0,name:WEEK_CHANNELS[group],parent_id:destination,topic,
-    permission_overwrites:withBotAccess(target.permission_overwrites,env.DISCORD_CLIENT_ID,REQUIRED)},budget);
+  const created = await discord(env,'POST',`/guilds/${row.guild_id}/channels`,{type:0,name:WEEK_CHANNELS[group],topic,...(parent ? {parent_id:parent} : {}),
+    permission_overwrites:withBotAccess(category?.permission_overwrites,env.DISCORD_CLIENT_ID,REQUIRED)},budget);
+  // Its place among the channels of that category: first, or right after the chosen channel (one request).
+  const siblings = channels.filter(item => item.type !== 4 && (item.parent_id || null) === parent)
+    .sort((a,b) => (a.position || 0) - (b.position || 0) || (BigInt(a.id) < BigInt(b.id) ? -1 : 1));
+  siblings.splice(target.type === 4 ? 0 : siblings.findIndex(item => item.id === target.id) + 1, 0, created);
+  if (siblings.length > 1) await discord(env,'PATCH',`/guilds/${row.guild_id}/channels`,siblings.map((item,position) => ({id:item.id,position})),budget);
   return {channel:created.id, category:destination};
 }
 // A week's message the admins no longer want (or no longer there): deleted on Discord, with the bot's channel once no recap
@@ -385,7 +392,7 @@ async function takeDown(env, community, row, budget) {
   const ignoreGone = error => { if (error.status !== 404) throw error; };
   if (row.message_id) await discord(env,'DELETE',`/channels/${row.channel_id}/messages/${row.message_id}`,null,budget).catch(ignoreGone);
   await env.DB.prepare("UPDATE discord_recap_publications SET channel_id=NULL,category_id=NULL,message_id=NULL,content_hash='' WHERE community_id=? AND event_id=?").bind(community.id,row.event_id).run();
-  if (row.category_id && row.channel_id && !await env.DB.prepare("SELECT 1 FROM discord_recap_publications WHERE community_id=? AND event_id LIKE 'week:%' AND channel_id=?").bind(community.id,row.channel_id).first())
+  if (row.category_id && row.channel_id && row.channel_id !== row.category_id && !await env.DB.prepare("SELECT 1 FROM discord_recap_publications WHERE community_id=? AND event_id LIKE 'week:%' AND channel_id=?").bind(community.id,row.channel_id).first())
     await discord(env,'DELETE',`/channels/${row.channel_id}`,null,budget).catch(ignoreGone);
   Object.assign(row, {channel_id:null, category_id:null, message_id:null, content_hash:''});
 }
@@ -464,6 +471,11 @@ export async function syncBotRecaps(env,timestamp,community, test = false, prior
     await env.DB.prepare('UPDATE community_recap_settings SET last_error=NULL WHERE community_id=? AND lock_token=?').bind(community.id,token).run();
     return result;
   } catch (error) {
+    // Out of requests for this pass (a new setting can take several): not an error, the next pass goes on.
+    if (error.budget) {
+      await env.DB.prepare('UPDATE community_recap_settings SET dirty=1 WHERE community_id=? AND lock_token=?').bind(community.id,token).run();
+      return {ok:true,partial:true};
+    }
     const message = error.message.startsWith('Discord') ? recapError(error) : error.message;
     await env.DB.prepare('UPDATE community_recap_settings SET last_error=?,dirty=1 WHERE community_id=? AND lock_token=?').bind(message,community.id,token).run();
     throw new Error(message);
