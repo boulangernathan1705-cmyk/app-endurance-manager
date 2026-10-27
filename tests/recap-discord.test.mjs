@@ -856,3 +856,14 @@ test('the pilots with access are added to the race\'s thread once each, those of
   await syncBotRecaps(env,NOW+1000,COMMUNITY);
   calls.length=0;assert.equal(await addThreadMembers(env,NOW+2000,12),2);
 });
+
+test('a pass with nothing to change makes one request; a changed race only its edit more',async t=>{
+  const {DB,env,calls}=setup(t);race(DB);race(DB,'race-b','8h de Monza','monza',[{id:'start-b',startsAt:NOW+2*DAY}]);
+  await layout(env,COMMUNITY,{mode:'events',sims:'lmu',under:'111111111111111110',voices:true});
+  for(let pass=0;pass<3;pass++)await syncBotRecaps(env,NOW+pass*1000,COMMUNITY);
+  calls.length=0;await syncBotRecaps(env,NOW+5000,COMMUNITY);
+  assert.deepEqual(calls.map(call=>call.method),['GET'],'the server\'s channels, read once');
+  DB.db.prepare("UPDATE discord_recap_publications SET content_hash='x' WHERE event_id='race-a'").run();
+  calls.length=0;await syncBotRecaps(env,NOW+6000,COMMUNITY);
+  assert.deepEqual(calls.map(call=>call.method),['GET','PATCH']);
+});
