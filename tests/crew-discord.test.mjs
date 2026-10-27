@@ -405,6 +405,24 @@ test('« un fil par course »: voices straight in the bot\'s category (no waitin
   mark=discord.calls.length;await sync(at+60_000);assert.deepEqual(created(discord.calls,mark),[]);
 });
 
+test('« un fil par course » with LMU and iRacing apart: an iRacing race\'s voices go in « iRacing », not « LMU »', async () => {
+  const {DB,req,login,sync,discord}=harness();
+  await login(ADMIN,'admin','Orga');await login(PILOT,'pilot','Alice');
+  assert.equal((await req('/api/community/modules','PATCH',{crewChannels:true},'admin')).status,200);
+  assert.equal((await req('/api/events','POST',race,'admin')).status,201);
+  const event=(await req('/api/events','GET',null,'admin')).data.events[0];
+  const departure=event.departures[0], base=`/api/events/${event.id}/departures/${departure.id}`, at=departure.startsAt-2*24*HOUR;
+  DB.db.prepare("UPDATE events SET circuit='iracing-spa' WHERE id=?").run(event.id);
+  discord.state.channels.push({id:'600000000000000007',type:4,name:'LMU'},{id:'600000000000000009',type:4,name:'iRacing'});
+  DB.db.prepare("UPDATE community_crew_discord SET voice_category_id='600000000000000007'").run();
+  DB.db.prepare(`INSERT INTO community_recap_settings(community_id,enabled,mode,scope,guild_id,destination_id,destination_name,iracing_destination_id,layout,bot_categories) VALUES(?,1,'events','all',?,'600000000000000007','LMU','600000000000000009','{"mode":"events","sims":"all","split":true}','{"lmu":"600000000000000007","iracing":"600000000000000009"}')`).run(DEV,GUILD);
+  DB.db.prepare("INSERT INTO discord_recap_publications(community_id,event_id,guild_id,channel_id,in_thread,marker) VALUES(?,?,?,'600000000000000008',1,'m')").run(DEV,event.id,GUILD);
+  assert.equal((await req(base+'/registrations','POST',{name:'x',category:'GT3',status:'whole'},'pilot')).status,201);
+  assert.equal((await req(base+'/crews','POST',{name:'Fil',category:'GT3'},'pilot')).status,201);
+  const mark=discord.calls.length;await sync(at);
+  assert.equal(created(discord.calls,mark)[0].body.parent_id,'600000000000000009');
+});
+
 test('an empty crew gets its voice channel as soon as it is created', async () => {
   const {DB,req,login,sync,discord}=harness();
   await login(ADMIN,'admin','Orga');

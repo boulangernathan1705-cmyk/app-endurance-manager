@@ -5,7 +5,7 @@ import {readFileSync,readdirSync} from 'node:fs';
 import worker from '../server/worker.mjs';
 import {linkTestServer,DEV_COMMUNITY,GUILD} from './fixtures/discord-server.mjs';
 import {syncWeeklyDiscord} from '../server/discord-weekly.mjs';
-import {addThreadMembers,botCategoryEmojis,saveBotRecap,validateDiscordLayout,syncBotRecaps,previewBotRecap,recapDestinations,eventDeletionTime,eventChannelName,settingsRow,recapError,repairBotRecap,racesOpenNow} from '../server/recap-discord.mjs';
+import {botCategoryEmojis,saveBotRecap,validateDiscordLayout,syncBotRecaps,previewBotRecap,recapDestinations,eventDeletionTime,eventChannelName,settingsRow,recapError,repairBotRecap,racesOpenNow} from '../server/recap-discord.mjs';
 
 const OWNER='333333333333333333', BOT='444444444444444444', TEXT='555555555555555555', CATEGORY='666666666666666666';
 const NOW=Date.parse('2026-10-10T12:00:00Z'), DAY=86400000;
@@ -736,25 +736,32 @@ test('« récap de la semaine »: just below a channel, the events with the endu
   assert.equal(DB.db.prepare("SELECT COUNT(DISTINCT channel_id) AS n FROM discord_recap_publications WHERE event_id LIKE 'week:%'").get().n,1,'one channel for the three messages');
   const pit=named(channels,'🎙️ Pit talk');assert.equal(pit.type,4);
   assert.equal(DB.db.prepare('SELECT voice_category_id FROM community_crew_discord').get().voice_category_id,pit.id);
+  await syncBotRecaps(env,NOW,community);
   assert.deepEqual(categoriesInOrder(channels),['Accueil','Endurances','Vocaux','🎙️ Pit talk']);
   assert.equal(channels.filter(item=>item.type===4&&item.name.includes('6h de Spa')).length,0,'no race category');
+  // The race has its thread in # endurances-de-la-semaine too; the week's message links to it.
+  const thread=channels.find(item=>item.type===11);
+  assert.equal(thread.name,'🏎️ LMU · 6h de Spa');assert.equal(thread.parent_id,week.id);
 });
 
 test('changing one\'s mind: the bot takes off what it made and puts the new setting in place; « Tout retirer » takes off everything',async t=>{
   const {DB,env,channels}=setup(t);race(DB);
   await layout(env,COMMUNITY,{mode:'events',sims:'all',showWeek:true,under:ACCUEIL});
   await syncBotRecaps(env,NOW,COMMUNITY);
-  assert.ok(named(channels,'Endurance Manager'));assert.ok(named(channels,'🏎️ LMU · 6h de Spa'));
+  assert.ok(named(channels,'Endurance Manager'));
+  const before=channels.find(item=>item.type===11&&item.name==='🏎️ LMU · 6h de Spa');assert.ok(before);
   await layout(env,COMMUNITY,{mode:'general',sims:'lmu',week:{all:CATEGORY},events:''});
   for(let pass=0;pass<3;pass++)await syncBotRecaps(env,NOW,COMMUNITY);
-  assert.equal(named(channels,'🏎️ LMU · 6h de Spa'),undefined,'race category gone');
+  assert.equal(channels.find(item=>item.id===before.id),undefined,'the old thread gone');
   assert.equal(named(channels,'Endurance Manager'),undefined,'the bot\'s category gone once empty');
   const week=channels.filter(item=>item.name==='endurances-de-la-semaine');
   assert.equal(week.length,1);assert.equal(week[0].parent_id,CATEGORY);
+  assert.equal(channels.find(item=>item.type===11&&item.name==='🏎️ LMU · 6h de Spa')?.parent_id,week[0].id,'its thread in the new place');
   assert.equal((await as(env,'/api/community/discord','DELETE')).status,200);
   for(let pass=0;pass<2;pass++)await syncBotRecaps(env,NOW,COMMUNITY);
   assert.equal(channels.filter(item=>item.name==='endurances-de-la-semaine').length,0);
-  assert.equal(DB.db.prepare("SELECT COUNT(*) AS n FROM discord_recap_publications WHERE channel_id IS NOT NULL OR message_id IS NOT NULL").get().n,0);
+  assert.equal(channels.filter(item=>item.type===11).length,0);
+  assert.equal(DB.db.prepare("SELECT COUNT(*) AS n FROM discord_recap_publications WHERE closed_at IS NULL AND (channel_id IS NOT NULL OR message_id IS NOT NULL)").get().n,0);
   assert.deepEqual(categoriesInOrder(channels),['Accueil','Endurances','Vocaux']);
 });
 
@@ -806,10 +813,10 @@ test('below a private category, the bot\'s own is private like it when chosen, a
 test('a week message deleted on Discord is put back by the next sync, without « Réparer »',async t=>{
   const {DB,env,messages}=setup(t);race(DB);
   await layout(env,COMMUNITY,{mode:'general',sims:'lmu',week:{all:CATEGORY},events:''});
-  assert.equal(messages.size,1);
+  assert.equal(messages.size,2,'the week\'s message and the race\'s, in its thread');
   messages.clear();DB.db.prepare("UPDATE discord_recap_publications SET content_hash='old'").run();
   const result=await syncBotRecaps(env,NOW+1000,COMMUNITY);
-  assert.equal(messages.size,1);assert.ok(!result?.error);
+  assert.equal(messages.size,2);assert.ok(!result?.error);
   assert.equal(DB.db.prepare('SELECT last_error FROM community_recap_settings').get().last_error,null);
 });
 
@@ -822,23 +829,3 @@ test('saving the setting with voices does not ask for rights in the places of th
   assert.equal(JSON.parse(DB.db.prepare('SELECT modules FROM communities WHERE id=?').get(DEV_COMMUNITY).modules).crewChannels,true);
 });
 
-test('the pilots with access are added to the race\'s thread once each, those of the race first',async t=>{
-  const {DB,env,calls,channels}=setup(t);race(DB);
-  await layout(env,COMMUNITY,{mode:'events',sims:'lmu',under:ACCUEIL});
-  const thread=channels.find(item=>item.type===11);
-  const ROLE='777777777777777001';
-  DB.db.prepare("UPDATE community_role_permissions SET permissions='[]' WHERE discord_role_id=?").run(GUILD);
-  DB.db.prepare("INSERT INTO community_role_permissions(community_id,discord_role_id,permissions,updated_at) VALUES(?,?,'[\"access\"]',0)").run(DEV_COMMUNITY,ROLE);
-  const pilot=(id,roles,status='member')=>{DB.db.prepare('INSERT OR IGNORE INTO users(id,name,created_at) VALUES(?,?,0)').run(id,id);
-    DB.db.prepare('INSERT INTO memberships(community_id,user_id,discord_roles,status,checked_at,created_at) VALUES(?,?,?,?,0,0)').run(DEV_COMMUNITY,id,JSON.stringify(roles),status);};
-  pilot('100000000000000001',[ROLE]);pilot('100000000000000002',[ROLE]);pilot('100000000000000003',[]);pilot('100000000000000004',[ROLE],'left');
-  DB.db.prepare("INSERT INTO participants(id,name,user_id,created_by,created_at,community_id) VALUES('p2','P2','100000000000000002',?,0,?)").run(OWNER,DEV_COMMUNITY);
-  DB.db.prepare("INSERT INTO registrations(id,event_id,departure_id,user_id,name,name_key,category,status,created_at,participant_id,community_id) VALUES('r','race-a','start-a','100000000000000002','P2','p2','GT3','whole',0,'p2',?)").run(DEV_COMMUNITY);
-  calls.length=0;
-  assert.equal(await addThreadMembers(env,NOW,12),2,'the two with access, not the one without, nor one gone');
-  const [post,remove]=calls;
-  assert.equal(post.path,`/channels/${thread.id}/messages`);assert.equal(post.body.flags,4096,'silent');
-  assert.deepEqual(post.body.allowed_mentions.users,['100000000000000002','100000000000000001'],'the race\'s pilot first');
-  assert.equal(remove.method,'DELETE');assert.match(remove.path,new RegExp(`^/channels/${thread.id}/messages/`));
-  calls.length=0;assert.equal(await addThreadMembers(env,NOW,12),0);assert.ok(!calls.some(call=>call.method==='POST'),'each once');
-});

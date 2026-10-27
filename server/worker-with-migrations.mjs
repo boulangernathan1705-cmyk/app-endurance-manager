@@ -7,7 +7,7 @@ import {importNextCommunity, completeSpecialTimes} from './iracing-import.mjs';
 import {refreshShowcaseIfDue} from './demo.mjs';
 import {refreshMemberships} from './access.mjs';
 import {purgeNotifications} from './notifications.mjs';
-import {cleanupEventRecaps,addThreadMembers} from './recap-discord.mjs';
+import {cleanupEventRecaps} from './recap-discord.mjs';
 import {syncCrewDiscord, cleanupOrphanCrewDiscord} from './crew-discord.mjs';
 import {allCommunities, currentCommunity, communityById, communitySlug, appearanceOf} from './community.mjs';
 import {isDevelopment,devRobots,markDevelopmentResponse} from './dev-environment.mjs';
@@ -134,11 +134,6 @@ export default {
   async scheduled(controller, env, ctx) {
     if (!env?.DB) return;
     const at = new Date(controller?.scheduledTime || Date.now());
-    // Every 2 minutes: only the pilots added to the races' threads, a batch at a time.
-    if (controller?.cron === '*/2 * * * *') {
-      if (env.DISCORD_BOT_TOKEN) ctx.waitUntil(addThreadMembers(env, at.getTime(), 25).catch(error => console.error('Thread members failed', error instanceof Error ? error.message : 'unknown')));
-      return;
-    }
     const slot = Math.floor(at.getUTCMinutes() / 15);
     const run = (label, task) => ctx.waitUntil(task().catch(error => console.error(label, error instanceof Error ? error.message : 'unknown')));
     // Expired sessions, OAuth states and rate-limit counters are purged here too, not only on Discord login.
