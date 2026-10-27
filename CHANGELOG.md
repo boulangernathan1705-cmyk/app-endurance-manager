@@ -2,6 +2,11 @@
 
 ## v1.59 — 27 octobre 2026
 
+### ✨ Nouveautés
+
+- **Discord** : en récap de la semaine avec LMU et iRacing séparés, le bot crée les catégories « LMU » et « iRacing », chacune avec son # endurances-de-la-semaine, là où tu les places.
+- **Discord** : les catégories privées sont signalées. Sous une catégorie privée, tu choisis si celles du bot deviennent privées comme elle ou restent publiques, et le réglage explique l'exception à ajouter pour le bot.
+
 ### 🔧 Corrections
 
 - **Discord** : un salon ou un vocal du bot supprimé à la main sur le serveur ne bloque plus l'activation du réglage ; le bot le recrée si besoin.

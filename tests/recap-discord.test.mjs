@@ -722,3 +722,38 @@ test('the answers are checked: a place on the server, a category for the bot\'s,
   const ok=await validateDiscordLayout(env,COMMUNITY,{mode:'general',sims:'iracing',split:true,week:{all:TEXT},events:'same'});
   assert.equal(JSON.parse(ok.layout).split,false,'apart only with both sims');
 });
+
+test('« récap de la semaine », LMU and iRacing apart: the bot makes « LMU » and « iRacing », each with its endurances-de-la-semaine',async t=>{
+  const {DB,env,channels}=setup(t);race(DB);
+  const community={...COMMUNITY,modules:{...COMMUNITY.modules,soloRaces:true}};
+  await layout(env,community,{mode:'general',sims:'all',split:true,week:{lmu:'bot',iracing:'bot'},events:'bot-iracing',under:ACCUEIL});
+  await syncBotRecaps(env,NOW,community);
+  assert.equal(named(channels,'Endurance Manager'),undefined);
+  const lmu=named(channels,'LMU'),iracing=named(channels,'iRacing');
+  assert.deepEqual(channels.filter(item=>item.parent_id===lmu.id).map(item=>item.name),['endurances-de-la-semaine']);
+  assert.deepEqual(channels.filter(item=>item.parent_id===iracing.id).map(item=>item.name).sort(),['endurances-de-la-semaine','event-solo-de-la-semaine']);
+  assert.deepEqual(categoriesInOrder(channels).slice(0,3),['Accueil','LMU','iRacing']);
+  // Both just below the same channel: each its own name.
+  await layout(env,community,{mode:'general',sims:'all',split:true,week:{lmu:TEXT,iracing:TEXT},events:''});
+  for(let pass=0;pass<3;pass++)await syncBotRecaps(env,NOW,community);
+  assert.ok(named(channels,'endurances-lmu-de-la-semaine'));assert.ok(named(channels,'endurances-iracing-de-la-semaine'));
+  assert.equal(named(channels,'LMU'),undefined,'its categories go once empty');
+});
+
+test('below a private category, the bot\'s own is private like it when chosen, and open again when not',async t=>{
+  const PRIVATE=[{id:GUILD,type:0,allow:'0',deny:'1024'},{id:'222222222222222222',type:0,allow:'3072',deny:'0'}];
+  const {env,channels,calls}=setup(t,{rights:'268520464'});
+  Object.assign(named(channels,'Accueil'),{permission_overwrites:PRIVATE});
+  assert.equal((await recapDestinations(env,COMMUNITY)).find(item=>item.id===ACCUEIL).private,true);
+  await layout(env,COMMUNITY,{mode:'events',sims:'lmu',showWeek:true,under:ACCUEIL,copy:true});
+  const bot=named(channels,'Endurance Manager');
+  const others=item=>item.permission_overwrites.filter(rule=>rule.id!==BOT).sort((a,b)=>a.id.localeCompare(b.id));
+  assert.deepEqual(others(bot),[...PRIVATE].sort((a,b)=>a.id.localeCompare(b.id)));
+  assert.ok(bot.permission_overwrites.some(rule=>rule.id===BOT&&rule.type===1),'the bot keeps its rights');
+  // Open to all: changed in place, with what is inside.
+  await layout(env,COMMUNITY,{mode:'events',sims:'lmu',showWeek:true,under:ACCUEIL});
+  assert.deepEqual(others(bot),[]);
+  assert.deepEqual(others(named(channels,'endurances-de-la-semaine')),[]);
+  calls.length=0;await syncBotRecaps(env,NOW,COMMUNITY);
+  assert.equal(calls.filter(call=>call.method==='PATCH'&&call.path===`/channels/${bot.id}`).length,0,'nothing to change: no write');
+});

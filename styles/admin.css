@@ -172,6 +172,7 @@ img.admin-preview-badge { width: 22px; min-width: 0; padding: 0; border: 0; bord
   .discord-steps{display:flex;align-items:center;justify-content:space-between;gap:10px;border-top:1px solid #2c3533;padding-top:12px;margin-top:12px}
   .discord-steps span{color:#99a3a0;font-variant-numeric:tabular-nums}
   .discord-steps button:disabled{visibility:hidden}
+  .discord-steps button[hidden]{display:none}
 }
 .recap-live-preview{display:grid;gap:16px;min-width:0}
 .recap-live-preview:empty{display:none}

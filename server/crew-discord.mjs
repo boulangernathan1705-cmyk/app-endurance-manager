@@ -30,8 +30,9 @@ export const REMINDERS = [{bit:1, before:24 * HOUR}, {bit:2, before:HOUR}];
 // What the bot needs on the server for the crews (invite link of the « Modules » settings): view channels,
 // manage channels, connect to voice channels, send messages, read the history.
 const ADMINISTRATOR = 1n << 3n, NEEDED = VOICE_ACCESS;
-// One invite for the whole « Discord » setting: the voices, and the bot's own categories and messages (embeds).
-export const CREW_BOT_PERMISSIONS = String(NEEDED | EMBED);
+// One invite for the whole « Discord » setting: the voices, the bot's own categories and messages (embeds), and making
+// its categories private or open again (« Gérer les rôles »: Discord asks it to change a channel's rights).
+export const CREW_BOT_PERMISSIONS = String(NEEDED | EMBED | (1n << 28n));
 const VOICE = 2, CATEGORY = 4;
 
 class Stop extends Error {}
