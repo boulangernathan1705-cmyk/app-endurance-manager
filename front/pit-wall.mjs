@@ -244,9 +244,16 @@ function pitCell(feed, car) {
   return `<b>${stopsOf(feed, car)}</b>${known(last) ? chip(`${fr(last, 1)}s`, 'stop') : ''}`;
 }
 const clsPill = cls => `<span class="pw-cls" style="--cls:${classColor(cls)}">${esc(clsName(cls) || '—')}</span>`;
-// The game gives each car's tank in %: of its virtual energy, or of its fuel for a car without (LMP2). Fuel cars of our
-// class have our tank, so their % reads in litres (null: shown in %).
-const litresPer = (feed, car) => !known(feed.snap.me.ve) && car.cls === feed.snap.me.cls && feed.snap.me.capacity > 0 ? feed.snap.me.capacity / 100 : null;
+// The game gives each car's tank in %: of its virtual energy for a Hypercar or a GT3, of its fuel for the other
+// classes, shown in litres when the tank is known: ours for our class, the Oreca 07's (75 L) for the LMP2.
+const LMP2_TANK = 75;
+const onEnergy = cls => /hyper|lmh|lmdh|gt3/i.test(cls || '');
+function litresPer(feed, car) {
+  const me = feed.snap.me, cls = car.cls || '';
+  if (onEnergy(cls)) return null;
+  if (cls === me.cls && !known(me.ve) && me.capacity > 0) return me.capacity / 100;
+  return /p2/i.test(cls) ? LMP2_TANK / 100 : null;
+}
 // The game gives 0 for a car whose tank it does not share (other players online): shown as unknown.
 function tankCell(car, perCent = null) {
   if (!(known(car.tank) && car.tank > 0)) return '<span class="pw-dim">—</span>';
@@ -286,7 +293,7 @@ function general(feed, race) {
       <td class="pw-n">${best}</td><td class="pw-n pw-opt">${tankCell(car, litresPer(feed, car))}</td><td class="pw-n pw-stand">${pitCell(feed, car)}</td></tr>`;
   }).join('');
   return `<div class="pw-table"><table><thead><tr><th>Pos</th><th class="pw-yellow">#</th><th class="pw-opt">Cat</th><th>Pilote / équipe</th><th class="pw-opt2">Équipe</th><th class="pw-n">${race ? 'Écart leader' : 'Écart'}</th>
-    <th class="pw-n pw-opt">Tours</th><th class="pw-n pw-opt">Dernier tour</th><th class="pw-n">Meilleur tour</th><th class="pw-n pw-opt" title="Réservoir ou énergie virtuelle restante">${known(snap.me.ve) ? 'Énergie virt.' : 'Carburant'}</th><th class="pw-n">Stands / arrêt</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+    <th class="pw-n pw-opt">Tours</th><th class="pw-n pw-opt">Dernier tour</th><th class="pw-n">Meilleur tour</th><th class="pw-n pw-opt" title="Énergie virtuelle restante (Hypercar, GT3) ou carburant (autres catégories)">Énergie / carb.</th><th class="pw-n">Stands / arrêt</th></tr></thead><tbody>${rows}</tbody></table></div>`;
 }
 
 // Every car around us on track, seconds ahead or behind at our pace, whatever its class: who we are about to catch,
@@ -348,7 +355,7 @@ function opponents(feed) {
       <td class="pw-n pw-opt">${known(info.sinceStop) ? info.sinceStop : '—'}</td><td class="pw-n pw-stand">${pitCell(feed, car)}</td></tr>`;
   }).join('');
   return `<div class="pw-table"><table><thead><tr><th>Pos</th><th class="pw-yellow">#</th><th>Pilote / équipe</th><th class="pw-n">${race ? 'Sur nous' : 'Meilleur / nous'}</th><th class="pw-n">Moy. 5 tours</th>
-    <th>Pneus</th><th class="pw-opt">Dégâts</th><th class="pw-n">${known(snap.me.ve) ? 'Énergie' : 'Carburant'}</th><th class="pw-n pw-opt">Conso / tour</th><th class="pw-n" title="Réserve ÷ conso moyenne sur 5 tours">Tours restants</th>
+    <th>Pneus</th><th class="pw-opt">Dégâts</th><th class="pw-n">${onEnergy(snap.me.cls) ? 'Énergie virt.' : 'Carburant'}</th><th class="pw-n pw-opt">Conso / tour</th><th class="pw-n" title="Réserve ÷ conso moyenne sur 5 tours">Tours restants</th>
     <th class="pw-n pw-opt" title="Tours depuis son dernier arrêt">Relais</th><th class="pw-n">Stands / arrêt</th></tr></thead><tbody>${rows}</tbody></table></div>
     <p class="pw-note">${race ? 'Écart en course : + devant nous, − derrière.' : 'Meilleur tour comparé au nôtre : + plus lent.'} Rythme sur 5 tours : <span class="pw-red">rouge</span> plus rapide que nous. Tours restants : énergie ÷ conso moyenne sur 5 tours.</p>`;
 }
