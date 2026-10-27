@@ -7,7 +7,7 @@ import {importNextCommunity, completeSpecialTimes} from './iracing-import.mjs';
 import {refreshShowcaseIfDue} from './demo.mjs';
 import {refreshMemberships} from './access.mjs';
 import {purgeNotifications} from './notifications.mjs';
-import {cleanupEventRecaps} from './recap-discord.mjs';
+import {cleanupEventRecaps,addThreadMembers} from './recap-discord.mjs';
 import {syncCrewDiscord, cleanupOrphanCrewDiscord} from './crew-discord.mjs';
 import {allCommunities, currentCommunity, communityById, communitySlug, appearanceOf} from './community.mjs';
 import {isDevelopment,devRobots,markDevelopmentResponse} from './dev-environment.mjs';
@@ -145,6 +145,8 @@ export default {
     run('Crew Discord sync failed', () => syncCrewDiscord(env, at.getTime(), {requests:slot === 1 ? 4 : 8}));
     run('Orphan crew Discord cleanup failed', () => cleanupOrphanCrewDiscord(env, at.getTime()));
     run('Event recap cleanup failed', () => cleanupEventRecaps(env,at.getTime()));
+    // The pilots added to the races' threads, a few at a time (not next to the iRacing import).
+    if (slot !== 1) run('Thread members failed', () => addThreadMembers(env,at.getTime()));
     // :00 Members and Discord roles not checked for a day are checked again by the bot, a few at a time.
     if (slot === 0 && env.DISCORD_BOT_TOKEN) run('Membership check failed', async () => refreshMemberships(env, await allCommunities(env), 12));
     // :15 Official team and solo iRacing endurances, once for the whole platform.

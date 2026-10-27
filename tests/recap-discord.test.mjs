@@ -5,7 +5,7 @@ import {readFileSync,readdirSync} from 'node:fs';
 import worker from '../server/worker.mjs';
 import {linkTestServer,DEV_COMMUNITY,GUILD} from './fixtures/discord-server.mjs';
 import {syncWeeklyDiscord} from '../server/discord-weekly.mjs';
-import {botCategoryEmojis,saveBotRecap,validateDiscordLayout,syncBotRecaps,previewBotRecap,recapDestinations,eventDeletionTime,eventChannelName,settingsRow,recapError,repairBotRecap,racesOpenNow} from '../server/recap-discord.mjs';
+import {addThreadMembers,botCategoryEmojis,saveBotRecap,validateDiscordLayout,syncBotRecaps,previewBotRecap,recapDestinations,eventDeletionTime,eventChannelName,settingsRow,recapError,repairBotRecap,racesOpenNow} from '../server/recap-discord.mjs';
 
 const OWNER='333333333333333333', BOT='444444444444444444', TEXT='555555555555555555', CATEGORY='666666666666666666';
 const NOW=Date.parse('2026-10-10T12:00:00Z'), DAY=86400000;
@@ -43,6 +43,7 @@ function setup(t,{rights='85008',overrides=[],failure=null}={}){
     if(send){const message={...body,id:String(counter++),channel_id:send[1],author:{id:BOT}};messages.set(message.id,message);return Response.json(message);}
     const edit=path.match(/^\/channels\/(\d+)\/messages\/(\d+)$/);
     if(edit){const message=messages.get(edit[2]);if(!message)return Response.json({code:10008},{status:404});if(method==='DELETE'){messages.delete(edit[2]);return new Response(null,{status:204});}Object.assign(message,body);return Response.json(message);}
+    if(/^\/channels\/\d+\/thread-members\/\d+$/.test(path))return new Response(null,{status:204});
     const thread=path.match(/^\/channels\/(\d+)\/threads$/);
     if(thread&&method==='POST'){const created={...body,id:String(counter++),parent_id:thread[1]};channels.push(created);return Response.json(created);}
     const channel=path.match(/^\/channels\/(\d+)$/);
@@ -817,4 +818,23 @@ test('saving the setting with voices does not ask for rights in the places of th
   const result=await as(env,'/api/community/discord','PUT',{layout:{mode:'events',sims:'lmu',showWeek:true,under:ACCUEIL,voices:true}});
   assert.equal(result.status,200,JSON.stringify(result.data));
   assert.equal(JSON.parse(DB.db.prepare('SELECT modules FROM communities WHERE id=?').get(DEV_COMMUNITY).modules).crewChannels,true);
+});
+
+test('the pilots with access are added to the race\'s thread once each, those of the race first',async t=>{
+  const {DB,env,calls,channels}=setup(t);race(DB);
+  await layout(env,COMMUNITY,{mode:'events',sims:'lmu',under:ACCUEIL});
+  const thread=channels.find(item=>item.type===11);
+  const ROLE='777777777777777001';
+  DB.db.prepare("UPDATE community_role_permissions SET permissions='[]' WHERE discord_role_id=?").run(GUILD);
+  DB.db.prepare("INSERT INTO community_role_permissions(community_id,discord_role_id,permissions,updated_at) VALUES(?,?,'[\"access\"]',0)").run(DEV_COMMUNITY,ROLE);
+  const pilot=(id,roles,status='member')=>{DB.db.prepare('INSERT OR IGNORE INTO users(id,name,created_at) VALUES(?,?,0)').run(id,id);
+    DB.db.prepare('INSERT INTO memberships(community_id,user_id,discord_roles,status,checked_at,created_at) VALUES(?,?,?,?,0,0)').run(DEV_COMMUNITY,id,JSON.stringify(roles),status);};
+  pilot('100000000000000001',[ROLE]);pilot('100000000000000002',[ROLE]);pilot('100000000000000003',[]);pilot('100000000000000004',[ROLE],'left');
+  DB.db.prepare("INSERT INTO participants(id,name,user_id,created_by,created_at,community_id) VALUES('p2','P2','100000000000000002',?,0,?)").run(OWNER,DEV_COMMUNITY);
+  DB.db.prepare("INSERT INTO registrations(id,event_id,departure_id,user_id,name,name_key,category,status,created_at,participant_id,community_id) VALUES('r','race-a','start-a','100000000000000002','P2','p2','GT3','whole',0,'p2',?)").run(DEV_COMMUNITY);
+  calls.length=0;
+  assert.equal(await addThreadMembers(env,NOW,1),1);
+  assert.deepEqual(calls.map(call=>call.path),[`/channels/${thread.id}/thread-members/100000000000000002`],'the race\'s pilot first');
+  assert.equal(await addThreadMembers(env,NOW,12),1,'then the other one with access, not the one without, nor one gone');
+  calls.length=0;assert.equal(await addThreadMembers(env,NOW,12),0);assert.equal(calls.length,0,'each once');
 });
