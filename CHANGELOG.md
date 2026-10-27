@@ -9,7 +9,7 @@
 ### 🔧 Corrections
 
 - **Discord** : en « Un fil par course » avec LMU et iRacing séparés, les vocaux iRacing vont dans « iRacing ».
-- **Discord** : le bot n'ajoute plus les pilotes aux fils (Discord le signalait toujours) ; chacun ouvre le fil depuis # endurances-de-la-semaine.
+- **Discord** : le bot ajoute les pilotes aux fils sans aucune notification (plus de point rouge), y compris dans un fil recréé.
 - **Discord** : le bot attend quand Discord lui demande de ralentir, au lieu d'échouer (« Discord limite les requêtes »).
 
 ## v1.66 — 27 octobre 2026
