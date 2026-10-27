@@ -1,5 +1,13 @@
 # Nouveautés d'Endurance Manager
 
+## v1.60 — 27 octobre 2026
+
+### 🔧 Corrections
+
+- **Discord** : quand Discord demande au bot d'attendre un instant, le bot attend et réessaie au lieu d'afficher « Discord ne répond pas ».
+- **Discord** : la liste de tes salons se relit toute seule si elle échoue après un enregistrement. Sinon, un message le dit et tes choix restent gardés.
+- **Discord** : un message de la semaine (ou son salon) supprimé sur Discord est remis tout seul, sans passer en « Publication en erreur ».
+
 ## v1.59 — 27 octobre 2026
 
 ### ✨ Nouveautés

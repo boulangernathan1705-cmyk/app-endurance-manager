@@ -1,3 +1,4 @@
+import {pause,retryAfter} from './recap-discord.mjs';
 import {effectivePermissions,guildPermissions,missingVoicePermissions,withBotAccess,VOICE_ACCESS,EMBED} from './discord-permissions.mjs';
 // Crews on Discord (migrations 0044, 0045). Two modules, each enabled by the admins of a community:
 // - crewChannels (« Salons d'équipage »): as soon as it is made, every crew gets a voice
@@ -41,9 +42,12 @@ class Stop extends Error {}
 async function discord(env, budget, method, path, body) {
   if (budget.left <= 0) throw new Stop('budget');
   budget.left -= 1;
-  const response = await fetch(`${DISCORD_API}${path}`, {method, signal:AbortSignal.timeout(8000),
+  const call = () => fetch(`${DISCORD_API}${path}`, {method, signal:AbortSignal.timeout(8000),
     headers:{Authorization:`Bot ${String(env.DISCORD_BOT_TOKEN || '').trim()}`, ...(body ? {'Content-Type':'application/json'} : {})},
     body:body ? JSON.stringify(body) : undefined});
+  let response = await call();
+  const wait = await retryAfter(response);
+  if (wait !== null) response = await (await pause(wait), call());
   if (response.status === 429) { budget.left = 0; throw new Stop('rate-limited'); }
   const data = response.status === 204 ? null : await response.json().catch(() => null);
   if (!response.ok) {
