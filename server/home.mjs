@@ -10,7 +10,7 @@ export function homeRedirect(request, community = null) {
   const sim = /(?:^|;\s*)em_sim=([a-z]+)(?:;|$)/.exec(request.headers.get('Cookie') || '')?.[1];
   const events = community?.modules?.soloRaces === true;
   if (!events && !SIMULATORS.includes(sim)) return null;
-  const location = events ? `/${SIMULATORS.includes(sim) ? sim : 'lmu'}/#solo` : `/${sim}/`;
+  const location = events ? '/events/' : `/${sim}/`;
   // 302, never 301: a permanent redirect would stay in the browser cache after a change of simulator.
   return new Response(null, {status:302, headers:{Location:location, 'Cache-Control':'no-store', Vary:'Cookie'}});
 }
