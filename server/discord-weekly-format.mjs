@@ -207,7 +207,8 @@ function footer(updatedAt){return{text:`Endurance Manager · mise à jour à ${u
 // `emojis`: ids of the bot's category emojis by name; without them the categories keep their colour.
 // `weekly`: the week's message of one sim (« 📝 Endurances LMU · semaine du … »), not a race's channel.
 // `alone`: a race's thread, its block only (the week is already in the channel's message).
-export function buildWeeklyDiscordPayload(snapshot,site={},updatedAt=Date.now(),scope='lmu',emojis={},{weekly=false,alone=false}={}){
+// `threads`: « un fil par course », the week's message lists the races only, each a link to its thread ({eventId: thread id}).
+export function buildWeeklyDiscordPayload(snapshot,site={},updatedAt=Date.now(),scope='lmu',emojis={},{weekly=false,alone=false,threads=null}={}){
   const siteUrl=typeof site==='string'?(()=>{try{return new URL(site).origin;}catch{return '';}})():String(site.url||'');
   const sim=SCOPE_LABELS[scope]??' LMU',simPage=scope==='iracing'?'/iracing/':scope==='all'?'/':'/lmu/';
   const current=Array.isArray(snapshot.currentDepartures)?snapshot.currentDepartures:[],future=Array.isArray(snapshot.futureDepartures)?snapshot.futureDepartures:[];
@@ -218,6 +219,16 @@ export function buildWeeklyDiscordPayload(snapshot,site={},updatedAt=Date.now(),
   if(!current.length&&!future.length){
     header.description=`Aucune course avec un équipage engagé n’est en cours et aucun prochain départ${sim} n’est programmé.`;
     header.title=`Aucune endurance${sim} à préparer`;header.color=0x6b7280;header.footer=footer(updatedAt);
+    return{content:'',embeds:[header],allowed_mentions:{parse:[]}};
+  }
+  if(threads){
+    // One line per race: its thread (or its page until the thread is there), then its first start.
+    const line=group=>{const first=group[0],thread=threads[first.eventId],url=raceUrl(siteUrl,first),name=clean(eventTitleAndNote(first.eventName).title);
+      const more=group.length>1?` · ${group.length} départs`:'';
+      return `${thread?`<#${thread}>`:url?`🏁 [${name}](${url})`:`🏁 ${name}`} — ${departureTitle(first)}${more}`;};
+    header.description=cut([...groupByRace(current),...groupByRace(future)].map(line).join('\n'),4096);
+    if(site.bannerUrl)header.image={url:site.bannerUrl};
+    header.footer=footer(updatedAt);
     return{content:'',embeds:[header],allowed_mentions:{parse:[]}};
   }
   const build=compact=>{

@@ -685,6 +685,10 @@ test('« un fil par course »: the bot makes « Endurance Manager » under the c
   const inThread=[...messages.values()].find(item=>item.channel_id===threads.find(thread=>thread.name.includes('Spa')).id);
   assert.ok(inThread);assert.ok(!inThread.embeds.some(embed=>embed.title?.startsWith('📝')),JSON.stringify(inThread.embeds.map(embed=>embed.title)));
   assert.match(inThread.embeds[0].title,/6h de Spa/);
+  // The week's message: the races only, each a link to its thread.
+  const index=[...messages.values()].find(item=>item.channel_id===week.id&&item.embeds[0].title.includes('LMU'));
+  assert.equal(index.embeds.length,1);
+  assert.match(index.embeds[0].description,new RegExp(`<#${threads.find(thread=>thread.name.includes('Spa')).id}>`));
 });
 
 test('LMU and iRacing apart: one category each, each race its thread in its sim\'s channel',async t=>{
