@@ -803,11 +803,11 @@ export async function removeBotDiscord(env,timestamp,community) {
 // Every 2 minutes: the pilots with access to the site added to the races' threads, so each thread stays in their list on
 // Discord (no notification). Those of the race first; each added once (one who leaves it stays out). limit: requests.
 // A thread with nobody left to add is looked at again an hour later (a pilot given access meanwhile).
-export async function addThreadMembers(env, timestamp = Date.now(), limit = 40) {
+export async function addThreadMembers(env, timestamp = Date.now(), limit = 25) {
   if (!env?.DB || !env.DISCORD_BOT_TOKEN) return 0;
   const threads = (await env.DB.prepare(`SELECT p.community_id,p.event_id,p.channel_id,p.guild_id FROM discord_recap_publications p
-    JOIN community_recap_settings s ON s.community_id=p.community_id AND s.enabled=1 AND s.guild_id=p.guild_id
-    WHERE p.in_thread=1 AND p.channel_id IS NOT NULL AND p.closed_at IS NULL AND p.members_checked_at<? ORDER BY p.members_checked_at`).bind(timestamp - 3600000).all()).results || [];
+    JOIN community_recap_settings s ON s.community_id=p.community_id AND s.enabled=1 AND s.guild_id=p.guild_id AND s.lock_until<?
+    WHERE p.in_thread=1 AND p.channel_id IS NOT NULL AND p.closed_at IS NULL AND p.members_checked_at<? ORDER BY p.members_checked_at`).bind(Date.now(), timestamp - 3600000).all()).results || [];
   const budget = {left:limit};
   let added = 0;
   for (const thread of threads) {
@@ -824,9 +824,11 @@ export async function addThreadMembers(env, timestamp = Date.now(), limit = 40) 
       continue;
     }
     for (const {user_id} of pilots) {
+      // Slowly, never while the recap works on this server (Réparer, a new setting): Discord limits the bot's requests.
+      if (added) await pause(400);
       try { await discord(env,'PUT',`/channels/${thread.channel_id}/thread-members/${user_id}`,null,budget); }
       catch (error) {
-        if (error.budget) return added;
+        if (error.budget || error.status === 429) return added;
         // No longer on the server: nothing to add. Anything else (archived thread, rights): this thread waits for next time.
         if (error.code !== 10007) break;
       }
