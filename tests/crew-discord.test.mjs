@@ -367,6 +367,23 @@ test('with « Une catégorie par course », a new crew\'s voice channel waits fo
   assert.deepEqual(created(discord.calls,mark)[0].body,{name:'LMU · 6h SPA · Attente',type:2,permission_overwrites:BOT_ACCESS});
 });
 
+test('a race category deleted on Discord is forgotten: no error, the recap makes it again', async () => {
+  const {DB,req,login,sync,discord}=harness();
+  await login(ADMIN,'admin','Orga');await login(PILOT,'pilot','Alice');
+  assert.equal((await req('/api/community/modules','PATCH',{crewChannels:true},'admin')).status,200);
+  assert.equal((await req('/api/events','POST',race,'admin')).status,201);
+  const event=(await req('/api/events','GET',null,'admin')).data.events[0];
+  const departure=event.departures[0], base=`/api/events/${event.id}/departures/${departure.id}`, at=departure.startsAt-2*24*HOUR;
+  DB.db.prepare("INSERT INTO community_recap_settings(community_id,enabled,mode,scope,guild_id,destination_id,destination_name) VALUES(?,1,'events','lmu',?,'500000000000000002','Courses')").run(DEV,GUILD);
+  DB.db.prepare("INSERT INTO discord_recap_publications(community_id,event_id,guild_id,category_id,marker) VALUES(?,?,?,'600000000000000009','m')").run(DEV,event.id,GUILD);
+  assert.equal((await req(base+'/registrations','POST',{name:'x',category:'GT3',status:'whole'},'pilot')).status,201);
+  assert.equal((await req(base+'/crews','POST',{name:'Perdue',category:'GT3'},'pilot')).status,201);
+  await sync(at);
+  assert.equal(DB.db.prepare('SELECT category_id FROM discord_recap_publications').get().category_id,null);
+  assert.equal(DB.db.prepare('SELECT last_error FROM community_crew_discord').get().last_error,null);
+  assert.equal(DB.db.prepare('SELECT dirty FROM community_recap_settings').get().dirty,1);
+});
+
 test('an empty crew gets its voice channel as soon as it is created', async () => {
   const {DB,req,login,sync,discord}=harness();
   await login(ADMIN,'admin','Orga');
