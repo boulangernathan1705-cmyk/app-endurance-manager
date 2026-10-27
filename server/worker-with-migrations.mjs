@@ -136,7 +136,7 @@ export default {
     const at = new Date(controller?.scheduledTime || Date.now());
     // Every 2 minutes: only the pilots added to the races' threads, a batch at a time.
     if (controller?.cron === '*/2 * * * *') {
-      if (env.DISCORD_BOT_TOKEN) ctx.waitUntil(addThreadMembers(env, at.getTime(), 40).catch(error => console.error('Thread members failed', error instanceof Error ? error.message : 'unknown')));
+      if (env.DISCORD_BOT_TOKEN) ctx.waitUntil(addThreadMembers(env, at.getTime(), 25).catch(error => console.error('Thread members failed', error instanceof Error ? error.message : 'unknown')));
       return;
     }
     const slot = Math.floor(at.getUTCMinutes() / 15);
