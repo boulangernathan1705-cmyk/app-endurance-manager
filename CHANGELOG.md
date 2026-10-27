@@ -1,5 +1,11 @@
 # Nouveautés d'Endurance Manager
 
+## v1.65 — 27 octobre 2026
+
+### 🔧 Corrections
+
+- **Discord** : l'ajout des pilotes aux fils va plus doucement et s'arrête dès que Discord demande de ralentir, pour ne plus gêner le récap (« Discord limite les requêtes »).
+
 ## v1.64 — 27 octobre 2026
 
 ### ✨ Nouveautés
