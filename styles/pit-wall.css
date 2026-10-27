@@ -195,6 +195,7 @@
 .pw-body .pw-car-dents path, .pw-body .pw-car-dents rect { fill: none; stroke-linecap: round; stroke-linejoin: round; }
 .pw-body .pw-car-dents .pw-dent-zone { stroke-width: 6; }
 .pw-body .pw-car-dents .pw-dent-arms path, .pw-body .pw-car-dents .pw-dent-pillar { stroke: var(--pw-muted); stroke-width: 2.5; }
+.pw-body .pw-car-dents .pw-dent-arms path { stroke: var(--pw-text2); stroke-width: 2.5; }
 .pw-body .pw-car-dents .pw-dent-wheel { fill: var(--pw-accent); stroke: var(--pw-muted); stroke-width: 2; }
 .pw-body .pw-car-dents .pw-dent-cockpit { stroke: var(--pw-line); stroke-width: 3; }
 .pw-body .pw-car-dents .pw-dent-wing { stroke: var(--pw-text2); stroke-width: 4; }

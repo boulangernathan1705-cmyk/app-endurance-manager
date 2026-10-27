@@ -427,7 +427,7 @@ function car(feed) {
     'M92 214Q110 212 110 194V170', 'M110 170Q106 117 110 64', 'M110 64V42Q108 18 88 16'];
   const hub = (x, y) => `<rect x="${x}" y="${y}" width="14" height="30" rx="4" class="pw-dent-wheel"/>`;
   const drawing = dents ? `<svg class="pw-car-dents" viewBox="0 0 140 240" role="img" aria-label="Dégâts par zone">
-      <g class="pw-dent-arms"><path d="M26 44L36 40M26 58L36 60M26 52H32M114 44L104 40M114 58L104 60M114 52H108M26 176L36 172M26 190L36 192M114 176L104 172M114 190L104 192"/></g>
+      <g class="pw-dent-arms"><path d="M26 51L52 38L52 64ZM26 183L52 170L52 196ZM114 51L88 38L88 64ZM114 183L88 170L88 196Z"/></g>
       ${hub(12, 36)}${hub(114, 36)}${hub(12, 168)}${hub(114, 168)}
       <rect x="50" y="78" width="40" height="70" rx="16" class="pw-dent-cockpit"/>
       ${outline.map((d, index) => `<path d="${d}" stroke="${zone(dents[index])}" class="pw-dent-zone"/>`).join('')}
