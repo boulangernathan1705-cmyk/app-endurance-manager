@@ -1,5 +1,12 @@
 # Nouveautés d'Endurance Manager
 
+## v1.62 — 27 octobre 2026
+
+### ✨ Nouveautés
+
+- **Calendrier des events** : il a sa propre adresse, `/events/`, la même quel que soit le simu. Un lien copié depuis le calendrier y ramène toujours, même depuis l'aperçu de Discord.
+- **Nouveautés** : chacun ne voit que ce qui le concerne. Les lignes pour les admins ne s'affichent qu'aux admins, et celles d'une communauté qu'à ses pilotes.
+
 ## v1.61 — 27 octobre 2026
 
 ### 🔧 Corrections
