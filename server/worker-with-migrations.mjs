@@ -151,6 +151,8 @@ export default {
     if (slot === 1 && env.IRACING_IMPORT !== 'off') run('iRacing import failed', () => importNextCommunity(env, at));
     // :30 The weekly Discord recaps checked longest ago.
     if (slot === 2) run('Discord weekly scheduled sync failed', () => syncDueRecaps(env, 3));
+    // :00 and :45: a Discord setting still being put in place (or taken off) goes on (not next to the iRacing import).
+    else if (slot !== 1) run('Discord pending sync failed', () => syncDueRecaps(env, 1, at.getTime(), {pending:true}));
     // :45 Time slots of the coming special events (iracing.com article of the race week), and the showcase on Mondays.
     if (slot === 3) run('Special times or showcase failed', async () => {
       if (env.IRACING_IMPORT !== 'off') await completeSpecialTimes(env, {withinDays:10});

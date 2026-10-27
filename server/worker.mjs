@@ -28,7 +28,8 @@ import {resetShowcase, makeOfficial} from './demo.mjs';
 import {setupOfficialServer} from './official-discord.mjs';
 
 
-import {botRecapSettings, recapDestinations, recapError, validateRecapDestinations, previewBotRecap, saveBotRecap, syncBotRecaps, repairBotRecap, RECAP_BOT_PERMISSIONS} from './recap-discord.mjs';
+import {botRecapSettings, recapDestinations, recapError, validateRecapDestinations, validateDiscordLayout, previewBotRecap, saveBotRecap, syncBotRecaps, repairBotRecap, removeBotDiscord, serverRights, RECAP_BOT_PERMISSIONS} from './recap-discord.mjs';
+import {parseLayout} from './discord-layout.mjs';
 import {notify, notificationsApi, departurePilots, eventPilots, crewPilots} from './notifications.mjs';
 import {checkCrewAccess, validateCrewAccess, serverCategories, closeDeletedCrewDiscord, CREW_BOT_PERMISSIONS} from './crew-discord.mjs';
 // Official races (iRacing's official endurances, LMU official events): common to every community (migration 0039).
@@ -960,7 +961,8 @@ async function api(request, env) {
     const savedBotRecap = await botRecapSettings(env, community);
     const botRecap = savedBotRecap;
     return json({botRecap:botRecap ? {enabled:Boolean(botRecap.enabled),mode:botRecap.mode,lmuId:botRecap.destination_id,lmuName:botRecap.destination_name,
-        iracingId:botRecap.iracing_destination_id,iracingName:botRecap.iracing_destination_name,calendarId:botRecap.calendar_destination_id,calendarName:botRecap.calendar_destination_name,lastError:botRecap.last_error} : null,
+        iracingId:botRecap.iracing_destination_id,iracingName:botRecap.iracing_destination_name,calendarId:botRecap.calendar_destination_id,calendarName:botRecap.calendar_destination_name,lastError:botRecap.last_error,
+        layout:parseLayout(botRecap.layout), leftovers:!botRecap.enabled && botRecap.bot_categories !== '{}'} : null,
       recapBotInviteUrl:env.DISCORD_CLIENT_ID ? `https://discord.com/oauth2/authorize?client_id=${encodeURIComponent(env.DISCORD_CLIENT_ID)}&scope=bot&permissions=${RECAP_BOT_PERMISSIONS}&guild_id=${community.discordGuildId}&disable_guild_select=true` : null,
       community:{name:community.name, slug:community.slug}, siteUrl:communityUrl(env, community), rolesConfigured, recapSetupRequired:!savedBotRecap, recapSuggestedScope:legacyScopes.length === 1 ? legacyScopes[0] : 'all',
       guild:{id:community.discordGuildId, name:discord?.name || null, botPresent:Boolean(discord)}, botInviteUrl:botInvite(env, community.discordGuildId),
@@ -969,34 +971,47 @@ async function api(request, env) {
   // Guided bot recaps: preview is read-only; only explicit activation/test publishes.
   if (path === '/api/community/recap/destinations' && method === 'GET') {
     requirePermission(actor,'admin');
-    try { return json({destinations:await recapDestinations(env, community)}); }
+    try { const [destinations, server] = await Promise.all([recapDestinations(env, community), serverRights(env, community)]); return json({destinations, server}); }
     catch (error) { fail(400, recapError(error)); }
   }
   if (path === '/api/community/recap/preview' && method === 'POST') {
     requirePermission(actor,'admin');
     try {
-      const settings = await validateRecapDestinations(env,community,await body(request));
-      return json({previews:await previewBotRecap(env,Date.now(),community,settings)});
+      const input = await body(request);
+      const settings = input.layout ? await validateDiscordLayout(env,community,input.layout) : await validateRecapDestinations(env,community,input);
+      const saved = await botRecapSettings(env, community);
+      return json({previews:await previewBotRecap(env,Date.now(),community,{...settings, bot_categories:saved?.bot_categories || '{}'})});
     } catch (error) { fail(400,error.message === 'Discord indisponible' ? recapError(error) : error.message); }
   }
+  // Everything the bot made for « Discord » taken off: the messages, channels and categories, the crews' voice channels.
+  const removeDiscord = async () => {
+    requirePermission(actor,'admin');
+    const modules = {...community.modules, crewChannels:false, raceReminders:false};
+    let result;
+    try { result = await removeBotDiscord(env,Date.now(),community); }
+    catch (error) { fail(error.status === 409 ? 409 : 400,error.message === 'Discord indisponible' ? recapError(error) : error.message); }
+    await env.DB.prepare('UPDATE communities SET modules=? WHERE id=?').bind(JSON.stringify(modules), community.id).run();
+    community.modules = modules;
+    return json({ok:true, done:!result?.more && !result?.partial});
+  };
   // « Discord » (Modules): the recaps, the crews' voice channels and the reminders, saved together.
   if (path === '/api/community/discord' && method === 'PUT') {
     requirePermission(actor,'admin');
     const input = await body(request);
     const modules = {...community.modules};
-    if (input.enabled === false) {
-      const result = await env.DB.prepare('UPDATE community_recap_settings SET enabled=0 WHERE community_id=? AND lock_until<?').bind(community.id,Date.now()).run();
-      if (!result.meta.changes && await botRecapSettings(env, community)) fail(409,'Une synchronisation est en cours. Réessaie dans un instant.');
-      Object.assign(modules, {crewChannels:false, raceReminders:false});
-      await env.DB.prepare('UPDATE communities SET modules=? WHERE id=?').bind(JSON.stringify(modules), community.id).run();
-      return json({ok:true});
-    }
+    if (input.enabled === false) return removeDiscord();
     try {
-      const settings = await validateRecapDestinations(env,community,input);
-      if (typeof input.raceReminders === 'boolean') modules.raceReminders = input.raceReminders;
-      const voices = input.crewChannels === true;
-      // « Récap de la semaine »: the voice channels go to the category chosen for them; « une catégorie par course »: to the race's.
-      const crewInput = {crewChannels:voices, ...(voices && settings.mode === 'general' && typeof input.crewCategory === 'string' ? {crewCategory:input.crewCategory} : {})};
+      // The setting asked question by question (input.layout), or the one of the previous page.
+      const settings = input.layout ? await validateDiscordLayout(env,community,input.layout) : await validateRecapDestinations(env,community,input);
+      const layout = parseLayout(settings.layout);
+      const reminders = layout ? layout.reminders : input.raceReminders;
+      if (typeof reminders === 'boolean') modules.raceReminders = reminders;
+      const voices = layout ? layout.voices : input.crewChannels === true;
+      // « Récap de la semaine »: the voice channels go to the category chosen for them (« Pit talk », made by the bot, gets
+      // its id at the sync); « une catégorie par course »: to the race's.
+      const crewCategory = layout ? (voices && layout.mode === 'general' && layout.pit === 'existing' ? (layout.pitAt === 'top' ? '' : layout.pitAt) : undefined)
+        : voices && settings.mode === 'general' && typeof input.crewCategory === 'string' ? input.crewCategory : undefined;
+      const crewInput = {crewChannels:voices, ...(crewCategory !== undefined ? {crewCategory} : {})};
       const statements = await crewModuleStatements(env, community, modules, crewInput);
       await saveBotRecap(env,community,settings);
       await env.DB.batch([...statements, env.DB.prepare('UPDATE communities SET modules=? WHERE id=?').bind(JSON.stringify(modules), community.id)]);
@@ -1007,6 +1022,11 @@ async function api(request, env) {
       if (error instanceof HttpError) throw error;
       fail(error.status === 409 ? 409 : 400,error.message === 'Discord indisponible' ? recapError(error) : error.message);
     }
+  }
+  // « Tout retirer »: the bot takes off what it made (a few requests per pass, the next ones every quarter of an hour).
+  if (path === '/api/community/discord' && method === 'DELETE') {
+    requirePermission(actor,'admin');
+    return removeDiscord();
   }
   if (path === '/api/community/recap/repair' && method === 'POST') {
     requirePermission(actor,'admin');

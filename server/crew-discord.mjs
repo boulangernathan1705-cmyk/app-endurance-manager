@@ -107,7 +107,8 @@ const CREW_COLUMNS = `c.id AS crew_id, c.community_id, c.name AS crew_name, c.ca
   e.name AS event_name, e.departures, e.duration_hours, e.duration_minutes, e.circuit, e.schedule_pending`;
 const TRACKED_CREWS = `SELECT d.crew_id AS row_id, d.community_id AS row_community, d.guild_id, d.category_id, d.text_id, d.voice_id, d.message_id,
   d.recap_hash, d.members, d.starts_at, d.reminded, d.created_at, d.parent_id, ${CREW_COLUMNS},
-  CASE WHEN p.category_id NOT IN (COALESCE(s.destination_id,''),COALESCE(s.iracing_destination_id,'')) THEN p.category_id END AS race_category,
+  -- A race's category only counts while « Une catégorie par course » is on: otherwise the voices leave it before it goes.
+  CASE WHEN s.enabled=1 AND s.mode='events' AND p.category_id NOT IN (COALESCE(s.destination_id,''),COALESCE(s.iracing_destination_id,'')) THEN p.category_id END AS race_category,
   CASE WHEN s.enabled=1 AND s.mode='events' THEN CASE WHEN s.destination_id<>'' AND s.iracing_destination_id<>'' THEN 'all'
     WHEN s.destination_id<>'' THEN 'lmu' WHEN s.iracing_destination_id<>'' THEN 'iracing' END END AS race_scope
   FROM crew_discord d LEFT JOIN crews c ON c.id=d.crew_id LEFT JOIN events e ON e.id=c.event_id
@@ -224,7 +225,8 @@ function dueReminders(community, row, start, timestamp) {
 async function needsWork(env, timestamp, community, setting, row, pilots) {
   const start = row.crew_id && row.event_name ? startOf(row) : null;
   if (!start || !community || timestamp >= start.endsAt + CLOSE_AFTER) return true;
-  if (community.modules?.crewChannels !== true || !setting) return false;
+  // Voices turned off (or everything taken off): the voice channel goes.
+  if (community.modules?.crewChannels !== true || !setting) return Boolean(row.voice_id);
   if (!row.voice_id || !row.message_id || row.text_id || row.category_id || Number(row.starts_at) !== start.startsAt) return true;
   if ((row.parent_id || null) !== (row.race_category || setting.voice_category_id || null)) return true;
   const current = discordIds(pilots), known = JSON.parse(row.members || '[]');
@@ -321,7 +323,7 @@ export async function closeDeletedCrewDiscord(env, crewId, timestamp = Date.now(
 
 // The voice channel deleted (with its chat), then what the first version made (text channel, category). Each
 // step is saved, so a run that stops halfway goes on from there.
-async function closeRow(env, budget, timestamp, row, members, {force = false} = {}) {
+async function closeRow(env, budget, timestamp, row, members, {force = false, keepOpen = false} = {}) {
   if (row.voice_id) {
     // A pilot of the crew still talking in the voice channel: it stays until the next check.
     if (!force) for (const userId of members) {
@@ -331,9 +333,10 @@ async function closeRow(env, budget, timestamp, row, members, {force = false} = 
       } catch (error) { if (error instanceof Stop) throw error; }
     }
     await remove(env, budget, row.voice_id);
-    await env.DB.prepare('UPDATE crew_discord SET voice_id=NULL WHERE crew_id=?').bind(row.row_id).run();
+    await env.DB.prepare(`UPDATE crew_discord SET voice_id=NULL${keepOpen ? ', message_id=NULL, parent_id=NULL' : ''} WHERE crew_id=?`).bind(row.row_id).run();
     row.voice_id = null;
   }
+  if (keepOpen) return true;
   await removeLegacy(env, budget, row);
   await env.DB.prepare('UPDATE crew_discord SET closed_at=? WHERE crew_id=?').bind(timestamp, row.row_id).run();
   return true;
@@ -418,8 +421,13 @@ async function syncRow(env, budget, timestamp, community, setting, row, pilots) 
     // A failed DELETE is still pending, regardless of the age of the crew or race.
     return await closeRow(env, budget, timestamp, row, members, {force:!start || !community}) ? 'closed' : null;
   }
-  // Module turned off: nothing new on Discord (what exists closes at the end).
-  if (community.modules?.crewChannels !== true || !setting) return null;
+  // Voices turned off: the voice channel goes once nobody of the crew talks in it; the row stays open, so the voice comes
+  // back if the admins turn them on again before the race.
+  if (community.modules?.crewChannels !== true || !setting) {
+    if (!row.voice_id) return null;
+    const removed = await closeRow(env, budget, timestamp, {...row, text_id:null, category_id:null}, members, {keepOpen:true});
+    return removed ? 'closed' : null;
+  }
 
   const current = discordIds(pilots);
   const crewName = safe(row.crew_name) || 'Équipage';
