@@ -1,5 +1,12 @@
 # Nouveautés d'Endurance Manager
 
+## v1.69 — 27 octobre 2026
+
+### 🔧 Corrections
+
+- **Discord** : les changements du site (inscriptions, équipages, courses) sont regroupés et Discord est mis à jour une fois toutes les 2 minutes, pour ne plus atteindre les limites de Discord.
+- **Discord** : un passage où rien ne change fait moins de requêtes.
+
 ## v1.68 — 27 octobre 2026
 
 ### 🔧 Corrections
