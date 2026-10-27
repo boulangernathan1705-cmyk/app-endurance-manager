@@ -107,7 +107,8 @@ const CREW_COLUMNS = `c.id AS crew_id, c.community_id, c.name AS crew_name, c.ca
   e.name AS event_name, e.departures, e.duration_hours, e.duration_minutes, e.circuit, e.schedule_pending`;
 const TRACKED_CREWS = `SELECT d.crew_id AS row_id, d.community_id AS row_community, d.guild_id, d.category_id, d.text_id, d.voice_id, d.message_id,
   d.recap_hash, d.members, d.starts_at, d.reminded, d.created_at, d.parent_id, ${CREW_COLUMNS},
-  CASE WHEN p.category_id NOT IN (COALESCE(s.destination_id,''),COALESCE(s.iracing_destination_id,'')) THEN p.category_id END AS race_category,
+  -- A race's category only counts while « Une catégorie par course » is on: otherwise the voices leave it before it goes.
+  CASE WHEN s.enabled=1 AND s.mode='events' AND p.category_id NOT IN (COALESCE(s.destination_id,''),COALESCE(s.iracing_destination_id,'')) THEN p.category_id END AS race_category,
   CASE WHEN s.enabled=1 AND s.mode='events' THEN CASE WHEN s.destination_id<>'' AND s.iracing_destination_id<>'' THEN 'all'
     WHEN s.destination_id<>'' THEN 'lmu' WHEN s.iracing_destination_id<>'' THEN 'iracing' END END AS race_scope
   FROM crew_discord d LEFT JOIN crews c ON c.id=d.crew_id LEFT JOIN events e ON e.id=c.event_id

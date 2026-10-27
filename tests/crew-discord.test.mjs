@@ -542,6 +542,7 @@ test('moving a root fallback vocal into a private race category retains the targ
   const tracked=DB.db.prepare('SELECT * FROM crew_discord').get();
   const parent='600000000000000001',rules=[{id:GUILD,type:0,allow:'0',deny:'1049600'},{id:ORGA_ROLE,type:0,allow:'1049600',deny:'0'}];
   discord.state.channels.push({id:parent,type:4,name:'Course privée',permission_overwrites:structuredClone(rules)});
+  DB.db.prepare("INSERT INTO community_recap_settings(community_id,mode,scope,guild_id,destination_id,destination_name) VALUES(?,'events','all',?,'500000000000000002','Courses')").run(DEV,GUILD);
   DB.db.prepare("INSERT INTO discord_recap_publications(community_id,event_id,guild_id,category_id,marker) VALUES(?,?,?,?,'p')").run(DEV,event.id,GUILD,parent);
   await sync(Date.now()+60_000);
   const voice=discord.state.channels.find(item=>item.id===tracked.voice_id);
@@ -569,4 +570,26 @@ test('a voice channel made before the admins chose « Vocaux d’équipage » mo
   assert.equal(DB.db.prepare('SELECT parent_id FROM crew_discord').get().parent_id,'500000000000000002');
   const again=discord.calls.length;await sync(at+2*HOUR);
   assert.equal(discord.calls.slice(again).filter(call=>call.method==='PATCH'&&call.path===`/channels/${row.voice_id}`).length,0,'moved once');
+});
+
+test('switching to « récap de la semaine » takes the voices out of their race category before it goes', async () => {
+  const {DB,req,login,sync,discord}=harness();
+  await login(ADMIN,'admin','Orga');await login(PILOT,'pilot','Alice');
+  assert.equal((await req('/api/community/modules','PATCH',{crewChannels:true},'admin')).status,200);
+  assert.equal((await req('/api/events','POST',race,'admin')).status,201);
+  const event=(await req('/api/events','GET',null,'admin')).data.events[0];
+  const departure=event.departures[0], base=`/api/events/${event.id}/departures/${departure.id}`, at=departure.startsAt-2*24*HOUR;
+  DB.db.prepare("INSERT INTO community_recap_settings(community_id,mode,scope,guild_id,destination_id,destination_name) VALUES(?,'events','all',?,'500000000000000002','Courses')").run(DEV,GUILD);
+  discord.state.channels.push({id:'600000000000000001',type:4,name:'Course'});
+  DB.db.prepare("INSERT INTO discord_recap_publications(community_id,event_id,guild_id,category_id,marker) VALUES(?,?,?,'600000000000000001','m')").run(DEV,event.id,GUILD);
+  assert.equal((await req(base+'/registrations','POST',{name:'x',category:'GT3',status:'whole'},'pilot')).status,201);
+  assert.equal((await req(base+'/crews','POST',{name:'Équipage A',category:'GT3'},'pilot')).status,201);
+  await sync(at);
+  const row=DB.db.prepare('SELECT * FROM crew_discord').get();assert.equal(row.parent_id,'600000000000000001');
+  // The admins switch to the weekly recap with a « pit walk » category; the race category is still there.
+  DB.db.prepare("UPDATE community_recap_settings SET mode='general'").run();
+  assert.equal((await req('/api/community/modules','PATCH',{crewCategory:'500000000000000002'},'admin')).status,200);
+  const mark=discord.calls.length;await sync(at+HOUR);
+  const moves=discord.calls.slice(mark).filter(call=>call.method==='PATCH'&&call.path===`/channels/${row.voice_id}`);
+  assert.equal(moves.length,1);assert.equal(moves[0].body.parent_id,'500000000000000002');assert.equal(moves[0].body.name,'LMU · 6h SPA · Équipage A');
 });
