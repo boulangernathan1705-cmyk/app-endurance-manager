@@ -2,9 +2,9 @@ import {test,expect} from '@playwright/test';
 import {mkdir} from 'node:fs/promises';
 import {join} from 'node:path';
 
-const TEXT='555555555555555555', CATEGORY='666666666666666666';
+const TEXT='555555555555555555', CATEGORY='666666666666666666', PIT='777777777777777777';
 // This suite mocks every API request, so it never writes to a community or to a real Discord server.
-async function mockAdmin(page,{legacy=false,permission=true,initialRecap=null,repairError=null}={}) {
+async function mockAdmin(page,{permission=true,initialRecap=null,repairError=null,solo=true}={}) {
   const calls=[];let botRecap=initialRecap;
   await page.route('**/api/**',async route=>{
     const request=route.request(),path=new URL(request.url()).pathname,method=request.method();
@@ -12,11 +12,16 @@ async function mockAdmin(page,{legacy=false,permission=true,initialRecap=null,re
     let data={ok:true},status=200;
     if(path==='/api/session')data={user:{id:'100000000000000001',name:'Max'},permissions:['admin','access'],manager:false,community:{name:'Ma communauté',shortName:'MC',appearance:{}},communities:[]};
     if(path==='/api/members')data={members:[],permissions:['access','admin']};
-    if(path==='/api/community/settings')data={community:{name:'Ma communauté',shortName:'MC'},modules:{},permissions:['access','admin'],roles:[],crews:{}};
-    if(path==='/api/community/setup')data={community:{name:'Ma communauté'},siteUrl:'https://site.example',guild:{id:'900000000000000001',name:'Ma communauté',botPresent:true},rolesConfigured:true,recapSetupRequired:!botRecap,recapSuggestedScope:legacy?'lmu':'all',botRecap,recapBotInviteUrl:'https://discord.com/oauth2/authorize?client_id=123&scope=bot&permissions=85008',discordInviteUrl:'https://discord.gg/example'};
-    if(path==='/api/community/recap/destinations')data={destinations:[{id:TEXT,type:0,name:'récap-endurances',ready:true,missing:[]},{id:CATEGORY,type:4,name:'Endurances',ready:permission,missing:permission?[]:['Intégrer des liens','Gérer les salons']}]};
-    if(path==='/api/community/recap/preview')data={previews:(request.postDataJSON().mode==='events'?['6h-de-spa-12345678','24h-du-mans-87654321']:['récap-endurances']).map(name=>({name,payload:{embeds:[{title:'Préparation des endurances',description:'📍 Spa-Francorchamps · ⏱️ 6h\n📅 dimanche 11 octobre · 14h',fields:[{name:'Équipages',value:'🟪 **Apex Racing** · GT3 · 🔓 Ouvert\n👤 Nathan · 👤 Max\n📋 Sans équipage : Leo'},{name:'🚫 Pilotes absents',value:'Alex'}],url:'https://site.example/lmu/#event=spa'}]}}))};
-    if(path==='/api/community/recap'&&method==='PUT'){const input=request.postDataJSON();botRecap={...input,enabled:input.enabled!==false,destinationName:input.mode==='events'?'Endurances':'récap-endurances'};data={ok:true,published:true};}
+    if(path==='/api/community/settings')data={community:{name:'Ma communauté',shortName:'MC'},modules:{soloRaces:solo},permissions:['access','admin'],roles:[],crews:{botReady:true,categories:[{id:PIT,name:'PIT WALK'}]}};
+    if(path==='/api/community/setup')data={community:{name:'Ma communauté'},siteUrl:'https://site.example',guild:{id:'900000000000000001',name:'Ma communauté',botPresent:true},rolesConfigured:true,recapSetupRequired:!botRecap,botRecap,recapBotInviteUrl:'https://discord.com/oauth2/authorize?client_id=123&scope=bot&permissions=85008',discordInviteUrl:'https://discord.gg/example'};
+    if(path==='/api/community/recap/destinations')data={destinations:[{id:TEXT,type:0,name:'annonces',position:0,parentId:CATEGORY,parentName:'Endurances',ready:true,missing:[]},{id:CATEGORY,type:4,name:'Endurances',ready:permission,missing:permission?[]:['Intégrer des liens','Gérer les salons']},{id:PIT,type:4,name:'PIT WALK',ready:true,missing:[]}]};
+    if(path==='/api/community/recap/preview')data={previews:(request.postDataJSON().mode==='events'?['🏎️ LMU · 6h de Spa','🏎️ LMU · 24h du Mans']:['récap-de-la-semaine · Endurances LMU']).map(name=>({name,payload:{embeds:[{title:'📝 Endurances LMU',description:'📍 Spa-Francorchamps · ⏱️ 6h\n📅 dimanche 11 octobre · 14h',fields:[{name:'Équipages',value:'🟪 **Équipage A** · GT3 · 🔓 Ouvert\n👤 Pilote 1 · 👤 Pilote 2'}],url:'https://site.example/lmu/#event=spa'}]}}))};
+    if(path==='/api/community/discord'&&method==='PUT'){
+      const input=request.postDataJSON();
+      if(input.enabled===false)botRecap={...botRecap,enabled:false};
+      else if(!input.lmuId&&!input.iracingId&&!input.calendarId){status=400;data={error:'Choisis au moins un endroit où publier.'};}
+      else {botRecap={enabled:true,mode:input.mode,lmuId:input.lmuId,lmuName:input.lmuId===TEXT?'récap-de-la-semaine':'Endurances',iracingId:input.iracingId,iracingName:'',calendarId:input.calendarId,calendarName:'',lastError:null};data={ok:true,published:true};}
+    }
     if(path==='/api/community/recap/repair'){
       if(repairError){status=400;data={error:repairError};}
       else botRecap={...botRecap,lastError:null};
@@ -26,83 +31,88 @@ async function mockAdmin(page,{legacy=false,permission=true,initialRecap=null,re
   await page.addInitScript(()=>localStorage.setItem('endurance_manager_locale','fr'));
   await page.goto('/members.html');
   await page.getByRole('tab',{name:'Modules',exact:true}).click();
-  await page.locator('[data-module-tile="recap"] [data-module-open]').click();
+  await page.locator('[data-module-tile="discord"] [data-module-open]').click();
   return calls;
 }
 async function screenshot(page,name){
   if(!process.env.RECAP_SCREENSHOT_DIR)return;
   await mkdir(process.env.RECAP_SCREENSHOT_DIR,{recursive:true});
-  await page.locator('[data-module-tile="recap"]').screenshot({path:join(process.env.RECAP_SCREENSHOT_DIR,name+'.png')});
+  await page.locator('[data-module-tile="discord"]').screenshot({path:join(process.env.RECAP_SCREENSHOT_DIR,name+'.png')});
 }
-for(const mode of ['general','events'])test(`guided ${mode} recap: independent filters, read-only preview, explicit test and activation`,async({page},testInfo)=>{
-  const calls=await mockAdmin(page),wizard=page.locator('[data-recap-wizard]');
-  await expect(wizard.locator('[data-recap-step]:visible')).toHaveCount(1);
-  await expect(wizard.locator('[data-recap-back]')).toBeHidden();
-  await wizard.locator(`input[name="mode"][value="${mode}"]`).check();
-  if(mode==='events')await screenshot(page,`recap-choices-${testInfo.project.name}`);
-  await wizard.getByRole('button',{name:'Continuer',exact:true}).click();
-  await expect(wizard.locator('input[name="lmu"]')).toBeChecked();await expect(wizard.locator('input[name="iracing"]')).toBeChecked();
-  await wizard.locator('.role-pill').filter({has:page.locator('input[name="lmu"]')}).click();await wizard.locator('.role-pill').filter({has:page.locator('input[name="iracing"]')}).click();
-  await wizard.getByRole('button',{name:'Continuer',exact:true}).click();await expect(wizard.locator('.settings-status')).toContainText('au moins un simulateur');
-  await wizard.locator('.role-pill').filter({has:page.locator('input[name="lmu"]')}).click();await wizard.locator('.role-pill').filter({has:page.locator('input[name="iracing"]')}).click();
-  await wizard.getByRole('button',{name:'Continuer',exact:true}).click();
-  await wizard.locator('select[name="destination"]').selectOption(mode==='events'?CATEGORY:TEXT);
-  await wizard.getByRole('button',{name:'Continuer',exact:true}).click();
-  await expect(wizard.locator('[data-recap-preview]')).toContainText('Apex Racing');
-  await expect(wizard.locator('[data-recap-next]')).toBeHidden();
-  expect(calls.filter(call=>['/api/community/recap','/api/community/recap/test'].includes(call.path))).toHaveLength(0);
-  await expect(wizard.locator('.recap-preview')).toHaveCount(mode==='events'?2:1);
-  if(mode==='events')await screenshot(page,`recap-preview-${testInfo.project.name}`);
+const saves=calls=>calls.filter(call=>call.path==='/api/community/discord');
+
+for(const mode of ['events','general'])test(`Discord setting, ${mode}: rows follow the choice, read-only preview, then activation`,async({page},testInfo)=>{
+  const calls=await mockAdmin(page),form=page.locator('[data-discord-form]');
+  await form.locator(`input[name="mode"][value="${mode}"]`).check();
+  const target=CATEGORY;
+  // Race categories go in categories; a week's recap goes below a channel or a category.
+  await expect(form.locator('select[name="lmu"] option',{hasText:'annonces'})).toHaveCount(mode==='events'?0:1);
+  await expect(form.locator('select[name="calendar"] option',{hasText:'annonces'})).toHaveCount(1);
+  await expect(form.locator('select[name="lmu"] option',{hasText:'Endurances'})).toHaveCount(1);
+  await expect(form.locator('select[name="calendar"]')).toBeVisible();
+  await expect(form.locator('select[name="crewCategory"]')).toHaveCount(0);
+  // Nothing chosen yet: the server refuses, nothing is published.
+  await form.getByRole('button',{name:'Activer',exact:true}).click();
+  await expect(form.locator('.setup-actions .settings-status')).toContainText('au moins un endroit');
+  await form.locator('select[name="lmu"]').selectOption(target);
+  await form.locator('select[name="iracing"]').selectOption(target);
+  await expect(form.locator('[data-discord-sketch]')).toContainText(mode==='events'?'6h de Spa':'Endurances iRacing');
+  if(mode==='general'){
+    await form.locator('input[name="crewChannels"]').check();
+    await form.locator('select[name="crewCategory"]').selectOption(PIT);
+    await expect(form.locator('[data-discord-sketch]')).toContainText('LMU · 6h de Spa · Équipage A');
+  }
+  await screenshot(page,`discord-${mode}-${testInfo.project.name}`);
+  await form.getByRole('button',{name:'Voir les messages',exact:true}).click();
+  await expect(form.locator('[data-recap-preview]')).toContainText('Équipage A');
+  await expect(form.locator('.recap-preview')).toHaveCount(mode==='events'?2:1);
+  expect(saves(calls)).toHaveLength(1);
   expect(await page.evaluate(()=>document.documentElement.scrollWidth-document.documentElement.clientWidth)).toBeLessThanOrEqual(1);
-  await wizard.getByRole('button',{name:'Envoyer un test sur Discord',exact:true}).click();
-  await expect(wizard.locator('.settings-status')).toContainText('n’active pas');
-  expect(calls.filter(call=>call.path==='/api/community/recap/test')).toHaveLength(1);
-  await wizard.getByRole('button',{name:'Activer le récap automatique',exact:true}).click();
-  await expect(page.locator('[data-recap-summary]')).toContainText('Actif');
-  await expect(page.locator('[data-recap-wizard]')).toBeHidden();
-  const activation=calls.find(call=>call.path==='/api/community/recap');expect(activation.input).toMatchObject({mode,scope:'all',destinationId:mode==='events'?CATEGORY:TEXT});
+  await form.getByRole('button',{name:'Activer',exact:true}).click();
+  await expect(page.locator('[data-module-tile="discord"] .admin-state')).toContainText('Actif');
+  const activation=saves(calls).at(-1);
+  expect(activation.input).toMatchObject({mode,lmuId:target,iracingId:target,calendarId:''});
+  if(mode==='general')expect(activation.input).toMatchObject({crewChannels:true,crewCategory:PIT});
 });
 
-test('webhook transition opens bot setup and missing permissions block activation',async({page})=>{
-  const calls=await mockAdmin(page,{legacy:true,permission:false});
-  await expect(page.locator('[data-recap-guide]')).toContainText('les anciennes publications par webhook sont arrêtées');
-  await expect(page.locator('[data-recap-summary]')).toHaveCount(0);
-  await expect(page.locator('[data-recap-legacy],form[data-recaps]')).toHaveCount(0);
-  await expect(page.locator('[data-recap-wizard]')).toBeVisible();
-  const wizard=page.locator('[data-recap-wizard]');await wizard.locator('input[value="events"]').check();
-  await wizard.getByRole('button',{name:'Continuer',exact:true}).click();
-  await expect(wizard.locator('input[name="lmu"]')).toBeChecked();
-  await expect(wizard.locator('input[name="iracing"]')).not.toBeChecked();
-  await wizard.getByRole('button',{name:'Continuer',exact:true}).click();
-  await wizard.locator('select').selectOption(CATEGORY);await expect(wizard.locator('[data-recap-rights]')).toContainText('Gérer les salons');
-  await expect(wizard.locator('[data-recap-rights]')).toContainText('Intégrer des liens');
-  await expect(wizard.getByRole('link',{name:'Donner les droits au bot'})).toHaveAttribute('href',/permissions=85008/);
-  await wizard.getByRole('button',{name:'Continuer',exact:true}).click();
-  await expect(wizard.locator('.settings-status')).toContainText('Permissions manquantes');
-  await expect(wizard.locator('[data-recap-step="2"]')).toBeVisible();
-  expect(calls.filter(call=>call.path==='/api/community/recap'||call.path.startsWith('/api/community/recaps'))).toHaveLength(0);
+test('below a chosen channel, the sketch shows the bot channel right after it',async({page})=>{
+  await mockAdmin(page);
+  const form=page.locator('[data-discord-form]');
+  await form.locator('input[name="mode"][value="general"]').check();
+  await form.locator('select[name="lmu"]').selectOption(TEXT);
+  await expect(form.locator('[data-discord-sketch] li')).toHaveText(['Endurances','# annonces',/# récap-de-la-semaine/]);
 });
 
+test('missing bot permissions are named in the destination list',async({page})=>{
+  await mockAdmin(page,{permission:false});
+  const form=page.locator('[data-discord-form]');
+  await expect(form.locator('select[name="lmu"] option',{hasText:'le bot n’a pas ses droits'})).toHaveCount(1);
+  await form.locator('select[name="lmu"]').selectOption(CATEGORY);
+  await expect(form.locator('.discord-rights')).toContainText('Gérer les salons');
+  await expect(form.getByRole('link',{name:'Inviter le bot avec ses droits'})).toHaveAttribute('href',/permissions=85008/);
+});
 
-const brokenRecap={enabled:true,mode:'events',scope:'lmu',destinationId:CATEGORY,destinationName:'Endurances',lastError:'Le salon de publication du récap est introuvable ou inaccessible au bot. Clique sur Réparer le récap.'};
-test('admin can repair from the error summary without reconfiguring or reauthorizing the bot',async({page})=>{
+test('no calendar row without the events module',async({page})=>{
+  await mockAdmin(page,{solo:false});
+  await expect(page.locator('[data-discord-form] select[name="calendar"]')).toHaveCount(0);
+});
+
+const brokenRecap={enabled:true,mode:'events',lmuId:CATEGORY,lmuName:'Endurances',iracingId:'',iracingName:'',calendarId:'',calendarName:'',lastError:'Le salon de publication du récap est introuvable ou inaccessible au bot. Clique sur Réparer le récap.'};
+test('admin can repair from the error without reconfiguring',async({page})=>{
   const calls=await mockAdmin(page,{initialRecap:brokenRecap});
-  const summary=page.locator('[data-recap-summary]');
-  await expect(summary).toContainText('Publication en erreur');
-  await expect(summary.getByRole('link',{name:'Donner les droits au bot'})).toHaveCount(0);
-  await summary.getByRole('button',{name:'Réparer le récap',exact:true}).click();
-  await expect(page.locator('[data-recap-repair-status]')).toContainText('Réparation effectuée');
-  await expect(page.locator('[data-recap-summary]')).not.toContainText('Publication en erreur');
-  await expect(page.locator('[data-recap-summary]')).toContainText('Actif');
-  await expect(page.locator('[data-recap-wizard]')).toBeHidden();
+  const form=page.locator('[data-discord-form]');
+  await expect(form).toContainText('Publication en erreur');
+  await form.getByRole('button',{name:'Réparer',exact:true}).click();
+  await expect(page.locator('[data-discord-form] .setup-actions .settings-status')).toContainText('vérifiés');
+  await expect(page.locator('[data-discord-form]')).not.toContainText('Publication en erreur');
   expect(calls.filter(c=>c.path==='/api/community/recap/repair')).toHaveLength(1);
-  expect(calls.filter(c=>c.path==='/api/community/recap'&&c.method==='PUT')).toHaveLength(0);
+  expect(saves(calls)).toHaveLength(0);
 });
 
 test('repair failures are visible beside the button and leave the settings intact',async({page})=>{
   await mockAdmin(page,{initialRecap:brokenRecap,repairError:'Dans les permissions de « Endurances », autorise le bot : Intégrer des liens.'});
-  await page.getByRole('button',{name:'Réparer le récap',exact:true}).click();
-  await expect(page.locator('[data-recap-repair-status]')).toContainText('Intégrer des liens');
-  await expect(page.getByRole('button',{name:'Réparer le récap',exact:true})).toBeEnabled();
-  await expect(page.locator('[data-recap-summary]')).toContainText('Publication en erreur');
+  await page.getByRole('button',{name:'Réparer',exact:true}).click();
+  await expect(page.locator('[data-discord-form] .setup-actions .settings-status')).toContainText('Intégrer des liens');
+  await expect(page.getByRole('button',{name:'Réparer',exact:true})).toBeEnabled();
+  await expect(page.locator('[data-discord-form]')).toContainText('Publication en erreur');
 });

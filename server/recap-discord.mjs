@@ -21,9 +21,10 @@ export const botRecapSettings = (env, community) => env.DB.prepare('SELECT * FRO
 const WEEK = {lmu:'week:lmu', iracing:'week:iracing', calendar:'week:calendar'};
 const isRaceRow = row => Boolean(row?.event_id) && !String(row.event_id).startsWith('week:');
 const isIracing = event => String(event?.circuit || '').startsWith('iracing-');
-const anchorOf = (settings, event) => (isIracing(event) ? settings.iracing_destination_id : settings.destination_id) || '';
-// Never deleted: in « récap de la semaine » they are text channels, never a race's category.
-const anchorIds = settings => [settings.destination_id, settings.iracing_destination_id].filter(Boolean);
+// The category a race goes under; none in « récap de la semaine ».
+const anchorOf = (settings, event) => settings.mode !== 'events' ? '' : (isIracing(event) ? settings.iracing_destination_id : settings.destination_id) || '';
+// The admins' categories and channels: never deleted.
+const anchorIds = settings => [settings.destination_id, settings.iracing_destination_id, settings.calendar_destination_id].filter(Boolean);
 // The races that get a category: 'all', 'lmu', 'iracing', or null.
 export const scopeOf = settings => settings.mode !== 'events' ? null : settings.destination_id && settings.iracing_destination_id ? 'all'
   : settings.destination_id ? 'lmu' : settings.iracing_destination_id ? 'iracing' : null;
@@ -34,6 +35,9 @@ function weekDestination(settings, kind, community) {
 // Several messages in one channel keep the order they were sent in: the TDZ calendar comes first.
 const messageOrder = (env, community) => tdzOnly(community, isDevelopment(env)) ? ['calendar','lmu','iracing'] : ['lmu','iracing','calendar'];
 const MESSAGE_NAMES = {lmu:'Endurances LMU', iracing:'Endurances iRacing', calendar:'Calendrier de la semaine'};
+// In the category chosen for a week's recap, the bot makes its own text channel (with its rights): the endurances share one.
+export const WEEK_CHANNELS = {races:'récap-de-la-semaine', calendar:'calendrier-de-la-semaine'};
+const weekGroup = kind => kind === 'calendar' ? 'calendar' : 'races';
 const parse = value => { try { const result = JSON.parse(value); return Array.isArray(result) ? result : []; } catch { return []; } };
 
 export function recapError(error) {
@@ -51,7 +55,7 @@ export function recapError(error) {
 }
 async function discord(env, method, path, body, budget = {left:12}) {
   if (!String(env.DISCORD_BOT_TOKEN || '').trim()) throw Object.assign(new Error('Le bot du site n’est pas configuré.'), {status:401});
-  if (--budget.left < 0) throw new Error('Lot terminé ; les autres événements seront traités au prochain passage.');
+  if (--budget.left < 0) throw Object.assign(new Error('Lot terminé ; les autres événements seront traités au prochain passage.'), {budget:true});
   const response = await fetch(API + path, {method, signal:AbortSignal.timeout(8000),
     headers:{Authorization:`Bot ${env.DISCORD_BOT_TOKEN}`, ...(body ? {'Content-Type':'application/json'} : {})}, body:body ? JSON.stringify(body) : undefined});
   const data = response.status === 204 ? null : await response.json().catch(() => null);
@@ -66,11 +70,13 @@ export async function recapDestinations(env, community) {
     discord(env, 'GET', `/guilds/${guild}/members/${env.DISCORD_CLIENT_ID}`)]);
   if (!Array.isArray(channels) || !Array.isArray(roles) || !member) throw new Error('Réponse Discord invalide.');
   return channels.filter(channel => [0,4].includes(channel.type)).map(channel => {
-    const rights = effectivePermissions(roles, member, guild, channel, env.DISCORD_CLIENT_ID);
+    // Below a text channel the bot makes its own: what counts is its category (or the server).
+    const parent = channel.type === 0 ? channels.find(item => item.id === channel.parent_id && item.type === 4) : null;
+    const rights = effectivePermissions(roles, member, guild, channel.type === 0 ? parent || {id:'',permission_overwrites:[]} : channel, env.DISCORD_CLIENT_ID);
     const voiceRequired = channel.type === 4 && community.modules?.crewChannels === true;
-    const required = REQUIRED | (channel.type === 4 ? MANAGE : 0n) | (voiceRequired ? VOICE_ACCESS : 0n);
-    return {id:channel.id, name:channel.name, type:channel.type, ready:(rights & required) === required,
-      missing:[['Voir le salon',VIEW],['Envoyer des messages',SEND],['Voir les anciens messages',HISTORY],['Intégrer des liens',EMBED], ...(channel.type === 4 ? [['Gérer les salons',MANAGE]] : []),...(voiceRequired ? [['Se connecter',1n << 20n]] : [])].filter(([,bit]) => !(rights & bit)).map(([label]) => label)};
+    const required = REQUIRED | MANAGE | (voiceRequired ? VOICE_ACCESS : 0n);
+    return {id:channel.id, name:channel.name, type:channel.type, position:channel.position || 0, parentId:channel.parent_id || null, parentName:parent?.name || null, ready:(rights & required) === required,
+      missing:[['Voir le salon',VIEW],['Envoyer des messages',SEND],['Voir les anciens messages',HISTORY],['Intégrer des liens',EMBED],['Gérer les salons',MANAGE],...(voiceRequired ? [['Se connecter',1n << 20n]] : [])].filter(([,bit]) => !(rights & bit)).map(([label]) => label)};
   });
 }
 // The admins' choice: the mode, then where each recap goes (an id, or '' for « Ne pas publier »).
@@ -103,8 +109,10 @@ export async function validateRecapDestinations(env, community, input) {
     if (!destination.ready) throw Object.assign(new Error(`Dans les permissions de « ${destination.name} », autorise le bot : ${destination.missing.join(', ')}.`), {status:400});
     return {id, name:destination.name};
   };
-  const races = wanted.mode === 'events' ? 4 : 0;
-  return settingsRow(wanted.mode, pick(wanted.lmu, races), pick(wanted.iracing, races), pick(calendar, 0));
+  // A week's recap goes in a category (the bot makes its channel there); a text channel chosen before still works.
+  const week = id => destinations.find(item => item.id === id)?.type === 0 ? pick(id, 0) : pick(id, 4);
+  const races = id => wanted.mode === 'events' ? pick(id, 4) : week(id);
+  return settingsRow(wanted.mode, races(wanted.lmu), races(wanted.iracing), week(calendar));
 }
 export function eventChannelName(name, eventId) {
   const slug = String(name).normalize('NFKD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'') || 'endurance';
@@ -284,11 +292,24 @@ async function publish(env, timestamp, community, settings, row, event, budget, 
   if (row.closed_at) return;
   let channel = row.channel_id;
   const kind = isEvent ? null : row.event_id.slice(5);
-  if (!isEvent && channel !== weekDestination(settings, kind, community)) {
-    channel = weekDestination(settings, kind, community);
-    row.message_id = null; row.content_hash = '';
-    await env.DB.prepare('UPDATE discord_recap_publications SET channel_id=?,message_id=NULL,content_hash=? WHERE community_id=? AND event_id=?')
-      .bind(channel,'',community.id,row.event_id).run();
+  if (!isEvent) {
+    const destination = weekDestination(settings, kind, community);
+    // Set up for this destination (a recap posted straight into a channel by an older version is moved to its own).
+    const placed = Boolean(row.category_id) && row.category_id === destination;
+    let channels = null;
+    if (placed && repair && row.category_id) {
+      channels = await discord(env,'GET',`/guilds/${row.guild_id}/channels`,null,budget);
+      if (!channels.some(item => item.id === channel)) channel = null;
+    }
+    if (!placed || !channel) {
+      const next = await weekChannel(env, community, row, kind, destination, budget);
+      if (row.channel_id !== next.channel) await takeDown(env, community, row, budget);
+      channel = next.channel;
+      if (row.channel_id !== channel) { row.message_id = null; row.content_hash = ''; }
+      Object.assign(row, {channel_id:channel, category_id:next.category});
+      await env.DB.prepare('UPDATE discord_recap_publications SET channel_id=?,category_id=?,message_id=?,content_hash=? WHERE community_id=? AND event_id=?')
+        .bind(channel,next.category,row.message_id,row.content_hash,community.id,row.event_id).run();
+    }
   }
   const anchors = anchorIds(settings), anchorId = isEvent ? anchorOf(settings, event) : '';
   if (isEvent && (repair || !channel || !row.category_id || anchors.includes(row.category_id))) {
@@ -346,11 +367,34 @@ async function publish(env, timestamp, community, settings, row, event, budget, 
   await env.DB.prepare('UPDATE discord_recap_publications SET message_id=?,content_hash=? WHERE community_id=? AND event_id=?')
     .bind(row.message_id,hash,community.id,row.event_id).run();
 }
-// A week's message the admins no longer want: deleted on Discord (already gone: forgotten).
+// The week's channel, made by the bot (with its rights) just below the chosen channel, or at the top of the chosen category,
+// and found again by its topic. category_id keeps the place chosen for it.
+async function weekChannel(env, community, row, kind, destination, budget) {
+  const channels = await discord(env,'GET',`/guilds/${row.guild_id}/channels`,null,budget);
+  const target = channels.find(item => item.id === destination);
+  if (!target) throw Object.assign(new Error('Discord indisponible'), {status:404,code:10003,path:`/channels/${destination}`});
+  const parent = target.type === 4 ? target.id : target.parent_id || null, category = channels.find(item => item.id === parent);
+  const group = weekGroup(kind), topic = 'endurance-manager:' + (await digest([community.id,'week',destination,group])).slice(0,24);
+  const existing = channels.find(item => item.type === 0 && item.topic === topic);
+  if (existing) return {channel:existing.id, category:destination};
+  const created = await discord(env,'POST',`/guilds/${row.guild_id}/channels`,{type:0,name:WEEK_CHANNELS[group],topic,...(parent ? {parent_id:parent} : {}),
+    permission_overwrites:withBotAccess(category?.permission_overwrites,env.DISCORD_CLIENT_ID,REQUIRED)},budget);
+  // Its place among the channels of that category: first, or right after the chosen channel (one request).
+  const siblings = channels.filter(item => item.type !== 4 && (item.parent_id || null) === parent)
+    .sort((a,b) => (a.position || 0) - (b.position || 0) || (BigInt(a.id) < BigInt(b.id) ? -1 : 1));
+  siblings.splice(target.type === 4 ? 0 : siblings.findIndex(item => item.id === target.id) + 1, 0, created);
+  if (siblings.length > 1) await discord(env,'PATCH',`/guilds/${row.guild_id}/channels`,siblings.map((item,position) => ({id:item.id,position})),budget);
+  return {channel:created.id, category:destination};
+}
+// A week's message the admins no longer want (or no longer there): deleted on Discord, with the bot's channel once no recap
+// uses it. Already gone: forgotten.
 async function takeDown(env, community, row, budget) {
-  try { await discord(env,'DELETE',`/channels/${row.channel_id}/messages/${row.message_id}`,null,budget); }
-  catch (error) { if (error.status !== 404) throw error; }
-  await env.DB.prepare("UPDATE discord_recap_publications SET channel_id=NULL,message_id=NULL,content_hash='' WHERE community_id=? AND event_id=?").bind(community.id,row.event_id).run();
+  const ignoreGone = error => { if (error.status !== 404) throw error; };
+  if (row.message_id) await discord(env,'DELETE',`/channels/${row.channel_id}/messages/${row.message_id}`,null,budget).catch(ignoreGone);
+  await env.DB.prepare("UPDATE discord_recap_publications SET channel_id=NULL,category_id=NULL,message_id=NULL,content_hash='' WHERE community_id=? AND event_id=?").bind(community.id,row.event_id).run();
+  if (row.category_id && row.channel_id && row.channel_id !== row.category_id && !await env.DB.prepare("SELECT 1 FROM discord_recap_publications WHERE community_id=? AND event_id LIKE 'week:%' AND channel_id=?").bind(community.id,row.channel_id).first())
+    await discord(env,'DELETE',`/channels/${row.channel_id}`,null,budget).catch(ignoreGone);
+  Object.assign(row, {channel_id:null, category_id:null, message_id:null, content_hash:''});
 }
 async function syncLocked(env,timestamp,community,settings, test = false, budget = {left:12}, priority = null) {
   const rows = (await env.DB.prepare('SELECT * FROM discord_recap_publications WHERE community_id=? AND closed_at IS NULL ORDER BY checked_at,event_id').bind(community.id).all()).results || [];
@@ -358,10 +402,17 @@ async function syncLocked(env,timestamp,community,settings, test = false, budget
   // Cleanup is independent of mode/activation. Only bot-created event channels may be deleted.
   for (const row of rows.filter(isRaceRow).slice(0,2)) {
     const event = events.find(item => item.id === row.event_id), deleteAt = event ? eventDeletionTime(event) : row.delete_after;
+    // A race no longer given a category (« récap de la semaine », or its sim not published) loses its channels at once.
+    const unwanted = settings.enabled && event && !anchorOf(settings, event);
     if (deleteAt !== null && timestamp >= deleteAt) {
       await removeRaceChannels(env,row,anchorIds(settings),budget);
       await env.DB.prepare('UPDATE discord_recap_publications SET closed_at=? WHERE community_id=? AND event_id=?').bind(timestamp,community.id,row.event_id).run();
       row.closed_at = timestamp;
+    } else if (unwanted && (row.category_id || row.channel_id)) {
+      // Forgotten, not closed: back to « une catégorie par course », the race gets its category again.
+      await removeRaceChannels(env,row,anchorIds(settings),budget);
+      await env.DB.prepare("UPDATE discord_recap_publications SET category_id=NULL,channel_id=NULL,message_id=NULL,content_hash='' WHERE community_id=? AND event_id=?").bind(community.id,row.event_id).run();
+      Object.assign(row, {category_id:null, channel_id:null, message_id:null, content_hash:''});
     }
     await env.DB.prepare('UPDATE discord_recap_publications SET checked_at=? WHERE community_id=? AND event_id=?').bind(timestamp,community.id,row.event_id).run();
   }
@@ -389,7 +440,6 @@ async function syncLocked(env,timestamp,community,settings, test = false, budget
       const channels = await discord(env,'GET',`/guilds/${settings.guild_id}/channels`,null,budget);
       await placeCategory(env,community,settings.guild_id,channels,null,settings,budget);
     }
-    // A race of a sim no longer published keeps its channels until they are deleted after the race.
     for (const eventId of ordered.filter(id => anchorOf(settings, events.find(item => item.id === id))).slice(0,2)) {
       const event = events.find(item => item.id === eventId);
       if (!event || (eventDeletionTime(event) !== null && timestamp >= eventDeletionTime(event))) continue;
@@ -421,6 +471,11 @@ export async function syncBotRecaps(env,timestamp,community, test = false, prior
     await env.DB.prepare('UPDATE community_recap_settings SET last_error=NULL WHERE community_id=? AND lock_token=?').bind(community.id,token).run();
     return result;
   } catch (error) {
+    // Out of requests for this pass (a new setting can take several): not an error, the next pass goes on.
+    if (error.budget) {
+      await env.DB.prepare('UPDATE community_recap_settings SET dirty=1 WHERE community_id=? AND lock_token=?').bind(community.id,token).run();
+      return {ok:true,partial:true};
+    }
     const message = error.message.startsWith('Discord') ? recapError(error) : error.message;
     await env.DB.prepare('UPDATE community_recap_settings SET last_error=?,dirty=1 WHERE community_id=? AND lock_token=?').bind(message,community.id,token).run();
     throw new Error(message);
