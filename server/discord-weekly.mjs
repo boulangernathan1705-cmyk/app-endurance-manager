@@ -190,12 +190,13 @@ export async function loadWeeklyDiscordSnapshot(env, timestamp, community, scope
 }
 
 // The calendar's events (EVENT SOLO / EVENT TDZ) of the week, with their places taken by this community's pilots.
-export async function loadCalendarSnapshot(env, timestamp, community) {
+// sim: 'iracing' for the iRacing events only, 'lmu' for all the others (null: all).
+export async function loadCalendarSnapshot(env, timestamp, community, sim = null) {
   const rows = (await env.DB.prepare(`SELECT id,name,sim,circuit,rounds,capacity,departures,schedule_pending FROM events
     WHERE (community_id=? OR community_id='official') AND format='solo' AND ${iracingSoloSql(env,community)}
     ${grindfestEnabled(community, isDevelopment(env)) ? '' : "AND COALESCE(json_extract(details,'$.type'),'') NOT IN ('Gridfest','Grindfest')"}
     ORDER BY created_at,id`).bind(community.id).all()).results || [];
-  const starts = rows.flatMap(row => parseJson(row.departures, []).filter(start => Number.isFinite(Number(start?.startsAt)))
+  const starts = rows.filter(row => !sim || (simForEvent(row) === 'iracing') === (sim === 'iracing')).flatMap(row => parseJson(row.departures, []).filter(start => Number.isFinite(Number(start?.startsAt)))
     .map(start => ({row, start, startsAt:Number(start.startsAt)})));
   const currentWeek = parisWeek(timestamp);
   let week = currentWeek, selected = starts.filter(item => item.startsAt > timestamp && isInParisWeek(item.startsAt, week));
@@ -233,10 +234,12 @@ export async function syncWeeklyDiscord(env,timestamp=Date.now(),community=null,
   return result;
 }
 
-export async function syncDueRecaps(env,limit=3,timestamp=Date.now()) {
+// pending: only a community with work left from its last pass (a new setting takes several), never one in error.
+export async function syncDueRecaps(env,limit=3,timestamp=Date.now(),{pending=false}={}) {
   if (!env?.DB || limit < 1) return 0;
+  const rows=(await env.DB.prepare(`SELECT community_id,checked_at FROM community_recap_settings ${pending ? 'WHERE dirty=1 AND last_error IS NULL' : ''} ORDER BY checked_at,community_id`).all()).results || [];
+  if (!rows.length) return 0;
   const communities=await allCommunities(env);
-  const rows=(await env.DB.prepare('SELECT community_id,checked_at FROM community_recap_settings ORDER BY checked_at,community_id').all()).results || [];
   for (const row of rows) {
     const community=communities.find(item=>item.id===row.community_id);
     if (!community) continue;

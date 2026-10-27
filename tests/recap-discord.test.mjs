@@ -5,7 +5,7 @@ import {readFileSync,readdirSync} from 'node:fs';
 import worker from '../server/worker.mjs';
 import {linkTestServer,DEV_COMMUNITY,GUILD} from './fixtures/discord-server.mjs';
 import {syncWeeklyDiscord} from '../server/discord-weekly.mjs';
-import {botCategoryEmojis,saveBotRecap,syncBotRecaps,previewBotRecap,recapDestinations,eventDeletionTime,eventChannelName,settingsRow,recapError,repairBotRecap,racesOpenNow} from '../server/recap-discord.mjs';
+import {botCategoryEmojis,saveBotRecap,validateDiscordLayout,syncBotRecaps,previewBotRecap,recapDestinations,eventDeletionTime,eventChannelName,settingsRow,recapError,repairBotRecap,racesOpenNow} from '../server/recap-discord.mjs';
 
 const OWNER='333333333333333333', BOT='444444444444444444', TEXT='555555555555555555', CATEGORY='666666666666666666';
 const NOW=Date.parse('2026-10-10T12:00:00Z'), DAY=86400000;
@@ -429,8 +429,8 @@ test('repair refuses insufficient permissions or a missing destination; disabled
   await assert.rejects(repairBotRecap(env,NOW,COMMUNITY),/Intégrer des liens/);assert.equal(creates(calls).length,0);
   channels.find(c=>c.id===CATEGORY).permission_overwrites=[];
   await repairBotRecap(env,NOW,COMMUNITY);assert.equal(DB.db.prepare('SELECT enabled FROM community_recap_settings').get().enabled,0);
-  const fail=(path,method)=>method==='PATCH'&&path.includes('/messages/');fail.status=403;setFailure(fail);calls.length=0;
-  await assert.rejects(repairBotRecap(env,NOW,COMMUNITY),/permissions/);assert.equal(sends(calls).length,0);
+  // Taken off (enabled 0): a repair puts nothing back.
+  assert.equal(sends(calls).length,0);assert.equal(creates(calls).length,0);
   setFailure(null);channels.splice(channels.findIndex(c=>c.id===CATEGORY),1);calls.length=0;
   await assert.rejects(repairBotRecap(env,NOW,COMMUNITY),/destination/);assert.equal(creates(calls).length,0);
 });
@@ -650,4 +650,75 @@ test('switching to « récap de la semaine » removes the race categories at onc
   assert.ok(channels.some(item=>item.id===CATEGORY),'the chosen category stays');
   await saveBotRecap(env,COMMUNITY,SETTINGS);calls.length=0;await syncBotRecaps(env,NOW+2000,COMMUNITY);
   assert.ok(channels.some(item=>item.name==='🏎️ LMU · 6h de Spa'));
+});
+
+// The setting asked question by question (server/discord-layout.mjs).
+const ACCUEIL='111111111111111110', VOCAUX='111111111111111112';
+async function layout(env,community,answers){
+  const settings=await validateDiscordLayout(env,community,answers);
+  await saveBotRecap(env,community,settings);
+  return syncBotRecaps(env,NOW,community);
+}
+const named=(channels,name)=>channels.find(item=>item.name===name);
+const categoriesInOrder=channels=>channels.filter(item=>item.type===4).sort((a,b)=>(a.position||0)-(b.position||0)).map(item=>item.name);
+
+test('« une catégorie par course »: the bot makes « Endurance Manager » under the chosen category, its channels, then the races',async t=>{
+  const {DB,env,channels}=setup(t);race(DB);race(DB,'race-b','8h de Watkins Glen','iracing-watkins',[{id:'start-b',startsAt:NOW+2*DAY}]);
+  const community={...COMMUNITY,modules:{...COMMUNITY.modules,soloRaces:true}};
+  await layout(env,community,{mode:'events',sims:'all',split:false,showWeek:true,showEvents:true,under:ACCUEIL});
+  const bot=named(channels,'Endurance Manager');assert.equal(bot.type,4);
+  assert.deepEqual(channels.filter(item=>item.parent_id===bot.id).map(item=>item.name).sort(),['endurances-de-la-semaine','event-solo-de-la-semaine']);
+  const settings=DB.db.prepare('SELECT * FROM community_recap_settings').get();
+  assert.equal(settings.destination_id,bot.id);assert.equal(settings.iracing_destination_id,bot.id);
+  await syncBotRecaps(env,NOW,community);
+  assert.deepEqual(categoriesInOrder(channels),['Accueil','Endurance Manager','🏎️ LMU · 6h de Spa','🏁 iRacing · 8h de Watkins Glen','Endurances','Vocaux']);
+});
+
+test('LMU and iRacing apart: one category each, with their own channels and races',async t=>{
+  const {DB,env,channels}=setup(t);race(DB);race(DB,'race-b','8h de Watkins Glen','iracing-watkins',[{id:'start-b',startsAt:NOW+2*DAY}]);
+  await layout(env,COMMUNITY,{mode:'events',sims:'all',split:true,showWeek:true,showEvents:false,under:'top'});
+  await syncBotRecaps(env,NOW,COMMUNITY);
+  assert.deepEqual(categoriesInOrder(channels).slice(0,4),['LMU','🏎️ LMU · 6h de Spa','iRacing','🏁 iRacing · 8h de Watkins Glen']);
+  assert.equal(channels.filter(item=>item.name==='endurances-de-la-semaine').length,2);
+});
+
+test('« récap de la semaine »: just below a channel, the events with the endurances, voices in « Pit talk » made by the bot',async t=>{
+  const {DB,env,channels}=setup(t);race(DB);
+  const community={...COMMUNITY,modules:{...COMMUNITY.modules,soloRaces:true,crewChannels:true}};
+  DB.db.prepare("INSERT INTO community_crew_discord(community_id,updated_at) VALUES(?,0)").run(DEV_COMMUNITY);
+  await layout(env,community,{mode:'general',sims:'all',split:false,week:{all:TEXT},events:'same',voices:true,pit:'bot',pitAt:VOCAUX});
+  const week=named(channels,'endurances-de-la-semaine');assert.ok(week);
+  assert.equal(DB.db.prepare("SELECT COUNT(DISTINCT channel_id) AS n FROM discord_recap_publications WHERE event_id LIKE 'week:%'").get().n,1,'one channel for the three messages');
+  const pit=named(channels,'🎙️ Pit talk');assert.equal(pit.type,4);
+  assert.equal(DB.db.prepare('SELECT voice_category_id FROM community_crew_discord').get().voice_category_id,pit.id);
+  assert.deepEqual(categoriesInOrder(channels),['Accueil','Endurances','Vocaux','🎙️ Pit talk']);
+  assert.equal(channels.filter(item=>item.type===4&&item.name.includes('6h de Spa')).length,0,'no race category');
+});
+
+test('changing one\'s mind: the bot takes off what it made and puts the new setting in place; « Tout retirer » takes off everything',async t=>{
+  const {DB,env,channels}=setup(t);race(DB);
+  await layout(env,COMMUNITY,{mode:'events',sims:'all',showWeek:true,under:ACCUEIL});
+  await syncBotRecaps(env,NOW,COMMUNITY);
+  assert.ok(named(channels,'Endurance Manager'));assert.ok(named(channels,'🏎️ LMU · 6h de Spa'));
+  await layout(env,COMMUNITY,{mode:'general',sims:'lmu',week:{all:CATEGORY},events:''});
+  for(let pass=0;pass<3;pass++)await syncBotRecaps(env,NOW,COMMUNITY);
+  assert.equal(named(channels,'🏎️ LMU · 6h de Spa'),undefined,'race category gone');
+  assert.equal(named(channels,'Endurance Manager'),undefined,'the bot\'s category gone once empty');
+  const week=channels.filter(item=>item.name==='endurances-de-la-semaine');
+  assert.equal(week.length,1);assert.equal(week[0].parent_id,CATEGORY);
+  assert.equal((await as(env,'/api/community/discord','DELETE')).status,200);
+  for(let pass=0;pass<2;pass++)await syncBotRecaps(env,NOW,COMMUNITY);
+  assert.equal(channels.filter(item=>item.name==='endurances-de-la-semaine').length,0);
+  assert.equal(DB.db.prepare("SELECT COUNT(*) AS n FROM discord_recap_publications WHERE channel_id IS NOT NULL OR message_id IS NOT NULL").get().n,0);
+  assert.deepEqual(categoriesInOrder(channels),['Accueil','Endurances','Vocaux']);
+});
+
+test('the answers are checked: a place on the server, a category for the bot\'s, nothing outside the server',async t=>{
+  const {env}=setup(t);
+  await assert.rejects(validateDiscordLayout(env,COMMUNITY,{mode:'events',sims:'all'}),/catégorie du bot/);
+  await assert.rejects(validateDiscordLayout(env,COMMUNITY,{mode:'events',sims:'all',under:TEXT}),/existe/);
+  await assert.rejects(validateDiscordLayout(env,COMMUNITY,{mode:'general',sims:'all',week:{all:'999999999999999999'}}),/existe/);
+  await assert.rejects(validateDiscordLayout(env,COMMUNITY,{mode:'general',sims:'both'}),/simus/);
+  const ok=await validateDiscordLayout(env,COMMUNITY,{mode:'general',sims:'iracing',split:true,week:{all:TEXT},events:'same'});
+  assert.equal(JSON.parse(ok.layout).split,false,'apart only with both sims');
 });
