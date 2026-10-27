@@ -5,6 +5,7 @@
 ### 🔧 Corrections
 
 - **Discord** : l'activation du réglage ne demande plus de droits dans l'endroit de l'ancien réglage. Le bot crée sa propre catégorie avec ses droits.
+- **Récap de la semaine** : les endurances LMU officielles y figurent toujours, comme leurs catégories, même sans inscrit.
 
 ## v1.62 — 27 octobre 2026
 
