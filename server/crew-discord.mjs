@@ -373,6 +373,13 @@ async function sendInChannel(env, budget, row, method, path, body) {
 // The crew's voice channel, in its race's category when the recap made one (« 🏎️ LMU · 6h de Spa »), otherwise
 // in the category chosen by the admins. That category deleted on Discord: the choice is forgotten (the admins are
 // told) and the channel is made at the top of the server next time.
+// The race's category deleted on Discord: forgotten, the recap makes it again (server/recap-discord.mjs raceThread) and
+// the voice goes there on the next pass.
+async function raceCategoryGone(env, row) {
+  await env.DB.prepare('UPDATE discord_recap_publications SET category_id=NULL WHERE community_id=? AND event_id=? AND category_id=?').bind(row.row_community, row.event_id, row.race_category).run();
+  await env.DB.prepare('UPDATE community_recap_settings SET dirty=1 WHERE community_id=?').bind(row.row_community).run();
+  throw new Stop('gone');
+}
 async function createVoice(env, budget, row, setting, body) {
   const parent = row.race_category || setting.voice_category_id;
   try {
@@ -381,6 +388,7 @@ async function createVoice(env, budget, row, setting, body) {
       ...(parent ? {parent_id:parent} : {}),permission_overwrites:withBotAccess(category?.permission_overwrites,env.DISCORD_CLIENT_ID,VOICE_ACCESS)});
   } catch (error) {
     const parentGone = error?.status === 404 && error?.code === 10003 || error?.status === 400 && error?.errors?.parent_id;
+    if (row.race_category && parentGone) await raceCategoryGone(env, row);
     if (row.race_category || !parent || !parentGone) throw error;
     await env.DB.prepare('UPDATE community_crew_discord SET voice_category_id=NULL, last_error=?, last_error_at=? WHERE community_id=?')
       .bind('La catégorie choisie pour les vocaux n’existe plus : ils arrivent en haut du serveur.', Math.floor(Date.now() / 1000), row.row_community).run();
@@ -460,13 +468,15 @@ async function syncRow(env, budget, timestamp, community, setting, row, pilots) 
     let target = {permission_overwrites:[]};
     if (parent) try { target = await discord(env,budget,'GET',`/channels/${parent}`); }
     catch (error) {
+      if (row.race_category && error?.status === 404) await raceCategoryGone(env, row);
       if (error instanceof Stop || row.race_category || error?.status !== 404) throw error;
       await env.DB.prepare('UPDATE community_crew_discord SET voice_category_id=NULL, last_error=?, last_error_at=? WHERE community_id=?')
         .bind('La catégorie choisie pour les vocaux n’existe plus : ils arrivent en haut du serveur.', Math.floor(Date.now() / 1000), row.row_community).run();
       setting.voice_category_id = null;
       throw new Stop('gone');
     }
-    const voice = await discord(env,budget,'GET',`/channels/${row.voice_id}`);
+    // Deleted on Discord: made again on the next pass.
+    const voice = await sendInChannel(env,budget,row,'GET',`/channels/${row.voice_id}`);
     // A fallback vocal created at server root has only the bot exception: take the
     // private destination rules when moving it. Preserve any existing non-bot rules.
     const hasMemberRules = (voice.permission_overwrites || []).some(item => !(String(item.id) === String(env.DISCORD_CLIENT_ID) && Number(item.type) === 1));
