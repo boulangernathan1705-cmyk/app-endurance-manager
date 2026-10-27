@@ -767,3 +767,12 @@ test('a week message deleted on Discord is put back by the next sync, without «
   assert.equal(messages.size,1);assert.ok(!result?.error);
   assert.equal(DB.db.prepare('SELECT last_error FROM community_recap_settings').get().last_error,null);
 });
+
+test('saving the setting with voices does not ask for rights in the places of the setting before',async t=>{
+  // The old destination is closed to all (no « Se connecter » for the bot there); the bot now makes its own category.
+  const {DB,env}=setup(t,{rights:'269569040',overrides:[{id:GUILD,type:0,allow:'0',deny:'1049600'}]});
+  await saveBotRecap(env,COMMUNITY,SETTINGS);
+  const result=await as(env,'/api/community/discord','PUT',{layout:{mode:'events',sims:'lmu',showWeek:true,under:ACCUEIL,voices:true}});
+  assert.equal(result.status,200,JSON.stringify(result.data));
+  assert.equal(JSON.parse(DB.db.prepare('SELECT modules FROM communities WHERE id=?').get(DEV_COMMUNITY).modules).crewChannels,true);
+});
