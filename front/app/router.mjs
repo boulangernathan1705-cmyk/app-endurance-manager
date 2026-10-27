@@ -11,8 +11,11 @@ let homeScroll=0;
 export function routeFromLocation(){
   const match=location.hash.match(EVENT_HASH);
   if(match)return {page:'event',eventId:match[1]};
-  if(location.hash===ENTRIES_HASH)return {page:'my-entries'};
-  if(location.hash===SOLO_HASH)return {page:'home',list:'solo'};
+  // Shared links are often typed by hand (#SOLO, #Inscriptions): the case does not matter.
+  const hash=location.hash.toLowerCase();
+  if(hash!==location.hash&&[ENTRIES_HASH,SOLO_HASH].includes(hash))history.replaceState(null,'',location.pathname+location.search+hash);
+  if(hash===ENTRIES_HASH)return {page:'my-entries'};
+  if(hash===SOLO_HASH)return {page:'home',list:'solo'};
   return {page:'home',list:'endurance'};
 }
 
