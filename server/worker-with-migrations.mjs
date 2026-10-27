@@ -154,7 +154,9 @@ export default {
     // the pilots added to the races' threads.
     if (controller?.cron === '*/2 * * * *') {
       // The setting and the threads take turns first, so that neither waits on the other.
-      const tasks = [() => syncDueRecaps(env, 1, at.getTime(), {pending:true}), () => addThreadMembers(env, at.getTime(), 25)];
+      // A setting being put in place or taken off moves its crews' voices too (« Tout retirer » in minutes, not a quarter of an hour).
+      const voices = community => community.modules?.crewChannels === true ? syncCrewDiscord(env, Date.now(), {community, requests:6}) : null;
+      const tasks = [() => syncDueRecaps(env, 1, at.getTime(), {pending:true, then:voices}), () => addThreadMembers(env, at.getTime(), 25)];
       if (Math.floor(at.getUTCMinutes() / 2) % 2) tasks.reverse();
       if (env.DISCORD_BOT_TOKEN) ctx.waitUntil((async () => {
         for (const task of [() => flushDiscord(env, 1), ...tasks]) if (await task()) return;

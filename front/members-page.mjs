@@ -740,7 +740,7 @@ app.addEventListener('click', async event => {
         status.textContent = 'Retrait…';
         const result = await api('/api/community/discord','DELETE',{});
         await reload('modules',{module:'discord'});
-        app.querySelector('[data-discord-form] .setup-actions .settings-status').textContent = result.done ? '✓ Tout est retiré.' : 'Retrait commencé : le bot finit dans le quart d’heure (les vocaux occupés attendent d’être vides).';
+        app.querySelector('[data-discord-form] .setup-actions .settings-status').textContent = result.done ? '✓ Tout est retiré.' : 'Retrait commencé : le bot finit dans quelques minutes (les vocaux occupés attendent d’être vides).';
       }
     } catch (error) { status.textContent = error.message; }
     finally { discordButton.disabled = false; }

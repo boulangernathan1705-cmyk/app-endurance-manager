@@ -1035,7 +1035,7 @@ async function api(request, env) {
       fail(error.status === 409 ? 409 : 400,error.message === 'Discord indisponible' ? recapError(error) : error.message);
     }
   }
-  // « Tout retirer »: the bot takes off what it made (a few requests per pass, the next ones every quarter of an hour).
+  // « Tout retirer »: the bot takes off what it made (a few requests per pass, the next ones every 2 minutes).
   if (path === '/api/community/discord' && method === 'DELETE') {
     requirePermission(actor,'admin');
     return removeDiscord();
