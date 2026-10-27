@@ -1,6 +1,7 @@
 import {renderRallyEventForm} from './rally-form.mjs';
 import {streamerFields, streamerData, syncStreamerFields} from './grindfest.mjs';
 import {isGrindfest} from '../../shared/grindfest.mjs';
+import {commentaryOf} from '../../shared/commentary.mjs';
 // Creating or editing an event of the community calendar (solo format), step by step, for every simulator.
 // The fields follow the community’s calendar: start time, server password, and per round the
 // circuit, categories, practice / qualifying / race minutes, weather, fuel and tyre multipliers.
@@ -20,6 +21,25 @@ export function typeField(chosen){
   const types=[...state.eventTypes];if(chosen&&!types.includes(chosen))types.push(chosen);
   if(!types.length)return '';
   return `<fieldset class="sim-options"><legend class="form-label">Type d’événement</legend><div class="sim-option-row">${types.map(type=>`<label class="sim-option event-type-option"><input type="radio" name="eventType" value="${esc(type)}" ${type===chosen?'checked':''} required><span>${esc(type)}</span></label>`).join('')}</div></fieldset>`;
+}
+// EVENT TDZ « Event commenté »: the pilots race it too, or it is only a commentary (no entry). The channel is
+// asked once, then the last one used fills the field.
+function commentaryField(details){
+  if(!state.eventTdz)return '';
+  const chosen=commentaryOf({details}),mode=chosen?.mode||'race',stream=chosen?.stream||state.streamChannel||'';
+  const choice=(value,label)=>`<label class="sim-option"><input type="radio" name="commentaryMode" value="${value}" ${mode===value?'checked':''}><span>${label}</span></label>`;
+  return `<fieldset class="sim-options commentary-field"><legend class="form-label">Stream</legend><div class="sim-option-row"><label class="sim-option commentary-toggle"><input type="checkbox" name="commentary" ${chosen?'checked':''}><span>🎙 Event commenté</span></label></div>
+    <div class="commentary-options" ${chosen?'':'hidden'}><div class="sim-option-row">${choice('race','Les pilotes roulent aussi')}${choice('watch','Commentary seulement')}</div>
+    <label class="form-label">Chaîne du stream<input name="commentaryStream" maxlength="200" value="${esc(stream)}" placeholder="Nom Twitch ou adresse de la chaîne" ${chosen?'required':''}></label></div></fieldset>`;
+}
+function syncCommentary(form){
+  const on=Boolean(form.elements.commentary?.checked),options=form.querySelector('.commentary-options');
+  if(!options)return;
+  options.hidden=!on;form.elements.commentaryStream.required=on;
+  const watch=on&&form.querySelector('[name="commentaryMode"]:checked')?.value==='watch';
+  form.toggleAttribute('data-watch',watch);
+  // A commentary only: nobody enters, the type (OPEN, SAFE…) is optional.
+  form.querySelectorAll('[name="eventType"]').forEach(input=>{input.required=!watch;});
 }
 // A type named OPEN or SAFE already says the access: the access choice is then hidden.
 const accessType=type=>['open','safe'].includes(String(type||'').toLowerCase());
@@ -73,7 +93,7 @@ export function renderSoloEventForm(event=null,{focusPassword=false}={}){
   <div class="registration-progress" aria-hidden="true" data-solo-progress>${STEPS.map((_,index)=>`<span class="${index<first?'done':''}"></span>`).join('')}</div>
   <p class="registration-step-label" data-solo-step-label>Étape ${first} sur ${LAST} · ${STEPS[first-1]}</p>
   ${step(1,`<label class="form-label">Nom de l’événement<input name="eventName" maxlength="100" value="${esc(event?.name||'')}" required></label>
-    <fieldset class="sim-options"><legend class="form-label">Simulateur</legend><div class="sim-option-row">${SIMS.map(item=>simChoice(item,sim)).join('')}</div></fieldset>${typeField(details.type)}`)}
+    <fieldset class="sim-options"><legend class="form-label">Simulateur</legend><div class="sim-option-row">${SIMS.map(item=>simChoice(item,sim)).join('')}</div></fieldset>${typeField(details.type)}${commentaryField(details)}`)}
   ${step(2,`<div class="solo-form-start">${start}</div>
     <div class="solo-form-row"><label class="form-label">Mot de passe du serveur <small>(facultatif)</small><input name="eventPassword" maxlength="30" value="${esc(details.password||'')}" autocomplete="off"></label></div><div data-gridfest-password-tools hidden><p class="creation-help">30 caractères maximum, sans espace. Envoyé par MP Discord aux pilotes confirmés.</p></div>`)}
   ${step(3,`<div class="solo-rounds" data-rounds>${rounds.map(round=>roundField(sim,round)).join('')}</div><button type="button" class="secondary-button" data-add-round>+ Ajouter une manche</button>`)}
@@ -83,7 +103,7 @@ export function renderSoloEventForm(event=null,{focusPassword=false}={}){
   <div class="creation-actions registration-step-nav"><button type="button" class="secondary-button registration-back" data-solo-step="back" ${first>1?'':'hidden'}>Retour</button><button type="button" class="primary-button registration-next" data-solo-step="next" ${first<LAST?'':'hidden'}>Continuer</button><button type="submit" class="primary-button registration-next" data-solo-submit ${first===LAST?'':'hidden'}>${event?'ENREGISTRER':'CRÉER L’ÉVÉNEMENT'}</button></div>
 </form>`;
   const form=app.querySelector('form[data-kind="solo-event"]');
-  syncRounds(form);syncStreamerFields(form);if(first===LAST)fillRecap(form);
+  syncRounds(form);syncStreamerFields(form);syncCommentary(form);if(first===LAST)fillRecap(form);
   notifyRender();
   if(focusPassword)requestAnimationFrame(()=>form.elements.eventPassword.focus());
 }
@@ -98,6 +118,7 @@ function formData(form){
   const start=form.querySelector('.departure-field');
   const details={type:form.querySelector('[name="eventType"]:checked')?.value||'',password:form.elements.eventPassword.value.trim(),note:form.elements.eventNote.value.trim()};
   if (isGrindfest({details})) { details.streamers = streamerData(form); rounds.forEach(round => { round.capacity = null; }); }
+  if (form.elements.commentary?.checked) details.commentary = {mode:form.querySelector('[name="commentaryMode"]:checked')?.value||'race', stream:form.elements.commentaryStream.value.trim()};
   return {name:form.elements.eventName.value.trim(),format:'solo',sim:form.elements.eventSim.value,access:form.querySelector('[name="eventAccess"]:checked')?.value||'open',
     rounds,categories:[],details,
     departures:[{id:start.dataset.id||undefined,date:start.querySelector('[name="date"]').value,time:start.querySelector('[name="time"]').value,tbd:false}]};
@@ -108,10 +129,10 @@ function fillRecap(form){
   const date=data.departures[0].date,day=date?new Intl.DateTimeFormat('fr-FR',{weekday:'short',day:'numeric',month:'short',timeZone:'UTC'}).format(new Date(`${date}T00:00:00Z`)):'—';
   const line=(n,label,value)=>`<button type="button" class="registration-summary-row" data-solo-step="${n}"><span>${label}</span><strong>${esc(value)}</strong><em>Modifier</em></button>`;
   const time=data.departures[0].time;
-  form.querySelector('[data-solo-recap]').innerHTML=line(1,'Événement',[data.name||'—',sim.short,data.details.type].filter(Boolean).join(' · '))
+  form.querySelector('[data-solo-recap]').innerHTML=line(1,'Événement',[data.name||'—',sim.short,data.details.type,data.details.commentary&&'🎙 Commenté'].filter(Boolean).join(' · '))
     +line(2,'Horaire',`${day} · ${time}${data.details.password?` · mdp : ${data.details.password}`:''}`)
     +data.rounds.map((round,index)=>line(3,data.rounds.length>1?`Manche ${index+1}`:'Manche',[circuitName(round.circuit),isRandomCircuit(round.circuit)&&eventCatalog(data.sim)?'catégorie aléatoire':round.categories.join(' ')||round.category,round.car,roundFormat(round),roundExtras(round)].filter(Boolean).join(' · '))).join('')
-    +line(4,'Inscriptions',[accessType(data.details.type)||!state.eventTdz?'':data.access==='safe'?'SAFE':'OPEN',isGrindfest(data)?`${data.details.streamers.length} streamers · ${data.details.streamers.reduce((sum,item)=>sum+item.capacity,0)} places`:data.rounds.some(round=>round.capacity)?data.rounds.map(round=>round.capacity?`${round.capacity} places`:'illimité').join(' / '):'places illimitées',data.details.note].filter(Boolean).join(' · '));
+    +(data.details.commentary?.mode==='watch'?line(4,'Inscriptions',['Commentary seulement : pas d’inscription',data.details.note].filter(Boolean).join(' · ')):line(4,'Inscriptions',[accessType(data.details.type)||!state.eventTdz?'':data.access==='safe'?'SAFE':'OPEN',isGrindfest(data)?`${data.details.streamers.length} streamers · ${data.details.streamers.reduce((sum,item)=>sum+item.capacity,0)} places`:data.rounds.some(round=>round.capacity)?data.rounds.map(round=>round.capacity?`${round.capacity} places`:'illimité').join(' / '):'places illimitées',data.details.note].filter(Boolean).join(' · ')));
 }
 function goToStep(form,target){
   const current=Number(form.dataset.step)||1;
@@ -141,6 +162,7 @@ function showStep(form,n){
 if(typeof document!=='undefined'){
   document.addEventListener('change',event=>{
     const field=event.target,form=field.closest?.('form[data-kind="solo-event"]');
+    if(form&&['commentary','commentaryMode'].includes(field.name)){syncCommentary(form);return;}
     if(form&&field.name==='eventType'){
       // A type named OPEN or SAFE sets the access.
       const access=form.querySelector(`[name="eventAccess"][value="${field.value.toLowerCase()}"]`);if(access)access.checked=true;const fieldset=form.querySelector('.solo-access');if(fieldset)fieldset.hidden=accessType(field.value);return;

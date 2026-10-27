@@ -4,6 +4,7 @@
 import {state,esc,pilotNameTip,button,canManage,can,logo,badge,categories} from './core.mjs';
 import {SIMS,simCatalog,simForEvent} from '../../shared/catalog.mjs';
 import {isGrindfest} from '../../shared/grindfest.mjs';
+import {commentaryOf,isWatchOnly,streamLabel} from '../../shared/commentary.mjs';
 
 export const ANY_CATEGORY = '*';
 export const isSolo = event => event?.format === 'solo';
@@ -20,14 +21,32 @@ export function simBadge(event) {
   const sim = SIMS.find(item => item.id === simForEvent(event));
   return `<span class="event-sim-badge sim-${sim.id}" title="${esc(sim.name)}">${esc(sim.short)}</span>`;
 }
+// « Event commenté »: a 🎙 badge; a commentary only has no access (nobody enters).
+const commentaryBadge = event => commentaryOf(event) ? `<span class="event-commentary-badge" title="${isWatchOnly(event) ? 'Commentary seulement : pas d’inscription' : 'Commenté en direct'}">🎙 ${isWatchOnly(event) ? 'Commentary' : 'Commenté'}</span>` : '';
 // The simulator, the event type, then OPEN or SAFE (unless the type already says it).
 export function accessBadge(event) {
   if (!state.eventTdz) return `<span class="event-badge-row">${simBadge(event)}</span>`;
   const safe = event.access === 'safe', type = event.details?.type || '';
   const typeBadge = type ? `<span class="event-type-badge">${esc(type)}</span>` : '';
-  if (type.toLowerCase() === (safe ? 'safe' : 'open')) return `<span class="event-badge-row">${simBadge(event)}<span class="event-access-badge ${safe ? 'is-safe' : 'is-open'}">${esc(type)}</span></span>`;
-  return `<span class="event-badge-row">${simBadge(event)}${typeBadge}<span class="event-access-badge ${safe ? 'is-safe' : 'is-open'}" title="${safe ? 'Réservé aux pilotes SAFE' : 'Ouvert à tous les pilotes connectés'}">${safe ? 'SAFE' : 'OPEN'}</span></span>`;
+  if (isWatchOnly(event)) return `<span class="event-badge-row">${simBadge(event)}${typeBadge}${commentaryBadge(event)}</span>`;
+  if (type.toLowerCase() === (safe ? 'safe' : 'open')) return `<span class="event-badge-row">${simBadge(event)}<span class="event-access-badge ${safe ? 'is-safe' : 'is-open'}">${esc(type)}</span>${commentaryBadge(event)}</span>`;
+  return `<span class="event-badge-row">${simBadge(event)}${typeBadge}<span class="event-access-badge ${safe ? 'is-safe' : 'is-open'}" title="${safe ? 'Réservé aux pilotes SAFE' : 'Ouvert à tous les pilotes connectés'}">${safe ? 'SAFE' : 'OPEN'}</span>${commentaryBadge(event)}</span>`;
 }
+// The stream of a commented event: a button to watch it, or '' when the event isn't commented.
+export function streamButton(event, label = 'Regarder le stream') {
+  const commentary = commentaryOf(event);
+  return commentary ? `<a class="primary-button stream-button" href="${esc(commentary.stream)}" target="_blank" rel="noopener">${esc(label)}</a>` : '';
+}
+// Above the entries of a commented event (pilots race it too): when and where to watch it.
+export function streamBlock(event) {
+  if (!commentaryOf(event) || isWatchOnly(event)) return '';
+  return `<div class="commentary-block"><span><strong>🎙 Commenté en direct</strong><small>${esc(streamLabel(commentaryOf(event).stream))}</small></span>${streamButton(event)}</div>`;
+}
+// A commentary only: no entry, the stream instead of the pilots.
+export function watchCard(event) {
+  return `<div class="commentary-block is-watch"><span><strong>🎙 Commentary</strong><small>Pas d’inscription : rendez-vous sur le stream · ${esc(streamLabel(commentaryOf(event).stream))}</small></span>${streamButton(event)}</div>`;
+}
+export const watchPanel = () => '<span class="commentary-panel" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v4M8 22h8"/></svg></span>';
 
 // Circuit of an event: from the catalog (LMU, older iRacing events), or as typed (AMS2, iRacing, ACE).
 export function eventCircuitName(event, id) {
