@@ -16,8 +16,8 @@ const signed = (value, digits = 1) => known(value) ? `${value > 0 ? '+' : value 
 const WHEELS = ['AVG', 'AVD', 'ARG', 'ARD'];
 const TABS = [['board', 'Classement', 'Class.', '🏆'], ['chrono', 'Chronométrage', 'Chrono', '⏱️'], ['car', 'Véhicule & énergie', 'Voiture', '🏎️'], ['tele', 'Télémétrie & graphes', 'Télém.', '📊'], ['map', 'Carte en direct', 'Carte', '🗺️']];
 const MODES = [['all', 'Général', '🏆'], ['rel', 'Relatif', '⏱️'], ['opp', 'Opposants', '⚔️']];
-// The last minute of our car, ten times a second.
-const TELE_KEPT = 600;
+// The last minute of our car, thirty times a second (plugin 2.4; ten before).
+const TELE_KEPT = 1800;
 
 const saved = (() => { try { return JSON.parse(localStorage.getItem('pw-view') || '{}'); } catch { return {}; } })();
 const view = {raw:new Map(), feeds:new Map(), key:null, tab:TABS.some(([id]) => id === location.hash.slice(1)) ? location.hash.slice(1) : saved.tab || 'board',
@@ -66,6 +66,13 @@ async function connect() {
     }
     const key = message.key || message.feed?.key;
     if (key && Array.isArray(message.tm)) addFrames(key, message.tm);
+    // Plugin 2.4's quick messages, nine a second between two complete ones: only the curves, the speed and the map move.
+    if (message.type === 'fast') {
+      const feed = view.feeds.get(key);
+      if (feed && Array.isArray(message.pos) && known(message.et)) moveCars(feed, message.et, message.pos);
+      if (feed && feed.key === view.key && (view.tab === 'car' || view.tab === 'tele')) render();
+      return;
+    }
     pick();
     render();
   });
@@ -122,13 +129,17 @@ function pick() {
 }
 const current = () => view.feeds.get(view.key) || null;
 
-// ---------- Our car ten times a second (plugin 2.0) ----------
+// ---------- Our car ten times a second (plugin 2.0), thirty from 2.4 ----------
 
 // Per feed: [{t (page seconds), d, v, throttle, brake, steer, gear}], the frames of each second spread over it.
 const teles = new Map();
+// The frames of a message cover the time since the previous one: 0.1 s apart from plugin 2.0, 0.033 s from 2.4.
+const frameGaps = new Map();
 function addFrames(key, frames) {
-  const list = teles.get(key) || [], now = performance.now() / 1000;
-  frames.forEach(([d, v, throttle, brake, steer, gear], index) => list.push({t:now - (frames.length - 1 - index) * 0.1, d, v, throttle, brake, steer, gear}));
+  const list = teles.get(key) || [], now = performance.now() / 1000, since = frameGaps.get(key);
+  const step = since && now - since < 2 ? Math.min(0.1, Math.max(0.025, (now - since) / frames.length)) : 0.1;
+  frameGaps.set(key, now);
+  frames.forEach(([d, v, throttle, brake, steer, gear], index) => list.push({t:now - (frames.length - 1 - index) * step, d, v, throttle, brake, steer, gear}));
   if (list.length > TELE_KEPT) list.splice(0, list.length - TELE_KEPT);
   teles.set(key, list);
   // The rate the car comes at: frames in the last 5 s.
@@ -515,7 +526,9 @@ function drawCurves(feed) {
 
 // ---------- Map (the cars glide between two messages) ----------
 
-const PLAYBACK_DELAY = 1.8, JUMP = 400, KEPT = 6;
+// The cars are shown a little in the past, so there is always a next position to glide to: 1.8 s with one position a
+// second, 0.3 s with plugin 2.4's ten (KEPT: positions kept per car, a few seconds' worth either way).
+const PLAYBACK_DELAY = 1.8, QUICK_DELAY = 0.3, JUMP = 400, KEPT = 30;
 const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const motions = new Map();
 let frame = null;
@@ -538,10 +551,29 @@ function record(feed) {
     motion.cars.set(car.id, list);
   }
 }
+// Plugin 2.4: the cars' positions between two snapshots, at the game's clock (et).
+function moveCars(feed, et, pos) {
+  const motion = motions.get(feed.key);
+  if (!motion || et <= motion.et) return;
+  const at = new Map(pos.map(([id, x, z]) => [id, [x, z]]));
+  motion.et = et;
+  motion.quickAt = performance.now();
+  if (motion.offset !== null) motion.offset += (et - motion.quickAt / 1000 - motion.offset) * 0.1;
+  for (const car of feed.snap.field) {
+    const where = at.get(car.id);
+    if (!where) continue;
+    [car.x, car.z] = where;
+    const list = motion.cars.get(car.id) || [];
+    list.push({et, x:car.x, z:car.z, pit:car.pit});
+    if (list.length > KEPT) list.shift();
+    motion.cars.set(car.id, list);
+  }
+}
 function placed(feed, car) {
   const motion = motions.get(feed.key), list = motion?.cars.get(car.id);
   if (!list?.length || still) return [car.x, car.z];
-  const at = performance.now() / 1000 + motion.offset - PLAYBACK_DELAY;
+  const quick = motion.quickAt && performance.now() - motion.quickAt < 3000;
+  const at = performance.now() / 1000 + motion.offset - (quick ? QUICK_DELAY : PLAYBACK_DELAY);
   const next = list.findIndex(item => item.et > at);
   if (next === -1) return [list.at(-1).x, list.at(-1).z];
   if (next === 0) return [list[0].x, list[0].z];
