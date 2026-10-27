@@ -1,5 +1,11 @@
 # Nouveautés d'Endurance Manager
 
+## v1.57 — 27 octobre 2026
+
+### 🔧 Corrections
+
+- **Discord** : pour le récap de la semaine et le calendrier, choisis un salon ou une catégorie : le bot crée son propre salon juste en dessous, avec ses droits. Si un endroit est fermé au bot, la ligne dit quoi cocher. Les vocaux d'équipage déjà créés rejoignent la catégorie choisie avec leur nouveau nom, et les catégories de course disparaissent dès qu'on passe au récap de la semaine.
+
 ## v1.56 — 26 octobre 2026
 
 ### ✨ Nouveautés
