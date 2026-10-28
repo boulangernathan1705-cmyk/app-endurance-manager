@@ -32,6 +32,9 @@ function harness(withParticipants=true){
  DB.db.exec(readFileSync(new URL('../migrations/0030_iracing_import.sql',import.meta.url),'utf8'));
  DB.db.exec(readFileSync(new URL('../migrations/0031_solo_driver.sql',import.meta.url),'utf8'));
  DB.db.exec(readFileSync(new URL('../migrations/0054_event_sim.sql',import.meta.url),'utf8'));
+ // The simulator check as in production (AC Rally, then streams).
+ DB.db.exec(readFileSync(new URL('../migrations/0067_acrally_event_sim.sql',import.meta.url),'utf8'));
+ DB.db.exec(readFileSync(new URL('../migrations/0088_stream_event_sim.sql',import.meta.url),'utf8'));
  DB.db.exec(readFileSync(new URL('../migrations/0055_event_absences.sql',import.meta.url),'utf8'));
  DB.db.exec(readFileSync(new URL('../migrations/0059_grindfest.sql',import.meta.url),'utf8'));
  DB.db.exec(readFileSync(new URL('../migrations/0063_registration_comment.sql',import.meta.url),'utf8'));
@@ -808,3 +811,12 @@ test('a pilot linked to Discord always shows his Discord name, never another mem
 });
 
 
+test('a stream is announced and listed, nobody enters it', async () => {
+ const {req,login}=harness();await login(ADMIN,'admin');await login(PILOT,'pilot');
+ const created=await req('/api/events','POST',{name:'LES 6H DE SPA',format:'solo',sim:'stream',access:'open',rounds:[{circuit:'',durationMinutes:60,categories:[]}],categories:[],details:{streamTime:'19:45',raceSim:'lmu',raceTime:'20:00'},departures:[{date:'2090-10-15',time:'19:45'}]},'admin');
+ assert.equal(created.status,201,JSON.stringify(created.data));
+ const event=(await req('/api/events','GET',null,'pilot')).data.events.find(e=>e.id===created.data.id);
+ assert.equal(event.sim,'stream');assert.equal(event.departures[0].time,'19:45');
+ assert.equal((await req(`/api/events/${event.id}/departures/${event.departures[0].id}/registrations`,'POST',{name:'Pilote',choices:[]},'pilot')).status,409);
+ assert.equal((await req(`/api/events/${event.id}/absence`,'PUT',null,'pilot')).status,409);
+});
