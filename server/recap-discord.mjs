@@ -5,6 +5,7 @@ import {loadWeeklyDiscordSnapshot, loadCalendarSnapshot, siteOf} from './discord
 import {buildWeeklyDiscordPayload, buildWeekHeadPayload, buildCalendarPayload, CATEGORY_EMOJI_NAMES} from './discord-weekly-format.mjs';
 import {tdzOnly} from '../shared/catalog.mjs';
 import {isDevelopment} from './dev-environment.mjs';
+import {crewVoiceName} from './crew-discord.mjs';
 import {CATEGORY_NAMES,parseLayout,parseCategories,layoutInput,layoutPlan,wantedCategories,chosenPlaces} from './discord-layout.mjs';
 
 const API = 'https://discord.com/api/v10', DAY = 86400000;
@@ -330,8 +331,13 @@ async function placeCategories(env, community, guildId, channels, category, sett
 // The crews' voices in each category: LMU first, then iRacing, each by its start (server/crew-discord.mjs sorts them when one
 // is made, a pass that can stop on the way). Other voices stay first, as they are. One request, only when out of order.
 async function placeVoices(env, community, guildId, channels, budget) {
-  const rows = (await env.DB.prepare(`SELECT d.voice_id, d.created_at, c.departure_id, e.circuit, e.departures FROM crew_discord d
+  const rows = (await env.DB.prepare(`SELECT d.voice_id, d.created_at, c.departure_id, c.name AS crew_name, e.name AS event_name, e.circuit, e.departures FROM crew_discord d
     JOIN crews c ON c.id=d.crew_id JOIN events e ON e.id=c.event_id WHERE d.community_id=? AND d.closed_at IS NULL AND d.voice_id IS NOT NULL`).bind(community.id).all()).results || [];
+  // Named as now wanted (the race's logo in front since it came; a crew renamed on the site).
+  for (const item of rows) {
+    const voice = channels.find(channel => channel.id === item.voice_id && channel.type === 2), name = crewVoiceName(item);
+    if (voice && voice.name !== name) { await discord(env,'PATCH',`/channels/${voice.id}`,{name},budget); voice.name = name; }
+  }
   if (rows.length < 2) return;
   const crews = new Map(rows.map(item => [item.voice_id, [isIracing(item) ? 1 : 0,
     Number((parse(item.departures).find(start => start?.id === item.departure_id) || {}).startsAt) || Infinity, Number(item.created_at) || 0]]));
