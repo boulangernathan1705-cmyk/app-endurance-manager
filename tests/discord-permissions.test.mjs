@@ -26,3 +26,10 @@ test('bot access merges an existing member exception without losing unrelated de
   const rights=effectivePermissions([{id:guild,permissions:String(ADMIN)}],{roles:[]},guild,{permission_overwrites:rules},bot);
   assert.equal(rights&VOICE_ACCESS,VOICE_ACCESS,'administrator bypasses local denies');
 });
+
+test('« Gérer les permissions » is never copied (only an administrator may set it on a channel)',()=>{
+  const manageRoles=1n<<28n;
+  const rules=withBotAccess([{id:pilots,type:0,allow:String(manageRoles|VIEW),deny:'0'},{id:bot,type:1,allow:String(manageRoles),deny:'0'}],bot,VOICE_ACCESS);
+  assert.equal(rules[0].allow,String(VIEW));
+  assert.equal(BigInt(rules[1].allow)&manageRoles,0n);
+});

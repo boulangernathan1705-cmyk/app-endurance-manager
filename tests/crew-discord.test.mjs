@@ -39,6 +39,7 @@ function fakeDiscord(){
     if(method==='GET'&&path===`/guilds/${GUILD}/roles`)return reply(200,[{id:GUILD,name:'@everyone',permissions:'0',position:0},{id:BOT_ROLE,name:'Endurance Manager',permissions:state.botRights?(state.botPermissions||'1117200'):'0',position:1}]);
     const voice=path.match(/^\/guilds\/\d+\/voice-states\/(\d+)$/);
     if(voice)return voiceStates.has(voice[1])?reply(200,{channel_id:voiceStates.get(voice[1])}):reply(404,{code:10065});
+    if(method==='POST'&&path===`/guilds/${GUILD}/channels`&&state.refuseCopy&&(body?.permission_overwrites||[]).some(item=>item.id!=='app-id'))return reply(403,{code:50013});
     if(method==='POST'&&path===`/guilds/${GUILD}/channels`){const channel={...body,id:String(next++)};state.channels.push(channel);return reply(200,channel);}
     const channelPath=path.match(/^\/channels\/(\d+)$/);
     if(channelPath){const channel=state.channels.find(item=>item.id===channelPath[1]);if(method==='GET')return channel?reply(200,channel):reply(404,{code:10003});if(method==='DELETE')state.channels=state.channels.filter(item=>item.id!==channelPath[1]);else if(method==='PATCH'&&channel)Object.assign(channel,body);}
@@ -403,6 +404,24 @@ test('« un fil par course »: voices straight in the bot\'s category (no waitin
   DB.db.prepare("UPDATE events SET circuit='iracing-spa' WHERE id=?").run(event.id);
   DB.db.prepare('DELETE FROM crew_discord').run();
   mark=discord.calls.length;await sync(at+60_000);assert.deepEqual(created(discord.calls,mark),[]);
+});
+
+test('a category rule with a right the bot lacks: the voice is made without the copy (Discord gives it the category\'s rights)', async () => {
+  const {DB,req,login,sync,discord}=harness();
+  await login(ADMIN,'admin','Orga');await login(PILOT,'pilot','Alice');
+  assert.equal((await req('/api/community/modules','PATCH',{crewChannels:true},'admin')).status,200);
+  assert.equal((await req('/api/events','POST',race,'admin')).status,201);
+  const event=(await req('/api/events','GET',null,'admin')).data.events[0];
+  const departure=event.departures[0], base=`/api/events/${event.id}/departures/${departure.id}`, at=departure.startsAt-2*24*HOUR;
+  discord.state.channels.push({id:'600000000000000007',type:4,name:'Vocal',permission_overwrites:[{id:'600000000000000010',type:0,allow:String(1n<<22n),deny:'0'}]});
+  discord.state.refuseCopy=true;
+  DB.db.prepare("UPDATE community_crew_discord SET voice_category_id='600000000000000007'").run();
+  assert.equal((await req(base+'/registrations','POST',{name:'x',category:'GT3',status:'whole'},'pilot')).status,201);
+  assert.equal((await req(base+'/crews','POST',{name:'Copie',category:'GT3'},'pilot')).status,201);
+  const mark=discord.calls.length;await sync(at);
+  const posts=created(discord.calls,mark);
+  assert.equal(posts.length,2);assert.equal(posts[1].body.permission_overwrites,undefined);assert.equal(posts[1].body.parent_id,'600000000000000007');
+  assert.ok(DB.db.prepare('SELECT voice_id FROM crew_discord').get().voice_id);
 });
 
 test('« un fil par course » with LMU and iRacing apart: an iRacing race\'s voices go in « iRacing », not « LMU »', async () => {
