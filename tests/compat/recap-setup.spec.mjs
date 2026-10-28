@@ -13,7 +13,7 @@ async function mockAdmin(page,{permission=true,initialRecap=null,repairError=nul
     if(path==='/api/session')data={user:{id:'100000000000000001',name:'Max'},permissions:['admin','access'],manager:false,community:{name:'Ma communauté',shortName:'MC',appearance:{}},communities:[]};
     if(path==='/api/members')data={members:[],permissions:['access','admin']};
     if(path==='/api/community/settings')data={community:{name:'Ma communauté',shortName:'MC'},modules:{soloRaces:solo},permissions:['access','admin'],roles:[],crews:{botReady:true,categories:[{id:PIT,name:'PIT WALK'}]}};
-    if(path==='/api/community/setup')data={community:{name:'Ma communauté'},siteUrl:'https://site.example',guild:{id:'900000000000000001',name:'Ma communauté',botPresent:true},rolesConfigured:true,recapSetupRequired:!botRecap,botRecap,recapBotInviteUrl:'https://discord.com/oauth2/authorize?client_id=123&scope=bot&permissions=85008',discordInviteUrl:'https://discord.gg/example'};
+    if(path==='/api/community/setup')data={community:{name:'Ma communauté'},siteUrl:'https://site.example',guild:{id:'900000000000000001',name:'Ma communauté',botPresent:true},rolesConfigured:true,recapSetupRequired:!botRecap,botRecap,recapBotInviteUrl:'https://discord.com/oauth2/authorize?client_id=123&scope=bot&permissions=85008',recapBotAdminInviteUrl:'https://discord.com/oauth2/authorize?client_id=123&scope=bot&permissions=8&guild_id=1',discordInviteUrl:'https://discord.gg/example'};
     if(path==='/api/community/recap/destinations')data={server:{ready:true,missing:[]},destinations:[{id:TEXT,type:0,name:'annonces',position:0,parentId:CATEGORY,parentName:'Endurances',ready:true,missing:[]},{id:CATEGORY,type:4,name:'Endurances',private:true,ready:permission,missing:permission?[]:['Intégrer des liens','Gérer les salons']},{id:PIT,type:4,name:'PIT WALK',ready:true,missing:[]}]};
     if(path==='/api/community/recap/preview')data={previews:(request.postDataJSON().mode==='events'?['🏎️ LMU · 6h de Spa','🏎️ LMU · 24h du Mans']:['récap-de-la-semaine · Endurances LMU']).map(name=>({name,payload:{embeds:[{title:'📝 Endurances LMU',description:'📍 Spa-Francorchamps · ⏱️ 6h\n📅 dimanche 11 octobre · 14h',fields:[{name:'Équipages',value:'🟪 **Équipage A** · GT3 · 🔓 Ouvert\n👤 Pilote 1 · 👤 Pilote 2'}],url:'https://site.example/lmu/#event=spa'}]}}))};
     if(path==='/api/community/discord'&&method==='DELETE'){botRecap={...botRecap,enabled:false};data={ok:true,done:true};}
@@ -78,7 +78,7 @@ test('« récap de la semaine »: just below a channel, voices in « Pit talk »
   await (await reach(page,form.locator('input[name="pit"][value="bot"]'))).check();
   await (await reach(page,form.locator('select[name="pitAt"]'))).selectOption(PIT);
   const sketch=await form.locator('[data-discord-sketch] li').allInnerTexts();
-  expect(sketch.indexOf('# annonces')).toBeLessThan(sketch.indexOf('# endurances-de-la-semaine'));
+  expect(sketch.indexOf('# annonces')).toBeLessThan(sketch.indexOf('# 📅・endurances-de-la-semaine'));
   expect(sketch.indexOf('PIT WALK')+1).toBe(sketch.findIndex(item=>/Pit talk/i.test(item)));
   await screenshot(page,`discord-general-${testInfo.project.name}`);
   await (await reach(page,form.getByRole('button',{name:'Voir les messages',exact:true}))).click();
@@ -161,7 +161,7 @@ test('« récap de la semaine », simus séparées: the bot makes « LMU » and 
   await (await reach(page,form.locator('select[name="under"]'))).selectOption(CATEGORY);
   await expect(form.locator('select[name="under"] option[value="'+CATEGORY+'"]')).toContainText('privée');
   await expect(form.locator('input[name="copy"][value="private"]')).toBeChecked();
-  await expect(form.getByText('Seuls ceux qui voient « Endurances » verront « LMU » et « iRacing ».')).toBeVisible();
+  await expect(form.getByText('Seuls ceux qui voient « Endurances » verront « 🔴 LMU » et « 🔵 iRacing ».')).toBeVisible();
   const submit=await reach(page,form.locator('button[type="submit"]'));
   await expect(form.locator('[data-discord-sketch]')).toContainText('LMU 🔒');
   await screenshot(page,'weekly-apart-private');
