@@ -32,7 +32,7 @@ const contentHash = payload => digest({...payload, embeds:(payload.embeds || [])
 
 // The channel chosen for the announcement, or '' (layout.announce).
 export const announceChannel = settings => settings?.enabled === 0 ? '' : String(parseLayout(settings?.layout)?.announce || '');
-// The community's stream, a link on every message of the announcement, or '' (layout.stream).
+// The community's stream, linked in the intro of the announcement, or '' (layout.stream).
 export const announceStream = settings => String(parseLayout(settings?.layout)?.stream || '');
 
 const SOLO_SQL = (env, community) => `(community_id=? OR community_id='official') AND format='solo' AND ${iracingSoloSql(env, community)}
@@ -90,6 +90,16 @@ async function raceSnapshot(env, community, id, timestamp) {
   return {id:row.id, name:row.name, circuit:row.circuit, eventType:row.event_type || '', official:row.community_id === 'official',
     durationMinutes:Number(row.duration_minutes) || Number(row.duration_hours) * 60 || 0, details:parse(row.details, {}) || {}, departures};
 }
+// The stream times the admins gave today's events (details.streamTime), for the intro.
+async function streamTimes(env, rows) {
+  const streams = [];
+  for (const row of rows.filter(item => item.kind === 'event')) {
+    const event = await env.DB.prepare('SELECT name,details FROM events WHERE id=?').bind(row.item).first();
+    const time = parse(event?.details, {})?.streamTime;
+    if (time) streams.push({name:event.name, time});
+  }
+  return streams;
+}
 // What a row of the announcement shows now (null: the race is gone from the site).
 export async function announcePayload(env, community, row, timestamp, counts = null, stream = '') {
   const site = {...siteOf(env, community), streamUrl:stream}, absent = discordAbsentButton(env);
@@ -123,7 +133,8 @@ export async function announceCommunity(env, community, settings, timestamp = Da
     rows = (await env.DB.prepare('SELECT * FROM discord_announcements WHERE community_id=? AND day=? ORDER BY position').bind(community.id, day).all()).results || [];
   }
   let asked = false;
-  const counts = {events:rows.filter(item => item.kind === 'event').length, races:rows.filter(item => item.kind === 'race').length};
+  const counts = {events:rows.filter(item => item.kind === 'event').length, races:rows.filter(item => item.kind === 'race').length,
+    streams:rows.some(item => item.kind === 'intro' && !item.message_id) ? await streamTimes(env, rows) : []};
   // In order: Discord keeps messages in the order they were sent.
   for (const row of rows.filter(item => !item.message_id)) {
     if (budget.left < 2) break;

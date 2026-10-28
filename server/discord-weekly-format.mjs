@@ -374,23 +374,29 @@ function announceTime(startsAt,timePending){
   const hour=Number(new Intl.DateTimeFormat('fr-FR',{timeZone:TIME_ZONE,hour:'numeric',hourCycle:'h23'}).formatToParts(startsAt).find(part=>part.type==='hour').value);
   return `${hour>=18?'Ce soir':'Aujourd’hui'} ${recapTime.format(startsAt).replace(':','h')}`;
 }
-// The buttons under each race: « Présent » opens it on the site, « Absent » (absent: its button) marks it from Discord,
-// « Stream » opens the community's stream (site.streamUrl, set with the announcement).
-const streamButton=site=>site.streamUrl?[{type:2,style:5,label:'Stream',emoji:{name:'📺'},url:site.streamUrl}]:[];
-function announceButtons(url,eventId,absent,site={}){
-  const buttons=[...(url?[{type:2,style:5,label:'Présent',emoji:{name:'✅'},url},...(absent?[absent(eventId)]:[])]:[]),...streamButton(site)];
-  return buttons.length?[{type:1,components:buttons}]:[];
+// The buttons under each race: « Présent » opens it on the site, « Absent » (absent: its button) marks it from Discord.
+function announceButtons(url,eventId,absent){
+  return url?[{type:1,components:[{type:2,style:5,label:'Présent',emoji:{name:'✅'},url},...(absent?[absent(eventId)]:[])]}]:[];
+}
+// « 📺 Lancement du stream sur Twitch à 19h45 »: the community's stream (site.streamUrl, a link on its platform) and the
+// stream times the admins gave today's events (streams: [{name, time:'19:45'}]).
+function streamLine(site,streams=[]){
+  const url=String(site.streamUrl||''),host=url&&URL.canParse(url)?new URL(url).hostname.replace(/^www\./,''):'';
+  const label=/(^|\.)twitch\.tv$/.test(host)?'Twitch':/(^|\.)(youtube\.com|youtu\.be)$/.test(host)?'YouTube':/(^|\.)kick\.com$/.test(host)?'Kick':'notre chaîne';
+  const where=url?` sur [${label}](${url})`:'',at=time=>time.replace(':','h');
+  const times=[...new Map(streams.filter(item=>item.time).map(item=>[item.time,item])).values()].sort((a,b)=>a.time.localeCompare(b.time));
+  if(!times.length)return url?`📺 Le stream en direct${where}`:'';
+  return `📺 Lancement du stream${where} à ${times.length===1?at(times[0].time):times.map(item=>`${at(item.time)} (${clean(item.name)})`).join(', ')}`;
 }
 // The first message: the community, « C'est jour de course ! », what the day holds and the banner; it pings @everyone.
-// counts: {events, races}.
+// counts: {events, races, streams}.
 export function buildAnnounceIntro(counts,site={}){
   const parts=[counts.events&&`**${plural(counts.events,'event')}**`,counts.races&&`**${plural(counts.races,'endurance')}**`].filter(Boolean);
   const embed={title:'🏁 C’est jour de course !',color:0xd71920,
-    description:`Aujourd’hui sur le serveur : ${parts.join(' et ')}.\nInscris-toi, préviens si tu ne viens pas, et rendez-vous en piste 👇`};
+    description:[`Aujourd’hui sur le serveur : ${parts.join(' et ')}.`,streamLine(site,counts.streams),'Inscris-toi, préviens si tu ne viens pas, et rendez-vous en piste 👇'].filter(Boolean).join('\n')};
   if(site.name){embed.author={name:cut(site.name,256)};if(site.url)embed.author.url=`${site.url}/`;if(site.logoUrl)embed.author.icon_url=site.logoUrl;}
   if(site.bannerUrl)embed.image={url:site.bannerUrl};
-  const stream=streamButton(site);
-  return{content:'@everyone',embeds:[embed],...(stream.length?{components:[{type:1,components:stream}]}:{}),allowed_mentions:{parse:['everyone']}};
+  return{content:'@everyone',embeds:[embed],allowed_mentions:{parse:['everyone']}};
 }
 function roundName(round){
   if(round.randomCategory||round.circuit==='random'||round.circuit==='iracing-random')return '📍 Circuit aléatoire · 🎲 catégorie au hasard';
@@ -426,7 +432,7 @@ export function buildAnnounceEvent(event,site={},updatedAt=Date.now(),absent=nul
   if(url)embed.url=url;
   if(event.logoUrl)embed.thumbnail={url:event.logoUrl};
   embed.footer=footer(updatedAt);
-  return{content:'',embeds:[embed],components:announceButtons(url,event.id,absent,site),allowed_mentions:{parse:[]}};
+  return{content:'',embeds:[embed],components:announceButtons(url,event.id,absent),allowed_mentions:{parse:[]}};
 }
 // An endurance of the day: its hook, its conditions, then each of today's starts with its crews and pilots (as in its
 // thread). race: {id,name,circuit,eventType,official,durationMinutes,details,departures} (departures: today's, as loaded
@@ -447,5 +453,5 @@ export function buildAnnounceRace(race,site={},updatedAt=Date.now(),emojis={},ab
   if(url)embed.url=url;
   embed.footer=footer(updatedAt);
   const [fitted]=fitDiscordEmbeds([embed]);
-  return{content:'',embeds:[fitted],components:announceButtons(url,race.id,absent,site),allowed_mentions:{parse:[]}};
+  return{content:'',embeds:[fitted],components:announceButtons(url,race.id,absent),allowed_mentions:{parse:[]}};
 }
