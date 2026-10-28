@@ -409,7 +409,7 @@ export function buildAnnounceIntro(counts,site={}){
   const parts=[counts.events&&`**${plural(counts.events,'event')}**`,counts.races&&`**${plural(counts.races,'endurance')}**`,counts.lives&&`**${plural(counts.lives,'stream')}**`].filter(Boolean);
   const streamOnly=counts.lives>0&&!counts.events&&!counts.races;
   const embed={title:streamOnly?'🎙 C’est jour de stream !':'🏁 C’est jour de course !',color:streamOnly?0x9146ff:0xd71920,
-    description:[`Aujourd’hui sur le serveur : ${parts.join(' et ')}.`,streamLine(site,counts.streams),streamOnly?'Retrouve les horaires et les liens du live ci-dessous 👇':'Inscris-toi, préviens si tu ne viens pas, et rendez-vous en piste 👇'].filter(Boolean).join('\n')};
+    description:[`Aujourd’hui sur le serveur : ${parts.join(' et ')}.`,streamLine(site,counts.streams),streamOnly?'Retrouve les horaires et les liens du live ci-dessous 👇':'Inscris-toi, préviens si tu ne viens pas, et rendez-vous en piste 👇'].filter(Boolean).join('\n\n')};
   if(site.name){embed.author={name:cut(site.name,256)};if(site.url)embed.author.url=`${site.url}/`;if(site.logoUrl)embed.author.icon_url=site.logoUrl;}
   if(site.bannerUrl)embed.image={url:site.bannerUrl};
   return{content:'@everyone',embeds:[embed],allowed_mentions:{parse:['everyone']}};
@@ -419,9 +419,9 @@ function roundName(round){
   return `📍 ${clean(circuitNames.get(round.circuit)||round.circuit||'Circuit à préciser')}`;
 }
 function roundDetails(round){
-  const format=[round.practice&&`E${round.practice}`,round.qualifying&&`Q${round.qualifying}`,round.durationMinutes&&`C${round.durationMinutes}`].filter(Boolean).join(' / ');
+  const format=[round.practice&&`⏱️ Essais : ${round.practice} min`,round.qualifying&&`⏱️ Qualifications : ${round.qualifying} min`,round.durationMinutes&&`🏁 Course : ${round.durationMinutes} min`].filter(Boolean).join('\n');
   const categories=round.randomCategory?'':(round.categories?.length?round.categories:round.category?[round.category]:[]).map(clean).join(', ');
-  return [categories,round.car&&`🏎️ ${clean(round.car)}`,format,ROUND_WEATHER[round.weather],round.fuel>1&&`⛽ ×${round.fuel}`,round.tyres>1&&`🛞 ×${round.tyres}`].filter(Boolean).join(' · ');
+  return [[categories,round.car&&`🏎️ ${clean(round.car)}`].filter(Boolean).join(' · '),format,[ROUND_WEATHER[round.weather],round.fuel>1&&`⛽ ×${round.fuel}`,round.tyres>1&&`🛞 ×${round.tyres}`].filter(Boolean).join(' · ')].filter(Boolean).join('\n');
 }
 // An event of the day: its hook, the admin's note, when and on which sim, its rounds, the count of présents and the buttons.
 // event: {id,name,sim,type,access,tdz,note,startsAt,timePending,rounds,capacity,entered,streamers,rally,password}.
@@ -429,8 +429,8 @@ export function buildAnnounceEvent(event,site={},updatedAt=Date.now(),absent=nul
   const siteUrl=String(site.url||''),url=siteUrl?`${siteUrl}/${event.sim==='iracing'?'iracing':'lmu'}/#event=${encodeURIComponent(event.id)}`:'';
   const gridfest=isGridfestType(event.type),rounds=Array.isArray(event.rounds)?event.rounds:[];
   const typeLabel=event.tdz&&event.type&&!['OPEN','SAFE'].includes(event.type)?`🏷️ ${clean(gridfest?'Gridfest':normalizeTdzEventType(event.type))}`:'';
-  const lines=[`**${eventHook(event)}**`,event.note&&`*« ${clean(event.note)} »*`,
-    [`🕘 ${announceTime(event.startsAt,event.timePending)}`,`🎮 ${SIM_SHORT[event.sim]||clean(event.sim)}`,typeLabel,event.tdz&&!gridfest&&event.access&&event.access.toUpperCase()].filter(Boolean).join(' · ')];
+  const lines=[eventHook(event),event.note&&`*« ${clean(event.note)} »*`,
+    [`🕘 ${announceTime(event.startsAt,event.timePending)}`,`🎮 ${SIM_SHORT[event.sim]||clean(event.sim)}`,typeLabel,event.tdz&&!gridfest&&event.access&&event.access.toUpperCase()].filter(Boolean).join('\n')];
   const rally=event.rally;
   if(rally){
     if(rally.stages?.length)lines.push(`🏔️ Spéciales : ${rally.stages.map(clean).join(', ')}`);
@@ -442,7 +442,7 @@ export function buildAnnounceEvent(event,site={},updatedAt=Date.now(),absent=nul
   if(event.password)lines.push('🔑 Mot de passe du serveur sur le site');
   const places=event.capacity&&!gridfest?(event.entered>=event.capacity?` · complet${event.entered>event.capacity?` · ${event.entered-event.capacity} en attente`:''}`:` · ${plural(event.capacity-event.entered,'place')} restante${event.capacity-event.entered>1?'s':''}`):'';
   const count=`✅ **${plural(Math.min(event.entered,event.capacity||event.entered),'présent')}**${places}`;
-  const embed={title:cut(`🏁 ${clean(event.name)}`,256),color:ANNOUNCE_SIM_COLORS[event.sim]||0xe7b653,description:cut(lines.filter(Boolean).join('\n'),4096)};
+  const embed={title:cut(`🏁 ${clean(event.name)}`,256),color:ANNOUNCE_SIM_COLORS[event.sim]||0xe7b653,description:cut(lines.filter(Boolean).join('\n\n'),4096)};
   if(!rally&&rounds.length>1)embed.fields=rounds.slice(0,4).map((round,index)=>({name:cut(`Manche ${index+1} · ${roundName(round).slice(3)}`,256),value:cut([roundDetails(round),round.capacity&&`👥 ${round.capacity} places`].filter(Boolean).join(' · ')||BLANK,1024),inline:false}));
   embed.fields=[...(embed.fields||[]),{name:BLANK,value:count,inline:false}];
   if(url)embed.url=url;
@@ -491,12 +491,14 @@ export function buildCompleteAnnouncement(intro, items, site={}) {
   head.fields=[];
   for(const card of cards) {
     const title=card.url?`**[${card.title}](${card.url})**`:`**${card.title}**`;
-    head.fields.push({name:'────────────',value:cut([title,card.description].filter(Boolean).join('\n'),1024),inline:false});
+    head.fields.push({name:'────────────',value:cut([title,card.description].filter(Boolean).join('\n\n'),1024),inline:false});
     const fields=card.fields||[];
     if(fields.length) {
-      const summary=fields.at(-1).value||'';
-      const details=fields.slice(0,-1).map(field=>[field.name===BLANK?'':`**${field.name}**`,field.value].filter(Boolean).join('\n')).join('\n\n');
-      head.fields.push({name:BLANK,value:cut([details&&cut(details,Math.max(80,1020-summary.length)),summary].filter(Boolean).join('\n\n'),1024),inline:false});
+      // Real embed fields provide breathing room between rounds and participation.
+      const limit=Math.max(1,Math.floor((24-cards.length)/cards.length));
+      const selected=fields.length<=limit?fields:[...fields.slice(0,limit-1),fields.at(-1)];
+      head.fields.push(...selected.map((field,index)=>({...field,
+        name:index===selected.length-1?'👥 Participation':field.name,inline:false})));
     }
   }
   if(cards.length===1) {

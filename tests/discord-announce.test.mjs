@@ -234,3 +234,17 @@ test('a failed replacement preserves legacy cards and retries on the following p
   assert.equal(messages.size,1);
   assert.ok(!messages.has('888888888888888888'));
 });
+
+
+test('rounds have distinct readable sections and full session labels inside a single frame',()=>{
+  const event=buildAnnounceEvent({id:EVENT,name:'SAFE race',sim:'ams2',tdz:true,type:'SAFE',access:'safe',startsAt:MORNING+HOUR,entered:12,rounds:[{circuit:'Velo Città',category:'GT4',car:'Ginetta G55',practice:10,qualifying:10,durationMinutes:20},{circuit:'Velo Città',category:'GT4',practice:5,qualifying:10,durationMinutes:40}]},{url:'https://site.example'});
+  const payload=buildCompleteAnnouncement(buildAnnounceIntro({events:1,races:0}),[{name:'SAFE race',payload:event}],{});
+  const embed=payload.embeds[0];
+  assert.equal(payload.embeds.length,1);
+  assert.ok(embed.fields.some(field=>field.name.startsWith('Manche 1')));
+  assert.ok(embed.fields.some(field=>field.name.startsWith('Manche 2')));
+  assert.ok(embed.fields.some(field=>field.name==='👥 Participation'));
+  assert.match(JSON.stringify(embed),/Essais : 10 min/);
+  assert.match(JSON.stringify(embed),/Qualifications : 10 min/);
+  assert.match(JSON.stringify(embed),/Course : 40 min/);
+});
