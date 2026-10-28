@@ -272,7 +272,7 @@ function discordQuestions(form, answers) {
     <label class="discord-check"><input type="checkbox" name="reminders" ${answers.reminders ? 'checked' : ''}><span><strong>Rappels avant le départ</strong><small>${answers.voices ? '24 h avant dans la cloche du site, puis 24 h et 1 h avant dans le chat du vocal.' : '24 h avant dans la cloche du site.'}</small></span></label>`]);
   return questions;
 }
-const discordEventChannel = form => form.dataset.tdz === 'true' ? 'event-tdz-de-la-semaine' : 'event-solo-de-la-semaine';
+const discordEventChannel = form => form.dataset.tdz === 'true' ? '🗓️・calendrier' : 'event-solo-de-la-semaine';
 // The questions follow the answers; on a phone, one per screen (the sketch and the buttons last).
 function discordRefresh(form) {
   const answers = discordRead(form), questions = discordQuestions(form, answers);
