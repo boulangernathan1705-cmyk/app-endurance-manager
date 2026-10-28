@@ -7,7 +7,7 @@ Le récap annonce les courses, départs, équipages, catégories, voitures, pilo
 Dans **Administration → Modules → Discord → Régler**, le réglage se fait question par question (`server/discord-layout.mjs`) : chaque réponse fait apparaître les questions qui en dépendent. Sur téléphone, une question par écran, le croquis du serveur à la fin.
 
 1. **Comment ranger les courses ?**
-   - **Un fil par course** : chaque course a son fil « 🏎️ LMU · 6h de Spa » dans `# endurances-de-la-semaine` (une carte comme celle des vocaux : simu, circuit et grille en haut, départ, durée et arrivée, inscrits, météo, pneus, limites de piste, puis les équipages ; un bouton « ✅ Présent » qui ouvre la course sur le site et, quand `DISCORD_PUBLIC_KEY` est réglée, un bouton « ❌ Absent » (voir plus bas) ; ouvert une semaine, rouvert par le bot à sa prochaine mise à jour s’il a été archivé), et les vocaux de ses équipages juste en dessous, dans la même catégorie du bot (« 🏎️ LMU · 6h de Spa · Équipage A » ; aucun vocal pour une simu non affichée). Plus de catégorie par course : celle d’un réglage fait avant perd son salon `infos-de-la-course` (remplacé par le fil), puis est supprimée une fois ses vocaux sortis. Une course a son fil 7 jours avant son départ (15 jours pour une course de 24 h ou plus), même sans inscrit (les courses officielles iRacing importées attendent un inscrit de la communauté). Plus de nouvelle catégorie quand le serveur approche les 500 salons de Discord.
+   - **Un fil par course** : chaque course a son fil « 🏎️ LMU · 6h de Spa » dans `# endurances-de-la-semaine` (le bloc de la course seul, sans l’en-tête de la semaine ; un bouton « ✅ Présent » qui ouvre la course sur le site et, quand `DISCORD_PUBLIC_KEY` est réglée, un bouton « ❌ Absent » (voir plus bas) ; ouvert une semaine, rouvert par le bot à sa prochaine mise à jour s’il a été archivé), et les vocaux de ses équipages juste en dessous, dans la même catégorie du bot (« 🏎️ LMU · 6h de Spa · Équipage A » ; aucun vocal pour une simu non affichée). Plus de catégorie par course : celle d’un réglage fait avant perd son salon `infos-de-la-course` (remplacé par le fil), puis est supprimée une fois ses vocaux sortis. Une course a son fil 7 jours avant son départ (15 jours pour une course de 24 h ou plus), même sans inscrit (les courses officielles iRacing importées attendent un inscrit de la communauté). Plus de nouvelle catégorie quand le serveur approche les 500 salons de Discord.
    - **Récap de la semaine + pit talk** : le message court de la semaine et un fil par course dans `# endurances-de-la-semaine` (à l’endroit choisi), les vocaux d’équipage dans « Pit talk ».
 2. **Quelles simus ?** LMU, iRacing ou les deux ; avec les deux : **ensemble ou séparés**.
 3. Par course : le bot crée sa catégorie **« Endurance Manager »** (ou **« LMU »** et **« iRacing »** séparées) juste sous la catégorie choisie, chacune suivie de ses courses (LMU d’abord, puis iRacing, chacune par date). Dedans : `# endurances-de-la-semaine` (toujours, les fils des courses y sont) et, au choix, `# event-solo-de-la-semaine` (`# 🗓️・calendrier` avec EVENT TDZ).
@@ -98,6 +98,15 @@ Dans Administration → Modules → Récap, **Réparer le récap** vérifie les 
 - **Permissions manquantes** : donner les droits au bot et vérifier les refus propres au salon sur Discord, puis réparer. Le bot ne s’accorde aucun droit automatiquement.
 - **Discord temporairement indisponible** : l’erreur est affichée ; réessayer plus tard. Une panne réseau ne déclenche pas la création d’un deuxième message.
 
+
+## Les messages en cartes
+
+Tous les messages du bot sont des cartes Discord, avec des boutons vers le site au lieu de liens :
+- **En-tête de la semaine** : la semaine, le nombre de courses LMU et iRacing (jamais le nombre de pilotes), la bannière, « 📅 Toutes les endurances » et « 🏆 Mes inscriptions ».
+- **Endurances de la semaine** (une par simu) : une case par course dans l’ordre des départs, le jour et l’heure en titre, puis le lien du fil, les départs, les équipages (ou inscrits) et la météo ; bouton « Endurances LMU ».
+- **Calendrier** : une case par event (jour et heure, nom, simu, circuits, places, OPEN/SAFE) ; bouton « Tous les events ».
+- **Vocal d’équipage** : la carte de l’équipage, les rappels 24 h (départ, pilotes, météo) et 1 h (court, pour le téléphone), et la fin de course (pilotes, fermeture du vocal), tous silencieux.
+- **Gridfest** : le mot de passe en bloc de code, facile à copier.
 
 ## Bouton « Absent » des fils des courses
 

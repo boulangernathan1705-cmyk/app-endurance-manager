@@ -88,7 +88,9 @@ export async function sendGridfestPasswords(env, community, event, cursor = '') 
       const currentPilot = (await entries(env, community, latest)).confirmed.find(row => row.id === pilot.id && row.user_id === pilot.user_id && row.game_name?.trim());
       if (!currentPilot) throw Error('La place de ce pilote n’est plus confirmée.');
       await discord(env, 'POST', `/channels/${channel.id}/messages`, {
-        content:`Gridfest TDZ · ${event.name}\nTa place est confirmée pour ${currentPilot.game_name}.\nMot de passe du serveur de course : ${password}\nCe mot de passe est réservé aux pilotes invités. Ne le partage pas.`,
+        content:'', embeds:[{color:0x23a55a, author:{name:'Gridfest TDZ'}, title:String(event.name).slice(0, 256),
+          description:`✅ Ta place est confirmée pour **${String(currentPilot.game_name).replace(/[\\`*_~|]/g, '\\$&')}**.`,
+          fields:[{name:'🔑 Mot de passe du serveur de course', value:String(password).includes('`') ? String(password) : `\`${password}\``}], footer:{text:'Réservé aux pilotes invités, ne le partage pas.'}}],
         nonce:(await hash(`${event.id}:${pilot.user_id}:${digest}`)).slice(0,24), enforce_nonce:true, allowed_mentions:{parse:[]}});
       await env.DB.prepare("UPDATE gridfest_password_deliveries SET status='sent',sent_at=?,error='' WHERE event_id=? AND user_id=? AND password_hash=? AND attempt_token=?")
         .bind(now(), event.id, pilot.user_id, digest, attempt).run();
