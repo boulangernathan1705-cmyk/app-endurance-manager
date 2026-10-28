@@ -206,6 +206,9 @@ export async function validateDiscordLayout(env, community, input) {
     const place = destinations.find(item => item.id === layout.announce && [0,5].includes(item.type));
     if (!place) throw Object.assign(new Error('Choisis un salon qui existe sur le serveur Discord de cette communauté pour l’annonce du jour.'), {status:400});
     if (!place.announceReady) throw Object.assign(new Error(`Dans les permissions du salon « ${place.name} », autorise le bot : ${place.announceMissing.join(', ')}.`), {status:400});
+    // Turned on (or moved) now: announced today already, then every morning (server/discord-announce.mjs).
+    const before = parseLayout((await botRecapSettings(env, community))?.layout);
+    layout.announceAt = before?.announce === layout.announce && before.announceAt ? before.announceAt : Date.now();
   }
   if (wantedCategories(layout).length) {
     const server = await serverRights(env, community);

@@ -81,7 +81,7 @@ test('at 7h30 the day\'s endurances and events are announced in order, @everyone
   assert.equal(sent(calls).length,0);
 });
 
-test('the count of présents is kept up to date; a setting made after 9h waits for the next morning',async t=>{
+test('the count of présents is kept up to date; after 9h only the day it is turned on',async t=>{
   const {DB,env,calls,messages,settings}=setup(t);
   await announceCommunity(env,TDZ,settings(),MORNING);
   DB.db.prepare(`INSERT INTO participants(id,name,user_id,created_by,created_at,community_id) VALUES('p2','Pilote 2',NULL,'111111111111111111',0,?)`).run(DEV_COMMUNITY);
@@ -96,6 +96,10 @@ test('the count of présents is kept up to date; a setting made after 9h waits f
   DB.db.prepare('DELETE FROM discord_announcements').run();calls.length=0;
   assert.equal(await announceCommunity(env,TDZ,settings(),MORNING+2*HOUR),false);
   assert.equal(calls.length,0);
+  // Turned on at 9h29: announced at once (the races left today).
+  DB.db.prepare('UPDATE community_recap_settings SET layout=?').run(JSON.stringify({v:1,mode:'events',sims:'all',announce:ANNOUNCES,announceAt:MORNING+2*HOUR-60000}));
+  assert.equal(await announceCommunity(env,TDZ,settings(),MORNING+2*HOUR),true);
+  assert.equal(sent(calls).length,3);
 });
 
 test('« Absent » from the announcement marks the pilot absent on the site',async t=>{
