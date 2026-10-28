@@ -390,6 +390,9 @@ test('Discord diagnostics distinguish removed messages, missing channels and mis
   assert.match(recapError({status:404,code:10003,path:'/channels/123/messages?limit=100'}),/salon de publication/);
   assert.match(recapError({status:404,code:10004}),/serveur Discord/);
   assert.match(recapError({status:404}),/actualise les destinations/);
+  assert.match(recapError({status:403,code:50013,path:'/channels/1/messages?limit=5'}),/Voir le salon.*\(Discord 50013 sur \/channels\/1\/messages\)/);
+  assert.match(recapError({status:403,code:50005,path:'/channels/1/messages/2'}),/n’a pas écrit.*Discord 50005/);
+  assert.match(recapError({status:403,code:160005}),/verrouillé.*Discord 160005/);
   assert.match(recapError({status:403,code:50013}),/permissions.*Intégrer des liens/);
 });
 
