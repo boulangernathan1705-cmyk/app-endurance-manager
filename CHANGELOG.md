@@ -1,5 +1,11 @@
 # Nouveautés d'Endurance Manager
 
+## v1.91 — 28 octobre 2026
+
+### 🛠️ Pour les admins
+
+- **Discord · Vocaux d’équipage** : le bot ouvre automatiquement les salons à tous les membres du serveur (voir, rejoindre et parler), y compris les vocaux existants à la prochaine synchronisation.
+
 ## v1.90 — 28 octobre 2026
 
 ### 🛠️ Corrections
