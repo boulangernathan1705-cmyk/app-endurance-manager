@@ -13,6 +13,7 @@
 //   voices, pit ('bot': the bot makes « Pit talk » just below pitAt, 'existing': in the category pitAt), reminders
 //   copy / pitCopy: the bot's categories / « Pit talk » take the rights of the category they sit under (private like it)
 //   announce: the text or announcement channel of the morning announcement (server/discord-announce.mjs), '' for none
+//   stream: the community's stream, a link on each message of the announcement, '' for none
 // Discord shows every name in the same size: an emoji in front makes the bot's own stand out (custom emojis are not allowed
 // in names).
 export const CATEGORY_NAMES = {main:'🏆 Endurance Manager', lmu:'🔴 LMU', iracing:'🔵 iRacing', pit:'🎙️ Pit talk'};
@@ -67,6 +68,10 @@ export function layoutInput(input) {
   const announce = String(input.announce ?? '').trim();
   if (announce && !ID.test(announce)) throw bad('Choisis le salon de l’annonce du jour.');
   if (announce) layout.announce = announce;
+  // The stream linked on every message of the announcement (a Twitch, YouTube… address), '' for none.
+  const stream = String(input.stream ?? '').trim();
+  if (stream && (!/^https:\/\/[^\s<>"]{3,300}$/.test(stream) || !URL.canParse(stream))) throw bad('Colle l’adresse complète du stream, en https://.');
+  if (announce && stream) layout.stream = stream;
   return layout;
 }
 
