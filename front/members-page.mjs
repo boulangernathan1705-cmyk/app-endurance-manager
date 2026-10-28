@@ -273,7 +273,7 @@ function discordQuestions(form, answers) {
     ${answers.voices && !race ? `<div class="discord-pills">${radio('pit','bot','Le bot crée « 🎙️ Pit talk »',answers.pit !== 'existing')}${radio('pit','existing','Dans une catégorie existante',answers.pit === 'existing')}</div>
       ${row(answers.pit === 'existing' ? 'Vocaux d’équipage' : '🎙️ Pit talk', answers.pit === 'existing' ? 'Le bot les crée dans' : 'Le bot la crée juste sous', category('pitAt', answers.pitAt || 'top', answers.pit === 'existing'), answers.pit === 'existing' ? help(answers.pitAt) : privacy('pitCopy', answers.pitAt, '« 🎙️ Pit talk »', answers.pitCopy))}` : ''}
     ${answers.voices && !race && answers.pit === 'existing' ? '<p class="members-help">Si cette catégorie est privée, ajoute sur Discord une exception pour le bot (le rôle « Endurance Manager ») : les vocaux qu’il y crée restent privés comme elle.</p>' : ''}
-    <p class="members-help">${!answers.voices ? 'Pas de vocal : les équipages s’organisent ailleurs.' : race ? 'Dans la catégorie de sa course, nommé « Équipage A ». Supprimé 2 h après la course.' : 'Nommés « LMU · 6h de Spa · Équipage A », LMU puis iRacing, par date. Supprimés 2 h après la course.'}</p>
+    <p class="members-help">${!answers.voices ? 'Pas de vocal : les équipages s’organisent ailleurs.' : race ? 'Juste sous les fils, nommés « 🏎️ LMU · 6h de Spa · Équipage A », LMU puis iRacing, par date. Supprimés 2 h après la course.' : 'Nommés « 🏎️ LMU · 6h de Spa · Équipage A », LMU puis iRacing, par date. Supprimés 2 h après la course.'}</p>
     <label class="discord-check"><input type="checkbox" name="reminders" ${answers.reminders ? 'checked' : ''}><span><strong>Rappels avant le départ</strong><small>${answers.voices ? '24 h avant dans la cloche du site, puis 24 h et 1 h avant dans le chat du vocal.' : '24 h avant dans la cloche du site.'}</small></span></label>`]);
   return questions;
 }
@@ -319,7 +319,7 @@ function discordSketch(form, answers = discordRead(form)) {
   const RACES = {lmu:['🏎️ LMU · 6h de Spa', ['Équipage A','Équipage B']], iracing:['🏁 iRacing · 8h de Watkins Glen', ['Équipage A']]};
   const bot = name => ({name, bot:true});
   // Each race: its thread in # endurances-de-la-semaine, its crews' voices just below (Discord lists them after the texts).
-  const voices = list => answers.voices ? list.flatMap(sim => RACES[sim][1].map(crew => bot(`🔊 ${RACES[sim][0].replace(/^\S+ /, '')} · ${crew}`))) : [];
+  const voices = list => answers.voices ? list.flatMap(sim => RACES[sim][1].map(crew => bot(`🔊 ${RACES[sim][0]} · ${crew}`))) : [];
   const week = list => [bot('# 📅・endurances-de-la-semaine'), ...list.map(sim => bot(`　🧵 ${RACES[sim][0]}`))];
   const eventName = `# ${discordEventChannel(form)}`;
   const isPrivate = id => list.some(item => item.id === id && item.type === 4 && item.private);
@@ -354,7 +354,7 @@ function discordSketch(form, answers = discordRead(form)) {
     const made = [botCat, ...Object.values(simCats)].filter(group => group.items.length);
     if (made.length) after(answers.under || 'top', ...made);
     if (answers.voices) {
-      const voices = sims.flatMap(sim => RACES[sim][1].map(crew => bot(`🔊 ${sim === 'lmu' ? 'LMU · 6h de Spa' : 'iRacing · 8h de Watkins Glen'} · ${crew}`)));
+      const voices = sims.flatMap(sim => RACES[sim][1].map(crew => bot(`🔊 ${RACES[sim][0]} · ${crew}`)));
       if (answers.pit === 'existing') (groups[at(answers.pitAt || 'top')] || groups[0]).items.push(...voices);
       else after(answers.pitAt || 'top', {name:`🎙️ Pit talk${lock(answers.pitCopy, answers.pitAt)}`, bot:true, items:voices});
     }
