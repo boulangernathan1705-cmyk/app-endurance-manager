@@ -1,0 +1,19 @@
+/* « Annoncer un stream »: purple, the microphone in the logo panel, the block of its page and its one-screen form. */
+.sim-stream {--sim:#9146ff}
+.event-sim-badge.sim-stream {background:#9146ff;border-color:#9146ff;color:#fff}
+.stream-panel {display:flex;align-items:center;justify-content:center;width:100%;height:100%}
+.stream-panel svg {width:72px;height:72px;fill:none;stroke:#a970ff;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;filter:drop-shadow(0 0 12px rgba(145,70,255,.5))}
+html[data-game] #app .race-header .event-type-panel .stream-panel svg {width:110px;height:110px}
+.stream-crew {color:var(--muted,#9aa3ad);font-size:13px;overflow-wrap:anywhere}
+.stream-block {display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:0 0 16px;padding:14px 16px;border:1px solid rgba(145,70,255,.55);border-radius:12px;background:rgba(145,70,255,.1)}
+.stream-block-copy {display:flex;flex-direction:column;gap:2px;min-width:0;margin:0}
+.stream-block-copy small {color:var(--muted,#9aa3ad);overflow-wrap:anywhere}
+.stream-block-actions {display:flex;gap:8px;flex-wrap:wrap}
+.stream-block-actions a {text-decoration:none}
+.stream-block .stream-button {background:#9146ff;border-color:#9146ff;color:#fff}
+.stream-event-form .creation-card {display:grid;gap:12px}
+.stream-event-form .stream-race {display:grid;gap:10px}
+.stream-event-form .stream-race[hidden] {display:none}
+.home-create-event {display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+@media (max-width:700px) {.home-create-event > * {flex:1 1 100%}}
+.stream-race-toggle:has(input:checked) {border-color:#9146ff;background:rgba(145,70,255,.16)}

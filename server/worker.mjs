@@ -12,6 +12,8 @@ import {racesPath} from './races-path.mjs';
 import {catalogForGame, gameForEvent, simForEvent, TDZ_EVENT_TYPES, tdzOnly, eventsLabel} from '../shared/catalog.mjs';
 import {currentCommunity, appearanceOf, allCommunities, communityUrl, communitySlug, communityById, communityFromRow} from './community.mjs';
 import {isDevelopment} from './dev-environment.mjs';
+import {STREAM_SIM} from '../shared/stream.mjs';
+import {streamCrews} from './stream-crew.mjs';
 import {communityAccess, requirePermission, displayRole, PERMISSIONS, ALL_PERMISSIONS, DEFAULT_EVERYONE, normalizePermissions, discordGuild, keepDiscordLook, memberPermissions, refreshCommunityMembers, discoverMemberships} from './access.mjs';
 // Solo races: a module each community turns on or off (settings of the members page).
 import {iracingSoloEnabled,importedIracingSolo,iracingSoloSql} from './iracing-visibility.mjs';
@@ -342,11 +344,12 @@ async function listEvents(env, actor, game='', scope='', community) {
       ...(official.has(crew.event_id) ? {community:names.get(crew.community_id) || null} : {})
     });
   }
+  const crewsOfStreams = await streamCrews(env, community.id, rows);
   return rows.map(row => {
     const format=row.format||'endurance', capacity=row.capacity==null?null:Number(row.capacity);
     const durationHours=Number(row.duration_hours)||3, durationMinutes=Number(row.duration_minutes)||durationHours*60;
     return {id:row.id, name:row.name, official:row.community_id===OFFICIAL, format, ...(format==='solo' ? {sim:simForEvent(row)} : {}), details:JSON.parse(row.details||'{}'), access:row.access||'open', capacity, rounds:JSON.parse(row.rounds||'[]'), circuit:row.circuit||'', durationHours, durationMinutes, driverChangeRequired:row.driver_change_required==null?null:Boolean(row.driver_change_required), eventType:row.event_type||'private', schedulePending:Boolean(row.schedule_pending), createdByMe:Boolean(actor.user && row.created_by===actor.user.id), categories:JSON.parse(row.categories), version:row.version,
-      absences:absences.get(row.id) || [], departures:JSON.parse(row.departures).map(d => {
+      ...(crewsOfStreams.has(row.id) ? {streamCrew:crewsOfStreams.get(row.id)} : {}), absences:absences.get(row.id) || [], departures:JSON.parse(row.departures).map(d => {
         const availability=grouped.get(`${row.id}:${d.id}`) || [];
         // Solo race: entries keep their order of arrival; beyond the number of places they are on the
         // waiting list, and the first one waiting moves up by itself when someone withdraws.
@@ -694,6 +697,7 @@ async function api(request, env) {
     if (isGrindfest(data) && (!grindfestEnabled(community, isDevelopment(env)) || input.official === true)) fail(403, 'Gridfest est réservé aux TDZ et doit être activé dans les modules.');
     // « Course officielle (toutes les communautés) »: the platform managers only.
     if (input.official === true && !actor.manager) fail(403, 'Seuls les gestionnaires de la plateforme créent des courses officielles.');
+    if (input.official === true && data.sim === STREAM_SIM) fail(400, 'Un stream reste dans sa communauté.');
     const owner = input.official === true ? OFFICIAL : community.id;
     await dropEmptyCommonStart(env, null, data);
     await env.DB.prepare('INSERT INTO events(id,name,duration_hours,duration_minutes,event_type,circuit,schedule_pending,driver_change_required,format,access,capacity,rounds,categories,departures,created_by,created_at,community_id,sim,details) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)').bind(eventId, data.name, data.durationHours, data.durationMinutes, data.eventType, data.circuit, data.schedulePending?1:0, data.driverChangeRequired==null?null:(data.driverChangeRequired?1:0), data.format, data.access, data.capacity, JSON.stringify(data.rounds), JSON.stringify(data.categories), JSON.stringify(data.departures), actor.user.id, now(), owner, data.sim, JSON.stringify(data.details)).run();
@@ -756,6 +760,7 @@ async function api(request, env) {
     if (!actor.user) fail(401, 'Connecte-toi avec Discord.');
     // After the last start, nothing changes any more; « Absent » is for those who could enter.
     if (Math.max(...JSON.parse(event.departures || '[]').map(d => Number(d.startsAt) || 0)) <= Date.now()) fail(409, 'Cet événement est passé.');
+    if (method === 'PUT' && event.sim === STREAM_SIM) fail(409, 'Un stream n’a pas d’inscription.');
     if (method === 'DELETE') { await env.DB.prepare('DELETE FROM event_absences WHERE event_id=? AND user_id=? AND community_id=?').bind(event.id, actor.user.id, community.id).run(); return json({ok:true}); }
     if (!(event.format === 'solo' && tdzOnly(community, isDevelopment(env)) ? can(actor, 'solo_open') || can(actor, 'solo_safe') : can(actor, 'endurance'))) fail(403, 'Tu n’as pas l’autorisation de t’inscrire à cet événement.');
     if (await env.DB.prepare("SELECT 1 FROM registrations WHERE event_id=? AND user_id=? AND community_id=? AND COALESCE(status,'')!='unavailable' LIMIT 1").bind(event.id, actor.user.id, community.id).first())
@@ -768,6 +773,7 @@ async function api(request, env) {
     const event = await eventById(env, departureMatch[1], community);
     const departure = departureById(event, departureMatch[2]);
     if (departure.startsAt <= Date.now()) fail(409, 'Ce départ est passé. Les inscriptions sont fermées.');
+    if (event.sim === STREAM_SIM) fail(409, 'Un stream n’a pas d’inscription.');
     const input = await body(request);
     // Official race: an own entry is made for the community chosen at its first step (another pilot: the site's).
     if (input.communityId && input.communityId !== community.id && (input.forOther === true || input.participantUserId || input.participantId)) fail(400, 'Un autre pilote s’inscrit dans la communauté du site.');

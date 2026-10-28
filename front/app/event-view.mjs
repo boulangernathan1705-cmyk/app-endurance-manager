@@ -9,7 +9,8 @@ import {filterStorageKey,filterSelection,readFilterState,writeFilterState} from 
 import {eventCommunities,filterEventCommunities} from '../community-filters.mjs';
 import {ownRegistration,renderRegistrationWorkspace,soloRounds} from './registration.mjs';
 import {renderPilots} from './crews.mjs';
-import {isSolo,eventAccessLogo,accessBadge,soloCardMeta,soloEventDetails,soloPasswordBlock,soloHeaderChips,roundTiles,roundPilots,soloEntryList,eventCircuitName,soloEntryBlock,safeGuideLink} from './solo.mjs';
+import {isStream} from '../../shared/stream.mjs';
+import {isSolo,streamBlock,streamPanel,eventAccessLogo,accessBadge,soloCardMeta,soloEventDetails,soloPasswordBlock,soloHeaderChips,roundTiles,roundPilots,soloEntryList,eventCircuitName,soloEntryBlock,safeGuideLink} from './solo.mjs';
 import {renderHome,raceDateBlock} from './home-view.mjs';
 import {planningDays,renderPlanning,syncPlanning,CHEVRON} from './planning.mjs';
 import {raceInfoChips} from './race-info.mjs';
@@ -210,6 +211,7 @@ function soloHeaderTime(event,next){
   return `<span class="race-header-time">Départ · ${esc(timeLabel(departure.time))}</span>`;
 }
 function eventTypePanel(event){
+  if(isStream(event))return `<span class="event-type-panel has-access-logo">${streamPanel()}</span>`;
   if(isGrindfest(event))return `<span class="event-type-panel has-gridfest-logo"><img class="gridfest-header-logo" src="/images/event-access/gridfest-horizontal.png" alt="Gridfest" width="1280" height="720"></span>`;
   const logo=eventAccessLogo(event,{header:true});
   if(logo)return `<span class="event-type-panel has-access-logo">${logo}</span>`;
@@ -236,13 +238,14 @@ export function renderEvent(message=''){
   const days=planningDays(event);
   // The planning shows the crews and pilots of every start: no category summary above it, and the race
   // actions sit on its heading line.
-  const starts=days.length?renderPlanning(event,days,departure=>departureFoldBody(event,departure),{quick:departure=>quickActions(event,departure),cards:departure=>roundCards(event,departure)})
+  // A stream: when, the streamer's crew and the links; no start to enter.
+  const starts=isStream(event)?streamBlock(event):days.length?renderPlanning(event,days,departure=>departureFoldBody(event,departure),{quick:departure=>quickActions(event,departure),cards:departure=>roundCards(event,departure)})
     :`<section class="departure-accordion" aria-label="Départs de la course">${upcoming}${renderPastDepartures(event,past)}</section>`;
   // Endurances: the badges sit under the date, the race settings (icons) under the circuit.
   const badges=`<span class="race-badges">${officialBadge(event)}${isSolo(event)?accessBadge(event):eventTypeBadge(event.eventType)}${schedulePendingBadge(event)}</span>`;
   app.eventViewData={eventId:event.id,events:state.events,message};
   const gate=categoryEntryGate(full);
-  app.innerHTML=`<div class="event-header event-header-compact race-header event-type-${event.eventType||'private'}${isSolo(event)?` is-solo-${event.access||'open'} sim-${simForEvent(event)}`:''}${isGrindfest(event)?' is-gridfest':''}" data-event-id="${event.id}"><div class="race-card-top"><div class="race-side">${raceDateBlock(event,!next&&!undated.length)}${badges}</div><div class="race-head"><h1 class="event-title event-name">${esc(event.name)}</h1><span class="race-meta">${isSolo(event)?((event.rounds||[]).length>1?soloCardMeta(event):`<strong class="solo-header-circuit">${soloCardMeta(event)}</strong>`):`${esc(circuitLabel(event.circuit))} · <span class="nowrap">${durationLabel(eventMinutes(event))}</span>`}${isSolo(event)?soloHeaderTime(event,next):''}</span>${isSolo(event)?soloHeaderChips(event):raceInfoChips(event)}</div>${isSolo(event)?eventTypePanel(event):circuitVisual(event.circuit)}</div>${isSolo(event)&&soloEventDetails(event)?`<div class="race-header-footer">${soloEventDetails(event)}</div>`:''}</div><div id="crew-builder-root"></div>${message?`<p class="creation-success" role="status">${esc(message)}</p>`:''}<div class="race-controls">${communityFilter(present,chosen)}<span class="race-controls-actions">${helpContext(isGrindfest(event)?'grindfest':simForEvent(event)==='acrally'?'rally':isSolo(event)?'solo':'race')}${shareAction}${eventActions}</span></div>${gate||`${categoryEntryBar(full)}${categoryEntryBoard(event)}${soloPasswordBlock(full)}${starts}${absencesSection(event,!!(next||undated.length))}`}`;
+  app.innerHTML=`<div class="event-header event-header-compact race-header event-type-${event.eventType||'private'}${isSolo(event)?` is-solo-${event.access||'open'} sim-${simForEvent(event)}`:''}${isGrindfest(event)?' is-gridfest':''}" data-event-id="${event.id}"><div class="race-card-top"><div class="race-side">${raceDateBlock(event,!next&&!undated.length)}${badges}</div><div class="race-head"><h1 class="event-title event-name">${esc(event.name)}</h1><span class="race-meta">${isSolo(event)?((event.rounds||[]).length>1?soloCardMeta(event):`<strong class="solo-header-circuit">${soloCardMeta(event)}</strong>`):`${esc(circuitLabel(event.circuit))} · <span class="nowrap">${durationLabel(eventMinutes(event))}</span>`}${isSolo(event)&&!isStream(event)?soloHeaderTime(event,next):''}</span>${isSolo(event)?soloHeaderChips(event):raceInfoChips(event)}</div>${isSolo(event)?eventTypePanel(event):circuitVisual(event.circuit)}</div>${isSolo(event)&&soloEventDetails(event)?`<div class="race-header-footer">${soloEventDetails(event)}</div>`:''}</div><div id="crew-builder-root"></div>${message?`<p class="creation-success" role="status">${esc(message)}</p>`:''}<div class="race-controls">${communityFilter(present,chosen)}<span class="race-controls-actions">${helpContext(isGrindfest(event)?'grindfest':simForEvent(event)==='acrally'?'rally':isSolo(event)?'solo':'race')}${shareAction}${eventActions}</span></div>${gate||`${categoryEntryBar(full)}${categoryEntryBoard(event)}${soloPasswordBlock(full)}${starts}${isStream(event)?'':absencesSection(event,!!(next||undated.length))}`}`;
   if(days.length)syncPlanning(app);
   notifyRender();
 }
