@@ -107,7 +107,8 @@ test('missing bot permissions are named in the destination list',async({page})=>
   await expect(form.locator('select[name="week-all"] option',{hasText:'le bot n’a pas ses droits'})).toHaveCount(1);
   await (await reach(page,form.locator('select[name="week-all"]'))).selectOption(CATEGORY);
   await expect(form.locator('.discord-rights')).toContainText('Gérer les salons');
-  await expect(await reach(page,form.getByRole('link',{name:'Inviter le bot avec ses droits'}))).toHaveAttribute('href',/permissions=85008/);
+  await expect(await reach(page,form.getByRole('link',{name:'Lien normal'}))).toHaveAttribute('href',/permissions=85008/);
+  await expect(form.getByRole('link',{name:'Lien administrateur'})).toHaveAttribute('href',/permissions=8&/);
 });
 
 test('« Tout retirer » asks once more on the button itself',async({page})=>{
