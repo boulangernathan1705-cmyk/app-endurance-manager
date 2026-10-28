@@ -952,3 +952,27 @@ test('EVENT TDZ\'s channel is shown as « 🗓️・calendrier », found again b
   assert.equal(calendar.topic,'event-tdz-de-la-semaine');
   assert.equal(layoutPlan({mode:'events',sims:'lmu',showEvents:true},{main:'123'}).week.find(entry=>entry.kind.startsWith('calendar')).channel,'event-solo-de-la-semaine');
 });
+
+test('the recap written in a channel of the admins: after its messages, threads in it, never deleted',async t=>{
+  const {DB,env,channels,messages}=setup(t,{rights:String(85008n|(1n<<35n)|(1n<<38n))});race(DB);
+  messages.set('800000000000000000',{id:'800000000000000000',channel_id:TEXT,author:{id:OWNER},content:'Comment marche le site'});
+  const count=channels.length;
+  await layout(env,COMMUNITY,{mode:'general',sims:'lmu',week:{all:`in:${TEXT}`},events:''});
+  await syncBotRecaps(env,NOW,COMMUNITY);
+  assert.equal(channels.filter(item=>item.type!==11).length,count,'no channel made');
+  const rows=DB.db.prepare("SELECT event_id,channel_id,message_id FROM discord_recap_publications WHERE event_id LIKE 'week:%'").all();
+  assert.deepEqual(rows.map(row=>row.channel_id),rows.map(()=>TEXT));
+  assert.ok(rows.every(row=>BigInt(row.message_id)>800000000000000000n),'after the admins\' message');
+  assert.equal(channels.find(item=>item.type===11).parent_id,TEXT);
+  // Back to a channel of the bot: its messages leave the admins' channel, which stays.
+  await layout(env,COMMUNITY,{mode:'general',sims:'lmu',week:{all:CATEGORY},events:''});
+  for(let pass=0;pass<3;pass++)await syncBotRecaps(env,NOW,COMMUNITY);
+  assert.ok(channels.some(item=>item.id===TEXT));
+  assert.deepEqual([...messages.values()].filter(item=>item.channel_id===TEXT&&item.author.id===BOT&&item.type!==18).map(item=>item.id),[]);
+  assert.ok(named(channels,'📅・endurances-de-la-semaine'));
+});
+
+test('written in a channel: the bot must be allowed there, threads included',async t=>{
+  const {env}=setup(t);
+  await assert.rejects(validateDiscordLayout(env,COMMUNITY,{mode:'general',sims:'lmu',week:{all:`in:${TEXT}`},events:''}),/salon « recap ».*Créer des fils publics/);
+});

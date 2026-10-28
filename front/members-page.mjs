@@ -228,14 +228,19 @@ function discordQuestions(form, answers) {
   const list = form._destinations, solo = form.dataset.solo === 'true', race = answers.mode === 'events', apart = discordApart(answers);
   const places = list ? discordPlaces(list) : [];
   const radio = (name, value, label, checked) => `<label class="discord-pill"><input type="radio" name="${name}" value="${value}" ${checked ? 'checked' : ''}> ${label}</label>`;
-  const known = (value, label) => value && !['top','bot','same','bot-lmu','bot-iracing'].includes(value) && !places.some(item => item.id === value) ? `<option value="${esc(value)}" selected>${esc(label || 'Choix enregistré')}</option>` : '';
+  const known = (value, label) => value && !['top','bot','same','bot-lmu','bot-iracing'].includes(value) && !places.some(item => item.id === value || `in:${item.id}` === value) ? `<option value="${esc(value)}" selected>${esc(label || 'Choix enregistré')}</option>` : '';
+  // Written in a channel of the server: its own rights count.
+  const inside = (item, value) => `<option value="in:${esc(item.id)}" ${`in:${item.id}` === value ? 'selected' : ''}># ${esc(item.name)}${item.insideReady === false ? ' · le bot n’a pas ses droits' : ''}</option>`;
   const option = (item, value, inside = false, rights = true) => `<option value="${esc(item.id)}" ${item.id === value ? 'selected' : ''}>${item.type === 0 ? `${inside && item.parentId ? '   ' : ''}# ` : '📁 '}${esc(item.name)}${item.type === 4 && item.private ? ' · privée' : ''}${rights && item.ready === false ? ' · le bot n’a pas ses droits' : ''}</option>`;
   // A place for a recap: not shown, a category the bot makes, or just below a channel or category of the server.
   const place = (name, value, extra = '', bots = [['bot', apart && name.startsWith('week-') ? SIM_NAMES[name.slice(5)] : 'Endurance Manager']]) => `<select name="${name}"><option value="" ${!value ? 'selected' : ''}>Ne pas afficher</option>${extra}
-    ${bots.map(([key, label]) => `<option value="${key}" ${value === key ? 'selected' : ''}>Dans « ${label} », créée par le bot</option>`).join('')}<optgroup label="Ou juste sous…">${places.map(item => option(item, value, true)).join('')}${known(value)}</optgroup></select>`;
+    ${bots.map(([key, label]) => `<option value="${key}" ${value === key ? 'selected' : ''}>Dans « ${label} », créée par le bot</option>`).join('')}<optgroup label="Ou juste sous…">${places.map(item => option(item, value, true)).join('')}${known(value)}</optgroup><optgroup label="Ou dans ce salon…">${places.filter(item => item.type === 0).map(item => inside(item, value)).join('')}</optgroup></select>`;
   // rights: only where the bot writes inside; placing its own category just below needs no rights there.
   const category = (name, value, rights = false) => `<select name="${name}"><option value="top" ${value === 'top' ? 'selected' : ''}>Le haut du serveur</option>${places.filter(item => item.type === 4).map(item => option(item, value, false, rights)).join('')}${known(value)}</select>`;
-  const help = value => { const chosen = places.find(item => item.id === value); return chosen?.ready === false ? discordRightsHelp(chosen) : ''; };
+  const help = value => {
+    if (value?.startsWith('in:')) { const chosen = places.find(item => `in:${item.id}` === value); return chosen?.insideReady === false ? discordInsideHelp(chosen) : ''; }
+    const chosen = places.find(item => item.id === value); return chosen?.ready === false ? discordRightsHelp(chosen) : '';
+  };
   // Below a private category, the bot's own one is private like it (its rights copied) or open to all: the admins choose.
   const privacy = (name, at, label, value) => {
     const chosen = places.find(item => item.id === at && item.type === 4);
@@ -256,7 +261,7 @@ function discordQuestions(form, answers) {
   else {
     questions.push(['Où mettre les endurances de la semaine ?', (apart ? discordSims(answers).map(sim => row(SIM_NAMES[sim], `# ${discordWeekChannel(answers, sim)}`, place(`week-${sim}`, answers.week?.[sim] || ''), help(answers.week?.[sim])))
       : [row('# endurances-de-la-semaine', discordSims(answers).length > 1 ? 'LMU puis iRacing, un message chacun.' : '', place('week-all', answers.week?.all || ''), help(answers.week?.all))]).join('')
-      + `<p class="members-help">${apart ? 'Dans « LMU » ou « iRacing » : le bot crée cette catégorie pour la simu, tu choisis ensuite où la placer.' : 'Dans « Endurance Manager » : le bot crée sa catégorie, tu choisis ensuite où la placer.'} Juste sous un salon : le bot crée le sien juste après, dans la même catégorie. Sous une catégorie : en tête de celle-ci, avec ses droits.</p>`]);
+      + `<p class="members-help">${apart ? 'Dans « LMU » ou « iRacing » : le bot crée cette catégorie pour la simu, tu choisis ensuite où la placer.' : 'Dans « Endurance Manager » : le bot crée sa catégorie, tu choisis ensuite où la placer.'} Juste sous un salon : le bot crée le sien juste après, dans la même catégorie. Sous une catégorie : en tête de celle-ci, avec ses droits. Dans un salon : le bot écrit après les messages déjà là et y ouvre les fils des courses ; ses messages restent ensuite à leur place.</p>`]);
     const events = discordEvents(answers);
     if (solo) questions.push(['Où mettre les events de la semaine ?', row(`# ${discordEventChannel(form)}`, '', place('events', events, `<option value="same" ${events === 'same' ? 'selected' : ''}>Avec les endurances</option>`, apart ? discordSims(answers).map(sim => [`bot-${sim}`, SIM_NAMES[sim]]) : undefined), help(events))]);
   }
@@ -291,6 +296,10 @@ function discordPage(form) {
   back.disabled = step === 0; next.hidden = step === last;
   next.textContent = step === last - 1 ? 'Voir le résultat' : 'Suivant';
 }
+// Written in a channel: what to tick on that channel.
+function discordInsideHelp(destination) {
+  return `<p class="setup-note setup-error discord-rights">Le bot n’a pas ses droits dans ce salon. Sur Discord : clic droit sur « ${esc(destination.name)} » › Modifier le salon › Permissions › « + » › Endurance Manager, puis coche ${esc((destination.insideMissing || []).join(', '))}. Reviens ensuite sur « Actualiser les salons ».</p>`;
+}
 // What to tick on Discord when the bot cannot work in the chosen place (the invitation only gives server-wide rights).
 function discordRightsHelp(destination) {
   // Below a channel, the bot makes its own in that channel's category: the rights count there.
@@ -323,8 +332,14 @@ function discordSketch(form, answers = discordRead(form)) {
     after(answers.under || 'top', ...blocks);
   } else {
     // A week's channel with its races' threads.
-    const placeIn = (value, name, sim = null, threads = []) => {
+    const placeIn = (value, name, sim = null, threads = [], label = '') => {
       if (!value) return;
+      if (value.startsWith('in:')) {
+        // In a channel of the server: its messages after those already there, then the races' threads.
+        const items = [bot(`　💬 ${label}`), ...threads.map(item => bot(`　🧵 ${RACES[item][0]}`))];
+        for (const item of groups) { const index = item.items.findIndex(text => `in:${text.id}` === value); if (index >= 0) { item.items.splice(index + 1 + item.items.slice(index + 1).filter(text => text.bot && text.name.startsWith('　')).length, 0, ...items); return; } }
+        return;
+      }
       const items = [bot(name), ...threads.map(item => bot(`　🧵 ${RACES[item][0]}`))];
       if (value === 'bot') { (apart && sim ? simCats[sim] : botCat).items.push(...items); return; }
       if (value.startsWith('bot-')) { simCats[value.slice(4)]?.items.push(...items); return; }
@@ -333,9 +348,9 @@ function discordSketch(form, answers = discordRead(form)) {
       for (const item of groups) { const index = item.items.findIndex(text => text.id === value); if (index >= 0) { item.items.splice(index + 1, 0, ...items); return; } }
     };
     const channels = apart ? sims.map(sim => [answers.week?.[sim], `# ${discordWeekChannel(answers, sim)}`, sim, [sim]]) : [[answers.week?.all, '# 📅・endurances-de-la-semaine', null, sims]];
-    for (const [value, name, sim, threads] of channels) placeIn(value, name, sim, threads);
+    for (const [value, name, sim, threads] of channels) placeIn(value, name, sim, threads, sim ? `Endurances ${SIM_NAMES[sim]}` : 'Endurances de la semaine');
     const events = discordEvents(answers);
-    if (solo && events && events !== 'same') placeIn(events, eventName);
+    if (solo && events && events !== 'same') placeIn(events, eventName, null, [], 'Events de la semaine');
     const made = [botCat, ...Object.values(simCats)].filter(group => group.items.length);
     if (made.length) after(answers.under || 'top', ...made);
     if (answers.voices) {
