@@ -1,5 +1,11 @@
 # Nouveautés d'Endurance Manager
 
+## v1.80 — 28 octobre 2026
+
+### ✨ Améliorations
+
+- **Discord** : dans le chat du vocal d’équipage, une carte de la course : circuit, équipage ouvert ou complet, départ et arrivée, voiture, pilotes, météo, pneus, limites de piste, et un bouton vers la course. Après l’arrivée, un petit mot à l’équipage avant la fermeture du vocal.
+
 ## v1.79 — 28 octobre 2026
 
 ### ✨ Améliorations
