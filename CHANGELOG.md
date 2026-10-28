@@ -1,5 +1,11 @@
 # Nouveautés d'Endurance Manager
 
+## v1.77 — 28 octobre 2026
+
+### ✨ Améliorations
+
+- **Discord** : dans # endurances-de-la-semaine, la bannière et la semaine ont leur propre message en haut. Dessous, les messages LMU et iRacing ont le même format.
+
 ## v1.76 — 28 octobre 2026
 
 ### 🔧 Corrections
