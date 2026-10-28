@@ -25,8 +25,11 @@ export function missingVoicePermissions(rights) {
 }
 // POST Create Guild Channel may only allow permissions already held by the bot in the guild.
 // Callers validate the destination first. Existing member restrictions remain byte-for-byte equivalent.
+// « Gérer les permissions » (Manage Roles) on a channel may only be set by an administrator: left out of the copy, or
+// Discord refuses the whole channel.
+const MANAGE_ROLES = 1n << 28n;
 export function withBotAccess(overwrites, clientId, required) {
-  const copy = (overwrites || []).map(item => ({...item}));
+  const copy = (overwrites || []).map(item => ({...item, allow:String(BigInt(item.allow || 0) & ~MANAGE_ROLES), deny:String(BigInt(item.deny || 0) & ~MANAGE_ROLES)}));
   if (!clientId) throw new Error('Le bot du site n’est pas configuré.');
   let mine = copy.find(item => String(item.id) === String(clientId) && Number(item.type) === 1);
   if (!mine) { mine = {id:String(clientId),type:1,allow:'0',deny:'0'}; copy.push(mine); }
