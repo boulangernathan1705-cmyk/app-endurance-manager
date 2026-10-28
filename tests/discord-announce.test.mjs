@@ -248,3 +248,21 @@ test('rounds have distinct readable sections and full session labels inside a si
   assert.match(JSON.stringify(embed),/Qualifications : 10 min/);
   assert.match(JSON.stringify(embed),/Course : 40 min/);
 });
+
+test('all simulator events share identical facts and retain differences per round',()=>{
+  for(const sim of ['lmu','iracing','ams2','ace'])for(const type of ['SAFE','BOULOULES','TONDEUZ TRAINING','Gridfest']){
+    const base={circuit:'Velo Città',category:'GT4',car:'Ginetta G55',weather:'random',fuel:1,tyres:1,practice:10,qualifying:10,durationMinutes:20};
+    const event={id:EVENT,name:'Race',sim,type,tdz:true,access:'safe',startsAt:MORNING,entered:0,rounds:[base,{...base,durationMinutes:40}]};
+    const shared=buildAnnounceEvent(event).embeds[0];
+    assert.match(shared.description,/Velo Città/);
+    assert.match(shared.description,/Ginetta G55/);
+    assert.doesNotMatch(shared.fields[0].value,/Velo Città|Ginetta G55/);
+    event.rounds[1]={...base,circuit:'Interlagos',car:'Porsche',weather:'rain',fuel:2};
+    const mixed=buildAnnounceEvent(event).embeds[0];
+    assert.doesNotMatch(mixed.description,/Velo Città|Interlagos|Ginetta G55|Porsche/);
+    assert.match(mixed.fields[0].value,/Velo Città/);
+    assert.match(mixed.fields[1].value,/Interlagos/);
+    assert.match(mixed.fields[1].value,/Porsche/);
+    assert.match(mixed.description,/GT4/);
+  }
+});
