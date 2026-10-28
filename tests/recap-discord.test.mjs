@@ -934,3 +934,13 @@ test('a server set up before the emojis: the bot\'s categories and week\'s chann
   assert.equal(bot.name,'🏆 Endurance Manager');assert.equal(week.name,'📅・endurances-de-la-semaine');
   assert.equal(channels.length,count);
 });
+
+test('a community showing the official iRacing races on its site: each gets its thread and its line, even without any entry',async t=>{
+  const {DB,env,channels,messages}=setup(t);
+  race(DB,'ir','Officielle iRacing','iracing-spa',[{id:'i',startsAt:NOW+DAY}],'official');
+  const community={...COMMUNITY,modules:{...COMMUNITY.modules,iracingImport:true}};
+  await layout(env,community,{mode:'events',sims:'iracing',showEvents:false,under:'top'});
+  await syncBotRecaps(env,NOW,community);
+  assert.ok(channels.some(item=>item.type===11&&item.name==='🏁 iRacing · Officielle iRacing'));
+  assert.ok([...messages.values()].some(item=>item.embeds[0].title==='Endurances iRacing'&&/Officielle iRacing|<#/.test(item.embeds[0].description||'')));
+});
