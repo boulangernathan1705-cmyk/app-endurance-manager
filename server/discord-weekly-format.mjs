@@ -278,12 +278,10 @@ export function buildWeeklyDiscordPayload(snapshot,site={},updatedAt=Date.now(),
 
 // Above the sims' messages of a channel: the community, the week (a link to the site) and the banner.
 // counts: the races of the week by sim ({lmu, iracing}), one box each for the sims of the channel.
-export function buildWeekHeadPayload(periodLabel,site={},scope='all',counts={}){
+export function buildWeekHeadPayload(periodLabel,site={},scope='all'){
   const siteUrl=String(site.url||''),simPage=scope==='iracing'?'/iracing/':scope==='all'?'/':'/lmu/';
   const embed={title:cut(`📝 ${cap(periodLabel||'semaine à venir')}`,256),color:0x52d3d8};
   if(site.name){embed.author={name:cut(site.name,256)};if(siteUrl)embed.author.url=`${siteUrl}/`;if(site.logoUrl)embed.author.icon_url=site.logoUrl;}
-  const sims=scope==='all'?['lmu','iracing']:[scope];
-  embed.fields=sims.map(id=>{const n=Number(counts[id])||0;return{name:`${SIM_MARKS[id]}${SCOPE_LABELS[id]}`,value:n?`${n} course${n>1?'s':''}`:'Aucune course',inline:true};});
   if(site.bannerUrl)embed.image={url:site.bannerUrl};
   // The title links to the endurances rather than a button (less room); components:[] takes off the buttons of before.
   if(siteUrl)embed.url=`${siteUrl}${simPage}`;
