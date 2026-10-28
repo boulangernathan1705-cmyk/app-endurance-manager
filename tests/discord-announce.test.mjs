@@ -67,14 +67,15 @@ test('at 7h30 the day\'s endurances and events are announced in order, @everyone
   assert.equal(combined.embeds.length,1,'one visual frame, not several embeds');
   assert.doesNotMatch(text,/Aujourd’hui sur le serveur|C’est jour de course|Inscris-toi, préviens/);
   assert.match(embed.title,/6h de Spa/);
-  assert.match(embed.fields.at(-1).value,/Regarder le live sur Twitch.*https:\/\/twitch.tv\/tdz/);
+  assert.equal(embed.fields.at(-1).name,'📺 LA SOIRÉE EN DIRECT');
+  assert.match(embed.fields.at(-1).value,/\*\*\[▶ Regarder sur Twitch · tdz\].*https:\/\/twitch.tv\/tdz/);
   assert.ok(!combined.components.flatMap(row=>row.components).some(button=>button.label==='Regarder le live'));
   assert.match(text,/6h de Spa/);assert.match(text,/Coupe GT3/);
   assert.ok(text.indexOf('6h de Spa')<text.indexOf('Coupe GT3'));
   assert.match(text,/Équipage A/);assert.match(text,/Pilote 1/);assert.match(text,/1 présent/);
   assert.match(text,/La pluie attendue sur Spa/);assert.match(text,/Manche 1/);assert.match(text,/Manche 2/);
   assert.ok(embed.image);assert.ok(embed.fields.some(field=>field.name==='────────────'));
-  assert.deepEqual(combined.components[1].components.map(button=>button.label),['Présent / S’inscrire · Coupe GT3','Absent · Coupe GT3']);
+  assert.deepEqual(combined.components[1].components.map(button=>button.label),['S’inscrire · Coupe GT3','Absent · Coupe GT3']);
   assert.equal(combined.components[1].components[1].custom_id,`absent:${EVENT}`);
   // The next passes send nothing again.
   calls.length=0;
