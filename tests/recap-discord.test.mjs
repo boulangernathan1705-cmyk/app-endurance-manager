@@ -696,7 +696,7 @@ test('« un fil par course »: the bot makes « Endurance Manager » under the c
   const index=[...messages.values()].find(item=>item.channel_id===week.id&&item.embeds[0].author?.name.includes('LMU'));
   assert.equal(index.embeds.length,1);assert.match(index.embeds[0].author.name,/^🏎️ LMU · 1 course cette semaine$/);
   assert.match(index.embeds[0].fields[0].name,/^🟢 \S+ \d+ \S+ \d+:\d\d$/);assert.doesNotMatch(index.embeds[0].fields[0].name,/Spa/);
-  assert.match(index.embeds[0].fields[0].value,new RegExp(`^<#${threads.find(thread=>thread.name.includes('Spa')).id}> · personne pour l’instant$`));
+  assert.match(index.embeds[0].fields[0].value,new RegExp(`^<#${threads.find(thread=>thread.name.includes('Spa')).id}>$`));
   assert.match(index.embeds[0].author.url,/\/lmu\/$/);assert.deepEqual(index.components,[],'a link, no button');
 });
 
@@ -913,8 +913,8 @@ test('LMU and iRacing in the same channel: the banner and the week in a message 
   const id=event=>DB.db.prepare('SELECT message_id FROM discord_recap_publications WHERE event_id=?').get(event).message_id;
   const week=event=>messages.get(id(event)).embeds[0];
   assert.match(week('week:head:lmu').title,/Semaine/);
-  // The head: the races of each sim (never the number of pilots), and two buttons to the site.
-  assert.deepEqual(week('week:head:lmu').fields.map(field=>[field.name,field.value]),[['🏎️ LMU','1 course'],['🏁 iRacing','1 course']]);
+  // The head: only the week (its link to the site) and the banner, no count.
+  assert.equal(week('week:head:lmu').fields,undefined);
   assert.match(week('week:head:lmu').url,/^https:\/\/[^ ]+\/$/);assert.equal(week('week:head:lmu').description,undefined);assert.deepEqual(messages.get(id('week:head:lmu')).components,[]);
   assert.equal(week('week:lmu').author.name,'🏎️ LMU · 1 course cette semaine');assert.equal(week('week:iracing').author.name,'🏁 iRacing · 1 course cette semaine');
   for (const sim of ['week:lmu','week:iracing']) {assert.equal(week(sim).image,undefined);assert.equal(week(sim).title,undefined);assert.ok(week(sim).footer);}
