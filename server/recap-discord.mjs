@@ -249,8 +249,10 @@ async function enteredRaces(env, community) {
   return new Set(rows.map(row => row.event_id));
 }
 // The races that get a recap now, even without any entry: it invites the pilots to sign up. The official iRacing
-// races are imported by the dozen (server/iracing-import.mjs): only those where the community has something.
+// races: all of them when the community shows them on its site (module « iracingImport »), otherwise only those where it
+// has something.
 async function openRaces(env, community, events, scope, timestamp) {
+  if (community.modules?.iracingImport === true) return racesOpenNow(events, scope, timestamp);
   const entered = await enteredRaces(env, community);
   return racesOpenNow(events.filter(event => event.community_id !== 'official' || !String(event.circuit || '').startsWith('iracing-') || entered.has(event.id)), scope, timestamp);
 }
