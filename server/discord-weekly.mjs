@@ -2,6 +2,7 @@ import {iracingSoloSql} from './iracing-visibility.mjs';
 import {allCommunities, communityUrl, appearanceOf} from './community.mjs';
 import {isInParisWeek, parisWeek} from './discord-weekly-format.mjs';
 import {simForEvent} from '../shared/catalog.mjs';
+import {raceFinishAt} from '../shared/duration.mjs';
 import {grindfestEnabled} from '../shared/grindfest.mjs';
 import {isDevelopment} from './dev-environment.mjs';
 import {syncBotRecaps, botRecapSettings} from './recap-discord.mjs';
@@ -41,7 +42,7 @@ export function flattenDepartures(events) {
         // "Horaires à confirmer": the time of the start is only a placeholder.
         timePending: Boolean(event.schedule_pending) || departure.tbd === true,
         startsAt,
-        endsAt: startsAt + durationMinutes * 60_000,
+        endsAt: raceFinishAt(startsAt, durationMinutes),
         crews: [],
         registrations: [],
         pilotCount: 0,

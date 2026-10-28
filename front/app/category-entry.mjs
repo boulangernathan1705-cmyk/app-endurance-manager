@@ -4,7 +4,7 @@ import {contextHelpMarker as helpContext} from './core.mjs';
 // for the whole race or some hours; he is entered on each of them. The TM
 // then makes the crews on a start.
 import {weekdayLong,weekdayLabel,dayMonthShort,timeLabel,timeAt} from '../dates.mjs';
-import {eventMinutes} from '../../shared/duration.mjs';
+import {eventMinutes,raceFinishAt} from '../../shared/duration.mjs';
 import {state,esc,pilotNameTip,button,logo,categories,api,can,CARS,communityTag,registrationCarLabel,renderAvailabilityTimeline} from './core.mjs';
 import {groupByPilot} from './crews.mjs';
 
@@ -62,7 +62,7 @@ const ICON_REGISTER=ICON('M8 7a4 4 0 1 0 8 0a4 4 0 0 0-8 0M6 21v-2a4 4 0 0 1 4-4
 const ICON_ABSENT=ICON('M8 7a4 4 0 1 0 8 0a4 4 0 0 0-8 0M6 21v-2a4 4 0 0 1 4-4h3M17 16l4 4M21 16l-4 4');
 function startCard(event,departure){
   const status=statusOf(departure),on=Boolean(status),absent=draft.starts[departure.id]==='no';
-  const start=Number(departure.startsAt),end=start+eventMinutes(event)*60000;
+  const start=Number(departure.startsAt),end=raceFinishAt(start,eventMinutes(event));
   const endDay=dayKey(end)!==dayKey(start)?` le ${weekdayLabel(end)}`:'';
   const crews=departure.crews||[],assigned=new Set(crews.flatMap(crew=>crew.registrationIds||[]));
   const others=(departure.availability||[]).filter(reg=>!reg.mine&&reg.status!=='unavailable');

@@ -1,5 +1,5 @@
 import {racesPath} from './races-path.mjs';
-import {durationLabel} from '../shared/duration.mjs';
+import {durationLabel,PRE_RACE_MINUTES} from '../shared/duration.mjs';
 import {catalogForGame,SIMS} from '../shared/catalog.mjs';
 
 const DAY_MS=86_400_000,HOUR_MS=3_600_000,TIME_ZONE='Europe/Paris';
@@ -34,7 +34,7 @@ export function nextParisWeek(timestamp=Date.now()){return weekFromMonday(parisW
 export function isInParisWeek(timestamp,week){const day=localDay(timestamp);return day>=week.monday&&day<=week.sunday;}
 export function isDepartureRelevant(startsAt,durationHours,week,now=Date.now()){
   if(!Number.isFinite(startsAt)||!isInParisWeek(startsAt,week))return false;
-  const hours=Number(durationHours),endAt=startsAt+(Number.isFinite(hours)&&hours>0?hours*HOUR_MS:0);
+  const hours=Number(durationHours),endAt=startsAt+(Number.isFinite(hours)&&hours>0?hours*HOUR_MS+PRE_RACE_MINUTES*60_000:0);
   return startsAt>=now||endAt>now;
 }
 
