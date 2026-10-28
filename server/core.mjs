@@ -269,6 +269,8 @@ function validateSoloRace(input, existing) {
   if (raw.password) details.password = text(raw.password, 30, 'Mot de passe');
   if (isGrindfest({details}) && details.password && !gridfestPasswordValid(details.password)) fail(400, 'Mot de passe Gridfest : 30 caractères maximum, sans espace.');
   if (raw.note) details.note = text(raw.note, 120, 'Info');
+  // When the stream starts (it can start before the race): announced in the morning (server/discord-announce.mjs).
+  if (raw.streamTime) { if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(raw.streamTime)) fail(400, 'Heure de début du stream invalide.'); details.streamTime = raw.streamTime; }
   if(rally){
     if(isGrindfest({details})) fail(400, 'Le format Gridfest ne correspond pas à une soirée rallye.');
     if(raw.rallyHost) details.rallyHost=text(raw.rallyHost,60,'Hôte');
