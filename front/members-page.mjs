@@ -173,7 +173,11 @@ function discordForm(setup, settings) {
     <div data-discord-questions></div>
     <div class="discord-end">
       <div class="discord-sketch" data-discord-sketch></div>
-      <p class="members-help">Le bot crée lui-même ses catégories, salons et vocaux.${invite ? ` <a href="${esc(invite)}" target="_blank" rel="noopener">Inviter le bot avec ses droits</a> : il a tout ce qu’il faut, sans être administrateur.` : ''} Dans une catégorie privée, ajoute en plus une exception pour lui (le rôle « Endurance Manager ») : les autres accès restent privés.</p>
+      <p class="members-help">Le bot crée lui-même ses catégories, salons et vocaux. Deux façons de l’inviter :</p>
+      <ul class="members-help">
+        <li>${invite ? `<a href="${esc(invite)}" target="_blank" rel="noopener">Lien normal</a>` : 'Lien normal'} : il a tout ce qu’il faut, sans être administrateur. Dans une catégorie privée, ajoute une exception pour lui (le rôle « Endurance Manager ») sur la catégorie elle-même, pas sur un salon : les autres accès restent privés.</li>
+        <li>${setup.recapBotAdminInviteUrl ? `<a href="${esc(setup.recapBotAdminInviteUrl)}" target="_blank" rel="noopener">Lien administrateur</a>` : 'Lien administrateur'} : il voit et gère aussi les catégories privées, sans exception à ajouter.</li>
+      </ul>
       <div class="setup-actions"><button type="submit" class="primary-button">${config?.enabled ? 'Enregistrer' : 'Activer'}</button><button type="button" class="secondary-button" data-discord-preview>Voir les messages</button><button type="button" class="secondary-button" data-discord-destinations>Actualiser les salons</button>${config?.lastError ? '<button type="button" class="secondary-button" data-discord-repair>Réparer</button>' : ''}${config?.enabled || leaving ? '<button type="button" class="danger-button" data-discord-remove>Tout retirer</button>' : ''}<span class="settings-status" role="status" aria-live="polite"></span></div>
       <p class="members-help">${config?.enabled ? 'Si tu changes d’avis, le bot retire ce qu’il avait créé et refait selon tes nouveaux choix. Les messages sont modifiés sans notification.' : 'Rien n’est publié avant « Activer ».'}</p>
       <div data-recap-preview class="recap-live-preview"></div>
