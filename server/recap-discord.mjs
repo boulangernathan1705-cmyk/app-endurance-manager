@@ -136,6 +136,12 @@ export async function recapDestinations(env, community) {
       missing:[['Voir le salon',VIEW],['Envoyer des messages',SEND],['Voir les anciens messages',HISTORY],['Intégrer des liens',EMBED],['Gérer les salons',MANAGE],...(voiceRequired ? [['Se connecter',1n << 20n]] : [])].filter(([,bit]) => !(rights & bit)).map(([label]) => label)};
   });
 }
+// Below a text channel, the bot makes its own in that channel's category: its rights count there, so the message names it.
+function rightsError(place) {
+  const category = place.type === 4 ? place.name : place.parentName;
+  const where = category ? `de la catégorie « ${category} »${place.type === 0 ? ` (celle de « ${place.name} »)` : ''}` : 'du rôle « Endurance Manager » (Paramètres du serveur › Rôles)';
+  return Object.assign(new Error(`Dans les permissions ${where}, autorise le bot : ${place.missing.join(', ')}.`), {status:400});
+}
 // The admins' choice: the mode, then where each recap goes (an id, or '' for « Ne pas publier »).
 export function recapInput(input) {
   const id = value => {
@@ -167,7 +173,7 @@ export async function validateDiscordLayout(env, community, input) {
     const place = destinations.find(item => item.id === id);
     const category = id === layout.under || id === layout.pitAt;
     if (!place || (category && place.type !== 4)) throw Object.assign(new Error('Choisis un endroit qui existe sur le serveur Discord de cette communauté.'), {status:400});
-    if (!place.ready && !(id === layout.pitAt && layout.pit === 'bot') && id !== layout.under) throw Object.assign(new Error(`Dans les permissions de « ${place.name} », autorise le bot : ${place.missing.join(', ')}.`), {status:400});
+    if (!place.ready && !(id === layout.pitAt && layout.pit === 'bot') && id !== layout.under) throw rightsError(place);
   }
   if (wantedCategories(layout).length) {
     const server = await serverRights(env, community);
@@ -195,7 +201,7 @@ export async function validateRecapDestinations(env, community, input) {
     if (!id) return {};
     const destination = destinations.find(item => item.id === id && item.type === type);
     if (!destination) throw Object.assign(new Error('Choisis une destination sur le serveur Discord de cette communauté.'), {status:400});
-    if (!destination.ready) throw Object.assign(new Error(`Dans les permissions de « ${destination.name} », autorise le bot : ${destination.missing.join(', ')}.`), {status:400});
+    if (!destination.ready) throw rightsError(destination);
     return {id, name:destination.name};
   };
   // A week's recap goes in a category (the bot makes its channel there); a text channel chosen before still works.
