@@ -77,6 +77,15 @@ Envoie les séances Le Mans Ultimate d'un pilote aux fiches combo de son équipe
   vérifier en ligne : que le jeu remplit la gomme et les dégâts des autres pilotes. `watch/standings` est gardé avec les
   autres réponses du jeu dans `api`.
 
+- rend le mur des stands plus fluide depuis la 2.4.0 : quand une page regarde, la voiture est lue trente fois par seconde
+  (vitesse, pédales, volant, rapport) et ces instants partent dix fois par seconde, avec, si une page montre la carte,
+  la position de toutes les voitures (petit message `f:1` entre deux envois complets, `LiveShare.Fast`). Le reste part
+  toujours une fois par seconde. Personne ne regarde : rien de plus qu'avant.
+- envoie aussi au mur, depuis la 2.4.0, les trois températures de bande de roulement de chaque pneu (intérieur, milieu,
+  extérieur), celles de l'écran pneus du jeu, en plus de la carcasse (5e valeur de `wheels`).
+- envoie aussi au mur, depuis la 2.4.0, les dégâts des huit zones de carrosserie (`dents`, 0 à 2 chacune) et si une
+  pièce s'est détachée (`detached` : dans LMU, seul l'aileron arrière peut s'arracher).
+
 Il ne fait que lire : il ne modifie rien dans le jeu ni dans SimHub. Il n'envoie plus les fichiers de résultats XML.
 
 ## Ressources et stabilité

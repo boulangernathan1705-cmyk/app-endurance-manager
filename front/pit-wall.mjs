@@ -4,7 +4,7 @@
 // one), the same as the old page front/live-page.mjs; plugin 2.0 adds the car ten times a second (tm), its settings and
 // every car's tank. Raw numbers only, no advice.
 import {COLORS} from '../shared/combos.mjs';
-import {addToPath, isRace, lapsLeft, outlineLines, patch, readFeed, stationary, timeAt, LIVE_FOR} from '../shared/live.mjs';
+import {addToPath, isRace, lapsLeft, median, outlineLines, patch, readFeed, stationary, timeAt, LIVE_FOR} from '../shared/live.mjs';
 
 const app = document.getElementById('pw-app');
 const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
@@ -16,8 +16,8 @@ const signed = (value, digits = 1) => known(value) ? `${value > 0 ? '+' : value 
 const WHEELS = ['AVG', 'AVD', 'ARG', 'ARD'];
 const TABS = [['board', 'Classement', 'Class.', '🏆'], ['chrono', 'Chronométrage', 'Chrono', '⏱️'], ['car', 'Véhicule & énergie', 'Voiture', '🏎️'], ['tele', 'Télémétrie & graphes', 'Télém.', '📊'], ['map', 'Carte en direct', 'Carte', '🗺️']];
 const MODES = [['all', 'Général', '🏆'], ['rel', 'Relatif', '⏱️'], ['opp', 'Opposants', '⚔️']];
-// The last minute of our car, ten times a second.
-const TELE_KEPT = 600;
+// The last minute of our car, thirty times a second (plugin 2.4; ten before).
+const TELE_KEPT = 1800;
 
 const saved = (() => { try { return JSON.parse(localStorage.getItem('pw-view') || '{}'); } catch { return {}; } })();
 const view = {raw:new Map(), feeds:new Map(), key:null, tab:TABS.some(([id]) => id === location.hash.slice(1)) ? location.hash.slice(1) : saved.tab || 'board',
@@ -66,6 +66,13 @@ async function connect() {
     }
     const key = message.key || message.feed?.key;
     if (key && Array.isArray(message.tm)) addFrames(key, message.tm);
+    // Plugin 2.4's quick messages, nine a second between two complete ones: only the curves, the speed and the map move.
+    if (message.type === 'fast') {
+      const feed = view.feeds.get(key);
+      if (feed && Array.isArray(message.pos) && known(message.et)) moveCars(feed, message.et, message.pos);
+      if (feed && feed.key === view.key && (view.tab === 'car' || view.tab === 'tele')) render();
+      return;
+    }
     pick();
     render();
   });
@@ -122,13 +129,17 @@ function pick() {
 }
 const current = () => view.feeds.get(view.key) || null;
 
-// ---------- Our car ten times a second (plugin 2.0) ----------
+// ---------- Our car ten times a second (plugin 2.0), thirty from 2.4 ----------
 
 // Per feed: [{t (page seconds), d, v, throttle, brake, steer, gear}], the frames of each second spread over it.
 const teles = new Map();
+// The frames of a message cover the time since the previous one: 0.1 s apart from plugin 2.0, 0.033 s from 2.4.
+const frameGaps = new Map();
 function addFrames(key, frames) {
-  const list = teles.get(key) || [], now = performance.now() / 1000;
-  frames.forEach(([d, v, throttle, brake, steer, gear], index) => list.push({t:now - (frames.length - 1 - index) * 0.1, d, v, throttle, brake, steer, gear}));
+  const list = teles.get(key) || [], now = performance.now() / 1000, since = frameGaps.get(key);
+  const step = since && now - since < 2 ? Math.min(0.1, Math.max(0.025, (now - since) / frames.length)) : 0.1;
+  frameGaps.set(key, now);
+  frames.forEach(([d, v, throttle, brake, steer, gear], index) => list.push({t:now - (frames.length - 1 - index) * step, d, v, throttle, brake, steer, gear}));
   if (list.length > TELE_KEPT) list.splice(0, list.length - TELE_KEPT);
   teles.set(key, list);
   // The rate the car comes at: frames in the last 5 s.
@@ -233,11 +244,21 @@ function pitCell(feed, car) {
   return `<b>${stopsOf(feed, car)}</b>${known(last) ? chip(`${fr(last, 1)}s`, 'stop') : ''}`;
 }
 const clsPill = cls => `<span class="pw-cls" style="--cls:${classColor(cls)}">${esc(clsName(cls) || '—')}</span>`;
+// The game gives each car's tank in %: of its virtual energy for a Hypercar or a GT3, of its fuel for the other
+// classes, shown in litres when the tank is known: ours for our class, the Oreca 07's (75 L) for the LMP2.
+const LMP2_TANK = 75;
+const onEnergy = cls => /hyper|lmh|lmdh|gt3/i.test(cls || '');
+function litresPer(feed, car) {
+  const me = feed.snap.me, cls = car.cls || '';
+  if (onEnergy(cls)) return null;
+  if (cls === me.cls && !known(me.ve) && me.capacity > 0) return me.capacity / 100;
+  return /p2/i.test(cls) ? LMP2_TANK / 100 : null;
+}
 // The game gives 0 for a car whose tank it does not share (other players online): shown as unknown.
-function tankCell(car) {
+function tankCell(car, perCent = null) {
   if (!(known(car.tank) && car.tank > 0)) return '<span class="pw-dim">—</span>';
   const level = Math.max(0, Math.min(100, car.tank)), color = level < 15 ? 'var(--pw-red)' : level < 35 ? 'var(--pw-yellow)' : 'var(--pw-green)';
-  return `<span class="pw-tank" style="--tank:${level}%;--bar:${color}"><b>${fr(level, 0)}%</b><i></i></span>`;
+  return `<span class="pw-tank" style="--tank:${level}%;--bar:${color}"><b>${perCent ? `${fr(level * perCent, 1)} L` : `${fr(level, 0)}%`}</b><i></i></span>`;
 }
 const numCell = car => `<td class="pw-num">#${esc(car.num || '')}</td>`;
 const nameCell = car => `<td class="pw-name"><b>${esc(car.driver)}</b></td>`;
@@ -269,10 +290,10 @@ function general(feed, race) {
       <td class="pw-pos">P${placeOf(feed, car)}</td>${numCell(car)}<td class="pw-opt">${clsPill(car.cls)}</td>
       ${nameCell(car)}<td class="pw-team pw-opt2">${esc(model(car))}</td>
       <td class="pw-n">${gap}</td><td class="pw-n pw-opt">${car.laps ?? '—'}</td><td class="pw-n pw-opt">${lapTime(car.last)}</td>
-      <td class="pw-n">${best}</td><td class="pw-n pw-opt">${tankCell(car)}</td><td class="pw-n pw-stand">${pitCell(feed, car)}</td></tr>`;
+      <td class="pw-n">${best}</td><td class="pw-n pw-opt">${tankCell(car, litresPer(feed, car))}</td><td class="pw-n pw-stand">${pitCell(feed, car)}</td></tr>`;
   }).join('');
   return `<div class="pw-table"><table><thead><tr><th>Pos</th><th class="pw-yellow">#</th><th class="pw-opt">Cat</th><th>Pilote / équipe</th><th class="pw-opt2">Équipe</th><th class="pw-n">${race ? 'Écart leader' : 'Écart'}</th>
-    <th class="pw-n pw-opt">Tours</th><th class="pw-n pw-opt">Dernier tour</th><th class="pw-n">Meilleur tour</th><th class="pw-n pw-opt" title="Réservoir ou énergie virtuelle restante">Énergie virt.</th><th class="pw-n">Stands / arrêt</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+    <th class="pw-n pw-opt">Tours</th><th class="pw-n pw-opt">Dernier tour</th><th class="pw-n">Meilleur tour</th><th class="pw-n pw-opt" title="Énergie virtuelle restante (Hypercar, GT3) ou carburant (autres catégories)">Énergie / carb.</th><th class="pw-n">Stands / arrêt</th></tr></thead><tbody>${rows}</tbody></table></div>`;
 }
 
 // Every car around us on track, seconds ahead or behind at our pace, whatever its class: who we are about to catch,
@@ -326,15 +347,15 @@ function opponents(feed) {
     const pace = known(diff) ? ` <small class="${diff < 0 ? 'pw-red' : 'pw-green'}">${signed(diff, 2)}</small>` : '';
     // Our own car: what our plugin reads of it when the field's row has nothing.
     const compound = car.cmp || (ours ? snap.me.compound : null), damage = car.dmg ?? (ours ? snap.me.damage : null);
-    const use = info.use5, left = known(use) && use > 0 && known(car.tank) && car.tank > 0 ? car.tank / use : null;
+    const use = info.use5, perCent = litresPer(feed, car), left = known(use) && use > 0 && known(car.tank) && car.tank > 0 ? car.tank / use : null;
     const leftTone = !known(left) ? '' : left < 4 ? 'pw-red' : left < 8 ? 'pw-yellow' : 'pw-green';
     return `<tr class="${ours ? 'us' : ''}"><td class="pw-pos">P${index + 1}</td>${numCell(car)}${nameCell(car)}<td class="pw-n pw-big">${gap}</td>
       <td class="pw-n">${lapTime(info.avg5)}${pace}</td><td>${tyreCell(compound)}</td><td class="pw-opt">${damageCell(damage)}</td>
-      <td class="pw-n">${tankCell(car)}</td><td class="pw-n pw-opt">${known(use) ? `${fr(use, 1)} %` : '—'}</td><td class="pw-n"><b class="${leftTone}">${known(left) ? `${fr(left, 1)} t` : '—'}</b></td>
+      <td class="pw-n">${tankCell(car, perCent)}</td><td class="pw-n pw-opt">${known(use) ? perCent ? `${fr(use * perCent, 2)} L` : `${fr(use, 1)} %` : '—'}</td><td class="pw-n"><b class="${leftTone}">${known(left) ? `${fr(left, 1)} t` : '—'}</b></td>
       <td class="pw-n pw-opt">${known(info.sinceStop) ? info.sinceStop : '—'}</td><td class="pw-n pw-stand">${pitCell(feed, car)}</td></tr>`;
   }).join('');
   return `<div class="pw-table"><table><thead><tr><th>Pos</th><th class="pw-yellow">#</th><th>Pilote / équipe</th><th class="pw-n">${race ? 'Sur nous' : 'Meilleur / nous'}</th><th class="pw-n">Moy. 5 tours</th>
-    <th>Pneus</th><th class="pw-opt">Dégâts</th><th class="pw-n">Énergie</th><th class="pw-n pw-opt">Conso / tour</th><th class="pw-n" title="Énergie restante ÷ conso moyenne sur 5 tours">Tours restants</th>
+    <th>Pneus</th><th class="pw-opt">Dégâts</th><th class="pw-n">${onEnergy(snap.me.cls) ? 'Énergie virt.' : 'Carburant'}</th><th class="pw-n pw-opt">Conso / tour</th><th class="pw-n" title="Réserve ÷ conso moyenne sur 5 tours">Tours restants</th>
     <th class="pw-n pw-opt" title="Tours depuis son dernier arrêt">Relais</th><th class="pw-n">Stands / arrêt</th></tr></thead><tbody>${rows}</tbody></table></div>
     <p class="pw-note">${race ? 'Écart en course : + devant nous, − derrière.' : 'Meilleur tour comparé au nôtre : + plus lent.'} Rythme sur 5 tours : <span class="pw-red">rouge</span> plus rapide que nous. Tours restants : énergie ÷ conso moyenne sur 5 tours.</p>`;
 }
@@ -383,7 +404,6 @@ function chrono(feed) {
 // Colours of temperatures: blue cold, green in its window, yellow then red too hot.
 const tyreColor = value => !known(value) ? 'var(--pw-muted)' : value < 60 ? 'var(--pw-blue)' : value < 75 ? 'var(--pw-cyan)' : value <= 100 ? 'var(--pw-green)' : value <= 110 ? 'var(--pw-yellow)' : 'var(--pw-red)';
 const brakeColor = value => !known(value) ? 'var(--pw-muted)' : value < 250 ? 'var(--pw-blue)' : value <= 650 ? 'var(--pw-green)' : value <= 850 ? 'var(--pw-orange)' : 'var(--pw-red)';
-const wearColor = value => !known(value) ? 'var(--pw-muted)' : value > 60 ? 'var(--pw-green)' : value > 35 ? 'var(--pw-yellow)' : 'var(--pw-red)';
 
 function car(feed) {
   const snap = feed.snap, me = snap.me, control = me.control || {}, energy = energyOf(feed), pace = ourPace(feed), now = lastFrame(feed);
@@ -400,8 +420,23 @@ function car(feed) {
       <div class="pw-pitstate">${box('Stands', me.pit === 2 ? 'GARAGE' : me.pit ? 'PIT LANE' : 'PISTE', '', me.pit ? 'warn' : 'good')}${box('Météo', known(snap.rain) ? `${fr(snap.rain * 100, 0)}% pluie` : '—', known(snap.trackTemp) ? `piste ${fr(snap.trackTemp, 0)}°C · air ${fr(snap.air, 0)}°C` : '')}</div>
     </div>${settings ? `<div class="pw-settings">${settings}</div>` : ''}`);
   const damage = known(me.damage) ? me.damage : null;
-  const damageCard = card('🛠️ Dégâts', `<div class="pw-damage" style="--level:${damage || 0}%;--bar:${!damage ? 'var(--pw-green)' : damage < 30 ? 'var(--pw-yellow)' : damage < 65 ? 'var(--pw-orange)' : 'var(--pw-red)'}">
-      <b>${known(damage) ? `${fr(damage, 0)}%` : '—'}</b><i></i></div>`,
+  // The car from above (front up) in the game's eight dent zones, and the rear wing (the only part that comes off in LMU).
+  const dents = me.dents, zone = level => ['var(--pw-text2)', 'var(--pw-yellow)', 'var(--pw-red)'][level] || 'var(--pw-muted)';
+  // The outline in the game's eight zones (0 front, then round by the left), each stroke coloured by its dents.
+  const outline = ['M52 16H88', 'M52 16Q32 18 30 42V64', 'M30 64Q34 117 30 170', 'M30 170V194Q30 212 48 214', 'M48 214H92',
+    'M92 214Q110 212 110 194V170', 'M110 170Q106 117 110 64', 'M110 64V42Q108 18 88 16'];
+  const hub = (x, y) => `<rect x="${x}" y="${y}" width="14" height="30" rx="4" class="pw-dent-wheel"/>`;
+  const drawing = dents ? `<svg class="pw-car-dents" viewBox="0 0 140 240" role="img" aria-label="Dégâts par zone">
+      <g class="pw-dent-arms"><path d="M26 51L52 38L52 64ZM26 183L52 170L52 196ZM114 51L88 38L88 64ZM114 183L88 170L88 196Z"/></g>
+      ${hub(12, 36)}${hub(114, 36)}${hub(12, 168)}${hub(114, 168)}
+      <rect x="50" y="78" width="40" height="70" rx="16" class="pw-dent-cockpit"/>
+      ${outline.map((d, index) => `<path d="${d}" stroke="${zone(dents[index])}" class="pw-dent-zone"/>`).join('')}
+      <path d="M56 214V222M84 214V222" class="pw-dent-pillar"/>
+      <rect x="34" y="222" width="72" height="9" rx="2" class="pw-dent-wing${me.detached ? ' off' : ''}"/>
+    </svg>` : '';
+  const damageCard = card('🛠️ Dégâts', `<div class="pw-damage${dents ? ' with-car' : ''}" style="--level:${damage || 0}%;--bar:${!damage ? 'var(--pw-green)' : damage < 30 ? 'var(--pw-yellow)' : damage < 65 ? 'var(--pw-orange)' : 'var(--pw-red)'}">
+      ${drawing}<div class="pw-damage-sum"><b>${known(damage) ? `${fr(damage, 0)}%` : '—'}</b><i></i>
+      ${dents ? `<div class="pw-wing ${me.detached ? 'bad' : 'good'}"><span>Aileron arrière</span><b>${me.detached ? 'ARRACHÉ' : 'En place'}</b></div>` : ''}</div></div>`,
     known(damage) ? chip(!damage ? 'AUCUN DÉGÂT' : damage < 30 ? 'DÉGÂTS MINEURS' : damage < 65 ? 'DÉGÂTS MOYENS' : 'DÉGÂTS GRAVES', !damage ? 'good' : damage < 65 ? 'warn' : 'bad') : '', 'pw-damage-card');
   // Fuel and virtual energy side by side, each with what it lasts at the 5-lap average.
   const tank = (title, icon, value, unit, full, last, perLap, cls) => {
@@ -412,6 +447,12 @@ function car(feed) {
         ${box('Tours estimés', known(laps) ? `${fr(laps, 1)} t` : '—')}${box('Temps restant', known(laps) && pace ? clock(laps * pace) : '—')}</div></div>`;
   };
   const ours = feed.ours, ve = known(me.ve);
+  // From our own stops: the pit lane without the time stopped, and what a stop costs on top of the same stretch at racing
+  // speed (drive, measured by the plugin) once the car is filled up and on 4 new tyres. The deadline is the last lap the
+  // tank still covers at our 5-lap average.
+  const recent = stops.slice(-5), traverse = recent.length ? median(recent.map(stop => stop.lane - stop.stopped)) : null;
+  const drives = recent.map(stop => stop.drive).filter(known), lost = drives.length && known(stopFor('tyres')) ? median(drives) + stopFor('tyres') : null;
+  const before = known(energy.laps) ? Math.floor(energy.laps) : null, finish = known(energy.missing) && energy.missing <= 0;
   const energyCard = card('⚡ Énergie et consommation', `<div class="pw-row2 pw-tanks${ve ? '' : ' single'}">
       ${tank('Carburant', '⛽', me.fuel, 'L', me.capacity, ours.lastFuel, ours.fuel5, 'fuel')}
       ${ve ? tank('Énergie virtuelle', '⚡', me.ve, '%', 100, ours.lastVe, ours.ve5, 've') : ''}
@@ -419,20 +460,33 @@ function car(feed) {
     <h3>🧮 Ravitaillement</h3>
     <div class="pw-row3">
       ${box('Pour finir', known(energy.need) ? `${fr(energy.need, 1)} ${energy.unit}` : '—', known(energy.left) ? `${fr(energy.left, 1)} tours à notre moyenne` : 'à notre moyenne')}
-      ${box('Il manque', known(energy.missing) ? `${fr(energy.missing, 1)} ${energy.unit}` : '—', 'en plus de ce qu’il reste', energy.missing > 0 ? 'warn' : 'good')}
-      ${box('Arrêts', known(energy.stops) ? energy.stops : '—', 'pleins pour aller au bout')}
-      ${box('Plein', known(energy.room) ? `${fr(energy.room, 1)} ${energy.unit}` : '—', 'place libre')}
       ${box('Arrêt plein', known(stopFor('energy')) ? `${fr(stopFor('energy'), 1)} s` : '—', 'immobile')}
       ${box('Plein + 4 pneus', known(stopFor('tyres')) ? `${fr(stopFor('tyres'), 1)} s` : '—', 'immobile')}
+      ${box('Traversée des stands', known(traverse) ? `${fr(traverse, 1)} s` : '—', known(traverse) ? 'voie des stands, sans l’arrêt' : 'après notre 1er arrêt')}
+      ${box('Temps perdu par arrêt', known(lost) ? `${fr(lost, 1)} s` : '—', known(lost) ? 'plein + 4 pneus, contre un tour normal' : 'après notre 1er arrêt')}
+      ${box('Rentrer au plus tard', finish ? 'Pas besoin' : known(before) ? `T ${(meOf(feed)?.laps || 0) + before}` : '—', finish ? 'assez pour finir' : known(before) ? `dans ${before} tour${before > 1 ? 's' : ''}` : 'à notre moyenne', finish ? 'good' : known(before) && before <= 2 ? 'warn' : '')}
     </div>`);
+  // The tread's three temperatures as the game shows them (plugin 2.4), laid out as on the car (outer side out), their
+  // mean in big; older plugins give only the carcass.
+  const tyreTemps = (w, index) => {
+    if (!w.tread) return `<div class="pw-tyre" style="--temp:${tyreColor(w.carcass)}"><b>${known(w.carcass) ? `${fr(w.carcass, 0)}°C` : '—'}</b><small>carcasse</small></div>`;
+    const [inner, middle, outer] = w.tread, mean = (inner + middle + outer) / 3, row = index % 2 ? [inner, middle, outer] : [outer, middle, inner];
+    return `<div class="pw-tyre" style="--temp:${tyreColor(mean)}"><b>${fr(mean, 0)}°C</b><span class="pw-tread">${row.map(value => `<i style="--temp:${tyreColor(value)}">${fr(value, 0)}</i>`).join('')}</span></div>`;
+  };
+  // Laid out as on the car, left wheels mirrored by right ones: wear gauge and pressure on the outer side, the last
+  // lap's wear on the inner side, by the brake. Wear is what the tyre has lost (100 − what the game says is left).
   const wheel = (w, index) => {
-    const wear5 = ours.wear5?.[index], lastWear = ours.laps?.at(-1)?.wear?.[index];
-    return `<div class="pw-wheel"><div class="pw-wheel-head"><b>${WHEELS[index]}</b>${me.compound ? chip(esc(me.compound.toUpperCase()), 'compound') : ''}<span>Pression <b class="pw-cyan">${known(w.kpa) ? fr(w.kpa, 0) : '—'}</b> kPa</span></div>
+    const wear5 = ours.wear5?.[index], lastWear = ours.laps?.at(-1)?.wear?.[index], worn = known(w.left) ? 100 - w.left : null;
+    const color = !known(worn) ? 'var(--pw-muted)' : worn < 40 ? 'var(--pw-green)' : worn < 65 ? 'var(--pw-yellow)' : 'var(--pw-red)';
+    const gauge = `<div class="pw-wear" style="--wear:${known(worn) ? Math.max(0, Math.min(100, worn)) : 0}%;--bar:${color}"><b>${known(worn) ? `${fr(worn, 1)}%` : '—'}</b><i></i><small>usure</small></div>`;
+    const boxes = [box('Pression', known(w.kpa) ? `<span class="pw-cyan">${fr(w.kpa, 0)}</span> kPa` : '—'), box('Moyenne', known(wear5) ? `${fr(wear5, 2)}%/t` : '—'),
+      box('Dernier tour', known(lastWear) ? `${fr(lastWear, 2)}%` : '—')];
+    return `<div class="pw-wheel"><div class="pw-wheel-head${index % 2 ? ' right' : ''}"><b>${WHEELS[index]}</b>${me.compound ? chip(esc(me.compound.toUpperCase()), 'compound') : ''}</div>
       <div class="pw-wheel-body${index % 2 ? ' right' : ''}">
-        <div class="pw-tyre" style="--temp:${tyreColor(w.carcass)}"><b>${known(w.carcass) ? `${fr(w.carcass, 0)}°C` : '—'}</b><small>carcasse</small></div>
+        ${gauge}${tyreTemps(w, index)}
         <div class="pw-brake" style="--temp:${brakeColor(w.brake)}"><i></i><b>${known(w.brake) ? `${fr(w.brake, 0)}°C` : '—'}</b><small>frein</small></div>
       </div>
-      <div class="pw-row3">${box('Restante', `<span style="color:${wearColor(w.left)}">${known(w.left) ? `${fr(w.left, 1)}%` : '—'}</span>`)}${box('Moyenne', known(wear5) ? `${fr(wear5, 2)}%/t` : '—')}${box('Dernier tour', known(lastWear) ? `${fr(lastWear, 2)}%` : '—')}</div></div>`;
+      <div class="pw-row3">${(index % 2 ? boxes.reverse() : boxes).join('')}</div></div>`;
   };
   const tyres = card('🛞 Pneus et freins', `<div class="pw-wheels">${me.wheels.map(wheel).join('')}</div>`);
   return `<div class="pw-grid pw-car-top">${cockpit}${damageCard}</div><div class="pw-grid pw-car-bottom">${energyCard}${tyres}</div>`;
@@ -515,7 +569,9 @@ function drawCurves(feed) {
 
 // ---------- Map (the cars glide between two messages) ----------
 
-const PLAYBACK_DELAY = 1.8, JUMP = 400, KEPT = 6;
+// The cars are shown a little in the past, so there is always a next position to glide to: 1.8 s with one position a
+// second, 0.3 s with plugin 2.4's ten (KEPT: positions kept per car, a few seconds' worth either way).
+const PLAYBACK_DELAY = 1.8, QUICK_DELAY = 0.3, JUMP = 400, KEPT = 30;
 const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const motions = new Map();
 let frame = null;
@@ -538,10 +594,29 @@ function record(feed) {
     motion.cars.set(car.id, list);
   }
 }
+// Plugin 2.4: the cars' positions between two snapshots, at the game's clock (et).
+function moveCars(feed, et, pos) {
+  const motion = motions.get(feed.key);
+  if (!motion || et <= motion.et) return;
+  const at = new Map(pos.map(([id, x, z]) => [id, [x, z]]));
+  motion.et = et;
+  motion.quickAt = performance.now();
+  if (motion.offset !== null) motion.offset += (et - motion.quickAt / 1000 - motion.offset) * 0.1;
+  for (const car of feed.snap.field) {
+    const where = at.get(car.id);
+    if (!where) continue;
+    [car.x, car.z] = where;
+    const list = motion.cars.get(car.id) || [];
+    list.push({et, x:car.x, z:car.z, pit:car.pit});
+    if (list.length > KEPT) list.shift();
+    motion.cars.set(car.id, list);
+  }
+}
 function placed(feed, car) {
   const motion = motions.get(feed.key), list = motion?.cars.get(car.id);
   if (!list?.length || still) return [car.x, car.z];
-  const at = performance.now() / 1000 + motion.offset - PLAYBACK_DELAY;
+  const quick = motion.quickAt && performance.now() - motion.quickAt < 3000;
+  const at = performance.now() / 1000 + motion.offset - (quick ? QUICK_DELAY : PLAYBACK_DELAY);
   const next = list.findIndex(item => item.et > at);
   if (next === -1) return [list.at(-1).x, list.at(-1).z];
   if (next === 0) return [list[0].x, list[0].z];

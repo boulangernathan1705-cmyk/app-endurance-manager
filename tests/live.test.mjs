@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {addToPath, cleanFrames, cleanSnapshot, diff, ingest, mergeSnapshot, outlineLines, patch, publicFeed, raceGaps, readFeed, fairShare, rejoin, stationary, lapsLeft, timeAt, FIELD, prune, STALE_DROP} from '../shared/live.mjs';
+import {addToPath, cleanFrames, cleanPositions, cleanSnapshot, diff, ingest, mergeSnapshot, outlineLines, patch, publicFeed, raceGaps, readFeed, fairShare, rejoin, stationary, lapsLeft, timeAt, FIELD, prune, STALE_DROP} from '../shared/live.mjs';
 import {LiveRoom} from '../server/live.mjs';
 
 const TRACK = 'Circuit de la Sarthe';
@@ -251,8 +251,56 @@ test('plugin 2.0: the last second of our car goes to the pages watching with the
   await room.webSocketMessage(driver, JSON.stringify({v:2, et:1002, me:{ve:57}}));
   assert.equal(JSON.parse(viewer.sent.at(-1)).tm, undefined);
   assert.deepEqual(cleanFrames([[10.4, 120.06, 140, -5, -150, 3], ['x', 1], [null, 2], 'odd']), [[10, 120.1, null, null, null, 3]]);
-  assert.equal(cleanFrames(Array.from({length:50}, () => [1, 1, 1, 1, 1, 1])).length, 30);
+  assert.equal(cleanFrames(Array.from({length:80}, () => [1, 1, 1, 1, 1, 1])).length, 60);
   assert.equal(cleanFrames(null).length, 0);
+});
+
+test('plugin 2.4: quick messages pass our car\'s frames to every page shown and the positions to the map, nothing stored', async () => {
+  const {room, stored, socket} = fakeRoom();
+  const until = Date.now() + 60_000;
+  const driver = socket('driver', {role:'driver', user:'u1', name:'Nathan', until, conn:'c1'});
+  const board = socket('viewer', {role:'viewer', user:'u2', until, watch:true, map:false});
+  const mapPage = socket('viewer', {role:'viewer', user:'u3', until, watch:true, map:true});
+  const hidden = socket('viewer', {role:'viewer', user:'u4', until, watch:false, map:true});
+  const quick = {v:2, f:1, et:1000.2, tm:[[6000, 266.4, 100, 0, -3, 6], [6007, 266.9, 100, 0, -2, 6]], pos:[[2, 130.4, -28.6], [1, 'x', 0]]};
+  await room.webSocketMessage(driver, JSON.stringify(quick));
+  assert.equal(board.sent.length, 0, 'before its first snapshot the room does not know the car');
+  await room.webSocketMessage(driver, JSON.stringify(snap({field:[{id:2, x:120, z:-30}]})));
+  const counts = [board.sent.length, mapPage.sent.length, hidden.sent.length];
+  room.savedAt = Date.now();
+  await room.webSocketMessage(driver, JSON.stringify(quick));
+  const toBoard = JSON.parse(board.sent.at(-1)), toMap = JSON.parse(mapPage.sent.at(-1));
+  assert.equal(toBoard.type, 'fast');
+  assert.equal(toBoard.key, `${TRACK}|10|FMT #17`);
+  assert.equal(toBoard.et, 1000.2);
+  assert.deepEqual(toBoard.tm, cleanFrames(quick.tm));
+  assert.equal(toBoard.pos, undefined, 'no positions for a page without the map');
+  assert.deepEqual(toMap.pos, [[2, 130, -29]]);
+  assert.equal(hidden.sent.length, counts[2], 'nothing to a hidden page');
+  assert.deepEqual([room.feeds[toBoard.key].snap.field[1].x, room.feeds[toBoard.key].snap.field[1].z], [130, -29], 'a page opening gets the latest place');
+  assert.equal(room.feeds[toBoard.key].snap.et, 1000, 'the snapshot itself is untouched');
+  // Positions alone go only to the map.
+  await room.webSocketMessage(driver, JSON.stringify({v:2, f:1, et:1000.4, pos:[[2, 131, -28]]}));
+  assert.equal(board.sent.length, counts[0] + 1);
+  assert.equal(mapPage.sent.length, counts[1] + 2);
+  assert.equal(stored.size, 0, 'nothing written');
+  assert.equal(cleanPositions('x'), null);
+  assert.equal(cleanPositions(Array.from({length:200}, (_, k) => [k, 1, 1])).length, 120);
+});
+
+test('plugin 2.4: the tread\'s three temperatures per wheel, as the game shows them; none from older plugins', () => {
+  const wheels = [[90, 85, 170, 500, [92, 88, 81]], [90, 85, 170, 500], [90, 85, 170, 500, [92, 'x', 81]], [90, 85, 170, 500, [92, 88, 900]]];
+  const read = cleanSnapshot(snap({me:{wheels}})).me.wheels;
+  assert.deepEqual(read.map(wheel => wheel.tread), [[92, 88, 81], null, null, null]);
+  assert.equal(read[0].carcass, 85);
+});
+
+test('plugin 2.4: the eight dent zones and the rear wing come off; none from older plugins', () => {
+  const read = dents => cleanSnapshot(snap({me:{dents, detached:true}})).me;
+  assert.deepEqual(read([0, 1, 0, 0, 2, 0, 0, 0]).dents, [0, 1, 0, 0, 2, 0, 0, 0]);
+  assert.equal(read([0, 1, 0, 0, 2, 0, 0, 0]).detached, true);
+  for (const bad of [undefined, [0, 1], [0, 1, 0, 0, 3, 0, 0, 0], 'x']) assert.equal(read(bad).dents, null);
+  assert.equal(cleanSnapshot(snap({me:{detached:1}})).me.detached, false);
 });
 
 test('only what changed, and the same value back once applied', () => {

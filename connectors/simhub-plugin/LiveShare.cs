@@ -3,8 +3,10 @@
 // coéquipiers le suivent sur la page « Mur des stands ». Le format est celui de shared/live.mjs (FIELD pour les lignes
 // du classement, mergeSnapshot pour les changements). Activé par défaut, un interrupteur de l'écran du plugin le coupe.
 //
-// Quand une page regarde, la voiture est aussi lue dix fois par seconde (vitesse, pédales, volant, rapport) et ces
-// instants partent groupés avec l'envoi de chaque seconde : un seul message par seconde pour le relais.
+// Quand une page regarde, la voiture est aussi lue trente fois par seconde (vitesse, pédales, volant, rapport ; dix
+// avant la 2.4.0). Ces instants partent dix fois par seconde : avec l'envoi de chaque seconde, et entre deux dans un
+// petit message rapide (Fast) qui porte aussi la position des voitures quand une page montre la carte. Le reste
+// (classement, énergie, pneus…) part toujours une fois par seconde. Dix messages par seconde, seulement quand on regarde.
 //
 // Pour envoyer le moins possible : tout à l'ouverture de la connexion, puis seulement ce qui a changé. Le site dit si
 // quelqu'un regarde (message « mode ») : personne, seulement ce que l'historique demande (tours, arrêts, pilotes…), et
@@ -41,8 +43,10 @@ namespace EnduranceManager.SimHub
         readonly AutoResetEvent wake = new AutoResetEvent(false);
         readonly object gate = new object();
         Snapshot pending;
-        // Our car ten times a second while someone watches, sent grouped with the next snapshot (the room counts one
-        // message a second). Each: metres into the lap, km/h, throttle %, brake %, steering %, gear.
+        // The quick message between two snapshots (2.4.0): our car's last frames and, map shown, where the cars are.
+        Dictionary<string, object> fastPending;
+        // Our car thirty times a second while someone watches, sent with the next message (snapshot or quick one).
+        // Each: metres into the lap, km/h, throttle %, brake %, steering %, gear.
         List<object[]> frames = new List<object[]>();
         DateTime offeredAt, retryAt;
         int backoff = 5;
@@ -108,12 +112,45 @@ namespace EnduranceManager.SimHub
             public List<object[]> Field;
         }
 
-        // Called on every reading of the game (ten a second): kept only while a page watches, at most 3 s of them.
+        public bool Watching => watching;
+
+        // Called on every reading of the game (thirty a second while watched, 2.4.0): kept only while a page watches,
+        // at most 2 s of them.
         public void Frame(Sample s)
         {
             if (!watching) return;
             var frame = new object[] { R(s.LapDist, 0), R(s.Speed, 1), R(s.Throttle * 100, 0), R(s.BrakePedal * 100, 0), R(s.Steer * 100, 0), s.Gear };
-            lock (gate) { frames.Add(frame); if (frames.Count > 30) frames.RemoveAt(0); }
+            lock (gate) { frames.Add(frame); if (frames.Count > 60) frames.RemoveAt(0); }
+        }
+
+        // Nine times a second between two snapshots, while a page watches: the frames read since the last message and,
+        // when a page shows the map, every car's position ([id, x, z] to the metre). Replaced if not sent yet.
+        public void Fast(byte[] b)
+        {
+            if (!watching) return;
+            List<object[]> positions = null;
+            if (mapShown)
+            {
+                int count = Math.Min(I32(b, ScoringInfo + 104), MaxVehicles);
+                positions = new List<object[]>(count);
+                for (int i = 0; i < count; i++)
+                {
+                    int at = VehScoring + i * VehSize;
+                    double x = F64(b, at + 264), z = F64(b, at + 280);
+                    if (!double.IsNaN(x) && !double.IsNaN(z)) positions.Add(new object[] { I32(b, at), Math.Round(x), Math.Round(z) });
+                }
+            }
+            lock (gate)
+            {
+                var message = new Dictionary<string, object> { ["v"] = 2, ["f"] = 1, ["et"] = R(F64(b, ScoringInfo + 68), 2) };
+                if (frames.Count > 0) { message["tm"] = frames; frames = new List<object[]>(); }
+                if (positions != null) message["pos"] = positions;
+                if (fastPending != null && fastPending.TryGetValue("tm", out var older) && message.TryGetValue("tm", out var newer))
+                    message["tm"] = ((List<object[]>)older).Concat((List<object[]>)newer).ToList();
+                else if (fastPending != null && fastPending.ContainsKey("tm") && !message.ContainsKey("tm")) message["tm"] = fastPending["tm"];
+                fastPending = message;
+            }
+            wake.Set();
         }
 
         // One snapshot from the copy of the game's memory, handed to the sending thread; the previous one, if not
@@ -197,9 +234,11 @@ namespace EnduranceManager.SimHub
                 ["compound"] = string.IsNullOrEmpty(s.RearCompound) || s.RearCompound == s.FrontCompound ? s.FrontCompound : s.FrontCompound + " / " + s.RearCompound,
                 ["cur"] = R(s.IntoLap, 2), ["pit"] = s.Garage ? 2 : s.InPits ? 1 : 0, ["ve"] = hasEnergy ? R(s.Energy, 2) : null,
                 ["fuel"] = R(s.Fuel, 2), ["capacity"] = R(s.FuelCapacity, 1),
-                ["wheels"] = s.Wheels.Select(w => new[] { R(w.Wear * 100, 1), R(w.Temp, 0), R(w.Pressure, 1), R(w.Brake, 0) }).ToArray(),
+                // Per wheel: wear, carcass, pressure, brake and (2.4.0) the tread's inner, middle and outer temperatures.
+                ["wheels"] = s.Wheels.Select(w => new object[] { R(w.Wear * 100, 1), R(w.Temp, 0), R(w.Pressure, 1), R(w.Brake, 0),
+                    new[] { R(w.TreadIn, 0), R(w.TreadMid, 0), R(w.TreadOut, 0) } }).ToArray(),
                 // The eight dent zones, 0 to 2 each.
-                ["damage"] = R(s.Damage / 16.0 * 100, 0),
+                ["damage"] = R(s.Damage / 16.0 * 100, 0), ["dents"] = s.Dents, ["detached"] = s.Detached,
                 ["stops"] = (session?.Stops ?? new List<LiveStop>()).Select(stop => new Dictionary<string, object>
                 {
                     ["lap"] = stop.Lap, ["lane"] = stop.Lane, ["stopped"] = stop.Stationary, ["ve"] = stop.Energy, ["fuel"] = stop.Fuel,
@@ -457,7 +496,27 @@ namespace EnduranceManager.SimHub
                 wake.WaitOne(2000);
                 Snapshot snap;
                 List<object[]> last;
-                lock (gate) { snap = pending; pending = null; last = frames; frames = new List<object[]>(); }
+                Dictionary<string, object> fast;
+                lock (gate)
+                {
+                    snap = pending; pending = null; fast = fastPending; fastPending = null;
+                    last = frames; frames = new List<object[]>();
+                    // A quick message not sent yet: its frames go with the snapshot, or back with the next quick one.
+                    if (fast != null && fast.TryGetValue("tm", out var early)) last = ((List<object[]>)early).Concat(last).ToList();
+                    if (snap == null && fast != null) { if (last.Count > 0) fast["tm"] = last; else fast.Remove("tm"); last = new List<object[]>(); }
+                }
+                if (snap == null && fast != null)
+                {
+                    // Only on a connection already open, and only while a page watches.
+                    if (socket == null || socket.State != WebSocketState.Open || !watching) continue;
+                    try
+                    {
+                        var quick = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(fast));
+                        if (!socket.SendAsync(new ArraySegment<byte>(quick), WebSocketMessageType.Text, true, CancellationToken.None).Wait(2000)) throw new TimeoutException();
+                    }
+                    catch { Drop("Coupé, nouvel essai dans " + backoff + " s"); }
+                    continue;
+                }
                 if (snap == null)
                 {
                     // Nothing to send for a minute (out of the car, game closed): the connection is let go.

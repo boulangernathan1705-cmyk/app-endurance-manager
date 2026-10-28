@@ -13,7 +13,7 @@
 // Rights are checked when a socket opens and again by making it reconnect after RECHECK. The object is never
 // reachable from outside: only these two routes forward to it, with who is connecting in X-Live-* headers.
 import {fail} from './core.mjs';
-import {cleanFrames, cleanSnapshot, diff, ingest, mergeSnapshot, positionsOf, prune, publicFeed, raceGaps, DELTA_VERSION, LIVE_FOR} from '../shared/live.mjs';
+import {cleanFrames, cleanPositions, cleanSnapshot, diff, ingest, mergeSnapshot, positionsOf, prune, publicFeed, raceGaps, DELTA_VERSION, LIVE_FOR} from '../shared/live.mjs';
 
 const MESSAGE_LIMIT = 256_000;
 const RECHECK = 4 * 3600_000;
@@ -49,6 +49,8 @@ export class LiveRoom {
     this.sent = new Map();
     this.trails = new Map();
     this.bases = new Map();
+    // Per plugin connection, the feed its quick messages belong to (known from its first snapshot).
+    this.keys = new Map();
   }
 
   async load() {
@@ -122,6 +124,8 @@ export class LiveRoom {
     if (info.role !== 'driver') return;
     let input;
     try { input = JSON.parse(message); } catch { return; }
+    // Plugin 2.4: a quick message between two snapshots (our car's last frames, the cars on the map), only passed on.
+    if (input?.f === 1) return this.fast(info, input);
     // Plugin 2.0: the last second of our car, passed on as it is and never merged into the snapshot.
     const frames = cleanFrames(input?.tm);
     if (input && typeof input === 'object') delete input.tm;
@@ -138,6 +142,7 @@ export class LiveRoom {
     try { snap = cleanSnapshot(input); } catch { return; }
     const feeds = await this.load(), at = Date.now();
     const feed = ingest(feeds, snap, at, {id:info.user, name:info.name, color:info.color}, this.paths);
+    this.keys.set(info.conn, feed.key);
     this.dirty.add(feed.key);
     this.broadcast(feed, at, frames);
     if (at - this.savedAt > SAVE_EVERY) await this.save(at);
@@ -158,6 +163,24 @@ export class LiveRoom {
     let withMap = null;
     for (const {socket, info} of watching) {
       try { socket.send(info.map ? withMap ??= JSON.stringify({...out, pos:positionsOf(feed)}) : plain); } catch {}
+    }
+  }
+
+  // Plugin 2.4's quick message, nine times a second while a page watches: the frames go to every page shown, the
+  // positions to those showing the map (and onto the car's last snapshot, for a page opening). Nothing is computed.
+  fast(info, input) {
+    const feed = this.feeds?.[this.keys.get(info.conn)];
+    if (!feed?.snap) return;
+    const at = Date.now(), frames = cleanFrames(input.tm), pos = cleanPositions(input.pos), et = Number(input.et);
+    if (pos) { const where = new Map(pos.map(([id, x, z]) => [id, [x, z]])); for (const car of feed.snap.field) if (where.has(car.id)) [car.x, car.z] = where.get(car.id); }
+    if (!frames.length && !pos) return;
+    const out = {type:'fast', now:at, key:feed.key, ...(Number.isFinite(et) ? {et} : {})};
+    if (frames.length) out.tm = frames;
+    let plain = null, withMap = null;
+    for (const {socket, info:page} of this.viewers(at)) {
+      if (page.watch === false) continue;
+      const text = page.map && pos ? withMap ??= JSON.stringify({...out, pos}) : frames.length ? plain ??= JSON.stringify(out) : null;
+      if (text) try { socket.send(text); } catch {}
     }
   }
 
@@ -192,6 +215,7 @@ export class LiveRoom {
     const info = socket.deserializeAttachment() || {};
     if (info.role === 'viewer') { await this.tellDrivers(socket); return; }
     this.bases.delete(info.conn);
+    this.keys.delete(info.conn);
     // The last pilot gone: his history is written now rather than lost if the room is put to sleep.
     if (this.dirty.size && !this.state.getWebSockets('driver').filter(item => item !== socket).length) await this.save();
   }

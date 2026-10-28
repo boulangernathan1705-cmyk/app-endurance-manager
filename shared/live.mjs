@@ -47,9 +47,20 @@ export const median = list => {
 
 // ---------- What the plugin sends ----------
 
+// Per wheel: wear left %, carcass °C, kPa, brake °C and (plugin 2.4) the tread's inner, middle and outer °C, the
+// temperatures the game's tyre screen shows (null from older plugins).
 function cleanWheel(input) {
-  const [left, carcass, kpa, brake] = Array.isArray(input) ? input : [];
-  return {left:num(left, 0, 100), carcass:num(carcass, -50, 400), kpa:num(kpa, 0, 1000), brake:num(brake, -50, 2000)};
+  const [left, carcass, kpa, brake, tread] = Array.isArray(input) ? input : [];
+  const three = Array.isArray(tread) ? [0, 1, 2].map(index => num(tread[index], -50, 400)) : null;
+  return {left:num(left, 0, 100), carcass:num(carcass, -50, 400), kpa:num(kpa, 0, 1000), brake:num(brake, -50, 2000),
+    tread:three && three.every(value => value !== null) ? three : null};
+}
+
+// The eight dent zones (plugin 2.4: 0 front, then round by the left to 7 front right), 0 to 2 each; null before.
+function cleanDents(input) {
+  if (!Array.isArray(input) || input.length !== 8) return null;
+  const list = input.map(value => num(value, 0, 2));
+  return list.every(value => value !== null) ? list.map(Math.round) : null;
 }
 
 function cleanStop(input) {
@@ -93,7 +104,7 @@ export function cleanSnapshot(input) {
     // car: the model as the fiches combo name it (their track + car), vehicle: the entry's full name in the scoring.
     me:{id, driver:text(me.driver, 40), car:text(me.car, 120), vehicle:text(me.vehicle, 80), cls:text(me.cls, 40), compound:text(me.compound, 40),
       cur:num(me.cur, -10, 3600), pit:num(me.pit, 0, 2) ?? 0, ve:num(me.ve, -1, 100), fuel:num(me.fuel, 0, 500), capacity:num(me.capacity, 0, 500),
-      wheels:[0, 1, 2, 3].map(index => cleanWheel(me.wheels?.[index])), damage:num(me.damage, 0, 100),
+      wheels:[0, 1, 2, 3].map(index => cleanWheel(me.wheels?.[index])), damage:num(me.damage, 0, 100), dents:cleanDents(me.dents), detached:me.detached === true,
       limits:num(me.limits, 0, 1000), battery:num(me.battery, 0, 100), regen:num(me.regen, -1000, 1000), delta:num(me.delta, -600, 600),
       water:num(me.water, -50, 250), oil:num(me.oil, -50, 250), control:control && Object.values(control).some(value => value !== null) ? control : null,
       stops:(Array.isArray(me.stops) ? me.stops : []).slice(-STOPS_KEPT).map(cleanStop).filter(Boolean), service, profile},
@@ -104,12 +115,19 @@ export function cleanSnapshot(input) {
 // Plugin 2.0, while a page watches: our car ten times a second, the frames of the last second grouped in one message
 // (`tm`), so the room is billed one message a second. Each frame: [metres into the lap, km/h, throttle %, brake %,
 // steering % (left negative), gear]. Passed on to the pages as they come, never kept.
-export const FRAMES_MAX = 30;
+export const FRAMES_MAX = 60;
 export function cleanFrames(input) {
   if (!Array.isArray(input)) return [];
   return input.slice(-FRAMES_MAX).filter(Array.isArray).map(([d, v, throttle, brake, steer, gear]) =>
     [round(num(d, -1000, 100000), 0), round(num(v, 0, 500), 1), round(num(throttle, 0, 100), 0), round(num(brake, 0, 100), 0),
       round(num(steer, -100, 100), 0), num(gear, -1, 12)]).filter(frame => frame[0] !== null && frame[1] !== null);
+}
+
+// Plugin 2.4: where the cars are, nine times a second between two snapshots ([id, x, z] to the metre).
+export function cleanPositions(input) {
+  if (!Array.isArray(input)) return null;
+  return input.slice(0, 120).filter(item => Array.isArray(item) && Number.isInteger(item[0]) && finite(item[1]) && finite(item[2]))
+    .map(([id, x, z]) => [id, Math.round(x), Math.round(z)]);
 }
 
 // What plugin 1.6 sends after its first snapshot: only the keys that changed (`me` by key too) and, per car, only the

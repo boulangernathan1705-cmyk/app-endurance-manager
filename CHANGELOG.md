@@ -1,5 +1,15 @@
 # Nouveautés d'Endurance Manager
 
+## v1.74 — 28 octobre 2026
+
+### ✨ Nouveautés
+
+- **Mur des stands plus fluide** : avec le plugin SimHub 2.4.0, la vitesse, les pédales, le volant, les graphes et la carte se mettent à jour dix fois par seconde pendant qu'on regarde le mur.
+- **Pneus** : les températures de la bande de roulement, comme dans le jeu (intérieur, milieu, extérieur), une jauge d'usure à côté de chaque pneu et la pression dans les cases. Les quatre roues sont en miroir, comme sur la voiture.
+- **Énergie ou carburant selon la catégorie** : en Hypercar et GT3, en énergie virtuelle ; dans les autres catégories, en litres.
+- **Ravitaillement** : la traversée des stands, le temps perdu par arrêt et le tour où il faut rentrer au plus tard.
+- **Dégâts** : la voiture vue de dessus, avec chaque zone touchée en couleur et l'aileron arrière quand il est arraché (plugin 2.4.0).
+
 ## v1.73 — 27 octobre 2026
 
 ### 🔧 Corrections

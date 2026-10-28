@@ -188,6 +188,23 @@
 .pw-body .pw-set.red { --tone: var(--pw-red); } .pw-body .pw-set.blue { --tone: var(--pw-blue); } .pw-body .pw-set.yellow { --tone: var(--pw-yellow); }
 .pw-body .pw-damage { display: grid; gap: 14px; justify-items: center; padding: 18px 0; }
 .pw-body .pw-damage b { font-family: var(--pw-mono); font-size: 44px; color: var(--bar); }
+.pw-body .pw-damage-sum { display: grid; gap: 14px; justify-items: center; width: 100%; }
+.pw-body .pw-damage.with-car { grid-template-columns: auto 1fr; align-items: center; gap: 18px; padding: 10px 0; }
+.pw-body .pw-damage.with-car b { font-size: 36px; }
+.pw-body .pw-car-dents { width: 128px; height: auto; }
+.pw-body .pw-car-dents path, .pw-body .pw-car-dents rect { fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.pw-body .pw-car-dents .pw-dent-zone { stroke-width: 6; }
+.pw-body .pw-car-dents .pw-dent-arms path, .pw-body .pw-car-dents .pw-dent-pillar { stroke: var(--pw-muted); stroke-width: 2.5; }
+.pw-body .pw-car-dents .pw-dent-arms path { stroke: var(--pw-text2); stroke-width: 2.5; }
+.pw-body .pw-car-dents .pw-dent-wheel { fill: var(--pw-accent); stroke: var(--pw-muted); stroke-width: 2; }
+.pw-body .pw-car-dents .pw-dent-cockpit { stroke: var(--pw-line); stroke-width: 3; }
+.pw-body .pw-car-dents .pw-dent-wing { stroke: var(--pw-text2); stroke-width: 4; }
+.pw-body .pw-car-dents .pw-dent-wing.off { stroke: var(--pw-red); stroke-dasharray: 6 5; }
+.pw-body .pw-wing { display: grid; justify-items: center; gap: 2px; }
+.pw-body .pw-wing span { font-size: 12px; color: var(--pw-muted); text-transform: uppercase; }
+.pw-body .pw-damage .pw-wing b { font-size: 18px; font-family: inherit; }
+.pw-body .pw-wing.good b { color: var(--pw-green); }
+.pw-body .pw-wing.bad b { color: var(--pw-red); }
 .pw-body .pw-damage i { width: 100%; height: 10px; border-radius: 5px; background: linear-gradient(90deg, var(--bar) var(--level), var(--pw-accent) var(--level)); }
 .pw-body .pw-tank-card { background: var(--pw-inset); border: 1px solid var(--pw-line); border-radius: 6px; padding: 12px; display: grid; gap: 8px; align-content: start; }
 .pw-body .pw-tank-card .pw-tank-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
@@ -207,6 +224,9 @@
 .pw-body .pw-wheel { display: grid; gap: 8px; padding: 10px 12px; border-radius: 6px; border: 1px solid rgba(0,230,118,.3); background: var(--pw-inset); }
 .pw-body .pw-wheel .pw-wheel-head { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
 .pw-body .pw-wheel .pw-wheel-head > b { font-size: 16px; }
+.pw-body .pw-wheel .pw-wheel-head > .pw-chip { margin-left: auto; }
+.pw-body .pw-wheel .pw-wheel-head.right { flex-direction: row-reverse; }
+.pw-body .pw-wheel .pw-wheel-head.right > .pw-chip { margin-left: 0; margin-right: auto; }
 .pw-body .pw-wheel .pw-wheel-head > span { margin-left: auto; font-size: 13px; color: var(--pw-text2); }
 .pw-body .pw-wheel .pw-wheel-head > span b { font-family: var(--pw-mono); font-size: 16px; }
 .pw-body .pw-wheel-body { display: flex; align-items: center; justify-content: center; gap: 16px; padding: 4px 0; }
@@ -214,9 +234,15 @@
 .pw-body .pw-tyre { display: grid; place-content: center; justify-items: center; width: 88px; height: 92px; border-radius: 12px; border: 3px solid #2b3245; background: linear-gradient(180deg, color-mix(in srgb, var(--temp) 85%, #000), color-mix(in srgb, var(--temp) 45%, #000)); box-shadow: 0 0 18px color-mix(in srgb, var(--temp) 30%, transparent); }
 .pw-body .pw-tyre b { font-family: var(--pw-mono); font-size: 18px; color: #fff; text-shadow: 0 1px 3px #000; }
 .pw-body .pw-tyre small { color: rgba(255,255,255,.75); font-weight: 600; }
+.pw-body .pw-tread { display: flex; gap: 3px; margin-top: 4px; }
+.pw-body .pw-tread i { font-style: normal; font-family: var(--pw-mono); font-size: 11px; color: #fff; padding: 1px 3px; border-radius: 4px; background: color-mix(in srgb, var(--temp) 70%, #000); }
 .pw-body .pw-brake { display: grid; justify-items: center; gap: 6px; }
 .pw-body .pw-brake i { width: 10px; height: 54px; border-radius: 6px; background: linear-gradient(180deg, var(--temp), color-mix(in srgb, var(--temp) 40%, #000)); box-shadow: 0 0 10px color-mix(in srgb, var(--temp) 40%, transparent); }
 .pw-body .pw-brake b { font-family: var(--pw-mono); font-size: 18px; }
+.pw-body .pw-wear { display: grid; justify-items: center; gap: 6px; }
+.pw-body .pw-wear i { position: relative; width: 14px; height: 70px; border-radius: 7px; background: #1b2131; overflow: hidden; }
+.pw-body .pw-wear i::after { content: ''; position: absolute; inset: auto 0 0; height: var(--wear); background: var(--bar); box-shadow: 0 0 10px color-mix(in srgb, var(--bar) 50%, transparent); }
+.pw-body .pw-wear b { font-family: var(--pw-mono); font-size: 15px; color: var(--bar); }
 .pw-body .pw-wheel .pw-box { background: var(--pw-card); padding: 8px; }
 .pw-body .pw-wheel .pw-box > span { font-size: 11px; }
 .pw-body .pw-wheel .pw-box > b { font-size: 15px; }

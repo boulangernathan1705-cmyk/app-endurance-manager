@@ -20,6 +20,8 @@ namespace EnduranceManager.SimHub
         public double Surface, Slip;
         // The tread's inner side minus its outer side (°C) and the ride height at that corner (metres).
         public double Spread, Ride;
+        // The tread's three temperatures as the game's tyre screen shows them (°C): inner, middle, outer side.
+        public double TreadIn, TreadMid, TreadOut;
     }
 
     public struct Sample
@@ -35,6 +37,10 @@ namespace EnduranceManager.SimHub
         public byte PitState;
         public double Speed, Fuel, FuelCapacity, Energy;
         public int Damage;
+        // The eight dent zones as the game counts them (0 front, then round by the left: 1 front left ... 7 front right), 0 to
+        // 2 each, and whether a part came off (in LMU only the rear wing can).
+        public int[] Dents = new int[8];
+        public bool Detached;
         public bool Invalid;
         public string FrontCompound, RearCompound;
         public Wheel[] Wheels;
@@ -129,7 +135,8 @@ namespace EnduranceManager.SimHub
             if (s.Car != radiusCar) { radiusCar = s.Car; radius = new double[4]; }
             // Coasting straight (no brake, wheel near centre, above 100 km/h): a free wheel, its rolling radius measured.
             bool free = s.BrakePedal < 0.02 && Math.Abs(s.Steer) < 0.05 && s.Speed > 100;
-            for (int i = 0; i < 8; i++) s.Damage += b[t + 544 + i];
+            for (int i = 0; i < 8; i++) { s.Dents[i] = b[t + 544 + i]; s.Damage += s.Dents[i]; }
+            s.Detached = b[t + 542] != 0;
             for (int i = 0; i < 4; i++)
             {
                 int w = t + 848 + i * 260;
@@ -146,7 +153,8 @@ namespace EnduranceManager.SimHub
                     Temp = F64(b, w + 204) - 273.15, Wear = F64(b, w + 152),
                     Pressure = F64(b, w + 120), Brake = F64(b, w + 24) - 273.15,
                     Surface = F64(b, w + 136) - 273.15, Slip = ground > 5 ? Math.Max(-1, Math.Min(1, (turning - ground) / ground)) : 0,
-                    Spread = i % 2 == 0 ? right - left : left - right, Ride = F64(b, w + 8)
+                    Spread = i % 2 == 0 ? right - left : left - right, Ride = F64(b, w + 8),
+                    TreadIn = (i % 2 == 0 ? right : left) - 273.15, TreadMid = F64(b, w + 136) - 273.15, TreadOut = (i % 2 == 0 ? left : right) - 273.15
                 };
             }
             // LMU leaves mFrontRideHeight and mRearRideHeight at 0: the axle's height is its two wheels' (checked on track).

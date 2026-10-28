@@ -144,7 +144,8 @@ namespace EnduranceManager.SimHub
             reader?.Join(3000);
         }
 
-        // SimHub calls this sixty times a second; the plugin reads the game on its own thread, ten times a second.
+        // SimHub calls this sixty times a second; the plugin reads the game on its own thread, ten times a second (our car
+        // thirty times while a teammate watches the wall).
         public void DataUpdate(PluginManager pluginManager, ref GameData data) { }
 
         public System.Windows.Controls.Control GetWPFSettingsControl(PluginManager pluginManager) => new SettingsControl(this);
@@ -237,6 +238,8 @@ namespace EnduranceManager.SimHub
                             // Once a second, the car and the field for the team's mur des stands.
                             if (driving && Settings.Share) live.Frame(sample);
                             if (driving && Settings.Share && tick % 10 == 0) live.Offer(buffer, sample, recorder, api);
+                            // Between two, nine quick messages a second: our car's frames and the cars on the map.
+                            else if (driving && Settings.Share) live.Fast(buffer);
                             // Once a second, the race figures for the dashboards; the pit menu every 2 s, read aside.
                             if (driving && tick % 10 == 0) try { Course.Update(buffer, sample, recorder.Current, api.Service, Menu, Game, api.Refuel, standings, lovely); } catch { }
                             if (driving && tick % 20 == 5 && !Menu.Busy) ThreadPool.QueueUserWorkItem(_ => Menu.Read());
@@ -279,7 +282,16 @@ namespace EnduranceManager.SimHub
                                 bool setupOnly = api.Service != null;
                                 ThreadPool.QueueUserWorkItem(_ => api.Read(compound, setupOnly));
                             }
-                            Thread.Sleep(100);
+                            // In between, while a page watches the car: two more readings of it for the wall's curves
+                            // (thirty a second), nothing else.
+                            for (int extra = 0; extra < 2; extra++)
+                            {
+                                Thread.Sleep(33);
+                                if (!driving || !Settings.Share || !live.Watching) continue;
+                                Copy(view, buffer);
+                                if (LmuMemory.Read(buffer, out var between) && between.Realtime) live.Frame(between);
+                            }
+                            Thread.Sleep(34);
                         }
                     }
                 }
