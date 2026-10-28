@@ -1,5 +1,5 @@
 import {pause,retryAfter,spaceOut} from './recap-discord.mjs';
-import {effectivePermissions,guildPermissions,missingVoicePermissions,withBotAccess,VOICE_ACCESS,EMBED} from './discord-permissions.mjs';
+import {effectivePermissions,guildPermissions,missingVoicePermissions,withPublicVoiceAccess,VOICE_ACCESS,EMBED} from './discord-permissions.mjs';
 // Crews on Discord (migrations 0044, 0045). Two modules, each enabled by the admins of a community:
 // - crewChannels (« Salons d'équipage »): as soon as it is made, every crew gets a voice
 //   channel named after its sim and its name (« LMU-Les Tondeuz »), made in the category the admins chose
@@ -288,7 +288,7 @@ async function needsWork(env, timestamp, community, setting, row, pilots) {
   const current = discordIds(pilots), known = JSON.parse(row.members || '[]');
   if (current.length !== known.length || current.some(id => !known.includes(id))) return true;
   if (dueReminders(community, row, start, timestamp).length || endDue(row, start, timestamp)) return true;
-  return row.recap_hash !== await hash(JSON.stringify(recapPayload(env, community, row, start, pilots)));
+  return row.recap_hash !== 'public-voice-v1:' + await hash(JSON.stringify(recapPayload(env, community, row, start, pilots)));
 }
 
 // Deletes a channel (already gone: fine).
@@ -436,10 +436,9 @@ async function createVoice(env, budget, row, setting, body) {
   try {
     const category = parent ? await discord(env,budget,'GET',`/channels/${parent}`) : null;
     const create = rules => discord(env,budget,'POST',`/guilds/${row.guild_id}/channels`,{...body,...(parent ? {parent_id:parent} : {}),...rules});
-    // A right the bot does not hold itself in a copied rule (a role's « Rendre muet »…): made without the copy, Discord
-    // then gives it the category's rights.
-    return await create({permission_overwrites:withBotAccess(category?.permission_overwrites,env.DISCORD_CLIENT_ID,VOICE_ACCESS)})
-      .catch(error => { if (parent && error?.code === 50013) return create({}); throw error; });
+    // If copied permissions are refused, retry with only public voice and bot access.
+    return await create({permission_overwrites:withPublicVoiceAccess(category?.permission_overwrites,row.guild_id,env.DISCORD_CLIENT_ID)})
+      .catch(error => { if (parent && error?.code === 50013) return create({permission_overwrites:withPublicVoiceAccess([],row.guild_id,env.DISCORD_CLIENT_ID)}); throw error; });
   } catch (error) {
     const parentGone = error?.status === 404 && error?.code === 10003 || error?.status === 400 && error?.errors?.parent_id;
     if (row.race_category && parentGone) await raceCategoryGone(env, row);
@@ -535,18 +534,25 @@ async function syncRow(env, budget, timestamp, community, setting, row, pilots) 
     }
     // Deleted on Discord: made again on the next pass.
     const voice = await sendInChannel(env,budget,row,'GET',`/channels/${row.voice_id}`);
-    // A fallback vocal created at server root has only the bot exception: take the
-    // private destination rules when moving it. Preserve any existing non-bot rules.
+    // Preserve existing channel rules where available; apply public voice access below.
     const hasMemberRules = (voice.permission_overwrites || []).some(item => !(String(item.id) === String(env.DISCORD_CLIENT_ID) && Number(item.type) === 1));
     const rules = hasMemberRules ? voice.permission_overwrites : target.permission_overwrites;
     await sendInChannel(env, budget, row, 'PATCH', `/channels/${row.voice_id}`, {parent_id:parent, name:voiceName(row, crewName),
-      permission_overwrites:withBotAccess(rules,env.DISCORD_CLIENT_ID,VOICE_ACCESS)});
+      permission_overwrites:withPublicVoiceAccess(rules,row.guild_id,env.DISCORD_CLIENT_ID)});
     row.parent_id = parent;
     await env.DB.prepare('UPDATE crew_discord SET parent_id=? WHERE crew_id=?').bind(row.parent_id, row.row_id).run();
     if (!row.race_category && parent) await sortVoices(env, budget, row, parent);
   }
+  // The hash version schedules existing vocals once after the public-access upgrade.
+  if (!opened && !row.recap_hash?.startsWith('public-voice-v1:') && (row.parent_id || null) === parent) {
+    const voice = await sendInChannel(env,budget,row,'GET',`/channels/${row.voice_id}`);
+    const rules = withPublicVoiceAccess(voice.permission_overwrites,row.guild_id,env.DISCORD_CLIENT_ID);
+    if (JSON.stringify(rules) !== JSON.stringify(voice.permission_overwrites || [])) {
+      await sendInChannel(env,budget,row,'PATCH',`/channels/${row.voice_id}`,{permission_overwrites:rules});
+    }
+  }
   const payload = recapPayload(env, community, row, start, pilots);
-  const contentHash = await hash(JSON.stringify(payload));
+  const contentHash = 'public-voice-v1:' + await hash(JSON.stringify(payload));
   if (!row.message_id) {
     // Plain names only: even the first message must not notify or ping the pilots.
     const message = await sendInChannel(env, budget, row, 'POST', `/channels/${row.voice_id}/messages`, {...payload, allowed_mentions:{parse:[]}, flags:4096});
