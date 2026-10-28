@@ -4,7 +4,7 @@ import {DatabaseSync} from 'node:sqlite';
 import {readFileSync,readdirSync} from 'node:fs';
 import worker from '../server/worker.mjs';
 import {announceCommunity} from '../server/discord-announce.mjs';
-import {buildAnnounceEvent,buildAnnounceIntro,buildAnnounceRace,eventHook,ANNOUNCE_HOOKS} from '../server/discord-weekly-format.mjs';
+import {buildCompleteAnnouncement,buildAnnounceEvent,buildAnnounceIntro,buildAnnounceRace,eventHook,ANNOUNCE_HOOKS} from '../server/discord-weekly-format.mjs';
 import {layoutInput} from '../server/discord-layout.mjs';
 import {linkTestServer,DEV_COMMUNITY,GUILD} from './fixtures/discord-server.mjs';
 
@@ -44,7 +44,7 @@ function setup(t){
     const send=path.match(/^\/channels\/(\d+)\/messages$/);
     if(send){const message={...body,id:String(counter++),channel_id:send[1]};messages.set(message.id,message);return Response.json(message);}
     const edit=path.match(/^\/channels\/(\d+)\/messages\/(\d+)$/);
-    if(edit){Object.assign(messages.get(edit[2]),body);return Response.json(messages.get(edit[2]));}
+    if(edit){if(method==='DELETE'){messages.delete(edit[2]);return new Response(null,{status:204});}Object.assign(messages.get(edit[2]),body);return Response.json(messages.get(edit[2]));}
     return new Response('{}',{status:404});
   };
   t.after(()=>globalThis.fetch=original);
@@ -60,13 +60,14 @@ test('at 7h30 the day\'s endurances and events are announced in order, @everyone
   assert.equal(calls.length,0);
   assert.equal(await announceCommunity(env,TDZ,settings(),MORNING),true);
   const posts=sent(calls);
-  assert.equal(posts.length,3,'the intro, the 6h at 20h, the event at 21h; not tomorrow\'s race');
+  assert.equal(posts.length,1,'one complete message for the day');
   assert.ok(posts.every(call=>call.path===`/channels/${ANNOUNCES}/messages`));
-  const [intro,race,event]=posts.map(call=>call.body);
+  const combined=posts[0].body;
+  const intro={...combined,embeds:[combined.embeds[0]]},race={embeds:[combined.embeds[1]]},event={embeds:[combined.embeds[2]],components:[combined.components[1]]};
   assert.equal(intro.content,'@everyone');assert.deepEqual(intro.allowed_mentions,{parse:['everyone']});assert.equal(intro.flags,undefined);
   assert.match(intro.embeds[0].description,/\*\*1 event\*\* et \*\*1 endurance\*\*/);
   assert.match(intro.embeds[0].description,/📺 Lancement du stream sur \[Twitch\]\(https:\/\/twitch\.tv\/tdz\) à 20h45/);
-  assert.equal(race.flags,4096);assert.deepEqual(race.allowed_mentions,{parse:[]});
+  assert.equal(combined.embeds.length,3);assert.equal(combined.embeds.filter(embed=>embed.image).length,1);
   assert.match(race.embeds[0].title,/6h de Spa/);assert.match(race.embeds[0].description,new RegExp(ANNOUNCE_HOOKS.endurance));
   assert.match(JSON.stringify(race.embeds[0].fields),/Équipage A[\s\S]*Pilote 1/);
   assert.match(JSON.stringify(race.embeds[0].fields),/1 présent/);
@@ -74,7 +75,7 @@ test('at 7h30 the day\'s endurances and events are announced in order, @everyone
   assert.match(event.embeds[0].description,new RegExp(`${ANNOUNCE_HOOKS.ams2} ${ANNOUNCE_HOOKS.open}`));
   assert.match(event.embeds[0].description,/La pluie attendue sur Spa/);
   assert.equal(event.embeds[0].thumbnail.url.endsWith('/images/event-access/open-ams2.png'),true);
-  assert.deepEqual(event.components[0].components.map(button=>button.label),['Présent','Absent']);
+  assert.deepEqual(event.components[0].components.map(button=>button.label),['Présent / S’inscrire · Coupe GT3','Absent · Coupe GT3']);
   assert.equal(event.components[0].components[1].custom_id,`absent:${EVENT}`);
   // The next passes send nothing again.
   calls.length=0;
@@ -91,8 +92,8 @@ test('the count of présents is kept up to date; after 9h only the day it is tur
   assert.equal(await announceCommunity(env,TDZ,settings(),MORNING+11*60000),true);
   const edits=calls.filter(call=>call.method==='PATCH');
   assert.equal(edits.length,1,'only the event changed');
-  assert.match(JSON.stringify(edits[0].body.embeds[0].fields),/1 présent\*\* · 19 places restantes/);
-  assert.equal([...messages.values()].length,3);
+  assert.match(JSON.stringify(edits[0].body.embeds),/1 présent\*\* · 19 places restantes/);
+  assert.equal([...messages.values()].length,1);
 
   DB.db.prepare('DELETE FROM discord_announcements').run();calls.length=0;
   assert.equal(await announceCommunity(env,TDZ,settings(),MORNING+2*HOUR),false);
@@ -100,7 +101,7 @@ test('the count of présents is kept up to date; after 9h only the day it is tur
   // Turned on at 9h29: announced at once (the races left today).
   DB.db.prepare('UPDATE community_recap_settings SET layout=?').run(JSON.stringify({v:1,mode:'events',sims:'all',announce:ANNOUNCES,announceAt:MORNING+2*HOUR-60000}));
   assert.equal(await announceCommunity(env,TDZ,settings(),MORNING+2*HOUR),true);
-  assert.equal(sent(calls).length,3);
+  assert.equal(sent(calls).length,1);
 });
 
 test('« Absent » from the announcement marks the pilot absent on the site',async t=>{
@@ -118,7 +119,7 @@ test('« Absent » from the announcement marks the pilot absent on the site',asy
 });
 
 test('hooks: the type, else the sim, then OPEN / SAFE (TDZ only); Gridfest has its own; the password never goes on Discord',()=>{
-  assert.equal(eventHook({tdz:true,sim:'lmu',type:'Bouboule',access:'safe'}),`${ANNOUNCE_HOOKS.Bouboule} ${ANNOUNCE_HOOKS.safe}`);
+  assert.equal(eventHook({tdz:true,sim:'lmu',type:'Bouboule',access:'safe'}),`${ANNOUNCE_HOOKS.BOULOULES} ${ANNOUNCE_HOOKS.safe}`);
   assert.equal(eventHook({tdz:true,sim:'iracing',type:'SAFE',access:'safe'}),`${ANNOUNCE_HOOKS.iracing} ${ANNOUNCE_HOOKS.safe}`);
   assert.equal(eventHook({tdz:true,sim:'lmu',type:'Gridfest',access:'open'}),ANNOUNCE_HOOKS.Gridfest);
   assert.equal(eventHook({tdz:false,sim:'ace',type:'',access:''}),ANNOUNCE_HOOKS.ace);
@@ -152,4 +153,42 @@ test('the community\'s stream in the intro, at the time given on the event; the 
   assert.equal(layoutInput({mode:'events',sims:'all',under:'top',announce:ANNOUNCES,stream:' https://twitch.tv/tdz '}).stream,'https://twitch.tv/tdz');
   assert.equal(layoutInput({mode:'events',sims:'all',under:'top',announce:'',stream:'https://twitch.tv/tdz'}).stream,undefined);
   assert.throws(()=>layoutInput({mode:'events',sims:'all',under:'top',announce:ANNOUNCES,stream:'twitch.tv/tdz'}),/stream/);
+});
+
+
+test('an existing multi-message day is consolidated silently into the original intro',async t=>{
+  const {DB,env,calls,messages,settings}=setup(t);
+  await announceCommunity(env,TDZ,settings(),MORNING);
+  const intro=sent(calls)[0].body;
+  messages.set('888888888888888888',{id:'888888888888888888',content:'old separate race'});
+  DB.db.prepare("UPDATE discord_announcements SET message_id='888888888888888888' WHERE item=?").run(RACE);
+  calls.length=0;
+  await announceCommunity(env,TDZ,settings(),MORNING+60000);
+  assert.equal(sent(calls).length,0,'reuses the original message');
+  assert.ok(calls.some(call=>call.method==='DELETE'&&call.path.endsWith('/888888888888888888')));
+  const edit=calls.find(call=>call.method==='PATCH');
+  assert.deepEqual(edit.body.allowed_mentions,{parse:[]},'migration does not ping everyone again');
+  assert.equal(messages.size,1);
+  assert.equal(new Set(DB.db.prepare('SELECT message_id FROM discord_announcements').all().map(row=>row.message_id)).size,1);
+});
+
+test('large daily announcements respect Discord embed, character and component limits',()=>{
+  const intro=buildAnnounceIntro({events:12},{name:'TDZ',url:'https://site.example'});
+  const items=Array.from({length:12},(_,index)=>({name:`Event ${index}`,payload:buildAnnounceEvent({id:String(index),name:`Event ${index}`,sim:'lmu',tdz:true,type:'BOULOULES',access:'open',startsAt:MORNING+HOUR,rounds:[],entered:0,note:'Long note '.repeat(80)},{url:'https://site.example'})}));
+  const payload=buildCompleteAnnouncement(intro,items,{url:'https://site.example',bannerUrl:'https://site.example/banner.webp'});
+  assert.equal(payload.embeds.length,10);
+  assert.ok(payload.components.length<=5);
+  assert.equal(payload.embeds.filter(embed=>embed.image).length,1);
+  assert.match(payload.embeds[0].description,/3 autres rendez-vous/);
+  const chars=payload.embeds.reduce((sum,embed)=>sum+[embed.title,embed.description,embed.author?.name,embed.footer?.text,...(embed.fields||[]).flatMap(field=>[field.name,field.value])].reduce((total,value)=>total+String(value||'').length,0),0);
+  assert.ok(chars<=6000);
+});
+
+
+test('a stream-only announcement has no invitation to register or absence buttons',()=>{
+  const intro=buildAnnounceIntro({events:0,races:0,lives:1},{url:'https://site.example'});
+  const payload=buildCompleteAnnouncement(intro,[{name:'Live',payload:{embeds:[{title:'Live',description:'Twitch'}],components:[]}}],{url:'https://site.example'});
+  assert.match(payload.embeds[0].title,/stream/);
+  assert.doesNotMatch(payload.embeds[0].description,/Inscris-toi/);
+  assert.deepEqual(payload.components,[]);
 });
