@@ -397,8 +397,11 @@ async function createVoice(env, budget, row, setting, body) {
   const parent = voiceParent(row, setting);
   try {
     const category = parent ? await discord(env,budget,'GET',`/channels/${parent}`) : null;
-    return await discord(env,budget,'POST',`/guilds/${row.guild_id}/channels`,{...body,
-      ...(parent ? {parent_id:parent} : {}),permission_overwrites:withBotAccess(category?.permission_overwrites,env.DISCORD_CLIENT_ID,VOICE_ACCESS)});
+    const create = rules => discord(env,budget,'POST',`/guilds/${row.guild_id}/channels`,{...body,...(parent ? {parent_id:parent} : {}),...rules});
+    // A right the bot does not hold itself in a copied rule (a role's « Rendre muet »…): made without the copy, Discord
+    // then gives it the category's rights.
+    return await create({permission_overwrites:withBotAccess(category?.permission_overwrites,env.DISCORD_CLIENT_ID,VOICE_ACCESS)})
+      .catch(error => { if (parent && error?.code === 50013) return create({}); throw error; });
   } catch (error) {
     const parentGone = error?.status === 404 && error?.code === 10003 || error?.status === 400 && error?.errors?.parent_id;
     if (row.race_category && parentGone) await raceCategoryGone(env, row);
