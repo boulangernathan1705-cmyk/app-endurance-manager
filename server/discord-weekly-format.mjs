@@ -455,7 +455,7 @@ export function buildAnnounceEvent(event,site={},updatedAt=Date.now(),absent=nul
   const gridfest=isGridfestType(event.type),rounds=Array.isArray(event.rounds)?event.rounds:[];
   const typeLabel=event.tdz&&event.type&&!['OPEN','SAFE'].includes(event.type)?`🏷️ ${clean(gridfest?'Gridfest':normalizeTdzEventType(event.type))}`:'';
   const lines=[eventHook(event),event.note&&`*« ${clean(event.note)} »*`,
-    [`🕘 ${announceTime(event.startsAt,event.timePending)}`,`🎮 ${SIM_SHORT[event.sim]||clean(event.sim)}`,typeLabel,event.tdz&&!gridfest&&event.access&&event.access.toUpperCase()].filter(Boolean).join('\n')];
+    [`🕘 ${announceTime(event.startsAt,event.timePending)}`,`🎮 ${SIM_SHORT[event.sim]||clean(event.sim)}`,typeLabel,event.tdz&&!gridfest&&event.access&&event.access.toUpperCase()].filter(Boolean).join(' · ')];
   const rally=event.rally;
   const grouped=!rally&&rounds.length>1?sharedRoundDetails(rounds):null;
   if(grouped?.common)lines.push(grouped.common);
@@ -515,17 +515,23 @@ export function buildCompleteAnnouncement(intro, items, site={}) {
   const head=structuredClone(intro.embeds[0]);
   delete head.image;
   const cards=items.slice(0,9).flatMap(item=>structuredClone(item.payload.embeds||[])).slice(0,9);
+  const streamLink=String(head.description||'').match(/\[(Twitch|YouTube|Kick|notre chaîne)\]\((https?:\/\/[^\s)]+)\)/);
+  // Start directly with the first race; no generic introduction or event counts.
+  delete head.author;
+  head.title=cards[0]?.title||'Rendez-vous';
+  head.description=cards[0]?.description||'';
+  if(cards[0]?.url)head.url=cards[0].url;
   head.fields=[];
-  for(const card of cards) {
+  for(const [index,card] of cards.entries()) {
     const title=card.url?`**[${card.title}](${card.url})**`:`**${card.title}**`;
-    head.fields.push({name:'────────────',value:cut([title,card.description].filter(Boolean).join('\n\n'),1024),inline:false});
+    if(index)head.fields.push({name:'────────────',value:cut([title,card.description].filter(Boolean).join('\n\n'),1024),inline:false});
     const fields=card.fields||[];
     if(fields.length) {
       // Real embed fields provide breathing room between rounds and participation.
       const limit=Math.max(1,Math.floor((24-cards.length)/cards.length));
       const selected=fields.length<=limit?fields:[...fields.slice(0,limit-1),fields.at(-1)];
       head.fields.push(...selected.map((field,index)=>({...field,
-        name:index===selected.length-1?'👥 Participation':field.name,inline:false})));
+        name:field.name,inline:false})));
     }
   }
   if(cards.length===1) {
@@ -541,5 +547,10 @@ export function buildCompleteAnnouncement(intro, items, site={}) {
   const components=actionable.length<=5 ? actionable.map(item=>({type:1,components:item.payload.components[0].components.map(button=>({...button,
     label:cut(`${button.style===5?'Présent / S’inscrire':'Absent'}${actionable.length>1?` · ${item.name}`:''}`,80)}))}))
     : [{type:1,components:[{type:2,style:5,label:'Inscriptions et absences sur le site',url:`${site.url}/events/`}]}];
+  if(streamLink){
+    const button={type:2,style:5,label:'Regarder le live',emoji:{name:'📺'},url:streamLink[2]};
+    if(components.length&&components[0].components.length<5)components[0].components.push(button);
+    else if(components.length<5)components.push({type:1,components:[button]});
+  }
   return {content:intro.content,embeds:fitDiscordEmbeds(embeds),components,allowed_mentions:intro.allowed_mentions};
 }
