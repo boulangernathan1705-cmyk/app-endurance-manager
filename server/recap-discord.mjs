@@ -372,7 +372,12 @@ async function makeCategories(env, community, settings, channels, budget) {
   const wanted = settings.enabled === 0 ? [] : wantedCategories(layout);
   let changed = false;
   for (const key of wanted) {
-    if (cats[key] && channels.some(item => item.id === cats[key] && item.type === 4)) continue;
+    const mine = cats[key] && channels.find(item => item.id === cats[key] && item.type === 4);
+    if (mine) {
+      // Made with an older name (before its emoji): renamed once.
+      if (mine.name !== CATEGORY_NAMES[key]) { await discord(env,'PATCH',`/channels/${mine.id}`,{name:CATEGORY_NAMES[key]},budget); mine.name = CATEGORY_NAMES[key]; }
+      continue;
+    }
     // Taken back if the bot made it already (a lost answer), never a category of the admins with the same name.
     const created = await discord(env,'POST',`/guilds/${settings.guild_id}/channels`,{type:4,name:CATEGORY_NAMES[key],
       permission_overwrites:withBotAccess(categoryRules(env, layout, key, channels),env.DISCORD_CLIENT_ID,categoryAccess(community))},budget);
@@ -692,7 +697,11 @@ async function weekChannel(env, community, row, entry, budget) {
   const parent = target.type === 4 ? target.id : target.parent_id || null, category = channels.find(item => item.id === parent);
   const topic = 'endurance-manager:' + (await digest([community.id,'week',destination,entry.topic])).slice(0,24);
   const existing = channels.find(item => item.type === 0 && item.topic === topic);
-  if (existing) return {channel:existing.id, category:entry.key};
+  if (existing) {
+    // Found by its topic: named as now wanted (« 📅・endurances-de-la-semaine » since its emoji).
+    if (existing.name !== entry.channel) await discord(env,'PATCH',`/channels/${existing.id}`,{name:entry.channel},budget);
+    return {channel:existing.id, category:entry.key};
+  }
   const create = rules => discord(env,'POST',`/guilds/${row.guild_id}/channels`,{type:0,name:entry.channel,topic,...(parent ? {parent_id:parent} : {}),...rules},budget);
   // A right the bot does not hold in a copied rule: made without the copy, Discord then gives it the category's rights.
   const created = await create({permission_overwrites:withBotAccess(category?.permission_overwrites,env.DISCORD_CLIENT_ID,REQUIRED)})

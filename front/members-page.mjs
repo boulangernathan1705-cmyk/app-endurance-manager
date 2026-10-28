@@ -205,20 +205,22 @@ function discordRead(form) {
 const discordSims = answers => answers.sims === 'all' ? ['lmu','iracing'] : [answers.sims];
 const discordApart = answers => answers.sims === 'all' && answers.split;
 const SIM_NAMES = {lmu:'LMU', iracing:'iRacing'};
+// The bot's own names on Discord (as server/discord-layout.mjs): an emoji in front makes them stand out.
+const BOT_NAMES = {main:'🏆 Endurance Manager', lmu:'🔴 LMU', iracing:'🔵 iRacing'};
 // Where the events go: apart, the bot's category is the one of a sim (« LMU » or « iRacing »).
 const discordEvents = answers => discordApart(answers) && answers.events === 'bot' ? `bot-${discordSims(answers).find(sim => answers.week?.[sim] === 'bot') || 'lmu'}`
   : !discordApart(answers) && answers.events?.startsWith('bot-') ? 'bot' : answers.events || '';
 // The categories the bot makes for the races and the week's channels (as server/discord-layout.mjs).
 function discordBotCategories(answers) {
-  if (answers.mode === 'events') return discordApart(answers) ? ['LMU','iRacing'] : ['Endurance Manager'];
-  if (discordApart(answers)) return discordSims(answers).filter(sim => answers.week?.[sim] === 'bot' || discordEvents(answers) === `bot-${sim}`).map(sim => SIM_NAMES[sim]);
-  return [answers.week?.all, discordEvents(answers)].includes('bot') ? ['Endurance Manager'] : [];
+  if (answers.mode === 'events') return discordApart(answers) ? [BOT_NAMES.lmu,BOT_NAMES.iracing] : [BOT_NAMES.main];
+  if (discordApart(answers)) return discordSims(answers).filter(sim => answers.week?.[sim] === 'bot' || discordEvents(answers) === `bot-${sim}`).map(sim => BOT_NAMES[sim]);
+  return [answers.week?.all, discordEvents(answers)].includes('bot') ? [BOT_NAMES.main] : [];
 }
 const discordUsesBot = answers => discordBotCategories(answers).length > 0;
 // Apart, each sim's channel is « endurances-de-la-semaine »; both just below the same place, they need their own names.
 const discordWeekChannel = (answers, sim) => {
   const here = answers.week?.[sim], other = answers.week?.[sim === 'lmu' ? 'iracing' : 'lmu'];
-  return here && here !== 'bot' && here === other ? `endurances-${sim}-de-la-semaine` : 'endurances-de-la-semaine';
+  return `📅・${here && here !== 'bot' && here === other ? `endurances-${sim}-de-la-semaine` : 'endurances-de-la-semaine'}`;
 };
 const quoted = names => names.map(name => `« ${name} »`).join(' et ');
 // The questions these answers need, in order.
@@ -309,14 +311,14 @@ function discordSketch(form, answers = discordRead(form)) {
   const bot = name => ({name, bot:true});
   // Each race: its thread in # endurances-de-la-semaine, its crews' voices just below (Discord lists them after the texts).
   const voices = list => answers.voices ? list.flatMap(sim => RACES[sim][1].map(crew => bot(`🔊 ${RACES[sim][0].replace(/^\S+ /, '')} · ${crew}`))) : [];
-  const week = list => [bot('# endurances-de-la-semaine'), ...list.map(sim => bot(`　🧵 ${RACES[sim][0]}`))];
+  const week = list => [bot('# 📅・endurances-de-la-semaine'), ...list.map(sim => bot(`　🧵 ${RACES[sim][0]}`))];
   const eventName = `# ${discordEventChannel(form)}`;
   const isPrivate = id => list.some(item => item.id === id && item.type === 4 && item.private);
   const lock = (copy, at) => copy !== false && isPrivate(at) ? ' 🔒' : '';
-  const botCat = {name:`Endurance Manager${lock(answers.copy, answers.under)}`, bot:true, items:[]};
-  const simCats = Object.fromEntries(sims.map(sim => [sim, {name:`${SIM_NAMES[sim]}${lock(answers.copy, answers.under)}`, bot:true, items:[]}]));
+  const botCat = {name:`${BOT_NAMES.main}${lock(answers.copy, answers.under)}`, bot:true, items:[]};
+  const simCats = Object.fromEntries(sims.map(sim => [sim, {name:`${BOT_NAMES[sim]}${lock(answers.copy, answers.under)}`, bot:true, items:[]}]));
   if (race) {
-    const blocks = apart ? sims.map((sim, index) => ({name:`${sim === 'lmu' ? 'LMU' : 'iRacing'}${lock(answers.copy, answers.under)}`, bot:true, items:[...week([sim]), ...(solo && answers.showEvents ? [bot(eventName)] : []), ...voices([sim])]}))
+    const blocks = apart ? sims.map((sim, index) => ({name:`${BOT_NAMES[sim]}${lock(answers.copy, answers.under)}`, bot:true, items:[...week([sim]), ...(solo && answers.showEvents ? [bot(eventName)] : []), ...voices([sim])]}))
       : [{...botCat, items:[...week(sims), ...(solo && answers.showEvents ? [bot(eventName)] : []), ...voices(sims)]}];
     after(answers.under || 'top', ...blocks);
   } else {
@@ -330,7 +332,7 @@ function discordSketch(form, answers = discordRead(form)) {
       if (group) { group.items.unshift(...items); return; }
       for (const item of groups) { const index = item.items.findIndex(text => text.id === value); if (index >= 0) { item.items.splice(index + 1, 0, ...items); return; } }
     };
-    const channels = apart ? sims.map(sim => [answers.week?.[sim], `# ${discordWeekChannel(answers, sim)}`, sim, [sim]]) : [[answers.week?.all, '# endurances-de-la-semaine', null, sims]];
+    const channels = apart ? sims.map(sim => [answers.week?.[sim], `# ${discordWeekChannel(answers, sim)}`, sim, [sim]]) : [[answers.week?.all, '# 📅・endurances-de-la-semaine', null, sims]];
     for (const [value, name, sim, threads] of channels) placeIn(value, name, sim, threads);
     const events = discordEvents(answers);
     if (solo && events && events !== 'same') placeIn(events, eventName);
