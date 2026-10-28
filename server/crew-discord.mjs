@@ -431,7 +431,9 @@ const waitsForCategory = (row, timestamp) => !row.race_category && timestamp - N
   && (row.race_scope === 'all' || row.race_scope === game(row.circuit));
 
 // In its race's category the crew's name is enough; elsewhere the sim and the race come first (« LMU · 6h de Spa · Équipage A »).
-const voiceName = (row, crewName) => clip(row.race_category ? crewName : `${game(row.circuit) === 'iracing' ? 'iRacing' : 'LMU'} · ${safe(row.event_name) || 'Endurance'} · ${crewName}`, 100);
+// « 🏎️ LMU · 6h de Spa · Équipage A »: the race's logo in front, as its thread.
+export const crewVoiceName = row => clip(`${game(row.circuit) === 'iracing' ? '🏁 iRacing' : '🏎️ LMU'} · ${safe(row.event_name) || 'Endurance'} · ${safe(row.crew_name) || 'Équipage'}`, 100);
+const voiceName = (row, crewName) => clip(row.race_category ? crewName : crewVoiceName({...row, crew_name:crewName}), 100);
 // In the admins' category the voice channels follow the races: LMU first, then iRacing, each by start (one request).
 async function sortVoices(env, budget, row, parent) {
   const rows = (await env.DB.prepare(`SELECT d.voice_id, d.created_at, c.departure_id, e.circuit, e.departures FROM crew_discord d
