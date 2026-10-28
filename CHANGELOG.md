@@ -1,5 +1,12 @@
 # Nouveautés d'Endurance Manager
 
+## v1.96 — 28 octobre 2026
+
+### ✨ Améliorations
+
+- **Discord · Annonce du jour** : un seul encadré regroupe désormais l’introduction et les courses, avec les manches, équipages, inscrits, boutons et la bannière configurée. Les annonces existantes sont actualisées automatiquement.
+- **Discord · Calendrier** : des séparateurs en texte distinguent les événements.
+
 ## v1.95 — 28 octobre 2026
 
 ### 🛠️ Pour les admins

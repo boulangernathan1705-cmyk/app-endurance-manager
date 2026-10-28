@@ -311,12 +311,12 @@ function calendarBox(event,siteUrl){
 }
 // The week's events (« EVENT SOLO », « EVENT TDZ »): one box per event, in the order of their starts.
 // `snapshot`: {periodLabel, events:[{id,name,sim,circuits,startsAt,timePending,capacity,entered,access}]}.
-export const CALENDAR_FORMAT = 'calendar-v2:';
+export const CALENDAR_FORMAT = 'calendar-v3:';
 export function buildCalendarPayload(snapshot,site={},updatedAt=Date.now()){
   const siteUrl=String(site.url||''),events=Array.isArray(snapshot.events)?snapshot.events:[];
   const embed={title:'📅 Le programme de la semaine',description:cut(cap(snapshot.periodLabel||'semaine à venir'),4096),color:events.length?0xe7b653:0x6b7280};
   if(site.name){embed.author={name:cut(`${site.name}${events.length?` · ${events.length} event${events.length>1?'s':''} cette semaine`:''}`,256)};if(siteUrl)embed.author.url=`${siteUrl}/`;if(site.logoUrl)embed.author.icon_url=site.logoUrl;}
-  if(events.length){embed.fields=events.slice(0,events.length>25?24:25).map(event=>calendarBox(event,siteUrl));if(events.length>25)embed.fields.push({name:BLANK,value:`… et ${events.length-24} autres events sur le site.`,inline:false});}
+  if(events.length){embed.fields=events.slice(0,events.length>25?24:25).map((event,index)=>{const field=calendarBox(event,siteUrl);if(index)field.name=cut(`────────────\n${field.name}`,256);return field;});if(events.length>25)embed.fields.push({name:BLANK,value:`… et ${events.length-24} autres events sur le site.`,inline:false});}
   else embed.description+='\nAucun événement de prévu pour l’instant.';
   if(site.bannerUrl)embed.image={url:site.bannerUrl};
   embed.footer=footer(updatedAt);
@@ -487,13 +487,27 @@ export function buildAnnounceRace(race,site={},updatedAt=Date.now(),emojis={},ab
 export function buildCompleteAnnouncement(intro, items, site={}) {
   const head=structuredClone(intro.embeds[0]);
   delete head.image;
-  const embeds=[head,...items.slice(0,9).flatMap(item=>structuredClone(item.payload.embeds||[])).slice(0,9)];
-  for(const embed of embeds)delete embed.footer;
-  if(items.length>9)head.description+=`\n… et ${items.length-9} autres rendez-vous : [calendrier complet](${site.url}/events/).`;
-  const last=embeds.at(-1);
-  if(site.bannerUrl)last.image={url:site.bannerUrl};
-  const lastFooter=items.at(-1)?.payload.embeds?.[0]?.footer;
-  if(lastFooter)last.footer=lastFooter;
+  const cards=items.slice(0,9).flatMap(item=>structuredClone(item.payload.embeds||[])).slice(0,9);
+  head.fields=[];
+  for(const card of cards) {
+    const title=card.url?`**[${card.title}](${card.url})**`:`**${card.title}**`;
+    head.fields.push({name:'────────────',value:cut([title,card.description].filter(Boolean).join('\n'),1024),inline:false});
+    const fields=card.fields||[];
+    if(fields.length) {
+      const summary=fields.at(-1).value||'';
+      const details=fields.slice(0,-1).map(field=>[field.name===BLANK?'':`**${field.name}**`,field.value].filter(Boolean).join('\n')).join('\n\n');
+      head.fields.push({name:BLANK,value:cut([details&&cut(details,Math.max(80,1020-summary.length)),summary].filter(Boolean).join('\n\n'),1024),inline:false});
+    }
+  }
+  if(cards.length===1) {
+    head.color=cards[0].color||head.color;
+    if(cards[0].thumbnail)head.thumbnail=cards[0].thumbnail;
+  }
+  if(items.length>9)head.fields.push({name:'────────────',value:`… et ${items.length-9} autres rendez-vous : [calendrier complet](${site.url}/events/).`,inline:false});
+  if(site.bannerUrl)head.image={url:site.bannerUrl};
+  const lastFooter=cards.at(-1)?.footer;
+  if(lastFooter)head.footer=lastFooter;
+  const embeds=[head];
   const actionable=items.filter(item=>item.payload.components?.length);
   const components=actionable.length<=5 ? actionable.map(item=>({type:1,components:item.payload.components[0].components.map(button=>({...button,
     label:cut(`${button.style===5?'Présent / S’inscrire':'Absent'}${actionable.length>1?` · ${item.name}`:''}`,80)}))}))

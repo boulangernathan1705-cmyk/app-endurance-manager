@@ -1043,7 +1043,7 @@ test('pending scheduled passes upgrade an unchanged calendar automatically and r
   const current=DB.db.prepare("SELECT * FROM discord_recap_publications WHERE event_id='week:calendar'").get();
   assert.notEqual(current.message_id,row.message_id);
   assert.ok(messages.has(current.message_id));
-  assert.match(current.content_hash,/^calendar-v2:/);
+  assert.match(current.content_hash,/^calendar-v3:/);
   assert.ok(sends(calls).some(call=>call.body.flags===4096));
   calls.length=0;
   assert.equal(await syncDueRecaps(env,1,NOW+120000,{pending:true}),0,'upgrade does not repeat');
