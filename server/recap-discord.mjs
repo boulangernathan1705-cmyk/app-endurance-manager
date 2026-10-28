@@ -87,7 +87,13 @@ const parse = value => { try { const result = JSON.parse(value); return Array.is
 export function recapError(error) {
   if (error.rights) return error.message;
   if (error.status === 429) return 'Discord limite les requêtes. Le récap réessaiera automatiquement.';
-  if (error.status === 403) return 'Dans les permissions du salon ou de la catégorie, autorise le bot à Voir le salon, Envoyer des messages, Intégrer des liens et Voir les anciens messages ; en mode par événement, ajoute Gérer les salons.';
+  if (error.status === 403) {
+    // Not every 403 is a missing permission: an admin bot gets these too.
+    const where = `(Discord ${error.code || 403}${error.path ? ` sur ${error.path.split('?')[0]}` : ''})`;
+    if (error.code === 50005) return `Discord refuse que le bot modifie un message qu’il n’a pas écrit. Clique sur Réparer le récap pour le republier. ${where}`;
+    if (error.code === 160005 || error.code === 50083) return `Un fil de course est verrouillé ou archivé sur Discord. Rouvre-le ou clique sur Réparer le récap. ${where}`;
+    return `Dans les permissions du salon ou de la catégorie, autorise le bot à Voir le salon, Envoyer des messages, Intégrer des liens et Voir les anciens messages ; en mode par événement, ajoute Gérer les salons. ${where}`;
+  }
   if (error.status === 404) {
     if (error.code === 10008 || (!error.code && /\/messages\/[^/?]+$/.test(error.path || ''))) return 'Le message de récap a été supprimé sur Discord. Clique sur Réparer le récap pour le republier dans le salon existant.';
     if (error.code === 10004) return 'Le serveur Discord est introuvable pour le bot. Vérifie le serveur lié à cette communauté et la présence du bot.';

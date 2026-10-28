@@ -1,5 +1,11 @@
 # Nouveautés d'Endurance Manager
 
+## v1.90 — 28 octobre 2026
+
+### 🛠️ Corrections
+
+- **Discord** : quand Discord refuse une action du bot, le message dit la vraie cause (message pas écrit par le bot, fil verrouillé) et donne le code Discord, au lieu de toujours parler de permissions, même quand le bot est admin.
+
 ## v1.89 — 28 octobre 2026
 
 ### 🛠️ Corrections
