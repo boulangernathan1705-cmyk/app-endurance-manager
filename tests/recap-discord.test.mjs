@@ -915,7 +915,7 @@ test('LMU and iRacing in the same channel: the banner and the week in a message 
   assert.match(week('week:head:lmu').title,/Semaine/);
   // The head: the races of each sim (never the number of pilots), and two buttons to the site.
   assert.deepEqual(week('week:head:lmu').fields.map(field=>[field.name,field.value]),[['🏎️ LMU','1 course'],['🏁 iRacing','1 course']]);
-  assert.match(week('week:head:lmu').description,/^📅 \[Toutes les endurances\]\(https:\/\/[^)]+\/\)$/);assert.deepEqual(messages.get(id('week:head:lmu')).components,[]);
+  assert.match(week('week:head:lmu').url,/^https:\/\/[^ ]+\/$/);assert.equal(week('week:head:lmu').description,undefined);assert.deepEqual(messages.get(id('week:head:lmu')).components,[]);
   assert.equal(week('week:lmu').author.name,'🏎️ LMU · 1 course cette semaine');assert.equal(week('week:iracing').author.name,'🏁 iRacing · 1 course cette semaine');
   for (const sim of ['week:lmu','week:iracing']) {assert.equal(week(sim).image,undefined);assert.equal(week(sim).title,undefined);assert.ok(week(sim).footer);}
   // Sent in this order: the banner first.

@@ -285,8 +285,8 @@ export function buildWeekHeadPayload(periodLabel,site={},scope='all',counts={}){
   const sims=scope==='all'?['lmu','iracing']:[scope];
   embed.fields=sims.map(id=>{const n=Number(counts[id])||0;return{name:`${SIM_MARKS[id]}${SCOPE_LABELS[id]}`,value:n?`${n} course${n>1?'s':''}`:'Aucune course',inline:true};});
   if(site.bannerUrl)embed.image={url:site.bannerUrl};
-  // Links in the message rather than buttons (less room); components:[] takes off the buttons of before.
-  if(siteUrl)embed.description=`📅 [Toutes les endurances](${siteUrl}${simPage})`;
+  // The title links to the endurances rather than a button (less room); components:[] takes off the buttons of before.
+  if(siteUrl)embed.url=`${siteUrl}${simPage}`;
   return{content:'',embeds:[embed],components:[],allowed_mentions:{parse:[]}};
 }
 
