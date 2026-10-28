@@ -11,7 +11,10 @@
 //     and the events go in one of them ('bot-lmu' / 'bot-iracing')
 //   voices, pit ('bot': the bot makes « Pit talk » just below pitAt, 'existing': in the category pitAt), reminders
 //   copy / pitCopy: the bot's categories / « Pit talk » take the rights of the category they sit under (private like it)
-export const CATEGORY_NAMES = {main:'Endurance Manager', lmu:'LMU', iracing:'iRacing', pit:'🎙️ Pit talk'};
+// Discord shows every name in the same size: an emoji in front makes the bot's own stand out (custom emojis are not allowed
+// in names).
+export const CATEGORY_NAMES = {main:'🏆 Endurance Manager', lmu:'🔴 LMU', iracing:'🔵 iRacing', pit:'🎙️ Pit talk'};
+export const WEEK_EMOJI = '📅・';
 const SIMS = {all:['lmu','iracing'], lmu:['lmu'], iracing:['iracing']};
 const ID = /^\d{15,22}$/;
 const bad = message => Object.assign(new Error(message), {status:400});
@@ -85,7 +88,7 @@ function weekChannel(layout, sim) {
 export function layoutPlan(layout, cats, {eventChannel = 'event-solo-de-la-semaine', calendar = true} = {}) {
   const sims = SIMS[layout.sims] || SIMS.all, filter = layout.sims === 'all' ? null : layout.sims;
   const week = [], anchors = {lmu:'', iracing:''};
-  const add = (kind, destination, channel, sim = null) => { if (destination && (calendar || !kind.startsWith('calendar'))) week.push({kind, destination, channel, sim, topic:channel}); };
+  const add = (kind, destination, channel, sim = null) => { if (destination && (calendar || !kind.startsWith('calendar'))) week.push({kind, destination, channel:channel.startsWith('endurances') ? WEEK_EMOJI + channel : channel, sim, topic:channel}); };
   if (layout.mode === 'events') {
     const groups = layout.split ? sims.map(sim => ({cat:cats[sim], sims:[sim]})) : [{cat:cats.main, sims}];
     for (const group of groups) {
