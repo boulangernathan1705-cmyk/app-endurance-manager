@@ -27,7 +27,7 @@ function driverChangeField(event){
 export function formDurationMinutes(form){
   return Number(form.elements.eventDurationHours?.value||6)*60+Number(form.elements.eventDurationMinutes?.value||0);
 }
-function parisToday(){return new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Paris',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());}
+export function parisToday(){return new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Paris',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());}
 // Common start whose time is not known yet: only its day. Everyone enters there; the real starts are
 // added later by editing the race, and each crew then picks its start.
 function commonStartField(departure){

@@ -1,4 +1,6 @@
 import {renderRallyEventForm} from './rally-form.mjs';
+import {renderStreamForm} from './stream-form.mjs';
+import {isStream} from '../../shared/stream.mjs';
 import {streamerFields, streamerData, syncStreamerFields} from './grindfest.mjs';
 import {isGrindfest} from '../../shared/grindfest.mjs';
 // Creating or editing an event of the community calendar (solo format), step by step, for every simulator.
@@ -7,7 +9,7 @@ import {isGrindfest} from '../../shared/grindfest.mjs';
 // LMU takes its circuits and categories from the catalog; on AMS2, iRacing and ACE they are typed, with the car.
 import {formSheet} from './event-form.mjs';
 import {app,state,esc,button,api,notifyRender} from './core.mjs';
-import {SIMS,simCatalog,eventCatalog,simForEvent,isRandomCircuit} from '../../shared/catalog.mjs';
+import {SIMS,EVENT_SIMS,simCatalog,eventCatalog,simForEvent,isRandomCircuit} from '../../shared/catalog.mjs';
 import {departureFields} from './event-form.mjs';
 import {refreshAfterSave} from './refresh.mjs';
 import {WEATHERS,roundFormat,roundExtras} from './solo.mjs';
@@ -65,6 +67,7 @@ const STEPS=['Événement','Horaire','Manches','Inscriptions','Récapitulatif'],
 
 export function renderSoloEventForm(event=null,{focusPassword=false}={}){
   if(event&&simForEvent(event)==='acrally')return renderRallyEventForm(event);
+  if(isStream(event))return renderStreamForm(event);
   const sim=event?simForEvent(event):'lmu',rounds=(event?.rounds?.length?event.rounds:[{circuit:event?.circuit,durationMinutes:event?.durationMinutes}]).map((round,index,list)=>list.length===1&&!round.capacity&&event?.capacity?{...round,capacity:event.capacity}:round);
   const details=event?.details||{},access=event?.access||'open',departure=event?.departures?.[0]||{time:'21:00'},first=event?(focusPassword?2:LAST):1;
   const start=departureFields(departure).replace(/<button[^>]*data-action="remove-departure"[^>]*>.*?<\/button>/,'');
@@ -73,7 +76,7 @@ export function renderSoloEventForm(event=null,{focusPassword=false}={}){
   <div class="registration-progress" aria-hidden="true" data-solo-progress>${STEPS.map((_,index)=>`<span class="${index<first?'done':''}"></span>`).join('')}</div>
   <p class="registration-step-label" data-solo-step-label>Étape ${first} sur ${LAST} · ${STEPS[first-1]}</p>
   ${step(1,`<label class="form-label">Nom de l’événement<input name="eventName" maxlength="100" value="${esc(event?.name||'')}" required></label>
-    <fieldset class="sim-options"><legend class="form-label">Simulateur</legend><div class="sim-option-row">${SIMS.map(item=>simChoice(item,sim)).join('')}</div></fieldset>${typeField(details.type)}
+    <fieldset class="sim-options"><legend class="form-label">Simulateur</legend><div class="sim-option-row">${EVENT_SIMS.map(item=>simChoice(item,sim)).join('')}</div></fieldset>${typeField(details.type)}
     <label class="form-label">Début du stream <small>(facultatif)</small><input name="eventStreamTime" type="time" value="${esc(details.streamTime||'')}"></label>`)}
   ${step(2,`<div class="solo-form-start">${start}</div>
     <div class="solo-form-row"><label class="form-label">Mot de passe du serveur <small>(facultatif)</small><input name="eventPassword" maxlength="30" value="${esc(details.password||'')}" autocomplete="off"></label></div><div data-gridfest-password-tools hidden><p class="creation-help">30 caractères maximum, sans espace. Envoyé par MP Discord aux pilotes confirmés.</p></div>`)}

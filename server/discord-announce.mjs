@@ -6,13 +6,15 @@
 import {communityById} from './community.mjs';
 import {iracingSoloSql} from './iracing-visibility.mjs';
 import {loadWeeklyDiscordSnapshot, siteOf} from './discord-weekly.mjs';
-import {buildAnnounceIntro, buildAnnounceEvent, buildAnnounceRace, parisDay} from './discord-weekly-format.mjs';
+import {buildAnnounceIntro, buildAnnounceEvent, buildAnnounceRace, buildAnnounceStream, parisDay} from './discord-weekly-format.mjs';
 import {discordRequest, botCategoryEmojis} from './recap-discord.mjs';
 import {discordAbsentButton} from './discord-interactions.mjs';
 import {parseLayout} from './discord-layout.mjs';
 import {simForEvent, tdzOnly} from '../shared/catalog.mjs';
 import {grindfestEnabled, isGrindfest, streamersOf} from '../shared/grindfest.mjs';
 import {isDevelopment} from './dev-environment.mjs';
+import {isStream, streamDetails} from '../shared/stream.mjs';
+import {streamCrew} from './stream-crew.mjs';
 
 const MINUTE = 60000;
 // Posted from 7h30 to 9h (Paris), or at once the day the announcement is turned on (from 7h30).
@@ -44,10 +46,11 @@ const today = (start, day, timestamp, pending) => Number.isFinite(Number(start?.
 // The day's races of a community, in the order of their first start today: [{item, kind:'event'|'race', startsAt}].
 export async function announceItems(env, community, timestamp) {
   const day = parisDay(timestamp), items = [];
-  const solo = (await env.DB.prepare(`SELECT id,departures,schedule_pending FROM events WHERE ${SOLO_SQL(env, community)}`).bind(community.id).all()).results || [];
+  const solo = (await env.DB.prepare(`SELECT id,sim,departures,schedule_pending FROM events WHERE ${SOLO_SQL(env, community)}`).bind(community.id).all()).results || [];
   for (const row of solo) {
     const starts = parse(row.departures, []).filter(start => today(start, day, timestamp, Boolean(row.schedule_pending)));
-    if (starts.length) items.push({item:row.id, kind:'event', startsAt:Math.min(...starts.map(start => Number(start.startsAt)))});
+    // A stream (« Annoncer un stream ») has its own card, without « Présent » nor « Absent ».
+    if (starts.length) items.push({item:row.id, kind:isStream(row) ? 'stream' : 'event', startsAt:Math.min(...starts.map(start => Number(start.startsAt)))});
   }
   // The endurances as in the week's message (official LMU ones included, iRacing ones as the community shows them).
   const snapshot = await loadWeeklyDiscordSnapshot(env, timestamp, community, 'all');
@@ -60,12 +63,13 @@ export async function announceItems(env, community, timestamp) {
 
 // An event of the calendar as announced: its rounds, its places and this community's entries for today's start.
 async function eventSnapshot(env, community, id, timestamp) {
-  const row = await env.DB.prepare(`SELECT id,name,sim,circuit,rounds,capacity,access,details,departures,schedule_pending FROM events WHERE id=? AND ${SOLO_SQL(env, community)}`)
+  const row = await env.DB.prepare(`SELECT id,name,sim,circuit,rounds,capacity,access,details,departures,schedule_pending,created_by FROM events WHERE id=? AND ${SOLO_SQL(env, community)}`)
     .bind(id, community.id).first();
   if (!row) return null;
   const day = parisDay(timestamp), start = parse(row.departures, []).find(item => Number.isFinite(Number(item?.startsAt)) && parisDay(Number(item.startsAt)) === day);
   if (!start) return null;
   const details = parse(row.details, {}) || {}, sim = simForEvent(row), tdz = tdzOnly(community, isDevelopment(env));
+  if (isStream(row)) return {id:row.id, name:row.name, startsAt:Number(start.startsAt), stream:{...streamDetails({details}), crew:await streamCrew(env, community.id, row)}};
   const entries = (await env.DB.prepare(`SELECT streamer_id,COUNT(DISTINCT COALESCE(participant_id,id)) AS entered FROM registrations
     WHERE event_id=? AND departure_id=? AND community_id=? AND COALESCE(status,'')<>'unavailable' GROUP BY streamer_id`).bind(row.id, start.id, community.id).all()).results || [];
   const entered = entries.reduce((total, item) => total + Number(item.entered || 0), 0);
@@ -93,7 +97,7 @@ async function raceSnapshot(env, community, id, timestamp) {
 // The stream times the admins gave today's events (details.streamTime), for the intro.
 async function streamTimes(env, rows) {
   const streams = [];
-  for (const row of rows.filter(item => item.kind === 'event')) {
+  for (const row of rows.filter(item => ['event','stream'].includes(item.kind))) {
     const event = await env.DB.prepare('SELECT name,details FROM events WHERE id=?').bind(row.item).first();
     const time = parse(event?.details, {})?.streamTime;
     if (time) streams.push({name:event.name, time});
@@ -104,9 +108,9 @@ async function streamTimes(env, rows) {
 export async function announcePayload(env, community, row, timestamp, counts = null, stream = '') {
   const site = {...siteOf(env, community), streamUrl:stream}, absent = discordAbsentButton(env);
   if (row.kind === 'intro') return buildAnnounceIntro(counts || {events:0, races:0}, site);
-  if (row.kind === 'event') {
+  if (row.kind === 'event' || row.kind === 'stream') {
     const event = await eventSnapshot(env, community, row.item, timestamp);
-    return event ? buildAnnounceEvent(event, site, timestamp, absent) : null;
+    return !event ? null : event.stream ? buildAnnounceStream(event, site, timestamp) : buildAnnounceEvent(event, site, timestamp, absent);
   }
   const race = await raceSnapshot(env, community, row.item, timestamp);
   return race ? buildAnnounceRace(race, site, timestamp, await botCategoryEmojis(env, timestamp), absent) : null;
@@ -133,7 +137,7 @@ export async function announceCommunity(env, community, settings, timestamp = Da
     rows = (await env.DB.prepare('SELECT * FROM discord_announcements WHERE community_id=? AND day=? ORDER BY position').bind(community.id, day).all()).results || [];
   }
   let asked = false;
-  const counts = {events:rows.filter(item => item.kind === 'event').length, races:rows.filter(item => item.kind === 'race').length,
+  const counts = {events:rows.filter(item => item.kind === 'event').length, races:rows.filter(item => item.kind === 'race').length, lives:rows.filter(item => item.kind === 'stream').length,
     streams:rows.some(item => item.kind === 'intro' && !item.message_id) ? await streamTimes(env, rows) : []};
   // In order: Discord keeps messages in the order they were sent.
   for (const row of rows.filter(item => !item.message_id)) {
@@ -155,7 +159,7 @@ export async function announceCommunity(env, community, settings, timestamp = Da
   }
   if (rows.some(item => !item.message_id)) return asked;
   // The counts of présents (and anything else changed on the site): the races checked longest ago, edited when changed.
-  const due = rows.filter(item => ['event','race'].includes(item.kind) && item.message_id !== '-' && timestamp - Number(item.checked_at || 0) >= REFRESH_EVERY)
+  const due = rows.filter(item => ['event','race','stream'].includes(item.kind) && item.message_id !== '-' && timestamp - Number(item.checked_at || 0) >= REFRESH_EVERY)
     .sort((a, b) => Number(a.checked_at) - Number(b.checked_at)).slice(0, REFRESHES);
   for (const row of due) {
     const payload = await announcePayload(env, community, row, timestamp, null, stream);

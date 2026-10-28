@@ -4,13 +4,14 @@
 import {state,esc,pilotNameTip,button,canManage,can,logo,badge,categories} from './core.mjs';
 import {SIMS,simCatalog,simForEvent} from '../../shared/catalog.mjs';
 import {isGrindfest} from '../../shared/grindfest.mjs';
+import {isStream,streamDetails,hourLabel,streamPlatform} from '../../shared/stream.mjs';
 
 export const ANY_CATEGORY = '*';
 export const isSolo = event => event?.format === 'solo';
 
 // Supplied OPEN/SAFE artwork, shared by the calendar, event and personal entries.
 export function eventAccessLogo(event,{header=false}={}) {
-  if ((!state.eventTdz&&!header) || !isSolo(event) || isGrindfest(event)) return '';
+  if ((!state.eventTdz&&!header) || !isSolo(event) || isGrindfest(event) || isStream(event)) return '';
   const sim = SIMS.find(item => item.id === simForEvent(event));
   const access = event.access === 'safe' ? 'safe' : 'open';
   return `<img class="event-access-logo" src="/images/event-access/${access}-${sim.id}.png" alt="${access.toUpperCase()} · ${esc(sim.name)}" width="300" height="300" loading="lazy" decoding="async">`;
@@ -22,11 +23,32 @@ export function simBadge(event) {
 }
 // The simulator, the event type, then OPEN or SAFE (unless the type already says it).
 export function accessBadge(event) {
+  // A stream: « Stream », then the sim of its race.
+  if (isStream(event)) { const race = SIMS.find(item => item.id === streamDetails(event).raceSim); return `<span class="event-badge-row">${simBadge(event)}${race ? simBadge({sim:race.id}) : ''}</span>`; }
   if (!state.eventTdz) return `<span class="event-badge-row">${simBadge(event)}</span>`;
   const safe = event.access === 'safe', type = event.details?.type || '';
   const typeBadge = type ? `<span class="event-type-badge">${esc(type)}</span>` : '';
   if (type.toLowerCase() === (safe ? 'safe' : 'open')) return `<span class="event-badge-row">${simBadge(event)}<span class="event-access-badge ${safe ? 'is-safe' : 'is-open'}">${esc(type)}</span></span>`;
   return `<span class="event-badge-row">${simBadge(event)}${typeBadge}<span class="event-access-badge ${safe ? 'is-safe' : 'is-open'}" title="${safe ? 'Réservé aux pilotes SAFE' : 'Ouvert à tous les pilotes connectés'}">${safe ? 'SAFE' : 'OPEN'}</span></span>`;
+}
+
+// « Annoncer un stream » (shared/stream.mjs): its times (« Stream 19h45 · Départ 20h00 »), the streamer's crew when he
+// races it, the microphone where the other events show their logo, and on its page the links to the stream and to the
+// endurances.
+export function streamTimes(event) {
+  const {streamTime, raceTime} = streamDetails(event);
+  return [streamTime && `Stream ${hourLabel(streamTime)}`, raceTime && `Départ ${hourLabel(raceTime)}`].filter(Boolean).join(' · ');
+}
+export function streamCrewLine(event) {
+  const crew = event.streamCrew;
+  return crew ? `${esc(crew.eventName)} avec l’${esc(crew.crew)}${crew.pilots.length ? ` · ${crew.pilots.map(esc).join(', ')}` : ''}` : '';
+}
+export const streamPanel = () => '<span class="stream-panel" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v4M8 22h8"/></svg></span>';
+export function streamBlock(event) {
+  const {raceSim, streamUrl} = streamDetails(event), crew = streamCrewLine(event);
+  const watch = streamUrl ? `<a class="primary-button stream-button" href="${esc(streamUrl)}" target="_blank" rel="noopener">Regarder sur ${esc(streamPlatform(streamUrl))}</a>` : '';
+  const endurance = raceSim ? `<a class="secondary-button" href="/${raceSim}/">Inscriptions endurance</a>` : '';
+  return `<section class="stream-block"><p class="stream-block-copy"><strong>🎙 ${esc(streamTimes(event))}</strong>${crew ? `<small>${crew}</small>` : ''}</p>${watch || endurance ? `<span class="stream-block-actions">${watch}${endurance}</span>` : ''}</section>`;
 }
 
 // Circuit of an event: from the catalog (LMU, older iRacing events), or as typed (AMS2, iRacing, ACE).
@@ -51,6 +73,7 @@ const infoChip = (icon, value, title) => `<span class="solo-info-chip" title="${
 // The event's details on the calendar card: per round its sessions, weather, multipliers and car, then the
 // schedule of an open session, the server password and the note.
 export function soloCardInfo(event) {
+  if (isStream(event)) { const crew = streamCrewLine(event); return crew ? `<span class="solo-card-info"><span class="solo-info-row"><span class="stream-crew">🏁 ${crew}</span></span></span>` : ''; }
   if(simForEvent(event)==='acrally'){
     const round=event.rounds?.[0]||{},details=event.details||{};
     return `<span class="solo-card-info"><span class="solo-info-row">${infoChip('car',round.car||round.category||'Voitures libres','Voitures autorisées')}${details.rallyEstimatedMinutes?infoChip('time',`Environ ${details.rallyEstimatedMinutes} min`,'Durée estimée de la soirée'):''}${details.note?infoChip('info',details.note,'Consignes'):''}</span></span>`;
@@ -137,7 +160,7 @@ export function soloPasswordBlock(event){
   return password?`<div class="solo-password-near-entry">${detailTile(detailSvg(ICONS.lock),'Mot de passe',esc(password))}</div>`:'';
 }
 export function soloHeaderChips(event){
-  if(isGrindfest(event)||simForEvent(event)==='acrally'||event.rounds?.length>1)return '';
+  if(isGrindfest(event)||isStream(event)||simForEvent(event)==='acrally'||event.rounds?.length>1)return '';
   const round=event.rounds?.[0]||{durationMinutes:event.durationMinutes},weather=WEATHERS.find(([value])=>value===round.weather);
   const chip=(label,value)=>value?`<span class="solo-session-pill">${esc(label)} · ${esc(value)}</span>`:'';
   const minutes=value=>Number(value)>0?`${Number(value)} min`:'';
@@ -149,6 +172,7 @@ export function soloHeaderChips(event){
 // Above the card's details: the circuit, or the number of rounds.
 export function soloCardMeta(event) {
   const rounds = event.rounds || [];
+  if (isStream(event)) return esc(streamTimes(event));
   if(simForEvent(event)==='acrally'){const stages=event.details?.rallyStages||rounds.map(r=>r.circuit).filter(Boolean);return stages.length>1?`${stages.length} spéciales prévues`:esc(stages[0]||'Spéciales à définir');}
   return rounds.length > 1 ? `${rounds.length} manches` : esc(eventCircuitName(event, rounds[0]?.circuit ?? event.circuit));
 }

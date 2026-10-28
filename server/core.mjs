@@ -1,4 +1,5 @@
 import {isGrindfest, streamersOf, normalizeStreamers, gridfestPasswordValid} from '../shared/grindfest.mjs';
+import {STREAM_SIM, STREAM_RACE_SIMS, streamUrl} from '../shared/stream.mjs';
 import {catalogForGame, gameForEvent, CATEGORIES, EVENT_TYPE_IDS as EVENT_TYPES, CIRCUIT_IDS as CIRCUITS, CARS, SIM_IDS, eventCatalog, simForEvent, isRandomCircuit, TDZ_EVENT_TYPES, TRACK_LIMITS, RACE_WEATHERS, RACE_SKIES, WEATHER_SLOTS} from '../shared/catalog.mjs';
 const LEGACY_CAR_ALIASES = new Map([
   ['BMW M Hybrid V8 Evo (2026)','BMW M Hybrid V8'],['Cadillac V-Series.R Evo (2026)','Cadillac V-Series.R'],['Peugeot 9X8 2023','Peugeot 9X8'],['Peugeot 9X8 2024','Peugeot 9X8'],['Toyota TR010 Hybrid (2026)','Toyota GR010 Hybrid'],['Ginetta G61-LT-P3 Evo','Ginetta G61-LT-P3'],['Ferrari 488 GTE Evo','Ferrari 488 GTE'],['Aston Martin Vantage AMR LMGT3 Evo','Aston Martin Vantage AMR LMGT3'],['BMW M4 LMGT3 Evo','BMW M4 LMGT3'],['Ferrari 296 LMGT3 Evo','Ferrari 296 LMGT3'],['Ford Mustang LMGT3 Evo','Ford Mustang LMGT3'],['Lamborghini Huracán LMGT3 Evo 2','Lamborghini Huracán LMGT3'],['McLaren 720S LMGT3 Evo','McLaren 720S LMGT3'],['Porsche 911 LMGT3 R (992)','Porsche 911 GT3 R LMGT3'],['Porsche 911 LMGT3 R (992) 2026','Porsche 911 GT3 R LMGT3']
@@ -207,7 +208,28 @@ const WEATHERS = ['random','sun','cloud','overcast','rain'];
 // An event of the calendar (solo format): a simulator, one to four rounds (circuit and duration in minutes),
 // one start, an optional number of places and an OPEN / SAFE access. LMU circuits and categories come from
 // the catalog; on the other simulators the circuit, category and car are typed.
+// « Annoncer un stream » (shared/stream.mjs): a title, a day and at least one time, the stream's or the race's.
+// Its one start is the earliest of the two times.
+const HOUR = /^([01]\d|2[0-3]):[0-5]\d$/;
+function validateStream(input) {
+  const raw = input.details && typeof input.details === 'object' ? input.details : {};
+  const time = (value, label) => { if (!value) return ''; if (!HOUR.test(value)) fail(400, `${label} invalide.`); return value; };
+  const raceSim = raw.raceSim || '';
+  if (raceSim && !STREAM_RACE_SIMS.includes(raceSim)) fail(400, 'Choisis la simu de la course : LMU ou iRacing.');
+  const streamTime = time(raw.streamTime, 'Heure du stream'), raceTime = raceSim ? time(raw.raceTime, 'Heure du départ') : '';
+  if (!streamTime && !raceTime) fail(400, raceSim ? 'Indique l’heure du stream ou celle du départ de la course.' : 'Indique l’heure du stream.');
+  const details = {};
+  if (streamTime) details.streamTime = streamTime;
+  if (raceSim) details.raceSim = raceSim;
+  if (raceTime) details.raceTime = raceTime;
+  if (raw.streamUrl) { const url = streamUrl(raw.streamUrl); if (!url) fail(400, 'Lien du stream : une chaîne Twitch, YouTube ou Kick.'); details.streamUrl = url; }
+  return {sim:STREAM_SIM, access:'open', rounds:[{circuit:'', durationMinutes:60, categories:[]}], capacity:null, categories:[], details, circuit:'', durationMinutes:60,
+    startTime:[streamTime, raceTime].filter(Boolean).sort()[0]};
+}
 function validateSoloRace(input, existing) {
+  const stream = existing ? existing.sim === STREAM_SIM : input.sim === STREAM_SIM;
+  if (stream !== (input.sim === STREAM_SIM)) fail(400, 'Un stream reste un stream : crée plutôt un nouvel événement.');
+  if (stream) return validateStream(input);
   const access = input.access == null ? (existing?.access || 'open') : input.access;
   if (!SOLO_ACCESS.includes(access)) fail(400, 'Choisis l’accès OPEN ou SAFE.');
   const rounds = input.rounds;
@@ -352,6 +374,8 @@ function validateEvent(input, existing = null, {officialImport=false}={}) {
   if (!solo && circuit && Array.isArray(categoriesInput) && categoriesInput.some(category=>!catalogForGame(gameForEvent({circuit})).categories[category])) fail(400, 'Choisis une catégorie de ce simulateur.');
   if (!solo && (!Array.isArray(categoriesInput) || !categoriesInput.length || categoriesInput.some(c => !CATEGORIES.includes(c)))) fail(400, 'Choisis au moins une catégorie autorisée.');
   if (!Array.isArray(input.departures) || !input.departures.length || input.departures.length > 30) fail(400, 'Ajoute entre 1 et 30 départs.');
+  // A stream starts at the earliest of its times.
+  if (solo?.startTime) input = {...input, departures:input.departures.map(item => ({...item, time:solo.startTime, tbd:false}))};
   const importedSolo=solo?.sim==='iracing'&&(officialImport||(existing?.community_id==='official'&&existing?.created_by==='system:iracing'));
   if (solo && !importedSolo && input.departures.length !== 1) fail(400, 'Un événement a un seul départ.');
   const known = existing ? JSON.parse(existing.departures) : [];

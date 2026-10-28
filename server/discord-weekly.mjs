@@ -5,6 +5,8 @@ import {simForEvent} from '../shared/catalog.mjs';
 import {raceFinishAt} from '../shared/duration.mjs';
 import {grindfestEnabled} from '../shared/grindfest.mjs';
 import {isDevelopment} from './dev-environment.mjs';
+import {isStream, streamDetails} from '../shared/stream.mjs';
+import {streamCrew} from './stream-crew.mjs';
 import {syncBotRecaps, botRecapSettings} from './recap-discord.mjs';
 
 // All publications are now managed by the bot; historical webhook rows are inert.
@@ -198,11 +200,13 @@ export async function loadWeeklyDiscordSnapshot(env, timestamp, community, scope
 // The calendar's events (EVENT SOLO / EVENT TDZ) of the week, with their places taken by this community's pilots.
 // sim: 'iracing' for the iRacing events only, 'lmu' for all the others (null: all).
 export async function loadCalendarSnapshot(env, timestamp, community, sim = null) {
-  const rows = (await env.DB.prepare(`SELECT id,name,sim,circuit,rounds,capacity,access,departures,schedule_pending FROM events
+  const rows = (await env.DB.prepare(`SELECT id,name,sim,circuit,rounds,capacity,access,departures,schedule_pending,details,created_by FROM events
     WHERE (community_id=? OR community_id='official') AND format='solo' AND ${iracingSoloSql(env,community)}
     ${grindfestEnabled(community, isDevelopment(env)) ? '' : "AND COALESCE(json_extract(details,'$.type'),'') NOT IN ('Gridfest','Grindfest')"}
     ORDER BY created_at,id`).bind(community.id).all()).results || [];
-  const starts = rows.filter(row => !sim || (simForEvent(row) === 'iracing') === (sim === 'iracing')).flatMap(row => parseJson(row.departures, []).filter(start => Number.isFinite(Number(start?.startsAt)))
+  // A stream goes with the sim of its race.
+  const simOf = row => isStream(row) ? streamDetails({details:parseJson(row.details, {})}).raceSim || 'stream' : simForEvent(row);
+  const starts = rows.filter(row => !sim || (simOf(row) === 'iracing') === (sim === 'iracing')).flatMap(row => parseJson(row.departures, []).filter(start => Number.isFinite(Number(start?.startsAt)))
     .map(start => ({row, start, startsAt:Number(start.startsAt)})));
   const currentWeek = parisWeek(timestamp);
   let week = currentWeek, selected = starts.filter(item => item.startsAt > timestamp && isInParisWeek(item.startsAt, week));
@@ -219,11 +223,14 @@ export async function loadCalendarSnapshot(env, timestamp, community, sim = null
       .bind(...ids, community.id).all()).results || [];
     for (const row of result) counts.set(`${row.event_id}:${row.departure_id}`, Number(row.entered) || 0);
   }
+  const crews = new Map();
+  for (const {row} of selected) if (isStream(row) && !crews.has(row.id)) crews.set(row.id, await streamCrew(env, community.id, row));
   return {periodKey:week.key, periodLabel:week.label, events:selected.map(({row, start, startsAt}) => {
     const rounds = parseJson(row.rounds, []);
     return {id:row.id, name:row.name, sim:simForEvent(row), circuits:rounds.length ? rounds.map(round => round?.circuit) : [row.circuit],
       startsAt, timePending:Boolean(row.schedule_pending) || start.tbd === true, capacity:row.capacity == null ? null : Number(row.capacity),
-      entered:counts.get(`${row.id}:${start.id}`) || 0, access:row.access || ''};
+      entered:counts.get(`${row.id}:${start.id}`) || 0, access:row.access || '',
+      ...(isStream(row) ? {stream:{...streamDetails({details:parseJson(row.details, {})}), crew:crews.get(row.id) || null}} : {})};
   })};
 }
 
