@@ -4,7 +4,7 @@ import {DatabaseSync} from 'node:sqlite';
 import {readFileSync,readdirSync} from 'node:fs';
 import worker from '../server/worker.mjs';
 import {announceCommunity} from '../server/discord-announce.mjs';
-import {buildAnnounceEvent,buildAnnounceRace,eventHook,ANNOUNCE_HOOKS} from '../server/discord-weekly-format.mjs';
+import {buildAnnounceEvent,buildAnnounceIntro,buildAnnounceRace,eventHook,ANNOUNCE_HOOKS} from '../server/discord-weekly-format.mjs';
 import {layoutInput} from '../server/discord-layout.mjs';
 import {linkTestServer,DEV_COMMUNITY,GUILD} from './fixtures/discord-server.mjs';
 
@@ -134,4 +134,21 @@ test('the setting keeps the announcement channel, and refuses anything else',()=
   assert.equal(layoutInput({mode:'events',sims:'all',under:'top',announce:ANNOUNCES}).announce,ANNOUNCES);
   assert.equal(layoutInput({mode:'events',sims:'all',under:'top',announce:''}).announce,undefined);
   assert.throws(()=>layoutInput({mode:'events',sims:'all',under:'top',announce:'bot'}),/annonce du jour/);
+});
+
+test('the community\'s stream: a « Stream » button on every message, and the Twitch of each Gridfest streamer',()=>{
+  const site={url:'https://tdz.site.example',streamUrl:'https://twitch.tv/tdz'};
+  const stream=payload=>payload.components?.[0]?.components.find(button=>button.label==='Stream')?.url;
+  const event=buildAnnounceEvent({id:EVENT,name:'Gridfest',sim:'lmu',type:'Gridfest',access:'open',tdz:true,startsAt:MORNING+12*HOUR,rounds:[],capacity:null,entered:1,
+    streamers:[{name:'Zed',twitchUrl:'https://twitch.tv/zed',capacity:5,entered:1},{name:'Ana',twitchUrl:'',capacity:5,entered:0}]},site);
+  assert.equal(stream(event),'https://twitch.tv/tdz');
+  assert.match(event.embeds[0].description,/🎙️ \[Zed\]\(https:\/\/twitch\.tv\/zed\)/);
+  assert.match(event.embeds[0].description,/🎙️ Ana ·/);
+  assert.equal(stream(buildAnnounceIntro({events:1,races:0},site)),'https://twitch.tv/tdz');
+  assert.equal(buildAnnounceIntro({events:1,races:0},{url:site.url}).components,undefined);
+  const race=buildAnnounceRace({id:RACE,name:'4h du Mans',circuit:'le-mans',official:true,durationMinutes:240,departures:[]},site);
+  assert.equal(stream(race),'https://twitch.tv/tdz');
+  assert.equal(layoutInput({mode:'events',sims:'all',under:'top',announce:ANNOUNCES,stream:' https://twitch.tv/tdz '}).stream,'https://twitch.tv/tdz');
+  assert.equal(layoutInput({mode:'events',sims:'all',under:'top',announce:'',stream:'https://twitch.tv/tdz'}).stream,undefined);
+  assert.throws(()=>layoutInput({mode:'events',sims:'all',under:'top',announce:ANNOUNCES,stream:'twitch.tv/tdz'}),/stream/);
 });
