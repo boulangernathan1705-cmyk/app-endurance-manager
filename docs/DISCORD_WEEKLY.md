@@ -103,7 +103,7 @@ Dans Administration → Modules → Récap, **Réparer le récap** vérifie les 
 
 Tous les messages du bot sont des cartes Discord. Dans `# endurances-de-la-semaine` et le calendrier, des liens plutôt que des boutons (moins de place) ; les boutons restent dans les fils (Présent / Absent) et les vocaux :
 - **En-tête de la semaine** : seulement le titre « Semaine du … au … » (lien vers les endurances) et la bannière.
-- **Endurances de la semaine** (une par simu) : une case par course dans l’ordre des départs, le jour et l’heure en titre, puis le lien du fil, les départs, les équipages (ou inscrits) et la météo ; le nom de la simu en haut est le lien vers ses endurances.
+- **Endurances de la semaine** (une par simu) : une case par course dans l’ordre des départs, le jour et l’heure en titre, puis le lien du fil, les départs et la météo (les équipages sont dans le fil) ; le nom de la simu en haut est le lien vers ses endurances.
 - **Calendrier** : une case par event (jour et heure, nom, simu, circuits, places, OPEN/SAFE) ; le titre est le lien vers tous les events.
 - **Vocal d’équipage** : la carte de l’équipage, les rappels 24 h (départ, pilotes, météo) et 1 h (court, pour le téléphone), et la fin de course (pilotes, fermeture du vocal), tous silencieux.
 - **Gridfest** : le mot de passe en bloc de code, facile à copier.

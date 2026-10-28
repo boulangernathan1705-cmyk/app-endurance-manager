@@ -696,7 +696,7 @@ test('« un fil par course »: the bot makes « Endurance Manager » under the c
   const index=[...messages.values()].find(item=>item.channel_id===week.id&&item.embeds[0].author?.name.includes('LMU'));
   assert.equal(index.embeds.length,1);assert.match(index.embeds[0].author.name,/^🏎️ LMU · 1 course cette semaine$/);
   assert.match(index.embeds[0].fields[0].name,/^🟢 \S+ \d+ \S+ \d+:\d\d$/);assert.doesNotMatch(index.embeds[0].fields[0].name,/Spa/);
-  assert.match(index.embeds[0].fields[0].value,new RegExp(`^<#${threads.find(thread=>thread.name.includes('Spa')).id}> · personne pour l’instant$`));
+  assert.match(index.embeds[0].fields[0].value,new RegExp(`^<#${threads.find(thread=>thread.name.includes('Spa')).id}>$`));
   assert.match(index.embeds[0].author.url,/\/lmu\/$/);assert.deepEqual(index.components,[],'a link, no button');
 });
 

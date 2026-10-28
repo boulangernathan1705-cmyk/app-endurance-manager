@@ -239,14 +239,11 @@ export function buildWeeklyDiscordPayload(snapshot,site={},updatedAt=Date.now(),
   }
   if(threads){
     // One box per race, in the order of the starts: its day and time on top (Paris time), then the link to its thread (or
-    // its page until the thread is there), its starts, its entries and its weather.
+    // its page until the thread is there), its starts and its weather. Its entries are a click away, in the thread.
     const races=[...groupByRace(current).map(group=>[group,true]),...groupByRace(future).map(group=>[group,false])];
     const box=([group,live])=>{const first=group[0],thread=threads[first.eventId],url=raceUrl(siteUrl,first),name=clean(eventTitleAndNote(first.eventName).title);
-      const crews=group.reduce((total,departure)=>total+departure.crews.length,0);
-      const pilots=new Set(group.flatMap(departure=>(departure.registrations||[]).map(item=>item.participantId))).size;
       const when=`${cap(recapDay.format(first.startsAt))}${first.timePending?' · horaire à confirmer':` ${recapTime.format(first.startsAt)}`}`;
-      const entries=crews?`${crews} équipage${crews>1?'s':''}`:pilots?`${pilots} inscrit${pilots>1?'s':''}`:'personne pour l’instant';
-      return{name:cut(`${live?'🔴 En cours':'🟢'} ${when}`,256),value:cut([thread?`<#${thread}>`:url?`🏁 [${name}](${url})`:`🏁 ${name}`,group.length>1&&`${group.length} départs`,entries,WEATHER[first.details?.weather]].filter(Boolean).join(' · '),1024),inline:false};};
+      return{name:cut(`${live?'🔴 En cours':'🟢'} ${when}`,256),value:cut([thread?`<#${thread}>`:url?`🏁 [${name}](${url})`:`🏁 ${name}`,group.length>1&&`${group.length} départs`,WEATHER[first.details?.weather]].filter(Boolean).join(' · '),1024),inline:false};};
     const fields=races.slice(0,races.length>25?24:25).map(box);
     if(races.length>25)fields.push({name:BLANK,value:`… et ${races.length-24} autres courses sur le site.`,inline:false});
     Object.assign(header,{color:SIM_COLORS[scope]||header.color,author:{name:`${SIM_MARKS[scope]||'🏁'}${sim} · ${races.length} course${races.length>1?'s':''} cette semaine`},fields,footer:footer(updatedAt)});
