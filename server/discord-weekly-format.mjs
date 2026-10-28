@@ -208,9 +208,9 @@ function footer(updatedAt){return{text:`Endurance Manager · mise à jour à ${u
 // `weekly`: the week's message of one sim (« 📝 Endurances LMU · semaine du … »), not a race's channel.
 // `alone`: a race's thread, its block only (the week is already in the channel's message).
 // `threads`: « un fil par course », the week's message lists the races only, each a link to its thread ({eventId: thread id}).
-// `part`: with threads, this sim's message among those of the same channel ('first', 'middle', 'last'): the title and its
-// link on the first only, the banner and the time of update on the last only.
-export function buildWeeklyDiscordPayload(snapshot,site={},updatedAt=Date.now(),scope='lmu',emojis={},{weekly=false,alone=false,threads=null,part=null}={}){
+// With threads, the banner, the week and the link to the site are in a message of their own above (buildWeekHeadPayload):
+// each sim's message is its name, its races and the time of update.
+export function buildWeeklyDiscordPayload(snapshot,site={},updatedAt=Date.now(),scope='lmu',emojis={},{weekly=false,alone=false,threads=null}={}){
   const siteUrl=typeof site==='string'?(()=>{try{return new URL(site).origin;}catch{return '';}})():String(site.url||'');
   const sim=SCOPE_LABELS[scope]??' LMU',simPage=scope==='iracing'?'/iracing/':scope==='all'?'/':'/lmu/';
   const current=Array.isArray(snapshot.currentDepartures)?snapshot.currentDepartures:[],future=Array.isArray(snapshot.futureDepartures)?snapshot.futureDepartures:[];
@@ -218,7 +218,9 @@ export function buildWeeklyDiscordPayload(snapshot,site={},updatedAt=Date.now(),
   const header={title:cut(weekly?`📝 Endurances${sim} · ${period}`:`📝 ${cap(period)}`,256),color:0x52d3d8};
   if(siteUrl)header.url=`${siteUrl}${simPage}`;
   if(site.name){header.author={name:cut(site.name,256)};if(siteUrl)header.author.url=`${siteUrl}/`;if(site.logoUrl)header.author.icon_url=site.logoUrl;}
+  if(threads){delete header.url;delete header.author;header.title=`Endurances${sim}`;}
   if(!current.length&&!future.length){
+    if(threads){header.description=`Aucune endurance${sim} cette semaine.`;header.color=0x6b7280;header.footer=footer(updatedAt);return{content:'',embeds:[header],allowed_mentions:{parse:[]}};}
     header.description=`Aucune course avec un équipage engagé n’est en cours et aucun prochain départ${sim} n’est programmé.`;
     header.title=`Aucune endurance${sim} à préparer`;header.color=0x6b7280;header.footer=footer(updatedAt);
     return{content:'',embeds:[header],allowed_mentions:{parse:[]}};
@@ -229,8 +231,7 @@ export function buildWeeklyDiscordPayload(snapshot,site={},updatedAt=Date.now(),
       const more=group.length>1?` · ${group.length} départs`:'';
       return `${thread?`<#${thread}>`:url?`🏁 [${name}](${url})`:`🏁 ${name}`} — ${departureTitle(first)}${more}`;};
     header.description=cut([...groupByRace(current),...groupByRace(future)].map(line).join('\n'),4096);
-    if(part==='middle'||part==='last'){delete header.title;delete header.url;delete header.author;}
-    if(part!=='first'&&part!=='middle'){if(site.bannerUrl)header.image={url:site.bannerUrl};header.footer=footer(updatedAt);}
+    header.footer=footer(updatedAt);
     return{content:'',embeds:[header],allowed_mentions:{parse:[]}};
   }
   const build=compact=>{
@@ -249,6 +250,16 @@ export function buildWeeklyDiscordPayload(snapshot,site={},updatedAt=Date.now(),
   if(site.bannerUrl)last.image={url:site.bannerUrl};
   last.footer=footer(updatedAt);
   return{content:'',embeds:fitDiscordEmbeds(embeds.slice(0,10)),allowed_mentions:{parse:[]}};
+}
+
+// Above the sims' messages of a channel: the community, the week (a link to the site) and the banner.
+export function buildWeekHeadPayload(periodLabel,site={},scope='all'){
+  const siteUrl=String(site.url||''),simPage=scope==='iracing'?'/iracing/':scope==='all'?'/':'/lmu/';
+  const embed={title:cut(`📝 Endurances · ${periodLabel||'semaine à venir'}`,256),color:0x52d3d8};
+  if(siteUrl)embed.url=`${siteUrl}${simPage}`;
+  if(site.name){embed.author={name:cut(site.name,256)};if(siteUrl)embed.author.url=`${siteUrl}/`;if(site.logoUrl)embed.author.icon_url=site.logoUrl;}
+  if(site.bannerUrl)embed.image={url:site.bannerUrl};
+  return{content:'',embeds:[embed],allowed_mentions:{parse:[]}};
 }
 
 const SIM_SHORT=Object.fromEntries(SIMS.map(sim=>[sim.id,sim.short]));

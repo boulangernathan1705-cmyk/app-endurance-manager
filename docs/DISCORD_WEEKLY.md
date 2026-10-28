@@ -36,6 +36,7 @@ Le bot doit pouvoir **Voir le salon**, **Envoyer des messages**, **Intégrer des
 
 - Chaque publication conserve son identifiant de message et modifie ce message sur place. Une inscription, un changement d’équipage ou une absence ne crée pas une nouvelle publication et ne provoque pas de notification répétée.
 - Les mentions sont désactivées ; le premier message du bot est également envoyé avec les notifications supprimées.
+- Dans # endurances-de-la-semaine, un premier message porte la bannière, la semaine et le lien vers le site ; dessous, un message par simu au même format (nom de la simu, courses, heure de mise à jour). Un salon fait avant ce message reçoit à nouveau ses messages de simu, sous la bannière.
 - Tous les départs d’une même endurance sont regroupés dans son salon. La clé de suivi utilise la communauté et l’identité de l’événement, jamais son nom, son équipage ou un horaire de départ.
 - Le nom du salon est dérivé du nom de l’endurance, avec un suffixe stable. Les événements homonymes et les collisions ne mélangent pas leurs données.
 - Les nouveaux événements éligibles obtiennent automatiquement leur salon. Le bot traite au plus deux événements par synchronisation pour rester dans son budget de requêtes ; les autres passent aux synchronisations suivantes.
