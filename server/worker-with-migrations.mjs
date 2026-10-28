@@ -76,7 +76,16 @@ export async function flushDiscord(env, limit = 3) {
     await env.DB.prepare('DELETE FROM discord_pending WHERE community_id=?').bind(row.community_id).run();
     const community = await communityById(env, row.community_id);
     if (!community) continue;
-    await runWeeklySync(env, community, row.event_id).catch(error => console.error('Discord weekly sync failed', error instanceof Error ? error.message : 'unknown'));
+    const result = await runWeeklySync(env, community, row.event_id).catch(error => {
+      console.error('Discord weekly sync failed', error instanceof Error ? error.message : 'unknown');
+      return {ok:false};
+    });
+    // A failed or locked pass must not lose the update. A concurrent new change wins;
+    // otherwise retry at the back of the queue so other communities can still advance.
+    if (!result?.ok || result.queued || result.partial || result.more) {
+      await env.DB.prepare('INSERT INTO discord_pending(community_id,event_id,queued_at) VALUES(?,?,?) ON CONFLICT(community_id) DO NOTHING')
+        .bind(row.community_id,row.event_id,Date.now()).run();
+    }
     // The voices of its crews on Discord follow (a new pilot, another car…).
     if (community.modules?.crewChannels === true) await syncCrewDiscord(env, Date.now(), {community, requests:6})
       .catch(error => console.error('Crew Discord sync failed', error instanceof Error ? error.message : 'unknown'));
