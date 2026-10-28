@@ -28,7 +28,7 @@ async function digest(value) {
   return [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify(value))))].map(byte => byte.toString(16).padStart(2,'0')).join('');
 }
 // The update time in the footer changes on every pass: not part of what is compared.
-const contentHash = payload => digest({...payload, embeds:(payload.embeds || []).map(({footer, ...embed}) => embed)});
+const contentHash = async payload => 'single-embed-v1:' + await digest({...payload, embeds:(payload.embeds || []).map(({footer, ...embed}) => embed)});
 
 // The channel chosen for the announcement, or '' (layout.announce).
 export const announceChannel = settings => settings?.enabled === 0 ? '' : String(parseLayout(settings?.layout)?.announce || '');
@@ -137,7 +137,7 @@ export async function announceCommunity(env, community, settings, timestamp = Da
   const intro=rows.find(row=>row.kind==='intro');
   if(!intro)return false;
   const legacy=rows.filter(row=>row.kind!=='intro' && row.message_id && row.message_id!=='-' && row.message_id!==intro.message_id);
-  const due=!intro.message_id || legacy.length || timestamp-Number(intro.checked_at||0)>=REFRESH_EVERY;
+  const due=!intro.message_id || !intro.content_hash?.startsWith('single-embed-v1:') || legacy.length || timestamp-Number(intro.checked_at||0)>=REFRESH_EVERY;
   if(!due)return false;
   const counts={events:rows.filter(row=>row.kind==='event').length,races:rows.filter(row=>row.kind==='race').length,
     lives:rows.filter(row=>row.kind==='stream').length,streams:await streamTimes(env,rows)};
