@@ -51,7 +51,8 @@ test('simulator spaces remember the choice and the logo leads to the chosen simu
   const routes = prod.assets.run_worker_first;
   assert.ok(!routes.includes('/*'), 'unknown addresses must not wake the Worker');
   assert.equal(prod.assets.not_found_handling, '404-page');
-  for (const route of ['/', '/api/*', '/telemetry/*', '/manifest.webmanifest', '/app-icon.png', '/lmu*', '/iracing*', '/events*'])
+  // /discord/*: the clicks on the « Absent » button of the races' threads (server/discord-interactions.mjs).
+  for (const route of ['/', '/api/*', '/telemetry/*', '/discord/*', '/manifest.webmanifest', '/app-icon.png', '/lmu*', '/iracing*', '/events*'])
     assert.ok(routes.includes(route), route);
   for (const page of ['members', 'help', 'about', 'legal', 'privacy', 'changelog', 'circuit-credits', 'demande-communaute', 'diagnostics', 'fiches-combo', 'mur-des-stands', 'mur'])
     assert.ok(routes.some(route => route.endsWith('*') && `/${page}`.startsWith(route.slice(0, -1))), page);
