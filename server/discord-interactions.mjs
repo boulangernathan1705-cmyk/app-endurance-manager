@@ -1,4 +1,5 @@
-// The buttons of the races' threads on Discord (server/discord-weekly-format.mjs): « ❌ Absent » marks the pilot absent
+// The buttons of the races' threads and of the morning announcement on Discord (server/discord-weekly-format.mjs,
+// server/discord-announce.mjs): « ❌ Absent » marks the pilot absent
 // on the site, as the site's own « Absent » button (/api/events/:id/absence), « Annuler » takes it back.
 // Discord sends each click here (the « Interactions Endpoint URL » of the application, Developer Portal), signed with
 // the application's key (DISCORD_PUBLIC_KEY): an unsigned or wrongly signed request is refused. Only the one who
@@ -6,6 +7,8 @@
 import {communityById, communityUrl} from './community.mjs';
 import {memberPermissions} from './access.mjs';
 import {now} from './core.mjs';
+import {tdzOnly} from '../shared/catalog.mjs';
+import {isDevelopment} from './dev-environment.mjs';
 
 const PING = 1, COMPONENT = 3;
 const REPLY = 4, UPDATE = 7, EPHEMERAL = 64;
@@ -44,11 +47,12 @@ export async function discordInteraction(request, env) {
   const user = interaction.member?.user;
   if (!['absent', 'undo'].includes(action) || !/^[a-f0-9-]{36}$/.test(eventId || '') || !user?.id || !interaction.guild_id) return reply('Action inconnue.');
 
-  // The race's thread says which community it belongs to (the same race can have a thread on several servers).
+  // The race's thread or the day's announcement says which community it belongs to (the same race can be on several servers).
   const publication = await env.DB.prepare('SELECT community_id FROM discord_recap_publications WHERE event_id=? AND guild_id=? AND closed_at IS NULL LIMIT 1')
-    .bind(eventId, interaction.guild_id).first();
+    .bind(eventId, interaction.guild_id).first()
+    || await env.DB.prepare('SELECT community_id FROM discord_announcements WHERE item=? AND guild_id=? ORDER BY day DESC LIMIT 1').bind(eventId, interaction.guild_id).first();
   const community = publication && await communityById(env, publication.community_id);
-  const event = community && await env.DB.prepare('SELECT id,name,circuit,departures,format FROM events WHERE id=?').bind(eventId).first();
+  const event = community && await env.DB.prepare('SELECT id,name,circuit,departures,format,access FROM events WHERE id=?').bind(eventId).first();
   if (!event) return reply('Cette course n’est plus sur le site.');
   let site = '';
   try { site = communityUrl(env, community); } catch {}
@@ -64,7 +68,10 @@ export async function discordInteraction(request, env) {
   const member = interaction.member;
   const admin = (BigInt(member.permissions || '0') & ADMINISTRATOR) === ADMINISTRATOR;
   const permissions = await memberPermissions(env, community, {discord_admin:admin ? 1 : 0, discord_roles:JSON.stringify((member.roles || []).map(String))});
-  if (!permissions.has('endurance')) return reply('Tu n’as pas l’accès aux endurances sur le site de ce serveur.', linkRow('Ouvrir le site', site));
+  // An event of EVENT TDZ: OPEN or SAFE, as on the site.
+  const tdzEvent = event.format === 'solo' && tdzOnly(community, isDevelopment(env));
+  if (tdzEvent ? !permissions.has('solo_open') && !permissions.has('solo_safe') : !permissions.has('endurance'))
+    return reply(`Tu n’as pas l’accès aux ${event.format === 'solo' ? 'events' : 'endurances'} sur le site de ce serveur.`, linkRow('Ouvrir le site', site));
   if (await env.DB.prepare("SELECT 1 FROM registrations WHERE event_id=? AND user_id=? AND community_id=? AND COALESCE(status,'')!='unavailable' LIMIT 1").bind(event.id, user.id, community.id).first())
     return reply('Tu es inscrit à cette course : retire d’abord ton inscription sur le site.', linkRow('Ouvrir la course', page));
   // A pilot who never came to the site gets his account, named as on Discord (his server nickname shows on the site).

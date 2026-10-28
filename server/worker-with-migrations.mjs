@@ -9,6 +9,7 @@ import {refreshMemberships} from './access.mjs';
 import {purgeNotifications} from './notifications.mjs';
 import {cleanupEventRecaps,addThreadMembers} from './recap-discord.mjs';
 import {syncCrewDiscord, cleanupOrphanCrewDiscord} from './crew-discord.mjs';
+import {syncAnnouncements} from './discord-announce.mjs';
 import {allCommunities, currentCommunity, communityById, communitySlug, appearanceOf} from './community.mjs';
 import {isDevelopment,devRobots,markDevelopmentResponse} from './dev-environment.mjs';
 import {isCommunityPage, freshPageRequest, withCommunityLook} from './community-look.mjs';
@@ -149,7 +150,7 @@ export default {
   async scheduled(controller, env, ctx) {
     if (!env?.DB) return;
     const at = new Date(controller?.scheduledTime || Date.now());
-    // Every 2 minutes, one Discord task (a run may make 50 requests and 50 calls to the database): the changes on the
+    // Every 2 minutes, one Discord task (a run may make 50 requests and 50 calls to the database): the day's announcement, the changes on the
     // site, else a setting still being put in place (the first one, or Monday's new week, takes several passes), else
     // the pilots added to the races' threads.
     if (controller?.cron === '*/2 * * * *') {
@@ -159,7 +160,8 @@ export default {
       const tasks = [() => syncDueRecaps(env, 1, at.getTime(), {pending:true, then:voices}), () => addThreadMembers(env, at.getTime(), 25)];
       if (Math.floor(at.getUTCMinutes() / 2) % 2) tasks.reverse();
       if (env.DISCORD_BOT_TOKEN) ctx.waitUntil((async () => {
-        for (const task of [() => flushDiscord(env, 1), ...tasks]) if (await task()) return;
+        // The morning announcement first (7h30), then the changes on the site.
+        for (const task of [() => syncAnnouncements(env, at.getTime()), () => flushDiscord(env, 1), ...tasks]) if (await task()) return;
       })().catch(error => console.error('Discord pass failed', error instanceof Error ? error.message : 'unknown')));
       return;
     }

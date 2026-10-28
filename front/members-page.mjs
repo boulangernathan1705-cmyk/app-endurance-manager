@@ -157,9 +157,10 @@ function discordAnswers(setup, settings) {
     voices:settings.modules.crewChannels === true, pit:crews.voiceCategoryId ? 'existing' : 'bot', pitAt:crews.voiceCategoryId || 'top', reminders:settings.modules.raceReminders === true};
 }
 // The server as on Discord: the channels without category, then each category followed by its text channels.
-function discordPlaces(list) {
+// types: the channels shown (text ones; with 5, the announcement ones too).
+function discordPlaces(list, types = [0]) {
   const byPosition = (a, b) => (a.position || 0) - (b.position || 0);
-  const texts = list.filter(item => item.type === 0).sort(byPosition);
+  const texts = list.filter(item => types.includes(item.type)).sort(byPosition);
   return [...texts.filter(item => !item.parentId), ...list.filter(item => item.type === 4).sort(byPosition)
     .flatMap(category => [category, ...texts.filter(item => item.parentId === category.id)])];
 }
@@ -197,7 +198,7 @@ function discordRead(form) {
   if (radio('copy')) answers.copy = radio('copy') === 'private';
   if (radio('pitCopy')) answers.pitCopy = radio('pitCopy') === 'private';
   for (const name of ['showWeek','showEvents','reminders']) if (field(name)) answers[name] = field(name).checked;
-  for (const name of ['under','events','pitAt']) if (field(name)) answers[name] = field(name).value;
+  for (const name of ['under','events','pitAt','announce']) if (field(name)) answers[name] = field(name).value;
   answers.week ||= {};
   for (const key of ['all','lmu','iracing']) if (field(`week-${key}`)) answers.week[key] = field(`week-${key}`).value;
   return answers;
@@ -275,6 +276,12 @@ function discordQuestions(form, answers) {
     ${answers.voices && !race && answers.pit === 'existing' ? '<p class="members-help">Si cette catégorie est privée, ajoute sur Discord une exception pour le bot (le rôle « Endurance Manager ») : les vocaux qu’il y crée restent privés comme elle.</p>' : ''}
     <p class="members-help">${!answers.voices ? 'Pas de vocal : les équipages s’organisent ailleurs.' : race ? 'Juste sous les fils, nommés « 🏎️ LMU · 6h de Spa · Équipage A », LMU puis iRacing, par date. Supprimés 2 h après la course.' : 'Nommés « 🏎️ LMU · 6h de Spa · Équipage A », LMU puis iRacing, par date. Supprimés 2 h après la course.'}</p>
     <label class="discord-check"><input type="checkbox" name="reminders" ${answers.reminders ? 'checked' : ''}><span><strong>Rappels avant le départ</strong><small>${answers.voices ? '24 h avant dans la cloche du site, puis 24 h et 1 h avant dans le chat du vocal.' : '24 h avant dans la cloche du site.'}</small></span></label>`]);
+  // The morning announcement: written in a text or announcement channel of the server, with @everyone.
+  const channels = discordPlaces(list || [], [0,5]).filter(item => item.type !== 4), announce = answers.announce || '';
+  const chosen = channels.find(item => item.id === announce);
+  questions.push(['Annoncer les courses du jour ?', row('📣 Annonce du jour', 'Chaque matin à 7h30, avec @everyone : les events et endurances du jour, avec Présent et Absent.',
+    `<select name="announce"><option value="" ${!announce ? 'selected' : ''}>Ne pas annoncer</option>${channels.map(item => `<option value="${esc(item.id)}" ${item.id === announce ? 'selected' : ''}>${item.parentId ? '   ' : ''}# ${esc(item.name)}${item.announceReady === false ? ' · le bot n’a pas ses droits' : ''}</option>`).join('')}${announce && !chosen ? `<option value="${esc(announce)}" selected>Choix enregistré</option>` : ''}</select>`,
+    chosen?.announceReady === false ? `<p class="setup-note setup-error discord-rights">Sur Discord : clic droit sur « ${esc(chosen.name)} » › Modifier le salon › Permissions › « + » › Endurance Manager, puis coche ${esc((chosen.announceMissing || []).join(', '))}. Reviens ensuite sur « Actualiser les salons ».</p>` : '')]);
   return questions;
 }
 const discordEventChannel = form => form.dataset.tdz === 'true' ? '🗓️・calendrier' : 'event-solo-de-la-semaine';

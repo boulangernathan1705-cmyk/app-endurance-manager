@@ -14,7 +14,9 @@ const API = 'https://discord.com/api/v10', DAY = 86400000;
 const RECAP_FORMAT = 12;
 const MAX_CHANNELS = 450;
 const RACE_INFO_CHANNEL = 'infos-de-la-course'; // Discord writes text channel names in lowercase with dashes
-const VIEW = 1024n, SEND = 2048n, HISTORY = 65536n, EMBED = 16384n, MANAGE = 16n, ADMIN = 8n;
+const VIEW = 1024n, SEND = 2048n, HISTORY = 65536n, EMBED = 16384n, MANAGE = 16n, ADMIN = 8n, EVERYONE = 131072n;
+// The morning announcement: written in the channel, with @everyone.
+const ANNOUNCE_REQUIRED = VIEW | SEND | EMBED | EVERYONE;
 const REQUIRED = VIEW | SEND | HISTORY | EMBED;
 // Written in a channel of the admins: the races' threads are opened there too.
 const INSIDE_REQUIRED = REQUIRED | (1n << 35n) | (1n << 38n);
@@ -124,6 +126,8 @@ async function discord(env, method, path, body, budget = {left:12}) {
   if (!response.ok) throw Object.assign(new Error('Discord indisponible'), {status:response.status, code:data?.code, path});
   return data;
 }
+// The same requests for the morning announcement (server/discord-announce.mjs).
+export const discordRequest = discord;
 // Closed to @everyone (« Voir le salon » refused): only the roles allowed there see it.
 const isPrivate = (channel, guildId) => (channel.permission_overwrites || []).some(item => String(item.id) === String(guildId) && Number(item.type) === 0 && (BigInt(item.deny || 0) & VIEW));
 export async function recapDestinations(env, community) {
@@ -133,17 +137,20 @@ export async function recapDestinations(env, community) {
     discord(env, 'GET', `/guilds/${guild}/channels`), discord(env, 'GET', `/guilds/${guild}/roles`),
     discord(env, 'GET', `/guilds/${guild}/members/${env.DISCORD_CLIENT_ID}`)]);
   if (!Array.isArray(channels) || !Array.isArray(roles) || !member) throw new Error('Réponse Discord invalide.');
-  return channels.filter(channel => [0,4].includes(channel.type)).map(channel => {
+  // The announcement channels (type 5) only serve the morning announcement.
+  return channels.filter(channel => [0,4,5].includes(channel.type)).map(channel => {
     // Below a text channel the bot makes its own: what counts is its category (or the server).
     const parent = channel.type === 0 ? channels.find(item => item.id === channel.parent_id && item.type === 4) : null;
     const rights = effectivePermissions(roles, member, guild, channel.type === 0 ? parent || {id:'',permission_overwrites:[]} : channel, env.DISCORD_CLIENT_ID);
     const voiceRequired = channel.type === 4 && community.modules?.crewChannels === true;
     const required = REQUIRED | MANAGE | (voiceRequired ? VOICE_ACCESS : 0n);
     // Written in the channel itself: its own rights count.
-    const own = channel.type === 0 ? effectivePermissions(roles, member, guild, channel, env.DISCORD_CLIENT_ID) : 0n;
+    const own = channel.type !== 4 ? effectivePermissions(roles, member, guild, channel, env.DISCORD_CLIENT_ID) : 0n;
     return {id:channel.id, name:channel.name, type:channel.type, position:channel.position || 0, parentId:channel.parent_id || null, parentName:parent?.name || null, ready:(rights & required) === required,
       private:isPrivate(channel.type === 0 ? parent || channel : channel, guild),
       missing:[['Voir le salon',VIEW],['Envoyer des messages',SEND],['Voir les anciens messages',HISTORY],['Intégrer des liens',EMBED],['Gérer les salons',MANAGE],...(voiceRequired ? [['Se connecter',1n << 20n]] : [])].filter(([,bit]) => !(rights & bit)).map(([label]) => label),
+      ...(channel.type !== 4 ? {announceReady:(own & ANNOUNCE_REQUIRED) === ANNOUNCE_REQUIRED,
+        announceMissing:[['Voir le salon',VIEW],['Envoyer des messages',SEND],['Intégrer des liens',EMBED],['Mentionner @everyone',EVERYONE]].filter(([,bit]) => !(own & bit)).map(([label]) => label)} : {}),
       ...(channel.type === 0 ? {insideReady:(own & INSIDE_REQUIRED) === INSIDE_REQUIRED,
         insideMissing:[['Voir le salon',VIEW],['Envoyer des messages',SEND],['Voir les anciens messages',HISTORY],['Intégrer des liens',EMBED],['Créer des fils publics',1n << 35n],['Envoyer des messages dans les fils',1n << 38n]].filter(([,bit]) => !(own & bit)).map(([label]) => label)} : {})};
   });
@@ -194,6 +201,11 @@ export async function validateDiscordLayout(env, community, input) {
     const category = id === layout.under || id === layout.pitAt;
     if (!place || (category && place.type !== 4)) throw Object.assign(new Error('Choisis un endroit qui existe sur le serveur Discord de cette communauté.'), {status:400});
     if (!place.ready && !(id === layout.pitAt && layout.pit === 'bot') && id !== layout.under) throw rightsError(place);
+  }
+  if (layout.announce) {
+    const place = destinations.find(item => item.id === layout.announce && [0,5].includes(item.type));
+    if (!place) throw Object.assign(new Error('Choisis un salon qui existe sur le serveur Discord de cette communauté pour l’annonce du jour.'), {status:400});
+    if (!place.announceReady) throw Object.assign(new Error(`Dans les permissions du salon « ${place.name} », autorise le bot : ${place.announceMissing.join(', ')}.`), {status:400});
   }
   if (wantedCategories(layout).length) {
     const server = await serverRights(env, community);
