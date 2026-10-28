@@ -1,5 +1,13 @@
 # Nouveautés d'Endurance Manager
 
+## v1.88 — 28 octobre 2026
+
+### 🚀 Nouveautés
+
+- **Events · Annoncer un stream** : un bouton « 🎙 Annoncer un stream » ajoute une case au calendrier, sur un seul écran : titre, jour, début du stream et/ou départ de la course (LMU ou iRacing), lien du stream facultatif. Pas d’inscription ni d’absence.
+- Sur la page du stream : « Regarder sur Twitch » et « Inscriptions endurance » (menu ENDU de la simu). Si le streamer roule une endurance ce jour-là, son équipage et ses coéquipiers sont affichés.
+- **Discord** : le stream apparaît dans le calendrier de la semaine et dans l’annonce de 7h30 (« Ce soir, c’est stream ! »).
+
 ## v1.87 — 28 octobre 2026
 
 ### 🚀 Nouveautés
