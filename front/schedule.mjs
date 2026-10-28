@@ -1,4 +1,5 @@
 import {getLocale,localeTag} from './i18n.mjs';
+import {eventMinutes,raceFinishAt} from '../shared/duration.mjs';
 
 export function countdown(timestamp) {
   const seconds=Math.max(0,Math.floor((timestamp-Date.now())/1000));
@@ -18,9 +19,8 @@ export function parisCalendar(timestamp) {
 }
 export function eventSchedule(event,now) {
   const departures=[...event.departures].filter(d=>Number.isFinite(d.startsAt)).sort((a,b)=>a.startsAt-b.startsAt);
-  const duration=(Number(event.durationMinutes)||(event.durationHours||6)*60)*60000;
   const next=departures.find(d=>d.startsAt>now);
-  const running=departures.find(d=>d.startsAt<=now&&d.startsAt+duration>now);
+  const running=departures.find(d=>d.startsAt<=now&&raceFinishAt(d.startsAt,eventMinutes(event))>now);
   const archiveAt=departures.length?departures[departures.length-1].startsAt:null;
   return {event,next,running,end:archiveAt,archiveAt,archived:archiveAt!==null&&archiveAt<=now,timestamp:next?.startsAt??archiveAt};
 }

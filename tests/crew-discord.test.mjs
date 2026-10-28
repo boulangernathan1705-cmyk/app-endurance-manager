@@ -178,7 +178,9 @@ test('a crew gets a voice channel « LMU · race · name » outside any category
   assert.deepEqual(last.body.allowed_mentions,{parse:[]});assert.equal(last.body.flags,4096);
 
   // 2 h after the end: still a pilot in the voice channel, so it waits; then it is deleted with its chat.
-  const endsAt=startsAt+6*HOUR;
+  // The finish counts 30 min of practice and qualifying before the 6 h of race (also shown on the card).
+  const endsAt=startsAt+6*HOUR+30*60_000;
+  assert.match(JSON.stringify(recap.body),new RegExp(`arrivée <t:${endsAt/1000}:t>`));
   // After the finish: a word to the crew, once.
   mark=discord.calls.length;await sync(endsAt+10*60_000);
   const end=discord.calls.slice(mark).filter(call=>call.method==='POST');

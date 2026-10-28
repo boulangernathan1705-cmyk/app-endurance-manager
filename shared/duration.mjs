@@ -6,6 +6,11 @@ export function durationLabel(minutes) {
   return rest ? `${hours} h ${String(rest).padStart(2, '0')}` : `${hours} h`;
 }
 
+// Before the green flag a session has about 5 min of practice and 10 to 20 min of qualifying: the
+// finish shown everywhere (site and Discord) is the start + 30 min + the race duration.
+export const PRE_RACE_MINUTES = 30;
+export const raceFinishAt = (startsAt, minutes) => Number(startsAt) + (Number(minutes) + PRE_RACE_MINUTES) * 60_000;
+
 // Duration of an event in minutes (events saved before minutes existed only have whole hours).
 export const eventMinutes = event => Number(event?.durationMinutes) || (Number(event?.durationHours) || 6) * 60;
 

@@ -14,7 +14,7 @@ import {effectivePermissions,guildPermissions,missingVoicePermissions,withBotAcc
 // after a change on a crew, a few requests at a time (a run of the Worker may make 50).
 import {allCommunities, communityById, communityUrl} from './community.mjs';
 import {notify} from './notifications.mjs';
-import {durationLabel} from '../shared/duration.mjs';
+import {durationLabel,raceFinishAt} from '../shared/duration.mjs';
 import {catalogForGame, TRACK_LIMITS} from '../shared/catalog.mjs';
 import {categoryEmojiName} from './discord-weekly-format.mjs';
 
@@ -87,7 +87,7 @@ function startOf(row) {
   const startsAt = Number(departure?.startsAt);
   if (!departure || !Number.isFinite(startsAt)) return null;
   const minutes = Number(row.duration_minutes) || (Number(row.duration_hours) || 0) * 60;
-  return {startsAt, endsAt:startsAt + minutes * 60_000, minutes, pending:Boolean(row.schedule_pending) || departure.tbd === true};
+  return {startsAt, endsAt:raceFinishAt(startsAt, minutes), minutes, pending:Boolean(row.schedule_pending) || departure.tbd === true};
 }
 
 // The card of the voice channel's chat: the race, the crew and its conditions, a button to the race on the site.
