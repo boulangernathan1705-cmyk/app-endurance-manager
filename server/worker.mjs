@@ -1016,7 +1016,7 @@ async function api(request, env) {
     if(matches.length!==1)fail(400,'Choisis un salon texte unique du serveur de cette communauté.');
     const channel=matches[0];
     if(channel.announceMissing?.some(right=>right!=='Mentionner @everyone'))fail(400,'Le bot doit pouvoir voir le salon, envoyer des messages et intégrer des liens.');
-    const site={...siteOf(env,community),streamUrl:announceStream(await botRecapSettings(env,community))};
+    const site={...siteOf(env,community),streamUrl:announceStream(await botRecapSettings(env,community))||'https://www.twitch.tv/lapraline_tdz'};
     const round={circuit:'Velo Città',category:'GT4',car:'Ginetta G55',weather:'random',fuel:1,tyres:1,qualifying:10};
     const event={id:'demo',name:'APERÇU · SAFE’S RACE',sim:'ams2',type:'SAFE',access:'safe',tdz:true,startsAt:Date.now(),entered:13,
       note:'Démonstration de présentation : données d’exemple.',rounds:[{...round,practice:10,durationMinutes:20},{...round,practice:5,durationMinutes:40}]};
