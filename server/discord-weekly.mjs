@@ -1,6 +1,6 @@
 import {iracingSoloSql} from './iracing-visibility.mjs';
 import {allCommunities, communityUrl, appearanceOf} from './community.mjs';
-import {isInParisWeek, parisWeek} from './discord-weekly-format.mjs';
+import {CALENDAR_FORMAT, isInParisWeek, parisWeek} from './discord-weekly-format.mjs';
 import {simForEvent} from '../shared/catalog.mjs';
 import {raceFinishAt} from '../shared/duration.mjs';
 import {grindfestEnabled} from '../shared/grindfest.mjs';
@@ -251,7 +251,7 @@ export async function syncWeeklyDiscord(env,timestamp=Date.now(),community=null,
 // then: what follows the pass for that community (its crews' voices).
 export async function syncDueRecaps(env,limit=3,timestamp=Date.now(),{pending=false,then=null}={}) {
   if (!env?.DB || limit < 1) return 0;
-  const rows=(await env.DB.prepare(`SELECT community_id,checked_at FROM community_recap_settings ${pending ? 'WHERE dirty=1 AND last_error IS NULL' : ''} ORDER BY checked_at,community_id`).all()).results || [];
+  const rows=(await env.DB.prepare(`SELECT community_id,checked_at FROM community_recap_settings ${pending ? `WHERE last_error IS NULL AND (dirty=1 OR (enabled=1 AND EXISTS (SELECT 1 FROM discord_recap_publications p WHERE p.community_id=community_recap_settings.community_id AND p.closed_at IS NULL AND p.event_id LIKE 'week:calendar%' AND p.message_id IS NOT NULL AND p.content_hash NOT LIKE '${CALENDAR_FORMAT}%')))` : ''} ORDER BY checked_at,community_id`).all()).results || [];
   if (!rows.length) return 0;
   const communities=await allCommunities(env);
   for (const row of rows) {
