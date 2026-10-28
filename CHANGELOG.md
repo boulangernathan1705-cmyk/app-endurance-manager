@@ -1,5 +1,11 @@
 # Nouveautés d'Endurance Manager
 
+## v1.83 — 28 octobre 2026
+
+### ✨ Améliorations
+
+- **Discord** : dans `# endurances-de-la-semaine` et le calendrier, des liens plutôt que des boutons, pour prendre moins de place.
+
 ## v1.82 — 28 octobre 2026
 
 ### 🐛 Corrections
