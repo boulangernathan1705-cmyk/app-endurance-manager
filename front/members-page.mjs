@@ -199,7 +199,7 @@ function discordRead(form) {
   if (radio('copy')) answers.copy = radio('copy') === 'private';
   if (radio('pitCopy')) answers.pitCopy = radio('pitCopy') === 'private';
   for (const name of ['showWeek','showEvents','reminders']) if (field(name)) answers[name] = field(name).checked;
-  for (const name of ['under','events','pitAt','announce','stream']) if (field(name)) answers[name] = field(name).value.trim();
+  for (const name of ['under','events','pitAt','announce','stream','streamName']) if (field(name)) answers[name] = field(name).value.trim();
   answers.week ||= {};
   for (const key of ['all','lmu','iracing']) if (field(`week-${key}`)) answers.week[key] = field(`week-${key}`).value;
   return answers;
@@ -284,7 +284,7 @@ function discordQuestions(form, answers) {
     `<select name="announce"><option value="" ${!announce ? 'selected' : ''}>Ne pas annoncer</option>${channels.map(item => `<option value="${esc(item.id)}" ${item.id === announce ? 'selected' : ''}>${item.parentId ? '   ' : ''}# ${esc(item.name)}${item.announceReady === false ? ' · le bot n’a pas ses droits' : ''}</option>`).join('')}${announce && !chosen ? `<option value="${esc(announce)}" selected>Choix enregistré</option>` : ''}</select>`,
     chosen?.announceReady === false ? `<p class="setup-note setup-error discord-rights">Sur Discord : clic droit sur « ${esc(chosen.name)} » › Modifier le salon › Permissions › « + » › Endurance Manager, puis coche ${esc((chosen.announceMissing || []).join(', '))}. Reviens ensuite sur « Actualiser les salons ».</p>` : '')
     + (announce ? row('📺 Lien du stream', 'Facultatif : « 📺 Lancement du stream sur Twitch à 19h45 » dans l’annonce, avec l’heure de début du stream de l’event.',
-      `<input type="url" name="stream" inputmode="url" maxlength="300" placeholder="https://twitch.tv/…" value="${esc(answers.stream || '')}">`) : '')]);
+      `<input type="url" name="stream" inputmode="url" maxlength="300" placeholder="https://twitch.tv/…" value="${esc(answers.stream || '')}">`)+row('Nom du streamer','Nom affiché dans « La soirée avec… ». Sans nom renseigné, le nom de la chaîne est utilisé.',`<input name="streamName" maxlength="80" placeholder="La Praline" value="${esc(answers.streamName||'')}">`) : '')]);
   return questions;
 }
 const discordEventChannel = form => form.dataset.tdz === 'true' ? '🗓️・calendrier' : 'event-solo-de-la-semaine';

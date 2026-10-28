@@ -72,6 +72,9 @@ export function layoutInput(input) {
   const stream = String(input.stream ?? '').trim();
   if (stream && (!/^https:\/\/[^\s<>"]{3,300}$/.test(stream) || !URL.canParse(stream))) throw bad('Colle l’adresse complète du stream, en https://.');
   if (announce && stream) layout.stream = stream;
+  const streamName=String(input.streamName??'').trim();
+  if(streamName.length>80)throw bad('Le nom du streamer est limité à 80 caractères.');
+  if(announce&&stream&&streamName)layout.streamName=streamName;
   return layout;
 }
 
