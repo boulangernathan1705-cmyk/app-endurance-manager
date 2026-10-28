@@ -944,3 +944,11 @@ test('a community showing the official iRacing races on its site: each gets its 
   assert.ok(channels.some(item=>item.type===11&&item.name==='🏁 iRacing · Officielle iRacing'));
   assert.ok([...messages.values()].some(item=>item.embeds[0].title==='Endurances iRacing'&&/Officielle iRacing|<#/.test(item.embeds[0].description||'')));
 });
+test('EVENT TDZ\'s channel is shown as « 🗓️・calendrier », found again by its first name',async()=>{
+  const {layoutPlan}=await import('../server/discord-layout.mjs');
+  const {week}=layoutPlan({mode:'events',sims:'lmu',showEvents:true},{main:'123'},{eventChannel:'event-tdz-de-la-semaine'});
+  const calendar=week.find(entry=>entry.kind.startsWith('calendar'));
+  assert.equal(calendar.channel,'🗓️・calendrier');
+  assert.equal(calendar.topic,'event-tdz-de-la-semaine');
+  assert.equal(layoutPlan({mode:'events',sims:'lmu',showEvents:true},{main:'123'}).week.find(entry=>entry.kind.startsWith('calendar')).channel,'event-solo-de-la-semaine');
+});

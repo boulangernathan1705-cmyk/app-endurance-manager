@@ -15,6 +15,8 @@
 // in names).
 export const CATEGORY_NAMES = {main:'🏆 Endurance Manager', lmu:'🔴 LMU', iracing:'🔵 iRacing', pit:'🎙️ Pit talk'};
 export const WEEK_EMOJI = '📅・';
+// The names shown on Discord where they differ from the channel's first name (its topic keeps the first: found again, renamed).
+const SHOWN = {'event-tdz-de-la-semaine':'🗓️・calendrier'};
 const SIMS = {all:['lmu','iracing'], lmu:['lmu'], iracing:['iracing']};
 const ID = /^\d{15,22}$/;
 const bad = message => Object.assign(new Error(message), {status:400});
@@ -88,7 +90,7 @@ function weekChannel(layout, sim) {
 export function layoutPlan(layout, cats, {eventChannel = 'event-solo-de-la-semaine', calendar = true} = {}) {
   const sims = SIMS[layout.sims] || SIMS.all, filter = layout.sims === 'all' ? null : layout.sims;
   const week = [], anchors = {lmu:'', iracing:''};
-  const add = (kind, destination, channel, sim = null) => { if (destination && (calendar || !kind.startsWith('calendar'))) week.push({kind, destination, channel:channel.startsWith('endurances') ? WEEK_EMOJI + channel : channel, sim, topic:channel}); };
+  const add = (kind, destination, channel, sim = null) => { if (destination && (calendar || !kind.startsWith('calendar'))) week.push({kind, destination, channel:SHOWN[channel] || (channel.startsWith('endurances') ? WEEK_EMOJI + channel : channel), sim, topic:channel}); };
   if (layout.mode === 'events') {
     const groups = layout.split ? sims.map(sim => ({cat:cats[sim], sims:[sim]})) : [{cat:cats.main, sims}];
     for (const group of groups) {
