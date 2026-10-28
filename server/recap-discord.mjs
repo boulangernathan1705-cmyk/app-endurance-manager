@@ -6,11 +6,12 @@ import {buildWeeklyDiscordPayload, buildWeekHeadPayload, buildCalendarPayload, C
 import {tdzOnly} from '../shared/catalog.mjs';
 import {isDevelopment} from './dev-environment.mjs';
 import {crewVoiceName} from './crew-discord.mjs';
+import {discordAbsentButton} from './discord-interactions.mjs';
 import {CATEGORY_NAMES,parseLayout,parseCategories,layoutInput,layoutPlan,wantedCategories,chosenPlaces} from './discord-layout.mjs';
 
 const API = 'https://discord.com/api/v10', DAY = 86400000;
 // Layout of the recap message: raised when it changes, so the published recaps are edited once.
-const RECAP_FORMAT = 7;
+const RECAP_FORMAT = 8;
 const MAX_CHANNELS = 450;
 const RACE_INFO_CHANNEL = 'infos-de-la-course'; // Discord writes text channel names in lowercase with dashes
 const VIEW = 1024n, SEND = 2048n, HISTORY = 65536n, EMBED = 16384n, MANAGE = 16n, ADMIN = 8n;
@@ -486,11 +487,11 @@ async function snapshotPayload(env, timestamp, community, eventId = null, kind =
   const scope = eventId ? 'all' : kind;
   const snapshot = await loadWeeklyDiscordSnapshot(env, timestamp, community, scope, eventId);
   const emojis = await botCategoryEmojis(env, timestamp);
-  const payload = buildWeeklyDiscordPayload(snapshot, siteOf(env, community), timestamp, scope, emojis, {weekly:!eventId, alone:Boolean(eventId) && alone, threads:eventId ? null : threads});
+  const payload = buildWeeklyDiscordPayload(snapshot, siteOf(env, community), timestamp, scope, emojis, {weekly:!eventId, alone:Boolean(eventId) && alone, threads:eventId ? null : threads, absent:discordAbsentButton(env)});
   // Message edits are silent; never turn driver names into mentions.
   payload.allowed_mentions = {parse:[]};
   // A new layout of the message (RECAP_FORMAT) edits the published recaps once.
-  return {snapshot, payload, hash:await digest([RECAP_FORMAT,snapshot,emojis,...(eventId && alone ? ['alone'] : []),...(!eventId && threads ? [threads, 'head'] : [])])};
+  return {snapshot, payload, hash:await digest([RECAP_FORMAT,snapshot,emojis,...(eventId && alone ? ['alone', Boolean(discordAbsentButton(env))] : []),...(!eventId && threads ? [threads, 'head'] : [])])};
 }
 // What the bot would publish with these settings (a settings row), without publishing anything.
 export async function previewBotRecap(env, timestamp, community, settings) {

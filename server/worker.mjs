@@ -1,4 +1,5 @@
 import {grindfestAvailable, grindfestEnabled, isGrindfest, streamersOf, assignStreamerWaitlist} from '../shared/grindfest.mjs';
+import {discordInteraction} from './discord-interactions.mjs';
 import {gridfestPasswordStatus, sendGridfestPasswords} from './gridfest-discord.mjs';
 import {
   LEGACY_CAR_ALIASES, COOKIE_SESSION, COOKIE_STATE, COOKIE_RETURN, DAY, HttpError, fail, now, id, token, hash, cookie,
@@ -1167,6 +1168,8 @@ export default {
       try { return await ingestClientError(request,env); }
       catch { return new Response(null,{status:204}); }
     }
+    // The buttons of the races' threads on Discord (server/discord-interactions.mjs).
+    if (pathname === '/discord/interactions') return discordInteraction(request, env);
     if (!pathname.startsWith('/api/')) {
       const asset = await env.ASSETS.fetch(request);
       return asset.status === 404 && (request.headers.get('Accept') || '').includes('text/html') ? pageNotFound() : asset;

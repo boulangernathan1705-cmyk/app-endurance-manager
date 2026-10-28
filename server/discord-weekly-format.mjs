@@ -1,6 +1,6 @@
 import {racesPath} from './races-path.mjs';
-import {durationLabel,PRE_RACE_MINUTES} from '../shared/duration.mjs';
-import {catalogForGame,SIMS} from '../shared/catalog.mjs';
+import {durationLabel,PRE_RACE_MINUTES,raceFinishAt} from '../shared/duration.mjs';
+import {catalogForGame,SIMS,TRACK_LIMITS} from '../shared/catalog.mjs';
 
 const DAY_MS=86_400_000,HOUR_MS=3_600_000,TIME_ZONE='Europe/Paris';
 const circuitNames=new Map([...catalogForGame('lmu').circuits,...catalogForGame('iracing').circuits].map(c=>[c.id,c.name]));
@@ -174,6 +174,39 @@ function raceEmbed(departures,siteUrl,compact=false,current=false,emojis={}){
   const url=raceUrl(siteUrl,first);if(url)embed.url=url;
   return embed;
 }
+// The race's conditions as set on the site (« Infos de la course »), on the race's card and on the crews' voice cards.
+const SKY={clear:'☀️',lightClouds:'🌤️',partlyCloudy:'⛅',mostlyCloudy:'🌥️',overcast:'☁️',cloudyDrizzle:'🌦️',cloudyLightRain:'🌦️',
+  overcastLightRain:'🌧️',overcastRain:'🌧️',overcastHeavyRain:'🌧️',overcastStorm:'⛈️'};
+const WEATHER={dry:'☀️ Sec',mixed:'🌦️ Variable',rain:'🌧️ Pluie'};
+export function conditionFields(info={}){
+  const weather=[WEATHER[info.weather],Array.isArray(info.weatherSlots)&&info.weatherSlots.some(Boolean)?info.weatherSlots.map(sky=>SKY[sky]||'❔').join(' '):'',clean(info.weatherNote)].filter(Boolean);
+  return [weather.length&&{name:'🌦️ Météo',value:cut(weather.join('\n'),1024),inline:true},
+    info.tyres&&{name:'🛞 Pneus',value:`${info.tyres} pneu${info.tyres>1?'s':''}`,inline:true},
+    TRACK_LIMITS[info.trackLimits]&&{name:'🚧 Limites de piste',value:TRACK_LIMITS[info.trackLimits],inline:true},
+    info.fairShare===true&&{name:'⚖️ Partage équitable',value:'Oui',inline:true}].filter(Boolean);
+}
+// A race's thread: its card, like the crews' voice cards (sim, circuit and grid on top, start, duration and finish,
+// entries, conditions), then its crews and pilots as in the week's message.
+function raceCard(departures,siteUrl,compact,current,emojis,logoUrl){
+  const first=departures[0],info=first.details||{},sim=simOf(first),{title,note}=eventTitleAndNote(first.eventName);
+  const circuit=circuitNames.get(first.circuit)||first.circuit;
+  const minutes=first.durationMinutes||first.durationHours*60||0,single=departures.length===1;
+  const pilots=new Set(departures.flatMap(departure=>(departure.registrations||[]).map(item=>item.participantId))).size;
+  const crews=departures.reduce((total,departure)=>total+departure.crews.length,0);
+  const start=single&&!first.timePending?`${discordTime(first.startsAt,'F')}\n${discordTime(first.startsAt,'R')}`:single?`${discordTime(first.startsAt,'D')}\nhoraire à confirmer`:startsRecap(departures);
+  const fields=[{name:single?'🟢 Départ':`🟢 ${departures.length} départs`,value:cut(start,1024),inline:single},
+    minutes&&{name:'⏱️ Durée',value:`${durationLabel(minutes)}${single&&!first.timePending?`\narrivée ${discordTime(raceFinishAt(first.startsAt,minutes),'t')}`:''}`,inline:true},
+    {name:'👥 Inscrits',value:pilots?`${pilots} pilote${pilots>1?'s':''}${crews?` · ${crews} équipage${crews>1?'s':''}`:''}`:'Personne pour l’instant',inline:true},
+    ...conditionFields(info)].filter(Boolean);
+  const embed={author:{name:[sim==='iracing'?'🏁 iRacing':'🏎️ LMU',circuit&&clean(circuit),info.grid&&`${info.grid} voitures`].filter(Boolean).join(' · ')},
+    title:cut(`${current?'🔴 En cours — ':''}${title}`,256),color:current?0xd71920:SIM_COLORS[sim],
+    description:cut([TYPE_LABELS[first.eventType]&&`🏷️ ${TYPE_LABELS[first.eventType]}`,note].filter(Boolean).join('\n'),4096)||undefined,
+    fields:[...fields,...raceFields(departures,compact,emojis)].slice(0,25)};
+  if(!embed.description)delete embed.description;
+  const url=raceUrl(siteUrl,first);if(url)embed.url=url;
+  if(logoUrl)embed.thumbnail={url:logoUrl};
+  return embed;
+}
 function groupByRace(departures){
   const groups=new Map();
   for(const departure of departures){const key=departure.eventId||departure.eventName;if(!groups.has(key))groups.set(key,[]);groups.get(key).push(departure);}
@@ -210,7 +243,7 @@ function footer(updatedAt){return{text:`Endurance Manager · mise à jour à ${u
 // `threads`: « un fil par course », the week's message lists the races only, each a link to its thread ({eventId: thread id}).
 // With threads, the banner, the week and the link to the site are in a message of their own above (buildWeekHeadPayload):
 // each sim's message is its name, its races and the time of update.
-export function buildWeeklyDiscordPayload(snapshot,site={},updatedAt=Date.now(),scope='lmu',emojis={},{weekly=false,alone=false,threads=null}={}){
+export function buildWeeklyDiscordPayload(snapshot,site={},updatedAt=Date.now(),scope='lmu',emojis={},{weekly=false,alone=false,threads=null,absent=null}={}){
   const siteUrl=typeof site==='string'?(()=>{try{return new URL(site).origin;}catch{return '';}})():String(site.url||'');
   const sim=SCOPE_LABELS[scope]??' LMU',simPage=scope==='iracing'?'/iracing/':scope==='all'?'/':'/lmu/';
   const current=Array.isArray(snapshot.currentDepartures)?snapshot.currentDepartures:[],future=Array.isArray(snapshot.futureDepartures)?snapshot.futureDepartures:[];
@@ -235,7 +268,8 @@ export function buildWeeklyDiscordPayload(snapshot,site={},updatedAt=Date.now(),
     return{content:'',embeds:[header],allowed_mentions:{parse:[]}};
   }
   const build=compact=>{
-    const blocks=[...groupByRace(current).map(group=>raceEmbed(group,siteUrl,compact,true,emojis)),...groupByRace(future).map(group=>raceEmbed(group,siteUrl,compact,false,emojis))];
+    const block=alone?(group,live)=>raceCard(group,siteUrl,compact,live,emojis,site.logoUrl):(group,live)=>raceEmbed(group,siteUrl,compact,live,emojis);
+    const blocks=[...groupByRace(current).map(group=>block(group,true)),...groupByRace(future).map(group=>block(group,false))];
     // 10 blocks at most: beyond 8 races, the others are listed (linked) in one last block.
     if(blocks.length>8){
       const rest=groupByRace([...current,...future]).slice(8);
@@ -249,7 +283,11 @@ export function buildWeeklyDiscordPayload(snapshot,site={},updatedAt=Date.now(),
   const last=embeds[embeds.length-1];
   if(site.bannerUrl)last.image={url:site.bannerUrl};
   last.footer=footer(updatedAt);
-  return{content:'',embeds:fitDiscordEmbeds(embeds.slice(0,10)),allowed_mentions:{parse:[]}};
+  const payload={content:'',embeds:fitDiscordEmbeds(embeds.slice(0,10)),allowed_mentions:{parse:[]}};
+  // A race's thread: « Présent » opens the race on the site, « Absent » (absent: its button) marks it from Discord.
+  const first=[...current,...future][0],url=raceUrl(siteUrl,first);
+  if(alone&&url)payload.components=[{type:1,components:[{type:2,style:5,label:'Présent',emoji:{name:'✅'},url},...(absent?[absent(first.eventId)]:[])]}];
+  return payload;
 }
 
 // Above the sims' messages of a channel: the community, the week (a link to the site) and the banner.
