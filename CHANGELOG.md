@@ -1,5 +1,11 @@
 # Nouveautés d'Endurance Manager
 
+## v1.89 — 28 octobre 2026
+
+### 🛠️ Corrections
+
+- **Annoncer un stream** : la création d’un stream affichait « Le service est momentanément indisponible ». La base accepte maintenant les streams.
+
 ## v1.88 — 28 octobre 2026
 
 ### 🚀 Nouveautés
