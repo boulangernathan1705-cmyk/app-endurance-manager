@@ -311,12 +311,12 @@ function calendarBox(event,siteUrl){
 }
 // The week's events (« EVENT SOLO », « EVENT TDZ »): one box per event, in the order of their starts.
 // `snapshot`: {periodLabel, events:[{id,name,sim,circuits,startsAt,timePending,capacity,entered,access}]}.
-export const CALENDAR_FORMAT = 'calendar-v2:';
+export const CALENDAR_FORMAT = 'calendar-v3:';
 export function buildCalendarPayload(snapshot,site={},updatedAt=Date.now()){
   const siteUrl=String(site.url||''),events=Array.isArray(snapshot.events)?snapshot.events:[];
   const embed={title:'📅 Le programme de la semaine',description:cut(cap(snapshot.periodLabel||'semaine à venir'),4096),color:events.length?0xe7b653:0x6b7280};
   if(site.name){embed.author={name:cut(`${site.name}${events.length?` · ${events.length} event${events.length>1?'s':''} cette semaine`:''}`,256)};if(siteUrl)embed.author.url=`${siteUrl}/`;if(site.logoUrl)embed.author.icon_url=site.logoUrl;}
-  if(events.length){embed.fields=events.slice(0,events.length>25?24:25).map(event=>calendarBox(event,siteUrl));if(events.length>25)embed.fields.push({name:BLANK,value:`… et ${events.length-24} autres events sur le site.`,inline:false});}
+  if(events.length){embed.fields=events.slice(0,events.length>25?24:25).map((event,index)=>{const field=calendarBox(event,siteUrl);if(index)field.name=cut(`────────────\n${field.name}`,256);return field;});if(events.length>25)embed.fields.push({name:BLANK,value:`… et ${events.length-24} autres events sur le site.`,inline:false});}
   else embed.description+='\nAucun événement de prévu pour l’instant.';
   if(site.bannerUrl)embed.image={url:site.bannerUrl};
   embed.footer=footer(updatedAt);
@@ -409,7 +409,7 @@ export function buildAnnounceIntro(counts,site={}){
   const parts=[counts.events&&`**${plural(counts.events,'event')}**`,counts.races&&`**${plural(counts.races,'endurance')}**`,counts.lives&&`**${plural(counts.lives,'stream')}**`].filter(Boolean);
   const streamOnly=counts.lives>0&&!counts.events&&!counts.races;
   const embed={title:streamOnly?'🎙 C’est jour de stream !':'🏁 C’est jour de course !',color:streamOnly?0x9146ff:0xd71920,
-    description:[`Aujourd’hui sur le serveur : ${parts.join(' et ')}.`,streamLine(site,counts.streams),streamOnly?'Retrouve les horaires et les liens du live ci-dessous 👇':'Inscris-toi, préviens si tu ne viens pas, et rendez-vous en piste 👇'].filter(Boolean).join('\n')};
+    description:[`Aujourd’hui sur le serveur : ${parts.join(' et ')}.`,streamLine(site,counts.streams),streamOnly?'Retrouve les horaires et les liens du live ci-dessous 👇':'Inscris-toi, préviens si tu ne viens pas, et rendez-vous en piste 👇'].filter(Boolean).join('\n\n')};
   if(site.name){embed.author={name:cut(site.name,256)};if(site.url)embed.author.url=`${site.url}/`;if(site.logoUrl)embed.author.icon_url=site.logoUrl;}
   if(site.bannerUrl)embed.image={url:site.bannerUrl};
   return{content:'@everyone',embeds:[embed],allowed_mentions:{parse:['everyone']}};
@@ -419,9 +419,9 @@ function roundName(round){
   return `📍 ${clean(circuitNames.get(round.circuit)||round.circuit||'Circuit à préciser')}`;
 }
 function roundDetails(round){
-  const format=[round.practice&&`E${round.practice}`,round.qualifying&&`Q${round.qualifying}`,round.durationMinutes&&`C${round.durationMinutes}`].filter(Boolean).join(' / ');
+  const format=[round.practice&&`⏱️ Essais : ${round.practice} min`,round.qualifying&&`⏱️ Qualifications : ${round.qualifying} min`,round.durationMinutes&&`🏁 Course : ${round.durationMinutes} min`].filter(Boolean).join('\n');
   const categories=round.randomCategory?'':(round.categories?.length?round.categories:round.category?[round.category]:[]).map(clean).join(', ');
-  return [categories,round.car&&`🏎️ ${clean(round.car)}`,format,ROUND_WEATHER[round.weather],round.fuel>1&&`⛽ ×${round.fuel}`,round.tyres>1&&`🛞 ×${round.tyres}`].filter(Boolean).join(' · ');
+  return [[categories,round.car&&`🏎️ ${clean(round.car)}`].filter(Boolean).join(' · '),format,[ROUND_WEATHER[round.weather],round.fuel>1&&`⛽ ×${round.fuel}`,round.tyres>1&&`🛞 ×${round.tyres}`].filter(Boolean).join(' · ')].filter(Boolean).join('\n');
 }
 // An event of the day: its hook, the admin's note, when and on which sim, its rounds, the count of présents and the buttons.
 // event: {id,name,sim,type,access,tdz,note,startsAt,timePending,rounds,capacity,entered,streamers,rally,password}.
@@ -429,8 +429,8 @@ export function buildAnnounceEvent(event,site={},updatedAt=Date.now(),absent=nul
   const siteUrl=String(site.url||''),url=siteUrl?`${siteUrl}/${event.sim==='iracing'?'iracing':'lmu'}/#event=${encodeURIComponent(event.id)}`:'';
   const gridfest=isGridfestType(event.type),rounds=Array.isArray(event.rounds)?event.rounds:[];
   const typeLabel=event.tdz&&event.type&&!['OPEN','SAFE'].includes(event.type)?`🏷️ ${clean(gridfest?'Gridfest':normalizeTdzEventType(event.type))}`:'';
-  const lines=[`**${eventHook(event)}**`,event.note&&`*« ${clean(event.note)} »*`,
-    [`🕘 ${announceTime(event.startsAt,event.timePending)}`,`🎮 ${SIM_SHORT[event.sim]||clean(event.sim)}`,typeLabel,event.tdz&&!gridfest&&event.access&&event.access.toUpperCase()].filter(Boolean).join(' · ')];
+  const lines=[eventHook(event),event.note&&`*« ${clean(event.note)} »*`,
+    [`🕘 ${announceTime(event.startsAt,event.timePending)}`,`🎮 ${SIM_SHORT[event.sim]||clean(event.sim)}`,typeLabel,event.tdz&&!gridfest&&event.access&&event.access.toUpperCase()].filter(Boolean).join('\n')];
   const rally=event.rally;
   if(rally){
     if(rally.stages?.length)lines.push(`🏔️ Spéciales : ${rally.stages.map(clean).join(', ')}`);
@@ -442,7 +442,7 @@ export function buildAnnounceEvent(event,site={},updatedAt=Date.now(),absent=nul
   if(event.password)lines.push('🔑 Mot de passe du serveur sur le site');
   const places=event.capacity&&!gridfest?(event.entered>=event.capacity?` · complet${event.entered>event.capacity?` · ${event.entered-event.capacity} en attente`:''}`:` · ${plural(event.capacity-event.entered,'place')} restante${event.capacity-event.entered>1?'s':''}`):'';
   const count=`✅ **${plural(Math.min(event.entered,event.capacity||event.entered),'présent')}**${places}`;
-  const embed={title:cut(`🏁 ${clean(event.name)}`,256),color:ANNOUNCE_SIM_COLORS[event.sim]||0xe7b653,description:cut(lines.filter(Boolean).join('\n'),4096)};
+  const embed={title:cut(`🏁 ${clean(event.name)}`,256),color:ANNOUNCE_SIM_COLORS[event.sim]||0xe7b653,description:cut(lines.filter(Boolean).join('\n\n'),4096)};
   if(!rally&&rounds.length>1)embed.fields=rounds.slice(0,4).map((round,index)=>({name:cut(`Manche ${index+1} · ${roundName(round).slice(3)}`,256),value:cut([roundDetails(round),round.capacity&&`👥 ${round.capacity} places`].filter(Boolean).join(' · ')||BLANK,1024),inline:false}));
   embed.fields=[...(embed.fields||[]),{name:BLANK,value:count,inline:false}];
   if(url)embed.url=url;
@@ -487,13 +487,29 @@ export function buildAnnounceRace(race,site={},updatedAt=Date.now(),emojis={},ab
 export function buildCompleteAnnouncement(intro, items, site={}) {
   const head=structuredClone(intro.embeds[0]);
   delete head.image;
-  const embeds=[head,...items.slice(0,9).flatMap(item=>structuredClone(item.payload.embeds||[])).slice(0,9)];
-  for(const embed of embeds)delete embed.footer;
-  if(items.length>9)head.description+=`\n… et ${items.length-9} autres rendez-vous : [calendrier complet](${site.url}/events/).`;
-  const last=embeds.at(-1);
-  if(site.bannerUrl)last.image={url:site.bannerUrl};
-  const lastFooter=items.at(-1)?.payload.embeds?.[0]?.footer;
-  if(lastFooter)last.footer=lastFooter;
+  const cards=items.slice(0,9).flatMap(item=>structuredClone(item.payload.embeds||[])).slice(0,9);
+  head.fields=[];
+  for(const card of cards) {
+    const title=card.url?`**[${card.title}](${card.url})**`:`**${card.title}**`;
+    head.fields.push({name:'────────────',value:cut([title,card.description].filter(Boolean).join('\n\n'),1024),inline:false});
+    const fields=card.fields||[];
+    if(fields.length) {
+      // Real embed fields provide breathing room between rounds and participation.
+      const limit=Math.max(1,Math.floor((24-cards.length)/cards.length));
+      const selected=fields.length<=limit?fields:[...fields.slice(0,limit-1),fields.at(-1)];
+      head.fields.push(...selected.map((field,index)=>({...field,
+        name:index===selected.length-1?'👥 Participation':field.name,inline:false})));
+    }
+  }
+  if(cards.length===1) {
+    head.color=cards[0].color||head.color;
+    if(cards[0].thumbnail)head.thumbnail=cards[0].thumbnail;
+  }
+  if(items.length>9)head.fields.push({name:'────────────',value:`… et ${items.length-9} autres rendez-vous : [calendrier complet](${site.url}/events/).`,inline:false});
+  if(site.bannerUrl)head.image={url:site.bannerUrl};
+  const lastFooter=cards.at(-1)?.footer;
+  if(lastFooter)head.footer=lastFooter;
+  const embeds=[head];
   const actionable=items.filter(item=>item.payload.components?.length);
   const components=actionable.length<=5 ? actionable.map(item=>({type:1,components:item.payload.components[0].components.map(button=>({...button,
     label:cut(`${button.style===5?'Présent / S’inscrire':'Absent'}${actionable.length>1?` · ${item.name}`:''}`,80)}))}))
