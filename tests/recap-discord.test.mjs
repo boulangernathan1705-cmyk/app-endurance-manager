@@ -565,7 +565,7 @@ test('the week calendar is its own message, never mixed with the endurances',asy
   const made=channels.find(item=>item.name==='calendrier-de-la-semaine');assert.ok(made,'the bot makes its channel below the chosen one');
   const calendar=sends(calls).find(call=>call.path===`/channels/${made.id}/messages`);assert.ok(calendar);
   const text=JSON.stringify(calendar.body);
-  assert.match(text,/🗓️ Semaine du/);assert.match(text,/Tous les events/);assert.match(text,/Sprint du mardi/);assert.match(text,/Coupe du jeudi/);
+  assert.match(text,/🗓️ Semaine du/);assert.equal(calendar.body.embeds[0].url,'https://site.example/events/');assert.deepEqual(calendar.body.components,[]);assert.match(text,/Sprint du mardi/);assert.match(text,/Coupe du jeudi/);
   assert.match(text,/2\/2 places · complet/);assert.doesNotMatch(text,/6h de Spa/,'the endurances stay in their category');
   assert.doesNotMatch(JSON.stringify(sends(calls).filter(call=>call!==calendar).map(call=>call.body)),/Sprint du mardi/,'events never get a race category');
   assert.ok(!creates(calls).some(call=>/Sprint/.test(call.body.name)));
@@ -697,7 +697,7 @@ test('« un fil par course »: the bot makes « Endurance Manager » under the c
   assert.equal(index.embeds.length,1);assert.match(index.embeds[0].author.name,/^🏎️ LMU · 1 course cette semaine$/);
   assert.match(index.embeds[0].fields[0].name,/^🟢 \S+ \d+ \S+ \d+:\d\d$/);assert.doesNotMatch(index.embeds[0].fields[0].name,/Spa/);
   assert.match(index.embeds[0].fields[0].value,new RegExp(`^<#${threads.find(thread=>thread.name.includes('Spa')).id}> · personne pour l’instant$`));
-  assert.equal(index.components[0].components[0].label,'Endurances LMU');
+  assert.match(index.embeds[0].author.url,/\/lmu\/$/);assert.deepEqual(index.components,[],'a link, no button');
 });
 
 test('LMU and iRacing apart: one category each, each race its thread in its sim\'s channel',async t=>{
@@ -915,7 +915,7 @@ test('LMU and iRacing in the same channel: the banner and the week in a message 
   assert.match(week('week:head:lmu').title,/Semaine/);
   // The head: the races of each sim (never the number of pilots), and two buttons to the site.
   assert.deepEqual(week('week:head:lmu').fields.map(field=>[field.name,field.value]),[['🏎️ LMU','1 course'],['🏁 iRacing','1 course']]);
-  assert.deepEqual(messages.get(id('week:head:lmu')).components[0].components.map(button=>button.label),['Toutes les endurances','Mes inscriptions']);
+  assert.match(week('week:head:lmu').description,/^📅 \[Toutes les endurances\]\(https:\/\/[^)]+\/\)$/);assert.deepEqual(messages.get(id('week:head:lmu')).components,[]);
   assert.equal(week('week:lmu').author.name,'🏎️ LMU · 1 course cette semaine');assert.equal(week('week:iracing').author.name,'🏁 iRacing · 1 course cette semaine');
   for (const sim of ['week:lmu','week:iracing']) {assert.equal(week(sim).image,undefined);assert.equal(week(sim).title,undefined);assert.ok(week(sim).footer);}
   // Sent in this order: the banner first.
