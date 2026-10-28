@@ -1022,6 +1022,8 @@ async function api(request, env) {
       note:'Démonstration de présentation : données d’exemple.',rounds:[{...round,practice:10,durationMinutes:20},{...round,practice:5,durationMinutes:40}]};
     const card=buildAnnounceEvent(event,{},Date.now());
     const payload=buildCompleteAnnouncement(buildAnnounceIntro({events:1},site),[{name:event.name,payload:card}],site);
+    const live=payload.embeds[0].fields.find(field=>field.name==='📺 LA SOIRÉE EN DIRECT');
+    if(live){live.name='📺 LA SOIRÉE AVEC LA PRALINE';live.value=`Début du stream à **20h45** · horaire d’exemple\n**[▶ REJOINDRE LE STREAM](${site.streamUrl})**`;}
     payload.content='Aperçu de présentation · données d’exemple';payload.allowed_mentions={parse:[]};payload.components=[];
     const sent=await discordRequest(env,'POST',`/channels/${channel.id}/messages`,payload);
     return json({ok:true,url:`https://discord.com/channels/${community.discordGuildId}/${channel.id}/${sent.id}`});
