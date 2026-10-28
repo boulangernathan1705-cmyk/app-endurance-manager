@@ -340,3 +340,8 @@ test('Discord orders crews, unassigned pilots and their category logos by LMU cl
  }
  assert.equal(pilots[0].name,'Pilot-5','formatting preserves the snapshot order');
 });
+
+
+test('making a race official triggers its Discord recap update',()=>{
+  assert.equal(isWeeklyDiscordMutation(new Request('https://site.example/api/events/11111111-1111-4111-8111-111111111111/official',{method:'POST'})),true);
+});

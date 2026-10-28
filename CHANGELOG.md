@@ -1,5 +1,11 @@
 # Nouveautés d'Endurance Manager
 
+## v1.92 — 28 octobre 2026
+
+### 🛠️ Pour les admins
+
+- **Discord · Courses officielles** : la création, la modification, la suppression et le passage en course officielle déclenchent la mise à jour de tous les Discord configurés, sans attendre le contrôle périodique.
+
 ## v1.91 — 28 octobre 2026
 
 ### 🛠️ Pour les admins

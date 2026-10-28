@@ -22,12 +22,22 @@ async function runWeeklySync(env, community = null, eventId = null) {
 // The race changed by a request, read before it runs (a deleted entry or crew can no longer be looked up).
 export async function discordMutationTarget(env, request) {
   const target=mutationTarget(request);
-  if(!target)return null;
+  if(!target){
+    if(request.method==='POST' && /\/api\/(?:events|races)$/.test(new URL(request.url).pathname)) {
+      try { if((await request.clone().json()).official===true) return {eventId:null,communityId:null,shared:true}; } catch {}
+    }
+    return null;
+  }
   if(target.kind==='events'){
     // Official race entries can belong to a different community than the current site.
     let communityId=null;
     if(request.method==='POST'&&/\/(registrations|crews)$/.test(new URL(request.url).pathname)){
       try{communityId=(await request.clone().json()).communityId||null;}catch{}
+    }
+    const direct = /\/api\/(?:events|races)\/[^/]+(?:\/official)?$/.test(new URL(request.url).pathname);
+    if(direct) {
+      const event = await env.DB.prepare('SELECT community_id FROM events WHERE id=?').bind(target.id).first();
+      if(event?.community_id==='official' || /\/official$/.test(new URL(request.url).pathname)) return {eventId:target.id,communityId,shared:true};
     }
     return {eventId:target.id,communityId};
   }
@@ -39,8 +49,16 @@ export async function discordMutationTarget(env, request) {
 }
 
 // After a change of races or entries: this community's Discord is noted, and followed within 2 minutes (flushDiscord).
-function queueWeeklySync(env, ctx, request, eventId = null, communityId = null) {
+export function queueWeeklySync(env, ctx, request, eventId = null, communityId = null, shared = false) {
   if (!env?.DB || !ctx?.waitUntil) return;
+  // Official race changes affect every configured Discord, not just the editing site.
+  if(shared) {
+    ctx.waitUntil(env.DB.prepare(`INSERT INTO discord_pending(community_id,event_id,queued_at)
+      SELECT community_id,?,? FROM community_recap_settings WHERE enabled=1
+      ON CONFLICT(community_id) DO UPDATE SET event_id=excluded.event_id`)
+      .bind(eventId,Date.now()).run().catch(error => console.error('Discord shared sync failed',error.message)));
+    return;
+  }
   ctx.waitUntil((communityId?communityById(env,communityId):currentCommunity(env,request)).then(async community => {
     if(!community)return;
     await env.DB.prepare('INSERT INTO discord_pending(community_id,event_id,queued_at) VALUES(?,?,?) ON CONFLICT(community_id) DO UPDATE SET event_id=excluded.event_id')
@@ -139,7 +157,7 @@ export default {
     const weeklyMutation = isWeeklyDiscordMutation(request);
     const target = weeklyMutation && env?.DB ? await discordMutationTarget(env, request) : null;
     const response = withCommunityLook(await worker.fetch(request, env, ctx), lookOf);
-    if (weeklyMutation && response.ok) queueWeeklySync(env, ctx, request, target?.eventId, target?.communityId);
+    if (weeklyMutation && response.ok) queueWeeklySync(env, ctx, request, target?.eventId, target?.communityId, target?.shared);
     // A WebSocket opening (mur des stands) goes back untouched: a copied response would lose its socket.
     if (response.status === 101) return response;
     return development ? markDevelopmentResponse(response, env) : response;
