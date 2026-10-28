@@ -5,7 +5,8 @@ Deux modules, activés par les admins de chaque communauté avec un simple inter
 ## Salons d'équipage (`crewChannels`)
 
 - Dès sa création (horaire connu), chaque équipage reçoit **son salon vocal**, nommé « 🏎️ LMU · 6h de Spa · Équipage A » (simu, course, équipage). Le bot le crée dans la catégorie choisie dans le réglage Discord (**Vocaux d’équipage**, par défaut en haut du serveur) et range les vocaux de cette catégorie : LMU puis iRacing, chacun par date de départ. Un vocal créé ailleurs (avant ce choix, ou dans une catégorie de course retirée) y est déplacé une fois et renommé. Si cette catégorie est supprimée sur Discord, le choix revient à « En haut du serveur » et les admins en sont prévenus.
-- Dans le chat du vocal, un récap : course, horaire (à l'heure de chaque joueur), durée, voiture, pilotes, lien du site. Les pilotes y sont mentionnés, et un pilote qui rejoint l'équipage y est accueilli.
+- Dans le chat du vocal, une carte à la couleur de la simu : circuit et nombre de voitures, équipage ouvert ou complet, départ et arrivée (à l'heure de chaque joueur), durée, voiture, pilotes (le responsable en premier), météo, nombre de pneus, limites de piste, partage équitable, le logo de la catégorie en vignette et un bouton « Page de la course ». Sans mention ni notification.
+- Après l'arrivée, un message une seule fois : « Course terminée, bien joué … », l'heure de fermeture du vocal et un bouton vers les prochaines endurances.
 - Le récap est modifié à chaque changement (voiture, horaire, pilotes…), sans renvoyer de mention.
 - 2 h après la fin prévue, le vocal est supprimé avec son chat (dès qu'aucun pilote de l'équipage n'y est connecté). Un équipage supprimé avant sa course est fermé tout de suite.
 - Un vocal ou un récap supprimés à la main sur Discord sont recréés au passage suivant.
