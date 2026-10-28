@@ -1,5 +1,11 @@
 # Nouveautés d'Endurance Manager
 
+## v1.84 — 28 octobre 2026
+
+### ✨ Améliorations
+
+- **Discord** : dans l’en-tête de la semaine, le lien est sur le titre « Semaine du … au … ».
+
 ## v1.83 — 28 octobre 2026
 
 ### ✨ Améliorations
