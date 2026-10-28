@@ -32,6 +32,8 @@ const contentHash = payload => digest({...payload, embeds:(payload.embeds || [])
 
 // The channel chosen for the announcement, or '' (layout.announce).
 export const announceChannel = settings => settings?.enabled === 0 ? '' : String(parseLayout(settings?.layout)?.announce || '');
+// The community's stream, linked in the intro of the announcement, or '' (layout.stream).
+export const announceStream = settings => String(parseLayout(settings?.layout)?.stream || '');
 
 const SOLO_SQL = (env, community) => `(community_id=? OR community_id='official') AND format='solo' AND ${iracingSoloSql(env, community)}
   ${grindfestEnabled(community, isDevelopment(env)) ? '' : "AND COALESCE(json_extract(details,'$.type'),'') NOT IN ('Gridfest','Grindfest')"}`;
@@ -71,7 +73,7 @@ async function eventSnapshot(env, community, id, timestamp) {
   return {id:row.id, name:row.name, sim, type:details.type || '', access:tdz ? row.access || 'open' : '', tdz, note:details.note || '',
     startsAt:Number(start.startsAt), timePending:Boolean(row.schedule_pending) || start.tbd === true,
     rounds:parse(row.rounds, []), capacity:row.capacity == null ? null : Number(row.capacity), entered,
-    streamers:gridfest ? streamersOf(row).map(streamer => ({name:streamer.name, capacity:streamer.capacity, entered:Number(entries.find(item => item.streamer_id === streamer.id)?.entered || 0)})) : [],
+    streamers:gridfest ? streamersOf(row).map(streamer => ({name:streamer.name, twitchUrl:streamer.twitchUrl, capacity:streamer.capacity, entered:Number(entries.find(item => item.streamer_id === streamer.id)?.entered || 0)})) : [],
     rally:sim === 'acrally' ? {stages:details.rallyStages || [], host:details.rallyHost || '', carMode:details.rallyCarMode || '', minutes:details.rallyEstimatedMinutes || 0} : null,
     // The password itself never goes on Discord.
     password:Boolean(details.password) && row.access === 'safe' && !gridfest,
@@ -88,9 +90,19 @@ async function raceSnapshot(env, community, id, timestamp) {
   return {id:row.id, name:row.name, circuit:row.circuit, eventType:row.event_type || '', official:row.community_id === 'official',
     durationMinutes:Number(row.duration_minutes) || Number(row.duration_hours) * 60 || 0, details:parse(row.details, {}) || {}, departures};
 }
+// The stream times the admins gave today's events (details.streamTime), for the intro.
+async function streamTimes(env, rows) {
+  const streams = [];
+  for (const row of rows.filter(item => item.kind === 'event')) {
+    const event = await env.DB.prepare('SELECT name,details FROM events WHERE id=?').bind(row.item).first();
+    const time = parse(event?.details, {})?.streamTime;
+    if (time) streams.push({name:event.name, time});
+  }
+  return streams;
+}
 // What a row of the announcement shows now (null: the race is gone from the site).
-export async function announcePayload(env, community, row, timestamp, counts = null) {
-  const site = siteOf(env, community), absent = discordAbsentButton(env);
+export async function announcePayload(env, community, row, timestamp, counts = null, stream = '') {
+  const site = {...siteOf(env, community), streamUrl:stream}, absent = discordAbsentButton(env);
   if (row.kind === 'intro') return buildAnnounceIntro(counts || {events:0, races:0}, site);
   if (row.kind === 'event') {
     const event = await eventSnapshot(env, community, row.item, timestamp);
@@ -103,7 +115,7 @@ export async function announcePayload(env, community, row, timestamp, counts = n
 // One community: today's list made in the morning, its messages sent in order, then the counts kept up to date.
 // Returns whether Discord was asked something.
 export async function announceCommunity(env, community, settings, timestamp = Date.now()) {
-  const channel = announceChannel(settings);
+  const channel = announceChannel(settings), stream = announceStream(settings);
   if (!channel || !community.discordGuildId || settings.guild_id !== community.discordGuildId) return false;
   const day = parisDay(timestamp), budget = {left:SENDS + REFRESHES + 1};
   let rows = (await env.DB.prepare('SELECT * FROM discord_announcements WHERE community_id=? AND day=? ORDER BY position').bind(community.id, day).all()).results || [];
@@ -121,11 +133,12 @@ export async function announceCommunity(env, community, settings, timestamp = Da
     rows = (await env.DB.prepare('SELECT * FROM discord_announcements WHERE community_id=? AND day=? ORDER BY position').bind(community.id, day).all()).results || [];
   }
   let asked = false;
-  const counts = {events:rows.filter(item => item.kind === 'event').length, races:rows.filter(item => item.kind === 'race').length};
+  const counts = {events:rows.filter(item => item.kind === 'event').length, races:rows.filter(item => item.kind === 'race').length,
+    streams:rows.some(item => item.kind === 'intro' && !item.message_id) ? await streamTimes(env, rows) : []};
   // In order: Discord keeps messages in the order they were sent.
   for (const row of rows.filter(item => !item.message_id)) {
     if (budget.left < 2) break;
-    const payload = await announcePayload(env, community, row, timestamp, counts);
+    const payload = await announcePayload(env, community, row, timestamp, counts, stream);
     if (!payload) {
       // Taken off the site since the morning: nothing sent.
       await env.DB.prepare("UPDATE discord_announcements SET message_id='-' WHERE community_id=? AND day=? AND item=?").bind(community.id, day, row.item).run();
@@ -145,7 +158,7 @@ export async function announceCommunity(env, community, settings, timestamp = Da
   const due = rows.filter(item => ['event','race'].includes(item.kind) && item.message_id !== '-' && timestamp - Number(item.checked_at || 0) >= REFRESH_EVERY)
     .sort((a, b) => Number(a.checked_at) - Number(b.checked_at)).slice(0, REFRESHES);
   for (const row of due) {
-    const payload = await announcePayload(env, community, row, timestamp);
+    const payload = await announcePayload(env, community, row, timestamp, null, stream);
     const hash = payload ? await contentHash(payload) : row.content_hash;
     if (payload && hash !== row.content_hash) {
       await discordRequest(env, 'PATCH', `/channels/${row.channel_id}/messages/${row.message_id}`, payload, budget).catch(error => {

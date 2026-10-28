@@ -378,12 +378,22 @@ function announceTime(startsAt,timePending){
 function announceButtons(url,eventId,absent){
   return url?[{type:1,components:[{type:2,style:5,label:'Présent',emoji:{name:'✅'},url},...(absent?[absent(eventId)]:[])]}]:[];
 }
+// « 📺 Lancement du stream sur Twitch à 19h45 »: the community's stream (site.streamUrl, a link on its platform) and the
+// stream times the admins gave today's events (streams: [{name, time:'19:45'}]).
+function streamLine(site,streams=[]){
+  const url=String(site.streamUrl||''),host=url&&URL.canParse(url)?new URL(url).hostname.replace(/^www\./,''):'';
+  const label=/(^|\.)twitch\.tv$/.test(host)?'Twitch':/(^|\.)(youtube\.com|youtu\.be)$/.test(host)?'YouTube':/(^|\.)kick\.com$/.test(host)?'Kick':'notre chaîne';
+  const where=url?` sur [${label}](${url})`:'',at=time=>time.replace(':','h');
+  const times=[...new Map(streams.filter(item=>item.time).map(item=>[item.time,item])).values()].sort((a,b)=>a.time.localeCompare(b.time));
+  if(!times.length)return url?`📺 Le stream en direct${where}`:'';
+  return `📺 Lancement du stream${where} à ${times.length===1?at(times[0].time):times.map(item=>`${at(item.time)} (${clean(item.name)})`).join(', ')}`;
+}
 // The first message: the community, « C'est jour de course ! », what the day holds and the banner; it pings @everyone.
-// counts: {events, races}.
+// counts: {events, races, streams}.
 export function buildAnnounceIntro(counts,site={}){
   const parts=[counts.events&&`**${plural(counts.events,'event')}**`,counts.races&&`**${plural(counts.races,'endurance')}**`].filter(Boolean);
   const embed={title:'🏁 C’est jour de course !',color:0xd71920,
-    description:`Aujourd’hui sur le serveur : ${parts.join(' et ')}.\nInscris-toi, préviens si tu ne viens pas, et rendez-vous en piste 👇`};
+    description:[`Aujourd’hui sur le serveur : ${parts.join(' et ')}.`,streamLine(site,counts.streams),'Inscris-toi, préviens si tu ne viens pas, et rendez-vous en piste 👇'].filter(Boolean).join('\n')};
   if(site.name){embed.author={name:cut(site.name,256)};if(site.url)embed.author.url=`${site.url}/`;if(site.logoUrl)embed.author.icon_url=site.logoUrl;}
   if(site.bannerUrl)embed.image={url:site.bannerUrl};
   return{content:'@everyone',embeds:[embed],allowed_mentions:{parse:['everyone']}};
@@ -412,7 +422,7 @@ export function buildAnnounceEvent(event,site={},updatedAt=Date.now(),absent=nul
     lines.push([cars,rally.minutes&&`⏱️ environ ${durationLabel(rally.minutes)}`].filter(Boolean).join(' · '));
     if(rally.host)lines.push(`🏠 Hôte : ${clean(rally.host)}`);
   }else if(rounds.length===1)lines.push([roundName(rounds[0]),roundDetails(rounds[0])].filter(Boolean).join('\n'));
-  if(gridfest&&event.streamers?.length)lines.push(event.streamers.map(streamer=>`🎙️ ${clean(streamer.name)} · ${Math.min(streamer.entered,streamer.capacity)}/${streamer.capacity} places${streamer.entered>=streamer.capacity?' · complet':''}`).join('\n'));
+  if(gridfest&&event.streamers?.length)lines.push(event.streamers.map(streamer=>`🎙️ ${streamer.twitchUrl?`[${clean(streamer.name)}](${streamer.twitchUrl})`:clean(streamer.name)} · ${Math.min(streamer.entered,streamer.capacity)}/${streamer.capacity} places${streamer.entered>=streamer.capacity?' · complet':''}`).join('\n'));
   if(event.password)lines.push('🔑 Mot de passe du serveur sur le site');
   const places=event.capacity&&!gridfest?(event.entered>=event.capacity?` · complet${event.entered>event.capacity?` · ${event.entered-event.capacity} en attente`:''}`:` · ${plural(event.capacity-event.entered,'place')} restante${event.capacity-event.entered>1?'s':''}`):'';
   const count=`✅ **${plural(Math.min(event.entered,event.capacity||event.entered),'présent')}**${places}`;

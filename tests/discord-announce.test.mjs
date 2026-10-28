@@ -4,7 +4,7 @@ import {DatabaseSync} from 'node:sqlite';
 import {readFileSync,readdirSync} from 'node:fs';
 import worker from '../server/worker.mjs';
 import {announceCommunity} from '../server/discord-announce.mjs';
-import {buildAnnounceEvent,buildAnnounceRace,eventHook,ANNOUNCE_HOOKS} from '../server/discord-weekly-format.mjs';
+import {buildAnnounceEvent,buildAnnounceIntro,buildAnnounceRace,eventHook,ANNOUNCE_HOOKS} from '../server/discord-weekly-format.mjs';
 import {layoutInput} from '../server/discord-layout.mjs';
 import {linkTestServer,DEV_COMMUNITY,GUILD} from './fixtures/discord-server.mjs';
 
@@ -26,7 +26,7 @@ function setup(t){
   // An AMS2 event at 21h (TDZ, OPEN, two rounds, 20 places), a 6h at 20h with a crew, a race tomorrow (not announced).
   event(EVENT,'Coupe GT3',Date.parse('2026-10-28T20:00:00Z'),{format:'solo',sim:'ams2',circuit:'Interlagos',minutes:80,capacity:20,access:'open',
     rounds:[{circuit:'Interlagos',durationMinutes:40,categories:[],category:'GT3',practice:10,qualifying:10,weather:'sun'},{circuit:'Spa',durationMinutes:40,categories:[],category:'GT3',weather:'rain'}],
-    details:{type:'OPEN',note:'La pluie attendue sur Spa.'}});
+    details:{type:'OPEN',note:'La pluie attendue sur Spa.',streamTime:'20:45'}});
   event(RACE,'6h de Spa',Date.parse('2026-10-28T19:00:00Z'),{hours:6,minutes:360,details:{weather:'mixed'},type:'private'});
   event(TOMORROW,'4h de Monza',Date.parse('2026-10-29T19:00:00Z'),{hours:4,minutes:240,circuit:'monza'});
   DB.db.prepare(`INSERT INTO participants(id,name,user_id,created_by,created_at,community_id) VALUES('p1','Pilote 1',NULL,'111111111111111111',0,?)`).run(DEV_COMMUNITY);
@@ -34,7 +34,7 @@ function setup(t){
   DB.db.prepare(`INSERT INTO crews(id,event_id,departure_id,name,category,car,created_at,community_id) VALUES('c1',?,'start-e2','Équipage A','GT3','Ferrari 296',0,?)`).run(RACE,DEV_COMMUNITY);
   DB.db.prepare(`INSERT INTO crew_members(registration_id,crew_id) VALUES('r1','c1')`).run();
   DB.db.prepare(`INSERT INTO community_recap_settings(community_id,enabled,mode,scope,guild_id,destination_id,destination_name,layout) VALUES(?,1,'events','all',?,'','',?)`)
-    .run(DEV_COMMUNITY,GUILD,JSON.stringify({v:1,mode:'events',sims:'all',announce:ANNOUNCES}));
+    .run(DEV_COMMUNITY,GUILD,JSON.stringify({v:1,mode:'events',sims:'all',announce:ANNOUNCES,stream:'https://twitch.tv/tdz'}));
   const env={DB,APP_ORIGIN:'https://site.example',DISCORD_BOT_TOKEN:'fake',DISCORD_CLIENT_ID:'444444444444444444',DISCORD_PUBLIC_KEY:'a'.repeat(64)};
   const original=globalThis.fetch;
   globalThis.fetch=async(url,options={})=>{
@@ -65,6 +65,7 @@ test('at 7h30 the day\'s endurances and events are announced in order, @everyone
   const [intro,race,event]=posts.map(call=>call.body);
   assert.equal(intro.content,'@everyone');assert.deepEqual(intro.allowed_mentions,{parse:['everyone']});assert.equal(intro.flags,undefined);
   assert.match(intro.embeds[0].description,/\*\*1 event\*\* et \*\*1 endurance\*\*/);
+  assert.match(intro.embeds[0].description,/📺 Lancement du stream sur \[Twitch\]\(https:\/\/twitch\.tv\/tdz\) à 20h45/);
   assert.equal(race.flags,4096);assert.deepEqual(race.allowed_mentions,{parse:[]});
   assert.match(race.embeds[0].title,/6h de Spa/);assert.match(race.embeds[0].description,new RegExp(ANNOUNCE_HOOKS.endurance));
   assert.match(JSON.stringify(race.embeds[0].fields),/Équipage A[\s\S]*Pilote 1/);
@@ -134,4 +135,21 @@ test('the setting keeps the announcement channel, and refuses anything else',()=
   assert.equal(layoutInput({mode:'events',sims:'all',under:'top',announce:ANNOUNCES}).announce,ANNOUNCES);
   assert.equal(layoutInput({mode:'events',sims:'all',under:'top',announce:''}).announce,undefined);
   assert.throws(()=>layoutInput({mode:'events',sims:'all',under:'top',announce:'bot'}),/annonce du jour/);
+});
+
+test('the community\'s stream in the intro, at the time given on the event; the Twitch of each Gridfest streamer',()=>{
+  const site={url:'https://tdz.site.example',streamUrl:'https://www.twitch.tv/tdz'};
+  const intro=counts=>buildAnnounceIntro({events:2,races:0,...counts},site).embeds[0].description;
+  assert.match(intro({streams:[{name:'Soirée',time:'19:45'}]}),/📺 Lancement du stream sur \[Twitch\]\(https:\/\/www\.twitch\.tv\/tdz\) à 19h45/);
+  assert.match(intro({streams:[{name:'B',time:'21:15'},{name:'A',time:'19:45'}]}),/à 19h45 \(A\), 21h15 \(B\)/);
+  assert.match(intro({streams:[]}),/📺 Le stream en direct sur \[Twitch\]/);
+  assert.doesNotMatch(buildAnnounceIntro({events:1,races:0,streams:[]},{url:site.url}).embeds[0].description,/📺/);
+  const event=buildAnnounceEvent({id:EVENT,name:'Gridfest',sim:'lmu',type:'Gridfest',access:'open',tdz:true,startsAt:MORNING+12*HOUR,rounds:[],capacity:null,entered:1,
+    streamers:[{name:'Zed',twitchUrl:'https://twitch.tv/zed',capacity:5,entered:1},{name:'Ana',twitchUrl:'',capacity:5,entered:0}]},site);
+  assert.doesNotMatch(JSON.stringify(event.components),/Stream/);
+  assert.match(event.embeds[0].description,/🎙️ \[Zed\]\(https:\/\/twitch\.tv\/zed\)/);
+  assert.match(event.embeds[0].description,/🎙️ Ana ·/);
+  assert.equal(layoutInput({mode:'events',sims:'all',under:'top',announce:ANNOUNCES,stream:' https://twitch.tv/tdz '}).stream,'https://twitch.tv/tdz');
+  assert.equal(layoutInput({mode:'events',sims:'all',under:'top',announce:'',stream:'https://twitch.tv/tdz'}).stream,undefined);
+  assert.throws(()=>layoutInput({mode:'events',sims:'all',under:'top',announce:ANNOUNCES,stream:'twitch.tv/tdz'}),/stream/);
 });

@@ -1,5 +1,13 @@
 # Nouveautés d'Endurance Manager
 
+## v1.87 — 28 octobre 2026
+
+### 🚀 Nouveautés
+
+- **Discord · Annonce du jour** : un lien du stream facultatif dans le réglage Discord. L’intro de l’annonce dit « 📺 Lancement du stream sur Twitch à 19h45 », avec le lien sur le mot Twitch.
+- **Events** : un champ facultatif « Début du stream » sur la première page de création, quand le stream commence avant la course.
+- **Gridfest** : dans l’annonce, le nom de chaque streamer mène à sa chaîne Twitch.
+
 ## v1.86 — 28 octobre 2026
 
 ### 🚀 Nouveautés
