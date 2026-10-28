@@ -1,5 +1,11 @@
 # Nouveautés d'Endurance Manager
 
+## v1.76 — 28 octobre 2026
+
+### 🔧 Corrections
+
+- **Discord** : les vocaux et le salon de la semaine se créent même quand la catégorie a des droits que le bot ne peut pas recopier (par exemple « Gérer les permissions »).
+
 ## v1.75 — 28 octobre 2026
 
 ### 🔧 Corrections
