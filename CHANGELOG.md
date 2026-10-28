@@ -1,5 +1,11 @@
 # Nouveautés d'Endurance Manager
 
+## v1.79 — 28 octobre 2026
+
+### ✨ Améliorations
+
+- **Discord** : les vocaux d’équipage ont le logo de leur course devant (« 🏎️ LMU · 6h de Spa · Équipage A »). Ceux qui existent déjà sont renommés, comme un équipage renommé sur le site.
+
 ## v1.78 — 28 octobre 2026
 
 ### ✨ Améliorations
