@@ -423,6 +423,31 @@ function roundDetails(round){
   const categories=round.randomCategory?'':(round.categories?.length?round.categories:round.category?[round.category]:[]).map(clean).join(', ');
   return [[categories,round.car&&`🏎️ ${clean(round.car)}`].filter(Boolean).join(' · '),format,[ROUND_WEATHER[round.weather],round.fuel>1&&`⛽ ×${round.fuel}`,round.tyres>1&&`🛞 ×${round.tyres}`].filter(Boolean).join(' · ')].filter(Boolean).join('\n');
 }
+// Compare each fact independently: a common circuit must not hide a different car.
+// Missing values are not evidence that a setting is shared by all rounds.
+function sharedRoundDetails(rounds){
+  const facts=round=>({
+    circuit:round.circuit?`📍 ${clean(circuitNames.get(round.circuit)||round.circuit)}`:'',
+    category:round.randomCategory?'🎲 Catégorie au hasard':(round.categories?.length?round.categories:round.category?[round.category]:[]).map(clean).sort().join(', '),
+    car:round.car?`🏎️ ${clean(round.car)}`:'',
+    weather:ROUND_WEATHER[round.weather]||'',
+    fuel:round.fuel!=null?`⛽ Carburant ×${round.fuel}`:'',
+    tyres:round.tyres!=null?`🛞 Pneus ×${round.tyres}`:'',
+    capacity:round.capacity?`👥 ${round.capacity} places`:''
+  });
+  const values=rounds.map(facts),keys=Object.keys(values[0]);
+  const shared=keys.filter(key=>values[0][key]&&values.every(value=>value[key]===values[0][key]));
+  const lines=value=>[
+    ['circuit','category','car'].map(key=>value[key]).filter(Boolean).join(' · '),
+    ['weather','fuel','tyres'].map(key=>value[key]).filter(Boolean).join(' · '),
+    value.capacity
+  ].filter(Boolean).join('\n');
+  return {common:lines(Object.fromEntries(shared.map(key=>[key,values[0][key]]))),
+    fields:rounds.slice(0,4).map((round,index)=>({name:`Manche ${index+1}`,inline:false,
+      value:cut([lines(Object.fromEntries(keys.filter(key=>!shared.includes(key)).map(key=>[key,values[index][key]]))),
+        [round.practice&&`Essais : ${round.practice} min`,round.qualifying&&`Qualifications : ${round.qualifying} min`,round.durationMinutes&&`Course : ${round.durationMinutes} min`].filter(Boolean).join(' · ')
+      ].filter(Boolean).join('\n')||BLANK,1024)}))};
+}
 // An event of the day: its hook, the admin's note, when and on which sim, its rounds, the count of présents and the buttons.
 // event: {id,name,sim,type,access,tdz,note,startsAt,timePending,rounds,capacity,entered,streamers,rally,password}.
 export function buildAnnounceEvent(event,site={},updatedAt=Date.now(),absent=null){
@@ -432,6 +457,8 @@ export function buildAnnounceEvent(event,site={},updatedAt=Date.now(),absent=nul
   const lines=[eventHook(event),event.note&&`*« ${clean(event.note)} »*`,
     [`🕘 ${announceTime(event.startsAt,event.timePending)}`,`🎮 ${SIM_SHORT[event.sim]||clean(event.sim)}`,typeLabel,event.tdz&&!gridfest&&event.access&&event.access.toUpperCase()].filter(Boolean).join('\n')];
   const rally=event.rally;
+  const grouped=!rally&&rounds.length>1?sharedRoundDetails(rounds):null;
+  if(grouped?.common)lines.push(grouped.common);
   if(rally){
     if(rally.stages?.length)lines.push(`🏔️ Spéciales : ${rally.stages.map(clean).join(', ')}`);
     const cars=rally.carMode==='category'&&rounds[0]?.category?`🚗 Catégorie imposée : ${clean(rounds[0].category)}`:rally.carMode==='car'&&rounds[0]?.car?`🚗 Voiture imposée : ${clean(rounds[0].car)}`:rally.carMode==='all'?'🚗 Toutes voitures':'';
@@ -443,7 +470,7 @@ export function buildAnnounceEvent(event,site={},updatedAt=Date.now(),absent=nul
   const places=event.capacity&&!gridfest?(event.entered>=event.capacity?` · complet${event.entered>event.capacity?` · ${event.entered-event.capacity} en attente`:''}`:` · ${plural(event.capacity-event.entered,'place')} restante${event.capacity-event.entered>1?'s':''}`):'';
   const count=`✅ **${plural(Math.min(event.entered,event.capacity||event.entered),'présent')}**${places}`;
   const embed={title:cut(`🏁 ${clean(event.name)}`,256),color:ANNOUNCE_SIM_COLORS[event.sim]||0xe7b653,description:cut(lines.filter(Boolean).join('\n\n'),4096)};
-  if(!rally&&rounds.length>1)embed.fields=rounds.slice(0,4).map((round,index)=>({name:cut(`Manche ${index+1} · ${roundName(round).slice(3)}`,256),value:cut([roundDetails(round),round.capacity&&`👥 ${round.capacity} places`].filter(Boolean).join(' · ')||BLANK,1024),inline:false}));
+  if(grouped)embed.fields=grouped.fields;
   embed.fields=[...(embed.fields||[]),{name:BLANK,value:count,inline:false}];
   if(url)embed.url=url;
   if(event.logoUrl)embed.thumbnail={url:event.logoUrl};
