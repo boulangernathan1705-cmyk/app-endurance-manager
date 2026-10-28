@@ -1,5 +1,11 @@
 # Nouveautés d'Endurance Manager
 
+## v1.82 — 28 octobre 2026
+
+### 🐛 Corrections
+
+- **Discord** : l’adresse qui reçoit les clics sur « Absent » répond en prod.
+
 ## v1.81 — 28 octobre 2026
 
 ### ✨ Améliorations
