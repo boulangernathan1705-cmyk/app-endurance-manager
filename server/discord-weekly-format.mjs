@@ -442,10 +442,14 @@ function sharedRoundDetails(rounds){
     ['weather','fuel','tyres'].map(key=>value[key]).filter(Boolean).join(' · '),
     value.capacity
   ].filter(Boolean).join('\n');
-  return {common:lines(Object.fromEntries(shared.map(key=>[key,values[0][key]]))),
-    fields:rounds.slice(0,4).map((round,index)=>({name:`Manche ${index+1}`,inline:false,
+  const common=Object.fromEntries(shared.map(key=>[key,values[0][key]]));
+  return {common:lines(common),commonFields:[
+      {name:'📍 Circuit et voiture',value:lines({circuit:common.circuit,category:common.category,car:common.car})},
+      {name:'Conditions communes',value:lines({weather:common.weather,fuel:common.fuel,tyres:common.tyres,capacity:common.capacity})}
+    ].filter(field=>field.value).map(field=>({...field,inline:false})),
+    fields:rounds.slice(0,4).map((round,index)=>({name:`Manche ${index+1}${round.durationMinutes?` · Course : ${round.durationMinutes} min`:''}`,inline:false,
       value:cut([lines(Object.fromEntries(keys.filter(key=>!shared.includes(key)).map(key=>[key,values[index][key]]))),
-        [round.practice&&`Essais : ${round.practice} min`,round.qualifying&&`Qualifications : ${round.qualifying} min`,round.durationMinutes&&`Course : ${round.durationMinutes} min`].filter(Boolean).join(' · ')
+        [round.practice&&`Essais : ${round.practice} min`,round.qualifying&&`Qualifications : ${round.qualifying} min`].filter(Boolean).join(' · ')
       ].filter(Boolean).join('\n')||BLANK,1024)}))};
 }
 // An event of the day: its hook, the admin's note, when and on which sim, its rounds, the count of présents and the buttons.
@@ -458,7 +462,6 @@ export function buildAnnounceEvent(event,site={},updatedAt=Date.now(),absent=nul
     [`🕘 ${announceTime(event.startsAt,event.timePending)}`,`🎮 ${SIM_SHORT[event.sim]||clean(event.sim)}`,typeLabel,event.tdz&&!gridfest&&event.access&&event.access.toUpperCase()].filter(Boolean).join(' · ')];
   const rally=event.rally;
   const grouped=!rally&&rounds.length>1?sharedRoundDetails(rounds):null;
-  if(grouped?.common)lines.push(grouped.common);
   if(rally){
     if(rally.stages?.length)lines.push(`🏔️ Spéciales : ${rally.stages.map(clean).join(', ')}`);
     const cars=rally.carMode==='category'&&rounds[0]?.category?`🚗 Catégorie imposée : ${clean(rounds[0].category)}`:rally.carMode==='car'&&rounds[0]?.car?`🚗 Voiture imposée : ${clean(rounds[0].car)}`:rally.carMode==='all'?'🚗 Toutes voitures':'';
@@ -466,12 +469,13 @@ export function buildAnnounceEvent(event,site={},updatedAt=Date.now(),absent=nul
     if(rally.host)lines.push(`🏠 Hôte : ${clean(rally.host)}`);
   }else if(rounds.length===1)lines.push([roundName(rounds[0]),roundDetails(rounds[0])].filter(Boolean).join('\n'));
   if(gridfest&&event.streamers?.length)lines.push(event.streamers.map(streamer=>`🎙️ ${streamer.twitchUrl?`[${clean(streamer.name)}](${streamer.twitchUrl})`:clean(streamer.name)} · ${Math.min(streamer.entered,streamer.capacity)}/${streamer.capacity} places${streamer.entered>=streamer.capacity?' · complet':''}`).join('\n'));
-  if(event.password)lines.push('🔑 Mot de passe du serveur sur le site');
   const places=event.capacity&&!gridfest?(event.entered>=event.capacity?` · complet${event.entered>event.capacity?` · ${event.entered-event.capacity} en attente`:''}`:` · ${plural(event.capacity-event.entered,'place')} restante${event.capacity-event.entered>1?'s':''}`):'';
   const count=`✅ **${plural(Math.min(event.entered,event.capacity||event.entered),'présent')}**${places}`;
-  const embed={title:cut(`🏁 ${clean(event.name)}`,256),color:ANNOUNCE_SIM_COLORS[event.sim]||0xe7b653,description:cut(lines.filter(Boolean).join('\n\n'),4096)};
-  if(grouped)embed.fields=grouped.fields;
+  const [hook,note,when,...details]=lines;
+  const embed={title:cut(`🏁 ${clean(event.name)}`,256),color:ANNOUNCE_SIM_COLORS[event.sim]||0xe7b653,description:cut([`**${when}**`,hook,note,...details].filter(Boolean).join('\n\n'),4096)};
+  if(grouped)embed.fields=[...grouped.commonFields.filter(field=>field.name==='📍 Circuit et voiture'),...grouped.fields,...grouped.commonFields.filter(field=>field.name!=='📍 Circuit et voiture')];
   embed.fields=[...(embed.fields||[]),{name:BLANK,value:count,inline:false}];
+  if(event.password)embed.fields.push({name:BLANK,value:'🔑 Mot de passe disponible sur la fiche',inline:false});
   if(url)embed.url=url;
   if(event.logoUrl)embed.thumbnail={url:event.logoUrl};
   embed.footer=footer(updatedAt);
