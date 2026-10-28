@@ -1,5 +1,9 @@
 import {grindfestAvailable, grindfestEnabled, isGrindfest, streamersOf, assignStreamerWaitlist} from '../shared/grindfest.mjs';
 import {discordInteraction} from './discord-interactions.mjs';
+import {discordRequest} from './recap-discord.mjs';
+import {buildAnnounceEvent,buildAnnounceIntro,buildCompleteAnnouncement} from './discord-weekly-format.mjs';
+import {siteOf} from './discord-weekly.mjs';
+import {announceStream} from './discord-announce.mjs';
 import {gridfestPasswordStatus, sendGridfestPasswords} from './gridfest-discord.mjs';
 import {
   LEGACY_CAR_ALIASES, COOKIE_SESSION, COOKIE_STATE, COOKIE_RETURN, DAY, HttpError, fail, now, id, token, hash, cookie,
@@ -1003,6 +1007,24 @@ async function api(request, env) {
       const saved = await botRecapSettings(env, community);
       return json({previews:await previewBotRecap(env,Date.now(),community,{...settings, bot_categories:saved?.bot_categories || '{}'})});
     } catch (error) { fail(400,error.message === 'Discord indisponible' ? recapError(error) : error.message); }
+  }
+  if(path==='/api/community/discord/announcement-test'&&method==='POST'){
+    requirePermission(actor,'admin');
+    await rateLimit(request,env,'discord-announcement-test',3);
+    const input=await body(request),destinations=await recapDestinations(env,community);
+    const matches=destinations.filter(channel=>channel.type===0&&(channel.id===input.channel||channel.name===input.channel));
+    if(matches.length!==1)fail(400,'Choisis un salon texte unique du serveur de cette communauté.');
+    const channel=matches[0];
+    if(channel.announceMissing?.some(right=>right!=='Mentionner @everyone'))fail(400,'Le bot doit pouvoir voir le salon, envoyer des messages et intégrer des liens.');
+    const site={...siteOf(env,community),streamUrl:announceStream(await botRecapSettings(env,community))};
+    const round={circuit:'Velo Città',category:'GT4',car:'Ginetta G55',weather:'random',fuel:1,tyres:1,qualifying:10};
+    const event={id:'demo',name:'APERÇU · SAFE’S RACE',sim:'ams2',type:'SAFE',access:'safe',tdz:true,startsAt:Date.now(),entered:13,
+      note:'Démonstration de présentation : données d’exemple.',rounds:[{...round,practice:10,durationMinutes:20},{...round,practice:5,durationMinutes:40}]};
+    const card=buildAnnounceEvent(event,{},Date.now());
+    const payload=buildCompleteAnnouncement(buildAnnounceIntro({events:1},site),[{name:event.name,payload:card}],site);
+    payload.content='Aperçu de présentation · données d’exemple';payload.allowed_mentions={parse:[]};payload.components=[];
+    const sent=await discordRequest(env,'POST',`/channels/${channel.id}/messages`,payload);
+    return json({ok:true,url:`https://discord.com/channels/${community.discordGuildId}/${channel.id}/${sent.id}`});
   }
   // Everything the bot made for « Discord » taken off: the messages, channels and categories, the crews' voice channels.
   const removeDiscord = async () => {
