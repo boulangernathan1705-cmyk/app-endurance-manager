@@ -683,8 +683,10 @@ async function weekChannel(env, community, row, entry, budget) {
   const topic = 'endurance-manager:' + (await digest([community.id,'week',destination,entry.topic])).slice(0,24);
   const existing = channels.find(item => item.type === 0 && item.topic === topic);
   if (existing) return {channel:existing.id, category:entry.key};
-  const created = await discord(env,'POST',`/guilds/${row.guild_id}/channels`,{type:0,name:entry.channel,topic,...(parent ? {parent_id:parent} : {}),
-    permission_overwrites:withBotAccess(category?.permission_overwrites,env.DISCORD_CLIENT_ID,REQUIRED)},budget);
+  const create = rules => discord(env,'POST',`/guilds/${row.guild_id}/channels`,{type:0,name:entry.channel,topic,...(parent ? {parent_id:parent} : {}),...rules},budget);
+  // A right the bot does not hold in a copied rule: made without the copy, Discord then gives it the category's rights.
+  const created = await create({permission_overwrites:withBotAccess(category?.permission_overwrites,env.DISCORD_CLIENT_ID,REQUIRED)})
+    .catch(error => { if (parent && error?.code === 50013) return create({}); throw error; });
   // Its place among the channels of that category: first, or right after the chosen channel (one request).
   const siblings = channels.filter(item => item.type !== 4 && (item.parent_id || null) === parent)
     .sort((a,b) => (a.position || 0) - (b.position || 0) || (BigInt(a.id) < BigInt(b.id) ? -1 : 1));
