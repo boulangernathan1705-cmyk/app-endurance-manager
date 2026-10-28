@@ -74,7 +74,7 @@ function soloCardFoot(event,archived,situation){
   if(isStream(event))return situation?`<span class="solo-card-foot"><span class="race-situation">${situation}</span></span>`:'';
   return `<span class="solo-card-foot">${start}${event.official&&(event.departures||[]).length>1?raceStarts(event,archived):''}${soloFill(event,shown)}${situation?`<span class="race-situation">${situation}</span>`:''}</span>`;
 }
-// EVENT TDZ card: no circuit map; the panel is kept for the logo of the event type (OPEN, SAFE, Bouboule…),
+// EVENT TDZ card: no circuit map; the panel is kept for the logo of the event type (OPEN, SAFE, BOULOULES…),
 // using the simulator-specific OPEN/SAFE artwork.
 function soloCircuit(event){
   // Gridfest: its own wordmark and the streamers' logos.

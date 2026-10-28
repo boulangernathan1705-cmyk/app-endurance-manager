@@ -146,7 +146,10 @@ export const TRACK_LIMITS = {strict:'Strictes', normal:'Normales'};
 export const RACE_SKIES = {clear:'Dégagé', lightClouds:'Quelques nuages', partlyCloudy:'Partiellement nuageux', mostlyCloudy:'Très nuageux', overcast:'Couvert', cloudyDrizzle:'Nuageux, bruine', cloudyLightRain:'Nuageux, pluie légère', overcastLightRain:'Couvert, pluie légère', overcastRain:'Couvert, pluie', overcastHeavyRain:'Couvert, forte pluie', overcastStorm:'Couvert, orage'};
 export const WEATHER_SLOTS = 5;
 export const RACE_WEATHERS = {dry:'Sec', mixed:'Variable', rain:'Pluie'};
-export const TDZ_EVENT_TYPES = ['OPEN', 'SAFE', 'Bouboule', 'TONDEUZ TRAINING'];
+// Keep older saved event types readable while presenting the current label.
+export const normalizeTdzEventType = value => /^(?:bouboules?|bouloules?)$/i.test(String(value || '')) ? 'BOULOULES' : value;
+export const normalizeTdzDetails = details => details?.type ? {...details,type:normalizeTdzEventType(details.type)} : details;
+export const TDZ_EVENT_TYPES = ['OPEN', 'SAFE', 'BOULOULES', 'TONDEUZ TRAINING'];
 export const TDZ_EVENTS_LABEL = 'EVENT TDZ';
 // The events module (modules.soloRaces) is « EVENT TDZ » for the TDZ community (plus « test » on the dev site),
 // with its types and OPEN / SAFE access; everywhere else it is « EVENT SOLO »: no type, open to the « Endurances » permission.

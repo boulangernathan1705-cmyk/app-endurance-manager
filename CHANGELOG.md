@@ -1,5 +1,13 @@
 # Nouveautés d'Endurance Manager
 
+## v1.94 — 28 octobre 2026
+
+### ✨ Améliorations
+
+- **Discord · Annonce du jour** : une seule publication regroupe les events, endurances et streams, avec leurs informations adaptées et les boutons de participation. Les anciens messages du jour sont regroupés sans nouvelle mention.
+- **Discord · Calendrier** : horaires, simulations, circuits et places sont mieux séparés ; la bannière configurée de la communauté est conservée.
+- **TDZ** · Le type d’événement s’affiche désormais « BOULOULES », y compris pour les anciens événements.
+
 ## v1.93 — 28 octobre 2026
 
 ### 🛠️ Pour les admins

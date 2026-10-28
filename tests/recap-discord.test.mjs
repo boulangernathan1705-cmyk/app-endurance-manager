@@ -569,7 +569,7 @@ test('the week calendar is its own message, never mixed with the endurances',asy
   const made=channels.find(item=>item.name==='calendrier-de-la-semaine');assert.ok(made,'the bot makes its channel below the chosen one');
   const calendar=sends(calls).find(call=>call.path===`/channels/${made.id}/messages`);assert.ok(calendar);
   const text=JSON.stringify(calendar.body);
-  assert.match(text,/🗓️ Semaine du/);assert.equal(calendar.body.embeds[0].url,'https://site.example/events/');assert.deepEqual(calendar.body.components,[]);assert.match(text,/Sprint du mardi/);assert.match(text,/Coupe du jeudi/);
+  assert.match(text,/📅 Le programme de la semaine/);assert.match(text,/Semaine du/);assert.equal(calendar.body.embeds[0].url,'https://site.example/events/');assert.deepEqual(calendar.body.components,[]);assert.match(text,/Sprint du mardi/);assert.match(text,/Coupe du jeudi/);
   assert.match(text,/2\/2 places · complet/);assert.doesNotMatch(text,/6h de Spa/,'the endurances stay in their category');
   assert.doesNotMatch(JSON.stringify(sends(calls).filter(call=>call!==calendar).map(call=>call.body)),/Sprint du mardi/,'events never get a race category');
   assert.ok(!creates(calls).some(call=>/Sprint/.test(call.body.name)));
@@ -992,11 +992,11 @@ test('written in a channel: the bot must be allowed there, threads included',asy
 });
 
 
-test('automatic Discord synchronization retries a failed publication without saving settings again',async t=>{
+for (const status of [403,429]) test(`automatic Discord synchronization retries a ${status} publication without saving settings again`,async t=>{
   const {DB,env,setFailure,messages}=setup(t);
   await saveBotRecap(env,COMMUNITY,GENERAL);
   DB.db.prepare('INSERT INTO discord_pending(community_id,event_id,queued_at) VALUES(?,?,?)').run(COMMUNITY.id,null,1);
-  setFailure(()=>true);
+  const failure=()=>true;failure.status=status;setFailure(failure);
   assert.equal(await flushDiscord(env,1),1);
   assert.ok(DB.db.prepare('SELECT * FROM discord_pending WHERE community_id=?').get(COMMUNITY.id),'failed update remains pending');
   setFailure(null);

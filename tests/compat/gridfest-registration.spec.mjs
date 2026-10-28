@@ -12,7 +12,7 @@ for(const type of ['Grindfest','Gridfest'])test(`${type}: LMU name and streamer 
     const request=route.request(),url=new URL(request.url()),path=url.pathname;
     let data={ok:true};
     if(path==='/api/session')data={user:{id:'111111111111111111',name:'Nathan Boulanger',communityIntroSeen:true},access:'member',permissions:['access','solo_open'],
-      discordReady:true,soloRaces:true,eventTdz:true,grindfest:true,soloLabel:'EVENT TDZ',eventTypes:['OPEN','SAFE','Bouboule','Gridfest'],
+      discordReady:true,soloRaces:true,eventTdz:true,grindfest:true,soloLabel:'EVENT TDZ',eventTypes:['OPEN','SAFE','BOULOULES','Gridfest'],
       community:{id:'tdz',slug:'tdz',name:'TDZ',shortName:'TDZ',appearance:{},discordInviteUrl:'https://discord.gg/tdz-test'},communities:[]};
     else if(['/api/races','/api/events'].includes(path))data={events:url.searchParams.get('scope')==='archived'?[]:[event]};
     else if(path==='/api/participants')data={participants:[]};

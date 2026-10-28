@@ -9,7 +9,7 @@ import {
 import {ingestClientError, clientErrorsApi} from './telemetry.mjs';
 import {communityRequestsApi, closeCommunityRequest} from './community-requests.mjs';
 import {racesPath} from './races-path.mjs';
-import {catalogForGame, gameForEvent, simForEvent, TDZ_EVENT_TYPES, tdzOnly, eventsLabel} from '../shared/catalog.mjs';
+import {catalogForGame, gameForEvent, simForEvent, TDZ_EVENT_TYPES, normalizeTdzDetails, tdzOnly, eventsLabel} from '../shared/catalog.mjs';
 import {currentCommunity, appearanceOf, allCommunities, communityUrl, communitySlug, communityById, communityFromRow} from './community.mjs';
 import {isDevelopment} from './dev-environment.mjs';
 import {STREAM_SIM} from '../shared/stream.mjs';
@@ -348,7 +348,7 @@ async function listEvents(env, actor, game='', scope='', community) {
   return rows.map(row => {
     const format=row.format||'endurance', capacity=row.capacity==null?null:Number(row.capacity);
     const durationHours=Number(row.duration_hours)||3, durationMinutes=Number(row.duration_minutes)||durationHours*60;
-    return {id:row.id, name:row.name, official:row.community_id===OFFICIAL, format, ...(format==='solo' ? {sim:simForEvent(row)} : {}), details:JSON.parse(row.details||'{}'), access:row.access||'open', capacity, rounds:JSON.parse(row.rounds||'[]'), circuit:row.circuit||'', durationHours, durationMinutes, driverChangeRequired:row.driver_change_required==null?null:Boolean(row.driver_change_required), eventType:row.event_type||'private', schedulePending:Boolean(row.schedule_pending), createdByMe:Boolean(actor.user && row.created_by===actor.user.id), categories:JSON.parse(row.categories), version:row.version,
+    return {id:row.id, name:row.name, official:row.community_id===OFFICIAL, format, ...(format==='solo' ? {sim:simForEvent(row)} : {}), details:normalizeTdzDetails(JSON.parse(row.details||'{}')), access:row.access||'open', capacity, rounds:JSON.parse(row.rounds||'[]'), circuit:row.circuit||'', durationHours, durationMinutes, driverChangeRequired:row.driver_change_required==null?null:Boolean(row.driver_change_required), eventType:row.event_type||'private', schedulePending:Boolean(row.schedule_pending), createdByMe:Boolean(actor.user && row.created_by===actor.user.id), categories:JSON.parse(row.categories), version:row.version,
       ...(crewsOfStreams.has(row.id) ? {streamCrew:crewsOfStreams.get(row.id)} : {}), absences:absences.get(row.id) || [], departures:JSON.parse(row.departures).map(d => {
         const availability=grouped.get(`${row.id}:${d.id}`) || [];
         // Solo race: entries keep their order of arrival; beyond the number of places they are on the
@@ -719,7 +719,7 @@ async function api(request, env) {
     const event=await eventById(env,editDetails[1],community);
     if(event.community_id===OFFICIAL&&!actor.manager)fail(403,'Une course officielle se modifie par les gestionnaires de la plateforme.');
     if(!can(actor,'manage_races')&&!(can(actor,'create_race')&&event.created_by===actor.user?.id))requirePermission(actor,'manage_races');
-    return json({details:JSON.parse(event.details||'{}')});
+    return json({details:normalizeTdzDetails(JSON.parse(event.details||'{}'))});
   }
   const eventMatch = path.match(/^\/api\/events\/([a-f0-9-]{36})$/);
   if (eventMatch && ['PATCH','DELETE'].includes(method)) {
