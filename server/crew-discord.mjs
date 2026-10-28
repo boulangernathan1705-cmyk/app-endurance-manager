@@ -15,6 +15,8 @@ import {effectivePermissions,guildPermissions,missingVoicePermissions,withBotAcc
 import {allCommunities, communityById, communityUrl} from './community.mjs';
 import {notify} from './notifications.mjs';
 import {durationLabel} from '../shared/duration.mjs';
+import {catalogForGame, TRACK_LIMITS} from '../shared/catalog.mjs';
+import {categoryEmojiName} from './discord-weekly-format.mjs';
 
 const DISCORD_API = 'https://discord.com/api/v10';
 const HOUR = 3600_000;
@@ -88,21 +90,52 @@ function startOf(row) {
   return {startsAt, endsAt:startsAt + minutes * 60_000, minutes, pending:Boolean(row.schedule_pending) || departure.tbd === true};
 }
 
-// The recap message of the voice channel's chat.
-function recapContent(env, community, row, start, pilots) {
-  const unix = Math.floor(start.startsAt / 1000);
-  const names = pilots.map(pilot => safe(pilot.name)).filter(Boolean);
-  let link = '';
-  try { link = `${communityUrl(env, community)}/${game(row.circuit)}/#event=${row.event_id}`; } catch {}
-  return [
-    `🏁 **${safe(row.event_name)}** · ${game(row.circuit) === 'iracing' ? 'iRacing' : 'LMU'}`,
-    start.pending ? '🕐 Horaire à confirmer' : `🕐 <t:${unix}:F> (<t:${unix}:R>)`,
-    start.minutes ? `⏱️ ${durationLabel(start.minutes)}` : '',
-    `🚗 ${safe(row.car) || 'Voiture à choisir'} · ${safe(row.category)}`,
-    `👥 Équipage **${safe(row.crew_name)}** : ${names.join(', ') || 'personne pour l’instant'}`,
-    link ? `🔗 Inscriptions et équipage : ${link}` : ''
-  ].filter(Boolean).join('\n');
+// The card of the voice channel's chat: the race, the crew and its conditions, a button to the race on the site.
+const SKY = {clear:'☀️', lightClouds:'🌤️', partlyCloudy:'⛅', mostlyCloudy:'🌥️', overcast:'☁️', cloudyDrizzle:'🌦️', cloudyLightRain:'🌦️',
+  overcastLightRain:'🌧️', overcastRain:'🌧️', overcastHeavyRain:'🌧️', overcastStorm:'⛈️'};
+const WEATHER = {dry:'☀️ Sec', mixed:'🌦️ Variable', rain:'🌧️ Pluie'};
+const COLORS = {lmu:0xe5484d, iracing:0x3b82f6};
+const raceLink = (env, community, row) => { try { return `${communityUrl(env, community)}/${game(row.circuit)}/#event=${row.event_id}`; } catch { return ''; } };
+function recapPayload(env, community, row, start, pilots) {
+  const sim = game(row.circuit), info = parse(row.event_details, {}) || {}, link = raceLink(env, community, row);
+  const unix = Math.floor(start.startsAt / 1000), end = Math.floor(start.endsAt / 1000);
+  const circuit = catalogForGame(sim).circuits?.find(item => item.id === row.circuit)?.name;
+  // The one who made the crew first, then the others in their order of entry.
+  const ordered = [...pilots].sort((a, b) => (b.user_id && b.user_id === row.owner_user_id) - (a.user_id && a.user_id === row.owner_user_id));
+  const names = ordered.map(pilot => safe(pilot.name) && `${safe(pilot.name)}${pilot.user_id && pilot.user_id === row.owner_user_id ? ' · responsable' : ''}`).filter(Boolean);
+  const weather = [WEATHER[info.weather], Array.isArray(info.weatherSlots) && info.weatherSlots.some(Boolean) ? info.weatherSlots.map(sky => SKY[sky] || '❔').join(' ') : '', safe(info.weatherNote)].filter(Boolean);
+  const fields = [
+    {name:'🟢 Départ', value:start.pending ? 'Horaire à confirmer' : `<t:${unix}:F>\n<t:${unix}:R>`, inline:true},
+    start.minutes && {name:'⏱️ Durée', value:`${durationLabel(start.minutes)}${start.pending ? '' : `\narrivée <t:${end}:t>`}`, inline:true},
+    {name:'🚗 Voiture', value:[safe(row.car) || 'À choisir', safe(row.category)].filter(Boolean).join('\n'), inline:true},
+    {name:`👥 Pilotes · ${names.length}`, value:names.join('\n') || 'Personne pour l’instant', inline:true},
+    weather.length && {name:'🌦️ Météo', value:weather.join('\n'), inline:true},
+    info.tyres && {name:'🛞 Pneus', value:`${info.tyres} pneu${info.tyres > 1 ? 's' : ''}`, inline:true},
+    TRACK_LIMITS[info.trackLimits] && {name:'🚧 Limites de piste', value:TRACK_LIMITS[info.trackLimits], inline:true},
+    info.fairShare === true && {name:'⚖️ Partage équitable', value:'Oui', inline:true}
+  ].filter(Boolean);
+  const logo = categoryEmojiName(sim, row.category);
+  let site = '';
+  try { site = communityUrl(env, community); } catch {}
+  const embed = {color:COLORS[sim],
+    author:{name:[`${sim === 'iracing' ? '🏁 iRacing' : '🏎️ LMU'}`, circuit, info.grid && `${info.grid} voitures`].filter(Boolean).join(' · ')},
+    title:clip(safe(row.event_name) || 'Endurance', 256), ...(link ? {url:link} : {}),
+    description:`Équipage **${safe(row.crew_name)}** · ${row.locked ? '🔒 Complet' : '🔓 Ouvert, il reste de la place'}`,
+    ...(site && logo ? {thumbnail:{url:`${site}/images/discord-emojis/${logo.slice(3)}.png`}} : {}),
+    fields, footer:{text:'Endurance Manager · ce vocal ferme 2 h après l’arrivée'}};
+  return {content:'', embeds:[embed], components:link ? [{type:1, components:[{type:2, style:5, label:'Page de la course', emoji:{name:'📋'}, url:link}]}] : []};
 }
+// After the finish, once: a word to the crew before its voice closes.
+function endPayload(env, community, row, start) {
+  let site = '';
+  try { site = communityUrl(env, community); } catch {}
+  const close = Math.floor((start.endsAt + CLOSE_AFTER) / 1000);
+  return {content:`🏁 **Course terminée, bien joué ${safe(row.crew_name)} !** Ce vocal ferme <t:${close}:R>.`,
+    components:site ? [{type:1, components:[{type:2, style:5, label:'Prochaines endurances', emoji:{name:'📅'}, url:`${site}/${game(row.circuit)}/`}]}] : []};
+}
+const END_BIT = 4;
+const endDue = (row, start, timestamp) => !start.pending && timestamp >= start.endsAt && timestamp < start.endsAt + CLOSE_AFTER
+  && !((Number(row.starts_at) === start.startsAt ? Number(row.reminded) || 0 : 0) & END_BIT);
 
 async function hash(text) {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
@@ -111,8 +144,8 @@ async function hash(text) {
 const discordIds = pilots => [...new Set(pilots.map(pilot => pilot.user_id).filter(id => /^\d{15,22}$/.test(id || '')))];
 
 // The crews with their race (rows of crew_discord, or crews about to get one).
-const CREW_COLUMNS = `c.id AS crew_id, c.community_id, c.name AS crew_name, c.car, c.category, c.departure_id, c.event_id,
-  e.name AS event_name, e.departures, e.duration_hours, e.duration_minutes, e.circuit, e.schedule_pending`;
+const CREW_COLUMNS = `c.id AS crew_id, c.community_id, c.name AS crew_name, c.car, c.category, c.departure_id, c.event_id, c.locked, c.owner_user_id,
+  e.name AS event_name, e.details AS event_details, e.departures, e.duration_hours, e.duration_minutes, e.circuit, e.schedule_pending`;
 const TRACKED_CREWS = `SELECT d.crew_id AS row_id, d.community_id AS row_community, d.guild_id, d.category_id, d.text_id, d.voice_id, d.message_id,
   d.recap_hash, d.members, d.starts_at, d.reminded, d.created_at, d.parent_id, ${CREW_COLUMNS},
   -- A race's category only counts while « Une catégorie par course » is on: otherwise the voices leave it before it goes.
@@ -251,8 +284,8 @@ async function needsWork(env, timestamp, community, setting, row, pilots) {
   if ((row.parent_id || null) !== voiceParent(row, setting)) return true;
   const current = discordIds(pilots), known = JSON.parse(row.members || '[]');
   if (current.length !== known.length || current.some(id => !known.includes(id))) return true;
-  if (dueReminders(community, row, start, timestamp).length) return true;
-  return row.recap_hash !== await hash(recapContent(env, community, row, start, pilots));
+  if (dueReminders(community, row, start, timestamp).length || endDue(row, start, timestamp)) return true;
+  return row.recap_hash !== await hash(JSON.stringify(recapPayload(env, community, row, start, pilots)));
 }
 
 // Deletes a channel (already gone: fine).
@@ -298,10 +331,12 @@ export async function cleanupOrphanCrewDiscord(env, timestamp = Date.now()) {
   try {
     const eventId = races.get(channel.parent_id);
     const messages = await discord(env,budget,'GET',`/channels/${channel.id}/messages?after=0&limit=100`);
+    const links = ['lmu','iracing'].map(sim => `${communityUrl(env,community)}/${sim}/#event=${eventId}`);
+    // The text recap of before, or the card (its title links to the race).
     const recap = (Array.isArray(messages) ? messages : []).find(message => message.author?.bot === true
-      && message.author.id === env.DISCORD_CLIENT_ID && ['lmu','iracing'].some(sim =>
-        String(message.content || '').split('\n').includes(`🔗 Inscriptions et équipage : ${communityUrl(env,community)}/${sim}/#event=${eventId}`)));
-    const name = recap?.content?.match(/^👥 Équipage \*\*([^\n]+)\*\* : /m)?.[1];
+      && message.author.id === env.DISCORD_CLIENT_ID && (links.some(link => String(message.content || '').split('\n').includes(`🔗 Inscriptions et équipage : ${link}`))
+        || links.includes(message.embeds?.[0]?.url)));
+    const name = (recap?.content?.match(/^👥 Équipage \*\*([^\n]+)\*\* : /m) || recap?.embeds?.[0]?.description?.match(/^Équipage \*\*([^\n]+)\*\* · /))?.[1];
     if (!name || channel.name !== clip(name,100)) return 0;
     // Re-read immediately before deletion: a creation still in flight or another live crew is protected.
     if (await env.DB.prepare('SELECT 1 FROM crew_discord WHERE guild_id=? AND voice_id=?')
@@ -507,16 +542,16 @@ async function syncRow(env, budget, timestamp, community, setting, row, pilots) 
     await env.DB.prepare('UPDATE crew_discord SET parent_id=? WHERE crew_id=?').bind(row.parent_id, row.row_id).run();
     if (!row.race_category && parent) await sortVoices(env, budget, row, parent);
   }
-  const content = recapContent(env, community, row, start, pilots);
-  const contentHash = await hash(content);
+  const payload = recapPayload(env, community, row, start, pilots);
+  const contentHash = await hash(JSON.stringify(payload));
   if (!row.message_id) {
     // Plain names only: even the first message must not notify or ping the pilots.
-    const message = await sendInChannel(env, budget, row, 'POST', `/channels/${row.voice_id}/messages`, {content, allowed_mentions:{parse:[]}, flags:4096});
+    const message = await sendInChannel(env, budget, row, 'POST', `/channels/${row.voice_id}/messages`, {...payload, allowed_mentions:{parse:[]}, flags:4096});
     Object.assign(row, {message_id:message.id, recap_hash:contentHash, members:JSON.stringify(current)});
     await env.DB.prepare('UPDATE crew_discord SET message_id=?, recap_hash=?, members=? WHERE crew_id=?').bind(message.id, contentHash, row.members, row.row_id).run();
   } else {
     if (row.recap_hash !== contentHash) {
-      await sendInChannel(env, budget, row, 'PATCH', `/channels/${row.voice_id}/messages/${row.message_id}`, {content, allowed_mentions:{parse:[]}});
+      await sendInChannel(env, budget, row, 'PATCH', `/channels/${row.voice_id}/messages/${row.message_id}`, {...payload, allowed_mentions:{parse:[]}});
       await env.DB.prepare('UPDATE crew_discord SET recap_hash=? WHERE crew_id=?').bind(contentHash, row.row_id).run();
     }
     // A pilot who joins gets no message: the edited recap is enough.
@@ -540,6 +575,12 @@ async function syncRow(env, budget, timestamp, community, setting, row, pilots) 
     await sendInChannel(env, budget, row, 'POST', `/channels/${row.voice_id}/messages`, {content:content.replace(/ {2,}/g, ' '), allowed_mentions:{parse:[]}, flags:4096});
     for (const item of due) reminded |= item.bit;
     await env.DB.prepare('UPDATE crew_discord SET reminded=? WHERE crew_id=?').bind(reminded, row.row_id).run();
+    row.reminded = reminded;
+  }
+  if (endDue(row, start, timestamp)) {
+    await sendInChannel(env, budget, row, 'POST', `/channels/${row.voice_id}/messages`, {...endPayload(env, community, row, start), allowed_mentions:{parse:[]}, flags:4096});
+    row.reminded = (Number(row.reminded) || 0) | END_BIT;
+    await env.DB.prepare('UPDATE crew_discord SET reminded=? WHERE crew_id=?').bind(row.reminded, row.row_id).run();
   }
   return opened ? 'opened' : 'updated';
 }
