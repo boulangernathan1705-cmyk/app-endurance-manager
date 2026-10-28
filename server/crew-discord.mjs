@@ -15,8 +15,8 @@ import {effectivePermissions,guildPermissions,missingVoicePermissions,withBotAcc
 import {allCommunities, communityById, communityUrl} from './community.mjs';
 import {notify} from './notifications.mjs';
 import {durationLabel,raceFinishAt} from '../shared/duration.mjs';
-import {catalogForGame, TRACK_LIMITS} from '../shared/catalog.mjs';
-import {categoryEmojiName} from './discord-weekly-format.mjs';
+import {catalogForGame} from '../shared/catalog.mjs';
+import {categoryEmojiName, conditionFields} from './discord-weekly-format.mjs';
 
 const DISCORD_API = 'https://discord.com/api/v10';
 const HOUR = 3600_000;
@@ -91,9 +91,6 @@ function startOf(row) {
 }
 
 // The card of the voice channel's chat: the race, the crew and its conditions, a button to the race on the site.
-const SKY = {clear:'☀️', lightClouds:'🌤️', partlyCloudy:'⛅', mostlyCloudy:'🌥️', overcast:'☁️', cloudyDrizzle:'🌦️', cloudyLightRain:'🌦️',
-  overcastLightRain:'🌧️', overcastRain:'🌧️', overcastHeavyRain:'🌧️', overcastStorm:'⛈️'};
-const WEATHER = {dry:'☀️ Sec', mixed:'🌦️ Variable', rain:'🌧️ Pluie'};
 const COLORS = {lmu:0xe5484d, iracing:0x3b82f6};
 const raceLink = (env, community, row) => { try { return `${communityUrl(env, community)}/${game(row.circuit)}/#event=${row.event_id}`; } catch { return ''; } };
 function recapPayload(env, community, row, start, pilots) {
@@ -103,16 +100,12 @@ function recapPayload(env, community, row, start, pilots) {
   // The one who made the crew first, then the others in their order of entry.
   const ordered = [...pilots].sort((a, b) => (b.user_id && b.user_id === row.owner_user_id) - (a.user_id && a.user_id === row.owner_user_id));
   const names = ordered.map(pilot => safe(pilot.name) && `${safe(pilot.name)}${pilot.user_id && pilot.user_id === row.owner_user_id ? ' · responsable' : ''}`).filter(Boolean);
-  const weather = [WEATHER[info.weather], Array.isArray(info.weatherSlots) && info.weatherSlots.some(Boolean) ? info.weatherSlots.map(sky => SKY[sky] || '❔').join(' ') : '', safe(info.weatherNote)].filter(Boolean);
   const fields = [
     {name:'🟢 Départ', value:start.pending ? 'Horaire à confirmer' : `<t:${unix}:F>\n<t:${unix}:R>`, inline:true},
     start.minutes && {name:'⏱️ Durée', value:`${durationLabel(start.minutes)}${start.pending ? '' : `\narrivée <t:${end}:t>`}`, inline:true},
     {name:'🚗 Voiture', value:[safe(row.car) || 'À choisir', safe(row.category)].filter(Boolean).join('\n'), inline:true},
     {name:`👥 Pilotes · ${names.length}`, value:names.join('\n') || 'Personne pour l’instant', inline:true},
-    weather.length && {name:'🌦️ Météo', value:weather.join('\n'), inline:true},
-    info.tyres && {name:'🛞 Pneus', value:`${info.tyres} pneu${info.tyres > 1 ? 's' : ''}`, inline:true},
-    TRACK_LIMITS[info.trackLimits] && {name:'🚧 Limites de piste', value:TRACK_LIMITS[info.trackLimits], inline:true},
-    info.fairShare === true && {name:'⚖️ Partage équitable', value:'Oui', inline:true}
+    ...conditionFields(info)
   ].filter(Boolean);
   const logo = categoryEmojiName(sim, row.category);
   let site = '';

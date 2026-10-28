@@ -688,6 +688,15 @@ test('« un fil par course »: the bot makes « Endurance Manager » under the c
   const inThread=[...messages.values()].find(item=>item.channel_id===threads.find(thread=>thread.name.includes('Spa')).id);
   assert.ok(inThread);assert.ok(!inThread.embeds.some(embed=>embed.title?.startsWith('📝')),JSON.stringify(inThread.embeds.map(embed=>embed.title)));
   assert.match(inThread.embeds[0].title,/6h de Spa/);
+  // Its card, like the crews' voices: sim and circuit on top, start, duration and finish (30 min of practice and
+  // qualifying before the race), entries; « Présent » opens the race on the site; no « Absent » without the key.
+  const card=inThread.embeds[0];
+  assert.match(card.author.name,/^🏎️ LMU · /);
+  assert.deepEqual(card.fields.slice(0,3).map(field=>field.name),['🟢 Départ','⏱️ Durée','👥 Inscrits']);
+  assert.equal(card.fields[1].value,`6 h\narrivée <t:${(NOW+DAY+6.5*3600000)/1000}:t>`);
+  assert.equal(card.fields[2].value,'Personne pour l’instant');
+  assert.deepEqual(inThread.components[0].components.map(button=>[button.label,button.style]),[['Présent',5]]);
+  assert.match(inThread.components[0].components[0].url,/#event=race-a$/);
   // The week's message: the races only, each a link to its thread.
   const index=[...messages.values()].find(item=>item.channel_id===week.id&&item.embeds[0].title.includes('LMU'));
   assert.equal(index.embeds.length,1);
