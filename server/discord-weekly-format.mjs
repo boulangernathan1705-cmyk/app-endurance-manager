@@ -548,6 +548,9 @@ export function buildCompleteAnnouncement(intro, items, site={}) {
     label:cut(`${button.style===5?'Présent / S’inscrire':'Absent'}${actionable.length>1?` · ${item.name}`:''}`,80)}))}))
     : [{type:1,components:[{type:2,style:5,label:'Inscriptions et absences sur le site',url:`${site.url}/events/`}]}];
   // Embed fields appear above its image: keep the live link just above the banner.
-  if(streamLink&&head.fields.length<25)head.fields.push({name:BLANK,value:`📺 [Regarder le live sur ${streamLink[1]}](${streamLink[2]})`,inline:false});
+  if(streamLink&&head.fields.length<25){
+    const channel=new URL(streamLink[2]).pathname.split('/').filter(Boolean)[0]||'';
+    head.fields.push({name:'📺 LA SOIRÉE EN DIRECT',value:`**[▶ Regarder sur ${streamLink[1]}${channel?` · ${clean(channel)}`:''}](${streamLink[2]})**`,inline:false});
+  }
   return {content:intro.content,embeds:fitDiscordEmbeds(embeds),components,allowed_mentions:intro.allowed_mentions};
 }

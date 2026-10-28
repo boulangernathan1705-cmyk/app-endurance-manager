@@ -67,7 +67,8 @@ test('at 7h30 the day\'s endurances and events are announced in order, @everyone
   assert.equal(combined.embeds.length,1,'one visual frame, not several embeds');
   assert.doesNotMatch(text,/Aujourd’hui sur le serveur|C’est jour de course|Inscris-toi, préviens/);
   assert.match(embed.title,/6h de Spa/);
-  assert.match(embed.fields.at(-1).value,/Regarder le live sur Twitch.*https:\/\/twitch.tv\/tdz/);
+  assert.equal(embed.fields.at(-1).name,'📺 LA SOIRÉE EN DIRECT');
+  assert.match(embed.fields.at(-1).value,/\*\*\[▶ Regarder sur Twitch · tdz\].*https:\/\/twitch.tv\/tdz/);
   assert.ok(!combined.components.flatMap(row=>row.components).some(button=>button.label==='Regarder le live'));
   assert.match(text,/6h de Spa/);assert.match(text,/Coupe GT3/);
   assert.ok(text.indexOf('6h de Spa')<text.indexOf('Coupe GT3'));
