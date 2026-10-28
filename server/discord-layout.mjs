@@ -12,6 +12,7 @@
 //     and the events go in one of them ('bot-lmu' / 'bot-iracing')
 //   voices, pit ('bot': the bot makes « Pit talk » just below pitAt, 'existing': in the category pitAt), reminders
 //   copy / pitCopy: the bot's categories / « Pit talk » take the rights of the category they sit under (private like it)
+//   announce: the text or announcement channel of the morning announcement (server/discord-announce.mjs), '' for none
 // Discord shows every name in the same size: an emoji in front makes the bot's own stand out (custom emojis are not allowed
 // in names).
 export const CATEGORY_NAMES = {main:'🏆 Endurance Manager', lmu:'🔴 LMU', iracing:'🔵 iRacing', pit:'🎙️ Pit talk'};
@@ -63,6 +64,9 @@ export function layoutInput(input) {
   // Private like the category they sit under (its rights copied), or open to all.
   if (layout.under && layout.under !== 'top' && input.copy === true) layout.copy = true;
   if (layout.pit === 'bot' && layout.pitAt !== 'top' && input.pitCopy === true) layout.pitCopy = true;
+  const announce = String(input.announce ?? '').trim();
+  if (announce && !ID.test(announce)) throw bad('Choisis le salon de l’annonce du jour.');
+  if (announce) layout.announce = announce;
   return layout;
 }
 
