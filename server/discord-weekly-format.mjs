@@ -250,8 +250,9 @@ export function buildWeeklyDiscordPayload(snapshot,site={},updatedAt=Date.now(),
     const fields=races.slice(0,races.length>25?24:25).map(box);
     if(races.length>25)fields.push({name:BLANK,value:`… et ${races.length-24} autres courses sur le site.`,inline:false});
     Object.assign(header,{color:SIM_COLORS[scope]||header.color,author:{name:`${SIM_MARKS[scope]||'🏁'}${sim} · ${races.length} course${races.length>1?'s':''} cette semaine`},fields,footer:footer(updatedAt)});
-    const button=siteUrl?[{type:1,components:[{type:2,style:5,label:`Endurances${sim}`,emoji:{name:SIM_MARKS[scope]||'📅'},url:`${siteUrl}${simPage}`}]}]:[];
-    return{content:'',embeds:[header],components:button,allowed_mentions:{parse:[]}};
+    // A link on the sim's name rather than a button (less room); components:[] takes off the buttons of before.
+    if(siteUrl)header.author.url=`${siteUrl}${simPage}`;
+    return{content:'',embeds:[header],components:[],allowed_mentions:{parse:[]}};
   }
   const build=compact=>{
     const blocks=[...groupByRace(current).map(group=>raceEmbed(group,siteUrl,compact,true,emojis)),...groupByRace(future).map(group=>raceEmbed(group,siteUrl,compact,false,emojis))];
@@ -284,9 +285,9 @@ export function buildWeekHeadPayload(periodLabel,site={},scope='all',counts={}){
   const sims=scope==='all'?['lmu','iracing']:[scope];
   embed.fields=sims.map(id=>{const n=Number(counts[id])||0;return{name:`${SIM_MARKS[id]}${SCOPE_LABELS[id]}`,value:n?`${n} course${n>1?'s':''}`:'Aucune course',inline:true};});
   if(site.bannerUrl)embed.image={url:site.bannerUrl};
-  const components=siteUrl?[{type:1,components:[{type:2,style:5,label:'Toutes les endurances',emoji:{name:'📅'},url:`${siteUrl}${simPage}`},
-    {type:2,style:5,label:'Mes inscriptions',emoji:{name:'🏆'},url:`${siteUrl}${scope==='all'?'/lmu/':simPage}#inscriptions`}]}]:[];
-  return{content:'',embeds:[embed],components,allowed_mentions:{parse:[]}};
+  // Links in the message rather than buttons (less room); components:[] takes off the buttons of before.
+  if(siteUrl)embed.description=`📅 [Toutes les endurances](${siteUrl}${simPage})`;
+  return{content:'',embeds:[embed],components:[],allowed_mentions:{parse:[]}};
 }
 
 const SIM_SHORT=Object.fromEntries(SIMS.map(sim=>[sim.id,sim.short]));
@@ -310,8 +311,9 @@ export function buildCalendarPayload(snapshot,site={},updatedAt=Date.now()){
   else embed.description='Aucun événement de prévu pour l’instant.';
   if(site.bannerUrl)embed.image={url:site.bannerUrl};
   embed.footer=footer(updatedAt);
-  const components=siteUrl?[{type:1,components:[{type:2,style:5,label:'Tous les events',emoji:{name:'🗓️'},url:`${siteUrl}/events/`}]}]:[];
-  return{content:'',embeds:[embed],components,allowed_mentions:{parse:[]}};
+  // The title links to the events (no button: less room); components:[] takes off the buttons of before.
+  if(siteUrl)embed.url=`${siteUrl}/events/`;
+  return{content:'',embeds:[embed],components:[],allowed_mentions:{parse:[]}};
 }
 
 // The race a change is about: its id in the address, or the entry / crew to look up (null when unknown).
