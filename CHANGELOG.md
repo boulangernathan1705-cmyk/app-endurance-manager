@@ -1,5 +1,13 @@
 # Nouveautés d'Endurance Manager
 
+## v1.81 — 28 octobre 2026
+
+### ✨ Améliorations
+
+- **Fin de course** : partout sur le site et sur Discord, l’heure de fin compte 30 min de plus pour les essais et la qualif avant le départ.
+- **Discord** : tous les messages du bot sont des cartes avec des boutons vers le site (semaine, calendrier, rappels, fin de course, mot de passe Gridfest).
+- **Discord** : dans le fil d’une course, un bouton « Présent » qui ouvre la course sur le site et un bouton « Absent » qui te marque absent sans quitter Discord.
+
 ## v1.80 — 28 octobre 2026
 
 ### ✨ Améliorations

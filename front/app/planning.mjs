@@ -3,7 +3,7 @@
 // window (three by default, five or seven by choice, fewer when the window is narrow); the arrows move them by
 // one day. A start opens where it is and its day widens so its crews sit side by side.
 import {timeLabel,timeAt,weekdayLabel,weekdayLong,dayMonthLong,dayMonthShort,dateRangeBlock} from '../dates.mjs';
-import {eventMinutes} from '../../shared/duration.mjs';
+import {eventMinutes,raceFinishAt} from '../../shared/duration.mjs';
 import {raceDays,parisDayKey as dayKey} from '../../shared/start-times.mjs';
 import {state,esc,categories,logo,sortedCrews,crewColorClass,pilotCount,communityTag,communityPrefix} from './core.mjs';
 import {isSolo,soloFill} from './solo.mjs';
@@ -31,7 +31,7 @@ export function raceRangeBlock(event){
 }
 
 function startCard(event,departure,body,{minutes,now,open,quick=''}){
-  const start=Number(departure.startsAt),end=start+minutes*60000,done=end<=now,live=!departure.tbd&&start<=now&&!done;
+  const start=Number(departure.startsAt),end=raceFinishAt(start,minutes),done=end<=now,live=!departure.tbd&&start<=now&&!done;
   const crews=sortedCrews(event,departure),assigned=new Set(crews.flatMap(crew=>crew.registrationIds||[]));
   const present=(departure.availability||[]).filter(reg=>reg.status!=='unavailable');
   const pilots=pilotCount(departure.availability||[]),mine=present.some(reg=>reg.mine);
@@ -60,7 +60,7 @@ function startCard(event,departure,body,{minutes,now,open,quick=''}){
 // card per round) instead of one start card.
 export function renderPlanning(event,days,body,{actions='',quick=()=>'',cards=()=>''}={}){
   const minutes=eventMinutes(event),now=Date.now();
-  const finished=day=>day.items.every(({departure})=>Number(departure.startsAt)+minutes*60000<=now);
+  const finished=day=>day.items.every(({departure})=>raceFinishAt(departure.startsAt,minutes)<=now);
   const openId=state.selectedDepartureId||[...state.registrationOpen].find(id=>days.some(day=>day.items.some(item=>item.departure.id===id)));
   const active=days.find(day=>day.key===state.planningDay)||days.find(day=>day.items.some(item=>item.departure.id===openId))||days.find(day=>!finished(day))||days[0];
   // One day only: no day tabs on phones, the day heading below already gives the date.

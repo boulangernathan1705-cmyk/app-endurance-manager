@@ -164,8 +164,8 @@ test('a crew gets a voice channel « LMU · race · name » outside any category
   // 24 h before: a reminder in the voice channel's chat and on the bell (with the channel); sent once.
   mark=discord.calls.length;await sync(startsAt-23*HOUR);
   const reminder=discord.calls.slice(mark).filter(call=>call.method==='POST');
-  assert.equal(reminder.length,1);assert.equal(reminder[0].path,`/channels/${row.voice_id}/messages`);assert.match(reminder[0].body.content,/⏰ .*Rappel/);
-  assert.match(reminder[0].body.content,/Alice, Bob|Bob, Alice/);assert.doesNotMatch(reminder[0].body.content,/@/);
+  assert.equal(reminder.length,1);assert.equal(reminder[0].path,`/channels/${row.voice_id}/messages`);const card24=JSON.stringify(reminder[0].body);assert.match(reminder[0].body.embeds[0].title,/⏰ Rappel · /);
+  assert.match(card24,/Alice\\nBob|Bob\\nAlice/);assert.doesNotMatch(card24,/@/);assert.equal(reminder[0].body.components[0].components[0].label,'Page de la course');
   assert.deepEqual(reminder[0].body.allowed_mentions,{parse:[]});assert.equal(reminder[0].body.flags,4096);
   for(const actor of ['pilot','mate']){const item=(await notifications(req,actor)).find(item=>item.kind==='race_reminder');assert.ok(item,actor);assert.equal(item.crewName,'Les Tondeuz');assert.equal(item.channelUrl,`https://discord.com/channels/${GUILD}/${row.voice_id}`);}
   mark=discord.calls.length;await sync(startsAt-22*HOUR);assert.deepEqual(since(discord.calls,mark),[]);
@@ -173,16 +173,18 @@ test('a crew gets a voice channel « LMU · race · name » outside any category
   // 1 h before: the last reminder.
   mark=discord.calls.length;await sync(startsAt-30*60_000);
   const last=discord.calls.slice(mark).find(call=>call.method==='POST');
-  assert.equal(last.path,`/channels/${row.voice_id}/messages`);assert.match(last.body.content,/On se retrouve ici/);
-  assert.match(last.body.content,/Alice, Bob|Bob, Alice/);assert.doesNotMatch(last.body.content,/@/);
+  assert.equal(last.path,`/channels/${row.voice_id}/messages`);const card1=last.body.embeds[0].description;assert.match(card1,/on se retrouve ici/);
+  assert.match(card1,/Alice · Bob|Bob · Alice/);assert.doesNotMatch(card1,/@/);
   assert.deepEqual(last.body.allowed_mentions,{parse:[]});assert.equal(last.body.flags,4096);
 
   // 2 h after the end: still a pilot in the voice channel, so it waits; then it is deleted with its chat.
-  const endsAt=startsAt+6*HOUR;
+  // The finish counts 30 min of practice and qualifying before the 6 h of race (also shown on the card).
+  const endsAt=startsAt+6*HOUR+30*60_000;
+  assert.match(JSON.stringify(recap.body),new RegExp(`arrivée <t:${endsAt/1000}:t>`));
   // After the finish: a word to the crew, once.
   mark=discord.calls.length;await sync(endsAt+10*60_000);
   const end=discord.calls.slice(mark).filter(call=>call.method==='POST');
-  assert.equal(end.length,1);assert.match(end[0].body.content,/Course terminée, bien joué Les Tondeuz/);assert.equal(end[0].body.flags,4096);
+  assert.equal(end.length,1);assert.match(end[0].body.embeds[0].title,/Course terminée, bien joué Les Tondeuz/);assert.equal(end[0].body.flags,4096);
   mark=discord.calls.length;await sync(endsAt+20*60_000);assert.ok(!discord.calls.slice(mark).some(call=>call.method==='POST'));
   assert.equal(CLOSE_AFTER,2*HOUR);
   discord.voiceStates.set(MATE,row.voice_id);

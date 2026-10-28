@@ -2,6 +2,7 @@ import {iracingSoloSql} from './iracing-visibility.mjs';
 import {allCommunities, communityUrl, appearanceOf} from './community.mjs';
 import {isInParisWeek, parisWeek} from './discord-weekly-format.mjs';
 import {simForEvent} from '../shared/catalog.mjs';
+import {raceFinishAt} from '../shared/duration.mjs';
 import {grindfestEnabled} from '../shared/grindfest.mjs';
 import {isDevelopment} from './dev-environment.mjs';
 import {syncBotRecaps, botRecapSettings} from './recap-discord.mjs';
@@ -26,6 +27,7 @@ export function flattenDepartures(events) {
   for (const event of events) {
     const eventDepartures = parseJson(event.departures, []);
     if (!Array.isArray(eventDepartures)) continue;
+    const details = parseJson(event.details, {}) || {};
     const durationHours = Number(event.duration_hours) || 0, durationMinutes = Number(event.duration_minutes) || durationHours * 60;
     for (const departure of eventDepartures) {
       const startsAt = Number(departure?.startsAt);
@@ -34,6 +36,8 @@ export function flattenDepartures(events) {
         eventId: event.id,
         eventName: event.name,
         eventType: event.event_type || '',
+        // The race's conditions (weather, tyres, track limits…), on its thread's card.
+        details,
         circuit: event.circuit || '',
         durationHours,
         durationMinutes,
@@ -41,7 +45,7 @@ export function flattenDepartures(events) {
         // "Horaires à confirmer": the time of the start is only a placeholder.
         timePending: Boolean(event.schedule_pending) || departure.tbd === true,
         startsAt,
-        endsAt: startsAt + durationMinutes * 60_000,
+        endsAt: raceFinishAt(startsAt, durationMinutes),
         crews: [],
         registrations: [],
         pilotCount: 0,
@@ -74,7 +78,7 @@ export async function loadWeeklyDiscordSnapshot(env, timestamp, community, scope
   // openRaces), the official iRacing ones (all of them when the community shows them on its site, otherwise those where it
   // has entries or a crew), or the one asked for (its race channel): only its
   // own entries and crews are shown.
-  const events = (await env.DB.prepare(`SELECT id,name,circuit,duration_hours,duration_minutes,event_type,schedule_pending,departures
+  const events = (await env.DB.prepare(`SELECT id,name,circuit,duration_hours,duration_minutes,event_type,schedule_pending,departures,details
     FROM events WHERE (community_id=? OR (community_id='official' AND (${community.modules?.iracingImport === true ? "1 OR " : ''}circuit NOT LIKE 'iracing-%' OR EXISTS (SELECT 1 FROM registrations r WHERE r.event_id=events.id AND r.community_id=?) OR EXISTS (SELECT 1 FROM event_absences a WHERE a.event_id=events.id AND a.community_id=?)
       OR EXISTS (SELECT 1 FROM crews c WHERE c.event_id=events.id AND c.community_id=?)) OR (community_id='official' AND id=?)))
     AND COALESCE(format,'endurance')<>'solo' AND ${iracingSoloSql(env,community)} ${CIRCUITS[scope] ?? CIRCUITS.lmu} ORDER BY created_at,id`).bind(community.id, community.id, community.id, community.id, eventId).all()).results || [];
@@ -194,7 +198,7 @@ export async function loadWeeklyDiscordSnapshot(env, timestamp, community, scope
 // The calendar's events (EVENT SOLO / EVENT TDZ) of the week, with their places taken by this community's pilots.
 // sim: 'iracing' for the iRacing events only, 'lmu' for all the others (null: all).
 export async function loadCalendarSnapshot(env, timestamp, community, sim = null) {
-  const rows = (await env.DB.prepare(`SELECT id,name,sim,circuit,rounds,capacity,departures,schedule_pending FROM events
+  const rows = (await env.DB.prepare(`SELECT id,name,sim,circuit,rounds,capacity,access,departures,schedule_pending FROM events
     WHERE (community_id=? OR community_id='official') AND format='solo' AND ${iracingSoloSql(env,community)}
     ${grindfestEnabled(community, isDevelopment(env)) ? '' : "AND COALESCE(json_extract(details,'$.type'),'') NOT IN ('Gridfest','Grindfest')"}
     ORDER BY created_at,id`).bind(community.id).all()).results || [];
@@ -219,7 +223,7 @@ export async function loadCalendarSnapshot(env, timestamp, community, sim = null
     const rounds = parseJson(row.rounds, []);
     return {id:row.id, name:row.name, sim:simForEvent(row), circuits:rounds.length ? rounds.map(round => round?.circuit) : [row.circuit],
       startsAt, timePending:Boolean(row.schedule_pending) || start.tbd === true, capacity:row.capacity == null ? null : Number(row.capacity),
-      entered:counts.get(`${row.id}:${start.id}`) || 0};
+      entered:counts.get(`${row.id}:${start.id}`) || 0, access:row.access || ''};
   })};
 }
 

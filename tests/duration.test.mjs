@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {durationLabel, eventMinutes} from '../shared/duration.mjs';
+import {durationLabel, eventMinutes, raceFinishAt} from '../shared/duration.mjs';
 
 test('race durations read in hours and minutes', () => {
   assert.equal(durationLabel(360), '6 h');
@@ -18,4 +18,10 @@ test('driver change required: always on LMU; on iRacing the organizer decides, o
   assert.equal(driverChangeRequired({circuit:'iracing-spa', durationMinutes:360}), true);
   assert.equal(driverChangeRequired({circuit:'iracing-spa', durationMinutes:360, driverChangeRequired:false}), false);
   assert.equal(driverChangeRequired({circuit:'iracing-spa', durationMinutes:120, driverChangeRequired:true}), true);
+});
+
+test('the finish shown counts 30 min of practice and qualifying before the race', () => {
+  const start = Date.UTC(2026, 9, 31, 12);
+  assert.equal(raceFinishAt(start, 360), start + 6.5 * 3_600_000);
+  assert.equal(raceFinishAt(start, 150), start + 3 * 3_600_000);
 });

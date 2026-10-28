@@ -14,9 +14,9 @@ import {effectivePermissions,guildPermissions,missingVoicePermissions,withBotAcc
 // after a change on a crew, a few requests at a time (a run of the Worker may make 50).
 import {allCommunities, communityById, communityUrl} from './community.mjs';
 import {notify} from './notifications.mjs';
-import {durationLabel} from '../shared/duration.mjs';
-import {catalogForGame, TRACK_LIMITS} from '../shared/catalog.mjs';
-import {categoryEmojiName} from './discord-weekly-format.mjs';
+import {durationLabel,raceFinishAt} from '../shared/duration.mjs';
+import {catalogForGame} from '../shared/catalog.mjs';
+import {categoryEmojiName, conditionFields} from './discord-weekly-format.mjs';
 
 const DISCORD_API = 'https://discord.com/api/v10';
 const HOUR = 3600_000;
@@ -87,13 +87,10 @@ function startOf(row) {
   const startsAt = Number(departure?.startsAt);
   if (!departure || !Number.isFinite(startsAt)) return null;
   const minutes = Number(row.duration_minutes) || (Number(row.duration_hours) || 0) * 60;
-  return {startsAt, endsAt:startsAt + minutes * 60_000, minutes, pending:Boolean(row.schedule_pending) || departure.tbd === true};
+  return {startsAt, endsAt:raceFinishAt(startsAt, minutes), minutes, pending:Boolean(row.schedule_pending) || departure.tbd === true};
 }
 
 // The card of the voice channel's chat: the race, the crew and its conditions, a button to the race on the site.
-const SKY = {clear:'☀️', lightClouds:'🌤️', partlyCloudy:'⛅', mostlyCloudy:'🌥️', overcast:'☁️', cloudyDrizzle:'🌦️', cloudyLightRain:'🌦️',
-  overcastLightRain:'🌧️', overcastRain:'🌧️', overcastHeavyRain:'🌧️', overcastStorm:'⛈️'};
-const WEATHER = {dry:'☀️ Sec', mixed:'🌦️ Variable', rain:'🌧️ Pluie'};
 const COLORS = {lmu:0xe5484d, iracing:0x3b82f6};
 const raceLink = (env, community, row) => { try { return `${communityUrl(env, community)}/${game(row.circuit)}/#event=${row.event_id}`; } catch { return ''; } };
 function recapPayload(env, community, row, start, pilots) {
@@ -103,16 +100,12 @@ function recapPayload(env, community, row, start, pilots) {
   // The one who made the crew first, then the others in their order of entry.
   const ordered = [...pilots].sort((a, b) => (b.user_id && b.user_id === row.owner_user_id) - (a.user_id && a.user_id === row.owner_user_id));
   const names = ordered.map(pilot => safe(pilot.name) && `${safe(pilot.name)}${pilot.user_id && pilot.user_id === row.owner_user_id ? ' · responsable' : ''}`).filter(Boolean);
-  const weather = [WEATHER[info.weather], Array.isArray(info.weatherSlots) && info.weatherSlots.some(Boolean) ? info.weatherSlots.map(sky => SKY[sky] || '❔').join(' ') : '', safe(info.weatherNote)].filter(Boolean);
   const fields = [
     {name:'🟢 Départ', value:start.pending ? 'Horaire à confirmer' : `<t:${unix}:F>\n<t:${unix}:R>`, inline:true},
     start.minutes && {name:'⏱️ Durée', value:`${durationLabel(start.minutes)}${start.pending ? '' : `\narrivée <t:${end}:t>`}`, inline:true},
     {name:'🚗 Voiture', value:[safe(row.car) || 'À choisir', safe(row.category)].filter(Boolean).join('\n'), inline:true},
     {name:`👥 Pilotes · ${names.length}`, value:names.join('\n') || 'Personne pour l’instant', inline:true},
-    weather.length && {name:'🌦️ Météo', value:weather.join('\n'), inline:true},
-    info.tyres && {name:'🛞 Pneus', value:`${info.tyres} pneu${info.tyres > 1 ? 's' : ''}`, inline:true},
-    TRACK_LIMITS[info.trackLimits] && {name:'🚧 Limites de piste', value:TRACK_LIMITS[info.trackLimits], inline:true},
-    info.fairShare === true && {name:'⚖️ Partage équitable', value:'Oui', inline:true}
+    ...conditionFields(info)
   ].filter(Boolean);
   const logo = categoryEmojiName(sim, row.category);
   let site = '';
@@ -126,12 +119,22 @@ function recapPayload(env, community, row, start, pilots) {
   return {content:'', embeds:[embed], components:link ? [{type:1, components:[{type:2, style:5, label:'Page de la course', emoji:{name:'📋'}, url:link}]}] : []};
 }
 // After the finish, once: a word to the crew before its voice closes.
-function endPayload(env, community, row, start) {
+function endPayload(env, community, row, start, pilots) {
   let site = '';
   try { site = communityUrl(env, community); } catch {}
-  const close = Math.floor((start.endsAt + CLOSE_AFTER) / 1000);
-  return {content:`🏁 **Course terminée, bien joué ${safe(row.crew_name)} !** Ce vocal ferme <t:${close}:R>.`,
+  const close = Math.floor((start.endsAt + CLOSE_AFTER) / 1000), names = pilots.map(pilot => safe(pilot.name)).filter(Boolean);
+  return {content:'', embeds:[{color:0x23a55a, title:clip(`🏁 Course terminée, bien joué ${safe(row.crew_name) || 'l’équipage'} !`, 256),
+    fields:[names.length && {name:'👥 Pilotes', value:clip(names.join(' · '), 1024), inline:true}, {name:'🔊 Ce vocal', value:`ferme <t:${close}:R>`, inline:true}].filter(Boolean)}],
     components:site ? [{type:1, components:[{type:2, style:5, label:'Prochaines endurances', emoji:{name:'📅'}, url:`${site}/${game(row.circuit)}/`}]}] : []};
+}
+// 24 h and 1 h before the start: a card in the voice's chat, naming its pilots without mentions.
+function reminderPayload(env, community, row, start, pilots, soon) {
+  const unix = Math.floor(start.startsAt / 1000), names = pilots.map(pilot => safe(pilot.name)).filter(Boolean), link = raceLink(env, community, row);
+  if (soon) return {content:'', embeds:[{color:0x23a55a, description:clip(`🟢 **Départ <t:${unix}:R>, on se retrouve ici.**\n${[...names, `arrivée vers <t:${Math.floor(start.endsAt / 1000)}:t>`].join(' · ')}`, 4096)}]};
+  const weather = conditionFields(parse(row.event_details, {}) || {}).find(field => field.name.startsWith('🌦️'));
+  return {content:'', embeds:[{color:COLORS[game(row.circuit)], title:clip(`⏰ Rappel · ${safe(row.event_name) || 'Endurance'}`, 256),
+    fields:[{name:'🟢 Départ', value:`<t:${unix}:F>\n<t:${unix}:R>`, inline:true}, names.length && {name:'👥 Pilotes', value:clip(names.join('\n'), 1024), inline:true}, weather].filter(Boolean)}],
+    components:link ? [{type:1, components:[{type:2, style:5, label:'Page de la course', emoji:{name:'📋'}, url:link}]}] : []};
 }
 const END_BIT = 4;
 const endDue = (row, start, timestamp) => !start.pending && timestamp >= start.endsAt && timestamp < start.endsAt + CLOSE_AFTER
@@ -567,18 +570,14 @@ async function syncRow(env, budget, timestamp, community, setting, row, pilots) 
   if (due.length) {
     let reminded = Number(row.reminded) || 0;
     // Only the closest one is sent (a crew opened 30 min before its start gets the « 1 h » one alone).
-    const last = due[due.length - 1], unix = Math.floor(start.startsAt / 1000);
-    const who = pilots.map(pilot => safe(pilot.name)).filter(Boolean).join(', ');
-    const content = last.before <= HOUR
-      ? `⏰ ${who} Départ <t:${unix}:R> ! On se retrouve ici.`
-      : `⏰ ${who} Rappel : **${safe(row.event_name)}**, départ <t:${unix}:F> (<t:${unix}:R>).`;
-    await sendInChannel(env, budget, row, 'POST', `/channels/${row.voice_id}/messages`, {content:content.replace(/ {2,}/g, ' '), allowed_mentions:{parse:[]}, flags:4096});
+    const last = due[due.length - 1];
+    await sendInChannel(env, budget, row, 'POST', `/channels/${row.voice_id}/messages`, {...reminderPayload(env, community, row, start, pilots, last.before <= HOUR), allowed_mentions:{parse:[]}, flags:4096});
     for (const item of due) reminded |= item.bit;
     await env.DB.prepare('UPDATE crew_discord SET reminded=? WHERE crew_id=?').bind(reminded, row.row_id).run();
     row.reminded = reminded;
   }
   if (endDue(row, start, timestamp)) {
-    await sendInChannel(env, budget, row, 'POST', `/channels/${row.voice_id}/messages`, {...endPayload(env, community, row, start), allowed_mentions:{parse:[]}, flags:4096});
+    await sendInChannel(env, budget, row, 'POST', `/channels/${row.voice_id}/messages`, {...endPayload(env, community, row, start, pilots), allowed_mentions:{parse:[]}, flags:4096});
     row.reminded = (Number(row.reminded) || 0) | END_BIT;
     await env.DB.prepare('UPDATE crew_discord SET reminded=? WHERE crew_id=?').bind(row.reminded, row.row_id).run();
   }
