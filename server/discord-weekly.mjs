@@ -198,7 +198,7 @@ export async function loadWeeklyDiscordSnapshot(env, timestamp, community, scope
 // The calendar's events (EVENT SOLO / EVENT TDZ) of the week, with their places taken by this community's pilots.
 // sim: 'iracing' for the iRacing events only, 'lmu' for all the others (null: all).
 export async function loadCalendarSnapshot(env, timestamp, community, sim = null) {
-  const rows = (await env.DB.prepare(`SELECT id,name,sim,circuit,rounds,capacity,departures,schedule_pending FROM events
+  const rows = (await env.DB.prepare(`SELECT id,name,sim,circuit,rounds,capacity,access,departures,schedule_pending FROM events
     WHERE (community_id=? OR community_id='official') AND format='solo' AND ${iracingSoloSql(env,community)}
     ${grindfestEnabled(community, isDevelopment(env)) ? '' : "AND COALESCE(json_extract(details,'$.type'),'') NOT IN ('Gridfest','Grindfest')"}
     ORDER BY created_at,id`).bind(community.id).all()).results || [];
@@ -223,7 +223,7 @@ export async function loadCalendarSnapshot(env, timestamp, community, sim = null
     const rounds = parseJson(row.rounds, []);
     return {id:row.id, name:row.name, sim:simForEvent(row), circuits:rounds.length ? rounds.map(round => round?.circuit) : [row.circuit],
       startsAt, timePending:Boolean(row.schedule_pending) || start.tbd === true, capacity:row.capacity == null ? null : Number(row.capacity),
-      entered:counts.get(`${row.id}:${start.id}`) || 0};
+      entered:counts.get(`${row.id}:${start.id}`) || 0, access:row.access || ''};
   })};
 }
 

@@ -1,11 +1,12 @@
 import {racesPath} from './races-path.mjs';
-import {durationLabel,PRE_RACE_MINUTES,raceFinishAt} from '../shared/duration.mjs';
+import {durationLabel,PRE_RACE_MINUTES} from '../shared/duration.mjs';
 import {catalogForGame,SIMS,TRACK_LIMITS} from '../shared/catalog.mjs';
 
 const DAY_MS=86_400_000,HOUR_MS=3_600_000,TIME_ZONE='Europe/Paris';
 const circuitNames=new Map([...catalogForGame('lmu').circuits,...catalogForGame('iracing').circuits].map(c=>[c.id,c.name]));
 // What a recap message covers (community_recaps.scope).
 const SCOPE_LABELS={all:'',lmu:' LMU',iracing:' iRacing'};
+const SIM_MARKS={lmu:'🏎️',iracing:'🏁'};
 const ymd=new Intl.DateTimeFormat('en-CA',{timeZone:TIME_ZONE,year:'numeric',month:'2-digit',day:'2-digit'});
 const startLabel=new Intl.DateTimeFormat('fr-FR',{timeZone:'UTC',day:'numeric',month:'long'});
 const endLabel=new Intl.DateTimeFormat('fr-FR',{timeZone:'UTC',day:'numeric',month:'long',year:'numeric'});
@@ -185,28 +186,6 @@ export function conditionFields(info={}){
     TRACK_LIMITS[info.trackLimits]&&{name:'🚧 Limites de piste',value:TRACK_LIMITS[info.trackLimits],inline:true},
     info.fairShare===true&&{name:'⚖️ Partage équitable',value:'Oui',inline:true}].filter(Boolean);
 }
-// A race's thread: its card, like the crews' voice cards (sim, circuit and grid on top, start, duration and finish,
-// entries, conditions), then its crews and pilots as in the week's message.
-function raceCard(departures,siteUrl,compact,current,emojis,logoUrl){
-  const first=departures[0],info=first.details||{},sim=simOf(first),{title,note}=eventTitleAndNote(first.eventName);
-  const circuit=circuitNames.get(first.circuit)||first.circuit;
-  const minutes=first.durationMinutes||first.durationHours*60||0,single=departures.length===1;
-  const pilots=new Set(departures.flatMap(departure=>(departure.registrations||[]).map(item=>item.participantId))).size;
-  const crews=departures.reduce((total,departure)=>total+departure.crews.length,0);
-  const start=single&&!first.timePending?`${discordTime(first.startsAt,'F')}\n${discordTime(first.startsAt,'R')}`:single?`${discordTime(first.startsAt,'D')}\nhoraire à confirmer`:startsRecap(departures);
-  const fields=[{name:single?'🟢 Départ':`🟢 ${departures.length} départs`,value:cut(start,1024),inline:single},
-    minutes&&{name:'⏱️ Durée',value:`${durationLabel(minutes)}${single&&!first.timePending?`\narrivée ${discordTime(raceFinishAt(first.startsAt,minutes),'t')}`:''}`,inline:true},
-    {name:'👥 Inscrits',value:pilots?`${pilots} pilote${pilots>1?'s':''}${crews?` · ${crews} équipage${crews>1?'s':''}`:''}`:'Personne pour l’instant',inline:true},
-    ...conditionFields(info)].filter(Boolean);
-  const embed={author:{name:[sim==='iracing'?'🏁 iRacing':'🏎️ LMU',circuit&&clean(circuit),info.grid&&`${info.grid} voitures`].filter(Boolean).join(' · ')},
-    title:cut(`${current?'🔴 En cours — ':''}${title}`,256),color:current?0xd71920:SIM_COLORS[sim],
-    description:cut([TYPE_LABELS[first.eventType]&&`🏷️ ${TYPE_LABELS[first.eventType]}`,note].filter(Boolean).join('\n'),4096)||undefined,
-    fields:[...fields,...raceFields(departures,compact,emojis)].slice(0,25)};
-  if(!embed.description)delete embed.description;
-  const url=raceUrl(siteUrl,first);if(url)embed.url=url;
-  if(logoUrl)embed.thumbnail={url:logoUrl};
-  return embed;
-}
 function groupByRace(departures){
   const groups=new Map();
   for(const departure of departures){const key=departure.eventId||departure.eventName;if(!groups.has(key))groups.set(key,[]);groups.get(key).push(departure);}
@@ -251,25 +230,31 @@ export function buildWeeklyDiscordPayload(snapshot,site={},updatedAt=Date.now(),
   const header={title:cut(weekly?`📝 Endurances${sim} · ${period}`:`📝 ${cap(period)}`,256),color:0x52d3d8};
   if(siteUrl)header.url=`${siteUrl}${simPage}`;
   if(site.name){header.author={name:cut(site.name,256)};if(siteUrl)header.author.url=`${siteUrl}/`;if(site.logoUrl)header.author.icon_url=site.logoUrl;}
-  if(threads){delete header.url;delete header.author;header.title=`Endurances${sim}`;}
+  if(threads){delete header.url;delete header.author;delete header.title;}
   if(!current.length&&!future.length){
-    if(threads){header.description=`Aucune endurance${sim} cette semaine.`;header.color=0x6b7280;header.footer=footer(updatedAt);return{content:'',embeds:[header],allowed_mentions:{parse:[]}};}
+    if(threads){header.author={name:`${SIM_MARKS[scope]||'🏁'} Aucune endurance${sim} cette semaine`};header.color=0x6b7280;header.footer=footer(updatedAt);return{content:'',embeds:[header],allowed_mentions:{parse:[]}};}
     header.description=`Aucune course avec un équipage engagé n’est en cours et aucun prochain départ${sim} n’est programmé.`;
     header.title=`Aucune endurance${sim} à préparer`;header.color=0x6b7280;header.footer=footer(updatedAt);
     return{content:'',embeds:[header],allowed_mentions:{parse:[]}};
   }
   if(threads){
-    // One line per race: its thread (or its page until the thread is there), then its first start.
-    const line=group=>{const first=group[0],thread=threads[first.eventId],url=raceUrl(siteUrl,first),name=clean(eventTitleAndNote(first.eventName).title);
-      const more=group.length>1?` · ${group.length} départs`:'';
-      return `${thread?`<#${thread}>`:url?`🏁 [${name}](${url})`:`🏁 ${name}`} — ${departureTitle(first)}${more}`;};
-    header.description=cut([...groupByRace(current),...groupByRace(future)].map(line).join('\n'),4096);
-    header.footer=footer(updatedAt);
-    return{content:'',embeds:[header],allowed_mentions:{parse:[]}};
+    // One box per race, in the order of the starts: its day and time on top (Paris time), then the link to its thread (or
+    // its page until the thread is there), its starts, its entries and its weather.
+    const races=[...groupByRace(current).map(group=>[group,true]),...groupByRace(future).map(group=>[group,false])];
+    const box=([group,live])=>{const first=group[0],thread=threads[first.eventId],url=raceUrl(siteUrl,first),name=clean(eventTitleAndNote(first.eventName).title);
+      const crews=group.reduce((total,departure)=>total+departure.crews.length,0);
+      const pilots=new Set(group.flatMap(departure=>(departure.registrations||[]).map(item=>item.participantId))).size;
+      const when=`${cap(recapDay.format(first.startsAt))}${first.timePending?' · horaire à confirmer':` ${recapTime.format(first.startsAt)}`}`;
+      const entries=crews?`${crews} équipage${crews>1?'s':''}`:pilots?`${pilots} inscrit${pilots>1?'s':''}`:'personne pour l’instant';
+      return{name:cut(`${live?'🔴 En cours':'🟢'} ${when}`,256),value:cut([thread?`<#${thread}>`:url?`🏁 [${name}](${url})`:`🏁 ${name}`,group.length>1&&`${group.length} départs`,entries,WEATHER[first.details?.weather]].filter(Boolean).join(' · '),1024),inline:false};};
+    const fields=races.slice(0,races.length>25?24:25).map(box);
+    if(races.length>25)fields.push({name:BLANK,value:`… et ${races.length-24} autres courses sur le site.`,inline:false});
+    Object.assign(header,{color:SIM_COLORS[scope]||header.color,author:{name:`${SIM_MARKS[scope]||'🏁'}${sim} · ${races.length} course${races.length>1?'s':''} cette semaine`},fields,footer:footer(updatedAt)});
+    const button=siteUrl?[{type:1,components:[{type:2,style:5,label:`Endurances${sim}`,emoji:{name:SIM_MARKS[scope]||'📅'},url:`${siteUrl}${simPage}`}]}]:[];
+    return{content:'',embeds:[header],components:button,allowed_mentions:{parse:[]}};
   }
   const build=compact=>{
-    const block=alone?(group,live)=>raceCard(group,siteUrl,compact,live,emojis,site.logoUrl):(group,live)=>raceEmbed(group,siteUrl,compact,live,emojis);
-    const blocks=[...groupByRace(current).map(group=>block(group,true)),...groupByRace(future).map(group=>block(group,false))];
+    const blocks=[...groupByRace(current).map(group=>raceEmbed(group,siteUrl,compact,true,emojis)),...groupByRace(future).map(group=>raceEmbed(group,siteUrl,compact,false,emojis))];
     // 10 blocks at most: beyond 8 races, the others are listed (linked) in one last block.
     if(blocks.length>8){
       const rest=groupByRace([...current,...future]).slice(8);
@@ -291,37 +276,42 @@ export function buildWeeklyDiscordPayload(snapshot,site={},updatedAt=Date.now(),
 }
 
 // Above the sims' messages of a channel: the community, the week (a link to the site) and the banner.
-export function buildWeekHeadPayload(periodLabel,site={},scope='all'){
+// counts: the races of the week by sim ({lmu, iracing}), one box each for the sims of the channel.
+export function buildWeekHeadPayload(periodLabel,site={},scope='all',counts={}){
   const siteUrl=String(site.url||''),simPage=scope==='iracing'?'/iracing/':scope==='all'?'/':'/lmu/';
-  const embed={title:cut(`📝 Endurances · ${periodLabel||'semaine à venir'}`,256),color:0x52d3d8};
-  if(siteUrl)embed.url=`${siteUrl}${simPage}`;
+  const embed={title:cut(`📝 ${cap(periodLabel||'semaine à venir')}`,256),color:0x52d3d8};
   if(site.name){embed.author={name:cut(site.name,256)};if(siteUrl)embed.author.url=`${siteUrl}/`;if(site.logoUrl)embed.author.icon_url=site.logoUrl;}
+  const sims=scope==='all'?['lmu','iracing']:[scope];
+  embed.fields=sims.map(id=>{const n=Number(counts[id])||0;return{name:`${SIM_MARKS[id]}${SCOPE_LABELS[id]}`,value:n?`${n} course${n>1?'s':''}`:'Aucune course',inline:true};});
   if(site.bannerUrl)embed.image={url:site.bannerUrl};
-  return{content:'',embeds:[embed],allowed_mentions:{parse:[]}};
+  const components=siteUrl?[{type:1,components:[{type:2,style:5,label:'Toutes les endurances',emoji:{name:'📅'},url:`${siteUrl}${simPage}`},
+    {type:2,style:5,label:'Mes inscriptions',emoji:{name:'🏆'},url:`${siteUrl}${scope==='all'?'/lmu/':simPage}#inscriptions`}]}]:[];
+  return{content:'',embeds:[embed],components,allowed_mentions:{parse:[]}};
 }
 
 const SIM_SHORT=Object.fromEntries(SIMS.map(sim=>[sim.id,sim.short]));
-// One event of the calendar: its name (link to it), sim, circuits and start, then its places.
-function calendarBlock(event,siteUrl){
+// One event of the calendar: its day and time on top (Paris time), then its name (link to it), sim, circuits, places and lobby.
+function calendarBox(event,siteUrl){
   const name=clean(event.name),url=siteUrl?`${siteUrl}/lmu/#event=${encodeURIComponent(event.id)}`:'';
   const circuits=[...new Set(event.circuits.map(circuit=>circuitNames.get(circuit)||circuit).filter(Boolean))].map(clean).join(', ');
-  const when=event.timePending?`${discordTime(event.startsAt,'D')} — horaire à confirmer`:discordTime(event.startsAt,'f');
+  const when=`${cap(recapDay.format(event.startsAt))}${event.timePending?' · horaire à confirmer':` ${recapTime.format(event.startsAt)}`}`;
   const places=event.capacity
     ?`👥 ${Math.min(event.entered,event.capacity)}/${event.capacity} places${event.entered>=event.capacity?' · complet':''}${event.entered>event.capacity?` · ${event.entered-event.capacity} en attente`:''}`
-    :event.entered?`👥 ${event.entered} inscrit${event.entered>1?'s':''}`:'👥 Personne d’inscrit pour l’instant.';
-  return [`**${url?`[${name}](${url})`:name}**`,[`🎮 ${SIM_SHORT[event.sim]||clean(event.sim)}`,circuits&&`📍 ${circuits}`,`🕐 ${when}`].filter(Boolean).join(' · '),places].join('\n');
+    :event.entered?`👥 ${event.entered} inscrit${event.entered>1?'s':''}`:'👥 personne pour l’instant';
+  return{name:cut(`🏁 ${when}`,256),value:cut([url?`**[${name}](${url})**`:`**${name}**`,[`🎮 ${SIM_SHORT[event.sim]||clean(event.sim)}`,circuits&&`📍 ${circuits}`,places,event.access&&event.access.toUpperCase()].filter(Boolean).join(' · ')].join('\n'),1024),inline:false};
 }
-// The week's events (« EVENT SOLO », « EVENT TDZ »): one block, one paragraph per event.
-// `snapshot`: {periodLabel, events:[{id,name,sim,circuits,startsAt,timePending,capacity,entered}]}.
+// The week's events (« EVENT SOLO », « EVENT TDZ »): one box per event, in the order of their starts.
+// `snapshot`: {periodLabel, events:[{id,name,sim,circuits,startsAt,timePending,capacity,entered,access}]}.
 export function buildCalendarPayload(snapshot,site={},updatedAt=Date.now()){
   const siteUrl=String(site.url||''),events=Array.isArray(snapshot.events)?snapshot.events:[];
-  const embed={title:cut(`📅 Calendrier de la ${snapshot.periodLabel||'semaine à venir'}`,256),color:events.length?0xe7b653:0x6b7280,
-    description:events.length?cut(events.map(event=>calendarBlock(event,siteUrl)).join('\n\n'),4096):'Aucun événement de prévu pour l’instant.'};
-  if(siteUrl)embed.url=`${siteUrl}/events/`;
-  if(site.name){embed.author={name:cut(site.name,256)};if(siteUrl)embed.author.url=`${siteUrl}/`;if(site.logoUrl)embed.author.icon_url=site.logoUrl;}
+  const embed={title:cut(`🗓️ ${cap(snapshot.periodLabel||'semaine à venir')}`,256),color:events.length?0xe7b653:0x6b7280};
+  if(site.name){embed.author={name:cut(`${site.name}${events.length?` · ${events.length} event${events.length>1?'s':''} cette semaine`:''}`,256)};if(siteUrl)embed.author.url=`${siteUrl}/`;if(site.logoUrl)embed.author.icon_url=site.logoUrl;}
+  if(events.length){embed.fields=events.slice(0,events.length>25?24:25).map(event=>calendarBox(event,siteUrl));if(events.length>25)embed.fields.push({name:BLANK,value:`… et ${events.length-24} autres events sur le site.`,inline:false});}
+  else embed.description='Aucun événement de prévu pour l’instant.';
   if(site.bannerUrl)embed.image={url:site.bannerUrl};
   embed.footer=footer(updatedAt);
-  return{content:'',embeds:[embed],allowed_mentions:{parse:[]}};
+  const components=siteUrl?[{type:1,components:[{type:2,style:5,label:'Tous les events',emoji:{name:'🗓️'},url:`${siteUrl}/events/`}]}]:[];
+  return{content:'',embeds:[embed],components,allowed_mentions:{parse:[]}};
 }
 
 // The race a change is about: its id in the address, or the entry / crew to look up (null when unknown).

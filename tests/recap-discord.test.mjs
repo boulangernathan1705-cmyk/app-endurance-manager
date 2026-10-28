@@ -565,7 +565,7 @@ test('the week calendar is its own message, never mixed with the endurances',asy
   const made=channels.find(item=>item.name==='calendrier-de-la-semaine');assert.ok(made,'the bot makes its channel below the chosen one');
   const calendar=sends(calls).find(call=>call.path===`/channels/${made.id}/messages`);assert.ok(calendar);
   const text=JSON.stringify(calendar.body);
-  assert.match(text,/📅 Calendrier de la semaine/);assert.match(text,/Sprint du mardi/);assert.match(text,/Coupe du jeudi/);
+  assert.match(text,/🗓️ Semaine du/);assert.match(text,/Tous les events/);assert.match(text,/Sprint du mardi/);assert.match(text,/Coupe du jeudi/);
   assert.match(text,/2\/2 places · complet/);assert.doesNotMatch(text,/6h de Spa/,'the endurances stay in their category');
   assert.doesNotMatch(JSON.stringify(sends(calls).filter(call=>call!==calendar).map(call=>call.body)),/Sprint du mardi/,'events never get a race category');
   assert.ok(!creates(calls).some(call=>/Sprint/.test(call.body.name)));
@@ -688,19 +688,16 @@ test('« un fil par course »: the bot makes « Endurance Manager » under the c
   const inThread=[...messages.values()].find(item=>item.channel_id===threads.find(thread=>thread.name.includes('Spa')).id);
   assert.ok(inThread);assert.ok(!inThread.embeds.some(embed=>embed.title?.startsWith('📝')),JSON.stringify(inThread.embeds.map(embed=>embed.title)));
   assert.match(inThread.embeds[0].title,/6h de Spa/);
-  // Its card, like the crews' voices: sim and circuit on top, start, duration and finish (30 min of practice and
-  // qualifying before the race), entries; « Présent » opens the race on the site; no « Absent » without the key.
-  const card=inThread.embeds[0];
-  assert.match(card.author.name,/^🏎️ LMU · /);
-  assert.deepEqual(card.fields.slice(0,3).map(field=>field.name),['🟢 Départ','⏱️ Durée','👥 Inscrits']);
-  assert.equal(card.fields[1].value,`6 h\narrivée <t:${(NOW+DAY+6.5*3600000)/1000}:t>`);
-  assert.equal(card.fields[2].value,'Personne pour l’instant');
+  // « Présent » opens the race on the site; no « Absent » without the key.
   assert.deepEqual(inThread.components[0].components.map(button=>[button.label,button.style]),[['Présent',5]]);
   assert.match(inThread.components[0].components[0].url,/#event=race-a$/);
   // The week's message: the races only, each a link to its thread.
-  const index=[...messages.values()].find(item=>item.channel_id===week.id&&item.embeds[0].title.includes('LMU'));
-  assert.equal(index.embeds.length,1);
-  assert.match(index.embeds[0].description,new RegExp(`<#${threads.find(thread=>thread.name.includes('Spa')).id}>`));
+  // One box per race: its day and time as the name (the race's name only once, in its thread's link).
+  const index=[...messages.values()].find(item=>item.channel_id===week.id&&item.embeds[0].author?.name.includes('LMU'));
+  assert.equal(index.embeds.length,1);assert.match(index.embeds[0].author.name,/^🏎️ LMU · 1 course cette semaine$/);
+  assert.match(index.embeds[0].fields[0].name,/^🟢 \S+ \d+ \S+ \d+:\d\d$/);assert.doesNotMatch(index.embeds[0].fields[0].name,/Spa/);
+  assert.match(index.embeds[0].fields[0].value,new RegExp(`^<#${threads.find(thread=>thread.name.includes('Spa')).id}> · personne pour l’instant$`));
+  assert.equal(index.components[0].components[0].label,'Endurances LMU');
 });
 
 test('LMU and iRacing apart: one category each, each race its thread in its sim\'s channel',async t=>{
@@ -915,9 +912,12 @@ test('LMU and iRacing in the same channel: the banner and the week in a message 
   await layout(env,COMMUNITY,{mode:'events',sims:'all',under:'111111111111111110'});
   const id=event=>DB.db.prepare('SELECT message_id FROM discord_recap_publications WHERE event_id=?').get(event).message_id;
   const week=event=>messages.get(id(event)).embeds[0];
-  assert.match(week('week:head:lmu').title,/semaine/);
-  assert.equal(week('week:lmu').title,'Endurances LMU');assert.equal(week('week:iracing').title,'Endurances iRacing');
-  for (const sim of ['week:lmu','week:iracing']) {assert.equal(week(sim).image,undefined);assert.equal(week(sim).author,undefined);assert.ok(week(sim).footer);}
+  assert.match(week('week:head:lmu').title,/Semaine/);
+  // The head: the races of each sim (never the number of pilots), and two buttons to the site.
+  assert.deepEqual(week('week:head:lmu').fields.map(field=>[field.name,field.value]),[['🏎️ LMU','1 course'],['🏁 iRacing','1 course']]);
+  assert.deepEqual(messages.get(id('week:head:lmu')).components[0].components.map(button=>button.label),['Toutes les endurances','Mes inscriptions']);
+  assert.equal(week('week:lmu').author.name,'🏎️ LMU · 1 course cette semaine');assert.equal(week('week:iracing').author.name,'🏁 iRacing · 1 course cette semaine');
+  for (const sim of ['week:lmu','week:iracing']) {assert.equal(week(sim).image,undefined);assert.equal(week(sim).title,undefined);assert.ok(week(sim).footer);}
   // Sent in this order: the banner first.
   assert.ok(BigInt(id('week:head:lmu'))<BigInt(id('week:lmu'))&&BigInt(id('week:lmu'))<BigInt(id('week:iracing')));
 });
@@ -952,7 +952,7 @@ test('a community showing the official iRacing races on its site: each gets its 
   await layout(env,community,{mode:'events',sims:'iracing',showEvents:false,under:'top'});
   await syncBotRecaps(env,NOW,community);
   assert.ok(channels.some(item=>item.type===11&&item.name==='🏁 iRacing · Officielle iRacing'));
-  assert.ok([...messages.values()].some(item=>item.embeds[0].title==='Endurances iRacing'&&/Officielle iRacing|<#/.test(item.embeds[0].description||'')));
+  assert.ok([...messages.values()].some(item=>item.embeds[0].author?.name.startsWith('🏁 iRacing')&&/<#/.test(item.embeds[0].fields?.[0]?.value||'')));
 });
 test('EVENT TDZ\'s channel is shown as « 🗓️・calendrier », found again by its first name',async()=>{
   const {layoutPlan}=await import('../server/discord-layout.mjs');

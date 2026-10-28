@@ -182,8 +182,8 @@ test('private sends exclude waiting pilots, track blocked MPs, resume without du
     assert.equal(first.status, 200, JSON.stringify(first.data));
     assert.equal(discord.messages.length, 1);
     assert.equal(discord.messages[0].recipient, FIRST);
-    assert.ok(discord.messages[0].content.includes(PASSWORD));
-    assert.ok(discord.messages[0].content.includes(`Game ${FIRST}`));
+    assert.equal(discord.messages[0].embeds[0].fields[0].value, `\`${PASSWORD}\``, 'the password in a code block, easy to copy');
+    assert.ok(discord.messages[0].embeds[0].description.includes(`Game ${FIRST}`));
     assert.equal(first.data.pilots.find(pilot => pilot.name === `Discord ${SECOND}`).status, 'failed');
     assert.equal(discord.requests.some(request => request.data?.recipient_id === WAITING), false);
     assert.equal(JSON.stringify(first.data).includes(PASSWORD), false);
@@ -205,7 +205,7 @@ test('private sends exclude waiting pilots, track blocked MPs, resume without du
     const updated = (await req('/api/events')).data.events[0];
     await req(sendPath, 'POST', {version:updated.version});
     assert.equal(discord.messages.length, 5, 'new password can be sent to the currently confirmed pilots');
-    assert.ok(discord.messages.slice(-2).every(message => message.content.includes(newPassword)));
+    assert.ok(discord.messages.slice(-2).every(message => message.embeds[0].fields[0].value.includes(newPassword)));
   } finally { discord.restore(); }
 });
 
