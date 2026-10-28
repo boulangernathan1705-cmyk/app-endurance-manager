@@ -67,8 +67,9 @@ test('at 7h30 the day\'s endurances and events are announced in order, @everyone
   assert.equal(combined.embeds.length,1,'one visual frame, not several embeds');
   assert.doesNotMatch(text,/Aujourd’hui sur le serveur|C’est jour de course|Inscris-toi, préviens/);
   assert.match(embed.title,/6h de Spa/);
-  assert.equal(embed.fields.at(-1).name,'📺 LA SOIRÉE EN DIRECT');
-  assert.match(embed.fields.at(-1).value,/\*\*\[▶ Regarder sur Twitch · tdz\].*https:\/\/twitch.tv\/tdz/);
+  assert.equal(embed.fields.at(-1).name,'📺 LA SOIRÉE AVEC TDZ');
+  assert.match(embed.fields.at(-1).value,/Début du stream à \*\*20h45\*\*/);
+  assert.match(embed.fields.at(-1).value,/\*\*\[▶ REJOINDRE LE STREAM\].*https:\/\/twitch.tv\/tdz/);
   assert.ok(!combined.components.flatMap(row=>row.components).some(button=>button.label==='Regarder le live'));
   assert.match(text,/6h de Spa/);assert.match(text,/Coupe GT3/);
   assert.ok(text.indexOf('6h de Spa')<text.indexOf('Coupe GT3'));
@@ -252,6 +253,12 @@ test('rounds have distinct readable sections and full session labels inside a si
   assert.match(JSON.stringify(embed),/Course : 40 min/);
 });
 
+test('live block uses configured streamer name and omits an unspecified schedule',()=>{
+  const intro=buildAnnounceIntro({events:1},{streamUrl:'https://twitch.tv/test'});
+  const payload=buildCompleteAnnouncement(intro,[],{streamName:'La Praline'});
+  assert.equal(payload.embeds[0].fields.at(-1).name,'📺 LA SOIRÉE AVEC LA PRALINE');
+  assert.doesNotMatch(payload.embeds[0].fields.at(-1).value,/Début du stream/);
+});
 test('all simulator events share identical facts and retain differences per round',()=>{
   for(const sim of ['lmu','iracing','ams2','ace'])for(const type of ['SAFE','BOULOULES','TONDEUZ TRAINING','Gridfest']){
     const base={circuit:'Velo Città',category:'GT4',car:'Ginetta G55',weather:'random',fuel:1,tyres:1,practice:10,qualifying:10,durationMinutes:20};

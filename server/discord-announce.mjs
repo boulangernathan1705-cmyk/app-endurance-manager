@@ -148,7 +148,8 @@ export async function announceCommunity(env, community, settings, timestamp = Da
     if(payload)items.push({name:payload.embeds[0].title.replace(/^[^\p{L}\p{N}]+/u,''),payload});
   }
   items.push(...eventRows.slice(9).map(row=>({name:row.item,payload:{embeds:[],components:[]}})));
-  const payload=buildCompleteAnnouncement(buildAnnounceIntro(counts,{...siteOf(env,community),streamUrl:stream}),items,siteOf(env,community));
+  const site={...siteOf(env,community),streamUrl:stream,streamName:parseLayout(settings.layout)?.streamName||'',streams:counts.streams};
+  const payload=buildCompleteAnnouncement(buildAnnounceIntro(counts,site),items,site);
   const hash=await contentHash(payload);
   let asked=false;
   const previousId=intro.message_id;

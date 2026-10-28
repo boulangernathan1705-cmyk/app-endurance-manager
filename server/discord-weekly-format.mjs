@@ -554,7 +554,10 @@ export function buildCompleteAnnouncement(intro, items, site={}) {
   // Embed fields appear above its image: keep the live link just above the banner.
   if(streamLink&&head.fields.length<25){
     const channel=new URL(streamLink[2]).pathname.split('/').filter(Boolean)[0]||'';
-    head.fields.push({name:'📺 LA SOIRÉE EN DIRECT',value:`**[▶ Regarder sur ${streamLink[1]}${channel?` · ${clean(channel)}`:''}](${streamLink[2]})**`,inline:false});
+    const name=clean(site.streamName||channel);
+    const times=[...new Set((site.streams||[]).map(stream=>stream.time).filter(time=>/^([01]\d|2[0-3]):[0-5]\d$/.test(time)))].sort();
+    const schedule=times.length?`Début du stream à **${times.map(time=>time.replace(':','h')).join(' · ')}**\n`:'';
+    head.fields.push({name:cut(name?`📺 LA SOIRÉE AVEC ${name.toUpperCase()}`:'📺 LA SOIRÉE EN DIRECT',256),value:`${schedule}**[▶ REJOINDRE LE STREAM](${streamLink[2]})**`,inline:false});
   }
   return {content:intro.content,embeds:fitDiscordEmbeds(embeds),components,allowed_mentions:intro.allowed_mentions};
 }
