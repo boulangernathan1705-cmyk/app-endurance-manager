@@ -151,14 +151,28 @@ export async function announceCommunity(env, community, settings, timestamp = Da
   const payload=buildCompleteAnnouncement(buildAnnounceIntro(counts,{...siteOf(env,community),streamUrl:stream}),items,siteOf(env,community));
   const hash=await contentHash(payload);
   let asked=false;
+  const previousId=intro.message_id;
+  if(previousId) {
+    try {
+      // Even unchanged content must still exist before the old cards can be removed.
+      const confirmed=await discordRequest(env,hash!==intro.content_hash||legacy.length?'PATCH':'GET',
+        `/channels/${intro.channel_id}/messages/${previousId}`,
+        hash!==intro.content_hash||legacy.length?{...payload,allowed_mentions:{parse:[]}}:null,budget);
+      if(confirmed?.id!==previousId)throw new Error('Discord n’a pas confirmé le message de remplacement.');
+      asked=true;
+    } catch(error) {
+      if(error.status!==404 || error.code!==10008)throw error;
+      intro.message_id=null;
+    }
+  }
   if(!intro.message_id) {
-    const nonce=(await digest([community.id,day,'complete'])).slice(0,24);
-    const message=await discordRequest(env,'POST',`/channels/${intro.channel_id}/messages`,{...payload,nonce,enforce_nonce:true},budget);
+    const nonce=(await digest([community.id,day,'complete',previousId||'initial'])).slice(0,24);
+    const message=await discordRequest(env,'POST',`/channels/${intro.channel_id}/messages`,{
+      ...payload,nonce,enforce_nonce:true,
+      ...(previousId?{allowed_mentions:{parse:[]},flags:4096}:{})
+    },budget);
+    if(!message?.id)throw new Error('Discord n’a pas confirmé la publication de l’annonce.');
     intro.message_id=message.id;asked=true;
-  } else if(hash!==intro.content_hash || legacy.length) {
-    await discordRequest(env,'PATCH',`/channels/${intro.channel_id}/messages/${intro.message_id}`,{...payload,allowed_mentions:{parse:[]}},budget)
-      .catch(error=>{if(error.status!==404)throw error;});
-    asked=true;
   }
   // Persist the combined publication before cleanup; an interrupted cleanup resumes next pass.
   await env.DB.prepare('UPDATE discord_announcements SET message_id=?,content_hash=?,checked_at=? WHERE community_id=? AND day=? AND item=?')

@@ -2,7 +2,7 @@ import {effectivePermissions,withBotAccess,VOICE_ACCESS} from './discord-permiss
 import {iracingSoloSql} from './iracing-visibility.mjs';
 // Text recaps configured explicitly by an admin, published exclusively by the bot.
 import {loadWeeklyDiscordSnapshot, loadCalendarSnapshot, siteOf} from './discord-weekly.mjs';
-import {buildWeeklyDiscordPayload, buildWeekHeadPayload, buildCalendarPayload, CATEGORY_EMOJI_NAMES} from './discord-weekly-format.mjs';
+import {CALENDAR_FORMAT, buildWeeklyDiscordPayload, buildWeekHeadPayload, buildCalendarPayload, CATEGORY_EMOJI_NAMES} from './discord-weekly-format.mjs';
 import {tdzOnly} from '../shared/catalog.mjs';
 import {isDevelopment} from './dev-environment.mjs';
 import {crewVoiceName} from './crew-discord.mjs';
@@ -504,7 +504,7 @@ async function snapshotPayload(env, timestamp, community, eventId = null, kind =
   if (kind?.startsWith('calendar')) {
     const snapshot = await loadCalendarSnapshot(env, timestamp, community, sim);
     const payload = buildCalendarPayload(snapshot, siteOf(env, community), timestamp);
-    return {snapshot, payload, hash:await digest([RECAP_FORMAT,'calendar',snapshot])};
+    return {snapshot, payload, hash:CALENDAR_FORMAT + await digest([RECAP_FORMAT,'calendar',snapshot])};
   }
   const scope = eventId ? 'all' : kind;
   const snapshot = await loadWeeklyDiscordSnapshot(env, timestamp, community, scope, eventId);

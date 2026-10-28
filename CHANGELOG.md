@@ -1,5 +1,12 @@
 # Nouveautés d'Endurance Manager
 
+## v1.95 — 28 octobre 2026
+
+### 🛠️ Pour les admins
+
+- **Discord · Annonce du jour** : si le message principal a disparu, le bot le recrée sans nouvelle mention avant de supprimer les anciennes annonces séparées. Un échec de publication conserve les anciens messages et sera retenté.
+- **Discord · Calendrier** : la nouvelle présentation est appliquée automatiquement même si les événements n’ont pas changé ; un message disparu est rétabli lors de cette mise à jour.
+
 ## v1.94 — 28 octobre 2026
 
 ### ✨ Améliorations

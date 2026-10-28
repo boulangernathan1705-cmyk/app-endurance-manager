@@ -311,6 +311,7 @@ function calendarBox(event,siteUrl){
 }
 // The week's events (« EVENT SOLO », « EVENT TDZ »): one box per event, in the order of their starts.
 // `snapshot`: {periodLabel, events:[{id,name,sim,circuits,startsAt,timePending,capacity,entered,access}]}.
+export const CALENDAR_FORMAT = 'calendar-v2:';
 export function buildCalendarPayload(snapshot,site={},updatedAt=Date.now()){
   const siteUrl=String(site.url||''),events=Array.isArray(snapshot.events)?snapshot.events:[];
   const embed={title:'📅 Le programme de la semaine',description:cut(cap(snapshot.periodLabel||'semaine à venir'),4096),color:events.length?0xe7b653:0x6b7280};

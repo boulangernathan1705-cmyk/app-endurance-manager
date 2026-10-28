@@ -5,7 +5,7 @@ import {readFileSync,readdirSync} from 'node:fs';
 import worker from '../server/worker.mjs';
 import {flushDiscord} from '../server/worker-with-migrations.mjs';
 import {linkTestServer,DEV_COMMUNITY,GUILD} from './fixtures/discord-server.mjs';
-import {syncWeeklyDiscord} from '../server/discord-weekly.mjs';
+import {syncDueRecaps,syncWeeklyDiscord} from '../server/discord-weekly.mjs';
 import {addThreadMembers,botCategoryEmojis,saveBotRecap,validateDiscordLayout,syncBotRecaps,previewBotRecap,recapDestinations,eventDeletionTime,eventChannelName,settingsRow,recapError,repairBotRecap,racesOpenNow} from '../server/recap-discord.mjs';
 
 const OWNER='333333333333333333', BOT='444444444444444444', TEXT='555555555555555555', CATEGORY='666666666666666666';
@@ -1026,4 +1026,26 @@ test('automatic synchronization retries a busy community without overwriting a c
   };
   await flushDiscord(env,1);
   assert.equal(DB.db.prepare('SELECT event_id FROM discord_pending WHERE community_id=?').get(COMMUNITY.id).event_id,'new-event');
+});
+
+
+test('pending scheduled passes upgrade an unchanged calendar automatically and recover its missing message',async t=>{
+  const {DB,env,calls,messages}=setup(t);
+  const community={...COMMUNITY,modules:{soloRaces:true}};
+  DB.db.prepare('UPDATE communities SET modules=? WHERE id=?').run(JSON.stringify(community.modules),community.id);
+  await saveBotRecap(env,community,settingsRow('general',RECAP,RECAP,RECAP));
+  await syncBotRecaps(env,NOW,community);
+  const row=DB.db.prepare("SELECT * FROM discord_recap_publications WHERE event_id='week:calendar'").get();
+  assert.ok(row.message_id);
+  DB.db.prepare("UPDATE discord_recap_publications SET content_hash='old-format' WHERE event_id='week:calendar'").run();
+  DB.db.prepare('UPDATE community_recap_settings SET dirty=0,last_error=NULL').run();
+  messages.delete(row.message_id);calls.length=0;
+  assert.equal(await syncDueRecaps(env,1,NOW+60000,{pending:true}),1);
+  const current=DB.db.prepare("SELECT * FROM discord_recap_publications WHERE event_id='week:calendar'").get();
+  assert.notEqual(current.message_id,row.message_id);
+  assert.ok(messages.has(current.message_id));
+  assert.match(current.content_hash,/^calendar-v2:/);
+  assert.ok(sends(calls).some(call=>call.body.flags===4096));
+  calls.length=0;
+  assert.equal(await syncDueRecaps(env,1,NOW+120000,{pending:true}),0,'upgrade does not repeat');
 });
