@@ -1,5 +1,11 @@
 # Nouveautés d'Endurance Manager
 
+## v1.75 — 28 octobre 2026
+
+### 🔧 Corrections
+
+- **Discord** : deux liens pour inviter le bot, un normal et un administrateur (qui gère aussi les catégories privées). Le message de droits nomme la catégorie où ajouter l'exception, plus le salon choisi.
+
 ## v1.74 — 28 octobre 2026
 
 ### ✨ Nouveautés
