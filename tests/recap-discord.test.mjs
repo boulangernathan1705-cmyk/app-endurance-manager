@@ -893,9 +893,10 @@ test('the crews\' voices: LMU first, then iRacing, each by its start; other voic
     channels.push({id,type:2,name:crew,parent_id:bot.id,position});};
   channels.push({id:'777777777777777700',type:2,name:'Général',parent_id:bot.id,position:5});
   voice('iracing','race-b','start-b','777777777777777701',0);voice('spa','race-a','start-a','777777777777777702',1);voice('monza','race-c','start-c','777777777777777703',2);
-  calls.length=0;await syncBotRecaps(env,NOW+1000,community);
+  calls.length=0;await syncBotRecaps(env,NOW+1000,community);await syncBotRecaps(env,NOW+1500,community);
   const order=channels.filter(item=>item.type===2&&item.parent_id===bot.id).sort((a,b)=>a.position-b.position).map(item=>item.name);
-  assert.deepEqual(order,['Général','monza','spa','iracing']);
+  // Named with the race's logo in front (voices made before it renamed).
+  assert.deepEqual(order,['Général','🏎️ LMU · 4h de Monza · monza','🏎️ LMU · 6h de Spa · spa','🏁 iRacing · 8h de Watkins Glen · iracing']);
   calls.length=0;await syncBotRecaps(env,NOW+2000,community);
   assert.ok(!calls.some(call=>call.method==='PATCH'&&call.path===`/guilds/${GUILD}/channels`),'in order: nothing sent');
 });
