@@ -1,5 +1,12 @@
 # Nouveautés d'Endurance Manager
 
+## v1.85 — 28 octobre 2026
+
+### ✨ Améliorations
+
+- **Discord** : l’en-tête de la semaine ne garde que son titre (lien vers les endurances) et la bannière.
+- **Discord** : dans la liste de la semaine, plus le nombre d’équipages ou d’inscrits à côté de chaque course (il est dans son fil).
+
 ## v1.84 — 28 octobre 2026
 
 ### ✨ Améliorations
