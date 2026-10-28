@@ -27,6 +27,7 @@ export function flattenDepartures(events) {
   for (const event of events) {
     const eventDepartures = parseJson(event.departures, []);
     if (!Array.isArray(eventDepartures)) continue;
+    const details = parseJson(event.details, {}) || {};
     const durationHours = Number(event.duration_hours) || 0, durationMinutes = Number(event.duration_minutes) || durationHours * 60;
     for (const departure of eventDepartures) {
       const startsAt = Number(departure?.startsAt);
@@ -35,6 +36,8 @@ export function flattenDepartures(events) {
         eventId: event.id,
         eventName: event.name,
         eventType: event.event_type || '',
+        // The race's conditions (weather, tyres, track limits…), on its thread's card.
+        details,
         circuit: event.circuit || '',
         durationHours,
         durationMinutes,
@@ -75,7 +78,7 @@ export async function loadWeeklyDiscordSnapshot(env, timestamp, community, scope
   // openRaces), the official iRacing ones (all of them when the community shows them on its site, otherwise those where it
   // has entries or a crew), or the one asked for (its race channel): only its
   // own entries and crews are shown.
-  const events = (await env.DB.prepare(`SELECT id,name,circuit,duration_hours,duration_minutes,event_type,schedule_pending,departures
+  const events = (await env.DB.prepare(`SELECT id,name,circuit,duration_hours,duration_minutes,event_type,schedule_pending,departures,details
     FROM events WHERE (community_id=? OR (community_id='official' AND (${community.modules?.iracingImport === true ? "1 OR " : ''}circuit NOT LIKE 'iracing-%' OR EXISTS (SELECT 1 FROM registrations r WHERE r.event_id=events.id AND r.community_id=?) OR EXISTS (SELECT 1 FROM event_absences a WHERE a.event_id=events.id AND a.community_id=?)
       OR EXISTS (SELECT 1 FROM crews c WHERE c.event_id=events.id AND c.community_id=?)) OR (community_id='official' AND id=?)))
     AND COALESCE(format,'endurance')<>'solo' AND ${iracingSoloSql(env,community)} ${CIRCUITS[scope] ?? CIRCUITS.lmu} ORDER BY created_at,id`).bind(community.id, community.id, community.id, community.id, eventId).all()).results || [];
