@@ -332,3 +332,116 @@ export function isWeeklyDiscordMutation(request){
   if(new RegExp(`^/api/crews/${uuid}(?:/members(?:/${uuid})?)?$`).test(path))return true;
   return false;
 }
+
+// « Annonce du jour » (server/discord-announce.mjs): at 7h30 the day's events and endurances, to make the pilots want to come.
+// The day of a time in Paris (« 2026-10-28 »).
+export function parisDay(timestamp){return dayKey(localDay(timestamp));}
+// Each race has its hook: the event's type (Bouboule, Training, Gridfest) or else its sim, then OPEN / SAFE behind it; the
+// endurances after their kind. Only at TDZ do the events have types and OPEN / SAFE (as on the site).
+export const ANNOUNCE_HOOKS={
+  lmu:'Protos et GT vous attendent sur Le Mans Ultimate : place à la course !',
+  iracing:'Ce soir sur iRacing, chaque dixième compte. À vous de jouer.',
+  ams2:'Automobilista 2 au programme : du pilotage pur et des bagarres serrées.',
+  ace:'Assetto Corsa EVO ce soir : sortez les gants, ça va glisser.',
+  acrally:'Spéciales au programme : notes en main et pied droit au plancher.',
+  Bouboule:'Soirée Bouboule ! Ambiance détendue et fous rires garantis, le chrono passe après.',
+  'TONDEUZ TRAINING':'Entraînement collectif : on tourne, on compare, on progresse ensemble.',
+  Gridfest:'C’est la Gridfest ! Choisis ton streamer et viens faire le show.',
+  open:'Grille ouverte à tous, nouveaux comme habitués !',
+  safe:'Soirée SAFE : on roule propre et on respecte les autres.',
+  official:'Course officielle LMU aujourd’hui : nos équipages défendent les couleurs de la communauté !',
+  officialIracing:'Course spéciale iRacing aujourd’hui : nos équipages défendent les couleurs de la communauté !',
+  championship:'Manche de championnat aujourd’hui : chaque point compte, on vise le podium !',
+  endurance:'Jour d’endurance : relais, stratégie, et tout l’équipage soudé jusqu’au drapeau à damier.'};
+const isGridfestType=type=>['Gridfest','Grindfest'].includes(type);
+export function eventHook(event){
+  const type=isGridfestType(event.type)?'Gridfest':event.type;
+  const first=event.tdz&&ANNOUNCE_HOOKS[type]&&!['open','safe'].includes(type)?ANNOUNCE_HOOKS[type]:ANNOUNCE_HOOKS[event.sim]||ANNOUNCE_HOOKS.lmu;
+  return [first,event.tdz&&type!=='Gridfest'&&ANNOUNCE_HOOKS[event.access]].filter(Boolean).join(' ');
+}
+export function raceHook(race){
+  const iracing=String(race.circuit||'').startsWith('iracing-');
+  if(race.eventType==='lmu')return ANNOUNCE_HOOKS.championship;
+  if(race.official)return iracing?ANNOUNCE_HOOKS.officialIracing:ANNOUNCE_HOOKS.official;
+  return ANNOUNCE_HOOKS.endurance;
+}
+const ANNOUNCE_SIM_COLORS={lmu:0xd8322c,iracing:0x2f6fd6,ams2:0xf08a24,ace:0x2fae5b,acrally:0x8b5cf6};
+const ROUND_WEATHER={sun:'☀️',cloud:'⛅',overcast:'☁️',rain:'🌧️',random:'🎲 météo aléatoire'};
+const plural=(count,word)=>`${count} ${word}${count>1?'s':''}`;
+// « Ce soir 21h00 » after 18h, else « Aujourd’hui 14h00 » (Paris time).
+function announceTime(startsAt,timePending){
+  if(timePending)return 'Aujourd’hui · horaire à confirmer';
+  const hour=Number(new Intl.DateTimeFormat('fr-FR',{timeZone:TIME_ZONE,hour:'numeric',hourCycle:'h23'}).formatToParts(startsAt).find(part=>part.type==='hour').value);
+  return `${hour>=18?'Ce soir':'Aujourd’hui'} ${recapTime.format(startsAt).replace(':','h')}`;
+}
+// The buttons under each race: « Présent » opens it on the site, « Absent » (absent: its button) marks it from Discord.
+function announceButtons(url,eventId,absent){
+  return url?[{type:1,components:[{type:2,style:5,label:'Présent',emoji:{name:'✅'},url},...(absent?[absent(eventId)]:[])]}]:[];
+}
+// The first message: the community, « C'est jour de course ! », what the day holds and the banner; it pings @everyone.
+// counts: {events, races}.
+export function buildAnnounceIntro(counts,site={}){
+  const parts=[counts.events&&`**${plural(counts.events,'event')}**`,counts.races&&`**${plural(counts.races,'endurance')}**`].filter(Boolean);
+  const embed={title:'🏁 C’est jour de course !',color:0xd71920,
+    description:`Aujourd’hui sur le serveur : ${parts.join(' et ')}.\nInscris-toi, préviens si tu ne viens pas, et rendez-vous en piste 👇`};
+  if(site.name){embed.author={name:cut(site.name,256)};if(site.url)embed.author.url=`${site.url}/`;if(site.logoUrl)embed.author.icon_url=site.logoUrl;}
+  if(site.bannerUrl)embed.image={url:site.bannerUrl};
+  return{content:'@everyone',embeds:[embed],allowed_mentions:{parse:['everyone']}};
+}
+function roundName(round){
+  if(round.randomCategory||round.circuit==='random'||round.circuit==='iracing-random')return '📍 Circuit aléatoire · 🎲 catégorie au hasard';
+  return `📍 ${clean(circuitNames.get(round.circuit)||round.circuit||'Circuit à préciser')}`;
+}
+function roundDetails(round){
+  const format=[round.practice&&`E${round.practice}`,round.qualifying&&`Q${round.qualifying}`,round.durationMinutes&&`C${round.durationMinutes}`].filter(Boolean).join(' / ');
+  const categories=round.randomCategory?'':(round.categories?.length?round.categories:round.category?[round.category]:[]).map(clean).join(', ');
+  return [categories,round.car&&`🏎️ ${clean(round.car)}`,format,ROUND_WEATHER[round.weather],round.fuel>1&&`⛽ ×${round.fuel}`,round.tyres>1&&`🛞 ×${round.tyres}`].filter(Boolean).join(' · ');
+}
+// An event of the day: its hook, the admin's note, when and on which sim, its rounds, the count of présents and the buttons.
+// event: {id,name,sim,type,access,tdz,note,startsAt,timePending,rounds,capacity,entered,streamers,rally,password}.
+export function buildAnnounceEvent(event,site={},updatedAt=Date.now(),absent=null){
+  const siteUrl=String(site.url||''),url=siteUrl?`${siteUrl}/${event.sim==='iracing'?'iracing':'lmu'}/#event=${encodeURIComponent(event.id)}`:'';
+  const gridfest=isGridfestType(event.type),rounds=Array.isArray(event.rounds)?event.rounds:[];
+  const typeLabel=event.tdz&&event.type&&!['OPEN','SAFE'].includes(event.type)?`🏷️ ${clean(gridfest?'Gridfest':event.type)}`:'';
+  const lines=[`**${eventHook(event)}**`,event.note&&`*« ${clean(event.note)} »*`,
+    [`🕘 ${announceTime(event.startsAt,event.timePending)}`,`🎮 ${SIM_SHORT[event.sim]||clean(event.sim)}`,typeLabel,event.tdz&&!gridfest&&event.access&&event.access.toUpperCase()].filter(Boolean).join(' · ')];
+  const rally=event.rally;
+  if(rally){
+    if(rally.stages?.length)lines.push(`🏔️ Spéciales : ${rally.stages.map(clean).join(', ')}`);
+    const cars=rally.carMode==='category'&&rounds[0]?.category?`🚗 Catégorie imposée : ${clean(rounds[0].category)}`:rally.carMode==='car'&&rounds[0]?.car?`🚗 Voiture imposée : ${clean(rounds[0].car)}`:rally.carMode==='all'?'🚗 Toutes voitures':'';
+    lines.push([cars,rally.minutes&&`⏱️ environ ${durationLabel(rally.minutes)}`].filter(Boolean).join(' · '));
+    if(rally.host)lines.push(`🏠 Hôte : ${clean(rally.host)}`);
+  }else if(rounds.length===1)lines.push([roundName(rounds[0]),roundDetails(rounds[0])].filter(Boolean).join('\n'));
+  if(gridfest&&event.streamers?.length)lines.push(event.streamers.map(streamer=>`🎙️ ${clean(streamer.name)} · ${Math.min(streamer.entered,streamer.capacity)}/${streamer.capacity} places${streamer.entered>=streamer.capacity?' · complet':''}`).join('\n'));
+  if(event.password)lines.push('🔑 Mot de passe du serveur sur le site');
+  const places=event.capacity&&!gridfest?(event.entered>=event.capacity?` · complet${event.entered>event.capacity?` · ${event.entered-event.capacity} en attente`:''}`:` · ${plural(event.capacity-event.entered,'place')} restante${event.capacity-event.entered>1?'s':''}`):'';
+  const count=`✅ **${plural(Math.min(event.entered,event.capacity||event.entered),'présent')}**${places}`;
+  const embed={title:cut(`🏁 ${clean(event.name)}`,256),color:ANNOUNCE_SIM_COLORS[event.sim]||0xe7b653,description:cut(lines.filter(Boolean).join('\n'),4096)};
+  if(!rally&&rounds.length>1)embed.fields=rounds.slice(0,4).map((round,index)=>({name:cut(`Manche ${index+1} · ${roundName(round).slice(3)}`,256),value:cut([roundDetails(round),round.capacity&&`👥 ${round.capacity} places`].filter(Boolean).join(' · ')||BLANK,1024),inline:false}));
+  embed.fields=[...(embed.fields||[]),{name:BLANK,value:count,inline:false}];
+  if(url)embed.url=url;
+  if(event.logoUrl)embed.thumbnail={url:event.logoUrl};
+  embed.footer=footer(updatedAt);
+  return{content:'',embeds:[embed],components:announceButtons(url,event.id,absent),allowed_mentions:{parse:[]}};
+}
+// An endurance of the day: its hook, its conditions, then each of today's starts with its crews and pilots (as in its
+// thread). race: {id,name,circuit,eventType,official,durationMinutes,details,departures} (departures: today's, as loaded
+// for the threads).
+export function buildAnnounceRace(race,site={},updatedAt=Date.now(),emojis={},absent=null){
+  const siteUrl=String(site.url||''),first={eventId:race.id,circuit:race.circuit},url=raceUrl(siteUrl,first);
+  const {title,note}=eventTitleAndNote(race.name),circuit=circuitNames.get(race.circuit)||race.circuit||'Circuit à préciser';
+  const info=race.details||{};
+  const conditions=[`📍 ${clean(circuit)}`,race.durationMinutes&&`⏱️ ${durationLabel(race.durationMinutes)}`,WEATHER[info.weather],info.tyres&&`🛞 ${plural(info.tyres,'pneu')}`,
+    TRACK_LIMITS[info.trackLimits]&&`🚧 Limites ${TRACK_LIMITS[info.trackLimits].toLowerCase()}`,info.fairShare===true&&'⚖️ Partage équitable'].filter(Boolean).join(' · ');
+  const departures=(race.departures||[]).filter(departure=>departure.crews.length||departure.unassignedPilots?.length);
+  const fields=departures.slice(0,20).map(departure=>({name:BLANK,value:cut(departureValue(departure,false,emojis),1024),inline:false}));
+  if(!departures.length)fields.push({name:BLANK,value:`${(race.departures||[]).map(departure=>`🕐 **${departureTitle(departure)}**`).join('\n')}\nAucun équipage pour l’instant : lance-toi !`,inline:false});
+  const pilots=new Set(departures.flatMap(departure=>[...departure.crews.flatMap(crew=>crew.pilots),...(departure.unassignedPilots||[]).map(pilot=>typeof pilot==='string'?pilot:pilot.name)]));
+  const crews=departures.reduce((total,departure)=>total+departure.crews.length,0);
+  fields.push({name:BLANK,value:`✅ **${plural(pilots.size,'présent')}**${crews?` · ${plural(crews,'équipage')}`:''}`,inline:false});
+  const embed={title:cut(`🏁 ${title}`,256),color:SIM_COLORS[simOf(first)],description:cut([`**${raceHook(race)}**`,note,conditions].filter(Boolean).join('\n'),4096),fields};
+  if(url)embed.url=url;
+  embed.footer=footer(updatedAt);
+  const [fitted]=fitDiscordEmbeds([embed]);
+  return{content:'',embeds:[fitted],components:announceButtons(url,race.id,absent),allowed_mentions:{parse:[]}};
+}
