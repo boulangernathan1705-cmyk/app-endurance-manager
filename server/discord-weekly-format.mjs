@@ -338,6 +338,7 @@ export function isWeeklyDiscordMutation(request){
   // The Discord setting: the crews' voice channels follow at once.
   if(path==='/api/community/discord'&&['PUT','DELETE'].includes(method))return true;
   if(path==='/api/events'&&method==='POST')return true;
+  if(new RegExp(`^/api/events/${uuid}/official$`).test(path)&&method==='POST')return true;
   if(new RegExp(`^/api/events/${uuid}$`).test(path)&&['PATCH','DELETE'].includes(method))return true;
   if(new RegExp(`^/api/events/${uuid}/departures/${uuid}/registrations$`).test(path)&&method==='POST')return true;
   if(new RegExp(`^/api/events/${uuid}/departures/${uuid}/crews$`).test(path)&&method==='POST')return true;
