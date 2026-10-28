@@ -44,7 +44,7 @@ function setup(t){
     const send=path.match(/^\/channels\/(\d+)\/messages$/);
     if(send){const message={...body,id:String(counter++),channel_id:send[1]};messages.set(message.id,message);return Response.json(message);}
     const edit=path.match(/^\/channels\/(\d+)\/messages\/(\d+)$/);
-    if(edit){if(method==='DELETE'){messages.delete(edit[2]);return new Response(null,{status:204});}Object.assign(messages.get(edit[2]),body);return Response.json(messages.get(edit[2]));}
+    if(edit){if(method!=='DELETE'&&!messages.has(edit[2]))return Response.json({code:10008},{status:404});if(method==='DELETE'){messages.delete(edit[2]);return new Response(null,{status:204});}Object.assign(messages.get(edit[2]),body);return Response.json(messages.get(edit[2]));}
     return new Response('{}',{status:404});
   };
   t.after(()=>globalThis.fetch=original);
@@ -191,4 +191,49 @@ test('a stream-only announcement has no invitation to register or absence button
   assert.match(payload.embeds[0].title,/stream/);
   assert.doesNotMatch(payload.embeds[0].description,/Inscris-toi/);
   assert.deepEqual(payload.components,[]);
+});
+
+
+test('a missing original intro is replaced before legacy cards are deleted, without pinging again',async t=>{
+  const {DB,env,calls,messages,settings}=setup(t);
+  await announceCommunity(env,TDZ,settings(),MORNING);
+  messages.clear();
+  messages.set('888888888888888888',{id:'888888888888888888',content:'old race'});
+  DB.db.prepare("UPDATE discord_announcements SET message_id='888888888888888888' WHERE item=?").run(RACE);
+  calls.length=0;
+  await announceCommunity(env,TDZ,settings(),MORNING+60000);
+  const replacement=sent(calls)[0];
+  assert.ok(replacement);
+  assert.deepEqual(replacement.body.allowed_mentions,{parse:[]});
+  assert.equal(replacement.body.flags,4096);
+  assert.ok(calls.indexOf(replacement)<calls.findIndex(call=>call.method==='DELETE'));
+  assert.ok(messages.has(DB.db.prepare("SELECT message_id FROM discord_announcements WHERE item='intro'").get().message_id));
+  assert.equal(messages.size,1);
+});
+
+test('an unchanged announcement deleted from Discord is recovered on the next refresh',async t=>{
+  const {env,calls,messages,settings}=setup(t);
+  await announceCommunity(env,TDZ,settings(),MORNING);
+  messages.clear();calls.length=0;
+  await announceCommunity(env,TDZ,settings(),MORNING+11*60000);
+  assert.equal(sent(calls).length,1);
+  assert.equal(messages.size,1);
+  assert.deepEqual(sent(calls)[0].body.allowed_mentions,{parse:[]});
+});
+
+test('a failed replacement preserves legacy cards and retries on the following pass',async t=>{
+  const {DB,env,calls,messages,settings}=setup(t);
+  await announceCommunity(env,TDZ,settings(),MORNING);
+  messages.clear();messages.set('888888888888888888',{id:'888888888888888888',content:'old race'});
+  DB.db.prepare("UPDATE discord_announcements SET message_id='888888888888888888' WHERE item=?").run(RACE);
+  const fetch=globalThis.fetch;
+  globalThis.fetch=async(url,options)=>options?.method==='POST'?Response.json({code:50013},{status:403}):fetch(url,options);
+  calls.length=0;
+  await assert.rejects(announceCommunity(env,TDZ,settings(),MORNING+60000));
+  assert.equal(calls.filter(call=>call.method==='DELETE').length,0);
+  assert.ok(messages.has('888888888888888888'));
+  globalThis.fetch=fetch;
+  await announceCommunity(env,TDZ,settings(),MORNING+120000);
+  assert.equal(messages.size,1);
+  assert.ok(!messages.has('888888888888888888'));
 });
