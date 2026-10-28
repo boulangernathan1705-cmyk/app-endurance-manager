@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {effectivePermissions,withBotAccess,VOICE_ACCESS,VIEW,CONNECT,ADMIN} from '../server/discord-permissions.mjs';
+import {effectivePermissions,withPublicVoiceAccess,PUBLIC_VOICE_ACCESS,withBotAccess,VOICE_ACCESS,VIEW,CONNECT,ADMIN} from '../server/discord-permissions.mjs';
 const guild='100000000000000001',bot='100000000000000002',pilots='100000000000000003';
 
 test('a private category denies a globally capable bot until its member exception is allowed',()=>{
@@ -32,4 +32,21 @@ test('« Gérer les permissions » is never copied (only an administrator may se
   const rules=withBotAccess([{id:pilots,type:0,allow:String(manageRoles|VIEW),deny:'0'},{id:bot,type:1,allow:String(manageRoles),deny:'0'}],bot,VOICE_ACCESS);
   assert.equal(rules[0].allow,String(VIEW));
   assert.equal(BigInt(rules[1].allow)&manageRoles,0n);
+});
+
+
+test('public vocals remove access denies for roles and members while retaining unrelated restrictions',()=>{
+  const unrelated=1n<<22n;
+  const rules=[{id:guild,type:0,allow:'0',deny:String(PUBLIC_VOICE_ACCESS)},
+    {id:pilots,type:0,allow:'0',deny:String(PUBLIC_VOICE_ACCESS|unrelated)},
+    {id:'member',type:1,allow:'0',deny:String(PUBLIC_VOICE_ACCESS)}];
+  const original=structuredClone(rules);
+  const result=withPublicVoiceAccess(rules,guild,bot);
+  assert.deepEqual(rules,original);
+  assert.equal(result[1].deny,String(unrelated));
+  for(const [id,roles] of [['visitor',[]],['member',[pilots]]]) {
+    const rights=effectivePermissions([{id:guild,permissions:'0'}],{roles},guild,{permission_overwrites:result},id);
+    assert.equal(rights&PUBLIC_VOICE_ACCESS,PUBLIC_VOICE_ACCESS);
+  }
+  assert.deepEqual(withPublicVoiceAccess(result,guild,bot),result);
 });
