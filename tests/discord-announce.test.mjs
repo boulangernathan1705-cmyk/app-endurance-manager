@@ -75,7 +75,7 @@ test('at 7h30 the day\'s endurances and events are announced in order, @everyone
   assert.match(text,/Équipage A/);assert.match(text,/Pilote 1/);assert.match(text,/1 présent/);
   assert.match(text,/La pluie attendue sur Spa/);assert.match(text,/Manche 1/);assert.match(text,/Manche 2/);
   assert.ok(embed.image);assert.ok(embed.fields.some(field=>field.name==='────────────'));
-  assert.deepEqual(combined.components[1].components.map(button=>button.label),['Présent / S’inscrire · Coupe GT3','Absent · Coupe GT3']);
+  assert.deepEqual(combined.components[1].components.map(button=>button.label),['S’inscrire · Coupe GT3','Absent · Coupe GT3']);
   assert.equal(combined.components[1].components[1].custom_id,`absent:${EVENT}`);
   // The next passes send nothing again.
   calls.length=0;

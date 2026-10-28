@@ -545,7 +545,7 @@ export function buildCompleteAnnouncement(intro, items, site={}) {
   const embeds=[head];
   const actionable=items.filter(item=>item.payload.components?.length);
   const components=actionable.length<=5 ? actionable.map(item=>({type:1,components:item.payload.components[0].components.map(button=>({...button,
-    label:cut(`${button.style===5?'Présent / S’inscrire':'Absent'}${actionable.length>1?` · ${item.name}`:''}`,80)}))}))
+    label:cut(`${button.style===5?'S’inscrire':'Absent'}${actionable.length>1?` · ${item.name}`:''}`,80)}))}))
     : [{type:1,components:[{type:2,style:5,label:'Inscriptions et absences sur le site',url:`${site.url}/events/`}]}];
   // Embed fields appear above its image: keep the live link just above the banner.
   if(streamLink&&head.fields.length<25){
