@@ -119,12 +119,22 @@ function recapPayload(env, community, row, start, pilots) {
   return {content:'', embeds:[embed], components:link ? [{type:1, components:[{type:2, style:5, label:'Page de la course', emoji:{name:'📋'}, url:link}]}] : []};
 }
 // After the finish, once: a word to the crew before its voice closes.
-function endPayload(env, community, row, start) {
+function endPayload(env, community, row, start, pilots) {
   let site = '';
   try { site = communityUrl(env, community); } catch {}
-  const close = Math.floor((start.endsAt + CLOSE_AFTER) / 1000);
-  return {content:`🏁 **Course terminée, bien joué ${safe(row.crew_name)} !** Ce vocal ferme <t:${close}:R>.`,
+  const close = Math.floor((start.endsAt + CLOSE_AFTER) / 1000), names = pilots.map(pilot => safe(pilot.name)).filter(Boolean);
+  return {content:'', embeds:[{color:0x23a55a, title:clip(`🏁 Course terminée, bien joué ${safe(row.crew_name) || 'l’équipage'} !`, 256),
+    fields:[names.length && {name:'👥 Pilotes', value:clip(names.join(' · '), 1024), inline:true}, {name:'🔊 Ce vocal', value:`ferme <t:${close}:R>`, inline:true}].filter(Boolean)}],
     components:site ? [{type:1, components:[{type:2, style:5, label:'Prochaines endurances', emoji:{name:'📅'}, url:`${site}/${game(row.circuit)}/`}]}] : []};
+}
+// 24 h and 1 h before the start: a card in the voice's chat, naming its pilots without mentions.
+function reminderPayload(env, community, row, start, pilots, soon) {
+  const unix = Math.floor(start.startsAt / 1000), names = pilots.map(pilot => safe(pilot.name)).filter(Boolean), link = raceLink(env, community, row);
+  if (soon) return {content:'', embeds:[{color:0x23a55a, description:clip(`🟢 **Départ <t:${unix}:R>, on se retrouve ici.**\n${[...names, `arrivée vers <t:${Math.floor(start.endsAt / 1000)}:t>`].join(' · ')}`, 4096)}]};
+  const weather = conditionFields(parse(row.event_details, {}) || {}).find(field => field.name.startsWith('🌦️'));
+  return {content:'', embeds:[{color:COLORS[game(row.circuit)], title:clip(`⏰ Rappel · ${safe(row.event_name) || 'Endurance'}`, 256),
+    fields:[{name:'🟢 Départ', value:`<t:${unix}:F>\n<t:${unix}:R>`, inline:true}, names.length && {name:'👥 Pilotes', value:clip(names.join('\n'), 1024), inline:true}, weather].filter(Boolean)}],
+    components:link ? [{type:1, components:[{type:2, style:5, label:'Page de la course', emoji:{name:'📋'}, url:link}]}] : []};
 }
 const END_BIT = 4;
 const endDue = (row, start, timestamp) => !start.pending && timestamp >= start.endsAt && timestamp < start.endsAt + CLOSE_AFTER
@@ -560,18 +570,14 @@ async function syncRow(env, budget, timestamp, community, setting, row, pilots) 
   if (due.length) {
     let reminded = Number(row.reminded) || 0;
     // Only the closest one is sent (a crew opened 30 min before its start gets the « 1 h » one alone).
-    const last = due[due.length - 1], unix = Math.floor(start.startsAt / 1000);
-    const who = pilots.map(pilot => safe(pilot.name)).filter(Boolean).join(', ');
-    const content = last.before <= HOUR
-      ? `⏰ ${who} Départ <t:${unix}:R> ! On se retrouve ici.`
-      : `⏰ ${who} Rappel : **${safe(row.event_name)}**, départ <t:${unix}:F> (<t:${unix}:R>).`;
-    await sendInChannel(env, budget, row, 'POST', `/channels/${row.voice_id}/messages`, {content:content.replace(/ {2,}/g, ' '), allowed_mentions:{parse:[]}, flags:4096});
+    const last = due[due.length - 1];
+    await sendInChannel(env, budget, row, 'POST', `/channels/${row.voice_id}/messages`, {...reminderPayload(env, community, row, start, pilots, last.before <= HOUR), allowed_mentions:{parse:[]}, flags:4096});
     for (const item of due) reminded |= item.bit;
     await env.DB.prepare('UPDATE crew_discord SET reminded=? WHERE crew_id=?').bind(reminded, row.row_id).run();
     row.reminded = reminded;
   }
   if (endDue(row, start, timestamp)) {
-    await sendInChannel(env, budget, row, 'POST', `/channels/${row.voice_id}/messages`, {...endPayload(env, community, row, start), allowed_mentions:{parse:[]}, flags:4096});
+    await sendInChannel(env, budget, row, 'POST', `/channels/${row.voice_id}/messages`, {...endPayload(env, community, row, start, pilots), allowed_mentions:{parse:[]}, flags:4096});
     row.reminded = (Number(row.reminded) || 0) | END_BIT;
     await env.DB.prepare('UPDATE crew_discord SET reminded=? WHERE crew_id=?').bind(row.reminded, row.row_id).run();
   }
