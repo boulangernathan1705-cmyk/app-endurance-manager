@@ -2,7 +2,7 @@ import {effectivePermissions,withBotAccess,VOICE_ACCESS} from './discord-permiss
 import {iracingSoloSql} from './iracing-visibility.mjs';
 // Text recaps configured explicitly by an admin, published exclusively by the bot.
 import {loadWeeklyDiscordSnapshot, loadCalendarSnapshot, siteOf} from './discord-weekly.mjs';
-import {buildWeeklyDiscordPayload, buildCalendarPayload, CATEGORY_EMOJI_NAMES} from './discord-weekly-format.mjs';
+import {buildWeeklyDiscordPayload, buildWeekHeadPayload, buildCalendarPayload, CATEGORY_EMOJI_NAMES} from './discord-weekly-format.mjs';
 import {tdzOnly} from '../shared/catalog.mjs';
 import {isDevelopment} from './dev-environment.mjs';
 import {CATEGORY_NAMES,parseLayout,parseCategories,layoutInput,layoutPlan,wantedCategories,chosenPlaces} from './discord-layout.mjs';
@@ -48,7 +48,7 @@ function weekDestination(settings, kind, community) {
 }
 // Several messages in one channel keep the order they were sent in: the TDZ calendar comes first.
 const messageOrder = (env, community) => tdzOnly(community, isDevelopment(env)) ? ['calendar','lmu','iracing'] : ['lmu','iracing','calendar'];
-const MESSAGE_NAMES = {lmu:'Endurances LMU', iracing:'Endurances iRacing', calendar:'Calendrier de la semaine'};
+const MESSAGE_NAMES = {lmu:'Endurances LMU', iracing:'Endurances iRacing', calendar:'Calendrier de la semaine', head:'Bannière de la semaine'};
 // In the category chosen for a week's recap, the bot makes its own text channel (with its rights): the endurances share one.
 export const WEEK_CHANNELS = {races:'récap-de-la-semaine', calendar:'calendrier-de-la-semaine'};
 const weekGroup = kind => kind.startsWith('calendar') ? 'calendar' : 'races';
@@ -65,12 +65,16 @@ function weekPlan(env, community, settings, cats = parseCategories(settings.bot_
     : order.map(kind => ({kind, destination:weekDestination(settings, kind, community), channel:WEEK_CHANNELS[weekGroup(kind)], topic:weekGroup(kind), sim:null}))
       .filter(entry => entry.destination).map(entry => ({...entry, key:entry.destination}));
   week.sort((a,b) => rank(a.kind) - rank(b.kind));
-  // Several sims' messages in the same channel read as one: see buildWeeklyDiscordPayload's `part`.
-  if (layout) for (const entry of week.filter(item => !item.kind.startsWith('calendar'))) {
-    const same = week.filter(item => !item.kind.startsWith('calendar') && item.key === entry.key), index = same.indexOf(entry);
-    if (same.length > 1) entry.part = index === 0 ? 'first' : index === same.length - 1 ? 'last' : 'middle';
+  if (!layout) return week;
+  // Above the sims' messages of a channel, one message of its own: the banner, the week and the link to the site. The sims'
+  // messages below it all look the same.
+  const plan = [];
+  for (const entry of week) {
+    const same = entry.kind.startsWith('calendar') ? [] : week.filter(item => !item.kind.startsWith('calendar') && item.key === entry.key);
+    if (same[0] === entry) plan.push({...entry, kind:`head:${entry.kind}`, sims:same.map(item => item.kind)});
+    plan.push(entry);
   }
-  return week;
+  return plan;
 }
 const parse = value => { try { const result = JSON.parse(value); return Array.isArray(result) ? result : []; } catch { return []; } };
 
@@ -440,7 +444,13 @@ export async function botCategoryEmojis(env, timestamp = Date.now()) {
 // A race's message (eventId), or a week's message: kind 'lmu', 'iracing' or 'calendar'.
 // alone: a race's thread (its block only).
 // threads: « un fil par course », the week's message lists the races with a link to their threads ({eventId: thread}).
-async function snapshotPayload(env, timestamp, community, eventId = null, kind = null, sim = null, alone = false, threads = null, part = null) {
+async function snapshotPayload(env, timestamp, community, eventId = null, kind = null, sim = null, alone = false, threads = null, sims = null) {
+  if (kind?.startsWith('head')) {
+    const scope = sims?.length > 1 ? 'all' : kind.slice(5);
+    const {periodLabel} = await loadWeeklyDiscordSnapshot(env, timestamp, community, scope);
+    const payload = buildWeekHeadPayload(periodLabel, siteOf(env, community), scope);
+    return {snapshot:{periodLabel}, payload, hash:await digest([RECAP_FORMAT,'head',payload])};
+  }
   if (kind?.startsWith('calendar')) {
     const snapshot = await loadCalendarSnapshot(env, timestamp, community, sim);
     const payload = buildCalendarPayload(snapshot, siteOf(env, community), timestamp);
@@ -449,11 +459,11 @@ async function snapshotPayload(env, timestamp, community, eventId = null, kind =
   const scope = eventId ? 'all' : kind;
   const snapshot = await loadWeeklyDiscordSnapshot(env, timestamp, community, scope, eventId);
   const emojis = await botCategoryEmojis(env, timestamp);
-  const payload = buildWeeklyDiscordPayload(snapshot, siteOf(env, community), timestamp, scope, emojis, {weekly:!eventId, alone:Boolean(eventId) && alone, threads:eventId ? null : threads, part:eventId || !threads ? null : part});
+  const payload = buildWeeklyDiscordPayload(snapshot, siteOf(env, community), timestamp, scope, emojis, {weekly:!eventId, alone:Boolean(eventId) && alone, threads:eventId ? null : threads});
   // Message edits are silent; never turn driver names into mentions.
   payload.allowed_mentions = {parse:[]};
   // A new layout of the message (RECAP_FORMAT) edits the published recaps once.
-  return {snapshot, payload, hash:await digest([RECAP_FORMAT,snapshot,emojis,...(eventId && alone ? ['alone'] : []),...(!eventId && threads ? [threads, part] : [])])};
+  return {snapshot, payload, hash:await digest([RECAP_FORMAT,snapshot,emojis,...(eventId && alone ? ['alone'] : []),...(!eventId && threads ? [threads, 'head'] : [])])};
 }
 // What the bot would publish with these settings (a settings row), without publishing anything.
 export async function previewBotRecap(env, timestamp, community, settings) {
@@ -461,7 +471,7 @@ export async function previewBotRecap(env, timestamp, community, settings) {
   // The bot's categories not made yet stand in for themselves.
   const cats = layout ? Object.fromEntries(wantedCategories(layout).map(key => [key, parseCategories(settings.bot_categories)[key] || `new-${key}`])) : undefined;
   for (const entry of weekPlan(env, community, settings, cats)) {
-    const {payload} = await snapshotPayload(env, timestamp, community, null, entry.kind, entry.sim, false, layout && !entry.kind.startsWith('calendar') ? {} : null, entry.part);
+    const {payload} = await snapshotPayload(env, timestamp, community, null, entry.kind, entry.sim, false, layout && !entry.kind.startsWith('calendar') ? {} : null, entry.sims);
     const name = layout ? `# ${entry.channel}` : entry.kind === 'calendar' ? settings.calendar_destination_name : entry.kind === 'iracing' ? settings.iracing_destination_name : settings.destination_name;
     previews.push({eventId:'week:' + entry.kind, name:`${name} · ${MESSAGE_NAMES[entry.kind.split(':')[0]]}`, payload});
   }
@@ -566,8 +576,8 @@ async function publish(env, timestamp, community, settings, row, event, budget, 
     channel = existing?.id || channel || (await discord(env,'POST',`/guilds/${row.guild_id}/channels`,{type:0,name:RACE_INFO_CHANNEL,parent_id:category,topic:row.marker},budget)).id;
     await env.DB.prepare('UPDATE discord_recap_publications SET channel_id=? WHERE community_id=? AND event_id=?').bind(channel,community.id,row.event_id).run();
   }
-  const threads = !isEvent && layout && !kind.startsWith('calendar') ? await raceThreads(env, community) : null;
-  const {payload, hash} = prepared || await snapshotPayload(env,timestamp,community,isEvent ? row.event_id : null,kind,entry?.sim,threaded,threads,entry?.part);
+  const threads = !isEvent && layout && !kind.startsWith('calendar') && !kind.startsWith('head') ? await raceThreads(env, community) : null;
+  const {payload, hash} = prepared || await snapshotPayload(env,timestamp,community,isEvent ? row.event_id : null,kind,entry?.sim,threaded,threads,entry?.sims);
   if (!repair && row.message_id && row.content_hash === hash) return;
   if (row.message_id) {
     // A removed message or channel is reported, not recreated on every update (no surprise notifications).
@@ -762,6 +772,14 @@ async function syncLocked(env,timestamp,community,settings, test = false, budget
   const plan = weekPlan(env, community, settings);
   for (const entry of plan) {
     const row = await ensurePublication(env,community,'week:' + entry.kind,settings);
+    // Discord keeps messages in the order they were sent: a banner not sent yet goes above the sims' messages already there,
+    // which are sent again after it.
+    if (entry.kind.startsWith('head') && !row.message_id) for (const sim of entry.sims) {
+      const below = await ensurePublication(env,community,'week:' + sim,settings);
+      if (!below.message_id || !below.channel_id) continue;
+      await discord(env,'DELETE',`/channels/${below.channel_id}/messages/${below.message_id}`,null,budget).catch(error => { if (error.status !== 404) throw error; });
+      await env.DB.prepare("UPDATE discord_recap_publications SET message_id=NULL,content_hash='' WHERE community_id=? AND event_id=?").bind(community.id,below.event_id).run();
+    }
     await publish(env,timestamp,community,settings,row,null,budget,null,test,entry);
   }
   for (const row of rows.filter(item => !isRaceRow(item) && !plan.some(entry => 'week:' + entry.kind === item.event_id))) {

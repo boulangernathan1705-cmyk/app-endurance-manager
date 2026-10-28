@@ -697,7 +697,7 @@ test('« un fil par course »: the bot makes « Endurance Manager » under the c
 test('LMU and iRacing apart: one category each, each race its thread in its sim\'s channel',async t=>{
   const {DB,env,channels}=setup(t);race(DB);race(DB,'race-b','8h de Watkins Glen','iracing-watkins',[{id:'start-b',startsAt:NOW+2*DAY}]);
   await layout(env,COMMUNITY,{mode:'events',sims:'all',split:true,showEvents:false,under:'top'});
-  await syncBotRecaps(env,NOW,COMMUNITY);
+  await syncBotRecaps(env,NOW,COMMUNITY);await syncBotRecaps(env,NOW,COMMUNITY);
   assert.deepEqual(categoriesInOrder(channels).slice(0,2),['LMU','iRacing']);
   const parent=name=>channels.find(item=>item.id===channels.find(thread=>thread.type===11&&thread.name===name).parent_id).parent_id;
   assert.equal(parent('🏎️ LMU · 6h de Spa'),named(channels,'LMU').id);
@@ -816,10 +816,10 @@ test('below a private category, the bot\'s own is private like it when chosen, a
 test('a week message deleted on Discord is put back by the next sync, without « Réparer »',async t=>{
   const {DB,env,messages}=setup(t);race(DB);
   await layout(env,COMMUNITY,{mode:'general',sims:'lmu',week:{all:CATEGORY},events:''});
-  assert.equal(messages.size,2,'the week\'s message and the race\'s, in its thread');
+  assert.equal(messages.size,3,'the banner, the week\'s message and the race\'s, in its thread');
   messages.clear();DB.db.prepare("UPDATE discord_recap_publications SET content_hash='old'").run();
   const result=await syncBotRecaps(env,NOW+1000,COMMUNITY);
-  assert.equal(messages.size,2);assert.ok(!result?.error);
+  assert.equal(messages.size,3);assert.ok(!result?.error);
   assert.equal(DB.db.prepare('SELECT last_error FROM community_recap_settings').get().last_error,null);
 });
 
@@ -900,10 +900,25 @@ test('the crews\' voices: LMU first, then iRacing, each by its start; other voic
   assert.ok(!calls.some(call=>call.method==='PATCH'&&call.path===`/guilds/${GUILD}/channels`),'in order: nothing sent');
 });
 
-test('LMU and iRacing in the same channel read as one message: the title on the first, the banner on the last',async t=>{
+test('LMU and iRacing in the same channel: the banner and the week in a message above, the sims\' messages alike below',async t=>{
   const {DB,env,messages}=setup(t);race(DB);race(DB,'race-b','8h de Watkins Glen','iracing-watkins',[{id:'start-b',startsAt:NOW+2*DAY}]);
   await layout(env,COMMUNITY,{mode:'events',sims:'all',under:'111111111111111110'});
-  const week=id=>messages.get(DB.db.prepare('SELECT message_id FROM discord_recap_publications WHERE event_id=?').get(id).message_id).embeds[0];
-  assert.match(week('week:lmu').title,/semaine/);assert.equal(week('week:lmu').image,undefined);
-  assert.equal(week('week:iracing').title,undefined);assert.equal(week('week:iracing').author,undefined);
+  const id=event=>DB.db.prepare('SELECT message_id FROM discord_recap_publications WHERE event_id=?').get(event).message_id;
+  const week=event=>messages.get(id(event)).embeds[0];
+  assert.match(week('week:head:lmu').title,/semaine/);
+  assert.equal(week('week:lmu').title,'Endurances LMU');assert.equal(week('week:iracing').title,'Endurances iRacing');
+  for (const sim of ['week:lmu','week:iracing']) {assert.equal(week(sim).image,undefined);assert.equal(week(sim).author,undefined);assert.ok(week(sim).footer);}
+  // Sent in this order: the banner first.
+  assert.ok(BigInt(id('week:head:lmu'))<BigInt(id('week:lmu'))&&BigInt(id('week:lmu'))<BigInt(id('week:iracing')));
+});
+
+test('a channel set up before the banner message: the sims\' messages are sent again below it',async t=>{
+  const {DB,env,messages}=setup(t);race(DB);
+  await layout(env,COMMUNITY,{mode:'events',sims:'lmu',under:'111111111111111110'});
+  const id=event=>DB.db.prepare('SELECT message_id FROM discord_recap_publications WHERE event_id=?').get(event)?.message_id;
+  const before=id('week:lmu');
+  // As before this version: no banner message.
+  messages.delete(id('week:head:lmu'));DB.db.prepare("DELETE FROM discord_recap_publications WHERE event_id='week:head:lmu'").run();
+  await syncBotRecaps(env,NOW+1000,COMMUNITY);
+  assert.ok(!messages.has(before));assert.ok(BigInt(id('week:head:lmu'))<BigInt(id('week:lmu')));
 });
