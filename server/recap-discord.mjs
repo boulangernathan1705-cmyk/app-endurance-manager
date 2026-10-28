@@ -14,6 +14,8 @@ const MAX_CHANNELS = 450;
 const RACE_INFO_CHANNEL = 'infos-de-la-course'; // Discord writes text channel names in lowercase with dashes
 const VIEW = 1024n, SEND = 2048n, HISTORY = 65536n, EMBED = 16384n, MANAGE = 16n, ADMIN = 8n;
 const REQUIRED = VIEW | SEND | HISTORY | EMBED;
+// Written in a channel of the admins: the races' threads are opened there too.
+const INSIDE_REQUIRED = REQUIRED | (1n << 35n) | (1n << 38n);
 // The races' threads: making them, writing in them, deleting them once the race is over.
 export const THREADS = (1n << 34n) | (1n << 35n) | (1n << 38n);
 export const RECAP_BOT_PERMISSIONS = String(REQUIRED | MANAGE | THREADS);
@@ -60,7 +62,7 @@ function weekPlan(env, community, settings, cats = parseCategories(settings.bot_
   const order = messageOrder(env, community), rank = kind => order.indexOf(kind.split(':')[0]);
   const layout = parseLayout(settings.layout);
   const week = layout
-    ? layoutPlan(layout, cats, {eventChannel:eventChannelOf(env, community), calendar:community.modules?.soloRaces === true}).week.map(entry => ({...entry, key:`${entry.destination}#${entry.channel}`}))
+    ? layoutPlan(layout, cats, {eventChannel:eventChannelOf(env, community), calendar:community.modules?.soloRaces === true}).week.map(entry => ({...entry, key:entry.inside ? `in:${entry.destination}` : `${entry.destination}#${entry.channel}`}))
     // A setting made before: its channels as they were (« récap-de-la-semaine », « calendrier-de-la-semaine »).
     : order.map(kind => ({kind, destination:weekDestination(settings, kind, community), channel:WEEK_CHANNELS[weekGroup(kind)], topic:weekGroup(kind), sim:null}))
       .filter(entry => entry.destination).map(entry => ({...entry, key:entry.destination}));
@@ -135,9 +137,13 @@ export async function recapDestinations(env, community) {
     const rights = effectivePermissions(roles, member, guild, channel.type === 0 ? parent || {id:'',permission_overwrites:[]} : channel, env.DISCORD_CLIENT_ID);
     const voiceRequired = channel.type === 4 && community.modules?.crewChannels === true;
     const required = REQUIRED | MANAGE | (voiceRequired ? VOICE_ACCESS : 0n);
+    // Written in the channel itself: its own rights count.
+    const own = channel.type === 0 ? effectivePermissions(roles, member, guild, channel, env.DISCORD_CLIENT_ID) : 0n;
     return {id:channel.id, name:channel.name, type:channel.type, position:channel.position || 0, parentId:channel.parent_id || null, parentName:parent?.name || null, ready:(rights & required) === required,
       private:isPrivate(channel.type === 0 ? parent || channel : channel, guild),
-      missing:[['Voir le salon',VIEW],['Envoyer des messages',SEND],['Voir les anciens messages',HISTORY],['Intégrer des liens',EMBED],['Gérer les salons',MANAGE],...(voiceRequired ? [['Se connecter',1n << 20n]] : [])].filter(([,bit]) => !(rights & bit)).map(([label]) => label)};
+      missing:[['Voir le salon',VIEW],['Envoyer des messages',SEND],['Voir les anciens messages',HISTORY],['Intégrer des liens',EMBED],['Gérer les salons',MANAGE],...(voiceRequired ? [['Se connecter',1n << 20n]] : [])].filter(([,bit]) => !(rights & bit)).map(([label]) => label),
+      ...(channel.type === 0 ? {insideReady:(own & INSIDE_REQUIRED) === INSIDE_REQUIRED,
+        insideMissing:[['Voir le salon',VIEW],['Envoyer des messages',SEND],['Voir les anciens messages',HISTORY],['Intégrer des liens',EMBED],['Créer des fils publics',1n << 35n],['Envoyer des messages dans les fils',1n << 38n]].filter(([,bit]) => !(own & bit)).map(([label]) => label)} : {})};
   });
 }
 // Below a text channel, the bot makes its own in that channel's category: its rights count there, so the message names it.
@@ -146,6 +152,8 @@ function rightsError(place) {
   const where = category ? `de la catégorie « ${category} »${place.type === 0 ? ` (celle de « ${place.name} »)` : ''}` : 'du rôle « Endurance Manager » (Paramètres du serveur › Rôles)';
   return Object.assign(new Error(`Dans les permissions ${where}, autorise le bot : ${place.missing.join(', ')}.`), {status:400});
 }
+// Written in a channel: its own permissions.
+const insideError = place => Object.assign(new Error(`Dans les permissions du salon « ${place.name} », autorise le bot : ${place.insideMissing.join(', ')}.`), {status:400});
 // The admins' choice: the mode, then where each recap goes (an id, or '' for « Ne pas publier »).
 export function recapInput(input) {
   const id = value => {
@@ -173,8 +181,14 @@ function layoutAnchors(layout, cats) {
 export async function validateDiscordLayout(env, community, input) {
   const layout = layoutInput(input);
   const destinations = await recapDestinations(env, community);
-  for (const id of chosenPlaces(layout)) {
-    const place = destinations.find(item => item.id === id);
+  for (const chosen of chosenPlaces(layout)) {
+    if (chosen.startsWith('in:')) {
+      const place = destinations.find(item => item.id === chosen.slice(3) && item.type === 0);
+      if (!place) throw Object.assign(new Error('Choisis un salon qui existe sur le serveur Discord de cette communauté.'), {status:400});
+      if (!place.insideReady) throw insideError(place);
+      continue;
+    }
+    const id = chosen, place = destinations.find(item => item.id === id);
     const category = id === layout.under || id === layout.pitAt;
     if (!place || (category && place.type !== 4)) throw Object.assign(new Error('Choisis un endroit qui existe sur le serveur Discord de cette communauté.'), {status:400});
     if (!place.ready && !(id === layout.pitAt && layout.pit === 'bot') && id !== layout.under) throw rightsError(place);
@@ -249,8 +263,10 @@ async function enteredRaces(env, community) {
   return new Set(rows.map(row => row.event_id));
 }
 // The races that get a recap now, even without any entry: it invites the pilots to sign up. The official iRacing
-// races are imported by the dozen (server/iracing-import.mjs): only those where the community has something.
+// races: all of them when the community shows them on its site (module « iracingImport »), otherwise only those where it
+// has something.
 async function openRaces(env, community, events, scope, timestamp) {
+  if (community.modules?.iracingImport === true) return racesOpenNow(events, scope, timestamp);
   const entered = await enteredRaces(env, community);
   return racesOpenNow(events.filter(event => event.community_id !== 'official' || !String(event.circuit || '').startsWith('iracing-') || entered.has(event.id)), scope, timestamp);
 }
@@ -372,7 +388,12 @@ async function makeCategories(env, community, settings, channels, budget) {
   const wanted = settings.enabled === 0 ? [] : wantedCategories(layout);
   let changed = false;
   for (const key of wanted) {
-    if (cats[key] && channels.some(item => item.id === cats[key] && item.type === 4)) continue;
+    const mine = cats[key] && channels.find(item => item.id === cats[key] && item.type === 4);
+    if (mine) {
+      // Made with an older name (before its emoji): renamed once.
+      if (mine.name !== CATEGORY_NAMES[key]) { await discord(env,'PATCH',`/channels/${mine.id}`,{name:CATEGORY_NAMES[key]},budget); mine.name = CATEGORY_NAMES[key]; }
+      continue;
+    }
     // Taken back if the bot made it already (a lost answer), never a category of the admins with the same name.
     const created = await discord(env,'POST',`/guilds/${settings.guild_id}/channels`,{type:4,name:CATEGORY_NAMES[key],
       permission_overwrites:withBotAccess(categoryRules(env, layout, key, channels),env.DISCORD_CLIENT_ID,categoryAccess(community))},budget);
@@ -531,7 +552,7 @@ async function publish(env, timestamp, community, settings, row, event, budget, 
       if (!channels.some(item => item.id === channel)) channel = null;
     }
     if (!placed || !channel) {
-      const next = await weekChannel(env, community, row, entry, budget);
+      const next = entry.inside ? {channel:entry.destination, category:entry.key} : await weekChannel(env, community, row, entry, budget);
       if (row.channel_id !== next.channel) await takeDown(env, community, row, budget);
       channel = next.channel;
       if (row.channel_id !== channel) { row.message_id = null; row.content_hash = ''; }
@@ -692,7 +713,11 @@ async function weekChannel(env, community, row, entry, budget) {
   const parent = target.type === 4 ? target.id : target.parent_id || null, category = channels.find(item => item.id === parent);
   const topic = 'endurance-manager:' + (await digest([community.id,'week',destination,entry.topic])).slice(0,24);
   const existing = channels.find(item => item.type === 0 && item.topic === topic);
-  if (existing) return {channel:existing.id, category:entry.key};
+  if (existing) {
+    // Found by its topic: named as now wanted (« 📅・endurances-de-la-semaine » since its emoji).
+    if (existing.name !== entry.channel) await discord(env,'PATCH',`/channels/${existing.id}`,{name:entry.channel},budget);
+    return {channel:existing.id, category:entry.key};
+  }
   const create = rules => discord(env,'POST',`/guilds/${row.guild_id}/channels`,{type:0,name:entry.channel,topic,...(parent ? {parent_id:parent} : {}),...rules},budget);
   // A right the bot does not hold in a copied rule: made without the copy, Discord then gives it the category's rights.
   const created = await create({permission_overwrites:withBotAccess(category?.permission_overwrites,env.DISCORD_CLIENT_ID,REQUIRED)})
@@ -710,7 +735,8 @@ async function takeDown(env, community, row, budget) {
   const ignoreGone = error => { if (error.status !== 404) throw error; };
   if (row.message_id) await discord(env,'DELETE',`/channels/${row.channel_id}/messages/${row.message_id}`,null,budget).catch(ignoreGone);
   await env.DB.prepare("UPDATE discord_recap_publications SET channel_id=NULL,category_id=NULL,message_id=NULL,content_hash='' WHERE community_id=? AND event_id=?").bind(community.id,row.event_id).run();
-  if (row.category_id && row.channel_id && row.channel_id !== row.category_id && !await env.DB.prepare("SELECT 1 FROM discord_recap_publications WHERE community_id=? AND event_id LIKE 'week:%' AND channel_id=?").bind(community.id,row.channel_id).first())
+  // A channel of the admins (written in it) is never deleted.
+  if (row.category_id && row.channel_id && row.channel_id !== row.category_id && !row.category_id.startsWith('in:') && !await env.DB.prepare("SELECT 1 FROM discord_recap_publications WHERE community_id=? AND event_id LIKE 'week:%' AND channel_id=?").bind(community.id,row.channel_id).first())
     await discord(env,'DELETE',`/channels/${row.channel_id}`,null,budget).catch(ignoreGone);
   Object.assign(row, {channel_id:null, category_id:null, message_id:null, content_hash:''});
 }
