@@ -15,7 +15,7 @@ import {grindfestEnabled, isGrindfest, streamersOf} from '../shared/grindfest.mj
 import {isDevelopment} from './dev-environment.mjs';
 
 const MINUTE = 60000;
-// Posted from 7h30 to 9h (Paris): a setting made later in the day waits for the next morning (no @everyone at night).
+// Posted from 7h30 to 9h (Paris), or at once the day the announcement is turned on (from 7h30).
 const FROM = 7 * 60 + 30, UNTIL = 9 * 60;
 // Messages sent per pass (the list goes on 2 minutes later, in order), and counts refreshed per pass.
 const SENDS = 4, REFRESHES = 2, REFRESH_EVERY = 10 * MINUTE;
@@ -108,8 +108,10 @@ export async function announceCommunity(env, community, settings, timestamp = Da
   const day = parisDay(timestamp), budget = {left:SENDS + REFRESHES + 1};
   let rows = (await env.DB.prepare('SELECT * FROM discord_announcements WHERE community_id=? AND day=? ORDER BY position').bind(community.id, day).all()).results || [];
   if (!rows.length) {
-    const minutes = parisMinutes(timestamp);
-    if (minutes < FROM || minutes >= UNTIL) return false;
+    // The day it is turned on, at once (from 7h30): the races left today.
+    const minutes = parisMinutes(timestamp), since = Number(parseLayout(settings.layout)?.announceAt) || 0;
+    const justOn = since && since <= timestamp && parisDay(since) === day;
+    if (minutes < FROM || (minutes >= UNTIL && !justOn)) return false;
     const items = await announceItems(env, community, timestamp);
     // Nothing today: a row says so, no message.
     const planned = items.length ? [{item:'intro', kind:'intro'}, ...items] : [{item:'none', kind:'none'}];
