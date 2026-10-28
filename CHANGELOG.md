@@ -1,5 +1,11 @@
 # Nouveautés d'Endurance Manager
 
+## v1.86 — 28 octobre 2026
+
+### 🚀 Nouveautés
+
+- **Discord · Annonce du jour** : une nouvelle question du réglage Discord choisit un salon où le bot annonce chaque matin à 7h30, avec @everyone, les events et endurances du jour (officielles LMU comprises). Chaque course a son accroche, ses manches ou ses équipages, le nombre de présents et les boutons ✅ Présent / ❌ Absent. Le jour où on l’active, l’annonce part tout de suite pour les courses qui restent.
+
 ## v1.85 — 28 octobre 2026
 
 ### ✨ Améliorations
