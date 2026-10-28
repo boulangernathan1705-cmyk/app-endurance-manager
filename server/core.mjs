@@ -1,6 +1,6 @@
 import {isGrindfest, streamersOf, normalizeStreamers, gridfestPasswordValid} from '../shared/grindfest.mjs';
 import {STREAM_SIM, STREAM_RACE_SIMS, streamUrl} from '../shared/stream.mjs';
-import {catalogForGame, gameForEvent, CATEGORIES, EVENT_TYPE_IDS as EVENT_TYPES, CIRCUIT_IDS as CIRCUITS, CARS, SIM_IDS, eventCatalog, simForEvent, isRandomCircuit, TDZ_EVENT_TYPES, TRACK_LIMITS, RACE_WEATHERS, RACE_SKIES, WEATHER_SLOTS} from '../shared/catalog.mjs';
+import {catalogForGame, gameForEvent, CATEGORIES, EVENT_TYPE_IDS as EVENT_TYPES, CIRCUIT_IDS as CIRCUITS, CARS, SIM_IDS, eventCatalog, simForEvent, isRandomCircuit, TDZ_EVENT_TYPES, normalizeTdzEventType, TRACK_LIMITS, RACE_WEATHERS, RACE_SKIES, WEATHER_SLOTS} from '../shared/catalog.mjs';
 const LEGACY_CAR_ALIASES = new Map([
   ['BMW M Hybrid V8 Evo (2026)','BMW M Hybrid V8'],['Cadillac V-Series.R Evo (2026)','Cadillac V-Series.R'],['Peugeot 9X8 2023','Peugeot 9X8'],['Peugeot 9X8 2024','Peugeot 9X8'],['Toyota TR010 Hybrid (2026)','Toyota GR010 Hybrid'],['Ginetta G61-LT-P3 Evo','Ginetta G61-LT-P3'],['Ferrari 488 GTE Evo','Ferrari 488 GTE'],['Aston Martin Vantage AMR LMGT3 Evo','Aston Martin Vantage AMR LMGT3'],['BMW M4 LMGT3 Evo','BMW M4 LMGT3'],['Ferrari 296 LMGT3 Evo','Ferrari 296 LMGT3'],['Ford Mustang LMGT3 Evo','Ford Mustang LMGT3'],['Lamborghini Huracán LMGT3 Evo 2','Lamborghini Huracán LMGT3'],['McLaren 720S LMGT3 Evo','McLaren 720S LMGT3'],['Porsche 911 LMGT3 R (992)','Porsche 911 GT3 R LMGT3'],['Porsche 911 LMGT3 R (992) 2026','Porsche 911 GT3 R LMGT3']
 ]);
@@ -281,7 +281,7 @@ function validateSoloRace(input, existing) {
   // Event details: its type (OPEN, SAFE… which sets the access), the server password and a short note.
   const raw = input.details && typeof input.details === 'object' ? input.details : {};
   const details = {};
-  if (raw.type) { if (![...TDZ_EVENT_TYPES, 'Gridfest', 'Grindfest'].includes(raw.type)) fail(400, 'Choisis un type d’événement de la liste.'); details.type = isGrindfest({details:raw}) ? 'Gridfest' : raw.type; }
+  if (raw.type) { if (![...TDZ_EVENT_TYPES, 'Gridfest', 'Grindfest'].includes(normalizeTdzEventType(raw.type))) fail(400, 'Choisis un type d’événement de la liste.'); details.type = isGrindfest({details:raw}) ? 'Gridfest' : normalizeTdzEventType(raw.type); }
   if (isGrindfest({details})) {
     try { details.streamers = normalizeStreamers(raw.streamers); } catch (error) { fail(400, error.message); }
     capacity = details.streamers.reduce((sum, streamer) => sum + streamer.capacity, 0);

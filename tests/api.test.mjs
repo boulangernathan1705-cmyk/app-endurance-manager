@@ -498,7 +498,7 @@ test('events calendar: every simulator, typed circuit on AMS2 / ACE, no limit an
  // Shown on both simulator sites: the calendar is common to every simulator.
  for(const game of ['lmu','iracing']){
   const event=(await req(`/api/events?game=${game}`,'GET',null,'admin')).data.events.find(e=>e.id===created.data.id);
-  assert.ok(event,game);assert.equal(event.sim,'ams2');assert.deepEqual(event.details,{type:'Bouboule',note:'Special event'});assert.deepEqual(event.rounds[0],{circuit:'Interlagos',durationMinutes:30,categories:[],practice:5,qualifying:10,fuel:1,tyres:2,weather:'sun',category:'GT3',car:'Porsche 911 GT3 R'});assert.equal(event.durationMinutes,70,'practice, qualifying and races');assert.equal(event.capacity,null);assert.equal(event.circuit,'Interlagos');assert.deepEqual(event.categories,[]);
+  assert.ok(event,game);assert.equal(event.sim,'ams2');assert.deepEqual(event.details,{type:'BOULOULES',note:'Special event'});assert.deepEqual(event.rounds[0],{circuit:'Interlagos',durationMinutes:30,categories:[],practice:5,qualifying:10,fuel:1,tyres:2,weather:'sun',category:'GT3',car:'Porsche 911 GT3 R'});assert.equal(event.durationMinutes,70,'practice, qualifying and races');assert.equal(event.capacity,null);assert.equal(event.circuit,'Interlagos');assert.deepEqual(event.categories,[]);
  }
  const event=(await req('/api/events','GET',null,'admin')).data.events.find(e=>e.id===created.data.id);
  const path=`/api/events/${event.id}/departures/${event.departures[0].id}/registrations`;
@@ -525,7 +525,7 @@ test('events calendar: every simulator, typed circuit on AMS2 / ACE, no limit an
  assert.equal((await req('/api/events','GET',null,'admin')).data.events.find(e=>e.id===lmu.data.id).sim,'lmu');
  // EVENT TDZ: its name and its event types are fixed (offered in the creation form).
  const session=(await req('/api/session','GET',null,'pilot')).data;
- assert.deepEqual(session.eventTypes,['OPEN','SAFE','Bouboule','TONDEUZ TRAINING']);assert.equal(session.soloLabel,'EVENT TDZ');
+ assert.deepEqual(session.eventTypes,['OPEN','SAFE','BOULOULES','TONDEUZ TRAINING']);assert.equal(session.soloLabel,'EVENT TDZ');
 });
 test('a pilot says he will miss an event, and entering it withdraws the absence',async()=>{
  const {req,login}=harness();await login(ADMIN,'admin');await login(PILOT,'pilot');

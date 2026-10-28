@@ -1,16 +1,14 @@
-// « Annonce du jour »: at 7h30 (Paris) the bot announces the day's events and endurances in the channel the admins chose in
-// the « Discord » setting (layout.announce, a text or announcement channel). A first message pings @everyone (the community,
-// « C'est jour de course ! », what the day holds), then one message per race in the order of its start, each with its hook,
-// its rounds or its crews, the count of présents and the buttons « Présent » (the race on the site) and « Absent »
-// (server/discord-interactions.mjs). The list is made once in the morning; the counts are refreshed during the day.
+// At 7h30 (Paris), one message combines the community intro and today's events,
+// endurances and streams. Existing builders retain the type/sim-specific details.
+// Counts are updated in place; legacy split messages are consolidated without a ping.
 import {communityById} from './community.mjs';
 import {iracingSoloSql} from './iracing-visibility.mjs';
 import {loadWeeklyDiscordSnapshot, siteOf} from './discord-weekly.mjs';
-import {buildAnnounceIntro, buildAnnounceEvent, buildAnnounceRace, buildAnnounceStream, parisDay} from './discord-weekly-format.mjs';
+import {buildCompleteAnnouncement, buildAnnounceIntro, buildAnnounceEvent, buildAnnounceRace, buildAnnounceStream, parisDay} from './discord-weekly-format.mjs';
 import {discordRequest, botCategoryEmojis} from './recap-discord.mjs';
 import {discordAbsentButton} from './discord-interactions.mjs';
 import {parseLayout} from './discord-layout.mjs';
-import {simForEvent, tdzOnly} from '../shared/catalog.mjs';
+import {simForEvent, tdzOnly, normalizeTdzEventType} from '../shared/catalog.mjs';
 import {grindfestEnabled, isGrindfest, streamersOf} from '../shared/grindfest.mjs';
 import {isDevelopment} from './dev-environment.mjs';
 import {isStream, streamDetails} from '../shared/stream.mjs';
@@ -19,8 +17,8 @@ import {streamCrew} from './stream-crew.mjs';
 const MINUTE = 60000;
 // Posted from 7h30 to 9h (Paris), or at once the day the announcement is turned on (from 7h30).
 const FROM = 7 * 60 + 30, UNTIL = 9 * 60;
-// Messages sent per pass (the list goes on 2 minutes later, in order), and counts refreshed per pass.
-const SENDS = 4, REFRESHES = 2, REFRESH_EVERY = 10 * MINUTE;
+// A small Discord budget also bounds cleanup of legacy separate messages.
+const REQUESTS = 7, REFRESH_EVERY = 10 * MINUTE;
 const parisMinutes = timestamp => {
   const parts = Object.fromEntries(new Intl.DateTimeFormat('en-GB', {timeZone:'Europe/Paris', hour:'numeric', minute:'numeric', hourCycle:'h23'}).formatToParts(timestamp).map(part => [part.type, part.value]));
   return Number(parts.hour) * 60 + Number(parts.minute);
@@ -74,7 +72,7 @@ async function eventSnapshot(env, community, id, timestamp) {
     WHERE event_id=? AND departure_id=? AND community_id=? AND COALESCE(status,'')<>'unavailable' GROUP BY streamer_id`).bind(row.id, start.id, community.id).all()).results || [];
   const entered = entries.reduce((total, item) => total + Number(item.entered || 0), 0);
   const gridfest = isGrindfest(row), site = siteOf(env, community).url || '';
-  return {id:row.id, name:row.name, sim, type:details.type || '', access:tdz ? row.access || 'open' : '', tdz, note:details.note || '',
+  return {id:row.id, name:row.name, sim, type:normalizeTdzEventType(details.type) || '', access:tdz ? row.access || 'open' : '', tdz, note:details.note || '',
     startsAt:Number(start.startsAt), timePending:Boolean(row.schedule_pending) || start.tbd === true,
     rounds:parse(row.rounds, []), capacity:row.capacity == null ? null : Number(row.capacity), entered,
     streamers:gridfest ? streamersOf(row).map(streamer => ({name:streamer.name, twitchUrl:streamer.twitchUrl, capacity:streamer.capacity, entered:Number(entries.find(item => item.streamer_id === streamer.id)?.entered || 0)})) : [],
@@ -121,7 +119,7 @@ export async function announcePayload(env, community, row, timestamp, counts = n
 export async function announceCommunity(env, community, settings, timestamp = Date.now()) {
   const channel = announceChannel(settings), stream = announceStream(settings);
   if (!channel || !community.discordGuildId || settings.guild_id !== community.discordGuildId) return false;
-  const day = parisDay(timestamp), budget = {left:SENDS + REFRESHES + 1};
+  const day = parisDay(timestamp), budget = {left:REQUESTS};
   let rows = (await env.DB.prepare('SELECT * FROM discord_announcements WHERE community_id=? AND day=? ORDER BY position').bind(community.id, day).all()).results || [];
   if (!rows.length) {
     // The day it is turned on, at once (from 7h30): the races left today.
@@ -136,42 +134,44 @@ export async function announceCommunity(env, community, settings, timestamp = Da
         .bind(community.id, day, item.item, item.kind, position, community.discordGuildId, channel, item.kind === 'none' ? '-' : null, timestamp).run();
     rows = (await env.DB.prepare('SELECT * FROM discord_announcements WHERE community_id=? AND day=? ORDER BY position').bind(community.id, day).all()).results || [];
   }
-  let asked = false;
-  const counts = {events:rows.filter(item => item.kind === 'event').length, races:rows.filter(item => item.kind === 'race').length, lives:rows.filter(item => item.kind === 'stream').length,
-    streams:rows.some(item => item.kind === 'intro' && !item.message_id) ? await streamTimes(env, rows) : []};
-  // In order: Discord keeps messages in the order they were sent.
-  for (const row of rows.filter(item => !item.message_id)) {
-    if (budget.left < 2) break;
-    const payload = await announcePayload(env, community, row, timestamp, counts, stream);
-    if (!payload) {
-      // Taken off the site since the morning: nothing sent.
-      await env.DB.prepare("UPDATE discord_announcements SET message_id='-' WHERE community_id=? AND day=? AND item=?").bind(community.id, day, row.item).run();
-      row.message_id = '-';
-      continue;
-    }
-    const nonce = (await digest([community.id, day, row.item])).slice(0, 24);
-    // The intro pings everyone; the races below it arrive without a notification of their own.
-    const message = await discordRequest(env, 'POST', `/channels/${row.channel_id}/messages`, {...payload, nonce, enforce_nonce:true, ...(row.kind === 'intro' ? {} : {flags:4096})}, budget);
-    asked = true;
-    await env.DB.prepare('UPDATE discord_announcements SET message_id=?,content_hash=?,checked_at=? WHERE community_id=? AND day=? AND item=?')
-      .bind(message.id, await contentHash(payload), timestamp, community.id, day, row.item).run();
-    row.message_id = message.id;
+  const intro=rows.find(row=>row.kind==='intro');
+  if(!intro)return false;
+  const legacy=rows.filter(row=>row.kind!=='intro' && row.message_id && row.message_id!=='-' && row.message_id!==intro.message_id);
+  const due=!intro.message_id || legacy.length || timestamp-Number(intro.checked_at||0)>=REFRESH_EVERY;
+  if(!due)return false;
+  const counts={events:rows.filter(row=>row.kind==='event').length,races:rows.filter(row=>row.kind==='race').length,
+    lives:rows.filter(row=>row.kind==='stream').length,streams:await streamTimes(env,rows)};
+  const items=[];
+  const eventRows=rows.filter(row=>['event','race','stream'].includes(row.kind));
+  for(const row of eventRows.slice(0,9)) {
+    const payload=await announcePayload(env,community,row,timestamp,null,stream);
+    if(payload)items.push({name:payload.embeds[0].title.replace(/^[^\p{L}\p{N}]+/u,''),payload});
   }
-  if (rows.some(item => !item.message_id)) return asked;
-  // The counts of présents (and anything else changed on the site): the races checked longest ago, edited when changed.
-  const due = rows.filter(item => ['event','race','stream'].includes(item.kind) && item.message_id !== '-' && timestamp - Number(item.checked_at || 0) >= REFRESH_EVERY)
-    .sort((a, b) => Number(a.checked_at) - Number(b.checked_at)).slice(0, REFRESHES);
-  for (const row of due) {
-    const payload = await announcePayload(env, community, row, timestamp, null, stream);
-    const hash = payload ? await contentHash(payload) : row.content_hash;
-    if (payload && hash !== row.content_hash) {
-      await discordRequest(env, 'PATCH', `/channels/${row.channel_id}/messages/${row.message_id}`, payload, budget).catch(error => {
-        // The message deleted on Discord: left alone.
-        if (error.status !== 404) throw error;
-      });
-      asked = true;
+  items.push(...eventRows.slice(9).map(row=>({name:row.item,payload:{embeds:[],components:[]}})));
+  const payload=buildCompleteAnnouncement(buildAnnounceIntro(counts,{...siteOf(env,community),streamUrl:stream}),items,siteOf(env,community));
+  const hash=await contentHash(payload);
+  let asked=false;
+  if(!intro.message_id) {
+    const nonce=(await digest([community.id,day,'complete'])).slice(0,24);
+    const message=await discordRequest(env,'POST',`/channels/${intro.channel_id}/messages`,{...payload,nonce,enforce_nonce:true},budget);
+    intro.message_id=message.id;asked=true;
+  } else if(hash!==intro.content_hash || legacy.length) {
+    await discordRequest(env,'PATCH',`/channels/${intro.channel_id}/messages/${intro.message_id}`,{...payload,allowed_mentions:{parse:[]}},budget)
+      .catch(error=>{if(error.status!==404)throw error;});
+    asked=true;
+  }
+  // Persist the combined publication before cleanup; an interrupted cleanup resumes next pass.
+  await env.DB.prepare('UPDATE discord_announcements SET message_id=?,content_hash=?,checked_at=? WHERE community_id=? AND day=? AND item=?')
+    .bind(intro.message_id,hash,timestamp,community.id,day,'intro').run();
+  for(const row of rows.filter(row=>row.kind!=='intro')) {
+    if(row.message_id && row.message_id!=='-' && row.message_id!==intro.message_id) {
+      if(budget.left<=0)break;
+      await discordRequest(env,'DELETE',`/channels/${row.channel_id}/messages/${row.message_id}`,null,budget)
+        .catch(error=>{if(error.status!==404)throw error;});
+      asked=true;
     }
-    await env.DB.prepare('UPDATE discord_announcements SET content_hash=?,checked_at=? WHERE community_id=? AND day=? AND item=?').bind(hash, timestamp, community.id, day, row.item).run();
+    await env.DB.prepare('UPDATE discord_announcements SET message_id=?,content_hash=?,checked_at=? WHERE community_id=? AND day=? AND item=?')
+      .bind(intro.message_id,hash,timestamp,community.id,day,row.item).run();
   }
   return asked;
 }

@@ -1,6 +1,6 @@
 import {racesPath} from './races-path.mjs';
 import {durationLabel,PRE_RACE_MINUTES} from '../shared/duration.mjs';
-import {catalogForGame,SIMS,TRACK_LIMITS} from '../shared/catalog.mjs';
+import {catalogForGame,SIMS,TRACK_LIMITS,normalizeTdzEventType} from '../shared/catalog.mjs';
 import {hourLabel as streamHour,streamPlatform} from '../shared/stream.mjs';
 
 const DAY_MS=86_400_000,HOUR_MS=3_600_000,TIME_ZONE='Europe/Paris';
@@ -301,22 +301,22 @@ function streamFacts(stream){
 const streamCrewText=crew=>`👥 ${clean(crew.eventName)} avec l’**${clean(crew.crew)}**${crew.pilots.length?` · ${crew.pilots.map(clean).join(', ')}`:''}`;
 function calendarBox(event,siteUrl){
   if(event.stream)return streamBox(event,siteUrl);
-  const name=clean(event.name),url=siteUrl?`${siteUrl}/lmu/#event=${encodeURIComponent(event.id)}`:'';
+  const name=clean(event.name),url=siteUrl?`${siteUrl}/${event.sim==='iracing'?'iracing':'lmu'}/#event=${encodeURIComponent(event.id)}`:'';
   const circuits=[...new Set(event.circuits.map(circuit=>circuitNames.get(circuit)||circuit).filter(Boolean))].map(clean).join(', ');
   const when=`${cap(recapDay.format(event.startsAt))}${event.timePending?' · horaire à confirmer':` ${recapTime.format(event.startsAt)}`}`;
   const places=event.capacity
     ?`👥 ${Math.min(event.entered,event.capacity)}/${event.capacity} places${event.entered>=event.capacity?' · complet':''}${event.entered>event.capacity?` · ${event.entered-event.capacity} en attente`:''}`
     :event.entered?`👥 ${event.entered} inscrit${event.entered>1?'s':''}`:'👥 personne pour l’instant';
-  return{name:cut(`🏁 ${when}`,256),value:cut([url?`**[${name}](${url})**`:`**${name}**`,[`🎮 ${SIM_SHORT[event.sim]||clean(event.sim)}`,circuits&&`📍 ${circuits}`,places,event.access&&event.access.toUpperCase()].filter(Boolean).join(' · ')].join('\n'),1024),inline:false};
+  return{name:cut(`🏁 ${when}`,256),value:cut([url?`**[${name}](${url})**`:`**${name}**`,[`🎮 ${SIM_SHORT[event.sim]||clean(event.sim)}`,circuits&&`📍 ${circuits}`].filter(Boolean).join(' · '),[places,event.access&&(event.access==='safe'?'🔒 SAFE':'🟢 OPEN')].filter(Boolean).join(' · '),event.capacity&&event.entered<event.capacity?`${event.capacity-event.entered} places disponibles`:''].filter(Boolean).join('\n'),1024),inline:false};
 }
 // The week's events (« EVENT SOLO », « EVENT TDZ »): one box per event, in the order of their starts.
 // `snapshot`: {periodLabel, events:[{id,name,sim,circuits,startsAt,timePending,capacity,entered,access}]}.
 export function buildCalendarPayload(snapshot,site={},updatedAt=Date.now()){
   const siteUrl=String(site.url||''),events=Array.isArray(snapshot.events)?snapshot.events:[];
-  const embed={title:cut(`🗓️ ${cap(snapshot.periodLabel||'semaine à venir')}`,256),color:events.length?0xe7b653:0x6b7280};
+  const embed={title:'📅 Le programme de la semaine',description:cut(cap(snapshot.periodLabel||'semaine à venir'),4096),color:events.length?0xe7b653:0x6b7280};
   if(site.name){embed.author={name:cut(`${site.name}${events.length?` · ${events.length} event${events.length>1?'s':''} cette semaine`:''}`,256)};if(siteUrl)embed.author.url=`${siteUrl}/`;if(site.logoUrl)embed.author.icon_url=site.logoUrl;}
   if(events.length){embed.fields=events.slice(0,events.length>25?24:25).map(event=>calendarBox(event,siteUrl));if(events.length>25)embed.fields.push({name:BLANK,value:`… et ${events.length-24} autres events sur le site.`,inline:false});}
-  else embed.description='Aucun événement de prévu pour l’instant.';
+  else embed.description+='\nAucun événement de prévu pour l’instant.';
   if(site.bannerUrl)embed.image={url:site.bannerUrl};
   embed.footer=footer(updatedAt);
   // The title links to the events (no button: less room); components:[] takes off the buttons of before.
@@ -350,7 +350,7 @@ export function isWeeklyDiscordMutation(request){
 // « Annonce du jour » (server/discord-announce.mjs): at 7h30 the day's events and endurances, to make the pilots want to come.
 // The day of a time in Paris (« 2026-10-28 »).
 export function parisDay(timestamp){return dayKey(localDay(timestamp));}
-// Each race has its hook: the event's type (Bouboule, Training, Gridfest) or else its sim, then OPEN / SAFE behind it; the
+// Each race has its hook: the event's type (BOULOULES, Training, Gridfest) or else its sim, then OPEN / SAFE behind it; the
 // endurances after their kind. Only at TDZ do the events have types and OPEN / SAFE (as on the site).
 export const ANNOUNCE_HOOKS={
   lmu:'Protos et GT vous attendent sur Le Mans Ultimate : place à la course !',
@@ -358,7 +358,7 @@ export const ANNOUNCE_HOOKS={
   ams2:'Automobilista 2 au programme : du pilotage pur et des bagarres serrées.',
   ace:'Assetto Corsa EVO ce soir : sortez les gants, ça va glisser.',
   acrally:'Spéciales au programme : notes en main et pied droit au plancher.',
-  Bouboule:'Soirée Bouboule ! Ambiance détendue et fous rires garantis, le chrono passe après.',
+  BOULOULES:'Soirée BOULOULES ! Ambiance détendue et fous rires garantis, le chrono passe après.',
   'TONDEUZ TRAINING':'Entraînement collectif : on tourne, on compare, on progresse ensemble.',
   Gridfest:'C’est la Gridfest ! Choisis ton streamer et viens faire le show.',
   open:'Grille ouverte à tous, nouveaux comme habitués !',
@@ -369,7 +369,7 @@ export const ANNOUNCE_HOOKS={
   endurance:'Jour d’endurance : relais, stratégie, et tout l’équipage soudé jusqu’au drapeau à damier.'};
 const isGridfestType=type=>['Gridfest','Grindfest'].includes(type);
 export function eventHook(event){
-  const type=isGridfestType(event.type)?'Gridfest':event.type;
+  const type=isGridfestType(event.type)?'Gridfest':normalizeTdzEventType(event.type);
   const first=event.tdz&&ANNOUNCE_HOOKS[type]&&!['open','safe'].includes(type)?ANNOUNCE_HOOKS[type]:ANNOUNCE_HOOKS[event.sim]||ANNOUNCE_HOOKS.lmu;
   return [first,event.tdz&&type!=='Gridfest'&&ANNOUNCE_HOOKS[event.access]].filter(Boolean).join(' ');
 }
@@ -406,8 +406,9 @@ function streamLine(site,streams=[]){
 // counts: {events, races, streams}.
 export function buildAnnounceIntro(counts,site={}){
   const parts=[counts.events&&`**${plural(counts.events,'event')}**`,counts.races&&`**${plural(counts.races,'endurance')}**`,counts.lives&&`**${plural(counts.lives,'stream')}**`].filter(Boolean);
-  const embed={title:'🏁 C’est jour de course !',color:0xd71920,
-    description:[`Aujourd’hui sur le serveur : ${parts.join(' et ')}.`,streamLine(site,counts.streams),'Inscris-toi, préviens si tu ne viens pas, et rendez-vous en piste 👇'].filter(Boolean).join('\n')};
+  const streamOnly=counts.lives>0&&!counts.events&&!counts.races;
+  const embed={title:streamOnly?'🎙 C’est jour de stream !':'🏁 C’est jour de course !',color:streamOnly?0x9146ff:0xd71920,
+    description:[`Aujourd’hui sur le serveur : ${parts.join(' et ')}.`,streamLine(site,counts.streams),streamOnly?'Retrouve les horaires et les liens du live ci-dessous 👇':'Inscris-toi, préviens si tu ne viens pas, et rendez-vous en piste 👇'].filter(Boolean).join('\n')};
   if(site.name){embed.author={name:cut(site.name,256)};if(site.url)embed.author.url=`${site.url}/`;if(site.logoUrl)embed.author.icon_url=site.logoUrl;}
   if(site.bannerUrl)embed.image={url:site.bannerUrl};
   return{content:'@everyone',embeds:[embed],allowed_mentions:{parse:['everyone']}};
@@ -426,7 +427,7 @@ function roundDetails(round){
 export function buildAnnounceEvent(event,site={},updatedAt=Date.now(),absent=null){
   const siteUrl=String(site.url||''),url=siteUrl?`${siteUrl}/${event.sim==='iracing'?'iracing':'lmu'}/#event=${encodeURIComponent(event.id)}`:'';
   const gridfest=isGridfestType(event.type),rounds=Array.isArray(event.rounds)?event.rounds:[];
-  const typeLabel=event.tdz&&event.type&&!['OPEN','SAFE'].includes(event.type)?`🏷️ ${clean(gridfest?'Gridfest':event.type)}`:'';
+  const typeLabel=event.tdz&&event.type&&!['OPEN','SAFE'].includes(event.type)?`🏷️ ${clean(gridfest?'Gridfest':normalizeTdzEventType(event.type))}`:'';
   const lines=[`**${eventHook(event)}**`,event.note&&`*« ${clean(event.note)} »*`,
     [`🕘 ${announceTime(event.startsAt,event.timePending)}`,`🎮 ${SIM_SHORT[event.sim]||clean(event.sim)}`,typeLabel,event.tdz&&!gridfest&&event.access&&event.access.toUpperCase()].filter(Boolean).join(' · ')];
   const rally=event.rally;
@@ -478,4 +479,23 @@ export function buildAnnounceRace(race,site={},updatedAt=Date.now(),emojis={},ab
   embed.footer=footer(updatedAt);
   const [fitted]=fitDiscordEmbeds([embed]);
   return{content:'',embeds:[fitted],components:announceButtons(url,race.id,absent),allowed_mentions:{parse:[]}};
+}
+
+
+// A single Discord message: community intro, the day's cards, and the existing banner.
+export function buildCompleteAnnouncement(intro, items, site={}) {
+  const head=structuredClone(intro.embeds[0]);
+  delete head.image;
+  const embeds=[head,...items.slice(0,9).flatMap(item=>structuredClone(item.payload.embeds||[])).slice(0,9)];
+  for(const embed of embeds)delete embed.footer;
+  if(items.length>9)head.description+=`\n… et ${items.length-9} autres rendez-vous : [calendrier complet](${site.url}/events/).`;
+  const last=embeds.at(-1);
+  if(site.bannerUrl)last.image={url:site.bannerUrl};
+  const lastFooter=items.at(-1)?.payload.embeds?.[0]?.footer;
+  if(lastFooter)last.footer=lastFooter;
+  const actionable=items.filter(item=>item.payload.components?.length);
+  const components=actionable.length<=5 ? actionable.map(item=>({type:1,components:item.payload.components[0].components.map(button=>({...button,
+    label:cut(`${button.style===5?'Présent / S’inscrire':'Absent'}${actionable.length>1?` · ${item.name}`:''}`,80)}))}))
+    : [{type:1,components:[{type:2,style:5,label:'Inscriptions et absences sur le site',url:`${site.url}/events/`}]}];
+  return {content:intro.content,embeds:fitDiscordEmbeds(embeds),components,allowed_mentions:intro.allowed_mentions};
 }
