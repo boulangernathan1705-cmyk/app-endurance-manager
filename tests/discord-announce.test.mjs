@@ -65,8 +65,9 @@ test('at 7h30 the day\'s endurances and events are announced in order, @everyone
   const combined=posts[0].body,embed=combined.embeds[0],text=JSON.stringify(embed);
   assert.equal(combined.content,'@everyone');assert.deepEqual(combined.allowed_mentions,{parse:['everyone']});
   assert.equal(combined.embeds.length,1,'one visual frame, not several embeds');
-  assert.match(embed.description,/\*\*1 event\*\* et \*\*1 endurance\*\*/);
-  assert.match(embed.description,/20h45/);
+  assert.doesNotMatch(text,/Aujourd’hui sur le serveur|C’est jour de course|Inscris-toi, préviens/);
+  assert.match(embed.title,/6h de Spa/);
+  assert.ok(combined.components.flatMap(row=>row.components).some(button=>button.label==='Regarder le live'&&button.url==='https://twitch.tv/tdz'));
   assert.match(text,/6h de Spa/);assert.match(text,/Coupe GT3/);
   assert.ok(text.indexOf('6h de Spa')<text.indexOf('Coupe GT3'));
   assert.match(text,/Équipage A/);assert.match(text,/Pilote 1/);assert.match(text,/1 présent/);
@@ -185,7 +186,7 @@ test('large daily announcements respect Discord embed, character and component l
 test('a stream-only announcement has no invitation to register or absence buttons',()=>{
   const intro=buildAnnounceIntro({events:0,races:0,lives:1},{url:'https://site.example'});
   const payload=buildCompleteAnnouncement(intro,[{name:'Live',payload:{embeds:[{title:'Live',description:'Twitch'}],components:[]}}],{url:'https://site.example'});
-  assert.match(payload.embeds[0].title,/stream/);
+  assert.equal(payload.embeds[0].title,'Live');
   assert.doesNotMatch(payload.embeds[0].description,/Inscris-toi/);
   assert.deepEqual(payload.components,[]);
 });
@@ -243,7 +244,7 @@ test('rounds have distinct readable sections and full session labels inside a si
   assert.equal(payload.embeds.length,1);
   assert.ok(embed.fields.some(field=>field.name.startsWith('Manche 1')));
   assert.ok(embed.fields.some(field=>field.name.startsWith('Manche 2')));
-  assert.ok(embed.fields.some(field=>field.name==='👥 Participation'));
+  assert.ok(embed.fields.some(field=>/12 présents/.test(field.value)));
   assert.match(JSON.stringify(embed),/Essais : 10 min/);
   assert.match(JSON.stringify(embed),/Qualifications : 10 min/);
   assert.match(JSON.stringify(embed),/Course : 40 min/);
