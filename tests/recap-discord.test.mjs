@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {DatabaseSync} from 'node:sqlite';
 import {readFileSync,readdirSync} from 'node:fs';
 import worker from '../server/worker.mjs';
+import {flushDiscord} from '../server/worker-with-migrations.mjs';
 import {linkTestServer,DEV_COMMUNITY,GUILD} from './fixtures/discord-server.mjs';
 import {syncWeeklyDiscord} from '../server/discord-weekly.mjs';
 import {addThreadMembers,botCategoryEmojis,saveBotRecap,validateDiscordLayout,syncBotRecaps,previewBotRecap,recapDestinations,eventDeletionTime,eventChannelName,settingsRow,recapError,repairBotRecap,racesOpenNow} from '../server/recap-discord.mjs';
@@ -989,4 +990,40 @@ test('the recap written in a channel of the admins: after its messages, threads 
 test('written in a channel: the bot must be allowed there, threads included',async t=>{
   const {env}=setup(t);
   await assert.rejects(validateDiscordLayout(env,COMMUNITY,{mode:'general',sims:'lmu',week:{all:`in:${TEXT}`},events:''}),/salon « recap ».*Créer des fils publics/);
+});
+
+
+test('automatic Discord synchronization retries a failed publication without saving settings again',async t=>{
+  const {DB,env,setFailure,messages}=setup(t);
+  await saveBotRecap(env,COMMUNITY,GENERAL);
+  DB.db.prepare('INSERT INTO discord_pending(community_id,event_id,queued_at) VALUES(?,?,?)').run(COMMUNITY.id,null,1);
+  setFailure(()=>true);
+  assert.equal(await flushDiscord(env,1),1);
+  assert.ok(DB.db.prepare('SELECT * FROM discord_pending WHERE community_id=?').get(COMMUNITY.id),'failed update remains pending');
+  setFailure(null);
+  assert.equal(await flushDiscord(env,1),1);
+  assert.equal(DB.db.prepare('SELECT * FROM discord_pending WHERE community_id=?').get(COMMUNITY.id),undefined);
+  assert.ok(messages.size>0,'next scheduled pass publishes without a manual save');
+});
+
+test('automatic synchronization retries a busy community without overwriting a concurrent change',async t=>{
+  const {DB,env}=setup(t);
+  await saveBotRecap(env,COMMUNITY,GENERAL);
+  DB.db.prepare('UPDATE community_recap_settings SET lock_until=?').run(Date.now()+60000);
+  DB.db.prepare('INSERT INTO discord_pending(community_id,event_id,queued_at) VALUES(?,?,?)').run(COMMUNITY.id,'old-event',1);
+  const prepare=DB.prepare.bind(DB);
+  DB.prepare=sql=>{
+    const statement=prepare(sql);
+    if(sql.startsWith('DELETE FROM discord_pending')) {
+      const run=statement.run.bind(statement);
+      statement.run=async()=>{
+        const result=await run();
+        DB.db.prepare('INSERT INTO discord_pending(community_id,event_id,queued_at) VALUES(?,?,?)').run(COMMUNITY.id,'new-event',2);
+        return result;
+      };
+    }
+    return statement;
+  };
+  await flushDiscord(env,1);
+  assert.equal(DB.db.prepare('SELECT event_id FROM discord_pending WHERE community_id=?').get(COMMUNITY.id).event_id,'new-event');
 });

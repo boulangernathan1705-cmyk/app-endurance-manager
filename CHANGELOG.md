@@ -1,5 +1,11 @@
 # Nouveautés d'Endurance Manager
 
+## v1.93 — 28 octobre 2026
+
+### 🛠️ Pour les admins
+
+- **Discord · Mise à jour automatique** : une synchronisation échouée, occupée ou incomplète reste en attente pour être reprise automatiquement, sans devoir enregistrer à nouveau les réglages.
+
 ## v1.92 — 28 octobre 2026
 
 ### 🛠️ Pour les admins
