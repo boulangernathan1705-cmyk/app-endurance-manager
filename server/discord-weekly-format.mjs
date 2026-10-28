@@ -1,6 +1,7 @@
 import {racesPath} from './races-path.mjs';
 import {durationLabel,PRE_RACE_MINUTES} from '../shared/duration.mjs';
 import {catalogForGame,SIMS,TRACK_LIMITS} from '../shared/catalog.mjs';
+import {hourLabel as streamHour,streamPlatform} from '../shared/stream.mjs';
 
 const DAY_MS=86_400_000,HOUR_MS=3_600_000,TIME_ZONE='Europe/Paris';
 const circuitNames=new Map([...catalogForGame('lmu').circuits,...catalogForGame('iracing').circuits].map(c=>[c.id,c.name]));
@@ -287,7 +288,19 @@ export function buildWeekHeadPayload(periodLabel,site={},scope='all'){
 
 const SIM_SHORT=Object.fromEntries(SIMS.map(sim=>[sim.id,sim.short]));
 // One event of the calendar: its day and time on top (Paris time), then its name (link to it), sim, circuits, places and lobby.
+// A stream (« Annoncer un stream »): its day, its title (link to it), its times, the streamer's crew and the stream's link.
+function streamBox(event,siteUrl){
+  const name=clean(event.name),url=siteUrl?`${siteUrl}/lmu/#event=${encodeURIComponent(event.id)}`:'',stream=event.stream;
+  return{name:cut(`🎙 ${cap(recapDay.format(event.startsAt))}`,256),value:cut([url?`**[${name}](${url})**`:`**${name}**`,streamFacts(stream),stream.crew&&streamCrewText(stream.crew)].filter(Boolean).join('\n'),1024),inline:false};
+}
+// « 📺 Stream 19h45 sur [Twitch](…) · 🏁 Départ 20h00 · 🎮 LMU ».
+function streamFacts(stream){
+  const on=stream.streamUrl?` sur [${streamPlatform(stream.streamUrl)}](${stream.streamUrl})`:'';
+  return [stream.streamTime?`📺 Stream ${streamHour(stream.streamTime)}${on}`:on&&`📺 En direct${on}`,stream.raceTime&&`🏁 Départ ${streamHour(stream.raceTime)}`,stream.raceSim&&`🎮 ${SIM_SHORT[stream.raceSim]}`].filter(Boolean).join(' · ');
+}
+const streamCrewText=crew=>`👥 ${clean(crew.eventName)} avec l’**${clean(crew.crew)}**${crew.pilots.length?` · ${crew.pilots.map(clean).join(', ')}`:''}`;
 function calendarBox(event,siteUrl){
+  if(event.stream)return streamBox(event,siteUrl);
   const name=clean(event.name),url=siteUrl?`${siteUrl}/lmu/#event=${encodeURIComponent(event.id)}`:'';
   const circuits=[...new Set(event.circuits.map(circuit=>circuitNames.get(circuit)||circuit).filter(Boolean))].map(clean).join(', ');
   const when=`${cap(recapDay.format(event.startsAt))}${event.timePending?' · horaire à confirmer':` ${recapTime.format(event.startsAt)}`}`;
@@ -391,7 +404,7 @@ function streamLine(site,streams=[]){
 // The first message: the community, « C'est jour de course ! », what the day holds and the banner; it pings @everyone.
 // counts: {events, races, streams}.
 export function buildAnnounceIntro(counts,site={}){
-  const parts=[counts.events&&`**${plural(counts.events,'event')}**`,counts.races&&`**${plural(counts.races,'endurance')}**`].filter(Boolean);
+  const parts=[counts.events&&`**${plural(counts.events,'event')}**`,counts.races&&`**${plural(counts.races,'endurance')}**`,counts.lives&&`**${plural(counts.lives,'stream')}**`].filter(Boolean);
   const embed={title:'🏁 C’est jour de course !',color:0xd71920,
     description:[`Aujourd’hui sur le serveur : ${parts.join(' et ')}.`,streamLine(site,counts.streams),'Inscris-toi, préviens si tu ne viens pas, et rendez-vous en piste 👇'].filter(Boolean).join('\n')};
   if(site.name){embed.author={name:cut(site.name,256)};if(site.url)embed.author.url=`${site.url}/`;if(site.logoUrl)embed.author.icon_url=site.logoUrl;}
@@ -433,6 +446,16 @@ export function buildAnnounceEvent(event,site={},updatedAt=Date.now(),absent=nul
   if(event.logoUrl)embed.thumbnail={url:event.logoUrl};
   embed.footer=footer(updatedAt);
   return{content:'',embeds:[embed],components:announceButtons(url,event.id,absent),allowed_mentions:{parse:[]}};
+}
+// A stream of the day (« Annoncer un stream »): « Ce soir, c’est stream ! », its times and link, the streamer's crew when he
+// races; no « Présent » nor « Absent ». event: {id,name,startsAt,stream:{streamTime,raceSim,raceTime,streamUrl,crew}}.
+export function buildAnnounceStream(event,site={},updatedAt=Date.now()){
+  const siteUrl=String(site.url||''),stream=event.stream,hour=Number(String(stream.streamTime||stream.raceTime||'').split(':')[0]);
+  const embed={title:cut(`🎙 ${clean(event.name)}`,256),color:0x9146ff,
+    description:cut([`**${hour>=18?'Ce soir':'Aujourd’hui'}, c’est stream !**`,streamFacts(stream),stream.crew&&streamCrewText(stream.crew)].filter(Boolean).join('\n'),4096)};
+  if(siteUrl)embed.url=`${siteUrl}/lmu/#event=${encodeURIComponent(event.id)}`;
+  embed.footer=footer(updatedAt);
+  return{content:'',embeds:[embed],components:[],allowed_mentions:{parse:[]}};
 }
 // An endurance of the day: its hook, its conditions, then each of today's starts with its crews and pilots (as in its
 // thread). race: {id,name,circuit,eventType,official,durationMinutes,details,departures} (departures: today's, as loaded

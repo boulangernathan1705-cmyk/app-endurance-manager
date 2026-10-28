@@ -168,9 +168,13 @@ export const SIMS = [
   {id:'iracing',name:'iRacing',short:'iRacing'},
   {id:'ams2',name:'Automobilista 2',short:'AMS2'},
   {id:'ace',name:'Assetto Corsa EVO',short:'ACE'},
-  {id:'acrally',name:'Assetto Corsa Rally',short:'AC Rally'}
+  {id:'acrally',name:'Assetto Corsa Rally',short:'AC Rally'},
+  // « Annoncer un stream » (shared/stream.mjs): not a simulator, only a stream in the calendar.
+  {id:'stream',name:'Stream',short:'Stream'}
 ];
 export const SIM_IDS = SIMS.map(sim => sim.id);
+// The simulators offered in the event form and the filters (a stream has its own form).
+export const EVENT_SIMS = SIMS.filter(sim => sim.id !== 'stream');
 // Older events have no simulator saved: it follows their circuit.
 export function simForEvent(event) { return SIM_IDS.includes(event?.sim) ? event.sim : gameForEvent(event); }
 export function simCatalog(sim) { return GAME_IDS.includes(sim) ? GAME_CATALOGS[sim] : null; }
