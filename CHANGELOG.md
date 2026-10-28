@@ -6,6 +6,8 @@
 
 - **Discord** : les catégories et le salon du bot ont un emoji devant (🏆 Endurance Manager, 🔴 LMU, 🔵 iRacing, 📅・endurances-de-la-semaine). Ceux qui existent déjà sont renommés.
 - **Discord** : quand la communauté affiche les courses officielles iRacing, elles ont toutes leur fil, même sans inscrit.
+- **Discord** : le salon EVENT TDZ s'appelle « 🗓️・calendrier ».
+- **Discord** : un récap peut s'écrire dans un salon qui existe déjà, après ses messages (« Ou dans ce salon… »).
 
 ## v1.77 — 28 octobre 2026
 
