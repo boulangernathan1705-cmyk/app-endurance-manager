@@ -6,7 +6,8 @@
 //   events mode: # endurances-de-la-semaine (always: each race has its thread there) and showEvents, the channels of the
 //     bot's category (« Endurance Manager », or « LMU » and « iRacing »)
 //   general mode: week.all (together) or week.lmu / week.iracing (apart), events: where each goes, a place being
-//     '' (not shown), 'bot' (in the bot's category) or a channel / category of the server (the bot's channel goes just below);
+//     '' (not shown), 'bot' (in the bot's category), a channel / category of the server (the bot's channel goes just below)
+//     or 'in:' + a text channel of the server (written in it, after the messages already there);
 //     events may also be 'same' (with the endurances); apart, 'bot' means the sim's own category (« LMU » or « iRacing »),
 //     and the events go in one of them ('bot-lmu' / 'bot-iracing')
 //   voices, pit ('bot': the bot makes « Pit talk » just below pitAt, 'existing': in the category pitAt), reminders
@@ -18,7 +19,7 @@ export const WEEK_EMOJI = '📅・';
 // The names shown on Discord where they differ from the channel's first name (its topic keeps the first: found again, renamed).
 const SHOWN = {'event-tdz-de-la-semaine':'🗓️・calendrier'};
 const SIMS = {all:['lmu','iracing'], lmu:['lmu'], iracing:['iracing']};
-const ID = /^\d{15,22}$/;
+const ID = /^\d{15,22}$/, INSIDE = /^in:\d{15,22}$/;
 const bad = message => Object.assign(new Error(message), {status:400});
 
 export function parseLayout(value) {
@@ -42,7 +43,7 @@ export function layoutInput(input) {
   };
   const place = (value, extra = []) => {
     const text = String(value ?? '').trim();
-    if (!text || text === 'bot' || extra.includes(text) || ID.test(text)) return text;
+    if (!text || text === 'bot' || extra.includes(text) || ID.test(text) || INSIDE.test(text)) return text;
     throw bad('Choisis un endroit sur le serveur Discord de cette communauté.');
   };
   const split = sims === 'all' && input.split === true;
@@ -90,7 +91,12 @@ function weekChannel(layout, sim) {
 export function layoutPlan(layout, cats, {eventChannel = 'event-solo-de-la-semaine', calendar = true} = {}) {
   const sims = SIMS[layout.sims] || SIMS.all, filter = layout.sims === 'all' ? null : layout.sims;
   const week = [], anchors = {lmu:'', iracing:''};
-  const add = (kind, destination, channel, sim = null) => { if (destination && (calendar || !kind.startsWith('calendar'))) week.push({kind, destination, channel:SHOWN[channel] || (channel.startsWith('endurances') ? WEEK_EMOJI + channel : channel), sim, topic:channel}); };
+  const add = (kind, destination, channel, sim = null) => {
+    if (!destination || (!calendar && kind.startsWith('calendar'))) return;
+    // In a channel of the server: written there, no channel of the bot.
+    if (INSIDE.test(destination)) return week.push({kind, destination:destination.slice(3), inside:true, channel:'', sim, topic:''});
+    week.push({kind, destination, channel:SHOWN[channel] || (channel.startsWith('endurances') ? WEEK_EMOJI + channel : channel), sim, topic:channel});
+  };
   if (layout.mode === 'events') {
     const groups = layout.split ? sims.map(sim => ({cat:cats[sim], sims:[sim]})) : [{cat:cats.main, sims}];
     for (const group of groups) {
@@ -114,6 +120,6 @@ export function layoutPlan(layout, cats, {eventChannel = 'event-solo-de-la-semai
 
 // The places the admins chose on their server (to check the bot's rights there).
 export function chosenPlaces(layout) {
-  const ids = [layout.under, layout.pitAt, ...Object.values(layout.week || {}), layout.events].filter(value => ID.test(String(value || '')));
+  const ids = [layout.under, layout.pitAt, ...Object.values(layout.week || {}), layout.events].filter(value => ID.test(String(value || '')) || INSIDE.test(String(value || '')));
   return [...new Set(ids)];
 }
