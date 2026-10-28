@@ -1,5 +1,12 @@
 # Nouveautés d'Endurance Manager
 
+## v1.78 — 28 octobre 2026
+
+### ✨ Améliorations
+
+- **Discord** : les catégories et le salon du bot ont un emoji devant (🏆 Endurance Manager, 🔴 LMU, 🔵 iRacing, 📅・endurances-de-la-semaine). Ceux qui existent déjà sont renommés.
+- **Discord** : quand la communauté affiche les courses officielles iRacing, elles ont toutes leur fil, même sans inscrit.
+
 ## v1.77 — 28 octobre 2026
 
 ### ✨ Améliorations
