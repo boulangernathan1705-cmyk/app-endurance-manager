@@ -12,7 +12,7 @@ const ADMIN='111111111111111111', PILOT='222222222222222222', MATE='333333333333
 const DEV='e0a1c0de-0000-4000-8000-000000000001';
 const BOT_ROLE='900000000000000009';
 const HOUR=3600_000;
-const BOT_ACCESS=[{id:'app-id',type:1,allow:'1117200',deny:'0'}];
+const BOT_ACCESS=[{id:'app-id',type:1,allow:'1117200',deny:'0'},{id:GUILD,type:0,allow:'3146752',deny:'0'}];
 const MIGRATIONS=readdirSync(new URL('../migrations/',import.meta.url)).filter(name=>name.endsWith('.sql')).sort();
 
 class D1 {
@@ -39,7 +39,7 @@ function fakeDiscord(){
     if(method==='GET'&&path===`/guilds/${GUILD}/roles`)return reply(200,[{id:GUILD,name:'@everyone',permissions:'0',position:0},{id:BOT_ROLE,name:'Endurance Manager',permissions:state.botRights?(state.botPermissions||'1117200'):'0',position:1}]);
     const voice=path.match(/^\/guilds\/\d+\/voice-states\/(\d+)$/);
     if(voice)return voiceStates.has(voice[1])?reply(200,{channel_id:voiceStates.get(voice[1])}):reply(404,{code:10065});
-    if(method==='POST'&&path===`/guilds/${GUILD}/channels`&&state.refuseCopy&&(body?.permission_overwrites||[]).some(item=>item.id!=='app-id'))return reply(403,{code:50013});
+    if(method==='POST'&&path===`/guilds/${GUILD}/channels`&&state.refuseCopy&&(body?.permission_overwrites||[]).some(item=>item.id!=='app-id'&&item.id!==GUILD))return reply(403,{code:50013});
     if(method==='POST'&&path===`/guilds/${GUILD}/channels`){const channel={...body,id:String(next++)};state.channels.push(channel);return reply(200,channel);}
     const channelPath=path.match(/^\/channels\/(\d+)$/);
     if(channelPath){const channel=state.channels.find(item=>item.id===channelPath[1]);if(method==='GET')return channel?reply(200,channel):reply(404,{code:10003});if(method==='DELETE')state.channels=state.channels.filter(item=>item.id!==channelPath[1]);else if(method==='PATCH'&&channel)Object.assign(channel,body);}
@@ -284,7 +284,7 @@ test('a recap or a voice channel deleted on Discord is made again', async () => 
   await sync(at+HOUR);
   assert.equal(DB.db.prepare('SELECT message_id FROM crew_discord').get().message_id,null);
   let mark=discord.calls.length;await sync(at+2*HOUR);
-  assert.deepEqual(since(discord.calls,mark),[`POST /channels/${row.voice_id}/messages`]);
+  assert.deepEqual(since(discord.calls,mark),[`GET /channels/${row.voice_id}`,`POST /channels/${row.voice_id}/messages`]);
   // Someone deletes the voice channel: a new one, with the recap.
   const now=DB.db.prepare('SELECT * FROM crew_discord').get();
   discord.unknownChannel.add(`/channels/${row.voice_id}/messages/${now.message_id}`);
@@ -418,7 +418,7 @@ test('« un fil par course »: voices straight in the bot\'s category (no waitin
   mark=discord.calls.length;await sync(at+60_000);assert.deepEqual(created(discord.calls,mark),[]);
 });
 
-test('a category rule with a right the bot lacks: the voice is made without the copy (Discord gives it the category\'s rights)', async () => {
+test('a category rule with a right the bot lacks: the voice retries with public access only', async () => {
   const {DB,req,login,sync,discord}=harness();
   await login(ADMIN,'admin','Orga');await login(PILOT,'pilot','Alice');
   assert.equal((await req('/api/community/modules','PATCH',{crewChannels:true},'admin')).status,200);
@@ -432,7 +432,7 @@ test('a category rule with a right the bot lacks: the voice is made without the 
   assert.equal((await req(base+'/crews','POST',{name:'Copie',category:'GT3'},'pilot')).status,201);
   const mark=discord.calls.length;await sync(at);
   const posts=created(discord.calls,mark);
-  assert.equal(posts.length,2);assert.equal(posts[1].body.permission_overwrites,undefined);assert.equal(posts[1].body.parent_id,'600000000000000007');
+  assert.equal(posts.length,2);assert.deepEqual(posts[1].body.permission_overwrites,BOT_ACCESS);assert.equal(posts[1].body.parent_id,'600000000000000007');
   assert.ok(DB.db.prepare('SELECT voice_id FROM crew_discord').get().voice_id);
 });
 
@@ -593,7 +593,7 @@ for (const previousSchema of [false,true]) test(`automatic recovery protects liv
 });
 
 
-test('private voice destination blocks activation before writes; an admin exception preserves privacy on creation',async()=>{
+test('private voice destination blocks activation before writes; an admin exception lets the bot create a public vocal',async()=>{
   const {DB,req,login,discord,sync}=harness();
   await login(ADMIN,'admin','Orga');
   const category=discord.state.channels.find(item=>item.name==='Courses');
@@ -602,24 +602,35 @@ test('private voice destination blocks activation before writes; an admin except
   assert.equal(result.status,400);assert.match(result.data.error,/Courses.*Voir le salon.*Se connecter/);
   assert.equal(DB.db.prepare('SELECT count(*) n FROM community_crew_discord').get().n,0,'refused configuration is not saved');
   const original=structuredClone(category.permission_overwrites);
-  category.permission_overwrites.push(...BOT_ACCESS);
+  category.permission_overwrites.push(BOT_ACCESS[0]);
   assert.equal((await req('/api/community/modules','PATCH',{crewChannels:true,crewCategory:category.id},'admin')).status,200);
   await req('/api/events','POST',race,'admin');
   const event=(await req('/api/events','GET',null,'admin')).data.events[0],departure=event.departures[0];
   await req(`/api/events/${event.id}/departures/${departure.id}/crews`,'POST',{name:'Pilotes privés',category:'GT3'},'admin');
   assert.equal((await sync(Date.now())).opened,1);
   const voice=discord.state.channels.find(item=>item.name==='🏎️ LMU · 6h SPA · Pilotes privés');
-  assert.deepEqual(voice.permission_overwrites.slice(0,2),original);
+  assert.deepEqual(voice.permission_overwrites.slice(0,2),[{id:GUILD,type:0,allow:'3146752',deny:'0'},original[1]]);
   assert.deepEqual(voice.permission_overwrites.at(-1),BOT_ACCESS[0]);
+  // A vocal made by the previous version is opened on the next sync, without recreation.
+  voice.permission_overwrites = [...structuredClone(original),BOT_ACCESS[0]];
+  DB.db.prepare("UPDATE crew_discord SET recap_hash='legacy-private-vocal'").run();
+  const repairMark=discord.calls.length;
+  await sync(Date.now()+60_000);
+  assert.deepEqual(voice.permission_overwrites.slice(0,2),[BOT_ACCESS[1],original[1]]);
+  assert.equal(created(discord.calls,repairMark).length,0);
+  const stableMark=discord.calls.length;
+  await sync(Date.now()+120_000);
+  assert.equal(discord.calls.slice(stableMark).filter(call=>call.method==='PATCH'&&call.path===`/channels/${voice.id}`).length,0);
   // The destination remains accessible, but an existing vocal gets a local restriction later.
   voice.permission_overwrites.find(item=>item.id==='app-id').allow='68624';
+  voice.permission_overwrites.find(item=>item.id==='app-id').deny='1048576';
   const state=(await req('/api/community/settings','GET',null,'admin')).data.crews;
   assert.equal(state.botReady,false);assert.equal(state.botProblem,'channel');
   assert.equal(state.botChannelName,voice.name);assert.deepEqual(state.botMissing,['Se connecter']);
 });
 
 
-test('moving a root fallback vocal into a private race category retains the target pilot restrictions',async()=>{
+test('moving a root fallback vocal into a private race category opens access for all server members',async()=>{
   const {DB,req,login,discord,sync}=harness();
   await login(ADMIN,'admin','Orga');await req('/api/community/modules','PATCH',{crewChannels:true},'admin');
   await req('/api/events','POST',race,'admin');
@@ -634,7 +645,7 @@ test('moving a root fallback vocal into a private race category retains the targ
   await sync(Date.now()+60_000);
   const voice=discord.state.channels.find(item=>item.id===tracked.voice_id);
   assert.equal(voice.parent_id,parent);
-  assert.deepEqual(voice.permission_overwrites,[...rules,...BOT_ACCESS]);
+  assert.deepEqual(voice.permission_overwrites,BOT_ACCESS);
 });
 
 test('a voice channel made before the admins chose « Vocaux d’équipage » moves there once, with its new name', async () => {

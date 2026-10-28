@@ -1,4 +1,4 @@
-// Shared Discord permission calculation. Never change another role/member's overwrites.
+// Shared Discord permission calculation and explicit channel access policies.
 export const VIEW = 1n << 10n, MANAGE = 1n << 4n, SEND = 1n << 11n;
 export const HISTORY = 1n << 16n, CONNECT = 1n << 20n, EMBED = 1n << 14n, ADMIN = 1n << 3n;
 export const VOICE_ACCESS = VIEW | MANAGE | SEND | HISTORY | CONNECT;
@@ -35,5 +35,16 @@ export function withBotAccess(overwrites, clientId, required) {
   if (!mine) { mine = {id:String(clientId),type:1,allow:'0',deny:'0'}; copy.push(mine); }
   mine.allow = String(BigInt(mine.allow || 0) | required);
   mine.deny = String(BigInt(mine.deny || 0) & ~required);
+  return copy;
+}
+
+// Crew vocals are public to server members, even under a private category.
+export const PUBLIC_VOICE_ACCESS = VIEW | CONNECT | (1n << 21n);
+export function withPublicVoiceAccess(overwrites, guildId, clientId) {
+  const copy = withBotAccess(overwrites, clientId, VOICE_ACCESS);
+  for (const rule of copy) rule.deny = String(BigInt(rule.deny || 0) & ~PUBLIC_VOICE_ACCESS);
+  let everyone = copy.find(rule => String(rule.id) === String(guildId) && Number(rule.type) === 0);
+  if (!everyone) { everyone = {id:String(guildId),type:0,allow:'0',deny:'0'}; copy.push(everyone); }
+  everyone.allow = String(BigInt(everyone.allow || 0) | PUBLIC_VOICE_ACCESS);
   return copy;
 }
