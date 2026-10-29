@@ -23,7 +23,9 @@ test('daily proposals retain detailed sections in one message, with the banner l
   for(const detail of ['MANCHE 01','MANCHE 02','Qualifications : 10 min','⛽ **Carburant** · ×1','13 pilotes inscrits sur 20']){
     assert.ok(rendered.solo.includes(detail));assert.ok(rendered.multi.includes(detail));
   }
-  for(const detail of ['Apex Racing','Ferrari 296 GT3','Léa, Hugo','Porsche 911 GT3 R','Sam, Noah, Alex']){
+  assert.doesNotMatch(rendered.endurance,/\d+\/\d+/);
+  assert.match(rendered.endurance,/Ouvert/);assert.match(rendered.endurance,/Fermé/);
+  for(const detail of ['Apex Racing','Ferrari 296 GT3','Léa · Hugo','Porsche 911 GT3 R','Sam · Noah · Alex']){
     assert.ok(rendered.endurance.includes(detail));assert.ok(rendered.multi.includes(detail));
   }
 });
