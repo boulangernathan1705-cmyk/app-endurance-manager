@@ -1,4 +1,5 @@
 import {racesPath} from './races-path.mjs';
+import {buildAnnouncementV2} from './discord-announcement-v2.mjs';
 import {durationLabel,PRE_RACE_MINUTES} from '../shared/duration.mjs';
 import {catalogForGame,SIMS,TRACK_LIMITS,normalizeTdzEventType} from '../shared/catalog.mjs';
 import {hourLabel as streamHour,streamPlatform} from '../shared/stream.mjs';
@@ -516,6 +517,7 @@ export function buildAnnounceRace(race,site={},updatedAt=Date.now(),emojis={},ab
 
 // A single Discord message: community intro, the day's cards, and the existing banner.
 export function buildCompleteAnnouncement(intro, items, site={}) {
+  if(site.announceFormat==='v2')return buildAnnouncementV2(intro,items,site);
   const head=structuredClone(intro.embeds[0]);
   delete head.image;
   const cards=items.slice(0,9).flatMap(item=>structuredClone(item.payload.embeds||[])).slice(0,9);
@@ -560,4 +562,17 @@ export function buildCompleteAnnouncement(intro, items, site={}) {
     head.fields.push({name:cut(name?`📺 LA SOIRÉE AVEC ${name.toUpperCase()}`:'📺 LA SOIRÉE EN DIRECT',256),value:`${schedule}**[▶ REJOINDRE LE STREAM](${streamLink[2]})**`,inline:false});
   }
   return {content:intro.content,embeds:fitDiscordEmbeds(embeds),components,allowed_mentions:intro.allowed_mentions};
+}
+
+// The browser preview and explicit Discord test use the very same sample.
+export function buildAnnouncementDemo(site={}, timestamp=Date.now()) {
+  const round={circuit:'Velo Città',category:'GT4',car:'Ginetta G55',weather:'random',fuel:1,tyres:1,qualifying:10};
+  const event={id:'demo',name:'APERÇU · SAFE’S RACE',sim:'ams2',type:'SAFE',access:'safe',tdz:true,startsAt:timestamp,entered:13,
+    note:'Démonstration de présentation : données d’exemple.',rounds:[{...round,practice:10,durationMinutes:20},{...round,practice:5,durationMinutes:40}]};
+  const card=buildAnnounceEvent(event,{},timestamp);
+  // No fake registrations or clickable absence handlers on a demonstration.
+  card.components=[{type:1,components:[{type:2,style:5,label:'S’inscrire',url:site.url||'https://example.com',disabled:true},{type:2,style:4,label:'Absent',custom_id:'preview:absent',disabled:true}]}];
+  const intro=buildAnnounceIntro({events:1},site);
+  intro.content='Aperçu de présentation · données d’exemple';intro.allowed_mentions={parse:[]};
+  return buildCompleteAnnouncement(intro,[{name:event.name,payload:card}],site);
 }

@@ -28,7 +28,8 @@ async function digest(value) {
   return [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify(value))))].map(byte => byte.toString(16).padStart(2,'0')).join('');
 }
 // The update time in the footer changes on every pass: not part of what is compared.
-const contentHash = async payload => 'single-embed-v1:' + await digest({...payload, embeds:(payload.embeds || []).map(({footer, ...embed}) => embed)});
+const formatPrefix = settings => parseLayout(settings.layout)?.announceFormat === 'v2' ? 'components-v2:' : 'single-embed-v1:';
+const contentHash = async (payload, prefix) => prefix + await digest({...payload, embeds:(payload.embeds || []).map(({footer, ...embed}) => embed)});
 
 // The channel chosen for the announcement, or '' (layout.announce).
 export const announceChannel = settings => settings?.enabled === 0 ? '' : String(parseLayout(settings?.layout)?.announce || '');
@@ -137,7 +138,8 @@ export async function announceCommunity(env, community, settings, timestamp = Da
   const intro=rows.find(row=>row.kind==='intro');
   if(!intro)return false;
   const legacy=rows.filter(row=>row.kind!=='intro' && row.message_id && row.message_id!=='-' && row.message_id!==intro.message_id);
-  const due=!intro.message_id || !intro.content_hash?.startsWith('single-embed-v1:') || legacy.length || timestamp-Number(intro.checked_at||0)>=REFRESH_EVERY;
+  const prefix=formatPrefix(settings);
+  const due=!intro.message_id || !intro.content_hash?.startsWith(prefix) || legacy.length || timestamp-Number(intro.checked_at||0)>=REFRESH_EVERY;
   if(!due)return false;
   const counts={events:rows.filter(row=>row.kind==='event').length,races:rows.filter(row=>row.kind==='race').length,
     lives:rows.filter(row=>row.kind==='stream').length,streams:await streamTimes(env,rows)};
@@ -148,17 +150,20 @@ export async function announceCommunity(env, community, settings, timestamp = Da
     if(payload)items.push({name:payload.embeds[0].title.replace(/^[^\p{L}\p{N}]+/u,''),payload});
   }
   items.push(...eventRows.slice(9).map(row=>({name:row.item,payload:{embeds:[],components:[]}})));
-  const site={...siteOf(env,community),streamUrl:stream,streamName:parseLayout(settings.layout)?.streamName||'',streams:counts.streams};
+  const site={...siteOf(env,community),announceFormat:parseLayout(settings.layout)?.announceFormat,streamUrl:stream,streamName:parseLayout(settings.layout)?.streamName||'',streams:counts.streams};
   const payload=buildCompleteAnnouncement(buildAnnounceIntro(counts,site),items,site);
-  const hash=await contentHash(payload);
+  const hash=await contentHash(payload,prefix);
   let asked=false;
   const previousId=intro.message_id;
-  if(previousId) {
+  // A V2 flag cannot be removed. Switching back publishes a silent replacement;
+  // the previous message remains until that publication is confirmed and saved.
+  if(previousId && intro.content_hash?.startsWith('components-v2:') && prefix!=='components-v2:') intro.message_id=null;
+  if(intro.message_id) {
     try {
       // Even unchanged content must still exist before the old cards can be removed.
       const confirmed=await discordRequest(env,hash!==intro.content_hash||legacy.length?'PATCH':'GET',
         `/channels/${intro.channel_id}/messages/${previousId}`,
-        hash!==intro.content_hash||legacy.length?{...payload,allowed_mentions:{parse:[]}}:null,budget);
+        hash!==intro.content_hash||legacy.length?{...payload,...(payload.flags&32768?{content:null,embeds:[]}:{}),allowed_mentions:{parse:[]}}:null,budget);
       if(confirmed?.id!==previousId)throw new Error('Discord n’a pas confirmé le message de remplacement.');
       asked=true;
     } catch(error) {
@@ -167,10 +172,10 @@ export async function announceCommunity(env, community, settings, timestamp = Da
     }
   }
   if(!intro.message_id) {
-    const nonce=(await digest([community.id,day,'complete',previousId||'initial'])).slice(0,24);
+    const nonce=(await digest([community.id,day,'complete',prefix,previousId||'initial'])).slice(0,24);
     const message=await discordRequest(env,'POST',`/channels/${intro.channel_id}/messages`,{
       ...payload,nonce,enforce_nonce:true,
-      ...(previousId?{allowed_mentions:{parse:[]},flags:4096}:{})
+      ...(previousId?{allowed_mentions:{parse:[]},flags:(payload.flags||0)|4096}:{})
     },budget);
     if(!message?.id)throw new Error('Discord n’a pas confirmé la publication de l’annonce.');
     intro.message_id=message.id;asked=true;

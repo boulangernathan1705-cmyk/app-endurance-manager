@@ -1,5 +1,19 @@
 # Récap de préparation sur Discord
 
+## Préparer la présentation des messages
+
+Dans **Administration → Modules → Discord → Régler**, la question **Annoncer les courses du jour ?** permet de choisir la présentation : **Embed classique** (conservé par défaut) ou **Carte avec sections (Components V2)**. Ce choix concerne l’annonce du jour ; les récaps et les fils de course gardent leur format actuel.
+
+Avant d’enregistrer, utiliser **Voir un exemple d’annonce du jour** : la démonstration SAFE’S RACE utilise des données fictives, les images de la communauté et le format choisi. **Voir les messages** affiche les récaps réels. Aucun de ces aperçus n’envoie de message ni ne change les réglages. L’aperçu représente les couleurs, miniatures, bannière, Markdown simple et boutons. **Mobile** et **Ordinateur** changent uniquement sa largeur. Les boutons restent inactifs, les dates suivent le fuseau de l’appareil et le rendu n’est pas une copie exacte du client Discord.
+
+**Exporter le JSON** télécharge le payload Discord du message affiché, sans URL de webhook ni jeton et avec les mentions désactivées. Il peut servir de base dans un éditeur acceptant ce format ; certains éditeurs demandent une enveloppe d’import spécifique. Un export est un instantané, pas un modèle connecté aux courses : les changements faits dans Discohook ou Embed Generator ne sont pas réimportés automatiquement. Les `custom_id` des vraies actions appartiennent au bot Endurance Manager.
+
+Pour vérifier dans le client Discord, ouvrir **Tester une annonce dans Discord**, choisir un salon texte de test, puis utiliser **Envoyer l’exemple dans Discord**. C’est un envoi réel, limité à trois essais par période de rate limiting ; la démonstration ne mentionne personne et ses boutons d’inscription et d’absence sont désactivés. Utiliser ensuite **Enregistrer** (ou **Activer**) pour appliquer la présentation aux annonces automatiques.
+
+En V2, les courses sont regroupées dans des conteneurs, avec séparateurs, actions locales et accès au stream. Le texte et le nombre de composants sont bornés ; les rendez-vous supplémentaires renvoient vers le programme du site. Les données et les contrôles d’accès des actions restent ceux du bot. Le passage embed → V2 est effectué sans mention supplémentaire. Discord interdit de retirer le flag V2 : le retour au format classique recrée donc le message silencieusement, puis retire l’ancien après confirmation de publication. Il change ainsi de place dans le salon.
+
+Référence : [composants Discord](https://docs.discord.com/developers/components/reference).
+
 Le récap annonce les courses, départs, équipages, catégories, voitures, pilotes, places ouvertes/completes et pilotes sans équipage (un par ligne, avec les logos de ses catégories). Les logos de catégorie sont les emojis du bot lui-même (`images/discord-emojis`, envoyés une fois par le bot, sans Nitro) ; tant qu’ils manquent, la catégorie garde sa couleur. Il ne constitue pas un bilan des résultats sportifs. Chaque communauté ne publie que ses propres inscriptions, équipages et absences, y compris sur les courses officielles partagées.
 
 ## Réglage « Discord »

@@ -68,6 +68,8 @@ export function layoutInput(input) {
   const announce = String(input.announce ?? '').trim();
   if (announce && !ID.test(announce)) throw bad('Choisis le salon de l’annonce du jour.');
   if (announce) layout.announce = announce;
+  if (input.announceFormat != null && !['embed','v2'].includes(input.announceFormat)) throw bad('Choisis la présentation de l’annonce du jour.');
+  if (input.announceFormat === 'v2') layout.announceFormat = 'v2';
   // The stream linked in the intro of the announcement (a Twitch, YouTube… address), '' for none.
   const stream = String(input.stream ?? '').trim();
   if (stream && (!/^https:\/\/[^\s<>"]{3,300}$/.test(stream) || !URL.canParse(stream))) throw bad('Colle l’adresse complète du stream, en https://.');
