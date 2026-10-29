@@ -296,7 +296,7 @@ function streamBox(event,siteUrl){
 // « 📺 Stream 19h45 sur [Twitch](…) · 🏁 Départ 20h00 · 🎮 LMU ».
 function streamFacts(stream){
   const on=stream.streamUrl?` sur [${streamPlatform(stream.streamUrl)}](${stream.streamUrl})`:'';
-  return [stream.streamTime?`📺 Stream ${streamHour(stream.streamTime)}${on}`:on&&`📺 En direct${on}`,stream.raceTime&&`🏁 Départ ${streamHour(stream.raceTime)}`,stream.raceSim&&`🎮 ${SIM_SHORT[stream.raceSim]}`].filter(Boolean).join(' · ');
+  return [stream.streamTime?`📺 Stream ${streamHour(stream.streamTime)}${on}`:on&&`📺 En direct${on}`,stream.raceTime&&`🏁 Départ ${streamHour(stream.raceTime)}`,(stream.activity||stream.raceSim)&&`🎮 ${clean(stream.activity || SIM_SHORT[stream.raceSim] || stream.raceSim)}`].filter(Boolean).join(' · ');
 }
 const streamCrewText=crew=>`👥 ${clean(crew.eventName)} avec l’**${clean(crew.crew)}**${crew.pilots.length?` · ${crew.pilots.map(clean).join(', ')}`:''}`;
 function calendarBox(event,siteUrl){

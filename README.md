@@ -24,6 +24,12 @@ Les permissions sont toujours vérifiées côté serveur. Un pseudo seul ne donn
 
 Les horaires sont interprétés en heure de Paris. Les inscriptions se verrouillent au départ. Un pilote peut proposer plusieurs catégories sur le même départ ; lorsqu’il est affecté à un équipage, la catégorie de cet équipage devient celle retenue.
 
+## Annonces de stream
+
+Les organisateurs autorisés à créer un événement peuvent annoncer un stream dans le calendrier. Le nom du streamer, le simulateur/jeu/activité et la description sont libres et facultatifs. Une course peut préciser son heure de départ indépendamment du début du stream. Les anciens streams LMU et iRacing conservent leurs horaires et leur recherche d’équipage.
+
+Le streamer peut importer, remplacer ou retirer un logo PNG, JPEG ou WebP de 5 Mo maximum. Le navigateur le redimensionne sans recadrage et le compresse ; le serveur vérifie le format et la taille avant de le conserver dans les détails de l’événement. Aucune nouvelle table ni migration n’est nécessaire. Les initiales remplacent un logo absent ; les anciens streams sans nom gardent leur micro. La carte native du calendrier sert aussi d’aperçu dans le formulaire.
+
 ## Développement et contrôles
 
 ```bash
