@@ -11,7 +11,7 @@ export function eveningDemo(site={}, timestamp=Date.now(), scenario='solo') {
   // https://commons.wikimedia.org/wiki/File:LeMansUltimateLogo.png
   const lmuLogo='https://upload.wikimedia.org/wikipedia/commons/8/8a/LeMansUltimateLogo.png';
   const banner=site.bannerUrl||`${origin}/images/endurance-manager-banner.webp`;
-  const day=new Intl.DateTimeFormat('fr-FR',{timeZone:'Europe/Paris',weekday:'long',day:'numeric',month:'long'}).format(timestamp);
+  const day=new Intl.DateTimeFormat('fr-FR',{timeZone:'Europe/Paris',weekday:'long',day:'numeric',month:'long'}).format(timestamp)+' · aperçu fictif';
   const live={type:9,components:[text('### 🟣 LA SOIRÉE AVEC LA PRALINE\n**20:45 · Prise d’antenne**\nRetrouve la soirée en direct sur Twitch.')],accessory:{type:2,style:5,label:'Regarder le live',url:'https://www.twitch.tv/lapraline_tdz',disabled:true}};
   const closing={type:12,items:[{media:{url:banner},description:'Bannière de la communauté'}]};
   const soloHeading='# SAFE’S RACE\n**AMS2 · ÉVÉNEMENT SAFE**';
