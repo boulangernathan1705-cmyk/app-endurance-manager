@@ -1,5 +1,5 @@
 import {isGrindfest, streamersOf, normalizeStreamers, gridfestPasswordValid} from '../shared/grindfest.mjs';
-import {STREAM_SIM, STREAM_RACE_SIMS, streamUrl} from '../shared/stream.mjs';
+import {STREAM_SIM, STREAM_RACE_SIMS, streamUrl, streamRaceSim, isStreamLogo} from '../shared/stream.mjs';
 import {catalogForGame, gameForEvent, CATEGORIES, EVENT_TYPE_IDS as EVENT_TYPES, CIRCUIT_IDS as CIRCUITS, CARS, SIM_IDS, eventCatalog, simForEvent, isRandomCircuit, TDZ_EVENT_TYPES, normalizeTdzEventType, TRACK_LIMITS, RACE_WEATHERS, RACE_SKIES, WEATHER_SLOTS} from '../shared/catalog.mjs';
 const LEGACY_CAR_ALIASES = new Map([
   ['BMW M Hybrid V8 Evo (2026)','BMW M Hybrid V8'],['Cadillac V-Series.R Evo (2026)','Cadillac V-Series.R'],['Peugeot 9X8 2023','Peugeot 9X8'],['Peugeot 9X8 2024','Peugeot 9X8'],['Toyota TR010 Hybrid (2026)','Toyota GR010 Hybrid'],['Ginetta G61-LT-P3 Evo','Ginetta G61-LT-P3'],['Ferrari 488 GTE Evo','Ferrari 488 GTE'],['Aston Martin Vantage AMR LMGT3 Evo','Aston Martin Vantage AMR LMGT3'],['BMW M4 LMGT3 Evo','BMW M4 LMGT3'],['Ferrari 296 LMGT3 Evo','Ferrari 296 LMGT3'],['Ford Mustang LMGT3 Evo','Ford Mustang LMGT3'],['Lamborghini Huracán LMGT3 Evo 2','Lamborghini Huracán LMGT3'],['McLaren 720S LMGT3 Evo','McLaren 720S LMGT3'],['Porsche 911 LMGT3 R (992)','Porsche 911 GT3 R LMGT3'],['Porsche 911 LMGT3 R (992) 2026','Porsche 911 GT3 R LMGT3']
@@ -216,12 +216,23 @@ function validateStream(input) {
   const time = (value, label) => { if (!value) return ''; if (!HOUR.test(value)) fail(400, `${label} invalide.`); return value; };
   const raceSim = raw.raceSim || '';
   if (raceSim && !STREAM_RACE_SIMS.includes(raceSim)) fail(400, 'Choisis la simu de la course : LMU ou iRacing.');
-  const streamTime = time(raw.streamTime, 'Heure du stream'), raceTime = raceSim ? time(raw.raceTime, 'Heure du départ') : '';
-  if (!streamTime && !raceTime) fail(400, raceSim ? 'Indique l’heure du stream ou celle du départ de la course.' : 'Indique l’heure du stream.');
+  if (raw.isRace != null && typeof raw.isRace !== 'boolean') fail(400, 'Indique si le stream diffuse une course.');
+  const isRace = raw.isRace ?? Boolean(raceSim);
+  const streamTime = time(raw.streamTime, 'Heure du stream'), raceTime = isRace ? time(raw.raceTime, 'Heure du départ') : '';
+  if (!streamTime && !raceTime) fail(400, isRace ? 'Indique l’heure du stream ou celle du départ de la course.' : 'Indique l’heure du stream.');
   const details = {};
+  for (const [key, max, label] of [['streamerName',60,'Nom du streamer'],['activity',100,'Simulateur, jeu ou activité'],['description',1200,'Description']]) {
+    if (raw[key] != null && raw[key] !== '') details[key] = text(raw[key], max, label);
+  }
+  if (raw.isRace != null) details.isRace = isRace;
   if (streamTime) details.streamTime = streamTime;
-  if (raceSim) details.raceSim = raceSim;
+  const crewSim = raw.activity != null ? streamRaceSim(details.activity) : raceSim;
+  if (isRace && crewSim) details.raceSim = crewSim;
   if (raceTime) details.raceTime = raceTime;
+  if (raw.logoUrl) {
+    if (!isStreamLogo(raw.logoUrl)) fail(400, 'Logo invalide : importe une image PNG, JPEG ou WebP.');
+    details.logoUrl = raw.logoUrl;
+  }
   if (raw.streamUrl) { const url = streamUrl(raw.streamUrl); if (!url) fail(400, 'Lien du stream : une chaîne Twitch, YouTube ou Kick.'); details.streamUrl = url; }
   return {sim:STREAM_SIM, access:'open', rounds:[{circuit:'', durationMinutes:60, categories:[]}], capacity:null, categories:[], details, circuit:'', durationMinutes:60,
     startTime:[streamTime, raceTime].filter(Boolean).sort()[0]};

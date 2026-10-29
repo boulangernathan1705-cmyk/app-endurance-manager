@@ -1,12 +1,34 @@
 // « Annoncer un stream »: an entry of the events calendar (events.sim 'stream') that only tells the community when the
-// streamer is live. No entry, no category, no duration: a title, a day, the stream's start and/or, when it is a race
-// (LMU or iRacing), its start. details = {streamTime?:'19:45', raceSim?:'lmu'|'iracing', raceTime?:'20:00', streamUrl?}.
+// streamer is live: free activity and description, optional identity/logo, a day and the stream's start and/or race start.
+// raceSim remains an internal hint for matching an endurance crew, never a UI restriction.
 export const STREAM_SIM = 'stream';
 export const STREAM_RACE_SIMS = ['lmu', 'iracing'];
+export const STREAM_LOGO_MAX_LENGTH = 12000;
+export const STREAM_LOGO_MAX_FILE_SIZE = 5 * 1024 * 1024;
+export function streamRaceSim(activity) {
+  const name = String(activity || '').trim().toLowerCase();
+  return ['lmu', 'le mans ultimate'].includes(name) ? 'lmu' : name === 'iracing' ? 'iracing' : '';
+}
+// Inline raster images only, already resized by the browser. Keep the event within the 24 KB JSON request budget.
+export function isStreamLogo(value) {
+  if (typeof value !== 'string' || value.length > STREAM_LOGO_MAX_LENGTH) return false;
+  const match = value.match(/^data:image\/(png|jpeg|webp);base64,([A-Za-z0-9+/]+={0,2})$/);
+  if (!match) return false;
+  try {
+    const bytes = atob(match[2]);
+    return match[1] === 'webp' ? bytes.startsWith('RIFF') && bytes.slice(8, 12) === 'WEBP'
+      : match[1] === 'png' ? bytes.startsWith('\x89PNG\r\n\x1a\n')
+      : bytes.startsWith('\xff\xd8\xff');
+  } catch { return false; }
+}
 export const isStream = event => event?.sim === STREAM_SIM;
 export const streamDetails = event => {
   const details = event?.details || {};
-  return {streamTime:details.streamTime || '', raceSim:STREAM_RACE_SIMS.includes(details.raceSim) ? details.raceSim : '', raceTime:details.raceTime || '', streamUrl:details.streamUrl || ''};
+  const isRace = typeof details.isRace === 'boolean' ? details.isRace : Boolean(details.raceSim);
+  const activity = details.activity ?? ({lmu:'Le Mans Ultimate', iracing:'iRacing'}[details.raceSim] || '');
+  const raceSim = isRace ? streamRaceSim(activity) : '';
+  return {streamTime:details.streamTime || '', raceSim, raceTime:isRace ? details.raceTime || '' : '', streamUrl:streamUrl(details.streamUrl) || '',
+    isRace, activity, description:details.description || '', streamerName:details.streamerName || '', logoUrl:isStreamLogo(details.logoUrl) ? details.logoUrl : ''};
 };
 // « 19h45 ».
 export const hourLabel = time => String(time || '').replace(':', 'h');

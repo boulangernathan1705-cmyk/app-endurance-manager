@@ -8,8 +8,8 @@ import {dateBlock,dayLabel,timeLabel} from '../dates.mjs';
 import {durationLabel,eventMinutes} from '../../shared/duration.mjs';
 import {isGrindfest,streamersOf} from '../../shared/grindfest.mjs';
 import {streamerLogo} from './grindfest.mjs';
-import {isStream} from '../../shared/stream.mjs';
-import {isSolo,streamPanel,eventAccessLogo,accessBadge,soloCardMeta,soloCardInfo,soloFill,ANY_CATEGORY} from './solo.mjs';
+import {isStream,streamDetails,streamPlatform} from '../../shared/stream.mjs';
+import {isSolo,streamPanel,eventAccessLogo,accessBadge,soloCardMeta,soloCardInfo,streamTimes,soloFill,ANY_CATEGORY} from './solo.mjs';
 
 const dayKeyFormatter=new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Paris',year:'numeric',month:'2-digit',day:'2-digit'});
 function datedDepartures(event){return (event.departures||[]).filter(d=>Number.isFinite(Number(d.startsAt))).sort((a,b)=>Number(a.startsAt)-Number(b.startsAt));}
@@ -79,10 +79,18 @@ function soloCardFoot(event,archived,situation){
 function soloCircuit(event){
   // Gridfest: its own wordmark and the streamers' logos.
   if(isGrindfest(event))return `<span class="race-card-circuit race-card-type-logo gridfest-card-panel" aria-hidden="true"><img class="gridfest-card-logo" src="/images/event-access/gridfest-stacked.png" alt="Gridfest" width="1248" height="1252"><span class="gridfest-avatars">${streamersOf(event).slice(0,6).map(streamer=>streamerLogo(streamer)).join('')}</span></span>`;
-  if(isStream(event))return `<span class="race-card-circuit race-card-type-logo is-stream" aria-hidden="true">${streamPanel()}</span>`;
+  if(isStream(event))return `<span class="race-card-circuit race-card-type-logo is-stream" aria-hidden="true">${streamPanel(event)}</span>`;
   return `<span class="race-card-circuit race-card-type-logo" data-type="${esc(event.details?.type||'')}" aria-hidden="true">${eventAccessLogo(event)}</span>`;
 }
+// The same native card is used in the calendar and the stream form's live preview.
+export function streamEventCard(event,{preview=false,archived=false}={}) {
+  const details=streamDetails(event),title=esc(event.name || 'Le titre de ton stream');
+  const open=preview ? `<span class="event-name">${title}</span>` : `<button type="button" class="event-name stream-card-title" data-action="open" data-id="${esc(event.id)}">${title}</button>`;
+  const watch=details.streamUrl ? `<a class="primary-button stream-button" href="${esc(details.streamUrl)}" target="_blank" rel="noopener noreferrer">Regarder sur ${esc(streamPlatform(details.streamUrl))} →</a>` : '';
+  return `<article class="event-card event-card-harmonized race-card event-type-private is-solo is-solo-open sim-stream stream-event-card${archived?' archived':''}"><div class="event-card-body race-card-body"><div class="race-card-content"><div class="race-card-top">${raceDateBlock(event,archived)}<div class="race-head">${open}${details.streamerName?`<span class="race-meta">Avec ${esc(details.streamerName)}</span>`:''}${accessBadge(event)}</div></div>${details.description?`<p class="stream-description">${esc(details.description)}</p>`:''}<div class="stream-card-times">${esc(streamTimes(event))}</div>${soloCardInfo(event)}<div class="stream-card-actions"><small>${archived?'Stream passé':'Horaires de Paris'}</small>${watch}</div></div><div class="race-card-circuit race-card-type-logo is-stream">${streamPanel(event)}</div></div></article>`;
+}
 function eventCard({event,next,archived,end}){
+  if(isStream(event))return streamEventCard(event,{archived});
   const registered=registeredRaceStatus(event);const displayNext=registered.next;
   const untilNext=displayNext?displayNext.startsAt-Date.now():Infinity,statusClass=archived?'finished':displayNext&&untilNext<=3600000?'soon':'upcoming';
   const status=archived?`Tous les départs ont eu lieu · ${esc(dateLabel({startsAt:end}))}`:displayNext?`Prochain départ avec pilotes : ${esc(dateLabel(displayNext))} à ${esc(timeLabel(displayNext.time))} · <span data-countdown="${displayNext.startsAt}">${countdown(displayNext.startsAt)}</span>`:next?'Aucun départ à venir avec pilote inscrit':'Dates à confirmer';

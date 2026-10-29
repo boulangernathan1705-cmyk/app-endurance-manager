@@ -23,8 +23,8 @@ export function simBadge(event) {
 }
 // The simulator, the event type, then OPEN or SAFE (unless the type already says it).
 export function accessBadge(event) {
-  // A stream: « Stream », then the sim of its race.
-  if (isStream(event)) { const race = SIMS.find(item => item.id === streamDetails(event).raceSim); return `<span class="event-badge-row">${simBadge(event)}${race ? simBadge({sim:race.id}) : ''}</span>`; }
+  // A stream: its violet badge, then the freely chosen activity.
+  if (isStream(event)) { const {activity} = streamDetails(event); return `<span class="event-badge-row">${simBadge(event)}${activity ? `<span class="event-type-badge stream-activity">${esc(activity)}</span>` : ''}</span>`; }
   if (!state.eventTdz) return `<span class="event-badge-row">${simBadge(event)}</span>`;
   const safe = event.access === 'safe', type = event.details?.type || '';
   const typeBadge = type ? `<span class="event-type-badge">${esc(type)}</span>` : '';
@@ -33,7 +33,7 @@ export function accessBadge(event) {
 }
 
 // « Annoncer un stream » (shared/stream.mjs): its times (« Stream 19h45 · Départ 20h00 »), the streamer's crew when he
-// races it, the microphone where the other events show their logo, and on its page the links to the stream and to the
+// races it, its uploaded logo (or initials/microphone), and on its page the links to the stream and to the
 // endurances.
 export function streamTimes(event) {
   const {streamTime, raceTime} = streamDetails(event);
@@ -43,7 +43,14 @@ export function streamCrewLine(event) {
   const crew = event.streamCrew;
   return crew ? `${esc(crew.eventName)} avec l’${esc(crew.crew)}${crew.pilots.length ? ` · ${crew.pilots.map(esc).join(', ')}` : ''}` : '';
 }
-export const streamPanel = () => '<span class="stream-panel" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v4M8 22h8"/></svg></span>';
+const streamMicrophone = () => '<span class="stream-panel" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v4M8 22h8"/></svg></span>';
+// A supplied raster logo keeps its aspect ratio; old streams retain the microphone fallback.
+export function streamPanel(event) {
+  const {logoUrl, streamerName} = streamDetails(event);
+  if (logoUrl) return `<span class="stream-panel"><img class="stream-logo" src="${esc(logoUrl)}" alt="Logo de ${esc(streamerName || 'la chaîne')}"></span>`;
+  if (streamerName) return `<span class="stream-panel"><span class="stream-initials" aria-hidden="true">${esc(streamerName.trim().split(/\s+/).map(part=>part[0]).join('').slice(0,2).toUpperCase())}</span></span>`;
+  return streamMicrophone();
+}
 export function streamBlock(event) {
   const {raceSim, streamUrl} = streamDetails(event), crew = streamCrewLine(event);
   const watch = streamUrl ? `<a class="primary-button stream-button" href="${esc(streamUrl)}" target="_blank" rel="noopener">Regarder sur ${esc(streamPlatform(streamUrl))}</a>` : '';
@@ -143,6 +150,7 @@ export function roundTiles(round) {
 // Event page header: a single round shows its tiles; several rounds show theirs in their own cards, below.
 // Then the note, and the password for the pilots entered.
 export function soloEventDetails(event) {
+  if (isStream(event)) { const {description} = streamDetails(event); return description ? `<p class="stream-description">${esc(description)}</p>` : ''; }
   if(simForEvent(event)==='acrally'){
     const details=event.details||{},round=event.rounds?.[0]||{},stages=details.rallyStages||event.rounds?.map(r=>r.circuit).filter(Boolean)||[];
     const weather=WEATHERS.find(([value])=>value===round.weather);
@@ -172,7 +180,7 @@ export function soloHeaderChips(event){
 // Above the card's details: the circuit, or the number of rounds.
 export function soloCardMeta(event) {
   const rounds = event.rounds || [];
-  if (isStream(event)) return esc(streamTimes(event));
+  if (isStream(event)) { const {streamerName} = streamDetails(event); return esc(streamerName ? `Avec ${streamerName} · ${streamTimes(event)}` : streamTimes(event)); }
   if(simForEvent(event)==='acrally'){const stages=event.details?.rallyStages||rounds.map(r=>r.circuit).filter(Boolean);return stages.length>1?`${stages.length} spéciales prévues`:esc(stages[0]||'Spéciales à définir');}
   return rounds.length > 1 ? `${rounds.length} manches` : esc(eventCircuitName(event, rounds[0]?.circuit ?? event.circuit));
 }
