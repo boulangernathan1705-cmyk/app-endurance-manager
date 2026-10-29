@@ -2,6 +2,21 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {discordPayloadMarkup,discordPreviewText,discordExportPayload,discordPreviewsMarkup} from '../front/discord-preview.mjs';
 import {buildAnnouncementDemo} from '../server/discord-weekly-format.mjs';
+import {eveningDemo} from '../shared/discord-evening-demo.mjs';
+
+test('the evening proposal has a banner, two distinct races and a live card, within Discord limits and without active actions',()=>{
+  const payload=eveningDemo({url:'https://site.example'},Date.parse('2026-10-29T12:00:00Z'));
+  const walk=items=>items.flatMap(item=>[item,...walk(item.components||[]),...(item.accessory?walk([item.accessory]):[])]);
+  const components=walk(payload.components);
+  assert.equal(payload.flags,32768);assert.deepEqual(payload.allowed_mentions,{parse:[]});
+  assert.equal(payload.components[0].type,12);assert.equal(payload.components.filter(item=>item.type===17).length,3);
+  assert.ok(components.length<=40);assert.ok(components.filter(item=>item.type===10).reduce((n,item)=>n+item.content.length,0)<=4000);
+  const buttons=components.filter(item=>item.type===2);assert.equal(buttons.length,5);assert.ok(buttons.every(item=>item.disabled));
+  const markup=discordPayloadMarkup(payload);
+  assert.match(markup,/6 HEURES DE SPA/);assert.match(markup,/7 places disponibles/);assert.match(markup,/LA SOIRÉE AVEC LA PRALINE/);
+  assert.match(markup,/dc-heading-1/);assert.match(markup,/dc-heading-2/);
+  assert.equal(payload.embeds,undefined);assert.equal(payload.content,undefined);
+});
 
 test('the comparison shows both named formats together with separate exports',()=>{
   const previews=['embed','v2'].map(format=>({format,name:format==='embed'?'Embed classique':'Carte avec sections · Components V2',payload:buildAnnouncementDemo({announceFormat:format})}));

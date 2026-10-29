@@ -50,7 +50,7 @@ function componentMarkup(component, depth = 0) {
   switch (component.type) {
     case 1: return buttons(component.components);
     case 9: return `<div class="dc-section"><div>${children()}</div>${component.accessory?.type===2 ? buttons([component.accessory]) : image(component.accessory?.media?.url,component.accessory?.description,'dc-section-image')}</div>`;
-    case 10: return `<div class="dc-text">${String(component.content || '').split('\n').map(line=>/^#{1,3} /.test(line) ? `<div class="dc-title">${discordPreviewText(line.replace(/^#{1,3} /,''))}</div>` : discordPreviewText(line)).join('\n')}</div>`;
+    case 10: return `<div class="dc-text">${String(component.content || '').split('\n').map(line=>/^#{1,3} /.test(line) ? `<div class="dc-title dc-heading-${line.match(/^#+/)[0].length}">${discordPreviewText(line.replace(/^#{1,3} /,''))}</div>` : discordPreviewText(line)).join('\n')}</div>`;
     case 12: return `<div class="dc-gallery">${(component.items || []).map(item=>image(item.media?.url,item.description,'dc-image')).join('')}</div>`;
     case 14: return `<div class="dc-separator${component.divider===false ? ' no-line' : ''}${component.spacing===2 ? ' is-large' : ''}"></div>`;
     case 17: return `<article class="dc-container" style="--dc-accent:${color(component.accent_color)}">${children()}</article>`;
