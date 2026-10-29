@@ -1015,9 +1015,10 @@ async function api(request, env) {
     if(testing)await rateLimit(request,env,'discord-announcement-test',3);
     const input=await body(request),saved=await botRecapSettings(env,community);
     if(input.variant!=null&&input.variant!=='evening')fail(400,'Choisis une maquette connue.');
+    if(input.scenario!=null&&!['solo','endurance','multi'].includes(input.scenario))fail(400,'Choisis un exemple connu.');
     const layout=input.layout?layoutInput(input.layout):parseLayout(saved?.layout)||{};
     const site={...siteOf(env,community),announceFormat:layout.announceFormat,streamUrl:input.layout?layout.stream||'':announceStream(saved),streamName:layout.streamName||'',streams:[{time:'20:45'}]};
-    const payload=input.variant==='evening'?eveningDemo(site):buildAnnouncementDemo(site);
+    const payload=input.variant==='evening'?eveningDemo(site,Date.now(),input.scenario||'solo'):buildAnnouncementDemo(site);
     if(!testing){
       if(input.variant==='evening')return json({previews:[{name:'Nouvelle proposition · Programme du soir',payload}]});
       const timestamp=Date.now();
