@@ -1,7 +1,7 @@
 import {grindfestAvailable, grindfestEnabled, isGrindfest, streamersOf, assignStreamerWaitlist} from '../shared/grindfest.mjs';
 import {discordInteraction} from './discord-interactions.mjs';
 import {discordRequest} from './recap-discord.mjs';
-import {buildAnnounceEvent,buildAnnounceIntro,buildCompleteAnnouncement} from './discord-weekly-format.mjs';
+import {buildAnnouncementDemo} from './discord-weekly-format.mjs';
 import {siteOf} from './discord-weekly.mjs';
 import {announceStream} from './discord-announce.mjs';
 import {gridfestPasswordStatus, sendGridfestPasswords} from './gridfest-discord.mjs';
@@ -36,7 +36,7 @@ import {setupOfficialServer} from './official-discord.mjs';
 
 
 import {botRecapSettings, recapDestinations, recapError, validateRecapDestinations, validateDiscordLayout, previewBotRecap, saveBotRecap, syncBotRecaps, repairBotRecap, removeBotDiscord, serverRights, RECAP_BOT_PERMISSIONS} from './recap-discord.mjs';
-import {parseLayout} from './discord-layout.mjs';
+import {parseLayout,layoutInput} from './discord-layout.mjs';
 import {notify, notificationsApi, departurePilots, eventPilots, crewPilots} from './notifications.mjs';
 import {checkCrewAccess, validateCrewAccess, serverCategories, closeDeletedCrewDiscord, CREW_BOT_PERMISSIONS} from './crew-discord.mjs';
 // Official races (iRacing's official endurances, LMU official events): common to every community (migration 0039).
@@ -1008,23 +1008,20 @@ async function api(request, env) {
       return json({previews:await previewBotRecap(env,Date.now(),community,{...settings, bot_categories:saved?.bot_categories || '{}'})});
     } catch (error) { fail(400,error.message === 'Discord indisponible' ? recapError(error) : error.message); }
   }
-  if(path==='/api/community/discord/announcement-test'&&method==='POST'){
+  if(['/api/community/discord/announcement-test','/api/community/discord/announcement-preview'].includes(path)&&method==='POST'){
     requirePermission(actor,'admin');
-    await rateLimit(request,env,'discord-announcement-test',3);
-    const input=await body(request),destinations=await recapDestinations(env,community);
+    const testing=path.endsWith('announcement-test');
+    if(testing)await rateLimit(request,env,'discord-announcement-test',3);
+    const input=await body(request),saved=await botRecapSettings(env,community);
+    const layout=input.layout?layoutInput(input.layout):parseLayout(saved?.layout)||{};
+    const site={...siteOf(env,community),announceFormat:layout.announceFormat,streamUrl:input.layout?layout.stream||'':announceStream(saved),streamName:layout.streamName||'',streams:[{time:'20:45'}]};
+    const payload=buildAnnouncementDemo(site);
+    if(!testing)return json({previews:[{name:'Annonce du jour · exemple',payload}]});
+    const destinations=await recapDestinations(env,community);
     const matches=destinations.filter(channel=>channel.type===0&&(channel.id===input.channel||channel.name===input.channel));
     if(matches.length!==1)fail(400,'Choisis un salon texte unique du serveur de cette communauté.');
     const channel=matches[0];
     if(channel.announceMissing?.some(right=>right!=='Mentionner @everyone'))fail(400,'Le bot doit pouvoir voir le salon, envoyer des messages et intégrer des liens.');
-    const site={...siteOf(env,community),streamUrl:announceStream(await botRecapSettings(env,community))||'https://www.twitch.tv/lapraline_tdz'};
-    const round={circuit:'Velo Città',category:'GT4',car:'Ginetta G55',weather:'random',fuel:1,tyres:1,qualifying:10};
-    const event={id:'demo',name:'APERÇU · SAFE’S RACE',sim:'ams2',type:'SAFE',access:'safe',tdz:true,startsAt:Date.now(),entered:13,
-      note:'Démonstration de présentation : données d’exemple.',rounds:[{...round,practice:10,durationMinutes:20},{...round,practice:5,durationMinutes:40}]};
-    const card=buildAnnounceEvent(event,{},Date.now());
-    const payload=buildCompleteAnnouncement(buildAnnounceIntro({events:1},site),[{name:event.name,payload:card}],site);
-    const live=payload.embeds[0].fields.find(field=>field.name==='📺 LA SOIRÉE EN DIRECT');
-    if(live){live.name='📺 LA SOIRÉE AVEC LA PRALINE';live.value=`Début du stream à **20h45** · horaire d’exemple\n**[▶ REJOINDRE LE STREAM](${site.streamUrl})**`;}
-    payload.content='Aperçu de présentation · données d’exemple';payload.allowed_mentions={parse:[]};payload.components=[];
     const sent=await discordRequest(env,'POST',`/channels/${channel.id}/messages`,payload);
     return json({ok:true,url:`https://discord.com/channels/${community.discordGuildId}/${channel.id}/${sent.id}`});
   }

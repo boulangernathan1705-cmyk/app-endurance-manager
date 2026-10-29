@@ -1,5 +1,12 @@
 # Nouveautés d'Endurance Manager
 
+## v1.97 — 29 octobre 2026
+
+### ✨ Améliorations
+
+- **Discord · Aperçus** : les couleurs, images, champs, liens et boutons sont représentés avant publication, avec une largeur ordinateur ou mobile et un export JSON sans notification.
+- **Discord · Annonce du jour** : présentation au choix, embed classique ou carte avec sections (Components V2). Chaque course conserve ses actions et les données continuent de se mettre à jour. Une démonstration peut être consultée sur le site avant un envoi explicite dans un salon de test.
+
 ## v1.96 — 28 octobre 2026
 
 ### ✨ Améliorations

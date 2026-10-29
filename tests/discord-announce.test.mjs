@@ -4,7 +4,7 @@ import {DatabaseSync} from 'node:sqlite';
 import {readFileSync,readdirSync} from 'node:fs';
 import worker from '../server/worker.mjs';
 import {announceCommunity} from '../server/discord-announce.mjs';
-import {buildCompleteAnnouncement,buildAnnounceEvent,buildAnnounceIntro,buildAnnounceRace,eventHook,ANNOUNCE_HOOKS} from '../server/discord-weekly-format.mjs';
+import {buildCompleteAnnouncement,buildAnnounceEvent,buildAnnounceIntro,buildAnnounceRace,buildAnnouncementDemo,eventHook,ANNOUNCE_HOOKS} from '../server/discord-weekly-format.mjs';
 import {layoutInput} from '../server/discord-layout.mjs';
 import {linkTestServer,DEV_COMMUNITY,GUILD} from './fixtures/discord-server.mjs';
 
@@ -52,6 +52,73 @@ function setup(t){
   return {DB,env,calls,messages,settings};
 }
 const sent=calls=>calls.filter(call=>call.method==='POST'&&call.path.startsWith('/channels/'));
+const walk=items=>items.flatMap(item=>[item,...walk(item.components||[]),...(item.accessory?walk([item.accessory]):[])]);
+
+test('V2 keeps race actions next to their details, within Discord budgets, without mutating source cards',()=>{
+  const card=buildAnnounceEvent({id:EVENT,name:'Course',sim:'lmu',startsAt:MORNING,entered:3,rounds:[],note:'Détail '.repeat(1500)},{url:'https://site.example'},MORNING,()=>({type:2,style:4,custom_id:`absent:${EVENT}`,label:'Absent'}));
+  const before=JSON.stringify(card),items=Array.from({length:30},()=>({name:'Course',payload:card}));
+  const payload=buildCompleteAnnouncement(buildAnnounceIntro({events:30}),items,{announceFormat:'v2',url:'https://site.example',bannerUrl:'https://site.example/banner.webp',streamUrl:'https://twitch.tv/tdz',streams:[{time:'20:45'}]});
+  const all=walk(payload.components);
+  assert.equal(payload.flags,32768);assert.equal(payload.content,undefined);assert.equal(payload.embeds,undefined);
+  assert.ok(all.length<=40);assert.ok(all.filter(item=>item.type===10).reduce((n,item)=>n+item.content.length,0)<=4000);
+  assert.ok(all.some(item=>item.custom_id===`absent:${EVENT}`));assert.ok(all.some(item=>item.type===12));
+  assert.match(JSON.stringify(payload),/Programme complet/);assert.equal(JSON.stringify(card),before);
+  const demo=buildAnnouncementDemo({announceFormat:'v2'},MORNING);
+  assert.ok(walk(demo.components).filter(item=>item.type===2).every(item=>item.disabled));
+  assert.deepEqual(demo.allowed_mentions,{parse:[]});
+  assert.equal(layoutInput({mode:'events',sims:'all',under:'top',announceFormat:'v2'}).announceFormat,'v2');
+  assert.throws(()=>layoutInput({mode:'events',sims:'all',under:'top',announceFormat:'unknown'}));
+});
+
+test('switching to V2 clears legacy content; switching back replaces silently and retains absence actions',async t=>{
+  const {DB,env,calls,messages,settings}=setup(t);
+  await announceCommunity(env,TDZ,settings(),MORNING);
+  const old=sent(calls)[0].body,oldId=[...messages.keys()][0];
+  const updateFormat=format=>{
+    const layout=JSON.parse(settings().layout);layout.announceFormat=format;
+    DB.db.prepare('UPDATE community_recap_settings SET layout=?').run(JSON.stringify(layout));
+  };
+  updateFormat('v2');calls.length=0;
+  await announceCommunity(env,TDZ,settings(),MORNING+60000);
+  const patch=calls.find(call=>call.method==='PATCH').body;
+  assert.equal(patch.flags,32768);assert.equal(patch.content,null);assert.deepEqual(patch.embeds,[]);
+  assert.deepEqual(patch.allowed_mentions,{parse:[]});assert.ok(walk(patch.components).some(item=>item.custom_id===`absent:${EVENT}`));
+  // An unchanged V2 refresh does not re-edit just because the clock advanced.
+  calls.length=0;await announceCommunity(env,TDZ,settings(),MORNING+12*60000);
+  assert.equal(calls.filter(call=>call.method==='PATCH').length,0);
+  updateFormat('embed');calls.length=0;
+  await announceCommunity(env,TDZ,settings(),MORNING+13*60000);
+  const replacement=sent(calls)[0].body;
+  assert.equal(replacement.flags,4096);assert.deepEqual(replacement.allowed_mentions,{parse:[]});
+  assert.ok(replacement.embeds.length);assert.ok(!messages.has(oldId));assert.equal(messages.size,1);
+  assert.equal(old.flags,undefined);
+});
+
+test('recovering a deleted V2 announcement preserves its flag and never pings again',async t=>{
+  const {DB,env,calls,messages,settings}=setup(t);
+  const layout=JSON.parse(settings().layout);layout.announceFormat='v2';
+  DB.db.prepare('UPDATE community_recap_settings SET layout=?').run(JSON.stringify(layout));
+  await announceCommunity(env,TDZ,settings(),MORNING);
+  assert.deepEqual(sent(calls)[0].body.allowed_mentions,{parse:['everyone']});
+  messages.clear();calls.length=0;
+  await announceCommunity(env,TDZ,settings(),MORNING+11*60000);
+  assert.equal(sent(calls)[0].body.flags,32768|4096);
+  assert.deepEqual(sent(calls)[0].body.allowed_mentions,{parse:[]});
+});
+
+test('a failed switch back to classic keeps the V2 publication and its database reference',async t=>{
+  const {DB,env,messages,settings}=setup(t);
+  const layout=JSON.parse(settings().layout);layout.announceFormat='v2';
+  DB.db.prepare('UPDATE community_recap_settings SET layout=?').run(JSON.stringify(layout));
+  await announceCommunity(env,TDZ,settings(),MORNING);
+  const previous=DB.db.prepare("SELECT message_id FROM discord_announcements WHERE kind='intro'").get().message_id;
+  layout.announceFormat='embed';DB.db.prepare('UPDATE community_recap_settings SET layout=?').run(JSON.stringify(layout));
+  const fetch=globalThis.fetch;
+  globalThis.fetch=(url,options)=>options?.method==='POST'&&String(url).endsWith('/messages')?Promise.reject(new Error('Publication indisponible')):fetch(url,options);
+  await assert.rejects(announceCommunity(env,TDZ,settings(),MORNING+60000),/Publication indisponible/);
+  assert.ok(messages.has(previous));
+  assert.equal(DB.db.prepare("SELECT message_id FROM discord_announcements WHERE kind='intro'").get().message_id,previous);
+});
 
 test('at 7h30 the day\'s endurances and events are announced in order, @everyone on the first message only',async t=>{
   const {env,calls,settings}=setup(t);

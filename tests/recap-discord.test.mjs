@@ -74,6 +74,16 @@ async function as(env,path,method='GET',input,user=OWNER){
   return {status:response.status,data:await response.json()};
 }
 
+test('daily announcement browser preview supports V2 and never publishes or changes settings',async t=>{
+  const {env,calls,DB}=setup(t);
+  const before=DB.db.prepare('SELECT * FROM community_recap_settings').all();
+  const result=await as(env,'/api/community/discord/announcement-preview','POST',{layout:{mode:'events',sims:'all',under:'top',announceFormat:'v2'}});
+  assert.equal(result.status,200);assert.equal(result.data.previews[0].payload.flags,32768);
+  assert.deepEqual(result.data.previews[0].payload.allowed_mentions,{parse:[]});
+  assert.equal(written(calls).length,0);
+  assert.deepEqual(DB.db.prepare('SELECT * FROM community_recap_settings').all(),before);
+});
+
 test('read-only previews preserve every departure and never send to Discord',async t=>{
   const {DB,env,calls}=setup(t);race(DB,'a','Même course','spa',[{id:'s1',startsAt:NOW+DAY},{id:'s2',startsAt:NOW+8*DAY}]);race(DB,'b','Même course','iracing-spa');
   const previews=await previewBotRecap(env,NOW,COMMUNITY,SETTINGS);
