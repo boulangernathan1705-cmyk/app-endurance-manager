@@ -2,6 +2,11 @@ import {eveningDemo} from '../shared/discord-evening-demo.mjs';
 import {discordPreviewsMarkup,discordExportPayload} from './discord-preview.mjs';
 
 const root=document.getElementById('evening-preview');
+let requestedChannel=new URLSearchParams(location.search).get('channel')||'';
+try{
+  if(/^\d{15,22}$/.test(requestedChannel))sessionStorage.setItem('em-preview-channel',requestedChannel);
+  else if(!requestedChannel)requestedChannel=sessionStorage.getItem('em-preview-channel')||'';
+}catch{/* The channel can still be selected when browser storage is disabled. */}
 let payload=eveningDemo({url:location.origin});
 const render=()=>{root.innerHTML=discordPreviewsMarkup([{name:'Nouvelle proposition · Programme du soir',payload}]);};
 render();
@@ -29,13 +34,13 @@ async function prepareSender(){
     if(!session.user){
       status.textContent='Connecte-toi avec ton compte administrateur pour choisir ton salon de test.';
       const login=document.createElement('a');login.className='primary-button';login.textContent='Se connecter avec Discord';
-      login.href='/api/auth/discord?return='+encodeURIComponent(location.pathname+location.search);panel.append(login);return;
+      login.href='/api/auth/discord?return='+encodeURIComponent(location.pathname);panel.append(login);return;
     }
     if(!session.permissions?.includes('admin')){status.textContent='L’envoi est réservé aux administrateurs de cette communauté.';return;}
     const [destinations,preview]=await Promise.all([api('/api/community/recap/destinations'),api('/api/community/discord/announcement-preview',{variant:'evening'})]);
     payload=preview.previews[0].payload;render();
     const channels=(destinations.destinations||[]).filter(channel=>channel.type===0);
-    const requested=new URLSearchParams(location.search).get('channel')||'';
+    const requested=requestedChannel;
     const form=document.createElement('form'),label=document.createElement('label'),select=document.createElement('select'),button=document.createElement('button');
     label.textContent='Salon de test';select.name='channel';select.required=true;
     const empty=document.createElement('option');empty.value='';empty.textContent='Choisir le salon texte';select.append(empty);
