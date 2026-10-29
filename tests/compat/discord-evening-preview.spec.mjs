@@ -22,16 +22,16 @@ test('an administrator can send this exact concept to the selected channel only 
 test('the evening concept is readable on desktop and mobile without activating announcements',async ({page})=>{
   await page.goto('/discord-preview.html');
   await expect(page.getByRole('heading',{name:'Le programme du soir.'})).toBeVisible();
-  await expect(page.getByText('SAFE’S RACE',{exact:true})).toBeVisible();
+  await expect(page.getByText('🎉 SOIRÉE BOUBOULES AUJOURD’HUI !',{exact:true})).toBeVisible();
   await expect(page.getByText('MANCHE 01 · VELO CITTÀ',{exact:true})).toBeVisible();
   await expect(page.getByText(/LA SOIRÉE AVEC LA PRALINE/)).toBeVisible();
   const cards=page.locator('.dc-container');await expect(cards).toHaveCount(1);
   await page.locator('#evening-scenario').selectOption('endurance');
-  await expect(page.getByText('6 HEURES DE SPA',{exact:true})).toBeVisible();
+  await expect(page.getByText('🏁 6 HEURES DE SPA',{exact:true})).toBeVisible();
   await expect(page.getByText('Apex Racing · 2/3',{exact:true})).toBeVisible();
   await page.locator('#evening-scenario').selectOption('multi');
   await expect(page.getByText('20:00 · 6 HEURES DE SPA',{exact:true})).toBeVisible();
-  await expect(page.getByText('21:00 · SAFE’S RACE',{exact:true})).toBeVisible();
+  await expect(page.getByText('21:00 · SOIRÉE BOUBOULES',{exact:true})).toBeVisible();
   await expect(cards).toHaveCount(1);
   for(const button of await page.locator('.dc-button').all())await expect(button).toBeDisabled();
   await page.getByRole('button',{name:'Mobile',exact:true}).click();
