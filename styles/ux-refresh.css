@@ -1586,6 +1586,7 @@ html[data-game] #app .ux-unassigned-grid > .pilot-row > .edit-button { align-sel
 .dc-message .dc-style-1{background:#5865f2}.dc-message .dc-style-3{background:#248046}.dc-message .dc-style-4{background:#a12828}
 .dc-section{display:flex;gap:12px;align-items:flex-start;justify-content:space-between}.dc-section>div{min-width:0;flex:1}
 .dc-section-image{width:64px;height:64px;object-fit:contain;border-radius:4px}
+.dc-section-image[src*="LeMansUltimateLogo.png"]{box-sizing:border-box;padding:10px}
 .dc-separator{border-top:1px solid #484a50;margin:4px 0}.dc-separator.no-line{border:0}.dc-separator.is-large{margin:10px 0}
 .dc-date,.dc-mention{background:#414563;border-radius:3px;padding:0 3px}
 .recap-live-preview.is-mobile .dc-message-body{margin-left:0}

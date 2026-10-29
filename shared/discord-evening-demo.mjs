@@ -21,7 +21,7 @@ export function eveningDemo(site={}, timestamp=Date.now(), scenario='solo') {
   const raceHeading='# 🏁 JOUR D’ENDURANCE AUJOURD’HUI !';
   const raceFacts=`🕘 **20:00 · LMU · EN ÉQUIPE**\n📅 ${day}`;
   const raceProgram='### 🏁 6 HEURES DE SPA\n📍 **Circuit** · Spa-Francorchamps\n🏎️ **Catégorie** · GT3\n🕘 **Départ** · 20:00\n⏱️ **Durée** · 6 heures\n\n### ⚙️ LES CONDITIONS\n🌦️ **Météo** · changeante\n⚖️ **Temps de conduite** · partagé';
-  const raceParticipation='### 👥 LES ÉQUIPAGES\n**7 pilotes · 3 équipages**\n🟢 **2 équipages cherchent des pilotes**\n\n🟢 **Apex Racing · 2/3**\nFerrari 296 GT3 · Ana, Max\n\n🟢 **Night Shift · 2/3**\nBMW M4 GT3 · Léa, Hugo\n\n🔒 **Endurance Crew · 3/3**\nPorsche 911 GT3 R · Sam, Noah, Alex';
+  const raceParticipation='### 👥 LES ÉQUIPAGES\n**7 pilotes · 3 équipages**\n\n🟢 **Apex Racing · Ouvert**\n🏎️ Ferrari 296 GT3 · 🕘 Départ **20:00**\n👤 **Ana · Max**\n\n🟢 **Night Shift · Ouvert**\n🏎️ BMW M4 GT3 · 🕘 Départ **20:00**\n👤 **Léa · Hugo**\n\n🔒 **Endurance Crew · Fermé**\n🏎️ Porsche 911 GT3 R · 🕘 Départ **20:00**\n👤 **Sam · Noah · Alex**';
   let components,color;
   if(scenario==='multi'){
     color=0x52d3d8;

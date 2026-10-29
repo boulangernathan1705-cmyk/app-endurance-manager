@@ -3,6 +3,8 @@ import {discordInteraction} from './discord-interactions.mjs';
 import {discordRequest} from './recap-discord.mjs';
 import {buildAnnouncementDemo} from './discord-weekly-format.mjs';
 import {eveningDemo} from '../shared/discord-evening-demo.mjs';
+import {tdzRallyCapture} from '../shared/discord-tdz-rally-capture.mjs';
+import {rallyComparison} from './discord-rally-preview.mjs';
 import {siteOf} from './discord-weekly.mjs';
 import {announceStream} from './discord-announce.mjs';
 import {gridfestPasswordStatus, sendGridfestPasswords} from './gridfest-discord.mjs';
@@ -1014,11 +1016,18 @@ async function api(request, env) {
     const testing=path.endsWith('announcement-test');
     if(testing)await rateLimit(request,env,'discord-announcement-test',3);
     const input=await body(request),saved=await botRecapSettings(env,community);
-    if(input.variant!=null&&input.variant!=='evening')fail(400,'Choisis une maquette connue.');
+    if(input.variant!=null&&!['evening','tdz-rally'].includes(input.variant))fail(400,'Choisis une maquette connue.');
     if(input.scenario!=null&&!['solo','endurance','multi'].includes(input.scenario))fail(400,'Choisis un exemple connu.');
     const layout=input.layout?layoutInput(input.layout):parseLayout(saved?.layout)||{};
     const site={...siteOf(env,community),announceFormat:layout.announceFormat,streamUrl:input.layout?layout.stream||'':announceStream(saved),streamName:layout.streamName||'',streams:[{time:'20:45'}]};
-    const payload=input.variant==='evening'?eveningDemo(site,Date.now(),input.scenario||'solo'):buildAnnouncementDemo(site);
+    let rallyPayload=null;
+    if(input.variant==='tdz-rally'){
+      const capture=tdzRallyCapture();
+      const previews=rallyComparison(capture,{...site,url:'https://tdz.endurance-manager.app',announceFormat:'embed',streamUrl:'',streams:[]},Date.now(),eventId=>({type:2,style:2,label:'Absent',custom_id:`preview:absent:${eventId}`,disabled:true}));
+      if(!testing)return json({previews,source:{kind:'capture',label:'Capture TDZ du 29 octobre · 13 inscrits / 16 · 8 absents',url:capture.sourceUrl}});
+      rallyPayload=previews.find(item=>item.view==='proposed').payload;
+    }
+    const payload=rallyPayload||(input.variant==='evening'?eveningDemo(site,Date.now(),input.scenario||'solo'):buildAnnouncementDemo(site));
     if(!testing){
       if(input.variant==='evening')return json({previews:[{name:'Nouvelle proposition · Programme du soir',payload}]});
       const timestamp=Date.now();
@@ -1032,7 +1041,7 @@ async function api(request, env) {
     if(matches.length!==1)fail(400,'Choisis un salon texte unique du serveur de cette communauté.');
     const channel=matches[0];
     if(channel.announceMissing?.some(right=>right!=='Mentionner @everyone'))fail(400,'Le bot doit pouvoir voir le salon, envoyer des messages et intégrer des liens.');
-    if(input.variant==='evening')payload.flags|=4096;
+    if(['evening','tdz-rally'].includes(input.variant))payload.flags=(payload.flags||0)|4096;
     const sent=await discordRequest(env,'POST',`/channels/${channel.id}/messages`,payload);
     return json({ok:true,url:`https://discord.com/channels/${community.discordGuildId}/${channel.id}/${sent.id}`});
   }

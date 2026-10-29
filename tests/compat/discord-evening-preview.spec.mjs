@@ -1,11 +1,12 @@
 import {test,expect} from '@playwright/test';
-import {eveningDemo} from '../../shared/discord-evening-demo.mjs';
+import {rallyComparison} from '../../server/discord-rally-preview.mjs';
+import {tdzRallyCapture} from '../../shared/discord-tdz-rally-capture.mjs';
 
 test('an administrator can send this exact concept to the selected channel only after clicking',async ({page})=>{
   const channel='1558551791824805949',guild='900000000000000001',message='900000000000000002',sent=[];
   await page.route('**/api/session',route=>route.fulfill({json:{user:{id:'333333333333333333'},permissions:['admin']}}));
   await page.route('**/api/community/recap/destinations',route=>route.fulfill({json:{destinations:[{id:channel,name:'test-annonces',type:0,announceMissing:[]}]}}));
-  await page.route('**/api/community/discord/announcement-preview',route=>route.fulfill({json:{previews:[{payload:eveningDemo({url:'https://site.example'})}]}}));
+  await page.route('**/api/community/discord/announcement-preview',route=>route.fulfill({json:{previews:rallyComparison(tdzRallyCapture(),{url:'https://tdz.endurance-manager.app'})}}));
   await page.route('**/api/community/discord/announcement-test',route=>{
     sent.push(route.request().postDataJSON());
     return route.fulfill({json:{ok:true,url:`https://discord.com/channels/${guild}/${channel}/${message}`}});
@@ -13,22 +14,25 @@ test('an administrator can send this exact concept to the selected channel only 
   await page.goto(`/discord-preview.html?channel=${channel}`);
   const button=page.getByRole('button',{name:'Envoyer la maquette sur Discord',exact:true});
   await expect(button).toBeEnabled();expect(sent).toHaveLength(0);
+  await expect(page.locator('.dc-preview-cards.is-comparison figure')).toHaveCount(2);
+  await expect(page.getByText('13 inscrits sur 16',{exact:true})).toBeVisible();
   await expect(page.locator('select[name=channel]')).toHaveValue(channel);
   await button.click();
   await expect(page.getByRole('link',{name:'Ouvrir le message dans Discord'})).toHaveAttribute('href',`https://discord.com/channels/${guild}/${channel}/${message}`);
-  expect(sent).toEqual([{channel,variant:'evening',scenario:'solo'}]);
+  expect(sent).toEqual([{channel,variant:'tdz-rally'}]);
 });
 
 test('the evening concept is readable on desktop and mobile without activating announcements',async ({page})=>{
   await page.goto('/discord-preview.html');
   await expect(page.getByRole('heading',{name:'Le programme du soir.'})).toBeVisible();
+  await page.locator('#evening-scenario').selectOption('solo');
   await expect(page.getByText('🎉 SOIRÉE BOUBOULES AUJOURD’HUI !',{exact:true})).toBeVisible();
   await expect(page.getByText('MANCHE 01 · VELO CITTÀ',{exact:true})).toBeVisible();
   await expect(page.getByText(/LA SOIRÉE AVEC LA PRALINE/)).toBeVisible();
   const cards=page.locator('.dc-container');await expect(cards).toHaveCount(1);
   await page.locator('#evening-scenario').selectOption('endurance');
   await expect(page.getByText('🏁 6 HEURES DE SPA',{exact:true})).toBeVisible();
-  await expect(page.getByText('Apex Racing · 2/3',{exact:true})).toBeVisible();
+  await expect(page.getByText('Apex Racing · Ouvert',{exact:true})).toBeVisible();
   await page.locator('#evening-scenario').selectOption('multi');
   await expect(page.getByText('20:00 · 6 HEURES DE SPA',{exact:true})).toBeVisible();
   await expect(page.getByText('21:00 · SOIRÉE BOUBOULES',{exact:true})).toBeVisible();

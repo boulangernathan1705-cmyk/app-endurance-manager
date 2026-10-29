@@ -103,6 +103,19 @@ test('the evening concept posts one real Discord sample only to an authorized co
   assert.equal(denied.status,400);assert.equal(sends(calls).length,0);
 });
 
+test('TDZ capture comparison is read-only; explicit test sends only the proposed layout',async t=>{
+  const {env,calls}=setup(t);
+  const preview=await as(env,'/api/community/discord/announcement-preview','POST',{variant:'tdz-rally'});
+  assert.equal(preview.status,200,JSON.stringify(preview.data));
+  assert.equal(preview.data.source.kind,'capture');assert.equal(preview.data.previews.length,2);
+  assert.equal(sends(calls).length,0);
+  const sent=await as(env,'/api/community/discord/announcement-test','POST',{channel:TEXT,variant:'tdz-rally'});
+  assert.equal(sent.status,200,JSON.stringify(sent.data));assert.equal(sends(calls).length,1);
+  const payload=sends(calls)[0].body;assert.equal(payload.flags,32768|4096);
+  assert.deepEqual(payload.allowed_mentions,{parse:[]});assert.match(JSON.stringify(payload),/BOUBOULES AC RALLY/);
+  assert.doesNotMatch(JSON.stringify(payload),/Ginetta|20:45/);
+});
+
 test('read-only previews preserve every departure and never send to Discord',async t=>{
   const {DB,env,calls}=setup(t);race(DB,'a','Même course','spa',[{id:'s1',startsAt:NOW+DAY},{id:'s2',startsAt:NOW+8*DAY}]);race(DB,'b','Même course','iracing-spa');
   const previews=await previewBotRecap(env,NOW,COMMUNITY,SETTINGS);
