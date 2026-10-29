@@ -20,7 +20,7 @@ test('daily proposals retain detailed sections in one message, with the banner l
     assert.equal(payload.embeds,undefined);assert.equal(payload.content,undefined);
     if(scenario==='endurance')assert.match(frame.components[0].accessory.media.url,/LeMansUltimateLogo/);
   }
-  for(const detail of ['MANCHE 01','MANCHE 02','Qualifications : 10 min','Carburant ×1','13 pilotes inscrits sur 20']){
+  for(const detail of ['MANCHE 01','MANCHE 02','Qualifications : 10 min','⛽ **Carburant** · ×1','13 pilotes inscrits sur 20']){
     assert.ok(rendered.solo.includes(detail));assert.ok(rendered.multi.includes(detail));
   }
   for(const detail of ['Apex Racing','Ferrari 296 GT3','Léa, Hugo','Porsche 911 GT3 R','Sam, Noah, Alex']){
