@@ -820,3 +820,17 @@ test('a stream is announced and listed, nobody enters it', async () => {
  assert.equal((await req(`/api/events/${event.id}/departures/${event.departures[0].id}/registrations`,'POST',{name:'Pilote',choices:[]},'pilot')).status,409);
  assert.equal((await req(`/api/events/${event.id}/absence`,'PUT',null,'pilot')).status,409);
 });
+
+test('stream identity, free content and logo persist; unauthorized members cannot edit', async()=>{
+ const {req,login}=harness();await login(ADMIN,'admin');await login(PILOT,'pilot');
+ const logo='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLbtAAAAABJRU5ErkJggg==';
+ const input={name:'La soirée libre',format:'solo',sim:'stream',details:{streamerName:'Mon pseudo',activity:'Assetto Corsa EVO',description:'Une soirée découverte.\nOn roule ensemble.',logoUrl:logo,isRace:false,streamTime:'19:00',streamUrl:'https://twitch.tv/pilote'},departures:[{date:'2090-10-15',time:'19:00'}]};
+ const created=await req('/api/events','POST',input,'admin');assert.equal(created.status,201,JSON.stringify(created.data));
+ const listed=async()=> (await req('/api/events','GET',null,'admin')).data.events.find(event=>event.id===created.data.id);
+ const saved=await listed();assert.deepEqual(saved.details,input.details);
+ assert.equal((await req(`/api/events/${saved.id}`,'PATCH',{...input,version:saved.version},'pilot')).status,403);
+ const update={...input,departures:saved.departures,version:saved.version,details:{...input.details,activity:'Discussion',logoUrl:'',description:'',isRace:false}};
+ assert.equal((await req(`/api/events/${saved.id}`,'PATCH',update,'admin')).status,200);
+ const edited=await listed();assert.equal(edited.details.logoUrl,undefined);assert.equal(edited.details.description,undefined);assert.equal(edited.details.activity,'Discussion');
+ assert.equal((await req(`/api/events/${saved.id}`,'PATCH',update,'admin')).status,409,'stale versions stay protected');
+});

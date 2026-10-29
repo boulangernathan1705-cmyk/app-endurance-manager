@@ -211,7 +211,7 @@ function soloHeaderTime(event,next){
   return `<span class="race-header-time">Départ · ${esc(timeLabel(departure.time))}</span>`;
 }
 function eventTypePanel(event){
-  if(isStream(event))return `<span class="event-type-panel has-access-logo">${streamPanel()}</span>`;
+  if(isStream(event))return `<span class="event-type-panel has-access-logo">${streamPanel(event)}</span>`;
   if(isGrindfest(event))return `<span class="event-type-panel has-gridfest-logo"><img class="gridfest-header-logo" src="/images/event-access/gridfest-horizontal.png" alt="Gridfest" width="1280" height="720"></span>`;
   const logo=eventAccessLogo(event,{header:true});
   if(logo)return `<span class="event-type-panel has-access-logo">${logo}</span>`;

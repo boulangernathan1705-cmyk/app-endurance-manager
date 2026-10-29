@@ -17,3 +17,43 @@ html[data-game] #app .race-header .event-type-panel .stream-panel svg {width:110
 .home-create-event {display:flex;flex-wrap:wrap;gap:8px;align-items:center}
 @media (max-width:700px) {.home-create-event > * {flex:1 1 100%}}
 .stream-race-toggle:has(input:checked) {border-color:#9146ff;background:rgba(145,70,255,.16)}
+
+/* Streams reuse the site's native forms and event cards; violet identifies this event type. */
+.stream-panel .stream-logo {display:block;width:100%;height:100%;max-height:150px;object-fit:contain}
+.stream-initials {display:grid;place-items:center;width:80px;height:80px;border:1px solid #a970ff;border-radius:10px;background:rgba(145,70,255,.12);color:#d6b7ff;font-size:28px;font-weight:900}
+.stream-description {margin:0;white-space:pre-wrap;overflow-wrap:anywhere;font-size:14px;line-height:1.5;color:var(--muted,#91a4a7)}
+.stream-activity {max-width:100%;white-space:normal;overflow-wrap:anywhere}
+.stream-event-card .stream-card-title {display:block;min-height:0;padding:0;border:0;border-radius:0;background:none;box-shadow:none;text-align:left;white-space:normal;overflow-wrap:anywhere}
+.stream-event-card .stream-card-title:hover {text-decoration:underline;background:none}
+.stream-card-times {font-size:14px;font-weight:700;color:#c7d0d4}
+.stream-card-actions {display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;margin-top:auto;padding-top:10px;border-top:1px solid rgba(255,255,255,.08)}
+.stream-card-actions small {font-size:12px;color:var(--muted,#91a4a7)}
+.stream-card-actions .stream-button {font-size:12px;text-decoration:none}
+.stream-button,.stream-event-form .stream-button {background:linear-gradient(180deg,#b991f6,#9146ff);border-color:rgba(185,145,246,.55);color:#130920;box-shadow:inset 0 1px rgba(255,255,255,.26),0 5px 16px rgba(145,70,255,.12)}
+.form-sheet:has(.stream-event-form) {width:min(1320px,calc(100vw - 32px));max-width:1320px}
+.stream-form-layout {display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:24px;align-items:start}
+.stream-form-fields {display:grid;gap:18px;min-width:0}
+.stream-event-form .creation-card-heading {align-items:center;margin:0 0 6px}
+.stream-event-form .creation-card-heading h2 {margin:0}
+.stream-event-form .creation-step {border-color:#a970ff;color:#b991f6}
+.stream-event-form textarea {display:block;width:100%;min-height:112px;resize:vertical;padding:12px;border:1px solid var(--border);border-radius:8px;color:var(--text);font:inherit;line-height:1.5}
+.stream-event-form .form-label>input,.stream-event-form .form-label>textarea {margin-top:8px}
+.stream-event-form .form-label>small {font-size:12px;font-weight:400;color:var(--muted)}
+.stream-event-form .form-label>small:last-child {display:block;margin-top:6px;text-transform:none}
+.stream-form-preview {min-width:0;position:sticky;top:0}
+.stream-form-preview>h3 {display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 0 16px;font-size:17px}
+.stream-form-preview>h3>small {font-size:11px;font-weight:400;color:var(--muted)}
+.stream-logo-upload {display:flex;gap:14px;align-items:center;min-width:0}
+.stream-logo-upload .creation-help {font-size:13px;margin:4px 0 10px}
+.stream-logo-upload small {display:block;font-size:11px;color:var(--muted);margin-top:8px}
+.stream-logo-upload>div:last-child {min-width:0}
+.stream-logo-upload .link-button {margin-left:6px}
+.stream-logo-preview {display:grid;place-items:center;flex:0 0 88px;width:88px;height:88px;border:1px dashed #a970ff;border-radius:8px;background:var(--panel2)}
+.stream-logo-preview .stream-panel {width:78px;height:78px}
+.stream-logo-preview .stream-initials {width:70px;height:70px}
+.stream-logo-pick {position:relative;overflow:hidden;display:inline-flex;cursor:pointer;font-size:12px}
+.stream-logo-pick input[type=file] {position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;margin:0}
+.stream-logo-pick:focus-within {outline:2px solid #b991f6;outline-offset:3px}
+.stream-logo-status {margin:0;font-size:12px;color:var(--muted)}
+@media(max-width:1100px) {.stream-form-layout {grid-template-columns:minmax(0,1fr)}.stream-form-preview {position:static}}
+@media(max-width:700px) {.stream-logo-preview {flex-basis:64px;width:64px;height:64px}.stream-logo-preview .stream-panel {width:56px;height:56px}.stream-logo-preview .stream-initials {width:52px;height:52px;font-size:22px}.stream-event-form .creation-actions>.stream-button {width:100%}}

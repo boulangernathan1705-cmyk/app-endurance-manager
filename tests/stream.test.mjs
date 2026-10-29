@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {validateEvent} from '../server/core.mjs';
 import {buildCalendarPayload, buildAnnounceStream, buildAnnounceIntro} from '../server/discord-weekly-format.mjs';
-import {streamUrl} from '../shared/stream.mjs';
+import {streamUrl,streamDetails,isStreamLogo,STREAM_LOGO_MAX_LENGTH} from '../shared/stream.mjs';
 
 const stream = details => ({name:'LES 6H DE SPA', format:'solo', sim:'stream', details, departures:[{date:'2090-10-15', time:'00:00'}]});
 
@@ -46,4 +46,44 @@ test('the week’s calendar and the morning announcement show the stream, its cr
   assert.match(card.embeds[0].description, /Ce soir, c’est stream !/);
   assert.deepEqual(card.components, []);
   assert.match(buildAnnounceIntro({events:0, races:1, lives:1, streams:[]}).embeds[0].description, /1 endurance\*\* et \*\*1 stream/);
+});
+
+test('free activity, description and streamer identity survive validation without a simulator restriction', () => {
+  const details={isRace:true,activity:'Automobilista 2',streamerName:'La Praline',description:'Préparation de la course.\nPuis relais en équipe.',raceTime:'20:00'};
+  const result=validateEvent(stream(details));
+  assert.equal(result.departures[0].time,'20:00');
+  assert.deepEqual(result.details,details);
+  assert.equal(streamDetails({details:result.details}).raceSim,'');
+  const discussion=validateEvent(stream({...details,isRace:false,streamTime:'19:00',activity:'Discussion avec le chat'}));
+  assert.equal(discussion.details.raceTime,undefined);
+  assert.equal(discussion.details.activity,'Discussion avec le chat');
+  assert.equal(streamDetails({details:{raceSim:'lmu',raceTime:'21:00'}}).activity,'Le Mans Ultimate');
+  assert.equal(streamDetails({details:{raceSim:'iracing'}}).isRace,true);
+  assert.equal(validateEvent(stream({...details,activity:'Le Mans Ultimate'})).details.raceSim,'lmu');
+});
+
+test('new stream fields are bounded and logos must be small inline raster images', () => {
+  const base={streamTime:'19:00',isRace:false};
+  for(const [key,max] of [['activity',100],['streamerName',60],['description',1200]]){
+    assert.throws(()=>validateEvent(stream({...base,[key]:'x'.repeat(max+1)})),/caractères/);
+    assert.throws(()=>validateEvent(stream({...base,[key]:{text:'bad'}})),/caractères/);
+  }
+  assert.throws(()=>validateEvent(stream({...base,isRace:'false'})),/course/);
+  const png='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLbtAAAAABJRU5ErkJggg==';
+  assert.equal(validateEvent(stream({...base,logoUrl:png})).details.logoUrl,png);
+  for(const logoUrl of ['data:image/svg+xml;base64,PHN2Zz4=', 'https://example.com/logo.png','data:image/png;base64,PHNjcmlwdD4=',png+'x'.repeat(12000),123]){
+    assert.throws(()=>validateEvent(stream({...base,logoUrl})),/Logo invalide/);
+    assert.equal(isStreamLogo(logoUrl),false);
+  }
+  assert.equal(streamDetails({details:{...base,logoUrl:'javascript:bad',streamUrl:'javascript:bad'}}).logoUrl,'');
+  assert.equal(streamDetails({details:{streamUrl:'javascript:bad'}}).streamUrl,'');
+  // Even maximum-length Unicode fields plus the largest logo fit the existing JSON request limit.
+  const largest={...base,activity:'😀'.repeat(50),streamerName:'😀'.repeat(30),description:'😀'.repeat(600),logoUrl:'x'.repeat(STREAM_LOGO_MAX_LENGTH)};
+  assert.ok(new TextEncoder().encode(JSON.stringify(stream(largest))).length<24000);
+});
+
+test('Discord shows a freely chosen activity instead of an undefined simulator label',()=>{
+  const event={id:'free',name:'Soirée découverte',startsAt:Date.UTC(2090,9,15,17),stream:{isRace:false,activity:'Euro Truck Simulator 2',streamTime:'19:00'}};
+  assert.match(buildAnnounceStream(event).embeds[0].description,/🎮 Euro Truck Simulator 2/);
+  assert.doesNotMatch(buildAnnounceStream(event).embeds[0].description,/undefined/);
 });
