@@ -89,12 +89,12 @@ test('daily announcement browser preview supports V2 and never publishes or chan
 
 test('the evening concept posts one real Discord sample only to an authorized community channel, without mentions or active actions',async t=>{
   const {env,calls}=setup(t);
-  const result=await as(env,'/api/community/discord/announcement-test','POST',{channel:TEXT,variant:'evening'});
+  const result=await as(env,'/api/community/discord/announcement-test','POST',{channel:TEXT,variant:'evening',scenario:'endurance'});
   assert.equal(result.status,200,JSON.stringify(result.data));
   const posts=sends(calls);assert.equal(posts.length,1);
   assert.equal(posts[0].path,`/channels/${TEXT}/messages`);
   const payload=posts[0].body;assert.equal(payload.flags,32768|4096);
-  assert.deepEqual(payload.allowed_mentions,{parse:[]});assert.equal(payload.components.at(-1).type,12);
+  assert.deepEqual(payload.allowed_mentions,{parse:[]});assert.equal(payload.components.length,1);assert.equal(payload.components[0].components.at(-1).type,12);
   assert.match(JSON.stringify(payload),/LeMansUltimateLogo/);assert.equal(payload.content,undefined);
   const walk=items=>items.flatMap(item=>[item,...walk(item.components||[])]);
   assert.ok(walk(payload.components).filter(item=>item.type===2).every(item=>item.disabled));

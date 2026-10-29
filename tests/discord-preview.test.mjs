@@ -4,21 +4,28 @@ import {discordPayloadMarkup,discordPreviewText,discordExportPayload,discordPrev
 import {buildAnnouncementDemo} from '../server/discord-weekly-format.mjs';
 import {eveningDemo} from '../shared/discord-evening-demo.mjs';
 
-test('the evening proposal has a banner, two distinct races and a live card, within Discord limits and without active actions',()=>{
-  const payload=eveningDemo({url:'https://site.example'},Date.parse('2026-10-29T12:00:00Z'));
+test('daily proposals retain detailed sections in one message, with the banner last and disabled sample actions',()=>{
   const walk=items=>items.flatMap(item=>[item,...walk(item.components||[]),...(item.accessory?walk([item.accessory]):[])]);
-  const components=walk(payload.components);
-  assert.equal(payload.flags,32768);assert.deepEqual(payload.allowed_mentions,{parse:[]});
-  assert.equal(payload.components.at(-1).type,12);assert.equal(payload.components.filter(item=>item.type===17).length,3);
-  const race=payload.components.find(item=>item.type===17);
-  assert.match(race.components[0].accessory.media.url,/LeMansUltimateLogo\.png$/);
-  assert.doesNotMatch(race.components[0].accessory.media.url,/endurance-manager/);
-  assert.ok(components.length<=40);assert.ok(components.filter(item=>item.type===10).reduce((n,item)=>n+item.content.length,0)<=4000);
-  const buttons=components.filter(item=>item.type===2);assert.equal(buttons.length,5);assert.ok(buttons.every(item=>item.disabled));
-  const markup=discordPayloadMarkup(payload);
-  assert.match(markup,/6 HEURES DE SPA/);assert.match(markup,/7 places disponibles/);assert.match(markup,/LA SOIRÉE AVEC LA PRALINE/);
-  assert.match(markup,/dc-heading-1/);assert.match(markup,/dc-heading-2/);
-  assert.equal(payload.embeds,undefined);assert.equal(payload.content,undefined);
+  const rendered={};
+  for(const scenario of ['solo','endurance','multi']){
+    const payload=eveningDemo({url:'https://site.example'},Date.parse('2026-10-29T12:00:00Z'),scenario);
+    const components=walk(payload.components),frame=payload.components[0];
+    assert.equal(payload.flags,32768);assert.deepEqual(payload.allowed_mentions,{parse:[]});
+    assert.equal(payload.components.length,1);assert.equal(frame.type,17);assert.ok(frame.components.length<=10);
+    assert.equal(frame.components.at(-1).type,12);assert.equal(components.filter(item=>item.type===14).length,3);
+    assert.ok(components.length<=40);assert.ok(components.filter(item=>item.type===10).reduce((n,item)=>n+item.content.length,0)<=4000);
+    assert.ok(components.filter(item=>item.type===2).every(item=>item.disabled));
+    rendered[scenario]=components.filter(item=>item.type===10).map(item=>item.content).join('\n');
+    const markup=discordPayloadMarkup(payload);assert.match(markup,/LA SOIRÉE AVEC LA PRALINE/);assert.match(markup,/dc-heading-3/);
+    assert.equal(payload.embeds,undefined);assert.equal(payload.content,undefined);
+    if(scenario==='endurance')assert.match(frame.components[0].accessory.media.url,/LeMansUltimateLogo/);
+  }
+  for(const detail of ['MANCHE 01','MANCHE 02','Qualifications : 10 min','Carburant ×1','13 pilotes inscrits sur 20']){
+    assert.ok(rendered.solo.includes(detail));assert.ok(rendered.multi.includes(detail));
+  }
+  for(const detail of ['Apex Racing','Ferrari 296 GT3','Léa, Hugo','Porsche 911 GT3 R','Sam, Noah, Alex']){
+    assert.ok(rendered.endurance.includes(detail));assert.ok(rendered.multi.includes(detail));
+  }
 });
 
 test('the comparison shows both named formats together with separate exports',()=>{

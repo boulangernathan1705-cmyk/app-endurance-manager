@@ -2,14 +2,25 @@ import {eveningDemo} from '../shared/discord-evening-demo.mjs';
 import {discordPreviewsMarkup,discordExportPayload} from './discord-preview.mjs';
 
 const root=document.getElementById('evening-preview');
+const scenario=document.getElementById('evening-scenario');
+let previewAuthorized=false,previewGeneration=0;
 let requestedChannel=new URLSearchParams(location.search).get('channel')||'';
 try{
   if(/^\d{15,22}$/.test(requestedChannel))sessionStorage.setItem('em-preview-channel',requestedChannel);
   else if(!requestedChannel)requestedChannel=sessionStorage.getItem('em-preview-channel')||'';
 }catch{/* The channel can still be selected when browser storage is disabled. */}
-let payload=eveningDemo({url:location.origin});
+let payload=eveningDemo({url:location.origin},Date.now(),scenario.value);
 const render=()=>{root.innerHTML=discordPreviewsMarkup([{name:'Nouvelle proposition · Programme du soir',payload}]);};
 render();
+async function refreshPreview(){
+  const generation=++previewGeneration,selected=scenario.value;
+  payload=eveningDemo({url:location.origin},Date.now(),selected);render();
+  if(previewAuthorized){
+    const result=await api('/api/community/discord/announcement-preview',{variant:'evening',scenario:selected});
+    if(generation===previewGeneration){payload=result.previews[0].payload;render();}
+  }
+}
+scenario.addEventListener('change',()=>refreshPreview().catch(error=>{document.querySelector('[data-send-status]').textContent=error.message;}));
 root.addEventListener('click',event=>{
   const size=event.target.closest('[data-discord-preview-size]');
   if(size){
@@ -37,8 +48,8 @@ async function prepareSender(){
       login.href='/api/auth/discord?return='+encodeURIComponent(location.pathname);panel.append(login);return;
     }
     if(!session.permissions?.includes('admin')){status.textContent='L’envoi est réservé aux administrateurs de cette communauté.';return;}
-    const [destinations,preview]=await Promise.all([api('/api/community/recap/destinations'),api('/api/community/discord/announcement-preview',{variant:'evening'})]);
-    payload=preview.previews[0].payload;render();
+    previewAuthorized=true;
+    const [destinations]=await Promise.all([api('/api/community/recap/destinations'),refreshPreview()]);
     const channels=(destinations.destinations||[]).filter(channel=>channel.type===0);
     const requested=requestedChannel;
     const form=document.createElement('form'),label=document.createElement('label'),select=document.createElement('select'),button=document.createElement('button');
@@ -55,15 +66,15 @@ async function prepareSender(){
     status.textContent=requested&&!select.value?'Le salon demandé est indisponible dans cette communauté. Choisis un salon où le bot peut publier.':'Un exemple avec des données fictives sera envoyé, sans notification ni inscription.';
     form.addEventListener('submit',async event=>{
       event.preventDefault();if(!select.value||button.disabled)return;
-      button.disabled=true;status.textContent='Envoi de la maquette…';
+      button.disabled=true;scenario.disabled=true;status.textContent='Envoi de la maquette…';
       try{
-        const sent=await api('/api/community/discord/announcement-test',{channel:select.value,variant:'evening'});
+        const sent=await api('/api/community/discord/announcement-test',{channel:select.value,variant:'evening',scenario:scenario.value});
         status.textContent='Maquette envoyée. ';
         if(/^https:\/\/discord\.com\/channels\/\d+\/\d+\/\d+$/.test(sent.url)){
           const link=document.createElement('a');link.href=sent.url;link.target='_blank';link.rel='noopener';link.textContent='Ouvrir le message dans Discord';status.append(link);
         }
       }catch(error){status.textContent=error.message;}
-      finally{button.disabled=!select.value;}
+      finally{button.disabled=!select.value;scenario.disabled=false;}
     });
   }catch(error){status.textContent=error.message||'Impossible de charger les salons de test.';}
 }
