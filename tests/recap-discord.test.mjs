@@ -87,6 +87,22 @@ test('daily announcement browser preview supports V2 and never publishes or chan
   assert.deepEqual(DB.db.prepare('SELECT * FROM community_recap_settings').all(),before);
 });
 
+test('the evening concept posts one real Discord sample only to an authorized community channel, without mentions or active actions',async t=>{
+  const {env,calls}=setup(t);
+  const result=await as(env,'/api/community/discord/announcement-test','POST',{channel:TEXT,variant:'evening'});
+  assert.equal(result.status,200,JSON.stringify(result.data));
+  const posts=sends(calls);assert.equal(posts.length,1);
+  assert.equal(posts[0].path,`/channels/${TEXT}/messages`);
+  const payload=posts[0].body;assert.equal(payload.flags,32768|4096);
+  assert.deepEqual(payload.allowed_mentions,{parse:[]});assert.equal(payload.components.at(-1).type,12);
+  assert.match(JSON.stringify(payload),/LeMansUltimateLogo/);assert.equal(payload.content,undefined);
+  const walk=items=>items.flatMap(item=>[item,...walk(item.components||[])]);
+  assert.ok(walk(payload.components).filter(item=>item.type===2).every(item=>item.disabled));
+  calls.length=0;
+  const denied=await as(env,'/api/community/discord/announcement-test','POST',{channel:'999999999999999999',variant:'evening'});
+  assert.equal(denied.status,400);assert.equal(sends(calls).length,0);
+});
+
 test('read-only previews preserve every departure and never send to Discord',async t=>{
   const {DB,env,calls}=setup(t);race(DB,'a','Même course','spa',[{id:'s1',startsAt:NOW+DAY},{id:'s2',startsAt:NOW+8*DAY}]);race(DB,'b','Même course','iracing-spa');
   const previews=await previewBotRecap(env,NOW,COMMUNITY,SETTINGS);

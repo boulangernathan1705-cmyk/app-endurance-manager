@@ -9,7 +9,10 @@ test('the evening proposal has a banner, two distinct races and a live card, wit
   const walk=items=>items.flatMap(item=>[item,...walk(item.components||[]),...(item.accessory?walk([item.accessory]):[])]);
   const components=walk(payload.components);
   assert.equal(payload.flags,32768);assert.deepEqual(payload.allowed_mentions,{parse:[]});
-  assert.equal(payload.components[0].type,12);assert.equal(payload.components.filter(item=>item.type===17).length,3);
+  assert.equal(payload.components.at(-1).type,12);assert.equal(payload.components.filter(item=>item.type===17).length,3);
+  const race=payload.components.find(item=>item.type===17);
+  assert.match(race.components[0].accessory.media.url,/LeMansUltimateLogo\.png$/);
+  assert.doesNotMatch(race.components[0].accessory.media.url,/endurance-manager/);
   assert.ok(components.length<=40);assert.ok(components.filter(item=>item.type===10).reduce((n,item)=>n+item.content.length,0)<=4000);
   const buttons=components.filter(item=>item.type===2);assert.equal(buttons.length,5);assert.ok(buttons.every(item=>item.disabled));
   const markup=discordPayloadMarkup(payload);
