@@ -78,8 +78,11 @@ test('daily announcement browser preview supports V2 and never publishes or chan
   const {env,calls,DB}=setup(t);
   const before=DB.db.prepare('SELECT * FROM community_recap_settings').all();
   const result=await as(env,'/api/community/discord/announcement-preview','POST',{layout:{mode:'events',sims:'all',under:'top',announceFormat:'v2'}});
-  assert.equal(result.status,200);assert.equal(result.data.previews[0].payload.flags,32768);
-  assert.deepEqual(result.data.previews[0].payload.allowed_mentions,{parse:[]});
+  assert.equal(result.status,200);assert.equal(result.data.previews.length,2);
+  const [classic,v2]=result.data.previews;
+  assert.equal(classic.format,'embed');assert.ok(classic.payload.embeds.length);
+  assert.equal(v2.format,'v2');assert.equal(v2.payload.flags,32768);
+  assert.deepEqual(classic.payload.allowed_mentions,{parse:[]});assert.deepEqual(v2.payload.allowed_mentions,{parse:[]});
   assert.equal(written(calls).length,0);
   assert.deepEqual(DB.db.prepare('SELECT * FROM community_recap_settings').all(),before);
 });

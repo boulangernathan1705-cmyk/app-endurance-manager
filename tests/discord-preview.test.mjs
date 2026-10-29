@@ -1,7 +1,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {discordPayloadMarkup,discordPreviewText,discordExportPayload} from '../front/discord-preview.mjs';
+import {discordPayloadMarkup,discordPreviewText,discordExportPayload,discordPreviewsMarkup} from '../front/discord-preview.mjs';
 import {buildAnnouncementDemo} from '../server/discord-weekly-format.mjs';
+
+test('the comparison shows both named formats together with separate exports',()=>{
+  const previews=['embed','v2'].map(format=>({format,name:format==='embed'?'Embed classique':'Carte avec sections · Components V2',payload:buildAnnouncementDemo({announceFormat:format})}));
+  const html=discordPreviewsMarkup(previews);
+  assert.match(html,/is-comparison/);assert.match(html,/Embed classique/);assert.match(html,/Components V2/);
+  assert.match(html,/data-discord-export="0"/);assert.match(html,/data-discord-export="1"/);
+  assert.equal((html.match(/<figure/g)||[]).length,2);
+  assert.match(html,/dc-embed/);assert.match(html,/dc-container/);
+});
 
 test('preview renders both formats and exports the payload without credentials or notifications',()=>{
   for(const announceFormat of ['embed','v2']){

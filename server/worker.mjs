@@ -1016,7 +1016,13 @@ async function api(request, env) {
     const layout=input.layout?layoutInput(input.layout):parseLayout(saved?.layout)||{};
     const site={...siteOf(env,community),announceFormat:layout.announceFormat,streamUrl:input.layout?layout.stream||'':announceStream(saved),streamName:layout.streamName||'',streams:[{time:'20:45'}]};
     const payload=buildAnnouncementDemo(site);
-    if(!testing)return json({previews:[{name:'Annonce du jour · exemple',payload}]});
+    if(!testing){
+      const timestamp=Date.now();
+      return json({previews:[
+        {name:'Embed classique',format:'embed',payload:buildAnnouncementDemo({...site,announceFormat:'embed'},timestamp)},
+        {name:'Carte avec sections · Components V2',format:'v2',payload:buildAnnouncementDemo({...site,announceFormat:'v2'},timestamp)}
+      ]});
+    }
     const destinations=await recapDestinations(env,community);
     const matches=destinations.filter(channel=>channel.type===0&&(channel.id===input.channel||channel.name===input.channel));
     if(matches.length!==1)fail(400,'Choisis un salon texte unique du serveur de cette communauté.');

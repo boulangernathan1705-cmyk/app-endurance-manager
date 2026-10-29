@@ -1556,6 +1556,11 @@ html[data-game] #app .ux-unassigned-grid > .pilot-row > .edit-button { align-sel
 .recap-preview-embed em { margin-top: 4px; color: #949ba4; font-size: 11px; font-style: normal; }
 .recap-preview figcaption,.dc-preview-toolbar,.dc-preview-toolbar>div{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
 .dc-preview-toolbar button[aria-pressed=true]{border-color:#5865f2;background:#414a93;color:#fff}
+.dc-preview-cards{display:grid;gap:16px;min-width:0;align-items:start}
+.dc-preview-cards.is-comparison{grid-template-columns:repeat(2,minmax(0,1fr))}
+.recap-live-preview.is-mobile .dc-preview-cards{grid-template-columns:1fr}
+.dc-preview-cards.is-comparison .dc-message-body{margin-left:0}
+@media(max-width:760px){.dc-preview-cards.is-comparison{grid-template-columns:1fr}}
 .recap-live-preview.is-mobile .recap-preview{max-width:390px;justify-self:center}
 .dc-message{font:14px/1.45 system-ui,sans-serif;color:#dbdee1;text-align:left;overflow-wrap:anywhere;min-width:0}
 .dc-bot{display:flex;align-items:center;gap:8px;margin-bottom:8px;color:#f2f3f5}
