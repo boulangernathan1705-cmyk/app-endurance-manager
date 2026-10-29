@@ -24,6 +24,9 @@ body.discord-concept-page{margin:0;background:#101718;color:#e7ecea;font:15px/1.
 .discord-concept-page .recap-preview figcaption{margin-bottom:16px}
 .discord-concept-page .dc-message-body{gap:18px}
 .discord-concept-page .concept-note{font-size:13px;color:#a2b4ac;margin-top:24px}
+.discord-concept-page .concept-send{padding:20px;background:#1b2822;border:1px solid #3a5144;border-radius:12px;margin:24px 0}
+.discord-concept-page .concept-send form{display:flex;align-items:end;gap:12px;flex-wrap:wrap}.discord-concept-page .concept-send label{display:grid;gap:6px;flex:1 1 230px}
+.discord-concept-page .concept-send select{width:100%;padding:10px;background:#101718;color:#e7ecea;border:1px solid #62756b;border-radius:6px}.discord-concept-page .concept-send h2{font-size:19px;margin:0 0 8px}
 @media(max-width:600px){.discord-concept-page main{padding:20px 12px 40px}.discord-concept-page header{align-items:flex-start}.discord-concept-page .concept-brand{font-size:12px}.discord-concept-page .recap-preview{padding:12px}}
 </style>
 <script type="module" src="/front/discord-evening-preview.mjs"></script>
@@ -33,9 +36,10 @@ body.discord-concept-page{margin:0;background:#101718;color:#e7ecea;font:15px/1.
 <header><div class="concept-brand"><img src="/images/endurance-manager-logo.webp" alt="">ENDURANCE MANAGER</div><a href="/members.html">Retour à l’administration</a></header>
 <span class="concept-label">Proposition visuelle · données fictives</span>
 <h1>Le programme du soir.</h1>
-<p class="concept-intro">Une bannière d’ouverture, une carte par course, les disponibilités en évidence et un espace dédié au live. Voici la nouvelle composition proposée pour ton annonce Discord.</p>
+<p class="concept-intro">Une carte par course, le logo de la simulation, les disponibilités en évidence, un espace dédié au live et la bannière en bas. Voici la nouvelle composition proposée pour ton annonce Discord.</p>
+<section id="evening-send" class="concept-send" aria-label="Envoyer un aperçu sur Discord"><h2>Voir le résultat dans ton Discord</h2><p data-send-status role="status">Vérification de ta connexion…</p></section>
 <section id="evening-preview" class="recap-live-preview" aria-label="Maquette de l’annonce Discord"></section>
-<p class="concept-note">Cette page ne change aucun réglage et n’envoie aucun message sur Discord. Les boutons des cartes sont désactivés. Les images utilisent les visuels existants ; le rendu final peut varier dans Discord.</p>
+<p class="concept-note">Afficher cette page ne change aucun réglage et ne publie rien. Seul le bouton « Envoyer la maquette sur Discord » envoie un exemple dans le salon choisi, sans mentionner personne. Les boutons des cartes restent désactivés.</p>
 </main>
 </body>
 </html>

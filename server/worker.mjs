@@ -2,6 +2,7 @@ import {grindfestAvailable, grindfestEnabled, isGrindfest, streamersOf, assignSt
 import {discordInteraction} from './discord-interactions.mjs';
 import {discordRequest} from './recap-discord.mjs';
 import {buildAnnouncementDemo} from './discord-weekly-format.mjs';
+import {eveningDemo} from '../shared/discord-evening-demo.mjs';
 import {siteOf} from './discord-weekly.mjs';
 import {announceStream} from './discord-announce.mjs';
 import {gridfestPasswordStatus, sendGridfestPasswords} from './gridfest-discord.mjs';
@@ -1013,10 +1014,12 @@ async function api(request, env) {
     const testing=path.endsWith('announcement-test');
     if(testing)await rateLimit(request,env,'discord-announcement-test',3);
     const input=await body(request),saved=await botRecapSettings(env,community);
+    if(input.variant!=null&&input.variant!=='evening')fail(400,'Choisis une maquette connue.');
     const layout=input.layout?layoutInput(input.layout):parseLayout(saved?.layout)||{};
     const site={...siteOf(env,community),announceFormat:layout.announceFormat,streamUrl:input.layout?layout.stream||'':announceStream(saved),streamName:layout.streamName||'',streams:[{time:'20:45'}]};
-    const payload=buildAnnouncementDemo(site);
+    const payload=input.variant==='evening'?eveningDemo(site):buildAnnouncementDemo(site);
     if(!testing){
+      if(input.variant==='evening')return json({previews:[{name:'Nouvelle proposition · Programme du soir',payload}]});
       const timestamp=Date.now();
       return json({previews:[
         {name:'Embed classique',format:'embed',payload:buildAnnouncementDemo({...site,announceFormat:'embed'},timestamp)},
@@ -1028,6 +1031,7 @@ async function api(request, env) {
     if(matches.length!==1)fail(400,'Choisis un salon texte unique du serveur de cette communauté.');
     const channel=matches[0];
     if(channel.announceMissing?.some(right=>right!=='Mentionner @everyone'))fail(400,'Le bot doit pouvoir voir le salon, envoyer des messages et intégrer des liens.');
+    if(input.variant==='evening')payload.flags|=4096;
     const sent=await discordRequest(env,'POST',`/channels/${channel.id}/messages`,payload);
     return json({ok:true,url:`https://discord.com/channels/${community.discordGuildId}/${channel.id}/${sent.id}`});
   }
