@@ -8,6 +8,7 @@
   "account_id": "880b4cbe0740cbc099a25c17773c0ec7",
   "keep_vars": true,
   "minify": true,
+  "observability": {"enabled": true, "head_sampling_rate": 0.1},
   "build": { "command": "npm run build:workers" },
   "triggers": {
     "crons": ["*/15 * * * *", "*/2 * * * *", "*/5 * * * *"]
@@ -40,6 +41,7 @@
   // Secrets set in the dashboard (never here): DISCORD_CLIENT_ID, DISCORD_CLIENT_SECRET, DISCORD_BOT_TOKEN,
   // ADMIN_DISCORD_IDS (the platform managers).
   "vars": {
+    "REQUEST_METRICS": "on",
     "APP_ORIGIN": "https://dev.endurance-manager.app",
     "SITE_ENV": "development",
     // Used for real by a team: no « Version de test » banner (still out of search engines, own cookies).

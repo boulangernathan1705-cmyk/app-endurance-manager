@@ -50,9 +50,12 @@ function siteOrigin(request, env) {
   return communityLabel(url, env) ? url.origin : origin(env);
 }
 function json(data, status = 200, cookies = []) {
+  return jsonText(JSON.stringify(data), status, cookies);
+}
+function jsonText(serialized, status = 200, cookies = []) {
   const headers = new Headers({'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer'});
   for (const c of cookies) headers.append('Set-Cookie', c);
-  return new Response(JSON.stringify(data), {status, headers});
+  return new Response(serialized, {status, headers});
 }
 function redirect(location, cookies = []) {
   const response = json({}, 302, cookies); response.headers.set('Location', location); return response;
@@ -493,7 +496,7 @@ function validateRegistration(input, event) {
 
 export {
   LEGACY_CAR_ALIASES, COOKIE_SESSION, COOKIE_STATE, COOKIE_RETURN, DAY, HttpError, fail, now, id, token, hash, cookie,
-  SESSION_DAYS, setCookie, cookieNames, siteOrigin, communityLabel, baseDomain, json, redirect, origin, requireDiscord, administrators, identity, owned, personal,
+  SESSION_DAYS, setCookie, cookieNames, siteOrigin, communityLabel, baseDomain, json, jsonText, redirect, origin, requireDiscord, administrators, identity, owned, personal,
   registrationSelect, registrationParticipant, NAME_IN_COMMUNITY, communityName, body, rateLimit, cleanup, returnPath, text, parisTimestamp, validateEvent, validateRegistration, ANY_CATEGORY
 };
 
