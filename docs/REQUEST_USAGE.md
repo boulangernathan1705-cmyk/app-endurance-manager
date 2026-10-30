@@ -25,8 +25,9 @@ la reconstruction du graphe événements/inscriptions/équipages.
 Les ETag sont liés à l'identité, aux permissions, à la communauté, à l'origine, au simulateur,
 au filtre et à l'environnement. Ils incluent les passages en archives, la marge d'un jour des
 courses à venir et l'expiration de l'association stream/équipage. Ces recherches utilisent des index,
-sans relire l'ensemble des courses archivées. Une restauration/remise à zéro de la base change
-la génération du compteur. Toute future table ou règle temporelle influençant la liste doit être
+sans relire l'ensemble des courses archivées. Une nouvelle table de révision reçoit une génération aléatoire. Après une restauration de sauvegarde,
+renouveler cette génération avec `UPDATE event_list_revision SET generation=lower(hex(randomblob(16))) WHERE id=1;`
+pour éviter de réutiliser un ancien ETag après un retour en arrière du compteur. Toute future table ou règle temporelle influençant la liste doit être
 ajoutée à l'invalidation ; une modification du format de réponse doit changer `events-v1`.
 
 ## Mesures
