@@ -1,0 +1,100 @@
+name: Clean 16 verified memo and preparation branches (manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Preview eligible branches or delete after confirmation
+        required: true
+        type: choice
+        default: preview
+        options: [preview, delete]
+      confirmation:
+        description: "For delete mode, enter DELETE_16_MEMO_PREP_BRANCHES"
+        required: false
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify exact merged PR commits and clean only allowed branches
+        uses: actions/github-script@v7
+        env:
+          CLEANUP_MODE: ${{ inputs.mode }}
+          CLEANUP_CONFIRMATION: ${{ inputs.confirmation }}
+        with:
+          script: |
+            // Each triplet was verified against a merged PR (head SHA matches branch head).
+            // The workflow does not discover, glob or clean any other branches.
+            const candidates = [
+              ['claude/entrainement-suite', 202, '7dbd30b2215b6e14f82b7108da037e240ceec1be'],
+              ['claude/memo-cadres-devise', 211, '00b325f72b46e5f7f5f68b62e579784548a267e1'],
+              ['claude/memo-dates-y0ayxy', 432, 'cfd03ec8b7d3831ba425ed86452cd8db4ace119c'],
+              ['claude/memo-maquette', 207, '5ef903d6923c97c688490b300ba6a4347ac9939b'],
+              ['claude/memo-partage', 216, '2de377e53105d03f193327d45333258ba130170c'],
+              ['claude/memo-pneus', 212, '54d116701a2c56a78ed7f65dbaf778c64c4dce60'],
+              ['claude/memo-pneus-relais', 213, 'eafe9d60e5a106a7b60d1ba8bf386029a52ac356'],
+              ['claude/memo-retours', 209, '5c325bf59f53f3d30b677fd469933162a28e30c0'],
+              ['claude/memo-retours-2', 210, '5b4a44010e4e73616ad09a11b18ee4a138b15ba9'],
+              ['feature/preparation-guide-endurance', 196, '0e9ca1800b3bd64204e001c12998d9b10f12afb2'],
+              ['fix/preparation-ergonomie', 195, 'f53191b409cf11eae986eb13c4b441b7b12bb7f4'],
+              ['fix/preparation-onglets-tableaux', 198, '0f1edd489a9e063950f66cc38baca1dcaa37bba5'],
+              ['fix/preparation-simplicite', 197, '0c9a7ebc53d57ca8fa2c160fed6e549e10c018cb'],
+              ['fix/remove-memo-v2', 400, '1fa324cc12d667b00a436ec343dc25fef84b42fd'],
+              ['fix/remove-training-memo', 397, '4a6432c6813300f1203a5e001730dad536b9ed27'],
+              ['docs/final-51-branches-triage-20261030', 601, '95fe0a8128cffd646363c3b8f429459b2d265e2e'],
+            ];
+            const mode = process.env.CLEANUP_MODE || 'preview';
+            if (!['preview','delete'].includes(mode)) {
+              core.setFailed('Unsupported mode');
+              return;
+            }
+            if (mode === 'delete' && process.env.CLEANUP_CONFIRMATION !== 'DELETE_16_MEMO_PREP_BRANCHES') {
+              core.setFailed('Deletion requires exactly DELETE_16_MEMO_PREP_BRANCHES');
+              return;
+            }
+            const {owner,repo} = context.repo;
+            const open = await github.paginate(github.rest.pulls.list,{owner,repo,state:'open',per_page:100});
+            let eligible = 0, deleted = 0, skipped = 0;
+            for (const [branch,prNumber,expectedSha] of candidates) {
+              try {
+                if (['main', 'dev'].includes(branch) || branch.startsWith('archive/') ||
+                    open.some(pr => pr.head.ref === branch && pr.head.repo?.full_name === `${owner}/${repo}`)) {
+                  core.warning(`SKIP ${branch}: prohibited prefix or open PR`); skipped++; continue;
+                }
+                const pr = (await github.rest.pulls.get({owner,repo,pull_number:prNumber})).data;
+                if (!pr.merged_at || pr.base.ref !== 'dev' && pr.base.ref !== 'main' ||
+                    pr.head.ref !== branch || pr.head.sha !== expectedSha) {
+                  core.warning(`SKIP ${branch}: matching PR was not merged at the expected head`); skipped++; continue;
+                }
+                let current;
+                try {
+                  current = (await github.rest.git.getRef({owner,repo,ref:`heads/${branch}`})).data;
+                } catch(e) {
+                  if (e.status === 404) {core.info(`SKIP ${branch}: already absent`); skipped++; continue;}
+                  throw e;
+                }
+                if (current.object.sha !== expectedSha) {
+                  core.warning(`SKIP ${branch}: branch head changed`); skipped++; continue;
+                }
+                eligible++;
+                if (mode === 'preview') {core.notice(`PREVIEW eligible: ${branch} (PR #${prNumber})`);continue;}
+                // If the ref moved after inspection, do not delete.
+                const last = (await github.rest.git.getRef({owner,repo,ref:`heads/${branch}`})).data;
+                if (last.object.sha !== expectedSha) {core.warning(`SKIP ${branch}: SHA changed`);skipped++;continue;}
+                await github.rest.git.deleteRef({owner,repo,ref:`heads/${branch}`});
+                deleted++;
+                core.notice(`DELETED: ${branch}`);
+              } catch(e) {
+                core.error(`Branch ${branch}: ${e.message}`);
+                throw e;
+              }
+            }
+            core.summary.addHeading('Historical merged PR branch cleanup');
+            core.summary.addRaw(`Mode: ${mode}; eligible: ${eligible}; deleted: ${deleted}; skipped: ${skipped}`);
+            await core.summary.write();
