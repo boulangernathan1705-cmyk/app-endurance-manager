@@ -38,6 +38,9 @@ structuré `event=request_usage`, avec une route fixe, le statut, le nombre de r
 les lignes lues/écrites, la durée SQL et `elapsed_ms` (temps écoulé, **pas** temps CPU).
 Le journal personnalisé ne contient ni SQL, ni paramètres, ni cookies, ni identifiants de pilotes,
 ni corps de réponse. Les métadonnées natives d'invocation Cloudflare donnent le temps CPU.
+`observability.redact_query_string=true` retire également les paramètres des URL des nouveaux
+journaux et traces natifs, notamment sur les retours OAuth Discord. Ce réglage ne modifie pas
+les requêtes reçues par le Worker et ne supprime pas les journaux antérieurs.
 
 Pour les requêtes suivies, `first()` exécute la même requête SQL via `all()` une seule fois pour
 conserver les métadonnées D1 normalement perdues par `first()`. `metadata_complete=false` signale
