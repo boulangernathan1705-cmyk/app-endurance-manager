@@ -10,7 +10,7 @@
   "minify": true,
   "build": { "command": "npm run build:workers" },
   "triggers": {
-    "crons": ["*/15 * * * *", "*/2 * * * *"]
+    "crons": ["*/15 * * * *", "*/2 * * * *", "*/5 * * * *"]
   },
   // The route (more specific than production's *.endurance-manager.app/*) keeps dev on this Worker.
   "routes": [

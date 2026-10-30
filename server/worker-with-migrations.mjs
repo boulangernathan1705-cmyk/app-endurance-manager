@@ -172,11 +172,16 @@ export default {
     return development ? markDevelopmentResponse(response, env) : response;
   },
 
-  // Every 15 minutes. A run may make 50 calls to the database and 50 requests: one heavy task per quarter of
-  // an hour, each working by small batches (the cleanup, light, runs every time).
+  // Separate schedules keep crew vocals responsive without accelerating the heavier maintenance jobs.
   async scheduled(controller, env, ctx) {
     if (!env?.DB) return;
     const at = new Date(controller?.scheduledTime || Date.now());
+    const run = (label, task) => ctx.waitUntil(task().catch(error => console.error(label, error instanceof Error ? error.message : 'unknown')));
+    // Every 5 minutes: crew vocals and race reminders, within their own request budget.
+    if (controller?.cron === '*/5 * * * *') {
+      run('Crew Discord sync failed', () => syncCrewDiscord(env, at.getTime(), {requests:8}));
+      return;
+    }
     // Every 2 minutes, one Discord task (a run may make 50 requests and 50 calls to the database): the day's announcement, the changes on the
     // site, else a setting still being put in place (the first one, or Monday's new week, takes several passes), else
     // the pilots added to the races' threads.
@@ -193,14 +198,11 @@ export default {
       return;
     }
     const slot = Math.floor(at.getUTCMinutes() / 15);
-    const run = (label, task) => ctx.waitUntil(task().catch(error => console.error(label, error instanceof Error ? error.message : 'unknown')));
     // Expired sessions, OAuth states and rate-limit counters are purged here too, not only on Discord login.
     run('Scheduled cleanup failed', () => cleanup(env));
     // Notifications of the bell older than 30 days.
     run('Notifications cleanup failed', () => purgeNotifications(env));
-    // Every quarter of an hour: the crews on Discord (voice channels, reminders), a few requests at a
-    // time (fewer next to the iRacing import, which makes many).
-    run('Crew Discord sync failed', () => syncCrewDiscord(env, at.getTime(), {requests:slot === 1 ? 4 : 8}));
+    // Maintenance stays every 15 minutes; crew sync has its own schedule, so it is not duplicated here.
     run('Orphan crew Discord cleanup failed', () => cleanupOrphanCrewDiscord(env, at.getTime()));
     run('Event recap cleanup failed', () => cleanupEventRecaps(env,at.getTime()));
     // :00 Members and Discord roles not checked for a day are checked again by the bot, a few at a time.
