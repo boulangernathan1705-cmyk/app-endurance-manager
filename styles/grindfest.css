@@ -93,3 +93,16 @@ html[data-game] #app .race-header .event-type-panel .gridfest-header-logo {displ
   .gridfest-avatars {display:grid;grid-template-columns:repeat(2,56px)}
   .gridfest-avatars .gridfest-avatar {width:56px;height:56px;font-size:22px}
 }
+
+/* Long notes and circuit names must fit inside the calendar card. */
+html[data-game] #app .race-card.is-gridfest .solo-card-info {min-width:0;grid-template-columns:minmax(0,1fr)}
+html[data-game] #app .race-card.is-gridfest .solo-info-row {min-width:0}
+html[data-game] #app .race-card.is-gridfest .solo-info-chip {min-width:0;box-sizing:border-box;white-space:normal;text-align:left}
+html[data-game] #app .race-card.is-gridfest .solo-info-chip > span,
+html[data-game] #app .race-card.is-gridfest .solo-round-name {min-width:0;white-space:normal;overflow-wrap:anywhere}
+html[data-game] #app .race-card.is-gridfest .solo-round-lines {grid-template-columns:auto minmax(0,1fr) auto auto}
+@media(max-width:760px) {
+  html[data-game] #app .race-card.is-gridfest .solo-round-lines {grid-template-columns:minmax(0,1fr)}
+  html[data-game] #app .race-card.is-gridfest .solo-round-line {display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:6px 10px}
+  html[data-game] #app .race-card.is-gridfest .solo-round-line > .solo-info-chip {grid-column:2 / -1;justify-self:start}
+}
