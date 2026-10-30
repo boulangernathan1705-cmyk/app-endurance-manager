@@ -38,8 +38,9 @@ export function withBotAccess(overwrites, clientId, required) {
   return copy;
 }
 
-// Crew vocals are public to server members, even under a private category.
-export const PUBLIC_VOICE_ACCESS = VIEW | CONNECT | (1n << 21n);
+// Crew vocals are public to server members, even under a private category, with voice activation allowed.
+export const SPEAK = 1n << 21n, USE_VAD = 1n << 25n;
+export const PUBLIC_VOICE_ACCESS = VIEW | CONNECT | SPEAK | USE_VAD;
 export function withPublicVoiceAccess(overwrites, guildId, clientId) {
   const copy = withBotAccess(overwrites, clientId, VOICE_ACCESS);
   for (const rule of copy) rule.deny = String(BigInt(rule.deny || 0) & ~PUBLIC_VOICE_ACCESS);
