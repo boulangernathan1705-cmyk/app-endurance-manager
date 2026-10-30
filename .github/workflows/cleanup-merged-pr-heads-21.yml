@@ -68,7 +68,7 @@ jobs:
             let eligible = 0, deleted = 0, skipped = 0;
             for (const [branch,prNumber,expectedSha] of candidates) {
               try {
-                if (!/^(?:feature|fix|hotfix|claude|codex)\//.test(branch) ||
+                if (['main', 'dev'].includes(branch) || branch.startsWith('archive/') ||
                     open.some(pr => pr.head.ref === branch && pr.head.repo?.full_name === `${owner}/${repo}`)) {
                   core.warning(`SKIP ${branch}: prohibited prefix or open PR`); skipped++; continue;
                 }
