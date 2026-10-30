@@ -1,44 +1,61 @@
-name: Cleanup old branches
+name: Cleanup merged temporary branches
 
+# Do not run a bulk deletion of historical branches.
+# Only a completed PR merged into dev can trigger cleanup.
 on:
-  workflow_dispatch:
+  pull_request:
+    types: [closed]
+    branches: [dev]
 
 permissions:
   contents: write
+  pull-requests: read
 
 jobs:
   cleanup:
+    if: ${{ github.event.pull_request.merged == true && github.event.pull_request.head.repo.full_name == github.repository }}
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout full history
-        uses: actions/checkout@v4
+      - name: Delete unchanged merged temporary branch only
+        uses: actions/github-script@v7
         with:
-          fetch-depth: 0
-
-      - name: Delete every branch except main and dev
-        shell: bash
-        run: |
-          set -euo pipefail
-          git fetch origin '+refs/heads/*:refs/remotes/origin/*' --prune
-
-          deleted=0
-          kept=0
-
-          while IFS= read -r ref; do
-            branch="${ref#origin/}"
-
-            case "$branch" in
-              main|dev|HEAD)
-                echo "Keeping protected branch: $branch"
-                kept=$((kept + 1))
-                continue
-                ;;
-            esac
-
-            echo "Deleting old branch: $branch"
-            git push origin --delete "$branch"
-            deleted=$((deleted + 1))
-          done < <(git for-each-ref --format='%(refname:short)' refs/remotes/origin/ | sort)
-
-          echo "Deleted: $deleted"
-          echo "Kept: $kept"
+          script: |
+            const pr = context.payload.pull_request;
+            const branch = pr.head.ref;
+            const allowed = /^(?:feature|fix|refactor|claude|codex)\/[A-Za-z0-9._/-]+$/;
+            if (!allowed.test(branch) || ['main', 'dev'].includes(branch)) {
+              core.info(`Kept: ${branch} (not a temporary branch eligible for cleanup).`);
+              return;
+            }
+            if (pr.head.repo.full_name !== `${context.repo.owner}/${context.repo.repo}`) {
+              core.info('Kept: external repository.');
+              return;
+            }
+            let current;
+            try {
+              current = await github.rest.git.getRef({
+                ...context.repo, ref: `heads/${branch}`
+              });
+            } catch (error) {
+              if (error.status === 404) {
+                core.info('Branch already deleted.');
+                return;
+              }
+              throw error;
+            }
+            if (current.data.object.sha !== pr.head.sha) {
+              core.warning(`Kept ${branch}: new commits after merge.`);
+              return;
+            }
+            const open = await github.paginate(github.rest.pulls.list, {
+              ...context.repo, state: 'open', per_page: 100
+            });
+            if (open.some(other => other.head.ref === branch &&
+                other.head.repo?.full_name === pr.head.repo.full_name)) {
+              core.warning(`Kept ${branch}: still used by another open PR.`);
+              return;
+            }
+            await github.rest.git.deleteRef({
+              ...context.repo, ref: `heads/${branch}`
+            });
+            core.notice(`Removed merged branch: ${branch}`);
