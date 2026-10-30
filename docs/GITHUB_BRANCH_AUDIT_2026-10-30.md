@@ -113,3 +113,58 @@ Familles à vérifier par PR et comparaison des fichiers : `claude/memo-*`, `cod
 - **À examiner** : commits propres, travaux récents ou PR ouverte ; conserver.
 
 Aucune suppression historique n'est réalisée par cet audit. Le nouveau workflow de nettoyage automatique proposé porte uniquement sur les futures fusions de PR vers `dev`, et non sur le stock de branches existantes.
+
+---
+
+# Revue globale actualisée après le premier nettoyage (30 octobre 2026)
+
+## État actuel
+
+- **192 branches** relevées dans GitHub, après la suppression confirmée des 14 branches du premier lot et la création de nouvelles branches de maintenance.
+- **2 PR ouvertes** : #569 (`claude/project-thread-ogkwfr`) et #431 (`suite-modules`). Conserver impérativement.
+- `dev` est actuellement un descendant de `main` (0 commit propre à `main`, 1 338 commits d'avance pour `dev`). Ce compte est un indicateur d'historique, **pas** de modifications applicatives à publier sans revue.
+- Le workflow dangereux de suppression massive a été remplacé sur `main`, et les 14 branches du premier lot ont disparu.
+
+## Second lot : 6 branches confirmées intégrées à dev
+
+Comparaison actuelle `dev...branche` : **0 commit propre à la branche**, historique entièrement dans `dev`.
+
+| Branche | Décision |
+| --- | --- |
+| `claude/project-thread-9s5f96` | Candidate à suppression ciblée |
+| `claude/project-thread-45sfow` | Candidate à suppression ciblée |
+| `claude/project-thread-576zob` | Candidate à suppression ciblée |
+| `claude/project-thread-buns8z` | Candidate à suppression ciblée |
+| `claude/project-thread-d9cp4o` | Candidate à suppression ciblée |
+| `claude/project-thread-niyep3` | Candidate à suppression ciblée |
+
+Ces six branches ne sont pas parmi les deux branches des PR ouvertes. Refaire la vérification de leur SHA, des PR et de leur ancêtre de `dev` immédiatement avant suppression.
+
+`archive/dev-communautes-2026-09-24` est également intégrée, **mais doit être conservée comme archive**.
+
+## Branches avec changements potentiellement réutilisables : conserver
+
+- `claude/project-thread-at8rnd` : **43 commits propres** relativement à `dev`. Les différences concernent notamment `server/discord-weekly-format.mjs`, `server/recap-discord.mjs`, la documentation et les tests de récap Discord.
+- `overlay-dash` : **5 commits propres** ; concerne le plugin C# SimHub, les dashes et leur livraison. Ne pas éliminer sans rapprochement avec le plugin actuellement distribué.
+- `suite-modules` : PR #431 ouverte, contient notamment des éléments SimHub et de packaging. Conserver.
+- `claude/project-thread-ogkwfr` : PR #569 ouverte, concerne `front/members-page.mjs`. Conserver.
+- Branches récentes de l'aperçu Discord : `feature/discord-daily-detailed-layout`, `feature/discord-evening-concept-preview`, `feature/discord-evening-real-preview`, `feature/discord-message-preview-v2`, `feature/tdz-rally-real-comparison`, `fix/discord-preview-comparison`, `fix/discord-preview-concise-headline`. Leur ancien patch peut avoir été repris par squash : vérifier avant suppression.
+
+## Branches d'essais/anciens chantiers : potentiellement obsolètes, mais non approuvées pour suppression
+
+- Mémo abandonné : `feature/memo-v2`, `claude/memo-*`, `codex/memo-collection-cycle`, `fix/remove-memo-v2`, `fix/remove-training-memo`.
+- Mur des stands mis en pause : `claude/mur-*`, `hotfix/bouton-mur`, certaines branches `feature/endurance-preparation`.
+- Essais d'interface : `fiche-*`, `fiches-combo*`, `analyse-*`, `carte-fluide`, `palette-sans-violet`, `overlay-essais`.
+- Anciennes versions et corrections : `hotfix/v1.*`, `release/v1.*`, autres `claude/project-thread-*`.
+- Branches issues de Codex : `codex/endurance-training-checklist`, `codex/pit-training-usability`, `codex/training-mockup`.
+
+**Important :** la plupart de ces branches ont des commits propres à leur historique. Elles peuvent correspondre à du code déjà squashé, à des essais abandonnés ou à des fonctions en pause. Leur nom et leur statut `diverged` ne prouvent pas l'absence de contenu inédit.
+
+## Décision opérationnelle
+
+1. Autoriser **seulement les 6 branches du second lot** à entrer dans une future liste de suppression après dernier contrôle du SHA et des PR. Ne pas relancer le premier lot de 14 (déjà supprimé).
+2. Conserver `main`, `dev`, toutes les archives, les 2 branches de PR ouvertes et les branches SimHub/Discord ayant des commits propres.
+3. Pour supprimer d'autres branches divergentes, comparer leur patch à la version fonctionnelle et à la PR de fusion squash, puis classer chacune comme `repris`, `abandonné`, `en pause` ou `inédit`.
+4. Ne pas utiliser le workflow de suppression massive historique, et ne pas confondre réduction du nombre de branches et réduction de la dette de code.
+
+**Périmètre de cette revue :** analyse de branches et inspection de fichiers ciblés par GitHub ; ni exécution de tests applicatifs ni audit de sécurité exhaustif du code.
