@@ -69,15 +69,13 @@ html[data-game] #app .race-card.is-gridfest .event-name {background:var(--gf-gra
 html[data-game] #app .race-card.is-gridfest {border:1px solid transparent;background:radial-gradient(circle at 85% 50%,rgba(255,123,0,.22),transparent 45%),linear-gradient(#17120c,#17120c) padding-box,var(--gf-grad) border-box}
 html[data-game] #app .race-card .gridfest-card-panel {display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px}
 .gridfest-card-panel .gridfest-wordmark {font-size:24px}
-.gridfest-avatars {display:flex;justify-content:center}
-.gridfest-avatars .gridfest-avatar {width:38px;height:38px;border-radius:50%;font-size:16px;margin-left:-8px;box-shadow:0 0 0 2px #17120c}
-.gridfest-avatars .gridfest-avatar:first-child {margin-left:0}
+.gridfest-avatars {display:flex;flex-wrap:wrap;justify-content:center;gap:10px}
+.gridfest-avatars .gridfest-avatar {width:38px;height:38px;border-radius:50%;font-size:16px;box-shadow:0 0 0 2px #17120c}
 @media(max-width:600px) {
   .grindfest-streamer-head .gridfest-avatar {width:60px;height:60px}
   .gridfest-streamer-cards {grid-template-columns:1fr}
   html[data-game] #app .race-card .race-card-type-logo.gridfest-card-panel {display:flex}
   .gridfest-card-panel .gridfest-wordmark {font-size:15px}
-  .gridfest-avatars .gridfest-avatar {width:28px;height:28px;font-size:12px}
 }
 @media(prefers-reduced-motion:no-preference) {.gridfest-wordmark,html[data-game] #app .race-header.is-gridfest .event-type-panel span {background-size:200% 100%;animation:gf-shine 6s ease-in-out infinite alternate}}
 @keyframes gf-shine {to {background-position:100% 0}}
@@ -88,4 +86,10 @@ html[data-game] #app .race-card .gridfest-card-panel {gap:6px}
 html[data-game] #app .race-header .event-type-panel .gridfest-header-logo {display:block;width:100%;height:100%;object-fit:contain}
 @media(max-width:600px) {
   .gridfest-card-panel .gridfest-card-logo {height:60px}
+}
+
+/* Streamers stay in the card content so every row contributes to its height. */
+@media(max-width:760px) {
+  .gridfest-avatars {display:grid;grid-template-columns:repeat(2,56px)}
+  .gridfest-avatars .gridfest-avatar {width:56px;height:56px;font-size:22px}
 }
