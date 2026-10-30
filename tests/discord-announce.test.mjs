@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {DatabaseSync} from 'node:sqlite';
 import {readFileSync,readdirSync} from 'node:fs';
 import worker from '../server/worker.mjs';
-import {announceCommunity} from '../server/discord-announce.mjs';
+import {announceCommunity,announceItems} from '../server/discord-announce.mjs';
 import {buildCompleteAnnouncement,buildAnnounceEvent,buildAnnounceIntro,buildAnnounceRace,buildAnnouncementDemo,eventHook,ANNOUNCE_HOOKS} from '../server/discord-weekly-format.mjs';
 import {layoutInput} from '../server/discord-layout.mjs';
 import {linkTestServer,DEV_COMMUNITY,GUILD} from './fixtures/discord-server.mjs';
@@ -31,6 +31,7 @@ function setup(t){
   event(TOMORROW,'4h de Monza',Date.parse('2026-10-29T19:00:00Z'),{hours:4,minutes:240,circuit:'monza'});
   DB.db.prepare(`INSERT INTO participants(id,name,user_id,created_by,created_at,community_id) VALUES('p1','Pilote 1',NULL,'111111111111111111',0,?)`).run(DEV_COMMUNITY);
   DB.db.prepare(`INSERT INTO registrations(id,event_id,departure_id,guest_hash,name,name_key,category,status,created_at,participant_id,community_id) VALUES('r1',?,'start-e2','g1','Pilote 1','pilote 1','GT3','whole',0,'p1',?)`).run(RACE,DEV_COMMUNITY);
+  DB.db.prepare(`INSERT INTO registrations(id,event_id,departure_id,guest_hash,name,name_key,category,status,created_at,participant_id,community_id) VALUES('r-event',?,'start-e1','g1','Pilote 1','pilote 1','GT3','whole',0,'p1',?)`).run(EVENT,DEV_COMMUNITY);
   DB.db.prepare(`INSERT INTO crews(id,event_id,departure_id,name,category,car,created_at,community_id) VALUES('c1',?,'start-e2','Équipage A','GT3','Ferrari 296',0,?)`).run(RACE,DEV_COMMUNITY);
   DB.db.prepare(`INSERT INTO crew_members(registration_id,crew_id) VALUES('r1','c1')`).run();
   DB.db.prepare(`INSERT INTO community_recap_settings(community_id,enabled,mode,scope,guild_id,destination_id,destination_name,layout) VALUES(?,1,'events','all',?,'','',?)`)
@@ -160,7 +161,7 @@ test('the count of présents is kept up to date; after 9h only the day it is tur
   assert.equal(await announceCommunity(env,TDZ,settings(),MORNING+11*60000),true);
   const edits=calls.filter(call=>call.method==='PATCH');
   assert.equal(edits.length,1,'only the event changed');
-  assert.match(JSON.stringify(edits[0].body.embeds),/1 présent\*\* · 19 places restantes/);
+  assert.match(JSON.stringify(edits[0].body.embeds),/2 présents\*\* · 18 places restantes/);
   assert.equal([...messages.values()].length,1);
 
   DB.db.prepare('DELETE FROM discord_announcements').run();calls.length=0;
@@ -342,4 +343,90 @@ test('all simulator events share identical facts and retain differences per roun
     assert.match(mixed.fields.find(field=>field.name.startsWith('Manche 2')).value,/Porsche/);
     assert.match(mixed.fields[0].value,/GT4/);
   }
+});
+
+
+test('no entrants: no morning message or ping, even with an empty crew and repeated runs',async t=>{
+  const {DB,env,calls,settings}=setup(t);
+  DB.db.prepare('DELETE FROM crew_members').run();
+  DB.db.prepare('DELETE FROM registrations').run();
+  assert.deepEqual(await announceItems(env,TDZ,MORNING),[]);
+  for(const offset of [0,2,12,30])assert.equal(await announceCommunity(env,TDZ,settings(),MORNING+offset*60000),false);
+  assert.equal(calls.length,0);
+});
+
+test('official races with no local entrant and unavailable or other-departure entries are excluded',async t=>{
+  const {DB,env,calls,settings}=setup(t);
+  DB.db.prepare('DELETE FROM crew_members').run();
+  DB.db.prepare("UPDATE events SET community_id='official' WHERE id=?").run(RACE);
+  DB.db.prepare("UPDATE registrations SET status='unavailable' WHERE event_id=?").run(RACE);
+  DB.db.prepare("UPDATE registrations SET departure_id='another-start' WHERE event_id=?").run(EVENT);
+  assert.equal(await announceCommunity(env,TDZ,settings(),MORNING),false);
+  assert.equal(sent(calls).length,0);
+});
+
+test('only races with entrants are included in a mixed day',async t=>{
+  const {DB,env,calls,settings}=setup(t);
+  DB.db.prepare('DELETE FROM registrations WHERE event_id=?').run(EVENT);
+  await announceCommunity(env,TDZ,settings(),MORNING);
+  const body=JSON.stringify(sent(calls)[0].body);
+  assert.match(body,/6h de Spa/);
+  assert.doesNotMatch(body,/Coupe GT3|20h45/);
+});
+
+test('two concurrent passes publish only one message and release their lock',async t=>{
+  const {DB,env,calls,settings}=setup(t);
+  const results=await Promise.all([announceCommunity(env,TDZ,settings(),MORNING),announceCommunity(env,TDZ,settings(),MORNING)]);
+  assert.equal(results.filter(Boolean).length,1);
+  assert.equal(sent(calls).length,1);
+  assert.equal(settings().lock_until,0);
+  assert.equal(DB.db.prepare("SELECT COUNT(DISTINCT message_id) AS n FROM discord_announcements").get().n,1);
+});
+
+test('a previously planned empty day is neither sent nor recreated after cancellations',async t=>{
+  const {DB,env,calls,messages,settings}=setup(t);
+  await announceCommunity(env,TDZ,settings(),MORNING);
+  DB.db.prepare('DELETE FROM crew_members').run();
+  DB.db.prepare('DELETE FROM registrations').run();
+  messages.clear();calls.length=0;
+  await announceCommunity(env,TDZ,settings(),MORNING+12*60000);
+  assert.equal(calls.length,0);
+  DB.db.prepare('UPDATE discord_announcements SET message_id=NULL').run();
+  await announceCommunity(env,TDZ,settings(),MORNING+24*60000);
+  assert.equal(calls.length,0);
+});
+
+test('an explicit stream announcement still works without registrations',async t=>{
+  const {DB,env,calls,settings}=setup(t);
+  DB.db.prepare('DELETE FROM crew_members').run();
+  DB.db.prepare('DELETE FROM registrations').run();
+  DB.db.prepare("UPDATE events SET sim='stream',details='{}' WHERE id=?").run(EVENT);
+  await announceCommunity(env,TDZ,settings(),MORNING);
+  assert.equal(sent(calls).length,1);
+  assert.deepEqual(sent(calls)[0].body.components,[]);
+});
+
+test('entries from another community never trigger this community’s announcement',async t=>{
+  const {DB,env,calls,settings}=setup(t);
+  DB.db.prepare('DELETE FROM crew_members').run();
+  DB.db.prepare("INSERT INTO communities(id,slug,name,short_name,created_at) VALUES('other','other','Other','OTHER',0)").run();
+  DB.db.prepare("INSERT INTO participants(id,name,created_by,created_at,community_id) VALUES('other-p','Other pilot','111111111111111111',0,'other')").run();
+  DB.db.prepare("UPDATE events SET community_id='official'").run();
+  DB.db.prepare(`INSERT INTO registrations(id,event_id,departure_id,guest_hash,name,name_key,category,status,created_at,participant_id,community_id)
+    SELECT 'other-'||id,event_id,departure_id,'other-'||guest_hash,name,'other-'||name_key,category,status,created_at,'other-p','other' FROM registrations`).run();
+  DB.db.prepare('DELETE FROM registrations WHERE community_id=?').run(DEV_COMMUNITY);
+  assert.equal(await announceCommunity(env,TDZ,settings(),MORNING),false);
+  assert.equal(sent(calls).length,0);
+});
+
+test('a solo event selects today’s registered departure rather than an earlier empty one',async t=>{
+  const {DB,env,calls,settings}=setup(t);
+  DB.db.prepare('UPDATE events SET departures=? WHERE id=?').run(JSON.stringify([
+    {id:'empty-start',startsAt:MORNING+HOUR},{id:'start-e1',startsAt:MORNING+2*HOUR}
+  ]),EVENT);
+  await announceCommunity(env,TDZ,settings(),MORNING);
+  const body=JSON.stringify(sent(calls)[0].body);
+  assert.match(body,/Coupe GT3/);
+  assert.match(body,/9h30/);
+  assert.doesNotMatch(body,/8h30/);
 });
