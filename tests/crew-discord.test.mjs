@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {DatabaseSync} from 'node:sqlite';
 import {readFileSync, readdirSync} from 'node:fs';
 import worker from '../server/worker.mjs';
+import scheduledWorker from '../server/worker-with-migrations.mjs';
 import {syncCrewDiscord, closeDeletedCrewDiscord, cleanupOrphanCrewDiscord, OPEN_BEFORE, CLOSE_AFTER, KEEP_ARCHIVES} from '../server/crew-discord.mjs';
 import {linkTestServer, allowCrews, setMember, ORGA_ROLE, GUILD} from './fixtures/discord-server.mjs';
 
@@ -91,6 +92,43 @@ const race={name:'6h SPA',circuit:'spa',categories:['Hypercar','GT3'],departures
 const since=(calls,from)=>calls.slice(from).map(call=>`${call.method} ${call.path}`);
 const notifications=async (req,actor)=>(await req('/api/notifications','GET',null,actor)).data.notifications;
 const created=(calls,from)=>calls.slice(from).filter(call=>call.method==='POST'&&call.path===`/guilds/${GUILD}/channels`);
+
+test('crew vocals sync every five minutes while quarter-hour maintenance stays separate',async()=>{
+  for(const file of ['wrangler.jsonc','wrangler.dev.jsonc','wrangler.prod.jsonc']) {
+    const config=JSON.parse(readFileSync(new URL(`../${file}`,import.meta.url),'utf8').replace(/^\s*\/\/.*$/gm,''));
+    for(const cron of ['*/2 * * * *','*/5 * * * *','*/15 * * * *']) assert.ok(config.triggers.crons.includes(cron),`${file}: ${cron}`);
+  }
+  const {DB,env,req,login,discord}=harness();
+  await login(ADMIN,'admin','Orga');
+  await req('/api/community/modules','PATCH',{crewChannels:true},'admin');
+  await req('/api/events','POST',race,'admin');
+  const event=(await req('/api/events','GET',null,'admin')).data.events[0],departure=event.departures[0];
+  await req(`/api/events/${event.id}/departures/${departure.id}/crews`,'POST',{name:'Toutes les cinq minutes',category:'GT3'},'admin');
+  DB.db.prepare('INSERT INTO rate_limits(key,count,expires_at) VALUES(?,?,?)').run('expired-before-crew-sync',1,Math.floor(Date.now()/1000)-60);
+  env.IRACING_IMPORT='off';
+  const prepare=DB.prepare.bind(DB);let crewCheckWrites=0;
+  DB.prepare=sql=>{if(sql.startsWith('UPDATE crew_discord SET checked_at='))crewCheckWrites++;return prepare(sql);};
+  const scheduled=async(cron,scheduledTime)=>{
+    const pending=[],realFetch=globalThis.fetch;globalThis.fetch=discord.handler;
+    try{
+      await scheduledWorker.scheduled({cron,scheduledTime},env,{waitUntil:promise=>pending.push(promise)});
+      await Promise.all(pending);
+    }finally{globalThis.fetch=realFetch;}
+  };
+  const at=Date.UTC(2090,9,14,12,5);
+  await scheduled('*/5 * * * *',at);
+  const row=DB.db.prepare('SELECT * FROM crew_discord').get();
+  assert.ok(row.voice_id&&row.message_id,'the five-minute tick creates the crew vocal');
+  assert.equal(row.checked_at,at);
+  assert.ok(DB.db.prepare('SELECT 1 FROM rate_limits WHERE key=?').get('expired-before-crew-sync'),'five-minute sync does not run maintenance');
+  await scheduled('*/5 * * * *',at+10*60_000);
+  assert.equal(DB.db.prepare('SELECT checked_at FROM crew_discord').get().checked_at,at+10*60_000,'the quarter-hour five-minute tick still syncs crews');
+  await scheduled('*/15 * * * *',at+10*60_000);
+  assert.equal(crewCheckWrites,2,'only the two five-minute ticks check the crew, without a duplicate at the quarter hour');
+  assert.equal(DB.db.prepare('SELECT checked_at FROM crew_discord').get().checked_at,at+10*60_000,'maintenance does not sync crews a second time');
+  assert.equal(DB.db.prepare('SELECT 1 FROM rate_limits WHERE key=?').get('expired-before-crew-sync'),undefined,'quarter-hour maintenance still runs');
+  assert.equal(created(discord.calls,0).length,1,'the same vocal is retained across ticks');
+});
 
 test('voice channel setup detects missing Connect even when the bot can manage text channels', async () => {
   const {req,login,discord}=harness();
