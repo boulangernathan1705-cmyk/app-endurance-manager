@@ -42,8 +42,9 @@ function setup(t){
     const path=String(url).replace('https://discord.com/api/v10',''),method=options.method||'GET',body=options.body?JSON.parse(options.body):null;
     calls.push({path,method,body});
     if(path.startsWith('/applications/'))return Response.json({items:[]});
-    const send=path.match(/^\/channels\/(\d+)\/messages$/);
-    if(send){const message={...body,id:String(counter++),channel_id:send[1]};messages.set(message.id,message);return Response.json(message);}
+    const send=path.split('?')[0].match(/^\/channels\/(\d+)\/messages$/);
+    if(send&&method==='GET')return Response.json([...messages.values()].filter(message=>message.channel_id===send[1]).slice(-100).reverse());
+    if(send){const message={...body,id:String(counter++),channel_id:send[1],author:{id:env.DISCORD_CLIENT_ID,bot:true}};messages.set(message.id,message);return Response.json(message);}
     const edit=path.match(/^\/channels\/(\d+)\/messages\/(\d+)$/);
     if(edit){if(method!=='DELETE'&&!messages.has(edit[2]))return Response.json({code:10008},{status:404});if(method==='DELETE'){messages.delete(edit[2]);return new Response(null,{status:204});}Object.assign(messages.get(edit[2]),body);return Response.json(messages.get(edit[2]));}
     return new Response('{}',{status:404});
@@ -85,7 +86,7 @@ test('at 7h30 the day\'s endurances and events are announced in order, @everyone
   assert.equal(sent(calls).length,0);
 });
 
-test('the count of présents is kept up to date; after 9h only the day it is turned on',async t=>{
+test('counts refresh silently; first publication after 9h and late activation are silent',async t=>{
   const {DB,env,calls,messages,settings}=setup(t);
   await announceCommunity(env,TDZ,settings(),MORNING);
   DB.db.prepare(`INSERT INTO participants(id,name,user_id,created_by,created_at,community_id) VALUES('p2','Pilote 2',NULL,'111111111111111111',0,?)`).run(DEV_COMMUNITY);
@@ -98,12 +99,15 @@ test('the count of présents is kept up to date; after 9h only the day it is tur
   assert.equal([...messages.values()].length,1);
 
   DB.db.prepare('DELETE FROM discord_announcements').run();calls.length=0;
-  assert.equal(await announceCommunity(env,TDZ,settings(),MORNING+2*HOUR),false);
-  assert.equal(calls.length,0);
+  assert.equal(await announceCommunity(env,TDZ,settings(),MORNING+2*HOUR),true);
+  assert.deepEqual(sent(calls)[0].body.allowed_mentions,{parse:[]});
+  assert.equal(sent(calls)[0].body.flags,4096);
+  DB.db.prepare('DELETE FROM discord_announcements').run();calls.length=0;
   // Turned on at 9h29: announced at once (the races left today).
   DB.db.prepare('UPDATE community_recap_settings SET layout=?').run(JSON.stringify({v:1,mode:'events',sims:'all',announce:ANNOUNCES,announceAt:MORNING+2*HOUR-60000}));
   assert.equal(await announceCommunity(env,TDZ,settings(),MORNING+2*HOUR),true);
   assert.equal(sent(calls).length,1);
+  assert.deepEqual(sent(calls)[0].body.allowed_mentions,{parse:[]});
 });
 
 test('« Absent » from the announcement marks the pilot absent on the site',async t=>{
@@ -323,7 +327,9 @@ test('a previously planned empty day is neither sent nor recreated after cancell
   DB.db.prepare('DELETE FROM registrations').run();
   messages.clear();calls.length=0;
   await announceCommunity(env,TDZ,settings(),MORNING+12*60000);
-  assert.equal(calls.length,0);
+  assert.ok(calls.some(call=>call.method==='DELETE'));
+  assert.equal(sent(calls).length,0);
+  calls.length=0;
   DB.db.prepare('UPDATE discord_announcements SET message_id=NULL').run();
   await announceCommunity(env,TDZ,settings(),MORNING+24*60000);
   assert.equal(calls.length,0);
@@ -337,6 +343,8 @@ test('an explicit stream announcement still works without registrations',async t
   await announceCommunity(env,TDZ,settings(),MORNING);
   assert.equal(sent(calls).length,1);
   assert.deepEqual(sent(calls)[0].body.components,[]);
+  assert.deepEqual(sent(calls)[0].body.allowed_mentions,{parse:[]});
+  assert.equal(sent(calls)[0].body.flags,4096);
 });
 
 test('entries from another community never trigger this community’s announcement',async t=>{
@@ -362,4 +370,93 @@ test('a solo event selects today’s registered departure rather than an earlier
   assert.match(body,/Coupe GT3/);
   assert.match(body,/9h30/);
   assert.doesNotMatch(body,/8h30/);
+});
+
+
+const clearEntries=DB=>{DB.db.prepare('DELETE FROM crew_members').run();DB.db.prepare('DELETE FROM registrations').run();};
+const lateEntry=DB=>DB.db.prepare(`INSERT INTO registrations(id,event_id,departure_id,guest_hash,name,name_key,category,status,created_at,participant_id,community_id)
+ VALUES('late',?,'start-e1','late','Pilote 1','late','GT3','whole',0,'p1',?)`).run(EVENT,DEV_COMMUNITY);
+
+test('a late first entrant creates a silent announcement after an empty morning',async t=>{
+ const {DB,env,calls,settings}=setup(t);clearEntries(DB);
+ await announceCommunity(env,TDZ,settings(),MORNING);lateEntry(DB);
+ await announceCommunity(env,TDZ,settings(),MORNING+12*60000);
+ assert.equal(sent(calls).length,1);assert.deepEqual(sent(calls)[0].body.allowed_mentions,{parse:[]});assert.equal(sent(calls)[0].body.flags,4096);
+ assert.match(JSON.stringify(sent(calls)[0].body),/Coupe GT3/);
+});
+
+test('a newly entered race is added to the existing message without another ping',async t=>{
+ const {DB,env,calls,messages,settings}=setup(t);DB.db.prepare('DELETE FROM registrations WHERE event_id=?').run(EVENT);
+ await announceCommunity(env,TDZ,settings(),MORNING);lateEntry(DB);calls.length=0;
+ await announceCommunity(env,TDZ,settings(),MORNING+12*60000);
+ assert.equal(sent(calls).length,0);assert.equal(messages.size,1);
+ assert.match(JSON.stringify([...messages.values()]),/Coupe GT3/);
+ assert.deepEqual(calls.find(call=>call.method==='PATCH').body.allowed_mentions,{parse:[]});
+});
+
+test('last cancellation removes the stale message; a later return never pings again',async t=>{
+ const {DB,env,calls,messages,settings}=setup(t);await announceCommunity(env,TDZ,settings(),MORNING);clearEntries(DB);calls.length=0;
+ await announceCommunity(env,TDZ,settings(),MORNING+12*60000);
+ assert.equal(messages.size,0);assert.equal(calls.filter(call=>call.method==='DELETE').length,1);
+ lateEntry(DB);calls.length=0;await announceCommunity(env,TDZ,settings(),MORNING+24*60000);
+ assert.equal(messages.size,1);assert.deepEqual(sent(calls)[0].body.allowed_mentions,{parse:[]});assert.equal(sent(calls)[0].body.flags,4096);
+});
+
+test('an accepted initial POST with a lost response is recovered without a second POST',async t=>{
+ const {DB,env,calls,messages,settings}=setup(t),fetch=globalThis.fetch;let lose=true;
+ globalThis.fetch=async(url,options)=>{
+   if(options?.method==='POST'&&String(url).endsWith('/messages')){
+     const row=DB.db.prepare("SELECT * FROM discord_announcements WHERE item='intro'").get();assert.equal(row.ping_attempted,1);assert.ok(row.pending_nonce);
+     const response=await fetch(url,options);if(lose){lose=false;throw new Error('Response lost');}return response;
+   }return fetch(url,options);
+ };
+ await assert.rejects(announceCommunity(env,TDZ,settings(),MORNING),/Response lost/);
+ await announceCommunity(env,TDZ,settings(),MORNING+12*60000);
+ assert.equal(messages.size,1);assert.equal(sent(calls).length,1);
+ assert.equal(DB.db.prepare("SELECT pending_nonce FROM discord_announcements WHERE item='intro'").get().pending_nonce,'');
+});
+
+test('a failed DB save after successful publication recovers the message before retrying',async t=>{
+ const {DB,env,calls,messages,settings}=setup(t),prepare=DB.prepare.bind(DB);let fail=true;
+ DB.prepare=sql=>{const stmt=prepare(sql);if(sql.startsWith('UPDATE discord_announcements SET message_id=?,channel_id=?,content_hash=?,checked_at=')){
+  const run=stmt.run.bind(stmt);stmt.run=async()=>{if(fail){fail=false;throw new Error('DB save failed');}return run();};}return stmt;};
+ await assert.rejects(announceCommunity(env,TDZ,settings(),MORNING),/DB save failed/);
+ await announceCommunity(env,TDZ,settings(),MORNING+12*60000);
+ assert.equal(sent(calls).length,1);assert.equal(messages.size,1);
+ assert.ok(DB.db.prepare("SELECT message_id FROM discord_announcements WHERE item='intro'").get().message_id);
+});
+
+test('when no accepted message is found, retrying the reserved nonce is silent',async t=>{
+ const {DB,env,calls,settings}=setup(t),fetch=globalThis.fetch;let fail=true;
+ globalThis.fetch=(url,options)=>{if(fail&&options?.method==='POST'&&String(url).endsWith('/messages')){fail=false;return Promise.reject(new Error('Send failed'));}return fetch(url,options);};
+ await assert.rejects(announceCommunity(env,TDZ,settings(),MORNING),/Send failed/);
+ const nonce=DB.db.prepare("SELECT pending_nonce FROM discord_announcements WHERE item='intro'").get().pending_nonce;
+ await announceCommunity(env,TDZ,settings(),MORNING+12*60000);
+ assert.equal(sent(calls).length,1);assert.equal(sent(calls)[0].body.nonce,nonce);
+ assert.deepEqual(sent(calls)[0].body.allowed_mentions,{parse:[]});assert.equal(sent(calls)[0].body.flags,4096);
+});
+
+test('an unreadable recovery history fails closed without a second send',async t=>{
+ const {env,calls,settings}=setup(t),fetch=globalThis.fetch;let lose=true;
+ globalThis.fetch=async(url,options)=>{const response=await fetch(url,options);if(lose&&options?.method==='POST'&&String(url).endsWith('/messages')){lose=false;throw new Error('Response lost');}return response;};
+ await assert.rejects(announceCommunity(env,TDZ,settings(),MORNING));
+ globalThis.fetch=(url,options)=>String(url).includes('messages?limit=100')?Promise.resolve(Response.json({code:50013},{status:403})):fetch(url,options);
+ await assert.rejects(announceCommunity(env,TDZ,settings(),MORNING+12*60000));assert.equal(sent(calls).length,1);
+});
+
+test('moving the announcement channel replaces it silently and cleans the old location',async t=>{
+ const {DB,env,calls,messages,settings}=setup(t);await announceCommunity(env,TDZ,settings(),MORNING);
+ const layout=JSON.parse(settings().layout);layout.announce='666666666666666666';DB.db.prepare('UPDATE community_recap_settings SET layout=?').run(JSON.stringify(layout));calls.length=0;
+ await announceCommunity(env,TDZ,settings(),MORNING+60000);
+ assert.equal(sent(calls)[0].path,'/channels/666666666666666666/messages');assert.equal(messages.size,1);
+ assert.deepEqual(sent(calls)[0].body.allowed_mentions,{parse:[]});assert.equal(sent(calls)[0].body.flags,4096);
+ assert.ok(calls.some(call=>call.method==='DELETE'&&call.path.startsWith(`/channels/${ANNOUNCES}/`)));
+});
+
+test('the delivery migration marks existing days as already attempted',()=>{
+ const db=new DatabaseSync(':memory:');
+ for(const file of readdirSync(new URL('../migrations/',import.meta.url)).filter(file=>file.endsWith('.sql')&&!file.startsWith('0089')).sort())db.exec(readFileSync(new URL('../migrations/'+file,import.meta.url),'utf8'));
+ db.prepare(`INSERT INTO discord_announcements(community_id,day,item,kind,position,guild_id,channel_id,created_at) VALUES(?,'2026-10-28','intro','intro',0,?,?,0)`).run(DEV_COMMUNITY,GUILD,ANNOUNCES);
+ db.exec(readFileSync(new URL('../migrations/0089_discord_announcement_delivery.sql',import.meta.url),'utf8'));
+ const row=db.prepare('SELECT * FROM discord_announcements').get();assert.equal(row.ping_attempted,1);assert.equal(row.pending_nonce,'');db.close();
 });
