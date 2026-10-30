@@ -695,7 +695,8 @@ async function api(request, env) {
   }
   if (path === '/api/events' && method === 'POST') {
     requirePermission(actor,'create_race','Tu n’as pas l’autorisation de créer une course dans cette communauté.');
-    const input = plainSoloInput(env, community, await body(request));
+    // Allow twelve inline logos (6000 base64 characters each) plus event fields.
+    const input = plainSoloInput(env, community, await body(request, 96000));
     if (input.format === 'solo' && !soloRacesEnabled(env, community)) fail(400, 'Les événements ne sont pas activés sur ce site.');
     const data = validateEvent(input), eventId = id();
     if (isGrindfest(data) && (!grindfestEnabled(community, isDevelopment(env)) || input.official === true)) fail(403, 'Gridfest est réservé aux TDZ et doit être activé dans les modules.');
@@ -727,7 +728,7 @@ async function api(request, env) {
   }
   const eventMatch = path.match(/^\/api\/events\/([a-f0-9-]{36})$/);
   if (eventMatch && ['PATCH','DELETE'].includes(method)) {
-    const event = await eventById(env, eventMatch[1], community), input = await body(request);
+    const event = await eventById(env, eventMatch[1], community), input = await body(request, 96000);
     if (event.community_id === OFFICIAL && !actor.manager) fail(403, 'Une course officielle se modifie par les gestionnaires de la plateforme.');
     // Every race with "Gérer toutes les courses"; one's own races with "Créer une course".
     if (!can(actor,'manage_races') && !(can(actor,'create_race') && event.created_by === actor.user?.id)) requirePermission(actor,'manage_races','Tu n’as pas l’autorisation de modifier cette course.');

@@ -27,7 +27,7 @@ export function normalizeStreamers(raw) {
     ids.add(id); names.add(key);
     return {id, name, capacity, twitchUrl, logoUrl};
   });
-  if (JSON.stringify(result).length > 18000) throw Error('Les logos sont trop volumineux. Utilise des images plus simples.');
+  // Each logo is bounded above; allow all 12 streamers to use their full allowance.
   return result;
 }
 
