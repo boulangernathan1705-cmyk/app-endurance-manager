@@ -1,5 +1,5 @@
 import {pause,retryAfter,spaceOut} from './recap-discord.mjs';
-import {effectivePermissions,guildPermissions,missingVoicePermissions,withPublicVoiceAccess,VOICE_ACCESS,EMBED} from './discord-permissions.mjs';
+import {effectivePermissions,guildPermissions,missingVoicePermissions,withPublicVoiceAccess,PUBLIC_VOICE_ACCESS,VOICE_ACCESS,EMBED} from './discord-permissions.mjs';
 // Crews on Discord (migrations 0044, 0045). Two modules, each enabled by the admins of a community:
 // - crewChannels (« Salons d'équipage »): as soon as it is made, every crew gets a voice
 //   channel named after its sim and its name (« LMU-Les Tondeuz »), made in the category the admins chose
@@ -36,7 +36,9 @@ const ADMINISTRATOR = 1n << 3n, NEEDED = VOICE_ACCESS;
 // One invite for the whole « Discord » setting: the voices, the bot's own categories and messages (embeds), and making
 // its categories private or open again (« Gérer les rôles »: Discord asks it to change a channel's rights), the races'
 // threads (make, write in, delete).
-export const CREW_BOT_PERMISSIONS = String(NEEDED | EMBED | (1n << 28n) | (1n << 34n) | (1n << 35n) | (1n << 38n));
+export const CREW_BOT_PERMISSIONS = String(NEEDED | PUBLIC_VOICE_ACCESS | EMBED | (1n << 28n) | (1n << 34n) | (1n << 35n) | (1n << 38n));
+// Changing this version also repairs existing channels on their next sync.
+const VOICE_POLICY_VERSION = 'public-voice-v2:';
 const VOICE = 2, CATEGORY = 4;
 
 class Stop extends Error {}
@@ -288,7 +290,7 @@ async function needsWork(env, timestamp, community, setting, row, pilots) {
   const current = discordIds(pilots), known = JSON.parse(row.members || '[]');
   if (current.length !== known.length || current.some(id => !known.includes(id))) return true;
   if (dueReminders(community, row, start, timestamp).length || endDue(row, start, timestamp)) return true;
-  return row.recap_hash !== 'public-voice-v1:' + await hash(JSON.stringify(recapPayload(env, community, row, start, pilots)));
+  return row.recap_hash !== VOICE_POLICY_VERSION + await hash(JSON.stringify(recapPayload(env, community, row, start, pilots)));
 }
 
 // Deletes a channel (already gone: fine).
@@ -543,8 +545,8 @@ async function syncRow(env, budget, timestamp, community, setting, row, pilots) 
     await env.DB.prepare('UPDATE crew_discord SET parent_id=? WHERE crew_id=?').bind(row.parent_id, row.row_id).run();
     if (!row.race_category && parent) await sortVoices(env, budget, row, parent);
   }
-  // The hash version schedules existing vocals once after the public-access upgrade.
-  if (!opened && !row.recap_hash?.startsWith('public-voice-v1:') && (row.parent_id || null) === parent) {
+  // Repair existing vocals once after a voice policy upgrade, preserving unrelated restrictions.
+  if (!opened && !row.recap_hash?.startsWith(VOICE_POLICY_VERSION) && (row.parent_id || null) === parent) {
     const voice = await sendInChannel(env,budget,row,'GET',`/channels/${row.voice_id}`);
     const rules = withPublicVoiceAccess(voice.permission_overwrites,row.guild_id,env.DISCORD_CLIENT_ID);
     if (JSON.stringify(rules) !== JSON.stringify(voice.permission_overwrites || [])) {
@@ -552,7 +554,7 @@ async function syncRow(env, budget, timestamp, community, setting, row, pilots) 
     }
   }
   const payload = recapPayload(env, community, row, start, pilots);
-  const contentHash = 'public-voice-v1:' + await hash(JSON.stringify(payload));
+  const contentHash = VOICE_POLICY_VERSION + await hash(JSON.stringify(payload));
   if (!row.message_id) {
     // Plain names only: even the first message must not notify or ping the pilots.
     const message = await sendInChannel(env, budget, row, 'POST', `/channels/${row.voice_id}/messages`, {...payload, allowed_mentions:{parse:[]}, flags:4096});
