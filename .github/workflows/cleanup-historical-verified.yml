@@ -1,0 +1,116 @@
+name: Clean 14 verified historical branches (manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Preview candidates or delete only verified candidates
+        required: true
+        default: preview
+        type: choice
+        options:
+          - preview
+          - delete
+      confirmation:
+        description: "For delete mode, type exactly DELETE_14_VERIFIED_BRANCHES"
+        required: false
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify every branch before any optional deletion
+        uses: actions/github-script@v7
+        env:
+          CLEANUP_MODE: ${{ inputs.mode }}
+          CLEANUP_CONFIRMATION: ${{ inputs.confirmation }}
+        with:
+          script: |
+            // Frozen inventory: name and SHA observed during the audit.
+            // No wildcard selection and no deletion of newly created branches.
+            const candidates = [
+              ['feature/grindfest-tdz', '2d060c97898808dc51733463b9c672928530e6f1'],
+              ['feature/grindfest-multiple-rounds', 'faf2fb9f1e5ee9e5c0be9cf35c5fac838683ddbe'],
+              ['feature/grindfest-dev-test', 'c2aff4d784571a1a842194c2952024ed9e24cf87'],
+              ['feature/261-discord-recap', '71c3d27e82c8e20e5866bfae1338b94d0a0ba03b'],
+              ['fix/grindfest-optional-twitch', 'ac651c500f543c252b8249ac3dde7ec43ff344ae'],
+              ['claude/acces-stinger-xznhdr', '51196abd1919581836c3de96e5e831bbe4f9fef7'],
+              ['claude/plugin-simhub-v2', '5881c9db52b89dd2d9a5fb05a22854299a3740ca'],
+              ['claude/project-thread-5rjj4k', '1536dd3731a2b7985758394b668c4ed9d37cd8fd'],
+              ['communautes', 'ab421c688240bcdf8ddba981b591569aafd83fd4'],
+              ['events-commentes', '9b4ab7ae91ff2b5fda3e0c8253a414c0e83e78a2'],
+              ['noop-temp-ignore', 'f9a59bdaf7a41c78f61136a980b86e23074feaca'],
+              ['release-sync-150', 'd26cf98cb39ae6ed90e56cd48c07eb20e33f1f87'],
+              ['sync/main-v1.54', '162bf3df20e99bab95fecfa705f033833f670ef4'],
+              ['sync/main-v1.57', '51ed52d576605697f1e2ac770fcab73ff4081e6c'],
+            ];
+            const mode = process.env.CLEANUP_MODE || 'preview';
+            const deleting = mode === 'delete';
+            if (deleting && process.env.CLEANUP_CONFIRMATION !== 'DELETE_14_VERIFIED_BRANCHES') {
+              core.setFailed('Deletion requires the exact confirmation phrase.');
+              return;
+            }
+            const { owner, repo } = context.repo;
+            const openPRs = await github.paginate(github.rest.pulls.list, {
+              owner, repo, state: 'open', per_page: 100
+            });
+            let ready = 0, removed = 0, skipped = 0;
+            for (const [branch, expectedSha] of candidates) {
+              if (branch === 'main' || branch === 'dev' || branch.startsWith('archive/')) {
+                core.warning(`SKIP protected or archived branch: ${branch}`);
+                skipped++;
+                continue;
+              }
+              if (openPRs.some(p => p.head.ref === branch && p.head.repo?.full_name === `${owner}/${repo}`)) {
+                core.warning(`SKIP ${branch}: referenced by an open PR`);
+                skipped++;
+                continue;
+              }
+              let ref;
+              try {
+                ref = await github.rest.git.getRef({owner, repo, ref: `heads/${branch}`});
+              } catch (e) {
+                if (e.status === 404) {
+                  core.info(`SKIP ${branch}: already absent`);
+                  skipped++;
+                  continue;
+                }
+                throw e;
+              }
+              if (ref.data.object.sha !== expectedSha) {
+                core.warning(`SKIP ${branch}: SHA changed since audit`);
+                skipped++;
+                continue;
+              }
+              const compare = await github.rest.repos.compareCommits({
+                owner, repo, base: branch, head: 'dev'
+              });
+              if (compare.data.behind_by !== 0) {
+                core.warning(`SKIP ${branch}: contains commits absent from dev`);
+                skipped++;
+                continue;
+              }
+              ready++;
+              if (!deleting) {
+                core.notice(`PREVIEW eligible: ${branch} @ ${expectedSha}`);
+                continue;
+              }
+              // SHA-lease checked again immediately before deletion.
+              const latest = await github.rest.git.getRef({owner, repo, ref: `heads/${branch}`});
+              if (latest.data.object.sha !== expectedSha) {
+                core.warning(`SKIP ${branch}: moved during inspection`);
+                skipped++;
+                continue;
+              }
+              await github.rest.git.deleteRef({owner, repo, ref: `heads/${branch}`});
+              removed++;
+              core.notice(`DELETED: ${branch}`);
+            }
+            core.summary.addHeading('Historical branch cleanup');
+            core.summary.addRaw(`Mode: ${mode}; eligible: ${ready}; deleted: ${removed}; skipped: ${skipped}`);
+            await core.summary.write();
