@@ -110,4 +110,3 @@ END;
 CREATE TRIGGER event_list_memberships_delete AFTER DELETE ON memberships BEGIN
   UPDATE event_list_revision SET revision=revision+1 WHERE id=1;
 END;
-
