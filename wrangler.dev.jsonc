@@ -8,7 +8,7 @@
   "account_id": "880b4cbe0740cbc099a25c17773c0ec7",
   "keep_vars": true,
   "minify": true,
-  "observability": {"enabled": true, "head_sampling_rate": 0.1},
+  "observability": {"enabled": true, "head_sampling_rate": 0.1, "redact_query_string": true},
   "build": { "command": "npm run build:workers" },
   "triggers": {
     "crons": ["*/15 * * * *", "*/2 * * * *", "*/5 * * * *"]
