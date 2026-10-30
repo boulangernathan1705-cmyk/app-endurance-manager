@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {validateEvent, validateRegistration} from '../server/core.mjs';
+import {body, validateEvent, validateRegistration} from '../server/core.mjs';
 import {assignStreamerWaitlist, grindfestEnabled, normalizeStreamers} from '../shared/grindfest.mjs';
 
 const streamers = [{id:'a',name:'Alpha',capacity:1,twitchUrl:'https://www.twitch.tv/alpha'}, {id:'b',name:'Bravo',capacity:2,twitchUrl:'https://www.twitch.tv/bravo'}];
@@ -47,3 +47,16 @@ test('streamer configuration rejects duplicate identities, unsafe links and inva
   }
 });
 
+
+test('twelve bounded logos fit an event request; an oversized individual logo is rejected', async () => {
+  const logoUrl = 'data:image/webp;base64,' + 'A'.repeat(6000);
+  const streamers = Array.from({length:12}, (_, i) => ({id:`s-${i}`,name:`Streamer ${i}`,capacity:10,logoUrl}));
+  assert.equal(normalizeStreamers(streamers).length, 12);
+  assert.throws(() => normalizeStreamers([{...streamers[0],logoUrl:logoUrl+'AAAA'},streamers[1]]), /logo/i);
+  const payload = JSON.stringify({...input,details:{type:'Grindfest',streamers}});
+  const request = () => new Request('https://example.com/api/events', {method:'POST',headers:{'Content-Type':'application/json'},body:payload});
+  assert.equal(validateEvent(await body(request(), 96000)).details.streamers.length, 12);
+  await assert.rejects(body(request()), error => error.status === 413);
+  const oversized = new Request('https://example.com/api/events', {method:'POST',headers:{'Content-Type':'application/json'},body:' '.repeat(96001)});
+  await assert.rejects(body(oversized, 96000), error => error.status === 413);
+});

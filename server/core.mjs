@@ -152,12 +152,12 @@ async function registrationParticipant(env, actor, input, data, community) {
   await env.DB.prepare('INSERT INTO participants(id,name,user_id,created_by,created_at,community_id) VALUES(?,?,?,?,?,?) ON CONFLICT(community_id,user_id) WHERE user_id IS NOT NULL DO UPDATE SET name=excluded.name').bind(id(),data.name,actor.user.id,actor.user.id,now(),cid).run();
   return env.DB.prepare('SELECT * FROM participants WHERE user_id=? AND community_id=?').bind(actor.user.id,cid).first();
 }
-async function body(request) {
+async function body(request, limit = 24000) {
   if (!request.headers.get('Content-Type')?.startsWith('application/json')) fail(415, 'Format JSON requis.');
   const reader = request.body?.getReader();
   if (!reader) fail(400, 'Formulaire vide.');
   let size = 0; const chunks = [];
-  while (true) { const {value, done} = await reader.read(); if (done) break; size += value.length; if (size > 24000) { await reader.cancel(); fail(413, 'Formulaire trop volumineux.'); } chunks.push(value); }
+  while (true) { const {value, done} = await reader.read(); if (done) break; size += value.length; if (size > limit) { await reader.cancel(); fail(413, 'Formulaire trop volumineux.'); } chunks.push(value); }
   const all = new Uint8Array(size); let offset = 0;
   for (const chunk of chunks) { all.set(chunk, offset); offset += chunk.length; }
   try { const value = JSON.parse(new TextDecoder().decode(all)); if (!value || Array.isArray(value) || typeof value !== 'object') throw Error(); return value; } catch { fail(400, 'Formulaire invalide.'); }
