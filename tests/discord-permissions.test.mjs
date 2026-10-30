@@ -50,3 +50,17 @@ test('public vocals remove access denies for roles and members while retaining u
   }
   assert.deepEqual(withPublicVoiceAccess(result,guild,bot),result);
 });
+
+test('crew vocals allow voice activation even when guild, role and member rules require push to talk',()=>{
+  const voiceActivation=1n<<25n, muteMembers=1n<<22n;
+  const rules=[{id:guild,type:0,allow:'0',deny:String(voiceActivation)},
+    {id:pilots,type:0,allow:'0',deny:String(voiceActivation|muteMembers)},
+    {id:'pilot',type:1,allow:'0',deny:String(voiceActivation)}];
+  const result=withPublicVoiceAccess(rules,guild,bot);
+  for(const [id,roles] of [['visitor',[]],['pilot',[pilots]]]) {
+    const rights=effectivePermissions([{id:guild,permissions:'0'}],{roles},guild,{permission_overwrites:result},id);
+    assert.equal(rights&voiceActivation,voiceActivation,'voice activity must be explicitly granted');
+    assert.equal(rights&muteMembers,0n,'moderation permissions must not be granted');
+  }
+  assert.equal(result[1].deny,String(muteMembers));
+});
