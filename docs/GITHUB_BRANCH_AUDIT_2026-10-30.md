@@ -70,3 +70,46 @@ Ne pas clore ces PR dans une campagne de nettoyage sans validation fonctionnelle
 - Vérifier le statut réel des checks et des workflows Cloudflare sur chaque type de PR.
 - Revoir les modules d'API sensibles (autorisations communautaires, migrations, interactions Discord), puis exécuter les tests et un contrôle de scénarios navigateur.
 - Une vérification statique partielle ne constitue pas un audit de sécurité exhaustif.
+
+## Tri complémentaire : essais et branches mises en pause
+
+De nombreuses branches `claude/*`, `codex/*`, `feature/*`, `hotfix/*` et sans préfixe ont été comparées à `dev`. Les résultats observés sont souvent `diverged` avec un à quelques commits propres, ce qui est attendu si une PR a été intégrée en squash ou si un essai a été abandonné. **Ne pas réintégrer automatiquement ces commits.**
+
+### Branches explicitement ancêtres de dev, sans commit propre
+
+Les comparaisons ont notamment confirmé les candidates suivantes :
+- `feature/grindfest-tdz`
+- `feature/grindfest-multiple-rounds`
+- `feature/grindfest-dev-test`
+- `feature/261-discord-recap`
+- `fix/grindfest-optional-twitch`
+- `claude/acces-stinger-xznhdr`
+- `claude/plugin-simhub-v2`
+- `claude/project-thread-5rjj4k`
+- `communautes`
+- `events-commentes`
+- `noop-temp-ignore`
+- `release-sync-150`
+- `sync/main-v1.54`
+- `sync/main-v1.57`
+
+L'archive `archive/dev-communautes-2026-09-24` est également ancêtre de `dev`, mais **à conserver comme archive** jusqu'à décision explicite.
+
+### Branches divergentes constituant probablement des essais ou versions anciennes
+
+Familles à vérifier par PR et comparaison des fichiers : `claude/memo-*`, `codex/*training*`, `feature/memo-v2`, `fix/remove-*`, `claude/mur-*`, `overlay-*`, `hotfix/v1.*`, `release/v1.*`, `fiche-*`, `fiches-combo*`, `claude/project-thread-*`. Certains travaux ont été arrêtés ou remplacés, mais leur seule divergence Git ne permet pas de les déclarer supprimables.
+
+### Cas qui méritent une attention particulière
+
+- `claude/project-thread-at8rnd` contient 43 commits propres par rapport à `dev`. Ne pas supprimer sur un simple critère de date.
+- `feature/tdz-rally-real-comparison`, `feature/discord-daily-detailed-layout`, `fix/discord-preview-concise-headline` et d'autres branches récentes ne divergent que de quelques commits. Elles peuvent représenter une version intermédiaire déjà squashée ; vérifier les PR.
+- Les PR **#569** (branche `claude/project-thread-ogkwfr`) et **#431** (branche `suite-modules`) sont ouvertes : conserver leurs branches.
+
+## Décision de classement
+
+- **Intégrée** : ancêtre Git de `dev`, et aucune PR ouverte ni dépendance active ; candidate au nettoyage.
+- **Essai remplacé** : la fonctionnalité actuelle est vérifiée et rend les modifications obsolètes ; candidate seulement après contrôle du patch/PR.
+- **En pause** : une reprise reste plausible ; conserver ou créer un tag de sauvegarde avant suppression.
+- **À examiner** : commits propres, travaux récents ou PR ouverte ; conserver.
+
+Aucune suppression historique n'est réalisée par cet audit. Le nouveau workflow de nettoyage automatique proposé porte uniquement sur les futures fusions de PR vers `dev`, et non sur le stock de branches existantes.
