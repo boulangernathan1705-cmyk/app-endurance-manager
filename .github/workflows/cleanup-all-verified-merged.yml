@@ -28,7 +28,7 @@ jobs:
   review-and-clean:
     runs-on: ubuntu-latest
     steps:
-      - name: Inventory merged PR heads and protect ongoing projects
+      - name: Inventory every branch and delete only verified merged PR heads
         uses: actions/github-script@v7
         env:
           CLEANUP_MODE: ${{ inputs.mode }}
@@ -42,18 +42,14 @@ jobs:
             }
             const {owner,repo} = context.repo;
             const fullName = `${owner}/${repo}`;
-            // Never touch stable refs, archives, paused projects or ongoing SimHub work.
+            // All named projects are in scope IF their exact head is already in a merged PR.
+            // Unmerged work is never removed, even if it is old or named like an experiment.
+            // Keep stable refs, archives and the two active PR branches unconditionally.
             const protectedNames = new Set([
-              'main', 'dev', 'suite-modules', 'overlay-dash',
-              'claude/project-thread-at8rnd', 'claude/project-thread-ogkwfr'
+              'main', 'dev', 'suite-modules', 'claude/project-thread-ogkwfr'
             ]);
-            const protectedFragments = [
-              'archive/', 'plugin', 'simhub', 'dash', 'pitwall', 'mur-',
-              'memo', 'preparation', 'entrainement'
-            ];
             function protectedBranch(name) {
-              const lower = name.toLowerCase();
-              return protectedNames.has(name) || protectedFragments.some(fragment => lower.includes(fragment));
+              return protectedNames.has(name) || name.startsWith('archive/');
             }
 
             const pulls = await github.paginate(github.rest.pulls.list, {
