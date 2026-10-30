@@ -1,43 +1,49 @@
-# Déploiement production
+# Déploiement et séparation des environnements
 
-Le dépôt de production est `boulangernathan1705-cmyk/app-endurance-manager` et la branche de production est `main`.
+La branche `main` correspond à la production ; `dev` est la branche d'intégration et de test.
 
-## Cloudflare Workers
+## Trois configurations Wrangler distinctes
 
-Cloudflare Workers déploie le projet avec `npx wrangler deploy`. Le fichier `wrangler.jsonc` est la source de vérité du déploiement :
+| Utilisation | Fichier | Worker | Origine | Base D1 |
+| --- | --- | --- | --- | --- |
+| Local | `wrangler.jsonc` | `endurance-manager-local` | `http://localhost:8787` | `fmt-endurance` |
+| Développement distant | `wrangler.dev.jsonc` | `endurance-manager-dev` | `https://dev.endurance-manager.app` | `endurance-manager-dev` |
+| Production | `wrangler.prod.jsonc` | `endurance-manager-prod` | `https://endurance-manager.app` | `endurance-manager-prod` |
 
-- `server/worker.mjs` reste le Worker d’API ;
-- `npm run build:workers` génère les assets statiques dans `public/` ;
-- seules les routes `/api/*` passent d’abord par le Worker ;
-- les assets statiques sont servis directement par Cloudflare ;
-- aucun binding `ASSETS` n’est déclaré, car le Worker ne lit pas les fichiers statiques lui-même ;
-- `minify: true` laisse Wrangler minifier le Worker avant l’envoi ;
-- `keep_vars: true` conserve les variables et secrets déjà configurés côté Cloudflare.
+Le fichier `wrangler.jsonc` est la configuration **locale par défaut**. Il ne doit pas être pris pour la configuration de production. Chaque environnement distant a une base D1 séparée, qui ne doit être ni recréée ni remplacée pendant un nettoyage de code.
 
-Le build rassemble les feuilles CSS utilisées par `index.html` dans un unique `public/app.css`. Les fichiers CSS restent modulaires dans le dépôt pour faciliter les modifications, mais ils ne sont pas publiés séparément dans le build de production.
+## Architecture Cloudflare actuelle
 
-L’aide est volontairement exclue du CSS principal : `front/help-loader.mjs` charge `help.js` et `help.css` uniquement lorsque l’utilisateur clique sur **Aide**. Les captures de l’aide utilisent déjà `loading="lazy"` et ne sont téléchargées que lorsqu’elles deviennent nécessaires.
+- Entrée Worker : `server/worker-with-migrations.mjs`, qui enveloppe le Worker d'API `server/worker.mjs`.
+- `npm run build:workers` génère les assets dans `public/` et rassemble notamment le CSS dans `public/app.css`.
+- `ASSETS` est effectivement déclaré : le Worker l'utilise pour servir/adapter certaines pages et ressources de communauté.
+- La production utilise `run_worker_first` pour des routes déterminées, et sert directement les ressources statiques exclues ; elle utilise `not_found_handling: "404-page"`.
+- Le développement distant fait transiter les pages par le Worker pour personnaliser les communautés et gérer son environnement de test.
+- `minify: true` et `keep_vars: true` sont présents sur les configurations.
+- L'API envoie `Cache-Control: no-store` ; le cache des assets reste géré par Cloudflare.
 
-Le fichier `_headers` généré ne surcharge que les en-têtes de sécurité des assets statiques. Le cache statique reste géré par le comportement natif de Cloudflare Workers Static Assets (validation par ETag), afin d’éviter les règles dupliquées dans le dépôt. Les réponses de l’API restent explicitement en `Cache-Control: no-store` dans `server/core.mjs`.
+Les fichiers CSS restent modulaires dans le dépôt, mais le build publie une feuille principale. Les ressources d'aide sont chargées à la demande.
 
-La bannière principale est validée au build : elle doit garder une largeur minimale de 1900 px, une hauteur minimale de 512 px et rester sous 300 000 octets. Cette limite protège le temps de chargement du premier écran.
+## Commandes de déploiement : attention à la configuration
 
-## D1
+Le script `npm run deploy:workers` utilise actuellement les commandes Wrangler **sans** `--config`, donc `wrangler.jsonc` (configuration locale). **Ne pas employer ce script comme une commande universelle de déploiement en production.**
 
-La base D1 existante `fmt-endurance` doit être conservée. Son binding est `DB`.
+Toute opération sur les environnements distants doit sélectionner explicitement le bon fichier de configuration. Les migrations D1 doivent cibler la même configuration que le Worker à déployer. Vérifier l'identité du compte, le nom du Worker, la base D1 et les changements de migration avant l'exécution. La procédure automatique de livraison existante reste la référence ; ce document ne la déclenche pas.
 
-Ne pas recréer la base ni rejouer manuellement la migration initiale sur une base déjà en production. Pour un déploiement manuel qui comporte de nouvelles migrations, utiliser `npm run deploy:workers`, qui applique uniquement les migrations D1 en attente avant `wrangler deploy`.
+Les secrets `DISCORD_CLIENT_SECRET` et `DISCORD_BOT_TOKEN` restent dans Cloudflare, jamais dans le dépôt.
 
-## Variables et secrets
+## Publication main après validation dev
 
-`APP_ORIGIN` est versionnée dans `wrangler.jsonc`. Les identifiants Discord non secrets peuvent rester configurés côté Cloudflare grâce à `keep_vars: true`. `DISCORD_CLIENT_SECRET` doit rester un secret Cloudflare et ne jamais être ajouté au dépôt.
+1. Les fonctionnalités sont développées dans une branche temporaire puis intégrées par PR dans `dev`.
+2. Vérifier le site de développement, les tests et les migrations éventuelles ; mettre `CHANGELOG.md` à jour.
+3. Ouvrir une PR `dev` → `main`, titrée `vX.Y : …`. Le ruleset « Protect production » exige les checks `check` et `Release must come from dev`, ainsi qu'une fusion squash.
+4. Après la fusion autorisée, le workflow `Sync dev after release` fusionne `main` dans `dev` afin de préserver la filiation Git après le squash. Vérifier sa réussite avant la release suivante.
 
-## Mise en production (release dev → main)
+**Ne pas fusionner dans `main` sans accord explicite.** Le nettoyage des branches historiques est indépendant des releases.
 
-1. Les changements arrivent sur `dev` (version de test `https://app.endurance-manager.workers.dev`).
-2. `CHANGELOG.md` reçoit la nouvelle version en haut (`## vX.Y — date`), sur `dev`.
-   Les lignes qui ne concernent que les admins vont sous `### 🛠️ Pour les admins` ; une ligne propre à une communauté commence par son nom court (`- **FMT** · …`). La page Nouveautés ne montre à chacun que ce qui le concerne.
-3. Une PR `dev` → `main` est ouverte, titrée `vX.Y : …`. Le ruleset « Protect production » exige les checks `check` et `Release must come from dev`, et une fusion en squash.
-4. Après la fusion, Cloudflare déploie `https://endurance-manager.app` et le workflow `Sync dev after release` remet `main` dans `dev` (commit « Synchronisation avec main après vX.Y »), sans quoi la release suivante serait refusée.
+## Points de vérification avant toute refonte du déploiement
 
-Claude peut faire toutes ces étapes depuis le projet ; il ne fusionne la PR vers `main` qu'après l'accord explicite de Nathan.
+- Confirmer dans le tableau de bord Cloudflare les workflows réellement chargés du déploiement, leur compte et leurs secrets.
+- Contrôler que les environnements de test et de production restent isolés.
+- Vérifier les résultats du workflow de synchronisation et des contrôles de release.
+- Ne modifier ni les routes Cloudflare, ni les bindings, ni les bases D1 dans une PR purement documentaire.

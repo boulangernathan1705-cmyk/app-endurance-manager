@@ -141,14 +141,17 @@ function xhrApi(path,method,data,priorDetail='') {
     request.send(method==='GET'?null:JSON.stringify(data||{}));
   });
 }
-export async function api(path,method='GET',data) {
+export async function api(path,method='GET',data,conditional=null) {
   const attempts=[];
   // Only reads are tried again: a creation whose answer was lost may already be saved (no duplicate race).
   const tries=method==='GET'?2:1;
   for (let attempt=0;attempt<tries;attempt++) {
     const started=tick();
     try {
-      const response = await fetch(path,{method,credentials:'same-origin',cache:'no-store',headers:method==='GET'?{'Accept':'application/json'}:{'Accept':'application/json','Content-Type':'application/json'},body:method==='GET'?undefined:JSON.stringify(data||{})});
+      const headers=method==='GET'?{'Accept':'application/json'}:{'Accept':'application/json','Content-Type':'application/json'};
+      if (method==='GET' && conditional?.tag && conditional.data) headers['If-None-Match']=conditional.tag;
+      const response = await fetch(path,{method,credentials:'same-origin',cache:'no-store',headers,body:method==='GET'?undefined:JSON.stringify(data||{})});
+      if (response.status===304 && conditional?.tag && conditional.data) return structuredClone(conditional.data);
       const elapsed=Math.round(tick()-started);
       const text=await response.text();
       const bytes=new TextEncoder().encode(text).length;
@@ -156,6 +159,10 @@ export async function api(path,method='GET',data) {
       try { result=JSON.parse(text); }
       catch { const error=Error(`Le service partagé ne répond pas correctement (${method} ${path}, statut ${response.status}, ${bytes} octets).`);reportClientError({path,method,message:error.message,detail:`fetch ${attempt+1}; ${elapsed}ms; status ${response.status}; ${bytes} bytes; server ${response.headers.get('X-Endurance-Approx-Bytes')||'n/a'}`});throw error; }
       if (!response.ok) throw Error(result.error || `Cette action a échoué (${response.status}).`);
+      if (conditional && method==='GET') {
+        conditional.tag=response.headers.get('ETag')||'';
+        conditional.data=conditional.tag?structuredClone(result):null;
+      }
       return result;
     } catch (error) {
       const elapsed=Math.round(tick()-started);
@@ -170,6 +177,8 @@ export async function api(path,method='GET',data) {
     reportClientError({path,method,message:diagnosticMessage(path,method,'envoi en échec, non renvoyé'),detail:priorDetail});
     throw error;
   }
+  // XHR is an unconditional fallback; an older tag must never label its newer response.
+  if (conditional) { conditional.tag=''; conditional.data=null; }
   try { return await xhrApi(path,method,data,priorDetail); }
   catch (error) {
     if (/Diagnostic :/.test(String(error?.message || ''))) throw error;
@@ -178,8 +187,12 @@ export async function api(path,method='GET',data) {
     throw wrapped;
   }
 }
+// Only two lists, in this page's memory. Never persist private event data across visits.
+const eventResponses=new Map();
+let eventSession='';
 async function fetchEvents(scope) {
-  const result = await api(`/api/races?game=${encodeURIComponent(activeGame)}&scope=${scope}`);
+  if (!eventResponses.has(scope)) eventResponses.set(scope,{});
+  const result = await api(`/api/races?game=${encodeURIComponent(activeGame)}&scope=${scope}`,'GET',undefined,eventResponses.get(scope));
   return (Array.isArray(result.events)?result.events:[]).filter(event => event.format === 'solo' || gameForEvent(event) === activeGame);
 }
 // Common start of a race whose time is not known yet ("Horaire à définir"): its time reads "à définir"
@@ -206,6 +219,9 @@ function mergeEvents(...lists) {
 export async function load() {
   // The community is only open to the members of its Discord server: nothing else is loaded otherwise.
   const session = await api('/api/session');
+  // Account, community settings or permissions changed: discard both private representations.
+  const sessionKey=JSON.stringify(session);
+  if (sessionKey!==eventSession) { eventResponses.clear(); eventSession=sessionKey; }
   const accessChanged = state.access !== session.access;
   state.access=session.access; state.permissions=session.permissions||[]; state.manager=session.manager===true; state.community=session.community||null; state.communities=Array.isArray(session.communities)?session.communities:[]; state.openSite=session.openSite===true; state.platformDiscordUrl=session.platformDiscordUrl||null; state.elsewhere=Array.isArray(session.elsewhere)?session.elsewhere:[];
   const member = session.access === 'member';
