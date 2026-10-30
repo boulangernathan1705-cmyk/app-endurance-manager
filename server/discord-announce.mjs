@@ -45,14 +45,17 @@ const today = (start, day, timestamp, pending) => Number.isFinite(Number(start?.
 export async function announceItems(env, community, timestamp) {
   const day = parisDay(timestamp), items = [];
   const solo = (await env.DB.prepare(`SELECT id,sim,departures,schedule_pending FROM events WHERE ${SOLO_SQL(env, community)}`).bind(community.id).all()).results || [];
+  const registrations = (await env.DB.prepare(`SELECT event_id,departure_id FROM registrations
+    WHERE community_id=? AND COALESCE(status,'')<>'unavailable' GROUP BY event_id,departure_id`).bind(community.id).all()).results || [];
   for (const row of solo) {
-    const starts = parse(row.departures, []).filter(start => today(start, day, timestamp, Boolean(row.schedule_pending)));
+    const starts = parse(row.departures, []).filter(start => today(start, day, timestamp, Boolean(row.schedule_pending))
+      && (isStream(row) || registrations.some(entry => entry.event_id === row.id && entry.departure_id === start.id)));
     // A stream (« Annoncer un stream ») has its own card, without « Présent » nor « Absent ».
     if (starts.length) items.push({item:row.id, kind:isStream(row) ? 'stream' : 'event', startsAt:Math.min(...starts.map(start => Number(start.startsAt)))});
   }
   // The endurances as in the week's message (official LMU ones included, iRacing ones as the community shows them).
   const snapshot = await loadWeeklyDiscordSnapshot(env, timestamp, community, 'all');
-  for (const departure of snapshot.futureDepartures.filter(item => parisDay(item.startsAt) === day)) {
+  for (const departure of snapshot.futureDepartures.filter(item => parisDay(item.startsAt) === day && item.pilotCount > 0)) {
     const known = items.find(item => item.item === departure.eventId);
     if (!known) items.push({item:departure.eventId, kind:'race', startsAt:departure.startsAt});
   }
@@ -64,18 +67,22 @@ async function eventSnapshot(env, community, id, timestamp) {
   const row = await env.DB.prepare(`SELECT id,name,sim,circuit,rounds,capacity,access,details,departures,schedule_pending,created_by FROM events WHERE id=? AND ${SOLO_SQL(env, community)}`)
     .bind(id, community.id).first();
   if (!row) return null;
-  const day = parisDay(timestamp), start = parse(row.departures, []).find(item => Number.isFinite(Number(item?.startsAt)) && parisDay(Number(item.startsAt)) === day);
+  const day = parisDay(timestamp);
+  const entries = isStream(row) ? [] : (await env.DB.prepare(`SELECT departure_id,streamer_id,COUNT(DISTINCT COALESCE(participant_id,id)) AS entered FROM registrations
+    WHERE event_id=? AND community_id=? AND COALESCE(status,'')<>'unavailable' GROUP BY departure_id,streamer_id`).bind(row.id, community.id).all()).results || [];
+  const start = parse(row.departures, []).find(item => today(item, day, timestamp, Boolean(row.schedule_pending))
+    && (isStream(row) || entries.some(entry => entry.departure_id === item.id)));
   if (!start) return null;
   const details = parse(row.details, {}) || {}, sim = simForEvent(row), tdz = tdzOnly(community, isDevelopment(env));
   if (isStream(row)) return {id:row.id, name:row.name, startsAt:Number(start.startsAt), stream:{...streamDetails({details}), crew:await streamCrew(env, community.id, row)}};
-  const entries = (await env.DB.prepare(`SELECT streamer_id,COUNT(DISTINCT COALESCE(participant_id,id)) AS entered FROM registrations
-    WHERE event_id=? AND departure_id=? AND community_id=? AND COALESCE(status,'')<>'unavailable' GROUP BY streamer_id`).bind(row.id, start.id, community.id).all()).results || [];
-  const entered = entries.reduce((total, item) => total + Number(item.entered || 0), 0);
+  const startEntries = entries.filter(entry => entry.departure_id === start.id);
+  const entered = startEntries.reduce((total, item) => total + Number(item.entered || 0), 0);
+  if (!entered) return null;
   const gridfest = isGrindfest(row), site = siteOf(env, community).url || '';
   return {id:row.id, name:row.name, sim, type:normalizeTdzEventType(details.type) || '', access:tdz ? row.access || 'open' : '', tdz, note:details.note || '',
     startsAt:Number(start.startsAt), timePending:Boolean(row.schedule_pending) || start.tbd === true,
     rounds:parse(row.rounds, []), capacity:row.capacity == null ? null : Number(row.capacity), entered,
-    streamers:gridfest ? streamersOf(row).map(streamer => ({name:streamer.name, twitchUrl:streamer.twitchUrl, capacity:streamer.capacity, entered:Number(entries.find(item => item.streamer_id === streamer.id)?.entered || 0)})) : [],
+    streamers:gridfest ? streamersOf(row).map(streamer => ({name:streamer.name, twitchUrl:streamer.twitchUrl, capacity:streamer.capacity, entered:Number(startEntries.find(item => item.streamer_id === streamer.id)?.entered || 0)})) : [],
     rally:sim === 'acrally' ? {stages:details.rallyStages || [], host:details.rallyHost || '', carMode:details.rallyCarMode || '', minutes:details.rallyEstimatedMinutes || 0} : null,
     // The password itself never goes on Discord.
     password:Boolean(details.password) && row.access === 'safe' && !gridfest,
@@ -87,7 +94,7 @@ async function raceSnapshot(env, community, id, timestamp) {
   const row = await env.DB.prepare('SELECT id,name,circuit,event_type,community_id,duration_hours,duration_minutes,details FROM events WHERE id=?').bind(id).first();
   if (!row) return null;
   const day = parisDay(timestamp), snapshot = await loadWeeklyDiscordSnapshot(env, timestamp, community, 'all', id);
-  const departures = snapshot.futureDepartures.filter(item => parisDay(item.startsAt) === day);
+  const departures = snapshot.futureDepartures.filter(item => parisDay(item.startsAt) === day && item.pilotCount > 0 && (item.timePending || item.startsAt > timestamp));
   if (!departures.length) return null;
   return {id:row.id, name:row.name, circuit:row.circuit, eventType:row.event_type || '', official:row.community_id === 'official',
     durationMinutes:Number(row.duration_minutes) || Number(row.duration_hours) * 60 || 0, details:parse(row.details, {}) || {}, departures};
@@ -117,8 +124,24 @@ export async function announcePayload(env, community, row, timestamp, counts = n
 // One community: today's list made in the morning, its messages sent in order, then the counts kept up to date.
 // Returns whether Discord was asked something.
 export async function announceCommunity(env, community, settings, timestamp = Date.now()) {
-  const channel = announceChannel(settings), stream = announceStream(settings);
+  const channel = announceChannel(settings);
   if (!channel || !community.discordGuildId || settings.guild_id !== community.discordGuildId) return false;
+  // Share the settings lock with recap sync/configuration; a nonce alone only deduplicates recent sends.
+  const token = crypto.randomUUID(), now = Date.now();
+  const lock = await env.DB.prepare('UPDATE community_recap_settings SET lock_token=?,lock_until=? WHERE community_id=? AND lock_until<?')
+    .bind(token, now + 180000, community.id, now).run();
+  if (!lock.meta.changes) return false;
+  try {
+    const current = await env.DB.prepare('SELECT * FROM community_recap_settings WHERE community_id=?').bind(community.id).first();
+    if (!announceChannel(current) || current.guild_id !== community.discordGuildId) return false;
+    return await publishAnnouncement(env, community, current, timestamp);
+  } finally {
+    await env.DB.prepare("UPDATE community_recap_settings SET lock_token='',lock_until=0 WHERE community_id=? AND lock_token=?").bind(community.id, token).run();
+  }
+}
+
+async function publishAnnouncement(env, community, settings, timestamp) {
+  const channel = announceChannel(settings), stream = announceStream(settings);
   const day = parisDay(timestamp), budget = {left:REQUESTS};
   let rows = (await env.DB.prepare('SELECT * FROM discord_announcements WHERE community_id=? AND day=? ORDER BY position').bind(community.id, day).all()).results || [];
   if (!rows.length) {
@@ -139,15 +162,20 @@ export async function announceCommunity(env, community, settings, timestamp = Da
   const legacy=rows.filter(row=>row.kind!=='intro' && row.message_id && row.message_id!=='-' && row.message_id!==intro.message_id);
   const due=!intro.message_id || !intro.content_hash?.startsWith('single-embed-v1:') || legacy.length || timestamp-Number(intro.checked_at||0)>=REFRESH_EVERY;
   if(!due)return false;
-  const counts={events:rows.filter(row=>row.kind==='event').length,races:rows.filter(row=>row.kind==='race').length,
-    lives:rows.filter(row=>row.kind==='stream').length,streams:await streamTimes(env,rows)};
-  const items=[];
+  const items=[], activeRows=[];
   const eventRows=rows.filter(row=>['event','race','stream'].includes(row.kind));
-  for(const row of eventRows.slice(0,9)) {
+  for(const row of eventRows) {
     const payload=await announcePayload(env,community,row,timestamp,null,stream);
-    if(payload)items.push({name:payload.embeds[0].title.replace(/^[^\p{L}\p{N}]+/u,''),payload});
+    if(payload){activeRows.push(row);items.push({name:payload.embeds[0].title.replace(/^[^\p{L}\p{N}]+/u,''),payload});}
   }
-  items.push(...eventRows.slice(9).map(row=>({name:row.item,payload:{embeds:[],components:[]}})));
+  // Entries may have disappeared since planning (or an old version planned empty races).
+  // Never create/recreate an empty announcement, including after a manual Discord deletion.
+  if (!items.length) {
+    await env.DB.prepare('UPDATE discord_announcements SET checked_at=? WHERE community_id=? AND day=?').bind(timestamp,community.id,day).run();
+    return false;
+  }
+  const counts={events:activeRows.filter(row=>row.kind==='event').length,races:activeRows.filter(row=>row.kind==='race').length,
+    lives:activeRows.filter(row=>row.kind==='stream').length,streams:await streamTimes(env,activeRows)};
   const site={...siteOf(env,community),streamUrl:stream,streamName:parseLayout(settings.layout)?.streamName||'',streams:counts.streams};
   const payload=buildCompleteAnnouncement(buildAnnounceIntro(counts,site),items,site);
   const hash=await contentHash(payload);
