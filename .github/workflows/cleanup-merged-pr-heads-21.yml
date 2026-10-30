@@ -1,0 +1,105 @@
+name: Clean 21 merged PR head branches (manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Preview eligible branches or delete after confirmation
+        required: true
+        type: choice
+        default: preview
+        options: [preview, delete]
+      confirmation:
+        description: "For delete mode, enter DELETE_21_MERGED_BRANCHES"
+        required: false
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify exact merged PR commits and clean only allowed branches
+        uses: actions/github-script@v7
+        env:
+          CLEANUP_MODE: ${{ inputs.mode }}
+          CLEANUP_CONFIRMATION: ${{ inputs.confirmation }}
+        with:
+          script: |
+            // Each triplet was verified against a merged PR (head SHA matches branch head).
+            // The workflow does not discover, glob or clean any other branches.
+            const candidates = [
+              ['analyse-du-tour', 414, '062d98159c34963bc8f9d784b42075ecdfff26b1'],
+              ['analyse-mobile', 419, '44a7048b24bfdf94e045e321d4e818bf7cc0bd86'],
+              ['fiche-actualiser', 415, '6e3608a3ee3c4b9fba13a357a5e8b095e615fc02'],
+              ['fiche-cache', 426, '8d92c0032dd8ed9a7cc0f9b1788db74f114688fb'],
+              ['fiche-entete', 422, 'b4d65711e347168661640e645a13d1f9d7ab88f4'],
+              ['fiche-lisible', 412, 'd03f00d948c9d7136b075b1ce2eb9814aa4f22e2'],
+              ['fiche-violet', 421, 'b6a40ed451874859491d8faf382c22db0c38ad60'],
+              ['fiches-combo-page', 409, 'e359ca896a843f3de85ee034a7e74ea37829a70d'],
+              ['palette-sans-violet', 428, '7856d8b19f937c80b43002b4ab4ab26b243cc432'],
+              ['fix/discord-preview-comparison', 587, '5ed34333a18eacf202a632fbcf41d880e24c2135'],
+              ['fix/discord-preview-concise-headline', 591, 'ebb4a853e09de2877c166e114e06180f486a2483'],
+              ['fix/iracing-audit-filters-circuits', 389, '848d63859183ad0d2e19eb255960f7fc243f983e'],
+              ['fix/crew-channel-cleanup-retries', 401, 'c3cc09275aa6ae0de9de57bdff2e08c308bc8060'],
+              ['fix/delete-crew-voice', 384, '27ca10872962e88df0e0d5aca32250d0577f58eb'],
+              ['feature/discord-evening-real-preview', 589, '54546821772244fd358633a4f36b9c96c8cec9a8'],
+              ['feature/discord-message-preview-v2', 586, 'e9443449d9fb42d5654f21e0426d2669d705d709'],
+              ['hotfix/discord-live-heading', 580, '12e80458a89e13fb8c46686b1267645e13425c1c'],
+              ['hotfix/discord-preview-twitch', 582, '197595bc37f2e1c378e965feb9afb22a6147bfbe'],
+              ['hotfix/discord-announcement-preview', 581, 'e834625958cbe7e4eb5aac119941854eb71a6375'],
+              ['hotfix/v1.84', 550, '11016919909bac6c9f52f31445195f2d62767473'],
+              ['hotfix/v1.85', 551, '5f88f5fb9317eb15e03705cb69de088205a0c46f'],
+            ];
+            const mode = process.env.CLEANUP_MODE || 'preview';
+            if (!['preview','delete'].includes(mode)) {
+              core.setFailed('Unsupported mode');
+              return;
+            }
+            if (mode === 'delete' && process.env.CLEANUP_CONFIRMATION !== 'DELETE_21_MERGED_BRANCHES') {
+              core.setFailed('Deletion requires exactly DELETE_21_MERGED_BRANCHES');
+              return;
+            }
+            const {owner,repo} = context.repo;
+            const open = await github.paginate(github.rest.pulls.list,{owner,repo,state:'open',per_page:100});
+            let eligible = 0, deleted = 0, skipped = 0;
+            for (const [branch,prNumber,expectedSha] of candidates) {
+              try {
+                if (['main', 'dev'].includes(branch) || branch.startsWith('archive/') ||
+                    open.some(pr => pr.head.ref === branch && pr.head.repo?.full_name === `${owner}/${repo}`)) {
+                  core.warning(`SKIP ${branch}: prohibited prefix or open PR`); skipped++; continue;
+                }
+                const pr = (await github.rest.pulls.get({owner,repo,pull_number:prNumber})).data;
+                if (!pr.merged_at || pr.base.ref !== 'dev' && pr.base.ref !== 'main' ||
+                    pr.head.ref !== branch || pr.head.sha !== expectedSha) {
+                  core.warning(`SKIP ${branch}: matching PR was not merged at the expected head`); skipped++; continue;
+                }
+                let current;
+                try {
+                  current = (await github.rest.git.getRef({owner,repo,ref:`heads/${branch}`})).data;
+                } catch(e) {
+                  if (e.status === 404) {core.info(`SKIP ${branch}: already absent`); skipped++; continue;}
+                  throw e;
+                }
+                if (current.object.sha !== expectedSha) {
+                  core.warning(`SKIP ${branch}: branch head changed`); skipped++; continue;
+                }
+                eligible++;
+                if (mode === 'preview') {core.notice(`PREVIEW eligible: ${branch} (PR #${prNumber})`);continue;}
+                // If the ref moved after inspection, do not delete.
+                const last = (await github.rest.git.getRef({owner,repo,ref:`heads/${branch}`})).data;
+                if (last.object.sha !== expectedSha) {core.warning(`SKIP ${branch}: SHA changed`);skipped++;continue;}
+                await github.rest.git.deleteRef({owner,repo,ref:`heads/${branch}`});
+                deleted++;
+                core.notice(`DELETED: ${branch}`);
+              } catch(e) {
+                core.error(`Branch ${branch}: ${e.message}`);
+                throw e;
+              }
+            }
+            core.summary.addHeading('Historical merged PR branch cleanup');
+            core.summary.addRaw(`Mode: ${mode}; eligible: ${eligible}; deleted: ${deleted}; skipped: ${skipped}`);
+            await core.summary.write();
