@@ -1,5 +1,4 @@
 import {helpContext} from './context-help.mjs';
-import {discordPreviewsMarkup,discordExportPayload} from './discord-preview.mjs';
 const app = document.getElementById('members-app');
 const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
 
@@ -182,9 +181,7 @@ function discordForm(setup, settings) {
       </ul>
       <div class="setup-actions"><button type="submit" class="primary-button">${config?.enabled ? 'Enregistrer' : 'Activer'}</button><button type="button" class="secondary-button" data-discord-preview>Voir les messages</button><button type="button" class="secondary-button" data-discord-destinations>Actualiser les salons</button>${config?.lastError ? '<button type="button" class="secondary-button" data-discord-repair>Réparer</button>' : ''}${config?.enabled || leaving ? '<button type="button" class="danger-button" data-discord-remove>Tout retirer</button>' : ''}<span class="settings-status" role="status" aria-live="polite"></span></div>
       <p class="members-help">${config?.enabled ? 'Si tu changes d’avis, le bot retire ce qu’il avait créé et refait selon tes nouveaux choix. Les messages sont modifiés sans notification.' : 'Rien n’est publié avant « Activer ».'}</p>
-      <a class="primary-button" href="/discord-preview.html" target="_blank" rel="noopener">Voir la nouvelle maquette · Programme du soir</a>
-      <button type="button" class="secondary-button" data-discord-announcement-preview>Comparer les deux versions de l’annonce</button>
-      <details><summary>Tester une annonce dans Discord</summary><p>Envoie une démonstration SAFE’S RACE avec des données d’exemple, sans mention ni inscription. Les boutons d’exemple sont désactivés.</p><label>Nom ou identifiant du salon texte <input name="announcementTestChannel" placeholder="discussion"></label><button type="button" class="secondary-button" data-discord-announcement-test>Envoyer l’exemple dans Discord</button></details>
+      <details><summary>Tester une annonce dans Discord</summary><p>Envoie une démonstration SAFE’S RACE avec des données d’exemple, sans mention ni inscription.</p><label>Nom ou identifiant du salon texte <input name="announcementTestChannel" placeholder="discussion"></label><button type="button" class="secondary-button" data-discord-announcement-test>Envoyer l’aperçu</button></details>
       <div data-recap-preview class="recap-live-preview"></div>
     </div>
     <div class="discord-steps"><button type="button" class="secondary-button" data-discord-step="-1">Retour</button><span data-discord-count></span><button type="button" class="primary-button" data-discord-step="1">Suivant</button></div>
@@ -202,7 +199,7 @@ function discordRead(form) {
   if (radio('copy')) answers.copy = radio('copy') === 'private';
   if (radio('pitCopy')) answers.pitCopy = radio('pitCopy') === 'private';
   for (const name of ['showWeek','showEvents','reminders']) if (field(name)) answers[name] = field(name).checked;
-  for (const name of ['under','events','pitAt','announce','stream','streamName','announceFormat']) if (field(name)) answers[name] = field(name).value.trim();
+  for (const name of ['under','events','pitAt','announce','stream','streamName']) if (field(name)) answers[name] = field(name).value.trim();
   answers.week ||= {};
   for (const key of ['all','lmu','iracing']) if (field(`week-${key}`)) answers.week[key] = field(`week-${key}`).value;
   return answers;
@@ -286,7 +283,6 @@ function discordQuestions(form, answers) {
   questions.push(['Annoncer les courses du jour ?', row('📣 Annonce du jour', 'Chaque matin à 7h30, avec @everyone : les events et endurances du jour, avec Présent et Absent.',
     `<select name="announce"><option value="" ${!announce ? 'selected' : ''}>Ne pas annoncer</option>${channels.map(item => `<option value="${esc(item.id)}" ${item.id === announce ? 'selected' : ''}>${item.parentId ? '   ' : ''}# ${esc(item.name)}${item.announceReady === false ? ' · le bot n’a pas ses droits' : ''}</option>`).join('')}${announce && !chosen ? `<option value="${esc(announce)}" selected>Choix enregistré</option>` : ''}</select>`,
     chosen?.announceReady === false ? `<p class="setup-note setup-error discord-rights">Sur Discord : clic droit sur « ${esc(chosen.name)} » › Modifier le salon › Permissions › « + » › Endurance Manager, puis coche ${esc((chosen.announceMissing || []).join(', '))}. Reviens ensuite sur « Actualiser les salons ».</p>` : '')
-    + row('Présentation de l’annonce', 'Le bouton « Comparer les deux versions de l’annonce » affiche les deux présentations ensemble. Le choix sera appliqué après enregistrement.', `<select name="announceFormat"><option value="embed" ${answers.announceFormat!=='v2'?'selected':''}>Embed classique</option><option value="v2" ${answers.announceFormat==='v2'?'selected':''}>Carte avec sections (Components V2)</option></select>`)
     + (announce ? row('📺 Lien du stream', 'Facultatif : « 📺 Lancement du stream sur Twitch à 19h45 » dans l’annonce, avec l’heure de début du stream de l’event.',
       `<input type="url" name="stream" inputmode="url" maxlength="300" placeholder="https://twitch.tv/…" value="${esc(answers.stream || '')}">`)+row('Nom du streamer','Nom affiché dans « La soirée avec… ». Sans nom renseigné, le nom de la chaîne est utilisé.',`<input name="streamName" maxlength="80" placeholder="La Praline" value="${esc(answers.streamName||'')}">`) : '')]);
   return questions;
@@ -394,11 +390,10 @@ function discordInput(form) {
   const isPrivate = id => list.some(item => item.id === id && item.type === 4 && item.private);
   return {layout:{...answers, events:discordEvents(answers), copy:answers.copy !== false && isPrivate(answers.under), pitCopy:answers.pitCopy !== false && isPrivate(answers.pitAt)}};
 }
-function showDiscordPreviews(form, previews) {
-  form._previews=previews;
-  const target=form.querySelector('[data-recap-preview]');
-  target.classList.remove('is-mobile');
-  target.innerHTML=discordPreviewsMarkup(previews);
+const recapPreviewText = value => esc(String(value || '').replace(/<t:(\d+):[A-Za-z]>/g,(_,unix) => new Date(Number(unix)*1000).toLocaleString('fr-FR',{timeZone:'Europe/Paris',dateStyle:'medium',timeStyle:'short'})).replace(/\*\*/g,''))
+  .replace(/&lt;:em_([a-z0-9_]+):\d+&gt;/g,'<img src="/images/discord-emojis/$1.png" width="18" height="18" alt="">');
+function recapPreviewMarkup(previews) {
+  return previews.length ? previews.map(item => `<figure class="recap-preview"><figcaption># ${esc(item.name)}</figcaption>${item.payload.embeds.map(embed => `<div class="recap-preview-embed"><strong>${esc(embed.title || '')}</strong><span>${recapPreviewText(embed.description)}</span>${(embed.fields || []).map(field => `<b>${esc(field.name)}</b><span>${recapPreviewText(field.value)}</span>`).join('')}${embed.url ? `<a href="${esc(embed.url)}">Voir sur le site</a>` : ''}</div>`).join('')}</figure>`).join('') : '<p>Rien à publier pour le moment. Les prochaines courses apparaîtront toutes seules.</p>';
 }
 // Why the crews' channels cannot be turned on yet (the bot's state on the server, checked by the site).
 const BOT_PROBLEMS = {
@@ -754,35 +749,20 @@ app.addEventListener('click', async event => {
     const form = discordButton.closest('[data-discord-form]'), status = form.querySelector('.setup-actions .settings-status');
     discordButton.disabled = true; status.textContent = '';
     try {
-      if(discordButton.matches('[data-discord-preview-size]')){
-        const target=form.querySelector('[data-recap-preview]');
-        target.classList.toggle('is-mobile',discordButton.dataset.discordPreviewSize==='mobile');
-        for(const button of target.querySelectorAll('[data-discord-preview-size]'))button.setAttribute('aria-pressed',String(button===discordButton));
-      }
-      else if(discordButton.matches('[data-discord-export]')){
-        const item=form._previews?.[Number(discordButton.dataset.discordExport)];
-        if(!item)throw new Error('Recharge l’aperçu avant de l’exporter.');
-        const blob=new Blob([JSON.stringify(discordExportPayload(item.payload),null,2)+'\n'],{type:'application/json'});
-        const href=URL.createObjectURL(blob),link=document.createElement('a');
-        link.href=href;link.download=`discord-${Number(discordButton.dataset.discordExport)+1}.json`;
-        document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(href),1000);
-        status.textContent='✓ JSON exporté, sans notification. Les actions nécessitent le bot Endurance Manager.';
-      }
-      else if (discordButton.matches('[data-discord-destinations]')) { await loadDiscordDestinations(form); status.textContent = '✓'; }
+      if (discordButton.matches('[data-discord-destinations]')) { await loadDiscordDestinations(form); status.textContent = '✓'; }
       else if(discordButton.matches('[data-discord-announcement-test]')){
         const channel=form.elements.announcementTestChannel.value.trim();
         if(!channel)throw new Error('Indique le salon de test.');
         status.textContent='Envoi de l’aperçu…';
-        await api('/api/community/discord/announcement-test','POST',{channel,...discordInput(form)});
+        await api('/api/community/discord/announcement-test','POST',{channel});
         status.textContent='✓ Aperçu envoyé dans le salon choisi, sans mention.';
       }
-      else if (discordButton.matches('[data-discord-preview],[data-discord-announcement-preview]')) {
+      else if (discordButton.matches('[data-discord-preview]')) {
         const preview = form.querySelector('[data-recap-preview]'), input = discordInput(form);
-        const requestId=(form._previewRequest||0)+1;form._previewRequest=requestId;
         preview.textContent = 'Chargement de l’aperçu…';
-        const result = await api(discordButton.matches('[data-discord-announcement-preview]')?'/api/community/discord/announcement-preview':'/api/community/recap/preview','POST',input);
+        const result = await api('/api/community/recap/preview','POST',input);
         // A late answer never replaces a newer choice.
-        if (form._previewRequest===requestId && JSON.stringify(discordInput(form)) === JSON.stringify(input)) showDiscordPreviews(form,result.previews);
+        if (JSON.stringify(discordInput(form)) === JSON.stringify(input)) preview.innerHTML = recapPreviewMarkup(result.previews);
       } else if (discordButton.matches('[data-discord-repair]')) {
         status.textContent = 'Réparation…';
         const result = await api('/api/community/recap/repair','POST',{});

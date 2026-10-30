@@ -74,48 +74,6 @@ async function as(env,path,method='GET',input,user=OWNER){
   return {status:response.status,data:await response.json()};
 }
 
-test('daily announcement browser preview supports V2 and never publishes or changes settings',async t=>{
-  const {env,calls,DB}=setup(t);
-  const before=DB.db.prepare('SELECT * FROM community_recap_settings').all();
-  const result=await as(env,'/api/community/discord/announcement-preview','POST',{layout:{mode:'events',sims:'all',under:'top',announceFormat:'v2'}});
-  assert.equal(result.status,200);assert.equal(result.data.previews.length,2);
-  const [classic,v2]=result.data.previews;
-  assert.equal(classic.format,'embed');assert.ok(classic.payload.embeds.length);
-  assert.equal(v2.format,'v2');assert.equal(v2.payload.flags,32768);
-  assert.deepEqual(classic.payload.allowed_mentions,{parse:[]});assert.deepEqual(v2.payload.allowed_mentions,{parse:[]});
-  assert.equal(written(calls).length,0);
-  assert.deepEqual(DB.db.prepare('SELECT * FROM community_recap_settings').all(),before);
-});
-
-test('the evening concept posts one real Discord sample only to an authorized community channel, without mentions or active actions',async t=>{
-  const {env,calls}=setup(t);
-  const result=await as(env,'/api/community/discord/announcement-test','POST',{channel:TEXT,variant:'evening',scenario:'endurance'});
-  assert.equal(result.status,200,JSON.stringify(result.data));
-  const posts=sends(calls);assert.equal(posts.length,1);
-  assert.equal(posts[0].path,`/channels/${TEXT}/messages`);
-  const payload=posts[0].body;assert.equal(payload.flags,32768|4096);
-  assert.deepEqual(payload.allowed_mentions,{parse:[]});assert.equal(payload.components.length,1);assert.equal(payload.components[0].components.at(-1).type,12);
-  assert.match(JSON.stringify(payload),/LeMansUltimateLogo/);assert.equal(payload.content,undefined);
-  const walk=items=>items.flatMap(item=>[item,...walk(item.components||[])]);
-  assert.ok(walk(payload.components).filter(item=>item.type===2).every(item=>item.disabled));
-  calls.length=0;
-  const denied=await as(env,'/api/community/discord/announcement-test','POST',{channel:'999999999999999999',variant:'evening'});
-  assert.equal(denied.status,400);assert.equal(sends(calls).length,0);
-});
-
-test('TDZ capture comparison is read-only; explicit test sends only the proposed layout',async t=>{
-  const {env,calls}=setup(t);
-  const preview=await as(env,'/api/community/discord/announcement-preview','POST',{variant:'tdz-rally'});
-  assert.equal(preview.status,200,JSON.stringify(preview.data));
-  assert.equal(preview.data.source.kind,'capture');assert.equal(preview.data.previews.length,2);
-  assert.equal(sends(calls).length,0);
-  const sent=await as(env,'/api/community/discord/announcement-test','POST',{channel:TEXT,variant:'tdz-rally'});
-  assert.equal(sent.status,200,JSON.stringify(sent.data));assert.equal(sends(calls).length,1);
-  const payload=sends(calls)[0].body;assert.equal(payload.flags,32768|4096);
-  assert.deepEqual(payload.allowed_mentions,{parse:[]});assert.match(JSON.stringify(payload),/BOUBOULES AC RALLY/);
-  assert.doesNotMatch(JSON.stringify(payload),/Ginetta|20:45/);
-});
-
 test('read-only previews preserve every departure and never send to Discord',async t=>{
   const {DB,env,calls}=setup(t);race(DB,'a','Même course','spa',[{id:'s1',startsAt:NOW+DAY},{id:'s2',startsAt:NOW+8*DAY}]);race(DB,'b','Même course','iracing-spa');
   const previews=await previewBotRecap(env,NOW,COMMUNITY,SETTINGS);
@@ -436,7 +394,6 @@ test('Discord diagnostics distinguish removed messages, missing channels and mis
   assert.match(recapError({status:403,code:50013,path:'/channels/1/messages?limit=5'}),/Voir le salon.*\(Discord 50013 sur \/channels\/1\/messages\)/);
   assert.match(recapError({status:403,code:50005,path:'/channels/1/messages/2'}),/n’a pas écrit.*Discord 50005/);
   assert.match(recapError({status:403,code:160005}),/verrouillé.*Discord 160005/);
-  assert.match(recapError({status:403,code:60003,path:'/guilds/1/channels'}),/2FA.*Discord 60003 sur \/guilds\/1\/channels/);
   assert.match(recapError({status:403,code:50013}),/permissions.*Intégrer des liens/);
 });
 

@@ -91,7 +91,6 @@ await mkdir(new URL('.well-known/', out), {recursive: true});
 const sourceIndex = await readFile(root + 'index.html', 'utf8');
 const sourceGame = await readFile(root + 'game.html', 'utf8');
 const sourceMembers = await readFile(root + 'members.html', 'utf8');
-const sourceDiscordPreview = await readFile(root + 'discord-preview.html', 'utf8');
 const sourceDiagnostics = await readFile(root + 'diagnostics.html', 'utf8');
 const sourceHelp = await readFile(root + 'help.html', 'utf8');
 const sourceRequest = await readFile(root + 'demande-communaute.html', 'utf8');
@@ -102,7 +101,6 @@ const paths = [
   ...stylesheetPaths(sourceIndex,'index.html'),
   ...stylesheetPaths(sourceGame,'game.html'),
   ...stylesheetPaths(sourceMembers,'members.html'),
-  ...stylesheetPaths(sourceDiscordPreview,'discord-preview.html'),
   ...stylesheetPaths(sourceDiagnostics,'diagnostics.html'),
   ...stylesheetPaths(sourceHelp,'help.html'),
   ...stylesheetPaths(sourceRequest,'demande-communaute.html'),
@@ -123,7 +121,6 @@ await writeFile(new URL('app.css', out), bundledCss);
 
 await writeFile(new URL('index.html', out), productionHtml(sourceIndex));
 await writeFile(new URL('members.html', out), productionHtml(sourceMembers));
-await writeFile(new URL('discord-preview.html', out), productionHtml(sourceDiscordPreview));
 await writeFile(new URL('diagnostics.html', out), productionHtml(sourceDiagnostics));
 await writeFile(new URL('help.html', out), productionHtml(sourceHelp));
 await writeFile(new URL('demande-communaute.html', out), productionHtml(sourceRequest));
@@ -198,7 +195,7 @@ async function addModulePreloads(file) {
   const links = modules.map(url => `<link rel="modulepreload" href="${url}">`).join('\n');
   await writeFile(target, html.replace('</head>', `${links}\n</head>`));
 }
-for (const file of ['index.html', 'members.html', 'discord-preview.html', 'diagnostics.html', 'help.html', 'demande-communaute.html', 'fiches-combo.html', 'mur-des-stands.html', 'mur.html',
+for (const file of ['index.html', 'members.html', 'diagnostics.html', 'help.html', 'demande-communaute.html', 'fiches-combo.html', 'mur-des-stands.html', 'mur.html',
   'lmu/index.html', 'iracing/index.html', 'events/index.html', 'privacy.html', 'legal.html', 'about.html', 'circuit-credits.html', 'changelog.html']) await addModulePreloads(file);
 
 if (!workers) {

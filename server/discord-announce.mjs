@@ -28,8 +28,7 @@ async function digest(value) {
   return [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify(value))))].map(byte => byte.toString(16).padStart(2,'0')).join('');
 }
 // The update time in the footer changes on every pass: not part of what is compared.
-const formatPrefix = settings => parseLayout(settings.layout)?.announceFormat === 'v2' ? 'components-v2:' : 'single-embed-v1:';
-const contentHash = async (payload, prefix) => prefix + await digest({...payload, embeds:(payload.embeds || []).map(({footer, ...embed}) => embed)});
+const contentHash = async payload => 'single-embed-v1:' + await digest({...payload, embeds:(payload.embeds || []).map(({footer, ...embed}) => embed)});
 
 // The channel chosen for the announcement, or '' (layout.announce).
 export const announceChannel = settings => settings?.enabled === 0 ? '' : String(parseLayout(settings?.layout)?.announce || '');
@@ -178,7 +177,7 @@ async function publishAnnouncement(env, community, settings, timestamp) {
       VALUES(?,?,?,'intro',0,?,?,?,?)`).bind(community.id,day,'intro',community.discordGuildId,channel,timestamp,rows.length ? 1 : 0).run();
     rows = await announcementRows(env, community, day);intro = rows.find(row => row.kind === 'intro');
   }
-  const prefix = formatPrefix(settings);
+  const prefix = 'single-embed-v1:';
   const legacy = rows.some(row => row.kind !== 'intro' && row.message_id && row.message_id !== '-' && (row.message_id !== intro.message_id || row.channel_id !== intro.channel_id));
   const due = intro.pending_nonce || !intro.content_hash?.startsWith(prefix) || legacy || intro.channel_id !== channel || timestamp - Number(intro.checked_at || 0) >= REFRESH_EVERY;
   if (!due) return false;
@@ -217,7 +216,7 @@ async function publishAnnouncement(env, community, settings, timestamp) {
     lives:activeRows.filter(row => row.kind === 'stream').length,streams:await streamTimes(env,activeRows)};
   const site = {...siteOf(env,community),announceFormat:parseLayout(settings.layout)?.announceFormat,streamUrl:stream,streamName:parseLayout(settings.layout)?.streamName || '',streams:counts.streams};
   const quietIntro = buildAnnounceIntro(counts,site);quietIntro.content='';quietIntro.allowed_mentions={parse:[]};
-  const payload = buildCompleteAnnouncement(quietIntro,items,site), hash = await contentHash(payload,prefix);
+  const payload = buildCompleteAnnouncement(quietIntro,items,site), hash = await contentHash(payload);
   const previousId = intro.message_id, previousChannel = intro.channel_id;
   // V2 cannot be reverted in place; a channel move also requires a silent replacement.
   const replace = previousChannel !== channel || (intro.content_hash?.startsWith('components-v2:') && prefix !== 'components-v2:');
