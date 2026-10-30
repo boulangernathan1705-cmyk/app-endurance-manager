@@ -16,8 +16,6 @@
 
 - **Annonces de stream** : le streamer peut importer son logo, indiquer librement son simulateur, jeu ou activité, et décrire sa soirée. Un aperçu de la carte se met à jour pendant la saisie.
 - **Calendrier** : la carte du stream reprend la charte des autres événements, avec son identité violette, ses horaires et un lien direct vers la chaîne. Le logo et la description apparaissent aussi sur la page de l’annonce. Les annonces existantes restent compatibles.
-- **Discord · Aperçus** : les couleurs, images, champs, liens et boutons sont représentés avant publication, avec une largeur ordinateur ou mobile et un export JSON sans notification.
-- **Discord · Annonce du jour** : présentation au choix, embed classique ou carte avec sections (Components V2). Chaque course conserve ses actions et les données continuent de se mettre à jour. Une démonstration peut être consultée sur le site avant un envoi explicite dans un salon de test.
 
 ## v1.96 — 28 octobre 2026
 
