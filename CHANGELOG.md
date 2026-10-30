@@ -1,5 +1,15 @@
 # Nouveautés d'Endurance Manager
 
+## v1.98 — 30 octobre 2026
+
+### ✨ Améliorations
+
+- **Calendrier** : les actualisations automatiques évitent de recharger les courses inchangées. Le rythme de mise à jour, les informations affichées et les protections pendant la saisie sont conservés.
+
+### 🛠️ Pour les admins
+
+- **Performance** : ajout de mesures de consommation et de temps de traitement pour suivre les économies Cloudflare et repérer les requêtes coûteuses.
+
 ## v1.97 — 29 octobre 2026
 
 ### ✨ Améliorations

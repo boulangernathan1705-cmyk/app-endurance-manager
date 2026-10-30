@@ -10,12 +10,14 @@ import {announceStream} from './discord-announce.mjs';
 import {gridfestPasswordStatus, sendGridfestPasswords} from './gridfest-discord.mjs';
 import {
   LEGACY_CAR_ALIASES, COOKIE_SESSION, COOKIE_STATE, COOKIE_RETURN, DAY, HttpError, fail, now, id, token, hash, cookie,
-  SESSION_DAYS, setCookie, cookieNames, siteOrigin, communityLabel, baseDomain, json, redirect, origin, requireDiscord, administrators, identity, owned, personal,
+  SESSION_DAYS, setCookie, cookieNames, siteOrigin, communityLabel, baseDomain, json, jsonText, redirect, origin, requireDiscord, administrators, identity, owned, personal,
   registrationSelect, registrationParticipant, NAME_IN_COMMUNITY, communityName, body, rateLimit, cleanup, returnPath, text, validateEvent, validateRegistration, ANY_CATEGORY
 } from './core.mjs';
 import {ingestClientError, clientErrorsApi} from './telemetry.mjs';
 import {communityRequestsApi, closeCommunityRequest} from './community-requests.mjs';
 import {racesPath} from './races-path.mjs';
+import {eventListTag, matchesEventTag} from './event-revision.mjs';
+import {measureRequest} from './request-metrics.mjs';
 import {catalogForGame, gameForEvent, simForEvent, TDZ_EVENT_TYPES, normalizeTdzDetails, tdzOnly, eventsLabel} from '../shared/catalog.mjs';
 import {currentCommunity, appearanceOf, allCommunities, communityUrl, communitySlug, communityById, communityFromRow} from './community.mjs';
 import {isDevelopment} from './dev-environment.mjs';
@@ -252,12 +254,12 @@ function eventScopeFilter(scope, nowMs=Date.now()) {
   if (scope==='archived') return `e.last_start<=${cutoff}`;
   return '';
 }
-async function listEvents(env, actor, game='', scope='', community) {
+async function listEvents(env, actor, game='', scope='', community, at=Date.now()) {
   // Bound in order: the site's community (filters), then the site's community and the player (mine). The races of the community and the official races (iRacing's ones
   // where the community shows the iRacing calendar); on an official race, the entries and crews of every
   // community the player is a member of, never of the others.
   const officialRaces = community.modules?.iracingImport === true ? "e.community_id='official'" : "(e.community_id='official' AND e.circuit NOT LIKE 'iracing-%')";
-  const filters=[`(e.community_id=? OR ${officialRaces})`, iracingSoloSql(env,community,'e.'),game==='iracing' ? "(e.format='solo' OR e.circuit LIKE 'iracing-%')" : game==='lmu' ? "(e.format='solo' OR e.circuit NOT LIKE 'iracing-%')" : '', eventScopeFilter(scope), soloRacesEnabled(env, community) ? '' : "COALESCE(e.format,'endurance')!='solo'", grindfestEnabled(community, isDevelopment(env)) ? '' : "COALESCE(json_extract(e.details,'$.type'),'') NOT IN ('Gridfest','Grindfest')"].filter(Boolean);
+  const filters=[`(e.community_id=? OR ${officialRaces})`, iracingSoloSql(env,community,'e.'),game==='iracing' ? "(e.format='solo' OR e.circuit LIKE 'iracing-%')" : game==='lmu' ? "(e.format='solo' OR e.circuit NOT LIKE 'iracing-%')" : '', eventScopeFilter(scope, at), soloRacesEnabled(env, community) ? '' : "COALESCE(e.format,'endurance')!='solo'", grindfestEnabled(community, isDevelopment(env)) ? '' : "COALESCE(json_extract(e.details,'$.type'),'') NOT IN ('Gridfest','Grindfest')"].filter(Boolean);
   const where=filters.length ? ` WHERE ${filters.join(' AND ')}` : '';
   const player = actor.user?.id || '';
   const rows = (await env.DB.prepare(`SELECT e.* FROM events e${where} ORDER BY e.created_at DESC, e.id DESC`).bind(community.id).all()).results;
@@ -534,13 +536,22 @@ async function api(request, env) {
     const game=requestedGame==='lmu'||requestedGame==='iracing'?requestedGame:'';
     const requestedScope=url.searchParams.get('scope');
     const scope=requestedScope==='upcoming'||requestedScope==='archived'?requestedScope:'';
-    const events=await listEvents(env,actor,game,scope,community);
+    // Authentication and community access above still run for every conditional request.
+    const at=Date.now();
+    const tag=await eventListTag(env,actor,community,{game,scope,origin:url.origin,at});
+    if (matchesEventTag(request.headers.get('If-None-Match'),tag)) {
+      return new Response(null,{status:304,headers:{'ETag':tag,'Cache-Control':'no-store','Vary':'Cookie'}});
+    }
+    const events=await listEvents(env,actor,game,scope,community,at);
     const payload={events};
-    const response=json(payload);
+    const serialized=JSON.stringify(payload);
+    const response=jsonText(serialized);
     response.headers.set('X-Endurance-Game',game||'all');
     response.headers.set('X-Endurance-Scope',scope||'all');
     response.headers.set('X-Endurance-Events',String(events.length));
-    response.headers.set('X-Endurance-Approx-Bytes',String(new TextEncoder().encode(JSON.stringify(payload)).length));
+    response.headers.set('X-Endurance-Approx-Bytes',String(new TextEncoder().encode(serialized).length));
+    if (tag) response.headers.set('ETag',tag);
+    response.headers.set('Vary','Cookie');
     return response;
   }
   if (path === '/api/participants' && method === 'GET') {
@@ -1222,7 +1233,7 @@ export default {
       const asset = await env.ASSETS.fetch(request);
       return asset.status === 404 && (request.headers.get('Accept') || '').includes('text/html') ? pageNotFound() : asset;
     }
-    try { return await api(request, env); }
+    try { return await measureRequest(request, env, measuredEnv => api(request, measuredEnv)); }
     catch (error) {
       if (error instanceof HttpError) return json({error:error.message},error.status);
       const message=String(error.message);
