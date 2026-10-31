@@ -1,4 +1,4 @@
-// The week of the « Semaine » page (front/app/week-view.mjs), Monday to Sunday in Paris time, without any page code
+// The week of the « Accueil » page (front/app/week-view.mjs), Monday to Sunday in Paris time, without any page code
 // (tested on its own).
 import {eventMinutes} from '../shared/duration.mjs';
 

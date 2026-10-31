@@ -47,7 +47,8 @@ test('home loads without network error', async ({page}) => {
 });
 
 test('language switch shows the current language, translates event counters and persists', async ({page}) => {
-  await openAndCheck(page, '/');
+  // The former simulator choice ("/" now opens the « Accueil »).
+  await openAndCheck(page, '/?accueil');
   const toggle = page.locator('[data-language-toggle]');
   await expect(toggle).toBeVisible();
   await expect(toggle).toContainText('🇫🇷');
@@ -101,7 +102,7 @@ test('mobile interface stays compact without horizontal overflow across main pag
 });
 
 test('LMU space opens from home', async ({page}) => {
-  await openAndCheck(page, '/');
+  await openAndCheck(page, '/?accueil');
   const link = page.locator('.game-hub-enter[href="/lmu/"]');
   await expect(link).toBeVisible();
   await Promise.all([page.waitForURL('**/lmu/'), link.click()]);
@@ -111,7 +112,7 @@ test('LMU space opens from home', async ({page}) => {
 });
 
 test('iRacing space opens from home', async ({page}) => {
-  await openAndCheck(page, '/');
+  await openAndCheck(page, '/?accueil');
   const link = page.locator('.game-hub-enter[href="/iracing/"]');
   await expect(link).toBeVisible();
   await Promise.all([page.waitForURL('**/iracing/'), link.click()]);

@@ -2575,3 +2575,54 @@ html[data-game] #app .my-entry-slot-heading .race-badges { display: flex; flex-w
   .week-block { grid-template-columns: 64px minmax(0, 1fr); column-gap: 10px; }
   .week-block-time { grid-row: span 2; }
 }
+
+/* « Accueil » (front/app/week-view.mjs): the next race, a card for each part of the site, the week. */
+.home-head { margin-bottom: 12px; }
+.home-next {
+  display: flex; align-items: center; gap: 14px; width: 100%; margin: 0 0 16px; padding: 13px 18px; text-align: left;
+  border: 1px solid rgba(231,182,83,.45); border-left: 4px solid #e7b653; border-radius: 12px;
+  background: linear-gradient(90deg, rgba(231,182,83,.12), var(--panel, #111315) 60%); color: #eef3f2; font: inherit; text-decoration: none; cursor: pointer;
+}
+.home-next:hover { background: linear-gradient(90deg, rgba(231,182,83,.2), var(--panel, #111315) 70%); }
+.home-next.is-empty { cursor: default; }
+.home-next-label { flex: none; font-size: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: #e7b653; }
+.home-next-text { min-width: 0; overflow-wrap: anywhere; }
+.home-next-go { margin-left: auto; flex: none; font-weight: 800; color: #e7b653; }
+button.home-next-go { min-height: 0; padding: 0; border: 0; background: none; font: inherit; font-weight: 800; color: #e7b653; cursor: pointer; }
+.home-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; margin-bottom: 26px; }
+.home-cards.is-small { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); margin-bottom: 0; }
+.home-card {
+  --tone: #59d3d8;
+  position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; min-height: 118px; padding: 16px; text-align: left;
+  border: 1px solid var(--border, #292d31); border-radius: 14px; overflow: hidden;
+  background: linear-gradient(160deg, rgba(255,255,255,.04), var(--panel, #111315)); color: #eef3f2; font: inherit; text-decoration: none; cursor: pointer;
+}
+.home-card::before { content: ""; position: absolute; inset: 0 0 auto; height: 3px; background: var(--tone); }
+.home-card:hover { border-color: color-mix(in srgb, var(--tone) 55%, var(--border, #292d31)); }
+.home-card:focus-visible { outline: 2px solid var(--tone); outline-offset: 2px; }
+.home-card.is-lmu { --tone: #e5484d; }
+.home-card.is-iracing { --tone: #4f74d8; }
+.home-card.is-event { --tone: #f3b33d; }
+.home-card.is-mine { --tone: #3ecf8e; }
+.home-card.is-tools { --tone: #a970ff; }
+.home-card.is-admin { --tone: #e5484d; min-height: 90px; }
+.home-card-arrow { position: absolute; top: 14px; right: 16px; color: #8f9a9e; }
+.home-card-icon { font-size: 24px; line-height: 1; }
+.home-card-title { font-size: 17px; font-weight: 850; letter-spacing: .04em; text-transform: uppercase; }
+.home-card-live { margin-top: auto; font-size: 13.5px; font-weight: 650; color: color-mix(in srgb, var(--tone) 75%, #fff); }
+.home-card-alert { display: inline-block; margin-left: 4px; padding: 1px 7px; border-radius: 999px; font-size: 11.5px; font-weight: 800; background: rgba(229,72,77,.18); color: #ff8b82; }
+.home-section { margin: 26px 0 10px; font-size: 12px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: #8f9a9e; }
+.week-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 10px 16px; }
+.week-head .week-title { margin: 0; }
+.week-filters { margin: 10px 0 12px; }
+@media (max-width: 760px) {
+  .home-next { flex-wrap: wrap; gap: 4px 10px; padding: 12px; }
+  .home-next-go { margin-left: 0; }
+  .home-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .home-card { min-height: 108px; padding: 13px; }
+  .home-card-title { font-size: 15px; }
+}
+@media (max-width: 760px) {
+  .week-filters { display: flex; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+  .week-filters .event-filter-button { flex: none; white-space: nowrap; }
+}

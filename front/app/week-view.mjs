@@ -1,14 +1,17 @@
-// « Semaine » (audit R26): the week at a glance, Monday to Sunday (Paris), every start of the community: its events
-// (every simulator, Gridfest, streams) and the endurances of LMU and iRacing together. A view only: a click opens the
-// race's own page (the other simulator's races in its own space), nothing is entered here. On a phone the days follow
-// each other in a list.
-import {app,state,esc,button,notifyRender,activeGame,api} from './core.mjs';
+// « Accueil » (audit R25 + R26): the pilot's next race, a card for each part of the site with what is new there, then
+// the week at a glance, Monday to Sunday (Paris), every start of the community: its events (every simulator,
+// Gridfest, streams) and the endurances of LMU and iRacing together. A view only: a click opens the race's own page
+// (the other simulator's races in its own space), nothing is entered here. On a phone the days follow each other in
+// a list.
+import {app,state,esc,button,notifyRender,activeGame,api,can} from './core.mjs';
+import {todoItems} from '../admin-todo.mjs';
 import {gameForEvent} from '../../shared/catalog.mjs';
 import {isSolo} from './solo.mjs';
 import {isStream} from '../../shared/stream.mjs';
 import {isGrindfest} from '../../shared/grindfest.mjs';
 import {simForEvent,SIMS} from '../../shared/catalog.mjs';
 import {parisDay,weekStart,weekDays} from '../week-days.mjs';
+import {eventMinutes} from '../../shared/duration.mjs';
 
 const DAY=86400000;
 const dateOf=day=>new Date(day*DAY);
@@ -62,27 +65,102 @@ function block(item,now){
   ${event.otherGame?'</a>':'</button>'}`;
 }
 
-const FILTERS=[['all','Tout'],['endurance','Endurance'],['event','Events'],['mine','Mes courses']];
-const keep=(item,filter)=>filter==='all'||(filter==='mine'?item.mine:filter==='event'?item.kind.key!=='endurance':item.kind.key==='endurance');
+const FILTERS=[['all','Tout'],['lmu','Endurance LMU'],['iracing','Endurance iRacing'],['event','Events'],['mine','Mes courses']];
+const simOf=event=>event.otherGame||activeGame;
+const keep=(item,filter)=>filter==='all'||(filter==='mine'?item.mine:filter==='event'?item.kind.key!=='endurance':item.kind.key==='endurance'&&simOf(item.event)===filter);
+
+const SIM_NAME={lmu:'LMU',iracing:'iRacing'};
+const dateShort=new Intl.DateTimeFormat('fr-FR',{timeZone:'Europe/Paris',weekday:'short',day:'numeric',month:'short'});
+const when=timestamp=>dateShort.format(timestamp).replace(/\./g,'').replace(/ 1 /,' 1er ');
+const endurances=events=>events.filter(event=>!event.archived&&!isSolo(event));
+const nextStart=(event,now)=>Math.min(...(event.departures||[]).map(item=>Number(item.startsAt)).filter(at=>Number.isFinite(at)&&at>now));
+// The first race still to come among some, with its first start.
+function firstOf(events,now){
+  return events.map(event=>({event,at:nextStart(event,now)})).filter(item=>Number.isFinite(item.at)).sort((a,b)=>a.at-b.at)[0]||null;
+}
+const myRegs=departure=>(departure.availability||[]).filter(reg=>reg.mine&&reg.status!=='unavailable');
+const crewOf=(departure,reg)=>(departure.crews||[]).find(crew=>(crew.registrationIds||[]).some(id=>String(id)===String(reg.id)));
+// My starts still running or to come, the soonest first, with my crew.
+function myStarts(events,now){
+  const starts=[];
+  for(const event of events){
+    if(event.archived)continue;
+    for(const departure of event.departures||[]){
+      const startsAt=Number(departure.startsAt),regs=myRegs(departure);
+      if(!regs.length||!Number.isFinite(startsAt))continue;
+      const minutes=eventMinutes(event),endsAt=startsAt+Math.max(minutes,0)*60000;
+      if(endsAt<now&&startsAt<now)continue;
+      const crew=regs.map(reg=>crewOf(departure,reg)).find(Boolean)||null;
+      starts.push({event,departure,startsAt,crew});
+    }
+  }
+  return starts.sort((a,b)=>a.startsAt-b.startsAt);
+}
+const openRace=(event,inner,cls)=>event.otherGame?`<a class="${cls}" href="/${event.otherGame}/#event=${event.id}">${inner}</a>`:`<button type="button" class="${cls}" data-action="open" data-id="${event.id}">${inner}</button>`;
+
+function nextLine(all,now){
+  const next=myStarts(all,now)[0];
+  if(!next)return `<div class="home-next is-empty"><span class="home-next-label">Ta prochaine course</span><span>Aucune inscription pour l’instant.</span>${button('home','Voir les courses','data-list="endurance"','home-next-go')}</div>`;
+  const {event,startsAt,crew}=next,live=startsAt<=now;
+  const sim=isSolo(event)?SIMS.find(item=>item.id===simForEvent(event))?.short||'':SIM_NAME[simOf(event)];
+  return openRace(event,`<span class="home-next-label">${live?'En course':'Ta prochaine course'}</span>
+    <span class="home-next-text"><b>${esc(event.name)}</b> · ${esc(when(startsAt))} à ${esc(hour(startsAt))}${sim?` · ${esc(sim)}`:''}${crew?` · équipage <b>${esc(crew.name)}</b>`:''}</span>
+    <span class="home-next-go" aria-hidden="true">Voir →</span>`,'home-next');
+}
+
+function card({tone,icon,title,live,alert='',action,href,attrs=''}){
+  const inner=`<span class="home-card-arrow" aria-hidden="true">→</span><span class="home-card-icon" aria-hidden="true">${icon}</span><span class="home-card-title">${esc(title)}</span><span class="home-card-live">${esc(live)}${alert?` <span class="home-card-alert">${esc(alert)}</span>`:''}</span>`;
+  return href?`<a class="home-card is-${tone}" href="${href}">${inner}</a>`:`<button type="button" class="home-card is-${tone}" data-action="${action}" ${attrs}>${inner}</button>`;
+}
+
+function cards(all,now){
+  const list=[];
+  for(const game of ['lmu','iracing']){
+    const first=firstOf(endurances(all).filter(event=>simOf(event)===game),now);
+    const live=first?`Prochaine : ${first.event.name}, ${when(first.at)}`:'Aucune course prévue';
+    list.push(card({tone:game,icon:'🏁',title:`Endurance ${SIM_NAME[game]}`,live,...(game===activeGame?{action:'home',attrs:'data-list="endurance"'}:{href:`/${game}/`})}));
+  }
+  if(state.soloRaces){
+    const open=all.filter(event=>!event.archived&&isSolo(event)&&!isStream(event)&&Number.isFinite(nextStart(event,now))).length;
+    list.push(card({tone:'event',icon:'🏆',title:state.soloLabel||'Events',live:open?`${open} à venir`:'Rien de prévu',action:'home',attrs:'data-list="solo"'}));
+  }
+  const mine=myStarts(all,now),races=new Set(mine.map(item=>item.event.id)).size;
+  const alone=mine.filter(item=>!isSolo(item.event)&&!item.crew).length;
+  list.push(card({tone:'mine',icon:'✅',title:'Mes inscriptions',live:races?`${races} course${races>1?'s':''}`:'Aucune',alert:alone?`${alone} sans équipage`:'',action:'my-entries'}));
+  if(state.combos)list.push(card({tone:'tools',icon:'🛠️',title:'Outils',live:'Fiches combo, mur des stands',href:'/fiches-combo.html'}));
+  return list.join('');
+}
+
+// « À traiter » of the administration, counted here for its card.
+function adminCard(all,now){
+  if(!can('admin'))return '';
+  const count=['lmu','iracing'].reduce((total,game)=>total+todoItems(endurances(all).filter(event=>simOf(event)===game),game,now).length,0);
+  return `<h2 class="home-section">Organisation</h2><div class="home-cards is-small">${card({tone:'admin',icon:'⚙️',title:'Administration',live:count?`${count} point${count>1?'s':''} à traiter`:'Rien à traiter',href:'/members.html'})}</div>`;
+}
 
 export function renderWeek(){
   if(state.access!=='member'){state.page='home';return;}
   state.page='week';state.currentEventId=null;
   const offset=Number(state.weekOffset)||0,filter=state.weekFilter||'all',now=Date.now();
+  const all=[...state.events,...otherEndurances()];
   const monday=weekStart(now,offset),today=parisDay(now);
-  const days=weekStarts([...state.events,...otherEndurances()],monday).map(day=>({...day,items:day.items.filter(item=>keep(item,filter))}));
+  const days=weekStarts(all,monday).map(day=>({...day,items:day.items.filter(item=>keep(item,filter))}));
   const count=days.reduce((total,day)=>total+day.items.length,0);
-  const title=`Semaine du ${monthDay.format(dateOf(monday))} au ${monthDay.format(dateOf(monday+6))}`;
-  const filters=FILTERS.filter(([key])=>key!=='event'||state.soloRaces).filter(([key])=>key!=='endurance'||state.soloRaces)
+  const title=`Du ${monthDay.format(dateOf(monday))} au ${monthDay.format(dateOf(monday+6))}`;
+  const filters=FILTERS.filter(([key])=>key!=='event'||state.soloRaces)
     .map(([key,label])=>button('week-filter',label,`data-filter="${key}" aria-pressed="${filter===key}"`,'event-filter-button')).join('');
   const columns=days.map(day=>`<section class="week-day${day.day===today?' is-today':''}${day.day<today?' is-past':''}" aria-labelledby="week-day-${day.day}">
       <h3 class="week-day-head" id="week-day-${day.day}"><span class="week-day-name">${esc(dayName.format(dateOf(day.day)))}</span><span class="week-day-short" aria-hidden="true">${esc(dayShort.format(dateOf(day.day)))}</span><small>${esc(monthDay.format(dateOf(day.day)))}</small></h3>
       <div class="week-day-list">${day.items.map(item=>block(item,now)).join('')||'<p class="week-empty">—</p>'}</div>
     </section>`).join('');
-  app.innerHTML=`<div class="page-head week-head"><h1 class="page-title">SEMAINE</h1>
-      <div class="week-nav" role="group" aria-label="Changer de semaine">${button('week','‹ Précédente','data-offset="-1" aria-label="Semaine précédente"','secondary-button')}${offset?button('week','Cette semaine','data-offset="0"','secondary-button'):''}${button('week','Suivante ›','data-offset="1" aria-label="Semaine suivante"','secondary-button')}</div>
-      ${filters?`<div class="event-filter" role="group" aria-label="Filtrer la semaine">${filters}</div>`:''}</div>
-    <h2 class="week-title">${esc(title)} <small>${count} départ${count>1?'s':''}</small></h2>
-    <div class="week-grid">${columns}</div>`;
+  const name=String(state.user?.name||'').trim().split(/\s+/)[0];
+  app.innerHTML=`<div class="page-head home-head"><h1 class="page-title">${name?`SALUT ${esc(name.toLocaleUpperCase('fr-FR'))}`:'ACCUEIL'}</h1></div>
+    ${nextLine(all,now)}
+    <div class="home-cards">${cards(all,now)}</div>
+    <div class="week-head"><h2 class="week-title">${offset===0?'Cette semaine':offset===1?'La semaine prochaine':offset===-1?'La semaine dernière':'Semaine'} <small>${esc(title)} · ${count} départ${count>1?'s':''}</small></h2>
+      <div class="week-nav" role="group" aria-label="Changer de semaine">${button('week','‹ Précédente','data-offset="-1" aria-label="Semaine précédente"','secondary-button')}${offset?button('week','Cette semaine','data-offset="0"','secondary-button'):''}${button('week','Suivante ›','data-offset="1" aria-label="Semaine suivante"','secondary-button')}</div></div>
+    <div class="event-filter week-filters" role="group" aria-label="Filtrer la semaine">${filters}</div>
+    <div class="week-grid">${columns}</div>
+    ${adminCard(all,now)}`;
   notifyRender();
 }
