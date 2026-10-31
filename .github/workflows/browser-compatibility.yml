@@ -12,7 +12,8 @@ permissions:
 
 jobs:
   browser-compatibility:
-    runs-on: ubuntu-latest
+    # Playwright 1.55 is pinned in package-lock.json and does not support Ubuntu 26.04.
+    runs-on: ubuntu-24.04
     timeout-minutes: 25
     env:
       COMPAT_BASE_URL: http://localhost:8787

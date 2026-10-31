@@ -5,9 +5,10 @@ import {readFileSync,readdirSync} from 'node:fs';
 import worker from '../server/worker.mjs';
 import {flushDiscord} from '../server/worker-with-migrations.mjs';
 import {withPublicVoiceAccess} from '../server/discord-permissions.mjs';
+import {CREW_BOT_PERMISSIONS} from '../server/crew-discord.mjs';
 import {linkTestServer,DEV_COMMUNITY,GUILD} from './fixtures/discord-server.mjs';
 import {syncDueRecaps,syncWeeklyDiscord} from '../server/discord-weekly.mjs';
-import {addThreadMembers,botCategoryEmojis,saveBotRecap,validateDiscordLayout,syncBotRecaps,previewBotRecap,recapDestinations,eventDeletionTime,eventChannelName,settingsRow,recapError,repairBotRecap,racesOpenNow} from '../server/recap-discord.mjs';
+import {RECAP_BOT_PERMISSIONS,THREADS,addThreadMembers,botCategoryEmojis,saveBotRecap,validateDiscordLayout,syncBotRecaps,previewBotRecap,recapDestinations,eventDeletionTime,eventChannelName,settingsRow,recapError,repairBotRecap,racesOpenNow} from '../server/recap-discord.mjs';
 
 const OWNER='333333333333333333', BOT='444444444444444444', TEXT='555555555555555555', CATEGORY='666666666666666666';
 const NOW=Date.parse('2026-10-10T12:00:00Z'), DAY=86400000;
@@ -20,7 +21,7 @@ class D1 {
   prepare(sql){const db=this.db;return {params:[],bind(...params){this.params=params;return this;},async first(){return db.prepare(sql).get(...this.params)||null;},async all(){return {results:db.prepare(sql).all(...this.params)};},async run(){return {meta:{changes:Number(db.prepare(sql).run(...this.params).changes)}};}};}
   async batch(statements){this.db.exec('BEGIN');try{const results=[];for(const statement of statements)results.push(await statement.run());this.db.exec('COMMIT');return results;}catch(error){this.db.exec('ROLLBACK');throw error;}}
 }
-function setup(t,{rights='85008',overrides=[],failure=null}={}){
+function setup(t,{rights=RECAP_BOT_PERMISSIONS,overrides=[],failure=null}={}){
   const DB=new D1(),calls=[],channels=[{id:TEXT,type:0,name:'recap',permission_overwrites:overrides},{id:'111111111111111110',type:4,name:'Accueil',position:0},{id:CATEGORY,type:4,name:'Endurances',position:1,permission_overwrites:overrides},{id:'111111111111111112',type:4,name:'Vocaux',position:2}],messages=new Map();
   const env={DB,APP_ORIGIN:'https://site.example',DISCORD_CLIENT_ID:BOT,DISCORD_BOT_TOKEN:'fake',ADMIN_DISCORD_IDS:OWNER};
   let counter=900000000000000000n, fail=failure;
@@ -66,6 +67,41 @@ function race(DB,id='race-a',name='6h de Spa',circuit='spa',departures=[{id:'sta
 const written=calls=>calls.filter(item=>item.method!=='GET');
 const creates=calls=>calls.filter(item=>item.method==='POST'&&item.path.endsWith('/channels'));
 const sends=calls=>calls.filter(item=>item.method==='POST'&&item.path.endsWith('/messages'));
+
+test('audit: both invitation links cover the complete Discord lifecycle without Administrator',()=>{
+  assert.equal(RECAP_BOT_PERMISSIONS,CREW_BOT_PERMISSIONS);
+  const rights=BigInt(RECAP_BOT_PERMISSIONS);
+  for(const bit of [4,10,11,14,16,17,20,28,34,35,38]) assert.ok(rights&(1n<<BigInt(bit)),`permission ${bit}`);
+  for(const bit of [3,5,13,22,23,24,40]) assert.equal(rights&(1n<<BigInt(bit)),0n,`unneeded permission ${bit}`);
+});
+
+test('audit: daily announcement setup refuses missing history needed for recovery',async t=>{
+  const {env,channels,calls}=setup(t,{rights:String(BigInt(RECAP_BOT_PERMISSIONS)&~65536n)});
+  const answers={mode:'general',sims:'lmu',week:{all:''},events:'',announce:TEXT};
+  const place=(await recapDestinations(env,COMMUNITY)).find(item=>item.id===TEXT);
+  assert.equal(place.announceReady,false);
+  assert.deepEqual(place.announceMissing,['Voir les anciens messages']);
+  await assert.rejects(validateDiscordLayout(env,COMMUNITY,answers),/Voir les anciens messages/);
+  assert.equal(written(calls).length,0);
+  channels.find(item=>item.id===TEXT).permission_overwrites=[{id:BOT,type:1,allow:'65536',deny:'0'}];
+  await validateDiscordLayout(env,COMMUNITY,answers);
+});
+
+test('audit: a thread destination needs Manage Threads for its eventual deletion',async t=>{
+  const {env,channels,calls}=setup(t,{rights:String(BigInt(RECAP_BOT_PERMISSIONS)&~(1n<<34n))});
+  const answers={mode:'general',sims:'lmu',week:{all:`in:${TEXT}`},events:''};
+  await assert.rejects(validateDiscordLayout(env,COMMUNITY,answers),/Gérer les fils/);
+  assert.equal(written(calls).length,0);
+  channels.find(item=>item.id===TEXT).permission_overwrites=[{id:BOT,type:1,allow:String(1n<<34n),deny:'0'}];
+  await validateDiscordLayout(env,COMMUNITY,answers);
+});
+
+for(const [label,bit] of [['Gérer les rôles',28],['Gérer les fils',34],['Créer des fils publics',35],['Envoyer des messages dans les fils',38]])
+  test(`audit: bot categories require ${label} before setup writes`,async t=>{
+    const {env,calls}=setup(t,{rights:String(BigInt(RECAP_BOT_PERMISSIONS)&~(1n<<BigInt(bit)))});
+    await assert.rejects(validateDiscordLayout(env,COMMUNITY,{mode:'events',sims:'lmu',under:'top'}),new RegExp(label));
+    assert.equal(written(calls).length,0);
+  });
 
 async function as(env,path,method='GET',input,user=OWNER){
   env.DB.db.prepare('INSERT OR IGNORE INTO users(id,name,created_at) VALUES(?,?,0)').run(user,'Utilisateur');
@@ -191,7 +227,7 @@ test('historical webhooks stay inert; a community without setup sees the recap o
   DB.db.prepare("INSERT INTO community_recaps(community_id,scope,webhook_url,updated_at) VALUES(?,'all',?,0)").run(DEV_COMMUNITY,hook);
   const page=(await as(env,'/api/community/setup')).data;
   assert.equal(page.botRecap,null);assert.equal(page.recapSetupRequired,true);
-  assert.match(page.recapBotInviteUrl,/permissions=326417599504&/);
+  assert.equal(new URL(page.recapBotInviteUrl).searchParams.get('permissions'),RECAP_BOT_PERMISSIONS);
   calls.length=0;await syncWeeklyDiscord(env,NOW,COMMUNITY);assert.equal(sends(calls).length,0);assert.ok(calls.every(call=>!call.path.includes('/webhooks/')));
   await saveBotRecap(env,COMMUNITY,SETTINGS,false);calls.length=0;await syncBotRecaps(env,NOW,COMMUNITY);
   assert.equal(sends(calls).length,0);assert.ok(calls.every(call=>!call.path.includes('/webhooks/')));
@@ -808,7 +844,7 @@ test('« récap de la semaine », LMU and iRacing apart: the bot makes « LMU »
 
 test('below a private category, the bot\'s own is private like it when chosen, and open again when not',async t=>{
   const PRIVATE=[{id:GUILD,type:0,allow:'0',deny:'1024'},{id:'222222222222222222',type:0,allow:'3072',deny:'0'}];
-  const {env,channels,calls}=setup(t,{rights:'268520464'});
+  const {env,channels,calls}=setup(t,{rights:String(268520464n|THREADS)});
   Object.assign(named(channels,'Accueil'),{permission_overwrites:PRIVATE});
   assert.equal((await recapDestinations(env,COMMUNITY)).find(item=>item.id===ACCUEIL).private,true);
   await layout(env,COMMUNITY,{mode:'events',sims:'lmu',showWeek:true,under:ACCUEIL,copy:true});
@@ -825,7 +861,7 @@ test('below a private category, the bot\'s own is private like it when chosen, a
 });
 
 test('changing recap category permissions preserves normal vocal features and local moderation rules',async t=>{
-  const {env,channels,calls}=setup(t,{rights:'268520464'});
+  const {env,channels,calls}=setup(t,{rights:String(268520464n|THREADS)});
   const PRIVATE=[{id:GUILD,type:0,allow:'0',deny:'1024'}];
   Object.assign(named(channels,'Accueil'),{permission_overwrites:PRIVATE});
   await layout(env,COMMUNITY,{mode:'events',sims:'lmu',showWeek:true,under:ACCUEIL});
@@ -853,7 +889,7 @@ test('a week message deleted on Discord is put back by the next sync, without «
 
 test('saving the setting with voices does not ask for rights in the places of the setting before',async t=>{
   // The old destination is closed to all (no « Se connecter » for the bot there); the bot now makes its own category.
-  const {DB,env}=setup(t,{rights:'269569040',overrides:[{id:GUILD,type:0,allow:'0',deny:'1049600'}]});
+  const {DB,env}=setup(t,{rights:String(269569040n|THREADS),overrides:[{id:GUILD,type:0,allow:'0',deny:'1049600'}]});
   await saveBotRecap(env,COMMUNITY,SETTINGS);
   const result=await as(env,'/api/community/discord','PUT',{layout:{mode:'events',sims:'lmu',showWeek:true,under:ACCUEIL,voices:true}});
   assert.equal(result.status,200,JSON.stringify(result.data));
@@ -897,6 +933,39 @@ test('a pass with nothing to change makes one request; a changed race only its e
   DB.db.prepare("UPDATE discord_recap_publications SET content_hash='x' WHERE event_id='race-a'").run();
   calls.length=0;await syncBotRecaps(env,NOW+6000,COMMUNITY);
   assert.deepEqual(calls.map(call=>call.method),['GET','PATCH']);
+});
+
+test('audit: site administrators with an admin-only role and platform managers are included in thread membership',async t=>{
+  const {DB,env,calls}=setup(t);race(DB);
+  await layout(env,COMMUNITY,{mode:'events',sims:'lmu',under:ACCUEIL});
+  DB.db.prepare("UPDATE community_role_permissions SET permissions='[]' WHERE discord_role_id=?").run(GUILD);
+  const role='777777777777777001',user='100000000000000001';
+  DB.db.prepare("INSERT INTO community_role_permissions(community_id,discord_role_id,permissions,updated_at) VALUES(?,?,'[\"admin\"]',0)").run(DEV_COMMUNITY,role);
+  DB.db.prepare('INSERT INTO users(id,name,created_at) VALUES(?,?,0)').run(user,'Admin');
+  DB.db.prepare("INSERT INTO memberships(community_id,user_id,discord_roles,status,checked_at,created_at) VALUES(?,?,?,'member',0,0)").run(DEV_COMMUNITY,user,JSON.stringify([role]));
+  DB.db.prepare("INSERT INTO memberships(community_id,user_id,discord_roles,status,checked_at,created_at) VALUES(?,?,'[]','member',0,0)").run(DEV_COMMUNITY,OWNER);
+  calls.length=0;
+  assert.equal(await addThreadMembers(env,NOW,12),2);
+  assert.equal(calls[0].method,'PATCH');assert.equal(calls[0].body.content,`<@${user}> <@${OWNER}>`);
+  assert.equal(calls[1].body.content,'');assert.equal(calls.some(call=>call.method==='POST'),false);
+});
+
+test('audit: existing bot channels regain thread permissions even when copied public rules have not changed',async t=>{
+  const {env,channels,calls}=setup(t);
+  await layout(env,COMMUNITY,{mode:'events',sims:'lmu',under:ACCUEIL});
+  const category=named(channels,'🏆 Endurance Manager'),text=named(channels,'📅・endurances-de-la-semaine');
+  for(const channel of [category,text]){
+    const mine=channel.permission_overwrites.find(rule=>rule.id===BOT&&rule.type===1);
+    mine.allow=String(BigInt(mine.allow)&~THREADS);mine.deny=String(THREADS);
+  }
+  calls.length=0;await syncBotRecaps(env,NOW,COMMUNITY);
+  for(const channel of [category,text]){
+    const mine=channel.permission_overwrites.find(rule=>rule.id===BOT&&rule.type===1);
+    assert.equal(BigInt(mine.allow)&THREADS,THREADS);assert.equal(BigInt(mine.deny)&THREADS,0n);
+    assert.equal(channel.permission_overwrites.some(rule=>rule.id!==BOT&&(BigInt(rule.allow)&THREADS)!==0n),false,'members gain no thread management');
+  }
+  calls.length=0;await syncBotRecaps(env,NOW,COMMUNITY);
+  assert.equal(calls.some(call=>call.method==='PATCH'&&call.body?.permission_overwrites),false,'repair stabilizes');
 });
 
 test('Discord\'s « a commencé un fil » notice is deleted once from # endurances-de-la-semaine',async t=>{
@@ -986,7 +1055,7 @@ test('EVENT TDZ\'s channel is shown as « 🗓️・calendrier », found again b
 });
 
 test('the recap written in a channel of the admins: after its messages, threads in it, never deleted',async t=>{
-  const {DB,env,channels,messages}=setup(t,{rights:String(85008n|(1n<<35n)|(1n<<38n))});race(DB);
+  const {DB,env,channels,messages}=setup(t,{rights:String(85008n|THREADS)});race(DB);
   messages.set('800000000000000000',{id:'800000000000000000',channel_id:TEXT,author:{id:OWNER},content:'Comment marche le site'});
   const count=channels.length;
   await layout(env,COMMUNITY,{mode:'general',sims:'lmu',week:{all:`in:${TEXT}`},events:''});
@@ -1005,7 +1074,7 @@ test('the recap written in a channel of the admins: after its messages, threads 
 });
 
 test('written in a channel: the bot must be allowed there, threads included',async t=>{
-  const {env}=setup(t);
+  const {env}=setup(t,{rights:'85008'});
   await assert.rejects(validateDiscordLayout(env,COMMUNITY,{mode:'general',sims:'lmu',week:{all:`in:${TEXT}`},events:''}),/salon « recap ».*Créer des fils publics/);
 });
 

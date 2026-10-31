@@ -137,7 +137,7 @@ test('voice channel setup detects missing Connect even when the bot can manage t
   let settings=(await req('/api/community/settings','GET',null,'admin')).data;
   assert.equal(settings.crews.botReady,false);
   assert.deepEqual(settings.crews.botMissing,['Se connecter']);
-  assert.match(settings.crews.botInviteUrl,/permissions=2081292065037905&/);
+  assert.ok(BigInt(new URL(settings.crews.botInviteUrl).searchParams.get('permissions')) & (1n << 17n), 'the unified invite includes the daily announcement mention');
   discord.state.botPermissions='1117200';
   settings=(await req('/api/community/settings','GET',null,'admin')).data;
   assert.equal(settings.crews.botReady,true);
@@ -150,7 +150,7 @@ test('a crew gets a voice channel « LMU · race · name » outside any category
   // The admins turn the modules on in the settings, once the bot has the rights to make channels.
   discord.state.botRights=false;
   let settings=(await req('/api/community/settings','GET',null,'admin')).data;
-  assert.equal(settings.crews.botReady,false);assert.equal(settings.crews.botProblem,'rights');assert.match(settings.crews.botInviteUrl,/permissions=2081292065037905&/);
+  assert.equal(settings.crews.botReady,false);assert.equal(settings.crews.botProblem,'rights');assert.ok(BigInt(new URL(settings.crews.botInviteUrl).searchParams.get('permissions')) & (1n << 17n), 'the unified invite includes the daily announcement mention');
   assert.equal((await req('/api/community/modules','PATCH',{crewChannels:true},'admin')).status,400);
   discord.state.botAbsent=true;
   settings=(await req('/api/community/settings','GET',null,'admin')).data;
@@ -252,6 +252,30 @@ test('existing crew recaps are silently updated to plain community nicknames', a
   assert.equal(messages.length,1);assert.equal(messages[0].method,'PATCH');
   assert.match(JSON.stringify(messages[0].body),/Alice FMT everyone/);assert.doesNotMatch(JSON.stringify(messages[0].body),/@/);
   assert.deepEqual(messages[0].body.allowed_mentions,{parse:[]});
+});
+
+for(const status of [403,500]) test(`audit: an unreadable voice state (${status}) postpones automatic vocal deletion`,async()=>{
+  const {DB,env,req,login,sync,discord}=harness();
+  await login(ADMIN,'admin','Orga');await login(PILOT,'pilot','Alice');
+  await req('/api/community/modules','PATCH',{crewChannels:true},'admin');
+  await req('/api/events','POST',race,'admin');
+  const event=(await req('/api/events','GET',null,'admin')).data.events[0],departure=event.departures[0];
+  const base=`/api/events/${event.id}/departures/${departure.id}`;
+  const registration=await req(base+'/registrations','POST',{name:'x',category:'GT3',status:'whole'},'pilot');
+  const crew=await req(base+'/crews','POST',{name:'Protection',category:'GT3'},'pilot');
+  const crewRow=(await req('/api/events','GET',null,'pilot')).data.events[0].departures[0].crews[0];
+  await req(`/api/crews/${crew.data.id}/members`,'POST',{registrationId:registration.data.id,version:crewRow.version,selfJoin:true},'pilot');
+  await sync(departure.startsAt-HOUR);
+  const voice=DB.db.prepare('SELECT voice_id FROM crew_discord').get().voice_id;
+  const expiry=departure.startsAt+6*HOUR+CLOSE_AFTER+HOUR,original=globalThis.fetch;
+  discord.calls.length=0;
+  globalThis.fetch=async(url,options)=>String(url).includes('/voice-states/')
+    ? Response.json({code:status===403?50013:0},{status}) : discord.handler(url,options);
+  try{await syncCrewDiscord(env,expiry,{requests:20});}finally{globalThis.fetch=original;}
+  assert.equal(DB.db.prepare('SELECT closed_at FROM crew_discord').get().closed_at,null);
+  assert.equal(discord.calls.some(call=>call.method==='DELETE'),false);
+  assert.ok(discord.state.channels.some(channel=>channel.id===voice));
+  assert.equal((await sync(expiry+5*60_000)).closed,1,'confirmed absent voice state allows the next cleanup');
 });
 
 test('a crew opened by the first version loses its text channel and category, and old archives are deleted', async () => {

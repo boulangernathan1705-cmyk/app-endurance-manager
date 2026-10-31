@@ -1,5 +1,6 @@
-import {effectivePermissions,withBotAccess,VOICE_ACCESS} from './discord-permissions.mjs';
+import {effectivePermissions,withBotAccess,VOICE_ACCESS,PUBLIC_VOICE_ACCESS} from './discord-permissions.mjs';
 import {iracingSoloSql} from './iracing-visibility.mjs';
+import {administrators} from './core.mjs';
 // Text recaps configured explicitly by an admin, published exclusively by the bot.
 import {loadWeeklyDiscordSnapshot, loadCalendarSnapshot, siteOf} from './discord-weekly.mjs';
 import {CALENDAR_FORMAT, buildWeeklyDiscordPayload, buildWeekHeadPayload, buildCalendarPayload, CATEGORY_EMOJI_NAMES} from './discord-weekly-format.mjs';
@@ -16,13 +17,14 @@ const MAX_CHANNELS = 450;
 const RACE_INFO_CHANNEL = 'infos-de-la-course'; // Discord writes text channel names in lowercase with dashes
 const VIEW = 1024n, SEND = 2048n, HISTORY = 65536n, EMBED = 16384n, MANAGE = 16n, ADMIN = 8n, EVERYONE = 131072n;
 // The morning announcement: written in the channel, with @everyone.
-const ANNOUNCE_REQUIRED = VIEW | SEND | EMBED | EVERYONE;
+const ANNOUNCE_REQUIRED = VIEW | SEND | HISTORY | EMBED | EVERYONE;
 const REQUIRED = VIEW | SEND | HISTORY | EMBED;
 // Written in a channel of the admins: the races' threads are opened there too.
-const INSIDE_REQUIRED = REQUIRED | (1n << 35n) | (1n << 38n);
+const INSIDE_REQUIRED = REQUIRED | (1n << 34n) | (1n << 35n) | (1n << 38n);
 // The races' threads: making them, writing in them, deleting them once the race is over.
 export const THREADS = (1n << 34n) | (1n << 35n) | (1n << 38n);
-export const RECAP_BOT_PERMISSIONS = String(REQUIRED | MANAGE | THREADS);
+// Both settings screens invite the same bot for the complete Discord feature set.
+export const RECAP_BOT_PERMISSIONS = String(REQUIRED | MANAGE | THREADS | PUBLIC_VOICE_ACCESS | EVERYONE | (1n << 28n));
 export const botRecapSettings = (env, community) => env.DB.prepare('SELECT * FROM community_recap_settings WHERE community_id=?').bind(community.id).first();
 // Each recap has its own place (migration 0079): destination_id for the LMU races, iracing_destination_id for the iRacing
 // ones (a category in « une catégorie par course », a text channel in « récap de la semaine »), calendar_destination_id for
@@ -72,6 +74,7 @@ function weekPlan(env, community, settings, cats = parseCategories(settings.bot_
       .filter(entry => entry.destination).map(entry => ({...entry, key:entry.destination}));
   week.sort((a,b) => rank(a.kind) - rank(b.kind));
   if (!layout) return week;
+  for (const entry of week) entry.threads = !entry.kind.startsWith('calendar');
   // Above the sims' messages of a channel, one message of its own: the banner, the week and the link to the site. The sims'
   // messages below it all look the same.
   const plan = [];
@@ -156,9 +159,9 @@ export async function recapDestinations(env, community) {
       private:isPrivate(channel.type === 0 ? parent || channel : channel, guild),
       missing:[['Voir le salon',VIEW],['Envoyer des messages',SEND],['Voir les anciens messages',HISTORY],['Intégrer des liens',EMBED],['Gérer les salons',MANAGE],...(voiceRequired ? [['Se connecter',1n << 20n]] : [])].filter(([,bit]) => !(rights & bit)).map(([label]) => label),
       ...(channel.type !== 4 ? {announceReady:(own & ANNOUNCE_REQUIRED) === ANNOUNCE_REQUIRED,
-        announceMissing:[['Voir le salon',VIEW],['Envoyer des messages',SEND],['Intégrer des liens',EMBED],['Mentionner @everyone',EVERYONE]].filter(([,bit]) => !(own & bit)).map(([label]) => label)} : {}),
+        announceMissing:[['Voir le salon',VIEW],['Envoyer des messages',SEND],['Voir les anciens messages',HISTORY],['Intégrer des liens',EMBED],['Mentionner @everyone',EVERYONE]].filter(([,bit]) => !(own & bit)).map(([label]) => label)} : {}),
       ...(channel.type === 0 ? {insideReady:(own & INSIDE_REQUIRED) === INSIDE_REQUIRED,
-        insideMissing:[['Voir le salon',VIEW],['Envoyer des messages',SEND],['Voir les anciens messages',HISTORY],['Intégrer des liens',EMBED],['Créer des fils publics',1n << 35n],['Envoyer des messages dans les fils',1n << 38n]].filter(([,bit]) => !(own & bit)).map(([label]) => label)} : {})};
+        insideMissing:[['Voir le salon',VIEW],['Envoyer des messages',SEND],['Voir les anciens messages',HISTORY],['Intégrer des liens',EMBED],['Gérer les fils',1n << 34n],['Créer des fils publics',1n << 35n],['Envoyer des messages dans les fils',1n << 38n]].filter(([,bit]) => !(own & bit)).map(([label]) => label)} : {})};
   });
 }
 // Below a text channel, the bot makes its own in that channel's category: its rights count there, so the message names it.
@@ -227,7 +230,7 @@ export async function serverRights(env, community) {
   const guild = community.discordGuildId;
   const [roles, member] = await Promise.all([discord(env, 'GET', `/guilds/${guild}/roles`), discord(env, 'GET', `/guilds/${guild}/members/${env.DISCORD_CLIENT_ID}`)]);
   const rights = effectivePermissions(roles, member, guild, {id:'',permission_overwrites:[]}, env.DISCORD_CLIENT_ID);
-  const missing = [['Voir les salons',VIEW],['Envoyer des messages',SEND],['Voir les anciens messages',HISTORY],['Intégrer des liens',EMBED],['Gérer les salons',MANAGE]]
+  const missing = [['Voir les salons',VIEW],['Envoyer des messages',SEND],['Voir les anciens messages',HISTORY],['Intégrer des liens',EMBED],['Gérer les salons',MANAGE],['Gérer les rôles',1n << 28n],['Gérer les fils',1n << 34n],['Créer des fils publics',1n << 35n],['Envoyer des messages dans les fils',1n << 38n]]
     .filter(([,bit]) => !(rights & bit)).map(([label]) => label);
   return {ready:!missing.length, missing};
 }
@@ -374,7 +377,7 @@ async function placeVoices(env, community, guildId, channels, budget) {
     wanted.forEach((item,position) => { item.position = position; });
   }
 }
-const categoryAccess = community => REQUIRED | MANAGE | (community.modules?.crewChannels === true ? VOICE_ACCESS : 0n);
+const categoryAccess = community => REQUIRED | MANAGE | THREADS | (community.modules?.crewChannels === true ? VOICE_ACCESS : 0n);
 // What the bot may copy (it can only give rights it has): seeing, writing, joining.
 const SHARED = VIEW | SEND | HISTORY | EMBED | (1n << 20n);
 // The rights of a channel without the bot's own, in a stable order (to compare them).
@@ -401,9 +404,11 @@ async function shareRights(env, community, settings, rows, channels, budget) {
       // Vocals keep their own rules: crew sync grants normal member features there.
       // Copying the category's restricted text permissions would undo that policy.
       if (channel.type === 2) continue;
-      if (JSON.stringify(othersRules(env, channel.permission_overwrites)) === wanted) continue;
       const mine = (channel.permission_overwrites || []).filter(item => Number(item.type) === 1 && String(item.id) === String(env.DISCORD_CLIENT_ID));
-      const access = channel.type === 4 ? categoryAccess(community) : channel.type === 2 ? VOICE_ACCESS : REQUIRED;
+      const access = channel.type === 4 ? categoryAccess(community) : REQUIRED | THREADS;
+      const own = mine[0];
+      if (JSON.stringify(othersRules(env, channel.permission_overwrites)) === wanted
+        && (BigInt(own?.allow || 0) & access) === access && !(BigInt(own?.deny || 0) & access)) continue;
       const permission_overwrites = withBotAccess([...rules, ...mine], env.DISCORD_CLIENT_ID, access);
       await discord(env,'PATCH',`/channels/${channel.id}`,{permission_overwrites},budget).catch(error => {
         if ([403].includes(error.status) || error.code === 50013) throw Object.assign(new Error('Pour rendre la catégorie du bot privée ou publique, il lui faut « Gérer les rôles » : invite-le à nouveau avec ses droits.'), {rights:true});
@@ -751,7 +756,7 @@ async function weekChannel(env, community, row, entry, budget) {
   }
   const create = rules => discord(env,'POST',`/guilds/${row.guild_id}/channels`,{type:0,name:entry.channel,topic,...(parent ? {parent_id:parent} : {}),...rules},budget);
   // A right the bot does not hold in a copied rule: made without the copy, Discord then gives it the category's rights.
-  const created = await create({permission_overwrites:withBotAccess(category?.permission_overwrites,env.DISCORD_CLIENT_ID,REQUIRED)})
+  const created = await create({permission_overwrites:withBotAccess(category?.permission_overwrites,env.DISCORD_CLIENT_ID,REQUIRED | (entry.threads ? THREADS : 0n))})
     .catch(error => { if (parent && error?.code === 50013) return create({}); throw error; });
   // Its place among the channels of that category: first, or right after the chosen channel (one request).
   const siblings = channels.filter(item => item.type !== 4 && (item.parent_id || null) === parent)
@@ -947,11 +952,11 @@ export async function addThreadMembers(env, timestamp = Date.now(), limit = 25) 
     // On the server, with « Accès Endurance Manager » (a role, @everyone, or a Discord admin).
     const pilots = (await env.DB.prepare(`SELECT m.user_id FROM memberships m WHERE m.community_id=? AND m.status='member'
       AND NOT EXISTS (SELECT 1 FROM discord_thread_members t WHERE t.community_id=m.community_id AND t.event_id=? AND t.user_id=m.user_id)
-      AND (m.discord_admin=1 OR EXISTS (SELECT 1 FROM community_role_permissions r WHERE r.community_id=m.community_id
+      AND (m.discord_admin=1 OR m.user_id IN (SELECT value FROM json_each(?)) OR EXISTS (SELECT 1 FROM community_role_permissions r WHERE r.community_id=m.community_id
         AND (r.discord_role_id=? OR r.discord_role_id IN (SELECT value FROM json_each(m.discord_roles)))
-        AND EXISTS (SELECT 1 FROM json_each(r.permissions) WHERE value='access')))
+        AND EXISTS (SELECT 1 FROM json_each(r.permissions) WHERE value IN ('access','admin'))))
       ORDER BY EXISTS (SELECT 1 FROM registrations g WHERE g.event_id=? AND g.user_id=m.user_id) DESC, m.user_id LIMIT 50`)
-      .bind(thread.community_id,thread.event_id,thread.guild_id,thread.event_id).all()).results || [];
+      .bind(thread.community_id,thread.event_id,JSON.stringify(administrators(env)),thread.guild_id,thread.event_id).all()).results || [];
     if (!pilots.length) {
       await env.DB.prepare('UPDATE discord_recap_publications SET members_checked_at=? WHERE community_id=? AND event_id=?').bind(timestamp,thread.community_id,thread.event_id).run();
       continue;
