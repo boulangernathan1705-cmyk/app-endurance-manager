@@ -299,14 +299,15 @@ async function remove(env, budget, channelId) {
 }
 
 // Recover duplicates whose ids were overwritten by overlapping syncs in older versions.
-// Only inspect race categories managed by this site, and require the bot's own original recap.
+// Only inspect the categories the site puts voices in (race categories, the voices' category of « pit talk », the
+// bot's « LMU » / « iRacing »), and require the bot's own original recap of a race of this community.
 export async function cleanupOrphanCrewDiscord(env, timestamp = Date.now()) {
   if (!env?.DB || !env.DISCORD_BOT_TOKEN || !env.DISCORD_CLIENT_ID) return 0;
   // A Worker deployment does not necessarily apply D1 migrations. Recovery also works
   // on the previous schema, using the cron slot to rotate without the optional cursors.
   const settings = (await env.DB.prepare(`SELECT s.* FROM community_crew_discord s JOIN communities c ON c.id=s.community_id
-    WHERE c.discord_guild_id IS NOT NULL AND EXISTS(SELECT 1 FROM discord_recap_publications p
-      WHERE p.community_id=s.community_id AND p.category_id IS NOT NULL AND p.event_id<>'')
+    WHERE c.discord_guild_id IS NOT NULL AND (s.voice_category_id IS NOT NULL OR EXISTS(SELECT 1 FROM discord_recap_publications p
+      WHERE p.community_id=s.community_id AND p.category_id IS NOT NULL AND p.event_id<>''))
     ORDER BY s.community_id`).all()).results || [];
   if (!settings.length) return 0;
   const slot = Math.floor(timestamp / (15 * 60_000));
@@ -320,12 +321,16 @@ export async function cleanupOrphanCrewDiscord(env, timestamp = Date.now()) {
   const publications = (await env.DB.prepare(`SELECT event_id,category_id FROM discord_recap_publications
     WHERE community_id=? AND category_id IS NOT NULL AND event_id<>''`).bind(community.id).all()).results || [];
   const races = new Map(publications.map(row => [row.category_id,row.event_id]));
+  // Categories holding the voices of several races: the race is read from the recap's link.
+  const shared = new Set([setting.voice_category_id].filter(Boolean));
+  const recap = await env.DB.prepare('SELECT enabled,bot_categories FROM community_recap_settings WHERE community_id=?').bind(community.id).first().catch(() => null);
+  if (recap?.enabled) { try { for (const id of Object.values(JSON.parse(recap.bot_categories || '{}') || {})) if (typeof id === 'string') shared.add(id); } catch { /* unreadable: ignored */ } }
   const tracked = (await env.DB.prepare('SELECT voice_id FROM crew_discord WHERE guild_id=? AND voice_id IS NOT NULL')
     .bind(community.discordGuildId).all()).results || [];
   const known = new Set(tracked.map(row => row.voice_id));
   const channels = await discord(env,budget,'GET',`/guilds/${community.discordGuildId}/channels`);
   const candidates = (Array.isArray(channels) ? channels : []).filter(channel => channel.type === VOICE
-    && races.has(channel.parent_id) && !known.has(channel.id) && /^\d{15,22}$/.test(channel.id)
+    && (races.has(channel.parent_id) || shared.has(channel.parent_id)) && !known.has(channel.id) && /^\d{15,22}$/.test(channel.id)
     && Number((BigInt(channel.id) >> 22n) + 1420070400000n) < timestamp - 5 * 60_000)
     .sort((a,b) => BigInt(a.id) < BigInt(b.id) ? -1 : 1);
   const channel = persistentCursor
@@ -333,15 +338,19 @@ export async function cleanupOrphanCrewDiscord(env, timestamp = Date.now()) {
     : candidates[Math.floor(slot / settings.length) % candidates.length];
   if (!channel) return 0;
   try {
-    const eventId = races.get(channel.parent_id);
     const messages = await discord(env,budget,'GET',`/channels/${channel.id}/messages?after=0&limit=100`);
-    const links = ['lmu','iracing'].map(sim => `${communityUrl(env,community)}/${sim}/#event=${eventId}`);
+    const ours = (Array.isArray(messages) ? messages : []).filter(message => message.author?.bot === true && message.author.id === env.DISCORD_CLIENT_ID);
+    const base = communityUrl(env,community), linked = text => String(text || '').match(/#event=([\w-]+)$/)?.[1];
+    const eventId = races.get(channel.parent_id) || ours.map(message => linked(message.embeds?.[0]?.url)
+      || String(message.content || '').split('\n').map(line => line.startsWith('🔗 Inscriptions et équipage : ') ? linked(line) : null).find(Boolean)).find(Boolean);
+    if (!eventId) return 0;
+    const links = ['lmu','iracing'].map(sim => `${base}/${sim}/#event=${eventId}`);
     // The text recap of before, or the card (its title links to the race).
-    const recap = (Array.isArray(messages) ? messages : []).find(message => message.author?.bot === true
-      && message.author.id === env.DISCORD_CLIENT_ID && (links.some(link => String(message.content || '').split('\n').includes(`🔗 Inscriptions et équipage : ${link}`))
+    const card = ours.find(message => (links.some(link => String(message.content || '').split('\n').includes(`🔗 Inscriptions et équipage : ${link}`))
         || links.includes(message.embeds?.[0]?.url)));
-    const name = (recap?.content?.match(/^👥 Équipage \*\*([^\n]+)\*\* : /m) || recap?.embeds?.[0]?.description?.match(/^Équipage \*\*([^\n]+)\*\* · /))?.[1];
-    if (!name || channel.name !== clip(name,100)) return 0;
+    const name = (card?.content?.match(/^👥 Équipage \*\*([^\n]+)\*\* : /m) || card?.embeds?.[0]?.description?.match(/^Équipage \*\*([^\n]+)\*\* · /))?.[1];
+    // In a race's category the voice is named after its crew; elsewhere after its sim, race and crew.
+    if (!name || (channel.name !== clip(name,100) && !(/^(🏎️ LMU|🏁 iRacing) · /u.test(channel.name) && channel.name.endsWith(` · ${name}`)))) return 0;
     // Re-read immediately before deletion: a creation still in flight or another live crew is protected.
     if (await env.DB.prepare('SELECT 1 FROM crew_discord WHERE guild_id=? AND voice_id=?')
       .bind(community.discordGuildId,channel.id).first()) return 0;

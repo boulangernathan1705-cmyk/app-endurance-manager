@@ -825,3 +825,25 @@ test('a channel the bot tracked but that is gone from the server does not block 
   const result=await req('/api/community/modules','PATCH',{crewCategory:'600000000000000556'},'admin');
   assert.equal(result.status,400,'a category the admin just chose must still exist');
 });
+
+test('automatic recovery also removes an untracked crew voice left in the « pit talk » category', async () => {
+  const {DB,env,req,login,discord}=harness();
+  await login(ADMIN,'admin','Orga');
+  await req('/api/community/modules','PATCH',{crewChannels:true},'admin');
+  await req('/api/events','POST',race,'admin');
+  const event=(await req('/api/events','GET',null,'admin')).data.events[0];
+  const pitTalk='600000000000000077', voice='700000000000000098', other='700000000000000097';
+  DB.db.prepare('UPDATE community_crew_discord SET voice_category_id=? WHERE community_id=?').run(pitTalk,DEV);
+  discord.state.channels=[{id:voice,type:2,name:'🏎️ LMU · 6h SPA · Fantôme',parent_id:pitTalk},{id:other,type:2,name:'Discussion',parent_id:pitTalk}];
+  discord.state.messages=[{author:{id:env.DISCORD_CLIENT_ID,bot:true},embeds:[{url:`${ROOT}/lmu/#event=${event.id}`,description:'Équipage **Fantôme** · 🔓 ouvert'}]}];
+  const realFetch=globalThis.fetch;globalThis.fetch=discord.handler;
+  try{
+    // One voice looked at per pass: the server's own « Discussion » first (its name is no crew's), then the crew's.
+    assert.equal(await cleanupOrphanCrewDiscord(env),0);
+    assert.equal(await cleanupOrphanCrewDiscord(env),1);
+    assert.deepEqual(discord.calls.filter(call=>call.method==='DELETE').map(call=>call.path),[`/channels/${voice}`]);
+    // A voice of the server's own, without the bot's card, is never touched.
+    discord.state.messages=[];
+    assert.equal(await cleanupOrphanCrewDiscord(env),0);
+  }finally{globalThis.fetch=realFetch;}
+});
