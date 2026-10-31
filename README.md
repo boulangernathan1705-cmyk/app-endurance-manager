@@ -44,13 +44,13 @@ Le code CSS reste modulaire dans le dépôt, mais `npm run build:workers` rassem
 
 ## Déploiement
 
-La production utilise la branche `main`. La configuration Cloudflare se trouve dans `wrangler.jsonc`.
+Cloudflare (Workers Builds) déploie tout seul : la branche `dev` sur https://dev.endurance-manager.app (`wrangler.dev.jsonc`), la branche `main` sur https://endurance-manager.app (`wrangler.prod.jsonc`). Chaque build applique d’abord les migrations D1 de sa propre base.
+
+`wrangler.jsonc` est la configuration **locale** (`wrangler dev`). Aucune commande du dépôt ne déploie la production. À la main, seul le dev se déploie, avec sa configuration explicite :
 
 ```bash
-npm run deploy:workers
+npm run deploy:dev
 ```
-
-Cette commande applique les migrations D1 en attente puis déploie le Worker. La base D1 existante ne doit pas être recréée et les migrations déjà appliquées ne doivent pas être rejouées manuellement.
 
 Les variables Discord sont configurées dans Cloudflare. `DISCORD_CLIENT_SECRET` doit rester un secret Cloudflare et ne doit jamais être ajouté au dépôt.
 

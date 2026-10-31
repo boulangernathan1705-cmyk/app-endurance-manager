@@ -201,6 +201,9 @@ async function loadSession() {
       for (const link of document.querySelectorAll('a.brand-button')) link.href = '/events/';
     // The LMU module's own tab (fiches-combo.html): only for the roles that see the fiches combo.
     for (const link of document.querySelectorAll('[data-module-link]')) link.hidden = link.dataset.moduleLink === 'combos' && session.combos !== true;
+    // The administration's own tabs (Administration · Diagnostics): only for those who may open them.
+    const admin = Array.isArray(session.permissions) && session.permissions.includes('admin');
+    if (!admin) for (const link of document.querySelectorAll('.nav-sections a[href="/members.html"], .nav-sections a[href="/diagnostics.html"]')) link.remove();
     unifyNav(session);
     siteCommunityName = session.openSite ? '' : session.community?.name || '';
     if (session.user) {

@@ -50,3 +50,15 @@ test('an unknown page shows a "page introuvable" page, not a blank one', async (
   assert.equal(image.status, 404);
   assert.equal(await image.text(), '');
 });
+
+test('the dev site takes the production session cookies off every request', async () => {
+  const {withoutProductionCookies} = await import('../server/dev-environment.mjs');
+  const request = new Request('https://dev.endurance-manager.app/api/session', {headers:{Cookie:'__Secure-em_session=prod; em_sim=lmu; __Secure-em_dev_session=dev; __Secure-em_oauth=x'}});
+  assert.equal(withoutProductionCookies(request).headers.get('Cookie'), 'em_sim=lmu; __Secure-em_dev_session=dev');
+  assert.equal(withoutProductionCookies(new Request('https://x.example/', {headers:{Cookie:'__Secure-em_session=prod'}})).headers.get('Cookie'), null);
+  const untouched = new Request('https://x.example/', {headers:{Cookie:'em_sim=lmu'}});
+  assert.equal(withoutProductionCookies(untouched), untouched);
+  // The local site's own cookie (no Domain, never sent elsewhere) stays.
+  const local = new Request('http://localhost:8787/', {headers:{Cookie:'__Host-em_session=local'}});
+  assert.equal(withoutProductionCookies(local), local);
+});

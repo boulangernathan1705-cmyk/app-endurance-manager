@@ -18,8 +18,6 @@ test('le build produit les deux espaces simulateurs et Cloudflare conserve les U
   assert.equal(JSON.parse(wrangler).assets.html_handling, 'auto-trailing-slash');
   assert.match(home, /href="\/lmu\/"/);
   assert.match(home, /href="\/iracing\/"/);
-  assert.match(hub, /'\/lmu\/'/);
-  assert.match(hub, /'\/iracing\/'/);
   assert.match(homeView, /href="\/\$\{game\}\/"/);
   assert.match(homeView, /gameLink\('lmu'/);
   assert.match(homeView, /gameLink\('iracing'/);

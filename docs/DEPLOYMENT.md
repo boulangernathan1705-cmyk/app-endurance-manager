@@ -26,7 +26,7 @@ Les fichiers CSS restent modulaires dans le dépôt, mais le build publie une fe
 
 ## Commandes de déploiement : attention à la configuration
 
-Le script `npm run deploy:workers` utilise actuellement les commandes Wrangler **sans** `--config`, donc `wrangler.jsonc` (configuration locale). **Ne pas employer ce script comme une commande universelle de déploiement en production.**
+L’ancien script `npm run deploy:workers` (Wrangler **sans** `--config`, donc `wrangler.jsonc` et la base distante `fmt-endurance`) a été retiré. Le seul script de déploiement est `npm run deploy:dev`, qui nomme `wrangler.dev.jsonc` pour les migrations comme pour le Worker. La production n’est déployée que par Cloudflare à la fusion dans `main`.
 
 Toute opération sur les environnements distants doit sélectionner explicitement le bon fichier de configuration. Les migrations D1 doivent cibler la même configuration que le Worker à déployer. Vérifier l'identité du compte, le nom du Worker, la base D1 et les changements de migration avant l'exécution. La procédure automatique de livraison existante reste la référence ; ce document ne la déclenche pas.
 
