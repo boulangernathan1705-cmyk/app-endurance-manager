@@ -33,6 +33,9 @@ function dayKey(day){const d=new Date(day*DAY_MS);return `${d.getUTCFullYear()}-
 function weekFromMonday(monday){const sunday=monday+6;return{key:dayKey(monday),monday,sunday,label:`semaine du ${startLabel.format(dayDate(monday))} au ${endLabel.format(dayDate(sunday))}`};}
 export function parisWeek(timestamp=Date.now()){const day=localDay(timestamp),weekday=new Date(day*DAY_MS).getUTCDay();return weekFromMonday(day-(weekday===0?6:weekday-1));}
 export function nextParisWeek(timestamp=Date.now()){return weekFromMonday(parisWeek(timestamp).monday+7);}
+// Nathan's rule: a race's Discord thread and its crews' voices open on the Monday (Paris) of the week of the start,
+// together with the week's calendar, whatever the race's length.
+export function raceWeekOpen(startsAt,now=Date.now()){return Number.isFinite(Number(startsAt))&&parisWeek(Number(startsAt)).monday<=parisWeek(now).monday;}
 export function isInParisWeek(timestamp,week){const day=localDay(timestamp);return day>=week.monday&&day<=week.sunday;}
 export function isDepartureRelevant(startsAt,durationHours,week,now=Date.now()){
   if(!Number.isFinite(startsAt)||!isInParisWeek(startsAt,week))return false;

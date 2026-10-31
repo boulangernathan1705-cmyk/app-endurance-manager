@@ -11,7 +11,7 @@ import {syncDueRecaps,syncWeeklyDiscord} from '../server/discord-weekly.mjs';
 import {RECAP_BOT_PERMISSIONS,THREADS,addThreadMembers,botCategoryEmojis,saveBotRecap,validateDiscordLayout,syncBotRecaps,previewBotRecap,recapDestinations,eventDeletionTime,eventChannelName,settingsRow,recapError,repairBotRecap,racesOpenNow} from '../server/recap-discord.mjs';
 
 const OWNER='333333333333333333', BOT='444444444444444444', TEXT='555555555555555555', CATEGORY='666666666666666666';
-const NOW=Date.parse('2026-10-10T12:00:00Z'), DAY=86400000;
+const NOW=Date.parse('2026-10-12T08:00:00Z'), DAY=86400000;
 const COMMUNITY={id:DEV_COMMUNITY,slug:'commu-dev',name:'Test',discordGuildId:GUILD,modules:{discordWeekly:true}};
 const ENDURANCES={id:CATEGORY,name:'Endurances'}, RECAP={id:TEXT,name:'recap'};
 const SETTINGS=settingsRow('events',ENDURANCES,ENDURANCES), GENERAL=settingsRow('general',RECAP);
@@ -503,10 +503,15 @@ test('repair of a removed category moves the surviving recap channel and keeps i
   assert.equal(channels.find(c=>c.id===after.channel_id).parent_id,after.category_id);assert.equal(creates(calls).length,1);assert.equal(sends(calls).length,0);
 });
 
-test('a race opens 7 days before a start, a 24 h race 15 days before',()=>{
-  const ev=(id,hours,days)=>({id,circuit:'spa',duration_hours:hours,departures:JSON.stringify([{id:'s',startsAt:NOW+days*DAY}])});
-  const events=[ev('6h-8d',6,8),ev('6h-7d',6,7),ev('24h-16d',24,16),ev('24h-15d',24,15)];
-  assert.deepEqual(racesOpenNow(events,'all',NOW),['6h-7d','24h-15d']);
+test('a race opens on the Monday of its week (Paris), a 24 h race too, until it is over',()=>{
+  const SAT=Date.parse('2026-10-10T12:00:00Z'), MONDAY=Date.parse('2026-10-11T22:00:00Z');
+  const ev=(id,hours,at)=>({id,circuit:'spa',duration_hours:hours,departures:JSON.stringify([{id:'s',startsAt:at}])});
+  const events=[ev('6h-sunday',6,SAT+DAY),ev('6h-next-week',6,SAT+3*DAY),ev('24h-next-week',24,SAT+6*DAY),ev('6h-in-2-weeks',6,SAT+9*DAY)];
+  // Saturday: only this week's race, not next week's (even 2 or 6 days away).
+  assert.deepEqual(racesOpenNow(events,'all',SAT),['6h-sunday']);
+  // Sunday evening the past race is over; Monday 00:00 Paris: the week's races open, the 24 h race too; the following week waits.
+  assert.deepEqual(racesOpenNow(events,'all',MONDAY-1),[]);
+  assert.deepEqual(racesOpenNow(events,'all',MONDAY),['6h-next-week','24h-next-week']);
 });
 
 test('a race channel is titled with the week of the race, not the current week',async t=>{

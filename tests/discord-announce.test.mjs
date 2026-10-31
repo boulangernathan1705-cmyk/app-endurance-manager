@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {DatabaseSync} from 'node:sqlite';
 import {readFileSync,readdirSync} from 'node:fs';
 import worker from '../server/worker.mjs';
-import {announceCommunity,announceItems} from '../server/discord-announce.mjs';
+import {announceCommunity,announceItems,parisDayStart} from '../server/discord-announce.mjs';
 import {buildCompleteAnnouncement,buildAnnounceEvent,buildAnnounceIntro,buildAnnounceRace,eventHook,ANNOUNCE_HOOKS} from '../server/discord-weekly-format.mjs';
 import {layoutInput} from '../server/discord-layout.mjs';
 import {linkTestServer,DEV_COMMUNITY,GUILD} from './fixtures/discord-server.mjs';
@@ -459,4 +459,20 @@ test('the delivery migration marks existing days as already attempted',()=>{
  db.prepare(`INSERT INTO discord_announcements(community_id,day,item,kind,position,guild_id,channel_id,created_at) VALUES(?,'2026-10-28','intro','intro',0,?,?,0)`).run(DEV_COMMUNITY,GUILD,ANNOUNCES);
  db.exec(readFileSync(new URL('../migrations/0089_discord_announcement_delivery.sql',import.meta.url),'utf8'));
  const row=db.prepare('SELECT * FROM discord_announcements').get();assert.equal(row.ping_attempted,1);assert.equal(row.pending_nonce,'');db.close();
+});
+
+test('the day\'s announcement keeps every start of the day, started or not, until midnight',async t=>{
+  const {env,messages,settings}=setup(t);
+  await announceCommunity(env,TDZ,settings(),MORNING);
+  // 23h30 Paris (22h30 UTC): the 6h de Spa (21h Paris) and the event (22h Paris) have started; the message stays whole.
+  await announceCommunity(env,TDZ,settings(),Date.parse('2026-10-28T22:30:00Z'));
+  assert.equal(messages.size,1);
+  const text=JSON.stringify([...messages.values()]);
+  assert.match(text,/6h de Spa/);assert.match(text,/Coupe GT3/);assert.doesNotMatch(text,/4h de Monza/);
+});
+
+test('the morning of a summer-time change still starts the day at midnight (Paris)',()=>{
+  assert.equal(new Date(parisDayStart(Date.parse('2026-10-25T10:00:00Z'))+1).toISOString(),'2026-10-24T22:00:00.000Z');
+  assert.equal(new Date(parisDayStart(Date.parse('2026-10-26T10:00:00Z'))+1).toISOString(),'2026-10-25T23:00:00.000Z');
+  assert.equal(new Date(parisDayStart(Date.parse('2026-03-29T10:00:00Z'))+1).toISOString(),'2026-03-28T23:00:00.000Z');
 });

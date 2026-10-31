@@ -1,10 +1,10 @@
-import test from 'node:test';
+import test, {mock} from 'node:test';
 import assert from 'node:assert/strict';
 import {DatabaseSync} from 'node:sqlite';
 import {readFileSync, readdirSync} from 'node:fs';
 import worker from '../server/worker.mjs';
 import scheduledWorker from '../server/worker-with-migrations.mjs';
-import {syncCrewDiscord, closeDeletedCrewDiscord, cleanupOrphanCrewDiscord, OPEN_BEFORE, CLOSE_AFTER, KEEP_ARCHIVES} from '../server/crew-discord.mjs';
+import {syncCrewDiscord, closeDeletedCrewDiscord, cleanupOrphanCrewDiscord, CLOSE_AFTER, KEEP_ARCHIVES} from '../server/crew-discord.mjs';
 import {linkTestServer, allowCrews, setMember, ORGA_ROLE, GUILD} from './fixtures/discord-server.mjs';
 
 // Crews on Discord and race reminders (migrations 0044, 0045): the bot is a fake Discord that records each request.
@@ -13,6 +13,10 @@ const ADMIN='111111111111111111', PILOT='222222222222222222', MATE='333333333333
 const DEV='e0a1c0de-0000-4000-8000-000000000001';
 const BOT_ROLE='900000000000000009';
 const HOUR=3600_000;
+// Voices open from the Monday (Paris) of the race's week: the tests run on the Monday of the 6h SPA's week
+// (Sunday 15 October 2090), the clock standing still unless a test gives its own time.
+const RACE_MONDAY=Date.parse('2090-10-09T08:00:00Z');
+mock.timers.enable({apis:['Date'],now:RACE_MONDAY});
 const BOT_ACCESS=[{id:'app-id',type:1,allow:'1117200',deny:'0'},{id:GUILD,type:0,allow:'2080965379087937',deny:'0'}];
 const MIGRATIONS=readdirSync(new URL('../migrations/',import.meta.url)).filter(name=>name.endsWith('.sql')).sort();
 
@@ -170,10 +174,11 @@ test('a crew gets a voice channel « LMU · race · name » outside any category
   const mate=await req(base+'/registrations','POST',{name:'x',category:'GT3',status:'whole'},'mate');assert.equal(mate.status,201);
   const crew=await req(base+'/crews','POST',{name:'Les Tondeuz',category:'GT3'},'pilot');assert.equal(crew.status,201);
 
-  // As soon as the crew exists, even weeks before: one voice channel, no category (the server's owner places
-  // it), the recap in its chat.
+  // Weeks before, nothing yet; from the Monday of the race's week: one voice channel, no category (the server's
+  // owner places it), the recap in its chat.
   let mark=discord.calls.length;
-  assert.equal((await sync(startsAt-OPEN_BEFORE-30*24*HOUR)).opened,1);
+  assert.equal((await sync(startsAt-30*24*HOUR)).opened,0);assert.deepEqual(created(discord.calls,mark),[]);
+  assert.equal((await sync(RACE_MONDAY)).opened,1);
   const channels=created(discord.calls,mark);
   assert.equal(channels.length,1);assert.deepEqual(channels[0].body,{name:'🏎️ LMU · 6h SPA · Les Tondeuz',type:2,permission_overwrites:BOT_ACCESS});
   const row=DB.db.prepare('SELECT * FROM crew_discord').get();
@@ -424,7 +429,7 @@ test('with « Une catégorie par course », a new crew\'s voice channel waits fo
   assert.equal((await req('/api/community/modules','PATCH',{crewChannels:true},'admin')).status,200);
   assert.equal((await req('/api/events','POST',race,'admin')).status,201);
   const event=(await req('/api/events','GET',null,'admin')).data.events[0];
-  const departure=event.departures[0], base=`/api/events/${event.id}/departures/${departure.id}`, at=departure.startsAt-40*24*HOUR;
+  const departure=event.departures[0], base=`/api/events/${event.id}/departures/${departure.id}`, at=RACE_MONDAY;
   DB.db.prepare("INSERT INTO community_recap_settings(community_id,enabled,mode,scope,guild_id,destination_id,destination_name) VALUES(?,1,'events','lmu',?,'500000000000000002','Courses')").run(DEV,GUILD);
   assert.equal((await req(base+'/registrations','POST',{name:'x',category:'GT3',status:'whole'},'pilot')).status,201);
   assert.equal((await req(base+'/crews','POST',{name:'Attente',category:'GT3'},'pilot')).status,201);
@@ -516,7 +521,7 @@ test('« un fil par course » with LMU and iRacing apart: an iRacing race\'s voi
   assert.equal(created(discord.calls,mark)[0].body.parent_id,'600000000000000009');
 });
 
-test('an empty crew gets its voice channel as soon as it is created', async () => {
+test('an empty crew gets its voice channel from the Monday of its race\'s week', async () => {
   const {DB,req,login,sync,discord}=harness();
   await login(ADMIN,'admin','Orga');
   assert.equal((await req('/api/community/modules','PATCH',{crewChannels:true},'admin')).status,200);
@@ -524,7 +529,10 @@ test('an empty crew gets its voice channel as soon as it is created', async () =
   const event=(await req('/api/events','GET',null,'admin')).data.events[0], departure=event.departures[0];
   DB.db.prepare("INSERT INTO crews(id,event_id,departure_id,name,category,car,locked,created_at,community_id) VALUES('empty',?,?,'Sans pilote','GT3','',0,0,?)").run(event.id,departure.id,DEV);
   const mark=discord.calls.length;
-  assert.equal((await sync(departure.startsAt-30*24*HOUR)).opened,1);
+  // The Sunday before (Paris), nothing; on Monday 00:00 Paris (22:00 UTC on Sunday, summer time), the voice.
+  const monday=Date.parse('2090-10-08T22:00:00Z');
+  assert.equal((await sync(monday-1)).opened,0);
+  assert.equal((await sync(monday)).opened,1);
   assert.deepEqual(created(discord.calls,mark).map(call=>call.body.name),['🏎️ LMU · 6h SPA · Sans pilote']);
 });
 
