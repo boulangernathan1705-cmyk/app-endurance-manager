@@ -241,6 +241,9 @@ test('Discord not answering: a member already checked keeps the roles known last
   DB.db.prepare('UPDATE memberships SET checked_at=checked_at-700').run();
   const access=await accessOf(env,community,PILOT);
   assert.equal(access.status,'member');assert.ok(access.permissions.has('create_race'));
+  // Not forever: after a week without any successful check, the site closes until Discord answers again.
+  DB.db.prepare('UPDATE memberships SET checked_at=checked_at-7*24*3600').run();
+  assert.equal((await accessOf(env,community,PILOT)).status,'unavailable');
 });
 
 test('site access is explicit, cumulative and separate from action permissions; role settings revoke it immediately', async t => {
