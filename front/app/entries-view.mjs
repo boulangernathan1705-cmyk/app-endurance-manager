@@ -41,7 +41,7 @@ function crewSort(event) {
     || String(a.name || '').localeCompare(String(b.name || ''),locale,{sensitivity:'base',numeric:true});
 }
 
-// The entry body: three side-by-side columns (own crew, other crews, pilots without a crew), no nested frames.
+// The entry body: own crew first, then the other crews and the pilots without a crew, folded (no nested frames).
 function column(title,count,body) {
   return `<section class="my-entry-column"><h3 class="my-entry-column-title">${esc(title)} <span>${count}</span></h3>${body}</section>`;
 }
@@ -114,8 +114,14 @@ function card({event,departure,reg}, grouped=false) {
   const situation = crew
     ? `<span class="departure-mine-badge is-crew">✓ Équipage ${esc(crew.name)}</span>`
     : '<span class="departure-mine-badge is-waiting">En attente d’équipage</span>';
-  if(grouped)return slotCard(departure,reg,`${(reg.groupCategories||[reg.category]).map(badge).join('')}${situation}`,
-    `${column('Mon équipage',members.length,ownCrewBody)}${column('Autres équipages',otherCrews.length,otherCrewsBody)}${column('Pilotes sans équipage',freePilots.length,unassignedBody)}`,true);
+  // Your situation first, with what to do next; the rest of the start (other crews, pilots without a crew) folded
+  // underneath (audit R23 / AUD-14).
+  const next = crew ? '' : `<p class="my-entry-next"><strong>À faire :</strong> rejoins un équipage ou crée le tien.
+    <button type="button" class="secondary-button" data-action="open" data-id="${event.id}" data-departure="${departure.id}">Voir les équipages</button></p>`;
+  const others = `<details class="my-entry-collective"><summary>Le reste du départ · ${otherCrews.length} équipage${otherCrews.length>1?'s':''} · ${freePilots.length} pilote${freePilots.length>1?'s':''} sans équipage</summary>
+    <div class="my-entry-columns is-two">${column('Autres équipages',otherCrews.length,otherCrewsBody)}${column('Pilotes sans équipage',freePilots.length,unassignedBody)}</div></details>`;
+  const body = `${next}${column('Mon équipage',members.length,ownCrewBody)}${others}`;
+  if(grouped)return slotCard(departure,reg,`${(reg.groupCategories||[reg.category]).map(badge).join('')}${situation}`,body,true);
   return `<details class="native-my-entry-card race-card my-entry-race event-type-${event.eventType||'private'}" id="entry-${reg.id}">
     <summary class="native-my-entry-header">
       <span class="native-my-entry-toggle" aria-hidden="true">+</span>
@@ -127,11 +133,7 @@ function card({event,departure,reg}, grouped=false) {
       </span>${circuitVisual(event.circuit,true)}</span>
       <button type="button" class="primary-button native-my-entry-open-event" data-action="open" data-id="${event.id}" data-departure="${departure.id}">Voir la course</button>
     </summary>
-    <div class="native-my-entry-body my-entry-columns">
-      ${column('Mon équipage',members.length,ownCrewBody)}
-      ${column('Autres équipages',otherCrews.length,otherCrewsBody)}
-      ${column('Pilotes sans équipage',freePilots.length,unassignedBody)}
-    </div>
+    <div class="native-my-entry-body my-entry-focus">${body}</div>
   </details>`;
 }
 
@@ -139,7 +141,7 @@ function card({event,departure,reg}, grouped=false) {
 function slotCard(departure,reg,badges,body,columns=false){
   return `<section class="my-entry-slot" id="entry-${reg.id}" data-entry-departure="${departure.id}">
     <h3 class="my-entry-slot-heading"><span>${esc(new Date(departure.startsAt).toLocaleDateString(localeTag(),{timeZone:'Europe/Paris',weekday:'short',day:'numeric',month:'short'}))} · Départ ${esc(timeLabel(departure.time))}</span><span class="race-badges">${badges}</span></h3>
-    <div class="native-my-entry-body${columns?' my-entry-columns':''}">${body}</div>
+    <div class="native-my-entry-body${columns?' my-entry-focus':''}">${body}</div>
   </section>`;
 }
 

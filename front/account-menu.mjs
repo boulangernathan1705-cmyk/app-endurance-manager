@@ -178,7 +178,7 @@ function unifyNav(session) {
   sections.className = 'nav-sections';
   sections.setAttribute('role', 'group');
   sections.setAttribute('aria-label', 'Sections');
-  sections.innerHTML = `${events ? link('/events/', session.soloLabel || 'EVENT TDZ', ' nav-events-button') : ''}${endurance}${link(`/${sim}/#inscriptions`, 'Mes inscriptions')}${own}`;
+  sections.innerHTML = `${link(`/${sim}/#semaine`, 'Semaine', ' nav-week-button')}${events ? link('/events/', session.soloLabel || 'EVENT TDZ', ' nav-events-button') : ''}${endurance}${link(`/${sim}/#inscriptions`, 'Mes inscriptions')}${own}`;
   // Simulator not chosen yet: « Endurance » asks for it first.
   if (events) sections.children[1].addEventListener('click', event => { if (!simChosen()) { event.preventDefault(); openSimChooser(); } });
   nav.append(sections);

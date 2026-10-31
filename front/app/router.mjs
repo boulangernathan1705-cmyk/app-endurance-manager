@@ -6,6 +6,7 @@ import {app,state,activeGame,loadArchive,showError} from './core.mjs';
 const EVENT_HASH=/^#event=([a-f0-9-]{36})$/;
 const ENTRIES_HASH='#inscriptions';
 const SOLO_HASH='#solo';
+const WEEK_HASH='#semaine';
 const EVENTS_PATH='/events/';
 const onEvents=()=>/^\/events\/?$/i.test(location.pathname);
 let views=null;
@@ -20,6 +21,7 @@ export function routeFromLocation(){
   if(hash===SOLO_HASH){history.replaceState(null,'',EVENTS_PATH+location.search);return {page:'home',list:'solo'};}
   if(hash!==location.hash&&hash===ENTRIES_HASH)history.replaceState(null,'',location.pathname+location.search+hash);
   if(hash===ENTRIES_HASH)return {page:'my-entries'};
+  if(hash===WEEK_HASH)return {page:'week'};
   if(onEvents())return {page:'home',list:'solo'};
   return {page:'home',list:'endurance'};
 }
@@ -28,6 +30,7 @@ function addressFor(detail){
   const here=location.pathname+location.search;
   if(detail.page==='event'&&detail.eventId)return `${here}#event=${detail.eventId}`;
   if(detail.page==='my-entries')return `${here}${ENTRIES_HASH}`;
+  if(detail.page==='week')return `${here}${WEEK_HASH}`;
   if(detail.page==='home')return detail.list==='solo'?EVENTS_PATH+location.search:onEvents()?`/${activeGame}/${location.search}`:here;
   return null; // Event form: keep the current address.
 }
@@ -51,6 +54,7 @@ export async function applyRoute(route,message=''){
     return;
   }
   if(route.page==='my-entries'){views.renderMyEntries();return;}
+  if(route.page==='week'){views.renderWeek();return;}
   if(route.list)state.listFormat=route.list==='solo'&&!state.soloRaces?'endurance':route.list;
   views.renderHome(message);
 }

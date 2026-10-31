@@ -575,6 +575,9 @@ async function syncRow(env, budget, timestamp, community, setting, row, pilots) 
   } else {
     if (row.recap_hash !== contentHash) {
       await sendInChannel(env, budget, row, 'PATCH', `/channels/${row.voice_id}/messages/${row.message_id}`, {...payload, allowed_mentions:{parse:[]}});
+      // The crew may have been renamed: its voice follows (read first, Discord allows few renames per channel).
+      const wanted = voiceName(row, crewName), voice = await sendInChannel(env, budget, row, 'GET', `/channels/${row.voice_id}`);
+      if (voice?.name && voice.name !== wanted) await sendInChannel(env, budget, row, 'PATCH', `/channels/${row.voice_id}`, {name:wanted});
       await env.DB.prepare('UPDATE crew_discord SET recap_hash=? WHERE crew_id=?').bind(contentHash, row.row_id).run();
     }
     // A pilot who joins gets no message: the edited recap is enough.
