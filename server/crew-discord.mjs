@@ -38,7 +38,7 @@ const ADMINISTRATOR = 1n << 3n, NEEDED = VOICE_ACCESS;
 // threads (make, write in, delete).
 export const CREW_BOT_PERMISSIONS = String(NEEDED | PUBLIC_VOICE_ACCESS | EMBED | (1n << 28n) | (1n << 34n) | (1n << 35n) | (1n << 38n));
 // Changing this version also repairs existing channels on their next sync.
-const VOICE_POLICY_VERSION = 'public-voice-v2:';
+const VOICE_POLICY_VERSION = 'public-voice-v3:';
 const VOICE = 2, CATEGORY = 4;
 
 class Stop extends Error {}
