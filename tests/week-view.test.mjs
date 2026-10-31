@@ -33,11 +33,17 @@ test('each start of the week is on its day, in time order, with the pilot\'s own
   assert.equal(days.flatMap(item => item.items).some(item => item.event.id === 'next'), false);
 });
 
-test('« Semaine » is reached from the bar and its own address, and shows both simulators\' endurances', () => {
+test('« Accueil » is reached from the bar and its own address, and shows both simulators\' endurances', () => {
   const view = read('front/app/week-view.mjs'), router = read('front/app/router.mjs');
-  assert.match(router, /WEEK_HASH='#semaine'/);
-  assert.match(read('front/app/home-view.mjs'), /button\('week','Semaine'/);
-  assert.match(read('front/account-menu.mjs'), /#semaine`, 'Semaine'/);
+  assert.match(router, /WEEK_HASH='#accueil'/);
+  // Its first address (#semaine) still leads there.
+  assert.match(router, /OLD_WEEK_HASH='#semaine'/);
+  assert.match(read('front/app/home-view.mjs'), /button\('week','Accueil'/);
+  assert.match(read('front/account-menu.mjs'), /#accueil`, 'Accueil'/);
+  // A card for each part of the site; the administration only with its permission; endurances filtered by sim.
+  assert.match(view, /title:`Endurance \$\{SIM_NAME\[game\]\}`/);
+  assert.match(view, /if\(!can\('admin'\)\)return ''/);
+  assert.match(view, /\['lmu','Endurance LMU'\],\['iracing','Endurance iRacing'\]/);
   // The other simulator's endurances open in its own space.
   assert.match(view, /\/api\/races\?game=\$\{game\}&scope=upcoming/);
   assert.match(view, /href="\/\$\{event\.otherGame\}\/#event=\$\{event\.id\}"/);

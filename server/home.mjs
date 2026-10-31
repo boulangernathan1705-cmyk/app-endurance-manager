@@ -1,16 +1,13 @@
-// Home page ("/"): only newcomers see it. A pilot who already chose a simulator (cookie em_sim, set by
-// that space) goes straight to it, from the address bar as from the logo of every page.
-// With the events module (EVENT TDZ, every sim), the events calendar is the home page for everyone: the
-// choice between LMU and iRacing is asked when the pilot opens « Endurance ».
+// "/" leads to the « Accueil » of the site (front/app/week-view.mjs): the next race, a card for each part of the
+// site and the week's planning, every simulator together. It opens in the space of the simulator the pilot chose
+// (cookie em_sim), LMU otherwise. The former simulator choice stays reachable at /?accueil.
 const SIMULATORS = ['lmu','iracing'];
 
-export function homeRedirect(request, community = null) {
+export function homeRedirect(request) {
   const url = new URL(request.url);
   if (url.pathname !== '/' || url.searchParams.has('accueil')) return null;
   const sim = /(?:^|;\s*)em_sim=([a-z]+)(?:;|$)/.exec(request.headers.get('Cookie') || '')?.[1];
-  const events = community?.modules?.soloRaces === true;
-  if (!events && !SIMULATORS.includes(sim)) return null;
-  const location = events ? '/events/' : `/${sim}/`;
+  const location = `/${SIMULATORS.includes(sim) ? sim : 'lmu'}/#accueil`;
   // 302, never 301: a permanent redirect would stay in the browser cache after a change of simulator.
   return new Response(null, {status:302, headers:{Location:location, 'Cache-Control':'no-store', Vary:'Cookie'}});
 }

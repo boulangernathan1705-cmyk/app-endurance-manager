@@ -6,23 +6,19 @@ import workerWithMigrations from '../server/worker-with-migrations.mjs';
 const assets = {fetch: async () => new Response('<html><body>accueil</body></html>', {headers:{'Content-Type':'text/html; charset=utf-8', ETag:'"abc"'}})};
 const home = (path, cookie = '') => workerWithMigrations.fetch(new Request(`https://site.example${path}`, {headers: cookie ? {Cookie: cookie} : {}}), {ASSETS: assets}, {});
 
-test('a returning pilot goes straight to the simulator they chose', async () => {
-  const response = await home('/', 'em_session=x; em_sim=iracing');
-  assert.equal(response.status, 302);
-  assert.equal(response.headers.get('Location'), '/iracing/');
-  assert.equal(response.headers.get('Cache-Control'), 'no-store');
-});
-
-test('with EVENT TDZ, the events calendar is the home page; the simulator is asked in Endurance', async () => {
+test('"/" opens the « Accueil » in the simulator the pilot chose, LMU otherwise', async () => {
+  for (const [cookie, location] of [['em_session=x; em_sim=iracing', '/iracing/#accueil'], ['em_sim=lmu', '/lmu/#accueil'], ['', '/lmu/#accueil'], ['em_sim=elsewhere', '/lmu/#accueil']]) {
+    const response = await home('/', cookie);
+    assert.equal(response.status, 302, cookie);
+    assert.equal(response.headers.get('Location'), location, cookie);
+    assert.equal(response.headers.get('Cache-Control'), 'no-store');
+  }
   const {homeRedirect} = await import('../server/home.mjs');
-  const events = {slug:'tdz', modules:{soloRaces:true}};
-  const go = cookie => homeRedirect(new Request('https://site.example/', {headers: cookie ? {Cookie: cookie} : {}}), events)?.headers.get('Location');
-  assert.equal(go(''), '/events/');
-  assert.equal(go('em_sim=iracing'), '/events/');
-  assert.equal(homeRedirect(new Request('https://site.example/?accueil'), events), null);
-  assert.equal(homeRedirect(new Request('https://site.example/'), {modules:{}}), null);
+  // With EVENT TDZ too: the « Accueil » shows the events with the endurances.
+  assert.equal(homeRedirect(new Request('https://site.example/')).headers.get('Location'), '/lmu/#accueil');
   const context = readFileSync(new URL('../front/game-context.js', import.meta.url), 'utf8');
-  assert.match(context, /if \(!events && \(chosen \|\| !\/\^#\(solo\|event=\)\/i\.test\(location\.hash\)\)\)/);
+  // The « Accueil », the events calendar and a shared race are not a choice of simulator.
+  assert.match(context, /if \(!events && \(chosen \|\| !\/\^#\(solo\|event=\|accueil\)\/i\.test\(location\.hash\)\)\)/);
   // The calendar has its own address (/events/); older links, even typed by hand (/lmu/#SOLO), lead there.
   const router = readFileSync(new URL('../front/app/router.mjs', import.meta.url), 'utf8');
   assert.match(router, /const hash=location\.hash\.toLowerCase\(\);[\s\S]*if\(hash===SOLO_HASH\)\{history\.replaceState\(null,'',EVENTS_PATH\+location\.search\);return \{page:'home',list:'solo'\};\}/);
@@ -31,13 +27,11 @@ test('with EVENT TDZ, the events calendar is the home page; the simulator is ask
   assert.match(readFileSync(new URL('../front/app/actions.mjs', import.meta.url), 'utf8'), /state\.soloRaces&&!simChosen\(\)\)\{openSimChooser\(\)/);
 });
 
-test('the home page stays reachable with ?accueil, for new visitors and unknown values', async () => {
-  for (const [path, cookie] of [['/?accueil', 'em_sim=lmu'], ['/', ''], ['/', 'em_sim=elsewhere']]) {
-    const response = await home(path, cookie);
-    assert.equal(response.status, 200, `${path} ${cookie}`);
-    assert.equal(response.headers.get('ETag'), null, 'the home page is never answered with a stale 304');
-    assert.equal(response.headers.get('Cache-Control'), 'no-store, no-transform');
-  }
+test('the former simulator choice stays reachable with ?accueil', async () => {
+  const response = await home('/?accueil', 'em_sim=lmu');
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get('ETag'), null, 'the home page is never answered with a stale 304');
+  assert.equal(response.headers.get('Cache-Control'), 'no-store, no-transform');
 });
 
 test('simulator spaces remember the choice and the logo leads to the chosen simulator', () => {
