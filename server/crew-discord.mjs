@@ -1,7 +1,7 @@
 import {pause,retryAfter,spaceOut} from './recap-discord.mjs';
 import {effectivePermissions,guildPermissions,missingVoicePermissions,withPublicVoiceAccess,PUBLIC_VOICE_ACCESS,VOICE_ACCESS,EMBED} from './discord-permissions.mjs';
 // Crews on Discord (migrations 0044, 0045). Two modules, each enabled by the admins of a community:
-// - crewChannels (« Salons d'équipage »): as soon as it is made, every crew gets a voice
+// - crewChannels (« Salons d'équipage »): from the Monday of its race's week (at once if made during that week), every crew gets a voice
 //   channel named after its sim and its name (« LMU-Les Tondeuz »), made in the category the admins chose
 //   (none: at the top of the server). When the recap gives each race its category (« 🏎️ LMU · 6h de Spa »), the
 //   voice channel goes there, named after the crew alone, and is moved there once if it was made before. A recap message in the voice channel's chat follows the crew
@@ -16,12 +16,10 @@ import {allCommunities, communityById, communityUrl} from './community.mjs';
 import {notify} from './notifications.mjs';
 import {durationLabel,raceFinishAt} from '../shared/duration.mjs';
 import {catalogForGame} from '../shared/catalog.mjs';
-import {categoryEmojiName, conditionFields} from './discord-weekly-format.mjs';
+import {categoryEmojiName, conditionFields, raceWeekOpen} from './discord-weekly-format.mjs';
 
 const DISCORD_API = 'https://discord.com/api/v10';
 const HOUR = 3600_000;
-// A race without any crew yet gets its recap category this long before its start (server/recap-discord.mjs).
-export const OPEN_BEFORE = 6 * 24 * HOUR;
 // The recap makes the race's category first: a crew's voice channel waits for it (made there directly), at
 // most this long, then is made in the admins' category (and moved later).
 const WAIT_CATEGORY = HOUR;
@@ -184,15 +182,16 @@ export async function syncCrewDiscord(env, timestamp = Date.now(), {community = 
   const enabled = [...communities.values()].filter(item => item.modules?.crewChannels === true && item.discordGuildId && settings.has(item.id));
   const report = {opened:0, updated:0, closed:0, reminded:0, purged:0};
 
-  // New crews: a row for each crew as soon as it is created (even before a pilot joins), its start time known and still to come.
+  // New crews: a row for each crew (even before a pilot joins), its start time known and still to come, from the
+  // Monday of the week of its start (a crew made during that week gets its voice at once).
   if (enabled.length) {
     const candidates = (await env.DB.prepare(`SELECT ${CREW_COLUMNS} FROM crews c JOIN events e ON e.id=c.event_id
       WHERE c.community_id IN (${enabled.map(() => '?').join(',')}) AND e.schedule_pending=0
         AND NOT EXISTS(SELECT 1 FROM crew_discord d WHERE d.crew_id=c.id)
         AND EXISTS(SELECT 1 FROM json_each(e.departures) j WHERE json_extract(j.value,'$.id')=c.departure_id
-          AND COALESCE(json_extract(j.value,'$.tbd'),0)=0 AND json_extract(j.value,'$.startsAt') > ?)
-      LIMIT 20`).bind(...enabled.map(item => item.id), timestamp - 2 * 24 * HOUR).all()).results || [];
-    const fresh = candidates.filter(row => { const start = startOf(row); return start && !start.pending && timestamp < start.endsAt; });
+          AND COALESCE(json_extract(j.value,'$.tbd'),0)=0 AND json_extract(j.value,'$.startsAt') > ? AND json_extract(j.value,'$.startsAt') <= ?)
+      LIMIT 20`).bind(...enabled.map(item => item.id), timestamp - 2 * 24 * HOUR, timestamp + 8 * 24 * HOUR).all()).results || [];
+    const fresh = candidates.filter(row => { const start = startOf(row); return start && !start.pending && timestamp < start.endsAt && raceWeekOpen(start.startsAt, timestamp); });
     if (fresh.length) await env.DB.batch(fresh.map(row => env.DB.prepare('INSERT OR IGNORE INTO crew_discord(crew_id,community_id,guild_id,created_at) VALUES(?,?,?,?)')
       .bind(row.crew_id, row.community_id, communities.get(row.community_id).discordGuildId, timestamp)));
   }
@@ -300,14 +299,15 @@ async function remove(env, budget, channelId) {
 }
 
 // Recover duplicates whose ids were overwritten by overlapping syncs in older versions.
-// Only inspect race categories managed by this site, and require the bot's own original recap.
+// Only inspect the categories the site puts voices in (race categories, the voices' category of « pit talk », the
+// bot's « LMU » / « iRacing »), and require the bot's own original recap of a race of this community.
 export async function cleanupOrphanCrewDiscord(env, timestamp = Date.now()) {
   if (!env?.DB || !env.DISCORD_BOT_TOKEN || !env.DISCORD_CLIENT_ID) return 0;
   // A Worker deployment does not necessarily apply D1 migrations. Recovery also works
   // on the previous schema, using the cron slot to rotate without the optional cursors.
   const settings = (await env.DB.prepare(`SELECT s.* FROM community_crew_discord s JOIN communities c ON c.id=s.community_id
-    WHERE c.discord_guild_id IS NOT NULL AND EXISTS(SELECT 1 FROM discord_recap_publications p
-      WHERE p.community_id=s.community_id AND p.category_id IS NOT NULL AND p.event_id<>'')
+    WHERE c.discord_guild_id IS NOT NULL AND (s.voice_category_id IS NOT NULL OR EXISTS(SELECT 1 FROM discord_recap_publications p
+      WHERE p.community_id=s.community_id AND p.category_id IS NOT NULL AND p.event_id<>''))
     ORDER BY s.community_id`).all()).results || [];
   if (!settings.length) return 0;
   const slot = Math.floor(timestamp / (15 * 60_000));
@@ -321,12 +321,16 @@ export async function cleanupOrphanCrewDiscord(env, timestamp = Date.now()) {
   const publications = (await env.DB.prepare(`SELECT event_id,category_id FROM discord_recap_publications
     WHERE community_id=? AND category_id IS NOT NULL AND event_id<>''`).bind(community.id).all()).results || [];
   const races = new Map(publications.map(row => [row.category_id,row.event_id]));
+  // Categories holding the voices of several races: the race is read from the recap's link.
+  const shared = new Set([setting.voice_category_id].filter(Boolean));
+  const recap = await env.DB.prepare('SELECT enabled,bot_categories FROM community_recap_settings WHERE community_id=?').bind(community.id).first().catch(() => null);
+  if (recap?.enabled) { try { for (const id of Object.values(JSON.parse(recap.bot_categories || '{}') || {})) if (typeof id === 'string') shared.add(id); } catch { /* unreadable: ignored */ } }
   const tracked = (await env.DB.prepare('SELECT voice_id FROM crew_discord WHERE guild_id=? AND voice_id IS NOT NULL')
     .bind(community.discordGuildId).all()).results || [];
   const known = new Set(tracked.map(row => row.voice_id));
   const channels = await discord(env,budget,'GET',`/guilds/${community.discordGuildId}/channels`);
   const candidates = (Array.isArray(channels) ? channels : []).filter(channel => channel.type === VOICE
-    && races.has(channel.parent_id) && !known.has(channel.id) && /^\d{15,22}$/.test(channel.id)
+    && (races.has(channel.parent_id) || shared.has(channel.parent_id)) && !known.has(channel.id) && /^\d{15,22}$/.test(channel.id)
     && Number((BigInt(channel.id) >> 22n) + 1420070400000n) < timestamp - 5 * 60_000)
     .sort((a,b) => BigInt(a.id) < BigInt(b.id) ? -1 : 1);
   const channel = persistentCursor
@@ -334,15 +338,19 @@ export async function cleanupOrphanCrewDiscord(env, timestamp = Date.now()) {
     : candidates[Math.floor(slot / settings.length) % candidates.length];
   if (!channel) return 0;
   try {
-    const eventId = races.get(channel.parent_id);
     const messages = await discord(env,budget,'GET',`/channels/${channel.id}/messages?after=0&limit=100`);
-    const links = ['lmu','iracing'].map(sim => `${communityUrl(env,community)}/${sim}/#event=${eventId}`);
+    const ours = (Array.isArray(messages) ? messages : []).filter(message => message.author?.bot === true && message.author.id === env.DISCORD_CLIENT_ID);
+    const base = communityUrl(env,community), linked = text => String(text || '').match(/#event=([\w-]+)$/)?.[1];
+    const eventId = races.get(channel.parent_id) || ours.map(message => linked(message.embeds?.[0]?.url)
+      || String(message.content || '').split('\n').map(line => line.startsWith('🔗 Inscriptions et équipage : ') ? linked(line) : null).find(Boolean)).find(Boolean);
+    if (!eventId) return 0;
+    const links = ['lmu','iracing'].map(sim => `${base}/${sim}/#event=${eventId}`);
     // The text recap of before, or the card (its title links to the race).
-    const recap = (Array.isArray(messages) ? messages : []).find(message => message.author?.bot === true
-      && message.author.id === env.DISCORD_CLIENT_ID && (links.some(link => String(message.content || '').split('\n').includes(`🔗 Inscriptions et équipage : ${link}`))
+    const card = ours.find(message => (links.some(link => String(message.content || '').split('\n').includes(`🔗 Inscriptions et équipage : ${link}`))
         || links.includes(message.embeds?.[0]?.url)));
-    const name = (recap?.content?.match(/^👥 Équipage \*\*([^\n]+)\*\* : /m) || recap?.embeds?.[0]?.description?.match(/^Équipage \*\*([^\n]+)\*\* · /))?.[1];
-    if (!name || channel.name !== clip(name,100)) return 0;
+    const name = (card?.content?.match(/^👥 Équipage \*\*([^\n]+)\*\* : /m) || card?.embeds?.[0]?.description?.match(/^Équipage \*\*([^\n]+)\*\* · /))?.[1];
+    // In a race's category the voice is named after its crew; elsewhere after its sim, race and crew.
+    if (!name || (channel.name !== clip(name,100) && !(/^(🏎️ LMU|🏁 iRacing) · /u.test(channel.name) && channel.name.endsWith(` · ${name}`)))) return 0;
     // Re-read immediately before deletion: a creation still in flight or another live crew is protected.
     if (await env.DB.prepare('SELECT 1 FROM crew_discord WHERE guild_id=? AND voice_id=?')
       .bind(community.discordGuildId,channel.id).first()) return 0;

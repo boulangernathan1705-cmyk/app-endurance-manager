@@ -3,7 +3,7 @@ import {iracingSoloSql} from './iracing-visibility.mjs';
 import {administrators} from './core.mjs';
 // Text recaps configured explicitly by an admin, published exclusively by the bot.
 import {loadWeeklyDiscordSnapshot, loadCalendarSnapshot, siteOf} from './discord-weekly.mjs';
-import {CALENDAR_FORMAT, buildWeeklyDiscordPayload, buildWeekHeadPayload, buildCalendarPayload, CATEGORY_EMOJI_NAMES} from './discord-weekly-format.mjs';
+import {CALENDAR_FORMAT, raceWeekOpen, buildWeeklyDiscordPayload, buildWeekHeadPayload, buildCalendarPayload, CATEGORY_EMOJI_NAMES} from './discord-weekly-format.mjs';
 import {tdzOnly} from '../shared/catalog.mjs';
 import {isDevelopment} from './dev-environment.mjs';
 import {crewVoiceName} from './crew-discord.mjs';
@@ -268,14 +268,13 @@ export function eventDeletionTime(event) {
   if (!(minutes > 0)) return null;
   return Math.max(...departures.map(item => Number(item.startsAt))) + minutes * 60000 + DAY;
 }
-// The races that get their category now: 7 days before a start (15 for a 24 h race) until they are over.
-export const openBefore = minutes => (minutes >= 1440 ? 15 : 7) * DAY;
+// The races that get their thread now: from the Monday of the week of a start until it is over.
 export function racesOpenNow(events, scope, timestamp) {
   return events.filter(event => {
     const iracing = isIracing(event);
     if ((scope === 'lmu' && iracing) || (scope === 'iracing' && !iracing) || event.schedule_pending) return false;
     const minutes = Number(event.duration_minutes) || Number(event.duration_hours) * 60 || 0;
-    return parse(event.departures).some(item => !item.tbd && Number(item.startsAt) + minutes * 60000 > timestamp && Number(item.startsAt) - openBefore(minutes) <= timestamp);
+    return parse(event.departures).some(item => !item.tbd && Number(item.startsAt) + minutes * 60000 > timestamp && raceWeekOpen(item.startsAt, timestamp));
   }).map(event => event.id);
 }
 // The endurances (the calendar's events have their own message).

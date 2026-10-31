@@ -37,9 +37,20 @@ export const announceStream = settings => String(parseLayout(settings?.layout)?.
 
 const SOLO_SQL = (env, community) => `(community_id=? OR community_id='official') AND format='solo' AND ${iracingSoloSql(env, community)}
   ${grindfestEnabled(community, isDevelopment(env)) ? '' : "AND COALESCE(json_extract(details,'$.type'),'') NOT IN ('Gridfest','Grindfest')"}`;
-// A start of today still to come (or today with its time to confirm).
-const today = (start, day, timestamp, pending) => Number.isFinite(Number(start?.startsAt)) && parisDay(Number(start.startsAt)) === day
-  && (pending || start.tbd === true || Number(start.startsAt) > timestamp);
+// A start of today, started or not: the announcement keeps the whole day (Nathan's rule).
+const today = (start, day) => Number.isFinite(Number(start?.startsAt)) && parisDay(Number(start.startsAt)) === day;
+// Midnight (Paris) of the day of the timestamp: the week's snapshot read from there still holds the day's started races.
+export function parisDayStart(timestamp) {
+  const parts = Object.fromEntries(new Intl.DateTimeFormat('en-GB', {timeZone:'Europe/Paris', year:'numeric', month:'numeric', day:'numeric', hour:'numeric', minute:'numeric', second:'numeric', hourCycle:'h23'})
+    .formatToParts(timestamp).map(part => [part.type, Number(part.value)]));
+  const offset = Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, parts.second) - Math.floor(timestamp / 1000) * 1000;
+  let start = Date.UTC(parts.year, parts.month - 1, parts.day) - offset;
+  // The offset may change during the night (summer time): step to the true first moment of the day.
+  const day = parisDay(timestamp);
+  while (parisDay(start - 1) === day) start -= 3600000;
+  while (parisDay(start) !== day) start += 3600000;
+  return start - 1;
+}
 
 // The day's races of a community, in the order of their first start today: [{item, kind:'event'|'race', startsAt}].
 export async function announceItems(env, community, timestamp) {
@@ -48,13 +59,13 @@ export async function announceItems(env, community, timestamp) {
   const registrations = (await env.DB.prepare(`SELECT event_id,departure_id FROM registrations
     WHERE community_id=? AND COALESCE(status,'')<>'unavailable' GROUP BY event_id,departure_id`).bind(community.id).all()).results || [];
   for (const row of solo) {
-    const starts = parse(row.departures, []).filter(start => today(start, day, timestamp, Boolean(row.schedule_pending))
+    const starts = parse(row.departures, []).filter(start => today(start, day)
       && (isStream(row) || registrations.some(entry => entry.event_id === row.id && entry.departure_id === start.id)));
     // A stream (« Annoncer un stream ») has its own card, without « Présent » nor « Absent ».
     if (starts.length) items.push({item:row.id, kind:isStream(row) ? 'stream' : 'event', startsAt:Math.min(...starts.map(start => Number(start.startsAt)))});
   }
   // The endurances as in the week's message (official LMU ones included, iRacing ones as the community shows them).
-  const snapshot = await loadWeeklyDiscordSnapshot(env, timestamp, community, 'all');
+  const snapshot = await loadWeeklyDiscordSnapshot(env, parisDayStart(timestamp), community, 'all');
   for (const departure of snapshot.futureDepartures.filter(item => parisDay(item.startsAt) === day && item.pilotCount > 0)) {
     const known = items.find(item => item.item === departure.eventId);
     if (!known) items.push({item:departure.eventId, kind:'race', startsAt:departure.startsAt});
@@ -70,7 +81,7 @@ async function eventSnapshot(env, community, id, timestamp) {
   const day = parisDay(timestamp);
   const entries = isStream(row) ? [] : (await env.DB.prepare(`SELECT departure_id,streamer_id,COUNT(DISTINCT COALESCE(participant_id,id)) AS entered FROM registrations
     WHERE event_id=? AND community_id=? AND COALESCE(status,'')<>'unavailable' GROUP BY departure_id,streamer_id`).bind(row.id, community.id).all()).results || [];
-  const start = parse(row.departures, []).find(item => today(item, day, timestamp, Boolean(row.schedule_pending))
+  const start = parse(row.departures, []).find(item => today(item, day)
     && (isStream(row) || entries.some(entry => entry.departure_id === item.id)));
   if (!start) return null;
   const details = parse(row.details, {}) || {}, sim = simForEvent(row), tdz = tdzOnly(community, isDevelopment(env));
@@ -94,7 +105,7 @@ async function raceSnapshot(env, community, id, timestamp) {
   const row = await env.DB.prepare('SELECT id,name,circuit,event_type,community_id,duration_hours,duration_minutes,details FROM events WHERE id=?').bind(id).first();
   if (!row) return null;
   const day = parisDay(timestamp), snapshot = await loadWeeklyDiscordSnapshot(env, timestamp, community, 'all', id);
-  const departures = snapshot.futureDepartures.filter(item => parisDay(item.startsAt) === day && item.pilotCount > 0 && (item.timePending || item.startsAt > timestamp));
+  const departures = snapshot.futureDepartures.filter(item => parisDay(item.startsAt) === day && item.pilotCount > 0);
   if (!departures.length) return null;
   return {id:row.id, name:row.name, circuit:row.circuit, eventType:row.event_type || '', official:row.community_id === 'official',
     durationMinutes:Number(row.duration_minutes) || Number(row.duration_hours) * 60 || 0, details:parse(row.details, {}) || {}, departures};
