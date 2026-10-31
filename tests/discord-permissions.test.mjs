@@ -64,3 +64,23 @@ test('crew vocals allow voice activation even when guild, role and member rules 
   }
   assert.equal(result[1].deny,String(muteMembers));
 });
+
+test('ordinary vocal features work despite guild, role and member denies without granting moderation',()=>{
+  const features={invites:0,reactions:6,screenAndCamera:9,view:10,chat:11,tts:12,links:14,files:15,history:16,
+    externalEmojis:18,connect:20,speak:21,voiceActivity:25,commands:31,externalStickers:37,activities:39,
+    soundboard:42,externalSounds:45,voiceMessages:46,voiceStatus:48,polls:49,externalApps:50};
+  const expected=Object.values(features).reduce((bits,bit)=>bits|(1n<<BigInt(bit)),0n);
+  const moderation=[1,2,3,4,5,8,13,17,22,23,24,28,29,40];
+  const deniedModeration=moderation.reduce((bits,bit)=>bits|(1n<<BigInt(bit)),0n);
+  const rules=[{id:guild,type:0,allow:'0',deny:String(expected)},
+    {id:pilots,type:0,allow:'0',deny:String(expected|deniedModeration)},
+    {id:'pilot',type:1,allow:'0',deny:String(expected)}];
+  const result=withPublicVoiceAccess(rules,guild,bot);
+  for(const [id,roles] of [['visitor',[]],['pilot',[pilots]]]) {
+    const rights=effectivePermissions([{id:guild,permissions:'0'}],{roles},guild,{permission_overwrites:result},id);
+    for(const [name,bit] of Object.entries(features)) assert.ok(rights&(1n<<BigInt(bit)),name);
+    assert.equal(rights&deniedModeration,0n,'normal members do not gain moderation or mass mentions');
+  }
+  assert.equal(BigInt(result[1].deny),deniedModeration&~(1n<<28n),'non-assignable Manage Roles is stripped by the shared helper');
+  assert.deepEqual(withPublicVoiceAccess(result,guild,bot),result,'repeated repair is stable');
+});

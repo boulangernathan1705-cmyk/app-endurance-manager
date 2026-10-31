@@ -38,9 +38,14 @@ export function withBotAccess(overwrites, clientId, required) {
   return copy;
 }
 
-// Crew vocals are public to server members, even under a private category, with voice activation allowed.
+// Ordinary member features of a voice channel and its chat. Moderation, mass mentions,
+// role/channel management and priority speaker remain governed by the server's roles.
 export const SPEAK = 1n << 21n, USE_VAD = 1n << 25n;
-export const PUBLIC_VOICE_ACCESS = VIEW | CONNECT | SPEAK | USE_VAD;
+export const STREAM = 1n << 9n;
+const VOICE_FEATURES = STREAM | (1n << 39n) | (1n << 42n) | (1n << 45n) | (1n << 48n);
+const VOICE_CHAT = SEND | HISTORY | EMBED | (1n << 6n) | (1n << 12n) | (1n << 15n)
+  | (1n << 18n) | (1n << 31n) | (1n << 37n) | (1n << 46n) | (1n << 49n) | (1n << 50n);
+export const PUBLIC_VOICE_ACCESS = VIEW | CONNECT | SPEAK | USE_VAD | VOICE_FEATURES | VOICE_CHAT | (1n << 0n);
 export function withPublicVoiceAccess(overwrites, guildId, clientId) {
   const copy = withBotAccess(overwrites, clientId, VOICE_ACCESS);
   for (const rule of copy) rule.deny = String(BigInt(rule.deny || 0) & ~PUBLIC_VOICE_ACCESS);
