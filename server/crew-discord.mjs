@@ -36,7 +36,7 @@ const ADMINISTRATOR = 1n << 3n, NEEDED = VOICE_ACCESS;
 // One invite for the whole « Discord » setting: the voices, the bot's own categories and messages (embeds), and making
 // its categories private or open again (« Gérer les rôles »: Discord asks it to change a channel's rights), the races'
 // threads (make, write in, delete).
-export const CREW_BOT_PERMISSIONS = String(NEEDED | PUBLIC_VOICE_ACCESS | EMBED | (1n << 28n) | (1n << 34n) | (1n << 35n) | (1n << 38n));
+export const CREW_BOT_PERMISSIONS = String(NEEDED | PUBLIC_VOICE_ACCESS | EMBED | (1n << 17n) | (1n << 28n) | (1n << 34n) | (1n << 35n) | (1n << 38n));
 // Changing this version also repairs existing channels on their next sync.
 const VOICE_POLICY_VERSION = 'public-voice-v3:';
 const VOICE = 2, CATEGORY = 4;
@@ -71,7 +71,7 @@ function errorText(error) {
     const action = error.method === 'DELETE' ? 'la suppression du salon'
       : error.path?.includes('/messages') ? 'le message dans le vocal'
       : error.method === 'PATCH' ? 'la modification du salon' : 'la création du salon';
-    return `Discord refuse ${action}${channelId ? ` (salon ${channelId})` : ''} : vérifie les droits du bot dans ce salon et sa catégorie, notamment « Voir le salon », « Gérer les salons » et « Se connecter ».`;
+    return `Discord refuse ${action}${channelId ? ` (salon ${channelId})` : ''} : vérifie les droits du bot dans ce salon et sa catégorie, notamment « Voir le salon », « Gérer les salons », « Gérer les rôles » pour modifier les permissions, et « Se connecter ».`;
   }
   if (error?.status === 400) return `Discord a refusé les réglages du salon (code ${error.code || 'inconnu'}). Vérifie les permissions du bot et de la catégorie ; le bot réessaiera automatiquement.`;
   return 'Discord n’a pas répondu : le bot réessaiera tout seul.';
@@ -390,7 +390,11 @@ async function closeRow(env, budget, timestamp, row, members, {force = false, ke
       try {
         const state = await discord(env, budget, 'GET', `/guilds/${row.guild_id}/voice-states/${userId}`);
         if (state?.channel_id === row.voice_id) return false;
-      } catch (error) { if (error instanceof Stop) throw error; }
+      } catch (error) {
+        // Only a confirmed absence proves this pilot is not in the voice channel.
+        // A permission refusal or an outage must never disconnect an occupied crew.
+        if (error instanceof Stop || error?.status !== 404 || ![10065,10007].includes(error?.code)) throw error;
+      }
     }
     await remove(env, budget, row.voice_id);
     await env.DB.prepare(`UPDATE crew_discord SET voice_id=NULL${keepOpen ? ', message_id=NULL, parent_id=NULL' : ''} WHERE crew_id=?`).bind(row.row_id).run();

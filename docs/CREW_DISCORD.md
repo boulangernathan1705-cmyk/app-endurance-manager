@@ -17,9 +17,9 @@ Droits du bot : tant qu'il ne les a pas, l'interrupteur est grisé et le bouton 
 
 ## Rappels de course (`raceReminders`)
 
-- 24 h avant le départ : une notification dans la cloche pour chaque pilote inscrit (avec son équipage, et le lien de son vocal s'il existe), et un message dans le chat du vocal de l'équipage qui mentionne ses pilotes.
+- 24 h avant le départ : une notification dans la cloche pour les pilotes inscrits au passage du rappel (avec leur équipage, et le lien de leur vocal s'il existe), et un message silencieux dans le chat du vocal qui nomme les pilotes sans mention `@`.
 - 1 h avant : un message dans le chat du vocal.
-- Si le départ change d'horaire, les rappels sont recomptés.
+- Si le départ change d'horaire, les rappels du vocal sont recomptés. La cloche garde actuellement un seul envoi par départ ; les limites concernant les inscriptions tardives sont détaillées dans [l'audit du bot](DISCORD_BOT_AUDIT_2026-10-31.md).
 
 ## Fonctionnement
 
