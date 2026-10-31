@@ -138,6 +138,15 @@ function communityNotFound() {
   return new Response(page, {status:404, headers:{'Content-Type':'text/html; charset=utf-8', 'Cache-Control':'no-store', 'X-Robots-Tag':'noindex'}});
 }
 
+// HTML pages carry "no-transform": Cloudflare then injects no script of its own (JavaScript detections), which
+// our CSP (script-src 'self') would block with an error on every page.
+export function withoutEdgeScripts(response) {
+  if (!(response.headers.get('Content-Type') || '').includes('text/html')) return response;
+  const kept = new Response(response.body, response), cache = kept.headers.get('Cache-Control');
+  if (!/no-transform/i.test(cache || '')) kept.headers.set('Cache-Control', cache ? `${cache}, no-transform` : 'no-transform');
+  return kept;
+}
+
 export default {
   async fetch(request, env, ctx) {
     const pathname = new URL(request.url).pathname;
@@ -160,7 +169,7 @@ export default {
       const redirect = homeRedirect(request, community);
       if (redirect) return redirect;
       if (env?.ASSETS) {
-        const home = withCommunityLook(await homePage(request, env), lookOf);
+        const home = withoutEdgeScripts(withCommunityLook(await homePage(request, env), lookOf));
         return development ? markDevelopmentResponse(home, env) : home;
       }
     }
@@ -170,7 +179,8 @@ export default {
     if (weeklyMutation && response.ok) queueWeeklySync(env, ctx, request, target?.eventId, target?.communityId, target?.shared);
     // A WebSocket opening (mur des stands) goes back untouched: a copied response would lose its socket.
     if (response.status === 101) return response;
-    return development ? markDevelopmentResponse(response, env) : response;
+    const page = withoutEdgeScripts(response);
+    return development ? markDevelopmentResponse(page, env) : page;
   },
 
   // Separate schedules keep crew vocals responsive without accelerating the heavier maintenance jobs.
