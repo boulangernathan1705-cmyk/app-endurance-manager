@@ -201,8 +201,22 @@ test('a crew gets a voice channel « LMU · race · name » outside any category
   assert.equal((await req(`/api/crews/${crew.data.id}`,'PATCH',{name:'Les Tondeuz',category:'GT3',car:'Ferrari 296 LMGT3',version:crewRow.version},'pilot')).status,200);
   mark=discord.calls.length;await sync(startsAt-2*24*HOUR);
   const changed=discord.calls.slice(mark);
-  assert.deepEqual(changed.map(call=>call.method),['PATCH']);
-  assert.equal(changed[0].path,`/channels/${row.voice_id}/messages/${row.message_id}`);assert.match(JSON.stringify(changed[0].body),/Ferrari 296 LMGT3/);assert.deepEqual(changed[0].body.allowed_mentions,{parse:[]});
+  // The recap is edited; the voice is only read (its name has not changed), never renamed.
+  assert.deepEqual(changed.map(call=>`${call.method} ${call.path}`),[`PATCH /channels/${row.voice_id}/messages/${row.message_id}`,`GET /channels/${row.voice_id}`]);assert.match(JSON.stringify(changed[0].body),/Ferrari 296 LMGT3/);assert.deepEqual(changed[0].body.allowed_mentions,{parse:[]});
+
+  // The crew is renamed: the recap and the voice follow, once, without a new channel.
+  crewRow=(await req('/api/events','GET',null,'pilot')).data.events[0].departures[0].crews[0];
+  assert.equal((await req(`/api/crews/${crew.data.id}`,'PATCH',{name:'Les Faucheuz',category:'GT3',car:'Ferrari 296 LMGT3',version:crewRow.version},'pilot')).status,200);
+  mark=discord.calls.length;await sync(startsAt-2*24*HOUR+60_000);
+  const renamed=discord.calls.slice(mark).filter(call=>call.method==='PATCH'&&call.path===`/channels/${row.voice_id}`);
+  assert.deepEqual(renamed.map(call=>call.body),[{name:'🏎️ LMU · 6h SPA · Les Faucheuz'}]);assert.deepEqual(created(discord.calls,mark),[]);
+  mark=discord.calls.length;await sync(startsAt-2*24*HOUR+120_000);
+  assert.ok(!discord.calls.slice(mark).some(call=>call.method==='PATCH'),'renamed once');
+  // And back.
+  crewRow=(await req('/api/events','GET',null,'pilot')).data.events[0].departures[0].crews[0];
+  assert.equal((await req(`/api/crews/${crew.data.id}`,'PATCH',{name:'Les Tondeuz',category:'GT3',car:'Ferrari 296 LMGT3',version:crewRow.version},'pilot')).status,200);
+  mark=discord.calls.length;await sync(startsAt-2*24*HOUR+180_000);
+  assert.deepEqual(discord.calls.slice(mark).filter(call=>call.method==='PATCH'&&call.path===`/channels/${row.voice_id}`).map(call=>call.body),[{name:'🏎️ LMU · 6h SPA · Les Tondeuz'}]);
 
   // 24 h before: a reminder in the voice channel's chat and on the bell (with the channel); sent once.
   mark=discord.calls.length;await sync(startsAt-23*HOUR);
