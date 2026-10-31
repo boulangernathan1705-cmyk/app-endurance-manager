@@ -2,10 +2,13 @@ name: Browser compatibility
 
 # The site runs on the GitHub machine itself (wrangler dev, local database with every migration): nothing depends
 # on a deployed site (the Cloudflare bot protection of endurance-manager.app answers 403 to GitHub's machines).
+# Also on every PR into dev or main, so a browser regression is seen before it is merged (audit R15).
 on:
   workflow_dispatch:
   push:
     branches: [dev]
+  pull_request:
+    branches: [dev, main]
 
 permissions:
   contents: read

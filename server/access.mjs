@@ -129,6 +129,7 @@ export async function memberPermissions(env, community, membership) {
   return rolePermissions(env, community, JSON.parse(membership.discord_roles || '[]'));
 }
 
+const STALE_ROLES = 7 * 24 * 3600;
 // Access of the actor to the community: {status, permissions, manager}.
 //   status: 'member' (access), 'anonymous' (not signed in), 'not-member' (not on the Discord server),
 //   'forbidden' (member without site access), 'unavailable' (the server or the bot cannot be checked).
@@ -145,7 +146,8 @@ export async function communityAccess(env, actor, community, {open = false} = {}
   const recheck = membership?.status === 'member' ? VISIT_CHECK_EVERY : NOT_MEMBER_CHECK_EVERY;
   if (!membership || membership.checked_at < now() - recheck) membership = (await checkMembership(env, community, actor.user.id).catch(error => { if (!manager && !membership) throw error; return null; })) || membership;
   if (manager) return {status:'member', permissions:new Set(ALL_PERMISSIONS), manager};
-  if (!membership) return none('unavailable');
+  // ...but not forever: roles nobody could check for a week (bot removed, Discord refusing) no longer open the site.
+  if (!membership || membership.checked_at < now() - STALE_ROLES) return none('unavailable');
   if (membership.status !== 'member') return none('not-member');
   if (membership.discord_admin) return {status:'member', permissions:new Set(ALL_PERMISSIONS), manager:false};
   const permissions = await rolePermissions(env, community, JSON.parse(membership.discord_roles || '[]'));

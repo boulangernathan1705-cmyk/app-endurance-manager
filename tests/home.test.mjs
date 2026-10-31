@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {readFileSync} from 'node:fs';
+import {readdirSync, readFileSync} from 'node:fs';
 import workerWithMigrations from '../server/worker-with-migrations.mjs';
 
 const assets = {fetch: async () => new Response('<html><body>accueil</body></html>', {headers:{'Content-Type':'text/html; charset=utf-8', ETag:'"abc"'}})};
@@ -54,8 +54,14 @@ test('simulator spaces remember the choice and the logo leads to the chosen simu
   // /discord/*: the clicks on the « Absent » button of the races' threads (server/discord-interactions.mjs).
   for (const route of ['/', '/api/*', '/telemetry/*', '/discord/*', '/manifest.webmanifest', '/app-icon.png', '/lmu*', '/iracing*', '/events*'])
     assert.ok(routes.includes(route), route);
-  for (const page of ['members', 'help', 'about', 'legal', 'privacy', 'changelog', 'circuit-credits', 'demande-communaute', 'diagnostics', 'fiches-combo', 'mur-des-stands', 'mur'])
-    assert.ok(routes.some(route => route.endsWith('*') && `/${page}`.startsWith(route.slice(0, -1))), page);
+  // Every page of the site (each .html at the root), not only those known today: a new page works on dev (where
+  // everything goes through the Worker) and must not be forgotten in production. Pages without a route of their own:
+  // index (« / »), game (served under /lmu and /iracing), 404 and offline (served without the Worker).
+  const pages = readdirSync(new URL('..', import.meta.url)).filter(name => name.endsWith('.html')).map(name => name.slice(0, -5))
+    .filter(page => !['index', 'game', '404', 'offline'].includes(page));
+  assert.ok(pages.length >= 12, 'the pages are found');
+  for (const page of pages)
+    assert.ok(routes.some(route => route.endsWith('*') && `/${page}`.startsWith(route.slice(0, -1))), `${page}.html must be in run_worker_first of wrangler.prod.jsonc`);
   // Wrangler refuses the deploy when a route is already covered by a shorter one ('/mur*' covers '/mur-des-stands*').
   for (const route of routes) assert.ok(!routes.some(other => other !== route && other.endsWith('*') && !other.startsWith('!') && !route.startsWith('!') && route.startsWith(other.slice(0, -1))), `${route} is redundant`);
   for (const route of routes.filter(route => route.startsWith('!'))) assert.doesNotMatch(route, /\.html|^!\/(?:\*|api|telemetry|downloads|lmu|iracing)/, route);
@@ -63,10 +69,10 @@ test('simulator spaces remember the choice and the logo leads to the chosen simu
   assert.equal(prod.assets.binding, 'ASSETS');
 });
 
-test('after the Discord login, a pilot without a simulator picks one in a small window', () => {
+test('after the Discord login, a pilot without a simulator picks one on the page itself, asked once', () => {
   const hub = readFileSync(new URL('../front/game-hub.mjs', import.meta.url), 'utf8');
-  assert.match(hub, /if \(!\/\(\?:\^\|;\\s\*\)em_sim=\/\.test\(document\.cookie\)\) openSimChooser\(session\.user\.name\)/);
-  assert.match(hub, /href="\$\{sim\.href\}"/);
+  assert.doesNotMatch(hub, /openSimChooser|showModal/);
+  assert.match(hub, /Choisis ta simu ci-dessous/);
   // The home page no longer lists races: the simulator spaces do.
   assert.doesNotMatch(hub, /\/api\/races/);
 });

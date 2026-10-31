@@ -212,7 +212,7 @@ function soloHeaderTime(event,next){
 }
 function eventTypePanel(event){
   if(isStream(event))return `<span class="event-type-panel has-access-logo">${streamPanel(event)}</span>`;
-  if(isGrindfest(event))return `<span class="event-type-panel has-gridfest-logo"><img class="gridfest-header-logo" src="/images/event-access/gridfest-horizontal.png" alt="Gridfest" width="1280" height="720"></span>`;
+  if(isGrindfest(event))return `<span class="event-type-panel has-gridfest-logo"><img class="gridfest-header-logo" src="/images/event-access/gridfest-horizontal.png" alt="Gridfest" width="640" height="360"></span>`;
   const logo=eventAccessLogo(event,{header:true});
   if(logo)return `<span class="event-type-panel has-access-logo">${logo}</span>`;
   const type=event.details?.type;

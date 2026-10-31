@@ -2498,3 +2498,10 @@ html[data-game] #app .my-entry-slot + .my-entry-slot { border-top: 1px solid var
 html[data-game] #app .my-entry-slot-heading { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin: 0; padding: 14px 16px; font-size: 15px; }
 html[data-game] #app .my-entry-slot-heading .race-badges { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 
+
+/* Keyboard: every button, link and fold of the site shows where the focus is (audit R07). */
+#app button:focus-visible, #app a:focus-visible, #app summary:focus-visible, #app [role="button"]:focus-visible,
+.site-nav-shell a:focus-visible, .site-nav-shell button:focus-visible {
+  outline: 2px solid var(--community-accent, #52d3d8) !important;
+  outline-offset: 2px;
+}

@@ -62,7 +62,7 @@ Ne pas clore ces PR dans une campagne de nettoyage sans validation fonctionnelle
 3. Petites itérations sur la même branche et la même PR tant que le sujet reste identique.
 4. Passer `npm run check` ; ajouter les tests du comportement modifié.
 5. Fusionner vers `dev` seulement après revue et tests ; supprimer ensuite la branche temporaire lorsque c'est sûr.
-6. Pour publier en production, respecter exclusivement la procédure `dev` → `main` documentée dans `docs/DEPLOYMENT.md`.
+6. Pour publier en production, respecter exclusivement la procédure `dev` → `main` documentée dans `DEPLOYMENT.md`.
 
 ## Contrôles complémentaires à réaliser
 

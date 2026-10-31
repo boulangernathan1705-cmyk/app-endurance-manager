@@ -75,6 +75,6 @@ export async function ingestClientError(request,env) {
 export async function clientErrorsApi(path,method,env,actor,community) {
   if (path!=='/api/client-errors') return null;
   if (method!=='GET') fail(405,'Méthode non autorisée.');
-  if (!actor.user || !(actor.permissions?.has('admin') || actor.permissions?.has('manage_races'))) fail(403,'Accès réservé aux organisateurs et administrateurs.');
+  if (!actor.user || !(actor.permissions?.has('admin') || actor.permissions?.has('manage_races'))) fail(403,'Accès réservé aux administrateurs.');
   return json({errors:await readClientErrors(env, community)});
 }

@@ -11,7 +11,7 @@ import {cleanupEventRecaps,addThreadMembers} from './recap-discord.mjs';
 import {syncCrewDiscord, cleanupOrphanCrewDiscord} from './crew-discord.mjs';
 import {syncAnnouncements} from './discord-announce.mjs';
 import {allCommunities, currentCommunity, communityById, communitySlug, appearanceOf} from './community.mjs';
-import {isDevelopment,devRobots,markDevelopmentResponse} from './dev-environment.mjs';
+import {isDevelopment,devRobots,markDevelopmentResponse,withoutProductionCookies} from './dev-environment.mjs';
 import {isCommunityPage, freshPageRequest, withCommunityLook} from './community-look.mjs';
 // The team's live room of the mur des stands (Durable Object, binding LIVE in the wrangler files).
 export {LiveRoom} from './live.mjs';
@@ -142,6 +142,7 @@ export default {
   async fetch(request, env, ctx) {
     const pathname = new URL(request.url).pathname;
     const development = isDevelopment(env);
+    if (development) request = withoutProductionCookies(request);
     // A page of a community's site: its look is put in the page itself (server/community-look.mjs).
     const lookOf = env?.DB && isCommunityPage(request, communityLabel(new URL(request.url), env)) ? await currentCommunity(env, request).catch(() => null) : null;
     if (lookOf) request = freshPageRequest(request);

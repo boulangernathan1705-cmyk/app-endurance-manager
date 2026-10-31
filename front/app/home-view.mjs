@@ -78,7 +78,7 @@ function soloCardFoot(event,archived,situation){
 // using the simulator-specific OPEN/SAFE artwork.
 function soloCircuit(event){
   // Gridfest: its own wordmark and the streamers' logos.
-  if(isGrindfest(event))return `<span class="race-card-circuit race-card-type-logo gridfest-card-panel" aria-hidden="true"><img class="gridfest-card-logo" src="/images/event-access/gridfest-stacked.png" alt="Gridfest" width="1248" height="1252"></span>`;
+  if(isGrindfest(event))return `<span class="race-card-circuit race-card-type-logo gridfest-card-panel" aria-hidden="true"><img class="gridfest-card-logo" src="/images/event-access/gridfest-stacked.png" alt="Gridfest" width="308" height="320"></span>`;
   if(isStream(event))return `<span class="race-card-circuit race-card-type-logo is-stream" aria-hidden="true">${streamPanel(event)}</span>`;
   return `<span class="race-card-circuit race-card-type-logo" data-type="${esc(event.details?.type||'')}" aria-hidden="true">${eventAccessLogo(event)}</span>`;
 }
@@ -174,7 +174,7 @@ export function communityGate(){
     lead='Inscriptions, disponibilités, création d’équipage et relais : tout le plateau au même endroit, pour Le Mans Ultimate et iRacing.';
     actions=`<div class="welcome-actions">${login}<a class="secondary-button" href="/demande-communaute.html">Demander un espace pour ta communauté</a></div>${trust}`;
   }else if(state.access==='anonymous'){
-    kicker=name;title=`Bienvenue sur l’espace de ${name}`;
+    kicker=name;title=`Bienvenue sur l’espace ${/^[aeiouyhàâéèêëîïôûü]/i.test(name)?'d’':'de '}${name}`;
     lead='Cet espace est réservé aux membres autorisés de son serveur Discord. Connecte-toi pour voir les courses et t’inscrire.';actions=login+trust;
   }else if(state.access==='not-member'){
     kicker=name;title=`Rejoins ${name} pour rouler avec eux`;

@@ -5,6 +5,20 @@ const BANNER=`<div class="dev-site-banner" role="note" style="position:relative;
 export function isDevelopment(env) {
   return env?.SITE_ENV==='development';
 }
+// The production's session cookies are set for the whole domain (Domain=.endurance-manager.app, so that every
+// community's address shares them): the browser sends them to dev.endurance-manager.app too. The dev site never
+// needs them: they are taken off the request before anything reads, forwards or logs it.
+// (A __Host- cookie never has a Domain: it never leaves its own address, and the local site uses it.)
+const PRODUCTION_COOKIES = /^__Secure-em_(?:session|oauth|return)=/;
+export function withoutProductionCookies(request) {
+  const header = request.headers.get('Cookie');
+  if (!header) return request;
+  const kept = header.split(';').map(item => item.trim()).filter(item => item && !PRODUCTION_COOKIES.test(item));
+  if (kept.length === header.split(';').filter(item => item.trim()).length) return request;
+  const headers = new Headers(request.headers);
+  if (kept.length) headers.set('Cookie', kept.join('; ')); else headers.delete('Cookie');
+  return new Request(request, {headers});
+}
 
 export function devRobots() {
   return new Response('User-agent: *\nDisallow: /\n',{headers:{'Content-Type':'text/plain; charset=utf-8','X-Robots-Tag':'noindex, nofollow'}});
