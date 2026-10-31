@@ -398,6 +398,9 @@ async function shareRights(env, community, settings, rows, channels, budget) {
     const below = key === 'pit' ? [] : channels.filter(item => races.includes(item.id) && [settings.destination_id, settings.iracing_destination_id].includes(id));
     const targets = [id, ...below.map(item => item.id)].flatMap(parent => [channels.find(item => item.id === parent), ...channels.filter(item => item.parent_id === parent)]).filter(Boolean);
     for (const channel of targets) {
+      // Vocals keep their own rules: crew sync grants normal member features there.
+      // Copying the category's restricted text permissions would undo that policy.
+      if (channel.type === 2) continue;
       if (JSON.stringify(othersRules(env, channel.permission_overwrites)) === wanted) continue;
       const mine = (channel.permission_overwrites || []).filter(item => Number(item.type) === 1 && String(item.id) === String(env.DISCORD_CLIENT_ID));
       const access = channel.type === 4 ? categoryAccess(community) : channel.type === 2 ? VOICE_ACCESS : REQUIRED;
