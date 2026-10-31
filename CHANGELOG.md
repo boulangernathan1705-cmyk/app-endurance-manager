@@ -1,5 +1,17 @@
 # Nouveautés d'Endurance Manager
 
+## v1.99 — 31 octobre 2026
+
+### 🔧 Corrections
+
+- **Discord · Vocaux d’équipage** : la fermeture automatique attend lorsque Discord ne permet pas de vérifier si les pilotes sont encore connectés.
+
+### 🛠️ Pour les admins
+
+- **Discord · Droits du bot** : les liens d’invitation demandent les droits nécessaires aux annonces, aux permissions des salons et à la gestion des fils. Les contrôles signalent les droits manquants avant activation.
+- **Discord · Fils de course** : les permissions propres au bot sont réparées lors de la synchronisation ; les administrateurs du site et les gestionnaires membres du serveur sont inclus dans les ajouts aux fils.
+- **Discord · Diagnostic** : les erreurs de modification des permissions indiquent aussi le droit « Gérer les rôles » à vérifier.
+
 ## v1.98 — 30 octobre 2026
 
 ### ✨ Améliorations
