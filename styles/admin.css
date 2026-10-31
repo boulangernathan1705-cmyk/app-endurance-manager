@@ -34,6 +34,7 @@
 .admin-dot { display: inline-block; width: 10px; height: 10px; margin-right: 8px; border-radius: 50%; vertical-align: 2px; }
 .admin-dot.is-ok { background: #35c26b; } .admin-dot.is-bad { background: #e0534f; }
 .admin-columns { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 14px; align-items: start; }
+.admin-todo { margin: 0 0 14px; }
 .admin-card { display: grid; gap: 12px; padding: 18px; border: 1px solid var(--border, #292d31); border-radius: 14px; background: var(--panel2, #16191c); min-width: 0; }
 .admin-card h2, .admin-card h3 { margin: 0; font-size: 17px; color: #f4f6f5; }
 .admin-card-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }

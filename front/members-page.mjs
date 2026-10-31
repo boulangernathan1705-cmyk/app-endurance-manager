@@ -1,4 +1,5 @@
 import {helpContext} from './context-help.mjs';
+import {todoItems, todoWhen} from './admin-todo.mjs';
 const app = document.getElementById('members-app');
 const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
 
@@ -112,7 +113,9 @@ function overviewMarkup(setup, settings, members) {
   if (states.iracingImport) alerts.push(['ok', 'Endurances iRacing officielles importées automatiquement.', '']);
   if (!alerts.some(([tone]) => tone !== 'ok')) alerts.unshift(['ok', 'Rien à signaler : tout fonctionne.', '']);
   const watch = `<section class="admin-card"><div class="admin-card-head"><h2>À surveiller</h2></div><ul class="admin-alerts">${alerts.map(([tone, text, action]) => `<li class="is-${tone}"><span>${text}</span>${action}</li>`).join('')}</ul></section>`;
-  return {todo:left, html:`<div class="admin-head"><h2>Vue d’ensemble</h2><p>Ce qui marche, ce qui reste à faire et ce qui demande ton attention.</p></div>${tiles}<div class="admin-columns">${start}${watch}</div>`};
+  // « À traiter »: filled once the races are read (fillTodo).
+  const todo = `<section class="admin-card admin-todo" data-admin-todo><div class="admin-card-head"><h2>À traiter</h2><span class="admin-muted">Endurances des 14 prochains jours</span></div><p class="admin-muted">Chargement…</p></section>`;
+  return {todo:left, html:`<div class="admin-head"><h2>Vue d’ensemble</h2><p>Ce qui marche, ce qui reste à faire et ce qui demande ton attention.</p></div>${tiles}${todo}<div class="admin-columns">${start}${watch}</div>`};
 }
 
 // « Membres et rôles »: the members, or the table of the roles.
@@ -552,11 +555,28 @@ async function load() {
       </nav>
       <div class="admin-main">${sections.map(([key]) => `<section class="admin-panel${key === 'platform' ? ' community-settings' : ''}" data-panel="${key}" role="tabpanel" ${key === current ? '' : 'hidden'}>${helpContext('admin-'+key)}${panels[key]}</section>`).join('')}</div></div>`;
     for (const form of app.querySelectorAll('[data-discord-form]')) discordRefresh(form);
+    void fillTodo();
     if (openView) showView(openView);
     if (openModule) openModuleSettings(openModule);
     openView = ''; openModule = '';
   } catch (error) {
     renderError(error.message || String(error));
+  }
+}
+// The races of both simulators: one line per thing to do, each opening its race.
+async function fillTodo() {
+  const box = app.querySelector('[data-admin-todo]');
+  if (!box) return;
+  try {
+    const lists = await Promise.all(['lmu', 'iracing'].map(game => api(`/api/races?game=${game}&scope=upcoming`)
+      .then(result => todoItems((result.events || []).filter(event => String(event.circuit || '').startsWith('iracing-') === (game === 'iracing')), game))));
+    const items = lists.flat().sort((a, b) => a.startsAt - b.startsAt);
+    box.querySelector('p')?.remove();
+    box.insertAdjacentHTML('beforeend', items.length
+      ? `<ul class="admin-alerts">${items.slice(0, 12).map(item => `<li class="is-${item.tone}"><span><strong>${esc(item.name)}</strong> · ${esc(todoWhen(item))} : ${esc(item.text)}</span><a class="link-button" href="/${item.game}/#event=${esc(item.eventId)}">Ouvrir</a></li>`).join('')}</ul>${items.length > 12 ? `<p class="admin-muted">Et ${items.length - 12} autre${items.length - 12 > 1 ? 's' : ''}.</p>` : ''}`
+      : '<ul class="admin-alerts"><li class="is-ok"><span>Rien à traiter : chaque pilote inscrit a son équipage.</span></li></ul>');
+  } catch {
+    box.querySelector('p').textContent = 'Les courses n’ont pas pu être lues. Recharge la page.';
   }
 }
 function showView(view) {
