@@ -1060,8 +1060,16 @@ html[data-game] #app .my-entry-column .ux-my-other-crew:first-child { border-top
 html[data-game] #app .my-entry-column .ux-my-awaiting-copy { display: grid; gap: 2px; }
 html[data-game] #app .my-entry-column .ux-my-awaiting-copy span { color: #aab3b6; font-size: 13px; }
 html[data-game] #app .my-entry-column .crew-pilot-lines { margin-top: 0 !important; }
+/* Ma situation d'abord : mon équipage en pleine largeur, puis le reste du départ replié (audit R23). */
+html[data-game] #app .my-entry-race .my-entry-focus { display: block !important; padding: 0 !important; border-top: 1px solid rgba(255, 255, 255, .08); }
+html[data-game] #app .my-entry-race .my-entry-columns.is-two { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+html[data-game] #app .my-entry-next { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 12px 16px 0; padding: 10px 12px; border: 1px solid rgba(243, 179, 61, .5); border-left: 4px solid #f3b33d; border-radius: 10px; background: rgba(243, 179, 61, .08); color: #ffe2a8; font-size: 14px; }
+html[data-game] #app .my-entry-next .secondary-button { min-height: 32px; padding: 0 12px; font-size: 13px; }
+html[data-game] #app .my-entry-collective { border-top: 1px solid rgba(255, 255, 255, .08); }
+html[data-game] #app .my-entry-collective > summary { padding: 12px 16px; cursor: pointer; font-size: 14px; font-weight: 750; color: #c7d0d4; list-style-position: inside; }
+html[data-game] #app .my-entry-collective > summary:hover { color: #fff; }
 @media (max-width: 1000px) {
-  html[data-game] #app .my-entry-race .my-entry-columns { grid-template-columns: minmax(0, 1fr) !important; }
+  html[data-game] #app .my-entry-race .my-entry-columns, html[data-game] #app .my-entry-race .my-entry-columns.is-two { grid-template-columns: minmax(0, 1fr) !important; }
   html[data-game] #app .my-entry-column + .my-entry-column { border-left: 0; border-top: 1px solid rgba(255, 255, 255, .08); }
 }
 html[data-game] #app .my-entry-column .crew-pilot-line { background: none !important; border-radius: 0 !important; box-shadow: none !important; padding-left: 0 !important; padding-right: 0 !important; }
