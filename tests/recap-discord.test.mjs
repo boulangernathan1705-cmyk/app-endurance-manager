@@ -4,6 +4,7 @@ import {DatabaseSync} from 'node:sqlite';
 import {readFileSync,readdirSync} from 'node:fs';
 import worker from '../server/worker.mjs';
 import {flushDiscord} from '../server/worker-with-migrations.mjs';
+import {withPublicVoiceAccess} from '../server/discord-permissions.mjs';
 import {linkTestServer,DEV_COMMUNITY,GUILD} from './fixtures/discord-server.mjs';
 import {syncDueRecaps,syncWeeklyDiscord} from '../server/discord-weekly.mjs';
 import {addThreadMembers,botCategoryEmojis,saveBotRecap,validateDiscordLayout,syncBotRecaps,previewBotRecap,recapDestinations,eventDeletionTime,eventChannelName,settingsRow,recapError,repairBotRecap,racesOpenNow} from '../server/recap-discord.mjs';
@@ -821,6 +822,23 @@ test('below a private category, the bot\'s own is private like it when chosen, a
   assert.deepEqual(others(named(channels,'📅・endurances-de-la-semaine')),[]);
   calls.length=0;await syncBotRecaps(env,NOW,COMMUNITY);
   assert.equal(calls.filter(call=>call.method==='PATCH'&&call.path===`/channels/${bot.id}`).length,0,'nothing to change: no write');
+});
+
+test('changing recap category permissions preserves normal vocal features and local moderation rules',async t=>{
+  const {env,channels,calls}=setup(t,{rights:'268520464'});
+  const PRIVATE=[{id:GUILD,type:0,allow:'0',deny:'1024'}];
+  Object.assign(named(channels,'Accueil'),{permission_overwrites:PRIVATE});
+  await layout(env,COMMUNITY,{mode:'events',sims:'lmu',showWeek:true,under:ACCUEIL});
+  const parent=named(channels,'🏆 Endurance Manager');
+  const rules=withPublicVoiceAccess([{id:'222222222222222222',type:0,allow:'0',deny:String(1n<<22n)}],GUILD,BOT);
+  const voice={id:'777777777777777777',type:2,name:'Équipage',parent_id:parent.id,permission_overwrites:rules};
+  channels.push(voice);const original=structuredClone(voice.permission_overwrites);
+  calls.length=0;
+  await layout(env,COMMUNITY,{mode:'events',sims:'lmu',showWeek:true,under:ACCUEIL,copy:true});
+  assert.deepEqual(voice.permission_overwrites,original,'a private category must not replace the vocal policy');
+  await layout(env,COMMUNITY,{mode:'events',sims:'lmu',showWeek:true,under:ACCUEIL});
+  assert.deepEqual(voice.permission_overwrites,original,'reopening the category preserves voice features and local restrictions');
+  assert.equal(calls.filter(c=>c.method==='PATCH'&&c.path===`/channels/${voice.id}`&&c.body?.permission_overwrites).length,0);
 });
 
 test('a week message deleted on Discord is put back by the next sync, without « Réparer »',async t=>{
