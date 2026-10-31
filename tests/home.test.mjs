@@ -36,7 +36,7 @@ test('the home page stays reachable with ?accueil, for new visitors and unknown 
     const response = await home(path, cookie);
     assert.equal(response.status, 200, `${path} ${cookie}`);
     assert.equal(response.headers.get('ETag'), null, 'the home page is never answered with a stale 304');
-    assert.equal(response.headers.get('Cache-Control'), 'no-store');
+    assert.equal(response.headers.get('Cache-Control'), 'no-store, no-transform');
   }
 });
 
