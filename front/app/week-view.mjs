@@ -10,7 +10,7 @@ import {isStream} from '../../shared/stream.mjs';
 import {isGrindfest} from '../../shared/grindfest.mjs';
 import {simForEvent,SIMS} from '../../shared/catalog.mjs';
 import {parisDay,weekStart,weekDays} from '../week-days.mjs';
-import {eventMinutes} from '../../shared/duration.mjs';
+import {eventMinutes,raceFinishAt} from '../../shared/duration.mjs';
 import {RACE_WEATHERS} from '../../shared/catalog.mjs';
 
 const DAY=86400000;
@@ -55,7 +55,6 @@ function weatherOf(event){
   return RACE_WEATHERS[info.weather]||'';
 }
 // « 6H », « 12H », « 1H30 »: an endurance's length on its block.
-const lengthOf=event=>{const minutes=eventMinutes(event);return minutes>0?`${Math.floor(minutes/60)}H${minutes%60?String(minutes%60).padStart(2,'0'):''}`:'';};
 // The hours a pilot drives: « toute la course » or « 15h–18h ».
 function hoursOf(departure,reg,event){
   if(reg.status==='whole')return 'toute la course';
@@ -72,10 +71,11 @@ const logoOf=event=>isGrindfest(event)?'<img class="event-access-logo" src="/ima
 function block(item,now){
   const {event,departure,startsAt,endsAt,kind,mine,pilots,pending}=item;
   const past=(endsAt||startsAt)<now,live=!pending&&startsAt<=now&&!past,solo=isSolo(event),stream=isStream(event);
-  // A race over several days says when it ends (« → dim. 16h »), a long one its finish time.
-  const ends=endsAt&&parisDay(endsAt)!==parisDay(startsAt)?`→ ${endDay.format(endsAt).replace('.','')} ${hour(endsAt)}`:endsAt&&!solo?`→ ${hour(endsAt)}`:'';
+  // Simulator on top, then « 15h – fin 18h10 » (« – fin dim 2h30 » over several days), then the name (Nathan chose version B, 2026-11-01).
+  const late=endsAt&&parisDay(endsAt)!==parisDay(startsAt);
+  const fin=pending||!endsAt||(solo&&!late)?'':`fin ${late?`${endDay.format(endsAt).replace('.','')} `:''}${hour(endsAt)}`;
   const sim=solo?(stream?'':SIMS.find(item=>item.id===simForEvent(event))?.short||''):SIM_NAME[event.otherGame||activeGame];
-  const badge=solo?kind.label:lengthOf(event),logo=solo?logoOf(event):'';
+  const badge=solo?kind.label:'',logo=solo?logoOf(event):'';
   const weather=solo?'':weatherOf(event);
   const rounds=solo&&!stream&&Array.isArray(event.rounds)&&event.rounds.length>1?`${event.rounds.length} manches`:'';
   const left=solo&&!stream&&Number(event.capacity)>0?Number(event.capacity)-pilots:null;
@@ -89,9 +89,10 @@ function block(item,now){
   const cls=`week-block is-${kind.key}${sim2}${mine?' is-mine':''}${past?' is-past':''}${live?' is-live':''}`;
   const open=event.otherGame?`<a class="${cls}" href="/${event.otherGame}/#event=${event.id}" aria-label="${esc(label)}">`
     :`<button type="button" class="${cls}" data-action="open" data-id="${event.id}" aria-label="${esc(label)}">`;
-  const meta=[sim,rounds,weather&&`${weather==='Pluie'?'🌧':'☀️'} ${weather}`,ends,past&&'Terminé'].filter(Boolean);
+  const meta=[rounds,weather&&`${weather==='Pluie'?'🌧':'☀️'} ${weather}`,past&&'Terminé'].filter(Boolean);
   return `${open}
-    <span class="week-block-head"><span class="week-block-time">${pending?'à définir':esc(hour(startsAt))}</span>${logo?`<span class="week-block-logo">${logo}</span>`:badge?`<span class="week-badge">${esc(badge)}</span>`:''}</span>
+    ${sim||logo||badge?`<span class="week-block-head"><span class="week-block-sim">${esc(sim)}</span>${logo?`<span class="week-block-logo">${logo}</span>`:badge?`<span class="week-badge">${esc(badge)}</span>`:''}</span>`:''}
+    <span class="week-block-time">${pending?'à définir':esc(hour(startsAt))}${fin?` <small>– ${esc(fin)}</small>`:''}</span>
     ${live?'<span class="week-chip is-live">● En cours</span>':''}
     <span class="week-block-name">${esc(event.name)}</span>
     ${meta.length?`<span class="week-block-meta">${meta.map(text=>`<span>${esc(text)}</span>`).join('')}</span>`:''}
@@ -122,7 +123,7 @@ function myStarts(events,now){
     for(const departure of event.departures||[]){
       const startsAt=Number(departure.startsAt),regs=myRegs(departure);
       if(!regs.length||!Number.isFinite(startsAt))continue;
-      const minutes=eventMinutes(event),endsAt=startsAt+Math.max(minutes,0)*60000;
+      const minutes=eventMinutes(event),endsAt=isSolo(event)?startsAt+Math.max(minutes,0)*60000:raceFinishAt(startsAt,Math.max(minutes,0));
       if(endsAt<now&&startsAt<now)continue;
       const crew=regs.map(reg=>crewOf(departure,reg)).find(Boolean)||null;
       starts.push({event,departure,startsAt,crew});

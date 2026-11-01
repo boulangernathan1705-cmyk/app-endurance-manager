@@ -1,6 +1,6 @@
 // The week of the « Accueil » page (front/app/week-view.mjs), Monday to Sunday in Paris time, without any page code
 // (tested on its own).
-import {eventMinutes} from '../shared/duration.mjs';
+import {eventMinutes,raceFinishAt} from '../shared/duration.mjs';
 
 const DAY=86400000;
 const paris=new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Paris',year:'numeric',month:'2-digit',day:'2-digit'});
@@ -25,7 +25,9 @@ export function weekDays(events,monday){
       const index=parisDay(startsAt)-monday;
       if(index<0||index>6)continue;
       const minutes=eventMinutes(event);
-      days[index].items.push({event,departure,startsAt,endsAt:minutes>0?startsAt+minutes*60000:null,mine:mineOn(departure),pilots:pilotsOn(departure)});
+      // An endurance finishes 30 min (practice and qualifying) after its race time, as everywhere on the site.
+      const endsAt=minutes>0?(event.format==='solo'?startsAt+minutes*60000:raceFinishAt(startsAt,minutes)):null;
+      days[index].items.push({event,departure,startsAt,endsAt,mine:mineOn(departure),pilots:pilotsOn(departure)});
     }
   }
   for(const day of days)day.items.sort((a,b)=>a.startsAt-b.startsAt||String(a.event.name).localeCompare(String(b.event.name),'fr'));

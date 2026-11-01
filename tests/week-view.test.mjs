@@ -28,8 +28,11 @@ test('each start of the week is on its day, in time order, with the pilot\'s own
   assert.deepEqual(days[5].items.map(item => `${item.event.id}:${item.departure.id}`), ['monza:d', 'spa:a', 'spa:b']);
   assert.equal(days[5].items[1].mine, true); assert.equal(days[5].items[1].pilots, 2);
   assert.equal(days[5].items[2].mine, false); assert.equal(days[5].items[2].pilots, 0);
-  // The second 6 h start ends the next day.
-  assert.equal(days[5].items[2].endsAt, Date.parse('2026-11-08T02:00:00Z'));
+  // The second 6 h start ends the next day, 30 min of practice and qualifying after its 6 h (as everywhere on the site).
+  assert.equal(days[5].items[2].endsAt, Date.parse('2026-11-08T02:30:00Z'));
+  // A solo event keeps its own length.
+  const cup = {id:'cup', name:'Coupe', format:'solo', durationMinutes:60, departures:[{id:'e', startsAt:Date.parse('2026-11-04T19:00:00Z')}]};
+  assert.equal(weekDays([cup], monday)[2].items[0].endsAt, Date.parse('2026-11-04T20:00:00Z'));
   assert.equal(days.flatMap(item => item.items).some(item => item.event.id === 'next'), false);
 });
 
@@ -58,4 +61,12 @@ test('« Accueil » is reached from the bar and its own address, and shows both 
   // The other simulator's endurances open in its own space.
   assert.match(view, /\/api\/races\?game=\$\{game\}&scope=upcoming/);
   assert.match(view, /href="\/\$\{event\.otherGame\}\/#event=\$\{event\.id\}"/);
+});
+
+test('a week card shows its simulator on top, then « 15h – fin 18h10 », then the name (version B)', () => {
+  const view = read('front/app/week-view.mjs');
+  assert.match(view, /`fin \$\{late\?/);
+  assert.match(view, /<span class="week-block-sim">/);
+  assert.match(view, /<small>– \$\{esc\(fin\)\}<\/small>/);
+  assert.doesNotMatch(view, /Arrivée \$\{hour/);
 });
