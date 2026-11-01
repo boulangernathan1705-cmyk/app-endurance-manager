@@ -78,7 +78,17 @@ test('a week card shows its simulator on top, its start time(s), the name and it
   assert.match(view, /<span class="week-block-circuit">\$\{circuit\}<\/span>/);
   assert.match(view, /simCatalog\(event\.otherGame\|\|activeGame\)/);
   // Several starts on one card: every start time.
-  assert.match(view, /join\(' · '\)/);
+  assert.match(view, /join\('<i> · <\/i>'\)/);
+});
+
+test('on a phone a week card is an agenda row: time left, logo or length right, crews or pilots shown (option B)', () => {
+  const view = read('front/app/week-view.mjs'), css = read('styles/ux-refresh.css');
+  assert.match(view, /<span class="week-block-body">/);
+  assert.match(view, /week-badge week-block-length/);
+  assert.match(view, /équipage\$\{crews>1\?'s':''\}/);
+  assert.match(css, /\.week-block-body \{ display: contents; \}/);
+  assert.match(css, /\.week-block \{ grid-template-columns: 62px minmax\(0, 1fr\) auto;/);
+  assert.match(css, /\.week-block-logo \{ width: 64px; height: 64px;/);
 });
 
 test('the week is short: finished races fold per day, busy days are wider, the home takes the width (C + A)', () => {
