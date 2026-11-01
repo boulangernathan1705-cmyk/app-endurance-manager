@@ -90,13 +90,14 @@ test('at 7h30 the stream comes first with @everyone and the race it streams, the
   assert.equal(sent(calls).length,0);
 });
 
-test('a day without a stream: one message for the races, without a ping (Nathan, 2026-11-01)',async t=>{
+test('a day without a stream: one message for the races, a plain alert without a ping (Nathan, 2026-11-01)',async t=>{
   const {DB,env,calls,settings}=setup(t);
   DB.db.prepare("UPDATE events SET details=json_remove(details,'$.streamTime') WHERE id=?").run(EVENT);
   await announceCommunity(env,TDZ,settings(),MORNING);
   const posts=sent(calls);
   assert.equal(posts.length,1);
-  assert.equal(posts[0].body.content,'');assert.deepEqual(posts[0].body.allowed_mentions,{parse:[]});assert.equal(posts[0].body.flags,4096);
+  // « Une alerte de message suffit »: notified as a normal message (no silent flag), no @everyone.
+  assert.equal(posts[0].body.content,'');assert.deepEqual(posts[0].body.allowed_mentions,{parse:[]});assert.equal(posts[0].body.flags,undefined);
   const text=JSON.stringify(posts[0].body.embeds[0]);
   assert.match(text,/6h de Spa/);assert.match(text,/Coupe GT3/);assert.ok(text.indexOf('6h de Spa')<text.indexOf('Coupe GT3'));
   assert.doesNotMatch(text,/REJOINDRE LE STREAM/);assert.ok(posts[0].body.embeds[0].image,'the banner when the races are alone');

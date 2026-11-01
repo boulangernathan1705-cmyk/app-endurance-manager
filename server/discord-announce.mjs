@@ -225,14 +225,17 @@ async function publishSlot(env, community, day, channel, row, payload, ping, bud
     }
   } else id = null;
   if (!id) {
-    ping = ping && !previousId && !row.pending_nonce;
+    if (previousId || row.pending_nonce) ping = false;
     // Reserve the only possible mention BEFORE the network call. An ambiguous retry is silent.
     const nonce = row.pending_nonce || crypto.randomUUID().replaceAll('-','').slice(0,24);
     if (previousId) await retainAnnouncement(env,community,day,{message_id:previousId,channel_id:previousChannel},timestamp);
     const reserved = await env.DB.prepare("UPDATE discord_announcements SET ping_attempted=1,pending_nonce=?,pending_hash=?,pending_channel_id=? WHERE community_id=? AND day=? AND item=? AND pending_nonce=? AND ping_attempted=? AND COALESCE(message_id,'')=?")
       .bind(nonce,hash,channel,community.id,day,row.item,row.pending_nonce,row.ping_attempted,previousId || '').run();
     if (!reserved.meta.changes) return {asked, id:null, blocked:true};
-    const body = ping ? {...payload,content:'@everyone',allowed_mentions:{parse:['everyone']}} : {...payload,allowed_mentions:{parse:[]},flags:(payload.flags || 0) | 4096};
+    // 'everyone': the stream's @everyone; 'alert': a plain message notification, no mention; otherwise silent.
+    const body = ping === 'everyone' ? {...payload,content:'@everyone',allowed_mentions:{parse:['everyone']}}
+      : ping === 'alert' ? {...payload,allowed_mentions:{parse:[]}}
+      : {...payload,allowed_mentions:{parse:[]},flags:(payload.flags || 0) | 4096};
     const message = await discordRequest(env,'POST',`/channels/${channel}/messages`,{...body,nonce,enforce_nonce:true},budget);
     if (!message?.id) throw new Error('Discord n’a pas confirmé la publication de l’annonce.');
     id = message.id;asked = true;
@@ -285,9 +288,11 @@ async function publishAnnouncement(env, community, settings, timestamp) {
   const ping = intro.ping_attempted === 0 && minutes < UNTIL && Boolean(livePayload);
   if (intro.ping_attempted === 0 && !livePayload) await env.DB.prepare("UPDATE discord_announcements SET ping_attempted=1 WHERE community_id=? AND day=? AND item='intro'").bind(community.id,day).run();
   let asked = false;
-  const first = await publishSlot(env,community,day,channel,intro,livePayload,ping,budget,timestamp);asked ||= first.asked;
+  // A day without a stream: the races alone, with a plain message alert (no @everyone), once that morning.
+  const alert = !livePayload && intro.ping_attempted === 0 && minutes < UNTIL ? 'alert' : false;
+  const first = await publishSlot(env,community,day,channel,intro,livePayload,ping ? 'everyone' : false,budget,timestamp);asked ||= first.asked;
   if (first.blocked) return asked;
-  const second = await publishSlot(env,community,day,channel,races,restPayload,false,budget,timestamp);asked ||= second.asked;
+  const second = await publishSlot(env,community,day,channel,races,restPayload,alert,budget,timestamp);asked ||= second.asked;
   if (second.blocked) return asked;
   // Persist before cleanup: retired references survive an interrupted cleanup.
   const keep = new Set([first.id,second.id].filter(Boolean).map(id => `${channel}:${id}`));
