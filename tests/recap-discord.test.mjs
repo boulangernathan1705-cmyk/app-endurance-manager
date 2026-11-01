@@ -7,7 +7,7 @@ import {flushDiscord} from '../server/worker-with-migrations.mjs';
 import {withPublicVoiceAccess} from '../server/discord-permissions.mjs';
 import {CREW_BOT_PERMISSIONS} from '../server/crew-discord.mjs';
 import {linkTestServer,DEV_COMMUNITY,GUILD} from './fixtures/discord-server.mjs';
-import {syncDueRecaps,syncWeeklyDiscord} from '../server/discord-weekly.mjs';
+import {syncDueRecaps,syncWeeklyDiscord,loadCalendarSnapshot} from '../server/discord-weekly.mjs';
 import {RECAP_BOT_PERMISSIONS,THREADS,addThreadMembers,botCategoryEmojis,saveBotRecap,validateDiscordLayout,syncBotRecaps,previewBotRecap,recapDestinations,eventDeletionTime,eventChannelName,settingsRow,recapError,repairBotRecap,racesOpenNow} from '../server/recap-discord.mjs';
 
 const OWNER='333333333333333333', BOT='444444444444444444', TEXT='555555555555555555', CATEGORY='666666666666666666';
@@ -599,6 +599,17 @@ function solo(DB,id,name,startsAt,capacity=null,community=DEV_COMMUNITY){
   DB.db.prepare(`INSERT INTO events(id,name,circuit,duration_hours,categories,departures,created_by,created_at,community_id,format,capacity) VALUES(?,?,'monza',1,'["GT3"]',?,?,0,?,'solo',?)`)
     .run(id,name,JSON.stringify([{id:'d-'+id,startsAt}]),OWNER,community,capacity);
 }
+
+test('the events calendar turns to the next week on Monday at 7h30, not when the week\'s last event starts',async t=>{
+  const {DB,env}=setup(t);
+  // Week of 26 Oct–1 Nov 2026: last event Sunday 14h00 Paris; next week: Monday 18h00.
+  solo(DB,'bmc','BMC Round 5',Date.parse('2026-11-01T13:00:00Z'));solo(DB,'training','Training du lundi',Date.parse('2026-11-02T17:00:00Z'));
+  const at=async iso=>loadCalendarSnapshot(env,Date.parse(iso),COMMUNITY);
+  let snap=await at('2026-11-01T12:00:00Z');assert.match(snap.periodLabel,/26 octobre/);assert.deepEqual(snap.events.map(e=>e.name),['BMC Round 5']);
+  snap=await at('2026-11-01T13:02:00Z');assert.match(snap.periodLabel,/26 octobre/,'Sunday after the last event: the week stays');assert.deepEqual(snap.events.map(e=>e.name),['BMC Round 5']);
+  snap=await at('2026-11-02T06:29:00Z');assert.match(snap.periodLabel,/26 octobre/,'Monday 7h29 Paris: still the past week');
+  snap=await at('2026-11-02T06:30:00Z');assert.match(snap.periodLabel,/2 novembre/,'Monday 7h30 Paris: the new week');assert.deepEqual(snap.events.map(e=>e.name),['Training du lundi']);
+});
 
 test('the week calendar is its own message, never mixed with the endurances',async t=>{
   const {DB,env,calls,messages,channels}=setup(t);race(DB);solo(DB,'sprint','Sprint du mardi',NOW+DAY,2);solo(DB,'cup','Coupe du jeudi',NOW+DAY/4);

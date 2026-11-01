@@ -197,6 +197,8 @@ export async function loadWeeklyDiscordSnapshot(env, timestamp, community, scope
   };
 }
 
+const CALENDAR_TURN_MS = 7.5 * 3600000;
+
 // The calendar's events (EVENT SOLO / EVENT TDZ) of the week, with their places taken by this community's pilots.
 // sim: 'iracing' for the iRacing events only, 'lmu' for all the others (null: all).
 export async function loadCalendarSnapshot(env, timestamp, community, sim = null) {
@@ -208,8 +210,12 @@ export async function loadCalendarSnapshot(env, timestamp, community, sim = null
   const simOf = row => isStream(row) ? streamDetails({details:parseJson(row.details, {})}).raceSim || 'stream' : simForEvent(row);
   const starts = rows.filter(row => !sim || (simOf(row) === 'iracing') === (sim === 'iracing')).flatMap(row => parseJson(row.departures, []).filter(start => Number.isFinite(Number(start?.startsAt)))
     .map(start => ({row, start, startsAt:Number(start.startsAt)})));
-  const currentWeek = parisWeek(timestamp);
-  let week = currentWeek, selected = starts.filter(item => item.startsAt > timestamp && isInParisWeek(item.startsAt, week));
+  // The calendar's week turns on Monday at 7h30, with the morning announcement (Nathan, 2026-11-01):
+  // once its events are over, the week stays shown until then.
+  const currentWeek = parisWeek(timestamp - CALENDAR_TURN_MS);
+  const thisWeek = starts.filter(item => isInParisWeek(item.startsAt, currentWeek));
+  let week = currentWeek, selected = thisWeek.filter(item => item.startsAt > timestamp);
+  if (!selected.length && thisWeek.length) selected = thisWeek;
   if (!selected.length) {
     const next = starts.filter(item => item.startsAt > timestamp).sort((a,b) => a.startsAt - b.startsAt)[0];
     if (next) { week = parisWeek(next.startsAt); selected = starts.filter(item => item.startsAt > timestamp && isInParisWeek(item.startsAt, week)); }
