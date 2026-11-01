@@ -242,7 +242,8 @@ async function perform(action,target){
     case 'week-filter': state.weekFilter=target.dataset.filter||'all';renderWeek();break;
     // « Équipages » (organisers): the page, on a start when the race page's « Former les équipages » leads there.
     case 'crews-page': await load();renderNav();if(target.dataset.departure&&target.dataset.game&&target.dataset.game!==activeGame){location.href=`/${target.dataset.game}/#equipages=${target.dataset.departure}`;break;}renderCrewsPage(target.dataset.departure||'');break;
-    case 'crews-view': case 'crews-sim': case 'crews-see': case 'crew-request-refuse': if(await crewsAction(action,target)==='refresh')await refreshAfterSave('Demande refusée. Le pilote est prévenu.');break;
+    case 'crews-view': case 'crews-sim': case 'crews-category': case 'crews-see': case 'crew-request-refuse': if(await crewsAction(action,target)==='refresh')await refreshAfterSave('Demande refusée. Le pilote est prévenu.');break;
+    case 'crews-lock': if(await crewsAction(action,target)==='refresh')await refreshAfterSave(target.dataset.locked==='1'?'Équipage rouvert.':'Équipage marqué complet.');break;
     // « Demander un équipage » (pilots).
     case 'crew-request': openCrewRequest(event,target.dataset.departure);break;
     case 'crew-request-cancel': if(await cancelCrewRequest(target.dataset.id))await refreshAfterSave('Demande annulée.');break;
