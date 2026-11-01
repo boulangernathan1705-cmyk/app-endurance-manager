@@ -1,9 +1,9 @@
-// « Accueil » (audit R25 + R26): the pilot's next race, a card for each part of the site with what is new there, then
-// the week at a glance, Monday to Sunday (Paris), every start of the community: its events (every simulator,
+// « Accueil » (audit R25 + R26): the week at a glance, the pilot's next race beside it (none if signed up nowhere), and
+// for those who may create races the « event » and « stream » buttons. The week: Monday to Sunday (Paris), every start of the community: its events (every simulator,
 // Gridfest, streams) and the endurances of LMU and iRacing together. A view only: a click opens the race's own page
 // (the other simulator's races in its own space), nothing is entered here. On a phone the days follow each other in
 // a list.
-import {app,state,esc,button,notifyRender,activeGame,api,coversHour} from './core.mjs';
+import {app,state,esc,button,notifyRender,activeGame,api,coversHour,can} from './core.mjs';
 import {gameForEvent} from '../../shared/catalog.mjs';
 import {isSolo,eventAccessLogo} from './solo.mjs';
 import {isStream} from '../../shared/stream.mjs';
@@ -84,7 +84,8 @@ function block(item,now){
     :crew?`<span class="week-chip is-ok">✓ ${esc(crew.name)}${reg?` · ${esc(hoursOf(departure,reg,event))}`:''}</span>`:'<span class="week-chip is-alert">Sans équipage</span>';
   const places=left===null||past?'':left<=0?'<span class="week-chip is-warn">Complet</span>':`<span class="week-chip is-warn">${left} place${left>1?'s':''} restante${left>1?'s':''}</span>`;
   const label=`${pending?'Horaire à définir':hour(startsAt)} · ${event.name}${mine?' · tu es inscrit':''}`;
-  const sim2=solo?'':` is-${event.otherGame||activeGame}`;
+  // An event takes its simulator's colour, as its card on the events page (Nathan 2026-11-01).
+  const sim2=!solo?` is-${event.otherGame||activeGame}`:kind.key==='event'?` sim-${simForEvent(event)}`:'';
   const cls=`week-block is-${kind.key}${sim2}${mine?' is-mine':''}${past?' is-past':''}${live?' is-live':''}`;
   const open=event.otherGame?`<a class="${cls}" href="/${event.otherGame}/#event=${event.id}" aria-label="${esc(label)}">`
     :`<button type="button" class="${cls}" data-action="open" data-id="${event.id}" aria-label="${esc(label)}">`;
@@ -134,7 +135,8 @@ const openRace=(event,inner,cls)=>event.otherGame?`<a class="${cls}" href="/${ev
 // « Ta prochaine course »: the pilot's next start with his crew, his hours, the car and the forecast.
 function nextBox(all,now){
   const next=myStarts(all,now)[0];
-  if(!next)return `<aside class="home-next-box is-empty"><h2 class="home-next-label">Ta prochaine course</h2><p>Aucune inscription pour l’instant.</p>${button('home','Voir les courses','data-list="endurance"','home-next-go')}</aside>`;
+  // Not signed up anywhere: no box, the week takes the whole width (Nathan 2026-11-01).
+  if(!next)return '';
   const {event,departure,startsAt,crew}=next,live=startsAt<=now,reg=myReg(departure);
   const sim=isSolo(event)?SIMS.find(item=>item.id===simForEvent(event))?.short||'':SIM_NAME[simOf(event)];
   const weather=isSolo(event)?'':weatherOf(event);
@@ -160,16 +162,18 @@ export function renderWeek(){
       <h3 class="week-day-head" id="week-day-${day.day}"><span class="week-day-name">${esc(dayName.format(dateOf(day.day)))}</span><small>${esc(monthDay.format(dateOf(day.day)))}</small>${day.day===today?'<span class="week-today">Aujourd’hui</span>':''}</h3>
       <div class="week-day-list">${day.items.map(item=>block(item,now)).join('')||'<p class="week-empty">—</p>'}</div>
     </section>`).join('');
-  const name=String(state.user?.name||'').trim().split(/\s+/)[0];
+  const name=String(state.user?.name||'').trim().split(/\s+/)[0],box=nextBox(all,now);
+  // Admins create an event or announce a stream from here too (Nathan 2026-11-01), as on the events page.
+  const create=can('create_race')&&state.soloRaces?`<div class="home-create">${button('create-stream','🎙 Annoncer un stream','','secondary-button')}${button('create','Ajouter un événement','data-format="solo"','primary-button')}</div>`:'';
   const weekLabel=offset===0?'Cette semaine':offset===1?'La semaine prochaine':offset===-1?'La semaine dernière':`Semaine du ${monthDay.format(dateOf(monday))}`;
   app.innerHTML=`<div class="page-head home-head"><h1 class="page-title">${name?`SALUT ${esc(name.toLocaleUpperCase('fr-FR'))}`:'ACCUEIL'}</h1>
-      <div class="week-nav" role="group" aria-label="Changer de semaine">${button('week','‹','data-offset="-1" aria-label="Semaine précédente"','secondary-button week-step')}<span class="week-label">${esc(weekLabel)}<small>${esc(range)}</small></span>${button('week','›','data-offset="1" aria-label="Semaine suivante"','secondary-button week-step')}${offset?button('week','Revenir à cette semaine','data-offset="0"','link-button week-back'):''}</div></div>
-    <div class="home-layout">
+      <div class="week-nav" role="group" aria-label="Changer de semaine">${button('week','‹','data-offset="-1" aria-label="Semaine précédente"','secondary-button week-step')}<span class="week-label">${esc(weekLabel)}<small>${esc(range)}</small></span>${button('week','›','data-offset="1" aria-label="Semaine suivante"','secondary-button week-step')}${offset?button('week','Revenir à cette semaine','data-offset="0"','link-button week-back'):''}</div>${create}</div>
+    <div class="home-layout${box?'':' is-full'}">
       <section class="home-week" aria-label="${esc(weekLabel)}">
         <div class="event-filter week-filters" role="group" aria-label="Filtrer la semaine">${filters}</div>
-        <div class="week-grid">${columns}</div>
+        <div class="week-grid${days.some(day=>day.items.length)?'':' is-quiet'}">${columns}</div>
       </section>
-      ${nextBox(all,now)}
+      ${box}
     </div>`;
   notifyRender();
 }

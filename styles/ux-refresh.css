@@ -2532,11 +2532,13 @@ html[data-game] #app .my-entry-slot-heading .race-badges { display: flex; flex-w
    days one under the other on a phone), and the pilot's next race beside it. One colour per kind of race.
    ===================================================================== */
 .home-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: var(--em-space-3) var(--em-space-4); margin-bottom: var(--em-space-4); }
+.home-create { display: flex; flex-wrap: wrap; gap: var(--em-space-2); margin-left: auto; }
 .week-nav { display: flex; flex-wrap: wrap; align-items: center; gap: var(--em-space-2); }
 .week-nav .week-step { min-width: 38px; min-height: 36px; padding: 0 var(--em-space-3); font-size: var(--em-text-lg); }
 .week-label { display: grid; min-width: 170px; text-align: center; font-size: var(--em-text-md); font-weight: 800; color: var(--em-text); }
 .week-label small { font-size: 12px; font-weight: 600; color: var(--em-muted); }
-.home-layout { display: grid; grid-template-columns: minmax(0, 1fr) 270px; gap: var(--em-space-4); align-items: start; }
+.home-layout { display: grid; grid-template-columns: minmax(0, 1fr) 210px; gap: var(--em-space-3); align-items: start; }
+.home-layout.is-full { grid-template-columns: minmax(0, 1fr); }
 .week-filters { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 var(--em-space-3); }
 .week-filters .week-filter { border-radius: var(--em-radius-pill); }
 .week-filters .week-filter i { display: inline-block; width: 9px; height: 9px; margin-right: 6px; border-radius: 50%; background: var(--kind, var(--em-accent)); }
@@ -2564,7 +2566,7 @@ html[data-game] #app .my-entry-slot-heading .race-badges { display: flex; flex-w
 .week-block:hover { background: linear-gradient(160deg, color-mix(in srgb, var(--kind) 26%, var(--em-panel-2)), var(--em-panel-2) 75%); }
 .week-block.is-endurance.is-lmu { --kind: var(--em-kind-lmu); }
 .week-block.is-endurance.is-iracing { --kind: var(--em-kind-iracing); }
-.week-block.is-event { --kind: var(--em-kind-event); }
+.week-block.is-event { --kind: var(--sim, var(--em-kind-event)); }
 .week-block.is-gridfest { --kind: var(--em-kind-gridfest); }
 .week-block.is-stream { --kind: var(--em-kind-stream); }
 .week-block.is-past { opacity: .6; }
@@ -2581,17 +2583,16 @@ html[data-game] #app .my-entry-slot-heading .race-badges { display: flex; flex-w
 .week-chip.is-alert, .week-chip.is-live { background: color-mix(in srgb, var(--em-danger) 18%, transparent); color: var(--em-danger-text); }
 .week-chip.is-warn { background: color-mix(in srgb, var(--em-warn) 18%, transparent); color: color-mix(in srgb, var(--em-warn) 80%, #fff); }
 
-.home-next-box { display: grid; gap: 4px; padding: var(--em-space-4); border: 1px solid color-mix(in srgb, var(--em-warn) 50%, transparent); border-radius: var(--em-radius-lg);
+.home-next-box { display: grid; gap: 2px; padding: var(--em-space-3); border: 1px solid color-mix(in srgb, var(--em-warn) 50%, transparent); border-radius: var(--em-radius-lg);
   background: linear-gradient(160deg, color-mix(in srgb, var(--em-warn) 14%, transparent), var(--em-panel) 65%); }
-.home-next-label { margin: 0 0 6px; font-size: 12px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--em-muted); }
-.home-next-name { margin: 0; font-size: 22px; font-weight: 850; line-height: 1.15; text-transform: uppercase; color: var(--em-text-strong); }
+.home-next-label { margin: 0 0 4px; font-size: 11px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--em-muted); }
+.home-next-name { margin: 0; font-size: 18px; font-weight: 850; line-height: 1.15; text-transform: uppercase; color: var(--em-text-strong); }
 .home-next-when { margin: 0 0 6px; font-weight: 750; color: var(--em-warn); }
-.home-next-box.is-empty p { margin: 0 0 8px; color: var(--em-muted); }
 .home-next-rows { margin: 0; }
-.home-next-rows div { display: flex; justify-content: space-between; gap: 10px; padding: 5px 0; border-top: 1px solid var(--em-border); font-size: var(--em-text-sm); }
+.home-next-rows div { display: flex; justify-content: space-between; gap: 8px; padding: 4px 0; border-top: 1px solid var(--em-border); font-size: var(--em-text-sm); }
 .home-next-rows dt { color: var(--em-muted); }
 .home-next-rows dd { margin: 0; text-align: right; font-weight: 750; color: var(--em-text); }
-.home-next-go { display: block; width: 100%; margin-top: 10px; padding: 10px; border: 0; border-radius: var(--em-radius-sm); background: var(--em-warn); color: #111; font: inherit; font-weight: 800; text-align: center; text-decoration: none; cursor: pointer; }
+.home-next-go { display: block; width: 100%; margin-top: 8px; padding: 8px; border: 0; border-radius: var(--em-radius-sm); background: var(--em-warn); color: #111; font: inherit; font-weight: 800; text-align: center; text-decoration: none; cursor: pointer; }
 .home-next-go:hover { filter: brightness(1.08); }
 
 @media (max-width: 1100px) and (min-width: 761px) {
@@ -2600,6 +2601,9 @@ html[data-game] #app .my-entry-slot-heading .race-badges { display: flex; flex-w
   .week-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
 @media (max-width: 760px) {
+  .home-create { width: 100%; margin-left: 0; }
+  .home-create > * { flex: 1 1 0; font-size: var(--em-text-sm); padding-inline: var(--em-space-2); }
+  .week-grid.is-quiet::after { content: "Aucune course cette semaine."; color: var(--em-muted); padding: var(--em-space-3) 0; }
   .home-layout { grid-template-columns: minmax(0, 1fr); gap: var(--em-space-3); }
   .home-next-box { order: -1; }
   .week-filters { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }

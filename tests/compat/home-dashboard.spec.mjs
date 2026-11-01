@@ -36,3 +36,26 @@ for(const width of [1440,390])test(`the home shows the week and the next race at
  await next.locator('.home-next-go').click();
  await expect(page).toHaveURL(/#event=aaaaaaaa/);
 });
+
+// Signed up nowhere: no next-race box. Those who may create races add an event or announce a stream from here.
+test('the home of an organiser signed up nowhere',async({page})=>{
+ await page.setViewportSize({width:1440,height:1000});
+ await page.route('**/api/**',route=>{
+  const url=new URL(route.request().url()),path=url.pathname;let data={ok:true};
+  if(path==='/api/session')data={user:{id:'111111111111111111',name:'Nathan',communityIntroSeen:true},access:'member',permissions:['access','endurance','create_race'],soloRaces:true,community:{id:'test',slug:'test',name:'Test',appearance:{}},communities:[]};
+  else if(['/api/races','/api/events'].includes(path))data={events:[]};
+  else if(path==='/api/participants')data={participants:[]};
+  else if(path.includes('/notifications'))data={notifications:[],unread:0};
+  return route.fulfill({contentType:'application/json',body:JSON.stringify(data)});
+ });
+ await page.addInitScript(()=>localStorage.setItem('endurance_manager_locale','fr'));
+ await page.goto('/lmu/#accueil');
+ await expect(page.locator('.home-layout.is-full')).toBeVisible();
+ await expect(page.locator('.home-next-box')).toHaveCount(0);
+ await page.locator('.home-create [data-action="create-stream"]').click();
+ await expect(page.locator('.stream-event-form')).toBeVisible();
+ await page.goto('/lmu/#solo');
+ await page.goto('/lmu/#accueil');
+ await page.locator('.home-create [data-action="create"]').click();
+ await expect(page.locator('form.event-creation')).toBeVisible();
+});
