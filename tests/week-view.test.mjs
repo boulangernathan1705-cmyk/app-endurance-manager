@@ -62,3 +62,9 @@ test('« Accueil » is reached from the bar and its own address, and shows both 
   assert.match(view, /\/api\/races\?game=\$\{game\}&scope=upcoming/);
   assert.match(view, /href="\/\$\{event\.otherGame\}\/#event=\$\{event\.id\}"/);
 });
+
+test('a week card writes its start with its finish (« 15h → 18h10 »), never the finish alone', () => {
+  const view = read('front/app/week-view.mjs');
+  assert.match(view, /const from=pending\?'':`\$\{hour\(startsAt\)\} `/);
+  assert.match(view, /\$\{from\}→ \$\{hour\(endsAt\)\}/);
+});
