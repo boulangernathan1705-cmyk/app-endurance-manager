@@ -43,6 +43,9 @@ test('« Accueil » is reached from the bar and its own address, and shows both 
   // No cards repeating the bar (Nathan 2026-11-01): the week, and the pilot's next race beside it; endurances filtered by sim.
   assert.doesNotMatch(view, /home-card/);
   assert.match(view, /function nextBox\(all,now\)/);
+  // Signed up nowhere: no box, the week takes the whole width.
+  assert.match(view, /if\(!next\)return '';/);
+  assert.match(view, /home-layout\$\{box\?'':' is-full'\}/);
   assert.doesNotMatch(view, /départ\$\{count/);
   assert.match(view, /\['lmu','Endurance LMU'\],\['iracing','Endurance iRacing'\]/);
   // The other simulator's endurances open in its own space.

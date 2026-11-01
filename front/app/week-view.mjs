@@ -134,7 +134,8 @@ const openRace=(event,inner,cls)=>event.otherGame?`<a class="${cls}" href="/${ev
 // « Ta prochaine course »: the pilot's next start with his crew, his hours, the car and the forecast.
 function nextBox(all,now){
   const next=myStarts(all,now)[0];
-  if(!next)return `<aside class="home-next-box is-empty"><h2 class="home-next-label">Ta prochaine course</h2><p>Aucune inscription pour l’instant.</p>${button('home','Voir les courses','data-list="endurance"','home-next-go')}</aside>`;
+  // Not signed up anywhere: no box, the week takes the whole width (Nathan 2026-11-01).
+  if(!next)return '';
   const {event,departure,startsAt,crew}=next,live=startsAt<=now,reg=myReg(departure);
   const sim=isSolo(event)?SIMS.find(item=>item.id===simForEvent(event))?.short||'':SIM_NAME[simOf(event)];
   const weather=isSolo(event)?'':weatherOf(event);
@@ -160,16 +161,16 @@ export function renderWeek(){
       <h3 class="week-day-head" id="week-day-${day.day}"><span class="week-day-name">${esc(dayName.format(dateOf(day.day)))}</span><small>${esc(monthDay.format(dateOf(day.day)))}</small>${day.day===today?'<span class="week-today">Aujourd’hui</span>':''}</h3>
       <div class="week-day-list">${day.items.map(item=>block(item,now)).join('')||'<p class="week-empty">—</p>'}</div>
     </section>`).join('');
-  const name=String(state.user?.name||'').trim().split(/\s+/)[0];
+  const name=String(state.user?.name||'').trim().split(/\s+/)[0],box=nextBox(all,now);
   const weekLabel=offset===0?'Cette semaine':offset===1?'La semaine prochaine':offset===-1?'La semaine dernière':`Semaine du ${monthDay.format(dateOf(monday))}`;
   app.innerHTML=`<div class="page-head home-head"><h1 class="page-title">${name?`SALUT ${esc(name.toLocaleUpperCase('fr-FR'))}`:'ACCUEIL'}</h1>
       <div class="week-nav" role="group" aria-label="Changer de semaine">${button('week','‹','data-offset="-1" aria-label="Semaine précédente"','secondary-button week-step')}<span class="week-label">${esc(weekLabel)}<small>${esc(range)}</small></span>${button('week','›','data-offset="1" aria-label="Semaine suivante"','secondary-button week-step')}${offset?button('week','Revenir à cette semaine','data-offset="0"','link-button week-back'):''}</div></div>
-    <div class="home-layout">
+    <div class="home-layout${box?'':' is-full'}">
       <section class="home-week" aria-label="${esc(weekLabel)}">
         <div class="event-filter week-filters" role="group" aria-label="Filtrer la semaine">${filters}</div>
         <div class="week-grid">${columns}</div>
       </section>
-      ${nextBox(all,now)}
+      ${box}
     </div>`;
   notifyRender();
 }

@@ -2536,7 +2536,8 @@ html[data-game] #app .my-entry-slot-heading .race-badges { display: flex; flex-w
 .week-nav .week-step { min-width: 38px; min-height: 36px; padding: 0 var(--em-space-3); font-size: var(--em-text-lg); }
 .week-label { display: grid; min-width: 170px; text-align: center; font-size: var(--em-text-md); font-weight: 800; color: var(--em-text); }
 .week-label small { font-size: 12px; font-weight: 600; color: var(--em-muted); }
-.home-layout { display: grid; grid-template-columns: minmax(0, 1fr) 270px; gap: var(--em-space-4); align-items: start; }
+.home-layout { display: grid; grid-template-columns: minmax(0, 1fr) 210px; gap: var(--em-space-3); align-items: start; }
+.home-layout.is-full { grid-template-columns: minmax(0, 1fr); }
 .week-filters { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 var(--em-space-3); }
 .week-filters .week-filter { border-radius: var(--em-radius-pill); }
 .week-filters .week-filter i { display: inline-block; width: 9px; height: 9px; margin-right: 6px; border-radius: 50%; background: var(--kind, var(--em-accent)); }
@@ -2581,17 +2582,16 @@ html[data-game] #app .my-entry-slot-heading .race-badges { display: flex; flex-w
 .week-chip.is-alert, .week-chip.is-live { background: color-mix(in srgb, var(--em-danger) 18%, transparent); color: var(--em-danger-text); }
 .week-chip.is-warn { background: color-mix(in srgb, var(--em-warn) 18%, transparent); color: color-mix(in srgb, var(--em-warn) 80%, #fff); }
 
-.home-next-box { display: grid; gap: 4px; padding: var(--em-space-4); border: 1px solid color-mix(in srgb, var(--em-warn) 50%, transparent); border-radius: var(--em-radius-lg);
+.home-next-box { display: grid; gap: 2px; padding: var(--em-space-3); border: 1px solid color-mix(in srgb, var(--em-warn) 50%, transparent); border-radius: var(--em-radius-lg);
   background: linear-gradient(160deg, color-mix(in srgb, var(--em-warn) 14%, transparent), var(--em-panel) 65%); }
-.home-next-label { margin: 0 0 6px; font-size: 12px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--em-muted); }
-.home-next-name { margin: 0; font-size: 22px; font-weight: 850; line-height: 1.15; text-transform: uppercase; color: var(--em-text-strong); }
+.home-next-label { margin: 0 0 4px; font-size: 11px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--em-muted); }
+.home-next-name { margin: 0; font-size: 18px; font-weight: 850; line-height: 1.15; text-transform: uppercase; color: var(--em-text-strong); }
 .home-next-when { margin: 0 0 6px; font-weight: 750; color: var(--em-warn); }
-.home-next-box.is-empty p { margin: 0 0 8px; color: var(--em-muted); }
 .home-next-rows { margin: 0; }
-.home-next-rows div { display: flex; justify-content: space-between; gap: 10px; padding: 5px 0; border-top: 1px solid var(--em-border); font-size: var(--em-text-sm); }
+.home-next-rows div { display: flex; justify-content: space-between; gap: 8px; padding: 4px 0; border-top: 1px solid var(--em-border); font-size: var(--em-text-sm); }
 .home-next-rows dt { color: var(--em-muted); }
 .home-next-rows dd { margin: 0; text-align: right; font-weight: 750; color: var(--em-text); }
-.home-next-go { display: block; width: 100%; margin-top: 10px; padding: 10px; border: 0; border-radius: var(--em-radius-sm); background: var(--em-warn); color: #111; font: inherit; font-weight: 800; text-align: center; text-decoration: none; cursor: pointer; }
+.home-next-go { display: block; width: 100%; margin-top: 8px; padding: 8px; border: 0; border-radius: var(--em-radius-sm); background: var(--em-warn); color: #111; font: inherit; font-weight: 800; text-align: center; text-decoration: none; cursor: pointer; }
 .home-next-go:hover { filter: brightness(1.08); }
 
 @media (max-width: 1100px) and (min-width: 761px) {
