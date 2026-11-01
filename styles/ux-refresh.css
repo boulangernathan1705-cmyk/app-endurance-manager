@@ -2584,6 +2584,10 @@ main:not(.charte):has(.home-layout) { max-width: 2400px; }
 .week-badge { padding: 2px 6px; border-radius: var(--em-radius-pill); background: color-mix(in srgb, var(--kind) 32%, transparent); font-size: 10.5px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: var(--em-text-strong); white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; flex: 0 1 auto; min-width: 0; }
 .week-block-logo { flex: none; width: 40px; height: 40px; margin: -2px -2px -4px 0; }
 .week-block-logo img { display: block; width: 100%; height: 100%; object-fit: contain; }
+/* The body's lines are the card's own lines on a computer; on a phone they make the middle of the agenda row. */
+.week-block-body { display: contents; }
+.week-block-time > span { white-space: nowrap; }
+.week-block-length small { display: none; }
 .week-block-name { font-size: 13.5px; font-weight: 750; line-height: 1.25; overflow-wrap: anywhere; }
 .week-block-circuit { font-size: 12px; font-weight: 650; line-height: 1.25; color: var(--em-muted); overflow-wrap: anywhere; }
 .week-block-meta { display: flex; flex-wrap: wrap; gap: 2px 8px; font-size: var(--em-text-xs); color: var(--em-muted); }
@@ -2623,6 +2627,20 @@ main:not(.charte):has(.home-layout) { max-width: 2400px; }
   .week-day { min-height: 0; }
   .week-day.is-empty { display: none; }
   .week-day-name { display: inline; margin-right: 8px; }
+  /* Option B (Nathan 2026-11-01): an agenda row, the time on the left, the logo (or the length) big on the right. */
+  .week-block { grid-template-columns: 62px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 10px 10px 10px 14px; }
+  .week-block-head { display: contents; }
+  .week-block-sim { display: none; }
+  .week-block-time { grid-column: 1; grid-row: 1; align-self: stretch; display: flex; flex-direction: column; justify-content: center; padding-right: 8px; border-right: 1px solid var(--em-border); font-size: 18px; font-weight: 900; line-height: 1.15; }
+  .week-block-time > i { display: none; }
+  .week-block-time > span { font-size: 16px; }
+  .week-block-time.is-pending { font-size: 13px; font-weight: 800; color: var(--em-muted); }
+  .week-block-body { grid-column: 2; grid-row: 1; display: grid; gap: 3px; min-width: 0; }
+  .week-block-name { font-size: 14px; }
+  .week-block-logo, .week-block-head .week-badge { grid-column: 3; grid-row: 1; }
+  .week-block-logo { width: 64px; height: 64px; margin: 0; }
+  .week-block-length { display: grid; place-content: center; width: 58px; height: 58px; padding: 0; border-radius: 10px; border: 1px solid color-mix(in srgb, var(--kind) 70%, transparent); background: color-mix(in srgb, var(--kind) 45%, #000); font-size: 18px; font-weight: 900; letter-spacing: 0; text-align: center; }
+  .week-block-length small { display: block; font-size: 9px; font-weight: 800; letter-spacing: .06em; opacity: .85; }
 }
 
 /* Event en plusieurs manches : un seul bloc d'inscription en haut, les manches en infos, les pilotes une fois. */
