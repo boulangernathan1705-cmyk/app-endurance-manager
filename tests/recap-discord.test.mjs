@@ -166,10 +166,11 @@ test('a recap posted straight into a channel by the previous version moves to th
   assert.equal(creates(calls).length,1);assert.equal(sends(calls).length,1);
 });
 
-test('cleanup waits 24 hours after the FINAL departure, then deletes only the event text channel',async t=>{
+test('cleanup waits for the week to turn after the FINAL departure, then deletes only the event text channel',async t=>{
   const {DB,env,calls}=setup(t);const start=NOW+DAY,last=NOW+3*DAY;race(DB,'a','Spa','spa',[{id:'a1',startsAt:start},{id:'a2',startsAt:last}]);
   await saveBotRecap(env,COMMUNITY,SETTINGS);await syncBotRecaps(env,NOW,COMMUNITY);calls.length=0;
-  const end=last+6*3600000;
+  // The thread goes with its week: the Monday 7h30 (Paris) after the last start, or the race's end when later.
+  const {weekTurnAfter}=await import('../server/discord-weekly-format.mjs'),end=Math.max(weekTurnAfter(last),last+(6*60+30)*60000)-DAY;
   await syncBotRecaps(env,end+DAY-1,COMMUNITY);assert.equal(calls.filter(call=>call.method==='DELETE').length,0);
   await syncBotRecaps(env,end+DAY,COMMUNITY);assert.equal(calls.filter(call=>call.method==='DELETE').length,2,'the recap, then its race category');
   assert.ok(!calls.some(call=>call.method==='DELETE'&&call.path===`/channels/${CATEGORY}`));
@@ -256,9 +257,13 @@ test('event channels contain only this community’s crews and absences even on 
   assert.doesNotMatch(JSON.stringify(await previewBotRecap(env,NOW,COMMUNITY,SETTINGS)),/Pilotes absents/);
 });
 
-test('cleanup respects duration minutes and pending starts; names obey Discord length limits',()=>{
+test('cleanup respects duration minutes and pending starts; names obey Discord length limits',async()=>{
+  const {weekTurnAfter}=await import('../server/discord-weekly-format.mjs');
   const event={departures:JSON.stringify([{startsAt:NOW},{startsAt:NOW+DAY}]),duration_hours:6,duration_minutes:90};
-  assert.equal(eventDeletionTime(event),NOW+2*DAY+90*60000);
+  assert.equal(eventDeletionTime(event),Math.max(weekTurnAfter(NOW+DAY),NOW+DAY+120*60000));
+  // A 24 h still running when the week turns keeps its thread until its end.
+  const sunday=weekTurnAfter(NOW)-9*3600000;
+  assert.equal(eventDeletionTime({departures:JSON.stringify([{startsAt:sunday}]),duration_hours:24}),sunday+(24*60+30)*60000);
   assert.equal(eventDeletionTime({...event,departures:JSON.stringify([{startsAt:NOW,tbd:true}])}),null);
   assert.equal(eventDeletionTime({...event,duration_minutes:0,duration_hours:0}),null);
   assert.ok(eventChannelName('Événement '.repeat(30),'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee').length<=100);
@@ -275,11 +280,11 @@ test('quarter-hour cleanup rechecks current event times, works while disabled an
   assert.equal(await cleanupEventRecaps(env,NOW+21*DAY),0);assert.equal(calls.filter(call=>call.method==='DELETE').length,2);
 });
 
-test('a manually deleted event keeps its channel until its last known end plus 24 hours',async t=>{
+test('a manually deleted event keeps its channel until its week turns',async t=>{
   const {cleanupEventRecaps}=await import('../server/recap-discord.mjs');
   const {DB,env}=setup(t);race(DB);await saveBotRecap(env,COMMUNITY,SETTINGS);await syncBotRecaps(env,NOW,COMMUNITY);
   DB.db.prepare('DELETE FROM events').run();
-  assert.equal(await cleanupEventRecaps(env,NOW),0);assert.equal(await cleanupEventRecaps(env,NOW+3*DAY),1);
+  assert.equal(await cleanupEventRecaps(env,NOW),0);assert.equal(await cleanupEventRecaps(env,NOW+9*DAY),1);
 });
 
 test('new eligible races are created automatically; changing the anchor reorders without recreating channels',async t=>{
@@ -793,8 +798,8 @@ test('no race category any more, even with a crew; the old infos-de-la-course ch
   DB.db.prepare("UPDATE discord_recap_publications SET content_hash='changed' WHERE event_id='race-a'").run();
   calls.length=0;await syncBotRecaps(env,NOW+2000,community);
   assert.ok(calls.some(call=>call.method==='PATCH'&&call.path.startsWith(`/channels/${thread.id}/messages/`)));
-  // After the race: the thread goes.
-  await syncBotRecaps(env,NOW+3*DAY,community);
+  // When its week turns: the thread goes.
+  await syncBotRecaps(env,NOW+9*DAY,community);
   assert.equal(channels.find(item=>item.id===thread.id),undefined);
 });
 
