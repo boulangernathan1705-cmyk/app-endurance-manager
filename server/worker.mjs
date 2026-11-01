@@ -2,9 +2,8 @@ import {discordDiagnostic} from './discord-diagnostic.mjs';
 import {grindfestAvailable, grindfestEnabled, isGrindfest, streamersOf, assignStreamerWaitlist} from '../shared/grindfest.mjs';
 import {discordInteraction} from './discord-interactions.mjs';
 import {discordRequest} from './recap-discord.mjs';
-import {buildAnnounceEvent,buildAnnounceIntro,buildCompleteAnnouncement} from './discord-weekly-format.mjs';
 import {siteOf} from './discord-weekly.mjs';
-import {announceStream} from './discord-announce.mjs';
+import {announceStream,sendAnnouncementPreview} from './discord-announce.mjs';
 import {gridfestPasswordStatus, sendGridfestPasswords} from './gridfest-discord.mjs';
 import {
   LEGACY_CAR_ALIASES, COOKIE_SESSION, COOKIE_STATE, COOKIE_RETURN, DAY, HttpError, fail, now, id, token, hash, cookie,
@@ -1097,17 +1096,10 @@ async function api(request, env) {
     if(matches.length!==1)fail(400,'Choisis un salon texte unique du serveur de cette communauté.');
     const channel=matches[0];
     if(channel.announceMissing?.some(right=>!['Mentionner @everyone','Voir les anciens messages'].includes(right)))fail(400,'Le bot doit pouvoir voir le salon, envoyer des messages et intégrer des liens.');
+    // The poster of a stream day with example data, as sent at 7h30 (the text when Cloudflare's browser is not set up).
     const site={...siteOf(env,community),streamUrl:announceStream(await botRecapSettings(env,community))||'https://www.twitch.tv/lapraline_tdz'};
-    const round={circuit:'Velo Città',category:'GT4',car:'Ginetta G55',weather:'random',fuel:1,tyres:1,qualifying:10};
-    const event={id:'demo',name:'APERÇU · SAFE’S RACE',sim:'ams2',type:'SAFE',access:'safe',tdz:true,startsAt:Date.now(),entered:13,
-      note:'Démonstration de présentation : données d’exemple.',rounds:[{...round,practice:10,durationMinutes:20},{...round,practice:5,durationMinutes:40}]};
-    const card=buildAnnounceEvent(event,{},Date.now());
-    const payload=buildCompleteAnnouncement(buildAnnounceIntro({events:1,streams:[{name:event.name,time:'20:45'}]},site),[{name:event.name,payload:card}],site);
-    const live=payload.embeds[0].fields.find(field=>field.name==='📺 LA SOIRÉE EN DIRECT');
-    if(live){live.name='📺 LA SOIRÉE AVEC LA PRALINE';live.value=`Début du stream à **20h45** · horaire d’exemple\n**[▶ REJOINDRE LE STREAM](${site.streamUrl})**`;}
-    payload.content='Aperçu de présentation · données d’exemple';payload.allowed_mentions={parse:[]};payload.components=[];
-    const sent=await discordRequest(env,'POST',`/channels/${channel.id}/messages`,payload);
-    return json({ok:true,url:`https://discord.com/channels/${community.discordGuildId}/${channel.id}/${sent.id}`});
+    const sent=await sendAnnouncementPreview(env,channel.id,site);
+    return json({ok:true,poster:sent.poster,url:`https://discord.com/channels/${community.discordGuildId}/${channel.id}/${sent.id}`});
   }
   // Everything the bot made for « Discord » taken off: the messages, channels and categories, the crews' voice channels.
   const removeDiscord = async () => {

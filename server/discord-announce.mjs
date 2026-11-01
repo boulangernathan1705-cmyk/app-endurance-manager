@@ -4,7 +4,8 @@
 import {communityById} from './community.mjs';
 import {iracingSoloSql} from './iracing-visibility.mjs';
 import {loadWeeklyDiscordSnapshot, siteOf} from './discord-weekly.mjs';
-import {buildCompleteAnnouncement, buildAnnounceIntro, buildAnnounceEvent, buildAnnounceRace, buildAnnounceStream, parisDay} from './discord-weekly-format.mjs';
+import {buildAnnounceIntro, buildAnnounceEvent, buildAnnounceRace, buildAnnounceStream, parisDay, raceUrl} from './discord-weekly-format.mjs';
+import {posterModel, posterHtml, posterText, renderPoster} from './discord-poster.mjs';
 import {discordRequest, botCategoryEmojis} from './recap-discord.mjs';
 import {discordAbsentButton} from './discord-interactions.mjs';
 import {parseLayout} from './discord-layout.mjs';
@@ -95,7 +96,7 @@ async function eventSnapshot(env, community, id, timestamp) {
   return {id:row.id, name:row.name, sim, type:normalizeTdzEventType(details.type) || '', access:tdz ? row.access || 'open' : '', tdz, note:details.note || '',
     startsAt:Number(start.startsAt), timePending:Boolean(row.schedule_pending) || start.tbd === true,
     rounds:parse(row.rounds, []), capacity:row.capacity == null ? null : Number(row.capacity), entered,
-    streamers:gridfest ? streamersOf(row).map(streamer => ({name:streamer.name, twitchUrl:streamer.twitchUrl, capacity:streamer.capacity, entered:Number(startEntries.find(item => item.streamer_id === streamer.id)?.entered || 0)})) : [],
+    streamers:gridfest ? streamersOf(row).map(streamer => ({name:streamer.name, twitchUrl:streamer.twitchUrl, logoUrl:streamer.logoUrl || '', capacity:streamer.capacity, entered:Number(startEntries.find(item => item.streamer_id === streamer.id)?.entered || 0)})) : [],
     rally:sim === 'acrally' ? {stages:details.rallyStages || [], host:details.rallyHost || '', carMode:details.rallyCarMode || '', minutes:details.rallyEstimatedMinutes || 0} : null,
     // The password itself never goes on Discord.
     password:Boolean(details.password) && row.access === 'safe' && !gridfest,
@@ -182,10 +183,34 @@ async function removeOldAnnouncements(env, community, day, keep, budget) {
   return {asked, done:true};
 }
 
+// A message of the announcement: its poster (made when the message is sent, see publishSlot) and the same facts as text,
+// the fallback; under it « Regarder le stream », then « S’inscrire » (and « Absent ») for each race, 5 rows at most.
+const cut = (value, size) => value.length > size ? `${value.slice(0, size - 1)}…` : value;
+function posterPayload(model, list, absent) {
+  const rows = [], stream = model.live && /^https:\/\//.test(model.streamUrl) ? {type:2,style:5,label:'Regarder le stream',emoji:{name:'📺'},url:model.streamUrl} : null;
+  const actionable = list.filter(item => item.kind !== 'stream' && /^https:\/\//.test(item.url));
+  const name = item => String(item.data.name || '').replace(/[\u0000-\u001f]/g, ' ').trim();
+  const join = item => {
+    const gridfest = item.data.streamers?.length > 0, more = actionable.length > 1 ? ` · ${name(item)}` : '';
+    return [{type:2,style:5,label:cut(`${gridfest ? 'Piloter pour un streamer' : 'S’inscrire'}${more}`,80),emoji:{name:gridfest ? '🎙️' : '✅'},url:item.url},
+      ...(absent ? [{...absent(item.row.item),label:cut(`Absent${more}`,80)}] : [])];
+  };
+  if (actionable.length === 1) rows.push({type:1,components:[...(stream ? [stream] : []),...join(actionable[0])]});
+  else {
+    if (stream) rows.push({type:1,components:[stream]});
+    if (actionable.length + rows.length <= 5) rows.push(...actionable.map(item => ({type:1,components:join(item)})));
+    else if (actionable.length) rows.push({type:1,components:[{type:2,style:5,label:'S’inscrire sur le site',emoji:{name:'✅'},url:actionable[0].url.replace(/\/(lmu|iracing)\/#.*$/, '/events/')}]});
+  }
+  const embed = {description:posterText(model),color:model.gridfest ? 0xff7b00 : model.live ? 0x9146ff : 0xe8792b};
+  if (model.live && /^https:\/\//.test(model.banner || '')) embed.image = {url:model.banner};
+  return {content:'',embeds:[embed],components:rows,allowed_mentions:{parse:[]},poster:posterHtml(model)};
+}
+
 // One of the day's two messages (row: 'intro' for the stream, 'races' for the rest): recovered after a lost answer,
 // edited in place, sent again silently when gone, or removed when it has nothing left to say (payload null).
-async function publishSlot(env, community, day, channel, row, payload, ping, budget, timestamp) {
+async function publishSlot(env, community, day, channel, row, input, ping, budget, timestamp) {
   let asked = false;
+  const {poster = '', ...payload} = input || {};
   const save = (sql, ...values) => env.DB.prepare(`UPDATE discord_announcements SET ${sql} WHERE community_id=? AND day=? AND item=?`).bind(...values, community.id, day, row.item).run();
   // A POST may have succeeded even when its response or the subsequent DB write failed.
   // Recover its ID before any retry. Failure to read history fails closed (no second POST).
@@ -200,7 +225,7 @@ async function publishSlot(env, community, day, channel, row, payload, ping, bud
       row = {...row,message_id:recovered.id,channel_id:row.pending_channel_id,content_hash:row.pending_hash,pending_nonce:'',pending_hash:'',pending_channel_id:''};
     }
   }
-  if (!payload) {
+  if (!input) {
     if (row.message_id && row.message_id !== '-' && !row.pending_nonce) {
       if (budget.left <= 0) return {asked, id:row.message_id};
       await discordRequest(env,'DELETE',`/channels/${row.channel_id}/messages/${row.message_id}`,null,budget).catch(error => { if (error.status !== 404) throw error; });
@@ -211,13 +236,17 @@ async function publishSlot(env, community, day, channel, row, payload, ping, bud
     await save("message_id=NULL,content_hash=?,checked_at=?,ping_attempted=1,pending_nonce='',pending_hash='',pending_channel_id=''",PREFIX+'empty',timestamp);
     return {asked, id:null};
   }
-  const hash = await contentHash(payload), previousId = row.message_id, previousChannel = row.channel_id;
+  let hash = await contentHash(payload);
+  const previousId = row.message_id, previousChannel = row.channel_id;
+  // A poster is made once: later changes (a late entrant) stay on the site, the message is only checked.
+  const posted = String(row.content_hash || '').startsWith(`${PREFIX}poster:`);
   // A channel move (or an older layout) needs a silent replacement.
   const replace = previousChannel !== channel || !String(row.content_hash || '').startsWith(PREFIX);
   let id = previousId;
   if (previousId && !replace && !row.pending_nonce) {
     try {
-      const changed = hash !== row.content_hash;
+      const changed = hash !== row.content_hash && !posted;
+      if (posted) hash = row.content_hash;
       const confirmed = await discordRequest(env,changed ? 'PATCH' : 'GET',`/channels/${channel}/messages/${previousId}`,
         changed ? {...payload,allowed_mentions:{parse:[]}} : null,budget);
       if (confirmed?.id !== previousId) throw new Error('Discord n’a pas confirmé le message de l’annonce.');
@@ -229,6 +258,9 @@ async function publishSlot(env, community, day, channel, row, payload, ping, bud
   } else id = null;
   if (!id) {
     if (previousId || row.pending_nonce) ping = false;
+    // The picture first (a few seconds in Cloudflare's browser); without it, the text.
+    const picture = poster ? await renderPoster(env, poster) : null;
+    if (picture) hash = `${PREFIX}poster:${hash.slice(PREFIX.length)}`;
     // Reserve the only possible mention BEFORE the network call. An ambiguous retry is silent.
     const nonce = row.pending_nonce || crypto.randomUUID().replaceAll('-','').slice(0,24);
     if (previousId) await retainAnnouncement(env,community,day,{message_id:previousId,channel_id:previousChannel},timestamp);
@@ -239,7 +271,14 @@ async function publishSlot(env, community, day, channel, row, payload, ping, bud
     const body = ping === 'everyone' ? {...payload,content:'@everyone',allowed_mentions:{parse:['everyone']}}
       : ping === 'alert' ? {...payload,allowed_mentions:{parse:[]}}
       : {...payload,allowed_mentions:{parse:[]},flags:(payload.flags || 0) | 4096};
-    const message = await discordRequest(env,'POST',`/channels/${channel}/messages`,{...body,nonce,enforce_nonce:true},budget);
+    let request = {...body,nonce,enforce_nonce:true};
+    if (picture) {
+      // The poster alone: the text would repeat it.
+      request = new FormData();
+      request.append('payload_json', JSON.stringify({...body,embeds:[],attachments:[{id:0,filename:'annonce.png'}],nonce,enforce_nonce:true}));
+      request.append('files[0]', new Blob([picture], {type:'image/png'}), 'annonce.png');
+    }
+    const message = await discordRequest(env,'POST',`/channels/${channel}/messages`,request,budget);
     if (!message?.id) throw new Error('Discord n’a pas confirmé la publication de l’annonce.');
     id = message.id;asked = true;
   }
@@ -268,27 +307,23 @@ async function publishAnnouncement(env, community, settings, timestamp) {
   if (!due) return false;
   // Rebuild the eligible list: a late entrant can add a race without another ping.
   const eligible = await announceItems(env,community,timestamp), items = [], activeRows = [];
+  const layout = parseLayout(settings.layout) || {}, site = {...siteOf(env,community),streamUrl:stream,streamName:layout.streamName || ''};
   for (const row of eligible) {
-    const payload = await announcePayload(env,community,row,timestamp,null,stream);
-    if (payload) { activeRows.push(row);items.push({row,name:payload.embeds[0].title.replace(/^[^\p{L}\p{N}]+/u,''),payload}); }
+    const data = row.kind === 'race' ? await raceSnapshot(env,community,row.item,timestamp) : await eventSnapshot(env,community,row.item,timestamp);
+    if (!data) continue;
+    activeRows.push(row);
+    items.push({row,kind:data.stream ? 'stream' : row.kind,data,url:row.kind === 'race' ? raceUrl(site.url,{eventId:row.item,circuit:data.circuit}) : site.url ? `${site.url}/lmu/#event=${encodeURIComponent(row.item)}` : ''});
   }
   for (const [position,row] of activeRows.entries()) await env.DB.prepare(`INSERT OR IGNORE INTO discord_announcements(community_id,day,item,kind,position,guild_id,channel_id,created_at)
     VALUES(?,?,?,?,?,?,?,?)`).bind(community.id,day,row.item,row.kind,position+1,community.discordGuildId,channel,timestamp).run();
   const streams = await streamTimes(env,activeRows), streamed = new Set(streams.map(item => item.item));
-  const layout = parseLayout(settings.layout) || {};
-  const site = {...siteOf(env,community),announceFormat:layout.announceFormat,streamUrl:stream,streamName:layout.streamName || '',streams};
+  site.streams = streams;
   // The stream's message: an « Annoncer un stream », or the community's stream link with a stream time on a race today.
-  const live = items.filter(item => item.row.kind === 'stream' || (stream && streamed.has(item.row.item)));
+  const live = items.filter(item => item.kind === 'stream' || (stream && streamed.has(item.row.item)));
   const rest = items.filter(item => !live.includes(item));
-  const count = list => ({events:list.filter(item => item.row.kind === 'event').length,races:list.filter(item => item.row.kind === 'race').length,lives:list.filter(item => item.row.kind === 'stream').length});
-  const quiet = intro => ({...intro,content:'',allowed_mentions:{parse:[]}});
-  const livePayload = live.length ? buildCompleteAnnouncement(quiet(buildAnnounceIntro({...count(live),streams},site)),live,site) : null;
-  // The races: no stream block, the banner only when they are alone.
-  const restSite = {...site,streamUrl:'',streams:[],bannerUrl:live.length ? '' : site.bannerUrl};
-  const restPayload = rest.length ? buildCompleteAnnouncement(quiet(buildAnnounceIntro(count(rest),restSite)),rest,restSite) : null;
-  if (restPayload && live.length) restPayload.content = '**Aussi aujourd’hui sur le serveur :**';
-  // Buttons only on the stream's message; the other races keep the link on their name (Nathan, 2026-11-01).
-  if (restPayload) restPayload.components = [];
+  const absent = discordAbsentButton(env);
+  const livePayload = live.length ? posterPayload(posterModel(live,site,{live:true,timestamp}),live,absent) : null;
+  const restPayload = rest.length ? posterPayload(posterModel(rest,site,{timestamp}),rest,absent) : null;
   // Only the stream's message pings, once, on the first morning evaluation (7h30–9h).
   const ping = intro.ping_attempted === 0 && minutes < UNTIL && Boolean(livePayload);
   if (intro.ping_attempted === 0 && !livePayload) await env.DB.prepare("UPDATE discord_announcements SET ping_attempted=1 WHERE community_id=? AND day=? AND item='intro'").bind(community.id,day).run();
@@ -322,4 +357,23 @@ export async function syncAnnouncements(env, timestamp = Date.now()) {
   }
   if (parisMinutes(timestamp) === 0) await env.DB.prepare('DELETE FROM discord_announcements WHERE created_at<?').bind(timestamp - 7 * 1440 * MINUTE).run();
   return false;
+}
+
+// « Envoyer un aperçu » (admin): a stream day with example data, as a poster when Cloudflare's browser answers.
+export async function sendAnnouncementPreview(env, channel, site, timestamp = Date.now()) {
+  const round = {circuit:'Velo Città', category:'GT4', car:'Ginetta G55', practice:10, qualifying:10, durationMinutes:20};
+  const event = {id:'demo', name:'APERÇU · SAFE’S RACE', sim:'ams2', type:'SAFE', access:'safe', tdz:true, startsAt:timestamp, entered:13, capacity:20,
+    rounds:[round, {...round, durationMinutes:40}]};
+  const list = [{row:{item:'demo', kind:'event'}, kind:'event', data:event, url:''}];
+  const {poster, ...payload} = posterPayload(posterModel(list, {...site, streams:[{item:'demo', time:'20:45'}]}, {live:true, timestamp}), list, null);
+  const picture = await renderPoster(env, poster);
+  const body = {...payload, content:'Aperçu · données d’exemple', allowed_mentions:{parse:[]}};
+  let request = body;
+  if (picture) {
+    request = new FormData();
+    request.append('payload_json', JSON.stringify({...body, embeds:[], attachments:[{id:0, filename:'annonce.png'}]}));
+    request.append('files[0]', new Blob([picture], {type:'image/png'}), 'annonce.png');
+  }
+  const sent = await discordRequest(env, 'POST', `/channels/${channel}/messages`, request);
+  return {id:sent.id, poster:Boolean(picture)};
 }
