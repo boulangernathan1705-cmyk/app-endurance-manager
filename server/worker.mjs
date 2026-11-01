@@ -1,3 +1,4 @@
+import {discordDiagnostic} from './discord-diagnostic.mjs';
 import {grindfestAvailable, grindfestEnabled, isGrindfest, streamersOf, assignStreamerWaitlist} from '../shared/grindfest.mjs';
 import {discordInteraction} from './discord-interactions.mjs';
 import {discordRequest} from './recap-discord.mjs';
@@ -1084,6 +1085,12 @@ async function api(request, env) {
   if (path === '/api/community/discord' && method === 'DELETE') {
     requirePermission(actor,'admin');
     return removeDiscord();
+  }
+  if (path === '/api/community/discord/diagnostic' && method === 'GET') {
+    requirePermission(actor,'admin');
+    const live = new URL(request.url).searchParams.get('live') === '1';
+    if (live) await rateLimit(request,env,'discord-diagnostic',6);
+    return json(await discordDiagnostic(env,community,{live}));
   }
   if (path === '/api/community/recap/repair' && method === 'POST') {
     requirePermission(actor,'admin');

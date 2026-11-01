@@ -295,6 +295,13 @@ async function openRaces(env, community, events, scope, timestamp) {
   const entered = await enteredRaces(env, community);
   return racesOpenNow(events.filter(event => event.community_id !== 'official' || !String(event.circuit || '').startsWith('iracing-') || entered.has(event.id)), scope, timestamp);
 }
+// The races that should have their Discord thread now: [{id, name, circuit, departures, …}] (the diagnostic).
+export async function expectedRaceThreads(env, community, settings, timestamp = Date.now()) {
+  const scope = scopeOf(settings);
+  if (!scope) return [];
+  const events = await raceEvents(env, community), open = new Set(await openRaces(env, community, events, scope, timestamp));
+  return events.filter(event => open.has(event.id));
+}
 export const raceCategoryName = event =>
   `${String(event?.circuit || '').startsWith('iracing-') ? '🏁 iRacing' : '🏎️ LMU'} · ${String(event?.name || 'Endurance').trim()}`.slice(0,100);
 // The race categories follow the category chosen for their sim: LMU first, then iRacing, each by date of its first start
