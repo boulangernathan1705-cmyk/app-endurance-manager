@@ -69,13 +69,14 @@ test('« Accueil » is reached from the bar and its own address, and shows both 
   assert.match(view, /href="\/\$\{event\.otherGame\}\/#event=\$\{event\.id\}"/);
 });
 
-test('a week card shows its simulator on top, then « 15h – fin 18h10 », then the name (version B)', () => {
+test('a week card shows its simulator on top, its start time(s), the name and its circuit, never its end', () => {
   const view = read('front/app/week-view.mjs');
-  assert.match(view, /`fin \$\{late\?/);
   assert.match(view, /<span class="week-block-sim">/);
-  assert.match(view, /<small>– \$\{esc\(fin\)\}<\/small>/);
+  // No end time (Nathan 2026-11-01): the circuit tells the weekend's endurances apart.
+  assert.doesNotMatch(view, /fin \$\{/);
   assert.doesNotMatch(view, /Arrivée \$\{hour/);
-  // Several starts on one card: only the start times, no end.
-  assert.match(view, /const fin=several\|\|/);
+  assert.match(view, /<span class="week-block-circuit">\$\{circuit\}<\/span>/);
+  assert.match(view, /simCatalog\(event\.otherGame\|\|activeGame\)/);
+  // Several starts on one card: every start time.
   assert.match(view, /join\(' · '\)/);
 });
