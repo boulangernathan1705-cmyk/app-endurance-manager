@@ -12,7 +12,7 @@ import {CATEGORY_NAMES,parseLayout,parseCategories,layoutInput,layoutPlan,wanted
 
 const API = 'https://discord.com/api/v10', DAY = 86400000;
 // Layout of the recap message: raised when it changes, so the published recaps are edited once.
-const RECAP_FORMAT = 12;
+const RECAP_FORMAT = 13;
 const MAX_CHANNELS = 450;
 const RACE_INFO_CHANNEL = 'infos-de-la-course'; // Discord writes text channel names in lowercase with dashes
 const VIEW = 1024n, SEND = 2048n, HISTORY = 65536n, EMBED = 16384n, MANAGE = 16n, ADMIN = 8n, EVERYONE = 131072n;
@@ -75,15 +75,10 @@ function weekPlan(env, community, settings, cats = parseCategories(settings.bot_
   week.sort((a,b) => rank(a.kind) - rank(b.kind));
   if (!layout) return week;
   for (const entry of week) entry.threads = !entry.kind.startsWith('calendar');
-  // Above the sims' messages of a channel, one message of its own: the banner, the week and the link to the site. The sims'
-  // messages below it all look the same.
-  const plan = [];
-  for (const entry of week) {
-    const same = entry.kind.startsWith('calendar') ? [] : week.filter(item => !item.kind.startsWith('calendar') && item.key === entry.key);
-    if (same[0] === entry) plan.push({...entry, kind:`head:${entry.kind}`, sims:same.map(item => item.kind)});
-    plan.push(entry);
-  }
-  return plan;
+  // One message per sim (Nathan, 2026-11-01, « option A »): the first message of a channel carries the card of the community,
+  // the week and the banner above its sim's card. The banner's message of its own (« head ») is gone: taken down as no longer wanted.
+  for (const entry of week) if (!entry.kind.startsWith('calendar')) entry.sims = week.filter(item => !item.kind.startsWith('calendar') && item.key === entry.key).map(item => item.kind);
+  return week;
 }
 const parse = value => { try { const result = JSON.parse(value); return Array.isArray(result) ? result : []; } catch { return []; } };
 
@@ -524,11 +519,12 @@ async function snapshotPayload(env, timestamp, community, eventId = null, kind =
   const scope = eventId ? 'all' : kind;
   const snapshot = await loadWeeklyDiscordSnapshot(env, timestamp, community, scope, eventId);
   const emojis = await botCategoryEmojis(env, timestamp);
-  const payload = buildWeeklyDiscordPayload(snapshot, siteOf(env, community), timestamp, scope, emojis, {weekly:!eventId, alone:Boolean(eventId) && alone, threads:eventId ? null : threads, absent:discordAbsentButton(env)});
+  const place = {head:!sims?.length || sims[0] === kind};
+  const payload = buildWeeklyDiscordPayload(snapshot, siteOf(env, community), timestamp, scope, emojis, {weekly:!eventId, alone:Boolean(eventId) && alone, threads:eventId ? null : threads, absent:discordAbsentButton(env), ...place});
   // Message edits are silent; never turn driver names into mentions.
   payload.allowed_mentions = {parse:[]};
   // A new layout of the message (RECAP_FORMAT) edits the published recaps once.
-  return {snapshot, payload, hash:await digest([RECAP_FORMAT,snapshot,emojis,...(eventId && alone ? ['alone', Boolean(discordAbsentButton(env))] : []),...(!eventId && threads ? [threads, 'head'] : [])])};
+  return {snapshot, payload, hash:await digest([RECAP_FORMAT,snapshot,emojis,...(eventId && alone ? ['alone', Boolean(discordAbsentButton(env))] : []),...(!eventId && threads ? [threads, 'head', place] : [])])};
 }
 // What the bot would publish with these settings (a settings row), without publishing anything.
 export async function previewBotRecap(env, timestamp, community, settings) {

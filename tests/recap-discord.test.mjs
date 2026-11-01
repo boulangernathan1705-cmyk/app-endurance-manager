@@ -748,13 +748,18 @@ test('« un fil par course »: the bot makes « Endurance Manager » under the c
   // « Présent » opens the race on the site; no « Absent » without the key.
   assert.deepEqual(inThread.components[0].components.map(button=>[button.label,button.style]),[['S’inscrire',5]]);
   assert.match(inThread.components[0].components[0].url,/#event=race-a$/);
-  // The week's message: the races only, each a link to its thread.
-  // One box per race: its day and time as the name (the race's name only once, in its thread's link).
-  const index=[...messages.values()].find(item=>item.channel_id===week.id&&item.embeds[0].author?.name.includes('LMU'));
-  assert.equal(index.embeds.length,1);assert.match(index.embeds[0].author.name,/^🏎️ LMU · 1 course à venir$/);
-  assert.match(index.embeds[0].fields[0].name,/^🟢 \S+ \d+ \S+ · \d+h\d\d$/);assert.doesNotMatch(index.embeds[0].fields[0].name,/Spa/);
-  assert.match(index.embeds[0].fields[0].value,new RegExp(`^<#${threads.find(thread=>thread.name.includes('Spa')).id}>$`));
-  assert.match(index.embeds[0].author.url,/\/lmu\/$/);assert.deepEqual(index.components,[],'a link, no button');
+  // The week's message (option A, Nathan 2026-11-01): ONE message, the community's card with the week and its banner, then
+  // the sim's card, as wide (a clear picture under it); one race in two or three lines, its name the link to its thread.
+  const index=[...messages.values()].find(item=>item.channel_id===week.id&&item.embeds.some(embed=>embed.title?.includes('LMU')));
+  const card=index.embeds.at(-1),spa=threads.find(thread=>thread.name.includes('Spa')).id;
+  assert.equal(index.embeds.length,2);assert.match(index.embeds[0].title,/^📝 Semaine/);assert.ok(index.embeds[0].image.url.includes('banner'));
+  assert.equal(card.title,'🏎️ LMU · 1 course à venir');assert.match(card.image.url,/\/images\/discord-spacer\.png$/);
+  assert.match(card.description,new RegExp(`^\\*\\*\\S+ \\d+ \\S+\\*\\* · <#${spa}>\\n📍 .+ · ⏱️ .+\\n🕑 \\*\\*\\d+h\\d\\d\\*\\*`));
+  assert.match(card.url,/\/lmu\/$/);assert.deepEqual(index.components,[],'a link, no button');
+  // LMU and iRacing share the channel: the iRacing message has its card only, as wide.
+  const iracing=[...messages.values()].find(item=>item.channel_id===week.id&&item.embeds.some(embed=>embed.title?.includes('iRacing')));
+  assert.equal(iracing.embeds.length,1);assert.equal(iracing.embeds[0].title,'🏁 iRacing · 1 course à venir');
+  assert.equal([...messages.values()].filter(item=>item.channel_id===week.id).length,2,'no banner message of its own any more');
 });
 
 test('LMU and iRacing apart: one category each, each race its thread in its sim\'s channel',async t=>{
@@ -896,10 +901,10 @@ test('changing recap category permissions preserves normal vocal features and lo
 test('a week message deleted on Discord is put back by the next sync, without « Réparer »',async t=>{
   const {DB,env,messages}=setup(t);race(DB);
   await layout(env,COMMUNITY,{mode:'general',sims:'lmu',week:{all:CATEGORY},events:''});
-  assert.equal(messages.size,3,'the banner, the week\'s message and the race\'s, in its thread');
+  assert.equal(messages.size,2,'the week\'s message (banner and races) and the race\'s, in its thread');
   messages.clear();DB.db.prepare("UPDATE discord_recap_publications SET content_hash='old'").run();
   const result=await syncBotRecaps(env,NOW+1000,COMMUNITY);
-  assert.equal(messages.size,3);assert.ok(!result?.error);
+  assert.equal(messages.size,2);assert.ok(!result?.error);
   assert.equal(DB.db.prepare('SELECT last_error FROM community_recap_settings').get().last_error,null);
 });
 
@@ -1014,30 +1019,29 @@ test('the crews\' voices: LMU first, then iRacing, each by its start; other voic
   assert.ok(!calls.some(call=>call.method==='PATCH'&&call.path===`/guilds/${GUILD}/channels`),'in order: nothing sent');
 });
 
-test('LMU and iRacing in the same channel: the banner and the week in a message above, the sims\' messages alike below',async t=>{
+test('LMU and iRacing in the same channel: the week and its banner on top of the LMU message, the iRacing one below, same width',async t=>{
   const {DB,env,messages}=setup(t);race(DB);race(DB,'race-b','8h de Watkins Glen','iracing-watkins',[{id:'start-b',startsAt:NOW+2*DAY}]);
   await layout(env,COMMUNITY,{mode:'events',sims:'all',under:'111111111111111110'});
-  const id=event=>DB.db.prepare('SELECT message_id FROM discord_recap_publications WHERE event_id=?').get(event).message_id;
-  const week=event=>messages.get(id(event)).embeds[0];
-  assert.match(week('week:head:lmu').title,/Semaine/);
-  // The head: only the week (its link to the site) and the banner, no count.
-  assert.equal(week('week:head:lmu').fields,undefined);
-  assert.match(week('week:head:lmu').url,/^https:\/\/[^ ]+\/$/);assert.equal(week('week:head:lmu').description,undefined);assert.deepEqual(messages.get(id('week:head:lmu')).components,[]);
-  assert.equal(week('week:lmu').author.name,'🏎️ LMU · 1 course à venir');assert.equal(week('week:iracing').author.name,'🏁 iRacing · 1 course à venir');
-  for (const sim of ['week:lmu','week:iracing']) {assert.equal(week(sim).image,undefined);assert.equal(week(sim).title,undefined);assert.ok(week(sim).footer);}
-  // Sent in this order: the banner first.
-  assert.ok(BigInt(id('week:head:lmu'))<BigInt(id('week:lmu'))&&BigInt(id('week:lmu'))<BigInt(id('week:iracing')));
+  const id=event=>DB.db.prepare('SELECT message_id FROM discord_recap_publications WHERE event_id=?').get(event)?.message_id;
+  const lmu=messages.get(id('week:lmu')),iracing=messages.get(id('week:iracing'));
+  assert.equal(id('week:head:lmu'),undefined,'no banner message of its own');
+  assert.equal(lmu.embeds.length,2);assert.match(lmu.embeds[0].title,/Semaine/);assert.match(lmu.embeds[0].url,/^https:\/\/[^ ]+\/$/);assert.ok(lmu.embeds[0].image);
+  assert.equal(lmu.embeds[1].title,'🏎️ LMU · 1 course à venir');assert.equal(iracing.embeds.length,1);assert.equal(iracing.embeds[0].title,'🏁 iRacing · 1 course à venir');
+  for (const card of [lmu.embeds[1],iracing.embeds[0]]) {assert.match(card.image.url,/discord-spacer\.png$/);assert.ok(card.footer);}
+  assert.deepEqual(lmu.components,[]);
+  assert.ok(BigInt(id('week:lmu'))<BigInt(id('week:iracing')));
 });
 
-test('a channel set up before the banner message: the sims\' messages are sent again below it',async t=>{
+test('a channel set up with the banner message of before: it is taken down, the week\'s message keeps its place',async t=>{
   const {DB,env,messages}=setup(t);race(DB);
   await layout(env,COMMUNITY,{mode:'events',sims:'lmu',under:'111111111111111110'});
   const id=event=>DB.db.prepare('SELECT message_id FROM discord_recap_publications WHERE event_id=?').get(event)?.message_id;
-  const before=id('week:lmu');
-  // As before this version: no banner message.
-  messages.delete(id('week:head:lmu'));DB.db.prepare("DELETE FROM discord_recap_publications WHERE event_id='week:head:lmu'").run();
+  const before=id('week:lmu'),channel=messages.get(before).channel_id;
+  // As before this version: a banner message above.
+  messages.set('900000000000000001',{id:'900000000000000001',channel_id:channel,embeds:[{title:'📝 Semaine'}]});
+  DB.db.prepare("INSERT INTO discord_recap_publications(community_id,event_id,guild_id,channel_id,message_id,marker,content_hash) SELECT community_id,'week:head:lmu',guild_id,channel_id,'900000000000000001','head','x' FROM discord_recap_publications WHERE event_id='week:lmu'").run();
   await syncBotRecaps(env,NOW+1000,COMMUNITY);
-  assert.ok(!messages.has(before));assert.ok(BigInt(id('week:head:lmu'))<BigInt(id('week:lmu')));
+  assert.ok(!messages.has('900000000000000001'));assert.equal(id('week:lmu'),before);
 });
 
 test('a server set up before the emojis: the bot\'s categories and week\'s channel are renamed, nothing made again',async t=>{
@@ -1059,7 +1063,7 @@ test('a community showing the official iRacing races on its site: each gets its 
   await layout(env,community,{mode:'events',sims:'iracing',showEvents:false,under:'top'});
   await syncBotRecaps(env,NOW,community);
   assert.ok(channels.some(item=>item.type===11&&item.name==='🏁 iRacing · Officielle iRacing'));
-  assert.ok([...messages.values()].some(item=>item.embeds[0].author?.name.startsWith('🏁 iRacing')&&/<#/.test(item.embeds[0].fields?.[0]?.value||'')));
+  assert.ok([...messages.values()].some(item=>item.embeds.at(-1).title?.startsWith('🏁 iRacing')&&/<#/.test(item.embeds.at(-1).description||'')));
 });
 test('EVENT TDZ\'s channel is shown as « 🗓️・calendrier », found again by its first name',async()=>{
   const {layoutPlan}=await import('../server/discord-layout.mjs');

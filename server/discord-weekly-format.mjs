@@ -228,7 +228,7 @@ function footer(updatedAt){return{text:`Endurance Manager · mise à jour à ${u
 // `threads`: « un fil par course », the week's message lists the races only, each a link to its thread ({eventId: thread id}).
 // With threads, the banner, the week and the link to the site are in a message of their own above (buildWeekHeadPayload):
 // each sim's message is its name, its races and the time of update.
-export function buildWeeklyDiscordPayload(snapshot,site={},updatedAt=Date.now(),scope='lmu',emojis={},{weekly=false,alone=false,threads=null,absent=null}={}){
+export function buildWeeklyDiscordPayload(snapshot,site={},updatedAt=Date.now(),scope='lmu',emojis={},{weekly=false,alone=false,threads=null,absent=null,head=true}={}){
   const siteUrl=typeof site==='string'?(()=>{try{return new URL(site).origin;}catch{return '';}})():String(site.url||'');
   const sim=SCOPE_LABELS[scope]??' LMU',simPage=scope==='iracing'?'/iracing/':scope==='all'?'/':'/lmu/';
   const current=Array.isArray(snapshot.currentDepartures)?snapshot.currentDepartures:[],future=Array.isArray(snapshot.futureDepartures)?snapshot.futureDepartures:[];
@@ -238,25 +238,34 @@ export function buildWeeklyDiscordPayload(snapshot,site={},updatedAt=Date.now(),
   if(site.name){header.author={name:cut(site.name,256)};if(siteUrl)header.author.url=`${siteUrl}/`;if(site.logoUrl)header.author.icon_url=site.logoUrl;}
   if(threads){delete header.url;delete header.author;delete header.title;}
   if(!current.length&&!future.length){
-    if(threads){header.author={name:`${SIM_MARKS[scope]||'🏁'} Aucune endurance${sim} cette semaine`};header.color=0x6b7280;header.footer=footer(updatedAt);return{content:'',embeds:[header],allowed_mentions:{parse:[]}};}
+    if(threads){
+      Object.assign(header,{title:`${SIM_MARKS[scope]||'🏁'} Aucune endurance${sim} cette semaine`,color:0x6b7280,footer:footer(updatedAt)});
+      return weekCards(header,site,siteUrl,period,head);
+    }
     header.description=`Aucune course avec un équipage engagé n’est en cours et aucun prochain départ${sim} n’est programmé.`;
     header.title=`Aucune endurance${sim} à préparer`;header.color=0x6b7280;header.footer=footer(updatedAt);
     return{content:'',embeds:[header],allowed_mentions:{parse:[]}};
   }
   if(threads){
-    // One box per race, in the order of the starts: its day and time on top (Paris time), then the link to its thread (or
-    // its page until the thread is there), its starts and its weather. Its entries are a click away, in the thread.
+    // One message per sim and channel (Nathan, 2026-11-01, « option A »): the card of the community and the week with its
+    // banner (first message of the channel), then the sim's card, each race in two or three lines (its day and the link to
+    // its thread; circuit, length and type; its start times and crews).
     const races=[...groupByRace(current).map(group=>[group,true]),...groupByRace(future).map(group=>[group,false])];
     const box=([group,live])=>{const first=group[0],thread=threads[first.eventId],url=raceUrl(siteUrl,first),name=clean(eventTitleAndNote(first.eventName).title);
-      const when=startTimeLabel(first.startsAt,first.timePending);
-      return{name:cut(`${live?'🔴 En cours':'🟢'} ${when}`,256),value:cut([thread?`<#${thread}>`:url?`🏁 [${name}](${url})`:`🏁 ${name}`,group.length>1&&`${group.length} départs`,WEATHER[first.details?.weather]].filter(Boolean).join(' · '),1024),inline:false};};
-    const fields=races.slice(0,races.length>25?24:25).map(box);
-    if(races.length>25)fields.push({name:BLANK,value:`… et ${races.length-24} autres courses sur le site.`,inline:false});
-    // The races still to come (or under way): on Sunday, those of Monday are gone.
-    Object.assign(header,{color:SIM_COLORS[scope]||header.color,author:{name:`${SIM_MARKS[scope]||'🏁'}${sim} · ${races.length} course${races.length>1?'s':''} à venir`},fields,footer:footer(updatedAt)});
-    // A link on the sim's name rather than a button (less room); components:[] takes off the buttons of before.
-    if(siteUrl)header.author.url=`${siteUrl}${simPage}`;
-    return{content:'',embeds:[header],components:[],allowed_mentions:{parse:[]}};
+      const circuit=circuitNames.get(first.circuit)||first.circuit||'Circuit à préciser';
+      const duration=first.durationMinutes||first.durationHours?durationLabel(first.durationMinutes||first.durationHours*60):'';
+      const day=recapDay.format(first.startsAt);
+      const times=group.map(departure=>departure.timePending?'horaire à confirmer':recapDay.format(departure.startsAt)===day?`**${clockLabel(departure.startsAt)}**`:`${recapDay.format(departure.startsAt).split(' ')[0]} ${clockLabel(departure.startsAt)}`);
+      const crews=group.reduce((total,departure)=>total+(departure.crews||[]).filter(crew=>crew.pilots?.length).length,0);
+      return [`${live?'🔴 **En cours** · ':''}**${cap(day)}** · ${thread?`<#${thread}>`:url?`[${name}](${url})`:name}`,
+        [`📍 ${clean(circuit)}`,duration&&`⏱️ ${duration}`,TYPE_LABELS[first.eventType]&&`🏷️ ${TYPE_LABELS[first.eventType]}`].filter(Boolean).join(' · '),
+        [`🕑 ${[...new Set(times)].join(' · ')}`,crews&&`👥 ${crews} équipage${crews>1?'s':''}`].filter(Boolean).join(' · ')].join('\n');};
+    let shown=races.length,description='';
+    // 4096 characters at most: the last races go to the site.
+    do{description=[...races.slice(0,shown).map(box),shown<races.length&&`… et ${races.length-shown} autre${races.length-shown>1?'s':''} sur le site.`].filter(Boolean).join('\n\n');}while(description.length>4000&&--shown>0);
+    Object.assign(header,{color:SIM_COLORS[scope]||header.color,title:cut(`${SIM_MARKS[scope]||'🏁'}${sim} · ${races.length} course${races.length>1?'s':''} à venir`,256),description,footer:footer(updatedAt)});
+    if(siteUrl)header.url=`${siteUrl}${simPage}`;
+    return weekCards(header,site,siteUrl,period,head);
   }
   const build=compact=>{
     const blocks=[...groupByRace(current).map(group=>raceEmbed(group,siteUrl,compact,true,emojis)),...groupByRace(future).map(group=>raceEmbed(group,siteUrl,compact,false,emojis))];
@@ -281,6 +290,19 @@ export function buildWeeklyDiscordPayload(snapshot,site={},updatedAt=Date.now(),
   return payload;
 }
 
+// The week's message of a sim in « un fil par course »: on the first message of the channel, the card of the community, the
+// week (a link to the site) and its banner above the sim's card. A wide clear picture under the sim's card gives it the
+// banner's width: the two cards line up (Nathan, 2026-11-01).
+function weekCards(card,site,siteUrl,period,head){
+  const embeds=[card];
+  if(siteUrl)card.image={url:`${siteUrl}/images/discord-spacer.png`};
+  if(head){
+    const top=buildWeekHeadPayload(period,site,'all').embeds[0];
+    if(card.url)top.url=card.url.replace(/\/(lmu|iracing)\/$/,'/');
+    embeds.unshift(top);
+  }
+  return{content:'',embeds,components:[],allowed_mentions:{parse:[]}};
+}
 // Above the sims' messages of a channel: the community, the week (a link to the site) and the banner.
 // counts: the races of the week by sim ({lmu, iracing}), one box each for the sims of the channel.
 export function buildWeekHeadPayload(periodLabel,site={},scope='all'){
