@@ -15,8 +15,6 @@
 .charte-sizes code { margin-right: var(--em-space-2); color: var(--em-accent); }
 .charte-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--em-space-2); margin-bottom: var(--em-space-3); }
 .charte-week { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-.charte-crews { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 340px)); gap: var(--em-space-3); }
 @media (max-width: 760px) {
   .charte-week { grid-template-columns: minmax(0, 1fr); }
-  .charte-crews { grid-template-columns: minmax(0, 1fr); }
 }
