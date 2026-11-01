@@ -291,6 +291,10 @@ async function publishAnnouncement(env, community, settings, timestamp) {
   const day = parisDay(timestamp), minutes = parisMinutes(timestamp), budget = {left:REQUESTS};
   if (minutes < FROM) return false;
   let rows = await announcementRows(env, community, day);
+  // A day already announced by an older version of the site keeps its message until midnight: a deploy during the day
+  // never deletes and reposts the morning's announcement (Nathan, 2026-11-01). The new layout starts the next morning.
+  const older = rows.find(row => row.item === 'intro');
+  if (older?.content_hash && !String(older.content_hash).startsWith(PREFIX) && !older.pending_nonce) return false;
   if (!rows.some(row => row.item === 'intro')) {
     // Existing days (including legacy 'none') have already had their morning opportunity.
     await env.DB.prepare(`INSERT OR IGNORE INTO discord_announcements(community_id,day,item,kind,position,guild_id,channel_id,created_at,ping_attempted)
