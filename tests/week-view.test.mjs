@@ -80,3 +80,14 @@ test('a week card shows its simulator on top, its start time(s), the name and it
   // Several starts on one card: every start time.
   assert.match(view, /join\(' · '\)/);
 });
+
+test('the week is short: finished races fold per day, busy days are wider, the home takes the width (C + A)', () => {
+  const view = read('front/app/week-view.mjs'), css = read('styles/ux-refresh.css'), actions = read('front/app/actions.mjs');
+  assert.match(view, /button\('week-done',day\.opened\?'▴ Replier':`✓ \$\{day\.done\.length\} terminée/);
+  assert.match(actions, /case 'week-done':/);
+  assert.match(view, /weight:items\.length>2\?2:items\.length\?1:done\.length\?\.75:\.5/);
+  assert.match(view, /style="--week-columns:\$\{widths\}"/);
+  assert.match(css, /grid-template-columns: var\(--week-columns, repeat\(7, minmax\(0, 1fr\)\)\)/);
+  assert.match(css, /main:has\(\.home-layout\) \{ max-width: 2400px; \}/);
+  assert.match(css, /\.week-day\.is-busy \.week-day-list \{ grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/);
+});
