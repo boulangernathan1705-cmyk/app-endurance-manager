@@ -46,7 +46,7 @@ function kindOf(event){
   return {key:'endurance',label:'Endurance'};
 }
 // Every start of the week, by day, each with the kind of its race.
-const weekStarts=(events,monday)=>weekDays(events,monday).map(day=>({...day,items:day.items.map(item=>({...item,kind:kindOf(item.event),pending:item.departure.hideClock===true}))}));
+const weekStarts=(events,monday)=>weekDays(events,monday).map(day=>({...day,items:day.items.map(item=>({...item,kind:kindOf(item.event),pending:item.starts.every(start=>start.departure.hideClock===true)}))}));
 
 // The forecast in a word: « Pluie » when a slot says rain, else the race's single forecast (details).
 function weatherOf(event){
@@ -70,11 +70,15 @@ const myReg=departure=>(departure.availability||[]).find(reg=>reg.mine&&reg.stat
 const logoOf=event=>isGrindfest(event)?'<img class="event-access-logo" src="/images/event-access/gridfest-stacked.png" alt="Gridfest" width="308" height="320" loading="lazy" decoding="async">':eventAccessLogo(event);
 
 function block(item,now){
-  const {event,departure,startsAt,endsAt,kind,mine,pilots,pending}=item;
-  const past=(endsAt||startsAt)<now,live=!pending&&startsAt<=now&&!past,solo=isSolo(event),stream=isStream(event);
+  const {event,departure,startsAt,endsAt,kind,mine,pilots,pending,starts}=item;
+  const past=(endsAt||startsAt)<now,solo=isSolo(event),stream=isStream(event);
+  const live=starts.some(start=>start.departure.hideClock!==true&&start.startsAt<=now&&(start.endsAt||start.startsAt)>=now);
+  // Several starts the same day: one card with every start time, no end time (Nathan 2026-11-01).
+  const several=starts.length>1;
+  const times=several?esc(starts.map(start=>start.departure.hideClock?'à définir':hour(start.startsAt)).join(' · ')):'';
   // Simulator on top, then « 15h – fin 18h10 » (« – fin dim 2h30 » over several days), then the name (Nathan chose version B, 2026-11-01).
   const late=endsAt&&parisDay(endsAt)!==parisDay(startsAt);
-  const fin=pending||!endsAt||(solo&&!late)?'':`fin ${late?`${endDay.format(endsAt).replace('.','')} `:''}${hour(endsAt)}`;
+  const fin=several||pending||!endsAt||(solo&&!late)?'':`fin ${late?`${endDay.format(endsAt).replace('.','')} `:''}${hour(endsAt)}`;
   const sim=solo?(stream?'':SIMS.find(item=>item.id===simForEvent(event))?.short||''):SIM_NAME[event.otherGame||activeGame];
   const badge=solo?kind.label:'',logo=solo?logoOf(event):'';
   const weather=solo?'':weatherOf(event);
@@ -84,7 +88,7 @@ function block(item,now){
   const situation=!mine?'':solo?'<span class="week-chip is-ok">✓ Inscrit</span>'
     :crew?`<span class="week-chip is-ok">✓ ${esc(crew.name)}${reg?` · ${esc(hoursOf(departure,reg,event))}`:''}</span>`:'<span class="week-chip is-alert">Sans équipage</span>';
   const places=left===null||past?'':left<=0?'<span class="week-chip is-warn">Complet</span>':`<span class="week-chip is-warn">${left} place${left>1?'s':''} restante${left>1?'s':''}</span>`;
-  const label=`${pending?'Horaire à définir':hour(startsAt)} · ${event.name}${mine?' · tu es inscrit':''}`;
+  const label=`${pending?'Horaire à définir':several?starts.map(start=>start.departure.hideClock?'à définir':hour(start.startsAt)).join(', '):hour(startsAt)} · ${event.name}${mine?' · tu es inscrit':''}`;
   // An event takes its simulator's colour, as its card on the events page (Nathan 2026-11-01).
   const sim2=!solo?` is-${event.otherGame||activeGame}`:kind.key==='event'?` sim-${simForEvent(event)}`:'';
   const cls=`week-block is-${kind.key}${sim2}${mine?' is-mine':''}${past?' is-past':''}${live?' is-live':''}`;
@@ -93,7 +97,7 @@ function block(item,now){
   const meta=[rounds,weather&&`${weather==='Pluie'?'🌧':'☀️'} ${weather}`,past&&'Terminé'].filter(Boolean);
   return `${open}
     ${sim||logo||badge?`<span class="week-block-head"><span class="week-block-sim">${esc(sim)}</span>${logo?`<span class="week-block-logo">${logo}</span>`:badge?`<span class="week-badge">${esc(badge)}</span>`:''}</span>`:''}
-    <span class="week-block-time">${pending?'à définir':esc(hour(startsAt))}${fin?` <small>– ${esc(fin)}</small>`:''}</span>
+    <span class="week-block-time">${several?times:pending?'à définir':esc(hour(startsAt))}${fin?` <small>– ${esc(fin)}</small>`:''}</span>
     ${live?'<span class="week-chip is-live">● En cours</span>':''}
     <span class="week-block-name">${esc(event.name)}</span>
     ${meta.length?`<span class="week-block-meta">${meta.map(text=>`<span>${esc(text)}</span>`).join('')}</span>`:''}
