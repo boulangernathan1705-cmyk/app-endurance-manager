@@ -3,7 +3,7 @@ import {iracingSoloSql} from './iracing-visibility.mjs';
 import {administrators} from './core.mjs';
 // Text recaps configured explicitly by an admin, published exclusively by the bot.
 import {loadWeeklyDiscordSnapshot, loadCalendarSnapshot, siteOf} from './discord-weekly.mjs';
-import {CALENDAR_FORMAT, raceWeekOpen, buildWeeklyDiscordPayload, buildWeekHeadPayload, buildCalendarPayload, CATEGORY_EMOJI_NAMES} from './discord-weekly-format.mjs';
+import {CALENDAR_FORMAT, raceWeekOpen, weekTurnAfter, buildWeeklyDiscordPayload, buildWeekHeadPayload, buildCalendarPayload, CATEGORY_EMOJI_NAMES} from './discord-weekly-format.mjs';
 import {tdzOnly} from '../shared/catalog.mjs';
 import {isDevelopment} from './dev-environment.mjs';
 import {crewVoiceName} from './crew-discord.mjs';
@@ -263,7 +263,10 @@ export function eventDeletionTime(event) {
   if (!departures.length || event?.schedule_pending || departures.some(item => item.tbd || !Number.isFinite(Number(item.startsAt)))) return null;
   const minutes = Number(event.duration_minutes) || Number(event.duration_hours) * 60;
   if (!(minutes > 0)) return null;
-  return Math.max(...departures.map(item => Number(item.startsAt))) + minutes * 60000 + DAY;
+  // A race's thread goes with its week, when the next one turns (Monday 7h30, Paris): the channel never shows two weeks
+  // (Nathan, 2026-11-01). A race still running then (a 24 h) keeps it until its end plus its 30 min of practice and qualifying.
+  const last = Math.max(...departures.map(item => Number(item.startsAt)));
+  return Math.max(weekTurnAfter(last), last + (minutes + 30) * 60000);
 }
 // The races that get their thread now: from the Monday of the week of a start until it is over.
 export function racesOpenNow(events, scope, timestamp) {

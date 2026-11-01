@@ -33,6 +33,14 @@ function dayKey(day){const d=new Date(day*DAY_MS);return `${d.getUTCFullYear()}-
 function weekFromMonday(monday){const sunday=monday+6;return{key:dayKey(monday),monday,sunday,label:`semaine du ${startLabel.format(dayDate(monday))} au ${endLabel.format(dayDate(sunday))}`};}
 export function parisWeek(timestamp=Date.now()){const day=localDay(timestamp),weekday=new Date(day*DAY_MS).getUTCDay();return weekFromMonday(day-(weekday===0?6:weekday-1));}
 export function nextParisWeek(timestamp=Date.now()){return weekFromMonday(parisWeek(timestamp).monday+7);}
+// The week turns on the Monday at 7h30 (Paris), with the morning announcement and the events' calendar (Nathan, 2026-11-01).
+export const WEEK_TURN_HOURS=7.5;
+// When the week of `timestamp` hands over to the next one: the next Monday at 7h30, Paris time (summer or winter).
+export function weekTurnAfter(timestamp){
+  const monday=parisWeek(timestamp).monday+7;
+  for(const offset of [1,2]){const at=monday*DAY_MS+WEEK_TURN_HOURS*HOUR_MS-offset*HOUR_MS;if(localDay(at)===monday&&updateTimeLabel.format(at)==='07:30')return at;}
+  return monday*DAY_MS+WEEK_TURN_HOURS*HOUR_MS-HOUR_MS;
+}
 // Nathan's rule: a race's Discord thread and its crews' voices open on the Monday (Paris) of the week of the start,
 // together with the week's calendar, whatever the race's length.
 export function raceWeekOpen(startsAt,now=Date.now()){return Number.isFinite(Number(startsAt))&&parisWeek(Number(startsAt)).monday<=parisWeek(now).monday;}
