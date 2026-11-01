@@ -15,6 +15,8 @@
 - **Events en plusieurs manches** : un seul bloc d’inscription. « Annoncer un stream » se fait en 3 étapes.
 - **Discord** : un seul message par simu dans le salon des endurances ; fils et vocaux ouverts le lundi ; calendrier des events tourné le lundi à 7h30 ; messages plus lisibles.
 - **Discord · Fils des courses** : ceux de la semaine finie partent le lundi à 7h30, quand la nouvelle semaine s’ouvre ; le salon ne montre plus deux semaines à la fois.
+- **Équipages** : une jauge par départ, la couverture des heures de chaque équipage (les trous en rouge), les voitures, le coéquipier souhaité et le commentaire de chaque pilote, un filtre par catégorie, et le cadenas qui ouvre ou ferme un équipage en un clic.
+- **Accueil sur téléphone** : les cartes de la semaine deviennent des lignes d’agenda, avec le nombre d’équipages ou de pilotes.
 
 ### 🔧 Corrections
 
