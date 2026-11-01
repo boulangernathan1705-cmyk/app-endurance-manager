@@ -27,7 +27,7 @@ for(const width of [1440,390])test(`the home shows the week and the next race at
  await expect(page.locator('.home-card')).toHaveCount(0);
  await expect(page.locator('.week-block')).toHaveCount(2);
  await expect(page.locator('.week-block.is-mine')).toContainText('Apex Racing');
- await expect(page.locator('.week-block').filter({hasText:'12h de Sebring'})).toContainText('6H');
+ await expect(page.locator('.week-block').filter({hasText:'12h de Sebring'})).toContainText(/iRacing[\s\S]*– fin /);
  await expect(page.locator('.home-head')).not.toContainText('départ');
  await page.locator('[data-action="week-filter"][data-filter="iracing"]').click();
  await expect(page.locator('.week-block')).toHaveCount(1);
