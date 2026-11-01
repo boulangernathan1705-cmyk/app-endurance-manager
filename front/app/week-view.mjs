@@ -72,10 +72,10 @@ const logoOf=event=>isGrindfest(event)?'<img class="event-access-logo" src="/ima
 function block(item,now){
   const {event,departure,startsAt,endsAt,kind,mine,pilots,pending}=item;
   const past=(endsAt||startsAt)<now,live=!pending&&startsAt<=now&&!past,solo=isSolo(event),stream=isStream(event);
-  // Start and finish together (« 15h → 18h10 », or « 15h → dim 16h » over several days): an arrival alone read as the
+  // Start and finish in words (« Départ 15h · Arrivée 18h10 », « … · Arrivée dim 2h30 » over several days): an arrival alone read as the
   // start (Nathan, 2026-11-01).
-  const from=pending?'':`${hour(startsAt)} `;
-  const ends=endsAt&&parisDay(endsAt)!==parisDay(startsAt)?`${from}→ ${endDay.format(endsAt).replace('.','')} ${hour(endsAt)}`:endsAt&&!solo?`${from}→ ${hour(endsAt)}`:'';
+  const from=pending?'':`Départ ${hour(startsAt)} · `;
+  const ends=endsAt&&parisDay(endsAt)!==parisDay(startsAt)?`${from}Arrivée ${endDay.format(endsAt).replace('.','')} ${hour(endsAt)}`:endsAt&&!solo?`${from}Arrivée ${hour(endsAt)}`:'';
   const sim=solo?(stream?'':SIMS.find(item=>item.id===simForEvent(event))?.short||''):SIM_NAME[event.otherGame||activeGame];
   const badge=solo?kind.label:lengthOf(event),logo=solo?logoOf(event):'';
   const weather=solo?'':weatherOf(event);
