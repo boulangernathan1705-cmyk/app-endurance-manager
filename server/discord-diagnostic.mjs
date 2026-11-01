@@ -55,7 +55,9 @@ export async function discordDiagnostic(env, community, {timestamp = Date.now(),
   const voices = !voicesOn ? [] : (await expectedCrews(env, community, timestamp)).map(({channelId, ...crew}) => ({...crew, state:stateOf(channelId, found)}));
   const pending = await env.DB.prepare('SELECT queued_at FROM discord_pending WHERE community_id=?').bind(community.id).first();
   const day = parisDay(timestamp);
-  const intro = await env.DB.prepare("SELECT message_id,checked_at FROM discord_announcements WHERE community_id=? AND day=? AND item='intro'").bind(community.id, day).first();
+  // The day's two messages: the stream ('intro') and the other races ('races').
+  const parts = (await env.DB.prepare("SELECT message_id,checked_at FROM discord_announcements WHERE community_id=? AND day=? AND item IN ('intro','races')").bind(community.id, day).all()).results || [];
+  const intro = {message_id:parts.find(row => row.message_id && row.message_id !== '-')?.message_id || '', checked_at:Math.max(0, ...parts.map(row => Number(row.checked_at || 0)))};
   const announced = (await env.DB.prepare("SELECT COUNT(*) AS n FROM discord_announcements WHERE community_id=? AND day=? AND kind IN ('race','event','stream')").bind(community.id, day).first())?.n || 0;
   return {
     checkedLive:Boolean(found), liveError,

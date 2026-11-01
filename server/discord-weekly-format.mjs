@@ -129,7 +129,7 @@ function unassignedField(departures,compact,emojis){
   const value=!compact&&readingSize(byDeparture)<=readingSize(byPilot)*1.2?byDeparture:byPilot;
   return [{name:'📋 Sans équipage',value:cut(value,1024),inline:false}];
 }
-function departureValue(departure,compact=false,emojis={}){
+function departureValue(departure,compact=false,emojis={},title=departureTitle){
   const sim=simOf(departure);
   if(compact){
     const lines=[`🕐 **${departureTitle(departure)}**`,...orderedEntries(departure.crews).map(crew=>`${categoryMark(crew.category,sim,emojis)} ${clean(crew.name)} · ${crew.pilots.length} pilote${crew.pilots.length>1?'s':''}`)];
@@ -137,7 +137,7 @@ function departureValue(departure,compact=false,emojis={}){
     if(!departure.crews.length&&!departure.unassignedPilots?.length)lines.push('Personne d’inscrit pour l’instant.');
     return cut(lines.join('\n'),1024);
   }
-  const blocks=[`🕐 **${departureTitle(departure)}**`,...orderedEntries(departure.crews).map(crew=>crewBlock(crew,sim,emojis))];
+  const blocks=[`🕐 **${title(departure)}**`,...orderedEntries(departure.crews).map(crew=>crewBlock(crew,sim,emojis))];
   if(departure.unassignedPilots?.length)blocks.push(unassignedBlock(departure.unassignedPilots,sim,emojis));
   if(!departure.crews.length&&!departure.unassignedPilots?.length)blocks.push('Personne d’inscrit pour l’instant.');
   return cut(blocks.join('\n\n'),1024);
@@ -422,10 +422,11 @@ function roundName(round){
   if(round.randomCategory||round.circuit==='random'||round.circuit==='iracing-random')return '📍 Circuit aléatoire · 🎲 catégorie au hasard';
   return `📍 ${clean(circuitNames.get(round.circuit)||round.circuit||'Circuit à préciser')}`;
 }
-function roundDetails(round){
-  const format=[round.practice&&`⏱️ Essais : ${round.practice} min`,round.qualifying&&`⏱️ Qualifications : ${round.qualifying} min`,round.durationMinutes&&`🏁 Course : ${round.durationMinutes} min`].filter(Boolean).join('\n');
+// A single round on one line, as an endurance (Nathan, 2026-11-01): « 📍 Portimão · LMP3 · 🏎️ Ligier · ⏱️ 4 h · 🎲 météo aléatoire ».
+function roundLine(round){
   const categories=round.randomCategory?'':(round.categories?.length?round.categories:round.category?[round.category]:[]).map(clean).join(', ');
-  return [[categories,round.car&&`🏎️ ${clean(round.car)}`].filter(Boolean).join(' · '),format,[ROUND_WEATHER[round.weather],round.fuel>1&&`⛽ ×${round.fuel}`,round.tyres>1&&`🛞 ×${round.tyres}`].filter(Boolean).join(' · ')].filter(Boolean).join('\n');
+  return [roundName(round),categories,round.car&&`🏎️ ${clean(round.car)}`,round.durationMinutes&&`⏱️ ${durationLabel(round.durationMinutes)}`,
+    ROUND_WEATHER[round.weather],round.fuel>1&&`⛽ ×${round.fuel}`,round.tyres>1&&`🛞 ×${round.tyres}`].filter(Boolean).join(' · ');
 }
 // Compare each fact independently: a common circuit must not hide a different car.
 // Missing values are not evidence that a setting is shared by all rounds.
@@ -471,7 +472,7 @@ export function buildAnnounceEvent(event,site={},updatedAt=Date.now(),absent=nul
     const cars=rally.carMode==='category'&&rounds[0]?.category?`🚗 Catégorie imposée : ${clean(rounds[0].category)}`:rally.carMode==='car'&&rounds[0]?.car?`🚗 Voiture imposée : ${clean(rounds[0].car)}`:rally.carMode==='all'?'🚗 Toutes voitures':'';
     lines.push([cars,rally.minutes&&`⏱️ environ ${durationLabel(rally.minutes)}`].filter(Boolean).join(' · '));
     if(rally.host)lines.push(`🏠 Hôte : ${clean(rally.host)}`);
-  }else if(rounds.length===1)lines.push([roundName(rounds[0]),roundDetails(rounds[0])].filter(Boolean).join('\n'));
+  }else if(rounds.length===1)lines.push(roundLine(rounds[0]));
   if(gridfest&&event.streamers?.length)lines.push(event.streamers.map(streamer=>`🎙️ ${streamer.twitchUrl?`[${clean(streamer.name)}](${streamer.twitchUrl})`:clean(streamer.name)} · ${Math.min(streamer.entered,streamer.capacity)}/${streamer.capacity} places${streamer.entered>=streamer.capacity?' · complet':''}`).join('\n'));
   const places=event.capacity&&!gridfest?(event.entered>=event.capacity?` · complet${event.entered>event.capacity?` · ${event.entered-event.capacity} en attente`:''}`:` · ${plural(event.capacity-event.entered,'place')} restante${event.capacity-event.entered>1?'s':''}`):'';
   const count=`✅ **${plural(Math.min(event.entered,event.capacity||event.entered),'présent')}**${places}`;
@@ -505,8 +506,10 @@ export function buildAnnounceRace(race,site={},updatedAt=Date.now(),emojis={},ab
   const conditions=[`📍 ${clean(circuit)}`,race.durationMinutes&&`⏱️ ${durationLabel(race.durationMinutes)}`,WEATHER[info.weather],info.tyres&&`🛞 ${plural(info.tyres,'pneu')}`,
     TRACK_LIMITS[info.trackLimits]&&`🚧 Limites ${TRACK_LIMITS[info.trackLimits].toLowerCase()}`,info.fairShare===true&&'⚖️ Partage équitable'].filter(Boolean).join(' · ');
   const departures=(race.departures||[]).filter(departure=>departure.crews.length||departure.unassignedPilots?.length);
-  const fields=departures.slice(0,20).map(departure=>({name:BLANK,value:cut(departureValue(departure,false,emojis),1024),inline:false}));
-  if(!departures.length)fields.push({name:BLANK,value:`${(race.departures||[]).map(departure=>`🕐 **${departureTitle(departure)}**`).join('\n')}\nAucun équipage pour l’instant : lance-toi !`,inline:false});
+  // « Aujourd’hui 13h00 », as the events: a Discord date would show in each reader's language, in full.
+  const today=departure=>announceTime(departure.startsAt,departure.timePending);
+  const fields=departures.slice(0,20).map(departure=>({name:BLANK,value:cut(departureValue(departure,false,emojis,today),1024),inline:false}));
+  if(!departures.length)fields.push({name:BLANK,value:`${(race.departures||[]).map(departure=>`🕐 **${today(departure)}**`).join('\n')}\nAucun équipage pour l’instant : lance-toi !`,inline:false});
   const pilots=new Set(departures.flatMap(departure=>[...departure.crews.flatMap(crew=>crew.pilots),...(departure.unassignedPilots||[]).map(pilot=>typeof pilot==='string'?pilot:pilot.name)]));
   const crews=departures.reduce((total,departure)=>total+departure.crews.length,0);
   fields.push({name:BLANK,value:`✅ **${plural(pilots.size,'présent')}**${crews?` · ${plural(crews,'équipage')}`:''}`,inline:false});
