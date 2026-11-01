@@ -2722,6 +2722,34 @@ main:not(.charte):has(.home-layout) { max-width: 2400px; }
 .crews-request dd { margin: 0; font-weight: 800; color: var(--em-text-strong); }
 .crews-note { margin: 8px 0 0; font-size: var(--em-text-sm); color: color-mix(in srgb, var(--em-warn) 80%, #fff); }
 .crews-refuse { color: var(--em-danger-text); }
+/* v3 (Nathan 2026-11-01): gauge of each start, crew coverage, richer pilot cards, category filter, padlock. */
+.crews-gauge { flex: 1 1 100%; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; margin-top: 4px; font-size: var(--em-text-sm); color: var(--em-muted); }
+.crews-gauge-text { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; }
+.crews-start > summary .crews-gauge strong { font-size: 13.5px; color: var(--em-text-strong); }
+.crews-gauge-bar { display: flex; flex: 0 0 220px; height: 9px; border-radius: 999px; background: color-mix(in srgb, var(--em-text) 10%, transparent); overflow: hidden; }
+.crews-gauge-bar i { background: var(--em-ok); }
+.crews-gauge-bar u { background: var(--em-warn); text-decoration: none; }
+.crews-gauge .is-ask { color: color-mix(in srgb, var(--em-warn) 80%, #fff); }
+.crews-gauge .is-alert { color: var(--em-danger-text); }
+.crews-gauge .is-ok { color: color-mix(in srgb, var(--em-ok) 70%, #fff); }
+.crews-dot { color: var(--em-muted); opacity: .6; }
+.crews-axis { margin-top: 6px; }
+.crews-axis .crews-bar span { font-size: 10.5px; color: var(--em-muted); white-space: nowrap; overflow: visible; }
+.crews-coverage { margin-top: 8px; padding-top: 7px; border-top: 1px dashed var(--em-border); font-weight: 800; }
+.crews-bar.is-coverage i { height: 11px; }
+.crews-bar.is-coverage i.on { background: var(--em-ok); }
+.crews-bar i.hole { background: repeating-linear-gradient(45deg, var(--em-danger) 0 4px, color-mix(in srgb, var(--em-danger) 45%, #000) 4px 8px); }
+.crews-coverage-text { margin: 4px 0 0 118px; font-size: 12px; font-weight: 800; }
+.crews-coverage-text.is-ok { color: color-mix(in srgb, var(--em-ok) 70%, #fff); }
+.crews-coverage-text.is-hole { color: var(--em-danger-text); }
+.crews-meta { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 0; font-size: 12.5px; color: var(--em-muted); }
+.crews-meta strong { color: var(--em-text-strong); }
+.crews-meta .is-wish, .crews-meta .is-wish strong { color: color-mix(in srgb, var(--em-warn) 80%, #fff); }
+.crews-comment { grid-column: 1 / -1; margin: 0; padding: 5px 9px; border-left: 3px solid var(--em-border); border-radius: 0 6px 6px 0; background: var(--em-bg); font-size: 12.5px; font-style: italic; color: var(--em-text); }
+button.crews-lock { min-height: 0; min-width: 0; padding: 2px 8px; line-height: 1.4; box-shadow: none; border: 1px solid transparent; cursor: pointer; font: inherit; font-size: 11.5px; font-weight: 800; }
+button.crews-lock:hover { border-color: currentColor; }
+button.crews-lock:disabled { opacity: .6; cursor: progress; }
+.crews-filters-hint { align-self: center; margin-left: 4px; font-size: 12px; color: var(--em-muted); }
 
 /* « Demander un équipage » (pilots). */
 .crew-request-sheet .crew-builder-form { display: grid; gap: var(--em-space-3); }
@@ -2743,6 +2771,9 @@ main:not(.charte):has(.home-layout) { max-width: 2400px; }
   .crews-filters .crews-filter { flex: none; white-space: nowrap; }
   .crews-request-row { flex-wrap: wrap; }
   .crews-line { grid-template-columns: 84px minmax(0, 1fr); }
+  .crews-coverage-text { margin-left: 92px; }
+  .crews-gauge-bar { flex-basis: 100%; }
+  .crews-filters-hint { display: none; }
 }
 @media (max-width: 760px) {
   .crews-pilot { grid-template-columns: minmax(0, 1fr); }

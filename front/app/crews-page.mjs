@@ -3,14 +3,14 @@
 // crews on one side, its pilots without a crew on the other, each with the bar of their hours. The organiser ticks
 // pilots and creates a crew (the usual crew window, filled in), puts a pilot in an open crew (« Ajouter à… »), or
 // checks a pilot's request (« Demander un équipage ») before creating it. Pilots only see their race pages.
-import {app,state,esc,button,api,activeGame,coversHour,can,logo,notifyRender,showError} from './core.mjs';
+import {app,state,esc,button,api,activeGame,coversHour,can,logo,notifyRender,showError,registrationCarLabel} from './core.mjs';
 import {gameForEvent} from '../../shared/catalog.mjs';
 import {eventMinutes,raceFinishAt} from '../../shared/duration.mjs';
 
 const DAY=86400000,HORIZON=14*DAY;
 const SIM_NAME={lmu:'LMU',iracing:'iRacing'};
 const OTHER={lmu:'iracing',iracing:'lmu'};
-const SIMS_KEY='em-crews-sims';
+const SIMS_KEY='em-crews-sims',CATS_KEY='em-crews-categories';
 const dateFormat=new Intl.DateTimeFormat('fr-FR',{timeZone:'Europe/Paris',weekday:'short',day:'numeric',month:'short'});
 const clock=new Intl.DateTimeFormat('fr-FR',{timeZone:'Europe/Paris',hour:'2-digit',minute:'2-digit'});
 const dayOf=new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Paris',year:'numeric',month:'2-digit',day:'2-digit'});
@@ -43,6 +43,24 @@ function toggleSim(sim){
   sims.has(sim)?sims.delete(sim):sims.add(sim);
   // Never none: unticking the last one shows both again.
   try{localStorage.setItem(SIMS_KEY,JSON.stringify(sims.size?[...sims]:['lmu','iracing']));}catch{}
+}
+
+// Categories shown (none chosen = all), kept in the browser like the simulators.
+function chosenCategories(){
+  try{const saved=JSON.parse(localStorage.getItem(CATS_KEY)||'null');if(Array.isArray(saved))return saved.filter(item=>typeof item==='string');}catch{}
+  return [];
+}
+function toggleCategory(category){
+  const chosen=new Set(chosenCategories());
+  if(!category)chosen.clear();else chosen.has(category)?chosen.delete(category):chosen.add(category);
+  try{localStorage.setItem(CATS_KEY,JSON.stringify([...chosen]));}catch{}
+}
+// A start seen through the category filter: its crews, pilots and requests of those categories only.
+function inCategories(start,categories){
+  if(!categories.length)return start;
+  const keep=new Set(categories);
+  const alone=start.alone.filter(pilot=>pilot.regs.some(reg=>keep.has(reg.category)));
+  return {...start,alone,crews:start.crews.filter(crew=>keep.has(crew.category)),requests:start.requests.filter(item=>keep.has(item.category))};
 }
 
 // Entries and crews of this community only (an official race shows those of the viewer's other communities too).
@@ -107,16 +125,50 @@ function gaps(event,departure,regs){
   return list.map(range=>`de ${at(range.start)} à ${at(range.end)}`);
 }
 const cars=reg=>reg.carAny?'Peu importe':(reg.cars?.length?reg.cars.join(', '):reg.car||'');
+// The hours of the race over the bars, one label every few hours on long races.
+function hoursAxis(event,departure){
+  const total=hoursOf(event),step=Math.ceil(total/8);
+  const cells=Array.from({length:total},(_,index)=>`<span>${index%step===0?esc(hour(Number(departure.startsAt)+index*3600000)):''}</span>`).join('');
+  return `<div class="crews-line crews-axis" aria-hidden="true"><span></span><span class="crews-bar" style="--hours:${total}">${cells}</span></div>`;
+}
+// A crew's hours put together: the hours nobody of it can drive in hatched red (Nathan 2026-11-01).
+function coverage(event,departure,regs){
+  const total=hoursOf(event);
+  const cells=Array.from({length:total},(_,index)=>`<i class="${regs.some(reg=>coversHour(reg,index))?'on':'hole'}"></i>`).join('');
+  const holes=gaps(event,departure,regs);
+  const text=holes.length?`⚠ Personne ${holes.join(', ')}`:`✓ ${total>1?`Les ${total}h sont couvertes`:'La course est couverte'}`;
+  return `<div class="crews-line crews-coverage"><span>Couverture</span><span class="crews-bar is-coverage" style="--hours:${total}" role="img" aria-label="${esc(text)}">${cells}</span></div><p class="crews-coverage-text ${holes.length?'is-hole':'is-ok'}">${esc(text)}</p>`;
+}
+// Where a start stands, in one line: placed pilots (green), pilots in a request (yellow), the rest.
+function gauge(start){
+  const {departure,alone,crews,requests}=start;
+  const inCrew=new Set();
+  for(const crew of crews)for(const id of crew.registrationIds||[]){const reg=(departure.availability||[]).find(item=>String(item.id)===String(id));if(reg&&ours(reg))inCrew.add(reg.participantId||`reg:${reg.id}`);}
+  const asked=new Set(requests.flatMap(item=>item.registrationIds).map(String));
+  const waiting=alone.filter(pilot=>pilot.regs.some(reg=>asked.has(String(reg.id)))).length;
+  const placed=inCrew.size,total=placed+alone.length;
+  const pct=value=>total?Math.round(value*100/total):0;
+  const open=crews.filter(crew=>!crew.locked).length;
+  const parts=[`<strong>${placed} / ${total}</strong> pilotes placés`,
+    crews.length?`<strong>${crews.length}</strong> ${crews.length>1?'équipages':'équipage'}${open&&open<crews.length?`, dont ${open} ${open>1?'ouverts':'ouvert'}`:(open?` ${open>1?'ouverts':'ouvert'}`:` ${crews.length>1?'complets':'complet'}`)}`:'aucun équipage',
+    requests.length?`<span class="is-ask"><strong>${requests.length}</strong> ${requests.length>1?'demandes':'demande'}</span>`:'',
+    alone.length?`<span class="is-alert"><strong>${alone.length}</strong> sans équipage</span>`:'<span class="is-ok">✓ Tout le monde a un équipage</span>'].filter(Boolean);
+  return `<div class="crews-gauge"><span class="crews-gauge-bar" role="img" aria-label="${placed} pilotes placés sur ${total}"><i style="width:${pct(placed)}%"></i><u style="width:${pct(waiting)}%"></u></span><span class="crews-gauge-text">${parts.join('<span class="crews-dot" aria-hidden="true">·</span>')}</span></div>`;
+}
 const plural=(count,word)=>`${count} ${word}${count>1?'s':''}`;
 
 function crewCard(start,crew){
   const {event,game,departure}=start;
   const regs=(crew.registrationIds||[]).map(id=>(departure.availability||[]).find(reg=>String(reg.id)===String(id))).filter(Boolean);
-  const status=crew.locked?'<span class="crews-chip is-ok">🔒 Complet</span>':'<span class="crews-chip is-warn">Ouvert</span>';
+  // The padlock opens and closes the crew in one click, no confirmation (Nathan 2026-11-01).
+  const label=crew.locked?'🔒 Complet':'🔓 Ouvert';
+  const status=crew.canManage
+    ?`<button type="button" class="crews-chip crews-lock ${crew.locked?'is-ok':'is-warn'}" data-action="crews-lock" data-id="${esc(crew.id)}" data-version="${esc(crew.version)}" data-locked="${crew.locked?'1':'0'}" aria-pressed="${crew.locked?'true':'false'}" data-tip="${crew.locked?'Rouvrir l’équipage':'Marquer l’équipage complet'}" aria-label="${esc(`${crew.name} : ${crew.locked?'complet, cliquer pour le rouvrir':'ouvert, cliquer pour le marquer complet'}`)}">${label}</button>`
+    :`<span class="crews-chip ${crew.locked?'is-ok':'is-warn'}">${label}</span>`;
   const manage=crew.canManage?`<button type="button" class="link-button crews-manage" data-action="edit-crew" data-id="${esc(crew.id)}" data-event="${esc(event.id)}" data-game="${game}" aria-label="Gérer l’équipage ${esc(crew.name)}">Gérer</button>`:'';
   return `<article class="crews-crew">
     <div class="crews-crew-head"><span class="crews-cat">${logo(crew.category)}</span><strong>${esc(crew.name)}</strong><small>${esc(crew.car||'Voiture à choisir')}</small>${status}${manage}</div>
-    ${regs.length?regs.map(reg=>`<div class="crews-line"><span>${esc(reg.name)}</span>${hoursBar(event,departure,reg)}</div>`).join(''):'<p class="crews-empty">Aucun pilote</p>'}
+    ${regs.length?`${hoursAxis(event,departure)}${regs.map(reg=>`<div class="crews-line"><span>${esc(reg.name)}</span>${hoursBar(event,departure,reg)}</div>`).join('')}${coverage(event,departure,regs)}`:'<p class="crews-empty">Aucun pilote</p>'}
   </article>`;
 }
 function pilotCard(start,{main,regs}){
@@ -126,10 +178,17 @@ function pilotCard(start,{main,regs}){
   const open=crews.filter(crew=>!crew.locked&&crew.canManage&&categories.includes(crew.category));
   const add=open.length?`<label class="crews-add"><span class="sr-only">Ajouter ${esc(main.name)} à un équipage</span><select data-crews-add>${['<option value="">Ajouter à…</option>',...open.map(crew=>{const reg=regs.find(item=>item.category===crew.category);return `<option value="${esc(crew.id)}|${esc(reg.id)}|${crew.version}">${esc(crew.name)} · ${esc(crew.category)}</option>`;})].join('')}</select></label>`:'';
   return `<div class="crews-pilot">
-    <label class="crews-pick"><input type="checkbox" data-crews-pick value="${esc(regs.map(reg=>reg.id).join(','))}" data-category="${esc(main.category)}"><span><strong>${esc(main.name)}</strong> ${categories.map(category=>`<span class="crews-cat">${logo(category)}</span>`).join('')} <small>${esc([cars(main),hoursText(event,departure,main)].filter(Boolean).join(' · '))}</small></span></label>
+    <label class="crews-pick"><input type="checkbox" data-crews-pick value="${esc(regs.map(reg=>reg.id).join(','))}" data-category="${esc(main.category)}"><span><strong>${esc(main.name)}</strong> ${categories.map(category=>`<span class="crews-cat">${logo(category)}</span>`).join('')}</span></label>
     ${add}
+    ${pilotMeta(event,departure,main)}
     ${hoursBar(event,departure,main)}
+    ${main.comment?`<p class="crews-comment">« ${esc(main.comment)} »</p>`:''}
   </div>`;
+}
+// What the organiser needs to place a pilot: wanted cars (the first in bold), hours, wished teammate.
+function pilotMeta(event,departure,reg){
+  const list=reg.carAny||!reg.cars?.length?`<span>${esc(registrationCarLabel(reg))}</span>`:`<span><strong>${esc(reg.cars[0])}</strong>${reg.cars.length>1?`, ${esc(reg.cars.slice(1).join(', '))}`:''}</span>`;
+  return `<p class="crews-meta"><span class="crews-meta-item"><span aria-hidden="true">🚗</span> ${list}</span><span class="crews-meta-item"><span aria-hidden="true">🕒</span> ${esc(hoursText(event,departure,reg))}</span>${reg.preferredPilot?`<span class="crews-meta-item is-wish"><span aria-hidden="true">🤝</span> Veut rouler avec <strong>${esc(reg.preferredPilot)}</strong></span>`:''}</p>`;
 }
 // A pilot's request, to check before creating it: its crew, its pilots' hours, the hours nobody drives and the
 // pilots of the start who would stay alone (Nathan: « qu'on puisse vérifier que personne n'est oublié »).
@@ -162,12 +221,10 @@ function when(start){
 function startCard(start,focus){
   const {event,game,departure,alone,crews,requests}=start;
   const todo=alone.length+requests.length;
-  const status=alone.length?`<span class="crews-chip is-alert">${plural(alone.length,'pilote')} sans équipage</span>`:'<span class="crews-chip is-ok">✓ Tout le monde a un équipage</span>';
-  const asked=requests.length?`<span class="crews-chip is-ask">${plural(requests.length,'demande')}</span>`:'';
   const open=event.otherGame||game!==activeGame?`<a class="link-button" href="/${game}/#event=${esc(event.id)}">Ouvrir la course →</a>`:button('open','Ouvrir la course →',`data-id="${esc(event.id)}"`,'link-button');
   const pick=alone.length?`<button type="button" class="primary-button crews-create" data-crews-create data-event="${esc(event.id)}" data-game="${game}" data-departure="${esc(departure.id)}" disabled>Créer un équipage</button>`:'';
   return `<details class="crews-start is-${game}${focus===departure.id?' is-focus':''}" id="crews-${esc(departure.id)}" ${todo||focus===departure.id?'open':''}>
-    <summary><span class="crews-sim">${SIM_NAME[game]}</span><strong>${esc(event.name)}</strong><span class="crews-when">${esc(when(start))}</span><span class="crews-status">${asked}${status}</span></summary>
+    <summary><span class="crews-sim">${SIM_NAME[game]}</span><strong>${esc(event.name)}</strong><span class="crews-when">${esc(when(start))}</span>${gauge(start)}</summary>
     ${requests.map(request=>requestRecap(start,request)).join('')}
     <div class="crews-cols">
       <section><h3>Équipages · ${crews.length}</h3>${crews.length?crews.map(crew=>crewCard(start,crew)).join(''):'<p class="crews-empty">Aucun équipage pour l’instant.</p>'}</section>
@@ -181,7 +238,10 @@ export function renderCrewsPage(focus=state.crewsFocus||''){
   if(state.access!=='member'||!can('crews')){state.page='home';return false;}
   state.page='crews';state.currentEventId=null;state.crewsFocus=focus;
   const view=state.crewsView||'todo',sims=chosenSims(),all=crewStarts();
-  const shownSims=all.filter(start=>sims.includes(start.game));
+  const simStarts=all.filter(start=>sims.includes(start.game));
+  const categoryList=[...new Set(simStarts.flatMap(start=>start.event.categories||[]))];
+  const categories=chosenCategories().filter(category=>categoryList.includes(category));
+  const shownSims=simStarts.map(start=>inCategories(start,categories)).filter(start=>!categories.length||start.alone.length||start.crews.length||start.requests.length);
   const todo=shownSims.filter(start=>start.alone.length||start.requests.length);
   const starts=view==='todo'&&!focus?todo:shownSims;
   const requests=shownSims.flatMap(start=>start.requests.map(request=>({request,start})));
@@ -189,7 +249,7 @@ export function renderCrewsPage(focus=state.crewsFocus||''){
   const list=requests.length?`<section class="crews-requests" aria-label="Demandes d’équipage"><h2>Demandes d’équipage · ${requests.length}</h2>${requests.map(({request,start})=>`<div class="crews-request-row"><span><strong>${esc(request.requester)}</strong> demande l’équipage <strong>« ${esc(request.name)} »</strong> · ${esc(request.category)}${request.car?` · ${esc(request.car)}`:''}<small>${esc(start.event.name)} · ${esc(when(start))} · ${esc(ago(request.createdAt))}</small></span>${button('crews-see','Voir',`data-departure="${esc(start.departure.id)}" data-request="${esc(request.id)}"`,'primary-button')}</div>`).join('')}</section>`:'';
   app.innerHTML=`<div class="crews-page" data-crews-page>
     <div class="crews-head"><h1 class="page-title">ÉQUIPAGES</h1><p class="crews-lead">Les endurances des deux prochaines semaines.</p></div>
-    <div class="event-filter crews-filters" role="group" aria-label="Filtrer les départs">${chip('crews-view',`À former · ${todo.length}`,view==='todo','data-view="todo"')}${chip('crews-view',`Tous les départs · ${shownSims.length}`,view==='all','data-view="all"')}<span class="crews-sep" aria-hidden="true"></span>${['lmu','iracing'].map(sim=>chip('crews-sim',`<i aria-hidden="true"></i>${SIM_NAME[sim]}`,sims.includes(sim),`data-sim="${sim}" data-sim-color="${sim}"`)).join('')}</div>
+    <div class="event-filter crews-filters" role="group" aria-label="Filtrer les départs">${chip('crews-view',`À former · ${todo.length}`,view==='todo','data-view="todo"')}${chip('crews-view',`Tous les départs · ${shownSims.length}`,view==='all','data-view="all"')}<span class="crews-sep" aria-hidden="true"></span>${['lmu','iracing'].map(sim=>chip('crews-sim',`<i aria-hidden="true"></i>${SIM_NAME[sim]}`,sims.includes(sim),`data-sim="${sim}" data-sim-color="${sim}"`)).join('')}${categoryList.length>1?`<span class="crews-sep" aria-hidden="true"></span>${chip('crews-category','Toutes catégories',!categories.length,'data-category=""')}${categoryList.map(category=>chip('crews-category',esc(category),categories.includes(category),`data-category="${esc(category)}"`)).join('')}`:''}<span class="crews-filters-hint">Tes filtres sont gardés pour la prochaine fois.</span></div>
     ${list}
     ${starts.length?starts.map(start=>startCard(start,focus)).join(''):`<p class="crews-done">${shownSims.length?'✓ Tout le monde a un équipage sur les deux prochaines semaines.':'Aucun pilote inscrit sur les deux prochaines semaines.'}</p>`}
     <div id="crew-builder-root"></div>
@@ -202,6 +262,14 @@ export function renderCrewsPage(focus=state.crewsFocus||''){
 export async function crewsAction(action,target){
   if(action==='crews-view'){state.crewsView=target.dataset.view;state.crewsFocus='';renderCrewsPage('');return true;}
   if(action==='crews-sim'){toggleSim(target.dataset.sim);renderCrewsPage('');return true;}
+  if(action==='crews-category'){toggleCategory(target.dataset.category||'');renderCrewsPage('');return true;}
+  if(action==='crews-lock'){
+    target.disabled=true;
+    try{await api(`/api/crews/${target.dataset.id}`,'PATCH',{locked:target.dataset.locked!=='1',version:Number(target.dataset.version)});}
+    catch(error){target.disabled=false;throw error;}
+    forgetOtherEndurances();
+    return 'refresh';
+  }
   if(action==='crews-see'){renderCrewsPage(target.dataset.departure);requestAnimationFrame(()=>document.getElementById(`request-${target.dataset.request}`)?.scrollIntoView({block:'center',behavior:'smooth'}));return true;}
   if(action==='crew-request-refuse'){
     if(!confirm(`Refuser la demande de ${target.dataset.name} ? Le pilote reçoit une notification sur le site.`))return true;
