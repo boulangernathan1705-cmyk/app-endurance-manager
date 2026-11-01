@@ -594,3 +594,19 @@ test('posters: two streams on one, the Gridfest and its streamers, crews cut at 
   assert.doesNotMatch(html,/<b>Bob<\/b>/);assert.match(html,/&lt;b&gt;Bob/);
   assert.match(posterText(endus),/\\<b\\>Bob/);
 });
+
+test('a day announced by the previous version keeps its message until midnight, the new one starts the next morning (Nathan, 2026-11-01)',async t=>{
+  const {DB,env,calls,messages,settings}=setup(t);
+  // The morning's message, sent by the version in production before the deploy.
+  messages.set('888888888888888888',{id:'888888888888888888',channel_id:ANNOUNCES,content:'old announcement'});
+  DB.db.prepare(`INSERT INTO discord_announcements(community_id,day,item,kind,position,guild_id,channel_id,message_id,content_hash,checked_at,created_at,ping_attempted)
+    VALUES(?,?,'intro','intro',0,?,?,'888888888888888888','single-embed-v1:abc',?,?,1)`).run(DEV_COMMUNITY,'2026-10-28',GUILD,ANNOUNCES,MORNING,MORNING);
+  await announceCommunity(env,TDZ,settings(),MORNING+8*HOUR);
+  assert.equal(calls.filter(call=>call.path.startsWith('/channels/')).length,0,'not deleted, edited nor reposted');
+  assert.ok(messages.has('888888888888888888'));
+  DB.db.prepare(`INSERT INTO registrations(id,event_id,departure_id,guest_hash,name,name_key,category,status,created_at,participant_id,community_id) VALUES('r3',?,'start-e3','g1','Pilote 1','pilote 1','GT3','whole',0,'p1',?)`).run(TOMORROW,DEV_COMMUNITY);
+  DB.db.prepare(`INSERT INTO crews(id,event_id,departure_id,name,category,car,created_at,community_id) VALUES('c3',?,'start-e3','Équipage B','GT3','Ferrari 296',0,?)`).run(TOMORROW,DEV_COMMUNITY);
+  DB.db.prepare(`INSERT INTO crew_members(registration_id,crew_id) VALUES('r3','c3')`).run();
+  await announceCommunity(env,TDZ,settings(),MORNING+24*HOUR);
+  assert.ok(sent(calls).length>0,'the next morning uses the new layout');
+});
