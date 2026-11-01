@@ -124,8 +124,10 @@ async function discord(env, method, path, body, budget = {left:12}) {
   if (--budget.left < 0) throw Object.assign(new Error('Lot terminé ; les autres événements seront traités au prochain passage.'), {budget:true});
   // Something made, moved or deleted on the server (not a message): its list of channels is read again.
   if (method !== 'GET' && !path.includes('/messages')) budget.moved = true;
-  const call = () => fetch(API + path, {method, signal:AbortSignal.timeout(8000),
-    headers:{Authorization:`Bot ${env.DISCORD_BOT_TOKEN}`, ...(body ? {'Content-Type':'application/json'} : {})}, body:body ? JSON.stringify(body) : undefined});
+  // A FormData body carries a file (the announcement's poster): sent as is, with more time.
+  const form = typeof FormData !== 'undefined' && body instanceof FormData;
+  const call = () => fetch(API + path, {method, signal:AbortSignal.timeout(form ? 20000 : 8000),
+    headers:{Authorization:`Bot ${env.DISCORD_BOT_TOKEN}`, ...(body && !form ? {'Content-Type':'application/json'} : {})}, body:form ? body : body ? JSON.stringify(body) : undefined});
   let response = await call();
   // A short wait asked by Discord (several requests at once on the same server): one more try, the first was not done.
   const wait = await retryAfter(response);

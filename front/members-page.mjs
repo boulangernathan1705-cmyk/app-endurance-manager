@@ -184,7 +184,7 @@ function discordForm(setup, settings) {
       </ul>
       <div class="setup-actions"><button type="submit" class="primary-button">${config?.enabled ? 'Enregistrer' : 'Activer'}</button><button type="button" class="secondary-button" data-discord-preview>Voir les messages</button><button type="button" class="secondary-button" data-discord-destinations>Actualiser les salons</button>${config?.lastError ? '<button type="button" class="secondary-button" data-discord-repair>Réparer</button>' : ''}${config?.enabled || leaving ? '<button type="button" class="danger-button" data-discord-remove>Tout retirer</button>' : ''}<span class="settings-status" role="status" aria-live="polite"></span></div>
       <p class="members-help">${config?.enabled ? 'Si tu changes d’avis, le bot retire ce qu’il avait créé et refait selon tes nouveaux choix. Les messages sont modifiés sans notification.' : 'Rien n’est publié avant « Activer ».'}</p>
-      <details><summary>Tester une annonce dans Discord</summary><p>Envoie une démonstration SAFE’S RACE avec des données d’exemple, sans mention ni inscription.</p><label>Nom ou identifiant du salon texte <input name="announcementTestChannel" placeholder="discussion"></label><button type="button" class="secondary-button" data-discord-announcement-test>Envoyer l’aperçu</button></details>
+      <details><summary>Tester une annonce dans Discord</summary><p>Envoie l’affiche d’un jour de stream avec des données d’exemple, sans mention ni inscription.</p><label>Nom ou identifiant du salon texte <input name="announcementTestChannel" placeholder="discussion"></label><button type="button" class="secondary-button" data-discord-announcement-test>Envoyer l’aperçu</button></details>
       <div data-recap-preview class="recap-live-preview"></div>
     </div>
     <div class="discord-steps"><button type="button" class="secondary-button" data-discord-step="-1">Retour</button><span data-discord-count></span><button type="button" class="primary-button" data-discord-step="1">Suivant</button></div>
@@ -815,8 +815,8 @@ app.addEventListener('click', async event => {
         const channel=form.elements.announcementTestChannel.value.trim();
         if(!channel)throw new Error('Indique le salon de test.');
         status.textContent='Envoi de l’aperçu…';
-        await api('/api/community/discord/announcement-test','POST',{channel});
-        status.textContent='✓ Aperçu envoyé dans le salon choisi, sans mention.';
+        const sent=await api('/api/community/discord/announcement-test','POST',{channel});
+        status.textContent=sent?.poster?'✓ Affiche envoyée dans le salon choisi, sans mention.':'✓ Aperçu envoyé en texte : l’affiche n’a pas pu être créée (navigateur Cloudflare non réglé).';
       }
       else if (discordButton.matches('[data-discord-preview]')) {
         const preview = form.querySelector('[data-recap-preview]'), input = discordInput(form);
