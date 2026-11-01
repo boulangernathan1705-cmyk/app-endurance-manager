@@ -1,6 +1,6 @@
-// At 7h30 (Paris), one message combines the community intro and today's events,
-// endurances and streams. Existing builders retain the type/sim-specific details.
-// Counts are updated in place; legacy split messages are consolidated without a ping.
+// At 7h30 (Paris), two messages (Nathan, 2026-11-01): the stream of the day first, with the races it streams, the only
+// one that pings @everyone; then the day's other endurances and events, without a ping. A day without a stream has only
+// the second one. Counts are updated in place; older layouts are replaced without a ping.
 import {communityById} from './community.mjs';
 import {iracingSoloSql} from './iracing-visibility.mjs';
 import {loadWeeklyDiscordSnapshot, siteOf} from './discord-weekly.mjs';
@@ -28,7 +28,8 @@ async function digest(value) {
   return [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify(value))))].map(byte => byte.toString(16).padStart(2,'0')).join('');
 }
 // The update time in the footer changes on every pass: not part of what is compared.
-const contentHash = async payload => 'single-embed-v1:' + await digest({...payload, embeds:(payload.embeds || []).map(({footer, ...embed}) => embed)});
+const PREFIX = 'split-v1:';
+const contentHash = async payload => PREFIX + await digest({...payload, embeds:(payload.embeds || []).map(({footer, ...embed}) => embed)});
 
 // The channel chosen for the announcement, or '' (layout.announce).
 export const announceChannel = settings => settings?.enabled === 0 ? '' : String(parseLayout(settings?.layout)?.announce || '');
@@ -117,7 +118,7 @@ async function streamTimes(env, rows) {
     const event = await env.DB.prepare('SELECT name,details FROM events WHERE id=?').bind(row.item).first();
     // A stream announced with only the race's time starts then.
     const details = parse(event?.details, {}) || {}, time = details.streamTime || (row.kind === 'stream' ? details.raceTime : '');
-    if (time) streams.push({name:event.name, time});
+    if (time) streams.push({item:row.item, name:event.name, time});
   }
   return streams;
 }
@@ -166,7 +167,7 @@ async function removeOldAnnouncements(env, community, day, keep, budget) {
   let asked = false;
   for (const row of rows) {
     const key = `${row.channel_id}:${row.message_id}`;
-    if (!row.message_id || row.message_id === '-' || seen.has(key) || key === keep) continue;
+    if (!row.message_id || row.message_id === '-' || seen.has(key) || keep?.has?.(key)) continue;
     if (budget.left <= 0) return {asked, done:false};
     seen.add(key);
     await discordRequest(env,'DELETE',`/channels/${row.channel_id}/messages/${row.message_id}`,null,budget)
@@ -178,91 +179,129 @@ async function removeOldAnnouncements(env, community, day, keep, budget) {
   return {asked, done:true};
 }
 
-async function publishAnnouncement(env, community, settings, timestamp) {
-  const channel = announceChannel(settings), stream = announceStream(settings);
-  const day = parisDay(timestamp), minutes = parisMinutes(timestamp), budget = {left:REQUESTS};
-  if (minutes < FROM) return false;
-  let rows = await announcementRows(env, community, day), intro = rows.find(row => row.kind === 'intro');
-  if (!intro) {
-    // Existing days (including legacy 'none') have already had their morning opportunity.
-    await env.DB.prepare(`INSERT OR IGNORE INTO discord_announcements(community_id,day,item,kind,position,guild_id,channel_id,created_at,ping_attempted)
-      VALUES(?,?,?,'intro',0,?,?,?,?)`).bind(community.id,day,'intro',community.discordGuildId,channel,timestamp,rows.length ? 1 : 0).run();
-    rows = await announcementRows(env, community, day);intro = rows.find(row => row.kind === 'intro');
-  }
-  const prefix = 'single-embed-v1:';
-  const legacy = rows.some(row => row.kind !== 'intro' && row.message_id && row.message_id !== '-' && (row.message_id !== intro.message_id || row.channel_id !== intro.channel_id));
-  const due = intro.pending_nonce || !intro.content_hash?.startsWith(prefix) || legacy || intro.channel_id !== channel || timestamp - Number(intro.checked_at || 0) >= REFRESH_EVERY;
-  if (!due) return false;
+// One of the day's two messages (row: 'intro' for the stream, 'races' for the rest): recovered after a lost answer,
+// edited in place, sent again silently when gone, or removed when it has nothing left to say (payload null).
+async function publishSlot(env, community, day, channel, row, payload, ping, budget, timestamp) {
   let asked = false;
+  const save = (sql, ...values) => env.DB.prepare(`UPDATE discord_announcements SET ${sql} WHERE community_id=? AND day=? AND item=?`).bind(...values, community.id, day, row.item).run();
   // A POST may have succeeded even when its response or the subsequent DB write failed.
   // Recover its ID before any retry. Failure to read history fails closed (no second POST).
-  if (intro.pending_nonce) {
-    const history = await discordRequest(env,'GET',`/channels/${intro.pending_channel_id}/messages?limit=100`,null,budget);
+  if (row.pending_nonce) {
+    const history = await discordRequest(env,'GET',`/channels/${row.pending_channel_id}/messages?limit=100`,null,budget);
     asked = true;
     if (!Array.isArray(history)) throw new Error('Discord n’a pas confirmé l’historique des annonces.');
-    const recovered = history.find(message => String(message.nonce || '') === intro.pending_nonce && message.author?.id === env.DISCORD_CLIENT_ID);
+    const recovered = history.find(message => String(message.nonce || '') === row.pending_nonce && message.author?.id === env.DISCORD_CLIENT_ID);
     if (recovered) {
-      if (intro.message_id !== recovered.id || intro.channel_id !== intro.pending_channel_id) await retainAnnouncement(env,community,day,intro,timestamp);
-      await env.DB.prepare("UPDATE discord_announcements SET message_id=?,channel_id=?,content_hash=?,pending_nonce='',pending_hash='',pending_channel_id='' WHERE community_id=? AND day=? AND item='intro'")
-        .bind(recovered.id,intro.pending_channel_id,intro.pending_hash,community.id,day).run();
-      intro = {...intro,message_id:recovered.id,channel_id:intro.pending_channel_id,content_hash:intro.pending_hash,pending_nonce:'',pending_hash:'',pending_channel_id:''};
+      if (row.message_id !== recovered.id || row.channel_id !== row.pending_channel_id) await retainAnnouncement(env,community,day,row,timestamp);
+      await save("message_id=?,channel_id=?,content_hash=?,pending_nonce='',pending_hash='',pending_channel_id=''",recovered.id,row.pending_channel_id,row.pending_hash);
+      row = {...row,message_id:recovered.id,channel_id:row.pending_channel_id,content_hash:row.pending_hash,pending_nonce:'',pending_hash:'',pending_channel_id:''};
     }
   }
-  // Rebuild the eligible list: a late entrant can add a race without another ping.
-  const eligible = await announceItems(env,community,timestamp), items = [], activeRows = [];
-  for (const row of eligible) {
-    const payload = await announcePayload(env,community,row,timestamp,null,stream);
-    if (payload) { activeRows.push(row);items.push({name:payload.embeds[0].title.replace(/^[^\p{L}\p{N}]+/u,''),payload}); }
+  if (!payload) {
+    if (row.message_id && row.message_id !== '-' && !row.pending_nonce) {
+      if (budget.left <= 0) return {asked, id:row.message_id};
+      await discordRequest(env,'DELETE',`/channels/${row.channel_id}/messages/${row.message_id}`,null,budget).catch(error => { if (error.status !== 404) throw error; });
+      asked = true;
+      // The races of that message point to it too: no second DELETE at cleanup.
+      await env.DB.prepare('UPDATE discord_announcements SET message_id=NULL WHERE community_id=? AND day=? AND channel_id=? AND message_id=?').bind(community.id,day,row.channel_id,row.message_id).run();
+    }
+    await save("message_id=NULL,content_hash=?,checked_at=?,ping_attempted=1,pending_nonce='',pending_hash='',pending_channel_id=''",PREFIX+'empty',timestamp);
+    return {asked, id:null};
   }
-  if (!items.length) {
-    // Consume the morning opportunity even on an empty day; remove stale counts silently.
-    await env.DB.prepare("UPDATE discord_announcements SET ping_attempted=1 WHERE community_id=? AND day=? AND item='intro'").bind(community.id,day).run();
-    const cleanup = await removeOldAnnouncements(env,community,day,null,budget);
-    if (cleanup.done) await env.DB.prepare("UPDATE discord_announcements SET message_id=NULL,content_hash=?,checked_at=?,pending_nonce='',pending_hash='',pending_channel_id='' WHERE community_id=? AND day=? AND item='intro'")
-      .bind(prefix+'empty',timestamp,community.id,day).run();
-    return asked || cleanup.asked;
-  }
-  for (const [position,row] of activeRows.entries()) await env.DB.prepare(`INSERT OR IGNORE INTO discord_announcements(community_id,day,item,kind,position,guild_id,channel_id,created_at)
-    VALUES(?,?,?,?,?,?,?,?)`).bind(community.id,day,row.item,row.kind,position+1,community.discordGuildId,channel,timestamp).run();
-  const counts = {events:activeRows.filter(row => row.kind === 'event').length,races:activeRows.filter(row => row.kind === 'race').length,
-    lives:activeRows.filter(row => row.kind === 'stream').length,streams:await streamTimes(env,activeRows)};
-  const site = {...siteOf(env,community),announceFormat:parseLayout(settings.layout)?.announceFormat,streamUrl:stream,streamName:parseLayout(settings.layout)?.streamName || '',streams:counts.streams};
-  const quietIntro = buildAnnounceIntro(counts,site);quietIntro.content='';quietIntro.allowed_mentions={parse:[]};
-  const payload = buildCompleteAnnouncement(quietIntro,items,site), hash = await contentHash(payload);
-  const previousId = intro.message_id, previousChannel = intro.channel_id;
-  // V2 cannot be reverted in place; a channel move also requires a silent replacement.
-  const replace = previousChannel !== channel || (intro.content_hash?.startsWith('components-v2:') && prefix !== 'components-v2:');
-  if (previousId && !replace && !intro.pending_nonce) {
+  const hash = await contentHash(payload), previousId = row.message_id, previousChannel = row.channel_id;
+  // A channel move (or an older layout) needs a silent replacement.
+  const replace = previousChannel !== channel || !String(row.content_hash || '').startsWith(PREFIX);
+  let id = previousId;
+  if (previousId && !replace && !row.pending_nonce) {
     try {
-      const changed = hash !== intro.content_hash || legacy;
+      const changed = hash !== row.content_hash;
       const confirmed = await discordRequest(env,changed ? 'PATCH' : 'GET',`/channels/${channel}/messages/${previousId}`,
-        changed ? {...payload,...(payload.flags & 32768 ? {content:null,embeds:[]} : {}),allowed_mentions:{parse:[]}} : null,budget);
+        changed ? {...payload,allowed_mentions:{parse:[]}} : null,budget);
       if (confirmed?.id !== previousId) throw new Error('Discord n’a pas confirmé le message de l’annonce.');
       asked = true;
     } catch (error) {
       if (error.status !== 404 || error.code !== 10008) throw error;
-      intro.message_id = null;
+      id = null;
     }
-  } else if (replace || intro.pending_nonce) intro.message_id = null;
-  if (!intro.message_id) {
-    const ping = intro.ping_attempted === 0 && !previousId && !intro.pending_nonce && minutes < UNTIL && counts.events + counts.races > 0;
+  } else id = null;
+  if (!id) {
+    if (previousId || row.pending_nonce) ping = false;
     // Reserve the only possible mention BEFORE the network call. An ambiguous retry is silent.
-    const nonce = intro.pending_nonce || crypto.randomUUID().replaceAll('-','').slice(0,24);
+    const nonce = row.pending_nonce || crypto.randomUUID().replaceAll('-','').slice(0,24);
     if (previousId) await retainAnnouncement(env,community,day,{message_id:previousId,channel_id:previousChannel},timestamp);
-    const reserved = await env.DB.prepare("UPDATE discord_announcements SET ping_attempted=1,pending_nonce=?,pending_hash=?,pending_channel_id=? WHERE community_id=? AND day=? AND item='intro' AND pending_nonce=? AND ping_attempted=? AND COALESCE(message_id,'')=?")
-      .bind(nonce,hash,channel,community.id,day,intro.pending_nonce,intro.ping_attempted,previousId || '').run();
-    if (!reserved.meta.changes) return asked;
-    const pingPayload = ping ? buildCompleteAnnouncement(buildAnnounceIntro(counts,site),items,site) : {...payload,flags:(payload.flags || 0) | 4096};
-    const message = await discordRequest(env,'POST',`/channels/${channel}/messages`,{...pingPayload,nonce,enforce_nonce:true},budget);
+    const reserved = await env.DB.prepare("UPDATE discord_announcements SET ping_attempted=1,pending_nonce=?,pending_hash=?,pending_channel_id=? WHERE community_id=? AND day=? AND item=? AND pending_nonce=? AND ping_attempted=? AND COALESCE(message_id,'')=?")
+      .bind(nonce,hash,channel,community.id,day,row.item,row.pending_nonce,row.ping_attempted,previousId || '').run();
+    if (!reserved.meta.changes) return {asked, id:null, blocked:true};
+    // 'everyone': the stream's @everyone; 'alert': a plain message notification, no mention; otherwise silent.
+    const body = ping === 'everyone' ? {...payload,content:'@everyone',allowed_mentions:{parse:['everyone']}}
+      : ping === 'alert' ? {...payload,allowed_mentions:{parse:[]}}
+      : {...payload,allowed_mentions:{parse:[]},flags:(payload.flags || 0) | 4096};
+    const message = await discordRequest(env,'POST',`/channels/${channel}/messages`,{...body,nonce,enforce_nonce:true},budget);
     if (!message?.id) throw new Error('Discord n’a pas confirmé la publication de l’annonce.');
-    intro.message_id = message.id;asked = true;
+    id = message.id;asked = true;
   }
-  // Persist the replacement before cleanup. Retired references survive interrupted cleanup.
-  await env.DB.prepare("UPDATE discord_announcements SET message_id=?,channel_id=?,content_hash=?,checked_at=?,ping_attempted=1,pending_nonce='',pending_hash='',pending_channel_id='' WHERE community_id=? AND day=? AND item='intro'")
-    .bind(intro.message_id,channel,hash,timestamp,community.id,day).run();
-  const cleanup = await removeOldAnnouncements(env,community,day,`${channel}:${intro.message_id}`,budget);
-  for (const row of activeRows) await env.DB.prepare('UPDATE discord_announcements SET message_id=?,channel_id=?,content_hash=?,checked_at=? WHERE community_id=? AND day=? AND item=? AND (message_id IS NULL OR message_id=?)')
-    .bind(intro.message_id,channel,hash,timestamp,community.id,day,row.item,intro.message_id).run();
+  await save("message_id=?,channel_id=?,content_hash=?,checked_at=?,ping_attempted=1,pending_nonce='',pending_hash='',pending_channel_id=''",id,channel,hash,timestamp);
+  return {asked, id};
+}
+
+async function publishAnnouncement(env, community, settings, timestamp) {
+  const channel = announceChannel(settings), stream = announceStream(settings);
+  const day = parisDay(timestamp), minutes = parisMinutes(timestamp), budget = {left:REQUESTS};
+  if (minutes < FROM) return false;
+  let rows = await announcementRows(env, community, day);
+  if (!rows.some(row => row.item === 'intro')) {
+    // Existing days (including legacy 'none') have already had their morning opportunity.
+    await env.DB.prepare(`INSERT OR IGNORE INTO discord_announcements(community_id,day,item,kind,position,guild_id,channel_id,created_at,ping_attempted)
+      VALUES(?,?,?,'intro',0,?,?,?,?)`).bind(community.id,day,'intro',community.discordGuildId,channel,timestamp,rows.length ? 1 : 0).run();
+  }
+  await env.DB.prepare(`INSERT OR IGNORE INTO discord_announcements(community_id,day,item,kind,position,guild_id,channel_id,created_at)
+    VALUES(?,?,'races','part',0,?,?,?)`).bind(community.id,day,community.discordGuildId,channel,timestamp).run();
+  rows = await announcementRows(env, community, day);
+  const intro = rows.find(row => row.item === 'intro'), races = rows.find(row => row.item === 'races'), slots = [intro, races];
+  const ids = new Set(slots.map(row => row.message_id).filter(Boolean));
+  const legacy = rows.some(row => !['intro','part'].includes(row.kind) && row.message_id && row.message_id !== '-' && !ids.has(row.message_id));
+  const due = slots.some(row => row.pending_nonce || !String(row.content_hash || '').startsWith(PREFIX) || (row.message_id && row.channel_id !== channel))
+    || legacy || timestamp - Math.min(...slots.map(row => Number(row.checked_at || 0))) >= REFRESH_EVERY;
+  if (!due) return false;
+  // Rebuild the eligible list: a late entrant can add a race without another ping.
+  const eligible = await announceItems(env,community,timestamp), items = [], activeRows = [];
+  for (const row of eligible) {
+    const payload = await announcePayload(env,community,row,timestamp,null,stream);
+    if (payload) { activeRows.push(row);items.push({row,name:payload.embeds[0].title.replace(/^[^\p{L}\p{N}]+/u,''),payload}); }
+  }
+  for (const [position,row] of activeRows.entries()) await env.DB.prepare(`INSERT OR IGNORE INTO discord_announcements(community_id,day,item,kind,position,guild_id,channel_id,created_at)
+    VALUES(?,?,?,?,?,?,?,?)`).bind(community.id,day,row.item,row.kind,position+1,community.discordGuildId,channel,timestamp).run();
+  const streams = await streamTimes(env,activeRows), streamed = new Set(streams.map(item => item.item));
+  const layout = parseLayout(settings.layout) || {};
+  const site = {...siteOf(env,community),announceFormat:layout.announceFormat,streamUrl:stream,streamName:layout.streamName || '',streams};
+  // The stream's message: an « Annoncer un stream », or the community's stream link with a stream time on a race today.
+  const live = items.filter(item => item.row.kind === 'stream' || (stream && streamed.has(item.row.item)));
+  const rest = items.filter(item => !live.includes(item));
+  const count = list => ({events:list.filter(item => item.row.kind === 'event').length,races:list.filter(item => item.row.kind === 'race').length,lives:list.filter(item => item.row.kind === 'stream').length});
+  const quiet = intro => ({...intro,content:'',allowed_mentions:{parse:[]}});
+  const livePayload = live.length ? buildCompleteAnnouncement(quiet(buildAnnounceIntro({...count(live),streams},site)),live,site) : null;
+  // The races: no stream block, the banner only when they are alone.
+  const restSite = {...site,streamUrl:'',streams:[],bannerUrl:live.length ? '' : site.bannerUrl};
+  const restPayload = rest.length ? buildCompleteAnnouncement(quiet(buildAnnounceIntro(count(rest),restSite)),rest,restSite) : null;
+  if (restPayload && live.length) restPayload.content = '**Aussi aujourd’hui sur le serveur :**';
+  // Only the stream's message pings, once, on the first morning evaluation (7h30–9h).
+  const ping = intro.ping_attempted === 0 && minutes < UNTIL && Boolean(livePayload);
+  if (intro.ping_attempted === 0 && !livePayload) await env.DB.prepare("UPDATE discord_announcements SET ping_attempted=1 WHERE community_id=? AND day=? AND item='intro'").bind(community.id,day).run();
+  let asked = false;
+  // A day without a stream: the races alone, with a plain message alert (no @everyone), once that morning.
+  const alert = !livePayload && intro.ping_attempted === 0 && minutes < UNTIL ? 'alert' : false;
+  const first = await publishSlot(env,community,day,channel,intro,livePayload,ping ? 'everyone' : false,budget,timestamp);asked ||= first.asked;
+  if (first.blocked) return asked;
+  const second = await publishSlot(env,community,day,channel,races,restPayload,alert,budget,timestamp);asked ||= second.asked;
+  if (second.blocked) return asked;
+  // Persist before cleanup: retired references survive an interrupted cleanup.
+  const keep = new Set([first.id,second.id].filter(Boolean).map(id => `${channel}:${id}`));
+  const cleanup = await removeOldAnnouncements(env,community,day,keep,budget);
+  for (const item of items) {
+    const id = live.includes(item) ? first.id : second.id;
+    await env.DB.prepare('UPDATE discord_announcements SET message_id=?,channel_id=?,checked_at=? WHERE community_id=? AND day=? AND item=? AND (message_id IS NULL OR message_id=? OR message_id=?)')
+      .bind(id,channel,timestamp,community.id,day,item.row.item,first.id || '',second.id || '').run();
+  }
   return asked || cleanup.asked;
 }
 
