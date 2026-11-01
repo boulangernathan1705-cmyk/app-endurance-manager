@@ -115,7 +115,8 @@ async function streamTimes(env, rows) {
   const streams = [];
   for (const row of rows.filter(item => ['event','stream'].includes(item.kind))) {
     const event = await env.DB.prepare('SELECT name,details FROM events WHERE id=?').bind(row.item).first();
-    const time = parse(event?.details, {})?.streamTime;
+    // A stream announced with only the race's time starts then.
+    const details = parse(event?.details, {}) || {}, time = details.streamTime || (row.kind === 'stream' ? details.raceTime : '');
     if (time) streams.push({name:event.name, time});
   }
   return streams;

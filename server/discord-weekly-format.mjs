@@ -397,13 +397,14 @@ function announceButtons(url,eventId,absent){
   return url?[{type:1,components:[{type:2,style:5,label:'Présent',emoji:{name:'✅'},url},...(absent?[absent(eventId)]:[])]}]:[];
 }
 // « 📺 Lancement du stream sur Twitch à 19h45 »: the community's stream (site.streamUrl, a link on its platform) and the
-// stream times the admins gave today's events (streams: [{name, time:'19:45'}]).
+// stream times the admins gave today's events (streams: [{name, time:'19:45'}]). Without a stream time today, nothing:
+// the streamer neither streams nor races that day (Nathan, 2026-11-01).
 function streamLine(site,streams=[]){
   const url=String(site.streamUrl||''),host=url&&URL.canParse(url)?new URL(url).hostname.replace(/^www\./,''):'';
   const label=/(^|\.)twitch\.tv$/.test(host)?'Twitch':/(^|\.)(youtube\.com|youtu\.be)$/.test(host)?'YouTube':/(^|\.)kick\.com$/.test(host)?'Kick':'notre chaîne';
   const where=url?` sur [${label}](${url})`:'',at=time=>time.replace(':','h');
   const times=[...new Map(streams.filter(item=>item.time).map(item=>[item.time,item])).values()].sort((a,b)=>a.time.localeCompare(b.time));
-  if(!times.length)return url?`📺 Le stream en direct${where}`:'';
+  if(!url||!times.length)return '';
   return `📺 Lancement du stream${where} à ${times.length===1?at(times[0].time):times.map(item=>`${at(item.time)} (${clean(item.name)})`).join(', ')}`;
 }
 // The first message: the community, « C'est jour de course ! », what the day holds and the banner; it pings @everyone.
