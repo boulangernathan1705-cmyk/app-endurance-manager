@@ -100,8 +100,8 @@ function quickActions(event,departure){
   const menu=!more.length?'':more.length===1&&!main?square(ICON_REGISTER,more[0].label,`data-action="${more[0].action}" data-departure="${departure.id}" ${more[0].extra}`,'Inscrire')
     :`<span class="planning-quick-menu-wrap">${square(ICON_MORE,'Autres inscriptions','data-action="quick-menu" aria-haspopup="menu" aria-expanded="false"')}<span class="planning-quick-menu" role="menu" hidden>${more.map(item=>`<button type="button" role="menuitem" class="planning-quick-item" data-action="${item.action}" data-departure="${departure.id}" ${item.extra}>${esc(item.label)}</button>`).join('')}</span></span>`;
   const crewAction=solo?null:crewButton(event,departure);
-  // « Demander un équipage » and « Former les équipages » are written out (an icon alone would not say it).
-  const crew=crewAction?square(ICON_CREW,crewAction.label,crewAction.attrs,crewAction.kind!=='builder'?crewAction.label:''):'';
+  // « Demander un équipage » is written out for pilots (an icon alone would not say it); organisers keep the icon.
+  const crew=crewAction?square(ICON_CREW,crewAction.label,crewAction.attrs,crewAction.kind==='request'?crewAction.label:''):'';
   const absence=absenceButton(event);
   return register||absence||menu||crew?`<span class="planning-quick">${register}${unregister}${absence}${menu}${crew}</span>`:'';
 }
