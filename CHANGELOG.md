@@ -11,6 +11,7 @@
 
 ### ✨ Améliorations
 
+- **Accueil** : la semaine prend toute la largeur de l’écran ; les jours chargés sont plus larges et les courses terminées se replient en une ligne.
 - **Events en plusieurs manches** : un seul bloc d’inscription. « Annoncer un stream » se fait en 3 étapes.
 - **Discord** : un seul message par simu dans le salon des endurances ; fils et vocaux ouverts le lundi ; calendrier des events tourné le lundi à 7h30 ; messages plus lisibles.
 
