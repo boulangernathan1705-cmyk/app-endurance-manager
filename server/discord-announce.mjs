@@ -259,7 +259,7 @@ async function publishSlot(env, community, day, channel, row, input, ping, budge
   if (!id) {
     if (previousId || row.pending_nonce) ping = false;
     // The picture first (a few seconds in Cloudflare's browser); without it, the text.
-    const picture = poster ? await renderPoster(env, poster) : null;
+    const picture = poster ? await renderPoster(env, poster, {community, origin:siteOf(env, community).url}) : null;
     if (picture) hash = `${PREFIX}poster:${hash.slice(PREFIX.length)}`;
     // Reserve the only possible mention BEFORE the network call. An ambiguous retry is silent.
     const nonce = row.pending_nonce || crypto.randomUUID().replaceAll('-','').slice(0,24);
@@ -360,13 +360,13 @@ export async function syncAnnouncements(env, timestamp = Date.now()) {
 }
 
 // « Envoyer un aperçu » (admin): a stream day with example data, as a poster when Cloudflare's browser answers.
-export async function sendAnnouncementPreview(env, channel, site, timestamp = Date.now()) {
+export async function sendAnnouncementPreview(env, community, channel, site, timestamp = Date.now()) {
   const round = {circuit:'Velo Città', category:'GT4', car:'Ginetta G55', practice:10, qualifying:10, durationMinutes:20};
   const event = {id:'demo', name:'APERÇU · SAFE’S RACE', sim:'ams2', type:'SAFE', access:'safe', tdz:true, startsAt:timestamp, entered:13, capacity:20,
-    rounds:[round, {...round, durationMinutes:40}]};
+    rounds:[round, {...round, durationMinutes:40}], logoUrl:site.url ? `${site.url}/images/event-access/safe-ams2.png` : ''};
   const list = [{row:{item:'demo', kind:'event'}, kind:'event', data:event, url:''}];
   const {poster, ...payload} = posterPayload(posterModel(list, {...site, streams:[{item:'demo', time:'20:45'}]}, {live:true, timestamp}), list, null);
-  const picture = await renderPoster(env, poster);
+  const picture = await renderPoster(env, poster, {community, origin:site.url});
   const body = {...payload, content:'Aperçu · données d’exemple', allowed_mentions:{parse:[]}};
   let request = body;
   if (picture) {
