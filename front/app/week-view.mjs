@@ -5,10 +5,10 @@
 // a list.
 import {app,state,esc,button,notifyRender,activeGame,api,coversHour,can} from './core.mjs';
 import {gameForEvent} from '../../shared/catalog.mjs';
-import {isSolo,eventAccessLogo} from './solo.mjs';
+import {isSolo,eventAccessLogo,soloCardMeta} from './solo.mjs';
 import {isStream} from '../../shared/stream.mjs';
 import {isGrindfest} from '../../shared/grindfest.mjs';
-import {simForEvent,SIMS} from '../../shared/catalog.mjs';
+import {simForEvent,SIMS,simCatalog} from '../../shared/catalog.mjs';
 import {parisDay,weekStart,weekDays} from '../week-days.mjs';
 import {eventMinutes,raceFinishAt} from '../../shared/duration.mjs';
 import {RACE_WEATHERS} from '../../shared/catalog.mjs';
@@ -34,7 +34,6 @@ const monthDayRaw=new Intl.DateTimeFormat('fr-FR',{timeZone:'UTC',day:'numeric',
 // « 1er novembre », as written in French.
 const monthDay={format:date=>monthDayRaw.format(date).replace(/^1 /,'1er ')};
 const clock=new Intl.DateTimeFormat('fr-FR',{timeZone:'Europe/Paris',hour:'2-digit',minute:'2-digit'});
-const endDay=new Intl.DateTimeFormat('fr-FR',{timeZone:'Europe/Paris',weekday:'short'});
 
 const hour=timestamp=>clock.format(timestamp).replace(':','h').replace(/h00$/,'h').replace(/^0(?=\d)/,'');
 
@@ -76,13 +75,12 @@ function block(item,now){
   // Several starts the same day: one card with every start time, no end time (Nathan 2026-11-01).
   const several=starts.length>1;
   const times=several?esc(starts.map(start=>start.departure.hideClock?'à définir':hour(start.startsAt)).join(' · ')):'';
-  // Simulator on top, then « 15h – fin 18h10 » (« – fin dim 2h30 » over several days), then the name (Nathan chose version B, 2026-11-01).
-  const late=endsAt&&parisDay(endsAt)!==parisDay(startsAt);
-  const fin=several||pending||!endsAt||(solo&&!late)?'':`fin ${late?`${endDay.format(endsAt).replace('.','')} `:''}${hour(endsAt)}`;
+  // Simulator on top, then the start time(s), the name and its circuit: no end time, the circuit tells the weekend's
+  // many endurances apart (Nathan 2026-11-01).
+  const circuit=stream?'':solo?soloCardMeta(event).replace('Circuit à préciser',''):esc(simCatalog(event.otherGame||activeGame)?.circuits.find(item=>item.id===event.circuit)?.name||'');
   const sim=solo?(stream?'':SIMS.find(item=>item.id===simForEvent(event))?.short||''):SIM_NAME[event.otherGame||activeGame];
   const badge=solo?kind.label:'',logo=solo?logoOf(event):'';
   const weather=solo?'':weatherOf(event);
-  const rounds=solo&&!stream&&Array.isArray(event.rounds)&&event.rounds.length>1?`${event.rounds.length} manches`:'';
   const left=solo&&!stream&&Number(event.capacity)>0?Number(event.capacity)-pilots:null;
   const reg=mine?myReg(departure):null,crew=reg&&!solo?crewOf(departure,reg):null;
   const situation=!mine?'':solo?'<span class="week-chip is-ok">✓ Inscrit</span>'
@@ -94,12 +92,13 @@ function block(item,now){
   const cls=`week-block is-${kind.key}${sim2}${mine?' is-mine':''}${past?' is-past':''}${live?' is-live':''}`;
   const open=event.otherGame?`<a class="${cls}" href="/${event.otherGame}/#event=${event.id}" aria-label="${esc(label)}">`
     :`<button type="button" class="${cls}" data-action="open" data-id="${event.id}" aria-label="${esc(label)}">`;
-  const meta=[rounds,weather&&`${weather==='Pluie'?'🌧':'☀️'} ${weather}`,past&&'Terminé'].filter(Boolean);
+  const meta=[weather&&`${weather==='Pluie'?'🌧':'☀️'} ${weather}`,past&&'Terminé'].filter(Boolean);
   return `${open}
     ${sim||logo||badge?`<span class="week-block-head"><span class="week-block-sim">${esc(sim)}</span>${logo?`<span class="week-block-logo">${logo}</span>`:badge?`<span class="week-badge">${esc(badge)}</span>`:''}</span>`:''}
-    <span class="week-block-time">${several?times:pending?'à définir':esc(hour(startsAt))}${fin?` <small>– ${esc(fin)}</small>`:''}</span>
+    <span class="week-block-time">${several?times:pending?'à définir':esc(hour(startsAt))}</span>
     ${live?'<span class="week-chip is-live">● En cours</span>':''}
     <span class="week-block-name">${esc(event.name)}</span>
+    ${circuit?`<span class="week-block-circuit">${circuit}</span>`:''}
     ${meta.length?`<span class="week-block-meta">${meta.map(text=>`<span>${esc(text)}</span>`).join('')}</span>`:''}
     ${situation}${places}
   ${event.otherGame?'</a>':'</button>'}`;

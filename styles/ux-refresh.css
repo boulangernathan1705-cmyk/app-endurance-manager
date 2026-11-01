@@ -2579,6 +2579,7 @@ html[data-game] #app .my-entry-slot-heading .race-badges { display: flex; flex-w
 .week-block-logo { flex: none; width: 40px; height: 40px; margin: -2px -2px -4px 0; }
 .week-block-logo img { display: block; width: 100%; height: 100%; object-fit: contain; }
 .week-block-name { font-size: 13.5px; font-weight: 750; line-height: 1.25; overflow-wrap: anywhere; }
+.week-block-circuit { font-size: 12px; font-weight: 650; line-height: 1.25; color: var(--em-muted); overflow-wrap: anywhere; }
 .week-block-meta { display: flex; flex-wrap: wrap; gap: 2px 8px; font-size: var(--em-text-xs); color: var(--em-muted); }
 .week-chip { justify-self: start; padding: 2px 7px; border-radius: 7px; font-size: 11px; font-weight: 800; line-height: 1.3; }
 .week-chip.is-ok { background: color-mix(in srgb, var(--em-ok) 16%, transparent); color: color-mix(in srgb, var(--em-ok) 70%, #fff); }
