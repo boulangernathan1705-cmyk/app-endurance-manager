@@ -67,7 +67,8 @@ export async function announceItems(env, community, timestamp) {
   }
   // The endurances as in the week's message (official LMU ones included, iRacing ones as the community shows them).
   const snapshot = await loadWeeklyDiscordSnapshot(env, parisDayStart(timestamp), community, 'all');
-  for (const departure of snapshot.futureDepartures.filter(item => parisDay(item.startsAt) === day && item.pilotCount > 0)) {
+  // Only the starts with a crew: the announcement puts forward who is sure to race that day (Nathan, 2026-11-01).
+  for (const departure of snapshot.futureDepartures.filter(item => parisDay(item.startsAt) === day && crewed(item))) {
     const known = items.find(item => item.item === departure.eventId);
     if (!known) items.push({item:departure.eventId, kind:'race', startsAt:departure.startsAt});
   }
@@ -101,12 +102,14 @@ async function eventSnapshot(env, community, id, timestamp) {
     // As on the site: the event's logo (OPEN / SAFE of its sim, or Gridfest) at TDZ only.
     logoUrl:tdz && site ? `${site}/images/event-access/${gridfest ? 'gridfest-stacked' : `${row.access === 'safe' ? 'safe' : 'open'}-${sim}`}.png` : ''};
 }
+const crewed = departure => (departure.crews || []).some(crew => crew.pilots?.length);
 // An endurance as announced: today's starts with this community's crews and pilots (as in its thread).
 async function raceSnapshot(env, community, id, timestamp) {
   const row = await env.DB.prepare('SELECT id,name,circuit,event_type,community_id,duration_hours,duration_minutes,details FROM events WHERE id=?').bind(id).first();
   if (!row) return null;
   const day = parisDay(timestamp), snapshot = await loadWeeklyDiscordSnapshot(env, timestamp, community, 'all', id);
-  const departures = snapshot.futureDepartures.filter(item => parisDay(item.startsAt) === day && item.pilotCount > 0);
+  // Its starts with a crew, without the pilots still alone (they see the race on the site).
+  const departures = snapshot.futureDepartures.filter(item => parisDay(item.startsAt) === day && crewed(item)).map(item => ({...item, unassignedPilots:[]}));
   if (!departures.length) return null;
   return {id:row.id, name:row.name, circuit:row.circuit, eventType:row.event_type || '', official:row.community_id === 'official',
     durationMinutes:Number(row.duration_minutes) || Number(row.duration_hours) * 60 || 0, details:parse(row.details, {}) || {}, departures};

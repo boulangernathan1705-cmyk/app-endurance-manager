@@ -510,3 +510,18 @@ test('the hooks by simulator never say « ce soir » (a race may start at 14h)',
   const {ANNOUNCE_HOOKS} = await import('../server/discord-weekly-format.mjs');
   for (const [key, text] of Object.entries(ANNOUNCE_HOOKS)) assert.doesNotMatch(text, /ce soir/i, key);
 });
+
+test('an endurance is announced only on its starts with a crew, without the pilots still alone (Nathan, 2026-11-01)',async t=>{
+  const {DB,env,calls,settings}=setup(t);
+  // A pilot alone on the 6h: still announced (the crew races), but without « Sans équipage ».
+  DB.db.prepare(`INSERT INTO participants(id,name,user_id,created_by,created_at,community_id) VALUES('p9','Pilote Seul',NULL,'111111111111111111',0,?)`).run(DEV_COMMUNITY);
+  DB.db.prepare(`INSERT INTO registrations(id,event_id,departure_id,guest_hash,name,name_key,category,status,created_at,participant_id,community_id) VALUES('r9',?,'start-e2','g9','Pilote Seul','pilote seul','GT3','whole',0,'p9',?)`).run(RACE,DEV_COMMUNITY);
+  await announceCommunity(env,TDZ,settings(),MORNING);
+  let text=JSON.stringify(sent(calls).map(call=>call.body.embeds));
+  assert.match(text,/6h de Spa/);assert.doesNotMatch(text,/Sans équipage|Pilote Seul/);assert.match(text,/1 présent\*\* · 1 équipage/);
+  // No crew left: the 6h is not announced at all, even with pilots entered.
+  DB.db.prepare('DELETE FROM crew_members').run();DB.db.prepare('DELETE FROM discord_announcements').run();calls.length=0;
+  await announceCommunity(env,TDZ,settings(),MORNING);
+  text=JSON.stringify(sent(calls).map(call=>call.body.embeds));
+  assert.doesNotMatch(text,/6h de Spa/);assert.match(text,/Coupe GT3/);
+});
