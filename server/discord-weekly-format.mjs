@@ -234,7 +234,8 @@ export function buildWeeklyDiscordPayload(snapshot,site={},updatedAt=Date.now(),
   const current=Array.isArray(snapshot.currentDepartures)?snapshot.currentDepartures:[],future=Array.isArray(snapshot.futureDepartures)?snapshot.futureDepartures:[];
   const period=snapshot.periodLabel||'semaine à venir';
   const header={title:cut(weekly?`📝 Endurances${sim} · ${period}`:`📝 ${cap(period)}`,256),color:0x52d3d8};
-  if(siteUrl)header.url=`${siteUrl}${simPage}`;
+  // « Semaine du … » leads to the site's home (« Accueil », the week of every sim), like the calendar's title (Nathan, 2026-11-01).
+  if(siteUrl)header.url=`${siteUrl}/`;
   if(site.name){header.author={name:cut(site.name,256)};if(siteUrl)header.author.url=`${siteUrl}/`;if(site.logoUrl)header.author.icon_url=site.logoUrl;}
   if(threads){delete header.url;delete header.author;delete header.title;}
   if(!current.length&&!future.length){
@@ -298,7 +299,6 @@ function weekCards(card,site,siteUrl,period,head){
   if(siteUrl)card.image={url:`${siteUrl}/images/discord-spacer.png`};
   if(head){
     const top=buildWeekHeadPayload(period,site,'all').embeds[0];
-    if(card.url)top.url=card.url.replace(/\/(lmu|iracing)\/$/,'/');
     embeds.unshift(top);
   }
   return{content:'',embeds,components:[],allowed_mentions:{parse:[]}};
@@ -306,12 +306,12 @@ function weekCards(card,site,siteUrl,period,head){
 // Above the sims' messages of a channel: the community, the week (a link to the site) and the banner.
 // counts: the races of the week by sim ({lmu, iracing}), one box each for the sims of the channel.
 export function buildWeekHeadPayload(periodLabel,site={},scope='all'){
-  const siteUrl=String(site.url||''),simPage=scope==='iracing'?'/iracing/':scope==='all'?'/':'/lmu/';
+  const siteUrl=String(site.url||'');
   const embed={title:cut(`📝 ${cap(periodLabel||'semaine à venir')}`,256),color:0x52d3d8};
   if(site.name){embed.author={name:cut(site.name,256)};if(siteUrl)embed.author.url=`${siteUrl}/`;if(site.logoUrl)embed.author.icon_url=site.logoUrl;}
   if(site.bannerUrl)embed.image={url:site.bannerUrl};
-  // The title links to the endurances rather than a button (less room); components:[] takes off the buttons of before.
-  if(siteUrl)embed.url=`${siteUrl}${simPage}`;
+  // The week links to the site's home (« Accueil »: the week of every sim) rather than a button (less room); components:[] takes off the buttons of before.
+  if(siteUrl)embed.url=`${siteUrl}/`;
   return{content:'',embeds:[embed],components:[],allowed_mentions:{parse:[]}};
 }
 

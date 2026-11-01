@@ -1155,3 +1155,11 @@ test('pending scheduled passes upgrade an unchanged calendar automatically and r
   calls.length=0;
   assert.equal(await syncDueRecaps(env,1,NOW+120000,{pending:true}),0,'upgrade does not repeat');
 });
+
+test('« Semaine du … » in the Discord messages leads to the site’s home (« Accueil »), like the calendar’s title', async () => {
+  const {buildWeekHeadPayload,buildWeeklyDiscordPayload}=await import('../server/discord-weekly-format.mjs');
+  const site={url:'https://tdz.example.app',name:'TDZ'};
+  for(const scope of ['all','lmu','iracing'])assert.equal(buildWeekHeadPayload('semaine du 2 au 8 novembre',site,scope).embeds[0].url,'https://tdz.example.app/');
+  const recap=buildWeeklyDiscordPayload({periodLabel:'semaine du 2 au 8 novembre',currentDepartures:[],futureDepartures:[]},site,Date.now(),'iracing',{},{weekly:true});
+  assert.equal(recap.embeds[0].url,'https://tdz.example.app/');
+});
