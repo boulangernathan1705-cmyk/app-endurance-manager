@@ -5,27 +5,31 @@ import {refreshAfterSave} from './refresh.mjs';
 import {streamEventCard} from './home-view.mjs';
 import {streamDetails,isStream,isStreamLogo,STREAM_LOGO_MAX_LENGTH,STREAM_LOGO_MAX_FILE_SIZE} from '../../shared/stream.mjs';
 
+const STEPS=['Le stream','Le rendez-vous','Aperçu'],LAST=STEPS.length;
+
 export function renderStreamForm(event=null){
   state.editingEvent=event?structuredClone(event):null;
   const details=streamDetails(event),departure=event?.departures?.[0]||{};
   const lastUrl=details.streamUrl||state.events.filter(isStream).map(item=>streamDetails(item).streamUrl).find(Boolean)||'';
   const body=formSheet(event,event?'Modifier le stream':'Annoncer un stream','create-event');
-  body.innerHTML=`<form class="form-panel event-creation stream-event-form" data-kind="stream-event"><div class="stream-form-layout"><div class="stream-form-fields"><section class="creation-card">
-    <div class="creation-card-heading"><span class="creation-step">01</span><h2>L’identité du stream</h2></div>
+  // Same window as every creation (Nathan 2026-11-01): one step at a time, Retour / Continuer, the card's preview to finish.
+  const first=event?LAST:1,step=(n,content)=>`<section class="creation-card stream-form-step" data-stream-step-pane="${n}" ${n===first?'':'hidden'}>${content}</section>`;
+  body.innerHTML=`<form class="form-panel event-creation stream-event-form" data-kind="stream-event" data-step="${first}">
+    <div class="registration-progress" aria-hidden="true" data-stream-progress>${STEPS.map((_,index)=>`<span class="${index<first?'done':''}"></span>`).join('')}</div>
+    <p class="registration-step-label" data-stream-step-label>Étape ${first} sur ${LAST} · ${STEPS[first-1]}</p>
+    ${step(1,`<label class="form-label">Titre<input name="eventName" maxlength="100" value="${esc(event?.name||'')}" placeholder="Le programme de ta soirée" required></label>
     <label class="form-label">Nom du streamer <small>(facultatif)</small><input name="streamerName" maxlength="60" value="${esc(details.streamerName || (event?'':state.user?.name || ''))}" placeholder="Ton pseudo"></label>
-    <div class="stream-logo-upload"><div class="stream-logo-preview" data-stream-logo-preview></div><div><strong>Ton logo, ton identité</strong><p class="creation-help">Importe le visuel de ton choix. Il conserve ses proportions.</p><label class="secondary-button stream-logo-pick">Importer un logo<input type="file" name="streamLogoFile" accept="image/png,image/jpeg,image/webp" data-stream-logo-file></label><button type="button" class="link-button" data-stream-logo-remove>Retirer</button><small>PNG, JPG ou WebP · 5 Mo max</small></div></div>
-    <input type="hidden" name="logoUrl" value="${esc(details.logoUrl)}"><p class="stream-logo-status" data-stream-logo-status role="status"></p>
     <label class="form-label">Lien du stream <small>(facultatif)</small><input name="streamUrl" maxlength="200" value="${esc(lastUrl)}" placeholder="Twitch, YouTube ou Kick"></label>
-  </section><section class="creation-card">
-    <div class="creation-card-heading"><span class="creation-step">02</span><h2>Le rendez-vous</h2></div>
-    <label class="form-label">Titre<input name="eventName" maxlength="100" value="${esc(event?.name||'')}" placeholder="Le programme de ta soirée" required></label>
-    <label class="form-label">Simulateur, jeu ou activité <small>(facultatif)</small><input name="activity" maxlength="100" value="${esc(details.activity)}" placeholder="Ex. Automobilista 2, rallye, discussion…"><small>Écris ce que tu veux, sans liste imposée.</small></label>
-    <label class="form-label">Description <small>(facultatif)</small><textarea name="description" maxlength="1200" rows="4" placeholder="Présente ton programme, l’ambiance ou les infos à partager…">${esc(details.description)}</textarea></label>
-    <div class="solo-form-row"><label class="form-label">Jour<input name="streamDate" type="date" value="${esc(departure.date||'')}" ${event?'':`min="${parisToday()}"`} required></label><label class="form-label">Début du stream<input name="streamTime" type="time" value="${esc(details.streamTime)}"></label></div>
+    <div class="stream-logo-upload"><div class="stream-logo-preview" data-stream-logo-preview></div><div><strong>Ton logo, ton identité</strong><p class="creation-help">Importe le visuel de ton choix. Il conserve ses proportions.</p><label class="secondary-button stream-logo-pick">Importer un logo<input type="file" name="streamLogoFile" accept="image/png,image/jpeg,image/webp" data-stream-logo-file></label><button type="button" class="link-button" data-stream-logo-remove>Retirer</button><small>PNG, JPG ou WebP · 5 Mo max</small></div></div>
+    <input type="hidden" name="logoUrl" value="${esc(details.logoUrl)}"><p class="stream-logo-status" data-stream-logo-status role="status"></p>`)}
+    ${step(2,`<div class="solo-form-row"><label class="form-label">Jour<input name="streamDate" type="date" value="${esc(departure.date||'')}" ${event?'':`min="${parisToday()}"`} required></label><label class="form-label">Début du stream<input name="streamTime" type="time" value="${esc(details.streamTime)}"></label></div>
     <label class="sim-option stream-race-toggle"><input type="checkbox" name="streamRace" ${details.isRace?'checked':''}><span>🏁 Je diffuse une course</span></label>
     <div class="stream-race" ${details.isRace?'':'hidden'}><label class="form-label">Départ de la course<input name="raceTime" type="time" value="${esc(details.raceTime)}"></label></div>
     <p class="creation-help">Heures de Paris : indique l’heure du stream ou, pour une course, celle du départ.</p>
-  </section></div><aside class="stream-form-preview" aria-label="Aperçu de l’annonce"><h3>Sur le site <small>Aperçu en direct</small></h3><div data-stream-card-preview></div></aside></div><div class="creation-actions"><button type="submit" class="primary-button stream-button">${event?'ENREGISTRER':'ANNONCER LE STREAM'}</button></div></form>`;
+    <label class="form-label">Simulateur, jeu ou activité <small>(facultatif)</small><input name="activity" maxlength="100" value="${esc(details.activity)}" placeholder="Ex. Automobilista 2, rallye, discussion…"><small>Écris ce que tu veux, sans liste imposée.</small></label>
+    <label class="form-label">Description <small>(facultatif)</small><textarea name="description" maxlength="1200" rows="4" placeholder="Présente ton programme, l’ambiance ou les infos à partager…">${esc(details.description)}</textarea></label>`)}
+    ${step(3,`<p class="creation-help">Voici ta carte sur le site. Reviens en arrière pour changer quelque chose.</p><div class="stream-form-preview" data-stream-card-preview></div>`)}
+    <div class="creation-actions registration-step-nav"><button type="button" class="secondary-button registration-back" data-stream-step="back" ${first>1?'':'hidden'}>Retour</button><button type="button" class="primary-button registration-next" data-stream-step="next" ${first<LAST?'':'hidden'}>Continuer</button><button type="submit" class="primary-button registration-next stream-button" data-stream-submit ${first===LAST?'':'hidden'}>${event?'ENREGISTRER':'ANNONCER LE STREAM'}</button></div></form>`;
   updatePreview(body.querySelector('form'));
   notifyRender();
 }
@@ -71,6 +75,27 @@ async function importLogo(file){
     throw Error('Cette image reste trop lourde. Choisis une version plus simple.');
   }finally{bitmap.close();}
 }
+// Continuer checks the fields of the steps left behind; Retour never does.
+function goToStep(form,target){
+  const current=Number(form.dataset.step)||1,wanted=target==='back'?current-1:target==='next'?current+1:Number(target);
+  if(wanted>current)for(let n=current;n<wanted;n++){
+    const invalid=[...form.querySelectorAll(`[data-stream-step-pane="${n}"] input:not([type="file"])`)].find(field=>!field.checkValidity());
+    if(invalid){invalid.reportValidity();return;}
+    if(n===2&&!checkTimes(form)){form.elements.streamTime.reportValidity();return;}
+  }
+  showStep(form,Math.max(1,Math.min(LAST,wanted)));
+}
+function showStep(form,n){
+  form.dataset.step=String(n);
+  form.querySelectorAll('[data-stream-step-pane]').forEach(pane=>{pane.hidden=Number(pane.dataset.streamStepPane)!==n;});
+  form.querySelectorAll('[data-stream-progress] span').forEach((bar,index)=>bar.classList.toggle('done',index<n));
+  form.querySelector('[data-stream-step-label]').textContent=`Étape ${n} sur ${LAST} · ${STEPS[n-1]}`;
+  form.querySelector('[data-stream-step="back"]').hidden=n===1;
+  form.querySelector('[data-stream-step="next"]').hidden=n===LAST;
+  form.querySelector('[data-stream-submit]').hidden=n!==LAST;
+  form.scrollIntoView({block:'start',behavior:'auto'});
+}
+
 if(typeof document!=='undefined'){
   document.addEventListener('input',event=>{
     const form=event.target.closest?.('form[data-kind="stream-event"]');if(!form||event.target.type==='file')return;
@@ -78,6 +103,8 @@ if(typeof document!=='undefined'){
     checkTimes(form);updatePreview(form);
   });
   document.addEventListener('click',event=>{
+    const step=event.target.closest?.('form[data-kind="stream-event"] [data-stream-step]');
+    if(step){goToStep(step.closest('form'),step.dataset.streamStep);return;}
     const button=event.target.closest?.('[data-stream-logo-remove]'),form=button?.closest('form[data-kind="stream-event"]');if(!form)return;
     form.elements.logoUrl.value='';form.elements.streamLogoFile.value='';form.querySelector('[data-stream-logo-status]').textContent='Logo retiré.';updatePreview(form);
   });
@@ -93,6 +120,8 @@ if(typeof document!=='undefined'){
 }
 export async function submitStreamEvent(form){
   if(form.dataset.logoBusy)return;
+  // Enter in a field of an earlier step goes on to the next step.
+  if(Number(form.dataset.step)<LAST){goToStep(form,'next');return;}
   if(!checkTimes(form)){form.elements.streamTime.reportValidity();return;}
   const editing=state.editingEvent,result=await api(editing?`/api/races/${editing.id}`:'/api/races',editing?'PATCH':'POST',{...streamFormData(form),version:editing?.version});
   if(editing){state.currentEventId=editing.id;state.page='event';}else{state.page='home';state.currentEventId=null;}

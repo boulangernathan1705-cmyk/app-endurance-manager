@@ -90,25 +90,6 @@ function quickActions(event,departure){
   return register||absence||menu||crew?`<span class="planning-quick">${register}${unregister}${absence}${menu}${crew}</span>`:'';
 }
 
-// An event in several rounds: each round is shown like a start, « Manche 1 », « Manche 2 », with its own
-// « M'inscrire » and « Absent »; open by default on its details and its pilots.
-function roundQuick(event,departure,index){
-  if(departure.startsAt<=Date.now()||!state.user)return '';
-  const own=ownRegistration(departure),inRound=own&&own.status!=='unavailable'&&!own.roundChoices?.[index]?.skip,blocked=soloEntryBlock(event);
-  const square=(icon,tip,attrs,label,extra='')=>`<button type="button" class="planning-quick-button is-labelled${extra}" ${attrs} data-tip="${esc(tip)}" aria-label="${esc(tip)}"><span class="planning-quick-icon">${icon}</span><span class="planning-quick-label">${esc(label)}</span></button>`;
-  const attrs=action=>`data-action="${action}" data-departure="${departure.id}" data-round="${index}"`;
-  // Entered on this round: « Me désinscrire » (from this round only), as on every event; the category can be
-  // changed from the « … » menu.
-  const register=inRound?square(ICON_UNREGISTER,`Me désinscrire de la manche ${index+1}`,attrs('round-skip'),'Me désinscrire',' is-leave')
-    :blocked?safeGuideLink(event):square(ICON_REGISTER,`M’inscrire à la manche ${index+1}`,attrs('round-enter'),'M’inscrire');
-  const absence=inRound||own?'':absenceButton(event);
-  const items=[
-    inRound&&soloRounds(event)[index]?.categories.length>1?`<button type="button" role="menuitem" class="planning-quick-item" ${attrs('round-edit')}>Changer de catégorie</button>`:'',
-    can('manage_registrations')?`<button type="button" role="menuitem" class="planning-quick-item" data-action="new-registration" data-departure="${departure.id}" data-round="${index}" data-mode="pilot">Inscrire un autre pilote</button>`:'',
-  ].filter(Boolean);
-  const more=items.length?`<span class="planning-quick-menu-wrap"><button type="button" class="planning-quick-button" data-action="quick-menu" aria-haspopup="menu" aria-expanded="false" data-tip="Autres choix" aria-label="Autres choix"><span class="planning-quick-icon">${ICON_MORE}</span></button><span class="planning-quick-menu" role="menu" hidden>${items.join('')}</span></span>`:'';
-  return register||absence||more?`<span class="planning-quick">${register}${absence}${more}</span>`:'';
-}
 function roundEntries(event,departure,index){
   const capacity=event.rounds[index]?.capacity||null;
   return soloEntryList(event,departure,(departure.availability||[]).filter(reg=>reg.status!=='unavailable'&&!reg.roundChoices?.[index]?.skip),{round:index,capacity,waitOf:capacity?reg=>reg.roundWaitlist?.[index]:reg=>reg.waitlistPosition});
@@ -125,16 +106,36 @@ function roundCards(event,departure){
   // A single round: one frame, without « Manche 1 » nor the circuit (both in the header), with the event's usual buttons.
   const single=(event.rounds||[]).length<2,rounds=single?[event.rounds?.[0]||{circuit:event.circuit}]:event.rounds;
   if(single&&(event.departures||[]).length>1)return '';
-  const locked=departure.startsAt<=Date.now(),editing=state.registrationOpen.has(departure.id),focus=Number(state.roundFocus?.[departure.id])||0;
-  return `<div class="solo-round-starts" id="departure-${departure.id}">${rounds.map((round,index)=>{
-    const pilots=roundPilots(event,index,departure),own=ownRegistration(departure),mine=own&&own.status!=='unavailable'&&!own.roundChoices?.[index]?.skip;
-    const capacity=single?Number(event.capacity)||null:round.capacity;
-    const open=(editing&&focus===index)||!state.closedRounds?.has(`${departure.id}:${index}`);
-    const editor=!locked&&editing&&focus===index?`<section class="fold-section fold-registration">${renderRegistrationWorkspace(event,departure)}</section>`:'';
+  const locked=departure.startsAt<=Date.now(),editing=state.registrationOpen.has(departure.id);
+  const editor=!locked&&editing?`<section class="fold-section fold-registration">${renderRegistrationWorkspace(event,departure)}</section>`:'';
+  if(single){
+    const pilots=roundPilots(event,0,departure),own=ownRegistration(departure),mine=own&&own.status!=='unavailable',capacity=Number(event.capacity)||null;
     // One round: a plain frame, always open (it doesn't fold); its details stay at the top of the page.
-    if(single)return `<details class="planning-start solo-round-start is-single has-quick${mine?' is-mine':''}" open><summary><span class="planning-start-head solo-round-head"><span class="solo-subtitle">Pilotes <span class="count-pill">${pilots}${capacity?` / ${capacity}`:''}</span></span>${mine?'<span class="planning-tag is-mine">Inscrit</span>':''}</span>${quickActions(event,departure)}</summary><div class="departure-fold planning-body"><div class="departure-fold-body">${editor}${soloEntryList(event,departure,(departure.availability||[]).filter(reg=>reg.status!=='unavailable'),{capacity,waitOf:reg=>reg.waitlistPosition})}</div></div></details>`;
-    return `<details class="planning-start solo-round-start has-quick${mine?' is-mine':''}" data-round-key="${departure.id}:${index}" ${open?'open':''}><summary><span class="planning-start-head solo-round-head"><span class="round-start-title"><small>Manche ${index+1}</small><strong>${esc(eventCircuitName(event,round.circuit))}</strong></span>${mine?'<span class="planning-tag is-mine">Inscrit</span>':''}</span><span class="planning-row"><span class="solo-round-pilots">${capacity?`<strong>${pilots} / ${capacity}</strong> places prises`:`${pilots} pilote${pilots>1?'s':''}`}</span></span>${roundQuick(event,departure,index)}${CHEVRON}</summary><div class="departure-fold planning-body"><div class="departure-fold-body">${editor}${roundTiles(round)}${roundEntries(event,departure,index)}</div></div></details>`;
-  }).join('')}</div>`;
+    return `<div class="solo-round-starts" id="departure-${departure.id}"><details class="planning-start solo-round-start is-single has-quick${mine?' is-mine':''}" open><summary><span class="planning-start-head solo-round-head"><span class="solo-subtitle">Pilotes <span class="count-pill">${pilots}${capacity?` / ${capacity}`:''}</span></span>${mine?'<span class="planning-tag is-mine">Inscrit</span>':''}</span>${quickActions(event,departure)}</summary><div class="departure-fold planning-body"><div class="departure-fold-body">${editor}${soloEntryList(event,departure,(departure.availability||[]).filter(reg=>reg.status!=='unavailable'),{capacity,waitOf:reg=>reg.waitlistPosition})}</div></div></details></div>`;
+  }
+  return multiRounds(event,departure,rounds,editor);
+}
+
+// An event in several rounds (Nathan 2026-11-01): ONE entry block at the top (« M'inscrire », « Absent », the pilot's
+// rounds are chosen in the entry window), then the rounds as information only, then the pilots once. When the
+// pilots differ from a round to another (a round skipped, another category, places per round), each round keeps
+// its own list.
+const roundCategory=(reg,index)=>reg.roundChoices?.[index]?.category??reg.category;
+const roundList=indexes=>indexes.length===1?`à la manche ${indexes[0]+1}`:`aux manches ${indexes.slice(0,-1).map(i=>i+1).join(', ')} et ${indexes.at(-1)+1}`;
+function multiRounds(event,departure,rounds,editor){
+  const entries=(departure.availability||[]).filter(reg=>reg.status!=='unavailable'),own=ownRegistration(departure);
+  const same=!rounds.some(round=>Number(round.capacity)>0)&&entries.every(reg=>rounds.every((_,index)=>!reg.roundChoices?.[index]?.skip&&roundCategory(reg,index)===roundCategory(reg,0)));
+  const mineIn=own&&own.status!=='unavailable'?rounds.map((_,index)=>index).filter(index=>!own.roundChoices?.[index]?.skip):[];
+  const title=mineIn.length===rounds.length?`✓ Inscrit aux ${rounds.length} manches`:mineIn.length?`✓ Inscrit ${roundList(mineIn)}`:`Inscription aux ${rounds.length} manches`;
+  const pilots=roundPilots(event,0,departure),capacity=Number(event.capacity)||null;
+  const count=same?`${pilots}${capacity?` / ${capacity} places prises`:` pilote${pilots>1?'s':''} inscrit${pilots>1?'s':''}`}`:'Chaque manche a ses pilotes, ci-dessous.';
+  const block=`<section class="solo-entry-block${mineIn.length?' is-mine':''}"><span class="solo-entry-copy"><strong>${esc(title)}</strong><small>${esc(count)}</small></span>${quickActions(event,departure)}</section>`;
+  const cards=rounds.map((round,index)=>{
+    const capacity=Number(round.capacity)||null,count=roundPilots(event,index,departure);
+    return `<section class="solo-round-card${mineIn.includes(index)?' is-mine':''}"><p class="solo-round-card-title"><small>Manche ${index+1}</small><strong>${esc(eventCircuitName(event,round.circuit))}</strong>${mineIn.includes(index)?'<span class="planning-tag is-mine">Inscrit</span>':''}</p>${roundTiles(round)}${same?'':`<p class="solo-round-card-count">${capacity?`<strong>${count} / ${capacity}</strong> places prises`:`${count} pilote${count>1?'s':''}`}</p>${roundEntries(event,departure,index)}`}</section>`;
+  }).join('');
+  const list=same?`<section class="solo-round-pilots-all">${soloEntryList(event,departure,entries,{capacity,waitOf:reg=>reg.waitlistPosition})}</section>`:'';
+  return `<div class="solo-round-starts is-multi" id="departure-${departure.id}">${block}${editor}<div class="solo-round-cards">${cards}</div>${list}</div>`;
 }
 
 // Buttons of a start (enter, enter another pilot, create a crew) and what an opened start shows.
