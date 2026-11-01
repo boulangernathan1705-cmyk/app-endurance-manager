@@ -174,10 +174,20 @@ export function renderWeek(){
   const range=`du ${monthDay.format(dateOf(monday))} au ${monthDay.format(dateOf(monday+6))}`;
   const filters=FILTERS.filter(([key])=>key!=='event'||state.soloRaces)
     .map(([key,label])=>button('week-filter',`${key==='all'?'':'<i aria-hidden="true"></i>'}${label}`,`data-filter="${key}" aria-pressed="${filter===key}"`,`event-filter-button week-filter is-${key}`)).join('');
-  const columns=days.map(day=>`<section class="week-day${day.day===today?' is-today':''}${day.day<today?' is-past':''}${day.items.length?'':' is-empty'}" aria-labelledby="week-day-${day.day}">
+  // Finished races fold into one line per day, opened with a click; busy days get more width, empty days less, so the
+  // week stays short (Nathan 2026-11-01, options C + A).
+  const open=state.weekOpenDays||(state.weekOpenDays=new Set());
+  const shown=days.map(day=>{
+    const done=day.items.filter(item=>(item.endsAt||item.startsAt)<now),opened=open.has(day.day);
+    const items=opened?day.items:day.items.filter(item=>!done.includes(item));
+    return {...day,done,opened,shown:items,weight:items.length>2?2:items.length?1:done.length?.75:.5};
+  });
+  const doneLine=day=>day.done.length?button('week-done',day.opened?'▴ Replier':`✓ ${day.done.length} terminée${day.done.length>1?'s':''} ▾`,`data-day="${day.day}" aria-expanded="${day.opened}"`,'week-done'):'';
+  const columns=shown.map(day=>`<section class="week-day${day.day===today?' is-today':''}${day.day<today?' is-past':''}${day.items.length?'':' is-empty'}${day.weight>1?' is-busy':''}" aria-labelledby="week-day-${day.day}">
       <h3 class="week-day-head" id="week-day-${day.day}"><span class="week-day-name">${esc(dayName.format(dateOf(day.day)))}</span><small>${esc(monthDay.format(dateOf(day.day)))}</small>${day.day===today?'<span class="week-today">Aujourd’hui</span>':''}</h3>
-      <div class="week-day-list">${day.items.map(item=>block(item,now)).join('')||'<p class="week-empty">—</p>'}</div>
+      <div class="week-day-list">${day.shown.map(item=>block(item,now)).join('')}${doneLine(day)}${day.items.length?'':'<p class="week-empty">—</p>'}</div>
     </section>`).join('');
+  const widths=shown.map(day=>`minmax(0,${day.weight}fr)`).join(' ');
   const name=String(state.user?.name||'').trim().split(/\s+/)[0],side=nextBox(all,now)+crewsBox(),box=side?`<div class="home-side">${side}</div>`:'';
   // Admins create an event or announce a stream from here too (Nathan 2026-11-01), as on the events page.
   const create=can('create_race')&&state.soloRaces?`<div class="home-create">${button('create-stream','🎙 Annoncer un stream','','secondary-button')}${button('create','Ajouter un événement','data-format="solo"','primary-button')}</div>`:'';
@@ -187,7 +197,7 @@ export function renderWeek(){
     <div class="home-layout${box?'':' is-full'}">
       <section class="home-week" aria-label="${esc(weekLabel)}">
         <div class="event-filter week-filters" role="group" aria-label="Filtrer la semaine">${filters}</div>
-        <div class="week-grid${days.some(day=>day.items.length)?'':' is-quiet'}">${columns}</div>
+        <div class="week-grid${days.some(day=>day.items.length)?'':' is-quiet'}" style="--week-columns:${widths}">${columns}</div>
       </section>
       ${box}
     </div>`;
