@@ -149,7 +149,8 @@ test('the community\'s stream in the intro, at the time given on the event; the 
   const intro=counts=>buildAnnounceIntro({events:2,races:0,...counts},site).embeds[0].description;
   assert.match(intro({streams:[{name:'Soirée',time:'19:45'}]}),/📺 Lancement du stream sur \[Twitch\]\(https:\/\/www\.twitch\.tv\/tdz\) à 19h45/);
   assert.match(intro({streams:[{name:'B',time:'21:15'},{name:'A',time:'19:45'}]}),/à 19h45 \(A\), 21h15 \(B\)/);
-  assert.match(intro({streams:[]}),/📺 Le stream en direct sur \[Twitch\]/);
+  // No stream time today: the streamer neither streams nor races, no stream line.
+  assert.doesNotMatch(intro({streams:[]}),/📺/);
   assert.doesNotMatch(buildAnnounceIntro({events:1,races:0,streams:[]},{url:site.url}).embeds[0].description,/📺/);
   const event=buildAnnounceEvent({id:EVENT,name:'Gridfest',sim:'lmu',type:'Gridfest',access:'open',tdz:true,startsAt:MORNING+12*HOUR,rounds:[],capacity:null,entered:1,
     streamers:[{name:'Zed',twitchUrl:'https://twitch.tv/zed',capacity:5,entered:1},{name:'Ana',twitchUrl:'',capacity:5,entered:0}]},site);
@@ -258,11 +259,13 @@ test('rounds have distinct readable sections and full session labels inside a si
   assert.match(JSON.stringify(embed),/Course : 40 min/);
 });
 
-test('live block uses configured streamer name and omits an unspecified schedule',()=>{
-  const intro=buildAnnounceIntro({events:1},{streamUrl:'https://twitch.tv/test'});
+test('live block uses configured streamer name, and only on a day with a stream time',()=>{
+  const intro=buildAnnounceIntro({events:1,streams:[{name:'A',time:'20:45'}]},{streamUrl:'https://twitch.tv/test'});
   const payload=buildCompleteAnnouncement(intro,[],{streamName:'La Praline'});
   assert.equal(payload.embeds[0].fields.at(-1).name,'📺 LA SOIRÉE AVEC LA PRALINE');
-  assert.doesNotMatch(payload.embeds[0].fields.at(-1).value,/Début du stream/);
+  // Races of other crews, no stream planned: the day is announced, without the stream.
+  const quiet=buildCompleteAnnouncement(buildAnnounceIntro({races:2,streams:[]},{streamUrl:'https://twitch.tv/test'}),[],{streamName:'La Praline'});
+  assert.ok(!quiet.embeds[0].fields.some(field=>/SOIRÉE/.test(field.name)));
 });
 test('all simulator events share identical facts and retain differences per round',()=>{
   for(const sim of ['lmu','iracing','ams2','ace'])for(const type of ['SAFE','BOULOULES','TONDEUZ TRAINING','Gridfest']){
