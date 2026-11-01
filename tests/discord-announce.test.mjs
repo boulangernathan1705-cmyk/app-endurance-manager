@@ -70,9 +70,8 @@ test('at 7h30 the stream comes first with @everyone and the race it streams, the
   assert.equal(live.embeds.length,1,'one visual frame, not several embeds');
   assert.doesNotMatch(text,/Aujourd’hui sur le serveur|C’est jour de course|Inscris-toi, préviens/);
   assert.match(embed.title,/Coupe GT3/);assert.doesNotMatch(text,/6h de Spa/);
-  assert.equal(embed.fields.at(-1).name,'📺 LA SOIRÉE AVEC TDZ');
-  assert.match(embed.fields.at(-1).value,/Début du stream à \*\*20h45\*\*/);
-  assert.match(embed.fields.at(-1).value,/\*\*\[▶ REJOINDRE LE STREAM\].*https:\/\/twitch.tv\/tdz/);
+  assert.equal(embed.fields.at(-1).name,'📺 En direct avec tdz · 20h45');
+  assert.match(embed.fields.at(-1).value,/\*\*\[▶ Rejoindre le stream\].*https:\/\/twitch.tv\/tdz/);
   assert.match(text,/La pluie attendue sur Spa/);assert.match(text,/Manche 1/);assert.match(text,/Manche 2/);assert.match(text,/1 présent/);
   assert.ok(embed.image,'the banner goes with the stream');
   assert.deepEqual(live.components[0].components.map(button=>button.label),['S’inscrire','Absent']);
@@ -81,9 +80,10 @@ test('at 7h30 the stream comes first with @everyone and the race it streams, the
   const races=posts[1].body,other=JSON.stringify(races.embeds[0]);
   assert.equal(races.content,'**Aussi aujourd’hui sur le serveur :**');
   assert.deepEqual(races.allowed_mentions,{parse:[]});assert.equal(races.flags,4096);
-  assert.match(races.embeds[0].title,/6h de Spa/);assert.doesNotMatch(other,/Coupe GT3|REJOINDRE LE STREAM/);
-  assert.match(other,/Équipage A/);assert.match(other,/Pilote 1/);assert.match(other,/Ce soir 20h00/);assert.doesNotMatch(other,/<t:/);
-  assert.ok(!races.embeds[0].image);
+  assert.match(races.embeds[0].title,/6h de Spa/);assert.doesNotMatch(other,/Coupe GT3|Rejoindre le stream/);
+  // Each start, then one line per crew with its pilots' names (put forward); no buttons (the name is a link).
+  assert.match(other,/Ce soir 20h00\*\*\\n\S+ \*\*Équipage A\*\* · Pilote 1/);assert.doesNotMatch(other,/<t:/);
+  assert.ok(!races.embeds[0].image);assert.deepEqual(races.components,[]);
   // The next passes send nothing again.
   calls.length=0;
   assert.equal(await announceCommunity(env,TDZ,settings(),MORNING+2*60000),false);
@@ -100,7 +100,7 @@ test('a day without a stream: one message for the races, a plain alert without a
   assert.equal(posts[0].body.content,'');assert.deepEqual(posts[0].body.allowed_mentions,{parse:[]});assert.equal(posts[0].body.flags,undefined);
   const text=JSON.stringify(posts[0].body.embeds[0]);
   assert.match(text,/6h de Spa/);assert.match(text,/Coupe GT3/);assert.ok(text.indexOf('6h de Spa')<text.indexOf('Coupe GT3'));
-  assert.doesNotMatch(text,/REJOINDRE LE STREAM/);assert.ok(posts[0].body.embeds[0].image,'the banner when the races are alone');
+  assert.doesNotMatch(text,/Rejoindre le stream/);assert.ok(posts[0].body.embeds[0].image,'the banner when the races are alone');
   // A stream time added later the same morning sends the stream's message, without a ping: the morning's chance is gone.
   DB.db.prepare("UPDATE events SET details=json_set(details,'$.streamTime','20:45') WHERE id=?").run(EVENT);calls.length=0;
   await announceCommunity(env,TDZ,settings(),MORNING+11*60000);
@@ -147,8 +147,8 @@ test('« Absent » from the announcement marks the pilot absent on the site',asy
 });
 
 test('hooks: the type, else the sim, then OPEN / SAFE (TDZ only); Gridfest has its own; the password never goes on Discord',()=>{
-  assert.equal(eventHook({tdz:true,sim:'lmu',type:'Bouboule',access:'safe'}),`${ANNOUNCE_HOOKS.BOULOULES} ${ANNOUNCE_HOOKS.safe}`);
-  assert.equal(eventHook({tdz:true,sim:'iracing',type:'SAFE',access:'safe'}),`${ANNOUNCE_HOOKS.iracing} ${ANNOUNCE_HOOKS.safe}`);
+  assert.equal(eventHook({tdz:true,sim:'lmu',type:'Bouboule',access:'safe'}),ANNOUNCE_HOOKS.BOULOULES);
+  assert.equal(eventHook({tdz:true,sim:'iracing',type:'SAFE',access:'safe'}),'Course SAFE sur iRacing : on roule propre et on respecte les autres.');
   assert.equal(eventHook({tdz:true,sim:'lmu',type:'Gridfest',access:'open'}),ANNOUNCE_HOOKS.Gridfest);
   assert.equal(eventHook({tdz:false,sim:'ace',type:'',access:''}),ANNOUNCE_HOOKS.ace);
   const payload=buildAnnounceEvent({id:EVENT,name:'Soirée',sim:'lmu',type:'SAFE',access:'safe',tdz:true,startsAt:MORNING+12*HOUR,rounds:[{circuit:'spa',durationMinutes:40,categories:['GT3']}],capacity:null,entered:3,password:true},{url:'https://tdz.site.example'});
@@ -283,7 +283,7 @@ test('rounds have distinct readable sections and full session labels inside a si
 test('live block uses configured streamer name, and only on a day with a stream time',()=>{
   const intro=buildAnnounceIntro({events:1,streams:[{name:'A',time:'20:45'}]},{streamUrl:'https://twitch.tv/test'});
   const payload=buildCompleteAnnouncement(intro,[],{streamName:'La Praline'});
-  assert.equal(payload.embeds[0].fields.at(-1).name,'📺 LA SOIRÉE AVEC LA PRALINE');
+  assert.equal(payload.embeds[0].fields.at(-1).name,'📺 En direct avec La Praline');
   // Races of other crews, no stream planned: the day is announced, without the stream.
   const quiet=buildCompleteAnnouncement(buildAnnounceIntro({races:2,streams:[]},{streamUrl:'https://twitch.tv/test'}),[],{streamName:'La Praline'});
   assert.ok(!quiet.embeds[0].fields.some(field=>/SOIRÉE/.test(field.name)));
@@ -509,4 +509,19 @@ test('the morning of a summer-time change still starts the day at midnight (Pari
 test('the hooks by simulator never say « ce soir » (a race may start at 14h)', async () => {
   const {ANNOUNCE_HOOKS} = await import('../server/discord-weekly-format.mjs');
   for (const [key, text] of Object.entries(ANNOUNCE_HOOKS)) assert.doesNotMatch(text, /ce soir/i, key);
+});
+
+test('an endurance is announced only on its starts with a crew, without the pilots still alone (Nathan, 2026-11-01)',async t=>{
+  const {DB,env,calls,settings}=setup(t);
+  // A pilot alone on the 6h: still announced (the crew races), but without « Sans équipage ».
+  DB.db.prepare(`INSERT INTO participants(id,name,user_id,created_by,created_at,community_id) VALUES('p9','Pilote Seul',NULL,'111111111111111111',0,?)`).run(DEV_COMMUNITY);
+  DB.db.prepare(`INSERT INTO registrations(id,event_id,departure_id,guest_hash,name,name_key,category,status,created_at,participant_id,community_id) VALUES('r9',?,'start-e2','g9','Pilote Seul','pilote seul','GT3','whole',0,'p9',?)`).run(RACE,DEV_COMMUNITY);
+  await announceCommunity(env,TDZ,settings(),MORNING);
+  let text=JSON.stringify(sent(calls).map(call=>call.body.embeds));
+  assert.match(text,/6h de Spa/);assert.doesNotMatch(text,/Sans équipage|Pilote Seul/);assert.match(text,/1 présent\*\* · 1 équipage/);
+  // No crew left: the 6h is not announced at all, even with pilots entered.
+  DB.db.prepare('DELETE FROM crew_members').run();DB.db.prepare('DELETE FROM discord_announcements').run();calls.length=0;
+  await announceCommunity(env,TDZ,settings(),MORNING);
+  text=JSON.stringify(sent(calls).map(call=>call.body.embeds));
+  assert.doesNotMatch(text,/6h de Spa/);assert.match(text,/Coupe GT3/);
 });

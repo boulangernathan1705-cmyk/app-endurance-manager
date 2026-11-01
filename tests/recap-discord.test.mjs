@@ -611,7 +611,7 @@ test('the week calendar is its own message, never mixed with the endurances',asy
   const made=channels.find(item=>item.name==='calendrier-de-la-semaine');assert.ok(made,'the bot makes its channel below the chosen one');
   const calendar=sends(calls).find(call=>call.path===`/channels/${made.id}/messages`);assert.ok(calendar);
   const text=JSON.stringify(calendar.body);
-  assert.match(text,/📅 Le programme de la semaine/);assert.match(text,/Semaine du/);assert.equal(calendar.body.embeds[0].url,'https://site.example/events/');assert.deepEqual(calendar.body.components,[]);assert.match(text,/Sprint du mardi/);assert.match(text,/Coupe du jeudi/);
+  assert.match(text,/📅 Events du 12 octobre au 18 octobre 2026/);assert.equal(calendar.body.embeds[0].url,'https://site.example/events/');assert.deepEqual(calendar.body.components,[]);assert.match(text,/Sprint du mardi/);assert.match(text,/Coupe du jeudi/);
   assert.match(text,/2\/2 places · complet/);assert.doesNotMatch(text,/6h de Spa/,'the endurances stay in their category');
   assert.doesNotMatch(JSON.stringify(sends(calls).filter(call=>call!==calendar).map(call=>call.body)),/Sprint du mardi/,'events never get a race category');
   assert.ok(!creates(calls).some(call=>/Sprint/.test(call.body.name)));
@@ -735,13 +735,13 @@ test('« un fil par course »: the bot makes « Endurance Manager » under the c
   assert.ok(inThread);assert.ok(!inThread.embeds.some(embed=>embed.title?.startsWith('📝')),JSON.stringify(inThread.embeds.map(embed=>embed.title)));
   assert.match(inThread.embeds[0].title,/6h de Spa/);
   // « Présent » opens the race on the site; no « Absent » without the key.
-  assert.deepEqual(inThread.components[0].components.map(button=>[button.label,button.style]),[['Présent',5]]);
+  assert.deepEqual(inThread.components[0].components.map(button=>[button.label,button.style]),[['S’inscrire',5]]);
   assert.match(inThread.components[0].components[0].url,/#event=race-a$/);
   // The week's message: the races only, each a link to its thread.
   // One box per race: its day and time as the name (the race's name only once, in its thread's link).
   const index=[...messages.values()].find(item=>item.channel_id===week.id&&item.embeds[0].author?.name.includes('LMU'));
-  assert.equal(index.embeds.length,1);assert.match(index.embeds[0].author.name,/^🏎️ LMU · 1 course cette semaine$/);
-  assert.match(index.embeds[0].fields[0].name,/^🟢 \S+ \d+ \S+ \d+:\d\d$/);assert.doesNotMatch(index.embeds[0].fields[0].name,/Spa/);
+  assert.equal(index.embeds.length,1);assert.match(index.embeds[0].author.name,/^🏎️ LMU · 1 course à venir$/);
+  assert.match(index.embeds[0].fields[0].name,/^🟢 \S+ \d+ \S+ · \d+h\d\d$/);assert.doesNotMatch(index.embeds[0].fields[0].name,/Spa/);
   assert.match(index.embeds[0].fields[0].value,new RegExp(`^<#${threads.find(thread=>thread.name.includes('Spa')).id}>$`));
   assert.match(index.embeds[0].author.url,/\/lmu\/$/);assert.deepEqual(index.components,[],'a link, no button');
 });
@@ -1012,7 +1012,7 @@ test('LMU and iRacing in the same channel: the banner and the week in a message 
   // The head: only the week (its link to the site) and the banner, no count.
   assert.equal(week('week:head:lmu').fields,undefined);
   assert.match(week('week:head:lmu').url,/^https:\/\/[^ ]+\/$/);assert.equal(week('week:head:lmu').description,undefined);assert.deepEqual(messages.get(id('week:head:lmu')).components,[]);
-  assert.equal(week('week:lmu').author.name,'🏎️ LMU · 1 course cette semaine');assert.equal(week('week:iracing').author.name,'🏁 iRacing · 1 course cette semaine');
+  assert.equal(week('week:lmu').author.name,'🏎️ LMU · 1 course à venir');assert.equal(week('week:iracing').author.name,'🏁 iRacing · 1 course à venir');
   for (const sim of ['week:lmu','week:iracing']) {assert.equal(week(sim).image,undefined);assert.equal(week(sim).title,undefined);assert.ok(week(sim).footer);}
   // Sent in this order: the banner first.
   assert.ok(BigInt(id('week:head:lmu'))<BigInt(id('week:lmu'))&&BigInt(id('week:lmu'))<BigInt(id('week:iracing')));
