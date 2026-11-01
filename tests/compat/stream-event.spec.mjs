@@ -43,10 +43,6 @@ for(const width of [1440,390])test(`stream creation, live card and edit preserve
   await form.locator('[name="activity"]').fill('Euro Truck Simulator 2');
   await form.locator('[name="description"]').fill('On découvre ensemble.\nTous les jeux sont bienvenus. <b>texte</b>');
   await form.locator('[name="streamDate"]').fill('2090-10-15');
-  // No time yet: Continuer stays on this step.
-  await form.locator('[data-stream-step="next"]').click();
-  await expect(form.locator('[data-stream-step-label]')).toHaveText('Étape 2 sur 3 · Le rendez-vous');
-  await form.locator('[name="streamTime"]').fill('19:45');
   await expect(preview.locator('.stream-description')).toContainText('<b>texte</b>');
   await expect(preview.locator('.stream-description b')).toHaveCount(0);
   await form.locator('.stream-race-toggle').click();await form.locator('[name="raceTime"]').fill('20:00');
@@ -54,6 +50,10 @@ for(const width of [1440,390])test(`stream creation, live card and edit preserve
   await form.locator('.stream-race-toggle').click();await expect(preview).not.toContainText('Départ');
   await expect(form.locator('[name="activity"]')).toBeEnabled();
   expect(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth)).toBe(false);
+  // No time yet: Continuer stays on this step (last click of the step: the browser's message sits on the time field).
+  await form.locator('[data-stream-step="next"]').click();
+  await expect(form.locator('[data-stream-step-label]')).toHaveText('Étape 2 sur 3 · Le rendez-vous');
+  await form.locator('[name="streamTime"]').fill('19:45');
   await form.locator('[data-stream-step="next"]').click();
   await expect(form.locator('[data-stream-step-label]')).toHaveText('Étape 3 sur 3 · Aperçu');
   await expect(preview).toBeVisible();
