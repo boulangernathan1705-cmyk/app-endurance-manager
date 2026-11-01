@@ -1,6 +1,18 @@
 # Nouveautés d'Endurance Manager
 
-## v1.99 — 31 octobre 2026
+## v1.99 — 1er novembre 2026
+
+### ✨ Nouveautés
+
+- **Accueil** : la semaine en grand, ta prochaine course à droite. Une carte par course et par jour, avec tous ses départs et le circuit.
+- **Semaine** : LMU, iRacing, events, Gridfest et streams au même endroit. « Mes inscriptions » commence par ton équipage.
+- **Équipages** : une page pour les organisateurs, avec « Équipages à former » sur l’accueil. Les pilotes font une « Demande d’équipage » ; rejoindre un équipage ne fait plus de toi son responsable.
+- **Discord · Annonce du jour** : une affiche le matin. Seuls les départs avec un équipage sont annoncés, et seuls les streams pinguent @everyone.
+
+### ✨ Améliorations
+
+- **Events en plusieurs manches** : un seul bloc d’inscription. « Annoncer un stream » se fait en 3 étapes.
+- **Discord** : un seul message par simu dans le salon des endurances ; fils et vocaux ouverts le lundi ; calendrier des events tourné le lundi à 7h30 ; messages plus lisibles.
 
 ### 🔧 Corrections
 
@@ -8,9 +20,9 @@
 
 ### 🛠️ Pour les admins
 
-- **Discord · Droits du bot** : les liens d’invitation demandent les droits nécessaires aux annonces, aux permissions des salons et à la gestion des fils. Les contrôles signalent les droits manquants avant activation.
-- **Discord · Fils de course** : les permissions propres au bot sont réparées lors de la synchronisation ; les administrateurs du site et les gestionnaires membres du serveur sont inclus dans les ajouts aux fils.
-- **Discord · Diagnostic** : les erreurs de modification des permissions indiquent aussi le droit « Gérer les rôles » à vérifier.
+- **Discord** : diagnostic dans Modules, droits du bot vérifiés avant activation et réparés à la synchronisation.
+- **Vue d’ensemble** : « À traiter » regroupe ce qui attend une action.
+- **Site** : charte de style fixe, sécurité renforcée et pages plus légères.
 
 ## v1.98 — 30 octobre 2026
 
