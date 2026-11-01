@@ -2546,7 +2546,13 @@ html[data-game] #app .my-entry-slot-heading .race-badges { display: flex; flex-w
 .week-filters .is-iracing { --kind: var(--em-kind-iracing); }
 .week-filters .is-event { --kind: var(--em-kind-event); }
 .week-filters .is-mine { --kind: var(--em-ok); }
-.week-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; align-items: stretch; }
+.week-grid { display: grid; grid-template-columns: var(--week-columns, repeat(7, minmax(0, 1fr))); gap: 6px; align-items: stretch; }
+/* The home takes the screen's width (Nathan 2026-11-01): the week needs it more than the other pages. */
+main:has(.home-layout) { max-width: 2400px; }
+.week-day.is-busy .week-day-list { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+.week-day-head .week-day-name, .week-day-head small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.week-done { justify-self: stretch; grid-column: 1 / -1; padding: 5px 9px; border: 1px dashed var(--em-border); border-radius: 8px; background: none; color: var(--em-muted); font: inherit; font-size: 12.5px; font-weight: 700; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
+.week-done:hover { color: var(--em-text); border-color: var(--em-muted); }
 .week-day { min-width: 0; min-height: 260px; border: 1px solid var(--em-border); border-radius: var(--em-radius-md); background: var(--em-panel); overflow: hidden; }
 .week-day.is-today { border-color: color-mix(in srgb, var(--em-accent) 70%, transparent); box-shadow: inset 0 3px 0 var(--em-accent); }
 .week-day.is-past { opacity: .6; }
@@ -2602,6 +2608,7 @@ html[data-game] #app .my-entry-slot-heading .race-badges { display: flex; flex-w
   .home-layout { grid-template-columns: minmax(0, 1fr); }
   .home-side { order: -1; }
   .week-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .week-day.is-busy .week-day-list { grid-template-columns: minmax(0, 1fr); }
 }
 @media (max-width: 760px) {
   .home-create { width: 100%; margin-left: 0; }
@@ -2612,6 +2619,7 @@ html[data-game] #app .my-entry-slot-heading .race-badges { display: flex; flex-w
   .week-filters { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
   .week-filters .week-filter { flex: none; white-space: nowrap; }
   .week-grid { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  .week-day.is-busy .week-day-list { grid-template-columns: minmax(0, 1fr); }
   .week-day { min-height: 0; }
   .week-day.is-empty { display: none; }
   .week-day-name { display: inline; margin-right: 8px; }

@@ -238,6 +238,7 @@ async function perform(action,target){
     case 'my-entries': await load();renderNav();renderMyEntries();break;
     // « Semaine »: from the bar, this week; its arrows move a week back or forward.
     case 'week': state.weekOffset=target.dataset.offset===undefined||target.dataset.offset==='0'?0:(Number(state.weekOffset)||0)+Number(target.dataset.offset);renderWeek();break;
+    case 'week-done': {const day=Number(target.dataset.day),open=state.weekOpenDays||(state.weekOpenDays=new Set());if(open.has(day))open.delete(day);else open.add(day);renderWeek();break;}
     case 'week-filter': state.weekFilter=target.dataset.filter||'all';renderWeek();break;
     // « Équipages » (organisers): the page, on a start when the race page's « Former les équipages » leads there.
     case 'crews-page': await load();renderNav();if(target.dataset.departure&&target.dataset.game&&target.dataset.game!==activeGame){location.href=`/${target.dataset.game}/#equipages=${target.dataset.departure}`;break;}renderCrewsPage(target.dataset.departure||'');break;
