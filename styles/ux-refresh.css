@@ -2613,3 +2613,24 @@ html[data-game] #app .my-entry-slot-heading .race-badges { display: flex; flex-w
   .week-day.is-empty { display: none; }
   .week-day-name { display: inline; margin-right: 8px; }
 }
+
+/* Event en plusieurs manches : un seul bloc d'inscription en haut, les manches en infos, les pilotes une fois. */
+.solo-entry-block { display: flex; flex-wrap: wrap; align-items: center; gap: var(--em-space-3); padding: var(--em-space-3) var(--em-space-4);
+  border: 1px solid color-mix(in srgb, var(--em-accent) 45%, transparent); border-left: 4px solid var(--em-accent); border-radius: var(--em-radius-lg);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--em-accent) 10%, transparent), var(--em-panel) 60%); }
+.solo-entry-block.is-mine { border-color: color-mix(in srgb, var(--em-ok) 50%, transparent); border-left-color: var(--em-ok); background: linear-gradient(90deg, color-mix(in srgb, var(--em-ok) 10%, transparent), var(--em-panel) 60%); }
+.solo-entry-copy { display: grid; gap: 2px; min-width: 0; }
+.solo-entry-copy strong { font-size: var(--em-text-lg); color: var(--em-text-strong); }
+.solo-entry-copy small { color: var(--em-muted); font-size: var(--em-text-sm); }
+.solo-entry-block .planning-quick { position: static; margin-left: auto; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.solo-round-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: var(--em-space-3); }
+.solo-round-card { display: grid; align-content: start; gap: var(--em-space-2); min-width: 0; padding: var(--em-space-3) var(--em-space-4); border: 1px solid var(--em-border); border-radius: var(--em-radius-lg); background: var(--em-panel); }
+.solo-round-card.is-mine { border-color: color-mix(in srgb, var(--em-ok) 45%, transparent); }
+.solo-round-card-title { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px var(--em-space-2); margin: 0; }
+.solo-round-card-title small { flex-basis: 100%; font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--em-accent); }
+.solo-round-card-title strong { font-size: var(--em-text-lg); color: var(--em-text-strong); overflow-wrap: anywhere; }
+.solo-round-card-count { margin: 0; color: var(--em-muted); font-size: var(--em-text-sm); }
+.solo-round-pilots-all { padding: var(--em-space-3) var(--em-space-4); border: 1px solid var(--em-border); border-radius: var(--em-radius-lg); background: var(--em-panel); }
+@media (max-width: 760px) {
+  .solo-entry-block .planning-quick { margin-left: 0; width: 100%; justify-content: flex-start; }
+}
