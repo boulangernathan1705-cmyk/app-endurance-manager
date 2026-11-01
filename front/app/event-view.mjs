@@ -24,6 +24,21 @@ function canCreateCrewOnDeparture(departure,event=null){
   return Boolean(event?.official&&(state.communities||[]).some(item=>item.manageCrews));
 }
 
+// The crew button of a start (Nathan 2026-11-01): the organisers form the crews on the « Équipages » page; a pilot
+// entered without a crew asks for one (« Demander un équipage »), the organisers check it there.
+// {kind:'organiser'|'builder'|'request', label, attrs} or null.
+function crewButton(event,departure){
+  if(!state.user||isSolo(event)||departure.startsAt<=Date.now())return null;
+  if(can('crews'))return {kind:'organiser',label:'Former les équipages',attrs:`data-action="crews-page" data-departure="${departure.id}" data-game="${activeGame}"`};
+  if(canCreateCrewOnDeparture(departure,event))return {kind:'builder',label:'Créer un équipage',attrs:`data-crew-builder-open data-departure="${departure.id}"`};
+  if(categoryEntryOn(event))return null;
+  const assigned=new Set((departure.crews||[]).flatMap(crew=>crew.registrationIds||[]).map(String));
+  const free=(departure.availability||[]).some(reg=>reg.mine&&!reg.foreign&&reg.status!=='unavailable'&&!assigned.has(String(reg.id)));
+  if(!free)return null;
+  const sent=(state.crewRequests||[]).some(item=>item.mine&&item.departureId===departure.id);
+  return {kind:'request',label:sent?'Demande envoyée ✓':'Demander un équipage',attrs:`data-action="crew-request" data-departure="${departure.id}"`};
+}
+
 // Where the pilot stands on this start, shown in its title line: their crew, or their categories.
 function myDepartureBadge(departure){
   const regs=(departure.availability||[]).filter(reg=>reg.mine&&reg.status!=='unavailable');
@@ -84,8 +99,9 @@ function quickActions(event,departure){
   const unregister=leave?square(ICON_UNREGISTER,leave.label,`data-action="${leave.action}" data-departure="${departure.id}" ${leave.extra}`,leave.label,' is-leave'):'';
   const menu=!more.length?'':more.length===1&&!main?square(ICON_REGISTER,more[0].label,`data-action="${more[0].action}" data-departure="${departure.id}" ${more[0].extra}`,'Inscrire')
     :`<span class="planning-quick-menu-wrap">${square(ICON_MORE,'Autres inscriptions','data-action="quick-menu" aria-haspopup="menu" aria-expanded="false"')}<span class="planning-quick-menu" role="menu" hidden>${more.map(item=>`<button type="button" role="menuitem" class="planning-quick-item" data-action="${item.action}" data-departure="${departure.id}" ${item.extra}>${esc(item.label)}</button>`).join('')}</span></span>`;
-  const crewLabel='Créer un équipage';
-  const crew=!solo&&canCreateCrewOnDeparture(departure,event)?square(ICON_CREW,crewLabel,`data-crew-builder-open data-departure="${departure.id}"`):'';
+  const crewAction=solo?null:crewButton(event,departure);
+  // « Demander un équipage » and « Former les équipages » are written out (an icon alone would not say it).
+  const crew=crewAction?square(ICON_CREW,crewAction.label,crewAction.attrs,crewAction.kind!=='builder'?crewAction.label:''):'';
   const absence=absenceButton(event);
   return register||absence||menu||crew?`<span class="planning-quick">${register}${unregister}${absence}${menu}${crew}</span>`:'';
 }
@@ -141,8 +157,9 @@ function multiRounds(event,departure,rounds,editor){
 // Buttons of a start (enter, enter another pilot, create a crew) and what an opened start shows.
 function departureActions(event,departure){
   if(departure.startsAt<=Date.now())return '';
-  const own=ownRegistration(departure),canCreateCrew=canCreateCrewOnDeparture(departure,event);
-  const createCrewAction=canCreateCrew?`<button type="button" class="link-button ux-summary-create-crew" data-crew-builder-open data-departure="${departure.id}" data-tip="Choisis la voiture, compose les pilotes et verrouille l’équipage quand il est complet.">Créer un équipage</button>`:'';
+  const own=ownRegistration(departure),crewAction=crewButton(event,departure),canCreateCrew=Boolean(crewAction);
+  const crewTips={organiser:'Ouvre la page « Équipages » sur ce départ.',builder:'Choisis la voiture, compose les pilotes et verrouille l’équipage quand il est complet.',request:'Propose ton équipage : les organisateurs le vérifient et le créent.'};
+  const createCrewAction=crewAction?`<button type="button" class="link-button ux-summary-create-crew" ${crewAction.attrs} data-tip="${esc(crewTips[crewAction.kind])}">${esc(crewAction.label)}${crewAction.kind==='organiser'?' →':''}</button>`:'';
   const mine=(departure.availability||[]).filter(reg=>reg.mine&&reg.status!=='unavailable');
   const leave=mine.length===1?button('delete-registration','Me désinscrire',`data-departure="${departure.id}" data-id="${mine[0].id}"`,'secondary-button is-leave'):'';
   return `<span class="ux-summary-registration-actions${canCreateCrew?' is-three-actions':''}">${own||(can('endurance')&&!categoryEntryOn(event))?button('my-registration',own?'Modifier mon inscription':'S’inscrire',`data-departure="${departure.id}"`,'primary-button ux-summary-registration-toggle'):''}${leave}${can('manage_registrations')?button('new-registration','Inscrire un autre pilote',`data-departure="${departure.id}" data-mode="pilot"`,'link-button ux-summary-registration-other'):''}${createCrewAction}</span>`;

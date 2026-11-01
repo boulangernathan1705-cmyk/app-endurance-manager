@@ -1,13 +1,15 @@
 import {entryCommunities} from './core.mjs';
 import {submitRallyEvent} from './rally-form.mjs';
 import {renderStreamForm,submitStreamEvent} from './stream-form.mjs';
-import {app,state,api,load,loadArchive,showError,countdown,CARS,inCommunity,can} from './core.mjs';
+import {app,state,api,load,loadArchive,showError,countdown,CARS,inCommunity,can,activeGame} from './core.mjs';
 import {renderNav,renderHome,toggleRaceFilter,resetRaceFilters,simChosen,openSimChooser} from './home-view.mjs';
 import {renderEvent,togglePlanningCommunity} from './event-view.mjs';
 import {showPlanningDay,scrollPlanning,goToDeparture,setPlanningSpan,toggleQuickMenu} from './planning.mjs';
 import {renderEventForm,departureFields,updateRemoveButtons,goToEventStep,formDurationMinutes,bulkPreview,shiftBulkWeek} from './event-form.mjs';
 import {renderMyEntries} from './entries-view.mjs';
 import {renderWeek} from './week-view.mjs';
+import {renderCrewsPage,crewsAction} from './crews-page.mjs';
+import {openCrewRequest,cancelCrewRequest} from './crew-request.mjs';
 import {submitSoloEvent} from './solo-form.mjs';
 import {readRaceInfo} from './race-info.mjs';
 import {refresh,refreshAfterSave} from './refresh.mjs';
@@ -184,7 +186,7 @@ async function perform(action,target){
       if(!crew||crew.locked)throw Error('Cet équipage n’est plus disponible. Actualise la page.');
       if(!reg){beginCrewJoin(event,departure,crew);break;}
       const result=await api(`/api/crews/${crew.id}/members`,'POST',{registrationId:reg.id,version:crew.version,selfJoin:true});state.crewManagementOpen.add(crew.id);
-      await refreshAfterSave(`Tu as rejoint « ${crew.name} ».${result.claimedOwnership?' Tu en es maintenant le responsable.':''}`);break;
+      await refreshAfterSave(`Tu as rejoint « ${crew.name} ».`);break;
     }
     case 'leave-crew': {
       const departure=event?.departures.find(item=>item.id===target.dataset.departure);const crew=departure?.crews.find(item=>item.id===target.dataset.id);const reg=departure?.availability.find(item=>item.id===target.dataset.registration);
@@ -237,6 +239,12 @@ async function perform(action,target){
     // « Semaine »: from the bar, this week; its arrows move a week back or forward.
     case 'week': state.weekOffset=target.dataset.offset===undefined||target.dataset.offset==='0'?0:(Number(state.weekOffset)||0)+Number(target.dataset.offset);renderWeek();break;
     case 'week-filter': state.weekFilter=target.dataset.filter||'all';renderWeek();break;
+    // « Équipages » (organisers): the page, on a start when the race page's « Former les équipages » leads there.
+    case 'crews-page': await load();renderNav();if(target.dataset.departure&&target.dataset.game&&target.dataset.game!==activeGame){location.href=`/${target.dataset.game}/#equipages=${target.dataset.departure}`;break;}renderCrewsPage(target.dataset.departure||'');break;
+    case 'crews-view': case 'crews-sim': case 'crews-see': case 'crew-request-refuse': if(await crewsAction(action,target)==='refresh')await refreshAfterSave('Demande refusée. Le pilote est prévenu.');break;
+    // « Demander un équipage » (pilots).
+    case 'crew-request': openCrewRequest(event,target.dataset.departure);break;
+    case 'crew-request-cancel': if(await cancelCrewRequest(target.dataset.id))await refreshAfterSave('Demande annulée.');break;
     case 'share-event': { const link=`${location.origin}${location.pathname}#event=${target.dataset.id}`; try{await navigator.clipboard.writeText(link);}catch{window.prompt('Copie le lien de la course :',link);break;} target.textContent='Lien copié ✓'; setTimeout(()=>{if(target.isConnected)target.textContent='Copier le lien de la course';},2500); break; }
   }
 }
@@ -271,7 +279,7 @@ document.addEventListener('error',event=>{const image=event.target;if(image inst
 setInterval(()=>document.querySelectorAll('[data-countdown]').forEach(element=>{element.textContent=countdown(Number(element.dataset.countdown));}),1000);
 
 async function start(){
-  try{const authError=new URLSearchParams(location.search).get('auth');if(authError){history.replaceState(null,'',location.pathname);state.flash='La connexion Discord n’a pas abouti. Tu peux réessayer.';}await load();renderNav();installRouter({renderHome,renderEvent,renderMyEntries,renderWeek});await applyRoute(routeFromLocation(),state.flash);installAutoRefresh(refresh);}catch(error){app.innerHTML='<h1 class="page-title">ENDURANCE MANAGER</h1>';showError(error);}
+  try{const authError=new URLSearchParams(location.search).get('auth');if(authError){history.replaceState(null,'',location.pathname);state.flash='La connexion Discord n’a pas abouti. Tu peux réessayer.';}await load();renderNav();installRouter({renderHome,renderEvent,renderMyEntries,renderWeek,renderCrewsPage});await applyRoute(routeFromLocation(),state.flash);installAutoRefresh(refresh);}catch(error){app.innerHTML='<h1 class="page-title">ENDURANCE MANAGER</h1>';showError(error);}
 }
 start();
 

@@ -2599,7 +2599,7 @@ html[data-game] #app .my-entry-slot-heading .race-badges { display: flex; flex-w
 
 @media (max-width: 1100px) and (min-width: 761px) {
   .home-layout { grid-template-columns: minmax(0, 1fr); }
-  .home-next-box { order: -1; }
+  .home-side { order: -1; }
   .week-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
 @media (max-width: 760px) {
@@ -2607,7 +2607,7 @@ html[data-game] #app .my-entry-slot-heading .race-badges { display: flex; flex-w
   .home-create > * { flex: 1 1 0; font-size: var(--em-text-sm); padding-inline: var(--em-space-2); }
   .week-grid.is-quiet::after { content: "Aucune course cette semaine."; color: var(--em-muted); padding: var(--em-space-3) 0; }
   .home-layout { grid-template-columns: minmax(0, 1fr); gap: var(--em-space-3); }
-  .home-next-box { order: -1; }
+  .home-side { order: -1; }
   .week-filters { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
   .week-filters .week-filter { flex: none; white-space: nowrap; }
   .week-grid { grid-template-columns: minmax(0, 1fr); gap: 10px; }
@@ -2635,4 +2635,107 @@ html[data-game] #app .my-entry-slot-heading .race-badges { display: flex; flex-w
 .solo-round-pilots-all { padding: var(--em-space-3) var(--em-space-4); border: 1px solid var(--em-border); border-radius: var(--em-radius-lg); background: var(--em-panel); }
 @media (max-width: 760px) {
   .solo-entry-block .planning-quick { margin-left: 0; width: 100%; justify-content: flex-start; }
+}
+
+/* « Équipages à former » on the home page (organisers), under « Ta prochaine course ». */
+.home-side { display: grid; gap: var(--em-space-3); align-content: start; }
+.home-crews-box { display: grid; gap: 2px; padding: var(--em-space-3); border: 1px solid var(--em-border); border-radius: var(--em-radius-lg); background: var(--em-panel); }
+.home-crews-box ul { margin: 0; padding: 0; list-style: none; }
+.home-crews-row { display: flex; width: 100%; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 0; border: 0; border-top: 1px solid var(--em-border); background: none; color: var(--em-text); font: inherit; text-align: left; cursor: pointer; }
+.home-crews-row > span:first-child { display: grid; min-width: 0; font-size: var(--em-text-sm); }
+.home-crews-row strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.home-crews-row small { color: var(--em-muted); }
+.home-crews-row:hover strong { color: var(--em-accent); }
+.home-crews-row .week-chip { flex: none; }
+.home-crews-done, .home-crews-more { margin: 4px 0 0; font-size: var(--em-text-sm); color: var(--em-muted); }
+.home-crews-box .home-next-go { background: var(--em-accent); color: var(--em-bg); }
+
+/* Counter of the « Équipages » tab. */
+.nav-count { display: inline-block; min-width: 18px; margin-left: 6px; padding: 1px 5px; border-radius: var(--em-radius-pill); background: var(--em-danger); color: var(--em-text-strong); font-size: 11px; font-weight: 800; line-height: 1.4; text-align: center; }
+
+/* « Équipages » page (organisers). */
+.crews-head { margin: 4px 0 var(--em-space-3); }
+.crews-head .page-title { margin: 0; }
+.crews-lead { margin: 2px 0 0; color: var(--em-muted); }
+.crews-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0 0 var(--em-space-4); }
+.crews-filters .crews-filter { border-radius: var(--em-radius-pill); }
+.crews-filters .crews-filter i { display: inline-block; width: 9px; height: 9px; margin-right: 6px; border-radius: 50%; background: var(--sim-color, var(--em-accent)); }
+.crews-filters [data-sim-color="lmu"] { --sim-color: var(--em-kind-lmu); }
+.crews-filters [data-sim-color="iracing"] { --sim-color: var(--em-kind-iracing); }
+.crews-filters .crews-filter.is-on { border-color: color-mix(in srgb, var(--em-accent) 60%, transparent); background: color-mix(in srgb, var(--em-accent) 22%, var(--em-panel)); color: var(--em-text-strong); }
+.crews-sep { width: 1px; height: 24px; margin: 0 4px; background: var(--em-border); }
+.crews-requests { margin: 0 0 var(--em-space-4); }
+.crews-requests h2, .crews-start h3, .crews-request h4 { margin: 0 0 var(--em-space-2); font-size: 12px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--em-muted); }
+.crews-request-row { display: flex; align-items: center; justify-content: space-between; gap: var(--em-space-3); margin-bottom: 6px; padding: 10px 14px; border: 1px solid color-mix(in srgb, var(--em-accent) 35%, var(--em-border)); border-radius: var(--em-radius-md); background: linear-gradient(90deg, color-mix(in srgb, var(--em-accent) 10%, var(--em-panel)), var(--em-panel)); }
+.crews-request-row small { display: block; margin-top: 2px; color: var(--em-muted); }
+.crews-start { --sim-color: var(--em-kind-lmu); margin-bottom: var(--em-space-3); border: 1px solid var(--em-border); border-left: 4px solid var(--sim-color); border-radius: var(--em-radius-lg); background: var(--em-panel); overflow: hidden; }
+.crews-start.is-iracing { --sim-color: var(--em-kind-iracing); }
+.crews-start.is-focus { border-color: var(--em-accent); border-left-color: var(--sim-color); }
+.crews-start > summary { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; padding: 12px 16px; cursor: pointer; list-style: none; }
+.crews-start > summary::-webkit-details-marker { display: none; }
+.crews-start[open] > summary { border-bottom: 1px solid var(--em-border); }
+.crews-sim { font-size: 10.5px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: color-mix(in srgb, var(--sim-color) 70%, var(--em-text-strong)); }
+.crews-start > summary strong { font-size: var(--em-text-lg); color: var(--em-text-strong); }
+.crews-when { font-weight: 750; color: var(--em-warn); }
+.crews-status { display: flex; gap: 6px; margin-left: auto; }
+.crews-chip { display: inline-block; padding: 2px 8px; border-radius: 7px; font-size: 11.5px; font-weight: 800; white-space: nowrap; }
+.crews-chip.is-ok { background: color-mix(in srgb, var(--em-ok) 16%, transparent); color: color-mix(in srgb, var(--em-ok) 70%, #fff); }
+.crews-chip.is-warn { background: color-mix(in srgb, var(--em-warn) 18%, transparent); color: color-mix(in srgb, var(--em-warn) 80%, #fff); }
+.crews-chip.is-alert { background: color-mix(in srgb, var(--em-danger) 18%, transparent); color: var(--em-danger-text); }
+.crews-chip.is-ask { background: color-mix(in srgb, var(--em-accent) 18%, transparent); color: var(--em-accent); }
+.crews-cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.crews-cols > section { min-width: 0; padding: 12px 16px; }
+.crews-cols > section + section { border-left: 1px solid var(--em-border); }
+.crews-crew, .crews-pilot { margin-bottom: 8px; padding: 9px 11px; border: 1px solid var(--em-border); border-radius: var(--em-radius-sm); background: var(--em-panel-2); }
+.crews-crew-head { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin-bottom: 4px; }
+.crews-crew-head small { color: var(--em-muted); }
+.crews-crew-head .crews-chip { margin-left: auto; }
+.crews-manage { font-size: var(--em-text-sm); }
+.crews-cat { display: inline-flex; vertical-align: middle; }
+.crews-cat img, .crews-cat .category-logo { width: auto; height: 18px; }
+.crews-line { display: grid; grid-template-columns: 110px minmax(0, 1fr); align-items: center; gap: 8px; margin-top: 5px; font-size: var(--em-text-sm); }
+.crews-line > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.crews-bar { display: grid; grid-template-columns: repeat(var(--hours, 6), minmax(0, 1fr)); gap: 2px; }
+.crews-bar i { height: 9px; border-radius: 2px; background: color-mix(in srgb, var(--em-text) 10%, transparent); }
+.crews-bar i.on { background: var(--em-accent); }
+.crews-pilot { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 10px; align-items: center; }
+.crews-pilot .crews-bar { grid-column: 1 / -1; }
+.crews-pick { display: flex; align-items: center; gap: 10px; min-width: 0; cursor: pointer; }
+.crews-pick input { flex: none; width: 17px; height: 17px; accent-color: var(--em-accent); }
+.crews-pick small { color: var(--em-muted); }
+.crews-add select { min-height: 32px; padding: 4px 8px; border: 1px solid var(--em-border); border-radius: var(--em-radius-sm); background: var(--em-bg); color: var(--em-text); font: inherit; font-size: var(--em-text-sm); }
+.crews-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 8px; }
+.crews-empty, .crews-done { margin: 4px 0; color: var(--em-muted); }
+.crews-request { margin: 12px 16px 0; padding: 12px 14px; border: 1px solid color-mix(in srgb, var(--em-accent) 40%, var(--em-border)); border-radius: var(--em-radius-md); background: linear-gradient(90deg, color-mix(in srgb, var(--em-accent) 10%, var(--em-panel)), var(--em-panel)); }
+.crews-request h4 { color: var(--em-accent); }
+.crews-request dl { display: flex; flex-wrap: wrap; gap: 6px 28px; margin: 0 0 6px; }
+.crews-request dt { font-size: 12px; color: var(--em-muted); }
+.crews-request dd { margin: 0; font-weight: 800; color: var(--em-text-strong); }
+.crews-note { margin: 8px 0 0; font-size: var(--em-text-sm); color: color-mix(in srgb, var(--em-warn) 80%, #fff); }
+.crews-refuse { color: var(--em-danger-text); }
+
+/* « Demander un équipage » (pilots). */
+.crew-request-sheet .crew-builder-form { display: grid; gap: var(--em-space-3); }
+.crew-request-sheet label { display: grid; gap: 5px; font-weight: 700; }
+.crew-request-field { margin: 0; padding: 0; border: 0; }
+.crew-request-field small { font-weight: 600; color: var(--em-muted); }
+.crew-request-choices { display: flex; flex-wrap: wrap; gap: 6px; }
+.crew-request-choices label { display: flex; align-items: center; gap: 6px; padding: 6px 10px; border: 1px solid var(--em-border); border-radius: var(--em-radius-sm); }
+.crew-request-sheet label.crew-request-mate { display: flex; align-items: center; gap: 9px; padding: 5px 0; font-weight: 600; }
+.crew-request-sheet input[type="checkbox"], .crew-request-sheet input[type="radio"] { flex: none; width: 17px; height: 17px; margin: 0; accent-color: var(--em-accent); }
+.crew-request-note { margin: 0; padding: 9px 11px; border: 1px solid color-mix(in srgb, var(--em-accent) 30%, var(--em-border)); border-radius: var(--em-radius-sm); font-size: var(--em-text-sm); color: var(--em-muted); }
+
+@media (max-width: 760px) {
+  .crews-cols { grid-template-columns: minmax(0, 1fr); }
+  .crews-cols > section + section { border-left: 0; border-top: 1px solid var(--em-border); }
+  .crews-cols > section:last-child { order: -1; }
+  .crews-status { margin-left: 0; }
+  .crews-filters { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+  .crews-filters .crews-filter { flex: none; white-space: nowrap; }
+  .crews-request-row { flex-wrap: wrap; }
+  .crews-line { grid-template-columns: 84px minmax(0, 1fr); }
+}
+@media (max-width: 760px) {
+  .crews-pilot { grid-template-columns: minmax(0, 1fr); }
+  .crews-add select { width: 100%; }
 }

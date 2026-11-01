@@ -27,6 +27,9 @@ function sentence(item) {
       return `La course a été modifiée${what.length ? ` : ${esc(what.join(', '))}` : ''}${item.previousName ? ` (ancien nom : ${esc(item.previousName)})` : ''}`;
     }
     case 'race_deleted': return 'La course a été supprimée';
+    case 'crew_request': return `${b(item.pilot)} demande un équipage : ${crew}`;
+    case 'crew_request_accepted': return `Ta demande est acceptée : tu roules avec l’équipage ${crew}`;
+    case 'crew_request_refused': return `Ta demande d’équipage ${crew} n’a pas été retenue`;
     case 'race_reminder': return `Rappel : ta course commence dans moins de 24 h${item.crewName ? ` avec ton équipage ${crew}` : ''}${discordChannel(item) ? ' · ouvre le salon de l’équipage sur Discord' : ''}`;
     default: return 'Du nouveau sur une de tes courses';
   }
@@ -54,6 +57,8 @@ const discordChannel = item => item.kind === 'race_reminder' && /^https:\/\/disc
 function link(item) {
   if (!item.eventId || item.kind === 'race_deleted') return '';
   if (discordChannel(item)) return discordChannel(item);
+  // A crew request opens the organisers' « Équipages » page on its start.
+  if (item.kind === 'crew_request') return `/${item.game === 'iracing' ? 'iracing' : 'lmu'}/#equipages${item.departureId ? `=${item.departureId}` : ''}`;
   return `/${item.game === 'iracing' ? 'iracing' : 'lmu'}/#event=${item.eventId}`;
 }
 

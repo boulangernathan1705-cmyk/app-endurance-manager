@@ -13,6 +13,8 @@ const SPA=race('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa','6h de Spa','spa',SATURDAY
    reg('r5','Sara Lopes','GT3','h4,h5,h6'),reg('r6','Nico Varga','GT3','h3,h4,h5,h6'),reg('r7','Jules Martin','GT3','h1,h2'),reg('r8','Leo','Hypercar','whole')],
   [{id:'c1',name:'Apex Racing #7',category:'Hypercar',car:'Porsche 963',locked:true,version:1,canManage:true,registrationIds:['r1','r2','r3','r4'],pilots:['Alex Moreau','Léa Fontaine','Tom Weber','Max']},
    {id:'c2',name:'Team Dune #92',category:'GT3',car:'',locked:false,version:1,canManage:true,registrationIds:['r5','r6'],pilots:['Sara Lopes','Nico Varga']}]);
+// A pilot's « Demander un équipage », checked on the organisers' « Équipages » page.
+const REQUEST={id:'cccccccc-cccc-4ccc-8ccc-cccccccccccc',eventId:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',departureId:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa-d',game:'lmu',name:'Les Tortues',category:'GT3',car:'',registrationIds:['r7'],requester:'Jules Martin',mine:false,createdAt:NOW/1000-1200};
 const SEBRING=race('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb','12h de Sebring','iracing-sebring',SUNDAY);
 
 async function mockSite(page){
@@ -23,6 +25,7 @@ async function mockSite(page){
     else if(['/api/races','/api/events'].includes(path))data={events:url.searchParams.get('game')==='iracing'?[SEBRING]:[SPA]};
     else if(path==='/api/participants')data={participants:[]};
     else if(path.includes('/notifications'))data={notifications:[],unread:0};
+    else if(path==='/api/crew-requests')data={requests:[REQUEST]};
     return route.fulfill({contentType:'application/json',body:JSON.stringify(data)});
   });
   await page.addInitScript(()=>{localStorage.setItem('endurance_manager_locale','fr');document.cookie='em_sim=lmu; Path=/';});
@@ -50,4 +53,12 @@ test('equipages',async({page})=>{
   await expect(page.locator('.crew-card-shell:visible').first()).toContainText('Apex Racing');
   await settle(page);
   await expect(page.locator('.pilot-section:visible').first()).toHaveScreenshot('equipages.png');
+});
+
+test('organisateurs',async({page})=>{
+  await mockSite(page);
+  await page.goto('/lmu/#equipages');
+  await expect(page.locator('.crews-request')).toContainText('Les Tortues');
+  await settle(page);
+  await expect(page.locator('#app')).toHaveScreenshot('organisateurs.png');
 });

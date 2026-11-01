@@ -4,6 +4,7 @@ import {contextHelpMarker as helpContext} from './core.mjs';
 import {simForEvent,SIMS} from '../../shared/catalog.mjs';
 import {app,nav,state,activeGame,esc,button,canManage,isAdmin,can,circuitLabel,EVENT_TYPES,CATEGORIES,eventTypeBadge,officialBadge,schedulePendingBadge,eventBadge,eventCategoryCount,circuitVisual,logo,dateLabel,countdown,groupEvents,notifyRender,notifyNav} from './core.mjs';
 import {raceRangeBlock} from './planning.mjs';
+import {crewsTodoCount} from './crews-page.mjs';
 import {dateBlock,dayLabel,timeLabel} from '../dates.mjs';
 import {durationLabel,eventMinutes} from '../../shared/duration.mjs';
 import {isGrindfest,streamersOf} from '../../shared/grindfest.mjs';
@@ -60,12 +61,19 @@ function activeList(page){
   if(page==='event'){const event=state.events.find(item=>item.id===state.currentEventId);return event?.format==='solo'?'solo':'endurance';}
   return state.listFormat;
 }
-function syncNavSection(page){for(const item of nav.querySelectorAll('.nav-section-button')){const current=['my-entries','week'].includes(item.dataset.action)?page===item.dataset.action:!['my-entries','week'].includes(page)&&item.dataset.list===activeList(page);item.setAttribute('aria-current',current?'page':'false');}
+function syncNavSection(page){for(const item of nav.querySelectorAll('.nav-section-button')){const current=item.dataset.action==='crews-page'?page==='crews':['my-entries','week'].includes(item.dataset.action)?page===item.dataset.action:!['my-entries','week','crews'].includes(page)&&item.dataset.list===activeList(page);item.setAttribute('aria-current',current?'page':'false');}
   // The simulator is chosen in Endurance only: the events calendar shows every simulator.
-  const games=nav.querySelector('.nav-game-switcher');if(games)games.hidden=page==='week'||(page!=='my-entries'&&activeList(page)==='solo');}
+  const games=nav.querySelector('.nav-game-switcher');if(games)games.hidden=page==='week'||page==='crews'||(page!=='my-entries'&&activeList(page)==='solo');}
 // Events of the community first (every simulator), then Endurance with its simulator (LMU or iRacing).
-export function renderNav(){const games=`<div class="nav-game-switcher" role="group" aria-label="Changer de simulateur">${gameLink('lmu','Le Mans Ultimate','LMU')}${gameLink('iracing','iRacing','iRacing')}</div>`;nav.innerHTML=`<div class="nav-sections" role="group" aria-label="Sections">${state.access==='member'?button('week','Accueil','','nav-section-button nav-week-button'):''}${state.soloRaces?button('home',esc(state.soloLabel),'data-list="solo"','nav-section-button nav-events-button'):''}${button('home','ENDURANCE','data-list="endurance"','nav-section-button')}${games}${button('my-entries','Mes inscriptions','','nav-section-button')}${activeGame==='lmu'&&state.combos?'<a class="nav-section-button" href="/fiches-combo.html">Fiches combo</a><a class="nav-section-button" href="/mur.html">Mur des stands</a>':''}</div>`;syncNavSection(state.page);notifyNav();}
+export function renderNav(){const games=`<div class="nav-game-switcher" role="group" aria-label="Changer de simulateur">${gameLink('lmu','Le Mans Ultimate','LMU')}${gameLink('iracing','iRacing','iRacing')}</div>`;nav.innerHTML=`<div class="nav-sections" role="group" aria-label="Sections">${state.access==='member'?button('week','Accueil','','nav-section-button nav-week-button'):''}${state.soloRaces?button('home',esc(state.soloLabel),'data-list="solo"','nav-section-button nav-events-button'):''}${button('home','ENDURANCE','data-list="endurance"','nav-section-button')}${games}${button('my-entries','Mes inscriptions','','nav-section-button')}${crewsTab()}${activeGame==='lmu'&&state.combos?'<a class="nav-section-button" href="/fiches-combo.html">Fiches combo</a><a class="nav-section-button" href="/mur.html">Mur des stands</a>':''}</div>`;syncNavSection(state.page);notifyNav();}
 document.addEventListener('endurance:render',event=>syncNavSection(event.detail?.page));
+// « Équipages » for the organisers, with the number of pilots waiting for a crew and of requests.
+function crewsTab(){
+  if(state.access!=='member'||!can('crews'))return '';
+  const count=crewsTodoCount();
+  return button('crews-page',`Équipages${count?`<span class="nav-count" aria-label="${count} à traiter">${count}</span>`:''}`,'','nav-section-button nav-crews-button');
+}
+document.addEventListener('endurance:crews-count',()=>{const tab=nav.querySelector('.nav-crews-button');if(tab)tab.outerHTML=crewsTab();syncNavSection(state.page);});
 // Solo event card: one bottom line with the start (« 21h »), the places and where the pilot stands.
 function soloCardFoot(event,archived,situation){
   const dated=datedDepartures(event),shown=archived?dated.at(-1):dated.find(d=>Number(d.startsAt)>Date.now())||dated.at(-1);
