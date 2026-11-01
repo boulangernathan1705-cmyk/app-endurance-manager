@@ -97,6 +97,7 @@ const sourceRequest = await readFile(root + 'demande-communaute.html', 'utf8');
 const sourceCombos = await readFile(root + 'fiches-combo.html', 'utf8');
 const sourceLive = await readFile(root + 'mur-des-stands.html', 'utf8');
 const sourceWall = await readFile(root + 'mur.html', 'utf8');
+const sourceCharte = await readFile(root + 'charte.html', 'utf8');
 const paths = [
   ...stylesheetPaths(sourceIndex,'index.html'),
   ...stylesheetPaths(sourceGame,'game.html'),
@@ -107,6 +108,7 @@ const paths = [
   ...stylesheetPaths(sourceCombos,'fiches-combo.html'),
   ...stylesheetPaths(sourceLive,'mur-des-stands.html'),
   ...stylesheetPaths(sourceWall,'mur.html'),
+  ...stylesheetPaths(sourceCharte,'charte.html'),
 ];
 // styles/ux-refresh.css is the final layer that replaces older rules: keep it last in the
 // shared bundle whichever page lists it first.
@@ -127,6 +129,7 @@ await writeFile(new URL('demande-communaute.html', out), productionHtml(sourceRe
 await writeFile(new URL('fiches-combo.html', out), productionHtml(sourceCombos));
 await writeFile(new URL('mur-des-stands.html', out), productionHtml(sourceLive));
 await writeFile(new URL('mur.html', out), productionHtml(sourceWall));
+await writeFile(new URL('charte.html', out), productionHtml(sourceCharte));
 const gameHtml = productionHtml(sourceGame);
 await writeFile(new URL('lmu/index.html', out), gameHtml);
 await writeFile(new URL('iracing/index.html', out), gameHtml);
@@ -234,6 +237,12 @@ await writeFile(new URL('_headers', out), `/*
 /mur
   X-Robots-Tag: noindex, nofollow
 
+/charte.html
+  X-Robots-Tag: noindex, nofollow
+
+/charte
+  X-Robots-Tag: noindex, nofollow
+
 /downloads/*
   X-Robots-Tag: noindex, nofollow
 
@@ -251,6 +260,7 @@ Disallow: /fiches-combo.html
 Disallow: /mur-des-stands.html
 Disallow: /mur.html
 Disallow: /mur
+Disallow: /charte
 Disallow: /downloads/
 Sitemap: https://endurance-manager.app/sitemap.xml
 `);

@@ -46,6 +46,8 @@ jobs:
           echo "::error::the local site did not start"
           exit 1
       - run: npm run compat:test
+      # The « Charte »: the reference pages compared with their captures (tests/visual/__screenshots__).
+      - run: npm run visual:test
       - name: Upload Playwright report on failure
         if: failure()
         uses: actions/upload-artifact@v4
@@ -53,6 +55,7 @@ jobs:
           name: browser-compatibility-report-${{ github.run_id }}
           path: |
             playwright-report/
+            playwright-visual-report/
             test-results/
             wrangler-dev.log
           if-no-files-found: ignore

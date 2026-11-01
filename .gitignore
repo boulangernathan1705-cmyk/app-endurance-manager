@@ -11,3 +11,4 @@ public/
 npm-debug.log*
 connectors/simhub-plugin/obj/
 connectors/simhub-plugin/bin/
+playwright-visual-report/
