@@ -75,9 +75,11 @@ function categoryMark(category,sim,emojis={}){
   const name=categoryEmojiName(sim,category),id=emojis[name];
   return id?`<:${name}:${id}>`:markers.get(category)||'⬜';
 }
-// Discord shows <t:…> timestamps in each reader's own time zone.
-const discordTime=(startsAt,style)=>`<t:${Math.floor(startsAt/1000)}:${style}>`;
-function departureTitle(departure){return departure.timePending?`${discordTime(departure.startsAt,'D')} — horaire à confirmer`:discordTime(departure.startsAt,'F');}
+// One way to write a start everywhere (Nathan, 2026-11-01): « Dim. 1 nov. · 13h00 », Paris time. Discord's <t:…> dates
+// show in each reader's own language (« Sunday, November 1, 2026 1:00 PM »), so they are kept for « dans 2 heures » only.
+export function clockLabel(startsAt){return recapTime.format(startsAt).replace(':','h');}
+export function startTimeLabel(startsAt,timePending=false){return `${cap(recapDay.format(startsAt))} · ${timePending?'horaire à confirmer':clockLabel(startsAt)}`;}
+function departureTitle(departure){return startTimeLabel(departure.startsAt,departure.timePending);}
 // One crew per block, separated by a blank line: name, then its car, then one pilot per line.
 function crewBlock(crew,sim,emojis){
   const marker=categoryMark(crew.category,sim,emojis),status=crew.locked?'🔒':'🔓';
@@ -152,7 +154,7 @@ function raceFields(departures,compact,emojis){
   if(departures.length===1)return [{name:BLANK,value:departureValue(departures[0],compact,emojis),inline:false},...absences];
   // Starts with crews in detail, a blank line after each; the pilots without a crew once, below.
   const filled=departures.filter(departure=>departure.crews.length);
-  const fields=filled.slice(0,22).map(departure=>({name:BLANK,value:cut(departureValue({...departure,unassignedPilots:[]},compact,emojis)+'\n'+BLANK,1024),inline:false}));
+  const fields=filled.slice(0,22).map(departure=>({name:BLANK,value:departureValue({...departure,unassignedPilots:[]},compact,emojis),inline:false}));
   fields.push(...unassignedField(departures,compact,emojis));
   if(!departures.some(hasEntries))fields.push({name:BLANK,value:'Personne d’inscrit pour l’instant.',inline:false});
   return [...fields,...absences];
@@ -246,11 +248,12 @@ export function buildWeeklyDiscordPayload(snapshot,site={},updatedAt=Date.now(),
     // its page until the thread is there), its starts and its weather. Its entries are a click away, in the thread.
     const races=[...groupByRace(current).map(group=>[group,true]),...groupByRace(future).map(group=>[group,false])];
     const box=([group,live])=>{const first=group[0],thread=threads[first.eventId],url=raceUrl(siteUrl,first),name=clean(eventTitleAndNote(first.eventName).title);
-      const when=`${cap(recapDay.format(first.startsAt))}${first.timePending?' · horaire à confirmer':` ${recapTime.format(first.startsAt)}`}`;
+      const when=startTimeLabel(first.startsAt,first.timePending);
       return{name:cut(`${live?'🔴 En cours':'🟢'} ${when}`,256),value:cut([thread?`<#${thread}>`:url?`🏁 [${name}](${url})`:`🏁 ${name}`,group.length>1&&`${group.length} départs`,WEATHER[first.details?.weather]].filter(Boolean).join(' · '),1024),inline:false};};
     const fields=races.slice(0,races.length>25?24:25).map(box);
     if(races.length>25)fields.push({name:BLANK,value:`… et ${races.length-24} autres courses sur le site.`,inline:false});
-    Object.assign(header,{color:SIM_COLORS[scope]||header.color,author:{name:`${SIM_MARKS[scope]||'🏁'}${sim} · ${races.length} course${races.length>1?'s':''} cette semaine`},fields,footer:footer(updatedAt)});
+    // The races still to come (or under way): on Sunday, those of Monday are gone.
+    Object.assign(header,{color:SIM_COLORS[scope]||header.color,author:{name:`${SIM_MARKS[scope]||'🏁'}${sim} · ${races.length} course${races.length>1?'s':''} à venir`},fields,footer:footer(updatedAt)});
     // A link on the sim's name rather than a button (less room); components:[] takes off the buttons of before.
     if(siteUrl)header.author.url=`${siteUrl}${simPage}`;
     return{content:'',embeds:[header],components:[],allowed_mentions:{parse:[]}};
@@ -268,12 +271,13 @@ export function buildWeeklyDiscordPayload(snapshot,site={},updatedAt=Date.now(),
   let embeds=build(false);
   if(embeds.reduce((total,embed)=>total+embedSize(embed),0)>5600)embeds=build(true);
   const last=embeds[embeds.length-1];
-  if(site.bannerUrl)last.image={url:site.bannerUrl};
+  // The banner stays on the week's and the day's messages: in a race's thread it took half the height for nothing.
+  if(site.bannerUrl&&!alone)last.image={url:site.bannerUrl};
   last.footer=footer(updatedAt);
   const payload={content:'',embeds:fitDiscordEmbeds(embeds.slice(0,10)),allowed_mentions:{parse:[]}};
-  // A race's thread: « Présent » opens the race on the site, « Absent » (absent: its button) marks it from Discord.
+  // A race's thread: « S’inscrire » opens the race on the site, « Absent » (absent: its button) marks it from Discord.
   const first=[...current,...future][0],url=raceUrl(siteUrl,first);
-  if(alone&&url)payload.components=[{type:1,components:[{type:2,style:5,label:'Présent',emoji:{name:'✅'},url},...(absent?[absent(first.eventId)]:[])]}];
+  if(alone&&url)payload.components=[{type:1,components:[{type:2,style:5,label:'S’inscrire',emoji:{name:'✅'},url},...(absent?[absent(first.eventId)]:[])]}];
   return payload;
 }
 
@@ -306,7 +310,7 @@ function calendarBox(event,siteUrl){
   if(event.stream)return streamBox(event,siteUrl);
   const name=clean(event.name),url=siteUrl?`${siteUrl}/${event.sim==='iracing'?'iracing':'lmu'}/#event=${encodeURIComponent(event.id)}`:'';
   const circuits=[...new Set(event.circuits.map(circuit=>circuitNames.get(circuit)||circuit).filter(Boolean))].map(clean).join(', ');
-  const when=`${cap(recapDay.format(event.startsAt))}${event.timePending?' · horaire à confirmer':` ${recapTime.format(event.startsAt)}`}`;
+  const when=startTimeLabel(event.startsAt,event.timePending);
   const places=event.capacity
     ?`👥 ${Math.min(event.entered,event.capacity)}/${event.capacity} places${event.entered>=event.capacity?' · complet':''}${event.entered>event.capacity?` · ${event.entered-event.capacity} en attente`:''}`
     :event.entered?`👥 ${event.entered} inscrit${event.entered>1?'s':''}`:'👥 personne pour l’instant';
@@ -317,10 +321,11 @@ function calendarBox(event,siteUrl){
 export const CALENDAR_FORMAT = 'calendar-v3:';
 export function buildCalendarPayload(snapshot,site={},updatedAt=Date.now()){
   const siteUrl=String(site.url||''),events=Array.isArray(snapshot.events)?snapshot.events:[];
-  const embed={title:'📅 Le programme de la semaine',description:cut(cap(snapshot.periodLabel||'semaine à venir'),4096),color:events.length?0xe7b653:0x6b7280};
-  if(site.name){embed.author={name:cut(`${site.name}${events.length?` · ${events.length} event${events.length>1?'s':''} cette semaine`:''}`,256)};if(siteUrl)embed.author.url=`${siteUrl}/`;if(site.logoUrl)embed.author.icon_url=site.logoUrl;}
+  // One title (Nathan, 2026-11-01): « 📅 Events du 26 octobre au 1 novembre 2026 ».
+  const period=String(snapshot.periodLabel||'').replace(/^semaine /i,'');
+  const embed={title:cut(`📅 Events ${period||'de la semaine'}`,256),color:events.length?0xe7b653:0x6b7280};
   if(events.length){embed.fields=events.slice(0,events.length>25?24:25).map((event,index)=>{const field=calendarBox(event,siteUrl);if(index)field.name=cut(`────────────\n${field.name}`,256);return field;});if(events.length>25)embed.fields.push({name:BLANK,value:`… et ${events.length-24} autres events sur le site.`,inline:false});}
-  else embed.description+='\nAucun événement de prévu pour l’instant.';
+  else embed.description='Aucun événement de prévu pour l’instant.';
   if(site.bannerUrl)embed.image={url:site.bannerUrl};
   embed.footer=footer(updatedAt);
   // The title links to the events (no button: less room); components:[] takes off the buttons of before.
@@ -358,24 +363,27 @@ export function parisDay(timestamp){return dayKey(localDay(timestamp));}
 // endurances after their kind. Only at TDZ do the events have types and OPEN / SAFE (as on the site).
 export const ANNOUNCE_HOOKS={
   lmu:'Protos et GT vous attendent sur Le Mans Ultimate : place à la course !',
-  iracing:'Place à iRacing : chaque dixième compte. À vous de jouer.',
+  iracing:'Place à iRacing : chaque dixième compte.',
   ams2:'Automobilista 2 au programme : du pilotage pur et des bagarres serrées.',
   ace:'Assetto Corsa EVO au programme : sortez les gants, ça va glisser.',
   acrally:'Spéciales au programme : notes en main et pied droit au plancher.',
   BOULOULES:'Soirée BOULOULES ! Ambiance détendue et fous rires garantis, le chrono passe après.',
   'TONDEUZ TRAINING':'Entraînement collectif : on tourne, on compare, on progresse ensemble.',
   Gridfest:'C’est la Gridfest ! Choisis ton streamer et viens faire le show.',
-  open:'Grille ouverte à tous, nouveaux comme habitués !',
-  safe:'Course SAFE : on roule propre et on respecte les autres.',
+  open:'Grille ouverte à tous sur {sim}, nouveaux comme habitués !',
+  safe:'Course SAFE sur {sim} : on roule propre et on respecte les autres.',
   official:'Course officielle LMU aujourd’hui : nos équipages défendent les couleurs de la communauté !',
   officialIracing:'Course spéciale iRacing aujourd’hui : nos équipages défendent les couleurs de la communauté !',
   championship:'Manche de championnat aujourd’hui : chaque point compte, on vise le podium !',
   endurance:'Jour d’endurance : relais, stratégie, et tout l’équipage soudé jusqu’au drapeau à damier.'};
 const isGridfestType=type=>['Gridfest','Grindfest'].includes(type);
+// One sentence (Nathan, 2026-11-01): the event's type, else OPEN / SAFE with its sim, else its sim. OPEN / SAFE is also on
+// the line of its time.
 export function eventHook(event){
   const type=isGridfestType(event.type)?'Gridfest':normalizeTdzEventType(event.type);
-  const first=event.tdz&&ANNOUNCE_HOOKS[type]&&!['open','safe'].includes(type)?ANNOUNCE_HOOKS[type]:ANNOUNCE_HOOKS[event.sim]||ANNOUNCE_HOOKS.lmu;
-  return [first,event.tdz&&type!=='Gridfest'&&ANNOUNCE_HOOKS[event.access]].filter(Boolean).join(' ');
+  if(event.tdz&&ANNOUNCE_HOOKS[type]&&!['open','safe'].includes(type))return ANNOUNCE_HOOKS[type];
+  if(event.tdz&&['open','safe'].includes(event.access))return ANNOUNCE_HOOKS[event.access].replace('{sim}',SIM_SHORT[event.sim]||clean(event.sim)||'LMU');
+  return ANNOUNCE_HOOKS[event.sim]||ANNOUNCE_HOOKS.lmu;
 }
 export function raceHook(race){
   const iracing=String(race.circuit||'').startsWith('iracing-');
@@ -392,9 +400,9 @@ function announceTime(startsAt,timePending){
   const hour=Number(new Intl.DateTimeFormat('fr-FR',{timeZone:TIME_ZONE,hour:'numeric',hourCycle:'h23'}).formatToParts(startsAt).find(part=>part.type==='hour').value);
   return `${hour>=18?'Ce soir':'Aujourd’hui'} ${recapTime.format(startsAt).replace(':','h')}`;
 }
-// The buttons under each race: « Présent » opens it on the site, « Absent » (absent: its button) marks it from Discord.
+// The buttons under each race: « S’inscrire » opens it on the site, « Absent » (absent: its button) marks it from Discord.
 function announceButtons(url,eventId,absent){
-  return url?[{type:1,components:[{type:2,style:5,label:'Présent',emoji:{name:'✅'},url},...(absent?[absent(eventId)]:[])]}]:[];
+  return url?[{type:1,components:[{type:2,style:5,label:'S’inscrire',emoji:{name:'✅'},url},...(absent?[absent(eventId)]:[])]}]:[];
 }
 // « 📺 Lancement du stream sur Twitch à 19h45 »: the community's stream (site.streamUrl, a link on its platform) and the
 // stream times the admins gave today's events (streams: [{name, time:'19:45'}]). Without a stream time today, nothing:
@@ -508,7 +516,9 @@ export function buildAnnounceRace(race,site={},updatedAt=Date.now(),emojis={},ab
   const departures=(race.departures||[]).filter(departure=>departure.crews.length||departure.unassignedPilots?.length);
   // « Aujourd’hui 13h00 », as the events: a Discord date would show in each reader's language, in full.
   const today=departure=>announceTime(departure.startsAt,departure.timePending);
-  const fields=departures.slice(0,20).map(departure=>({name:BLANK,value:cut(departureValue(departure,false,emojis,today),1024),inline:false}));
+  // One line per start (Nathan, 2026-11-01): its time and its crews with their number of pilots; the names are in its thread.
+  const sim=simOf(first),startLine=departure=>[`🕐 **${today(departure)}**`,...orderedEntries(departure.crews).map(crew=>`${categoryMark(crew.category,sim,emojis)} ${clean(crew.name)} (${crew.pilots.length})`)].join(' · ');
+  const fields=departures.length?[{name:BLANK,value:cut(departures.slice(0,20).map(startLine).join('\n'),1024),inline:false}]:[];
   if(!departures.length)fields.push({name:BLANK,value:`${(race.departures||[]).map(departure=>`🕐 **${today(departure)}**`).join('\n')}\nAucun équipage pour l’instant : lance-toi !`,inline:false});
   const pilots=new Set(departures.flatMap(departure=>[...departure.crews.flatMap(crew=>crew.pilots),...(departure.unassignedPilots||[]).map(pilot=>typeof pilot==='string'?pilot:pilot.name)]));
   const crews=departures.reduce((total,departure)=>total+departure.crews.length,0);
@@ -561,10 +571,11 @@ export function buildCompleteAnnouncement(intro, items, site={}) {
   // Embed fields appear above its image: keep the live link just above the banner.
   if(streamLink&&head.fields.length<25){
     const channel=new URL(streamLink[2]).pathname.split('/').filter(Boolean)[0]||'';
+    // « 📺 En direct avec La Praline · 13h45 », whatever the hour (« La soirée avec… » at 13h45 read wrong, Nathan 2026-11-01).
     const name=clean(site.streamName||channel);
     const times=[...new Set((site.streams||[]).map(stream=>stream.time).filter(time=>/^([01]\d|2[0-3]):[0-5]\d$/.test(time)))].sort();
-    const schedule=times.length?`Début du stream à **${times.map(time=>time.replace(':','h')).join(' · ')}**\n`:'';
-    head.fields.push({name:cut(name?`📺 LA SOIRÉE AVEC ${name.toUpperCase()}`:'📺 LA SOIRÉE EN DIRECT',256),value:`${schedule}**[▶ REJOINDRE LE STREAM](${streamLink[2]})**`,inline:false});
+    const at=times.length?` · ${times.map(time=>time.replace(':','h')).join(', ')}`:'';
+    head.fields.push({name:cut(`📺 En direct${name?` avec ${name}`:''}${at}`,256),value:`**[▶ Rejoindre le stream](${streamLink[2]})**`,inline:false});
   }
   return {content:intro.content,embeds:fitDiscordEmbeds(embeds),components,allowed_mentions:intro.allowed_mentions};
 }

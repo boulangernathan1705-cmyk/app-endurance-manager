@@ -287,6 +287,8 @@ async function publishAnnouncement(env, community, settings, timestamp) {
   const restSite = {...site,streamUrl:'',streams:[],bannerUrl:live.length ? '' : site.bannerUrl};
   const restPayload = rest.length ? buildCompleteAnnouncement(quiet(buildAnnounceIntro(count(rest),restSite)),rest,restSite) : null;
   if (restPayload && live.length) restPayload.content = '**Aussi aujourd’hui sur le serveur :**';
+  // Buttons only on the stream's message; the other races keep the link on their name (Nathan, 2026-11-01).
+  if (restPayload) restPayload.components = [];
   // Only the stream's message pings, once, on the first morning evaluation (7h30–9h).
   const ping = intro.ping_attempted === 0 && minutes < UNTIL && Boolean(livePayload);
   if (intro.ping_attempted === 0 && !livePayload) await env.DB.prepare("UPDATE discord_announcements SET ping_attempted=1 WHERE community_id=? AND day=? AND item='intro'").bind(community.id,day).run();

@@ -16,7 +16,7 @@ import {allCommunities, communityById, communityUrl} from './community.mjs';
 import {notify} from './notifications.mjs';
 import {durationLabel,raceFinishAt} from '../shared/duration.mjs';
 import {catalogForGame} from '../shared/catalog.mjs';
-import {categoryEmojiName, conditionFields, raceWeekOpen} from './discord-weekly-format.mjs';
+import {conditionFields, raceWeekOpen, startTimeLabel, clockLabel} from './discord-weekly-format.mjs';
 
 const DISCORD_API = 'https://discord.com/api/v10';
 const HOUR = 3600_000;
@@ -80,6 +80,8 @@ const clip = (value, size) => { const text = String(value || '').trim(); return 
 const game = circuit => String(circuit || '').startsWith('iracing-') ? 'iracing' : 'lmu';
 // No mention or link can be slipped in through a name chosen on the site.
 const safe = value => String(value || '').replace(/[@#<>*_~`|\\[\]]/g, '').replace(/\s+/g, ' ').trim();
+// In a message's text a « # » stays (« Les Tondeuz #12 »): without « < », it can't make a link to a channel.
+const safeText = value => String(value || '').replace(/[@<>*_~`|\\[\]]/g, '').replace(/\s+/g, ' ').trim();
 
 // The start of the crew and when its race ends, or null (start gone, or its time not known yet).
 function startOf(row) {
@@ -91,50 +93,54 @@ function startOf(row) {
 }
 
 // The card of the voice channel's chat: the race, the crew and its conditions, a button to the race on the site.
+// A voice's chat is narrow (Nathan, 2026-11-01): one column, a fact per line, no side picture; times in Paris words
+// (« Dim. 1 nov. · 13h00 »), as everywhere; Discord's own dates only for « dans 2 heures ».
 const COLORS = {lmu:0xe5484d, iracing:0x3b82f6};
 const raceLink = (env, community, row) => { try { return `${communityUrl(env, community)}/${game(row.circuit)}/#event=${row.event_id}`; } catch { return ''; } };
+const relative = timestamp => `<t:${Math.floor(timestamp / 1000)}:R>`;
+const pageButton = link => link ? [{type:1, components:[{type:2, style:5, label:'Page de la course', emoji:{name:'📋'}, url:link}]}] : [];
+const weatherOf = row => conditionFields(parse(row.event_details, {}) || {}).find(field => field.name.startsWith('🌦️'))?.value.replace(/\n/g, ' · ') || '';
 function recapPayload(env, community, row, start, pilots) {
-  const sim = game(row.circuit), info = parse(row.event_details, {}) || {}, link = raceLink(env, community, row);
-  const unix = Math.floor(start.startsAt / 1000), end = Math.floor(start.endsAt / 1000);
+  const sim = game(row.circuit), link = raceLink(env, community, row);
   const circuit = catalogForGame(sim).circuits?.find(item => item.id === row.circuit)?.name;
   // The one who made the crew first, then the others in their order of entry.
   const ordered = [...pilots].sort((a, b) => (b.user_id && b.user_id === row.owner_user_id) - (a.user_id && a.user_id === row.owner_user_id));
-  const names = ordered.map(pilot => safe(pilot.name) && `${safe(pilot.name)}${pilot.user_id && pilot.user_id === row.owner_user_id ? ' · responsable' : ''}`).filter(Boolean);
-  const fields = [
-    {name:'🟢 Départ', value:start.pending ? 'Horaire à confirmer' : `<t:${unix}:F>\n<t:${unix}:R>`, inline:true},
-    start.minutes && {name:'⏱️ Durée', value:`${durationLabel(start.minutes)}${start.pending ? '' : `\narrivée <t:${end}:t>`}`, inline:true},
-    {name:'🚗 Voiture', value:[safe(row.car) || 'À choisir', safe(row.category)].filter(Boolean).join('\n'), inline:true},
-    {name:`👥 Pilotes · ${names.length}`, value:names.join('\n') || 'Personne pour l’instant', inline:true},
-    ...conditionFields(info)
-  ].filter(Boolean);
-  const logo = categoryEmojiName(sim, row.category);
-  let site = '';
-  try { site = communityUrl(env, community); } catch {}
+  const names = ordered.map(pilot => safeText(pilot.name) && `${safeText(pilot.name)}${pilot.user_id && pilot.user_id === row.owner_user_id ? ' · responsable' : ''}`).filter(Boolean);
+  const weather = weatherOf(row);
+  const lines = [
+    `Équipage **${safeText(row.crew_name)}** · ${row.locked ? '🔒 Complet' : '🔓 Il reste de la place'}`,
+    '',
+    `🟢 **${startTimeLabel(start.startsAt, start.pending)}**`,
+    start.minutes && `⏱️ ${durationLabel(start.minutes)}${start.pending ? '' : ` · arrivée ${clockLabel(start.endsAt)}`}`,
+    `🚗 ${[safeText(row.car) || 'Voiture à choisir', safeText(row.category)].filter(Boolean).join(' · ')}`,
+    weather && `🌦️ ${weather}`,
+    '',
+    `👥 **Pilotes · ${names.length}**`,
+    ...(names.length ? names : ['Personne pour l’instant'])
+  ].filter(line => line !== false && line !== null && line !== undefined && line !== 0);
   const embed = {color:COLORS[sim],
-    author:{name:[`${sim === 'iracing' ? '🏁 iRacing' : '🏎️ LMU'}`, circuit, info.grid && `${info.grid} voitures`].filter(Boolean).join(' · ')},
-    title:clip(safe(row.event_name) || 'Endurance', 256), ...(link ? {url:link} : {}),
-    description:`Équipage **${safe(row.crew_name)}** · ${row.locked ? '🔒 Complet' : '🔓 Ouvert, il reste de la place'}`,
-    ...(site && logo ? {thumbnail:{url:`${site}/images/discord-emojis/${logo.slice(3)}.png`}} : {}),
-    fields, footer:{text:'Endurance Manager · ce vocal ferme 2 h après l’arrivée'}};
-  return {content:'', embeds:[embed], components:link ? [{type:1, components:[{type:2, style:5, label:'Page de la course', emoji:{name:'📋'}, url:link}]}] : []};
+    author:{name:[`${sim === 'iracing' ? '🏁 iRacing' : '🏎️ LMU'}`, circuit].filter(Boolean).join(' · ')},
+    title:clip(safeText(row.event_name) || 'Endurance', 256), ...(link ? {url:link} : {}),
+    description:clip(lines.join('\n'), 4096), footer:{text:'Ce vocal ferme 2 h après l’arrivée'}};
+  return {content:'', embeds:[embed], components:pageButton(link)};
 }
 // After the finish, once: a word to the crew before its voice closes.
 function endPayload(env, community, row, start, pilots) {
   let site = '';
   try { site = communityUrl(env, community); } catch {}
-  const close = Math.floor((start.endsAt + CLOSE_AFTER) / 1000), names = pilots.map(pilot => safe(pilot.name)).filter(Boolean);
-  return {content:'', embeds:[{color:0x23a55a, title:clip(`🏁 Course terminée, bien joué ${safe(row.crew_name) || 'l’équipage'} !`, 256),
-    fields:[names.length && {name:'👥 Pilotes', value:clip(names.join(' · '), 1024), inline:true}, {name:'🔊 Ce vocal', value:`ferme <t:${close}:R>`, inline:true}].filter(Boolean)}],
+  const names = pilots.map(pilot => safeText(pilot.name)).filter(Boolean);
+  return {content:'', embeds:[{color:0x23a55a, title:clip(`🏁 Course terminée, bien joué ${safeText(row.crew_name) || 'l’équipage'} !`, 256),
+    description:clip([names.length && `👥 ${names.join(' · ')}`, `🔊 Ce vocal ferme ${relative(start.endsAt + CLOSE_AFTER)}`].filter(Boolean).join('\n'), 4096)}],
     components:site ? [{type:1, components:[{type:2, style:5, label:'Prochaines endurances', emoji:{name:'📅'}, url:`${site}/${game(row.circuit)}/`}]}] : []};
 }
 // 24 h and 1 h before the start: a card in the voice's chat, naming its pilots without mentions.
 function reminderPayload(env, community, row, start, pilots, soon) {
-  const unix = Math.floor(start.startsAt / 1000), names = pilots.map(pilot => safe(pilot.name)).filter(Boolean), link = raceLink(env, community, row);
-  if (soon) return {content:'', embeds:[{color:0x23a55a, description:clip(`🟢 **Départ <t:${unix}:R>, on se retrouve ici.**\n${[...names, `arrivée vers <t:${Math.floor(start.endsAt / 1000)}:t>`].join(' · ')}`, 4096)}]};
-  const weather = conditionFields(parse(row.event_details, {}) || {}).find(field => field.name.startsWith('🌦️'));
-  return {content:'', embeds:[{color:COLORS[game(row.circuit)], title:clip(`⏰ Rappel · ${safe(row.event_name) || 'Endurance'}`, 256),
-    fields:[{name:'🟢 Départ', value:`<t:${unix}:F>\n<t:${unix}:R>`, inline:true}, names.length && {name:'👥 Pilotes', value:clip(names.join('\n'), 1024), inline:true}, weather].filter(Boolean)}],
-    components:link ? [{type:1, components:[{type:2, style:5, label:'Page de la course', emoji:{name:'📋'}, url:link}]}] : []};
+  const names = pilots.map(pilot => safeText(pilot.name)).filter(Boolean), link = raceLink(env, community, row);
+  if (soon) return {content:'', embeds:[{color:0x23a55a, description:clip(`🟢 **Départ ${relative(start.startsAt)}, on se retrouve ici.**\n${[...names, `arrivée vers ${clockLabel(start.endsAt)}`].join(' · ')}`, 4096)}]};
+  const weather = weatherOf(row);
+  return {content:'', embeds:[{color:COLORS[game(row.circuit)], title:clip(`⏰ Rappel · ${safeText(row.event_name) || 'Endurance'}`, 256),
+    description:clip([`🟢 **${startTimeLabel(start.startsAt, start.pending)}** · ${relative(start.startsAt)}`, weather && `🌦️ ${weather}`, names.length && `👥 ${names.join(' · ')}`].filter(Boolean).join('\n'), 4096)}],
+    components:pageButton(link)};
 }
 const END_BIT = 4;
 const endDue = (row, start, timestamp) => !start.pending && timestamp >= start.endsAt && timestamp < start.endsAt + CLOSE_AFTER
