@@ -10,7 +10,7 @@ import {isStream} from '../../shared/stream.mjs';
 import {isGrindfest} from '../../shared/grindfest.mjs';
 import {simForEvent,SIMS} from '../../shared/catalog.mjs';
 import {parisDay,weekStart,weekDays} from '../week-days.mjs';
-import {eventMinutes} from '../../shared/duration.mjs';
+import {eventMinutes,raceFinishAt} from '../../shared/duration.mjs';
 import {RACE_WEATHERS} from '../../shared/catalog.mjs';
 
 const DAY=86400000;
@@ -122,7 +122,7 @@ function myStarts(events,now){
     for(const departure of event.departures||[]){
       const startsAt=Number(departure.startsAt),regs=myRegs(departure);
       if(!regs.length||!Number.isFinite(startsAt))continue;
-      const minutes=eventMinutes(event),endsAt=startsAt+Math.max(minutes,0)*60000;
+      const minutes=eventMinutes(event),endsAt=isSolo(event)?startsAt+Math.max(minutes,0)*60000:raceFinishAt(startsAt,Math.max(minutes,0));
       if(endsAt<now&&startsAt<now)continue;
       const crew=regs.map(reg=>crewOf(departure,reg)).find(Boolean)||null;
       starts.push({event,departure,startsAt,crew});
