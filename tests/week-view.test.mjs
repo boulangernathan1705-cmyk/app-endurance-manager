@@ -88,6 +88,6 @@ test('the week is short: finished races fold per day, busy days are wider, the h
   assert.match(view, /weight:items\.length>2\?2:items\.length\?1:done\.length\?\.75:\.5/);
   assert.match(view, /style="--week-columns:\$\{widths\}"/);
   assert.match(css, /grid-template-columns: var\(--week-columns, repeat\(7, minmax\(0, 1fr\)\)\)/);
-  assert.match(css, /main:has\(\.home-layout\) \{ max-width: 2400px; \}/);
+  assert.match(css, /main:not\(\.charte\):has\(\.home-layout\) \{ max-width: 2400px; \}/);
   assert.match(css, /\.week-day\.is-busy \.week-day-list \{ grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/);
 });
