@@ -25,11 +25,17 @@ test('each start of the week is on its day, in time order, with the pilot\'s own
   const monza = {id:'monza', name:'Monza', durationHours:1, departures:[{id:'d', startsAt:Date.parse('2026-11-07T08:00:00Z')}]};
   const days = weekDays([spa, next, monza], monday);
   assert.equal(days.length, 7);
-  assert.deepEqual(days[5].items.map(item => `${item.event.id}:${item.departure.id}`), ['monza:d', 'spa:a', 'spa:b']);
+  // A race's starts of the same day share ONE card (Nathan 2026-11-01), the pilot's own start as its start.
+  assert.deepEqual(days[5].items.map(item => `${item.event.id}:${item.starts.map(start => start.departure.id).join('+')}`), ['monza:d', 'spa:a+b']);
+  assert.equal(days[5].items[1].departure.id, 'a');
   assert.equal(days[5].items[1].mine, true); assert.equal(days[5].items[1].pilots, 2);
-  assert.equal(days[5].items[2].mine, false); assert.equal(days[5].items[2].pilots, 0);
-  // The second 6 h start ends the next day, 30 min of practice and qualifying after its 6 h (as everywhere on the site).
-  assert.equal(days[5].items[2].endsAt, Date.parse('2026-11-08T02:30:00Z'));
+  assert.equal(days[5].items[1].starts[1].mine, false); assert.equal(days[5].items[1].starts[1].pilots, 0);
+  // The card ends with its last start: 30 min of practice and qualifying after its 6 h (as everywhere on the site).
+  assert.equal(days[5].items[1].endsAt, Date.parse('2026-11-08T02:30:00Z'));
+  // Starts on other days stay on their own day.
+  const two = {id:'two', name:'Deux jours', durationHours:1, departures:[{id:'f', startsAt:Date.parse('2026-11-07T08:00:00Z')}, {id:'g', startsAt:Date.parse('2026-11-08T08:00:00Z')}]};
+  const split = weekDays([two], monday);
+  assert.equal(split[5].items.length, 1); assert.equal(split[6].items.length, 1);
   // A solo event keeps its own length.
   const cup = {id:'cup', name:'Coupe', format:'solo', durationMinutes:60, departures:[{id:'e', startsAt:Date.parse('2026-11-04T19:00:00Z')}]};
   assert.equal(weekDays([cup], monday)[2].items[0].endsAt, Date.parse('2026-11-04T20:00:00Z'));
@@ -69,4 +75,7 @@ test('a week card shows its simulator on top, then « 15h – fin 18h10 », then
   assert.match(view, /<span class="week-block-sim">/);
   assert.match(view, /<small>– \$\{esc\(fin\)\}<\/small>/);
   assert.doesNotMatch(view, /Arrivée \$\{hour/);
+  // Several starts on one card: only the start times, no end.
+  assert.match(view, /const fin=several\|\|/);
+  assert.match(view, /join\(' · '\)/);
 });

@@ -13,12 +13,13 @@ export function weekStart(timestamp=Date.now(),offset=0){
 }
 const mineOn=departure=>(departure.availability||[]).some(reg=>reg.mine&&reg.status!=='unavailable');
 const pilotsOn=departure=>new Set((departure.availability||[]).filter(reg=>reg.status!=='unavailable').map(reg=>reg.participantId||reg.id)).size;
-// Every start of the week, by day (the day of its start in Paris), in time order: a race of several starts appears
-// at each of them, a race over several days on the day it starts (with its end).
+// Every race of the week, by day (the day of its start in Paris), in time order: a race of several starts that day is
+// ONE item with all its starts (Nathan 2026-11-01), a race over several days on the day it starts (with its end).
 export function weekDays(events,monday){
   const days=Array.from({length:7},(_,index)=>({day:monday+index,items:[]}));
   for(const event of events){
     if(event.archived)continue;
+    const byDay=new Map();
     for(const departure of event.departures||[]){
       const startsAt=Number(departure.startsAt);
       if(!Number.isFinite(startsAt))continue;
@@ -27,7 +28,14 @@ export function weekDays(events,monday){
       const minutes=eventMinutes(event);
       // An endurance finishes 30 min (practice and qualifying) after its race time, as everywhere on the site.
       const endsAt=minutes>0?(event.format==='solo'?startsAt+minutes*60000:raceFinishAt(startsAt,minutes)):null;
-      days[index].items.push({event,departure,startsAt,endsAt,mine:mineOn(departure),pilots:pilotsOn(departure)});
+      if(!byDay.has(index))byDay.set(index,[]);
+      byDay.get(index).push({departure,startsAt,endsAt,mine:mineOn(departure),pilots:pilotsOn(departure)});
+    }
+    for(const [index,starts] of byDay){
+      starts.sort((a,b)=>a.startsAt-b.startsAt);
+      const first=starts[0],own=starts.find(start=>start.mine);
+      days[index].items.push({event,starts,departure:(own||first).departure,startsAt:first.startsAt,endsAt:starts.at(-1).endsAt,
+        mine:Boolean(own),pilots:starts.reduce((sum,start)=>sum+start.pilots,0)});
     }
   }
   for(const day of days)day.items.sort((a,b)=>a.startsAt-b.startsAt||String(a.event.name).localeCompare(String(b.event.name),'fr'));
