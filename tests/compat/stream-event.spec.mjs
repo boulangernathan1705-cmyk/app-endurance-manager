@@ -1,6 +1,8 @@
 import {test,expect} from '@playwright/test';
 const EVENT='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 for(const width of [1440,390])test(`stream creation, live card and edit preserve free content at ${width}px`,async({page})=>{
+  // The whole flow (create, show, edit again in three steps) runs past 30 s on the emulated iPhone's WebKit.
+  test.setTimeout(60000);
   await page.setViewportSize({width,height:1000});
   const errors=[];page.on('pageerror',error=>errors.push(error.message));
   let events=[],saved=null;
