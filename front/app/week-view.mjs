@@ -3,15 +3,15 @@
 // Gridfest, streams) and the endurances of LMU and iRacing together. A view only: a click opens the race's own page
 // (the other simulator's races in its own space), nothing is entered here. On a phone the days follow each other in
 // a list.
-import {app,state,esc,button,notifyRender,activeGame,api,can} from './core.mjs';
-import {todoItems} from '../admin-todo.mjs';
+import {app,state,esc,button,notifyRender,activeGame,api,coversHour} from './core.mjs';
 import {gameForEvent} from '../../shared/catalog.mjs';
-import {isSolo} from './solo.mjs';
+import {isSolo,eventAccessLogo} from './solo.mjs';
 import {isStream} from '../../shared/stream.mjs';
 import {isGrindfest} from '../../shared/grindfest.mjs';
 import {simForEvent,SIMS} from '../../shared/catalog.mjs';
 import {parisDay,weekStart,weekDays} from '../week-days.mjs';
 import {eventMinutes} from '../../shared/duration.mjs';
+import {RACE_WEATHERS} from '../../shared/catalog.mjs';
 
 const DAY=86400000;
 const dateOf=day=>new Date(day*DAY);
@@ -47,21 +47,54 @@ function kindOf(event){
 // Every start of the week, by day, each with the kind of its race.
 const weekStarts=(events,monday)=>weekDays(events,monday).map(day=>({...day,items:day.items.map(item=>({...item,kind:kindOf(item.event),pending:item.departure.hideClock===true}))}));
 
+// The forecast in a word: « Pluie » when a slot says rain, else the race's single forecast (details).
+function weatherOf(event){
+  const info=event.details||{},slots=(info.weatherSlots||[]).filter(Boolean);
+  if(slots.some(sky=>/Rain|Drizzle|Storm/.test(sky)))return 'Pluie';
+  if(slots.length)return 'Sec';
+  return RACE_WEATHERS[info.weather]||'';
+}
+// « 6H », « 12H », « 1H30 »: an endurance's length on its block.
+const lengthOf=event=>{const minutes=eventMinutes(event);return minutes>0?`${Math.floor(minutes/60)}H${minutes%60?String(minutes%60).padStart(2,'0'):''}`:'';};
+// The hours a pilot drives: « toute la course » or « 15h–18h ».
+function hoursOf(departure,reg,event){
+  if(reg.status==='whole')return 'toute la course';
+  const hours=Math.ceil(eventMinutes(event)/60),ranges=[];
+  for(let index=0;index<hours;index++){if(!coversHour(reg,index))continue;const last=ranges.at(-1);if(last&&last.end===index)last.end=index+1;else ranges.push({start:index,end:index+1});}
+  const at=offset=>hour(Number(departure.startsAt)+offset*3600000);
+  return ranges.map(range=>`${at(range.start)}–${at(range.end)}`).join(', ');
+}
+const myReg=departure=>(departure.availability||[]).find(reg=>reg.mine&&reg.status!=='unavailable')||null;
+
+// The event's logo (OPEN or SAFE of its simulator, Gridfest), as on its card.
+const logoOf=event=>isGrindfest(event)?'<img class="event-access-logo" src="/images/event-access/gridfest-stacked.png" alt="Gridfest" width="308" height="320" loading="lazy" decoding="async">':eventAccessLogo(event);
+
 function block(item,now){
   const {event,departure,startsAt,endsAt,kind,mine,pilots,pending}=item;
-  const past=(endsAt||startsAt)<now;
-  // A race over several days says when it ends (« → dim. 16h »).
-  const ends=endsAt&&parisDay(endsAt)!==parisDay(startsAt)?` → ${endDay.format(endsAt).replace('.','')} ${hour(endsAt)}`:'';
-  const sim=isSolo(event)&&!isStream(event)?SIMS.find(item=>item.id===simForEvent(event))?.short||'':'';
-  const places=isSolo(event)&&!isStream(event)&&Number(event.capacity)>0?`${pilots}/${event.capacity}`:pilots?`${pilots} pilote${pilots>1?'s':''}`:'';
+  const past=(endsAt||startsAt)<now,live=!pending&&startsAt<=now&&!past,solo=isSolo(event),stream=isStream(event);
+  // A race over several days says when it ends (« → dim. 16h »), a long one its finish time.
+  const ends=endsAt&&parisDay(endsAt)!==parisDay(startsAt)?`→ ${endDay.format(endsAt).replace('.','')} ${hour(endsAt)}`:endsAt&&!solo?`→ ${hour(endsAt)}`:'';
+  const sim=solo?(stream?'':SIMS.find(item=>item.id===simForEvent(event))?.short||''):SIM_NAME[event.otherGame||activeGame];
+  const badge=solo?kind.label:lengthOf(event),logo=solo?logoOf(event):'';
+  const weather=solo?'':weatherOf(event);
+  const rounds=solo&&!stream&&Array.isArray(event.rounds)&&event.rounds.length>1?`${event.rounds.length} manches`:'';
+  const left=solo&&!stream&&Number(event.capacity)>0?Number(event.capacity)-pilots:null;
+  const reg=mine?myReg(departure):null,crew=reg&&!solo?crewOf(departure,reg):null;
+  const situation=!mine?'':solo?'<span class="week-chip is-ok">✓ Inscrit</span>'
+    :crew?`<span class="week-chip is-ok">✓ ${esc(crew.name)}${reg?` · ${esc(hoursOf(departure,reg,event))}`:''}</span>`:'<span class="week-chip is-alert">Sans équipage</span>';
+  const places=left===null||past?'':left<=0?'<span class="week-chip is-warn">Complet</span>':`<span class="week-chip is-warn">${left} place${left>1?'s':''} restante${left>1?'s':''}</span>`;
   const label=`${pending?'Horaire à définir':hour(startsAt)} · ${event.name}${mine?' · tu es inscrit':''}`;
-  const sim2=isSolo(event)?'':` is-${event.otherGame||activeGame}`;
-  const open=event.otherGame?`<a class="week-block is-${kind.key}${sim2}${mine?' is-mine':''}${past?' is-past':''}" href="/${event.otherGame}/#event=${event.id}" aria-label="${esc(label)}">`
-    :`<button type="button" class="week-block is-${kind.key}${sim2}${mine?' is-mine':''}${past?' is-past':''}" data-action="open" data-id="${event.id}" aria-label="${esc(label)}">`;
+  const sim2=solo?'':` is-${event.otherGame||activeGame}`;
+  const cls=`week-block is-${kind.key}${sim2}${mine?' is-mine':''}${past?' is-past':''}${live?' is-live':''}`;
+  const open=event.otherGame?`<a class="${cls}" href="/${event.otherGame}/#event=${event.id}" aria-label="${esc(label)}">`
+    :`<button type="button" class="${cls}" data-action="open" data-id="${event.id}" aria-label="${esc(label)}">`;
+  const meta=[sim,rounds,weather&&`${weather==='Pluie'?'🌧':'☀️'} ${weather}`,ends,past&&'Terminé'].filter(Boolean);
   return `${open}
-    <span class="week-block-time">${pending?'à définir':esc(hour(startsAt))}${ends?`<small>${esc(ends)}</small>`:''}</span>
-    <span class="week-block-name">${mine?'<span class="week-mine" aria-hidden="true">✓</span>':''}${esc(event.name)}</span>
-    <span class="week-block-meta"><span class="week-kind">${esc(kind.label)}</span>${sim?`<span>${esc(sim)}</span>`:''}${!isSolo(event)?`<span>${(event.otherGame||activeGame)==='iracing'?'iRacing':'LMU'}</span>`:''}${places?`<span>${esc(places)}</span>`:''}${(event.departures||[]).length>1&&!isSolo(event)?`<span>départ ${(event.departures||[]).indexOf(departure)+1}</span>`:''}</span>
+    <span class="week-block-head"><span class="week-block-time">${pending?'à définir':esc(hour(startsAt))}</span>${logo?`<span class="week-block-logo">${logo}</span>`:badge?`<span class="week-badge">${esc(badge)}</span>`:''}</span>
+    ${live?'<span class="week-chip is-live">● En cours</span>':''}
+    <span class="week-block-name">${esc(event.name)}</span>
+    ${meta.length?`<span class="week-block-meta">${meta.map(text=>`<span>${esc(text)}</span>`).join('')}</span>`:''}
+    ${situation}${places}
   ${event.otherGame?'</a>':'</button>'}`;
 }
 
@@ -98,44 +131,19 @@ function myStarts(events,now){
 }
 const openRace=(event,inner,cls)=>event.otherGame?`<a class="${cls}" href="/${event.otherGame}/#event=${event.id}">${inner}</a>`:`<button type="button" class="${cls}" data-action="open" data-id="${event.id}">${inner}</button>`;
 
-function nextLine(all,now){
+// « Ta prochaine course »: the pilot's next start with his crew, his hours, the car and the forecast.
+function nextBox(all,now){
   const next=myStarts(all,now)[0];
-  if(!next)return `<div class="home-next is-empty"><span class="home-next-label">Ta prochaine course</span><span>Aucune inscription pour l’instant.</span>${button('home','Voir les courses','data-list="endurance"','home-next-go')}</div>`;
-  const {event,startsAt,crew}=next,live=startsAt<=now;
+  if(!next)return `<aside class="home-next-box is-empty"><h2 class="home-next-label">Ta prochaine course</h2><p>Aucune inscription pour l’instant.</p>${button('home','Voir les courses','data-list="endurance"','home-next-go')}</aside>`;
+  const {event,departure,startsAt,crew}=next,live=startsAt<=now,reg=myReg(departure);
   const sim=isSolo(event)?SIMS.find(item=>item.id===simForEvent(event))?.short||'':SIM_NAME[simOf(event)];
-  return openRace(event,`<span class="home-next-label">${live?'En course':'Ta prochaine course'}</span>
-    <span class="home-next-text"><b>${esc(event.name)}</b> · ${esc(when(startsAt))} à ${esc(hour(startsAt))}${sim?` · ${esc(sim)}`:''}${crew?` · équipage <b>${esc(crew.name)}</b>`:''}</span>
-    <span class="home-next-go" aria-hidden="true">Voir →</span>`,'home-next');
-}
-
-function card({tone,icon,title,live,alert='',action,href,attrs=''}){
-  const inner=`<span class="home-card-arrow" aria-hidden="true">→</span><span class="home-card-icon" aria-hidden="true">${icon}</span><span class="home-card-title">${esc(title)}</span><span class="home-card-live">${esc(live)}${alert?` <span class="home-card-alert">${esc(alert)}</span>`:''}</span>`;
-  return href?`<a class="home-card is-${tone}" href="${href}">${inner}</a>`:`<button type="button" class="home-card is-${tone}" data-action="${action}" ${attrs}>${inner}</button>`;
-}
-
-function cards(all,now){
-  const list=[];
-  for(const game of ['lmu','iracing']){
-    const first=firstOf(endurances(all).filter(event=>simOf(event)===game),now);
-    const live=first?`Prochaine : ${first.event.name}, ${when(first.at)}`:'Aucune course prévue';
-    list.push(card({tone:game,icon:'🏁',title:`Endurance ${SIM_NAME[game]}`,live,...(game===activeGame?{action:'home',attrs:'data-list="endurance"'}:{href:`/${game}/`})}));
-  }
-  if(state.soloRaces){
-    const open=all.filter(event=>!event.archived&&isSolo(event)&&!isStream(event)&&Number.isFinite(nextStart(event,now))).length;
-    list.push(card({tone:'event',icon:'🏆',title:state.soloLabel||'Events',live:open?`${open} à venir`:'Rien de prévu',action:'home',attrs:'data-list="solo"'}));
-  }
-  const mine=myStarts(all,now),races=new Set(mine.map(item=>item.event.id)).size;
-  const alone=mine.filter(item=>!isSolo(item.event)&&!item.crew).length;
-  list.push(card({tone:'mine',icon:'✅',title:'Mes inscriptions',live:races?`${races} course${races>1?'s':''}`:'Aucune',alert:alone?`${alone} sans équipage`:'',action:'my-entries'}));
-  if(state.combos)list.push(card({tone:'tools',icon:'🛠️',title:'Outils',live:'Fiches combo, mur des stands',href:'/fiches-combo.html'}));
-  return list.join('');
-}
-
-// « À traiter » of the administration, counted here for its card.
-function adminCard(all,now){
-  if(!can('admin'))return '';
-  const count=['lmu','iracing'].reduce((total,game)=>total+todoItems(endurances(all).filter(event=>simOf(event)===game),game,now).length,0);
-  return `<h2 class="home-section">Organisation</h2><div class="home-cards is-small">${card({tone:'admin',icon:'⚙️',title:'Administration',live:count?`${count} point${count>1?'s':''} à traiter`:'Rien à traiter',href:'/members.html'})}</div>`;
+  const weather=isSolo(event)?'':weatherOf(event);
+  const rows=[['Simu',sim],['Équipage',crew?.name],['Tes heures',!isSolo(event)&&reg?hoursOf(departure,reg,event):''],['Voiture',crew?.car],['Météo',weather]].filter(([,value])=>value);
+  const go=event.otherGame?`<a class="home-next-go" href="/${event.otherGame}/#event=${event.id}">Voir la course →</a>`:button('open','Voir la course →',`data-id="${event.id}"`,'home-next-go');
+  return `<aside class="home-next-box"><h2 class="home-next-label">${live?'En course':'Ta prochaine course'}</h2>
+    <p class="home-next-name">${esc(event.name)}</p><p class="home-next-when">${esc(when(startsAt))} · ${esc(hour(startsAt))}</p>
+    ${rows.length?`<dl class="home-next-rows">${rows.map(([key,value])=>`<div><dt>${esc(key)}</dt><dd>${esc(value)}</dd></div>`).join('')}</dl>`:''}
+    ${go}</aside>`;
 }
 
 export function renderWeek(){
@@ -145,22 +153,23 @@ export function renderWeek(){
   const all=[...state.events,...otherEndurances()];
   const monday=weekStart(now,offset),today=parisDay(now);
   const days=weekStarts(all,monday).map(day=>({...day,items:day.items.filter(item=>keep(item,filter))}));
-  const count=days.reduce((total,day)=>total+day.items.length,0);
-  const title=`Du ${monthDay.format(dateOf(monday))} au ${monthDay.format(dateOf(monday+6))}`;
+  const range=`du ${monthDay.format(dateOf(monday))} au ${monthDay.format(dateOf(monday+6))}`;
   const filters=FILTERS.filter(([key])=>key!=='event'||state.soloRaces)
-    .map(([key,label])=>button('week-filter',label,`data-filter="${key}" aria-pressed="${filter===key}"`,'event-filter-button')).join('');
-  const columns=days.map(day=>`<section class="week-day${day.day===today?' is-today':''}${day.day<today?' is-past':''}" aria-labelledby="week-day-${day.day}">
-      <h3 class="week-day-head" id="week-day-${day.day}"><span class="week-day-name">${esc(dayName.format(dateOf(day.day)))}</span><span class="week-day-short" aria-hidden="true">${esc(dayShort.format(dateOf(day.day)))}</span><small>${esc(monthDay.format(dateOf(day.day)))}</small></h3>
+    .map(([key,label])=>button('week-filter',`${key==='all'?'':'<i aria-hidden="true"></i>'}${label}`,`data-filter="${key}" aria-pressed="${filter===key}"`,`event-filter-button week-filter is-${key}`)).join('');
+  const columns=days.map(day=>`<section class="week-day${day.day===today?' is-today':''}${day.day<today?' is-past':''}${day.items.length?'':' is-empty'}" aria-labelledby="week-day-${day.day}">
+      <h3 class="week-day-head" id="week-day-${day.day}"><span class="week-day-name">${esc(dayName.format(dateOf(day.day)))}</span><small>${esc(monthDay.format(dateOf(day.day)))}</small>${day.day===today?'<span class="week-today">Aujourd’hui</span>':''}</h3>
       <div class="week-day-list">${day.items.map(item=>block(item,now)).join('')||'<p class="week-empty">—</p>'}</div>
     </section>`).join('');
   const name=String(state.user?.name||'').trim().split(/\s+/)[0];
-  app.innerHTML=`<div class="page-head home-head"><h1 class="page-title">${name?`SALUT ${esc(name.toLocaleUpperCase('fr-FR'))}`:'ACCUEIL'}</h1></div>
-    ${nextLine(all,now)}
-    <div class="home-cards">${cards(all,now)}</div>
-    <div class="week-head"><h2 class="week-title">${offset===0?'Cette semaine':offset===1?'La semaine prochaine':offset===-1?'La semaine dernière':'Semaine'} <small>${esc(title)} · ${count} départ${count>1?'s':''}</small></h2>
-      <div class="week-nav" role="group" aria-label="Changer de semaine">${button('week','‹ Précédente','data-offset="-1" aria-label="Semaine précédente"','secondary-button')}${offset?button('week','Cette semaine','data-offset="0"','secondary-button'):''}${button('week','Suivante ›','data-offset="1" aria-label="Semaine suivante"','secondary-button')}</div></div>
-    <div class="event-filter week-filters" role="group" aria-label="Filtrer la semaine">${filters}</div>
-    <div class="week-grid">${columns}</div>
-    ${adminCard(all,now)}`;
+  const weekLabel=offset===0?'Cette semaine':offset===1?'La semaine prochaine':offset===-1?'La semaine dernière':`Semaine du ${monthDay.format(dateOf(monday))}`;
+  app.innerHTML=`<div class="page-head home-head"><h1 class="page-title">${name?`SALUT ${esc(name.toLocaleUpperCase('fr-FR'))}`:'ACCUEIL'}</h1>
+      <div class="week-nav" role="group" aria-label="Changer de semaine">${button('week','‹','data-offset="-1" aria-label="Semaine précédente"','secondary-button week-step')}<span class="week-label">${esc(weekLabel)}<small>${esc(range)}</small></span>${button('week','›','data-offset="1" aria-label="Semaine suivante"','secondary-button week-step')}${offset?button('week','Revenir à cette semaine','data-offset="0"','link-button week-back'):''}</div></div>
+    <div class="home-layout">
+      <section class="home-week" aria-label="${esc(weekLabel)}">
+        <div class="event-filter week-filters" role="group" aria-label="Filtrer la semaine">${filters}</div>
+        <div class="week-grid">${columns}</div>
+      </section>
+      ${nextBox(all,now)}
+    </div>`;
   notifyRender();
 }

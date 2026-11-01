@@ -59,28 +59,26 @@
 <div class="charte-row"><button type="button" class="primary-button">M’inscrire</button><button type="button" class="secondary-button">Absent</button><button type="button" class="danger-button">Me désinscrire</button><button type="button" class="link-button">Gérer</button></div>
 <div class="charte-row event-filters" role="group" aria-label="Filtres"><button type="button" class="event-filter-button is-active" aria-pressed="true">Tout</button><button type="button" class="event-filter-button" aria-pressed="false">Endurance LMU</button><button type="button" class="event-filter-button" aria-pressed="false">Endurance iRacing</button><button type="button" class="event-filter-button" aria-pressed="false">Events</button></div></section>
 
-<section class="charte-section" aria-labelledby="c-home"><h2 id="c-home">Accueil</h2>
-<a class="home-next" href="#"><span class="home-next-label">Ta prochaine course</span><span class="home-next-text"><strong>6h de Spa</strong> · sam. 7 nov. à 15h · LMU · équipage <strong>Apex</strong></span><span class="home-next-go">Voir →</span></a>
-<div class="home-cards">
-<a class="home-card is-lmu" href="#"><span class="home-card-arrow">→</span><span class="home-card-icon">🏁</span><span class="home-card-title">Endurance LMU</span><span class="home-card-live">Prochaine : 6h de Spa, sam.</span></a>
-<a class="home-card is-iracing" href="#"><span class="home-card-arrow">→</span><span class="home-card-icon">🏁</span><span class="home-card-title">Endurance iRacing</span><span class="home-card-live">Prochaine : 12h de Sebring, dim.</span></a>
-<a class="home-card is-event" href="#"><span class="home-card-arrow">→</span><span class="home-card-icon">🏆</span><span class="home-card-title">Event</span><span class="home-card-live">2 events cette semaine</span></a>
-<a class="home-card is-mine" href="#"><span class="home-card-arrow">→</span><span class="home-card-icon">✅</span><span class="home-card-title">Mes inscriptions</span><span class="home-card-live">2 courses<span class="home-card-alert">1 sans équipage</span></span></a>
-<a class="home-card is-tools" href="#"><span class="home-card-arrow">→</span><span class="home-card-icon">🛠️</span><span class="home-card-title">Outils</span><span class="home-card-live">Fiches combo</span></a>
-</div></section>
-
-<section class="charte-section" aria-labelledby="c-week"><h2 id="c-week">Semaine</h2>
+<section class="charte-section" aria-labelledby="c-home"><h2 id="c-home">Accueil : la semaine et la prochaine course</h2>
+<div class="home-layout">
+<section class="home-week">
+<div class="event-filter week-filters" role="group" aria-label="Filtres"><button type="button" class="event-filter-button week-filter is-all" aria-pressed="true">Tout</button><button type="button" class="event-filter-button week-filter is-lmu" aria-pressed="false"><i></i>Endurance LMU</button><button type="button" class="event-filter-button week-filter is-iracing" aria-pressed="false"><i></i>Endurance iRacing</button><button type="button" class="event-filter-button week-filter is-event" aria-pressed="false"><i></i>Events</button><button type="button" class="event-filter-button week-filter is-mine" aria-pressed="false"><i></i>Mes courses</button></div>
 <div class="week-grid charte-week">
-<section class="week-day is-today"><h3 class="week-day-head">samedi<small>7 nov.</small></h3><div class="week-day-list">
-<a class="week-block is-endurance is-lmu is-mine" href="#"><span class="week-block-time">15h00</span><span class="week-block-name"><span class="week-mine">✓</span>6h de Spa</span><span class="week-block-meta"><span class="week-kind">LMU</span><span>8 pilotes</span></span></a>
-<a class="week-block is-event" href="#"><span class="week-block-time">21h00</span><span class="week-block-name">SAFE’S RACE</span><span class="week-block-meta"><span class="week-kind">Event</span><span>12/20</span></span></a>
+<section class="week-day is-today"><h3 class="week-day-head"><span class="week-day-name">mercredi</span><small>4 novembre</small><span class="week-today">Aujourd’hui</span></h3><div class="week-day-list">
+<a class="week-block is-event is-live" href="#"><span class="week-block-head"><span class="week-block-time">20h</span><span class="week-block-logo"><img class="event-access-logo" src="/images/event-access/open-lmu.png" alt="" width="300" height="300"></span></span><span class="week-block-name">OPEN Bouboule</span><span class="week-block-meta"><span>LMU</span><span>3 manches</span></span><span class="week-chip is-live">● En cours</span><span class="week-chip is-warn">2 places restantes</span></a>
 </div></section>
-<section class="week-day"><h3 class="week-day-head">dimanche<small>8 nov.</small></h3><div class="week-day-list">
-<a class="week-block is-endurance is-iracing" href="#"><span class="week-block-time">14h00</span><span class="week-block-name">12h de Sebring</span><span class="week-block-meta"><span class="week-kind">iRacing</span><span>6 pilotes</span></span></a>
-<a class="week-block is-gridfest" href="#"><span class="week-block-time">20h00</span><span class="week-block-name">Gridfest</span><span class="week-block-meta"><span class="week-kind">Gridfest</span><span>3 streamers</span></span></a>
-<a class="week-block is-stream" href="#"><span class="week-block-time">20h45</span><span class="week-block-name">Soirée stream</span><span class="week-block-meta"><span class="week-kind">Stream</span></span></a>
+<section class="week-day"><h3 class="week-day-head"><span class="week-day-name">samedi</span><small>7 novembre</small></h3><div class="week-day-list">
+<a class="week-block is-endurance is-lmu is-mine" href="#"><span class="week-block-head"><span class="week-block-time">15h</span><span class="week-badge">6H</span></span><span class="week-block-name">6h de Spa</span><span class="week-block-meta"><span>LMU</span><span>🌧 Pluie</span><span>→ 21h</span></span><span class="week-chip is-ok">✓ Apex Racing · 15h–18h</span></a>
+<a class="week-block is-gridfest" href="#"><span class="week-block-head"><span class="week-block-time">21h</span><span class="week-block-logo"><img class="event-access-logo" src="/images/event-access/gridfest-stacked.png" alt="" width="300" height="300"></span></span><span class="week-block-name">Gridfest #4</span><span class="week-block-meta"></span><span class="week-chip is-warn">Complet</span></a>
 </div></section>
-<section class="week-day"><h3 class="week-day-head">lundi<small>9 nov.</small></h3><div class="week-day-list"><p class="week-empty">—</p></div></section>
+<section class="week-day"><h3 class="week-day-head"><span class="week-day-name">dimanche</span><small>8 novembre</small></h3><div class="week-day-list">
+<a class="week-block is-endurance is-iracing is-mine" href="#"><span class="week-block-head"><span class="week-block-time">14h</span><span class="week-badge">12H</span></span><span class="week-block-name">12h de Sebring</span><span class="week-block-meta"><span>iRacing</span><span>→ lun 2h</span></span><span class="week-chip is-alert">Sans équipage</span></a>
+<a class="week-block is-stream" href="#"><span class="week-block-head"><span class="week-block-time">20h45</span><span class="week-badge">Stream</span></span><span class="week-block-name">Soirée stream</span><span class="week-block-meta"></span></a>
+</div></section>
+</div></section>
+<aside class="home-next-box"><h2 class="home-next-label">Ta prochaine course</h2><p class="home-next-name">6h de Spa</p><p class="home-next-when">sam 7 nov · 15h</p>
+<dl class="home-next-rows"><div><dt>Simu</dt><dd>LMU</dd></div><div><dt>Équipage</dt><dd>Apex Racing #7</dd></div><div><dt>Tes heures</dt><dd>15h–18h</dd></div><div><dt>Voiture</dt><dd>Porsche 963</dd></div><div><dt>Météo</dt><dd>Pluie</dd></div></dl>
+<button type="button" class="home-next-go">Voir la course →</button></aside>
 </div></section>
 
 <section class="charte-section" aria-labelledby="c-discord"><h2 id="c-discord">États</h2>
