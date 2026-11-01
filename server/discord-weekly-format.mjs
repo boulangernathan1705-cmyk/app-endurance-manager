@@ -516,9 +516,9 @@ export function buildAnnounceRace(race,site={},updatedAt=Date.now(),emojis={},ab
   const departures=(race.departures||[]).filter(departure=>departure.crews.length||departure.unassignedPilots?.length);
   // « Aujourd’hui 13h00 », as the events: a Discord date would show in each reader's language, in full.
   const today=departure=>announceTime(departure.startsAt,departure.timePending);
-  // One line per start (Nathan, 2026-11-01): its time and its crews with their number of pilots; the names are in its thread.
-  const sim=simOf(first),startLine=departure=>[`🕐 **${today(departure)}**`,...orderedEntries(departure.crews).map(crew=>`${categoryMark(crew.category,sim,emojis)} ${clean(crew.name)} (${crew.pilots.length})`)].join(' · ');
-  const fields=departures.length?[{name:BLANK,value:cut(departures.slice(0,20).map(startLine).join('\n'),1024),inline:false}]:[];
+  // Each start: its time, then one line per crew with its pilots' names, to put them forward (Nathan, 2026-11-01).
+  const sim=simOf(first),startBlock=departure=>[`🕐 **${today(departure)}**`,...orderedEntries(departure.crews).map(crew=>`${categoryMark(crew.category,sim,emojis)} **${clean(crew.name)}** · ${crew.pilots.map(clean).join(', ')}`)].join('\n');
+  const fields=departures.length?[{name:BLANK,value:cut(departures.slice(0,20).map(startBlock).join('\n\n'),1024),inline:false}]:[];
   if(!departures.length)fields.push({name:BLANK,value:`${(race.departures||[]).map(departure=>`🕐 **${today(departure)}**`).join('\n')}\nAucun équipage pour l’instant : lance-toi !`,inline:false});
   const pilots=new Set(departures.flatMap(departure=>[...departure.crews.flatMap(crew=>crew.pilots),...(departure.unassignedPilots||[]).map(pilot=>typeof pilot==='string'?pilot:pilot.name)]));
   const crews=departures.reduce((total,departure)=>total+departure.crews.length,0);

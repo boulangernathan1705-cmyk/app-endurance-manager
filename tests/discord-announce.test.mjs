@@ -81,8 +81,8 @@ test('at 7h30 the stream comes first with @everyone and the race it streams, the
   assert.equal(races.content,'**Aussi aujourd’hui sur le serveur :**');
   assert.deepEqual(races.allowed_mentions,{parse:[]});assert.equal(races.flags,4096);
   assert.match(races.embeds[0].title,/6h de Spa/);assert.doesNotMatch(other,/Coupe GT3|Rejoindre le stream/);
-  // One line per start: its crews and their number of pilots, the names in the thread; no buttons (the name is a link).
-  assert.match(other,/Ce soir 20h00\*\* · \S+ Équipage A \(1\)/);assert.doesNotMatch(other,/Pilote 1|<t:/);
+  // Each start, then one line per crew with its pilots' names (put forward); no buttons (the name is a link).
+  assert.match(other,/Ce soir 20h00\*\*\\n\S+ \*\*Équipage A\*\* · Pilote 1/);assert.doesNotMatch(other,/<t:/);
   assert.ok(!races.embeds[0].image);assert.deepEqual(races.components,[]);
   // The next passes send nothing again.
   calls.length=0;
