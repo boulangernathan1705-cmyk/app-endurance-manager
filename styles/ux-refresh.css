@@ -1060,8 +1060,16 @@ html[data-game] #app .my-entry-column .ux-my-other-crew:first-child { border-top
 html[data-game] #app .my-entry-column .ux-my-awaiting-copy { display: grid; gap: 2px; }
 html[data-game] #app .my-entry-column .ux-my-awaiting-copy span { color: #aab3b6; font-size: 13px; }
 html[data-game] #app .my-entry-column .crew-pilot-lines { margin-top: 0 !important; }
+/* Ma situation d'abord : mon équipage en pleine largeur, puis le reste du départ replié (audit R23). */
+html[data-game] #app .my-entry-race .my-entry-focus { display: block !important; padding: 0 !important; border-top: 1px solid rgba(255, 255, 255, .08); }
+html[data-game] #app .my-entry-race .my-entry-columns.is-two { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+html[data-game] #app .my-entry-next { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 12px 16px 0; padding: 10px 12px; border: 1px solid rgba(243, 179, 61, .5); border-left: 4px solid #f3b33d; border-radius: 10px; background: rgba(243, 179, 61, .08); color: #ffe2a8; font-size: 14px; }
+html[data-game] #app .my-entry-next .secondary-button { min-height: 32px; padding: 0 12px; font-size: 13px; }
+html[data-game] #app .my-entry-collective { border-top: 1px solid rgba(255, 255, 255, .08); }
+html[data-game] #app .my-entry-collective > summary { padding: 12px 16px; cursor: pointer; font-size: 14px; font-weight: 750; color: #c7d0d4; list-style-position: inside; }
+html[data-game] #app .my-entry-collective > summary:hover { color: #fff; }
 @media (max-width: 1000px) {
-  html[data-game] #app .my-entry-race .my-entry-columns { grid-template-columns: minmax(0, 1fr) !important; }
+  html[data-game] #app .my-entry-race .my-entry-columns, html[data-game] #app .my-entry-race .my-entry-columns.is-two { grid-template-columns: minmax(0, 1fr) !important; }
   html[data-game] #app .my-entry-column + .my-entry-column { border-left: 0; border-top: 1px solid rgba(255, 255, 255, .08); }
 }
 html[data-game] #app .my-entry-column .crew-pilot-line { background: none !important; border-radius: 0 !important; box-shadow: none !important; padding-left: 0 !important; padding-right: 0 !important; }
@@ -1781,11 +1789,20 @@ html[data-game] #app .race-my-start .secondary-button { border-color: var(--comm
 }
 
 /* =====================================================================
-   Race page, compact: the banner as a thin band and the race header on few lines, so the starts come right
-   under it (the full banner stays on the list of races and the home page).
+   Race page, « Mes inscriptions », forms and the pages outside the races (administration, help…): the banner as a
+   thin band, so the content comes right under it (audit R12). The full banner stays on the list of races and the
+   home page.
    ===================================================================== */
-html[data-view="event"] header.site-hero .hero-picture { aspect-ratio: auto; height: clamp(76px, 8vw, 140px); }
-html[data-view="event"] header.site-hero .hero-banner { object-fit: cover; object-position: center 40%; }
+html[data-view="event"] header.site-hero .hero-picture,
+html[data-view="my-entries"] header.site-hero .hero-picture,
+html[data-view="form"] header.site-hero .hero-picture,
+html[data-view="week"] header.site-hero .hero-picture,
+html:not([data-game]) body:not(:has(.hub-main)):not(.live-body) header.site-hero .hero-picture { aspect-ratio: auto; height: clamp(76px, 8vw, 140px); }
+html[data-view="event"] header.site-hero .hero-banner,
+html[data-view="my-entries"] header.site-hero .hero-banner,
+html[data-view="form"] header.site-hero .hero-banner,
+html[data-view="week"] header.site-hero .hero-banner,
+html:not([data-game]) body:not(:has(.hub-main)):not(.live-body) header.site-hero .hero-banner { object-fit: cover; object-position: center 40%; }
 html[data-game] #app .race-header { gap: 10px !important; padding: 14px 18px !important; }
 html[data-game] #app .race-header .race-card-top { align-items: center; gap: 16px; }
 html[data-game] #app .race-header .race-date { width: 66px; padding: 5px 0 6px; }
@@ -1802,7 +1819,11 @@ html[data-game] #app .race-header .race-header-actions .secondary-button { min-h
 html[data-game] #app .race-header .event-category-badge { padding-block: 4px !important; }
 html[data-game] #app .departure-planning { margin-top: 12px; }
 @media (max-width: 760px) {
-  html[data-view="event"] header.site-hero .hero-picture { height: 64px; }
+  html[data-view="event"] header.site-hero .hero-picture,
+  html[data-view="my-entries"] header.site-hero .hero-picture,
+  html[data-view="form"] header.site-hero .hero-picture,
+  html[data-view="week"] header.site-hero .hero-picture,
+  html:not([data-game]) body:not(:has(.hub-main)):not(.live-body) header.site-hero .hero-picture { height: 64px; }
   html[data-game] #app .race-header { padding: 12px !important; }
   html[data-game] #app .race-header .event-title { font-size: 22px !important; }
   html[data-game] #app .race-header .race-card-top > .circuit-visual { width: 72px !important; height: 56px !important; }
@@ -2498,3 +2519,224 @@ html[data-game] #app .my-entry-slot + .my-entry-slot { border-top: 1px solid var
 html[data-game] #app .my-entry-slot-heading { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin: 0; padding: 14px 16px; font-size: 15px; }
 html[data-game] #app .my-entry-slot-heading .race-badges { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 
+
+/* Keyboard: every button, link and fold of the site shows where the focus is (audit R07). */
+#app button:focus-visible, #app a:focus-visible, #app summary:focus-visible, #app [role="button"]:focus-visible,
+.site-nav-shell a:focus-visible, .site-nav-shell button:focus-visible {
+  outline: 2px solid var(--community-accent, #52d3d8) !important;
+  outline-offset: 2px;
+}
+
+/* =====================================================================
+   « Accueil » (front/app/week-view.mjs): the week of the community, Monday to Sunday (7 columns on a computer, the
+   days one under the other on a phone), and the pilot's next race beside it. One colour per kind of race.
+   ===================================================================== */
+.home-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: var(--em-space-3) var(--em-space-4); margin-bottom: var(--em-space-4); }
+.home-create { display: flex; flex-wrap: wrap; gap: var(--em-space-2); margin-left: auto; }
+.week-nav { display: flex; flex-wrap: wrap; align-items: center; gap: var(--em-space-2); }
+.week-nav .week-step { min-width: 38px; min-height: 36px; padding: 0 var(--em-space-3); font-size: var(--em-text-lg); }
+.week-label { display: grid; min-width: 170px; text-align: center; font-size: var(--em-text-md); font-weight: 800; color: var(--em-text); }
+.week-label small { font-size: 12px; font-weight: 600; color: var(--em-muted); }
+.home-layout { display: grid; grid-template-columns: minmax(0, 1fr) 210px; gap: var(--em-space-3); align-items: start; }
+.home-layout.is-full { grid-template-columns: minmax(0, 1fr); }
+.week-filters { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 var(--em-space-3); }
+.week-filters .week-filter { border-radius: var(--em-radius-pill); }
+.week-filters .week-filter i { display: inline-block; width: 9px; height: 9px; margin-right: 6px; border-radius: 50%; background: var(--kind, var(--em-accent)); }
+.week-filters .is-lmu { --kind: var(--em-kind-lmu); }
+.week-filters .is-iracing { --kind: var(--em-kind-iracing); }
+.week-filters .is-event { --kind: var(--em-kind-event); }
+.week-filters .is-mine { --kind: var(--em-ok); }
+.week-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; align-items: stretch; }
+.week-day { min-width: 0; min-height: 260px; border: 1px solid var(--em-border); border-radius: var(--em-radius-md); background: var(--em-panel); overflow: hidden; }
+.week-day.is-today { border-color: color-mix(in srgb, var(--em-accent) 70%, transparent); box-shadow: inset 0 3px 0 var(--em-accent); }
+.week-day.is-past { opacity: .6; }
+.week-day-head { display: flow-root; margin: 0; padding: 9px 10px 7px; border-bottom: 1px solid var(--em-border); font-size: var(--em-text-md); font-weight: 850; color: var(--em-text); }
+.week-day-name { display: block; text-transform: capitalize; }
+.week-day-head small { font-size: 12px; font-weight: 600; color: var(--em-muted); }
+.week-today { float: right; margin-top: 2px; font-size: 10px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--em-accent); }
+.week-day-list { display: grid; gap: 7px; padding: 7px; }
+.week-empty { margin: 4px 0; text-align: center; color: var(--em-faint); }
+.week-block {
+  --kind: var(--em-accent);
+  position: relative; display: grid; gap: 4px; width: 100%; padding: 8px 9px 9px 12px; text-align: left; overflow: hidden;
+  border: 1px solid var(--em-border); border-radius: 10px; color: var(--em-text); font: inherit; text-decoration: none; cursor: pointer;
+  background: linear-gradient(160deg, color-mix(in srgb, var(--kind) 16%, var(--em-panel-2)), var(--em-panel-2) 70%);
+}
+.week-block::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 4px; background: var(--kind); }
+.week-block:hover { background: linear-gradient(160deg, color-mix(in srgb, var(--kind) 26%, var(--em-panel-2)), var(--em-panel-2) 75%); }
+.week-block.is-endurance.is-lmu { --kind: var(--em-kind-lmu); }
+.week-block.is-endurance.is-iracing { --kind: var(--em-kind-iracing); }
+.week-block.is-event { --kind: var(--sim, var(--em-kind-event)); }
+.week-block.is-gridfest { --kind: var(--em-kind-gridfest); }
+.week-block.is-stream { --kind: var(--em-kind-stream); }
+.week-block.is-past { opacity: .6; }
+.week-block.is-mine { box-shadow: 0 0 0 1px color-mix(in srgb, var(--em-ok) 60%, transparent); }
+.week-block-head { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.week-block-time { font-size: 15px; font-weight: 850; color: var(--em-text-strong); }
+.week-block-time small { font-size: 12.5px; font-weight: 700; color: var(--em-muted); white-space: nowrap; }
+.week-block-sim { font-size: 10.5px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: color-mix(in srgb, var(--kind) 75%, var(--em-text-strong)); }
+.week-badge { padding: 2px 6px; border-radius: var(--em-radius-pill); background: color-mix(in srgb, var(--kind) 32%, transparent); font-size: 10.5px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: var(--em-text-strong); white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; flex: 0 1 auto; min-width: 0; }
+.week-block-logo { flex: none; width: 40px; height: 40px; margin: -2px -2px -4px 0; }
+.week-block-logo img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.week-block-name { font-size: 13.5px; font-weight: 750; line-height: 1.25; overflow-wrap: anywhere; }
+.week-block-circuit { font-size: 12px; font-weight: 650; line-height: 1.25; color: var(--em-muted); overflow-wrap: anywhere; }
+.week-block-meta { display: flex; flex-wrap: wrap; gap: 2px 8px; font-size: var(--em-text-xs); color: var(--em-muted); }
+.week-chip { justify-self: start; padding: 2px 7px; border-radius: 7px; font-size: 11px; font-weight: 800; line-height: 1.3; }
+.week-chip.is-ok { background: color-mix(in srgb, var(--em-ok) 16%, transparent); color: color-mix(in srgb, var(--em-ok) 70%, #fff); }
+.week-chip.is-alert, .week-chip.is-live { background: color-mix(in srgb, var(--em-danger) 18%, transparent); color: var(--em-danger-text); }
+.week-chip.is-warn { background: color-mix(in srgb, var(--em-warn) 18%, transparent); color: color-mix(in srgb, var(--em-warn) 80%, #fff); }
+
+.home-next-box { display: grid; gap: 2px; padding: var(--em-space-3); border: 1px solid color-mix(in srgb, var(--em-warn) 50%, transparent); border-radius: var(--em-radius-lg);
+  background: linear-gradient(160deg, color-mix(in srgb, var(--em-warn) 14%, transparent), var(--em-panel) 65%); }
+.home-next-label { margin: 0 0 4px; font-size: 11px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--em-muted); }
+.home-next-name { margin: 0; font-size: 18px; font-weight: 850; line-height: 1.15; text-transform: uppercase; color: var(--em-text-strong); }
+.home-next-when { margin: 0 0 6px; font-weight: 750; color: var(--em-warn); }
+.home-next-rows { margin: 0; }
+.home-next-rows div { display: flex; justify-content: space-between; gap: 8px; padding: 4px 0; border-top: 1px solid var(--em-border); font-size: var(--em-text-sm); }
+.home-next-rows dt { color: var(--em-muted); }
+.home-next-rows dd { margin: 0; text-align: right; font-weight: 750; color: var(--em-text); }
+.home-next-go { display: block; width: 100%; margin-top: 8px; padding: 8px; border: 0; border-radius: var(--em-radius-sm); background: var(--em-warn); color: #111; font: inherit; font-weight: 800; text-align: center; text-decoration: none; cursor: pointer; }
+.home-next-go:hover { filter: brightness(1.08); }
+
+@media (max-width: 1100px) and (min-width: 761px) {
+  .home-layout { grid-template-columns: minmax(0, 1fr); }
+  .home-side { order: -1; }
+  .week-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+@media (max-width: 760px) {
+  .home-create { width: 100%; margin-left: 0; }
+  .home-create > * { flex: 1 1 0; font-size: var(--em-text-sm); padding-inline: var(--em-space-2); }
+  .week-grid.is-quiet::after { content: "Aucune course cette semaine."; color: var(--em-muted); padding: var(--em-space-3) 0; }
+  .home-layout { grid-template-columns: minmax(0, 1fr); gap: var(--em-space-3); }
+  .home-side { order: -1; }
+  .week-filters { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+  .week-filters .week-filter { flex: none; white-space: nowrap; }
+  .week-grid { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  .week-day { min-height: 0; }
+  .week-day.is-empty { display: none; }
+  .week-day-name { display: inline; margin-right: 8px; }
+}
+
+/* Event en plusieurs manches : un seul bloc d'inscription en haut, les manches en infos, les pilotes une fois. */
+.solo-entry-block { display: flex; flex-wrap: wrap; align-items: center; gap: var(--em-space-3); padding: var(--em-space-3) var(--em-space-4);
+  border: 1px solid color-mix(in srgb, var(--em-accent) 45%, transparent); border-left: 4px solid var(--em-accent); border-radius: var(--em-radius-lg);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--em-accent) 10%, transparent), var(--em-panel) 60%); }
+.solo-entry-block.is-mine { border-color: color-mix(in srgb, var(--em-ok) 50%, transparent); border-left-color: var(--em-ok); background: linear-gradient(90deg, color-mix(in srgb, var(--em-ok) 10%, transparent), var(--em-panel) 60%); }
+.solo-entry-copy { display: grid; gap: 2px; min-width: 0; }
+.solo-entry-copy strong { font-size: var(--em-text-lg); color: var(--em-text-strong); }
+.solo-entry-copy small { color: var(--em-muted); font-size: var(--em-text-sm); }
+.solo-entry-block .planning-quick { position: static; margin-left: auto; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.solo-round-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: var(--em-space-3); }
+.solo-round-card { display: grid; align-content: start; gap: var(--em-space-2); min-width: 0; padding: var(--em-space-3) var(--em-space-4); border: 1px solid var(--em-border); border-radius: var(--em-radius-lg); background: var(--em-panel); }
+.solo-round-card.is-mine { border-color: color-mix(in srgb, var(--em-ok) 45%, transparent); }
+.solo-round-card-title { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px var(--em-space-2); margin: 0; }
+.solo-round-card-title small { flex-basis: 100%; font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--em-accent); }
+.solo-round-card-title strong { font-size: var(--em-text-lg); color: var(--em-text-strong); overflow-wrap: anywhere; }
+.solo-round-card-count { margin: 0; color: var(--em-muted); font-size: var(--em-text-sm); }
+.solo-round-pilots-all { padding: var(--em-space-3) var(--em-space-4); border: 1px solid var(--em-border); border-radius: var(--em-radius-lg); background: var(--em-panel); }
+@media (max-width: 760px) {
+  .solo-entry-block .planning-quick { margin-left: 0; width: 100%; justify-content: flex-start; }
+}
+
+/* « Équipages à former » on the home page (organisers), under « Ta prochaine course ». */
+.home-side { display: grid; gap: var(--em-space-3); align-content: start; }
+.home-crews-box { display: grid; gap: 2px; padding: var(--em-space-3); border: 1px solid var(--em-border); border-radius: var(--em-radius-lg); background: var(--em-panel); }
+.home-crews-box ul { margin: 0; padding: 0; list-style: none; }
+.home-crews-row { display: flex; width: 100%; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 0; border: 0; border-top: 1px solid var(--em-border); background: none; color: var(--em-text); font: inherit; text-align: left; cursor: pointer; }
+.home-crews-row > span:first-child { display: grid; min-width: 0; font-size: var(--em-text-sm); }
+.home-crews-row strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.home-crews-row small { color: var(--em-muted); }
+.home-crews-row:hover strong { color: var(--em-accent); }
+.home-crews-row .week-chip { flex: none; }
+.home-crews-done, .home-crews-more { margin: 4px 0 0; font-size: var(--em-text-sm); color: var(--em-muted); }
+.home-crews-box .home-next-go { background: var(--em-accent); color: var(--em-bg); }
+
+/* Counter of the « Équipages » tab. */
+.nav-count { display: inline-block; min-width: 18px; margin-left: 6px; padding: 1px 5px; border-radius: var(--em-radius-pill); background: var(--em-danger); color: var(--em-text-strong); font-size: 11px; font-weight: 800; line-height: 1.4; text-align: center; }
+
+/* « Équipages » page (organisers). */
+.crews-head { margin: 4px 0 var(--em-space-3); }
+.crews-head .page-title { margin: 0; }
+.crews-lead { margin: 2px 0 0; color: var(--em-muted); }
+.crews-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0 0 var(--em-space-4); }
+.crews-filters .crews-filter { border-radius: var(--em-radius-pill); }
+.crews-filters .crews-filter i { display: inline-block; width: 9px; height: 9px; margin-right: 6px; border-radius: 50%; background: var(--sim-color, var(--em-accent)); }
+.crews-filters [data-sim-color="lmu"] { --sim-color: var(--em-kind-lmu); }
+.crews-filters [data-sim-color="iracing"] { --sim-color: var(--em-kind-iracing); }
+.crews-filters .crews-filter.is-on { border-color: color-mix(in srgb, var(--em-accent) 60%, transparent); background: color-mix(in srgb, var(--em-accent) 22%, var(--em-panel)); color: var(--em-text-strong); }
+.crews-sep { width: 1px; height: 24px; margin: 0 4px; background: var(--em-border); }
+.crews-requests { margin: 0 0 var(--em-space-4); }
+.crews-requests h2, .crews-start h3, .crews-request h4 { margin: 0 0 var(--em-space-2); font-size: 12px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--em-muted); }
+.crews-request-row { display: flex; align-items: center; justify-content: space-between; gap: var(--em-space-3); margin-bottom: 6px; padding: 10px 14px; border: 1px solid color-mix(in srgb, var(--em-accent) 35%, var(--em-border)); border-radius: var(--em-radius-md); background: linear-gradient(90deg, color-mix(in srgb, var(--em-accent) 10%, var(--em-panel)), var(--em-panel)); }
+.crews-request-row small { display: block; margin-top: 2px; color: var(--em-muted); }
+.crews-start { --sim-color: var(--em-kind-lmu); margin-bottom: var(--em-space-3); border: 1px solid var(--em-border); border-left: 4px solid var(--sim-color); border-radius: var(--em-radius-lg); background: var(--em-panel); overflow: hidden; }
+.crews-start.is-iracing { --sim-color: var(--em-kind-iracing); }
+.crews-start.is-focus { border-color: var(--em-accent); border-left-color: var(--sim-color); }
+.crews-start > summary { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; padding: 12px 16px; cursor: pointer; list-style: none; }
+.crews-start > summary::-webkit-details-marker { display: none; }
+.crews-start[open] > summary { border-bottom: 1px solid var(--em-border); }
+.crews-sim { font-size: 10.5px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: color-mix(in srgb, var(--sim-color) 70%, var(--em-text-strong)); }
+.crews-start > summary strong { font-size: var(--em-text-lg); color: var(--em-text-strong); }
+.crews-when { font-weight: 750; color: var(--em-warn); }
+.crews-status { display: flex; gap: 6px; margin-left: auto; }
+.crews-chip { display: inline-block; padding: 2px 8px; border-radius: 7px; font-size: 11.5px; font-weight: 800; white-space: nowrap; }
+.crews-chip.is-ok { background: color-mix(in srgb, var(--em-ok) 16%, transparent); color: color-mix(in srgb, var(--em-ok) 70%, #fff); }
+.crews-chip.is-warn { background: color-mix(in srgb, var(--em-warn) 18%, transparent); color: color-mix(in srgb, var(--em-warn) 80%, #fff); }
+.crews-chip.is-alert { background: color-mix(in srgb, var(--em-danger) 18%, transparent); color: var(--em-danger-text); }
+.crews-chip.is-ask { background: color-mix(in srgb, var(--em-accent) 18%, transparent); color: var(--em-accent); }
+.crews-cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.crews-cols > section { min-width: 0; padding: 12px 16px; }
+.crews-cols > section + section { border-left: 1px solid var(--em-border); }
+.crews-crew, .crews-pilot { margin-bottom: 8px; padding: 9px 11px; border: 1px solid var(--em-border); border-radius: var(--em-radius-sm); background: var(--em-panel-2); }
+.crews-crew-head { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin-bottom: 4px; }
+.crews-crew-head small { color: var(--em-muted); }
+.crews-crew-head .crews-chip { margin-left: auto; }
+.crews-manage { font-size: var(--em-text-sm); }
+.crews-cat { display: inline-flex; vertical-align: middle; }
+.crews-cat img, .crews-cat .category-logo { width: auto; height: 18px; }
+.crews-line { display: grid; grid-template-columns: 110px minmax(0, 1fr); align-items: center; gap: 8px; margin-top: 5px; font-size: var(--em-text-sm); }
+.crews-line > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.crews-bar { display: grid; grid-template-columns: repeat(var(--hours, 6), minmax(0, 1fr)); gap: 2px; }
+.crews-bar i { height: 9px; border-radius: 2px; background: color-mix(in srgb, var(--em-text) 10%, transparent); }
+.crews-bar i.on { background: var(--em-accent); }
+.crews-pilot { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 10px; align-items: center; }
+.crews-pilot .crews-bar { grid-column: 1 / -1; }
+.crews-pick { display: flex; align-items: center; gap: 10px; min-width: 0; cursor: pointer; }
+.crews-pick input { flex: none; width: 17px; height: 17px; accent-color: var(--em-accent); }
+.crews-pick small { color: var(--em-muted); }
+.crews-add select { min-height: 32px; padding: 4px 8px; border: 1px solid var(--em-border); border-radius: var(--em-radius-sm); background: var(--em-bg); color: var(--em-text); font: inherit; font-size: var(--em-text-sm); }
+.crews-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 8px; }
+.crews-empty, .crews-done { margin: 4px 0; color: var(--em-muted); }
+.crews-request { margin: 12px 16px 0; padding: 12px 14px; border: 1px solid color-mix(in srgb, var(--em-accent) 40%, var(--em-border)); border-radius: var(--em-radius-md); background: linear-gradient(90deg, color-mix(in srgb, var(--em-accent) 10%, var(--em-panel)), var(--em-panel)); }
+.crews-request h4 { color: var(--em-accent); }
+.crews-request dl { display: flex; flex-wrap: wrap; gap: 6px 28px; margin: 0 0 6px; }
+.crews-request dt { font-size: 12px; color: var(--em-muted); }
+.crews-request dd { margin: 0; font-weight: 800; color: var(--em-text-strong); }
+.crews-note { margin: 8px 0 0; font-size: var(--em-text-sm); color: color-mix(in srgb, var(--em-warn) 80%, #fff); }
+.crews-refuse { color: var(--em-danger-text); }
+
+/* « Demander un équipage » (pilots). */
+.crew-request-sheet .crew-builder-form { display: grid; gap: var(--em-space-3); }
+.crew-request-sheet label { display: grid; gap: 5px; font-weight: 700; }
+.crew-request-field { margin: 0; padding: 0; border: 0; }
+.crew-request-field small { font-weight: 600; color: var(--em-muted); }
+.crew-request-choices { display: flex; flex-wrap: wrap; gap: 6px; }
+.crew-request-choices label { display: flex; align-items: center; gap: 6px; padding: 6px 10px; border: 1px solid var(--em-border); border-radius: var(--em-radius-sm); }
+.crew-request-sheet label.crew-request-mate { display: flex; align-items: center; gap: 9px; padding: 5px 0; font-weight: 600; }
+.crew-request-sheet input[type="checkbox"], .crew-request-sheet input[type="radio"] { flex: none; width: 17px; height: 17px; margin: 0; accent-color: var(--em-accent); }
+.crew-request-note { margin: 0; padding: 9px 11px; border: 1px solid color-mix(in srgb, var(--em-accent) 30%, var(--em-border)); border-radius: var(--em-radius-sm); font-size: var(--em-text-sm); color: var(--em-muted); }
+
+@media (max-width: 760px) {
+  .crews-cols { grid-template-columns: minmax(0, 1fr); }
+  .crews-cols > section + section { border-left: 0; border-top: 1px solid var(--em-border); }
+  .crews-cols > section:last-child { order: -1; }
+  .crews-status { margin-left: 0; }
+  .crews-filters { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+  .crews-filters .crews-filter { flex: none; white-space: nowrap; }
+  .crews-request-row { flex-wrap: wrap; }
+  .crews-line { grid-template-columns: 84px minmax(0, 1fr); }
+}
+@media (max-width: 760px) {
+  .crews-pilot { grid-template-columns: minmax(0, 1fr); }
+  .crews-add select { width: 100%; }
+}

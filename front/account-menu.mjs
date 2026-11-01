@@ -178,7 +178,7 @@ function unifyNav(session) {
   sections.className = 'nav-sections';
   sections.setAttribute('role', 'group');
   sections.setAttribute('aria-label', 'Sections');
-  sections.innerHTML = `${events ? link('/events/', session.soloLabel || 'EVENT TDZ', ' nav-events-button') : ''}${endurance}${link(`/${sim}/#inscriptions`, 'Mes inscriptions')}${own}`;
+  sections.innerHTML = `${link(`/${sim}/#accueil`, 'Accueil', ' nav-week-button')}${events ? link('/events/', session.soloLabel || 'EVENT TDZ', ' nav-events-button') : ''}${endurance}${link(`/${sim}/#inscriptions`, 'Mes inscriptions')}${own}`;
   // Simulator not chosen yet: « Endurance » asks for it first.
   if (events) sections.children[1].addEventListener('click', event => { if (!simChosen()) { event.preventDefault(); openSimChooser(); } });
   nav.append(sections);
@@ -201,6 +201,9 @@ async function loadSession() {
       for (const link of document.querySelectorAll('a.brand-button')) link.href = '/events/';
     // The LMU module's own tab (fiches-combo.html): only for the roles that see the fiches combo.
     for (const link of document.querySelectorAll('[data-module-link]')) link.hidden = link.dataset.moduleLink === 'combos' && session.combos !== true;
+    // The administration's own tabs (Administration · Diagnostics): only for those who may open them.
+    const admin = Array.isArray(session.permissions) && session.permissions.includes('admin');
+    if (!admin) for (const link of document.querySelectorAll('.nav-sections a[href="/members.html"], .nav-sections a[href="/diagnostics.html"]')) link.remove();
     unifyNav(session);
     siteCommunityName = session.openSite ? '' : session.community?.name || '';
     if (session.user) {

@@ -392,7 +392,7 @@ test('the plugin and the pages reach the room only through their checks', async 
   assert.match(live, /env\.LIVE\.idFromName\(communityId\)/);
   const entry = readFileSync(new URL('../server/worker-with-migrations.mjs', import.meta.url), 'utf8');
   assert.match(entry, /export \{LiveRoom\} from '\.\/live\.mjs';/);
-  assert.match(entry, /if \(response\.status === 101\) return response;\n\s+return development \? markDevelopmentResponse/);
+  assert.match(entry, /if \(response\.status === 101\) return response;\n\s+const page = withoutEdgeScripts\(response\);/);
   for (const file of ['wrangler.jsonc', 'wrangler.dev.jsonc', 'wrangler.prod.jsonc', 'wrangler.relay.jsonc']) {
     const config = readFileSync(new URL(`../${file}`, import.meta.url), 'utf8');
     assert.match(config, /"durable_objects": \{ "bindings": \[\{ "name": "LIVE", "class_name": "LiveRoom" \}\] \}/, file);

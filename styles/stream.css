@@ -12,6 +12,7 @@ html[data-game] #app .race-header .event-type-panel .stream-panel svg {width:110
 .stream-block-actions a {text-decoration:none}
 .stream-block .stream-button {background:#9146ff;border-color:#9146ff;color:#fff}
 .stream-event-form .creation-card {display:grid;gap:12px}
+.stream-event-form .stream-form-step[hidden] {display:none}
 .stream-event-form .stream-race {display:grid;gap:10px}
 .stream-event-form .stream-race[hidden] {display:none}
 .home-create-event {display:flex;flex-wrap:wrap;gap:8px;align-items:center}
@@ -30,9 +31,6 @@ html[data-game] #app .race-header .event-type-panel .stream-panel svg {width:110
 .stream-card-actions small {font-size:12px;color:var(--muted,#91a4a7)}
 .stream-card-actions .stream-button {font-size:12px;text-decoration:none}
 .stream-button,.stream-event-form .stream-button {background:linear-gradient(180deg,#b991f6,#9146ff);border-color:rgba(185,145,246,.55);color:#130920;box-shadow:inset 0 1px rgba(255,255,255,.26),0 5px 16px rgba(145,70,255,.12)}
-.form-sheet:has(.stream-event-form) {width:min(1320px,calc(100vw - 32px));max-width:1320px}
-.stream-form-layout {display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:24px;align-items:start}
-.stream-form-fields {display:grid;gap:18px;min-width:0}
 .stream-event-form .creation-card-heading {align-items:center;margin:0 0 6px}
 .stream-event-form .creation-card-heading h2 {margin:0}
 .stream-event-form .creation-step {border-color:#a970ff;color:#b991f6}

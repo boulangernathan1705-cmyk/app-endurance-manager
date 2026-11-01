@@ -6,6 +6,11 @@ import {app,state,activeGame,loadArchive,showError} from './core.mjs';
 const EVENT_HASH=/^#event=([a-f0-9-]{36})$/;
 const ENTRIES_HASH='#inscriptions';
 const SOLO_HASH='#solo';
+// « Accueil » (#accueil); its first address, #semaine, still leads there.
+const WEEK_HASH='#accueil';
+const OLD_WEEK_HASH='#semaine';
+// The organisers' « Équipages » page, opened on a start with #equipages=<start id>.
+const CREWS_HASH=/^#equipages(?:=([a-f0-9-]{36}))?$/i;
 const EVENTS_PATH='/events/';
 const onEvents=()=>/^\/events\/?$/i.test(location.pathname);
 let views=null;
@@ -20,6 +25,10 @@ export function routeFromLocation(){
   if(hash===SOLO_HASH){history.replaceState(null,'',EVENTS_PATH+location.search);return {page:'home',list:'solo'};}
   if(hash!==location.hash&&hash===ENTRIES_HASH)history.replaceState(null,'',location.pathname+location.search+hash);
   if(hash===ENTRIES_HASH)return {page:'my-entries'};
+  if(hash===OLD_WEEK_HASH){history.replaceState(null,'',location.pathname+location.search+WEEK_HASH);return {page:'week'};}
+  if(hash===WEEK_HASH)return {page:'week'};
+  const crews=location.hash.match(CREWS_HASH);
+  if(crews)return {page:'crews',departureId:crews[1]||''};
   if(onEvents())return {page:'home',list:'solo'};
   return {page:'home',list:'endurance'};
 }
@@ -28,6 +37,8 @@ function addressFor(detail){
   const here=location.pathname+location.search;
   if(detail.page==='event'&&detail.eventId)return `${here}#event=${detail.eventId}`;
   if(detail.page==='my-entries')return `${here}${ENTRIES_HASH}`;
+  if(detail.page==='week')return `${here}${WEEK_HASH}`;
+  if(detail.page==='crews')return `${here}#equipages${state.crewsFocus?`=${state.crewsFocus}`:''}`;
   if(detail.page==='home')return detail.list==='solo'?EVENTS_PATH+location.search:onEvents()?`/${activeGame}/${location.search}`:here;
   return null; // Event form: keep the current address.
 }
@@ -51,6 +62,10 @@ export async function applyRoute(route,message=''){
     return;
   }
   if(route.page==='my-entries'){views.renderMyEntries();return;}
+  // A visitor (no access yet) sees the list of races.
+  if(route.page==='week'&&state.access==='member'){views.renderWeek();return;}
+  if(route.page==='crews'&&views.renderCrewsPage(route.departureId))return;
+  if(route.page==='week'){views.renderHome(message);return;}
   if(route.list)state.listFormat=route.list==='solo'&&!state.soloRaces?'endurance':route.list;
   views.renderHome(message);
 }

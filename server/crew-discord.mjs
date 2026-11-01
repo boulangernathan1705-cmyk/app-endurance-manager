@@ -1,7 +1,7 @@
 import {pause,retryAfter,spaceOut} from './recap-discord.mjs';
 import {effectivePermissions,guildPermissions,missingVoicePermissions,withPublicVoiceAccess,PUBLIC_VOICE_ACCESS,VOICE_ACCESS,EMBED} from './discord-permissions.mjs';
 // Crews on Discord (migrations 0044, 0045). Two modules, each enabled by the admins of a community:
-// - crewChannels (« Salons d'équipage »): as soon as it is made, every crew gets a voice
+// - crewChannels (« Salons d'équipage »): from the Monday of its race's week (at once if made during that week), every crew gets a voice
 //   channel named after its sim and its name (« LMU-Les Tondeuz »), made in the category the admins chose
 //   (none: at the top of the server). When the recap gives each race its category (« 🏎️ LMU · 6h de Spa »), the
 //   voice channel goes there, named after the crew alone, and is moved there once if it was made before. A recap message in the voice channel's chat follows the crew
@@ -16,12 +16,10 @@ import {allCommunities, communityById, communityUrl} from './community.mjs';
 import {notify} from './notifications.mjs';
 import {durationLabel,raceFinishAt} from '../shared/duration.mjs';
 import {catalogForGame} from '../shared/catalog.mjs';
-import {categoryEmojiName, conditionFields} from './discord-weekly-format.mjs';
+import {conditionFields, raceWeekOpen, startTimeLabel, clockLabel} from './discord-weekly-format.mjs';
 
 const DISCORD_API = 'https://discord.com/api/v10';
 const HOUR = 3600_000;
-// A race without any crew yet gets its recap category this long before its start (server/recap-discord.mjs).
-export const OPEN_BEFORE = 6 * 24 * HOUR;
 // The recap makes the race's category first: a crew's voice channel waits for it (made there directly), at
 // most this long, then is made in the admins' category (and moved later).
 const WAIT_CATEGORY = HOUR;
@@ -36,7 +34,7 @@ const ADMINISTRATOR = 1n << 3n, NEEDED = VOICE_ACCESS;
 // One invite for the whole « Discord » setting: the voices, the bot's own categories and messages (embeds), and making
 // its categories private or open again (« Gérer les rôles »: Discord asks it to change a channel's rights), the races'
 // threads (make, write in, delete).
-export const CREW_BOT_PERMISSIONS = String(NEEDED | PUBLIC_VOICE_ACCESS | EMBED | (1n << 28n) | (1n << 34n) | (1n << 35n) | (1n << 38n));
+export const CREW_BOT_PERMISSIONS = String(NEEDED | PUBLIC_VOICE_ACCESS | EMBED | (1n << 17n) | (1n << 28n) | (1n << 34n) | (1n << 35n) | (1n << 38n));
 // Changing this version also repairs existing channels on their next sync.
 const VOICE_POLICY_VERSION = 'public-voice-v3:';
 const VOICE = 2, CATEGORY = 4;
@@ -71,7 +69,7 @@ function errorText(error) {
     const action = error.method === 'DELETE' ? 'la suppression du salon'
       : error.path?.includes('/messages') ? 'le message dans le vocal'
       : error.method === 'PATCH' ? 'la modification du salon' : 'la création du salon';
-    return `Discord refuse ${action}${channelId ? ` (salon ${channelId})` : ''} : vérifie les droits du bot dans ce salon et sa catégorie, notamment « Voir le salon », « Gérer les salons » et « Se connecter ».`;
+    return `Discord refuse ${action}${channelId ? ` (salon ${channelId})` : ''} : vérifie les droits du bot dans ce salon et sa catégorie, notamment « Voir le salon », « Gérer les salons », « Gérer les rôles » pour modifier les permissions, et « Se connecter ».`;
   }
   if (error?.status === 400) return `Discord a refusé les réglages du salon (code ${error.code || 'inconnu'}). Vérifie les permissions du bot et de la catégorie ; le bot réessaiera automatiquement.`;
   return 'Discord n’a pas répondu : le bot réessaiera tout seul.';
@@ -82,6 +80,8 @@ const clip = (value, size) => { const text = String(value || '').trim(); return 
 const game = circuit => String(circuit || '').startsWith('iracing-') ? 'iracing' : 'lmu';
 // No mention or link can be slipped in through a name chosen on the site.
 const safe = value => String(value || '').replace(/[@#<>*_~`|\\[\]]/g, '').replace(/\s+/g, ' ').trim();
+// In a message's text a « # » stays (« Les Tondeuz #12 »): without « < », it can't make a link to a channel.
+const safeText = value => String(value || '').replace(/[@<>*_~`|\\[\]]/g, '').replace(/\s+/g, ' ').trim();
 
 // The start of the crew and when its race ends, or null (start gone, or its time not known yet).
 function startOf(row) {
@@ -93,50 +93,54 @@ function startOf(row) {
 }
 
 // The card of the voice channel's chat: the race, the crew and its conditions, a button to the race on the site.
+// A voice's chat is narrow (Nathan, 2026-11-01): one column, a fact per line, no side picture; times in Paris words
+// (« Dim. 1 nov. · 13h00 »), as everywhere; Discord's own dates only for « dans 2 heures ».
 const COLORS = {lmu:0xe5484d, iracing:0x3b82f6};
 const raceLink = (env, community, row) => { try { return `${communityUrl(env, community)}/${game(row.circuit)}/#event=${row.event_id}`; } catch { return ''; } };
+const relative = timestamp => `<t:${Math.floor(timestamp / 1000)}:R>`;
+const pageButton = link => link ? [{type:1, components:[{type:2, style:5, label:'Page de la course', emoji:{name:'📋'}, url:link}]}] : [];
+const weatherOf = row => conditionFields(parse(row.event_details, {}) || {}).find(field => field.name.startsWith('🌦️'))?.value.replace(/\n/g, ' · ') || '';
 function recapPayload(env, community, row, start, pilots) {
-  const sim = game(row.circuit), info = parse(row.event_details, {}) || {}, link = raceLink(env, community, row);
-  const unix = Math.floor(start.startsAt / 1000), end = Math.floor(start.endsAt / 1000);
+  const sim = game(row.circuit), link = raceLink(env, community, row);
   const circuit = catalogForGame(sim).circuits?.find(item => item.id === row.circuit)?.name;
   // The one who made the crew first, then the others in their order of entry.
   const ordered = [...pilots].sort((a, b) => (b.user_id && b.user_id === row.owner_user_id) - (a.user_id && a.user_id === row.owner_user_id));
-  const names = ordered.map(pilot => safe(pilot.name) && `${safe(pilot.name)}${pilot.user_id && pilot.user_id === row.owner_user_id ? ' · responsable' : ''}`).filter(Boolean);
-  const fields = [
-    {name:'🟢 Départ', value:start.pending ? 'Horaire à confirmer' : `<t:${unix}:F>\n<t:${unix}:R>`, inline:true},
-    start.minutes && {name:'⏱️ Durée', value:`${durationLabel(start.minutes)}${start.pending ? '' : `\narrivée <t:${end}:t>`}`, inline:true},
-    {name:'🚗 Voiture', value:[safe(row.car) || 'À choisir', safe(row.category)].filter(Boolean).join('\n'), inline:true},
-    {name:`👥 Pilotes · ${names.length}`, value:names.join('\n') || 'Personne pour l’instant', inline:true},
-    ...conditionFields(info)
-  ].filter(Boolean);
-  const logo = categoryEmojiName(sim, row.category);
-  let site = '';
-  try { site = communityUrl(env, community); } catch {}
+  const names = ordered.map(pilot => safeText(pilot.name) && `${safeText(pilot.name)}${pilot.user_id && pilot.user_id === row.owner_user_id ? ' · responsable' : ''}`).filter(Boolean);
+  const weather = weatherOf(row);
+  const lines = [
+    `Équipage **${safeText(row.crew_name)}** · ${row.locked ? '🔒 Complet' : '🔓 Il reste de la place'}`,
+    '',
+    `🟢 **${startTimeLabel(start.startsAt, start.pending)}**`,
+    start.minutes && `⏱️ ${durationLabel(start.minutes)}${start.pending ? '' : ` · arrivée ${clockLabel(start.endsAt)}`}`,
+    `🚗 ${[safeText(row.car) || 'Voiture à choisir', safeText(row.category)].filter(Boolean).join(' · ')}`,
+    weather && `🌦️ ${weather}`,
+    '',
+    `👥 **Pilotes · ${names.length}**`,
+    ...(names.length ? names : ['Personne pour l’instant'])
+  ].filter(line => line !== false && line !== null && line !== undefined && line !== 0);
   const embed = {color:COLORS[sim],
-    author:{name:[`${sim === 'iracing' ? '🏁 iRacing' : '🏎️ LMU'}`, circuit, info.grid && `${info.grid} voitures`].filter(Boolean).join(' · ')},
-    title:clip(safe(row.event_name) || 'Endurance', 256), ...(link ? {url:link} : {}),
-    description:`Équipage **${safe(row.crew_name)}** · ${row.locked ? '🔒 Complet' : '🔓 Ouvert, il reste de la place'}`,
-    ...(site && logo ? {thumbnail:{url:`${site}/images/discord-emojis/${logo.slice(3)}.png`}} : {}),
-    fields, footer:{text:'Endurance Manager · ce vocal ferme 2 h après l’arrivée'}};
-  return {content:'', embeds:[embed], components:link ? [{type:1, components:[{type:2, style:5, label:'Page de la course', emoji:{name:'📋'}, url:link}]}] : []};
+    author:{name:[`${sim === 'iracing' ? '🏁 iRacing' : '🏎️ LMU'}`, circuit].filter(Boolean).join(' · ')},
+    title:clip(safeText(row.event_name) || 'Endurance', 256), ...(link ? {url:link} : {}),
+    description:clip(lines.join('\n'), 4096), footer:{text:'Ce vocal ferme 2 h après l’arrivée'}};
+  return {content:'', embeds:[embed], components:pageButton(link)};
 }
 // After the finish, once: a word to the crew before its voice closes.
 function endPayload(env, community, row, start, pilots) {
   let site = '';
   try { site = communityUrl(env, community); } catch {}
-  const close = Math.floor((start.endsAt + CLOSE_AFTER) / 1000), names = pilots.map(pilot => safe(pilot.name)).filter(Boolean);
-  return {content:'', embeds:[{color:0x23a55a, title:clip(`🏁 Course terminée, bien joué ${safe(row.crew_name) || 'l’équipage'} !`, 256),
-    fields:[names.length && {name:'👥 Pilotes', value:clip(names.join(' · '), 1024), inline:true}, {name:'🔊 Ce vocal', value:`ferme <t:${close}:R>`, inline:true}].filter(Boolean)}],
+  const names = pilots.map(pilot => safeText(pilot.name)).filter(Boolean);
+  return {content:'', embeds:[{color:0x23a55a, title:clip(`🏁 Course terminée, bien joué ${safeText(row.crew_name) || 'l’équipage'} !`, 256),
+    description:clip([names.length && `👥 ${names.join(' · ')}`, `🔊 Ce vocal ferme ${relative(start.endsAt + CLOSE_AFTER)}`].filter(Boolean).join('\n'), 4096)}],
     components:site ? [{type:1, components:[{type:2, style:5, label:'Prochaines endurances', emoji:{name:'📅'}, url:`${site}/${game(row.circuit)}/`}]}] : []};
 }
 // 24 h and 1 h before the start: a card in the voice's chat, naming its pilots without mentions.
 function reminderPayload(env, community, row, start, pilots, soon) {
-  const unix = Math.floor(start.startsAt / 1000), names = pilots.map(pilot => safe(pilot.name)).filter(Boolean), link = raceLink(env, community, row);
-  if (soon) return {content:'', embeds:[{color:0x23a55a, description:clip(`🟢 **Départ <t:${unix}:R>, on se retrouve ici.**\n${[...names, `arrivée vers <t:${Math.floor(start.endsAt / 1000)}:t>`].join(' · ')}`, 4096)}]};
-  const weather = conditionFields(parse(row.event_details, {}) || {}).find(field => field.name.startsWith('🌦️'));
-  return {content:'', embeds:[{color:COLORS[game(row.circuit)], title:clip(`⏰ Rappel · ${safe(row.event_name) || 'Endurance'}`, 256),
-    fields:[{name:'🟢 Départ', value:`<t:${unix}:F>\n<t:${unix}:R>`, inline:true}, names.length && {name:'👥 Pilotes', value:clip(names.join('\n'), 1024), inline:true}, weather].filter(Boolean)}],
-    components:link ? [{type:1, components:[{type:2, style:5, label:'Page de la course', emoji:{name:'📋'}, url:link}]}] : []};
+  const names = pilots.map(pilot => safeText(pilot.name)).filter(Boolean), link = raceLink(env, community, row);
+  if (soon) return {content:'', embeds:[{color:0x23a55a, description:clip(`🟢 **Départ ${relative(start.startsAt)}, on se retrouve ici.**\n${[...names, `arrivée vers ${clockLabel(start.endsAt)}`].join(' · ')}`, 4096)}]};
+  const weather = weatherOf(row);
+  return {content:'', embeds:[{color:COLORS[game(row.circuit)], title:clip(`⏰ Rappel · ${safeText(row.event_name) || 'Endurance'}`, 256),
+    description:clip([`🟢 **${startTimeLabel(start.startsAt, start.pending)}** · ${relative(start.startsAt)}`, weather && `🌦️ ${weather}`, names.length && `👥 ${names.join(' · ')}`].filter(Boolean).join('\n'), 4096)}],
+    components:pageButton(link)};
 }
 const END_BIT = 4;
 const endDue = (row, start, timestamp) => !start.pending && timestamp >= start.endsAt && timestamp < start.endsAt + CLOSE_AFTER
@@ -184,15 +188,16 @@ export async function syncCrewDiscord(env, timestamp = Date.now(), {community = 
   const enabled = [...communities.values()].filter(item => item.modules?.crewChannels === true && item.discordGuildId && settings.has(item.id));
   const report = {opened:0, updated:0, closed:0, reminded:0, purged:0};
 
-  // New crews: a row for each crew as soon as it is created (even before a pilot joins), its start time known and still to come.
+  // New crews: a row for each crew (even before a pilot joins), its start time known and still to come, from the
+  // Monday of the week of its start (a crew made during that week gets its voice at once).
   if (enabled.length) {
     const candidates = (await env.DB.prepare(`SELECT ${CREW_COLUMNS} FROM crews c JOIN events e ON e.id=c.event_id
       WHERE c.community_id IN (${enabled.map(() => '?').join(',')}) AND e.schedule_pending=0
         AND NOT EXISTS(SELECT 1 FROM crew_discord d WHERE d.crew_id=c.id)
         AND EXISTS(SELECT 1 FROM json_each(e.departures) j WHERE json_extract(j.value,'$.id')=c.departure_id
-          AND COALESCE(json_extract(j.value,'$.tbd'),0)=0 AND json_extract(j.value,'$.startsAt') > ?)
-      LIMIT 20`).bind(...enabled.map(item => item.id), timestamp - 2 * 24 * HOUR).all()).results || [];
-    const fresh = candidates.filter(row => { const start = startOf(row); return start && !start.pending && timestamp < start.endsAt; });
+          AND COALESCE(json_extract(j.value,'$.tbd'),0)=0 AND json_extract(j.value,'$.startsAt') > ? AND json_extract(j.value,'$.startsAt') <= ?)
+      LIMIT 20`).bind(...enabled.map(item => item.id), timestamp - 2 * 24 * HOUR, timestamp + 8 * 24 * HOUR).all()).results || [];
+    const fresh = candidates.filter(row => { const start = startOf(row); return start && !start.pending && timestamp < start.endsAt && raceWeekOpen(start.startsAt, timestamp); });
     if (fresh.length) await env.DB.batch(fresh.map(row => env.DB.prepare('INSERT OR IGNORE INTO crew_discord(crew_id,community_id,guild_id,created_at) VALUES(?,?,?,?)')
       .bind(row.crew_id, row.community_id, communities.get(row.community_id).discordGuildId, timestamp)));
   }
@@ -300,14 +305,15 @@ async function remove(env, budget, channelId) {
 }
 
 // Recover duplicates whose ids were overwritten by overlapping syncs in older versions.
-// Only inspect race categories managed by this site, and require the bot's own original recap.
+// Only inspect the categories the site puts voices in (race categories, the voices' category of « pit talk », the
+// bot's « LMU » / « iRacing »), and require the bot's own original recap of a race of this community.
 export async function cleanupOrphanCrewDiscord(env, timestamp = Date.now()) {
   if (!env?.DB || !env.DISCORD_BOT_TOKEN || !env.DISCORD_CLIENT_ID) return 0;
   // A Worker deployment does not necessarily apply D1 migrations. Recovery also works
   // on the previous schema, using the cron slot to rotate without the optional cursors.
   const settings = (await env.DB.prepare(`SELECT s.* FROM community_crew_discord s JOIN communities c ON c.id=s.community_id
-    WHERE c.discord_guild_id IS NOT NULL AND EXISTS(SELECT 1 FROM discord_recap_publications p
-      WHERE p.community_id=s.community_id AND p.category_id IS NOT NULL AND p.event_id<>'')
+    WHERE c.discord_guild_id IS NOT NULL AND (s.voice_category_id IS NOT NULL OR EXISTS(SELECT 1 FROM discord_recap_publications p
+      WHERE p.community_id=s.community_id AND p.category_id IS NOT NULL AND p.event_id<>''))
     ORDER BY s.community_id`).all()).results || [];
   if (!settings.length) return 0;
   const slot = Math.floor(timestamp / (15 * 60_000));
@@ -321,12 +327,16 @@ export async function cleanupOrphanCrewDiscord(env, timestamp = Date.now()) {
   const publications = (await env.DB.prepare(`SELECT event_id,category_id FROM discord_recap_publications
     WHERE community_id=? AND category_id IS NOT NULL AND event_id<>''`).bind(community.id).all()).results || [];
   const races = new Map(publications.map(row => [row.category_id,row.event_id]));
+  // Categories holding the voices of several races: the race is read from the recap's link.
+  const shared = new Set([setting.voice_category_id].filter(Boolean));
+  const recap = await env.DB.prepare('SELECT enabled,bot_categories FROM community_recap_settings WHERE community_id=?').bind(community.id).first().catch(() => null);
+  if (recap?.enabled) { try { for (const id of Object.values(JSON.parse(recap.bot_categories || '{}') || {})) if (typeof id === 'string') shared.add(id); } catch { /* unreadable: ignored */ } }
   const tracked = (await env.DB.prepare('SELECT voice_id FROM crew_discord WHERE guild_id=? AND voice_id IS NOT NULL')
     .bind(community.discordGuildId).all()).results || [];
   const known = new Set(tracked.map(row => row.voice_id));
   const channels = await discord(env,budget,'GET',`/guilds/${community.discordGuildId}/channels`);
   const candidates = (Array.isArray(channels) ? channels : []).filter(channel => channel.type === VOICE
-    && races.has(channel.parent_id) && !known.has(channel.id) && /^\d{15,22}$/.test(channel.id)
+    && (races.has(channel.parent_id) || shared.has(channel.parent_id)) && !known.has(channel.id) && /^\d{15,22}$/.test(channel.id)
     && Number((BigInt(channel.id) >> 22n) + 1420070400000n) < timestamp - 5 * 60_000)
     .sort((a,b) => BigInt(a.id) < BigInt(b.id) ? -1 : 1);
   const channel = persistentCursor
@@ -334,15 +344,19 @@ export async function cleanupOrphanCrewDiscord(env, timestamp = Date.now()) {
     : candidates[Math.floor(slot / settings.length) % candidates.length];
   if (!channel) return 0;
   try {
-    const eventId = races.get(channel.parent_id);
     const messages = await discord(env,budget,'GET',`/channels/${channel.id}/messages?after=0&limit=100`);
-    const links = ['lmu','iracing'].map(sim => `${communityUrl(env,community)}/${sim}/#event=${eventId}`);
+    const ours = (Array.isArray(messages) ? messages : []).filter(message => message.author?.bot === true && message.author.id === env.DISCORD_CLIENT_ID);
+    const base = communityUrl(env,community), linked = text => String(text || '').match(/#event=([\w-]+)$/)?.[1];
+    const eventId = races.get(channel.parent_id) || ours.map(message => linked(message.embeds?.[0]?.url)
+      || String(message.content || '').split('\n').map(line => line.startsWith('🔗 Inscriptions et équipage : ') ? linked(line) : null).find(Boolean)).find(Boolean);
+    if (!eventId) return 0;
+    const links = ['lmu','iracing'].map(sim => `${base}/${sim}/#event=${eventId}`);
     // The text recap of before, or the card (its title links to the race).
-    const recap = (Array.isArray(messages) ? messages : []).find(message => message.author?.bot === true
-      && message.author.id === env.DISCORD_CLIENT_ID && (links.some(link => String(message.content || '').split('\n').includes(`🔗 Inscriptions et équipage : ${link}`))
+    const card = ours.find(message => (links.some(link => String(message.content || '').split('\n').includes(`🔗 Inscriptions et équipage : ${link}`))
         || links.includes(message.embeds?.[0]?.url)));
-    const name = (recap?.content?.match(/^👥 Équipage \*\*([^\n]+)\*\* : /m) || recap?.embeds?.[0]?.description?.match(/^Équipage \*\*([^\n]+)\*\* · /))?.[1];
-    if (!name || channel.name !== clip(name,100)) return 0;
+    const name = (card?.content?.match(/^👥 Équipage \*\*([^\n]+)\*\* : /m) || card?.embeds?.[0]?.description?.match(/^Équipage \*\*([^\n]+)\*\* · /))?.[1];
+    // In a race's category the voice is named after its crew; elsewhere after its sim, race and crew.
+    if (!name || (channel.name !== clip(name,100) && !(/^(🏎️ LMU|🏁 iRacing) · /u.test(channel.name) && channel.name.endsWith(` · ${name}`)))) return 0;
     // Re-read immediately before deletion: a creation still in flight or another live crew is protected.
     if (await env.DB.prepare('SELECT 1 FROM crew_discord WHERE guild_id=? AND voice_id=?')
       .bind(community.discordGuildId,channel.id).first()) return 0;
@@ -390,7 +404,11 @@ async function closeRow(env, budget, timestamp, row, members, {force = false, ke
       try {
         const state = await discord(env, budget, 'GET', `/guilds/${row.guild_id}/voice-states/${userId}`);
         if (state?.channel_id === row.voice_id) return false;
-      } catch (error) { if (error instanceof Stop) throw error; }
+      } catch (error) {
+        // Only a confirmed absence proves this pilot is not in the voice channel.
+        // A permission refusal or an outage must never disconnect an occupied crew.
+        if (error instanceof Stop || error?.status !== 404 || ![10065,10007].includes(error?.code)) throw error;
+      }
     }
     await remove(env, budget, row.voice_id);
     await env.DB.prepare(`UPDATE crew_discord SET voice_id=NULL${keepOpen ? ', message_id=NULL, parent_id=NULL' : ''} WHERE crew_id=?`).bind(row.row_id).run();
@@ -563,6 +581,9 @@ async function syncRow(env, budget, timestamp, community, setting, row, pilots) 
   } else {
     if (row.recap_hash !== contentHash) {
       await sendInChannel(env, budget, row, 'PATCH', `/channels/${row.voice_id}/messages/${row.message_id}`, {...payload, allowed_mentions:{parse:[]}});
+      // The crew may have been renamed: its voice follows (read first, Discord allows few renames per channel).
+      const wanted = voiceName(row, crewName), voice = await sendInChannel(env, budget, row, 'GET', `/channels/${row.voice_id}`);
+      if (voice?.name && voice.name !== wanted) await sendInChannel(env, budget, row, 'PATCH', `/channels/${row.voice_id}`, {name:wanted});
       await env.DB.prepare('UPDATE crew_discord SET recap_hash=? WHERE crew_id=?').bind(contentHash, row.row_id).run();
     }
     // A pilot who joins gets no message: the edited recap is enough.

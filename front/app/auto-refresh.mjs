@@ -11,7 +11,7 @@ let running=false;
 
 function pilotIsBusy(){
   if(state.busy||state.pendingCrewJoin||state.registrationOpen.size)return true;
-  if(!['home','event','my-entries'].includes(state.page))return true;
+  if(!['home','event','my-entries','week'].includes(state.page))return true;
   const active=document.activeElement;
   if(active?.matches?.('input,select,textarea,[contenteditable="true"]'))return true;
   if(document.querySelector('[aria-modal="true"],dialog[open],[data-ux-error-modal]'))return true;

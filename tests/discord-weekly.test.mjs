@@ -124,7 +124,8 @@ test('le message : un bloc par course, dont le nom mène à la course sur le sit
   assert.match(silverstone.description,/📅 \*\*ven\. 18 sept\.\*\* · 14h, 18h/);
   assert.match(silverstone.description,/Horaires non définis par LMU/);
   // Times in each reader's own time zone.
-  assert.match(silverstone.fields[0].value,/<t:1789747200:F>/);
+  // One way to write a start, Paris time, never a Discord date (shown in each reader's language).
+  assert.match(silverstone.fields[0].value,/🕐 \*\*\S+ \d+ \S+ · \d+h\d\d\*\*/);assert.doesNotMatch(silverstone.fields[0].value,/<t:/);
   assert.match(silverstone.fields[0].value,/Mrt blé/);assert.match(silverstone.fields[0].value,/👤 Etienne\\_48/);
   assert.equal(silverstone.fields[1].name,'📋 Sans équipage');assert.equal(silverstone.fields[1].value,'👤 Léo · ven. 18h');
   assert.doesNotMatch(JSON.stringify(silverstone),/autre départ|voir la course/,'no line for the empty starts');
@@ -173,7 +174,7 @@ test('une course « Horaires à confirmer » n’est jamais annoncée en cours e
   assert.equal(snapshot.currentDepartures.length,0,'placeholder 0:00 start is not "en cours"');
   const payload=JSON.stringify(buildWeeklyDiscordPayload(snapshot,{url:'https://endurance-manager.app'},now));
   // Only the day is shown (in the reader's time zone), never the placeholder time.
-  assert.match(payload,/<t:\d+:D> — horaire à confirmer/);
+  assert.match(payload,/Lun\. 5 oct\. · horaire à confirmer/);
   assert.doesNotMatch(payload,/<t:\d+:F>/);
 });
 
@@ -184,7 +185,7 @@ test('un événement spécial à 15 départs : seuls les départs avec des inscr
   departures[7].unassignedPilots=['Nathan'];
   const [,fuji]=buildWeeklyDiscordPayload({currentDepartures:[],futureDepartures:departures,periodLabel:'semaine'},{url:'https://fmt.endurance-manager.app'},Date.parse('2026-09-29T10:00:00Z')).embeds;
   assert.equal(fuji.fields.length,2,'the start with a crew, then the pilots without a crew');
-  assert.match(fuji.fields[0].value,/FMT 001/);assert.match(fuji.fields[0].value,/\n\u200b$/,'a blank line after each start');
+  assert.match(fuji.fields[0].value,/FMT 001/);assert.doesNotMatch(fuji.fields[0].value,/\n\u200b$/,'no extra blank line after each start');
   assert.equal(fuji.fields[1].value,'👤 Nathan · sam. 18h');
   // Every day of the event and its start times, at the top.
   assert.match(fuji.description,/📅 \*\*ven\. 2 oct\.\*\* · 7h, 12h, 17h, 22h/);

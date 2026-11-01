@@ -1,4 +1,5 @@
 import {helpContext} from './context-help.mjs';
+import {todoItems, todoWhen} from './admin-todo.mjs';
 const app = document.getElementById('members-app');
 const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
 
@@ -112,7 +113,9 @@ function overviewMarkup(setup, settings, members) {
   if (states.iracingImport) alerts.push(['ok', 'Endurances iRacing officielles importées automatiquement.', '']);
   if (!alerts.some(([tone]) => tone !== 'ok')) alerts.unshift(['ok', 'Rien à signaler : tout fonctionne.', '']);
   const watch = `<section class="admin-card"><div class="admin-card-head"><h2>À surveiller</h2></div><ul class="admin-alerts">${alerts.map(([tone, text, action]) => `<li class="is-${tone}"><span>${text}</span>${action}</li>`).join('')}</ul></section>`;
-  return {todo:left, html:`<div class="admin-head"><h2>Vue d’ensemble</h2><p>Ce qui marche, ce qui reste à faire et ce qui demande ton attention.</p></div>${tiles}<div class="admin-columns">${start}${watch}</div>`};
+  // « À traiter »: filled once the races are read (fillTodo).
+  const todo = `<section class="admin-card admin-todo" data-admin-todo><div class="admin-card-head"><h2>À traiter</h2><span class="admin-muted">Endurances des 14 prochains jours</span></div><p class="admin-muted">Chargement…</p></section>`;
+  return {todo:left, html:`<div class="admin-head"><h2>Vue d’ensemble</h2><p>Ce qui marche, ce qui reste à faire et ce qui demande ton attention.</p></div>${tiles}${todo}<div class="admin-columns">${start}${watch}</div>`};
 }
 
 // « Membres et rôles »: the members, or the table of the roles.
@@ -181,12 +184,53 @@ function discordForm(setup, settings) {
       </ul>
       <div class="setup-actions"><button type="submit" class="primary-button">${config?.enabled ? 'Enregistrer' : 'Activer'}</button><button type="button" class="secondary-button" data-discord-preview>Voir les messages</button><button type="button" class="secondary-button" data-discord-destinations>Actualiser les salons</button>${config?.lastError ? '<button type="button" class="secondary-button" data-discord-repair>Réparer</button>' : ''}${config?.enabled || leaving ? '<button type="button" class="danger-button" data-discord-remove>Tout retirer</button>' : ''}<span class="settings-status" role="status" aria-live="polite"></span></div>
       <p class="members-help">${config?.enabled ? 'Si tu changes d’avis, le bot retire ce qu’il avait créé et refait selon tes nouveaux choix. Les messages sont modifiés sans notification.' : 'Rien n’est publié avant « Activer ».'}</p>
-      <details><summary>Tester une annonce dans Discord</summary><p>Envoie une démonstration SAFE’S RACE avec des données d’exemple, sans mention ni inscription.</p><label>Nom ou identifiant du salon texte <input name="announcementTestChannel" placeholder="discussion"></label><button type="button" class="secondary-button" data-discord-announcement-test>Envoyer l’aperçu</button></details>
+      <details><summary>Tester une annonce dans Discord</summary><p>Envoie l’affiche d’un jour de stream avec des données d’exemple, sans mention ni inscription.</p><label>Nom ou identifiant du salon texte <input name="announcementTestChannel" placeholder="discussion"></label><button type="button" class="secondary-button" data-discord-announcement-test>Envoyer l’aperçu</button></details>
       <div data-recap-preview class="recap-live-preview"></div>
     </div>
     <div class="discord-steps"><button type="button" class="secondary-button" data-discord-step="-1">Retour</button><span data-discord-count></span><button type="button" class="primary-button" data-discord-step="1">Suivant</button></div>
   </form>`;
 }
+// « Diagnostic » (server/discord-diagnostic.mjs): what the bot should have made now, and where it stands. Loaded when opened.
+const DIAGNOSTIC_PANEL = `<details class="discord-diagnostic" data-discord-diagnostic><summary>Diagnostic : ce que le bot a fait sur Discord</summary><div data-diagnostic-body><p class="members-help">Chargement…</p></div></details>`;
+const DIAG_STATES = {ok:['ok','✓ En place'], waiting:['wait','En attente'], missing:['bad','Introuvable sur Discord']};
+const diagWhen = value => value ? new Date(value).toLocaleString('fr-FR',{timeZone:'Europe/Paris',weekday:'short',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}) : '';
+const diagSim = sim => sim === 'iracing' ? 'iRacing' : 'LMU';
+function diagnosticMarkup(result) {
+  const row = (title, meta, state) => { const [tone, label] = DIAG_STATES[state] || DIAG_STATES.waiting; return `<li class="diag-row is-${tone}"><span><strong>${esc(title)}</strong><small>${esc(meta)}</small></span><b>${label}</b></li>`; };
+  const list = (title, items, empty) => `<h4>${title}</h4>${items.length ? `<ul class="diag-list">${items.join('')}</ul>` : `<p class="members-help">${empty}</p>`}`;
+  const {recap, voices, announcement} = result, problems = [...result.threads, ...result.crews].filter(item => item.state !== 'ok').length;
+  const facts = [
+    recap.on ? `Dernier passage du bot : ${recap.lastPass ? diagWhen(recap.lastPass) : 'pas encore'}` : 'Fils des courses : éteints',
+    recap.waiting ? 'Des changements attendent le prochain passage (2 min au plus).' : '',
+    recap.on && !recap.sameServer ? 'Le serveur choisi n’est plus celui de la communauté : relance le réglage.' : '',
+    announcement.posted ? `Annonce du jour publiée (${announcement.items} course${announcement.items > 1 ? 's' : ''}).` : '',
+  ].filter(Boolean);
+  const errors = [recap.error, voices.error].filter(Boolean).map(text => `<p class="settings-status" role="alert">⚠️ ${esc(text)}</p>`).join('');
+  return `${errors}<ul class="members-help diag-facts">${facts.map(text => `<li>${esc(text)}</li>`).join('')}</ul>
+    ${recap.on ? list('Fils des courses de la semaine', result.threads.map(item => row(item.name, `${diagSim(item.sim)} · ${diagWhen(item.startsAt)}`, item.state)), 'Aucune course cette semaine.') : ''}
+    ${voices.on ? list('Vocaux des équipages', result.crews.map(item => row(item.name, `${diagSim(item.sim)} · ${item.race} · ${diagWhen(item.startsAt)}`, item.state)), 'Aucun équipage cette semaine.') : ''}
+    <p class="members-help">${result.liveError ? esc(result.liveError) : result.checkedLive ? 'Vérifié sur Discord à l’instant.' : '« En place » : noté par le bot. « Vérifier sur Discord » regarde s’ils existent encore.'}</p>
+    <div class="setup-actions"><button type="button" class="secondary-button" data-diagnostic-live>Vérifier sur Discord</button>${problems ? '<button type="button" class="secondary-button" data-diagnostic-repair>Réparer</button>' : ''}<span class="settings-status" role="status" aria-live="polite"></span></div>`;
+}
+async function loadDiagnostic(panel, live = false) {
+  const body = panel.querySelector('[data-diagnostic-body]');
+  try { body.innerHTML = diagnosticMarkup(await api(`/api/community/discord/diagnostic${live ? '?live=1' : ''}`)); }
+  catch (error) { body.innerHTML = `<p class="settings-status" role="alert">${esc(error.message)}</p>`; }
+}
+app.addEventListener('toggle', event => {
+  const panel = event.target;
+  if (panel.matches?.('[data-discord-diagnostic]') && panel.open && !panel.dataset.loaded) { panel.dataset.loaded = '1'; loadDiagnostic(panel); }
+}, true);
+app.addEventListener('click', async event => {
+  const button = event.target.closest('[data-diagnostic-live],[data-diagnostic-repair]');
+  if (!button) return;
+  const panel = button.closest('[data-discord-diagnostic]'), status = panel.querySelector('.settings-status');
+  button.disabled = true; status.textContent = button.matches('[data-diagnostic-live]') ? 'Vérification…' : 'Réparation…';
+  try {
+    if (button.matches('[data-diagnostic-repair]')) await api('/api/community/recap/repair','POST',{});
+    await loadDiagnostic(panel, button.matches('[data-diagnostic-live]'));
+  } catch (error) { status.textContent = error.message; button.disabled = false; }
+});
 // The answers as the questions show them now (a question not shown keeps its last answer).
 function discordRead(form) {
   const answers = form._answers ||= JSON.parse(form.dataset.answers || '{}'), field = name => form.elements[name];
@@ -232,8 +276,8 @@ function discordQuestions(form, answers) {
   const radio = (name, value, label, checked) => `<label class="discord-pill"><input type="radio" name="${name}" value="${value}" ${checked ? 'checked' : ''}> ${label}</label>`;
   const known = (value, label) => value && !['top','bot','same','bot-lmu','bot-iracing'].includes(value) && !places.some(item => item.id === value || `in:${item.id}` === value) ? `<option value="${esc(value)}" selected>${esc(label || 'Choix enregistré')}</option>` : '';
   // Written in a channel of the server: its own rights count.
-  const inside = (item, value) => `<option value="in:${esc(item.id)}" ${`in:${item.id}` === value ? 'selected' : ''}># ${esc(item.name)}${item.insideReady === false ? ' · le bot n’a pas ses droits' : ''}</option>`;
-  const option = (item, value, inside = false, rights = true) => `<option value="${esc(item.id)}" ${item.id === value ? 'selected' : ''}>${item.type === 0 ? `${inside && item.parentId ? '   ' : ''}# ` : '📁 '}${esc(item.name)}${item.type === 4 && item.private ? ' · privée' : ''}${rights && item.ready === false ? ' · le bot n’a pas ses droits' : ''}</option>`;
+  const inside = (item, value) => `<option value="in:${esc(item.id)}" ${`in:${item.id}` === value ? 'selected' : ''}>Dans # ${esc(item.name)}${item.insideReady === false ? ' · le bot n’a pas ses droits' : ''}</option>`;
+  const option = (item, value, inside = false, rights = true) => `<option value="${esc(item.id)}" ${item.id === value ? 'selected' : ''}>${inside ? 'Juste sous ' : ''}${item.type === 0 ? `# ` : '📁 '}${esc(item.name)}${item.type === 4 && item.private ? ' · privée' : ''}${rights && item.ready === false ? ' · le bot n’a pas ses droits' : ''}</option>`;
   // A place for a recap: not shown, a category the bot makes, or just below a channel or category of the server.
   const place = (name, value, extra = '', bots = [['bot', apart && name.startsWith('week-') ? SIM_NAMES[name.slice(5)] : 'Endurance Manager']]) => `<select name="${name}"><option value="" ${!value ? 'selected' : ''}>Ne pas afficher</option>${extra}
     ${bots.map(([key, label]) => `<option value="${key}" ${value === key ? 'selected' : ''}>Dans « ${label} », créée par le bot</option>`).join('')}<optgroup label="Ou juste sous…">${places.map(item => option(item, value, true)).join('')}${known(value)}</optgroup><optgroup label="Ou dans ce salon…">${places.filter(item => item.type === 0).map(item => inside(item, value)).join('')}</optgroup></select>`;
@@ -413,7 +457,7 @@ function modulesMarkup(settings, setup) {
     {key:'discord', name:'Discord', text:'Le bot affiche tes courses et crée les vocaux des équipages sur ton serveur.',
       state:setup.botRecap?.lastError ? ['warn','Publication en erreur'] : crewWarn ? ['warn', crews.botProblem === 'channel' ? 'Accès au salon à corriger' : crews.botReady !== true ? 'Le bot n’a pas les droits' : 'Vocaux en échec']
         : states.discord ? ['ok', setup.botRecap.mode === 'events' ? 'Actif · une catégorie par course' : 'Actif · récap de la semaine'] : ['off', 'Éteint'],
-      control:'', settings:`${crewWarn ? crewRights : ''}${discordForm(setup, settings)}`},
+      control:'', settings:`${crewWarn ? crewRights : ''}${discordForm(setup, settings)}${setup.botRecap?.enabled || voices ? DIAGNOSTIC_PANEL : ''}`},
     {key:'categoryEntry', name:'Inscription par catégorie', text:'Sur une course à plusieurs départs, le pilote choisit ses catégories et ses départs possibles. Seuls les TM forment les équipages.',
       state:states.categoryEntry ? ['ok', 'Actif'] : ['off', 'Éteint'], control:toggle('categoryEntry', 'Inscription par catégorie'), settings:''},
     {key:'iracingImport', name:'Endurances iRacing officielles', text:settings.modules.eventTdzAvailable?'Les séries en équipe et les événements spéciaux importés automatiquement.':'Les séries en équipe et les événements spéciaux importés automatiquement. Avec EVENT SOLO activé, les endurances solo apparaissent aussi dans son calendrier.',
@@ -552,11 +596,28 @@ async function load() {
       </nav>
       <div class="admin-main">${sections.map(([key]) => `<section class="admin-panel${key === 'platform' ? ' community-settings' : ''}" data-panel="${key}" role="tabpanel" ${key === current ? '' : 'hidden'}>${helpContext('admin-'+key)}${panels[key]}</section>`).join('')}</div></div>`;
     for (const form of app.querySelectorAll('[data-discord-form]')) discordRefresh(form);
+    void fillTodo();
     if (openView) showView(openView);
     if (openModule) openModuleSettings(openModule);
     openView = ''; openModule = '';
   } catch (error) {
     renderError(error.message || String(error));
+  }
+}
+// The races of both simulators: one line per thing to do, each opening its race.
+async function fillTodo() {
+  const box = app.querySelector('[data-admin-todo]');
+  if (!box) return;
+  try {
+    const lists = await Promise.all(['lmu', 'iracing'].map(game => api(`/api/races?game=${game}&scope=upcoming`)
+      .then(result => todoItems((result.events || []).filter(event => String(event.circuit || '').startsWith('iracing-') === (game === 'iracing')), game))));
+    const items = lists.flat().sort((a, b) => a.startsAt - b.startsAt);
+    box.querySelector('p')?.remove();
+    box.insertAdjacentHTML('beforeend', items.length
+      ? `<ul class="admin-alerts">${items.slice(0, 12).map(item => `<li class="is-${item.tone}"><span><strong>${esc(item.name)}</strong> · ${esc(todoWhen(item))} : ${esc(item.text)}</span><a class="link-button" href="/${item.game}/#event=${esc(item.eventId)}">Ouvrir</a></li>`).join('')}</ul>${items.length > 12 ? `<p class="admin-muted">Et ${items.length - 12} autre${items.length - 12 > 1 ? 's' : ''}.</p>` : ''}`
+      : '<ul class="admin-alerts"><li class="is-ok"><span>Rien à traiter : chaque pilote inscrit a son équipage.</span></li></ul>');
+  } catch {
+    box.querySelector('p').textContent = 'Les courses n’ont pas pu être lues. Recharge la page.';
   }
 }
 function showView(view) {
@@ -754,8 +815,8 @@ app.addEventListener('click', async event => {
         const channel=form.elements.announcementTestChannel.value.trim();
         if(!channel)throw new Error('Indique le salon de test.');
         status.textContent='Envoi de l’aperçu…';
-        await api('/api/community/discord/announcement-test','POST',{channel});
-        status.textContent='✓ Aperçu envoyé dans le salon choisi, sans mention.';
+        const sent=await api('/api/community/discord/announcement-test','POST',{channel});
+        status.textContent=sent?.poster?'✓ Affiche envoyée dans le salon choisi, sans mention.':'✓ Aperçu envoyé en texte : l’affiche n’a pas pu être créée (navigateur Cloudflare non réglé).';
       }
       else if (discordButton.matches('[data-discord-preview]')) {
         const preview = form.querySelector('[data-recap-preview]'), input = discordInput(form);

@@ -11,7 +11,7 @@ import {cleanupEventRecaps,addThreadMembers} from './recap-discord.mjs';
 import {syncCrewDiscord, cleanupOrphanCrewDiscord} from './crew-discord.mjs';
 import {syncAnnouncements} from './discord-announce.mjs';
 import {allCommunities, currentCommunity, communityById, communitySlug, appearanceOf} from './community.mjs';
-import {isDevelopment,devRobots,markDevelopmentResponse} from './dev-environment.mjs';
+import {isDevelopment,devRobots,markDevelopmentResponse,withoutProductionCookies} from './dev-environment.mjs';
 import {isCommunityPage, freshPageRequest, withCommunityLook} from './community-look.mjs';
 // The team's live room of the mur des stands (Durable Object, binding LIVE in the wrangler files).
 export {LiveRoom} from './live.mjs';
@@ -138,10 +138,20 @@ function communityNotFound() {
   return new Response(page, {status:404, headers:{'Content-Type':'text/html; charset=utf-8', 'Cache-Control':'no-store', 'X-Robots-Tag':'noindex'}});
 }
 
+// HTML pages carry "no-transform": Cloudflare then injects no script of its own (JavaScript detections), which
+// our CSP (script-src 'self') would block with an error on every page.
+export function withoutEdgeScripts(response) {
+  if (!(response.headers.get('Content-Type') || '').includes('text/html')) return response;
+  const kept = new Response(response.body, response), cache = kept.headers.get('Cache-Control');
+  if (!/no-transform/i.test(cache || '')) kept.headers.set('Cache-Control', cache ? `${cache}, no-transform` : 'no-transform');
+  return kept;
+}
+
 export default {
   async fetch(request, env, ctx) {
     const pathname = new URL(request.url).pathname;
     const development = isDevelopment(env);
+    if (development) request = withoutProductionCookies(request);
     // A page of a community's site: its look is put in the page itself (server/community-look.mjs).
     const lookOf = env?.DB && isCommunityPage(request, communityLabel(new URL(request.url), env)) ? await currentCommunity(env, request).catch(() => null) : null;
     if (lookOf) request = freshPageRequest(request);
@@ -159,7 +169,7 @@ export default {
       const redirect = homeRedirect(request, community);
       if (redirect) return redirect;
       if (env?.ASSETS) {
-        const home = withCommunityLook(await homePage(request, env), lookOf);
+        const home = withoutEdgeScripts(withCommunityLook(await homePage(request, env), lookOf));
         return development ? markDevelopmentResponse(home, env) : home;
       }
     }
@@ -169,7 +179,8 @@ export default {
     if (weeklyMutation && response.ok) queueWeeklySync(env, ctx, request, target?.eventId, target?.communityId, target?.shared);
     // A WebSocket opening (mur des stands) goes back untouched: a copied response would lose its socket.
     if (response.status === 101) return response;
-    return development ? markDevelopmentResponse(response, env) : response;
+    const page = withoutEdgeScripts(response);
+    return development ? markDevelopmentResponse(page, env) : page;
   },
 
   // Separate schedules keep crew vocals responsive without accelerating the heavier maintenance jobs.

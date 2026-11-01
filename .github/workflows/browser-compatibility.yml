@@ -2,17 +2,21 @@ name: Browser compatibility
 
 # The site runs on the GitHub machine itself (wrangler dev, local database with every migration): nothing depends
 # on a deployed site (the Cloudflare bot protection of endurance-manager.app answers 403 to GitHub's machines).
+# Also on every PR into dev or main, so a browser regression is seen before it is merged (audit R15).
 on:
   workflow_dispatch:
   push:
     branches: [dev]
+  pull_request:
+    branches: [dev, main]
 
 permissions:
   contents: read
 
 jobs:
   browser-compatibility:
-    runs-on: ubuntu-latest
+    # Playwright 1.55 is pinned in package-lock.json and does not support Ubuntu 26.04.
+    runs-on: ubuntu-24.04
     timeout-minutes: 25
     env:
       COMPAT_BASE_URL: http://localhost:8787
@@ -42,13 +46,16 @@ jobs:
           echo "::error::the local site did not start"
           exit 1
       - run: npm run compat:test
+      # The « Charte »: the reference pages compared with their captures (tests/visual/__screenshots__).
+      - run: npm run visual:test
       - name: Upload Playwright report on failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: browser-compatibility-report-${{ github.ref_name }}
+          name: browser-compatibility-report-${{ github.run_id }}
           path: |
             playwright-report/
+            playwright-visual-report/
             test-results/
             wrangler-dev.log
           if-no-files-found: ignore

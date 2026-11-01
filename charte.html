@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="fr" data-game="lmu">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<meta name="robots" content="noindex, nofollow">
+<title>Charte · ENDURANCE MANAGER</title>
+<link rel="icon" href="/images/endurance-manager-logo.webp" type="image/webp">
+<meta name="theme-color" content="#0a0b0c">
+<link rel="stylesheet" href="/styles.css?v=46-race-planning">
+<link rel="stylesheet" href="/crew-accordion.css?v=3">
+<link rel="stylesheet" href="/crew-builder.css?v=2-pilot-crews">
+<link rel="stylesheet" href="/styles/crew-builder-registration-shortcut.css?v=2-modal">
+<link rel="stylesheet" href="/ux-refinement.css?v=2">
+<link rel="stylesheet" href="/styles/crew-controls.css?v=7-colored-crews">
+<link rel="stylesheet" href="/styles/desktop-polish.css?v=1">
+<link rel="stylesheet" href="/styles/event-shell-alignment.css?v=8-explicit-three-departure-actions">
+<link rel="stylesheet" href="/styles/mobile.css?v=1">
+<link rel="stylesheet" href="/styles/mobile-density.css?v=1">
+<link rel="stylesheet" href="/styles/mobile-polish-v3.css?v=2">
+<link rel="stylesheet" href="/styles/mobile-bugfixes.css?v=1">
+<link rel="stylesheet" href="/styles/pilot-dashboard.css?v=1">
+<link rel="stylesheet" href="/styles/my-entries-native.css?v=3-consolidated">
+<link rel="stylesheet" href="/styles/my-entries-accordions.css?v=1-compact-secondary">
+<link rel="stylesheet" href="/styles/pilot-emphasis.css?v=4">
+<link rel="stylesheet" href="/styles/registration-sharing.css?v=9-pilot-logo-balance">
+<link rel="stylesheet" href="/styles/layout-polish.css?v=5">
+<link rel="stylesheet" href="/styles/home-event-card.css?v=9-compact-sim-home">
+<link rel="stylesheet" href="/styles/game-context.css?v=5-account-menu">
+<link rel="stylesheet" href="/styles/account-menu.css?v=4-oauth-trust">
+<link rel="stylesheet" href="/styles/desktop-nav-unified.css?v=6-full-sim-names">
+<link rel="stylesheet" href="/styles/legal.css?v=2">
+<link rel="stylesheet" href="/styles/circuit-sources.css?v=5-compact-sim-home">
+<link rel="stylesheet" href="/styles/mobile-timeline-compact.css?v=3">
+<link rel="stylesheet" href="/styles/mobile-final.css?v=2-readable-pilot-cards">
+<link rel="stylesheet" href="/styles/account-mobile-fix.css?v=2-left-popover">
+<link rel="stylesheet" href="/styles/event-polish.css?v=4-desktop-meta-action-columns">
+<link rel="stylesheet" href="/styles/crew-open-compact.css?v=1">
+<link rel="stylesheet" href="/styles/past-departures.css?v=2">
+<link rel="stylesheet" href="/styles/mobile-density-v2.css?v=3-three-departure-actions">
+<link rel="stylesheet" href="/styles/admin.css?v=4-diagnostic">
+<link rel="stylesheet" href="/styles/charte.css?v=1">
+<link rel="stylesheet" href="/styles/ux-refresh.css?v=29-crews-page">
+</head>
+<body class="charte-page">
+<main id="app" class="charte">
+<div class="charte-head"><h1>Charte</h1><p>Les valeurs et les composants de référence du site. Toute nouvelle page les reprend : les variables sont dans <code>styles/tokens.css</code>, et les tests visuels (<code>tests/visual</code>) comparent cette page à sa capture de référence.</p></div>
+
+<section class="charte-section" aria-labelledby="c-colors"><h2 id="c-colors">Couleurs</h2>
+<ul class="charte-swatches"><li><span class="charte-swatch" style="background:var(--em-bg)"></span><code>--em-bg</code><small>Fond</small></li><li><span class="charte-swatch" style="background:var(--em-panel)"></span><code>--em-panel</code><small>Panneau</small></li><li><span class="charte-swatch" style="background:var(--em-panel-2)"></span><code>--em-panel-2</code><small>Panneau 2</small></li><li><span class="charte-swatch" style="background:var(--em-border)"></span><code>--em-border</code><small>Bordure</small></li><li><span class="charte-swatch" style="background:var(--em-text)"></span><code>--em-text</code><small>Texte</small></li><li><span class="charte-swatch" style="background:var(--em-muted)"></span><code>--em-muted</code><small>Texte discret</small></li><li><span class="charte-swatch" style="background:var(--em-accent)"></span><code>--em-accent</code><small>Couleur de la communauté</small></li><li><span class="charte-swatch" style="background:var(--em-ok)"></span><code>--em-ok</code><small>OK</small></li><li><span class="charte-swatch" style="background:var(--em-warn)"></span><code>--em-warn</code><small>Attention</small></li><li><span class="charte-swatch" style="background:var(--em-danger)"></span><code>--em-danger</code><small>Danger</small></li></ul>
+<h3>Une couleur par type de course</h3>
+<ul class="charte-swatches"><li><span class="charte-swatch" style="background:var(--em-kind-lmu)"></span><code>--em-kind-lmu</code><small>Endurance LMU</small></li><li><span class="charte-swatch" style="background:var(--em-kind-iracing)"></span><code>--em-kind-iracing</code><small>Endurance iRacing</small></li><li><span class="charte-swatch" style="background:var(--em-kind-event)"></span><code>--em-kind-event</code><small>Event</small></li><li><span class="charte-swatch" style="background:var(--em-kind-gridfest)"></span><code>--em-kind-gridfest</code><small>Gridfest</small></li><li><span class="charte-swatch" style="background:var(--em-kind-stream)"></span><code>--em-kind-stream</code><small>Stream</small></li></ul></section>
+
+<section class="charte-section" aria-labelledby="c-text"><h2 id="c-text">Textes</h2>
+<ul class="charte-sizes"><li style="font-size:var(--em-text-xs)"><code>--em-text-xs</code> Détail, méta</li><li style="font-size:var(--em-text-sm)"><code>--em-text-sm</code> Petit texte, boutons</li><li style="font-size:var(--em-text-md)"><code>--em-text-md</code> Texte courant</li><li style="font-size:var(--em-text-lg)"><code>--em-text-lg</code> Titre de carte</li><li style="font-size:var(--em-text-xl)"><code>--em-text-xl</code> Titre de section</li></ul></section>
+
+<section class="charte-section" aria-labelledby="c-buttons"><h2 id="c-buttons">Boutons</h2>
+<div class="charte-row"><button type="button" class="primary-button">M’inscrire</button><button type="button" class="secondary-button">Absent</button><button type="button" class="danger-button">Me désinscrire</button><button type="button" class="link-button">Gérer</button></div>
+<div class="charte-row event-filters" role="group" aria-label="Filtres"><button type="button" class="event-filter-button is-active" aria-pressed="true">Tout</button><button type="button" class="event-filter-button" aria-pressed="false">Endurance LMU</button><button type="button" class="event-filter-button" aria-pressed="false">Endurance iRacing</button><button type="button" class="event-filter-button" aria-pressed="false">Events</button></div></section>
+
+<section class="charte-section" aria-labelledby="c-home"><h2 id="c-home">Accueil : la semaine et la prochaine course</h2>
+<div class="home-layout">
+<section class="home-week">
+<div class="event-filter week-filters" role="group" aria-label="Filtres"><button type="button" class="event-filter-button week-filter is-all" aria-pressed="true">Tout</button><button type="button" class="event-filter-button week-filter is-lmu" aria-pressed="false"><i></i>Endurance LMU</button><button type="button" class="event-filter-button week-filter is-iracing" aria-pressed="false"><i></i>Endurance iRacing</button><button type="button" class="event-filter-button week-filter is-event" aria-pressed="false"><i></i>Events</button><button type="button" class="event-filter-button week-filter is-mine" aria-pressed="false"><i></i>Mes courses</button></div>
+<div class="week-grid charte-week">
+<section class="week-day is-today"><h3 class="week-day-head"><span class="week-day-name">mercredi</span><small>4 novembre</small><span class="week-today">Aujourd’hui</span></h3><div class="week-day-list">
+<a class="week-block is-event sim-lmu is-live" href="#"><span class="week-block-head"><span class="week-block-time">20h</span><span class="week-block-logo"><img class="event-access-logo" src="/images/event-access/open-lmu.png" alt="" width="300" height="300"></span></span><span class="week-block-name">OPEN Bouboule</span><span class="week-block-meta"><span>LMU</span><span>3 manches</span></span><span class="week-chip is-live">● En cours</span><span class="week-chip is-warn">2 places restantes</span></a>
+</div></section>
+<section class="week-day"><h3 class="week-day-head"><span class="week-day-name">samedi</span><small>7 novembre</small></h3><div class="week-day-list">
+<a class="week-block is-endurance is-lmu is-mine" href="#"><span class="week-block-head"><span class="week-block-time">15h</span><span class="week-badge">6H</span></span><span class="week-block-name">6h de Spa</span><span class="week-block-meta"><span>LMU</span><span>🌧 Pluie</span><span>→ 21h</span></span><span class="week-chip is-ok">✓ Apex Racing · 15h–18h</span></a>
+<a class="week-block is-gridfest" href="#"><span class="week-block-head"><span class="week-block-time">21h</span><span class="week-block-logo"><img class="event-access-logo" src="/images/event-access/gridfest-stacked.png" alt="" width="300" height="300"></span></span><span class="week-block-name">Gridfest #4</span><span class="week-block-meta"></span><span class="week-chip is-warn">Complet</span></a>
+</div></section>
+<section class="week-day"><h3 class="week-day-head"><span class="week-day-name">dimanche</span><small>8 novembre</small></h3><div class="week-day-list">
+<a class="week-block is-endurance is-iracing is-mine" href="#"><span class="week-block-head"><span class="week-block-time">14h</span><span class="week-badge">12H</span></span><span class="week-block-name">12h de Sebring</span><span class="week-block-meta"><span>iRacing</span><span>→ lun 2h</span></span><span class="week-chip is-alert">Sans équipage</span></a>
+<a class="week-block is-stream" href="#"><span class="week-block-head"><span class="week-block-time">20h45</span><span class="week-badge">Stream</span></span><span class="week-block-name">Soirée stream</span><span class="week-block-meta"></span></a>
+</div></section>
+</div></section>
+<aside class="home-next-box"><h2 class="home-next-label">Ta prochaine course</h2><p class="home-next-name">6h de Spa</p><p class="home-next-when">sam 7 nov · 15h</p>
+<dl class="home-next-rows"><div><dt>Simu</dt><dd>LMU</dd></div><div><dt>Équipage</dt><dd>Apex Racing #7</dd></div><div><dt>Tes heures</dt><dd>15h–18h</dd></div><div><dt>Voiture</dt><dd>Porsche 963</dd></div><div><dt>Météo</dt><dd>Pluie</dd></div></dl>
+<button type="button" class="home-next-go">Voir la course →</button></aside>
+</div></section>
+
+<section class="charte-section" aria-labelledby="c-discord"><h2 id="c-discord">États</h2>
+<ul class="diag-list">
+<li class="diag-row is-ok"><span><strong>6h de Spa</strong><small>LMU · sam. 7 nov. 15:00</small></span><b>✓ En place</b></li>
+<li class="diag-row is-wait"><span><strong>Team Dune #92</strong><small>LMU · 6h de Spa</small></span><b>En attente</b></li>
+<li class="diag-row is-bad"><span><strong>12h de Sebring</strong><small>iRacing · dim. 8 nov. 14:00</small></span><b>Introuvable sur Discord</b></li>
+</ul></section>
+</main>
+</body>
+</html>

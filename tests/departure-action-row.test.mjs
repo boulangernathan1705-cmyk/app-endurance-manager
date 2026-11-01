@@ -12,7 +12,9 @@ test('la création d’équipage est regroupée avec les actions du départ',()=
   const html=read('game.html');
 
   assert.match(view,/ux-summary-registration-actions\$\{canCreateCrew\?' is-three-actions':''\}/);
-  assert.match(view,/ux-summary-create-crew[\s\S]*data-crew-builder-open/);
+  // The crew button of a start: « Former les équipages » (organisers), the crew window, or « Demander un équipage ».
+  assert.match(view,/ux-summary-create-crew" \$\{crewAction\.attrs\}/);
+  assert.match(view,/kind:'builder',label:'Créer un équipage',attrs:`data-crew-builder-open/);
   assert.match(view,/const participation=renderPilots\(event,departure\);/);
   assert.doesNotMatch(view,/renderPilots\(event,departure,\{canCreateCrew:/);
   assert.match(css,/grid-template-columns:repeat\(3,minmax\(0,1fr\)\)/);

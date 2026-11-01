@@ -123,12 +123,30 @@ async function rolePermissions(env, community, roles) {
   return permissions.has('access') ? permissions : new Set();
 }
 
+// The organisers of a community: its members whose roles give « Équipages » (or « Administrer »), told on the site
+// when a pilot asks for a crew. [{user_id, community_id}]
+export async function crewOrganisers(env, community) {
+  const everyone = community.discordGuildId;
+  const rows = (await env.DB.prepare('SELECT discord_role_id, permissions FROM community_role_permissions WHERE community_id=?').bind(community.id).all()).results || [];
+  const byRole = new Map(rows.map(row => [row.discord_role_id, normalizePermissions(JSON.parse(row.permissions || '[]'))]));
+  const base = byRole.has(everyone) ? byRole.get(everyone) : DEFAULT_EVERYONE;
+  const members = (await env.DB.prepare(`SELECT user_id, discord_roles, discord_admin FROM memberships WHERE community_id=? AND status='member' AND checked_at>=?`)
+    .bind(community.id, now() - STALE_ROLES).all()).results || [];
+  return members.filter(member => {
+    if (member.discord_admin) return true;
+    const granted = new Set(base);
+    for (const role of JSON.parse(member.discord_roles || '[]')) for (const permission of byRole.get(role) || []) granted.add(permission);
+    return granted.has('access') && (granted.has('crews') || granted.has('admin'));
+  }).map(member => ({user_id:member.user_id, community_id:community.id}));
+}
+
 // Permissions of a stored membership (members page).
 export async function memberPermissions(env, community, membership) {
   if (membership.discord_admin) return new Set(ALL_PERMISSIONS);
   return rolePermissions(env, community, JSON.parse(membership.discord_roles || '[]'));
 }
 
+const STALE_ROLES = 7 * 24 * 3600;
 // Access of the actor to the community: {status, permissions, manager}.
 //   status: 'member' (access), 'anonymous' (not signed in), 'not-member' (not on the Discord server),
 //   'forbidden' (member without site access), 'unavailable' (the server or the bot cannot be checked).
@@ -145,7 +163,8 @@ export async function communityAccess(env, actor, community, {open = false} = {}
   const recheck = membership?.status === 'member' ? VISIT_CHECK_EVERY : NOT_MEMBER_CHECK_EVERY;
   if (!membership || membership.checked_at < now() - recheck) membership = (await checkMembership(env, community, actor.user.id).catch(error => { if (!manager && !membership) throw error; return null; })) || membership;
   if (manager) return {status:'member', permissions:new Set(ALL_PERMISSIONS), manager};
-  if (!membership) return none('unavailable');
+  // ...but not forever: roles nobody could check for a week (bot removed, Discord refusing) no longer open the site.
+  if (!membership || membership.checked_at < now() - STALE_ROLES) return none('unavailable');
   if (membership.status !== 'member') return none('not-member');
   if (membership.discord_admin) return {status:'member', permissions:new Set(ALL_PERMISSIONS), manager:false};
   const permissions = await rolePermissions(env, community, JSON.parse(membership.discord_roles || '[]'));

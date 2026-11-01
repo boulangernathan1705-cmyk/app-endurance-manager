@@ -5,12 +5,13 @@ import {readFileSync,readdirSync} from 'node:fs';
 import worker from '../server/worker.mjs';
 import {flushDiscord} from '../server/worker-with-migrations.mjs';
 import {withPublicVoiceAccess} from '../server/discord-permissions.mjs';
+import {CREW_BOT_PERMISSIONS} from '../server/crew-discord.mjs';
 import {linkTestServer,DEV_COMMUNITY,GUILD} from './fixtures/discord-server.mjs';
-import {syncDueRecaps,syncWeeklyDiscord} from '../server/discord-weekly.mjs';
-import {addThreadMembers,botCategoryEmojis,saveBotRecap,validateDiscordLayout,syncBotRecaps,previewBotRecap,recapDestinations,eventDeletionTime,eventChannelName,settingsRow,recapError,repairBotRecap,racesOpenNow} from '../server/recap-discord.mjs';
+import {syncDueRecaps,syncWeeklyDiscord,loadCalendarSnapshot} from '../server/discord-weekly.mjs';
+import {RECAP_BOT_PERMISSIONS,THREADS,addThreadMembers,botCategoryEmojis,saveBotRecap,validateDiscordLayout,syncBotRecaps,previewBotRecap,recapDestinations,eventDeletionTime,eventChannelName,settingsRow,recapError,repairBotRecap,racesOpenNow} from '../server/recap-discord.mjs';
 
 const OWNER='333333333333333333', BOT='444444444444444444', TEXT='555555555555555555', CATEGORY='666666666666666666';
-const NOW=Date.parse('2026-10-10T12:00:00Z'), DAY=86400000;
+const NOW=Date.parse('2026-10-12T08:00:00Z'), DAY=86400000;
 const COMMUNITY={id:DEV_COMMUNITY,slug:'commu-dev',name:'Test',discordGuildId:GUILD,modules:{discordWeekly:true}};
 const ENDURANCES={id:CATEGORY,name:'Endurances'}, RECAP={id:TEXT,name:'recap'};
 const SETTINGS=settingsRow('events',ENDURANCES,ENDURANCES), GENERAL=settingsRow('general',RECAP);
@@ -20,7 +21,7 @@ class D1 {
   prepare(sql){const db=this.db;return {params:[],bind(...params){this.params=params;return this;},async first(){return db.prepare(sql).get(...this.params)||null;},async all(){return {results:db.prepare(sql).all(...this.params)};},async run(){return {meta:{changes:Number(db.prepare(sql).run(...this.params).changes)}};}};}
   async batch(statements){this.db.exec('BEGIN');try{const results=[];for(const statement of statements)results.push(await statement.run());this.db.exec('COMMIT');return results;}catch(error){this.db.exec('ROLLBACK');throw error;}}
 }
-function setup(t,{rights='85008',overrides=[],failure=null}={}){
+function setup(t,{rights=RECAP_BOT_PERMISSIONS,overrides=[],failure=null}={}){
   const DB=new D1(),calls=[],channels=[{id:TEXT,type:0,name:'recap',permission_overwrites:overrides},{id:'111111111111111110',type:4,name:'Accueil',position:0},{id:CATEGORY,type:4,name:'Endurances',position:1,permission_overwrites:overrides},{id:'111111111111111112',type:4,name:'Vocaux',position:2}],messages=new Map();
   const env={DB,APP_ORIGIN:'https://site.example',DISCORD_CLIENT_ID:BOT,DISCORD_BOT_TOKEN:'fake',ADMIN_DISCORD_IDS:OWNER};
   let counter=900000000000000000n, fail=failure;
@@ -66,6 +67,41 @@ function race(DB,id='race-a',name='6h de Spa',circuit='spa',departures=[{id:'sta
 const written=calls=>calls.filter(item=>item.method!=='GET');
 const creates=calls=>calls.filter(item=>item.method==='POST'&&item.path.endsWith('/channels'));
 const sends=calls=>calls.filter(item=>item.method==='POST'&&item.path.endsWith('/messages'));
+
+test('audit: both invitation links cover the complete Discord lifecycle without Administrator',()=>{
+  assert.equal(RECAP_BOT_PERMISSIONS,CREW_BOT_PERMISSIONS);
+  const rights=BigInt(RECAP_BOT_PERMISSIONS);
+  for(const bit of [4,10,11,14,16,17,20,28,34,35,38]) assert.ok(rights&(1n<<BigInt(bit)),`permission ${bit}`);
+  for(const bit of [3,5,13,22,23,24,40]) assert.equal(rights&(1n<<BigInt(bit)),0n,`unneeded permission ${bit}`);
+});
+
+test('audit: daily announcement setup refuses missing history needed for recovery',async t=>{
+  const {env,channels,calls}=setup(t,{rights:String(BigInt(RECAP_BOT_PERMISSIONS)&~65536n)});
+  const answers={mode:'general',sims:'lmu',week:{all:''},events:'',announce:TEXT};
+  const place=(await recapDestinations(env,COMMUNITY)).find(item=>item.id===TEXT);
+  assert.equal(place.announceReady,false);
+  assert.deepEqual(place.announceMissing,['Voir les anciens messages']);
+  await assert.rejects(validateDiscordLayout(env,COMMUNITY,answers),/Voir les anciens messages/);
+  assert.equal(written(calls).length,0);
+  channels.find(item=>item.id===TEXT).permission_overwrites=[{id:BOT,type:1,allow:'65536',deny:'0'}];
+  await validateDiscordLayout(env,COMMUNITY,answers);
+});
+
+test('audit: a thread destination needs Manage Threads for its eventual deletion',async t=>{
+  const {env,channels,calls}=setup(t,{rights:String(BigInt(RECAP_BOT_PERMISSIONS)&~(1n<<34n))});
+  const answers={mode:'general',sims:'lmu',week:{all:`in:${TEXT}`},events:''};
+  await assert.rejects(validateDiscordLayout(env,COMMUNITY,answers),/Gérer les fils/);
+  assert.equal(written(calls).length,0);
+  channels.find(item=>item.id===TEXT).permission_overwrites=[{id:BOT,type:1,allow:String(1n<<34n),deny:'0'}];
+  await validateDiscordLayout(env,COMMUNITY,answers);
+});
+
+for(const [label,bit] of [['Gérer les rôles',28],['Gérer les fils',34],['Créer des fils publics',35],['Envoyer des messages dans les fils',38]])
+  test(`audit: bot categories require ${label} before setup writes`,async t=>{
+    const {env,calls}=setup(t,{rights:String(BigInt(RECAP_BOT_PERMISSIONS)&~(1n<<BigInt(bit)))});
+    await assert.rejects(validateDiscordLayout(env,COMMUNITY,{mode:'events',sims:'lmu',under:'top'}),new RegExp(label));
+    assert.equal(written(calls).length,0);
+  });
 
 async function as(env,path,method='GET',input,user=OWNER){
   env.DB.db.prepare('INSERT OR IGNORE INTO users(id,name,created_at) VALUES(?,?,0)').run(user,'Utilisateur');
@@ -191,7 +227,7 @@ test('historical webhooks stay inert; a community without setup sees the recap o
   DB.db.prepare("INSERT INTO community_recaps(community_id,scope,webhook_url,updated_at) VALUES(?,'all',?,0)").run(DEV_COMMUNITY,hook);
   const page=(await as(env,'/api/community/setup')).data;
   assert.equal(page.botRecap,null);assert.equal(page.recapSetupRequired,true);
-  assert.match(page.recapBotInviteUrl,/permissions=326417599504&/);
+  assert.equal(new URL(page.recapBotInviteUrl).searchParams.get('permissions'),RECAP_BOT_PERMISSIONS);
   calls.length=0;await syncWeeklyDiscord(env,NOW,COMMUNITY);assert.equal(sends(calls).length,0);assert.ok(calls.every(call=>!call.path.includes('/webhooks/')));
   await saveBotRecap(env,COMMUNITY,SETTINGS,false);calls.length=0;await syncBotRecaps(env,NOW,COMMUNITY);
   assert.equal(sends(calls).length,0);assert.ok(calls.every(call=>!call.path.includes('/webhooks/')));
@@ -467,10 +503,15 @@ test('repair of a removed category moves the surviving recap channel and keeps i
   assert.equal(channels.find(c=>c.id===after.channel_id).parent_id,after.category_id);assert.equal(creates(calls).length,1);assert.equal(sends(calls).length,0);
 });
 
-test('a race opens 7 days before a start, a 24 h race 15 days before',()=>{
-  const ev=(id,hours,days)=>({id,circuit:'spa',duration_hours:hours,departures:JSON.stringify([{id:'s',startsAt:NOW+days*DAY}])});
-  const events=[ev('6h-8d',6,8),ev('6h-7d',6,7),ev('24h-16d',24,16),ev('24h-15d',24,15)];
-  assert.deepEqual(racesOpenNow(events,'all',NOW),['6h-7d','24h-15d']);
+test('a race opens on the Monday of its week (Paris), a 24 h race too, until it is over',()=>{
+  const SAT=Date.parse('2026-10-10T12:00:00Z'), MONDAY=Date.parse('2026-10-11T22:00:00Z');
+  const ev=(id,hours,at)=>({id,circuit:'spa',duration_hours:hours,departures:JSON.stringify([{id:'s',startsAt:at}])});
+  const events=[ev('6h-sunday',6,SAT+DAY),ev('6h-next-week',6,SAT+3*DAY),ev('24h-next-week',24,SAT+6*DAY),ev('6h-in-2-weeks',6,SAT+9*DAY)];
+  // Saturday: only this week's race, not next week's (even 2 or 6 days away).
+  assert.deepEqual(racesOpenNow(events,'all',SAT),['6h-sunday']);
+  // Sunday evening the past race is over; Monday 00:00 Paris: the week's races open, the 24 h race too; the following week waits.
+  assert.deepEqual(racesOpenNow(events,'all',MONDAY-1),[]);
+  assert.deepEqual(racesOpenNow(events,'all',MONDAY),['6h-next-week','24h-next-week']);
 });
 
 test('a race channel is titled with the week of the race, not the current week',async t=>{
@@ -559,6 +600,17 @@ function solo(DB,id,name,startsAt,capacity=null,community=DEV_COMMUNITY){
     .run(id,name,JSON.stringify([{id:'d-'+id,startsAt}]),OWNER,community,capacity);
 }
 
+test('the events calendar turns to the next week on Monday at 7h30, not when the week\'s last event starts',async t=>{
+  const {DB,env}=setup(t);
+  // Week of 26 Oct–1 Nov 2026: last event Sunday 14h00 Paris; next week: Monday 18h00.
+  solo(DB,'bmc','BMC Round 5',Date.parse('2026-11-01T13:00:00Z'));solo(DB,'training','Training du lundi',Date.parse('2026-11-02T17:00:00Z'));
+  const at=async iso=>loadCalendarSnapshot(env,Date.parse(iso),COMMUNITY);
+  let snap=await at('2026-11-01T12:00:00Z');assert.match(snap.periodLabel,/26 octobre/);assert.deepEqual(snap.events.map(e=>e.name),['BMC Round 5']);
+  snap=await at('2026-11-01T13:02:00Z');assert.match(snap.periodLabel,/26 octobre/,'Sunday after the last event: the week stays');assert.deepEqual(snap.events.map(e=>e.name),['BMC Round 5']);
+  snap=await at('2026-11-02T06:29:00Z');assert.match(snap.periodLabel,/26 octobre/,'Monday 7h29 Paris: still the past week');
+  snap=await at('2026-11-02T06:30:00Z');assert.match(snap.periodLabel,/2 novembre/,'Monday 7h30 Paris: the new week');assert.deepEqual(snap.events.map(e=>e.name),['Training du lundi']);
+});
+
 test('the week calendar is its own message, never mixed with the endurances',async t=>{
   const {DB,env,calls,messages,channels}=setup(t);race(DB);solo(DB,'sprint','Sprint du mardi',NOW+DAY,2);solo(DB,'cup','Coupe du jeudi',NOW+DAY/4);
   const participant=DB.db.prepare("INSERT INTO participants(id,name,user_id,created_by,created_at,community_id) VALUES(?,?,?,?,0,?)");
@@ -570,7 +622,7 @@ test('the week calendar is its own message, never mixed with the endurances',asy
   const made=channels.find(item=>item.name==='calendrier-de-la-semaine');assert.ok(made,'the bot makes its channel below the chosen one');
   const calendar=sends(calls).find(call=>call.path===`/channels/${made.id}/messages`);assert.ok(calendar);
   const text=JSON.stringify(calendar.body);
-  assert.match(text,/📅 Le programme de la semaine/);assert.match(text,/Semaine du/);assert.equal(calendar.body.embeds[0].url,'https://site.example/events/');assert.deepEqual(calendar.body.components,[]);assert.match(text,/Sprint du mardi/);assert.match(text,/Coupe du jeudi/);
+  assert.match(text,/📅 Events du 12 octobre au 18 octobre 2026/);assert.equal(calendar.body.embeds[0].url,'https://site.example/events/');assert.deepEqual(calendar.body.components,[]);assert.match(text,/Sprint du mardi/);assert.match(text,/Coupe du jeudi/);
   assert.match(text,/2\/2 places · complet/);assert.doesNotMatch(text,/6h de Spa/,'the endurances stay in their category');
   assert.doesNotMatch(JSON.stringify(sends(calls).filter(call=>call!==calendar).map(call=>call.body)),/Sprint du mardi/,'events never get a race category');
   assert.ok(!creates(calls).some(call=>/Sprint/.test(call.body.name)));
@@ -694,15 +746,20 @@ test('« un fil par course »: the bot makes « Endurance Manager » under the c
   assert.ok(inThread);assert.ok(!inThread.embeds.some(embed=>embed.title?.startsWith('📝')),JSON.stringify(inThread.embeds.map(embed=>embed.title)));
   assert.match(inThread.embeds[0].title,/6h de Spa/);
   // « Présent » opens the race on the site; no « Absent » without the key.
-  assert.deepEqual(inThread.components[0].components.map(button=>[button.label,button.style]),[['Présent',5]]);
+  assert.deepEqual(inThread.components[0].components.map(button=>[button.label,button.style]),[['S’inscrire',5]]);
   assert.match(inThread.components[0].components[0].url,/#event=race-a$/);
-  // The week's message: the races only, each a link to its thread.
-  // One box per race: its day and time as the name (the race's name only once, in its thread's link).
-  const index=[...messages.values()].find(item=>item.channel_id===week.id&&item.embeds[0].author?.name.includes('LMU'));
-  assert.equal(index.embeds.length,1);assert.match(index.embeds[0].author.name,/^🏎️ LMU · 1 course cette semaine$/);
-  assert.match(index.embeds[0].fields[0].name,/^🟢 \S+ \d+ \S+ \d+:\d\d$/);assert.doesNotMatch(index.embeds[0].fields[0].name,/Spa/);
-  assert.match(index.embeds[0].fields[0].value,new RegExp(`^<#${threads.find(thread=>thread.name.includes('Spa')).id}>$`));
-  assert.match(index.embeds[0].author.url,/\/lmu\/$/);assert.deepEqual(index.components,[],'a link, no button');
+  // The week's message (option A, Nathan 2026-11-01): ONE message, the community's card with the week and its banner, then
+  // the sim's card, as wide (a clear picture under it); one race in two or three lines, its name the link to its thread.
+  const index=[...messages.values()].find(item=>item.channel_id===week.id&&item.embeds.some(embed=>embed.title?.includes('LMU')));
+  const card=index.embeds.at(-1),spa=threads.find(thread=>thread.name.includes('Spa')).id;
+  assert.equal(index.embeds.length,2);assert.match(index.embeds[0].title,/^📝 Semaine/);assert.ok(index.embeds[0].image.url.includes('banner'));
+  assert.equal(card.title,'🏎️ LMU · 1 course à venir');assert.match(card.image.url,/\/images\/discord-spacer\.png$/);
+  assert.match(card.description,new RegExp(`^\\*\\*\\S+ \\d+ \\S+\\*\\* · <#${spa}>\\n📍 .+ · ⏱️ .+\\n🕑 \\*\\*\\d+h\\d\\d\\*\\*`));
+  assert.match(card.url,/\/lmu\/$/);assert.deepEqual(index.components,[],'a link, no button');
+  // LMU and iRacing share the channel: the iRacing message has its card only, as wide.
+  const iracing=[...messages.values()].find(item=>item.channel_id===week.id&&item.embeds.some(embed=>embed.title?.includes('iRacing')));
+  assert.equal(iracing.embeds.length,1);assert.equal(iracing.embeds[0].title,'🏁 iRacing · 1 course à venir');
+  assert.equal([...messages.values()].filter(item=>item.channel_id===week.id).length,2,'no banner message of its own any more');
 });
 
 test('LMU and iRacing apart: one category each, each race its thread in its sim\'s channel',async t=>{
@@ -808,7 +865,7 @@ test('« récap de la semaine », LMU and iRacing apart: the bot makes « LMU »
 
 test('below a private category, the bot\'s own is private like it when chosen, and open again when not',async t=>{
   const PRIVATE=[{id:GUILD,type:0,allow:'0',deny:'1024'},{id:'222222222222222222',type:0,allow:'3072',deny:'0'}];
-  const {env,channels,calls}=setup(t,{rights:'268520464'});
+  const {env,channels,calls}=setup(t,{rights:String(268520464n|THREADS)});
   Object.assign(named(channels,'Accueil'),{permission_overwrites:PRIVATE});
   assert.equal((await recapDestinations(env,COMMUNITY)).find(item=>item.id===ACCUEIL).private,true);
   await layout(env,COMMUNITY,{mode:'events',sims:'lmu',showWeek:true,under:ACCUEIL,copy:true});
@@ -825,7 +882,7 @@ test('below a private category, the bot\'s own is private like it when chosen, a
 });
 
 test('changing recap category permissions preserves normal vocal features and local moderation rules',async t=>{
-  const {env,channels,calls}=setup(t,{rights:'268520464'});
+  const {env,channels,calls}=setup(t,{rights:String(268520464n|THREADS)});
   const PRIVATE=[{id:GUILD,type:0,allow:'0',deny:'1024'}];
   Object.assign(named(channels,'Accueil'),{permission_overwrites:PRIVATE});
   await layout(env,COMMUNITY,{mode:'events',sims:'lmu',showWeek:true,under:ACCUEIL});
@@ -844,16 +901,16 @@ test('changing recap category permissions preserves normal vocal features and lo
 test('a week message deleted on Discord is put back by the next sync, without « Réparer »',async t=>{
   const {DB,env,messages}=setup(t);race(DB);
   await layout(env,COMMUNITY,{mode:'general',sims:'lmu',week:{all:CATEGORY},events:''});
-  assert.equal(messages.size,3,'the banner, the week\'s message and the race\'s, in its thread');
+  assert.equal(messages.size,2,'the week\'s message (banner and races) and the race\'s, in its thread');
   messages.clear();DB.db.prepare("UPDATE discord_recap_publications SET content_hash='old'").run();
   const result=await syncBotRecaps(env,NOW+1000,COMMUNITY);
-  assert.equal(messages.size,3);assert.ok(!result?.error);
+  assert.equal(messages.size,2);assert.ok(!result?.error);
   assert.equal(DB.db.prepare('SELECT last_error FROM community_recap_settings').get().last_error,null);
 });
 
 test('saving the setting with voices does not ask for rights in the places of the setting before',async t=>{
   // The old destination is closed to all (no « Se connecter » for the bot there); the bot now makes its own category.
-  const {DB,env}=setup(t,{rights:'269569040',overrides:[{id:GUILD,type:0,allow:'0',deny:'1049600'}]});
+  const {DB,env}=setup(t,{rights:String(269569040n|THREADS),overrides:[{id:GUILD,type:0,allow:'0',deny:'1049600'}]});
   await saveBotRecap(env,COMMUNITY,SETTINGS);
   const result=await as(env,'/api/community/discord','PUT',{layout:{mode:'events',sims:'lmu',showWeek:true,under:ACCUEIL,voices:true}});
   assert.equal(result.status,200,JSON.stringify(result.data));
@@ -899,6 +956,39 @@ test('a pass with nothing to change makes one request; a changed race only its e
   assert.deepEqual(calls.map(call=>call.method),['GET','PATCH']);
 });
 
+test('audit: site administrators with an admin-only role and platform managers are included in thread membership',async t=>{
+  const {DB,env,calls}=setup(t);race(DB);
+  await layout(env,COMMUNITY,{mode:'events',sims:'lmu',under:ACCUEIL});
+  DB.db.prepare("UPDATE community_role_permissions SET permissions='[]' WHERE discord_role_id=?").run(GUILD);
+  const role='777777777777777001',user='100000000000000001';
+  DB.db.prepare("INSERT INTO community_role_permissions(community_id,discord_role_id,permissions,updated_at) VALUES(?,?,'[\"admin\"]',0)").run(DEV_COMMUNITY,role);
+  DB.db.prepare('INSERT INTO users(id,name,created_at) VALUES(?,?,0)').run(user,'Admin');
+  DB.db.prepare("INSERT INTO memberships(community_id,user_id,discord_roles,status,checked_at,created_at) VALUES(?,?,?,'member',0,0)").run(DEV_COMMUNITY,user,JSON.stringify([role]));
+  DB.db.prepare("INSERT INTO memberships(community_id,user_id,discord_roles,status,checked_at,created_at) VALUES(?,?,'[]','member',0,0)").run(DEV_COMMUNITY,OWNER);
+  calls.length=0;
+  assert.equal(await addThreadMembers(env,NOW,12),2);
+  assert.equal(calls[0].method,'PATCH');assert.equal(calls[0].body.content,`<@${user}> <@${OWNER}>`);
+  assert.equal(calls[1].body.content,'');assert.equal(calls.some(call=>call.method==='POST'),false);
+});
+
+test('audit: existing bot channels regain thread permissions even when copied public rules have not changed',async t=>{
+  const {env,channels,calls}=setup(t);
+  await layout(env,COMMUNITY,{mode:'events',sims:'lmu',under:ACCUEIL});
+  const category=named(channels,'🏆 Endurance Manager'),text=named(channels,'📅・endurances-de-la-semaine');
+  for(const channel of [category,text]){
+    const mine=channel.permission_overwrites.find(rule=>rule.id===BOT&&rule.type===1);
+    mine.allow=String(BigInt(mine.allow)&~THREADS);mine.deny=String(THREADS);
+  }
+  calls.length=0;await syncBotRecaps(env,NOW,COMMUNITY);
+  for(const channel of [category,text]){
+    const mine=channel.permission_overwrites.find(rule=>rule.id===BOT&&rule.type===1);
+    assert.equal(BigInt(mine.allow)&THREADS,THREADS);assert.equal(BigInt(mine.deny)&THREADS,0n);
+    assert.equal(channel.permission_overwrites.some(rule=>rule.id!==BOT&&(BigInt(rule.allow)&THREADS)!==0n),false,'members gain no thread management');
+  }
+  calls.length=0;await syncBotRecaps(env,NOW,COMMUNITY);
+  assert.equal(calls.some(call=>call.method==='PATCH'&&call.body?.permission_overwrites),false,'repair stabilizes');
+});
+
 test('Discord\'s « a commencé un fil » notice is deleted once from # endurances-de-la-semaine',async t=>{
   const {DB,env,messages,calls}=setup(t);race(DB);
   await layout(env,COMMUNITY,{mode:'events',sims:'lmu',under:'111111111111111110'});
@@ -929,30 +1019,29 @@ test('the crews\' voices: LMU first, then iRacing, each by its start; other voic
   assert.ok(!calls.some(call=>call.method==='PATCH'&&call.path===`/guilds/${GUILD}/channels`),'in order: nothing sent');
 });
 
-test('LMU and iRacing in the same channel: the banner and the week in a message above, the sims\' messages alike below',async t=>{
+test('LMU and iRacing in the same channel: the week and its banner on top of the LMU message, the iRacing one below, same width',async t=>{
   const {DB,env,messages}=setup(t);race(DB);race(DB,'race-b','8h de Watkins Glen','iracing-watkins',[{id:'start-b',startsAt:NOW+2*DAY}]);
   await layout(env,COMMUNITY,{mode:'events',sims:'all',under:'111111111111111110'});
-  const id=event=>DB.db.prepare('SELECT message_id FROM discord_recap_publications WHERE event_id=?').get(event).message_id;
-  const week=event=>messages.get(id(event)).embeds[0];
-  assert.match(week('week:head:lmu').title,/Semaine/);
-  // The head: only the week (its link to the site) and the banner, no count.
-  assert.equal(week('week:head:lmu').fields,undefined);
-  assert.match(week('week:head:lmu').url,/^https:\/\/[^ ]+\/$/);assert.equal(week('week:head:lmu').description,undefined);assert.deepEqual(messages.get(id('week:head:lmu')).components,[]);
-  assert.equal(week('week:lmu').author.name,'🏎️ LMU · 1 course cette semaine');assert.equal(week('week:iracing').author.name,'🏁 iRacing · 1 course cette semaine');
-  for (const sim of ['week:lmu','week:iracing']) {assert.equal(week(sim).image,undefined);assert.equal(week(sim).title,undefined);assert.ok(week(sim).footer);}
-  // Sent in this order: the banner first.
-  assert.ok(BigInt(id('week:head:lmu'))<BigInt(id('week:lmu'))&&BigInt(id('week:lmu'))<BigInt(id('week:iracing')));
+  const id=event=>DB.db.prepare('SELECT message_id FROM discord_recap_publications WHERE event_id=?').get(event)?.message_id;
+  const lmu=messages.get(id('week:lmu')),iracing=messages.get(id('week:iracing'));
+  assert.equal(id('week:head:lmu'),undefined,'no banner message of its own');
+  assert.equal(lmu.embeds.length,2);assert.match(lmu.embeds[0].title,/Semaine/);assert.match(lmu.embeds[0].url,/^https:\/\/[^ ]+\/$/);assert.ok(lmu.embeds[0].image);
+  assert.equal(lmu.embeds[1].title,'🏎️ LMU · 1 course à venir');assert.equal(iracing.embeds.length,1);assert.equal(iracing.embeds[0].title,'🏁 iRacing · 1 course à venir');
+  for (const card of [lmu.embeds[1],iracing.embeds[0]]) {assert.match(card.image.url,/discord-spacer\.png$/);assert.ok(card.footer);}
+  assert.deepEqual(lmu.components,[]);
+  assert.ok(BigInt(id('week:lmu'))<BigInt(id('week:iracing')));
 });
 
-test('a channel set up before the banner message: the sims\' messages are sent again below it',async t=>{
+test('a channel set up with the banner message of before: it is taken down, the week\'s message keeps its place',async t=>{
   const {DB,env,messages}=setup(t);race(DB);
   await layout(env,COMMUNITY,{mode:'events',sims:'lmu',under:'111111111111111110'});
   const id=event=>DB.db.prepare('SELECT message_id FROM discord_recap_publications WHERE event_id=?').get(event)?.message_id;
-  const before=id('week:lmu');
-  // As before this version: no banner message.
-  messages.delete(id('week:head:lmu'));DB.db.prepare("DELETE FROM discord_recap_publications WHERE event_id='week:head:lmu'").run();
+  const before=id('week:lmu'),channel=messages.get(before).channel_id;
+  // As before this version: a banner message above.
+  messages.set('900000000000000001',{id:'900000000000000001',channel_id:channel,embeds:[{title:'📝 Semaine'}]});
+  DB.db.prepare("INSERT INTO discord_recap_publications(community_id,event_id,guild_id,channel_id,message_id,marker,content_hash) SELECT community_id,'week:head:lmu',guild_id,channel_id,'900000000000000001','head','x' FROM discord_recap_publications WHERE event_id='week:lmu'").run();
   await syncBotRecaps(env,NOW+1000,COMMUNITY);
-  assert.ok(!messages.has(before));assert.ok(BigInt(id('week:head:lmu'))<BigInt(id('week:lmu')));
+  assert.ok(!messages.has('900000000000000001'));assert.equal(id('week:lmu'),before);
 });
 
 test('a server set up before the emojis: the bot\'s categories and week\'s channel are renamed, nothing made again',async t=>{
@@ -974,7 +1063,7 @@ test('a community showing the official iRacing races on its site: each gets its 
   await layout(env,community,{mode:'events',sims:'iracing',showEvents:false,under:'top'});
   await syncBotRecaps(env,NOW,community);
   assert.ok(channels.some(item=>item.type===11&&item.name==='🏁 iRacing · Officielle iRacing'));
-  assert.ok([...messages.values()].some(item=>item.embeds[0].author?.name.startsWith('🏁 iRacing')&&/<#/.test(item.embeds[0].fields?.[0]?.value||'')));
+  assert.ok([...messages.values()].some(item=>item.embeds.at(-1).title?.startsWith('🏁 iRacing')&&/<#/.test(item.embeds.at(-1).description||'')));
 });
 test('EVENT TDZ\'s channel is shown as « 🗓️・calendrier », found again by its first name',async()=>{
   const {layoutPlan}=await import('../server/discord-layout.mjs');
@@ -986,7 +1075,7 @@ test('EVENT TDZ\'s channel is shown as « 🗓️・calendrier », found again b
 });
 
 test('the recap written in a channel of the admins: after its messages, threads in it, never deleted',async t=>{
-  const {DB,env,channels,messages}=setup(t,{rights:String(85008n|(1n<<35n)|(1n<<38n))});race(DB);
+  const {DB,env,channels,messages}=setup(t,{rights:String(85008n|THREADS)});race(DB);
   messages.set('800000000000000000',{id:'800000000000000000',channel_id:TEXT,author:{id:OWNER},content:'Comment marche le site'});
   const count=channels.length;
   await layout(env,COMMUNITY,{mode:'general',sims:'lmu',week:{all:`in:${TEXT}`},events:''});
@@ -1005,7 +1094,7 @@ test('the recap written in a channel of the admins: after its messages, threads 
 });
 
 test('written in a channel: the bot must be allowed there, threads included',async t=>{
-  const {env}=setup(t);
+  const {env}=setup(t,{rights:'85008'});
   await assert.rejects(validateDiscordLayout(env,COMMUNITY,{mode:'general',sims:'lmu',week:{all:`in:${TEXT}`},events:''}),/salon « recap ».*Créer des fils publics/);
 });
 
@@ -1065,4 +1154,12 @@ test('pending scheduled passes upgrade an unchanged calendar automatically and r
   assert.ok(sends(calls).some(call=>call.body.flags===4096));
   calls.length=0;
   assert.equal(await syncDueRecaps(env,1,NOW+120000,{pending:true}),0,'upgrade does not repeat');
+});
+
+test('« Semaine du … » in the Discord messages leads to the site’s home (« Accueil »), like the calendar’s title', async () => {
+  const {buildWeekHeadPayload,buildWeeklyDiscordPayload}=await import('../server/discord-weekly-format.mjs');
+  const site={url:'https://tdz.example.app',name:'TDZ'};
+  for(const scope of ['all','lmu','iracing'])assert.equal(buildWeekHeadPayload('semaine du 2 au 8 novembre',site,scope).embeds[0].url,'https://tdz.example.app/');
+  const recap=buildWeeklyDiscordPayload({periodLabel:'semaine du 2 au 8 novembre',currentDepartures:[],futureDepartures:[]},site,Date.now(),'iracing',{},{weekly:true});
+  assert.equal(recap.embeds[0].url,'https://tdz.example.app/');
 });

@@ -1,28 +1,24 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {readFileSync} from 'node:fs';
+import {readdirSync, readFileSync} from 'node:fs';
 import workerWithMigrations from '../server/worker-with-migrations.mjs';
 
 const assets = {fetch: async () => new Response('<html><body>accueil</body></html>', {headers:{'Content-Type':'text/html; charset=utf-8', ETag:'"abc"'}})};
 const home = (path, cookie = '') => workerWithMigrations.fetch(new Request(`https://site.example${path}`, {headers: cookie ? {Cookie: cookie} : {}}), {ASSETS: assets}, {});
 
-test('a returning pilot goes straight to the simulator they chose', async () => {
-  const response = await home('/', 'em_session=x; em_sim=iracing');
-  assert.equal(response.status, 302);
-  assert.equal(response.headers.get('Location'), '/iracing/');
-  assert.equal(response.headers.get('Cache-Control'), 'no-store');
-});
-
-test('with EVENT TDZ, the events calendar is the home page; the simulator is asked in Endurance', async () => {
+test('"/" opens the « Accueil » in the simulator the pilot chose, LMU otherwise', async () => {
+  for (const [cookie, location] of [['em_session=x; em_sim=iracing', '/iracing/#accueil'], ['em_sim=lmu', '/lmu/#accueil'], ['', '/lmu/#accueil'], ['em_sim=elsewhere', '/lmu/#accueil']]) {
+    const response = await home('/', cookie);
+    assert.equal(response.status, 302, cookie);
+    assert.equal(response.headers.get('Location'), location, cookie);
+    assert.equal(response.headers.get('Cache-Control'), 'no-store');
+  }
   const {homeRedirect} = await import('../server/home.mjs');
-  const events = {slug:'tdz', modules:{soloRaces:true}};
-  const go = cookie => homeRedirect(new Request('https://site.example/', {headers: cookie ? {Cookie: cookie} : {}}), events)?.headers.get('Location');
-  assert.equal(go(''), '/events/');
-  assert.equal(go('em_sim=iracing'), '/events/');
-  assert.equal(homeRedirect(new Request('https://site.example/?accueil'), events), null);
-  assert.equal(homeRedirect(new Request('https://site.example/'), {modules:{}}), null);
+  // With EVENT TDZ too: the « Accueil » shows the events with the endurances.
+  assert.equal(homeRedirect(new Request('https://site.example/')).headers.get('Location'), '/lmu/#accueil');
   const context = readFileSync(new URL('../front/game-context.js', import.meta.url), 'utf8');
-  assert.match(context, /if \(!events && \(chosen \|\| !\/\^#\(solo\|event=\)\/i\.test\(location\.hash\)\)\)/);
+  // The « Accueil », the events calendar and a shared race are not a choice of simulator.
+  assert.match(context, /if \(!events && \(chosen \|\| !\/\^#\(solo\|event=\|accueil\)\/i\.test\(location\.hash\)\)\)/);
   // The calendar has its own address (/events/); older links, even typed by hand (/lmu/#SOLO), lead there.
   const router = readFileSync(new URL('../front/app/router.mjs', import.meta.url), 'utf8');
   assert.match(router, /const hash=location\.hash\.toLowerCase\(\);[\s\S]*if\(hash===SOLO_HASH\)\{history\.replaceState\(null,'',EVENTS_PATH\+location\.search\);return \{page:'home',list:'solo'\};\}/);
@@ -31,13 +27,11 @@ test('with EVENT TDZ, the events calendar is the home page; the simulator is ask
   assert.match(readFileSync(new URL('../front/app/actions.mjs', import.meta.url), 'utf8'), /state\.soloRaces&&!simChosen\(\)\)\{openSimChooser\(\)/);
 });
 
-test('the home page stays reachable with ?accueil, for new visitors and unknown values', async () => {
-  for (const [path, cookie] of [['/?accueil', 'em_sim=lmu'], ['/', ''], ['/', 'em_sim=elsewhere']]) {
-    const response = await home(path, cookie);
-    assert.equal(response.status, 200, `${path} ${cookie}`);
-    assert.equal(response.headers.get('ETag'), null, 'the home page is never answered with a stale 304');
-    assert.equal(response.headers.get('Cache-Control'), 'no-store');
-  }
+test('the former simulator choice stays reachable with ?accueil', async () => {
+  const response = await home('/?accueil', 'em_sim=lmu');
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get('ETag'), null, 'the home page is never answered with a stale 304');
+  assert.equal(response.headers.get('Cache-Control'), 'no-store, no-transform');
 });
 
 test('simulator spaces remember the choice and the logo leads to the chosen simulator', () => {
@@ -54,8 +48,14 @@ test('simulator spaces remember the choice and the logo leads to the chosen simu
   // /discord/*: the clicks on the « Absent » button of the races' threads (server/discord-interactions.mjs).
   for (const route of ['/', '/api/*', '/telemetry/*', '/discord/*', '/manifest.webmanifest', '/app-icon.png', '/lmu*', '/iracing*', '/events*'])
     assert.ok(routes.includes(route), route);
-  for (const page of ['members', 'help', 'about', 'legal', 'privacy', 'changelog', 'circuit-credits', 'demande-communaute', 'diagnostics', 'fiches-combo', 'mur-des-stands', 'mur'])
-    assert.ok(routes.some(route => route.endsWith('*') && `/${page}`.startsWith(route.slice(0, -1))), page);
+  // Every page of the site (each .html at the root), not only those known today: a new page works on dev (where
+  // everything goes through the Worker) and must not be forgotten in production. Pages without a route of their own:
+  // index (« / »), game (served under /lmu and /iracing), 404 and offline (served without the Worker).
+  const pages = readdirSync(new URL('..', import.meta.url)).filter(name => name.endsWith('.html')).map(name => name.slice(0, -5))
+    .filter(page => !['index', 'game', '404', 'offline'].includes(page));
+  assert.ok(pages.length >= 12, 'the pages are found');
+  for (const page of pages)
+    assert.ok(routes.some(route => route.endsWith('*') && `/${page}`.startsWith(route.slice(0, -1))), `${page}.html must be in run_worker_first of wrangler.prod.jsonc`);
   // Wrangler refuses the deploy when a route is already covered by a shorter one ('/mur*' covers '/mur-des-stands*').
   for (const route of routes) assert.ok(!routes.some(other => other !== route && other.endsWith('*') && !other.startsWith('!') && !route.startsWith('!') && route.startsWith(other.slice(0, -1))), `${route} is redundant`);
   for (const route of routes.filter(route => route.startsWith('!'))) assert.doesNotMatch(route, /\.html|^!\/(?:\*|api|telemetry|downloads|lmu|iracing)/, route);
@@ -63,10 +63,10 @@ test('simulator spaces remember the choice and the logo leads to the chosen simu
   assert.equal(prod.assets.binding, 'ASSETS');
 });
 
-test('after the Discord login, a pilot without a simulator picks one in a small window', () => {
+test('after the Discord login, a pilot without a simulator picks one on the page itself, asked once', () => {
   const hub = readFileSync(new URL('../front/game-hub.mjs', import.meta.url), 'utf8');
-  assert.match(hub, /if \(!\/\(\?:\^\|;\\s\*\)em_sim=\/\.test\(document\.cookie\)\) openSimChooser\(session\.user\.name\)/);
-  assert.match(hub, /href="\$\{sim\.href\}"/);
+  assert.doesNotMatch(hub, /openSimChooser|showModal/);
+  assert.match(hub, /Choisis ta simu ci-dessous/);
   // The home page no longer lists races: the simulator spaces do.
   assert.doesNotMatch(hub, /\/api\/races/);
 });

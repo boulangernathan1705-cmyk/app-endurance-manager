@@ -1,12 +1,15 @@
 import {entryCommunities} from './core.mjs';
 import {submitRallyEvent} from './rally-form.mjs';
 import {renderStreamForm,submitStreamEvent} from './stream-form.mjs';
-import {app,state,api,load,loadArchive,showError,countdown,CARS,inCommunity,can} from './core.mjs';
+import {app,state,api,load,loadArchive,showError,countdown,CARS,inCommunity,can,activeGame} from './core.mjs';
 import {renderNav,renderHome,toggleRaceFilter,resetRaceFilters,simChosen,openSimChooser} from './home-view.mjs';
 import {renderEvent,togglePlanningCommunity} from './event-view.mjs';
 import {showPlanningDay,scrollPlanning,goToDeparture,setPlanningSpan,toggleQuickMenu} from './planning.mjs';
 import {renderEventForm,departureFields,updateRemoveButtons,goToEventStep,formDurationMinutes,bulkPreview,shiftBulkWeek} from './event-form.mjs';
 import {renderMyEntries} from './entries-view.mjs';
+import {renderWeek} from './week-view.mjs';
+import {renderCrewsPage,crewsAction} from './crews-page.mjs';
+import {openCrewRequest,cancelCrewRequest} from './crew-request.mjs';
 import {submitSoloEvent} from './solo-form.mjs';
 import {readRaceInfo} from './race-info.mjs';
 import {refresh,refreshAfterSave} from './refresh.mjs';
@@ -183,7 +186,7 @@ async function perform(action,target){
       if(!crew||crew.locked)throw Error('Cet équipage n’est plus disponible. Actualise la page.');
       if(!reg){beginCrewJoin(event,departure,crew);break;}
       const result=await api(`/api/crews/${crew.id}/members`,'POST',{registrationId:reg.id,version:crew.version,selfJoin:true});state.crewManagementOpen.add(crew.id);
-      await refreshAfterSave(`Tu as rejoint « ${crew.name} ».${result.claimedOwnership?' Tu en es maintenant le responsable.':''}`);break;
+      await refreshAfterSave(`Tu as rejoint « ${crew.name} ».`);break;
     }
     case 'leave-crew': {
       const departure=event?.departures.find(item=>item.id===target.dataset.departure);const crew=departure?.crews.find(item=>item.id===target.dataset.id);const reg=departure?.availability.find(item=>item.id===target.dataset.registration);
@@ -233,6 +236,15 @@ async function perform(action,target){
     case 'remove-departure': if(app.querySelectorAll('.departure-field').length>1)target.closest('.departure-field').remove();updateRemoveButtons();break;
     case 'delete-event': if(!confirm(`Supprimer « ${event.name} » et toutes ses inscriptions ? Cette suppression est définitive.${inCommunity()}`))return;await api(`/api/races/${event.id}`,'DELETE',{version:event.version});state.page='home';await refreshAfterSave('Événement supprimé.');break;
     case 'my-entries': await load();renderNav();renderMyEntries();break;
+    // « Semaine »: from the bar, this week; its arrows move a week back or forward.
+    case 'week': state.weekOffset=target.dataset.offset===undefined||target.dataset.offset==='0'?0:(Number(state.weekOffset)||0)+Number(target.dataset.offset);renderWeek();break;
+    case 'week-filter': state.weekFilter=target.dataset.filter||'all';renderWeek();break;
+    // « Équipages » (organisers): the page, on a start when the race page's « Former les équipages » leads there.
+    case 'crews-page': await load();renderNav();if(target.dataset.departure&&target.dataset.game&&target.dataset.game!==activeGame){location.href=`/${target.dataset.game}/#equipages=${target.dataset.departure}`;break;}renderCrewsPage(target.dataset.departure||'');break;
+    case 'crews-view': case 'crews-sim': case 'crews-see': case 'crew-request-refuse': if(await crewsAction(action,target)==='refresh')await refreshAfterSave('Demande refusée. Le pilote est prévenu.');break;
+    // « Demander un équipage » (pilots).
+    case 'crew-request': openCrewRequest(event,target.dataset.departure);break;
+    case 'crew-request-cancel': if(await cancelCrewRequest(target.dataset.id))await refreshAfterSave('Demande annulée.');break;
     case 'share-event': { const link=`${location.origin}${location.pathname}#event=${target.dataset.id}`; try{await navigator.clipboard.writeText(link);}catch{window.prompt('Copie le lien de la course :',link);break;} target.textContent='Lien copié ✓'; setTimeout(()=>{if(target.isConnected)target.textContent='Copier le lien de la course';},2500); break; }
   }
 }
@@ -251,13 +263,23 @@ document.addEventListener('submit',event=>{const form=event.target;if(form.datas
 document.addEventListener('click',event=>{if(event.target.matches?.('.fold-registration'))event.target.querySelector('.registration-close-button')?.click();});
 document.addEventListener('keydown',event=>{if(event.key!=='Escape'||document.querySelector('[data-ux-error-modal]'))return;document.querySelector('.fold-registration:not([hidden]) .registration-close-button, .form-sheet [data-action="close-form"]')?.click();});
 document.addEventListener('toggle',event=>{const details=event.target;if(details instanceof HTMLDetailsElement&&details.matches('.crew-unified-card[data-crew],.crew-management-accordion[data-crew]'))details.open?state.crewManagementOpen.add(details.dataset.crew):state.crewManagementOpen.delete(details.dataset.crew);},true);
-document.addEventListener('click',async event=>{const target=event.target.closest?.('[data-action]');if(!target||target.disabled)return;if(target.dataset.action==='edit-crew')return;event.preventDefault();if(state.busy&&target.dataset.action!=='dismiss-error')return;state.busy=true;target.disabled=true;try{await perform(target.dataset.action,target);}catch(error){showError(error);}finally{state.busy=false;if(target.isConnected)target.disabled=false;updateRemoveButtons();}});
+// Keyboard on a button of a start's heading (inside <summary>): the button acts, the start does not fold or unfold.
+const inSummary=target=>target?.matches?.('summary button, summary [role="button"]');
+document.addEventListener('keydown',event=>{if((event.key===' '||event.key==='Enter')&&inSummary(event.target)){event.preventDefault();if(!event.repeat)event.target.click();}},true);
+document.addEventListener('keyup',event=>{if(event.key===' '&&inSummary(event.target))event.preventDefault();},true);
+// Closing a window (registration, form, error) gives the focus back to the button that opened it, once the page is
+// drawn again: a keyboard user goes on where they were instead of starting from the top of the page.
+const CLOSERS=new Set(['close-registration','close-form','dismiss-error']);
+let opener=null;
+const locate=target=>['action','departure','id','round','mode'].map(key=>target.dataset[key]!==undefined?`[data-${key}="${CSS.escape(target.dataset[key])}"]`:'').join('');
+function restoreFocus(){const selector=opener;opener=null;if(!selector)return;requestAnimationFrame(()=>{const back=document.querySelector(selector);if(back&&!back.closest('[hidden]'))back.focus({preventScroll:false});});}
+document.addEventListener('click',async event=>{const target=event.target.closest?.('[data-action]');if(!target||target.disabled)return;if(target.dataset.action==='edit-crew')return;event.preventDefault();if(state.busy&&target.dataset.action!=='dismiss-error')return;const action=target.dataset.action;if(!CLOSERS.has(action)&&!target.closest('[role="dialog"],[role="alertdialog"],.form-sheet'))opener=locate(target);state.busy=true;target.disabled=true;try{await perform(action,target);if(CLOSERS.has(action))restoreFocus();}catch(error){showError(error);}finally{state.busy=false;if(target.isConnected)target.disabled=false;updateRemoveButtons();}});
 document.addEventListener('submit',async event=>{const form=event.target;if(!form.dataset.kind)return;event.preventDefault();if(state.busy)return;state.busy=true;const submit=form.querySelector('[type="submit"]');if(submit)submit.disabled=true;try{if(form.dataset.kind==='event')await submitEvent(form);else if(form.dataset.kind==='rally-event')await submitRallyEvent(form);else if(form.dataset.kind==='stream-event')await submitStreamEvent(form);else if(form.dataset.kind==='solo-event')await submitSoloEvent(form);else if(form.dataset.kind==='registration'){const departureId=form.dataset.departure;const result=await submitRegistration(form,api);if(!(await finishPendingCrewJoin(departureId,result.id)))await refreshAfterSave(result.notice||'Inscription enregistrée.');}}catch(error){showError(error);}finally{state.busy=false;if(submit?.isConnected)submit.disabled=false;}});
 document.addEventListener('error',event=>{const image=event.target;if(image instanceof HTMLImageElement&&image.matches('.circuit-visual img'))image.remove();},true);
 setInterval(()=>document.querySelectorAll('[data-countdown]').forEach(element=>{element.textContent=countdown(Number(element.dataset.countdown));}),1000);
 
 async function start(){
-  try{const authError=new URLSearchParams(location.search).get('auth');if(authError){history.replaceState(null,'',location.pathname);state.flash='La connexion Discord n’a pas abouti. Tu peux réessayer.';}await load();renderNav();installRouter({renderHome,renderEvent,renderMyEntries});await applyRoute(routeFromLocation(),state.flash);installAutoRefresh(refresh);}catch(error){app.innerHTML='<h1 class="page-title">ENDURANCE MANAGER</h1>';showError(error);}
+  try{const authError=new URLSearchParams(location.search).get('auth');if(authError){history.replaceState(null,'',location.pathname);state.flash='La connexion Discord n’a pas abouti. Tu peux réessayer.';}await load();renderNav();installRouter({renderHome,renderEvent,renderMyEntries,renderWeek,renderCrewsPage});await applyRoute(routeFromLocation(),state.flash);installAutoRefresh(refresh);}catch(error){app.innerHTML='<h1 class="page-title">ENDURANCE MANAGER</h1>';showError(error);}
 }
 start();
 

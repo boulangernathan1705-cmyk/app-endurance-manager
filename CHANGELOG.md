@@ -1,5 +1,29 @@
 # Nouveautés d'Endurance Manager
 
+## v1.99 — 1er novembre 2026
+
+### ✨ Nouveautés
+
+- **Accueil** : la semaine en grand, ta prochaine course à droite. Une carte par course et par jour, avec tous ses départs et le circuit.
+- **Semaine** : LMU, iRacing, events, Gridfest et streams au même endroit. « Mes inscriptions » commence par ton équipage.
+- **Équipages** : une page pour les organisateurs, avec « Équipages à former » sur l’accueil. Les pilotes font une « Demande d’équipage » ; rejoindre un équipage ne fait plus de toi son responsable.
+- **Discord · Annonce du jour** : une affiche le matin. Seuls les départs avec un équipage sont annoncés, et seuls les streams pinguent @everyone.
+
+### ✨ Améliorations
+
+- **Events en plusieurs manches** : un seul bloc d’inscription. « Annoncer un stream » se fait en 3 étapes.
+- **Discord** : un seul message par simu dans le salon des endurances ; fils et vocaux ouverts le lundi ; calendrier des events tourné le lundi à 7h30 ; messages plus lisibles.
+
+### 🔧 Corrections
+
+- **Discord · Vocaux d’équipage** : la fermeture automatique attend lorsque Discord ne permet pas de vérifier si les pilotes sont encore connectés.
+
+### 🛠️ Pour les admins
+
+- **Discord** : diagnostic dans Modules, droits du bot vérifiés avant activation et réparés à la synchronisation.
+- **Vue d’ensemble** : « À traiter » regroupe ce qui attend une action.
+- **Site** : charte de style fixe, sécurité renforcée et pages plus légères.
+
 ## v1.98 — 30 octobre 2026
 
 ### ✨ Améliorations

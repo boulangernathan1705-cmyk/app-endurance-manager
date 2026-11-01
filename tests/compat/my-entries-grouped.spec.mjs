@@ -21,9 +21,9 @@ for(const width of [1440,390])test(`entries group race starts and keep crews and
  await expect(personal.locator('.native-my-entry-card')).toHaveCount(2);
  const grouped=personal.locator('.my-entry-grouped');
  await expect(grouped.locator('h2')).toHaveText('4h de Portimao');
- await expect(grouped.locator('summary')).toContainText('2 créneaux');
- await expect(grouped.locator('summary')).toContainText('14h');await expect(grouped.locator('summary')).toContainText('19h');
- await grouped.locator('summary').click();
+ await expect(grouped.locator('summary.native-my-entry-header')).toContainText('2 créneaux');
+ await expect(grouped.locator('summary.native-my-entry-header')).toContainText('14h');await expect(grouped.locator('summary.native-my-entry-header')).toContainText('19h');
+ await grouped.locator('summary.native-my-entry-header').click();
  await expect(grouped.locator('.my-entry-slot')).toHaveCount(2);
  await expect(grouped.locator('[data-entry-departure="start-1"]')).toContainText('En attente d’affectation');
  await expect(grouped.locator('[data-entry-departure="start-2"]')).toContainText('Apex Racing');
@@ -41,7 +41,7 @@ for(const width of [1440,390])test(`entries group race starts and keep crews and
  });
  const solo=personal.locator('.my-entry-grouped.is-solo');
  await expect(solo).toHaveCount(1);
- await solo.locator('summary').click();
+ await solo.locator('summary.native-my-entry-header').click();
  await expect(solo.locator('.my-entry-slot')).toHaveCount(2);
  await expect(solo.locator('.native-my-entry-card')).toHaveCount(0);
 });

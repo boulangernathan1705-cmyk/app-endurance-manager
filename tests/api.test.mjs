@@ -141,6 +141,32 @@ test('one pilot may register in multiple categories until an organizer assigns o
  assert.deepEqual(after.availability.map(r=>r.category),['GT3']);
  assert.deepEqual(after.crews[0].registrationIds,[gt3.data.id]);
 });
+test('full path: two categories, a crew, a change of category, the crew deleted, then the entry withdrawn',async()=>{
+ const {req,login,DB}=harness();
+ await login(ADMIN,'admin');await login(PILOT,'pilot');
+ const created=await req('/api/events','POST',{...eventInput,name:'Parcours complet',categories:['Hypercar','GT3']},'admin');
+ const departure=(await req('/api/events','GET',null,'admin')).data.events[0].departures[0];
+ const base=`/api/events/${created.data.id}/departures/${departure.id}`;
+ const hyper=await req(base+'/registrations','POST',{name:'Pilote multi',category:'Hypercar',status:'whole'},'pilot');
+ const gt3=await req(base+'/registrations','POST',{name:'Pilote multi',category:'GT3',status:'whole'},'pilot');
+ const crew=await req(base+'/crews','POST',{name:'GT3 équipe',category:'GT3',car:''},'admin');
+ assert.equal((await req(`/api/crews/${crew.data.id}/members`,'POST',{registrationId:gt3.data.id,version:1},'admin')).status,200);
+ // Placed in GT3: the Hypercar entry is gone, the GT3 one is in the crew.
+ assert.equal(DB.db.prepare('SELECT id FROM registrations WHERE id=?').get(hyper.data.id),undefined);
+ const version=()=>DB.db.prepare('SELECT version FROM registrations WHERE id=?').get(gt3.data.id).version;
+ // In a crew, the category cannot change behind the crew's back.
+ assert.equal((await req('/api/registrations/'+gt3.data.id,'PATCH',{name:'Pilote multi',category:'Hypercar',status:'whole',version:version()},'pilot')).status,409);
+ // The crew is deleted: the pilot stays entered, without a crew, and can now change category.
+ const crewVersion=DB.db.prepare('SELECT version FROM crews WHERE id=?').get(crew.data.id).version;
+ assert.equal((await req(`/api/crews/${crew.data.id}`,'DELETE',{version:crewVersion},'admin')).status,200);
+ let start=(await req('/api/events','GET',null,'pilot')).data.events[0].departures[0];
+ assert.deepEqual(start.crews,[]);assert.deepEqual(start.availability.map(reg=>[reg.id,reg.category]),[[gt3.data.id,'GT3']]);
+ assert.equal((await req('/api/registrations/'+gt3.data.id,'PATCH',{name:'Pilote multi',category:'Hypercar',status:'whole',version:version()},'pilot')).status,200);
+ // Withdrawn: nothing is left of the pilot on the start.
+ assert.equal((await req('/api/registrations/'+gt3.data.id,'DELETE',{version:version()},'pilot')).status,200);
+ start=(await req('/api/events','GET',null,'pilot')).data.events[0].departures[0];
+ assert.deepEqual(start.availability,[]);assert.equal(DB.db.prepare('SELECT count(*) n FROM crew_members').get().n,0);
+});
 test('managed multi-category assignment removes only the matching pilot on the same departure',async()=>{
  const {req,login,DB}=harness();
  await login(ADMIN,'admin');await login(OTHER,'organizer');
