@@ -47,7 +47,7 @@ test('equipages',async({page})=>{
   await mockSite(page);
   await page.goto(`/lmu/#event=${SPA.id}`);
   await page.locator(`#departure-${SPA.departures[0].id} > summary`).click();
-  await expect(page.locator('.crew-gap-suggestion:visible')).toContainText('Jules Martin');
+  await expect(page.locator('.crew-card-shell:visible').first()).toContainText('Apex Racing');
   await settle(page);
   await expect(page.locator('.pilot-section:visible').first()).toHaveScreenshot('equipages.png');
 });

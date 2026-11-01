@@ -148,7 +148,7 @@ function departureActions(event,departure){
 }
 function departureFoldBody(event,departure){
   const locked=departure.startsAt<=Date.now(),editorOpen=state.registrationOpen.has(departure.id);
-  const participation=renderPilots(event,departure,{newCrewTile:departure.startsAt>Date.now()&&canCreateCrewOnDeparture(departure,event)});
+  const participation=renderPilots(event,departure);
   return `<div class="departure-fold-body">${locked?'<p class="finished-history">Les inscriptions sont verrouillées. Les équipages restent consultables ci-dessous.</p>':`<section class="fold-section fold-registration" ${editorOpen?'':'hidden'}>${renderRegistrationWorkspace(event,departure)}</section>`}<section class="fold-section departure-participation-section">${participation}</section></div>`;
 }
 

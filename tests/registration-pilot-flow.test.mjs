@@ -53,8 +53,7 @@ test('personal registration and crew creation stay contextualized in the same de
   assert.match(eventView,/ux-summary-registration-actions/);
   assert.match(eventView,/ux-summary-create-crew/);
   assert.match(eventView,/data-crew-builder-open data-departure="\$\{departure\.id\}"/);
-  // The crews board ends with a « + Nouvel équipage » tile (maquette-crews); the start's own button stays in its action row.
-  assert.match(eventView,/renderPilots\(event,departure,\{newCrewTile:/);
+  assert.match(eventView,/renderPilots\(event,departure\);/);
   assert.match(crews,/data-departure="\$\{departure\.id\}"/);
   assert.doesNotMatch(registration,/\+ Ajouter un pilote/);
 });

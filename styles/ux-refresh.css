@@ -2626,16 +2626,3 @@ button.home-next-go { min-height: 0; padding: 0; border: 0; background: none; fo
   .week-filters { display: flex; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
   .week-filters .event-filter-button { flex: none; white-space: nowrap; }
 }
-
-/* Crews board (maquette-crews): each crew's hours at a glance, red where nobody drives; suggestion; new crew tile. */
-html[data-game] #app .crew-tile-summary .crew-coverage { display: flex !important; flex-direction: column !important; align-items: stretch !important; gap: 4px !important; width: 100%; margin: 0; }
-html[data-game] #app .crew-coverage-scale { display: flex !important; justify-content: space-between; color: var(--em-muted); font-size: 11px !important; font-weight: 600; }
-html[data-game] #app .crew-coverage-bar { display: flex !important; gap: 3px; }
-html[data-game] #app .crew-coverage-bar i { flex: 1 1 0; height: 8px; border-radius: 3px; background: var(--crew-color, var(--em-accent)); }
-html[data-game] #app .crew-coverage-bar i.is-gap { background: color-mix(in srgb, var(--em-danger) 28%, transparent); box-shadow: inset 0 0 0 1px var(--em-danger); }
-html[data-game] #app .crew-pilot-hours { color: var(--em-muted); font-size: 12.5px; font-weight: 500; }
-html[data-game] #app .crew-gap-suggestion { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin: 0; padding: 8px 14px; border-top: 1px dashed color-mix(in srgb, var(--em-accent) 35%, transparent); color: var(--em-accent); font-size: var(--em-text-sm); font-weight: 700; }
-html[data-game] #app .crew-gap-suggestion .crew-gap-add { margin-left: auto; }
-html[data-game] #app .crew-new-tile { display: grid; place-items: center; min-height: 120px; border: 1px dashed var(--em-border); border-radius: var(--em-radius-lg); background: transparent; color: var(--em-muted); font: inherit; font-weight: 700; cursor: pointer; }
-html[data-game] #app .crew-new-tile:hover, html[data-game] #app .crew-new-tile:focus-visible { border-color: var(--em-accent); color: var(--em-accent); }
-@media (max-width: 760px) { html[data-game] #app .crew-new-tile { min-height: 64px; } }
