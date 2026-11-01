@@ -12,6 +12,7 @@ import {simForEvent,SIMS} from '../../shared/catalog.mjs';
 import {parisDay,weekStart,weekDays} from '../week-days.mjs';
 import {eventMinutes,raceFinishAt} from '../../shared/duration.mjs';
 import {RACE_WEATHERS} from '../../shared/catalog.mjs';
+import {crewStarts} from './crews-page.mjs';
 
 const DAY=86400000;
 const dateOf=day=>new Date(day*DAY);
@@ -149,6 +150,17 @@ function nextBox(all,now){
     ${go}</aside>`;
 }
 
+// « Équipages à former » (organisers): the starts where pilots wait for a crew or ask for one, and the way to the
+// « Équipages » page (Nathan 2026-11-01).
+function crewsBox(){
+  if(!can('crews'))return '';
+  const starts=crewStarts().filter(start=>start.alone.length||start.requests.length);
+  const row=start=>`<li>${button('crews-page',`<span><strong>${esc(start.event.name)}</strong><small>${esc(when(start.startsAt))}${start.departure.hideClock?'':` · ${esc(hour(start.startsAt))}`}</small></span><span class="week-chip ${start.requests.length?'is-warn':'is-alert'}">${start.requests.length?`${start.requests.length} demande${start.requests.length>1?'s':''}`:`${start.alone.length} seul${start.alone.length>1?'s':''}`}</span>`,`data-departure="${esc(start.departure.id)}" data-game="${esc(gameForEvent(start.event))}"`,'home-crews-row')}</li>`;
+  return `<aside class="home-crews-box"><h2 class="home-next-label">Équipages à former</h2>
+    ${starts.length?`<ul>${starts.slice(0,4).map(row).join('')}</ul>${starts.length>4?`<p class="home-crews-more">+ ${starts.length-4} autre${starts.length-4>1?'s':''} départ${starts.length-4>1?'s':''}</p>`:''}`:'<p class="home-crews-done">✓ Tout le monde a un équipage.</p>'}
+    ${button('crews-page','Voir les équipages →','','home-next-go')}</aside>`;
+}
+
 export function renderWeek(){
   if(state.access!=='member'){state.page='home';return;}
   state.page='week';state.currentEventId=null;
@@ -163,7 +175,7 @@ export function renderWeek(){
       <h3 class="week-day-head" id="week-day-${day.day}"><span class="week-day-name">${esc(dayName.format(dateOf(day.day)))}</span><small>${esc(monthDay.format(dateOf(day.day)))}</small>${day.day===today?'<span class="week-today">Aujourd’hui</span>':''}</h3>
       <div class="week-day-list">${day.items.map(item=>block(item,now)).join('')||'<p class="week-empty">—</p>'}</div>
     </section>`).join('');
-  const name=String(state.user?.name||'').trim().split(/\s+/)[0],box=nextBox(all,now);
+  const name=String(state.user?.name||'').trim().split(/\s+/)[0],side=nextBox(all,now)+crewsBox(),box=side?`<div class="home-side">${side}</div>`:'';
   // Admins create an event or announce a stream from here too (Nathan 2026-11-01), as on the events page.
   const create=can('create_race')&&state.soloRaces?`<div class="home-create">${button('create-stream','🎙 Annoncer un stream','','secondary-button')}${button('create','Ajouter un événement','data-format="solo"','primary-button')}</div>`:'';
   const weekLabel=offset===0?'Cette semaine':offset===1?'La semaine prochaine':offset===-1?'La semaine dernière':`Semaine du ${monthDay.format(dateOf(monday))}`;

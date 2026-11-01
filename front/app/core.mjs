@@ -15,7 +15,9 @@ export const state = {
   access:'anonymous', permissions:[], community:null, platformDiscordUrl:null,
   drafts:{}, busy:false, participants:[], flash:'', eventFilter:'upcoming', listFormat:'endurance', soloLabel:'EVENT TDZ', eventTypes:[], soloRaces:false, eventTdz:false, grindfest:false, combos:false,
   selectedDepartureId:null, eventSection:'race', pilotName:'', registrationOpen:new Set(), crewManagementOpen:new Set(),
-  pendingCrewJoin:null, archiveLoaded:false, participantsLoaded:false
+  pendingCrewJoin:null, archiveLoaded:false, participantsLoaded:false,
+  // « Demander un équipage »: the open requests (all of them for the organisers, his own for a pilot).
+  crewRequests:[], crewsView:'todo', crewsFocus:''
 };
 try { state.pilotName = localStorage.getItem('em_pilot_name') || ''; } catch {}
 
@@ -249,6 +251,7 @@ export async function load() {
     state.participantsLoaded=true;
   }
   if (state.user && !state.pilotName) state.pilotName=state.user.name.slice(0,32);
+  state.crewRequests = member && state.user ? ((await api('/api/crew-requests').catch(() => null))?.requests || []) : [];
 }
 export async function loadArchive() {
   if (state.archiveLoaded) return;

@@ -24,7 +24,11 @@ for(const identity of ['member','external'])test(`crew registration: category ca
   });
   await page.addInitScript(()=>{localStorage.setItem('endurance_manager_locale','fr');document.cookie='em_sim=lmu; Path=/';});
   await page.goto(`/lmu/#event=${EVENT}`);
-  await page.locator('[data-crew-builder-open]').first().click();
+  // An organiser's race button leads to the « Équipages » page (Nathan 2026-11-01); its « Créer un équipage »
+  // opens this same builder, so the test opens it directly on the start.
+  await expect(page.locator('[data-action="crews-page"]').first()).toBeAttached();
+  await page.evaluate(start=>{const button=document.createElement('button');button.type='button';button.dataset.crewBuilderOpen='';button.dataset.departure=start;button.id='open-builder';document.body.append(button);},START);
+  await page.locator('#open-builder').click();
   const crew=page.locator('[data-crew-builder-panel]');
   await crew.getByRole('textbox',{name:'Nom de l’équipage'}).fill('Team test');
   await crew.locator('[data-crew-builder-category="LMP2 ELMS"]').click();

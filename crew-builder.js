@@ -11,6 +11,9 @@ let builderState = null;
 let builderPanel = null;
 let pendingMessage = null;
 let submitting = false;
+// Opened from the organisers' « Équipages » page (front/app/crews-page.mjs): the race and its simulator, as the
+// page lists several races of both simulators.
+let context = null;
 
 const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
 
@@ -32,11 +35,13 @@ async function loadSession() {
   return sessionCache;
 }
 
+let eventsCacheGame = '';
 async function loadEvents(force = false) {
   if (!force && app?.querySelector('[data-event-id]') && app.eventViewData) return app.eventViewData.events;
-  if (!force && eventsCache) return eventsCache;
-  // Crews are only built for upcoming starts of the current simulator.
-  const game = globalThis.__ENDURANCE_GAME__ === 'iracing' ? 'iracing' : 'lmu';
+  // Crews are only built for upcoming starts of the current simulator (or of the race opened from « Équipages »).
+  const game = context?.game || (globalThis.__ENDURANCE_GAME__ === 'iracing' ? 'iracing' : 'lmu');
+  if (!force && eventsCache && eventsCacheGame === game) return eventsCache;
+  eventsCacheGame = game;
   const result = await api(`/api/races?game=${game}&scope=upcoming`);
   eventsCache = Array.isArray(result.events) ? result.events : [];
   // Common start whose time is not known yet: "à définir", as on the race page (front/app/core.mjs).
@@ -45,7 +50,7 @@ async function loadEvents(force = false) {
 }
 
 function currentEventId() {
-  return app?.querySelector('[data-event-id]')?.dataset.eventId || '';
+  return app?.querySelector('[data-event-id]')?.dataset.eventId || context?.eventId || '';
 }
 
 function futureDepartures(event) {
@@ -310,6 +315,8 @@ function insertPendingMessage() {
 }
 
 function decorateEventView() {
+  // Outside a race page, the builder lives on the « Équipages » page only.
+  if (context && !app?.querySelector('[data-crews-page]')) context = null;
   const eventId = currentEventId();
   if (!eventId) {
     builderState = null;
@@ -335,8 +342,11 @@ async function refreshMainView() {
   document.dispatchEvent(new CustomEvent('endurance:refresh'));
 }
 
-async function openBuilder(crewId = null, preferredDepartureId = '') {
-  const eventId = currentEventId();
+// `options` (« Équipages » page): {eventId, game, registrationIds, name, category, car, step, requestId}, a crew
+// already filled in (a pilot's request, or the pilots ticked on the page).
+async function openBuilder(crewId = null, preferredDepartureId = '', preset = {}) {
+  if (preset.eventId) { context = {eventId:preset.eventId, game:preset.game === 'iracing' ? 'iracing' : 'lmu'}; eventsCache = null; }
+  const eventId = preset.eventId || currentEventId();
   if (!eventId) return;
   try {
     const [events,session] = await Promise.all([loadEvents(),loadSession()]);
@@ -344,7 +354,8 @@ async function openBuilder(crewId = null, preferredDepartureId = '') {
     if (!event) throw new Error('Événement introuvable. Actualise la page.');
     if (!session.user) throw new Error('Connecte-toi avec Discord pour gérer un équipage.');
     // "Gérer tous les équipages" in this community (Discord roles).
-    const manager=(session.permissions || []).includes('manage_registrations');
+    // The organisers (« Équipages ») compose crews for others: they are not put in the crew they create.
+    const manager=(session.permissions || []).includes('manage_registrations') || (session.permissions || []).includes('crews');
 
     if (crewId) {
       let found = null;
@@ -370,6 +381,15 @@ async function openBuilder(crewId = null, preferredDepartureId = '') {
       builderState = {mode:'create',eventId,manager,siteManager:manager,communityOptions:options,communityId:'',departureId:departure.id,category:'',car:'',name:'',locked:false,ownerRegistrationId:null,registrationIds:[],originalRegistrationIds:[],step:1};
       // Only one possible community (always, on a race of the site's community): chosen already.
       if (options.length <= 1) chooseCommunity(event,departure,options[0]?.id || '');
+      // Prefilled (« Équipages » page): the request's or the ticked pilots, its name, category and car.
+      if (preset.registrationIds?.length || preset.category) {
+        if (preset.category && event.categories.includes(preset.category)) builderState.category = preset.category;
+        builderState.name = preset.name || builderState.name;
+        builderState.car = preset.car || '';
+        builderState.registrationIds = [...(preset.registrationIds || [])];
+        builderState.requestId = preset.requestId || null;
+        builderState.step = Math.min(3, Math.max(1, Number(preset.step) || 1));
+      }
     }
 
     renderPanel(event,{scroll:true});
@@ -386,6 +406,7 @@ async function createCrew() {
     name:builderState.name,
     category:builderState.category,
     car:builderState.car,
+    ...(builderState.manager ? {join:false} : {}),
     ...(builderState.communityId && builderState.communityId !== sessionCache?.community?.id ? {communityId:builderState.communityId} : {})
   });
   const createdId = result.id;
@@ -405,6 +426,8 @@ async function createCrew() {
       version += 1;
     }
   }
+  // A pilot's request (« Demander un équipage »): done, the pilot is told.
+  if (builderState.requestId) await api(`/api/crew-requests/${builderState.requestId}/accept`,'POST',{crewId:createdId});
   return {createdId,removedRegistrations};
 }
 
@@ -471,14 +494,16 @@ document.addEventListener('click', event => {
   const create = event.target.closest('[data-crew-builder-open]');
   if (create) {
     event.preventDefault();
-    void openBuilder(null,create.dataset.departure || '');
+    const data = create.dataset;
+    void openBuilder(null,data.departure || '',data.event ? {eventId:data.event, game:data.game, registrationIds:(data.registrations || '').split(',').filter(Boolean),
+      name:data.name || '', category:data.category || '', car:data.car || '', step:data.step, requestId:data.request || ''} : {});
     return;
   }
   const edit = event.target.closest('[data-action="edit-crew"]');
   if (edit) {
     event.preventDefault();
     event.stopPropagation();
-    void openBuilder(edit.dataset.id);
+    void openBuilder(edit.dataset.id,'',edit.dataset.event ? {eventId:edit.dataset.event, game:edit.dataset.game} : {});
     return;
   }
   if (event.target.closest('[data-crew-builder-cancel]') || event.target.matches?.('[data-crew-builder-overlay]')) {
