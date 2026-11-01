@@ -2532,6 +2532,7 @@ html[data-game] #app .my-entry-slot-heading .race-badges { display: flex; flex-w
    days one under the other on a phone), and the pilot's next race beside it. One colour per kind of race.
    ===================================================================== */
 .home-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: var(--em-space-3) var(--em-space-4); margin-bottom: var(--em-space-4); }
+.home-create { display: flex; flex-wrap: wrap; gap: var(--em-space-2); margin-left: auto; }
 .week-nav { display: flex; flex-wrap: wrap; align-items: center; gap: var(--em-space-2); }
 .week-nav .week-step { min-width: 38px; min-height: 36px; padding: 0 var(--em-space-3); font-size: var(--em-text-lg); }
 .week-label { display: grid; min-width: 170px; text-align: center; font-size: var(--em-text-md); font-weight: 800; color: var(--em-text); }
@@ -2565,7 +2566,7 @@ html[data-game] #app .my-entry-slot-heading .race-badges { display: flex; flex-w
 .week-block:hover { background: linear-gradient(160deg, color-mix(in srgb, var(--kind) 26%, var(--em-panel-2)), var(--em-panel-2) 75%); }
 .week-block.is-endurance.is-lmu { --kind: var(--em-kind-lmu); }
 .week-block.is-endurance.is-iracing { --kind: var(--em-kind-iracing); }
-.week-block.is-event { --kind: var(--em-kind-event); }
+.week-block.is-event { --kind: var(--sim, var(--em-kind-event)); }
 .week-block.is-gridfest { --kind: var(--em-kind-gridfest); }
 .week-block.is-stream { --kind: var(--em-kind-stream); }
 .week-block.is-past { opacity: .6; }
@@ -2600,6 +2601,9 @@ html[data-game] #app .my-entry-slot-heading .race-badges { display: flex; flex-w
   .week-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
 @media (max-width: 760px) {
+  .home-create { width: 100%; margin-left: 0; }
+  .home-create > * { flex: 1 1 0; font-size: var(--em-text-sm); padding-inline: var(--em-space-2); }
+  .week-grid.is-quiet::after { content: "Aucune course cette semaine."; color: var(--em-muted); padding: var(--em-space-3) 0; }
   .home-layout { grid-template-columns: minmax(0, 1fr); gap: var(--em-space-3); }
   .home-next-box { order: -1; }
   .week-filters { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
