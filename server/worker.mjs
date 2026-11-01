@@ -1098,7 +1098,7 @@ async function api(request, env) {
     if(channel.announceMissing?.some(right=>!['Mentionner @everyone','Voir les anciens messages'].includes(right)))fail(400,'Le bot doit pouvoir voir le salon, envoyer des messages et intégrer des liens.');
     // The poster of a stream day with example data, as sent at 7h30 (the text when Cloudflare's browser is not set up).
     const site={...siteOf(env,community),streamUrl:announceStream(await botRecapSettings(env,community))||'https://www.twitch.tv/lapraline_tdz'};
-    const sent=await sendAnnouncementPreview(env,channel.id,site);
+    const sent=await sendAnnouncementPreview(env,community,channel.id,site);
     return json({ok:true,poster:sent.poster,url:`https://discord.com/channels/${community.discordGuildId}/${channel.id}/${sent.id}`});
   }
   // Everything the bot made for « Discord » taken off: the messages, channels and categories, the crews' voice channels.

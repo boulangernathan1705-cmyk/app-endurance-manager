@@ -539,13 +539,15 @@ test('an endurance is announced only on its starts with a crew, without the pilo
 
 test('with Cloudflare’s browser, each message is a poster made once at 7h30: the picture, the buttons, no text (Nathan, 2026-11-01)',async t=>{
   const {DB,env,calls,settings}=setup(t);
-  Object.assign(env,{CF_ACCOUNT_ID:'acc',BROWSER_RENDERING_TOKEN:'token'});
+  Object.assign(env,{CF_ACCOUNT_ID:'acc',BROWSER_RENDERING_TOKEN:'token',
+    ASSETS:{fetch:async request=>new URL(request.url).pathname==='/images/endurance-manager-banner.webp'?new Response(new Uint8Array([1,2,3]),{headers:{'content-type':'image/webp'}}):new Response('',{status:404})}});
   await announceCommunity(env,TDZ,settings(),MORNING);
   const renders=calls.filter(call=>call.method==='RENDER'),posts=sent(calls);
   assert.equal(renders.length,2);assert.equal(posts.length,2);
   assert.ok(renders[0].path.endsWith('/accounts/acc/browser-rendering/screenshot'));
   // The stream's poster: the banner, « STREAM 20H45 », the streamer; the races' one: no banner.
-  assert.match(renders[0].body.html,/class=ban src="https:\/\/site\.example\/images\/endurance-manager-banner\.webp"/);
+  // The site's pictures go inside the page: Cloudflare's browser does not fetch them from the site.
+  assert.match(renders[0].body.html,/class=ban src="data:image\/webp;base64,AQID"/);
   assert.match(renders[0].body.html,/STREAM 20H45/);assert.match(renders[0].body.html,/avec <b>tdz<\/b>/);
   assert.doesNotMatch(renders[1].body.html,/class=ban/);assert.match(renders[1].body.html,/ENDURANCES DU JOUR/);
   assert.equal(posts[0].body.content,'@everyone');assert.deepEqual(posts[0].body.embeds,[]);

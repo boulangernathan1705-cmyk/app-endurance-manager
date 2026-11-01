@@ -190,11 +190,42 @@ export function posterText(model) {
   return [head, ...model.blocks.map(block), model.more ? `-# + ${plural(model.more, 'autre rendez-vous')} sur le site` : ''].filter(Boolean).join('\n\n').slice(0, 4000);
 }
 
+const base64 = bytes => {
+  if (typeof bytes.toBase64 === 'function') return bytes.toBase64();
+  let binary = '';
+  for (let index = 0; index < bytes.length; index += 0x8000) binary += String.fromCharCode.apply(null, bytes.subarray(index, index + 0x8000));
+  return btoa(binary);
+};
+// The site's own pictures (banner, event logos) put inside the page: Cloudflare's browser does not get them from the
+// site itself (a test on 2026-11-01 came back without the banner).
+async function inlineImage(env, community, origin, address) {
+  try {
+    const url = new URL(address.replace(/&amp;/g, '&'));
+    if (!origin || url.origin !== new URL(origin).origin) return null;
+    let bytes, type;
+    if (url.pathname === '/api/community/banner' && community?.id) {
+      const row = await env.DB.prepare('SELECT image, content_type FROM community_banners WHERE community_id=?').bind(community.id).first();
+      if (!row) return null;
+      bytes = new Uint8Array(row.image);type = row.content_type;
+    } else if (url.pathname.startsWith('/images/') && env.ASSETS) {
+      const response = await env.ASSETS.fetch(new Request(new URL(url.pathname, origin)));
+      if (!response.ok) return null;
+      bytes = new Uint8Array(await response.arrayBuffer());type = response.headers.get('content-type') || '';
+    } else return null;
+    return /^image\/(png|jpeg|webp|gif)$/.test(String(type).split(';')[0]) && bytes.length < 2_000_000 ? `data:${String(type).split(';')[0]};base64,${base64(bytes)}` : null;
+  } catch { return null; }
+}
+
 // The picture of a poster from Cloudflare's browser (REST API: CF_ACCOUNT_ID + BROWSER_RENDERING_TOKEN), or null.
-export async function renderPoster(env, page) {
+// where: {community, origin} of the site, to put its pictures inside the page.
+export async function renderPoster(env, page, {community = null, origin = ''} = {}) {
   const account = String(env.CF_ACCOUNT_ID || '').trim(), token = String(env.BROWSER_RENDERING_TOKEN || '').trim();
   if (!account || !token) return null;
   try {
+    for (const address of new Set([...page.matchAll(/src="(https:[^"]+)"/g)].map(match => match[1]))) {
+      const inline = await inlineImage(env, community, origin, address);
+      if (inline) page = page.split(`src="${address}"`).join(`src="${inline}"`);
+    }
     const response = await fetch(`https://api.cloudflare.com/client/v4/accounts/${account}/browser-rendering/screenshot`, {method:'POST', signal:AbortSignal.timeout(45000),
       headers:{Authorization:`Bearer ${token}`, 'Content-Type':'application/json'},
       body:JSON.stringify({html:page, viewport:{width:1200, height:600}, gotoOptions:{waitUntil:'networkidle0', timeout:20000}, screenshotOptions:{fullPage:true, type:'png'}})});
