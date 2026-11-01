@@ -40,9 +40,10 @@ test('« Accueil » is reached from the bar and its own address, and shows both 
   assert.match(router, /OLD_WEEK_HASH='#semaine'/);
   assert.match(read('front/app/home-view.mjs'), /button\('week','Accueil'/);
   assert.match(read('front/account-menu.mjs'), /#accueil`, 'Accueil'/);
-  // A card for each part of the site; the administration only with its permission; endurances filtered by sim.
-  assert.match(view, /title:`Endurance \$\{SIM_NAME\[game\]\}`/);
-  assert.match(view, /if\(!can\('admin'\)\)return ''/);
+  // No cards repeating the bar (Nathan 2026-11-01): the week, and the pilot's next race beside it; endurances filtered by sim.
+  assert.doesNotMatch(view, /home-card/);
+  assert.match(view, /function nextBox\(all,now\)/);
+  assert.doesNotMatch(view, /départ\$\{count/);
   assert.match(view, /\['lmu','Endurance LMU'\],\['iracing','Endurance iRacing'\]/);
   // The other simulator's endurances open in its own space.
   assert.match(view, /\/api\/races\?game=\$\{game\}&scope=upcoming/);

@@ -1,7 +1,7 @@
 import {test,expect} from '@playwright/test';
 
-// « Accueil »: the next race, a card for each part of the site, the week with both simulators' endurances.
-for(const width of [1440,390])test(`the home shows the next race, the cards and the week at ${width}px`,async({page})=>{
+// « Accueil »: the week with both simulators' endurances, and the pilot's next race beside it.
+for(const width of [1440,390])test(`the home shows the week and the next race at ${width}px`,async({page})=>{
  await page.setViewportSize({width,height:1000});
  // Both starts in a few minutes: always in this week.
  const now=Date.now(),soon=now+5*60000;
@@ -20,18 +20,19 @@ for(const width of [1440,390])test(`the home shows the next race, the cards and 
  });
  await page.addInitScript(()=>localStorage.setItem('endurance_manager_locale','fr'));
  await page.goto('/lmu/#accueil');
- await expect(page.locator('.home-next')).toContainText('6h de Spa');
- await expect(page.locator('.home-next')).toContainText('Apex Racing');
- await expect(page.locator('.home-card.is-lmu')).toContainText('6h de Spa');
- await expect(page.locator('.home-card.is-iracing')).toContainText('12h de Sebring');
- await expect(page.locator('.home-card.is-mine')).toContainText('1 course');
- // No administration card without the permission.
- await expect(page.locator('.home-card.is-admin')).toHaveCount(0);
+ const next=page.locator('.home-next-box');
+ await expect(next).toContainText('6h de Spa');
+ await expect(next).toContainText('Apex Racing');
+ // No cards repeating the navigation bar.
+ await expect(page.locator('.home-card')).toHaveCount(0);
  await expect(page.locator('.week-block')).toHaveCount(2);
+ await expect(page.locator('.week-block.is-mine')).toContainText('Apex Racing');
+ await expect(page.locator('.week-block').filter({hasText:'12h de Sebring'})).toContainText('6H');
+ await expect(page.locator('.home-head')).not.toContainText('départ');
  await page.locator('[data-action="week-filter"][data-filter="iracing"]').click();
  await expect(page.locator('.week-block')).toHaveCount(1);
  await expect(page.locator('.week-block')).toContainText('12h de Sebring');
  expect(await page.evaluate(()=>document.documentElement.scrollWidth-document.documentElement.clientWidth)).toBeLessThanOrEqual(1);
- await page.locator('.home-card.is-mine').click();
- await expect(page).toHaveURL(/#inscriptions$/);
+ await next.locator('.home-next-go').click();
+ await expect(page).toHaveURL(/#event=aaaaaaaa/);
 });

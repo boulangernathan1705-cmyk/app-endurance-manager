@@ -9,7 +9,7 @@ const reg=(id,name,category,status,extra={})=>({id,name,category,status,cars:[],
 const race=(id,name,circuit,startsAt,availability=[],crews=[])=>({id,name,format:'endurance',eventType:'private',createdByMe:true,categories:['Hypercar','GT3'],circuit,durationMinutes:360,durationHours:6,version:1,
   departures:[{id:`${id}-d`,date:new Date(startsAt).toISOString().slice(0,10),time:new Date(startsAt).toLocaleTimeString('fr-FR',{timeZone:'Europe/Paris',hour:'2-digit',minute:'2-digit'}),startsAt,endsAt:startsAt+6*HOUR,availability,crews}]});
 const SPA=race('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa','6h de Spa','spa',SATURDAY,
-  [reg('r1','Alex Moreau','Hypercar','whole'),reg('r2','Léa Fontaine','Hypercar','whole'),reg('r3','Tom Weber','Hypercar','h1,h2,h3'),reg('r4','Max','Hypercar','h4,h5,h6'),
+  [reg('r1','Alex Moreau','Hypercar','whole'),reg('r2','Léa Fontaine','Hypercar','whole'),reg('r3','Tom Weber','Hypercar','h1,h2,h3',{mine:true}),reg('r4','Max','Hypercar','h4,h5,h6'),
    reg('r5','Sara Lopes','GT3','h4,h5,h6'),reg('r6','Nico Varga','GT3','h3,h4,h5,h6'),reg('r7','Jules Martin','GT3','h1,h2'),reg('r8','Leo','Hypercar','whole')],
   [{id:'c1',name:'Apex Racing #7',category:'Hypercar',car:'Porsche 963',locked:true,version:1,canManage:true,registrationIds:['r1','r2','r3','r4'],pilots:['Alex Moreau','Léa Fontaine','Tom Weber','Max']},
    {id:'c2',name:'Team Dune #92',category:'GT3',car:'',locked:false,version:1,canManage:true,registrationIds:['r5','r6'],pilots:['Sara Lopes','Nico Varga']}]);
@@ -38,7 +38,7 @@ test('charte',async({page})=>{
 test('accueil',async({page})=>{
   await mockSite(page);
   await page.goto('/lmu/#accueil');
-  await expect(page.locator('.home-card.is-lmu')).toContainText('6h de Spa');
+  await expect(page.locator('.home-next-box')).toContainText('6h de Spa');
   await settle(page);
   await expect(page.locator('#app')).toHaveScreenshot('accueil.png');
 });
