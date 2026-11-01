@@ -358,15 +358,15 @@ export function parisDay(timestamp){return dayKey(localDay(timestamp));}
 // endurances after their kind. Only at TDZ do the events have types and OPEN / SAFE (as on the site).
 export const ANNOUNCE_HOOKS={
   lmu:'Protos et GT vous attendent sur Le Mans Ultimate : place à la course !',
-  iracing:'Ce soir sur iRacing, chaque dixième compte. À vous de jouer.',
+  iracing:'Place à iRacing : chaque dixième compte. À vous de jouer.',
   ams2:'Automobilista 2 au programme : du pilotage pur et des bagarres serrées.',
-  ace:'Assetto Corsa EVO ce soir : sortez les gants, ça va glisser.',
+  ace:'Assetto Corsa EVO au programme : sortez les gants, ça va glisser.',
   acrally:'Spéciales au programme : notes en main et pied droit au plancher.',
   BOULOULES:'Soirée BOULOULES ! Ambiance détendue et fous rires garantis, le chrono passe après.',
   'TONDEUZ TRAINING':'Entraînement collectif : on tourne, on compare, on progresse ensemble.',
   Gridfest:'C’est la Gridfest ! Choisis ton streamer et viens faire le show.',
   open:'Grille ouverte à tous, nouveaux comme habitués !',
-  safe:'Soirée SAFE : on roule propre et on respecte les autres.',
+  safe:'Course SAFE : on roule propre et on respecte les autres.',
   official:'Course officielle LMU aujourd’hui : nos équipages défendent les couleurs de la communauté !',
   officialIracing:'Course spéciale iRacing aujourd’hui : nos équipages défendent les couleurs de la communauté !',
   championship:'Manche de championnat aujourd’hui : chaque point compte, on vise le podium !',

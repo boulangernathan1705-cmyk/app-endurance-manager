@@ -479,3 +479,8 @@ test('the morning of a summer-time change still starts the day at midnight (Pari
   assert.equal(new Date(parisDayStart(Date.parse('2026-10-26T10:00:00Z'))+1).toISOString(),'2026-10-25T23:00:00.000Z');
   assert.equal(new Date(parisDayStart(Date.parse('2026-03-29T10:00:00Z'))+1).toISOString(),'2026-03-28T23:00:00.000Z');
 });
+
+test('the hooks by simulator never say « ce soir » (a race may start at 14h)', async () => {
+  const {ANNOUNCE_HOOKS} = await import('../server/discord-weekly-format.mjs');
+  for (const [key, text] of Object.entries(ANNOUNCE_HOOKS)) assert.doesNotMatch(text, /ce soir/i, key);
+});
