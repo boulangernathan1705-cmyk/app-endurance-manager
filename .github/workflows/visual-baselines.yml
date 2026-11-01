@@ -1,0 +1,51 @@
+name: Références visuelles
+
+# Makes the reference captures of the visual tests again (tests/visual/__screenshots__) on GitHub's machine, the
+# same one as the tests, and commits them to the branch. Runs when a commit message of a work branch contains
+# « [références visuelles] » (a layout change that is meant), or by hand (Actions › Références visuelles › Run).
+on:
+  workflow_dispatch:
+  push:
+    branches-ignore: [main, dev]
+
+permissions:
+  contents: write
+
+jobs:
+  references:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[références visuelles]')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      COMPAT_BASE_URL: http://localhost:8787
+      WRANGLER_SEND_METRICS: 'false'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.13.0'
+      - run: npm install --no-audit --no-fund
+      - run: npx playwright install --with-deps chromium
+      - run: npm run build:workers
+        env:
+          LOCAL_HTTP: '1'
+      - run: npx --yes wrangler@4.138.0 d1 migrations apply DB --local
+      - name: Start the site locally
+        run: |
+          LOCAL_HTTP=1 npx --yes wrangler@4.138.0 dev --port 8787 --var APP_ORIGIN:http://localhost:8787 \
+            --var DISCORD_CLIENT_ID:ci --var DISCORD_CLIENT_SECRET:ci > wrangler-dev.log 2>&1 &
+          for i in {1..60}; do
+            if curl --fail --silent --max-time 5 "${COMPAT_BASE_URL}/api/session" | grep -q '"discordReady"'; then exit 0; fi
+            sleep 2
+          done
+          cat wrangler-dev.log
+          exit 1
+      - run: npm run visual:update
+      - name: Commit the captures
+        run: |
+          git add tests/visual/__screenshots__
+          if git diff --cached --quiet; then echo "Captures unchanged."; exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Références visuelles mises à jour"
+          git push

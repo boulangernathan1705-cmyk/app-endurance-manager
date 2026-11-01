@@ -134,7 +134,8 @@ test('Équipages est intégré directement dans chaque départ avec actions pilo
   const crews=read('front/app/crews.mjs');
   const eventView=read('front/app/event-view.mjs');
   assert.doesNotMatch(eventView,/event-section','Équipages'/);
-  assert.match(eventView,/renderPilots\(event,departure\);/);
+  // The crews board ends with a « + Nouvel équipage » tile (maquette-crews); the start's own button stays in its action row.
+  assert.match(eventView,/renderPilots\(event,departure,\{newCrewTile:/);
   assert.match(eventView,/Créer un équipage/);
   assert.match(eventView,/data-crew-builder-open/);
   assert.match(crews,/crew-unified-card/);

@@ -13,7 +13,8 @@ test('la création d’équipage est regroupée avec les actions du départ',()=
 
   assert.match(view,/ux-summary-registration-actions\$\{canCreateCrew\?' is-three-actions':''\}/);
   assert.match(view,/ux-summary-create-crew[\s\S]*data-crew-builder-open/);
-  assert.match(view,/const participation=renderPilots\(event,departure\);/);
+  // The crews board ends with a « + Nouvel équipage » tile (maquette-crews); the start's own button stays in its action row.
+  assert.match(view,/renderPilots\(event,departure,\{newCrewTile:/);
   assert.doesNotMatch(view,/renderPilots\(event,departure,\{canCreateCrew:/);
   assert.match(css,/grid-template-columns:repeat\(3,minmax\(0,1fr\)\)/);
   assert.match(css,/grid-template-columns:34px minmax\(220px,1fr\) max-content minmax\(420px,520px\)!important/);

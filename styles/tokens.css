@@ -1,0 +1,45 @@
+/* =====================================================================
+   Charte Endurance Manager : the reference values (colours, sizes, radii, spacing) of the site.
+   Every new style uses these variables, never a raw value: change a value here and the whole site follows,
+   change a page without touching them and the visual tests (tests/visual) show what moved.
+   The page /charte.html shows each component with these values.
+   Phone layout: below 760px (a media query cannot read a variable, so the number is written there).
+   ===================================================================== */
+:root {
+  /* Surfaces and text */
+  --em-bg: #07090a;
+  --em-panel: var(--panel, #111315);
+  --em-panel-2: var(--panel2, #171a1d);
+  --em-border: var(--border, #292d31);
+  --em-text: #eef3f2;
+  --em-text-strong: #ffffff;
+  --em-muted: #9aa6aa;
+  --em-faint: #5f6a6e;
+  /* The community's colour (its own on its subdomain), and the states */
+  --em-accent: var(--community-accent, #52d3d8);
+  --em-ok: #3ecf8e;
+  --em-warn: #e7b653;
+  --em-danger: #e4483d;
+  --em-danger-text: #ff8b82;
+  /* One colour per kind of race, the same everywhere (week, home, cards) */
+  --em-kind-lmu: #e5484d;
+  --em-kind-iracing: #4f74d8;
+  --em-kind-event: #f3b33d;
+  --em-kind-gridfest: #ff7a1a;
+  --em-kind-stream: #a970ff;
+  /* Sizes */
+  --em-text-xs: 11.5px;
+  --em-text-sm: 13px;
+  --em-text-md: 14.5px;
+  --em-text-lg: 17px;
+  --em-text-xl: 19px;
+  --em-radius-sm: 9px;
+  --em-radius-md: 12px;
+  --em-radius-lg: 14px;
+  --em-radius-pill: 999px;
+  --em-space-1: 4px;
+  --em-space-2: 8px;
+  --em-space-3: 12px;
+  --em-space-4: 16px;
+  --em-space-5: 24px;
+}

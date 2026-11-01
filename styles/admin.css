@@ -182,3 +182,17 @@ img.admin-preview-badge { width: 22px; min-width: 0; padding: 0; border: 0; bord
 .recap-live-preview figcaption{overflow-wrap:anywhere}
 @media(max-width:600px){.discord-form .recap-cards,.discord-row{grid-template-columns:1fr}.discord-form .setup-actions button{flex:1 1 140px}}
 .recap-live-preview a{color:#9fe8ec;text-decoration:underline}
+
+/* « Diagnostic » of the Discord module: one row per race thread or crew voice, its state on the right. */
+.discord-diagnostic { margin-top: 14px; padding: 10px 14px; border: 1px solid var(--em-border); border-radius: var(--em-radius-md); }
+.discord-diagnostic > summary { cursor: pointer; font-weight: 800; color: var(--em-accent); }
+.discord-diagnostic h4 { margin: 14px 0 6px; font-size: var(--em-text-md); }
+.diag-facts { margin: 10px 0 0; padding-left: 18px; }
+.diag-list { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.diag-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 12px; border: 1px solid var(--em-border); border-left-width: 4px; border-radius: var(--em-radius-sm); }
+.diag-row span { display: grid; gap: 2px; min-width: 0; }
+.diag-row small { color: var(--em-muted); }
+.diag-row b { flex: 0 0 auto; font-size: var(--em-text-sm); }
+.diag-row.is-ok { border-left-color: var(--em-ok); } .diag-row.is-ok b { color: var(--em-ok); }
+.diag-row.is-wait { border-left-color: var(--em-warn); } .diag-row.is-wait b { color: var(--em-warn); }
+.diag-row.is-bad { border-left-color: var(--em-danger); } .diag-row.is-bad b { color: var(--em-danger-text); }

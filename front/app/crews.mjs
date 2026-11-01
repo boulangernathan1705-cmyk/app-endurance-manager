@@ -15,6 +15,30 @@ function uncoveredRanges(counts){
   counts.forEach((count,index)=>{if(count)return;const last=ranges.at(-1);if(last&&last.end===index)last.end=index+1;else ranges.push({start:index,end:index+1});});
   return ranges;
 }
+// The pilot's hours, short: « toute » or « 15h–18h, 20h–21h » (the crews board).
+function hoursOf(departure,duration,reg){
+  if(reg.status==='whole')return 'toute';
+  const ranges=uncoveredRanges(Array.from({length:duration},(_,index)=>coversHour(reg,index)?0:1));
+  return ranges.map(range=>`${hourLabel(departure,range.start)}–${hourLabel(departure,range.end)}`).join(', ')||'heures à choisir';
+}
+// The crew's hours at a glance: one segment per hour, red where nobody drives (the crews board, maquette-crews).
+export function coverageBar(departure,counts){
+  const duration=counts.length,middle=Math.floor(duration/2);
+  const gaps=counts.filter(count=>!count).length;
+  return `<span class="crew-coverage" role="img" aria-label="${gaps?`${gaps} heure${gaps>1?'s':''} sans pilote`:'Toutes les heures couvertes'}"><span class="crew-coverage-scale" aria-hidden="true"><span>${esc(hourLabel(departure,0))}</span>${duration>2?`<span>${esc(hourLabel(departure,middle))}</span>`:''}<span>${esc(hourLabel(departure,duration))}</span></span><span class="crew-coverage-bar" aria-hidden="true">${counts.map(count=>`<i class="${count?'is-on':'is-gap'}"></i>`).join('')}</span></span>`;
+}
+// A pilot without crew of the same category who drives at least one empty hour of the crew: « Jules couvrirait 15h–17h ».
+function gapSuggestion(event,departure,crew,counts,unassigned){
+  if(!crew.canManage||crew.locked||startHasBegun(departure)||!counts.some(count=>!count))return '';
+  const sameCommunity=reg=>(reg.community?.id||'')===(crew.community?.id||'');
+  const best=unassigned.filter(reg=>reg.category===crew.category&&sameCommunity(reg))
+    .map(reg=>({reg,fills:counts.map((count,index)=>!count&&coversHour(reg,index)?0:1)}))
+    .map(item=>({...item,score:item.fills.filter(value=>!value).length})).filter(item=>item.score)
+    .sort((a,b)=>b.score-a.score||String(a.reg.name).localeCompare(String(b.reg.name),'fr'))[0];
+  if(!best)return '';
+  const hours=uncoveredRanges(best.fills).map(range=>`${hourLabel(departure,range.start)}–${hourLabel(departure,range.end)}`).join(', ');
+  return `<p class="crew-gap-suggestion">${esc(best.reg.name)} couvrirait ${esc(hours)}${button('add-crew-pilot','Ajouter',`data-id="${crew.id}" data-departure="${departure.id}" data-registration="${best.reg.id}" aria-label="Ajouter ${esc(best.reg.name)} à ${esc(crew.name)}"`,'link-button crew-gap-add')}</p>`;
+}
 // One line per pilot: name (in the pilot's colour) and their timeline with its own hour scale.
 export function pilotLines(departure,duration,regs,{editable=true}={}){
   const locked=departure.startsAt<=Date.now();
@@ -83,7 +107,8 @@ function crewCard(event,departure,crew,index,unassigned,allCrews){
       <summary class="crew-pilot-accordion-summary crew-tile-summary" aria-label="${esc(crew.name)} · ${esc(names)} · ${esc(crew.car||'Voiture à choisir')}">
         <span class="crew-tile-head"><span class="crew-compact-category" aria-hidden="true">${logo(crew.category)}</span><span class="crew-compact-team">${communityTag(crew)}<strong>${esc(crew.name)}</strong></span><span class="crew-compact-chevron" aria-hidden="true">›</span></span>
         ${ownMember||ownerBadge?`<span class="crew-tile-badges">${ownMember?'<span class="crew-mine-badge">Ton équipage</span>':''}${ownerBadge}</span>`:''}
-        <span class="crew-compact-pilots">${regs.length?regs.map(reg=>`<span ${pilotNameTip(reg)}>${esc(reg.name)}</span>`).join(''):'<span class="is-empty">Aucun pilote</span>'}</span>
+        ${regs.length?coverageBar(departure,cov.counts):''}
+        <span class="crew-compact-pilots">${regs.length?regs.map(reg=>`<span ${pilotNameTip(reg)}>${esc(reg.name)}<small class="crew-pilot-hours"> · ${esc(hoursOf(departure,cov.duration,reg))}</small></span>`).join(''):'<span class="is-empty">Aucun pilote</span>'}</span>
         <span class="crew-tile-foot"><span class="crew-compact-car"${crew.car?'':' data-tip="Le responsable choisit la voiture dans « Gérer »."'}>${esc(crew.car||'Voiture à choisir')}</span>${statusPill(crew)}</span>
       </summary>
       <div class="crew-pilot-accordion-body crew-unified-body">
@@ -91,7 +116,7 @@ function crewCard(event,departure,crew,index,unassigned,allCrews){
         ${crewAvailability(event,departure,regs)}
       </div>
     </details>
-    ${actions}
+    ${gapSuggestion(event,departure,crew,cov.counts,unassigned)}${actions}
   </div>`;
 }
 
@@ -116,7 +141,8 @@ export function renderPilots(event,departure,options={}){
   const assigned=new Set(crews.flatMap(crew=>crew.registrationIds||[]));
   const unassigned=(departure.availability||[]).filter(reg=>reg.status!=='unavailable'&&!assigned.has(reg.id)).sort((a,b)=>event.categories.indexOf(a.category)-event.categories.indexOf(b.category)||String(a.name).localeCompare(String(b.name),'fr',{sensitivity:'base'}));
   const unavailable=(departure.availability||[]).filter(reg=>reg.status==='unavailable');
-  const crewCards=crews.length?crews.map((crew,index)=>crewCard(event,departure,crew,index,unassigned,crews)).join(''):'<p class="empty">Aucun équipage pour ce départ.</p>';
+  const newTile=options.newCrewTile&&crews.length?`<button type="button" class="crew-new-tile crew-builder-open" data-crew-builder-open data-departure="${departure.id}">+ Nouvel équipage</button>`:'';
+  const crewCards=crews.length?crews.map((crew,index)=>crewCard(event,departure,crew,index,unassigned,crews)).join('')+newTile:'<p class="empty">Aucun équipage pour ce départ.</p>';
   const pilots=unassigned.length?`<section class="ux-unassigned-section"><div class="ux-unassigned-grid">${groupByPilot(unassigned,event).map(reg=>renderRegistration(reg,departure,event.durationHours||6)+(reg.canEdit&&!startHasBegun(departure)?slotPicker(event,departure,{kind:'registration',id:reg.id,version:reg.version,label:reg.mine?'Choisir mon départ':`Choisir le départ de ${reg.name}`}):'')).join('')}</div></section>`:`<section class="ux-unassigned-section"><p class="empty">${departure.availability.length?'Tous les pilotes disponibles ont déjà un équipage.':'Aucun pilote inscrit sur ce départ.'}</p></section>`;
   const unavailableHtml=unavailable.length?`<details class="ux-crew-bucket ux-unavailable-bucket"><summary><span>Pilotes indisponibles</span><strong>${unavailable.length}</strong></summary><div class="ux-crew-bucket-body">${unavailable.map(reg=>renderRegistration(reg,departure,event.durationHours||6)).join('')}</div></details>`:'';
   const createCrew=options.canCreateCrew?`<button type="button" class="secondary-button crew-builder-open crew-section-create" data-crew-builder-open data-departure="${departure.id}">${esc(options.createCrewLabel||'Créer un équipage')}</button>`:'';
@@ -125,7 +151,7 @@ export function renderPilots(event,departure,options={}){
     :'Horaire pas encore connu : inscris-toi et forme ton équipage ici. Quand les horaires seront publiés, chaque équipage choisira son départ.'}</p>`:'';
   return `<div class="pilot-section">${tbdNotice}<div class="ux-course-overview ux-course-split-overview">
     <section class="ux-course-crews-block"><div class="ux-course-crews-heading"><span class="ux-course-crews-title">Équipages <strong>${crews.length}</strong></span>${createCrew}</div><div class="ux-course-crews-body">${crewCards}</div></section>
-    <details class="ux-course-pilots-accordion" id="pilots-${departure.id}" ${crews.length||!unassigned.length?'':'open'}>${contentSummary('Pilotes sans équipage',pilotCount(unassigned))}<div class="ux-course-pilots-body">${pilots}${unavailableHtml}</div></details>
+    <details class="ux-course-pilots-accordion" id="pilots-${departure.id}" ${unassigned.length?'open':''}>${contentSummary('Pilotes sans équipage',pilotCount(unassigned))}<div class="ux-course-pilots-body">${pilots}${unavailableHtml}</div></details>
   </div></div>`;
 }
 

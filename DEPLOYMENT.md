@@ -16,6 +16,24 @@ Les deux environnements utilisent des Workers et des bases D1 distincts.
 5. Après fusion, Cloudflare déploie `main` vers `endurance-manager.app`.
 6. Le workflow Browser compatibility contrôle ensuite le domaine correspondant à la branche.
 
+## Charte et tests visuels
+
+Le style du site a des valeurs de référence (couleurs, tailles, arrondis, espacements) dans `styles/tokens.css`.
+Les nouveaux styles utilisent ces variables (`var(--em-…)`), jamais une valeur brute. La page `/charte` montre les
+composants avec ces valeurs.
+
+Les tests visuels (`tests/visual`, `npm run visual:test`) comparent la charte, l'accueil et le tableau des équipages
+à leurs captures de référence (`tests/visual/__screenshots__`), sur ordinateur et téléphone. Ils tournent dans le
+contrôle « browser-compatibility » : une mise en page qui bouge sans le vouloir le fait échouer, et le rapport
+joint au contrôle montre l'avant, l'après et la différence.
+
+Quand le changement est voulu, refaire les captures de référence sur GitHub (pas en local : le rendu diffère d'une
+machine à l'autre) :
+1. mettre `[références visuelles]` dans le message d'un commit de la branche de travail (ou Actions ›
+   « Références visuelles » › Run workflow sur la branche) ;
+2. le workflow refait les captures et les ajoute à la branche (commit « Références visuelles mises à jour ») ;
+3. pousser ensuite un commit sur la branche pour relancer les contrôles de la PR (un commit du bot ne les relance pas).
+
 ## Configurations Cloudflare
 
 ### DEV
