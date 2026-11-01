@@ -74,12 +74,18 @@ function block(item,now){
   const live=starts.some(start=>start.departure.hideClock!==true&&start.startsAt<=now&&(start.endsAt||start.startsAt)>=now);
   // Several starts the same day: one card with every start time, no end time (Nathan 2026-11-01).
   const several=starts.length>1;
-  const times=several?esc(starts.map(start=>start.departure.hideClock?'à définir':hour(start.startsAt)).join(' · ')):'';
+  // Each time in its own span: on a phone they stack in the time column, on a computer they follow each other.
+  const times=several?starts.map(start=>`<span>${esc(start.departure.hideClock?'à définir':hour(start.startsAt))}</span>`).join('<i> · </i>'):'';
   // Simulator on top, then the start time(s), the name and its circuit: no end time, the circuit tells the weekend's
   // many endurances apart (Nathan 2026-11-01).
   const circuit=stream?'':solo?soloCardMeta(event).replace('Circuit à préciser',''):esc(simCatalog(event.otherGame||activeGame)?.circuits.find(item=>item.id===event.circuit)?.name||'');
   const sim=solo?(stream?'':SIMS.find(item=>item.id===simForEvent(event))?.short||''):SIM_NAME[event.otherGame||activeGame];
   const badge=solo?kind.label:'',logo=solo?logoOf(event):'';
+  // An endurance has no logo: its length takes the logo's place (« 6H »), with its simulator under it on a phone.
+  const minutes=solo?0:eventMinutes(event),length=minutes>0?`${Math.floor(minutes/60)}H${minutes%60?String(minutes%60).padStart(2,'0'):''}`:'';
+  // Who is there: the crews of an endurance, else its pilots (Nathan 2026-11-01, option B).
+  const crews=solo?0:starts.reduce((sum,start)=>sum+(start.departure.crews||[]).length,0);
+  const count=stream?'':crews?`${crews} équipage${crews>1?'s':''}`:pilots?`${pilots} pilote${pilots>1?'s':''}`:'';
   const weather=solo?'':weatherOf(event);
   const left=solo&&!stream&&Number(event.capacity)>0?Number(event.capacity)-pilots:null;
   const reg=mine?myReg(departure):null,crew=reg&&!solo?crewOf(departure,reg):null;
@@ -92,15 +98,21 @@ function block(item,now){
   const cls=`week-block is-${kind.key}${sim2}${mine?' is-mine':''}${past?' is-past':''}${live?' is-live':''}`;
   const open=event.otherGame?`<a class="${cls}" href="/${event.otherGame}/#event=${event.id}" aria-label="${esc(label)}">`
     :`<button type="button" class="${cls}" data-action="open" data-id="${event.id}" aria-label="${esc(label)}">`;
-  const meta=[weather&&`${weather==='Pluie'?'🌧':'☀️'} ${weather}`,past&&'Terminé'].filter(Boolean);
+  const meta=[count,weather&&`${weather==='Pluie'?'🌧':'☀️'} ${weather}`,past&&'Terminé'].filter(Boolean);
+  const mark=logo?`<span class="week-block-logo">${logo}</span>`:badge?`<span class="week-badge">${esc(badge)}</span>`
+    :length?`<span class="week-badge week-block-length">${esc(length)}<small>${esc(sim)}</small></span>`:'';
+  // On a phone the card is an agenda row: the time on the left, the logo (or length) on the right, the rest between
+  // them (Nathan 2026-11-01, option B); on a computer the body's lines follow the head as before.
   return `${open}
-    ${sim||logo||badge?`<span class="week-block-head"><span class="week-block-sim">${esc(sim)}</span>${logo?`<span class="week-block-logo">${logo}</span>`:badge?`<span class="week-badge">${esc(badge)}</span>`:''}</span>`:''}
-    <span class="week-block-time">${several?times:pending?'à définir':esc(hour(startsAt))}</span>
+    ${sim||mark?`<span class="week-block-head"><span class="week-block-sim">${esc(sim)}</span>${mark}</span>`:''}
+    <span class="week-block-time${pending?' is-pending':''}">${several?times:pending?'à définir':esc(hour(startsAt))}</span>
+    <span class="week-block-body">
     ${live?'<span class="week-chip is-live">● En cours</span>':''}
     <span class="week-block-name">${esc(event.name)}</span>
     ${circuit?`<span class="week-block-circuit">${circuit}</span>`:''}
     ${meta.length?`<span class="week-block-meta">${meta.map(text=>`<span>${esc(text)}</span>`).join('')}</span>`:''}
     ${situation}${places}
+    </span>
   ${event.otherGame?'</a>':'</button>'}`;
 }
 
