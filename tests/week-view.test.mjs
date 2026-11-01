@@ -63,8 +63,10 @@ test('« Accueil » is reached from the bar and its own address, and shows both 
   assert.match(view, /href="\/\$\{event\.otherGame\}\/#event=\$\{event\.id\}"/);
 });
 
-test('a week card writes its start with its finish in words (« Départ 15h · Arrivée 18h10 »), never the finish alone', () => {
+test('a week card shows its simulator on top, then « 15h – fin 18h10 », then the name (version B)', () => {
   const view = read('front/app/week-view.mjs');
-  assert.match(view, /const from=pending\?'':`Départ \$\{hour\(startsAt\)\} · `/);
-  assert.match(view, /\$\{from\}Arrivée \$\{hour\(endsAt\)\}/);
+  assert.match(view, /`fin \$\{late\?/);
+  assert.match(view, /<span class="week-block-sim">/);
+  assert.match(view, /<small>– \$\{esc\(fin\)\}<\/small>/);
+  assert.doesNotMatch(view, /Arrivée \$\{hour/);
 });
