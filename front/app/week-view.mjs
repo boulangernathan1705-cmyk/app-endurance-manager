@@ -98,7 +98,7 @@ function planOf(item){
   }
   if(stream){if(info.raceTime)rows.push({key:clockMinutes(info.raceTime),label:'🏁 Course',from:shortClock(info.raceTime),to:''});}
   else{
-    const solo=isSolo(event),rounds=(event.rounds||[]).length,name=solo?(/training/i.test(String(kind.label))?'Training':rounds>1?`${rounds} manches`:'Course'):'Départ';
+    const solo=isSolo(event),rounds=(event.rounds||[]).length,name=solo?(/training/i.test(String(kind.label))?'Training':'Course'):'Départ';
     starts.forEach((start,index)=>{
       const pending=start.departure.hideClock===true;
       rows.push({key:pending?1e4+index:parisMinutes(start.startsAt),label:`🏁 ${starts.length>1?`${solo?'Course':'Départ'} ${index+1}`:solo?name:'Course'}`,

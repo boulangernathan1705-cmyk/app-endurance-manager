@@ -87,8 +87,8 @@ test('on a phone a week card has its logo or length on the left of its name, cre
   assert.match(view, /week-badge week-block-length/);
   assert.match(view, /équipage\$\{crews>1\?'s':''\}/);
   assert.match(css, /\.week-block-body \{ display: contents; \}/);
-  assert.match(css, /\.week-block \{ grid-template-columns: 56px minmax\(0, 1fr\);/);
-  assert.match(css, /\.week-block-logo \{ width: 56px; height: 56px;/);
+  assert.match(css, /\.week-block \{ grid-template-columns: 64px minmax\(0, 1fr\);/);
+  assert.match(css, /\.week-block-logo \{ width: 64px; height: 64px;/);
 });
 
 test('the week is short: finished races fold per day, busy days are wider, the home takes the width (C + A)', () => {
@@ -113,5 +113,5 @@ test('on a phone a week card shows its schedule, start → end, the stream first
   assert.match(view, /function soonOf\(items,now\)/);
   // The schedule is only on a phone: the computer keeps its cards.
   assert.match(css, /\.week-block-kind, \.week-block-plan, \.week-soon \{ display: none; \}/);
-  assert.match(css, /\.week-block-plan \{ grid-column: 1 \/ -1;/);
+  assert.match(css, /\.week-block-plan \{ grid-column: 2;/);
 });

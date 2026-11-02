@@ -2622,38 +2622,39 @@ main:not(.charte):has(.home-layout) { max-width: 2400px; }
   .week-day-name { display: inline; margin-right: 8px; }
   /* Option G (Nathan 2026-11-02): no box around the day; each card in three floors: what (logo, kind, name, circuit),
      when (one line per moment, start → end, the stream first when it starts first), who (pilots, places, my status). */
-  .week-grid { gap: 16px; }
+  .week-grid { gap: 12px; }
   .week-day, .week-day.is-today { border: 0; border-radius: 0; background: none; box-shadow: none; overflow: visible; }
-  .week-day-head { padding: 0 2px 8px; border: 0; font-size: 16px; }
+  .week-day-head { padding: 0 2px 6px; border: 0; font-size: 16px; }
   .week-day-head small { font-size: 13px; }
   .week-day.is-today .week-day-name { color: var(--em-accent); }
   .week-soon { display: inline; }
-  .week-day-list { gap: 10px; padding: 0; }
-  .week-block { grid-template-columns: 56px minmax(0, 1fr); align-items: center; gap: 10px 12px; padding: 12px 12px 12px 15px; border-radius: 14px;
+  .week-day-list { gap: 8px; padding: 0; }
+  .week-block { grid-template-columns: 64px minmax(0, 1fr); align-items: center; gap: 5px 12px; padding: 10px 10px 10px 13px; border-radius: 14px;
     background: linear-gradient(110deg, color-mix(in srgb, var(--kind) 20%, var(--em-panel-2)), var(--em-panel-2) 55%); }
   .week-block-head { display: contents; }
   .week-block-sim, .week-block-time, .week-block-stream { display: none; }
-  .week-block-logo, .week-block-head .week-badge { grid-column: 1; grid-row: 1; }
-  .week-block-logo { width: 56px; height: 56px; margin: 0; }
-  .week-block-head .week-badge { display: grid; place-content: center; width: 56px; height: 56px; padding: 0; border-radius: 12px; border: 1px solid color-mix(in srgb, var(--kind) 70%, transparent); background: color-mix(in srgb, var(--kind) 42%, #000); font-size: 10px; text-align: center; white-space: normal; }
+  .week-block-logo, .week-block-head .week-badge { grid-column: 1; grid-row: 1 / span 3; align-self: center; }
+  .week-block-logo { width: 64px; height: 64px; margin: 0; }
+  .week-block-head .week-badge { display: grid; place-content: center; width: 64px; height: 64px; padding: 0; border-radius: 12px; border: 1px solid color-mix(in srgb, var(--kind) 70%, transparent); background: color-mix(in srgb, var(--kind) 42%, #000); font-size: 10px; text-align: center; white-space: normal; }
   .week-block-head .week-block-length { font-size: 18px; font-weight: 900; letter-spacing: 0; }
   .week-block-length small { display: block; font-size: 9px; font-weight: 800; letter-spacing: .06em; opacity: .85; }
   .week-block-body { display: contents; }
   .week-block-title { grid-column: 2; grid-row: 1; display: grid; gap: 1px; min-width: 0; }
   .week-block-title .week-chip { margin-bottom: 3px; }
-  .week-block-kind { display: block; font-size: 10.5px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: color-mix(in srgb, var(--kind) 60%, #fff); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .week-block-name { font-size: 16.5px; font-weight: 900; line-height: 1.12; text-transform: uppercase; color: var(--em-text-strong); }
+  .week-block-kind { display: none; font-size: 10.5px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: color-mix(in srgb, var(--kind) 60%, #fff); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .week-block-name { font-size: 15.5px; font-weight: 900; line-height: 1.12; text-transform: uppercase; color: var(--em-text-strong); }
   .week-block-circuit { font-size: 12.5px; }
-  .week-block-plan { grid-column: 1 / -1; display: grid; gap: 4px; padding: 8px 10px; border: 1px solid rgba(255, 255, 255, .06); border-radius: 10px; background: rgba(0, 0, 0, .28); }
-  .week-plan-row { display: grid; grid-template-columns: 7.2em auto 1.2em auto minmax(0, 1fr); align-items: baseline; gap: 4px; font-size: 13px; font-weight: 700; color: var(--em-muted); }
-  .week-plan-row b { font-size: 15px; font-weight: 900; color: var(--em-text-strong); white-space: nowrap; }
+  .week-block-plan { grid-column: 2; display: grid; gap: 1px; }
+  .week-plan-row { display: grid; grid-template-columns: 6.4em auto 1.1em auto minmax(0, 1fr); align-items: baseline; gap: 3px; font-size: 12.5px; line-height: 1.35; font-weight: 700; color: var(--em-muted); }
+  .week-plan-row > span:first-child { white-space: nowrap; }
+  .week-plan-row b { font-size: 14px; font-weight: 900; color: var(--em-text-strong); white-space: nowrap; }
   .week-plan-row i { font-style: normal; text-align: center; opacity: .6; }
   .week-plan-row.is-stream > span:first-child, .week-plan-row.is-stream b { color: #c9a6ff; }
   .week-plan-row .week-stream-link { justify-self: end; font-size: 12.5px; }
-  .week-block-facts { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+  .week-block-facts { grid-column: 2; display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
   .week-block-facts .week-block-meta { display: contents; }
-  .week-block-facts .week-block-meta > span { padding: 2px 8px; border-radius: 999px; background: rgba(255, 255, 255, .06); font-size: 12.5px; font-weight: 700; color: var(--em-text); }
-  .week-block-facts .week-chip { font-size: 12px; }
+  .week-block-facts .week-block-meta > span { padding: 1px 7px; border-radius: 999px; background: rgba(255, 255, 255, .06); font-size: 12px; font-weight: 700; color: var(--em-text); }
+  .week-block-facts .week-chip { font-size: 11.5px; padding: 1px 7px; }
 }
 
 /* Event en plusieurs manches : un seul bloc d'inscription en haut, les manches en infos, les pilotes une fois. */
