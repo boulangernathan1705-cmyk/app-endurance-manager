@@ -81,6 +81,40 @@ function streamLine(event){
   return `<span class="week-block-stream"><span>📺 ${esc(span)}${esc(race)}</span>${link}</span>`;
 }
 
+// The card's schedule on a phone (Nathan 2026-11-02, option G): one line per moment, start → end: the stream (with its
+// link), then the race, each round set or each start of an endurance. An endurance ends 30 min after its race time.
+const parisMinutes=timestamp=>{const [h,m]=clock.format(timestamp).split(':').map(Number);return h*60+m;};
+const clockMinutes=time=>{const [h,m]=String(time||'').split(':').map(Number);return Number.isFinite(h)?h*60+(m||0):0;};
+const shortClock=time=>String(time||'').replace(':','h').replace(/h00$/,'h').replace(/^0(?=\d)/,'');
+function planOf(item){
+  const {event,starts,kind}=item,stream=isStream(event),info=stream?streamDetails(event):event.details||{},rows=[];
+  if(info.streamTime||info.streamEnd){
+    const url=streamUrl(stream?info.streamUrl:state.communityStreamUrl)||'';
+    rows.push({key:clockMinutes(info.streamTime||info.streamEnd),cls:'is-stream',label:'📺 Stream',from:shortClock(info.streamTime),to:shortClock(info.streamEnd),
+      link:url?`<span class="week-stream-link" role="link" tabindex="0" data-stream-url="${esc(url)}">▶ ${esc(streamPlatform(url))}</span>`:''});
+  }
+  if(stream){if(info.raceTime)rows.push({key:clockMinutes(info.raceTime),label:'🏁 Course',from:shortClock(info.raceTime),to:''});}
+  else{
+    const solo=isSolo(event),rounds=(event.rounds||[]).length,name=solo?(/training/i.test(String(kind.label))?'Training':rounds>1?`${rounds} manches`:'Course'):'Départ';
+    starts.forEach((start,index)=>{
+      const pending=start.departure.hideClock===true;
+      rows.push({key:pending?1e4+index:parisMinutes(start.startsAt),label:`🏁 ${starts.length>1?`${solo?'Course':'Départ'} ${index+1}`:solo?name:'Course'}`,
+        from:pending?'à définir':hour(start.startsAt),to:pending||!start.endsAt?'':hour(start.endsAt)});
+    });
+  }
+  if(!rows.length)return '';
+  rows.sort((a,b)=>a.key-b.key);
+  return `<span class="week-block-plan">${rows.map(row=>`<span class="week-plan-row${row.cls?` ${row.cls}`:''}"><span>${esc(row.label)}</span><b>${esc(row.from||'')}</b>${row.to?`<i aria-hidden="true">→</i><b>${esc(row.to)}</b>`:'<i></i><b></b>'}${row.link||''}</span>`).join('')}</span>`;
+}
+// « dans 3 h », « dans 20 min », « en cours »: how long before the day's next start, on today's heading.
+function soonOf(items,now){
+  if(items.some(item=>item.starts.some(start=>start.departure.hideClock!==true&&start.startsAt<=now&&(start.endsAt||start.startsAt)>=now)))return 'en cours';
+  const next=items.flatMap(item=>item.starts).filter(start=>start.departure.hideClock!==true&&start.startsAt>now).map(start=>start.startsAt).sort((a,b)=>a-b)[0];
+  if(!next)return '';
+  const minutes=Math.round((next-now)/60000);
+  return minutes<60?`dans ${Math.max(minutes,1)} min`:`dans ${Math.round(minutes/60)} h`;
+}
+
 function block(item,now){
   const {event,departure,startsAt,endsAt,kind,mine,pilots,pending,starts}=item;
   const past=(endsAt||startsAt)<now,solo=isSolo(event),stream=isStream(event);
@@ -111,6 +145,8 @@ function block(item,now){
   const cls=`week-block is-${kind.key}${sim2}${mine?' is-mine':''}${past?' is-past':''}${live?' is-live':''}`;
   const open=event.otherGame?`<a class="${cls}" href="/${event.otherGame}/#event=${event.id}" aria-label="${esc(label)}">`
     :`<button type="button" class="${cls}" data-action="open" data-id="${event.id}" aria-label="${esc(label)}">`;
+  // « LMU · Training », « iRacing · Endurance », « Stream »: above the name on a phone.
+  const kindLine=[sim,solo?kind.label:'Endurance'].filter(Boolean).filter((text,index,list)=>list.findIndex(other=>String(other).toLowerCase()===String(text).toLowerCase())===index).join(' · ');
   const meta=[count,weather&&`${weather==='Pluie'?'🌧':'☀️'} ${weather}`,past&&'Terminé'].filter(Boolean);
   const mark=logo?`<span class="week-block-logo">${logo}</span>`:badge?`<span class="week-badge">${esc(badge)}</span>`
     :length?`<span class="week-badge week-block-length">${esc(length)}<small>${esc(sim)}</small></span>`:'';
@@ -120,12 +156,15 @@ function block(item,now){
     ${sim||mark?`<span class="week-block-head"><span class="week-block-sim">${esc(sim)}</span>${mark}</span>`:''}
     <span class="week-block-time${pending?' is-pending':''}">${several?times:pending?'à définir':esc(hour(startsAt))}</span>
     <span class="week-block-body">
+    <span class="week-block-title">
     ${live?'<span class="week-chip is-live">● En cours</span>':''}
+    <span class="week-block-kind">${esc(kindLine)}</span>
     <span class="week-block-name">${esc(event.name)}</span>
     ${circuit?`<span class="week-block-circuit">${circuit}</span>`:''}
+    </span>
     ${solo?streamLine(event):''}
-    ${meta.length?`<span class="week-block-meta">${meta.map(text=>`<span>${esc(text)}</span>`).join('')}</span>`:''}
-    ${situation}${places}
+    ${planOf(item)}
+    ${meta.length||situation||places?`<span class="week-block-facts">${meta.length?`<span class="week-block-meta">${meta.map(text=>`<span>${esc(text)}</span>`).join('')}</span>`:''}${situation}${places}</span>`:''}
     </span>
   ${event.otherGame?'</a>':'</button>'}`;
 }
@@ -233,11 +272,11 @@ export function renderWeek(){
   const shown=days.map(day=>{
     const done=day.items.filter(item=>(item.endsAt||item.startsAt)<now),opened=open.has(day.day);
     const items=opened?day.items:day.items.filter(item=>!done.includes(item));
-    return {...day,done,opened,shown:items,weight:items.length>2?2:items.length?1:done.length?.75:.5};
+    return {...day,done,opened,shown:items,soon:day.day===today?soonOf(day.items,now):'',weight:items.length>2?2:items.length?1:done.length?.75:.5};
   });
   const doneLine=day=>day.done.length?button('week-done',day.opened?'▴ Replier':`✓ ${day.done.length} terminée${day.done.length>1?'s':''} ▾`,`data-day="${day.day}" aria-expanded="${day.opened}"`,'week-done'):'';
   const columns=shown.map(day=>`<section class="week-day${day.day===today?' is-today':''}${day.day<today?' is-past':''}${day.items.length?'':' is-empty'}${day.weight>1?' is-busy':''}" aria-labelledby="week-day-${day.day}">
-      <h3 class="week-day-head" id="week-day-${day.day}"><span class="week-day-name">${esc(dayName.format(dateOf(day.day)))}</span><small>${esc(monthDay.format(dateOf(day.day)))}</small>${day.day===today?'<span class="week-today">Aujourd’hui</span>':''}</h3>
+      <h3 class="week-day-head" id="week-day-${day.day}"><span class="week-day-name">${esc(dayName.format(dateOf(day.day)))}</span><small>${esc(monthDay.format(dateOf(day.day)))}</small>${day.day===today?`<span class="week-today">Aujourd’hui${day.soon?`<span class="week-soon"> · ${esc(day.soon)}</span>`:''}</span>`:''}</h3>
       <div class="week-day-list">${day.shown.map(item=>block(item,now)).join('')}${doneLine(day)}${day.items.length?'':'<p class="week-empty">—</p>'}</div>
     </section>`).join('');
   const widths=shown.map(day=>`minmax(0,${day.weight}fr)`).join(' ');
