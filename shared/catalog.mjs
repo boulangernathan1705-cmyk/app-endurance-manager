@@ -151,6 +151,10 @@ export const normalizeTdzEventType = value => /^(?:bouboules?|bouloules?)$/i.tes
 export const normalizeTdzDetails = details => details?.type ? {...details,type:normalizeTdzEventType(details.type)} : details;
 export const TDZ_EVENT_TYPES = ['OPEN', 'SAFE', 'BOULOULES', 'TONDEUZ TRAINING'];
 export const TDZ_EVENTS_LABEL = 'EVENT TDZ';
+// The artwork of a TDZ event (images/event-access/<name>.png): TONDEUZ TRAINING has its own on LMU and iRacing,
+// otherwise OPEN or SAFE of its sim.
+export const eventLogoName = ({sim, access, type}) => normalizeTdzEventType(type) === 'TONDEUZ TRAINING' && ['lmu', 'iracing'].includes(sim)
+  ? `training-${sim}` : `${access === 'safe' ? 'safe' : 'open'}-${sim}`;
 // The events module (modules.soloRaces) is « EVENT TDZ » for the TDZ community (plus « test » on the dev site),
 // with its types and OPEN / SAFE access; everywhere else it is « EVENT SOLO »: no type, open to the « Endurances » permission.
 export const SOLO_EVENTS_LABEL = 'EVENT SOLO';

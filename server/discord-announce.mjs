@@ -9,7 +9,7 @@ import {posterModel, posterHtml, posterText, renderPoster} from './discord-poste
 import {discordRequest, botCategoryEmojis} from './recap-discord.mjs';
 import {discordAbsentButton} from './discord-interactions.mjs';
 import {parseLayout} from './discord-layout.mjs';
-import {simForEvent, tdzOnly, normalizeTdzEventType} from '../shared/catalog.mjs';
+import {simForEvent, tdzOnly, normalizeTdzEventType, eventLogoName} from '../shared/catalog.mjs';
 import {grindfestEnabled, isGrindfest, streamersOf} from '../shared/grindfest.mjs';
 import {isDevelopment} from './dev-environment.mjs';
 import {isStream, streamDetails} from '../shared/stream.mjs';
@@ -101,7 +101,7 @@ async function eventSnapshot(env, community, id, timestamp) {
     // The password itself never goes on Discord.
     password:Boolean(details.password) && row.access === 'safe' && !gridfest,
     // As on the site: the event's logo (OPEN / SAFE of its sim, or Gridfest) at TDZ only.
-    logoUrl:tdz && site ? `${site}/images/event-access/${gridfest ? 'gridfest-stacked' : `${row.access === 'safe' ? 'safe' : 'open'}-${sim}`}.png` : ''};
+    logoUrl:tdz && site ? `${site}/images/event-access/${gridfest ? 'gridfest-stacked' : eventLogoName({sim, access:row.access, type:details.type})}.png` : ''};
 }
 const crewed = departure => (departure.crews || []).some(crew => crew.pilots?.length);
 // An endurance as announced: today's starts with this community's crews and pilots (as in its thread).
