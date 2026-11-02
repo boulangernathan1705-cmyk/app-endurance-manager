@@ -1,6 +1,6 @@
 import {iracingSoloSql} from './iracing-visibility.mjs';
 import {allCommunities, communityUrl, appearanceOf} from './community.mjs';
-import {CALENDAR_FORMAT, isInParisWeek, parisWeek} from './discord-weekly-format.mjs';
+import {CALENDAR_FORMAT, isInParisWeek, parisWeek, lastWeekTurn} from './discord-weekly-format.mjs';
 import {simForEvent} from '../shared/catalog.mjs';
 import {raceFinishAt} from '../shared/duration.mjs';
 import {grindfestEnabled} from '../shared/grindfest.mjs';
@@ -257,7 +257,11 @@ export async function syncWeeklyDiscord(env,timestamp=Date.now(),community=null,
 // then: what follows the pass for that community (its crews' voices).
 export async function syncDueRecaps(env,limit=3,timestamp=Date.now(),{pending=false,then=null}={}) {
   if (!env?.DB || limit < 1) return 0;
-  const rows=(await env.DB.prepare(`SELECT community_id,checked_at FROM community_recap_settings ${pending ? `WHERE last_error IS NULL AND (dirty=1 OR (enabled=1 AND EXISTS (SELECT 1 FROM discord_recap_publications p WHERE p.community_id=community_recap_settings.community_id AND p.closed_at IS NULL AND p.event_id LIKE 'week:calendar%' AND p.message_id IS NOT NULL AND p.content_hash NOT LIKE '${CALENDAR_FORMAT}%')))` : ''} ORDER BY checked_at,community_id`).all()).results || [];
+  // Pending: a change on the site (dirty), an old calendar format, or a community not looked at since the week turned
+  // (Monday 7h30, Paris): its calendar, week messages and finished race threads change with the time alone, not with a
+  // change on the site, so they would otherwise wait for its hourly turn (up to 4 hours with 4 communities, 2026-11-02).
+  const statement=env.DB.prepare(`SELECT community_id,checked_at FROM community_recap_settings ${pending ? `WHERE last_error IS NULL AND (dirty=1 OR (enabled=1 AND checked_at<?) OR (enabled=1 AND EXISTS (SELECT 1 FROM discord_recap_publications p WHERE p.community_id=community_recap_settings.community_id AND p.closed_at IS NULL AND p.event_id LIKE 'week:calendar%' AND p.message_id IS NOT NULL AND p.content_hash NOT LIKE '${CALENDAR_FORMAT}%')))` : ''} ORDER BY checked_at,community_id`);
+  const rows=(await (pending ? statement.bind(lastWeekTurn(timestamp)) : statement).all()).results || [];
   if (!rows.length) return 0;
   const communities=await allCommunities(env);
   for (const row of rows) {
