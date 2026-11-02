@@ -1480,6 +1480,12 @@ html[data-game] #app .ux-unassigned-grid > .pilot-row > .edit-button { align-sel
 .banner-crop-frame { overflow: hidden; border: 2px solid var(--community-accent, #52d3d8); border-radius: 10px; }
 .banner-crop-frame canvas { display: block; width: 100%; aspect-ratio: 4 / 1; cursor: grab; touch-action: none; }
 .banner-crop-frame canvas:active { cursor: grabbing; }
+.settings-bot-current { display: flex; align-items: center; gap: 16px; }
+.settings-bot-current[hidden] { display: none; }
+.settings-bot-current .settings-banner-preview { width: 84px; height: 84px; aspect-ratio: 1; border-radius: 50%; flex: none; }
+.settings-bot-current small { display: block; color: var(--muted, #9aa4a8); margin-top: 4px; }
+.bot-cropper .banner-crop-frame { width: min(320px, 100%); border-radius: 50%; }
+.bot-cropper .banner-crop-frame canvas { aspect-ratio: 1; }
 .banner-crop-zoom { display: flex; align-items: center; gap: 10px; color: #c7d0d4; font-size: 13px; font-weight: 700; }
 .banner-crop-zoom input { flex: 1; accent-color: var(--community-accent, #52d3d8); }
 

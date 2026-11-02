@@ -133,6 +133,38 @@ test('community banner: sent by its admins (checked image, 600 KB at most), publ
   assert.equal((await as(OWNER,'/api/session')).data.community.appearance.bannerUrl,null,'the site\'s banner again');
 });
 
+test('bot logo: set on the community\'s own Discord server by its admins (PNG or JPEG), removed back to the shared logo', async t => {
+  fakeDiscord(t);
+  const calls=[];const inner=globalThis.fetch;
+  globalThis.fetch=async (url,options={})=>{
+    if(String(url).endsWith(`/guilds/${GUILD}/members/@me`)){
+      const body=JSON.parse(options.body);calls.push({method:options.method,body});
+      return Response.json({user:{id:'bot-id'},avatar:body.avatar?'a_hash':null});
+    }
+    return inner(url,options);
+  };
+  const {env,as}=setup();
+  await as(OWNER,'/api/community/setup');await as(PILOT,'/api/community/setup');
+  const send=async (userId,bytes,type='image/png')=>{
+    const raw=userId.slice(0,1).repeat(64);
+    return worker.fetch(new Request(ROOT+'/api/community/bot-avatar',{method:'PUT',headers:{Cookie:`__Host-em_session=${raw}`,'CF-Connecting-IP':userId,Origin:ROOT,'Content-Type':type},body:bytes}),env);
+  };
+  const png=new Uint8Array([0x89,0x50,0x4e,0x47,13,10,26,10,...new Array(50).fill(3)]);
+  assert.equal((await send(PILOT,png)).status,403,'admins only');
+  const webp=new Uint8Array([...new TextEncoder().encode('RIFF'),0,0,0,0,...new TextEncoder().encode('WEBPVP8 '),1,2]);
+  assert.equal((await send(OWNER,webp)).status,400,'Discord takes PNG or JPEG only');
+  assert.equal(calls.length,0);
+  const saved=await send(OWNER,png);
+  assert.equal(saved.status,200);
+  assert.equal(calls[0].method,'PATCH');assert.match(calls[0].body.avatar,/^data:image\/png;base64,iVBORw0KGgo/);
+  const url=`https://cdn.discordapp.com/guilds/${GUILD}/users/bot-id/avatars/a_hash.png?size=256`;
+  assert.equal((await saved.json()).botAvatarUrl,url);
+  assert.equal((await as(OWNER,'/api/community/settings')).data.community.botAvatarUrl,url);
+  assert.equal((await as(OWNER,'/api/community/bot-avatar','DELETE',{})).status,200);
+  assert.equal(calls[1].body.avatar,null,'the shared logo again');
+  assert.equal((await as(OWNER,'/api/community/settings')).data.community.botAvatarUrl,null);
+});
+
 test('each community\'s recap only has its own races, and every link goes to its own site', async t => {
   const posts=fakeDiscord(t);
   const {DB,env}=setup();

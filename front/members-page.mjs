@@ -500,6 +500,11 @@ function lookMarkup(settings) {
           <div class="settings-actions"><label class="secondary-button settings-banner-pick">Choisir une image<input type="file" accept="image/png,image/jpeg,image/webp" data-banner-file hidden></label>
             ${look.bannerUrl ? '<button type="button" class="secondary-button" data-banner-remove>Remettre la bannière du site</button>' : ''}<span class="settings-status" aria-live="polite"></span></div>
           <p class="members-help">Format conseillé : 2048 × 512 (4 fois plus large que haute). Tu la cadres et la zoomes avant de l’enregistrer ; elle est allégée automatiquement.</p></div></section>
+        ${look.discordServer ? `<section class="admin-card settings-banner-card"><h3>Logo du bot</h3><div class="settings-banner settings-bot" data-image-kind="bot">
+          <div class="settings-bot-current"><img class="settings-banner-preview" src="${esc(look.botAvatarUrl || '/images/app-icon-192.png')}" alt="Logo actuel du bot"><span><b>${look.botAvatarUrl ? 'Ton logo' : 'Logo d’Endurance Manager'}</b><small>${look.botAvatarUrl ? 'Seulement sur ton serveur' : 'Le même sur tous les serveurs'}</small></span></div>
+          <div class="settings-actions"><label class="secondary-button settings-banner-pick">Choisir une image<input type="file" accept="image/png,image/jpeg,image/webp" data-banner-file hidden></label>
+            ${look.botAvatarUrl ? '<button type="button" class="secondary-button" data-bot-avatar-remove>Remettre le logo du site</button>' : ''}<span class="settings-status" aria-live="polite"></span></div>
+          <p class="members-help">Visible seulement sur ton serveur Discord. Image carrée, tu la cadres avant de l’enregistrer. Le nom du bot se change directement sur Discord.</p></div></section>` : ''}
       </div>
       <div class="admin-preview-wrap"><p class="admin-preview-label">Aperçu : ce que verront tes membres</p>
         <div class="admin-preview" data-look-preview style="--preview-accent:${esc(accent)}">
@@ -666,15 +671,17 @@ function setZoom(zoom) {
 }
 async function openCropper(file, container) {
   const bitmap = await createImageBitmap(file);
+  const bot = container.dataset.imageKind === 'bot';
   container.querySelector('.banner-cropper')?.remove();
   const box = document.createElement('div');
-  box.className = 'banner-cropper';
-  box.innerHTML = `<div class="banner-crop-frame"><canvas width="2048" height="512" aria-label="Cadrage de la bannière"></canvas></div>
+  box.className = `banner-cropper${bot ? ' bot-cropper' : ''}`;
+  box.innerHTML = `<div class="banner-crop-frame"><canvas width="${bot ? 512 : 2048}" height="512" aria-label="${bot ? 'Cadrage du logo' : 'Cadrage de la bannière'}"></canvas></div>
     <label class="banner-crop-zoom">Zoom<input type="range" min="1" max="4" step="0.01" value="1" data-banner-zoom></label>
     <p class="members-help">Fais glisser l’image pour choisir la partie visible, et zoome si besoin.</p>
-    <div class="settings-actions"><button type="button" class="primary-button" data-banner-save>Enregistrer la bannière</button><button type="button" class="secondary-button" data-banner-cancel>Annuler</button></div>`;
-  container.querySelector('.settings-banner-preview').after(box);
-  container.querySelector('.settings-banner-preview').hidden = true;
+    <div class="settings-actions"><button type="button" class="primary-button" data-banner-save>${bot ? 'Enregistrer le logo' : 'Enregistrer la bannière'}</button><button type="button" class="secondary-button" data-banner-cancel>Annuler</button></div>`;
+  const shown = container.querySelector('.settings-bot-current') || container.querySelector('.settings-banner-preview');
+  shown.after(box);
+  shown.hidden = true;
   const canvas = box.querySelector('canvas');
   cropper = {canvas, bitmap, zoom:1, x:null, y:null};
   drawCropper();
@@ -697,7 +704,7 @@ async function openCropper(file, container) {
 }
 function closeCropper(container) {
   container.querySelector('.banner-cropper')?.remove();
-  const preview = container.querySelector('.settings-banner-preview');
+  const preview = container.querySelector('.settings-bot-current') || container.querySelector('.settings-banner-preview');
   if (preview) preview.hidden = false;
   cropper = null;
 }
@@ -706,6 +713,14 @@ async function bannerImage(canvas) {
     let blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/webp', quality));
     if (blob?.type !== 'image/webp') blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', quality));
     if (blob && blob.size <= 600000) return blob;
+  }
+  throw new Error('Cette image reste trop lourde : essaie une image plus simple.');
+}
+// Logo of the bot: Discord takes PNG or JPEG only (PNG keeps the transparency).
+async function botImage(canvas) {
+  for (const [type, quality] of [['image/png'], ['image/jpeg', .9], ['image/jpeg', .75]]) {
+    const blob = await new Promise(resolve => canvas.toBlob(resolve, type, quality));
+    if (blob && blob.size <= 1000000) return blob;
   }
   throw new Error('Cette image reste trop lourde : essaie une image plus simple.');
 }
@@ -782,6 +797,17 @@ app.addEventListener('click', async event => {
   if (event.target.closest('[data-banner-save]') && cropper) {
     const container = event.target.closest('.settings-banner'), status = container.querySelector('.settings-status');
     status.textContent = 'Envoi…';
+    if (container.dataset.imageKind === 'bot') {
+      try {
+        const image = await botImage(cropper.canvas);
+        const response = await fetch('/api/community/bot-avatar', {method:'PUT', credentials:'same-origin', headers:{'Content-Type':image.type}, body:image});
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(result.error || 'L’envoi a échoué.');
+        cropper = null;
+        await reload('look');
+      } catch (error) { status.textContent = error.message; }
+      return;
+    }
     try {
       const image = await bannerImage(cropper.canvas);
       const response = await fetch('/api/community/banner', {method:'PUT', credentials:'same-origin', headers:{'Content-Type':image.type}, body:image});
@@ -791,6 +817,11 @@ app.addEventListener('click', async event => {
       cropper = null;
       await reload('look');
     } catch (error) { status.textContent = error.message; }
+    return;
+  }
+  if (event.target.closest('[data-bot-avatar-remove]')) {
+    if (!confirm('Remettre le logo d’Endurance Manager sur ton serveur Discord ?')) return;
+    try { await api('/api/community/bot-avatar', 'DELETE', {}); await reload('look'); } catch (error) { alert(error.message); }
     return;
   }
   if (event.target.closest('[data-banner-remove]')) {
