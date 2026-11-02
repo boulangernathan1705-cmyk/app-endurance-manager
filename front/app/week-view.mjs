@@ -140,9 +140,9 @@ function block(item,now){
   // many endurances apart (Nathan 2026-11-01).
   const circuit=stream?'':solo?soloCardMeta(event).replace('Circuit à préciser',''):esc(simCatalog(event.otherGame||activeGame)?.circuits.find(item=>item.id===event.circuit)?.name||'');
   const sim=solo?(stream?'':SIMS.find(item=>item.id===simForEvent(event))?.short||''):SIM_NAME[event.otherGame||activeGame];
-  const badge=solo?kind.label:'',logo=solo?logoOf(event):'';
-  // An endurance has no logo: its length takes the logo's place (« 6H »), with its simulator under it on a phone.
-  const minutes=solo?0:eventMinutes(event),length=minutes>0?`${Math.floor(minutes/60)}H${minutes%60?String(minutes%60).padStart(2,'0'):''}`:'';
+  // An endurance shows the Endurance Manager endurance logo of its simulator, without its length (Nathan 2026-11-02).
+  const enduSim=event.otherGame||activeGame;
+  const badge=solo?kind.label:'',logo=solo?logoOf(event):`<img class="event-access-logo" src="/images/event-access/endurance-${esc(enduSim)}.png" alt="Endurance · ${esc(SIM_NAME[enduSim]||'')}" width="300" height="300" loading="lazy" decoding="async">`;
   // Who is there: the crews of an endurance, else its pilots (Nathan 2026-11-01, option B).
   const crews=solo?0:starts.reduce((sum,start)=>sum+(start.departure.crews||[]).length,0);
   const count=stream?'':crews?`${crews} équipage${crews>1?'s':''}`:pilots?`${pilots} pilote${pilots>1?'s':''}`:'';
@@ -164,8 +164,7 @@ function block(item,now){
   const kindLine=[sim,solo?kind.label:'Endurance'].filter(Boolean).filter((text,index,list)=>list.findIndex(other=>String(other).toLowerCase()===String(text).toLowerCase())===index).join(' · ');
   const plan=planOf(item);
   const meta=[count,weather&&`${weather==='Pluie'?'🌧':'☀️'} ${weather}`,past&&'Terminé'].filter(Boolean);
-  const mark=logo?`<span class="week-block-logo">${logo}</span>`:badge?`<span class="week-badge">${esc(badge)}</span>`
-    :length?`<span class="week-badge week-block-length">${esc(length)}<small>${esc(sim)}</small></span>`:'';
+  const mark=logo?`<span class="week-block-logo">${logo}</span>`:badge?`<span class="week-badge">${esc(badge)}</span>`:'';
   // On a phone the card is an agenda row: the time on the left, the logo (or length) on the right, the rest between
   // them (Nathan 2026-11-01, option B); on a computer the body's lines follow the head as before.
   return `${open}

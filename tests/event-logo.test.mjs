@@ -9,5 +9,5 @@ test('TDZ Training events show their own logo on LMU and iRacing, others keep OP
   assert.equal(eventLogoName({sim:'ams2', access:'safe', type:'TONDEUZ TRAINING'}), 'safe-ams2');
   assert.equal(eventLogoName({sim:'lmu', access:'safe', type:'SAFE'}), 'safe-lmu');
   assert.equal(eventLogoName({sim:'iracing', access:'open'}), 'open-iracing');
-  for (const name of ['training-lmu', 'training-iracing']) assert.ok(existsSync(new URL(`../images/event-access/${name}.png`, import.meta.url)));
+  for (const name of ['training-lmu', 'training-iracing', 'endurance-lmu', 'endurance-iracing']) assert.ok(existsSync(new URL(`../images/event-access/${name}.png`, import.meta.url)));
 });
