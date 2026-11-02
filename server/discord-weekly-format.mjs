@@ -1,6 +1,6 @@
 import {racesPath} from './races-path.mjs';
 import {durationLabel,PRE_RACE_MINUTES} from '../shared/duration.mjs';
-import {catalogForGame,SIMS,TRACK_LIMITS,normalizeTdzEventType} from '../shared/catalog.mjs';
+import {catalogForGame,SIMS,TRACK_LIMITS,normalizeTdzEventType,parisHour} from '../shared/catalog.mjs';
 import {hourLabel as streamHour,streamPlatform} from '../shared/stream.mjs';
 
 const DAY_MS=86_400_000,HOUR_MS=3_600_000,TIME_ZONE='Europe/Paris';
@@ -507,7 +507,7 @@ export function buildAnnounceEvent(event,site={},updatedAt=Date.now(),absent=nul
   const gridfest=isGridfestType(event.type),rounds=Array.isArray(event.rounds)?event.rounds:[];
   const typeLabel=event.tdz&&event.type&&!['OPEN','SAFE'].includes(event.type)?`🏷️ ${clean(gridfest?'Gridfest':normalizeTdzEventType(event.type))}`:'';
   const lines=[eventHook(event),event.note&&`*« ${clean(event.note)} »*`,
-    [`🕘 ${announceTime(event.startsAt,event.timePending)}`,`🎮 ${SIM_SHORT[event.sim]||clean(event.sim)}`,typeLabel,event.tdz&&!gridfest&&event.access&&event.access.toUpperCase()].filter(Boolean).join(' · ')];
+    [`🕘 ${announceTime(event.startsAt,event.timePending)}${event.training&&!event.timePending?` → ${parisHour(Number(event.startsAt)+rounds.reduce((sum,round)=>sum+(Number(round.durationMinutes)||0),0)*60000)}`:''}`,`🎮 ${SIM_SHORT[event.sim]||clean(event.sim)}`,typeLabel,event.tdz&&!gridfest&&event.access&&event.access.toUpperCase()].filter(Boolean).join(' · ')];
   const rally=event.rally;
   const grouped=!rally&&rounds.length>1?sharedRoundDetails(rounds):null;
   if(rally){
@@ -515,14 +515,14 @@ export function buildAnnounceEvent(event,site={},updatedAt=Date.now(),absent=nul
     const cars=rally.carMode==='category'&&rounds[0]?.category?`🚗 Catégorie imposée : ${clean(rounds[0].category)}`:rally.carMode==='car'&&rounds[0]?.car?`🚗 Voiture imposée : ${clean(rounds[0].car)}`:rally.carMode==='all'?'🚗 Toutes voitures':'';
     lines.push([cars,rally.minutes&&`⏱️ environ ${durationLabel(rally.minutes)}`].filter(Boolean).join(' · '));
     if(rally.host)lines.push(`🏠 Hôte : ${clean(rally.host)}`);
-  }else if(rounds.length===1)lines.push(roundLine(rounds[0]));
+  }else if(rounds.length===1)lines.push(event.training?roundLine({...rounds[0],durationMinutes:0}):roundLine(rounds[0]));
   if(gridfest&&event.streamers?.length)lines.push(event.streamers.map(streamer=>`🎙️ ${streamer.twitchUrl?`[${clean(streamer.name)}](${streamer.twitchUrl})`:clean(streamer.name)} · ${Math.min(streamer.entered,streamer.capacity)}/${streamer.capacity} places${streamer.entered>=streamer.capacity?' · complet':''}`).join('\n'));
   const places=event.capacity&&!gridfest?(event.entered>=event.capacity?` · complet${event.entered>event.capacity?` · ${event.entered-event.capacity} en attente`:''}`:` · ${plural(event.capacity-event.entered,'place')} restante${event.capacity-event.entered>1?'s':''}`):'';
   const count=`✅ **${plural(Math.min(event.entered,event.capacity||event.entered),'présent')}**${places}`;
   const [hook,note,when,...details]=lines;
   const embed={title:cut(`🏁 ${clean(event.name)}`,256),color:ANNOUNCE_SIM_COLORS[event.sim]||0xe7b653,description:cut([`**${when}**`,hook,note,...details].filter(Boolean).join('\n\n'),4096)};
   if(grouped)embed.fields=[...grouped.commonFields.filter(field=>field.name==='📍 Circuit et voiture'),...grouped.fields,...grouped.commonFields.filter(field=>field.name!=='📍 Circuit et voiture')];
-  embed.fields=[...(embed.fields||[]),{name:BLANK,value:count,inline:false}];
+  embed.fields=[...(embed.fields||[]),...(event.entered||event.capacity?[{name:BLANK,value:count,inline:false}]:[])];
   if(event.password)embed.fields.push({name:BLANK,value:'🔑 Mot de passe disponible sur la fiche',inline:false});
   if(url)embed.url=url;
   if(event.logoUrl)embed.thumbnail={url:event.logoUrl};

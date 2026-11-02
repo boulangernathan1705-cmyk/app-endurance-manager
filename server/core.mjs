@@ -1,6 +1,6 @@
 import {isGrindfest, streamersOf, normalizeStreamers, gridfestPasswordValid} from '../shared/grindfest.mjs';
 import {STREAM_SIM, STREAM_RACE_SIMS, streamUrl, streamRaceSim, isStreamLogo} from '../shared/stream.mjs';
-import {catalogForGame, gameForEvent, CATEGORIES, EVENT_TYPE_IDS as EVENT_TYPES, CIRCUIT_IDS as CIRCUITS, CARS, SIM_IDS, eventCatalog, simForEvent, isRandomCircuit, TDZ_EVENT_TYPES, normalizeTdzEventType, TRACK_LIMITS, RACE_WEATHERS, RACE_SKIES, WEATHER_SLOTS} from '../shared/catalog.mjs';
+import {catalogForGame, gameForEvent, CATEGORIES, EVENT_TYPE_IDS as EVENT_TYPES, CIRCUIT_IDS as CIRCUITS, CARS, SIM_IDS, eventCatalog, simForEvent, isRandomCircuit, TDZ_EVENT_TYPES, normalizeTdzEventType, isTrainingType, TRACK_LIMITS, RACE_WEATHERS, RACE_SKIES, WEATHER_SLOTS} from '../shared/catalog.mjs';
 const LEGACY_CAR_ALIASES = new Map([
   ['BMW M Hybrid V8 Evo (2026)','BMW M Hybrid V8'],['Cadillac V-Series.R Evo (2026)','Cadillac V-Series.R'],['Peugeot 9X8 2023','Peugeot 9X8'],['Peugeot 9X8 2024','Peugeot 9X8'],['Toyota TR010 Hybrid (2026)','Toyota GR010 Hybrid'],['Ginetta G61-LT-P3 Evo','Ginetta G61-LT-P3'],['Ferrari 488 GTE Evo','Ferrari 488 GTE'],['Aston Martin Vantage AMR LMGT3 Evo','Aston Martin Vantage AMR LMGT3'],['BMW M4 LMGT3 Evo','BMW M4 LMGT3'],['Ferrari 296 LMGT3 Evo','Ferrari 296 LMGT3'],['Ford Mustang LMGT3 Evo','Ford Mustang LMGT3'],['Lamborghini Huracán LMGT3 Evo 2','Lamborghini Huracán LMGT3'],['McLaren 720S LMGT3 Evo','McLaren 720S LMGT3'],['Porsche 911 LMGT3 R (992)','Porsche 911 GT3 R LMGT3'],['Porsche 911 LMGT3 R (992) 2026','Porsche 911 GT3 R LMGT3']
 ]);
@@ -254,12 +254,16 @@ function validateSoloRace(input, existing) {
   if (!SIM_IDS.includes(sim)) fail(400, 'Choisis le simulateur.');
   const catalog = sim==='iracing' && rounds.every(round=>catalogForGame('iracing').circuits.some(circuit=>circuit.id===round?.circuit)) ? catalogForGame('iracing') : eventCatalog(sim), rally = sim === 'acrally';
   if(rally && rounds.length !== 1 && input.details?.rallyCarMode) fail(400, 'Une soirée rallye utilise un seul lobby.');
+  // A training is one window (« de 20h à 22h »): one round whose length is that window, up to 24 hours.
+  const training = !rally && isTrainingType(input.details?.type);
+  if (training) rounds.splice(1);
   const cleanRounds = rounds.map((round, index) => {
     const where = rounds.length > 1 ? ` de la manche ${index + 1}` : '';
     const circuit = catalog ? (typeof round?.circuit === 'string' ? round.circuit : '') : rally && !round?.circuit ? '' : text(round?.circuit, 60, `Circuit${where}`);
     if (catalog && (!CIRCUITS.includes(circuit) || circuit.startsWith('iracing-') !== (sim === 'iracing'))) fail(400, `Choisis le circuit${where}.`);
     const durationMinutes = Number(round.durationMinutes);
-    if (!Number.isInteger(durationMinutes) || durationMinutes < 5 || durationMinutes > 600) fail(400, `La durée${where} doit être comprise entre 5 et 600 minutes.`);
+    if (training ? !Number.isInteger(durationMinutes) || durationMinutes < 5 || durationMinutes > 24 * 60 : !Number.isInteger(durationMinutes) || durationMinutes < 5 || durationMinutes > 600)
+      fail(400, training ? 'La fin de l’entraînement doit être après son début.' : `La durée${where} doit être comprise entre 5 et 600 minutes.`);
     // Categories: optional; none means a simple entry (no category or car to choose).
     // A random circuit (LMU) comes with a random category: nothing to choose.
     const randomCategory = Boolean(catalog && isRandomCircuit(circuit));
@@ -290,6 +294,8 @@ function validateSoloRace(input, existing) {
       if (round.category) extras.category = text(round.category, 40, `Catégorie${where}`);
       if (round.car) extras.car = text(round.car, 60, `Voiture${where}`);
     }
+    // A training keeps its circuit, categories and cars only.
+    if (training) for (const key of ['practice','qualifying','fuel','tyres','weather','capacity']) delete extras[key];
     return {circuit, durationMinutes, categories:[...new Set(roundCategories)], ...extras};
   });
   // Places are set round by round; one round: they are the event's places (one waiting list).
@@ -310,6 +316,9 @@ function validateSoloRace(input, existing) {
   // When the stream starts (it can start before the race): announced in the morning (server/discord-announce.mjs).
   if (raw.streamTime) { if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(raw.streamTime)) fail(400, 'Heure de début du stream invalide.'); details.streamTime = raw.streamTime; }
   if (raw.streamEnd) { if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(raw.streamEnd)) fail(400, 'Heure de fin du stream invalide.'); details.streamEnd = raw.streamEnd; }
+  // An end needs a start; an end before the start is the next morning (until 6h), otherwise a mistake.
+  if (details.streamEnd && !details.streamTime) fail(400, 'Indique le début du stream.');
+  if (details.streamEnd && (details.streamEnd === details.streamTime || (details.streamEnd < details.streamTime && details.streamEnd > '06:00'))) fail(400, 'La fin du stream doit être après son début.');
   if(rally){
     if(isGrindfest({details})) fail(400, 'Le format Gridfest ne correspond pas à une soirée rallye.');
     if(raw.rallyHost) details.rallyHost=text(raw.rallyHost,60,'Hôte');

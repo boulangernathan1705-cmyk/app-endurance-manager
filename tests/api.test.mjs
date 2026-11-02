@@ -546,6 +546,14 @@ test('events calendar: every simulator, typed circuit on AMS2 / ACE, no limit an
  const training=await req('/api/events','POST',{...input,details:{type:'TONDEUZ TRAINING'}},'admin');
  assert.equal(training.status,201,JSON.stringify(training.data));
  assert.equal((await req('/api/events','GET',null,'admin')).data.events.find(e=>e.id===training.data.id).details.type,'TONDEUZ TRAINING');
+ // A training is one window: its first circuit, as long as the window (up to 24 h), without sessions, weather or places.
+ const saved=(await req('/api/events','GET',null,'admin')).data.events.find(e=>e.id===training.data.id);
+ assert.equal(saved.rounds.length,1);assert.deepEqual(saved.rounds[0],{circuit:'Interlagos',durationMinutes:30,categories:[],category:'GT3',car:'Porsche 911 GT3 R'});
+ const night=await req('/api/events','POST',{...input,rounds:[{circuit:'Spa',durationMinutes:14*60}],details:{type:'TONDEUZ TRAINING',streamTime:'22:00',streamEnd:'01:00'}},'admin');
+ assert.equal(night.status,201,'a 14 h training, a stream ending after midnight');
+ // Stream times: an end needs a start and must follow it.
+ for(const details of [{streamEnd:'22:00'},{streamTime:'21:00',streamEnd:'20:00'},{streamTime:'21:00',streamEnd:'21:00'}])
+  assert.equal((await req('/api/events','POST',{...input,details:{type:'OPEN',...details}},'admin')).status,400,JSON.stringify(details));
  const iracing=await req('/api/events','POST',{...input,sim:'iracing',rounds:[{circuit:'Indianapolis',durationMinutes:40,category:'GT3',car:'Ferrari 296 GT3'}]},'admin');assert.equal(iracing.status,201,'iRacing circuits and categories are typed');
  const lmu=await req('/api/events','POST',{...soloInput,sim:undefined},'admin');assert.equal(lmu.status,201);
  assert.equal((await req('/api/events','GET',null,'admin')).data.events.find(e=>e.id===lmu.data.id).sim,'lmu');
