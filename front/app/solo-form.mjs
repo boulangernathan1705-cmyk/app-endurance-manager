@@ -68,7 +68,7 @@ const stepName=(form,n)=>n===3&&trainingOf(form)?'Circuit':STEPS[n-1];
 const trainingOf=form=>isTrainingType(form.querySelector('[name="eventType"]:checked')?.value||form.querySelector('input[type="hidden"][name="eventType"]')?.value);
 // An hour and minutes picked as on the start (24 h on every browser), kept in a hidden field « HH:MM ».
 const FIVE=Array.from({length:12},(_,index)=>String(index*5).padStart(2,'0'));
-const timeInput=(name,label,value)=>{
+export const timeInput=(name,label,value)=>{
   const [hour,minute]=String(value||'21:00').split(':'),minutes=FIVE.includes(minute)?FIVE:[...FIVE,minute].sort();
   return `<div class="form-label time-picker" data-clock><span>${label}</span><span class="time-picker-row" role="group" aria-label="${esc(label)}"><select data-clock-hour aria-label="Heure">${Array.from({length:24},(_,n)=>String(n).padStart(2,'0')).map(item=>`<option value="${item}" ${item===hour?'selected':''}>${item} h</option>`).join('')}</select><span aria-hidden="true">:</span><select data-clock-minute aria-label="Minutes">${minutes.map(item=>`<option value="${item}" ${item===minute?'selected':''}>${item}</option>`).join('')}</select></span><input type="hidden" name="${name}" value="${esc(value||'')}"></div>`;
 };
@@ -79,7 +79,7 @@ function setClock(input,value){
   if(![...select.options].some(option=>option.value===minute))select.insertAdjacentHTML('beforeend',`<option value="${minute}">${minute}</option>`);
   box.querySelector('[data-clock-hour]').value=hour;select.value=minute;input.value=value;
 }
-const addMinutes=(time,minutes)=>{const [h,m]=String(time||'21:00').split(':').map(Number),at=((h*60+m+minutes)%1440+1440)%1440;return `${String(Math.floor(at/60)).padStart(2,'0')}:${String(at%60).padStart(2,'0')}`;};
+export const addMinutes=(time,minutes)=>{const [h,m]=String(time||'21:00').split(':').map(Number),at=((h*60+m+minutes)%1440+1440)%1440;return `${String(Math.floor(at/60)).padStart(2,'0')}:${String(at%60).padStart(2,'0')}`;};
 // A picker's hidden field and selects are on or off together; its error shows on the hour.
 function clockState(input,on,error=''){
   const box=clockOf(input);box.hidden=!on;input.disabled=!on;box.querySelectorAll('select').forEach(select=>{select.disabled=!on;});
@@ -97,7 +97,7 @@ export function streamChoice(details={},editing=false){
     <p class="creation-help stream-choice-link">${url?`Lien : <a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(url.replace(/^https:\/\/(www\.)?/,''))}</a>`:'Aucun lien de stream réglé : ajoute-le dans Administration › Discord.'}</p></div>`;
 }
 // « 22h → 1h » is the next morning (until 6h); otherwise the end must follow the start.
-const endBefore=(start,end)=>Boolean(start&&end)&&(end===start||(end<start&&end>'06:00'));
+export const endBefore=(start,end)=>Boolean(start&&end)&&(end===start||(end<start&&end>'06:00'));
 const minutesBetween=(start,end)=>{const [a,b]=[start,end].map(time=>{const [h,m]=String(time).split(':').map(Number);return h*60+m;});return ((b-a)+1440)%1440;};
 // Shows the stream times when « En stream » is chosen; hidden fields are disabled so they are neither checked nor sent.
 export function syncStream(form){

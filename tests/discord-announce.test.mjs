@@ -633,3 +633,14 @@ test('a training shows its window on the poster and in the text, without « 0 in
   const embed=buildAnnounceEvent(event,{url:'https://site.example'},startsAt).embeds[0];
   assert.match(embed.description,/→ 22h/);assert.doesNotMatch(embed.description,/⏱️/);
 });
+
+test('an endurance an admin streams (« Je streame ce départ ») is on the stream poster with @everyone, even without a crew',async t=>{
+  const {DB,env,calls,settings}=setup(t);unstream(DB);
+  DB.db.prepare('DELETE FROM crew_members').run();
+  DB.db.prepare("UPDATE registrations SET stream_time='20:45',stream_end='23:00' WHERE id='r1'").run();
+  assert.ok((await announceItems(env,TDZ,MORNING)).some(item=>item.item===RACE&&item.kind==='race'));
+  await announceCommunity(env,TDZ,settings(),MORNING);
+  const first=sent(calls)[0].body;
+  assert.equal(first.content,'@everyone');
+  assert.match(JSON.stringify(first),/6h de Spa/);assert.match(JSON.stringify(first),/20h45/);
+});

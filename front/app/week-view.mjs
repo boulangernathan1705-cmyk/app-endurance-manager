@@ -71,8 +71,10 @@ const logoOf=event=>isGrindfest(event)?'<img class="event-access-logo" src="/ima
 // When the stream is live, in small, with its link (Nathan 2026-11-02): « 📺 19h45–23h · ▶ Twitch ». A stream has its own
 // link; an event the community streams (« Début du stream ») takes the community's stream link. The card is a button: the
 // link is a span that opens the stream in a new tab without opening the race.
-function streamLine(event){
-  const stream=isStream(event),info=stream?streamDetails(event):event.details||{};
+function streamLine(event,starts=[]){
+  // An endurance: the start an admin streams (« Je streame ce départ »), with the community's link.
+  const streamer=isSolo(event)?null:starts.flatMap(start=>start.departure.availability||[]).find(reg=>reg.streamTime&&reg.status!=='unavailable');
+  const stream=isStream(event),info=streamer?{streamTime:streamer.streamTime,streamEnd:streamer.streamEnd}:stream?streamDetails(event):event.details||{};
   const span=streamSpan(info.streamTime,info.streamEnd);
   if(!span)return '';
   const url=streamUrl(stream?info.streamUrl:state.communityStreamUrl)||'';
@@ -124,7 +126,7 @@ function block(item,now){
     <span class="week-block-name">${esc(event.name)}</span>
     ${circuit?`<span class="week-block-circuit">${circuit}</span>`:''}
     ${solo&&isTraining(event)?`<span class="week-block-stream"><span>🏁 Entraînement ${esc(trainingSpan(startsAt,eventMinutes(event)))}</span></span>`:''}
-    ${solo?streamLine(event):''}
+    ${streamLine(event,starts)}
     ${meta.length?`<span class="week-block-meta">${meta.map(text=>`<span>${esc(text)}</span>`).join('')}</span>`:''}
     ${situation}${places}
     </span>
