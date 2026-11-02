@@ -1,5 +1,12 @@
 # Nouveautés d'Endurance Manager
 
+## v2.0 — 2 novembre 2026
+
+### 🔧 Corrections
+
+- **Discord · Affiche du jour** : l’image s’arrête au bas de son contenu (une seule course laissait la moitié basse vide). Les infos ne passent plus sous le logo de l’event, et le streamer au volant n’est plus nommé deux fois.
+- **Discord · Lundi 7h30** : chaque communauté passe dès le changement de semaine. Le calendrier tourne, et les fils de la semaine finie partent en quelques minutes.
+
 ## v1.99 — 1er novembre 2026
 
 ### ✨ Nouveautés
