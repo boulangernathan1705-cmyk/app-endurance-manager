@@ -139,20 +139,20 @@ function rolesMarkup(settings) {
   const others = settings.roles.filter(item => !item.administrator);
   const followed = item => everyone(item) || item.permissions.length > 0;
   const card = item => `<article class="adm-role" data-role="${esc(item.id)}" data-role-name="${esc(item.name)}" data-kept="${esc(JSON.stringify(item.permissions.filter(permission => !shown.includes(permission))))}" ${followed(item) ? '' : 'hidden'}>
-    <div class="adm-role-head"><strong>${esc(item.name)}</strong>${everyone(item) ? `<small>Tout le serveur ${tip('Ce que tout membre du serveur peut faire, même sans rôle.')}</small>` : ''}<span class="settings-status" aria-live="polite"></span>
-      ${everyone(item) ? '' : '<button type="button" class="adm-role-remove" data-role-remove>Retirer</button>'}</div>
+    <div class="adm-role-name"><strong>${esc(item.name)}</strong>${everyone(item) ? `<small>Tout le serveur ${tip('Ce que tout membre du serveur peut faire, même sans rôle.')}</small>` : ''}</div>
     <div class="adm-perms">${shown.map(permission => `<label class="adm-perm"><input type="checkbox" data-permission="${permission}" aria-label="${esc(item.name)} : ${esc(PERMISSION_LABELS[permission] || permission)}" ${item.permissions.includes(permission) ? 'checked' : ''}><span>${esc(PERMISSION_SHORT[permission] || PERMISSION_LABELS[permission] || permission)}</span></label>`).join('')}</div>
+    <div class="adm-role-end"><span class="settings-status" aria-live="polite"></span>${everyone(item) ? '' : '<button type="button" class="adm-role-remove" data-role-remove>Retirer</button>'}</div>
   </article>`;
   const option = item => `<option value="${esc(item.id)}" ${followed(item) ? 'hidden disabled' : ''}>${esc(item.name)}</option>`;
   const legend = `<dl class="adm-legend">${shown.map(permission => `<div><dt>${esc(PERMISSION_SHORT[permission] || PERMISSION_LABELS[permission])}</dt><dd>${esc(PERMISSION_HELP[permission])}</dd></div>`).join('')}</dl>`;
   if (!settings.roles.length) return '<ul class="adm-rows">' + row('warn', 'Les rôles du serveur ne peuvent pas être lus', 'Vérifie que le bot est bien sur ton serveur Discord.') + '</ul>';
   const sorted = [...others].sort((a, b) => a.name.localeCompare(b.name, 'fr'));
-  return `<p class="adm-intro">Le site ne regarde que les rôles listés ici. Ajoute ceux qui comptent pour ta communauté et coche ce qu’ils permettent : c’est enregistré tout de suite. Les autres rôles du serveur sont ignorés.</p>
+  return `<p class="adm-intro">Le site ne regarde que les rôles listés ici. Coche ce que chacun permet : c’est enregistré tout de suite.</p>
     <details class="adm-help"><summary>Que permet chaque autorisation ?</summary>${legend}<p>Les autorisations de plusieurs rôles s’additionnent. Les rôles se donnent sur Discord.</p></details>
-    <div class="adm-role-add"><label for="adm-role-add">Ajouter un rôle ${tip('Les rôles de ton serveur Discord que le site ne regarde pas encore.')}</label>
+    <div class="adm-roles">${[...others.filter(everyone), ...sorted.filter(item => !everyone(item))].map(card).join('')}
+    <div class="adm-role-add"><label for="adm-role-add">+ Ajouter un rôle ${tip('Les rôles de ton serveur Discord que le site ne regarde pas encore.')}</label>
       <select id="adm-role-add" data-role-add><option value="">Choisir un rôle du serveur…</option>${sorted.filter(item => !everyone(item)).map(option).join('')}</select>
-      <small data-role-left>${sorted.filter(item => !followed(item)).length} autres rôles sur le serveur</small></div>
-    <div class="adm-roles">${[...others.filter(everyone), ...sorted.filter(item => !everyone(item))].map(card).join('')}</div>
+      <small data-role-left>${sorted.filter(item => !followed(item)).length} autres rôles sur le serveur</small></div></div>
     ${admins.length ? `<p class="adm-admins">Ont déjà tout, car « Administrateur » sur Discord : <b>${admins.map(item => esc(item.name)).join(', ')}</b> ${tip('Le propriétaire du serveur et les rôles « Administrateur » sur Discord ont toutes les autorisations du site, sans rien cocher.')}</p>` : ''}`;
 }
 
@@ -1101,8 +1101,8 @@ app.addEventListener('change', async event => {
     card.hidden = false;
     roleOption(card.dataset.role, false);
     card.querySelector('.settings-status').textContent = '';
-    card.querySelector('.adm-role-head strong').insertAdjacentHTML('afterend', '<small data-role-new>Coche ce que ce rôle permet</small>');
-    card.scrollIntoView({block:'center', behavior:'smooth'});
+    card.querySelector('.adm-role-name strong').insertAdjacentHTML('afterend', '<small data-role-new>Coche ce que ce rôle permet</small>');
+    card.scrollIntoView({block:'nearest', behavior:'smooth'});
     card.querySelector('input[data-permission]')?.focus({preventScroll:true});
     return;
   }
