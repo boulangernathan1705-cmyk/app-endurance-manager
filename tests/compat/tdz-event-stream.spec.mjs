@@ -32,18 +32,19 @@ for(const width of [1440,390])test(`TDZ event: stream choice and training window
   await expect(clock('eventEnd')).toContainText('Fin (Paris)');
   await expect(form.locator('.departure-field')).toContainText('Début (Paris)');
   await setClock('eventEnd','22:00');
-  // The stream question has no default answer.
+  // The stream question has no default answer and must be answered (no click on « Continuer » here: Firefox's
+  // validation bubble would block the next clicks).
   await expect(form.locator('[data-stream-times]')).toBeHidden();
-  await next.click();
-  await expect(form.locator('[data-solo-step-label]')).toHaveText('Étape 2 sur 5 · Horaire');
+  await expect(form.locator('input[name="eventStreamed"]:checked')).toHaveCount(0);
+  await expect(form.locator('input[name="eventStreamed"]').first()).toHaveAttribute('required','');
   await form.locator('label:has(input[name="eventStreamed"][value="yes"])').click();
   await expect(form.locator('[data-stream-times]')).toBeVisible();
   await expect(form.locator('[data-stream-times] a')).toHaveText('twitch.tv/lapraline_tdz');
   await expect(form.locator('[name="eventStreamTime"]')).toHaveValue('20:00');
   await expect(form.locator('[name="eventStreamEnd"]')).toHaveValue('22:00');
   // An end before the start is refused (until 6h it is the next morning).
-  await setClock('eventStreamEnd','19:00');await next.click();
-  await expect(form.locator('[data-solo-step-label]')).toHaveText('Étape 2 sur 5 · Horaire');
+  await setClock('eventStreamEnd','19:00');
+  expect(await clock('eventStreamEnd').locator('[data-clock-hour]').evaluate(select=>select.validationMessage)).toBe('La fin du stream doit être après son début.');
   await setClock('eventStreamEnd','23:00');
   await next.click();
   // A training: the circuit and categories only.
