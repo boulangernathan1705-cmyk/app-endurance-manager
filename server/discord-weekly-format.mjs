@@ -41,6 +41,11 @@ export function weekTurnAfter(timestamp){
   for(const offset of [1,2]){const at=monday*DAY_MS+WEEK_TURN_HOURS*HOUR_MS-offset*HOUR_MS;if(localDay(at)===monday&&updateTimeLabel.format(at)==='07:30')return at;}
   return monday*DAY_MS+WEEK_TURN_HOURS*HOUR_MS-HOUR_MS;
 }
+// The last time the week turned (Monday 7h30, Paris) at or before `timestamp`.
+export function lastWeekTurn(timestamp){
+  const turn=weekTurnAfter(timestamp-7*DAY_MS);
+  return turn<=timestamp?turn:weekTurnAfter(timestamp-14*DAY_MS);
+}
 // Nathan's rule: a race's Discord thread and its crews' voices open on the Monday (Paris) of the week of the start,
 // together with the week's calendar, whatever the race's length.
 export function raceWeekOpen(startsAt,now=Date.now()){return Number.isFinite(Number(startsAt))&&parisWeek(Number(startsAt)).monday<=parisWeek(now).monday;}

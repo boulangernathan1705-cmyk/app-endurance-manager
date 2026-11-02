@@ -1168,3 +1168,15 @@ test('« Semaine du … » in the Discord messages leads to the site’s home (�
   const recap=buildWeeklyDiscordPayload({periodLabel:'semaine du 2 au 8 novembre',currentDepartures:[],futureDepartures:[]},site,Date.now(),'iracing',{},{weekly:true});
   assert.equal(recap.embeds[0].url,'https://tdz.example.app/');
 });
+
+test('a community not looked at since the week turned (Monday 7h30) gets its pass at once: calendar, week and finished threads follow the time',async t=>{
+  const {lastWeekTurn,weekTurnAfter}=await import('../server/discord-weekly-format.mjs');
+  const {DB,env}=setup(t);race(DB);
+  await saveBotRecap(env,COMMUNITY,SETTINGS);await syncBotRecaps(env,NOW,COMMUNITY);
+  DB.db.prepare('UPDATE community_recap_settings SET dirty=0,last_error=NULL').run();
+  assert.equal(await syncDueRecaps(env,1,NOW+60000,{pending:true}),0,'already looked at this week');
+  const turn=weekTurnAfter(NOW);assert.equal(lastWeekTurn(turn+60000),turn);assert.ok(lastWeekTurn(turn-60000)<turn);
+  assert.equal(await syncDueRecaps(env,1,turn-60000,{pending:true}),0,'not before the turn');
+  assert.equal(await syncDueRecaps(env,1,turn+60000,{pending:true}),1,'right after the turn');
+  assert.equal(await syncDueRecaps(env,1,turn+120000,{pending:true}),0,'once');
+});
