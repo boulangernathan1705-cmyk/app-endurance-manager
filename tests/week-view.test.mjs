@@ -87,7 +87,7 @@ test('on a phone a week card has its logo or length on the left of its name, cre
   assert.match(view, /week-badge week-block-length/);
   assert.match(view, /équipage\$\{crews>1\?'s':''\}/);
   assert.match(css, /\.week-block-body \{ display: contents; \}/);
-  assert.match(css, /\.week-block \{ grid-template-columns: 64px minmax\(0, 1fr\);/);
+  assert.match(css, /\.week-block \{ display: grid; grid-template-columns: 64px minmax\(0, 1fr\);/);
   assert.match(css, /\.week-block-logo \{ width: 64px; height: 64px;/);
 });
 
@@ -109,9 +109,12 @@ test('on a phone a week card shows its schedule, start → end, the stream first
   assert.match(view, /icon:'📺',label:'Stream'/);
   assert.match(view, /`\$\{solo\?'Course':'Départ'\} \$\{index\+1\}`/);
   assert.match(view, /rows\.sort\(\(a,b\)=>a\.key-b\.key\)/);
+  // On a computer (option P1): the times in a coloured band, the stream on its own line with its link.
+  assert.match(view, /class="week-block-band/);
+  assert.match(view, /class="week-block-live"/);
   // « Aujourd’hui · dans 3 h » on today's heading.
   assert.match(view, /function soonOf\(items,now\)/);
   // The schedule replaces the start time and the stream line, on a computer too.
-  assert.match(css, /\.week-block \.week-block-time, \.week-block \.week-block-stream \{ display: none; \}/);
+  assert.match(css, /\.week-block \.week-block-time, \.week-block \.week-block-stream, \.week-block-sim \{ display: none; \}/);
   assert.match(css, /\.week-block-plan \{ grid-column: 2;/);
 });

@@ -2580,21 +2580,42 @@ main:not(.charte):has(.home-layout) { max-width: 2400px; }
 /* The title, the schedule and the facts of a card are only grouped on a phone (option G, Nathan 2026-11-02). */
 .week-block-title { display: contents; }
 .week-block-facts { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
-.week-block-kind, .week-soon { display: none; }
-/* Its schedule takes the place of the start time and the stream line, on a computer too (Nathan 2026-11-02): one
-   line per moment, start → end, the stream link under its line when the column is narrow. */
-.week-block .week-block-time, .week-block .week-block-stream { display: none; }
-.week-block-logo { width: 46px; height: 46px; margin: -4px -4px -6px 0; }
-.week-block-plan { display: grid; gap: 1px; }
-.week-plan-row { display: flex; align-items: baseline; gap: 0 6px; font-size: 11.5px; font-weight: 700; line-height: 1.35; color: var(--em-muted); }
-.week-plan-row > span:first-child { flex: none; white-space: nowrap; }
-.week-plan-row em { display: none; font-style: normal; }
-.week-plan-time { white-space: nowrap; }
-.week-plan-row b { font-size: 13.5px; font-weight: 900; color: var(--em-text-strong); }
-.week-plan-row i { font-style: normal; opacity: .6; }
-.week-plan-row.is-stream > span:first-child, .week-plan-row.is-stream b { color: #c9a6ff; }
-.week-block-facts .week-stream-link { font-size: 12px; }
 .week-block-facts .week-block-meta { display: contents; }
+.week-block-kind, .week-soon, .week-block-plan { display: none; }
+/* On a computer (option P1, Nathan 2026-11-02): a band of the race's colour on top with its times (the start big,
+   « → end » small) and its logo inside the band; under it the kind, the name, the circuit, the stream in its own
+   purple line with its link, the facts and how full it is. */
+.week-block { display: flex; flex-direction: column; gap: 0; padding: 0; }
+.week-block::before { display: none; }
+.week-block .week-block-time, .week-block .week-block-stream, .week-block-sim { display: none; }
+.week-block-head { order: 0; position: absolute; top: 6px; right: 8px; z-index: 1; }
+.week-block-logo { width: 50px; height: 50px; margin: 0; }
+.week-block-logo img { filter: drop-shadow(0 3px 8px rgba(0, 0, 0, .55)); }
+.week-block-head .week-badge { display: grid; place-content: center; width: 46px; height: 46px; margin-top: 2px; padding: 0; border-radius: 11px; border: 1px solid rgba(255, 255, 255, .22); background: rgba(0, 0, 0, .3); font-size: 9.5px; text-align: center; white-space: normal; }
+.week-block-head .week-block-length { font-size: 18px; font-weight: 900; letter-spacing: 0; line-height: 1; }
+.week-block-head .week-block-length small { display: block; margin-top: 2px; font-size: 8.5px; font-weight: 800; letter-spacing: .06em; opacity: .85; }
+.week-block-band { display: grid; align-content: center; min-height: 62px; padding: 8px 64px 8px 11px; color: #fff;
+  background: repeating-linear-gradient(115deg, rgba(255, 255, 255, .06) 0 6px, transparent 6px 14px), linear-gradient(105deg, color-mix(in srgb, var(--kind) 85%, #000), color-mix(in srgb, var(--kind) 42%, #000)); }
+.week-block-band > span { white-space: nowrap; }
+.week-block-band b { font-size: 22px; font-weight: 900; letter-spacing: -.02em; line-height: 1.05; }
+.week-block-band small { font-size: 12.5px; font-weight: 800; opacity: .82; }
+.week-block-band.is-many b { font-size: 14.5px; }
+.week-block-band.is-many small { font-size: 12px; }
+.week-block-body { display: grid; gap: 3px; padding: 8px 11px 10px; }
+.week-block-title { display: contents; }
+.week-block-kind { display: block; font-size: 9.5px; font-weight: 850; letter-spacing: .1em; text-transform: uppercase; color: color-mix(in srgb, var(--kind) 55%, #fff); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.week-block-name { text-transform: uppercase; font-weight: 900; color: var(--em-text-strong); }
+.week-block-live { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 6px; margin-top: 3px; padding: 4px 8px; border: 1px solid color-mix(in srgb, #a970ff 35%, transparent); border-radius: 8px; background: color-mix(in srgb, #a970ff 16%, transparent); font-size: 12px; color: #d9c4ff; }
+.week-block-live > i { width: 7px; height: 7px; border-radius: 50%; background: #ff4d6d; box-shadow: 0 0 0 3px rgba(255, 77, 109, .25); }
+.week-block-live b { font-weight: 900; white-space: nowrap; }
+.week-block-live .week-stream-link { margin-left: auto; white-space: nowrap; }
+.week-block-facts { margin-top: 3px; }
+.week-block-facts .week-block-meta > span { padding: 1px 7px; border-radius: 999px; background: rgba(255, 255, 255, .07); color: var(--em-text); font-weight: 700; }
+.week-block-facts .week-chip.is-warn { display: none; }
+.week-block-gauge { display: flex; align-items: center; gap: 8px; margin-top: 3px; }
+.week-block-gauge > span { flex: 1; height: 5px; border-radius: 5px; background: rgba(255, 255, 255, .08); overflow: hidden; }
+.week-block-gauge i { display: block; height: 100%; background: linear-gradient(90deg, var(--kind), color-mix(in srgb, var(--kind) 60%, #fff)); }
+.week-block-gauge em { font-style: normal; font-size: 11px; font-weight: 800; color: color-mix(in srgb, var(--em-warn) 85%, #fff); white-space: nowrap; }
 .week-block-facts .week-block-meta > span { padding: 1px 7px; border-radius: 999px; background: rgba(255, 255, 255, .06); color: var(--em-text); font-weight: 700; }
 /* When the stream is live, in small, with its link (Nathan 2026-11-02). */
 .week-block-stream { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; font-size: var(--em-text-xs); font-weight: 650; color: var(--em-muted); }
@@ -2645,19 +2666,24 @@ main:not(.charte):has(.home-layout) { max-width: 2400px; }
   .week-day.is-today .week-day-name { color: var(--em-accent); }
   .week-soon { display: inline; }
   .week-day-list { gap: 8px; padding: 0; }
-  .week-block { grid-template-columns: 64px minmax(0, 1fr); align-items: center; gap: 5px 12px; padding: 10px 10px 10px 13px; border-radius: 14px;
+  .week-block { display: grid; grid-template-columns: 64px minmax(0, 1fr); align-items: center; gap: 5px 12px; padding: 10px 10px 10px 13px; border-radius: 14px;
     background: linear-gradient(110deg, color-mix(in srgb, var(--kind) 20%, var(--em-panel-2)), var(--em-panel-2) 55%); }
+  .week-block::before { display: block; }
   .week-block-head { display: contents; }
-  .week-block-sim, .week-block .week-block-time, .week-block .week-block-stream { display: none; }
+  .week-block-sim, .week-block .week-block-time, .week-block .week-block-stream, .week-block-band, .week-block-live, .week-block-gauge { display: none; }
+  .week-block-facts .week-chip.is-warn { display: inline-block; }
+  .week-plan-row .week-stream-link { justify-self: end; font-size: 12.5px; white-space: nowrap; }
+  .week-plan-time { white-space: nowrap; }
   .week-block-logo, .week-block-head .week-badge { grid-column: 1; grid-row: 1 / span 3; align-self: center; }
   .week-block-logo { width: 64px; height: 64px; margin: 0; }
-  .week-block-head .week-badge { display: grid; place-content: center; width: 64px; height: 64px; padding: 0; border-radius: 12px; border: 1px solid color-mix(in srgb, var(--kind) 70%, transparent); background: color-mix(in srgb, var(--kind) 42%, #000); font-size: 10px; text-align: center; white-space: normal; }
+  .week-block-head .week-badge { display: grid; place-content: center; width: 64px; height: 64px; margin: 0; padding: 0; border-radius: 12px; border: 1px solid color-mix(in srgb, var(--kind) 70%, transparent); background: color-mix(in srgb, var(--kind) 42%, #000); font-size: 10px; text-align: center; white-space: normal; }
   .week-block-head .week-block-length { font-size: 18px; font-weight: 900; letter-spacing: 0; }
   .week-block-length small { display: block; font-size: 9px; font-weight: 800; letter-spacing: .06em; opacity: .85; }
   .week-block-body { display: contents; }
   .week-block-title { grid-column: 2; grid-row: 1; display: grid; gap: 1px; min-width: 0; }
   .week-block-title .week-chip { margin-bottom: 3px; }
   .week-block-kind { display: none; font-size: 10.5px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: color-mix(in srgb, var(--kind) 60%, #fff); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .week-block-body { padding: 0; }
   .week-block-name { font-size: 15.5px; font-weight: 900; line-height: 1.12; text-transform: uppercase; color: var(--em-text-strong); }
   .week-block-circuit { font-size: 12.5px; }
   .week-block-plan { grid-column: 2; display: grid; gap: 1px; margin: 0; padding: 0; border: 0; background: none; }
