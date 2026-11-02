@@ -1,5 +1,18 @@
 # Nouveautés d'Endurance Manager
 
+## v2.1 — 2 novembre 2026
+
+### ✨ Nouveautés
+
+- **Administration** : des onglets clairs, Discord dans son propre onglet, et seulement les rôles suivis.
+- **Apparence** : un logo du bot propre à chaque serveur Discord.
+
+### ✨ Améliorations
+
+- **Accueil · Semaine** : plusieurs filtres à la fois, gardés d’une visite à l’autre. Les streams montrent leur début et leur fin, avec un lien cliquable.
+- **Events TONDEUZ TRAINING** : leurs propres logos sur LMU et iRacing.
+- **Bannière** : la même taille sur toutes les pages, entière sur ordinateur, bande fine sur téléphone.
+
 ## v2.0 — 2 novembre 2026
 
 ### 🔧 Corrections
