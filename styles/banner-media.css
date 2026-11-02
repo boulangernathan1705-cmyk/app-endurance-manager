@@ -2,7 +2,7 @@
    Keep the complete artwork visible as a real image. The image is capped on ultrawide
    displays so browser zoom never stretches it beyond its source resolution; only the
    blurred backdrop fills the unused sides.
-   One height on every page (--em-banner-height in tokens.css): a thin band, so the content comes right under it.
+   One size on every page (tokens.css): the whole banner on a computer, a thin band on a phone.
    Only the live pit wall (live.css) keeps a thinner strip. */
 
 header.site-hero {
@@ -48,7 +48,7 @@ header.site-hero::after {
   z-index: 1;
   display: block;
   width: min(100%, 2048px);
-  height: var(--em-banner-height);
+  aspect-ratio: var(--em-banner-ratio);
   margin: 0 auto;
   background: #080b0d;
   box-shadow: 0 0 46px rgba(0,0,0,.4);
@@ -121,7 +121,7 @@ header.site-hero .brand-button.logo {
 }
 
 @media (max-width: 760px) {
-  .hero-picture { height: var(--em-banner-height-phone); }
+  .hero-picture { aspect-ratio: auto; height: var(--em-banner-height-phone); }
 }
 
 @media (max-width: 700px) {

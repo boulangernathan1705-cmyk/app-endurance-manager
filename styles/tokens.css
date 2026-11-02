@@ -42,7 +42,7 @@
   --em-space-3: 12px;
   --em-space-4: 16px;
   --em-space-5: 24px;
-  /* The banner: the same thin band on every page */
-  --em-banner-height: clamp(76px, 8vw, 140px);
+  /* The banner, the same on every page: the whole artwork on a computer, a thin band on a phone */
+  --em-banner-ratio: 4 / 1;
   --em-banner-height-phone: 64px;
 }
