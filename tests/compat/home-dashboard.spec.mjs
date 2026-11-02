@@ -34,6 +34,17 @@ for(const width of [1440,390])test(`the home shows the week and the next race at
  await page.locator('[data-action="week-filter"][data-filter="iracing"]').click();
  await expect(page.locator('.week-block')).toHaveCount(1);
  await expect(page.locator('.week-block')).toContainText('12h de Sebring');
+ // Several filters at once (Nathan 2026-11-02), kept after a reload; « Tout » clears them.
+ await page.locator('[data-action="week-filter"][data-filter="lmu"]').click();
+ await expect(page.locator('.week-block')).toHaveCount(2);
+ await page.reload();
+ await expect(page.locator('[data-action="week-filter"][aria-pressed="true"]')).toHaveCount(2);
+ await page.locator('[data-action="week-filter"][data-filter="mine"]').click();
+ await expect(page.locator('.week-block')).toHaveCount(1);
+ await expect(page.locator('.week-block')).toContainText('6h de Spa');
+ await page.locator('[data-action="week-filter"][data-filter="all"]').click();
+ await expect(page.locator('[data-action="week-filter"][data-filter="all"]')).toHaveAttribute('aria-pressed','true');
+ await expect(page.locator('.week-block')).toHaveCount(2);
  expect(await page.evaluate(()=>document.documentElement.scrollWidth-document.documentElement.clientWidth)).toBeLessThanOrEqual(1);
  await next.locator('.home-next-go').click();
  await expect(page).toHaveURL(/#event=aaaaaaaa/);
