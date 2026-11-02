@@ -183,6 +183,15 @@ async function assertCrewAccess(env,community,options) {
 }
 // Permissions of the actor in the current community (server/access.mjs).
 const can = (actor, permission) => Boolean(actor.permissions?.has(permission));
+// « Je streame ce départ »: {stream:{start:'20:00', end:'23:00'}} or {stream:null}. An end before the start is the next
+// morning until 6h, otherwise a mistake.
+function registrationStream(input) {
+  const raw = input?.stream, clock = /^([01]\d|2[0-3]):[0-5]\d$/;
+  if (!raw) return {time:'', end:''};
+  if (!clock.test(raw.start || '') || (raw.end && !clock.test(raw.end))) fail(400, 'Heures du stream invalides.');
+  if (raw.end && (raw.end === raw.start || (raw.end < raw.start && raw.end > '06:00'))) fail(400, 'La fin du stream doit être après son début.');
+  return {time:raw.start, end:raw.end || ''};
+}
 function isRegistrationManager(actor) {
   return can(actor, 'manage_registrations');
 }
@@ -230,6 +239,8 @@ function publicRegistration(reg, actor, userNames = new Map(), community = null,
     status:reg.status,
     preferredPilot:reg.preferred_pilot || '',
     comment:reg.comment || '',
+    // A stream is told on its community's site only (its link is that community's).
+    ...(reg.stream_time && !foreign && (!community || reg.community_id === community.id) ? {streamTime:reg.stream_time, streamEnd:reg.stream_end || ''} : {}),
     soloDriver:Boolean(reg.solo_driver),
     version:reg.version,
     discordLinked:Boolean(reg.participant_user_id),
@@ -874,6 +885,7 @@ async function api(request, env) {
     else if (solo) { if (!can(who,'solo_safe')) requirePermission(who,'solo_open','Tu n’as pas l’autorisation de t’inscrire aux événements de cette communauté.'); }
     else requirePermission(who,'endurance','Tu n’as pas l’autorisation de t’inscrire aux endurances de cette communauté.');
     const data = validateRegistration(input, event);
+    const stream = !solo && !forOther && can(who,'admin') ? registrationStream(input) : {time:'', end:''};
     const participant=await registrationParticipant(env,who,input,data,here);
     if (solo && await env.DB.prepare('SELECT 1 FROM registrations WHERE event_id=? AND departure_id=? AND participant_id=? LIMIT 1').bind(event.id,departure.id,participant.id).first()) fail(409, 'Ce pilote est déjà inscrit à cette course. Modifie son inscription.');
     const userId=participant.user_id;
@@ -889,6 +901,8 @@ async function api(request, env) {
     const result = await env.DB.prepare(`INSERT INTO registrations(id,event_id,departure_id,user_id,owner_user_id,guest_hash,name,name_key,category,car,car_preferences,car_any,status,preferred_pilot,comment,created_at,participant_id,round_choices,solo_driver,community_id,game_name,streamer_id,streamer_order)
       SELECT ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,CASE WHEN ? IS NOT NULL THEN (SELECT COALESCE(MAX(streamer_order),0)+1 FROM registrations WHERE event_id=?) ELSE NULL END FROM events WHERE id=? AND version=? AND (community_id=? OR community_id=?)`).bind(regId,event.id,departure.id,userId,ownerUserId,guestHash,data.name,data.nameKey,data.category,data.car,JSON.stringify(data.cars),data.carAny?1:0,data.status,data.preferredPilot,data.comment||'',now(),participant.id,JSON.stringify(data.roundChoices||[]),data.soloDriver?1:0,here.id,data.gameName || '',data.streamerId || null,data.streamerId || null,event.id,event.id,event.version,community.id,OFFICIAL).run();
     if (!result.meta.changes) fail(409, 'Cet événement a changé. Actualise avant de t’inscrire.');
+    // An admin entering himself on an endurance can say he streams this start.
+    if (stream.time) await env.DB.prepare('UPDATE registrations SET stream_time=?,stream_end=? WHERE id=?').bind(stream.time,stream.end,regId).run();
     if (userId && data.status!=='unavailable') await env.DB.prepare('DELETE FROM event_absences WHERE event_id=? AND user_id=? AND community_id=?').bind(event.id, userId, here.id).run();
     if (!alreadyThere && data.status!=='unavailable') await notify(env,await departurePilots(env,event.id,departure.id,here.id),'entry',event,{departure,skip:[actor.user?.id,userId],pilot:data.name,category:data.category});
     if (forOther && userId && userId!==actor.user?.id) await notify(env,[{user_id:userId,community_id:here.id}],'entered_by',event,{departure,by:actor.user.name,category:data.category});
@@ -926,6 +940,8 @@ async function api(request, env) {
     if (method === 'DELETE') result = await env.DB.prepare('DELETE FROM registrations WHERE id=? AND version=?').bind(reg.id,input.version).run();
     else {
       const data = validateRegistration(input,event);
+      const ownStream = input.stream !== undefined && (event.format || 'endurance') !== 'solo' && reg.participant_user_id && reg.participant_user_id === actor.user?.id && can(who,'admin');
+      const stream = ownStream ? registrationStream(input) : null;
       // A pilot linked to Discord keeps his Discord name: an edit cannot show him as another member.
       if (reg.participant_user_id) {
         data.name=await communityName(env, reg.participant_user_id, reg.community_id) || reg.participant_name || data.name;
@@ -936,6 +952,10 @@ async function api(request, env) {
         env.DB.prepare('UPDATE participants SET name=? WHERE id=? AND changes()=1').bind(data.name,reg.participant_id)
       ]);
       result=results[0];
+      // His own entry: an admin streams this start or no longer does (an older page leaves it as it is).
+      if (result.meta.changes && stream) {
+        await env.DB.prepare('UPDATE registrations SET stream_time=?,stream_end=? WHERE id=?').bind(stream.time,stream.end,reg.id).run();
+      }
     }
     if (!result.meta.changes) fail(409, 'Les données ont changé. Actualise avant de réessayer.');
     if (method === 'DELETE') {

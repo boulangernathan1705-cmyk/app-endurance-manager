@@ -112,7 +112,8 @@ export function posterModel(items, site, {live = false, timestamp = Date.now()} 
     : (site.streams || []).find(stream => stream.item === item.data.id)?.time).map(timeOf).filter(Boolean))].sort();
   const gridfest = items.length === 1 && blocks[0].streamers;
   Object.assign(model, {banner:site.bannerUrl || '', platform:streamPlatform(streamUrl), streamUrl, streamer,
-    driving:items.some(item => item.data.stream?.crew)});
+    // An endurance on the stream's poster is one the streamer drives (« Je streame ce départ »).
+    driving:items.some(item => item.data.stream?.crew || item.kind === 'race')});
   if (gridfest) Object.assign(model, {gridfest:true, big:`GRIDFEST ${hhmm(items[0].data.startsAt).toUpperCase()}`,
     who:`${times[0] ? `stream dès <b>${html(times[0])}</b> · ` : ''}pilote pour ton streamer`});
   else Object.assign(model, {big:times.length ? `STREAM${times.length > 1 ? 'S' : ''} ${times.join(' & ').toUpperCase()}` : 'STREAM',

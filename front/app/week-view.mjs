@@ -71,8 +71,10 @@ const logoOf=event=>isGrindfest(event)?'<img class="event-access-logo" src="/ima
 // When the stream is live, in small, with its link (Nathan 2026-11-02): « 📺 19h45–23h · ▶ Twitch ». A stream has its own
 // link; an event the community streams (« Début du stream ») takes the community's stream link. The card is a button: the
 // link is a span that opens the stream in a new tab without opening the race.
-function streamLine(event){
-  const stream=isStream(event),info=stream?streamDetails(event):event.details||{};
+function streamLine(event,starts=[]){
+  // An endurance: the start an admin streams (« Je streame ce départ »), with the community's link.
+  const streamer=isSolo(event)?null:starts.flatMap(start=>start.departure.availability||[]).find(reg=>reg.streamTime&&reg.status!=='unavailable');
+  const stream=isStream(event),info=streamer?{streamTime:streamer.streamTime,streamEnd:streamer.streamEnd}:stream?streamDetails(event):event.details||{};
   const span=streamSpan(info.streamTime,info.streamEnd);
   if(!span)return '';
   const url=streamUrl(stream?info.streamUrl:state.communityStreamUrl)||'';
@@ -89,7 +91,7 @@ const shortClock=time=>String(time||'').replace(':','h').replace(/h00$/,'h').rep
 function planOf(item){
   const {event,starts,kind}=item,stream=isStream(event),rows=[];
   // An endurance start a member streams (« Je streame ce départ »): its times come with that registration.
-  const streamed=stream?null:starts.flatMap(start=>start.departure.availability||[]).find(reg=>reg.streamTime);
+  const streamed=stream?null:starts.flatMap(start=>start.departure.availability||[]).find(reg=>reg.streamTime&&reg.status!=='unavailable');
   const info=stream?streamDetails(event):{...(event.details||{}),...(streamed&&!event.details?.streamTime?{streamTime:streamed.streamTime,streamEnd:streamed.streamEnd||''}:{})};
   if(info.streamTime||info.streamEnd){
     const url=streamUrl(stream?info.streamUrl:state.communityStreamUrl)||'';
@@ -169,7 +171,7 @@ function block(item,now){
     ${circuit?`<span class="week-block-circuit">${circuit}</span>`:''}
     </span>
     ${solo&&isTraining(event)?`<span class="week-block-stream"><span>🏁 Entraînement ${esc(trainingSpan(startsAt,eventMinutes(event)))}</span></span>`:''}
-    ${solo?streamLine(event):''}
+    ${streamLine(event,starts)}
     ${plan.plan}
     ${meta.length||situation||places||plan.link?`<span class="week-block-facts">${meta.length?`<span class="week-block-meta">${meta.map(text=>`<span>${esc(text)}</span>`).join('')}</span>`:''}${situation}${places}${plan.link}</span>`:''}
     </span>

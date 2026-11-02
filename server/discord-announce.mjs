@@ -69,7 +69,9 @@ export async function announceItems(env, community, timestamp) {
   // The endurances as in the week's message (official LMU ones included, iRacing ones as the community shows them).
   const snapshot = await loadWeeklyDiscordSnapshot(env, parisDayStart(timestamp), community, 'all');
   // Only the starts with a crew: the announcement puts forward who is sure to race that day (Nathan, 2026-11-01).
-  for (const departure of snapshot.futureDepartures.filter(item => parisDay(item.startsAt) === day && crewed(item))) {
+  // A start an admin streams (« Je streame ce départ ») is announced with or without a crew.
+  const streamed = await streamedStarts(env, community);
+  for (const departure of snapshot.futureDepartures.filter(item => parisDay(item.startsAt) === day && (crewed(item) || streamed.has(item.departureId)))) {
     const known = items.find(item => item.item === departure.eventId);
     if (!known) items.push({item:departure.eventId, kind:'race', startsAt:departure.startsAt});
   }
@@ -112,14 +114,30 @@ async function raceSnapshot(env, community, id, timestamp) {
   if (!row) return null;
   const day = parisDay(timestamp), snapshot = await loadWeeklyDiscordSnapshot(env, timestamp, community, 'all', id);
   // Its starts with a crew, without the pilots still alone (they see the race on the site).
-  const departures = snapshot.futureDepartures.filter(item => parisDay(item.startsAt) === day && crewed(item)).map(item => ({...item, unassignedPilots:[]}));
+  const streamed = await streamedStarts(env, community, id);
+  const departures = snapshot.futureDepartures.filter(item => parisDay(item.startsAt) === day && (crewed(item) || streamed.has(item.departureId))).map(item => ({...item, unassignedPilots:[]}));
   if (!departures.length) return null;
   return {id:row.id, name:row.name, circuit:row.circuit, eventType:row.event_type || '', official:row.community_id === 'official',
     durationMinutes:Number(row.duration_minutes) || Number(row.duration_hours) * 60 || 0, details:parse(row.details, {}) || {}, departures};
 }
-// The stream times the admins gave today's events (details.streamTime), for the intro.
-async function streamTimes(env, rows) {
+// The entries of this community's admins who stream an endurance start (« Je streame ce départ »).
+const streamRows = async (env, community, eventId = null) => (await env.DB.prepare(`SELECT r.event_id,r.departure_id,r.stream_time,e.departures FROM registrations r
+  JOIN events e ON e.id=r.event_id WHERE r.community_id=? AND r.stream_time<>'' AND COALESCE(r.status,'')<>'unavailable' ${eventId ? 'AND r.event_id=?' : ''}`)
+  .bind(...[community.id, eventId].filter(Boolean)).all()).results || [];
+async function streamedStarts(env, community, eventId = null) { return new Set((await streamRows(env, community, eventId)).map(row => row.departure_id)); }
+// When an admin streams an endurance today: its earliest stream time.
+async function raceStreamTime(env, community, eventId, timestamp) {
+  const rows = await streamRows(env, community, eventId);
+  const day = parisDay(timestamp);
+  return rows.filter(row => today(parse(row.departures, []).find(start => start.id === row.departure_id), day)).map(row => row.stream_time).sort()[0] || '';
+}
+// The stream times the admins gave today's events (details.streamTime) and endurances, for the intro.
+async function streamTimes(env, rows, community = null, timestamp = Date.now()) {
   const streams = [];
+  for (const row of rows.filter(item => item.kind === 'race' && community)) {
+    const time = await raceStreamTime(env, community, row.item, timestamp);
+    if (time) streams.push({item:row.item, name:'', time});
+  }
   for (const row of rows.filter(item => ['event','stream'].includes(item.kind))) {
     const event = await env.DB.prepare('SELECT name,details FROM events WHERE id=?').bind(row.item).first();
     // A stream announced with only the race's time starts then.
@@ -322,7 +340,7 @@ async function publishAnnouncement(env, community, settings, timestamp) {
   }
   for (const [position,row] of activeRows.entries()) await env.DB.prepare(`INSERT OR IGNORE INTO discord_announcements(community_id,day,item,kind,position,guild_id,channel_id,created_at)
     VALUES(?,?,?,?,?,?,?,?)`).bind(community.id,day,row.item,row.kind,position+1,community.discordGuildId,channel,timestamp).run();
-  const streams = await streamTimes(env,activeRows), streamed = new Set(streams.map(item => item.item));
+  const streams = await streamTimes(env,activeRows,community,timestamp), streamed = new Set(streams.map(item => item.item));
   site.streams = streams;
   // The stream's message: an « Annoncer un stream », or the community's stream link with a stream time on a race today.
   const live = items.filter(item => item.kind === 'stream' || (stream && streamed.has(item.row.item)));
