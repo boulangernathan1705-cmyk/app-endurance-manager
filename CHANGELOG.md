@@ -1,5 +1,17 @@
 # Nouveautés d'Endurance Manager
 
+## v2.2 — 2 novembre 2026
+
+### ✨ Nouveautés
+
+- **Events TDZ** : à la création, « Sans stream » ou « En stream » avec le début et la fin du stream. Un Training demande juste son créneau. Les events streamés et les Training sont annoncés le matin, même sans inscrit.
+- **Endurances** : un admin qui s’inscrit peut cocher « 📺 Je streame ce départ ». L’affiche du jour annonce alors le stream avec @everyone.
+
+### ✨ Améliorations
+
+- **Accueil · Semaine** : des cartes plus vivantes. Chaque moment a son début et sa fin (stream, Training, course, départs), avec « ▶ Twitch » sur la ligne du stream. Sur ordinateur, les horaires sont dans une bande à la couleur de la course avec une jauge des places ; sur téléphone, le logo est dans une bande de couleur à gauche.
+- **Endurances** : un logo Endurance Manager pour LMU et pour iRacing.
+
 ## v2.1 — 2 novembre 2026
 
 ### ✨ Nouveautés
