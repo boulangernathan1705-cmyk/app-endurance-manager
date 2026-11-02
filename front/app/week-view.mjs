@@ -8,7 +8,7 @@ import {gameForEvent} from '../../shared/catalog.mjs';
 import {isSolo,eventAccessLogo,soloCardMeta} from './solo.mjs';
 import {isStream,streamDetails,streamSpan,streamPlatform,streamUrl} from '../../shared/stream.mjs';
 import {isGrindfest} from '../../shared/grindfest.mjs';
-import {simForEvent,SIMS,simCatalog} from '../../shared/catalog.mjs';
+import {simForEvent,SIMS,simCatalog,isTraining,trainingSpan} from '../../shared/catalog.mjs';
 import {parisDay,weekStart,weekDays} from '../week-days.mjs';
 import {eventMinutes,raceFinishAt} from '../../shared/duration.mjs';
 import {RACE_WEATHERS} from '../../shared/catalog.mjs';
@@ -168,6 +168,7 @@ function block(item,now){
     <span class="week-block-name">${esc(event.name)}</span>
     ${circuit?`<span class="week-block-circuit">${circuit}</span>`:''}
     </span>
+    ${solo&&isTraining(event)?`<span class="week-block-stream"><span>🏁 Entraînement ${esc(trainingSpan(startsAt,eventMinutes(event)))}</span></span>`:''}
     ${solo?streamLine(event):''}
     ${plan.plan}
     ${meta.length||situation||places||plan.link?`<span class="week-block-facts">${meta.length?`<span class="week-block-meta">${meta.map(text=>`<span>${esc(text)}</span>`).join('')}</span>`:''}${situation}${places}${plan.link}</span>`:''}

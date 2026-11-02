@@ -150,6 +150,14 @@ export const RACE_WEATHERS = {dry:'Sec', mixed:'Variable', rain:'Pluie'};
 export const normalizeTdzEventType = value => /^(?:bouboules?|bouloules?)$/i.test(String(value || '')) ? 'BOULOULES' : value;
 export const normalizeTdzDetails = details => details?.type ? {...details,type:normalizeTdzEventType(details.type)} : details;
 export const TDZ_EVENT_TYPES = ['OPEN', 'SAFE', 'BOULOULES', 'TONDEUZ TRAINING'];
+// A TONDEUZ TRAINING: a circuit, categories and a time window (« 20h–22h »), no rounds (Nathan 2026-11-02).
+export const isTrainingType = type => normalizeTdzEventType(type) === 'TONDEUZ TRAINING';
+export const isTraining = event => event?.sim !== 'stream' && isTrainingType(event?.details?.type);
+// « 20h », « 20h30 », « 0h30 »: an hour of Paris.
+export const parisHour = at => new Intl.DateTimeFormat('fr-FR', {timeZone:'Europe/Paris', hour:'2-digit', minute:'2-digit', hourCycle:'h23'})
+  .format(at).replace(':', 'h').replace(/h00$/, 'h').replace(/^0(?=\d)/, '');
+// « 20h–22h »: the window of a training from its start and its length.
+export const trainingSpan = (startsAt, minutes) => Number.isFinite(Number(startsAt)) ? `${parisHour(Number(startsAt))}–${parisHour(Number(startsAt) + (Number(minutes) || 0) * 60000)}` : '';
 export const TDZ_EVENTS_LABEL = 'EVENT TDZ';
 // The artwork of a TDZ event (images/event-access/<name>.png): TONDEUZ TRAINING has its own on LMU and iRacing,
 // otherwise OPEN or SAFE of its sim.

@@ -1,6 +1,6 @@
 import {renderRallyEventForm} from './rally-form.mjs';
 import {renderStreamForm} from './stream-form.mjs';
-import {isStream,streamSpan} from '../../shared/stream.mjs';
+import {isStream,streamSpan,streamUrl} from '../../shared/stream.mjs';
 import {streamerFields, streamerData, syncStreamerFields} from './grindfest.mjs';
 import {isGrindfest} from '../../shared/grindfest.mjs';
 // Creating or editing an event of the community calendar (solo format), step by step, for every simulator.
@@ -9,7 +9,7 @@ import {isGrindfest} from '../../shared/grindfest.mjs';
 // LMU takes its circuits and categories from the catalog; on AMS2, iRacing and ACE they are typed, with the car.
 import {formSheet} from './event-form.mjs';
 import {app,state,esc,button,api,notifyRender} from './core.mjs';
-import {SIMS,EVENT_SIMS,simCatalog,eventCatalog,simForEvent,isRandomCircuit} from '../../shared/catalog.mjs';
+import {SIMS,EVENT_SIMS,simCatalog,eventCatalog,simForEvent,isRandomCircuit,isTrainingType} from '../../shared/catalog.mjs';
 import {departureFields} from './event-form.mjs';
 import {refreshAfterSave} from './refresh.mjs';
 import {WEATHERS,roundFormat,roundExtras} from './solo.mjs';
@@ -60,10 +60,71 @@ function weatherField(round){
 function syncRounds(form){
   const rounds=[...form.querySelectorAll('.solo-round')];
   rounds.forEach((row,index)=>{row.querySelector('.solo-round-title').textContent=`Manche ${index+1}`;row.querySelector('[data-remove-round]').hidden=rounds.length<2;});
-  form.querySelector('[data-add-round]').hidden=rounds.length>=MAX_ROUNDS;
+  form.querySelector('[data-add-round]').hidden=rounds.length>=MAX_ROUNDS||trainingOf(form);
   syncStreamerFields(form);
 }
 const STEPS=['Événement','Horaire','Manches','Inscriptions','Récapitulatif'],LAST=STEPS.length;
+const stepName=(form,n)=>n===3&&trainingOf(form)?'Circuit':STEPS[n-1];
+const trainingOf=form=>isTrainingType(form.querySelector('[name="eventType"]:checked')?.value||form.querySelector('input[type="hidden"][name="eventType"]')?.value);
+// An hour and minutes picked as on the start (24 h on every browser), kept in a hidden field « HH:MM ».
+const FIVE=Array.from({length:12},(_,index)=>String(index*5).padStart(2,'0'));
+const timeInput=(name,label,value)=>{
+  const [hour,minute]=String(value||'21:00').split(':'),minutes=FIVE.includes(minute)?FIVE:[...FIVE,minute].sort();
+  return `<div class="form-label time-picker" data-clock><span>${label}</span><span class="time-picker-row" role="group" aria-label="${esc(label)}"><select data-clock-hour aria-label="Heure">${Array.from({length:24},(_,n)=>String(n).padStart(2,'0')).map(item=>`<option value="${item}" ${item===hour?'selected':''}>${item} h</option>`).join('')}</select><span aria-hidden="true">:</span><select data-clock-minute aria-label="Minutes">${minutes.map(item=>`<option value="${item}" ${item===minute?'selected':''}>${item}</option>`).join('')}</select></span><input type="hidden" name="${name}" value="${esc(value||'')}"></div>`;
+};
+const clockOf=input=>input.closest('[data-clock]');
+// Writes « HH:MM » in a picker (its selects and its hidden field).
+function setClock(input,value){
+  if(!value)return;const [hour,minute]=value.split(':'),box=clockOf(input),select=box.querySelector('[data-clock-minute]');
+  if(![...select.options].some(option=>option.value===minute))select.insertAdjacentHTML('beforeend',`<option value="${minute}">${minute}</option>`);
+  box.querySelector('[data-clock-hour]').value=hour;select.value=minute;input.value=value;
+}
+const addMinutes=(time,minutes)=>{const [h,m]=String(time||'21:00').split(':').map(Number),at=((h*60+m+minutes)%1440+1440)%1440;return `${String(Math.floor(at/60)).padStart(2,'0')}:${String(at%60).padStart(2,'0')}`;};
+// A picker's hidden field and selects are on or off together; its error shows on the hour.
+function clockState(input,on,error=''){
+  const box=clockOf(input);box.hidden=!on;input.disabled=!on;box.querySelectorAll('select').forEach(select=>{select.disabled=!on;});
+  box.querySelector('[data-clock-hour]').setCustomValidity(on?error:'');
+  if(on&&!input.value)input.value=`${box.querySelector('[data-clock-hour]').value}:${box.querySelector('[data-clock-minute]').value}`;
+}
+// EVENT TDZ (Nathan 2026-11-02): « Sans stream » or « En stream », always answered; streamed, its start and end are asked
+// and the link is the community's (Discord setting). It decides the morning poster (@everyone or not) and the 📺 line.
+export function streamChoice(details={},editing=false){
+  if(!state.eventTdz)return '';
+  const on=Boolean(details.streamTime),chosen=editing?(on?'yes':'no'):'',url=streamUrl(state.communityStreamUrl);
+  const option=(value,label)=>`<label class="sim-option stream-choice-option"><input type="radio" name="eventStreamed" value="${value}" ${chosen===value?'checked':''} required><span>${label}</span></label>`;
+  return `<fieldset class="sim-options stream-choice"><legend class="form-label">Stream</legend><div class="sim-option-row">${option('no','Sans stream')}${option('yes','📺 En stream')}</div></fieldset>
+    <div data-stream-times ${on?'':'hidden'}><div class="solo-form-row">${timeInput('eventStreamTime','Début du stream',details.streamTime)}${timeInput('eventStreamEnd','Fin du stream',details.streamEnd)}</div>
+    <p class="creation-help stream-choice-link">${url?`Lien : <a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(url.replace(/^https:\/\/(www\.)?/,''))}</a>`:'Aucun lien de stream réglé : ajoute-le dans Administration › Discord.'}</p></div>`;
+}
+// « 22h → 1h » is the next morning (until 6h); otherwise the end must follow the start.
+const endBefore=(start,end)=>Boolean(start&&end)&&(end===start||(end<start&&end>'06:00'));
+const minutesBetween=(start,end)=>{const [a,b]=[start,end].map(time=>{const [h,m]=String(time).split(':').map(Number);return h*60+m;});return ((b-a)+1440)%1440;};
+// Shows the stream times when « En stream » is chosen; hidden fields are disabled so they are neither checked nor sent.
+export function syncStream(form){
+  const box=form.querySelector('[data-stream-times]');if(!box)return;
+  const on=form.querySelector('[name="eventStreamed"]:checked')?.value==='yes',start=form.elements.eventStreamTime,end=form.elements.eventStreamEnd;
+  // Just chosen: the stream as the event (a training's window, or the start and two hours), to change if needed.
+  if(on&&box.hidden&&!start.value){
+    const begin=form.querySelector('.departure-field [name="time"]')?.value||'21:00',training=form.elements.eventEnd&&!form.elements.eventEnd.disabled;
+    setClock(start,begin);setClock(end,training?form.elements.eventEnd.value:addMinutes(begin,120));
+  }
+  box.hidden=!on;clockState(start,on);clockState(end,on,endBefore(start.value,end.value)?'La fin du stream doit être après son début.':'');
+}
+// A training: an end time in « Horaire », only the circuit and categories in « Circuit » (no rounds, sessions, places).
+function syncTraining(form){
+  const training=trainingOf(form),end=form.elements.eventEnd;
+  const start=form.querySelector('.departure-field [name="time"]')?.value||'';
+  if(training&&!end.value)setClock(end,addMinutes(start,120));
+  clockState(end,training,end.value&&minutesBetween(start,end.value)<5?'La fin doit être après le début.':'');
+  // The start of a training is the start of its window.
+  const startLabel=form.querySelector('.departure-field .time-picker > .form-label');if(startLabel)startLabel.textContent=training?'Début (Paris)':'Heure (Paris)';
+  syncRounds(form);
+  form.querySelectorAll('.solo-round').forEach((row,index)=>{
+    row.hidden=training&&index>0;
+    row.querySelectorAll('.solo-round-format,.solo-weather').forEach(part=>{part.hidden=training;part.querySelectorAll('input').forEach(input=>{input.disabled=training;});});
+  });
+  if(training)form.querySelector('[data-add-round]').hidden=true;
+}
 
 export function renderSoloEventForm(event=null,{focusPassword=false}={}){
   if(event&&simForEvent(event)==='acrally')return renderRallyEventForm(event);
@@ -71,14 +132,16 @@ export function renderSoloEventForm(event=null,{focusPassword=false}={}){
   const sim=event?simForEvent(event):'lmu',rounds=(event?.rounds?.length?event.rounds:[{circuit:event?.circuit,durationMinutes:event?.durationMinutes}]).map((round,index,list)=>list.length===1&&!round.capacity&&event?.capacity?{...round,capacity:event.capacity}:round);
   const details=event?.details||{},access=event?.access||'open',departure=event?.departures?.[0]||{time:'21:00'},first=event?(focusPassword?2:LAST):1;
   const start=departureFields(departure).replace(/<button[^>]*data-action="remove-departure"[^>]*>.*?<\/button>/,'');
+  // A training's end, from its start and its length.
+  const trainingEnd=isTrainingType(details.type)&&departure.time?(()=>{const [h,m]=departure.time.split(':').map(Number),at=(h*60+m+(Number(rounds[0]?.durationMinutes)||0))%1440;return `${String(Math.floor(at/60)).padStart(2,'0')}:${String(at%60).padStart(2,'0')}`;})():'';
   const step=(n,content)=>`<section class="creation-card solo-form-step" data-solo-step-pane="${n}" ${n===first?'':'hidden'}>${content}</section>`;
   formSheet(event,event?'Modifier l’événement':'Nouvel événement','create-event').innerHTML=`<form class="form-panel event-creation solo-event-form" data-kind="solo-event" data-step="${first}">
   <div class="registration-progress" aria-hidden="true" data-solo-progress>${STEPS.map((_,index)=>`<span class="${index<first?'done':''}"></span>`).join('')}</div>
   <p class="registration-step-label" data-solo-step-label>Étape ${first} sur ${LAST} · ${STEPS[first-1]}</p>
   ${step(1,`<label class="form-label">Nom de l’événement<input name="eventName" maxlength="100" value="${esc(event?.name||'')}" required></label>
     <fieldset class="sim-options"><legend class="form-label">Simulateur</legend><div class="sim-option-row">${EVENT_SIMS.map(item=>simChoice(item,sim)).join('')}</div></fieldset>${typeField(details.type)}
-    <div class="solo-form-row"><label class="form-label">Début du stream <small>(facultatif)</small><input name="eventStreamTime" type="time" value="${esc(details.streamTime||'')}"></label><label class="form-label">Fin du stream <small>(facultatif)</small><input name="eventStreamEnd" type="time" value="${esc(details.streamEnd||'')}"></label></div>`)}
-  ${step(2,`<div class="solo-form-start">${start}</div>
+    ${state.eventTdz?'':`<div class="solo-form-row"><label class="form-label">Début du stream <small>(facultatif)</small><input name="eventStreamTime" type="time" value="${esc(details.streamTime||'')}"></label><label class="form-label">Fin du stream <small>(facultatif)</small><input name="eventStreamEnd" type="time" value="${esc(details.streamEnd||'')}"></label></div>`}`)}
+  ${step(2,`<div class="solo-form-start">${start}${timeInput('eventEnd','Fin (Paris)',trainingEnd)}</div>${streamChoice(details,Boolean(event))}
     <div class="solo-form-row"><label class="form-label">Mot de passe du serveur <small>(facultatif)</small><input name="eventPassword" maxlength="30" value="${esc(details.password||'')}" autocomplete="off"></label></div><div data-gridfest-password-tools hidden><p class="creation-help">30 caractères maximum, sans espace. Envoyé par MP Discord aux pilotes confirmés.</p></div>`)}
   ${step(3,`<div class="solo-rounds" data-rounds>${rounds.map(round=>roundField(sim,round)).join('')}</div><button type="button" class="secondary-button" data-add-round>+ Ajouter une manche</button>`)}
   ${step(4,`${streamerFields(details)}<div class="solo-form-row"><fieldset class="solo-access" ${accessType(details.type)||!state.eventTdz?'hidden':''}><legend class="form-label">Accès</legend><div class="sim-option-row">${['open','safe'].map(value=>`<label class="sim-option access-${value}"><input type="radio" name="eventAccess" value="${value}" ${access===value?'checked':''}><span>${value.toUpperCase()}</span></label>`).join('')}</div></fieldset></div>
@@ -87,7 +150,7 @@ export function renderSoloEventForm(event=null,{focusPassword=false}={}){
   <div class="creation-actions registration-step-nav"><button type="button" class="secondary-button registration-back" data-solo-step="back" ${first>1?'':'hidden'}>Retour</button><button type="button" class="primary-button registration-next" data-solo-step="next" ${first<LAST?'':'hidden'}>Continuer</button><button type="submit" class="primary-button registration-next" data-solo-submit ${first===LAST?'':'hidden'}>${event?'ENREGISTRER':'CRÉER L’ÉVÉNEMENT'}</button></div>
 </form>`;
   const form=app.querySelector('form[data-kind="solo-event"]');
-  syncRounds(form);syncStreamerFields(form);if(first===LAST)fillRecap(form);
+  syncRounds(form);syncStreamerFields(form);syncTraining(form);syncStream(form);showStep(form,first,false);
   notifyRender();
   if(focusPassword)requestAnimationFrame(()=>form.elements.eventPassword.focus());
 }
@@ -100,7 +163,10 @@ function formData(form){
     categories:[...row.querySelectorAll('[name="roundCategory"]:checked')].map(input=>input.value),
     category:value(row,'roundCategoryText'),car:value(row,'roundCar'),practice:optional(row,'roundPractice'),qualifying:optional(row,'roundQualifying'),weather:row.querySelector('[data-weather]:checked')?.value||'',fuel:optional(row,'roundFuel'),tyres:optional(row,'roundTyres'),capacity:optional(row,'roundCapacity')}));
   const start=form.querySelector('.departure-field');
-  const details={type:form.querySelector('[name="eventType"]:checked')?.value||'',password:form.elements.eventPassword.value.trim(),note:form.elements.eventNote.value.trim(),streamTime:form.elements.eventStreamTime.value,streamEnd:form.elements.eventStreamEnd.value};
+  const live=name=>form.elements[name]&&!form.elements[name].disabled?form.elements[name].value:'';
+  const details={type:form.querySelector('[name="eventType"]:checked')?.value||'',password:form.elements.eventPassword.value.trim(),note:form.elements.eventNote.value.trim(),streamTime:live('eventStreamTime'),streamEnd:live('eventStreamEnd')};
+  // A training: its first circuit only, as long as its window.
+  if(isTrainingType(details.type)){rounds.splice(1);Object.assign(rounds[0],{durationMinutes:minutesBetween(start.querySelector('[name="time"]').value,form.elements.eventEnd.value),practice:null,qualifying:null,weather:'',fuel:null,tyres:null,capacity:null});}
   if (isGrindfest({details})) { details.streamers = streamerData(form); rounds.forEach(round => { round.capacity = null; }); }
   return {name:form.elements.eventName.value.trim(),format:'solo',sim:form.elements.eventSim.value,access:form.querySelector('[name="eventAccess"]:checked')?.value||'open',
     rounds,categories:[],details,
@@ -111,10 +177,11 @@ function fillRecap(form){
   const circuitName=id=>catalog?(catalog.circuits.find(item=>item.id===id)?.name||'—'):id||'—';
   const date=data.departures[0].date,day=date?new Intl.DateTimeFormat('fr-FR',{weekday:'short',day:'numeric',month:'short',timeZone:'UTC'}).format(new Date(`${date}T00:00:00Z`)):'—';
   const line=(n,label,value)=>`<button type="button" class="registration-summary-row" data-solo-step="${n}"><span>${label}</span><strong>${esc(value)}</strong><em>Modifier</em></button>`;
-  const time=data.departures[0].time;
-  form.querySelector('[data-solo-recap]').innerHTML=line(1,'Événement',[data.name||'—',sim.short,data.details.type,(data.details.streamTime||data.details.streamEnd)&&`stream ${streamSpan(data.details.streamTime,data.details.streamEnd)}`].filter(Boolean).join(' · '))
-    +line(2,'Horaire',`${day} · ${time}${data.details.password?` · mdp : ${data.details.password}`:''}`)
-    +data.rounds.map((round,index)=>line(3,data.rounds.length>1?`Manche ${index+1}`:'Manche',[circuitName(round.circuit),isRandomCircuit(round.circuit)&&eventCatalog(data.sim)?'catégorie aléatoire':round.categories.join(' ')||round.category,round.car,roundFormat(round),roundExtras(round)].filter(Boolean).join(' · '))).join('')
+  const time=data.departures[0].time,training=isTrainingType(data.details.type);
+  const stream=data.details.streamTime?`📺 ${streamSpan(data.details.streamTime,data.details.streamEnd)}`:state.eventTdz?'sans stream':'';
+  form.querySelector('[data-solo-recap]').innerHTML=line(1,'Événement',[data.name||'—',sim.short,data.details.type].filter(Boolean).join(' · '))
+    +line(2,'Horaire',[day,training?`${streamSpan(time,form.elements.eventEnd.value)}`:time,stream,data.details.password&&`mdp : ${data.details.password}`].filter(Boolean).join(' · '))
+    +data.rounds.map((round,index)=>line(3,training?'Circuit':data.rounds.length>1?`Manche ${index+1}`:'Manche',[circuitName(round.circuit),isRandomCircuit(round.circuit)&&eventCatalog(data.sim)?'catégorie aléatoire':round.categories.join(' ')||round.category,round.car,!training&&roundFormat(round),!training&&roundExtras(round)].filter(Boolean).join(' · '))).join('')
     +line(4,'Inscriptions',[accessType(data.details.type)||!state.eventTdz?'':data.access==='safe'?'SAFE':'OPEN',isGrindfest(data)?`${data.details.streamers.length} streamers · ${data.details.streamers.reduce((sum,item)=>sum+item.capacity,0)} places`:data.rounds.some(round=>round.capacity)?data.rounds.map(round=>round.capacity?`${round.capacity} places`:'illimité').join(' / '):'places illimitées',data.details.note].filter(Boolean).join(' · '));
 }
 function goToStep(form,target){
@@ -131,23 +198,31 @@ function goToStep(form,target){
   }
   form.dataset.step=String(wanted);showStep(form,wanted);
 }
-function showStep(form,n){
+function showStep(form,n,scroll=true){
   form.querySelectorAll('[data-solo-step-pane]').forEach(pane=>{pane.hidden=Number(pane.dataset.soloStepPane)!==n;});
   form.querySelectorAll('[data-solo-progress] span').forEach((bar,index)=>bar.classList.toggle('done',index<n));
-  form.querySelector('[data-solo-step-label]').textContent=`Étape ${n} sur ${LAST} · ${STEPS[n-1]}`;
+  form.querySelector('[data-solo-step-label]').textContent=`Étape ${n} sur ${LAST} · ${stepName(form,n)}`;
   form.querySelector('[data-solo-step="back"]').hidden=n===1;
   form.querySelector('[data-solo-step="next"]').hidden=n===LAST;
   form.querySelector('[data-solo-submit]').hidden=n!==LAST;
   if(n===LAST)fillRecap(form);
-  form.scrollIntoView({block:'start',behavior:'auto'});
+  if(scroll)form.scrollIntoView({block:'start',behavior:'auto'});
 }
 
 if(typeof document!=='undefined'){
+  // A picker's selects write its hidden field first (solo and rally forms).
+  document.addEventListener('change',event=>{
+    const box=event.target.closest?.('[data-clock]');if(!box)return;
+    box.querySelector('input[type="hidden"]').value=`${box.querySelector('[data-clock-hour]').value}:${box.querySelector('[data-clock-minute]').value}`;
+  });
   document.addEventListener('change',event=>{
     const field=event.target,form=field.closest?.('form[data-kind="solo-event"]');
     if(form&&field.name==='eventType'){
       // A type named OPEN or SAFE sets the access.
-      const access=form.querySelector(`[name="eventAccess"][value="${field.value.toLowerCase()}"]`);if(access)access.checked=true;const fieldset=form.querySelector('.solo-access');if(fieldset)fieldset.hidden=accessType(field.value);return;
+      const access=form.querySelector(`[name="eventAccess"][value="${field.value.toLowerCase()}"]`);if(access)access.checked=true;const fieldset=form.querySelector('.solo-access');if(fieldset)fieldset.hidden=accessType(field.value);syncTraining(form);syncStream(form);return;
+    }
+    if(form&&(field.name==='eventStreamed'||field.matches('[data-clock] select,[name="timeHour"],[name="timeMinute"]'))){
+      syncTraining(form);syncStream(form);return;
     }
     if(form&&field.name==='roundCircuit'&&field.tagName==='SELECT'){
       // Random circuit: the category is random too (and back to the chips otherwise).
