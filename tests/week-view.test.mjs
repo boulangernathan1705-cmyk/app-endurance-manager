@@ -106,7 +106,7 @@ test('on a phone a week card shows its schedule, start → end, the stream first
   const view = read('front/app/week-view.mjs'), css = read('styles/ux-refresh.css');
   // One line per moment: the stream with its link, then the race, each start of an endurance with its end.
   assert.match(view, /function planOf\(item\)/);
-  assert.match(view, /label:'📺 Stream'/);
+  assert.match(view, /icon:'📺',label:'Stream'/);
   assert.match(view, /`\$\{solo\?'Course':'Départ'\} \$\{index\+1\}`/);
   assert.match(view, /rows\.sort\(\(a,b\)=>a\.key-b\.key\)/);
   // « Aujourd’hui · dans 3 h » on today's heading.

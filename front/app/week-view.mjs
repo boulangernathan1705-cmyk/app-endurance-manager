@@ -93,21 +93,23 @@ function planOf(item){
   const info=stream?streamDetails(event):{...(event.details||{}),...(streamed&&!event.details?.streamTime?{streamTime:streamed.streamTime,streamEnd:streamed.streamEnd||''}:{})};
   if(info.streamTime||info.streamEnd){
     const url=streamUrl(stream?info.streamUrl:state.communityStreamUrl)||'';
-    rows.push({key:clockMinutes(info.streamTime||info.streamEnd),cls:'is-stream',label:'📺 Stream',from:shortClock(info.streamTime),to:shortClock(info.streamEnd),
+    rows.push({key:clockMinutes(info.streamTime||info.streamEnd),cls:'is-stream',icon:'📺',label:'Stream',from:shortClock(info.streamTime),to:shortClock(info.streamEnd),
       link:url?`<span class="week-stream-link" role="link" tabindex="0" data-stream-url="${esc(url)}">▶ ${esc(streamPlatform(url))}</span>`:''});
   }
-  if(stream){if(info.raceTime)rows.push({key:clockMinutes(info.raceTime),label:'🏁 Course',from:shortClock(info.raceTime),to:''});}
+  if(stream){if(info.raceTime)rows.push({key:clockMinutes(info.raceTime),icon:'🏁',label:'Course',from:shortClock(info.raceTime),to:''});}
   else{
     const solo=isSolo(event),rounds=(event.rounds||[]).length,name=solo?(/training/i.test(String(kind.label))?'Training':'Course'):'Départ';
     starts.forEach((start,index)=>{
       const pending=start.departure.hideClock===true;
-      rows.push({key:pending?1e4+index:parisMinutes(start.startsAt),label:`🏁 ${starts.length>1?`${solo?'Course':'Départ'} ${index+1}`:solo?name:'Course'}`,
+      rows.push({key:pending?1e4+index:parisMinutes(start.startsAt),icon:'🏁',label:`${starts.length>1?`${solo?'Course':'Départ'} ${index+1}`:solo?name:'Course'}`,
         from:pending?'à définir':hour(start.startsAt),to:pending||!start.endsAt?'':hour(start.endsAt)});
     });
   }
-  if(!rows.length)return '';
+  if(!rows.length)return {plan:'',link:''};
   rows.sort((a,b)=>a.key-b.key);
-  return `<span class="week-block-plan">${rows.map(row=>`<span class="week-plan-row${row.cls?` ${row.cls}`:''}"><span>${esc(row.label)}</span><span class="week-plan-time"><b>${esc(row.from||'')}</b>${row.to?` <i aria-hidden="true">→</i> <b>${esc(row.to)}</b>`:''}</span>${row.link||''}</span>`).join('')}</span>`;
+  // The stream's link goes with the facts at the bottom, not between the times (Nathan 2026-11-02).
+  const link=rows.find(row=>row.link)?.link||'';
+  return {link,plan:`<span class="week-block-plan">${rows.map(row=>`<span class="week-plan-row${row.cls?` ${row.cls}`:''}"><span>${esc(row.icon)}<em> ${esc(row.label)}</em></span><span class="week-plan-time"><b>${esc(row.from||'')}</b>${row.to?` <i aria-hidden="true">→</i> <b>${esc(row.to)}</b>`:''}</span></span>`).join('')}</span>`};
 }
 // « dans 3 h », « dans 20 min », « en cours »: how long before the day's next start, on today's heading.
 function soonOf(items,now){
@@ -150,6 +152,7 @@ function block(item,now){
     :`<button type="button" class="${cls}" data-action="open" data-id="${event.id}" aria-label="${esc(label)}">`;
   // « LMU · Training », « iRacing · Endurance », « Stream »: above the name on a phone.
   const kindLine=[sim,solo?kind.label:'Endurance'].filter(Boolean).filter((text,index,list)=>list.findIndex(other=>String(other).toLowerCase()===String(text).toLowerCase())===index).join(' · ');
+  const plan=planOf(item);
   const meta=[count,weather&&`${weather==='Pluie'?'🌧':'☀️'} ${weather}`,past&&'Terminé'].filter(Boolean);
   const mark=logo?`<span class="week-block-logo">${logo}</span>`:badge?`<span class="week-badge">${esc(badge)}</span>`
     :length?`<span class="week-badge week-block-length">${esc(length)}<small>${esc(sim)}</small></span>`:'';
@@ -166,8 +169,8 @@ function block(item,now){
     ${circuit?`<span class="week-block-circuit">${circuit}</span>`:''}
     </span>
     ${solo?streamLine(event):''}
-    ${planOf(item)}
-    ${meta.length||situation||places?`<span class="week-block-facts">${meta.length?`<span class="week-block-meta">${meta.map(text=>`<span>${esc(text)}</span>`).join('')}</span>`:''}${situation}${places}</span>`:''}
+    ${plan.plan}
+    ${meta.length||situation||places||plan.link?`<span class="week-block-facts">${meta.length?`<span class="week-block-meta">${meta.map(text=>`<span>${esc(text)}</span>`).join('')}</span>`:''}${situation}${places}${plan.link}</span>`:''}
     </span>
   ${event.otherGame?'</a>':'</button>'}`;
 }
