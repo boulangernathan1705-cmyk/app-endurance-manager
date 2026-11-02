@@ -1,6 +1,7 @@
 import {esc, state, api, isAdmin} from './core.mjs';
 import {isGrindfest, streamersOf, gridfestPasswordValid} from '../../shared/grindfest.mjs';
 import {soloEntryList} from './solo.mjs';
+import {isTrainingType} from '../../shared/catalog.mjs';
 
 // The streamer's logo, or its initial on a coloured tile when it has none.
 export function streamerLogo(streamer, extra = '') {
@@ -39,8 +40,10 @@ export function syncStreamerFields(form) {
     else password.removeAttribute('pattern');
   }
   const addRound = form.querySelector('[data-add-round]');
-  if (addRound) addRound.hidden = form.querySelectorAll('.solo-round').length >= 4;
-  form.querySelectorAll('[name="roundCapacity"]').forEach(field => { field.disabled = active; if (active) field.value = ''; });
+  // A training has one circuit and no places (solo-form.mjs).
+  const training = isTrainingType(form.querySelector('[name="eventType"]:checked')?.value);
+  if (addRound) addRound.hidden = training || form.querySelectorAll('.solo-round').length >= 4;
+  form.querySelectorAll('[name="roundCapacity"]').forEach(field => { field.disabled = active || training; if (active) field.value = ''; });
 }
 export function streamerColumns(event, departure) {
   const streamers = streamersOf(event);

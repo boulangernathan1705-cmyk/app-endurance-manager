@@ -50,13 +50,15 @@ function eventBlock(event, url) {
   else if (circuits.length === 1) facts.push(['📍', circuits[0]]);
   const cars = [...new Set(rounds.map(round => [round.category, round.car].filter(Boolean).map(text).join(' · ')).filter(Boolean))];
   if (!event.rally && !random && cars.length === 1) facts.push(['🚗', cars[0]]);
-  facts.push(['🕑 Départ', event.timePending ? 'à confirmer' : hhmm(event.startsAt)]);
+  // A training: its window (« 20h–22h »), a moment to drop in rather than a start.
+  const length = rounds.reduce((sum, round) => sum + (Number(round.durationMinutes) || 0), 0);
+  facts.push(event.training && !event.timePending ? ['🕑 Entraînement', `${hhmm(event.startsAt)}–${hhmm(Number(event.startsAt) + length * 60000)}`] : ['🕑 Départ', event.timePending ? 'à confirmer' : hhmm(event.startsAt)]);
   if (type === 'Gridfest') facts.push(['🎙️', plural(event.streamers?.length || 0, 'streamer')]);
   else if (event.capacity) {
     const full = event.entered >= event.capacity, waiting = Math.max(0, event.entered - event.capacity);
     facts.push(['👥', `${Math.min(event.entered, event.capacity)} / ${event.capacity}`, waiting ? `· ${waiting} en attente` : '']);
     if (full) chips.push(['COMPLET', 'red']);
-  } else facts.push(['👥', String(event.entered || 0), event.entered > 1 ? 'inscrits' : 'inscrit']);
+  } else if (event.entered) facts.push(['👥', String(event.entered), event.entered > 1 ? 'inscrits' : 'inscrit']);
   // Rounds one after the other: each after the previous one's practice, qualifying and race.
   if (rounds.length > 1 && !event.rally) {
     let at = Number(event.startsAt);

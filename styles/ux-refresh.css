@@ -2787,3 +2787,7 @@ button.crews-lock:disabled { opacity: .6; cursor: progress; }
   .crews-pilot { grid-template-columns: minmax(0, 1fr); }
   .crews-add select { width: 100%; }
 }
+
+/* Creation forms: a part hidden by the form (training window, stream times, sessions of a training) stays hidden. */
+.solo-event-form [hidden] { display: none !important; }
+.stream-choice-link a { color: inherit; text-decoration: underline; font-weight: 700; }

@@ -23,6 +23,7 @@ export function renderStreamForm(event=null){
     <div class="stream-logo-upload"><div class="stream-logo-preview" data-stream-logo-preview></div><div><strong>Ton logo, ton identité</strong><p class="creation-help">Importe le visuel de ton choix. Il conserve ses proportions.</p><label class="secondary-button stream-logo-pick">Importer un logo<input type="file" name="streamLogoFile" accept="image/png,image/jpeg,image/webp" data-stream-logo-file></label><button type="button" class="link-button" data-stream-logo-remove>Retirer</button><small>PNG, JPG ou WebP · 5 Mo max</small></div></div>
     <input type="hidden" name="logoUrl" value="${esc(details.logoUrl)}"><p class="stream-logo-status" data-stream-logo-status role="status"></p>`)}
     ${step(2,`<div class="solo-form-row"><label class="form-label">Jour<input name="streamDate" type="date" value="${esc(departure.date||'')}" ${event?'':`min="${parisToday()}"`} required></label><label class="form-label">Début du stream<input name="streamTime" type="time" value="${esc(details.streamTime)}"></label><label class="form-label">Fin <small>(facultatif)</small><input name="streamEnd" type="time" value="${esc(details.streamEnd)}"></label></div>
+    <p class="creation-help" data-stream-duplicate hidden></p>
     <label class="sim-option stream-race-toggle"><input type="checkbox" name="streamRace" ${details.isRace?'checked':''}><span>🏁 Je diffuse une course</span></label>
     <div class="stream-race" ${details.isRace?'':'hidden'}><label class="form-label">Départ de la course<input name="raceTime" type="time" value="${esc(details.raceTime)}"></label></div>
     <p class="creation-help">Heures de Paris : indique l’heure du stream ou, pour une course, celle du départ.</p>
@@ -49,6 +50,9 @@ function updatePreview(form){
   const panel=form.querySelector('[data-stream-logo-preview]');
   panel.innerHTML=form.querySelector('.is-stream').innerHTML;
   form.querySelector('[data-stream-logo-remove]').hidden=!event.details.logoUrl;
+  // An event of that day already streamed (« En stream »): announcing it again would make two stream posters.
+  const twin=departure.date&&state.events.find(item=>item.format==='solo'&&!isStream(item)&&item.id!==state.editingEvent?.id&&item.details?.streamTime&&(item.departures||[]).some(start=>Number.isFinite(Number(start.startsAt))&&new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Paris'}).format(Number(start.startsAt))===departure.date));
+  const note=form.querySelector('[data-stream-duplicate]');note.hidden=!twin;note.textContent=twin?`« ${twin.name} » est déjà annoncé en stream ce jour-là.`:'';
 }
 function checkTimes(form){
   const time=form.elements.streamTime,missing=!time.value&&!(form.elements.streamRace.checked&&form.elements.raceTime.value);

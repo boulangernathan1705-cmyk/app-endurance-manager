@@ -9,7 +9,7 @@ import {posterModel, posterHtml, posterText, renderPoster} from './discord-poste
 import {discordRequest, botCategoryEmojis} from './recap-discord.mjs';
 import {discordAbsentButton} from './discord-interactions.mjs';
 import {parseLayout} from './discord-layout.mjs';
-import {simForEvent, tdzOnly, normalizeTdzEventType, eventLogoName} from '../shared/catalog.mjs';
+import {simForEvent, tdzOnly, normalizeTdzEventType, eventLogoName, isTrainingType} from '../shared/catalog.mjs';
 import {grindfestEnabled, isGrindfest, streamersOf} from '../shared/grindfest.mjs';
 import {isDevelopment} from './dev-environment.mjs';
 import {isStream, streamDetails} from '../shared/stream.mjs';
@@ -57,12 +57,12 @@ export function parisDayStart(timestamp) {
 // The day's races of a community, in the order of their first start today: [{item, kind:'event'|'race', startsAt}].
 export async function announceItems(env, community, timestamp) {
   const day = parisDay(timestamp), items = [];
-  const solo = (await env.DB.prepare(`SELECT id,sim,departures,schedule_pending FROM events WHERE ${SOLO_SQL(env, community)}`).bind(community.id).all()).results || [];
+  const solo = (await env.DB.prepare(`SELECT id,sim,departures,schedule_pending,details FROM events WHERE ${SOLO_SQL(env, community)}`).bind(community.id).all()).results || [];
   const registrations = (await env.DB.prepare(`SELECT event_id,departure_id FROM registrations
     WHERE community_id=? AND COALESCE(status,'')<>'unavailable' GROUP BY event_id,departure_id`).bind(community.id).all()).results || [];
   for (const row of solo) {
     const starts = parse(row.departures, []).filter(start => today(start, day)
-      && (isStream(row) || registrations.some(entry => entry.event_id === row.id && entry.departure_id === start.id)));
+      && (isStream(row) || announcedEmpty(row) || registrations.some(entry => entry.event_id === row.id && entry.departure_id === start.id)));
     // A stream (« Annoncer un stream ») has its own card, without « Présent » nor « Absent ».
     if (starts.length) items.push({item:row.id, kind:isStream(row) ? 'stream' : 'event', startsAt:Math.min(...starts.map(start => Number(start.startsAt)))});
   }
@@ -76,6 +76,8 @@ export async function announceItems(env, community, timestamp) {
   return items.sort((a, b) => a.startsAt - b.startsAt || a.item.localeCompare(b.item));
 }
 
+// A streamed event or a training is announced even before its first entry: people need to know (Nathan 2026-11-02).
+const announcedEmpty = row => { const details = parse(row.details, {}) || {}; return Boolean(details.streamTime) || isTrainingType(details.type); };
 // An event of the calendar as announced: its rounds, its places and this community's entries for today's start.
 async function eventSnapshot(env, community, id, timestamp) {
   const row = await env.DB.prepare(`SELECT id,name,sim,circuit,rounds,capacity,access,details,departures,schedule_pending,created_by FROM events WHERE id=? AND ${SOLO_SQL(env, community)}`)
@@ -85,17 +87,17 @@ async function eventSnapshot(env, community, id, timestamp) {
   const entries = isStream(row) ? [] : (await env.DB.prepare(`SELECT departure_id,streamer_id,COUNT(DISTINCT COALESCE(participant_id,id)) AS entered FROM registrations
     WHERE event_id=? AND community_id=? AND COALESCE(status,'')<>'unavailable' GROUP BY departure_id,streamer_id`).bind(row.id, community.id).all()).results || [];
   const start = parse(row.departures, []).find(item => today(item, day)
-    && (isStream(row) || entries.some(entry => entry.departure_id === item.id)));
+    && (isStream(row) || announcedEmpty(row) || entries.some(entry => entry.departure_id === item.id)));
   if (!start) return null;
   const details = parse(row.details, {}) || {}, sim = simForEvent(row), tdz = tdzOnly(community, isDevelopment(env));
   if (isStream(row)) return {id:row.id, name:row.name, startsAt:Number(start.startsAt), stream:{...streamDetails({details}), crew:await streamCrew(env, community.id, row)}};
   const startEntries = entries.filter(entry => entry.departure_id === start.id);
   const entered = startEntries.reduce((total, item) => total + Number(item.entered || 0), 0);
-  if (!entered) return null;
+  if (!entered && !announcedEmpty(row)) return null;
   const gridfest = isGrindfest(row), site = siteOf(env, community).url || '';
   return {id:row.id, name:row.name, sim, type:normalizeTdzEventType(details.type) || '', access:tdz ? row.access || 'open' : '', tdz, note:details.note || '',
     startsAt:Number(start.startsAt), timePending:Boolean(row.schedule_pending) || start.tbd === true,
-    rounds:parse(row.rounds, []), capacity:row.capacity == null ? null : Number(row.capacity), entered,
+    training:isTrainingType(details.type), rounds:parse(row.rounds, []), capacity:row.capacity == null ? null : Number(row.capacity), entered,
     streamers:gridfest ? streamersOf(row).map(streamer => ({name:streamer.name, twitchUrl:streamer.twitchUrl, logoUrl:streamer.logoUrl || '', capacity:streamer.capacity, entered:Number(startEntries.find(item => item.streamer_id === streamer.id)?.entered || 0)})) : [],
     rally:sim === 'acrally' ? {stages:details.rallyStages || [], host:details.rallyHost || '', carMode:details.rallyCarMode || '', minutes:details.rallyEstimatedMinutes || 0} : null,
     // The password itself never goes on Discord.
