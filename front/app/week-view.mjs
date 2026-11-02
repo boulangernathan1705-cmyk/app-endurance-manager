@@ -6,7 +6,7 @@
 import {app,state,esc,button,notifyRender,activeGame,api,coversHour,can} from './core.mjs';
 import {gameForEvent} from '../../shared/catalog.mjs';
 import {isSolo,eventAccessLogo,soloCardMeta} from './solo.mjs';
-import {isStream} from '../../shared/stream.mjs';
+import {isStream,streamDetails,streamSpan,streamPlatform,streamUrl} from '../../shared/stream.mjs';
 import {isGrindfest} from '../../shared/grindfest.mjs';
 import {simForEvent,SIMS,simCatalog} from '../../shared/catalog.mjs';
 import {parisDay,weekStart,weekDays} from '../week-days.mjs';
@@ -68,6 +68,19 @@ const myReg=departure=>(departure.availability||[]).find(reg=>reg.mine&&reg.stat
 // The event's logo (OPEN or SAFE of its simulator, Gridfest), as on its card.
 const logoOf=event=>isGrindfest(event)?'<img class="event-access-logo" src="/images/event-access/gridfest-stacked.png" alt="Gridfest" width="308" height="320" loading="lazy" decoding="async">':eventAccessLogo(event);
 
+// When the stream is live, in small, with its link (Nathan 2026-11-02): « 📺 19h45–23h · ▶ Twitch ». A stream has its own
+// link; an event the community streams (« Début du stream ») takes the community's stream link. The card is a button: the
+// link is a span that opens the stream in a new tab without opening the race.
+function streamLine(event){
+  const stream=isStream(event),info=stream?streamDetails(event):event.details||{};
+  const span=streamSpan(info.streamTime,info.streamEnd);
+  if(!span)return '';
+  const url=streamUrl(stream?info.streamUrl:state.communityStreamUrl)||'';
+  const race=stream&&info.raceTime?` · 🏁 ${streamSpan(info.raceTime)}`:'';
+  const link=url?`<span class="week-stream-link" role="link" tabindex="0" data-stream-url="${esc(url)}">▶ ${esc(streamPlatform(url))}</span>`:'';
+  return `<span class="week-block-stream"><span>📺 ${esc(span)}${esc(race)}</span>${link}</span>`;
+}
+
 function block(item,now){
   const {event,departure,startsAt,endsAt,kind,mine,pilots,pending,starts}=item;
   const past=(endsAt||startsAt)<now,solo=isSolo(event),stream=isStream(event);
@@ -110,15 +123,43 @@ function block(item,now){
     ${live?'<span class="week-chip is-live">● En cours</span>':''}
     <span class="week-block-name">${esc(event.name)}</span>
     ${circuit?`<span class="week-block-circuit">${circuit}</span>`:''}
+    ${solo?streamLine(event):''}
     ${meta.length?`<span class="week-block-meta">${meta.map(text=>`<span>${esc(text)}</span>`).join('')}</span>`:''}
     ${situation}${places}
     </span>
   ${event.otherGame?'</a>':'</button>'}`;
 }
 
+if(typeof document!=='undefined'){
+  const openStream=event=>{
+    const link=event.target.closest?.('[data-stream-url]');if(!link)return;
+    if(event.type==='keydown'&&event.key!=='Enter'&&event.key!==' ')return;
+    event.preventDefault();event.stopPropagation();
+    window.open(link.dataset.streamUrl,'_blank','noopener,noreferrer');
+  };
+  document.addEventListener('click',openStream,true);
+  document.addEventListener('keydown',openStream,true);
+}
+
 const FILTERS=[['all','Tout'],['lmu','Endurance LMU'],['iracing','Endurance iRacing'],['event','Events'],['mine','Mes courses']];
 const simOf=event=>event.otherGame||activeGame;
-const keep=(item,filter)=>filter==='all'||(filter==='mine'?item.mine:filter==='event'?item.kind.key!=='endurance':item.kind.key==='endurance'&&simOf(item.event)===filter);
+// Several filters at once (Nathan 2026-11-02): the kinds ticked add up (« Events » + « Endurance LMU »), « Mes courses »
+// keeps only the pilot's own among them; none ticked = « Tout ». The choice is kept in this browser.
+const FILTERS_KEY='em_week_filters';
+const kindKey=item=>item.kind.key==='endurance'?simOf(item.event):'event';
+const keep=(item,chosen)=>(!chosen.has('mine')||item.mine)&&(![...chosen].some(key=>key!=='mine')||chosen.has(kindKey(item)));
+export function weekFilters(){
+  if(!(state.weekFilters instanceof Set)){
+    let saved=[];try{saved=JSON.parse(localStorage.getItem(FILTERS_KEY)||'[]');}catch{}
+    state.weekFilters=new Set((Array.isArray(saved)?saved:[]).filter(key=>FILTERS.some(([known])=>known===key&&key!=='all')));
+  }
+  return state.weekFilters;
+}
+export function toggleWeekFilter(key){
+  const chosen=weekFilters();
+  if(key==='all')chosen.clear();else if(chosen.has(key))chosen.delete(key);else chosen.add(key);
+  try{localStorage.setItem(FILTERS_KEY,JSON.stringify([...chosen]));}catch{}
+}
 
 const SIM_NAME={lmu:'LMU',iracing:'iRacing'};
 const dateShort=new Intl.DateTimeFormat('fr-FR',{timeZone:'Europe/Paris',weekday:'short',day:'numeric',month:'short'});
@@ -179,13 +220,13 @@ function crewsBox(){
 export function renderWeek(){
   if(state.access!=='member'){state.page='home';return;}
   state.page='week';state.currentEventId=null;
-  const offset=Number(state.weekOffset)||0,filter=state.weekFilter||'all',now=Date.now();
+  const offset=Number(state.weekOffset)||0,chosen=new Set([...weekFilters()].filter(key=>key!=='event'||state.soloRaces)),now=Date.now();
   const all=[...state.events,...otherEndurances()];
   const monday=weekStart(now,offset),today=parisDay(now);
-  const days=weekStarts(all,monday).map(day=>({...day,items:day.items.filter(item=>keep(item,filter))}));
+  const days=weekStarts(all,monday).map(day=>({...day,items:day.items.filter(item=>keep(item,chosen))}));
   const range=`du ${monthDay.format(dateOf(monday))} au ${monthDay.format(dateOf(monday+6))}`;
   const filters=FILTERS.filter(([key])=>key!=='event'||state.soloRaces)
-    .map(([key,label])=>button('week-filter',`${key==='all'?'':'<i aria-hidden="true"></i>'}${label}`,`data-filter="${key}" aria-pressed="${filter===key}"`,`event-filter-button week-filter is-${key}`)).join('');
+    .map(([key,label])=>button('week-filter',`${key==='all'?'':'<i aria-hidden="true"></i>'}${label}`,`data-filter="${key}" aria-pressed="${key==='all'?!chosen.size:chosen.has(key)}"`,`event-filter-button week-filter is-${key}`)).join('');
   // Finished races fold into one line per day, opened with a click; busy days get more width, empty days less, so the
   // week stays short (Nathan 2026-11-01, options C + A).
   const open=state.weekOpenDays||(state.weekOpenDays=new Set());

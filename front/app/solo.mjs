@@ -2,9 +2,9 @@
 // OPEN / SAFE access. They reuse the race cards, the race page and the registration window; this module
 // only holds what differs from endurance events.
 import {state,esc,pilotNameTip,button,canManage,can,logo,badge,categories} from './core.mjs';
-import {SIMS,simCatalog,simForEvent} from '../../shared/catalog.mjs';
+import {SIMS,simCatalog,simForEvent,eventLogoName} from '../../shared/catalog.mjs';
 import {isGrindfest} from '../../shared/grindfest.mjs';
-import {isStream,streamDetails,hourLabel,streamPlatform} from '../../shared/stream.mjs';
+import {isStream,streamDetails,hourLabel,streamPlatform,streamSpan} from '../../shared/stream.mjs';
 
 export const ANY_CATEGORY = '*';
 export const isSolo = event => event?.format === 'solo';
@@ -14,7 +14,8 @@ export function eventAccessLogo(event,{header=false}={}) {
   if ((!state.eventTdz&&!header) || !isSolo(event) || isGrindfest(event) || isStream(event)) return '';
   const sim = SIMS.find(item => item.id === simForEvent(event));
   const access = event.access === 'safe' ? 'safe' : 'open';
-  return `<img class="event-access-logo" src="/images/event-access/${access}-${sim.id}.png" alt="${access.toUpperCase()} · ${esc(sim.name)}" width="300" height="300" loading="lazy" decoding="async">`;
+  const name = eventLogoName({sim:sim.id, access, type:event.details?.type});
+  return `<img class="event-access-logo" src="/images/event-access/${name}.png" alt="${name.startsWith('training') ? 'TRAINING' : access.toUpperCase()} · ${esc(sim.name)}" width="300" height="300" loading="lazy" decoding="async">`;
 }
 
 export function simBadge(event) {
@@ -36,8 +37,8 @@ export function accessBadge(event) {
 // races it, its uploaded logo (or initials/microphone), and on its page the links to the stream and to the
 // endurances.
 export function streamTimes(event) {
-  const {streamTime, raceTime} = streamDetails(event);
-  return [streamTime && `Stream ${hourLabel(streamTime)}`, raceTime && `Départ ${hourLabel(raceTime)}`].filter(Boolean).join(' · ');
+  const {streamTime, streamEnd, raceTime} = streamDetails(event);
+  return [(streamTime || streamEnd) && `Stream ${streamSpan(streamTime, streamEnd)}`, raceTime && `Départ ${hourLabel(raceTime)}`].filter(Boolean).join(' · ');
 }
 export function streamCrewLine(event) {
   const crew = event.streamCrew;

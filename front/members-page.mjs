@@ -33,17 +33,19 @@ const PERMISSION_HELP = {access:'Accéder au site de la communauté. Sans cette 
 const initials = name => esc(String(name || '?').trim().slice(0, 2).toLocaleUpperCase('fr-FR'));
 function memberCard(member, allPermissions) {
   const search = esc(`${member.name} ${member.nickname} ${member.id} ${member.roles.map(role => role.name).join(' ')}`.toLocaleLowerCase('fr-FR'));
-  const badge = member.manager ? '<span class="member-badge">Gestionnaire</span>'
-    : member.discordAdmin ? '<span class="member-badge">Admin Discord</span>' : '';
-  const roles = member.roles.length ? member.roles.map(role => `<span class="members-discord-role">${esc(role.name)}</span>`).join('') : '<span class="members-discord-role is-empty">Aucun rôle</span>';
+  const badge = member.manager ? '<span class="crews-chip is-ask">Gestionnaire</span>'
+    : member.discordAdmin ? '<span class="crews-chip is-ask">Admin Discord</span>' : '';
+  const roles = member.roles.length ? member.roles.map(role => `<span class="adm-role-pill">${esc(role.name)}</span>`).join('') : '<span class="adm-role-pill is-empty">Aucun rôle</span>';
   const allowed = allPermissions.filter(permission => member.permissions.includes(permission));
-  const rights = allowed.length === allPermissions.length && allowed.length ? '<span class="member-right is-all">Toutes les autorisations</span>'
-    : allowed.map(permission => `<span class="member-right">${esc(PERMISSION_LABELS[permission] || permission)}</span>`).join('') || '<span class="member-right is-none">Aucune autorisation</span>';
-  return `<article class="members-row member-card" data-search="${search}">
-    <div class="member-head"><span class="member-avatar" aria-hidden="true">${initials(member.nickname || member.name)}</span>
-      <div class="members-identity"><strong>${esc(member.nickname || member.name)}</strong><small>${member.nickname ? `${esc(member.name)} · ` : ''}${esc(member.id)}</small></div>${badge}</div>
-    <div class="members-discord-roles">${roles}</div>
-    <div class="member-rights">${rights}</div>
+  const access = member.permissions.includes('access') || member.permissions.includes('admin');
+  const rights = !access ? '<span class="adm-rights is-none">Pas d’accès au site</span>'
+    : allowed.length === allPermissions.length && allowed.length ? '<span class="adm-rights">Tout</span>'
+    : `<span class="adm-rights">${allowed.filter(permission => permission !== 'access').map(permission => esc(PERMISSION_LABELS[permission] || permission)).join(' · ') || 'Voir les courses'}</span>`;
+  const group = !access ? 'none' : member.permissions.includes('admin') ? 'admin' : 'access';
+  return `<article class="members-row adm-member" data-search="${search}" data-group="${group}">
+    <span class="adm-avatar" aria-hidden="true">${initials(member.nickname || member.name)}</span>
+    <div class="adm-member-name"><strong>${esc(member.nickname || member.name)}</strong>${member.nickname && member.nickname !== member.name ? `<small>${esc(member.name)}</small>` : ''}</div>
+    <div class="adm-member-roles">${roles}</div>${rights}${badge}
   </article>`;
 }
 
@@ -75,81 +77,108 @@ function moduleStates(settings, setup) {
     iracingImport:settings.modules.iracingImport === true, soloRaces:settings.modules.soloRaces === true, grindfest:settings.modules.grindfest === true, categoryEntry:settings.modules.categoryEntry === true, combos:settings.modules.combos === true};
 }
 
-// « Vue d'ensemble ».
+// A ⓘ that explains in a bubble (front/tooltip.mjs).
+const tip = text => `<span class="tip-info" data-tip="${esc(text)}" tabindex="0" role="note" aria-label="${esc(text)}">ⓘ</span>`;
+// One line of a list: a coloured stripe for its state, a title, a short line, an action on the right.
+const row = (tone, title, sub = '', action = '') => `<li class="adm-row is-${tone}"><span><strong>${title}</strong>${sub ? `<small>${sub}</small>` : ''}</span>${action}</li>`;
+const goTo = (tab, label, extra = '') => `<button type="button" class="secondary-button" data-go-tab="${tab}" ${extra}>${label}</button>`;
+const MODE_NAMES = {events:'Catégorie du bot', general:'Dans tes salons'};
+
+// « Vue d'ensemble »: what needs fixing (only that), then the server and how to bring the members, as the home page.
 function overviewMarkup(setup, settings, members) {
-  const guild = setup.guild || {}, crews = settings.crews || {};
-  const server = guild.name ? `« ${esc(guild.name)} »` : 'de la communauté';
-  const states = moduleStates(settings, setup), active = Object.values(states).filter(Boolean).length;
-  const recapDone = states.discord, voices = settings.modules.crewChannels === true;
-  const tile = (label, value, sub, tone = '') => `<div class="admin-tile"><span class="admin-tile-label">${label}</span><strong class="admin-tile-value ${tone}">${value}</strong><span class="admin-tile-sub">${sub}</span></div>`;
-  const tiles = `<div class="admin-tiles">
-    ${tile('Serveur Discord', !guild.id ? '<i class="admin-dot is-bad"></i>Aucun' : guild.botPresent ? '<i class="admin-dot is-ok"></i>Relié' : '<i class="admin-dot is-bad"></i>Bot absent', guild.botPresent ? `Bot présent sur ${server}` : 'Personne ne peut entrer sur le site', 'is-small')}
-    ${tile('Membres connectés', members.length, 'Membres du serveur venus sur le site')}
-    ${tile('Modules actifs', `${active} / ${Object.keys(states).length}`, Object.entries(states).filter(([, on]) => !on).length ? 'Le reste est dans Modules' : 'Tout est allumé')}</div>`;
-  // Getting started: the four steps, then the announcement once they are done.
-  const steps = [
-    {done:Boolean(guild.botPresent), title:'Inviter le bot sur ton serveur Discord', action:!guild.id ? '<small>Demande à un gestionnaire de relier ton serveur.</small>'
-      : `${setup.botInviteUrl ? `<a class="primary-button" href="${esc(setup.botInviteUrl)}" target="_blank" rel="noopener">Inviter le bot</a>` : ''}<button type="button" class="secondary-button" data-setup-refresh>Vérifier</button>`},
-    {done:Boolean(setup.rolesConfigured), title:'Choisir ce que chaque rôle peut faire', action:'<button type="button" class="secondary-button" data-go-tab="people" data-go-view="roles">Ouvrir les rôles</button>'},
-    {done:recapDone, title:'Afficher les courses sur Discord', action:'<button type="button" class="secondary-button" data-go-tab="modules" data-go-module="discord">Régler Discord</button>'},
-    {done:Boolean(setup.discordInviteUrl), title:'Ajouter le lien d’invitation de ton serveur', action:`<form class="admin-inline-form" data-invite><input name="invite" type="url" placeholder="https://discord.gg/…" aria-label="Lien d’invitation Discord" value="${esc(setup.discordInviteUrl || '')}"><button class="primary-button" type="submit">Ajouter</button><span class="settings-status" aria-live="polite"></span></form>`}];
-  const left = steps.filter(item => !item.done).length;
+  const guild = setup.guild || {}, crews = settings.crews || {}, recap = setup.botRecap;
+  const voices = settings.modules.crewChannels === true;
+  const problems = [];
+  if (!guild.id) problems.push(row('bad', 'Aucun serveur Discord relié', 'Demande à un gestionnaire d’Endurance Manager de relier ton serveur.'));
+  else if (!guild.botPresent) problems.push(row('bad', 'Le bot n’est pas sur ton serveur Discord', 'Personne ne peut entrer sur le site tant qu’il n’y est pas.',
+    `<span class="adm-actions">${setup.botInviteUrl ? `<a class="primary-button" href="${esc(setup.botInviteUrl)}" target="_blank" rel="noopener">Inviter le bot</a>` : ''}<button type="button" class="secondary-button" data-setup-refresh>Vérifier</button></span>`));
+  if (!setup.rolesConfigured) problems.push(row('warn', 'Aucun rôle n’ouvre le site', 'Choisis quels rôles Discord peuvent entrer sur le site.', goTo('roles', 'Ouvrir les rôles')));
+  if (recap?.lastError) problems.push(row('bad', 'Discord : publication en erreur', esc(recap.lastError), goTo('discord', 'Voir')));
+  else if (setup.recapSetupRequired) problems.push(row('warn', 'Discord attend son réglage', 'Choisis comment le bot affiche tes courses sur ton serveur.', goTo('discord', 'Régler Discord')));
+  if (voices && crews.botReady !== true) problems.push(row('warn', 'Vocaux d’équipage : le bot n’a pas ses droits', 'Il ne peut pas créer les salons vocaux.', goTo('discord', 'Voir')));
+  else if (voices && crews.lastError) problems.push(row('warn', 'Vocaux d’équipage en échec', esc(crews.lastError), goTo('discord', 'Voir')));
+  const states = moduleStates(settings, setup);
+  const on = MODULE_NAMES.filter(([key]) => states[key]).map(([, name]) => name);
   const message = `🏁 Nos courses d’endurance s’organisent maintenant sur Endurance Manager !\n👉 ${setup.siteUrl}/\n\nConnecte-toi avec ton compte Discord : tu y retrouves les courses LMU et iRacing, tu t’inscris avec tes disponibilités et tu crées ou rejoins un équipage.`;
-  const announce = `<div class="admin-announce"><p>Partage l’adresse du site sur ton Discord et épingle le message dans ton salon d’annonces.</p>
-    <div class="setup-inline"><input readonly id="setup-site-url" value="${esc(setup.siteUrl)}/" aria-label="Adresse du site">${copyButton('setup-site-url')}</div>
-    <label class="setup-message">Message prêt à poster<textarea id="setup-announce" rows="4" readonly>${esc(message)}</textarea></label>
-    <div class="setup-actions">${copyButton('setup-announce')}</div></div>`;
-  const start = `<section class="admin-card"><div class="admin-card-head"><h2>${left ? 'Démarrage de la communauté' : 'Annoncer le site'}</h2>${left ? `<span class="admin-muted">${4 - left} étape${4 - left > 1 ? 's' : ''} sur 4</span>` : ''}</div>
-    ${left ? `<div class="admin-progress" role="progressbar" aria-valuemin="0" aria-valuemax="4" aria-valuenow="${4 - left}"><i style="width:${(4 - left) * 25}%"></i></div>
-    <ol class="admin-steps">${steps.map((item, index) => `<li class="${item.done ? 'is-done' : ''}"><span class="admin-step-check" aria-hidden="true">${item.done ? '✓' : index + 1}</span><span class="admin-step-title">${item.title}</span>${item.done ? '' : `<span class="admin-step-action">${item.action}</span>`}</li>`).join('')}</ol>
-    <details class="admin-later"><summary>Message pour annoncer le site</summary>${announce}</details>` : announce}</section>`;
-  // What needs a look: problems first, then what works.
-  const alerts = [];
-  if (guild.id && !guild.botPresent) alerts.push(['bad', 'Le bot n’est pas sur ton serveur Discord : personne ne peut entrer sur le site.', '']);
-  if (voices && crews.botReady !== true) alerts.push(['warn', 'Vocaux d’équipage : le bot n’a pas les droits pour créer les salons.', '<button type="button" class="link-button" data-go-tab="modules" data-go-module="discord">Régler</button>']);
-  else if (voices && crews.lastError) alerts.push(['warn', `Vocaux d’équipage : ${esc(crews.lastError)}`, '<button type="button" class="link-button" data-go-tab="modules" data-go-module="discord">Voir</button>']);
-  if (setup.recapSetupRequired) alerts.push(['warn', 'Discord attend son réglage : choisis où le bot publie les courses.', '<button type="button" class="link-button" data-go-tab="modules" data-go-module="discord">Régler</button>']);
-  if (setup.botRecap?.lastError) alerts.push(['warn', esc(setup.botRecap.lastError), '<button type="button" class="link-button" data-go-tab="modules" data-go-module="discord">Voir</button>']);
-  if (states.iracingImport) alerts.push(['ok', 'Endurances iRacing officielles importées automatiquement.', '']);
-  if (!alerts.some(([tone]) => tone !== 'ok')) alerts.unshift(['ok', 'Rien à signaler : tout fonctionne.', '']);
-  const watch = `<section class="admin-card"><div class="admin-card-head"><h2>À surveiller</h2></div><ul class="admin-alerts">${alerts.map(([tone, text, action]) => `<li class="is-${tone}"><span>${text}</span>${action}</li>`).join('')}</ul></section>`;
-  // « À traiter »: filled once the races are read (fillTodo).
-  const todo = `<section class="admin-card admin-todo" data-admin-todo><div class="admin-card-head"><h2>À traiter</h2><span class="admin-muted">Endurances des 14 prochains jours</span></div><p class="admin-muted">Chargement…</p></section>`;
-  return {todo:left, html:`<div class="admin-head"><h2>Vue d’ensemble</h2><p>Ce qui marche, ce qui reste à faire et ce qui demande ton attention.</p></div>${tiles}${todo}<div class="admin-columns">${start}${watch}</div>`};
+  const server = `<aside class="home-next-box adm-server">
+      <h3 class="home-next-label">Ton serveur Discord</h3>
+      <p class="home-next-name">${esc(guild.name || 'Aucun serveur')}</p>
+      <p class="home-next-when ${guild.botPresent ? 'is-ok' : 'is-bad'}">${!guild.id ? 'Pas encore relié' : guild.botPresent ? '✓ Bot présent' : 'Bot absent'}</p>
+      <dl class="home-next-rows">
+        <div><dt>Membres venus sur le site</dt><dd>${members.length}</dd></div>
+        <div><dt>Discord</dt><dd>${recap?.enabled ? esc(MODE_NAMES[recap.mode] || 'Actif') : 'Éteint'}</dd></div>
+        <div><dt>Modules</dt><dd>${on.length ? esc(on.join(', ')) : 'Aucun'}</dd></div>
+      </dl>
+      <button type="button" class="home-next-go" data-go-tab="discord">Régler Discord →</button>
+    </aside>`;
+  const invite = `<section class="home-crews-box adm-invite">
+      <h3 class="home-next-label">Faire venir tes membres ${tip('Partage l’adresse du site sur ton Discord et épingle le message dans ton salon d’annonces. Le lien d’invitation est montré aux visiteurs qui ne sont pas encore sur ton serveur.')}</h3>
+      <div class="setup-inline"><input readonly id="setup-site-url" value="${esc(setup.siteUrl)}/" aria-label="Adresse du site">${copyButton('setup-site-url')}</div>
+      <textarea id="setup-announce" class="adm-hidden-copy" readonly aria-hidden="true" tabindex="-1">${esc(message)}</textarea>
+      <form class="admin-inline-form" data-invite><input name="invite" type="url" placeholder="Invitation : https://discord.gg/…" aria-label="Lien d’invitation de ton serveur Discord" value="${esc(setup.discordInviteUrl || '')}"><button class="secondary-button" type="submit">${setup.discordInviteUrl ? 'Modifier' : 'Ajouter'}</button><span class="settings-status" aria-live="polite"></span></form>
+      <button type="button" class="home-next-go" data-copy="setup-announce">Copier le message d’annonce</button>
+    </section>`;
+  const list = `<section class="adm-block" aria-labelledby="adm-todo-title">
+      <h2 class="adm-label" id="adm-todo-title">À régler <span data-todo-count>${problems.length ? `· ${problems.length}` : ''}</span></h2>
+      <ul class="adm-rows" data-admin-todo data-problems="${problems.length}">${problems.join('') || row('ok', 'Tout fonctionne', 'Rien à régler pour le moment.')}</ul>
+      <p class="adm-foot"><a href="/diagnostics.html">Erreurs techniques du site</a> ${tip('Les erreurs remontées par les navigateurs des membres ces 14 derniers jours. Utile pour signaler un bug.')}</p>
+    </section>`;
+  return {todo:problems.length, html:`<p class="adm-intro">Ce qui demande ton attention. Quand tout va bien, il n’y a rien à faire ici.</p>
+    <div class="adm-overview"><div class="adm-main-col">${list}</div><div class="adm-side">${server}${invite}</div></div>`};
 }
 
-// « Membres et rôles »: the members, or the table of the roles.
-function peopleMarkup(result, settings) {
-  const members = Array.isArray(result.members) ? result.members : [];
-  const server = result.community?.discordServer ? ` « ${esc(result.community.discordServer)} »` : '';
+// « Rôles »: one card per Discord role, what it allows on the site in chips (checkboxes saved at once).
+function rolesMarkup(settings) {
   // The solo races permissions only matter with the solo races module, the fiches combo one with its module.
   const shown = settings.permissions.filter(permission => ((settings.modules.soloRaces && settings.modules.eventTdzAvailable) || !permission.startsWith('solo_'))
     && (permission !== 'combos' || settings.modules.combos));
-  const legend = `<details class="role-legend-wrap"><summary>Que permet chaque autorisation ?</summary><dl class="role-legend">${shown.map(permission => `<div><dt>${esc(PERMISSION_LABELS[permission])}</dt><dd>${esc(PERMISSION_HELP[permission])}</dd></div>`).join('')}</dl></details>`;
-  const row = item => `<tr data-role="${esc(item.id)}" data-kept="${esc(JSON.stringify(item.permissions.filter(permission => !shown.includes(permission))))}">
-    <th scope="row"><strong>${esc(item.name)}</strong>${item.administrator ? '<small>Admin Discord : tout</small>' : ''}<span class="settings-status" aria-live="polite"></span></th>
-    ${shown.map(permission => `<td><label class="admin-tick"><input type="checkbox" data-permission="${permission}" aria-label="${esc(item.name)} : ${esc(PERMISSION_LABELS[permission] || permission)}" ${item.permissions.includes(permission) || item.administrator ? 'checked' : ''} ${item.administrator ? 'disabled' : ''}><span aria-hidden="true"></span></label></td>`).join('')}</tr>`;
-  const roles = settings.roles.length
-    ? `<div class="admin-matrix-wrap"><table class="admin-matrix"><thead><tr><th scope="col">Rôle Discord</th>${shown.map(permission => `<th scope="col" title="${esc(PERMISSION_HELP[permission])}">${esc(PERMISSION_LABELS[permission] || permission)}</th>`).join('')}</tr></thead><tbody>${settings.roles.map(row).join('')}</tbody></table></div>`
-    : '<p class="members-help">Les rôles du serveur Discord ne peuvent pas être lus : vérifie que le bot est bien sur le serveur.</p>';
-  return `<div class="admin-head admin-head-row"><div><h2>Membres et rôles</h2><p>Les membres venus sur le site, et ce que chaque rôle Discord leur permet.</p></div>
-      <div class="admin-seg" role="group" aria-label="Affichage"><button type="button" data-view="members" aria-pressed="true">Membres <span>${members.length}</span></button><button type="button" data-view="roles" aria-pressed="false">Rôles</button></div></div>
-    <div data-view-pane="members" class="admin-stack">
-      <div class="members-toolbar"><label class="members-search"><span class="sr-only">Rechercher un membre</span><input type="search" name="memberSearch" placeholder="Rechercher un pilote ou un rôle…" autocomplete="off"></label><button type="button" class="secondary-button" data-members-refresh data-tip="Relit tout de suite sur Discord les rôles de chaque membre et le nom des rôles. Sinon, c’est fait chaque jour.">Actualiser depuis Discord</button></div>
-      <p class="members-help">Les membres du serveur Discord${server} qui se sont connectés au site. Leurs rôles se donnent sur Discord.</p>
-      <div class="members-list member-grid">${members.map(member => memberCard(member, (result.permissions || []).filter(permission => permission !== 'combos' || settings.modules.combos))).join('')}</div>
-      <p class="members-empty" hidden>Aucun membre ne correspond à cette recherche.</p></div>
-    <div data-view-pane="roles" class="admin-stack" hidden>
-      <p class="members-help">Coche « Accès Endurance Manager » sur les rôles qui peuvent entrer (sur « @everyone », tout le serveur entre), puis ce que chacun peut faire. Le propriétaire du serveur et les admins Discord ont tout. Chaque case s’enregistre aussitôt.</p>
-      ${roles}${legend}</div>`;
+  // The site only looks at the roles listed here: those with at least one permission, and @everyone. The others
+  // (often dozens on a big server) wait in « Ajouter un rôle »; a role removed loses its permissions.
+  const everyone = item => item.name === '@everyone';
+  const admins = settings.roles.filter(item => item.administrator);
+  const others = settings.roles.filter(item => !item.administrator);
+  const followed = item => everyone(item) || item.permissions.length > 0;
+  const card = item => `<article class="adm-role" data-role="${esc(item.id)}" data-role-name="${esc(item.name)}" data-kept="${esc(JSON.stringify(item.permissions.filter(permission => !shown.includes(permission))))}" ${followed(item) ? '' : 'hidden'}>
+    <div class="adm-role-name"><strong>${esc(item.name)}</strong>${everyone(item) ? `<small>Tout le serveur ${tip('Ce que tout membre du serveur peut faire, même sans rôle.')}</small>` : ''}</div>
+    <div class="adm-perms">${shown.map(permission => `<label class="adm-perm"><input type="checkbox" data-permission="${permission}" aria-label="${esc(item.name)} : ${esc(PERMISSION_LABELS[permission] || permission)}" ${item.permissions.includes(permission) ? 'checked' : ''}><span>${esc(PERMISSION_SHORT[permission] || PERMISSION_LABELS[permission] || permission)}</span></label>`).join('')}</div>
+    <div class="adm-role-end"><span class="settings-status" aria-live="polite"></span>${everyone(item) ? '' : '<button type="button" class="adm-role-remove" data-role-remove>Retirer</button>'}</div>
+  </article>`;
+  const option = item => `<option value="${esc(item.id)}" ${followed(item) ? 'hidden disabled' : ''}>${esc(item.name)}</option>`;
+  const legend = `<dl class="adm-legend">${shown.map(permission => `<div><dt>${esc(PERMISSION_SHORT[permission] || PERMISSION_LABELS[permission])}</dt><dd>${esc(PERMISSION_HELP[permission])}</dd></div>`).join('')}</dl>`;
+  if (!settings.roles.length) return '<ul class="adm-rows">' + row('warn', 'Les rôles du serveur ne peuvent pas être lus', 'Vérifie que le bot est bien sur ton serveur Discord.') + '</ul>';
+  const sorted = [...others].sort((a, b) => a.name.localeCompare(b.name, 'fr'));
+  return `<p class="adm-intro">Le site ne regarde que les rôles listés ici. Coche ce que chacun permet : c’est enregistré tout de suite.</p>
+    <details class="adm-help"><summary>Que permet chaque autorisation ?</summary>${legend}<p>Les autorisations de plusieurs rôles s’additionnent. Les rôles se donnent sur Discord.</p></details>
+    <div class="adm-roles">${[...others.filter(everyone), ...sorted.filter(item => !everyone(item))].map(card).join('')}
+    <div class="adm-role-add"><label for="adm-role-add">+ Ajouter un rôle ${tip('Les rôles de ton serveur Discord que le site ne regarde pas encore.')}</label>
+      <select id="adm-role-add" data-role-add><option value="">Choisir un rôle du serveur…</option>${sorted.filter(item => !everyone(item)).map(option).join('')}</select>
+      <small data-role-left>${sorted.filter(item => !followed(item)).length} autres rôles sur le serveur</small></div></div>
+    ${admins.length ? `<p class="adm-admins">Ont déjà tout, car « Administrateur » sur Discord : <b>${admins.map(item => esc(item.name)).join(', ')}</b> ${tip('Le propriétaire du serveur et les rôles « Administrateur » sur Discord ont toutes les autorisations du site, sans rien cocher.')}</p>` : ''}`;
+}
+
+// « Membres »: the members of the server who came to the site, with what their roles allow.
+function membersMarkup(result, settings) {
+  const members = Array.isArray(result.members) ? result.members : [];
+  const permissions = result.permissions || [];
+  const count = group => members.filter(member => {
+    const access = member.permissions.includes('access') || member.permissions.includes('admin');
+    return group === 'none' ? !access : group === 'admin' ? member.permissions.includes('admin') : true;
+  }).length;
+  const chip = (group, label) => `<button type="button" class="event-filter-button crews-filter${group === 'all' ? ' is-on' : ''}" data-member-filter="${group}" aria-pressed="${group === 'all'}">${label} · ${count(group)}</button>`;
+  return `<p class="adm-intro">Les membres de ton serveur venus sur le site. Leurs rôles se donnent sur Discord ; ce qu’ils permettent se règle dans « Rôles ».</p>
+    <div class="adm-toolbar"><label class="members-search"><span class="sr-only">Rechercher un membre</span><input type="search" name="memberSearch" placeholder="Rechercher un pilote ou un rôle…" autocomplete="off"></label>
+      <button type="button" class="secondary-button" data-members-refresh data-tip="Relit tout de suite sur Discord les rôles de chaque membre. Sinon, c’est fait chaque jour.">Relire sur Discord</button></div>
+    <div class="event-filter crews-filters" role="group" aria-label="Filtrer les membres">${chip('all', 'Tous')}${chip('none', 'Sans accès')}${chip('admin', 'Admins')}</div>
+    <div class="members-list adm-members">${members.map(member => memberCard(member, permissions.filter(permission => permission !== 'combos' || settings.modules.combos))).join('')}</div>
+    <p class="members-empty adm-empty" hidden>Aucun membre ne correspond.</p>`;
 }
 
 // « Modules »: one tile each, its settings below it once opened.
 // « Discord »: the setting asked question by question (server/discord-layout.mjs): each answer shows the questions it
 // needs; on a phone, one question per screen, the server's sketch last.
 const DISCORD_MODES = {
-  events:['Un fil par course', 'Chaque course a son fil dans # endurances-de-la-semaine, les vocaux de ses équipages juste en dessous.'],
-  general:['Récap de la semaine + pit talk', 'Un fil par course dans # endurances-de-la-semaine, les vocaux d’équipage dans « Pit talk ».']};
+  events:['Catégorie du bot', 'Le bot crée sa propre catégorie et y range tout : les courses de la semaine (un fil par course), puis les vocaux d’équipage juste en dessous.'],
+  general:['Dans tes salons', 'Tu choisis le salon où le bot écrit les courses de la semaine (un fil par course) et la catégorie où vont les vocaux d’équipage.']};
 // The answers as saved, or those of a setting made before.
 function discordAnswers(setup, settings) {
   const config = setup.botRecap, crews = settings.crews || {};
@@ -174,6 +203,7 @@ function discordForm(setup, settings) {
     ${config.lastError ? `<p class="settings-status" role="alert">${esc(config.lastError)}</p>` : ''}`;
   return `<form class="setup-form discord-form" data-discord-form data-solo="${settings.modules.soloRaces === true}" data-tdz="${settings.modules.eventTdzAvailable === true}" data-answers="${esc(JSON.stringify(discordAnswers(setup, settings)))}" data-start="${config?.enabled || config?.lastError || leaving ? 'end' : ''}">
     ${helpContext('recap')}${state}
+    <div class="registration-progress" aria-hidden="true" data-discord-progress></div><p class="registration-step-label" data-discord-label></p>
     <div data-discord-questions></div>
     <div class="discord-end">
       <div class="discord-sketch" data-discord-sketch></div>
@@ -346,6 +376,9 @@ function discordPage(form) {
   questions.forEach((item, index) => item.classList.toggle('is-current', index === step));
   form.querySelector('.discord-end').classList.toggle('is-current', step === last);
   form.querySelector('[data-discord-count]').textContent = step === last ? 'Aperçu' : `${step + 1} / ${last}`;
+  // In the window: the bar and « Étape 2 sur 7 · … », as the creation of a race.
+  form.querySelector('[data-discord-progress]').innerHTML = [...questions, null].map((_, index) => `<span class="${index <= step ? 'done' : ''}"></span>`).join('');
+  form.querySelector('[data-discord-label]').textContent = step === last ? 'Dernière étape · Aperçu sur ton serveur' : `Question ${step + 1} sur ${last} · ${questions[step].querySelector('legend')?.textContent || ''}`;
   const [back, next] = form.querySelectorAll('[data-discord-step]');
   back.disabled = step === 0; next.hidden = step === last;
   next.textContent = step === last - 1 ? 'Voir le résultat' : 'Suivant';
@@ -439,72 +472,99 @@ const recapPreviewText = value => esc(String(value || '').replace(/<t:(\d+):[A-Z
 function recapPreviewMarkup(previews) {
   return previews.length ? previews.map(item => `<figure class="recap-preview"><figcaption># ${esc(item.name)}</figcaption>${item.payload.embeds.map(embed => `<div class="recap-preview-embed"><strong>${esc(embed.title || '')}</strong><span>${recapPreviewText(embed.description)}</span>${(embed.fields || []).map(field => `<b>${esc(field.name)}</b><span>${recapPreviewText(field.value)}</span>`).join('')}${embed.url ? `<a href="${esc(embed.url)}">Voir sur le site</a>` : ''}</div>`).join('')}</figure>`).join('') : '<p>Rien à publier pour le moment. Les prochaines courses apparaîtront toutes seules.</p>';
 }
+// Short names of the permissions (the chips) and of the modules (overview).
+const PERMISSION_SHORT = {access:'Accès au site', endurance:'Endurances', solo_open:'Events OPEN', solo_safe:'Events SAFE', crews:'Équipages', combos:'Fiches combo', admin:'Administrer'};
+const MODULE_NAMES = [['iracingImport', 'iRacing officiel'], ['soloRaces', 'Events'], ['categoryEntry', 'Inscription par catégorie'], ['combos', 'Fiches combo'], ['grindfest', 'Gridfest']];
+
 // Why the crews' channels cannot be turned on yet (the bot's state on the server, checked by the site).
 const BOT_PROBLEMS = {
   channel:'Un administrateur Discord doit autoriser le bot dans le salon ou sa catégorie. Les autres accès restent privés.',
-  rights:'Avant d’activer : touche « Donner les droits au bot », valide sur Discord, puis « C’est fait ».',
+  rights:'Touche « Donner les droits au bot », valide sur Discord, puis « C’est fait ».',
   absent:'Le bot n’est pas sur ton serveur : touche « Donner les droits au bot » pour l’ajouter avec ses droits, puis « C’est fait ».',
   config:'Le bot du site n’est pas configuré : préviens le gérant de la plateforme.',
   discord:'Discord ne répond pas pour l’instant : réessaie avec « C’est fait » dans un moment.'};
+
+// « Modules »: one line each, its switch on the right (saved at once), its settings below when it has some.
 function modulesMarkup(settings, setup) {
-  const crews = settings.crews || {}, states = moduleStates(settings, setup);
+  const states = moduleStates(settings, setup);
   const toggle = (key, label, locked = false) => `<label class="admin-switch"><input type="checkbox" role="switch" data-module="${key}" aria-label="${label}" ${states[key] ? 'checked' : ''} ${locked ? 'disabled' : ''}><i aria-hidden="true"></i></label>`;
-  const crewRights = crews.botReady === true ? (crews.lastError ? `<p class="setup-note setup-error">⚠️ ${esc(crews.lastError)}</p>` : '<p class="members-help">Le bot a les droits pour créer les salons.</p>')
-    : `<p class="members-help">${crews.botProblem === 'channel' ? `Dans « ${esc(crews.botChannelName || 'le salon')} », un administrateur Discord doit autoriser Endurance Manager : ${esc((crews.botMissing || []).join(', '))}. Les autres accès restent privés.` : crews.botProblem === 'rights' && crews.botMissing?.length ? `Droits manquants pour le bot : ${esc(crews.botMissing.join(', '))}.` : BOT_PROBLEMS[crews.botProblem] || BOT_PROBLEMS.rights}</p>
-      <div class="setup-actions">${crews.botInviteUrl && crews.botProblem !== 'channel' ? `<a class="primary-button" href="${esc(crews.botInviteUrl)}" target="_blank" rel="noopener">Donner les droits au bot</a>` : ''}<button type="button" class="secondary-button" data-modules-refresh="discord">C’est fait</button></div>`;
-  const voices = settings.modules.crewChannels === true, crewWarn = voices && (crews.botReady !== true || crews.lastError);
-  const tiles = [
-    {key:'discord', name:'Discord', text:'Le bot affiche tes courses et crée les vocaux des équipages sur ton serveur.',
-      state:setup.botRecap?.lastError ? ['warn','Publication en erreur'] : crewWarn ? ['warn', crews.botProblem === 'channel' ? 'Accès au salon à corriger' : crews.botReady !== true ? 'Le bot n’a pas les droits' : 'Vocaux en échec']
-        : states.discord ? ['ok', setup.botRecap.mode === 'events' ? 'Actif · une catégorie par course' : 'Actif · récap de la semaine'] : ['off', 'Éteint'],
-      control:'', settings:`${crewWarn ? crewRights : ''}${discordForm(setup, settings)}${setup.botRecap?.enabled || voices ? DIAGNOSTIC_PANEL : ''}`},
-    {key:'categoryEntry', name:'Inscription par catégorie', text:'Sur une course à plusieurs départs, le pilote choisit ses catégories et ses départs possibles. Seuls les TM forment les équipages.',
-      state:states.categoryEntry ? ['ok', 'Actif'] : ['off', 'Éteint'], control:toggle('categoryEntry', 'Inscription par catégorie'), settings:''},
-    {key:'iracingImport', name:'Endurances iRacing officielles', text:settings.modules.eventTdzAvailable?'Les séries en équipe et les événements spéciaux importés automatiquement.':'Les séries en équipe et les événements spéciaux importés automatiquement. Avec EVENT SOLO activé, les endurances solo apparaissent aussi dans son calendrier.',
-      state:states.iracingImport ? ['ok', 'Actif'] : ['off', 'Éteint'], control:toggle('iracingImport', 'Endurances iRacing officielles'), settings:''},
-    ...(!settings.modules.eventTdzAvailable ? [] : [{key:'soloRaces', name:'EVENT TDZ', text:'Un calendrier d’événements toutes simus&nbsp;: places limitées, liste d’attente, accès OPEN ou SAFE.',
-      state:states.soloRaces ? ['ok', 'Actif'] : ['off', 'Éteint'], control:toggle('soloRaces', 'EVENT TDZ'),
-      settings:`<form class="settings-safe-guide" data-safe-guide><label>Salon Discord « Comment devenir SAFE »<input name="url" type="url" maxlength="200" placeholder="https://discord.com/channels/…" value="${esc(settings.modules.safeGuideUrl || '')}"></label>
-        <div class="settings-actions"><button class="primary-button" type="submit">Enregistrer</button><span class="settings-status" aria-live="polite"></span></div></form>`}]),
-    ...(settings.modules.eventTdzAvailable ? [] : [{key:'soloRaces', name:'EVENT SOLO', text:'Un calendrier d’événements toutes simus&nbsp;: inscription en un clic, places limitées si besoin et liste d’attente.',
-      state:states.soloRaces ? ['ok', 'Actif'] : ['off', 'Éteint'], control:toggle('soloRaces', 'EVENT SOLO'), settings:''}]),
+  const tdz = settings.modules.eventTdzAvailable === true;
+  const items = [
+    {key:'iracingImport', name:'Endurances iRacing officielles', sub:'Importées toutes seules dans ton calendrier.', tip:tdz ? 'Les séries en équipe et les événements spéciaux d’iRacing arrivent seuls, avec leurs horaires.' : 'Les séries en équipe et les événements spéciaux d’iRacing arrivent seuls, avec leurs horaires. Avec EVENT SOLO activé, les endurances solo apparaissent aussi dans son calendrier.'},
+    tdz ? {key:'soloRaces', name:'EVENT TDZ', sub:'Un calendrier d’events : places limitées, liste d’attente, OPEN ou SAFE.', tip:'Les events de toutes les simus. L’accès OPEN ou SAFE se donne par rôle, dans « Rôles ».',
+      settings:`<form class="settings-safe-guide" data-safe-guide><label>Salon Discord « Comment devenir SAFE » ${tip('Lien du salon où les pilotes apprennent à passer SAFE. Il s’affiche aux pilotes qui n’ont que l’accès OPEN.')}<input name="url" type="url" maxlength="200" placeholder="https://discord.com/channels/…" value="${esc(settings.modules.safeGuideUrl || '')}"></label>
+        <div class="settings-actions"><button class="primary-button" type="submit">Enregistrer</button><span class="settings-status" aria-live="polite"></span></div></form>`}
+      : {key:'soloRaces', name:'EVENT SOLO', sub:'Un calendrier d’events : inscription en un clic, liste d’attente.', tip:'Les events de toutes les simus, avec des places limitées si besoin et une liste d’attente.'},
+    {key:'categoryEntry', name:'Inscription par catégorie', sub:'Le pilote choisit ses catégories, les responsables forment les équipages.', tip:'Sur une course à plusieurs départs, le pilote coche ses catégories et ses départs possibles. Seuls les responsables d’équipage (autorisation « Équipages ») forment les équipages.'},
     // Private module: opened for a team by the platform managers, shown to the community's admins once open.
-    ...(settings.modules.combosManager || states.combos ? [{key:'combos', name:'Fiches combo', text:'Module privé de l’équipe&nbsp;: les données de practice par voiture et circuit (énergie, pneus, rythme, arrêts), envoyées par le plugin SimHub de chaque pilote. Visible des rôles qui ont l’autorisation « Fiches combo ».',
-      state:states.combos ? ['ok', 'Actif'] : ['off', 'Éteint'], control:toggle('combos', 'Fiches combo', !settings.modules.combosManager), settings:''}] : []),
-    ...(settings.modules.grindfestAvailable ? [{key:'grindfest', name:'Gridfest', text:'Inscription par streamer, nom en jeu et mot de passe par MP Discord.', state:states.grindfest ? ['ok','Actif'] : ['off','Éteint'], control:toggle('grindfest','Gridfest'), settings:''}] : []),
-  ];
-  const tile = item => `<article class="admin-module ${states[item.key] ? 'is-on' : ''}" data-module-tile="${item.key}">
-    <div class="admin-module-top"><span class="admin-module-icon">${icon(item.key)}</span><strong>${item.name}</strong>${item.control}</div>
-    <p>${item.text}</p>
-    <div class="admin-module-foot"><span class="admin-state is-${item.state[0]}">${item.state[1]}</span>${item.settings ? `<button type="button" class="link-button" data-module-open="${item.key}" aria-expanded="false">Régler</button>` : ''}</div>
+    ...(settings.modules.combosManager || states.combos ? [{key:'combos', name:'Fiches combo', sub:'Les données de practice de l’équipe, par voiture et circuit.', tip:'Énergie, pneus, rythme et arrêts, envoyés par le plugin SimHub de chaque pilote. Visible des rôles qui ont l’autorisation « Fiches combo ».', locked:!settings.modules.combosManager}] : []),
+    ...(settings.modules.grindfestAvailable ? [{key:'grindfest', name:'Gridfest', sub:'Inscription par streamer.', tip:'Le pilote choisit le streamer qu’il représente et donne son nom en jeu ; le mot de passe arrive par message privé Discord.'}] : [])];
+  const line = item => `<article class="adm-module${states[item.key] ? ' is-on' : ''}" data-module-tile="${item.key}">
+    <div class="adm-module-line"><span class="admin-module-icon">${icon(item.key)}</span>
+      <span class="adm-module-text"><strong>${item.name} ${tip(item.tip)}</strong><small>${item.sub}</small></span>
+      ${item.settings && states[item.key] ? `<button type="button" class="link-button" data-module-open="${item.key}" aria-expanded="false">Régler</button>` : ''}${toggle(item.key, item.name, item.locked)}</div>
     ${item.settings ? `<div class="admin-module-settings" hidden>${item.settings}</div>` : ''}</article>`;
-  return `<div class="admin-head"><h2>Modules</h2><p>Tout ce qui s’allume ou s’éteint. Les interrupteurs s’enregistrent tout de suite.</p></div><div class="admin-modules">${tiles.map(tile).join('')}</div>`;
+  return `<p class="adm-intro">Allume ce que ta communauté utilise. Chaque interrupteur s’enregistre tout de suite. Discord a son propre onglet.</p>
+    <div class="adm-modules">${items.map(line).join('')}</div>`;
+}
+
+// « Discord »: where it stands, what the bot does (a summary), « Modifier » opens the questions step by step in a window.
+function discordTabMarkup(setup, settings, look) {
+  const config = setup.botRecap, crews = settings.crews || {}, guild = setup.guild || {};
+  const answers = discordAnswers(setup, settings), voices = settings.modules.crewChannels === true;
+  const leaving = config && !config.enabled && config.leftovers;
+  const [tone, title] = config?.lastError ? ['bad', 'Publication en erreur'] : config?.enabled ? ['ok', `Actif · ${MODE_NAMES[config.mode] || ''}`]
+    : leaving ? ['warn', 'Retrait en cours'] : ['off', 'Éteint'];
+  const sub = config?.lastError ? esc(config.lastError) : config?.enabled ? 'Le bot met ton serveur à jour tout seul, toutes les 2 minutes.' : leaving ? 'Le bot finit de retirer ce qu’il avait créé.' : 'Rien n’est publié sur ton serveur. Touche « Régler Discord » pour commencer.';
+  const state = `<ul class="adm-rows"><li class="adm-row is-${tone}" data-discord-state><span><strong>${title}</strong><small>${sub}</small></span>
+    <span class="adm-actions"><span class="settings-status" data-discord-saved aria-live="polite"></span><button type="button" class="primary-button" data-discord-open>${config?.enabled ? 'Modifier' : 'Régler Discord'}</button></span></li></ul>`;
+  const crewWarn = voices && (crews.botReady !== true || crews.lastError);
+  const crewRights = !crewWarn ? '' : crews.botReady === true ? row('warn', 'Vocaux d’équipage en échec', esc(crews.lastError))
+    : row('warn', 'Vocaux d’équipage : le bot n’a pas ses droits', esc(crews.botProblem === 'channel' ? `Dans « ${crews.botChannelName || 'le salon'} », un administrateur Discord doit autoriser Endurance Manager : ${(crews.botMissing || []).join(', ')}. Les autres accès restent privés.` : crews.botProblem === 'rights' && crews.botMissing?.length ? `Droits manquants : ${crews.botMissing.join(', ')}.` : BOT_PROBLEMS[crews.botProblem] || BOT_PROBLEMS.rights),
+      `<span class="adm-actions">${crews.botInviteUrl && crews.botProblem !== 'channel' ? `<a class="primary-button" href="${esc(crews.botInviteUrl)}" target="_blank" rel="noopener">Donner les droits au bot</a>` : ''}<button type="button" class="secondary-button" data-modules-refresh="discord">C’est fait</button></span>`);
+  const sims = {lmu:'LMU', iracing:'iRacing', all:'LMU et iRacing'}[answers.sims] || 'LMU et iRacing';
+  const fact = (label, value, help) => `<div><dt>${label} ${tip(help)}</dt><dd>${value}</dd></div>`;
+  const facts = config?.enabled ? `<section class="adm-block"><h2 class="adm-label">Ce que fait le bot</h2><dl class="adm-facts">
+      ${fact('Courses de la semaine', `${esc(MODE_NAMES[answers.mode] || '')} · ${sims}${answers.split && answers.sims === 'all' ? ' séparés' : ''}`, answers.mode === 'events' ? 'Le lundi à 7h30, le bot publie les courses de la semaine dans # endurances-de-la-semaine et ouvre un fil par course. Les pilotes inscrits y sont ajoutés sans notification.' : 'Le lundi à 7h30, le bot publie le récap de la semaine dans le salon choisi, avec un fil par course.')}
+      ${fact('Vocaux d’équipage', answers.voices ? (answers.reminders ? 'Oui, avec rappels' : 'Oui') : 'Non', 'Un salon vocal par équipage, ouvert le lundi de la semaine de la course et supprimé 2 h après la fin. Avec les rappels : 24 h et 1 h avant le départ dans son chat.')}
+      ${fact('Annonce du jour', answers.announce ? 'Oui, à 7h30' : 'Non', 'Chaque matin à 7h30, une affiche des courses du jour dans le salon choisi. @everyone seulement les jours de stream.')}
+      ${answers.announce ? fact('Stream', answers.stream ? esc(answers.stream.replace(/^https?:\/\//, '')) : 'Aucun', 'Facultatif : le lien et le nom du streamer s’affichent sur l’affiche des jours de stream.') : ''}
+    </dl></section>` : '';
+  const bot = look.discordServer ? `<section class="adm-block"><h2 class="adm-label">Logo du bot ${tip('L’image du bot, seulement sur ton serveur Discord. Le nom du bot se change directement sur Discord.')}</h2>
+      <div class="settings-banner settings-bot adm-card" data-image-kind="bot">
+        <div class="settings-bot-current"><img class="settings-banner-preview" src="${esc(look.botAvatarUrl || '/images/app-icon-192.png')}" alt="Logo actuel du bot"><span><b>${look.botAvatarUrl ? 'Ton logo' : 'Logo d’Endurance Manager'}</b><small>${look.botAvatarUrl ? 'Seulement sur ton serveur' : 'Le même sur tous les serveurs'}</small></span></div>
+        <div class="settings-actions"><label class="secondary-button settings-banner-pick">Changer<input type="file" accept="image/png,image/jpeg,image/webp" data-banner-file hidden></label>
+          ${look.botAvatarUrl ? '<button type="button" class="secondary-button" data-bot-avatar-remove>Remettre le logo du site</button>' : ''}<span class="settings-status" aria-live="polite"></span></div></div></section>` : '';
+  const presence = guild.id && !guild.botPresent ? row('bad', 'Le bot n’est pas sur ton serveur', 'Invite-le d’abord : sans lui, rien ne peut être publié.', setup.botInviteUrl ? `<a class="primary-button" href="${esc(setup.botInviteUrl)}" target="_blank" rel="noopener">Inviter le bot</a>` : '') : '';
+  return `<p class="adm-intro">Ce que le bot Endurance Manager fait sur ton serveur Discord : les courses de la semaine, les vocaux d’équipage et l’annonce du jour.</p>
+    ${state}${presence || crewRights ? `<ul class="adm-rows">${presence}${crewRights}</ul>` : ''}
+    ${facts}${config?.enabled || voices ? `<section class="adm-block">${DIAGNOSTIC_PANEL}</section>` : ''}${bot}
+    <div class="adm-sheet-home" data-discord-home hidden>${discordForm(setup, settings)}</div>`;
 }
 
 // « Apparence »: the form on the left, the preview of the site on the right.
 function lookMarkup(settings) {
   const look = settings.community;
   const accent = look.accent || '#52d3d8';
-  return `<div class="admin-head"><h2>Apparence</h2><p>L’aperçu montre tout de suite ce que verront tes membres.</p></div>
+  return `<p class="adm-intro">Le nom, la couleur et la bannière que voient tes membres. L’aperçu à droite change pendant que tu écris ; rien n’est gardé avant « Enregistrer ».</p>
     <div class="admin-look">
       <div class="admin-stack">
-        <section class="admin-card"><form class="settings-appearance" data-appearance>
-          <label>Nom de la communauté<input name="name" maxlength="80" required value="${esc(look.name)}"></label>
-          <label><span>Nom court <small>(onglet du navigateur)</small></span><input name="shortName" maxlength="12" required value="${esc(look.shortName)}"></label>
-          <div class="settings-accent"><label><span>Couleur d’accent <span class="tip-info" data-tip="Couleur des boutons, des traits et des repères sur le site de ta communauté.">ⓘ</span></span><input name="accent" type="color" value="${esc(accent)}"></label>
-            <label class="role-pill"><input type="checkbox" name="defaultAccent" ${look.accent ? '' : 'checked'}><span>Couleur du site</span></label></div>
-          <p class="members-help">Le logo est l’icône du serveur Discord${look.discordServer ? ` « ${esc(look.discordServer)} »` : ''} : change-la sur Discord.${look.logoUrl ? '' : ' Le serveur n’a pas d’icône : le logo du site est utilisé.'}</p>
+        <section class="adm-card"><form class="settings-appearance" data-appearance>
+          <label>Nom de la communauté ${tip('Affiché en haut du site et dans les messages du bot.')}<input name="name" maxlength="80" required value="${esc(look.name)}"></label>
+          <label><span>Nom court ${tip('Quelques lettres, affichées dans l’onglet du navigateur.')}</span><input name="shortName" maxlength="12" required value="${esc(look.shortName)}"></label>
+          <div class="settings-accent"><label><span>Couleur ${tip('Couleur des boutons, des traits et des repères sur le site de ta communauté.')}</span><input name="accent" type="color" value="${esc(accent)}"></label>
+            <label class="role-pill"><input type="checkbox" name="defaultAccent" ${look.accent ? '' : 'checked'}><span>Couleur d’Endurance Manager</span></label></div>
+          <p class="members-help">Le logo est l’icône du serveur Discord${look.discordServer ? ` « ${esc(look.discordServer)} »` : ''} : il se change sur Discord.${look.logoUrl ? '' : ' Le serveur n’a pas d’icône : le logo du site est utilisé.'}</p>
           <div class="settings-actions"><button class="primary-button" type="submit">Enregistrer</button><span class="settings-status" aria-live="polite"></span></div></form></section>
-        <section class="admin-card settings-banner-card"><h3>Bannière</h3><div class="settings-banner">
+        <section class="adm-card settings-banner-card"><h3 class="adm-label">Bannière ${tip('Image en haut du site, 2048 × 512 conseillé (4 fois plus large que haute). Tu la cadres et la zoomes avant de l’enregistrer ; elle est allégée automatiquement.')}</h3><div class="settings-banner">
           <img class="settings-banner-preview" src="${esc(look.bannerUrl || '/images/endurance-manager-banner.webp')}" alt="Bannière actuelle">
           <div class="settings-actions"><label class="secondary-button settings-banner-pick">Choisir une image<input type="file" accept="image/png,image/jpeg,image/webp" data-banner-file hidden></label>
-            ${look.bannerUrl ? '<button type="button" class="secondary-button" data-banner-remove>Remettre la bannière du site</button>' : ''}<span class="settings-status" aria-live="polite"></span></div>
-          <p class="members-help">Format conseillé : 2048 × 512 (4 fois plus large que haute). Tu la cadres et la zoomes avant de l’enregistrer ; elle est allégée automatiquement.</p></div></section>
+            ${look.bannerUrl ? '<button type="button" class="secondary-button" data-banner-remove>Remettre la bannière du site</button>' : ''}<span class="settings-status" aria-live="polite"></span></div></div></section>
       </div>
-      <div class="admin-preview-wrap"><p class="admin-preview-label">Aperçu : ce que verront tes membres</p>
+      <div class="admin-preview-wrap"><p class="adm-label">Aperçu</p>
         <div class="admin-preview" data-look-preview style="--preview-accent:${esc(accent)}">
           <div class="admin-preview-banner"><img src="${esc(look.bannerUrl || '/images/endurance-manager-banner.webp')}" alt=""></div>
-          <div class="admin-preview-nav">${look.logoUrl ? `<img class="admin-preview-badge" src="${esc(look.logoUrl)}" alt="">` : `<b class="admin-preview-badge" data-preview-short>${esc(String(look.shortName || look.name).slice(0, 4))}</b>`}<span>EVENT SOLO</span><span class="is-active">ENDURANCE</span><span>Mes inscriptions</span></div>
+          <div class="admin-preview-nav">${look.logoUrl ? `<img class="admin-preview-badge" src="${esc(look.logoUrl)}" alt="">` : `<b class="admin-preview-badge" data-preview-short>${esc(String(look.shortName || look.name).slice(0, 4))}</b>`}<span>Accueil</span><span class="is-active">ENDURANCE</span><span>Mes inscriptions</span></div>
           <div class="admin-preview-body">
             <div class="admin-preview-race"><span><b>6h de Spa</b><small>samedi 20:00 · LMU</small></span><span class="admin-preview-button">M’inscrire</span></div>
             <div class="admin-preview-race"><span><b>Daytona 24h</b><small>dimanche 14:00 · iRacing</small></span><span class="admin-preview-button">M’inscrire</span></div>
@@ -572,7 +632,9 @@ async function platformMarkup() {
 }
 
 let openTab = '', openView = '', openModule = '';
-const SECTIONS = [['overview', 'Vue d’ensemble'], ['people', 'Membres et rôles'], ['modules', 'Modules'], ['look', 'Apparence']];
+// The tabs, also in the address (#roles, #discord…) so a link or a reload opens the same one.
+const SECTIONS = [['overview', 'Vue d’ensemble'], ['roles', 'Rôles'], ['members', 'Membres'], ['discord', 'Discord'], ['modules', 'Modules'], ['look', 'Apparence']];
+const TAB_ALIASES = {people:'roles'};
 async function load() {
   try {
     const session = await api('/api/session');
@@ -583,63 +645,94 @@ async function load() {
       session.manager ? platformMarkup() : Promise.resolve('')]);
     const members = Array.isArray(result.members) ? result.members : [];
     const overview = overviewMarkup(setup, settings, members);
-    // The showcase (main address) has no Discord server and nobody real: no overview nor members there.
-    const sections = SECTIONS.filter(([key]) => !session.openSite || !['overview', 'people'].includes(key));
+    // The showcase (main address) has no Discord server and nobody real: only modules and appearance there.
+    const sections = SECTIONS.filter(([key]) => !session.openSite || !['overview', 'roles', 'members', 'discord'].includes(key));
     if (platform) sections.push(['platform', 'Plateforme']);
-    const panels = {overview:overview.html, people:peopleMarkup(result, settings), modules:modulesMarkup(settings, setup), look:lookMarkup(settings), platform};
-    const current = sections.some(([key]) => key === openTab) ? openTab : sections[0][0];
-    const brand = settings.community?.logoUrl ? `<img src="${esc(settings.community.logoUrl)}" alt="">` : `<span>${initials(settings.community?.shortName || settings.community?.name)}</span>`;
-    app.innerHTML = `<h1 class="sr-only">Administration</h1><div class="admin-shell">
-      <nav class="admin-rail" role="tablist" aria-label="Administration">
-        <div class="admin-brand">${brand}<div><strong>${esc(settings.community?.name || '')}</strong><small>Administration</small></div></div>
-        ${sections.map(([key, label]) => `<button type="button" role="tab" class="admin-nav${key === 'platform' ? ' is-platform' : ''}" data-tab="${key}" aria-selected="${key === current}">${icon(key)}<span>${label}</span>${key === 'overview' && overview.todo ? `<b class="admin-count">${overview.todo}</b>` : ''}</button>`).join('')}
-      </nav>
-      <div class="admin-main">${sections.map(([key]) => `<section class="admin-panel${key === 'platform' ? ' community-settings' : ''}" data-panel="${key}" role="tabpanel" ${key === current ? '' : 'hidden'}>${helpContext('admin-'+key)}${panels[key]}</section>`).join('')}</div></div>`;
+    const panels = {overview:overview.html, roles:rolesMarkup(settings), members:membersMarkup(result, settings), discord:discordTabMarkup(setup, settings, settings.community),
+      modules:modulesMarkup(settings, setup), look:lookMarkup(settings), platform:platform ? `<p class="adm-intro">Visible seulement des gestionnaires d’Endurance Manager : les demandes, les communautés et le Discord officiel.</p>${platform}` : ''};
+    const wanted = TAB_ALIASES[openTab || location.hash.slice(1)] || openTab || location.hash.slice(1);
+    const current = sections.some(([key]) => key === wanted) ? wanted : sections[0][0];
+    app.innerHTML = `<div class="crews-head adm-head"><h1 class="page-title">ADMINISTRATION</h1><p class="crews-lead">${esc(settings.community?.name || '')} · les réglages du site et du bot Discord.</p></div>
+      <div class="event-filter crews-filters adm-tabs" role="tablist" aria-label="Administration">
+        ${sections.map(([key, label]) => `${key === 'platform' ? '<span class="crews-sep" aria-hidden="true"></span>' : ''}<button type="button" role="tab" id="adm-tab-${key}" aria-controls="adm-panel-${key}" class="event-filter-button crews-filter adm-tab${key === current ? ' is-on' : ''}" data-tab="${key}" aria-selected="${key === current}" tabindex="${key === current ? 0 : -1}">${label}${key === 'overview' && overview.todo ? ` <b class="nav-count" data-todo-badge>${overview.todo}</b>` : ''}</button>`).join('')}
+      </div>
+      ${sections.map(([key]) => `<section class="adm-panel${key === 'platform' ? ' community-settings' : ''}" id="adm-panel-${key}" data-panel="${key}" role="tabpanel" aria-labelledby="adm-tab-${key}" ${key === current ? '' : 'hidden'}>${helpContext('admin-'+key)}${panels[key]}</section>`).join('')}`;
+    openTab = current;
     for (const form of app.querySelectorAll('[data-discord-form]')) discordRefresh(form);
     void fillTodo();
-    if (openView) showView(openView);
-    if (openModule) openModuleSettings(openModule);
+    if (openModule === 'discord') openDiscordSheet(true);
+    else if (openModule) openModuleSettings(openModule);
     openView = ''; openModule = '';
   } catch (error) {
     renderError(error.message || String(error));
   }
 }
-// The races of both simulators: one line per thing to do, each opening its race.
+// The endurances of both simulators: pilots without a crew, empty crews and times to confirm, one line each
+// in « À régler » (the details are on the « Équipages » page).
 async function fillTodo() {
   const box = app.querySelector('[data-admin-todo]');
   if (!box) return;
   try {
     const lists = await Promise.all(['lmu', 'iracing'].map(game => api(`/api/races?game=${game}&scope=upcoming`)
       .then(result => todoItems((result.events || []).filter(event => String(event.circuit || '').startsWith('iracing-') === (game === 'iracing')), game))));
-    const items = lists.flat().sort((a, b) => a.startsAt - b.startsAt);
-    box.querySelector('p')?.remove();
-    box.insertAdjacentHTML('beforeend', items.length
-      ? `<ul class="admin-alerts">${items.slice(0, 12).map(item => `<li class="is-${item.tone}"><span><strong>${esc(item.name)}</strong> · ${esc(todoWhen(item))} : ${esc(item.text)}</span><a class="link-button" href="/${item.game}/#event=${esc(item.eventId)}">Ouvrir</a></li>`).join('')}</ul>${items.length > 12 ? `<p class="admin-muted">Et ${items.length - 12} autre${items.length - 12 > 1 ? 's' : ''}.</p>` : ''}`
-      : '<ul class="admin-alerts"><li class="is-ok"><span>Rien à traiter : chaque pilote inscrit a son équipage.</span></li></ul>');
-  } catch {
-    box.querySelector('p').textContent = 'Les courses n’ont pas pu être lues. Recharge la page.';
-  }
-}
-function showView(view) {
-  for (const button of app.querySelectorAll('[data-view]')) button.setAttribute('aria-pressed', String(button.dataset.view === view));
-  for (const pane of app.querySelectorAll('[data-view-pane]')) pane.hidden = pane.dataset.viewPane !== view;
+    const items = lists.flat();
+    const names = list => [...new Set(list.map(item => item.name))];
+    const kinds = [['bad', 'sans équipage', 'Des pilotes inscrits attendent un équipage', 'Les responsables les placent depuis la page Équipages.'],
+      ['warn', 'sans pilote', 'Des équipages n’ont aucun pilote', 'À compléter ou à supprimer depuis la page Équipages.'],
+      ['warn', 'Horaires', 'Des courses ont leurs horaires à confirmer', 'Ajoute les horaires en modifiant la course.']];
+    const lines = kinds.map(([tone, match, title, sub]) => {
+      const found = items.filter(item => item.text.includes(match));
+      if (!found.length) return '';
+      const race = found[0], link = match === 'Horaires' ? `/${race.game}/#event=${esc(race.eventId)}` : `/${race.game}/#equipages`;
+      return row(tone, `${title} · ${names(found).length} course${names(found).length > 1 ? 's' : ''}`, `${esc(names(found).slice(0, 3).join(', '))}${names(found).length > 3 ? '…' : ''}. ${sub}`,
+        `<a class="secondary-button" href="${link}">${match === 'Horaires' ? 'Ouvrir la course' : 'Ouvrir Équipages'}</a>`);
+    }).filter(Boolean);
+    if (!lines.length) return;
+    const problems = Number(box.dataset.problems || 0), total = problems + lines.length;
+    box.innerHTML = (problems ? box.innerHTML : '') + lines.join('');
+    app.querySelector('[data-todo-count]').textContent = `· ${total}`;
+    const tab = app.querySelector('[data-tab="overview"]');
+    const badge = tab.querySelector('[data-todo-badge]');
+    if (badge) badge.textContent = total; else tab.insertAdjacentHTML('beforeend', ` <b class="nav-count" data-todo-badge>${total}</b>`);
+  } catch { /* the races could not be read: « À régler » keeps what it has */ }
 }
 function openModuleSettings(key, open = true) {
   const tile = app.querySelector(`[data-module-tile="${key}"]`), settings = tile?.querySelector('.admin-module-settings');
   if (!settings) return;
   settings.hidden = !open; tile.classList.toggle('is-open', open);
-  tile.querySelector('[data-module-open]')?.setAttribute('aria-expanded', String(open));
   const button = tile.querySelector('[data-module-open]');
-  if (button) button.textContent = open ? 'Fermer' : 'Régler';
-  if (open) tile.scrollIntoView({behavior:'smooth', block:'nearest'});
-  // The server's channels are read once the setting is opened.
-  const form = settings.querySelector('[data-discord-form]');
-  if (open && form && !form._destinations) loadDiscordDestinations(form).catch(error => { form.querySelector('.setup-actions .settings-status').textContent = error.message; });
+  if (button) { button.setAttribute('aria-expanded', String(open)); button.textContent = open ? 'Fermer' : 'Régler'; }
 }
-function selectTab(key) {
-  for (const button of app.querySelectorAll('[data-tab]')) button.setAttribute('aria-selected', String(button.dataset.tab === key));
+// The Discord questions in a window, step by step (as the creation of a race). The form itself only moves:
+// what was answered stays, and closing puts it back.
+function openDiscordSheet(atEnd = false) {
+  const form = app.querySelector('[data-discord-form]');
+  if (!form || form.closest('.form-sheet-overlay')) return;
+  const overlay = document.createElement('section');
+  overlay.className = 'form-sheet-overlay adm-sheet';
+  overlay.innerHTML = `<div class="registration-sheet form-sheet" role="dialog" aria-modal="true" aria-labelledby="discord-sheet-title"><div class="registration-workspace-head"><div class="registration-workspace-title"><h2 id="discord-sheet-title" tabindex="-1">Régler Discord</h2></div><span class="registration-workspace-actions"><button type="button" class="secondary-button registration-close-button" data-discord-close>Fermer</button></span></div><div class="form-sheet-body"></div></div>`;
+  overlay.querySelector('.form-sheet-body').append(form);
+  app.append(overlay);
+  form._step = atEnd ? form.querySelectorAll('.discord-q').length : 0;
+  discordPage(form);
+  if (!form._destinations) loadDiscordDestinations(form).catch(error => { form.querySelector('.setup-actions .settings-status').textContent = error.message; });
+  requestAnimationFrame(() => overlay.querySelector('h2')?.focus({preventScroll:true}));
+}
+function closeDiscordSheet() {
+  const overlay = app.querySelector('.adm-sheet'), form = overlay?.querySelector('[data-discord-form]');
+  if (form) app.querySelector('[data-discord-home]')?.append(form);
+  overlay?.remove();
+  app.querySelector('[data-discord-open]')?.focus();
+}
+function selectTab(key, focus = false) {
+  for (const button of app.querySelectorAll('[data-tab]')) {
+    const on = button.dataset.tab === key;
+    button.setAttribute('aria-selected', String(on)); button.classList.toggle('is-on', on); button.tabIndex = on ? 0 : -1;
+    if (on && focus) button.focus();
+  }
   for (const panel of app.querySelectorAll('[data-panel]')) panel.hidden = panel.dataset.panel !== key;
   openTab = key;
+  history.replaceState(null, '', key === 'overview' ? location.pathname : `#${key}`);
 }
 
 // Banner: cropped to 2048 × 512 in the browser (centre) and compressed, WebP (JPEG where WebP is not available).
@@ -666,15 +759,17 @@ function setZoom(zoom) {
 }
 async function openCropper(file, container) {
   const bitmap = await createImageBitmap(file);
+  const bot = container.dataset.imageKind === 'bot';
   container.querySelector('.banner-cropper')?.remove();
   const box = document.createElement('div');
-  box.className = 'banner-cropper';
-  box.innerHTML = `<div class="banner-crop-frame"><canvas width="2048" height="512" aria-label="Cadrage de la bannière"></canvas></div>
+  box.className = `banner-cropper${bot ? ' bot-cropper' : ''}`;
+  box.innerHTML = `<div class="banner-crop-frame"><canvas width="${bot ? 512 : 2048}" height="512" aria-label="${bot ? 'Cadrage du logo' : 'Cadrage de la bannière'}"></canvas></div>
     <label class="banner-crop-zoom">Zoom<input type="range" min="1" max="4" step="0.01" value="1" data-banner-zoom></label>
     <p class="members-help">Fais glisser l’image pour choisir la partie visible, et zoome si besoin.</p>
-    <div class="settings-actions"><button type="button" class="primary-button" data-banner-save>Enregistrer la bannière</button><button type="button" class="secondary-button" data-banner-cancel>Annuler</button></div>`;
-  container.querySelector('.settings-banner-preview').after(box);
-  container.querySelector('.settings-banner-preview').hidden = true;
+    <div class="settings-actions"><button type="button" class="primary-button" data-banner-save>${bot ? 'Enregistrer le logo' : 'Enregistrer la bannière'}</button><button type="button" class="secondary-button" data-banner-cancel>Annuler</button></div>`;
+  const shown = container.querySelector('.settings-bot-current') || container.querySelector('.settings-banner-preview');
+  shown.after(box);
+  shown.hidden = true;
   const canvas = box.querySelector('canvas');
   cropper = {canvas, bitmap, zoom:1, x:null, y:null};
   drawCropper();
@@ -697,7 +792,7 @@ async function openCropper(file, container) {
 }
 function closeCropper(container) {
   container.querySelector('.banner-cropper')?.remove();
-  const preview = container.querySelector('.settings-banner-preview');
+  const preview = container.querySelector('.settings-bot-current') || container.querySelector('.settings-banner-preview');
   if (preview) preview.hidden = false;
   cropper = null;
 }
@@ -709,15 +804,46 @@ async function bannerImage(canvas) {
   }
   throw new Error('Cette image reste trop lourde : essaie une image plus simple.');
 }
+// Logo of the bot: Discord takes PNG or JPEG only (PNG keeps the transparency).
+async function botImage(canvas) {
+  for (const [type, quality] of [['image/png'], ['image/jpeg', .9], ['image/jpeg', .75]]) {
+    const blob = await new Promise(resolve => canvas.toBlob(resolve, type, quality));
+    if (blob && blob.size <= 1000000) return blob;
+  }
+  throw new Error('Cette image reste trop lourde : essaie une image plus simple.');
+}
 // Reloads the page content and comes back to the same tab.
 async function reload(tab, {view = '', module = ''} = {}) { openTab = tab; openView = view; openModule = module; await load(); }
 
 app.addEventListener('click', async event => {
+  const roleRemove = event.target.closest('[data-role-remove]');
+  if (roleRemove) {
+    // Asked once more on the button itself: the role loses all its permissions.
+    if (!roleRemove.dataset.confirm) { roleRemove.dataset.confirm = '1'; roleRemove.textContent = 'Confirmer'; roleRemove.classList.add('is-danger'); return; }
+    const card = roleRemove.closest('[data-role]'), status = card.querySelector('.settings-status');
+    roleRemove.disabled = true;
+    try {
+      await api(`/api/community/roles/${card.dataset.role}`, 'PUT', {permissions:[]});
+      for (const input of card.querySelectorAll('input[data-permission]')) input.checked = false;
+      card.dataset.kept = '[]';
+      card.hidden = true;
+      roleOption(card.dataset.role, true);
+    } catch (error) { status.textContent = error.message; }
+    finally { roleRemove.disabled = false; delete roleRemove.dataset.confirm; roleRemove.textContent = 'Retirer'; roleRemove.classList.remove('is-danger'); }
+    return;
+  }
   const go = event.target.closest('[data-go-tab]');
   if (go) {
     selectTab(go.dataset.goTab);
-    if (go.dataset.goView) showView(go.dataset.goView);
-    if (go.dataset.goModule) openModuleSettings(go.dataset.goModule);
+    scrollTo({top:0, behavior:'smooth'});
+    return;
+  }
+  if (event.target.closest('[data-discord-open]')) { openDiscordSheet(); return; }
+  if (event.target.closest('[data-discord-close]')) { closeDiscordSheet(); return; }
+  const filter = event.target.closest('[data-member-filter]');
+  if (filter) {
+    for (const chip of app.querySelectorAll('[data-member-filter]')) { const on = chip === filter; chip.setAttribute('aria-pressed', String(on)); chip.classList.toggle('is-on', on); }
+    filterMembers();
     return;
   }
   if (event.target.closest('[data-setup-refresh]')) { await reload('overview'); return; }
@@ -734,15 +860,13 @@ app.addEventListener('click', async event => {
     return;
   }
   const modulesRefresh = event.target.closest('[data-modules-refresh]');
-  if (modulesRefresh) { await reload('modules', {module:modulesRefresh.dataset.modulesRefresh}); return; }
-  const view = event.target.closest('[data-view]');
-  if (view) { showView(view.dataset.view); return; }
+  if (modulesRefresh) { const discord = modulesRefresh.dataset.modulesRefresh === 'discord'; await reload(discord ? 'discord' : 'modules', {module:discord ? '' : modulesRefresh.dataset.modulesRefresh}); return; }
   const moduleOpen = event.target.closest('[data-module-open]');
   if (moduleOpen) { openModuleSettings(moduleOpen.dataset.moduleOpen, moduleOpen.getAttribute('aria-expanded') !== 'true'); return; }
   const refresh = event.target.closest('[data-members-refresh]');
   if (refresh) {
     refresh.disabled = true; refresh.textContent = 'Actualisation…';
-    try { await api('/api/members/refresh', 'POST', {}); await reload('people'); }
+    try { await api('/api/members/refresh', 'POST', {}); await reload('members'); }
     catch (error) { refresh.disabled = false; refresh.textContent = 'Actualiser depuis Discord'; alert(error.message); }
     return;
   }
@@ -782,6 +906,17 @@ app.addEventListener('click', async event => {
   if (event.target.closest('[data-banner-save]') && cropper) {
     const container = event.target.closest('.settings-banner'), status = container.querySelector('.settings-status');
     status.textContent = 'Envoi…';
+    if (container.dataset.imageKind === 'bot') {
+      try {
+        const image = await botImage(cropper.canvas);
+        const response = await fetch('/api/community/bot-avatar', {method:'PUT', credentials:'same-origin', headers:{'Content-Type':image.type}, body:image});
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(result.error || 'L’envoi a échoué.');
+        cropper = null;
+        await reload('look');
+      } catch (error) { status.textContent = error.message; }
+      return;
+    }
     try {
       const image = await bannerImage(cropper.canvas);
       const response = await fetch('/api/community/banner', {method:'PUT', credentials:'same-origin', headers:{'Content-Type':image.type}, body:image});
@@ -791,6 +926,11 @@ app.addEventListener('click', async event => {
       cropper = null;
       await reload('look');
     } catch (error) { status.textContent = error.message; }
+    return;
+  }
+  if (event.target.closest('[data-bot-avatar-remove]')) {
+    if (!confirm('Remettre le logo d’Endurance Manager sur ton serveur Discord ?')) return;
+    try { await api('/api/community/bot-avatar', 'DELETE', {}); await reload('look'); } catch (error) { alert(error.message); }
     return;
   }
   if (event.target.closest('[data-banner-remove]')) {
@@ -827,7 +967,7 @@ app.addEventListener('click', async event => {
       } else if (discordButton.matches('[data-discord-repair]')) {
         status.textContent = 'Réparation…';
         const result = await api('/api/community/recap/repair','POST',{});
-        await reload('modules',{module:'discord'});
+        await reload('discord',{module:'discord'});
         app.querySelector('[data-discord-form] .setup-actions .settings-status').textContent = result.queued ? 'Une synchronisation est en cours. Réessaie dans un instant.' : '✓ Salons et messages vérifiés, réglages conservés.';
       } else if (discordButton.matches('[data-discord-remove]')) {
         // Asked twice, on the button itself.
@@ -838,7 +978,7 @@ app.addEventListener('click', async event => {
         }
         status.textContent = 'Retrait…';
         const result = await api('/api/community/discord','DELETE',{});
-        await reload('modules',{module:'discord'});
+        await reload('discord',{module:'discord'});
         app.querySelector('[data-discord-form] .setup-actions .settings-status').textContent = result.done ? '✓ Tout est retiré.' : 'Retrait commencé : le bot finit dans quelques minutes (les vocaux occupés attendent d’être vides).';
       }
     } catch (error) { status.textContent = error.message; }
@@ -853,17 +993,21 @@ app.addEventListener('input', event => {
   if (event.target.matches?.('[data-banner-zoom]') && cropper) { setZoom(Number(event.target.value)); return; }
   const look = event.target.closest?.('form[data-appearance]');
   if (look) { updatePreview(look); return; }
-  if (event.target.name !== 'memberSearch') return;
-  const query = event.target.value.trim().toLocaleLowerCase('fr-FR');
+  if (event.target.name === 'memberSearch') filterMembers();
+});
+// Members: the search and the chosen chip (all, without access, admins) together.
+function filterMembers() {
+  const query = (app.querySelector('input[name="memberSearch"]')?.value || '').trim().toLocaleLowerCase('fr-FR');
+  const group = app.querySelector('[data-member-filter][aria-pressed="true"]')?.dataset.memberFilter || 'all';
   let visible = 0;
   for (const row of app.querySelectorAll('.members-row')) {
-    const match = !query || row.dataset.search.includes(query);
+    const match = (!query || row.dataset.search.includes(query)) && (group === 'all' || row.dataset.group === group || (group === 'admin' && row.dataset.group === 'admin'));
     row.hidden = !match;
     if (match) visible += 1;
   }
   const empty = app.querySelector('.members-empty');
   if (empty) empty.hidden = visible > 0;
-});
+}
 
 app.addEventListener('submit', async event => {
   const discord = event.target.closest('form[data-discord-form]');
@@ -873,8 +1017,8 @@ app.addEventListener('submit', async event => {
     button.disabled = true; status.textContent = 'Enregistrement…';
     try {
       const result = await api('/api/community/discord','PUT',discordInput(discord));
-      await reload('modules',{module:'discord'});
-      app.querySelector('[data-discord-form] .setup-actions .settings-status').textContent = result.published ? '✓ Enregistré.' : result.error || 'Enregistré ; la publication sera réessayée.';
+      await reload('discord');
+      app.querySelector('[data-discord-saved]').textContent = result.published ? '✓ Enregistré.' : result.error || 'Enregistré ; la publication sera réessayée.';
     } catch (error) { status.textContent = error.message; }
     finally { button.disabled = false; }
     return;
@@ -950,6 +1094,18 @@ function updatePreview(form) {
 
 app.addEventListener('change', async event => {
   const box = event.target;
+  if (box.matches('[data-role-add]')) {
+    const card = box.value && app.querySelector(`.adm-role[data-role="${CSS.escape(box.value)}"]`);
+    box.value = '';
+    if (!card) return;
+    card.hidden = false;
+    roleOption(card.dataset.role, false);
+    card.querySelector('.settings-status').textContent = '';
+    card.querySelector('.adm-role-name strong').insertAdjacentHTML('afterend', '<small data-role-new>Coche ce que ce rôle permet</small>');
+    card.scrollIntoView({block:'nearest', behavior:'smooth'});
+    card.querySelector('input[data-permission]')?.focus({preventScroll:true});
+    return;
+  }
   const look = box.closest('form[data-appearance]');
   if (look) { if (box.name === 'accent') look.elements.defaultAccent.checked = false; updatePreview(look); return; }
   if (box.matches('[data-banner-file]') && box.files?.[0]) {
@@ -982,6 +1138,28 @@ app.addEventListener('change', async event => {
   try { await api(`/api/community/roles/${row.dataset.role}`, 'PUT', {permissions}); status.textContent = '✓'; }
   catch (error) { box.checked = !box.checked; status.textContent = error.message; }
 });
+
+// A role listed or taken back off the list: its line in « Ajouter un rôle » follows, with the count of the others.
+function roleOption(id, available) {
+  const select = app.querySelector('[data-role-add]');
+  const option = select?.querySelector(`option[value="${CSS.escape(id)}"]`);
+  if (!option) return;
+  option.hidden = !available; option.disabled = !available;
+  const left = [...select.options].filter(item => item.value && !item.disabled).length;
+  app.querySelector('[data-role-left]').textContent = `${left} autre${left > 1 ? 's' : ''} rôle${left > 1 ? 's' : ''} sur le serveur`;
+}
+
+// Tabs with the keyboard: arrows move along them; Escape closes the Discord window.
+app.addEventListener('keydown', event => {
+  if (event.key === 'Escape' && app.querySelector('.adm-sheet')) { closeDiscordSheet(); return; }
+  const tab = event.target.closest?.('[role="tab"]');
+  if (!tab || !['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+  const tabs = [...app.querySelectorAll('[role="tab"]')], index = tabs.indexOf(tab);
+  const next = event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1 : (index + (event.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length;
+  event.preventDefault();
+  selectTab(tabs[next].dataset.tab, true);
+});
+addEventListener('hashchange', () => { const key = TAB_ALIASES[location.hash.slice(1)] || location.hash.slice(1) || 'overview'; if (app.querySelector(`[data-tab="${key}"]`)) selectTab(key); });
 
 void load();
 
