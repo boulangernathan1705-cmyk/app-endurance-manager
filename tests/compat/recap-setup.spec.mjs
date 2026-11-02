@@ -29,14 +29,14 @@ async function mockAdmin(page,{permission=true,initialRecap=null,repairError=nul
   });
   await page.addInitScript(()=>localStorage.setItem('endurance_manager_locale','fr'));
   await page.goto('/members.html');
-  await page.getByRole('tab',{name:'Modules',exact:true}).click();
-  await page.locator('[data-module-tile="discord"] [data-module-open]').click();
+  await page.getByRole('tab',{name:'Discord',exact:true}).click();
+  await page.locator('[data-discord-open]').click();
   return calls;
 }
 async function screenshot(page,name){
   if(!process.env.RECAP_SCREENSHOT_DIR)return;
   await mkdir(process.env.RECAP_SCREENSHOT_DIR,{recursive:true});
-  await page.locator('[data-module-tile="discord"]').screenshot({path:join(process.env.RECAP_SCREENSHOT_DIR,name+'.png')});
+  await page.locator('.adm-sheet .form-sheet').screenshot({path:join(process.env.RECAP_SCREENSHOT_DIR,name+'.png')});
 }
 // On a phone the questions come one per screen: « Suivant » / « Retour » until the control shows.
 async function reach(page,locator){
@@ -63,7 +63,7 @@ test('« une catégorie par course »: the questions follow the answers, the bot
   await expect(form.locator('select[name="week-all"]')).toHaveCount(0);
   expect(await page.evaluate(()=>document.documentElement.scrollWidth-document.documentElement.clientWidth)).toBeLessThanOrEqual(1);
   await (await reach(page,form.getByRole('button',{name:'Activer',exact:true}))).click();
-  await expect(page.locator('[data-module-tile="discord"] .admin-state')).toContainText('Actif');
+  await expect(page.locator('[data-discord-state]')).toContainText('Actif');
   expect(saves(calls).at(-1).input.layout).toMatchObject({mode:'events',sims:'all',split:false,under:CATEGORY,showWeek:true});
 });
 
@@ -84,7 +84,7 @@ test('« récap de la semaine »: just below a channel, voices in « Pit talk »
   await (await reach(page,form.getByRole('button',{name:'Voir les messages',exact:true}))).click();
   await expect(form.locator('[data-recap-preview]')).toContainText('Équipage A');
   await (await reach(page,form.getByRole('button',{name:'Activer',exact:true}))).click();
-  await expect(page.locator('[data-module-tile="discord"] .admin-state')).toContainText('Actif');
+  await expect(page.locator('[data-discord-state]')).toContainText('Actif');
   expect(saves(calls).at(-1).input.layout).toMatchObject({mode:'general',week:{all:TEXT},events:'same',voices:true,pit:'bot',pitAt:PIT});
 });
 
