@@ -27,11 +27,14 @@ export const streamDetails = event => {
   const isRace = typeof details.isRace === 'boolean' ? details.isRace : Boolean(details.raceSim);
   const activity = details.activity ?? ({lmu:'Le Mans Ultimate', iracing:'iRacing'}[details.raceSim] || '');
   const raceSim = isRace ? streamRaceSim(activity) : '';
-  return {streamTime:details.streamTime || '', raceSim, raceTime:isRace ? details.raceTime || '' : '', streamUrl:streamUrl(details.streamUrl) || '',
+  return {streamTime:details.streamTime || '', streamEnd:details.streamEnd || '', raceSim, raceTime:isRace ? details.raceTime || '' : '', streamUrl:streamUrl(details.streamUrl) || '',
     isRace, activity, description:details.description || '', streamerName:details.streamerName || '', logoUrl:isStreamLogo(details.logoUrl) ? details.logoUrl : ''};
 };
 // « 19h45 ».
 export const hourLabel = time => String(time || '').replace(':', 'h');
+// « 19h45–23h », « 21h », « jusqu’à 23h »: when a stream is live, short (Nathan 2026-11-02: start and end on the calendar).
+const shortHour = time => hourLabel(time).replace(/h00$/, 'h');
+export const streamSpan = (start, end) => start && end ? `${shortHour(start)}–${shortHour(end)}` : start ? shortHour(start) : end ? `jusqu’à ${shortHour(end)}` : '';
 
 const STREAM_HOSTS = ['twitch.tv', 'youtube.com', 'youtu.be', 'kick.com'];
 // A channel name (« tondeuz » = Twitch) or the address of a Twitch, YouTube or Kick channel. Null when invalid.

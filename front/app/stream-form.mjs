@@ -22,7 +22,7 @@ export function renderStreamForm(event=null){
     <label class="form-label">Lien du stream <small>(facultatif)</small><input name="streamUrl" maxlength="200" value="${esc(lastUrl)}" placeholder="Twitch, YouTube ou Kick"></label>
     <div class="stream-logo-upload"><div class="stream-logo-preview" data-stream-logo-preview></div><div><strong>Ton logo, ton identité</strong><p class="creation-help">Importe le visuel de ton choix. Il conserve ses proportions.</p><label class="secondary-button stream-logo-pick">Importer un logo<input type="file" name="streamLogoFile" accept="image/png,image/jpeg,image/webp" data-stream-logo-file></label><button type="button" class="link-button" data-stream-logo-remove>Retirer</button><small>PNG, JPG ou WebP · 5 Mo max</small></div></div>
     <input type="hidden" name="logoUrl" value="${esc(details.logoUrl)}"><p class="stream-logo-status" data-stream-logo-status role="status"></p>`)}
-    ${step(2,`<div class="solo-form-row"><label class="form-label">Jour<input name="streamDate" type="date" value="${esc(departure.date||'')}" ${event?'':`min="${parisToday()}"`} required></label><label class="form-label">Début du stream<input name="streamTime" type="time" value="${esc(details.streamTime)}"></label></div>
+    ${step(2,`<div class="solo-form-row"><label class="form-label">Jour<input name="streamDate" type="date" value="${esc(departure.date||'')}" ${event?'':`min="${parisToday()}"`} required></label><label class="form-label">Début du stream<input name="streamTime" type="time" value="${esc(details.streamTime)}"></label><label class="form-label">Fin <small>(facultatif)</small><input name="streamEnd" type="time" value="${esc(details.streamEnd)}"></label></div>
     <label class="sim-option stream-race-toggle"><input type="checkbox" name="streamRace" ${details.isRace?'checked':''}><span>🏁 Je diffuse une course</span></label>
     <div class="stream-race" ${details.isRace?'':'hidden'}><label class="form-label">Départ de la course<input name="raceTime" type="time" value="${esc(details.raceTime)}"></label></div>
     <p class="creation-help">Heures de Paris : indique l’heure du stream ou, pour une course, celle du départ.</p>
@@ -36,7 +36,7 @@ export function renderStreamForm(event=null){
 export function streamFormData(form){
   const value=name=>form.elements[name].value.trim(),isRace=form.elements.streamRace.checked;
   const details={streamerName:value('streamerName'),logoUrl:value('logoUrl'),activity:value('activity'),description:value('description'),isRace,
-    streamTime:value('streamTime'),raceTime:isRace?value('raceTime'):'',streamUrl:value('streamUrl')};
+    streamTime:value('streamTime'),streamEnd:value('streamEnd'),raceTime:isRace?value('raceTime'):'',streamUrl:value('streamUrl')};
   const time=[details.streamTime,details.raceTime].filter(Boolean).sort()[0]||'';
   return {name:value('eventName'),format:'solo',sim:'stream',access:'open',rounds:[{circuit:'',durationMinutes:60,categories:[]}],categories:[],details,
     departures:[{id:state.editingEvent?.departures?.[0]?.id,date:value('streamDate'),time,tbd:false}]};
