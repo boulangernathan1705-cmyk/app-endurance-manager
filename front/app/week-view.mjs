@@ -107,14 +107,17 @@ function planOf(item){
         from:pending?'à définir':hour(start.startsAt),to:pending||!start.endsAt?'':hour(start.endsAt)});
     });
   }
-  if(!rows.length)return {band:'',live:''};
+  if(!rows.length)return {plan:'',band:'',live:''};
   rows.sort((a,b)=>a.key-b.key);
-  // Phone and computer alike (option P1, Nathan 2026-11-02): the race's times in the coloured band on top, the start big; the stream in its own
+  const time=row=>`<span class="week-plan-time"><b>${esc(row.from||'')}</b>${row.to?` <i aria-hidden="true">→</i> <b>${esc(row.to)}</b>`:''}</span>`;
+  // On a phone: one line per moment, the stream's link at the end of its own line (Nathan 2026-11-02).
+  const plan=`<span class="week-block-plan">${rows.map(row=>`<span class="week-plan-row${row.cls?` ${row.cls}`:''}"><span>${esc(row.icon)}<em> ${esc(row.label)}</em></span>${time(row)}${row.link||''}</span>`).join('')}</span>`;
+  // On a computer (option P1): the race's times in the coloured band on top, the start big; the stream in its own
   // purple line with its link on the same line.
   const live=rows.find(row=>row.cls==='is-stream'),races=rows.filter(row=>row!==live),shown=races.length?races:[live];
   const band=`<span class="week-block-band${shown.length>1?' is-many':''}">${shown.map(row=>`<span><b>${esc(row.from||'')}</b>${row.to?`<small> → ${esc(row.to)}</small>`:''}</span>`).join('')}</span>`;
   const pill=live&&races.length?`<span class="week-block-live"><i aria-hidden="true"></i><b>${esc(live.from||'')}${live.to?` → ${esc(live.to)}`:''}</b>${live.link||''}</span>`:'';
-  return {band,live:pill};
+  return {plan,band,live:pill};
 }
 // « dans 3 h », « dans 20 min », « en cours »: how long before the day's next start, on today's heading.
 function soonOf(items,now){
@@ -148,7 +151,7 @@ function block(item,now){
   const reg=mine?myReg(departure):null,crew=reg&&!solo?crewOf(departure,reg):null;
   const situation=!mine?'':solo?'<span class="week-chip is-ok">✓ Inscrit</span>'
     :crew?`<span class="week-chip is-ok">✓ ${esc(crew.name)}${reg?` · ${esc(hoursOf(departure,reg,event))}`:''}</span>`:'<span class="week-chip is-alert">Sans équipage</span>';
-  // How full an event is, as a gauge (option P1).
+  // How full an event is, as a gauge on a computer (option P1).
   const gauge=left===null||past||!(Number(event.capacity)>0)?'':`<span class="week-block-gauge"><span><i style="width:${Math.min(100,Math.round(pilots/Number(event.capacity)*100))}%"></i></span><em>${left<=0?'Complet':`${left} place${left>1?'s':''}`}</em></span>`;
   const places=left===null||past?'':left<=0?'<span class="week-chip is-warn">Complet</span>':`<span class="week-chip is-warn">${left} place${left>1?'s':''} restante${left>1?'s':''}</span>`;
   const label=`${pending?'Horaire à définir':several?starts.map(start=>start.departure.hideClock?'à définir':hour(start.startsAt)).join(', '):hour(startsAt)} · ${event.name}${mine?' · tu es inscrit':''}`;
@@ -178,7 +181,7 @@ function block(item,now){
     </span>
     ${solo&&isTraining(event)?`<span class="week-block-stream"><span>🏁 Entraînement ${esc(trainingSpan(startsAt,eventMinutes(event)))}</span></span>`:''}
     ${streamLine(event,starts)}
-    ${plan.live}
+    ${plan.plan}${plan.live}
     ${meta.length||situation||places?`<span class="week-block-facts">${meta.length?`<span class="week-block-meta">${meta.map(text=>`<span>${esc(text)}</span>`).join('')}</span>`:''}${situation}${places}</span>`:''}
     ${gauge}
     </span>

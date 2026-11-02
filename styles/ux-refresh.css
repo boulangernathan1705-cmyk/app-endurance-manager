@@ -2581,7 +2581,7 @@ main:not(.charte):has(.home-layout) { max-width: 2400px; }
 .week-block-title { display: contents; }
 .week-block-facts { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
 .week-block-facts .week-block-meta { display: contents; }
-.week-block-kind, .week-soon { display: none; }
+.week-block-kind, .week-soon, .week-block-plan { display: none; }
 /* On a computer (option P1, Nathan 2026-11-02): a band of the race's colour on top with its times (the start big,
    « → end » small) and its logo inside the band; under it the kind, the name, the circuit, the stream in its own
    purple line with its link, the facts and how full it is. */
@@ -2657,7 +2657,8 @@ main:not(.charte):has(.home-layout) { max-width: 2400px; }
   .week-day { min-height: 0; }
   .week-day.is-empty { display: none; }
   .week-day-name { display: inline; margin-right: 8px; }
-  /* No box around the day on phone; the cards carry the colour. */
+  /* Option G (Nathan 2026-11-02): no box around the day; each card in three floors: what (logo, kind, name, circuit),
+     when (one line per moment, start → end, the stream first when it starts first), who (pilots, places, my status). */
   .week-grid { gap: 12px; }
   .week-day, .week-day.is-today { border: 0; border-radius: 0; background: none; box-shadow: none; overflow: visible; }
   .week-day-head { padding: 0 2px 6px; border: 0; font-size: 16px; }
@@ -2665,11 +2666,39 @@ main:not(.charte):has(.home-layout) { max-width: 2400px; }
   .week-day.is-today .week-day-name { color: var(--em-accent); }
   .week-soon { display: inline; }
   .week-day-list { gap: 8px; padding: 0; }
-  /* Same card as on the computer (P1, Nathan 2026-11-02 « harmonise le téléphone avec le pc »): colour band with the times
-     and the logo, then kind, name, circuit, stream line with Twitch, chips and the places gauge. Only sizes change. */
-  .week-block-band { min-height: 66px; padding-right: 76px; }
-  .week-block-head .week-block-logo { width: 56px; height: 56px; }
-  .week-block-name { font-size: 16px; }
+  /* The computer's colour band, turned on its side: a striped band on the left holds the logo (Nathan 2026-11-02). */
+  .week-block { display: grid; grid-template-columns: 76px minmax(0, 1fr); align-items: center; gap: 5px 12px; padding: 10px 10px 10px 0; border-radius: 14px;
+    background: var(--em-panel-2); }
+  .week-block::before { display: block; width: 76px;
+    background: repeating-linear-gradient(115deg, rgba(255, 255, 255, .06) 0 6px, transparent 6px 14px), linear-gradient(180deg, color-mix(in srgb, var(--kind) 85%, #000), color-mix(in srgb, var(--kind) 42%, #000)); }
+  .week-block-head { display: contents; }
+  .week-block-sim, .week-block .week-block-time, .week-block .week-block-stream, .week-block-band, .week-block-live, .week-block-gauge { display: none; }
+  .week-block-facts .week-chip.is-warn { display: inline-block; }
+  .week-plan-row .week-stream-link { justify-self: end; font-size: 12.5px; white-space: nowrap; }
+  .week-plan-time { white-space: nowrap; }
+  .week-block-logo, .week-block-head .week-badge { position: relative; z-index: 1; grid-column: 1; grid-row: 1 / span 3; align-self: center; justify-self: center; }
+  .week-block-logo { width: 60px; height: 60px; margin: 0; }
+  .week-block-head .week-badge { display: grid; place-content: center; width: 58px; height: 58px; margin: 0; padding: 0; border-radius: 12px; border: 1px solid rgba(255, 255, 255, .22); background: rgba(0, 0, 0, .3); color: #fff; font-size: 10px; text-align: center; white-space: normal; }
+  .week-block-head .week-block-length { font-size: 18px; font-weight: 900; letter-spacing: 0; }
+  .week-block-length small { display: block; font-size: 9px; font-weight: 800; letter-spacing: .06em; opacity: .85; }
+  .week-block-body { display: contents; }
+  .week-block-title { grid-column: 2; grid-row: 1; display: grid; gap: 1px; min-width: 0; }
+  .week-block-title .week-chip { margin-bottom: 3px; }
+  .week-block-kind { display: none; font-size: 10.5px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: color-mix(in srgb, var(--kind) 60%, #fff); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .week-block-body { padding: 0; }
+  .week-block-name { font-size: 15.5px; font-weight: 900; line-height: 1.12; text-transform: uppercase; color: var(--em-text-strong); }
+  .week-block-circuit { font-size: 12.5px; }
+  .week-block-plan { grid-column: 2; display: grid; gap: 1px; margin: 0; padding: 0; border: 0; background: none; }
+  .week-plan-row em { display: inline; }
+  .week-plan-row { display: grid; grid-template-columns: 6.4em auto minmax(0, 1fr); align-items: baseline; gap: 3px; font-size: 12.5px; line-height: 1.35; font-weight: 700; color: var(--em-muted); }
+  .week-plan-row > span:first-child { white-space: nowrap; }
+  .week-plan-row b { font-size: 14px; font-weight: 900; color: var(--em-text-strong); white-space: nowrap; }
+  .week-plan-row i { font-style: normal; text-align: center; opacity: .6; }
+  .week-plan-row.is-stream > span:first-child, .week-plan-row.is-stream b { color: #c9a6ff; }
+  .week-block-facts { grid-column: 2; display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+  .week-block-facts .week-block-meta { display: contents; }
+  .week-block-facts .week-block-meta > span { padding: 1px 7px; border-radius: 999px; background: rgba(255, 255, 255, .06); font-size: 12px; font-weight: 700; color: var(--em-text); }
+  .week-block-facts .week-chip { font-size: 11.5px; padding: 1px 7px; }
 }
 
 /* Event en plusieurs manches : un seul bloc d'inscription en haut, les manches en infos, les pilotes une fois. */
