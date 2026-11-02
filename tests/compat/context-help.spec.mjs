@@ -103,8 +103,8 @@ test('administration help follows the selected tab', async ({page}) => {
   await expect(page.locator('.account-popover a[href="/help.html"]')).toHaveCount(0);
   await expect(page.locator('.site-footer a[href="/help.html"]')).toHaveCount(1);
   await page.keyboard.press('Escape');
-  await page.getByRole('tab', {name:'Membres et rôles', exact:true}).click();
-  await page.locator('[data-context-help="admin-people"]').click();
+  await page.getByRole('tab', {name:'Rôles', exact:true}).click();
+  await page.locator('[data-context-help="admin-roles"]').click();
   await expect(page.locator('dialog.context-help-dialog')).toContainText('Accès Endurance Manager');
   await page.keyboard.press('Escape');
   await page.getByRole('tab', {name:'Modules', exact:true}).click();
