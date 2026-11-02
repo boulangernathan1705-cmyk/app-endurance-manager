@@ -226,9 +226,10 @@ export async function renderPoster(env, page, {community = null, origin = ''} = 
       const inline = await inlineImage(env, community, origin, address);
       if (inline) page = page.split(`src="${address}"`).join(`src="${inline}"`);
     }
+    // A short window: the full-page picture takes the poster's own height (a 600 px window left a short poster half empty).
     const response = await fetch(`https://api.cloudflare.com/client/v4/accounts/${account}/browser-rendering/screenshot`, {method:'POST', signal:AbortSignal.timeout(45000),
       headers:{Authorization:`Bearer ${token}`, 'Content-Type':'application/json'},
-      body:JSON.stringify({html:page, viewport:{width:1200, height:600}, gotoOptions:{waitUntil:'networkidle0', timeout:20000}, screenshotOptions:{fullPage:true, type:'png'}})});
+      body:JSON.stringify({html:page, viewport:{width:1200, height:100}, gotoOptions:{waitUntil:'networkidle0', timeout:20000}, screenshotOptions:{fullPage:true, type:'png'}})});
     if (!response.ok || !String(response.headers.get('content-type') || '').startsWith('image/')) return null;
     const bytes = await response.arrayBuffer();
     return bytes.byteLength > 1000 ? bytes : null;
