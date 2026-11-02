@@ -74,7 +74,8 @@ function streamBlock(event, url, streamer) {
   const stream = event.stream || {}, facts = [], lines = [];
   if (stream.activity) facts.push(['🎮', text(stream.activity)]);
   if (stream.raceTime) facts.push(['🏁 Course à', timeOf(stream.raceTime)]);
-  if (stream.crew) lines.push({time:timeOf(stream.raceTime) || timeOf(stream.streamTime), label:crewLabel(stream.crew.crew), text:[text(stream.crew.eventName), ...(stream.crew.pilots || []).map(text)].filter(Boolean).join(' · '), star:streamer});
+  // The streamer is already named first (📺): not twice in the crew's pilots.
+  if (stream.crew) lines.push({time:timeOf(stream.raceTime) || timeOf(stream.streamTime), label:crewLabel(stream.crew.crew), text:[text(stream.crew.eventName), ...(stream.crew.pilots || []).map(text).filter(pilot => pilot.toLowerCase() !== text(streamer).toLowerCase())].filter(Boolean).join(' · '), star:streamer});
   if (!stream.crew && !stream.raceTime) facts.push(['', 'Pas d’inscription : viens regarder !']);
   return {sim:'stream', icon:'🎙️', name:event.name, url, logo:stream.logoUrl || '', chips:[], facts, lines, note:stream.description ? text(stream.description).slice(0, 140) : ''};
 }
@@ -128,6 +129,7 @@ const CSS = `*{box-sizing:border-box;margin:0}body{width:1200px;font-family:"Not
 .logo{position:absolute;right:52px;top:26px;width:190px;height:190px;object-fit:contain}
 .blk{margin-top:26px;background:rgba(255,255,255,.04);border-radius:14px;padding:22px 26px;border-left:6px solid var(--rc);position:relative}
 .blk .lg{position:absolute;right:20px;top:14px;width:96px;height:96px;object-fit:contain}
+.lg~.row{padding-right:104px}
 .name{font-size:34px;font-weight:800;padding-right:110px;overflow-wrap:anywhere}
 .row{display:flex;gap:14px;margin-top:12px;align-items:center;flex-wrap:wrap}
 .chip{background:var(--rc);padding:5px 14px;border-radius:8px;font-weight:800;font-size:20px;letter-spacing:1px}
@@ -226,9 +228,10 @@ export async function renderPoster(env, page, {community = null, origin = ''} = 
       const inline = await inlineImage(env, community, origin, address);
       if (inline) page = page.split(`src="${address}"`).join(`src="${inline}"`);
     }
+    // A short window: the full-page picture takes the poster's own height (a 600 px window left a short poster half empty).
     const response = await fetch(`https://api.cloudflare.com/client/v4/accounts/${account}/browser-rendering/screenshot`, {method:'POST', signal:AbortSignal.timeout(45000),
       headers:{Authorization:`Bearer ${token}`, 'Content-Type':'application/json'},
-      body:JSON.stringify({html:page, viewport:{width:1200, height:600}, gotoOptions:{waitUntil:'networkidle0', timeout:20000}, screenshotOptions:{fullPage:true, type:'png'}})});
+      body:JSON.stringify({html:page, viewport:{width:1200, height:100}, gotoOptions:{waitUntil:'networkidle0', timeout:20000}, screenshotOptions:{fullPage:true, type:'png'}})});
     if (!response.ok || !String(response.headers.get('content-type') || '').startsWith('image/')) return null;
     const bytes = await response.arrayBuffer();
     return bytes.byteLength > 1000 ? bytes : null;
