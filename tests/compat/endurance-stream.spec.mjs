@@ -29,7 +29,8 @@ for(const admin of [true,false])test(`endurance entry: stream choice ${admin?'of
   const box=form.locator('[data-registration-stream]');
   if(!admin){await expect(box).toHaveCount(0);return;}
   await expect(form.locator('[data-registration-stream-times]')).toBeHidden();
-  await box.getByText('📺 Je streame ce départ').click();
+  await expect(box).toContainText('📺 Je streame ce départ');
+  await box.locator('[name="registrationStream"]').check();
   await expect(form.locator('[data-registration-stream-times]')).toBeVisible();
   await expect(form.locator('[name="registrationStreamStart"]')).toHaveValue('20:00');
   await expect(form.locator('[name="registrationStreamEnd"]')).toHaveValue('23:30');
