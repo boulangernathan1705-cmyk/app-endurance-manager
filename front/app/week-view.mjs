@@ -107,7 +107,7 @@ function planOf(item){
   }
   if(!rows.length)return '';
   rows.sort((a,b)=>a.key-b.key);
-  return `<span class="week-block-plan">${rows.map(row=>`<span class="week-plan-row${row.cls?` ${row.cls}`:''}"><span>${esc(row.label)}</span><b>${esc(row.from||'')}</b>${row.to?`<i aria-hidden="true">→</i><b>${esc(row.to)}</b>`:'<i></i><b></b>'}${row.link||''}</span>`).join('')}</span>`;
+  return `<span class="week-block-plan">${rows.map(row=>`<span class="week-plan-row${row.cls?` ${row.cls}`:''}"><span>${esc(row.label)}</span><span class="week-plan-time"><b>${esc(row.from||'')}</b>${row.to?` <i aria-hidden="true">→</i> <b>${esc(row.to)}</b>`:''}</span>${row.link||''}</span>`).join('')}</span>`;
 }
 // « dans 3 h », « dans 20 min », « en cours »: how long before the day's next start, on today's heading.
 function soonOf(items,now){

@@ -111,7 +111,7 @@ test('on a phone a week card shows its schedule, start → end, the stream first
   assert.match(view, /rows\.sort\(\(a,b\)=>a\.key-b\.key\)/);
   // « Aujourd’hui · dans 3 h » on today's heading.
   assert.match(view, /function soonOf\(items,now\)/);
-  // The schedule is only on a phone: the computer keeps its cards.
-  assert.match(css, /\.week-block-kind, \.week-block-plan, \.week-soon \{ display: none; \}/);
+  // The schedule replaces the start time and the stream line, on a computer too.
+  assert.match(css, /\.week-block \.week-block-time, \.week-block \.week-block-stream \{ display: none; \}/);
   assert.match(css, /\.week-block-plan \{ grid-column: 2;/);
 });
