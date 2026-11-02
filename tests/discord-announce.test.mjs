@@ -545,6 +545,8 @@ test('with Cloudflare’s browser, each message is a poster made once at 7h30: t
   const renders=calls.filter(call=>call.method==='RENDER'),posts=sent(calls);
   assert.equal(renders.length,2);assert.equal(posts.length,2);
   assert.ok(renders[0].path.endsWith('/accounts/acc/browser-rendering/screenshot'));
+  // A short window and a full-page picture: the poster is as tall as its content, never padded to the window (2026-11-02).
+  assert.ok(renders[0].body.viewport.height<=100);assert.equal(renders[0].body.screenshotOptions.fullPage,true);
   // The stream's poster: the banner, « STREAM 20H45 », the streamer; the races' one: no banner.
   // The site's pictures go inside the page: Cloudflare's browser does not fetch them from the site.
   assert.match(renders[0].body.html,/class=ban src="data:image\/webp;base64,AQID"/);
