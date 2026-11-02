@@ -118,7 +118,23 @@ function block(item,now){
 
 const FILTERS=[['all','Tout'],['lmu','Endurance LMU'],['iracing','Endurance iRacing'],['event','Events'],['mine','Mes courses']];
 const simOf=event=>event.otherGame||activeGame;
-const keep=(item,filter)=>filter==='all'||(filter==='mine'?item.mine:filter==='event'?item.kind.key!=='endurance':item.kind.key==='endurance'&&simOf(item.event)===filter);
+// Several filters at once (Nathan 2026-11-02): the kinds ticked add up (« Events » + « Endurance LMU »), « Mes courses »
+// keeps only the pilot's own among them; none ticked = « Tout ». The choice is kept in this browser.
+const FILTERS_KEY='em_week_filters';
+const kindKey=item=>item.kind.key==='endurance'?simOf(item.event):'event';
+const keep=(item,chosen)=>(!chosen.has('mine')||item.mine)&&(![...chosen].some(key=>key!=='mine')||chosen.has(kindKey(item)));
+export function weekFilters(){
+  if(!(state.weekFilters instanceof Set)){
+    let saved=[];try{saved=JSON.parse(localStorage.getItem(FILTERS_KEY)||'[]');}catch{}
+    state.weekFilters=new Set((Array.isArray(saved)?saved:[]).filter(key=>FILTERS.some(([known])=>known===key&&key!=='all')));
+  }
+  return state.weekFilters;
+}
+export function toggleWeekFilter(key){
+  const chosen=weekFilters();
+  if(key==='all')chosen.clear();else if(chosen.has(key))chosen.delete(key);else chosen.add(key);
+  try{localStorage.setItem(FILTERS_KEY,JSON.stringify([...chosen]));}catch{}
+}
 
 const SIM_NAME={lmu:'LMU',iracing:'iRacing'};
 const dateShort=new Intl.DateTimeFormat('fr-FR',{timeZone:'Europe/Paris',weekday:'short',day:'numeric',month:'short'});
@@ -179,13 +195,13 @@ function crewsBox(){
 export function renderWeek(){
   if(state.access!=='member'){state.page='home';return;}
   state.page='week';state.currentEventId=null;
-  const offset=Number(state.weekOffset)||0,filter=state.weekFilter||'all',now=Date.now();
+  const offset=Number(state.weekOffset)||0,chosen=new Set([...weekFilters()].filter(key=>key!=='event'||state.soloRaces)),now=Date.now();
   const all=[...state.events,...otherEndurances()];
   const monday=weekStart(now,offset),today=parisDay(now);
-  const days=weekStarts(all,monday).map(day=>({...day,items:day.items.filter(item=>keep(item,filter))}));
+  const days=weekStarts(all,monday).map(day=>({...day,items:day.items.filter(item=>keep(item,chosen))}));
   const range=`du ${monthDay.format(dateOf(monday))} au ${monthDay.format(dateOf(monday+6))}`;
   const filters=FILTERS.filter(([key])=>key!=='event'||state.soloRaces)
-    .map(([key,label])=>button('week-filter',`${key==='all'?'':'<i aria-hidden="true"></i>'}${label}`,`data-filter="${key}" aria-pressed="${filter===key}"`,`event-filter-button week-filter is-${key}`)).join('');
+    .map(([key,label])=>button('week-filter',`${key==='all'?'':'<i aria-hidden="true"></i>'}${label}`,`data-filter="${key}" aria-pressed="${key==='all'?!chosen.size:chosen.has(key)}"`,`event-filter-button week-filter is-${key}`)).join('');
   // Finished races fold into one line per day, opened with a click; busy days get more width, empty days less, so the
   // week stays short (Nathan 2026-11-01, options C + A).
   const open=state.weekOpenDays||(state.weekOpenDays=new Set());

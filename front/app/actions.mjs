@@ -7,7 +7,7 @@ import {renderEvent,togglePlanningCommunity} from './event-view.mjs';
 import {showPlanningDay,scrollPlanning,goToDeparture,setPlanningSpan,toggleQuickMenu} from './planning.mjs';
 import {renderEventForm,departureFields,updateRemoveButtons,goToEventStep,formDurationMinutes,bulkPreview,shiftBulkWeek} from './event-form.mjs';
 import {renderMyEntries} from './entries-view.mjs';
-import {renderWeek} from './week-view.mjs';
+import {renderWeek,toggleWeekFilter} from './week-view.mjs';
 import {renderCrewsPage,crewsAction} from './crews-page.mjs';
 import {openCrewRequest,cancelCrewRequest} from './crew-request.mjs';
 import {submitSoloEvent} from './solo-form.mjs';
@@ -239,7 +239,7 @@ async function perform(action,target){
     // « Semaine »: from the bar, this week; its arrows move a week back or forward.
     case 'week': state.weekOffset=target.dataset.offset===undefined||target.dataset.offset==='0'?0:(Number(state.weekOffset)||0)+Number(target.dataset.offset);renderWeek();break;
     case 'week-done': {const day=Number(target.dataset.day),open=state.weekOpenDays||(state.weekOpenDays=new Set());if(open.has(day))open.delete(day);else open.add(day);renderWeek();break;}
-    case 'week-filter': state.weekFilter=target.dataset.filter||'all';renderWeek();break;
+    case 'week-filter': toggleWeekFilter(target.dataset.filter||'all');renderWeek();break;
     // « Équipages » (organisers): the page, on a start when the race page's « Former les équipages » leads there.
     case 'crews-page': await load();renderNav();if(target.dataset.departure&&target.dataset.game&&target.dataset.game!==activeGame){location.href=`/${target.dataset.game}/#equipages=${target.dataset.departure}`;break;}renderCrewsPage(target.dataset.departure||'');break;
     case 'crews-view': case 'crews-sim': case 'crews-category': case 'crews-see': case 'crew-request-refuse': if(await crewsAction(action,target)==='refresh')await refreshAfterSave('Demande refusée. Le pilote est prévenu.');break;
