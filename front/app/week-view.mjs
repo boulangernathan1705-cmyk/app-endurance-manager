@@ -87,7 +87,10 @@ const parisMinutes=timestamp=>{const [h,m]=clock.format(timestamp).split(':').ma
 const clockMinutes=time=>{const [h,m]=String(time||'').split(':').map(Number);return Number.isFinite(h)?h*60+(m||0):0;};
 const shortClock=time=>String(time||'').replace(':','h').replace(/h00$/,'h').replace(/^0(?=\d)/,'');
 function planOf(item){
-  const {event,starts,kind}=item,stream=isStream(event),info=stream?streamDetails(event):event.details||{},rows=[];
+  const {event,starts,kind}=item,stream=isStream(event),rows=[];
+  // An endurance start a member streams (« Je streame ce départ »): its times come with that registration.
+  const streamed=stream?null:starts.flatMap(start=>start.departure.availability||[]).find(reg=>reg.streamTime);
+  const info=stream?streamDetails(event):{...(event.details||{}),...(streamed&&!event.details?.streamTime?{streamTime:streamed.streamTime,streamEnd:streamed.streamEnd||''}:{})};
   if(info.streamTime||info.streamEnd){
     const url=streamUrl(stream?info.streamUrl:state.communityStreamUrl)||'';
     rows.push({key:clockMinutes(info.streamTime||info.streamEnd),cls:'is-stream',label:'📺 Stream',from:shortClock(info.streamTime),to:shortClock(info.streamEnd),
