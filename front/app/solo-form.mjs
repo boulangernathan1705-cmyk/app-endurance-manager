@@ -1,6 +1,6 @@
 import {renderRallyEventForm} from './rally-form.mjs';
 import {renderStreamForm} from './stream-form.mjs';
-import {isStream} from '../../shared/stream.mjs';
+import {isStream,streamSpan} from '../../shared/stream.mjs';
 import {streamerFields, streamerData, syncStreamerFields} from './grindfest.mjs';
 import {isGrindfest} from '../../shared/grindfest.mjs';
 // Creating or editing an event of the community calendar (solo format), step by step, for every simulator.
@@ -77,7 +77,7 @@ export function renderSoloEventForm(event=null,{focusPassword=false}={}){
   <p class="registration-step-label" data-solo-step-label>Étape ${first} sur ${LAST} · ${STEPS[first-1]}</p>
   ${step(1,`<label class="form-label">Nom de l’événement<input name="eventName" maxlength="100" value="${esc(event?.name||'')}" required></label>
     <fieldset class="sim-options"><legend class="form-label">Simulateur</legend><div class="sim-option-row">${EVENT_SIMS.map(item=>simChoice(item,sim)).join('')}</div></fieldset>${typeField(details.type)}
-    <label class="form-label">Début du stream <small>(facultatif)</small><input name="eventStreamTime" type="time" value="${esc(details.streamTime||'')}"></label>`)}
+    <div class="solo-form-row"><label class="form-label">Début du stream <small>(facultatif)</small><input name="eventStreamTime" type="time" value="${esc(details.streamTime||'')}"></label><label class="form-label">Fin du stream <small>(facultatif)</small><input name="eventStreamEnd" type="time" value="${esc(details.streamEnd||'')}"></label></div>`)}
   ${step(2,`<div class="solo-form-start">${start}</div>
     <div class="solo-form-row"><label class="form-label">Mot de passe du serveur <small>(facultatif)</small><input name="eventPassword" maxlength="30" value="${esc(details.password||'')}" autocomplete="off"></label></div><div data-gridfest-password-tools hidden><p class="creation-help">30 caractères maximum, sans espace. Envoyé par MP Discord aux pilotes confirmés.</p></div>`)}
   ${step(3,`<div class="solo-rounds" data-rounds>${rounds.map(round=>roundField(sim,round)).join('')}</div><button type="button" class="secondary-button" data-add-round>+ Ajouter une manche</button>`)}
@@ -100,7 +100,7 @@ function formData(form){
     categories:[...row.querySelectorAll('[name="roundCategory"]:checked')].map(input=>input.value),
     category:value(row,'roundCategoryText'),car:value(row,'roundCar'),practice:optional(row,'roundPractice'),qualifying:optional(row,'roundQualifying'),weather:row.querySelector('[data-weather]:checked')?.value||'',fuel:optional(row,'roundFuel'),tyres:optional(row,'roundTyres'),capacity:optional(row,'roundCapacity')}));
   const start=form.querySelector('.departure-field');
-  const details={type:form.querySelector('[name="eventType"]:checked')?.value||'',password:form.elements.eventPassword.value.trim(),note:form.elements.eventNote.value.trim(),streamTime:form.elements.eventStreamTime.value};
+  const details={type:form.querySelector('[name="eventType"]:checked')?.value||'',password:form.elements.eventPassword.value.trim(),note:form.elements.eventNote.value.trim(),streamTime:form.elements.eventStreamTime.value,streamEnd:form.elements.eventStreamEnd.value};
   if (isGrindfest({details})) { details.streamers = streamerData(form); rounds.forEach(round => { round.capacity = null; }); }
   return {name:form.elements.eventName.value.trim(),format:'solo',sim:form.elements.eventSim.value,access:form.querySelector('[name="eventAccess"]:checked')?.value||'open',
     rounds,categories:[],details,
@@ -112,7 +112,7 @@ function fillRecap(form){
   const date=data.departures[0].date,day=date?new Intl.DateTimeFormat('fr-FR',{weekday:'short',day:'numeric',month:'short',timeZone:'UTC'}).format(new Date(`${date}T00:00:00Z`)):'—';
   const line=(n,label,value)=>`<button type="button" class="registration-summary-row" data-solo-step="${n}"><span>${label}</span><strong>${esc(value)}</strong><em>Modifier</em></button>`;
   const time=data.departures[0].time;
-  form.querySelector('[data-solo-recap]').innerHTML=line(1,'Événement',[data.name||'—',sim.short,data.details.type,data.details.streamTime&&`stream ${data.details.streamTime.replace(':','h')}`].filter(Boolean).join(' · '))
+  form.querySelector('[data-solo-recap]').innerHTML=line(1,'Événement',[data.name||'—',sim.short,data.details.type,(data.details.streamTime||data.details.streamEnd)&&`stream ${streamSpan(data.details.streamTime,data.details.streamEnd)}`].filter(Boolean).join(' · '))
     +line(2,'Horaire',`${day} · ${time}${data.details.password?` · mdp : ${data.details.password}`:''}`)
     +data.rounds.map((round,index)=>line(3,data.rounds.length>1?`Manche ${index+1}`:'Manche',[circuitName(round.circuit),isRandomCircuit(round.circuit)&&eventCatalog(data.sim)?'catégorie aléatoire':round.categories.join(' ')||round.category,round.car,roundFormat(round),roundExtras(round)].filter(Boolean).join(' · '))).join('')
     +line(4,'Inscriptions',[accessType(data.details.type)||!state.eventTdz?'':data.access==='safe'?'SAFE':'OPEN',isGrindfest(data)?`${data.details.streamers.length} streamers · ${data.details.streamers.reduce((sum,item)=>sum+item.capacity,0)} places`:data.rounds.some(round=>round.capacity)?data.rounds.map(round=>round.capacity?`${round.capacity} places`:'illimité').join(' / '):'places illimitées',data.details.note].filter(Boolean).join(' · '));

@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {validateEvent} from '../server/core.mjs';
 import {buildCalendarPayload, buildAnnounceStream, buildAnnounceIntro} from '../server/discord-weekly-format.mjs';
-import {streamUrl,streamDetails,isStreamLogo,STREAM_LOGO_MAX_LENGTH} from '../shared/stream.mjs';
+import {streamUrl,streamDetails,isStreamLogo,STREAM_LOGO_MAX_LENGTH,streamSpan} from '../shared/stream.mjs';
+import {readFileSync} from 'node:fs';
 
 const stream = details => ({name:'LES 6H DE SPA', format:'solo', sim:'stream', details, departures:[{date:'2090-10-15', time:'00:00'}]});
 
@@ -86,4 +87,17 @@ test('Discord shows a freely chosen activity instead of an undefined simulator l
   const event={id:'free',name:'Soirée découverte',startsAt:Date.UTC(2090,9,15,17),stream:{isRace:false,activity:'Euro Truck Simulator 2',streamTime:'19:00'}};
   assert.match(buildAnnounceStream(event).embeds[0].description,/🎮 Euro Truck Simulator 2/);
   assert.doesNotMatch(buildAnnounceStream(event).embeds[0].description,/undefined/);
+});
+
+test('a stream and an event keep the end of their stream, shown « 19h45–23h » on the week (Nathan 2026-11-02)', () => {
+  assert.equal(validateEvent(stream({streamTime:'19:45', streamEnd:'23:00'})).details.streamEnd, '23:00');
+  assert.throws(() => validateEvent(stream({streamTime:'19:45', streamEnd:'25:00'})), /fin du stream invalide/);
+  assert.equal(streamSpan('19:45', '23:00'), '19h45–23h');
+  assert.equal(streamSpan('21:00', ''), '21h');
+  assert.equal(streamSpan('', '23:30'), 'jusqu’à 23h30');
+  assert.equal(streamSpan('', ''), '');
+  const week = readFileSync(new URL('../front/app/week-view.mjs', import.meta.url), 'utf8');
+  // The link opens the stream without opening the race (the card is a button).
+  assert.match(week, /data-stream-url=/);
+  assert.match(week, /stopPropagation\(\);\s*window\.open\(link\.dataset\.streamUrl,'_blank','noopener,noreferrer'\)/);
 });

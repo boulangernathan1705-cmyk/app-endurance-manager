@@ -476,6 +476,8 @@ async function api(request, env) {
   if (requests) return requests;
   // Each opening of the site renews the sign-in (once a day at most), so it never runs out for a pilot who comes back.
   if (path === '/api/session' && method === 'GET') return json({user:actor.user, discordReady:!!(env.DISCORD_CLIENT_ID && env.DISCORD_CLIENT_SECRET), adminConfigured:administrators(env).length > 0, soloRaces:soloRacesEnabled(env, community), iracingImport:community.modules?.iracingImport===true, categoryEntry:community.modules?.categoryEntry === true, soloLabel:eventsLabel(community, isDevelopment(env)), eventTdz:tdzOnly(community, isDevelopment(env)), eventTypes:!tdzOnly(community, isDevelopment(env)) ? [] : grindfestEnabled(community, isDevelopment(env)) ? [...TDZ_EVENT_TYPES, 'Gridfest'] : TDZ_EVENT_TYPES, grindfest:grindfestEnabled(community, isDevelopment(env)), grindfestAvailable:grindfestAvailable(community, isDevelopment(env)), safeGuideUrl:community.modules?.safeGuideUrl || '',
+    // The community's stream link (« Annonce du jour »), for the events it streams on the week (members only).
+    communityStreamUrl:access.status === 'member' && soloRacesEnabled(env, community) ? announceStream(await botRecapSettings(env, community).catch(() => null)) : '',
     combos:combosEnabled(community) && access.permissions.has('combos'),
     community:{id:community.id, slug:community.slug, name:community.name, shortName:community.shortName, discordInviteUrl:community.discordInviteUrl, appearance:appearanceOf(community)},
     access:access.status, permissions:[...access.permissions], manager:access.manager, communities:await myCommunities(env, actor, community),

@@ -2577,6 +2577,10 @@ main:not(.charte):has(.home-layout) { max-width: 2400px; }
 .week-block-name { font-size: 13.5px; font-weight: 750; line-height: 1.25; overflow-wrap: anywhere; }
 .week-block-circuit { font-size: 12px; font-weight: 650; line-height: 1.25; color: var(--em-muted); overflow-wrap: anywhere; }
 .week-block-meta { display: flex; flex-wrap: wrap; gap: 2px 8px; font-size: var(--em-text-xs); color: var(--em-muted); }
+/* When the stream is live, in small, with its link (Nathan 2026-11-02). */
+.week-block-stream { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; font-size: var(--em-text-xs); font-weight: 650; color: var(--em-muted); }
+.week-stream-link { color: #a970ff; font-weight: 750; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+.week-stream-link:hover, .week-stream-link:focus-visible { color: #c9a6ff; }
 .week-chip { justify-self: start; padding: 2px 7px; border-radius: 7px; font-size: 11px; font-weight: 800; line-height: 1.3; }
 .week-chip.is-ok { background: color-mix(in srgb, var(--em-ok) 16%, transparent); color: color-mix(in srgb, var(--em-ok) 70%, #fff); }
 .week-chip.is-alert, .week-chip.is-live { background: color-mix(in srgb, var(--em-danger) 18%, transparent); color: var(--em-danger-text); }

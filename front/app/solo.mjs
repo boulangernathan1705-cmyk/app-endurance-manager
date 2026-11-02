@@ -4,7 +4,7 @@
 import {state,esc,pilotNameTip,button,canManage,can,logo,badge,categories} from './core.mjs';
 import {SIMS,simCatalog,simForEvent,eventLogoName} from '../../shared/catalog.mjs';
 import {isGrindfest} from '../../shared/grindfest.mjs';
-import {isStream,streamDetails,hourLabel,streamPlatform} from '../../shared/stream.mjs';
+import {isStream,streamDetails,hourLabel,streamPlatform,streamSpan} from '../../shared/stream.mjs';
 
 export const ANY_CATEGORY = '*';
 export const isSolo = event => event?.format === 'solo';
@@ -37,8 +37,8 @@ export function accessBadge(event) {
 // races it, its uploaded logo (or initials/microphone), and on its page the links to the stream and to the
 // endurances.
 export function streamTimes(event) {
-  const {streamTime, raceTime} = streamDetails(event);
-  return [streamTime && `Stream ${hourLabel(streamTime)}`, raceTime && `Départ ${hourLabel(raceTime)}`].filter(Boolean).join(' · ');
+  const {streamTime, streamEnd, raceTime} = streamDetails(event);
+  return [(streamTime || streamEnd) && `Stream ${streamSpan(streamTime, streamEnd)}`, raceTime && `Départ ${hourLabel(raceTime)}`].filter(Boolean).join(' · ');
 }
 export function streamCrewLine(event) {
   const crew = event.streamCrew;

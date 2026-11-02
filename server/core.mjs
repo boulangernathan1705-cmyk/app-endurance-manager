@@ -229,6 +229,8 @@ function validateStream(input) {
   }
   if (raw.isRace != null) details.isRace = isRace;
   if (streamTime) details.streamTime = streamTime;
+  const streamEnd = time(raw.streamEnd, 'Heure de fin du stream');
+  if (streamEnd) details.streamEnd = streamEnd;
   const crewSim = raw.activity != null ? streamRaceSim(details.activity) : raceSim;
   if (isRace && crewSim) details.raceSim = crewSim;
   if (raceTime) details.raceTime = raceTime;
@@ -307,6 +309,7 @@ function validateSoloRace(input, existing) {
   if (raw.note) details.note = text(raw.note, 120, 'Info');
   // When the stream starts (it can start before the race): announced in the morning (server/discord-announce.mjs).
   if (raw.streamTime) { if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(raw.streamTime)) fail(400, 'Heure de début du stream invalide.'); details.streamTime = raw.streamTime; }
+  if (raw.streamEnd) { if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(raw.streamEnd)) fail(400, 'Heure de fin du stream invalide.'); details.streamEnd = raw.streamEnd; }
   if(rally){
     if(isGrindfest({details})) fail(400, 'Le format Gridfest ne correspond pas à une soirée rallye.');
     if(raw.rallyHost) details.rallyHost=text(raw.rallyHost,60,'Hôte');
