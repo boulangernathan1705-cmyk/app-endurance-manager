@@ -39,6 +39,7 @@ function harness(withParticipants=true){
  DB.db.exec(readFileSync(new URL('../migrations/0059_grindfest.sql',import.meta.url),'utf8'));
  DB.db.exec(readFileSync(new URL('../migrations/0063_registration_comment.sql',import.meta.url),'utf8'));
  DB.db.exec(readFileSync(new URL('../migrations/0065_gridfest_registration.sql',import.meta.url),'utf8'));
+ DB.db.exec(readFileSync(new URL('../migrations/0092_registration_stream.sql',import.meta.url),'utf8'));
  DB.db.exec(readFileSync(new URL('../migrations/0015_crew_lock.sql',import.meta.url),'utf8'));
  DB.db.exec(readFileSync(new URL('../migrations/0016_client_errors.sql',import.meta.url),'utf8'));
  // The crews' owner column of migration 0016_crew_ownership (its backfill needs no data here).
@@ -123,6 +124,27 @@ test('a pilot shows under his nickname on the community Discord server, else his
  assert.deepEqual(names,['Pilote '+OTHER,'SPM | Jordi']);
  const picker=(await req('/api/participants','GET',null,'admin')).data.participants.find(p=>p.id===PILOT);
  assert.equal(picker.name,'SPM | Jordi');
+});
+test('an admin says he streams his endurance start; a pilot or an entry for someone else cannot',async()=>{
+ const {req,login}=harness();
+ await login(ADMIN,'admin');await login(PILOT,'pilot');
+ const created=await req('/api/events','POST',{...eventInput,name:'Stream endu',categories:['GT3']},'admin');
+ const event=(await req('/api/events','GET',null,'admin')).data.events.find(e=>e.id===created.data.id),departure=event.departures[0];
+ const path=`/api/events/${created.data.id}/departures/${departure.id}/registrations`;
+ const entry={category:'GT3',status:'whole',carAny:true};
+ assert.equal((await req(path,'POST',{...entry,name:'Admin',stream:{start:'21:00',end:'20:00'}},'admin')).status,400,'end before start');
+ const mine=await req(path,'POST',{...entry,name:'Admin',stream:{start:'14:45',end:'23:30'}},'admin');assert.equal(mine.status,201);
+ const pilot=await req(path,'POST',{...entry,name:'Pilote',stream:{start:'15:00'}},'pilot');assert.equal(pilot.status,201);
+ const find=async(actor='admin')=>(await req('/api/events','GET',null,actor)).data.events.find(e=>e.id===created.data.id).departures.find(d=>d.id===departure.id).availability;
+ let regs=await find();
+ assert.deepEqual([regs.find(r=>r.id===mine.data.id).streamTime,regs.find(r=>r.id===mine.data.id).streamEnd],['14:45','23:30']);
+ assert.equal(regs.find(r=>r.id===pilot.data.id).streamTime,undefined,'only an admin streams');
+ // An edit from an older page keeps the stream; « Je streame » unticked clears it.
+ const reg=regs.find(r=>r.id===mine.data.id);
+ assert.equal((await req(`/api/registrations/${reg.id}`,'PATCH',{...entry,name:'Admin',version:reg.version},'admin')).status,200);
+ regs=await find();assert.equal(regs.find(r=>r.id===mine.data.id).streamTime,'14:45');
+ assert.equal((await req(`/api/registrations/${reg.id}`,'PATCH',{...entry,name:'Admin',stream:null,version:regs.find(r=>r.id===mine.data.id).version},'admin')).status,200);
+ regs=await find();assert.equal(regs.find(r=>r.id===mine.data.id).streamTime,undefined);
 });
 test('one pilot may register in multiple categories until an organizer assigns one to a crew',async()=>{
  const {req,login}=harness();
@@ -546,6 +568,14 @@ test('events calendar: every simulator, typed circuit on AMS2 / ACE, no limit an
  const training=await req('/api/events','POST',{...input,details:{type:'TONDEUZ TRAINING'}},'admin');
  assert.equal(training.status,201,JSON.stringify(training.data));
  assert.equal((await req('/api/events','GET',null,'admin')).data.events.find(e=>e.id===training.data.id).details.type,'TONDEUZ TRAINING');
+ // A training is one window: its first circuit, as long as the window (up to 24 h), without sessions, weather or places.
+ const saved=(await req('/api/events','GET',null,'admin')).data.events.find(e=>e.id===training.data.id);
+ assert.equal(saved.rounds.length,1);assert.deepEqual(saved.rounds[0],{circuit:'Interlagos',durationMinutes:30,categories:[],category:'GT3',car:'Porsche 911 GT3 R'});
+ const night=await req('/api/events','POST',{...input,rounds:[{circuit:'Spa',durationMinutes:14*60}],details:{type:'TONDEUZ TRAINING',streamTime:'22:00',streamEnd:'01:00'}},'admin');
+ assert.equal(night.status,201,'a 14 h training, a stream ending after midnight');
+ // Stream times: an end needs a start and must follow it.
+ for(const details of [{streamEnd:'22:00'},{streamTime:'21:00',streamEnd:'20:00'},{streamTime:'21:00',streamEnd:'21:00'}])
+  assert.equal((await req('/api/events','POST',{...input,details:{type:'OPEN',...details}},'admin')).status,400,JSON.stringify(details));
  const iracing=await req('/api/events','POST',{...input,sim:'iracing',rounds:[{circuit:'Indianapolis',durationMinutes:40,category:'GT3',car:'Ferrari 296 GT3'}]},'admin');assert.equal(iracing.status,201,'iRacing circuits and categories are typed');
  const lmu=await req('/api/events','POST',{...soloInput,sim:undefined},'admin');assert.equal(lmu.status,201);
  assert.equal((await req('/api/events','GET',null,'admin')).data.events.find(e=>e.id===lmu.data.id).sim,'lmu');

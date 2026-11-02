@@ -2,7 +2,7 @@
 // OPEN / SAFE access. They reuse the race cards, the race page and the registration window; this module
 // only holds what differs from endurance events.
 import {state,esc,pilotNameTip,button,canManage,can,logo,badge,categories} from './core.mjs';
-import {SIMS,simCatalog,simForEvent,eventLogoName} from '../../shared/catalog.mjs';
+import {SIMS,simCatalog,simForEvent,eventLogoName,isTraining,trainingSpan} from '../../shared/catalog.mjs';
 import {isGrindfest} from '../../shared/grindfest.mjs';
 import {isStream,streamDetails,hourLabel,streamPlatform,streamSpan} from '../../shared/stream.mjs';
 
@@ -87,6 +87,8 @@ export function soloCardInfo(event) {
     return `<span class="solo-card-info"><span class="solo-info-row">${infoChip('car',round.car||round.category||'Voitures libres','Voitures autorisées')}${details.rallyEstimatedMinutes?infoChip('time',`Environ ${details.rallyEstimatedMinutes} min`,'Durée estimée de la soirée'):''}${details.note?infoChip('info',details.note,'Consignes'):''}</span></span>`;
   }
   const details = event.details || {}, rounds = event.rounds?.length ? event.rounds : [{circuit: event.circuit, durationMinutes: event.durationMinutes}];
+  // A training shows its window instead of the sessions (« 20h–22h »).
+  const training = isTraining(event) ? trainingSpan(event.departures?.[0]?.startsAt, rounds[0]?.durationMinutes) : '';
   const roundRow = round => {
     const weather = WEATHERS.find(([value]) => value === round.weather);
     const car = [(round.categories || []).length ? '' : round.category, round.car].filter(Boolean).join(' · ');
@@ -94,7 +96,7 @@ export function soloCardInfo(event) {
       rounds.length > 1 ? `<span class="solo-info-circuit">${esc(eventCircuitName(event, round.circuit))}</span>` : '',
       round.randomCategory ? '<span class="solo-info-chip" title="Catégorie aléatoire"><span aria-hidden="true">❓</span><span>Catégorie aléatoire</span></span>' : '',
       ...(round.categories || []).map(category => `<span class="solo-info-category" title="${esc(category)}">${logo(category)}</span>`),
-      infoChip('format', roundFormat(round).replaceAll('/', ' · '), 'Essais · Qualifs · Course (min)'),
+      training ? infoChip('time', `Entraînement ${training}`, 'Horaires de l’entraînement') : infoChip('format', roundFormat(round).replaceAll('/', ' · '), 'Essais · Qualifs · Course (min)'),
       weather ? `<span class="solo-info-chip solo-info-weather" title="Météo : ${esc(weather[2])}"><span aria-hidden="true">${weather[1]}</span><span class="sr-only">${esc(weather[2])}</span></span>` : '',
       round.fuel != null ? infoChip('fuel', `×${round.fuel}`, 'Consommation de carburant') : '',
       round.tyres != null ? infoChip('tyres', `×${round.tyres}`, 'Usure des pneus') : '',
@@ -106,6 +108,7 @@ export function soloCardInfo(event) {
   const roundLine = (round, index) => `<span class="solo-round-line"><span class="solo-round-label">Manche ${index + 1}</span><span class="solo-round-name">${esc(eventCircuitName(event, round.circuit))}</span><span class="solo-round-cats">${round.randomCategory ? '<span class="solo-info-chip" title="Catégorie aléatoire">❓</span>' : (round.categories || []).map(category => `<span class="solo-info-category" title="${esc(category)}">${logo(category)}</span>`).join('')}</span>${infoChip('format', roundFormat(round).replaceAll('/', ' · '), 'Essais · Qualifs · Course (min)')}</span>`;
   // The server password is not on the card: on the event page, for its pilots only.
   const extra = [
+    details.streamTime ? `<span class="solo-info-chip" title="Stream"><span aria-hidden="true">📺</span><span>${esc(streamSpan(details.streamTime, details.streamEnd))}</span></span>` : '',
     details.note ? infoChip('info', details.note, 'Info') : '',
   ].filter(Boolean);
   if (rounds.length > 1) return `<span class="solo-card-info"><span class="solo-round-lines">${rounds.map(roundLine).join('')}</span>${extra.length ? `<span class="solo-info-row">${extra.join('')}</span>` : ''}</span>`;
@@ -173,7 +176,8 @@ export function soloHeaderChips(event){
   const round=event.rounds?.[0]||{durationMinutes:event.durationMinutes},weather=WEATHERS.find(([value])=>value===round.weather);
   const chip=(label,value)=>value?`<span class="solo-session-pill">${esc(label)} · ${esc(value)}</span>`:'';
   const minutes=value=>Number(value)>0?`${Number(value)} min`:'';
-  const session=[chip('Essais',minutes(round.practice)),chip('Qualifs',minutes(round.qualifying)),chip('Course',minutes(round.durationMinutes))].join('');
+  const training=isTraining(event)?trainingSpan(event.departures?.[0]?.startsAt,round.durationMinutes):'',stream=event.details?.streamTime?streamSpan(event.details.streamTime,event.details.streamEnd):'';
+  const session=(training?chip('Entraînement',training):[chip('Essais',minutes(round.practice)),chip('Qualifs',minutes(round.qualifying)),chip('Course',minutes(round.durationMinutes))].join(''))+chip('📺 Stream',stream);
   const conditions=[chip('Météo',weather?.[2]),chip('Carburant',round.fuel!=null?`×${round.fuel}`:''),chip('Pneus',round.tyres!=null?`×${round.tyres}`:'')].join('');
   const cars=chip('Voiture',round.car)||chip('Catégorie',round.randomCategory?'Aléatoire':(round.categories||[]).join(' / ')||round.category);
   return `<div class="solo-session-chips">${[session,conditions,cars].filter(Boolean).map(row=>`<div class="solo-session-row">${row}</div>`).join('')}</div>`;

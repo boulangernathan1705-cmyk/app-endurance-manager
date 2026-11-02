@@ -9,7 +9,7 @@ import {posterModel, posterHtml, posterText, renderPoster} from './discord-poste
 import {discordRequest, botCategoryEmojis} from './recap-discord.mjs';
 import {discordAbsentButton} from './discord-interactions.mjs';
 import {parseLayout} from './discord-layout.mjs';
-import {simForEvent, tdzOnly, normalizeTdzEventType, eventLogoName} from '../shared/catalog.mjs';
+import {simForEvent, tdzOnly, normalizeTdzEventType, eventLogoName, isTrainingType} from '../shared/catalog.mjs';
 import {grindfestEnabled, isGrindfest, streamersOf} from '../shared/grindfest.mjs';
 import {isDevelopment} from './dev-environment.mjs';
 import {isStream, streamDetails} from '../shared/stream.mjs';
@@ -57,25 +57,29 @@ export function parisDayStart(timestamp) {
 // The day's races of a community, in the order of their first start today: [{item, kind:'event'|'race', startsAt}].
 export async function announceItems(env, community, timestamp) {
   const day = parisDay(timestamp), items = [];
-  const solo = (await env.DB.prepare(`SELECT id,sim,departures,schedule_pending FROM events WHERE ${SOLO_SQL(env, community)}`).bind(community.id).all()).results || [];
+  const solo = (await env.DB.prepare(`SELECT id,sim,departures,schedule_pending,details FROM events WHERE ${SOLO_SQL(env, community)}`).bind(community.id).all()).results || [];
   const registrations = (await env.DB.prepare(`SELECT event_id,departure_id FROM registrations
     WHERE community_id=? AND COALESCE(status,'')<>'unavailable' GROUP BY event_id,departure_id`).bind(community.id).all()).results || [];
   for (const row of solo) {
     const starts = parse(row.departures, []).filter(start => today(start, day)
-      && (isStream(row) || registrations.some(entry => entry.event_id === row.id && entry.departure_id === start.id)));
+      && (isStream(row) || announcedEmpty(row) || registrations.some(entry => entry.event_id === row.id && entry.departure_id === start.id)));
     // A stream (« Annoncer un stream ») has its own card, without « Présent » nor « Absent ».
     if (starts.length) items.push({item:row.id, kind:isStream(row) ? 'stream' : 'event', startsAt:Math.min(...starts.map(start => Number(start.startsAt)))});
   }
   // The endurances as in the week's message (official LMU ones included, iRacing ones as the community shows them).
   const snapshot = await loadWeeklyDiscordSnapshot(env, parisDayStart(timestamp), community, 'all');
   // Only the starts with a crew: the announcement puts forward who is sure to race that day (Nathan, 2026-11-01).
-  for (const departure of snapshot.futureDepartures.filter(item => parisDay(item.startsAt) === day && crewed(item))) {
+  // A start an admin streams (« Je streame ce départ ») is announced with or without a crew.
+  const streamed = await streamedStarts(env, community);
+  for (const departure of snapshot.futureDepartures.filter(item => parisDay(item.startsAt) === day && (crewed(item) || streamed.has(item.departureId)))) {
     const known = items.find(item => item.item === departure.eventId);
     if (!known) items.push({item:departure.eventId, kind:'race', startsAt:departure.startsAt});
   }
   return items.sort((a, b) => a.startsAt - b.startsAt || a.item.localeCompare(b.item));
 }
 
+// A streamed event or a training is announced even before its first entry: people need to know (Nathan 2026-11-02).
+const announcedEmpty = row => { const details = parse(row.details, {}) || {}; return Boolean(details.streamTime) || isTrainingType(details.type); };
 // An event of the calendar as announced: its rounds, its places and this community's entries for today's start.
 async function eventSnapshot(env, community, id, timestamp) {
   const row = await env.DB.prepare(`SELECT id,name,sim,circuit,rounds,capacity,access,details,departures,schedule_pending,created_by FROM events WHERE id=? AND ${SOLO_SQL(env, community)}`)
@@ -85,17 +89,17 @@ async function eventSnapshot(env, community, id, timestamp) {
   const entries = isStream(row) ? [] : (await env.DB.prepare(`SELECT departure_id,streamer_id,COUNT(DISTINCT COALESCE(participant_id,id)) AS entered FROM registrations
     WHERE event_id=? AND community_id=? AND COALESCE(status,'')<>'unavailable' GROUP BY departure_id,streamer_id`).bind(row.id, community.id).all()).results || [];
   const start = parse(row.departures, []).find(item => today(item, day)
-    && (isStream(row) || entries.some(entry => entry.departure_id === item.id)));
+    && (isStream(row) || announcedEmpty(row) || entries.some(entry => entry.departure_id === item.id)));
   if (!start) return null;
   const details = parse(row.details, {}) || {}, sim = simForEvent(row), tdz = tdzOnly(community, isDevelopment(env));
   if (isStream(row)) return {id:row.id, name:row.name, startsAt:Number(start.startsAt), stream:{...streamDetails({details}), crew:await streamCrew(env, community.id, row)}};
   const startEntries = entries.filter(entry => entry.departure_id === start.id);
   const entered = startEntries.reduce((total, item) => total + Number(item.entered || 0), 0);
-  if (!entered) return null;
+  if (!entered && !announcedEmpty(row)) return null;
   const gridfest = isGrindfest(row), site = siteOf(env, community).url || '';
   return {id:row.id, name:row.name, sim, type:normalizeTdzEventType(details.type) || '', access:tdz ? row.access || 'open' : '', tdz, note:details.note || '',
     startsAt:Number(start.startsAt), timePending:Boolean(row.schedule_pending) || start.tbd === true,
-    rounds:parse(row.rounds, []), capacity:row.capacity == null ? null : Number(row.capacity), entered,
+    training:isTrainingType(details.type), rounds:parse(row.rounds, []), capacity:row.capacity == null ? null : Number(row.capacity), entered,
     streamers:gridfest ? streamersOf(row).map(streamer => ({name:streamer.name, twitchUrl:streamer.twitchUrl, logoUrl:streamer.logoUrl || '', capacity:streamer.capacity, entered:Number(startEntries.find(item => item.streamer_id === streamer.id)?.entered || 0)})) : [],
     rally:sim === 'acrally' ? {stages:details.rallyStages || [], host:details.rallyHost || '', carMode:details.rallyCarMode || '', minutes:details.rallyEstimatedMinutes || 0} : null,
     // The password itself never goes on Discord.
@@ -110,14 +114,30 @@ async function raceSnapshot(env, community, id, timestamp) {
   if (!row) return null;
   const day = parisDay(timestamp), snapshot = await loadWeeklyDiscordSnapshot(env, timestamp, community, 'all', id);
   // Its starts with a crew, without the pilots still alone (they see the race on the site).
-  const departures = snapshot.futureDepartures.filter(item => parisDay(item.startsAt) === day && crewed(item)).map(item => ({...item, unassignedPilots:[]}));
+  const streamed = await streamedStarts(env, community, id);
+  const departures = snapshot.futureDepartures.filter(item => parisDay(item.startsAt) === day && (crewed(item) || streamed.has(item.departureId))).map(item => ({...item, unassignedPilots:[]}));
   if (!departures.length) return null;
   return {id:row.id, name:row.name, circuit:row.circuit, eventType:row.event_type || '', official:row.community_id === 'official',
     durationMinutes:Number(row.duration_minutes) || Number(row.duration_hours) * 60 || 0, details:parse(row.details, {}) || {}, departures};
 }
-// The stream times the admins gave today's events (details.streamTime), for the intro.
-async function streamTimes(env, rows) {
+// The entries of this community's admins who stream an endurance start (« Je streame ce départ »).
+const streamRows = async (env, community, eventId = null) => (await env.DB.prepare(`SELECT r.event_id,r.departure_id,r.stream_time,e.departures FROM registrations r
+  JOIN events e ON e.id=r.event_id WHERE r.community_id=? AND r.stream_time<>'' AND COALESCE(r.status,'')<>'unavailable' ${eventId ? 'AND r.event_id=?' : ''}`)
+  .bind(...[community.id, eventId].filter(Boolean)).all()).results || [];
+async function streamedStarts(env, community, eventId = null) { return new Set((await streamRows(env, community, eventId)).map(row => row.departure_id)); }
+// When an admin streams an endurance today: its earliest stream time.
+async function raceStreamTime(env, community, eventId, timestamp) {
+  const rows = await streamRows(env, community, eventId);
+  const day = parisDay(timestamp);
+  return rows.filter(row => today(parse(row.departures, []).find(start => start.id === row.departure_id), day)).map(row => row.stream_time).sort()[0] || '';
+}
+// The stream times the admins gave today's events (details.streamTime) and endurances, for the intro.
+async function streamTimes(env, rows, community = null, timestamp = Date.now()) {
   const streams = [];
+  for (const row of rows.filter(item => item.kind === 'race' && community)) {
+    const time = await raceStreamTime(env, community, row.item, timestamp);
+    if (time) streams.push({item:row.item, name:'', time});
+  }
   for (const row of rows.filter(item => ['event','stream'].includes(item.kind))) {
     const event = await env.DB.prepare('SELECT name,details FROM events WHERE id=?').bind(row.item).first();
     // A stream announced with only the race's time starts then.
@@ -320,7 +340,7 @@ async function publishAnnouncement(env, community, settings, timestamp) {
   }
   for (const [position,row] of activeRows.entries()) await env.DB.prepare(`INSERT OR IGNORE INTO discord_announcements(community_id,day,item,kind,position,guild_id,channel_id,created_at)
     VALUES(?,?,?,?,?,?,?,?)`).bind(community.id,day,row.item,row.kind,position+1,community.discordGuildId,channel,timestamp).run();
-  const streams = await streamTimes(env,activeRows), streamed = new Set(streams.map(item => item.item));
+  const streams = await streamTimes(env,activeRows,community,timestamp), streamed = new Set(streams.map(item => item.item));
   site.streams = streams;
   // The stream's message: an « Annoncer un stream », or the community's stream link with a stream time on a race today.
   const live = items.filter(item => item.kind === 'stream' || (stream && streamed.has(item.row.item)));

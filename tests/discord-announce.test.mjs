@@ -18,6 +18,8 @@ class D1 {
   constructor(){this.db=new DatabaseSync(':memory:');this.db.exec('PRAGMA foreign_keys=ON');for(const file of readdirSync(new URL('../migrations/',import.meta.url)).filter(file=>file.endsWith('.sql')).sort())this.db.exec(readFileSync(new URL('../migrations/'+file,import.meta.url),'utf8'));linkTestServer(this.db);}
   prepare(sql){const db=this.db;return {params:[],bind(...params){this.params=params;return this;},async first(){return db.prepare(sql).get(...this.params)||null;},async all(){return {results:db.prepare(sql).all(...this.params)};},async run(){return {meta:{changes:Number(db.prepare(sql).run(...this.params).changes)}};}};}
 }
+// The entries rule is for plain events: a streamed event or a training is announced even without entries.
+const unstream=DB=>DB.db.prepare("UPDATE events SET details=json_remove(details,'$.streamTime')").run();
 function setup(t){
   const DB=new D1(),calls=[],messages=new Map();let counter=900000000000000000n;
   DB.db.prepare('INSERT INTO users(id,name,created_at) VALUES(?,?,0)').run('111111111111111111','Orga');
@@ -317,7 +319,7 @@ test('all simulator events share identical facts and retain differences per roun
 
 
 test('no entrants: no morning message or ping, even with an empty crew and repeated runs',async t=>{
-  const {DB,env,calls,settings}=setup(t);
+  const {DB,env,calls,settings}=setup(t);unstream(DB);
   DB.db.prepare('DELETE FROM crew_members').run();
   DB.db.prepare('DELETE FROM registrations').run();
   assert.deepEqual(await announceItems(env,TDZ,MORNING),[]);
@@ -326,7 +328,7 @@ test('no entrants: no morning message or ping, even with an empty crew and repea
 });
 
 test('official races with no local entrant and unavailable or other-departure entries are excluded',async t=>{
-  const {DB,env,calls,settings}=setup(t);
+  const {DB,env,calls,settings}=setup(t);unstream(DB);
   DB.db.prepare('DELETE FROM crew_members').run();
   DB.db.prepare("UPDATE events SET community_id='official' WHERE id=?").run(RACE);
   DB.db.prepare("UPDATE registrations SET status='unavailable' WHERE event_id=?").run(RACE);
@@ -336,7 +338,7 @@ test('official races with no local entrant and unavailable or other-departure en
 });
 
 test('only races with entrants are included in a mixed day',async t=>{
-  const {DB,env,calls,settings}=setup(t);
+  const {DB,env,calls,settings}=setup(t);unstream(DB);
   DB.db.prepare('DELETE FROM registrations WHERE event_id=?').run(EVENT);
   await announceCommunity(env,TDZ,settings(),MORNING);
   const body=JSON.stringify(sent(calls)[0].body);
@@ -354,7 +356,7 @@ test('two concurrent passes publish the day only once and release their lock',as
 });
 
 test('a previously planned empty day is neither sent nor recreated after cancellations',async t=>{
-  const {DB,env,calls,messages,settings}=setup(t);
+  const {DB,env,calls,messages,settings}=setup(t);unstream(DB);
   await announceCommunity(env,TDZ,settings(),MORNING);
   DB.db.prepare('DELETE FROM crew_members').run();
   DB.db.prepare('DELETE FROM registrations').run();
@@ -383,7 +385,7 @@ test('an explicit stream announcement still works without registrations',async t
 });
 
 test('entries from another community never trigger this community’s announcement',async t=>{
-  const {DB,env,calls,settings}=setup(t);
+  const {DB,env,calls,settings}=setup(t);unstream(DB);
   DB.db.prepare('DELETE FROM crew_members').run();
   DB.db.prepare("INSERT INTO communities(id,slug,name,short_name,created_at) VALUES('other','other','Other','OTHER',0)").run();
   DB.db.prepare("INSERT INTO participants(id,name,created_by,created_at,community_id) VALUES('other-p','Other pilot','111111111111111111',0,'other')").run();
@@ -396,7 +398,7 @@ test('entries from another community never trigger this community’s announceme
 });
 
 test('a solo event selects today’s registered departure rather than an earlier empty one',async t=>{
-  const {DB,env,calls,settings}=setup(t);
+  const {DB,env,calls,settings}=setup(t);unstream(DB);
   DB.db.prepare('UPDATE events SET departures=? WHERE id=?').run(JSON.stringify([
     {id:'empty-start',startsAt:MORNING+HOUR},{id:'start-e1',startsAt:MORNING+2*HOUR}
   ]),EVENT);
@@ -413,7 +415,7 @@ const lateEntry=DB=>DB.db.prepare(`INSERT INTO registrations(id,event_id,departu
  VALUES('late',?,'start-e1','late','Pilote 1','late','GT3','whole',0,'p1',?)`).run(EVENT,DEV_COMMUNITY);
 
 test('a late first entrant creates a silent announcement after an empty morning',async t=>{
- const {DB,env,calls,settings}=setup(t);clearEntries(DB);
+ const {DB,env,calls,settings}=setup(t);unstream(DB);clearEntries(DB);
  await announceCommunity(env,TDZ,settings(),MORNING);lateEntry(DB);
  await announceCommunity(env,TDZ,settings(),MORNING+12*60000);
  assert.equal(sent(calls).length,1);assert.deepEqual(sent(calls)[0].body.allowed_mentions,{parse:[]});assert.equal(sent(calls)[0].body.flags,4096);
@@ -435,9 +437,9 @@ test('a newly entered race is added without another ping',async t=>{
 });
 
 test('last cancellation removes the stale message; a later return never pings again',async t=>{
- const {DB,env,calls,messages,settings}=setup(t);await announceCommunity(env,TDZ,settings(),MORNING);clearEntries(DB);calls.length=0;
+ const {DB,env,calls,messages,settings}=setup(t);unstream(DB);await announceCommunity(env,TDZ,settings(),MORNING);clearEntries(DB);calls.length=0;
  await announceCommunity(env,TDZ,settings(),MORNING+12*60000);
- assert.equal(messages.size,0);assert.equal(calls.filter(call=>call.method==='DELETE').length,2);
+ assert.equal(messages.size,0);assert.equal(calls.filter(call=>call.method==='DELETE').length,1);
  lateEntry(DB);calls.length=0;await announceCommunity(env,TDZ,settings(),MORNING+24*60000);
  assert.equal(messages.size,1);assert.deepEqual(sent(calls)[0].body.allowed_mentions,{parse:[]});assert.equal(sent(calls)[0].body.flags,4096);
 });
@@ -611,4 +613,34 @@ test('a day announced by the previous version keeps its message until midnight, 
   DB.db.prepare(`INSERT INTO crew_members(registration_id,crew_id) VALUES('r3','c3')`).run();
   await announceCommunity(env,TDZ,settings(),MORNING+24*HOUR);
   assert.ok(sent(calls).length>0,'the next morning uses the new layout');
+});
+
+test('a streamed event or a training is announced before its first entry; a plain event is not',async t=>{
+  const {DB,env}=setup(t);
+  DB.db.prepare('DELETE FROM registrations WHERE event_id=?').run(EVENT);
+  assert.ok((await announceItems(env,TDZ,MORNING)).some(item=>item.item===EVENT),'streamed');
+  unstream(DB);
+  assert.ok(!(await announceItems(env,TDZ,MORNING)).some(item=>item.item===EVENT),'plain, no entry');
+  DB.db.prepare("UPDATE events SET details=json_set(details,'$.type','TONDEUZ TRAINING'),rounds=? WHERE id=?").run(JSON.stringify([{circuit:'Interlagos',durationMinutes:120,categories:[]}]),EVENT);
+  assert.ok((await announceItems(env,TDZ,MORNING)).some(item=>item.item===EVENT),'training');
+});
+
+test('a training shows its window on the poster and in the text, without « 0 inscrit »',()=>{
+  const startsAt=Date.parse('2026-10-28T19:00:00Z');
+  const event={id:'t1',name:'Training Spa',sim:'lmu',type:'TONDEUZ TRAINING',training:true,tdz:true,access:'open',startsAt,rounds:[{circuit:'spa',durationMinutes:120,categories:[]}],capacity:null,entered:0,streamers:[]};
+  const text=posterText(posterModel([{kind:'event',data:event,url:'https://site.example/lmu/#event=t1'}],{name:'TDZ',url:'https://site.example'},{timestamp:startsAt}));
+  assert.match(text,/Entraînement/);assert.match(text,/20h00–22h00|20h–22h/);assert.doesNotMatch(text,/0 inscrit/);
+  const embed=buildAnnounceEvent(event,{url:'https://site.example'},startsAt).embeds[0];
+  assert.match(embed.description,/→ 22h/);assert.doesNotMatch(embed.description,/⏱️/);
+});
+
+test('an endurance an admin streams (« Je streame ce départ ») is on the stream poster with @everyone, even without a crew',async t=>{
+  const {DB,env,calls,settings}=setup(t);unstream(DB);
+  DB.db.prepare('DELETE FROM crew_members').run();
+  DB.db.prepare("UPDATE registrations SET stream_time='20:45',stream_end='23:00' WHERE id='r1'").run();
+  assert.ok((await announceItems(env,TDZ,MORNING)).some(item=>item.item===RACE&&item.kind==='race'));
+  await announceCommunity(env,TDZ,settings(),MORNING);
+  const first=sent(calls)[0].body;
+  assert.equal(first.content,'@everyone');
+  assert.match(JSON.stringify(first),/6h de Spa/);assert.match(JSON.stringify(first),/20h45/);
 });
