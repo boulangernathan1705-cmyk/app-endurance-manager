@@ -978,7 +978,7 @@ async function api(request, env) {
     const roles = (discord?.roles || []).sort((a, b) => b.position - a.position).map(role => ({id:role.id, name:role.id === community.discordGuildId ? '@everyone' : role.name,
       administrator:role.administrator, permissions:saved.has(role.id) ? normalizePermissions(saved.get(role.id)) : (role.id === community.discordGuildId ? [...DEFAULT_EVERYONE] : [])}));
     await keepDiscordLook(env, community, discord);
-    return json({community:{name:community.name, shortName:community.shortName, discordServer:discord?.name || null, ...appearanceOf(community)}, roles, permissions:PERMISSIONS,
+    return json({community:{name:community.name, shortName:community.shortName, discordServer:discord?.name || null, ...appearanceOf(community), botAvatarUrl:community.appearance?.botAvatarUrl || null}, roles, permissions:PERMISSIONS,
       modules:{iracingImport:community.modules.iracingImport === true, discordWeekly:community.modules.discordWeekly === true, soloRaces:soloRacesEnabled(env, community), eventTdzAvailable:tdzOnly(community, isDevelopment(env)), eventsLabel:eventsLabel(community, isDevelopment(env)), eventTypes:!tdzOnly(community, isDevelopment(env)) ? [] : grindfestEnabled(community, isDevelopment(env)) ? [...TDZ_EVENT_TYPES, 'Gridfest'] : TDZ_EVENT_TYPES, grindfest:grindfestEnabled(community, isDevelopment(env)), grindfestAvailable:grindfestAvailable(community, isDevelopment(env)),
         crewChannels:community.modules.crewChannels === true, raceReminders:community.modules.raceReminders === true, categoryEntry:community.modules.categoryEntry === true, combos:combosEnabled(community), combosManager:actor.manager === true},
       crews:await crewDiscordState(env, community)});
@@ -1002,6 +1002,27 @@ async function api(request, env) {
         ON CONFLICT(community_id) DO UPDATE SET image=excluded.image,content_type=excluded.content_type,updated_at=excluded.updated_at`).bind(community.id, image, type, now()),
       env.DB.prepare('UPDATE communities SET appearance=? WHERE id=?').bind(JSON.stringify(appearance), community.id)]);
     return json({ok:true, bannerUrl:`/api/community/banner?v=${appearance.bannerVersion}`});
+  }
+  // Logo of the bot on this community's Discord server only (Discord: Modify Current Member, avatar as a data URI,
+  // PNG or JPEG). Without one, the bot keeps its own logo, the same everywhere.
+  if (path === '/api/community/bot-avatar' && ['PUT','DELETE'].includes(method)) {
+    requirePermission(actor,'admin');
+    if (!community.discordGuildId) fail(400, 'Aucun serveur Discord n’est relié à cette communauté.');
+    let avatar = null;
+    if (method === 'PUT') {
+      const image = await imageBody(request, 1000000);
+      const type = imageType(image);
+      if (!['image/png','image/jpeg'].includes(type)) fail(400, 'Envoie une image PNG ou JPEG.');
+      let binary = ''; for (let i = 0; i < image.length; i += 0x8000) binary += String.fromCharCode(...image.subarray(i, i + 0x8000));
+      avatar = `data:${type};base64,${btoa(binary)}`;
+    }
+    let member;
+    try { member = await discordRequest(env, 'PATCH', `/guilds/${community.discordGuildId}/members/@me`, {avatar}); }
+    catch (error) { fail(502, error.status === 429 ? 'Discord limite les changements de logo : réessaie dans quelques minutes.' : error.status === 403 || error.status === 404 ? 'Le bot n’est pas sur le serveur Discord.' : 'Discord a refusé ce logo. Réessaie avec une autre image.'); }
+    const url = member?.avatar && member?.user?.id ? `https://cdn.discordapp.com/guilds/${community.discordGuildId}/users/${member.user.id}/avatars/${member.avatar}.png?size=256` : null;
+    await (url ? env.DB.prepare("UPDATE communities SET appearance=json_set(COALESCE(appearance,'{}'),'$.botAvatarUrl',?) WHERE id=?").bind(url, community.id)
+      : env.DB.prepare("UPDATE communities SET appearance=json_remove(COALESCE(appearance,'{}'),'$.botAvatarUrl') WHERE id=?").bind(community.id)).run();
+    return json({ok:true, botAvatarUrl:url});
   }
   if (path === '/api/community/appearance' && method === 'PATCH') {
     requirePermission(actor,'admin');
