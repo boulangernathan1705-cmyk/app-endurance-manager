@@ -59,6 +59,17 @@
 .adm-role .adm-role-head strong { font-size: var(--em-text-lg); color: var(--em-text-strong); overflow-wrap: anywhere; }
 .adm-role .adm-role-head small { display: inline-flex; align-items: center; gap: 4px; color: var(--em-muted); font-size: var(--em-text-sm); }
 .adm-role .adm-role-head .settings-status { margin-left: auto; font-size: 12px; color: var(--em-ok); }
+.adm-role[hidden] { display: none; }
+.adm-role-remove { min-height: 28px; padding: 2px 10px; border: 1px solid var(--em-border); border-radius: var(--em-radius-sm, 6px); background: transparent; color: var(--em-muted); font: inherit; font-size: 12px; cursor: pointer; }
+.adm-role .adm-role-head .settings-status:empty + .adm-role-remove, .adm-role-remove { align-self: center; }
+.adm-role-remove:hover, .adm-role-remove:focus-visible { color: var(--em-text-strong); border-color: var(--em-muted); }
+.adm-role-remove.is-danger { color: var(--em-danger-text); border-color: var(--em-danger); }
+.adm-role-add { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 0 0 var(--em-space-3); }
+.adm-role-add label { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; color: var(--em-text-strong); }
+.adm-role-add select { flex: 0 1 380px; min-width: 0; max-width: 100%; }
+.adm-role-add small { color: var(--em-muted); font-size: var(--em-text-sm); }
+.adm-admins { margin: var(--em-space-3) 0 0; color: var(--em-muted); font-size: var(--em-text-sm); display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.adm-admins b { color: var(--em-text); }
 .adm-perms { display: flex; flex-wrap: wrap; gap: 6px; }
 .adm-perm { position: relative; display: inline-flex; cursor: pointer; }
 .adm-perm input { position: absolute; opacity: 0; pointer-events: none; }

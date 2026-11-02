@@ -82,7 +82,7 @@ const tip = text => `<span class="tip-info" data-tip="${esc(text)}" tabindex="0"
 // One line of a list: a coloured stripe for its state, a title, a short line, an action on the right.
 const row = (tone, title, sub = '', action = '') => `<li class="adm-row is-${tone}"><span><strong>${title}</strong>${sub ? `<small>${sub}</small>` : ''}</span>${action}</li>`;
 const goTo = (tab, label, extra = '') => `<button type="button" class="secondary-button" data-go-tab="${tab}" ${extra}>${label}</button>`;
-const MODE_NAMES = {events:'Un fil par course', general:'Récap de la semaine + pit talk'};
+const MODE_NAMES = {events:'Catégorie du bot', general:'Dans tes salons'};
 
 // « Vue d'ensemble »: what needs fixing (only that), then the server and how to bring the members, as the home page.
 function overviewMarkup(setup, settings, members) {
@@ -132,15 +132,28 @@ function rolesMarkup(settings) {
   // The solo races permissions only matter with the solo races module, the fiches combo one with its module.
   const shown = settings.permissions.filter(permission => ((settings.modules.soloRaces && settings.modules.eventTdzAvailable) || !permission.startsWith('solo_'))
     && (permission !== 'combos' || settings.modules.combos));
-  const card = item => `<article class="adm-role" data-role="${esc(item.id)}" data-kept="${esc(JSON.stringify(item.permissions.filter(permission => !shown.includes(permission))))}">
-    <div class="adm-role-head"><strong>${esc(item.name)}</strong>${item.administrator ? `<small>Admin Discord : a tout ${tip('Le propriétaire du serveur et les rôles qui ont « Administrateur » sur Discord ont toutes les autorisations, sans case à cocher.')}</small>` : ''}<span class="settings-status" aria-live="polite"></span></div>
-    <div class="adm-perms">${shown.map(permission => `<label class="adm-perm"><input type="checkbox" data-permission="${permission}" aria-label="${esc(item.name)} : ${esc(PERMISSION_LABELS[permission] || permission)}" ${item.permissions.includes(permission) || item.administrator ? 'checked' : ''} ${item.administrator ? 'disabled' : ''}><span>${esc(PERMISSION_SHORT[permission] || PERMISSION_LABELS[permission] || permission)}</span></label>`).join('')}</div>
+  // The site only looks at the roles listed here: those with at least one permission, and @everyone. The others
+  // (often dozens on a big server) wait in « Ajouter un rôle »; a role removed loses its permissions.
+  const everyone = item => item.name === '@everyone';
+  const admins = settings.roles.filter(item => item.administrator);
+  const others = settings.roles.filter(item => !item.administrator);
+  const followed = item => everyone(item) || item.permissions.length > 0;
+  const card = item => `<article class="adm-role" data-role="${esc(item.id)}" data-role-name="${esc(item.name)}" data-kept="${esc(JSON.stringify(item.permissions.filter(permission => !shown.includes(permission))))}" ${followed(item) ? '' : 'hidden'}>
+    <div class="adm-role-head"><strong>${esc(item.name)}</strong>${everyone(item) ? `<small>Tout le serveur ${tip('Ce que tout membre du serveur peut faire, même sans rôle.')}</small>` : ''}<span class="settings-status" aria-live="polite"></span>
+      ${everyone(item) ? '' : '<button type="button" class="adm-role-remove" data-role-remove>Retirer</button>'}</div>
+    <div class="adm-perms">${shown.map(permission => `<label class="adm-perm"><input type="checkbox" data-permission="${permission}" aria-label="${esc(item.name)} : ${esc(PERMISSION_LABELS[permission] || permission)}" ${item.permissions.includes(permission) ? 'checked' : ''}><span>${esc(PERMISSION_SHORT[permission] || PERMISSION_LABELS[permission] || permission)}</span></label>`).join('')}</div>
   </article>`;
+  const option = item => `<option value="${esc(item.id)}" ${followed(item) ? 'hidden disabled' : ''}>${esc(item.name)}</option>`;
   const legend = `<dl class="adm-legend">${shown.map(permission => `<div><dt>${esc(PERMISSION_SHORT[permission] || PERMISSION_LABELS[permission])}</dt><dd>${esc(PERMISSION_HELP[permission])}</dd></div>`).join('')}</dl>`;
-  return `<p class="adm-intro">Ce que chaque rôle de ton serveur Discord permet sur le site. Touche une autorisation pour l’allumer ou l’éteindre : c’est enregistré tout de suite.</p>
+  if (!settings.roles.length) return '<ul class="adm-rows">' + row('warn', 'Les rôles du serveur ne peuvent pas être lus', 'Vérifie que le bot est bien sur ton serveur Discord.') + '</ul>';
+  const sorted = [...others].sort((a, b) => a.name.localeCompare(b.name, 'fr'));
+  return `<p class="adm-intro">Le site ne regarde que les rôles listés ici. Ajoute ceux qui comptent pour ta communauté et coche ce qu’ils permettent : c’est enregistré tout de suite. Les autres rôles du serveur sont ignorés.</p>
     <details class="adm-help"><summary>Que permet chaque autorisation ?</summary>${legend}<p>Les autorisations de plusieurs rôles s’additionnent. Les rôles se donnent sur Discord.</p></details>
-    ${settings.roles.length ? `<div class="adm-roles">${settings.roles.map(card).join('')}</div>`
-      : '<ul class="adm-rows">' + row('warn', 'Les rôles du serveur ne peuvent pas être lus', 'Vérifie que le bot est bien sur ton serveur Discord.') + '</ul>'}`;
+    <div class="adm-role-add"><label for="adm-role-add">Ajouter un rôle ${tip('Les rôles de ton serveur Discord que le site ne regarde pas encore.')}</label>
+      <select id="adm-role-add" data-role-add><option value="">Choisir un rôle du serveur…</option>${sorted.filter(item => !everyone(item)).map(option).join('')}</select>
+      <small data-role-left>${sorted.filter(item => !followed(item)).length} autres rôles sur le serveur</small></div>
+    <div class="adm-roles">${[...others.filter(everyone), ...sorted.filter(item => !everyone(item))].map(card).join('')}</div>
+    ${admins.length ? `<p class="adm-admins">Ont déjà tout, car « Administrateur » sur Discord : <b>${admins.map(item => esc(item.name)).join(', ')}</b> ${tip('Le propriétaire du serveur et les rôles « Administrateur » sur Discord ont toutes les autorisations du site, sans rien cocher.')}</p>` : ''}`;
 }
 
 // « Membres »: the members of the server who came to the site, with what their roles allow.
@@ -164,8 +177,8 @@ function membersMarkup(result, settings) {
 // « Discord »: the setting asked question by question (server/discord-layout.mjs): each answer shows the questions it
 // needs; on a phone, one question per screen, the server's sketch last.
 const DISCORD_MODES = {
-  events:['Un fil par course', 'Chaque course a son fil dans # endurances-de-la-semaine, les vocaux de ses équipages juste en dessous.'],
-  general:['Récap de la semaine + pit talk', 'Un fil par course dans # endurances-de-la-semaine, les vocaux d’équipage dans « Pit talk ».']};
+  events:['Catégorie du bot', 'Le bot crée sa propre catégorie et y range tout : les courses de la semaine (un fil par course), puis les vocaux d’équipage juste en dessous.'],
+  general:['Dans tes salons', 'Tu choisis le salon où le bot écrit les courses de la semaine (un fil par course) et la catégorie où vont les vocaux d’équipage.']};
 // The answers as saved, or those of a setting made before.
 function discordAnswers(setup, settings) {
   const config = setup.botRecap, crews = settings.crews || {};
@@ -803,6 +816,22 @@ async function botImage(canvas) {
 async function reload(tab, {view = '', module = ''} = {}) { openTab = tab; openView = view; openModule = module; await load(); }
 
 app.addEventListener('click', async event => {
+  const roleRemove = event.target.closest('[data-role-remove]');
+  if (roleRemove) {
+    // Asked once more on the button itself: the role loses all its permissions.
+    if (!roleRemove.dataset.confirm) { roleRemove.dataset.confirm = '1'; roleRemove.textContent = 'Confirmer'; roleRemove.classList.add('is-danger'); return; }
+    const card = roleRemove.closest('[data-role]'), status = card.querySelector('.settings-status');
+    roleRemove.disabled = true;
+    try {
+      await api(`/api/community/roles/${card.dataset.role}`, 'PUT', {permissions:[]});
+      for (const input of card.querySelectorAll('input[data-permission]')) input.checked = false;
+      card.dataset.kept = '[]';
+      card.hidden = true;
+      roleOption(card.dataset.role, true);
+    } catch (error) { status.textContent = error.message; }
+    finally { roleRemove.disabled = false; delete roleRemove.dataset.confirm; roleRemove.textContent = 'Retirer'; roleRemove.classList.remove('is-danger'); }
+    return;
+  }
   const go = event.target.closest('[data-go-tab]');
   if (go) {
     selectTab(go.dataset.goTab);
@@ -1065,6 +1094,18 @@ function updatePreview(form) {
 
 app.addEventListener('change', async event => {
   const box = event.target;
+  if (box.matches('[data-role-add]')) {
+    const card = box.value && app.querySelector(`.adm-role[data-role="${CSS.escape(box.value)}"]`);
+    box.value = '';
+    if (!card) return;
+    card.hidden = false;
+    roleOption(card.dataset.role, false);
+    card.querySelector('.settings-status').textContent = '';
+    card.querySelector('.adm-role-head strong').insertAdjacentHTML('afterend', '<small data-role-new>Coche ce que ce rôle permet</small>');
+    card.scrollIntoView({block:'center', behavior:'smooth'});
+    card.querySelector('input[data-permission]')?.focus({preventScroll:true});
+    return;
+  }
   const look = box.closest('form[data-appearance]');
   if (look) { if (box.name === 'accent') look.elements.defaultAccent.checked = false; updatePreview(look); return; }
   if (box.matches('[data-banner-file]') && box.files?.[0]) {
@@ -1097,6 +1138,16 @@ app.addEventListener('change', async event => {
   try { await api(`/api/community/roles/${row.dataset.role}`, 'PUT', {permissions}); status.textContent = '✓'; }
   catch (error) { box.checked = !box.checked; status.textContent = error.message; }
 });
+
+// A role listed or taken back off the list: its line in « Ajouter un rôle » follows, with the count of the others.
+function roleOption(id, available) {
+  const select = app.querySelector('[data-role-add]');
+  const option = select?.querySelector(`option[value="${CSS.escape(id)}"]`);
+  if (!option) return;
+  option.hidden = !available; option.disabled = !available;
+  const left = [...select.options].filter(item => item.value && !item.disabled).length;
+  app.querySelector('[data-role-left]').textContent = `${left} autre${left > 1 ? 's' : ''} rôle${left > 1 ? 's' : ''} sur le serveur`;
+}
 
 // Tabs with the keyboard: arrows move along them; Escape closes the Discord window.
 app.addEventListener('keydown', event => {
