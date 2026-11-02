@@ -81,14 +81,14 @@ test('a week card shows its simulator on top, its start time(s), the name and it
   assert.match(view, /join\('<i> · <\/i>'\)/);
 });
 
-test('on a phone a week card is an agenda row: time left, logo or length right, crews or pilots shown (option B)', () => {
+test('on a phone a week card has its logo or length on the left of its name, crews or pilots shown (option G)', () => {
   const view = read('front/app/week-view.mjs'), css = read('styles/ux-refresh.css');
   assert.match(view, /<span class="week-block-body">/);
   assert.match(view, /week-badge week-block-length/);
   assert.match(view, /équipage\$\{crews>1\?'s':''\}/);
   assert.match(css, /\.week-block-body \{ display: contents; \}/);
-  assert.match(css, /\.week-block \{ grid-template-columns: 62px minmax\(0, 1fr\) auto;/);
-  assert.match(css, /\.week-block-logo \{ width: 64px; height: 64px;/);
+  assert.match(css, /\.week-block \{ display: grid; grid-template-columns: 76px minmax\(0, 1fr\);/);
+  assert.match(css, /\.week-block-logo \{ width: 60px; height: 60px;/);
 });
 
 test('the week is short: finished races fold per day, busy days are wider, the home takes the width (C + A)', () => {
@@ -100,4 +100,21 @@ test('the week is short: finished races fold per day, busy days are wider, the h
   assert.match(css, /grid-template-columns: var\(--week-columns, repeat\(7, minmax\(0, 1fr\)\)\)/);
   assert.match(css, /main:not\(\.charte\):has\(\.home-layout\) \{ max-width: 2400px; \}/);
   assert.match(css, /\.week-day\.is-busy \.week-day-list \{ grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/);
+});
+
+test('on a phone a week card shows its schedule, start → end, the stream first when it starts first (Nathan 2026-11-02, option G)', () => {
+  const view = read('front/app/week-view.mjs'), css = read('styles/ux-refresh.css');
+  // One line per moment: the stream with its link, then the race, each start of an endurance with its end.
+  assert.match(view, /function planOf\(item\)/);
+  assert.match(view, /icon:'📺',label:'Stream'/);
+  assert.match(view, /`\$\{solo\?'Course':'Départ'\} \$\{index\+1\}`/);
+  assert.match(view, /rows\.sort\(\(a,b\)=>a\.key-b\.key\)/);
+  // On a computer (option P1): the times in a coloured band, the stream on its own line with its link.
+  assert.match(view, /class="week-block-band/);
+  assert.match(view, /class="week-block-live"/);
+  // « Aujourd’hui · dans 3 h » on today's heading.
+  assert.match(view, /function soonOf\(items,now\)/);
+  // The schedule replaces the start time and the stream line, on a computer too.
+  assert.match(css, /\.week-block \.week-block-time, \.week-block \.week-block-stream, \.week-block-sim \{ display: none; \}/);
+  assert.match(css, /\.week-block-plan \{ grid-column: 2;/);
 });
