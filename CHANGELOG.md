@@ -1,5 +1,11 @@
 # Nouveautés d'Endurance Manager
 
+## v2.3 — 3 novembre 2026
+
+### ✨ Améliorations
+
+- **Discord · Calendrier** : les endurances du streamer de la communauté y apparaissent, avec son équipage, et l’heure du stream quand il la streame.
+
 ## v2.2 — 2 novembre 2026
 
 ### ✨ Nouveautés
