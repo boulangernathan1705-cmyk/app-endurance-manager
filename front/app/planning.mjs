@@ -10,6 +10,8 @@ import {isSolo,soloFill} from './solo.mjs';
 
 const LOCKED_ICON='<span class="planning-crew-lock is-locked" data-tip="Complet : l’équipage est verrouillé" aria-label="Complet"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" d="M5 13a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2zM8 11V7a4 4 0 1 1 8 0v4"/></svg></span>';
 const OPEN_ICON='<span class="planning-crew-lock is-open" data-tip="Places libres : tu peux le rejoindre" aria-label="Places libres"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" d="M5 13a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2zM8 11V7a4 4 0 0 1 8 0"/></svg></span>';
+// « Sans équipage » (Nathan 2026-11-03): a pilot with a cross, the words in its bubble.
+const NO_CREW_ICON='<span class="planning-no-crew" data-tip="Sans équipage" aria-label="Sans équipage"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="8" r="3.6" fill="none" stroke="currentColor" stroke-width="2"/><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M4 20c.8-3.6 3.6-5.4 7-5.4 1.4 0 2.7.3 3.8.9M17 15l4 4m0-4-4 4"/></svg></span>';
 export const CHEVRON='<svg class="planning-chevron" viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6"/></svg>';
 
 // The race days with their starts: every race and event uses the planning, over one day or several. A start
@@ -44,11 +46,14 @@ function startCard(event,departure,body,{minutes,now,open,quick=''}){
   // Pilots without a crew, by category (« 2 GT3 » « 1 Hypercar »): where a pilot can find a crew. The crews
   // follow, by name.
   const free=event.categories.map(category=>{const regs=present.filter(reg=>!assigned.has(reg.id)&&reg.category===category);return [category,regs.length,regs.map(reg=>communityPrefix(reg)+reg.name)];}).filter(([,count])=>count);
-  // The crews (by name, in their colour), then, under a thin line, the pilots without a crew.
+  // Who takes part, without opening the start (Nathan 2026-11-03): one line per crew (name in its colour, padlock,
+  // then its pilots), then the pilots without a crew, by category.
   const row=(content,extra='')=>`<span class="planning-row"${extra}>${content}</span>`;
+  const names=list=>`<span class="planning-pilot-names">${list.map(esc).join(' · ')}</span>`;
+  const byId=new Map(present.map(reg=>[reg.id,communityPrefix(reg)+reg.name]));
   // A crew that still takes pilots shows a green open padlock, a full one a red closed padlock.
-  const crewLine=crews.length?row(crews.map((crew,index)=>`<span class="planning-crew ${crewColorClass(crew.id,index)}">${logo(crew.category)}${communityTag(crew)}<span>${esc(crew.name)}</span>${crew.locked?LOCKED_ICON:OPEN_ICON}</span>`).join('')):'';
-  const freeLine=free.length?row(free.map(([category,count,names])=>`<span class="planning-free-pill ${categories[category]?.css||''}" data-tip="${esc(names.join(', '))}">${count} ${esc(category)}</span>`).join(''),' data-free-pilots data-tip="Pilotes cherchant un équipage"'):'';
+  const crewLine=crews.map((crew,index)=>row(`<span class="planning-crew ${crewColorClass(crew.id,index)}">${logo(crew.category)}${communityTag(crew)}<span>${esc(crew.name)}</span>${crew.locked?LOCKED_ICON:OPEN_ICON}</span>${names([...new Set((crew.registrationIds||[]).map(id=>byId.get(id)).filter(Boolean))])}`,' data-crew-line')).join('');
+  const freeLine=free.length?row(NO_CREW_ICON+free.map(([category,,list])=>`<span class="planning-free-group">${logo(category)}${names(list)}</span>`).join(''),' data-free-pilots'):'';
   // Solo event: no crews, the number of participants (and places) instead.
   const details=compact?'':isSolo(event)?row(soloFill(event,departure)):`${crewLine}${freeLine}`;
   return `<details class="planning-start${compact?' is-compact':''}${done?' is-done':''}${mine?' is-mine':''}${!pilots?' is-empty':''}${quick?' has-quick':''}" id="departure-${departure.id}" ${open?'open':''}><summary>${head}${details}${quick}${CHEVRON}</summary><div class="departure-fold planning-body">${body}</div></details>`;

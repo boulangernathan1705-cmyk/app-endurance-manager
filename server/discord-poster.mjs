@@ -105,7 +105,8 @@ export function posterModel(items, site, {live = false, timestamp = Date.now()} 
     : item.kind === 'stream' ? streamBlock(item.data, item.url, streamer) : eventBlock(item.data, item.url));
   const model = {day:longDay.format(timestamp).toUpperCase(), blocks, more:Math.max(0, items.length - MAX_BLOCKS), live};
   if (!live) {
-    model.head = items.every(item => item.kind === 'race') ? '🏁 ENDURANCES DU JOUR' : '📅 AU PROGRAMME AUJOURD’HUI';
+    // The day alone: the message is the announcement (Nathan, 2026-11-03: « on sait que c’est une annonce »).
+    model.head = `📅 ${model.day}`;
     return model;
   }
   const times = [...new Set(items.map(item => item.kind === 'stream' ? item.data.stream?.streamTime || item.data.stream?.raceTime
@@ -121,32 +122,35 @@ export function posterModel(items, site, {live = false, timestamp = Date.now()} 
   return model;
 }
 
-const CSS = `*{box-sizing:border-box;margin:0}body{width:1200px;font-family:"Noto Sans","DejaVu Sans","Segoe UI",Arial,sans-serif;color:#fff;background:#0b0d12}
-.card{width:1200px;background:linear-gradient(180deg,#141821,#0b0d12);border-left:14px solid var(--c)}
-.ban{display:block;width:1186px;height:296px;object-fit:cover}.in{padding:34px 56px 44px;position:relative}
-.top{display:flex;align-items:center;gap:14px;font-weight:800;letter-spacing:3px;font-size:22px;color:var(--t)}
-.dot{width:16px;height:16px;border-radius:50%;background:#ff4d6d;box-shadow:0 0 18px #ff4d6d}.day{color:#9aa0b0;font-weight:600}
-.big{font-size:88px;font-weight:900;line-height:1.05;margin-top:12px;letter-spacing:-1px;max-width:820px}
-.gf .big{font-size:80px;background:linear-gradient(90deg,#ffcf4d,#ff7b00);-webkit-background-clip:text;color:transparent}
-.who{font-size:32px;font-weight:600;color:#d7d9e0}.who b{color:#b78bff}.gf .who b{color:#ffcf4d}
-.logo{position:absolute;right:52px;top:26px;width:190px;height:190px;object-fit:contain}
-.blk{margin-top:26px;background:rgba(255,255,255,.04);border-radius:14px;padding:22px 26px;border-left:6px solid var(--rc);position:relative}
-.blk .lg{position:absolute;right:20px;top:14px;width:96px;height:96px;object-fit:contain}
-.lg~.row{padding-right:104px}
-.name{font-size:34px;font-weight:800;padding-right:110px;overflow-wrap:anywhere}
+const CSS = `*{box-sizing:border-box;margin:0}body{width:720px;font-family:"Barlow Condensed","Noto Sans","DejaVu Sans",Arial,sans-serif;color:#fff;background:#0b0d12}
+.card{width:720px;background:linear-gradient(180deg,#141821,#0b0d12);border-left:10px solid var(--c)}
+.ban{display:block;width:710px;height:177px;object-fit:cover}.in{padding:26px 30px 30px;position:relative}
+.top{font-weight:800;letter-spacing:2px;font-size:22px;line-height:1.5;color:var(--t)}
+.dot{display:inline-block;margin-right:10px;width:14px;height:14px;border-radius:50%;background:#ff4d6d;box-shadow:0 0 18px #ff4d6d}.day{color:#9aa0b0;font-weight:600;margin-left:10px}
+.big{font-size:69px;font-weight:900;line-height:1.05;margin-top:10px;letter-spacing:-1px;max-width:520px}
+.gf .big{font-size:55px;background:linear-gradient(90deg,#ffcf4d,#ff7b00);-webkit-background-clip:text;color:transparent}
+.who{font-size:30px;max-width:520px;font-weight:600;color:#d7d9e0}.who b{color:#b78bff}.gf .who b{color:#ffcf4d}
+.logo{position:absolute;right:26px;top:20px;width:130px;height:130px;object-fit:contain}
+/* One frame only: the rendez-vous are rows split by a line (Nathan, 2026-11-03: « un cadre dans le cadre »). */
+.blk{margin-top:16px;padding:20px 0 4px;border-top:1px solid rgba(255,255,255,.12);position:relative}
+/* The event's logo takes the free column on the right of its title and facts; the lines below use the whole width
+   (Nathan, 2026-11-03). */
+.hd{display:flex;gap:18px;align-items:center}.tx{flex:1;min-width:0}
+.blk .lg{flex:none;width:150px;height:150px;object-fit:contain}
+.name{font-size:37px;font-weight:800;overflow-wrap:anywhere}
 .row{display:flex;gap:14px;margin-top:12px;align-items:center;flex-wrap:wrap}
-.chip{background:var(--rc);padding:5px 14px;border-radius:8px;font-weight:800;font-size:20px;letter-spacing:1px}
+.chip{background:var(--rc);padding:5px 14px;border-radius:8px;font-weight:800;font-size:21px;letter-spacing:1px}
 .chip.outline{background:transparent;border:2px solid var(--rc)}.chip.grey{background:#3a3f4b}.chip.red{background:#b91c1c}
-.fact{font-size:24px;color:#c9ccd6}.fact b{color:#fff}.note{margin-top:10px;font-size:22px;color:#c9ccd6;font-style:italic}
+.fact{font-size:26px;color:#c9ccd6}.fact b{color:#fff}.note{margin-top:10px;font-size:25px;color:#c9ccd6;font-style:italic}
 .line{display:flex;align-items:center;gap:18px;margin-top:14px}
-.time{background:#fff;color:#0b0d12;font-weight:900;font-size:24px;border-radius:8px;padding:4px 12px;min-width:104px;text-align:center;flex:none}
-.time.tbd{background:#3a3f4b;color:#fff;font-size:16px;line-height:1.1}
-.cn{font-size:26px;font-weight:800;min-width:150px;flex:none}.pi{font-size:22px;color:#c9ccd6}.pi b{color:#b78bff}
-.more{margin-top:14px;font-size:22px;color:#9aa0b0;font-weight:700}
-.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:18px}
+.time{background:#fff;color:#0b0d12;font-weight:900;font-size:25px;border-radius:8px;padding:4px 12px;min-width:92px;text-align:center;flex:none}
+.time.tbd{background:#3a3f4b;color:#fff;font-size:18px;line-height:1.1}
+.cn{font-size:26px;font-weight:800;min-width:120px;flex:none}.pi{font-size:23px;color:#c9ccd6}.pi b{color:#b78bff}
+.more{margin-top:14px;font-size:25px;color:#9aa0b0;font-weight:700}
+.grid{display:grid;grid-template-columns:1fr;gap:14px;margin-top:18px}
 .st{display:flex;align-items:center;justify-content:space-between;background:rgba(255,123,0,.12);border:2px solid #ff7b00;border-radius:12px;padding:8px 20px 8px 10px}
-.st.full{border-color:#555}.st span{display:flex;align-items:center;gap:16px;font-size:28px;font-weight:800}.st img{width:80px;height:80px}
-.st em{font-style:normal;font-size:24px;font-weight:800;color:#ffcf4d}.st.full em{color:#9aa0b0}`;
+.st.full{border-color:#555}.st span{display:flex;align-items:center;gap:16px;font-size:32px;font-weight:800}.st img{width:80px;height:80px}
+.st em{font-style:normal;font-size:28px;font-weight:800;color:#ffcf4d}.st.full em{color:#9aa0b0}`;
 const factHtml = ([label, strong, after]) => `<span class=fact>${html(label)} <b>${html(strong)}</b>${after ? ` ${html(after)}` : ''}</span>`;
 function blockHtml(block) {
   const [simLabel, color] = SIMS[block.sim] || SIMS.lmu;
@@ -158,10 +162,10 @@ function blockHtml(block) {
     const full = item.capacity && item.entered >= item.capacity;
     return `<div class="st${full ? ' full' : ''}"><span>${/^(https:|data:image\/)/.test(item.logo) ? `<img src="${html(item.logo)}">` : '🎙️'}${html(item.name)}</span><em>${full ? 'COMPLET' : `${Math.min(item.entered, item.capacity)} / ${item.capacity}`}</em></div>`;
   }).join('')}</div>` : '';
-  return `<div class=blk style="--rc:${color2}">${/^(https:|data:image\/)/.test(block.logo || '') ? `<img class=lg src="${html(block.logo)}" onerror="this.remove()">` : ''}
+  return `<div class=blk style="--rc:${color2}"><div class=hd><div class=tx>
 <div class=name>${block.icon || '🏁'} ${html(block.name)}</div>
 <div class=row><span class=chip>${html(block.sim === 'stream' ? 'STREAM' : simLabel.toUpperCase())}</span>${block.chips.map(([label, kind]) => `<span class="chip ${kind}">${html(label)}</span>`).join('')}${block.facts.map(factHtml).join('')}</div>
-${block.note ? `<div class=note>${html(block.note)}</div>` : ''}${lines}${more}${streamers}</div>`;
+${block.note ? `<div class=note>${html(block.note)}</div>` : ''}</div>${/^(https:|data:image\/)/.test(block.logo || '') ? `<img class=lg src="${html(block.logo)}" onerror="this.remove()">` : ''}</div>${lines}${more}${streamers}</div>`;
 }
 // The poster's page, for the browser. Pictures: https addresses (the site's) or inline ones only.
 export function posterHtml(model) {
@@ -171,7 +175,7 @@ export function posterHtml(model) {
   const blocks = model.gridfest ? model.blocks.map(block => ({...block, logo:''})) : model.blocks;
   return `<!doctype html><html lang=fr><meta charset=utf-8><style>${CSS}</style><body><div class="card${model.gridfest ? ' gf' : ''}" style="--c:${accent};--t:${model.live ? (model.gridfest ? '#ffcf4d' : '#ff4d6d') : '#ffb35c'}">
 ${model.live && /^https:/.test(model.banner) ? `<img class=ban src="${html(model.banner)}" onerror="this.remove()">` : ''}<div class=in>${logo}
-<div class=top>${top}<span class=day>· ${html(model.day)}</span></div>
+<div class=top>${top}${model.live ? `<span class=day>· ${html(model.day)}</span>` : ''}</div>
 ${model.big ? `<div class=big>${html(model.big)}</div>` : ''}${model.who ? `<div class=who>${model.who}</div>` : ''}
 ${blocks.map(blockHtml).join('')}${model.more ? `<div class=more>+ ${plural(model.more, 'autre rendez-vous')} sur le site</div>` : ''}</div></div></body></html>`;
 }
@@ -221,6 +225,21 @@ async function inlineImage(env, community, origin, address) {
   } catch { return null; }
 }
 
+// The poster's font (Nathan, 2026-11-03: police 4, « Barlow Condensed », 15 % plus grande), put inside the page like
+// the pictures: Cloudflare's browser does not have it.
+export const POSTER_FONTS = [400, 600, 700, 800, 900].map(weight => ({weight, path:`/images/fonts/barlow-condensed-latin-${weight}-normal.woff2`}));
+export const fontFaces = fonts => fonts.map(({weight, data}) => `@font-face{font-family:"Barlow Condensed";font-weight:${weight};src:url(data:font/woff2;base64,${data}) format("woff2")}`).join('');
+async function posterFontFaces(env, origin) {
+  if (!env.ASSETS || !origin) return '';
+  try {
+    const fonts = await Promise.all(POSTER_FONTS.map(async ({weight, path}) => {
+      const response = await env.ASSETS.fetch(new Request(new URL(path, origin)));
+      return response.ok ? {weight, data:base64(new Uint8Array(await response.arrayBuffer()))} : null;
+    }));
+    return fontFaces(fonts.filter(Boolean));
+  } catch { return ''; }
+}
+
 // The picture of a poster from Cloudflare's browser (REST API: CF_ACCOUNT_ID + BROWSER_RENDERING_TOKEN), or null.
 // where: {community, origin} of the site, to put its pictures inside the page.
 export async function renderPoster(env, page, {community = null, origin = ''} = {}) {
@@ -231,10 +250,11 @@ export async function renderPoster(env, page, {community = null, origin = ''} = 
       const inline = await inlineImage(env, community, origin, address);
       if (inline) page = page.split(`src="${address}"`).join(`src="${inline}"`);
     }
+    page = page.replace('<style>', `<style>${await posterFontFaces(env, origin)}`);
     // A short window: the full-page picture takes the poster's own height (a 600 px window left a short poster half empty).
     const response = await fetch(`https://api.cloudflare.com/client/v4/accounts/${account}/browser-rendering/screenshot`, {method:'POST', signal:AbortSignal.timeout(45000),
       headers:{Authorization:`Bearer ${token}`, 'Content-Type':'application/json'},
-      body:JSON.stringify({html:page, viewport:{width:1200, height:100}, gotoOptions:{waitUntil:'networkidle0', timeout:20000}, screenshotOptions:{fullPage:true, type:'png'}})});
+      body:JSON.stringify({html:page, viewport:{width:720, height:100, deviceScaleFactor:2}, gotoOptions:{waitUntil:'networkidle0', timeout:20000}, screenshotOptions:{fullPage:true, type:'png'}})});
     if (!response.ok || !String(response.headers.get('content-type') || '').startsWith('image/')) return null;
     const bytes = await response.arrayBuffer();
     return bytes.byteLength > 1000 ? bytes : null;

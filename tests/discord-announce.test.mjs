@@ -87,7 +87,7 @@ test('at 7h30 the stream comes first with @everyone and the race it streams, the
   const races=posts[1].body,other=JSON.stringify(races.embeds[0]);
   assert.equal(races.content,'');
   assert.deepEqual(races.allowed_mentions,{parse:[]});assert.equal(races.flags,4096);
-  assert.match(races.embeds[0].description,/^## 🏁 Endurances du jour/);
+  assert.match(races.embeds[0].description,/^## 📅 [A-Z][a-zé]+ \d+ /);
   assert.match(other,/6h de Spa/);assert.doesNotMatch(other,/Coupe GT3|twitch/);
   assert.match(other,/`LMU` `PRIVÉE`/);assert.match(other,/fin \*\*jeu\. 02h30\*\*/);
   assert.match(other,/\*\*20h00\*\* · Équipage A\\n-# Pilote 1/);
@@ -109,7 +109,7 @@ test('a day without a stream: one message for the races, a plain alert without a
   assert.equal(posts[0].body.content,'');assert.deepEqual(posts[0].body.allowed_mentions,{parse:[]});assert.equal(posts[0].body.flags,undefined);
   const text=JSON.stringify(posts[0].body.embeds[0]);
   assert.match(text,/6h de Spa/);assert.match(text,/Coupe GT3/);assert.ok(text.indexOf('6h de Spa')<text.indexOf('Coupe GT3'));
-  assert.match(posts[0].body.embeds[0].description,/^## 📅 Au programme aujourd’hui/);
+  assert.match(posts[0].body.embeds[0].description,/^## 📅 [A-Z][a-zé]+ \d+ /);
   assert.doesNotMatch(text,/twitch/);assert.ok(!posts[0].body.embeds[0].image,'no banner without a stream: it shows the streamer');
   assert.deepEqual(posts[0].body.components.map(row=>row.components[0].label),['S’inscrire · 6h de Spa','S’inscrire · Coupe GT3']);
   // A stream time added later the same morning sends the stream's message, without a ping: the morning's chance is gone.
@@ -542,18 +542,22 @@ test('an endurance is announced only on its starts with a crew, without the pilo
 test('with Cloudflare’s browser, each message is a poster made once at 7h30: the picture, the buttons, no text (Nathan, 2026-11-01)',async t=>{
   const {DB,env,calls,settings}=setup(t);
   Object.assign(env,{CF_ACCOUNT_ID:'acc',BROWSER_RENDERING_TOKEN:'token',
-    ASSETS:{fetch:async request=>new URL(request.url).pathname==='/images/endurance-manager-banner.webp'?new Response(new Uint8Array([1,2,3]),{headers:{'content-type':'image/webp'}}):new Response('',{status:404})}});
+    ASSETS:{fetch:async request=>new URL(request.url).pathname==='/images/endurance-manager-banner.webp'?new Response(new Uint8Array([1,2,3]),{headers:{'content-type':'image/webp'}}):/^\/images\/fonts\/barlow-condensed-latin-\d+-normal\.woff2$/.test(new URL(request.url).pathname)?new Response(new Uint8Array([4,5,6])):new Response('',{status:404})}});
   await announceCommunity(env,TDZ,settings(),MORNING);
   const renders=calls.filter(call=>call.method==='RENDER'),posts=sent(calls);
   assert.equal(renders.length,2);assert.equal(posts.length,2);
   assert.ok(renders[0].path.endsWith('/accounts/acc/browser-rendering/screenshot'));
   // A short window and a full-page picture: the poster is as tall as its content, never padded to the window (2026-11-02).
   assert.ok(renders[0].body.viewport.height<=100);assert.equal(renders[0].body.screenshotOptions.fullPage,true);
+  // A 720 px poster taken at 2×: on a phone, Discord shrinks the picture to the screen and the text stays readable (2026-11-03).
+  assert.equal(renders[0].body.viewport.width,720);assert.equal(renders[0].body.viewport.deviceScaleFactor,2);
   // The stream's poster: the banner, « STREAM 20H45 », the streamer; the races' one: no banner.
   // The site's pictures go inside the page: Cloudflare's browser does not fetch them from the site.
   assert.match(renders[0].body.html,/class=ban src="data:image\/webp;base64,AQID"/);
+  // The font goes inside the page too: Barlow Condensed, its five weights (Nathan, 2026-11-03).
+  assert.equal(renders[0].body.html.match(/@font-face\{font-family:"Barlow Condensed";font-weight:\d+;src:url\(data:font\/woff2;base64,BAUG\)/g).length,5);
   assert.match(renders[0].body.html,/STREAM 20H45/);assert.match(renders[0].body.html,/avec <b>tdz<\/b>/);
-  assert.doesNotMatch(renders[1].body.html,/class=ban/);assert.match(renders[1].body.html,/ENDURANCES DU JOUR/);
+  assert.doesNotMatch(renders[1].body.html,/class=ban/);assert.match(renders[1].body.html,/class=top>📅 [A-Z]+ \d+ [A-ZÉÛ]+<\/div>/);
   assert.equal(posts[0].body.content,'@everyone');assert.deepEqual(posts[0].body.embeds,[]);
   assert.deepEqual(posts[0].body.attachments,[{id:0,filename:'annonce.png'}]);assert.ok(posts[0].file);
   assert.deepEqual(posts[0].body.components[0].components.map(button=>button.label),['Regarder le stream','S’inscrire','Absent']);
@@ -591,7 +595,7 @@ test('posters: two streams on one, the Gridfest and its streamers, crews cut at 
   const race={kind:'race',url:'',data:{id:'r',name:'24h du Mans',circuit:'le-mans',official:true,durationMinutes:1440,
     departures:[{startsAt:at,endsAt:at+(1440+30)*60000,crews}]}};
   const endus=posterModel([race],site,{timestamp:at});
-  assert.equal(endus.head,'🏁 ENDURANCES DU JOUR');assert.ok(!endus.banner);
+  assert.match(endus.head,/^📅 [A-Z]+ \d+ /);assert.ok(!endus.banner);
   const html=posterHtml(endus);
   assert.match(html,/Équipage 06/);assert.doesNotMatch(html,/Équipage 07/);assert.match(html,/\+ 2 autres équipages sur le site/);
   assert.match(html,/OFFICIELLE/);assert.match(html,/🏁 fin <b>lun\. 14h30<\/b>/);

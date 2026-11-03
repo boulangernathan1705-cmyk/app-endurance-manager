@@ -298,18 +298,12 @@ export function otherStartsFor(event,departure,stateDraft){
     .sort((a,b)=>Number(a.startsAt)-Number(b.startsAt));
 }
 const startLabel=item=>`${weekdayLabel(item.startsAt)} ${String(item.time||'').replace(/^0?(\d+):00$/,'$1h').replace(':','h')}`;
-// Known from the first step: the other future starts of the race, for a new entry of one's own.
-export function lastRegistrationStep(event,departure,stateDraft){
-  if(stateDraft.id||stateDraft.forOther||stateDraft.mode==='category'||isSolo(event))return 4;
-  return (event.departures||[]).some(item=>item.id!==departure.id&&!item.tbd&&Number(item.startsAt)>Date.now())?5:4;
-}
-function chosenOtherStarts(event,departure,stateDraft){
-  const chosen=new Set(stateDraft.copyDepartures||[]);
-  return otherStartsFor(event,departure,stateDraft).filter(item=>chosen.has(item.id));
-}
+// Four steps (category, cars, hours, summary): the other starts of the race are offered in the summary
+// (Nathan 2026-11-03, one screen less).
+export function lastRegistrationStep(){return 4;}
 function otherStartsField(event,departure,stateDraft){
   const starts=otherStartsFor(event,departure,stateDraft);
-  if(!starts.length)return `<p class="registration-step-help">Aucun autre horaire disponible dans cette catégorie.</p>`;
+  if(!starts.length)return '';
   const chosen=new Set(stateDraft.copyDepartures||[]);
   return `<fieldset class="registration-other-starts"><legend class="form-label">Ajouter d’autres horaires ?</legend><p class="registration-step-help">Même catégorie, mêmes voitures et même présence.</p><div class="registration-other-starts-list">${starts.map(item=>`<label class="registration-other-start"><input type="checkbox" name="copyDeparture" value="${item.id}" data-departure="${departure.id}" ${chosen.has(item.id)?'checked':''}><span>${esc(startLabel(item))}</span></label>`).join('')}</div></fieldset>`;
 }
@@ -343,7 +337,7 @@ export function renderSteppedRegistration(event,departure,stateDraft=draftFor(de
   if(isSolo(event))return renderSoloStepper(event,departure,stateDraft);
   const last=lastRegistrationStep(event,departure,stateDraft);
   const duration=event.durationHours||6,step=registrationStep(stateDraft,last);
-  const steps=last===5?['Catégorie','Voiture(s)','Heures de présence','Autres horaires','Récapitulatif']:REGISTRATION_STEPS;
+  const steps=REGISTRATION_STEPS;
   const {same,assigned}=registrationContext(event,departure,stateDraft);
   const categoryMode=stateDraft.mode==='category';
   const linkedOther=stateDraft.forOther&&!!(stateDraft.participantUserId||stateDraft.discordLinked);
@@ -358,7 +352,6 @@ export function renderSteppedRegistration(event,departure,stateDraft=draftFor(de
   const summaryRow=(n,label,value)=>`<button type="button" class="registration-summary-row" data-action="registration-step" data-departure="${departure.id}" data-step="${n}" data-edit="true"><span>${label}</span><strong>${value}</strong><em>Modifier</em></button>`;
   const cars=stateDraft.carAny?'Peu importe':(stateDraft.cars||[]).length?esc(stateDraft.cars.join(', ')):'—';
   const pilot=stateDraft.name||(!stateDraft.forOther?state.user?.name:'')||'';
-  const others=chosenOtherStarts(event,departure,stateDraft);
   const next=step<last?button('registration-step',stateDraft.returnToSummary?'Revenir au récapitulatif':'Continuer',`data-departure="${departure.id}" data-step="${stateDraft.returnToSummary?last:step+1}"`,'primary-button registration-next'):`<button type="submit" class="save-button registration-next">${stateDraft.id?'ENREGISTRER':stateDraft.forOther?'INSCRIRE LE PILOTE':'VALIDER MON INSCRIPTION'}</button>`;
   return `<form class="form-section registration-form registration-stepper" data-kind="registration" data-departure="${departure.id}" data-step="${step}" data-last-step="${last}">
 <div class="registration-progress" aria-hidden="true">${steps.map((_,index)=>`<span class="${index<step?'done':''}"></span>`).join('')}</div>
@@ -366,8 +359,7 @@ export function renderSteppedRegistration(event,departure,stateDraft=draftFor(de
 ${pane(1,`${communityLine(event,departure,stateDraft)}${identity}<div class="category-area"><span class="form-label">Dans quelle catégorie ${stateDraft.forOther?'ce pilote veut-il':'veux-tu'} rouler ?</span><div class="categories registration-category-list">${categoryButtons}</div>${categoryMode?'':'<p class="registration-step-help">Tu pourras ajouter une autre catégorie ensuite : celle de ton équipage sera retenue.</p>'}</div>`)}
 ${pane(2,stateDraft.category?carPreferenceChoices(stateDraft.category,stateDraft.cars,stateDraft.carAny):'<p class="registration-step-help">Choisis d’abord une catégorie.</p>')}
 ${pane(3,`<div class="registration-choices"><span class="form-label">Heures de présence (${durationLabel(eventMinutes(event))})</span><p class="availability-hint">Touche les heures où tu seras là.</p>${renderAvailabilityTimeline({departure,duration,status:stateDraft.status,interactive:true,label:'Heures de présence'})}<div class="special-availability">${button('availability','TOUTE LA COURSE',`data-departure="${departure.id}" data-value="whole" aria-pressed="${stateDraft.status==='whole'}"`,`special-button whole ${stateDraft.status==='whole'&&!stateDraft.soloDriver?'active':''}`)}${button('solo-driver','JE LA FAIS TOUT SEUL',`data-departure="${departure.id}" aria-pressed="${!!stateDraft.soloDriver}"`,`special-button solo-driver ${stateDraft.soloDriver?'active':''}`)}</div><p class="registration-step-help">${esc(hoursSummary(stateDraft.status,departure,duration))}${stateDraft.soloDriver?'<span class="solo-driver-tag">en solo</span>':''}</p>${soloDriverNotice(event,stateDraft)}</div>`)}
-${last===5?pane(4,otherStartsField(event,departure,stateDraft)):''}
-${pane(last,`<div class="registration-summary">${pilot?`<div class="registration-summary-row is-static"><span>Pilote</span><strong>${esc(pilot)}</strong></div>`:''}${summaryRow(1,'Catégorie',stateDraft.category?`${logo(stateDraft.category)} ${esc(stateDraft.category)}`:'—')}${summaryRow(2,'Voiture(s)',cars)}${summaryRow(3,'Présence',esc(hoursSummary(stateDraft.status,departure,duration))+(stateDraft.soloDriver?'<span class="solo-driver-tag">en solo</span>':''))}${last===5?summaryRow(4,'Autres horaires',others.length?esc(others.map(startLabel).join(', ')):'Aucun'):''}</div>${soloDriverNotice(event,stateDraft)}${streamField(event,departure,stateDraft)}${preferredPilotField(stateDraft,departure)}${stateDraft.id?`<div class="registration-danger-zone">${button('delete-registration',stateDraft.forOther?'Supprimer l’inscription':'Se désinscrire',`data-id="${stateDraft.id}" data-departure="${departure.id}"`,'danger-button')}</div>`:''}`)}
+${pane(last,`<div class="registration-summary">${pilot?`<div class="registration-summary-row is-static"><span>Pilote</span><strong>${esc(pilot)}</strong></div>`:''}${summaryRow(1,'Catégorie',stateDraft.category?`${logo(stateDraft.category)} ${esc(stateDraft.category)}`:'—')}${summaryRow(2,'Voiture(s)',cars)}${summaryRow(3,'Présence',esc(hoursSummary(stateDraft.status,departure,duration))+(stateDraft.soloDriver?'<span class="solo-driver-tag">en solo</span>':''))}</div>${otherStartsField(event,departure,stateDraft)}${soloDriverNotice(event,stateDraft)}${streamField(event,departure,stateDraft)}${preferredPilotField(stateDraft,departure)}${stateDraft.id?`<div class="registration-danger-zone">${button('delete-registration',stateDraft.forOther?'Supprimer l’inscription':'Se désinscrire',`data-id="${stateDraft.id}" data-departure="${departure.id}"`,'danger-button')}</div>`:''}`)}
 <div class="registration-step-nav">${step>1?button('registration-step','Retour',`data-departure="${departure.id}" data-step="${step-1}"`,'secondary-button registration-back'):''}${next}</div>
 </form>`;
 }

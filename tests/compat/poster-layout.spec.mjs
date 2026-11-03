@@ -1,9 +1,11 @@
 import {test,expect} from '@playwright/test';
 import {readFileSync} from 'node:fs';
-import {posterModel,posterHtml} from '../../server/discord-poster.mjs';
+import {posterModel,posterHtml,POSTER_FONTS,fontFaces} from '../../server/discord-poster.mjs';
 // The morning posters as Cloudflare's browser (Chromium) takes them: a 100 px window and a full-page picture.
 // Every case must be as tall as its content (2026-11-02: a one-race poster came out half empty), stay within its
-// 1200 px and never write under a logo.
+// 720 px and never write under a logo.
+// The poster's font, put inside the page as Cloudflare's run does.
+const faces=fontFaces(POSTER_FONTS.map(({weight,path})=>({weight,data:readFileSync(new URL(`../..${path}`,import.meta.url)).toString('base64')})));
 const img=path=>'data:image/png;base64,'+readFileSync(new URL(`../../images/${path}`,import.meta.url)).toString('base64');
 const at=hour=>Date.parse('2026-11-02T00:00:00Z')+(hour-1)*3600000;
 const site={name:'TDZ',url:'https://tdz.example',bannerUrl:'',streamUrl:'https://twitch.tv/streamer',streamName:'Le streamer',streams:[]};
@@ -22,12 +24,12 @@ const cases={
 };
 for(const [name,[items,live,streams=[]]] of Object.entries(cases))test(`morning poster « ${name} »: as tall as its content, within its width, nothing under a logo`,async({page},info)=>{
   test.skip(!info.project.name.startsWith('chromium'),'Cloudflare renders the posters with Chromium');
-  await page.setViewportSize({width:1200,height:100});
-  await page.setContent(posterHtml(posterModel(items,{...site,streams},{live,timestamp:at(8)})));
+  await page.setViewportSize({width:720,height:100});
+  await page.setContent(posterHtml(posterModel(items,{...site,streams},{live,timestamp:at(8)})).replace('<style>',`<style>${faces}`));
   const shot=await page.screenshot({fullPage:true});
   const layout=await page.evaluate(()=>{
     const card=document.querySelector('.card').getBoundingClientRect();
-    const wide=[...document.querySelectorAll('.card *')].filter(item=>item.getBoundingClientRect().right>1201).length;
+    const wide=[...document.querySelectorAll('.card *')].filter(item=>item.getBoundingClientRect().right>721).length;
     const under=[...document.querySelectorAll('.blk')].filter(block=>{
       const logo=block.querySelector('.lg');if(!logo)return false;const box=logo.getBoundingClientRect();
       return [...block.querySelectorAll('.name,.row > *')].some(item=>{const range=document.createRange();range.selectNodeContents(item);

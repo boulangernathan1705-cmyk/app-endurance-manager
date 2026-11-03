@@ -60,8 +60,8 @@ test('« Accueil » is reached from the bar and its own address, and shows both 
   assert.match(read('styles/ux-refresh.css'), /\.week-block\.is-event \{ --kind: var\(--sim, var\(--em-kind-event\)\); \}/);
   // Those who may create races add an event or announce a stream from here.
   assert.match(view, /can\('create_race'\)&&state\.soloRaces/);
-  assert.match(view, /button\('create-stream'/);
-  assert.match(view, /button\('create','Ajouter un événement','data-format="solo"'/);
+  // Behind one small « ＋ Ajouter » menu (core.mjs addMenu, 2026-11-03).
+  assert.match(view, /addMenu\(\[\['create','🏁 Événement','data-format="solo"'\],\['create-stream','🎙 Stream'\]\]\)/);
   assert.doesNotMatch(view, /départ\$\{count/);
   assert.match(view, /\['lmu','Endurance LMU'\],\['iracing','Endurance iRacing'\]/);
   // The other simulator's endurances open in its own space.

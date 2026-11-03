@@ -98,7 +98,26 @@ test('the summary offers the same entry on the other starts of the race', () => 
   assert.match(registration,/!\(item\.availability\|\|\[\]\)\.some\(reg=>reg\.mine&&reg\.category===stateDraft\.category\)/);
   assert.match(registration,/await api\(`\/api\/races\/\$\{event\.id\}\/departures\/\$\{other\.id\}\/registrations`,'POST',\{\.\.\.payload,stream:undefined,version:undefined\}\)/);
   assert.match(actions,/refreshAfterSave\(result\.notice\|\|'Inscription enregistrée\.'\)/);
-  // Its own step before the summary (4 other starts, 5 summary); Enter only submits on the last step.
-  assert.match(registration,/\['Catégorie','Voiture\(s\)','Heures de présence','Autres horaires','Récapitulatif'\]/);
+  // Offered in the summary (4 steps); Enter only submits on the last step.
+  assert.match(registration,/export function lastRegistrationStep\(\)\{return 4;\}/);
+  assert.match(registration,/<\/div>\$\{otherStartsField\(event,departure,stateDraft\)\}/);
   assert.match(registration,/data-last-step="\$\{last\}"/);
+});
+
+test('a choice that answers its step moves on by itself (category, any car, whole race)', () => {
+  const actions=fs.readFileSync('front/app/actions.mjs','utf8');
+  assert.match(actions,/function advanceRegistration\(event,departure,from,to=from\+1\)/);
+  assert.match(actions,/if\(!advanceRegistration\(event,departure,1\)\)rerenderRegistrationSection/);
+  assert.match(actions,/if\(value==='whole'&&advanceRegistration\(event,departure,3,lastRegistrationStep\(event,departure,draft\)\)\)break;/);
+  assert.match(actions,/if\(departure\)advanceRegistration\(event,departure,2\);/);
+  // Nothing moves while the step still misses something; back to the summary when coming from it.
+  assert.match(actions,/catch\{return false;\}/);
+  assert.match(actions,/draft\.returnToSummary\?last:/);
+});
+
+test('a closed start shows its pilots: after each crew, then without a crew', () => {
+  const planning=fs.readFileSync('front/app/planning.mjs','utf8');
+  assert.match(planning,/data-tip="Sans équipage"/);
+  assert.match(planning,/list\.map\(esc\)\.join\(' · '\)/);
+  assert.match(planning,/' data-crew-line'/);
 });

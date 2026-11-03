@@ -90,6 +90,21 @@ export function circuitVisual(id, compact = false) {
 }
 export function button(action,label,extra='',css='secondary-button') { return `<button type="button" class="${css}" data-action="${action}" ${extra}>${label}</button>`; }
 
+// The admins' creations (event, stream, iRacing calendar) behind ONE small « ＋ Ajouter » button that opens a short
+// menu (Nathan 2026-11-03: the big buttons took a third of the phone screen). One choice only: the button itself.
+// items: [action, label, extra] — the menu's buttons keep their data-action, so the app's click handling is unchanged.
+export function addMenu(items) {
+  const list = items.filter(Boolean);
+  if (!list.length) return '';
+  if (list.length === 1) { const [action, label, extra = ''] = list[0]; return button(action, `<b aria-hidden="true">＋</b><span> Ajouter</span>`, `aria-label="Ajouter : ${label.replace(/^\S+\s/, '')}" ${extra}`, 'primary-button add-menu-single'); }
+  return `<details class="add-menu"><summary class="primary-button add-menu-toggle" aria-label="Ajouter"><b aria-hidden="true">＋</b><span> Ajouter</span></summary><div class="add-menu-list" role="menu">${list.map(([action, label, extra = '']) => button(action, label, `role="menuitem" ${extra}`, 'add-menu-item')).join('')}</div></details>`;
+}
+// A tap outside the menu, or on one of its choices, closes it.
+document.addEventListener('click', event => {
+  for (const menu of document.querySelectorAll('details.add-menu[open]'))
+    if (!menu.contains(event.target) || event.target.closest('.add-menu-item')) menu.open = false;
+});
+
 export function carPreferenceChoices(category, selected=[], any=false) {
   const values = Array.isArray(selected) ? selected : selected ? [selected] : [];
   return `<fieldset class="car-preference-panel"><legend class="form-label">Voiture(s) souhaitée(s)</legend><label class="car-any-option" data-tip="Tu t’adaptes à la voiture que choisira ton équipage."><input type="checkbox" name="carAny" ${any?'checked':''}><span>Peu importe la voiture</span></label><div class="car-preference-grid">${(CARS[category]||[]).map(car => `<label class="car-preference-option"><input type="checkbox" name="carPreference" value="${esc(car)}" ${values.includes(car)&&!any?'checked':''} ${any?'disabled':''}><span>${esc(car)}</span></label>`).join('')}</div><p class="car-preference-help">Choisis un ou plusieurs modèles, ou coche « Peu importe la voiture ». Ces souhaits aident à former les équipages.</p></fieldset>`;
