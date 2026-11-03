@@ -3,7 +3,7 @@
 // Gridfest, streams) and the endurances of LMU and iRacing together. A view only: a click opens the race's own page
 // (the other simulator's races in its own space), nothing is entered here. On a phone the days follow each other in
 // a list.
-import {app,state,esc,button,notifyRender,activeGame,api,coversHour,can} from './core.mjs';
+import {app,state,esc,button,addMenu,notifyRender,activeGame,api,coversHour,can} from './core.mjs';
 import {gameForEvent} from '../../shared/catalog.mjs';
 import {isSolo,eventAccessLogo,soloCardMeta} from './solo.mjs';
 import {isStream,streamDetails,streamSpan,streamPlatform,streamUrl} from '../../shared/stream.mjs';
@@ -300,7 +300,7 @@ export function renderWeek(){
   const widths=shown.map(day=>`minmax(0,${day.weight}fr)`).join(' ');
   const name=String(state.user?.name||'').trim().split(/\s+/)[0],side=nextBox(all,now)+crewsBox(),box=side?`<div class="home-side">${side}</div>`:'';
   // Admins create an event or announce a stream from here too (Nathan 2026-11-01), as on the events page.
-  const create=can('create_race')&&state.soloRaces?`<div class="home-create">${button('create-stream','🎙 Annoncer un stream','','secondary-button')}${button('create','Ajouter un événement','data-format="solo"','primary-button')}</div>`:'';
+  const create=can('create_race')&&state.soloRaces?`<div class="home-create">${addMenu([['create','🏁 Événement','data-format="solo"'],['create-stream','🎙 Stream']])}</div>`:'';
   const weekLabel=offset===0?'Cette semaine':offset===1?'La semaine prochaine':offset===-1?'La semaine dernière':`Semaine du ${monthDay.format(dateOf(monday))}`;
   app.innerHTML=`<div class="page-head home-head"><h1 class="page-title">${name?`SALUT ${esc(name.toLocaleUpperCase('fr-FR'))}`:'ACCUEIL'}</h1>
       <div class="week-nav" role="group" aria-label="Changer de semaine">${button('week','‹','data-offset="-1" aria-label="Semaine précédente"','secondary-button week-step')}<span class="week-label">${esc(weekLabel)}<small>${esc(range)}</small></span>${button('week','›','data-offset="1" aria-label="Semaine suivante"','secondary-button week-step')}${offset?button('week','Revenir à cette semaine','data-offset="0"','link-button week-back'):''}</div>${create}</div>

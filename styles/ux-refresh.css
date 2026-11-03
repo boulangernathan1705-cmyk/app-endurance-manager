@@ -2888,3 +2888,24 @@ button.crews-lock:disabled { opacity: .6; cursor: progress; }
   body.has-tab-bar .site-nav-shell #navigation .nav-sections .nav-game-switcher { order: 0; flex: 0 0 auto; margin: 0 !important; }
   body.has-tab-bar .site-nav-shell #navigation .nav-game-switcher-button { flex: 0 0 auto; min-height: 32px !important; padding: 0 12px !important; font-size: 12.5px !important; }
 }
+
+/* ---------- « ＋ Ajouter » : les créations des admins derrière un seul petit bouton (core.mjs addMenu, 2026-11-03) ---------- */
+.home-create:has(.add-menu, .add-menu-single),
+.home-create-event:has(.add-menu, .add-menu-single) { display: flex !important; flex: 0 0 auto !important; width: auto !important; margin: 0 0 0 auto !important; }
+.home-create > .add-menu, .home-create > .add-menu-single,
+.home-create-event > .add-menu, .home-create-event > .add-menu-single { flex: 0 0 auto !important; width: auto !important; }
+.add-menu { position: relative; }
+.add-menu-toggle, .add-menu-single { display: inline-flex !important; width: auto !important; min-width: 0 !important; align-items: center; min-height: 38px !important; padding: 0 14px !important; font-size: var(--em-text-sm) !important; white-space: nowrap; cursor: pointer; list-style: none; }
+.add-menu-toggle::-webkit-details-marker { display: none; }
+.add-menu-toggle::marker { content: ""; }
+.add-menu-list { position: absolute; right: 0; top: calc(100% + 6px); z-index: 1000; display: grid; min-width: 210px; padding: 6px; border: 1px solid var(--em-border); border-radius: var(--em-radius-md); background: linear-gradient(var(--em-panel), var(--em-panel)), var(--em-bg); box-shadow: 0 12px 30px rgba(0, 0, 0, .45); }
+.add-menu-item { display: block; width: 100%; padding: 10px 12px; border: 0; border-radius: var(--em-radius-sm); background: transparent; color: var(--em-text-strong); font: inherit; font-weight: 700; text-align: left; cursor: pointer; }
+.add-menu-item:hover, .add-menu-item:focus-visible { background: color-mix(in srgb, var(--em-accent) 14%, transparent); }
+/* Téléphone : le « ＋ » se range au bout de la ligne des flèches de la semaine ou des filtres, sans ligne à lui. */
+@media (max-width: 760px) {
+  html[data-game] #app .page-head:has(.add-menu, .add-menu-single) { flex-wrap: nowrap !important; align-items: center; gap: 8px; }
+  html[data-game] #app .page-head:has(.add-menu, .add-menu-single) > :is(.week-nav, .event-filter) { flex: 1 1 auto !important; min-width: 0; width: auto !important; margin: 0 !important; }
+  html[data-game] #app .page-head:has(.add-menu, .add-menu-single) > :is(.home-create, .home-create-event) { order: 5; margin: 0 !important; }
+  :is(.add-menu-toggle, .add-menu-single) { width: 42px !important; min-height: 42px !important; padding: 0 !important; justify-content: center; font-size: 22px !important; }
+  :is(.add-menu-toggle, .add-menu-single) > span { display: none; }
+}

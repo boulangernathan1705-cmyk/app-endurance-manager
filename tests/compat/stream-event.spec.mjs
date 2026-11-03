@@ -20,7 +20,8 @@ for(const width of [1440,390])test(`stream creation, live card and edit preserve
   });
   await page.addInitScript(()=>localStorage.setItem('endurance_manager_locale','fr'));
   await page.goto('/events/');
-  await page.getByRole('button',{name:/Annoncer un stream/}).click();
+  await page.locator('.add-menu-toggle').click();
+  await page.getByRole('menuitem',{name:/Stream/}).click();
   const form=page.locator('form[data-kind="stream-event"]'),preview=form.locator('[data-stream-card-preview]');
   await expect(form.locator('[name="streamerName"]')).toHaveValue('Streamer');
   await expect(form.locator('select,[name="raceSim"]')).toHaveCount(0);
