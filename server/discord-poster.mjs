@@ -133,9 +133,11 @@ const CSS = `*{box-sizing:border-box;margin:0}body{width:720px;font-family:"Noto
 .logo{position:absolute;right:26px;top:20px;width:130px;height:130px;object-fit:contain}
 /* One frame only: the rendez-vous are rows split by a line (Nathan, 2026-11-03: « un cadre dans le cadre »). */
 .blk{margin-top:16px;padding:20px 0 4px;border-top:1px solid rgba(255,255,255,.12);position:relative}
-.blk .lg{position:absolute;right:0;top:18px;width:84px;height:84px;object-fit:contain}
-.lg~.row{padding-right:94px}
-.name{font-size:32px;font-weight:800;padding-right:96px;overflow-wrap:anywhere}
+/* The event's logo takes the free column on the right of its title and facts; the lines below use the whole width
+   (Nathan, 2026-11-03). */
+.hd{display:flex;gap:18px;align-items:center}.tx{flex:1;min-width:0}
+.blk .lg{flex:none;width:150px;height:150px;object-fit:contain}
+.name{font-size:32px;font-weight:800;overflow-wrap:anywhere}
 .row{display:flex;gap:14px;margin-top:12px;align-items:center;flex-wrap:wrap}
 .chip{background:var(--rc);padding:5px 14px;border-radius:8px;font-weight:800;font-size:18px;letter-spacing:1px}
 .chip.outline{background:transparent;border:2px solid var(--rc)}.chip.grey{background:#3a3f4b}.chip.red{background:#b91c1c}
@@ -160,10 +162,10 @@ function blockHtml(block) {
     const full = item.capacity && item.entered >= item.capacity;
     return `<div class="st${full ? ' full' : ''}"><span>${/^(https:|data:image\/)/.test(item.logo) ? `<img src="${html(item.logo)}">` : '🎙️'}${html(item.name)}</span><em>${full ? 'COMPLET' : `${Math.min(item.entered, item.capacity)} / ${item.capacity}`}</em></div>`;
   }).join('')}</div>` : '';
-  return `<div class=blk style="--rc:${color2}">${/^(https:|data:image\/)/.test(block.logo || '') ? `<img class=lg src="${html(block.logo)}" onerror="this.remove()">` : ''}
+  return `<div class=blk style="--rc:${color2}"><div class=hd><div class=tx>
 <div class=name>${block.icon || '🏁'} ${html(block.name)}</div>
 <div class=row><span class=chip>${html(block.sim === 'stream' ? 'STREAM' : simLabel.toUpperCase())}</span>${block.chips.map(([label, kind]) => `<span class="chip ${kind}">${html(label)}</span>`).join('')}${block.facts.map(factHtml).join('')}</div>
-${block.note ? `<div class=note>${html(block.note)}</div>` : ''}${lines}${more}${streamers}</div>`;
+${block.note ? `<div class=note>${html(block.note)}</div>` : ''}</div>${/^(https:|data:image\/)/.test(block.logo || '') ? `<img class=lg src="${html(block.logo)}" onerror="this.remove()">` : ''}</div>${lines}${more}${streamers}</div>`;
 }
 // The poster's page, for the browser. Pictures: https addresses (the site's) or inline ones only.
 export function posterHtml(model) {
