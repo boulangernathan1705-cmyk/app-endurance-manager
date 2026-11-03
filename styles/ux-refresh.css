@@ -2864,7 +2864,9 @@ button.crews-lock:disabled { opacity: .6; cursor: progress; }
 
 /* ---------- Téléphone : barre d'onglets en bas (front/tab-bar.mjs, Nathan 2026-11-03) ---------- */
 .tab-bar { display: none; }
+.account-phone-only { display: none !important; }
 @media (max-width: 760px) {
+  body.has-tab-bar .account-phone-only { display: flex !important; }
   body.has-tab-bar { padding-bottom: calc(68px + env(safe-area-inset-bottom)) !important; }
   .tab-bar {
     position: fixed; left: 0; right: 0; bottom: 0; z-index: 1100;
@@ -2879,7 +2881,10 @@ button.crews-lock:disabled { opacity: .6; cursor: progress; }
   .tab-bar a[aria-current="page"] { color: var(--em-accent); }
   .tab-bar a[aria-current="page"]::before { content: ""; position: absolute; top: -6px; width: 28px; height: 3px; border-radius: 0 0 3px 3px; background: currentColor; }
   .tab-bar em { position: absolute; top: 1px; left: calc(50% + 6px); min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; background: var(--em-danger); color: #fff; font-size: 10px; font-weight: 800; font-style: normal; line-height: 16px; text-align: center; }
-  /* En haut ne restent que les onglets propres à la page (LMU / iRacing, Fiches combo, Administration…). */
-  body.has-tab-bar .site-nav-shell #navigation .nav-sections > :is(.nav-week-button, .nav-events-button, .nav-endurance-button, .nav-entries-button, .nav-crews-button) { display: none !important; }
-  body.has-tab-bar .site-nav-shell #navigation .nav-sections:not(:has(> :not(.nav-week-button, .nav-events-button, .nav-endurance-button, .nav-entries-button, .nav-crews-button, [hidden]))) { display: none !important; }
+  /* En haut, une seule ligne d'icônes : le choix LMU / iRacing s'y glisse, au milieu, quand la page l'a ; les autres
+     onglets (Fiches combo, Mur des stands, Administration, Aide) passent dans le menu du compte. */
+  body.has-tab-bar .site-nav-shell #navigation > .nav-sections { grid-area: switch !important; justify-self: center; width: auto; min-width: 0; margin: 0 !important; padding: 0 !important; border: 0 !important; }
+  body.has-tab-bar .site-nav-shell #navigation .nav-sections > .nav-section-button { display: none !important; }
+  body.has-tab-bar .site-nav-shell #navigation .nav-sections .nav-game-switcher { order: 0; flex: 0 0 auto; margin: 0 !important; }
+  body.has-tab-bar .site-nav-shell #navigation .nav-game-switcher-button { flex: 0 0 auto; min-height: 32px !important; padding: 0 12px !important; font-size: 12.5px !important; }
 }
