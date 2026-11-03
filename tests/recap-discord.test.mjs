@@ -1180,3 +1180,34 @@ test('a community not looked at since the week turned (Monday 7h30) gets its pas
   assert.equal(await syncDueRecaps(env,1,turn+60000,{pending:true}),1,'right after the turn');
   assert.equal(await syncDueRecaps(env,1,turn+120000,{pending:true}),0,'once');
 });
+
+test('the events calendar lists the endurances of the community streamer, with his crew and his stream',async t=>{
+  const {DB,env}=setup(t);
+  const monday=Date.parse('2026-11-02T06:30:00Z');
+  DB.db.prepare(`INSERT INTO community_recap_settings(community_id,enabled,mode,scope,guild_id,destination_id,destination_name,layout) VALUES(?,1,'events','lmu',?,'600000000000000007','Endurance Manager',?)`)
+    .run(DEV_COMMUNITY,GUILD,JSON.stringify({mode:'events',sims:'lmu',announce:'600000000000000008',stream:'https://twitch.tv/lapraline',streamName:'La Praline'}));
+  race(DB,'spa','6h de Spa','spa',[{id:'s1',startsAt:Date.parse('2026-11-04T18:00:00Z')}]);
+  race(DB,'monza','4h de Monza','monza',[{id:'m1',startsAt:Date.parse('2026-11-05T18:00:00Z')}]);
+  race(DB,'imola','6h d’Imola','imola',[{id:'i1',startsAt:Date.parse('2026-11-06T18:00:00Z')}]);
+  solo(DB,'bmc','BMC Round 6',Date.parse('2026-11-03T19:00:00Z'));
+  for(const [id,name] of [['222222222222222221','La Praline'],['222222222222222222','Pilote 2'],['222222222222222223','Admin 3']]){
+    DB.db.prepare('INSERT INTO users(id,name,created_at) VALUES(?,?,0)').run(id,name);
+    DB.db.prepare('INSERT INTO participants(id,name,user_id,created_by,created_at,community_id) VALUES(?,?,?,?,0,?)').run('p'+id,name,id,OWNER,DEV_COMMUNITY);
+  }
+  const reg=DB.db.prepare("INSERT INTO registrations(id,event_id,departure_id,user_id,name,name_key,category,status,created_at,community_id,stream_time,stream_end,participant_id) VALUES(?,?,?,?,?,?,'GT3','whole',?,?,?,?,?)");
+  reg.run('rp','spa','s1','222222222222222221','La Praline','la praline',1,DEV_COMMUNITY,'','','p222222222222222221');
+  reg.run('r2','spa','s1','222222222222222222','Pilote 2','pilote 2',2,DEV_COMMUNITY,'','','p222222222222222222');
+  reg.run('rp2','monza','m1','222222222222222221','La Praline','la praline',3,DEV_COMMUNITY,'19:45','23:00','p222222222222222221');
+  // Imola: other pilots only, nobody streams it: not in the calendar.
+  reg.run('r3','imola','i1','222222222222222223','Admin 3','admin 3',4,DEV_COMMUNITY,'','','p222222222222222223');
+  DB.db.prepare("INSERT INTO crews(id,event_id,departure_id,name,category,created_at,community_id) VALUES('c1','spa','s1','Équipage A','GT3',0,?)").run(DEV_COMMUNITY);
+  DB.db.prepare("INSERT INTO crew_members(crew_id,registration_id) VALUES('c1','rp'),('c1','r2')").run();
+  const snap=await loadCalendarSnapshot(env,monday,COMMUNITY);
+  assert.deepEqual(snap.events.map(event=>event.name),['BMC Round 6','6h de Spa','4h de Monza']);
+  const {buildCalendarPayload}=await import('../server/discord-weekly-format.mjs');
+  const text=JSON.stringify(buildCalendarPayload(snap,{url:'https://site.example'},monday));
+  assert.match(text,/Équipage A\*\* · La Praline, Pilote 2/);
+  assert.match(text,/📺 Stream 19h45 → 23h00 sur \[Twitch\]\(https:\/\/twitch.tv\/lapraline\)/);
+  assert.match(text,/https:\/\/site.example\/lmu\/#event=spa/);
+  assert.doesNotMatch(text,/Imola/);
+});

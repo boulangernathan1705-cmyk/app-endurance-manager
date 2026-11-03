@@ -7,6 +7,7 @@ import {grindfestEnabled} from '../shared/grindfest.mjs';
 import {isDevelopment} from './dev-environment.mjs';
 import {isStream, streamDetails} from '../shared/stream.mjs';
 import {streamCrew} from './stream-crew.mjs';
+import {parseLayout} from './discord-layout.mjs';
 import {syncBotRecaps, botRecapSettings} from './recap-discord.mjs';
 
 // All publications are now managed by the bot; historical webhook rows are inert.
@@ -198,6 +199,44 @@ export async function loadWeeklyDiscordSnapshot(env, timestamp, community, scope
 }
 
 const CALENDAR_TURN_MS = 7.5 * 3600000;
+const nameKey = value => String(value || '').trim().toLowerCase();
+
+// The endurances of the community's streamer in the calendar (Nathan, 2026-11-03): each start where he is in a crew of
+// this community (his name on the site = « Nom du streamer » of Admin > Discord), or where an admin streams it
+// (« Je streame ce départ »), with that crew and the stream's times and link.
+async function streamerEndurances(env, community, timestamp) {
+  const layout = parseLayout((await env.DB.prepare('SELECT layout FROM community_recap_settings WHERE community_id=?').bind(community.id).first())?.layout) || {};
+  const streamer = nameKey(layout.streamName);
+  const regs = (await env.DB.prepare(`SELECT r.event_id,r.departure_id,r.stream_time,r.stream_end,COALESCE(p.name,r.name) AS pilot,cm.crew_id,
+      e.name,e.circuit,e.departures,e.schedule_pending
+    FROM registrations r JOIN events e ON e.id=r.event_id LEFT JOIN participants p ON p.id=r.participant_id
+    LEFT JOIN crew_members cm ON cm.registration_id=r.id
+    WHERE r.community_id=? AND COALESCE(e.format,'endurance')<>'solo' AND COALESCE(r.status,'')<>'unavailable'
+      AND (COALESCE(r.stream_time,'')<>'' OR (?<>'' AND lower(trim(COALESCE(p.name,r.name)))=?))
+      AND EXISTS (SELECT 1 FROM json_each(e.departures) d WHERE json_extract(d.value,'$.id')=r.departure_id AND json_extract(d.value,'$.startsAt')>=?)
+    ORDER BY r.created_at,r.id`).bind(community.id, streamer, streamer, timestamp - 8 * 86400000).all()).results || [];
+  const byStart = new Map();
+  for (const reg of regs) {
+    const start = parseJson(reg.departures, []).find(item => item?.id === reg.departure_id);
+    if (!Number.isFinite(Number(start?.startsAt))) continue;
+    const key = `${reg.event_id}:${reg.departure_id}`;
+    const item = byStart.get(key) || {row:{id:reg.event_id, name:reg.name, circuit:reg.circuit || '', schedule_pending:reg.schedule_pending}, start, startsAt:Number(start.startsAt),
+      endurance:{sim:String(reg.circuit || '').startsWith('iracing-') ? 'iracing' : 'lmu', info:{crew:null, streamTime:'', streamEnd:'', streamUrl:layout.stream || ''}}, crewId:null, streamerCrew:false};
+    if (reg.stream_time && !item.endurance.info.streamTime) Object.assign(item.endurance.info, {streamTime:reg.stream_time, streamEnd:reg.stream_end || ''});
+    // The streamer's own crew first, else the crew of the admin who streams it.
+    const own = streamer && nameKey(reg.pilot) === streamer;
+    if (reg.crew_id && (!item.crewId || (own && !item.streamerCrew))) { item.crewId = reg.crew_id; item.streamerCrew = own; }
+    byStart.set(key, item);
+  }
+  for (const item of byStart.values()) {
+    if (!item.crewId) continue;
+    const crew = await env.DB.prepare('SELECT name FROM crews WHERE id=?').bind(item.crewId).first();
+    const pilots = (await env.DB.prepare(`SELECT COALESCE(p.name,r.name) AS name FROM crew_members cm JOIN registrations r ON r.id=cm.registration_id
+      LEFT JOIN participants p ON p.id=r.participant_id WHERE cm.crew_id=? ORDER BY r.created_at,r.id`).bind(item.crewId).all()).results || [];
+    if (crew) item.endurance.info.crew = {name:String(crew.name), pilots:pilots.map(pilot => String(pilot.name)).filter(Boolean)};
+  }
+  return [...byStart.values()].map(({crewId, streamerCrew, ...item}) => item);
+}
 
 // The calendar's events (EVENT SOLO / EVENT TDZ) of the week, with their places taken by this community's pilots.
 // sim: 'iracing' for the iRacing events only, 'lmu' for all the others (null: all).
@@ -210,6 +249,7 @@ export async function loadCalendarSnapshot(env, timestamp, community, sim = null
   const simOf = row => isStream(row) ? streamDetails({details:parseJson(row.details, {})}).raceSim || 'stream' : simForEvent(row);
   const starts = rows.filter(row => !sim || (simOf(row) === 'iracing') === (sim === 'iracing')).flatMap(row => parseJson(row.departures, []).filter(start => Number.isFinite(Number(start?.startsAt)))
     .map(start => ({row, start, startsAt:Number(start.startsAt)})));
+  starts.push(...(await streamerEndurances(env, community, timestamp)).filter(item => !sim || (item.endurance.sim === 'iracing') === (sim === 'iracing')));
   // The calendar's week turns on Monday at 7h30, with the morning announcement (Nathan, 2026-11-01):
   // once its events are over, the week stays shown until then.
   const currentWeek = parisWeek(timestamp - CALENDAR_TURN_MS);
@@ -221,7 +261,7 @@ export async function loadCalendarSnapshot(env, timestamp, community, sim = null
     if (next) { week = parisWeek(next.startsAt); selected = starts.filter(item => item.startsAt > timestamp && isInParisWeek(item.startsAt, week)); }
   }
   selected.sort((a,b) => a.startsAt - b.startsAt || String(a.row.name).localeCompare(String(b.row.name),'fr'));
-  const ids = [...new Set(selected.map(item => item.row.id))];
+  const ids = [...new Set(selected.filter(item => !item.endurance).map(item => item.row.id))];
   const counts = new Map();
   if (ids.length) {
     const result = (await env.DB.prepare(`SELECT event_id,departure_id,COUNT(DISTINCT COALESCE(participant_id,id)) AS entered FROM registrations
@@ -231,7 +271,8 @@ export async function loadCalendarSnapshot(env, timestamp, community, sim = null
   }
   const crews = new Map();
   for (const {row} of selected) if (isStream(row) && !crews.has(row.id)) crews.set(row.id, await streamCrew(env, community.id, row));
-  return {periodKey:week.key, periodLabel:week.label, events:selected.map(({row, start, startsAt}) => {
+  return {periodKey:week.key, periodLabel:week.label, events:selected.map(({row, start, startsAt, endurance}) => {
+    if (endurance) return {id:row.id, name:row.name, sim:endurance.sim, circuits:[row.circuit], startsAt, timePending:Boolean(row.schedule_pending) || start.tbd === true, endurance:endurance.info};
     const rounds = parseJson(row.rounds, []);
     return {id:row.id, name:row.name, sim:simForEvent(row), circuits:rounds.length ? rounds.map(round => round?.circuit) : [row.circuit],
       startsAt, timePending:Boolean(row.schedule_pending) || start.tbd === true, capacity:row.capacity == null ? null : Number(row.capacity),
