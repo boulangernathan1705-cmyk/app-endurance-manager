@@ -4,6 +4,8 @@ import './tooltip.mjs?v=2';
 import {showCommunityIntro} from './community-intro.mjs';
 import {installNotifications} from './notifications.mjs?v=1';
 import {simChosen, openSimChooser} from './sim-chooser.mjs';
+// On a phone, the main sections go to a bar at the bottom of the screen.
+import './tab-bar.mjs?v=1';
 const root = document.getElementById('account-menu-root');
 
 const roleLabel = role => ({admin:'Administrateur',organizer:'Organisateur',pilot:'Pilote'}[role] || 'Pilote');
@@ -170,7 +172,9 @@ function unifyNav(session) {
   const sim = document.querySelector('[data-module-link]') ? 'lmu' : /(?:^|;\s*)em_sim=(lmu|iracing)(?:;|$)/.exec(document.cookie)?.[1] || 'lmu';
   const link = (href, label, extra = '') => `<a class="nav-section-button${extra}" href="${href}">${esc(label)}</a>`;
   const events = session.soloRaces === true;
-  const endurance = link(`/${sim}/`, 'ENDURANCE');
+  const endurance = link(`/${sim}/`, 'ENDURANCE', ' nav-endurance-button');
+  // Équipages, like on the race pages, for those who may place pilots in crews.
+  const crews = Array.isArray(session.permissions) && session.permissions.includes('crews') ? link(`/${sim}/#equipages`, 'Équipages', ' nav-crews-button') : '';
   const own = [...nav.querySelectorAll('.nav-sections .nav-section-button')].map(item => item.outerHTML).join('');
   nav.querySelector('.nav-game-switcher')?.remove();
   for (const group of nav.querySelectorAll('.nav-sections')) group.remove();
@@ -178,7 +182,7 @@ function unifyNav(session) {
   sections.className = 'nav-sections';
   sections.setAttribute('role', 'group');
   sections.setAttribute('aria-label', 'Sections');
-  sections.innerHTML = `${link(`/${sim}/#accueil`, 'Accueil', ' nav-week-button')}${events ? link('/events/', session.soloLabel || 'EVENT TDZ', ' nav-events-button') : ''}${endurance}${link(`/${sim}/#inscriptions`, 'Mes inscriptions')}${own}`;
+  sections.innerHTML = `${link(`/${sim}/#accueil`, 'Accueil', ' nav-week-button')}${events ? link('/events/', session.soloLabel || 'EVENT TDZ', ' nav-events-button') : ''}${endurance}${link(`/${sim}/#inscriptions`, 'Mes inscriptions', ' nav-entries-button')}${crews}${own}`;
   // Simulator not chosen yet: « Endurance » asks for it first.
   if (events) sections.children[1].addEventListener('click', event => { if (!simChosen()) { event.preventDefault(); openSimChooser(); } });
   nav.append(sections);
