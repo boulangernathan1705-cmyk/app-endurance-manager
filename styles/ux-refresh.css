@@ -100,14 +100,16 @@ html[data-game="lmu"] { --game-accent: #d8322c; }
 }
 .site-nav-shell #navigation .nav-section-button {
   min-height: 36px;
-  padding: 0 14px;
+  padding: 0 11px;
   border: 1px solid transparent;
   border-radius: 8px;
   background: transparent;
   color: #c7d0d4;
   font: inherit;
-  font-size: 14px;
-  font-weight: 700;
+  font-size: 12.5px;
+  font-weight: 750;
+  letter-spacing: .03em;
+  text-transform: uppercase;
   cursor: pointer;
   white-space: nowrap;
 }
@@ -2604,7 +2606,7 @@ main:not(.charte):has(.home-layout) { max-width: 2400px; }
 .week-block-body { display: grid; gap: 3px; padding: 8px 11px 10px; }
 .week-block-title { display: contents; }
 .week-block-kind { display: block; font-size: 9.5px; font-weight: 850; letter-spacing: .1em; text-transform: uppercase; color: color-mix(in srgb, var(--kind) 55%, #fff); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.week-block-name { text-transform: uppercase; font-weight: 900; color: var(--em-text-strong); }
+.week-block-name { font-weight: 900; color: var(--em-text-strong); }
 .week-block-live { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 6px; margin-top: 3px; padding: 4px 8px; border: 1px solid color-mix(in srgb, #a970ff 35%, transparent); border-radius: 8px; background: color-mix(in srgb, #a970ff 16%, transparent); font-size: 12px; color: #d9c4ff; }
 .week-block-live > i { width: 7px; height: 7px; border-radius: 50%; background: #ff4d6d; box-shadow: 0 0 0 3px rgba(255, 77, 109, .25); }
 .week-block-live b { font-weight: 900; white-space: nowrap; }
@@ -2629,7 +2631,7 @@ main:not(.charte):has(.home-layout) { max-width: 2400px; }
 .home-next-box { display: grid; gap: 2px; padding: var(--em-space-3); border: 1px solid color-mix(in srgb, var(--em-warn) 50%, transparent); border-radius: var(--em-radius-lg);
   background: linear-gradient(160deg, color-mix(in srgb, var(--em-warn) 14%, transparent), var(--em-panel) 65%); }
 .home-next-label { margin: 0 0 4px; font-size: 11px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--em-muted); }
-.home-next-name { margin: 0; font-size: 18px; font-weight: 850; line-height: 1.15; text-transform: uppercase; color: var(--em-text-strong); }
+.home-next-name { margin: 0; font-size: 18px; font-weight: 850; line-height: 1.15; color: var(--em-text-strong); }
 .home-next-when { margin: 0 0 6px; font-weight: 750; color: var(--em-warn); }
 .home-next-rows { margin: 0; }
 .home-next-rows div { display: flex; justify-content: space-between; gap: 8px; padding: 4px 0; border-top: 1px solid var(--em-border); font-size: var(--em-text-sm); }
@@ -2686,7 +2688,7 @@ main:not(.charte):has(.home-layout) { max-width: 2400px; }
   .week-block-title .week-chip { margin-bottom: 3px; }
   .week-block-kind { display: none; font-size: 10.5px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: color-mix(in srgb, var(--kind) 60%, #fff); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .week-block-body { padding: 0; }
-  .week-block-name { font-size: 15.5px; font-weight: 900; line-height: 1.12; text-transform: uppercase; color: var(--em-text-strong); }
+  .week-block-name { font-size: 15.5px; font-weight: 900; line-height: 1.12; color: var(--em-text-strong); }
   .week-block-circuit { font-size: 12.5px; }
   .week-block-plan { grid-column: 2; display: grid; gap: 1px; margin: 0; padding: 0; border: 0; background: none; }
   .week-plan-row em { display: inline; }
@@ -2859,3 +2861,57 @@ button.crews-lock:disabled { opacity: .6; cursor: progress; }
 /* Creation forms: a part hidden by the form (training window, stream times, sessions of a training) stays hidden. */
 .solo-event-form [hidden] { display: none !important; }
 .stream-choice-link a { color: inherit; text-decoration: underline; font-weight: 700; }
+
+/* ---------- Téléphone : barre d'onglets en bas (front/tab-bar.mjs, Nathan 2026-11-03) ---------- */
+.tab-bar { display: none; }
+.account-phone-only { display: none !important; }
+@media (max-width: 760px) {
+  body.has-tab-bar .account-phone-only { display: flex !important; }
+  body.has-tab-bar { padding-bottom: calc(68px + env(safe-area-inset-bottom)) !important; }
+  .tab-bar {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 1100;
+    display: grid; grid-auto-flow: column; grid-auto-columns: 1fr;
+    padding: 6px 4px calc(6px + env(safe-area-inset-bottom));
+    border-top: 1px solid var(--em-border);
+    background: color-mix(in srgb, var(--em-bg) 92%, transparent);
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  }
+  .tab-bar a { position: relative; display: grid; justify-items: center; gap: 3px; padding: 6px 0 2px; color: var(--em-muted); font-size: 10.5px; font-weight: 700; line-height: 1.1; text-decoration: none; -webkit-tap-highlight-color: transparent; }
+  .tab-bar svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+  .tab-bar a[aria-current="page"] { color: var(--em-accent); }
+  .tab-bar a[aria-current="page"]::before { content: ""; position: absolute; top: -6px; width: 28px; height: 3px; border-radius: 0 0 3px 3px; background: currentColor; }
+  .tab-bar em { position: absolute; top: 1px; left: calc(50% + 6px); min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; background: var(--em-danger); color: #fff; font-size: 10px; font-weight: 800; font-style: normal; line-height: 16px; text-align: center; }
+  /* En haut, une seule ligne d'icônes : le choix LMU / iRacing s'y glisse, au milieu, quand la page l'a ; les autres
+     onglets (Fiches combo, Mur des stands, Administration, Aide) passent dans le menu du compte. */
+  body.has-tab-bar .site-nav-shell #navigation > .nav-sections { grid-area: switch !important; justify-self: center; width: auto; min-width: 0; margin: 0 !important; padding: 0 !important; border: 0 !important; }
+  body.has-tab-bar .site-nav-shell #navigation .nav-sections > .nav-section-button { display: none !important; }
+  body.has-tab-bar .site-nav-shell #navigation .nav-sections .nav-game-switcher { order: 0; flex: 0 0 auto; margin: 0 !important; }
+  body.has-tab-bar .site-nav-shell #navigation .nav-game-switcher-button { flex: 0 0 auto; min-height: 32px !important; padding: 0 12px !important; font-size: 12.5px !important; }
+}
+
+/* ---------- « ＋ Ajouter » : les créations des admins derrière un seul petit bouton (core.mjs addMenu, 2026-11-03) ---------- */
+.home-create:has(.add-menu, .add-menu-single),
+.home-create-event:has(.add-menu, .add-menu-single) { display: flex !important; flex: 0 0 auto !important; width: auto !important; margin: 0 0 0 auto !important; }
+.home-create > .add-menu, .home-create > .add-menu-single,
+.home-create-event > .add-menu, .home-create-event > .add-menu-single { flex: 0 0 auto !important; width: auto !important; }
+.add-menu { position: relative; }
+.add-menu-toggle, .add-menu-single { display: inline-flex !important; width: auto !important; min-width: 0 !important; align-items: center; min-height: 38px !important; padding: 0 14px !important; font-size: var(--em-text-sm) !important; white-space: nowrap; cursor: pointer; list-style: none; }
+.add-menu-toggle::-webkit-details-marker { display: none; }
+.add-menu-toggle::marker { content: ""; }
+.add-menu-list { position: absolute; right: 0; top: calc(100% + 6px); z-index: 1000; display: grid; min-width: 210px; padding: 6px; border: 1px solid var(--em-border); border-radius: var(--em-radius-md); background: linear-gradient(var(--em-panel), var(--em-panel)), var(--em-bg); box-shadow: 0 12px 30px rgba(0, 0, 0, .45); }
+.add-menu-item { display: block; width: 100%; padding: 10px 12px; border: 0; border-radius: var(--em-radius-sm); background: transparent; color: var(--em-text-strong); font: inherit; font-weight: 700; text-align: left; cursor: pointer; }
+.add-menu-item:hover, .add-menu-item:focus-visible { background: color-mix(in srgb, var(--em-accent) 14%, transparent); }
+/* Téléphone : le « ＋ » se range au bout de la ligne des flèches de la semaine ou des filtres, sans ligne à lui. */
+@media (max-width: 760px) {
+  html[data-game] #app .page-head:has(.add-menu, .add-menu-single) { flex-wrap: nowrap !important; align-items: center; gap: 8px; }
+  html[data-game] #app .page-head:has(.add-menu, .add-menu-single) > :is(.week-nav, .event-filter) { flex: 1 1 auto !important; min-width: 0; width: auto !important; margin: 0 !important; }
+  html[data-game] #app .page-head:has(.add-menu, .add-menu-single) > :is(.home-create, .home-create-event) { order: 5; margin: 0 !important; }
+  :is(.add-menu-toggle, .add-menu-single) { min-height: 40px !important; padding: 0 10px !important; justify-content: center; font-size: 13px !important; }
+  /* Accueil : les flèches et la semaine restent sur une ligne, le texte de la semaine se resserre. */
+  html[data-game] #app .page-head:has(.add-menu, .add-menu-single) > .week-nav:not(:has(.week-back)) { flex-wrap: nowrap !important; }
+  html[data-game] #app .page-head:has(.add-menu, .add-menu-single) > .week-nav .week-label { min-width: 0; font-size: 14px; }
+  html[data-game] #app .page-head:has(.add-menu, .add-menu-single) > .week-nav .week-label small { font-size: 11px; white-space: nowrap; }
+  /* Quatre filtres (À venir, Mes courses, Archivés, Filtres) : pas la place, « Ajouter » passe à droite en dessous. */
+  html[data-game] #app .page-head:has(.add-menu, .add-menu-single):has(> .event-filter > :nth-child(4)) { flex-wrap: wrap !important; }
+  html[data-game] #app .page-head:has(> .event-filter > :nth-child(4)) > :is(.home-create, .home-create-event) { margin-left: auto !important; }
+}

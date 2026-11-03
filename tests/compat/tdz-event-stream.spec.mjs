@@ -17,7 +17,8 @@ for(const width of [1440,390])test(`TDZ event: stream choice and training window
   });
   await page.addInitScript(()=>localStorage.setItem('endurance_manager_locale','fr'));
   await page.goto('/events/');
-  await page.getByRole('button',{name:'Ajouter un événement'}).click();
+  await page.locator('.add-menu-toggle').click();
+  await page.getByRole('menuitem',{name:/Événement/}).click();
   const form=page.locator('form[data-kind="solo-event"]'),next=form.locator('[data-solo-step="next"]');
   const clock=name=>form.locator('[data-clock]').filter({has:page.locator(`[name="${name}"]`)});
   const setClock=async(name,value)=>{await clock(name).locator('[data-clock-hour]').selectOption(value.slice(0,2));await clock(name).locator('[data-clock-minute]').selectOption(value.slice(3));};
@@ -74,7 +75,8 @@ test('TDZ event without stream sends no stream times',async({page})=>{
   });
   await page.addInitScript(()=>localStorage.setItem('endurance_manager_locale','fr'));
   await page.goto('/events/');
-  await page.getByRole('button',{name:'Ajouter un événement'}).click();
+  await page.locator('.add-menu-toggle').click();
+  await page.getByRole('menuitem',{name:/Événement/}).click();
   const form=page.locator('form[data-kind="solo-event"]'),next=form.locator('[data-solo-step="next"]');
   const clock=name=>form.locator('[data-clock]').filter({has:page.locator(`[name="${name}"]`)});
   const setClock=async(name,value)=>{await clock(name).locator('[data-clock-hour]').selectOption(value.slice(0,2));await clock(name).locator('[data-clock-minute]').selectOption(value.slice(3));};
@@ -107,7 +109,8 @@ test('TDZ rally night asks the stream too',async({page})=>{
   });
   await page.addInitScript(()=>localStorage.setItem('endurance_manager_locale','fr'));
   await page.goto('/events/');
-  await page.getByRole('button',{name:'Ajouter un événement'}).click();
+  await page.locator('.add-menu-toggle').click();
+  await page.getByRole('menuitem',{name:/Événement/}).click();
   const solo=page.locator('form[data-kind="solo-event"]');
   await solo.locator('[name="eventName"]').fill('Bouboules');
   await solo.locator('label:has(input[name="eventSim"][value="acrally"])').click();

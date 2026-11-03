@@ -65,10 +65,13 @@ test('the home of an organiser signed up nowhere',async({page})=>{
  await page.goto('/lmu/#accueil');
  await expect(page.locator('.home-layout.is-full')).toBeVisible();
  await expect(page.locator('.home-next-box')).toHaveCount(0);
+ // One small « ＋ » opens the admins' menu (2026-11-03).
+ await page.locator('.home-create .add-menu-toggle').click();
  await page.locator('.home-create [data-action="create-stream"]').click();
  await expect(page.locator('.stream-event-form')).toBeVisible();
  await page.goto('/lmu/#solo');
  await page.goto('/lmu/#accueil');
+ await page.locator('.home-create .add-menu-toggle').click();
  await page.locator('.home-create [data-action="create"]').click();
  await expect(page.locator('form.event-creation')).toBeVisible();
 });
