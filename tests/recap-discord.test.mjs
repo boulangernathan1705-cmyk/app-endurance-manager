@@ -1194,12 +1194,12 @@ test('the events calendar lists the endurances of the community streamer, with h
     DB.db.prepare('INSERT INTO users(id,name,created_at) VALUES(?,?,0)').run(id,name);
     DB.db.prepare('INSERT INTO participants(id,name,user_id,created_by,created_at,community_id) VALUES(?,?,?,?,0,?)').run('p'+id,name,id,OWNER,DEV_COMMUNITY);
   }
-  const reg=DB.db.prepare("INSERT INTO registrations(id,event_id,departure_id,user_id,name,name_key,category,status,created_at,community_id,stream_time,stream_end,participant_id) VALUES(?,?,?,?,?,?,'GT3','whole',?,?,?,?,'p'||?4)");
-  reg.run('rp','spa','s1','222222222222222221','La Praline','la praline',1,DEV_COMMUNITY,'','');
-  reg.run('r2','spa','s1','222222222222222222','Pilote 2','pilote 2',2,DEV_COMMUNITY,'','');
-  reg.run('rp2','monza','m1','222222222222222221','La Praline','la praline',3,DEV_COMMUNITY,'19:45','23:00');
+  const reg=DB.db.prepare("INSERT INTO registrations(id,event_id,departure_id,user_id,name,name_key,category,status,created_at,community_id,stream_time,stream_end,participant_id) VALUES(?,?,?,?,?,?,'GT3','whole',?,?,?,?,?)");
+  reg.run('rp','spa','s1','222222222222222221','La Praline','la praline',1,DEV_COMMUNITY,'','','p222222222222222221');
+  reg.run('r2','spa','s1','222222222222222222','Pilote 2','pilote 2',2,DEV_COMMUNITY,'','','p222222222222222222');
+  reg.run('rp2','monza','m1','222222222222222221','La Praline','la praline',3,DEV_COMMUNITY,'19:45','23:00','p222222222222222221');
   // Imola: other pilots only, nobody streams it: not in the calendar.
-  reg.run('r3','imola','i1','222222222222222223','Admin 3','admin 3',4,DEV_COMMUNITY,'','');
+  reg.run('r3','imola','i1','222222222222222223','Admin 3','admin 3',4,DEV_COMMUNITY,'','','p222222222222222223');
   DB.db.prepare("INSERT INTO crews(id,event_id,departure_id,name,category,created_at,community_id) VALUES('c1','spa','s1','Équipage A','GT3',0,?)").run(DEV_COMMUNITY);
   DB.db.prepare("INSERT INTO crew_members(crew_id,registration_id) VALUES('c1','rp'),('c1','r2')").run();
   const snap=await loadCalendarSnapshot(env,monday,COMMUNITY);
