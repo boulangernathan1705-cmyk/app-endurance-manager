@@ -204,8 +204,8 @@ const nameKey = value => String(value || '').trim().toLowerCase();
 // The endurances of the community's streamer in the calendar (Nathan, 2026-11-03): each start where he is in a crew of
 // this community (his name on the site = « Nom du streamer » of Admin > Discord), or where an admin streams it
 // (« Je streame ce départ »), with that crew and the stream's times and link.
-async function streamerEndurances(env, community, timestamp) {
-  const layout = parseLayout((await env.DB.prepare('SELECT layout FROM community_recap_settings WHERE community_id=?').bind(community.id).first())?.layout) || {};
+const recapLayout = async (env, community) => parseLayout((await env.DB.prepare('SELECT layout FROM community_recap_settings WHERE community_id=?').bind(community.id).first())?.layout) || {};
+async function streamerEndurances(env, community, timestamp, layout) {
   const streamer = nameKey(layout.streamName);
   const regs = (await env.DB.prepare(`SELECT r.event_id,r.departure_id,r.stream_time,r.stream_end,COALESCE(p.name,r.name) AS pilot,cm.crew_id,
       e.name,e.circuit,e.departures,e.schedule_pending
@@ -249,7 +249,8 @@ export async function loadCalendarSnapshot(env, timestamp, community, sim = null
   const simOf = row => isStream(row) ? streamDetails({details:parseJson(row.details, {})}).raceSim || 'stream' : simForEvent(row);
   const starts = rows.filter(row => !sim || (simOf(row) === 'iracing') === (sim === 'iracing')).flatMap(row => parseJson(row.departures, []).filter(start => Number.isFinite(Number(start?.startsAt)))
     .map(start => ({row, start, startsAt:Number(start.startsAt)})));
-  starts.push(...(await streamerEndurances(env, community, timestamp)).filter(item => !sim || (item.endurance.sim === 'iracing') === (sim === 'iracing')));
+  const layout = await recapLayout(env, community);
+  starts.push(...(await streamerEndurances(env, community, timestamp, layout)).filter(item => !sim || (item.endurance.sim === 'iracing') === (sim === 'iracing')));
   // The calendar's week turns on Monday at 7h30, with the morning announcement (Nathan, 2026-11-01):
   // once its events are over, the week stays shown until then.
   const currentWeek = parisWeek(timestamp - CALENDAR_TURN_MS);
@@ -273,10 +274,12 @@ export async function loadCalendarSnapshot(env, timestamp, community, sim = null
   for (const {row} of selected) if (isStream(row) && !crews.has(row.id)) crews.set(row.id, await streamCrew(env, community.id, row));
   return {periodKey:week.key, periodLabel:week.label, events:selected.map(({row, start, startsAt, endurance}) => {
     if (endurance) return {id:row.id, name:row.name, sim:endurance.sim, circuits:[row.circuit], startsAt, timePending:Boolean(row.schedule_pending) || start.tbd === true, endurance:endurance.info};
-    const rounds = parseJson(row.rounds, []);
+    const rounds = parseJson(row.rounds, []), details = parseJson(row.details, {}) || {};
     return {id:row.id, name:row.name, sim:simForEvent(row), circuits:rounds.length ? rounds.map(round => round?.circuit) : [row.circuit],
       startsAt, timePending:Boolean(row.schedule_pending) || start.tbd === true, capacity:row.capacity == null ? null : Number(row.capacity),
       entered:counts.get(`${row.id}:${start.id}`) || 0, access:row.access || '',
+      // An event the community streams (« En stream »): its times, with the community's stream link (Nathan, 2026-11-03).
+      ...(!isStream(row) && details.streamTime ? {live:{streamTime:details.streamTime, streamEnd:details.streamEnd || '', streamUrl:layout.stream || ''}} : {}),
       ...(isStream(row) ? {stream:{...streamDetails({details:parseJson(row.details, {})}), crew:crews.get(row.id) || null}} : {})};
   })};
 }

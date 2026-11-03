@@ -1190,6 +1190,8 @@ test('the events calendar lists the endurances of the community streamer, with h
   race(DB,'monza','4h de Monza','monza',[{id:'m1',startsAt:Date.parse('2026-11-05T18:00:00Z')}]);
   race(DB,'imola','6h d’Imola','imola',[{id:'i1',startsAt:Date.parse('2026-11-06T18:00:00Z')}]);
   solo(DB,'bmc','BMC Round 6',Date.parse('2026-11-03T19:00:00Z'));
+  // An event « En stream »: its stream times in the calendar too.
+  DB.db.prepare("UPDATE events SET details=? WHERE id='bmc'").run(JSON.stringify({streamTime:'19:45',streamEnd:'22:30'}));
   for(const [id,name] of [['222222222222222221','La Praline'],['222222222222222222','Pilote 2'],['222222222222222223','Admin 3']]){
     DB.db.prepare('INSERT INTO users(id,name,created_at) VALUES(?,?,0)').run(id,name);
     DB.db.prepare('INSERT INTO participants(id,name,user_id,created_by,created_at,community_id) VALUES(?,?,?,?,0,?)').run('p'+id,name,id,OWNER,DEV_COMMUNITY);
@@ -1210,4 +1212,5 @@ test('the events calendar lists the endurances of the community streamer, with h
   assert.match(text,/📺 Stream 19h45 → 23h00 sur \[Twitch\]\(https:\/\/twitch.tv\/lapraline\)/);
   assert.match(text,/https:\/\/site.example\/lmu\/#event=spa/);
   assert.doesNotMatch(text,/Imola/);
+  assert.match(text,/BMC Round 6[^"]*📺 Stream 19h45 → 22h30 sur \[Twitch\]/);
 });
