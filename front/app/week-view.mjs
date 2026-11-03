@@ -3,7 +3,7 @@
 // Gridfest, streams) and the endurances of LMU and iRacing together. A view only: a click opens the race's own page
 // (the other simulator's races in its own space), nothing is entered here. On a phone the days follow each other in
 // a list.
-import {app,state,esc,button,addMenu,notifyRender,activeGame,api,coversHour,can} from './core.mjs';
+import {app,state,esc,button,addMenu,notifyRender,activeGame,api,coversHour,can,markUndefinedStarts} from './core.mjs';
 import {gameForEvent} from '../../shared/catalog.mjs';
 import {isSolo,eventAccessLogo,soloCardMeta} from './solo.mjs';
 import {isStream,streamDetails,streamSpan,streamPlatform,streamUrl} from '../../shared/stream.mjs';
@@ -23,7 +23,8 @@ function otherEndurances(){
   const game=OTHER[activeGame];
   if(other.game===game&&Date.now()-other.at<60000)return other.events;
   other.loading??=api(`/api/races?game=${game}&scope=upcoming`).then(result=>{
-    other={game,events:(Array.isArray(result.events)?result.events:[]).filter(event=>event.format!=='solo'&&gameForEvent(event)===game).map(event=>({...event,otherGame:game})),at:Date.now(),loading:null};
+    // A start still to define reads « à définir » here too, as in its own space (Nathan 2026-11-03, 8H Bahreïn).
+    other={game,events:markUndefinedStarts((Array.isArray(result.events)?result.events:[]).filter(event=>event.format!=='solo'&&gameForEvent(event)===game).map(event=>({...event,otherGame:game}))),at:Date.now(),loading:null};
     if(state.page==='week')renderWeek();
   }).catch(()=>{other.loading=null;other.at=Date.now();other.game=game;});
   return other.game===game?other.events:[];
@@ -150,7 +151,7 @@ function block(item,now){
   const left=solo&&!stream&&Number(event.capacity)>0?Number(event.capacity)-pilots:null;
   const reg=mine?myReg(departure):null,crew=reg&&!solo?crewOf(departure,reg):null;
   const situation=!mine?'':solo?'<span class="week-chip is-ok">✓ Inscrit</span>'
-    :crew?`<span class="week-chip is-ok">✓ ${esc(crew.name)}${reg?` · ${esc(hoursOf(departure,reg,event))}`:''}</span>`:'<span class="week-chip is-alert">Sans équipage</span>';
+    :crew?`<span class="week-chip is-ok">✓ ${esc(crew.name)}${reg?` · ${esc(hoursOf(departure,reg,event))}`:''}</span>`:'<span class="week-chip is-alert">Toi : sans équipage</span>';
   // How full an event is, as a gauge on a computer (option P1).
   const gauge=left===null||past||!(Number(event.capacity)>0)?'':`<span class="week-block-gauge"><span><i style="width:${Math.min(100,Math.round(pilots/Number(event.capacity)*100))}%"></i></span><em>${left<=0?'Complet':`${left} place${left>1?'s':''}`}</em></span>`;
   const places=left===null||past?'':left<=0?'<span class="week-chip is-warn">Complet</span>':`<span class="week-chip is-warn">${left} place${left>1?'s':''} restante${left>1?'s':''}</span>`;
@@ -265,9 +266,10 @@ function nextBox(all,now){
 
 // « Équipages à former » (organisers): the starts where pilots wait for a crew or ask for one, and the way to the
 // « Équipages » page (Nathan 2026-11-01).
-function crewsBox(){
+// Only the starts of the week shown (Nathan 2026-11-03).
+function crewsBox(monday){
   if(!can('crews'))return '';
-  const starts=crewStarts().filter(start=>start.alone.length||start.requests.length);
+  const starts=crewStarts().filter(start=>start.alone.length||start.requests.length).filter(start=>{const day=parisDay(start.startsAt);return day>=monday&&day<monday+7;});
   const row=start=>`<li>${button('crews-page',`<span><strong>${esc(start.event.name)}</strong><small>${esc(when(start.startsAt))}${start.departure.hideClock?'':` · ${esc(hour(start.startsAt))}`}</small></span><span class="week-chip ${start.requests.length?'is-warn':'is-alert'}">${start.requests.length?`${start.requests.length} demande${start.requests.length>1?'s':''}`:`${start.alone.length} seul${start.alone.length>1?'s':''}`}</span>`,`data-departure="${esc(start.departure.id)}" data-game="${esc(gameForEvent(start.event))}"`,'home-crews-row')}</li>`;
   return `<aside class="home-crews-box"><h2 class="home-next-label">Équipages à former</h2>
     ${starts.length?`<ul>${starts.slice(0,4).map(row).join('')}</ul>${starts.length>4?`<p class="home-crews-more">+ ${starts.length-4} autre${starts.length-4>1?'s':''} départ${starts.length-4>1?'s':''}</p>`:''}`:'<p class="home-crews-done">✓ Tout le monde a un équipage.</p>'}
@@ -298,7 +300,7 @@ export function renderWeek(){
       <div class="week-day-list">${day.shown.map(item=>block(item,now)).join('')}${doneLine(day)}${day.items.length?'':'<p class="week-empty">—</p>'}</div>
     </section>`).join('');
   const widths=shown.map(day=>`minmax(0,${day.weight}fr)`).join(' ');
-  const name=String(state.user?.name||'').trim().split(/\s+/)[0],side=nextBox(all,now)+crewsBox(),box=side?`<div class="home-side">${side}</div>`:'';
+  const name=String(state.user?.name||'').trim().split(/\s+/)[0],side=nextBox(all,now)+crewsBox(monday),box=side?`<div class="home-side">${side}</div>`:'';
   // Admins create an event or announce a stream from here too (Nathan 2026-11-01), as on the events page.
   const create=can('create_race')&&state.soloRaces?`<div class="home-create">${addMenu([['create','🏁 Événement','data-format="solo"'],['create-stream','🎙 Stream']])}</div>`:'';
   const weekLabel=offset===0?'Cette semaine':offset===1?'La semaine prochaine':offset===-1?'La semaine dernière':`Semaine du ${monthDay.format(dateOf(monday))}`;

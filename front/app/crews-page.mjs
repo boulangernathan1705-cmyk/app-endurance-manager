@@ -3,7 +3,7 @@
 // crews on one side, its pilots without a crew on the other, each with the bar of their hours. The organiser ticks
 // pilots and creates a crew (the usual crew window, filled in), puts a pilot in an open crew (« Ajouter à… »), or
 // checks a pilot's request (« Demander un équipage ») before creating it. Pilots only see their race pages.
-import {app,state,esc,button,api,activeGame,coversHour,can,logo,notifyRender,showError,registrationCarLabel} from './core.mjs';
+import {app,state,esc,button,api,activeGame,coversHour,can,logo,notifyRender,showError,registrationCarLabel,markUndefinedStarts} from './core.mjs';
 import {gameForEvent} from '../../shared/catalog.mjs';
 import {eventMinutes,raceFinishAt} from '../../shared/duration.mjs';
 
@@ -24,7 +24,7 @@ function otherEndurances(){
   const game=OTHER[activeGame];
   if(other.game===game&&Date.now()-other.at<60000)return other.events;
   other.loading??=api(`/api/races?game=${game}&scope=upcoming`).then(result=>{
-    other={game,events:(Array.isArray(result.events)?result.events:[]).filter(event=>event.format!=='solo'&&gameForEvent(event)===game),at:Date.now(),loading:null};
+    other={game,events:markUndefinedStarts((Array.isArray(result.events)?result.events:[]).filter(event=>event.format!=='solo'&&gameForEvent(event)===game)),at:Date.now(),loading:null};
     if(state.page==='crews')renderCrewsPage();
     document.dispatchEvent(new CustomEvent('endurance:crews-count'));
   }).catch(()=>{other={game,events:[],at:Date.now(),loading:null};});

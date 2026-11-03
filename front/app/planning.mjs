@@ -45,14 +45,16 @@ function startCard(event,departure,body,{minutes,now,open,quick=''}){
   const head=`<span class="planning-start-head"><strong>Départ ${esc(timeLabel(departure.time))}</strong>${compact?(done?'<span class="planning-start-state">Terminé</span>':''):(isSolo(event)||departure.tbd?'':`<span class="planning-start-end">fin ${esc(timeAt(end))}${esc(endDay)}</span>`)}${tags}</span>`;
   // Pilots without a crew, by category (« 2 GT3 » « 1 Hypercar »): where a pilot can find a crew. The crews
   // follow, by name.
-  const free=event.categories.map(category=>{const regs=present.filter(reg=>!assigned.has(reg.id)&&reg.category===category);return [category,regs.length,regs.map(reg=>communityPrefix(reg)+reg.name)];}).filter(([,count])=>count);
+  const free=event.categories.map(category=>{const regs=present.filter(reg=>!assigned.has(reg.id)&&reg.category===category);return [category,regs.length,regs];}).filter(([,count])=>count);
   // Who takes part, without opening the start (Nathan 2026-11-03): one line per crew (name in its colour, padlock,
   // then its pilots), then the pilots without a crew, by category.
   const row=(content,extra='')=>`<span class="planning-row"${extra}>${content}</span>`;
-  const names=list=>`<span class="planning-pilot-names">${list.map(esc).join(' · ')}</span>`;
-  const byId=new Map(present.map(reg=>[reg.id,communityPrefix(reg)+reg.name]));
+  // Each pilot in his own small tag, never cut in two, his community's tag dimmed in front (Nathan 2026-11-03).
+  const pilot=reg=>{const tag=communityPrefix(reg).trim().replace(/^\[|\]$/g,'');return `<span class="planning-pilot">${tag?`<small>${esc(tag)}</small>`:''}${esc(reg.name)}</span>`;};
+  const names=list=>`<span class="planning-pilot-names">${list.map(pilot).join('')}</span>`;
+  const byId=new Map(present.map(reg=>[reg.id,reg]));
   // A crew that still takes pilots shows a green open padlock, a full one a red closed padlock.
-  const crewLine=crews.map((crew,index)=>row(`<span class="planning-crew ${crewColorClass(crew.id,index)}">${logo(crew.category)}${communityTag(crew)}<span>${esc(crew.name)}</span>${crew.locked?LOCKED_ICON:OPEN_ICON}</span>${names([...new Set((crew.registrationIds||[]).map(id=>byId.get(id)).filter(Boolean))])}`,' data-crew-line')).join('');
+  const crewLine=crews.map((crew,index)=>row(`<span class="planning-crew ${crewColorClass(crew.id,index)}">${logo(crew.category)}${communityTag(crew)}<span>${esc(crew.name)}</span>${crew.locked?LOCKED_ICON:OPEN_ICON}</span>${names([...new Map((crew.registrationIds||[]).map(id=>byId.get(id)).filter(Boolean).map(reg=>[reg.participantId||reg.id,reg])).values()])}`,' data-crew-line')).join('');
   const freeLine=free.length?row(NO_CREW_ICON+free.map(([category,,list])=>`<span class="planning-free-group">${logo(category)}${names(list)}</span>`).join(''),' data-free-pilots'):'';
   // Solo event: no crews, the number of participants (and places) instead.
   const details=compact?'':isSolo(event)?row(soloFill(event,departure)):`${crewLine}${freeLine}`;
