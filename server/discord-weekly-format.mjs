@@ -341,8 +341,20 @@ function streamFacts(stream){
   return [stream.streamTime?`📺 Stream ${streamHour(stream.streamTime)}${on}`:on&&`📺 En direct${on}`,stream.raceTime&&`🏁 Départ ${streamHour(stream.raceTime)}`,(stream.activity||stream.raceSim)&&`🎮 ${clean(stream.activity || SIM_SHORT[stream.raceSim] || stream.raceSim)}`].filter(Boolean).join(' · ');
 }
 const streamCrewText=crew=>`👥 ${clean(crew.eventName)} avec l’**${clean(crew.crew)}**${crew.pilots.length?` · ${crew.pilots.map(clean).join(', ')}`:''}`;
+// An endurance of the community's streamer: its start, name (link to it), sim and circuit, his crew, and his stream
+// when he streams it (« Je streame ce départ »): « 📺 Stream 19h45 → 23h sur Twitch ».
+function enduranceBox(event,siteUrl){
+  const info=event.endurance,name=clean(event.name),url=raceUrl(siteUrl,{eventId:event.id,circuit:event.circuits[0]});
+  const circuit=circuitNames.get(event.circuits[0])||event.circuits[0]||'';
+  const on=info.streamUrl?` sur [${streamPlatform(info.streamUrl)}](${info.streamUrl})`:'';
+  return{name:cut(`🏁 ${startTimeLabel(event.startsAt,event.timePending)}`,256),value:cut([url?`**[${name}](${url})**`:`**${name}**`,
+    [`🎮 Endurance ${SIM_SHORT[event.sim]||(event.sim==='iracing'?'iRacing':'LMU')}`,circuit&&`📍 ${clean(circuit)}`].filter(Boolean).join(' · '),
+    info.crew&&`👥 **${clean(info.crew.name)}**${info.crew.pilots.length?` · ${info.crew.pilots.map(clean).join(', ')}`:''}`,
+    info.streamTime&&`📺 Stream ${streamHour(info.streamTime)}${info.streamEnd?` → ${streamHour(info.streamEnd)}`:''}${on}`].filter(Boolean).join('\n'),1024),inline:false};
+}
 function calendarBox(event,siteUrl){
   if(event.stream)return streamBox(event,siteUrl);
+  if(event.endurance)return enduranceBox(event,siteUrl);
   const name=clean(event.name),url=siteUrl?`${siteUrl}/${event.sim==='iracing'?'iracing':'lmu'}/#event=${encodeURIComponent(event.id)}`:'';
   const circuits=[...new Set(event.circuits.map(circuit=>circuitNames.get(circuit)||circuit).filter(Boolean))].map(clean).join(', ');
   const when=startTimeLabel(event.startsAt,event.timePending);
