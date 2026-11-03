@@ -122,14 +122,14 @@ export function posterModel(items, site, {live = false, timestamp = Date.now()} 
   return model;
 }
 
-const CSS = `*{box-sizing:border-box;margin:0}body{width:720px;font-family:"Noto Sans","DejaVu Sans","Segoe UI",Arial,sans-serif;color:#fff;background:#0b0d12}
+const CSS = `*{box-sizing:border-box;margin:0}body{width:720px;font-family:"Barlow Condensed","Noto Sans","DejaVu Sans",Arial,sans-serif;color:#fff;background:#0b0d12}
 .card{width:720px;background:linear-gradient(180deg,#141821,#0b0d12);border-left:10px solid var(--c)}
 .ban{display:block;width:710px;height:177px;object-fit:cover}.in{padding:26px 30px 30px;position:relative}
-.top{font-weight:800;letter-spacing:2px;font-size:19px;line-height:1.5;color:var(--t)}
+.top{font-weight:800;letter-spacing:2px;font-size:22px;line-height:1.5;color:var(--t)}
 .dot{display:inline-block;margin-right:10px;width:14px;height:14px;border-radius:50%;background:#ff4d6d;box-shadow:0 0 18px #ff4d6d}.day{color:#9aa0b0;font-weight:600;margin-left:10px}
-.big{font-size:60px;font-weight:900;line-height:1.05;margin-top:10px;letter-spacing:-1px;max-width:520px}
-.gf .big{font-size:48px;background:linear-gradient(90deg,#ffcf4d,#ff7b00);-webkit-background-clip:text;color:transparent}
-.who{font-size:26px;max-width:520px;font-weight:600;color:#d7d9e0}.who b{color:#b78bff}.gf .who b{color:#ffcf4d}
+.big{font-size:69px;font-weight:900;line-height:1.05;margin-top:10px;letter-spacing:-1px;max-width:520px}
+.gf .big{font-size:55px;background:linear-gradient(90deg,#ffcf4d,#ff7b00);-webkit-background-clip:text;color:transparent}
+.who{font-size:30px;max-width:520px;font-weight:600;color:#d7d9e0}.who b{color:#b78bff}.gf .who b{color:#ffcf4d}
 .logo{position:absolute;right:26px;top:20px;width:130px;height:130px;object-fit:contain}
 /* One frame only: the rendez-vous are rows split by a line (Nathan, 2026-11-03: « un cadre dans le cadre »). */
 .blk{margin-top:16px;padding:20px 0 4px;border-top:1px solid rgba(255,255,255,.12);position:relative}
@@ -137,20 +137,20 @@ const CSS = `*{box-sizing:border-box;margin:0}body{width:720px;font-family:"Noto
    (Nathan, 2026-11-03). */
 .hd{display:flex;gap:18px;align-items:center}.tx{flex:1;min-width:0}
 .blk .lg{flex:none;width:150px;height:150px;object-fit:contain}
-.name{font-size:32px;font-weight:800;overflow-wrap:anywhere}
+.name{font-size:37px;font-weight:800;overflow-wrap:anywhere}
 .row{display:flex;gap:14px;margin-top:12px;align-items:center;flex-wrap:wrap}
-.chip{background:var(--rc);padding:5px 14px;border-radius:8px;font-weight:800;font-size:18px;letter-spacing:1px}
+.chip{background:var(--rc);padding:5px 14px;border-radius:8px;font-weight:800;font-size:21px;letter-spacing:1px}
 .chip.outline{background:transparent;border:2px solid var(--rc)}.chip.grey{background:#3a3f4b}.chip.red{background:#b91c1c}
-.fact{font-size:23px;color:#c9ccd6}.fact b{color:#fff}.note{margin-top:10px;font-size:22px;color:#c9ccd6;font-style:italic}
+.fact{font-size:26px;color:#c9ccd6}.fact b{color:#fff}.note{margin-top:10px;font-size:25px;color:#c9ccd6;font-style:italic}
 .line{display:flex;align-items:center;gap:18px;margin-top:14px}
-.time{background:#fff;color:#0b0d12;font-weight:900;font-size:22px;border-radius:8px;padding:4px 12px;min-width:92px;text-align:center;flex:none}
-.time.tbd{background:#3a3f4b;color:#fff;font-size:16px;line-height:1.1}
-.cn{font-size:23px;font-weight:800;min-width:120px;flex:none}.pi{font-size:20px;color:#c9ccd6}.pi b{color:#b78bff}
-.more{margin-top:14px;font-size:22px;color:#9aa0b0;font-weight:700}
+.time{background:#fff;color:#0b0d12;font-weight:900;font-size:25px;border-radius:8px;padding:4px 12px;min-width:92px;text-align:center;flex:none}
+.time.tbd{background:#3a3f4b;color:#fff;font-size:18px;line-height:1.1}
+.cn{font-size:26px;font-weight:800;min-width:120px;flex:none}.pi{font-size:23px;color:#c9ccd6}.pi b{color:#b78bff}
+.more{margin-top:14px;font-size:25px;color:#9aa0b0;font-weight:700}
 .grid{display:grid;grid-template-columns:1fr;gap:14px;margin-top:18px}
 .st{display:flex;align-items:center;justify-content:space-between;background:rgba(255,123,0,.12);border:2px solid #ff7b00;border-radius:12px;padding:8px 20px 8px 10px}
-.st.full{border-color:#555}.st span{display:flex;align-items:center;gap:16px;font-size:28px;font-weight:800}.st img{width:80px;height:80px}
-.st em{font-style:normal;font-size:24px;font-weight:800;color:#ffcf4d}.st.full em{color:#9aa0b0}`;
+.st.full{border-color:#555}.st span{display:flex;align-items:center;gap:16px;font-size:32px;font-weight:800}.st img{width:80px;height:80px}
+.st em{font-style:normal;font-size:28px;font-weight:800;color:#ffcf4d}.st.full em{color:#9aa0b0}`;
 const factHtml = ([label, strong, after]) => `<span class=fact>${html(label)} <b>${html(strong)}</b>${after ? ` ${html(after)}` : ''}</span>`;
 function blockHtml(block) {
   const [simLabel, color] = SIMS[block.sim] || SIMS.lmu;
@@ -225,6 +225,21 @@ async function inlineImage(env, community, origin, address) {
   } catch { return null; }
 }
 
+// The poster's font (Nathan, 2026-11-03: police 4, « Barlow Condensed », 15 % plus grande), put inside the page like
+// the pictures: Cloudflare's browser does not have it.
+export const POSTER_FONTS = [400, 600, 700, 800, 900].map(weight => ({weight, path:`/images/fonts/barlow-condensed-latin-${weight}-normal.woff2`}));
+export const fontFaces = fonts => fonts.map(({weight, data}) => `@font-face{font-family:"Barlow Condensed";font-weight:${weight};src:url(data:font/woff2;base64,${data}) format("woff2")}`).join('');
+async function posterFontFaces(env, origin) {
+  if (!env.ASSETS || !origin) return '';
+  try {
+    const fonts = await Promise.all(POSTER_FONTS.map(async ({weight, path}) => {
+      const response = await env.ASSETS.fetch(new Request(new URL(path, origin)));
+      return response.ok ? {weight, data:base64(new Uint8Array(await response.arrayBuffer()))} : null;
+    }));
+    return fontFaces(fonts.filter(Boolean));
+  } catch { return ''; }
+}
+
 // The picture of a poster from Cloudflare's browser (REST API: CF_ACCOUNT_ID + BROWSER_RENDERING_TOKEN), or null.
 // where: {community, origin} of the site, to put its pictures inside the page.
 export async function renderPoster(env, page, {community = null, origin = ''} = {}) {
@@ -235,6 +250,7 @@ export async function renderPoster(env, page, {community = null, origin = ''} = 
       const inline = await inlineImage(env, community, origin, address);
       if (inline) page = page.split(`src="${address}"`).join(`src="${inline}"`);
     }
+    page = page.replace('<style>', `<style>${await posterFontFaces(env, origin)}`);
     // A short window: the full-page picture takes the poster's own height (a 600 px window left a short poster half empty).
     const response = await fetch(`https://api.cloudflare.com/client/v4/accounts/${account}/browser-rendering/screenshot`, {method:'POST', signal:AbortSignal.timeout(45000),
       headers:{Authorization:`Bearer ${token}`, 'Content-Type':'application/json'},
