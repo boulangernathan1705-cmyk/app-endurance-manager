@@ -20,12 +20,11 @@ for(const admin of [true,false])test(`endurance entry: stream choice ${admin?'of
   await page.goto(`/lmu/#event=${EVENT}`);
   await page.getByRole('button',{name:/M’inscrire|M'inscrire/}).first().click();
   const form=page.locator('form[data-kind="registration"]');
+  // Each choice moves on by itself (Nathan 2026-11-03): category → cars, « Peu importe » → hours, « Toute la course » → summary.
   await form.locator('[data-action="category"]').first().click();
-  for(let step=0;step<3&&await form.locator('.registration-next[data-action="registration-step"]').isVisible();step++){
-    if(await form.locator('[name="carAny"]').isVisible())await form.locator('[name="carAny"]').check();
-    if(await form.locator('[data-action="availability"][data-value="whole"]').isVisible())await form.locator('[data-action="availability"][data-value="whole"]').click();
-    await form.locator('.registration-next[data-action="registration-step"]').click();
-  }
+  await form.locator('[name="carAny"]').check();
+  await form.locator('[data-action="availability"][data-value="whole"]').click();
+  await expect(form.locator('.registration-step-label')).toContainText('Récapitulatif');
   const box=form.locator('[data-registration-stream]');
   if(!admin){await expect(box).toHaveCount(0);return;}
   await expect(form.locator('[data-registration-stream-times]')).toBeHidden();
