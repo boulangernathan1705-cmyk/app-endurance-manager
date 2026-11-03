@@ -1,5 +1,13 @@
 # Nouveautés d'Endurance Manager
 
+## v2.4 — 3 novembre 2026
+
+### ✨ Améliorations
+
+- **Discord · Affiche du jour** : plus lisible sur téléphone. Un seul cadre, la date seule en en-tête, le logo de l’event en grand et une police style course, plus grande.
+- **Menu** : onglets en majuscules et noms des courses tels qu’ils sont écrits. Sur téléphone, les onglets passent en bas de l’écran.
+- **Administration** : un seul bouton « ＋ Ajouter » pour créer un événement, un stream ou le calendrier iRacing.
+
 ## v2.3 — 3 novembre 2026
 
 ### ✨ Améliorations
