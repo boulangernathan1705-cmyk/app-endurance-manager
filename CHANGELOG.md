@@ -5,6 +5,8 @@
 ### ✨ Améliorations
 
 - **Discord · Affiche du jour** : plus lisible sur téléphone. Un seul cadre, la date seule en en-tête, le logo de l’event en grand et une police style course, plus grande.
+- **Inscription à une endurance** : plus courte, avec moins d’écrans à passer. Le résumé montre aussi tes autres départs.
+- **Départs** : sur les départs fermés, les pilotes de chaque équipage sont nommés, et ceux sans équipage sont signalés.
 - **Menu** : onglets en majuscules et noms des courses tels qu’ils sont écrits. Sur téléphone, les onglets passent en bas de l’écran.
 - **Administration** : un seul bouton « ＋ Ajouter » pour créer un événement, un stream ou le calendrier iRacing.
 
