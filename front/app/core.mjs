@@ -96,7 +96,7 @@ export function button(action,label,extra='',css='secondary-button') { return `<
 export function addMenu(items) {
   const list = items.filter(Boolean);
   if (!list.length) return '';
-  if (list.length === 1) { const [action, label, extra = ''] = list[0]; return button(action, `<b aria-hidden="true">＋</b><span> ${label.replace(/^\S+\s/, '')}</span>`, `aria-label="Ajouter : ${label.replace(/^\S+\s/, '')}" ${extra}`, 'primary-button add-menu-single'); }
+  if (list.length === 1) { const [action, label, extra = ''] = list[0]; return button(action, `<b aria-hidden="true">＋</b><span> Ajouter</span>`, `aria-label="Ajouter : ${label.replace(/^\S+\s/, '')}" ${extra}`, 'primary-button add-menu-single'); }
   return `<details class="add-menu"><summary class="primary-button add-menu-toggle" aria-label="Ajouter"><b aria-hidden="true">＋</b><span> Ajouter</span></summary><div class="add-menu-list" role="menu">${list.map(([action, label, extra = '']) => button(action, label, `role="menuitem" ${extra}`, 'add-menu-item')).join('')}</div></details>`;
 }
 // A tap outside the menu, or on one of its choices, closes it.

@@ -2906,6 +2906,12 @@ button.crews-lock:disabled { opacity: .6; cursor: progress; }
   html[data-game] #app .page-head:has(.add-menu, .add-menu-single) { flex-wrap: nowrap !important; align-items: center; gap: 8px; }
   html[data-game] #app .page-head:has(.add-menu, .add-menu-single) > :is(.week-nav, .event-filter) { flex: 1 1 auto !important; min-width: 0; width: auto !important; margin: 0 !important; }
   html[data-game] #app .page-head:has(.add-menu, .add-menu-single) > :is(.home-create, .home-create-event) { order: 5; margin: 0 !important; }
-  :is(.add-menu-toggle, .add-menu-single) { width: 42px !important; min-height: 42px !important; padding: 0 !important; justify-content: center; font-size: 22px !important; }
-  :is(.add-menu-toggle, .add-menu-single) > span { display: none; }
+  :is(.add-menu-toggle, .add-menu-single) { min-height: 40px !important; padding: 0 10px !important; justify-content: center; font-size: 13px !important; }
+  /* Accueil : les flèches et la semaine restent sur une ligne, le texte de la semaine se resserre. */
+  html[data-game] #app .page-head:has(.add-menu, .add-menu-single) > .week-nav:not(:has(.week-back)) { flex-wrap: nowrap !important; }
+  html[data-game] #app .page-head:has(.add-menu, .add-menu-single) > .week-nav .week-label { min-width: 0; font-size: 14px; }
+  html[data-game] #app .page-head:has(.add-menu, .add-menu-single) > .week-nav .week-label small { font-size: 11px; white-space: nowrap; }
+  /* Quatre filtres (À venir, Mes courses, Archivés, Filtres) : pas la place, « Ajouter » passe à droite en dessous. */
+  html[data-game] #app .page-head:has(.add-menu, .add-menu-single):has(> .event-filter > :nth-child(4)) { flex-wrap: wrap !important; }
+  html[data-game] #app .page-head:has(> .event-filter > :nth-child(4)) > :is(.home-create, .home-create-event) { margin-left: auto !important; }
 }
