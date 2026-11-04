@@ -1,0 +1,41 @@
+import {test,expect} from '@playwright/test';
+
+for(const width of [1440,390])test(`TDZ season: months, overview, history and opening a race at ${width}px`,async({page})=>{
+  await page.setViewportSize({width,height:1000});
+  const errors=[];page.on('pageerror',error=>errors.push(error.message));
+  const event=(id,name,date,archived=false)=>({id,name,format:'solo',sim:'lmu',access:'open',eventType:'private',details:{type:'OPEN'},categories:['Hypercar'],circuit:'spa',durationMinutes:60,rounds:[{circuit:'spa',durationMinutes:60,categories:['Hypercar']}],version:1,archived,
+    departures:[{id:id+'-d',startsAt:Date.parse(date+'T20:00:00Z'),date,time:'21:00',availability:[],crews:[]}]});
+  const future=event('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa','OPEN DE JANVIER','2027-01-06');
+  const past=event('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb','OPEN DE NOVEMBRE','2026-11-04',true);
+  await page.route('**/api/**',route=>{
+    const url=new URL(route.request().url());let data={ok:true};
+    if(url.pathname==='/api/session')data={user:{id:'111111111111111111',name:'Nathan',communityIntroSeen:true},access:'member',permissions:['access','endurance','solo_open'],soloRaces:true,eventTdz:true,soloLabel:'EVENT TDZ',eventTypes:['OPEN'],community:{id:'tdz',slug:'tdz',name:'TDZ',appearance:{}},communities:[]};
+    else if(url.pathname==='/api/races')data={events:url.searchParams.get('scope')==='archived'?[past]:[future]};
+    else if(url.pathname.includes('notifications'))data={notifications:[],unread:0};
+    return route.fulfill({contentType:'application/json',body:JSON.stringify(data)});
+  });
+  await page.addInitScript(()=>localStorage.setItem('endurance_manager_locale','fr'));
+  await page.goto('/events/');
+  await page.locator('[data-season-field="start"]').fill('2026-12');
+  await page.locator('[data-season-field="start"]').press('Tab');
+  await expect(page.locator('.tdz-calendar-title')).toContainText('décembre 2026');
+  await page.locator('[data-season-field="start"]').fill('2026-11');
+  await page.locator('[data-season-field="start"]').press('Tab');
+  await expect(page.locator('.tdz-month-tabs button')).toHaveCount(4);
+  await expect(page.locator('.tdz-month-grid')).toContainText('OPEN DE NOVEMBRE');
+  await page.locator('[data-action="tdz-season"][data-field="month"][data-value="2"]').click();
+  await expect(page.locator('.tdz-month-grid')).toContainText('OPEN DE JANVIER');
+  await page.getByRole('button',{name:'Toute la saison',exact:true}).click();
+  await expect(page.locator('.tdz-season-month')).toHaveCount(4);
+  await expect(page.locator('.tdz-season-overview')).toContainText('OPEN DE NOVEMBRE');
+  await expect(page.locator('.tdz-season-overview')).toContainText('OPEN DE JANVIER');
+  await page.locator('[data-season-field="length"]').selectOption('3');
+  await expect(page.locator('.tdz-season-month')).toHaveCount(3);
+  await page.reload();
+  await expect(page.locator('[data-season-field="start"]')).toHaveValue('2026-11');
+  await expect(page.locator('.tdz-season-month')).toHaveCount(3);
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
+  await page.locator('.tdz-season-overview [data-action="open"]').filter({hasText:'OPEN DE JANVIER'}).click();
+  await expect(page).toHaveURL(/#event=aaaaaaaa/);
+  expect(errors).toEqual([]);
+});
