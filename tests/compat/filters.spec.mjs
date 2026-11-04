@@ -15,6 +15,7 @@ async function boot(page,game,events){
   });
   await page.goto(`/${game}/`);
   await page.waitForFunction(async()=>{const {state}=await import('/front/app/core.mjs');return state.access==='member'&&state.events.length>0;});
+  await expect(page.locator('.page-head')).toBeVisible();
 }
 
 for(const game of ['lmu','iracing'])test(`${game}: mobile circuit drawings fit inside their cards`,async({page})=>{
@@ -73,6 +74,7 @@ test('SOLO and TDZ calendars ignore endurance-only filters and preserve their si
     state.raceFiltersBy={};state.raceFilterOpen=true;const {renderHome}=await import('/front/app/home-view.mjs');renderHome();
   });
   await page.locator('[data-season-field="start"]').fill('2090-10');
+  await page.locator('[data-season-field="start"]').press('Tab');
   await expect(page.locator('.tdz-calendar .week-block')).toHaveCount(1);
   await expect(page.locator('[data-group="sims"][data-value="lmu"]')).toHaveAttribute('aria-pressed','true');
   await expect(page.locator('[data-group="kinds"][data-value="OPEN"]')).toHaveAttribute('aria-pressed','true');

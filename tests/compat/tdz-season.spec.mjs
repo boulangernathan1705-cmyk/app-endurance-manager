@@ -16,7 +16,11 @@ for(const width of [1440,390])test(`TDZ season: months, overview, history and op
   });
   await page.addInitScript(()=>localStorage.setItem('endurance_manager_locale','fr'));
   await page.goto('/events/');
+  await page.locator('[data-season-field="start"]').fill('2026-12');
+  await page.locator('[data-season-field="start"]').press('Tab');
+  await expect(page.locator('.tdz-calendar-title')).toContainText('décembre 2026');
   await page.locator('[data-season-field="start"]').fill('2026-11');
+  await page.locator('[data-season-field="start"]').press('Tab');
   await expect(page.locator('.tdz-month-tabs button')).toHaveCount(4);
   await expect(page.locator('.tdz-month-grid')).toContainText('OPEN DE NOVEMBRE');
   await page.locator('[data-action="tdz-season"][data-field="month"][data-value="2"]').click();
