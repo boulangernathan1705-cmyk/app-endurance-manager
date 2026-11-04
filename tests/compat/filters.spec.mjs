@@ -72,7 +72,8 @@ test('SOLO and TDZ calendars ignore endurance-only filters and preserve their si
     localStorage.setItem(key,JSON.stringify({types:['special'],communities:['beta'],categories:['GTP'],sims:['lmu'],kinds:['OPEN'],situation:'crew'}));
     state.raceFiltersBy={};state.raceFilterOpen=true;const {renderHome}=await import('/front/app/home-view.mjs');renderHome();
   });
-  await expect(page.locator('.event-card')).toHaveCount(1);
+  await page.locator('[data-season-field="start"]').fill('2090-10');
+  await expect(page.locator('.tdz-calendar .week-block')).toHaveCount(1);
   await expect(page.locator('[data-group="sims"][data-value="lmu"]')).toHaveAttribute('aria-pressed','true');
   await expect(page.locator('[data-group="kinds"][data-value="OPEN"]')).toHaveAttribute('aria-pressed','true');
   await page.evaluate(async()=>{const {state}=await import('/front/app/core.mjs');state.eventTdz=false;state.eventTypes=[];state.events[0].details={};const {renderHome}=await import('/front/app/home-view.mjs');renderHome();});

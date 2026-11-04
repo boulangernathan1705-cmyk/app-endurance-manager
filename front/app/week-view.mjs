@@ -44,6 +44,8 @@ function kindOf(event){
   if(isSolo(event))return {key:'event',label:event.details?.type||state.soloLabel||'Event'};
   return {key:'endurance',label:'Endurance'};
 }
+// Shared by the TDZ season calendar: same logos, schedule, stream links and entry actions.
+export {kindOf as weekEventKind,block as weekEventCard};
 // Every start of the week, by day, each with the kind of its race.
 const weekStarts=(events,monday)=>weekDays(events,monday).map(day=>({...day,items:day.items.map(item=>({...item,kind:kindOf(item.event),pending:item.starts.every(start=>start.departure.hideClock===true)}))}));
 
