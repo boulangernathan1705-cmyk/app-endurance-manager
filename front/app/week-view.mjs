@@ -297,7 +297,7 @@ export function renderWeek(){
   const doneLine=day=>day.done.length?button('week-done',day.opened?'▴ Replier':`✓ ${day.done.length} terminée${day.done.length>1?'s':''} ▾`,`data-day="${day.day}" aria-expanded="${day.opened}"`,'week-done'):'';
   const columns=shown.map(day=>`<section class="week-day${day.day===today?' is-today':''}${day.day<today?' is-past':''}${day.items.length?'':' is-empty'}${day.weight>1?' is-busy':''}" aria-labelledby="week-day-${day.day}">
       <h3 class="week-day-head" id="week-day-${day.day}"><span class="week-day-name">${esc(dayName.format(dateOf(day.day)))}</span><small>${esc(monthDay.format(dateOf(day.day)))}</small>${day.day===today?`<span class="week-today">Aujourd’hui${day.soon?`<span class="week-soon"> · ${esc(day.soon)}</span>`:''}</span>`:''}</h3>
-      <div class="week-day-list">${day.shown.map(item=>block(item,now)).join('')}${doneLine(day)}${day.items.length?'':'<p class="week-empty">—</p>'}</div>
+      <div class="week-day-list" tabindex="0" role="region" aria-labelledby="week-day-${day.day}">${day.shown.map(item=>block(item,now)).join('')}${doneLine(day)}${day.items.length?'':'<p class="week-empty">—</p>'}</div>
     </section>`).join('');
   const widths=shown.map(day=>`minmax(0,${day.weight}fr)`).join(' ');
   const name=String(state.user?.name||'').trim().split(/\s+/)[0],side=nextBox(all,now)+crewsBox(),box=side?`<div class="home-side">${side}</div>`:'';
