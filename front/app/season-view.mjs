@@ -33,7 +33,7 @@ export function renderSeasonCalendar(events,filters,rerender){
     archiveRequest=loadArchive().then(()=>{if(state.page==='home'&&state.listFormat==='solo'&&state.eventTdz)rerender();}).catch(showError).finally(()=>{archiveRequest=null;});
   }
   const matching=events.filter(event=>raceMatches(event,filters,{communityId:state.community?.id,archived:true})&&(state.eventFilter!=='mine'||(event.departures||[]).some(d=>(d.availability||[]).some(r=>r.mine&&r.status!=='unavailable')))).map(event=>raceFilterView(event,filters,{communityId:state.community?.id}));
-  const cards=day=>day.items.map(item=>weekEventCard({...item,kind:weekEventKind(item.event),pending:item.starts.every(start=>start.departure.hideClock===true)},now)).join('');
+  const cards=day=>day.items.map(item=>weekEventCard({...item,kind:weekEventKind(item.event),pending:item.starts.every(start=>start.departure.hideClock===true)},now,{season:true})).join('');
   const monthContent=(key,full)=>{
     const days=monthDays(matching,key),count=days.reduce((n,day)=>n+day.items.length,0);
     if(full)return `<section class="tdz-season-month" aria-label="${esc(label(key))}"><h2>${esc(label(key))}<small>${count} événement${count>1?'s':''}</small></h2>${days.filter(day=>day.inMonth&&day.items.length).map(day=>`<section class="tdz-season-date"><h3>${esc(dayName.format(new Date(day.day*DAY)))}</h3><div class="tdz-season-cards">${cards(day)}</div></section>`).join('')||'<p class="empty">Aucun événement programmé.</p>'}</section>`;
