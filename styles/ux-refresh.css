@@ -2959,6 +2959,8 @@ button.crews-lock:disabled { opacity: .6; cursor: progress; }
 .tdz-calendar .tdz-race-round > strong { color: var(--em-accent); font-size: var(--em-text-xs); }
 .tdz-calendar .tdz-race-circuit, .tdz-calendar .tdz-race-duration { color: var(--em-text); }
 .tdz-calendar .week-block-facts .week-chip.is-warn { display: inline-block; }
+.tdz-calendar .week-block .week-block-stream { display: flex; margin-block: var(--em-space-2); }
+.tdz-calendar .week-block-live, .tdz-calendar .week-plan-row.is-stream { display: none; }
 .tdz-season-overview { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,calc(var(--em-space-5) * 10)),1fr)); gap: var(--em-space-5); align-items: start; }
 .tdz-season-month { min-width: 0; }
 .tdz-season-month > h2 { border-top: 2px solid var(--em-accent); padding-top: var(--em-space-3); }
@@ -2977,7 +2979,7 @@ button.crews-lock:disabled { opacity: .6; cursor: progress; }
   .tdz-month-grid .week-block-head { display: contents; position: static; }
   .tdz-month-grid .week-block-logo, .tdz-month-grid .week-block-head .week-badge { width: calc(var(--em-space-5) * 2); height: calc(var(--em-space-5) * 2); }
   .tdz-month-grid .week-block-body { padding: 0; }
-  .tdz-calendar .tdz-race-program { grid-column: 2; }
+  .tdz-calendar .tdz-race-program, .tdz-calendar .week-block .week-block-stream { grid-column: 2; }
   .tdz-calendar .week-block-kind { display: block; white-space: normal; }
   .tdz-month-grid .week-block-name { font-size: var(--em-text-md); }
   .tdz-month-grid .week-block-circuit { display: block; }

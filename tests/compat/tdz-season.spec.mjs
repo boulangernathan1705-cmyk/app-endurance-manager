@@ -38,6 +38,7 @@ for(const width of [1440,390])test(`TDZ season: months, overview, history and op
   await expect(program).toBeVisible();
   await expect(page.locator('.tdz-month-grid')).toContainText('Stream · 20h30–23h');
   await expect(page.locator('.tdz-month-grid [data-stream-url]')).toContainText('Twitch');
+  await expect(page.locator('.tdz-month-grid .week-block-stream')).toBeVisible();
   await expect(page.locator('.tdz-month-grid')).toContainText('0 / 30 inscrit');
   await page.getByRole('button',{name:'Toute la saison',exact:true}).click();
   await expect(page.locator('.tdz-season-month')).toHaveCount(4);
