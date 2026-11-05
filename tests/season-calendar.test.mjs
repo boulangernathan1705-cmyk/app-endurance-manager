@@ -2,8 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {monthKey,validMonth,shiftMonth,seasonMonths,monthDays} from '../front/season-calendar.mjs';
 const race=(id,date,extra={})=>({id,name:id,format:'solo',departures:[{id:id+'-d',startsAt:Date.parse(date),availability:[]}],...extra});
-test('seasons span three or four calendar months across a year boundary',()=>{
-  assert.deepEqual(seasonMonths('2026-11',4),['2026-11','2026-12','2027-01','2027-02']);
+test('seasons always contain three months',()=>{
+  assert.deepEqual(seasonMonths('2026-10'),['2026-10','2026-11','2026-12']);
   assert.deepEqual(seasonMonths('2026-12',3),['2026-12','2027-01','2027-02']);
   assert.equal(shiftMonth('2027-01',-1),'2026-12');
   assert.equal(validMonth('2026-13'),false);assert.equal(validMonth('bad'),false);

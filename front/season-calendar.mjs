@@ -8,7 +8,7 @@ export function shiftMonth(key,offset){
   const [year,month]=key.split('-').map(Number);
   return new Date(Date.UTC(year,month-1+offset,1)).toISOString().slice(0,7);
 }
-export function seasonMonths(start,length=4){return Array.from({length:length===3?3:4},(_,index)=>shiftMonth(start,index));}
+export function seasonMonths(start){return Array.from({length:3},(_,index)=>shiftMonth(start,index));}
 export function monthDays(events,key){
   const start=Date.parse(key+'-01T00:00:00Z')/DAY,end=Date.parse(shiftMonth(key,1)+'-01T00:00:00Z')/DAY;
   const offset=(new Date(start*DAY).getUTCDay()+6)%7,monday=start-offset,days=[];

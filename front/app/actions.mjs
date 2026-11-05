@@ -1,4 +1,4 @@
-import {changeSeason} from './season-view.mjs';
+import {changeSeason,saveSeason} from './season-view.mjs';
 import {entryCommunities} from './core.mjs';
 import {submitRallyEvent} from './rally-form.mjs';
 import {renderStreamForm,submitStreamEvent} from './stream-form.mjs';
@@ -136,6 +136,9 @@ async function perform(action,target){
     case 'dismiss-error': document.querySelector('[data-ux-error-modal]')?.remove(); break;
     case 'home': if(target.dataset.list==='endurance'&&state.soloRaces&&!simChosen()){openSimChooser();break;} if(target.dataset.list)state.listFormat=target.dataset.list; renderHome(); break;
     case 'planning-community': togglePlanningCommunity(target.dataset.community||''); renderEvent(); break;
+    case 'tdz-calendar-expand': changeSeason('expanded');renderHome();document.querySelector('[data-action="tdz-calendar-expand"]')?.focus();break;
+    case 'tdz-season-save': await saveSeason();renderHome('Saison enregistrée pour tous.');break;
+    case 'tdz-filter-all': resetRaceFilters();renderHome();break;
     case 'tdz-season': changeSeason(target.dataset.field,target.dataset.value);renderHome();break;
     case 'race-filter-toggle': state.raceFilterOpen=!state.raceFilterOpen; renderHome(); break;
     case 'race-filter': toggleRaceFilter(target.dataset.group,target.dataset.value); renderHome(); break;
@@ -270,7 +273,6 @@ async function perform(action,target){
 document.addEventListener('input',event=>{const field=event.target;if(field.dataset.departure&&state.drafts[field.dataset.departure]){if(field.name==='pilotName')state.drafts[field.dataset.departure].name=field.value;}});
 document.addEventListener('change',async event=>{
   const field=event.target;
-  if(field.matches?.('[data-season-field]')){changeSeason(field.dataset.seasonField,field.value);renderHome();return;}
   if(field.matches?.('[data-slot-picker]')){try{if(await pickSlot(field))await refreshAfterSave('Départ choisi.');}catch(error){showError(error);}return;}
   if(field.matches?.('[data-crew-state-select]')){try{await updateCrewState(field);await refreshAfterSave('Équipage mis à jour.');}catch(error){showError(error);}return;}
   if(field.name==='participant'){const draft=state.drafts[field.dataset.departure],participant=state.participants.find(item=>item.id===field.value);if(draft){draft.participantUserId=participant?.id||null;draft.participantId=participant?.participantId||null;draft.name=participant?.name||'';draft.category='';draft.cars=[];draft.carAny=false;state.registrationOpen.add(field.dataset.departure);renderEvent();}return;}
