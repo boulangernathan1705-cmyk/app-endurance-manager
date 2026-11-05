@@ -22,6 +22,8 @@ for(const [width,height] of [[1280,720],[1440,900],[1920,1080],[2560,1440],[390,
   await page.evaluate(()=>document.fonts.ready);
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBeTruthy();
   if(width>1100){
+    const banner=await page.locator('.hero-picture').boundingBox();
+    expect(banner.width/banner.height).toBeCloseTo(4,1);
     const grid=page.locator('.week-grid');
     const bounds=await grid.boundingBox();
     expect(bounds.y+bounds.height).toBeLessThanOrEqual(height);

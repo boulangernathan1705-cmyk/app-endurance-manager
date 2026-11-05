@@ -169,9 +169,3 @@ header.site-hero .brand-button.logo {
   }
 }
 
-/* The desktop weekly dashboard keeps the full artwork in a compact strip,
-   leaving room for all seven days. Other pages keep their standard banner. */
-@media (min-width: 1101px) {
-  body:has(#app > .home-layout) .hero-picture { height: var(--em-banner-height-phone); aspect-ratio: auto; }
-  body:has(#app > .home-layout) .hero-banner { object-fit: contain; }
-}
