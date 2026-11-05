@@ -46,3 +46,42 @@ for(const width of [1440,390])test(`TDZ shared quarter and seven-column calendar
   await expect(page.locator('.tdz-season-editor')).toHaveCount(0);
   expect(errors).toEqual([]);
 });
+
+for(const [width,height] of [[1440,900],[1366,768],[390,844]])test(`dense six-week month fits fullscreen and remembers preference at ${width}px`,async({page})=>{
+  await page.setViewportSize({width,height});
+  const events=Array.from({length:30},(_,i)=>{
+    const date=`2026-11-${String(i+1).padStart(2,'0')}`,id=`aaaaaaaa-aaaa-4aaa-8aaa-${String(i+1).padStart(12,'0')}`;
+    return {id,name:`Course ${i+1}`,format:'solo',sim:i%2?'iracing':'lmu',access:'open',eventType:'private',details:{type:'OPEN',streamTime:'20:30',streamEnd:'23:00'},categories:['GT3'],circuit:'spa',durationMinutes:60,rounds:[{circuit:'spa',durationMinutes:60,categories:['GT3']}],version:1,departures:[{id:id+'-d',startsAt:Date.parse(date+'T20:00:00Z'),date,time:'21:00',availability:[],crews:[]}]};
+  });
+  await page.route('**/api/**',route=>{
+    const url=new URL(route.request().url());let data={ok:true};
+    if(url.pathname==='/api/session')data={user:{id:'111111111111111111',name:'Nathan',communityIntroSeen:true},access:'member',permissions:['access','solo_open'],soloRaces:true,eventTdz:true,tdzSeason:{start:'2026-10',version:1},soloLabel:'EVENT TDZ',eventTypes:['OPEN'],community:{id:'tdz',slug:'tdz',name:'TDZ',appearance:{}},communities:[]};
+    else if(url.pathname==='/api/races')data={events:url.searchParams.get('scope')==='archived'?[]:events};
+    else if(url.pathname.includes('notifications'))data={notifications:[],unread:0};
+    return route.fulfill({contentType:'application/json',body:JSON.stringify(data)});
+  });
+  await page.goto('/events/');
+  await page.locator('[data-field="month"][data-value="1"][aria-pressed]').click();
+  await page.getByRole('button',{name:'Afficher le calendrier en plein écran'}).click();
+  const dialog=page.getByRole('dialog',{name:'Calendrier de saison en plein écran'});
+  await expect(dialog).toBeVisible();
+  await expect(dialog.locator('.tdz-race')).toHaveCount(30);
+  await expect(dialog.locator('.tdz-month-day')).toHaveCount(42);
+  expect(await dialog.evaluate(el=>el.scrollHeight<=el.clientHeight+1)).toBe(true);
+  expect(await dialog.evaluate(el=>el.scrollWidth<=el.clientWidth+1)).toBe(true);
+  expect(await dialog.locator('.tdz-month-grid').evaluate(grid=>{const bottom=grid.getBoundingClientRect().bottom;return [...grid.querySelectorAll('.tdz-race')].every(card=>card.getBoundingClientRect().bottom<=bottom);})).toBe(true);
+  const last=await dialog.locator('.tdz-month-day').last().boundingBox();
+  expect(last.y+last.height).toBeLessThanOrEqual(height);
+  await page.screenshot({path:test.info().outputPath(`tdz-fullscreen-${width}.png`)});
+  await page.reload();
+  await expect(dialog).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(dialog).toHaveCount(0);
+  await page.reload();
+  await expect(dialog).toHaveCount(0);
+  await page.getByRole('button',{name:'Afficher le calendrier en plein écran'}).click();
+  await dialog.locator('.tdz-race').first().click();
+  await expect(page).toHaveURL(/#event=/);
+  await expect(dialog).toHaveCount(0);
+  expect(await page.locator('body').evaluate(el=>getComputedStyle(el).overflow)).not.toBe('hidden');
+});

@@ -136,6 +136,7 @@ async function perform(action,target){
     case 'dismiss-error': document.querySelector('[data-ux-error-modal]')?.remove(); break;
     case 'home': if(target.dataset.list==='endurance'&&state.soloRaces&&!simChosen()){openSimChooser();break;} if(target.dataset.list)state.listFormat=target.dataset.list; renderHome(); break;
     case 'planning-community': togglePlanningCommunity(target.dataset.community||''); renderEvent(); break;
+    case 'tdz-calendar-expand': changeSeason('expanded');renderHome();document.querySelector('[data-action="tdz-calendar-expand"]')?.focus();break;
     case 'tdz-season-save': await saveSeason();renderHome('Saison enregistrée pour tous.');break;
     case 'tdz-season': changeSeason(target.dataset.field,target.dataset.value);renderHome();break;
     case 'race-filter-toggle': state.raceFilterOpen=!state.raceFilterOpen; renderHome(); break;

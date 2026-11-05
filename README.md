@@ -32,7 +32,7 @@ Les horaires sont interprétés en heure de Paris. Les inscriptions se verrouill
 
 La saison commune dure trois mois : janvier–mars, avril–juin, juillet–septembre ou octobre–décembre. Un organisateur disposant du droit de créer des courses choisit l’année et le trimestre dans « Définir la saison », puis « Enregistrer pour tous ». Sans réglage, le trimestre courant (heure de Paris) est affiché. Une fois enregistrée, la saison reste fixe jusqu’au prochain choix des organisateurs.
 
-Les membres parcourent ses trois mois dans une grille de sept jours, sur ordinateur et téléphone, ou consultent toute la saison. Les courses passées restent visibles. Chaque carte indique le circuit, le simulateur, le type, l’heure et la durée de course ; le stream possède sa propre ligne violette. Toucher une carte ouvre la fiche et ses inscriptions.
+Les membres parcourent ses trois mois dans une grille de sept jours, sur ordinateur et téléphone, ou consultent toute la saison. Les courses passées restent visibles. Chaque carte indique le circuit, le simulateur, le type, l’heure et la durée de course ; le stream possède sa propre ligne violette. Toucher une carte ouvre la fiche et ses inscriptions. Le bouton « Plein écran » affiche le calendrier seul, sans modifier la bannière du site ; « Réduire » ou Échap revient à la page. Ce choix est mémorisé par membre et communauté dans le navigateur. Les horaires et durées sont regroupés sur les cartes pour réduire leur hauteur.
 
 ## Annonces de stream
 
