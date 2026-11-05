@@ -3063,3 +3063,54 @@ body:has(.tdz-calendar-dialog[open]) { overflow: hidden; }
 .tdz-quick-filters .event-filter-button[aria-pressed="true"]{border-color:var(--em-accent);background:color-mix(in srgb,var(--em-accent) 15%,transparent)}
 .tdz-calendar .race-filter-panel{margin:0 0 var(--em-space-3)}
 @media(max-width:760px){.tdz-quick-filters{order:3;width:100%}.tdz-quick-filters .event-filter-button{flex:1;min-width:0;padding:var(--em-space-2)}}
+
+
+/* Mobile TDZ: keep the seven-day grid for dates, and show race details in a readable list. */
+.tdz-mobile-agenda { display: none; }
+@media (max-width: 760px) {
+  .tdz-month-view .tdz-month-grid {
+    grid-template-rows: auto !important;
+    align-content: start;
+  }
+  .tdz-month-view .tdz-month-day {
+    min-height: 44px;
+    padding: 3px 1px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 3px;
+  }
+  .tdz-month-view .tdz-month-day.has-events::after {
+    content: "";
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--em-accent);
+    flex: none;
+  }
+  .tdz-month-view .tdz-month-day .tdz-day-cards { display: none; }
+  .tdz-month-view .tdz-month-day > h3 { line-height: 1.1; }
+  .tdz-mobile-agenda { display: grid; gap: var(--em-space-3); margin-top: var(--em-space-3); }
+  .tdz-mobile-agenda-day { min-width: 0; }
+  .tdz-mobile-agenda-day > h3 {
+    margin: 0 0 var(--em-space-2);
+    font-size: var(--em-text-sm);
+    color: var(--em-muted);
+    text-transform: capitalize;
+  }
+  .tdz-mobile-agenda-cards { display: grid; grid-template-columns: minmax(0,1fr); gap: var(--em-space-2); }
+  .tdz-mobile-agenda .tdz-race { padding: 10px 12px; border-left-width: 4px; gap: 3px; }
+  .tdz-mobile-agenda .tdz-race-kind,
+  .tdz-mobile-agenda .tdz-race-circuit,
+  .tdz-mobile-agenda .tdz-race-stream { overflow: visible; white-space: normal; text-overflow: clip; }
+  .tdz-mobile-agenda .tdz-circuit-full { display: inline; }
+  .tdz-mobile-agenda .tdz-circuit-short { display: none; }
+  .tdz-mobile-agenda .tdz-race-name,
+  .tdz-mobile-agenda .tdz-race-status { display: initial; }
+  .tdz-mobile-agenda .tdz-race-time { white-space: nowrap; }
+  .tdz-mobile-agenda .tdz-race-mine { position: static; font-size: var(--em-text-xs); }
+  .tdz-calendar-dialog .tdz-calendar,
+  .tdz-calendar-dialog:has(.tdz-month-view) .tdz-calendar { height: auto; min-height: 0; }
+  .tdz-calendar-dialog .tdz-month-view { flex: none; }
+}

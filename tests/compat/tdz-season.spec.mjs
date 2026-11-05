@@ -33,6 +33,13 @@ for(const width of [1440,390])test(`TDZ shared quarter and seven-column calendar
   await expect(page.locator('.tdz-month-grid .tdz-race-duration')).toHaveText('1 h');
   await expect(page.locator('.tdz-month-grid .tdz-race-stream')).toContainText('Stream');
   expect(await page.locator('.tdz-month-grid').evaluate(el=>getComputedStyle(el).gridTemplateColumns.split(' ').length)).toBe(7);
+  if(width===390){
+    await expect(page.locator('.tdz-month-view .tdz-month-day .tdz-race:visible')).toHaveCount(0);
+    await expect(page.locator('.tdz-mobile-agenda .tdz-race:visible')).toHaveCount(1);
+    await expect(page.locator('.tdz-mobile-agenda')).toContainText('OPEN DE NOVEMBRE');
+    const cell=await page.locator('.tdz-month-day.has-events').first().boundingBox();
+    expect(cell.height).toBeLessThan(65);
+  }
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
   await page.screenshot({path:test.info().outputPath(`tdz-season-${width}.png`),fullPage:true});
   await page.getByRole('button',{name:'Toute la saison',exact:true}).click();
