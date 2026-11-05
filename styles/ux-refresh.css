@@ -2640,6 +2640,48 @@ main:not(.charte):has(.home-layout) { max-width: 2400px; }
 .home-next-go { display: block; width: 100%; margin-top: 8px; padding: 8px; border: 0; border-radius: var(--em-radius-sm); background: var(--em-warn); color: #111; font: inherit; font-weight: 800; text-align: center; text-decoration: none; cursor: pointer; }
 .home-next-go:hover { filter: brightness(1.08); }
 
+/* Desktop home: one viewport, with independent day scroll areas. The compact cards
+   keep every schedule, circuit, stream and registration; the season view is unchanged. */
+@media (min-width: 1101px) {
+  body:has(#app > .home-layout) { display: flex; flex-direction: column; height: 100dvh; min-height: calc(var(--em-space-5) * 24); }
+  body:has(#app > .home-layout) > * { flex-shrink: 0; zoom: 1; }
+  html[data-game] #app:has(> .home-layout) {
+    display: flex; flex-direction: column; flex: 1 1 0; min-height: 0;
+    width: 100%; max-width: none; margin: 0; padding: var(--em-space-2) var(--em-space-4);
+  }
+  #app > .home-head { flex: none; margin: 0 0 var(--em-space-2); }
+  #app > .home-layout { flex: 1 1 0; min-height: 0; grid-template-rows: minmax(0, 1fr); align-items: stretch; grid-template-columns: minmax(0, 1fr) calc(var(--em-space-5) * 9); }
+  #app > .home-layout.is-full { grid-template-columns: minmax(0, 1fr); }
+  .home-week { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+  .home-week .week-filters { flex: none; margin-bottom: var(--em-space-2); }
+  .home-week .week-grid { flex: 1 1 0; min-height: 0; grid-template-rows: minmax(0, 1fr); }
+  .home-week .week-day { display: flex; flex-direction: column; min-height: 0; }
+  .home-week .week-day-head { flex: none; padding: var(--em-space-2); }
+  .home-week .week-day-head .week-day-name, .home-week .week-day-head small { white-space: normal; overflow-wrap: anywhere; }
+  .home-week .week-today { float: none; display: block; }
+  .home-week .week-day-list, .home-week .week-day.is-busy .week-day-list {
+    flex: 1 1 0; min-height: 0; grid-template-columns: minmax(0, 1fr); grid-auto-rows: max-content; align-content: start;
+    overflow-y: auto; overscroll-behavior-y: contain; scrollbar-width: thin;
+    scrollbar-color: var(--em-muted) transparent; scrollbar-gutter: stable;
+    gap: var(--em-space-2); padding: var(--em-space-2) var(--em-space-1);
+  }
+  .home-week .week-block { flex: none; }
+  .home-week .week-block-head { top: var(--em-space-1); right: var(--em-space-1); }
+  .home-week .week-block-logo, .home-week .week-block-head .week-badge { width: calc(var(--em-space-5) * 2); height: calc(var(--em-space-5) * 2); }
+  .home-week .week-block-band { min-height: calc(var(--em-space-5) * 2 + var(--em-space-2)); padding: var(--em-space-2); padding-right: calc(var(--em-space-5) * 2 + var(--em-space-2)); }
+  .home-week .week-block-band > span { white-space: normal; }
+  .home-week .week-block-band b { font-size: var(--em-text-xl); }
+  .home-week .week-block-band.is-many b { font-size: var(--em-text-md); }
+  .home-week .week-block-band small { font-size: var(--em-text-xs); }
+  .home-week .week-block-body { gap: var(--em-space-1); padding: var(--em-space-2); }
+  .home-week .week-block-kind { white-space: normal; overflow: visible; font-size: var(--em-text-xs); }
+  .home-week .week-block-name { font-size: var(--em-text-md); }
+  .home-week .week-block-circuit { font-size: var(--em-text-sm); }
+  .home-layout > .home-side { min-height: 0; overflow-y: auto; overscroll-behavior-y: contain; scrollbar-width: thin; }
+  .home-layout .home-next-box, .home-layout .home-crews-box { padding: var(--em-space-2); }
+  body:has(#app > .home-layout) > .site-footer { margin: 0; padding: var(--em-space-1) var(--em-space-4); font-size: var(--em-text-xs); }
+}
+
 @media (max-width: 1100px) and (min-width: 761px) {
   .home-layout { grid-template-columns: minmax(0, 1fr); }
   .home-side { order: -1; }
