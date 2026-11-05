@@ -862,7 +862,10 @@ async function api(request, env) {
       (Number(event.duration_minutes) || Number(event.duration_hours) * 60) !== data.durationMinutes && 'duration', event.name !== data.name && 'name'].filter(Boolean);
     if (changes.length && !newlyPublished) await notify(env, await eventPilots(env, event.id), 'race_changed', {...event, name:data.name, circuit:data.circuit}, {skip:[actor.user?.id], changes, previousName:event.name !== data.name ? event.name : undefined});
     if (newlyPublished) {
-      const pendingPilots = (await eventPilots(env, event.id)).filter(Boolean);
+      const pendingPilots = (await env.DB.prepare(`SELECT DISTINCT p.user_id, r.community_id
+        FROM registrations r JOIN participants p ON p.id=r.participant_id
+        WHERE r.event_id=? AND r.departure_id=? AND r.status!='unavailable' AND p.user_id IS NOT NULL`)
+        .bind(event.id, oldCommon.id).all()).results || [];
       await notify(env, pendingPilots, 'choose_departure', {...event, name:data.name, circuit:data.circuit});
     }
     return json({ok:true});
