@@ -36,10 +36,10 @@ for(const width of [1440,390])test(`TDZ shared quarter and seven-column calendar
   if(width===390){
     await expect(page.locator('.tdz-mobile-agenda')).toHaveCount(0);
     await expect(page.locator('.tdz-month-view .tdz-month-day .tdz-race:visible')).toHaveCount(1);
-    const card=page.locator('.tdz-month-day.has-events .tdz-race').first();
+    const card=page.locator('.tdz-month-day .tdz-race').first();
     await expect(card).toContainText('Spa');
     await expect(card).toContainText('21h');
-    const row=await page.locator('.tdz-month-day.has-events').first().boundingBox();
+    const row=await page.locator('.tdz-month-day:has(.tdz-race)').first().boundingBox();
     expect(row.height).toBeGreaterThan(60);
     expect(row.height).toBeLessThan(145);
     await card.click();
