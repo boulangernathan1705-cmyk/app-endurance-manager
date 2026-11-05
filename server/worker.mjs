@@ -834,7 +834,20 @@ async function api(request, env) {
     }
     const data = validateEvent(plainSoloInput(env, community, input), event);
     if (isGrindfest(data) && !grindfestEnabled(community, isDevelopment(env))) fail(403, 'Gridfest n’est pas activé.');
+    // The provisional start is an event-level waiting area, not a real time slot.
+    // Keep its entries (and crews) when an organiser publishes actual start times.
+    const oldCommon = JSON.parse(event.departures || '[]').find(d => d.tbd);
+    const oldCommonUsed = oldCommon && await env.DB.prepare(
+      'SELECT 1 FROM registrations WHERE event_id=? AND departure_id=? UNION SELECT 1 FROM crews WHERE event_id=? AND departure_id=? LIMIT 1'
+    ).bind(event.id, oldCommon.id, event.id, oldCommon.id).first();
+    if (oldCommonUsed) {
+      const reused = data.departures.find(d => d.id === oldCommon.id);
+      if (reused && !reused.tbd) reused.id = id(); // A real start cannot take over waiting entries.
+      if (!data.departures.some(d => d.id === oldCommon.id)) data.departures.unshift(oldCommon);
+    }
     await dropEmptyCommonStart(env, event.id, data);
+    const newlyPublished = Boolean(oldCommonUsed && data.departures.some(d => !d.tbd) &&
+      !JSON.parse(event.departures || '[]').some(d => !d.tbd));
     const cats = JSON.stringify(data.categories), deps = JSON.stringify(data.departures);
     const result = await env.DB.prepare(`UPDATE events SET name=?,duration_hours=?,duration_minutes=?,event_type=?,circuit=?,schedule_pending=?,driver_change_required=?,access=?,capacity=?,rounds=?,categories=?,departures=?,sim=?,details=?,version=version+1 WHERE id=? AND version=?
       AND NOT EXISTS (SELECT 1 FROM registrations r WHERE r.event_id=events.id AND
@@ -848,6 +861,10 @@ async function api(request, env) {
     const changes = [starts(event.departures) !== starts(deps) && 'starts', (event.circuit || '') !== data.circuit && 'circuit',
       (Number(event.duration_minutes) || Number(event.duration_hours) * 60) !== data.durationMinutes && 'duration', event.name !== data.name && 'name'].filter(Boolean);
     if (changes.length) await notify(env, await eventPilots(env, event.id), 'race_changed', {...event, name:data.name, circuit:data.circuit}, {skip:[actor.user?.id], changes, previousName:event.name !== data.name ? event.name : undefined});
+    if (newlyPublished) {
+      const pendingPilots = await departurePilots(env, event.id, oldCommon.id, community.id);
+      await notify(env, pendingPilots, 'choose_departure', {...event, name:data.name, circuit:data.circuit});
+    }
     return json({ok:true});
   }
   // « Je serai absent » on an event or an endurance, for oneself; entering the event withdraws it.
