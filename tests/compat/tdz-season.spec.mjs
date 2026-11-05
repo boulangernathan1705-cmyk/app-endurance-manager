@@ -18,6 +18,13 @@ for(const width of [1440,390])test(`TDZ shared quarter and seven-column calendar
   });
   await page.addInitScript(()=>{localStorage.setItem('endurance_manager_locale','fr');localStorage.setItem('em_tdz_season:tdz:111111111111111111',JSON.stringify({start:'2020-01',length:4}));});
   await page.goto('/events/');
+  await expect(page.locator('.page-head [data-action="event-filter"]')).toHaveCount(0);
+  await expect(page.locator('.tdz-quick-filters [data-action="tdz-filter-all"]')).toBeVisible();
+  await expect(page.locator('.tdz-quick-filters [data-action="race-filter"][data-value="registered"]')).toBeVisible();
+  await page.locator('.tdz-quick-filters [data-action="race-filter-toggle"]').click();
+  await expect(page.locator('.tdz-calendar .race-filter-panel')).toBeVisible();
+  await expect(page.locator('[data-race-filter-date]')).toHaveCount(0);
+  await page.locator('.tdz-quick-filters [data-action="race-filter-toggle"]').click();
   await expect(page.locator('.tdz-month-tabs [aria-pressed]')).toHaveCount(3);
   await expect(page.locator('.tdz-season-editor')).toHaveCount(0);
   await page.locator('[data-action="tdz-season"][data-field="month"][data-value="1"][aria-pressed]').click();
