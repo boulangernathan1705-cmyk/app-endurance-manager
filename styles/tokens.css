@@ -42,8 +42,7 @@
   --em-space-3: 12px;
   --em-space-4: 16px;
   --em-space-5: 24px;
-  /* Banner: full artwork by default, balanced desktop home crop, thin phone strip. */
-  --em-banner-ratio: 4 / 1;
+  /* One banner height across every page, with a thinner strip on phones. */
   --em-banner-height-phone: 64px;
-  --em-banner-height-home: clamp(120px, 16dvh, 160px);
+  --em-banner-height-desktop: clamp(120px, 16dvh, 160px);
 }

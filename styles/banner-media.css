@@ -1,9 +1,6 @@
-/* Stable banner rendering.
-   Keep the complete artwork visible as a real image. The image is capped on ultrawide
-   displays so browser zoom never stretches it beyond its source resolution; only the
-   blurred backdrop fills the unused sides.
-   Shared sizes come from tokens.css: full artwork on standard desktop pages, a
-   balanced crop on the weekly dashboard, a thin band on phones and the live pit wall. */
+/* Shared banner rendering: every page uses the same responsive height and crop.
+   The image stays capped at its source width on ultrawide screens; the blurred
+   backdrop fills the sides. Desktop and phone heights come from tokens.css. */
 
 header.site-hero {
   position: relative;
@@ -48,7 +45,8 @@ header.site-hero::after {
   z-index: 1;
   display: block;
   width: min(100%, 2048px);
-  aspect-ratio: var(--em-banner-ratio);
+  height: var(--em-banner-height-desktop);
+  aspect-ratio: auto;
   margin: 0 auto;
   background: #080b0d;
   box-shadow: 0 0 46px rgba(0,0,0,.4);
@@ -167,11 +165,4 @@ header.site-hero .brand-button.logo {
     width: 100%;
     margin: 0;
   }
-}
-
-/* On the desktop weekly dashboard, keep the logo and cars prominent in a
-   full-width crop while giving the calendar the remaining viewport height. */
-@media (min-width: 1101px) {
-  body:has(#app > .home-layout) .hero-picture { height: var(--em-banner-height-home); aspect-ratio: auto; }
-  body:has(#app > .home-layout) .hero-banner { object-fit: cover; object-position: center 40%; }
 }

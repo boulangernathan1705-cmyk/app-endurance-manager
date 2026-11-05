@@ -21,8 +21,9 @@ Les deux environnements utilisent des Workers et des bases D1 distincts.
 Le style du site a des valeurs de référence (couleurs, tailles, arrondis, espacements) dans `styles/tokens.css`.
 Les nouveaux styles utilisent ces variables (`var(--em-…)`), jamais une valeur brute. La page `/charte` montre les
 composants avec ces valeurs.
-La bannière a la même taille sur toutes les pages : entière sur ordinateur (`--em-banner-ratio`), bande fine
-sur téléphone (`--em-banner-height-phone`) ; seul le mur des stands garde sa bande extra-fine.
+La bannière a la même taille et le même cadrage sur toutes les pages, mur des stands compris :
+120 à 160 px sur ordinateur et tablette (`--em-banner-height-desktop`), 64 px sur téléphone
+(`--em-banner-height-phone`, largeur de fenêtre jusqu’à 760 px). Les hauteurs sont définies dans `styles/tokens.css`.
 
 Les tests visuels (`tests/visual`, `npm run visual:test`) comparent la charte, l'accueil et le tableau des équipages
 à leurs captures de référence (`tests/visual/__screenshots__`), sur ordinateur et téléphone. Ils tournent dans le
