@@ -2,8 +2,8 @@
    Keep the complete artwork visible as a real image. The image is capped on ultrawide
    displays so browser zoom never stretches it beyond its source resolution; only the
    blurred backdrop fills the unused sides.
-   One size on every page (tokens.css): the whole banner on a computer, a thin band on a phone.
-   Only the live pit wall (live.css) keeps a thinner strip. */
+   Shared sizes come from tokens.css: full artwork on standard desktop pages, a
+   balanced crop on the weekly dashboard, a thin band on phones and the live pit wall. */
 
 header.site-hero {
   position: relative;
@@ -169,3 +169,9 @@ header.site-hero .brand-button.logo {
   }
 }
 
+/* On the desktop weekly dashboard, keep the logo and cars prominent in a
+   full-width crop while giving the calendar the remaining viewport height. */
+@media (min-width: 1101px) {
+  body:has(#app > .home-layout) .hero-picture { height: var(--em-banner-height-home); aspect-ratio: auto; }
+  body:has(#app > .home-layout) .hero-banner { object-fit: cover; object-position: center 40%; }
+}
