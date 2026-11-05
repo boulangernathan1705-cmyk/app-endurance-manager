@@ -77,6 +77,7 @@ test('SOLO and TDZ calendars ignore endurance-only filters and preserve their si
   await expect(page.locator('.tdz-season-editor')).toHaveCount(0);
   await expect(page.locator('.tdz-calendar .tdz-race')).toHaveCount(1);
   await expect(page.locator('.tdz-calendar .tdz-race')).toContainText('Solo OPEN');
+  await page.locator('[data-action="race-filter-toggle"]').click();
   await expect(page.locator('[data-group="sims"][data-value="lmu"]')).toHaveAttribute('aria-pressed','true');
   await expect(page.locator('[data-group="kinds"][data-value="OPEN"]')).toHaveAttribute('aria-pressed','true');
   await page.evaluate(async()=>{const {state}=await import('/front/app/core.mjs');state.eventTdz=false;state.eventTypes=[];state.events[0].details={};const {renderHome}=await import('/front/app/home-view.mjs');renderHome();});
