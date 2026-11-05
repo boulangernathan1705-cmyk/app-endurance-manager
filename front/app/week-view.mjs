@@ -5,7 +5,7 @@
 // a list.
 import {app,state,esc,button,addMenu,notifyRender,activeGame,api,coversHour,can} from './core.mjs';
 import {gameForEvent} from '../../shared/catalog.mjs';
-import {isSolo,eventAccessLogo,soloCardMeta} from './solo.mjs';
+import {isSolo,eventAccessLogo,soloCardMeta,soloCalendarProgram,soloCounts} from './solo.mjs';
 import {isStream,streamDetails,streamSpan,streamPlatform,streamUrl} from '../../shared/stream.mjs';
 import {isGrindfest} from '../../shared/grindfest.mjs';
 import {simForEvent,SIMS,simCatalog,isTraining,trainingSpan} from '../../shared/catalog.mjs';
@@ -73,7 +73,7 @@ const logoOf=event=>isGrindfest(event)?'<img class="event-access-logo" src="/ima
 // When the stream is live, in small, with its link (Nathan 2026-11-02): « 📺 19h45–23h · ▶ Twitch ». A stream has its own
 // link; an event the community streams (« Début du stream ») takes the community's stream link. The card is a button: the
 // link is a span that opens the stream in a new tab without opening the race.
-function streamLine(event,starts=[]){
+function streamLine(event,starts=[],season=false){
   // An endurance: the start an admin streams (« Je streame ce départ »), with the community's link.
   const streamer=isSolo(event)?null:starts.flatMap(start=>start.departure.availability||[]).find(reg=>reg.streamTime&&reg.status!=='unavailable');
   const stream=isStream(event),info=streamer?{streamTime:streamer.streamTime,streamEnd:streamer.streamEnd}:stream?streamDetails(event):event.details||{};
@@ -82,7 +82,7 @@ function streamLine(event,starts=[]){
   const url=streamUrl(stream?info.streamUrl:state.communityStreamUrl)||'';
   const race=stream&&info.raceTime?` · 🏁 ${streamSpan(info.raceTime)}`:'';
   const link=url?`<span class="week-stream-link" role="link" tabindex="0" data-stream-url="${esc(url)}">▶ ${esc(streamPlatform(url))}</span>`:'';
-  return `<span class="week-block-stream"><span>📺 ${esc(span)}${esc(race)}</span>${link}</span>`;
+  return `<span class="week-block-stream"><span>📺 ${season?'Stream · ':''}${esc(span)}${esc(race)}</span>${link}</span>`;
 }
 
 // The card's schedule on a phone (Nathan 2026-11-02, option G): one line per moment, start → end: the stream (with its
@@ -130,7 +130,7 @@ function soonOf(items,now){
   return minutes<60?`dans ${Math.max(minutes,1)} min`:`dans ${Math.round(minutes/60)} h`;
 }
 
-function block(item,now){
+function block(item,now,{season=false}={}){
   const {event,departure,startsAt,endsAt,kind,mine,pilots,pending,starts}=item;
   const past=(endsAt||startsAt)<now,solo=isSolo(event),stream=isStream(event);
   const live=starts.some(start=>start.departure.hideClock!==true&&start.startsAt<=now&&(start.endsAt||start.startsAt)>=now);
@@ -147,9 +147,10 @@ function block(item,now){
   const badge=solo?kind.label:'',logo=solo?logoOf(event):`<img class="event-access-logo" src="/images/event-access/endurance-${esc(enduSim)}.png" alt="Endurance · ${esc(SIM_NAME[enduSim]||'')}" width="300" height="300" loading="lazy" decoding="async">`;
   // Who is there: the crews of an endurance, else its pilots (Nathan 2026-11-01, option B).
   const crews=solo?0:starts.reduce((sum,start)=>sum+(start.departure.crews||[]).length,0);
-  const count=stream?'':crews?`${crews} équipage${crews>1?'s':''}`:pilots?`${pilots} pilote${pilots>1?'s':''}`:'';
+  const confirmed=season&&solo&&!stream?soloCounts(event,departure):null;
+  const count=confirmed?`${confirmed.confirmed}${confirmed.capacity?` / ${confirmed.capacity}`:''} inscrit${confirmed.confirmed>1?'s':''}${confirmed.waiting?` · ${confirmed.waiting} en attente`:''}`:stream?'':crews?`${crews} équipage${crews>1?'s':''}`:pilots?`${pilots} pilote${pilots>1?'s':''}`:'';
   const weather=solo?'':weatherOf(event);
-  const left=solo&&!stream&&Number(event.capacity)>0?Number(event.capacity)-pilots:null;
+  const left=solo&&!stream&&Number(event.capacity)>0?Number(event.capacity)-(confirmed?.confirmed??pilots):null;
   const reg=mine?myReg(departure):null,crew=reg&&!solo?crewOf(departure,reg):null;
   const situation=!mine?'':solo?'<span class="week-chip is-ok">✓ Inscrit</span>'
     :crew?`<span class="week-chip is-ok">✓ ${esc(crew.name)}${reg?` · ${esc(hoursOf(departure,reg,event))}`:''}</span>`:'<span class="week-chip is-alert">Sans équipage</span>';
@@ -163,7 +164,7 @@ function block(item,now){
   const open=event.otherGame?`<a class="${cls}" href="/${event.otherGame}/#event=${event.id}" aria-label="${esc(label)}">`
     :`<button type="button" class="${cls}" data-action="open" data-id="${event.id}" aria-label="${esc(label)}">`;
   // « LMU · Training », « iRacing · Endurance », « Stream »: above the name on a phone.
-  const kindLine=[sim,solo?kind.label:'Endurance'].filter(Boolean).filter((text,index,list)=>list.findIndex(other=>String(other).toLowerCase()===String(text).toLowerCase())===index).join(' · ');
+  const kindLine=[sim,solo?kind.label:'Endurance',season&&solo&&!stream?(event.access==='safe'?'SAFE':'OPEN'):''].filter(Boolean).filter((text,index,list)=>list.findIndex(other=>String(other).toLowerCase()===String(text).toLowerCase())===index).join(' · ');
   const plan=planOf(item);
   const meta=[count,weather&&`${weather==='Pluie'?'🌧':'☀️'} ${weather}`,past&&'Terminé'].filter(Boolean);
   const mark=logo?`<span class="week-block-logo">${logo}</span>`:badge?`<span class="week-badge">${esc(badge)}</span>`:'';
@@ -178,10 +179,11 @@ function block(item,now){
     ${live?'<span class="week-chip is-live">● En cours</span>':''}
     <span class="week-block-kind">${esc(kindLine)}</span>
     <span class="week-block-name">${esc(event.name)}</span>
-    ${circuit?`<span class="week-block-circuit">${circuit}</span>`:''}
+    ${circuit&&!season?`<span class="week-block-circuit">${circuit}</span>`:''}
     </span>
-    ${solo&&isTraining(event)?`<span class="week-block-stream"><span>🏁 Entraînement ${esc(trainingSpan(startsAt,eventMinutes(event)))}</span></span>`:''}
-    ${streamLine(event,starts)}
+    ${season&&solo?soloCalendarProgram(event):''}
+    ${!season&&solo&&isTraining(event)?`<span class="week-block-stream"><span>🏁 Entraînement ${esc(trainingSpan(startsAt,eventMinutes(event)))}</span></span>`:''}
+    ${streamLine(event,starts,season)}
     ${plan.plan}${plan.live}
     ${meta.length||situation||places?`<span class="week-block-facts">${meta.length?`<span class="week-block-meta">${meta.map(text=>`<span>${esc(text)}</span>`).join('')}</span>`:''}${situation}${places}</span>`:''}
     ${gauge}

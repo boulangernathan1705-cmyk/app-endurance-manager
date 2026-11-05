@@ -2995,6 +2995,14 @@ button.crews-lock:disabled { opacity: .6; cursor: progress; }
 .tdz-month-grid .week-block-body { padding: var(--em-space-2); }
 .tdz-month-grid .week-block-circuit, .tdz-month-grid .week-block-gauge { display: none; }
 .tdz-month-grid .week-block-stream { overflow-wrap: anywhere; }
+.tdz-calendar .tdz-race-program { display: grid; gap: var(--em-space-2); margin-block: var(--em-space-2); min-width: 0; font-size: var(--em-text-xs); color: var(--em-muted); overflow-wrap: anywhere; }
+.tdz-calendar .tdz-race-round { display: grid; gap: var(--em-space-1); }
+.tdz-calendar .tdz-race-round + .tdz-race-round { padding-top: var(--em-space-2); border-top: 1px solid var(--em-border); }
+.tdz-calendar .tdz-race-round > strong { color: var(--em-accent); font-size: var(--em-text-xs); }
+.tdz-calendar .tdz-race-circuit, .tdz-calendar .tdz-race-duration { color: var(--em-text); }
+.tdz-calendar .week-block-facts .week-chip.is-warn { display: inline-block; }
+.tdz-calendar .week-block .week-block-stream { display: flex; margin-block: var(--em-space-2); }
+.tdz-calendar .week-block-live, .tdz-calendar .week-plan-row.is-stream { display: none; }
 .tdz-season-overview { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,calc(var(--em-space-5) * 10)),1fr)); gap: var(--em-space-5); align-items: start; }
 .tdz-season-month { min-width: 0; }
 .tdz-season-month > h2 { border-top: 2px solid var(--em-accent); padding-top: var(--em-space-3); }
@@ -3013,6 +3021,8 @@ button.crews-lock:disabled { opacity: .6; cursor: progress; }
   .tdz-month-grid .week-block-head { display: contents; position: static; }
   .tdz-month-grid .week-block-logo, .tdz-month-grid .week-block-head .week-badge { width: calc(var(--em-space-5) * 2); height: calc(var(--em-space-5) * 2); }
   .tdz-month-grid .week-block-body { padding: 0; }
+  .tdz-calendar .tdz-race-program, .tdz-calendar .week-block .week-block-stream { grid-column: 2; }
+  .tdz-calendar .week-block-kind { display: block; white-space: normal; }
   .tdz-month-grid .week-block-name { font-size: var(--em-text-md); }
   .tdz-month-grid .week-block-circuit { display: block; }
   .tdz-period-nav strong { flex: 1; min-width: 0; text-align: center; }

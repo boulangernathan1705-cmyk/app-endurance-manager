@@ -6,10 +6,12 @@ for(const width of [1440,390])test(`TDZ season: months, overview, history and op
   const event=(id,name,date,archived=false)=>({id,name,format:'solo',sim:'lmu',access:'open',eventType:'private',details:{type:'OPEN'},categories:['Hypercar'],circuit:'spa',durationMinutes:60,rounds:[{circuit:'spa',durationMinutes:60,categories:['Hypercar']}],version:1,archived,
     departures:[{id:id+'-d',startsAt:Date.parse(date+'T20:00:00Z'),date,time:'21:00',availability:[],crews:[]}]});
   const future=event('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa','OPEN DE JANVIER','2027-01-06');
+  future.rounds=[{circuit:'spa',durationMinutes:40,practice:5,qualifying:10,categories:['Hypercar','GT3']},{circuit:'le-mans',durationMinutes:35,categories:['GT3']}];
+  future.details.streamTime='20:30';future.details.streamEnd='23:00';future.capacity=30;
   const past=event('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb','OPEN DE NOVEMBRE','2026-11-04',true);
   await page.route('**/api/**',route=>{
     const url=new URL(route.request().url());let data={ok:true};
-    if(url.pathname==='/api/session')data={user:{id:'111111111111111111',name:'Nathan',communityIntroSeen:true},access:'member',permissions:['access','endurance','solo_open'],soloRaces:true,eventTdz:true,soloLabel:'EVENT TDZ',eventTypes:['OPEN'],community:{id:'tdz',slug:'tdz',name:'TDZ',appearance:{}},communities:[]};
+    if(url.pathname==='/api/session')data={user:{id:'111111111111111111',name:'Nathan',communityIntroSeen:true},access:'member',permissions:['access','endurance','solo_open'],soloRaces:true,eventTdz:true,soloLabel:'EVENT TDZ',eventTypes:['OPEN'],communityStreamUrl:'https://www.twitch.tv/lapraline_tdz',community:{id:'tdz',slug:'tdz',name:'TDZ',appearance:{}},communities:[]};
     else if(url.pathname==='/api/races')data={events:url.searchParams.get('scope')==='archived'?[past]:[future]};
     else if(url.pathname.includes('notifications'))data={notifications:[],unread:0};
     return route.fulfill({contentType:'application/json',body:JSON.stringify(data)});
@@ -25,6 +27,19 @@ for(const width of [1440,390])test(`TDZ season: months, overview, history and op
   await expect(page.locator('.tdz-month-grid')).toContainText('OPEN DE NOVEMBRE');
   await page.locator('[data-action="tdz-season"][data-field="month"][data-value="2"]').click();
   await expect(page.locator('.tdz-month-grid')).toContainText('OPEN DE JANVIER');
+  const program=page.locator('.tdz-month-grid .tdz-race-program');
+  await expect(program).toContainText('Spa');
+  await expect(program).toContainText('Manche 1');
+  await expect(program).toContainText('Manche 2');
+  await expect(program).toContainText('Hypercar / GT3');
+  await expect(program).toContainText('Course · 40 min');
+  await expect(program).toContainText('Course · 35 min');
+  await expect(program).not.toContainText(/Essais|Qualifs/);
+  await expect(program).toBeVisible();
+  await expect(page.locator('.tdz-month-grid')).toContainText('Stream · 20h30–23h');
+  await expect(page.locator('.tdz-month-grid .week-block-stream [data-stream-url]')).toContainText('Twitch');
+  await expect(page.locator('.tdz-month-grid .week-block-stream')).toBeVisible();
+  await expect(page.locator('.tdz-month-grid')).toContainText('0 / 30 inscrit');
   await page.getByRole('button',{name:'Toute la saison',exact:true}).click();
   await expect(page.locator('.tdz-season-month')).toHaveCount(4);
   await expect(page.locator('.tdz-season-overview')).toContainText('OPEN DE NOVEMBRE');
