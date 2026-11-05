@@ -2987,9 +2987,12 @@ button.crews-lock:disabled { opacity: .6; cursor: progress; }
 body:has(.tdz-calendar-dialog[open]) { overflow: hidden; }
 .tdz-calendar-dialog .tdz-calendar { display: flex; flex-direction: column; min-height: 100%; }
 .tdz-calendar-dialog .tdz-month-view { flex: 1; display: flex; flex-direction: column; min-height: 0; }
-.tdz-calendar-dialog .tdz-month-grid { flex: 1; grid-template-rows: auto repeat(var(--tdz-weeks),minmax(min-content,1fr)); }
+.tdz-calendar-dialog .tdz-month-grid { flex: 1; grid-template-rows: auto repeat(var(--tdz-weeks),minmax(max-content,1fr)); }
 .tdz-calendar-dialog:has(.tdz-month-view) .tdz-calendar { height: 100%; }
-.tdz-calendar-dialog .tdz-month-day { min-height: 0; }
+.tdz-calendar-dialog .tdz-month-day { min-height: max-content; }
+.tdz-calendar-dialog .tdz-race > * { flex-shrink: 0; }
+.tdz-calendar-dialog .tdz-calendar-title { margin-bottom: var(--em-space-1); }
+.tdz-calendar-dialog .tdz-season-toolbar button, .tdz-calendar-dialog .tdz-month-tabs button { min-height: calc(var(--em-space-4) * 2); padding: var(--em-space-1) var(--em-space-2); }
 .tdz-calendar-dialog .tdz-day-cards { gap: var(--em-space-1); }
 .tdz-season-toolbar .event-filter { margin: 0 0 0 auto; }
 .tdz-calendar-dialog .tdz-month-grid { min-height: min-content; }
