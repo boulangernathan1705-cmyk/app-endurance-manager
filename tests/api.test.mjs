@@ -45,7 +45,7 @@ function harness(withParticipants=true){
  // The crews' owner column of migration 0016_crew_ownership (its backfill needs no data here).
  DB.db.exec('ALTER TABLE crews ADD COLUMN owner_user_id TEXT REFERENCES users(id) ON DELETE SET NULL;CREATE INDEX crews_owner_user ON crews(owner_user_id);');
  DB.db.exec(readFileSync(new URL('../migrations/0017_discord_weekly.sql',import.meta.url),'utf8'));
- if(withParticipants){DB.db.exec(readFileSync(new URL('../migrations/0034_communities.sql',import.meta.url),'utf8'));DB.db.exec(readFileSync(new URL('../migrations/0035_memberships.sql',import.meta.url),'utf8'));DB.db.exec(readFileSync(new URL('../migrations/0039_official_races.sql',import.meta.url),'utf8'));linkTestServer(DB.db);DB.db.exec(`DROP TRIGGER community_slug_fixed;UPDATE communities SET slug='tdz',modules=json_set(modules,'$.soloRaces',json('true'))`);DB.db.exec(readFileSync(new URL('../migrations/0057_event_last_start.sql',import.meta.url),'utf8'));DB.db.exec(readFileSync(new URL('../migrations/0058_event_last_start_undated.sql',import.meta.url),'utf8'));}
+ if(withParticipants){DB.db.exec(readFileSync(new URL('../migrations/0034_communities.sql',import.meta.url),'utf8'));DB.db.exec(readFileSync(new URL('../migrations/0035_memberships.sql',import.meta.url),'utf8'));DB.db.exec(readFileSync(new URL('../migrations/0039_official_races.sql',import.meta.url),'utf8'));DB.db.exec(readFileSync(new URL('../migrations/0093_community_season.sql',import.meta.url),'utf8'));linkTestServer(DB.db);DB.db.exec(`DROP TRIGGER community_slug_fixed;UPDATE communities SET slug='tdz',modules=json_set(modules,'$.soloRaces',json('true'))`);DB.db.exec(readFileSync(new URL('../migrations/0057_event_last_start.sql',import.meta.url),'utf8'));DB.db.exec(readFileSync(new URL('../migrations/0058_event_last_start_undated.sql',import.meta.url),'utf8'));}
  const env={DB,...(withParticipants?{COMMUNITY:'tdz'}:{}),APP_ORIGIN:ROOT,DISCORD_CLIENT_ID:'app-id',DISCORD_CLIENT_SECRET:'test-only-secret',ADMIN_DISCORD_IDS:ADMIN,ASSETS:{fetch:async()=>new Response('static')}};
  const jars=new Map();
  async function req(path,method='GET',data,actor='guest',options={}){
@@ -889,4 +889,17 @@ test('stream identity, free content and logo persist; unauthorized members canno
  assert.equal((await req(`/api/events/${saved.id}`,'PATCH',update,'admin')).status,200);
  const edited=await listed();assert.equal(edited.details.logoUrl,undefined);assert.equal(edited.details.description,undefined);assert.equal(edited.details.activity,'Discussion');
  assert.equal((await req(`/api/events/${saved.id}`,'PATCH',update,'admin')).status,409,'stale versions stay protected');
+});
+
+test('TDZ organisers set a shared quarter; members read it and cannot change it',async()=>{
+ const {req,login}=harness();await login(ADMIN,'admin');await login(PILOT,'pilot');await login(OTHER,'organiser');grant(OTHER,[ORGA_ROLE]);
+ const endpoint='/api/community/season';
+ assert.equal((await req(endpoint,'PUT',{start:'2026-10',version:0},'pilot')).status,403);
+ assert.equal((await req(endpoint,'PUT',{start:'2026-11',version:0},'organiser')).status,400);
+ assert.equal((await req(endpoint,'PUT',{start:'2026-10',version:0},'organiser')).status,200);
+ assert.deepEqual((await req('/api/session','GET',null,'pilot')).data.tdzSeason,{start:'2026-10',version:1});
+ assert.equal((await req(endpoint,'PUT',{start:'2027-01',version:0},'admin')).status,409);
+ assert.equal((await req(endpoint,'PUT',{start:'2027-01',version:1},'admin')).status,200);
+ assert.deepEqual((await req('/api/session','GET',null,'pilot')).data.tdzSeason,{start:'2027-01',version:2});
+ assert.equal((await req(endpoint,'PUT',{start:'2027-04',version:2},'admin',{origin:'https://elsewhere.example'})).status,403);
 });

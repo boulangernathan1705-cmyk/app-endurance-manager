@@ -28,6 +28,12 @@ Les permissions sont toujours vérifiées côté serveur. Un pseudo seul ne donn
 
 Les horaires sont interprétés en heure de Paris. Les inscriptions se verrouillent au départ. Un pilote peut proposer plusieurs catégories sur le même départ ; lorsqu’il est affecté à un équipage, la catégorie de cet équipage devient celle retenue.
 
+## Calendrier EVENT TDZ
+
+La saison commune dure trois mois : janvier–mars, avril–juin, juillet–septembre ou octobre–décembre. Un organisateur disposant du droit de créer des courses choisit l’année et le trimestre dans « Définir la saison », puis « Enregistrer pour tous ». Sans réglage, le trimestre courant (heure de Paris) est affiché. Une fois enregistrée, la saison reste fixe jusqu’au prochain choix des organisateurs.
+
+Les membres parcourent ses trois mois dans une grille de sept jours, sur ordinateur et téléphone, ou consultent toute la saison. Les courses passées restent visibles. Chaque carte indique le circuit, le simulateur, le type, l’heure et la durée de course ; le stream possède sa propre ligne violette. Toucher une carte ouvre la fiche et ses inscriptions. Le bouton « Plein écran » affiche le calendrier seul, sans modifier la bannière du site ; « Réduire » ou Échap revient à la page. Ce choix est mémorisé par membre et communauté dans le navigateur. Les horaires et durées sont regroupés sur les cartes pour réduire leur hauteur.
+
 ## Annonces de stream
 
 Les organisateurs autorisés à créer un événement peuvent annoncer un stream dans le calendrier. Le nom du streamer, le simulateur/jeu/activité et la description sont libres et facultatifs. Une course peut préciser son heure de départ indépendamment du début du stream. Les anciens streams LMU et iRacing conservent leurs horaires et leur recherche d’équipage.
