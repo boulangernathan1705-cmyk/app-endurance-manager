@@ -2967,64 +2967,99 @@ button.crews-lock:disabled { opacity: .6; cursor: progress; }
 .planning-free-group .category-logo { width: 22px; height: auto; flex: none; }
 .planning-row[data-free-pilots] { gap: 4px 14px; }
 .planning-row[data-free-pilots]:hover .planning-no-crew { color: var(--community-accent, #52d3d8); }
-/* EVENT TDZ: a season calendar; Accueil keeps its own week and crew dashboard. */
-.tdz-season-toolbar, .tdz-period-fields, .tdz-period-nav, .tdz-month-tabs { display: flex; align-items: center; flex-wrap: wrap; gap: var(--em-space-3); }
-.tdz-season-toolbar { justify-content: space-between; margin-bottom: var(--em-space-4); }
-.tdz-period-fields label { display: grid; gap: var(--em-space-1); font-size: var(--em-text-sm); color: var(--em-muted); }
+/* EVENT TDZ: shared quarterly season, seven-day grid on every screen. */
+.tdz-season-toolbar, .tdz-period-fields, .tdz-month-tabs { display: flex; align-items: center; flex-wrap: wrap; gap: var(--em-space-3); }
+.tdz-season-toolbar { justify-content: space-between; margin-bottom: var(--em-space-2); }
+.tdz-season-label small { display: none; color: var(--em-muted); font-size: var(--em-text-sm); font-weight: normal; margin-top: var(--em-space-1); }
+.tdz-season-editor { font-size: var(--em-text-sm); }
+.tdz-season-editor summary { cursor: pointer; padding: var(--em-space-2); }
+.tdz-period-fields { padding: var(--em-space-2); align-items: end; }
+.tdz-period-fields label { display: grid; gap: var(--em-space-1); color: var(--em-muted); }
 .tdz-period-fields input, .tdz-period-fields select { font: inherit; color: var(--em-text); background: var(--em-panel); border: 1px solid var(--em-border); border-radius: var(--em-radius-sm); padding: var(--em-space-2); min-width: 0; }
-.tdz-period-nav { margin-block: var(--em-space-4); }
-.tdz-period-nav strong { font-size: var(--em-text-md); text-transform: capitalize; }
-.tdz-month-tabs { margin-bottom: var(--em-space-5); }
+.tdz-month-tabs { margin-bottom: var(--em-space-2); }
 .tdz-month-tabs [aria-pressed="true"] { border-color: var(--em-accent); background: color-mix(in srgb, var(--em-accent) 20%, var(--em-panel)); }
-.tdz-calendar-title, .tdz-season-month > h2 { margin: 0 0 var(--em-space-4); font-size: var(--em-text-lg); text-transform: capitalize; }
-.tdz-calendar-title small, .tdz-season-month > h2 small { display: inline-block; margin-left: var(--em-space-3); font-size: var(--em-text-xs); font-weight: normal; color: var(--em-muted); }
+.tdz-month-tabs button:disabled { opacity: .4; cursor: default; }
+.tdz-calendar-title, .tdz-season-month > h2 { margin: 0 0 var(--em-space-3); font-size: var(--em-text-lg); text-transform: capitalize; }
+.tdz-calendar-title small, .tdz-season-month > h2 small { margin-left: var(--em-space-3); font-size: var(--em-text-xs); font-weight: normal; color: var(--em-muted); }
 .tdz-month-grid { display: grid; grid-template-columns: repeat(7,minmax(0,1fr)); gap: 1px; border: 1px solid var(--em-border); background: var(--em-border); border-radius: var(--em-radius-md); overflow: hidden; }
-.tdz-weekday { padding: var(--em-space-3) var(--em-space-1); font-size: var(--em-text-xs); font-weight: bold; text-align: center; background: var(--em-panel-2); color: var(--em-muted); }
-.tdz-month-day { min-width: 0; min-height: calc(var(--em-space-5) * 4); padding: var(--em-space-2); background: var(--em-panel); }
+.tdz-weekday { padding: var(--em-space-1); font-size: var(--em-text-sm); font-weight: bold; text-align: center; background: var(--em-panel-2); color: var(--em-text); }
+.tdz-weekday-short, .tdz-circuit-short { display: none; }
+.tdz-month-day { min-width: 0; min-height: calc(var(--em-space-5) * 4); padding: var(--em-space-1); background: var(--em-panel); }
 .tdz-month-day.is-outside { background: var(--em-bg); }
-.tdz-month-day > h3 { margin: 0 0 var(--em-space-2); font-size: var(--em-text-sm); color: var(--em-muted); }
-.tdz-day-long { display: none; }
+.tdz-month-day.is-today { background: color-mix(in srgb,var(--em-accent) 7%,var(--em-panel)); }
+.tdz-month-day > h3 { margin: 0; font-size: var(--em-text-xs); color: var(--em-muted); }
+.tdz-day-number { display: inline-flex; align-items: center; justify-content: center; min-width: var(--em-space-4); min-height: var(--em-space-4); }
+.tdz-day-number[aria-current] { border-radius: var(--em-radius-pill); color: var(--em-bg); background: var(--em-accent); }
 .tdz-day-cards { display: grid; gap: var(--em-space-2); }
-.tdz-month-grid .week-block { border-radius: var(--em-radius-sm); }
-.tdz-month-grid .week-block-head { top: var(--em-space-1); right: var(--em-space-1); }
-.tdz-month-grid .week-block-logo, .tdz-month-grid .week-block-head .week-badge { width: calc(var(--em-space-4) * 2); height: calc(var(--em-space-4) * 2); }
-.tdz-month-grid .week-block-band { min-height: calc(var(--em-space-5) * 2); padding: var(--em-space-2); padding-right: calc(var(--em-space-5) + var(--em-space-4)); }
-.tdz-month-grid .week-block-band > span { display: flex; flex-wrap: wrap; gap: var(--em-space-1); white-space: normal; }
-.tdz-month-grid .week-block-band b { font-size: var(--em-text-lg); }
-.tdz-month-grid .week-block-band small, .tdz-month-grid .week-block-name { font-size: var(--em-text-xs); }
-.tdz-month-grid .week-block-body { padding: var(--em-space-2); }
-.tdz-month-grid .week-block-circuit, .tdz-month-grid .week-block-gauge { display: none; }
-.tdz-month-grid .week-block-stream { overflow-wrap: anywhere; }
-.tdz-calendar .tdz-race-program { display: grid; gap: var(--em-space-2); margin-block: var(--em-space-2); min-width: 0; font-size: var(--em-text-xs); color: var(--em-muted); overflow-wrap: anywhere; }
-.tdz-calendar .tdz-race-round { display: grid; gap: var(--em-space-1); }
-.tdz-calendar .tdz-race-round + .tdz-race-round { padding-top: var(--em-space-2); border-top: 1px solid var(--em-border); }
-.tdz-calendar .tdz-race-round > strong { color: var(--em-accent); font-size: var(--em-text-xs); }
-.tdz-calendar .tdz-race-circuit, .tdz-calendar .tdz-race-duration { color: var(--em-text); }
-.tdz-calendar .week-block-facts .week-chip.is-warn { display: inline-block; }
-.tdz-calendar .week-block .week-block-stream { display: flex; margin-block: var(--em-space-2); }
-.tdz-calendar .week-block-live, .tdz-calendar .week-plan-row.is-stream { display: none; }
+.tdz-race { --tdz-color: var(--em-kind-event); display: flex; flex-direction: column; align-items: stretch; gap: 0; width: 100%; min-width: 0; padding: var(--em-space-1); text-align: left; font: inherit; font-size: var(--em-text-sm); line-height: 1.2; color: var(--em-text); background: color-mix(in srgb,var(--tdz-color) 9%,var(--em-panel)); border: 1px solid var(--em-border); border-left: var(--em-space-1) solid var(--tdz-color); border-radius: var(--em-radius-sm); cursor: pointer; overflow-wrap: anywhere; }
+.tdz-race.sim-lmu { --tdz-color: var(--em-kind-lmu); }
+.tdz-race.sim-iracing { --tdz-color: var(--em-kind-iracing); }
+.tdz-race.sim-stream { --tdz-color: var(--em-kind-stream); }
+.tdz-race:hover { background: color-mix(in srgb,var(--tdz-color) 18%,var(--em-panel)); }
+.tdz-race:focus-visible { outline: 2px solid var(--em-accent); outline-offset: 1px; }
+.tdz-race.is-past { background: var(--em-panel-2); }
+.tdz-race-kind, .tdz-race-name, .tdz-race-status { font-size: var(--em-text-xs); color: var(--em-muted); }
+.tdz-race-kind { color: var(--em-text); }
+.tdz-race-circuit { color: var(--em-text-strong); font-size: var(--em-text-sm); }
+.tdz-race-time { font-weight: bold; }
+.tdz-race-stream { padding: 0 var(--em-space-1); color: var(--em-text); background: color-mix(in srgb,var(--em-kind-stream) 22%,var(--em-panel)); border-radius: var(--em-radius-sm); font-size: var(--em-text-xs); }
+.tdz-race-mine { color: var(--em-ok); font-size: var(--em-text-xs); }
 .tdz-season-overview { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,calc(var(--em-space-5) * 10)),1fr)); gap: var(--em-space-5); align-items: start; }
 .tdz-season-month { min-width: 0; }
 .tdz-season-month > h2 { border-top: 2px solid var(--em-accent); padding-top: var(--em-space-3); }
 .tdz-season-month > h2 small { display: block; margin: var(--em-space-1) 0 0; }
-.tdz-season-date > h3 { font-size: var(--em-text-sm); font-weight: normal; color: var(--em-muted); text-transform: capitalize; margin: var(--em-space-4) 0 var(--em-space-2); }
+.tdz-season-date > h3 { font-size: var(--em-text-sm); color: var(--em-muted); margin: var(--em-space-4) 0 var(--em-space-2); }
 .tdz-season-cards { display: grid; gap: var(--em-space-2); }
-.tdz-calendar-hint { color: var(--em-muted); font-size: var(--em-text-xs); margin-top: var(--em-space-4); }
+.tdz-calendar-hint { color: var(--em-muted); font-size: var(--em-text-xs); margin-top: var(--em-space-1); }
 .tdz-undated { margin-top: var(--em-space-5); }
 .tdz-undated > h2 { font-size: var(--em-text-lg); }
 .tdz-undated > button { margin: var(--em-space-2); }
+
+.tdz-race-schedule { display: flex; align-items: baseline; flex-wrap: wrap; gap: 0 var(--em-space-1); }
+.tdz-race-duration::before { content: "· "; color: var(--em-muted); }
+.tdz-month-grid .tdz-race { position: relative; }
+.tdz-month-grid .tdz-race-name, .tdz-month-grid .tdz-race-status { display: none; }
+.tdz-month-grid .tdz-race-circuit, .tdz-month-grid .tdz-race-kind, .tdz-month-grid .tdz-race-stream { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tdz-month-grid .tdz-circuit-full { display: none; }
+.tdz-month-grid .tdz-circuit-short { display: inline; }
+.tdz-month-grid .tdz-race-mine { position: absolute; right: var(--em-space-1); top: 0; font-size: 0; }
+.tdz-month-grid .tdz-race-mine::after { content: "✓"; font-size: var(--em-text-xs); background: var(--em-panel); }
+.tdz-month-grid .tdz-race:has(.tdz-race-mine) .tdz-race-kind { padding-right: var(--em-space-3); }
+.tdz-calendar-dialog { position: fixed; inset: 0; box-sizing: border-box; width: 100%; max-width: none; height: 100dvh; max-height: none; margin: 0; padding: var(--em-space-3); border: 0; background: var(--em-bg); color: var(--em-text); overflow: auto; }
+body:has(.tdz-calendar-dialog[open]) { overflow: hidden; }
+.tdz-calendar-dialog .tdz-calendar { display: flex; flex-direction: column; min-height: 100%; }
+.tdz-calendar-dialog .tdz-month-view { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+.tdz-calendar-dialog .tdz-month-grid { flex: 1; grid-template-rows: auto repeat(var(--tdz-weeks),minmax(max-content,1fr)); }
+.tdz-calendar-dialog:has(.tdz-month-view) .tdz-calendar { height: 100%; }
+.tdz-calendar-dialog .tdz-month-day { min-height: max-content; }
+.tdz-calendar-dialog .tdz-race > * { flex-shrink: 0; }
+.tdz-calendar-dialog .tdz-calendar-title { margin-bottom: var(--em-space-1); }
+.tdz-calendar-dialog .tdz-season-toolbar button, .tdz-calendar-dialog .tdz-month-tabs button { min-height: calc(var(--em-space-4) * 2); padding: var(--em-space-1) var(--em-space-2); }
+.tdz-calendar-dialog .tdz-day-cards { gap: var(--em-space-1); }
+.tdz-season-toolbar .event-filter { margin: 0 0 0 auto; }
+.tdz-calendar-dialog .tdz-month-grid { min-height: min-content; }
 @media (max-width: 760px) {
-  .tdz-month-grid { display: block; background: none; border: 0; border-radius: 0; }
-  .tdz-weekday, .tdz-month-day.is-outside, .tdz-month-day:not(.has-events), .tdz-day-number { display: none; }
-  .tdz-day-long { display: inline; text-transform: capitalize; }
-  .tdz-month-day { min-height: 0; padding: 0; background: none; margin-bottom: var(--em-space-5); }
-  .tdz-month-grid .week-block-head { display: contents; position: static; }
-  .tdz-month-grid .week-block-logo, .tdz-month-grid .week-block-head .week-badge { width: calc(var(--em-space-5) * 2); height: calc(var(--em-space-5) * 2); }
-  .tdz-month-grid .week-block-body { padding: 0; }
-  .tdz-calendar .tdz-race-program, .tdz-calendar .week-block .week-block-stream { grid-column: 2; }
-  .tdz-calendar .week-block-kind { display: block; white-space: normal; }
-  .tdz-month-grid .week-block-name { font-size: var(--em-text-md); }
-  .tdz-month-grid .week-block-circuit { display: block; }
-  .tdz-period-nav strong { flex: 1; min-width: 0; text-align: center; }
-  .tdz-season-toolbar { align-items: flex-start; }
+  .tdz-season-toolbar, .tdz-month-tabs { gap: var(--em-space-1); }
+  .tdz-season-toolbar { align-items: center; }
+  .tdz-season-label { font-size: var(--em-text-sm); }
+  .tdz-season-toolbar .event-filter { order: 3; margin-left: 0; }
+  .tdz-season-toolbar .tdz-expand { margin-left: auto; }
+  .tdz-season-toolbar button, .tdz-month-tabs button { font-size: var(--em-text-xs); padding: var(--em-space-2); }
+  .tdz-calendar-title { font-size: var(--em-text-md); margin-bottom: var(--em-space-1); }
+  .tdz-weekday-full { display: none; }
+  .tdz-weekday-short { display: inline; }
+  .tdz-month-day { padding: 0; min-height: calc(var(--em-space-5) * 3); }
+  .tdz-month-day > h3 { text-align: center; }
+  .tdz-month-grid .tdz-race { padding: 0; border-radius: 0; border-left-width: 2px; font-size: var(--em-text-xs); }
+  .tdz-month-grid .tdz-race-circuit { font-size: var(--em-text-xs); }
+  .tdz-month-grid .tdz-race-stream { padding: 0; }
+  .tdz-month-grid .tdz-stream-time { display: none; }
+  .tdz-calendar-dialog { padding: var(--em-space-1); }
+  .tdz-calendar-hint { font-size: var(--em-text-xs); }
 }
+
+/* The TDZ calendar owns its navigation and contextual filters. */
+.tdz-quick-filters{display:flex;flex-wrap:wrap;align-items:center;gap:var(--em-space-2)}
+.tdz-quick-filters .event-filter-button[aria-pressed="true"]{border-color:var(--em-accent);background:color-mix(in srgb,var(--em-accent) 15%,transparent)}
+.tdz-calendar .race-filter-panel{margin:0 0 var(--em-space-3)}
+@media(max-width:760px){.tdz-quick-filters{order:3;width:100%}.tdz-quick-filters .event-filter-button{flex:1;min-width:0;padding:var(--em-space-2)}}
