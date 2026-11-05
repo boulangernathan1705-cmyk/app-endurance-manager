@@ -860,9 +860,9 @@ async function api(request, env) {
     const starts = list => JSON.stringify(JSON.parse(list).map(d => [d.id, d.startsAt, Boolean(d.tbd)]));
     const changes = [starts(event.departures) !== starts(deps) && 'starts', (event.circuit || '') !== data.circuit && 'circuit',
       (Number(event.duration_minutes) || Number(event.duration_hours) * 60) !== data.durationMinutes && 'duration', event.name !== data.name && 'name'].filter(Boolean);
-    if (changes.length) await notify(env, await eventPilots(env, event.id), 'race_changed', {...event, name:data.name, circuit:data.circuit}, {skip:[actor.user?.id], changes, previousName:event.name !== data.name ? event.name : undefined});
+    if (changes.length && !newlyPublished) await notify(env, await eventPilots(env, event.id), 'race_changed', {...event, name:data.name, circuit:data.circuit}, {skip:[actor.user?.id], changes, previousName:event.name !== data.name ? event.name : undefined});
     if (newlyPublished) {
-      const pendingPilots = await departurePilots(env, event.id, oldCommon.id, community.id);
+      const pendingPilots = (await eventPilots(env, event.id)).filter(Boolean);
       await notify(env, pendingPilots, 'choose_departure', {...event, name:data.name, circuit:data.circuit});
     }
     return json({ok:true});
