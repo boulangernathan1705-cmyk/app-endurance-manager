@@ -34,11 +34,17 @@ for(const width of [1440,390])test(`TDZ shared quarter and seven-column calendar
   await expect(page.locator('.tdz-month-grid .tdz-race-stream')).toContainText('Stream');
   expect(await page.locator('.tdz-month-grid').evaluate(el=>getComputedStyle(el).gridTemplateColumns.split(' ').length)).toBe(7);
   if(width===390){
-    await expect(page.locator('.tdz-month-view .tdz-month-day .tdz-race:visible')).toHaveCount(0);
-    await expect(page.locator('.tdz-mobile-agenda .tdz-race:visible')).toHaveCount(1);
-    await expect(page.locator('.tdz-mobile-agenda')).toContainText('OPEN DE NOVEMBRE');
-    const cell=await page.locator('.tdz-month-day.has-events').first().boundingBox();
-    expect(cell.height).toBeLessThan(65);
+    await expect(page.locator('.tdz-mobile-agenda')).toHaveCount(0);
+    await expect(page.locator('.tdz-month-view .tdz-month-day .tdz-race:visible')).toHaveCount(1);
+    const card=page.locator('.tdz-month-day .tdz-race').first();
+    await expect(card).toContainText('Spa');
+    await expect(card).toContainText('21h');
+    const row=await page.locator('.tdz-month-day:has(.tdz-race)').first().boundingBox();
+    expect(row.height).toBeGreaterThan(60);
+    expect(row.height).toBeLessThan(145);
+    await card.click();
+    await expect(page).toHaveURL(/#event=/);
+    await page.goto('/events/');
   }
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
   await page.screenshot({path:test.info().outputPath(`tdz-season-${width}.png`),fullPage:true});
