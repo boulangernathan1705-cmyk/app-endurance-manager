@@ -70,8 +70,10 @@ function entryHtml({event, departure, more}) {
 function cellHtml({event, departure}) {
   const type = calendarType(event), endurance = !isSolo(event), hours = Math.round(eventMinutes(event) / 60);
   const time = isStream(event) ? hourLabel(streamDetails(event).streamTime || departure.time) : timeOf(departure);
-  const sim = gameForEvent(event) === 'iracing' ? 'iRacing' : 'LMU';
-  const info = [sim, endurance && hours ? `${hours}h` : ''].filter(Boolean).join(' · ');
+  // The sim only where both can mix: endurances (Events are all LMU, Nathan 2026-11-07).
+  const sim = !endurance ? '' : gameForEvent(event) === 'iracing' ? 'iRacing' : 'LMU';
+  const confirmed = endurance || isStream(event) || type === 'training' ? 0 : soloCounts(event, departure).confirmed;
+  const info = [sim, endurance && hours ? `${hours}h` : '', confirmed ? `${confirmed} inscrit${confirmed > 1 ? 's' : ''}` : ''].filter(Boolean).join(' · ');
   const logo = endurance ? `<img class="event-access-logo" src="/images/event-access/endurance-${esc(gameForEvent(event))}.png" alt="" width="300" height="300" loading="lazy" decoding="async">` : eventAccessLogo(event) || `<span class="cal-logo-text" aria-hidden="true">${isStream(event) ? '🎙️' : isGrindfest(event) ? '🎉' : '🏁'}</span>`;
   return `<button type="button" class="cal-cell t-${type}" data-action="open" data-id="${esc(event.id)}" data-departure="${esc(departure.id)}">${logo}<b>${esc(event.name)}</b><small><strong>${esc(time)}</strong>${info ? ` · ${esc(info)}` : ''}${mySituation(event) ? ' <span class="cal-me" title="Tu es inscrit">✓</span>' : ''}</small></button>`;
 }
@@ -113,8 +115,11 @@ function grid(month, byDay, selected) {
   const [year, number] = month.split('-').map(Number);
   const first = new Date(Date.UTC(year, number - 1, 1)), lead = (first.getUTCDay() + 6) % 7;
   const days = new Date(Date.UTC(year, number, 0)).getUTCDate(), weeks = Math.ceil((lead + days) / 7), today = parisToday();
-  let cells = DAYS.map(day => `<div class="cal-dow">${day}</div>`).join('');
+  let cells = DAYS.map(day => `<div class="cal-dow">${day}</div>`).join(''), rows = '';
   for (let week = 0; week < weeks; week++) {
+    // A week without a race stays short, so the month needs less scrolling (Nathan 2026-11-07).
+    const busy = Array.from({length:7}, (_, column) => week * 7 + column - lead + 1).some(day => day >= 1 && day <= days && byDay.get(`${month}-${pad(day)}`)?.length);
+    rows += busy ? ' minmax(150px,auto)' : ' 76px';
     for (let column = 0; column < 7; column++) {
       const day = week * 7 + column - lead + 1;
       if (day < 1 || day > days) { cells += '<div class="cal-day out" aria-hidden="true"></div>'; continue; }
@@ -124,7 +129,7 @@ function grid(month, byDay, selected) {
       cells += `<div class="${css}"><button type="button" class="cal-num" data-action="cal-day" data-day="${date}" aria-label="${esc(label)}" aria-pressed="${date === selected}"><span>${day}</span></button>${list.slice(0, list.length > 3 ? 2 : 3).map(cellHtml).join('')}${list.length > 3 ? `<button type="button" class="cal-more" data-action="cal-day" data-day="${date}">+${list.length - 2} de plus</button>` : ''}<button type="button" class="cal-tap" data-action="cal-day" data-day="${date}" aria-label="${esc(label)}" tabindex="-1">${list.length ? dots(list) : ''}</button></div>`;
     }
   }
-  return `<div class="cal-grid" role="grid" style="--weeks:${weeks}" aria-label="${esc(`${monthName(month)} ${year}`)}">${cells}</div>`;
+  return `<div class="cal-grid" role="grid" style="--weeks:${weeks};--rows:${rows.trim()}" aria-label="${esc(`${monthName(month)} ${year}`)}">${cells}</div>`;
 }
 function seasonPanel(months) {
   const start = state.tdzSeason?.start || months[0], length = state.tdzSeason?.months || months.length;
