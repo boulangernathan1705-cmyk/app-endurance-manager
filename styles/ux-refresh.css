@@ -2537,7 +2537,10 @@ html[data-game] #app .my-entry-slot-heading .race-badges { display: flex; flex-w
 .week-grid { display: grid; grid-template-columns: var(--week-columns, repeat(7, minmax(0, 1fr))); gap: 6px; align-items: stretch; }
 /* The home takes the screen's width (Nathan 2026-11-01): the week needs it more than the other pages. */
 main:not(.charte):has(.home-layout) { max-width: 2400px; }
-.week-day.is-busy .week-day-list { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+/* A busy day scrolls on its own, its races one under the other; the page does not move (Nathan 2026-11-07). */
+@media (min-width: 761px) {
+  .week-day-list { max-height: 452px; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--em-accent) 55%, transparent) transparent; }
+}
 .week-day-head .week-day-name, .week-day-head small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .week-done { justify-self: stretch; grid-column: 1 / -1; padding: 5px 9px; border: 1px dashed var(--em-border); border-radius: 8px; background: none; color: var(--em-muted); font: inherit; font-size: 12.5px; font-weight: 700; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
 .week-done:hover { color: var(--em-text); border-color: var(--em-muted); }

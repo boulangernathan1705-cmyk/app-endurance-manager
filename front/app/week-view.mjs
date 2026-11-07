@@ -288,16 +288,16 @@ export function renderWeek(){
   const range=`du ${monthDay.format(dateOf(monday))} au ${monthDay.format(dateOf(monday+6))}`;
   const filters=FILTERS.filter(([key])=>key!=='event'||state.soloRaces)
     .map(([key,label])=>button('week-filter',`${key==='all'?'':'<i aria-hidden="true"></i>'}${label}`,`data-filter="${key}" aria-pressed="${key==='all'?!chosen.size:chosen.has(key)}"`,`event-filter-button week-filter is-${key}`)).join('');
-  // Finished races fold into one line per day, opened with a click; busy days get more width, empty days less, so the
-  // week stays short (Nathan 2026-11-01, options C + A).
+  // Finished races fold into one line per day, opened with a click; empty days get less width (Nathan 2026-11-01).
+  // A busy day keeps its races one under the other and scrolls on its own, the page does not move (Nathan 2026-11-07).
   const open=state.weekOpenDays||(state.weekOpenDays=new Set());
   const shown=days.map(day=>{
     const done=day.items.filter(item=>(item.endsAt||item.startsAt)<now),opened=open.has(day.day);
     const items=opened?day.items:day.items.filter(item=>!done.includes(item));
-    return {...day,done,opened,shown:items,soon:day.day===today?soonOf(day.items,now):'',weight:items.length>2?2:items.length?1:done.length?.75:.5};
+    return {...day,done,opened,shown:items,soon:day.day===today?soonOf(day.items,now):'',weight:items.length?1:done.length?.75:.5};
   });
   const doneLine=day=>day.done.length?button('week-done',day.opened?'▴ Replier':`✓ ${day.done.length} terminée${day.done.length>1?'s':''} ▾`,`data-day="${day.day}" aria-expanded="${day.opened}"`,'week-done'):'';
-  const columns=shown.map(day=>`<section class="week-day${day.day===today?' is-today':''}${day.day<today?' is-past':''}${day.items.length?'':' is-empty'}${day.weight>1?' is-busy':''}" aria-labelledby="week-day-${day.day}">
+  const columns=shown.map(day=>`<section class="week-day${day.day===today?' is-today':''}${day.day<today?' is-past':''}${day.items.length?'':' is-empty'}${day.shown.length>2?' is-busy':''}" aria-labelledby="week-day-${day.day}">
       <h3 class="week-day-head" id="week-day-${day.day}"><span class="week-day-name">${esc(dayName.format(dateOf(day.day)))}</span><small>${esc(monthDay.format(dateOf(day.day)))}</small>${day.day===today?`<span class="week-today">Aujourd’hui${day.soon?`<span class="week-soon"> · ${esc(day.soon)}</span>`:''}</span>`:''}</h3>
       <div class="week-day-list">${day.shown.map(item=>block(item,now)).join('')}${doneLine(day)}${day.items.length?'':'<p class="week-empty">—</p>'}</div>
     </section>`).join('');

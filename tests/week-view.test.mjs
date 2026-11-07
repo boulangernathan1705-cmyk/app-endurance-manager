@@ -97,11 +97,11 @@ test('the week is short: finished races fold per day, busy days are wider, the h
   const view = read('front/app/week-view.mjs'), css = read('styles/ux-refresh.css'), actions = read('front/app/actions.mjs');
   assert.match(view, /button\('week-done',day\.opened\?'▴ Replier':`✓ \$\{day\.done\.length\} terminée/);
   assert.match(actions, /case 'week-done':/);
-  assert.match(view, /weight:items\.length>2\?2:items\.length\?1:done\.length\?\.75:\.5/);
+  assert.match(view, /weight:items\.length\?1:done\.length\?\.75:\.5/);
   assert.match(view, /style="--week-columns:\$\{widths\}"/);
   assert.match(css, /grid-template-columns: var\(--week-columns, repeat\(7, minmax\(0, 1fr\)\)\)/);
   assert.match(css, /main:not\(\.charte\):has\(\.home-layout\) \{ max-width: 2400px; \}/);
-  assert.match(css, /\.week-day\.is-busy \.week-day-list \{ grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/);
+  assert.match(css, /\.week-day-list \{ max-height: 452px; overflow-y: auto; overscroll-behavior: contain;/);
 });
 
 test('on a phone a week card shows its schedule, start → end, the stream first when it starts first (Nathan 2026-11-02, option G)', () => {
