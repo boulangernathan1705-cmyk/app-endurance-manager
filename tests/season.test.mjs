@@ -23,7 +23,7 @@ test('the endurances get a month view too, with a Liste / Mois switch (Nathan 20
   const calendar = readFileSync(new URL('../front/app/season-calendar.mjs', import.meta.url), 'utf8');
   const actions = readFileSync(new URL('../front/app/actions.mjs', import.meta.url), 'utf8');
   assert.match(home, /if\(calendarView\(solo\)==='month'\)\{renderSeasonCalendar\(/);
-  assert.match(home, /solo&&state\.eventTdz\?'month':'list'/);
+  assert.match(home, /solo&&state\.eventTdz&&state\.tdzSeason\?'month':'list'/);
   assert.match(actions, /case 'cal-view': setCalendarView\(/);
   assert.match(calendar, /if \(!isSolo\(event\)\) return event\.eventType === 'special' \|\| event\.official \? 'special' : event\.eventType === 'lmu' \? 'championnat' : 'prive';/);
 });

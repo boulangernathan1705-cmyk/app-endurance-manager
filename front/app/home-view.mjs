@@ -215,8 +215,8 @@ const filterButton=filtered=>button('race-filter-toggle',`<svg viewBox="0 0 24 2
 const viewKey=solo=>`calendar-view:${solo?'solo':'endurance'}`;
 export function calendarView(solo){
   state.calendarViews??={};
-  if(!state.calendarViews[viewKey(solo)]){let saved='';try{saved=localStorage.getItem(viewKey(solo))||'';}catch{}state.calendarViews[viewKey(solo)]=saved==='month'||saved==='list'?saved:solo&&state.eventTdz?'month':'list';}
-  return state.calendarViews[viewKey(solo)];
+  if(state.calendarViews[viewKey(solo)]===undefined){let saved='';try{saved=localStorage.getItem(viewKey(solo))||'';}catch{}state.calendarViews[viewKey(solo)]=saved==='month'||saved==='list'?saved:'';}
+  return state.calendarViews[viewKey(solo)]||(solo&&state.eventTdz&&state.tdzSeason?'month':'list');
 }
 export function setCalendarView(solo,view){state.calendarViews??={};state.calendarViews[viewKey(solo)]=view;state.calendarDay=null;try{localStorage.setItem(viewKey(solo),view);}catch{}}
 const viewSwitch=solo=>{const view=calendarView(solo);return `<div class="cal-view" role="group" aria-label="Affichage">${[['list','Liste'],['month','Mois']].map(([key,label])=>button('cal-view',label,`data-view="${key}" aria-pressed="${view===key}"`,'event-filter-button')).join('')}</div>`;};
