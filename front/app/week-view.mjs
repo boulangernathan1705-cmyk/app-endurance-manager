@@ -3,6 +3,7 @@
 // Gridfest, streams) and the endurances of LMU and iRacing together. A view only: a click opens the race's own page
 // (the other simulator's races in its own space), nothing is entered here. On a phone the days follow each other in
 // a list.
+import {calendarType} from './season-calendar.mjs';
 import {app,state,esc,button,addMenu,notifyRender,activeGame,api,coversHour,can} from './core.mjs';
 import {gameForEvent} from '../../shared/catalog.mjs';
 import {isSolo,eventAccessLogo,soloCardMeta} from './solo.mjs';
@@ -157,7 +158,10 @@ function block(item,now){
   const label=`${pending?'Horaire à définir':several?starts.map(start=>start.departure.hideClock?'à définir':hour(start.startsAt)).join(', '):hour(startsAt)} · ${event.name}${mine?' · tu es inscrit':''}`;
   // An event takes its simulator's colour, as its card on the events page (Nathan 2026-11-01).
   const sim2=!solo?` is-${event.otherGame||activeGame}`:kind.key==='event'?` sim-${simForEvent(event)}`:'';
-  const cls=`week-block is-${kind.key}${sim2}${mine?' is-mine':''}${past?' is-past':''}${live?' is-live':''}`;
+  // The frame says the type (Nathan 2026-11-03, option A): OPEN, SAFE, BOULOULES, Training at the TDZ; special and
+  // championship endurances. Other races keep their simulator's colour.
+  const type=solo?(state.eventTdz&&!stream?calendarType(event):''):event.eventType==='lmu'?'championnat':event.official?'special':'';
+  const cls=`week-block is-${kind.key}${sim2}${type?` t-${type}`:''}${mine?' is-mine':''}${past?' is-past':''}${live?' is-live':''}`;
   const open=event.otherGame?`<a class="${cls}" href="/${event.otherGame}/#event=${event.id}" aria-label="${esc(label)}">`
     :`<button type="button" class="${cls}" data-action="open" data-id="${event.id}" aria-label="${esc(label)}">`;
   // « LMU · Training », « iRacing · Endurance », « Stream »: above the name on a phone.

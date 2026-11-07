@@ -61,3 +61,8 @@
   .cal-open .cal-go,.cal-later .cal-go{display:block;grid-column:3;grid-row:1/3;color:var(--muted);font-size:22px}
   .cal-later-list{grid-template-columns:1fr}
 }
+
+/* The week's cards on the home page: the frame and the band take the type's colour too (option A, 2026-11-03). */
+.week-block.week-block.t-open{--kind:#35b978}.week-block.week-block.t-safe{--kind:#4ea8e6}.week-block.week-block.t-bouloules{--kind:#e46fb0}.week-block.week-block.t-training{--kind:#9aa3a7}
+.week-block.week-block.t-special{--kind:#e7b653}.week-block.week-block.t-championnat{--kind:#e4483d}
+.week-block[class*=" t-"]{border-color:color-mix(in srgb,var(--kind) 70%,transparent)}
