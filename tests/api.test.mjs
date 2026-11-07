@@ -45,7 +45,7 @@ function harness(withParticipants=true){
  // The crews' owner column of migration 0016_crew_ownership (its backfill needs no data here).
  DB.db.exec('ALTER TABLE crews ADD COLUMN owner_user_id TEXT REFERENCES users(id) ON DELETE SET NULL;CREATE INDEX crews_owner_user ON crews(owner_user_id);');
  DB.db.exec(readFileSync(new URL('../migrations/0017_discord_weekly.sql',import.meta.url),'utf8'));
- if(withParticipants){DB.db.exec(readFileSync(new URL('../migrations/0034_communities.sql',import.meta.url),'utf8'));DB.db.exec(readFileSync(new URL('../migrations/0035_memberships.sql',import.meta.url),'utf8'));DB.db.exec(readFileSync(new URL('../migrations/0039_official_races.sql',import.meta.url),'utf8'));DB.db.exec(readFileSync(new URL('../migrations/0093_community_season.sql',import.meta.url),'utf8'));linkTestServer(DB.db);DB.db.exec(`DROP TRIGGER community_slug_fixed;UPDATE communities SET slug='tdz',modules=json_set(modules,'$.soloRaces',json('true'))`);DB.db.exec(readFileSync(new URL('../migrations/0057_event_last_start.sql',import.meta.url),'utf8'));DB.db.exec(readFileSync(new URL('../migrations/0058_event_last_start_undated.sql',import.meta.url),'utf8'));}
+ if(withParticipants){DB.db.exec(readFileSync(new URL('../migrations/0034_communities.sql',import.meta.url),'utf8'));DB.db.exec(readFileSync(new URL('../migrations/0035_memberships.sql',import.meta.url),'utf8'));DB.db.exec(readFileSync(new URL('../migrations/0039_official_races.sql',import.meta.url),'utf8'));linkTestServer(DB.db);DB.db.exec(`DROP TRIGGER community_slug_fixed;UPDATE communities SET slug='tdz',modules=json_set(modules,'$.soloRaces',json('true'))`);DB.db.exec(readFileSync(new URL('../migrations/0057_event_last_start.sql',import.meta.url),'utf8'));DB.db.exec(readFileSync(new URL('../migrations/0058_event_last_start_undated.sql',import.meta.url),'utf8'));}
  const env={DB,...(withParticipants?{COMMUNITY:'tdz'}:{}),APP_ORIGIN:ROOT,DISCORD_CLIENT_ID:'app-id',DISCORD_CLIENT_SECRET:'test-only-secret',ADMIN_DISCORD_IDS:ADMIN,ASSETS:{fetch:async()=>new Response('static')}};
  const jars=new Map();
  async function req(path,method='GET',data,actor='guest',options={}){
@@ -832,13 +832,10 @@ test('"Horaires à confirmer": a common start "à définir", real times added la
  assert.equal((await edit(event,[{id:pool.id,date:pool.date,time:pool.time,tbd:true},{date:'2090-10-17',time:'09:00'},{date:'2090-10-17',time:'14:00'}])).status,200);
  event=(await req('/api/events','GET',null,'admin')).data.events.find(e=>e.id===second.data.id);
  assert.deepEqual(event.departures.map(d=>`${d.date} ${d.time}${d.tbd?' tbd':''}`),['2090-10-17 09:00 tbd','2090-10-17 09:00','2090-10-17 14:00']);
- // Even when the organiser removes the provisional row from the edit form, pending entries remain.
- assert.equal((await edit(event,[{id:event.departures[1].id,date:'2090-10-17',time:'09:00'},{id:event.departures[2].id,date:'2090-10-17',time:'14:00'}])).status,200);
- event=(await req('/api/events','GET',null,'admin')).data.events.find(e=>e.id===second.data.id);
- assert.equal(event.departures.find(d=>d.id===pool.id)?.availability.length,1);
  const leo=event.departures[0].availability[0];
  assert.equal((await req('/api/registrations/'+leo.id+'/departure','PATCH',{departureId:event.departures[2].id,version:leo.version},'pilot')).status,200);
- // Confirming a real start must not silently assign a provisional entry to that start.
+ // Unticking "Horaires à confirmer" on a race with only its common start: it becomes a start with a time,
+ // its entries stay on it.
  const fourth=await req('/api/events','POST',{...base,name:'6h SPA',circuit:'spa',departures:[{date:'2090-12-04',time:'20:00',tbd:true}]},'admin');
  event=(await req('/api/events','GET',null,'admin')).data.events.find(e=>e.id===fourth.data.id);
  const spaPool=event.departures[0];
@@ -846,13 +843,7 @@ test('"Horaires à confirmer": a common start "à définir", real times added la
  event=(await req('/api/events','GET',null,'admin')).data.events.find(e=>e.id===fourth.data.id);
  assert.equal((await edit(event,[{id:spaPool.id,date:'2090-12-04',time:'20:00',tbd:false}])).status,200);
  event=(await req('/api/events','GET',null,'admin')).data.events.find(e=>e.id===fourth.data.id);
- assert.equal(event.departures.length,2);
- assert.equal(event.departures[0].tbd,true);
- assert.equal(event.departures[0].id,spaPool.id);
- assert.equal(event.departures[0].availability.length,1);
- assert.notEqual(event.departures[1].id,spaPool.id);
- const spaEntry=event.departures[0].availability[0];
- assert.equal((await req('/api/registrations/'+spaEntry.id+'/departure','PATCH',{departureId:event.departures[1].id,version:spaEntry.version},'pilot')).status,200);
+ assert.equal(event.departures[0].tbd,undefined);assert.equal(event.departures[0].id,spaPool.id);assert.equal(event.departures[0].availability.length,1);
  // Upcoming LMU races "à confirmer" without entries become a single common start (migration 0033).
  const third=await req('/api/events','POST',{...base,name:'8h BAHRAIN',circuit:'bahrain',departures:[{date:'2090-11-13',time:'00:00'},{date:'2090-11-14',time:'00:00'}]},'admin');
  DB.db.exec(readFileSync(new URL('../migrations/0033_lmu_pending_common_start.sql',import.meta.url),'utf8'));
@@ -898,17 +889,4 @@ test('stream identity, free content and logo persist; unauthorized members canno
  assert.equal((await req(`/api/events/${saved.id}`,'PATCH',update,'admin')).status,200);
  const edited=await listed();assert.equal(edited.details.logoUrl,undefined);assert.equal(edited.details.description,undefined);assert.equal(edited.details.activity,'Discussion');
  assert.equal((await req(`/api/events/${saved.id}`,'PATCH',update,'admin')).status,409,'stale versions stay protected');
-});
-
-test('TDZ organisers set a shared quarter; members read it and cannot change it',async()=>{
- const {req,login}=harness();await login(ADMIN,'admin');await login(PILOT,'pilot');await login(OTHER,'organiser');grant(OTHER,[ORGA_ROLE]);
- const endpoint='/api/community/season';
- assert.equal((await req(endpoint,'PUT',{start:'2026-10',version:0},'pilot')).status,403);
- assert.equal((await req(endpoint,'PUT',{start:'2026-11',version:0},'organiser')).status,400);
- assert.equal((await req(endpoint,'PUT',{start:'2026-10',version:0},'organiser')).status,200);
- assert.deepEqual((await req('/api/session','GET',null,'pilot')).data.tdzSeason,{start:'2026-10',version:1});
- assert.equal((await req(endpoint,'PUT',{start:'2027-01',version:0},'admin')).status,409);
- assert.equal((await req(endpoint,'PUT',{start:'2027-01',version:1},'admin')).status,200);
- assert.deepEqual((await req('/api/session','GET',null,'pilot')).data.tdzSeason,{start:'2027-01',version:2});
- assert.equal((await req(endpoint,'PUT',{start:'2027-04',version:2},'admin',{origin:'https://elsewhere.example'})).status,403);
 });

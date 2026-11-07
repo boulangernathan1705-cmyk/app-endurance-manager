@@ -5,21 +5,8 @@ import {state,esc,pilotNameTip,button,canManage,can,logo,badge,categories} from 
 import {SIMS,simCatalog,simForEvent,eventLogoName,isTraining,trainingSpan} from '../../shared/catalog.mjs';
 import {isGrindfest} from '../../shared/grindfest.mjs';
 import {isStream,streamDetails,hourLabel,streamPlatform,streamSpan} from '../../shared/stream.mjs';
-import {durationLabel} from '../../shared/duration.mjs';
 
 export const ANY_CATEGORY = '*';
-// Season cards show the race itself, not practice/qualifying or their combined evening duration.
-export function soloCalendarProgram(event){
-  if(isStream(event))return '';
-  if(simForEvent(event)==='acrally')return `<span class="tdz-race-program"><span>${soloCardMeta(event)}</span><span>${esc(event.rounds?.[0]?.car||'')}</span></span>`;
-  const rounds=event.rounds?.length?event.rounds:[{circuit:event.circuit,durationMinutes:event.durationMinutes,categories:event.categories}];
-  return `<span class="tdz-race-program">${rounds.map((round,index)=>{
-    const circuit=eventCircuitName(event,round.circuit||(rounds.length===1?event.circuit:''));
-    const cars=round.randomCategory?'Catégorie aléatoire':[...new Set([...(round.categories||[]),round.category,round.car].filter(value=>value&&value!==ANY_CATEGORY))].join(' / ')||'Voitures libres';
-    const minutes=Number(round.durationMinutes),duration=minutes>0?durationLabel(minutes):'durée à confirmer';
-    return `<span class="tdz-race-round">${rounds.length>1?`<strong>Manche ${index+1}</strong>`:''}<span class="tdz-race-circuit">${esc(circuit)}</span><span>${esc(cars)}</span><span class="tdz-race-duration">${isTraining(event)?'Entraînement':'Course'} · ${esc(duration)}</span></span>`;
-  }).join('')}</span>`;
-}
 export const isSolo = event => event?.format === 'solo';
 
 // Supplied OPEN/SAFE artwork, shared by the calendar, event and personal entries.
