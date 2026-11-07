@@ -24,7 +24,7 @@ const pad = value => String(value).padStart(2, '0');
 
 // The frame colour of an event.
 export function calendarType(event) {
-  if (!isSolo(event)) return event.eventType === 'special' || event.official ? 'special' : event.eventType === 'lmu' ? 'championnat' : 'prive';
+  if (!isSolo(event)) return event.eventType === 'special' ? 'special' : event.eventType === 'lmu' ? 'championnat' : 'prive';
   if (isStream(event)) return 'stream';
   if (isGrindfest(event)) return 'gridfest';
   const type = String(normalizeTdzEventType(event.details?.type) || '').toUpperCase();
@@ -67,7 +67,7 @@ function entryHtml({event, departure, more}) {
 // identical small logos looked mixed up).
 function dots(list) {
   const chip = ({event, departure}) => `<i class="cal-chip t-${calendarType(event)}">${esc(timeOf(departure) || '?')}</i>`;
-  return `<span class="cal-dots" aria-hidden="true">${list.slice(0, 3).map(chip).join('')}${list.length > 3 ? `<em>+${list.length - 3}</em>` : ''}</span>`;
+  return `<span class="cal-dots" aria-hidden="true">${list.slice(0, 2).map(chip).join('')}${list.length > 2 ? `<em>+${list.length - 2}</em>` : ''}</span>`;
 }
 
 // The season shown (state.calendarShift: 0 the current one) and the month chosen in it.
@@ -113,7 +113,7 @@ export function seasonCalendar(events, {mineOnly = false, canEdit = false, setti
   const tabs = months.map(month => `<button type="button" class="cal-month${month === state.calendarMonth ? ' on' : ''}" data-action="cal-month" data-month="${month}" aria-pressed="${month === state.calendarMonth}"><span class="cal-long">${monthName(month).replace(/^./, letter => letter.toUpperCase())}</span><span class="cal-short">${monthName(month, true).replace(/^./, letter => letter.toUpperCase())}</span> <small>${count(month) || '–'}</small></button>`).join('');
   const shift = (step, label) => `<button type="button" class="cal-shift" data-action="cal-season" data-shift="${step}" aria-label="${label}">${step < 0 ? '‹' : '›'}</button>`;
   const later = list.filter(undated);
-  const legend = [['special', 'Événement spécial'], ['championnat', 'Championnat LMU'], ['prive', 'Championnat privé'], ['open', 'OPEN'], ['safe', 'SAFE'], ['bouloules', 'BOULOULES'], ['training', 'Training'], ['stream', 'Stream']]
+  const legend = [['special', 'Événement spécial'], ['championnat', 'Championnat'], ['prive', 'Championnat privé'], ['open', 'OPEN'], ['safe', 'SAFE'], ['bouloules', 'BOULOULES'], ['training', 'Training'], ['stream', 'Stream']]
     .filter(([type]) => list.some(event => calendarType(event) === type || (type === 'stream' && event.details?.streamTime)))
     .map(([type, label]) => `<span class="t-${type}">${label}</span>`).join('');
   return `<div class="cal">

@@ -5,7 +5,7 @@
 .cal-tabs{display:flex;align-items:center;gap:6px;margin:0 0 14px;min-width:0}
 .cal-months{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;min-width:0}
 .cal-months::-webkit-scrollbar{display:none}
-.cal-month,.cal-shift{border:1px solid var(--border);background:var(--panel2);color:var(--text);border-radius:8px;padding:8px 12px;font:600 14px/1 inherit;white-space:nowrap;cursor:pointer}
+.cal-month,.cal-shift{border:1px solid var(--border);background:var(--panel2);color:var(--text);border-radius:8px;padding:8px 12px;font-weight:600;font-size:14px;line-height:1;white-space:nowrap;cursor:pointer}
 .cal-month small{color:var(--muted);font-weight:500;margin-left:4px}
 .cal-month.on{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 16%,transparent)}
 .cal-month.on small{color:var(--text)}
@@ -16,12 +16,12 @@
 .cal-season-panel label{display:flex;align-items:center;gap:8px;font-weight:600}
 .cal-season-panel p{flex-basis:100%;margin:0;color:var(--muted);font-size:13px}
 .cal-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));border:1px solid var(--border);border-radius:12px;overflow:hidden;background:var(--panel)}
-.cal-dow{padding:9px 10px;font:700 12px/1 inherit;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);background:var(--panel2)}
+.cal-dow{padding:9px 10px;font-weight:700;font-size:12px;line-height:1;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);background:var(--panel2)}
 .cal-day{min-height:96px;padding:8px;border-right:1px solid var(--border);border-bottom:1px solid var(--border);display:flex;flex-direction:column;gap:6px;min-width:0}
 .cal-day:nth-child(7n){border-right:0}
 .cal-day.out{background:rgba(0,0,0,.22)}
 .cal-day.past .cal-ev,.cal-day.past .cal-dots{opacity:.45}
-.cal-num{all:unset;font:700 13px/1 inherit;color:var(--muted);height:22px;display:flex;align-items:center;cursor:default}
+.cal-num{all:unset;font-weight:700;font-size:13px;line-height:1;color:var(--muted);height:22px;display:flex;align-items:center;cursor:default}
 .cal-day.today .cal-num span{background:var(--accent);color:#06100b;border-radius:99px;padding:4px 7px}
 .cal-ev{all:unset;box-sizing:border-box;cursor:pointer;display:grid;grid-template-columns:34px minmax(0,1fr);gap:2px 8px;align-items:center;padding:6px 8px 6px 6px;border-radius:8px;background:var(--panel2);border:1px solid var(--border);border-left:3px solid var(--c);color:var(--text);min-width:0}
 .cal-ev:hover,.cal-ev:focus-visible{border-color:var(--c)}
@@ -50,8 +50,8 @@
   .cal-tap{all:unset;display:flex;cursor:pointer;justify-content:center;width:100%}
   .cal-dots{display:flex;flex-direction:column;align-items:center;gap:2px}
   .cal-dots{width:100%;gap:3px}
-  .cal-chip{display:block;width:calc(100% - 4px);padding:3px 0;border-radius:5px;background:color-mix(in srgb,var(--c) 30%,transparent);box-shadow:inset 3px 0 var(--c);font:800 11px/1.1 inherit;font-style:normal;text-align:center;color:var(--text)}
-  .cal-dots em{font:700 10.5px/1 inherit;color:var(--muted);font-style:normal}
+  .cal-chip{display:block;width:calc(100% - 4px);padding:3px 0;border-radius:5px;background:color-mix(in srgb,var(--c) 30%,transparent);box-shadow:inset 3px 0 var(--c);font-weight:800;font-size:11px;line-height:1.1;font-style:normal;text-align:center;color:var(--text)}
+  .cal-dots em{font-weight:700;font-size:10.5px;line-height:1;color:var(--muted);font-style:normal}
   .cal-day.past .cal-chip{opacity:.55}
   .cal-day.sel{background:color-mix(in srgb,var(--accent) 14%,transparent);box-shadow:inset 0 0 0 2px var(--accent)}
   .cal-open{grid-column:1/-1;display:flex;flex-direction:column;gap:8px;border-bottom:1px solid var(--border);background:var(--panel2);padding:10px 10px 12px}

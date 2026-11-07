@@ -25,5 +25,5 @@ test('the endurances get a month view too, with a Liste / Mois switch (Nathan 20
   assert.match(home, /if\(calendarView\(solo\)==='month'\)\{renderSeasonCalendar\(/);
   assert.match(home, /solo&&state\.eventTdz&&state\.tdzSeason\?'month':'list'/);
   assert.match(actions, /case 'cal-view': setCalendarView\(/);
-  assert.match(calendar, /if \(!isSolo\(event\)\) return event\.eventType === 'special' \|\| event\.official \? 'special' : event\.eventType === 'lmu' \? 'championnat' : 'prive';/);
+  assert.match(calendar, /if \(!isSolo\(event\)\) return event\.eventType === 'special' \? 'special' : event\.eventType === 'lmu' \? 'championnat' : 'prive';/);
 });
