@@ -343,14 +343,15 @@ function streamFacts(stream){
 const streamCrewText=crew=>`👥 ${clean(crew.eventName)} avec l’**${clean(crew.crew)}**${crew.pilots.length?` · ${crew.pilots.map(clean).join(', ')}`:''}`;
 // An endurance of the community's streamer: its start, name (link to it), sim and circuit, his crew, and his stream
 // when he streams it (« Je streame ce départ »): « 📺 Stream 19h45 → 23h sur Twitch ».
+// « 📺 Stream 20h45 → 23h00 sur Twitch »: an endurance or an event the community streams.
+const liveLine=info=>info?.streamTime?`📺 Stream ${streamHour(info.streamTime)}${info.streamEnd?` → ${streamHour(info.streamEnd)}`:''}${info.streamUrl?` sur [${streamPlatform(info.streamUrl)}](${info.streamUrl})`:''}`:'';
 function enduranceBox(event,siteUrl){
   const info=event.endurance,name=clean(event.name),url=raceUrl(siteUrl,{eventId:event.id,circuit:event.circuits[0]});
   const circuit=circuitNames.get(event.circuits[0])||event.circuits[0]||'';
-  const on=info.streamUrl?` sur [${streamPlatform(info.streamUrl)}](${info.streamUrl})`:'';
   return{name:cut(`🏁 ${startTimeLabel(event.startsAt,event.timePending)}`,256),value:cut([url?`**[${name}](${url})**`:`**${name}**`,
     [`🎮 Endurance ${SIM_SHORT[event.sim]||(event.sim==='iracing'?'iRacing':'LMU')}`,circuit&&`📍 ${clean(circuit)}`].filter(Boolean).join(' · '),
     info.crew&&`👥 **${clean(info.crew.name)}**${info.crew.pilots.length?` · ${info.crew.pilots.map(clean).join(', ')}`:''}`,
-    info.streamTime&&`📺 Stream ${streamHour(info.streamTime)}${info.streamEnd?` → ${streamHour(info.streamEnd)}`:''}${on}`].filter(Boolean).join('\n'),1024),inline:false};
+    liveLine(info)].filter(Boolean).join('\n'),1024),inline:false};
 }
 function calendarBox(event,siteUrl){
   if(event.stream)return streamBox(event,siteUrl);
@@ -361,7 +362,7 @@ function calendarBox(event,siteUrl){
   const places=event.capacity
     ?`👥 ${Math.min(event.entered,event.capacity)}/${event.capacity} places${event.entered>=event.capacity?' · complet':''}${event.entered>event.capacity?` · ${event.entered-event.capacity} en attente`:''}`
     :event.entered?`👥 ${event.entered} inscrit${event.entered>1?'s':''}`:'👥 personne pour l’instant';
-  return{name:cut(`🏁 ${when}`,256),value:cut([url?`**[${name}](${url})**`:`**${name}**`,[`🎮 ${SIM_SHORT[event.sim]||clean(event.sim)}`,circuits&&`📍 ${circuits}`].filter(Boolean).join(' · '),[places,event.access&&(event.access==='safe'?'🔒 SAFE':'🟢 OPEN')].filter(Boolean).join(' · '),event.capacity&&event.entered<event.capacity?`${event.capacity-event.entered} places disponibles`:''].filter(Boolean).join('\n'),1024),inline:false};
+  return{name:cut(`🏁 ${when}`,256),value:cut([url?`**[${name}](${url})**`:`**${name}**`,[`🎮 ${SIM_SHORT[event.sim]||clean(event.sim)}`,circuits&&`📍 ${circuits}`].filter(Boolean).join(' · '),[places,event.access&&(event.access==='safe'?'🔒 SAFE':'🟢 OPEN')].filter(Boolean).join(' · '),event.capacity&&event.entered<event.capacity?`${event.capacity-event.entered} places disponibles`:'',liveLine(event.live)].filter(Boolean).join('\n'),1024),inline:false};
 }
 // The week's events (« EVENT SOLO », « EVENT TDZ »): one box per event, in the order of their starts.
 // `snapshot`: {periodLabel, events:[{id,name,sim,circuits,startsAt,timePending,capacity,entered,access}]}.
