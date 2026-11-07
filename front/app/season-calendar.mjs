@@ -121,7 +121,7 @@ function grid(month, byDay, selected) {
       const date = `${month}-${pad(day)}`, list = byDay.get(date) || [];
       const css = ['cal-day', date < today && 'past', date === today && 'today', list.length && 'has', date === selected && 'sel'].filter(Boolean).join(' ');
       const label = `${LONG_DAYS[column]} ${day} ${monthName(month)}${list.length ? ` · ${list.length} événement${list.length > 1 ? 's' : ''}` : ''}`;
-      cells += `<div class="${css}"><button type="button" class="cal-num" data-action="cal-day" data-day="${date}" aria-label="${esc(label)}" aria-pressed="${date === selected}"><span>${day}</span></button>${list.slice(0, list.length > 3 ? 2 : 3).map(cellHtml).join('')}${list.length > 3 ? `<button type="button" class="cal-more" data-action="cal-day" data-day="${date}">+${list.length - 2} de plus</button>` : ''}${list.length ? `<button type="button" class="cal-tap" data-action="cal-day" data-day="${date}" aria-label="${esc(label)}">${dots(list)}</button>` : ''}</div>`;
+      cells += `<div class="${css}"><button type="button" class="cal-num" data-action="cal-day" data-day="${date}" aria-label="${esc(label)}" aria-pressed="${date === selected}"><span>${day}</span></button>${list.slice(0, list.length > 3 ? 2 : 3).map(cellHtml).join('')}${list.length > 3 ? `<button type="button" class="cal-more" data-action="cal-day" data-day="${date}">+${list.length - 2} de plus</button>` : ''}<button type="button" class="cal-tap" data-action="cal-day" data-day="${date}" aria-label="${esc(label)}" tabindex="-1">${list.length ? dots(list) : ''}</button></div>`;
     }
   }
   return `<div class="cal-grid" role="grid" style="--weeks:${weeks}" aria-label="${esc(`${monthName(month)} ${year}`)}">${cells}</div>`;

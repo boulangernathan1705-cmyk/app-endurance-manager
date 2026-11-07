@@ -140,3 +140,10 @@
 .cal-cell small strong{color:color-mix(in srgb,var(--c) 70%,#fff);font-weight:800}
 .cal-cell:hover,.cal-cell:focus-visible{background:color-mix(in srgb,var(--c) 42%,#0d1214)}
 .cal-day.past .cal-cell{opacity:.4}
+/* The whole day picks it, not only its number (Nathan 2026-11-07): a layer under the races and buttons. */
+@media (min-width:701px){
+  .cal-main .cal-day{position:relative}
+  .cal-main .cal-day > .cal-tap{all:unset;display:block;position:absolute;inset:0;cursor:pointer;z-index:0}
+  .cal-main .cal-day > .cal-tap .cal-dots{display:none}
+  .cal-main .cal-day > :not(.cal-tap){position:relative;z-index:1}
+}
