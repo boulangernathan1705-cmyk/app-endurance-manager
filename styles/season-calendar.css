@@ -73,9 +73,9 @@
   .cal-dow{padding:7px 0;text-align:center;font-size:11px}
   .cal-body{display:flex;flex-direction:column;height:auto;gap:10px}
   .cal-main .cal-grid{flex:none;grid-template-rows:auto}
-  .cal-main .cal-grid{grid-template-rows:auto;grid-auto-rows:46px}
-  .cal-main .cal-day,.cal-day{height:46px;min-height:0;padding:5px 2px;align-items:center;justify-content:flex-start;gap:5px;overflow:hidden}
-  .cal-day > .cal-ev,.cal-day > .cal-more{display:none !important}
+  .cal-main .cal-grid{grid-template-rows:auto;grid-auto-rows:58px}
+  .cal-main .cal-day,.cal-day{height:58px;min-height:0;padding:5px 2px;align-items:center;justify-content:flex-start;gap:5px;overflow:hidden}
+  .cal-day > .cal-ev,.cal-day > .cal-cell,.cal-day > .cal-more{display:none !important}
   .cal-month:not(.on){display:none}.cal-months{flex:1;justify-content:center}
   .cal-side{overflow:visible;padding:10px}
   .cal-legend{display:none}
@@ -84,10 +84,12 @@
   .cal-day.today .cal-num span{padding:3px 6px}
   .cal-tap{all:unset;position:absolute;inset:0;cursor:pointer}
   .cal-day{position:relative}
-  .cal-dots{position:absolute;left:0;right:0;bottom:7px;display:flex;justify-content:center;align-items:center;gap:4px}
-  .cal-dot{display:block;width:7px;height:7px;border-radius:50%;background:var(--c)}
-  .cal-dots em{font-weight:800;font-size:10px;line-height:1;color:var(--muted);font-style:normal}
-  .cal-day.past .cal-dot{opacity:.45}
+  .cal-dots{position:absolute;left:3px;right:2px;bottom:4px;display:flex;flex-direction:column;gap:2px}
+  .cal-line{display:block;border-left:3px solid var(--c);padding-left:3px;color:var(--text);font-style:normal;font-weight:600;font-size:9.5px;line-height:12px;text-align:left;white-space:nowrap;overflow:hidden}
+  .cal-line b{font-weight:800}
+  .cal-line{-webkit-mask-image:linear-gradient(90deg,#000 78%,transparent);mask-image:linear-gradient(90deg,#000 78%,transparent)}
+  .cal-dots em{font-weight:700;font-size:9.5px;line-height:12px;color:var(--muted);font-style:normal;padding-left:6px}
+  .cal-day.past .cal-line{opacity:.45}
 
   .cal-later-list{grid-template-columns:1fr}
 }
@@ -122,3 +124,19 @@
   html[data-game] #app .page-head:has(.cal-view) > .cal-tabs .cal-season-button{margin-left:6px}
 }
 .cal-ev small .cal-type{font-style:normal;font-weight:700;color:var(--c)}
+
+/* A bigger month on a computer (Nathan 2026-11-07): it grows down and the page scrolls, each race a band in its type's
+   colour with name, time, sim and length; the chosen day stays in view beside it. */
+@media (min-width:701px){
+  .cal-body{height:auto;align-items:start}
+  .cal-main .cal-grid{flex:none;grid-template-rows:auto repeat(var(--weeks,5),minmax(150px,auto))}
+  .cal-main .cal-day{overflow:visible;padding:6px;gap:4px}
+  .cal-side{position:sticky;top:12px;max-height:calc(100dvh - 24px)}
+}
+.cal-cell{all:unset;box-sizing:border-box;cursor:pointer;display:grid;grid-template-columns:30px minmax(0,1fr);gap:0 7px;align-items:center;flex:none;padding:4px 7px 4px 5px;border-radius:6px;border-left:4px solid var(--c);background:color-mix(in srgb,var(--c) 30%,#0d1214);color:var(--text);min-width:0}
+.cal-cell .event-access-logo,.cal-cell .cal-logo-text{grid-row:span 2;width:30px;height:30px;object-fit:contain;display:flex;align-items:center;justify-content:center;font-size:18px}
+.cal-cell b{font-size:13px;font-weight:700;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cal-cell small{font-size:11.5px;font-weight:600;line-height:1.25;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cal-cell small strong{color:color-mix(in srgb,var(--c) 70%,#fff);font-weight:800}
+.cal-cell:hover,.cal-cell:focus-visible{background:color-mix(in srgb,var(--c) 42%,#0d1214)}
+.cal-day.past .cal-cell{opacity:.4}

@@ -65,11 +65,22 @@ function entryHtml({event, departure, more}) {
   const logo = endurance ? `<img class="event-access-logo" src="/images/event-access/endurance-${esc(gameForEvent(event))}.png" alt="" width="300" height="300" loading="lazy" decoding="async">` : eventAccessLogo(event) || `<span class="cal-logo-text" aria-hidden="true">${isStream(event) ? '🎙️' : isGrindfest(event) ? '🎉' : '🏁'}</span>`;
   return `<button type="button" class="cal-ev t-${type}" data-action="open" data-id="${esc(event.id)}" data-departure="${esc(departure.id)}">${logo}<b><i class="cal-t">${esc(time)} </i>${esc(event.name)}</b><small><strong>${esc(time)}</strong>${esc(info)}${type && type !== 'stream' && type !== 'training' ? `<em class="cal-type"> · ${esc(typeLabel(type))}</em>` : ''}${more ? ` · +${more}` : ''}${mySituation(event) ? ' <span class="cal-me" title="Tu es inscrit">✓</span>' : ''}</small>${live}<span class="cal-go" aria-hidden="true">›</span></button>`;
 }
-// On a phone every day is the same size: one dot per event in the type's colour, three at most; the chosen day's
-// races are listed in full under the month (Nathan 2026-11-07: chips of different sizes, only a colour and a time).
+// In a day of the month on a computer: the logo on a band tinted with the type's colour, the race's name, then its time,
+// sim and length (Nathan 2026-11-07, mockup B: a bigger month, the colour visible, the event, the sim and the time).
+function cellHtml({event, departure}) {
+  const type = calendarType(event), endurance = !isSolo(event), hours = Math.round(eventMinutes(event) / 60);
+  const time = isStream(event) ? hourLabel(streamDetails(event).streamTime || departure.time) : timeOf(departure);
+  const sim = gameForEvent(event) === 'iracing' ? 'iRacing' : 'LMU';
+  const info = [sim, endurance && hours ? `${hours}h` : ''].filter(Boolean).join(' · ');
+  const logo = endurance ? `<img class="event-access-logo" src="/images/event-access/endurance-${esc(gameForEvent(event))}.png" alt="" width="300" height="300" loading="lazy" decoding="async">` : eventAccessLogo(event) || `<span class="cal-logo-text" aria-hidden="true">${isStream(event) ? '🎙️' : isGrindfest(event) ? '🎉' : '🏁'}</span>`;
+  return `<button type="button" class="cal-cell t-${type}" data-action="open" data-id="${esc(event.id)}" data-departure="${esc(departure.id)}">${logo}<b>${esc(event.name)}</b><small><strong>${esc(time)}</strong>${info ? ` · ${esc(info)}` : ''}${mySituation(event) ? ' <span class="cal-me" title="Tu es inscrit">✓</span>' : ''}</small></button>`;
+}
+// On a phone every day is the same size: each race on one line, its time and the start of its name beside the type's
+// colour (Nathan 2026-11-07, mockup B); one line and « +N » when a day has more than two.
+const shortName = name => String(name || '').replace(/^(OPEN|SAFE|BOULOULES|Training|Stream)\s+/i, '');
 function dots(list) {
-  const dot = ({event}) => `<i class="cal-dot t-${calendarType(event)}"></i>`;
-  return `<span class="cal-dots" aria-hidden="true">${list.slice(0, 3).map(dot).join('')}${list.length > 3 ? '<em>+</em>' : ''}</span>`;
+  const line = ({event, departure}) => `<i class="cal-line t-${calendarType(event)}"><b>${esc(timeOf(departure) || '?')}</b> ${esc(shortName(event.name))}</i>`;
+  return `<span class="cal-dots" aria-hidden="true">${list.slice(0, list.length > 2 ? 1 : 2).map(line).join('')}${list.length > 2 ? `<em>+${list.length - 1}</em>` : ''}</span>`;
 }
 
 // The season shown (state.calendarShift: 0 the current one) and the month chosen in it. The arrows step one month
@@ -110,7 +121,7 @@ function grid(month, byDay, selected) {
       const date = `${month}-${pad(day)}`, list = byDay.get(date) || [];
       const css = ['cal-day', date < today && 'past', date === today && 'today', list.length && 'has', date === selected && 'sel'].filter(Boolean).join(' ');
       const label = `${LONG_DAYS[column]} ${day} ${monthName(month)}${list.length ? ` · ${list.length} événement${list.length > 1 ? 's' : ''}` : ''}`;
-      cells += `<div class="${css}"><button type="button" class="cal-num" data-action="cal-day" data-day="${date}" aria-label="${esc(label)}" aria-pressed="${date === selected}"><span>${day}</span></button>${list.slice(0, list.length > 2 ? 1 : 2).map(entryHtml).join('')}${list.length > 2 ? `<button type="button" class="cal-more" data-action="cal-day" data-day="${date}">+${list.length - 1} de plus</button>` : ''}${list.length ? `<button type="button" class="cal-tap" data-action="cal-day" data-day="${date}" aria-label="${esc(label)}">${dots(list)}</button>` : ''}</div>`;
+      cells += `<div class="${css}"><button type="button" class="cal-num" data-action="cal-day" data-day="${date}" aria-label="${esc(label)}" aria-pressed="${date === selected}"><span>${day}</span></button>${list.slice(0, list.length > 3 ? 2 : 3).map(cellHtml).join('')}${list.length > 3 ? `<button type="button" class="cal-more" data-action="cal-day" data-day="${date}">+${list.length - 2} de plus</button>` : ''}${list.length ? `<button type="button" class="cal-tap" data-action="cal-day" data-day="${date}" aria-label="${esc(label)}">${dots(list)}</button>` : ''}</div>`;
     }
   }
   return `<div class="cal-grid" role="grid" style="--weeks:${weeks}" aria-label="${esc(`${monthName(month)} ${year}`)}">${cells}</div>`;
