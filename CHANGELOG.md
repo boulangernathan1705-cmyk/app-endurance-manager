@@ -1,5 +1,22 @@
 # Nouveautés d'Endurance Manager
 
+## v2.5 — 7 novembre 2026
+
+### ✨ Nouveautés
+
+- **Calendrier par mois** : Event TDZ et Endurance ont une vue Mois en plus de la liste (bouton « Liste / Mois »). Chaque course a son logo, son nom, son heure et la couleur de son type. Le jour choisi est détaillé à côté sur ordinateur, dessous sur téléphone.
+- **Event TDZ · Saison** : les organisateurs choisissent le mois de début et la durée de la saison, et les saisons suivantes s’enchaînent.
+
+### ✨ Améliorations
+
+- **Accueil · Semaine** : le cadre de chaque carte prend la couleur de son type (OPEN, SAFE, Championnat…). Un jour chargé défile tout seul, sans faire bouger la page.
+- **Discord · Affiche du jour** : « Aujourd’hui sur Twitch » au lieu de « En direct », une heure par départ avec ses équipages dessous, l’heure de chaque manche et le logo LMU / iRacing sur les endurances. Une course annulée dans la journée est barrée dans le message, et l’image reste.
+- **Bannière** : plus fine sur ordinateur sur les listes et calendriers.
+
+### 🐛 Corrections
+
+- **Horaires « à définir »** : les inscrits restent en attente quand les vrais horaires sont publiés, et sont prévenus pour choisir leur créneau.
+
 ## v2.4 — 3 novembre 2026
 
 ### ✨ Améliorations
