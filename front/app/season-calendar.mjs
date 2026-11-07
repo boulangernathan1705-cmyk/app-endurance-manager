@@ -61,7 +61,7 @@ function entryHtml({event, departure, more}) {
   const time = undated(event) ? 'Date à confirmer' : isStream(event) ? hourLabel(stream.streamTime || stream.raceTime || departure.time) : timeOf(departure);
   const live = !isStream(event) && event.details?.streamTime ? `<span class="cal-live">● Stream ${esc(streamSpan(event.details.streamTime, event.details.streamEnd))}</span>` : '';
   const logo = endurance ? `<img class="event-access-logo" src="/images/event-access/endurance-${esc(gameForEvent(event))}.png" alt="" width="300" height="300" loading="lazy" decoding="async">` : eventAccessLogo(event) || `<span class="cal-logo-text" aria-hidden="true">${isStream(event) ? '🎙️' : isGrindfest(event) ? '🎉' : '🏁'}</span>`;
-  return `<button type="button" class="cal-ev t-${type}" data-action="open" data-id="${esc(event.id)}" data-departure="${esc(departure.id)}">${logo}<b>${esc(event.name)}</b><small><strong>${esc(time)}</strong>${esc(info)}${more ? ` · +${more}` : ''}${mySituation(event) ? ' <span class="cal-me" title="Tu es inscrit">✓</span>' : ''}</small>${live}<span class="cal-go" aria-hidden="true">›</span></button>`;
+  return `<button type="button" class="cal-ev t-${type}" data-action="open" data-id="${esc(event.id)}" data-departure="${esc(departure.id)}">${logo}<b><i class="cal-t">${esc(time)} </i>${esc(event.name)}</b><small><strong>${esc(time)}</strong>${esc(info)}${more ? ` · +${more}` : ''}${mySituation(event) ? ' <span class="cal-me" title="Tu es inscrit">✓</span>' : ''}</small>${live}<span class="cal-go" aria-hidden="true">›</span></button>`;
 }
 // On a phone a day shows one chip per event: its time on the type's colour (the legend's), no logo (Nathan 2026-11-07:
 // identical small logos looked mixed up).
@@ -94,7 +94,7 @@ function chosenDay(month, byDay) {
   if (today.startsWith(month) && byDay.has(today)) return today;
   return dates.find(date => date >= today) || (today.startsWith(month) ? today : dates[0]) || `${month}-01`;
 }
-// The month: each day shows two events at most, then « +N » (the day opens beside the month). On a phone, the times
+// The month: each day shows two events, or one and « +N » when it has more (the day opens beside the month). On a phone, the times
 // as small chips coloured by type.
 function grid(month, byDay, selected) {
   const [year, number] = month.split('-').map(Number);
@@ -108,7 +108,7 @@ function grid(month, byDay, selected) {
       const date = `${month}-${pad(day)}`, list = byDay.get(date) || [];
       const css = ['cal-day', date < today && 'past', date === today && 'today', list.length && 'has', date === selected && 'sel'].filter(Boolean).join(' ');
       const label = `${LONG_DAYS[column]} ${day} ${monthName(month)}${list.length ? ` · ${list.length} événement${list.length > 1 ? 's' : ''}` : ''}`;
-      cells += `<div class="${css}"><button type="button" class="cal-num" data-action="cal-day" data-day="${date}" aria-label="${esc(label)}" aria-pressed="${date === selected}"><span>${day}</span></button>${list.slice(0, 2).map(entryHtml).join('')}${list.length > 2 ? `<button type="button" class="cal-more" data-action="cal-day" data-day="${date}">+${list.length - 2} de plus</button>` : ''}${list.length ? `<button type="button" class="cal-tap" data-action="cal-day" data-day="${date}" aria-label="${esc(label)}">${dots(list)}</button>` : ''}</div>`;
+      cells += `<div class="${css}"><button type="button" class="cal-num" data-action="cal-day" data-day="${date}" aria-label="${esc(label)}" aria-pressed="${date === selected}"><span>${day}</span></button>${list.slice(0, list.length > 2 ? 1 : 2).map(entryHtml).join('')}${list.length > 2 ? `<button type="button" class="cal-more" data-action="cal-day" data-day="${date}">+${list.length - 1} de plus</button>` : ''}${list.length ? `<button type="button" class="cal-tap" data-action="cal-day" data-day="${date}" aria-label="${esc(label)}">${dots(list)}</button>` : ''}</div>`;
     }
   }
   return `<div class="cal-grid" role="grid" style="--weeks:${weeks}" aria-label="${esc(`${monthName(month)} ${year}`)}">${cells}</div>`;
@@ -122,7 +122,7 @@ function seasonPanel(months) {
   return `<form class="cal-season-panel" data-season-form><label>Début <select name="seasonStart">${options}</select></label><label>Durée <select name="seasonMonths">${lengths}</select></label><button type="submit" class="primary-button">Enregistrer</button>${button('cal-season-edit', 'Annuler', '', 'link-button')}<p>Les saisons suivantes s’enchaînent toutes seules.</p></form>`;
 }
 
-// The page's body under the head: tabs, grid, undated events. events: the filtered events, upcoming and past.
+// The months for the page's head, and the body: grid, chosen day, undated events. events: the filtered events, upcoming and past.
 // setting: the season (EVENT TDZ); without it, the calendar quarter (endurances).
 export function seasonCalendar(events, {mineOnly = false, canEdit = false, setting = state.tdzSeason} = {}) {
   const months = calendarMonths(setting), list = mineOnly ? events.filter(event => mySituation(event, {includePast:true})) : events;
@@ -135,10 +135,11 @@ export function seasonCalendar(events, {mineOnly = false, canEdit = false, setti
     .map(([type, label]) => `<span class="t-${type}">${label}</span>`).join('');
   const selected = chosenDay(state.calendarMonth, byDay), day = byDay.get(selected) || [];
   const side = `<aside class="cal-side" aria-label="${esc(dayTitle(selected))}"><h3>${esc(dayTitle(selected))}</h3>${day.length ? day.map(entryHtml).join('') : '<p class="cal-none">Rien ce jour-là.</p>'}${later.length ? `<h3 class="cal-later-title">Date à confirmer <small>${later.length}</small></h3>${later.map(event => entryHtml({event, departure:event.departures?.[0] || {id:'', time:''}, more:0})).join('')}` : ''}</aside>`;
-  return `<div class="cal">
-<div class="cal-tabs" role="group" aria-label="Mois">${shift(-1, 'Mois précédent')}<div class="cal-months">${tabs}</div>${shift(1, 'Mois suivant')}${canEdit ? button('cal-season-edit', 'Saison', `aria-expanded="${Boolean(state.calendarSeasonOpen)}"`, 'link-button cal-season-button') : ''}</div>
+  // The months go up in the page's head, on the line of the other choices (Nathan 2026-11-07: more room for the month).
+  const head = `<div class="cal-tabs" role="group" aria-label="Mois">${shift(-1, 'Mois précédent')}<div class="cal-months">${tabs}</div>${shift(1, 'Mois suivant')}${canEdit ? button('cal-season-edit', 'Saison', `aria-expanded="${Boolean(state.calendarSeasonOpen)}"`, 'link-button cal-season-button') : ''}</div>`;
+  return {head, body:`<div class="cal">
 ${canEdit && state.calendarSeasonOpen ? seasonPanel(months) : ''}
 <div class="cal-body"><div class="cal-main">${grid(state.calendarMonth, byDay, selected)}
 ${legend || list.some(mySituation) ? `<div class="cal-legend">${legend}${list.some(event => mySituation(event)) ? '<span class="cal-legend-me"><b>✓</b> Tu es inscrit</span>' : ''}</div>` : ''}</div>${side}</div>
-</div>`;
+</div>`};
 }
