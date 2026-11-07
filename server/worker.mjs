@@ -1,3 +1,4 @@
+import {communitySeason,saveCommunitySeason} from './season.mjs';
 import {discordDiagnostic} from './discord-diagnostic.mjs';
 import {grindfestAvailable, grindfestEnabled, isGrindfest, streamersOf, assignStreamerWaitlist} from '../shared/grindfest.mjs';
 import {discordInteraction} from './discord-interactions.mjs';
@@ -486,7 +487,7 @@ async function api(request, env) {
   const requests = await communityRequestsApi(path, method, request, env, actor);
   if (requests) return requests;
   // Each opening of the site renews the sign-in (once a day at most), so it never runs out for a pilot who comes back.
-  if (path === '/api/session' && method === 'GET') return json({user:actor.user, discordReady:!!(env.DISCORD_CLIENT_ID && env.DISCORD_CLIENT_SECRET), adminConfigured:administrators(env).length > 0, soloRaces:soloRacesEnabled(env, community), iracingImport:community.modules?.iracingImport===true, categoryEntry:community.modules?.categoryEntry === true, soloLabel:eventsLabel(community, isDevelopment(env)), eventTdz:tdzOnly(community, isDevelopment(env)), eventTypes:!tdzOnly(community, isDevelopment(env)) ? [] : grindfestEnabled(community, isDevelopment(env)) ? [...TDZ_EVENT_TYPES, 'Gridfest'] : TDZ_EVENT_TYPES, grindfest:grindfestEnabled(community, isDevelopment(env)), grindfestAvailable:grindfestAvailable(community, isDevelopment(env)), safeGuideUrl:community.modules?.safeGuideUrl || '',
+  if (path === '/api/session' && method === 'GET') return json({user:actor.user, discordReady:!!(env.DISCORD_CLIENT_ID && env.DISCORD_CLIENT_SECRET), adminConfigured:administrators(env).length > 0, soloRaces:soloRacesEnabled(env, community), iracingImport:community.modules?.iracingImport===true, categoryEntry:community.modules?.categoryEntry === true, soloLabel:eventsLabel(community, isDevelopment(env)), eventTdz:tdzOnly(community, isDevelopment(env)), tdzSeason:access.status === 'member' && soloRacesEnabled(env, community) && tdzOnly(community, isDevelopment(env)) ? await communitySeason(env, community).catch(() => null) : null, eventTypes:!tdzOnly(community, isDevelopment(env)) ? [] : grindfestEnabled(community, isDevelopment(env)) ? [...TDZ_EVENT_TYPES, 'Gridfest'] : TDZ_EVENT_TYPES, grindfest:grindfestEnabled(community, isDevelopment(env)), grindfestAvailable:grindfestAvailable(community, isDevelopment(env)), safeGuideUrl:community.modules?.safeGuideUrl || '',
     // The community's stream link (« Annonce du jour »), for the events it streams on the week (members only).
     communityStreamUrl:access.status === 'member' && soloRacesEnabled(env, community) ? announceStream(await botRecapSettings(env, community).catch(() => null)) : '',
     combos:combosEnabled(community) && access.permissions.has('combos'),
@@ -834,7 +835,20 @@ async function api(request, env) {
     }
     const data = validateEvent(plainSoloInput(env, community, input), event);
     if (isGrindfest(data) && !grindfestEnabled(community, isDevelopment(env))) fail(403, 'Gridfest n’est pas activé.');
+    // The provisional start is an event-level waiting area, not a real time slot.
+    // Keep its entries (and crews) when an organiser publishes actual start times.
+    const oldCommon = JSON.parse(event.departures || '[]').find(d => d.tbd);
+    const oldCommonUsed = oldCommon && await env.DB.prepare(
+      'SELECT 1 FROM registrations WHERE event_id=? AND departure_id=? UNION SELECT 1 FROM crews WHERE event_id=? AND departure_id=? LIMIT 1'
+    ).bind(event.id, oldCommon.id, event.id, oldCommon.id).first();
+    if (oldCommonUsed) {
+      const reused = data.departures.find(d => d.id === oldCommon.id);
+      if (reused && !reused.tbd) reused.id = id(); // A real start cannot take over waiting entries.
+      if (!data.departures.some(d => d.id === oldCommon.id)) data.departures.unshift(oldCommon);
+    }
     await dropEmptyCommonStart(env, event.id, data);
+    const newlyPublished = Boolean(oldCommonUsed && data.departures.some(d => !d.tbd) &&
+      !JSON.parse(event.departures || '[]').some(d => !d.tbd));
     const cats = JSON.stringify(data.categories), deps = JSON.stringify(data.departures);
     const result = await env.DB.prepare(`UPDATE events SET name=?,duration_hours=?,duration_minutes=?,event_type=?,circuit=?,schedule_pending=?,driver_change_required=?,access=?,capacity=?,rounds=?,categories=?,departures=?,sim=?,details=?,version=version+1 WHERE id=? AND version=?
       AND NOT EXISTS (SELECT 1 FROM registrations r WHERE r.event_id=events.id AND
@@ -847,7 +861,14 @@ async function api(request, env) {
     const starts = list => JSON.stringify(JSON.parse(list).map(d => [d.id, d.startsAt, Boolean(d.tbd)]));
     const changes = [starts(event.departures) !== starts(deps) && 'starts', (event.circuit || '') !== data.circuit && 'circuit',
       (Number(event.duration_minutes) || Number(event.duration_hours) * 60) !== data.durationMinutes && 'duration', event.name !== data.name && 'name'].filter(Boolean);
-    if (changes.length) await notify(env, await eventPilots(env, event.id), 'race_changed', {...event, name:data.name, circuit:data.circuit}, {skip:[actor.user?.id], changes, previousName:event.name !== data.name ? event.name : undefined});
+    if (changes.length && !newlyPublished) await notify(env, await eventPilots(env, event.id), 'race_changed', {...event, name:data.name, circuit:data.circuit}, {skip:[actor.user?.id], changes, previousName:event.name !== data.name ? event.name : undefined});
+    if (newlyPublished) {
+      const pendingPilots = (await env.DB.prepare(`SELECT DISTINCT p.user_id, r.community_id
+        FROM registrations r JOIN participants p ON p.id=r.participant_id
+        WHERE r.event_id=? AND r.departure_id=? AND r.status!='unavailable' AND p.user_id IS NOT NULL`)
+        .bind(event.id, oldCommon.id).all()).results || [];
+      await notify(env, pendingPilots, 'choose_departure', {...event, name:data.name, circuit:data.circuit});
+    }
     return json({ok:true});
   }
   // « Je serai absent » on an event or an endurance, for oneself; entering the event withdraws it.
@@ -992,6 +1013,10 @@ async function api(request, env) {
     return json({community:{name:community.name, discordServer:discord?.name || null}, members, permissions:PERMISSIONS});
   }
   // Community settings (admins): what each Discord role allows, and the enabled modules.
+  if (path === '/api/community/season' && method === 'PUT') {
+    if (!tdzOnly(community, isDevelopment(env)) || !soloRacesEnabled(env, community)) fail(403, 'Le calendrier des events n’est pas activé.');
+    return json(await saveCommunitySeason(env, actor, community, await body(request)));
+  }
   if (path === '/api/community/settings' && method === 'GET') {
     requirePermission(actor,'admin');
     const discord = community.discordGuildId ? await discordGuild(env, community.discordGuildId) : null;

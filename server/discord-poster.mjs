@@ -35,7 +35,7 @@ function eventBlock(event, url) {
   const sim = SIMS[event.sim] ? event.sim : 'lmu', rounds = Array.isArray(event.rounds) ? event.rounds : [];
   const type = isGridfest(event.type) ? 'Gridfest' : normalizeTdzEventType(event.type);
   const chips = [];
-  if (event.tdz && event.access && type !== 'Gridfest') chips.push([event.access.toUpperCase(), 'outline']);
+  if (event.tdz && event.access && type !== 'Gridfest' && !event.training) chips.push([event.access.toUpperCase(), 'outline']);
   if (event.tdz && type && !['OPEN', 'SAFE', 'Gridfest'].includes(type)) chips.push([type.toUpperCase(), 'outline']);
   const facts = [], lines = [];
   const random = rounds.some(round => round.randomCategory || ['random', 'iracing-random'].includes(round.circuit));
@@ -63,7 +63,9 @@ function eventBlock(event, url) {
   if (rounds.length > 1 && !event.rally) {
     let at = Number(event.startsAt);
     rounds.forEach((round, index) => {
-      lines.push({time:event.timePending ? '' : hhmm(at), label:`Manche ${index + 1}`,
+      // The time shown is the race's own start, after its practice and qualifying (2026-11-07).
+      const race = at + ((Number(round.practice) || 0) + (Number(round.qualifying) || 0)) * 60000;
+      lines.push({time:event.timePending ? '' : hhmm(race), label:`Manche ${index + 1}`,
         text:[circuits.length > 1 && roundCircuit(round), round.durationMinutes && `Course de ${durationLabel(round.durationMinutes)}`,
           [round.practice && `essais ${round.practice} min`, round.qualifying && `qualif ${round.qualifying} min`].filter(Boolean).join(' + ')].filter(Boolean).join(' · ')});
       at += ((Number(round.practice) || 0) + (Number(round.qualifying) || 0) + (Number(round.durationMinutes) || 0)) * 60000;
@@ -90,9 +92,10 @@ function raceBlock(race, url) {
   const last = departures.at(-1);
   // A race that ends another day (24 h): when.
   if (last?.endsAt && !last.timePending && shortDay.format(last.endsAt) !== shortDay.format(last.startsAt)) facts.push(['🏁 fin', `${weekday.format(last.endsAt)} ${hhmm(last.endsAt)}`]);
+  // One time per start, then its crews (2026-11-07: « 14H00 » was repeated before each crew).
   const lines = departures.flatMap(departure => (departure.crews || []).filter(crew => crew.pilots?.length)
-    .map(crew => ({time:departure.timePending ? '' : hhmm(departure.startsAt), label:crewLabel(crew.name), text:crew.pilots.map(text).join(' · ')})));
-  return {sim, name:race.name, url, chips:kind ? [[kind, 'grey']] : [], facts, lines};
+    .map((crew, index) => ({time:departure.timePending ? '' : hhmm(departure.startsAt), same:index > 0, label:crewLabel(crew.name), text:crew.pilots.map(text).join(' · ')})));
+  return {sim, name:race.name, url, logo:race.logoUrl || '', chips:kind ? [[kind, 'grey']] : [], facts, lines};
 }
 
 // The poster of one message. items: [{kind:'event'|'stream'|'race', data, url}]. site: {name, url, bannerUrl, streamUrl,
@@ -105,6 +108,11 @@ export function posterModel(items, site, {live = false, timestamp = Date.now()} 
     : item.kind === 'stream' ? streamBlock(item.data, item.url, streamer) : eventBlock(item.data, item.url));
   const model = {day:longDay.format(timestamp).toUpperCase(), blocks, more:Math.max(0, items.length - MAX_BLOCKS), live};
   if (!live) {
+    // A streamed event of this message keeps its live time (no stream link set: it is not on the stream's message).
+    blocks.forEach((block, index) => {
+      const time = timeOf((site.streams || []).find(stream => stream.item === items[index]?.data?.id)?.time);
+      if (time && block.sim !== 'stream') block.facts.push(['📺 Stream', time]);
+    });
     // The day alone: the message is the announcement (Nathan, 2026-11-03: « on sait que c’est une annonce »).
     model.head = `📅 ${model.day}`;
     return model;
@@ -144,7 +152,7 @@ const CSS = `*{box-sizing:border-box;margin:0}body{width:720px;font-family:"Barl
 .fact{font-size:26px;color:#c9ccd6}.fact b{color:#fff}.note{margin-top:10px;font-size:25px;color:#c9ccd6;font-style:italic}
 .line{display:flex;align-items:center;gap:18px;margin-top:14px}
 .time{background:#fff;color:#0b0d12;font-weight:900;font-size:25px;border-radius:8px;padding:4px 12px;min-width:92px;text-align:center;flex:none}
-.time.tbd{background:#3a3f4b;color:#fff;font-size:18px;line-height:1.1}
+.time.same{visibility:hidden}.time.tbd{background:#3a3f4b;color:#fff;font-size:18px;line-height:1.1}
 .cn{font-size:26px;font-weight:800;min-width:120px;flex:none}.pi{font-size:23px;color:#c9ccd6}.pi b{color:#b78bff}
 .more{margin-top:14px;font-size:25px;color:#9aa0b0;font-weight:700}
 .grid{display:grid;grid-template-columns:1fr;gap:14px;margin-top:18px}
@@ -155,7 +163,7 @@ const factHtml = ([label, strong, after]) => `<span class=fact>${html(label)} <b
 function blockHtml(block) {
   const [simLabel, color] = SIMS[block.sim] || SIMS.lmu;
   const color2 = block.streamers ? GRIDFEST : color;
-  const lines = block.lines.slice(0, MAX_LINES).map(line => `<div class=line><span class="time${line.time ? '' : ' tbd'}">${line.time ? html(line.time.toUpperCase()) : 'HORAIRE<br>À CONFIRMER'}</span>
+  const lines = block.lines.slice(0, MAX_LINES).map(line => `<div class=line><span class="time${line.same ? ' same' : line.time ? '' : ' tbd'}">${line.time ? html(line.time.toUpperCase()) : 'HORAIRE<br>À CONFIRMER'}</span>
 <span class=cn>${html(line.label)}</span><span class=pi>${line.star ? `<b>📺 ${html(line.star)}</b>${line.text ? ' · ' : ''}` : ''}${html(line.text)}</span></div>`).join('');
   const more = block.lines.length > MAX_LINES ? `<div class=more>+ ${block.lines.length - MAX_LINES} autres équipages sur le site</div>` : '';
   const streamers = block.streamers ? `<div class=grid>${block.streamers.map(item => {
@@ -163,14 +171,14 @@ function blockHtml(block) {
     return `<div class="st${full ? ' full' : ''}"><span>${/^(https:|data:image\/)/.test(item.logo) ? `<img src="${html(item.logo)}">` : '🎙️'}${html(item.name)}</span><em>${full ? 'COMPLET' : `${Math.min(item.entered, item.capacity)} / ${item.capacity}`}</em></div>`;
   }).join('')}</div>` : '';
   return `<div class=blk style="--rc:${color2}"><div class=hd><div class=tx>
-<div class=name>${block.icon || '🏁'} ${html(block.name)}</div>
+<div class=name>${block.icon ? `${block.icon} ` : ''}${html(block.name)}</div>
 <div class=row><span class=chip>${html(block.sim === 'stream' ? 'STREAM' : simLabel.toUpperCase())}</span>${block.chips.map(([label, kind]) => `<span class="chip ${kind}">${html(label)}</span>`).join('')}${block.facts.map(factHtml).join('')}</div>
 ${block.note ? `<div class=note>${html(block.note)}</div>` : ''}</div>${/^(https:|data:image\/)/.test(block.logo || '') ? `<img class=lg src="${html(block.logo)}" onerror="this.remove()">` : ''}</div>${lines}${more}${streamers}</div>`;
 }
 // The poster's page, for the browser. Pictures: https addresses (the site's) or inline ones only.
 export function posterHtml(model) {
   const accent = model.gridfest ? GRIDFEST : model.live ? '#9146ff' : '#e8792b';
-  const top = model.live ? (model.gridfest ? '🎉 C’EST LE GRIDFEST' : `<span class=dot></span>EN DIRECT SUR ${html(model.platform).toUpperCase()}`) : html(model.head);
+  const top = model.live ? (model.gridfest ? '🎉 C’EST LE GRIDFEST' : `AUJOURD’HUI SUR ${html(model.platform).toUpperCase()}`) : html(model.head);
   const logo = model.gridfest && model.blocks[0]?.logo ? `<img class=logo src="${html(model.blocks[0].logo)}" onerror="this.remove()">` : '';
   const blocks = model.gridfest ? model.blocks.map(block => ({...block, logo:''})) : model.blocks;
   return `<!doctype html><html lang=fr><meta charset=utf-8><style>${CSS}</style><body><div class="card${model.gridfest ? ' gf' : ''}" style="--c:${accent};--t:${model.live ? (model.gridfest ? '#ffcf4d' : '#ff4d6d') : '#ffb35c'}">
@@ -187,10 +195,10 @@ export function posterText(model) {
     const title = item.url ? `[${md(item.name)}](${item.url})` : md(item.name);
     const tags = [item.sim === 'stream' ? 'Stream' : simLabel, ...item.chips.map(([label]) => label)].map(label => `\`${text(label).replace(/`/g, '')}\``).join(' ');
     const facts = item.facts.map(([label, strong, after]) => [label, `**${md(strong)}**`, after && md(after)].filter(Boolean).join(' ')).join(' · ');
-    const lines = item.lines.slice(0, MAX_LINES).map(line => `**${line.time || 'Horaire à confirmer'}** · ${md(line.label)}${line.star || line.text ? `\n-# ${[line.star && `📺 ${md(line.star)}`, md(line.text)].filter(Boolean).join(' · ')}` : ''}`);
+    const lines = item.lines.slice(0, MAX_LINES).map(line => `${line.same ? '↳' : `**${line.time || 'Horaire à confirmer'}** ·`} ${md(line.label)}${line.star || line.text ? `\n-# ${[line.star && `📺 ${md(line.star)}`, md(line.text)].filter(Boolean).join(' · ')}` : ''}`);
     if (item.lines.length > MAX_LINES) lines.push(`-# + ${item.lines.length - MAX_LINES} autres équipages sur le site`);
     const streamers = (item.streamers || []).map(s => `🎙️ **${md(s.name)}** · ${s.capacity && s.entered >= s.capacity ? 'complet' : `${Math.min(s.entered, s.capacity)} / ${s.capacity}`}`);
-    return [`### ${item.icon || '🏁'} ${title}`, [tags, facts].filter(Boolean).join(' · '), item.note && `*${md(item.note)}*`, ...lines, ...streamers].filter(Boolean).join('\n');
+    return [`### ${item.icon ? `${item.icon} ` : ''}${title}`, [tags, facts].filter(Boolean).join(' · '), item.note && `*${md(item.note)}*`, ...lines, ...streamers].filter(Boolean).join('\n');
   };
   const head = model.live
     ? [`# ${model.gridfest ? '🎉' : '📺'} ${model.gridfest ? model.big.replace('GRIDFEST', 'Gridfest') : model.big.replace(/^STREAMS?/, match => match === 'STREAMS' ? 'Streams à' : 'Stream à').replace(' & ', ' et ').toLowerCase().replace(/^streams? à/, match => match[0].toUpperCase() + match.slice(1))}`,

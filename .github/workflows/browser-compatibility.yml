@@ -13,8 +13,32 @@ on:
 permissions:
   contents: read
 
+# A new push to the same PR stops the run that is now out of date.
+concurrency:
+  group: browser-compat-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
-  browser-compatibility:
+  # The browsers run side by side on four machines (about 5 min instead of 13 to 18 min on one machine).
+  browsers:
+    name: navigateur (${{ matrix.name }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: chromium
+            install: chromium
+            projects: --project=chromium-desktop --project=android-chrome
+            visual: true
+          - name: firefox
+            install: firefox
+            projects: --project=firefox-desktop --project=firefox-mobile-viewport
+          - name: safari-desktop
+            install: webkit
+            projects: --project=webkit-desktop
+          - name: iphone
+            install: webkit
+            projects: --project=iphone-safari
     # Playwright 1.55 is pinned in package-lock.json and does not support Ubuntu 26.04.
     runs-on: ubuntu-24.04
     timeout-minutes: 25
@@ -26,8 +50,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22.13.0'
-      - run: npm install --no-audit --no-fund
-      - run: npx playwright install --with-deps chromium firefox webkit
+          cache: 'npm'
+      - run: npm ci --no-audit --no-fund
+      - run: npx playwright install --with-deps ${{ matrix.install }}
       # The local site is served over http: Safari (unlike Chrome) applies upgrade-insecure-requests to localhost too.
       - run: npm run build:workers
         env:
@@ -45,14 +70,15 @@ jobs:
           cat wrangler-dev.log
           echo "::error::the local site did not start"
           exit 1
-      - run: npm run compat:test
+      - run: npm run compat:test -- ${{ matrix.projects }}
       # The « Charte »: the reference pages compared with their captures (tests/visual/__screenshots__).
-      - run: npm run visual:test
+      - if: matrix.visual
+        run: npm run visual:test
       - name: Upload Playwright report on failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: browser-compatibility-report-${{ github.run_id }}
+          name: browser-compatibility-report-${{ matrix.name }}-${{ github.run_id }}
           path: |
             playwright-report/
             playwright-visual-report/
@@ -60,3 +86,15 @@ jobs:
             wrangler-dev.log
           if-no-files-found: ignore
           retention-days: 7
+
+  # The check required on main keeps its name: green only when every browser is green.
+  browser-compatibility:
+    needs: browsers
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - if: needs.browsers.result != 'success'
+        run: |
+          echo "::error::a browser failed (${{ needs.browsers.result }})"
+          exit 1
+      - run: echo "Every browser passed."

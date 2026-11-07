@@ -40,6 +40,8 @@ function harness(withParticipants=true){
  DB.db.exec(readFileSync(new URL('../migrations/0063_registration_comment.sql',import.meta.url),'utf8'));
  DB.db.exec(readFileSync(new URL('../migrations/0065_gridfest_registration.sql',import.meta.url),'utf8'));
  DB.db.exec(readFileSync(new URL('../migrations/0092_registration_stream.sql',import.meta.url),'utf8'));
+ DB.db.exec(readFileSync(new URL('../migrations/0093_community_season.sql',import.meta.url),'utf8'));
+ DB.db.exec(readFileSync(new URL('../migrations/0095_season_months.sql',import.meta.url),'utf8'));
  DB.db.exec(readFileSync(new URL('../migrations/0015_crew_lock.sql',import.meta.url),'utf8'));
  DB.db.exec(readFileSync(new URL('../migrations/0016_client_errors.sql',import.meta.url),'utf8'));
  // The crews' owner column of migration 0016_crew_ownership (its backfill needs no data here).
@@ -640,6 +642,17 @@ test('EVENT SOLO (every community but the TDZ): no type, no SAFE, open to the En
  setRole('900000000000000001',['access','endurance']);
  assert.equal((await req(path,'POST',solo,'pilot')).status,201,'Endurances is enough');
 });
+test('EVENT TDZ season: the organisers choose its first month and length, members read it (Nathan 2026-11-07)',async()=>{
+ const {req,login}=harness();await login(ADMIN,'admin');await login(PILOT,'pilot');
+ const before=(await req('/api/session','GET',null,'pilot')).data.tdzSeason;
+ assert.equal(before.version,0);assert.equal(before.months,3);assert.match(before.start,/^\d{4}-(01|04|07|10)$/);
+ assert.equal((await req('/api/community/season','PUT',{start:'2026-09',months:4,version:0},'pilot')).status,403);
+ assert.equal((await req('/api/community/season','PUT',{start:'2026-09',months:13,version:0},'admin')).status,400);
+ const saved=await req('/api/community/season','PUT',{start:'2026-09',months:4,version:0},'admin');
+ assert.equal(saved.status,200,JSON.stringify(saved.data));assert.deepEqual(saved.data,{start:'2026-09',months:4,version:1});
+ assert.equal((await req('/api/community/season','PUT',{start:'2026-10',months:2,version:0},'admin')).status,409,'a change made meanwhile is not overwritten');
+ assert.deepEqual((await req('/api/session','GET',null,'pilot')).data.tdzSeason,{start:'2026-09',months:4,version:1});
+});
 test('solo race with two rounds: categories per round, one choice per round',async()=>{
  const {req,login}=harness();await login(ADMIN,'admin');await login(PILOT,'pilot');
  const input={...soloInput,capacity:10,rounds:[{circuit:'spa',durationMinutes:20,categories:['GT3']},{circuit:'monza',durationMinutes:20,categories:['Hypercar','LMP2 ELMS']}],categories:[]};
@@ -832,10 +845,13 @@ test('"Horaires à confirmer": a common start "à définir", real times added la
  assert.equal((await edit(event,[{id:pool.id,date:pool.date,time:pool.time,tbd:true},{date:'2090-10-17',time:'09:00'},{date:'2090-10-17',time:'14:00'}])).status,200);
  event=(await req('/api/events','GET',null,'admin')).data.events.find(e=>e.id===second.data.id);
  assert.deepEqual(event.departures.map(d=>`${d.date} ${d.time}${d.tbd?' tbd':''}`),['2090-10-17 09:00 tbd','2090-10-17 09:00','2090-10-17 14:00']);
+ // Even when the organiser removes the provisional row from the edit form, pending entries remain.
+ assert.equal((await edit(event,[{id:event.departures[1].id,date:'2090-10-17',time:'09:00'},{id:event.departures[2].id,date:'2090-10-17',time:'14:00'}])).status,200);
+ event=(await req('/api/events','GET',null,'admin')).data.events.find(e=>e.id===second.data.id);
+ assert.equal(event.departures.find(d=>d.id===pool.id)?.availability.length,1);
  const leo=event.departures[0].availability[0];
  assert.equal((await req('/api/registrations/'+leo.id+'/departure','PATCH',{departureId:event.departures[2].id,version:leo.version},'pilot')).status,200);
- // Unticking "Horaires à confirmer" on a race with only its common start: it becomes a start with a time,
- // its entries stay on it.
+ // Confirming a real start must not silently assign a provisional entry to that start.
  const fourth=await req('/api/events','POST',{...base,name:'6h SPA',circuit:'spa',departures:[{date:'2090-12-04',time:'20:00',tbd:true}]},'admin');
  event=(await req('/api/events','GET',null,'admin')).data.events.find(e=>e.id===fourth.data.id);
  const spaPool=event.departures[0];
@@ -843,7 +859,13 @@ test('"Horaires à confirmer": a common start "à définir", real times added la
  event=(await req('/api/events','GET',null,'admin')).data.events.find(e=>e.id===fourth.data.id);
  assert.equal((await edit(event,[{id:spaPool.id,date:'2090-12-04',time:'20:00',tbd:false}])).status,200);
  event=(await req('/api/events','GET',null,'admin')).data.events.find(e=>e.id===fourth.data.id);
- assert.equal(event.departures[0].tbd,undefined);assert.equal(event.departures[0].id,spaPool.id);assert.equal(event.departures[0].availability.length,1);
+ assert.equal(event.departures.length,2);
+ assert.equal(event.departures[0].tbd,true);
+ assert.equal(event.departures[0].id,spaPool.id);
+ assert.equal(event.departures[0].availability.length,1);
+ assert.notEqual(event.departures[1].id,spaPool.id);
+ const spaEntry=event.departures[0].availability[0];
+ assert.equal((await req('/api/registrations/'+spaEntry.id+'/departure','PATCH',{departureId:event.departures[1].id,version:spaEntry.version},'pilot')).status,200);
  // Upcoming LMU races "à confirmer" without entries become a single common start (migration 0033).
  const third=await req('/api/events','POST',{...base,name:'8h BAHRAIN',circuit:'bahrain',departures:[{date:'2090-11-13',time:'00:00'},{date:'2090-11-14',time:'00:00'}]},'admin');
  DB.db.exec(readFileSync(new URL('../migrations/0033_lmu_pending_common_start.sql',import.meta.url),'utf8'));

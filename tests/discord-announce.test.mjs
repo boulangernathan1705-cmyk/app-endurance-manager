@@ -78,11 +78,12 @@ test('at 7h30 the stream comes first with @everyone and the race it streams, the
   assert.match(embed.description,/^# 📺 Stream à 20h45\n\*\*avec \[tdz\]\(https:\/\/twitch.tv\/tdz\)\*\*/);
   assert.match(text,/Coupe GT3/);assert.doesNotMatch(text,/6h de Spa/);
   assert.match(text,/`AMS2` `OPEN`/);assert.match(text,/Départ \*\*21h00\*\*/);assert.match(text,/1 \/ 20/);
-  assert.match(text,/\*\*21h00\*\* · Manche 1/);assert.match(text,/\*\*22h00\*\* · Manche 2/);
+  assert.match(text,/\*\*21h20\*\* · Manche 1/);assert.match(text,/\*\*22h00\*\* · Manche 2/);
   assert.doesNotMatch(text,/pluie|météo|☀️/i);
   assert.ok(embed.image,'the banner goes with the stream');
-  assert.deepEqual(live.components[0].components.map(button=>button.label),['Regarder le stream','S’inscrire','Absent']);
-  assert.equal(live.components[0].components[2].custom_id,`absent:${EVENT}`);
+  // No « Regarder le stream »: the streamer posts his own message when he goes live (Nathan, 2026-11-07).
+  assert.deepEqual(live.components[0].components.map(button=>button.label),['S’inscrire','Absent']);
+  assert.equal(live.components[0].components[1].custom_id,`absent:${EVENT}`);
   // 2. The other races: no ping, no stream, no banner; one line per crew with its pilots.
   const races=posts[1].body,other=JSON.stringify(races.embeds[0]);
   assert.equal(races.content,'');
@@ -377,8 +378,8 @@ test('an explicit stream announcement still works without registrations',async t
   DB.db.prepare("UPDATE events SET sim='stream',details='{}' WHERE id=?").run(EVENT);
   await announceCommunity(env,TDZ,settings(),MORNING);
   assert.equal(sent(calls).length,1);
-  // Only « Regarder le stream »: nothing to sign up for.
-  assert.deepEqual(sent(calls)[0].body.components.map(row=>row.components.map(button=>button.label)),[['Regarder le stream']]);
+  // Nothing to sign up for: no button.
+  assert.deepEqual(sent(calls)[0].body.components,[]);
   assert.match(sent(calls)[0].body.embeds[0].description,/Pas d’inscription : viens regarder !/);
   // The announcement is first of all for the stream (Nathan, 2026-11-01): a stream alone pings @everyone.
   assert.deepEqual(sent(calls)[0].body.allowed_mentions,{parse:['everyone']});
@@ -560,12 +561,24 @@ test('with Cloudflare’s browser, each message is a poster made once at 7h30: t
   assert.doesNotMatch(renders[1].body.html,/class=ban/);assert.match(renders[1].body.html,/class=top>📅 [A-Z]+ \d+ [A-ZÉÛ]+<\/div>/);
   assert.equal(posts[0].body.content,'@everyone');assert.deepEqual(posts[0].body.embeds,[]);
   assert.deepEqual(posts[0].body.attachments,[{id:0,filename:'annonce.png'}]);assert.ok(posts[0].file);
-  assert.deepEqual(posts[0].body.components[0].components.map(button=>button.label),['Regarder le stream','S’inscrire','Absent']);
+  assert.deepEqual(posts[0].body.components[0].components.map(button=>button.label),['S’inscrire','Absent']);
   // A late entrant: the poster stays as it is (checked, never edited, never made again).
   DB.db.prepare(`INSERT INTO participants(id,name,user_id,created_by,created_at,community_id) VALUES('p2','Pilote 2',NULL,'111111111111111111',0,?)`).run(DEV_COMMUNITY);
   DB.db.prepare(`INSERT INTO registrations(id,event_id,departure_id,guest_hash,name,name_key,category,status,created_at,participant_id,community_id) VALUES('r2',?,'start-e1','g2','Pilote 2','pilote 2','GT3','whole',0,'p2',?)`).run(EVENT,DEV_COMMUNITY);
   calls.length=0;
   await announceCommunity(env,TDZ,settings(),MORNING+11*60000);
+  assert.equal(calls.filter(call=>['PATCH','POST','RENDER'].includes(call.method)).length,0);
+  // The 6h is cancelled (no start today any more): the picture stays, the race is crossed out in the text, silently (2026-11-07).
+  DB.db.prepare('DELETE FROM crew_members').run();DB.db.prepare('DELETE FROM crews WHERE event_id=?').run(RACE);DB.db.prepare('DELETE FROM registrations WHERE event_id=?').run(RACE);
+  DB.db.prepare("UPDATE events SET departures='[]' WHERE id=?").run(RACE);
+  calls.length=0;
+  await announceCommunity(env,TDZ,settings(),MORNING+22*60000);
+  const patches=calls.filter(call=>call.method==='PATCH');
+  assert.equal(patches.length,1);assert.equal(calls.filter(call=>['POST','RENDER'].includes(call.method)).length,0);
+  assert.equal(patches[0].body.content,'❌ ~~6h de Spa~~ · annulée');assert.deepEqual(patches[0].body.allowed_mentions,{parse:[]});
+  // Once is enough.
+  calls.length=0;
+  await announceCommunity(env,TDZ,settings(),MORNING+33*60000);
   assert.equal(calls.filter(call=>['PATCH','POST','RENDER'].includes(call.method)).length,0);
 });
 
@@ -586,6 +599,11 @@ test('posters: two streams on one, the Gridfest and its streamers, crews cut at 
   const two=posterModel([event('a'),event('b')],site,{live:true,timestamp:at});
   assert.equal(two.big,'STREAMS 14H00 & 20H45');assert.equal(two.who,'avec <b>La Praline</b>');
   assert.match(posterText(two),/^# 📺 Streams à 14h00 et 20h45/);
+  // In the morning the stream is not live yet (2026-11-07), and no 🏁 before each name.
+  assert.match(posterHtml(two),/AUJOURD’HUI SUR TWITCH/);assert.doesNotMatch(posterHtml(two),/EN DIRECT|class=name>🏁/);
+  // A training is neither OPEN nor SAFE.
+  const training=posterHtml(posterModel([event('t',{type:'TONDEUZ TRAINING',training:true})],site,{timestamp:at}));
+  assert.match(training,/TONDEUZ TRAINING/);assert.doesNotMatch(training,/>OPEN</);
   const gridfest=posterModel([event('a',{name:'Gridfest',type:'Gridfest',logoUrl:'https://site.example/images/event-access/gridfest-stacked.png',
     streamers:[{name:'Zed',logoUrl:'data:image/png;base64,AAAA',entered:8,capacity:10},{name:'Ana',logoUrl:'',entered:10,capacity:10}]})],{...site,streams:[{item:'a',time:'20:00'}]},{live:true,timestamp:at});
   const page=posterHtml(gridfest);
@@ -597,7 +615,9 @@ test('posters: two streams on one, the Gridfest and its streamers, crews cut at 
   const endus=posterModel([race],site,{timestamp:at});
   assert.match(endus.head,/^📅 [A-Z]+ \d+ /);assert.ok(!endus.banner);
   const html=posterHtml(endus);
-  assert.match(html,/Équipage 06/);assert.doesNotMatch(html,/Équipage 07/);assert.match(html,/\+ 2 autres équipages sur le site/);
+  assert.match(html,/Équipage 06/);
+  // One time per start: the crews after the first one leave it blank (2026-11-07).
+  assert.equal(html.match(/class="time same"/g).length,5);assert.match(posterText(endus),/↳ Équipage 02/);assert.doesNotMatch(html,/Équipage 07/);assert.match(html,/\+ 2 autres équipages sur le site/);
   assert.match(html,/OFFICIELLE/);assert.match(html,/🏁 fin <b>lun\. 14h30<\/b>/);
   assert.doesNotMatch(html,/<b>Bob<\/b>/);assert.match(html,/&lt;b&gt;Bob/);
   assert.match(posterText(endus),/\\<b\\>Bob/);

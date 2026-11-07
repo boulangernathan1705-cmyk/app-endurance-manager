@@ -117,7 +117,9 @@ async function raceSnapshot(env, community, id, timestamp) {
   const streamed = await streamedStarts(env, community, id);
   const departures = snapshot.futureDepartures.filter(item => parisDay(item.startsAt) === day && (crewed(item) || streamed.has(item.departureId))).map(item => ({...item, unassignedPilots:[]}));
   if (!departures.length) return null;
+  const site = siteOf(env, community).url || '', sim = String(row.circuit || '').startsWith('iracing-') ? 'iracing' : 'lmu';
   return {id:row.id, name:row.name, circuit:row.circuit, eventType:row.event_type || '', official:row.community_id === 'official',
+    logoUrl:site ? `${site}/images/event-access/endurance-${sim}.png` : '',
     durationMinutes:Number(row.duration_minutes) || Number(row.duration_hours) * 60 || 0, details:parse(row.details, {}) || {}, departures};
 }
 // The entries of this community's admins who stream an endurance start (« Je streame ce départ »).
@@ -204,10 +206,11 @@ async function removeOldAnnouncements(env, community, day, keep, budget) {
 }
 
 // A message of the announcement: its poster (made when the message is sent, see publishSlot) and the same facts as text,
-// the fallback; under it « Regarder le stream », then « S’inscrire » (and « Absent ») for each race, 5 rows at most.
+// the fallback; under it « S’inscrire » (and « Absent ») for each race, 5 rows at most.
 const cut = (value, size) => value.length > size ? `${value.slice(0, size - 1)}…` : value;
 function posterPayload(model, list, absent) {
-  const rows = [], stream = model.live && /^https:\/\//.test(model.streamUrl) ? {type:2,style:5,label:'Regarder le stream',emoji:{name:'📺'},url:model.streamUrl} : null;
+  // No « Regarder le stream » button: the streamer posts his own message when he goes live (Nathan, 2026-11-07).
+  const rows = [];
   const actionable = list.filter(item => item.kind !== 'stream' && /^https:\/\//.test(item.url));
   const name = item => String(item.data.name || '').replace(/[\u0000-\u001f]/g, ' ').trim();
   const join = item => {
@@ -215,9 +218,8 @@ function posterPayload(model, list, absent) {
     return [{type:2,style:5,label:cut(`${gridfest ? 'Piloter pour un streamer' : 'S’inscrire'}${more}`,80),emoji:{name:gridfest ? '🎙️' : '✅'},url:item.url},
       ...(absent ? [{...absent(item.row.item),label:cut(`Absent${more}`,80)}] : [])];
   };
-  if (actionable.length === 1) rows.push({type:1,components:[...(stream ? [stream] : []),...join(actionable[0])]});
+  if (actionable.length === 1) rows.push({type:1,components:join(actionable[0])});
   else {
-    if (stream) rows.push({type:1,components:[stream]});
     if (actionable.length + rows.length <= 5) rows.push(...actionable.map(item => ({type:1,components:join(item)})));
     else if (actionable.length) rows.push({type:1,components:[{type:2,style:5,label:'S’inscrire sur le site',emoji:{name:'✅'},url:actionable[0].url.replace(/\/(lmu|iracing)\/#.*$/, '/events/')}]});
   }
@@ -244,6 +246,12 @@ async function publishSlot(env, community, day, channel, row, input, ping, budge
       await save("message_id=?,channel_id=?,content_hash=?,pending_nonce='',pending_hash='',pending_channel_id=''",recovered.id,row.pending_channel_id,row.pending_hash);
       row = {...row,message_id:recovered.id,channel_id:row.pending_channel_id,content_hash:row.pending_hash,pending_nonce:'',pending_hash:'',pending_channel_id:''};
     }
+  }
+  // A poster already sent stays until midnight even when nothing is left on it: a cancelled race is crossed out instead
+  // (crossOutCancelled, Nathan 2026-11-07).
+  if (!input && row.message_id && row.message_id !== '-' && !row.pending_nonce && String(row.content_hash || '').startsWith(`${PREFIX}poster:`)) {
+    await save('checked_at=?',timestamp);
+    return {asked, id:row.message_id};
   }
   if (!input) {
     if (row.message_id && row.message_id !== '-' && !row.pending_nonce) {
@@ -338,8 +346,12 @@ async function publishAnnouncement(env, community, settings, timestamp) {
     activeRows.push(row);
     items.push({row,kind:data.stream ? 'stream' : row.kind,data,url:row.kind === 'race' ? raceUrl(site.url,{eventId:row.item,circuit:data.circuit}) : site.url ? `${site.url}/lmu/#event=${encodeURIComponent(row.item)}` : ''});
   }
-  for (const [position,row] of activeRows.entries()) await env.DB.prepare(`INSERT OR IGNORE INTO discord_announcements(community_id,day,item,kind,position,guild_id,channel_id,created_at)
-    VALUES(?,?,?,?,?,?,?,?)`).bind(community.id,day,row.item,row.kind,position+1,community.discordGuildId,channel,timestamp).run();
+  for (const [position,row] of activeRows.entries()) {
+    await env.DB.prepare(`INSERT OR IGNORE INTO discord_announcements(community_id,day,item,kind,position,guild_id,channel_id,created_at)
+      VALUES(?,?,?,?,?,?,?,?)`).bind(community.id,day,row.item,row.kind,position+1,community.discordGuildId,channel,timestamp).run();
+    await env.DB.prepare('UPDATE discord_announcements SET name=? WHERE community_id=? AND day=? AND item=?')
+      .bind(String(items[position]?.data?.name || ''),community.id,day,row.item).run();
+  }
   const streams = await streamTimes(env,activeRows,community,timestamp), streamed = new Set(streams.map(item => item.item));
   site.streams = streams;
   // The stream's message: an « Annoncer un stream », or the community's stream link with a stream time on a race today.
@@ -366,7 +378,32 @@ async function publishAnnouncement(env, community, settings, timestamp) {
     await env.DB.prepare('UPDATE discord_announcements SET message_id=?,channel_id=?,checked_at=? WHERE community_id=? AND day=? AND item=? AND (message_id IS NULL OR message_id=? OR message_id=?)')
       .bind(id,channel,timestamp,community.id,day,item.row.item,first.id || '',second.id || '').run();
   }
-  return asked || cleanup.asked;
+  const crossed = await crossOutCancelled(env,community,day,channel,[first.id,second.id],new Set(items.map(item => item.row.item)),budget);
+  return asked || cleanup.asked || crossed;
+}
+
+// A poster is never drawn again: a race of it cancelled since (deleted, or no start today any more) is crossed out in
+// the message's text, silently (Nathan, 2026-11-07). A race only left without crew or entries is not « cancelled ».
+async function crossOutCancelled(env, community, day, channel, ids, current, budget) {
+  let asked = false;
+  for (const id of ids.filter(Boolean)) {
+    const rows = await env.DB.prepare(`SELECT item,name,cancelled FROM discord_announcements WHERE community_id=? AND day=? AND message_id=? AND channel_id=?
+      AND kind IN ('event','race','stream') ORDER BY position`).bind(community.id,day,id,channel).all().then(result => result.results || []);
+    const slot = await env.DB.prepare("SELECT content_hash FROM discord_announcements WHERE community_id=? AND day=? AND message_id=? AND item IN ('intro','races')").bind(community.id,day,id).first();
+    if (!String(slot?.content_hash || '').startsWith(`${PREFIX}poster:`)) continue;
+    let changed = false;
+    for (const row of rows.filter(row => !row.cancelled && !current.has(row.item))) {
+      const event = await env.DB.prepare('SELECT departures FROM events WHERE id=?').bind(row.item).first();
+      if (event && parse(event.departures, []).some(start => today(start, day))) continue;
+      await env.DB.prepare('UPDATE discord_announcements SET cancelled=1 WHERE community_id=? AND day=? AND item=?').bind(community.id,day,row.item).run();
+      row.cancelled = 1;changed = true;
+    }
+    if (!changed || budget.left <= 0) continue;
+    const content = rows.filter(row => row.cancelled).map(row => `❌ ~~${String(row.name || 'Course').replace(/[\\*_~`|[\]<>@#]/g, match => `\\${match}`)}~~ · annulée`).join('\n');
+    await discordRequest(env,'PATCH',`/channels/${channel}/messages/${id}`,{content,allowed_mentions:{parse:[]}},budget);
+    asked = true;
+  }
+  return asked;
 }
 
 // Every 2 minutes: the first community with something to send or to refresh. Old days are forgotten after a week.

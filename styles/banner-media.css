@@ -120,6 +120,12 @@ header.site-hero .brand-button.logo {
   }
 }
 
+/* The whole banner on the home page and a race's page; a thin band on the lists and calendars (EVENT TDZ, Endurance,
+   Mes inscriptions) so they fit in the window (Nathan 2026-11-07). */
+@media (min-width: 761px) {
+html[data-view="home"] .hero-picture,
+html[data-view="my-entries"] .hero-picture { aspect-ratio: auto; height: var(--em-banner-height-thin); }
+}
 @media (max-width: 760px) {
   .hero-picture { aspect-ratio: auto; height: var(--em-banner-height-phone); }
 }
