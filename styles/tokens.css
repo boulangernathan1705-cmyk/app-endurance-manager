@@ -45,4 +45,6 @@
   /* The banner, the same on every page: the whole artwork on a computer, a thin band on a phone */
   --em-banner-ratio: 4 / 1;
   --em-banner-height-phone: 64px;
+  /* Lists and calendars on a computer (Nathan 2026-11-07): a thin band, so the month fits in the window */
+  --em-banner-height-thin: 140px;
 }
