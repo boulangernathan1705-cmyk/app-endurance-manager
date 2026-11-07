@@ -255,6 +255,8 @@ export async function load() {
   // EVENT TDZ (types, OPEN / SAFE); elsewhere EVENT SOLO, open to the « Endurances » permission.
   state.eventTdz=session.eventTdz===true;
   state.grindfest=session.grindfest===true;
+  // EVENT TDZ: the season chosen by the organisers (first month, length), for the calendar.
+  state.tdzSeason=session.tdzSeason&&typeof session.tdzSeason==='object'?session.tdzSeason:null;
   // The community's stream link (Discord setting « Annonce du jour »): the events it streams link to it.
   state.communityStreamUrl=typeof session.communityStreamUrl==='string'?session.communityStreamUrl:'';
   state.combos=session.combos===true;

@@ -1,3 +1,4 @@
+import {communitySeason,saveCommunitySeason} from './season.mjs';
 import {discordDiagnostic} from './discord-diagnostic.mjs';
 import {grindfestAvailable, grindfestEnabled, isGrindfest, streamersOf, assignStreamerWaitlist} from '../shared/grindfest.mjs';
 import {discordInteraction} from './discord-interactions.mjs';
@@ -486,7 +487,7 @@ async function api(request, env) {
   const requests = await communityRequestsApi(path, method, request, env, actor);
   if (requests) return requests;
   // Each opening of the site renews the sign-in (once a day at most), so it never runs out for a pilot who comes back.
-  if (path === '/api/session' && method === 'GET') return json({user:actor.user, discordReady:!!(env.DISCORD_CLIENT_ID && env.DISCORD_CLIENT_SECRET), adminConfigured:administrators(env).length > 0, soloRaces:soloRacesEnabled(env, community), iracingImport:community.modules?.iracingImport===true, categoryEntry:community.modules?.categoryEntry === true, soloLabel:eventsLabel(community, isDevelopment(env)), eventTdz:tdzOnly(community, isDevelopment(env)), eventTypes:!tdzOnly(community, isDevelopment(env)) ? [] : grindfestEnabled(community, isDevelopment(env)) ? [...TDZ_EVENT_TYPES, 'Gridfest'] : TDZ_EVENT_TYPES, grindfest:grindfestEnabled(community, isDevelopment(env)), grindfestAvailable:grindfestAvailable(community, isDevelopment(env)), safeGuideUrl:community.modules?.safeGuideUrl || '',
+  if (path === '/api/session' && method === 'GET') return json({user:actor.user, discordReady:!!(env.DISCORD_CLIENT_ID && env.DISCORD_CLIENT_SECRET), adminConfigured:administrators(env).length > 0, soloRaces:soloRacesEnabled(env, community), iracingImport:community.modules?.iracingImport===true, categoryEntry:community.modules?.categoryEntry === true, soloLabel:eventsLabel(community, isDevelopment(env)), eventTdz:tdzOnly(community, isDevelopment(env)), tdzSeason:access.status === 'member' && soloRacesEnabled(env, community) && tdzOnly(community, isDevelopment(env)) ? await communitySeason(env, community).catch(() => null) : null, eventTypes:!tdzOnly(community, isDevelopment(env)) ? [] : grindfestEnabled(community, isDevelopment(env)) ? [...TDZ_EVENT_TYPES, 'Gridfest'] : TDZ_EVENT_TYPES, grindfest:grindfestEnabled(community, isDevelopment(env)), grindfestAvailable:grindfestAvailable(community, isDevelopment(env)), safeGuideUrl:community.modules?.safeGuideUrl || '',
     // The community's stream link (« Annonce du jour »), for the events it streams on the week (members only).
     communityStreamUrl:access.status === 'member' && soloRacesEnabled(env, community) ? announceStream(await botRecapSettings(env, community).catch(() => null)) : '',
     combos:combosEnabled(community) && access.permissions.has('combos'),
@@ -1012,6 +1013,10 @@ async function api(request, env) {
     return json({community:{name:community.name, discordServer:discord?.name || null}, members, permissions:PERMISSIONS});
   }
   // Community settings (admins): what each Discord role allows, and the enabled modules.
+  if (path === '/api/community/season' && method === 'PUT') {
+    if (!tdzOnly(community, isDevelopment(env)) || !soloRacesEnabled(env, community)) fail(403, 'Le calendrier des events n’est pas activé.');
+    return json(await saveCommunitySeason(env, actor, community, await body(request)));
+  }
   if (path === '/api/community/settings' && method === 'GET') {
     requirePermission(actor,'admin');
     const discord = community.discordGuildId ? await discordGuild(env, community.discordGuildId) : null;

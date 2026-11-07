@@ -40,6 +40,8 @@ function harness(withParticipants=true){
  DB.db.exec(readFileSync(new URL('../migrations/0063_registration_comment.sql',import.meta.url),'utf8'));
  DB.db.exec(readFileSync(new URL('../migrations/0065_gridfest_registration.sql',import.meta.url),'utf8'));
  DB.db.exec(readFileSync(new URL('../migrations/0092_registration_stream.sql',import.meta.url),'utf8'));
+ DB.db.exec(readFileSync(new URL('../migrations/0093_community_season.sql',import.meta.url),'utf8'));
+ DB.db.exec(readFileSync(new URL('../migrations/0095_season_months.sql',import.meta.url),'utf8'));
  DB.db.exec(readFileSync(new URL('../migrations/0015_crew_lock.sql',import.meta.url),'utf8'));
  DB.db.exec(readFileSync(new URL('../migrations/0016_client_errors.sql',import.meta.url),'utf8'));
  // The crews' owner column of migration 0016_crew_ownership (its backfill needs no data here).
@@ -639,6 +641,17 @@ test('EVENT SOLO (every community but the TDZ): no type, no SAFE, open to the En
  assert.equal((await req(path,'POST',solo,'pilot')).status,403,'the OPEN permission is EVENT TDZ only');
  setRole('900000000000000001',['access','endurance']);
  assert.equal((await req(path,'POST',solo,'pilot')).status,201,'Endurances is enough');
+});
+test('EVENT TDZ season: the organisers choose its first month and length, members read it (Nathan 2026-11-07)',async()=>{
+ const {req,login}=harness();await login(ADMIN,'admin');await login(PILOT,'pilot');
+ const before=(await req('/api/session','GET',null,'pilot')).data.tdzSeason;
+ assert.equal(before.version,0);assert.equal(before.months,3);assert.match(before.start,/^\d{4}-(01|04|07|10)$/);
+ assert.equal((await req('/api/community/season','PUT',{start:'2026-09',months:4,version:0},'pilot')).status,403);
+ assert.equal((await req('/api/community/season','PUT',{start:'2026-09',months:13,version:0},'admin')).status,400);
+ const saved=await req('/api/community/season','PUT',{start:'2026-09',months:4,version:0},'admin');
+ assert.equal(saved.status,200,JSON.stringify(saved.data));assert.deepEqual(saved.data,{start:'2026-09',months:4,version:1});
+ assert.equal((await req('/api/community/season','PUT',{start:'2026-10',months:2,version:0},'admin')).status,409,'a change made meanwhile is not overwritten');
+ assert.deepEqual((await req('/api/session','GET',null,'pilot')).data.tdzSeason,{start:'2026-09',months:4,version:1});
 });
 test('solo race with two rounds: categories per round, one choice per round',async()=>{
  const {req,login}=harness();await login(ADMIN,'admin');await login(PILOT,'pilot');
