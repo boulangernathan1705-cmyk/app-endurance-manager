@@ -214,7 +214,7 @@ async function fetchEvents(scope) {
 }
 // Common start of a race whose time is not known yet ("Horaire à définir"): its time reads "à définir"
 // everywhere; the stored time stays in departure.clock (event form).
-function markUndefinedStarts(events) {
+export function markUndefinedStarts(events) {
   for (const event of events) for (const departure of event.departures || []) {
     // Also every start of a race marked "Horaires à confirmer": its time is only a placeholder.
     if ((departure.tbd || event.schedulePending) && !departure.clock) { departure.clock = departure.time; departure.time = 'à définir'; departure.hideClock = true; }

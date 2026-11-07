@@ -118,6 +118,17 @@ test('a choice that answers its step moves on by itself (category, any car, whol
 test('a closed start shows its pilots: after each crew, then without a crew', () => {
   const planning=fs.readFileSync('front/app/planning.mjs','utf8');
   assert.match(planning,/data-tip="Sans équipage"/);
-  assert.match(planning,/list\.map\(esc\)\.join\(' · '\)/);
+  // Each pilot in his own tag, never cut in two (Nathan 2026-11-03).
+  assert.match(planning,/class="planning-pilot"/);
+  assert.match(fs.readFileSync('styles/ux-refresh.css','utf8'),/\.planning-pilot \{[^}]*white-space: nowrap/);
   assert.match(planning,/' data-crew-line'/);
+});
+
+test('home: « Équipages à former » keeps the week shown, other simulator starts « à définir » stay so', () => {
+  const week=fs.readFileSync('front/app/week-view.mjs','utf8'),crews=fs.readFileSync('front/app/crews-page.mjs','utf8');
+  assert.match(week,/crewsBox\(monday\)/);
+  assert.match(week,/day>=monday&&day<monday\+7/);
+  assert.match(week,/markUndefinedStarts\(/);
+  assert.match(crews,/markUndefinedStarts\(/);
+  assert.match(fs.readFileSync('styles/ux-refresh.css','utf8'),/\.race-controls-actions > \.link-button \{ white-space: nowrap/);
 });
