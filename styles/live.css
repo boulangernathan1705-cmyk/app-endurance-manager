@@ -14,12 +14,8 @@
   gap: 14px;
 }
 .members-main.live-page { width: calc(100% - 32px); max-width: none; margin-top: 10px; }
-/* The banner as a thin band: the wall takes the screen. */
-body.live-body header.site-hero .hero-picture { aspect-ratio: auto; height: 54px; }
-body.live-body header.site-hero .hero-banner { object-fit: cover; object-position: 72% 55%; }
 body.live-body .site-nav-shell { width: calc(100% - 32px); max-width: none; }
 body.live-body .site-nav-shell #navigation { top: 9px; }
-@media (max-width: 700px) { body.live-body header.site-hero .hero-picture { height: 40px; } }
 .live-page [hidden] { display: none !important; }
 .live-page td, .lw-num { font-variant-numeric: tabular-nums; }
 .live-page button { font: inherit; color: inherit; }
