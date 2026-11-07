@@ -70,31 +70,48 @@ function dots(list) {
   return `<span class="cal-dots" aria-hidden="true">${list.slice(0, 2).map(chip).join('')}${list.length > 2 ? `<em>+${list.length - 2}</em>` : ''}</span>`;
 }
 
-// The season shown (state.calendarShift: 0 the current one) and the month chosen in it.
+// The season shown (state.calendarShift: 0 the current one) and the month chosen in it. The arrows step one month
+// (state.calendarStep), into the next or previous season when needed.
+const stepMonth = (month, step) => { const value = Number(month.slice(0, 4)) * 12 + Number(month.slice(5, 7)) - 1 + step; return `${Math.floor(value / 12)}-${pad(value % 12 + 1)}`; };
 export function calendarMonths(setting = state.tdzSeason) {
+  if (state.calendarStep && state.calendarMonth) {
+    const target = stepMonth(state.calendarMonth, state.calendarStep);
+    let shift = state.calendarShift || 0;
+    for (let tries = 0; tries < 24 && !seasonMonths(setting, parisMonth(), shift).includes(target); tries++) shift += Math.sign(state.calendarStep);
+    state.calendarShift = shift; state.calendarMonth = target;
+  }
+  state.calendarStep = 0;
   const months = seasonMonths(setting, parisMonth(), state.calendarShift || 0);
   if (!months.includes(state.calendarMonth)) state.calendarMonth = months.includes(parisMonth()) ? parisMonth() : months[0];
   return months;
 }
+const dayTitle = date => { const [year, month, day] = date.split('-').map(Number), column = (new Date(Date.UTC(year, month - 1, day)).getUTCDay() + 6) % 7; return `${LONG_DAYS[column].replace(/^./, letter => letter.toUpperCase())} ${day} ${MONTHS[month - 1]}`; };
+// The day shown beside the month (Nathan 2026-11-07: everything on one screen, like an app): the one chosen, else
+// today when it has events, else the month's next day with events, else today, else its first day with events.
+function chosenDay(month, byDay) {
+  if (state.calendarDay?.startsWith(month)) return state.calendarDay;
+  const today = parisToday(), dates = [...byDay.keys()].filter(date => date.startsWith(month)).sort();
+  if (today.startsWith(month) && byDay.has(today)) return today;
+  return dates.find(date => date >= today) || (today.startsWith(month) ? today : dates[0]) || `${month}-01`;
+}
+// The month: each day shows two events at most, then « +N » (the day opens beside the month). On a phone, the times
+// as small chips coloured by type.
 function grid(month, byDay, selected) {
   const [year, number] = month.split('-').map(Number);
   const first = new Date(Date.UTC(year, number - 1, 1)), lead = (first.getUTCDay() + 6) % 7;
   const days = new Date(Date.UTC(year, number, 0)).getUTCDate(), weeks = Math.ceil((lead + days) / 7), today = parisToday();
   let cells = DAYS.map(day => `<div class="cal-dow">${day}</div>`).join('');
   for (let week = 0; week < weeks; week++) {
-    let open = '';
     for (let column = 0; column < 7; column++) {
       const day = week * 7 + column - lead + 1;
       if (day < 1 || day > days) { cells += '<div class="cal-day out" aria-hidden="true"></div>'; continue; }
       const date = `${month}-${pad(day)}`, list = byDay.get(date) || [];
       const css = ['cal-day', date < today && 'past', date === today && 'today', list.length && 'has', date === selected && 'sel'].filter(Boolean).join(' ');
       const label = `${LONG_DAYS[column]} ${day} ${monthName(month)}${list.length ? ` · ${list.length} événement${list.length > 1 ? 's' : ''}` : ''}`;
-      cells += `<div class="${css}">${list.length ? `<button type="button" class="cal-num" data-action="cal-day" data-day="${date}" aria-label="${esc(label)}" aria-expanded="${date === selected}"><span>${day}</span></button>` : `<span class="cal-num"><span>${day}</span></span>`}${list.map(entryHtml).join('')}${list.length ? `<button type="button" class="cal-tap" data-action="cal-day" data-day="${date}" aria-label="${esc(label)}">${dots(list)}</button>` : ''}</div>`;
-      if (date === selected && list.length) open = `<div class="cal-open"><h3>${esc(`${LONG_DAYS[column].replace(/^./, letter => letter.toUpperCase())} ${day} ${monthName(month)}`)}</h3>${list.map(entryHtml).join('')}</div>`;
+      cells += `<div class="${css}"><button type="button" class="cal-num" data-action="cal-day" data-day="${date}" aria-label="${esc(label)}" aria-pressed="${date === selected}"><span>${day}</span></button>${list.slice(0, 2).map(entryHtml).join('')}${list.length > 2 ? `<button type="button" class="cal-more" data-action="cal-day" data-day="${date}">+${list.length - 2} de plus</button>` : ''}${list.length ? `<button type="button" class="cal-tap" data-action="cal-day" data-day="${date}" aria-label="${esc(label)}">${dots(list)}</button>` : ''}</div>`;
     }
-    cells += open;
   }
-  return `<div class="cal-grid" role="grid" aria-label="${esc(`${monthName(month)} ${year}`)}">${cells}</div>`;
+  return `<div class="cal-grid" role="grid" style="--weeks:${weeks}" aria-label="${esc(`${monthName(month)} ${year}`)}">${cells}</div>`;
 }
 function seasonPanel(months) {
   const start = state.tdzSeason?.start || months[0], length = state.tdzSeason?.months || months.length;
@@ -111,16 +128,17 @@ export function seasonCalendar(events, {mineOnly = false, canEdit = false, setti
   const months = calendarMonths(setting), list = mineOnly ? events.filter(event => mySituation(event, {includePast:true})) : events;
   const byDay = entries(list), count = month => [...byDay.entries()].filter(([date]) => date.startsWith(month)).reduce((sum, [, items]) => sum + items.length, 0);
   const tabs = months.map(month => `<button type="button" class="cal-month${month === state.calendarMonth ? ' on' : ''}" data-action="cal-month" data-month="${month}" aria-pressed="${month === state.calendarMonth}"><span class="cal-long">${monthName(month).replace(/^./, letter => letter.toUpperCase())}</span><span class="cal-short">${monthName(month, true).replace(/^./, letter => letter.toUpperCase())}</span> <small>${count(month) || '–'}</small></button>`).join('');
-  const shift = (step, label) => `<button type="button" class="cal-shift" data-action="cal-season" data-shift="${step}" aria-label="${label}">${step < 0 ? '‹' : '›'}</button>`;
+  const shift = (step, label) => `<button type="button" class="cal-shift" data-action="cal-step" data-step="${step}" aria-label="${label}">${step < 0 ? '‹' : '›'}</button>`;
   const later = list.filter(undated);
   const legend = [['special', 'Événement spécial'], ['championnat', 'Championnat'], ['prive', 'Championnat privé'], ['open', 'OPEN'], ['safe', 'SAFE'], ['bouloules', 'BOULOULES'], ['training', 'Training'], ['stream', 'Stream']]
     .filter(([type]) => list.some(event => calendarType(event) === type || (type === 'stream' && event.details?.streamTime)))
     .map(([type, label]) => `<span class="t-${type}">${label}</span>`).join('');
+  const selected = chosenDay(state.calendarMonth, byDay), day = byDay.get(selected) || [];
+  const side = `<aside class="cal-side" aria-label="${esc(dayTitle(selected))}"><h3>${esc(dayTitle(selected))}</h3>${day.length ? day.map(entryHtml).join('') : '<p class="cal-none">Rien ce jour-là.</p>'}${later.length ? `<h3 class="cal-later-title">Date à confirmer <small>${later.length}</small></h3>${later.map(event => entryHtml({event, departure:event.departures?.[0] || {id:'', time:''}, more:0})).join('')}` : ''}</aside>`;
   return `<div class="cal">
-<div class="cal-tabs" role="group" aria-label="Mois de la saison">${shift(-1, 'Saison précédente')}<div class="cal-months">${tabs}</div>${shift(1, 'Saison suivante')}${canEdit ? button('cal-season-edit', 'Saison', `aria-expanded="${Boolean(state.calendarSeasonOpen)}"`, 'link-button cal-season-button') : ''}</div>
+<div class="cal-tabs" role="group" aria-label="Mois">${shift(-1, 'Mois précédent')}<div class="cal-months">${tabs}</div>${shift(1, 'Mois suivant')}${canEdit ? button('cal-season-edit', 'Saison', `aria-expanded="${Boolean(state.calendarSeasonOpen)}"`, 'link-button cal-season-button') : ''}</div>
 ${canEdit && state.calendarSeasonOpen ? seasonPanel(months) : ''}
-${grid(state.calendarMonth, byDay, state.calendarDay)}
-${legend || list.some(mySituation) ? `<div class="cal-legend">${legend}${list.some(event => mySituation(event)) ? '<span class="cal-legend-me"><b>✓</b> Tu es inscrit</span>' : ''}</div>` : ''}
-${later.length ? `<section class="cal-later"><h2 class="event-period-heading"><span>Date à confirmer</span><small>${later.length} événement${later.length > 1 ? 's' : ''}</small></h2><div class="cal-later-list">${later.map(event => entryHtml({event, departure:event.departures?.[0] || {id:'', time:''}, more:0})).join('')}</div></section>` : ''}
+<div class="cal-body"><div class="cal-main">${grid(state.calendarMonth, byDay, selected)}
+${legend || list.some(mySituation) ? `<div class="cal-legend">${legend}${list.some(event => mySituation(event)) ? '<span class="cal-legend-me"><b>✓</b> Tu es inscrit</span>' : ''}</div>` : ''}</div>${side}</div>
 </div>`;
 }
