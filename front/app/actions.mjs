@@ -138,7 +138,8 @@ async function perform(action,target){
     // EVENT TDZ calendar (season-calendar.mjs): a month of the season, another season, a day on the phone, my entries.
     case 'cal-month': state.calendarMonth=target.dataset.month; state.calendarDay=null; renderHome(); break;
     case 'cal-season': state.calendarShift=(state.calendarShift||0)+Number(target.dataset.shift||0); state.calendarMonth=null; state.calendarDay=null; renderHome(); break;
-    case 'cal-day': state.calendarDay=state.calendarDay===target.dataset.day?null:target.dataset.day; renderHome(); break;
+    case 'cal-day': state.calendarDay=target.dataset.day; renderHome(); break;
+    case 'cal-step': state.calendarStep=Number(target.dataset.step)||0; state.calendarDay=null; renderHome(); break;
     case 'cal-view': setCalendarView(state.listFormat==='solo',target.dataset.view); renderHome(); break;
     case 'cal-mine': state.calendarMine=!state.calendarMine; renderHome(); break;
     case 'cal-season-edit': state.calendarSeasonOpen=!state.calendarSeasonOpen; renderHome(); break;

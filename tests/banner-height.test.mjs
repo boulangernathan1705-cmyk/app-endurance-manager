@@ -11,6 +11,9 @@ test('the banner height comes from the charte tokens only', () => {
   const media = readFileSync('styles/banner-media.css', 'utf8');
   assert.match(media, /\.hero-picture \{[^}]*aspect-ratio: var\(--em-banner-ratio\)/);
   assert.match(media, /height: var\(--em-banner-height-phone\)/);
+  // Lists and calendars: a thin band on a computer too (Nathan 2026-11-07).
+  assert.match(tokens, /--em-banner-height-thin:/);
+  assert.match(media, /html\[data-view="home"\] \.hero-picture,\nhtml\[data-view="my-entries"\] \.hero-picture \{ aspect-ratio: auto; height: var\(--em-banner-height-thin\); \}/);
   assert.doesNotMatch(media, /aspect-ratio: \d/);
   const others = readdirSync('styles').filter(name => name.endsWith('.css') && !['banner-media.css', 'live.css', 'tokens.css'].includes(name));
   for (const name of [...others.map(name => `styles/${name}`), 'styles.css']) {
