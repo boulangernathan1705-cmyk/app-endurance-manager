@@ -254,7 +254,6 @@ export async function load() {
   state.eventTypes=Array.isArray(session.eventTypes)?session.eventTypes:[];
   // EVENT TDZ (types, OPEN / SAFE); elsewhere EVENT SOLO, open to the « Endurances » permission.
   state.eventTdz=session.eventTdz===true;
-  state.communitySeason=session.tdzSeason||null;
   state.grindfest=session.grindfest===true;
   // The community's stream link (Discord setting « Annonce du jour »): the events it streams link to it.
   state.communityStreamUrl=typeof session.communityStreamUrl==='string'?session.communityStreamUrl:'';

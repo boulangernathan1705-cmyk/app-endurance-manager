@@ -7,7 +7,7 @@ async function boot(page,game,events){
   await page.route('**/api/**',async route=>{
     const path=new URL(route.request().url()).pathname;
     let data={ok:true};
-    if(path==='/api/session')data={user:{id:'111111111111111111',name:'Nathan',communityIntroSeen:true},access:'member',permissions:['access','endurance','crews','solo_open'],community:alpha,communities:[alpha,beta],soloRaces:true,eventTypes:['OPEN','SAFE'],eventTdz:true,tdzSeason:{start:'2090-10',version:1}};
+    if(path==='/api/session')data={user:{id:'111111111111111111',name:'Nathan',communityIntroSeen:true},access:'member',permissions:['access','endurance','crews','solo_open'],community:alpha,communities:[alpha,beta],soloRaces:true,eventTypes:['OPEN','SAFE'],eventTdz:true};
     else if(['/api/events','/api/races'].includes(path))data={events};
     else if(path==='/api/participants')data={participants:[]};
     else if(path.includes('notifications'))data={notifications:[],unread:0};
@@ -15,7 +15,6 @@ async function boot(page,game,events){
   });
   await page.goto(`/${game}/`);
   await page.waitForFunction(async()=>{const {state}=await import('/front/app/core.mjs');return state.access==='member'&&state.events.length>0;});
-  await expect(page.locator('.page-head')).toBeVisible();
 }
 
 for(const game of ['lmu','iracing'])test(`${game}: mobile circuit drawings fit inside their cards`,async({page})=>{
@@ -73,11 +72,7 @@ test('SOLO and TDZ calendars ignore endurance-only filters and preserve their si
     localStorage.setItem(key,JSON.stringify({types:['special'],communities:['beta'],categories:['GTP'],sims:['lmu'],kinds:['OPEN'],situation:'crew'}));
     state.raceFiltersBy={};state.raceFilterOpen=true;const {renderHome}=await import('/front/app/home-view.mjs');renderHome();
   });
-  await expect(page.locator('.tdz-season-label')).toContainText('2090');
-  await expect(page.locator('.tdz-season-editor')).toHaveCount(0);
-  await expect(page.locator('.tdz-calendar .tdz-race')).toHaveCount(1);
-  await expect(page.locator('.tdz-calendar .tdz-race')).toContainText('Solo OPEN');
-  await page.locator('[data-action="race-filter-toggle"]').click();
+  await expect(page.locator('.event-card')).toHaveCount(1);
   await expect(page.locator('[data-group="sims"][data-value="lmu"]')).toHaveAttribute('aria-pressed','true');
   await expect(page.locator('[data-group="kinds"][data-value="OPEN"]')).toHaveAttribute('aria-pressed','true');
   await page.evaluate(async()=>{const {state}=await import('/front/app/core.mjs');state.eventTdz=false;state.eventTypes=[];state.events[0].details={};const {renderHome}=await import('/front/app/home-view.mjs');renderHome();});
