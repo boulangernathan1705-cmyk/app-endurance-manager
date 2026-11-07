@@ -51,6 +51,8 @@ function entries(events) {
   return byDay;
 }
 function timeOf(departure) { const [hour, minute] = String(departure.time || '').split(':'); return /^\d{2}$/.test(hour || '') ? `${Number(hour)}h${minute && minute !== '00' ? minute : ''}` : ''; }
+const TYPES = [['special', 'Événement spécial'], ['championnat', 'Championnat'], ['prive', 'Championnat privé'], ['open', 'OPEN'], ['safe', 'SAFE'], ['bouloules', 'BOULOULES'], ['training', 'Training'], ['stream', 'Stream']];
+const typeLabel = type => TYPES.find(([key]) => key === type)?.[1] || '';
 function entryHtml({event, departure, more}) {
   const type = calendarType(event), stream = streamDetails(event);
   const {confirmed} = isStream(event) ? {confirmed:0} : soloCounts(event, departure);
@@ -61,13 +63,13 @@ function entryHtml({event, departure, more}) {
   const time = undated(event) ? 'Date à confirmer' : isStream(event) ? hourLabel(stream.streamTime || stream.raceTime || departure.time) : timeOf(departure);
   const live = !isStream(event) && event.details?.streamTime ? `<span class="cal-live">● Stream ${esc(streamSpan(event.details.streamTime, event.details.streamEnd))}</span>` : '';
   const logo = endurance ? `<img class="event-access-logo" src="/images/event-access/endurance-${esc(gameForEvent(event))}.png" alt="" width="300" height="300" loading="lazy" decoding="async">` : eventAccessLogo(event) || `<span class="cal-logo-text" aria-hidden="true">${isStream(event) ? '🎙️' : isGrindfest(event) ? '🎉' : '🏁'}</span>`;
-  return `<button type="button" class="cal-ev t-${type}" data-action="open" data-id="${esc(event.id)}" data-departure="${esc(departure.id)}">${logo}<b><i class="cal-t">${esc(time)} </i>${esc(event.name)}</b><small><strong>${esc(time)}</strong>${esc(info)}${more ? ` · +${more}` : ''}${mySituation(event) ? ' <span class="cal-me" title="Tu es inscrit">✓</span>' : ''}</small>${live}<span class="cal-go" aria-hidden="true">›</span></button>`;
+  return `<button type="button" class="cal-ev t-${type}" data-action="open" data-id="${esc(event.id)}" data-departure="${esc(departure.id)}">${logo}<b><i class="cal-t">${esc(time)} </i>${esc(event.name)}</b><small><strong>${esc(time)}</strong>${esc(info)}${type && type !== 'stream' && type !== 'training' ? `<em class="cal-type"> · ${esc(typeLabel(type))}</em>` : ''}${more ? ` · +${more}` : ''}${mySituation(event) ? ' <span class="cal-me" title="Tu es inscrit">✓</span>' : ''}</small>${live}<span class="cal-go" aria-hidden="true">›</span></button>`;
 }
-// On a phone a day shows one chip per event: its time on the type's colour (the legend's), no logo (Nathan 2026-11-07:
-// identical small logos looked mixed up).
+// On a phone every day is the same size: one dot per event in the type's colour, three at most; the chosen day's
+// races are listed in full under the month (Nathan 2026-11-07: chips of different sizes, only a colour and a time).
 function dots(list) {
-  const chip = ({event, departure}) => `<i class="cal-chip t-${calendarType(event)}">${esc(timeOf(departure) || '?')}</i>`;
-  return `<span class="cal-dots" aria-hidden="true">${list.slice(0, 2).map(chip).join('')}${list.length > 2 ? `<em>+${list.length - 2}</em>` : ''}</span>`;
+  const dot = ({event}) => `<i class="cal-dot t-${calendarType(event)}"></i>`;
+  return `<span class="cal-dots" aria-hidden="true">${list.slice(0, 3).map(dot).join('')}${list.length > 3 ? '<em>+</em>' : ''}</span>`;
 }
 
 // The season shown (state.calendarShift: 0 the current one) and the month chosen in it. The arrows step one month
@@ -130,7 +132,7 @@ export function seasonCalendar(events, {mineOnly = false, canEdit = false, setti
   const tabs = months.map(month => `<button type="button" class="cal-month${month === state.calendarMonth ? ' on' : ''}" data-action="cal-month" data-month="${month}" aria-pressed="${month === state.calendarMonth}"><span class="cal-long">${monthName(month).replace(/^./, letter => letter.toUpperCase())}</span><span class="cal-short">${monthName(month, true).replace(/^./, letter => letter.toUpperCase())}</span> <small>${count(month) || '–'}</small></button>`).join('');
   const shift = (step, label) => `<button type="button" class="cal-shift" data-action="cal-step" data-step="${step}" aria-label="${label}">${step < 0 ? '‹' : '›'}</button>`;
   const later = list.filter(undated);
-  const legend = [['special', 'Événement spécial'], ['championnat', 'Championnat'], ['prive', 'Championnat privé'], ['open', 'OPEN'], ['safe', 'SAFE'], ['bouloules', 'BOULOULES'], ['training', 'Training'], ['stream', 'Stream']]
+  const legend = TYPES
     .filter(([type]) => list.some(event => calendarType(event) === type || (type === 'stream' && event.details?.streamTime)))
     .map(([type, label]) => `<span class="t-${type}">${label}</span>`).join('');
   const selected = chosenDay(state.calendarMonth, byDay), day = byDay.get(selected) || [];
