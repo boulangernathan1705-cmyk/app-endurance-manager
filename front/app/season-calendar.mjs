@@ -59,9 +59,11 @@ function entryHtml({event, departure, more}) {
   const logo = eventAccessLogo(event) || `<span class="cal-logo-text" aria-hidden="true">${isStream(event) ? '🎙️' : isGrindfest(event) ? '🎉' : '🏁'}</span>`;
   return `<button type="button" class="cal-ev t-${type}" data-action="open" data-id="${esc(event.id)}" data-departure="${esc(departure.id)}">${logo}<b>${esc(event.name)}</b><small><strong>${esc(time)}</strong>${esc(info)}${more ? ` · +${more}` : ''}${mySituation(event) ? ' <span class="cal-me" title="Tu es inscrit">✓</span>' : ''}</small>${live}<span class="cal-go" aria-hidden="true">›</span></button>`;
 }
+// On a phone a day shows one chip per event: its time on the type's colour (the legend's), no logo (Nathan 2026-11-07:
+// identical small logos looked mixed up).
 function dots(list) {
-  const shown = list.slice(0, 2).map(({event}) => eventAccessLogo(event) || `<span class="cal-logo-text">${isStream(event) ? '🎙️' : '🏁'}</span>`).join('');
-  return `<span class="cal-dots" aria-hidden="true">${shown}${list.length > 2 ? `<em>+${list.length - 2}</em>` : list.length === 1 ? `<em>${esc(timeOf(list[0].departure))}</em>` : ''}</span>`;
+  const chip = ({event, departure}) => `<i class="cal-chip t-${calendarType(event)}">${esc(timeOf(departure) || '?')}</i>`;
+  return `<span class="cal-dots" aria-hidden="true">${list.slice(0, 3).map(chip).join('')}${list.length > 3 ? `<em>+${list.length - 3}</em>` : ''}</span>`;
 }
 
 // The season shown (state.calendarShift: 0 the current one) and the month chosen in it.
