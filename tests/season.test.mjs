@@ -16,3 +16,14 @@ test('without a choice: the calendar quarter; only valid settings are kept', () 
   assert.ok(validStart('2026-11'));assert.ok(!validStart('2026-13'));assert.ok(!validStart('26-11'));
   assert.ok(validMonths(12));assert.ok(!validMonths(0));assert.ok(!validMonths(13));assert.ok(!validMonths(2.5));
 });
+
+test('the endurances get a month view too, with a Liste / Mois switch (Nathan 2026-11-07)', async () => {
+  const {readFileSync} = await import('node:fs');
+  const home = readFileSync(new URL('../front/app/home-view.mjs', import.meta.url), 'utf8');
+  const calendar = readFileSync(new URL('../front/app/season-calendar.mjs', import.meta.url), 'utf8');
+  const actions = readFileSync(new URL('../front/app/actions.mjs', import.meta.url), 'utf8');
+  assert.match(home, /if\(calendarView\(solo\)==='month'\)\{renderSeasonCalendar\(/);
+  assert.match(home, /solo&&state\.eventTdz\?'month':'list'/);
+  assert.match(actions, /case 'cal-view': setCalendarView\(/);
+  assert.match(calendar, /if \(!isSolo\(event\)\) return event\.eventType === 'special' \|\| event\.official \? 'special' : event\.eventType === 'lmu' \? 'championnat' : 'prive';/);
+});

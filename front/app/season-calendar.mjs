@@ -8,7 +8,9 @@ import {mySituation} from '../race-filters.mjs';
 import {normalizeTdzEventType} from '../../shared/catalog.mjs';
 import {isGrindfest} from '../../shared/grindfest.mjs';
 import {isStream,streamDetails,streamSpan,hourLabel} from '../../shared/stream.mjs';
-import {eventAccessLogo,soloCounts} from './solo.mjs';
+import {eventAccessLogo,soloCounts,isSolo} from './solo.mjs';
+import {gameForEvent} from '../../shared/catalog.mjs';
+import {eventMinutes} from '../../shared/duration.mjs';
 import {parisMonth,seasonMonths} from '../../shared/season.mjs';
 
 const MONTHS = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
@@ -22,6 +24,7 @@ const pad = value => String(value).padStart(2, '0');
 
 // The frame colour of an event.
 export function calendarType(event) {
+  if (!isSolo(event)) return event.eventType === 'special' || event.official ? 'special' : event.eventType === 'lmu' ? 'championnat' : 'prive';
   if (isStream(event)) return 'stream';
   if (isGrindfest(event)) return 'gridfest';
   const type = String(normalizeTdzEventType(event.details?.type) || '').toUpperCase();
@@ -53,10 +56,11 @@ function entryHtml({event, departure, more}) {
   const {confirmed} = isStream(event) ? {confirmed:0} : soloCounts(event, departure);
   const training = type === 'training';
   const end = training && departure.endsAt ? new Date(departure.endsAt).toLocaleTimeString('fr-FR', {timeZone:'Europe/Paris', hour:'2-digit', minute:'2-digit'}).replace(':00', 'h').replace(':', 'h') : '';
-  const info = isStream(event) ? 'Stream' : training ? (end ? `–${end}` : '') : ` · ${confirmed} inscrit${confirmed > 1 ? 's' : ''}`;
+  const endurance = !isSolo(event), hours = Math.round(eventMinutes(event) / 60);
+  const info = endurance ? (hours ? ` · ${hours}h` : '') : isStream(event) ? 'Stream' : training ? (end ? `–${end}` : '') : ` · ${confirmed} inscrit${confirmed > 1 ? 's' : ''}`;
   const time = undated(event) ? 'Date à confirmer' : isStream(event) ? hourLabel(stream.streamTime || stream.raceTime || departure.time) : timeOf(departure);
   const live = !isStream(event) && event.details?.streamTime ? `<span class="cal-live">● Stream ${esc(streamSpan(event.details.streamTime, event.details.streamEnd))}</span>` : '';
-  const logo = eventAccessLogo(event) || `<span class="cal-logo-text" aria-hidden="true">${isStream(event) ? '🎙️' : isGrindfest(event) ? '🎉' : '🏁'}</span>`;
+  const logo = endurance ? `<img class="event-access-logo" src="/images/event-access/endurance-${esc(gameForEvent(event))}.png" alt="" width="300" height="300" loading="lazy" decoding="async">` : eventAccessLogo(event) || `<span class="cal-logo-text" aria-hidden="true">${isStream(event) ? '🎙️' : isGrindfest(event) ? '🎉' : '🏁'}</span>`;
   return `<button type="button" class="cal-ev t-${type}" data-action="open" data-id="${esc(event.id)}" data-departure="${esc(departure.id)}">${logo}<b>${esc(event.name)}</b><small><strong>${esc(time)}</strong>${esc(info)}${more ? ` · +${more}` : ''}${mySituation(event) ? ' <span class="cal-me" title="Tu es inscrit">✓</span>' : ''}</small>${live}<span class="cal-go" aria-hidden="true">›</span></button>`;
 }
 // On a phone a day shows one chip per event: its time on the type's colour (the legend's), no logo (Nathan 2026-11-07:
@@ -67,8 +71,8 @@ function dots(list) {
 }
 
 // The season shown (state.calendarShift: 0 the current one) and the month chosen in it.
-export function calendarMonths() {
-  const months = seasonMonths(state.tdzSeason, parisMonth(), state.calendarShift || 0);
+export function calendarMonths(setting = state.tdzSeason) {
+  const months = seasonMonths(setting, parisMonth(), state.calendarShift || 0);
   if (!months.includes(state.calendarMonth)) state.calendarMonth = months.includes(parisMonth()) ? parisMonth() : months[0];
   return months;
 }
@@ -102,13 +106,14 @@ function seasonPanel(months) {
 }
 
 // The page's body under the head: tabs, grid, undated events. events: the filtered events, upcoming and past.
-export function seasonCalendar(events, {mineOnly = false, canEdit = false} = {}) {
-  const months = calendarMonths(), list = mineOnly ? events.filter(event => mySituation(event, {includePast:true})) : events;
+// setting: the season (EVENT TDZ); without it, the calendar quarter (endurances).
+export function seasonCalendar(events, {mineOnly = false, canEdit = false, setting = state.tdzSeason} = {}) {
+  const months = calendarMonths(setting), list = mineOnly ? events.filter(event => mySituation(event, {includePast:true})) : events;
   const byDay = entries(list), count = month => [...byDay.entries()].filter(([date]) => date.startsWith(month)).reduce((sum, [, items]) => sum + items.length, 0);
   const tabs = months.map(month => `<button type="button" class="cal-month${month === state.calendarMonth ? ' on' : ''}" data-action="cal-month" data-month="${month}" aria-pressed="${month === state.calendarMonth}"><span class="cal-long">${monthName(month).replace(/^./, letter => letter.toUpperCase())}</span><span class="cal-short">${monthName(month, true).replace(/^./, letter => letter.toUpperCase())}</span> <small>${count(month) || '–'}</small></button>`).join('');
   const shift = (step, label) => `<button type="button" class="cal-shift" data-action="cal-season" data-shift="${step}" aria-label="${label}">${step < 0 ? '‹' : '›'}</button>`;
   const later = list.filter(undated);
-  const legend = [['open', 'OPEN'], ['safe', 'SAFE'], ['bouloules', 'BOULOULES'], ['training', 'Training'], ['stream', 'Stream']]
+  const legend = [['special', 'Événement spécial'], ['championnat', 'Championnat LMU'], ['prive', 'Championnat privé'], ['open', 'OPEN'], ['safe', 'SAFE'], ['bouloules', 'BOULOULES'], ['training', 'Training'], ['stream', 'Stream']]
     .filter(([type]) => list.some(event => calendarType(event) === type || (type === 'stream' && event.details?.streamTime)))
     .map(([type, label]) => `<span class="t-${type}">${label}</span>`).join('');
   return `<div class="cal">

@@ -1,7 +1,7 @@
 /* EVENT TDZ calendar (front/app/season-calendar.mjs, Nathan 2026-11-07): the season's months as tabs, the month as a
    grid, the frame colour by type. On a phone, a day shows its logos and opens under its week. */
 .cal{--cal-open:#35b978;--cal-safe:#4ea8e6;--cal-bouloules:#e46fb0;--cal-training:#9aa3a7;--cal-stream:#a78bfa;--cal-gridfest:#ff7b00;margin-top:4px}
-.t-open{--c:var(--cal-open)}.t-safe{--c:var(--cal-safe)}.t-bouloules{--c:var(--cal-bouloules)}.t-training{--c:var(--cal-training)}.t-stream{--c:var(--cal-stream)}.t-gridfest{--c:var(--cal-gridfest)}
+.t-special{--c:#e7b653}.t-championnat{--c:#e4483d}.t-prive{--c:#3fc1c9}.t-open{--c:var(--cal-open)}.t-safe{--c:var(--cal-safe)}.t-bouloules{--c:var(--cal-bouloules)}.t-training{--c:var(--cal-training)}.t-stream{--c:var(--cal-stream)}.t-gridfest{--c:var(--cal-gridfest)}
 .cal-tabs{display:flex;align-items:center;gap:6px;margin:0 0 14px;min-width:0}
 .cal-months{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;min-width:0}
 .cal-months::-webkit-scrollbar{display:none}
@@ -68,3 +68,15 @@
 .week-block.week-block.t-open{--kind:#35b978}.week-block.week-block.t-safe{--kind:#4ea8e6}.week-block.week-block.t-bouloules{--kind:#e46fb0}.week-block.week-block.t-training{--kind:#9aa3a7}
 .week-block.week-block.t-special{--kind:#e7b653}.week-block.week-block.t-championnat{--kind:#e4483d}
 .week-block[class*=" t-"]{border-color:color-mix(in srgb,var(--kind) 70%,transparent)}
+
+/* Liste / Mois (Nathan 2026-11-07), in front of the filters. */
+.cal-view{display:inline-flex;gap:0;border:1px solid var(--border);border-radius:9px;overflow:hidden;flex:none}
+.cal-view .event-filter-button{border:0;border-radius:0;margin:0}
+.cal-view .event-filter-button+.event-filter-button{border-left:1px solid var(--border)}
+@media (max-width:700px){
+  html[data-game] #app .page-head.page-head:has(.cal-view){flex-wrap:wrap !important}
+  html[data-game] #app .page-head:has(.cal-view) > .event-filter{order:6 !important;flex:1 1 100% !important}
+  html[data-game] #app .page-head:has(.cal-view) > .event-filter > .event-filter-button{flex:1}
+  html[data-game] #app .page-head:has(.cal-view) > .cal-view{order:1}
+  html[data-game] #app .page-head.page-head:has(.cal-view) > .home-create-event.home-create-event{order:2 !important;margin:0 0 0 auto !important}
+}

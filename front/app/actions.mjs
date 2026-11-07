@@ -2,7 +2,7 @@ import {entryCommunities} from './core.mjs';
 import {submitRallyEvent} from './rally-form.mjs';
 import {renderStreamForm,submitStreamEvent} from './stream-form.mjs';
 import {app,state,api,load,loadArchive,showError,countdown,CARS,inCommunity,can,activeGame} from './core.mjs';
-import {renderNav,renderHome,toggleRaceFilter,resetRaceFilters,simChosen,openSimChooser} from './home-view.mjs';
+import {renderNav,renderHome,setCalendarView,toggleRaceFilter,resetRaceFilters,simChosen,openSimChooser} from './home-view.mjs';
 import {renderEvent,togglePlanningCommunity} from './event-view.mjs';
 import {showPlanningDay,scrollPlanning,goToDeparture,setPlanningSpan,toggleQuickMenu} from './planning.mjs';
 import {renderEventForm,departureFields,updateRemoveButtons,goToEventStep,formDurationMinutes,bulkPreview,shiftBulkWeek} from './event-form.mjs';
@@ -139,6 +139,7 @@ async function perform(action,target){
     case 'cal-month': state.calendarMonth=target.dataset.month; state.calendarDay=null; renderHome(); break;
     case 'cal-season': state.calendarShift=(state.calendarShift||0)+Number(target.dataset.shift||0); state.calendarMonth=null; state.calendarDay=null; renderHome(); break;
     case 'cal-day': state.calendarDay=state.calendarDay===target.dataset.day?null:target.dataset.day; renderHome(); break;
+    case 'cal-view': setCalendarView(state.listFormat==='solo',target.dataset.view); renderHome(); break;
     case 'cal-mine': state.calendarMine=!state.calendarMine; renderHome(); break;
     case 'cal-season-edit': state.calendarSeasonOpen=!state.calendarSeasonOpen; renderHome(); break;
     case 'race-filter-toggle': state.raceFilterOpen=!state.raceFilterOpen; renderHome(); break;
