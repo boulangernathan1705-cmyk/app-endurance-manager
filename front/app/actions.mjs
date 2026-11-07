@@ -2,7 +2,7 @@ import {entryCommunities} from './core.mjs';
 import {submitRallyEvent} from './rally-form.mjs';
 import {renderStreamForm,submitStreamEvent} from './stream-form.mjs';
 import {app,state,api,load,loadArchive,showError,countdown,CARS,inCommunity,can,activeGame} from './core.mjs';
-import {renderNav,renderHome,toggleRaceFilter,resetRaceFilters,simChosen,openSimChooser} from './home-view.mjs';
+import {renderNav,renderHome,setCalendarView,toggleRaceFilter,resetRaceFilters,simChosen,openSimChooser} from './home-view.mjs';
 import {renderEvent,togglePlanningCommunity} from './event-view.mjs';
 import {showPlanningDay,scrollPlanning,goToDeparture,setPlanningSpan,toggleQuickMenu} from './planning.mjs';
 import {renderEventForm,departureFields,updateRemoveButtons,goToEventStep,formDurationMinutes,bulkPreview,shiftBulkWeek} from './event-form.mjs';
@@ -135,6 +135,13 @@ async function perform(action,target){
     case 'dismiss-error': document.querySelector('[data-ux-error-modal]')?.remove(); break;
     case 'home': if(target.dataset.list==='endurance'&&state.soloRaces&&!simChosen()){openSimChooser();break;} if(target.dataset.list)state.listFormat=target.dataset.list; renderHome(); break;
     case 'planning-community': togglePlanningCommunity(target.dataset.community||''); renderEvent(); break;
+    // EVENT TDZ calendar (season-calendar.mjs): a month of the season, another season, a day on the phone, my entries.
+    case 'cal-month': state.calendarMonth=target.dataset.month; state.calendarDay=null; renderHome(); break;
+    case 'cal-season': state.calendarShift=(state.calendarShift||0)+Number(target.dataset.shift||0); state.calendarMonth=null; state.calendarDay=null; renderHome(); break;
+    case 'cal-day': state.calendarDay=state.calendarDay===target.dataset.day?null:target.dataset.day; renderHome(); break;
+    case 'cal-view': setCalendarView(state.listFormat==='solo',target.dataset.view); renderHome(); break;
+    case 'cal-mine': state.calendarMine=!state.calendarMine; renderHome(); break;
+    case 'cal-season-edit': state.calendarSeasonOpen=!state.calendarSeasonOpen; renderHome(); break;
     case 'race-filter-toggle': state.raceFilterOpen=!state.raceFilterOpen; renderHome(); break;
     case 'race-filter': toggleRaceFilter(target.dataset.group,target.dataset.value); renderHome(); break;
     case 'race-filter-reset': resetRaceFilters(); renderHome(); break;
@@ -290,6 +297,10 @@ let opener=null;
 const locate=target=>['action','departure','id','round','mode'].map(key=>target.dataset[key]!==undefined?`[data-${key}="${CSS.escape(target.dataset[key])}"]`:'').join('');
 function restoreFocus(){const selector=opener;opener=null;if(!selector)return;requestAnimationFrame(()=>{const back=document.querySelector(selector);if(back&&!back.closest('[hidden]'))back.focus({preventScroll:false});});}
 document.addEventListener('click',async event=>{const target=event.target.closest?.('[data-action]');if(!target||target.disabled)return;if(target.dataset.action==='edit-crew')return;event.preventDefault();if(state.busy&&target.dataset.action!=='dismiss-error')return;const action=target.dataset.action;if(!CLOSERS.has(action)&&!target.closest('[role="dialog"],[role="alertdialog"],.form-sheet'))opener=locate(target);state.busy=true;target.disabled=true;try{await perform(action,target);if(CLOSERS.has(action))restoreFocus();}catch(error){showError(error);}finally{state.busy=false;if(target.isConnected)target.disabled=false;updateRemoveButtons();}});
+// The organisers' season (EVENT TDZ calendar): its first month and length.
+document.addEventListener('submit',async event=>{const form=event.target;if(!form.matches?.('[data-season-form]'))return;event.preventDefault();if(state.busy)return;state.busy=true;
+  try{state.tdzSeason=await api('/api/community/season','PUT',{start:form.elements.seasonStart.value,months:Number(form.elements.seasonMonths.value),version:state.tdzSeason?.version||0});state.calendarSeasonOpen=false;state.calendarShift=0;state.calendarMonth=null;renderHome('Saison enregistrée.');}
+  catch(error){showError(error);}finally{state.busy=false;}});
 document.addEventListener('submit',async event=>{const form=event.target;if(!form.dataset.kind)return;event.preventDefault();if(state.busy)return;state.busy=true;const submit=form.querySelector('[type="submit"]');if(submit)submit.disabled=true;try{if(form.dataset.kind==='event')await submitEvent(form);else if(form.dataset.kind==='rally-event')await submitRallyEvent(form);else if(form.dataset.kind==='stream-event')await submitStreamEvent(form);else if(form.dataset.kind==='solo-event')await submitSoloEvent(form);else if(form.dataset.kind==='registration'){const departureId=form.dataset.departure;const result=await submitRegistration(form,api);if(!(await finishPendingCrewJoin(departureId,result.id)))await refreshAfterSave(result.notice||'Inscription enregistrée.');}}catch(error){showError(error);}finally{state.busy=false;if(submit?.isConnected)submit.disabled=false;}});
 document.addEventListener('error',event=>{const image=event.target;if(image instanceof HTMLImageElement&&image.matches('.circuit-visual img'))image.remove();},true);
 setInterval(()=>document.querySelectorAll('[data-countdown]').forEach(element=>{element.textContent=countdown(Number(element.dataset.countdown));}),1000);

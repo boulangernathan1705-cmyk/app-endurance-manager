@@ -1,0 +1,82 @@
+/* EVENT TDZ calendar (front/app/season-calendar.mjs, Nathan 2026-11-07): the season's months as tabs, the month as a
+   grid, the frame colour by type. On a phone, a day shows its logos and opens under its week. */
+.cal{--cal-open:#35b978;--cal-safe:#4ea8e6;--cal-bouloules:#e46fb0;--cal-training:#9aa3a7;--cal-stream:#a78bfa;--cal-gridfest:#ff7b00;margin-top:4px}
+.t-special{--c:#e7b653}.t-championnat{--c:#e4483d}.t-prive{--c:#3fc1c9}.t-open{--c:var(--cal-open)}.t-safe{--c:var(--cal-safe)}.t-bouloules{--c:var(--cal-bouloules)}.t-training{--c:var(--cal-training)}.t-stream{--c:var(--cal-stream)}.t-gridfest{--c:var(--cal-gridfest)}
+.cal-tabs{display:flex;align-items:center;gap:6px;margin:0 0 14px;min-width:0}
+.cal-months{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;min-width:0}
+.cal-months::-webkit-scrollbar{display:none}
+.cal-month,.cal-shift{border:1px solid var(--border);background:var(--panel2);color:var(--text);border-radius:8px;padding:8px 12px;font:600 14px/1 inherit;white-space:nowrap;cursor:pointer}
+.cal-month small{color:var(--muted);font-weight:500;margin-left:4px}
+.cal-month.on{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 16%,transparent)}
+.cal-month.on small{color:var(--text)}
+.cal-shift{padding:8px 11px;color:var(--muted)}
+.cal-short{display:none}
+.cal-season-button{margin-left:auto;white-space:nowrap}
+.cal-season-panel{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;margin:0 0 14px;padding:12px 14px;border:1px solid var(--border);border-radius:12px;background:var(--panel)}
+.cal-season-panel label{display:flex;align-items:center;gap:8px;font-weight:600}
+.cal-season-panel p{flex-basis:100%;margin:0;color:var(--muted);font-size:13px}
+.cal-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));border:1px solid var(--border);border-radius:12px;overflow:hidden;background:var(--panel)}
+.cal-dow{padding:9px 10px;font:700 12px/1 inherit;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);background:var(--panel2)}
+.cal-day{min-height:96px;padding:8px;border-right:1px solid var(--border);border-bottom:1px solid var(--border);display:flex;flex-direction:column;gap:6px;min-width:0}
+.cal-day:nth-child(7n){border-right:0}
+.cal-day.out{background:rgba(0,0,0,.22)}
+.cal-day.past .cal-ev,.cal-day.past .cal-dots{opacity:.45}
+.cal-num{all:unset;font:700 13px/1 inherit;color:var(--muted);height:22px;display:flex;align-items:center;cursor:default}
+.cal-day.today .cal-num span{background:var(--accent);color:#06100b;border-radius:99px;padding:4px 7px}
+.cal-ev{all:unset;box-sizing:border-box;cursor:pointer;display:grid;grid-template-columns:34px minmax(0,1fr);gap:2px 8px;align-items:center;padding:6px 8px 6px 6px;border-radius:8px;background:var(--panel2);border:1px solid var(--border);border-left:3px solid var(--c);color:var(--text);min-width:0}
+.cal-ev:hover,.cal-ev:focus-visible{border-color:var(--c)}
+.cal-ev .event-access-logo,.cal-logo-text{grid-row:span 2;width:34px;height:34px;object-fit:contain;display:flex;align-items:center;justify-content:center;font-size:20px}
+.cal-ev b{font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cal-ev small{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cal-ev small strong{color:var(--text)}
+.cal-me{color:var(--cal-open);font-weight:800}
+.cal-live{grid-column:1/-1;font-size:11.5px;font-weight:700;color:var(--cal-stream);background:color-mix(in srgb,var(--cal-stream) 14%,transparent);border-radius:6px;padding:3px 6px;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cal-go,.cal-tap,.cal-open{display:none}
+.cal-legend{display:flex;flex-wrap:wrap;gap:8px 16px;margin-top:10px;color:var(--muted);font-size:12.5px}
+.cal-legend span[class^="t-"]::before{content:"";display:inline-block;width:10px;height:10px;border-radius:3px;background:var(--c);margin-right:6px;vertical-align:-1px}
+.cal-legend-me b{color:var(--cal-open)}
+.cal-later{margin-top:18px}
+.cal-later-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;margin-top:10px}
+@media (max-width:700px){
+  .cal-head{flex-wrap:wrap}
+  .cal-long{display:none}.cal-short{display:inline}
+  .cal-month{padding:8px 10px}.cal-shift{padding:8px 9px}
+  .cal-dow{padding:7px 0;text-align:center;font-size:11px}
+  .cal-day{min-height:64px;padding:5px 2px;align-items:center;gap:3px}
+  .cal-day > .cal-ev{display:none}
+  .cal-num{height:18px;font-size:12px}
+  .cal-day.has .cal-num{cursor:pointer}
+  .cal-day.today .cal-num span{padding:3px 6px}
+  .cal-tap{all:unset;display:flex;cursor:pointer;justify-content:center;width:100%}
+  .cal-dots{display:flex;flex-direction:column;align-items:center;gap:2px}
+  .cal-dots{width:100%;gap:3px}
+  .cal-chip{display:block;width:calc(100% - 4px);padding:3px 0;border-radius:5px;background:color-mix(in srgb,var(--c) 30%,transparent);box-shadow:inset 3px 0 var(--c);font:800 11px/1.1 inherit;font-style:normal;text-align:center;color:var(--text)}
+  .cal-dots em{font:700 10.5px/1 inherit;color:var(--muted);font-style:normal}
+  .cal-day.past .cal-chip{opacity:.55}
+  .cal-day.sel{background:color-mix(in srgb,var(--accent) 14%,transparent);box-shadow:inset 0 0 0 2px var(--accent)}
+  .cal-open{grid-column:1/-1;display:flex;flex-direction:column;gap:8px;border-bottom:1px solid var(--border);background:var(--panel2);padding:10px 10px 12px}
+  .cal-open h3{margin:0 0 2px;font-size:14px;color:var(--muted);font-weight:700}
+  .cal-open .cal-ev,.cal-later .cal-ev{grid-template-columns:44px minmax(0,1fr) auto;background:var(--panel);padding:8px}
+  .cal-open .cal-ev .event-access-logo,.cal-open .cal-logo-text,.cal-later .cal-ev .event-access-logo{grid-column:1;grid-row:1/3;width:44px;height:44px}
+  .cal-open .cal-ev b,.cal-later .cal-ev b{grid-column:2;grid-row:1;font-size:15px}
+  .cal-open .cal-ev small,.cal-later .cal-ev small{grid-column:2;grid-row:2;font-size:13px}
+  .cal-open .cal-go,.cal-later .cal-go{display:block;grid-column:3;grid-row:1/3;color:var(--muted);font-size:22px}
+  .cal-later-list{grid-template-columns:1fr}
+}
+
+/* The week's cards on the home page: the frame and the band take the type's colour too (option A, 2026-11-03). */
+.week-block.week-block.t-open{--kind:#35b978}.week-block.week-block.t-safe{--kind:#4ea8e6}.week-block.week-block.t-bouloules{--kind:#e46fb0}.week-block.week-block.t-training{--kind:#9aa3a7}
+.week-block.week-block.t-special{--kind:#e7b653}.week-block.week-block.t-championnat{--kind:#e4483d}
+.week-block[class*=" t-"]{border-color:color-mix(in srgb,var(--kind) 70%,transparent)}
+
+/* Liste / Mois (Nathan 2026-11-07), in front of the filters. */
+.cal-view{display:inline-flex;gap:0;border:1px solid var(--border);border-radius:9px;overflow:hidden;flex:none}
+.cal-view .event-filter-button{border:0;border-radius:0;margin:0}
+.cal-view .event-filter-button+.event-filter-button{border-left:1px solid var(--border)}
+@media (max-width:700px){
+  html[data-game] #app .page-head.page-head:has(.cal-view){flex-wrap:wrap !important}
+  html[data-game] #app .page-head:has(.cal-view) > .event-filter{order:6 !important;flex:1 1 100% !important}
+  html[data-game] #app .page-head:has(.cal-view) > .event-filter > .event-filter-button{flex:1}
+  html[data-game] #app .page-head:has(.cal-view) > .cal-view{order:1}
+  html[data-game] #app .page-head.page-head:has(.cal-view) > .home-create-event.home-create-event{order:2 !important;margin:0 0 0 auto !important}
+}
