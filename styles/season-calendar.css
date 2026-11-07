@@ -129,7 +129,7 @@
    colour with name, time, sim and length; the chosen day stays in view beside it. */
 @media (min-width:701px){
   .cal-body{height:auto;align-items:start}
-  .cal-main .cal-grid{flex:none;grid-template-rows:auto repeat(var(--weeks,5),minmax(150px,auto))}
+  .cal-main .cal-grid{flex:none;grid-template-rows:auto repeat(var(--weeks,5),minmax(150px,auto));grid-template-rows:auto var(--rows)}
   .cal-main .cal-day{overflow:visible;padding:6px;gap:4px}
   .cal-side{position:sticky;top:12px;max-height:calc(100dvh - 24px)}
 }
