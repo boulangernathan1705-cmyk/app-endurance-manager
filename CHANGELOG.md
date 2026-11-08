@@ -1,5 +1,11 @@
 # Nouveautés d'Endurance Manager
 
+## v2.8 — 8 novembre 2026
+
+### 🐛 Corrections
+
+- **Events** : une endurance streamée apparaît aussi dans la liste des events et avec le filtre « Events » de l’accueil (« 📺 Stream 13h30 · … »).
+
 ## v2.7 — 8 novembre 2026
 
 ### ✨ Nouveautés

@@ -58,3 +58,32 @@ for(const width of [1440,390])test(`EVENT TDZ month: streamed endurances, one st
   await expect(page.locator('.cal')).not.toContainText('Soirée setups');
   expect(errors).toEqual([]);
 });
+
+// The real case (Nathan 2026-11-08 12h): La Praline streams an iRacing endurance today, seen from the events' list and
+// from the home's « Events » filter, with a stream announced too. Both show the stream once, through the endurance.
+test('a streamed iRacing endurance shows in the events list and under the home « Events » filter',async({page})=>{
+  await page.setViewportSize({width:1440,height:1000});
+  const errors=[];page.on('pageerror',error=>errors.push(error.message));
+  const start=Date.now()+2*3600000,date=new Date(start).toISOString().slice(0,10);
+  const endu={id:'endu-ir',name:'Nurburgring Endurance Championship',format:'endurance',circuit:'iracing-spa',eventType:'lmu',official:true,categories:['GT3'],durationHours:4,durationMinutes:240,version:1,absences:[],
+    departures:[{id:'n1',date,time:'14:00',startsAt:start,endsAt:start+4*3600000,availability:[{id:'r1',name:'La Praline',status:'whole',category:'GT3',streamTime:'13:30'}],crews:[]}]};
+  const live={id:'stream-ir',name:'Stream du Nurburgring',format:'solo',sim:'stream',details:{streamTime:'13:30',activity:'iRacing'},categories:[],version:1,absences:[],
+    departures:[{id:'x1',date,time:'13:30',startsAt:start-30*60000,availability:[],crews:[]}]};
+  await page.route('**/api/**',route=>{
+    const url=new URL(route.request().url());let data={ok:true};
+    if(url.pathname==='/api/session')data={user:{id:'111111111111111111',name:'Nathan',communityIntroSeen:true},access:'member',permissions:['access','endurance','solo_open'],
+      soloRaces:true,eventTdz:true,eventTypes:['OPEN','SAFE'],community:{id:'tdz',slug:'tdz',name:'TDZ',appearance:{}},communities:[]};
+    else if(['/api/events','/api/races'].includes(url.pathname))data={events:url.searchParams.get('game')==='iracing'?[endu]:[live]};
+    else if(url.pathname.includes('notifications'))data={notifications:[],unread:0};
+    return route.fulfill({contentType:'application/json',body:JSON.stringify(data)});
+  });
+  await page.addInitScript(()=>{localStorage.setItem('endurance_manager_locale','fr');localStorage.setItem('calendar-view:solo','list');localStorage.setItem('em_week_filters','["event"]');document.cookie='em_sim=lmu; Path=/';});
+  await page.goto('/events/');
+  const list=page.locator('.event-agenda');
+  await expect(list).toContainText('📺 Stream 13h30 · Nurburgring Endurance Championship');
+  await expect(list).not.toContainText('Stream du Nurburgring');
+  await page.goto('/lmu/#accueil');
+  await expect(page.locator('.week-block').filter({hasText:'Nurburgring Endurance Championship'})).toBeVisible();
+  await expect(page.locator('.week-grid')).not.toContainText('Stream du Nurburgring');
+  expect(errors).toEqual([]);
+});
