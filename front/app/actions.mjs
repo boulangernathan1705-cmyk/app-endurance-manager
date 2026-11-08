@@ -7,7 +7,7 @@ import {renderEvent,togglePlanningCommunity} from './event-view.mjs';
 import {showPlanningDay,scrollPlanning,goToDeparture,setPlanningSpan,toggleQuickMenu} from './planning.mjs';
 import {renderEventForm,departureFields,updateRemoveButtons,goToEventStep,formDurationMinutes,bulkPreview,shiftBulkWeek} from './event-form.mjs';
 import {renderMyEntries} from './entries-view.mjs';
-import {renderWeek,toggleWeekFilter} from './week-view.mjs';
+import {renderWeek,toggleWeekFilter,otherGameEvent} from './week-view.mjs';
 import {renderCrewsPage,crewsAction} from './crews-page.mjs';
 import {openCrewRequest,cancelCrewRequest} from './crew-request.mjs';
 import {submitSoloEvent} from './solo-form.mjs';
@@ -149,7 +149,7 @@ async function perform(action,target){
     case 'race-filter-reset': resetRaceFilters(); renderHome(); break;
     case 'event-filter': state.eventFilter=target.dataset.filter||'upcoming'; if(state.eventFilter==='archived')await loadArchive(); renderHome(); break;
     case 'refresh': await refresh(); break;
-    case 'open': state.currentEventId=target.dataset.id; state.selectedDepartureId=target.dataset.departure||null; state.eventSection='race'; state.drafts={}; state.pendingCrewJoin=null; state.registrationOpen.clear(); renderEvent(); break;
+    case 'open': if(!state.events.some(event=>event.id===target.dataset.id)&&otherGameEvent(target.dataset.id)){location.href=`/${otherGameEvent(target.dataset.id).otherGame}/#event=${encodeURIComponent(target.dataset.id)}`;break;} state.currentEventId=target.dataset.id; state.selectedDepartureId=target.dataset.departure||null; state.eventSection='race'; state.drafts={}; state.pendingCrewJoin=null; state.registrationOpen.clear(); renderEvent(); break;
     case 'event-section': state.eventSection='race'; renderEvent(); break;
     case 'choose-start': {const card=document.getElementById('departure-'+target.dataset.departure);if(card){card.open=true;const own=target.dataset.id&&card.querySelector(`[data-slot-picker][data-id="${target.dataset.id}"]`),pick=own||card.querySelector('[data-slot-picker][data-kind="crew"]')||card.querySelector('[data-slot-picker]');const fold=pick?.closest('details');if(fold)fold.open=true;pick?.scrollIntoView({block:'center'});pick?.focus();}break;}
     case 'my-registration': { state.pendingCrewJoin=null; state.selectedDepartureId=target.dataset.departure; const oneClick=event?.departures.find(item=>item.id===target.dataset.departure); if(oneClick&&canEnterInOneClick(event,oneClick)){await enterInOneClick(event,oneClick,api); await refreshAfterSave(()=>enteredMessage(event.id,oneClick.id,null,'Tu es inscrit.')); break;} delete state.drafts[state.selectedDepartureId]; state.registrationOpen.add(state.selectedDepartureId); renderEvent(); revealRegistration(state.selectedDepartureId); break; }
