@@ -20,6 +20,8 @@ const dateOf=day=>new Date(day*DAY);
 const OTHER={lmu:'iracing',iracing:'lmu'};
 // The endurances of the other simulator (the page only loads those of its own): read once a minute at most.
 let other={game:'',events:[],at:0,loading:null};
+// The endurance of the other sim with this id, if loaded (it opens on that sim's site).
+export const otherGameEvent=id=>other.events?.find(event=>event.id===id)||null;
 // The endurances of the other sim (loaded once a minute); onLoad: what to draw again once they come.
 export function otherEndurances(onLoad=()=>{if(state.page==='week')renderWeek();}){
   const game=OTHER[activeGame];
@@ -209,7 +211,9 @@ const simOf=event=>event.otherGame||activeGame;
 // keeps only the pilot's own among them; none ticked = « Tout ». The choice is kept in this browser.
 const FILTERS_KEY='em_week_filters';
 const kindKey=item=>item.kind.key==='endurance'?simOf(item.event):'event';
-const keep=(item,chosen)=>(!chosen.has('mine')||item.mine)&&(![...chosen].some(key=>key!=='mine')||chosen.has(kindKey(item)));
+// A streamed endurance (« Je streame ce départ ») is also a stream: « Events » keeps it (Nathan, 2026-11-08).
+const streamedItem=item=>item.kind.key==='endurance'&&item.starts.some(start=>(start.departure.availability||[]).some(reg=>reg.streamTime&&reg.status!=='unavailable'));
+const keep=(item,chosen)=>(!chosen.has('mine')||item.mine)&&(![...chosen].some(key=>key!=='mine')||chosen.has(kindKey(item))||(chosen.has('event')&&streamedItem(item)));
 export function weekFilters(){
   if(!(state.weekFilters instanceof Set)){
     let saved=[];try{saved=JSON.parse(localStorage.getItem(FILTERS_KEY)||'[]');}catch{}
