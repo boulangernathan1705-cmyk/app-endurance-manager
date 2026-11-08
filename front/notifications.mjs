@@ -26,7 +26,7 @@ function sentence(item) {
       const what = (item.changes || []).map(key => CHANGES[key]).filter(Boolean);
       return `La course a été modifiée${what.length ? ` : ${esc(what.join(', '))}` : ''}${item.previousName ? ` (ancien nom : ${esc(item.previousName)})` : ''}`;
     }
-    case 'choose_departure': return 'Les horaires sont confirmés ! Choisis maintenant ton créneau de course.';
+    case 'choose_departure': return item.manage ? `Choisis l’horaire de ton équipage ${crew}` : item.crewName ? `Ton équipage ${crew} doit choisir son horaire` : 'Choisis ton horaire pour compléter ton inscription';
     case 'race_deleted': return 'La course a été supprimée';
     case 'crew_request': return `${b(item.pilot)} demande un équipage : ${crew}`;
     case 'crew_request_accepted': return `Ta demande est acceptée : tu roules avec l’équipage ${crew}`;

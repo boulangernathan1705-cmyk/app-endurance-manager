@@ -1,5 +1,13 @@
 # Nouveautés d'Endurance Manager
 
+## v2.6 — 8 novembre 2026
+
+### 🐛 Corrections
+
+- **Horaires « à définir »** : les pilotes s’inscrivent à la course sans horaire. Quand les horaires sont ajoutés, ils sont prévenus pour choisir le leur ; pour un équipage, c’est son responsable qui choisit.
+- **Départ supprimé** : un départ avec des inscrits peut être supprimé. Ses inscrits ne sont pas désinscrits, ils passent « Sans horaire » et sont prévenus pour en choisir un autre.
+- **Discord · Affiche du jour** : plus de « Pas d’inscription : viens regarder ! » sur les streams.
+
 ## v2.5 — 7 novembre 2026
 
 ### ✨ Nouveautés

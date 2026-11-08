@@ -4,7 +4,7 @@ import {streamerColumns, gridfestPasswordPanel} from './grindfest.mjs';
 import {simForEvent} from '../../shared/catalog.mjs';
 import {dateBlock,timeLabel,weekdayLong,dayMonthShort} from '../dates.mjs';
 import {durationLabel,eventMinutes} from '../../shared/duration.mjs';
-import {app,state,activeGame,esc,button,canManage,isAdmin,can,canEditRace,officialBadge,communityTag,circuitLabel,eventTypeBadge,schedulePendingBadge,eventBadge,eventCategoryCount,circuitVisual,pilotCount,notifyRender} from './core.mjs';
+import {app,state,activeGame,esc,button,canManage,isAdmin,can,canEditRace,officialBadge,communityTag,circuitLabel,eventTypeBadge,schedulePendingBadge,eventBadge,eventCategoryCount,circuitVisual,pilotCount,notifyRender,pickableSlots} from './core.mjs';
 import {filterStorageKey,filterSelection,readFilterState,writeFilterState} from '../filter-state.mjs';
 import {eventCommunities,filterEventCommunities} from '../community-filters.mjs';
 import {ownRegistration,renderRegistrationWorkspace,soloRounds} from './registration.mjs';
@@ -95,6 +95,14 @@ function quickActions(event,departure){
   }
   if(can('manage_registrations'))more.push({action:'new-registration',label:'Inscrire un autre pilote',extra:'data-mode="pilot"'});
   const square=(icon,tip,attrs,label='',extra='')=>`<button type="button" class="planning-quick-button${label?' is-labelled':''}${extra}" ${attrs} data-tip="${esc(tip)}" aria-label="${esc(tip)}"><span class="planning-quick-icon">${icon}</span>${label?`<span class="planning-quick-label">${esc(label)}</span>`:''}</button>`;
+  // Waiting start once the real times are known: no new entry here, the pilot (or the crew's manager) picks a time.
+  if(!solo&&pickableSlots(event,departure).length){
+    const inCrew=new Set((departure.crews||[]).flatMap(crew=>crew.registrationIds||[]));
+    const alone=mine.find(reg=>!inCrew.has(reg.id)),pick=alone||(departure.crews||[]).some(crew=>crew.canManage);
+    const choose=pick?square(ICON_REGISTER,'Choisir l’horaire',`data-action="choose-start" data-departure="${departure.id}" data-id="${alone?.id||''}"`,'Choisir l’horaire'):'';
+    const out=mine.length===1?square(ICON_UNREGISTER,'Me désinscrire',`data-action="delete-registration" data-departure="${departure.id}" data-id="${mine[0].id}"`,'',' is-leave'):'';
+    return choose||out?`<span class="planning-quick">${choose}${out}</span>`:'';
+  }
   const register=main?square(main.leave?ICON_UNREGISTER:ICON_REGISTER,main.label,`data-action="${main.action}" data-departure="${departure.id}" ${main.extra}`,main.label,main.leave?' is-leave':''):'';
   const unregister=leave?square(ICON_UNREGISTER,leave.label,`data-action="${leave.action}" data-departure="${departure.id}" ${leave.extra}`,leave.label,' is-leave'):'';
   const menu=!more.length?'':more.length===1&&!main?square(ICON_REGISTER,more[0].label,`data-action="${more[0].action}" data-departure="${departure.id}" ${more[0].extra}`,'Inscrire')

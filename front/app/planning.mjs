@@ -5,7 +5,7 @@
 import {timeLabel,timeAt,weekdayLabel,weekdayLong,dayMonthLong,dayMonthShort,dateRangeBlock} from '../dates.mjs';
 import {eventMinutes,raceFinishAt} from '../../shared/duration.mjs';
 import {raceDays,parisDayKey as dayKey} from '../../shared/start-times.mjs';
-import {state,esc,categories,logo,sortedCrews,crewColorClass,pilotCount,communityTag,communityPrefix} from './core.mjs';
+import {state,esc,categories,logo,sortedCrews,crewColorClass,pilotCount,communityTag,communityPrefix,pickableSlots} from './core.mjs';
 import {isSolo,soloFill} from './solo.mjs';
 
 const LOCKED_ICON='<span class="planning-crew-lock is-locked" data-tip="Complet : l’équipage est verrouillé" aria-label="Complet"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" d="M5 13a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2zM8 11V7a4 4 0 1 1 8 0v4"/></svg></span>';
@@ -41,8 +41,10 @@ function startCard(event,departure,body,{minutes,now,open,quick=''}){
   const endDay=dayKey(end)!==dayKey(start)?` le ${weekdayLabel(end)}`:'';
   // « Inscription par catégorie »: before the TM places him, the pilot is only « dispo » on his possible starts.
   const pending=mine&&state.categoryEntry&&(event.departures||[]).filter(item=>!item.tbd).length>1&&!present.some(reg=>reg.mine&&assigned.has(reg.id));
-  const tags=compact?'':`${mine?`<span class="planning-tag is-mine">${pending?'Dispo':'Ton départ'}</span>`:''}${live?'<span class="planning-tag is-live">En cours</span>':''}`;
-  const head=`<span class="planning-start-head"><strong>Départ ${esc(timeLabel(departure.time))}</strong>${compact?(done?'<span class="planning-start-state">Terminé</span>':''):(isSolo(event)||departure.tbd?'':`<span class="planning-start-end">fin ${esc(timeAt(end))}${esc(endDay)}</span>`)}${tags}</span>`;
+  // Waiting start once the real times are known: its pilots and crews still have to pick one.
+  const waiting=departure.tbd&&pickableSlots(event,departure).length>0;
+  const tags=compact?'':`${mine?`<span class="planning-tag is-mine">${waiting?'Horaire à choisir':pending?'Dispo':'Ton départ'}</span>`:''}${live?'<span class="planning-tag is-live">En cours</span>':''}`;
+  const head=`<span class="planning-start-head"><strong>${waiting?'Sans horaire':`Départ ${esc(timeLabel(departure.time))}`}</strong>${compact?(done?'<span class="planning-start-state">Terminé</span>':''):(isSolo(event)||departure.tbd?'':`<span class="planning-start-end">fin ${esc(timeAt(end))}${esc(endDay)}</span>`)}${tags}</span>`;
   // Pilots without a crew, by category (« 2 GT3 » « 1 Hypercar »): where a pilot can find a crew. The crews
   // follow, by name.
   const free=event.categories.map(category=>{const regs=present.filter(reg=>!assigned.has(reg.id)&&reg.category===category);return [category,regs.length,regs.map(reg=>communityPrefix(reg)+reg.name)];}).filter(([,count])=>count);
