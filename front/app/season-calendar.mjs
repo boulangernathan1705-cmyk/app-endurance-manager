@@ -24,6 +24,7 @@ const pad = value => String(value).padStart(2, '0');
 
 // The frame colour of an event.
 export function calendarType(event) {
+  if (event.streamedBy) return 'stream';
   if (!isSolo(event)) return event.eventType === 'special' ? 'special' : event.eventType === 'lmu' ? 'championnat' : 'prive';
   if (isStream(event)) return 'stream';
   if (isGrindfest(event)) return 'gridfest';
@@ -53,7 +54,19 @@ function entries(events) {
 function timeOf(departure) { const [hour, minute] = String(departure.time || '').split(':'); return /^\d{2}$/.test(hour || '') ? `${Number(hour)}h${minute && minute !== '00' ? minute : ''}` : ''; }
 const TYPES = [['special', 'Événement spécial'], ['championnat', 'Championnat'], ['prive', 'Championnat privé'], ['open', 'OPEN'], ['safe', 'SAFE'], ['bouloules', 'BOULOULES'], ['training', 'Training'], ['stream', 'Stream']];
 const typeLabel = type => TYPES.find(([key]) => key === type)?.[1] || '';
+// An endurance start the community streams (« Je streame ce départ », Nathan 2026-11-08): the stream's time, then the
+// start and the streamer's crew; it opens the endurance (on the other sim's site when it is there).
+const streamed = event => event.streamedBy ? hourLabel(event.streamedBy.streamTime) : '';
+function streamCrew({event, departure}) {
+  const crew = (departure.crews || []).find(item => (item.registrationIds || []).includes(event.streamedBy.id));
+  const pilots = crew ? (crew.registrationIds || []).map(id => (departure.availability || []).find(reg => reg.id === id)?.name).filter(Boolean) : [event.streamedBy.name];
+  return [crew && (/^\d{1,3}$/.test(crew.name) ? `Équipage ${crew.name}` : crew.name), ...pilots].filter(Boolean).join(' · ');
+}
+const opener = (event, departure, cls, inner) => event.otherGame
+  ? `<a class="${cls}" href="/${esc(event.otherGame)}/#event=${esc(event.id)}">${inner}</a>`
+  : `<button type="button" class="${cls}" data-action="open" data-id="${esc(event.id)}" data-departure="${esc(departure.id)}">${inner}</button>`;
 function entryHtml({event, departure, more}) {
+  if (event.streamedBy) return opener(event, departure, 'cal-ev t-stream', `<img class="event-access-logo" src="/images/event-access/endurance-${esc(gameForEvent(event))}.png" alt="" width="300" height="300" loading="lazy" decoding="async"><b>📺 ${esc(event.name)}</b><small><strong>Stream ${esc(streamed(event))}</strong> · départ ${esc(timeOf(departure))} · ${esc(streamCrew({event, departure}))}${mySituation(event) ? ' <span class="cal-me" title="Tu es inscrit">✓</span>' : ''}</small><span class="cal-go" aria-hidden="true">›</span>`);
   const type = calendarType(event), stream = streamDetails(event);
   const {confirmed} = isStream(event) ? {confirmed:0} : soloCounts(event, departure);
   const training = type === 'training';
@@ -69,19 +82,19 @@ function entryHtml({event, departure, more}) {
 // sim and length (Nathan 2026-11-07, mockup B: a bigger month, the colour visible, the event, the sim and the time).
 function cellHtml({event, departure}) {
   const type = calendarType(event), endurance = !isSolo(event), hours = Math.round(eventMinutes(event) / 60);
-  const time = isStream(event) ? hourLabel(streamDetails(event).streamTime || departure.time) : timeOf(departure);
+  const time = event.streamedBy ? `Stream ${streamed(event)}` : isStream(event) ? hourLabel(streamDetails(event).streamTime || departure.time) : timeOf(departure);
   // The sim only where both can mix: endurances (Events are all LMU, Nathan 2026-11-07).
   const sim = !endurance ? '' : gameForEvent(event) === 'iracing' ? 'iRacing' : 'LMU';
   const confirmed = endurance || isStream(event) || type === 'training' ? 0 : soloCounts(event, departure).confirmed;
   const info = [sim, endurance && hours ? `${hours}h` : '', confirmed ? `${confirmed} inscrit${confirmed > 1 ? 's' : ''}` : ''].filter(Boolean).join(' · ');
   const logo = endurance ? `<img class="event-access-logo" src="/images/event-access/endurance-${esc(gameForEvent(event))}.png" alt="" width="300" height="300" loading="lazy" decoding="async">` : eventAccessLogo(event) || `<span class="cal-logo-text" aria-hidden="true">${isStream(event) ? '🎙️' : isGrindfest(event) ? '🎉' : '🏁'}</span>`;
-  return `<button type="button" class="cal-cell t-${type}" data-action="open" data-id="${esc(event.id)}" data-departure="${esc(departure.id)}">${logo}<b>${esc(event.name)}</b><small><strong>${esc(time)}</strong>${info ? ` · ${esc(info)}` : ''}${mySituation(event) ? ' <span class="cal-me" title="Tu es inscrit">✓</span>' : ''}</small></button>`;
+  return opener(event, departure, `cal-cell t-${type}`, `${logo}<b>${event.streamedBy ? '📺 ' : ''}${esc(event.name)}</b><small><strong>${esc(time)}</strong>${info ? ` · ${esc(info)}` : ''}${mySituation(event) ? ' <span class="cal-me" title="Tu es inscrit">✓</span>' : ''}</small>`);
 }
 // On a phone every day is the same size: each race on one line, its time and the start of its name beside the type's
 // colour (Nathan 2026-11-07, mockup B); one line and « +N » when a day has more than two.
 const shortName = name => String(name || '').replace(/^(OPEN|SAFE|BOULOULES|Training|Stream)\s+/i, '');
 function dots(list) {
-  const line = ({event, departure}) => `<i class="cal-line t-${calendarType(event)}"><b>${esc(timeOf(departure) || '?')}</b> ${esc(shortName(event.name))}</i>`;
+  const line = ({event, departure}) => `<i class="cal-line t-${calendarType(event)}"><b>${esc(streamed(event) || timeOf(departure) || '?')}</b> ${event.streamedBy ? '📺 ' : ''}${esc(shortName(event.name))}</i>`;
   return `<span class="cal-dots" aria-hidden="true">${list.slice(0, list.length > 2 ? 1 : 2).map(line).join('')}${list.length > 2 ? `<em>+${list.length - 1}</em>` : ''}</span>`;
 }
 

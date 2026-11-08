@@ -4,10 +4,17 @@
 import {state,esc,pilotNameTip,button,canManage,can,logo,badge,categories} from './core.mjs';
 import {SIMS,simCatalog,simForEvent,eventLogoName,isTraining,trainingSpan} from '../../shared/catalog.mjs';
 import {isGrindfest} from '../../shared/grindfest.mjs';
-import {isStream,streamDetails,hourLabel,streamPlatform,streamSpan} from '../../shared/stream.mjs';
+import {isStream,streamDetails,hourLabel,streamPlatform,streamSpan,streamDuringEndurance} from '../../shared/stream.mjs';
 
 export const ANY_CATEGORY = '*';
 export const isSolo = event => event?.format === 'solo';
+// The endurance starts the community streams (« Je streame ce départ »): [{event, departure, reg, startsAt, endsAt}].
+export const streamedStarts = events => events.filter(event => !isSolo(event)).flatMap(event => (event.departures || []).map(departure => {
+  const reg = (departure.availability || []).find(item => item.streamTime && item.status !== 'unavailable');
+  return reg ? {event, departure, reg, startsAt:departure.startsAt, endsAt:departure.endsAt} : null;
+}).filter(Boolean));
+// « Annoncer un stream » during one of them: that endurance's stream, shown once (Nathan, 2026-11-08).
+export const mergedStream = (event, starts) => isStream(event) && streamDuringEndurance(event.departures?.[0]?.startsAt, starts);
 
 // Supplied OPEN/SAFE artwork, shared by the calendar, event and personal entries.
 export function eventAccessLogo(event,{header=false}={}) {

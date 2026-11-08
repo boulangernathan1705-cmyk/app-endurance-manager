@@ -142,6 +142,7 @@ async function perform(action,target){
     case 'cal-step': state.calendarStep=Number(target.dataset.step)||0; state.calendarDay=null; renderHome(); break;
     case 'cal-view': setCalendarView(state.listFormat==='solo',target.dataset.view); renderHome(); break;
     case 'cal-mine': state.calendarMine=!state.calendarMine; renderHome(); break;
+    case 'cal-kind': state.calendarKind=target.dataset.kind; state.calendarMine=false; renderHome(); break;
     case 'cal-season-edit': state.calendarSeasonOpen=!state.calendarSeasonOpen; renderHome(); break;
     case 'race-filter-toggle': state.raceFilterOpen=!state.raceFilterOpen; renderHome(); break;
     case 'race-filter': toggleRaceFilter(target.dataset.group,target.dataset.value); renderHome(); break;

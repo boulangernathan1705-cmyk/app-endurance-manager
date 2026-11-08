@@ -1202,6 +1202,9 @@ test('the events calendar lists the endurances of the community streamer, with h
   reg.run('r3','imola','i1','222222222222222223','Admin 3','admin 3',4,DEV_COMMUNITY,'','','p222222222222222223');
   DB.db.prepare("INSERT INTO crews(id,event_id,departure_id,name,category,created_at,community_id) VALUES('c1','spa','s1','Équipage A','GT3',0,?)").run(DEV_COMMUNITY);
   DB.db.prepare("INSERT INTO crew_members(crew_id,registration_id) VALUES('c1','rp'),('c1','r2')").run();
+  // « Annoncer un stream » just before the streamed Monza start: the same stream, shown once (Nathan, 2026-11-08).
+  solo(DB,'live','Stream Monza',Date.parse('2026-11-05T17:30:00Z'));
+  DB.db.prepare("UPDATE events SET sim='stream',details=? WHERE id='live'").run(JSON.stringify({streamTime:'18:30'}));
   const snap=await loadCalendarSnapshot(env,monday,COMMUNITY);
   assert.deepEqual(snap.events.map(event=>event.name),['BMC Round 6','6h de Spa','4h de Monza']);
   const {buildCalendarPayload}=await import('../server/discord-weekly-format.mjs');

@@ -669,3 +669,16 @@ test('an endurance an admin streams (« Je streame ce départ ») is on the stre
   assert.equal(first.content,'@everyone');
   assert.match(JSON.stringify(first),/6h de Spa/);assert.match(JSON.stringify(first),/20h45/);
 });
+
+test('a stream announced during an endurance the streamer streams is one stream, told by the endurance (Nathan, 2026-11-08)',async t=>{
+  const {DB,env,calls,settings}=setup(t);unstream(DB);
+  DB.db.prepare("UPDATE registrations SET stream_time='19:45' WHERE id='r1'").run();
+  // « Annoncer un stream » at 19h30 for the 6h (20h): the same stream.
+  DB.db.prepare(`INSERT INTO events(id,name,circuit,duration_hours,duration_minutes,categories,departures,created_by,created_at,community_id,format,sim,rounds,access,details,event_type)
+    VALUES('stream-1','Le stream du 6h','',1,60,'[]',?,'111111111111111111',0,?,'solo','stream','[]','open',?,'special')`)
+    .run(JSON.stringify([{id:'s1',startsAt:Date.parse('2026-10-28T18:30:00Z'),time:'19:30'}]),DEV_COMMUNITY,JSON.stringify({streamTime:'19:30',activity:'LMU'}));
+  await announceCommunity(env,TDZ,settings(),MORNING);
+  const live=JSON.stringify(sent(calls)[0].body);
+  assert.match(live,/6h de Spa/);assert.doesNotMatch(live,/Le stream du 6h/);
+  assert.match(live,/Stream à 19h45/);assert.doesNotMatch(live,/19h30/);
+});

@@ -1,5 +1,15 @@
 # Nouveautés d'Endurance Manager
 
+## v2.7 — 8 novembre 2026
+
+### ✨ Nouveautés
+
+- **Calendrier des events** : les endurances que le streamer streame y apparaissent en violet 📺, avec l’heure du stream et son équipage. Nouveaux filtres : Tout, Events, Streams, Mes courses.
+
+### 🐛 Corrections
+
+- **Un seul stream** : pour une endurance, le streamer s’inscrit et coche « 📺 Je streame ce départ ». Un stream annoncé en plus pendant cette course n’est plus compté deux fois (affiche, semaine, Discord).
+
 ## v2.6 — 8 novembre 2026
 
 ### 🐛 Corrections

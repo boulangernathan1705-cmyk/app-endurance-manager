@@ -12,6 +12,8 @@ import {durationLabel,eventMinutes} from '../../shared/duration.mjs';
 import {isGrindfest,streamersOf} from '../../shared/grindfest.mjs';
 import {streamerLogo} from './grindfest.mjs';
 import {isStream,streamDetails,streamPlatform} from '../../shared/stream.mjs';
+import {streamedStarts,mergedStream} from './solo.mjs';
+import {otherEndurances} from './week-view.mjs';
 import {isSolo,streamPanel,eventAccessLogo,accessBadge,soloCardMeta,soloCardInfo,streamTimes,soloFill,ANY_CATEGORY} from './solo.mjs';
 
 const dayKeyFormatter=new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Paris',year:'numeric',month:'2-digit',day:'2-digit'});
@@ -226,8 +228,20 @@ function renderSeasonCalendar(formatEvents,raceFilter,filtered,message,solo){
   const options={communityId:state.community?.id};
   const events=[...filteredCalendarEvents(formatEvents,raceFilter,{...options,archived:false}),...filteredCalendarEvents(formatEvents,raceFilter,{...options,archived:true})];
   const mine=state.calendarMine===true,season=solo&&state.eventTdz?state.tdzSeason:null;
-  const filters=`<div class="event-filter" role="group" aria-label="Filtrer les événements">${button('cal-mine','Mes inscriptions',`aria-pressed="${mine}"`,'event-filter-button')}${filterButton(filtered)}</div>`;
-  const calendar=seasonCalendar(events,{mineOnly:mine,canEdit:Boolean(season)&&can('create_race'),setting:season});
+  let shown=events,kinds='';
+  if(solo){
+    // The events' calendar also shows the endurance starts the community streams (« Je streame ce départ »), in violet;
+    // a stream announced during one of them is that start's (Nathan, 2026-11-08). The other endurances stay in Endurance.
+    const starts=streamedStarts([...state.events,...otherEndurances(()=>{if(state.page==='home')renderHome();})]);
+    const streamed=starts.map(({event,departure,reg})=>({...event,departures:[departure],streamedBy:reg}));
+    shown=[...events.filter(event=>!mergedStream(event,starts)),...streamed];
+    const kind=['event','stream'].includes(state.calendarKind)?state.calendarKind:'all';
+    if(kind==='event')shown=shown.filter(event=>isSolo(event)&&!isStream(event));
+    if(kind==='stream')shown=shown.filter(event=>isStream(event)||event.streamedBy);
+    kinds=[['all','Tout'],['event','Events'],['stream','📺 Streams']].map(([key,label])=>button('cal-kind',label,`data-kind="${key}" aria-pressed="${!mine&&kind===key}"`,'event-filter-button')).join('');
+  }
+  const filters=`<div class="event-filter" role="group" aria-label="Filtrer les événements">${kinds}${button('cal-mine',solo?'Mes courses':'Mes inscriptions',`aria-pressed="${mine}"`,'event-filter-button')}${filterButton(filtered)}</div>`;
+  const calendar=seasonCalendar(shown,{mineOnly:mine,canEdit:Boolean(season)&&can('create_race'),setting:season});
   app.innerHTML=`<div class="page-head cal-head"><h1 class="page-title">${solo?esc(state.soloLabel).toUpperCase():'ENDURANCE'}</h1>${viewSwitch(solo)}${filters}${calendar.head}${createMenu(solo)}${helpContext(solo?'events-calendar':'calendar')}</div>${state.raceFilterOpen?filterPanel(formatEvents,raceFilter):''}${message?`<p class="creation-success" role="status">${esc(message)}</p>`:''}${calendar.body}`;
   notifyRender();
 }
