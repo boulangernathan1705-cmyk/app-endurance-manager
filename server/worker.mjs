@@ -88,6 +88,79 @@ async function dropEmptyCommonStart(env, eventId, data) {
     .bind(eventId, common.id, eventId, common.id).first();
   if (!used) data.departures = data.departures.filter(departure => departure !== common);
 }
+// Real starts removed from a race while pilots are on them: their entries and crews go to the waiting start
+// ("Horaire à définir", added when missing), where each pilot or crew picks a time again. A pilot still entered
+// on another start keeps that one (the removed entry goes); a pilot can wait only once per category.
+async function waitingMoves(env, event, data) {
+  const kept = new Set(data.departures.map(d => d.id));
+  const removed = JSON.parse(event.departures || '[]').filter(d => !d.tbd && !kept.has(d.id));
+  if (!removed.length) return null;
+  const all = async (sql, ...params) => (await env.DB.prepare(sql).bind(...params).all()).results || [];
+  const gone = JSON.stringify(removed.map(d => d.id));
+  const regs = await all(`SELECT r.id, r.departure_id, r.participant_id, r.category, cm.crew_id FROM registrations r
+    LEFT JOIN crew_members cm ON cm.registration_id=r.id WHERE r.event_id=? AND r.departure_id IN (SELECT value FROM json_each(?))`, event.id, gone);
+  const crews = await all('SELECT id FROM crews WHERE event_id=? AND departure_id IN (SELECT value FROM json_each(?))', event.id, gone);
+  if (!regs.length && !crews.length) return null;
+  let waiting = data.departures.find(d => d.tbd), added = null;
+  if (!waiting) {
+    const first = [...data.departures, ...removed].sort((a, b) => a.startsAt - b.startsAt)[0];
+    waiting = added = {id:id(), date:first.date, time:first.time, startsAt:first.startsAt, tbd:true};
+    data.departures.unshift(added);
+  }
+  const others = await all(`SELECT r.id, r.departure_id, r.participant_id, r.category, cm.crew_id FROM registrations r
+    LEFT JOIN crew_members cm ON cm.registration_id=r.id WHERE r.event_id=? AND r.departure_id NOT IN (SELECT value FROM json_each(?))`, event.id, gone);
+  const key = reg => `${reg.participant_id}|${reg.category}`;
+  const waitingByKey = new Map(others.filter(reg => reg.departure_id === waiting.id).map(reg => [key(reg), reg]));
+  const elsewhere = new Set(others.filter(reg => reg.departure_id !== waiting.id && kept.has(reg.departure_id)).map(reg => reg.participant_id));
+  const move = [], drop = [], taken = new Set(waitingByKey.keys());
+  // Crew members first: their crew needs them. A plain waiting entry of the same pilot makes way.
+  for (const reg of regs.filter(item => item.crew_id)) {
+    const before = waitingByKey.get(key(reg));
+    if (!taken.has(key(reg))) { taken.add(key(reg)); move.push(reg); }
+    else if (before && !before.crew_id && !drop.includes(before.id)) { drop.push(before.id); move.push(reg); }
+    else drop.push(reg.id);
+  }
+  for (const reg of regs.filter(item => !item.crew_id)) {
+    if (taken.has(key(reg)) || elsewhere.has(reg.participant_id)) drop.push(reg.id);
+    else { taken.add(key(reg)); move.push(reg); }
+  }
+  const members = move.filter(reg => reg.crew_id), crewIds = JSON.stringify(crews.map(crew => crew.id));
+  const list = items => JSON.stringify(items);
+  return {statements:version => {
+    const same = 'EXISTS(SELECT 1 FROM events WHERE id=? AND version=?)', at = [event.id, version];
+    return [
+      ...(added ? [env.DB.prepare("UPDATE events SET departures=json_insert(departures,'$[#]',json(?)) WHERE id=? AND version=?").bind(JSON.stringify(added), ...at)] : []),
+      env.DB.prepare(`DELETE FROM crew_members WHERE crew_id IN (SELECT value FROM json_each(?)) AND ${same}`).bind(crewIds, ...at),
+      env.DB.prepare(`DELETE FROM registrations WHERE id IN (SELECT value FROM json_each(?)) AND ${same}`).bind(list(drop), ...at),
+      env.DB.prepare(`UPDATE registrations SET departure_id=?,version=version+1 WHERE id IN (SELECT value FROM json_each(?)) AND ${same}`).bind(waiting.id, list(move.map(reg => reg.id)), ...at),
+      env.DB.prepare(`UPDATE crews SET departure_id=?,version=version+1 WHERE id IN (SELECT value FROM json_each(?)) AND ${same}`).bind(waiting.id, crewIds, ...at),
+      ...members.map(reg => env.DB.prepare(`INSERT INTO crew_members(registration_id,crew_id) SELECT ?,? WHERE ${same}`).bind(reg.id, reg.crew_id, ...at))
+    ];
+  }};
+}
+// Pilots on the waiting start, once real times exist: a crew's manager picks its time, its pilots are told,
+// a pilot without a crew picks his own. Returns the players told.
+async function askToChooseStart(env, event, waitingId) {
+  const all = async (sql, ...params) => (await env.DB.prepare(sql).bind(...params).all()).results || [];
+  const crews = await all('SELECT id, name, owner_user_id, community_id FROM crews WHERE event_id=? AND departure_id=?', event.id, waitingId);
+  const told = [], organisers = new Map();
+  for (const crew of crews) {
+    // Without a manager (made by an organiser for others), the organisers of its community choose.
+    if (!crew.owner_user_id && !organisers.has(crew.community_id)) {
+      const home = await communityById(env, crew.community_id).catch(() => null);
+      organisers.set(crew.community_id, home ? (await crewOrganisers(env, home)).map(row => ({user_id:row.user_id, community_id:crew.community_id})) : []);
+    }
+    const manager = crew.owner_user_id ? [{user_id:crew.owner_user_id, community_id:crew.community_id}] : organisers.get(crew.community_id);
+    await notify(env, manager, 'choose_departure', event, {crewName:crew.name, manage:true});
+    await notify(env, await crewPilots(env, crew.id), 'choose_departure', event, {crewName:crew.name, skip:[crew.owner_user_id]});
+    told.push(...(await crewPilots(env, crew.id)).map(row => row.user_id));
+  }
+  const alone = await all(`SELECT DISTINCT p.user_id, r.community_id FROM registrations r JOIN participants p ON p.id=r.participant_id
+    WHERE r.event_id=? AND r.departure_id=? AND r.status!='unavailable' AND p.user_id IS NOT NULL
+      AND NOT EXISTS(SELECT 1 FROM crew_members cm WHERE cm.registration_id=r.id)`, event.id, waitingId);
+  await notify(env, alone, 'choose_departure', event, {skip:told});
+  return [...told, ...alone.map(row => row.user_id)];
+}
 // An official slot for pilots leaving the common "Horaire à définir" start of the same race.
 function slotFor(event, from, departureId) {
   if (!from.tbd) fail(409, 'Ce départ a déjà son horaire.');
@@ -846,29 +919,33 @@ async function api(request, env) {
       if (reused && !reused.tbd) reused.id = id(); // A real start cannot take over waiting entries.
       if (!data.departures.some(d => d.id === oldCommon.id)) data.departures.unshift(oldCommon);
     }
-    await dropEmptyCommonStart(env, event.id, data);
+    // A start removed with pilots on it: they go back to the waiting start ("Horaire à définir") and pick a time again.
+    const moves = await waitingMoves(env, event, data);
+    if (!moves) await dropEmptyCommonStart(env, event.id, data);
     const newlyPublished = Boolean(oldCommonUsed && data.departures.some(d => !d.tbd) &&
       !JSON.parse(event.departures || '[]').some(d => !d.tbd));
     const cats = JSON.stringify(data.categories), deps = JSON.stringify(data.departures);
-    const result = await env.DB.prepare(`UPDATE events SET name=?,duration_hours=?,duration_minutes=?,event_type=?,circuit=?,schedule_pending=?,driver_change_required=?,access=?,capacity=?,rounds=?,categories=?,departures=?,sim=?,details=?,version=version+1 WHERE id=? AND version=?
+    const update = env.DB.prepare(`UPDATE events SET name=?,duration_hours=?,duration_minutes=?,event_type=?,circuit=?,schedule_pending=?,driver_change_required=?,access=?,capacity=?,rounds=?,categories=?,departures=?,sim=?,details=?,version=version+1 WHERE id=? AND version=?
       AND NOT EXISTS (SELECT 1 FROM registrations r WHERE r.event_id=events.id AND
         (NOT EXISTS (SELECT 1 FROM json_each(?) d WHERE json_extract(d.value,'$.id')=r.departure_id)
       OR (r.category NOT IN ('','*') AND NOT EXISTS (SELECT 1 FROM json_each(?) c WHERE c.value=r.category))
       OR (r.streamer_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM json_each(?) s WHERE json_extract(s.value,'$.id')=r.streamer_id))
-      OR EXISTS (SELECT 1 FROM json_each(?) h WHERE instr(',' || r.status || ',', ',' || h.value || ',') > 0)))`).bind(data.name, data.durationHours, data.durationMinutes, data.eventType, data.circuit, data.schedulePending?1:0, data.driverChangeRequired==null?null:(data.driverChangeRequired?1:0), data.access, data.capacity, JSON.stringify(data.rounds), cats, deps, data.sim, JSON.stringify(data.details), event.id, input.version, deps, cats, JSON.stringify(data.details.streamers || []), JSON.stringify(Array.from({length:24-data.durationHours},(_,i)=>`h${data.durationHours+i+1}`))).run();
-    if (!result.meta.changes) fail(409, 'Modification impossible : événement modifié ailleurs, départ supprimé avec des inscrits, catégorie encore utilisée, ou disponibilités au-delà de la nouvelle durée. Ajuste les disponibilités concernées avant de raccourcir la course.');
+      OR EXISTS (SELECT 1 FROM json_each(?) h WHERE instr(',' || r.status || ',', ',' || h.value || ',') > 0)))`).bind(data.name, data.durationHours, data.durationMinutes, data.eventType, data.circuit, data.schedulePending?1:0, data.driverChangeRequired==null?null:(data.driverChangeRequired?1:0), data.access, data.capacity, JSON.stringify(data.rounds), cats, deps, data.sim, JSON.stringify(data.details), event.id, input.version, deps, cats, JSON.stringify(data.details.streamers || []), JSON.stringify(Array.from({length:24-data.durationHours},(_,i)=>`h${data.durationHours+i+1}`)));
+    const refused = 'Modification impossible : événement modifié ailleurs, catégorie encore utilisée, ou disponibilités au-delà de la nouvelle durée. Ajuste les disponibilités concernées avant de raccourcir la course.';
+    if (moves) {
+      // One transaction: the entries move only if the race itself is saved (the last statement fails otherwise).
+      try { await env.DB.batch([...moves.statements(input.version), update,
+        env.DB.prepare("SELECT CASE WHEN (SELECT version FROM events WHERE id=?)<>? THEN json('refused') END").bind(event.id, input.version + 1)]); }
+      catch { fail(409, refused); }
+    } else if (!(await update.run()).meta.changes) fail(409, refused);
     // The entered pilots are told what changed for them: the starts, the track, the length or the name.
     const starts = list => JSON.stringify(JSON.parse(list).map(d => [d.id, d.startsAt, Boolean(d.tbd)]));
     const changes = [starts(event.departures) !== starts(deps) && 'starts', (event.circuit || '') !== data.circuit && 'circuit',
       (Number(event.duration_minutes) || Number(event.duration_hours) * 60) !== data.durationMinutes && 'duration', event.name !== data.name && 'name'].filter(Boolean);
-    if (changes.length && !newlyPublished) await notify(env, await eventPilots(env, event.id), 'race_changed', {...event, name:data.name, circuit:data.circuit}, {skip:[actor.user?.id], changes, previousName:event.name !== data.name ? event.name : undefined});
-    if (newlyPublished) {
-      const pendingPilots = (await env.DB.prepare(`SELECT DISTINCT p.user_id, r.community_id
-        FROM registrations r JOIN participants p ON p.id=r.participant_id
-        WHERE r.event_id=? AND r.departure_id=? AND r.status!='unavailable' AND p.user_id IS NOT NULL`)
-        .bind(event.id, oldCommon.id).all()).results || [];
-      await notify(env, pendingPilots, 'choose_departure', {...event, name:data.name, circuit:data.circuit});
-    }
+    // Pilots waiting for a time are asked to pick one (crews: their manager), as soon as real times exist.
+    const saved = {...event, name:data.name, circuit:data.circuit}, waiting = data.departures.find(d => d.tbd);
+    const told = waiting && (newlyPublished || moves) && data.departures.some(d => !d.tbd) ? await askToChooseStart(env, saved, waiting.id) : [];
+    if (changes.length) await notify(env, await eventPilots(env, event.id), 'race_changed', saved, {skip:[actor.user?.id, ...told], changes, previousName:event.name !== data.name ? event.name : undefined});
     return json({ok:true});
   }
   // « Je serai absent » on an event or an endurance, for oneself; entering the event withdraws it.
@@ -891,6 +968,8 @@ async function api(request, env) {
     const event = await eventById(env, departureMatch[1], community);
     const departure = departureById(event, departureMatch[2]);
     if (departure.startsAt <= Date.now()) fail(409, 'Ce départ est passé. Les inscriptions sont fermées.');
+    // Real times known: a new entry goes on one of them, not on the waiting start.
+    if (departure.tbd && JSON.parse(event.departures).some(d => !d.tbd && d.startsAt > Date.now())) fail(409, 'Les horaires sont connus : choisis l’un d’eux.');
     if (event.sim === STREAM_SIM) fail(409, 'Un stream n’a pas d’inscription.');
     const input = await body(request);
     // Official race: an own entry is made for the community chosen at its first step (another pilot: the site's).

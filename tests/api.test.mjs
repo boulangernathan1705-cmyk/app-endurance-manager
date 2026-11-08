@@ -267,10 +267,12 @@ test('crews: manager-only writes, category/departure integrity, concurrency and 
  assert.equal(DB.db.prepare('SELECT count(*) n FROM crew_members').get().n,0);
  assert.equal((await req(crewPath,'DELETE',{version:5},'organizer')).status,200);
  assert.equal(DB.db.prepare('SELECT count(*) n FROM registrations').get().n,2);
- // An empty crew also protects its departure from deletion.
+ // Deleting the departure of an empty crew: the crew waits on a start without a time.
  DB.db.prepare('DELETE FROM registrations').run();
- assert.equal((await req('/api/events/'+event.id,'PATCH',{...event,departures:[second]},'admin')).status,409);
- assert.equal((await req('/api/events/'+event.id,'DELETE',{version:1},'admin')).status,200);
+ assert.equal((await req('/api/events/'+event.id,'PATCH',{...event,departures:[second]},'admin')).status,200);
+ const waitingStart=(await req('/api/events','GET',null,'admin')).data.events[0].departures.find(d=>d.tbd);
+ assert.equal(DB.db.prepare('SELECT departure_id FROM crews').get().departure_id,waitingStart.id);
+ assert.equal((await req('/api/events/'+event.id,'DELETE',{version:2},'admin')).status,200);
  assert.equal(DB.db.prepare('SELECT count(*) n FROM crews').get().n,0);
 });
 test('shared events, actual Discord callback, Discord role grants/revocation and ownership',async()=>{
@@ -305,10 +307,9 @@ test('shared events, actual Discord callback, Discord role grants/revocation and
  assert.equal((await req('/api/registrations/'+regId,'PATCH',{name:'Etienne',status:'unavailable',version:1},'other')).status,403);
  setMember(DB.db,OTHER,[]);
  assert.equal((await req('/api/registrations/'+regId,'PATCH',{name:'Etienne',category:'Hypercar',status:'beginning,end',version:1},'other')).status,200);
- // Removing a category or a departure that still has a registration must be rejected atomically.
+ // Removing a category that still has a registration must be rejected atomically.
  event=(await req('/api/events','GET',null,'admin')).data.events[0];
  assert.equal((await req('/api/events/'+eventId,'PATCH',{...event,categories:['GTE']},'pilot')).status,409);
- assert.equal((await req('/api/events/'+eventId,'PATCH',{...event,departures:[event.departures[1]]},'pilot')).status,409);
  const changed=await req('/api/events/'+eventId,'PATCH',{...event,name:'Daytona 8H — Nuit'},'pilot');assert.equal(changed.status,200);
  assert.equal((await req('/api/events/'+eventId,'PATCH',{...event,name:'stale'},'pilot')).status,409);
  // The organizer role removed on Discord: back to a driver.
@@ -911,4 +912,48 @@ test('stream identity, free content and logo persist; unauthorized members canno
  assert.equal((await req(`/api/events/${saved.id}`,'PATCH',update,'admin')).status,200);
  const edited=await listed();assert.equal(edited.details.logoUrl,undefined);assert.equal(edited.details.description,undefined);assert.equal(edited.details.activity,'Discussion');
  assert.equal((await req(`/api/events/${saved.id}`,'PATCH',update,'admin')).status,409,'stale versions stay protected');
+});
+
+test('a start removed with pilots on it: they wait without a time and are asked to pick one (crews: their manager)', async () => {
+ const {req,login,DB}=harness();await login(ADMIN,'admin');await login(PILOT,'pilot');await login(OTHER,'other');
+ DB.db.exec(readFileSync(new URL('../migrations/0043_notifications.sql',import.meta.url),'utf8'));
+ const base={name:'6h FUJI',circuit:'fuji',categories:['Hypercar'],durationMinutes:360,schedulePending:false};
+ const created=await req('/api/events','POST',{...base,departures:[{date:'2090-10-04',time:'20:00'},{date:'2090-10-04',time:'23:00'}]},'admin');
+ assert.equal(created.status,201);
+ const load=async()=>(await req('/api/events','GET',null,'admin')).data.events.find(e=>e.id===created.data.id);
+ let event=await load();
+ const [fake,real]=event.departures;
+ const enter=(dep,actor,name)=>req(`/api/events/${event.id}/departures/${dep.id}/registrations`,'POST',{name,category:'Hypercar',status:'whole'},actor);
+ const leo=await enter(fake,'pilot','Leo');assert.equal(leo.status,201);
+ assert.equal((await enter(fake,'other','Max')).status,201);
+ assert.equal((await enter(real,'other','Max')).status,201,'Max is also on the real start');
+ const crew=await req(`/api/events/${event.id}/departures/${fake.id}/crews`,'POST',{name:'Les Tondeuz',category:'Hypercar'},'admin');assert.equal(crew.status,201);
+ assert.equal((await req(`/api/crews/${crew.data.id}/members`,'POST',{registrationId:leo.data.id,version:1},'admin')).status,200);
+ DB.db.prepare('UPDATE crews SET owner_user_id=? WHERE id=?').run(ADMIN,crew.data.id); // its manager
+ // The organiser deletes the fake 20:00 start: allowed.
+ const saved=await req('/api/events/'+event.id,'PATCH',{...base,version:event.version,departures:[{id:real.id,date:real.date,time:real.time}]},'admin');
+ assert.equal(saved.status,200,JSON.stringify(saved.data));
+ event=await load();
+ assert.deepEqual(event.departures.map(d=>`${d.time}${d.tbd?' tbd':''}`),['20:00 tbd','23:00'],'a waiting start replaces it');
+ const waiting=event.departures[0];
+ assert.deepEqual(waiting.availability.map(r=>r.id),[leo.data.id],'Leo waits with his crew; Max keeps his real start only');
+ assert.equal(event.departures[1].availability.length,1);
+ const crewRow=DB.db.prepare('SELECT departure_id,version FROM crews WHERE id=?').get(crew.data.id);
+ assert.equal(crewRow.departure_id,waiting.id);
+ assert.equal(DB.db.prepare('SELECT COUNT(*) n FROM crew_members WHERE crew_id=?').get(crew.data.id).n,1,'the crew keeps its pilot');
+ assert.equal((await enter(waiting,'admin','Nathan')).status,409,'no new entry without a time once real times exist');
+ const notes=async actor=>(await req('/api/notifications','GET',null,actor)).data.notifications;
+ assert.equal((await notes('admin')).find(n=>n.kind==='choose_departure')?.manage,true,'the crew manager picks the time');
+ const leoNote=(await notes('pilot')).find(n=>n.kind==='choose_departure');
+ assert.equal(leoNote?.crewName,'Les Tondeuz');assert.equal(leoNote?.manage,undefined);
+ assert.ok((await notes('other')).some(n=>n.kind==='race_changed'));
+ assert.ok(!(await notes('other')).some(n=>n.kind==='choose_departure'));
+ // The manager moves the crew to the real start.
+ assert.equal((await req('/api/crews/'+crew.data.id,'PATCH',{departureId:event.departures[1].id,version:crewRow.version},'admin')).status,200);
+ // A refused edit moves nobody (the whole save is one transaction).
+ event=await load();
+ const solo=await enter(event.departures[1],'pilot','Leo2');
+ const refused=await req('/api/events/'+event.id,'PATCH',{...base,categories:['GT3'],version:event.version,departures:[{id:event.departures[0].id,date:'2090-10-04',time:'20:00',tbd:true}]},'admin');
+ assert.equal(refused.status,409);
+ assert.equal(DB.db.prepare('SELECT departure_id FROM registrations WHERE id=?').get(solo.data?.id||leo.data.id).departure_id,event.departures[1].id);
 });
