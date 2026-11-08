@@ -54,3 +54,11 @@ export function streamPlatform(url) {
   const host = URL.canParse(String(url || '')) ? new URL(url).hostname.replace(/^www\./, '') : '';
   return /(^|\.)twitch\.tv$/.test(host) ? 'Twitch' : /(^|\.)(youtube\.com|youtu\.be)$/.test(host) ? 'YouTube' : /(^|\.)kick\.com$/.test(host) ? 'Kick' : 'le stream';
 }
+
+// « Annoncer un stream » during an endurance start the community streams (« Je streame ce départ »): the same stream,
+// told once, by the endurance (Nathan, 2026-11-08: « STREAMS 13H30 & 14H00 » for one stream). startsAt: the stream's
+// start; starts: [{startsAt, endsAt}] of the streamed endurance starts. A stream from 3 h before such a start to its end
+// is the endurance's.
+const MERGE_BEFORE = 3 * 3600000;
+export const streamDuringEndurance = (startsAt, starts) => Number.isFinite(Number(startsAt))
+  && starts.some(start => Number(startsAt) >= Number(start.startsAt) - MERGE_BEFORE && Number(startsAt) <= Number(start.endsAt || start.startsAt));

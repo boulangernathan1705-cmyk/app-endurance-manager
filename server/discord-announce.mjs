@@ -12,7 +12,7 @@ import {parseLayout} from './discord-layout.mjs';
 import {simForEvent, tdzOnly, normalizeTdzEventType, eventLogoName, isTrainingType} from '../shared/catalog.mjs';
 import {grindfestEnabled, isGrindfest, streamersOf} from '../shared/grindfest.mjs';
 import {isDevelopment} from './dev-environment.mjs';
-import {isStream, streamDetails} from '../shared/stream.mjs';
+import {isStream, streamDetails, streamDuringEndurance} from '../shared/stream.mjs';
 import {streamCrew} from './stream-crew.mjs';
 
 const MINUTE = 60000;
@@ -352,7 +352,12 @@ async function publishAnnouncement(env, community, settings, timestamp) {
     await env.DB.prepare('UPDATE discord_announcements SET name=? WHERE community_id=? AND day=? AND item=?')
       .bind(String(items[position]?.data?.name || ''),community.id,day,row.item).run();
   }
-  const streams = await streamTimes(env,activeRows,community,timestamp), streamed = new Set(streams.map(item => item.item));
+  let streams = await streamTimes(env,activeRows,community,timestamp);
+  // A stream announced during an endurance start the community streams is that endurance's stream: told once.
+  const streamedStarts = items.filter(item => item.kind === 'race' && streams.some(stream => stream.item === item.row.item)).flatMap(item => item.data.departures || []);
+  const merged = new Set(items.filter(item => item.kind === 'stream' && streamDuringEndurance(item.data.startsAt, streamedStarts)).map(item => item.row.item));
+  if (merged.size) { items.splice(0, items.length, ...items.filter(item => !merged.has(item.row.item))); streams = streams.filter(stream => !merged.has(stream.item)); }
+  const streamed = new Set(streams.map(item => item.item));
   site.streams = streams;
   // The stream's message: an « Annoncer un stream », or the community's stream link with a stream time on a race today.
   const live = items.filter(item => item.kind === 'stream' || (stream && streamed.has(item.row.item)));
