@@ -80,7 +80,6 @@ function streamBlock(event, url, streamer) {
   if (stream.raceTime) facts.push(['🏁 Course à', timeOf(stream.raceTime)]);
   // The streamer is already named first (📺): not twice in the crew's pilots.
   if (stream.crew) lines.push({time:timeOf(stream.raceTime) || timeOf(stream.streamTime), label:crewLabel(stream.crew.crew), text:[text(stream.crew.eventName), ...(stream.crew.pilots || []).map(text).filter(pilot => pilot.toLowerCase() !== text(streamer).toLowerCase())].filter(Boolean).join(' · '), star:streamer});
-  if (!stream.crew && !stream.raceTime) facts.push(['', 'Pas d’inscription : viens regarder !']);
   return {sim:'stream', icon:'🎙️', name:event.name, url, logo:stream.logoUrl || '', chips:[], facts, lines, note:stream.description ? text(stream.description).slice(0, 140) : ''};
 }
 function raceBlock(race, url) {
