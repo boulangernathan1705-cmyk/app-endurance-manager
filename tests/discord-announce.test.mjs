@@ -380,7 +380,8 @@ test('an explicit stream announcement still works without registrations',async t
   assert.equal(sent(calls).length,1);
   // Nothing to sign up for: no button.
   assert.deepEqual(sent(calls)[0].body.components,[]);
-  assert.match(sent(calls)[0].body.embeds[0].description,/Pas d’inscription : viens regarder !/);
+  // No « Pas d’inscription » line: it read wrong next to a race to sign up for (Nathan, 2026-11-08).
+  assert.doesNotMatch(sent(calls)[0].body.embeds[0].description,/Pas d’inscription/);
   // The announcement is first of all for the stream (Nathan, 2026-11-01): a stream alone pings @everyone.
   assert.deepEqual(sent(calls)[0].body.allowed_mentions,{parse:['everyone']});
 });
